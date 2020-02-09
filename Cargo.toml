@@ -18,4 +18,4 @@ edition = "2018"
 
 
 [dependencies]
-jl-sys = { path = "jl-sys" }
+jl-sys = { path = "jl-sys", version = "0.1.0" }

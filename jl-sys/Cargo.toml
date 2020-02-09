@@ -1,12 +1,18 @@
 [package]
 name = "jl-sys"
 version = "0.1.0"
-authors = ["thomas"]
+authors = ["Thomas van Doornmalen <thomas.vandoornmalen@gmail.com>"]
+description = """
+jl-sys contains the generated bindings for the Julia C API used by jlrs.
+"""
+documentation = "https://docs.rs/jlrs"
+homepage = "https://github.com/Taaitaaiger/jlrs"
+repository = "https://github.com/Taaitaaiger/jlrs"
+readme = "README.md"
+keywords = ["Julia", "math", "mathematics", "n-dimensional", "bindings", "ffi"]
+license = "MIT"
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
 
 [build-dependencies]
 bindgen = "0.53.1"
