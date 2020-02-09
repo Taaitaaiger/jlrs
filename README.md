@@ -1,4 +1,10 @@
 # jlrs
+
+[![Build Status](https://travis-ci.com/Taaitaaiger/jlrs.svg?branch=master)](https://travis-ci.com/Taaitaaiger/jlrs)
+[![Coverage Status](https://coveralls.io/repos/github/Taaitaaiger/jlrs/badge.svg?branch=master)](https://coveralls.io/github/Taaitaaiger/jlrs?branch=master)
+[![License:MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+
 The main goal behind `jlrs` is to provide a simple and safe interface to the Julia C API. Using 
 this crate you can call arbitrary Julia code from Rust, including your own, and share data 
 between the two languages. Currently this crate has only been tested on Linux, if you try to use 
