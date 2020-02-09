@@ -1,0 +1,21 @@
+[package]
+name = "jlrs"
+version = "0.1.0"
+authors = ["Thomas van Doornmalen <thomas.vandoornmalen@gmail.com>"]
+description = """
+jlrs is a library built around bindings to the Julia C API that enables Julia code to be called 
+from Rust. jlrs can move many kinds of data from Rust to Julia and back, share n-dimensional 
+numerical arrays with Julia directly, call arbitrary functions, and load code from arbitrary Julia
+source files. jlrs currently only supports Linux.
+"""
+documentation = "https://docs.rs/jlrs"
+homepage = "https://github.com/Taaitaaiger/jlrs"
+repository = "https://github.com/Taaitaaiger/jlrs"
+readme = "README.md"
+keywords = ["Julia", "math", "mathematics", "n-dimensional", "bindings", "ffi"]
+license = "MIT"
+edition = "2018"
+
+
+[dependencies]
+jl-sys = { path = "jl-sys" }
