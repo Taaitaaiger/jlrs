@@ -9,7 +9,7 @@ documentation = "https://docs.rs/jlrs"
 homepage = "https://github.com/Taaitaaiger/jlrs"
 repository = "https://github.com/Taaitaaiger/jlrs"
 readme = "README.md"
-keywords = ["Julia", "math", "mathematics", "n-dimensional", "bindings", "ffi"]
+keywords = ["Julia", "math", "mathematics", "bindings", "ffi"]
 license = "MIT"
 edition = "2018"
 
