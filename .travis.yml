@@ -1,12 +1,37 @@
 language: rust
+sudo: required
 dist: bionic
+addons:
+    apt:
+        packages:
+            - libssl-dev
+cache: cargo
+rust:
+  - stable
+  - beta
+  - nightly
+matrix:
+  allow_failures:
+    - rust: nightly
+
+before_cache: |
+  if [[ "$TRAVIS_RUST_VERSION" == stable ]]; then
+    cargo install cargo-tarpaulin
+  fi
+
 before_script:
   - wget https://julialang-s3.julialang.org/bin/linux/x64/1.3/julia-1.3.1-linux-x86_64.tar.gz -O /tmp/julia.tar.gz
   - tar -xvf /tmp/julia.tar.gz
   - export JL_PATH=$PWD/julia-1.3.1
   - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/julia-1.3.1/lib
 script:
+  - cargo build --verbose
   - cargo test --verbose -- --test-threads 1
 branches:
   only:
     - master
+
+after_success: |
+  if [[ "$TRAVIS_RUST_VERSION" == stable ]]; then
+    cargo tarpaulin --ciserver travis-ci --coveralls $TRAVIS_JOB_ID --exclude-files jl-sys/* -- --test-threads 1
+  fi
