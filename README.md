@@ -17,9 +17,10 @@ the official website, which is distributed in an archive containing a directory 
 `julia-x.y.z`. This directory contains several other directories, including a `bin` directory
 containing the `julia` executable.
 
-In order to ensure the `julia.h` header file can be found, you have to set the `JL_PATH`
-environment variable to `/path/to/julia-x.y.z`. Similarly, in order to load `libjulia.so` you
-must add `/path/to/julia-x.y.z/lib` to the `LD_LIBRARY_PATH` environment variable.
+In order to ensure the `julia.h` header file can be found, either /usr/include/julia/julia.h 
+exists, or you have to set the `JL_PATH` environment variable to `/path/to/julia-x.y.z`. 
+Similarly, in order to load `libjulia.so` you must add `/path/to/julia-x.y.z/lib` to the
+`LD_LIBRARY_PATH` environment variable.
 
 ## Using this crate
 The first thing you should do is `use` the `prelude`-module with an asterisk, this will
