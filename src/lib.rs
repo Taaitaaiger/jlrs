@@ -1,4 +1,4 @@
-//! The main goal behind `jlrs`is to provide a simple and safe interface to the Julia C API.
+//! The main goal behind `jlrs` is to provide a simple and safe interface to the Julia C API.
 //! Currently this crate has only been tested on Linux, if you try to use it on another OS it will
 //! likely fail to generate the bindings to Julia.
 //!
@@ -11,104 +11,72 @@
 //!
 //! In order to ensure the `julia.h` header file can be found, you have to set the `JL_PATH`
 //! environment variable to `/path/to/julia-x.y.z`. Similarly, in order to load `libjulia.so` you
-//! must add `/path/to/julia-x.y.z/lib` to the `LD_LIBRARY_PATH` environment variable.
+//! must add `/path/to/julia-x.y.z/lib` to the `LD_LIBRARY_PATH` environment variable. If they can
+//! be found at the standard locations, e.g. because you've installed Julia through your package
+//! manager, this is not necessary and things should build without setting the `JL_PATH`
+//! environment variable.
 //!
 //! # Using this crate
 //! The first thing you should do is `use` the [`prelude`]-module with an asterisk, this will
 //! bring all the structs and traits you're likely to need in scope. Before you can use Julia it
 //! must first be initialized. You do this by creating a [`Runtime`] with [`Runtime::new`], this
-//! method forces you to pick a `stack size`. You will learn how to choose this value in the
-//! section about [`memory management`]. Note that this method can only be called once, if you
-//! drop the [`Runtime`] you won't be able to create a new one and have to restart the  entire
-//! program.
+//! method forces you to pick a `stack size`. You will learn how to choose this value soon. Note
+//! that this method can only be called once, if you drop the [`Runtime`] you won't be able to
+//! create a new one and have to restart the entire program.
 //!
 //! With the [`Runtime`] you can do two things: you can call [`Runtime::include`] to include your
-//! own Julia code, and [`Runtime::session`] to interact with Julia. If you want to create arrays
-//! with more than three dimensions or borrow arrays with more than one, you should include
-//! `jlrs.jl` first, which you can find in the root of this crate's github repository. This is
-//! necessary because this functionality currently depends on some Julia code defined in that file.
-//! The latter method takes a closure with a single argument, a mutable reference to a
-//! [`Session`]. Using this [`Session`] you can do useful things inside the closure.
+//! own Julia code and either [`Runtime::frame`] or [`Runtime::dynamic_frame`] to interact with
+//! Julia. If you want to create arrays with more than three dimensions or borrow arrays with more
+//! than one, you should include `jlrs.jl` first. You can find this file in the root of this
+//! crate's github repository. This is necessary because this functionality currently depends on
+//! some Julia code defined in that file.
 //!
-//! In order to actually call a function, you need three things:
-//!  - A place to store the function output that's protected from garbage collection
-//!  - Arguments to call the function with, also protected from garbage collection
-//!  - A handle to the function
+//! The other two methods, [`Runtime::frame`] and [`Runtime::dynamic_frame`], take a closure that
+//! provides you with a [`StaticFrame`] and a [`DynamicFrame`] respectively. Both types implement
+//! the [`Frame`] trait. These frames are used to create new values, access Julia modules and
+//! their functions, call functions, and copy data back to Rust. Additionally, frames can be
+//! nested; you're free to mix static and dynamic frames. The main reason things work this way is
+//! that it ensures that all active values are protected from being freed by Julia's garbage
+//! collector.
 //!
-//! The [`Session`] lets you take care of all the preliminary work; with
-//! [`Session::new_unassigned`] you create a safe place for the output to go, while other methods
-//! like [`Session::new_primitive`], [`Session::new_string`] and [`Session::new_owned_array`] let
-//! you transfer primitive datatypes like `u8` and `f32`, strings, and n-dimensional arrays to
-//! Julia. For a full overview of the possibilities, you should take a look at the documentation
-//! for [`Session`].
+//! In order to call a Julia function, you'll need two things: a function to call, and arguments
+//! to call it with. You can acquire the function through the module that defines it with
+//! [`Module::function`]; [`Module::base`] and [`Module::core`] provide access to Julia's `Base`
+//! and `Core` module respectively, while everything you include through [`Runtime::include`] is
+//! made available relative to the `Main` module which you can access by calling [`Module::main`].
 //!
-//! In the case of named functions, ie those defined inside a module, you must first acquire a
-//! handle to that module. You can can a handle to the `Main`, `Base` and  `Core` modules with the
-//! methods [`Session::main_module`], [`Session::base_module`] and [`Session::core_module`]
-//! respectively. You can traverse the path to a deeper module with [`Module::submodule`]. Finally,
-//! you get a handle to a function with [`Module::function`]. Because these are global handles
-//! they don't need to be protected from garbage collection.
+//! Most Julia data is represented by a [`Value`]. Basic data types like numbers, booleans, and
+//! strings can be created through [`Value::new`] and several methods exist to create an
+//! n-dimensional array. Julia functions, their arguments and their results are all `Value`s. All
+//! `Value`s can be called as functions, whether this will succeed depends on the value actually
+//! being a function. You can copy data from Julia to Rust by calling [`Value::try_unbox`].
 //!
-//! There's something a bit special about functions though: there's no real way to differentiate
-//! between functions and other globals in a module. For example, there's nothing that prevents
-//! you from calling `Base.pi` as a function. It's not possible to check if you call functions
-//! with the correct arguments, either. It's up to you to ensure you call things correctly.
-//! Failing to do so will only result in an error being returned, though, rather than crash your
-//! program.
-//!
-//! With all these things in hand, it is time to call [`Session::execute`]. This method works just
-//! like [`Runtime::session`] does: it takes closure with a single argument, a mutable reference
-//! to an [`ExecutionContext`]. Besides letting you copy data from Julia to Rust with
-//! [`ExecutionContext::try_unbox`], you will need this reference when calling functions using the
-//! [`Call`] trait.
-//!
-//! Both [`Runtime::session`] and [`Session::execute`] have generic return types, which lets you
-//! easily return the results of your computations. As a simple example, this is how you can add
-//! two numbers:
+//! As a simple example, let's create two values and add them:
 //!
 //! ```no_run
 //! # use jlrs::prelude::*;
 //! # fn main() {
+//! // Create the runtime and interact with Julia from a dynamic frame
 //! let mut runtime = unsafe { Runtime::new(16).unwrap() };
+//! runtime.dynamic_frame(|frame| {
+//!     // Create the two arguments
+//!     let i = Value::new(frame, 2u64)?;
+//!     let j = Value::new(frame, 1u32)?;
 //!
-//! let output = runtime.session(|session| {
-//!     let output = session.new_unassigned()?;
-//!     let i = session.new_primitive(2u64)?;
-//!     let j = session.new_primitive(1u32)?;
+//!     // We can find the addition-function in the base module
+//!     let func = Module::base(frame).function("+")?;
 //!
-//!     session.execute(|exec_ctx| {
-//!         let func = exec_ctx.base_module().function("+")?;
-//!         let output = func.call2(exec_ctx, output, i, j)?;
-//!         exec_ctx.try_unbox::<u64>(&output)
-//!     })
+//!     // Call the function and unbox the result
+//!     let output = func.call2(frame, i, j)?;
+//!     output.try_unbox::<u64>()
 //! }).unwrap();
-//!
-//! assert_eq!(output, 3);
 //! # }
 //! ```
 //!
 //! # Memory management
-//! So far you've seen that you can use a [`Session`] to allocate data and an [`ExecutionContext`]
-//! to use that data. The data allocated using a [`Session`] is valid until the session ends and
-//! nothing prevents you from allocating more data and calling [`Session::execute`] again. The
-//! actual allocations happen when [`Session::execute`] is called. If nothing was allocated,
-//! calling this function will take one slot on the stack, otherwise it will take as many slots as
-//! allocations plus three.
-//!
-//! It's also possible to allocate temporary data with [`Session::with_temporaries`], which works
-//! mostly the same way as [`Runtime::session`] and [`Session::execute`] do, except its argument
-//! is an [`AllocationContext`] rather than a mutable reference to one. The [`AllocationContext`]
-//! offers you the same interface as [`Session`] does, with two major differences:
-//!  - [`AllocationContext::execute`] takes the context by value rather than by reference, you
-//!    have to stop using the [`AllocationContext`] after calling [`AllocationContext::execute`].
-//!  - Data allocated by an [`AllocationContext`] is only valid within that context, rather than
-//!    the entire session.
-//!
-//! So, to summarize, in order to estimate how large your stack size should be, you need to check
-//! where you call [`Session::execute`], [`Session::with_temporaries`] and
-//! [`AllocationContext::execute`] and figure out how many items you're allocating to get a rough
-//! estimate for how many slots you need. In case your computations fail due to exceeding the
-//! stack size, you can use [`Runtime::set_stack_size`] to create a larger one.
+//! Julia is a garbage collected language. In order to prevent data from being freed while it is
+//! still in use, a stack is managed in the background that is used by the garbage collector to
+//! detect what data is still in use. The frames we've seen are
 //!
 //! # Limitations
 //! Calling Julia is entirely single-threaded. You won't be able to use the [`Runtime`] from
@@ -143,25 +111,24 @@
 //! [`AllocationContext::execute`]: context/struct.AllocationContext.html#method.execute
 //! [`Runtime::set_stack_size`]: struct.Runtime.html#method.set_stack_size
 
-pub mod context;
-pub mod dimensions;
+pub mod array;
 pub mod error;
-pub mod handles;
+pub mod frame;
 mod memory;
 pub mod module;
-pub mod pending;
 pub mod prelude;
 pub mod traits;
-pub mod unboxed_array;
+pub mod value;
 
-use context::{Scope, Session};
 use error::{JlrsError, JlrsResult};
+use frame::{DynamicFrame, StaticFrame};
 use jl_sys::{jl_atexit_hook, jl_init};
-use memory::Memory;
+use memory::{Dynamic, RawStack, StackView, Static};
+use module::Module;
 use std::mem::ManuallyDrop;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
-use traits::Call;
+use value::Value;
 
 static INIT: AtomicBool = AtomicBool::new(false);
 
@@ -170,14 +137,17 @@ static INIT: AtomicBool = AtomicBool::new(false);
 ///
 /// [`Runtime::new`]: struct.Runtime.html#method.new
 pub struct Runtime {
-    memory: Memory,
+    stack: RawStack,
 }
 
 impl Runtime {
     /// Creates the `Runtime`. This function can only be called once because it initializes Julia.
     /// If you call it a second time, it will return an error. If this struct is dropped, you will
-    /// need to restart your program to be able to call Julia code again. See the
-    /// [`libary documentation`] for information on how to pick a value for the stack size.
+    /// need to restart your program to be able to call Julia code again.
+    ///
+    /// You have to choose a stack size when calling this function. This will be the total number
+    /// of slots that will be available on the GC stack. One of these slots will alwas be in use,
+    /// each level of nesting frames will take at least two slots,
     ///
     /// This function is unsafe because this crate provides you with a way to execute arbitrary
     /// Julia code.
@@ -192,18 +162,18 @@ impl Runtime {
         jl_init();
 
         Ok(Runtime {
-            memory: Memory::new(stack_size),
+            stack: RawStack::new(stack_size),
         })
     }
 
-    /// Change the stack size.
+    /// Change the stack size to `stack_size`.
     pub fn set_stack_size(&mut self, stack_size: usize) {
-        self.memory = Memory::new(stack_size)
+        unsafe { self.stack = RawStack::new(stack_size) }
     }
 
-    /// Get the current stack size.
+    /// Returns the stack size.
     pub fn stack_size(&self) -> usize {
-        self.memory.stack_size()
+        self.stack.size()
     }
 
     #[doc(hidden)]
@@ -211,7 +181,7 @@ impl Runtime {
     // easier
     pub unsafe fn testing_instance() -> ManuallyDrop<Runtime> {
         let mut rt = ManuallyDrop::new(Runtime {
-            memory: Memory::new(16),
+            stack: RawStack::new(16),
         });
 
         if INIT.swap(true, Ordering::SeqCst) {
@@ -225,36 +195,101 @@ impl Runtime {
 
     /// Calls `include` in the `Main` module in Julia, which executes the file's contents in that
     /// module. This has the same effect as calling `include` in the Julia REPL.
+    ///
+    /// Example:
+    ///
+    /// ```no_run
+    /// # use jlrs::prelude::*;
+    /// # fn main() {
+    /// let mut runtime = unsafe { Runtime::new(16).unwrap() };
+    /// runtime.include("jlrs.jl").unwrap();
+    /// # }
+    /// ```
     pub fn include<P: AsRef<Path>>(&mut self, path: P) -> JlrsResult<()> {
         if path.as_ref().exists() {
-            self.session(|session| {
-                let out = session.new_unassigned()?;
-                let path_jl_str = session.new_string(path.as_ref().to_string_lossy())?;
-                let include_func = session.main_module().function("include")?;
-                session.execute(|exec_ctx| {
-                    include_func.call1(exec_ctx, out, path_jl_str)?;
-                    Ok(())
-                })
-            })?;
-
-            return Ok(());
+            return self.frame(3, |frame| {
+                let path_jl_str = Value::new(frame, path.as_ref().to_string_lossy())?;
+                let include_func = Module::main(frame).function("include")?;
+                let _ = include_func.call1(frame, path_jl_str)?;
+                Ok(())
+            });
         }
 
         Err(JlrsError::IncludeNotFound(path.as_ref().to_string_lossy().into()).into())
     }
 
-    /// Main entrypoint to start calling Julia code. See the example in the
-    /// [`library documentation`] and [`Session`] for more information.
+    /// Create a [`StaticFrame`] that can hold `capacity` values, and call the given closure.
+    /// Returns the result of this closure, or an error if the new frame can't be created because
+    /// there's not enough space on the GC stack. The number of required slots on the stack is
+    /// `capacity + 2`.
     ///
-    /// [`library documentation`]: index.html#using-this-crate
-    /// [`Session`]: context/struct.Session.html
-    pub fn session<T, S: FnOnce(&mut Session) -> JlrsResult<T>>(
-        &mut self,
-        func: S,
-    ) -> JlrsResult<T> {
-        let scope = Scope;
-        let mut session = Session::new(&mut self.memory, &scope);
-        func(&mut session)
+    /// Every output and value you create inside the closure using the [`StaticFrame`], either
+    /// directly or through calling a [`Value`], will reduce the available capacity of the
+    /// [`StaticFrame`] by 1.
+    ///
+    /// Example:
+    ///
+    /// ```no_run
+    /// # use jlrs::prelude::*;
+    /// # fn main() {
+    /// # let mut runtime = unsafe { Runtime::new(16).unwrap() };
+    /// runtime.frame(2, |frame| {
+    ///     let _i = Value::new(frame, 2u64)?;
+    ///     let _j = Value::new(frame, 1u32)?;
+    ///     Ok(())
+    /// }).unwrap();
+    /// # }
+    /// ```
+    ///
+    /// [`StaticFrame`]: ../frame/struct.StaticFrame.html
+    /// [`Value`]: ../value/struct.Value.html
+    pub fn frame<T, F>(&mut self, capacity: usize, func: F) -> JlrsResult<T>
+    where
+        F: FnOnce(&mut StaticFrame<'_, '_>) -> JlrsResult<T>,
+    {
+        unsafe {
+            let mut view = StackView::<Static>::new(self.stack.as_mut());
+            let frame_idx = view.new_frame(capacity)?;
+            let mut scope = frame::Scope;
+            let mut frame = StaticFrame::with_capacity(frame_idx, capacity, view, &mut scope);
+            func(&mut frame)
+        }
+    }
+
+    /// Create a [`DynamicFrame`] and call the given closure. Returns the result of this closure,
+    /// or an error if the new frame can't be created because the stack is too small. The number
+    /// of required slots on the stack is 2.
+    ///
+    /// Every output and value you create inside the closure using the [`DynamicFrame`], either
+    /// directly or through calling a [`Value`], will occupy a single slot on the GC stack.
+    ///
+    /// Example:
+    ///
+    /// ```no_run
+    /// # use jlrs::prelude::*;
+    /// # fn main() {
+    /// # let mut runtime = unsafe { Runtime::new(16).unwrap() };
+    /// runtime.dynamic_frame(|frame| {
+    ///     let _i = Value::new(frame, 2u64)?;
+    ///     let _j = Value::new(frame, 1u32)?;
+    ///     Ok(())
+    /// }).unwrap();
+    /// # }
+    /// ```
+    ///
+    /// [`DynamicFrame`]: ../frame/struct.DynamicFrame.html
+    /// [`Value`]: ../value/struct.Value.html
+    pub fn dynamic_frame<T, F>(&mut self, func: F) -> JlrsResult<T>
+    where
+        F: FnOnce(&mut DynamicFrame<'_, '_>) -> JlrsResult<T>,
+    {
+        unsafe {
+            let mut view = StackView::<Dynamic>::new(self.stack.as_mut());
+            let frame_idx = view.new_frame()?;
+            let mut scope = frame::Scope;
+            let mut frame = DynamicFrame::new(frame_idx, view, &mut scope);
+            func(&mut frame)
+        }
     }
 }
 

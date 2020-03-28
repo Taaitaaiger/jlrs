@@ -26,7 +26,7 @@ impl Exception {
     }
 }
 
-/// Alias that will be used for `Result` in this crate.
+/// Alias that is used for `Result` in this crate.
 pub type JlrsResult<T> = Result<T, Box<dyn Error>>;
 
 /// All different errors.
@@ -43,8 +43,10 @@ pub enum JlrsError {
     InvalidCharacter,
     NotAModule(String),
     StackSizeExceeded,
+    FrameSizeExceeded(usize),
     WrongType,
     ZeroDimension,
+    OutOfBounds(usize, usize),
 }
 
 impl Display for JlrsError {
@@ -73,12 +75,22 @@ impl Display for JlrsError {
             JlrsError::InvalidCharacter => write!(formatter, "Invalid character"),
             JlrsError::NotAModule(module) => write!(formatter, "{} is not a module", module),
             JlrsError::StackSizeExceeded => write!(formatter, "The stack cannot handle more data"),
+            JlrsError::FrameSizeExceeded(len) => write!(
+                formatter,
+                "The frame cannot handle more data (len: {})",
+                len
+            ),
             JlrsError::WrongType => {
                 write!(formatter, "Requested type does not match the found type")
             }
             JlrsError::ZeroDimension => {
                 write!(formatter, "Cannot handle arrays with zero dimensions")
             }
+            JlrsError::OutOfBounds(idx, sz) => write!(
+                formatter,
+                "Cannot access value at index {} because the number of values is {}",
+                idx, sz
+            ),
         }
     }
 }

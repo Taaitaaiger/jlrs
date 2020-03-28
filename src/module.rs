@@ -1,42 +1,48 @@
-//! Acquire handles to Julia modules, globals and functions.
+//! Access Julia modules, globals and functions.
 
-use crate::context::Scope;
 use crate::error::{JlrsError, JlrsResult};
-use crate::handles::GlobalHandle;
+use crate::traits::Frame;
+use crate::value::Value;
 use jl_sys::{
     jl_base_module, jl_core_module, jl_get_global, jl_main_module, jl_module_t, jl_module_type,
     jl_symbol_n, jl_typeis,
 };
 use std::marker::PhantomData;
 
-/// Functionality in Julia can be accessed through its module system. You can
-/// get a handle to the three standard modules, `Main`, `Base`, and `Core`,
-/// through either a `Session` or an `ExecutionContext`. In both cases these
-/// handles will be valid until the session ends.
+/// Functionality in Julia can be accessed through its module system. You can get a handle to the
+/// three standard modules, `Main`, `Base`, and `Core` and access their submodules through them.
+/// If you include your own Julia code with [`Runtime::include`], its contents are made available
+/// relative to `Main`.
 ///
-/// If you include your own Julia code with `Runtime::include`, its contents
-/// are made available relative to `Main`. If your code is defined in its own
-/// module, you have to acquire a handle to that module first by calling
-/// `submodule` one or more times.
+/// [`Runtime::include`]: ../struct.Runtime.html#method.include
 #[derive(Copy, Clone)]
-pub struct Module<'scope>(*mut jl_module_t, PhantomData<&'scope Scope>);
+pub struct Module<'scope>(*mut jl_module_t, PhantomData<&'scope ()>);
 
 impl<'scope> Module<'scope> {
-    pub(crate) unsafe fn main() -> Self {
-        Module(jl_main_module, PhantomData)
+    /// Returns a handle to Julia's `Main`-module. If you include your own Julia code by calling
+    /// [`Runtime::include`], handles to functions, globals, and submodules defined in these
+    /// included files are available through this module.
+    ///
+    /// [`Runtime::include`]: ../struct.Runtime.html#method.include
+    pub fn main<'base: 'frame, 'frame, F: Frame<'base, 'frame>>(_: &mut F) -> Module<'base> {
+        unsafe { Module(jl_main_module, PhantomData) }
     }
 
-    pub(crate) unsafe fn core() -> Self {
-        Module(jl_core_module, PhantomData)
+    /// Returns a handle to Julia's `Core`-module.
+    pub fn core<'base: 'frame, 'frame, F: Frame<'base, 'frame>>(_: &mut F) -> Module<'base> {
+        unsafe { Module(jl_core_module, PhantomData) }
     }
 
-    pub(crate) unsafe fn base() -> Self {
-        Module(jl_base_module, PhantomData)
+    /// Returns a handle to Julia's `Base`-module.
+    pub fn base<'base: 'frame, 'frame, F: Frame<'base, 'frame>>(_: &mut F) -> Module<'base> {
+        unsafe { Module(jl_base_module, PhantomData) }
     }
 
-    /// Get the submodule named `name` relative to this module. You have to visit
-    /// this level by level, ie you can't access `Main.A.B` by calling this
-    /// function with `"A.B"`, but have to access `A` first, and then `B`.
+    /// Returns the submodule named `name` relative to this module. You have to visit this level
+    /// by level: you can't access `Main.A.B` by calling this function with `"A.B"`, but have to
+    /// access `A` first and then `B`.
+    ///
+    /// Returns an error if the submodule doesn't exist.
     pub fn submodule<N: AsRef<str>>(self, name: N) -> JlrsResult<Self> {
         unsafe {
             // safe because jl_symbol_n copies the contents
@@ -53,8 +59,9 @@ impl<'scope> Module<'scope> {
         }
     }
 
-    /// Get the global named `name` in this module.
-    pub fn global<N: AsRef<str>>(self, name: N) -> JlrsResult<GlobalHandle<'scope>> {
+    /// Returns the global named `name` in this module.
+    /// Returns an error if the global doesn't exist.
+    pub fn global<N: AsRef<str>>(self, name: N) -> JlrsResult<Value<'scope>> {
         unsafe {
             // safe because jl_symbol_n copies the contents
             let name_str = name.as_ref();
@@ -68,15 +75,18 @@ impl<'scope> Module<'scope> {
                 return Err(JlrsError::FunctionNotFound(name_str.into()).into());
             }
 
-            return Ok(GlobalHandle::new(func, self.1));
+            Ok(Value::wrap(func as _))
         }
     }
 
-    /// Get the function named `name` in this module. Note that all globals defined within the
+    /// Returns the function named `name` in this module. Note that all globals defined within the
     /// module will be successfully resolved into a function; Julia will throw an exception if you
     /// try to call something that isn't a function. This means that `Module::global` and
     /// `Module::function` do exactly the same thing; this function mostly exists for clarity.
-    pub fn function<N: AsRef<str>>(self, name: N) -> JlrsResult<GlobalHandle<'scope>> {
+    /// Returns an error if the global doesn't exist.
+    /// 
+    /// Returns an error if th function doesn't exist.
+    pub fn function<N: AsRef<str>>(self, name: N) -> JlrsResult<Value<'scope>> {
         self.global(name)
     }
 }

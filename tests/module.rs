@@ -1,4 +1,4 @@
-use jlrs::prelude::*;
+/*use jlrs::prelude::*;
 
 #[test]
 fn use_core_module() {
@@ -164,3 +164,4 @@ fn error_nonexistent_submodule() {
     })
     .unwrap()
 }
+*/

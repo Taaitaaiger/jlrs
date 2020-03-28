@@ -3,14 +3,22 @@ use jlrs::prelude::*;
 #[test]
 fn call0() {
     let mut jlrs = unsafe { Runtime::testing_instance() };
+    
+    jlrs.frame(1, |frame| {
+        let func = Module::base(frame).function("vect")?;
+        func.call0(frame)?;
+        Ok(())
+    })
+    .unwrap();
+}
 
-    jlrs.session(|session| {
-        let module = session.base_module();
-        let func = module.function("vect").unwrap();
-        let out = session.new_unassigned()?;
-
-        session.execute(|exec_ctx| func.call0(exec_ctx, out))?;
-
+#[test]
+fn call0_dynamic() {
+    let mut jlrs = unsafe { Runtime::testing_instance() };
+    
+    jlrs.dynamic_frame(|frame| {
+        let func = Module::base(frame).function("vect")?;
+        func.call0(frame)?;
         Ok(())
     })
     .unwrap();
@@ -19,131 +27,123 @@ fn call0() {
 #[test]
 fn call1() {
     let mut jlrs = unsafe { Runtime::testing_instance() };
+    
+    let out = jlrs.frame(2, |frame| {
+        let func = Module::base(frame).function("cos")?;
+        let angle = Value::new(frame, std::f32::consts::PI)?;
+        let out = func.call1(frame, angle)?;
+        out.try_unbox::<f32>()
+    });
+    
+    assert_eq!(out.unwrap(), -1.);
+}
 
-    jlrs.session(|session| {
-        let module = session.base_module();
-        let func = module.function("cos").unwrap();
-        let p1 = session.new_primitive(std::f32::consts::PI)?;
-        let out = session.new_unassigned()?;
-
-        let res = session.execute(|exec_ctx| {
-            let out = func.call1(exec_ctx, out, p1)?;
-            exec_ctx.try_unbox::<f32>(&out)
-        })?;
-
-        assert_eq!(res, -1.);
-        Ok(())
-    })
-    .unwrap()
+#[test]
+fn call1_dynamic() {
+    let mut jlrs = unsafe { Runtime::testing_instance() };
+    
+    let out = jlrs.dynamic_frame(|frame| {
+        let func = Module::base(frame).function("cos")?;
+        let angle = Value::new(frame, std::f32::consts::PI)?;
+        let out = func.call1(frame, angle)?;
+        out.try_unbox::<f32>()
+    });
+    
+    assert_eq!(out.unwrap(), -1.);
 }
 
 #[test]
 fn call2() {
     let mut jlrs = unsafe { Runtime::testing_instance() };
+    
+    let out = jlrs.frame(3, |frame| {
+        let func = Module::base(frame).function("+")?;
+        let arg0 = Value::new(frame, 1u32)?;
+        let arg1 = Value::new(frame, 2u32)?;
+        let out = func.call2(frame, arg0, arg1)?;
+        out.try_unbox::<u32>()
+    });
+    
+    assert_eq!(out.unwrap(), 3);
+}
 
-    jlrs.session(|session| {
-        let module = session.base_module();
-        let func = module.function("+").unwrap();
-        let p1 = session.new_primitive(1u8)?;
-        let p2 = session.new_primitive(2u8)?;
-        let out = session.new_unassigned()?;
-
-        let res = session.execute(|exec_ctx| {
-            let out = func.call2(exec_ctx, out, p1, p2)?;
-            exec_ctx.try_unbox::<u8>(&out)
-        })?;
-
-        assert_eq!(res, 3);
-        Ok(())
-    })
-    .unwrap()
+#[test]
+fn call2_dynamic() {
+    let mut jlrs = unsafe { Runtime::testing_instance() };
+    
+    let out = jlrs.dynamic_frame(|frame| {
+        let func = Module::base(frame).function("+")?;
+        let arg0 = Value::new(frame, 1u32)?;
+        let arg1 = Value::new(frame, 2u32)?;
+        let out = func.call2(frame, arg0, arg1)?;
+        out.try_unbox::<u32>()
+    });
+    
+    assert_eq!(out.unwrap(), 3);
 }
 
 #[test]
 fn call3() {
     let mut jlrs = unsafe { Runtime::testing_instance() };
-
-    jlrs.session(|session| {
-        let module = session.base_module();
-        let func = module.function("+").unwrap();
-        let p1 = session.new_primitive(1u8)?;
-        let p2 = session.new_primitive(2u8)?;
-        let p3 = session.new_primitive(3u8)?;
-        let out = session.new_unassigned()?;
-
-        let res = session.execute(|exec_ctx| {
-            let out = func.call3(exec_ctx, out, p1, p2, p3)?;
-            exec_ctx.try_unbox::<u8>(&out)
-        })?;
-
-        assert_eq!(res, 6);
-        Ok(())
-    })
-    .unwrap()
+    
+    let out = jlrs.frame(4, |frame| {
+        let func = Module::base(frame).function("+")?;
+        let arg0 = Value::new(frame, 1u32)?;
+        let arg1 = Value::new(frame, 2u32)?;
+        let arg2 = Value::new(frame, 3u32)?;
+        let out = func.call3(frame, arg0, arg1, arg2)?;
+        out.try_unbox::<u32>()
+    });
+    
+    assert_eq!(out.unwrap(), 6);
 }
 
 #[test]
-fn call_primitives() {
+fn call3_dynamic() {
     let mut jlrs = unsafe { Runtime::testing_instance() };
-
-    jlrs.session(|session| {
-        let module = session.base_module();
-        let func = module.function("+").unwrap();
-        let ps = session.new_primitives([1u8, 2u8, 3u8, 4u8])?;
-        let out = session.new_unassigned()?;
-
-        let res = session.execute(|exec_ctx| {
-            let out = func.call_primitives(exec_ctx, out, ps)?;
-            exec_ctx.try_unbox::<u8>(&out)
-        })?;
-
-        assert_eq!(res, 10);
-        Ok(())
-    })
-    .unwrap()
-}
-
-#[test]
-fn call_dyn() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
-
-    jlrs.session(|session| {
-        let module = session.base_module();
-        let func = module.function("+").unwrap();
-        let p1 = session.new_primitive(1u8)?;
-        let p2 = session.new_primitive(2u16)?;
-        let p3 = session.new_primitive(3u32)?;
-        let out = session.new_unassigned()?;
-
-        let res = session.execute(|exec_ctx| {
-            let out = func.call_dyn(exec_ctx, out, [p1.as_dyn(), p2.as_dyn(), p3.as_dyn()])?;
-            exec_ctx.try_unbox::<u32>(&out)
-        })?;
-
-        assert_eq!(res, 6);
-        Ok(())
-    })
-    .unwrap()
+    
+    let out = jlrs.dynamic_frame(|frame| {
+        let func = Module::base(frame).function("+")?;
+        let arg0 = Value::new(frame, 1u32)?;
+        let arg1 = Value::new(frame, 2u32)?;
+        let arg2 = Value::new(frame, 3u32)?;
+        let out = func.call3(frame, arg0, arg1, arg2)?;
+        out.try_unbox::<u32>()
+    });
+    
+    assert_eq!(out.unwrap(), 6);
 }
 
 #[test]
 fn call() {
     let mut jlrs = unsafe { Runtime::testing_instance() };
+    
+    let out = jlrs.frame(5, |frame| {
+        let func = Module::base(frame).function("+")?;
+        let arg0 = Value::new(frame, 1u32)?;
+        let arg1 = Value::new(frame, 2u32)?;
+        let arg2 = Value::new(frame, 3u32)?;
+        let arg3 = Value::new(frame, 4u32)?;
+        let out = func.call(frame, [arg0, arg1, arg2, arg3])?;
+        out.try_unbox::<u32>()
+    });
+    
+    assert_eq!(out.unwrap(), 10);
+}
 
-    let res = jlrs
-        .session(|session| {
-            let func = session.base_module().function("+")?;
-            let p1 = session.new_primitive(1u8)?;
-            let p2 = session.new_primitive(2u8)?;
-            let p3 = session.new_primitive(3u8)?;
-            let p4 = session.new_primitive(4u8)?;
-            let out = session.new_unassigned()?;
-
-            session.execute(|exec_ctx| {
-                let out = func.call(exec_ctx, out, [p1, p2, p3, p4])?;
-                exec_ctx.try_unbox::<u8>(&out)
-            })
-        })
-        .unwrap();
-    assert_eq!(res, 10);
+#[test]
+fn call_dynamic() {
+    let mut jlrs = unsafe { Runtime::testing_instance() };
+    
+    let out = jlrs.dynamic_frame(|frame| {
+        let func = Module::base(frame).function("+")?;
+        let arg0 = Value::new(frame, 1u32)?;
+        let arg1 = Value::new(frame, 2u32)?;
+        let arg2 = Value::new(frame, 3u32)?;
+        let arg3 = Value::new(frame, 4u32)?;
+        let out = func.call(frame, [arg0, arg1, arg2, arg3])?;
+        out.try_unbox::<u32>()
+    });
+    
+    assert_eq!(out.unwrap(), 10);
 }

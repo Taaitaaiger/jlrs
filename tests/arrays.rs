@@ -1,12 +1,12 @@
 use jlrs::prelude::*;
 
 #[test]
-fn cannot_unbox_primitive_as_array() {
+fn cannot_unbox_new_as_array() {
     let mut jlrs = unsafe { Runtime::testing_instance() };
 
-    let out = jlrs.session(|session| {
-        let p = session.new_primitive(1u8)?;
-        session.execute(|exec_ctx| exec_ctx.try_unbox::<UnboxedArray<u8>>(&p))
+    let out = jlrs.frame(1, |frame| {
+        let p = Value::new(frame, 1u8)?;
+        p.try_unbox::<Array<u8>>()
     });
 
     assert!(out.is_err());
@@ -16,12 +16,9 @@ fn cannot_unbox_primitive_as_array() {
 fn cannot_unbox_array_with_wrong_type() {
     let mut jlrs = unsafe { Runtime::testing_instance() };
 
-    let out = jlrs.session(|session| {
-        let array = session.new_managed_array::<f32, _>(3)?;
-        session.execute(|exec_ctx| {
-            let array = array.set_all(exec_ctx, 2.0)?;
-            exec_ctx.try_unbox::<UnboxedArray<u8>>(&array)
-        })
+    let out = jlrs.frame(1, |frame| {
+        let array = Value::array::<f32, _, _>(frame, (3, 1))?;
+        array.try_unbox::<Array<u8>>()
     });
 
     assert!(out.is_err());

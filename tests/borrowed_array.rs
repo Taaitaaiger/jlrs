@@ -1,4 +1,4 @@
-use jlrs::prelude::*;
+/*use jlrs::prelude::*;
 
 #[test]
 fn borrow_array_1d() {
@@ -129,3 +129,4 @@ fn borrow_array_nd() {
 
     assert_eq!(data, vec![1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8]);
 }
+*/

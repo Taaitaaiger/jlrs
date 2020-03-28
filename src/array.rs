@@ -1,4 +1,25 @@
-//! Representation of the dimensions of an n-dimensional array.
+//! Support for n-dimensional arrays and their dimensions.
+
+/// An n-dimensional array whose contents have been copied from Julia to Rust. You can create this
+/// struct by calling [`Value::try_unbox`]. In order to unbox arrays that contain `bool`s or
+/// `char`s, you can unbox them as `Array<i8>` and `Array<u32>` respectively.
+///
+/// [`Value::try_unbox`]: ../value/struct.Value.html#method.try_unbox
+pub struct Array<T> {
+    data: Vec<T>,
+    dimensions: Dimensions,
+}
+
+impl<T> Array<T> {
+    pub(crate) fn new(data: Vec<T>, dimensions: Dimensions) -> Self {
+        Array { data, dimensions }
+    }
+
+    /// Turn the array into a tuple containing its data in column-major order and its dimensions.
+    pub fn splat(self) -> (Vec<T>, Dimensions) {
+        (self.data, self.dimensions)
+    }
+}
 
 /// The dimensions of an n-dimensional array.
 #[derive(Debug, Clone)]
@@ -10,7 +31,7 @@ pub enum Dimensions {
 }
 
 impl Dimensions {
-    /// Get the number of dimensions
+    /// Returns the number of dimensions.
     pub fn n_dimensions(&self) -> u64 {
         match self {
             Dimensions::Few([n, _, _, _]) => *n,
@@ -18,7 +39,7 @@ impl Dimensions {
         }
     }
 
-    /// Get the number of elements for the nth dimension. Indexing starts at 0
+    /// Returns the number of elements of the nth dimension. Indexing starts at 0.
     pub fn n_elements(&self, dimension: u64) -> u64 {
         let dims = match self {
             Dimensions::Few(ref dims) => dims,
@@ -36,9 +57,9 @@ impl Dimensions {
         dims.iter().product()
     }
 
-    pub(crate) fn unwrap_many(&self) -> &[u64] {
+    pub(crate) fn as_slice(&self) -> &[u64] {
         match self {
-            Dimensions::Few(_) => panic!(),
+            Dimensions::Few(ref v) => &v[1..v[0] as usize + 1],
             Dimensions::Many(ref v) => &v[1..],
         }
     }
