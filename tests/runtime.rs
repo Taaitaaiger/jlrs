@@ -1,4 +1,4 @@
-/*use jlrs::prelude::*;
+use jlrs::prelude::*;
 
 #[test]
 fn error_include_nonexistent() {
@@ -13,4 +13,3 @@ fn change_stack_size() {
     jlrs.set_stack_size(8);
     assert_eq!(jlrs.stack_size(), 8);
 }
-*/
