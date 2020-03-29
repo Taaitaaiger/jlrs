@@ -306,3 +306,61 @@ fn call_dynamic_output() {
     
     assert_eq!(out.unwrap(), 10);
 }
+
+#[test]
+fn call_values() {
+    let mut jlrs = unsafe { Runtime::testing_instance() };
+    
+    let out = jlrs.frame(5, |frame| {
+        let func = Module::base(frame).function("+")?;
+        let args = Values::new(frame, [1u32, 2u32, 3u32, 4u32])?;
+        let out = func.call_values(frame, args)?;
+        out.try_unbox::<u32>()
+    });
+    
+    assert_eq!(out.unwrap(), 10);
+}
+
+#[test]
+fn call_values_output() {
+    let mut jlrs = unsafe { Runtime::testing_instance() };
+    
+    let out = jlrs.frame(5, |frame| {
+        let output = frame.output()?;
+        let func = Module::base(frame).function("+")?;
+        let args = Values::new(frame, [1u32, 2u32, 3u32, 4u32])?;
+        let out = func.call_values_output(frame, output, args)?;
+        out.try_unbox::<u32>()
+    });
+    
+    assert_eq!(out.unwrap(), 10);
+}
+
+#[test]
+fn call_values_dynamic() {
+    let mut jlrs = unsafe { Runtime::testing_instance() };
+    
+    let out = jlrs.dynamic_frame(|frame| {
+        let func = Module::base(frame).function("+")?;
+        let args = Values::new(frame, [1u32, 2u32, 3u32, 4u32])?;
+        let out = func.call_values(frame, args)?;
+        out.try_unbox::<u32>()
+    });
+    
+    assert_eq!(out.unwrap(), 10);
+}
+
+#[test]
+fn call_values_dynamic_output() {
+    let mut jlrs = unsafe { Runtime::testing_instance() };
+    
+    let out = jlrs.dynamic_frame(|frame| {
+        let output = frame.output()?;
+        let func = Module::base(frame).function("+")?;
+        let args = Values::new(frame, [1u32, 2u32, 3u32, 4u32])?;
+        let out = func.call_values_output(frame, output, args)?;
+        out.try_unbox::<u32>()
+    });
+    
+    assert_eq!(out.unwrap(), 10);
+}

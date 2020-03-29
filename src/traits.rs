@@ -12,7 +12,7 @@
 
 use crate::array::Array;
 use crate::error::{JlrsError, JlrsResult};
-use crate::frame::{DynamicFrame, StaticFrame};
+use crate::frame::{DynamicFrame, StaticFrame, Scope};
 use crate::value::Output;
 use std::borrow::Cow;
 use std::marker::PhantomData;
@@ -176,7 +176,8 @@ impl<'base: 'frame, 'frame> Frame<'base, 'frame> for StaticFrame<'base, 'frame> 
         capacity: usize,
         func: F,
     ) -> JlrsResult<T> {
-        let mut frame = unsafe { self.nested_frame(capacity).unwrap() };
+        let mut scope = Scope;
+        let mut frame = unsafe { self.nested_frame(capacity, &mut scope).unwrap() };
         func(&mut frame)
     }
 
@@ -185,7 +186,8 @@ impl<'base: 'frame, 'frame> Frame<'base, 'frame> for StaticFrame<'base, 'frame> 
         func: F,
     ) -> JlrsResult<T> {
         unsafe {
-            let mut view = self.memory.nest_dynamic();
+            let mut scope = Scope;
+            let mut view = self.memory.nest_dynamic(&mut scope);
             let idx = view.new_frame()?;
             let mut frame = DynamicFrame {
                 idx,
@@ -226,7 +228,8 @@ impl<'base: 'frame, 'frame> Frame<'base, 'frame> for DynamicFrame<'base, 'frame>
         &mut self,
         func: F,
     ) -> JlrsResult<T> {
-        let mut frame = unsafe { self.nested_frame().unwrap() };
+        let mut scope = Scope;
+        let mut frame = unsafe { self.nested_frame(&mut scope).unwrap() };
         func(&mut frame)
     }
 
@@ -236,7 +239,8 @@ impl<'base: 'frame, 'frame> Frame<'base, 'frame> for DynamicFrame<'base, 'frame>
         func: F,
     ) -> JlrsResult<T> {
         unsafe {
-            let mut view = self.memory.nest_static();
+            let mut scope = Scope;
+            let mut view = self.memory.nest_static(&mut scope);
             let idx = view.new_frame(capacity)?;
             let mut frame = StaticFrame {
                 idx,
@@ -324,7 +328,7 @@ pub(crate) mod private {
             &mut self,
             value: *mut jl_value_t,
             _: Internal,
-        ) -> JlrsResult<Value<'frame>>;
+        ) -> JlrsResult<Value<'frame, 'static>>;
 
         // Create and protect multiple values from being garbage collected while this frame is active.
         fn create_many<P: IntoJulia>(
@@ -346,7 +350,7 @@ pub(crate) mod private {
             output: Output<'output>,
             value: *mut jl_value_t,
             _: Internal,
-        ) -> Value<'output>;
+        ) -> Value<'output, 'static>;
     }
 
     macro_rules! impl_into_julia {
@@ -625,7 +629,7 @@ pub(crate) mod private {
             &mut self,
             value: *mut jl_value_t,
             _: Internal,
-        ) -> JlrsResult<Value<'frame>> {
+        ) -> JlrsResult<Value<'frame, 'static>> {
             if self.capacity == self.len {
                 return Err(JlrsError::FrameSizeExceeded(self.len).into());
             }
@@ -686,7 +690,7 @@ pub(crate) mod private {
             output: Output<'output>,
             value: *mut jl_value_t,
             _: Internal,
-        ) -> Value<'output> {
+        ) -> Value<'output, 'static> {
             unsafe {
                 self.memory
                     .protect(FrameIdx::default(), output.offset, value as _)
@@ -699,7 +703,7 @@ pub(crate) mod private {
             &mut self,
             value: *mut jl_value_t,
             _: Internal,
-        ) -> JlrsResult<Value<'frame>> {
+        ) -> JlrsResult<Value<'frame, 'static>> {
             let out = self.memory.protect(self.idx, value as _)?;
             self.len += 1;
             Ok(out)
@@ -746,7 +750,7 @@ pub(crate) mod private {
             output: Output<'output>,
             value: *mut jl_value_t,
             _: Internal,
-        ) -> Value<'output> {
+        ) -> Value<'output, 'static> {
             unsafe { self.memory.protect_output(output, value as _) }
         }
     }

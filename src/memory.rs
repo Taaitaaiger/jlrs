@@ -18,6 +18,7 @@
 // longer than its frame while C can offer no such guarantees.
 
 use crate::error::{JlrsError, JlrsResult};
+use crate::frame::Scope;
 use crate::value::{Output, Value, Values};
 use jl_sys::jl_get_ptls_states;
 use std::ffi::c_void;
@@ -34,7 +35,8 @@ pub(crate) struct RawStack(Box<[*mut c_void]>);
 
 impl RawStack {
     pub(crate) unsafe fn new(stack_size: usize) -> Self {
-        let raw = vec![null_mut(); stack_size];
+        let mut raw = vec![null_mut(); stack_size];
+        raw[0] = 1 as _;
         let boxed = raw.into_boxed_slice();
         RawStack(boxed)
     }
@@ -70,14 +72,14 @@ impl<'stack, V> StackView<'stack, V> {
         self.stack[0] = (idx.0 - 2) as _;
     }
 
-    pub(crate) unsafe fn nest_static<'nested>(&'nested mut self) -> StackView<'nested, Static> {
+    pub(crate) unsafe fn nest_static<'nested>(&'nested mut self, _: &'nested mut Scope) -> StackView<'nested, Static> {
         StackView {
             stack: self.stack,
             _marker: PhantomData,
         }
     }
 
-    pub(crate) unsafe fn nest_dynamic<'nested>(&'nested mut self) -> StackView<'nested, Dynamic> {
+    pub(crate) unsafe fn nest_dynamic<'nested>(&'nested mut self, _: &'nested mut Scope) -> StackView<'nested, Dynamic> {
         StackView {
             stack: self.stack,
             _marker: PhantomData,
@@ -112,9 +114,9 @@ impl<'stack> StackView<'stack, Dynamic> {
         self.stack[self.size()] = 0 as _;
         self.stack[self.size() + 1] = rtls.pgcstack as _;
 
-        rtls.pgcstack = self.stack[self.size()..].as_ptr() as _;
+        rtls.pgcstack = self.stack[self.size() + 1..].as_ptr() as _;
         let idx = FrameIdx(self.size() + 2);
-        self.stack[0] = (self.stack[0] as usize + 2) as _;
+        self.stack[0] = (self.size() + 2) as _;
 
         Ok(idx)
     }
@@ -130,7 +132,7 @@ impl<'stack> StackView<'stack, Dynamic> {
         let sz = self.size();
         self.stack[sz] = null_mut();
         self.stack[idx.0 - 2] = (self.stack[idx.0 - 2] as usize + 2) as _;
-        self.stack[0] = (self.stack[0] as usize + 1) as _;
+        self.stack[0] = (self.size() + 1) as _;
         Ok(Output::new(sz))
     }
 
@@ -138,14 +140,14 @@ impl<'stack> StackView<'stack, Dynamic> {
         &mut self,
         idx: FrameIdx,
         value: *mut c_void,
-    ) -> JlrsResult<Value<'output>> {
+    ) -> JlrsResult<Value<'output, 'static>> {
         if self.size() == self.stack.len() {
             return Err(JlrsError::StackSizeExceeded.into());
         }
 
         self.stack[self.size()] = value.cast::<_>();
         self.stack[idx.0 - 2] = (self.stack[idx.0 - 2] as usize + 2) as _;
-        self.stack[0] = (self.stack[0] as usize + 1) as _;
+        self.stack[0] = (self.size() + 1) as _;
         Ok(Value::wrap(value.cast::<_>()))
     }
 
@@ -153,7 +155,7 @@ impl<'stack> StackView<'stack, Dynamic> {
         &mut self,
         output: Output,
         value: *mut c_void,
-    ) -> Value<'output> {
+    ) -> Value<'output, 'static> {
         self.stack[output.offset] = value.cast::<_>();
         Value::wrap(value.cast::<_>())
     }
@@ -182,7 +184,7 @@ impl<'stack> StackView<'stack, Static> {
 
         rtls.pgcstack = self.stack[self.size()..].as_ptr() as _;
         let idx = FrameIdx(self.size() + 2);
-        self.stack[0] = (self.stack[0] as usize + capacity + 2) as _;
+        self.stack[0] = (self.size() + capacity + 2) as _;
 
         Ok(idx)
     }
@@ -200,7 +202,7 @@ impl<'stack> StackView<'stack, Static> {
         idx: FrameIdx,
         offset: usize,
         value: *mut c_void,
-    ) -> Value<'output> {
+    ) -> Value<'output, 'static> {
         self.stack[idx.0 + offset] = value;
         Value::wrap(value as _)
     }

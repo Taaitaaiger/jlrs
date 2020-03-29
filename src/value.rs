@@ -25,12 +25,12 @@ impl<'frame> Values<'frame> {
     }
 
     /// Get a specific `Value` in this group. Returns an error if the index is out of bounds.
-    pub fn value(&self, index: usize) -> JlrsResult<Value<'frame>> {
+    pub fn value(&self, index: usize) -> JlrsResult<Value<'frame, 'static>> {
         if index >= self.1 {
             return Err(JlrsError::OutOfBounds(index, self.1).into());
         }
 
-        unsafe { Ok(Value(*(self.0.offset(index as isize)), PhantomData)) }
+        unsafe { Ok(Value(*(self.0.offset(index as isize)), PhantomData, PhantomData)) }
     }
 
     /// Allocate several values of the same type, this type must implement [`IntoJulia`]. The
@@ -52,7 +52,7 @@ impl<'frame> Values<'frame> {
     /// Returns an error if there is not enough space on the stack.
     ///
     /// [`IntoJulia`]: ../traits/trait.IntoJulia.html
-    pub fn new_dyn<'v, 'base: 'frame, V: AsRef<[&'v dyn IntoJulia]>, F: Frame<'base, 'frame>>(
+    pub fn new_dyn<'value, 'base: 'frame, V: AsRef<[&'value dyn IntoJulia]>, F: Frame<'base, 'frame>>(
         frame: &mut F,
         data: V,
     ) -> JlrsResult<Self> {
@@ -69,11 +69,11 @@ impl<'frame> Values<'frame> {
 /// [`Module`]: ../module/struct.Module.html
 #[repr(transparent)]
 #[derive(Copy, Clone)]
-pub struct Value<'frame>(*mut jl_value_t, PhantomData<&'frame ()>);
+pub struct Value<'frame, 'borrow>(*mut jl_value_t, PhantomData<&'frame ()>, PhantomData<&'borrow ()>);
 
-impl<'frame> Value<'frame> {
-    pub(crate) unsafe fn wrap(ptr: *mut jl_value_t) -> Self {
-        Value(ptr, PhantomData)
+impl<'frame, 'borrow> Value<'frame, 'borrow> {
+    pub(crate) unsafe fn wrap(ptr: *mut jl_value_t) -> Value<'frame, 'static> {
+        Value(ptr, PhantomData, PhantomData)
     }
 
     /// Create a new Julia value, any type that implements [`IntoJulia`] can be converted using
@@ -85,7 +85,7 @@ impl<'frame> Value<'frame> {
     pub fn new<'base: 'frame, V: IntoJulia, F: Frame<'base, 'frame>>(
         frame: &mut F,
         value: V,
-    ) -> JlrsResult<Value<'frame>> {
+    ) -> JlrsResult<Value<'frame, 'static>> {
         unsafe { frame.protect(value.into_julia(Internal), Internal) }
     }
 
@@ -118,7 +118,7 @@ impl<'frame> Value<'frame> {
     pub fn array<'base: 'frame, T: JuliaType, D: Into<Dimensions>, F: Frame<'base, 'frame>>(
         frame: &mut F,
         dimensions: D,
-    ) -> JlrsResult<Value<'frame>> {
+    ) -> JlrsResult<Value<'frame, 'static>> {
         unsafe {
             let dims = dimensions.into();
 
@@ -171,9 +171,9 @@ impl<'frame> Value<'frame> {
         F: Frame<'base, 'frame>,
     >(
         frame: &mut F,
-        data: &'frame mut V,
+        data: &'borrow mut V,
         dimensions: D,
-    ) -> JlrsResult<Value<'frame>> {
+    ) -> JlrsResult<Value<'frame, 'borrow>> {
         let dims = dimensions.into();
 
         let array_type = jl_apply_array_type(T::julia_type(Internal), dims.n_dimensions() as _);
@@ -210,7 +210,7 @@ impl<'frame> Value<'frame> {
         frame: &mut F,
         data: Vec<T>,
         dimensions: D,
-    ) -> JlrsResult<Value<'frame>> {
+    ) -> JlrsResult<Value<'frame, 'static>> {
         unsafe {
             let dims = dimensions.into();
 
@@ -260,7 +260,7 @@ impl<'frame> Value<'frame> {
     pub fn call0<'base: 'frame, F: Frame<'base, 'frame>>(
         self,
         frame: &mut F,
-    ) -> JlrsResult<Value<'frame>> {
+    ) -> JlrsResult<Value<'frame, 'static>> {
         unsafe {
             let res = jl_call0(self.0 as _);
             convert_exception()?;
@@ -275,7 +275,7 @@ impl<'frame> Value<'frame> {
         self,
         frame: &mut F,
         output: Output<'output>,
-    ) -> JlrsResult<Value<'output>> {
+    ) -> JlrsResult<Value<'output, 'static>> {
         unsafe {
             let res = jl_call0(self.0 as _);
             convert_exception()?;
@@ -290,7 +290,7 @@ impl<'frame> Value<'frame> {
         self,
         frame: &mut F,
         arg: Value,
-    ) -> JlrsResult<Value<'frame>> {
+    ) -> JlrsResult<Value<'frame, 'static>> {
         unsafe {
             let res = jl_call1(self.0 as _, arg.0 as _);
             convert_exception()?;
@@ -306,7 +306,7 @@ impl<'frame> Value<'frame> {
         frame: &mut F,
         output: Output<'output>,
         arg: Value,
-    ) -> JlrsResult<Value<'output>> {
+    ) -> JlrsResult<Value<'output, 'static>> {
         unsafe {
             let res = jl_call1(self.0 as _, arg.0 as _);
             convert_exception()?;
@@ -322,7 +322,7 @@ impl<'frame> Value<'frame> {
         frame: &mut F,
         arg0: Value,
         arg1: Value,
-    ) -> JlrsResult<Value<'frame>> {
+    ) -> JlrsResult<Value<'frame, 'static>> {
         unsafe {
             let res = jl_call2(self.0 as _, arg0.0 as _, arg1.0 as _);
             convert_exception()?;
@@ -339,7 +339,7 @@ impl<'frame> Value<'frame> {
         output: Output<'output>,
         arg0: Value,
         arg1: Value,
-    ) -> JlrsResult<Value<'output>> {
+    ) -> JlrsResult<Value<'output, 'static>> {
         unsafe {
             let res = jl_call2(self.0 as _, arg0.0 as _, arg1.0 as _);
             convert_exception()?;
@@ -356,7 +356,7 @@ impl<'frame> Value<'frame> {
         arg0: Value,
         arg1: Value,
         arg2: Value,
-    ) -> JlrsResult<Value<'frame>> {
+    ) -> JlrsResult<Value<'frame, 'static>> {
         unsafe {
             let res = jl_call3(self.0 as _, arg0.0 as _, arg1.0 as _, arg2.0 as _);
             convert_exception()?;
@@ -374,7 +374,7 @@ impl<'frame> Value<'frame> {
         arg0: Value,
         arg1: Value,
         arg2: Value,
-    ) -> JlrsResult<Value<'output>> {
+    ) -> JlrsResult<Value<'output, 'static>> {
         unsafe {
             let res = jl_call3(self.0 as _, arg0.0 as _, arg1.0 as _, arg2.0 as _);
             convert_exception()?;
@@ -385,11 +385,11 @@ impl<'frame> Value<'frame> {
     /// Call this value as a function that takes several arguments, this takes one slot on the GC
     /// stack. Returns the result of this function call if no exception is thrown, the exception
     /// if one is, or an error if no space is left on the stack.
-    pub fn call<'value, 'base: 'frame, V: AsRef<[Value<'value>]>, F: Frame<'base, 'frame>>(
+    pub fn call<'f, 'b, 'base: 'frame, V: AsRef<[Value<'f, 'b>]>, F: Frame<'base, 'frame>>(
         self,
         frame: &mut F,
         args: V,
-    ) -> JlrsResult<Value<'frame>> {
+    ) -> JlrsResult<Value<'frame, 'static>> {
         unsafe {
             let args = args.as_ref();
             let n = args.len();
@@ -405,15 +405,16 @@ impl<'frame> Value<'frame> {
     pub fn call_output<
         'output,
         'value,
+        'b,
         'base: 'frame,
-        V: AsRef<[Value<'value>]>,
+        V: AsRef<[Value<'value, 'b>]>,
         F: Frame<'base, 'frame>,
     >(
         self,
         frame: &mut F,
         output: Output<'output>,
         args: V,
-    ) -> JlrsResult<Value<'output>> {
+    ) -> JlrsResult<Value<'output, 'static>> {
         unsafe {
             let args = args.as_ref();
             let n = args.len();
@@ -430,7 +431,7 @@ impl<'frame> Value<'frame> {
         self,
         frame: &mut F,
         args: Values,
-    ) -> JlrsResult<Value<'frame>> {
+    ) -> JlrsResult<Value<'frame, 'static>> {
         unsafe {
             let res = jl_call(self.0 as _, args.0, args.1 as _);
             convert_exception()?;
@@ -446,7 +447,7 @@ impl<'frame> Value<'frame> {
         frame: &mut F,
         output: Output<'output>,
         args: Values,
-    ) -> JlrsResult<Value<'output>> {
+    ) -> JlrsResult<Value<'output, 'static>> {
         unsafe {
             let res = jl_call(self.0 as _, args.0, args.1 as _);
             convert_exception()?;

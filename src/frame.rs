@@ -70,11 +70,12 @@ impl<'base: 'frame, 'frame> StaticFrame<'base, 'frame> {
     pub(crate) unsafe fn nested_frame<'nested>(
         &'nested mut self,
         capacity: usize,
+        scope: &'nested mut Scope,
     ) -> JlrsResult<StaticFrame<'base, 'nested>> {
         let idx = self.memory.new_frame(capacity)?;
         Ok(StaticFrame {
             idx,
-            memory: self.memory.nest_static(),
+            memory: self.memory.nest_static(scope),
             capacity,
             len: 0,
             _guard: PhantomData,
@@ -129,11 +130,12 @@ impl<'base: 'frame, 'frame> DynamicFrame<'base, 'frame> {
 
     pub(crate) unsafe fn nested_frame<'nested>(
         &'nested mut self,
+        scope: &'nested mut Scope,
     ) -> JlrsResult<DynamicFrame<'base, 'nested>> {
         let idx = self.memory.new_frame()?;
         Ok(DynamicFrame {
             idx,
-            memory: self.memory.nest_dynamic(),
+            memory: self.memory.nest_dynamic(scope),
             len: 0,
             _guard: PhantomData,
         })

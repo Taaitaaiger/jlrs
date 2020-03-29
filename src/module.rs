@@ -61,7 +61,7 @@ impl<'scope> Module<'scope> {
 
     /// Returns the global named `name` in this module.
     /// Returns an error if the global doesn't exist.
-    pub fn global<N: AsRef<str>>(self, name: N) -> JlrsResult<Value<'scope>> {
+    pub fn global<N: AsRef<str>>(self, name: N) -> JlrsResult<Value<'scope, 'static>> {
         unsafe {
             // safe because jl_symbol_n copies the contents
             let name_str = name.as_ref();
@@ -86,7 +86,7 @@ impl<'scope> Module<'scope> {
     /// Returns an error if the global doesn't exist.
     /// 
     /// Returns an error if th function doesn't exist.
-    pub fn function<N: AsRef<str>>(self, name: N) -> JlrsResult<Value<'scope>> {
+    pub fn function<N: AsRef<str>>(self, name: N) -> JlrsResult<Value<'scope, 'static>> {
         self.global(name)
     }
 }
