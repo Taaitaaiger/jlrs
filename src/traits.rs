@@ -645,8 +645,8 @@ pub(crate) mod private {
             _: Internal,
         ) -> JlrsResult<Values<'frame>> {
             unsafe {
-                if self.capacity + values.len() >= self.len {
-                    return Err(JlrsError::FrameSizeExceeded(self.len).into());
+                if self.capacity < self.len + values.len() {
+                    return Err(JlrsError::FrameSizeExceeded(self.capacity).into());
                 }
 
                 let offset = self.len;
@@ -666,7 +666,7 @@ pub(crate) mod private {
             _: Internal,
         ) -> JlrsResult<Values<'frame>> {
             unsafe {
-                if self.capacity + values.len() >= self.len {
+                if self.capacity < self.len + values.len() {
                     return Err(JlrsError::FrameSizeExceeded(self.len).into());
                 }
 

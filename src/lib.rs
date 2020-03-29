@@ -181,7 +181,7 @@ impl Runtime {
     // easier
     pub unsafe fn testing_instance() -> ManuallyDrop<Runtime> {
         let mut rt = ManuallyDrop::new(Runtime {
-            stack: RawStack::new(16),
+            stack: RawStack::new(32),
         });
 
         if INIT.swap(true, Ordering::SeqCst) {

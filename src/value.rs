@@ -136,8 +136,9 @@ impl<'frame> Value<'frame> {
                 ),
                 n => frame.frame(n as usize + 1, |frame| {
                     let func = Module::main(frame)
-                        .submodule("jlrs")?
+                        .submodule("Jlrs")?
                         .function("arraydims")?;
+
                     let v = Values::new(frame, dims.as_slice())?;
                     let dims = func.call_values(frame, v)?;
                     Ok(jl_new_array(array_type, dims.0))
@@ -185,7 +186,7 @@ impl<'frame> Value<'frame> {
             ),
             n => frame.frame(n as usize + 1, |frame| {
                 let func = Module::main(frame)
-                    .submodule("jlrs")?
+                    .submodule("Jlrs")?
                     .function("arraydims")?;
                 let v = Values::new(frame, dims.as_slice())?;
                 let dims = func.call_values(frame, v)?;
@@ -223,7 +224,7 @@ impl<'frame> Value<'frame> {
                 ),
                 n => frame.frame(n as usize + 1, |frame| {
                     let func = Module::main(frame)
-                        .submodule("jlrs")?
+                        .submodule("Jlrs")?
                         .function("arraydims")?;
                     let v = Values::new(frame, dims.as_slice())?;
                     let dims = func.call_values(frame, v)?;

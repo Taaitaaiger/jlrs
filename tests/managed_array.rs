@@ -1,16 +1,31 @@
-/*
 use jlrs::prelude::*;
 
 #[test]
-fn managed_array_1d() {
+fn array_1d() {
     let mut jlrs = unsafe { Runtime::testing_instance() };
 
     let unboxed = jlrs
-        .session(|session| {
-            let array = session.new_managed_array::<f32, _>(3)?;
-            session.execute(|exec_ctx| {
-                let array = array.set_all(exec_ctx, 2.0)?;
-                exec_ctx.try_unbox::<UnboxedArray<f32>>(&array)
+        .frame(1, |frame| {
+            let array = Value::array::<f32, _, _>(frame, 3)?;
+            array.try_unbox::<Array<f32>>()
+        })
+        .unwrap();
+
+    let (data, dims) = unboxed.splat();
+    assert_eq!(dims.n_dimensions(), 1);
+    assert_eq!(dims.n_elements(0), 3);
+    assert_eq!(data.len(), 3);
+}
+
+#[test]
+fn array_1d_nested() {
+    let mut jlrs = unsafe { Runtime::testing_instance() };
+
+    let unboxed = jlrs
+        .frame(0, |frame| {
+            frame.frame(1, |frame| {
+                let array = Value::array::<f64, _, _>(frame, 3)?;
+                array.try_unbox::<Array<f64>>()
             })
         })
         .unwrap();
@@ -18,23 +33,18 @@ fn managed_array_1d() {
     let (data, dims) = unboxed.splat();
     assert_eq!(dims.n_dimensions(), 1);
     assert_eq!(dims.n_elements(0), 3);
-
-    assert_eq!(data, vec![2.0; 3]);
+    assert_eq!(data.len(), 3);
 }
 
 #[test]
-fn managed_array_1d_from_context() {
+fn array_1d_nested_dynamic() {
     let mut jlrs = unsafe { Runtime::testing_instance() };
 
     let unboxed = jlrs
-        .session(|session| {
-            session.with_temporaries(|mut alloc_ctx| {
-                let array = alloc_ctx.new_managed_array::<f32, _>(3)?;
-
-                alloc_ctx.execute(|exec_ctx| {
-                    let array = array.set_all(exec_ctx, 2.0)?;
-                    exec_ctx.try_unbox::<UnboxedArray<f32>>(&array)
-                })
+        .frame(0, |frame| {
+            frame.dynamic_frame(|frame| {
+                let array = Value::array::<i8, _, _>(frame, 3)?;
+                array.try_unbox::<Array<i8>>()
             })
         })
         .unwrap();
@@ -42,51 +52,91 @@ fn managed_array_1d_from_context() {
     let (data, dims) = unboxed.splat();
     assert_eq!(dims.n_dimensions(), 1);
     assert_eq!(dims.n_elements(0), 3);
-
-    assert_eq!(data, vec![2.0; 3]);
+    assert_eq!(data.len(), 3);
 }
 
 #[test]
-fn push_managed_array_1d() {
+fn array_1d_dynamic() {
     let mut jlrs = unsafe { Runtime::testing_instance() };
 
     let unboxed = jlrs
-        .session(|session| {
-            let array = session.new_managed_array::<u64, _>(3)?;
-            let el = session.new_primitive(5u64)?;
-            let out = session.new_unassigned()?;
+        .dynamic_frame(|frame| {
+            let array = Value::array::<i16, _, _>(frame, 3)?;
+            array.try_unbox::<Array<i16>>()
+        })
+        .unwrap();
 
-            let base = session.base_module();
-            let func = base.function("push!")?;
+    let (data, dims) = unboxed.splat();
+    assert_eq!(dims.n_dimensions(), 1);
+    assert_eq!(dims.n_elements(0), 3);
+    assert_eq!(data.len(), 3);
+}
 
-            session.execute(|exec_ctx| {
-                let array = array.set_all(exec_ctx, 2)?;
-                func.call2(exec_ctx, out, array, el)?;
-                exec_ctx.try_unbox::<UnboxedArray<u64>>(&array)
+#[test]
+fn array_1d_dynamic_nested() {
+    let mut jlrs = unsafe { Runtime::testing_instance() };
+
+    let unboxed = jlrs
+        .dynamic_frame(|frame| {
+            frame.frame(1, |frame| {
+                let array = Value::array::<i32, _, _>(frame, 3)?;
+                array.try_unbox::<Array<i32>>()
             })
         })
         .unwrap();
 
     let (data, dims) = unboxed.splat();
     assert_eq!(dims.n_dimensions(), 1);
-    assert_eq!(dims.n_elements(0), 4);
-
-    assert_eq!(data, vec![2, 2, 2, 5]);
+    assert_eq!(dims.n_elements(0), 3);
+    assert_eq!(data.len(), 3);
 }
 
 #[test]
-fn managed_array_2d() {
+fn array_1d_dynamic_nested_dynamic() {
     let mut jlrs = unsafe { Runtime::testing_instance() };
 
     let unboxed = jlrs
-        .session(|session| {
-            let array = session.new_managed_array::<f32, _>((3, 4))?;
-            session.execute(|exec_ctx| {
-                let array = array.set_from(
-                    exec_ctx,
-                    [1.0, 2.0, 1.0, 2.0, 1.0, 2.0, 1.0, 2.0, 1.0, 2.0, 1.0, 2.0],
-                )?;
-                exec_ctx.try_unbox::<UnboxedArray<f32>>(&array)
+        .dynamic_frame(|frame| {
+            frame.dynamic_frame(|frame| {
+                let array = Value::array::<i64, _, _>(frame, 3)?;
+                array.try_unbox::<Array<i64>>()
+            })
+        })
+        .unwrap();
+
+    let (data, dims) = unboxed.splat();
+    assert_eq!(dims.n_dimensions(), 1);
+    assert_eq!(dims.n_elements(0), 3);
+    assert_eq!(data.len(), 3);
+}
+
+#[test]
+fn array_2d() {
+    let mut jlrs = unsafe { Runtime::testing_instance() };
+
+    let unboxed = jlrs
+        .frame(1, |frame| {
+            let array = Value::array::<u8, _, _>(frame, (3, 4))?;
+            array.try_unbox::<Array<u8>>()
+        })
+        .unwrap();
+
+    let (data, dims) = unboxed.splat();
+    assert_eq!(dims.n_dimensions(), 2);
+    assert_eq!(dims.n_elements(0), 3);
+    assert_eq!(dims.n_elements(1), 4);
+    assert_eq!(data.len(), 12);
+}
+
+#[test]
+fn array_2d_nested() {
+    let mut jlrs = unsafe { Runtime::testing_instance() };
+
+    let unboxed = jlrs
+        .frame(0, |frame| {
+            frame.frame(1, |frame| {
+                let array = Value::array::<u16, _, _>(frame, (3, 4))?;
+                array.try_unbox::<Array<u16>>()
             })
         })
         .unwrap();
@@ -95,23 +145,115 @@ fn managed_array_2d() {
     assert_eq!(dims.n_dimensions(), 2);
     assert_eq!(dims.n_elements(0), 3);
     assert_eq!(dims.n_elements(1), 4);
-
-    assert_eq!(
-        data,
-        vec![1.0, 2.0, 1.0, 2.0, 1.0, 2.0, 1.0, 2.0, 1.0, 2.0, 1.0, 2.0]
-    );
+    assert_eq!(data.len(), 12);
 }
 
 #[test]
-fn managed_array_3d() {
+fn array_2d_nested_dynamic() {
     let mut jlrs = unsafe { Runtime::testing_instance() };
 
     let unboxed = jlrs
-        .session(|session| {
-            let array = session.new_managed_array::<f32, _>((3, 4, 5))?;
-            session.execute(|exec_ctx| {
-                let array = array.set_all(exec_ctx, 2.0)?;
-                exec_ctx.try_unbox::<UnboxedArray<f32>>(&array)
+        .frame(0, |frame| {
+            frame.dynamic_frame(|frame| {
+                let array = Value::array::<u32, _, _>(frame, (3, 4))?;
+                array.try_unbox::<Array<u32>>()
+            })
+        })
+        .unwrap();
+
+    let (data, dims) = unboxed.splat();
+    assert_eq!(dims.n_dimensions(), 2);
+    assert_eq!(dims.n_elements(0), 3);
+    assert_eq!(dims.n_elements(1), 4);
+    assert_eq!(data.len(), 12);
+}
+
+#[test]
+fn array_2d_dynamic() {
+    let mut jlrs = unsafe { Runtime::testing_instance() };
+
+    let unboxed = jlrs
+        .dynamic_frame(|frame| {
+            let array = Value::array::<u64, _, _>(frame, (3, 4))?;
+            array.try_unbox::<Array<u64>>()
+        })
+        .unwrap();
+
+    let (data, dims) = unboxed.splat();
+    assert_eq!(dims.n_dimensions(), 2);
+    assert_eq!(dims.n_elements(0), 3);
+    assert_eq!(dims.n_elements(1), 4);
+    assert_eq!(data.len(), 12);
+}
+
+#[test]
+fn array_2d_dynamic_nested() {
+    let mut jlrs = unsafe { Runtime::testing_instance() };
+
+    let unboxed = jlrs
+        .dynamic_frame(|frame| {
+            frame.frame(1, |frame| {
+                let array = Value::array::<usize, _, _>(frame, (3, 4))?;
+                array.try_unbox::<Array<usize>>()
+            })
+        })
+        .unwrap();
+
+    let (data, dims) = unboxed.splat();
+    assert_eq!(dims.n_dimensions(), 2);
+    assert_eq!(dims.n_elements(0), 3);
+    assert_eq!(dims.n_elements(1), 4);
+    assert_eq!(data.len(), 12);
+}
+
+#[test]
+fn array_2d_dynamic_nested_dynamic() {
+    let mut jlrs = unsafe { Runtime::testing_instance() };
+
+    let unboxed = jlrs
+        .dynamic_frame(|frame| {
+            frame.dynamic_frame(|frame| {
+                let array = Value::array::<isize, _, _>(frame, (3, 4))?;
+                array.try_unbox::<Array<isize>>()
+            })
+        })
+        .unwrap();
+
+    let (data, dims) = unboxed.splat();
+    assert_eq!(dims.n_dimensions(), 2);
+    assert_eq!(dims.n_elements(0), 3);
+    assert_eq!(dims.n_elements(1), 4);
+    assert_eq!(data.len(), 12);
+}
+
+#[test]
+fn array_3d() {
+    let mut jlrs = unsafe { Runtime::testing_instance() };
+
+    let unboxed = jlrs
+        .frame(1, |frame| {
+            let array = Value::array::<u8, _, _>(frame, (3, 4, 5))?;
+            array.try_unbox::<Array<u8>>()
+        })
+        .unwrap();
+
+    let (data, dims) = unboxed.splat();
+    assert_eq!(dims.n_dimensions(), 3);
+    assert_eq!(dims.n_elements(0), 3);
+    assert_eq!(dims.n_elements(1), 4);
+    assert_eq!(dims.n_elements(2), 5);
+    assert_eq!(data.len(), 60);
+}
+
+#[test]
+fn array_3d_nested() {
+    let mut jlrs = unsafe { Runtime::testing_instance() };
+
+    let unboxed = jlrs
+        .frame(0, |frame| {
+            frame.frame(1, |frame| {
+                let array = Value::array::<u16, _, _>(frame, (3, 4, 5))?;
+                array.try_unbox::<Array<u16>>()
             })
         })
         .unwrap();
@@ -121,31 +263,215 @@ fn managed_array_3d() {
     assert_eq!(dims.n_elements(0), 3);
     assert_eq!(dims.n_elements(1), 4);
     assert_eq!(dims.n_elements(2), 5);
-
-    assert_eq!(data, vec![2.0; 60]);
+    assert_eq!(data.len(), 60);
 }
 
 #[test]
-fn managed_array_nd() {
+fn array_3d_nested_dynamic() {
     let mut jlrs = unsafe { Runtime::testing_instance() };
 
     let unboxed = jlrs
-        .session(|session| {
-            let array = session.new_managed_array::<f32, _>((2, 3, 4, 5))?;
-            session.execute(|exec_ctx| {
-                let array = array.set_all(exec_ctx, 2.0)?;
-                exec_ctx.try_unbox::<UnboxedArray<f32>>(&array)
+        .frame(0, |frame| {
+            frame.dynamic_frame(|frame| {
+                let array = Value::array::<u32, _, _>(frame, (3, 4, 5))?;
+                array.try_unbox::<Array<u32>>()
+            })
+        })
+        .unwrap();
+
+    let (data, dims) = unboxed.splat();
+    assert_eq!(dims.n_dimensions(), 3);
+    assert_eq!(dims.n_elements(0), 3);
+    assert_eq!(dims.n_elements(1), 4);
+    assert_eq!(dims.n_elements(2), 5);
+    assert_eq!(data.len(), 60);
+}
+
+#[test]
+fn array_3d_dynamic() {
+    let mut jlrs = unsafe { Runtime::testing_instance() };
+
+    let unboxed = jlrs
+        .dynamic_frame(|frame| {
+            let array = Value::array::<u64, _, _>(frame, (3, 4, 5))?;
+            array.try_unbox::<Array<u64>>()
+        })
+        .unwrap();
+
+    let (data, dims) = unboxed.splat();
+    assert_eq!(dims.n_dimensions(), 3);
+    assert_eq!(dims.n_elements(0), 3);
+    assert_eq!(dims.n_elements(1), 4);
+    assert_eq!(dims.n_elements(2), 5);
+    assert_eq!(data.len(), 60);
+}
+
+#[test]
+fn array_3d_dynamic_nested() {
+    let mut jlrs = unsafe { Runtime::testing_instance() };
+
+    let unboxed = jlrs
+        .dynamic_frame(|frame| {
+            frame.frame(1, |frame| {
+                let array = Value::array::<usize, _, _>(frame, (3, 4, 5))?;
+                array.try_unbox::<Array<usize>>()
+            })
+        })
+        .unwrap();
+
+    let (data, dims) = unboxed.splat();
+    assert_eq!(dims.n_dimensions(), 3);
+    assert_eq!(dims.n_elements(0), 3);
+    assert_eq!(dims.n_elements(1), 4);
+    assert_eq!(dims.n_elements(2), 5);
+    assert_eq!(data.len(), 60);
+}
+
+#[test]
+fn array_3d_dynamic_nested_dynamic() {
+    let mut jlrs = unsafe { Runtime::testing_instance() };
+
+    let unboxed = jlrs
+        .dynamic_frame(|frame| {
+            frame.dynamic_frame(|frame| {
+                let array = Value::array::<isize, _, _>(frame, (3, 4, 5))?;
+                array.try_unbox::<Array<isize>>()
+            })
+        })
+        .unwrap();
+
+    let (data, dims) = unboxed.splat();
+    assert_eq!(dims.n_dimensions(), 3);
+    assert_eq!(dims.n_elements(0), 3);
+    assert_eq!(dims.n_elements(1), 4);
+    assert_eq!(dims.n_elements(2), 5);
+    assert_eq!(data.len(), 60);
+}
+
+#[test]
+fn array_4d() {
+    let mut jlrs = unsafe { Runtime::testing_instance() };
+
+    let unboxed = jlrs
+        .frame(1, |frame| {
+            let array = Value::array::<u8, _, _>(frame, (3, 4, 5, 6))?;
+            array.try_unbox::<Array<u8>>()
+        })
+        .unwrap();
+
+    let (data, dims) = unboxed.splat();
+    assert_eq!(dims.n_dimensions(), 4);
+    assert_eq!(dims.n_elements(0), 3);
+    assert_eq!(dims.n_elements(1), 4);
+    assert_eq!(dims.n_elements(2), 5);
+    assert_eq!(dims.n_elements(3), 6);
+    assert_eq!(data.len(), 360);
+}
+
+#[test]
+fn array_4d_nested() {
+    let mut jlrs = unsafe { Runtime::testing_instance() };
+
+    let unboxed = jlrs
+        .frame(0, |frame| {
+            frame.frame(1, |frame| {
+                let array = Value::array::<u16, _, _>(frame, (3, 4, 5, 6))?;
+                array.try_unbox::<Array<u16>>()
             })
         })
         .unwrap();
 
     let (data, dims) = unboxed.splat();
     assert_eq!(dims.n_dimensions(), 4);
-    assert_eq!(dims.n_elements(0), 2);
-    assert_eq!(dims.n_elements(1), 3);
-    assert_eq!(dims.n_elements(2), 4);
-    assert_eq!(dims.n_elements(3), 5);
-
-    assert_eq!(data, vec![2.0; 120]);
+    assert_eq!(dims.n_elements(0), 3);
+    assert_eq!(dims.n_elements(1), 4);
+    assert_eq!(dims.n_elements(2), 5);
+    assert_eq!(dims.n_elements(3), 6);
+    assert_eq!(data.len(), 360);
 }
-*/
+
+#[test]
+fn array_4d_nested_dynamic() {
+    let mut jlrs = unsafe { Runtime::testing_instance() };
+
+    let unboxed = jlrs
+        .frame(0, |frame| {
+            frame.dynamic_frame(|frame| {
+                let array = Value::array::<u32, _, _>(frame, (3, 4, 5, 6))?;
+                array.try_unbox::<Array<u32>>()
+            })
+        })
+        .unwrap();
+
+    let (data, dims) = unboxed.splat();
+    assert_eq!(dims.n_dimensions(), 4);
+    assert_eq!(dims.n_elements(0), 3);
+    assert_eq!(dims.n_elements(1), 4);
+    assert_eq!(dims.n_elements(2), 5);
+    assert_eq!(dims.n_elements(3), 6);
+    assert_eq!(data.len(), 360);
+}
+
+#[test]
+fn array_4d_dynamic() {
+    let mut jlrs = unsafe { Runtime::testing_instance() };
+
+    let unboxed = jlrs
+        .dynamic_frame(|frame| {
+            let array = Value::array::<u64, _, _>(frame, (3, 4, 5, 6))?;
+            array.try_unbox::<Array<u64>>()
+        })
+        .unwrap();
+
+    let (data, dims) = unboxed.splat();
+    assert_eq!(dims.n_dimensions(), 4);
+    assert_eq!(dims.n_elements(0), 3);
+    assert_eq!(dims.n_elements(1), 4);
+    assert_eq!(dims.n_elements(2), 5);
+    assert_eq!(dims.n_elements(3), 6);
+    assert_eq!(data.len(), 360);
+}
+
+#[test]
+fn array_4d_dynamic_nested() {
+    let mut jlrs = unsafe { Runtime::testing_instance() };
+
+    let unboxed = jlrs
+        .dynamic_frame(|frame| {
+            frame.frame(1, |frame| {
+                let array = Value::array::<usize, _, _>(frame, (3, 4, 5, 6))?;
+                array.try_unbox::<Array<usize>>()
+            })
+        })
+        .unwrap();
+
+    let (data, dims) = unboxed.splat();
+    assert_eq!(dims.n_dimensions(), 4);
+    assert_eq!(dims.n_elements(0), 3);
+    assert_eq!(dims.n_elements(1), 4);
+    assert_eq!(dims.n_elements(2), 5);
+    assert_eq!(dims.n_elements(3), 6);
+    assert_eq!(data.len(), 360);
+}
+
+#[test]
+fn array_4d_dynamic_nested_dynamic() {
+    let mut jlrs = unsafe { Runtime::testing_instance() };
+
+    let unboxed = jlrs
+        .dynamic_frame(|frame| {
+            frame.dynamic_frame(|frame| {
+                let array = Value::array::<isize, _, _>(frame, (3, 4, 5, 6))?;
+                array.try_unbox::<Array<isize>>()
+            })
+        })
+        .unwrap();
+
+    let (data, dims) = unboxed.splat();
+    assert_eq!(dims.n_dimensions(), 4);
+    assert_eq!(dims.n_elements(0), 3);
+    assert_eq!(dims.n_elements(1), 4);
+    assert_eq!(dims.n_elements(2), 5);
+    assert_eq!(dims.n_elements(3), 6);
+    assert_eq!(data.len(), 360);
+}
