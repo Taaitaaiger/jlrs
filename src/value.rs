@@ -404,10 +404,10 @@ impl<'frame, 'borrow> Value<'frame, 'borrow> {
     /// function call if no exception is thrown or the exception if one is.
     pub fn call_output<
         'output,
-        'value,
+        'f,
         'b,
         'base: 'frame,
-        V: AsRef<[Value<'value, 'b>]>,
+        V: AsRef<[Value<'f, 'b>]>,
         F: Frame<'base, 'frame>,
     >(
         self,
