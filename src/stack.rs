@@ -18,8 +18,8 @@
 // longer than its frame while C can offer no such guarantees.
 
 use crate::error::{JlrsError, JlrsResult};
-use crate::frame::Scope;
-use crate::value::{Output, Value, Values};
+use crate::frame::{Scope, Output};
+use crate::value::{Value, Values};
 use jl_sys::jl_get_ptls_states;
 use std::ffi::c_void;
 use std::marker::PhantomData;

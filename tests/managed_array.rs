@@ -2,7 +2,7 @@ use jlrs::prelude::*;
 
 #[test]
 fn array_1d() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     let unboxed = jlrs
         .frame(1, |frame| {
@@ -19,7 +19,7 @@ fn array_1d() {
 
 #[test]
 fn array_1d_nested() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     let unboxed = jlrs
         .frame(0, |frame| {
@@ -38,7 +38,7 @@ fn array_1d_nested() {
 
 #[test]
 fn array_1d_nested_dynamic() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     let unboxed = jlrs
         .frame(0, |frame| {
@@ -57,7 +57,7 @@ fn array_1d_nested_dynamic() {
 
 #[test]
 fn array_1d_dynamic() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     let unboxed = jlrs
         .dynamic_frame(|frame| {
@@ -74,7 +74,7 @@ fn array_1d_dynamic() {
 
 #[test]
 fn array_1d_dynamic_nested() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     let unboxed = jlrs
         .dynamic_frame(|frame| {
@@ -93,7 +93,7 @@ fn array_1d_dynamic_nested() {
 
 #[test]
 fn array_1d_dynamic_nested_dynamic() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     let unboxed = jlrs
         .dynamic_frame(|frame| {
@@ -112,7 +112,7 @@ fn array_1d_dynamic_nested_dynamic() {
 
 #[test]
 fn array_2d() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     let unboxed = jlrs
         .frame(1, |frame| {
@@ -130,7 +130,7 @@ fn array_2d() {
 
 #[test]
 fn array_2d_nested() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     let unboxed = jlrs
         .frame(0, |frame| {
@@ -150,7 +150,7 @@ fn array_2d_nested() {
 
 #[test]
 fn array_2d_nested_dynamic() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     let unboxed = jlrs
         .frame(0, |frame| {
@@ -170,7 +170,7 @@ fn array_2d_nested_dynamic() {
 
 #[test]
 fn array_2d_dynamic() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     let unboxed = jlrs
         .dynamic_frame(|frame| {
@@ -188,7 +188,7 @@ fn array_2d_dynamic() {
 
 #[test]
 fn array_2d_dynamic_nested() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     let unboxed = jlrs
         .dynamic_frame(|frame| {
@@ -208,7 +208,7 @@ fn array_2d_dynamic_nested() {
 
 #[test]
 fn array_2d_dynamic_nested_dynamic() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     let unboxed = jlrs
         .dynamic_frame(|frame| {
@@ -228,7 +228,7 @@ fn array_2d_dynamic_nested_dynamic() {
 
 #[test]
 fn array_3d() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     let unboxed = jlrs
         .frame(1, |frame| {
@@ -247,7 +247,7 @@ fn array_3d() {
 
 #[test]
 fn array_3d_nested() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     let unboxed = jlrs
         .frame(0, |frame| {
@@ -268,7 +268,7 @@ fn array_3d_nested() {
 
 #[test]
 fn array_3d_nested_dynamic() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     let unboxed = jlrs
         .frame(0, |frame| {
@@ -289,7 +289,7 @@ fn array_3d_nested_dynamic() {
 
 #[test]
 fn array_3d_dynamic() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     let unboxed = jlrs
         .dynamic_frame(|frame| {
@@ -308,7 +308,7 @@ fn array_3d_dynamic() {
 
 #[test]
 fn array_3d_dynamic_nested() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     let unboxed = jlrs
         .dynamic_frame(|frame| {
@@ -329,7 +329,7 @@ fn array_3d_dynamic_nested() {
 
 #[test]
 fn array_3d_dynamic_nested_dynamic() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     let unboxed = jlrs
         .dynamic_frame(|frame| {
@@ -350,7 +350,7 @@ fn array_3d_dynamic_nested_dynamic() {
 
 #[test]
 fn array_4d() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     let unboxed = jlrs
         .frame(1, |frame| {
@@ -370,7 +370,7 @@ fn array_4d() {
 
 #[test]
 fn array_4d_nested() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     let unboxed = jlrs
         .frame(0, |frame| {
@@ -392,7 +392,7 @@ fn array_4d_nested() {
 
 #[test]
 fn array_4d_nested_dynamic() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     let unboxed = jlrs
         .frame(0, |frame| {
@@ -414,7 +414,7 @@ fn array_4d_nested_dynamic() {
 
 #[test]
 fn array_4d_dynamic() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     let unboxed = jlrs
         .dynamic_frame(|frame| {
@@ -434,7 +434,7 @@ fn array_4d_dynamic() {
 
 #[test]
 fn array_4d_dynamic_nested() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     let unboxed = jlrs
         .dynamic_frame(|frame| {
@@ -456,7 +456,7 @@ fn array_4d_dynamic_nested() {
 
 #[test]
 fn array_4d_dynamic_nested_dynamic() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     let unboxed = jlrs
         .dynamic_frame(|frame| {

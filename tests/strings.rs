@@ -2,7 +2,7 @@ use jlrs::prelude::*;
 
 #[test]
 fn create_and_unbox_string_data() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     let unwrapped_string = jlrs
         .frame(1, |frame| {

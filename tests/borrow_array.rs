@@ -2,7 +2,7 @@ use jlrs::prelude::*;
 
 #[test]
 fn borrow_array_1d() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
     let mut data = vec![1u64, 2, 3, 4];
 
     let unboxed = jlrs
@@ -20,7 +20,7 @@ fn borrow_array_1d() {
 
 #[test]
 fn borrow_array_1d_dynamic() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
     let mut data = vec![1u64, 2, 3, 4];
 
     let unboxed = jlrs
@@ -38,7 +38,7 @@ fn borrow_array_1d_dynamic() {
 
 #[test]
 fn borrow_array_2d() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
     let mut data = vec![1u64, 2, 3, 4];
 
     let unboxed = jlrs
@@ -57,7 +57,7 @@ fn borrow_array_2d() {
 
 #[test]
 fn borrow_array_2d_dynamic() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
     let mut data = vec![1u64, 2, 3, 4];
 
     let unboxed = jlrs

@@ -2,7 +2,7 @@ use jlrs::prelude::*;
 
 #[test]
 fn create_and_unbox_uints() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     jlrs.frame(5, |frame| {
         let p1 = Value::new(frame, 1u8)?;
@@ -30,7 +30,7 @@ fn create_and_unbox_uints() {
 
 #[test]
 fn create_and_unbox_uints_dynamic() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     jlrs.dynamic_frame(|frame| {
         let p1 = Value::new(frame, 1u8)?;
@@ -58,7 +58,7 @@ fn create_and_unbox_uints_dynamic() {
 
 #[test]
 fn create_and_unbox_ints() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     jlrs.frame(5, |frame| {
         let p1 = Value::new(frame, 1i8)?;
@@ -86,7 +86,7 @@ fn create_and_unbox_ints() {
 
 #[test]
 fn create_and_unbox_ints_dynamic() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     jlrs.dynamic_frame(|frame| {
         let p1 = Value::new(frame, 1i8)?;
@@ -114,7 +114,7 @@ fn create_and_unbox_ints_dynamic() {
 
 #[test]
 fn create_and_unbox_floats() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     jlrs.frame(5, |frame| {
         let p1 = Value::new(frame, 1f32)?;
@@ -133,7 +133,7 @@ fn create_and_unbox_floats() {
 
 #[test]
 fn create_and_unbox_floats_dynamic() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     jlrs.dynamic_frame(|frame| {
         let p1 = Value::new(frame, 1f32)?;
@@ -152,7 +152,7 @@ fn create_and_unbox_floats_dynamic() {
 
 #[test]
 fn create_and_unbox_bool() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     jlrs.frame(5, |frame| {
         let p1 = Value::new(frame, true)?;
@@ -165,7 +165,7 @@ fn create_and_unbox_bool() {
 
 #[test]
 fn create_and_unbox_bool_dynamic() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     jlrs.dynamic_frame(|frame| {
         let p1 = Value::new(frame, false)?;
@@ -178,7 +178,7 @@ fn create_and_unbox_bool_dynamic() {
 
 #[test]
 fn create_and_unbox_char() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     jlrs.frame(5, |frame| {
         let p1 = Value::new(frame, 'a')?;
@@ -191,7 +191,7 @@ fn create_and_unbox_char() {
 
 #[test]
 fn create_and_unbox_char_dynamic() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     jlrs.dynamic_frame(|frame| {
         let p1 = Value::new(frame, 'a')?;
@@ -204,7 +204,7 @@ fn create_and_unbox_char_dynamic() {
 
 #[test]
 fn create_and_unbox_values() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     jlrs.frame(2, |frame| {
         let p1 = Values::new(frame, ['a', 'b'])?;
@@ -219,7 +219,7 @@ fn create_and_unbox_values() {
 
 #[test]
 fn create_and_unbox_values_dynamic() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     jlrs.dynamic_frame(|frame| {
         let p1 = Values::new(frame, ['a', 'b'])?;
@@ -234,7 +234,7 @@ fn create_and_unbox_values_dynamic() {
 
 #[test]
 fn create_and_unbox_dyn_values() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     jlrs.frame(2, |frame| {
         let p1 = Values::new_dyn(frame, [&1u32 as _, &2u64 as _])?;
@@ -249,7 +249,7 @@ fn create_and_unbox_dyn_values() {
 
 #[test]
 fn create_and_unbox_dyn_values_dynamic() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     jlrs.dynamic_frame(|frame| {
         let p1 = Values::new_dyn(frame, [&1u32 as _, &2u64 as _])?;
@@ -264,7 +264,7 @@ fn create_and_unbox_dyn_values_dynamic() {
 
 #[test]
 fn create_values_get_out_of_bounds() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     jlrs.frame(2, |frame| {
         let p1 = Values::new(frame, ['a'])?;

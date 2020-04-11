@@ -2,7 +2,7 @@ use jlrs::prelude::*;
 
 #[test]
 fn cannot_unbox_new_as_array() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     let out = jlrs.frame(1, |frame| {
         let p = Value::new(frame, 1u8)?;
@@ -14,7 +14,7 @@ fn cannot_unbox_new_as_array() {
 
 #[test]
 fn cannot_unbox_array_with_wrong_type() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     let out = jlrs.frame(1, |frame| {
         let array = Value::array::<f32, _, _>(frame, (3, 1))?;

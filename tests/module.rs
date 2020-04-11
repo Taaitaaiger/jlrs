@@ -2,7 +2,7 @@ use jlrs::prelude::*;
 
 #[test]
 fn core_module() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     jlrs.frame(0, |frame| {
         let module = Module::core(frame);
@@ -17,7 +17,7 @@ fn core_module() {
 
 #[test]
 fn core_module_dynamic() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     jlrs.dynamic_frame(|frame| {
         let module = Module::core(frame);
@@ -30,7 +30,7 @@ fn core_module_dynamic() {
 
 #[test]
 fn base_module() {
-let mut jlrs = unsafe { Runtime::testing_instance() };
+let mut jlrs = unsafe { Julia::testing_instance() };
 
     jlrs.frame(0, |frame| {
         let module = Module::base(frame);
@@ -45,7 +45,7 @@ let mut jlrs = unsafe { Runtime::testing_instance() };
 
 #[test]
 fn base_module_dynamic() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     jlrs.dynamic_frame(|frame| {
         let module = Module::base(frame);
@@ -58,7 +58,7 @@ fn base_module_dynamic() {
 
 #[test]
 fn main_module() {
-let mut jlrs = unsafe { Runtime::testing_instance() };
+let mut jlrs = unsafe { Julia::testing_instance() };
 
     jlrs.frame(0, |frame| {
         let main_module = Module::main(frame);
@@ -73,7 +73,7 @@ let mut jlrs = unsafe { Runtime::testing_instance() };
 
 #[test]
 fn main_module_dynamic() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     jlrs.dynamic_frame(|frame| {
         let main_module = Module::main(frame);
@@ -88,7 +88,7 @@ fn main_module_dynamic() {
 
 #[test]
 fn error_nonexistent_function() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     jlrs.frame(0, |frame| {
         assert!(Module::base(frame).function("foo").is_err());
@@ -99,7 +99,7 @@ fn error_nonexistent_function() {
 
 #[test]
 fn error_nonexistent_function_dynamic() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     jlrs.dynamic_frame(|frame| {
         assert!(Module::base(frame).function("foo").is_err());
@@ -110,7 +110,7 @@ fn error_nonexistent_function_dynamic() {
 
 #[test]
 fn error_nonexistent_submodule() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     jlrs.frame(0, |frame| {
         assert!(Module::base(frame).submodule("foo").is_err());
@@ -121,7 +121,7 @@ fn error_nonexistent_submodule() {
 
 #[test]
 fn error_nonexistent_submodule_dynamic() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
 
     jlrs.dynamic_frame(|frame| {
         assert!(Module::base(frame).submodule("foo").is_err());

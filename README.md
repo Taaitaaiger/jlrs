@@ -25,14 +25,14 @@ Similarly, in order to load `libjulia.so` you must add `/path/to/julia-x.y.z/lib
 ## Using this crate
 The first thing you should do is `use` the `prelude`-module with an asterisk, this will
 bring all the structs and traits you're likely to need in scope. Before you can use Julia it
-must first be initialized. You do this by creating a `Runtime` with `Runtime::new`, this
+must first be initialized. You do this by creating a `Julia` with `Julia::new`, this
 method forces you to pick a `stack size`. You will learn how to choose this value in the
 section about `memory management`. Note that this method can only be called once, if you
-drop the `Runtime` you won't be able to create a new one and have to restart the  entire
+drop the `Julia` you won't be able to create a new one and have to restart the  entire
 program.
 
-With the `Runtime` you can do two things: you can call `Runtime::include` to include your
-own Julia code, and `Runtime::session` to interact with Julia. If you want to create arrays
+With the `Julia` you can do two things: you can call `Julia::include` to include your
+own Julia code, and `Julia::session` to interact with Julia. If you want to create arrays
 with more than three dimensions or borrow arrays with more than one, you should include
 `jlrs.jl` first, which you can find in the root of this crate's github repository. This is
 necessary because this functionality currently depends on some Julia code defined in that file.
@@ -66,12 +66,12 @@ Failing to do so will only result in an error being returned, though, rather tha
 program.
 
 With all these things in hand, it is time to call `Session::execute`. This method works just
-like `Runtime::session` does: it takes closure with a single argument, a mutable reference
+like `Julia::session` does: it takes closure with a single argument, a mutable reference
 to an `ExecutionContext`. Besides letting you copy data from Julia to Rust with
 `ExecutionContext::try_unbox`, you will need this reference when calling functions using the
 `Call` trait.
 
-Both `Runtime::session` and `Session::execute` have generic return types, which lets you
+Both `Julia::session` and `Session::execute` have generic return types, which lets you
 easily return the results of your computations. As a simple example, this is how you can add
 two numbers:
 
@@ -79,7 +79,7 @@ two numbers:
 use jlrs::prelude::*;
 
 fn main() {
-    let mut runtime = unsafe { Runtime::new(16).unwrap() };
+    let mut runtime = unsafe { Julia::new(16).unwrap() };
 
     let output = runtime.session(|session| {
         let output = session.new_unassigned()?;
@@ -106,7 +106,7 @@ calling this function will take one slot on the stack, otherwise it will take as
 allocations plus three.
 
 It's also possible to allocate temporary data with `Session::with_temporaries`, which works
-mostly the same way as `Runtime::session` and `Session::execute` do, except its argument
+mostly the same way as `Julia::session` and `Session::execute` do, except its argument
 is an `AllocationContext` rather than a mutable reference to one. The `AllocationContext`
 offers you the same interface as `Session` does, with two major differences:
  - `AllocationContext::execute` takes the context by value rather than by reference, you
@@ -118,10 +118,10 @@ So, to summarize, in order to estimate how large your stack size should be, you 
 where you call `Session::execute`, `Session::with_temporaries` and
 `AllocationContext::execute` and figure out how many items you're allocating to get a rough
 estimate for how many slots you need. In case your computations fail due to exceeding the
-stack size, you can use `Runtime::set_stack_size` to create a larger one.
+stack size, you can use `Julia::set_stack_size` to create a larger one.
 
 ## Limitations
-Calling Julia is entirely single-threaded. You won't be able to use the `Runtime` from
+Calling Julia is entirely single-threaded. You won't be able to use the `Julia` from
 another thread and while Julia is doing stuff you won't be able to interact with it.
 Support for multithreading in Julia is currently in an experimental phase, there might still
 be options to use this functionality in order to build experimental support for some kind of

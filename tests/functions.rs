@@ -2,7 +2,7 @@ use jlrs::prelude::*;
 
 #[test]
 fn call0() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
     
     jlrs.frame(1, |frame| {
         let func = Module::base(frame).function("vect")?;
@@ -14,7 +14,7 @@ fn call0() {
 
 #[test]
 fn call0_output() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
     
     jlrs.frame(1, |frame| {
         let output = frame.output()?;
@@ -27,7 +27,7 @@ fn call0_output() {
 
 #[test]
 fn call0_dynamic() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
     
     jlrs.dynamic_frame(|frame| {
         let func = Module::base(frame).function("vect")?;
@@ -39,7 +39,7 @@ fn call0_dynamic() {
 
 #[test]
 fn call0_dynamic_output() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
     
     jlrs.dynamic_frame(|frame| {
         let output = frame.output()?;
@@ -52,7 +52,7 @@ fn call0_dynamic_output() {
 
 #[test]
 fn call1() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
     
     let out = jlrs.frame(2, |frame| {
         let func = Module::base(frame).function("cos")?;
@@ -66,7 +66,7 @@ fn call1() {
 
 #[test]
 fn call1_output() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
     
     let out = jlrs.frame(2, |frame| {
         let output = frame.output()?;
@@ -81,7 +81,7 @@ fn call1_output() {
 
 #[test]
 fn call1_dynamic() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
     
     let out = jlrs.dynamic_frame(|frame| {
         let func = Module::base(frame).function("cos")?;
@@ -95,7 +95,7 @@ fn call1_dynamic() {
 
 #[test]
 fn call1_dynamic_output() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
     
     let out = jlrs.dynamic_frame(|frame| {
         let output = frame.output()?;
@@ -110,7 +110,7 @@ fn call1_dynamic_output() {
 
 #[test]
 fn call2() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
     
     let out = jlrs.frame(3, |frame| {
         let func = Module::base(frame).function("+")?;
@@ -126,7 +126,7 @@ fn call2() {
 
 #[test]
 fn call2_output() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
     
     let out = jlrs.frame(3, |frame| {
         let output = frame.output()?;
@@ -142,7 +142,7 @@ fn call2_output() {
 
 #[test]
 fn call2_dynamic() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
     
     let out = jlrs.dynamic_frame(|frame| {
         let func = Module::base(frame).function("+")?;
@@ -157,7 +157,7 @@ fn call2_dynamic() {
 
 #[test]
 fn call2_dynamic_output() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
     
     let out = jlrs.dynamic_frame(|frame| {
         let output = frame.output()?;
@@ -173,7 +173,7 @@ fn call2_dynamic_output() {
 
 #[test]
 fn call3() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
     
     let out = jlrs.frame(4, |frame| {
         let func = Module::base(frame).function("+")?;
@@ -189,7 +189,7 @@ fn call3() {
 
 #[test]
 fn call3_output() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
     
     let out = jlrs.frame(4, |frame| {
         let output = frame.output()?;
@@ -206,7 +206,7 @@ fn call3_output() {
 
 #[test]
 fn call3_dynamic() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
     
     let out = jlrs.dynamic_frame(|frame| {
         let func = Module::base(frame).function("+")?;
@@ -222,7 +222,7 @@ fn call3_dynamic() {
 
 #[test]
 fn call3_dynamic_output() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
     
     let out = jlrs.dynamic_frame(|frame| {
         let output = frame.output()?;
@@ -239,7 +239,7 @@ fn call3_dynamic_output() {
 
 #[test]
 fn call() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
     
     let out = jlrs.frame(5, |frame| {
         let func = Module::base(frame).function("+")?;
@@ -256,7 +256,7 @@ fn call() {
 
 #[test]
 fn call_output() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
     
     let out = jlrs.frame(5, |frame| {
         let output = frame.output()?;
@@ -274,7 +274,7 @@ fn call_output() {
 
 #[test]
 fn call_dynamic() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
     
     let out = jlrs.dynamic_frame(|frame| {
         let func = Module::base(frame).function("+")?;
@@ -291,7 +291,7 @@ fn call_dynamic() {
 
 #[test]
 fn call_dynamic_output() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
     
     let out = jlrs.dynamic_frame(|frame| {
         let output = frame.output()?;
@@ -309,7 +309,7 @@ fn call_dynamic_output() {
 
 #[test]
 fn call_values() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
     
     let out = jlrs.frame(5, |frame| {
         let func = Module::base(frame).function("+")?;
@@ -323,7 +323,7 @@ fn call_values() {
 
 #[test]
 fn call_values_output() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
     
     let out = jlrs.frame(5, |frame| {
         let output = frame.output()?;
@@ -338,7 +338,7 @@ fn call_values_output() {
 
 #[test]
 fn call_values_dynamic() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
     
     let out = jlrs.dynamic_frame(|frame| {
         let func = Module::base(frame).function("+")?;
@@ -352,7 +352,7 @@ fn call_values_dynamic() {
 
 #[test]
 fn call_values_dynamic_output() {
-    let mut jlrs = unsafe { Runtime::testing_instance() };
+    let mut jlrs = unsafe { Julia::testing_instance() };
     
     let out = jlrs.dynamic_frame(|frame| {
         let output = frame.output()?;

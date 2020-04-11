@@ -1,4 +1,4 @@
-//! Access Julia modules, globals and functions.
+//! Access Julia modules and the globals and functions defined in them.
 
 use crate::error::{JlrsError, JlrsResult};
 use crate::traits::Frame;
@@ -11,19 +11,19 @@ use std::marker::PhantomData;
 
 /// Functionality in Julia can be accessed through its module system. You can get a handle to the
 /// three standard modules, `Main`, `Base`, and `Core` and access their submodules through them.
-/// If you include your own Julia code with [`Runtime::include`], its contents are made available
+/// If you include your own Julia code with [`Julia::include`], its contents are made available
 /// relative to `Main`.
 ///
-/// [`Runtime::include`]: ../struct.Runtime.html#method.include
+/// [`Julia::include`]: ../struct.Julia.html#method.include
 #[derive(Copy, Clone)]
 pub struct Module<'scope>(*mut jl_module_t, PhantomData<&'scope ()>);
 
 impl<'scope> Module<'scope> {
     /// Returns a handle to Julia's `Main`-module. If you include your own Julia code by calling
-    /// [`Runtime::include`], handles to functions, globals, and submodules defined in these
+    /// [`Julia::include`], handles to functions, globals, and submodules defined in these
     /// included files are available through this module.
     ///
-    /// [`Runtime::include`]: ../struct.Runtime.html#method.include
+    /// [`Julia::include`]: ../struct.Julia.html#method.include
     pub fn main<'base: 'frame, 'frame, F: Frame<'base, 'frame>>(_: &mut F) -> Module<'base> {
         unsafe { Module(jl_main_module, PhantomData) }
     }
@@ -81,9 +81,8 @@ impl<'scope> Module<'scope> {
 
     /// Returns the function named `name` in this module. Note that all globals defined within the
     /// module will be successfully resolved into a function; Julia will throw an exception if you
-    /// try to call something that isn't a function. This means that `Module::global` and
-    /// `Module::function` do exactly the same thing; this function mostly exists for clarity.
-    /// Returns an error if the global doesn't exist.
+    /// try to call something that isn't a function. This means that this method is just an alias
+    /// for `Module::global`.
     /// 
     /// Returns an error if th function doesn't exist.
     pub fn function<N: AsRef<str>>(self, name: N) -> JlrsResult<Value<'scope, 'static>> {

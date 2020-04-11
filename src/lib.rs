@@ -19,19 +19,19 @@
 //! # Using this crate
 //! The first thing you should do is `use` the [`prelude`]-module with an asterisk, this will
 //! bring all the structs and traits you're likely to need in scope. Before you can use Julia it
-//! must first be initialized. You do this by creating a [`Runtime`] with [`Runtime::new`], this
+//! must first be initialized. You do this by creating a [`Julia`] with [`Julia::new`], this
 //! method forces you to pick a `stack size`. You will learn how to choose this value soon. Note
-//! that this method can only be called once, if you drop the [`Runtime`] you won't be able to
+//! that this method can only be called once, if you drop the [`Julia`] you won't be able to
 //! create a new one and have to restart the entire program.
 //!
-//! With the [`Runtime`] you can do two things: you can call [`Runtime::include`] to include your
-//! own Julia code and either [`Runtime::frame`] or [`Runtime::dynamic_frame`] to interact with
+//! With the [`Julia`] you can do two things: you can call [`Julia::include`] to include your
+//! own Julia code and either [`Julia::frame`] or [`Julia::dynamic_frame`] to interact with
 //! Julia. If you want to create arrays with more than three dimensions or borrow arrays with more
 //! than one, you should include `jlrs.jl` first. You can find this file in the root of this
 //! crate's github repository. This is necessary because this functionality currently depends on
 //! some Julia code defined in that file.
 //!
-//! The other two methods, [`Runtime::frame`] and [`Runtime::dynamic_frame`], take a closure that
+//! The other two methods, [`Julia::frame`] and [`Julia::dynamic_frame`], take a closure that
 //! provides you with a [`StaticFrame`] and a [`DynamicFrame`] respectively. Both types implement
 //! the [`Frame`] trait. These frames are used to create new values, access Julia modules and
 //! their functions, call functions, and copy data back to Rust. Additionally, frames can be
@@ -42,7 +42,7 @@
 //! In order to call a Julia function, you'll need two things: a function to call, and arguments
 //! to call it with. You can acquire the function through the module that defines it with
 //! [`Module::function`]; [`Module::base`] and [`Module::core`] provide access to Julia's `Base`
-//! and `Core` module respectively, while everything you include through [`Runtime::include`] is
+//! and `Core` module respectively, while everything you include through [`Julia::include`] is
 //! made available relative to the `Main` module which you can access by calling [`Module::main`].
 //!
 //! Most Julia data is represented by a [`Value`]. Basic data types like numbers, booleans, and
@@ -57,7 +57,7 @@
 //! # use jlrs::prelude::*;
 //! # fn main() {
 //! // Create the runtime and interact with Julia from a dynamic frame
-//! let mut runtime = unsafe { Runtime::new(16).unwrap() };
+//! let mut runtime = unsafe { Julia::new(16).unwrap() };
 //! runtime.dynamic_frame(|frame| {
 //!     // Create the two arguments
 //!     let i = Value::new(frame, 2u64)?;
@@ -79,7 +79,7 @@
 //! detect what data is still in use. The frames we've seen are
 //!
 //! # Limitations
-//! Calling Julia is entirely single-threaded. You won't be able to use the [`Runtime`] from
+//! Calling Julia is entirely single-threaded. You won't be able to use the [`Julia`] from
 //! another thread and while Julia is doing stuff you won't be able to interact with it.
 //! Support for multithreading in Julia is currently in an experimental phase, there might still
 //! be options to use this functionality in order to build experimental support for some kind of
@@ -87,11 +87,11 @@
 //!
 //! [`jl-sys`]: ../jl_sys/index.html
 //! [`prelude`]: prelude/index.html
-//! [`Runtime`]: struct.Runtime.html
-//! [`Runtime::new`]: struct.Runtime.html#method.new
+//! [`Julia`]: struct.Julia.html
+//! [`Julia::new`]: struct.Julia.html#method.new
 //! [`memory management`]: #memory-management
-//! [`Runtime::include`]: struct.Runtime.html#method.include
-//! [`Runtime::session`]: struct.Runtime.html#method.session
+//! [`Julia::include`]: struct.Julia.html#method.include
+//! [`Julia::session`]: struct.Julia.html#method.session
 //! [`Session`]: context/struct.Session.html
 //! [`Session::new_unassigned`]: context/struct.Session.html#method.new_unassigned
 //! [`Session::new_primitive`]: context/struct.Session.html#method.new_primitive
@@ -109,12 +109,12 @@
 //! [`Session::with_temporaries`]: context/struct.Session.html#method.with_temporaries
 //! [`AllocationContext`]: context/struct.AllocationContext.html
 //! [`AllocationContext::execute`]: context/struct.AllocationContext.html#method.execute
-//! [`Runtime::set_stack_size`]: struct.Runtime.html#method.set_stack_size
+//! [`Julia::set_stack_size`]: struct.Julia.html#method.set_stack_size
 
 pub mod array;
 pub mod error;
 pub mod frame;
-mod memory;
+mod stack;
 pub mod module;
 pub mod prelude;
 pub mod traits;
@@ -123,7 +123,7 @@ pub mod value;
 use error::{JlrsError, JlrsResult};
 use frame::{DynamicFrame, StaticFrame};
 use jl_sys::{jl_atexit_hook, jl_init};
-use memory::{Dynamic, RawStack, StackView, Static};
+use stack::{Dynamic, RawStack, StackView, Static};
 use module::Module;
 use std::mem::ManuallyDrop;
 use std::path::Path;
@@ -133,35 +133,32 @@ use value::Value;
 static INIT: AtomicBool = AtomicBool::new(false);
 
 /// This struct can be created only once during the lifetime of your program. You
-/// must create it with [`Runtime::new`] before you can do anything related to Julia.
+/// must create it with [`Julia::init`] before you can do anything related to Julia.
 ///
-/// [`Runtime::new`]: struct.Runtime.html#method.new
-pub struct Runtime {
+/// [`Julia::new`]: struct.Julia.html#method.new
+pub struct Julia {
     stack: RawStack,
 }
 
-impl Runtime {
-    /// Creates the `Runtime`. This function can only be called once because it initializes Julia.
-    /// If you call it a second time, it will return an error. If this struct is dropped, you will
-    /// need to restart your program to be able to call Julia code again.
+impl Julia {
+    /// Initializes Julia, this function can only be called once. If you call it a second time it
+    /// will return an error. If this struct is dropped, you will need to restart your program to
+    /// be able to call Julia code again.
     ///
     /// You have to choose a stack size when calling this function. This will be the total number
-    /// of slots that will be available on the GC stack. One of these slots will alwas be in use,
-    /// each level of nesting frames will take at least two slots,
+    /// of slots that will be available on the GC stack. One of these slots will alwas be in use.
     ///
     /// This function is unsafe because this crate provides you with a way to execute arbitrary
-    /// Julia code.
-    ///
-    /// [`libary documentation`]: index.html
+    /// Julia code which can't be checked for correctness.
     #[cfg_attr(tarpaulin, skip)]
-    pub unsafe fn new(stack_size: usize) -> JlrsResult<Self> {
+    pub unsafe fn init(stack_size: usize) -> JlrsResult<Self> {
         if INIT.swap(true, Ordering::SeqCst) {
             return Err(JlrsError::AlreadyInitialized.into());
         }
 
         jl_init();
 
-        Ok(Runtime {
+        Ok(Julia {
             stack: RawStack::new(stack_size),
         })
     }
@@ -171,7 +168,7 @@ impl Runtime {
         unsafe { self.stack = RawStack::new(stack_size) }
     }
 
-    /// Returns the stack size.
+    /// Returns the current stack size.
     pub fn stack_size(&self) -> usize {
         self.stack.size()
     }
@@ -179,8 +176,8 @@ impl Runtime {
     #[doc(hidden)]
     // DO NOT USE THIS. It's an awful, memory-leaking, workaround to make integration testing
     // easier
-    pub unsafe fn testing_instance() -> ManuallyDrop<Runtime> {
-        let mut rt = ManuallyDrop::new(Runtime {
+    pub unsafe fn testing_instance() -> ManuallyDrop<Julia> {
+        let mut rt = ManuallyDrop::new(Julia {
             stack: RawStack::new(32),
         });
 
@@ -201,7 +198,7 @@ impl Runtime {
     /// ```no_run
     /// # use jlrs::prelude::*;
     /// # fn main() {
-    /// let mut runtime = unsafe { Runtime::new(16).unwrap() };
+    /// let mut runtime = unsafe { Julia::new(16).unwrap() };
     /// runtime.include("jlrs.jl").unwrap();
     /// # }
     /// ```
@@ -232,7 +229,7 @@ impl Runtime {
     /// ```no_run
     /// # use jlrs::prelude::*;
     /// # fn main() {
-    /// # let mut runtime = unsafe { Runtime::new(16).unwrap() };
+    /// # let mut runtime = unsafe { Julia::new(16).unwrap() };
     /// runtime.frame(2, |frame| {
     ///     let _i = Value::new(frame, 2u64)?;
     ///     let _j = Value::new(frame, 1u32)?;
@@ -268,7 +265,7 @@ impl Runtime {
     /// ```no_run
     /// # use jlrs::prelude::*;
     /// # fn main() {
-    /// # let mut runtime = unsafe { Runtime::new(16).unwrap() };
+    /// # let mut runtime = unsafe { Julia::new(16).unwrap() };
     /// runtime.dynamic_frame(|frame| {
     ///     let _i = Value::new(frame, 2u64)?;
     ///     let _j = Value::new(frame, 1u32)?;
@@ -293,7 +290,7 @@ impl Runtime {
     }
 }
 
-impl Drop for Runtime {
+impl Drop for Julia {
     #[cfg_attr(tarpaulin, skip)]
     fn drop(&mut self) {
         unsafe {

@@ -7,13 +7,12 @@
 //! This trait is automatically brought into scope by using the [`prelude`] module.
 //!
 //! [`Frame`]: trait.Frame.html
-//! [`Output`]: ../value/struct.Output.html
+//! [`Output`]: ../frame/struct.Output.html
 //! [`prelude`]: ../prelude/index.html
 
 use crate::array::Array;
 use crate::error::{JlrsError, JlrsResult};
-use crate::frame::{DynamicFrame, StaticFrame, Scope};
-use crate::value::Output;
+use crate::frame::{DynamicFrame, Output, StaticFrame, Scope};
 use std::borrow::Cow;
 use std::marker::PhantomData;
 
@@ -51,8 +50,8 @@ pub trait TryUnbox: private::TryUnbox {}
 ///
 /// Frames use two lifetimes, `'base` and `'frame`. The first is used to ensure global Julia
 /// values, like [`Module`]s and functions accessed through modules, can be used freely across
-/// frames, but can't be returned from the frame created through [`Runtime::frame`] or
-/// [`Runtime::dynamic_frame`]. Other values get the `'frame` lifetime which ensures those values
+/// frames, but can't be returned from the frame created through [`Julia::frame`] or
+/// [`Julia::dynamic_frame`]. Other values get the `'frame` lifetime which ensures those values
 /// can live as long as their frames.
 ///
 /// If you need the result of a function call to be valid outside the frame where it is called,
@@ -63,9 +62,9 @@ pub trait TryUnbox: private::TryUnbox {}
 /// [`StaticFrame`]: ../frame/struct.StaticFrame.html
 /// [`DynamicFrame`]: ../frame/struct.DynamicFrame.html
 /// [`Module`]: ../module/struct.Module.html
-/// [`Runtime::frame`]: ../struct.Runtime.html#method.frame
-/// [`Runtime::dynamic_frame`]: ../struct.Runtime.html#method.dynamic_frame
-/// [`Output`]: ../value/struct.Output.html
+/// [`Julia::frame`]: ../struct.Julia.html#method.frame
+/// [`Julia::dynamic_frame`]: ../struct.Julia.html#method.dynamic_frame
+/// [`Output`]: ../frame/struct.Output.html
 /// [`Value::call_output`]: ../value/struct.Value.html#method.call_output
 pub trait Frame<'base: 'frame, 'frame>: private::Frame<'base, 'frame> {
     /// Create a `StaticFrame` that can hold `capacity` values, and call the given closure.
@@ -275,9 +274,9 @@ pub(crate) mod private {
     use crate::array::Array;
     use crate::array::Dimensions;
     use crate::error::{JlrsError, JlrsResult};
-    use crate::frame::{DynamicFrame, StaticFrame};
-    use crate::memory::FrameIdx;
-    use crate::value::{Output, Value, Values};
+    use crate::frame::{DynamicFrame, Output, StaticFrame};
+    use crate::stack::FrameIdx;
+    use crate::value::{Value, Values};
     use jl_sys::{
         jl_array_data, jl_array_dim, jl_array_dims, jl_array_eltype, jl_array_ndims,
         jl_array_nrows, jl_bool_type, jl_box_bool, jl_box_char, jl_box_float32, jl_box_float64,

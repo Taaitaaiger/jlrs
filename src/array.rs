@@ -2,7 +2,8 @@
 
 /// An n-dimensional array whose contents have been copied from Julia to Rust. You can create this
 /// struct by calling [`Value::try_unbox`]. In order to unbox arrays that contain `bool`s or
-/// `char`s, you can unbox them as `Array<i8>` and `Array<u32>` respectively.
+/// `char`s, you can unbox them as `Array<i8>` and `Array<u32>` respectively. The data has a
+/// column-major layout.
 ///
 /// [`Value::try_unbox`]: ../value/struct.Value.html#method.try_unbox
 pub struct Array<T> {
