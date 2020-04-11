@@ -76,11 +76,11 @@ impl<'frame> Values<'frame> {
 ///
 /// A `Value` wraps around the raw value from the Julia C API and applies some restrictions
 /// through lifetimes to ensure it can only be used while it's protected from garbage collection
-/// and its contents are valid. The second lifetime of this struct is only relevant when you use 
-/// arrays that borrow their contents from Rust.
+/// and its contents are valid.
 /// 
 /// The methods that create a new `Value` come in two varieties: `method` and `method_output`. The
-/// first will use a slot in the current frame to protect the value from garbage collection, 
+/// first will use a slot in the current frame to protect the value from garbage collection, while 
+/// the latter uses a slot in an earlier frame.
 ///
 /// [`Value::new`]: struct.Value.html#method.new
 /// [`Module`]: ../module/struct.Module.html
@@ -157,6 +157,9 @@ impl<'frame, 'data> Value<'frame, 'data> {
         Value::wrap(self.0)
     }
 
+    /// Extend the `Value`'s lifetime to the `Output's lifetime. The original value will still be
+    /// valid after calling this method, the data will be protected from garbage collection until
+    /// the `Output`'s frame goes out of scope.
     pub fn extend<'output, 'base, F>(
         self,
         frame: &mut F,
