@@ -19,7 +19,7 @@
 //! # Using this crate
 //! The first thing you should do is `use` the [`prelude`]-module with an asterisk, this will
 //! bring all the structs and traits you're likely to need in scope. Before you can use Julia it
-//! must first be initialized. You do this by creating a [`Julia`] with [`Julia::new`], this
+//! must first be initialized. You do this by creating a [`Julia`] with [`Julia::init`], this
 //! method forces you to pick a `stack size`. You will learn how to choose this value soon. Note
 //! that this method can only be called once, if you drop the [`Julia`] you won't be able to
 //! create a new one and have to restart the entire program.
@@ -57,7 +57,7 @@
 //! # use jlrs::prelude::*;
 //! # fn main() {
 //! // Create the runtime and interact with Julia from a dynamic frame
-//! let mut runtime = unsafe { Julia::new(16).unwrap() };
+//! let mut runtime = unsafe { Julia::init(16).unwrap() };
 //! runtime.dynamic_frame(|frame| {
 //!     // Create the two arguments
 //!     let i = Value::new(frame, 2u64)?;
@@ -88,7 +88,7 @@
 //! [`jl-sys`]: ../jl_sys/index.html
 //! [`prelude`]: prelude/index.html
 //! [`Julia`]: struct.Julia.html
-//! [`Julia::new`]: struct.Julia.html#method.new
+//! [`Julia::init`]: struct.Julia.html#method.init
 //! [`memory management`]: #memory-management
 //! [`Julia::include`]: struct.Julia.html#method.include
 //! [`Julia::session`]: struct.Julia.html#method.session
@@ -135,7 +135,7 @@ static INIT: AtomicBool = AtomicBool::new(false);
 /// This struct can be created only once during the lifetime of your program. You
 /// must create it with [`Julia::init`] before you can do anything related to Julia.
 ///
-/// [`Julia::new`]: struct.Julia.html#method.new
+/// [`Julia::init`]: struct.Julia.html#method.init
 pub struct Julia {
     stack: RawStack,
 }
@@ -198,7 +198,7 @@ impl Julia {
     /// ```no_run
     /// # use jlrs::prelude::*;
     /// # fn main() {
-    /// let mut runtime = unsafe { Julia::new(16).unwrap() };
+    /// let mut runtime = unsafe { Julia::init(16).unwrap() };
     /// runtime.include("jlrs.jl").unwrap();
     /// # }
     /// ```
@@ -229,7 +229,7 @@ impl Julia {
     /// ```no_run
     /// # use jlrs::prelude::*;
     /// # fn main() {
-    /// # let mut runtime = unsafe { Julia::new(16).unwrap() };
+    /// # let mut runtime = unsafe { Julia::init(16).unwrap() };
     /// runtime.frame(2, |frame| {
     ///     let _i = Value::new(frame, 2u64)?;
     ///     let _j = Value::new(frame, 1u32)?;
@@ -265,7 +265,7 @@ impl Julia {
     /// ```no_run
     /// # use jlrs::prelude::*;
     /// # fn main() {
-    /// # let mut runtime = unsafe { Julia::new(16).unwrap() };
+    /// # let mut runtime = unsafe { Julia::init(16).unwrap() };
     /// runtime.dynamic_frame(|frame| {
     ///     let _i = Value::new(frame, 2u64)?;
     ///     let _j = Value::new(frame, 1u32)?;
