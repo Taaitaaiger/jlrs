@@ -1,6 +1,6 @@
 [package]
 name = "jlrs"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Thomas van Doornmalen <thomas.vandoornmalen@gmail.com>"]
 description = """
 jlrs is a library built around bindings to the Julia C API that enables Julia code to be called 
@@ -17,7 +17,7 @@ license = "MIT"
 edition = "2018"
 
 [dependencies]
-jl-sys = "0.3.0"
+jl-sys = "0.3.1"
 
 [features]
 docs-rs = ["jl-sys/docs-rs"]

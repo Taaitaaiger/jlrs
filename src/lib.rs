@@ -105,7 +105,7 @@
 //! Most of these lifetimes have a specific meaning:
 //! 
 //! - `'base` is the lifetime of a frame created through [`Julia::frame`] or 
-//! [`Julia::static_frame`]. This lifetime prevents you from using Julia data outside of a frame,
+//! [`Julia::dynamic_frame`]. This lifetime prevents you from using Julia data outside of a frame,
 //! even if that data is a global value in Julia.
 //! 
 //! - `'frame` is the lifetime of an arbitrary frame; in the base frame it will be the same as 

@@ -153,6 +153,7 @@ impl<'base: 'frame, 'frame> Drop for DynamicFrame<'base, 'frame> {
 /// An `Output` is a slot on the GC stack in the frame that was used to create it. It can be used
 /// to extend the lifetime of the result of a function call to the `Output`'s lifetime. You can
 /// create an output by calling [`Frame::output`].
+/// 
 /// [`Frame::output`]: ../traits/trait.Frame.html#method.output
 pub struct Output<'frame> {
     pub(crate) offset: usize,
