@@ -1,6 +1,7 @@
 //! The main goal behind `jlrs` is to provide a simple and safe interface to the Julia C API.
 //! Currently this crate has only been tested on Linux, if you try to use it on another OS it will
-//! likely fail to generate the bindings to Julia.
+//! likely fail to generate the bindings to Julia. This crate is currently tested with Julia 
+//! v1.4.0.
 //!
 //! # Generating the bindings
 //! This crate depends on `jl-sys` which contains the raw bindings to the Julia C API, these are
@@ -59,9 +60,8 @@
 //! ```no_run
 //! # use jlrs::prelude::*;
 //! # fn main() {
-//! // Create the runtime and interact with Julia from a dynamic frame
-//! let mut runtime = unsafe { Julia::init(16).unwrap() };
-//! runtime.dynamic_frame(|frame| {
+//! let mut julia = unsafe { Julia::init(16).unwrap() };
+//! julia.dynamic_frame(|frame| {
 //!     // Create the two arguments
 //!     let i = Value::new(frame, 2u64)?;
 //!     let j = Value::new(frame, 1u32)?;
@@ -81,10 +81,9 @@
 //! ```no_run
 //! # use jlrs::prelude::*;
 //! # fn main() {
-//! // Create the runtime and interact with Julia from a dynamic frame
-//! let mut runtime = unsafe { Julia::init(16).unwrap() };
+//! let mut julia = unsafe { Julia::init(16).unwrap() };
 //! // Three slots; two for the inputs and one for the output.
-//! runtime.frame(3, |frame| {
+//! julia.frame(3, |frame| {
 //!     // Create the two arguments
 //!     let i = Value::new(frame, 2u64)?;
 //!     let j = Value::new(frame, 1u32)?;
@@ -99,6 +98,8 @@
 //! # }
 //! ```
 //!
+//! For more examples, you can take a look at this crate's integration tests.
+//! 
 //! # Lifetimes
 //! While reading the documentation for this crate, you will see that a lot of lifetimes are used.
 //! Most of these lifetimes have a specific meaning:
@@ -177,7 +178,7 @@ impl Julia {
     /// of slots that will be available on the GC stack. One of these slots will alwas be in use.
     ///
     /// This function is unsafe because this crate provides you with a way to execute arbitrary
-    /// Julia code which can't be checked for correctness.
+    /// Julia code which can't be checked for correctness. 
     #[cfg_attr(tarpaulin, skip)]
     pub unsafe fn init(stack_size: usize) -> JlrsResult<Self> {
         if INIT.swap(true, Ordering::SeqCst) {
@@ -226,8 +227,8 @@ impl Julia {
     /// ```no_run
     /// # use jlrs::prelude::*;
     /// # fn main() {
-    /// let mut runtime = unsafe { Julia::init(16).unwrap() };
-    /// runtime.include("jlrs.jl").unwrap();
+    /// let mut julia = unsafe { Julia::init(16).unwrap() };
+    /// julia.include("jlrs.jl").unwrap();
     /// # }
     /// ```
     pub fn include<P: AsRef<Path>>(&mut self, path: P) -> JlrsResult<()> {
@@ -257,8 +258,8 @@ impl Julia {
     /// ```no_run
     /// # use jlrs::prelude::*;
     /// # fn main() {
-    /// # let mut runtime = unsafe { Julia::init(16).unwrap() };
-    /// runtime.frame(2, |frame| {
+    /// # let mut julia = unsafe { Julia::init(16).unwrap() };
+    /// julia.frame(2, |frame| {
     ///     let _i = Value::new(frame, 2u64)?;
     ///     let _j = Value::new(frame, 1u32)?;
     ///     Ok(())
@@ -293,8 +294,8 @@ impl Julia {
     /// ```no_run
     /// # use jlrs::prelude::*;
     /// # fn main() {
-    /// # let mut runtime = unsafe { Julia::init(16).unwrap() };
-    /// runtime.dynamic_frame(|frame| {
+    /// # let mut julia = unsafe { Julia::init(16).unwrap() };
+    /// julia.dynamic_frame(|frame| {
     ///     let _i = Value::new(frame, 2u64)?;
     ///     let _j = Value::new(frame, 1u32)?;
     ///     Ok(())
