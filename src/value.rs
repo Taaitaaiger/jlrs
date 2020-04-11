@@ -42,8 +42,9 @@ impl<'frame> Values<'frame> {
 
     /// Allocate several values of the same type, this type must implement [`IntoJulia`]. The
     /// values will be protected from garbage collection inside the frame used to create them.
-    /// This takes as many slots on the GC stack as values that are allocated. Returns an error if
-    /// there is not enough space on the stack.
+    /// This takes as many slots on the GC stack as values that are allocated. 
+    /// 
+    /// Returns an error if there is not enough space on the stack.
     ///
     /// [`IntoJulia`]: ../traits/trait.IntoJulia.html
     pub fn new<'base, T, V, F>(frame: &mut F, data: V) -> JlrsResult<Self>
@@ -58,7 +59,8 @@ impl<'frame> Values<'frame> {
 
     /// Allocate several values of possibly different types, these types must implement
     /// [`IntoJulia`]. The values will be protected from garbage collection inside the frame used
-    /// to create them.This takes as many slots on the GC stack as values that are allocated.
+    /// to create them. This takes as many slots on the GC stack as values that are allocated.
+    /// 
     /// Returns an error if there is not enough space on the stack.
     ///
     /// [`IntoJulia`]: ../traits/trait.IntoJulia.html
@@ -195,6 +197,15 @@ impl<'frame, 'data> Value<'frame, 'data> {
         }
     }
 
+    /// Allocates a new n-dimensional array in Julia using an `Output`.
+    ///
+    /// Because an `Output` is used, no additional slot in the current frame is used. If you
+    /// allocate an array with more dimensions, an extra frame is created with `n + 1` slots, 
+    /// temporarily taking `n + 3` additional slots. This latter case requires that `jlrs.jl` has
+    /// been included.
+    ///
+    /// This function returns an error if there are not enough slots available, or if `jlrs.jl`
+    /// has not been included when allocating arrays with four or more dimensions.
     pub fn array_output<'output, 'base, T, D, F>(
         frame: &mut F,
         output: Output<'output>,
@@ -244,6 +255,20 @@ impl<'frame, 'data> Value<'frame, 'data> {
         }
     }
 
+    /// Borrows an n-dimensional array from Rust for use in Julia using an `Output`.
+    ///
+    /// Because an `Output` is used, no additional slot in the current frame is used. If you 
+    /// borrow an array with more dimensions, an extra frame is created with `n + 1` slots, 
+    /// temporarily taking `n + 3` additional slots. This latter case requires that `jlrs.jl` has 
+    /// been included.
+    ///
+    /// This function returns an error if there are not enough slots available, or if `jlrs.jl`
+    /// has not been included when borrowing arrays with two or more dimensions.
+    ///
+    /// This function is unsafe to call because you must ensure that the lifetime of this value is
+    /// never extended through an `Output` by returning it from a Julia function, is never
+    /// assigned to a global in Julia, and is never referenced from a value with a longer lifetime
+    /// in Julia.
     pub fn borrow_array_output<'output, 'borrow, 'base, T, D, V, F>(
         frame: &mut F,
         output: Output<'output>,
@@ -264,10 +289,10 @@ impl<'frame, 'data> Value<'frame, 'data> {
         }
     }
 
-    /// Moves an n-dimensional array from Rust to Julia.
+    /// Moves an n-dimensional array from Rust to Julia using an `Output`.
     ///
-    /// Moving an array with one dimension requires one slot on the GC stack. If you borrow an
-    /// array with more dimensions, an extra frame is created with `n + 1` slots, temporarily
+    /// Because an `Output` is used, no additional slot in the current frame is used. If you move 
+    /// an array with more dimensions, an extra frame is created with `n + 1` slots, temporarily
     /// taking `n + 3` additional slots. This latter case requires that `jlrs.jl` has been
     /// included.
     ///
@@ -290,6 +315,15 @@ impl<'frame, 'data> Value<'frame, 'data> {
         }
     }
 
+    /// Moves an n-dimensional array from Rust to Julia.
+    ///
+    /// Moving an array with one dimension requires one slot on the GC stack. If you move an
+    /// array with more dimensions, an extra frame is created with `n + 1` slots, temporarily
+    /// taking `n + 3` additional slots. This latter case requires that `jlrs.jl` has been
+    /// included.
+    ///
+    /// This function returns an error if there are not enough slots available, or if `jlrs.jl`
+    /// has not been included when moving arrays with two or more dimensions.
     pub fn move_array_output<'output, 'base, T, D, F>(
         frame: &mut F,
         output: Output<'output>,

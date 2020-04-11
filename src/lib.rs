@@ -39,7 +39,8 @@
 //! collector. Each frame takes at least two slots on the stack whose size was chosen when you
 //! initialized Julia, plus an additional one for each value you create and function you call. A
 //! [`StaticFrame`] forces you to choose the number of slots that will be available, while a
-//! [`DynamicFrame`] grows dynamically.
+//! [`DynamicFrame`] grows dynamically. The slots that were used are reclaimed when the frame goes
+//! out of scope.
 //!
 //! In order to call a Julia function, you'll need two things: a function to call, and arguments
 //! to call it with. You can acquire the function through the module that defines it with
