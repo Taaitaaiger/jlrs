@@ -17,8 +17,8 @@
 // from existing in Rust. Similarly, thanks to lifetimes we can enforce that a value can't live
 // longer than its frame while C can offer no such guarantees.
 
-use crate::error::{JlrsError, JlrsResult};
-use crate::frame::{Scope, Output};
+use crate::error::{AllocError, JlrsResult};
+use crate::frame::Output;
 use crate::value::{Value, Values};
 use jl_sys::jl_get_ptls_states;
 use std::ffi::c_void;
@@ -41,14 +41,14 @@ impl RawStack {
         RawStack(boxed)
     }
 
+    pub(crate) fn as_mut<'original: 'scope, 'scope>(
+        &'original mut self,
+    ) -> &'scope mut [*mut c_void] {
+        &mut self.0
+    }
+
     pub(crate) fn size(&self) -> usize {
         self.0.len()
-    }
-}
-
-impl AsMut<[*mut c_void]> for RawStack {
-    fn as_mut(&mut self) -> &mut [*mut c_void] {
-        &mut self.0
     }
 }
 
@@ -62,6 +62,7 @@ impl<'stack, V> StackView<'stack, V> {
         self.stack[0] as _
     }
 
+    #[cfg_attr(tarpaulin, skip)]
     pub(crate) fn print_memory(&self) {
         println!("{:?}", &self.stack);
     }
@@ -72,14 +73,14 @@ impl<'stack, V> StackView<'stack, V> {
         self.stack[0] = (idx.0 - 2) as _;
     }
 
-    pub(crate) unsafe fn nest_static<'nested>(&'nested mut self, _: &'nested mut Scope) -> StackView<'nested, Static> {
+    pub(crate) unsafe fn nest_static<'nested>(&'nested mut self) -> StackView<'nested, Static> {
         StackView {
             stack: self.stack,
             _marker: PhantomData,
         }
     }
 
-    pub(crate) unsafe fn nest_dynamic<'nested>(&'nested mut self, _: &'nested mut Scope) -> StackView<'nested, Dynamic> {
+    pub(crate) unsafe fn nest_dynamic<'nested>(&'nested mut self) -> StackView<'nested, Dynamic> {
         StackView {
             stack: self.stack,
             _marker: PhantomData,
@@ -93,7 +94,7 @@ impl<'stack, V> StackView<'stack, V> {
         n: usize,
     ) -> Values<'output> {
         let ptr = self.stack[idx.0 + offset..].as_mut_ptr();
-        Values::wrap(ptr as _, n)
+        Values::wrap(ptr.cast(), n)
     }
 }
 
@@ -107,14 +108,15 @@ impl<'stack> StackView<'stack, Dynamic> {
 
     pub(crate) unsafe fn new_frame(&mut self) -> JlrsResult<FrameIdx> {
         if self.size() + 2 >= self.stack.len() {
-            return Err(JlrsError::StackSizeExceeded.into());
+            return Err(Box::new(AllocError::StackOverflow(2, self.stack.len()).into()));
         }
 
         let rtls = &mut *jl_get_ptls_states();
         self.stack[self.size()] = 0 as _;
-        self.stack[self.size() + 1] = rtls.pgcstack as _;
+        self.stack[self.size() + 1] = rtls.pgcstack.cast();
 
-        rtls.pgcstack = self.stack[self.size() + 1..].as_ptr() as _;
+        let sz = self.size();
+        rtls.pgcstack = self.stack[sz + 1..].as_mut_ptr().cast();
         let idx = FrameIdx(self.size() + 2);
         self.stack[0] = (self.size() + 2) as _;
 
@@ -126,7 +128,7 @@ impl<'stack> StackView<'stack, Dynamic> {
         idx: FrameIdx,
     ) -> JlrsResult<Output<'output>> {
         if self.size() >= self.stack.len() {
-            return Err(JlrsError::StackSizeExceeded.into());
+            return Err(Box::new(AllocError::StackOverflow(1, self.stack.len()).into()));
         }
 
         let sz = self.size();
@@ -140,9 +142,9 @@ impl<'stack> StackView<'stack, Dynamic> {
         &mut self,
         idx: FrameIdx,
         value: *mut c_void,
-    ) -> JlrsResult<Value<'output, 'static>> {
+    ) -> Result<Value<'output, 'static>, AllocError> {
         if self.size() == self.stack.len() {
-            return Err(JlrsError::StackSizeExceeded.into());
+            return Err(AllocError::StackOverflow(1, self.stack.len()));
         }
 
         self.stack[self.size()] = value.cast::<_>();
@@ -171,18 +173,19 @@ impl<'stack> StackView<'stack, Static> {
 
     pub(crate) unsafe fn new_frame(&mut self, capacity: usize) -> JlrsResult<FrameIdx> {
         if self.size() + capacity + 2 >= self.stack.len() {
-            return Err(JlrsError::StackSizeExceeded.into());
+            return Err(Box::new(AllocError::StackOverflow(capacity + 2, self.stack.len()).into()));
         }
 
         let rtls = &mut *jl_get_ptls_states();
         self.stack[self.size()] = (capacity << 1) as _;
-        self.stack[self.size() + 1] = rtls.pgcstack as _;
+        self.stack[self.size() + 1] = rtls.pgcstack.cast();
 
         for i in 0..capacity {
             self.stack[self.size() + 2 + i] = null_mut();
         }
 
-        rtls.pgcstack = self.stack[self.size()..].as_ptr() as _;
+        let sz = self.size();
+        rtls.pgcstack = self.stack[sz..].as_mut_ptr().cast();
         let idx = FrameIdx(self.size() + 2);
         self.stack[0] = (self.size() + capacity + 2) as _;
 
@@ -204,94 +207,6 @@ impl<'stack> StackView<'stack, Static> {
         value: *mut c_void,
     ) -> Value<'output, 'static> {
         self.stack[idx.0 + offset] = value;
-        Value::wrap(value as _)
+        Value::wrap(value.cast())
     }
 }
-
-/*
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn create_stack() {
-        let stack = Stack::new(32);
-        assert_eq!(stack.free_slots(), 30);
-        assert_eq!(stack.current_offset(), 2);
-        assert_eq!(stack.top, 0);
-    }
-
-    #[test]
-    fn push_empty_frame() {
-        unsafe {
-            let mut stack = Stack::new(32);
-            let offset = stack.push_frame_no_gc(0).unwrap();
-            assert_eq!(offset, 3);
-            assert_eq!(stack.inner[0] as usize, 1);
-            assert_eq!(stack.free_slots(), 29);
-            assert_eq!(stack.current_offset(), 3);
-            assert_eq!(stack.top, 1);
-        }
-    }
-
-    #[test]
-    fn pop_empty_frame() {
-        unsafe {
-            let mut stack = Stack::new(32);
-            stack.push_frame_no_gc(0).unwrap();
-            stack.pop_frame();
-            assert_eq!(stack.free_slots(), 30);
-            assert_eq!(stack.current_offset(), 2);
-            assert_eq!(stack.top, 0);
-        }
-    }
-
-    #[test]
-    fn push_nonempty_frame() {
-        unsafe {
-            let mut stack = Stack::new(32);
-            let offset = stack.push_frame_no_gc(1).unwrap();
-            assert_eq!(offset, 6);
-            assert_eq!(stack.inner[0] as usize, 2);
-            assert_eq!(stack.inner[3] as usize, 4);
-            assert_eq!(stack.free_slots(), 26);
-            assert_eq!(stack.current_offset(), 6);
-            assert_eq!(stack.top, 4);
-        }
-    }
-
-    #[test]
-    fn push_two_frames() {
-        unsafe {
-            let mut stack = Stack::new(32);
-            stack.push_frame_no_gc(1).unwrap();
-            let offset = stack.push_frame_no_gc(1).unwrap();
-            assert_eq!(offset, 10);
-            assert_eq!(stack.inner[4] as usize, 2);
-            assert_eq!(stack.inner[7] as usize, 4);
-            assert_eq!(stack.free_slots(), 22);
-            assert_eq!(stack.current_offset(), 10);
-            assert_eq!(stack.top, 8);
-        }
-    }
-
-    #[test]
-    fn pop_two_frames() {
-        unsafe {
-            let mut stack = Stack::new(32);
-            stack.push_frame_no_gc(1).unwrap();
-            stack.push_frame_no_gc(1).unwrap();
-
-            stack.pop_frame_no_gc();
-            assert_eq!(stack.free_slots(), 26);
-            assert_eq!(stack.current_offset(), 6);
-            assert_eq!(stack.top, 4);
-
-            stack.pop_frame_no_gc();
-            assert_eq!(stack.free_slots(), 30);
-            assert_eq!(stack.current_offset(), 2);
-            assert_eq!(stack.top, 0);
-        }
-    }
-}
-
-*/

@@ -1,11 +1,12 @@
 //! Access Julia modules and the globals and functions defined in them.
 
 use crate::error::{JlrsError, JlrsResult};
-use crate::traits::Frame;
+use crate::global::Global;
+use crate::traits::{private::Internal, TemporarySymbol};
 use crate::value::Value;
 use jl_sys::{
     jl_base_module, jl_core_module, jl_get_global, jl_main_module, jl_module_t, jl_module_type,
-    jl_symbol_n, jl_typeis,
+    jl_typeis,
 };
 use std::marker::PhantomData;
 
@@ -16,25 +17,29 @@ use std::marker::PhantomData;
 ///
 /// [`Julia::include`]: ../struct.Julia.html#method.include
 #[derive(Copy, Clone)]
-pub struct Module<'scope>(*mut jl_module_t, PhantomData<&'scope ()>);
+pub struct Module<'base>(*mut jl_module_t, PhantomData<&'base ()>);
 
-impl<'scope> Module<'scope> {
+impl<'base> Module<'base> {
+    pub(crate) unsafe fn ptr(self) -> *mut jl_module_t {
+        self.0
+    }
+
     /// Returns a handle to Julia's `Main`-module. If you include your own Julia code by calling
     /// [`Julia::include`], handles to functions, globals, and submodules defined in these
     /// included files are available through this module.
     ///
     /// [`Julia::include`]: ../struct.Julia.html#method.include
-    pub fn main<'base: 'frame, 'frame, F: Frame<'base, 'frame>>(_: &mut F) -> Module<'base> {
+    pub fn main(_: Global<'base>) -> Self {
         unsafe { Module(jl_main_module, PhantomData) }
     }
 
     /// Returns a handle to Julia's `Core`-module.
-    pub fn core<'base: 'frame, 'frame, F: Frame<'base, 'frame>>(_: &mut F) -> Module<'base> {
+    pub fn core(_: Global<'base>) -> Self {
         unsafe { Module(jl_core_module, PhantomData) }
     }
 
     /// Returns a handle to Julia's `Base`-module.
-    pub fn base<'base: 'frame, 'frame, F: Frame<'base, 'frame>>(_: &mut F) -> Module<'base> {
+    pub fn base(_: Global<'base>) -> Self {
         unsafe { Module(jl_base_module, PhantomData) }
     }
 
@@ -43,39 +48,41 @@ impl<'scope> Module<'scope> {
     /// access `A` first and then `B`.
     ///
     /// Returns an error if the submodule doesn't exist.
-    pub fn submodule<N: AsRef<str>>(self, name: N) -> JlrsResult<Self> {
+    pub fn submodule<N>(self, name: N) -> JlrsResult<Self>
+    where
+        N: TemporarySymbol,
+    {
         unsafe {
             // safe because jl_symbol_n copies the contents
-            let name_str = name.as_ref();
-            let name_ptr = name_str.as_ptr();
-            let symbol = jl_symbol_n(name_ptr as _, name_str.as_bytes().len() as _);
-            let submodule = jl_get_global(self.0, symbol);
+            let symbol = name.temporary_symbol(Internal);
+
+            let submodule = jl_get_global(self.ptr(), symbol.ptr());
 
             if jl_typeis(submodule, jl_module_type) {
                 Ok(Module(submodule as *mut jl_module_t, PhantomData))
             } else {
-                Err(JlrsError::NotAModule(name.as_ref().into()).into())
+                Err(JlrsError::NotAModule(symbol.into()).into())
             }
         }
     }
 
     /// Returns the global named `name` in this module.
     /// Returns an error if the global doesn't exist.
-    pub fn global<N: AsRef<str>>(self, name: N) -> JlrsResult<Value<'scope, 'static>> {
+    pub fn global<N>(self, name: N) -> JlrsResult<Value<'base, 'static>>
+    where
+        N: TemporarySymbol,
+    {
         unsafe {
-            // safe because jl_symbol_n copies the contents
-            let name_str = name.as_ref();
-            let name_ptr = name_str.as_ptr();
-            let symbol = jl_symbol_n(name_ptr as _, name_str.as_bytes().len() as _);
+            let symbol = name.temporary_symbol(Internal);
 
             // there doesn't seem to be a way to check if this is actually a
             // function...
-            let func = jl_get_global(self.0, symbol);
+            let func = jl_get_global(self.ptr(), symbol.ptr());
             if func.is_null() {
-                return Err(JlrsError::FunctionNotFound(name_str.into()).into());
+                return Err(JlrsError::FunctionNotFound(symbol.into()).into());
             }
 
-            Ok(Value::wrap(func as _))
+            Ok(Value::wrap(func.cast()))
         }
     }
 
@@ -83,9 +90,12 @@ impl<'scope> Module<'scope> {
     /// module will be successfully resolved into a function; Julia will throw an exception if you
     /// try to call something that isn't a function. This means that this method is just an alias
     /// for `Module::global`.
-    /// 
+    ///
     /// Returns an error if th function doesn't exist.
-    pub fn function<N: AsRef<str>>(self, name: N) -> JlrsResult<Value<'scope, 'static>> {
+    pub fn function<N>(self, name: N) -> JlrsResult<Value<'base, 'static>>
+    where
+        N: TemporarySymbol,
+    {
         self.global(name)
     }
 }

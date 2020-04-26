@@ -1,84 +1,67 @@
 //! Everything related to errors.
 
 use std::error::Error;
-use std::ffi::CStr;
+use crate::array::Dimensions;
 use std::fmt::{Display, Formatter, Result as FmtResult};
-use std::os::raw::c_char;
 
-/// Julia can throw exceptions, this struct contains the error message.
-#[derive(Debug)]
-pub struct Exception {
-    pub message: String,
-}
-
-impl Display for Exception {
-    #[cfg_attr(tarpaulin, skip)]
-    fn fmt(&self, formatter: &mut Formatter) -> FmtResult {
-        write!(formatter, "message: {}", self.message)
-    }
-}
-
-impl Exception {
-    pub(crate) unsafe fn new(message: *const c_char) -> Self {
-        let msg = CStr::from_ptr(message);
-        let message = msg.to_string_lossy().into_owned();
-        Exception { message }
-    }
-}
-
-/// Alias that is used for `Result` in this crate.
-pub type JlrsResult<T> = Result<T, Box<dyn Error>>;
+/// Alias that is used for most `Result`s in this crate. 
+pub type JlrsResult<T> = Result<T, Box<JlrsError>>;
 
 /// All different errors.
 #[derive(Debug)]
 pub enum JlrsError {
+    Other(Box<dyn Error + Send + Sync>),
     AlreadyInitialized,
-    ExceptionOccurred(Exception),
-    NullData,
     NotAnArray,
     NotAString,
-    DifferentNumberOfElements,
     FunctionNotFound(String),
     IncludeNotFound(String),
+    IncludeError(String, String),
+    NoSuchField(String),
     InvalidCharacter,
     NotAModule(String),
-    StackSizeExceeded,
-    FrameSizeExceeded(usize),
+    AllocError(AllocError),
     WrongType,
     ZeroDimension,
     OutOfBounds(usize, usize),
+    InvalidIndex(Dimensions, Dimensions),
 }
 
 impl Display for JlrsError {
     #[cfg_attr(tarpaulin, skip)]
     fn fmt(&self, formatter: &mut Formatter) -> FmtResult {
         match self {
+            JlrsError::Other(other) => write!(formatter, "An error occurred: {}", other),
             JlrsError::AlreadyInitialized => {
                 write!(formatter, "The runtime was already initialized")
             }
-            JlrsError::ExceptionOccurred(exc) => {
-                write!(formatter, "Julia threw an exception. {}", exc)
-            }
-            JlrsError::NullData => write!(formatter, "The array data pointer is null"),
             JlrsError::NotAnArray => write!(formatter, "This is not an array"),
             JlrsError::NotAString => write!(formatter, "This is not a string"),
-            JlrsError::DifferentNumberOfElements => write!(
-                formatter,
-                "The number of elements does not match the size of the array"
-            ),
             JlrsError::FunctionNotFound(func) => {
                 write!(formatter, "The function {} could not be found", func)
+            }
+            JlrsError::NoSuchField(field) => {
+                write!(formatter, "The field {} could not be found", field)
             }
             JlrsError::IncludeNotFound(inc) => {
                 write!(formatter, "The file {} could not be found", inc)
             }
+            JlrsError::IncludeError(inc, err_type) => write!(
+                formatter,
+                "The file {} could not be included successfully. Exception type: {}",
+                inc, err_type
+            ),
             JlrsError::InvalidCharacter => write!(formatter, "Invalid character"),
             JlrsError::NotAModule(module) => write!(formatter, "{} is not a module", module),
-            JlrsError::StackSizeExceeded => write!(formatter, "The stack cannot handle more data"),
-            JlrsError::FrameSizeExceeded(len) => write!(
+            JlrsError::AllocError(AllocError::FrameOverflow(n, cap)) => write!(
                 formatter,
-                "The frame cannot handle more data (len: {})",
-                len
+                "The frame cannot handle more data. Tried to allocate: {}; capacity: {}",
+                n, cap,
+            ),
+            JlrsError::AllocError(AllocError::StackOverflow(n, cap)) => write!(
+                formatter,
+                "The stack cannot handle more data. Tried to allocate: {}; capacity: {}",
+                n, cap,
             ),
             JlrsError::WrongType => {
                 write!(formatter, "Requested type does not match the found type")
@@ -91,20 +74,40 @@ impl Display for JlrsError {
                 "Cannot access value at index {} because the number of values is {}",
                 idx, sz
             ),
+            JlrsError::InvalidIndex(idx, sz) => write!(
+                formatter,
+                "Inde {} is not valid for array with shape {}",
+                idx, sz
+            )
         }
     }
 }
 
 impl Error for JlrsError {}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::ffi::CString;
-    #[test]
-    fn create_exception() {
-        let s = CString::new("Error!!").unwrap();
-        let e = unsafe { Exception::new(s.as_ptr()) };
-        assert_eq!(e.message, "Error!!");
+impl Into<Box<JlrsError>> for Box<dyn Error + Send + Sync + 'static> {
+    fn into(self) -> Box<JlrsError> {
+        Box::new(JlrsError::Other(self))
+    }
+}
+
+/// Frames and data they protect have a memory cost. If the memory set aside for containing frames
+/// or the frame itself is exhausted, this error is returned.
+#[derive(Copy, Clone, Debug)]
+pub enum AllocError {
+    //            desired, cap
+    StackOverflow(usize, usize),
+    FrameOverflow(usize, usize),
+}
+
+impl Into<JlrsError> for AllocError {
+    fn into(self) -> JlrsError {
+        JlrsError::AllocError(self)
+    }
+}
+
+impl Into<Box<JlrsError>> for AllocError {
+    fn into(self) -> Box<JlrsError> {
+        Box::new(self.into())
     }
 }
