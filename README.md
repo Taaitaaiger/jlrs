@@ -34,6 +34,10 @@ be found at the standard locations, e.g. because you've installed Julia through 
 manager, this is not necessary and things should build without setting the `JL_PATH`
 environment variable.
 
+If you create a dynamic library with this crate, the proper symbols must be loaded when your
+library is loaded. This can be handled by setting the `RTLD_GLOBAL` flag when loading your
+library or by setting `LD_PRELOAD=/path/to/julia-x.y.z/lib/libjulia.so`.
+
 ## Features
 
 A small and incomplete list of features that `jlrs` supports: 
