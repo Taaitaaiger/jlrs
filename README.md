@@ -1,11 +1,11 @@
 # jlrs
 
-![Build Status(https://travis-ci.com/Taaitaaiger/jlrs.svg?branch=master)](https://travis-ci.com/Taaitaaiger/jlrs)
-![Coverage Status(https://coveralls.io/repos/github/Taaitaaiger/jlrs/badge.svg?branch=master)](https://coveralls.io/github/Taaitaaiger/jlrs?branch=master)
-![Rust Docs(https://docs.rs/jlrs/badge.svg)](https://docs.rs/jlrs)
-![License:MIT(https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Build Status](https://travis-ci.com/Taaitaaiger/jlrs.svg?branch=master)](https://travis-ci.com/Taaitaaiger/jlrs)
+[![Coverage Status](https://coveralls.io/repos/github/Taaitaaiger/jlrs/badge.svg?branch=master)](https://coveralls.io/github/Taaitaaiger/jlrs?branch=master)
+[![Rust Docs](https://docs.rs/jlrs/badge.svg)](https://docs.rs/jlrs)
+[![License:MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-# jlrs
+## jlrs
 
 The main goal behind `jlrs` is to provide a simple and safe interface to the Julia C API.
 Currently this crate has only been tested on Linux, if you try to use it on another OS it will
@@ -17,7 +17,7 @@ v1.4.1.
 Add this to your `Cargo.toml`:
 
 ```toml
-dependencies
+[dependencies]
 jlrs = "0.3"
 ```
 
