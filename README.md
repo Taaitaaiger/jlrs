@@ -1,24 +1,24 @@
 # jlrs
 
-[![Build Status](https://travis-ci.com/Taaitaaiger/jlrs.svg?branch=master)](https://travis-ci.com/Taaitaaiger/jlrs)
-[![Coverage Status](https://coveralls.io/repos/github/Taaitaaiger/jlrs/badge.svg?branch=master)](https://coveralls.io/github/Taaitaaiger/jlrs?branch=master)
-[![Rust Docs](https://docs.rs/jlrs/badge.svg)](https://docs.rs/jlrs)
-[![License:MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+![Build Status(https://travis-ci.com/Taaitaaiger/jlrs.svg?branch=master)](https://travis-ci.com/Taaitaaiger/jlrs)
+![Coverage Status(https://coveralls.io/repos/github/Taaitaaiger/jlrs/badge.svg?branch=master)](https://coveralls.io/github/Taaitaaiger/jlrs?branch=master)
+![Rust Docs(https://docs.rs/jlrs/badge.svg)](https://docs.rs/jlrs)
+![License:MIT(https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 # jlrs
 
 The main goal behind `jlrs` is to provide a simple and safe interface to the Julia C API.
 Currently this crate has only been tested on Linux, if you try to use it on another OS it will
 likely fail to generate the bindings to Julia. This crate is currently tested with Julia 
-v1.4.0.
+v1.4.1.
 
 ## Usage
 
 Add this to your `Cargo.toml`:
 
 ```toml
-[dependencies]
-jlrs = "0.2"
+dependencies
+jlrs = "0.3"
 ```
 
 This crate depends on `jl-sys` which contains the raw bindings to the Julia C API, these are
@@ -41,67 +41,67 @@ A small and incomplete list of features that `jlrs` supports:
  - Call arbitrary functions from the Julia standard library.
  - Include and call your own Julia code.
  - Convert numbers, strings, n-dimensional arrays and more from Rust to Julia and back.
- - Safely borrow array data from Rust.
+ - Safely borrow array data from both Rust and Julia.
+ - Multidimensional indexing of array data with tuples.
+ - Access struct fields by name or number.
 
 ## Interacting with Julia
 
 The first thing you should do is `use` the `prelude`-module with an asterisk, this will
-bring all the structs and traits you're likely to need in scope. Before you can use Julia it
-must first be initialized. You do this by calling `Julia::init`, this method forces you to 
-pick a `stack size`. You will learn how to choose this value soon. Note that this method can 
-only be called once, if you drop `Julia` you won't be able to create a new one and have to 
+bring all the structs and traits you're likely to need into scope. Before you can use Julia it
+must first be initialized. You do this by calling `Julia::init`. Note that this method can
+only be called once, if you drop `Julia` you won't be able to create a new one and have to
 restart the entire program.
 
-You can call `Julia::include` to include your own Julia code and either `Julia::frame` or 
-`Julia::dynamic_frame` to interact with Julia. If you want to create arrays with more than 
-three dimensions or borrow arrays with more than one, `jlrs.jl` must be icluded. You can find 
-this file in the root of this crate's github repository. This is necessary because this 
-functionality currently depends on some Julia code defined in that file.
+You can call `Julia::include` to include your own Julia code and either `Julia::frame` or
+`Julia::dynamic_frame` to interact with Julia. If you want to create arrays with more than
+three dimensions, borrow arrays with more than one, or have improved support for backtraces, 
+`jlrs.jl` must be included. You can find this file in the root of this crate's github 
+repository. This is necessary because this functionality currently depends on some Julia code 
+defined in that file.
 
 The other two methods, `Julia::frame` and `Julia::dynamic_frame`, take a closure that
-provides you with a `StaticFrame` and a `DynamicFrame` respectively. Both types implement
-the `Frame` trait. These frames are used to create new values, access Julia modules and
-their functions, call functions, and copy data back to Rust. Additionally, frames can be
-nested; you're free to mix static and dynamic frames. The main reason things work this way is
-that it ensures that all active values are protected from being freed by Julia's garbage
-collector. Each frame takes at least two slots on the stack whose size was chosen when you
-initialized Julia, plus an additional one for each value you create and function you call. A
-`StaticFrame` forces you to choose the number of slots that will be available, while a
-`DynamicFrame` grows dynamically. The slots that were used are reclaimed when the frame goes
-out of scope.
+provides you with a `Global`, and either a `StaticFrame` or `DynamicFrame` respectively. 
+`Global` is a token that lets you access Julia modules and their contents, while the frames 
+are used to deal with local Julia data. 
+
+Local data must be handled properly: Julia is a programming language with a garbage collector 
+that is unaware of any references to data outside of Julia. In order to make it aware of this
+usage a stack must be maintained. You choose this stack's size when calling `Julia::init`. 
+The elements of this stack are called stack frames; they contain a pointer to the previous 
+frame, the number of protected values, and that number of pointers to values. The two frame 
+types offered by `jlrs` take care of all the technical details, a `DynamicFrame` will grow 
+to the required size while a `StaticFrame` has a definite number of slots. These frames can 
+be nested (ie stacked) arbitrarily. 
 
 In order to call a Julia function, you'll need two things: a function to call, and arguments
 to call it with. You can acquire the function through the module that defines it with
 `Module::function`; `Module::base` and `Module::core` provide access to Julia's `Base`
 and `Core` module respectively, while everything you include through `Julia::include` is
 made available relative to the `Main` module which you can access by calling `Module::main`.
-
 Most Julia data is represented by a `Value`. Basic data types like numbers, booleans, and
 strings can be created through `Value::new` and several methods exist to create an
-n-dimensional array. Julia functions, their arguments and their results are all `Value`s. All
-`Value`s can be called as functions, whether this will succeed depends on the value actually
-being a function. You can copy data from Julia to Rust by calling `Value::try_unbox`.
-
+n-dimensional array. Each value will be protected by a frame, and the two share a lifetime in
+order to enforce that a value can be used as long as its protecting frame hasn't been dropped.
+Julia functions, their arguments and their results are all `Value`s too. All `Value`s can be 
+called as functions, whether this will succeed depends on the value actually being a function.
+You can copy data from Julia to Rust by calling `Value::try_unbox`.
 As a simple example, let's create two values and add them:
 
 ```rust
 use jlrs::prelude::*;
 fn main() {
     let mut julia = unsafe { Julia::init(16).unwrap() };
-    let x = julia.dynamic_frame(|frame| {
+    julia.dynamic_frame(|global, frame| {
         // Create the two arguments
         let i = Value::new(frame, 2u64)?;
         let j = Value::new(frame, 1u32)?;
-
         // We can find the addition-function in the base module
-        let func = Module::base(frame).function("+")?;
-
+        let func = Module::base(global).function("+")?;
         // Call the function and unbox the result
-        let output = func.call2(frame, i, j)?;
+        let output = func.call2(frame, i, j)?.unwrap();
         output.try_unbox::<u64>()
     }).unwrap();
-
-    assert_eq(x, 3);
 }
 ```
 
@@ -111,25 +111,24 @@ You can also do this with a static frame:
 use jlrs::prelude::*;
 fn main() {
     let mut julia = unsafe { Julia::init(16).unwrap() };
-    let x = julia.frame(3, |frame| {
-        // Create the two arguments
+    // Three slots; two for the inputs and one for the output.
+    julia.frame(3, |global, frame| {
+        // Create the two arguments, each value requires one slot
         let i = Value::new(frame, 2u64)?;
         let j = Value::new(frame, 1u32)?;
-
         // We can find the addition-function in the base module
-        let func = Module::base(frame).function("+")?;
-
-        // Call the function and unbox the result
-        let output = func.call2(frame, i, j)?;
+        let func = Module::base(global).function("+")?;
+        // Call the function and unbox the result.  
+        let output = func.call2(frame, i, j)?.unwrap();
         output.try_unbox::<u64>()
     }).unwrap();
-
-    assert_eq(x, 3);
 }
 ```
 
-For more examples, you can take a look at this crate's integration tests.
+This is only a small example, other things can be done with `Value` as well: their fields 
+can be accessed if the `Value` is some tuple or struct, array data can be borrowed mutably 
+or immutably (although only a single array can currently be mutably borrowed at a time). 
+Additionally, you can create `Output`s in a frame in order to protect a value from with a 
+specific frame; this value will naturally share that frame's lifetime.
 
-## Limitations
-Calling Julia is entirely single-threaded. You won't be able to use `Julia` from
-another thread and while Julia is doing stuff you won't be able to interact with it.
+For more examples, you can take a look at this crate's integration tests.

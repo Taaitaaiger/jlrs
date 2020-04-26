@@ -30,8 +30,6 @@ use crate::error::JlrsResult;
 use crate::stack::{Dynamic, FrameIdx, StackView, Static};
 use std::marker::PhantomData;
 
-pub(crate) struct Scope;
-
 /// A `StaticFrame` is a frame that has a definite number of slots on the GC stack. With some
 /// exceptions, creating new `Value`s and calling them require one slot each. Rather than using
 /// new slots on the GC stack when a slot is needed, a `StaticFrame` uses the slots it acquired on
@@ -43,42 +41,37 @@ pub(crate) struct Scope;
 /// [`Julia::frame`]: ../struct.Julia.html#method.frame
 /// [`Frame::frame`]: ../traits/trait.Frame.html#method.frame
 /// [`Frame`]: ../traits/trait.Frame.html
-pub struct StaticFrame<'base: 'frame, 'frame> {
+pub struct StaticFrame<'frame> {
     pub(crate) idx: FrameIdx,
     pub(crate) memory: StackView<'frame, Static>,
     pub(crate) capacity: usize,
     pub(crate) len: usize,
-    pub(crate) _guard: PhantomData<&'base ()>,
 }
 
-impl<'base: 'frame, 'frame> StaticFrame<'base, 'frame> {
+impl<'frame> StaticFrame<'frame> {
     pub(crate) unsafe fn with_capacity(
         idx: FrameIdx,
         capacity: usize,
         memory: StackView<'frame, Static>,
-        _: &'base mut Scope,
-    ) -> StaticFrame<'base, 'frame> {
+    ) -> StaticFrame<'frame> {
         StaticFrame {
             idx,
             memory,
             capacity,
             len: 0,
-            _guard: PhantomData,
         }
     }
 
     pub(crate) unsafe fn nested_frame<'nested>(
         &'nested mut self,
         capacity: usize,
-        scope: &'nested mut Scope,
-    ) -> JlrsResult<StaticFrame<'base, 'nested>> {
+    ) -> JlrsResult<StaticFrame<'nested>> {
         let idx = self.memory.new_frame(capacity)?;
         Ok(StaticFrame {
             idx,
-            memory: self.memory.nest_static(scope),
+            memory: self.memory.nest_static(),
             capacity,
             len: 0,
-            _guard: PhantomData,
         })
     }
 
@@ -88,7 +81,7 @@ impl<'base: 'frame, 'frame> StaticFrame<'base, 'frame> {
     }
 }
 
-impl<'base: 'frame, 'frame> Drop for StaticFrame<'base, 'frame> {
+impl<'frame> Drop for StaticFrame<'frame> {
     fn drop(&mut self) {
         unsafe {
             self.memory.pop_frame(self.idx);
@@ -107,42 +100,34 @@ impl<'base: 'frame, 'frame> Drop for StaticFrame<'base, 'frame> {
 /// [`Julia::dynamic_frame`]: ../struct.Julia.html#method.dynamic_frame
 /// [`Frame::dynamic_frame`]: ../traits/trait.Frame.html#method.dynamic_frame
 /// [`Frame`]: ../traits/trait.Frame.html
-pub struct DynamicFrame<'base: 'frame, 'frame> {
+pub struct DynamicFrame<'frame> {
     pub(crate) idx: FrameIdx,
     pub(crate) memory: StackView<'frame, Dynamic>,
     pub(crate) len: usize,
-    pub(crate) _guard: PhantomData<&'base ()>,
 }
 
-impl<'base: 'frame, 'frame> DynamicFrame<'base, 'frame> {
-    pub(crate) unsafe fn new(
-        idx: FrameIdx,
-        memory: StackView<'frame, Dynamic>,
-        _: &'base mut Scope,
-    ) -> Self {
+impl<'frame> DynamicFrame<'frame> {
+    pub(crate) unsafe fn new(idx: FrameIdx, memory: StackView<'frame, Dynamic>) -> Self {
         DynamicFrame {
             idx,
             memory,
             len: 0,
-            _guard: PhantomData,
         }
     }
 
     pub(crate) unsafe fn nested_frame<'nested>(
         &'nested mut self,
-        scope: &'nested mut Scope,
-    ) -> JlrsResult<DynamicFrame<'base, 'nested>> {
+    ) -> JlrsResult<DynamicFrame<'nested>> {
         let idx = self.memory.new_frame()?;
         Ok(DynamicFrame {
             idx,
-            memory: self.memory.nest_dynamic(scope),
+            memory: self.memory.nest_dynamic(),
             len: 0,
-            _guard: PhantomData,
         })
     }
 }
 
-impl<'base: 'frame, 'frame> Drop for DynamicFrame<'base, 'frame> {
+impl<'frame> Drop for DynamicFrame<'frame> {
     fn drop(&mut self) {
         unsafe {
             self.memory.pop_frame(self.idx);
@@ -153,7 +138,7 @@ impl<'base: 'frame, 'frame> Drop for DynamicFrame<'base, 'frame> {
 /// An `Output` is a slot on the GC stack in the frame that was used to create it. It can be used
 /// to extend the lifetime of the result of a function call to the `Output`'s lifetime. You can
 /// create an output by calling [`Frame::output`].
-/// 
+///
 /// [`Frame::output`]: ../traits/trait.Frame.html#method.output
 pub struct Output<'frame> {
     pub(crate) offset: usize,

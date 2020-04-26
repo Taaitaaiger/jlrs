@@ -3,7 +3,7 @@
 //! A quick note: all of these traits are sealed, you can't implement them on your own types. Most
 //! serve as marker traits that are used as trait bounds on some methods to enforce you can only
 //! do things that make sense. The one trait that you will use directly is the [`Frame`] trait
-//! which exposes methods that let you create [`Output`]s in the current frame, and nest frames.
+//! which exposes methods that let you create [`Output`]s in the current frame and nest frames.
 //! This trait is automatically brought into scope by using the [`prelude`] module.
 //!
 //! [`Frame`]: trait.Frame.html
@@ -11,10 +11,10 @@
 //! [`prelude`]: ../prelude/index.html
 
 use crate::array::Array;
-use crate::error::{JlrsError, JlrsResult};
-use crate::frame::{DynamicFrame, Output, StaticFrame, Scope};
+use crate::error::{AllocError, JlrsResult};
+use crate::frame::{DynamicFrame, Output, StaticFrame};
+use crate::symbol::Symbol;
 use std::borrow::Cow;
-use std::marker::PhantomData;
 
 // All these traits have a public and a private side. In order to prevent users from using methods
 // that are for internal use only, all traits extend a base trait with the same name from the
@@ -31,6 +31,9 @@ macro_rules! p {
     };
 }
 
+/// Trait implemented by types that can be converted to a temporary `Symbol`.
+pub trait TemporarySymbol: private::TemporarySymbol {}
+
 /// Trait implemented by types that can be converted to a Julia value.
 pub trait IntoJulia: private::IntoJulia {}
 
@@ -41,18 +44,15 @@ pub trait JuliaType: private::JuliaType {}
 /// used as array data. Arrays whose elements are of a type that implements this trait can share
 /// their contents between Julia and Rust. This includes all types that implement `JuliaType`
 /// except `bool` and `char`.
-pub trait ArrayData: private::ArrayData {}
+pub trait ArrayDatatype: private::ArrayDatatype + JuliaType {}
 
 /// Trait implemented by types that can be created from a Julia value.
 pub trait TryUnbox: private::TryUnbox {}
 
-/// Functionality shared by [`StaticFrame`] and [`DynamicFrame`].
-///
-/// Frames use two lifetimes, `'base` and `'frame`. The first is used to ensure global Julia
-/// values, like [`Module`]s and functions accessed through modules, can be used freely across
-/// frames, but can't be returned from the frame created through [`Julia::frame`] or
-/// [`Julia::dynamic_frame`]. Other values get the `'frame` lifetime which ensures those values
-/// can live as long as their frames.
+/// Functionality shared by [`StaticFrame`] and [`DynamicFrame`]. These structs let you protect
+/// data from garbage collection. The lifetime of a frame is assigned to the values and outputs
+/// that are created using that frame. After a frame is dropped, these items are no longer 
+/// protected and cannot be used.
 ///
 /// If you need the result of a function call to be valid outside the frame where it is called,
 /// you can call `Frame::output` to create an [`Output`] and call the function through
@@ -66,15 +66,15 @@ pub trait TryUnbox: private::TryUnbox {}
 /// [`Julia::dynamic_frame`]: ../struct.Julia.html#method.dynamic_frame
 /// [`Output`]: ../frame/struct.Output.html
 /// [`Value::call_output`]: ../value/struct.Value.html#method.call_output
-pub trait Frame<'base: 'frame, 'frame>: private::Frame<'base, 'frame> {
+pub trait Frame<'frame>: private::Frame<'frame> {
     /// Create a `StaticFrame` that can hold `capacity` values, and call the given closure.
     /// Returns the result of this closure, or an error if the new frame can't be created
     /// because there's not enough space on the GC stack. The number of required slots on the
     /// stack is `capacity + 2`.
     ///
     /// Returns an error if there is not enough space on the stack.
-    fn frame<T, F: FnOnce(&mut StaticFrame<'base, '_>) -> JlrsResult<T>>(
-        &mut self,
+    fn frame<'nested, T, F: FnOnce(&mut StaticFrame<'nested>) -> JlrsResult<T>>(
+        &'nested mut self,
         capacity: usize,
         func: F,
     ) -> JlrsResult<T>;
@@ -84,8 +84,8 @@ pub trait Frame<'base: 'frame, 'frame>: private::Frame<'base, 'frame> {
     /// of required slots on the stack is `2`.
     ///
     /// Returns an error if there is not enough space on the stack.
-    fn dynamic_frame<T, F: FnOnce(&mut DynamicFrame<'base, '_>) -> JlrsResult<T>>(
-        &mut self,
+    fn dynamic_frame<'nested, T, F: FnOnce(&mut DynamicFrame<'nested>) -> JlrsResult<T>>(
+        &'nested mut self,
         func: F,
     ) -> JlrsResult<T>;
 
@@ -104,6 +104,12 @@ pub trait Frame<'base: 'frame, 'frame>: private::Frame<'base, 'frame> {
     // Exists for debugging purposes, prints the contents of the GC stack.
     fn print_memory(&self);
 }
+
+p!(TemporarySymbol, String);
+p!(TemporarySymbol, &dyn AsRef<str>);
+p!(TemporarySymbol, &'a str, 'a);
+p!(TemporarySymbol, Cow<'a, str>, 'a);
+p!(TemporarySymbol, Symbol<'s>, 's);
 
 p!(IntoJulia, bool);
 p!(IntoJulia, char);
@@ -139,18 +145,18 @@ p!(JuliaType, f64);
 p!(JuliaType, usize);
 p!(JuliaType, isize);
 
-p!(ArrayData, u8);
-p!(ArrayData, u16);
-p!(ArrayData, u32);
-p!(ArrayData, u64);
-p!(ArrayData, i8);
-p!(ArrayData, i16);
-p!(ArrayData, i32);
-p!(ArrayData, i64);
-p!(ArrayData, f32);
-p!(ArrayData, f64);
-p!(ArrayData, usize);
-p!(ArrayData, isize);
+p!(ArrayDatatype, u8);
+p!(ArrayDatatype, u16);
+p!(ArrayDatatype, u32);
+p!(ArrayDatatype, u64);
+p!(ArrayDatatype, i8);
+p!(ArrayDatatype, i16);
+p!(ArrayDatatype, i32);
+p!(ArrayDatatype, i64);
+p!(ArrayDatatype, f32);
+p!(ArrayDatatype, f64);
+p!(ArrayDatatype, usize);
+p!(ArrayDatatype, isize);
 
 p!(TryUnbox, bool);
 p!(TryUnbox, char);
@@ -167,32 +173,29 @@ p!(TryUnbox, f64);
 p!(TryUnbox, usize);
 p!(TryUnbox, isize);
 p!(TryUnbox, String);
-p!(TryUnbox, Array<A>, A: ArrayData);
+p!(TryUnbox, Array<A>, A: ArrayDatatype);
 
-impl<'base: 'frame, 'frame> Frame<'base, 'frame> for StaticFrame<'base, 'frame> {
-    fn frame<T, F: FnOnce(&mut StaticFrame<'base, '_>) -> JlrsResult<T>>(
-        &mut self,
+impl<'frame> Frame<'frame> for StaticFrame<'frame> {
+    fn frame<'nested, T, F: FnOnce(&mut StaticFrame<'nested>) -> JlrsResult<T>>(
+        &'nested mut self,
         capacity: usize,
         func: F,
     ) -> JlrsResult<T> {
-        let mut scope = Scope;
-        let mut frame = unsafe { self.nested_frame(capacity, &mut scope).unwrap() };
+        let mut frame = unsafe { self.nested_frame(capacity).unwrap() };
         func(&mut frame)
     }
 
-    fn dynamic_frame<T, F: FnOnce(&mut DynamicFrame<'base, '_>) -> JlrsResult<T>>(
-        &mut self,
+    fn dynamic_frame<'nested, T, F: FnOnce(&mut DynamicFrame<'nested>) -> JlrsResult<T>>(
+        &'nested mut self,
         func: F,
     ) -> JlrsResult<T> {
         unsafe {
-            let mut scope = Scope;
-            let mut view = self.memory.nest_dynamic(&mut scope);
+            let mut view = self.memory.nest_dynamic();
             let idx = view.new_frame()?;
             let mut frame = DynamicFrame {
                 idx,
                 len: 0,
                 memory: view,
-                _guard: PhantomData,
             };
 
             func(&mut frame)
@@ -201,7 +204,7 @@ impl<'base: 'frame, 'frame> Frame<'base, 'frame> for StaticFrame<'base, 'frame> 
 
     fn output(&mut self) -> JlrsResult<Output<'frame>> {
         if self.capacity == self.len {
-            return Err(JlrsError::FrameSizeExceeded(self.len).into());
+            return Err(AllocError::FrameOverflow(1, self.len).into());
         }
 
         let out = unsafe {
@@ -222,31 +225,28 @@ impl<'base: 'frame, 'frame> Frame<'base, 'frame> for StaticFrame<'base, 'frame> 
     }
 }
 
-impl<'base: 'frame, 'frame> Frame<'base, 'frame> for DynamicFrame<'base, 'frame> {
-    fn dynamic_frame<T, F: FnOnce(&mut DynamicFrame<'base, '_>) -> JlrsResult<T>>(
-        &mut self,
+impl<'frame> Frame<'frame> for DynamicFrame<'frame> {
+    fn dynamic_frame<'nested, T, F: FnOnce(&mut DynamicFrame<'nested>) -> JlrsResult<T>>(
+        &'nested mut self,
         func: F,
     ) -> JlrsResult<T> {
-        let mut scope = Scope;
-        let mut frame = unsafe { self.nested_frame(&mut scope).unwrap() };
+        let mut frame = unsafe { self.nested_frame().unwrap() };
         func(&mut frame)
     }
 
-    fn frame<T, F: FnOnce(&mut StaticFrame<'base, '_>) -> JlrsResult<T>>(
-        &mut self,
+    fn frame<'nested, T, F: FnOnce(&mut StaticFrame<'nested>) -> JlrsResult<T>>(
+        &'nested mut self,
         capacity: usize,
         func: F,
     ) -> JlrsResult<T> {
         unsafe {
-            let mut scope = Scope;
-            let mut view = self.memory.nest_static(&mut scope);
+            let mut view = self.memory.nest_static();
             let idx = view.new_frame(capacity)?;
             let mut frame = StaticFrame {
                 idx,
                 capacity,
                 len: 0,
                 memory: view,
-                _guard: PhantomData,
             };
 
             func(&mut frame)
@@ -273,9 +273,10 @@ impl<'base: 'frame, 'frame> Frame<'base, 'frame> for DynamicFrame<'base, 'frame>
 pub(crate) mod private {
     use crate::array::Array;
     use crate::array::Dimensions;
-    use crate::error::{JlrsError, JlrsResult};
+    use crate::error::{AllocError, JlrsError, JlrsResult};
     use crate::frame::{DynamicFrame, Output, StaticFrame};
     use crate::stack::FrameIdx;
+    use crate::symbol::Symbol;
     use crate::value::{Value, Values};
     use jl_sys::{
         jl_array_data, jl_array_dim, jl_array_dims, jl_array_eltype, jl_array_ndims,
@@ -286,7 +287,7 @@ pub(crate) mod private {
         jl_string_data, jl_string_len, jl_typeis, jl_uint16_type, jl_uint32_type, jl_uint64_type,
         jl_uint8_type, jl_unbox_float32, jl_unbox_float64, jl_unbox_int16, jl_unbox_int32,
         jl_unbox_int64, jl_unbox_int8, jl_unbox_uint16, jl_unbox_uint32, jl_unbox_uint64,
-        jl_unbox_uint8, jl_value_t,
+        jl_unbox_uint8, jl_value_t, jl_symbol_n
     };
     use std::borrow::Cow;
     use std::mem::size_of;
@@ -296,6 +297,11 @@ pub(crate) mod private {
     // be created inside this crate, as an argument, these methods can only be called from this
     // crate.
     pub struct Internal;
+
+    // safety: never return the symbol to the user without assigning the 'base lifetime.
+    pub trait TemporarySymbol {
+        unsafe fn temporary_symbol<'symbol>(&self, _: Internal) -> Symbol<'symbol>;
+    }
 
     pub trait IntoJulia {
         // safety: Julia must have been initialized. The converted value must be protected from
@@ -308,7 +314,7 @@ pub(crate) mod private {
         unsafe fn julia_type(_: Internal) -> *mut jl_value_t;
     }
 
-    pub trait ArrayData: JuliaType {}
+    pub trait ArrayDatatype: JuliaType {}
 
     pub trait TryUnbox
     where
@@ -320,28 +326,28 @@ pub(crate) mod private {
         unsafe fn try_unbox(value: *mut jl_value_t, _: Internal) -> JlrsResult<Self>;
     }
 
-    pub trait Frame<'base: 'frame, 'frame> {
+    pub trait Frame<'frame> {
         // protect the value from being garbage collected while this frame is active.
         // safety: the value must be a valid Julia value
         unsafe fn protect(
             &mut self,
             value: *mut jl_value_t,
             _: Internal,
-        ) -> JlrsResult<Value<'frame, 'static>>;
+        ) -> Result<Value<'frame, 'static>, AllocError>;
 
         // Create and protect multiple values from being garbage collected while this frame is active.
         fn create_many<P: IntoJulia>(
             &mut self,
             values: &[P],
             _: Internal,
-        ) -> JlrsResult<Values<'frame>>;
+        ) -> Result<Values<'frame>, AllocError>;
 
         // Create and protect multiple values from being garbage collected while this frame is active.
         fn create_many_dyn(
             &mut self,
             values: &[&dyn super::IntoJulia],
             _: Internal,
-        ) -> JlrsResult<Values<'frame>>;
+        ) -> Result<Values<'frame>, AllocError>;
 
         // Protect a value from being garbage collected while the output's frame is active.
         fn assign_output<'output>(
@@ -350,6 +356,44 @@ pub(crate) mod private {
             value: *mut jl_value_t,
             _: Internal,
         ) -> Value<'output, 'static>;
+    }
+
+    impl<'a> TemporarySymbol for &'a str {
+        unsafe fn temporary_symbol<'symbol>(&self, _: Internal) -> Symbol<'symbol> {
+            let symbol_ptr = self.as_ptr();
+            let symbol = jl_symbol_n(symbol_ptr.cast(), self.len());
+            Symbol::wrap(symbol)
+        }
+    }
+
+    impl<'a> TemporarySymbol for Cow<'a, str> {
+        unsafe fn temporary_symbol<'symbol>(&self, _: Internal) -> Symbol<'symbol> {
+            let symbol_ptr = self.as_ptr().cast();
+            let symbol = jl_symbol_n(symbol_ptr, self.len());
+            Symbol::wrap(symbol)
+        }
+    }
+
+    impl TemporarySymbol for String {
+        unsafe fn temporary_symbol<'symbol>(&self, _: Internal) -> Symbol<'symbol> {
+            let symbol_ptr = self.as_ptr().cast();
+            let symbol = jl_symbol_n(symbol_ptr, self.len());
+            Symbol::wrap(symbol)
+        }
+    }
+
+    impl TemporarySymbol for &dyn AsRef<str> {
+        unsafe fn temporary_symbol<'symbol>(&self, _: Internal) -> Symbol<'symbol> {
+            let symbol_ptr = self.as_ref().as_ptr().cast();
+            let symbol = jl_symbol_n(symbol_ptr, self.as_ref().len());
+            Symbol::wrap(symbol)
+        }
+    }
+
+    impl<'s> TemporarySymbol for Symbol<'s> {
+        unsafe fn temporary_symbol<'symbol>(&self, _: Internal) -> Symbol<'symbol> {
+            Symbol::wrap(self.ptr())
+        }
     }
 
     macro_rules! impl_into_julia {
@@ -404,33 +448,33 @@ pub(crate) mod private {
 
     impl<'a> IntoJulia for &'a str {
         unsafe fn into_julia(&self, _: Internal) -> *mut jl_value_t {
-            let ptr = self.as_ptr() as _;
+            let ptr = self.as_ptr().cast();
             let len = self.len();
-            jl_pchar_to_string(ptr, len as _)
+            jl_pchar_to_string(ptr, len)
         }
     }
 
     impl<'a> IntoJulia for Cow<'a, str> {
         unsafe fn into_julia(&self, _: Internal) -> *mut jl_value_t {
-            let ptr = self.as_ptr() as _;
+            let ptr = self.as_ptr().cast();
             let len = self.len();
-            jl_pchar_to_string(ptr, len as _)
+            jl_pchar_to_string(ptr, len)
         }
     }
 
     impl IntoJulia for String {
         unsafe fn into_julia(&self, _: Internal) -> *mut jl_value_t {
-            let ptr = self.as_ptr() as _;
+            let ptr = self.as_ptr().cast();
             let len = self.len();
-            jl_pchar_to_string(ptr, len as _)
+            jl_pchar_to_string(ptr, len)
         }
     }
 
     impl IntoJulia for &dyn AsRef<str> {
         unsafe fn into_julia(&self, _: Internal) -> *mut jl_value_t {
-            let ptr = self.as_ref().as_ptr() as _;
+            let ptr = self.as_ref().as_ptr().cast();
             let len = self.as_ref().len();
-            jl_pchar_to_string(ptr, len as _)
+            jl_pchar_to_string(ptr, len)
         }
     }
 
@@ -438,7 +482,7 @@ pub(crate) mod private {
         ($type:ty, $jl_type:expr) => {
             impl JuliaType for $type {
                 unsafe fn julia_type(_: Internal) -> *mut jl_value_t {
-                    $jl_type as _
+                    $jl_type.cast()
                 }
             }
         };
@@ -460,9 +504,9 @@ pub(crate) mod private {
     impl JuliaType for usize {
         unsafe fn julia_type(_: Internal) -> *mut jl_value_t {
             if size_of::<usize>() == size_of::<u32>() {
-                jl_uint32_type as _
+                jl_uint32_type.cast()
             } else {
-                jl_uint64_type as _
+                jl_uint64_type.cast()
             }
         }
     }
@@ -470,31 +514,31 @@ pub(crate) mod private {
     impl JuliaType for isize {
         unsafe fn julia_type(_: Internal) -> *mut jl_value_t {
             if size_of::<isize>() == size_of::<i32>() {
-                jl_int32_type as _
+                jl_int32_type.cast()
             } else {
-                jl_int64_type as _
+                jl_int64_type.cast()
             }
         }
     }
 
-    macro_rules! impl_array_data {
+    macro_rules! impl_array_datatype {
         ($type:ty) => {
-            impl ArrayData for $type {}
+            impl ArrayDatatype for $type {}
         };
     }
 
-    impl_array_data!(u8);
-    impl_array_data!(u16);
-    impl_array_data!(u32);
-    impl_array_data!(u64);
-    impl_array_data!(i8);
-    impl_array_data!(i16);
-    impl_array_data!(i32);
-    impl_array_data!(i64);
-    impl_array_data!(f32);
-    impl_array_data!(f64);
-    impl_array_data!(usize);
-    impl_array_data!(isize);
+    impl_array_datatype!(u8);
+    impl_array_datatype!(u16);
+    impl_array_datatype!(u32);
+    impl_array_datatype!(u64);
+    impl_array_datatype!(i8);
+    impl_array_datatype!(i16);
+    impl_array_datatype!(i32);
+    impl_array_datatype!(i64);
+    impl_array_datatype!(f32);
+    impl_array_datatype!(f64);
+    impl_array_datatype!(usize);
+    impl_array_datatype!(isize);
 
     macro_rules! impl_try_unbox {
         ($type:ty, $jl_type:expr, $unboxer:path) => {
@@ -503,6 +547,7 @@ pub(crate) mod private {
                     if jl_typeis(value, $jl_type) {
                         return Ok($unboxer(value));
                     }
+
                     Err(JlrsError::WrongType.into())
                 }
             }
@@ -586,11 +631,16 @@ pub(crate) mod private {
             let raw = jl_string_data(value);
             let raw_slice = std::slice::from_raw_parts(raw, len);
             let owned_slice = Vec::from(raw_slice);
-            Ok(String::from_utf8(owned_slice)?)
+            Ok(
+                String::from_utf8(owned_slice).map_err(|e| -> Box<JlrsError> {
+                    let b: Box<dyn std::error::Error + Send + Sync> = Box::new(e);
+                    b.into()
+                })?,
+            )
         }
     }
 
-    impl<T: ArrayData> TryUnbox for Array<T> {
+    impl<T: ArrayDatatype> TryUnbox for Array<T> {
         unsafe fn try_unbox(value: *mut jl_value_t, _: Internal) -> JlrsResult<Self> {
             if !jl_is_array(value) {
                 return Err(JlrsError::NotAnArray.into());
@@ -599,42 +649,42 @@ pub(crate) mod private {
                 return Err(JlrsError::WrongType.into());
             }
             let jl_data = jl_array_data(value) as *const T;
-            let n_dims = jl_array_ndims(value as _);
+            let n_dims = jl_array_ndims(value.cast());
             let dimensions: Dimensions = match n_dims {
                 0 => return Err(JlrsError::ZeroDimension.into()),
-                1 => Into::into(jl_array_nrows(value as _) as u64),
+                1 => Into::into(jl_array_nrows(value.cast()) as usize),
                 2 => Into::into((
-                    jl_array_dim(value as _, 0) as _,
-                    jl_array_dim(value as _, 1) as _,
+                    jl_array_dim(value.cast(), 0),
+                    jl_array_dim(value.cast(), 1),
                 )),
                 3 => Into::into((
-                    jl_array_dim(value as _, 0) as _,
-                    jl_array_dim(value as _, 1) as _,
-                    jl_array_dim(value as _, 2) as _,
+                    jl_array_dim(value.cast(), 0),
+                    jl_array_dim(value.cast(), 1),
+                    jl_array_dim(value.cast(), 2),
                 )),
-                ndims => Into::into(jl_array_dims(value as _, ndims as _)),
+                ndims => Into::into(jl_array_dims(value.cast(), ndims as _)),
             };
             let sz = dimensions.size();
-            let mut data = Vec::with_capacity(sz as _);
+            let mut data = Vec::with_capacity(sz);
             let ptr = data.as_mut_ptr();
-            std::ptr::copy_nonoverlapping(jl_data, ptr, sz as _);
-            data.set_len(sz as _);
+            std::ptr::copy_nonoverlapping(jl_data, ptr, sz);
+            data.set_len(sz);
             Ok(Array::new(data, dimensions))
         }
     }
 
-    impl<'base: 'frame, 'frame> Frame<'base, 'frame> for StaticFrame<'base, 'frame> {
+    impl<'frame> Frame<'frame> for StaticFrame<'frame> {
         unsafe fn protect(
             &mut self,
             value: *mut jl_value_t,
             _: Internal,
-        ) -> JlrsResult<Value<'frame, 'static>> {
+        ) -> Result<Value<'frame, 'static>, AllocError> {
             if self.capacity == self.len {
-                return Err(JlrsError::FrameSizeExceeded(self.len).into());
+                return Err(AllocError::FrameOverflow(1, self.len));
             }
 
             let out = {
-                let out = self.memory.protect(self.idx, self.len, value as _);
+                let out = self.memory.protect(self.idx, self.len, value.cast());
                 self.len += 1;
                 out
             };
@@ -646,16 +696,16 @@ pub(crate) mod private {
             &mut self,
             values: &[P],
             _: Internal,
-        ) -> JlrsResult<Values<'frame>> {
+        ) -> Result<Values<'frame>, AllocError> {
             unsafe {
                 if self.capacity < self.len + values.len() {
-                    return Err(JlrsError::FrameSizeExceeded(self.capacity).into());
+                    return Err(AllocError::FrameOverflow(values.len(), self.capacity()));
                 }
 
                 let offset = self.len;
                 for value in values {
                     self.memory
-                        .protect(self.idx, self.len, value.into_julia(Internal) as _);
+                        .protect(self.idx, self.len, value.into_julia(Internal).cast());
                     self.len += 1;
                 }
 
@@ -667,16 +717,16 @@ pub(crate) mod private {
             &mut self,
             values: &[&dyn super::IntoJulia],
             _: Internal,
-        ) -> JlrsResult<Values<'frame>> {
+        ) -> Result<Values<'frame>, AllocError> {
             unsafe {
                 if self.capacity < self.len + values.len() {
-                    return Err(JlrsError::FrameSizeExceeded(self.len).into());
+                    return Err(AllocError::FrameOverflow(values.len(), self.capacity()));
                 }
 
                 let offset = self.len;
                 for value in values {
                     self.memory
-                        .protect(self.idx, self.len, value.into_julia(Internal) as _);
+                        .protect(self.idx, self.len, value.into_julia(Internal).cast());
                     self.len += 1;
                 }
 
@@ -692,18 +742,18 @@ pub(crate) mod private {
         ) -> Value<'output, 'static> {
             unsafe {
                 self.memory
-                    .protect(FrameIdx::default(), output.offset, value as _)
+                    .protect(FrameIdx::default(), output.offset, value.cast())
             }
         }
     }
 
-    impl<'base: 'frame, 'frame> Frame<'base, 'frame> for DynamicFrame<'base, 'frame> {
+    impl<'frame> Frame<'frame> for DynamicFrame<'frame> {
         unsafe fn protect(
             &mut self,
             value: *mut jl_value_t,
             _: Internal,
-        ) -> JlrsResult<Value<'frame, 'static>> {
-            let out = self.memory.protect(self.idx, value as _)?;
+        ) -> Result<Value<'frame, 'static>, AllocError> {
+            let out = self.memory.protect(self.idx, value.cast())?;
             self.len += 1;
             Ok(out)
         }
@@ -712,13 +762,22 @@ pub(crate) mod private {
             &mut self,
             values: &[P],
             _: Internal,
-        ) -> JlrsResult<Values<'frame>> {
+        ) -> Result<Values<'frame>, AllocError> {
             unsafe {
                 let offset = self.len;
+                // TODO: check capacity
 
                 for value in values {
-                    self.memory
-                        .protect(self.idx, value.into_julia(Internal) as _)?;
+                    match self
+                        .memory
+                        .protect(self.idx, value.into_julia(Internal).cast())
+                    {
+                        Ok(_) => (),
+                        Err(AllocError::StackOverflow(_, n)) => {
+                            return Err(AllocError::StackOverflow(values.len(), n))
+                        }
+                        _ => unreachable!(),
+                    }
                     self.len += 1;
                 }
 
@@ -730,13 +789,14 @@ pub(crate) mod private {
             &mut self,
             values: &[&dyn super::IntoJulia],
             _: Internal,
-        ) -> JlrsResult<Values<'frame>> {
+        ) -> Result<Values<'frame>, AllocError> {
             unsafe {
                 let offset = self.len;
+                // TODO: check capacity
 
                 for value in values {
                     self.memory
-                        .protect(self.idx, value.into_julia(Internal) as _)?;
+                        .protect(self.idx, value.into_julia(Internal).cast())?;
                     self.len += 1;
                 }
 
@@ -750,7 +810,7 @@ pub(crate) mod private {
             value: *mut jl_value_t,
             _: Internal,
         ) -> Value<'output, 'static> {
-            unsafe { self.memory.protect_output(output, value as _) }
+            unsafe { self.memory.protect_output(output, value.cast()) }
         }
     }
 }
