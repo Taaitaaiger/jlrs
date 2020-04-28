@@ -22,7 +22,7 @@ before_cache: |
 before_script:
   - wget https://julialang-s3.julialang.org/bin/linux/x64/1.4/julia-1.4.1-linux-x86_64.tar.gz -O /tmp/julia.tar.gz
   - tar -xvf /tmp/julia.tar.gz
-  - export JL_PATH=$PWD/julia-1.4.1
+  - export JULIA_DIR=$PWD/julia-1.4.1
   - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/julia-1.4.1/lib
 script:
   - cargo build --verbose
