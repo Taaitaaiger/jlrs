@@ -1,5 +1,8 @@
 # Adapted from https://github.com/JuliaCI/Appveyor.jl and https://github.com/starkat99/appveyor-rust
 
+platform:
+ - x64
+
 # Only GNU is supported
 environment:
   julia_version: 1
