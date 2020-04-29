@@ -1,45 +1,22 @@
 # Adapted from https://github.com/JuliaCI/Appveyor.jl and https://github.com/starkat99/appveyor-rust
 
-platform:
- - x86
- - x64
-
 # Only GNU is supported
 environment:
   julia_version: 1
   JULIA_DIR: C:\julia
+  CYGWIN_DIR: C:\cygwin64
   matrix:
     # Stable 64-bit GNU
     - channel: stable
       target: x86_64-pc-windows-gnu
-      CYGWIN_DIR: C:\cygwin64
-    # Stable 32-bit GNU
-    - channel: stable
-      target: i686-pc-windows-gnu
-      CYGWIN_DIR: C:\cygwin
     # Beta 64-bit GNU
     - channel: beta
       target: x86_64-pc-windows-gnu
-      CYGWIN_DIR: C:\cygwin64
-    # Beta 32-bit GNU
-    - channel: beta
-      target: i686-pc-windows-gnu
-      CYGWIN_DIR: C:\cygwin
     # Nightly 64-bit GNU
     - channel: nightly
       target: x86_64-pc-windows-gnu
-      CYGWIN_DIR: C:\cygwin64
-    # Nightly 32-bit GNU
-    - channel: nightly
-      target: i686-pc-windows-gnu
-      CYGWIN_DIR: C:\cygwin
 
 matrix:
-  exclude:
-   - platform: x86
-     target: x86_64-pc-windows-gnu
-   - platform: x64
-     target: i686-pc-windows-gnu
   allow_failures:
     - channel: nightly
 
