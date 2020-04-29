@@ -17,7 +17,7 @@ license = "MIT"
 edition = "2018"
 
 [dependencies]
-jl-sys = "0.4"
+jl-sys = "0.5"
 
 [features]
 docs-rs = ["jl-sys/docs-rs"]
