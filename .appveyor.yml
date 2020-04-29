@@ -49,7 +49,7 @@ install:
   # Install Rust
   - appveyor DownloadFile https://win.rustup.rs/ -FileName rustup-init.exe
   - rustup-init -yv --default-toolchain %channel% --default-host %target%
-  - set PATH=%PATH%;%USERPROFILE%\.cargo\bin
+  - set PATH=%PATH%;%USERPROFILE%\.cargo\bin;C:\julia\bin
   - rustc -vV
   - cargo -vV
 
