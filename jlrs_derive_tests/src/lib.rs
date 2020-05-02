@@ -1,7 +1,6 @@
 #[cfg(test)] 
 mod tests {
     use jlrs::prelude::*;
-    use jlrs_derive::JuliaTuple;
 
     #[derive(Copy, Clone, JuliaTuple, Eq, PartialEq, Debug)]
     #[repr(C)]
@@ -9,7 +8,6 @@ mod tests {
     
     #[test]
     fn it_works() {
-        assert_eq!(1 + 1, 2);
         let mut julia = unsafe { Julia::init(16).unwrap() };
 
         julia.frame(3, |_global, frame| {
