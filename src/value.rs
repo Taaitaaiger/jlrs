@@ -6,19 +6,42 @@ use crate::frame::Output;
 use crate::global::Global;
 use crate::module::Module;
 use crate::symbol::Symbol;
-use crate::traits::{private::Internal, ArrayDatatype, Frame, IntoJulia, JuliaType, TryUnbox, TemporarySymbol};
+use crate::traits::{
+    private::{Internal, JuliaType as JuliaTypePriv},
+    ArrayDatatype, Frame, IntoJulia, JuliaType, TemporarySymbol, TryUnbox,
+};
 use jl_sys::{
-    jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_apply_array_type, jl_array_data,
-    jl_array_dim, jl_array_dims, jl_array_eltype, jl_array_ndims, jl_array_nrows, jl_call,
-    jl_call0, jl_call1, jl_call2, jl_call3, jl_exception_occurred, jl_field_index, jl_field_names,
-    jl_fieldref, jl_fieldref_noalloc, jl_get_nth_field, jl_get_nth_field_noalloc, jl_is_array,
-    jl_is_tuple, jl_new_array, jl_nfields, jl_ptr_to_array, jl_ptr_to_array_1d, jl_svec_data,
+    jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_apply_array_type,
+    jl_apply_tuple_type_v, jl_array_data, jl_array_dim, jl_array_dims, jl_array_eltype,
+    jl_array_ndims, jl_array_nrows, jl_call, jl_call0, jl_call1, jl_call2, jl_call3, jl_datatype_t,
+    jl_exception_occurred, jl_field_index, jl_field_names, jl_fieldref, jl_fieldref_noalloc,
+    jl_get_nth_field, jl_get_nth_field_noalloc, jl_is_array, jl_is_tuple, jl_new_array,
+    jl_new_struct_uninit, jl_nfields, jl_ptr_to_array, jl_ptr_to_array_1d, jl_svec_data,
     jl_svec_len, jl_typeis, jl_typeof, jl_typeof_str, jl_value_t,
 };
 use std::ffi::CStr;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::marker::PhantomData;
 use std::slice;
+
+thread_local! {
+    // Used as a pool to convert dimensions to tuples. Safe because a thread local is initialized
+    // when `with` is first called, which happens after `Julia::init` has been called. The C API
+    // requires a mutable pointer to this array when creating a tuple that contains 8 or fewer 
+    // `
+    static JL_LONG_TYPE: std::cell::UnsafeCell<[*mut jl_datatype_t; 8]> = unsafe {
+        std::cell::UnsafeCell::new([
+            usize::julia_type(Internal).cast(),
+            usize::julia_type(Internal).cast(),
+            usize::julia_type(Internal).cast(),
+            usize::julia_type(Internal).cast(),
+            usize::julia_type(Internal).cast(),
+            usize::julia_type(Internal).cast(),
+            usize::julia_type(Internal).cast(),
+            usize::julia_type(Internal).cast(),
+        ])
+    };
+}
 
 /// This type alias is used to encode the result of a function call: `Ok` indicates the call was
 /// successful and contains the function's result, while `Err` indicates an exception was thrown
@@ -100,7 +123,7 @@ impl<'frame> Values<'frame> {
 ///
 /// The methods that create a new `Value` come in two varieties: `method` and `method_output`. The
 /// first will use a slot in the current frame to protect the value from garbage collection, while
-/// the latter uses a slot in an earlier frame. Other features offered by `Value` include 
+/// the latter uses a slot in an earlier frame. Other features offered by `Value` include
 /// accessing the fields of these values and (im)mutably borrowing their underlying array data.
 ///
 /// [`Value::new`]: struct.Value.html#method.new
@@ -108,7 +131,7 @@ impl<'frame> Values<'frame> {
 #[repr(transparent)]
 #[derive(Copy, Clone)]
 pub struct Value<'frame, 'data>(
-    pub(crate) *mut jl_value_t,
+    *mut jl_value_t,
     PhantomData<&'frame ()>,
     PhantomData<&'data ()>,
 );
@@ -356,13 +379,11 @@ impl<'frame, 'data> Value<'frame, 'data> {
 
     /// Allocates a new n-dimensional array in Julia.
     ///
-    /// Allocating an array with one, two, or three dimensions requires one slot on the GC stack.
-    /// If you allocate an array with more dimensions, an extra frame is created with `n + 1`
-    /// slots, temporarily taking `n + 3` additional slots. This latter case requires that
-    /// `jlrs.jl` has been included.
+    /// Creating an an array with 1, 2 or 3 dimensions requires one slot on the GC stack. If you
+    /// create an array with more dimensions an extra frame is created with a single slot, 
+    /// temporarily taking 3 additional slots.
     ///
-    /// This function returns an error if there are not enough slots available, or if `jlrs.jl`
-    /// has not been included when allocating arrays with four or more dimensions.
+    /// This function returns an error if there are not enough slots available.
     pub fn array<T, D, F>(frame: &mut F, dimensions: D) -> JlrsResult<Value<'frame, 'static>>
     where
         T: JuliaType,
@@ -377,13 +398,11 @@ impl<'frame, 'data> Value<'frame, 'data> {
 
     /// Allocates a new n-dimensional array in Julia using an `Output`.
     ///
-    /// Because an `Output` is used, no additional slot in the current frame is used. If you
-    /// allocate an array with more dimensions, an extra frame is created with `n + 1` slots,
-    /// temporarily taking `n + 3` additional slots. This latter case requires that `jlrs.jl` has
-    /// been included.
+    /// Because an `Output` is used, no additional slot in the current frame is used if you create
+    /// an array with 1, 2 or 3 dimensions. If you create an array with more dimensions an extra 
+    // frame is created with a single slot, temporarily taking 3 additional slots.
     ///
-    /// This function returns an error if there are not enough slots available, or if `jlrs.jl`
-    /// has not been included when allocating arrays with four or more dimensions.
+    /// This function returns an error if there are not enough slots available.
     pub fn array_output<'output, T, D, F>(
         frame: &mut F,
         output: Output<'output>,
@@ -403,17 +422,10 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// Borrows an n-dimensional array from Rust for use in Julia.
     ///
     /// Borrowing an array with one dimension requires one slot on the GC stack. If you borrow an
-    /// array with more dimensions, an extra frame is created with `n + 1` slots, temporarily
-    /// taking `n + 3` additional slots. This latter case requires that `jlrs.jl` has been
-    /// included.
+    /// array with more dimensions, an extra frame is created with a single slot slot, temporarily
+    /// taking 3 additional slots. 
     ///
-    /// This function returns an error if there are not enough slots available, or if `jlrs.jl`
-    /// has not been included when borrowing arrays with two or more dimensions.
-    ///
-    /// This function is unsafe to call because you must ensure that the lifetime of this value is
-    /// never extended through an `Output` by returning it from a Julia function, is never
-    /// assigned to a global in Julia, and is never referenced from a value with a longer lifetime
-    /// in Julia.
+    /// This function returns an error if there are not enough slots available.
     pub fn borrow_array<T, D, V, F>(
         frame: &mut F,
         data: &'data mut V,
@@ -433,18 +445,11 @@ impl<'frame, 'data> Value<'frame, 'data> {
 
     /// Borrows an n-dimensional array from Rust for use in Julia using an `Output`.
     ///
-    /// Because an `Output` is used, no additional slot in the current frame is used. If you
-    /// borrow an array with more dimensions, an extra frame is created with `n + 1` slots,
-    /// temporarily taking `n + 3` additional slots. This latter case requires that `jlrs.jl` has
-    /// been included.
+    /// Because an `Output` is used, no additional slot in the current frame is used for the array 
+    /// itself. If you borrow an array with more than 1 dimension an extra frame is created with a
+    /// single slot, temporarily taking 3 additional slots.
     ///
-    /// This function returns an error if there are not enough slots available, or if `jlrs.jl`
-    /// has not been included when borrowing arrays with two or more dimensions.
-    ///
-    /// This function is unsafe to call because you must ensure that the lifetime of this value is
-    /// never extended through an `Output` by returning it from a Julia function, is never
-    /// assigned to a global in Julia, and is never referenced from a value with a longer lifetime
-    /// in Julia.
+    /// This function returns an error if there are not enough slots available.
     pub fn borrow_array_output<'output, 'borrow, T, D, V, F>(
         frame: &mut F,
         output: Output<'output>,
@@ -464,15 +469,13 @@ impl<'frame, 'data> Value<'frame, 'data> {
         }
     }
 
-    /// Moves an n-dimensional array from Rust to Julia using an `Output`.
+    /// Moves an n-dimensional array from Rust to Julia.
     ///
-    /// Because an `Output` is used, no additional slot in the current frame is used. If you move
-    /// an array with more dimensions, an extra frame is created with `n + 1` slots, temporarily
-    /// taking `n + 3` additional slots. This latter case requires that `jlrs.jl` has been
-    /// included.
+    /// Moving an array with one dimension requires one slot on the GC stack. If you move an array
+    /// with more dimensions, an extra frame is created with a single slot slot, temporarily 
+    /// taking 3 additional slots. 
     ///
-    /// This function returns an error if there are not enough slots available, or if `jlrs.jl`
-    /// has not been included when moving arrays with two or more dimensions.
+    /// This function returns an error if there are not enough slots available.
     pub fn move_array<T, D, F>(
         frame: &mut F,
         data: Vec<T>,
@@ -489,15 +492,13 @@ impl<'frame, 'data> Value<'frame, 'data> {
         }
     }
 
-    /// Moves an n-dimensional array from Rust to Julia.
+    /// Moves an n-dimensional array from Rust to Julia using an output.
     ///
-    /// Moving an array with one dimension requires one slot on the GC stack. If you move an
-    /// array with more dimensions, an extra frame is created with `n + 1` slots, temporarily
-    /// taking `n + 3` additional slots. This latter case requires that `jlrs.jl` has been
-    /// included.
+    /// Because an `Output` is used, no additional slot in the current frame is used for the array 
+    /// itself. If you move an array with more dimensions, an extra frame is created with a single 
+    /// slot slot, temporarily taking 3 additional slots. 
     ///
-    /// This function returns an error if there are not enough slots available, or if `jlrs.jl`
-    /// has not been included when moving arrays with two or more dimensions.
+    /// This function returns an error if there are not enough slots available.
     pub fn move_array_output<'output, T, D, F>(
         frame: &mut F,
         output: Output<'output>,
@@ -515,9 +516,9 @@ impl<'frame, 'data> Value<'frame, 'data> {
         }
     }
 
-    /// Immutably borrow array data, you can borrow data from multiple arrays at the same time. 
-    /// This data can only be borrowed if it contains floating point numbers or (unsigned) 
-    /// integers. Returns `JlrsError::NotAnArray` if this value is not an array or 
+    /// Immutably borrow array data, you can borrow data from multiple arrays at the same time.
+    /// This data can only be borrowed if it contains floating point numbers or (unsigned)
+    /// integers. Returns `JlrsError::NotAnArray` if this value is not an array or
     /// `JlrsError::WrongType` if the type of the elements is incorrect.
     pub fn array_data<'borrow, T: ArrayDatatype, F: Frame<'frame>>(
         &'borrow self,
@@ -526,7 +527,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
         if !self.is_array() {
             Err(JlrsError::NotAnArray)?;
         }
-        
+
         if !self.is_array_of::<T>() {
             Err(JlrsError::WrongType)?;
         }
@@ -554,9 +555,9 @@ impl<'frame, 'data> Value<'frame, 'data> {
         }
     }
 
-    /// Mutably borrow array data, you can borrow data from a single array at the same time. 
-    /// This data can only be borrowed if it contains floating point numbers or (unsigned) 
-    /// integers. Returns `JlrsError::NotAnArray` if this value is not an array or 
+    /// Mutably borrow array data, you can borrow data from a single array at the same time.
+    /// This data can only be borrowed if it contains floating point numbers or (unsigned)
+    /// integers. Returns `JlrsError::NotAnArray` if this value is not an array or
     /// `JlrsError::WrongType` if the type of the elements is incorrect.
     pub fn array_data_mut<'borrow, T: ArrayDatatype, F: Frame<'frame>>(
         &'borrow mut self,
@@ -605,6 +606,18 @@ impl<'frame, 'data> Value<'frame, 'data> {
         unsafe { T::try_unbox(self.ptr(), Internal) }
     }
 
+    /// Wraps a `Value` so that a function call will not require a slot in the current frame but
+    /// uses the one that was allocated for the output.
+    pub fn with_output<'output>(
+        self,
+        output: Output<'output>,
+    ) -> WithOutput<'output, Value<'frame, 'data>> {
+        WithOutput {
+            value: self,
+            output,
+        }
+    }
+
     /// Call this value as a function that takes zero arguments, this takes one slot on the GC
     /// stack. Returns the result of this function call if no exception is thrown, the exception
     /// if one is, or an error if no space is left on the stack.
@@ -615,23 +628,6 @@ impl<'frame, 'data> Value<'frame, 'data> {
         unsafe {
             let res = jl_call0(self.ptr());
             try_protect(frame, res)
-        }
-    }
-
-    /// Call this value as a function that takes zero arguments and use the `Output` to extend the
-    /// result's lifetime. This takes no space on the GC stack. Returns the result of this
-    /// function call if no exception is thrown or the exception if one is.
-    pub fn call0_output<'output, F>(
-        self,
-        frame: &mut F,
-        output: Output<'output>,
-    ) -> JlrsResult<CallResult<'output, 'static>>
-    where
-        F: Frame<'frame>,
-    {
-        unsafe {
-            let res = jl_call0(self.ptr());
-            assign(frame, output, res)
         }
     }
 
@@ -649,25 +645,6 @@ impl<'frame, 'data> Value<'frame, 'data> {
         unsafe {
             let res = jl_call1(self.ptr().cast(), arg.ptr());
             try_protect(frame, res)
-        }
-    }
-
-    /// Call this value as a function that takes one argument and use the `Output` to extend the
-    /// result's lifetime. This takes no space on the GC stack. Returns the result of this
-    /// function call if no exception is thrown or the exception if one is.
-    pub fn call1_output<'output, 'borrow, F>(
-        self,
-        frame: &mut F,
-        output: Output<'output>,
-        arg: Value<'_, 'borrow>,
-    ) -> JlrsResult<CallResult<'output, 'borrow>>
-    where
-        'borrow: 'output,
-        F: Frame<'frame>,
-    {
-        unsafe {
-            let res = jl_call1(self.ptr().cast(), arg.ptr());
-            assign(frame, output, res)
         }
     }
 
@@ -689,26 +666,6 @@ impl<'frame, 'data> Value<'frame, 'data> {
         }
     }
 
-    /// Call this value as a function that takes two arguments and use the `Output` to extend the
-    /// result's lifetime. This takes no space on the GC stack. Returns the result of this
-    /// function call if no exception is thrown or the exception if one is.
-    pub fn call2_output<'output, 'borrow, F>(
-        self,
-        frame: &mut F,
-        output: Output<'output>,
-        arg0: Value<'_, 'borrow>,
-        arg1: Value<'_, 'borrow>,
-    ) -> JlrsResult<CallResult<'output, 'borrow>>
-    where
-        'borrow: 'output,
-        F: Frame<'frame>,
-    {
-        unsafe {
-            let res = jl_call2(self.ptr().cast(), arg0.ptr(), arg1.ptr());
-            assign(frame, output, res)
-        }
-    }
-
     /// Call this value as a function that takes three arguments, this takes one slot on the GC
     /// stack. Returns the result of this function call if no exception is thrown, the exception
     /// if one is, or an error if no space is left on the stack.
@@ -725,27 +682,6 @@ impl<'frame, 'data> Value<'frame, 'data> {
         unsafe {
             let res = jl_call3(self.ptr().cast(), arg0.ptr(), arg1.ptr(), arg2.ptr());
             try_protect(frame, res)
-        }
-    }
-
-    /// Call this value as a function that takes three arguments and use the `Output` to extend
-    /// the result's lifetime. This takes no space on the GC stack. Returns the result of this
-    /// function call if no exception is thrown or the exception if one is.
-    pub fn call3_output<'output, 'borrow, F>(
-        self,
-        frame: &mut F,
-        output: Output<'output>,
-        arg0: Value<'_, 'borrow>,
-        arg1: Value<'_, 'borrow>,
-        arg2: Value<'_, 'borrow>,
-    ) -> JlrsResult<CallResult<'output, 'borrow>>
-    where
-        'borrow: 'output,
-        F: Frame<'frame>,
-    {
-        unsafe {
-            let res = jl_call3(self.ptr().cast(), arg0.ptr(), arg1.ptr(), arg2.ptr());
-            assign(frame, output, res)
         }
     }
 
@@ -769,28 +705,6 @@ impl<'frame, 'data> Value<'frame, 'data> {
         }
     }
 
-    /// Call this value as a function that takes several arguments and use the `Output` to extend
-    /// the result's lifetime. This takes no space on the GC stack. Returns the result of this
-    /// function call if no exception is thrown or the exception if one is.
-    pub fn call_output<'output, 'value, 'borrow, V, F>(
-        self,
-        frame: &mut F,
-        output: Output<'output>,
-        mut args: V,
-    ) -> JlrsResult<CallResult<'output, 'borrow>>
-    where
-        'borrow: 'output,
-        V: AsMut<[Value<'value, 'borrow>]>,
-        F: Frame<'frame>,
-    {
-        unsafe {
-            let args = args.as_mut();
-            let n = args.len();
-            let res = jl_call(self.ptr().cast(), args.as_mut_ptr().cast(), n as _);
-            assign(frame, output, res)
-        }
-    }
-
     /// Call this value as a function that takes several arguments in a single `Values`, this
     /// takes one slot on the GC stack. Returns the result of this function call if no exception
     /// is thrown, the exception if one is, or an error if no space is left on the stack.
@@ -808,27 +722,9 @@ impl<'frame, 'data> Value<'frame, 'data> {
         }
     }
 
-    /// Call this value as a function that takes several arguments in a single `Values` and use
-    /// the `Output` to extend the result's lifetime. This takes no space on the GC stack. Returns
-    /// the result of this function call if no exception is thrown or the exception if one is.
-    pub fn call_values_output<'output, F>(
-        self,
-        frame: &mut F,
-        output: Output<'output>,
-        args: Values,
-    ) -> JlrsResult<CallResult<'output, 'static>>
-    where
-        F: Frame<'frame>,
-    {
-        unsafe {
-            let res = jl_call(self.ptr().cast(), args.ptr(), args.len() as _);
-            assign(frame, output, res)
-        }
-    }
-
     /// Returns an anonymous function that wraps this value in a try-catch block. Calling this
     /// anonymous function with some arguments will call the value as a function with those
-    /// arguments and return its result, or catch the exception, print the stackstrace, and 
+    /// arguments and return its result, or catch the exception, print the stackstrace, and
     /// rethrow that exception. This takes one slot on the GC stack. You must include `jlrs.jl` to
     /// use this function.
     pub fn tracing_call<F>(self, frame: &mut F) -> JlrsResult<CallResult<'frame, 'data>>
@@ -847,8 +743,8 @@ impl<'frame, 'data> Value<'frame, 'data> {
 
     /// Returns an anonymous function that wraps this value in a try-catch block. Calling this
     /// anonymous function with some arguments will call the value as a function with those
-    /// arguments and return its result, or catch the exception and throw a new one with two 
-    /// fields, `exc` and `stacktrace`, containing the original exception and the stacktrace 
+    /// arguments and return its result, or catch the exception and throw a new one with two
+    /// fields, `exc` and `stacktrace`, containing the original exception and the stacktrace
     /// respectively. This takes one slot on the GC stack. You must include `jlrs.jl` to use this
     /// function.
     pub fn attach_stacktrace<F>(self, frame: &mut F) -> JlrsResult<CallResult<'frame, 'data>>
@@ -872,6 +768,166 @@ impl<'frame, 'data> Debug for Value<'frame, 'data> {
     }
 }
 
+/// A wrapper that will let you call a `Value` as a function and store the result using an 
+/// `Output`. The function call will not require a slot in the current frame but uses the one
+/// that was allocated for the output. You can create this by calling [`Value::with_output`].
+///
+/// Because the result of a function call is stored in an already allocated slot, calling a 
+/// function returns the `CallResult` directly rather than wrapping it in a `JlrsResult` except
+/// for the methods that depend on `jlrs.jl`.
+///
+/// [`Value::with_output`]: Value.html#method.with_output
+pub struct WithOutput<'output, V> {
+    value: V,
+    output: Output<'output>,
+}
+
+impl<'output, 'frame, 'data> WithOutput<'output, Value<'frame, 'data>> {
+    /// Call the value as a function that takes zero arguments and use the `Output` to extend the
+    /// result's lifetime. This takes no space on the GC stack. Returns the result of this
+    /// function call if no exception is thrown or the exception if one is.
+    pub fn call0<'fr, F>(self, frame: &mut F) -> CallResult<'output, 'static>
+    where
+        F: Frame<'fr>,
+    {
+        unsafe {
+            let res = jl_call0(self.value.ptr());
+            assign(frame, self.output, res)
+        }
+    }
+
+    /// Call the value as a function that takes one argument and use the `Output` to extend the
+    /// result's lifetime. This takes no space on the GC stack. Returns the result of this
+    /// function call if no exception is thrown or the exception if one is.
+    pub fn call1<'borrow, 'fr, F>(
+        self,
+        frame: &mut F,
+        arg: Value<'_, 'borrow>,
+    ) -> CallResult<'output, 'borrow>
+    where
+        'borrow: 'output,
+        F: Frame<'fr>,
+    {
+        unsafe {
+            let res = jl_call1(self.value.ptr().cast(), arg.ptr());
+            assign(frame, self.output, res)
+        }
+    }
+
+    /// Call the value as a function that takes two arguments and use the `Output` to extend the
+    /// result's lifetime. This takes no space on the GC stack. Returns the result of this
+    /// function call if no exception is thrown or the exception if one is.
+    pub fn call2<'borrow, 'fr, F>(
+        self,
+        frame: &mut F,
+        arg0: Value<'_, 'borrow>,
+        arg1: Value<'_, 'borrow>,
+    ) -> CallResult<'output, 'borrow>
+    where
+        'borrow: 'output,
+        F: Frame<'fr>,
+    {
+        unsafe {
+            let res = jl_call2(self.value.ptr().cast(), arg0.ptr(), arg1.ptr());
+            assign(frame, self.output, res)
+        }
+    }
+
+    /// Call the value as a function that takes three arguments and use the `Output` to extend
+    /// the result's lifetime. This takes no space on the GC stack. Returns the result of this
+    /// function call if no exception is thrown or the exception if one is.
+    pub fn call3<'borrow, 'fr, F>(
+        self,
+        frame: &mut F,
+        arg0: Value<'_, 'borrow>,
+        arg1: Value<'_, 'borrow>,
+        arg2: Value<'_, 'borrow>,
+    ) -> CallResult<'output, 'borrow>
+    where
+        'borrow: 'output,
+        F: Frame<'fr>,
+    {
+        unsafe {
+            let res = jl_call3(self.value.ptr().cast(), arg0.ptr(), arg1.ptr(), arg2.ptr());
+            assign(frame, self.output, res)
+        }
+    }
+
+    /// Call the value as a function that takes several arguments and use the `Output` to extend
+    /// the result's lifetime. This takes no space on the GC stack. Returns the result of this
+    /// function call if no exception is thrown or the exception if one is.
+    pub fn call<'value, 'borrow, 'fr, V, F>(
+        self,
+        frame: &mut F,
+        mut args: V,
+    ) -> CallResult<'output, 'borrow>
+    where
+        'borrow: 'output,
+        V: AsMut<[Value<'value, 'borrow>]>,
+        F: Frame<'fr>,
+    {
+        unsafe {
+            let args = args.as_mut();
+            let n = args.len();
+            let res = jl_call(self.value.ptr().cast(), args.as_mut_ptr().cast(), n as _);
+            assign(frame, self.output, res)
+        }
+    }
+
+    /// Call the value as a function that takes several arguments in a single `Values` and use
+    /// the `Output` to extend the result's lifetime. This takes no space on the GC stack. Returns
+    /// the result of this function call if no exception is thrown or the exception if one is.
+    pub fn call_values<'fr, F>(self, frame: &mut F, args: Values) -> CallResult<'output, 'static>
+    where
+        F: Frame<'fr>,
+    {
+        unsafe {
+            let res = jl_call(self.value.ptr().cast(), args.ptr(), args.len() as _);
+            assign(frame, self.output, res)
+        }
+    }
+
+    /// Returns an anonymous function that wraps the value in a try-catch block. Calling this
+    /// anonymous function with some arguments will call the value as a function with those
+    /// arguments and return its result, or catch the exception, print the stackstrace, and
+    /// rethrow that exception. The output is used to protect the result. You must include
+    /// `jlrs.jl` to use this function.
+    pub fn tracing_call<'fr, F>(self, frame: &mut F) -> JlrsResult<CallResult<'output, 'data>>
+    where
+        F: Frame<'fr>,
+    {
+        unsafe {
+            let global = Global::new();
+            let func = Module::main(global)
+                .submodule("Jlrs")?
+                .function("tracingcall")?;
+            let res = jl_call1(func.ptr(), self.value.ptr());
+            Ok(assign(frame, self.output, res))
+        }
+    }
+
+    /// Returns an anonymous function that wraps the value in a try-catch block. Calling this
+    /// anonymous function with some arguments will call the value as a function with those
+    /// arguments and return its result, or catch the exception and throw a new one with two
+    /// fields, `exc` and `stacktrace`, containing the original exception and the stacktrace
+    /// respectively. The output is used to protect the result. You must include `jlrs.jl` to use
+    /// this function.
+    pub fn attach_stacktrace<'fr, F>(self, frame: &mut F) -> JlrsResult<CallResult<'output, 'data>>
+    where
+        F: Frame<'fr>,
+    {
+        unsafe {
+            let global = Global::new();
+            let func = Module::main(global)
+                .submodule("Jlrs")?
+                .function("attachstacktrace")?;
+            let res = jl_call1(func.ptr(), self.value.ptr());
+            Ok(assign(frame, self.output, res))
+        }
+    }
+}
+
+
 unsafe fn array<'frame, T, D, F>(frame: &mut F, dimensions: D) -> JlrsResult<*mut jl_value_t>
 where
     T: JuliaType,
@@ -891,16 +947,13 @@ where
             dims.n_elements(2),
         )
         .cast()),
-        n => frame.frame(n as usize + 1, |frame| {
-            let global = Global::new();
-            let jlrs = Symbol::new(global, "Jlrs");
-            let arraydims = Symbol::new(global, "arraydims");
-
-            let func = Module::main(global).submodule(jlrs)?.function(arraydims)?;
-
-            let v = Values::new(frame, dims.as_slice())?;
-            let dims = func.call_values(frame, v)?.unwrap();
-            Ok(jl_new_array(array_type, dims.ptr()).cast())
+        n if n <= 8 => frame.frame(1, |frame| {
+            let tuple = small_dim_tuple(frame, &dims)?;
+            Ok(jl_new_array(array_type, tuple.ptr()).cast())
+        }),
+        _ => frame.frame(1, |frame| {
+            let tuple = large_dim_tuple(frame, &dims)?;
+            Ok(jl_new_array(array_type, tuple.ptr()).cast())
         }),
     }
 }
@@ -927,18 +980,27 @@ where
             0,
         )
         .cast()),
-        n => frame.frame(n as usize + 1, |frame| {
-            let global = Global::new();
-            let jlrs = Symbol::new(global, "Jlrs");
-            let arraydims = Symbol::new(global, "arraydims");
+        n if n <= 8 => frame.frame(1, |frame| {
+            let tuple = small_dim_tuple(frame, &dims)?;
 
-            let func = Module::main(global).submodule(jlrs)?.function(arraydims)?;
-            let v = Values::new(frame, dims.as_slice())?;
-            let dims = func.call_values(frame, v)?.unwrap();
-            Ok(
-                jl_ptr_to_array(array_type, data.as_mut().as_mut_ptr().cast(), dims.ptr(), 0)
-                    .cast(),
+            Ok(jl_ptr_to_array(
+                array_type,
+                data.as_mut().as_mut_ptr().cast(),
+                tuple.ptr(),
+                0,
             )
+            .cast())
+        }),
+        _ => frame.frame(1, |frame| {
+            let tuple = large_dim_tuple(frame, &dims)?;
+
+            Ok(jl_ptr_to_array(
+                array_type,
+                data.as_mut().as_mut_ptr().cast(),
+                tuple.ptr(),
+                0,
+            )
+            .cast())
         }),
     }
 }
@@ -964,18 +1026,24 @@ where
             1,
         )
         .cast()),
-        n => frame.frame(n as usize + 1, |frame| {
-            let global = Global::new();
-            let jlrs = Symbol::new(global, "Jlrs");
-            let arraydims = Symbol::new(global, "arraydims");
+        n if n <= 8 => frame.frame(1, |frame| {
+            let tuple = small_dim_tuple(frame, &dims)?;
 
-            let func = Module::main(global).submodule(jlrs)?.function(arraydims)?;
-            let v = Values::new(frame, dims.as_slice())?;
-            let dims = func.call_values(frame, v)?.unwrap();
             Ok(jl_ptr_to_array(
                 array_type,
                 Box::into_raw(data.into_boxed_slice()).cast(),
-                dims.ptr(),
+                tuple.ptr(),
+                1,
+            )
+            .cast())
+        }),
+        _ => frame.frame(1, |frame| {
+            let tuple = large_dim_tuple(frame, &dims)?;
+
+            Ok(jl_ptr_to_array(
+                array_type,
+                Box::into_raw(data.into_boxed_slice()).cast(),
+                tuple.ptr(),
                 1,
             )
             .cast())
@@ -1009,15 +1077,54 @@ unsafe fn assign<'output, 'frame, F>(
     frame: &mut F,
     output: Output<'output>,
     res: *mut jl_value_t,
-) -> JlrsResult<CallResult<'output, 'static>>
+) -> CallResult<'output, 'static>
 where
     F: Frame<'frame>,
 {
     let exc = jl_exception_occurred();
 
     if !exc.is_null() {
-        Ok(Err(frame.assign_output(output, exc, Internal)))
+        Err(frame.assign_output(output, exc, Internal))
     } else {
-        Ok(Ok(frame.assign_output(output, res, Internal)))
+        Ok(frame.assign_output(output, res, Internal))
     }
+}
+
+unsafe fn small_dim_tuple<'frame, F>(
+    frame: &mut F,
+    dims: &Dimensions,
+) -> JlrsResult<Value<'frame, 'static>>
+where
+    F: Frame<'frame>,
+{
+    let n = dims.n_dimensions();
+    assert!(n <= 8);
+    let elem_types = JL_LONG_TYPE.with(|longs| longs.get());
+    let tuple_type = jl_apply_tuple_type_v(elem_types.cast(), n);
+    let tuple = jl_new_struct_uninit(tuple_type);
+    let v = try_protect(frame, tuple)?.unwrap();
+
+    let usize_ptr: *mut usize = v.ptr().cast();
+    std::ptr::copy_nonoverlapping(dims.as_slice().as_ptr(), usize_ptr, n);
+
+    Ok(v)
+}
+
+unsafe fn large_dim_tuple<'frame, F>(
+    frame: &mut F,
+    dims: &Dimensions,
+) -> JlrsResult<Value<'frame, 'static>>
+where
+    F: Frame<'frame>,
+{
+    let n = dims.n_dimensions();
+    let mut elem_types = vec![usize::julia_type(Internal); n];
+    let tuple_type = jl_apply_tuple_type_v(elem_types.as_mut_ptr().cast(), n);
+    let tuple = jl_new_struct_uninit(tuple_type);
+    let v = try_protect(frame, tuple)?.unwrap();
+
+    let usize_ptr: *mut usize = v.ptr().cast();
+    std::ptr::copy_nonoverlapping(dims.as_slice().as_ptr(), usize_ptr, n);
+
+    Ok(v)
 }

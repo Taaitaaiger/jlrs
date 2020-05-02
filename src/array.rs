@@ -41,7 +41,7 @@ impl<T> Array<T> {
         Some(&mut self.data[self.dimensions.index_of(idx).ok()?])
     }
 
-    /// Returns the array's data as a slice, the data is in column-major order. 
+    /// Returns the array's data as a slice, the data is in column-major order.
     pub fn as_slice(&self) -> &[T] {
         &self.data
     }
@@ -65,9 +65,9 @@ impl<T, D: Into<Dimensions>> IndexMut<D> for Array<T> {
     }
 }
 
-/// Immutably borrowed array data from Julia. The data has a column-major order and can be indexed 
+/// Immutably borrowed array data from Julia. The data has a column-major order and can be indexed
 /// with an  n-dimensional index; see [`Dimensions`] for more information.
-/// 
+///
 /// [`Dimensions`]: struct.Dimensions.html
 pub struct ArrayData<'borrow, 'frame, T, F: Frame<'frame>> {
     data: &'borrow [T],
@@ -94,7 +94,7 @@ where
         Some(&self.data[self.dimensions.index_of(index).ok()?])
     }
 
-    /// Returns the array's data as a slice, the data is in column-major order. 
+    /// Returns the array's data as a slice, the data is in column-major order.
     pub fn as_slice(&self) -> &[T] {
         &self.data
     }
@@ -111,9 +111,9 @@ where
     }
 }
 
-/// Mutably borrowed array data from Julia. The data has a column-major order and can be indexed 
+/// Mutably borrowed array data from Julia. The data has a column-major order and can be indexed
 /// with an n-dimensional index; see [`Dimensions`] for more information.
-/// 
+///
 /// [`Dimensions`]: struct.Dimensions.html
 pub struct ArrayDataMut<'borrow, 'frame, T, F: Frame<'frame>> {
     data: &'borrow mut [T],
@@ -126,11 +126,15 @@ impl<'borrow, 'frame, T, F> ArrayDataMut<'borrow, 'frame, T, F>
 where
     F: Frame<'frame>,
 {
-    pub(crate) unsafe fn new(data: &'borrow mut [T], dimensions: Dimensions, _: &'borrow mut F) -> Self {
+    pub(crate) unsafe fn new(
+        data: &'borrow mut [T],
+        dimensions: Dimensions,
+        _: &'borrow mut F,
+    ) -> Self {
         ArrayDataMut {
             data,
             dimensions,
-            _notsendsync: PhantomData, 
+            _notsendsync: PhantomData,
             _frame: PhantomData,
         }
     }
@@ -145,7 +149,7 @@ where
         Some(&mut self.data[self.dimensions.index_of(index).ok()?])
     }
 
-    /// Returns the array's data as a slice, the data is in column-major order. 
+    /// Returns the array's data as a slice, the data is in column-major order.
     pub fn as_slice(&self) -> &[T] {
         &self.data
     }

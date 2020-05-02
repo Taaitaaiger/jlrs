@@ -75,7 +75,7 @@ fn main_module() {
             let main_module = Module::main(global);
             let jlrs_module = main_module.submodule("Jlrs");
             assert!(jlrs_module.is_ok());
-            let func = jlrs_module.unwrap().function("arraydims");
+            let func = jlrs_module.unwrap().function("attachstacktrace");
             assert!(func.is_ok());
             Ok(())
         })
@@ -92,7 +92,7 @@ fn main_module_dynamic() {
             let main_module = Module::main(global);
             let jlrs_module = main_module.submodule("Jlrs");
             assert!(jlrs_module.is_ok());
-            let func = jlrs_module.unwrap().function("arraydims");
+            let func = jlrs_module.unwrap().function("attachstacktrace");
             assert!(func.is_ok());
             Ok(())
         })

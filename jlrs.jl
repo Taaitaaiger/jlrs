@@ -34,6 +34,4 @@ function attachstacktrace(func)
 
     wrapper
 end
-
-arraydims(D...) = D
 end
