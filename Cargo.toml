@@ -3,6 +3,5 @@
 members = [
     "jlrs",
     "jlrs_derive",
-    "jlrs_derive_internal",
     "jlrs_derive_tests",
 ]
