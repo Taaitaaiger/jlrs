@@ -7,8 +7,7 @@ use crate::global::Global;
 use crate::module::Module;
 use crate::symbol::Symbol;
 use crate::traits::{
-    private::{Internal, JuliaType as JuliaTypePriv},
-    ArrayDatatype, Frame, IntoJulia, JuliaType, TemporarySymbol, TryUnbox,
+    private::Internal, ArrayDatatype, Frame, IntoJulia, JuliaType, TemporarySymbol, TryUnbox,
 };
 use jl_sys::{
     jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_apply_array_type,
@@ -27,18 +26,18 @@ use std::slice;
 thread_local! {
     // Used as a pool to convert dimensions to tuples. Safe because a thread local is initialized
     // when `with` is first called, which happens after `Julia::init` has been called. The C API
-    // requires a mutable pointer to this array when creating a tuple that contains 8 or fewer 
+    // requires a mutable pointer to this array when creating a tuple that contains 8 or fewer
     // `
     static JL_LONG_TYPE: std::cell::UnsafeCell<[*mut jl_datatype_t; 8]> = unsafe {
         std::cell::UnsafeCell::new([
-            usize::julia_type(Internal).cast(),
-            usize::julia_type(Internal).cast(),
-            usize::julia_type(Internal).cast(),
-            usize::julia_type(Internal).cast(),
-            usize::julia_type(Internal).cast(),
-            usize::julia_type(Internal).cast(),
-            usize::julia_type(Internal).cast(),
-            usize::julia_type(Internal).cast(),
+            usize::julia_type().cast(),
+            usize::julia_type().cast(),
+            usize::julia_type().cast(),
+            usize::julia_type().cast(),
+            usize::julia_type().cast(),
+            usize::julia_type().cast(),
+            usize::julia_type().cast(),
+            usize::julia_type().cast(),
         ])
     };
 }
@@ -158,7 +157,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     {
         unsafe {
             frame
-                .protect(value.into_julia(Internal), Internal)
+                .protect(value.into_julia(), Internal)
                 .map_err(Into::into)
         }
     }
@@ -178,12 +177,12 @@ impl<'frame, 'data> Value<'frame, 'data> {
         V: IntoJulia,
         F: Frame<'frame>,
     {
-        unsafe { frame.assign_output(output, value.into_julia(Internal), Internal) }
+        unsafe { frame.assign_output(output, value.into_julia(), Internal) }
     }
 
     /// Returns true if the value is of type `T`.
     pub fn is<T: JuliaType>(&self) -> bool {
-        unsafe { jl_typeis(self.ptr(), T::julia_type(Internal).cast()) }
+        unsafe { jl_typeis(self.ptr(), T::julia_type().cast()) }
     }
 
     /// Returns the type name of this value.
@@ -208,8 +207,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// Returns true if the value is an array with elements of type `T`.
     pub fn is_array_of<T: JuliaType>(&self) -> bool {
         unsafe {
-            self.is_array()
-                && jl_array_eltype(self.ptr()) as *mut jl_value_t == T::julia_type(Internal)
+            self.is_array() && jl_array_eltype(self.ptr()) as *mut jl_value_t == T::julia_type()
         }
     }
 
@@ -380,7 +378,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// Allocates a new n-dimensional array in Julia.
     ///
     /// Creating an an array with 1, 2 or 3 dimensions requires one slot on the GC stack. If you
-    /// create an array with more dimensions an extra frame is created with a single slot, 
+    /// create an array with more dimensions an extra frame is created with a single slot,
     /// temporarily taking 3 additional slots.
     ///
     /// This function returns an error if there are not enough slots available.
@@ -399,7 +397,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// Allocates a new n-dimensional array in Julia using an `Output`.
     ///
     /// Because an `Output` is used, no additional slot in the current frame is used if you create
-    /// an array with 1, 2 or 3 dimensions. If you create an array with more dimensions an extra 
+    /// an array with 1, 2 or 3 dimensions. If you create an array with more dimensions an extra
     // frame is created with a single slot, temporarily taking 3 additional slots.
     ///
     /// This function returns an error if there are not enough slots available.
@@ -423,7 +421,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     ///
     /// Borrowing an array with one dimension requires one slot on the GC stack. If you borrow an
     /// array with more dimensions, an extra frame is created with a single slot slot, temporarily
-    /// taking 3 additional slots. 
+    /// taking 3 additional slots.
     ///
     /// This function returns an error if there are not enough slots available.
     pub fn borrow_array<T, D, V, F>(
@@ -445,7 +443,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
 
     /// Borrows an n-dimensional array from Rust for use in Julia using an `Output`.
     ///
-    /// Because an `Output` is used, no additional slot in the current frame is used for the array 
+    /// Because an `Output` is used, no additional slot in the current frame is used for the array
     /// itself. If you borrow an array with more than 1 dimension an extra frame is created with a
     /// single slot, temporarily taking 3 additional slots.
     ///
@@ -472,8 +470,8 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// Moves an n-dimensional array from Rust to Julia.
     ///
     /// Moving an array with one dimension requires one slot on the GC stack. If you move an array
-    /// with more dimensions, an extra frame is created with a single slot slot, temporarily 
-    /// taking 3 additional slots. 
+    /// with more dimensions, an extra frame is created with a single slot slot, temporarily
+    /// taking 3 additional slots.
     ///
     /// This function returns an error if there are not enough slots available.
     pub fn move_array<T, D, F>(
@@ -494,9 +492,9 @@ impl<'frame, 'data> Value<'frame, 'data> {
 
     /// Moves an n-dimensional array from Rust to Julia using an output.
     ///
-    /// Because an `Output` is used, no additional slot in the current frame is used for the array 
-    /// itself. If you move an array with more dimensions, an extra frame is created with a single 
-    /// slot slot, temporarily taking 3 additional slots. 
+    /// Because an `Output` is used, no additional slot in the current frame is used for the array
+    /// itself. If you move an array with more dimensions, an extra frame is created with a single
+    /// slot slot, temporarily taking 3 additional slots.
     ///
     /// This function returns an error if there are not enough slots available.
     pub fn move_array_output<'output, T, D, F>(
@@ -768,11 +766,11 @@ impl<'frame, 'data> Debug for Value<'frame, 'data> {
     }
 }
 
-/// A wrapper that will let you call a `Value` as a function and store the result using an 
+/// A wrapper that will let you call a `Value` as a function and store the result using an
 /// `Output`. The function call will not require a slot in the current frame but uses the one
 /// that was allocated for the output. You can create this by calling [`Value::with_output`].
 ///
-/// Because the result of a function call is stored in an already allocated slot, calling a 
+/// Because the result of a function call is stored in an already allocated slot, calling a
 /// function returns the `CallResult` directly rather than wrapping it in a `JlrsResult` except
 /// for the methods that depend on `jlrs.jl`.
 ///
@@ -927,7 +925,6 @@ impl<'output, 'frame, 'data> WithOutput<'output, Value<'frame, 'data>> {
     }
 }
 
-
 unsafe fn array<'frame, T, D, F>(frame: &mut F, dimensions: D) -> JlrsResult<*mut jl_value_t>
 where
     T: JuliaType,
@@ -935,7 +932,7 @@ where
     F: Frame<'frame>,
 {
     let dims = dimensions.into();
-    let array_type = jl_apply_array_type(T::julia_type(Internal), dims.n_dimensions());
+    let array_type = jl_apply_array_type(T::julia_type(), dims.n_dimensions());
 
     match dims.n_dimensions() {
         1 => Ok(jl_alloc_array_1d(array_type, dims.n_elements(0)).cast()),
@@ -970,7 +967,7 @@ where
     F: Frame<'frame>,
 {
     let dims = dimensions.into();
-    let array_type = jl_apply_array_type(T::julia_type(Internal), dims.n_dimensions());
+    let array_type = jl_apply_array_type(T::julia_type(), dims.n_dimensions());
 
     match dims.n_dimensions() {
         1 => Ok(jl_ptr_to_array_1d(
@@ -1016,7 +1013,7 @@ where
     F: Frame<'frame>,
 {
     let dims = dimensions.into();
-    let array_type = jl_apply_array_type(T::julia_type(Internal), dims.n_dimensions());
+    let array_type = jl_apply_array_type(T::julia_type(), dims.n_dimensions());
 
     match dims.n_dimensions() {
         1 => Ok(jl_ptr_to_array_1d(
@@ -1118,7 +1115,7 @@ where
     F: Frame<'frame>,
 {
     let n = dims.n_dimensions();
-    let mut elem_types = vec![usize::julia_type(Internal); n];
+    let mut elem_types = vec![usize::julia_type(); n];
     let tuple_type = jl_apply_tuple_type_v(elem_types.as_mut_ptr().cast(), n);
     let tuple = jl_new_struct_uninit(tuple_type);
     let v = try_protect(frame, tuple)?.unwrap();

@@ -61,11 +61,10 @@ only be called once, if you drop `Julia` you won't be able to create a new one a
 restart the entire program.
 
 You can call `Julia::include` to include your own Julia code and either `Julia::frame` or
-`Julia::dynamic_frame` to interact with Julia. If you want to create arrays with more than
-three dimensions, borrow arrays with more than one, or have improved support for backtraces, 
-`jlrs.jl` must be included. You can find this file in the root of this crate's github 
-repository. This is necessary because this functionality currently depends on some Julia code 
-defined in that file.
+`Julia::dynamic_frame` to interact with Julia. If you want to have improved support for 
+backtraces `jlrs.jl` must be included. You can find this file in the root of this crate's github 
+repository. This is necessary because this functionality depends on some Julia code defined in 
+that file.
 
 The other two methods, `Julia::frame` and `Julia::dynamic_frame`, take a closure that
 provides you with a `Global`, and either a `StaticFrame` or `DynamicFrame` respectively. 

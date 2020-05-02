@@ -14,6 +14,13 @@ use crate::array::Array;
 use crate::error::{AllocError, JlrsResult};
 use crate::frame::{DynamicFrame, Output, StaticFrame};
 use crate::symbol::Symbol;
+use jl_sys::{
+    jl_bool_type, jl_box_bool, jl_box_char, jl_box_float32, jl_box_float64, jl_box_int16,
+    jl_box_int32, jl_box_int64, jl_box_int8, jl_box_uint16, jl_box_uint32, jl_box_uint64,
+    jl_box_uint8, jl_char_type, jl_float32_type, jl_float64_type, jl_int16_type, jl_int32_type,
+    jl_int64_type, jl_int8_type, jl_pchar_to_string, jl_uint16_type, jl_uint32_type,
+    jl_uint64_type, jl_uint8_type, jl_value_t,
+};
 use std::borrow::Cow;
 
 // All these traits have a public and a private side. In order to prevent users from using methods
@@ -35,10 +42,18 @@ macro_rules! p {
 pub trait TemporarySymbol: private::TemporarySymbol {}
 
 /// Trait implemented by types that can be converted to a Julia value.
-pub trait IntoJulia: private::IntoJulia {}
+pub unsafe trait IntoJulia {
+    // safety: Julia must have been initialized. The converted value must be protected from
+    // garbage collection before calling into julia again.
+    unsafe fn into_julia(&self) -> *mut jl_value_t;
+}
 
 /// Trait implemented by types that have an associated type in Julia.
-pub trait JuliaType: private::JuliaType {}
+pub unsafe trait JuliaType {
+    unsafe fn julia_type() -> *mut jl_value_t;
+}
+
+pub unsafe trait JuliaTuple: JuliaType + IntoJulia {}
 
 /// Trait implemented by types that have the same representation in Julia and Rust when they are
 /// used as array data. Arrays whose elements are of a type that implements this trait can share
@@ -51,7 +66,7 @@ pub trait TryUnbox: private::TryUnbox {}
 
 /// Functionality shared by [`StaticFrame`] and [`DynamicFrame`]. These structs let you protect
 /// data from garbage collection. The lifetime of a frame is assigned to the values and outputs
-/// that are created using that frame. After a frame is dropped, these items are no longer 
+/// that are created using that frame. After a frame is dropped, these items are no longer
 /// protected and cannot be used.
 ///
 /// If you need the result of a function call to be valid outside the frame where it is called,
@@ -111,39 +126,146 @@ p!(TemporarySymbol, &'a str, 'a);
 p!(TemporarySymbol, Cow<'a, str>, 'a);
 p!(TemporarySymbol, Symbol<'s>, 's);
 
-p!(IntoJulia, bool);
-p!(IntoJulia, char);
-p!(IntoJulia, u8);
-p!(IntoJulia, u16);
-p!(IntoJulia, u32);
-p!(IntoJulia, u64);
-p!(IntoJulia, i8);
-p!(IntoJulia, i16);
-p!(IntoJulia, i32);
-p!(IntoJulia, i64);
-p!(IntoJulia, f32);
-p!(IntoJulia, f64);
-p!(IntoJulia, usize);
-p!(IntoJulia, isize);
-p!(IntoJulia, String);
-p!(IntoJulia, &dyn AsRef<str>);
-p!(IntoJulia, &'a str, 'a);
-p!(IntoJulia, Cow<'a, str>, 'a);
+macro_rules! impl_into_julia {
+    ($type:ty, $boxer:ident) => {
+        unsafe impl IntoJulia for $type {
+            unsafe fn into_julia(&self) -> *mut jl_value_t {
+                $boxer(*self)
+            }
+        }
+    };
+    ($type:ty, $as:ty, $boxer:ident) => {
+        unsafe impl IntoJulia for $type {
+            unsafe fn into_julia(&self) -> *mut jl_value_t {
+                $boxer(*self as $as)
+            }
+        }
+    };
+}
 
-p!(JuliaType, bool);
-p!(JuliaType, char);
-p!(JuliaType, u8);
-p!(JuliaType, u16);
-p!(JuliaType, u32);
-p!(JuliaType, u64);
-p!(JuliaType, i8);
-p!(JuliaType, i16);
-p!(JuliaType, i32);
-p!(JuliaType, i64);
-p!(JuliaType, f32);
-p!(JuliaType, f64);
-p!(JuliaType, usize);
-p!(JuliaType, isize);
+impl_into_julia!(bool, i8, jl_box_bool);
+impl_into_julia!(char, u32, jl_box_char);
+impl_into_julia!(u8, jl_box_uint8);
+impl_into_julia!(u16, jl_box_uint16);
+impl_into_julia!(u32, jl_box_uint32);
+impl_into_julia!(u64, jl_box_uint64);
+impl_into_julia!(i8, jl_box_int8);
+impl_into_julia!(i16, jl_box_int16);
+impl_into_julia!(i32, jl_box_int32);
+impl_into_julia!(i64, jl_box_int64);
+impl_into_julia!(f32, jl_box_float32);
+impl_into_julia!(f64, jl_box_float64);
+
+#[cfg(not(target_pointer_width = "64"))]
+unsafe impl IntoJulia for usize {
+    unsafe fn into_julia(&self) -> *mut jl_value_t {
+        jl_box_uint32(*self as u32)
+    }
+}
+
+#[cfg(target_pointer_width = "64")]
+unsafe impl IntoJulia for usize {
+    unsafe fn into_julia(&self) -> *mut jl_value_t {
+        jl_box_uint64(*self as u64)
+    }
+}
+
+#[cfg(not(target_pointer_width = "64"))]
+unsafe impl IntoJulia for isize {
+    unsafe fn into_julia(&self) -> *mut jl_value_t {
+        jl_box_int32(*self as i32)
+    }
+}
+
+#[cfg(target_pointer_width = "64")]
+unsafe impl IntoJulia for isize {
+    unsafe fn into_julia(&self) -> *mut jl_value_t {
+        jl_box_int64(*self as i64)
+    }
+}
+
+unsafe impl<'a> IntoJulia for &'a str {
+    unsafe fn into_julia(&self) -> *mut jl_value_t {
+        let ptr = self.as_ptr().cast();
+        let len = self.len();
+        jl_pchar_to_string(ptr, len)
+    }
+}
+
+unsafe impl<'a> IntoJulia for Cow<'a, str> {
+    unsafe fn into_julia(&self) -> *mut jl_value_t {
+        let ptr = self.as_ptr().cast();
+        let len = self.len();
+        jl_pchar_to_string(ptr, len)
+    }
+}
+
+unsafe impl IntoJulia for String {
+    unsafe fn into_julia(&self) -> *mut jl_value_t {
+        let ptr = self.as_ptr().cast();
+        let len = self.len();
+        jl_pchar_to_string(ptr, len)
+    }
+}
+
+unsafe impl IntoJulia for &dyn AsRef<str> {
+    unsafe fn into_julia(&self) -> *mut jl_value_t {
+        let ptr = self.as_ref().as_ptr().cast();
+        let len = self.as_ref().len();
+        jl_pchar_to_string(ptr, len)
+    }
+}
+
+macro_rules! impl_julia_type {
+    ($type:ty, $jl_type:expr) => {
+        unsafe impl JuliaType for $type {
+            unsafe fn julia_type() -> *mut jl_value_t {
+                $jl_type.cast()
+            }
+        }
+    };
+}
+
+impl_julia_type!(u8, jl_uint8_type);
+impl_julia_type!(u16, jl_uint16_type);
+impl_julia_type!(u32, jl_uint32_type);
+impl_julia_type!(u64, jl_uint64_type);
+impl_julia_type!(i8, jl_int8_type);
+impl_julia_type!(i16, jl_int16_type);
+impl_julia_type!(i32, jl_int32_type);
+impl_julia_type!(i64, jl_int64_type);
+impl_julia_type!(f32, jl_float32_type);
+impl_julia_type!(f64, jl_float64_type);
+impl_julia_type!(bool, jl_bool_type);
+impl_julia_type!(char, jl_char_type);
+
+#[cfg(not(target_pointer_width = "64"))]
+unsafe impl JuliaType for usize {
+    unsafe fn julia_type() -> *mut jl_value_t {
+        jl_uint32_type.cast()
+    }
+}
+
+#[cfg(target_pointer_width = "64")]
+unsafe impl JuliaType for usize {
+    unsafe fn julia_type() -> *mut jl_value_t {
+        jl_uint64_type.cast()
+    }
+}
+
+#[cfg(not(target_pointer_width = "64"))]
+unsafe impl JuliaType for isize {
+    unsafe fn julia_type() -> *mut jl_value_t {
+        jl_int32_type.cast()
+    }
+}
+
+#[cfg(target_pointer_width = "64")]
+unsafe impl JuliaType for isize {
+    unsafe fn julia_type() -> *mut jl_value_t {
+        jl_int64_type.cast()
+    }
+}
 
 p!(ArrayDatatype, u8);
 p!(ArrayDatatype, u16);
@@ -280,14 +402,12 @@ pub(crate) mod private {
     use crate::value::{Value, Values};
     use jl_sys::{
         jl_array_data, jl_array_dim, jl_array_dims, jl_array_eltype, jl_array_ndims,
-        jl_array_nrows, jl_bool_type, jl_box_bool, jl_box_char, jl_box_float32, jl_box_float64,
-        jl_box_int16, jl_box_int32, jl_box_int64, jl_box_int8, jl_box_uint16, jl_box_uint32,
-        jl_box_uint64, jl_box_uint8, jl_char_type, jl_float32_type, jl_float64_type, jl_int16_type,
-        jl_int32_type, jl_int64_type, jl_int8_type, jl_is_array, jl_is_string, jl_pchar_to_string,
-        jl_string_data, jl_string_len, jl_typeis, jl_uint16_type, jl_uint32_type, jl_uint64_type,
-        jl_uint8_type, jl_unbox_float32, jl_unbox_float64, jl_unbox_int16, jl_unbox_int32,
-        jl_unbox_int64, jl_unbox_int8, jl_unbox_uint16, jl_unbox_uint32, jl_unbox_uint64,
-        jl_unbox_uint8, jl_value_t, jl_symbol_n
+        jl_array_nrows, jl_bool_type, jl_char_type, jl_float32_type, jl_float64_type,
+        jl_int16_type, jl_int32_type, jl_int64_type, jl_int8_type, jl_is_array, jl_is_string,
+        jl_string_data, jl_string_len, jl_symbol_n, jl_typeis, jl_uint16_type, jl_uint32_type,
+        jl_uint64_type, jl_uint8_type, jl_unbox_float32, jl_unbox_float64, jl_unbox_int16,
+        jl_unbox_int32, jl_unbox_int64, jl_unbox_int8, jl_unbox_uint16, jl_unbox_uint32,
+        jl_unbox_uint64, jl_unbox_uint8, jl_value_t,
     };
     use std::borrow::Cow;
     use std::mem::size_of;
@@ -303,18 +423,7 @@ pub(crate) mod private {
         unsafe fn temporary_symbol<'symbol>(&self, _: Internal) -> Symbol<'symbol>;
     }
 
-    pub trait IntoJulia {
-        // safety: Julia must have been initialized. The converted value must be protected from
-        // garbage collection before calling into julia again.
-        unsafe fn into_julia(&self, _: Internal) -> *mut jl_value_t;
-    }
-
-    pub trait JuliaType {
-        // safety: Julia must have been initialized.
-        unsafe fn julia_type(_: Internal) -> *mut jl_value_t;
-    }
-
-    pub trait ArrayDatatype: JuliaType {}
+    pub trait ArrayDatatype: super::JuliaType {}
 
     pub trait TryUnbox
     where
@@ -336,7 +445,7 @@ pub(crate) mod private {
         ) -> Result<Value<'frame, 'static>, AllocError>;
 
         // Create and protect multiple values from being garbage collected while this frame is active.
-        fn create_many<P: IntoJulia>(
+        fn create_many<P: super::IntoJulia>(
             &mut self,
             values: &[P],
             _: Internal,
@@ -396,130 +505,7 @@ pub(crate) mod private {
         }
     }
 
-    macro_rules! impl_into_julia {
-        ($type:ty, $boxer:ident) => {
-            impl IntoJulia for $type {
-                unsafe fn into_julia(&self, _: Internal) -> *mut jl_value_t {
-                    $boxer(*self)
-                }
-            }
-        };
-        ($type:ty, $as:ty, $boxer:ident) => {
-            impl IntoJulia for $type {
-                unsafe fn into_julia(&self, _: Internal) -> *mut jl_value_t {
-                    $boxer(*self as $as)
-                }
-            }
-        };
-    }
-
-    impl_into_julia!(bool, i8, jl_box_bool);
-    impl_into_julia!(char, u32, jl_box_char);
-    impl_into_julia!(u8, jl_box_uint8);
-    impl_into_julia!(u16, jl_box_uint16);
-    impl_into_julia!(u32, jl_box_uint32);
-    impl_into_julia!(u64, jl_box_uint64);
-    impl_into_julia!(i8, jl_box_int8);
-    impl_into_julia!(i16, jl_box_int16);
-    impl_into_julia!(i32, jl_box_int32);
-    impl_into_julia!(i64, jl_box_int64);
-    impl_into_julia!(f32, jl_box_float32);
-    impl_into_julia!(f64, jl_box_float64);
-
-    impl IntoJulia for usize {
-        unsafe fn into_julia(&self, _: Internal) -> *mut jl_value_t {
-            if size_of::<usize>() == size_of::<u32>() {
-                jl_box_uint32(*self as u32)
-            } else {
-                jl_box_uint64(*self as u64)
-            }
-        }
-    }
-
-    impl IntoJulia for isize {
-        unsafe fn into_julia(&self, _: Internal) -> *mut jl_value_t {
-            if size_of::<isize>() == size_of::<i32>() {
-                jl_box_int32(*self as i32)
-            } else {
-                jl_box_int64(*self as i64)
-            }
-        }
-    }
-
-    impl<'a> IntoJulia for &'a str {
-        unsafe fn into_julia(&self, _: Internal) -> *mut jl_value_t {
-            let ptr = self.as_ptr().cast();
-            let len = self.len();
-            jl_pchar_to_string(ptr, len)
-        }
-    }
-
-    impl<'a> IntoJulia for Cow<'a, str> {
-        unsafe fn into_julia(&self, _: Internal) -> *mut jl_value_t {
-            let ptr = self.as_ptr().cast();
-            let len = self.len();
-            jl_pchar_to_string(ptr, len)
-        }
-    }
-
-    impl IntoJulia for String {
-        unsafe fn into_julia(&self, _: Internal) -> *mut jl_value_t {
-            let ptr = self.as_ptr().cast();
-            let len = self.len();
-            jl_pchar_to_string(ptr, len)
-        }
-    }
-
-    impl IntoJulia for &dyn AsRef<str> {
-        unsafe fn into_julia(&self, _: Internal) -> *mut jl_value_t {
-            let ptr = self.as_ref().as_ptr().cast();
-            let len = self.as_ref().len();
-            jl_pchar_to_string(ptr, len)
-        }
-    }
-
-    macro_rules! impl_julia_type {
-        ($type:ty, $jl_type:expr) => {
-            impl JuliaType for $type {
-                unsafe fn julia_type(_: Internal) -> *mut jl_value_t {
-                    $jl_type.cast()
-                }
-            }
-        };
-    }
-
-    impl_julia_type!(u8, jl_uint8_type);
-    impl_julia_type!(u16, jl_uint16_type);
-    impl_julia_type!(u32, jl_uint32_type);
-    impl_julia_type!(u64, jl_uint64_type);
-    impl_julia_type!(i8, jl_int8_type);
-    impl_julia_type!(i16, jl_int16_type);
-    impl_julia_type!(i32, jl_int32_type);
-    impl_julia_type!(i64, jl_int64_type);
-    impl_julia_type!(f32, jl_float32_type);
-    impl_julia_type!(f64, jl_float64_type);
-    impl_julia_type!(bool, jl_bool_type);
-    impl_julia_type!(char, jl_char_type);
-
-    impl JuliaType for usize {
-        unsafe fn julia_type(_: Internal) -> *mut jl_value_t {
-            if size_of::<usize>() == size_of::<u32>() {
-                jl_uint32_type.cast()
-            } else {
-                jl_uint64_type.cast()
-            }
-        }
-    }
-
-    impl JuliaType for isize {
-        unsafe fn julia_type(_: Internal) -> *mut jl_value_t {
-            if size_of::<isize>() == size_of::<i32>() {
-                jl_int32_type.cast()
-            } else {
-                jl_int64_type.cast()
-            }
-        }
-    }
+    /**/
 
     macro_rules! impl_array_datatype {
         ($type:ty) => {
@@ -645,7 +631,7 @@ pub(crate) mod private {
             if !jl_is_array(value) {
                 return Err(JlrsError::NotAnArray.into());
             }
-            if jl_array_eltype(value) as *mut jl_value_t != T::julia_type(Internal) {
+            if jl_array_eltype(value) as *mut jl_value_t != T::julia_type() {
                 return Err(JlrsError::WrongType.into());
             }
             let jl_data = jl_array_data(value) as *const T;
@@ -653,10 +639,7 @@ pub(crate) mod private {
             let dimensions: Dimensions = match n_dims {
                 0 => return Err(JlrsError::ZeroDimension.into()),
                 1 => Into::into(jl_array_nrows(value.cast()) as usize),
-                2 => Into::into((
-                    jl_array_dim(value.cast(), 0),
-                    jl_array_dim(value.cast(), 1),
-                )),
+                2 => Into::into((jl_array_dim(value.cast(), 0), jl_array_dim(value.cast(), 1))),
                 3 => Into::into((
                     jl_array_dim(value.cast(), 0),
                     jl_array_dim(value.cast(), 1),
@@ -692,7 +675,7 @@ pub(crate) mod private {
             Ok(out)
         }
 
-        fn create_many<P: IntoJulia>(
+        fn create_many<P: super::IntoJulia>(
             &mut self,
             values: &[P],
             _: Internal,
@@ -705,7 +688,7 @@ pub(crate) mod private {
                 let offset = self.len;
                 for value in values {
                     self.memory
-                        .protect(self.idx, self.len, value.into_julia(Internal).cast());
+                        .protect(self.idx, self.len, value.into_julia().cast());
                     self.len += 1;
                 }
 
@@ -726,7 +709,7 @@ pub(crate) mod private {
                 let offset = self.len;
                 for value in values {
                     self.memory
-                        .protect(self.idx, self.len, value.into_julia(Internal).cast());
+                        .protect(self.idx, self.len, value.into_julia().cast());
                     self.len += 1;
                 }
 
@@ -758,7 +741,7 @@ pub(crate) mod private {
             Ok(out)
         }
 
-        fn create_many<P: IntoJulia>(
+        fn create_many<P: super::IntoJulia>(
             &mut self,
             values: &[P],
             _: Internal,
@@ -768,10 +751,7 @@ pub(crate) mod private {
                 // TODO: check capacity
 
                 for value in values {
-                    match self
-                        .memory
-                        .protect(self.idx, value.into_julia(Internal).cast())
-                    {
+                    match self.memory.protect(self.idx, value.into_julia().cast()) {
                         Ok(_) => (),
                         Err(AllocError::StackOverflow(_, n)) => {
                             return Err(AllocError::StackOverflow(values.len(), n))
@@ -795,8 +775,7 @@ pub(crate) mod private {
                 // TODO: check capacity
 
                 for value in values {
-                    self.memory
-                        .protect(self.idx, value.into_julia(Internal).cast())?;
+                    self.memory.protect(self.idx, value.into_julia().cast())?;
                     self.len += 1;
                 }
 
