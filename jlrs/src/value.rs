@@ -601,7 +601,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     where
         T: TryUnbox,
     {
-        unsafe { T::try_unbox(self.ptr(), Internal) }
+        unsafe { T::try_unbox(self.ptr()) }
     }
 
     /// Wraps a `Value` so that a function call will not require a slot in the current frame but

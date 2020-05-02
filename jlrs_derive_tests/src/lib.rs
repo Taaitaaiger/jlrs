@@ -3,7 +3,7 @@ mod tests {
     use jlrs::prelude::*;
     use jlrs_derive::JuliaTuple;
 
-    #[derive(Copy, Clone, JuliaTuple)]
+    #[derive(Copy, Clone, JuliaTuple, Eq, PartialEq, Debug)]
     #[repr(C)]
     struct UsizeAndIsize(usize, isize);
     
@@ -20,6 +20,7 @@ mod tests {
 
             assert_eq!(first.try_unbox::<usize>().unwrap(), 3);
             assert_eq!(second.try_unbox::<isize>().unwrap(), -4);
+            assert_eq!(v.try_unbox::<UsizeAndIsize>().unwrap(), s);
 
             Ok(())
         }).unwrap()

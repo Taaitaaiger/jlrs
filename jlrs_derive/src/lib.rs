@@ -36,20 +36,31 @@ fn impl_julia_tuple(ast: &syn::DeriveInput) -> TokenStream {
         unsafe impl jlrs::traits::JuliaType for #name {
             unsafe fn julia_type() -> *mut jlrs::jl_sys_export::jl_value_t {
                 let mut elem_types = [ #( <#it as jlrs::traits::JuliaType>::julia_type(), )* ];
-                let tp = jlrs::jl_sys_export::jl_apply_tuple_type_v(elem_types.as_mut_ptr().cast(), elem_types.len());
-                assert!(jlrs::jl_sys_export::jl_isbits(tp.cast()));
-                tp.cast()
+                jlrs::jl_sys_export::jl_apply_tuple_type_v(elem_types.as_mut_ptr().cast(), elem_types.len()).cast()
             }
         }
 
         unsafe impl jlrs::traits::IntoJulia for #name {
             unsafe fn into_julia(&self) -> *mut jlrs::jl_sys_export::jl_value_t {
                 let ty = <Self as jlrs::traits::JuliaType>::julia_type();
+                assert!(jlrs::jl_sys_export::jl_isbits(ty.cast()));
                 let tuple = jlrs::jl_sys_export::jl_new_struct_uninit(ty.cast());
                 let data: *mut Self = tuple.cast();
                 std::ptr::write(data, *self);
 
                 tuple
+            }
+        }
+
+        unsafe impl jlrs::traits::TryUnbox for #name {
+            unsafe fn try_unbox(value: *mut jlrs::jl_sys_export::jl_value_t) -> jlrs::error::JlrsResult<Self> {
+                let ty = <Self as jlrs::traits::JuliaType>::julia_type();
+                assert!(jlrs::jl_sys_export::jl_isbits(ty.cast()));
+                if jlrs::jl_sys_export::jl_typeis(value, ty.cast()) {
+                    return Ok(*(value as *mut Self));
+                }
+
+                Err(jlrs::error::JlrsError::WrongType.into())
             }
         }
 

@@ -10,16 +10,19 @@
 //! [`Output`]: ../frame/struct.Output.html
 //! [`prelude`]: ../prelude/index.html
 
-use crate::array::Array;
-use crate::error::{AllocError, JlrsResult};
+use crate::array::{Array, Dimensions};
+use crate::error::{AllocError, JlrsError, JlrsResult};
 use crate::frame::{DynamicFrame, Output, StaticFrame};
 use crate::symbol::Symbol;
 use jl_sys::{
+    jl_array_data, jl_array_dim, jl_array_dims, jl_array_eltype, jl_array_ndims, jl_array_nrows,
     jl_bool_type, jl_box_bool, jl_box_char, jl_box_float32, jl_box_float64, jl_box_int16,
     jl_box_int32, jl_box_int64, jl_box_int8, jl_box_uint16, jl_box_uint32, jl_box_uint64,
     jl_box_uint8, jl_char_type, jl_float32_type, jl_float64_type, jl_int16_type, jl_int32_type,
-    jl_int64_type, jl_int8_type, jl_pchar_to_string, jl_uint16_type, jl_uint32_type,
-    jl_uint64_type, jl_uint8_type, jl_value_t,
+    jl_int64_type, jl_int8_type, jl_is_array, jl_is_string, jl_pchar_to_string, jl_string_data,
+    jl_string_len, jl_typeis, jl_uint16_type, jl_uint32_type, jl_uint64_type, jl_uint8_type,
+    jl_unbox_float32, jl_unbox_float64, jl_unbox_int16, jl_unbox_int32, jl_unbox_int64,
+    jl_unbox_int8, jl_unbox_uint16, jl_unbox_uint32, jl_unbox_uint64, jl_unbox_uint8, jl_value_t,
 };
 use std::borrow::Cow;
 
@@ -53,7 +56,7 @@ pub unsafe trait JuliaType {
     unsafe fn julia_type() -> *mut jl_value_t;
 }
 
-pub unsafe trait JuliaTuple: JuliaType + IntoJulia {}
+pub unsafe trait JuliaTuple: JuliaType + IntoJulia + TryUnbox {}
 
 /// Trait implemented by types that have the same representation in Julia and Rust when they are
 /// used as array data. Arrays whose elements are of a type that implements this trait can share
@@ -62,8 +65,15 @@ pub unsafe trait JuliaTuple: JuliaType + IntoJulia {}
 pub trait ArrayDatatype: private::ArrayDatatype + JuliaType {}
 
 /// Trait implemented by types that can be created from a Julia value.
-pub trait TryUnbox: private::TryUnbox {}
-
+pub unsafe trait TryUnbox
+where
+    Self: Sized,
+{
+    // safety: you can't protect anything from garbage collection inside this function, so don't
+    // call Julia functions and use the results. The value should be protected from garbage
+    // collection when this function is called.
+    unsafe fn try_unbox(value: *mut jl_value_t) -> JlrsResult<Self>;
+}
 /// Functionality shared by [`StaticFrame`] and [`DynamicFrame`]. These structs let you protect
 /// data from garbage collection. The lifetime of a frame is assigned to the values and outputs
 /// that are created using that frame. After a frame is dropped, these items are no longer
@@ -280,22 +290,149 @@ p!(ArrayDatatype, f64);
 p!(ArrayDatatype, usize);
 p!(ArrayDatatype, isize);
 
-p!(TryUnbox, bool);
-p!(TryUnbox, char);
-p!(TryUnbox, u8);
-p!(TryUnbox, u16);
-p!(TryUnbox, u32);
-p!(TryUnbox, u64);
-p!(TryUnbox, i8);
-p!(TryUnbox, i16);
-p!(TryUnbox, i32);
-p!(TryUnbox, i64);
-p!(TryUnbox, f32);
-p!(TryUnbox, f64);
-p!(TryUnbox, usize);
-p!(TryUnbox, isize);
-p!(TryUnbox, String);
-p!(TryUnbox, Array<A>, A: ArrayDatatype);
+macro_rules! impl_try_unbox {
+    ($type:ty, $unboxer:path) => {
+        unsafe impl TryUnbox for $type {
+            unsafe fn try_unbox(value: *mut jl_value_t) -> JlrsResult<Self> {
+                if jl_typeis(value, <$type as crate::traits::JuliaType>::julia_type().cast()) {
+                    return Ok($unboxer(value));
+                }
+
+                Err(JlrsError::WrongType.into())
+            }
+        }
+    };
+}
+
+impl_try_unbox!(u8, jl_unbox_uint8);
+impl_try_unbox!(u16, jl_unbox_uint16);
+impl_try_unbox!(u32, jl_unbox_uint32);
+impl_try_unbox!(u64, jl_unbox_uint64);
+impl_try_unbox!(i8, jl_unbox_int8);
+impl_try_unbox!(i16, jl_unbox_int16);
+impl_try_unbox!(i32, jl_unbox_int32);
+impl_try_unbox!(i64, jl_unbox_int64);
+impl_try_unbox!(f32, jl_unbox_float32);
+impl_try_unbox!(f64, jl_unbox_float64);
+
+unsafe impl TryUnbox for bool {
+    unsafe fn try_unbox(value: *mut jl_value_t) -> JlrsResult<Self> {
+        if jl_typeis(value, jl_bool_type) {
+            return Ok(jl_unbox_int8(value) != 0);
+        }
+        Err(JlrsError::WrongType.into())
+    }
+}
+
+unsafe impl TryUnbox for char {
+    unsafe fn try_unbox(value: *mut jl_value_t) -> JlrsResult<Self> {
+        if jl_typeis(value, jl_char_type) {
+            return std::char::from_u32(jl_unbox_uint32(value))
+                .ok_or(JlrsError::InvalidCharacter.into());
+        }
+
+        Err(JlrsError::WrongType.into())
+    }
+}
+
+#[cfg(not(target_pointer_width = "64"))]
+unsafe impl TryUnbox for usize {
+    unsafe fn try_unbox(value: *mut jl_value_t) -> JlrsResult<Self> {
+        if jl_typeis(value, jl_uint32_type) {
+            return Ok(jl_unbox_uint32(value) as usize);
+        }
+
+        Err(JlrsError::WrongType.into())
+    }
+}
+
+#[cfg(target_pointer_width = "64")]
+unsafe impl TryUnbox for usize {
+    unsafe fn try_unbox(value: *mut jl_value_t) -> JlrsResult<Self> {
+        if jl_typeis(value, jl_uint64_type) {
+            return Ok(jl_unbox_uint64(value) as usize);
+        }
+
+        Err(JlrsError::WrongType.into())
+    }
+}
+
+#[cfg(not(target_pointer_width = "64"))]
+unsafe impl TryUnbox for isize {
+    unsafe fn try_unbox(value: *mut jl_value_t) -> JlrsResult<Self> {
+        if jl_typeis(value, jl_int32_type) {
+            return Ok(jl_unbox_int32(value) as isize);
+        }
+
+        Err(JlrsError::WrongType.into())
+    }
+}
+
+#[cfg(target_pointer_width = "64")]
+unsafe impl TryUnbox for isize {
+    unsafe fn try_unbox(value: *mut jl_value_t) -> JlrsResult<Self> {
+        if jl_typeis(value, jl_int64_type) {
+            return Ok(jl_unbox_int64(value) as isize);
+        }
+
+        Err(JlrsError::WrongType.into())
+    }
+}
+
+unsafe impl TryUnbox for String {
+    unsafe fn try_unbox(value: *mut jl_value_t) -> JlrsResult<String> {
+        if !jl_is_string(value) {
+            return Err(JlrsError::NotAString.into());
+        }
+
+        let len = jl_string_len(value);
+
+        if len == 0 {
+            return Ok(String::new());
+        }
+
+        // Is neither null nor dangling, we've just checked
+        let raw = jl_string_data(value);
+        let raw_slice = std::slice::from_raw_parts(raw, len);
+        let owned_slice = Vec::from(raw_slice);
+        Ok(
+            String::from_utf8(owned_slice).map_err(|e| -> Box<JlrsError> {
+                let b: Box<dyn std::error::Error + Send + Sync> = Box::new(e);
+                b.into()
+            })?,
+        )
+    }
+}
+
+unsafe impl<T: ArrayDatatype> TryUnbox for Array<T> {
+    unsafe fn try_unbox(value: *mut jl_value_t) -> JlrsResult<Self> {
+        if !jl_is_array(value) {
+            return Err(JlrsError::NotAnArray.into());
+        }
+        if jl_array_eltype(value) as *mut jl_value_t != T::julia_type() {
+            return Err(JlrsError::WrongType.into());
+        }
+        let jl_data = jl_array_data(value) as *const T;
+        let n_dims = jl_array_ndims(value.cast());
+        let dimensions: Dimensions = match n_dims {
+            0 => return Err(JlrsError::ZeroDimension.into()),
+            1 => Into::into(jl_array_nrows(value.cast()) as usize),
+            2 => Into::into((jl_array_dim(value.cast(), 0), jl_array_dim(value.cast(), 1))),
+            3 => Into::into((
+                jl_array_dim(value.cast(), 0),
+                jl_array_dim(value.cast(), 1),
+                jl_array_dim(value.cast(), 2),
+            )),
+            ndims => Into::into(jl_array_dims(value.cast(), ndims as _)),
+        };
+        let sz = dimensions.size();
+        let mut data = Vec::with_capacity(sz);
+        let ptr = data.as_mut_ptr();
+        std::ptr::copy_nonoverlapping(jl_data, ptr, sz);
+        data.set_len(sz);
+        Ok(Array::new(data, dimensions))
+    }
+}
 
 impl<'frame> Frame<'frame> for StaticFrame<'frame> {
     fn frame<'nested, T, F: FnOnce(&mut StaticFrame<'nested>) -> JlrsResult<T>>(
@@ -393,24 +530,14 @@ impl<'frame> Frame<'frame> for DynamicFrame<'frame> {
 }
 
 pub(crate) mod private {
-    use crate::array::Array;
-    use crate::array::Dimensions;
-    use crate::error::{AllocError, JlrsError, JlrsResult};
+    use crate::error::{AllocError};
     use crate::frame::{DynamicFrame, Output, StaticFrame};
+    use jl_sys::jl_symbol_n;
     use crate::stack::FrameIdx;
     use crate::symbol::Symbol;
     use crate::value::{Value, Values};
-    use jl_sys::{
-        jl_array_data, jl_array_dim, jl_array_dims, jl_array_eltype, jl_array_ndims,
-        jl_array_nrows, jl_bool_type, jl_char_type, jl_float32_type, jl_float64_type,
-        jl_int16_type, jl_int32_type, jl_int64_type, jl_int8_type, jl_is_array, jl_is_string,
-        jl_string_data, jl_string_len, jl_symbol_n, jl_typeis, jl_uint16_type, jl_uint32_type,
-        jl_uint64_type, jl_uint8_type, jl_unbox_float32, jl_unbox_float64, jl_unbox_int16,
-        jl_unbox_int32, jl_unbox_int64, jl_unbox_int8, jl_unbox_uint16, jl_unbox_uint32,
-        jl_unbox_uint64, jl_unbox_uint8, jl_value_t,
-    };
+    use jl_sys::jl_value_t;
     use std::borrow::Cow;
-    use std::mem::size_of;
 
     // If a trait A is used in a trait bound, the trait methods from traits that A extends become
     // available without explicitly using those base traits. By taking this struct, which can only
@@ -424,16 +551,6 @@ pub(crate) mod private {
     }
 
     pub trait ArrayDatatype: super::JuliaType {}
-
-    pub trait TryUnbox
-    where
-        Self: Sized,
-    {
-        // safety: you can't protect anything from garbage collection inside this function, so don't
-        // call Julia functions and use the results. The value should be protected from garbage
-        // collection when this function is called.
-        unsafe fn try_unbox(value: *mut jl_value_t, _: Internal) -> JlrsResult<Self>;
-    }
 
     pub trait Frame<'frame> {
         // protect the value from being garbage collected while this frame is active.
@@ -525,136 +642,6 @@ pub(crate) mod private {
     impl_array_datatype!(f64);
     impl_array_datatype!(usize);
     impl_array_datatype!(isize);
-
-    macro_rules! impl_try_unbox {
-        ($type:ty, $jl_type:expr, $unboxer:path) => {
-            impl TryUnbox for $type {
-                unsafe fn try_unbox(value: *mut jl_value_t, _: Internal) -> JlrsResult<Self> {
-                    if jl_typeis(value, $jl_type) {
-                        return Ok($unboxer(value));
-                    }
-
-                    Err(JlrsError::WrongType.into())
-                }
-            }
-        };
-    }
-
-    impl_try_unbox!(u8, jl_uint8_type, jl_unbox_uint8);
-    impl_try_unbox!(u16, jl_uint16_type, jl_unbox_uint16);
-    impl_try_unbox!(u32, jl_uint32_type, jl_unbox_uint32);
-    impl_try_unbox!(u64, jl_uint64_type, jl_unbox_uint64);
-    impl_try_unbox!(i8, jl_int8_type, jl_unbox_int8);
-    impl_try_unbox!(i16, jl_int16_type, jl_unbox_int16);
-    impl_try_unbox!(i32, jl_int32_type, jl_unbox_int32);
-    impl_try_unbox!(i64, jl_int64_type, jl_unbox_int64);
-    impl_try_unbox!(f32, jl_float32_type, jl_unbox_float32);
-    impl_try_unbox!(f64, jl_float64_type, jl_unbox_float64);
-
-    impl TryUnbox for bool {
-        unsafe fn try_unbox(value: *mut jl_value_t, _: Internal) -> JlrsResult<Self> {
-            if jl_typeis(value, jl_bool_type) {
-                return Ok(jl_unbox_int8(value) != 0);
-            }
-            Err(JlrsError::WrongType.into())
-        }
-    }
-
-    impl TryUnbox for char {
-        unsafe fn try_unbox(value: *mut jl_value_t, _: Internal) -> JlrsResult<Self> {
-            if jl_typeis(value, jl_char_type) {
-                return std::char::from_u32(jl_unbox_uint32(value))
-                    .ok_or(JlrsError::InvalidCharacter.into());
-            }
-
-            Err(JlrsError::WrongType.into())
-        }
-    }
-
-    impl TryUnbox for usize {
-        unsafe fn try_unbox(value: *mut jl_value_t, _: Internal) -> JlrsResult<Self> {
-            if size_of::<usize>() == size_of::<u32>() {
-                if jl_typeis(value, jl_uint32_type) {
-                    return Ok(jl_unbox_uint32(value) as usize);
-                }
-            } else {
-                if jl_typeis(value, jl_uint64_type) {
-                    return Ok(jl_unbox_uint64(value) as usize);
-                }
-            }
-            Err(JlrsError::WrongType.into())
-        }
-    }
-
-    impl TryUnbox for isize {
-        unsafe fn try_unbox(value: *mut jl_value_t, _: Internal) -> JlrsResult<Self> {
-            if size_of::<isize>() == size_of::<i32>() {
-                if jl_typeis(value, jl_int32_type) {
-                    return Ok(jl_unbox_int32(value) as isize);
-                }
-            } else {
-                if jl_typeis(value, jl_int64_type) {
-                    return Ok(jl_unbox_int64(value) as isize);
-                }
-            }
-            Err(JlrsError::WrongType.into())
-        }
-    }
-
-    impl TryUnbox for String {
-        unsafe fn try_unbox(value: *mut jl_value_t, _: Internal) -> JlrsResult<String> {
-            if !jl_is_string(value) {
-                return Err(JlrsError::NotAString.into());
-            }
-
-            let len = jl_string_len(value);
-
-            if len == 0 {
-                return Ok(String::new());
-            }
-
-            // Is neither null nor dangling, we've just checked
-            let raw = jl_string_data(value);
-            let raw_slice = std::slice::from_raw_parts(raw, len);
-            let owned_slice = Vec::from(raw_slice);
-            Ok(
-                String::from_utf8(owned_slice).map_err(|e| -> Box<JlrsError> {
-                    let b: Box<dyn std::error::Error + Send + Sync> = Box::new(e);
-                    b.into()
-                })?,
-            )
-        }
-    }
-
-    impl<T: ArrayDatatype> TryUnbox for Array<T> {
-        unsafe fn try_unbox(value: *mut jl_value_t, _: Internal) -> JlrsResult<Self> {
-            if !jl_is_array(value) {
-                return Err(JlrsError::NotAnArray.into());
-            }
-            if jl_array_eltype(value) as *mut jl_value_t != T::julia_type() {
-                return Err(JlrsError::WrongType.into());
-            }
-            let jl_data = jl_array_data(value) as *const T;
-            let n_dims = jl_array_ndims(value.cast());
-            let dimensions: Dimensions = match n_dims {
-                0 => return Err(JlrsError::ZeroDimension.into()),
-                1 => Into::into(jl_array_nrows(value.cast()) as usize),
-                2 => Into::into((jl_array_dim(value.cast(), 0), jl_array_dim(value.cast(), 1))),
-                3 => Into::into((
-                    jl_array_dim(value.cast(), 0),
-                    jl_array_dim(value.cast(), 1),
-                    jl_array_dim(value.cast(), 2),
-                )),
-                ndims => Into::into(jl_array_dims(value.cast(), ndims as _)),
-            };
-            let sz = dimensions.size();
-            let mut data = Vec::with_capacity(sz);
-            let ptr = data.as_mut_ptr();
-            std::ptr::copy_nonoverlapping(jl_data, ptr, sz);
-            data.set_len(sz);
-            Ok(Array::new(data, dimensions))
-        }
-    }
 
     impl<'frame> Frame<'frame> for StaticFrame<'frame> {
         unsafe fn protect(
