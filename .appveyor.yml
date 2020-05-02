@@ -32,6 +32,7 @@ install:
   - set PATH=%PATH%;%USERPROFILE%\.cargo\bin;C:\julia\bin
   - rustc -vV
   - cargo -vV
+  - git submodule udate
 
 # 'cargo test' takes care of building for us, so disable Appveyor's build stage. This prevents
 # the "directory does not contain a project or solution file" error.
