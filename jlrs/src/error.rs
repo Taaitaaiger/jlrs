@@ -18,6 +18,7 @@ pub enum JlrsError {
     IncludeNotFound(String),
     IncludeError(String, String),
     NoSuchField(String),
+    InvalidArrayType,
     InvalidCharacter,
     NotAModule(String),
     AllocError(AllocError),
@@ -51,6 +52,7 @@ impl Display for JlrsError {
                 "The file {} could not be included successfully. Exception type: {}",
                 inc, err_type
             ),
+            JlrsError::InvalidArrayType => write!(formatter, "Invalid array type"),
             JlrsError::InvalidCharacter => write!(formatter, "Invalid character"),
             JlrsError::NotAModule(module) => write!(formatter, "{} is not a module", module),
             JlrsError::AllocError(AllocError::FrameOverflow(n, cap)) => write!(

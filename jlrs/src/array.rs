@@ -2,9 +2,11 @@
 
 use crate::error::{JlrsError, JlrsResult};
 use crate::traits::Frame;
+use crate::value::Value;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::marker::PhantomData;
 use std::ops::{Index, IndexMut};
+use jl_sys::{jl_gc_wb, jl_typeof, jl_array_eltype};
 
 /// An n-dimensional array whose contents have been copied from Julia to Rust. You can create this
 /// struct by calling [`Value::try_unbox`]. In order to unbox arrays that contain `bool`s or
@@ -49,6 +51,10 @@ impl<T> Array<T> {
     /// Returns the array's data as a mutable slice, the data is in column-major order.
     pub fn as_mut_slice(&mut self) -> &mut [T] {
         &mut self.data
+    }
+
+    pub fn dimensions(&self) -> &Dimensions {
+        &self.dimensions
     }
 }
 
@@ -97,6 +103,10 @@ where
     /// Returns the array's data as a slice, the data is in column-major order.
     pub fn as_slice(&self) -> &[T] {
         &self.data
+    }
+
+    pub fn dimensions(&self) -> &Dimensions {
+        &self.dimensions
     }
 }
 
@@ -158,6 +168,10 @@ where
     pub fn as_mut_slice(&mut self) -> &mut [T] {
         &mut self.data
     }
+
+    pub fn dimensions(&self) -> &Dimensions {
+        &self.dimensions
+    }
 }
 
 impl<'borrow, 'frame, T, D, F> Index<D> for ArrayDataMut<'borrow, 'frame, T, F>
@@ -178,6 +192,77 @@ where
 {
     fn index_mut(&mut self, index: D) -> &mut Self::Output {
         &mut self.data[self.dimensions.index_of(index).unwrap()]
+    }
+}
+
+pub struct PtrArrayDataMut<'borrow, 'value, 'data, 'frame, F: Frame<'frame>> {
+    value: Value<'value, 'data>,
+    data: &'borrow mut [Value<'value, 'data>],
+    dimensions: Dimensions,
+    _notsendsync: PhantomData<*const ()>,
+    _frame: PhantomData<&'borrow &'frame mut F>,
+}
+
+impl<'borrow, 'value, 'data, 'frame, F> PtrArrayDataMut<'borrow, 'value, 'data, 'frame, F>
+where
+    F: Frame<'frame>,
+{
+    pub(crate) unsafe fn new(
+        value: Value<'value, 'data>,
+        data: &'borrow mut [Value<'value, 'data>],
+        dimensions: Dimensions,
+        _: &'borrow mut F,
+    ) -> Self {
+        PtrArrayDataMut {
+            value,
+            data,
+            dimensions,
+            _notsendsync: PhantomData,
+            _frame: PhantomData,
+        }
+    }
+
+    /// Get a reference to the value at `index`, or `None` if the index is out of bounds.
+    pub fn get<D: Into<Dimensions>>(&self, index: D) -> Option<&Value<'value, 'data>> {
+        Some(&self.data[self.dimensions.index_of(index).ok()?])
+    }
+
+    pub unsafe fn set<'va, 'da: 'data, D: Into<Dimensions>>(
+        &mut self,
+        index: D,
+        value: Value<'value, 'da>,
+    ) -> JlrsResult<()> {
+        let ptr = self.value.ptr();
+        let eltype = jl_array_eltype(ptr);
+
+        if eltype != jl_typeof(value.ptr().cast()).cast() {
+            Err(JlrsError::InvalidArrayType)?;
+        }
+
+        self.data[self.dimensions.index_of(index)?] = value;
+        jl_gc_wb(self.value.ptr(), value.ptr());
+
+        Ok(())
+    }
+
+    /// Returns the array's data as a slice, the data is in column-major order.
+    pub fn as_slice(&self) -> &[Value<'value, 'data>] {
+        &self.data
+    }
+
+    pub fn dimensions(&self) -> &Dimensions {
+        &self.dimensions
+    }
+}
+
+impl<'borrow, 'value, 'data, 'frame, D, F> Index<D> for PtrArrayDataMut<'borrow, 'value, 'data, 'frame, F>
+where
+    D: Into<Dimensions>,
+    F: Frame<'frame>,
+{
+    type Output = Value<'value, 'data>;
+    fn index(&self, index: D) -> &Self::Output {
+        &self.data[self.dimensions.index_of(index).unwrap()]
     }
 }
 

@@ -109,3 +109,53 @@ impl_test!(array_data_3d_i32, array_data_3d_i32_mut, i32);
 impl_test!(array_data_3d_i64, array_data_3d_i64_mut, i64);
 impl_test!(array_data_3d_f32, array_data_3d_f32_mut, f32);
 impl_test!(array_data_3d_f64, array_data_3d_f64_mut, f64);
+
+#[test]
+fn borrow_nested() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+
+        jlrs.frame(1, |global, frame| {
+            let data: Vec<u8> = (1..=24).map(|x| x as u8).collect();
+
+            let array = Value::move_array(frame, data, (2, 3, 4))?;
+
+            frame.frame(4, |frame| {
+                let d = array.array_data::<u8, _>(frame)?;
+
+                let mut out = 1 as u8;
+                for third in &[0, 1, 2, 3] {
+                    for second in &[0, 1, 2] {
+                        for first in &[0, 1] {
+                            assert_eq!(d[(*first, *second, *third)], out);
+                            out += 1 as u8;
+                        }
+                    }
+                }
+
+                let gi = Module::base(global).function("getindex")?;
+                let one = Value::new(frame, 1usize)?;
+                let two = Value::new(frame, 2usize)?;
+                let three = Value::new(frame, 3usize)?;
+                let four = Value::new(frame, 4usize)?;
+
+                out = 1 as u8;
+                for third in &[one, two, three, four] {
+                    for second in &[one, two, three] {
+                        for first in &[one, two] {
+                            frame.frame(1, |frame| {
+                                let v = gi.call(frame, [array, *first, *second, *third])?.unwrap();
+                                assert_eq!(v.try_unbox::<u8>()?, out);
+                                out += 1 as u8;
+                                Ok(())
+                            })?;
+                        }
+                    }
+                }
+
+                Ok(())
+            })
+        })
+        .unwrap();
+    });
+}

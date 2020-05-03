@@ -32,7 +32,7 @@ fn impl_julia_tuple(ast: &syn::DeriveInput) -> TokenStream {
     };
 
     let it = field_types.iter();
-    let julia_type_impl = quote! {
+    let julia_tuple_impl = quote! {
         unsafe impl jlrs::traits::JuliaType for #name {
             unsafe fn julia_type() -> *mut jlrs::jl_sys_export::jl_value_t {
                 let mut elem_types = [ #( <#it as jlrs::traits::JuliaType>::julia_type(), )* ];
@@ -67,7 +67,7 @@ fn impl_julia_tuple(ast: &syn::DeriveInput) -> TokenStream {
         unsafe impl jlrs::traits::JuliaTuple for #name {}
     };
 
-    julia_type_impl.into()
+    julia_tuple_impl.into()
 }
 
 fn is_repr_c(ast: &syn::DeriveInput) -> bool {

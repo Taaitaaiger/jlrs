@@ -16,12 +16,13 @@ keywords = ["Julia", "math", "mathematics", "bindings", "ffi"]
 license = "MIT"
 edition = "2018"
 
+[features]
+default = ["jlrs-derive"]
+docs-rs = ["jl-sys/docs-rs"]
+
 [dependencies]
 jl-sys = { path = "../jl_sys" }
-jlrs-derive = { path = "../jlrs_derive" }
-
-[features]
-docs-rs = ["jl-sys/docs-rs"]
+jlrs-derive = { path = "../jlrs_derive", optional = true }
 
 [package.metadata.docs.rs]
 features = ["docs-rs"]

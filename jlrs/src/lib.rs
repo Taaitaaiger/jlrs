@@ -181,6 +181,7 @@ pub mod array;
 pub mod error;
 pub mod frame;
 pub mod global;
+#[cfg(feature = "jlrs-derive")]
 pub mod jl_sys_export;
 pub mod module;
 pub mod prelude;
@@ -202,7 +203,8 @@ use value::Value;
 static INIT: AtomicBool = AtomicBool::new(false);
 
 /// This struct can be created only once during the lifetime of your program. You must create it
-/// with [`Julia::init`] before you can do anything related to Julia.
+/// with [`Julia::init`] before you can do anything related to Julia. While this struct exists, 
+/// Julia is active; dropping it causes the shutdown code to be called.
 ///
 /// [`Julia::init`]: struct.Julia.html#method.init
 pub struct Julia {
@@ -215,9 +217,9 @@ impl Julia {
     /// be able to call Julia code again.
     ///
     /// You have to choose a stack size when calling this function. This will be the total number
-    /// of slots that will be available on the GC stack. One of these slots will always be in use.
-    /// Each frame comes requires two slots of overhead, plus one for every value created with
-    /// that frame. [`StaticFrame`]s preallocate their slots, while [`DynamicFrame`]s grow to the
+    /// of slots that will be available for the GC stack. One of these slots will always be in 
+    /// use. Each frame needs two slots of overhead, plus one for every value created with that
+    /// frame. A [`StaticFrame`] preallocates its slots, while a [`DynamicFrame`] grows to the
     /// required size. If calling a method requires one or more slots, this amount is explicitly
     /// documented.
     ///

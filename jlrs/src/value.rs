@@ -1,6 +1,6 @@
 //! Convert data from Rust to Julia and back. Call Julia functions.
 
-use crate::array::{ArrayData, ArrayDataMut, Dimensions};
+use crate::array::{ArrayData, ArrayDataMut, Dimensions, PtrArrayDataMut};
 use crate::error::{JlrsError, JlrsResult};
 use crate::frame::Output;
 use crate::global::Global;
@@ -14,7 +14,7 @@ use jl_sys::{
     jl_apply_tuple_type_v, jl_array_data, jl_array_dim, jl_array_dims, jl_array_eltype,
     jl_array_ndims, jl_array_nrows, jl_call, jl_call0, jl_call1, jl_call2, jl_call3, jl_datatype_t,
     jl_exception_occurred, jl_field_index, jl_field_names, jl_fieldref, jl_fieldref_noalloc,
-    jl_get_nth_field, jl_get_nth_field_noalloc, jl_is_array, jl_is_tuple, jl_new_array,
+    jl_get_nth_field, jl_get_nth_field_noalloc, jl_is_array, jl_is_tuple, jl_isbits, jl_new_array,
     jl_new_struct_uninit, jl_nfields, jl_ptr_to_array, jl_ptr_to_array_1d, jl_svec_data,
     jl_svec_len, jl_typeis, jl_typeof, jl_typeof_str, jl_value_t,
 };
@@ -518,10 +518,10 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// This data can only be borrowed if it contains floating point numbers or (unsigned)
     /// integers. Returns `JlrsError::NotAnArray` if this value is not an array or
     /// `JlrsError::WrongType` if the type of the elements is incorrect.
-    pub fn array_data<'borrow, T: ArrayDatatype, F: Frame<'frame>>(
+    pub fn array_data<'borrow, 'fr, T: ArrayDatatype, F: Frame<'fr>>(
         &'borrow self,
         frame: &'borrow F,
-    ) -> JlrsResult<ArrayData<'borrow, 'frame, T, F>> {
+    ) -> JlrsResult<ArrayData<'borrow, 'fr, T, F>> {
         if !self.is_array() {
             Err(JlrsError::NotAnArray)?;
         }
@@ -553,14 +553,51 @@ impl<'frame, 'data> Value<'frame, 'data> {
         }
     }
 
+    pub fn ptr_array_data<'borrow, 'fr, F: Frame<'fr>>(
+        &'borrow self,
+        frame: &'borrow F,
+    ) -> JlrsResult<ArrayData<'borrow, 'fr, Value<'frame, 'data>, F>> {
+        if !self.is_array() {
+            Err(JlrsError::NotAnArray)?;
+        }
+
+        unsafe {
+            let ptr = self.ptr();
+            let eltype = jl_array_eltype(ptr);
+
+            if jl_isbits(eltype) {
+                Err(JlrsError::InvalidArrayType)?;
+            }
+
+            let jl_data = jl_array_data(ptr).cast();
+            let ptr = ptr.cast();
+            let n_dims = jl_array_ndims(ptr);
+            let dimensions: Dimensions = match n_dims {
+                0 => return Err(JlrsError::ZeroDimension.into()),
+                1 => Into::into(jl_array_nrows(ptr) as usize),
+                2 => Into::into((jl_array_dim(ptr, 0), jl_array_dim(ptr, 1))),
+                3 => Into::into((
+                    jl_array_dim(ptr, 0),
+                    jl_array_dim(ptr, 1),
+                    jl_array_dim(ptr, 2),
+                )),
+                ndims => Into::into(jl_array_dims(ptr, ndims as _)),
+            };
+
+            // the lifetime is constrained to the lifetime of the borrow
+            let data = slice::from_raw_parts(jl_data, dimensions.size());
+            Ok(ArrayData::new(data, dimensions, frame))
+        }
+    }
+
     /// Mutably borrow array data, you can borrow data from a single array at the same time.
     /// This data can only be borrowed if it contains floating point numbers or (unsigned)
     /// integers. Returns `JlrsError::NotAnArray` if this value is not an array or
     /// `JlrsError::WrongType` if the type of the elements is incorrect.
-    pub fn array_data_mut<'borrow, T: ArrayDatatype, F: Frame<'frame>>(
+    pub fn array_data_mut<'borrow, 'fr, T: ArrayDatatype, F: Frame<'fr>>(
         &'borrow mut self,
         frame: &'borrow mut F,
-    ) -> JlrsResult<ArrayDataMut<'borrow, 'frame, T, F>> {
+    ) -> JlrsResult<ArrayDataMut<'borrow, 'fr, T, F>> {
         if !self.is_array_of::<T>() {
             Err(JlrsError::NotAnArray)?;
         }
@@ -585,6 +622,37 @@ impl<'frame, 'data> Value<'frame, 'data> {
             // the lifetime is constrained to the lifetime of the borrow
             let data = slice::from_raw_parts_mut(jl_data, dimensions.size());
             Ok(ArrayDataMut::new(data, dimensions, frame))
+        }
+    }
+
+    pub fn ptr_array_data_mut<'borrow, 'fr, F: Frame<'fr>>(
+        &'borrow mut self,
+        frame: &'borrow mut F,
+    ) -> JlrsResult<PtrArrayDataMut<'borrow, 'frame, 'data, 'fr, F>> {
+        if !self.is_array() {
+            Err(JlrsError::NotAnArray)?;
+        }
+
+        unsafe {
+            let jl_data = jl_array_data(self.ptr()).cast();
+            let ptr = self.ptr().cast();
+            let n_dims = jl_array_ndims(ptr);
+            let dimensions: Dimensions = match n_dims {
+                0 => return Err(JlrsError::ZeroDimension.into()),
+                1 => (jl_array_nrows(ptr) as usize).into(),
+                2 => (jl_array_dim(ptr, 0), jl_array_dim(ptr, 1)).into(),
+                3 => (
+                    jl_array_dim(ptr, 0),
+                    jl_array_dim(ptr, 1),
+                    jl_array_dim(ptr, 2),
+                )
+                    .into(),
+                ndims => jl_array_dims(ptr, ndims as _).into(),
+            };
+
+            // the lifetime is constrained to the lifetime of the borrow
+            let data = slice::from_raw_parts_mut(jl_data, dimensions.size());
+            Ok(PtrArrayDataMut::new(*self, data, dimensions, frame))
         }
     }
 

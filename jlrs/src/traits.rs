@@ -20,11 +20,13 @@ use jl_sys::{
     jl_box_int32, jl_box_int64, jl_box_int8, jl_box_uint16, jl_box_uint32, jl_box_uint64,
     jl_box_uint8, jl_char_type, jl_float32_type, jl_float64_type, jl_int16_type, jl_int32_type,
     jl_int64_type, jl_int8_type, jl_is_array, jl_is_string, jl_pchar_to_string, jl_string_data,
-    jl_string_len, jl_typeis, jl_uint16_type, jl_uint32_type, jl_uint64_type, jl_uint8_type,
-    jl_unbox_float32, jl_unbox_float64, jl_unbox_int16, jl_unbox_int32, jl_unbox_int64,
-    jl_unbox_int8, jl_unbox_uint16, jl_unbox_uint32, jl_unbox_uint64, jl_unbox_uint8, jl_value_t,
+    jl_string_len, jl_typeis, jl_uint16_type, jl_uint32_type, jl_uint64_type,
+    jl_uint8_type, jl_unbox_float32, jl_unbox_float64, jl_unbox_int16, jl_unbox_int32,
+    jl_unbox_int64, jl_unbox_int8, jl_unbox_uint16, jl_unbox_uint32, jl_unbox_uint64,
+    jl_unbox_uint8, jl_value_t, jl_is_symbol, jl_symbol_name
 };
 use std::borrow::Cow;
+use std::ffi::CStr;
 
 // All these traits have a public and a private side. In order to prevent users from using methods
 // that are for internal use only, all traits extend a base trait with the same name from the
@@ -44,19 +46,25 @@ macro_rules! p {
 /// Trait implemented by types that can be converted to a temporary `Symbol`.
 pub trait TemporarySymbol: private::TemporarySymbol {}
 
-/// Trait implemented by types that can be converted to a Julia value.
+/// Trait implemented by types that can be converted to a Julia value. Do not implement this
+/// yourself. This trait can be derived for structs that are marked as `[repr(C)]` and only
+/// contain fields that implement this trait by deriving `JuliaTuple`.
 pub unsafe trait IntoJulia {
-    // safety: Julia must have been initialized. The converted value must be protected from
-    // garbage collection before calling into julia again.
+    /// Convert `self` into a raw Julia value. This value is not protected from garbage
+    /// collection after creation and must be assigned to a slot on the GC stack before calling
+    /// another allocating method from the Julia C API.
     unsafe fn into_julia(&self) -> *mut jl_value_t;
 }
 
-/// Trait implemented by types that have an associated type in Julia.
+/// Trait implemented by types that have an associated type in Julia. Do not implement this
+/// yourself. This trait can be derived for structs that are marked as `[repr(C)]` and only
+/// contain fields that implement this trait by deriving `JuliaTuple`.
 pub unsafe trait JuliaType {
     unsafe fn julia_type() -> *mut jl_value_t;
 }
 
-pub unsafe trait JuliaTuple: JuliaType + IntoJulia + TryUnbox {}
+/// Implemented when using `#[derive(JuliaTuple)]`. Do not implement this yourself.
+pub unsafe trait JuliaTuple: JuliaType + IntoJulia + TryUnbox + Copy + Clone {}
 
 /// Trait implemented by types that have the same representation in Julia and Rust when they are
 /// used as array data. Arrays whose elements are of a type that implements this trait can share
@@ -294,7 +302,10 @@ macro_rules! impl_try_unbox {
     ($type:ty, $unboxer:path) => {
         unsafe impl TryUnbox for $type {
             unsafe fn try_unbox(value: *mut jl_value_t) -> JlrsResult<Self> {
-                if jl_typeis(value, <$type as crate::traits::JuliaType>::julia_type().cast()) {
+                if jl_typeis(
+                    value,
+                    <$type as crate::traits::JuliaType>::julia_type().cast(),
+                ) {
                     return Ok($unboxer(value));
                 }
 
@@ -381,6 +392,12 @@ unsafe impl TryUnbox for isize {
 
 unsafe impl TryUnbox for String {
     unsafe fn try_unbox(value: *mut jl_value_t) -> JlrsResult<String> {
+        if jl_is_symbol(value) {
+            let ptr = jl_symbol_name(value.cast()).cast();
+            let symbol = CStr::from_ptr(ptr);
+            return Ok(symbol.to_str().unwrap().into())
+        }
+
         if !jl_is_string(value) {
             return Err(JlrsError::NotAString.into());
         }
@@ -530,12 +547,12 @@ impl<'frame> Frame<'frame> for DynamicFrame<'frame> {
 }
 
 pub(crate) mod private {
-    use crate::error::{AllocError};
+    use crate::error::AllocError;
     use crate::frame::{DynamicFrame, Output, StaticFrame};
-    use jl_sys::jl_symbol_n;
     use crate::stack::FrameIdx;
     use crate::symbol::Symbol;
     use crate::value::{Value, Values};
+    use jl_sys::jl_symbol_n;
     use jl_sys::jl_value_t;
     use std::borrow::Cow;
 
