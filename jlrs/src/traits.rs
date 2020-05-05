@@ -66,6 +66,9 @@ pub unsafe trait JuliaType {
 /// Implemented when using `#[derive(JuliaTuple)]`. Do not implement this yourself.
 pub unsafe trait JuliaTuple: JuliaType + IntoJulia + TryUnbox + Copy + Clone {}
 
+/// Implemented when using `#[derive(JuliaTuple)]`. Do not implement this yourself.
+pub unsafe trait JuliaStruct: JuliaType + IntoJulia + TryUnbox + Copy + Clone {}
+
 /// Trait implemented by types that have the same representation in Julia and Rust when they are
 /// used as array data. Arrays whose elements are of a type that implements this trait can share
 /// their contents between Julia and Rust. This includes all types that implement `JuliaType`

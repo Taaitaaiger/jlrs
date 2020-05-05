@@ -140,7 +140,8 @@ impl<'frame, 'data> Value<'frame, 'data> {
         Value(ptr, PhantomData, PhantomData)
     }
 
-    pub(crate) unsafe fn ptr(self) -> *mut jl_value_t {
+    #[doc(hidden)]
+    pub unsafe fn ptr(self) -> *mut jl_value_t {
         self.0
     }
 
