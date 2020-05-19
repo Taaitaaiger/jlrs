@@ -49,7 +49,7 @@ The recommended way to install Julia is to download the installer from the offic
 
 Additionally, MinGW must be installed through Cygwin. To install this and all potentially required dependencies, follow steps 1-4 of [the instructions for compiling Julia on Windows using Cygwin and MinGW](https://github.com/JuliaLang/julia/blob/v1.4.1/doc/build/windows.md#cygwin-to-mingw-cross-compiling). You must set the `CYGWIN_DIR` environment variable to the installation folder of Cygwin; this folder contains some icons, `Cygwin.bat` and folders with names like `usr` and `bin`. For example, if Cygwin is installed at `D:\cygwin64`, `CYGWIN_DIR` must be set to `D:\cygwin64`.
 
-Julia is compatible with the GNU toolchain on Windows. If you use rustup, you can set the toolchain for a project that depends on `jl-sys` by calling the command `rustup override set stable-gnu` in the project root folder.
+Julia is compatible with the GNU toolchain on Windows. If you use rustup, you can set the toolchain for a project that depends on `jlrs` by calling the command `rustup override set stable-gnu` in the project root folder.
 
 
 ## Interacting with Julia

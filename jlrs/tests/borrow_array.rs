@@ -11,7 +11,7 @@ fn borrow_array_1d() {
         let unboxed = jlrs
             .frame(1, |_, frame| {
                 let array = Value::borrow_array(frame, &mut data, 4)?;
-                array.try_unbox::<Array<u64>>()
+                array.try_unbox::<CopiedArray<u64>>()
             })
             .unwrap();
 
@@ -31,7 +31,7 @@ fn borrow_array_1d_dynamic() {
         let unboxed = jlrs
             .dynamic_frame(|_, frame| {
                 let array = Value::borrow_array(frame, &mut data, 4)?;
-                array.try_unbox::<Array<u64>>()
+                array.try_unbox::<CopiedArray<u64>>()
             })
             .unwrap();
 
@@ -51,7 +51,7 @@ fn borrow_array_2d() {
         let unboxed = jlrs
             .frame(1, |_, frame| {
                 let array = Value::borrow_array(frame, &mut data, (2, 2))?;
-                array.try_unbox::<Array<u64>>()
+                array.try_unbox::<CopiedArray<u64>>()
             })
             .unwrap();
 
@@ -72,7 +72,7 @@ fn borrow_array_2d_dynamic() {
         let unboxed = jlrs
             .dynamic_frame(|_, frame| {
                 let array = Value::borrow_array(frame, &mut data, (2, 2))?;
-                array.try_unbox::<Array<u64>>()
+                array.try_unbox::<CopiedArray<u64>>()
             })
             .unwrap();
         let (data, dims) = unboxed.splat();

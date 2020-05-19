@@ -13,7 +13,7 @@ macro_rules! impl_test {
                     let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
                     let array = Value::move_array(frame, data, (2, 3, 4))?;
-                    let d = array.try_unbox::<Array<$value_type>>()?;
+                    let d = array.try_unbox::<CopiedArray<$value_type>>()?;
 
                     let mut out = 1 as $value_type;
                     for third in &[0, 1, 2, 3] {
@@ -43,7 +43,7 @@ macro_rules! impl_test {
                     let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
                     let array = Value::move_array(frame, data, (2, 3, 4))?;
-                    let mut d = array.try_unbox::<Array<$value_type>>()?;
+                    let mut d = array.try_unbox::<CopiedArray<$value_type>>()?;
 
                     let mut out = 2 as $value_type;
                     for third in &[0, 1, 2, 3] {

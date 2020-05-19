@@ -23,6 +23,7 @@ pub enum JlrsError {
     NotAModule(String),
     AllocError(AllocError),
     WrongType,
+    NotInline,
     ZeroDimension,
     OutOfBounds(usize, usize),
     InvalidIndex(Dimensions, Dimensions),
@@ -54,6 +55,7 @@ impl Display for JlrsError {
             ),
             JlrsError::InvalidArrayType => write!(formatter, "Invalid array type"),
             JlrsError::InvalidCharacter => write!(formatter, "Invalid character"),
+            JlrsError::NotInline => write!(formatter, "Not inline"),
             JlrsError::NotAModule(module) => write!(formatter, "{} is not a module", module),
             JlrsError::AllocError(AllocError::FrameOverflow(n, cap)) => write!(
                 formatter,

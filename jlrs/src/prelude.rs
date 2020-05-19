@@ -1,6 +1,6 @@
 //! Reexports structs and traits you're likely to need.
 
-pub use crate::array::Array;
+pub use crate::array::CopiedArray;
 pub use crate::module::Module;
 pub use crate::symbol::Symbol;
 pub use crate::traits::{Frame, IntoJulia};

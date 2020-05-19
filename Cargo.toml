@@ -4,4 +4,5 @@ members = [
     "jlrs",
     "jlrs_derive",
     "jlrs_derive_tests",
+    "jl_sys",
 ]

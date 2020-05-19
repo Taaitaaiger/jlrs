@@ -28,7 +28,7 @@ fn bounds_error() {
                 let stacktrace = out.get_field_noalloc("stacktrace");
                 assert!(stacktrace.is_ok());
                 let stacktrace = stacktrace?;
-                let st_data = stacktrace.ptr_array_data(frame)?;
+                let st_data = stacktrace.array()?.value_array_data(frame)?;
                 let base = st_data[0];
                 assert!(base
                     .get_field(frame, "from_c")?

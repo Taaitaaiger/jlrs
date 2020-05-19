@@ -17,6 +17,7 @@ use std::marker::PhantomData;
 ///
 /// [`Julia::include`]: ../struct.Julia.html#method.include
 #[derive(Copy, Clone)]
+#[repr(transparent)]
 pub struct Module<'base>(*mut jl_module_t, PhantomData<&'base ()>);
 
 impl<'base> Module<'base> {
@@ -58,7 +59,7 @@ impl<'base> Module<'base> {
 
             let submodule = jl_get_global(self.ptr(), symbol.ptr());
 
-            if jl_typeis(submodule, jl_module_type) {
+            if !submodule.is_null() && jl_typeis(submodule, jl_module_type) {
                 Ok(Module(submodule as *mut jl_module_t, PhantomData))
             } else {
                 Err(JlrsError::NotAModule(symbol.into()).into())

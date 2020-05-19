@@ -178,6 +178,7 @@
 //! [`Value::try_unbox`]: value/struct.Value.html#method.try_unbox
 
 pub mod array;
+pub mod datatype;
 pub mod error;
 pub mod frame;
 pub mod global;
