@@ -108,7 +108,9 @@ impl<'stack> StackView<'stack, Dynamic> {
 
     pub(crate) unsafe fn new_frame(&mut self) -> JlrsResult<FrameIdx> {
         if self.size() + 2 >= self.stack.len() {
-            return Err(Box::new(AllocError::StackOverflow(2, self.stack.len()).into()));
+            return Err(Box::new(
+                AllocError::StackOverflow(2, self.stack.len()).into(),
+            ));
         }
 
         let rtls = &mut *jl_get_ptls_states();
@@ -128,7 +130,9 @@ impl<'stack> StackView<'stack, Dynamic> {
         idx: FrameIdx,
     ) -> JlrsResult<Output<'output>> {
         if self.size() >= self.stack.len() {
-            return Err(Box::new(AllocError::StackOverflow(1, self.stack.len()).into()));
+            return Err(Box::new(
+                AllocError::StackOverflow(1, self.stack.len()).into(),
+            ));
         }
 
         let sz = self.size();
@@ -173,7 +177,9 @@ impl<'stack> StackView<'stack, Static> {
 
     pub(crate) unsafe fn new_frame(&mut self, capacity: usize) -> JlrsResult<FrameIdx> {
         if self.size() + capacity + 2 >= self.stack.len() {
-            return Err(Box::new(AllocError::StackOverflow(capacity + 2, self.stack.len()).into()));
+            return Err(Box::new(
+                AllocError::StackOverflow(capacity + 2, self.stack.len()).into(),
+            ));
         }
 
         let rtls = &mut *jl_get_ptls_states();

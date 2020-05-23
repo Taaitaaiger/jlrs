@@ -169,10 +169,10 @@
 //! [`StaticFrame`]: frame/struct.StaticFrame.html
 //! [`DynamicFrame`]: frame/struct.DynamicFrame.html
 //! [`Frame`]: traits/trait.Frame.html
-//! [`Module::function`]: module/struct.Module.html#method.function
-//! [`Module::base`]: module/struct.Module.html#method.base
-//! [`Module::core`]: module/struct.Module.html#method.core
-//! [`Module::main`]: module/struct.Module.html#method.main
+//! [`Module::function`]: value/module/struct.Module.html#method.function
+//! [`Module::base`]: value/module/struct.Module.html#method.base
+//! [`Module::core`]: value/module/struct.Module.html#method.core
+//! [`Module::main`]: value/module/struct.Module.html#method.main
 //! [`Value`]: value/struct.Value.html
 //! [`Value::new`]: value/struct.Value.html#method.new
 //! [`Value::try_unbox`]: value/struct.Value.html#method.try_unbox
@@ -191,16 +191,16 @@ use error::{JlrsError, JlrsResult};
 use frame::{DynamicFrame, StaticFrame};
 use global::Global;
 use jl_sys::{jl_atexit_hook, jl_init};
-use value::module::Module;
 use stack::{Dynamic, RawStack, StackView, Static};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
+use value::module::Module;
 use value::Value;
 
 static INIT: AtomicBool = AtomicBool::new(false);
 
 /// This struct can be created only once during the lifetime of your program. You must create it
-/// with [`Julia::init`] before you can do anything related to Julia. While this struct exists, 
+/// with [`Julia::init`] before you can do anything related to Julia. While this struct exists,
 /// Julia is active; dropping it causes the shutdown code to be called.
 ///
 /// [`Julia::init`]: struct.Julia.html#method.init
@@ -214,7 +214,7 @@ impl Julia {
     /// be able to call Julia code again.
     ///
     /// You have to choose a stack size when calling this function. This will be the total number
-    /// of slots that will be available for the GC stack. One of these slots will always be in 
+    /// of slots that will be available for the GC stack. One of these slots will always be in
     /// use. Each frame needs two slots of overhead, plus one for every value created with that
     /// frame. A [`StaticFrame`] preallocates its slots, while a [`DynamicFrame`] grows to the
     /// required size. If calling a method requires one or more slots, this amount is explicitly

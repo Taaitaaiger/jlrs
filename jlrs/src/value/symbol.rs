@@ -7,7 +7,7 @@ use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::marker::PhantomData;
 
 /// In Julia many things are built from `Symbol`s. In jlrs, the only current use is accessing
-/// globals. 
+/// globals.
 #[repr(transparent)]
 #[derive(Copy, Clone)]
 pub struct Symbol<'base>(*mut jl_sym_t, PhantomData<&'base ()>);

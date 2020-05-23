@@ -1,10 +1,10 @@
 //! Everything related to errors.
 
-use std::error::Error;
 use crate::value::array::Dimensions;
+use std::error::Error;
 use std::fmt::{Display, Formatter, Result as FmtResult};
 
-/// Alias that is used for most `Result`s in this crate. 
+/// Alias that is used for most `Result`s in this crate.
 pub type JlrsResult<T> = Result<T, Box<JlrsError>>;
 
 /// All different errors.
@@ -56,8 +56,10 @@ impl Display for JlrsError {
             ),
             JlrsError::InvalidArrayType => write!(formatter, "Invalid array type"),
             JlrsError::InvalidCharacter => write!(formatter, "Invalid character"),
-            JlrsError::NotInline => write!(formatter, "Not inline"),
-            JlrsError::Inline => write!(formatter, "Inline"),
+            JlrsError::NotInline => {
+                write!(formatter, "The data of this array is not stored inline")
+            }
+            JlrsError::Inline => write!(formatter, "The data of this array is stored inline"),
             JlrsError::NotAModule(module) => write!(formatter, "{} is not a module", module),
             JlrsError::AllocError(AllocError::FrameOverflow(n, cap)) => write!(
                 formatter,
@@ -82,9 +84,9 @@ impl Display for JlrsError {
             ),
             JlrsError::InvalidIndex(idx, sz) => write!(
                 formatter,
-                "Inde {} is not valid for array with shape {}",
+                "Index {} is not valid for array with shape {}",
                 idx, sz
-            )
+            ),
         }
     }
 }

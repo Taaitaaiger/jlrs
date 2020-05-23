@@ -1,115 +1,28 @@
 //! Convert data from Rust to Julia and back. Call Julia functions.
 //!
-//! # The Julia C API
-//! 
-//! In general, the features offered by `jlrs` are thin wrappers around functionality offered by 
-//! the Julia C API. In order to understand what's offered by this crate and what limitations 
-//! exist, it helps to be aware of some of the technical details.
-//! 
-//! ### Values
-//! 
-//! Julia has many different kinds of data; numbers, strings, functions, tuples, structs, 
-//! n-dimensional arrays, and a whole lot more. In general, the C API provides access to this data
-//! using an opaque pointer type, `jl_value_t*`. This is opaque because the actual layout of the 
-//! data  pointed to depends on that data's type. For simple data such as numbers, the pointer 
-//! simply points to a number of the appropriate type. Information about the data's type and 
-//! layout is available because `jl_value_t*` doesn't just point to the data, this data is 
-//! preceded in memory by a header that contains this information.
-//! 
-//! Due to this header, some work must be done in order to convert a value in Rust to a
-//! `jl_value_t*`. The easiest case are primitive types like `f32` and `i64`: the C API offers
-//! functions that take a value of the appropriate type and return a `jl_value_t*`. For more 
-//! complex data, things are more difficult. Broadly speaking, a type belongs to one of four
-//! categories: it's an isbits-type, a union-type, or a pointer-type. 
-//! 
-//! The primitive types, along with structs and tuples whose fields are all primitive types, 
-//! are the basic building block of isbits-types. Structs and tuples that combine these types are
-//! also isbits-types. For these types, the data is laid out as a C-compatible struct. For 
-//! example, the data of `Tuple{Uint32, Int64}` in Julia is laid out exactly the same way as 
-//! `struct CStruct { uint32_t a; int64 b; }` is in C.
-//! 
-//! Note that all fields must be explicitly typed:
-//! 
-//! ```julia
-//! struct Mybits
-//!     a::UInt64
-//!     b::Int64
-//! end
-//! ```
-//! 
-//! is an isbits-type,
-//! 
-//! ```julia
-//! struct Notbits
-//!     a::UInt64
-//!     b
-//! end
-//! ```
-//! 
-//! is not, even if the value of `Notbits.b` is an isbits-type. You'll read about the layout of 
-//! this second struct soon.
-//! 
-//! You can check in Julia whether or not a type is an isbits-type by calling 
-//! `isbitstype(<Type>)`, or `isbits(<Value>)` to check if the value is an instance of an 
-//! isbits-type. Support for converting primitive types between Rust and Julia is provided 
-//! out-of-the-box, for more complicated isbits-types two custom derives are available: 
-//! [`JuliaTuple`] and [`JuliaStruct`]. 
-//! 
-//! The second category, union-types, are used to represent Julia's `Union`s. While `jlrs` offers
-//! no support to convert these values between Rust and Julia, you're free to return them from 
-//! Julia functions and use them as function arguments.
-//! 
-//! The pointer-types include everything that's not an isbits-type or a union-type. For example,
-//! Julia `Module`s, `CopiedArray`s and functions are all pointer-types. 
-//! 
-//! Additionally, Julia is a garbage collected programming language. Any time a new value is 
-//! allocated the garbage collector can run and free values that are no longer in use. The garbage
-//! collector normally uses a stack to track what's in use, the frame of this stack contain arrays
-//! with pointers to values. This works recursively in the sense that the fields of those values 
-//! are also protected from garbage collection, as are their fields, and so on. The frames of this 
-//! stack are represented in `jlrs` by [`StaticFrame`] and [`DynamicFrame`], please see the 
-//! documentation of the `frame` module for more detailed information. A `Value` has a lifetime 
-//! called `'frame` that refers to the lifetime of the frame that contains the proper pointer, 
-//! this ensures a `Value` can only be used as long as it is protected from garbage collection.
-//! 
-//! One important class of values are arrays. 
-//!  
-//! Julia is a garbage collected programming language, Data owned by the Julia garbage collector is represented in the C API with pointers to
-//! `jl_value_t`. These pointers are opaque: the layout of the data they point is different for
-//! values of different types. The actual layout of the data does follow some simple rules. We can
-//! essentially distinguish three kinds of types: isbits-types, union-types, and pointer-types. 
+//! When using this crate Julia data will generally be returned as a [`Value`]. A [`Value`] is a
+//! "generic" wrapper similar to a void pointer in C; it's opaque until you cast it to the right
+//! type. Type information will generally be available allowing you to safely convert a [`Value`]
+//! to its actual type.
 //!
-//! The simplest of these are isbits-types. These types include primitive types like `Bool` and 
-//! `UInt64`, and structs and tuples that only contain (structs and tuples of) those types. In 
-//! this case, the data is laid out in the same way as a struct in C containing those types in the
-//! same order. You can query if a type is an isbits-type by calling `isbitstype(<type>)` in 
-//! Julia. Essentially, this corresponds to primitive types and structs in Rust that are marked 
-//! with `#[repr(C)]`, implement `Copy`, and each field has a corresponding isbits-type in Julia. 
-//! jlrs supports converting primitive types between Julia and Rust out of the box, in order to 
-//! convert isbits-tuples and structs you can derive [`JuliaTuple`] for tuple structs and 
-//! [`JuliaStruct`] for structs with named fields respectively.
-//! 
-//! Since Julia 1.4, the optimization that this data can be laid has been extended to arrays: if
-//! the type of the array elements is an isbits-type, the backing storage will use the appropriate
-//! "structured" representation. In order to access the data of these arrays from Rust you must 
-//! derive [`ArrayDatatype`]. 
+//! [`Value`]: struct.Value.html
 
-use array::{Dimensions, Array};
+use self::array::{Array, Dimensions};
+use self::module::Module;
+use self::symbol::Symbol;
 use crate::error::{JlrsError, JlrsResult};
 use crate::frame::Output;
 use crate::global::Global;
-use module::Module;
-use symbol::Symbol;
 use crate::traits::{
-    private::Internal, ArrayDatatype, Frame, IntoJulia, TemporarySymbol, TryUnbox, JuliaType
+    private::Internal, ArrayDatatype, Frame, IntoJulia, JuliaType, TemporarySymbol, TryUnbox,
 };
 use jl_sys::{
     jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_apply_array_type,
-    jl_apply_tuple_type_v, jl_array_eltype,jl_call, jl_call0, jl_call1, jl_call2, jl_call3, jl_datatype_t,
-    jl_exception_occurred, jl_field_index, jl_field_names, jl_fieldref, jl_fieldref_noalloc,
-    jl_get_nth_field, jl_get_nth_field_noalloc, jl_is_array, jl_is_tuple,  jl_new_array,
-    jl_new_struct_uninit, jl_nfields, jl_ptr_to_array, jl_ptr_to_array_1d, jl_svec_data,
-    jl_svec_len, jl_typeis, jl_typeof, jl_typeof_str, jl_value_t,
+    jl_apply_tuple_type_v, jl_array_eltype, jl_call, jl_call0, jl_call1, jl_call2, jl_call3,
+    jl_datatype_t, jl_exception_occurred, jl_field_index, jl_field_names, jl_fieldref,
+    jl_fieldref_noalloc, jl_get_nth_field, jl_get_nth_field_noalloc, jl_is_array, jl_is_tuple,
+    jl_new_array, jl_new_struct_uninit, jl_nfields, jl_ptr_to_array, jl_ptr_to_array_1d,
+    jl_svec_data, jl_svec_len, jl_typeis, jl_typeof, jl_typeof_str, jl_value_t,
 };
 use std::ffi::CStr;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
@@ -127,14 +40,14 @@ thread_local! {
     // requires a mutable pointer to this array so an `UnsafeCell` is used to store it.
     static JL_LONG_TYPE: std::cell::UnsafeCell<[*mut jl_datatype_t; 8]> = unsafe {
         std::cell::UnsafeCell::new([
-            usize::julia_type().cast(),
-            usize::julia_type().cast(),
-            usize::julia_type().cast(),
-            usize::julia_type().cast(),
-            usize::julia_type().cast(),
-            usize::julia_type().cast(),
-            usize::julia_type().cast(),
-            usize::julia_type().cast(),
+            usize::julia_type(),
+            usize::julia_type(),
+            usize::julia_type(),
+            usize::julia_type(),
+            usize::julia_type(),
+            usize::julia_type(),
+            usize::julia_type(),
+            usize::julia_type(),
         ])
     };
 }
@@ -304,9 +217,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
 
     /// Returns true if the value is an array with elements of type `T`.
     pub fn is_array_of<T: JuliaType>(&self) -> bool {
-        unsafe {
-            self.is_array() && jl_array_eltype(self.ptr()).cast() == T::julia_type()
-        }
+        unsafe { self.is_array() && jl_array_eltype(self.ptr()).cast() == T::julia_type() }
     }
 
     /// Returns the field names of this value as a slice of `Symbol`s. These symbols can be used

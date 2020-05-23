@@ -1,4 +1,4 @@
-//! The type of a Julia value.
+//! Julia datatypes and properties.
 //!
 //! Julia has an optional typing system and the type information of a value is available at
 //! runtime. Additionally, a value can hold type information as its contents. For example,
@@ -10,11 +10,16 @@
 //! @assert(truthtype isa DataType)
 //! ```
 //!
-//! In this module you'll find the `DataType` struct which provides access to the properties
-//! of its counterpart in Julia and lets you perform a large set of checks. Many of these
-//! checks are handled through implementations of the trait [`JuliaTypecheck`].
+//! In this module you'll find the [`DataType`] struct which provides access to the properties
+//! of its counterpart in Julia and lets you perform a large set of checks to find out its
+//! properties. Many of these checks are handled through implementations of the trait
+//! [`JuliaTypecheck`]. Most of these checks can be found in this module.
+//!
+//! [`DataType`]: struct.DataType.html
+//! [`JuliaTypecheck`]: ../../traits/trait.JuliaTypecheck.html
 
 use crate::traits::JuliaType;
+use crate::traits::JuliaTypecheck;
 use crate::value::module::Module;
 use crate::value::symbol::Symbol;
 use jl_sys::{
@@ -29,22 +34,18 @@ use jl_sys::{
 };
 use std::marker::PhantomData;
 
-/// This trait is used in combination with [`DataType::is`] and can be used to check many 
-/// properties of a Julia `DataType`. You should not implement this trait for your own types.
-/// 
-/// This trait is implemented for a few types from the standard library, eg `String` and `u8`. In
-/// these cases, [`DataType::is`] returns true if [`Value::is`] would return `true` for that type.
-pub unsafe trait JuliaTypecheck {
-    #[doc(hidden)]
-    unsafe fn julia_typecheck(t: DataType) -> bool;
-}
-
-/// Julia type information. You can acquire a [`Value`]'s datatype by by calling 
-/// [`Value::datatype`]. If a the value contains a datatype (`value.is::<DataType>()` returns 
+/// Julia type information. You can acquire a [`Value`]'s datatype by by calling
+/// [`Value::datatype`]. If a the value contains a datatype (`value.is::<DataType>()` returns
 /// `true`), you can cast the value to a `DataType` by calling [`Value::cast`].
-/// 
+///
 /// `DataType` implements [`JuliaTypecheck`] and can be used in combination with [`DataType::is`].
-/// This method returns `true` if a value of this type is itself a datatype. 
+/// This method returns `true` if a value of this type is itself a datatype.
+///
+/// [`Value`]: ../struct.Value.html
+/// [`Value::datatype`]: ../struct.Value.html#method.datatype
+/// [`Value::cast`]: ../struct.Value.html#method.cast
+/// [`JuliaTypecheck`]: ../../traits/trait.JuliaTypecheck.html
+/// [`DataType::is`]: struct.Datatype.html#method.is
 #[derive(Copy, Clone)]
 #[repr(transparent)]
 pub struct DataType<'frame>(*mut jl_datatype_t, PhantomData<&'frame ()>);
@@ -81,7 +82,7 @@ impl<'frame> DataType<'frame> {
 
     /// Returns true if a value of this type stores its data inline.
     pub fn isinlinealloc(self) -> bool {
-        unsafe { jl_datatype_isinlinealloc(self.0) != 0 } 
+        unsafe { jl_datatype_isinlinealloc(self.0) != 0 }
     }
 }
 

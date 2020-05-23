@@ -15,7 +15,7 @@ use std::marker::PhantomData;
 /// If you include your own Julia code with [`Julia::include`], its contents are made available
 /// relative to `Main`.
 ///
-/// [`Julia::include`]: ../struct.Julia.html#method.include
+/// [`Julia::include`]: ../../struct.Julia.html#method.include
 #[derive(Copy, Clone)]
 #[repr(transparent)]
 pub struct Module<'base>(*mut jl_module_t, PhantomData<&'base ()>);
@@ -29,7 +29,7 @@ impl<'base> Module<'base> {
     /// [`Julia::include`], handles to functions, globals, and submodules defined in these
     /// included files are available through this module.
     ///
-    /// [`Julia::include`]: ../struct.Julia.html#method.include
+    /// [`Julia::include`]: ../../struct.Julia.html#method.include
     pub fn main(_: Global<'base>) -> Self {
         unsafe { Module(jl_main_module, PhantomData) }
     }

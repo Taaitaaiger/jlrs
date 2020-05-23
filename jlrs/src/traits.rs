@@ -13,18 +13,18 @@
 use crate::error::{AllocError, JlrsError, JlrsResult};
 use crate::frame::{DynamicFrame, Output, StaticFrame};
 use crate::value::array::{CopiedArray, Dimensions};
+use crate::value::datatype::DataType;
 use crate::value::symbol::Symbol;
 use jl_sys::{
     jl_array_data, jl_array_dim, jl_array_dims, jl_array_eltype, jl_array_ndims, jl_array_nrows,
-    jl_bool_type, jl_box_bool, jl_box_char, jl_box_float32, jl_box_float64,
-    jl_box_int16, jl_box_int32, jl_box_int64, jl_box_int8, jl_box_uint16, jl_box_uint32,
-    jl_box_uint64, jl_box_uint8, jl_char_type, jl_datatype_t, jl_float32_type,
-    jl_float64_type, jl_int16_type, jl_int32_type, jl_int64_type, jl_int8_type,
-    jl_is_array, jl_is_string, jl_is_symbol, jl_pchar_to_string, jl_string_data, jl_string_len,
-    jl_symbol_name, jl_typeis, jl_uint16_type, jl_uint32_type, jl_uint64_type,
-    jl_uint8_type, jl_unbox_float32, jl_unbox_float64, jl_unbox_int16, jl_unbox_int32,
-    jl_unbox_int64, jl_unbox_int8, jl_unbox_uint16, jl_unbox_uint32, jl_unbox_uint64,
-    jl_unbox_uint8, jl_value_t,
+    jl_bool_type, jl_box_bool, jl_box_char, jl_box_float32, jl_box_float64, jl_box_int16,
+    jl_box_int32, jl_box_int64, jl_box_int8, jl_box_uint16, jl_box_uint32, jl_box_uint64,
+    jl_box_uint8, jl_char_type, jl_datatype_t, jl_float32_type, jl_float64_type, jl_int16_type,
+    jl_int32_type, jl_int64_type, jl_int8_type, jl_is_array, jl_is_string, jl_is_symbol,
+    jl_pchar_to_string, jl_string_data, jl_string_len, jl_symbol_name, jl_typeis, jl_uint16_type,
+    jl_uint32_type, jl_uint64_type, jl_uint8_type, jl_unbox_float32, jl_unbox_float64,
+    jl_unbox_int16, jl_unbox_int32, jl_unbox_int64, jl_unbox_int8, jl_unbox_uint16,
+    jl_unbox_uint32, jl_unbox_uint64, jl_unbox_uint8, jl_value_t,
 };
 use std::borrow::Cow;
 use std::ffi::CStr;
@@ -86,6 +86,20 @@ where
     // collection when this function is called.
     unsafe fn try_unbox(value: *mut jl_value_t) -> JlrsResult<Self>;
 }
+
+/// This trait is used in combination with [`DataType::is`] and can be used to check many
+/// properties of a Julia `DataType`. You should not implement this trait for your own types.
+///
+/// This trait is implemented for a few types from the standard library, eg `String` and `u8`. In
+/// these cases, [`DataType::is`] returns true if [`Value::is`] would return `true` for that type.
+///
+/// [`DataType::is`]: ../value/datatype/struct.DataType.html#method.is
+/// [`Value::is`]: ../value/struct.Value.html#method.is
+pub unsafe trait JuliaTypecheck {
+    #[doc(hidden)]
+    unsafe fn julia_typecheck(t: DataType) -> bool;
+}
+
 /// Functionality shared by [`StaticFrame`] and [`DynamicFrame`]. These structs let you protect
 /// data from garbage collection. The lifetime of a frame is assigned to the values and outputs
 /// that are created using that frame. After a frame is dropped, these items are no longer
@@ -551,10 +565,10 @@ impl<'frame> Frame<'frame> for DynamicFrame<'frame> {
 }
 
 pub(crate) mod private {
+    use super::JuliaType;
     use crate::error::AllocError;
     use crate::frame::{DynamicFrame, Output, StaticFrame};
     use crate::stack::FrameIdx;
-    use super::JuliaType;
     use crate::value::symbol::Symbol;
     use crate::value::{Value, Values};
     use jl_sys::jl_symbol_n;
@@ -643,8 +657,6 @@ pub(crate) mod private {
             Symbol::wrap(self.ptr())
         }
     }
-
-    /**/
 
     macro_rules! impl_array_datatype {
         ($type:ty) => {
@@ -781,7 +793,7 @@ pub(crate) mod private {
         ) -> Result<Values<'frame>, AllocError> {
             unsafe {
                 let offset = self.len;
-                // TODO: check capacity
+                // TODO: check capacity in advance
 
                 for value in values {
                     self.memory.protect(self.idx, value.into_julia().cast())?;
