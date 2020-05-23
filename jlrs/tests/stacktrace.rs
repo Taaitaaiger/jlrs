@@ -28,7 +28,7 @@ fn bounds_error() {
                 let stacktrace = out.get_field_noalloc("stacktrace");
                 assert!(stacktrace.is_ok());
                 let stacktrace = stacktrace?;
-                let st_data = unsafe { stacktrace.array()?.value_data(frame)? };
+                let st_data = unsafe { stacktrace.cast::<Array>()?.value_data(frame)? };
                 let base = st_data[0];
                 assert!(base.get_field(frame, "from_c")?.try_unbox::<bool>().is_ok());
 

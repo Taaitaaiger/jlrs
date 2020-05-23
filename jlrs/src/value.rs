@@ -7,22 +7,23 @@
 //!
 //! [`Value`]: struct.Value.html
 
-use self::array::{Array, Dimensions};
+use self::array::Dimensions;
 use self::module::Module;
 use self::symbol::Symbol;
 use crate::error::{JlrsError, JlrsResult};
 use crate::frame::Output;
 use crate::global::Global;
 use crate::traits::{
-    private::Internal, ArrayDatatype, Frame, IntoJulia, JuliaType, TemporarySymbol, TryUnbox,
+    private::Internal, ArrayDatatype, Cast, Frame, IntoJulia, JuliaType, TemporarySymbol, TryUnbox,
 };
 use jl_sys::{
     jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_apply_array_type,
     jl_apply_tuple_type_v, jl_array_eltype, jl_call, jl_call0, jl_call1, jl_call2, jl_call3,
     jl_datatype_t, jl_exception_occurred, jl_field_index, jl_field_names, jl_fieldref,
-    jl_fieldref_noalloc, jl_get_nth_field, jl_get_nth_field_noalloc, jl_is_array, jl_is_tuple,
-    jl_new_array, jl_new_struct_uninit, jl_nfields, jl_ptr_to_array, jl_ptr_to_array_1d,
-    jl_svec_data, jl_svec_len, jl_typeis, jl_typeof, jl_typeof_str, jl_value_t,
+    jl_fieldref_noalloc, jl_get_nth_field, jl_get_nth_field_noalloc, jl_is_array, jl_is_datatype,
+    jl_is_module, jl_is_symbol, jl_is_tuple, jl_new_array, jl_new_struct_uninit, jl_nfields,
+    jl_ptr_to_array, jl_ptr_to_array_1d, jl_svec_data, jl_svec_len, jl_typeis, jl_typeof,
+    jl_typeof_str, jl_value_t,
 };
 use std::ffi::CStr;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
@@ -196,6 +197,18 @@ impl<'frame, 'data> Value<'frame, 'data> {
         unsafe { jl_typeis(self.ptr(), T::julia_type().cast()) }
     }
 
+    pub fn cast<T: Cast<'frame, 'data>>(
+        self,
+    ) -> JlrsResult<<T as crate::traits::private::Cast<'frame, 'data>>::Output> {
+        T::cast(self, Internal)
+    }
+
+    pub unsafe fn cast_unchecked<T: Cast<'frame, 'data>>(
+        self,
+    ) -> <T as crate::traits::private::Cast<'frame, 'data>>::Output {
+        T::cast_unchecked(self, Internal)
+    }
+
     /// Returns the type name of this value.
     pub fn type_name(&self) -> &str {
         unsafe {
@@ -208,6 +221,21 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// Returns true if the value is an array.
     pub fn is_array(&self) -> bool {
         unsafe { jl_is_array(self.ptr()) }
+    }
+
+    /// Returns true if the value is a datatype.
+    pub fn is_datatype(&self) -> bool {
+        unsafe { jl_is_datatype(self.ptr()) }
+    }
+
+    /// Returns true if the value is a symbol.
+    pub fn is_symbol(&self) -> bool {
+        unsafe { jl_is_symbol(self.ptr()) }
+    }
+
+    /// Returns true if the value is a module.
+    pub fn is_module(&self) -> bool {
+        unsafe { jl_is_module(self.ptr()) }
     }
 
     /// Returns true if the value is a tuple.
@@ -521,16 +549,6 @@ impl<'frame, 'data> Value<'frame, 'data> {
             let array = move_array(frame, data, dimensions)?;
             Ok(frame.assign_output(output, array, Internal))
         }
-    }
-
-    pub fn array(self) -> JlrsResult<Array<'frame, 'data>> {
-        unsafe {
-            if self.is_array() {
-                return Ok(Array::wrap(self.ptr().cast()));
-            }
-        }
-
-        Err(JlrsError::NotAnArray)?
     }
 
     /*

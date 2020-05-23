@@ -12,8 +12,9 @@
 
 use crate::error::{AllocError, JlrsError, JlrsResult};
 use crate::frame::{DynamicFrame, Output, StaticFrame};
-use crate::value::array::{CopiedArray, Dimensions};
+use crate::value::array::{Array, CopiedArray, Dimensions};
 use crate::value::datatype::DataType;
+use crate::value::module::Module;
 use crate::value::symbol::Symbol;
 use jl_sys::{
     jl_array_data, jl_array_dim, jl_array_dims, jl_array_eltype, jl_array_ndims, jl_array_nrows,
@@ -99,6 +100,17 @@ pub unsafe trait JuliaTypecheck {
     #[doc(hidden)]
     unsafe fn julia_typecheck(t: DataType) -> bool;
 }
+
+/// This trait is implemented by types that represent special cases of [`Value`] that have a more
+/// complex layout than several accessible fields. This currently includes [`Array`],
+/// [`DataType`], [`Module`] and [`Symbol`].
+///
+/// [`Value`]: ../value/struct.Value.html
+/// [`Array`]: ../value/array/struct.Array.html
+/// [`DataType`]: ../value/datatype/struct.DataType.html
+/// [`Module`]: ../value/module/struct.Module.html
+/// [`Symbol`]: ../value/symbol/struct.Symbol.html
+pub unsafe trait Cast<'frame, 'data>: private::Cast<'frame, 'data> {}
 
 /// Functionality shared by [`StaticFrame`] and [`DynamicFrame`]. These structs let you protect
 /// data from garbage collection. The lifetime of a frame is assigned to the values and outputs
@@ -469,6 +481,11 @@ unsafe impl<T: ArrayDatatype> TryUnbox for CopiedArray<T> {
     }
 }
 
+unsafe impl<'frame, 'data> Cast<'frame, 'data> for Array<'frame, 'data> {}
+unsafe impl<'frame, 'data> Cast<'frame, 'data> for DataType<'frame> {}
+unsafe impl<'frame, 'data> Cast<'frame, 'data> for Symbol<'frame> {}
+unsafe impl<'frame, 'data> Cast<'frame, 'data> for Module<'frame> {}
+
 impl<'frame> Frame<'frame> for StaticFrame<'frame> {
     fn frame<'nested, T, F: FnOnce(&mut StaticFrame<'nested>) -> JlrsResult<T>>(
         &'nested mut self,
@@ -566,9 +583,12 @@ impl<'frame> Frame<'frame> for DynamicFrame<'frame> {
 
 pub(crate) mod private {
     use super::JuliaType;
-    use crate::error::AllocError;
+    use crate::error::{AllocError, JlrsError, JlrsResult};
     use crate::frame::{DynamicFrame, Output, StaticFrame};
     use crate::stack::FrameIdx;
+    use crate::value::array::Array;
+    use crate::value::datatype::DataType;
+    use crate::value::module::Module;
     use crate::value::symbol::Symbol;
     use crate::value::{Value, Values};
     use jl_sys::jl_symbol_n;
@@ -587,6 +607,15 @@ pub(crate) mod private {
     }
 
     pub trait ArrayDatatype: JuliaType {}
+
+    pub trait Cast<'frame, 'data>: Sized {
+        type Output;
+        #[doc(hidden)]
+        fn cast(value: Value<'frame, 'data>, _: Internal) -> JlrsResult<Self::Output>;
+
+        #[doc(hidden)]
+        unsafe fn cast_unchecked(value: Value<'frame, 'data>, _: Internal) -> Self::Output;
+    }
 
     pub trait Frame<'frame> {
         // protect the value from being garbage collected while this frame is active.
@@ -676,6 +705,78 @@ pub(crate) mod private {
     impl_array_datatype!(f64);
     impl_array_datatype!(usize);
     impl_array_datatype!(isize);
+
+    impl<'frame, 'data> Cast<'frame, 'data> for Array<'frame, 'data> {
+        type Output = Self;
+        fn cast(value: Value<'frame, 'data>, _: Internal) -> JlrsResult<Self::Output> {
+            if value.is_array() {
+                return unsafe { Ok(Array::wrap(value.ptr().cast())) };
+            }
+
+            Err(JlrsError::NotAnArray)?
+        }
+
+        unsafe fn cast_unchecked<'fr, 'da>(
+            value: Value<'frame, 'data>,
+            _: Internal,
+        ) -> Self::Output {
+            Array::wrap(value.ptr().cast())
+        }
+    }
+
+    impl<'frame, 'data> Cast<'frame, 'data> for DataType<'frame> {
+        type Output = Self;
+        fn cast(value: Value<'frame, 'data>, _: Internal) -> JlrsResult<Self::Output> {
+            if value.is_datatype() {
+                return unsafe { Ok(DataType::wrap(value.ptr().cast())) };
+            }
+
+            Err(JlrsError::NotAnArray)?
+        }
+
+        unsafe fn cast_unchecked<'fr, 'da>(
+            value: Value<'frame, 'data>,
+            _: Internal,
+        ) -> Self::Output {
+            DataType::wrap(value.ptr().cast())
+        }
+    }
+
+    impl<'frame, 'data> Cast<'frame, 'data> for Symbol<'frame> {
+        type Output = Self;
+        fn cast(value: Value<'frame, 'data>, _: Internal) -> JlrsResult<Self::Output> {
+            if value.is_symbol() {
+                return unsafe { Ok(Symbol::wrap(value.ptr().cast())) };
+            }
+
+            Err(JlrsError::NotAnArray)?
+        }
+
+        unsafe fn cast_unchecked<'fr, 'da>(
+            value: Value<'frame, 'data>,
+            _: Internal,
+        ) -> Self::Output {
+            Symbol::wrap(value.ptr().cast())
+        }
+    }
+
+    impl<'frame, 'data> Cast<'frame, 'data> for Module<'frame> {
+        type Output = Self;
+        fn cast(value: Value<'frame, 'data>, _: Internal) -> JlrsResult<Self::Output> {
+            if value.is_module() {
+                return unsafe { Ok(Module::wrap(value.ptr().cast())) };
+            }
+
+            Err(JlrsError::NotAnArray)?
+        }
+
+        unsafe fn cast_unchecked<'fr, 'da>(
+            value: Value<'frame, 'data>,
+            _: Internal,
+        ) -> Self::Output {
+            Module::wrap(value.ptr().cast())
+        }
+    }
 
     impl<'frame> Frame<'frame> for StaticFrame<'frame> {
         unsafe fn protect(

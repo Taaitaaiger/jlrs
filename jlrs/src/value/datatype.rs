@@ -51,6 +51,10 @@ use std::marker::PhantomData;
 pub struct DataType<'frame>(*mut jl_datatype_t, PhantomData<&'frame ()>);
 
 impl<'frame> DataType<'frame> {
+    pub(crate) unsafe fn wrap(datatype: *mut jl_datatype_t) -> Self {
+        DataType(datatype, PhantomData)
+    }
+
     unsafe fn ptr(self) -> *mut jl_datatype_t {
         self.0
     }

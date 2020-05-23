@@ -21,6 +21,11 @@ use std::marker::PhantomData;
 pub struct Module<'base>(*mut jl_module_t, PhantomData<&'base ()>);
 
 impl<'base> Module<'base> {
+    pub(crate) unsafe fn wrap(module: *mut jl_module_t) -> Self {
+        Module(module, PhantomData)
+    }
+
+
     pub(crate) unsafe fn ptr(self) -> *mut jl_module_t {
         self.0
     }

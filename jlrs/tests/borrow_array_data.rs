@@ -13,7 +13,9 @@ macro_rules! impl_test {
                     let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
                     let array = Value::move_array(frame, data, (2, 3, 4))?;
-                    let d = array.array()?.inline_data::<$value_type, _>(frame)?;
+                    let d = array
+                        .cast::<Array>()?
+                        .inline_data::<$value_type, _>(frame)?;
 
                     let mut out = 1 as $value_type;
                     for third in &[0, 1, 2, 3] {
@@ -61,7 +63,9 @@ macro_rules! impl_test {
                     let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
                     let array = Value::move_array(frame, data, (2, 3, 4))?;
-                    let mut d = array.array()?.inline_data_mut::<$value_type, _>(frame)?;
+                    let mut d = array
+                        .cast::<Array>()?
+                        .inline_data_mut::<$value_type, _>(frame)?;
 
                     for third in &[0, 1, 2, 3] {
                         for second in &[0, 1, 2] {
@@ -121,7 +125,11 @@ fn borrow_nested() {
             let array = Value::move_array(frame, data, (2, 3, 4))?;
 
             frame.frame(4, |frame| {
-                let d = array.array()?.inline_data::<u8, _>(frame)?;
+                let d = unsafe {
+                    array
+                        .cast_unchecked::<Array>()
+                        .inline_data::<u8, _>(frame)?
+                };
 
                 let mut out = 1 as u8;
                 for third in &[0, 1, 2, 3] {

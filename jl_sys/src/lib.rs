@@ -99,6 +99,11 @@ pub unsafe fn jl_is_symbol(v: *mut jl_value_t) -> bool {
 }
 
 #[inline(always)]
+pub unsafe fn jl_is_module(v: *mut jl_value_t) -> bool {
+    jl_typeis(v, jl_module_type)
+}
+
+#[inline(always)]
 pub unsafe fn jl_is_task(v: *mut jl_value_t) -> bool {
     jl_typeis(v, jl_task_type)
 }
