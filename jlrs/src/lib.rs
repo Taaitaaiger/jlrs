@@ -177,17 +177,13 @@
 //! [`Value::new`]: value/struct.Value.html#method.new
 //! [`Value::try_unbox`]: value/struct.Value.html#method.try_unbox
 
-pub mod array;
-pub mod datatype;
 pub mod error;
 pub mod frame;
 pub mod global;
 #[cfg(feature = "jlrs-derive")]
 pub mod jl_sys_export;
-pub mod module;
 pub mod prelude;
 mod stack;
-pub mod symbol;
 pub mod traits;
 pub mod value;
 
@@ -195,7 +191,7 @@ use error::{JlrsError, JlrsResult};
 use frame::{DynamicFrame, StaticFrame};
 use global::Global;
 use jl_sys::{jl_atexit_hook, jl_init};
-use module::Module;
+use value::module::Module;
 use stack::{Dynamic, RawStack, StackView, Static};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};

@@ -41,9 +41,9 @@ fn impl_julia_tuple(ast: &syn::DeriveInput) -> TokenStream {
     };
 
     let julia_tuple_impl = quote! {
-        unsafe impl ::jlrs::datatype::JuliaType for #name {
+        unsafe impl ::jlrs::traits::JuliaType for #name {
             unsafe fn julia_type() -> *mut ::jlrs::jl_sys_export::jl_datatype_t {
-                let mut elem_types = [ #( <#field_types_iter as ::jlrs::datatype::JuliaType>::julia_type(), )* ];
+                let mut elem_types = [ #( <#field_types_iter as ::jlrs::traits::JuliaType>::julia_type(), )* ];
                 let ty = ::jlrs::jl_sys_export::jl_apply_tuple_type_v(elem_types.as_mut_ptr().cast(), elem_types.len());
                 assert!(::jlrs::jl_sys_export::jl_isbits(ty.cast()));
                 ty.cast()
@@ -52,7 +52,7 @@ fn impl_julia_tuple(ast: &syn::DeriveInput) -> TokenStream {
 
         unsafe impl ::jlrs::traits::IntoJulia for #name {
             unsafe fn into_julia(&self) -> *mut ::jlrs::jl_sys_export::jl_value_t {
-                let ty = <Self as ::jlrs::datatype::JuliaType>::julia_type();
+                let ty = <Self as ::jlrs::traits::JuliaType>::julia_type();
                 let tuple = ::jlrs::jl_sys_export::jl_new_struct_uninit(ty.cast());
                 let data: *mut Self = tuple.cast();
                 ::std::ptr::write(data, *self);
@@ -63,7 +63,7 @@ fn impl_julia_tuple(ast: &syn::DeriveInput) -> TokenStream {
 
         unsafe impl ::jlrs::traits::TryUnbox for #name {
             unsafe fn try_unbox(value: *mut ::jlrs::jl_sys_export::jl_value_t) -> ::jlrs::error::JlrsResult<Self> {
-                let ty = <Self as ::jlrs::datatype::JuliaType>::julia_type();
+                let ty = <Self as ::jlrs::traits::JuliaType>::julia_type();
                 if ::jlrs::jl_sys_export::jl_typeis(value, ty.cast()) {
                     return Ok(*(value as *mut Self));
                 }
@@ -72,7 +72,7 @@ fn impl_julia_tuple(ast: &syn::DeriveInput) -> TokenStream {
             }
         }
 
-        unsafe impl ::jlrs::datatype::JuliaTuple for #name {}
+        unsafe impl ::jlrs::traits::JuliaTuple for #name {}
     };
 
     julia_tuple_impl.into()
@@ -126,7 +126,7 @@ fn impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
     let rs_field_types_iter_b = rs_field_types_iter.clone();
 
     let julia_struct_impl = quote! {
-        unsafe impl ::jlrs::datatype::JuliaType for #name {
+        unsafe impl ::jlrs::traits::JuliaType for #name {
             unsafe fn julia_type() -> *mut ::jlrs::jl_sys_export::jl_datatype_t {
                 // Because Julia code can change independently of the Rust code that calls it, we
                 // need to check if the Julia type corresponds to the Rust type at runtime. This
@@ -137,7 +137,7 @@ fn impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
                     static JULIA_TYPE: *mut ::jlrs::jl_sys_export::jl_datatype_t =  unsafe {
                         // The Julia type is a global value in its module
                         let global = ::jlrs::global::Global::new();
-                        let julia_type = ::jlrs::module::Module::#func(global)
+                        let julia_type = ::jlrs::value::module::Module::#func(global)
                             #(.submodule(#modules_it).expect(&format!("Submodule {} cannot be found", #modules_it_b)))*
                             .global(#ty).expect(&format!("Type {} cannot be found in module", #ty))
                             .ptr();
@@ -163,7 +163,7 @@ fn impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
                         #(
                             let i = #fields_idx_it;
                             let jl_field_name_str = ::std::ffi::CStr::from_ptr(::jlrs::jl_sys_export::jl_symbol_name(field_names_slice[i]).cast()).to_string_lossy();
-                            let assoc_field_type = <#rs_field_types_iter as ::jlrs::datatype::JuliaType>::julia_type().cast();
+                            let assoc_field_type = <#rs_field_types_iter as ::jlrs::traits::JuliaType>::julia_type().cast();
 
                             let rs_renamed_field_name = #expected_field_names_iter;
                             let rs_concrete_field_name = #rs_fields_iter;
@@ -216,7 +216,7 @@ fn impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
 
         unsafe impl ::jlrs::traits::IntoJulia for #name {
             unsafe fn into_julia(&self) -> *mut ::jlrs::jl_sys_export::jl_value_t {
-                let ty = <Self as ::jlrs::datatype::JuliaType>::julia_type();
+                let ty = <Self as ::jlrs::traits::JuliaType>::julia_type();
                 let strct = ::jlrs::jl_sys_export::jl_new_struct_uninit(ty.cast());
                 let data: *mut Self = strct.cast();
                 // Avoid reading uninitialized data
@@ -228,7 +228,7 @@ fn impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
 
         unsafe impl ::jlrs::traits::TryUnbox for #name {
             unsafe fn try_unbox(value: *mut ::jlrs::jl_sys_export::jl_value_t) -> ::jlrs::error::JlrsResult<Self> {
-                let ty = <Self as ::jlrs::datatype::JuliaType>::julia_type();
+                let ty = <Self as ::jlrs::traits::JuliaType>::julia_type();
                 if ::jlrs::jl_sys_export::jl_typeis(value, ty.cast()) {
                     return Ok(*(value as *mut Self));
                 }

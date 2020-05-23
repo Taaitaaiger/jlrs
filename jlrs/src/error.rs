@@ -1,7 +1,7 @@
 //! Everything related to errors.
 
 use std::error::Error;
-use crate::array::Dimensions;
+use crate::value::array::Dimensions;
 use std::fmt::{Display, Formatter, Result as FmtResult};
 
 /// Alias that is used for most `Result`s in this crate. 
@@ -24,6 +24,7 @@ pub enum JlrsError {
     AllocError(AllocError),
     WrongType,
     NotInline,
+    Inline,
     ZeroDimension,
     OutOfBounds(usize, usize),
     InvalidIndex(Dimensions, Dimensions),
@@ -56,6 +57,7 @@ impl Display for JlrsError {
             JlrsError::InvalidArrayType => write!(formatter, "Invalid array type"),
             JlrsError::InvalidCharacter => write!(formatter, "Invalid character"),
             JlrsError::NotInline => write!(formatter, "Not inline"),
+            JlrsError::Inline => write!(formatter, "Inline"),
             JlrsError::NotAModule(module) => write!(formatter, "{} is not a module", module),
             JlrsError::AllocError(AllocError::FrameOverflow(n, cap)) => write!(
                 formatter,

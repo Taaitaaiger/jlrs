@@ -1,0 +1,24 @@
+[package]
+name = "jl-sys"
+version = "0.6.0"
+authors = ["Thomas van Doornmalen <thomas.vandoornmalen@gmail.com>"]
+description = """
+jl-sys contains the generated bindings for the Julia C API used by jlrs.
+"""
+documentation = "https://docs.rs/jl-sys"
+homepage = "https://github.com/Taaitaaiger/jl-sys"
+repository = "https://github.com/Taaitaaiger/jl-sys"
+readme = "README.md"
+keywords = ["Julia", "math", "mathematics", "bindings", "ffi"]
+license = "MIT"
+edition = "2018"
+links = "julia"
+
+[features]
+docs-rs = []
+
+[build-dependencies]
+bindgen = "0.54.0"
+
+[package.metadata.docs.rs]
+features = ["docs-rs"]

@@ -94,15 +94,14 @@
 //! "structured" representation. In order to access the data of these arrays from Rust you must 
 //! derive [`ArrayDatatype`]. 
 
-use crate::array::{Dimensions, Array};
+use array::{Dimensions, Array};
 use crate::error::{JlrsError, JlrsResult};
-use crate::datatype::JuliaType;
 use crate::frame::Output;
 use crate::global::Global;
-use crate::module::Module;
-use crate::symbol::Symbol;
+use module::Module;
+use symbol::Symbol;
 use crate::traits::{
-    private::Internal, ArrayDatatype, Frame, IntoJulia, TemporarySymbol, TryUnbox,
+    private::Internal, ArrayDatatype, Frame, IntoJulia, TemporarySymbol, TryUnbox, JuliaType
 };
 use jl_sys::{
     jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_apply_array_type,
@@ -116,6 +115,11 @@ use std::ffi::CStr;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::marker::PhantomData;
 use std::slice;
+
+pub mod array;
+pub mod datatype;
+pub mod module;
+pub mod symbol;
 
 thread_local! {
     // Used as a pool to convert dimensions to tuples. Safe because a thread local is initialized

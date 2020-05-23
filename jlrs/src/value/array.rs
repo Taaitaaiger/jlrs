@@ -1,27 +1,42 @@
 //! Support for n-dimensional arrays and their dimensions.
 //!
-//! When working with arrays, it's important to be aware of the `isbits` optimization in Julia.
-//! Simple types in Julia, eg `UInt64` and `Float32`, are stored in terms of their raw bits. This
-//! extends to structs and tuples containing combinations of those types, their data is stored
-//! inline (and compatible with a struct in C containing those types).
-//!
-//! Since Julia 1.4 this optimization has been extended to arrays: the raw data itself is stored
-//! inline inside the array's backing storage in a C-compatible way. In order to support that
-//! optimization, many types that derive either `JuliaTuple` or `JuliaStruct` can also derive
-//! `ArrayDatatype`.
-
-use crate::datatype::JuliaType;
+//! You will find several structs in this module that can be used to work with Julia arrays from
+//! Rust. An [`Array`] is the Julia array itself, and provides methods to (mutably) access the 
+//! data and copy it to Rust.
+//! 
+//! The structs that represent copied or borrowed data can be accessed using an n-dimensional
+//! index written as a tuple. For example, if `a` is a three-dimensional array, a single element 
+//! can be accessed with `a[(row, col, z)]`. 
 use crate::error::{JlrsError, JlrsResult};
-use crate::traits::Frame;
+use crate::traits::{Frame, JuliaType};
 use crate::value::Value;
 use jl_sys::{
-    jl_array_dim, jl_array_dims, jl_array_eltype, jl_array_ndims, jl_array_nrows, jl_array_t,
-    jl_gc_wb, jl_typeof, jl_array_data
+    jl_array_data, jl_array_dim, jl_array_dims, jl_array_eltype, jl_array_ndims, jl_array_nrows,
+    jl_array_t, jl_gc_wb, jl_typeof,
 };
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::marker::PhantomData;
 use std::ops::{Index, IndexMut};
 
+/// An n-dimensional Julia array. A [`Value`] that contains an array can be cast to this struct by
+/// calling [`Value::cast<Array>`]. ach element in the backing storage is either stored as a 
+/// [`Value`] or inline. You can check how the data is stored by calling [`Array::is_value_array`]
+/// or [`Array::is_inline_array`].
+///
+/// Arrays that contain integers or floats are an example of inline arrays. Their data is stored
+/// as an array that contains numbers of the appropriate type, for example an array of `Float32`s
+/// in Julia is backed by an an array of `f32`s. More complex data can be stored inline,
+/// specifically types for which `isbitstype(<Type>)` returns `true` can be inlined. The data of
+/// these arrays can be accessed with [`Array::inline_data`] and [`Array::inline_data_mut`], and
+/// copied from Julia to Rust with [`Array::copy_inline_data`]. In order to call these methods the
+/// type of the elements must be provided, arrays that contain numbers can be accessed by
+/// providing the appropriate Rust type (eg `f32` for `Float32` and `u64` for `UInt64`). More
+/// complex inlined data is supported through two custom derives: [`JuliaTuple`] and
+/// [`JuliaStruct`]. Accessing inline array data is not supported if the data contains inlined
+/// unions or pointers.
+///
+/// If the data isn't inlined each element is stored as a [`Value`]. This data can be accessed
+/// using [`Array::value_data`] and [`Array::value_data_mut`] but this is unsafe.
 #[derive(Copy, Clone)]
 #[repr(transparent)]
 pub struct Array<'frame, 'data>(
@@ -39,35 +54,30 @@ impl<'frame, 'data> Array<'frame, 'data> {
         self.0
     }
 
+    /// Returns the array's dimensions.
     pub fn dimensions(self) -> Dimensions {
-        unsafe {
-            let ptr = self.ptr();
-            match jl_array_ndims(ptr) {
-                0 => Into::into(()),
-                1 => Into::into(jl_array_nrows(ptr) as usize),
-                2 => Into::into((jl_array_dim(ptr, 0), jl_array_dim(ptr, 1))),
-                3 => Into::into((
-                    jl_array_dim(ptr, 0),
-                    jl_array_dim(ptr, 1),
-                    jl_array_dim(ptr, 2),
-                )),
-                ndims => Into::into(jl_array_dims(ptr, ndims as _)),
-            }
-        }
+        unsafe { Dimensions::from_array(self.ptr().cast()) }
     }
 
+    /// Returns `true` if the type of the elements of this array is `T`.
     pub fn contains<T: JuliaType>(self) -> bool {
         unsafe { jl_array_eltype(self.ptr().cast()).cast() == T::julia_type() }
     }
 
+    /// Returns `true` if the type of the elements of this array is `T` and these elements are
+    /// stored inline.
     pub fn contains_inline<T: JuliaType>(self) -> bool {
-        self.contains::<T>() && !self.is_inline_array()
+        self.contains::<T>() && self.is_inline_array()
     }
 
+    /// Returns true if the elements of the array are stored inline.
     pub fn is_inline_array(self) -> bool {
         unsafe { (&*self.ptr()).flags.ptrarray() == 0 }
     }
 
+    /// Returns true if the elements of the array are stored inline and at least one of the field
+    /// of the inlined type is a pointer. If this returns true the data cannot be accessed from
+    /// Rust.
     pub fn has_inlined_pointers(self) -> bool {
         unsafe {
             let flags = (&*self.ptr()).flags;
@@ -75,15 +85,45 @@ impl<'frame, 'data> Array<'frame, 'data> {
         }
     }
 
+    /// Returns true if the elements of the array are stored as [`Value`]s.
     pub fn is_value_array(self) -> bool {
         !self.is_inline_array()
     }
 
-    //pub fn try_unbox_array<T>()
+    /// Copy the data of an inline array to Rust. Returns `JlrsError::NotInline` if the data is
+    /// not stored inline or `JlrsError::WrongType` if the type of the elements is incorrect.
+    pub fn copy_inline_data<T>(self) -> JlrsResult<CopiedArray<T>>
+    where
+        T: JuliaType,
+    {
+        if !self.contains::<T>() {
+            Err(JlrsError::WrongType)?;
+        }
 
-    pub fn inline_array_data<'borrow, 'fr, T, F>(
+        if !self.is_inline_array() {
+            Err(JlrsError::NotInline)?;
+        }
+
+        unsafe {
+            let jl_data = jl_array_data(self.ptr().cast()).cast();
+            let dimensions = Dimensions::from_array(self.ptr().cast());
+
+            let sz = dimensions.size();
+            let mut data = Vec::with_capacity(sz);
+            let ptr = data.as_mut_ptr();
+            std::ptr::copy_nonoverlapping(jl_data, ptr, sz);
+            data.set_len(sz);
+
+            Ok(CopiedArray::new(data, dimensions))
+        }
+    }
+
+    /// Immutably borrow inline array data, you can borrow data from multiple arrays at the same
+    /// time. Returns `JlrsError::NotInline` if the data is not stored inline or
+    /// `JlrsError::WrongType` if the type of the elements is incorrect.
+    pub fn inline_data<'borrow, 'fr, T, F>(
         self,
-        frame: &'borrow F
+        frame: &'borrow F,
     ) -> JlrsResult<ArrayData<'borrow, 'fr, T, F>>
     where
         T: JuliaType,
@@ -99,15 +139,18 @@ impl<'frame, 'data> Array<'frame, 'data> {
 
         unsafe {
             let jl_data = jl_array_data(self.ptr().cast()).cast();
-            let dimensions= Dimensions::from_array(self.ptr().cast());
+            let dimensions = Dimensions::from_array(self.ptr().cast());
             let data = std::slice::from_raw_parts(jl_data, dimensions.size());
             Ok(ArrayData::new(data, dimensions, frame))
         }
     }
 
-    pub fn inline_array_data_mut<'borrow, 'fr, T, F>(
+    /// Mutably borrow inline array data, you can mutably borrow a single array at the same time.
+    /// Returns `JlrsError::NotInline` if the data is not stored inline or `JlrsError::WrongType`
+    /// if the type of the elements is incorrect.
+    pub fn inline_data_mut<'borrow, 'fr, T, F>(
         self,
-        frame: &'borrow mut F
+        frame: &'borrow mut F,
     ) -> JlrsResult<InlineArrayDataMut<'borrow, 'fr, T, F>>
     where
         T: JuliaType,
@@ -123,48 +166,59 @@ impl<'frame, 'data> Array<'frame, 'data> {
 
         unsafe {
             let jl_data = jl_array_data(self.ptr().cast()).cast();
-            let dimensions= Dimensions::from_array(self.ptr().cast());
+            let dimensions = Dimensions::from_array(self.ptr().cast());
             let data = std::slice::from_raw_parts_mut(jl_data, dimensions.size());
             Ok(InlineArrayDataMut::new(data, dimensions, frame))
         }
     }
 
-    pub fn value_array_data<'borrow, 'fr, F>(
+    /// Immutably borrow the data of this value array, you can borrow data from multiple arrays at
+    /// the same time. The values themselves can be mutable, but you can't replace an element with
+    /// another value. Returns `JlrsError::Inline` if the data is stored inline.
+    ///
+    /// Safety: no slot on the GC stack is required to access and use the values in this array,
+    /// the GC is aware of the array's data. If the element is changed either from Rust or Julia,
+    /// the original value is no longer protected from garbage collection. If you need to keep 
+    /// using this value you must protect it by calling [`Value::extend`].
+    pub unsafe fn value_data<'borrow, 'fr, F>(
         self,
-        frame: &'borrow F
+        frame: &'borrow F,
     ) -> JlrsResult<ArrayData<'borrow, 'fr, Value<'frame, 'data>, F>>
     where
         F: Frame<'fr>,
     {
         if !self.is_value_array() {
-            Err(JlrsError::WrongType)?;
+            Err(JlrsError::Inline)?;
         }
 
-        unsafe {
-            let jl_data = jl_array_data(self.ptr().cast()).cast();
-            let dimensions= Dimensions::from_array(self.ptr().cast());
-            let data = std::slice::from_raw_parts(jl_data, dimensions.size());
-            Ok(ArrayData::new(data, dimensions, frame))
-        }
+        let jl_data = jl_array_data(self.ptr().cast()).cast();
+        let dimensions = Dimensions::from_array(self.ptr().cast());
+        let data = std::slice::from_raw_parts(jl_data, dimensions.size());
+        Ok(ArrayData::new(data, dimensions, frame))
     }
 
-    pub fn value_array_data_mut<'borrow, 'fr, F>(
+    /// Mutably borrow the data of this value array, you can mutably borrow a single array at the
+    /// same time. Returns `JlrsError::Inline` if the data is stored inline.
+    ///
+    /// Safety: no slot on the GC stack is required to access and use the values in this array,
+    /// the GC is aware of the array's data. If the element is changed either from Rust or Julia,
+    /// the original value is no longer protected from garbage collection. If you need to keep 
+    /// using this value you must protect it by calling [`Value::extend`]. 
+    pub unsafe fn value_data_mut<'borrow, 'fr, F>(
         self,
-        frame: &'borrow mut F
+        frame: &'borrow mut F,
     ) -> JlrsResult<ValueArrayDataMut<'borrow, 'frame, 'data, 'fr, F>>
     where
         F: Frame<'fr>,
     {
         if !self.is_value_array() {
-            Err(JlrsError::WrongType)?;
+            Err(JlrsError::Inline)?;
         }
 
-        unsafe {
-            let jl_data = jl_array_data(self.ptr().cast()).cast();
-            let dimensions= Dimensions::from_array(self.ptr().cast());
-            let data = std::slice::from_raw_parts_mut(jl_data, dimensions.size());
-            Ok(ValueArrayDataMut::new(self, data, dimensions, frame))
-        }
+        let jl_data = jl_array_data(self.ptr().cast()).cast();
+        let dimensions = Dimensions::from_array(self.ptr().cast());
+        let data = std::slice::from_raw_parts_mut(jl_data, dimensions.size());
+        Ok(ValueArrayDataMut::new(self, data, dimensions, frame))
     }
 }
 
@@ -439,7 +493,7 @@ where
 /// you can use tuples of `usize`. In general, you can use slices of `usize`:
 ///
 /// ```
-/// # use jlrs::array::Dimensions;
+/// # use jlrs::value::array::Dimensions;
 /// # fn main() {
 /// let _0d: Dimensions = ().into();
 /// let _1d_value: Dimensions = 42.into();
@@ -457,7 +511,7 @@ pub enum Dimensions {
 }
 
 impl Dimensions {
-    pub(crate) unsafe fn from_array(array: *mut jl_array_t) -> Self{
+    pub(crate) unsafe fn from_array(array: *mut jl_array_t) -> Self {
         let n_dims = jl_array_ndims(array);
         match n_dims {
             0 => Into::into(()),
