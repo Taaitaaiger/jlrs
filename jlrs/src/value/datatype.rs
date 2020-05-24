@@ -55,7 +55,8 @@ impl<'frame> DataType<'frame> {
         DataType(datatype, PhantomData)
     }
 
-    unsafe fn ptr(self) -> *mut jl_datatype_t {
+    #[doc(hidden)]
+    pub unsafe fn ptr(self) -> *mut jl_datatype_t {
         self.0
     }
 

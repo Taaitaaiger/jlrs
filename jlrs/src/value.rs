@@ -8,13 +8,15 @@
 //! [`Value`]: struct.Value.html
 
 use self::array::Dimensions;
+use self::datatype::DataType;
 use self::module::Module;
 use self::symbol::Symbol;
 use crate::error::{JlrsError, JlrsResult};
 use crate::frame::Output;
 use crate::global::Global;
 use crate::traits::{
-    private::Internal, ArrayDatatype, Cast, Frame, IntoJulia, JuliaType, TemporarySymbol, TryUnbox,
+    private::{Cast as PrivCast, Internal},
+    ArrayDatatype, Cast, Frame, IntoJulia, JuliaType, JuliaTypecheck, TemporarySymbol, TryUnbox,
 };
 use jl_sys::{
     jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_apply_array_type,
@@ -22,12 +24,13 @@ use jl_sys::{
     jl_datatype_t, jl_exception_occurred, jl_field_index, jl_field_names, jl_fieldref,
     jl_fieldref_noalloc, jl_get_nth_field, jl_get_nth_field_noalloc, jl_is_array, jl_is_datatype,
     jl_is_module, jl_is_symbol, jl_is_tuple, jl_new_array, jl_new_struct_uninit, jl_nfields,
-    jl_ptr_to_array, jl_ptr_to_array_1d, jl_svec_data, jl_svec_len, jl_typeis, jl_typeof,
+    jl_ptr_to_array, jl_ptr_to_array_1d, jl_svec_data, jl_svec_len, jl_typeof,
     jl_typeof_str, jl_value_t,
 };
 use std::ffi::CStr;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::marker::PhantomData;
+use std::ptr::null_mut;
 use std::slice;
 
 pub mod array;
@@ -76,12 +79,12 @@ impl<'frame> Values<'frame> {
     }
 
     /// Returns the number of `Value`s in this group.
-    pub fn len(&self) -> usize {
+    pub fn len(self) -> usize {
         self.1
     }
 
     /// Get a specific `Value` in this group. Returns an error if the index is out of bounds.
-    pub fn value(&self, index: usize) -> JlrsResult<Value<'frame, 'static>> {
+    pub fn value(self, index: usize) -> JlrsResult<Value<'frame, 'static>> {
         if index >= self.len() {
             return Err(JlrsError::OutOfBounds(index, self.len()).into());
         }
@@ -125,13 +128,28 @@ impl<'frame> Values<'frame> {
     }
 }
 
-/// Except modules and symbols, all Julia data is represented as a `Value` in `jlrs`.
+/// When working with the Julia C API most data is returned as a raw pointer to a `jl_value_t`.
+/// This pointer is similar to a void pointer in the sense that this pointer can point to data of
+/// any type. It's up to the user to determine the correct type and cast the pointer. In order to
+/// make this possible, data pointed to by a `jl_value_t`-pointer is guaranteed to be preceded in
+/// memory by a fixed-size header that contains type and layout-information.
 ///
-/// A `Value` wraps around the pointer-value from the Julia C API and applies some restrictions
-/// through lifetimes to ensure it can only be used while it's protected from garbage collection
-/// and its contents are valid.
+/// A `Value` is a wrapper around the raw pointer to a `jl_value_t` that adds two lifetimes,
+/// `'frame` and `'data`. The first is inherited from the frame used to create the `Value`; frames
+/// ensure a `Value` is protected from garbage collection as long as the frame used to protect it
+/// has not been dropped. As a result, a `Value` can only be used when it can be guaranteed that
+/// the garbage collector won't drop it. The second indicates the lifetime of its contents; it's
+/// usually `'static`, but if you create a `Value` that borrows array data from Rust it's the
+/// lifetime of the borrow. If you call a Julia function the returned `Value` will inherit the
+/// `'data`-lifetime of the `Value`s used as arguments. This ensures that a `Value` that
+/// (possibly) borrows data from Rust can't be used after that borrow ends. If this restriction is
+/// too strict you can forget the second lifetime by calling [`Value::assume_static`].
 ///
-/// The methods that create a new `Value` come in two varieties: `method` and `method_output`. The
+/// A `Value`'s type information can be accessed by calling [`Value::dataype`], this is usually
+/// not necessary to determine what kind of data it contains.
+///
+/// The methods that create a new `Value` come in two varieties: `<method>` and `<method>_output`.
+/// The
 /// first will use a slot in the current frame to protect the value from garbage collection, while
 /// the latter uses a slot in an earlier frame. Other features offered by `Value` include
 /// accessing the fields of these values and (im)mutably borrowing their underlying array data.
@@ -192,25 +210,80 @@ impl<'frame, 'data> Value<'frame, 'data> {
         unsafe { frame.assign_output(output, value.into_julia(), Internal) }
     }
 
-    /// Returns true if the value is of type `T`.
-    pub fn is<T: JuliaType>(&self) -> bool {
-        unsafe { jl_typeis(self.ptr(), T::julia_type().cast()) }
+    /// Returns true if the value is `Nothing`.
+    pub fn is_nothing(self) -> bool {
+        unsafe { self.ptr() == null_mut() }
     }
 
+    /// Returns true if the value is of type `T`. This works for primitive types, for example:
+    ///
+    /// ```no_run
+    /// # use jlrs::prelude::*;
+    /// # fn main() {
+    /// # let mut julia = unsafe { Julia::init(16).unwrap() };
+    /// julia.frame(1, |_global, frame| {
+    ///     let i = Value::new(frame, 2u64)?;
+    ///     assert!(i.is::<u64>());
+    ///     Ok(())
+    /// }).unwrap();
+    /// # }
+    /// ```
+    ///
+    /// More complex types that are specific to Julia, currently [`Array`], [`DataType`],
+    /// [`Module`], and [`Symbol`] are also supported:
+    ///
+    /// ```no_run
+    /// # use jlrs::prelude::*;
+    /// # fn main() {
+    /// # /* let mut julia = unsafe { Julia::init(16).unwrap() };
+    /// # julia.frame(1, |_global, frame| {
+    /// #     let arr = Value::new_array<f64, _, _>(frame, (3, 3))?;
+    /// #     assert!(arr.is::<Array>());
+    /// #     Ok(())
+    /// # }).unwrap();
+    /// # */
+    /// # } 
+    /// ```
+    ///
+    /// If you derive [`JuliaStruct`] or [`JuliaTuple`] for some type, that type will also be
+    /// supported by this method.
+    ///
+    pub fn is<T: JuliaTypecheck>(self) -> bool {
+        if self.is_nothing() {
+            return false;
+        }
+
+        self.datatype().unwrap().is::<T>()
+    }
+
+    pub fn datatype(self) -> Option<DataType<'frame>> {
+        if self.is_nothing() {
+            return None;
+        }
+
+        unsafe { Some(DataType::wrap(jl_typeof(self.ptr()).cast())) }
+    }
+
+    /// Cast the value to one of the following types: [`Array`], [`DataType`], [`Module`], or
+    /// [`Symbol`].
     pub fn cast<T: Cast<'frame, 'data>>(
         self,
-    ) -> JlrsResult<<T as crate::traits::private::Cast<'frame, 'data>>::Output> {
+    ) -> JlrsResult<<T as PrivCast<'frame, 'data>>::Output> {
         T::cast(self, Internal)
     }
 
     pub unsafe fn cast_unchecked<T: Cast<'frame, 'data>>(
         self,
-    ) -> <T as crate::traits::private::Cast<'frame, 'data>>::Output {
+    ) -> <T as PrivCast<'frame, 'data>>::Output {
         T::cast_unchecked(self, Internal)
     }
 
     /// Returns the type name of this value.
-    pub fn type_name(&self) -> &str {
+    pub fn type_name(self) -> &'frame str {
+        if self.is_nothing() {
+            return "Nothing";
+        }
+
         unsafe {
             let type_name = jl_typeof_str(self.ptr());
             let type_name_ref = CStr::from_ptr(type_name);
@@ -219,32 +292,32 @@ impl<'frame, 'data> Value<'frame, 'data> {
     }
 
     /// Returns true if the value is an array.
-    pub fn is_array(&self) -> bool {
-        unsafe { jl_is_array(self.ptr()) }
+    pub fn is_array(self) -> bool {
+        unsafe { !self.is_nothing() && jl_is_array(self.ptr()) }
     }
 
     /// Returns true if the value is a datatype.
-    pub fn is_datatype(&self) -> bool {
-        unsafe { jl_is_datatype(self.ptr()) }
+    pub fn is_datatype(self) -> bool {
+        unsafe { !self.is_nothing() && jl_is_datatype(self.ptr()) }
     }
 
     /// Returns true if the value is a symbol.
-    pub fn is_symbol(&self) -> bool {
-        unsafe { jl_is_symbol(self.ptr()) }
+    pub fn is_symbol(self) -> bool {
+        unsafe { !self.is_nothing() && jl_is_symbol(self.ptr()) }
     }
 
     /// Returns true if the value is a module.
-    pub fn is_module(&self) -> bool {
-        unsafe { jl_is_module(self.ptr()) }
+    pub fn is_module(self) -> bool {
+        unsafe { !self.is_nothing() && jl_is_module(self.ptr()) }
     }
 
     /// Returns true if the value is a tuple.
-    pub fn is_tuple(&self) -> bool {
-        unsafe { jl_is_tuple(self.ptr()) }
+    pub fn is_tuple(self) -> bool {
+        unsafe { !self.is_nothing() && jl_is_tuple(self.ptr()) }
     }
 
     /// Returns true if the value is an array with elements of type `T`.
-    pub fn is_array_of<T: JuliaType>(&self) -> bool {
+    pub fn is_array_of<T: JuliaType>(self) -> bool {
         unsafe { self.is_array() && jl_array_eltype(self.ptr()).cast() == T::julia_type() }
     }
 
@@ -252,7 +325,11 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// to access their fields with [`Value::get_field`].
     ///
     /// [`Value::get_field`]: struct.Value.html#method.get_field
-    pub fn field_names<'base>(&self, _: Global<'base>) -> &[Symbol<'base>] {
+    pub fn field_names<'base>(self, _: Global<'base>) -> &[Symbol<'base>] {
+        if self.is_nothing() {
+            return &[];
+        }
+
         unsafe {
             let tp = jl_typeof(self.ptr());
             let field_names = jl_field_names(tp.cast());
@@ -266,7 +343,11 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// with [`Value::get_field_n`].
     ///
     /// [`Value::get_field_n`]: struct.Value.html#method.get_field_n
-    pub fn n_fields(&self) -> usize {
+    pub fn n_fields(self) -> usize {
+        if self.is_nothing() {
+            return 0;
+        }
+
         unsafe { jl_nfields(self.ptr()) as _ }
     }
 
@@ -274,7 +355,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// `JlrsError::OutOfBounds` is returned. This function assumes the field must be protected
     /// from garbage collection, so calling this function will take a single slot on the GC stack.
     /// If there is no slot available `JlrsError::AllocError` is returned.
-    pub fn get_nth_field<'fr, F>(&self, frame: &mut F, idx: usize) -> JlrsResult<Value<'fr, 'data>>
+    pub fn get_nth_field<'fr, F>(self, frame: &mut F, idx: usize) -> JlrsResult<Value<'fr, 'data>>
     where
         F: Frame<'fr>,
     {
@@ -293,7 +374,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// `JlrsError::OutOfBounds` is returned. This function assumes the field must be protected
     /// from garbage collection and uses the provided output to do so.
     pub fn get_nth_field_output<'output, 'fr, F>(
-        &self,
+        self,
         frame: &mut F,
         output: Output<'output>,
         idx: usize,
@@ -313,7 +394,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// Returns the field at index `idx` if it exists and no allocation is required to return it.
     /// If it does not exist `JlrsError::NoSuchField` is returned. If allocating is required to
     /// return the field, an `assert` will fail and the program will abort.
-    pub fn get_nth_field_noalloc(&self, idx: usize) -> JlrsResult<Value<'frame, 'data>> {
+    pub fn get_nth_field_noalloc(self, idx: usize) -> JlrsResult<Value<'frame, 'data>> {
         unsafe {
             if idx >= self.n_fields() {
                 return Err(JlrsError::OutOfBounds(idx, self.n_fields()).into());
@@ -334,6 +415,11 @@ impl<'frame, 'data> Value<'frame, 'data> {
     {
         unsafe {
             let symbol = field_name.temporary_symbol(Internal);
+
+            if self.is_nothing() {
+                return Err(JlrsError::NoSuchField(symbol.into()).into());
+            }
+
             let jl_type = jl_typeof(self.ptr()).cast();
             let idx = jl_field_index(jl_type, symbol.ptr(), 0);
 
@@ -362,6 +448,11 @@ impl<'frame, 'data> Value<'frame, 'data> {
     {
         unsafe {
             let symbol = field_name.temporary_symbol(Internal);
+
+            if self.is_nothing() {
+                return Err(JlrsError::NoSuchField(symbol.into()).into());
+            }
+
             let jl_type = jl_typeof(self.ptr()).cast();
             let idx = jl_field_index(jl_type, symbol.ptr(), 0);
 
@@ -382,6 +473,11 @@ impl<'frame, 'data> Value<'frame, 'data> {
     {
         unsafe {
             let symbol = field_name.temporary_symbol(Internal);
+
+            if self.is_nothing() {
+                return Err(JlrsError::NoSuchField(symbol.into()).into());
+            }
+
             let jl_type = jl_typeof(self.ptr()).cast();
             let idx = jl_field_index(jl_type, symbol.ptr(), 0);
 
@@ -550,149 +646,6 @@ impl<'frame, 'data> Value<'frame, 'data> {
             Ok(frame.assign_output(output, array, Internal))
         }
     }
-
-    /*
-    /// Immutably borrow array data, you can borrow data from multiple arrays at the same time.
-    /// This data can only be borrowed if it contains floating point numbers or (unsigned)
-    /// integers. Returns `JlrsError::NotAnArray` if this value is not an array or
-    /// `JlrsError::WrongType` if the type of the elements is incorrect.
-    pub fn array_data<'borrow, 'fr, T: ArrayDatatype, F: Frame<'fr>>(
-        &'borrow self,
-        frame: &'borrow F,
-    ) -> JlrsResult<ArrayData<'borrow, 'fr, T, F>> {
-        if !self.is_array() {
-            Err(JlrsError::NotAnArray)?;
-        }
-
-        if !self.is_array_of::<T>() {
-            Err(JlrsError::WrongType)?;
-        }
-
-        unsafe {
-            let ptr = self.ptr();
-            let jl_data = jl_array_data(ptr).cast();
-            let ptr = ptr.cast();
-            let n_dims = jl_array_ndims(ptr);
-            let dimensions: Dimensions = match n_dims {
-                0 => return Err(JlrsError::ZeroDimension.into()),
-                1 => Into::into(jl_array_nrows(ptr) as usize),
-                2 => Into::into((jl_array_dim(ptr, 0), jl_array_dim(ptr, 1))),
-                3 => Into::into((
-                    jl_array_dim(ptr, 0),
-                    jl_array_dim(ptr, 1),
-                    jl_array_dim(ptr, 2),
-                )),
-                ndims => Into::into(jl_array_dims(ptr, ndims as _)),
-            };
-
-            // the lifetime is constrained to the lifetime of the borrow
-            let data = slice::from_raw_parts(jl_data, dimensions.size());
-            Ok(ArrayData::new(data, dimensions, frame))
-        }
-    }
-
-    pub fn ptr_array_data<'borrow, 'fr, F: Frame<'fr>>(
-        &'borrow self,
-        frame: &'borrow F,
-    ) -> JlrsResult<ArrayData<'borrow, 'fr, Value<'frame, 'data>, F>> {
-        if !self.is_array() {
-            Err(JlrsError::NotAnArray)?;
-        }
-
-        unsafe {
-            let ptr = self.ptr();
-            let eltype = jl_array_eltype(ptr);
-
-            if jl_isbits(eltype) {
-                Err(JlrsError::InvalidArrayType)?;
-            }
-
-            let jl_data = jl_array_data(ptr).cast();
-            let ptr = ptr.cast();
-            let n_dims = jl_array_ndims(ptr);
-            let dimensions: Dimensions = match n_dims {
-                0 => return Err(JlrsError::ZeroDimension.into()),
-                1 => Into::into(jl_array_nrows(ptr) as usize),
-                2 => Into::into((jl_array_dim(ptr, 0), jl_array_dim(ptr, 1))),
-                3 => Into::into((
-                    jl_array_dim(ptr, 0),
-                    jl_array_dim(ptr, 1),
-                    jl_array_dim(ptr, 2),
-                )),
-                ndims => Into::into(jl_array_dims(ptr, ndims as _)),
-            };
-
-            // the lifetime is constrained to the lifetime of the borrow
-            let data = slice::from_raw_parts(jl_data, dimensions.size());
-            Ok(ArrayData::new(data, dimensions, frame))
-        }
-    }
-
-    /// Mutably borrow array data, you can borrow data from a single array at the same time.
-    /// This data can only be borrowed if it contains floating point numbers or (unsigned)
-    /// integers. Returns `JlrsError::NotAnArray` if this value is not an array or
-    /// `JlrsError::WrongType` if the type of the elements is incorrect.
-    pub fn array_data_mut<'borrow, 'fr, T: ArrayDatatype, F: Frame<'fr>>(
-        &'borrow mut self,
-        frame: &'borrow mut F,
-    ) -> JlrsResult<InlineArrayDataMut<'borrow, 'fr, T, F>> {
-        if !self.is_array_of::<T>() {
-            Err(JlrsError::NotAnArray)?;
-        }
-
-        unsafe {
-            let jl_data = jl_array_data(self.ptr()).cast();
-            let ptr = self.ptr().cast();
-            let n_dims = jl_array_ndims(ptr);
-            let dimensions: Dimensions = match n_dims {
-                0 => return Err(JlrsError::ZeroDimension.into()),
-                1 => (jl_array_nrows(ptr) as usize).into(),
-                2 => (jl_array_dim(ptr, 0), jl_array_dim(ptr, 1)).into(),
-                3 => (
-                    jl_array_dim(ptr, 0),
-                    jl_array_dim(ptr, 1),
-                    jl_array_dim(ptr, 2),
-                )
-                    .into(),
-                ndims => jl_array_dims(ptr, ndims as _).into(),
-            };
-
-            // the lifetime is constrained to the lifetime of the borrow
-            let data = slice::from_raw_parts_mut(jl_data, dimensions.size());
-            Ok(InlineArrayDataMut::new(data, dimensions, frame))
-        }
-    }
-
-    pub fn ptr_array_data_mut<'borrow, 'fr, F: Frame<'fr>>(
-        &'borrow mut self,
-        frame: &'borrow mut F,
-    ) -> JlrsResult<ValueArrayDataMut<'borrow, 'frame, 'data, 'fr, F>> {
-        if !self.is_array() {
-            Err(JlrsError::NotAnArray)?;
-        }
-
-        unsafe {
-            let jl_data = jl_array_data(self.ptr()).cast();
-            let ptr = self.ptr().cast();
-            let n_dims = jl_array_ndims(ptr);
-            let dimensions: Dimensions = match n_dims {
-                0 => return Err(JlrsError::ZeroDimension.into()),
-                1 => (jl_array_nrows(ptr) as usize).into(),
-                2 => (jl_array_dim(ptr, 0), jl_array_dim(ptr, 1)).into(),
-                3 => (
-                    jl_array_dim(ptr, 0),
-                    jl_array_dim(ptr, 1),
-                    jl_array_dim(ptr, 2),
-                )
-                    .into(),
-                ndims => jl_array_dims(ptr, ndims as _).into(),
-            };
-
-            // the lifetime is constrained to the lifetime of the borrow
-            let data = slice::from_raw_parts_mut(jl_data, dimensions.size());
-            Ok(ValueArrayDataMut::new(*self, data, dimensions, frame))
-        }
-    }*/
 
     /// Try to copy data from Julia to Rust. You can only copy data if the output type implements
     /// [`TryUnbox`]; this trait is implemented by all types that implement [`IntoJulia`] and

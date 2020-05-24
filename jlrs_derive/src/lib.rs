@@ -50,6 +50,12 @@ fn impl_julia_tuple(ast: &syn::DeriveInput) -> TokenStream {
             }
         }
 
+        unsafe impl ::jlrs::traits::JuliaTypecheck for #name {
+            unsafe fn julia_typecheck(t: ::jlrs::value::datatype::DataType) -> bool {
+                t.ptr() == <Self as ::jlrs::traits::JuliaType>::julia_type()
+            }
+        }
+
         unsafe impl ::jlrs::traits::IntoJulia for #name {
             unsafe fn into_julia(&self) -> *mut ::jlrs::jl_sys_export::jl_value_t {
                 let ty = <Self as ::jlrs::traits::JuliaType>::julia_type();
@@ -108,10 +114,7 @@ fn impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
             let n_fields = n.named.len();
             let types = n.named.iter().map(|f| &f.ty);
 
-            let names = n
-                .named
-                .iter()
-                .map(expected_field_name);
+            let names = n.named.iter().map(expected_field_name);
 
             (n_fields, names, types)
         }
@@ -170,8 +173,8 @@ fn impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
 
                             if rs_renamed_field_name == rs_concrete_field_name {
                                 assert_eq!(
-                                    rs_renamed_field_name, 
-                                    jl_field_name_str, 
+                                    rs_renamed_field_name,
+                                    jl_field_name_str,
                                     "The Rust struct {} has field {}, but the corresponding field of the Julia struct {} is {}. You can rename this field explicitly by setting the attribute #[jlrs(rename = \"{}\")] on the field in Rust",
                                     stringify!(#name),
                                     rs_concrete_field_name,
@@ -181,8 +184,8 @@ fn impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
                                 );
                             } else {
                                 assert_eq!(
-                                    rs_renamed_field_name, 
-                                    jl_field_name_str, 
+                                    rs_renamed_field_name,
+                                    jl_field_name_str,
                                     "The field {} of the Rust struct {} has been renamed to {}, but the corresponding field of the Julia struct {} is {}",
                                     rs_concrete_field_name,
                                     stringify!(#name),
@@ -191,7 +194,7 @@ fn impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
                                     jl_field_name_str,
                                 );
                             }
-                            
+
                             assert_eq!(
                                 fieldtypes_slice[i],
                                 assoc_field_type,
@@ -211,6 +214,12 @@ fn impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
                 }
 
                 JULIA_TYPE.with(|julia_type| { *julia_type })
+            }
+        }
+
+        unsafe impl ::jlrs::traits::JuliaTypecheck for #name {
+            unsafe fn julia_typecheck(t: ::jlrs::value::datatype::DataType) -> bool {
+                t.ptr() == <Self as ::jlrs::traits::JuliaType>::julia_type()
             }
         }
 
