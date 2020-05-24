@@ -67,14 +67,19 @@ fn impl_julia_tuple(ast: &syn::DeriveInput) -> TokenStream {
             }
         }
 
-        unsafe impl ::jlrs::traits::TryUnbox for #name {
-            unsafe fn try_unbox(value: *mut ::jlrs::jl_sys_export::jl_value_t) -> ::jlrs::error::JlrsResult<Self> {
-                let ty = <Self as ::jlrs::traits::JuliaType>::julia_type();
-                if ::jlrs::jl_sys_export::jl_typeis(value, ty.cast()) {
-                    return Ok(*(value as *mut Self));
+        unsafe impl<'frame, 'data> ::jlrs::traits::Cast<'frame, 'data> for #name {
+            type Output = Self;
+
+            fn cast(value: ::jlrs::value::Value<'frame, 'data>) -> ::jlrs::error::JlrsResult<Self::Output> {
+                if value.is::<#name>() {
+                    return unsafe { Ok(*(value.ptr().cast::<Self>())) };
                 }
 
-                Err(::jlrs::error::JlrsError::WrongType.into())
+                Err(::jlrs::error::JlrsError::WrongType)?
+            }
+
+            unsafe fn cast_unchecked<'fr, 'da>(value: ::jlrs::value::Value<'frame, 'data>) -> Self::Output {
+                *(value.ptr().cast::<Self>())
             }
         }
 
@@ -235,14 +240,19 @@ fn impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
             }
         }
 
-        unsafe impl ::jlrs::traits::TryUnbox for #name {
-            unsafe fn try_unbox(value: *mut ::jlrs::jl_sys_export::jl_value_t) -> ::jlrs::error::JlrsResult<Self> {
-                let ty = <Self as ::jlrs::traits::JuliaType>::julia_type();
-                if ::jlrs::jl_sys_export::jl_typeis(value, ty.cast()) {
-                    return Ok(*(value as *mut Self));
+        unsafe impl<'frame, 'data> ::jlrs::traits::Cast<'frame, 'data> for #name {
+            type Output = Self;
+
+            fn cast(value: ::jlrs::value::Value<'frame, 'data>) -> ::jlrs::error::JlrsResult<Self::Output> {
+                if value.is::<#name>() {
+                    return unsafe { Ok(*(value.ptr().cast::<Self>())) };
                 }
 
-                Err(::jlrs::error::JlrsError::WrongType.into())
+                Err(::jlrs::error::JlrsError::WrongType)?
+            }
+
+            unsafe fn cast_unchecked<'fr, 'da>(value: ::jlrs::value::Value<'frame, 'data>) -> Self::Output {
+                *value.ptr().cast::<Self>()
             }
         }
     };

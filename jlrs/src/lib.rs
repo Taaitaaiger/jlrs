@@ -82,7 +82,7 @@
 //! order to enforce that a value can be used as long as its protecting frame hasn't been dropped.
 //! Julia functions, their arguments and their results are all `Value`s too. All `Value`s can be
 //! called as functions, whether this will succeed depends on the value actually being a function.
-//! You can copy data from Julia to Rust by calling [`Value::try_unbox`].
+//! You can copy data from Julia to Rust by calling [`Value::cast`].
 //!
 //! As a simple example, let's create two values and add them:
 //!
@@ -100,7 +100,7 @@
 //!
 //!     // Call the function and unbox the result
 //!     let output = func.call2(frame, i, j)?.unwrap();
-//!     output.try_unbox::<u64>()
+//!     output.cast::<u64>()
 //! }).unwrap();
 //! # }
 //! ```
@@ -122,7 +122,7 @@
 //!
 //!     // Call the function and unbox the result.  
 //!     let output = func.call2(frame, i, j)?.unwrap();
-//!     output.try_unbox::<u64>()
+//!     output.cast::<u64>()
 //! }).unwrap();
 //! # }
 //! ```
@@ -175,7 +175,7 @@
 //! [`Module::main`]: value/module/struct.Module.html#method.main
 //! [`Value`]: value/struct.Value.html
 //! [`Value::new`]: value/struct.Value.html#method.new
-//! [`Value::try_unbox`]: value/struct.Value.html#method.try_unbox
+//! [`Value::cast`]: value/struct.Value.html#method.cast
 
 pub mod error;
 pub mod frame;

@@ -12,24 +12,21 @@
 
 use crate::error::{AllocError, JlrsError, JlrsResult};
 use crate::frame::{DynamicFrame, Output, StaticFrame};
-use crate::value::array::{Array, CopiedArray, Dimensions};
+use crate::value::array::Array;
 use crate::value::datatype::DataType;
 use crate::value::module::Module;
 use crate::value::symbol::Symbol;
 use crate::value::Value;
 use jl_sys::{
-    jl_array_data, jl_array_dim, jl_array_dims, jl_array_eltype, jl_array_ndims, jl_array_nrows,
     jl_bool_type, jl_box_bool, jl_box_char, jl_box_float32, jl_box_float64, jl_box_int16,
     jl_box_int32, jl_box_int64, jl_box_int8, jl_box_uint16, jl_box_uint32, jl_box_uint64,
     jl_box_uint8, jl_char_type, jl_datatype_t, jl_float32_type, jl_float64_type, jl_int16_type,
-    jl_int32_type, jl_int64_type, jl_int8_type, jl_is_array, jl_is_string, jl_is_symbol,
-    jl_pchar_to_string, jl_string_data, jl_string_len, jl_symbol_name, jl_typeis, jl_uint16_type,
-    jl_uint32_type, jl_uint64_type, jl_uint8_type, jl_unbox_float32, jl_unbox_float64,
-    jl_unbox_int16, jl_unbox_int32, jl_unbox_int64, jl_unbox_int8, jl_unbox_uint16,
-    jl_unbox_uint32, jl_unbox_uint64, jl_unbox_uint8, jl_value_t,
+    jl_int32_type, jl_int64_type, jl_int8_type, jl_pchar_to_string, jl_string_data,
+    jl_string_len, jl_uint16_type, jl_uint32_type, jl_uint64_type, jl_uint8_type, jl_unbox_float32,
+    jl_unbox_float64, jl_unbox_int16, jl_unbox_int32, jl_unbox_int64, jl_unbox_int8,
+    jl_unbox_uint16, jl_unbox_uint32, jl_unbox_uint64, jl_unbox_uint8, jl_value_t,
 };
 use std::borrow::Cow;
-use std::ffi::CStr;
 
 // All these traits have a public and a private side. In order to prevent users from using methods
 // that are for internal use only, all traits extend a base trait with the same name from the
@@ -67,27 +64,16 @@ pub unsafe trait JuliaType {
 }
 
 /// Implemented when using `#[derive(JuliaTuple)]`. Do not implement this yourself.
-pub unsafe trait JuliaTuple: JuliaType + IntoJulia + TryUnbox + Copy + Clone {}
+pub unsafe trait JuliaTuple: JuliaType + IntoJulia + Copy + Clone {}
 
 /// Implemented when using `#[derive(JuliaTuple)]`. Do not implement this yourself.
-pub unsafe trait JuliaStruct: JuliaType + IntoJulia + TryUnbox + Copy + Clone {}
+pub unsafe trait JuliaStruct: JuliaType + IntoJulia + Copy + Clone {}
 
 /// Trait implemented by types that have the same representation in Julia and Rust when they are
 /// used as array data. Arrays whose elements are of a type that implements this trait can share
 /// their contents between Julia and Rust. This includes all types that implement `JuliaType`
 /// except `bool` and `char`.
 pub trait ArrayDatatype: private::ArrayDatatype + JuliaType {}
-
-/// Trait implemented by types that can be created from a Julia value.
-pub unsafe trait TryUnbox
-where
-    Self: Sized,
-{
-    // safety: you can't protect anything from garbage collection inside this function, so don't
-    // call Julia functions and use the results. The value should be protected from garbage
-    // collection when this function is called.
-    unsafe fn try_unbox(value: *mut jl_value_t) -> JlrsResult<Self>;
-}
 
 /// This trait is used in combination with [`DataType::is`] and can be used to check many
 /// properties of a Julia `DataType`. You should not implement this trait for your own types.
@@ -336,159 +322,6 @@ p!(ArrayDatatype, f64);
 p!(ArrayDatatype, usize);
 p!(ArrayDatatype, isize);
 
-macro_rules! impl_try_unbox {
-    ($type:ty, $unboxer:path) => {
-        unsafe impl TryUnbox for $type {
-            unsafe fn try_unbox(value: *mut jl_value_t) -> JlrsResult<Self> {
-                if jl_typeis(
-                    value,
-                    <$type as crate::traits::JuliaType>::julia_type().cast(),
-                ) {
-                    return Ok($unboxer(value));
-                }
-
-                Err(JlrsError::WrongType.into())
-            }
-        }
-    };
-}
-
-impl_try_unbox!(u8, jl_unbox_uint8);
-impl_try_unbox!(u16, jl_unbox_uint16);
-impl_try_unbox!(u32, jl_unbox_uint32);
-impl_try_unbox!(u64, jl_unbox_uint64);
-impl_try_unbox!(i8, jl_unbox_int8);
-impl_try_unbox!(i16, jl_unbox_int16);
-impl_try_unbox!(i32, jl_unbox_int32);
-impl_try_unbox!(i64, jl_unbox_int64);
-impl_try_unbox!(f32, jl_unbox_float32);
-impl_try_unbox!(f64, jl_unbox_float64);
-
-unsafe impl TryUnbox for bool {
-    unsafe fn try_unbox(value: *mut jl_value_t) -> JlrsResult<Self> {
-        if jl_typeis(value, jl_bool_type) {
-            return Ok(jl_unbox_int8(value) != 0);
-        }
-        Err(JlrsError::WrongType.into())
-    }
-}
-
-unsafe impl TryUnbox for char {
-    unsafe fn try_unbox(value: *mut jl_value_t) -> JlrsResult<Self> {
-        if jl_typeis(value, jl_char_type) {
-            return std::char::from_u32(jl_unbox_uint32(value))
-                .ok_or(JlrsError::InvalidCharacter.into());
-        }
-
-        Err(JlrsError::WrongType.into())
-    }
-}
-
-#[cfg(not(target_pointer_width = "64"))]
-unsafe impl TryUnbox for usize {
-    unsafe fn try_unbox(value: *mut jl_value_t) -> JlrsResult<Self> {
-        if jl_typeis(value, jl_uint32_type) {
-            return Ok(jl_unbox_uint32(value) as usize);
-        }
-
-        Err(JlrsError::WrongType.into())
-    }
-}
-
-#[cfg(target_pointer_width = "64")]
-unsafe impl TryUnbox for usize {
-    unsafe fn try_unbox(value: *mut jl_value_t) -> JlrsResult<Self> {
-        if jl_typeis(value, jl_uint64_type) {
-            return Ok(jl_unbox_uint64(value) as usize);
-        }
-
-        Err(JlrsError::WrongType.into())
-    }
-}
-
-#[cfg(not(target_pointer_width = "64"))]
-unsafe impl TryUnbox for isize {
-    unsafe fn try_unbox(value: *mut jl_value_t) -> JlrsResult<Self> {
-        if jl_typeis(value, jl_int32_type) {
-            return Ok(jl_unbox_int32(value) as isize);
-        }
-
-        Err(JlrsError::WrongType.into())
-    }
-}
-
-#[cfg(target_pointer_width = "64")]
-unsafe impl TryUnbox for isize {
-    unsafe fn try_unbox(value: *mut jl_value_t) -> JlrsResult<Self> {
-        if jl_typeis(value, jl_int64_type) {
-            return Ok(jl_unbox_int64(value) as isize);
-        }
-
-        Err(JlrsError::WrongType.into())
-    }
-}
-
-unsafe impl TryUnbox for String {
-    unsafe fn try_unbox(value: *mut jl_value_t) -> JlrsResult<String> {
-        if jl_is_symbol(value) {
-            let ptr = jl_symbol_name(value.cast()).cast();
-            let symbol = CStr::from_ptr(ptr);
-            return Ok(symbol.to_str().unwrap().into());
-        }
-
-        if !jl_is_string(value) {
-            return Err(JlrsError::NotAString.into());
-        }
-
-        let len = jl_string_len(value);
-
-        if len == 0 {
-            return Ok(String::new());
-        }
-
-        // Is neither null nor dangling, we've just checked
-        let raw = jl_string_data(value);
-        let raw_slice = std::slice::from_raw_parts(raw, len);
-        let owned_slice = Vec::from(raw_slice);
-        Ok(
-            String::from_utf8(owned_slice).map_err(|e| -> Box<JlrsError> {
-                let b: Box<dyn std::error::Error + Send + Sync> = Box::new(e);
-                b.into()
-            })?,
-        )
-    }
-}
-
-unsafe impl<T: ArrayDatatype> TryUnbox for CopiedArray<T> {
-    unsafe fn try_unbox(value: *mut jl_value_t) -> JlrsResult<Self> {
-        if !jl_is_array(value) {
-            return Err(JlrsError::NotAnArray.into());
-        }
-        if jl_array_eltype(value) != T::julia_type().cast() {
-            return Err(JlrsError::WrongType.into());
-        }
-        let jl_data = jl_array_data(value) as *const T;
-        let n_dims = jl_array_ndims(value.cast());
-        let dimensions: Dimensions = match n_dims {
-            0 => return Err(JlrsError::ZeroDimension.into()),
-            1 => Into::into(jl_array_nrows(value.cast()) as usize),
-            2 => Into::into((jl_array_dim(value.cast(), 0), jl_array_dim(value.cast(), 1))),
-            3 => Into::into((
-                jl_array_dim(value.cast(), 0),
-                jl_array_dim(value.cast(), 1),
-                jl_array_dim(value.cast(), 2),
-            )),
-            ndims => Into::into(jl_array_dims(value.cast(), ndims as _)),
-        };
-        let sz = dimensions.size();
-        let mut data = Vec::with_capacity(sz);
-        let ptr = data.as_mut_ptr();
-        std::ptr::copy_nonoverlapping(jl_data, ptr, sz);
-        data.set_len(sz);
-        Ok(CopiedArray::new(data, dimensions))
-    }
-}
-
 unsafe impl<'frame, 'data> Cast<'frame, 'data> for Array<'frame, 'data> {
     type Output = Self;
     fn cast(value: Value<'frame, 'data>) -> JlrsResult<Self::Output> {
@@ -546,6 +379,127 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for Module<'frame> {
 
     unsafe fn cast_unchecked<'fr, 'da>(value: Value<'frame, 'data>) -> Self::Output {
         Module::wrap(value.ptr().cast())
+    }
+}
+
+macro_rules! impl_primitive_cast {
+    ($type:ty, $unboxer:ident) => {
+        unsafe impl<'frame, 'data> Cast<'frame, 'data> for $type {
+            type Output = Self;
+
+            fn cast(value: Value<'frame, 'data>) -> JlrsResult<Self::Output> {
+                if value.is::<$type>() {
+                    return unsafe { Ok($unboxer(value.ptr().cast()) as _) };
+                }
+
+                Err(JlrsError::WrongType)?
+            }
+
+            unsafe fn cast_unchecked<'fr, 'da>(value: Value<'frame, 'data>) -> Self::Output {
+                $unboxer(value.ptr().cast()) as _
+            }
+        }
+    };
+}
+
+impl_primitive_cast!(u8, jl_unbox_uint8);
+impl_primitive_cast!(u16, jl_unbox_uint16);
+impl_primitive_cast!(u32, jl_unbox_uint32);
+impl_primitive_cast!(u64, jl_unbox_uint64);
+impl_primitive_cast!(i8, jl_unbox_int8);
+impl_primitive_cast!(i16, jl_unbox_int16);
+impl_primitive_cast!(i32, jl_unbox_int32);
+impl_primitive_cast!(i64, jl_unbox_int64);
+impl_primitive_cast!(f32, jl_unbox_float32);
+impl_primitive_cast!(f64, jl_unbox_float64);
+
+#[cfg(not(target_pointer_width = "64"))]
+impl_primitive_cast!(usize, jl_unbox_uint32);
+
+#[cfg(not(target_pointer_width = "64"))]
+impl_primitive_cast!(isize, jl_unbox_int32);
+
+#[cfg(target_pointer_width = "64")]
+impl_primitive_cast!(usize, jl_unbox_uint64);
+
+#[cfg(target_pointer_width = "64")]
+impl_primitive_cast!(isize, jl_unbox_int64);
+
+unsafe impl<'frame, 'data> Cast<'frame, 'data> for bool {
+    type Output = Self;
+
+    fn cast(value: Value<'frame, 'data>) -> JlrsResult<Self::Output> {
+        if value.is::<bool>() {
+            unsafe { return Ok(jl_unbox_int8(value.ptr()) != 0) }
+        }
+
+        Err(JlrsError::WrongType)?
+    }
+
+    unsafe fn cast_unchecked<'fr, 'da>(value: Value<'frame, 'data>) -> Self::Output {
+        jl_unbox_int8(value.ptr()) != 0
+    }
+}
+
+unsafe impl<'frame, 'data> Cast<'frame, 'data> for char {
+    type Output = Self;
+
+    fn cast(value: Value<'frame, 'data>) -> JlrsResult<Self::Output> {
+        if value.is::<char>() {
+            unsafe {
+                return std::char::from_u32(jl_unbox_uint32(value.ptr()))
+                    .ok_or(JlrsError::InvalidCharacter.into());
+            }
+        }
+
+        Err(JlrsError::WrongType)?
+    }
+
+    unsafe fn cast_unchecked<'fr, 'da>(value: Value<'frame, 'data>) -> Self::Output {
+        std::char::from_u32_unchecked(jl_unbox_uint32(value.ptr()))
+    }
+}
+
+unsafe impl<'frame, 'data> Cast<'frame, 'data> for String {
+    type Output = Self;
+
+    fn cast(value: Value<'frame, 'data>) -> JlrsResult<Self::Output> {
+        if value.is::<String>() {
+            unsafe {
+                let len = jl_string_len(value.ptr());
+
+                if len == 0 {
+                    return Ok(String::new());
+                }
+
+                // Is neither null nor dangling, we've just checked
+                let raw = jl_string_data(value.ptr());
+                let raw_slice = std::slice::from_raw_parts(raw, len);
+                let owned_slice = Vec::from(raw_slice);
+                return Ok(
+                    String::from_utf8(owned_slice).map_err(|e| -> Box<JlrsError> {
+                        let b: Box<dyn std::error::Error + Send + Sync> = Box::new(e);
+                        b.into()
+                    })?,
+                );
+            }
+        }
+
+        Err(JlrsError::WrongType)?
+    }
+
+    unsafe fn cast_unchecked<'fr, 'da>(value: Value<'frame, 'data>) -> Self::Output {
+        let len = jl_string_len(value.ptr());
+
+        if len == 0 {
+            return String::new();
+        }
+
+        // Is neither null nor dangling, we've just checked
+        let raw = jl_string_data(value.ptr());
+        let raw_slice = std::slice::from_raw_parts(raw, len);
+        let owned_slice = Vec::from(raw_slice);
+        String::from_utf8_unchecked(owned_slice)
     }
 }
 

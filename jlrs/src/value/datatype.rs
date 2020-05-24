@@ -216,6 +216,7 @@ impl_julia_typecheck!(usize);
 impl_julia_typecheck!(f32);
 impl_julia_typecheck!(f64);
 impl_julia_typecheck!(bool);
+impl_julia_typecheck!(char);
 impl_julia_typecheck!(Symbol<'frame>, jl_symbol_type, 'frame);
 
 unsafe impl<'frame, 'data> JuliaTypecheck for Array<'frame, 'data> {

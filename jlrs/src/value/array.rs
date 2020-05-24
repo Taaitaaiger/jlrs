@@ -51,7 +51,7 @@ use std::ops::{Index, IndexMut};
 /// [`JuliaStruct`]: ../../traits/trait.JuliaStruct.html
 /// [`Array::value_data`]: struct.Array.html#method.value_data
 /// [`Array::value_data_mut`]: struct.Array.html#method.value_data_mut
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 #[repr(transparent)]
 pub struct Array<'frame, 'data>(
     *mut jl_array_t,
@@ -248,6 +248,7 @@ impl<'frame, 'data> Array<'frame, 'data> {
 ///
 /// [`Value::try_unbox`]: ../struct.Value.html#method.try_unbox
 /// [`Dimensions`]: struct.Dimensions.html
+#[derive(Debug)]
 pub struct CopiedArray<T> {
     data: Vec<T>,
     dimensions: Dimensions,

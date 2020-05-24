@@ -1,10 +1,10 @@
 //! Convert data from Rust to Julia and back. Call Julia functions.
-//! 
+//!
 //! When using this crate Julia data will generally be returned as a [`Value`]. A [`Value`] is a
-//! "generic" wrapper. Type information will generally be available allowing you to safely convert 
-//! a [`Value`] to its actual type. 
-//! 
-//! Multiple [`Value`]s can be created at the same time using [`Values`]. 
+//! "generic" wrapper. Type information will generally be available allowing you to safely convert
+//! a [`Value`] to its actual type.
+//!
+//! Multiple [`Value`]s can be created at the same time using [`Values`].
 //!
 //! [`Value`]: struct.Value.html
 
@@ -16,16 +16,16 @@ use crate::error::{JlrsError, JlrsResult};
 use crate::frame::Output;
 use crate::global::Global;
 use crate::traits::{
-    private::{Internal},
-    ArrayDatatype, Cast, Frame, IntoJulia, JuliaType, JuliaTypecheck, TemporarySymbol, TryUnbox,
+    private::Internal, ArrayDatatype, Cast, Frame, IntoJulia, JuliaType, JuliaTypecheck,
+    TemporarySymbol,
 };
 use jl_sys::{
     jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_apply_array_type,
-    jl_apply_tuple_type_v, jl_call, jl_call0, jl_call1, jl_call2, jl_call3,
-    jl_datatype_t, jl_exception_occurred, jl_field_index, jl_field_names, jl_fieldref,
-    jl_fieldref_noalloc, jl_get_nth_field, jl_get_nth_field_noalloc, jl_new_array,
-    jl_new_struct_uninit, jl_nfields, jl_ptr_to_array, jl_ptr_to_array_1d, jl_svec_data,
-    jl_svec_len, jl_typeof, jl_typeof_str, jl_value_t,
+    jl_apply_tuple_type_v, jl_call, jl_call0, jl_call1, jl_call2, jl_call3, jl_datatype_t,
+    jl_exception_occurred, jl_field_index, jl_field_names, jl_fieldref, jl_fieldref_noalloc,
+    jl_get_nth_field, jl_get_nth_field_noalloc, jl_new_array, jl_new_struct_uninit, jl_nfields,
+    jl_ptr_to_array, jl_ptr_to_array_1d, jl_svec_data, jl_svec_len, jl_typeof, jl_typeof_str,
+    jl_value_t,
 };
 use std::ffi::CStr;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
@@ -147,7 +147,7 @@ impl<'frame> Values<'frame> {
 ///
 /// A `Value`'s type information can be accessed by calling [`Value::dataype`], this is usually
 /// not necessary to determine what kind of data it contains; you can use [`Value::is`] to query
-/// properties of the value's type. 
+/// properties of the value's type.
 ///
 /// The methods that create a new `Value` come in two varieties: `<method>` and `<method>_output`.
 /// The
@@ -248,7 +248,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     ///
     /// If you derive [`JuliaStruct`] or [`JuliaTuple`] for some type, that type will also be
     /// supported by this method. A full list of supported checks can be found [here].
-    /// 
+    ///
     /// [`Array`]: array/struct.Array.html
     /// [`DataType`]: datatype/struct.DataType.html
     /// [`Module`]: module/struct.Module.html
@@ -275,17 +275,15 @@ impl<'frame, 'data> Value<'frame, 'data> {
 
     /// Cast the value to one of the following types: [`Array`], [`DataType`], [`Module`], or
     /// [`Symbol`].
-    pub fn cast<T: Cast<'frame, 'data>>(
-        self,
-    ) -> JlrsResult<<T as Cast<'frame, 'data>>::Output> {
+    pub fn cast<T: Cast<'frame, 'data>>(self) -> JlrsResult<<T as Cast<'frame, 'data>>::Output> {
         T::cast(self)
     }
 
-    /// Cast the value to one of the following types without checking if the cast is valid: 
+    /// Cast the value to one of the following types without checking if the cast is valid:
     /// [`Array`], [`DataType`], [`Module`], or [`Symbol`].
-    /// 
+    ///
     /// Safety:
-    /// 
+    ///
     /// You must guarantee `self.is::<T>()` would have returned `true`.
     pub unsafe fn cast_unchecked<T: Cast<'frame, 'data>>(
         self,
@@ -310,7 +308,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     pub fn is_array_of<T: JuliaType>(self) -> bool {
         match self.cast::<Array>() {
             Ok(arr) => arr.contains::<T>(),
-            Err(_) => false
+            Err(_) => false,
         }
     }
 
@@ -638,22 +636,6 @@ impl<'frame, 'data> Value<'frame, 'data> {
             let array = move_array(frame, data, dimensions)?;
             Ok(frame.assign_output(output, array, Internal))
         }
-    }
-
-    /// Try to copy data from Julia to Rust. You can only copy data if the output type implements
-    /// [`TryUnbox`]; this trait is implemented by all types that implement [`IntoJulia`] and
-    /// arrays whose contents implement [`ArrayData`] through [`CopiedArray`]. Returns an error if the
-    /// requested type does not match the actual type of the data.
-    ///
-    /// [`TryUnbox`]: ../traits/trait.TryUnbox.html
-    /// [`IntoJulia`]: ../traits/trait.IntoJulia.html
-    /// [`ArrayData`]: ../traits/trait.ArrayData.html
-    /// [`CopiedArray`]: ../array/struct.CopiedArray.html
-    pub fn try_unbox<T>(self) -> JlrsResult<T>
-    where
-        T: TryUnbox,
-    {
-        unsafe { T::try_unbox(self.ptr()) }
     }
 
     /// Wraps a `Value` so that a function call will not require a slot in the current frame but

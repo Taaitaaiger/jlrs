@@ -61,10 +61,10 @@ mod tests {
                     let first = v.get_nth_field(frame, 0).unwrap();
                     let second = v.get_nth_field(frame, 1).unwrap();
 
-                    assert_eq!(first.try_unbox::<usize>().unwrap(), 3);
-                    assert_eq!(second.try_unbox::<isize>().unwrap(), -4);
+                    assert_eq!(first.cast::<usize>().unwrap(), 3);
+                    assert_eq!(second.cast::<isize>().unwrap(), -4);
                     assert!(v.is::<UsizeAndIsize>());
-                    assert_eq!(v.try_unbox::<UsizeAndIsize>().unwrap(), s);
+                    assert_eq!(v.cast::<UsizeAndIsize>().unwrap(), s);
 
                     Ok(())
                 })
@@ -84,10 +84,10 @@ mod tests {
                     let first = v.get_field(frame, "v1").unwrap();
                     let second = v.get_field(frame, "v2").unwrap();
 
-                    assert_eq!(first.try_unbox::<isize>().unwrap(), -12);
-                    assert_eq!(second.try_unbox::<f64>().unwrap(), 3.0);
+                    assert_eq!(first.cast::<isize>().unwrap(), -12);
+                    assert_eq!(second.cast::<f64>().unwrap(), 3.0);
                     assert!(v.is::<MyType>());
-                    assert_eq!(v.try_unbox::<MyType>().unwrap(), s);
+                    assert_eq!(v.cast::<MyType>().unwrap(), s);
 
                     Ok(())
                 })
@@ -107,10 +107,10 @@ mod tests {
                     let first = v.get_field(frame, "🥒").unwrap();
                     let second = v.get_field(frame, "🍅").unwrap();
 
-                    assert_eq!(first.try_unbox::<i32>().unwrap(), -12);
-                    assert_eq!(second.try_unbox::<f32>().unwrap(), 3.0);
+                    assert_eq!(first.cast::<i32>().unwrap(), -12);
+                    assert_eq!(second.cast::<f32>().unwrap(), 3.0);
                     assert!(v.is::<Hamburger>());
-                    assert_eq!(v.try_unbox::<Hamburger>().unwrap(), s);
+                    assert_eq!(v.cast::<Hamburger>().unwrap(), s);
 
                     Ok(())
                 })

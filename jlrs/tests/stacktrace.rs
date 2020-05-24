@@ -30,7 +30,7 @@ fn bounds_error() {
                 let stacktrace = stacktrace?;
                 let st_data = unsafe { stacktrace.cast::<Array>()?.value_data(frame)? };
                 let base = st_data[0];
-                assert!(base.get_field(frame, "from_c")?.try_unbox::<bool>().is_ok());
+                assert!(base.get_field(frame, "from_c")?.cast::<bool>().is_ok());
 
                 Ok(())
             })

@@ -11,7 +11,7 @@ fn move_array_1d() {
             .frame(1, |_, frame| {
                 let data = vec![1.0f32, 2., 3.];
                 let array = Value::move_array(frame, data, 3)?;
-                array.try_unbox::<CopiedArray<f32>>()
+                array.cast::<Array>()?.copy_inline_data::<f32>()
             })
             .unwrap();
 
@@ -32,7 +32,7 @@ fn move_array_1d_nested() {
                 frame.frame(1, |frame| {
                     let data = vec![1.0f64, 2., 3.];
                     let array = Value::move_array(frame, data, 3)?;
-                    array.try_unbox::<CopiedArray<f64>>()
+                    array.cast::<Array>()?.copy_inline_data::<f64>()
                 })
             })
             .unwrap();
@@ -54,7 +54,7 @@ fn move_array_1d_nested_dynamic() {
                 frame.dynamic_frame(|frame| {
                     let data = vec![1i8, 2, 3];
                     let array = Value::move_array(frame, data, 3)?;
-                    array.try_unbox::<CopiedArray<i8>>()
+                    array.cast::<Array>()?.copy_inline_data::<i8>()
                 })
             })
             .unwrap();
@@ -75,7 +75,7 @@ fn move_array_1d_dynamic() {
             .dynamic_frame(|_, frame| {
                 let data = vec![1i16, 2, 3];
                 let array = Value::move_array(frame, data, 3)?;
-                array.try_unbox::<CopiedArray<i16>>()
+                array.cast::<Array>()?.copy_inline_data::<i16>()
             })
             .unwrap();
 
@@ -96,7 +96,7 @@ fn move_array_1d_dynamic_nested() {
                 frame.frame(1, |frame| {
                     let data = vec![1i32, 2, 3];
                     let array = Value::move_array(frame, data, 3)?;
-                    array.try_unbox::<CopiedArray<i32>>()
+                    array.cast::<Array>()?.copy_inline_data::<i32>()
                 })
             })
             .unwrap();
@@ -118,7 +118,7 @@ fn move_array_1d_dynamic_nested_dynamic() {
                 frame.dynamic_frame(|frame| {
                     let data = vec![1i64, 2, 3];
                     let array = Value::move_array(frame, data, 3)?;
-                    array.try_unbox::<CopiedArray<i64>>()
+                    array.cast::<Array>()?.copy_inline_data::<i64>()
                 })
             })
             .unwrap();
@@ -139,7 +139,7 @@ fn move_array_2d() {
             .frame(1, |_, frame| {
                 let data = vec![1u8, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4];
                 let array = Value::move_array(frame, data, (3, 4))?;
-                array.try_unbox::<CopiedArray<u8>>()
+                array.cast::<Array>()?.copy_inline_data::<u8>()
             })
             .unwrap();
 
@@ -161,7 +161,7 @@ fn move_array_2d_nested() {
                 frame.frame(1, |frame| {
                     let data = vec![1u16, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4];
                     let array = Value::move_array(frame, data, (3, 4))?;
-                    array.try_unbox::<CopiedArray<u16>>()
+                    array.cast::<Array>()?.copy_inline_data::<u16>()
                 })
             })
             .unwrap();
@@ -184,7 +184,7 @@ fn move_array_2d_nested_dynamic() {
                 frame.dynamic_frame(|frame| {
                     let data = vec![1u32, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4];
                     let array = Value::move_array(frame, data, (3, 4))?;
-                    array.try_unbox::<CopiedArray<u32>>()
+                    array.cast::<Array>()?.copy_inline_data::<u32>()
                 })
             })
             .unwrap();
@@ -206,7 +206,7 @@ fn move_array_2d_dynamic() {
             .dynamic_frame(|_, frame| {
                 let data = vec![1u64, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4];
                 let array = Value::move_array(frame, data, (3, 4))?;
-                array.try_unbox::<CopiedArray<u64>>()
+                array.cast::<Array>()?.copy_inline_data::<u64>()
             })
             .unwrap();
 
@@ -228,7 +228,7 @@ fn move_array_2d_dynamic_nested() {
                 frame.frame(1, |frame| {
                     let data = vec![1usize, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4];
                     let array = Value::move_array(frame, data, (3, 4))?;
-                    array.try_unbox::<CopiedArray<usize>>()
+                    array.cast::<Array>()?.copy_inline_data::<usize>()
                 })
             })
             .unwrap();
@@ -251,7 +251,7 @@ fn move_array_2d_dynamic_nested_dynamic() {
                 frame.dynamic_frame(|frame| {
                     let data = vec![1isize, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4];
                     let array = Value::move_array(frame, data, (3, 4))?;
-                    array.try_unbox::<CopiedArray<isize>>()
+                    array.cast::<Array>()?.copy_inline_data::<isize>()
                 })
             })
             .unwrap();

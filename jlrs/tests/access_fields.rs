@@ -27,7 +27,7 @@ fn access_bounds_error_fields() {
 
                 out.get_field(frame, field_names[1])?
                     .get_nth_field(frame, 0)?
-                    .try_unbox::<isize>()
+                    .cast::<isize>()
             })
             .unwrap();
 

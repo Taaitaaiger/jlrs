@@ -14,11 +14,11 @@ fn create_and_unbox_uints() {
             let p4 = Value::new(frame, 4u64)?;
             let p5 = Value::new(frame, 5usize)?;
 
-            let u1 = p1.try_unbox::<u8>()?;
-            let u2 = p2.try_unbox::<u16>()?;
-            let u3 = p3.try_unbox::<u32>()?;
-            let u4 = p4.try_unbox::<u64>()?;
-            let u5 = p5.try_unbox::<usize>()?;
+            let u1 = p1.cast::<u8>()?;
+            let u2 = p2.cast::<u16>()?;
+            let u3 = p3.cast::<u32>()?;
+            let u4 = p4.cast::<u64>()?;
+            let u5 = p5.cast::<usize>()?;
 
             assert_eq!(u1, 1);
             assert_eq!(u2, 2);
@@ -44,11 +44,11 @@ fn create_and_unbox_uints_dynamic() {
             let p4 = Value::new(frame, 4u64)?;
             let p5 = Value::new(frame, 5usize)?;
 
-            let u1 = p1.try_unbox::<u8>()?;
-            let u2 = p2.try_unbox::<u16>()?;
-            let u3 = p3.try_unbox::<u32>()?;
-            let u4 = p4.try_unbox::<u64>()?;
-            let u5 = p5.try_unbox::<usize>()?;
+            let u1 = p1.cast::<u8>()?;
+            let u2 = p2.cast::<u16>()?;
+            let u3 = p3.cast::<u32>()?;
+            let u4 = p4.cast::<u64>()?;
+            let u5 = p5.cast::<usize>()?;
 
             assert_eq!(u1, 1);
             assert_eq!(u2, 2);
@@ -74,11 +74,11 @@ fn create_and_unbox_ints() {
             let p4 = Value::new(frame, 4i64)?;
             let p5 = Value::new(frame, 5isize)?;
 
-            let u1 = p1.try_unbox::<i8>()?;
-            let u2 = p2.try_unbox::<i16>()?;
-            let u3 = p3.try_unbox::<i32>()?;
-            let u4 = p4.try_unbox::<i64>()?;
-            let u5 = p5.try_unbox::<isize>()?;
+            let u1 = p1.cast::<i8>()?;
+            let u2 = p2.cast::<i16>()?;
+            let u3 = p3.cast::<i32>()?;
+            let u4 = p4.cast::<i64>()?;
+            let u5 = p5.cast::<isize>()?;
 
             assert_eq!(u1, 1);
             assert_eq!(u2, 2);
@@ -104,11 +104,11 @@ fn create_and_unbox_ints_dynamic() {
             let p4 = Value::new(frame, 4i64)?;
             let p5 = Value::new(frame, 5isize)?;
 
-            let u1 = p1.try_unbox::<i8>()?;
-            let u2 = p2.try_unbox::<i16>()?;
-            let u3 = p3.try_unbox::<i32>()?;
-            let u4 = p4.try_unbox::<i64>()?;
-            let u5 = p5.try_unbox::<isize>()?;
+            let u1 = p1.cast::<i8>()?;
+            let u2 = p2.cast::<i16>()?;
+            let u3 = p3.cast::<i32>()?;
+            let u4 = p4.cast::<i64>()?;
+            let u5 = p5.cast::<isize>()?;
 
             assert_eq!(u1, 1);
             assert_eq!(u2, 2);
@@ -131,8 +131,8 @@ fn create_and_unbox_floats() {
             let p1 = Value::new(frame, 1f32)?;
             let p2 = Value::new(frame, 2f64)?;
 
-            let u1 = p1.try_unbox::<f32>()?;
-            let u2 = p2.try_unbox::<f64>()?;
+            let u1 = p1.cast::<f32>()?;
+            let u2 = p2.cast::<f64>()?;
 
             assert_eq!(u1, 1.);
             assert_eq!(u2, 2.);
@@ -152,8 +152,8 @@ fn create_and_unbox_floats_dynamic() {
             let p1 = Value::new(frame, 1f32)?;
             let p2 = Value::new(frame, 2f64)?;
 
-            let u1 = p1.try_unbox::<f32>()?;
-            let u2 = p2.try_unbox::<f64>()?;
+            let u1 = p1.cast::<f32>()?;
+            let u2 = p2.cast::<f64>()?;
 
             assert_eq!(u1, 1.);
             assert_eq!(u2, 2.);
@@ -171,7 +171,7 @@ fn create_and_unbox_bool() {
 
         jlrs.frame(5, |_, frame| {
             let p1 = Value::new(frame, true)?;
-            let u1 = p1.try_unbox::<bool>()?;
+            let u1 = p1.cast::<bool>()?;
             assert_eq!(u1, true);
             Ok(())
         })
@@ -186,7 +186,7 @@ fn create_and_unbox_bool_dynamic() {
 
         jlrs.dynamic_frame(|_, frame| {
             let p1 = Value::new(frame, false)?;
-            let u1 = p1.try_unbox::<bool>()?;
+            let u1 = p1.cast::<bool>()?;
             assert_eq!(u1, false);
             Ok(())
         })
@@ -201,7 +201,7 @@ fn create_and_unbox_char() {
 
         jlrs.frame(5, |_, frame| {
             let p1 = Value::new(frame, 'a')?;
-            let u1 = p1.try_unbox::<char>()?;
+            let u1 = p1.cast::<char>()?;
             assert_eq!(u1, 'a');
             Ok(())
         })
@@ -216,7 +216,7 @@ fn create_and_unbox_char_dynamic() {
 
         jlrs.dynamic_frame(|_, frame| {
             let p1 = Value::new(frame, 'a')?;
-            let u1 = p1.try_unbox::<char>()?;
+            let u1 = p1.cast::<char>()?;
             assert_eq!(u1, 'a');
             Ok(())
         })
@@ -231,8 +231,8 @@ fn create_and_unbox_values() {
 
         jlrs.frame(2, |_, frame| {
             let p1 = Values::new(frame, ['a', 'b'])?;
-            let u1 = p1.value(0)?.try_unbox::<char>()?;
-            let u2 = p1.value(1)?.try_unbox::<char>()?;
+            let u1 = p1.value(0)?.cast::<char>()?;
+            let u2 = p1.value(1)?.cast::<char>()?;
             assert_eq!(u1, 'a');
             assert_eq!(u2, 'b');
             Ok(())
@@ -248,8 +248,8 @@ fn create_and_unbox_values_dynamic() {
 
         jlrs.dynamic_frame(|_, frame| {
             let p1 = Values::new(frame, ['a', 'b'])?;
-            let u1 = p1.value(0)?.try_unbox::<char>()?;
-            let u2 = p1.value(1)?.try_unbox::<char>()?;
+            let u1 = p1.value(0)?.cast::<char>()?;
+            let u2 = p1.value(1)?.cast::<char>()?;
             assert_eq!(u1, 'a');
             assert_eq!(u2, 'b');
             Ok(())
@@ -265,8 +265,8 @@ fn create_and_unbox_dyn_values() {
 
         jlrs.frame(2, |_, frame| {
             let p1 = Values::new_dyn(frame, [&1u32 as _, &2u64 as _])?;
-            let u1 = p1.value(0)?.try_unbox::<u32>()?;
-            let u2 = p1.value(1)?.try_unbox::<u64>()?;
+            let u1 = p1.value(0)?.cast::<u32>()?;
+            let u2 = p1.value(1)?.cast::<u64>()?;
             assert_eq!(u1, 1u32);
             assert_eq!(u2, 2u64);
             Ok(())
@@ -282,8 +282,8 @@ fn create_and_unbox_dyn_values_dynamic() {
 
         jlrs.dynamic_frame(|_, frame| {
             let p1 = Values::new_dyn(frame, [&1u32 as _, &2u64 as _])?;
-            let u1 = p1.value(0)?.try_unbox::<u32>()?;
-            let u2 = p1.value(1)?.try_unbox::<u64>()?;
+            let u1 = p1.value(0)?.cast::<u32>()?;
+            let u2 = p1.value(1)?.cast::<u64>()?;
             assert_eq!(u1, 1u32);
             assert_eq!(u2, 2u64);
             Ok(())

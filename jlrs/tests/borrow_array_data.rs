@@ -40,7 +40,7 @@ macro_rules! impl_test {
                                 frame.frame(1, |frame| {
                                     let v =
                                         gi.call(frame, [array, *first, *second, *third])?.unwrap();
-                                    assert_eq!(v.try_unbox::<$value_type>()?, out);
+                                    assert_eq!(v.cast::<$value_type>()?, out);
                                     out += 1 as $value_type;
                                     Ok(())
                                 })?;
@@ -87,7 +87,7 @@ macro_rules! impl_test {
                                 frame.frame(1, |frame| {
                                     let v =
                                         gi.call(frame, [array, *first, *second, *third])?.unwrap();
-                                    assert_eq!(v.try_unbox::<$value_type>()?, out);
+                                    assert_eq!(v.cast::<$value_type>()?, out);
                                     out += 1 as $value_type;
                                     Ok(())
                                 })?;
@@ -153,7 +153,7 @@ fn borrow_nested() {
                         for first in &[one, two] {
                             frame.frame(1, |frame| {
                                 let v = gi.call(frame, [array, *first, *second, *third])?.unwrap();
-                                assert_eq!(v.try_unbox::<u8>()?, out);
+                                assert_eq!(v.cast::<u8>()?, out);
                                 out += 1 as u8;
                                 Ok(())
                             })?;
