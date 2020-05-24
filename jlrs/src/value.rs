@@ -1,13 +1,14 @@
 //! Convert data from Rust to Julia and back. Call Julia functions.
-//!
+//! 
 //! When using this crate Julia data will generally be returned as a [`Value`]. A [`Value`] is a
-//! "generic" wrapper similar to a void pointer in C; it's opaque until you cast it to the right
-//! type. Type information will generally be available allowing you to safely convert a [`Value`]
-//! to its actual type.
+//! "generic" wrapper. Type information will generally be available allowing you to safely convert 
+//! a [`Value`] to its actual type. 
+//! 
+//! Multiple [`Value`]s can be created at the same time using [`Values`]. 
 //!
 //! [`Value`]: struct.Value.html
 
-use self::array::Dimensions;
+use self::array::{Array, Dimensions};
 use self::datatype::DataType;
 use self::module::Module;
 use self::symbol::Symbol;
@@ -15,17 +16,16 @@ use crate::error::{JlrsError, JlrsResult};
 use crate::frame::Output;
 use crate::global::Global;
 use crate::traits::{
-    private::{Cast as PrivCast, Internal},
+    private::{Internal},
     ArrayDatatype, Cast, Frame, IntoJulia, JuliaType, JuliaTypecheck, TemporarySymbol, TryUnbox,
 };
 use jl_sys::{
     jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_apply_array_type,
-    jl_apply_tuple_type_v, jl_array_eltype, jl_call, jl_call0, jl_call1, jl_call2, jl_call3,
+    jl_apply_tuple_type_v, jl_call, jl_call0, jl_call1, jl_call2, jl_call3,
     jl_datatype_t, jl_exception_occurred, jl_field_index, jl_field_names, jl_fieldref,
-    jl_fieldref_noalloc, jl_get_nth_field, jl_get_nth_field_noalloc, jl_is_array, jl_is_datatype,
-    jl_is_module, jl_is_symbol, jl_is_tuple, jl_new_array, jl_new_struct_uninit, jl_nfields,
-    jl_ptr_to_array, jl_ptr_to_array_1d, jl_svec_data, jl_svec_len, jl_typeof,
-    jl_typeof_str, jl_value_t,
+    jl_fieldref_noalloc, jl_get_nth_field, jl_get_nth_field_noalloc, jl_new_array,
+    jl_new_struct_uninit, jl_nfields, jl_ptr_to_array, jl_ptr_to_array_1d, jl_svec_data,
+    jl_svec_len, jl_typeof, jl_typeof_str, jl_value_t,
 };
 use std::ffi::CStr;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
@@ -146,7 +146,8 @@ impl<'frame> Values<'frame> {
 /// too strict you can forget the second lifetime by calling [`Value::assume_static`].
 ///
 /// A `Value`'s type information can be accessed by calling [`Value::dataype`], this is usually
-/// not necessary to determine what kind of data it contains.
+/// not necessary to determine what kind of data it contains; you can use [`Value::is`] to query
+/// properties of the value's type. 
 ///
 /// The methods that create a new `Value` come in two varieties: `<method>` and `<method>_output`.
 /// The
@@ -215,7 +216,8 @@ impl<'frame, 'data> Value<'frame, 'data> {
         unsafe { self.ptr() == null_mut() }
     }
 
-    /// Returns true if the value is of type `T`. This works for primitive types, for example:
+    /// Performs the given type check. For types that represent Julia data, this check comes down
+    /// to checking if the data has that type. This works for primitive types, for example:
     ///
     /// ```no_run
     /// # use jlrs::prelude::*;
@@ -235,19 +237,25 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// ```no_run
     /// # use jlrs::prelude::*;
     /// # fn main() {
-    /// # /* let mut julia = unsafe { Julia::init(16).unwrap() };
-    /// # julia.frame(1, |_global, frame| {
-    /// #     let arr = Value::new_array<f64, _, _>(frame, (3, 3))?;
-    /// #     assert!(arr.is::<Array>());
-    /// #     Ok(())
-    /// # }).unwrap();
-    /// # */
-    /// # } 
+    /// # let mut julia = unsafe { Julia::init(16).unwrap() };
+    /// julia.frame(1, |_global, frame| {
+    ///     let arr = Value::new_array::<f64, _, _>(frame, (3, 3))?;
+    ///     assert!(arr.is::<Array>());
+    ///     Ok(())
+    /// }).unwrap();
+    /// # }
     /// ```
     ///
     /// If you derive [`JuliaStruct`] or [`JuliaTuple`] for some type, that type will also be
-    /// supported by this method.
-    ///
+    /// supported by this method. A full list of supported checks can be found [here].
+    /// 
+    /// [`Array`]: array/struct.Array.html
+    /// [`DataType`]: datatype/struct.DataType.html
+    /// [`Module`]: module/struct.Module.html
+    /// [`Symbol`]: symbol/struct.Symbol.html
+    /// [`JuliaStruct`]: ../traits/trait.JuliaStruct.html
+    /// [`JuliaTuple`]: ../traits/trait.JuliaTuple.html
+    /// [here]: ../traits/trait.JuliaTypecheck.html#implementors
     pub fn is<T: JuliaTypecheck>(self) -> bool {
         if self.is_nothing() {
             return false;
@@ -256,6 +264,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
         self.datatype().unwrap().is::<T>()
     }
 
+    /// Returns the `DataType` of this value, or `None` if it is `Nothing`.
     pub fn datatype(self) -> Option<DataType<'frame>> {
         if self.is_nothing() {
             return None;
@@ -268,14 +277,20 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// [`Symbol`].
     pub fn cast<T: Cast<'frame, 'data>>(
         self,
-    ) -> JlrsResult<<T as PrivCast<'frame, 'data>>::Output> {
-        T::cast(self, Internal)
+    ) -> JlrsResult<<T as Cast<'frame, 'data>>::Output> {
+        T::cast(self)
     }
 
+    /// Cast the value to one of the following types without checking if the cast is valid: 
+    /// [`Array`], [`DataType`], [`Module`], or [`Symbol`].
+    /// 
+    /// Safety:
+    /// 
+    /// You must guarantee `self.is::<T>()` would have returned `true`.
     pub unsafe fn cast_unchecked<T: Cast<'frame, 'data>>(
         self,
-    ) -> <T as PrivCast<'frame, 'data>>::Output {
-        T::cast_unchecked(self, Internal)
+    ) -> <T as Cast<'frame, 'data>>::Output {
+        T::cast_unchecked(self)
     }
 
     /// Returns the type name of this value.
@@ -291,34 +306,12 @@ impl<'frame, 'data> Value<'frame, 'data> {
         }
     }
 
-    /// Returns true if the value is an array.
-    pub fn is_array(self) -> bool {
-        unsafe { !self.is_nothing() && jl_is_array(self.ptr()) }
-    }
-
-    /// Returns true if the value is a datatype.
-    pub fn is_datatype(self) -> bool {
-        unsafe { !self.is_nothing() && jl_is_datatype(self.ptr()) }
-    }
-
-    /// Returns true if the value is a symbol.
-    pub fn is_symbol(self) -> bool {
-        unsafe { !self.is_nothing() && jl_is_symbol(self.ptr()) }
-    }
-
-    /// Returns true if the value is a module.
-    pub fn is_module(self) -> bool {
-        unsafe { !self.is_nothing() && jl_is_module(self.ptr()) }
-    }
-
-    /// Returns true if the value is a tuple.
-    pub fn is_tuple(self) -> bool {
-        unsafe { !self.is_nothing() && jl_is_tuple(self.ptr()) }
-    }
-
     /// Returns true if the value is an array with elements of type `T`.
     pub fn is_array_of<T: JuliaType>(self) -> bool {
-        unsafe { self.is_array() && jl_array_eltype(self.ptr()).cast() == T::julia_type() }
+        match self.cast::<Array>() {
+            Ok(arr) => arr.contains::<T>(),
+            Err(_) => false
+        }
     }
 
     /// Returns the field names of this value as a slice of `Symbol`s. These symbols can be used

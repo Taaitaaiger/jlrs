@@ -20,17 +20,19 @@
 
 use crate::traits::JuliaType;
 use crate::traits::JuliaTypecheck;
+use crate::value::array::Array;
 use crate::value::module::Module;
 use crate::value::symbol::Symbol;
 use jl_sys::{
     jl_code_info_type, jl_code_instance_type, jl_datatype_align, jl_datatype_isinlinealloc,
     jl_datatype_nbits, jl_datatype_nfields, jl_datatype_size, jl_datatype_t, jl_datatype_type,
-    jl_expr_type, jl_globalref_type, jl_gotonode_type, jl_intrinsic_type, jl_is_cpointer_type,
-    jl_linenumbernode_type, jl_method_instance_type, jl_method_type, jl_methtable_type,
-    jl_module_type, jl_namedtuple_typename, jl_newvarnode_type, jl_phicnode_type, jl_phinode_type,
-    jl_pinode_type, jl_quotenode_type, jl_simplevector_type, jl_slotnumber_type, jl_ssavalue_type,
-    jl_string_type, jl_symbol_type, jl_task_type, jl_tuple_typename, jl_tvar_type,
-    jl_typedslot_type, jl_typename_type, jl_unionall_type, jl_uniontype_type, jl_upsilonnode_type,
+    jl_expr_type, jl_globalref_type, jl_gotonode_type, jl_intrinsic_type, jl_is_array_type,
+    jl_is_cpointer_type, jl_linenumbernode_type, jl_method_instance_type, jl_method_type,
+    jl_methtable_type, jl_module_type, jl_namedtuple_typename, jl_newvarnode_type,
+    jl_phicnode_type, jl_phinode_type, jl_pinode_type, jl_quotenode_type, jl_simplevector_type,
+    jl_slotnumber_type, jl_ssavalue_type, jl_string_type, jl_symbol_type, jl_task_type,
+    jl_tuple_typename, jl_tvar_type, jl_typedslot_type, jl_typename_type, jl_unionall_type,
+    jl_uniontype_type, jl_upsilonnode_type,
 };
 use std::marker::PhantomData;
 
@@ -215,6 +217,12 @@ impl_julia_typecheck!(f32);
 impl_julia_typecheck!(f64);
 impl_julia_typecheck!(bool);
 impl_julia_typecheck!(Symbol<'frame>, jl_symbol_type, 'frame);
+
+unsafe impl<'frame, 'data> JuliaTypecheck for Array<'frame, 'data> {
+    unsafe fn julia_typecheck(t: DataType) -> bool {
+        jl_is_array_type(t.ptr().cast())
+    }
+}
 
 /// A typecheck that can be used in combination with `DataType::is`. This method returns true if
 /// a value of this type is an SSA value.

@@ -13,6 +13,8 @@ pub enum JlrsError {
     Other(Box<dyn Error + Send + Sync>),
     AlreadyInitialized,
     NotAnArray,
+    NotADataType,
+    NotASymbol,
     NotAString,
     FunctionNotFound(String),
     IncludeNotFound(String),
@@ -60,6 +62,8 @@ impl Display for JlrsError {
                 write!(formatter, "The data of this array is not stored inline")
             }
             JlrsError::Inline => write!(formatter, "The data of this array is stored inline"),
+            JlrsError::NotADataType => write!(formatter, "This is not a datatype"),
+            JlrsError::NotASymbol => write!(formatter, "This is not a symbol"),
             JlrsError::NotAModule(module) => write!(formatter, "{} is not a module", module),
             JlrsError::AllocError(AllocError::FrameOverflow(n, cap)) => write!(
                 formatter,
