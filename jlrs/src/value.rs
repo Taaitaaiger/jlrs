@@ -1,12 +1,17 @@
-//! Convert data from Rust to Julia and back. Call Julia functions.
+//! Julia values and functions.
 //!
 //! When using this crate Julia data will generally be returned as a [`Value`]. A [`Value`] is a
 //! "generic" wrapper. Type information will generally be available allowing you to safely convert
-//! a [`Value`] to its actual type.
+//! a [`Value`] to its actual type. Data like arrays and modules can be returned as a [`Value`].
+//! These, and other types with a custom implementation in the C API, can be found in the
+//! submodules of this module.
 //!
-//! Multiple [`Value`]s can be created at the same time using [`Values`].
+//! One special property of a [`Value`] is that it can always be called as a function; there's no
+//! way to check if a [`Value`] is actually a function except trying to call it. Multiple
+//! [`Value`]s can be created at the same time by using [`Values`].
 //!
 //! [`Value`]: struct.Value.html
+//! [`Values`]: struct.Values.html
 
 use self::array::{Array, Dimensions};
 use self::datatype::DataType;
@@ -16,7 +21,7 @@ use crate::error::{JlrsError, JlrsResult};
 use crate::frame::Output;
 use crate::global::Global;
 use crate::traits::{
-    private::Internal, ArrayDatatype, Cast, Frame, IntoJulia, JuliaType, JuliaTypecheck,
+    private::Internal, ArrayDataType, Cast, Frame, IntoJulia, JuliaType, JuliaTypecheck,
     TemporarySymbol,
 };
 use jl_sys::{
@@ -27,6 +32,7 @@ use jl_sys::{
     jl_ptr_to_array, jl_ptr_to_array_1d, jl_svec_data, jl_svec_len, jl_typeof, jl_typeof_str,
     jl_value_t,
 };
+use std::borrow::BorrowMut;
 use std::ffi::CStr;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::marker::PhantomData;
@@ -62,19 +68,20 @@ thread_local! {
 pub type CallResult<'frame, 'data> = Result<Value<'frame, 'data>, Value<'frame, 'data>>;
 
 /// Several values that are allocated consecutively. This can be used in combination with
-/// [`Value::call_values`] and [`Value::call_values_output`].
+/// [`Value::call_values`] and [`WithOutput::call_values`].
 ///
 /// [`Value::call_values`]: struct.Value.html#method.call_values
-/// [`Value::call_values_output`]: struct.Value.html#method.call_values_output
-#[derive(Copy, Clone)]
+/// [`WithOutput::call_values`]: struct.WithOutput.html#method.call_values
+#[derive(Copy, Clone, Debug)]
 pub struct Values<'frame>(*mut *mut jl_value_t, usize, PhantomData<&'frame ()>);
 
 impl<'frame> Values<'frame> {
-    pub(crate) fn wrap(ptr: *mut *mut jl_value_t, n: usize) -> Self {
+    pub(crate) unsafe fn wrap(ptr: *mut *mut jl_value_t, n: usize) -> Self {
         Values(ptr, n, PhantomData)
     }
 
-    pub(crate) unsafe fn ptr(self) -> *mut *mut jl_value_t {
+    #[doc(hidden)]
+    pub unsafe fn ptr(self) -> *mut *mut jl_value_t {
         self.0
     }
 
@@ -132,7 +139,7 @@ impl<'frame> Values<'frame> {
 /// This pointer is similar to a void pointer in the sense that this pointer can point to data of
 /// any type. It's up to the user to determine the correct type and cast the pointer. In order to
 /// make this possible, data pointed to by a `jl_value_t`-pointer is guaranteed to be preceded in
-/// memory by a fixed-size header that contains type and layout-information.
+/// memory by a fixed-size header that contains its type and layout-information.
 ///
 /// A `Value` is a wrapper around the raw pointer to a `jl_value_t` that adds two lifetimes,
 /// `'frame` and `'data`. The first is inherited from the frame used to create the `Value`; frames
@@ -143,11 +150,36 @@ impl<'frame> Values<'frame> {
 /// lifetime of the borrow. If you call a Julia function the returned `Value` will inherit the
 /// `'data`-lifetime of the `Value`s used as arguments. This ensures that a `Value` that
 /// (possibly) borrows data from Rust can't be used after that borrow ends. If this restriction is
-/// too strict you can forget the second lifetime by calling [`Value::assume_static`].
+/// too strict you can forget the second lifetime by calling [`Value::assume_owned`].
+///
+/// ### Creating new values
+///
+/// New `Value`s can be created from Rust in several ways. Types that implement [`JuliaType`] can
+/// be converted to a `Value` by calling [`Value::new`]. This trait is implemented by primitive
+/// types like `bool`, `char`, `i16`, and `usize`; string types like `String`, `&str`, and `Cow`;
+/// and you can derive it for your own types by deriving [`JuliaStruct`] and [`JuliaTuple`].
+///
+/// [`Value`] also has several methods to create an n-dimensional array if the element type
+/// implements [`ArrayDataType`]. This trait is a restricted version of [`JuliaType`] that is
+/// implemented by all primitive types except `bool` and `char`. Types that derive [`JuliaStruct`]
+/// or [`JuliaTuple`] can derive this trait if is implemented by all of its fields. A new array
+/// whose data is completely managed by Julia can be created by calling [`Value::new_array`]. You
+/// can also transfer the ownership of some `Vec` to Julia and treat it as an n-dimensional array
+/// with [`Value::move_array`]. Finally, you can borrow anything that can be borrowed as a mutable
+/// slice with [`Value::borrow_array`].
+///
+/// Functions and other global values defined in a module can be accessed through that module.
+/// Please see the documentation for [`Module`] for more information.
+///
+/// ### Casting values
 ///
 /// A `Value`'s type information can be accessed by calling [`Value::dataype`], this is usually
 /// not necessary to determine what kind of data it contains; you can use [`Value::is`] to query
-/// properties of the value's type.
+/// properties of the value's type. You can use [`Value::cast`] to convert the value to the
+/// appropriate type. If a type implements both [`JuliaTypecheck`] and [`Cast`], which are used by
+/// [`Value::is`] and [`Value::cast`] respectively, the former returning `true` when called with
+/// that type as generic parameter indicates that the latter will succeed. For example,
+/// `value.is::<u8>()` returning true means `value.cast::<u8>()` will succeed.
 ///
 /// The methods that create a new `Value` come in two varieties: `<method>` and `<method>_output`.
 /// The
@@ -155,8 +187,16 @@ impl<'frame> Values<'frame> {
 /// the latter uses a slot in an earlier frame. Other features offered by `Value` include
 /// accessing the fields of these values and (im)mutably borrowing their underlying array data.
 ///
+/// [`Value::assume_owned`]: struct.Value.html#method.assume_owned
+/// [`JuliaType`]: ../traits/trait.JuliaType.html
 /// [`Value::new`]: struct.Value.html#method.new
-/// [`Module`]: ../module/struct.Module.html
+/// [`JuliaStruct`]: ../traits/trait.JuliaStruct.html
+/// [`JuliaTuple`]: ../traits/trait.JuliaTuple.html
+/// [`Value::dataype`]: struct.Value.html#method.datatype
+/// [`Value::is`]: struct.Value.html#method.is
+/// [`Value::cast`]: struct.Value.html#method.cast
+/// [`JuliaTypecheck`]: ../traits/trait.JuliaTypecheck.html
+/// [`Cast`]: ../traits/trait.Cast.html
 #[repr(transparent)]
 #[derive(Copy, Clone)]
 pub struct Value<'frame, 'data>(
@@ -305,7 +345,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     }
 
     /// Returns true if the value is an array with elements of type `T`.
-    pub fn is_array_of<T: JuliaType>(self) -> bool {
+    pub fn is_array_of<T: ArrayDataType>(self) -> bool {
         match self.cast::<Array>() {
             Ok(arr) => arr.contains::<T>(),
             Err(_) => false,
@@ -508,7 +548,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// This function returns an error if there are not enough slots available.
     pub fn new_array<T, D, F>(frame: &mut F, dimensions: D) -> JlrsResult<Value<'frame, 'static>>
     where
-        T: JuliaType,
+        T: ArrayDataType,
         D: Into<Dimensions>,
         F: Frame<'frame>,
     {
@@ -531,7 +571,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
         dimensions: D,
     ) -> JlrsResult<Value<'output, 'static>>
     where
-        T: JuliaType,
+        T: ArrayDataType,
         D: Into<Dimensions>,
         F: Frame<'frame>,
     {
@@ -554,9 +594,9 @@ impl<'frame, 'data> Value<'frame, 'data> {
         dimensions: D,
     ) -> JlrsResult<Value<'frame, 'data>>
     where
-        T: ArrayDatatype,
+        T: ArrayDataType,
         D: Into<Dimensions>,
-        V: AsMut<[T]>,
+        V: BorrowMut<[T]>,
         F: Frame<'frame>,
     {
         unsafe {
@@ -580,9 +620,9 @@ impl<'frame, 'data> Value<'frame, 'data> {
     ) -> JlrsResult<Value<'output, 'borrow>>
     where
         'borrow: 'output,
-        T: JuliaType,
+        T: ArrayDataType,
         D: Into<Dimensions>,
-        V: AsMut<[T]>,
+        V: BorrowMut<[T]>,
         F: Frame<'frame>,
     {
         unsafe {
@@ -604,7 +644,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
         dimensions: D,
     ) -> JlrsResult<Value<'frame, 'static>>
     where
-        T: JuliaType,
+        T: ArrayDataType,
         D: Into<Dimensions>,
         F: Frame<'frame>,
     {
@@ -628,7 +668,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
         dimensions: D,
     ) -> JlrsResult<Value<'output, 'static>>
     where
-        T: JuliaType,
+        T: ArrayDataType,
         D: Into<Dimensions>,
         F: Frame<'frame>,
     {
@@ -997,7 +1037,7 @@ unsafe fn borrow_array<'data, 'frame, T, D, V, F>(
 where
     T: JuliaType,
     D: Into<Dimensions>,
-    V: AsMut<[T]>,
+    V: BorrowMut<[T]>,
     F: Frame<'frame>,
 {
     let dims = dimensions.into();
@@ -1006,7 +1046,7 @@ where
     match dims.n_dimensions() {
         1 => Ok(jl_ptr_to_array_1d(
             array_type,
-            data.as_mut().as_mut_ptr().cast(),
+            data.borrow_mut().as_mut_ptr().cast(),
             dims.n_elements(0),
             0,
         )
@@ -1016,7 +1056,7 @@ where
 
             Ok(jl_ptr_to_array(
                 array_type,
-                data.as_mut().as_mut_ptr().cast(),
+                data.borrow_mut().as_mut_ptr().cast(),
                 tuple.ptr(),
                 0,
             )
@@ -1027,7 +1067,7 @@ where
 
             Ok(jl_ptr_to_array(
                 array_type,
-                data.as_mut().as_mut_ptr().cast(),
+                data.borrow_mut().as_mut_ptr().cast(),
                 tuple.ptr(),
                 0,
             )

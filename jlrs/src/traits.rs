@@ -21,8 +21,8 @@ use jl_sys::{
     jl_bool_type, jl_box_bool, jl_box_char, jl_box_float32, jl_box_float64, jl_box_int16,
     jl_box_int32, jl_box_int64, jl_box_int8, jl_box_uint16, jl_box_uint32, jl_box_uint64,
     jl_box_uint8, jl_char_type, jl_datatype_t, jl_float32_type, jl_float64_type, jl_int16_type,
-    jl_int32_type, jl_int64_type, jl_int8_type, jl_pchar_to_string, jl_string_data,
-    jl_string_len, jl_uint16_type, jl_uint32_type, jl_uint64_type, jl_uint8_type, jl_unbox_float32,
+    jl_int32_type, jl_int64_type, jl_int8_type, jl_pchar_to_string, jl_string_data, jl_string_len,
+    jl_uint16_type, jl_uint32_type, jl_uint64_type, jl_uint8_type, jl_unbox_float32,
     jl_unbox_float64, jl_unbox_int16, jl_unbox_int32, jl_unbox_int64, jl_unbox_int8,
     jl_unbox_uint16, jl_unbox_uint32, jl_unbox_uint64, jl_unbox_uint8, jl_value_t,
 };
@@ -36,15 +36,15 @@ use std::borrow::Cow;
 // trait rather than with a single blanket implementation.
 macro_rules! p {
     ($trait:ident, $type:ty, $($bounds:tt)+) => {
-        impl<$($bounds)+> $trait for $type {}
+        unsafe impl<$($bounds)+> $trait for $type {}
     };
     ($trait:ident, $type:ty) => {
-        impl $trait for $type {}
+        unsafe impl $trait for $type {}
     };
 }
 
 /// Trait implemented by types that can be converted to a temporary `Symbol`.
-pub trait TemporarySymbol: private::TemporarySymbol {}
+pub unsafe trait TemporarySymbol: private::TemporarySymbol {}
 
 /// Trait implemented by types that can be converted to a Julia value. Do not implement this
 /// yourself. This trait can be derived for structs that are marked as `[repr(C)]` and only
@@ -73,7 +73,9 @@ pub unsafe trait JuliaStruct: JuliaType + IntoJulia + Copy + Clone {}
 /// used as array data. Arrays whose elements are of a type that implements this trait can share
 /// their contents between Julia and Rust. This includes all types that implement `JuliaType`
 /// except `bool` and `char`.
-pub trait ArrayDatatype: private::ArrayDatatype + JuliaType {}
+pub unsafe trait ArrayDataType: JuliaType {
+    fn array_data_type() {}
+}
 
 /// This trait is used in combination with [`DataType::is`] and can be used to check many
 /// properties of a Julia `DataType`. You should not implement this trait for your own types.
@@ -309,18 +311,18 @@ unsafe impl JuliaType for isize {
     }
 }
 
-p!(ArrayDatatype, u8);
-p!(ArrayDatatype, u16);
-p!(ArrayDatatype, u32);
-p!(ArrayDatatype, u64);
-p!(ArrayDatatype, i8);
-p!(ArrayDatatype, i16);
-p!(ArrayDatatype, i32);
-p!(ArrayDatatype, i64);
-p!(ArrayDatatype, f32);
-p!(ArrayDatatype, f64);
-p!(ArrayDatatype, usize);
-p!(ArrayDatatype, isize);
+p!(ArrayDataType, u8);
+p!(ArrayDataType, u16);
+p!(ArrayDataType, u32);
+p!(ArrayDataType, u64);
+p!(ArrayDataType, i8);
+p!(ArrayDataType, i16);
+p!(ArrayDataType, i32);
+p!(ArrayDataType, i64);
+p!(ArrayDataType, f32);
+p!(ArrayDataType, f64);
+p!(ArrayDataType, usize);
+p!(ArrayDataType, isize);
 
 unsafe impl<'frame, 'data> Cast<'frame, 'data> for Array<'frame, 'data> {
     type Output = Self;
@@ -599,7 +601,6 @@ impl<'frame> Frame<'frame> for DynamicFrame<'frame> {
 }
 
 pub(crate) mod private {
-    use super::JuliaType;
     use crate::error::AllocError;
     use crate::frame::{DynamicFrame, Output, StaticFrame};
     use crate::stack::FrameIdx;
@@ -619,8 +620,6 @@ pub(crate) mod private {
     pub trait TemporarySymbol {
         unsafe fn temporary_symbol<'symbol>(&self, _: Internal) -> Symbol<'symbol>;
     }
-
-    pub trait ArrayDatatype: JuliaType {}
 
     pub trait Frame<'frame> {
         // protect the value from being garbage collected while this frame is active.
@@ -691,25 +690,6 @@ pub(crate) mod private {
             Symbol::wrap(self.ptr())
         }
     }
-
-    macro_rules! impl_array_datatype {
-        ($type:ty) => {
-            impl ArrayDatatype for $type {}
-        };
-    }
-
-    impl_array_datatype!(u8);
-    impl_array_datatype!(u16);
-    impl_array_datatype!(u32);
-    impl_array_datatype!(u64);
-    impl_array_datatype!(i8);
-    impl_array_datatype!(i16);
-    impl_array_datatype!(i32);
-    impl_array_datatype!(i64);
-    impl_array_datatype!(f32);
-    impl_array_datatype!(f64);
-    impl_array_datatype!(usize);
-    impl_array_datatype!(isize);
 
     impl<'frame> Frame<'frame> for StaticFrame<'frame> {
         unsafe fn protect(

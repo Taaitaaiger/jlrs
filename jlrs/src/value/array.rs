@@ -10,7 +10,7 @@
 //!
 //! [`Array`]: struct.Array.html
 use crate::error::{JlrsError, JlrsResult};
-use crate::traits::{Frame, JuliaType};
+use crate::traits::{Frame, ArrayDataType};
 use crate::value::Value;
 use jl_sys::{
     jl_array_data, jl_array_dim, jl_array_dims, jl_array_eltype, jl_array_ndims, jl_array_nrows,
@@ -64,7 +64,8 @@ impl<'frame, 'data> Array<'frame, 'data> {
         Array(array, PhantomData, PhantomData)
     }
 
-    pub(crate) unsafe fn ptr(self) -> *mut jl_array_t {
+    #[doc(hidden)]
+    pub unsafe fn ptr(self) -> *mut jl_array_t {
         self.0
     }
 
@@ -74,13 +75,13 @@ impl<'frame, 'data> Array<'frame, 'data> {
     }
 
     /// Returns `true` if the type of the elements of this array is `T`.
-    pub fn contains<T: JuliaType>(self) -> bool {
+    pub fn contains<T: ArrayDataType>(self) -> bool {
         unsafe { jl_array_eltype(self.ptr().cast()).cast() == T::julia_type() }
     }
 
     /// Returns `true` if the type of the elements of this array is `T` and these elements are
     /// stored inline.
-    pub fn contains_inline<T: JuliaType>(self) -> bool {
+    pub fn contains_inline<T: ArrayDataType>(self) -> bool {
         self.contains::<T>() && self.is_inline_array()
     }
 
@@ -108,7 +109,7 @@ impl<'frame, 'data> Array<'frame, 'data> {
     /// not stored inline or `JlrsError::WrongType` if the type of the elements is incorrect.
     pub fn copy_inline_data<T>(self) -> JlrsResult<CopiedArray<T>>
     where
-        T: JuliaType,
+        T: ArrayDataType,
     {
         if !self.contains::<T>() {
             Err(JlrsError::WrongType)?;
@@ -140,7 +141,7 @@ impl<'frame, 'data> Array<'frame, 'data> {
         frame: &'borrow F,
     ) -> JlrsResult<ArrayData<'borrow, 'fr, T, F>>
     where
-        T: JuliaType,
+        T: ArrayDataType,
         F: Frame<'fr>,
     {
         if !self.contains::<T>() {
@@ -167,7 +168,7 @@ impl<'frame, 'data> Array<'frame, 'data> {
         frame: &'borrow mut F,
     ) -> JlrsResult<InlineArrayDataMut<'borrow, 'fr, T, F>>
     where
-        T: JuliaType,
+        T: ArrayDataType,
         F: Frame<'fr>,
     {
         if !self.contains::<T>() {

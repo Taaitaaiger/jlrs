@@ -41,7 +41,7 @@ mod tests {
         foo: i8,
     }
 
-    #[derive(Copy, Clone, JuliaStruct, PartialEq, Debug)]
+    #[derive(Copy, Clone, JuliaStruct, PartialEq, Debug, ArrayDataType)]
     #[jlrs(julia_type = "Main.JlrsDeriveTests.WrongType")]
     #[repr(C)]
     struct WrongRename {

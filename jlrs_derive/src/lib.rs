@@ -14,6 +14,16 @@ pub fn julia_tuple_derive(input: TokenStream) -> TokenStream {
     impl_julia_tuple(&ast)
 }
 
+#[proc_macro_derive(ArrayDataType)]
+pub fn array_data_type_derive(input: TokenStream) -> TokenStream {
+    // Construct a representation of Rust code as a syntax tree
+    // that we can manipulate
+    let ast = syn::parse(input).unwrap();
+
+    // Build the trait implementation
+    impl_array_data_type(&ast)
+}
+
 #[proc_macro_derive(JuliaStruct, attributes(julia_type, jlrs))]
 pub fn julia_struct_derive(input: TokenStream) -> TokenStream {
     // Construct a representation of Rust code as a syntax tree
@@ -87,6 +97,40 @@ fn impl_julia_tuple(ast: &syn::DeriveInput) -> TokenStream {
     };
 
     julia_tuple_impl.into()
+}
+
+fn impl_array_data_type(ast: &syn::DeriveInput) -> TokenStream {
+    let name = &ast.ident;
+
+    let fields = match &ast.data {
+        syn::Data::Struct(s) => &s.fields,
+        _ => panic!("JuliaStruct cannot be derived for enums and unions."),
+    };
+
+    let rs_field_types: Vec<_> = match fields {
+        syn::Fields::Named(n) => {
+            n.named.iter().map(|f| &f.ty).collect()
+        }
+        syn::Fields::Unnamed(u) => {
+            u.unnamed.iter().map(|f| &f.ty).collect()
+        }
+        _ => panic!("JuliaStruct cannot be derived for unit and tuple structs."),
+    };
+
+    let rs_fieldtypes_iter = rs_field_types
+        .iter();
+
+    let array_data_type_impl = quote! {
+        unsafe impl ::jlrs::traits::ArrayDataType for #name {
+            fn array_data_type() {
+                #(
+                    #rs_fieldtypes_iter::array_data_type();
+                )*
+            }
+        }
+    };
+
+    array_data_type_impl.into()
 }
 
 fn impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {

@@ -25,8 +25,8 @@ impl<'base> Module<'base> {
         Module(module, PhantomData)
     }
 
-
-    pub(crate) unsafe fn ptr(self) -> *mut jl_module_t {
+    #[doc(hidden)]
+    pub unsafe fn ptr(self) -> *mut jl_module_t {
         self.0
     }
 

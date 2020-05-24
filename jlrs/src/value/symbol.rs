@@ -13,17 +13,26 @@ use std::marker::PhantomData;
 pub struct Symbol<'base>(*mut jl_sym_t, PhantomData<&'base ()>);
 
 impl<'base> Symbol<'base> {
-    pub(crate) fn wrap(ptr: *mut jl_sym_t) -> Self {
+    pub(crate) unsafe fn wrap(ptr: *mut jl_sym_t) -> Self {
         Symbol(ptr, PhantomData)
     }
 
-    pub(crate) unsafe fn ptr(self) -> *mut jl_sym_t {
+    #[doc(hidden)]
+    pub unsafe fn ptr(self) -> *mut jl_sym_t {
         self.0
     }
 
-    /// Create a new symbol.
-    pub fn new<S: AsRef<str>>(global: Global<'base>, name: S) -> Self {
-        Symbol::from((global, name))
+    /// Convert the given string to a `Symbol`.
+    pub fn new<S: AsRef<str>>(global: Global<'base>, symbol: S) -> Self {
+        Symbol::from((global, symbol))
+    }
+
+    /// Extend the `Symbol`'s lifetime. `Symbol`s are not garbage collected, but a `Symbol` 
+    /// returned as a [`Value`] from a Julia function inherits the frame's lifetime when it's cast
+    /// to a `Symbol`. Its lifetime can be safely extended from `'frame` to `'global` using this 
+    /// method.
+    pub fn extend<'global>(self, _: Global<'global>) -> Symbol<'global> {
+        unsafe { Symbol::wrap(self.ptr()) }
     }
 }
 
