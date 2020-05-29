@@ -14,8 +14,17 @@ use std::marker::PhantomData;
 /// three standard modules, `Main`, `Base`, and `Core` and access their submodules through them.
 /// If you include your own Julia code with [`Julia::include`], its contents are made available
 /// relative to `Main`.
+/// 
+/// This struct implements [`JuliaTypecheck`] and [`Cast`]. It can be used in combination with 
+/// [`DataType::is`] and [`Value::is`]; if the check returns `true` the [`Value`] can be cast to
+///  `Module`.
 ///
 /// [`Julia::include`]: ../../struct.Julia.html#method.include
+/// [`JuliaTypecheck`]: ../../traits/trait.JuliaTypecheck.html
+/// [`Cast`]: ../../traits/trait.Cast.html
+/// [`DataType::is`]: ../datatype/struct.DataType.html#method.is
+/// [`Value::is`]: ../struct.Value.html#method.is
+/// [`Value`]: ../struct.Value.html
 #[derive(Copy, Clone)]
 #[repr(transparent)]
 pub struct Module<'base>(*mut jl_module_t, PhantomData<&'base ()>);

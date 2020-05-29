@@ -60,14 +60,16 @@ use std::marker::PhantomData;
 /// # }
 /// ```
 ///
-/// `DataType` implements [`JuliaTypecheck`] and can be used in combination with [`DataType::is`].
-/// This method returns `true` if a value of this type is itself a datatype. 
-///
+/// [`JuliaTypecheck`]: ../../traits/trait.JuliaTypecheck.html
+/// [`Cast`]: ../../traits/trait.Cast.html
+/// [`DataType::is`]: ../datatype/struct.DataType.html#method.is
+/// [`Value::is`]: ../struct.Value.html#method.is
 /// [`Value`]: ../struct.Value.html
 /// [`Value::datatype`]: ../struct.Value.html#method.datatype
 /// [`Value::cast`]: ../struct.Value.html#method.cast
 /// [`JuliaTypecheck`]: ../../traits/trait.JuliaTypecheck.html
 /// [`DataType::is`]: struct.Datatype.html#method.is
+/// [`Value::is`]: struct.Datatype.html#method.is
 #[derive(Copy, Clone)]
 #[repr(transparent)]
 pub struct DataType<'frame>(*mut jl_datatype_t, PhantomData<&'frame ()>);
