@@ -1,6 +1,5 @@
 use jlrs::prelude::*;
-mod util;
-use util::JULIA;
+use jlrs::util::JULIA;
 
 #[test]
 fn borrow_array_1d() {

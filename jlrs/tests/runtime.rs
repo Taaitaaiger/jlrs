@@ -1,5 +1,4 @@
-mod util;
-use util::JULIA;
+use jlrs::util::JULIA;
 use jlrs::prelude::*;
 
 #[test]

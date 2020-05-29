@@ -185,6 +185,8 @@ pub mod jl_sys_export;
 pub mod prelude;
 mod stack;
 pub mod traits;
+#[doc(hidden)]
+pub mod util;
 pub mod value;
 
 use error::{JlrsError, JlrsResult};

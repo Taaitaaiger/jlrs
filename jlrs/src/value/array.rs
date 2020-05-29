@@ -10,7 +10,7 @@
 //!
 //! [`Array`]: struct.Array.html
 use crate::error::{JlrsError, JlrsResult};
-use crate::traits::{Frame, ArrayDataType};
+use crate::traits::{ArrayDataType, Frame};
 use crate::value::Value;
 use jl_sys::{
     jl_array_data, jl_array_dim, jl_array_dims, jl_array_eltype, jl_array_ndims, jl_array_nrows,
@@ -20,26 +20,51 @@ use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::marker::PhantomData;
 use std::ops::{Index, IndexMut};
 
-/// An n-dimensional Julia array. A [`Value`] that contains an array can be cast to this struct by
-/// calling [`Value::cast`]. ach element in the backing storage is either stored as a [`Value`] or
-/// inline. You can check how the data is stored by calling [`Array::is_value_array`] or
-/// [`Array::is_inline_array`].
+/// An n-dimensional Julia array. This struct implements [`JuliaTypecheck`] and [`Cast`]. It can
+/// be used in combination with [`DataType::is`] and [`Value::is`]; if the check returns `true`
+/// the [`Value`] can be cast to `Array`:
+///
+/// ```
+/// # use jlrs::prelude::*;
+/// # use jlrs::util::JULIA;
+/// # fn main() {
+/// # JULIA.with(|j| {
+/// # let mut julia = j.borrow_mut();
+/// julia.frame(1, |_global, frame| {
+///     let arr = Value::new_array::<f64, _, _>(frame, (3, 3))?;
+///     assert!(arr.is::<Array>());
+///     assert!(arr.cast::<Array>().is_ok());
+///     Ok(())
+/// }).unwrap();
+/// # });
+/// # }
+/// ```
+///
+/// Each element in the backing storage is either stored as a [`Value`] or inline. You can check
+/// how the data is stored by calling [`Array::is_value_array`] or [`Array::is_inline_array`].
+/// Note that this is not necessarily consistent across different versions of Julia; the array 
+/// might be value array in Julia 1.0, but an inline array in Julia 1.4. If you want to ensure the
+/// data is not stored inline, you should use a mutable struct as the element type.
 ///
 /// Arrays that contain integers or floats are an example of inline arrays. Their data is stored
 /// as an array that contains numbers of the appropriate type, for example an array of `Float32`s
-/// in Julia is backed by an an array of `f32`s. More complex data can be stored inline,
-/// specifically types for which `isbitstype(<Type>)` returns `true` can be inlined. The data of
-/// these arrays can be accessed with [`Array::inline_data`] and [`Array::inline_data_mut`], and
-/// copied from Julia to Rust with [`Array::copy_inline_data`]. In order to call these methods the
-/// type of the elements must be provided, arrays that contain numbers can be accessed by
-/// providing the appropriate Rust type (eg `f32` for `Float32` and `u64` for `UInt64`). More
-/// complex inlined data is supported through two custom derives: [`JuliaTuple`] and
+/// in Julia is backed by an an array of `f32`s. The data of these arrays can be accessed with
+/// [`Array::inline_data`] and [`Array::inline_data_mut`], and copied from Julia to Rust with
+/// [`Array::copy_inline_data`]. In order to call these methods the type of the elements must be
+/// provided, arrays that contain numbers can be accessed by providing the appropriate Rust type 
+/// (eg `f32` for `Float32` and `u64` for `UInt64`). 
+/// 
+/// More complex inlined data is supported through two custom derives: [`JuliaTuple`] and
 /// [`JuliaStruct`]. Accessing inline array data is not supported if the data contains inlined
-/// unions or pointers.
+/// unions, [`Value`]s or pointers.
 ///
 /// If the data isn't inlined each element is stored as a [`Value`]. This data can be accessed
 /// using [`Array::value_data`] and [`Array::value_data_mut`] but this is unsafe.
 ///
+/// [`JuliaTypecheck`]: ../../traits/trait.JuliaTypecheck.html
+/// [`Cast`]: ../../traits/trait.Cast.html
+/// [`DataType::is`]: ../datatype/struct.DataType.html#method.is
+/// [`Value::is`]: ../struct.Value.html#method.is
 /// [`Value`]: ../struct.Value.html
 /// [`Value::cast`]: ../struct.Value.html#method.cast
 /// [`Array::is_value_array`]: struct.Array.html#method.is_value_array

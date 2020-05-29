@@ -1,6 +1,6 @@
-//! Julia datatypes and properties.
+//! Datatypes and properties.
 //!
-//! Julia has an optional typing system and the type information of a value is available at
+//! Julia has an optional typing system. The type information of a [`Value`] is available at
 //! runtime. Additionally, a value can hold type information as its contents. For example,
 //!
 //! ```julia
@@ -15,6 +15,7 @@
 //! properties. Many of these checks are handled through implementations of the trait
 //! [`JuliaTypecheck`]. Most of these checks can be found in this module.
 //!
+//! [`Value`]: ../struct.Value.html
 //! [`DataType`]: struct.DataType.html
 //! [`JuliaTypecheck`]: ../../traits/trait.JuliaTypecheck.html
 
@@ -37,11 +38,30 @@ use jl_sys::{
 use std::marker::PhantomData;
 
 /// Julia type information. You can acquire a [`Value`]'s datatype by by calling
-/// [`Value::datatype`]. If a the value contains a datatype (`value.is::<DataType>()` returns
-/// `true`), you can cast the value to a `DataType` by calling [`Value::cast`].
+/// [`Value::datatype`]. This struct implements [`JuliaTypecheck`] and [`Cast`]. It can be used in
+/// combination with [`DataType::is`] and [`Value::is`]; if the check returns `true` the [`Value`]
+///  can be cast to `DataType`:
+///
+/// ```
+/// # use jlrs::prelude::*;
+/// # use jlrs::util::JULIA;
+/// # fn main() {
+/// # JULIA.with(|j| {
+/// # let mut julia = j.borrow_mut();
+/// julia.frame(2, |global, frame| {
+///     let val = Value::new(frame, 1u8)?;
+///     let typeof_func = Module::core(global).function("typeof")?;
+///     let ty_val = typeof_func.call1(frame, val)?.unwrap();
+///     assert!(ty_val.is::<DataType>());
+///     assert!(ty_val.cast::<DataType>().is_ok());
+///     Ok(())
+/// }).unwrap();
+/// # });
+/// # }
+/// ```
 ///
 /// `DataType` implements [`JuliaTypecheck`] and can be used in combination with [`DataType::is`].
-/// This method returns `true` if a value of this type is itself a datatype.
+/// This method returns `true` if a value of this type is itself a datatype. 
 ///
 /// [`Value`]: ../struct.Value.html
 /// [`Value::datatype`]: ../struct.Value.html#method.datatype

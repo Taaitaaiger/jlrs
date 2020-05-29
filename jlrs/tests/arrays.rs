@@ -1,6 +1,5 @@
 use jlrs::prelude::*;
-mod util;
-use util::JULIA;
+use jlrs::util::JULIA;
 
 #[test]
 fn cannot_unbox_new_as_array() {
