@@ -305,3 +305,31 @@ fn create_values_get_out_of_bounds() {
         .unwrap();
     });
 }
+
+#[test]
+fn create_values_too_many() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+
+        jlrs.frame(2, |_, frame| {
+            let p1 = Values::new(frame, ['a', 'b', 'c']);
+            assert!(p1.is_err());
+            Ok(())
+        })
+        .unwrap();
+    });
+}
+
+#[test]
+fn create_values_too_many_dyn() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+
+        jlrs.frame(2, |_, frame| {
+            let p1 = Values::new_dyn(frame, [&'a' as _, &1usize as _, &1isize as _]);
+            assert!(p1.is_err());
+            Ok(())
+        })
+        .unwrap();
+    });
+}

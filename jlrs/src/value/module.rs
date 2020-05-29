@@ -45,17 +45,17 @@ impl<'base> Module<'base> {
     ///
     /// [`Julia::include`]: ../../struct.Julia.html#method.include
     pub fn main(_: Global<'base>) -> Self {
-        unsafe { Module(jl_main_module, PhantomData) }
+        unsafe { Module::wrap(jl_main_module) }
     }
 
     /// Returns a handle to Julia's `Core`-module.
     pub fn core(_: Global<'base>) -> Self {
-        unsafe { Module(jl_core_module, PhantomData) }
+        unsafe { Module::wrap(jl_core_module) }
     }
 
     /// Returns a handle to Julia's `Base`-module.
     pub fn base(_: Global<'base>) -> Self {
-        unsafe { Module(jl_base_module, PhantomData) }
+        unsafe { Module::wrap(jl_base_module) }
     }
 
     /// Returns the submodule named `name` relative to this module. You have to visit this level
