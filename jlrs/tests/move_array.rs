@@ -22,6 +22,27 @@ fn move_array_1d() {
 }
 
 #[test]
+fn move_array_1d_output() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+
+        let unboxed = jlrs
+            .frame(1, |_, frame| {
+                let output = frame.output()?;
+                let data = vec![1.0f32, 2., 3.];
+                let array = Value::move_array_output(frame, output, data, 3)?;
+                array.cast::<Array>()?.copy_inline_data::<f32>()
+            })
+            .unwrap();
+
+        let (data, dims) = unboxed.splat();
+        assert_eq!(dims.n_dimensions(), 1);
+        assert_eq!(dims.n_elements(0), 3);
+        assert_eq!(data, vec![1., 2., 3.]);
+    });
+}
+
+#[test]
 fn move_array_1d_nested() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();

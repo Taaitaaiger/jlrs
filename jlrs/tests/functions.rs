@@ -306,8 +306,7 @@ fn call_output() {
             let arg1 = Value::new(frame, 2u32)?;
             let arg2 = Value::new(frame, 3u32)?;
             let arg3 = Value::new(frame, 4u32)?;
-            func
-                .with_output(output)
+            func.with_output(output)
                 .call(frame, [arg0, arg1, arg2, arg3])
                 .unwrap()
                 .cast::<u32>()
@@ -422,5 +421,25 @@ fn call_values_dynamic_output() {
         });
 
         assert_eq!(out.unwrap(), 10);
+    });
+}
+
+#[test]
+fn jlrs_extensions_available() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+
+        jlrs.dynamic_frame(|global, frame| {
+            let func = Module::base(global).function("+")?;
+            assert!(func.attach_stacktrace(frame).is_ok());
+            assert!(func.tracing_call(frame).is_ok());
+
+            let o1 = frame.output()?;
+            let o2 = frame.output()?;
+            assert!(func.with_output(o1).attach_stacktrace(frame).is_ok());
+            assert!(func.with_output(o2).tracing_call(frame).is_ok());
+
+            Ok(())
+        }).unwrap();
     });
 }

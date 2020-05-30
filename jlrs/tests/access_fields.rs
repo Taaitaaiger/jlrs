@@ -1,6 +1,6 @@
 use jlrs::prelude::*;
 use jlrs::util::JULIA;
-use jlrs::value::datatype::{Tuple, Mutable};
+use jlrs::value::datatype::{Mutable, Tuple};
 
 #[test]
 fn access_tuple_fields() {
@@ -13,11 +13,13 @@ fn access_tuple_fields() {
                 .function("inlinetuple")?;
             let tup = func.call0(frame)?.unwrap();
 
+            let output = frame.output()?;
+
             assert!(tup.is::<Tuple>());
             assert_eq!(tup.n_fields(), 3);
             let v1 = tup.get_nth_field(frame, 0)?;
             let v2 = tup.get_nth_field(frame, 1)?;
-            let v3 = tup.get_nth_field(frame, 2)?;
+            let v3 = tup.get_nth_field_output(frame, output, 2)?;
 
             assert!(v1.is::<u32>());
             assert!(v2.is::<u16>());
@@ -77,10 +79,10 @@ fn access_mutable_struct_fields() {
             let func = Module::main(global)
                 .submodule("JlrsTests")?
                 .function("MutableStruct")?;
-            
+
             let x = Value::new(frame, 2.0f32)?;
             let y = Value::new(frame, 3u64)?;
-            
+
             let mut_struct = func.call2(frame, x, y)?.unwrap();
             assert!(mut_struct.is::<Mutable>());
 
@@ -88,7 +90,8 @@ fn access_mutable_struct_fields() {
             let x_val = mut_struct.get_field_noalloc("x");
             assert!(x_val.is_ok());
             assert!(x_val.unwrap().is::<f32>());
-            assert!(mut_struct.get_field(frame, "y").is_ok());
+            let output = frame.output()?;
+            assert!(mut_struct.get_field_output(frame, output, "y").is_ok());
             assert!(mut_struct.get_field_noalloc("y").is_err());
 
             Ok(())
@@ -109,10 +112,10 @@ fn cannot_access_unknown_mutable_struct_field() {
             let func = Module::main(global)
                 .submodule("JlrsTests")?
                 .function("MutableStruct")?;
-            
+
             let x = Value::new(frame, 2.0f32)?;
             let y = Value::new(frame, 3u64)?;
-            
+
             let mut_struct = func.call2(frame, x, y)?.unwrap();
             assert!(mut_struct.is::<Mutable>());
 
