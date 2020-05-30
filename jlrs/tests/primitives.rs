@@ -2,7 +2,7 @@ use jlrs::prelude::*;
 use jlrs::util::JULIA;
 
 #[test]
-fn create_and_unbox_uints() {
+fn create_and_cast_uints() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
@@ -32,7 +32,7 @@ fn create_and_unbox_uints() {
 }
 
 #[test]
-fn create_and_unbox_output() {
+fn create_and_cast_output() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
@@ -49,7 +49,7 @@ fn create_and_unbox_output() {
 }
 
 #[test]
-fn create_and_unbox_uints_dynamic() {
+fn create_and_cast_uints_dynamic() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
@@ -79,7 +79,7 @@ fn create_and_unbox_uints_dynamic() {
 }
 
 #[test]
-fn create_and_unbox_ints() {
+fn create_and_cast_ints() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
@@ -109,7 +109,7 @@ fn create_and_unbox_ints() {
 }
 
 #[test]
-fn create_and_unbox_ints_dynamic() {
+fn create_and_cast_ints_dynamic() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
@@ -139,7 +139,7 @@ fn create_and_unbox_ints_dynamic() {
 }
 
 #[test]
-fn create_and_unbox_floats() {
+fn create_and_cast_floats() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
@@ -160,7 +160,7 @@ fn create_and_unbox_floats() {
 }
 
 #[test]
-fn create_and_unbox_floats_dynamic() {
+fn create_and_cast_floats_dynamic() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
@@ -181,7 +181,7 @@ fn create_and_unbox_floats_dynamic() {
 }
 
 #[test]
-fn create_and_unbox_bool() {
+fn create_and_cast_bool() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
@@ -196,7 +196,7 @@ fn create_and_unbox_bool() {
 }
 
 #[test]
-fn create_and_unbox_bool_dynamic() {
+fn create_and_cast_bool_dynamic() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
@@ -211,7 +211,7 @@ fn create_and_unbox_bool_dynamic() {
 }
 
 #[test]
-fn create_and_unbox_char() {
+fn create_and_cast_char() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
@@ -226,7 +226,7 @@ fn create_and_unbox_char() {
 }
 
 #[test]
-fn create_and_unbox_char_dynamic() {
+fn create_and_cast_char_dynamic() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
@@ -241,7 +241,7 @@ fn create_and_unbox_char_dynamic() {
 }
 
 #[test]
-fn create_and_unbox_values() {
+fn create_and_cast_values() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
@@ -258,7 +258,7 @@ fn create_and_unbox_values() {
 }
 
 #[test]
-fn create_and_unbox_values_dynamic() {
+fn create_and_cast_values_dynamic() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
@@ -275,7 +275,7 @@ fn create_and_unbox_values_dynamic() {
 }
 
 #[test]
-fn create_and_unbox_dyn_values() {
+fn create_and_cast_dyn_values() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
@@ -292,7 +292,7 @@ fn create_and_unbox_dyn_values() {
 }
 
 #[test]
-fn create_and_unbox_dyn_values_dynamic() {
+fn create_and_cast_dyn_values_dynamic() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
@@ -373,7 +373,7 @@ fn create_nothing() {
     });
 }
 
-macro_rules! cannot_unbox_wrong_type {
+macro_rules! cannot_cast_wrong_type {
     ($name:ident, $val:expr, $from:ty, $to:ty) => {
         #[test]
         fn $name() {
@@ -392,15 +392,15 @@ macro_rules! cannot_unbox_wrong_type {
     };
 }
 
-cannot_unbox_wrong_type!(cannot_unbox_u8_as_u16, 1u8, u8, u16);
-cannot_unbox_wrong_type!(cannot_unbox_u16_as_u32, 1u16, u16, u32);
-cannot_unbox_wrong_type!(cannot_unbox_u32_as_u64, 1u32, u32, u64);
-cannot_unbox_wrong_type!(cannot_unbox_u64_as_i8, 1u64, u64, i8);
-cannot_unbox_wrong_type!(cannot_unbox_i8_as_i16, 1i8, i8, i16);
-cannot_unbox_wrong_type!(cannot_unbox_i16_as_i32, 1i16, i16, i32);
-cannot_unbox_wrong_type!(cannot_unbox_i32_as_i64, 1i32, i32, i64);
-cannot_unbox_wrong_type!(cannot_unbox_i64_as_u8, 1i64, i64, u8);
-cannot_unbox_wrong_type!(cannot_unbox_bool_as_char, true, bool, char);
-cannot_unbox_wrong_type!(cannot_unbox_char_as_bool, 'a', char, bool);
-cannot_unbox_wrong_type!(cannot_unbox_f32_as_64, 1f32, f32, f64);
-cannot_unbox_wrong_type!(cannot_unbox_f64_as_32, 1f64, f64, f32);
+cannot_cast_wrong_type!(cannot_cast_u8_as_u16, 1u8, u8, u16);
+cannot_cast_wrong_type!(cannot_cast_u16_as_u32, 1u16, u16, u32);
+cannot_cast_wrong_type!(cannot_cast_u32_as_u64, 1u32, u32, u64);
+cannot_cast_wrong_type!(cannot_cast_u64_as_i8, 1u64, u64, i8);
+cannot_cast_wrong_type!(cannot_cast_i8_as_i16, 1i8, i8, i16);
+cannot_cast_wrong_type!(cannot_cast_i16_as_i32, 1i16, i16, i32);
+cannot_cast_wrong_type!(cannot_cast_i32_as_i64, 1i32, i32, i64);
+cannot_cast_wrong_type!(cannot_cast_i64_as_u8, 1i64, i64, u8);
+cannot_cast_wrong_type!(cannot_cast_bool_as_char, true, bool, char);
+cannot_cast_wrong_type!(cannot_cast_char_as_bool, 'a', char, bool);
+cannot_cast_wrong_type!(cannot_cast_f32_as_64, 1f32, f32, f64);
+cannot_cast_wrong_type!(cannot_cast_f64_as_32, 1f64, f64, f32);
