@@ -90,6 +90,7 @@ impl<'frame, 'data> Array<'frame, 'data> {
     }
 
     #[doc(hidden)]
+    #[cfg_attr(tarpaulin, skip)]
     pub unsafe fn ptr(self) -> *mut jl_array_t {
         self.0
     }
