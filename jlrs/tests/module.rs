@@ -150,3 +150,22 @@ fn error_nonexistent_submodule_dynamic() {
         .unwrap()
     });
 }
+
+#[test]
+fn function_returns_module() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+        jlrs.frame(1, |global, frame| {
+            let base = Module::main(global)
+                .submodule("JlrsTests")?
+                .function("base")?;
+            let base_val = base.call0(frame)?.unwrap();
+
+            assert!(base_val.is::<Module>());
+            assert!(base_val.cast::<Module>().is_ok());
+
+            Ok(())
+        })
+        .unwrap();
+    })
+}

@@ -42,7 +42,7 @@ use std::ops::{Index, IndexMut};
 ///
 /// Each element in the backing storage is either stored as a [`Value`] or inline. You can check
 /// how the data is stored by calling [`Array::is_value_array`] or [`Array::is_inline_array`].
-/// Note that this is not necessarily consistent across different versions of Julia; the array 
+/// Note that this is not necessarily consistent across different versions of Julia; the array
 /// might be value array in Julia 1.0, but an inline array in Julia 1.4. If you want to ensure the
 /// data is not stored inline, you should use a mutable struct as the element type.
 ///
@@ -51,9 +51,9 @@ use std::ops::{Index, IndexMut};
 /// in Julia is backed by an an array of `f32`s. The data of these arrays can be accessed with
 /// [`Array::inline_data`] and [`Array::inline_data_mut`], and copied from Julia to Rust with
 /// [`Array::copy_inline_data`]. In order to call these methods the type of the elements must be
-/// provided, arrays that contain numbers can be accessed by providing the appropriate Rust type 
-/// (eg `f32` for `Float32` and `u64` for `UInt64`). 
-/// 
+/// provided, arrays that contain numbers can be accessed by providing the appropriate Rust type
+/// (eg `f32` for `Float32` and `u64` for `UInt64`).
+///
 /// More complex inlined data is supported through two custom derives: [`JuliaTuple`] and
 /// [`JuliaStruct`]. Accessing inline array data is not supported if the data contains inlined
 /// unions, [`Value`]s or pointers.

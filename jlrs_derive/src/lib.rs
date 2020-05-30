@@ -108,17 +108,12 @@ fn impl_array_data_type(ast: &syn::DeriveInput) -> TokenStream {
     };
 
     let rs_field_types: Vec<_> = match fields {
-        syn::Fields::Named(n) => {
-            n.named.iter().map(|f| &f.ty).collect()
-        }
-        syn::Fields::Unnamed(u) => {
-            u.unnamed.iter().map(|f| &f.ty).collect()
-        }
+        syn::Fields::Named(n) => n.named.iter().map(|f| &f.ty).collect(),
+        syn::Fields::Unnamed(u) => u.unnamed.iter().map(|f| &f.ty).collect(),
         _ => panic!("JuliaStruct cannot be derived for unit and tuple structs."),
     };
 
-    let rs_fieldtypes_iter = rs_field_types
-        .iter();
+    let rs_fieldtypes_iter = rs_field_types.iter();
 
     let array_data_type_impl = quote! {
         unsafe impl ::jlrs::traits::ArrayDataType for #name {

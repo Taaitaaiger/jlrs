@@ -1,5 +1,5 @@
-use jlrs::util::JULIA;
 use jlrs::prelude::*;
+use jlrs::util::JULIA;
 
 #[test]
 fn error_include_nonexistent() {
@@ -21,10 +21,8 @@ fn change_stack_size() {
 
 #[test]
 fn cannot_init_again() {
-    JULIA.with(|_j| {
-        unsafe {
-            assert!(Julia::init(42).is_err());
-        }
+    JULIA.with(|_j| unsafe {
+        assert!(Julia::init(42).is_err());
     });
 }
 

@@ -392,8 +392,10 @@ pub unsafe fn jl_field_isptr(st: *mut jl_datatype_t, i: i32) -> bool {
     let ly = &*(&*st).layout;
     assert!(i >= 0 && (i as u32) < ly.nfields);
     (&*jl_dt_layout_fields(ly as *const _ as *const u8)
-        .add(jl_fielddesc_size(ly.fielddesc_type() as i8) as usize * i  as usize)
-        .cast::<jl_fielddesc8_t>()).isptr() != 0
+        .add(jl_fielddesc_size(ly.fielddesc_type() as i8) as usize * i as usize)
+        .cast::<jl_fielddesc8_t>())
+        .isptr()
+        != 0
 }
 
 #[cfg(test)]

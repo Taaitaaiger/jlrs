@@ -73,7 +73,7 @@ macro_rules! impl_test {
 
                 jlrs.frame(1, |_, frame| {
                     let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
-                    
+
                     let array = Value::move_array(frame, data.clone(), (2, 3, 4))?;
                     let d = array.cast::<Array>()?.copy_inline_data::<$value_type>()?;
 
@@ -94,7 +94,7 @@ macro_rules! impl_test {
 
                 jlrs.frame(1, |_, frame| {
                     let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
-                    
+
                     let array = Value::move_array(frame, data.clone(), (2, 3, 4))?;
                     let mut d = array.cast::<Array>()?.copy_inline_data::<$value_type>()?;
 
@@ -110,16 +110,76 @@ macro_rules! impl_test {
     };
 }
 
-impl_test!(array_data_3d_u8, array_data_3d_u8_mut, array_data_3d_u8_slice, array_data_3d_u8_slice_mut, u8);
-impl_test!(array_data_3d_u16, array_data_3d_u16_mut, array_data_3d_u16_slice, array_data_3d_u16_slice_mut, u16);
-impl_test!(array_data_3d_u32, array_data_3d_u32_mut, array_data_3d_u32_slice, array_data_3d_u32_slice_mut, u32);
-impl_test!(array_data_3d_u64, array_data_3d_u64_mut, array_data_3d_u64_slice, array_data_3d_u64_slice_mut, u64);
-impl_test!(array_data_3d_i8, array_data_3d_i8_mut, array_data_3d_i8_slice, array_data_3d_i8_slice_mut, i8);
-impl_test!(array_data_3d_i16, array_data_3d_i16_mut, array_data_3d_i16_slice, array_data_3d_i16_slice_mut, i16);
-impl_test!(array_data_3d_i32, array_data_3d_i32_mut, array_data_3d_i32_slice, array_data_3d_i32_slice_mut, i32);
-impl_test!(array_data_3d_i64, array_data_3d_i64_mut, array_data_3d_i64_slice, array_data_3d_i64_slice_mut, i64);
-impl_test!(array_data_3d_f32, array_data_3d_f32_mut, array_data_3d_f32_slice, array_data_3d_f32_slice_mut, f32);
-impl_test!(array_data_3d_f64, array_data_3d_f64_mut, array_data_3d_f64_slice, array_data_3d_f64_slice_mut, f64);
+impl_test!(
+    array_data_3d_u8,
+    array_data_3d_u8_mut,
+    array_data_3d_u8_slice,
+    array_data_3d_u8_slice_mut,
+    u8
+);
+impl_test!(
+    array_data_3d_u16,
+    array_data_3d_u16_mut,
+    array_data_3d_u16_slice,
+    array_data_3d_u16_slice_mut,
+    u16
+);
+impl_test!(
+    array_data_3d_u32,
+    array_data_3d_u32_mut,
+    array_data_3d_u32_slice,
+    array_data_3d_u32_slice_mut,
+    u32
+);
+impl_test!(
+    array_data_3d_u64,
+    array_data_3d_u64_mut,
+    array_data_3d_u64_slice,
+    array_data_3d_u64_slice_mut,
+    u64
+);
+impl_test!(
+    array_data_3d_i8,
+    array_data_3d_i8_mut,
+    array_data_3d_i8_slice,
+    array_data_3d_i8_slice_mut,
+    i8
+);
+impl_test!(
+    array_data_3d_i16,
+    array_data_3d_i16_mut,
+    array_data_3d_i16_slice,
+    array_data_3d_i16_slice_mut,
+    i16
+);
+impl_test!(
+    array_data_3d_i32,
+    array_data_3d_i32_mut,
+    array_data_3d_i32_slice,
+    array_data_3d_i32_slice_mut,
+    i32
+);
+impl_test!(
+    array_data_3d_i64,
+    array_data_3d_i64_mut,
+    array_data_3d_i64_slice,
+    array_data_3d_i64_slice_mut,
+    i64
+);
+impl_test!(
+    array_data_3d_f32,
+    array_data_3d_f32_mut,
+    array_data_3d_f32_slice,
+    array_data_3d_f32_slice_mut,
+    f32
+);
+impl_test!(
+    array_data_3d_f64,
+    array_data_3d_f64_mut,
+    array_data_3d_f64_slice,
+    array_data_3d_f64_slice_mut,
+    f64
+);
 
 #[test]
 fn access_copied_array_dimensions() {
@@ -134,6 +194,7 @@ fn access_copied_array_dimensions() {
             assert_eq!(data.dimensions().as_slice(), &[1, 2]);
 
             Ok(())
-        }).unwrap();
+        })
+        .unwrap();
     })
 }

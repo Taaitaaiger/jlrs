@@ -59,7 +59,7 @@ fn access_non_pointer_tuple_field_must_alloc() {
                 .submodule("JlrsTests")?
                 .function("inlinetuple")?;
             let tup = func.call0(frame)?.unwrap();
-            assert!(tup.get_nth_field_noalloc(2).is_err());
+            assert!(unsafe { tup.get_nth_field_noalloc(2).is_err() });
 
             Ok(())
         })
@@ -87,12 +87,12 @@ fn access_mutable_struct_fields() {
             assert!(mut_struct.is::<Mutable>());
 
             assert!(mut_struct.get_field(frame, "x").is_ok());
-            let x_val = mut_struct.get_field_noalloc("x");
+            let x_val = unsafe { mut_struct.get_field_noalloc("x") };
             assert!(x_val.is_ok());
             assert!(x_val.unwrap().is::<f32>());
             let output = frame.output()?;
             assert!(mut_struct.get_field_output(frame, output, "y").is_ok());
-            assert!(mut_struct.get_field_noalloc("y").is_err());
+            assert!(unsafe { mut_struct.get_field_noalloc("y").is_err() });
 
             Ok(())
         })
@@ -147,7 +147,9 @@ fn access_bounds_error_fields() {
                 let f1: String = field_names[1].into();
                 assert_eq!(f1, "i");
 
-                out.get_field_noalloc("a")?;
+                unsafe {
+                    out.get_field_noalloc("a")?;
+                }
 
                 out.get_field(frame, field_names[1])?
                     .get_nth_field(frame, 0)?

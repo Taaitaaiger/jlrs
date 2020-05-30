@@ -27,10 +27,10 @@ use crate::traits::{
 use jl_sys::{
     jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_apply_array_type,
     jl_apply_tuple_type_v, jl_call, jl_call0, jl_call1, jl_call2, jl_call3, jl_datatype_t,
-    jl_exception_occurred, jl_field_index, jl_field_names, jl_fieldref, jl_fieldref_noalloc,
-    jl_get_nth_field, jl_get_nth_field_noalloc, jl_new_array, jl_new_struct_uninit, jl_nfields,
-    jl_ptr_to_array, jl_ptr_to_array_1d, jl_svec_data, jl_svec_len, jl_typeof, jl_typeof_str,
-    jl_value_t, jl_field_isptr
+    jl_exception_occurred, jl_field_index, jl_field_isptr, jl_field_names, jl_fieldref,
+    jl_fieldref_noalloc, jl_get_nth_field, jl_get_nth_field_noalloc, jl_new_array,
+    jl_new_struct_uninit, jl_nfields, jl_ptr_to_array, jl_ptr_to_array_1d, jl_svec_data,
+    jl_svec_len, jl_typeof, jl_typeof_str, jl_value_t,
 };
 use std::borrow::BorrowMut;
 use std::ffi::CStr;
@@ -432,22 +432,20 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// Returns the field at index `idx` if it exists and no allocation is required to return it.
     /// If it does not exist `JlrsError::NoSuchField` is returned. If allocating is required to
     /// return the field, an `assert` will fail and the program will abort.
-    pub fn get_nth_field_noalloc(self, idx: usize) -> JlrsResult<Value<'frame, 'data>> {
-        unsafe {
-            if self.is_nothing() {
-                Err(JlrsError::Nothing)?;
-            }
-
-            if idx >= self.n_fields() {
-                Err(JlrsError::OutOfBounds(idx, self.n_fields()))?
-            }
-
-            if !jl_field_isptr(self.datatype().unwrap().ptr(), idx as _) {
-                Err(JlrsError::NotAPointerField(idx))?;
-            }
-
-            Ok(Value::wrap(jl_fieldref_noalloc(self.ptr(), idx)))
+    pub unsafe fn get_nth_field_noalloc(self, idx: usize) -> JlrsResult<Value<'frame, 'data>> {
+        if self.is_nothing() {
+            Err(JlrsError::Nothing)?;
         }
+
+        if idx >= self.n_fields() {
+            Err(JlrsError::OutOfBounds(idx, self.n_fields()))?
+        }
+
+        if !jl_field_isptr(self.datatype().unwrap().ptr(), idx as _) {
+            Err(JlrsError::NotAPointerField(idx))?;
+        }
+
+        Ok(Value::wrap(jl_fieldref_noalloc(self.ptr(), idx)))
     }
 
     /// Returns the field with the name `field_name` if it exists. If it does not exist
@@ -513,30 +511,28 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// Returns the field with the name `field_name` if it exists and no allocation is required
     /// to return it. If it does not exist `JlrsError::NoSuchField` is returned. If allocating is
     /// required to return the field, an `assert` will fail and the program will abort.
-    pub fn get_field_noalloc<N>(self, field_name: N) -> JlrsResult<Value<'frame, 'data>>
+    pub unsafe fn get_field_noalloc<N>(self, field_name: N) -> JlrsResult<Value<'frame, 'data>>
     where
         N: TemporarySymbol,
     {
-        unsafe {
-            let symbol = field_name.temporary_symbol(Internal);
+        let symbol = field_name.temporary_symbol(Internal);
 
-            if self.is_nothing() {
-                Err(JlrsError::Nothing)?;
-            }
-
-            let jl_type = jl_typeof(self.ptr()).cast();
-            let idx = jl_field_index(jl_type, symbol.ptr(), 0);
-
-            if idx < 0 {
-                return Err(JlrsError::NoSuchField(symbol.into()).into());
-            }
-
-            if !jl_field_isptr(self.datatype().unwrap().ptr(), idx) {
-                Err(JlrsError::NotAPointerField(idx as _))?;
-            }
-
-            Ok(Value::wrap(jl_get_nth_field_noalloc(self.ptr(), idx as _)))
+        if self.is_nothing() {
+            Err(JlrsError::Nothing)?;
         }
+
+        let jl_type = jl_typeof(self.ptr()).cast();
+        let idx = jl_field_index(jl_type, symbol.ptr(), 0);
+
+        if idx < 0 {
+            return Err(JlrsError::NoSuchField(symbol.into()).into());
+        }
+
+        if !jl_field_isptr(self.datatype().unwrap().ptr(), idx) {
+            Err(JlrsError::NotAPointerField(idx as _))?;
+        }
+
+        Ok(Value::wrap(jl_get_nth_field_noalloc(self.ptr(), idx as _)))
     }
 
     /// If you call a function with one or more borrowed arrays as arguments, its result can only

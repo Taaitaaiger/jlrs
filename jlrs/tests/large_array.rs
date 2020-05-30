@@ -10,7 +10,8 @@ fn create_large_array() {
             let array = Value::new_array::<f32, _, _>(frame, &[1, 1, 1, 1, 1, 1, 1, 1, 1][..]);
             assert!(array.is_ok());
             Ok(())
-        }).unwrap();
+        })
+        .unwrap();
     });
 }
 
@@ -23,7 +24,8 @@ fn move_large_array() {
             let array = Value::move_array(frame, vec![1u64], &[1, 1, 1, 1, 1, 1, 1, 1, 1][..]);
             assert!(array.is_ok());
             Ok(())
-        }).unwrap();
+        })
+        .unwrap();
     });
 }
 
@@ -37,7 +39,8 @@ fn borrow_large_array() {
             let array = Value::borrow_array(frame, &mut data, &[1, 1, 1, 1, 1, 1, 1, 1, 1][..]);
             assert!(array.is_ok());
             Ok(())
-        }).unwrap();
+        })
+        .unwrap();
     });
 }
 
@@ -50,7 +53,8 @@ fn create_large_array_requires_slot() {
             let array = Value::new_array::<f32, _, _>(frame, &[1, 1, 1, 1, 1, 1, 1, 1, 1][..]);
             assert!(array.is_err());
             Ok(())
-        }).unwrap();
+        })
+        .unwrap();
     });
 }
 
@@ -63,7 +67,8 @@ fn move_large_array_requires_slot() {
             let array = Value::move_array(frame, vec![1u64], &[1, 1, 1, 1, 1, 1, 1, 1, 1][..]);
             assert!(array.is_err());
             Ok(())
-        }).unwrap();
+        })
+        .unwrap();
     });
 }
 
@@ -77,6 +82,7 @@ fn borrow_large_array_requires_slot() {
             let array = Value::borrow_array(frame, &mut data, &[1, 1, 1, 1, 1, 1, 1, 1, 1][..]);
             assert!(array.is_err());
             Ok(())
-        }).unwrap();
+        })
+        .unwrap();
     });
 }

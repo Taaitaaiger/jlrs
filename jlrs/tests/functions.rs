@@ -440,6 +440,7 @@ fn jlrs_extensions_available() {
             assert!(func.with_output(o2).tracing_call(frame).is_ok());
 
             Ok(())
-        }).unwrap();
+        })
+        .unwrap();
     });
 }

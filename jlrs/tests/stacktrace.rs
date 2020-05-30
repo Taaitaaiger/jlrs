@@ -24,7 +24,7 @@ fn bounds_error() {
                 let f1: String = field_names[1].into();
                 assert_eq!(f1, "stacktrace");
 
-                let stacktrace = out.get_field_noalloc("stacktrace");
+                let stacktrace = unsafe { out.get_field_noalloc("stacktrace") };
                 assert!(stacktrace.is_ok());
                 let stacktrace = stacktrace?;
                 let st_data = unsafe { stacktrace.cast::<Array>()?.value_data(frame)? };

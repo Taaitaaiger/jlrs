@@ -25,7 +25,7 @@ use std::marker::PhantomData;
 ///     let symbol_str = Value::new(frame, "+")?;
 ///     let symbol_val = symbol_func.call1(frame, symbol_str)?.unwrap();
 ///     assert!(symbol_val.is::<Symbol>());
-/// 
+///
 ///     let symbol = symbol_val.cast::<Symbol>()?;
 ///     assert!(Module::base(global).function(symbol).is_ok());
 ///     Ok(())

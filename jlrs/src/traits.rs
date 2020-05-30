@@ -328,7 +328,7 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for Array<'frame, 'data> {
     type Output = Self;
     fn cast(value: Value<'frame, 'data>) -> JlrsResult<Self::Output> {
         if value.is::<Array>() {
-            return unsafe { Ok(Array::wrap(value.ptr().cast())) };
+            return unsafe { Ok(Self::cast_unchecked(value)) };
         }
 
         Err(JlrsError::NotAnArray)?
@@ -343,7 +343,7 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for DataType<'frame> {
     type Output = Self;
     fn cast(value: Value<'frame, 'data>) -> JlrsResult<Self::Output> {
         if value.is::<DataType>() {
-            return unsafe { Ok(DataType::wrap(value.ptr().cast())) };
+            return unsafe { Ok(Self::cast_unchecked(value)) };
         }
 
         Err(JlrsError::NotADataType)?
@@ -358,7 +358,7 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for Symbol<'frame> {
     type Output = Self;
     fn cast(value: Value<'frame, 'data>) -> JlrsResult<Self::Output> {
         if value.is::<Symbol>() {
-            return unsafe { Ok(Symbol::wrap(value.ptr().cast())) };
+            return unsafe { Ok(Self::cast_unchecked(value)) };
         }
 
         Err(JlrsError::NotASymbol)?
@@ -373,7 +373,7 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for Module<'frame> {
     type Output = Self;
     fn cast(value: Value<'frame, 'data>) -> JlrsResult<Self::Output> {
         if value.is::<Module>() {
-            return unsafe { Ok(Module::wrap(value.ptr().cast())) };
+            return unsafe { Ok(Self::cast_unchecked(value)) };
         }
 
         Err(JlrsError::NotAModule("This".to_string()))?
@@ -391,7 +391,7 @@ macro_rules! impl_primitive_cast {
 
             fn cast(value: Value<'frame, 'data>) -> JlrsResult<Self::Output> {
                 if value.is::<$type>() {
-                    return unsafe { Ok($unboxer(value.ptr().cast()) as _) };
+                    return unsafe { Ok(Self::cast_unchecked(value)) };
                 }
 
                 Err(JlrsError::WrongType)?
@@ -432,7 +432,7 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for bool {
 
     fn cast(value: Value<'frame, 'data>) -> JlrsResult<Self::Output> {
         if value.is::<bool>() {
-            unsafe { return Ok(jl_unbox_int8(value.ptr()) != 0) }
+            unsafe { return Ok(Self::cast_unchecked(value)) }
         }
 
         Err(JlrsError::WrongType)?
@@ -467,24 +467,7 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for String {
 
     fn cast(value: Value<'frame, 'data>) -> JlrsResult<Self::Output> {
         if value.is::<String>() {
-            unsafe {
-                let len = jl_string_len(value.ptr());
-
-                if len == 0 {
-                    return Ok(String::new());
-                }
-
-                // Is neither null nor dangling, we've just checked
-                let raw = jl_string_data(value.ptr());
-                let raw_slice = std::slice::from_raw_parts(raw, len);
-                let owned_slice = Vec::from(raw_slice);
-                return Ok(
-                    String::from_utf8(owned_slice).map_err(|e| -> Box<JlrsError> {
-                        let b: Box<dyn std::error::Error + Send + Sync> = Box::new(e);
-                        b.into()
-                    })?,
-                );
-            }
+            unsafe { return Ok(Self::cast_unchecked(value)) }
         }
 
         Err(JlrsError::WrongType)?

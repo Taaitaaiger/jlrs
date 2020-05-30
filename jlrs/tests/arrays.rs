@@ -11,7 +11,8 @@ fn array_can_be_cast() {
             let arr = arr_val.cast::<Array>();
             assert!(arr.is_ok());
             Ok(())
-        }).unwrap();
+        })
+        .unwrap();
     });
 }
 
@@ -26,7 +27,8 @@ fn array_dimensions() {
             let dims = arr.dimensions();
             assert_eq!(dims.as_slice(), &[1, 2]);
             Ok(())
-        }).unwrap();
+        })
+        .unwrap();
     });
 }
 
@@ -44,7 +46,8 @@ fn check_array_contents_info() {
             assert!(arr.is_inline_array());
             assert!(!arr.is_value_array());
             Ok(())
-        }).unwrap();
+        })
+        .unwrap();
     });
 }
 

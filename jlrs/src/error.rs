@@ -61,7 +61,9 @@ impl Display for JlrsError {
             ),
             JlrsError::InvalidArrayType => write!(formatter, "Invalid array type"),
             JlrsError::InvalidCharacter => write!(formatter, "Invalid character"),
-            JlrsError::NotAPointerField(idx) => write!(formatter, "The field at index {} is stored inline", idx),
+            JlrsError::NotAPointerField(idx) => {
+                write!(formatter, "The field at index {} is stored inline", idx)
+            }
             JlrsError::NotInline => {
                 write!(formatter, "The data of this array is not stored inline")
             }

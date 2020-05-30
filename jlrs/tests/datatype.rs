@@ -1,6 +1,6 @@
 use jlrs::prelude::*;
-use jlrs::value::datatype::*;
 use jlrs::util::JULIA;
+use jlrs::value::datatype::*;
 
 #[test]
 fn datatype_methods() {
@@ -22,7 +22,6 @@ fn datatype_methods() {
         .unwrap();
     });
 }
-
 
 #[test]
 fn datatype_typechecks() {
@@ -82,3 +81,21 @@ fn datatype_typechecks() {
     });
 }
 
+#[test]
+fn function_returns_datatype() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+        jlrs.frame(1, |global, frame| {
+            let dt = Module::main(global)
+                .submodule("JlrsTests")?
+                .function("datatype")?;
+            let dt_val = dt.call0(frame)?.unwrap();
+
+            assert!(dt_val.is::<DataType>());
+            assert!(dt_val.cast::<DataType>().is_ok());
+
+            Ok(())
+        })
+        .unwrap();
+    })
+}

@@ -102,7 +102,10 @@ mod tests {
 
             julia
                 .frame(3, |_global, frame| {
-                    let s = Hamburger { pickle: -12, tomato: 3.0 };
+                    let s = Hamburger {
+                        pickle: -12,
+                        tomato: 3.0,
+                    };
                     let v = Value::new(frame, s).unwrap();
                     let first = v.get_field(frame, "🥒").unwrap();
                     let second = v.get_field(frame, "🍅").unwrap();

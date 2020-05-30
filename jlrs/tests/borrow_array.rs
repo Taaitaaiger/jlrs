@@ -20,7 +20,6 @@ fn borrow_array_1d() {
         assert_eq!(dims.n_elements(0), 4);
         assert_eq!(data, vec![1, 2, 3, 4]);
     });
-
 }
 
 #[test]
