@@ -1,5 +1,6 @@
 use jlrs::prelude::*;
 use jlrs::util::JULIA;
+use std::borrow::Cow;
 
 #[test]
 fn core_module() {
@@ -169,3 +170,51 @@ fn function_returns_module() {
         .unwrap();
     })
 }
+
+#[test]
+fn use_string_for_access() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+        jlrs.frame(1, |global, _frame| {
+            assert!(Module::main(global)
+                .submodule("JlrsTests".to_string())
+                .is_ok());
+
+            Ok(())
+        })
+        .unwrap();
+    })
+}
+
+#[test]
+fn use_cow_for_access() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+        jlrs.frame(1, |global, _frame| {
+            assert!(Module::main(global)
+                .submodule(Cow::from("JlrsTests"))
+                .is_ok());
+
+            Ok(())
+        })
+        .unwrap();
+    })
+}
+
+
+#[test]
+fn use_dyn_str_for_access() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+        jlrs.frame(1, |global, _frame| {
+            let name: &dyn AsRef<str> = &"JlrsTests";
+            assert!(Module::main(global)
+                .submodule(name)
+                .is_ok());
+
+            Ok(())
+        })
+        .unwrap();
+    })
+}
+
