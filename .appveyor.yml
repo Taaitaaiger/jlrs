@@ -39,4 +39,5 @@ install:
 build: false
 
 test_script:
+  - set JLRS_ROOT=%APPVEYOR_BUILD_FOLDER%
   - cargo test --verbose -- --test-threads 1

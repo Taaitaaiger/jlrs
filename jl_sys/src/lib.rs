@@ -355,6 +355,47 @@ pub unsafe fn jl_svecref(t: *mut c_void, i: usize) -> *mut jl_value_t {
     std::slice::from_raw_parts_mut(jl_svec_data(t.cast()), jl_svec_len(t.cast()))[i]
 }
 
+/*
+#define jl_dt_layout_fields(d) ((const char*)(d) + sizeof(jl_datatype_layout_t))
+
+static inline uint32_t jl_fielddesc_size(int8_t fielddesc_type) JL_NOTSAFEPOINT
+{
+    return 2 << fielddesc_type;
+    //if (fielddesc_type == 0) {
+    //    return sizeof(jl_fielddesc8_t);
+    //}
+    //else if (fielddesc_type == 1) {
+    //    return sizeof(jl_fielddesc16_t);
+    //}
+    //else {
+    //    return sizeof(jl_fielddesc32_t);
+    //}
+}
+
+static inline int jl_field_isptr(jl_datatype_t *st, int i) JL_NOTSAFEPOINT
+{
+    const jl_datatype_layout_t *ly = st->layout;
+    assert(i >= 0 && (size_t)i < ly->nfields);
+    return ((const jl_fielddesc8_t*)(jl_dt_layout_fields(ly) + jl_fielddesc_size(ly->fielddesc_type) * i))->isptr;
+}
+*/
+
+pub unsafe fn jl_dt_layout_fields(d: *const u8) -> *const u8 {
+    d.add(size_of::<jl_datatype_layout_t>())
+}
+
+pub unsafe fn jl_fielddesc_size(fielddesc_type: i8) -> u32 {
+    2 << fielddesc_type
+}
+
+pub unsafe fn jl_field_isptr(st: *mut jl_datatype_t, i: i32) -> bool {
+    let ly = &*(&*st).layout;
+    assert!(i >= 0 && (i as u32) < ly.nfields);
+    (&*jl_dt_layout_fields(ly as *const _ as *const u8)
+        .add(jl_fielddesc_size(ly.fielddesc_type() as i8) as usize * i  as usize)
+        .cast::<jl_fielddesc8_t>()).isptr() != 0
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

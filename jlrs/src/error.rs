@@ -13,6 +13,7 @@ pub enum JlrsError {
     Other(Box<dyn Error + Send + Sync>),
     AlreadyInitialized,
     NotAnArray,
+    Nothing,
     NotADataType,
     NotASymbol,
     NotAString,
@@ -27,6 +28,7 @@ pub enum JlrsError {
     WrongType,
     NotInline,
     Inline,
+    NotAPointerField(usize),
     ZeroDimension,
     OutOfBounds(usize, usize),
     InvalidIndex(Dimensions, Dimensions),
@@ -42,6 +44,7 @@ impl Display for JlrsError {
             }
             JlrsError::NotAnArray => write!(formatter, "This is not an array"),
             JlrsError::NotAString => write!(formatter, "This is not a string"),
+            JlrsError::Nothing => write!(formatter, "This value is Nothing"),
             JlrsError::FunctionNotFound(func) => {
                 write!(formatter, "The function {} could not be found", func)
             }
@@ -58,6 +61,7 @@ impl Display for JlrsError {
             ),
             JlrsError::InvalidArrayType => write!(formatter, "Invalid array type"),
             JlrsError::InvalidCharacter => write!(formatter, "Invalid character"),
+            JlrsError::NotAPointerField(idx) => write!(formatter, "The field at index {} is stored inline", idx),
             JlrsError::NotInline => {
                 write!(formatter, "The data of this array is not stored inline")
             }

@@ -30,7 +30,7 @@ use jl_sys::{
     jl_exception_occurred, jl_field_index, jl_field_names, jl_fieldref, jl_fieldref_noalloc,
     jl_get_nth_field, jl_get_nth_field_noalloc, jl_new_array, jl_new_struct_uninit, jl_nfields,
     jl_ptr_to_array, jl_ptr_to_array_1d, jl_svec_data, jl_svec_len, jl_typeof, jl_typeof_str,
-    jl_value_t,
+    jl_value_t, jl_field_isptr
 };
 use std::borrow::BorrowMut;
 use std::ffi::CStr;
@@ -434,8 +434,16 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// return the field, an `assert` will fail and the program will abort.
     pub fn get_nth_field_noalloc(self, idx: usize) -> JlrsResult<Value<'frame, 'data>> {
         unsafe {
+            if self.is_nothing() {
+                Err(JlrsError::Nothing)?;
+            }
+
             if idx >= self.n_fields() {
-                return Err(JlrsError::OutOfBounds(idx, self.n_fields()).into());
+                Err(JlrsError::OutOfBounds(idx, self.n_fields()))?
+            }
+
+            if !jl_field_isptr(self.datatype().unwrap().ptr(), idx as _) {
+                Err(JlrsError::NotAPointerField(idx))?;
             }
 
             Ok(Value::wrap(jl_fieldref_noalloc(self.ptr(), idx)))
@@ -455,7 +463,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
             let symbol = field_name.temporary_symbol(Internal);
 
             if self.is_nothing() {
-                return Err(JlrsError::NoSuchField(symbol.into()).into());
+                Err(JlrsError::Nothing)?;
             }
 
             let jl_type = jl_typeof(self.ptr()).cast();
@@ -488,7 +496,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
             let symbol = field_name.temporary_symbol(Internal);
 
             if self.is_nothing() {
-                return Err(JlrsError::NoSuchField(symbol.into()).into());
+                Err(JlrsError::Nothing)?;
             }
 
             let jl_type = jl_typeof(self.ptr()).cast();
@@ -513,7 +521,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
             let symbol = field_name.temporary_symbol(Internal);
 
             if self.is_nothing() {
-                return Err(JlrsError::NoSuchField(symbol.into()).into());
+                Err(JlrsError::Nothing)?;
             }
 
             let jl_type = jl_typeof(self.ptr()).cast();
@@ -521,6 +529,10 @@ impl<'frame, 'data> Value<'frame, 'data> {
 
             if idx < 0 {
                 return Err(JlrsError::NoSuchField(symbol.into()).into());
+            }
+
+            if !jl_field_isptr(self.datatype().unwrap().ptr(), idx) {
+                Err(JlrsError::NotAPointerField(idx as _))?;
             }
 
             Ok(Value::wrap(jl_get_nth_field_noalloc(self.ptr(), idx as _)))
