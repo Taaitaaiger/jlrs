@@ -164,6 +164,7 @@ fn function_returns_module() {
 
             assert!(base_val.is::<Module>());
             assert!(base_val.cast::<Module>().is_ok());
+            assert!(base_val.cast::<Symbol>().is_err());
 
             Ok(())
         })
@@ -201,15 +202,21 @@ fn use_cow_for_access() {
     })
 }
 
+struct MyString(String);
+impl AsRef<str> for MyString {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
 
 #[test]
 fn use_dyn_str_for_access() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
         jlrs.frame(1, |global, _frame| {
-            let name: &dyn AsRef<str> = &"JlrsTests";
+            let name = MyString("JlrsTests".to_string());
             assert!(Module::main(global)
-                .submodule(name)
+                .submodule(&name as &dyn AsRef<str>)
                 .is_ok());
 
             Ok(())
@@ -217,4 +224,3 @@ fn use_dyn_str_for_access() {
         .unwrap();
     })
 }
-

@@ -27,6 +27,9 @@ fn function_returns_symbol() {
 
             assert!(smb_val.is::<Symbol>());
             assert!(smb_val.cast::<Symbol>().is_ok());
+            assert!(smb_val.cast::<Module>().is_err());
+            assert!(smb_val.cast::<Array>().is_err());
+            assert!(smb_val.cast::<DataType>().is_err());
 
             Ok(())
         })

@@ -372,3 +372,35 @@ fn create_nothing() {
         .unwrap();
     });
 }
+
+macro_rules! cannot_unbox_wrong_type {
+    ($name:ident, $val:expr, $from:ty, $to:ty) => {
+        #[test]
+        fn $name() {
+            JULIA.with(|j| {
+                let mut jlrs = j.borrow_mut();
+
+                jlrs.frame(1, |_global, frame| {
+                    let val = Value::new(frame, $val)?;
+                    assert!(val.is::<$from>());
+                    assert!(val.cast::<$to>().is_err());
+                    Ok(())
+                })
+                .unwrap();
+            });
+        }
+    };
+}
+
+cannot_unbox_wrong_type!(cannot_unbox_u8_as_u16, 1u8, u8, u16);
+cannot_unbox_wrong_type!(cannot_unbox_u16_as_u32, 1u16, u16, u32);
+cannot_unbox_wrong_type!(cannot_unbox_u32_as_u64, 1u32, u32, u64);
+cannot_unbox_wrong_type!(cannot_unbox_u64_as_i8, 1u64, u64, i8);
+cannot_unbox_wrong_type!(cannot_unbox_i8_as_i16, 1i8, i8, i16);
+cannot_unbox_wrong_type!(cannot_unbox_i16_as_i32, 1i16, i16, i32);
+cannot_unbox_wrong_type!(cannot_unbox_i32_as_i64, 1i32, i32, i64);
+cannot_unbox_wrong_type!(cannot_unbox_i64_as_u8, 1i64, i64, u8);
+cannot_unbox_wrong_type!(cannot_unbox_bool_as_char, true, bool, char);
+cannot_unbox_wrong_type!(cannot_unbox_char_as_bool, 'a', char, bool);
+cannot_unbox_wrong_type!(cannot_unbox_f32_as_64, 1f32, f32, f64);
+cannot_unbox_wrong_type!(cannot_unbox_f64_as_32, 1f64, f64, f32);
