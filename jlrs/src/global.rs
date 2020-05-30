@@ -16,6 +16,7 @@ pub struct Global<'base>(PhantomData<&'base ()>);
 
 impl<'base> Global<'base> {
     #[doc(hidden)]
+    #[cfg_attr(tarpaulin, skip)]
     pub unsafe fn new() -> Self {
         Global(PhantomData)
     }

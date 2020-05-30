@@ -215,6 +215,13 @@ impl<'frame, 'data> Value<'frame, 'data> {
         self.0
     }
 
+    pub fn nothing<F>(_frame: &mut F) -> Value<'frame, 'static>
+    where
+        F: Frame<'frame>,
+    {
+        unsafe { Value::wrap(null_mut()) }
+    }
+
     /// Create a new Julia value, any type that implements [`IntoJulia`] can be converted using
     /// this function. The value will be protected from garbage collection inside the frame used
     /// to create it. One free slot on the garbage collection stack is required for this function

@@ -32,6 +32,23 @@ fn create_and_unbox_uints() {
 }
 
 #[test]
+fn create_and_unbox_output() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+
+        jlrs.frame(1, |_, frame| {
+            let output = frame.output()?;
+            let p1 = Value::new_output(frame, output, 1u8);
+            let u1 = p1.cast::<u8>()?;
+            assert_eq!(u1, 1);
+
+            Ok(())
+        })
+        .unwrap();
+    });
+}
+
+#[test]
 fn create_and_unbox_uints_dynamic() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
@@ -298,6 +315,7 @@ fn create_values_get_out_of_bounds() {
 
         jlrs.frame(2, |_, frame| {
             let p1 = Values::new(frame, ['a'])?;
+            assert_eq!(p1.len(), 1);
             let u2 = p1.value(1);
             assert!(u2.is_err());
             Ok(())
@@ -328,6 +346,27 @@ fn create_values_too_many_dyn() {
         jlrs.frame(2, |_, frame| {
             let p1 = Values::new_dyn(frame, [&'a' as _, &1usize as _, &1isize as _]);
             assert!(p1.is_err());
+            Ok(())
+        })
+        .unwrap();
+    });
+}
+
+#[test]
+fn create_nothing() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+
+        jlrs.frame(0, |global, frame| {
+            let nothing = Value::nothing(frame);
+            assert!(nothing.is_nothing());
+            assert!(!nothing.is::<f32>());
+            assert!(nothing.datatype().is_none());
+            assert_eq!(nothing.type_name(), "Nothing");
+            assert!(!nothing.is_array_of::<f32>());
+            assert_eq!(nothing.field_names(global).len(), 0);
+            assert_eq!(nothing.n_fields(), 0);
+
             Ok(())
         })
         .unwrap();
