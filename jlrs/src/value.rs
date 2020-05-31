@@ -243,10 +243,9 @@ impl<'frame, 'data> Value<'frame, 'data> {
         }
     }
 
-    /// Create a new Julia value, any type that implements [`IntoJulia`] can be converted using
-    /// this function. The value will be protected from garbage collection inside the frame used
-    /// to create it. One free slot on the garbage collection stack is required for this function
-    /// to succeed, returns an error if no slot is available.
+    /// Create a new Julia value using the output to protect it from garbage collection, any type
+    /// that implements [`IntoJulia`] can be converted using this function. The value will be
+    /// protected from garbage collection until the frame the output belongs to goes out of scope.
     ///
     /// [`IntoJulia`]: ../traits/trait.IntoJulia.html
     pub fn new_output<'output, V, F>(
@@ -433,8 +432,13 @@ impl<'frame, 'data> Value<'frame, 'data> {
     }
 
     /// Returns the field at index `idx` if it exists and no allocation is required to return it.
-    /// If it does not exist `JlrsError::NoSuchField` is returned. If allocating is required to
-    /// return the field, an `assert` will fail and the program will abort.
+    /// Allocation is not required if the field is a pointer to another value.
+    ///
+    /// If the field does not exist `JlrsError::NoSuchField` is returned. If allocating is
+    /// required to return the field, `JlrsError::NotAPointerField` is returned.
+    ///
+    /// This function is unsafe because the value returned as a result will only be valid as long
+    /// as the field is not changed.
     pub unsafe fn get_nth_field_noalloc(self, idx: usize) -> JlrsResult<Value<'frame, 'data>> {
         if self.is_nothing() {
             Err(JlrsError::Nothing)?;
@@ -512,8 +516,13 @@ impl<'frame, 'data> Value<'frame, 'data> {
     }
 
     /// Returns the field with the name `field_name` if it exists and no allocation is required
-    /// to return it. If it does not exist `JlrsError::NoSuchField` is returned. If allocating is
-    /// required to return the field, an `assert` will fail and the program will abort.
+    /// to return it. Allocation is not required if the field is a pointer to another value.
+    ///
+    /// If the field does not exist `JlrsError::NoSuchField` is returned. If allocating is
+    /// required to return the field, `JlrsError::NotAPointerField` is returned.
+    ///
+    /// This function is unsafe because the value returned as a result will only be valid as long
+    /// as the field is not changed.
     pub unsafe fn get_field_noalloc<N>(self, field_name: N) -> JlrsResult<Value<'frame, 'data>>
     where
         N: TemporarySymbol,
