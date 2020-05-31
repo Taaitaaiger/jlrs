@@ -10,7 +10,7 @@
 //!
 //! [`Array`]: struct.Array.html
 use crate::error::{JlrsError, JlrsResult};
-use crate::traits::{JuliaType, Frame};
+use crate::traits::{Frame, JuliaType};
 use crate::value::Value;
 use jl_sys::{
     jl_array_data, jl_array_dim, jl_array_dims, jl_array_eltype, jl_array_ndims, jl_array_nrows,
@@ -268,8 +268,8 @@ impl<'frame, 'data> Array<'frame, 'data> {
 }
 
 /// An n-dimensional array whose contents have been copied from Julia to Rust. You can create this
-/// struct by calling [`Array::copy_inline_data`]. The data has a column-major order and can be 
-/// indexed with anything that implements `Into<Dimensions>`; see [`Dimensions`] for more 
+/// struct by calling [`Array::copy_inline_data`]. The data has a column-major order and can be
+/// indexed with anything that implements `Into<Dimensions>`; see [`Dimensions`] for more
 /// information.
 ///
 /// [`Array::copy_inline_data`]: struct.Array.html#method.copy_inline_data

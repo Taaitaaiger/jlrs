@@ -566,7 +566,7 @@ fn array_of_bools() {
         assert_eq!(dims.n_elements(2), 5);
         assert_eq!(dims.n_elements(3), 6);
         assert_eq!(data.len(), 360);
-    });    
+    });
 }
 
 #[test]
@@ -590,5 +590,5 @@ fn array_of_chars() {
         assert_eq!(dims.n_elements(2), 5);
         assert_eq!(dims.n_elements(3), 6);
         assert_eq!(data.len(), 360);
-    });    
+    });
 }

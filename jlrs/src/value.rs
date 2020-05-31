@@ -21,8 +21,7 @@ use crate::error::{JlrsError, JlrsResult};
 use crate::frame::Output;
 use crate::global::Global;
 use crate::traits::{
-    private::Internal, Cast, Frame, IntoJulia, JuliaType, JuliaTypecheck,
-    TemporarySymbol,
+    private::Internal, Cast, Frame, IntoJulia, JuliaType, JuliaTypecheck, TemporarySymbol,
 };
 use jl_sys::{
     jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_apply_array_type,
@@ -183,7 +182,7 @@ impl<'frame> Values<'frame> {
 ///
 /// The methods that create a new `Value` come in two varieties: `<method>` and `<method>_output`.
 /// The first will use a slot in the current frame to protect the value from garbage collection,
-/// while the latter uses a slot in another active frame. 
+/// while the latter uses a slot in another active frame.
 ///
 /// [`Value::assume_owned`]: struct.Value.html#method.assume_owned
 /// [`IntoJulia`]: ../traits/trait.IntoJulia.html
