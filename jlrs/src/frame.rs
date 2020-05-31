@@ -1,9 +1,8 @@
-//! Frames ensure Julia's garbage collector (GC) is properly managed.
+//! Frames ensure Julia's garbage collector is properly managed.
 //!
-//! Julia data is freed by its GC when it's not in use. You will need to use a frame to do things
-//! like calling Julia functions, creating new values, and accessing modules; this ensures the
-//! values created in a specific frame are protected from garbage collection until that frame goes
-//! out of scope.
+//! Julia data is freed by the GC when it's not in use. You will need to use frames to do things
+//! like calling Julia functions and creating new values; this ensures the values created with a
+//! specific frame are protected from garbage collection until that frame goes out of scope.
 //!
 //! Frames can be nested, the two frame types that currently exist can be freely mixed. The main
 //! difference between the two is that a [`StaticFrame`] is created with a definite capacity,
@@ -11,12 +10,8 @@
 //! function is called. A `StaticFrame` is more efficient, a `DynamicFrame` is easier to use.
 //! Creating a nested frame takes no space in the current frame.
 //!
-//! Frames have two lifetimes, `'base` and `'frame`. The former is used to allow global values,
-//! like modules and functions defined in them, to be freely used across frames; the only
-//! restriction is that you can't return them from the base frame that was created through
-//! [`Julia::frame`] or [`Julia::dynamic_frame`]. The latter is used by data that is only
-//! valid until its frame goes out of scope, as a result values can only be used when they're
-//! guaranteed to be protected from garbage collection.
+//! Frames have a lifetime, `'frame`. This lifetime ensures that a [`Value`] can only be used as
+//! long as the frame that protects it has not been dropped.
 //!
 //! Most functionality that frames implement is defined in the [`Frame`] trait.
 //!
@@ -24,6 +19,7 @@
 //! [`DynamicFrame`]: struct.DynamicFrame.html
 //! [`Julia::frame`]: ../struct.Julia.html#method.frame
 //! [`Julia::dynamic_frame`]: ../struct.Julia.html#method.dynamic_frame
+//! [`Value`]: ../value/struct.Value.html
 //! [`Frame`]: ../traits/trait.Frame.html
 
 use crate::error::JlrsResult;
@@ -135,8 +131,8 @@ impl<'frame> Drop for DynamicFrame<'frame> {
     }
 }
 
-/// An `Output` is a slot on the GC stack in the frame that was used to create it. It can be used
-/// to extend the lifetime of the result of a function call to the `Output`'s lifetime. You can
+/// An `Output` is a slot of a frame that has been reserved for later use. It can be used to
+/// extend the lifetime of the result of a function call to the `Output`'s lifetime. You can
 /// create an output by calling [`Frame::output`].
 ///
 /// [`Frame::output`]: ../traits/trait.Frame.html#method.output

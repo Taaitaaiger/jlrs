@@ -104,13 +104,13 @@ fn impl_array_data_type(ast: &syn::DeriveInput) -> TokenStream {
 
     let fields = match &ast.data {
         syn::Data::Struct(s) => &s.fields,
-        _ => panic!("ArrayDatatype cannot be derived for enums and unions."),
+        _ => panic!("ArrayDataType cannot be derived for enums and unions."),
     };
 
     let rs_field_types: Vec<_> = match fields {
         syn::Fields::Named(n) => n.named.iter().map(|f| &f.ty).collect(),
         syn::Fields::Unnamed(u) => u.unnamed.iter().map(|f| &f.ty).collect(),
-        _ => panic!("ArrayDatatype cannot be derived for unit structs."),
+        _ => panic!("ArrayDataType cannot be derived for unit structs."),
     };
 
     let rs_fieldtypes_iter = rs_field_types.iter();

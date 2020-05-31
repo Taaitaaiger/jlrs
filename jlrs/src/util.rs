@@ -1,5 +1,5 @@
-//! This module exists for testing purposes, the thread-local instance ensures Julia is only
-//! initialized once.
+// This module exists for testing purposes, the thread-local instance ensures Julia is only
+// initialized once.
 
 use crate::prelude::*;
 use std::cell::RefCell;

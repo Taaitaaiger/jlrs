@@ -154,7 +154,7 @@ impl<'frame> Values<'frame> {
 ///
 /// ### Creating new values
 ///
-/// New `Value`s can be created from Rust in several ways. Types that implement [`JuliaType`] can
+/// New `Value`s can be created from Rust in several ways. Types that implement [`IntoJulia`] can
 /// be converted to a `Value` by calling [`Value::new`]. This trait is implemented by primitive
 /// types like `bool`, `char`, `i16`, and `usize`; string types like `String`, `&str`, and `Cow`;
 /// and you can derive it for your own types by deriving [`JuliaStruct`] and [`JuliaTuple`].
@@ -182,17 +182,18 @@ impl<'frame> Values<'frame> {
 /// `value.is::<u8>()` returning true means `value.cast::<u8>()` will succeed.
 ///
 /// The methods that create a new `Value` come in two varieties: `<method>` and `<method>_output`.
-/// The
-/// first will use a slot in the current frame to protect the value from garbage collection, while
-/// the latter uses a slot in an earlier frame. Other features offered by `Value` include
-/// accessing the fields of these values and (im)mutably borrowing their underlying array data.
+/// The first will use a slot in the current frame to protect the value from garbage collection,
+/// while the latter uses a slot in another active frame. Other features offered by `Value`
+/// include accessing the fields of these values and (im)mutably borrowing their underlying array
+/// data.
 ///
 /// [`Value::assume_owned`]: struct.Value.html#method.assume_owned
+/// [`IntoJulia`]: ../traits/trait.IntoJulia.html
 /// [`JuliaType`]: ../traits/trait.JuliaType.html
 /// [`Value::new`]: struct.Value.html#method.new
 /// [`JuliaStruct`]: ../traits/trait.JuliaStruct.html
 /// [`JuliaTuple`]: ../traits/trait.JuliaTuple.html
-/// [`Value::dataype`]: struct.Value.html#method.datatype
+/// [`Value::datatype`]: struct.Value.html#method.datatype
 /// [`Value::is`]: struct.Value.html#method.is
 /// [`Value::cast`]: struct.Value.html#method.cast
 /// [`JuliaTypecheck`]: ../traits/trait.JuliaTypecheck.html
@@ -215,6 +216,8 @@ impl<'frame, 'data> Value<'frame, 'data> {
         self.0
     }
 
+    /// Returns `Nothing` as a `Value`. Because `Nothing` is a singleton this takes no slot on the
+    /// GC stack.
     pub fn nothing<F>(_frame: &mut F) -> Value<'frame, 'static>
     where
         F: Frame<'frame>,
@@ -224,8 +227,8 @@ impl<'frame, 'data> Value<'frame, 'data> {
 
     /// Create a new Julia value, any type that implements [`IntoJulia`] can be converted using
     /// this function. The value will be protected from garbage collection inside the frame used
-    /// to create it. One free slot on the garbage collection stack is required for this function
-    /// to succeed, returns an error if no slot is available.
+    /// to create it. One free slot on the GC stack is required for this function to succeed,
+    /// returns an error if no slot is available.
     ///
     /// [`IntoJulia`]: ../traits/trait.IntoJulia.html
     pub fn new<V, F>(frame: &mut F, value: V) -> JlrsResult<Value<'frame, 'static>>
