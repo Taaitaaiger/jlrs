@@ -544,3 +544,51 @@ fn array_4d_dynamic_nested_dynamic() {
         assert_eq!(data.len(), 360);
     });
 }
+
+#[test]
+fn array_of_bools() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+
+        let unboxed = jlrs
+            .dynamic_frame(|_, frame| {
+                frame.dynamic_frame(|frame| {
+                    let new_array = Value::new_array::<bool, _, _>(frame, (3, 4, 5, 6))?;
+                    new_array.cast::<Array>()?.copy_inline_data::<bool>()
+                })
+            })
+            .unwrap();
+
+        let (data, dims) = unboxed.splat();
+        assert_eq!(dims.n_dimensions(), 4);
+        assert_eq!(dims.n_elements(0), 3);
+        assert_eq!(dims.n_elements(1), 4);
+        assert_eq!(dims.n_elements(2), 5);
+        assert_eq!(dims.n_elements(3), 6);
+        assert_eq!(data.len(), 360);
+    });    
+}
+
+#[test]
+fn array_of_chars() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+
+        let unboxed = jlrs
+            .dynamic_frame(|_, frame| {
+                frame.dynamic_frame(|frame| {
+                    let new_array = Value::new_array::<char, _, _>(frame, (3, 4, 5, 6))?;
+                    new_array.cast::<Array>()?.copy_inline_data::<char>()
+                })
+            })
+            .unwrap();
+
+        let (data, dims) = unboxed.splat();
+        assert_eq!(dims.n_dimensions(), 4);
+        assert_eq!(dims.n_elements(0), 3);
+        assert_eq!(dims.n_elements(1), 4);
+        assert_eq!(dims.n_elements(2), 5);
+        assert_eq!(dims.n_elements(3), 6);
+        assert_eq!(data.len(), 360);
+    });    
+}

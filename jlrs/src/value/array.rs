@@ -10,7 +10,7 @@
 //!
 //! [`Array`]: struct.Array.html
 use crate::error::{JlrsError, JlrsResult};
-use crate::traits::{ArrayDataType, Frame};
+use crate::traits::{JuliaType, Frame};
 use crate::value::Value;
 use jl_sys::{
     jl_array_data, jl_array_dim, jl_array_dims, jl_array_eltype, jl_array_ndims, jl_array_nrows,
@@ -56,7 +56,7 @@ use std::ops::{Index, IndexMut};
 ///
 /// More complex inlined data is supported through two custom derives: [`JuliaTuple`] and
 /// [`JuliaStruct`]. Accessing inline array data is not supported if the data contains inlined
-/// unions, [`Value`]s or pointers.
+/// unions, [`Value`]s or other pointers.
 ///
 /// If the data isn't inlined each element is stored as a [`Value`]. This data can be accessed
 /// using [`Array::value_data`] and [`Array::value_data_mut`] but this is unsafe.
@@ -101,13 +101,13 @@ impl<'frame, 'data> Array<'frame, 'data> {
     }
 
     /// Returns `true` if the type of the elements of this array is `T`.
-    pub fn contains<T: ArrayDataType>(self) -> bool {
+    pub fn contains<T: JuliaType>(self) -> bool {
         unsafe { jl_array_eltype(self.ptr().cast()).cast() == T::julia_type() }
     }
 
     /// Returns `true` if the type of the elements of this array is `T` and these elements are
     /// stored inline.
-    pub fn contains_inline<T: ArrayDataType>(self) -> bool {
+    pub fn contains_inline<T: JuliaType>(self) -> bool {
         self.contains::<T>() && self.is_inline_array()
     }
 
@@ -135,7 +135,7 @@ impl<'frame, 'data> Array<'frame, 'data> {
     /// not stored inline or `JlrsError::WrongType` if the type of the elements is incorrect.
     pub fn copy_inline_data<T>(self) -> JlrsResult<CopiedArray<T>>
     where
-        T: ArrayDataType,
+        T: JuliaType,
     {
         if !self.contains::<T>() {
             Err(JlrsError::WrongType)?;
@@ -167,7 +167,7 @@ impl<'frame, 'data> Array<'frame, 'data> {
         frame: &'borrow F,
     ) -> JlrsResult<ArrayData<'borrow, 'fr, T, F>>
     where
-        T: ArrayDataType,
+        T: JuliaType,
         F: Frame<'fr>,
     {
         if !self.contains::<T>() {
@@ -194,7 +194,7 @@ impl<'frame, 'data> Array<'frame, 'data> {
         frame: &'borrow mut F,
     ) -> JlrsResult<InlineArrayDataMut<'borrow, 'fr, T, F>>
     where
-        T: ArrayDataType,
+        T: JuliaType,
         F: Frame<'fr>,
     {
         if !self.contains::<T>() {
@@ -268,12 +268,11 @@ impl<'frame, 'data> Array<'frame, 'data> {
 }
 
 /// An n-dimensional array whose contents have been copied from Julia to Rust. You can create this
-/// struct by calling [`Value::try_unbox`]. In order to unbox arrays that contain `bool`s or
-/// `char`s, you must unbox them as `CopiedArray<i8>` and `CopiedArray<u32>` respectively because these arrays
-/// containt uninitialized values. The data has a column-major order and can be indexed with
-/// anything that implements `Into<Dimensions>`; see [`Dimensions`] for more information.
+/// struct by calling [`Array::copy_inline_data`]. The data has a column-major order and can be 
+/// indexed with anything that implements `Into<Dimensions>`; see [`Dimensions`] for more 
+/// information.
 ///
-/// [`Value::try_unbox`]: ../struct.Value.html#method.try_unbox
+/// [`Array::copy_inline_data`]: struct.Array.html#method.copy_inline_data
 /// [`Dimensions`]: struct.Dimensions.html
 #[derive(Debug)]
 pub struct CopiedArray<T> {

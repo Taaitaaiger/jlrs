@@ -161,14 +161,6 @@ pub unsafe trait JuliaTuple: JuliaType + IntoJulia + Copy + Clone {}
 /// [`Value::cast`]: ../value/struct.Value.html#method.cast
 pub unsafe trait JuliaStruct: JuliaType + IntoJulia + Copy + Clone {}
 
-/// Trait implemented by types that have the same representation in Julia and Rust when they are
-/// used as array data. Arrays whose elements are of a type that implements this trait can share
-/// their contents between Julia and Rust. This includes all types that implement `JuliaType`
-/// except `bool` and `char`.
-pub unsafe trait ArrayDataType: JuliaType {
-    unsafe fn array_data_type() {}
-}
-
 /// This trait is used in combination with [`Value::is`] and [`DataType::is`]; types that
 /// implement this trait can be used to check many properties of a Julia `DataType`.
 ///
@@ -407,19 +399,6 @@ unsafe impl JuliaType for isize {
         jl_int64_type
     }
 }
-
-p!(ArrayDataType, u8);
-p!(ArrayDataType, u16);
-p!(ArrayDataType, u32);
-p!(ArrayDataType, u64);
-p!(ArrayDataType, i8);
-p!(ArrayDataType, i16);
-p!(ArrayDataType, i32);
-p!(ArrayDataType, i64);
-p!(ArrayDataType, f32);
-p!(ArrayDataType, f64);
-p!(ArrayDataType, usize);
-p!(ArrayDataType, isize);
 
 unsafe impl<'frame, 'data> Cast<'frame, 'data> for Array<'frame, 'data> {
     type Output = Self;

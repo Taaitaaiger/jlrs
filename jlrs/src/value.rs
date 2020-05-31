@@ -21,7 +21,7 @@ use crate::error::{JlrsError, JlrsResult};
 use crate::frame::Output;
 use crate::global::Global;
 use crate::traits::{
-    private::Internal, ArrayDataType, Cast, Frame, IntoJulia, JuliaType, JuliaTypecheck,
+    private::Internal, Cast, Frame, IntoJulia, JuliaType, JuliaTypecheck,
     TemporarySymbol,
 };
 use jl_sys::{
@@ -160,7 +160,7 @@ impl<'frame> Values<'frame> {
 /// and you can derive it for your own types by deriving [`JuliaStruct`] and [`JuliaTuple`].
 ///
 /// [`Value`] also has several methods to create an n-dimensional array if the element type
-/// implements [`ArrayDataType`]. This trait is a restricted version of [`JuliaType`] that is
+/// implements [`JuliaType`]. This trait is a restricted version of [`JuliaType`] that is
 /// implemented by all primitive types except `bool` and `char`. Types that derive [`JuliaStruct`]
 /// or [`JuliaTuple`] can derive this trait if is implemented by all of its fields. A new array
 /// whose data is completely managed by Julia can be created by calling [`Value::new_array`]. You
@@ -354,7 +354,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     }
 
     /// Returns true if the value is an array with elements of type `T`.
-    pub fn is_array_of<T: ArrayDataType>(self) -> bool {
+    pub fn is_array_of<T: JuliaType>(self) -> bool {
         match self.cast::<Array>() {
             Ok(arr) => arr.contains::<T>(),
             Err(_) => false,
@@ -575,7 +575,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// This function returns an error if there are not enough slots available.
     pub fn new_array<T, D, F>(frame: &mut F, dimensions: D) -> JlrsResult<Value<'frame, 'static>>
     where
-        T: ArrayDataType,
+        T: JuliaType,
         D: Into<Dimensions>,
         F: Frame<'frame>,
     {
@@ -598,7 +598,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
         dimensions: D,
     ) -> JlrsResult<Value<'output, 'static>>
     where
-        T: ArrayDataType,
+        T: JuliaType,
         D: Into<Dimensions>,
         F: Frame<'frame>,
     {
@@ -621,7 +621,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
         dimensions: D,
     ) -> JlrsResult<Value<'frame, 'data>>
     where
-        T: ArrayDataType,
+        T: JuliaType,
         D: Into<Dimensions>,
         V: BorrowMut<[T]>,
         F: Frame<'frame>,
@@ -647,7 +647,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     ) -> JlrsResult<Value<'output, 'borrow>>
     where
         'borrow: 'output,
-        T: ArrayDataType,
+        T: JuliaType,
         D: Into<Dimensions>,
         V: BorrowMut<[T]>,
         F: Frame<'frame>,
@@ -671,7 +671,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
         dimensions: D,
     ) -> JlrsResult<Value<'frame, 'static>>
     where
-        T: ArrayDataType,
+        T: JuliaType,
         D: Into<Dimensions>,
         F: Frame<'frame>,
     {
@@ -695,7 +695,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
         dimensions: D,
     ) -> JlrsResult<Value<'output, 'static>>
     where
-        T: ArrayDataType,
+        T: JuliaType,
         D: Into<Dimensions>,
         F: Frame<'frame>,
     {
