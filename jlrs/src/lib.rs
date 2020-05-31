@@ -1,7 +1,21 @@
 //! The main goal behind `jlrs` is to provide a simple and safe interface to the Julia C API.
-//! Currently this crate has only been tested on Linux, if you try to use it on another OS it will
-//! likely fail to generate the bindings to Julia. This crate is currently tested with Julia
-//! v1.4.1.
+//! Currently this crate is only tested on Linux and Windows in combination with Julia 1.4.2, if
+//! you try to use it on another OS or with an earlier version of Julia it will likely fail to
+//! generate the bindings or crash when these bindings are used.
+//!
+//!
+//! # Features
+//!
+//! An incomplete list of features that are currently supported by `jlrs`:
+//!
+//!  - Access arbitrary Julia modules and their contents.
+//!  - Call arbitrary Julia functions.
+//!  - Include and use your own Julia code.
+//!  - Create values that Julia can use, and convert them back to Rust, from Rust.
+//!  - Access the type information and fields of values and check their properties.
+//!  - Support for mapping isbits tuples and structs to Rust structs.
+//!  - Create and use n-dimensional arrays.
+//!
 //!
 //! # Generating the bindings
 //!
@@ -33,7 +47,7 @@
 //!
 //! Additionally, MinGW must be installed through Cygwin. To install this and all potentially
 //! required dependencies, follow steps 1-4 of
-//! [the instructions for compiling Julia on Windows using Cygwin and MinGW](https://github.com/JuliaLang/julia/blob/v1.4.1/doc/build/windows.md#cygwin-to-mingw-cross-compiling).
+//! [the instructions for compiling Julia on Windows using Cygwin and MinGW].
 //! You must set the `CYGWIN_DIR` environment variable to the installation folder of Cygwin; this
 //! folder contains some icons, `Cygwin.bat` and folders with names like `usr` and `bin`. For
 //! example, if Cygwin is installed at `D:\cygwin64`, `CYGWIN_DIR` must be set to `D:\cygwin64`.
@@ -44,11 +58,13 @@
 //!
 //!
 //! # Using this crate
+//!
 //! The first thing you should do is `use` the [`prelude`]-module with an asterisk, this will
 //! bring all the structs and traits you're likely to need into scope. Before you can use Julia it
 //! must first be initialized. You do this by calling [`Julia::init`]. Note that this method can
 //! only be called once, if you drop [`Julia`] you won't be able to create a new one and have to
-//! restart the entire program.
+//! restart the entire program. If you want to use a custom system image, you must call
+//! [`Julia::init_with_image`] instead of [`Julia::init`].
 //!
 //! You can call [`Julia::include`] to include your own Julia code and either [`Julia::frame`] or
 //! [`Julia::dynamic_frame`] to interact with Julia. If you want to have improved support for
@@ -58,8 +74,8 @@
 //!
 //! The other two methods, [`Julia::frame`] and [`Julia::dynamic_frame`], take a closure that
 //! provides you with a [`Global`], and either a [`StaticFrame`] or [`DynamicFrame`] respectively.
-//! [`Global`] is a token that lets you access Julia modules and their contents, while the frames
-//! are used to deal with local Julia data.
+//! [`Global`] is a token that lets you access Julia modules their contents, and other global
+//! values, while the frames are used to deal with local Julia data.
 //!
 //! Local data must be handled properly: Julia is a programming language with a garbage collector
 //! that is unaware of any references to data outside of Julia. In order to make it aware of this
@@ -76,10 +92,10 @@
 //! and `Core` module respectively, while everything you include through [`Julia::include`] is
 //! made available relative to the `Main` module which you can access by calling [`Module::main`].
 //!
-//! Most Julia data is represented by a [`Value`]. Basic data types like numbers, booleans, and
-//! strings can be created through [`Value::new`] and several methods exist to create an
-//! n-dimensional array. Each value will be protected by a frame, and the two share a lifetime in
-//! order to enforce that a value can be used as long as its protecting frame hasn't been dropped.
+//! Julia data is represented by a [`Value`]. Basic data types like numbers, booleans, and strings
+//! can be created through [`Value::new`] and several methods exist to create an n-dimensional
+//! array. Each value will be protected by a frame, and the two share a lifetime in order to
+//! enforce that a value can only be used as long as its protecting frame hasn't been dropped.
 //! Julia functions, their arguments and their results are all `Value`s too. All `Value`s can be
 //! called as functions, whether this will succeed depends on the value actually being a function.
 //! You can copy data from Julia to Rust by calling [`Value::cast`].
@@ -128,14 +144,24 @@
 //! ```
 //!
 //! This is only a small example, other things can be done with [`Value`] as well: their fields
-//! can be accessed if the [`Value`] is some tuple or struct, array data can be borrowed mutably
-//! or immutably (although only a single array can currently be mutably borrowed at a time).
-//! Additionally, you can create [`Output`]s in a frame in order to protect a value from with a
-//! specific frame; this value will naturally share that frame's lifetime.
+//! can be accessed if the [`Value`] is some tuple or struct. They can contain more complex data;
+//! if a function returns an array or a module, it will still be returned as a [`Value`]. There
+//! complex types are compatible with [`Value::cast`]. Additionally, you can create [`Output`]s in
+//! a frame in order to protect a value from with a specific frame; this value will share that
+//! frame's lifetime.
 //!
-//! For more examples, you can take a look at this crate's integration tests.
+//!
+//! # Custom types
+//!
+//! Two traits can be used to make your own structs work in combination with [`Value::new`] and
+//! [`Value::cast`], [`JuliaTuple`] and [`JuliaStruct`]. The first can be used in combination with
+//! tuple structs in Rust, it will map to a tuple in Julia whose field types match the field types
+//! in Rust. The second can be used in combination with structs with named fields in Rust and must
+//! be explicitly mapped to a struct in Julia.
+//!
 //!
 //! # Lifetimes
+//!
 //! While reading the documentation for this crate, you will see that a lot of lifetimes are used.
 //! Most of these lifetimes have a specific meaning:
 //!
@@ -154,13 +180,17 @@
 //! when Julia data is protected by an older frame this data can be used until that frame goes out
 //! of scope.
 //!
+//!
 //! # Limitations
-//! Calling Julia is entirely single-threaded. You won't be able to use [`Julia`] from
-//! another thread and while Julia is doing stuff you won't be able to interact with it.
+//!
+//! Calling Julia is entirely single-threaded. You won't be able to use [`Julia`] from another
+//! thread than the thread that has been used to initialize Julia, and while Julia is doing stuff
+//! you won't be able to interact with it.
 //!
 //! [`prelude`]: prelude/index.html
 //! [`Julia`]: struct.Julia.html
 //! [`Julia::init`]: struct.Julia.html#method.init
+//! [`Julia::init_with_image`]: struct.Julia.html#method.init_with_image
 //! [`Julia::include`]: struct.Julia.html#method.include
 //! [`Julia::frame`]: struct.Julia.html#method.frame
 //! [`Julia::dynamic_frame`]: struct.Julia.html#method.dynamic_frame
@@ -176,6 +206,7 @@
 //! [`Value`]: value/struct.Value.html
 //! [`Value::new`]: value/struct.Value.html#method.new
 //! [`Value::cast`]: value/struct.Value.html#method.cast
+//! [the instructions for compiling Julia on Windows using Cygwin and MinGW]: https://github.com/JuliaLang/julia/blob/v1.4.1/doc/build/windows.md#cygwin-to-mingw-cross-compiling
 
 pub mod error;
 pub mod frame;
@@ -192,8 +223,9 @@ pub mod value;
 use error::{JlrsError, JlrsResult};
 use frame::{DynamicFrame, StaticFrame};
 use global::Global;
-use jl_sys::{jl_atexit_hook, jl_init};
+use jl_sys::{jl_atexit_hook, jl_init, jl_init_with_image__threading};
 use stack::{Dynamic, RawStack, StackView, Static};
+use std::io::{Error as IOError, ErrorKind};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use value::module::Module;
@@ -202,8 +234,9 @@ use value::Value;
 static INIT: AtomicBool = AtomicBool::new(false);
 
 /// This struct can be created only once during the lifetime of your program. You must create it
-/// with [`Julia::init`] before you can do anything related to Julia. While this struct exists,
-/// Julia is active; dropping it causes the shutdown code to be called.
+/// with [`Julia::init`] or [`Julia::init_with_image`] before you can do anything related to
+/// Julia. While this struct exists, Julia is active; dropping it causes the shutdown code to be
+/// called.
 ///
 /// [`Julia::init`]: struct.Julia.html#method.init
 pub struct Julia {
@@ -239,6 +272,53 @@ impl Julia {
         })
     }
 
+    /// This function is similar to [`Julia::init`] except that it loads a custom system image. A
+    /// custom image can be generated with the [`PackageCompiler`] package for Julia. The main
+    /// advantage of using a custom image over the default one is that it allows you to avoid much
+    /// of the compilation overhead often associated with Julia.
+    ///
+    /// Two additional arguments are required to call this function compared to [`Julia::init`];
+    /// `julia_bindir` and `image_relative_path`. The first must be the absolute path to a
+    /// directory that contains a compatible Julia binary (eg `${JULIA_DIR}/bin`), the second must
+    /// be either an absolute or a relative path to a system image.
+    ///
+    /// This function will return an error if either of the two paths does not exist or if Julia
+    /// has already been initialized.
+    ///
+    /// [`Julia::init`]: struct.Julia.html#init
+    /// [`PackageCompiler`]: https://julialang.github.io/PackageCompiler.jl/dev/
+    pub unsafe fn init_with_image<P: AsRef<Path>>(
+        stack_size: usize,
+        julia_bindir: P,
+        image_path: P,
+    ) -> JlrsResult<Self> {
+        if INIT.swap(true, Ordering::SeqCst) {
+            Err(JlrsError::AlreadyInitialized)?;
+        }
+
+        let julia_bindir_str = julia_bindir.as_ref().to_string_lossy().to_string();
+        let image_path_str = image_path.as_ref().to_string_lossy().to_string();
+
+        if !julia_bindir.as_ref().exists() {
+            let io_err = IOError::new(ErrorKind::NotFound, julia_bindir_str);
+            return Err(JlrsError::other(io_err))?;
+        }
+
+        if !image_path.as_ref().exists() {
+            let io_err = IOError::new(ErrorKind::NotFound, image_path_str);
+            return Err(JlrsError::other(io_err))?;
+        }
+
+        let bindir = std::ffi::CString::new(julia_bindir_str).unwrap();
+        let im_rel_path = std::ffi::CString::new(image_path_str).unwrap();
+
+        jl_init_with_image__threading(bindir.as_ptr(), im_rel_path.as_ptr());
+
+        Ok(Julia {
+            stack: RawStack::new(stack_size),
+        })
+    }
+
     /// Change the stack size to `stack_size`.
     pub fn set_stack_size(&mut self, stack_size: usize) {
         unsafe { self.stack = RawStack::new(stack_size) }
@@ -257,8 +337,8 @@ impl Julia {
     /// ```no_run
     /// # use jlrs::prelude::*;
     /// # fn main() {
-    /// let mut julia = unsafe { Julia::init(16).unwrap() };
-    /// julia.include("jlrs.jl").unwrap();
+    /// # let mut julia = unsafe { Julia::init(16).unwrap() };
+    /// julia.include("MyJuliaCode.jl").unwrap();
     /// # }
     /// ```
     pub fn include<P: AsRef<Path>>(&mut self, path: P) -> JlrsResult<()> {
@@ -293,15 +373,17 @@ impl Julia {
     ///
     /// Example:
     ///
-    /// ```no_run
+    /// ```
     /// # use jlrs::prelude::*;
+    /// # use jlrs::util::JULIA;
     /// # fn main() {
-    /// # let mut julia = unsafe { Julia::init(16).unwrap() };
-    /// julia.frame(2, |_global, frame| {
-    ///     let _i = Value::new(frame, 2u64)?;
-    ///     let _j = Value::new(frame, 1u32)?;
-    ///     Ok(())
-    /// }).unwrap();
+    /// # JULIA.with(|j| {
+    /// # let mut julia = j.borrow_mut();
+    ///   julia.frame(1, |_global, frame| {
+    ///       let i = Value::new(frame, 1u64)?;
+    ///       Ok(())
+    ///   }).unwrap();
+    /// # });
     /// # }
     /// ```
     ///
@@ -334,15 +416,17 @@ impl Julia {
     ///
     /// Example:
     ///
-    /// ```no_run
+    /// ```
     /// # use jlrs::prelude::*;
+    /// # use jlrs::util::JULIA;
     /// # fn main() {
-    /// # let mut julia = unsafe { Julia::init(16).unwrap() };
+    /// # JULIA.with(|j| {
+    /// # let mut julia = j.borrow_mut();
     /// julia.dynamic_frame(|_global, frame| {
-    ///     let _i = Value::new(frame, 2u64)?;
-    ///     let _j = Value::new(frame, 1u32)?;
+    ///     let j = Value::new(frame, 1u64)?;
     ///     Ok(())
     /// }).unwrap();
+    /// # });
     /// # }
     /// ```
     ///

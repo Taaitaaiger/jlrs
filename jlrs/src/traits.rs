@@ -1,14 +1,29 @@
-//! All traits used by the public API of this crate.
+//! All traits used by this crate.
 //!
-//! A quick note: all of these traits are sealed, you can't implement them on your own types. Most
-//! serve as marker traits that are used as trait bounds on some methods to enforce you can only
-//! do things that make sense. The one trait that you will use directly is the [`Frame`] trait
-//! which exposes methods that let you create [`Output`]s in the current frame and nest frames.
-//! This trait is automatically brought into scope by using the [`prelude`] module.
+//! Most of these traits are intended for internal use only and you should never manually
+//! implement them for your own types nor call any of their trait methods. The three major
+//! exceptions to this rule are [`Frame`], [`JuliaTuple`] and [`JuliaStruct`].
+//!
+//! The first of these three traits is implemented by the two frame types that can be used,
+//! [`StaticFrame`] and [`DynamicFrame`], and provides the common functionality they offer. The
+//! other two traits can be derived in order to be able to create Julia tuples and structs from
+//! Rust with [`Value::new`] and convert them back to Rust with [`Value::cast`]. See the
+//! documentation for those traits for more information and requirements.
+//!
+//! Another important trait is [`JuliaTypecheck`]. Types that implement this trait can be used in
+//! combination with [`Value::is`] and [`DataType::is`] in order to check a value's properties.
+//! Most of the structs that implement this trait are not included in the prelude.
 //!
 //! [`Frame`]: trait.Frame.html
-//! [`Output`]: ../frame/struct.Output.html
-//! [`prelude`]: ../prelude/index.html
+//! [`JuliaTuple`]: trait.JuliaTuple.html
+//! [`JuliaStruct`]: trait.JuliaStruct.html
+//! [`StaticFrame`]: ../frame/struct.StaticFrame.html
+//! [`DynamicFrame`]: ../frame/struct.DynamicFrame.html
+//! [`Value::new`]: ../value/struct.Value.html#method.new
+//! [`Value::cast`]: ../value/struct.Value.html#method.cast
+//! [`JuliaTypecheck`]: trait.JuliaTypecheck.html
+//! [`Value::is`]: ../value/struct.Value.html#method.is
+//! [`DataType::is`]: ../value/datatype/struct.DataType.html#method.is
 
 use crate::error::{AllocError, JlrsError, JlrsResult};
 use crate::frame::{DynamicFrame, Output, StaticFrame};
@@ -28,12 +43,6 @@ use jl_sys::{
 };
 use std::borrow::Cow;
 
-// All these traits have a public and a private side. In order to prevent users from using methods
-// that are for internal use only, all traits extend a base trait with the same name from the
-// crate-public private module that contains the methods intended for private use and serves as a
-// sealing trait. In order to retain information about what types implement a trait in the docs,
-// the public trait is explicitly implemented for each type that implements the associated private
-// trait rather than with a single blanket implementation.
 macro_rules! p {
     ($trait:ident, $type:ty, $($bounds:tt)+) => {
         unsafe impl<$($bounds)+> $trait for $type {}
@@ -43,30 +52,113 @@ macro_rules! p {
     };
 }
 
-/// Trait implemented by types that can be converted to a temporary `Symbol`.
+/// Trait implemented by types that can be converted to a temporary [`Symbol`].
+///
+/// [`Symbol`]: ../value/symbol/struct.Symbol.html
 pub unsafe trait TemporarySymbol: private::TemporarySymbol {}
 
-/// Trait implemented by types that can be converted to a Julia value. Do not implement this
-/// yourself. This trait can be derived for structs that are marked as `[repr(C)]` and only
-/// contain fields that implement this trait by deriving `JuliaTuple`.
+/// Trait implemented by types that can be converted to a Julia value in combination with
+/// [`Value::new`].
+///
+/// [`Value::new`]: ../value/struct.Value.html#method.new
 pub unsafe trait IntoJulia {
-    /// Convert `self` into a raw Julia value. This value is not protected from garbage
-    /// collection after creation and must be assigned to a slot on the GC stack before calling
-    /// another allocating method from the Julia C API.
+    #[doc(hidden)]
     unsafe fn into_julia(&self) -> *mut jl_value_t;
 }
 
-/// Trait implemented by types that have an associated type in Julia. Do not implement this
-/// yourself. This trait can be derived for structs that are marked as `[repr(C)]` and only
-/// contain fields that implement this trait by deriving `JuliaTuple`.
+/// Trait implemented by types that have an associated type in Julia.
 pub unsafe trait JuliaType {
+    #[doc(hidden)]
     unsafe fn julia_type() -> *mut jl_datatype_t;
 }
 
-/// Implemented when using `#[derive(JuliaTuple)]`. Do not implement this yourself.
+/// In order to be able to create Julia tuples from Rust and convert a [`Value`] that contains one
+/// back to Rust you will need to derive this trait. This has the following requirements:
+///  - the struct must be a tuple struct.
+///  - the struct must be annotated with `#[repr(C)]`.
+///  - the struct must implement `Copy` and `Clone`.
+///  - the struct must only contain fields that implement [`JuliaType`] and [`IntoJulia`].
+///
+/// If all these requirements are satisfied this trait can be derived successfully and corresponds
+/// to a Julia struct with the same fields. For example, if you want to work with Julia values
+/// that have the type `Tuple{UInt64, Int32}`, the following will work:
+///
+/// ```ignore
+/// #[derive(Copy, Clone, JuliaTuple)]
+/// #[repr(C)]
+/// struct MyTuple(u64, i32);
+/// ```
+///
+/// When you derive this trait, three additional traits are derived: [`JuliaType`], [`IntoJulia`],
+/// and [`JuliaTypecheck`]. As a result, this struct can be used in combination with
+/// [`DataType::is`], [`Value::is`], [`Value::new`], and [`Value::cast`].
+///
+/// [`Value`]: ../value/struct.Value.html
+/// [`JuliaType`]: trait.JuliaType.html
+/// [`IntoJulia`]: trait.IntoJulia.html
+/// [`JuliaTypecheck`]: trait.JuliaTypecheck.html
+/// [`Value::is`]: ../value/struct.Value.html#method.is
+/// [`DataType::is`]: ../value/datatype/struct.DataType.html#method.is
+/// [`Value::new`]: ../value/struct.Value.html#method.new
+/// [`Value::cast`]: ../value/struct.Value.html#method.cast
 pub unsafe trait JuliaTuple: JuliaType + IntoJulia + Copy + Clone {}
 
-/// Implemented when using `#[derive(JuliaTuple)]`. Do not implement this yourself.
+/// In order to be able to create Julia structs from Rust and convert a [`Value`] that contains one
+/// back to Rust you will need to derive this trait. This has the following requirements:
+///  - the struct must be a struct with named fields.
+///  - the names of the fields must match.
+///  - The associated Julia type must be explicitly provided
+///  - the struct must be annotated with `#[repr(C)]`.
+///  - the struct must implement `Copy` and `Clone`.
+///  - the struct must only contain fields that implement [`JuliaType`] and [`IntoJulia`].
+///
+/// If all these requirements are satisfied this trait can be derived successfully and corresponds
+/// to a Julia struct with the same name and fields. If you have the following struct in Julia
+///
+/// ```julia
+/// struct MyStruct
+///     a::UInt64
+///     b::Int32
+/// end
+/// ```
+/// in the `Main` module, you can derive `JuliaStruct` like this:
+///
+/// ```ignore
+/// #[derive(Copy, Clone, JuliaStruct)]
+/// #[repr(C)]
+/// #[jlrs(julia_type = "Main.MyStruct")]
+/// struct MyStruct {
+///     a: u64,   
+///     b: i32,   
+/// }
+/// ```
+///
+/// When you derive this trait, three additional traits are derived: [`JuliaType`], [`IntoJulia`],
+/// and [`JuliaTypecheck`]. As a result, this struct can be used in combination with
+/// [`DataType::is`], [`Value::is`], [`Value::new`], and [`Value::cast`].
+///
+/// If you want or need to use another name for a field, you can use the `rename`-attribute:
+///
+/// ```ignore
+/// #[derive(Copy, Clone, JuliaStruct)]
+/// #[jlrs(julia_type = "Main.🍔")]
+/// #[repr(C)]
+/// struct Hamburger {
+///     #[jlrs(rename = "🥒")]
+///     pickle: i32,
+///     #[jlrs(rename = "🍅")]
+///     tomato: f32,
+/// }
+/// ```
+///
+/// [`Value`]: ../value/struct.Value.html
+/// [`JuliaType`]: trait.JuliaType.html
+/// [`IntoJulia`]: trait.IntoJulia.html
+/// [`JuliaTypecheck`]: trait.JuliaTypecheck.html
+/// [`Value::is`]: ../value/struct.Value.html#method.is
+/// [`DataType::is`]: ../value/datatype/struct.DataType.html#method.is
+/// [`Value::new`]: ../value/struct.Value.html#method.new
+/// [`Value::cast`]: ../value/struct.Value.html#method.cast
 pub unsafe trait JuliaStruct: JuliaType + IntoJulia + Copy + Clone {}
 
 /// Trait implemented by types that have the same representation in Julia and Rust when they are
@@ -74,31 +166,32 @@ pub unsafe trait JuliaStruct: JuliaType + IntoJulia + Copy + Clone {}
 /// their contents between Julia and Rust. This includes all types that implement `JuliaType`
 /// except `bool` and `char`.
 pub unsafe trait ArrayDataType: JuliaType {
-    fn array_data_type() {}
+    unsafe fn array_data_type() {}
 }
 
-/// This trait is used in combination with [`DataType::is`] and can be used to check many
-/// properties of a Julia `DataType`. You should not implement this trait for your own types.
+/// This trait is used in combination with [`Value::is`] and [`DataType::is`]; types that
+/// implement this trait can be used to check many properties of a Julia `DataType`.
 ///
-/// This trait is implemented for a few types from the standard library, eg `String` and `u8`. In
-/// these cases, [`DataType::is`] returns true if [`Value::is`] would return `true` for that type.
+/// This trait is implemented for a few types that implement [`JuliaType ], eg `String`,
+/// [`Array`], and `u8`. In these cases, if the check returns `true` the value can be successfully
+/// cast to that type with [`Value::cast`].
 ///
 /// [`DataType::is`]: ../value/datatype/struct.DataType.html#method.is
 /// [`Value::is`]: ../value/struct.Value.html#method.is
+/// [`JuliaType`]: trait.JuliaType.html
+/// [`Array`]: ../value/array/struct.Array.html
+/// [`Value::cast`]: ../value/struct.Value.html#method.cast
 pub unsafe trait JuliaTypecheck {
     #[doc(hidden)]
     unsafe fn julia_typecheck(t: DataType) -> bool;
 }
 
-/// This trait is implemented by types that represent special cases of [`Value`] that have a more
-/// complex layout than several accessible fields. This currently includes [`Array`],
-/// [`DataType`], [`Module`] and [`Symbol`].
+/// This trait is implemented by types that a [`Value`] can be converted into by calling
+/// [`Value::cast`]. This includes types like `String`, [`Array`], and `u8`.
 ///
 /// [`Value`]: ../value/struct.Value.html
+/// [`Value::cast`]: ../value/struct.Value.html#method.cast
 /// [`Array`]: ../value/array/struct.Array.html
-/// [`DataType`]: ../value/datatype/struct.DataType.html
-/// [`Module`]: ../value/module/struct.Module.html
-/// [`Symbol`]: ../value/symbol/struct.Symbol.html
 pub unsafe trait Cast<'frame, 'data> {
     type Output;
     #[doc(hidden)]
@@ -114,9 +207,9 @@ pub unsafe trait Cast<'frame, 'data> {
 /// protected and cannot be used.
 ///
 /// If you need the result of a function call to be valid outside the frame where it is called,
-/// you can call `Frame::output` to create an [`Output`] and call the function through
-/// [`Value::call_output`] or one of the other `call*_output` methods. The result will share the
-/// output's lifetime so it can be used until the output's frame goes out of scope.
+/// you can call `Frame::output` to create an [`Output`] and use [`Value::with_output`] to use the
+/// output to protect the value rather than the current frame. The result will share the output's
+/// lifetime so it can be used until the output's frame goes out of scope.
 ///
 /// [`StaticFrame`]: ../frame/struct.StaticFrame.html
 /// [`DynamicFrame`]: ../frame/struct.DynamicFrame.html
@@ -124,7 +217,7 @@ pub unsafe trait Cast<'frame, 'data> {
 /// [`Julia::frame`]: ../struct.Julia.html#method.frame
 /// [`Julia::dynamic_frame`]: ../struct.Julia.html#method.dynamic_frame
 /// [`Output`]: ../frame/struct.Output.html
-/// [`Value::call_output`]: ../value/struct.Value.html#method.call_output
+/// [`Value::with_output`]: ../value/struct.Value.html#method.with_output
 pub trait Frame<'frame>: private::Frame<'frame> {
     /// Create a `StaticFrame` that can hold `capacity` values, and call the given closure.
     /// Returns the result of this closure, or an error if the new frame can't be created
@@ -583,6 +676,7 @@ impl<'frame> Frame<'frame> for DynamicFrame<'frame> {
         self.len
     }
 
+    #[cfg_attr(tarpaulin, skip)]
     fn print_memory(&self) {
         self.memory.print_memory()
     }

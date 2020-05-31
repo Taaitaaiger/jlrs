@@ -9,6 +9,31 @@ mod tests {
     #[repr(C)]
     struct UsizeAndIsize(usize, isize);
 
+    #[derive(Copy, Clone, JuliaTuple, Eq, PartialEq, Debug)]
+    #[repr(C)]
+    struct Usizes(
+        usize,
+        usize,
+        usize,
+        usize,
+        usize,
+        usize,
+        usize,
+        usize,
+        usize,
+        usize,
+        usize,
+        usize,
+        usize,
+        usize,
+        usize,
+        usize,
+    );
+
+    #[derive(Copy, Clone, JuliaTuple, PartialEq, Debug)]
+    #[repr(C)]
+    struct DifferentTypes(u8, u32, i64, f32, f64, i8, bool, u32, i8, i16);
+
     #[derive(Copy, Clone, JuliaStruct, PartialEq, Debug)]
     #[jlrs(julia_type = "Main.JlrsDeriveTests.Submodule.MyType")]
     #[repr(C)]
@@ -65,6 +90,52 @@ mod tests {
                     assert_eq!(second.cast::<isize>().unwrap(), -4);
                     assert!(v.is::<UsizeAndIsize>());
                     assert_eq!(v.cast::<UsizeAndIsize>().unwrap(), s);
+
+                    Ok(())
+                })
+                .unwrap()
+        })
+    }
+
+    #[test]
+    fn derive_usizes() {
+        JULIA.with(|j| {
+            let mut julia = j.borrow_mut();
+
+            julia
+                .frame(3, |_global, frame| {
+                    let s = Usizes(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16);
+                    let v = Value::new(frame, s).unwrap();
+                    let first = v.get_nth_field(frame, 0).unwrap();
+                    let second = v.get_nth_field(frame, 1).unwrap();
+
+                    assert_eq!(first.cast::<usize>().unwrap(), 1);
+                    assert_eq!(second.cast::<usize>().unwrap(), 2);
+                    assert!(v.is::<Usizes>());
+                    assert_eq!(v.cast::<Usizes>().unwrap(), s);
+
+                    Ok(())
+                })
+                .unwrap()
+        })
+    }
+
+    #[test]
+    fn derive_different_types() {
+        JULIA.with(|j| {
+            let mut julia = j.borrow_mut();
+
+            julia
+                .frame(3, |_global, frame| {
+                    let s = DifferentTypes(21, 293, -7, 12.34, 56.78, -3, true, 12331123, -9, -295);
+                    let v = Value::new(frame, s).unwrap();
+                    let first = v.get_nth_field(frame, 0).unwrap();
+                    let last = v.get_nth_field(frame, 9).unwrap();
+
+                    assert_eq!(first.cast::<u8>().unwrap(), 21);
+                    assert_eq!(last.cast::<i16>().unwrap(), -295);
+                    assert!(v.is::<DifferentTypes>());
+                    assert_eq!(v.cast::<DifferentTypes>().unwrap(), s);
 
                     Ok(())
                 })

@@ -34,6 +34,12 @@ pub enum JlrsError {
     InvalidIndex(Dimensions, Dimensions),
 }
 
+impl JlrsError {
+    pub(crate) fn other<E: Error + Send + Sync + 'static>(reason: E) -> Self {
+        JlrsError::Other(Box::new(reason))
+    }
+}
+
 impl Display for JlrsError {
     #[cfg_attr(tarpaulin, skip)]
     fn fmt(&self, formatter: &mut Formatter) -> FmtResult {
@@ -104,6 +110,7 @@ impl Display for JlrsError {
 impl Error for JlrsError {}
 
 impl Into<Box<JlrsError>> for Box<dyn Error + Send + Sync + 'static> {
+    #[cfg_attr(tarpaulin, skip)]
     fn into(self) -> Box<JlrsError> {
         Box::new(JlrsError::Other(self))
     }
