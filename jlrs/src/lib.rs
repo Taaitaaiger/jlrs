@@ -145,7 +145,7 @@
 //!
 //! This is only a small example, other things can be done with [`Value`] as well: their fields
 //! can be accessed if the [`Value`] is some tuple or struct. They can contain more complex data;
-//! if a function returns an array or a module, it will still be returned as a [`Value`]. There
+//! if a function returns an array or a module it will still be returned as a [`Value`]. There
 //! complex types are compatible with [`Value::cast`]. Additionally, you can create [`Output`]s in
 //! a frame in order to protect a value from with a specific frame; this value will share that
 //! frame's lifetime.
@@ -199,6 +199,8 @@
 //! [`StaticFrame`]: frame/struct.StaticFrame.html
 //! [`DynamicFrame`]: frame/struct.DynamicFrame.html
 //! [`Frame`]: traits/trait.Frame.html
+//! [`JuliaTuple`]: traits/trait.JuliaTuple.html
+//! [`JuliaStruct`]: traits/trait.JuliaStruct.html
 //! [`Module::function`]: value/module/struct.Module.html#method.function
 //! [`Module::base`]: value/module/struct.Module.html#method.base
 //! [`Module::core`]: value/module/struct.Module.html#method.core
@@ -240,6 +242,7 @@ static INIT: AtomicBool = AtomicBool::new(false);
 /// called.
 ///
 /// [`Julia::init`]: struct.Julia.html#method.init
+/// [`Julia::init_with_image`]: struct.Julia.html#method.init_with_image
 pub struct Julia {
     stack: RawStack,
 }

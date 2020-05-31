@@ -183,9 +183,7 @@ impl<'frame> Values<'frame> {
 ///
 /// The methods that create a new `Value` come in two varieties: `<method>` and `<method>_output`.
 /// The first will use a slot in the current frame to protect the value from garbage collection,
-/// while the latter uses a slot in another active frame. Other features offered by `Value`
-/// include accessing the fields of these values and (im)mutably borrowing their underlying array
-/// data.
+/// while the latter uses a slot in another active frame. 
 ///
 /// [`Value::assume_owned`]: struct.Value.html#method.assume_owned
 /// [`IntoJulia`]: ../traits/trait.IntoJulia.html

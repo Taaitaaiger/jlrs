@@ -7,7 +7,7 @@
 //! Frames can be nested, the two frame types that currently exist can be freely mixed. The main
 //! difference between the two is that a [`StaticFrame`] is created with a definite capacity,
 //! while a [`DynamicFrame`] will dynamically grow its capacity whenever a value is created or a
-//! function is called. A `StaticFrame` is more efficient, a `DynamicFrame` is easier to use.
+//! function is called. A [`StaticFrame`] is more efficient, a [`DynamicFrame`] is easier to use.
 //! Creating a nested frame takes no space in the current frame.
 //!
 //! Frames have a lifetime, `'frame`. This lifetime ensures that a [`Value`] can only be used as
