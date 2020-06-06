@@ -33,6 +33,48 @@ mod tests {
     #[derive(Copy, Clone, JuliaTuple, PartialEq, Debug)]
     #[repr(C)]
     struct DifferentTypes(u8, u32, i64, f32, f64, i8, bool, u32, i8, i16);
+    
+    /*
+    #[derive(Copy, Clone, JuliaStruct, PartialEq, Debug)]
+    #[jlrs(julia_type = "Main.JlrsDeriveTests.WithArray")]
+    #[repr(C)]
+    struct WithArray<'frame, 'data> {
+        id: u8,
+        array: Array<'frame, 'data>
+    }
+
+    #[derive(Copy, Clone, JuliaStruct, PartialEq, Debug)]
+    #[jlrs(julia_type = "Main.JlrsDeriveTests.WithValue")]
+    #[repr(C)]
+    struct WithValue<'frame, 'data> {
+        id: u8,
+        value: Value<'frame, 'data>
+    }
+
+    #[derive(Copy, Clone, JuliaStruct, PartialEq, Debug)]
+    #[jlrs(julia_type = "Main.JlrsDeriveTests.WithDataType")]
+    #[repr(C)]
+    struct WithDataType<'frame> {
+        id: u8,
+        datatype: DataType<'frame>
+    }
+
+    #[derive(Copy, Clone, JuliaStruct, PartialEq, Debug)]
+    #[jlrs(julia_type = "Main.JlrsDeriveTests.WithModule")]
+    #[repr(C)]
+    struct WithModule<'frame> {
+        id: u8,
+        module: Module<'frame>
+    }
+
+    #[derive(Copy, Clone, JuliaStruct, PartialEq, Debug)]
+    #[jlrs(julia_type = "Main.JlrsDeriveTests.WithSymbol")]
+    #[repr(C)]
+    struct WithSymbol<'frame> {
+        id: u8,
+        symbol: Symbol<'frame>
+    }
+    */
 
     #[derive(Copy, Clone, JuliaStruct, PartialEq, Debug)]
     #[jlrs(julia_type = "Main.JlrsDeriveTests.Submodule.MyType")]

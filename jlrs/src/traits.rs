@@ -33,13 +33,14 @@ use crate::value::module::Module;
 use crate::value::symbol::Symbol;
 use crate::value::Value;
 use jl_sys::{
-    jl_bool_type, jl_box_bool, jl_box_char, jl_box_float32, jl_box_float64, jl_box_int16,
-    jl_box_int32, jl_box_int64, jl_box_int8, jl_box_uint16, jl_box_uint32, jl_box_uint64,
-    jl_box_uint8, jl_char_type, jl_datatype_t, jl_float32_type, jl_float64_type, jl_int16_type,
-    jl_int32_type, jl_int64_type, jl_int8_type, jl_pchar_to_string, jl_string_data, jl_string_len,
-    jl_uint16_type, jl_uint32_type, jl_uint64_type, jl_uint8_type, jl_unbox_float32,
-    jl_unbox_float64, jl_unbox_int16, jl_unbox_int32, jl_unbox_int64, jl_unbox_int8,
-    jl_unbox_uint16, jl_unbox_uint32, jl_unbox_uint64, jl_unbox_uint8, jl_value_t,
+    jl_any_type, jl_bool_type, jl_box_bool, jl_box_char, jl_box_float32, jl_box_float64,
+    jl_box_int16, jl_box_int32, jl_box_int64, jl_box_int8, jl_box_uint16, jl_box_uint32,
+    jl_box_uint64, jl_box_uint8, jl_char_type, jl_datatype_t, jl_datatype_type, jl_float32_type,
+    jl_float64_type, jl_int16_type, jl_int32_type, jl_int64_type, jl_int8_type, jl_module_type,
+    jl_pchar_to_string, jl_string_data, jl_string_len, jl_symbol_type, jl_uint16_type,
+    jl_uint32_type, jl_uint64_type, jl_uint8_type, jl_unbox_float32, jl_unbox_float64,
+    jl_unbox_int16, jl_unbox_int32, jl_unbox_int64, jl_unbox_int8, jl_unbox_uint16,
+    jl_unbox_uint32, jl_unbox_uint64, jl_unbox_uint8, jl_value_t,
 };
 use std::borrow::Cow;
 
@@ -160,6 +161,14 @@ pub unsafe trait JuliaTuple: JuliaType + IntoJulia + Copy + Clone {}
 /// [`Value::new`]: ../value/struct.Value.html#method.new
 /// [`Value::cast`]: ../value/struct.Value.html#method.cast
 pub unsafe trait JuliaStruct: JuliaType + IntoJulia + Copy + Clone {}
+
+/*
+pub unsafe trait JuliaFieldType {
+    unsafe fn julia_field_type() {
+
+    }
+}
+*/
 
 /// This trait is used in combination with [`Value::is`] and [`DataType::is`]; types that
 /// implement this trait can be used to check many properties of a Julia `DataType`.
@@ -355,6 +364,13 @@ macro_rules! impl_julia_type {
             }
         }
     };
+    ($type:ty, $jl_type:expr, $($bounds:tt)+) => {
+        unsafe impl<$($bounds)+> JuliaType for $type {
+            unsafe fn julia_type() -> *mut jl_datatype_t {
+                $jl_type
+            }
+        }
+    };
 }
 
 impl_julia_type!(u8, jl_uint8_type);
@@ -369,6 +385,10 @@ impl_julia_type!(f32, jl_float32_type);
 impl_julia_type!(f64, jl_float64_type);
 impl_julia_type!(bool, jl_bool_type);
 impl_julia_type!(char, jl_char_type);
+impl_julia_type!(Module<'frame>, jl_module_type, 'frame);
+impl_julia_type!(Symbol<'frame>, jl_symbol_type, 'frame);
+impl_julia_type!(DataType<'frame>, jl_datatype_type, 'frame);
+impl_julia_type!(Value<'frame, 'data>, jl_any_type, 'frame, 'data);
 
 #[cfg(not(target_pointer_width = "64"))]
 unsafe impl JuliaType for usize {

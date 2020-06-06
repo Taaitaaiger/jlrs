@@ -6,6 +6,13 @@ edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+stable = ["jlrs/stable", "jlrs/jlrs-derive"]
+beta = ["jlrs/beta", "jlrs/jlrs-derive"]
+
 [dependencies]
-jlrs = { path = "../jlrs" }
 jlrs-derive = { path = "../jlrs_derive" }
+
+[dependencies.jlrs]
+path = "../jlrs"
+default-features = false

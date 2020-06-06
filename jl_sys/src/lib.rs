@@ -228,9 +228,20 @@ pub unsafe fn jl_fieldref_noalloc(s: *mut jl_value_t, i: usize) -> *mut jl_value
 }
 
 #[inline(always)]
+#[cfg(feature = "stable")]
 pub unsafe fn jl_get_fieldtypes(st: *mut jl_datatype_t) -> *mut jl_svec_t {
     if (&*st).types.is_null() {
         jl_compute_fieldtypes(st)
+    } else {
+        (&*st).types
+    }
+}
+
+#[inline(always)]
+#[cfg(feature = "beta")]
+pub unsafe fn jl_get_fieldtypes(st: *mut jl_datatype_t) -> *mut jl_svec_t {
+    if (&*st).types.is_null() {
+        jl_compute_fieldtypes(st, std::ptr::null_mut())
     } else {
         (&*st).types
     }

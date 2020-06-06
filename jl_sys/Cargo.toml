@@ -16,6 +16,8 @@ links = "julia"
 
 [features]
 docs-rs = []
+stable = []
+beta = []
 
 [build-dependencies]
 bindgen = "0.54.0"

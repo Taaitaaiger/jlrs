@@ -17,8 +17,10 @@ license = "MIT"
 edition = "2018"
 
 [features]
-default = ["jlrs-derive"]
+default = ["jlrs-derive", "stable"]
 docs-rs = ["jl-sys/docs-rs", "jlrs-derive"]
+stable = ["jl-sys/stable"]
+beta = ["jl-sys/beta"]
 
 [dependencies]
 jl-sys = {version = "0.7", path = "../jl_sys" }
