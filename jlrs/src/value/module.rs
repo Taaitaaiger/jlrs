@@ -114,3 +114,9 @@ impl<'base> Module<'base> {
         self.global(name)
     }
 }
+
+impl<'base> Into<Value<'base, 'static>> for Module<'base> {
+    fn into(self) -> Value<'base, 'static> {
+        unsafe { Value::wrap(self.ptr().cast()) }
+    }
+}

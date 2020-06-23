@@ -409,6 +409,73 @@ pub unsafe fn jl_field_isptr(st: *mut jl_datatype_t, i: i32) -> bool {
         != 0
 }
 
+/*
+#define DEFINE_FIELD_ACCESSORS(f)                                             \
+    static inline uint32_t jl_field_##f(jl_datatype_t *st,                    \
+                                        int i) JL_NOTSAFEPOINT                \
+    {                                                                         \
+        const jl_datatype_layout_t *ly = st->layout;                          \
+        assert(i >= 0 && (size_t)i < ly->nfields);                            \
+        if (ly->fielddesc_type == 0) {                                        \
+            return ((const jl_fielddesc8_t*)jl_dt_layout_fields(ly))[i].f;    \
+        }                                                                     \
+        else if (ly->fielddesc_type == 1) {                                   \
+            return ((const jl_fielddesc16_t*)jl_dt_layout_fields(ly))[i].f;   \
+        }                                                                     \
+        else {                                                                \
+            return ((const jl_fielddesc32_t*)jl_dt_layout_fields(ly))[i].f;   \
+        }                                                                     \
+    }                                                                         \
+
+DEFINE_FIELD_ACCESSORS(offset)
+DEFINE_FIELD_ACCESSORS(size)
+#undef DEFINE_FIELD_ACCESSORS
+*/
+
+pub unsafe fn jl_field_size(st: *mut jl_datatype_t, i: isize) -> u32 {
+    let ly = &*(&*st).layout;
+    assert!(i >= 0 && (i as u32) < ly.nfields);
+    match ly.fielddesc_type() {
+        0 => (&*(jl_dt_layout_fields((ly as *const jl_datatype_layout_t).cast())
+            .cast::<jl_fielddesc8_t>()
+            .offset(i)))
+            .size() as u32,
+        1 => (&*(jl_dt_layout_fields((ly as *const jl_datatype_layout_t).cast())
+            .cast::<jl_fielddesc16_t>()
+            .offset(i)))
+            .size() as u32,
+        _ => (&*(jl_dt_layout_fields((ly as *const jl_datatype_layout_t).cast())
+            .cast::<jl_fielddesc32_t>()
+            .offset(i)))
+            .size(),
+    }
+}
+
+pub unsafe fn jl_field_offset(st: *mut jl_datatype_t, i: isize) -> u32 {
+    let ly = &*(&*st).layout;
+    assert!(i >= 0 && (i as u32) < ly.nfields);
+    match ly.fielddesc_type() {
+        0 => {
+            (&*(jl_dt_layout_fields((ly as *const jl_datatype_layout_t).cast())
+                .cast::<jl_fielddesc8_t>()
+                .offset(i)))
+                .offset as u32
+        }
+        1 => {
+            (&*(jl_dt_layout_fields((ly as *const jl_datatype_layout_t).cast())
+                .cast::<jl_fielddesc16_t>()
+                .offset(i)))
+                .offset as u32
+        }
+        _ => {
+            (&*(jl_dt_layout_fields((ly as *const jl_datatype_layout_t).cast())
+                .cast::<jl_fielddesc32_t>()
+                .offset(i)))
+                .offset
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

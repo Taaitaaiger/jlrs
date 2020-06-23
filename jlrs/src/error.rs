@@ -11,6 +11,7 @@ pub type JlrsResult<T> = Result<T, Box<JlrsError>>;
 #[derive(Debug)]
 pub enum JlrsError {
     Other(Box<dyn Error + Send + Sync>),
+    Exception(String),
     AlreadyInitialized,
     NotAnArray,
     Nothing,
@@ -34,6 +35,14 @@ pub enum JlrsError {
     InvalidIndex(Dimensions, Dimensions),
 }
 
+pub fn exception<T>(exc: String) -> JlrsResult<T> {
+    Err(JlrsError::Exception(exc))?
+}
+
+pub fn other<E: Error + Send + Sync + 'static>(reason: E) -> JlrsResult<()> {
+    Err(JlrsError::Other(Box::new(reason)))?
+}
+
 impl JlrsError {
     pub(crate) fn other<E: Error + Send + Sync + 'static>(reason: E) -> Self {
         JlrsError::Other(Box::new(reason))
@@ -48,6 +57,7 @@ impl Display for JlrsError {
             JlrsError::AlreadyInitialized => {
                 write!(formatter, "The runtime was already initialized")
             }
+            JlrsError::Exception(exc) => write!(formatter, "An exception was thrown: {}", exc),
             JlrsError::NotAnArray => write!(formatter, "This is not an array"),
             JlrsError::NotAString => write!(formatter, "This is not a string"),
             JlrsError::Nothing => write!(formatter, "This value is Nothing"),

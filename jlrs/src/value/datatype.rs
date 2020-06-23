@@ -19,24 +19,28 @@
 //! [`DataType`]: struct.DataType.html
 //! [`JuliaTypecheck`]: ../../traits/trait.JuliaTypecheck.html
 
+use crate::global::Global;
 use crate::traits::JuliaType;
 use crate::traits::JuliaTypecheck;
 use crate::value::array::Array;
 use crate::value::module::Module;
 use crate::value::symbol::Symbol;
+use crate::value::Value;
 use jl_sys::{
-    jl_code_info_type, jl_code_instance_type, jl_datatype_align, jl_datatype_isinlinealloc,
-    jl_datatype_nbits, jl_datatype_nfields, jl_datatype_size, jl_datatype_t, jl_datatype_type,
-    jl_expr_type, jl_globalref_type, jl_gotonode_type, jl_intrinsic_type, jl_is_array_type,
-    jl_is_cpointer_type, jl_linenumbernode_type, jl_method_instance_type, jl_method_type,
-    jl_methtable_type, jl_module_type, jl_namedtuple_typename, jl_newvarnode_type,
+    jl_any_type, jl_code_info_type, jl_code_instance_type, jl_datatype_align,
+    jl_datatype_isinlinealloc, jl_datatype_nbits, jl_datatype_nfields, jl_datatype_size,
+    jl_datatype_t, jl_datatype_type, jl_expr_type, jl_field_isptr, jl_field_names, jl_field_offset,
+    jl_field_size, jl_get_fieldtypes, jl_globalref_type, jl_gotonode_type, jl_intrinsic_type,
+    jl_is_array_type, jl_is_cpointer_type, jl_linenumbernode_type, jl_method_instance_type,
+    jl_method_type, jl_methtable_type, jl_module_type, jl_namedtuple_typename, jl_newvarnode_type,
     jl_phicnode_type, jl_phinode_type, jl_pinode_type, jl_quotenode_type, jl_simplevector_type,
-    jl_slotnumber_type, jl_ssavalue_type, jl_string_type, jl_symbol_type, jl_task_type,
-    jl_tuple_typename, jl_tvar_type, jl_typedslot_type, jl_typename_type, jl_unionall_type,
-    jl_uniontype_type, jl_upsilonnode_type,
+    jl_slotnumber_type, jl_ssavalue_type, jl_string_type, jl_svec_data, jl_svec_len,
+    jl_symbol_type, jl_task_type, jl_tuple_typename, jl_tvar_type, jl_typedslot_type,
+    jl_typename_str, jl_typename_type, jl_unionall_type, jl_uniontype_type, jl_upsilonnode_type,
 };
+use std::ffi::CStr;
+use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::marker::PhantomData;
-
 /// Julia type information. You can acquire a [`Value`]'s datatype by by calling
 /// [`Value::datatype`]. This struct implements [`JuliaTypecheck`] and [`Cast`]. It can be used in
 /// combination with [`DataType::is`] and [`Value::is`]; if the check returns `true` the [`Value`]
@@ -70,7 +74,7 @@ use std::marker::PhantomData;
 /// [`JuliaTypecheck`]: ../../traits/trait.JuliaTypecheck.html
 /// [`DataType::is`]: struct.Datatype.html#method.is
 /// [`Value::is`]: struct.Datatype.html#method.is
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Hash, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct DataType<'frame>(*mut jl_datatype_t, PhantomData<&'frame ()>);
 
@@ -113,6 +117,60 @@ impl<'frame> DataType<'frame> {
     pub fn isinlinealloc(self) -> bool {
         unsafe { jl_datatype_isinlinealloc(self.0) != 0 }
     }
+
+    pub fn name(&self) -> &'frame str {
+        unsafe {
+            let name = jl_typename_str(self.ptr().cast());
+            CStr::from_ptr(name).to_str().unwrap()
+        }
+    }
+
+    /// Returns the field names of this type as a slice of `Symbol`s. These symbols can be used
+    /// to access their fields with [`Value::get_field`].
+    ///
+    /// [`Value::get_field`]: struct.Value.html#method.get_field
+    pub fn field_names<'base>(self, _: Global<'base>) -> &[Symbol<'base>] {
+        unsafe {
+            let field_names = jl_field_names(self.ptr().cast());
+            let len = jl_svec_len(field_names);
+            let items = jl_svec_data(field_names);
+            std::slice::from_raw_parts(items.cast(), len)
+        }
+    }
+
+    pub fn field_types(&self) -> &[Value<'frame, 'static>] {
+        unsafe {
+            let field_types = jl_get_fieldtypes(self.ptr());
+            let len = jl_svec_len(field_types);
+            let items = jl_svec_data(field_types);
+            std::slice::from_raw_parts(items.cast(), len)
+        }
+    }
+
+    pub fn field_size(&self, idx: usize) -> u32 {
+        unsafe { jl_field_size(self.ptr(), idx as _) }
+    }
+
+    pub fn field_offset(&self, idx: usize) -> u32 {
+        unsafe { jl_field_offset(self.ptr(), idx as _) }
+    }
+
+    pub fn is_pointer_field(&self, idx: usize) -> bool {
+        unsafe { jl_field_isptr(self.ptr(), idx as _) }
+    }
+}
+
+impl<'frame> Into<Value<'frame, 'static>> for DataType<'frame> {
+    fn into(self) -> Value<'frame, 'static> {
+        unsafe { Value::wrap(self.ptr().cast()) }
+    }
+}
+
+impl<'frame, 'data> Debug for DataType<'frame> {
+    #[cfg_attr(tarpaulin, skip)]
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        f.debug_tuple("DataType").field(&self.name()).finish()
+    }
 }
 
 macro_rules! impl_julia_typecheck {
@@ -148,6 +206,11 @@ unsafe impl JuliaTypecheck for Tuple {
         (&*t.ptr()).name == jl_tuple_typename
     }
 }
+
+/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
+/// a value of this type is a tuple.
+pub struct Any;
+impl_julia_typecheck!(Any, jl_any_type);
 
 /// A typecheck that can be used in combination with `DataType::is`. This method returns true if
 /// a value of this type is a named tuple.

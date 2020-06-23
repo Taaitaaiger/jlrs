@@ -1,5 +1,6 @@
 //! Symbols represent identifiers like module and function names.
 
+use super::Value;
 use crate::global::Global;
 use jl_sys::{jl_sym_t, jl_symbol_n, jl_symbol_name};
 use std::ffi::CStr;
@@ -69,6 +70,12 @@ impl<'base> Into<String> for Symbol<'base> {
             let symbol = CStr::from_ptr(ptr);
             symbol.to_str().unwrap().into()
         }
+    }
+}
+
+impl<'base> Into<Value<'base, 'static>> for Symbol<'base> {
+    fn into(self) -> Value<'base, 'static> {
+        unsafe { Value::wrap(self.ptr().cast()) }
     }
 }
 

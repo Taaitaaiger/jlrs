@@ -33,7 +33,7 @@ mod tests {
     #[derive(Copy, Clone, JuliaTuple, PartialEq, Debug)]
     #[repr(C)]
     struct DifferentTypes(u8, u32, i64, f32, f64, i8, bool, u32, i8, i16);
-    
+
     /*
     #[derive(Copy, Clone, JuliaStruct, PartialEq, Debug)]
     #[jlrs(julia_type = "Main.JlrsDeriveTests.WithArray")]
