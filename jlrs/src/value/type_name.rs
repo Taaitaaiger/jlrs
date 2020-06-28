@@ -1,6 +1,9 @@
 use super::{
-    array::Array, meth_table::MethTable, module::Module, s_vec::SVec, symbol::Symbol, Value,
+    meth_table::MethTable, module::Module, s_vec::SVec, symbol::Symbol, Value,
 };
+
+#[cfg(feature = "beta")]
+use super::array::Array;
 use crate::{impl_julia_typecheck, impl_julia_type};
 use crate::traits::Cast;
 use crate::error::{JlrsError, JlrsResult};
@@ -53,6 +56,7 @@ impl<'frame> TypeName<'frame> {
         unsafe { MethTable::wrap((&*self.ptr()).mt) }
     }
 
+    #[cfg(feature = "beta")]
     pub fn partial(self) -> Array<'frame, 'static> {
         unsafe { Array::wrap((&*self.ptr()).partial) }
     }
