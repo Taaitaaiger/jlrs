@@ -1,6 +1,12 @@
 use jlrs::prelude::*;
 use jlrs::util::JULIA;
 use jlrs::value::datatype::*;
+use jlrs::value::s_vec::SVec;
+use jlrs::value::ssa_value::SSAValue;
+use jlrs::value::type_name::TypeName;
+use jlrs::value::type_var::TypeVar;
+use jlrs::value::union::Union;
+use jlrs::value::union_all::UnionAll;
 
 #[test]
 fn datatype_methods() {
@@ -39,7 +45,7 @@ fn datatype_typechecks() {
             assert!(!dt.is::<MutableDatatype>());
             assert!(dt.is::<Immutable>());
             assert!(!dt.is::<ImmutableDatatype>());
-            assert!(!dt.is::<UnionType>());
+            assert!(!dt.is::<Union>());
             assert!(!dt.is::<TypeVar>());
             assert!(!dt.is::<UnionAll>());
             assert!(!dt.is::<TypeName>());
