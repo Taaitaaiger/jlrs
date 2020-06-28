@@ -2,7 +2,10 @@
 
 use super::Value;
 use crate::global::Global;
-use jl_sys::{jl_sym_t, jl_symbol_n, jl_symbol_name};
+use crate::error::{JlrsError, JlrsResult};
+use crate::traits::Cast;
+use crate::{impl_julia_type, impl_julia_typecheck};
+use jl_sys::{jl_sym_t, jl_symbol_n, jl_symbol_name, jl_symbol_type};
 use std::ffi::CStr;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::marker::PhantomData;
@@ -40,6 +43,7 @@ pub struct Symbol<'base>(*mut jl_sym_t, PhantomData<&'base ()>);
 
 impl<'base> Symbol<'base> {
     pub(crate) unsafe fn wrap(ptr: *mut jl_sym_t) -> Self {
+        assert!(!ptr.is_null());
         Symbol(ptr, PhantomData)
     }
 
@@ -60,6 +64,32 @@ impl<'base> Symbol<'base> {
     /// method.
     pub fn extend<'global>(self, _: Global<'global>) -> Symbol<'global> {
         unsafe { Symbol::wrap(self.ptr()) }
+    }
+
+    pub fn hash(self) -> usize {
+        unsafe { (&*self.ptr()).hash }
+    }
+
+    pub fn left(self) -> Option<Symbol<'base>> {
+        unsafe {
+            let ref_self = &*self.ptr();
+            if ref_self.left.is_null() {
+                return None;
+            }
+
+            Some(Symbol::wrap(ref_self.left))
+        }
+    }
+
+    pub fn right(self) -> Option<Symbol<'base>> {
+        unsafe {
+            let ref_self = &*self.ptr();
+            if ref_self.right.is_null() {
+                return None;
+            }
+
+            Some(Symbol::wrap(ref_self.right))
+        }
     }
 }
 
@@ -103,3 +133,21 @@ impl<'scope> Debug for Symbol<'scope> {
         }
     }
 }
+
+unsafe impl<'frame, 'data> Cast<'frame, 'data> for Symbol<'frame> {
+    type Output = Self;
+    fn cast(value: Value<'frame, 'data>) -> JlrsResult<Self::Output> {
+        if value.is::<Self::Output>() {
+            return unsafe { Ok(Self::cast_unchecked(value)) };
+        }
+
+        Err(JlrsError::NotASymbol)?
+    }
+
+    unsafe fn cast_unchecked(value: Value<'frame, 'data>) -> Self::Output {
+        Self::wrap(value.ptr().cast())
+    }
+}
+
+impl_julia_typecheck!(Symbol<'frame>, jl_symbol_type, 'frame);
+impl_julia_type!(Symbol<'frame>, jl_symbol_type, 'frame);

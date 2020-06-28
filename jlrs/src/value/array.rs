@@ -10,11 +10,12 @@
 //!
 //! [`Array`]: struct.Array.html
 use crate::error::{JlrsError, JlrsResult};
-use crate::traits::{Frame, JuliaType};
+use crate::traits::{Frame, JuliaType, JuliaTypecheck, Cast};
+use crate::value::datatype::DataType;
 use crate::value::Value;
 use jl_sys::{
     jl_array_data, jl_array_dim, jl_array_dims, jl_array_eltype, jl_array_ndims, jl_array_nrows,
-    jl_array_t, jl_gc_wb, jl_typeof,
+    jl_array_t, jl_gc_wb, jl_is_array_type, jl_typeof,
 };
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::marker::PhantomData;
@@ -264,6 +265,35 @@ impl<'frame, 'data> Array<'frame, 'data> {
         let dimensions = Dimensions::from_array(self.ptr().cast());
         let data = std::slice::from_raw_parts_mut(jl_data, dimensions.size());
         Ok(ValueArrayDataMut::new(self, data, dimensions, frame))
+    }
+}
+
+unsafe impl<'frame, 'data> JuliaTypecheck for Array<'frame, 'data> {
+    unsafe fn julia_typecheck(t: DataType) -> bool {
+        jl_is_array_type(t.ptr().cast())
+    }
+}
+
+impl<'frame, 'data> Into<Value<'frame, 'data>> for Array<'frame, 'data> {
+    fn into(self) -> Value<'frame, 'data> {
+        unsafe {
+            Value::wrap(self.ptr().cast())
+        }
+    }
+}
+
+unsafe impl<'frame, 'data> Cast<'frame, 'data> for Array<'frame, 'data> {
+    type Output = Self;
+    fn cast(value: Value<'frame, 'data>) -> JlrsResult<Self::Output> {
+        if value.is::<Self::Output>() {
+            return unsafe { Ok(Self::cast_unchecked(value)) };
+        }
+
+        Err(JlrsError::NotAnArray)?
+    }
+
+    unsafe fn cast_unchecked(value: Value<'frame, 'data>) -> Self::Output {
+        Self::wrap(value.ptr().cast())
     }
 }
 

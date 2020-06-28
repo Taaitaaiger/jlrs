@@ -20,11 +20,12 @@ use self::symbol::Symbol;
 use crate::error::{JlrsError, JlrsResult};
 use crate::frame::Output;
 use crate::global::Global;
+use crate::impl_julia_type;
 use crate::traits::{
     private::Internal, Cast, Frame, IntoJulia, JuliaType, JuliaTypecheck, TemporarySymbol,
 };
 use jl_sys::{
-    jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_apply_array_type,
+    jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_any_type, jl_apply_array_type,
     jl_apply_tuple_type_v, jl_call, jl_call0, jl_call1, jl_call2, jl_call3, jl_datatype_t,
     jl_exception_occurred, jl_field_index, jl_field_isptr, jl_field_names, jl_fieldref,
     jl_fieldref_noalloc, jl_get_nth_field, jl_get_nth_field_noalloc, jl_new_array,
@@ -40,8 +41,16 @@ use std::slice;
 
 pub mod array;
 pub mod datatype;
+pub mod meth_table;
 pub mod module;
 pub mod symbol;
+// pub mod tuple;
+pub mod s_vec;
+pub mod ssa_value;
+pub mod type_name;
+pub mod type_var;
+pub mod union;
+pub mod union_all;
 
 thread_local! {
     // Used as a pool to convert dimensions to tuples. Safe because a thread local is initialized
@@ -864,6 +873,14 @@ impl<'frame, 'data> Debug for Value<'frame, 'data> {
         f.debug_tuple("Value").field(&self.type_name()).finish()
     }
 }
+
+unsafe impl<'frame, 'data> IntoJulia for Value<'frame, 'data> {
+    unsafe fn into_julia(&self) -> *mut jl_value_t {
+        self.ptr()
+    }
+}
+
+impl_julia_type!(Value<'frame, 'data>, jl_any_type, 'frame, 'data);
 
 /// A wrapper that will let you call a `Value` as a function and store the result using an
 /// `Output`. The function call will not require a slot in the current frame but uses the one

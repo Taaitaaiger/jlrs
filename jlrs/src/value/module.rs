@@ -2,11 +2,12 @@
 
 use crate::error::{JlrsError, JlrsResult};
 use crate::global::Global;
-use crate::traits::{private::Internal, TemporarySymbol};
+use crate::traits::{private::Internal, TemporarySymbol, Cast};
 use crate::value::Value;
+use crate::{impl_julia_type, impl_julia_typecheck};
 use jl_sys::{
     jl_base_module, jl_core_module, jl_get_global, jl_main_module, jl_module_t, jl_module_type,
-    jl_typeis,
+    jl_set_const, jl_set_global, jl_typeis,
 };
 use std::marker::PhantomData;
 
@@ -81,6 +82,42 @@ impl<'base> Module<'base> {
         }
     }
 
+    pub unsafe fn set_global<'frame, N>(
+        self,
+        name: N,
+        value: Value<'frame, 'static>,
+    ) -> Value<'base, 'static>
+    where
+        N: TemporarySymbol,
+    {
+        jl_set_global(
+            self.ptr(),
+            name.temporary_symbol(Internal).ptr(),
+            value.ptr(),
+        );
+        Value::wrap(value.ptr())
+    }
+
+    pub fn set_const<'frame, N>(
+        self,
+        name: N,
+        value: Value<'frame, 'static>,
+    ) -> JlrsResult<Value<'base, 'static>>
+    where
+        N: TemporarySymbol,
+    {
+        unsafe {
+            let symbol = name.temporary_symbol(Internal);
+            if self.global(symbol).is_ok() {
+                Err(JlrsError::ConstAlreadyExists(symbol.into()))?;
+            }
+
+            jl_set_const(self.ptr(), symbol.ptr(), value.ptr());
+
+            Ok(Value::wrap(value.ptr()))
+        }
+    }
+
     /// Returns the global named `name` in this module.
     /// Returns an error if the global doesn't exist.
     pub fn global<N>(self, name: N) -> JlrsResult<Value<'base, 'static>>
@@ -120,3 +157,21 @@ impl<'base> Into<Value<'base, 'static>> for Module<'base> {
         unsafe { Value::wrap(self.ptr().cast()) }
     }
 }
+
+unsafe impl<'frame, 'data> Cast<'frame, 'data> for Module<'frame> {
+    type Output = Self;
+    fn cast(value: Value<'frame, 'data>) -> JlrsResult<Self::Output> {
+        if value.is::<Self::Output>() {
+            return unsafe { Ok(Self::cast_unchecked(value)) };
+        }
+
+        Err(JlrsError::NotAModule("This".to_string()))?
+    }
+
+    unsafe fn cast_unchecked(value: Value<'frame, 'data>) -> Self::Output {
+        Self::wrap(value.ptr().cast())
+    }
+}
+
+impl_julia_typecheck!(Module<'frame>, jl_module_type, 'frame);
+impl_julia_type!(Module<'frame>, jl_module_type, 'frame);

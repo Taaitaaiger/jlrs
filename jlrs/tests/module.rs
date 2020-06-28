@@ -224,3 +224,59 @@ fn use_dyn_str_for_access() {
         .unwrap();
     })
 }
+
+#[test]
+fn set_global() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+        jlrs.frame(1, |global, frame| {
+            let main = Module::main(global);
+            let value = Value::new(frame, 1usize)?;
+            unsafe {
+                main.set_global("one", value);
+            }
+
+            let value = main.global("one")?;
+            assert_eq!(value.cast::<usize>()?, 1);
+            Ok(())
+        })
+        .unwrap();
+    })
+}
+
+#[test]
+fn set_const() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+        jlrs.frame(1, |global, frame| {
+            let main = Module::main(global);
+            let value = Value::new(frame, 2usize)?;
+            main.set_const("ONE", value)?;
+
+            let value = main.global("ONE")?;
+            assert_eq!(value.cast::<usize>()?, 2);
+            Ok(())
+        })
+        .unwrap();
+    })
+}
+
+#[test]
+fn set_const_twice() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+        let err = jlrs.frame(2, |global, frame| {
+            let main = Module::main(global);
+            let value1 = Value::new(frame, 3usize)?;
+            let value2 = Value::new(frame, 4usize)?;
+            main.set_const("TWICE", value1)?;
+            main.set_const("TWICE", value2)?;
+
+            let value = main.global("TWICE")?;
+            assert_eq!(value.cast::<usize>()?, 2);
+            Ok(())
+        });
+
+        assert!(err.is_err());
+    })
+}

@@ -13,11 +13,18 @@ pub enum JlrsError {
     Other(Box<dyn Error + Send + Sync>),
     Exception(String),
     AlreadyInitialized,
+    ConstAlreadyExists(String),
     NotAnArray,
     Nothing,
     NotADataType,
     NotASymbol,
     NotAString,
+    NotAnSVec,
+    NotAnSSAValue,
+    NotATypeName,
+    NotATypeVar,
+    NotAUnion,
+    NotAUnionAll,
     FunctionNotFound(String),
     IncludeNotFound(String),
     IncludeError(String, String),
@@ -25,6 +32,7 @@ pub enum JlrsError {
     InvalidArrayType,
     InvalidCharacter,
     NotAModule(String),
+    NotAMethTable,
     AllocError(AllocError),
     WrongType,
     NotInline,
@@ -61,6 +69,9 @@ impl Display for JlrsError {
             JlrsError::NotAnArray => write!(formatter, "This is not an array"),
             JlrsError::NotAString => write!(formatter, "This is not a string"),
             JlrsError::Nothing => write!(formatter, "This value is Nothing"),
+            JlrsError::ConstAlreadyExists(name) => {
+                write!(formatter, "The constant {} already exists", name)
+            }
             JlrsError::FunctionNotFound(func) => {
                 write!(formatter, "The function {} could not be found", func)
             }
@@ -82,6 +93,27 @@ impl Display for JlrsError {
             }
             JlrsError::NotInline => {
                 write!(formatter, "The data of this array is not stored inline")
+            }
+            JlrsError::NotAMethTable => {
+                write!(formatter, "This is not a method table")
+            }
+            JlrsError::NotAnSVec => {
+                write!(formatter, "This is not a simple vector")
+            }
+            JlrsError::NotAnSSAValue => {
+                write!(formatter, "This is not an SSA value")
+            }
+            JlrsError::NotATypeName => {
+                write!(formatter, "This is not a typename")
+            }
+            JlrsError::NotATypeVar => {
+                write!(formatter, "This is not a type var")
+            }
+            JlrsError::NotAUnion => {
+                write!(formatter, "This is not a union")
+            }
+            JlrsError::NotAUnionAll => {
+                write!(formatter, "This is not a UnionAll")
             }
             JlrsError::Inline => write!(formatter, "The data of this array is stored inline"),
             JlrsError::NotADataType => write!(formatter, "This is not a datatype"),

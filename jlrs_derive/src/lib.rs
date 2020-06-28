@@ -38,7 +38,7 @@ fn impl_julia_tuple(ast: &syn::DeriveInput) -> TokenStream {
     let field_types_iter = match fields {
         syn::Fields::Unnamed(u) => u.unnamed.iter().map(|f| &f.ty),
         _ => panic!("JuliaTuple cannot be derived for unit structs and structs with named fields"),
-    };
+    };Cast
 
     let julia_tuple_impl = quote! {
         unsafe impl ::jlrs::traits::JuliaType for #name {

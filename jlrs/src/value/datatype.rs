@@ -20,23 +20,21 @@
 //! [`JuliaTypecheck`]: ../../traits/trait.JuliaTypecheck.html
 
 use crate::global::Global;
-use crate::traits::JuliaType;
-use crate::traits::JuliaTypecheck;
-use crate::value::array::Array;
-use crate::value::module::Module;
+use crate::error::{JlrsResult, JlrsError};
+use crate::traits::{JuliaTypecheck, Cast, JuliaType};
 use crate::value::symbol::Symbol;
+use crate::value::type_name::TypeName;
 use crate::value::Value;
+use crate::{impl_julia_type, impl_julia_typecheck};
 use jl_sys::{
     jl_any_type, jl_code_info_type, jl_code_instance_type, jl_datatype_align,
     jl_datatype_isinlinealloc, jl_datatype_nbits, jl_datatype_nfields, jl_datatype_size,
     jl_datatype_t, jl_datatype_type, jl_expr_type, jl_field_isptr, jl_field_names, jl_field_offset,
     jl_field_size, jl_get_fieldtypes, jl_globalref_type, jl_gotonode_type, jl_intrinsic_type,
-    jl_is_array_type, jl_is_cpointer_type, jl_linenumbernode_type, jl_method_instance_type,
-    jl_method_type, jl_methtable_type, jl_module_type, jl_namedtuple_typename, jl_newvarnode_type,
-    jl_phicnode_type, jl_phinode_type, jl_pinode_type, jl_quotenode_type, jl_simplevector_type,
-    jl_slotnumber_type, jl_ssavalue_type, jl_string_type, jl_svec_data, jl_svec_len,
-    jl_symbol_type, jl_task_type, jl_tuple_typename, jl_tvar_type, jl_typedslot_type,
-    jl_typename_str, jl_typename_type, jl_unionall_type, jl_uniontype_type, jl_upsilonnode_type,
+    jl_is_cpointer_type, jl_linenumbernode_type, jl_method_instance_type, jl_method_type,
+    jl_namedtuple_typename, jl_newvarnode_type, jl_phicnode_type, jl_phinode_type, jl_pinode_type,
+    jl_quotenode_type, jl_slotnumber_type, jl_string_type, jl_svec_data, jl_svec_len, jl_task_type,
+    jl_tuple_typename, jl_typedslot_type, jl_typename_str, jl_upsilonnode_type,
 };
 use std::ffi::CStr;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
@@ -118,11 +116,15 @@ impl<'frame> DataType<'frame> {
         unsafe { jl_datatype_isinlinealloc(self.0) != 0 }
     }
 
-    pub fn name(&self) -> &'frame str {
+    pub fn name(self) -> &'frame str {
         unsafe {
             let name = jl_typename_str(self.ptr().cast());
             CStr::from_ptr(name).to_str().unwrap()
         }
+    }
+
+    pub fn type_name(self) -> TypeName<'frame> {
+        unsafe { TypeName::wrap((&*self.ptr()).name) }
     }
 
     /// Returns the field names of this type as a slice of `Symbol`s. These symbols can be used
@@ -173,29 +175,22 @@ impl<'frame, 'data> Debug for DataType<'frame> {
     }
 }
 
-macro_rules! impl_julia_typecheck {
-    ($type:ty, $jl_type:expr, $($lt:lifetime),+) => {
-        unsafe impl<$($lt),+> JuliaTypecheck for $type {
-            unsafe fn julia_typecheck(t: DataType) -> bool {
-                t.ptr() == $jl_type
-            }
+unsafe impl<'frame, 'data> Cast<'frame, 'data> for DataType<'frame> {
+    type Output = Self;
+    fn cast(value: Value<'frame, 'data>) -> JlrsResult<Self::Output> {
+        if value.is::<Self::Output>() {
+            return unsafe { Ok(Self::cast_unchecked(value)) };
         }
-    };
-    ($type:ty, $jl_type:expr) => {
-        unsafe impl JuliaTypecheck for $type {
-            unsafe fn julia_typecheck(t: DataType) -> bool {
-                t.ptr() == $jl_type
-            }
-        }
-    };
-    ($type:ty) => {
-        unsafe impl JuliaTypecheck for $type {
-            unsafe fn julia_typecheck(t: DataType) -> bool {
-                t.ptr() == <$type as crate::value::datatype::JuliaType>::julia_type()
-            }
-        }
-    };
+
+        Err(JlrsError::NotADataType)?
+    }
+
+    unsafe fn cast_unchecked(value: Value<'frame, 'data>) -> Self::Output {
+        DataType::wrap(value.ptr().cast())
+    }
 }
+
+impl_julia_type!(DataType<'frame>, jl_datatype_type, 'frame);
 
 /// A typecheck that can be used in combination with `DataType::is`. This method returns true if
 /// a value of this type is a tuple.
@@ -222,10 +217,6 @@ unsafe impl JuliaTypecheck for NamedTuple {
     }
 }
 
-/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
-/// a value of this type is an svec (simple vector).
-pub struct SVec;
-impl_julia_typecheck!(SVec, jl_simplevector_type);
 impl_julia_typecheck!(DataType<'frame>, jl_datatype_type, 'frame);
 
 /// A typecheck that can be used in combination with `DataType::is`. This method returns true if
@@ -268,26 +259,6 @@ unsafe impl JuliaTypecheck for ImmutableDatatype {
     }
 }
 
-/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
-/// a value of this type is a union.
-pub struct UnionType;
-impl_julia_typecheck!(UnionType, jl_uniontype_type);
-
-/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
-/// a value of this type is a type var.
-pub struct TypeVar;
-impl_julia_typecheck!(TypeVar, jl_tvar_type);
-
-/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
-/// a value of this type is a `UnionAll`.
-pub struct UnionAll;
-impl_julia_typecheck!(UnionAll, jl_unionall_type);
-
-/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
-/// a value of this type is a type name.
-pub struct TypeName;
-impl_julia_typecheck!(TypeName, jl_typename_type);
-
 impl_julia_typecheck!(i8);
 impl_julia_typecheck!(i16);
 impl_julia_typecheck!(i32);
@@ -302,18 +273,6 @@ impl_julia_typecheck!(f32);
 impl_julia_typecheck!(f64);
 impl_julia_typecheck!(bool);
 impl_julia_typecheck!(char);
-impl_julia_typecheck!(Symbol<'frame>, jl_symbol_type, 'frame);
-
-unsafe impl<'frame, 'data> JuliaTypecheck for Array<'frame, 'data> {
-    unsafe fn julia_typecheck(t: DataType) -> bool {
-        jl_is_array_type(t.ptr().cast())
-    }
-}
-
-/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
-/// a value of this type is an SSA value.
-pub struct SSAValue;
-impl_julia_typecheck!(SSAValue, jl_ssavalue_type);
 
 /// A typecheck that can be used in combination with `DataType::is`. This method returns true if
 /// a value of this type is a slot.
@@ -396,13 +355,6 @@ impl_julia_typecheck!(CodeInfo, jl_code_info_type);
 pub struct Method;
 impl_julia_typecheck!(Method, jl_method_type);
 
-impl_julia_typecheck!(Module<'frame>, jl_module_type, 'frame);
-
-/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
-/// a value of this type is a method table.
-pub struct MethodTable;
-impl_julia_typecheck!(MethodTable, jl_methtable_type);
-
 /// A typecheck that can be used in combination with `DataType::is`. This method returns true if
 /// a value of this type is a task.
 pub struct Task;
@@ -423,3 +375,10 @@ unsafe impl JuliaTypecheck for Pointer {
 /// a value of this type is an intrinsic.
 pub struct Intrinsic;
 impl_julia_typecheck!(Intrinsic, jl_intrinsic_type);
+
+pub struct Concrete;
+unsafe impl JuliaTypecheck for Concrete {
+    unsafe fn julia_typecheck(t: DataType) -> bool {
+        (&*t.ptr()).isconcretetype != 0
+    }
+}

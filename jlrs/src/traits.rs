@@ -27,20 +27,17 @@
 
 use crate::error::{AllocError, JlrsError, JlrsResult};
 use crate::frame::{DynamicFrame, Output, StaticFrame};
-use crate::value::array::Array;
 use crate::value::datatype::DataType;
-use crate::value::module::Module;
 use crate::value::symbol::Symbol;
 use crate::value::Value;
 use jl_sys::{
-    jl_any_type, jl_bool_type, jl_box_bool, jl_box_char, jl_box_float32, jl_box_float64,
-    jl_box_int16, jl_box_int32, jl_box_int64, jl_box_int8, jl_box_uint16, jl_box_uint32,
-    jl_box_uint64, jl_box_uint8, jl_char_type, jl_datatype_t, jl_datatype_type, jl_float32_type,
-    jl_float64_type, jl_int16_type, jl_int32_type, jl_int64_type, jl_int8_type, jl_module_type,
-    jl_pchar_to_string, jl_string_data, jl_string_len, jl_symbol_type, jl_uint16_type,
-    jl_uint32_type, jl_uint64_type, jl_uint8_type, jl_unbox_float32, jl_unbox_float64,
-    jl_unbox_int16, jl_unbox_int32, jl_unbox_int64, jl_unbox_int8, jl_unbox_uint16,
-    jl_unbox_uint32, jl_unbox_uint64, jl_unbox_uint8, jl_value_t,
+    jl_bool_type, jl_box_bool, jl_box_char, jl_box_float32, jl_box_float64, jl_box_int16,
+    jl_box_int32, jl_box_int64, jl_box_int8, jl_box_uint16, jl_box_uint32, jl_box_uint64,
+    jl_box_uint8, jl_char_type, jl_datatype_t, jl_float32_type, jl_float64_type, jl_int16_type,
+    jl_int32_type, jl_int64_type, jl_int8_type, jl_pchar_to_string, jl_string_data, jl_string_len,
+    jl_uint16_type, jl_uint32_type, jl_uint64_type, jl_uint8_type, jl_unbox_float32,
+    jl_unbox_float64, jl_unbox_int16, jl_unbox_int32, jl_unbox_int64, jl_unbox_int8,
+    jl_unbox_uint16, jl_unbox_uint32, jl_unbox_uint64, jl_unbox_uint8, jl_value_t,
 };
 use std::borrow::Cow;
 
@@ -185,6 +182,32 @@ pub unsafe trait JuliaFieldType {
 pub unsafe trait JuliaTypecheck {
     #[doc(hidden)]
     unsafe fn julia_typecheck(t: DataType) -> bool;
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! impl_julia_typecheck {
+    ($type:ty, $jl_type:expr, $($lt:lifetime),+) => {
+        unsafe impl<$($lt),+> crate::traits::JuliaTypecheck for $type {
+            unsafe fn julia_typecheck(t: $crate::value::datatype::DataType) -> bool {
+                t.ptr() == $jl_type
+            }
+        }
+    };
+    ($type:ty, $jl_type:expr) => {
+        unsafe impl crate::traits::JuliaTypecheck for $type {
+            unsafe fn julia_typecheck(t: $crate::value::datatype::DataType) -> bool {
+                t.ptr() == $jl_type
+            }
+        }
+    };
+    ($type:ty) => {
+        unsafe impl crate::traits::JuliaTypecheck for $type {
+            unsafe fn julia_typecheck(t: crate::value::datatype::DataType) -> bool {
+                t.ptr() == <$type as $crate::value::datatype::JuliaType>::julia_type()
+            }
+        }
+    };
 }
 
 /// This trait is implemented by types that a [`Value`] can be converted into by calling
@@ -356,17 +379,19 @@ unsafe impl IntoJulia for &dyn AsRef<str> {
     }
 }
 
+#[doc(hidden)]
+#[macro_export]
 macro_rules! impl_julia_type {
     ($type:ty, $jl_type:expr) => {
-        unsafe impl JuliaType for $type {
-            unsafe fn julia_type() -> *mut jl_datatype_t {
+        unsafe impl crate::traits::JuliaType for $type {
+            unsafe fn julia_type() -> *mut ::jl_sys::jl_datatype_t {
                 $jl_type
             }
         }
     };
     ($type:ty, $jl_type:expr, $($bounds:tt)+) => {
-        unsafe impl<$($bounds)+> JuliaType for $type {
-            unsafe fn julia_type() -> *mut jl_datatype_t {
+        unsafe impl<$($bounds)+> crate::traits::JuliaType for $type {
+            unsafe fn julia_type() -> *mut ::jl_sys::jl_datatype_t {
                 $jl_type
             }
         }
@@ -385,10 +410,6 @@ impl_julia_type!(f32, jl_float32_type);
 impl_julia_type!(f64, jl_float64_type);
 impl_julia_type!(bool, jl_bool_type);
 impl_julia_type!(char, jl_char_type);
-impl_julia_type!(Module<'frame>, jl_module_type, 'frame);
-impl_julia_type!(Symbol<'frame>, jl_symbol_type, 'frame);
-impl_julia_type!(DataType<'frame>, jl_datatype_type, 'frame);
-impl_julia_type!(Value<'frame, 'data>, jl_any_type, 'frame, 'data);
 
 #[cfg(not(target_pointer_width = "64"))]
 unsafe impl JuliaType for usize {
@@ -417,66 +438,6 @@ unsafe impl JuliaType for isize {
 unsafe impl JuliaType for isize {
     unsafe fn julia_type() -> *mut jl_datatype_t {
         jl_int64_type
-    }
-}
-
-unsafe impl<'frame, 'data> Cast<'frame, 'data> for Array<'frame, 'data> {
-    type Output = Self;
-    fn cast(value: Value<'frame, 'data>) -> JlrsResult<Self::Output> {
-        if value.is::<Array>() {
-            return unsafe { Ok(Self::cast_unchecked(value)) };
-        }
-
-        Err(JlrsError::NotAnArray)?
-    }
-
-    unsafe fn cast_unchecked<'fr, 'da>(value: Value<'frame, 'data>) -> Self::Output {
-        Array::wrap(value.ptr().cast())
-    }
-}
-
-unsafe impl<'frame, 'data> Cast<'frame, 'data> for DataType<'frame> {
-    type Output = Self;
-    fn cast(value: Value<'frame, 'data>) -> JlrsResult<Self::Output> {
-        if value.is::<DataType>() {
-            return unsafe { Ok(Self::cast_unchecked(value)) };
-        }
-
-        Err(JlrsError::NotADataType)?
-    }
-
-    unsafe fn cast_unchecked<'fr, 'da>(value: Value<'frame, 'data>) -> Self::Output {
-        DataType::wrap(value.ptr().cast())
-    }
-}
-
-unsafe impl<'frame, 'data> Cast<'frame, 'data> for Symbol<'frame> {
-    type Output = Self;
-    fn cast(value: Value<'frame, 'data>) -> JlrsResult<Self::Output> {
-        if value.is::<Symbol>() {
-            return unsafe { Ok(Self::cast_unchecked(value)) };
-        }
-
-        Err(JlrsError::NotASymbol)?
-    }
-
-    unsafe fn cast_unchecked<'fr, 'da>(value: Value<'frame, 'data>) -> Self::Output {
-        Symbol::wrap(value.ptr().cast())
-    }
-}
-
-unsafe impl<'frame, 'data> Cast<'frame, 'data> for Module<'frame> {
-    type Output = Self;
-    fn cast(value: Value<'frame, 'data>) -> JlrsResult<Self::Output> {
-        if value.is::<Module>() {
-            return unsafe { Ok(Self::cast_unchecked(value)) };
-        }
-
-        Err(JlrsError::NotAModule("This".to_string()))?
-    }
-
-    unsafe fn cast_unchecked<'fr, 'da>(value: Value<'frame, 'data>) -> Self::Output {
-        Module::wrap(value.ptr().cast())
     }
 }
 
