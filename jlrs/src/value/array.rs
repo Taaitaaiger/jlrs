@@ -10,7 +10,7 @@
 //!
 //! [`Array`]: struct.Array.html
 use crate::error::{JlrsError, JlrsResult};
-use crate::traits::{Frame, JuliaType, JuliaTypecheck, Cast};
+use crate::traits::{Cast, Frame, JuliaType, JuliaTypecheck};
 use crate::value::datatype::DataType;
 use crate::value::Value;
 use jl_sys::{
@@ -276,9 +276,7 @@ unsafe impl<'frame, 'data> JuliaTypecheck for Array<'frame, 'data> {
 
 impl<'frame, 'data> Into<Value<'frame, 'data>> for Array<'frame, 'data> {
     fn into(self) -> Value<'frame, 'data> {
-        unsafe {
-            Value::wrap(self.ptr().cast())
-        }
+        unsafe { Value::wrap(self.ptr().cast()) }
     }
 }
 

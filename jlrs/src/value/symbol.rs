@@ -1,8 +1,8 @@
 //! Symbols represent identifiers like module and function names.
 
 use super::Value;
-use crate::global::Global;
 use crate::error::{JlrsError, JlrsResult};
+use crate::global::Global;
 use crate::traits::Cast;
 use crate::{impl_julia_type, impl_julia_typecheck};
 use jl_sys::{jl_sym_t, jl_symbol_n, jl_symbol_name, jl_symbol_type};

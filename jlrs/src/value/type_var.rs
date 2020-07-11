@@ -33,6 +33,12 @@ impl<'frame> TypeVar<'frame> {
     }
 }
 
+impl<'frame> Into<Value<'frame, 'static>> for TypeVar<'frame> {
+    fn into(self) -> Value<'frame, 'static> {
+        unsafe { Value::wrap(self.ptr().cast()) }
+    }
+}
+
 unsafe impl<'frame, 'data> Cast<'frame, 'data> for TypeVar<'frame> {
     type Output = Self;
     fn cast(value: Value<'frame, 'data>) -> JlrsResult<Self::Output> {

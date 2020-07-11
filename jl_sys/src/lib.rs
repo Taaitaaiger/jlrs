@@ -303,7 +303,8 @@ V1.4.2
 #[cfg(feature = "stable")]
 pub unsafe fn jl_get_fieldtypes(st: *mut jl_datatype_t) -> *mut jl_svec_t {
     if (&*st).types.is_null() {
-        jl_compute_fieldtypes(st)
+        //jl_compute_fieldtypes(st)
+        jl_compute_fieldtypes(st, std::ptr::null_mut())
     } else {
         (&*st).types
     }
@@ -313,7 +314,7 @@ pub unsafe fn jl_get_fieldtypes(st: *mut jl_datatype_t) -> *mut jl_svec_t {
 V1.5.0=beta1
 #define jl_get_fieldtypes(st) ((st)->types ? (st)->types : jl_compute_fieldtypes((st), NULL))
 */
-#[inline(always)]
+/*#[inline(always)]
 #[cfg(feature = "beta")]
 pub unsafe fn jl_get_fieldtypes(st: *mut jl_datatype_t) -> *mut jl_svec_t {
     if (&*st).types.is_null() {
@@ -321,7 +322,7 @@ pub unsafe fn jl_get_fieldtypes(st: *mut jl_datatype_t) -> *mut jl_svec_t {
     } else {
         (&*st).types
     }
-}
+}*/
 
 /*
 #define jl_datatype_size(t)    (((jl_datatype_t*)t)->size)
@@ -346,7 +347,6 @@ pub unsafe fn jl_datatype_align(t: *mut jl_datatype_t) -> u16 {
 pub unsafe fn jl_datatype_nbits(t: *mut jl_datatype_t) -> i32 {
     (&*(t)).size * 8
 }
-
 
 /*
 #define jl_datatype_nfields(t) (((jl_datatype_t*)(t))->layout->nfields)
@@ -402,7 +402,8 @@ pub unsafe fn jl_is_namedtuple(v: *mut jl_value_t) -> bool {
 
 /*
 #define jl_is_svec(v)        jl_typeis(v,jl_simplevector_type)
-*/#[inline(always)]
+*/
+#[inline(always)]
 pub unsafe fn jl_is_svec(v: *mut jl_value_t) -> bool {
     jl_typeis(v, jl_simplevector_type)
 }

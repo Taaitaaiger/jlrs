@@ -19,9 +19,9 @@
 //! [`DataType`]: struct.DataType.html
 //! [`JuliaTypecheck`]: ../../traits/trait.JuliaTypecheck.html
 
+use crate::error::{JlrsError, JlrsResult};
 use crate::global::Global;
-use crate::error::{JlrsResult, JlrsError};
-use crate::traits::{JuliaTypecheck, Cast, JuliaType};
+use crate::traits::{Cast, JuliaType, JuliaTypecheck};
 use crate::value::symbol::Symbol;
 use crate::value::type_name::TypeName;
 use crate::value::Value;

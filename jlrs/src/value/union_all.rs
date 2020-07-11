@@ -1,8 +1,8 @@
 use super::type_var::TypeVar;
 use super::Value;
-use crate::traits::Cast;
 use crate::error::{JlrsError, JlrsResult};
-use crate::{impl_julia_typecheck, impl_julia_type};
+use crate::traits::Cast;
+use crate::{impl_julia_type, impl_julia_typecheck};
 use jl_sys::{jl_unionall_t, jl_unionall_type};
 use std::marker::PhantomData;
 
@@ -29,6 +29,11 @@ impl<'frame> UnionAll<'frame> {
     }
 }
 
+impl<'frame> Into<Value<'frame, 'static>> for UnionAll<'frame> {
+    fn into(self) -> Value<'frame, 'static> {
+        unsafe { Value::wrap(self.ptr().cast()) }
+    }
+}
 
 unsafe impl<'frame, 'data> Cast<'frame, 'data> for UnionAll<'frame> {
     type Output = Self;

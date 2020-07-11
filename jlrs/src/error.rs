@@ -17,6 +17,14 @@ pub enum JlrsError {
     NotAnArray,
     Nothing,
     NotADataType,
+    NotAMethod,
+    NotAMethodInstance,
+    NotACodeInstance,
+    NotAWeakRef,
+    NotATypeMapEntry,
+    NotATypeMapLevel,
+    NotAnExpr,
+    NotATask,
     NotASymbol,
     NotAString,
     NotAnSVec,
@@ -94,29 +102,25 @@ impl Display for JlrsError {
             JlrsError::NotInline => {
                 write!(formatter, "The data of this array is not stored inline")
             }
-            JlrsError::NotAMethTable => {
-                write!(formatter, "This is not a method table")
-            }
-            JlrsError::NotAnSVec => {
-                write!(formatter, "This is not a simple vector")
-            }
-            JlrsError::NotAnSSAValue => {
-                write!(formatter, "This is not an SSA value")
-            }
-            JlrsError::NotATypeName => {
-                write!(formatter, "This is not a typename")
-            }
-            JlrsError::NotATypeVar => {
-                write!(formatter, "This is not a type var")
-            }
-            JlrsError::NotAUnion => {
-                write!(formatter, "This is not a union")
-            }
-            JlrsError::NotAUnionAll => {
-                write!(formatter, "This is not a UnionAll")
-            }
+            JlrsError::NotAMethTable => write!(formatter, "This is not a method table"),
+            JlrsError::NotAnSVec => write!(formatter, "This is not a simple vector"),
+            JlrsError::NotAnSSAValue => write!(formatter, "This is not an SSA value"),
+            JlrsError::NotATypeName => write!(formatter, "This is not a typename"),
+            JlrsError::NotATypeVar => write!(formatter, "This is not a type var"),
+            JlrsError::NotAUnion => write!(formatter, "This is not a union"),
+            JlrsError::NotAUnionAll => write!(formatter, "This is not a UnionAll"),
+
+            JlrsError::NotAMethodInstance => write!(formatter, "This is not a method instance"),
+            JlrsError::NotACodeInstance => write!(formatter, "This is not a code instance"),
+            JlrsError::NotAWeakRef => write!(formatter, "This is not a weak ref"),
+            JlrsError::NotATypeMapEntry => write!(formatter, "This is not a typemap entry"),
+            JlrsError::NotATypeMapLevel => write!(formatter, "This is not a typemap level"),
+            JlrsError::NotAnExpr => write!(formatter, "This is not an expr"),
+            JlrsError::NotATask => write!(formatter, "This is not a task"),
+
             JlrsError::Inline => write!(formatter, "The data of this array is stored inline"),
             JlrsError::NotADataType => write!(formatter, "This is not a datatype"),
+            JlrsError::NotAMethod => write!(formatter, "This is not a method"),
             JlrsError::NotASymbol => write!(formatter, "This is not a symbol"),
             JlrsError::NotAModule(module) => write!(formatter, "{} is not a module", module),
             JlrsError::AllocError(AllocError::FrameOverflow(n, cap)) => write!(

@@ -1,17 +1,17 @@
 use super::{array::Array, module::Module, symbol::Symbol, Value};
-use crate::{impl_julia_typecheck, impl_julia_type};
-use crate::error::{JlrsResult, JlrsError};
+use crate::error::{JlrsError, JlrsResult};
 use crate::traits::Cast;
+use crate::{impl_julia_type, impl_julia_typecheck};
 use jl_sys::{jl_methtable_t, jl_methtable_type};
 use std::marker::PhantomData;
 
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]
 #[repr(transparent)]
-pub struct MethTable<'frame>(*mut jl_methtable_t, PhantomData<&'frame ()>);
+pub struct MethodTable<'frame>(*mut jl_methtable_t, PhantomData<&'frame ()>);
 
-impl<'frame> MethTable<'frame> {
-    pub(crate) unsafe fn wrap(meth_table: *mut jl_methtable_t) -> Self {
-        MethTable(meth_table, PhantomData)
+impl<'frame> MethodTable<'frame> {
+    pub(crate) unsafe fn wrap(method_table: *mut jl_methtable_t) -> Self {
+        MethodTable(method_table, PhantomData)
     }
 
     #[doc(hidden)]
@@ -48,7 +48,13 @@ impl<'frame> MethTable<'frame> {
     }
 }
 
-unsafe impl<'frame, 'data> Cast<'frame, 'data> for MethTable<'frame> {
+impl<'frame> Into<Value<'frame, 'static>> for MethodTable<'frame> {
+    fn into(self) -> Value<'frame, 'static> {
+        unsafe { Value::wrap(self.ptr().cast()) }
+    }
+}
+
+unsafe impl<'frame, 'data> Cast<'frame, 'data> for MethodTable<'frame> {
     type Output = Self;
     fn cast(value: Value<'frame, 'data>) -> JlrsResult<Self::Output> {
         if value.is::<Self::Output>() {
@@ -63,6 +69,5 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for MethTable<'frame> {
     }
 }
 
-
-impl_julia_typecheck!(MethTable<'frame>, jl_methtable_type, 'frame);
-impl_julia_type!(MethTable<'frame>, jl_methtable_type, 'frame);
+impl_julia_typecheck!(MethodTable<'frame>, jl_methtable_type, 'frame);
+impl_julia_type!(MethodTable<'frame>, jl_methtable_type, 'frame);

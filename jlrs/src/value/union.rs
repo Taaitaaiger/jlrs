@@ -1,7 +1,7 @@
 use super::Value;
-use crate::traits::Cast;
 use crate::error::{JlrsError, JlrsResult};
-use crate::{impl_julia_typecheck, impl_julia_type};
+use crate::traits::Cast;
+use crate::{impl_julia_type, impl_julia_typecheck};
 use jl_sys::{jl_uniontype_t, jl_uniontype_type};
 use std::marker::PhantomData;
 
@@ -25,6 +25,12 @@ impl<'frame> Union<'frame> {
 
     pub fn b(self) -> Value<'frame, 'static> {
         unsafe { Value::wrap((&*self.ptr()).b) }
+    }
+}
+
+impl<'frame> Into<Value<'frame, 'static>> for Union<'frame> {
+    fn into(self) -> Value<'frame, 'static> {
+        unsafe { Value::wrap(self.ptr().cast()) }
     }
 }
 

@@ -68,6 +68,9 @@ pub unsafe trait IntoJulia {
 pub unsafe trait JuliaType {
     #[doc(hidden)]
     unsafe fn julia_type() -> *mut jl_datatype_t;
+    unsafe fn julia_type_v(&self) -> *mut jl_datatype_t {
+        Self::julia_type()
+    }
 }
 
 /// In order to be able to create Julia tuples from Rust and convert a [`Value`] that contains one

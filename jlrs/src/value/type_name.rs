@@ -1,12 +1,10 @@
-use super::{
-    meth_table::MethTable, module::Module, s_vec::SVec, symbol::Symbol, Value,
-};
+use super::{method_table::MethodTable, module::Module, simple_vector::SimpleVector, symbol::Symbol, Value};
 
 #[cfg(feature = "beta")]
 use super::array::Array;
-use crate::{impl_julia_typecheck, impl_julia_type};
-use crate::traits::Cast;
 use crate::error::{JlrsError, JlrsResult};
+use crate::traits::Cast;
+use crate::{impl_julia_type, impl_julia_typecheck};
 use jl_sys::{jl_typename_t, jl_typename_type};
 use std::marker::PhantomData;
 
@@ -32,33 +30,39 @@ impl<'frame> TypeName<'frame> {
         unsafe { Module::wrap((&*self.ptr()).module) }
     }
 
-    pub fn names(self) -> SVec<'frame> {
-        unsafe { SVec::wrap((&*self.ptr()).names) }
+    pub fn names(self) -> SimpleVector<'frame> {
+        unsafe { SimpleVector::wrap((&*self.ptr()).names) }
     }
 
     pub fn wrapper(self) -> Value<'frame, 'static> {
         unsafe { Value::wrap((&*self.ptr()).wrapper) }
     }
 
-    pub fn cache(self) -> SVec<'frame> {
-        unsafe { SVec::wrap((&*self.ptr()).cache) }
+    pub fn cache(self) -> SimpleVector<'frame> {
+        unsafe { SimpleVector::wrap((&*self.ptr()).cache) }
     }
 
-    pub fn linearcache(self) -> SVec<'frame> {
-        unsafe { SVec::wrap((&*self.ptr()).linearcache) }
+    pub fn linearcache(self) -> SimpleVector<'frame> {
+        unsafe { SimpleVector::wrap((&*self.ptr()).linearcache) }
     }
 
     pub fn hash(self) -> isize {
         unsafe { (&*self.ptr()).hash }
     }
 
-    pub fn mt(self) -> MethTable<'frame> {
-        unsafe { MethTable::wrap((&*self.ptr()).mt) }
+    pub fn mt(self) -> MethodTable<'frame> {
+        unsafe { MethodTable::wrap((&*self.ptr()).mt) }
     }
 
     #[cfg(feature = "beta")]
     pub fn partial(self) -> Array<'frame, 'static> {
         unsafe { Array::wrap((&*self.ptr()).partial) }
+    }
+}
+
+impl<'frame> Into<Value<'frame, 'static>> for TypeName<'frame> {
+    fn into(self) -> Value<'frame, 'static> {
+        unsafe { Value::wrap(self.ptr().cast()) }
     }
 }
 

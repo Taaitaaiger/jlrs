@@ -2,7 +2,7 @@
 
 use crate::error::{JlrsError, JlrsResult};
 use crate::global::Global;
-use crate::traits::{private::Internal, TemporarySymbol, Cast};
+use crate::traits::{private::Internal, Cast, TemporarySymbol};
 use crate::value::Value;
 use crate::{impl_julia_type, impl_julia_typecheck};
 use jl_sys::{

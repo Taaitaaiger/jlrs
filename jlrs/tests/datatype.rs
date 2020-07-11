@@ -1,7 +1,7 @@
 use jlrs::prelude::*;
 use jlrs::util::JULIA;
 use jlrs::value::datatype::*;
-use jlrs::value::s_vec::SVec;
+use jlrs::value::simple_vector::SimpleVector;
 use jlrs::value::ssa_value::SSAValue;
 use jlrs::value::type_name::TypeName;
 use jlrs::value::type_var::TypeVar;
@@ -40,7 +40,7 @@ fn datatype_typechecks() {
 
             assert!(!dt.is::<Tuple>());
             assert!(!dt.is::<NamedTuple>());
-            assert!(!dt.is::<SVec>());
+            assert!(!dt.is::<SimpleVector>());
             assert!(!dt.is::<Mutable>());
             assert!(!dt.is::<MutableDatatype>());
             assert!(dt.is::<Immutable>());

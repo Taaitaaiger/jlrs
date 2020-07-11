@@ -40,17 +40,25 @@ use std::ptr::null_mut;
 use std::slice;
 
 pub mod array;
+pub mod code_instance;
 pub mod datatype;
-pub mod meth_table;
+pub mod expr;
+pub mod method_table;
+pub mod method;
+pub mod method_instance;
 pub mod module;
 pub mod symbol;
-// pub mod tuple;
-pub mod s_vec;
+pub mod tuple;
+pub mod simple_vector;
 pub mod ssa_value;
+pub mod task;
 pub mod type_name;
 pub mod type_var;
+pub mod typemap_entry;
+pub mod typemap_level;
 pub mod union;
 pub mod union_all;
+pub mod weak_ref;
 
 thread_local! {
     // Used as a pool to convert dimensions to tuples. Safe because a thread local is initialized
@@ -871,12 +879,6 @@ impl<'frame, 'data> Debug for Value<'frame, 'data> {
     #[cfg_attr(tarpaulin, skip)]
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         f.debug_tuple("Value").field(&self.type_name()).finish()
-    }
-}
-
-unsafe impl<'frame, 'data> IntoJulia for Value<'frame, 'data> {
-    unsafe fn into_julia(&self) -> *mut jl_value_t {
-        self.ptr()
     }
 }
 
