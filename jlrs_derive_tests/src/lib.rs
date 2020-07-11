@@ -39,7 +39,7 @@ mod tests {
     #[jlrs(julia_type = "Main.JlrsDeriveTests.WithArray")]
     #[repr(C)]
     struct WithArray<'frame, 'data> {
-        id: u8,
+        id: NotInline<u8>,
         array: Array<'frame, 'data>
     }
 
@@ -114,6 +114,10 @@ mod tests {
     struct WrongRename {
         #[jlrs(rename = "bar")]
         foo: i16,
+    }
+    
+    #[test]
+    fn test_union() {
     }
 
     #[test]

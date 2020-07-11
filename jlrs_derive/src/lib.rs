@@ -45,7 +45,6 @@ fn impl_julia_tuple(ast: &syn::DeriveInput) -> TokenStream {
             unsafe fn julia_type() -> *mut ::jlrs::jl_sys_export::jl_datatype_t {
                 let mut elem_types = [ #( <#field_types_iter as ::jlrs::traits::JuliaType>::julia_type(), )* ];
                 let ty = ::jlrs::jl_sys_export::jl_apply_tuple_type_v(elem_types.as_mut_ptr().cast(), elem_types.len());
-                assert!(::jlrs::jl_sys_export::jl_isbits(ty.cast()));
                 ty.cast()
             }
         }
@@ -72,7 +71,7 @@ fn impl_julia_tuple(ast: &syn::DeriveInput) -> TokenStream {
 
             fn cast(value: ::jlrs::value::Value<'frame, 'data>) -> ::jlrs::error::JlrsResult<Self::Output> {
                 if value.is::<#name>() {
-                    return unsafe { Ok(*(value.ptr().cast::<Self>())) };
+                    return unsafe { Ok(*(value.ptr().cast::<Self::Output>())) };
                 }
 
                 Err(::jlrs::error::JlrsError::WrongType)?
@@ -153,7 +152,6 @@ fn impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
                         // Check if a type was given and if it uses the isbits optimization. isbits-types store
                         // their data inline and are compatible with C-style structs.
                         assert!(::jlrs::jl_sys_export::jl_is_datatype(julia_type), "{} is not a Julia type", #ty);
-                        assert!(::jlrs::jl_sys_export::jl_isbits(julia_type.cast()), "{} is a Julia type but isbitstype returned false", #ty);
 
                         // Get the field names, number of fields, and field types.
                         let field_names_svec = ::jlrs::jl_sys_export::jl_field_names(julia_type.cast());
@@ -245,7 +243,7 @@ fn impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
 
             fn cast(value: ::jlrs::value::Value<'frame, 'data>) -> ::jlrs::error::JlrsResult<Self::Output> {
                 if value.is::<#name>() {
-                    return unsafe { Ok(*(value.ptr().cast::<Self>())) };
+                    return unsafe { Ok(*(value.ptr().cast::<Self::Output>())) };
                 }
 
                 Err(::jlrs::error::JlrsError::WrongType)?

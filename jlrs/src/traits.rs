@@ -41,6 +41,16 @@ use jl_sys::{
 };
 use std::borrow::Cow;
 
+pub unsafe trait JuliaFieldType {
+    unsafe fn julia_field_type() -> *mut jl_value_t;
+}
+
+unsafe impl<T: JuliaType> JuliaFieldType for T {
+    unsafe fn julia_field_type() -> *mut jl_value_t {
+        T::julia_type().cast()
+    }
+}
+
 macro_rules! p {
     ($trait:ident, $type:ty, $($bounds:tt)+) => {
         unsafe impl<$($bounds)+> $trait for $type {}
