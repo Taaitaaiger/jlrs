@@ -1,7 +1,7 @@
 use super::Value;
 use crate::error::{JlrsError, JlrsResult};
 use crate::traits::Cast;
-use crate::{impl_julia_type, impl_julia_typecheck};
+use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_method_instance_t, jl_method_instance_type};
 use std::marker::PhantomData;
 
@@ -43,3 +43,4 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for MethodInstance<'frame> {
 
 impl_julia_typecheck!(MethodInstance<'frame>, jl_method_instance_type, 'frame);
 impl_julia_type!(MethodInstance<'frame>, jl_method_instance_type, 'frame);
+impl_valid_layout!(MethodInstance<'frame>, 'frame);

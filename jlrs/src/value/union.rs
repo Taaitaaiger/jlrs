@@ -1,7 +1,7 @@
 use super::Value;
 use crate::error::{JlrsError, JlrsResult};
 use crate::traits::Cast;
-use crate::{impl_julia_type, impl_julia_typecheck};
+use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_uniontype_t, jl_uniontype_type};
 use std::marker::PhantomData;
 
@@ -51,3 +51,4 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for Union<'frame> {
 
 impl_julia_typecheck!(Union<'frame>, jl_uniontype_type, 'frame);
 impl_julia_type!(Union<'frame>, jl_uniontype_type, 'frame);
+impl_valid_layout!(Union<'frame>, 'frame);

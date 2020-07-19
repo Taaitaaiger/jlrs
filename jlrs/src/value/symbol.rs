@@ -4,7 +4,7 @@ use super::Value;
 use crate::error::{JlrsError, JlrsResult};
 use crate::global::Global;
 use crate::traits::Cast;
-use crate::{impl_julia_type, impl_julia_typecheck};
+use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_sym_t, jl_symbol_n, jl_symbol_name, jl_symbol_type};
 use std::ffi::CStr;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
@@ -151,3 +151,4 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for Symbol<'frame> {
 
 impl_julia_typecheck!(Symbol<'frame>, jl_symbol_type, 'frame);
 impl_julia_type!(Symbol<'frame>, jl_symbol_type, 'frame);
+impl_valid_layout!(Symbol<'frame>, 'frame);

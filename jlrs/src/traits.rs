@@ -41,16 +41,6 @@ use jl_sys::{
 };
 use std::borrow::Cow;
 
-pub unsafe trait JuliaFieldType {
-    unsafe fn julia_field_type() -> *mut jl_value_t;
-}
-
-unsafe impl<T: JuliaType> JuliaFieldType for T {
-    unsafe fn julia_field_type() -> *mut jl_value_t {
-        T::julia_type().cast()
-    }
-}
-
 macro_rules! p {
     ($trait:ident, $type:ty, $($bounds:tt)+) => {
         unsafe impl<$($bounds)+> $trait for $type {}
@@ -64,6 +54,37 @@ macro_rules! p {
 ///
 /// [`Symbol`]: ../value/symbol/struct.Symbol.html
 pub unsafe trait TemporarySymbol: private::TemporarySymbol {}
+
+pub unsafe trait ValidLayout {
+    unsafe fn valid_layout(v: Value) -> bool;
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! impl_valid_layout {
+    ($type:ty, $($lt:lifetime),+) => {
+        unsafe impl<$($lt),+> $crate::traits::ValidLayout for $type {
+            unsafe fn valid_layout(v: $crate::value::Value) -> bool {
+                if let Ok(dt) =  v.cast::<$crate::value::datatype::DataType>() {
+                    dt.is::<$type>()
+                } else {
+                    false
+                }
+            }
+        }
+    };
+    ($t:ty) => {
+        unsafe impl $crate::traits::ValidLayout for $t {
+            unsafe fn valid_layout(v: $crate::value::Value) -> bool {
+                if let Ok(dt) =  v.cast::<$crate::value::datatype::DataType>() {
+                    dt.is::<$t>()
+                } else {
+                    false
+                }
+            }
+        }
+    }
+}
 
 /// Trait implemented by types that can be converted to a Julia value in combination with
 /// [`Value::new`].
@@ -299,6 +320,21 @@ p!(TemporarySymbol, &dyn AsRef<str>);
 p!(TemporarySymbol, &'a str, 'a);
 p!(TemporarySymbol, Cow<'a, str>, 'a);
 p!(TemporarySymbol, Symbol<'s>, 's);
+
+impl_valid_layout!(bool);
+impl_valid_layout!(char);
+impl_valid_layout!(i8);
+impl_valid_layout!(i16);
+impl_valid_layout!(i32);
+impl_valid_layout!(i64);
+impl_valid_layout!(isize);
+impl_valid_layout!(u8);
+impl_valid_layout!(u16);
+impl_valid_layout!(u32);
+impl_valid_layout!(u64);
+impl_valid_layout!(usize);
+impl_valid_layout!(f32);
+impl_valid_layout!(f64);
 
 macro_rules! impl_into_julia {
     ($type:ty, $boxer:ident) => {

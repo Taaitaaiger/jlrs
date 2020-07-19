@@ -4,7 +4,7 @@ use super::{method_table::MethodTable, module::Module, simple_vector::SimpleVect
 use super::array::Array;
 use crate::error::{JlrsError, JlrsResult};
 use crate::traits::Cast;
-use crate::{impl_julia_type, impl_julia_typecheck};
+use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_typename_t, jl_typename_type};
 use std::marker::PhantomData;
 
@@ -83,3 +83,4 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for TypeName<'frame> {
 
 impl_julia_typecheck!(TypeName<'frame>, jl_typename_type, 'frame);
 impl_julia_type!(TypeName<'frame>, jl_typename_type, 'frame);
+impl_valid_layout!(TypeName<'frame>, 'frame);

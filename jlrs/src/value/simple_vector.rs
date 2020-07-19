@@ -1,7 +1,7 @@
 use crate::error::{JlrsError, JlrsResult};
 use crate::traits::Cast;
 use crate::value::Value;
-use crate::{impl_julia_type, impl_julia_typecheck};
+use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_simplevector_type, jl_svec_t};
 use std::marker::PhantomData;
 
@@ -47,3 +47,4 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for SimpleVector<'frame> {
 
 impl_julia_typecheck!(SimpleVector<'frame>, jl_simplevector_type, 'frame);
 impl_julia_type!(SimpleVector<'frame>, jl_simplevector_type, 'frame);
+impl_valid_layout!(SimpleVector<'frame>, 'frame);

@@ -25,7 +25,7 @@ use crate::traits::{Cast, JuliaType, JuliaTypecheck};
 use crate::value::symbol::Symbol;
 use crate::value::type_name::TypeName;
 use crate::value::Value;
-use crate::{impl_julia_type, impl_julia_typecheck};
+use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{
     jl_any_type, jl_code_info_type, jl_code_instance_type, jl_datatype_align,
     jl_datatype_isinlinealloc, jl_datatype_nbits, jl_datatype_nfields, jl_datatype_size,
@@ -191,6 +191,7 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for DataType<'frame> {
 }
 
 impl_julia_type!(DataType<'frame>, jl_datatype_type, 'frame);
+impl_valid_layout!(DataType<'frame>, 'frame);
 
 /// A typecheck that can be used in combination with `DataType::is`. This method returns true if
 /// a value of this type is a tuple.

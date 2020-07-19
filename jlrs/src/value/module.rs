@@ -4,7 +4,7 @@ use crate::error::{JlrsError, JlrsResult};
 use crate::global::Global;
 use crate::traits::{private::Internal, Cast, TemporarySymbol};
 use crate::value::Value;
-use crate::{impl_julia_type, impl_julia_typecheck};
+use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{
     jl_base_module, jl_core_module, jl_get_global, jl_main_module, jl_module_t, jl_module_type,
     jl_set_const, jl_set_global, jl_typeis,
@@ -175,3 +175,4 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for Module<'frame> {
 
 impl_julia_typecheck!(Module<'frame>, jl_module_type, 'frame);
 impl_julia_type!(Module<'frame>, jl_module_type, 'frame);
+impl_valid_layout!(Module<'frame>, 'frame);

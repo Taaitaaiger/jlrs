@@ -1,7 +1,7 @@
 use super::{array::Array, module::Module, symbol::Symbol, Value};
 use crate::error::{JlrsError, JlrsResult};
 use crate::traits::Cast;
-use crate::{impl_julia_type, impl_julia_typecheck};
+use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_methtable_t, jl_methtable_type};
 use std::marker::PhantomData;
 
@@ -71,3 +71,4 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for MethodTable<'frame> {
 
 impl_julia_typecheck!(MethodTable<'frame>, jl_methtable_type, 'frame);
 impl_julia_type!(MethodTable<'frame>, jl_methtable_type, 'frame);
+impl_valid_layout!(MethodTable<'frame>, 'frame);
