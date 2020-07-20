@@ -9,9 +9,8 @@
 //! can be accessed with `a[(row, col, z)]`.
 //!
 //! [`Array`]: struct.Array.html
-use crate::impl_valid_layout;
 use crate::error::{JlrsError, JlrsResult};
-use crate::traits::{Cast, Frame, JuliaType, JuliaTypecheck};
+use crate::traits::{Cast, Frame, JuliaType, JuliaTypecheck, ValidLayout};
 use crate::value::datatype::DataType;
 use crate::value::Value;
 use jl_sys::{
@@ -296,7 +295,17 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for Array<'frame, 'data> {
     }
 }
 
-impl_valid_layout!(Array<'frame, 'data>, 'frame, 'data);
+unsafe impl<'frame, 'data> ValidLayout for Array<'frame, 'data> {
+    unsafe fn valid_layout(v: Value) -> bool {
+        if let Ok(dt) = v.cast::<DataType>() {
+            dt.is::<Array>()
+        } else if let Ok(ua) = v.cast::<super::union_all::UnionAll>() {
+            ua.base_type().is::<Array>()
+        } else {
+            false
+        }
+    }
+}
 
 /// An n-dimensional array whose contents have been copied from Julia to Rust. You can create this
 /// struct by calling [`Array::copy_inline_data`]. The data has a column-major order and can be

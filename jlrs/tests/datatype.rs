@@ -2,7 +2,6 @@ use jlrs::prelude::*;
 use jlrs::util::JULIA;
 use jlrs::value::datatype::*;
 use jlrs::value::simple_vector::SimpleVector;
-use jlrs::value::ssa_value::SSAValue;
 use jlrs::value::type_name::TypeName;
 use jlrs::value::type_var::TypeVar;
 use jlrs::value::union::Union;
@@ -63,7 +62,6 @@ fn datatype_typechecks() {
             assert!(!dt.is::<char>());
             assert!(!dt.is::<Symbol>());
             assert!(!dt.is::<Array>());
-            assert!(!dt.is::<SSAValue>());
             assert!(!dt.is::<Slot>());
             assert!(!dt.is::<Expr>());
             assert!(!dt.is::<GlobalRef>());

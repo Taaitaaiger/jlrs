@@ -22,7 +22,7 @@ use crate::frame::Output;
 use crate::global::Global;
 use crate::impl_julia_type;
 use crate::traits::{
-    private::Internal, Cast, Frame, IntoJulia, JuliaType, JuliaTypecheck, TemporarySymbol,
+    private::Internal, Cast, Frame, IntoJulia, JuliaType, JuliaTypecheck, TemporarySymbol, ValidLayout
 };
 use jl_sys::{
     jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_any_type, jl_apply_array_type,
@@ -882,6 +882,20 @@ impl<'frame, 'data> Debug for Value<'frame, 'data> {
 }
 
 impl_julia_type!(Value<'frame, 'data>, jl_any_type, 'frame, 'data);
+
+unsafe impl<'frame, 'data> ValidLayout for Value<'frame, 'data> {
+    unsafe fn valid_layout(v: Value) -> bool {
+        if let Ok(dt) = v.cast::<DataType>() {
+            dt.isinlinealloc()
+        } else if v.cast::<union_all::UnionAll>().is_ok() {
+            true
+        } else if let Ok(u) = v.cast::<union::Union>() {
+            !u.isbits()
+        } else {
+            false
+        }
+    }
+}
 
 /// A wrapper that will let you call a `Value` as a function and store the result using an
 /// `Output`. The function call will not require a slot in the current frame but uses the one

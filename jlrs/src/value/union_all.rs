@@ -1,5 +1,6 @@
 use super::type_var::TypeVar;
 use super::Value;
+use crate::value::datatype::DataType;
 use crate::error::{JlrsError, JlrsResult};
 use crate::traits::Cast;
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
@@ -18,6 +19,17 @@ impl<'frame> UnionAll<'frame> {
     #[doc(hidden)]
     pub unsafe fn ptr(self) -> *mut jl_unionall_t {
         self.0
+    }
+
+    pub fn base_type(self) -> DataType<'frame> {
+        let mut b = self;
+        while b.body().is::<UnionAll>() {
+            unsafe {
+                b = Value::from(b.body()).cast_unchecked::<UnionAll>();
+            }
+        }
+
+        Value::from(b.body()).cast::<DataType>().unwrap()
     }
 
     pub fn body(self) -> Value<'frame, 'static> {

@@ -19,6 +19,10 @@ impl<'frame> Union<'frame> {
         self.0
     }
 
+    pub fn isbits(self) -> bool {
+        todo!()
+    }
+
     pub fn a(self) -> Value<'frame, 'static> {
         unsafe { Value::wrap((&*self.ptr()).a) }
     }
