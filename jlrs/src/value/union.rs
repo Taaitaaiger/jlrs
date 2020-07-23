@@ -56,3 +56,15 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for Union<'frame> {
 impl_julia_typecheck!(Union<'frame>, jl_uniontype_type, 'frame);
 impl_julia_type!(Union<'frame>, jl_uniontype_type, 'frame);
 impl_valid_layout!(Union<'frame>, 'frame);
+
+#[repr(C, align(1))]
+pub struct Align1;
+
+#[repr(C, align(2))]
+pub struct Align2;
+
+#[repr(C, align(4))]
+pub struct Align4;
+
+#[repr(C, align(8))]
+pub struct Align8;
