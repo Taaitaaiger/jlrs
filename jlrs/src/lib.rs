@@ -213,7 +213,6 @@
 pub mod error;
 pub mod frame;
 pub mod global;
-#[cfg(feature = "jlrs-derive")]
 #[doc(hidden)]
 pub mod jl_sys_export;
 pub mod prelude;
