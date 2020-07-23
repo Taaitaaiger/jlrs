@@ -55,8 +55,12 @@ macro_rules! p {
 /// [`Symbol`]: ../value/symbol/struct.Symbol.html
 pub unsafe trait TemporarySymbol: private::TemporarySymbol {}
 
+/// Trait implemented as part of `JuliaStruct` that is used to verify if a value from Julia 
+/// can be safely cast into the implementing type.
 pub unsafe trait ValidLayout {
-    unsafe fn valid_layout(v: Value) -> bool;
+    #[doc(hidden)]
+    // NB: the type is passed as a value to account for DataTypes, UnionAlls and Unions.
+    unsafe fn valid_layout(ty: Value) -> bool;
 }
 
 #[doc(hidden)]
@@ -165,8 +169,8 @@ pub unsafe trait JuliaTuple: JuliaType + IntoJulia + Copy + Clone {}
 /// }
 /// ```
 ///
-/// When you derive this trait, three additional traits are derived: [`JuliaType`], [`IntoJulia`],
-/// and [`JuliaTypecheck`]. As a result, this struct can be used in combination with
+/// When you derive this trait, four traits are implemented for this struct: [`JuliaType`], 
+/// [`JuliaTypecheck`], [`Cast`], and [`ValidLayout`]. These  As a result, this struct can be used in combination with
 /// [`DataType::is`], [`Value::is`], [`Value::new`], and [`Value::cast`].
 ///
 /// If you want or need to use another name for a field, you can use the `rename`-attribute:
@@ -191,7 +195,7 @@ pub unsafe trait JuliaTuple: JuliaType + IntoJulia + Copy + Clone {}
 /// [`DataType::is`]: ../value/datatype/struct.DataType.html#method.is
 /// [`Value::new`]: ../value/struct.Value.html#method.new
 /// [`Value::cast`]: ../value/struct.Value.html#method.cast
-pub unsafe trait JuliaStruct: JuliaType + IntoJulia + Copy + Clone {}
+pub unsafe trait JuliaStruct: Copy + Clone {}
 
 /*
 pub unsafe trait JuliaFieldType {
@@ -503,7 +507,7 @@ macro_rules! impl_primitive_cast {
                 Err(JlrsError::WrongType)?
             }
 
-            unsafe fn cast_unchecked<'fr, 'da>(value: Value<'frame, 'data>) -> Self::Output {
+            unsafe fn cast_unchecked(value: Value<'frame, 'data>) -> Self::Output {
                 $unboxer(value.ptr().cast()) as _
             }
         }

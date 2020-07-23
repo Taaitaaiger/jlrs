@@ -48,7 +48,7 @@ pub mod method;
 pub mod method_instance;
 pub mod module;
 pub mod symbol;
-//pub mod tuple;
+pub mod tuple;
 pub mod simple_vector;
 pub mod task;
 pub mod type_name;

@@ -216,7 +216,6 @@ pub mod global;
 #[cfg(feature = "jlrs-derive")]
 #[doc(hidden)]
 pub mod jl_sys_export;
-pub mod not_inline;
 pub mod prelude;
 mod stack;
 pub mod traits;

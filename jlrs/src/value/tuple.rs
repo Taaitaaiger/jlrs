@@ -1,52 +1,90 @@
-use crate::error::JlrsResult;
-use crate::prelude::*;
-use crate::traits::{Cast, IntoJulia, JuliaType, JuliaTypecheck};
-use crate::value::datatype::Concrete;
-use jl_sys::{
-    jl_any_type, jl_apply_tuple_type_v, jl_array_type, jl_array_typename, jl_datatype_t,
-    jl_emptytuple, jl_emptytuple_type, jl_new_struct_uninit, jl_value_t,
-};
-use std::mem;
-
-pub unsafe trait JuliaFieldtype {
-    unsafe fn field_type() -> *mut jl_value_t;
+macro_rules! count {
+    ($t:ident, $($x:ident),+) => {
+        1 + count!($($x),+)
+    };
+    ($t:ident) => {
+        1
+    };
 }
 
-unsafe impl<'frame, 'data> JuliaFieldtype for Array<'frame, 'data> {
-    unsafe fn field_type() -> *mut jl_value_t {
-        jl_array_typename.cast()
-    }
-}
-
-unsafe impl<T: JuliaType> JuliaFieldtype for T {
-    unsafe fn field_type() -> *mut jl_value_t {
-        Self::julia_type().cast()
-    }
+macro_rules! check {
+    ($fieldtypes:expr, $n:expr, $t:ident, $($x:ident),+) => {
+        <$t>::valid_layout($fieldtypes[$n - 1 - count!($($x),+)]) && check!($fieldtypes, $n, $($x),+)
+    };
+    ($fieldtypes:expr, $n:expr, $t:ident) => {
+        <$t>::valid_layout($fieldtypes[$n - 1])
+    };
 }
 
 macro_rules! impl_tuple {
     ($name:ident, $($types:tt),+) => {
         #[repr(C)]
         #[derive(Copy, Clone, Debug)]
-        pub struct $name<$($types),+>($($types),+);
+        pub struct $name<$($types),+>($(pub $types),+);
 
-        unsafe impl<$($types),+> JuliaType for $name<$($types),+> where $($types: JuliaType),+
+        unsafe impl<$($types),+> $crate::traits::JuliaType for $name<$($types),+> where $($types: $crate::traits::JuliaType),+
         {
-            unsafe fn julia_type() -> *mut jl_datatype_t {
-                let types = &mut [$($types::julia_type()),+];
-                jl_apply_tuple_type_v(types.as_mut_ptr().cast(), types.len())
+            unsafe fn julia_type() -> *mut $crate::jl_sys_export::jl_datatype_t {
+                let types = &mut [$(<$types as $crate::traits::JuliaType>::julia_type()),+];
+                $crate::jl_sys_export::jl_apply_tuple_type_v(types.as_mut_ptr().cast(), types.len())
             }
         }
 
-        unsafe impl<$($types),+> IntoJulia for $name<$($types),+>  where $($types: IntoJulia + JuliaType + Copy),+
+        unsafe impl<$($types),+> $crate::traits::IntoJulia for $name<$($types),+>  where $($types: $crate::traits::IntoJulia + $crate::traits::JuliaType + Copy),+
         {
-            unsafe fn into_julia(&self) -> *mut jl_value_t {
-                let ty = Self::julia_type();
-                let tuple = jl_new_struct_uninit(ty.cast());
+            unsafe fn into_julia(&self) -> *mut $crate::jl_sys_export::jl_value_t {
+                let ty = <Self as $crate::traits::JuliaType>::julia_type();
+                let tuple = $crate::jl_sys_export::jl_new_struct_uninit(ty.cast());
                 let data: *mut Self = tuple.cast();
                 ::std::ptr::write(data, *self);
 
                 tuple
+            }
+        }
+
+        unsafe impl<$($types),+> $crate::traits::ValidLayout for $name<$($types),+>  where $($types: $crate::traits::ValidLayout + Copy),+ {
+            unsafe fn valid_layout(v: $crate::value::Value) -> bool {
+                if let Ok(dt) = v.cast::<$crate::value::datatype::DataType>() {
+                    let fieldtypes = dt.field_types();
+                    let n = count!($($types),+);
+                    if fieldtypes.len() != n {
+                        return false;
+                    }
+
+                    if !check!(fieldtypes, n, $($types),+) {
+                        return false
+                    }
+                }
+
+                true
+            }
+        }
+
+        unsafe impl<'frame, 'data, $($types),+> $crate::traits::Cast<'frame, 'data> for $name<$($types),+>  where $($types: $crate::traits::ValidLayout + Copy),+ {
+            type Output = Self;
+
+            fn cast(value: $crate::value::Value) -> $crate::error::JlrsResult<Self::Output> {
+                if value.is_nothing() {
+                    Err($crate::error::JlrsError::Nothing)?;
+                }
+
+                unsafe {
+                    if <Self::Output as $crate::traits::ValidLayout>::valid_layout(value.datatype().unwrap().into()) {
+                        Ok(Self::cast_unchecked(value))
+                    } else {
+                        Err($crate::error::JlrsError::WrongType)?
+                    }
+                }
+            }
+
+            unsafe fn cast_unchecked(value: $crate::value::Value) -> Self::Output {
+                *(value.ptr() as *mut Self::Output)
+            }
+        }
+
+        unsafe impl<$($types),+> $crate::traits::JuliaTypecheck for $name<$($types),+> where $($types: $crate::traits::JuliaType),+ {
+            unsafe fn julia_typecheck(t: $crate::value::datatype::DataType) -> bool {
+                t.ptr() == <Self as $crate::traits::JuliaType>::julia_type()
             }
         }
     };
@@ -55,17 +93,57 @@ macro_rules! impl_tuple {
         #[derive(Copy, Clone, Debug)]
         pub struct $name();
 
-        unsafe impl JuliaType for $name
+        unsafe impl $crate::value::JuliaType for $name
         {
-            unsafe fn julia_type() -> *mut jl_datatype_t {
-                jl_emptytuple_type
+            unsafe fn julia_type() -> *mut $crate::jl_sys_export::jl_datatype_t {
+                $crate::jl_sys_export::jl_emptytuple_type
             }
         }
 
-        unsafe impl IntoJulia for $name
+        unsafe impl $crate::value::IntoJulia for $name
         {
-            unsafe fn into_julia(&self) -> *mut jl_value_t {
-                jl_emptytuple
+            unsafe fn into_julia(&self) -> *mut $crate::jl_sys_export::jl_value_t {
+                $crate::jl_sys_export::jl_emptytuple
+            }
+        }
+
+        unsafe impl $crate::traits::ValidLayout for $name {
+            unsafe fn valid_layout(v: $crate::value::Value) -> bool {
+                if let Ok(dt) = v.cast::<$crate::value::datatype::DataType>() {
+                    if dt.is::<Self>() {
+                        return true;
+                    }
+                }
+
+                true
+            }
+        }
+
+        unsafe impl<'frame, 'data> $crate::traits::Cast<'frame, 'data> for $name {
+            type Output = Self;
+
+            fn cast(value: $crate::value::Value) -> $crate::error::JlrsResult<Self::Output> {
+                if value.is_nothing() {
+                    Err($crate::error::JlrsError::Nothing)?;
+                }
+
+                unsafe {
+                    if <Self::Output as $crate::traits::ValidLayout>::valid_layout(value.datatype().unwrap().into()) {
+                        Ok(Self::cast_unchecked(value))
+                    } else {
+                        Err($crate::error::JlrsError::WrongType)?
+                    }
+                }
+            }
+
+            unsafe fn cast_unchecked(value: $crate::value::Value) -> Self::Output {
+                *(value.ptr() as *mut Self::Output)
+            }
+        }
+
+        unsafe impl $crate::traits::JuliaTypecheck for $name {
+            unsafe fn julia_typecheck(t: $crate::value::datatype::DataType) -> bool {
+                t.ptr() == <Self as $crate::traits::JuliaType>::julia_type()
             }
         }
     };
@@ -74,45 +152,6 @@ macro_rules! impl_tuple {
 impl_tuple!(Tuple0);
 impl_tuple!(Tuple1, T1);
 impl_tuple!(Tuple2, T1, T2);
-
-unsafe impl<T1, T2> JuliaTypecheck for Tuple2<T1, T2>
-where
-    T1: JuliaFieldtype,
-    T2: JuliaFieldtype,
-{
-    unsafe fn julia_typecheck(t: DataType) -> bool {
-        /*        if !t.is::<Tuple>() {
-                    return false;
-                }
-
-                if t.size() != mem::size_of::<Self>() as i32 {
-                    return false;
-                }
-
-                if t.nfields() != 2 {
-                    return false;
-                }
-
-                let types = t.field_types();
-
-                if let Ok(dt) = types[0].cast::<DataType>() {
-                    if dt.is::<Array>() && T1::field_type() != jl_array_typename {
-                        return false
-                    } else if T1::field_type().cast() != dt.ptr() {
-                        return false;
-                    }
-                } else if types[0].is::<UnionAll>() {
-                    if T1::julia_type().cast() != jl_any_type {
-                        return false;
-                    }
-                } else if types[0].is::<UnionType>() {
-                } else {
-                }
-        */
-        true
-    }
-}
-
 impl_tuple!(Tuple3, T1, T2, T3);
 impl_tuple!(Tuple4, T1, T2, T3, T4);
 impl_tuple!(Tuple5, T1, T2, T3, T4, T5);
