@@ -121,11 +121,43 @@ mod tests {
     #[repr(C)]
     struct NewStructDerive<'frame, 'data, T>
     where
-        T: ValidLayout,
+        T: ValidLayout + Copy,
     {
         a: i32,
         b: T,
         c: Value<'frame, 'data>,
+    }
+
+    #[derive(Copy, Clone, NewJuliaStruct)]
+    #[jlrs(julia_type = "Main.JlrsDeriveTests.WrongType", unionall = true)]
+    #[repr(C)]
+    struct NewStructDerive2<'frame, T>
+    where
+        T: ValidLayout + Copy,
+    {
+        a: i32,
+        b: T,
+        c: Module<'frame>,
+    }
+
+    #[derive(Copy, Clone, NewJuliaStruct)]
+    #[jlrs(julia_type = "Main.JlrsDeriveTests.WrongType")]
+    #[repr(C)]
+    struct NewStructDerive3<T>
+    where
+        T: ValidLayout + Copy,
+    {
+        a: i32,
+        b: T,
+    }
+
+    #[derive(Copy, Clone, NewJuliaStruct)]
+    #[jlrs(julia_type = "Main.JlrsDeriveTests.WrongType")]
+    #[repr(C)]
+    struct NewStructDerive4
+    {
+        a: i32,
+        b: i64,
     }
 
     #[test]

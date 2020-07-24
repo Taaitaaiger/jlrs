@@ -282,7 +282,7 @@ pub unsafe fn jl_string_data(s: *mut jl_value_t) -> *const u8 {
 */
 #[inline(always)]
 pub unsafe fn jl_string_len(s: *mut jl_value_t) -> usize {
-    *(s as *const usize)
+    *(s.cast())
 }
 
 /*
@@ -304,16 +304,14 @@ V1.4.2
 pub unsafe fn jl_get_fieldtypes(st: *mut jl_datatype_t) -> *mut jl_svec_t {
     if (&*st).types.is_null() {
         jl_compute_fieldtypes(st)
-        //jl_compute_fieldtypes(st, std::ptr::null_mut())
     } else {
         (&*st).types
     }
 }
 
 /*
-V1.5.0=beta1
+V1.5.0-beta1
 #define jl_get_fieldtypes(st) ((st)->types ? (st)->types : jl_compute_fieldtypes((st), NULL))
-*/
 #[inline(always)]
 #[cfg(feature = "beta")]
 pub unsafe fn jl_get_fieldtypes(st: *mut jl_datatype_t) -> *mut jl_svec_t {
@@ -323,6 +321,7 @@ pub unsafe fn jl_get_fieldtypes(st: *mut jl_datatype_t) -> *mut jl_svec_t {
         (&*st).types
     }
 }
+*/
 
 /*
 #define jl_datatype_size(t)    (((jl_datatype_t*)t)->size)

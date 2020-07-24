@@ -3,12 +3,14 @@
 use crate::error::{JlrsError, JlrsResult};
 use crate::global::Global;
 use crate::traits::{private::Internal, Cast, TemporarySymbol};
+use crate::value::symbol::Symbol;
 use crate::value::Value;
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{
     jl_base_module, jl_core_module, jl_get_global, jl_main_module, jl_module_t, jl_module_type,
     jl_set_const, jl_set_global, jl_typeis,
 };
+use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::marker::PhantomData;
 
 /// Functionality in Julia can be accessed through its module system. You can get a handle to the
@@ -38,6 +40,30 @@ impl<'base> Module<'base> {
     #[doc(hidden)]
     pub unsafe fn ptr(self) -> *mut jl_module_t {
         self.0
+    }
+
+    /// Returns the name of this module.
+    pub fn name(self) -> Symbol<'base> {
+        unsafe { Symbol::wrap((&*(self.ptr())).name) }
+    }
+
+    /// Returns the parent of this module.
+    pub fn parent(self) -> Option<Self> {
+        unsafe {
+            let parent = (&*(self.ptr())).parent;
+            if parent.is_null() {
+                return None;
+            }
+
+            Some(Self::wrap(parent))
+        }
+    }
+
+    /// Extend the lifetime of this module; if `self` has originally been created by calling some
+    /// Julia function the lifetime will be limited to the frame the function is called with. This
+    /// can be extended to the lifetime of `Global` by calling this method.
+    pub fn extend<'global>(self, _: Global<'global>) -> Module<'global> {
+        unsafe { Module::wrap(self.ptr()) }
     }
 
     /// Returns a handle to Julia's `Main`-module. If you include your own Julia code by calling
@@ -82,6 +108,9 @@ impl<'base> Module<'base> {
         }
     }
 
+    /// Set a global value in this module. This is unsafe because if another global value was
+    /// previously assigned to this name, this previous value can become eligible for garbage 
+    /// collection. Don't use the previous value after calling this method.
     pub unsafe fn set_global<'frame, N>(
         self,
         name: N,
@@ -98,6 +127,7 @@ impl<'base> Module<'base> {
         Value::wrap(value.ptr())
     }
 
+    /// Set a constant in this module.
     pub fn set_const<'frame, N>(
         self,
         name: N,
@@ -176,3 +206,10 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for Module<'frame> {
 impl_julia_typecheck!(Module<'frame>, jl_module_type, 'frame);
 impl_julia_type!(Module<'frame>, jl_module_type, 'frame);
 impl_valid_layout!(Module<'frame>, 'frame);
+
+impl<'frame, 'data> Debug for Module<'frame> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        let name: String = self.name().into();
+        f.debug_tuple("Module").field(&name).finish()
+    }
+}

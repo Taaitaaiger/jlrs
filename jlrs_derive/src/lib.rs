@@ -4,6 +4,21 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{self, Meta};
 
+use syn::visit_mut::VisitMut;
+struct MissingLifetimes(Vec<String>);
+
+impl VisitMut for MissingLifetimes {
+    fn visit_generics_mut(&mut self, def: &mut syn::Generics) {
+        for s in self.0.iter() {
+            let gp = syn::GenericParam::Lifetime(syn::LifetimeDef::new(syn::Lifetime::new(
+                s,
+                ::proc_macro2::Span::call_site(),
+            )));
+            def.params.insert(0, gp);
+        }
+    }
+}
+
 #[proc_macro_derive(JuliaTuple)]
 pub fn julia_tuple_derive(input: TokenStream) -> TokenStream {
     // Construct a representation of Rust code as a syntax tree
@@ -101,11 +116,39 @@ fn impl_julia_tuple(ast: &syn::DeriveInput) -> TokenStream {
 fn new_impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
     let generics = &ast.generics;
+    let jl_type = corresponding_julia_type(ast).expect("JuliaStruct can only be derived if the corresponding Julia type is set with #[julia_type = \"Main.MyModule.Submodule.StructType\"]");
+    let mut type_it = jl_type.split('.');
+    let func = match type_it.next() {
+        Some("Main") => quote::format_ident!("main"),
+        Some("Base") => quote::format_ident!("base"),
+        Some("Core") => quote::format_ident!("core"),
+        _ => panic!("JuliaStruct can only be derived if the first module of \"julia_type\" is either \"Main\", \"Base\" or \"Core\"."),
+    };
+
+    let mut modules = type_it.collect::<Vec<_>>();
+    let ty = modules.pop().expect("JuliaStruct can only be derived if the corresponding Julia type is set with #[jlrs(julia_type = \"Main.MyModule.Submodule.StructType\")]");
+    let modules_it = modules.iter();
+    let modules_it_b = modules_it.clone();
+
+    let mut missing_lifetimes = MissingLifetimes(Vec::with_capacity(2));
+    
+    let data_lt = generics.lifetimes().find(|l| l.lifetime.ident.to_string() == "data");
+    if data_lt.is_none() {
+        missing_lifetimes.0.push("'data".into());
+    }
+    let frame_lt = generics.lifetimes().find(|l| l.lifetime.ident.to_string() == "frame");
+    if frame_lt.is_none() {
+        missing_lifetimes.0.push("'frame".into());
+    }
+    
+    let mut extended_generics = generics.clone();
+    missing_lifetimes.visit_generics_mut(&mut extended_generics);
+
     let where_clause = &ast.generics.where_clause;
 
     let fields = match &ast.data {
         syn::Data::Struct(s) => &s.fields,
-        _ => panic!("JuliaTuple cannot be derived for enums and unions"),
+        _ => panic!(""),
     };
 
     let field_types_iter = match fields {
@@ -118,7 +161,7 @@ fn new_impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
 
     let julia_struct_impl = quote! {
         unsafe impl #generics ::jlrs::traits::ValidLayout for #name #generics #where_clause {
-            unsafe fn valid_layout(v: Value) -> bool {
+            unsafe fn valid_layout(v: ::jlrs::value::Value) -> bool {
                 if let Ok(dt) = v.cast::<DataType>() {
                     if dt.nfields() as usize != #n_fields {
                         return false;
@@ -138,8 +181,54 @@ fn new_impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
                 false
             }
         }
+
+        unsafe impl #generics ::jlrs::traits::JuliaTypecheck for #name #generics #where_clause {
+            unsafe fn julia_typecheck(t: ::jlrs::value::datatype::DataType) -> bool {
+                <Self as ::jlrs::traits::ValidLayout>::valid_layout(t.into())
+            }
+        }
+
+        unsafe impl #generics ::jlrs::traits::JuliaType for #name #generics #where_clause {
+            unsafe fn julia_type() -> *mut ::jlrs::jl_sys_export::jl_datatype_t {
+                let global = ::jlrs::global::Global::new();
+                
+                let julia_type = ::jlrs::value::module::Module::#func(global)
+                    #(.submodule(#modules_it).expect(&format!("Submodule {} cannot be found", #modules_it_b)))*
+                    .global(#ty).expect(&format!("Type {} cannot be found in module", #ty));
+
+                if let Ok(dt) = julia_type.cast::<::jlrs::value::datatype::DataType>() {
+                    dt.ptr()
+                } else if let Ok(ua) = julia_type.cast::<::jlrs::value::union_all::UnionAll>() {
+                    ua.base_type().ptr()
+                } else {
+                    panic!("Invalid type: {:?}", julia_type.datatype());
+                }
+            }
+        }
+
+        unsafe impl #extended_generics ::jlrs::traits::Cast<'frame, 'data> for #name #generics #where_clause {
+            type Output = Self;
+
+            fn cast(value: ::jlrs::value::Value<'frame, 'data>) -> ::jlrs::error::JlrsResult<Self::Output> {
+                if value.is_nothing() {
+                    Err(::jlrs::error::JlrsError::Nothing)?
+                }
+
+                unsafe {
+                    if <Self as ::jlrs::traits::ValidLayout>::valid_layout(value.datatype().unwrap().into()) {
+                        return Ok(Self::cast_unchecked(value));
+                    }
+                }
+
+                Err(::jlrs::error::JlrsError::WrongType)?
+            }
+
+            unsafe fn cast_unchecked(value: ::jlrs::value::Value<'frame, 'data>) -> Self::Output {
+                *(value.ptr().cast::<Self::Output>())
+            }
+        }
     };
-    
+
     julia_struct_impl.into()
 }
 
