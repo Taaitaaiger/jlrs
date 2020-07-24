@@ -876,7 +876,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
 }
 
 impl<'frame, 'data> Debug for Value<'frame, 'data> {
-    #[cfg_attr(tarpaulin, skip)]
+    
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         f.debug_tuple("Value").field(&self.type_name()).finish()
     }

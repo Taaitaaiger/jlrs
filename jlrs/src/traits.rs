@@ -372,7 +372,7 @@ impl_into_julia!(f64, jl_box_float64);
 
 #[cfg(not(target_pointer_width = "64"))]
 unsafe impl IntoJulia for usize {
-    #[cfg_attr(tarpaulin, skip)]
+    
     unsafe fn into_julia(&self) -> *mut jl_value_t {
         jl_box_uint32(*self as u32)
     }
@@ -387,7 +387,7 @@ unsafe impl IntoJulia for usize {
 
 #[cfg(not(target_pointer_width = "64"))]
 unsafe impl IntoJulia for isize {
-    #[cfg_attr(tarpaulin, skip)]
+    
     unsafe fn into_julia(&self) -> *mut jl_value_t {
         jl_box_int32(*self as i32)
     }
@@ -466,7 +466,7 @@ impl_julia_type!(char, jl_char_type);
 
 #[cfg(not(target_pointer_width = "64"))]
 unsafe impl JuliaType for usize {
-    #[cfg_attr(tarpaulin, skip)]
+    
     unsafe fn julia_type() -> *mut jl_datatype_t {
         jl_uint32_type
     }
@@ -481,7 +481,7 @@ unsafe impl JuliaType for usize {
 
 #[cfg(not(target_pointer_width = "64"))]
 unsafe impl JuliaType for isize {
-    #[cfg_attr(tarpaulin, skip)]
+    
     unsafe fn julia_type() -> *mut jl_datatype_t {
         jl_int32_type
     }
@@ -643,7 +643,7 @@ impl<'frame> Frame<'frame> for StaticFrame<'frame> {
         self.len
     }
 
-    #[cfg_attr(tarpaulin, skip)]
+    
     fn print_memory(&self) {
         self.memory.print_memory()
     }
@@ -689,7 +689,7 @@ impl<'frame> Frame<'frame> for DynamicFrame<'frame> {
         self.len
     }
 
-    #[cfg_attr(tarpaulin, skip)]
+    
     fn print_memory(&self) {
         self.memory.print_memory()
     }

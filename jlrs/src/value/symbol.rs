@@ -48,7 +48,7 @@ impl<'base> Symbol<'base> {
     }
 
     #[doc(hidden)]
-    #[cfg_attr(tarpaulin, skip)]
+    
     pub unsafe fn ptr(self) -> *mut jl_sym_t {
         self.0
     }
@@ -124,7 +124,7 @@ where
 }
 
 impl<'scope> Debug for Symbol<'scope> {
-    #[cfg_attr(tarpaulin, skip)]
+    
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         unsafe {
             let ptr = jl_symbol_name(self.ptr()).cast();

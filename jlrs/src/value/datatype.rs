@@ -169,7 +169,7 @@ impl<'frame> Into<Value<'frame, 'static>> for DataType<'frame> {
 }
 
 impl<'frame, 'data> Debug for DataType<'frame> {
-    #[cfg_attr(tarpaulin, skip)]
+    
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         f.debug_tuple("DataType").field(&self.name()).finish()
     }

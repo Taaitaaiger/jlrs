@@ -91,7 +91,7 @@ impl<'frame, 'data> Array<'frame, 'data> {
     }
 
     #[doc(hidden)]
-    #[cfg_attr(tarpaulin, skip)]
+    
     pub unsafe fn ptr(self) -> *mut jl_array_t {
         self.0
     }
@@ -697,7 +697,7 @@ impl Dimensions {
     }
 }
 
-#[cfg_attr(tarpaulin, skip)]
+
 impl Debug for Dimensions {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         let mut f = f.debug_tuple("");
@@ -710,7 +710,7 @@ impl Debug for Dimensions {
     }
 }
 
-#[cfg_attr(tarpaulin, skip)]
+
 impl Display for Dimensions {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         let mut f = f.debug_tuple("");

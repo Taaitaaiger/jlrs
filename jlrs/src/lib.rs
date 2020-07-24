@@ -451,7 +451,7 @@ impl Julia {
 }
 
 impl Drop for Julia {
-    #[cfg_attr(tarpaulin, skip)]
+    
     fn drop(&mut self) {
         unsafe {
             jl_atexit_hook(0);
