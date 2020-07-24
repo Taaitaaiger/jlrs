@@ -115,9 +115,17 @@ mod tests {
         #[jlrs(rename = "bar")]
         foo: i16,
     }
-    
-    #[test]
-    fn test_union() {
+
+    #[derive(Copy, Clone, NewJuliaStruct, Debug)]
+    #[jlrs(julia_type = "Main.JlrsDeriveTests.WrongType", unionall = true)]
+    #[repr(C)]
+    struct NewStructDerive<'frame, 'data, T>
+    where
+        T: ValidLayout,
+    {
+        a: i32,
+        b: T,
+        c: Value<'frame, 'data>,
     }
 
     #[test]

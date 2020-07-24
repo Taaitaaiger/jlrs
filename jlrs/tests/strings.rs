@@ -1,7 +1,7 @@
 use jlrs::prelude::*;
 use jlrs::traits::ValidLayout;
 use jlrs::util::JULIA;
-use jlrs::value::jl_string::JlString;
+use jlrs::value::string::JuliaString;
 use std::borrow::Cow;
 
 #[test]
@@ -65,12 +65,14 @@ fn create_and_cast_jl_string() {
 
         jlrs.frame(1, |_global, frame| {
             let v = Value::new(frame, "Foo bar")?;
-            assert!(v.is::<JlString>());
-            let string = v.cast::<JlString>()?;
-            assert!(unsafe { JlString::valid_layout(v.datatype().unwrap().into()) });
+            assert!(v.is::<JuliaString>());
+            let string = v.cast::<JuliaString>()?;
+            assert!(unsafe { JuliaString::valid_layout(v.datatype().unwrap().into()) });
             assert_eq!(string.len(), 7);
-            assert_eq!(string.data_cstr().to_str().unwrap(), "Foo bar");
-            assert_eq!(string.data_slice(), b"Foo bar".as_ref());
+            assert_eq!(string.as_c_str().to_str().unwrap(), "Foo bar");
+            assert_eq!(string.as_str().unwrap(), "Foo bar");
+            assert_eq!(unsafe { string.as_str_unchecked() }, "Foo bar");
+            assert_eq!(string.as_slice(), b"Foo bar".as_ref());
 
             Ok(())
         })

@@ -27,6 +27,7 @@ pub enum JlrsError {
     NotATask,
     NotASymbol,
     NotAString,
+    NotUnicode,
     NotAnSVec,
     NotAnSSAValue,
     NotATypeName,
@@ -76,6 +77,7 @@ impl Display for JlrsError {
             JlrsError::Exception(exc) => write!(formatter, "An exception was thrown: {}", exc),
             JlrsError::NotAnArray => write!(formatter, "This is not an array"),
             JlrsError::NotAString => write!(formatter, "This is not a string"),
+            JlrsError::NotUnicode => write!(formatter, "This string contains invalid characters"),
             JlrsError::Nothing => write!(formatter, "This value is Nothing"),
             JlrsError::ConstAlreadyExists(name) => {
                 write!(formatter, "The constant {} already exists", name)

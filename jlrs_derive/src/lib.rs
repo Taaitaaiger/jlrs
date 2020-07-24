@@ -24,6 +24,16 @@ pub fn julia_struct_derive(input: TokenStream) -> TokenStream {
     impl_julia_struct(&ast)
 }
 
+#[proc_macro_derive(NewJuliaStruct, attributes(julia_type, unionall, jlrs))]
+pub fn new_julia_struct_derive(input: TokenStream) -> TokenStream {
+    // Construct a representation of Rust code as a syntax tree
+    // that we can manipulate
+    let ast = syn::parse(input).unwrap();
+
+    // Build the trait implementation
+    new_impl_julia_struct(&ast)
+}
+
 fn impl_julia_tuple(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
     if !is_repr_c(ast) {
@@ -86,6 +96,51 @@ fn impl_julia_tuple(ast: &syn::DeriveInput) -> TokenStream {
     };
 
     julia_tuple_impl.into()
+}
+
+fn new_impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
+    let name = &ast.ident;
+    let generics = &ast.generics;
+    let where_clause = &ast.generics.where_clause;
+
+    let fields = match &ast.data {
+        syn::Data::Struct(s) => &s.fields,
+        _ => panic!("JuliaTuple cannot be derived for enums and unions"),
+    };
+
+    let field_types_iter = match fields {
+        syn::Fields::Named(n) => n.named.iter().map(|f| &f.ty),
+        _ => panic!(""),
+    };
+
+    let n_fields = field_types_iter.len();
+    let idx = 0..n_fields;
+
+    let julia_struct_impl = quote! {
+        unsafe impl #generics ::jlrs::traits::ValidLayout for #name #generics #where_clause {
+            unsafe fn valid_layout(v: Value) -> bool {
+                if let Ok(dt) = v.cast::<DataType>() {
+                    if dt.nfields() as usize != #n_fields {
+                        return false;
+                    }
+
+                    let field_types = dt.field_types();
+
+                    #(
+                        if !<#field_types_iter as ::jlrs::traits::ValidLayout>::valid_layout(field_types[#idx]) {
+                            return false;
+                        }
+                    )*
+
+                    return true;
+                }
+
+                false
+            }
+        }
+    };
+    
+    julia_struct_impl.into()
 }
 
 fn impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
@@ -243,16 +298,22 @@ fn impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
 
             fn cast(value: ::jlrs::value::Value<'frame, 'data>) -> ::jlrs::error::JlrsResult<Self::Output> {
                 if value.is::<#name>() {
-                    return unsafe { Ok(*(value.ptr().cast::<Self::Output>())) };
+                    return unsafe { Ok(Self::cast_unchecked(value)) };
                 }
 
                 Err(::jlrs::error::JlrsError::WrongType)?
             }
 
-            unsafe fn cast_unchecked<'fr, 'da>(value: ::jlrs::value::Value<'frame, 'data>) -> Self::Output {
-                *value.ptr().cast::<Self>()
+            unsafe fn cast_unchecked(value: ::jlrs::value::Value<'frame, 'data>) -> Self::Output {
+                *value.ptr().cast::<Self::Output>()
             }
         }
+
+        /*
+        unsafe impl ::jlrs::traits::ValidLayout for #name {
+
+        }
+        */
     };
 
     julia_struct_impl.into()

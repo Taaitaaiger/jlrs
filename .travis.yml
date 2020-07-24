@@ -5,7 +5,6 @@ addons:
     apt:
         packages:
             - libssl-dev
-cache: cargo
 rust:
   - stable
   - beta
@@ -13,11 +12,6 @@ rust:
 matrix:
   allow_failures:
     - rust: nightly
-
-before_cache: |
-  if [[ "$TRAVIS_RUST_VERSION" == stable ]]; then
-    cargo install cargo-tarpaulin
-  fi
 
 before_script:
   - wget https://julialang-s3.julialang.org/bin/linux/x64/1.4/julia-1.4.2-linux-x86_64.tar.gz -O /tmp/julia.tar.gz
@@ -34,5 +28,6 @@ branches:
 
 after_success: |
   if [[ "$TRAVIS_RUST_VERSION" == stable ]]; then
+    cargo install cargo-tarpaulin
     cargo tarpaulin --ciserver travis-ci --coveralls $TRAVIS_JOB_ID --exclude-files jl_sys/* --exclude-files jlrs_derive/* jl_sys/*  -- --test-threads 1
   fi

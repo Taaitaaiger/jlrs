@@ -43,7 +43,7 @@ pub mod array;
 pub mod code_instance;
 pub mod datatype;
 pub mod expr;
-pub mod jl_string;
+pub mod string;
 pub mod method_table;
 pub mod method;
 pub mod method_instance;
