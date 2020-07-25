@@ -19,6 +19,68 @@ impl VisitMut for MissingLifetimes {
     }
 }
 
+
+#[derive(Default)]
+struct ClassifiedFields<'a> {
+    rs_flag_fields: Vec<&'a syn::Type>,
+    rs_align_fields: Vec<&'a syn::Type>,
+    rs_union_fields: Vec<&'a syn::Type>,
+    rs_non_union_fields: Vec<&'a syn::Type>,
+    jl_union_field_idxs: Vec<usize>,
+    jl_non_union_field_idxs: Vec<usize>,
+}
+
+impl<'a> ClassifiedFields<'a> {
+    fn classify<I>(fields_iter: I) -> Self
+    where
+        I: Iterator<Item = &'a syn::Field> + ExactSizeIterator + Clone,
+    {
+        let mut rs_flag_fields = vec![];
+        let mut rs_align_fields = vec![];
+        let mut rs_union_fields = vec![];
+        let mut rs_non_union_fields = vec![];
+        let mut jl_union_field_idxs = vec![];
+        let mut jl_non_union_field_idxs = vec![];
+        let mut offset = 0;
+
+        'outer: for (idx, field) in fields_iter.enumerate() {
+            for attr in field.attrs.iter() {
+                match JlrsAttr::parse(attr) {
+                    Some(JlrsAttr::BitsUnion) => {
+                        rs_union_fields.push(&field.ty);
+                        jl_union_field_idxs.push(idx - offset);
+                        offset += 1;
+                        continue 'outer;
+                    }
+                    Some(JlrsAttr::BitsUnionAlign) => {
+                        rs_align_fields.push(&field.ty);
+                        offset += 1;
+                        continue 'outer;
+                    }
+                    Some(JlrsAttr::BitsUnionFlag) => {
+                        rs_flag_fields.push(&field.ty);
+                        offset += 1;
+                        continue 'outer;
+                    }
+                    _ => (),
+                }
+            }
+
+            rs_non_union_fields.push(&field.ty);
+            jl_non_union_field_idxs.push(idx - offset);
+        }
+
+        ClassifiedFields {
+            rs_flag_fields,
+            rs_align_fields,
+            rs_union_fields,
+            rs_non_union_fields,
+            jl_union_field_idxs,
+            jl_non_union_field_idxs,
+        }
+    }
+}
+
 #[proc_macro_derive(JuliaTuple)]
 pub fn julia_tuple_derive(input: TokenStream) -> TokenStream {
     // Construct a representation of Rust code as a syntax tree
@@ -39,7 +101,7 @@ pub fn julia_struct_derive(input: TokenStream) -> TokenStream {
     impl_julia_struct(&ast)
 }
 
-#[proc_macro_derive(NewJuliaStruct, attributes(julia_type, unionall, jlrs))]
+#[proc_macro_derive(NewJuliaStruct, attributes(jlrs))]
 pub fn new_julia_struct_derive(input: TokenStream) -> TokenStream {
     // Construct a representation of Rust code as a syntax tree
     // that we can manipulate
@@ -102,7 +164,7 @@ fn impl_julia_tuple(ast: &syn::DeriveInput) -> TokenStream {
                 Err(::jlrs::error::JlrsError::WrongType)?
             }
 
-            unsafe fn cast_unchecked<'fr, 'da>(value: ::jlrs::value::Value<'frame, 'data>) -> Self::Output {
+            unsafe fn cast_unchecked(value: ::jlrs::value::Value<'frame, 'data>) -> Self::Output {
                 *(value.ptr().cast::<Self>())
             }
         }
@@ -131,16 +193,20 @@ fn new_impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
     let modules_it_b = modules_it.clone();
 
     let mut missing_lifetimes = MissingLifetimes(Vec::with_capacity(2));
-    
-    let data_lt = generics.lifetimes().find(|l| l.lifetime.ident.to_string() == "data");
+
+    let data_lt = generics
+        .lifetimes()
+        .find(|l| l.lifetime.ident.to_string() == "data");
     if data_lt.is_none() {
         missing_lifetimes.0.push("'data".into());
     }
-    let frame_lt = generics.lifetimes().find(|l| l.lifetime.ident.to_string() == "frame");
+    let frame_lt = generics
+        .lifetimes()
+        .find(|l| l.lifetime.ident.to_string() == "frame");
     if frame_lt.is_none() {
         missing_lifetimes.0.push("'frame".into());
     }
-    
+
     let mut extended_generics = generics.clone();
     missing_lifetimes.visit_generics_mut(&mut extended_generics);
 
@@ -148,16 +214,24 @@ fn new_impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
 
     let fields = match &ast.data {
         syn::Data::Struct(s) => &s.fields,
-        _ => panic!(""),
+        _ => panic!("Julia struct can only be derived for structs."),
     };
 
-    let field_types_iter = match fields {
-        syn::Fields::Named(n) => n.named.iter().map(|f| &f.ty),
-        _ => panic!(""),
+    let classified_fields = match fields {
+        syn::Fields::Named(n) => ClassifiedFields::classify(n.named.iter()),
+        syn::Fields::Unit => ClassifiedFields::default(),
+        _ => panic!("Julia struct cannot be derived for tuple structs."),
     };
 
-    let n_fields = field_types_iter.len();
-    let idx = 0..n_fields;
+    let rs_flag_fields = classified_fields.rs_flag_fields.iter();
+    let rs_align_fields = classified_fields.rs_align_fields.iter();
+    let rs_union_fields = classified_fields.rs_union_fields.iter();
+    let rs_non_union_fields = classified_fields.rs_non_union_fields.iter();
+    let jl_union_field_idxs = classified_fields.jl_union_field_idxs.iter();
+    let jl_non_union_field_idxs = classified_fields.jl_non_union_field_idxs.iter();
+
+    let n_fields = classified_fields.jl_union_field_idxs.len()
+        + classified_fields.jl_non_union_field_idxs.len();
 
     let julia_struct_impl = quote! {
         unsafe impl #generics ::jlrs::traits::ValidLayout for #name #generics #where_clause {
@@ -170,8 +244,18 @@ fn new_impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
                     let field_types = dt.field_types();
 
                     #(
-                        if !<#field_types_iter as ::jlrs::traits::ValidLayout>::valid_layout(field_types[#idx]) {
+                        if !<#rs_non_union_fields as ::jlrs::traits::ValidLayout>::valid_layout(field_types[#jl_non_union_field_idxs]) {
                             return false;
+                        }
+                    )*
+
+                    #(
+                        if let Ok(u) = field_types[#jl_union_field_idxs].cast::<::jlrs::value::union::Union>() {
+                            if !::jlrs::value::union::correct_layout_for::<#rs_align_fields, #rs_union_fields, #rs_flag_fields>(u) {
+                                return false
+                            }
+                        } else {
+                            return false
                         }
                     )*
 
@@ -191,7 +275,7 @@ fn new_impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
         unsafe impl #generics ::jlrs::traits::JuliaType for #name #generics #where_clause {
             unsafe fn julia_type() -> *mut ::jlrs::jl_sys_export::jl_datatype_t {
                 let global = ::jlrs::global::Global::new();
-                
+
                 let julia_type = ::jlrs::value::module::Module::#func(global)
                     #(.submodule(#modules_it).expect(&format!("Submodule {} cannot be found", #modules_it_b)))*
                     .global(#ty).expect(&format!("Type {} cannot be found in module", #ty));
@@ -397,12 +481,6 @@ fn impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
                 *value.ptr().cast::<Self::Output>()
             }
         }
-
-        /*
-        unsafe impl ::jlrs::traits::ValidLayout for #name {
-
-        }
-        */
     };
 
     julia_struct_impl.into()
@@ -458,4 +536,50 @@ fn expected_field_name(field: &syn::Field) -> String {
     }
 
     field.ident.as_ref().unwrap().to_string()
+}
+
+enum JlrsAttr {
+    Rename(String),
+    Type(String),
+    BitsUnionAlign,
+    BitsUnion,
+    BitsUnionFlag,
+}
+
+impl JlrsAttr {
+    pub fn parse(attr: &syn::Attribute) -> Option<Self> {
+        if let Ok(Meta::List(p)) = attr.parse_meta() {
+            if let syn::NestedMeta::Meta(syn::Meta::NameValue(nv)) = p.nested.first().unwrap() {
+                if nv.path.is_ident("rename") {
+                    if let syn::Lit::Str(string) = &nv.lit {
+                        return Some(JlrsAttr::Rename(string.value()));
+                    }
+                }
+
+                if nv.path.is_ident("julia_type") {
+                    if let syn::Lit::Str(string) = &nv.lit {
+                        return Some(JlrsAttr::Type(string.value()));
+                    }
+                }
+
+                return None;
+            }
+
+            if let Some(syn::NestedMeta::Meta(syn::Meta::Path(m))) = p.nested.first() {
+                if m.is_ident("bits_union") {
+                    return Some(JlrsAttr::BitsUnion);
+                }
+
+                if m.is_ident("bits_union_align") {
+                    return Some(JlrsAttr::BitsUnionAlign);
+                }
+
+                if m.is_ident("bits_union_flag") {
+                    return Some(JlrsAttr::BitsUnionFlag);
+                }
+            }
+        }
+
+        None
+    }
 }

@@ -160,6 +160,21 @@ mod tests {
         b: i64,
     }
 
+    #[derive(Copy, Clone, NewJuliaStruct)]
+    #[jlrs(julia_type = "Main.JlrsDeriveTests.WrongType")]
+    #[repr(C)]
+    struct NewStructDerive5
+    {
+        foo: bool,
+        #[jlrs(bits_union_align)]
+        _align_b: ::jlrs::value::union::Align4,
+        #[jlrs(bits_union)]
+        b: ::jlrs::value::union::BitsUnion<[std::mem::MaybeUninit<u8>;4]>,
+        #[jlrs(bits_union_flag)]
+        _flag_b: u8,
+        bar: usize
+    }
+
     #[test]
     fn derive_julia_tuple() {
         JULIA.with(|j| {

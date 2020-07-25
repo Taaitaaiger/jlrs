@@ -63,6 +63,16 @@ pub unsafe trait ValidLayout {
     unsafe fn valid_layout(ty: Value) -> bool;
 }
 
+pub unsafe trait Align {
+    const ALIGNMENT: usize;
+}
+
+pub unsafe trait BitsUnion {}
+
+pub unsafe trait Flag {}
+
+unsafe impl Flag for u8 {}
+
 #[doc(hidden)]
 #[macro_export]
 macro_rules! impl_valid_layout {
@@ -548,7 +558,7 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for bool {
         Err(JlrsError::WrongType)?
     }
 
-    unsafe fn cast_unchecked<'fr, 'da>(value: Value<'frame, 'data>) -> Self::Output {
+    unsafe fn cast_unchecked(value: Value<'frame, 'data>) -> Self::Output {
         jl_unbox_int8(value.ptr()) != 0
     }
 }
@@ -567,7 +577,7 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for char {
         Err(JlrsError::WrongType)?
     }
 
-    unsafe fn cast_unchecked<'fr, 'da>(value: Value<'frame, 'data>) -> Self::Output {
+    unsafe fn cast_unchecked(value: Value<'frame, 'data>) -> Self::Output {
         std::char::from_u32_unchecked(jl_unbox_uint32(value.ptr()))
     }
 }
@@ -583,7 +593,7 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for String {
         Err(JlrsError::WrongType)?
     }
 
-    unsafe fn cast_unchecked<'fr, 'da>(value: Value<'frame, 'data>) -> Self::Output {
+    unsafe fn cast_unchecked(value: Value<'frame, 'data>) -> Self::Output {
         let len = jl_string_len(value.ptr());
 
         if len == 0 {

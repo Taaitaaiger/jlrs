@@ -40,7 +40,7 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for SimpleVector<'frame> {
         Err(JlrsError::NotAnSVec)?
     }
 
-    unsafe fn cast_unchecked<'fr, 'da>(value: Value<'frame, 'data>) -> Self::Output {
+    unsafe fn cast_unchecked(value: Value<'frame, 'data>) -> Self::Output {
         Self::wrap(value.ptr().cast())
     }
 }

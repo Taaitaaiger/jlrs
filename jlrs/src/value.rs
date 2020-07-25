@@ -891,7 +891,7 @@ unsafe impl<'frame, 'data> ValidLayout for Value<'frame, 'data> {
         } else if v.cast::<union_all::UnionAll>().is_ok() {
             true
         } else if let Ok(u) = v.cast::<union::Union>() {
-            !u.isbits()
+            !u.isbitsunion()
         } else {
             false
         }

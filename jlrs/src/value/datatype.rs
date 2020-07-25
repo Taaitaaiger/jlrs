@@ -34,7 +34,7 @@ use jl_sys::{
     jl_is_cpointer_type, jl_linenumbernode_type, jl_method_instance_type, jl_method_type,
     jl_namedtuple_typename, jl_newvarnode_type, jl_phicnode_type, jl_phinode_type, jl_pinode_type,
     jl_quotenode_type, jl_slotnumber_type, jl_string_type, jl_svec_data, jl_svec_len, jl_task_type,
-    jl_tuple_typename, jl_typedslot_type, jl_typename_str, jl_upsilonnode_type,
+    jl_tuple_typename, jl_typedslot_type, jl_typename_str, jl_upsilonnode_type, jl_isbits
 };
 use std::ffi::CStr;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
@@ -140,7 +140,7 @@ impl<'frame> DataType<'frame> {
         }
     }
 
-    pub fn field_types(&self) -> &[Value<'frame, 'static>] {
+    pub fn field_types(self) -> &'frame [Value<'frame, 'static>] {
         unsafe {
             let field_types = jl_get_fieldtypes(self.ptr());
             let len = jl_svec_len(field_types);
@@ -149,16 +149,20 @@ impl<'frame> DataType<'frame> {
         }
     }
 
-    pub fn field_size(&self, idx: usize) -> u32 {
+    pub fn field_size(self, idx: usize) -> u32 {
         unsafe { jl_field_size(self.ptr(), idx as _) }
     }
 
-    pub fn field_offset(&self, idx: usize) -> u32 {
+    pub fn field_offset(self, idx: usize) -> u32 {
         unsafe { jl_field_offset(self.ptr(), idx as _) }
     }
 
-    pub fn is_pointer_field(&self, idx: usize) -> bool {
+    pub fn is_pointer_field(self, idx: usize) -> bool {
         unsafe { jl_field_isptr(self.ptr(), idx as _) }
+    }
+
+    pub fn isbits(self) -> bool {
+        unsafe { jl_isbits(self.ptr().cast()) }
     }
 }
 
