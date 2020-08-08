@@ -19,7 +19,6 @@ impl VisitMut for MissingLifetimes {
     }
 }
 
-
 #[derive(Default)]
 struct ClassifiedFields<'a> {
     rs_flag_fields: Vec<&'a syn::Type>,
@@ -81,6 +80,17 @@ impl<'a> ClassifiedFields<'a> {
     }
 }
 
+#[proc_macro_derive(IntoJulia)]
+pub fn into_julia_derive(input: TokenStream) -> TokenStream {
+    // Construct a representation of Rust code as a syntax tree
+    // that we can manipulate
+    let ast = syn::parse(input).unwrap();
+
+    // Build the trait implementation
+    impl_into_julia(&ast)
+}
+
+/*
 #[proc_macro_derive(JuliaTuple)]
 pub fn julia_tuple_derive(input: TokenStream) -> TokenStream {
     // Construct a representation of Rust code as a syntax tree
@@ -90,7 +100,9 @@ pub fn julia_tuple_derive(input: TokenStream) -> TokenStream {
     // Build the trait implementation
     impl_julia_tuple(&ast)
 }
+*/
 
+/*
 #[proc_macro_derive(JuliaStruct, attributes(julia_type, jlrs))]
 pub fn julia_struct_derive(input: TokenStream) -> TokenStream {
     // Construct a representation of Rust code as a syntax tree
@@ -100,17 +112,19 @@ pub fn julia_struct_derive(input: TokenStream) -> TokenStream {
     // Build the trait implementation
     impl_julia_struct(&ast)
 }
+*/
 
-#[proc_macro_derive(NewJuliaStruct, attributes(jlrs))]
-pub fn new_julia_struct_derive(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(JuliaStruct, attributes(jlrs))]
+pub fn julia_struct_derive(input: TokenStream) -> TokenStream {
     // Construct a representation of Rust code as a syntax tree
     // that we can manipulate
     let ast = syn::parse(input).unwrap();
 
     // Build the trait implementation
-    new_impl_julia_struct(&ast)
+    impl_julia_struct(&ast)
 }
 
+/*
 fn impl_julia_tuple(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
     if !is_repr_c(ast) {
@@ -174,9 +188,14 @@ fn impl_julia_tuple(ast: &syn::DeriveInput) -> TokenStream {
 
     julia_tuple_impl.into()
 }
+*/
 
-fn new_impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
+fn impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
+    if !is_repr_c(ast) {
+        panic!("JuliaStruct can only be derived for types with the attribute #[repr(C)].");
+    }
+
     let generics = &ast.generics;
     let jl_type = corresponding_julia_type(ast).expect("JuliaStruct can only be derived if the corresponding Julia type is set with #[julia_type = \"Main.MyModule.Submodule.StructType\"]");
     let mut type_it = jl_type.split('.');
@@ -316,6 +335,7 @@ fn new_impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
     julia_struct_impl.into()
 }
 
+/*
 fn impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
     if !is_repr_c(ast) {
@@ -485,6 +505,29 @@ fn impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
 
     julia_struct_impl.into()
 }
+*/
+fn impl_into_julia(ast: &syn::DeriveInput) -> TokenStream {
+    let name = &ast.ident;
+    
+    if !is_repr_c(ast) {
+        panic!("IntoJulia can only be derived for types with the attribute #[repr(C)].");
+    }
+
+    let into_julia_impl = quote! {
+        unsafe impl ::jlrs::traits::IntoJulia for #name {
+            unsafe fn into_julia(&self) -> *mut ::jlrs::jl_sys_export::jl_value_t {
+                let ty = <Self as ::jlrs::traits::JuliaType>::julia_type();
+                let container = ::jlrs::jl_sys_export::jl_new_struct_uninit(ty.cast());
+                let data: *mut Self = container.cast();
+                ::std::ptr::write(data, *self);
+                
+                container
+            }
+        }
+    };
+
+    into_julia_impl.into()
+}
 
 fn is_repr_c(ast: &syn::DeriveInput) -> bool {
     for attr in &ast.attrs {
@@ -519,7 +562,7 @@ fn corresponding_julia_type(ast: &syn::DeriveInput) -> Option<String> {
 
     None
 }
-
+/*
 fn expected_field_name(field: &syn::Field) -> String {
     for attr in &field.attrs {
         if attr.path.is_ident("jlrs") {
@@ -537,7 +580,7 @@ fn expected_field_name(field: &syn::Field) -> String {
 
     field.ident.as_ref().unwrap().to_string()
 }
-
+*/
 enum JlrsAttr {
     Rename(String),
     Type(String),

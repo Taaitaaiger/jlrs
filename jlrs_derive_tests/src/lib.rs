@@ -1,196 +1,26 @@
 mod util;
+mod impls;
 
 #[cfg(test)]
 mod tests {
     use super::util::JULIA;
+    use super::impls::*;
     use jlrs::prelude::*;
 
-    #[derive(Copy, Clone, JuliaTuple, Eq, PartialEq, Debug)]
-    #[repr(C)]
-    struct UsizeAndIsize(usize, isize);
-
-    #[derive(Copy, Clone, JuliaTuple, Eq, PartialEq, Debug)]
-    #[repr(C)]
-    struct Usizes(
-        usize,
-        usize,
-        usize,
-        usize,
-        usize,
-        usize,
-        usize,
-        usize,
-        usize,
-        usize,
-        usize,
-        usize,
-        usize,
-        usize,
-        usize,
-        usize,
-    );
-
-    #[derive(Copy, Clone, JuliaTuple, PartialEq, Debug)]
-    #[repr(C)]
-    struct DifferentTypes(u8, u32, i64, f32, f64, i8, bool, u32, i8, i16);
-
-    /*
-    #[derive(Copy, Clone, JuliaStruct, PartialEq, Debug)]
-    #[jlrs(julia_type = "Main.JlrsDeriveTests.WithArray")]
-    #[repr(C)]
-    struct WithArray<'frame, 'data> {
-        id: NotInline<u8>,
-        array: Array<'frame, 'data>
-    }
-
-    #[derive(Copy, Clone, JuliaStruct, PartialEq, Debug)]
-    #[jlrs(julia_type = "Main.JlrsDeriveTests.WithValue")]
-    #[repr(C)]
-    struct WithValue<'frame, 'data> {
-        id: u8,
-        value: Value<'frame, 'data>
-    }
-
-    #[derive(Copy, Clone, JuliaStruct, PartialEq, Debug)]
-    #[jlrs(julia_type = "Main.JlrsDeriveTests.WithDataType")]
-    #[repr(C)]
-    struct WithDataType<'frame> {
-        id: u8,
-        datatype: DataType<'frame>
-    }
-
-    #[derive(Copy, Clone, JuliaStruct, PartialEq, Debug)]
-    #[jlrs(julia_type = "Main.JlrsDeriveTests.WithModule")]
-    #[repr(C)]
-    struct WithModule<'frame> {
-        id: u8,
-        module: Module<'frame>
-    }
-
-    #[derive(Copy, Clone, JuliaStruct, PartialEq, Debug)]
-    #[jlrs(julia_type = "Main.JlrsDeriveTests.WithSymbol")]
-    #[repr(C)]
-    struct WithSymbol<'frame> {
-        id: u8,
-        symbol: Symbol<'frame>
-    }
-    */
-
-    #[derive(Copy, Clone, JuliaStruct, PartialEq, Debug)]
-    #[jlrs(julia_type = "Main.JlrsDeriveTests.Submodule.MyType")]
-    #[repr(C)]
-    struct MyType {
-        v1: isize,
-        v2: f64,
-    }
-
-    #[derive(Copy, Clone, JuliaStruct, PartialEq, Debug)]
-    #[jlrs(julia_type = "Main.JlrsDeriveTests.🍔")]
-    #[repr(C)]
-    struct Hamburger {
-        #[jlrs(rename = "🥒")]
-        pickle: i32,
-        #[jlrs(rename = "🍅")]
-        tomato: f32,
-    }
-
-    #[derive(Copy, Clone, JuliaStruct, PartialEq, Debug)]
-    #[jlrs(julia_type = "Main.JlrsDeriveTests.NoExist")]
-    #[repr(C)]
-    struct NoExist {
-        foo: i16,
-    }
-
-    #[derive(Copy, Clone, JuliaStruct, PartialEq, Debug)]
-    #[jlrs(julia_type = "Main.JlrsDeriveTests.WrongType")]
-    #[repr(C)]
-    struct WrongType {
-        foo: i8,
-    }
-
-    #[derive(Copy, Clone, JuliaStruct, PartialEq, Debug)]
-    #[jlrs(julia_type = "Main.JlrsDeriveTests.WrongType")]
-    #[repr(C)]
-    struct WrongRename {
-        #[jlrs(rename = "bar")]
-        foo: i16,
-    }
-
-    #[derive(Copy, Clone, NewJuliaStruct, Debug)]
-    #[jlrs(julia_type = "Main.JlrsDeriveTests.WrongType", unionall = true)]
-    #[repr(C)]
-    struct NewStructDerive<'frame, 'data, T>
-    where
-        T: ValidLayout + Copy,
-    {
-        a: i32,
-        b: T,
-        c: Value<'frame, 'data>,
-    }
-
-    #[derive(Copy, Clone, NewJuliaStruct)]
-    #[jlrs(julia_type = "Main.JlrsDeriveTests.WrongType", unionall = true)]
-    #[repr(C)]
-    struct NewStructDerive2<'frame, T>
-    where
-        T: ValidLayout + Copy,
-    {
-        a: i32,
-        b: T,
-        c: Module<'frame>,
-    }
-
-    #[derive(Copy, Clone, NewJuliaStruct)]
-    #[jlrs(julia_type = "Main.JlrsDeriveTests.WrongType")]
-    #[repr(C)]
-    struct NewStructDerive3<T>
-    where
-        T: ValidLayout + Copy,
-    {
-        a: i32,
-        b: T,
-    }
-
-    #[derive(Copy, Clone, NewJuliaStruct)]
-    #[jlrs(julia_type = "Main.JlrsDeriveTests.WrongType")]
-    #[repr(C)]
-    struct NewStructDerive4
-    {
-        a: i32,
-        b: i64,
-    }
-
-    #[derive(Copy, Clone, NewJuliaStruct)]
-    #[jlrs(julia_type = "Main.JlrsDeriveTests.WrongType")]
-    #[repr(C)]
-    struct NewStructDerive5
-    {
-        foo: bool,
-        #[jlrs(bits_union_align)]
-        _align_b: ::jlrs::value::union::Align4,
-        #[jlrs(bits_union)]
-        b: ::jlrs::value::union::BitsUnion<[std::mem::MaybeUninit<u8>;4]>,
-        #[jlrs(bits_union_flag)]
-        _flag_b: u8,
-        bar: usize
-    }
-
     #[test]
-    fn derive_julia_tuple() {
+    fn derive_bits_type_bool() {
         JULIA.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
-                .frame(3, |_global, frame| {
-                    let s = UsizeAndIsize(3, -4);
+                .dynamic_frame(|_global, frame| {
+                    let s = BitsTypeBool{ a: true };
                     let v = Value::new(frame, s).unwrap();
                     let first = v.get_nth_field(frame, 0).unwrap();
-                    let second = v.get_nth_field(frame, 1).unwrap();
 
-                    assert_eq!(first.cast::<usize>().unwrap(), 3);
-                    assert_eq!(second.cast::<isize>().unwrap(), -4);
-                    assert!(v.is::<UsizeAndIsize>());
-                    assert_eq!(v.cast::<UsizeAndIsize>().unwrap(), s);
+                    assert_eq!(first.cast::<bool>().unwrap(), true);
+                    assert!(v.is::<BitsTypeBool>());
+                    assert_eq!(v.cast::<BitsTypeBool>().unwrap(), s);
 
                     Ok(())
                 })
@@ -199,21 +29,19 @@ mod tests {
     }
 
     #[test]
-    fn derive_usizes() {
+    fn derive_bits_type_char() {
         JULIA.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
-                .frame(3, |_global, frame| {
-                    let s = Usizes(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16);
+                .dynamic_frame(|_global, frame| {
+                    let s = BitsTypeChar{ a: 'b' };
                     let v = Value::new(frame, s).unwrap();
                     let first = v.get_nth_field(frame, 0).unwrap();
-                    let second = v.get_nth_field(frame, 1).unwrap();
 
-                    assert_eq!(first.cast::<usize>().unwrap(), 1);
-                    assert_eq!(second.cast::<usize>().unwrap(), 2);
-                    assert!(v.is::<Usizes>());
-                    assert_eq!(v.cast::<Usizes>().unwrap(), s);
+                    assert_eq!(first.cast::<char>().unwrap(), 'b');
+                    assert!(v.is::<BitsTypeChar>());
+                    assert_eq!(v.cast::<BitsTypeChar>().unwrap(), s);
 
                     Ok(())
                 })
@@ -222,21 +50,19 @@ mod tests {
     }
 
     #[test]
-    fn derive_different_types() {
+    fn derive_bits_type_uint8() {
         JULIA.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
-                .frame(3, |_global, frame| {
-                    let s = DifferentTypes(21, 293, -7, 12.34, 56.78, -3, true, 12331123, -9, -295);
+                .dynamic_frame(|_global, frame| {
+                    let s = BitsTypeUInt8{ a: 1 };
                     let v = Value::new(frame, s).unwrap();
                     let first = v.get_nth_field(frame, 0).unwrap();
-                    let last = v.get_nth_field(frame, 9).unwrap();
 
-                    assert_eq!(first.cast::<u8>().unwrap(), 21);
-                    assert_eq!(last.cast::<i16>().unwrap(), -295);
-                    assert!(v.is::<DifferentTypes>());
-                    assert_eq!(v.cast::<DifferentTypes>().unwrap(), s);
+                    assert_eq!(first.cast::<u8>().unwrap(), 1);
+                    assert!(v.is::<BitsTypeUInt8>());
+                    assert_eq!(v.cast::<BitsTypeUInt8>().unwrap(), s);
 
                     Ok(())
                 })
@@ -245,21 +71,19 @@ mod tests {
     }
 
     #[test]
-    fn derive_julia_struct() {
+    fn derive_bits_type_uint16() {
         JULIA.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
-                .frame(3, |_global, frame| {
-                    let s = MyType { v1: -12, v2: 3.0 };
+                .dynamic_frame(|_global, frame| {
+                    let s = BitsTypeUInt16{ a: 2 };
                     let v = Value::new(frame, s).unwrap();
-                    let first = v.get_field(frame, "v1").unwrap();
-                    let second = v.get_field(frame, "v2").unwrap();
+                    let first = v.get_nth_field(frame, 0).unwrap();
 
-                    assert_eq!(first.cast::<isize>().unwrap(), -12);
-                    assert_eq!(second.cast::<f64>().unwrap(), 3.0);
-                    assert!(v.is::<MyType>());
-                    assert_eq!(v.cast::<MyType>().unwrap(), s);
+                    assert_eq!(first.cast::<u16>().unwrap(), 2);
+                    assert!(v.is::<BitsTypeUInt16>());
+                    assert_eq!(v.cast::<BitsTypeUInt16>().unwrap(), s);
 
                     Ok(())
                 })
@@ -268,24 +92,19 @@ mod tests {
     }
 
     #[test]
-    fn derive_renamed_julia_struct() {
+    fn derive_bits_type_uint32() {
         JULIA.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
-                .frame(3, |_global, frame| {
-                    let s = Hamburger {
-                        pickle: -12,
-                        tomato: 3.0,
-                    };
+                .dynamic_frame(|_global, frame| {
+                    let s = BitsTypeUInt32{ a: 3 };
                     let v = Value::new(frame, s).unwrap();
-                    let first = v.get_field(frame, "🥒").unwrap();
-                    let second = v.get_field(frame, "🍅").unwrap();
+                    let first = v.get_nth_field(frame, 0).unwrap();
 
-                    assert_eq!(first.cast::<i32>().unwrap(), -12);
-                    assert_eq!(second.cast::<f32>().unwrap(), 3.0);
-                    assert!(v.is::<Hamburger>());
-                    assert_eq!(v.cast::<Hamburger>().unwrap(), s);
+                    assert_eq!(first.cast::<u32>().unwrap(), 3);
+                    assert!(v.is::<BitsTypeUInt32>());
+                    assert_eq!(v.cast::<BitsTypeUInt32>().unwrap(), s);
 
                     Ok(())
                 })
@@ -294,15 +113,20 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
-    fn derive_noexist_julia_struct_panics() {
+    fn derive_bits_type_uint64() {
         JULIA.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
-                .frame(3, |_global, frame| {
-                    let s = NoExist { foo: 2 };
-                    let _v = Value::new(frame, s).unwrap();
+                .dynamic_frame(|_global, frame| {
+                    let s = BitsTypeUInt64{ a: 4 };
+                    let v = Value::new(frame, s).unwrap();
+                    let first = v.get_nth_field(frame, 0).unwrap();
+
+                    assert_eq!(first.cast::<u64>().unwrap(), 4);
+                    assert!(v.is::<BitsTypeUInt64>());
+                    assert_eq!(v.cast::<BitsTypeUInt64>().unwrap(), s);
+
                     Ok(())
                 })
                 .unwrap()
@@ -310,15 +134,20 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
-    fn derive_wrong_type_julia_struct_panics() {
+    fn derive_bits_type_uint() {
         JULIA.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
-                .frame(3, |_global, frame| {
-                    let s = WrongType { foo: 2 };
-                    let _v = Value::new(frame, s).unwrap();
+                .dynamic_frame(|_global, frame| {
+                    let s = BitsTypeUInt{ a: 5 };
+                    let v = Value::new(frame, s).unwrap();
+                    let first = v.get_nth_field(frame, 0).unwrap();
+
+                    assert_eq!(first.cast::<u64>().unwrap(), 5);
+                    assert!(v.is::<BitsTypeUInt>());
+                    assert_eq!(v.cast::<BitsTypeUInt>().unwrap(), s);
+
                     Ok(())
                 })
                 .unwrap()
@@ -326,15 +155,146 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
-    fn derive_wrong_rename_julia_struct_panics() {
+    fn derive_bits_type_int8() {
         JULIA.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
-                .frame(3, |_global, frame| {
-                    let s = WrongRename { foo: 2 };
-                    let _v = Value::new(frame, s).unwrap();
+                .dynamic_frame(|_global, frame| {
+                    let s = BitsTypeInt8{ a: -1 };
+                    let v = Value::new(frame, s).unwrap();
+                    let first = v.get_nth_field(frame, 0).unwrap();
+
+                    assert_eq!(first.cast::<i8>().unwrap(), -1);
+                    assert!(v.is::<BitsTypeInt8>());
+                    assert_eq!(v.cast::<BitsTypeInt8>().unwrap(), s);
+
+                    Ok(())
+                })
+                .unwrap()
+        })
+    }
+
+    #[test]
+    fn derive_bits_type_int16() {
+        JULIA.with(|j| {
+            let mut julia = j.borrow_mut();
+
+            julia
+                .dynamic_frame(|_global, frame| {
+                    let s = BitsTypeInt16{ a: -2 };
+                    let v = Value::new(frame, s).unwrap();
+                    let first = v.get_nth_field(frame, 0).unwrap();
+
+                    assert_eq!(first.cast::<i16>().unwrap(), -2);
+                    assert!(v.is::<BitsTypeInt16>());
+                    assert_eq!(v.cast::<BitsTypeInt16>().unwrap(), s);
+
+                    Ok(())
+                })
+                .unwrap()
+        })
+    }
+
+    #[test]
+    fn derive_bits_type_int32() {
+        JULIA.with(|j| {
+            let mut julia = j.borrow_mut();
+
+            julia
+                .dynamic_frame(|_global, frame| {
+                    let s = BitsTypeInt32{ a: -3 };
+                    let v = Value::new(frame, s).unwrap();
+                    let first = v.get_nth_field(frame, 0).unwrap();
+
+                    assert_eq!(first.cast::<i32>().unwrap(), -3);
+                    assert!(v.is::<BitsTypeInt32>());
+                    assert_eq!(v.cast::<BitsTypeInt32>().unwrap(), s);
+
+                    Ok(())
+                })
+                .unwrap()
+        })
+    }
+
+    #[test]
+    fn derive_bits_type_int64() {
+        JULIA.with(|j| {
+            let mut julia = j.borrow_mut();
+
+            julia
+                .dynamic_frame(|_global, frame| {
+                    let s = BitsTypeInt64{ a: -4 };
+                    let v = Value::new(frame, s).unwrap();
+                    let first = v.get_nth_field(frame, 0).unwrap();
+
+                    assert_eq!(first.cast::<i64>().unwrap(), -4);
+                    assert!(v.is::<BitsTypeInt64>());
+                    assert_eq!(v.cast::<BitsTypeInt64>().unwrap(), s);
+
+                    Ok(())
+                })
+                .unwrap()
+        })
+    }
+
+    #[test]
+    fn derive_bits_type_int() {
+        JULIA.with(|j| {
+            let mut julia = j.borrow_mut();
+
+            julia
+                .dynamic_frame(|_global, frame| {
+                    let s = BitsTypeInt{ a: -5 };
+                    let v = Value::new(frame, s).unwrap();
+                    let first = v.get_nth_field(frame, 0).unwrap();
+
+                    assert_eq!(first.cast::<i64>().unwrap(), -5);
+                    assert!(v.is::<BitsTypeInt>());
+                    assert_eq!(v.cast::<BitsTypeInt>().unwrap(), s);
+
+                    Ok(())
+                })
+                .unwrap()
+        })
+    }
+
+    #[test]
+    fn derive_bits_type_float32() {
+        JULIA.with(|j| {
+            let mut julia = j.borrow_mut();
+
+            julia
+                .dynamic_frame(|_global, frame| {
+                    let s = BitsTypeFloat32{ a: 1.2 };
+                    let v = Value::new(frame, s).unwrap();
+                    let first = v.get_nth_field(frame, 0).unwrap();
+
+                    assert_eq!(first.cast::<f32>().unwrap(), 1.2);
+                    assert!(v.is::<BitsTypeFloat32>());
+                    assert_eq!(v.cast::<BitsTypeFloat32>().unwrap(), s);
+
+                    Ok(())
+                })
+                .unwrap()
+        })
+    }
+
+    #[test]
+    fn derive_bits_type_float64() {
+        JULIA.with(|j| {
+            let mut julia = j.borrow_mut();
+
+            julia
+                .dynamic_frame(|_global, frame| {
+                    let s = BitsTypeFloat64{ a: -2.3 };
+                    let v = Value::new(frame, s).unwrap();
+                    let first = v.get_nth_field(frame, 0).unwrap();
+
+                    assert_eq!(first.cast::<f64>().unwrap(), -2.3);
+                    assert!(v.is::<BitsTypeFloat64>());
+                    assert_eq!(v.cast::<BitsTypeFloat64>().unwrap(), s);
+
                     Ok(())
                 })
                 .unwrap()

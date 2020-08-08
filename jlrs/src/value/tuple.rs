@@ -19,7 +19,7 @@ macro_rules! check {
 macro_rules! impl_tuple {
     ($name:ident, $($types:tt),+) => {
         #[repr(C)]
-        #[derive(Copy, Clone, Debug)]
+        #[derive(Copy, Clone, Debug, PartialEq)]
         pub struct $name<$($types),+>($(pub $types),+);
 
         unsafe impl<$($types),+> $crate::traits::JuliaType for $name<$($types),+> where $($types: $crate::traits::JuliaType),+
