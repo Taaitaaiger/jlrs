@@ -125,10 +125,10 @@ STATIC_INLINE int jl_is_cpointer_type(jl_value_t *t) JL_NOTSAFEPOINT
     return (jl_is_datatype(t) &&
             ((jl_datatype_t*)(t))->name == ((jl_datatype_t*)jl_pointer_type->body)->name);
 }
-STATIC_INLINE int jl_is_addrspace_ptr_type(jl_value_t *t) JL_NOTSAFEPOINT
+STATIC_INLINE int jl_is_llvmpointer_type(jl_value_t *t) JL_NOTSAFEPOINT
 {
     return (jl_is_datatype(t) &&
-            ((jl_datatype_t*)(t))->name == jl_addrspace_pointer_typename);
+            ((jl_datatype_t*)(t))->name == jl_llvmpointer_typename);
 }
 STATIC_INLINE int jl_is_abstract_ref_type(jl_value_t *t) JL_NOTSAFEPOINT
 {
@@ -162,11 +162,6 @@ STATIC_INLINE int jl_is_dispatch_tupletype(jl_value_t *v) JL_NOTSAFEPOINT
 STATIC_INLINE int jl_is_concrete_type(jl_value_t *v) JL_NOTSAFEPOINT
 {
     return jl_is_datatype(v) && ((jl_datatype_t*)v)->isconcretetype;
-}
-STATIC_INLINE jl_value_t *jl_typemap_entry_sig(jl_typemap_t *tmap JL_PROPAGATES_ROOT) JL_NOTSAFEPOINT
-{
-    assert(jl_typeof(tmap) == (jl_value_t*)jl_typemap_entry_type);
-    return (jl_value_t*)((jl_typemap_entry_t*)tmap)->sig;
 }
 STATIC_INLINE int jl_is_vararg_type(jl_value_t *v) JL_NOTSAFEPOINT
 {
