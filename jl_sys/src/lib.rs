@@ -1113,15 +1113,6 @@ STATIC_INLINE int jl_is_concrete_type(jl_value_t *v) JL_NOTSAFEPOINT
 // Not implemented
 
 /*
-STATIC_INLINE jl_value_t *jl_typemap_entry_sig(jl_typemap_t *tmap JL_PROPAGATES_ROOT) JL_NOTSAFEPOINT
-{
-    assert(jl_typeof(tmap) == (jl_value_t*)jl_typemap_entry_type);
-    return (jl_value_t*)((jl_typemap_entry_t*)tmap)->sig;
-}
-*/
-// Not implemented
-
-/*
 STATIC_INLINE int jl_is_vararg_type(jl_value_t *v) JL_NOTSAFEPOINT
 {
     v = jl_unwrap_unionall(v);
