@@ -1,6 +1,5 @@
 use super::{method_table::MethodTable, module::Module, simple_vector::SimpleVector, symbol::Symbol, Value};
 
-#[cfg(feature = "beta")]
 use super::array::Array;
 use crate::error::{JlrsError, JlrsResult};
 use crate::traits::Cast;
@@ -54,7 +53,6 @@ impl<'frame> TypeName<'frame> {
         unsafe { MethodTable::wrap((&*self.ptr()).mt) }
     }
 
-    #[cfg(feature = "beta")]
     pub fn partial(self) -> Array<'frame, 'static> {
         unsafe { Array::wrap((&*self.ptr()).partial) }
     }

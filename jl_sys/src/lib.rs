@@ -296,24 +296,9 @@ pub unsafe fn jl_string_len(s: *mut jl_value_t) -> usize {
 // Not implemented
 
 /*
-V1.4.2
-#define jl_get_fieldtypes(st) ((st)->types ? (st)->types : jl_compute_fieldtypes((st)))
+#define jl_get_fieldtypes(st) ((st)->types ? (st)->types : jl_compute_fieldtypes((st), NULL))
 */
 #[inline(always)]
-#[cfg(feature = "stable")]
-pub unsafe fn jl_get_fieldtypes(st: *mut jl_datatype_t) -> *mut jl_svec_t {
-    if (&*st).types.is_null() {
-        jl_compute_fieldtypes(st)
-    } else {
-        (&*st).types
-    }
-}
-
-/*
-V1.5.0-beta1
-#define jl_get_fieldtypes(st) ((st)->types ? (st)->types : jl_compute_fieldtypes((st), NULL))
-#[inline(always)]
-#[cfg(feature = "beta")]
 pub unsafe fn jl_get_fieldtypes(st: *mut jl_datatype_t) -> *mut jl_svec_t {
     if (&*st).types.is_null() {
         jl_compute_fieldtypes(st, std::ptr::null_mut())
@@ -321,7 +306,6 @@ pub unsafe fn jl_get_fieldtypes(st: *mut jl_datatype_t) -> *mut jl_svec_t {
         (&*st).types
     }
 }
-*/
 
 /*
 #define jl_datatype_size(t)    (((jl_datatype_t*)t)->size)
@@ -1036,15 +1020,15 @@ pub unsafe fn jl_is_cpointer_type(v: *mut c_void) -> bool {
 }
 
 /*
-STATIC_INLINE int jl_is_addrspace_ptr_type(jl_value_t *t) JL_NOTSAFEPOINT
+STATIC_INLINE int jl_is_llvmpointer_type(jl_value_t *t) JL_NOTSAFEPOINT
 {
     return (jl_is_datatype(t) &&
-            ((jl_datatype_t*)(t))->name == jl_addrspace_pointer_typename);
+            ((jl_datatype_t*)(t))->name == jl_llvmpointer_typename);
 }
 */
 #[inline]
-pub unsafe fn jl_is_addrspace_ptr_type(v: *mut c_void) -> bool {
-    jl_is_datatype(v.cast()) && (&*v.cast::<jl_datatype_t>()).name == jl_addrspace_pointer_typename
+pub unsafe fn jl_is_llvmpointer_type(v: *mut c_void) -> bool {
+    jl_is_datatype(v.cast()) && (&*v.cast::<jl_datatype_t>()).name == jl_llvmpointer_typename
 }
 
 /*
