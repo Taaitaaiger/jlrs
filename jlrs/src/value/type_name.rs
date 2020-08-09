@@ -1,3 +1,5 @@
+//! Support for values with the `Core.TypeName` type.
+
 use super::{method_table::MethodTable, module::Module, simple_vector::SimpleVector, symbol::Symbol, Value};
 
 use super::array::Array;

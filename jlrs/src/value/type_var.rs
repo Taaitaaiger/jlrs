@@ -1,3 +1,5 @@
+//! Support for values with the `Core.TypeVar` type.
+
 use super::symbol::Symbol;
 use super::Value;
 use crate::error::{JlrsError, JlrsResult};

@@ -1,3 +1,26 @@
+//! Generic `Tuple`s of different sizes.
+//!
+//! In this module generic tuple types from `Tuple0` up to and including `Tuple32` are available. 
+//! These types can be use to work with tuple values from Julia. A new tuple can be created with
+//! `Value::new` if all fields implement the `IntoJulia` trait:
+//!
+//! ```
+//! # use jlrs::prelude::*;
+//! # use jlrs::util::JULIA;
+//! # fn main() {
+//! # JULIA.with(|j| {
+//! # let mut julia = j.borrow_mut();
+//! julia.frame(2, |global, frame| {
+//!     let tup = Tuple2(2i32, true);
+//!     let val = Value::new(frame, tup)?;
+//!     assert!(val.is::<Tuple2<i32, bool>>());
+//!     assert!(val.cast::<Tuple2<i32, bool>>().is_ok());
+//!     Ok(())
+//! }).unwrap();
+//! # });
+//! # }
+//! ```
+
 macro_rules! count {
     ($t:ident, $($x:ident),+) => {
         1 + count!($($x),+)

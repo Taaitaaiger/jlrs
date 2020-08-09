@@ -1,3 +1,5 @@
+/// Support for values with the `Core.SimpleVector` (`SVec`) type.
+
 use crate::error::{JlrsError, JlrsResult};
 use crate::traits::Cast;
 use crate::value::Value;

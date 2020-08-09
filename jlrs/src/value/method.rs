@@ -1,3 +1,5 @@
+//! Support for values with the `Core.Method` type.
+
 use super::Value;
 use crate::error::{JlrsError, JlrsResult};
 use crate::traits::Cast;

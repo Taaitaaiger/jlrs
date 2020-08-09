@@ -1,3 +1,5 @@
+//! Support for values with the `Core.MethodTable` type.
+
 use super::{array::Array, module::Module, symbol::Symbol, Value};
 use crate::error::{JlrsError, JlrsResult};
 use crate::traits::Cast;

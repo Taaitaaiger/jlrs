@@ -1,3 +1,5 @@
+//! Support for values with the `Core.UnionAll` type.
+
 use super::type_var::TypeVar;
 use super::Value;
 use crate::value::datatype::DataType;
