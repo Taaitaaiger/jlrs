@@ -146,3 +146,49 @@ pub struct BitsTypeUInt64 {
 pub struct BitsTypeUInt8 {
     pub a: u8,
 }
+
+#[repr(C)]
+#[jlrs(julia_type = "Main.WithBitsUnion.DoubleVariant")]
+#[derive(Copy, Clone, Debug, JuliaStruct)]
+pub struct DoubleVariant {
+    pub a: i8,
+    #[jlrs(bits_union_align)]
+    _b_align: ::jlrs::value::union::Align4,
+    #[jlrs(bits_union)]
+    pub b: ::jlrs::value::union::BitsUnion<[::std::mem::MaybeUninit<u8>; 4]>,
+    #[jlrs(bits_union_flag)]
+    _b_flag: u8,
+    pub c: i8,
+}
+
+#[repr(C)]
+#[jlrs(julia_type = "Main.WithBitsUnion.SingleVariant")]
+#[derive(Copy, Clone, Debug, JuliaStruct, IntoJulia)]
+pub struct SingleVariant {
+    pub a: i8,
+    pub b: i32,
+    pub c: i8,
+}
+
+#[repr(C)]
+#[jlrs(julia_type = "Main.WithBitsUnion.SizeAlignMismatch")]
+#[derive(Copy, Clone, Debug, JuliaStruct)]
+pub struct SizeAlignMismatch {
+    pub a: i8,
+    #[jlrs(bits_union_align)]
+    _b_align: ::jlrs::value::union::Align4,
+    #[jlrs(bits_union)]
+    pub b: ::jlrs::value::union::BitsUnion<[::std::mem::MaybeUninit<u8>; 6]>,
+    #[jlrs(bits_union_flag)]
+    _b_flag: u8,
+    pub c: i8,
+}
+
+#[repr(C)]
+#[jlrs(julia_type = "Main.WithBitsUnion.UnionInTuple")]
+#[derive(Copy, Clone, Debug, JuliaStruct)]
+pub struct UnionInTuple<'frame, 'data> {
+    pub a: i8,
+    pub b: ::jlrs::value::Value<'frame, 'data>,
+    pub c: i8,
+}

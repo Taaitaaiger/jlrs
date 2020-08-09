@@ -841,12 +841,14 @@ STATIC_INLINE void jl_array_uint8_set(void *a, size_t i, uint8_t x) JL_NOTSAFEPO
 }*/
 #[inline]
 pub unsafe fn jl_field_names(st: *mut jl_datatype_t) -> *mut jl_svec_t {
-    let st = &mut *st;
+    let mut st = &mut *st;
     if !st.names.is_null() {
         return st.names;
     }
 
-    return (&mut *st.name).names;
+    st.names = (&mut *st.name).names;
+
+    return st.names;
 }
 
 /*

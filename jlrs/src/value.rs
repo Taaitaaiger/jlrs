@@ -887,7 +887,7 @@ impl_julia_type!(Value<'frame, 'data>, jl_any_type, 'frame, 'data);
 unsafe impl<'frame, 'data> ValidLayout for Value<'frame, 'data> {
     unsafe fn valid_layout(v: Value) -> bool {
         if let Ok(dt) = v.cast::<DataType>() {
-            dt.isinlinealloc()
+            !dt.isinlinealloc()
         } else if v.cast::<union_all::UnionAll>().is_ok() {
             true
         } else if let Ok(u) = v.cast::<union::Union>() {

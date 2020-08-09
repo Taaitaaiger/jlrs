@@ -451,7 +451,6 @@ impl Julia {
 }
 
 impl Drop for Julia {
-    
     fn drop(&mut self) {
         unsafe {
             jl_atexit_hook(0);

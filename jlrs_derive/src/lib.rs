@@ -48,7 +48,6 @@ impl<'a> ClassifiedFields<'a> {
                     Some(JlrsAttr::BitsUnion) => {
                         rs_union_fields.push(&field.ty);
                         jl_union_field_idxs.push(idx - offset);
-                        offset += 1;
                         continue 'outer;
                     }
                     Some(JlrsAttr::BitsUnionAlign) => {
@@ -508,7 +507,7 @@ fn impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
 */
 fn impl_into_julia(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
-    
+
     if !is_repr_c(ast) {
         panic!("IntoJulia can only be derived for types with the attribute #[repr(C)].");
     }
@@ -520,7 +519,7 @@ fn impl_into_julia(ast: &syn::DeriveInput) -> TokenStream {
                 let container = ::jlrs::jl_sys_export::jl_new_struct_uninit(ty.cast());
                 let data: *mut Self = container.cast();
                 ::std::ptr::write(data, *self);
-                
+
                 container
             }
         }

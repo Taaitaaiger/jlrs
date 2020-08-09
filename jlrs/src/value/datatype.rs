@@ -101,7 +101,7 @@ impl<'frame> DataType<'frame> {
         unsafe { jl_datatype_align(self.0) }
     }
 
-    /// Returns the alignment of a value of this type in bits.
+    /// Returns the size of a value of this type in bits.
     pub fn nbits(self) -> i32 {
         unsafe { jl_datatype_nbits(self.0) }
     }

@@ -93,6 +93,33 @@ struct BitsUInt8TupleInt32TupleInt16UInt16
 end
 end
 
+module WithBitsUnion
+struct SingleVariant
+    a::Int8
+    b::Union{Int32}
+    c::Int8
+end
+
+struct DoubleVariant
+    a::Int8
+    b::Union{Int16, Int32}
+    c::Int8
+end
+
+struct SizeAlignMismatch
+    a::Int8
+    b::Union{Tuple{Int16, Int16, Int16}, Int32}
+    c::Int8
+end
+
+struct UnionInTuple
+    a::Int8
+    b::Tuple{Union{Int16, Int32}}
+    c::Int8
+end
+end
+
+
 """
 JlrsReflect.reflect([
     SingleFieldBits.BitsTypeBool,
@@ -114,6 +141,10 @@ JlrsReflect.reflect([
     BitsWithCustom.BitsIntChar,
     BitsWithCustom.BitsCharBitsIntChar,
     BitsWithTuples.BitsUInt8TupleInt32Int64,
-    BitsWithTuples.BitsUInt8TupleInt32TupleInt16UInt16
+    BitsWithTuples.BitsUInt8TupleInt32TupleInt16UInt16,
+    WithBitsUnion.SingleVariant,
+    WithBitsUnion.DoubleVariant,
+    WithBitsUnion.SizeAlignMismatch,
+    WithBitsUnion.UnionInTuple,
 ])
 """

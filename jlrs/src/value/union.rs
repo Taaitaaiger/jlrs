@@ -90,7 +90,7 @@ impl_valid_layout!(Union<'frame>, 'frame);
 
 /// Ensures the next field is aligned to 1 byte.
 #[repr(C, align(1))]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Align1;
 
 unsafe impl Align for Align1 {
@@ -99,7 +99,7 @@ unsafe impl Align for Align1 {
 
 /// Ensures the next field is aligned to 2 bytes.
 #[repr(C, align(2))]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Align2;
 
 unsafe impl Align for Align2 {
@@ -108,7 +108,7 @@ unsafe impl Align for Align2 {
 
 /// Ensures the next field is aligned to 4 bytes.
 #[repr(C, align(4))]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Align4;
 
 unsafe impl Align for Align4 {
@@ -117,7 +117,7 @@ unsafe impl Align for Align4 {
 
 /// Ensures the next field is aligned to 8 bytes.
 #[repr(C, align(8))]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Align8;
 
 unsafe impl Align for Align8 {
@@ -126,7 +126,7 @@ unsafe impl Align for Align8 {
 
 /// Ensures the next field is aligned to 16 bytes.
 #[repr(C, align(16))]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Align16;
 
 unsafe impl Align for Align16 {
@@ -156,7 +156,7 @@ unsafe impl Align for Align16 {
 /// *The types that are eligible for the optimization is actually not limited to just isbits
 /// types. In particular, a struct which contains an optimized union as a field is no longer an 
 /// isbits type but the optimization still applies.
-#[repr(C, align(8))]
+#[repr(transparent)]
 #[derive(Copy, Clone, Debug)]
 pub struct BitsUnion<T>(T);
 
