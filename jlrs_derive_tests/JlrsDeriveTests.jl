@@ -119,6 +119,47 @@ struct UnionInTuple
 end
 end
 
+module WithNonBitsUnion
+struct NonBitsUnion
+    a::Union{String,Real}
+end
+end
+
+module WithGeneric
+struct WithGenericT{T}
+    a::T
+end
+
+struct WithNestedGenericT{T}
+    a::WithGenericT{T}
+end
+
+struct WithSetGeneric
+    a::WithGenericT{Int64}
+end
+
+struct WithValueType{N}
+    a::Int64
+end
+
+withvaluetype(a::Int64) = WithValueType{2}(a)
+
+struct WithGenericUnionAll
+    a::WithGenericT
+end
+
+struct WithSetGenericTuple
+    a::Tuple{WithGenericT{Int64}}
+end
+
+struct WithPropagatedLifetime
+    a::WithGenericT{Module}
+end
+
+struct WithPropagatedLifetimes
+    a::WithGenericT{Tuple{Int32, WithGenericT{Array{Int32, 2}}}}
+end
+end
 
 """
 JlrsReflect.reflect([
@@ -146,5 +187,14 @@ JlrsReflect.reflect([
     WithBitsUnion.DoubleVariant,
     WithBitsUnion.SizeAlignMismatch,
     WithBitsUnion.UnionInTuple,
+    WithNonBitsUnion.NonBitsUnion,
+    WithGeneric.WithGenericT,
+    WithGeneric.WithNestedGenericT,
+    WithGeneric.WithSetGeneric,
+    WithGeneric.WithValueType,
+    WithGeneric.WithGenericUnionAll,
+    WithGeneric.WithSetGenericTuple,
+    WithGeneric.WithPropagatedLifetime,
+    WithGeneric.WithPropagatedLifetimes,
 ])
 """
