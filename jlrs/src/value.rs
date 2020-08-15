@@ -368,7 +368,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     }
 
     /// Returns true if the value is an array with elements of type `T`.
-    pub fn is_array_of<T: JuliaType>(self) -> bool {
+    pub fn is_array_of<T: ValidLayout>(self) -> bool {
         match self.cast::<Array>() {
             Ok(arr) => arr.contains::<T>(),
             Err(_) => false,

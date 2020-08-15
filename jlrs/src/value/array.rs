@@ -91,7 +91,6 @@ impl<'frame, 'data> Array<'frame, 'data> {
     }
 
     #[doc(hidden)]
-    
     pub unsafe fn ptr(self) -> *mut jl_array_t {
         self.0
     }
@@ -102,13 +101,15 @@ impl<'frame, 'data> Array<'frame, 'data> {
     }
 
     /// Returns `true` if the type of the elements of this array is `T`.
-    pub fn contains<T: JuliaType>(self) -> bool {
-        unsafe { jl_array_eltype(self.ptr().cast()).cast() == T::julia_type() }
+    pub fn contains<T: ValidLayout>(self) -> bool {
+        unsafe {
+            T::valid_layout(Value::wrap(jl_array_eltype(self.ptr().cast()).cast()))
+        }
     }
 
     /// Returns `true` if the type of the elements of this array is `T` and these elements are
     /// stored inline.
-    pub fn contains_inline<T: JuliaType>(self) -> bool {
+    pub fn contains_inline<T: ValidLayout>(self) -> bool {
         self.contains::<T>() && self.is_inline_array()
     }
 
@@ -118,8 +119,7 @@ impl<'frame, 'data> Array<'frame, 'data> {
     }
 
     /// Returns true if the elements of the array are stored inline and at least one of the field
-    /// of the inlined type is a pointer. If this returns true the data cannot be accessed from
-    /// Rust.
+    /// of the inlined type is a pointer.
     pub fn has_inlined_pointers(self) -> bool {
         unsafe {
             let flags = (&*self.ptr()).flags;
@@ -136,7 +136,7 @@ impl<'frame, 'data> Array<'frame, 'data> {
     /// not stored inline or `JlrsError::WrongType` if the type of the elements is incorrect.
     pub fn copy_inline_data<T>(self) -> JlrsResult<CopiedArray<T>>
     where
-        T: JuliaType,
+        T: ValidLayout,
     {
         if !self.contains::<T>() {
             Err(JlrsError::WrongType)?;
@@ -168,7 +168,7 @@ impl<'frame, 'data> Array<'frame, 'data> {
         frame: &'borrow F,
     ) -> JlrsResult<ArrayData<'borrow, 'fr, T, F>>
     where
-        T: JuliaType,
+        T: ValidLayout,
         F: Frame<'fr>,
     {
         if !self.contains::<T>() {
@@ -195,7 +195,7 @@ impl<'frame, 'data> Array<'frame, 'data> {
         frame: &'borrow mut F,
     ) -> JlrsResult<InlineArrayDataMut<'borrow, 'fr, T, F>>
     where
-        T: JuliaType,
+        T: ValidLayout,
         F: Frame<'fr>,
     {
         if !self.contains::<T>() {
