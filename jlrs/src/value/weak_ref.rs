@@ -7,6 +7,7 @@ use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_weakref_t, jl_weakref_type};
 use std::marker::PhantomData;
 
+/// A weak reference.
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct WeakRef<'frame>(*mut jl_weakref_t, PhantomData<&'frame ()>);
@@ -21,6 +22,7 @@ impl<'frame> WeakRef<'frame> {
         self.0
     }
 
+    /// The referenced `Value`.
     pub fn value(self) -> Value<'frame, 'static> {
         unsafe { Value::wrap((&*self.ptr()).value) }
     }
