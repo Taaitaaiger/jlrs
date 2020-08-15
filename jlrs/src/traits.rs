@@ -14,7 +14,8 @@
 //! safely access the raw contents of a value; [`IntoJulia`] can be derived for bits types and lets
 //! you create new instances of that type using [`Value::new`]. While it's possible to manually
 //! implement and annotate these mapping structs, you should use `JlrsReflect.jl` which can
-//! generate these structs for you.
+//! generate these structs for you. If you do want to do this manually, see the documentation of
+//! [`JuliaStruct`] for instructions.
 //!
 //! [`Frame`]: trait.Frame.html
 //! [`StaticFrame`]: ../frame/struct.StaticFrame.html
@@ -33,6 +34,7 @@
 use crate::error::{AllocError, JlrsError, JlrsResult};
 use crate::frame::{DynamicFrame, Output, StaticFrame};
 use crate::value::datatype::DataType;
+use crate::value::string::JuliaString;
 use crate::value::symbol::Symbol;
 use crate::value::Value;
 use jl_sys::{
@@ -113,7 +115,8 @@ macro_rules! impl_valid_layout {
 }
 
 /// Trait implemented by types that can be converted to a Julia value in combination with
-/// [`Value::new`]. This trait can be derived for custom types that implement `JuliaStruct`.
+/// [`Value::new`]. This trait can be derived for custom bits types that implement
+/// `JuliaStruct`.
 ///
 /// [`Value::new`]: ../value/struct.Value.html#method.new
 pub unsafe trait IntoJulia {
@@ -302,6 +305,7 @@ p!(TemporarySymbol, &dyn AsRef<str>);
 p!(TemporarySymbol, &'a str, 'a);
 p!(TemporarySymbol, Cow<'a, str>, 'a);
 p!(TemporarySymbol, Symbol<'s>, 's);
+p!(TemporarySymbol, JuliaString<'frame>, 'frame);
 
 impl_valid_layout!(bool);
 impl_valid_layout!(char);
@@ -561,8 +565,7 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for String {
                 // Is neither null nor dangling, we've just checked
                 let raw = jl_string_data(value.ptr());
                 let raw_slice = std::slice::from_raw_parts(raw, len);
-                let owned_slice = Vec::from(raw_slice);
-                return Ok(String::from_utf8(owned_slice).map_err(JlrsError::other)?);
+                return Ok(String::from_utf8(raw_slice.into()).map_err(JlrsError::other)?);
             }
         }
 
@@ -683,10 +686,11 @@ pub(crate) mod private {
     use crate::error::AllocError;
     use crate::frame::{DynamicFrame, Output, StaticFrame};
     use crate::stack::FrameIdx;
+    use crate::value::string::JuliaString;
     use crate::value::symbol::Symbol;
     use crate::value::{Value, Values};
-    use jl_sys::jl_symbol_n;
     use jl_sys::jl_value_t;
+    use jl_sys::{jl_symbol, jl_symbol_n};
     use std::borrow::Cow;
 
     // If a trait A is used in a trait bound, the trait methods from traits that A extends become
@@ -760,6 +764,14 @@ pub(crate) mod private {
         unsafe fn temporary_symbol<'symbol>(&self, _: Internal) -> Symbol<'symbol> {
             let symbol_ptr = self.as_ref().as_ptr().cast();
             let symbol = jl_symbol_n(symbol_ptr, self.as_ref().len());
+            Symbol::wrap(symbol)
+        }
+    }
+
+    impl<'frame> TemporarySymbol for JuliaString<'frame> {
+        unsafe fn temporary_symbol<'symbol>(&self, _: Internal) -> Symbol<'symbol> {
+            let symbol_ptr = self.as_c_str();
+            let symbol = jl_symbol(symbol_ptr.as_ptr());
             Symbol::wrap(symbol)
         }
     }
