@@ -27,14 +27,14 @@ use crate::value::type_name::TypeName;
 use crate::value::Value;
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{
-    jl_any_type, jl_code_info_type, jl_code_instance_type, jl_datatype_align,
-    jl_datatype_isinlinealloc, jl_datatype_nbits, jl_datatype_nfields, jl_datatype_size,
-    jl_datatype_t, jl_datatype_type, jl_expr_type, jl_field_isptr, jl_field_names, jl_field_offset,
-    jl_field_size, jl_get_fieldtypes, jl_globalref_type, jl_gotonode_type, jl_intrinsic_type,
-    jl_is_cpointer_type, jl_linenumbernode_type, jl_method_instance_type, jl_method_type,
-    jl_namedtuple_typename, jl_newvarnode_type, jl_phicnode_type, jl_phinode_type, jl_pinode_type,
-    jl_quotenode_type, jl_slotnumber_type, jl_string_type, jl_svec_data, jl_svec_len, jl_task_type,
-    jl_tuple_typename, jl_typedslot_type, jl_typename_str, jl_upsilonnode_type, jl_isbits
+    jl_any_type, jl_code_info_type, jl_datatype_align, jl_datatype_isinlinealloc,
+    jl_datatype_nbits, jl_datatype_nfields, jl_datatype_size, jl_datatype_t, jl_datatype_type,
+    jl_field_isptr, jl_field_names, jl_field_offset, jl_field_size, jl_get_fieldtypes,
+    jl_globalref_type, jl_gotonode_type, jl_intrinsic_type, jl_is_cpointer_type, jl_isbits,
+    jl_linenumbernode_type, jl_namedtuple_typename, jl_newvarnode_type, jl_phicnode_type,
+    jl_phinode_type, jl_pinode_type, jl_quotenode_type, jl_slotnumber_type, jl_string_type,
+    jl_svec_data, jl_svec_len, jl_tuple_typename, jl_typedslot_type, jl_typename_str,
+    jl_upsilonnode_type,
 };
 use std::ffi::CStr;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
@@ -116,6 +116,7 @@ impl<'frame> DataType<'frame> {
         unsafe { jl_datatype_isinlinealloc(self.0) != 0 }
     }
 
+    /// Returns the name of this type.
     pub fn name(self) -> &'frame str {
         unsafe {
             let name = jl_typename_str(self.ptr().cast());
@@ -123,6 +124,7 @@ impl<'frame> DataType<'frame> {
         }
     }
 
+    /// Returns the `TypeName` of this type.
     pub fn type_name(self) -> TypeName<'frame> {
         unsafe { TypeName::wrap((&*self.ptr()).name) }
     }
@@ -140,6 +142,7 @@ impl<'frame> DataType<'frame> {
         }
     }
 
+    /// Returns the field types of this type.
     pub fn field_types(self) -> &'frame [Value<'frame, 'static>] {
         unsafe {
             let field_types = jl_get_fieldtypes(self.ptr());
@@ -149,20 +152,101 @@ impl<'frame> DataType<'frame> {
         }
     }
 
+    /// Returns the size of the field at position `idx` in this type.
     pub fn field_size(self, idx: usize) -> u32 {
         unsafe { jl_field_size(self.ptr(), idx as _) }
     }
 
+    /// Returns the offset where the field at position `idx` is stored.
     pub fn field_offset(self, idx: usize) -> u32 {
         unsafe { jl_field_offset(self.ptr(), idx as _) }
     }
 
+    /// Returns true if the field at position `idx` is a pointer.
     pub fn is_pointer_field(self, idx: usize) -> bool {
         unsafe { jl_field_isptr(self.ptr(), idx as _) }
     }
 
+    /// Returns true if this type is a bits-type.
     pub fn isbits(self) -> bool {
         unsafe { jl_isbits(self.ptr().cast()) }
+    }
+
+    /// Returns the supertype of this type.
+    pub fn super_type(self) -> Option<Self> {
+        unsafe {
+            let sup = (&*self.ptr()).super_;
+            if sup.is_null() {
+                None
+            } else {
+                Some(DataType::wrap(sup))
+            }
+        }
+    }
+
+    /// Returns the type parameters of this type.
+    pub fn parameters(self) -> &'frame [Value<'frame, 'static>] {
+        unsafe {
+            let params = (&*self.ptr()).parameters;
+            std::slice::from_raw_parts(jl_svec_data(params).cast(), jl_svec_len(params))
+        }
+    }
+
+    /// Returns the instance if this type is a singleton.
+    pub fn instance(self) -> Option<Value<'frame, 'static>> {
+        unsafe {
+            let instance = (&*self.ptr()).instance;
+            if instance.is_null() {
+                None
+            } else {
+                Some(Value::wrap(instance))
+            }
+        }
+    }
+
+    /// Returns the number of initialized fields.
+    pub fn n_initialized(self) -> i32 {
+        unsafe { (&*self.ptr()).ninitialized }
+    }
+
+    /// Returns the hash of this type.
+    pub fn hash(self) -> u32 {
+        unsafe { (&*self.ptr()).hash }
+    }
+
+    /// Returns true if this is an abstract type.
+    pub fn is_abstract(self) -> bool {
+        unsafe { (&*self.ptr()).abstract_ != 0 }
+    }
+
+    /// Returns true if this is a mutable type.
+    pub fn mutable(self) -> bool {
+        unsafe { (&*self.ptr()).mutabl != 0 }
+    }
+
+    /// Returns true if one or more of the type parameters has not been set.
+    pub fn has_free_type_vars(self) -> bool {
+        unsafe { (&*self.ptr()).hasfreetypevars != 0 }
+    }
+
+    /// Returns true if this type can have instances
+    pub fn is_concrete_type(self) -> bool {
+        unsafe { (&*self.ptr()).isconcretetype != 0 }
+    }
+
+    /// Returns true if this type is a dispatch, or leaf, tuple type.
+    pub fn is_dispatch_tuple(self) -> bool {
+        unsafe { (&*self.ptr()).isdispatchtuple != 0 }
+    }
+
+    /// Returns true if one or more fields require zero-initialization.
+    pub fn zeroinit(self) -> bool {
+        unsafe { (&*self.ptr()).zeroinit != 0 }
+    }
+
+    /// If false, no value will have this type.
+    pub fn has_concrete_subtype(self) -> bool {
+        unsafe { (&*self.ptr()).has_concrete_subtype != 0 }
     }
 }
 
@@ -173,7 +257,6 @@ impl<'frame> Into<Value<'frame, 'static>> for DataType<'frame> {
 }
 
 impl<'frame, 'data> Debug for DataType<'frame> {
-    
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         f.debug_tuple("DataType").field(&self.name()).finish()
     }
@@ -290,12 +373,6 @@ unsafe impl JuliaTypecheck for Slot {
 }
 
 /// A typecheck that can be used in combination with `DataType::is`. This method returns true if
-/// a value of this type is an expr, a type representing compound expressions in parsed julia code
-/// (ASTs).
-pub struct Expr;
-impl_julia_typecheck!(Expr, jl_expr_type);
-
-/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
 /// a value of this type is a global reference.
 pub struct GlobalRef;
 impl_julia_typecheck!(GlobalRef, jl_globalref_type);
@@ -341,29 +418,9 @@ pub struct LineNode;
 impl_julia_typecheck!(LineNode, jl_linenumbernode_type);
 
 /// A typecheck that can be used in combination with `DataType::is`. This method returns true if
-/// a value of this type is a method instance.
-pub struct MethodInstance;
-impl_julia_typecheck!(MethodInstance, jl_method_instance_type);
-
-/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
-/// a value of this type is a code instance.
-pub struct CodeInstance;
-impl_julia_typecheck!(CodeInstance, jl_code_instance_type);
-
-/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
 /// a value of this type is code info.
 pub struct CodeInfo;
 impl_julia_typecheck!(CodeInfo, jl_code_info_type);
-
-/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
-/// a value of this type is a method.
-pub struct Method;
-impl_julia_typecheck!(Method, jl_method_type);
-
-/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
-/// a value of this type is a task.
-pub struct Task;
-impl_julia_typecheck!(Task, jl_task_type);
 
 impl_julia_typecheck!(String, jl_string_type);
 

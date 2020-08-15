@@ -1,6 +1,8 @@
 //! Support for values with the `Core.TypeMapLevel` type.
 
 use super::Value;
+use super::array::Array;
+use super::typemap_entry::TypeMapEntry;
 use crate::error::{JlrsError, JlrsResult};
 use crate::traits::Cast;
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
@@ -19,6 +21,30 @@ impl<'frame> TypeMapLevel<'frame> {
     #[doc(hidden)]
     pub unsafe fn ptr(self) -> *mut jl_typemap_level_t {
         self.0
+    }
+
+    pub fn arg1(self) -> Array<'frame, 'static> {
+        unsafe {
+            Array::wrap((&*self.ptr()).arg1)
+        }
+    }
+
+    pub fn targ(self) -> Array<'frame, 'static> {
+        unsafe {
+            Array::wrap((&*self.ptr()).targ)
+        }
+    }
+
+    pub fn linear(self) -> TypeMapEntry<'frame> {
+        unsafe {
+            TypeMapEntry::wrap((&*self.ptr()).linear)
+        }
+    }
+
+    pub fn any(self) -> Value<'frame, 'static> {
+        unsafe {
+            Value::wrap((&*self.ptr()).any)
+        }
     }
 }
 

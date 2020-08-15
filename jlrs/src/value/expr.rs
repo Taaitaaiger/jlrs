@@ -1,5 +1,7 @@
 //! Support for values with the `Core.Expr` type.
 
+use super::symbol::Symbol;
+use super::array::Array;
 use super::Value;
 use crate::error::{JlrsError, JlrsResult};
 use crate::traits::Cast;
@@ -7,6 +9,7 @@ use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_expr_t, jl_expr_type};
 use std::marker::PhantomData;
 
+/// A compound expression in Julia ASTs.
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct Expr<'frame>(*mut jl_expr_t, PhantomData<&'frame ()>);
@@ -19,6 +22,16 @@ impl<'frame> Expr<'frame> {
     #[doc(hidden)]
     pub unsafe fn ptr(self) -> *mut jl_expr_t {
         self.0
+    }
+
+    /// Returns the head of the expression.
+    pub fn head(self) -> Symbol<'frame> {
+        unsafe { Symbol::wrap((&*self.ptr()).head) }
+    }
+
+    /// Returns the arguments of the expression.
+    pub fn args(self) -> Array<'frame, 'static> {
+        unsafe { Array::wrap((&*self.ptr()).args) }
     }
 }
 

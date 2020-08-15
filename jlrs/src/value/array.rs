@@ -10,12 +10,12 @@
 //!
 //! [`Array`]: struct.Array.html
 use crate::error::{JlrsError, JlrsResult};
-use crate::traits::{Cast, Frame, JuliaType, JuliaTypecheck, ValidLayout};
+use crate::traits::{Cast, Frame, JuliaTypecheck, ValidLayout};
 use crate::value::datatype::DataType;
 use crate::value::Value;
 use jl_sys::{
     jl_array_data, jl_array_dim, jl_array_dims, jl_array_eltype, jl_array_ndims, jl_array_nrows,
-    jl_array_t, jl_gc_wb, jl_is_array_type, jl_typeof,
+    jl_array_ptr_set, jl_array_t, jl_is_array_type, jl_typeof,
 };
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::marker::PhantomData;
@@ -44,8 +44,10 @@ use std::ops::{Index, IndexMut};
 /// Each element in the backing storage is either stored as a [`Value`] or inline. You can check
 /// how the data is stored by calling [`Array::is_value_array`] or [`Array::is_inline_array`].
 /// Note that this is not necessarily consistent across different versions of Julia; the array
-/// might be value array in Julia 1.0, but an inline array in Julia 1.4. If you want to ensure the
-/// data is not stored inline, you should use a mutable struct as the element type.
+/// might be value array in Julia 1.0, but an inline array in Julia 1.5. If you want to ensure the
+/// data is not stored inline, you should use a mutable struct as the element type. If the data is
+/// stored inline, you will need to provide a type with the appropriate layout, the easiest way to
+/// create these for types that are not available in jlrs is to use `JlrsReflect.jl`.
 ///
 /// Arrays that contain integers or floats are an example of inline arrays. Their data is stored
 /// as an array that contains numbers of the appropriate type, for example an array of `Float32`s
@@ -54,10 +56,6 @@ use std::ops::{Index, IndexMut};
 /// [`Array::copy_inline_data`]. In order to call these methods the type of the elements must be
 /// provided, arrays that contain numbers can be accessed by providing the appropriate Rust type
 /// (eg `f32` for `Float32` and `u64` for `UInt64`).
-///
-/// More complex inlined data is supported through two custom derives: [`JuliaTuple`] and
-/// [`JuliaStruct`]. Accessing inline array data is not supported if the data contains inlined
-/// unions, [`Value`]s or other pointers.
 ///
 /// If the data isn't inlined each element is stored as a [`Value`]. This data can be accessed
 /// using [`Array::value_data`] and [`Array::value_data_mut`] but this is unsafe.
@@ -100,11 +98,13 @@ impl<'frame, 'data> Array<'frame, 'data> {
         unsafe { Dimensions::from_array(self.ptr().cast()) }
     }
 
+    pub fn element_type(self) -> Value<'frame, 'static> {
+        unsafe { Value::wrap(jl_array_eltype(self.ptr().cast()).cast()) }
+    }
+
     /// Returns `true` if the type of the elements of this array is `T`.
     pub fn contains<T: ValidLayout>(self) -> bool {
-        unsafe {
-            T::valid_layout(Value::wrap(jl_array_eltype(self.ptr().cast()).cast()))
-        }
+        unsafe { T::valid_layout(Value::wrap(jl_array_eltype(self.ptr().cast()).cast())) }
     }
 
     /// Returns `true` if the type of the elements of this array is `T` and these elements are
@@ -547,9 +547,11 @@ where
             Err(JlrsError::InvalidArrayType)?;
         }
 
-        self.data[self.dimensions.index_of(index)?] = value;
-        jl_gc_wb(self.array.ptr().cast(), value.ptr().cast());
-
+        jl_array_ptr_set(
+            ptr.cast(),
+            self.dimensions.index_of(index)?,
+            value.ptr().cast(),
+        );
         Ok(())
     }
 
@@ -697,7 +699,6 @@ impl Dimensions {
     }
 }
 
-
 impl Debug for Dimensions {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         let mut f = f.debug_tuple("");
@@ -709,7 +710,6 @@ impl Debug for Dimensions {
         f.finish()
     }
 }
-
 
 impl Display for Dimensions {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {

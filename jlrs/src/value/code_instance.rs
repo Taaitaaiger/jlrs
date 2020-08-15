@@ -6,7 +6,9 @@ use crate::traits::Cast;
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_code_instance_t, jl_code_instance_type};
 use std::marker::PhantomData;
+use super::{method_instance::MethodInstance};
 
+/// A `CodeInstance` represents an executable operation.
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct CodeInstance<'frame>(*mut jl_code_instance_t, PhantomData<&'frame ()>);
@@ -19,6 +21,77 @@ impl<'frame> CodeInstance<'frame> {
     #[doc(hidden)]
     pub unsafe fn ptr(self) -> *mut jl_code_instance_t {
         self.0
+    }
+
+    /// Method this instance is specialized from.
+    pub fn def(self) -> MethodInstance<'frame> {
+        unsafe {
+            MethodInstance::wrap((&*self.ptr()).def)
+        }
+    }
+
+    /// Next cache entry.
+    pub fn next(self) -> Option<Self> {
+        unsafe {
+            let next = (&*self.ptr()).next;
+            if next.is_null() {
+                None
+            } else {
+                Some(CodeInstance::wrap(next))
+            }
+        }
+    }
+
+    /// Returns the minimum of the world range for which this object is valid to use.
+    pub fn min_world(self) -> usize {
+        unsafe {
+            (&*self.ptr()).min_world
+        }
+    }
+
+    /// Returns the maximum of the world range for which this object is valid to use.
+    pub fn max_world(self) -> usize {
+        unsafe {
+            (&*self.ptr()).max_world
+        }
+    }
+
+    /// Return type for fptr.
+    pub fn rettype(self) -> Value<'frame, 'static> {
+        unsafe {
+            Value::wrap((&*self.ptr()).rettype)
+        }
+    }
+
+    /// Inferred constant return value, or null
+    pub fn rettype_const(self) -> Option<Value<'frame, 'static>> {
+        unsafe {
+            let rettype_const = (&*self.ptr()).rettype_const;
+            if rettype_const.is_null() {
+                None
+            } else {
+                Some(Value::wrap(rettype_const))
+            }
+        }
+    }
+
+    /// Inferred `CodeInfo`, `Nothing`, or `None`.
+    pub fn inferred(self) -> Option<Value<'frame, 'static>> {
+        unsafe {
+            let inferred = (&*self.ptr()).inferred;
+            if inferred.is_null() {
+                None
+            } else {
+                Some(Value::wrap(inferred))
+            }
+        }
+    }
+
+    /// If `specptr` is a specialized function signature for specTypes->rettype
+    pub fn isspecsig(self) -> bool {
+        unsafe {
+            (&*self.ptr()).isspecsig != 0
+        }
     }
 }
 

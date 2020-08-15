@@ -25,6 +25,14 @@ impl<'frame> MethodTable<'frame> {
         unsafe { Symbol::wrap((&*self.ptr()).name) }
     }
 
+    pub fn defs(self) -> Value<'frame, 'static> {
+        unsafe { Value::wrap((&*self.ptr()).defs) }
+    }
+
+    pub fn cache(self) -> Value<'frame, 'static> {
+        unsafe { Value::wrap((&*self.ptr()).cache) }
+    }
+
     pub fn max_args(self) -> isize {
         unsafe { (&*self.ptr()).max_args }
     }

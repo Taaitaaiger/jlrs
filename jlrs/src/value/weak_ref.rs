@@ -20,6 +20,10 @@ impl<'frame> WeakRef<'frame> {
     pub unsafe fn ptr(self) -> *mut jl_weakref_t {
         self.0
     }
+
+    pub fn value(self) -> Value<'frame, 'static> {
+        unsafe { Value::wrap((&*self.ptr()).value) }
+    }
 }
 
 impl<'frame> Into<Value<'frame, 'static>> for WeakRef<'frame> {

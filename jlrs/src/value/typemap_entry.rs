@@ -1,6 +1,8 @@
 //! Support for values with the `Core.TypeMapEntry` type.
 
 use super::Value;
+use super::simple_vector::SimpleVector;
+use super::datatype::DataType;
 use crate::error::{JlrsError, JlrsResult};
 use crate::traits::Cast;
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
@@ -19,6 +21,71 @@ impl<'frame> TypeMapEntry<'frame> {
     #[doc(hidden)]
     pub unsafe fn ptr(self) -> *mut jl_typemap_entry_t {
         self.0
+    }
+
+    pub fn next(self) -> Option<Self> {
+        unsafe {
+            let next = (&*self.ptr()).next;
+            if next.is_null() {
+                None
+            } else {
+                Some(TypeMapEntry::wrap(next))
+            }
+        }
+    }
+
+    pub fn signature(self) -> DataType<'frame> {
+        unsafe {
+            DataType::wrap((&*self.ptr()).sig)
+        }
+    }
+
+    pub fn simple_signature(self) -> DataType<'frame> {
+        unsafe {
+            DataType::wrap((&*self.ptr()).simplesig)
+        }
+    }
+
+    pub fn guard_signature(self) -> SimpleVector<'frame> {
+        unsafe {
+            SimpleVector::wrap((&*self.ptr()).guardsigs)
+        }
+    }
+
+    pub fn min_world(self) -> usize{
+        unsafe {
+            (&*self.ptr()).min_world
+        }
+    }
+
+    pub fn max_world(self) -> usize{
+        unsafe {
+            (&*self.ptr()).max_world
+        }
+    }
+
+    pub fn func(self) -> Value<'frame, 'static> {
+        unsafe {
+            Value::wrap((&*self.ptr()).func.value)
+        }
+    }
+
+    pub fn is_leaf_signature(self) -> bool {
+        unsafe {
+            (&*self.ptr()).isleafsig != 0
+        }
+    }
+
+    pub fn is_simple_signature(self) -> bool {
+        unsafe {
+            (&*self.ptr()).issimplesig != 0
+        }
+    }
+
+    pub fn is_vararg(self) -> bool {
+        unsafe {
+            (&*self.ptr()).va != 0
+        }
     }
 }
 

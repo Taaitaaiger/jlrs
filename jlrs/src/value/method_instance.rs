@@ -1,5 +1,8 @@
 //! Support for values with the `Core.MethodInstance` type.
 
+use super::array::Array;
+use super::code_instance::CodeInstance;
+use super::simple_vector::SimpleVector;
 use super::Value;
 use crate::error::{JlrsError, JlrsResult};
 use crate::traits::Cast;
@@ -19,6 +22,34 @@ impl<'frame> MethodInstance<'frame> {
     #[doc(hidden)]
     pub unsafe fn ptr(self) -> *mut jl_method_instance_t {
         self.0
+    }
+
+    pub fn def(self) -> Value<'frame, 'static> {
+        unsafe { Value::wrap((&*self.ptr()).def.value) }
+    }
+
+    pub fn spec_types(self) -> Value<'frame, 'static> {
+        unsafe { Value::wrap((&*self.ptr()).specTypes) }
+    }
+
+    pub fn sparam_vals(self) -> SimpleVector<'frame> {
+        unsafe { SimpleVector::wrap((&*self.ptr()).sparam_vals) }
+    }
+
+    pub fn uninferred(self) -> Value<'frame, 'static> {
+        unsafe { Value::wrap((&*self.ptr()).uninferred) }
+    }
+
+    pub fn backedges(self) -> Array<'frame, 'static> {
+        unsafe { Array::wrap((&*self.ptr()).backedges) }
+    }
+
+    pub fn cache(self) -> CodeInstance<'frame> {
+        unsafe { CodeInstance::wrap((&*self.ptr()).cache) }
+    }
+
+    pub fn in_inference(self) -> u8 {
+        unsafe { (&*self.ptr()).inInference }
     }
 }
 

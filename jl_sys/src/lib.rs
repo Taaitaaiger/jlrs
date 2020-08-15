@@ -95,7 +95,10 @@ pub unsafe fn jl_svec_data(t: *mut jl_svec_t) -> *mut *mut jl_value_t {
 /*
 #define jl_array_len(a)   (((jl_array_t*)(a))->length)
 */
-// Not implemented
+#[inline(always)]
+pub unsafe fn jl_array_len(a: *mut jl_array_t) -> usize {
+    (&*a).length
+}
 
 /*
 #define jl_array_data(a)  ((void*)((jl_array_t*)(a))->data)
@@ -141,12 +144,32 @@ pub unsafe fn jl_array_ndims(array: *mut jl_array_t) -> u16 {
 /*
 #define jl_array_data_owner_offset(ndims) (offsetof(jl_array_t,ncols) + sizeof(size_t)*(1+jl_array_ndimwords(ndims))) // in bytes
 */
-// Not implemented
+pub unsafe fn jl_array_data_owner_offset(ndims: u16) -> usize {
+    // While there is a memoffset crate which provides the functionality offsetof does, it's UB.
+    // Until a sound alternative is available, calculate the offset manually.
+    // Assumption: JL_ARRAY_LEN is defined.
+
+    // data 
+    size_of::<*mut c_void>() + 
+    // length
+    size_of::<usize>() + 
+    // flags
+    2 + 
+    //elsize
+    2 + 
+    // offset
+    4 + 
+    // nrows
+    size_of::<usize>() +
+    size_of::<usize>() * (1 + jl_array_ndimwords(ndims as _)) as usize
+}
 
 /*
 #define jl_array_data_owner(a) (*((jl_value_t**)((char*)a + jl_array_data_owner_offset(jl_array_ndims(a)))))
 */
-// Not implemented
+pub unsafe fn jl_array_data_owner(a: *mut jl_array_t) -> *mut jl_value_t {
+    a.cast::<u8>().add(jl_array_data_owner_offset(jl_array_ndims(a))).cast::<jl_value_t>()
+}
 
 /*
 #define jl_array_ptr_data(a)  ((jl_value_t**)((jl_array_t*)(a))->data)
@@ -1323,6 +1346,50 @@ pub unsafe fn jl_field_offset(st: *mut jl_datatype_t, i: isize) -> u32 {
 pub unsafe fn jl_array_dims<'a>(array: *mut jl_array_t, ndims: usize) -> &'a [usize] {
     let x = &(&*array).nrows as *const usize;
     std::slice::from_raw_parts(x, ndims)
+}
+
+/*#define jl_array_ptr_data(a)  ((jl_value_t**)((jl_array_t*)(a))->data)
+STATIC_INLINE jl_value_t *jl_array_ptr_ref(void *a JL_PROPAGATES_ROOT, size_t i) JL_NOTSAFEPOINT
+{
+    assert(((jl_array_t*)a)->flags.ptrarray);
+    assert(i < jl_array_len(a));
+    return jl_atomic_load_relaxed(((jl_value_t**)(jl_array_data(a))) + i);
+}
+STATIC_INLINE jl_value_t *jl_array_ptr_set(
+    void *a JL_ROOTING_ARGUMENT, size_t i,
+    void *x JL_ROOTED_ARGUMENT) JL_NOTSAFEPOINT
+{
+    assert(((jl_array_t*)a)->flags.ptrarray);
+    assert(i < jl_array_len(a));
+    jl_atomic_store_relaxed(((jl_value_t**)(jl_array_data(a))) + i, (jl_value_t*)x);
+    if (x) {
+        if (((jl_array_t*)a)->flags.how == 3) {
+            a = jl_array_data_owner(a);
+        }
+        jl_gc_wb(a, x);
+    }
+    return (jl_value_t*)x;
+}*/
+
+pub unsafe fn jl_array_ptr_set(
+    a: *mut c_void, i: usize, x: *mut c_void
+) -> *mut jl_value_t {
+    let a: *mut jl_array_t = a.cast();
+    assert!((&*a).flags.ptrarray() != 0);
+    assert!(i < jl_array_len(a));
+    let a_data: *mut *mut jl_value_t = jl_array_data(a.cast()).cast();
+    let dest = std::sync::atomic::AtomicPtr::from(a_data.add(i));
+    dest.store(x.cast(), std::sync::atomic::Ordering::Relaxed);
+    
+    if !x.is_null() {
+        if (&*a).flags.how() == 3 {
+            jl_gc_wb(jl_array_data_owner(a).cast(), x.cast());
+        } else {
+            jl_gc_wb(a.cast(), x.cast());
+        }
+    }
+
+    x.cast()
 }
 
 #[cfg(test)]

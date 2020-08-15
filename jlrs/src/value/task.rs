@@ -1,5 +1,6 @@
 //! Support for values with the `Core.Taskk` type.
 
+use super::symbol::Symbol;
 use super::Value;
 use crate::error::{JlrsError, JlrsResult};
 use crate::traits::Cast;
@@ -19,6 +20,112 @@ impl<'frame> Task<'frame> {
     #[doc(hidden)]
     pub unsafe fn ptr(self) -> *mut jl_task_t {
         self.0
+    }
+
+    pub fn next(self) -> Option<Value<'frame, 'static>> {
+        unsafe {
+            let next = (&*self.ptr()).next;
+            if next.is_null() {
+                None
+            } else {
+                Some(Value::wrap(next))
+            }
+        }
+    }
+
+    pub fn queue(self) -> Option<Value<'frame, 'static>> {
+        unsafe {
+            let queue = (&*self.ptr()).queue;
+            if queue.is_null() {
+                None
+            } else {
+                Some(Value::wrap(queue))
+            }
+        }
+    }
+
+    pub fn tls(self) -> Value<'frame, 'static> {
+        unsafe {
+            let tls = (&*self.ptr()).tls;
+            Value::wrap(tls)
+        }
+    }
+
+    pub fn state(self) -> Symbol<'frame> {
+        unsafe {
+            let state = (&*self.ptr()).state;
+            Symbol::wrap(state)
+        }
+    }
+
+    pub fn donenotify(self) -> Option<Value<'frame, 'static>> {
+        unsafe {
+            let donenotify = (&*self.ptr()).donenotify;
+            if donenotify.is_null() {
+                None
+            } else {
+                Some(Value::wrap(donenotify))
+            }
+        }
+    }
+
+    pub fn result(self) -> Option<Value<'frame, 'static>> {
+        unsafe {
+            let result = (&*self.ptr()).result;
+            if result.is_null() {
+                None
+            } else {
+                Some(Value::wrap(result))
+            }
+        }
+    }
+
+    pub fn exception(self) -> Option<Value<'frame, 'static>> {
+        unsafe {
+            let exception = (&*self.ptr()).exception;
+            if exception.is_null() {
+                None
+            } else {
+                Some(Value::wrap(exception))
+            }
+        }
+    }
+
+    pub fn backtrace(self) -> Option<Value<'frame, 'static>> {
+        unsafe {
+            let backtrace = (&*self.ptr()).backtrace;
+            if backtrace.is_null() {
+                None
+            } else {
+                Some(Value::wrap(backtrace))
+            }
+        }
+    }
+
+    pub fn logstate(self) -> Option<Value<'frame, 'static>> {
+        unsafe {
+            let logstate = (&*self.ptr()).logstate;
+            if logstate.is_null() {
+                None
+            } else {
+                Some(Value::wrap(logstate))
+            }
+        }
+    }
+
+    pub fn start(self) -> Option<Value<'frame, 'static>> {
+        unsafe {
+            let start = (&*self.ptr()).start;
+            if start.is_null() {
+                None
+            } else {
+                Some(Value::wrap(start))
+            }
+        }
+    }
+
+    pub fn sticky(self) -> u8 {
+        unsafe { (&*self.ptr()).sticky }
     }
 }
 
