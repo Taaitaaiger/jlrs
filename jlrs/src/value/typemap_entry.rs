@@ -1,14 +1,20 @@
 //! Support for values with the `Core.TypeMapEntry` type.
+//!
+//! The documentation for this module has been slightly adapted from the comments for this struct
+//! in [`julia.h`]
+//!
+//! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#505
 
-use super::Value;
-use super::simple_vector::SimpleVector;
 use super::datatype::DataType;
+use super::simple_vector::SimpleVector;
+use super::Value;
 use crate::error::{JlrsError, JlrsResult};
 use crate::traits::Cast;
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_typemap_entry_t, jl_typemap_entry_type};
 use std::marker::PhantomData;
 
+/// One Type-to-Value entry
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct TypeMapEntry<'frame>(*mut jl_typemap_entry_t, PhantomData<&'frame ()>);
@@ -23,6 +29,7 @@ impl<'frame> TypeMapEntry<'frame> {
         self.0
     }
 
+    /// Invasive linked list
     pub fn next(self) -> Option<Self> {
         unsafe {
             let next = (&*self.ptr()).next;
@@ -34,58 +41,45 @@ impl<'frame> TypeMapEntry<'frame> {
         }
     }
 
+    /// The type signature for this entry
     pub fn signature(self) -> DataType<'frame> {
-        unsafe {
-            DataType::wrap((&*self.ptr()).sig)
-        }
+        unsafe { DataType::wrap((&*self.ptr()).sig) }
     }
 
+    /// A simple signature for fast rejection
     pub fn simple_signature(self) -> DataType<'frame> {
-        unsafe {
-            DataType::wrap((&*self.ptr()).simplesig)
-        }
+        unsafe { DataType::wrap((&*self.ptr()).simplesig) }
     }
 
     pub fn guard_signature(self) -> SimpleVector<'frame> {
-        unsafe {
-            SimpleVector::wrap((&*self.ptr()).guardsigs)
-        }
+        unsafe { SimpleVector::wrap((&*self.ptr()).guardsigs) }
     }
 
-    pub fn min_world(self) -> usize{
-        unsafe {
-            (&*self.ptr()).min_world
-        }
+    pub fn min_world(self) -> usize {
+        unsafe { (&*self.ptr()).min_world }
     }
 
-    pub fn max_world(self) -> usize{
-        unsafe {
-            (&*self.ptr()).max_world
-        }
+    pub fn max_world(self) -> usize {
+        unsafe { (&*self.ptr()).max_world }
     }
 
     pub fn func(self) -> Value<'frame, 'static> {
-        unsafe {
-            Value::wrap((&*self.ptr()).func.value)
-        }
+        unsafe { Value::wrap((&*self.ptr()).func.value) }
     }
 
+    /// `isleaftype(sig) & !any(isType, sig)` : unsorted and very fast
     pub fn is_leaf_signature(self) -> bool {
-        unsafe {
-            (&*self.ptr()).isleafsig != 0
-        }
+        unsafe { (&*self.ptr()).isleafsig != 0 }
     }
 
+    /// `all(isleaftype | isAny | isType | isVararg, sig)` : sorted and fast
     pub fn is_simple_signature(self) -> bool {
-        unsafe {
-            (&*self.ptr()).issimplesig != 0
-        }
+        unsafe { (&*self.ptr()).issimplesig != 0 }
     }
 
+    /// `isVararg(sig)`
     pub fn is_vararg(self) -> bool {
-        unsafe {
-            (&*self.ptr()).va != 0
-        }
+        unsafe { (&*self.ptr()).va != 0 }
     }
 }
 

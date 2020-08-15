@@ -1,12 +1,17 @@
 //! Support for values with the `Core.CodeInstance` type.
-
+//!
+//! The documentation for this module has been slightly adapted from the comments for this struct
+//! in [`julia.h`]
+//!
+//! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L339
+//!
+use super::method_instance::MethodInstance;
 use super::Value;
 use crate::error::{JlrsError, JlrsResult};
 use crate::traits::Cast;
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_code_instance_t, jl_code_instance_type};
 use std::marker::PhantomData;
-use super::{method_instance::MethodInstance};
 
 /// A `CodeInstance` represents an executable operation.
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]
@@ -25,9 +30,7 @@ impl<'frame> CodeInstance<'frame> {
 
     /// Method this instance is specialized from.
     pub fn def(self) -> MethodInstance<'frame> {
-        unsafe {
-            MethodInstance::wrap((&*self.ptr()).def)
-        }
+        unsafe { MethodInstance::wrap((&*self.ptr()).def) }
     }
 
     /// Next cache entry.
@@ -44,23 +47,17 @@ impl<'frame> CodeInstance<'frame> {
 
     /// Returns the minimum of the world range for which this object is valid to use.
     pub fn min_world(self) -> usize {
-        unsafe {
-            (&*self.ptr()).min_world
-        }
+        unsafe { (&*self.ptr()).min_world }
     }
 
     /// Returns the maximum of the world range for which this object is valid to use.
     pub fn max_world(self) -> usize {
-        unsafe {
-            (&*self.ptr()).max_world
-        }
+        unsafe { (&*self.ptr()).max_world }
     }
 
     /// Return type for fptr.
     pub fn rettype(self) -> Value<'frame, 'static> {
-        unsafe {
-            Value::wrap((&*self.ptr()).rettype)
-        }
+        unsafe { Value::wrap((&*self.ptr()).rettype) }
     }
 
     /// Inferred constant return value, or null
@@ -89,9 +86,7 @@ impl<'frame> CodeInstance<'frame> {
 
     /// If `specptr` is a specialized function signature for specTypes->rettype
     pub fn isspecsig(self) -> bool {
-        unsafe {
-            (&*self.ptr()).isspecsig != 0
-        }
+        unsafe { (&*self.ptr()).isspecsig != 0 }
     }
 }
 

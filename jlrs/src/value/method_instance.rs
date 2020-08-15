@@ -1,5 +1,9 @@
 //! Support for values with the `Core.MethodInstance` type.
-
+//!
+//! The documentation for this module has been slightly adapted from the comments for this struct
+//! in [`julia.h`]
+//!
+//! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L321
 use super::array::Array;
 use super::code_instance::CodeInstance;
 use super::simple_vector::SimpleVector;
@@ -10,6 +14,9 @@ use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_method_instance_t, jl_method_instance_type};
 use std::marker::PhantomData;
 
+/// This type is a placeholder to cache data for a specType signature specialization of a `Method`
+/// can can be used as a unique dictionary key representation of a call to a particular `Method`
+/// with a particular set of argument types
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct MethodInstance<'frame>(*mut jl_method_instance_t, PhantomData<&'frame ()>);
@@ -24,22 +31,27 @@ impl<'frame> MethodInstance<'frame> {
         self.0
     }
 
+    /// Context for this code
     pub fn def(self) -> Value<'frame, 'static> {
         unsafe { Value::wrap((&*self.ptr()).def.value) }
     }
 
+    // Argument types this was specialized for
     pub fn spec_types(self) -> Value<'frame, 'static> {
         unsafe { Value::wrap((&*self.ptr()).specTypes) }
     }
 
+    // Static parameter values, indexed by def.method->sparam_syms
     pub fn sparam_vals(self) -> SimpleVector<'frame> {
         unsafe { SimpleVector::wrap((&*self.ptr()).sparam_vals) }
     }
 
+    // Cached uncompressed code, for generated functions, top-level thunks, or the interpreter
     pub fn uninferred(self) -> Value<'frame, 'static> {
         unsafe { Value::wrap((&*self.ptr()).uninferred) }
     }
 
+    /// List of method-instances which contain a call into this method-instance
     pub fn backedges(self) -> Array<'frame, 'static> {
         unsafe { Array::wrap((&*self.ptr()).backedges) }
     }
@@ -48,6 +60,7 @@ impl<'frame> MethodInstance<'frame> {
         unsafe { CodeInstance::wrap((&*self.ptr()).cache) }
     }
 
+    /// Flags to tell if inference is running on this object
     pub fn in_inference(self) -> u8 {
         unsafe { (&*self.ptr()).inInference }
     }

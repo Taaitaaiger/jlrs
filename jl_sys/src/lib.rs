@@ -149,16 +149,16 @@ pub unsafe fn jl_array_data_owner_offset(ndims: u16) -> usize {
     // Until a sound alternative is available, calculate the offset manually.
     // Assumption: JL_ARRAY_LEN is defined.
 
-    // data 
-    size_of::<*mut c_void>() + 
+    // data
+    size_of::<*mut c_void>() +
     // length
-    size_of::<usize>() + 
+    size_of::<usize>() +
     // flags
-    2 + 
+    2 +
     //elsize
-    2 + 
+    2 +
     // offset
-    4 + 
+    4 +
     // nrows
     size_of::<usize>() +
     size_of::<usize>() * (1 + jl_array_ndimwords(ndims as _)) as usize
@@ -168,7 +168,9 @@ pub unsafe fn jl_array_data_owner_offset(ndims: u16) -> usize {
 #define jl_array_data_owner(a) (*((jl_value_t**)((char*)a + jl_array_data_owner_offset(jl_array_ndims(a)))))
 */
 pub unsafe fn jl_array_data_owner(a: *mut jl_array_t) -> *mut jl_value_t {
-    a.cast::<u8>().add(jl_array_data_owner_offset(jl_array_ndims(a))).cast::<jl_value_t>()
+    a.cast::<u8>()
+        .add(jl_array_data_owner_offset(jl_array_ndims(a)))
+        .cast::<jl_value_t>()
 }
 
 /*
@@ -1371,16 +1373,14 @@ STATIC_INLINE jl_value_t *jl_array_ptr_set(
     return (jl_value_t*)x;
 }*/
 
-pub unsafe fn jl_array_ptr_set(
-    a: *mut c_void, i: usize, x: *mut c_void
-) -> *mut jl_value_t {
+pub unsafe fn jl_array_ptr_set(a: *mut c_void, i: usize, x: *mut c_void) -> *mut jl_value_t {
     let a: *mut jl_array_t = a.cast();
     assert!((&*a).flags.ptrarray() != 0);
     assert!(i < jl_array_len(a));
     let a_data: *mut *mut jl_value_t = jl_array_data(a.cast()).cast();
     let dest = std::sync::atomic::AtomicPtr::from(a_data.add(i));
     dest.store(x.cast(), std::sync::atomic::Ordering::Relaxed);
-    
+
     if !x.is_null() {
         if (&*a).flags.how() == 3 {
             jl_gc_wb(jl_array_data_owner(a).cast(), x.cast());

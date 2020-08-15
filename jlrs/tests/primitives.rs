@@ -361,7 +361,7 @@ fn create_nothing() {
             let nothing = Value::nothing(frame);
             assert!(nothing.is_nothing());
             assert!(!nothing.is::<f32>());
-            assert!(nothing.datatype().is_none());
+            assert!(nothing.datatype().is_some());
             assert_eq!(nothing.type_name(), "Nothing");
             assert!(!nothing.is_array_of::<f32>());
             assert_eq!(nothing.field_names(global).len(), 0);

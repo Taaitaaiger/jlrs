@@ -1,4 +1,5 @@
-/// Support for values with the `Core.SimpleVector` (`SVec`) type.
+//! Support for values with the `Core.SimpleVector` (`SVec`) type.
+
 use crate::error::{JlrsError, JlrsResult};
 use crate::traits::Cast;
 use crate::value::Value;
@@ -6,6 +7,7 @@ use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_simplevector_type, jl_svec_data, jl_svec_t};
 use std::marker::PhantomData;
 
+/// A `SimpleVector` is a fixed-size array that contains `Value`s.
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct SimpleVector<'frame>(*mut jl_svec_t, PhantomData<&'frame ()>);
@@ -20,10 +22,12 @@ impl<'frame> SimpleVector<'frame> {
         self.0
     }
 
+    /// Returns the length of this `SimpleVector`.
     pub fn len(self) -> usize {
         unsafe { (&*self.ptr()).length }
     }
 
+    /// Returns the data of this `SimpleVector`.
     pub fn data(self) -> &'frame [Value<'frame, 'static>] {
         unsafe { std::slice::from_raw_parts(jl_svec_data(self.ptr()).cast(), self.len()) }
     }

@@ -2,7 +2,8 @@
 //!
 //! You will find several structs in this module that can be used to work with Julia arrays from
 //! Rust. An [`Array`] is the Julia array itself, and provides methods to (mutably) access the
-//! data and copy it to Rust.
+//! data and copy it to Rust. Accessing array data from Rust when the type of the elements is a
+//! union of bits types is not supported, use `Base.getindex` instead.
 //!
 //! The structs that represent copied or borrowed data can be accessed using an n-dimensional
 //! index written as a tuple. For example, if `a` is a three-dimensional array, a single element
@@ -98,6 +99,7 @@ impl<'frame, 'data> Array<'frame, 'data> {
         unsafe { Dimensions::from_array(self.ptr().cast()) }
     }
 
+    /// Returns the type of this array's elements.
     pub fn element_type(self) -> Value<'frame, 'static> {
         unsafe { Value::wrap(jl_array_eltype(self.ptr().cast()).cast()) }
     }

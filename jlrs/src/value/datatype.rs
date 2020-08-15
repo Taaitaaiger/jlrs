@@ -13,7 +13,7 @@
 //! In this module you'll find the [`DataType`] struct which provides access to the properties
 //! of its counterpart in Julia and lets you perform a large set of checks to find out its
 //! properties. Many of these checks are handled through implementations of the trait
-//! [`JuliaTypecheck`]. Most of these checks can be found in this module.
+//! [`JuliaTypecheck`]. Some of these checks can be found in this module.
 //!
 //! [`Value`]: ../struct.Value.html
 //! [`DataType`]: struct.DataType.html
@@ -33,8 +33,7 @@ use jl_sys::{
     jl_globalref_type, jl_gotonode_type, jl_intrinsic_type, jl_is_cpointer_type, jl_isbits,
     jl_linenumbernode_type, jl_namedtuple_typename, jl_newvarnode_type, jl_phicnode_type,
     jl_phinode_type, jl_pinode_type, jl_quotenode_type, jl_slotnumber_type, jl_string_type,
-    jl_svec_data, jl_svec_len, jl_tuple_typename, jl_typedslot_type, jl_typename_str,
-    jl_upsilonnode_type,
+    jl_svec_data, jl_svec_len, jl_typedslot_type, jl_typename_str, jl_upsilonnode_type,
 };
 use std::ffi::CStr;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
@@ -279,16 +278,6 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for DataType<'frame> {
 
 impl_julia_type!(DataType<'frame>, jl_datatype_type, 'frame);
 impl_valid_layout!(DataType<'frame>, 'frame);
-
-/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
-/// a value of this type is a tuple.
-pub struct Tuple;
-
-unsafe impl JuliaTypecheck for Tuple {
-    unsafe fn julia_typecheck(t: DataType) -> bool {
-        (&*t.ptr()).name == jl_tuple_typename
-    }
-}
 
 /// A typecheck that can be used in combination with `DataType::is`. This method returns true if
 /// a value of this type is a tuple.

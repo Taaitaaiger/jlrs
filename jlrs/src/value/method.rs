@@ -1,17 +1,24 @@
 //! Support for values with the `Core.Method` type.
+//!
+//! The documentation for this module has been slightly adapted from the comments for this struct
+//! in [`julia.h`]
+//!
+//! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L273
 
-use super::Value;
-use super::symbol::Symbol;
-use super::module::Module;
 use super::array::Array;
 use super::method_instance::MethodInstance;
+use super::module::Module;
 use super::simple_vector::SimpleVector;
+use super::symbol::Symbol;
+use super::Value;
 use crate::error::{JlrsError, JlrsResult};
 use crate::traits::Cast;
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_method_t, jl_method_type};
 use std::marker::PhantomData;
 
+/// This type describes a single method definition, and stores data shared by the specializations
+/// of a function.
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct Method<'frame>(*mut jl_method_t, PhantomData<&'frame ()>);
@@ -26,78 +33,65 @@ impl<'frame> Method<'frame> {
         self.0
     }
 
+    /// Method name for error reporting
     pub fn name(self) -> Symbol<'frame> {
-        unsafe {
-            Symbol::wrap((&*self.ptr()).name)
-        }
+        unsafe { Symbol::wrap((&*self.ptr()).name) }
     }
 
+    /// Method module
     pub fn module(self) -> Module<'frame> {
-        unsafe {
-            Module::wrap((&*self.ptr()).module)
-        }
+        unsafe { Module::wrap((&*self.ptr()).module) }
     }
 
+    /// Method file
     pub fn file(self) -> Symbol<'frame> {
-        unsafe {
-            Symbol::wrap((&*self.ptr()).file)
-        }
+        unsafe { Symbol::wrap((&*self.ptr()).file) }
     }
 
+    /// Method line in file
     pub fn line(self) -> i32 {
-        unsafe {
-            (&*self.ptr()).line
-        }
+        unsafe { (&*self.ptr()).line }
     }
 
     pub fn primary_world(self) -> usize {
-        unsafe {
-            (&*self.ptr()).primary_world
-        }
+        unsafe { (&*self.ptr()).primary_world }
     }
 
     pub fn deleted_world(self) -> usize {
-        unsafe {
-            (&*self.ptr()).deleted_world
-        }
+        unsafe { (&*self.ptr()).deleted_world }
     }
 
+    /// Method's type signature.
     pub fn signature(self) -> Value<'frame, 'static> {
-        unsafe {
-            Value::wrap((&*self.ptr()).sig)
-        }
+        unsafe { Value::wrap((&*self.ptr()).sig) }
     }
 
+    /// List of potentially-ambiguous methods (nothing = none, Vector{Any} of TypeMapEntry otherwise)
     pub fn ambiguous(self) -> Value<'frame, 'static> {
-        unsafe {
-            Value::wrap((&*self.ptr()).ambig)
-        }
+        unsafe { Value::wrap((&*self.ptr()).ambig) }
     }
 
+    /// Forward references to later items (typemap entries) which might sort before this one
     pub fn resorted(self) -> Value<'frame, 'static> {
-        unsafe {
-            Value::wrap((&*self.ptr()).resorted)
-        }
+        unsafe { Value::wrap((&*self.ptr()).resorted) }
     }
 
+    /// Table of all `Method` specializations, allocated as [hashable, ..., NULL, linear, ....]
     pub fn specializations(self) -> SimpleVector<'frame> {
-        unsafe {
-            SimpleVector::wrap((&*self.ptr()).specializations)
-        }
+        unsafe { SimpleVector::wrap((&*self.ptr()).specializations) }
     }
 
+    /// Index lookup by hash into specializations
     pub fn speckeyset(self) -> Array<'frame, 'static> {
-        unsafe {
-            Array::wrap((&*self.ptr()).speckeyset)
-        }
+        unsafe { Array::wrap((&*self.ptr()).speckeyset) }
     }
 
+    /// Compacted list of slot names (String)
     pub fn slot_syms(self) -> Value<'frame, 'static> {
-        unsafe {
-            Value::wrap((&*self.ptr()).slot_syms)
-        }
+        unsafe { Value::wrap((&*self.ptr()).slot_syms) }
     }
 
+    // Original code template (`Core.CodeInfo`, but may be compressed), `None` for builtins.
     pub fn source(self) -> Option<Value<'frame, 'static>> {
         unsafe {
             let source = (&*self.ptr()).source;
@@ -109,6 +103,7 @@ impl<'frame> Method<'frame> {
         }
     }
 
+    /// Unspecialized executable method instance, or `None`
     pub fn unspecialized(self) -> Option<MethodInstance<'frame>> {
         unsafe {
             let unspecialized = (&*self.ptr()).unspecialized;
@@ -120,6 +115,7 @@ impl<'frame> Method<'frame> {
         }
     }
 
+    /// Executable code-generating function if available
     pub fn generator(self) -> Option<Value<'frame, 'static>> {
         unsafe {
             let generator = (&*self.ptr()).generator;
@@ -131,6 +127,7 @@ impl<'frame> Method<'frame> {
         }
     }
 
+    /// Pointers in generated code (shared to reduce memory), or `None`
     pub fn roots(self) -> Option<Array<'frame, 'static>> {
         unsafe {
             let roots = (&*self.ptr()).roots;
@@ -142,6 +139,7 @@ impl<'frame> Method<'frame> {
         }
     }
 
+    /// `SimpleVector(rettype, sig)` if a ccallable entry point is requested for this
     pub fn ccallable(self) -> Option<SimpleVector<'frame>> {
         unsafe {
             let ccallable = (&*self.ptr()).ccallable;
@@ -153,44 +151,39 @@ impl<'frame> Method<'frame> {
         }
     }
 
+    /// Cache of specializations of this method for invoke(), i.e.
+    /// cases where this method was called even though it was not necessarily
+    /// the most specific for the argument types.
     pub fn invokes(self) -> Value<'frame, 'static> {
         unsafe { Value::wrap((&*self.ptr()).invokes) }
     }
 
     pub fn n_args(self) -> i32 {
-        unsafe {
-            (&*self.ptr()).nargs
-        }
+        unsafe { (&*self.ptr()).nargs }
     }
 
+    /// Bit flags: whether each of the first 8 arguments is called
     pub fn called(self) -> i32 {
-        unsafe {
-            (&*self.ptr()).called
-        }
+        unsafe { (&*self.ptr()).called }
     }
 
+    /// Bit flags: which arguments should not be specialized
     pub fn nospecialize(self) -> i32 {
-        unsafe {
-            (&*self.ptr()).nospecialize
-        }
+        unsafe { (&*self.ptr()).nospecialize }
     }
 
+    /// Number of leading arguments that are actually keyword arguments
+    /// of another method.
     pub fn nkw(self) -> i32 {
-        unsafe {
-            (&*self.ptr()).nkw
-        }
+        unsafe { (&*self.ptr()).nkw }
     }
 
     pub fn is_varargs(self) -> bool {
-        unsafe {
-            (&*self.ptr()).isva != 0
-        }
+        unsafe { (&*self.ptr()).isva != 0 }
     }
 
     pub fn pure(self) -> bool {
-        unsafe {
-            (&*self.ptr()).pure_ != 0
-        }
+        unsafe { (&*self.ptr()).pure_ != 0 }
     }
 }
 

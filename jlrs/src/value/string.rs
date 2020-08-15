@@ -42,7 +42,7 @@ impl<'frame> JuliaString<'frame> {
         }
     }
 
-    /// Returns the string as a string slice, or an error if it the string contains 
+    /// Returns the string as a string slice, or an error if it the string contains
     /// invalid characters
     pub fn as_str(self) -> JlrsResult<&'frame str> {
         Ok(std::str::from_utf8(self.as_slice()).or(Err(JlrsError::NotUnicode))?)

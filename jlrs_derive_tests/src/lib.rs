@@ -787,7 +787,7 @@ mod tests {
             julia
                 .dynamic_frame(|global, frame| {
                     let arr = Value::new_array::<i32, _, _>(frame, (2, 2))?;
-                    
+
                     let wgt_constr = Module::main(global)
                         .submodule("WithGeneric")?
                         .function("WithGenericT")?;
@@ -813,7 +813,9 @@ mod tests {
                         .is::<WithPropagatedLifetimes>());
 
                     let first = jl_val.get_nth_field(frame, 0).unwrap();
-                    assert!(first.cast::<WithGenericT<Tuple2<i32, WithGenericT<Array>>>>().is_ok());
+                    assert!(first
+                        .cast::<WithGenericT<Tuple2<i32, WithGenericT<Array>>>>()
+                        .is_ok());
 
                     assert!(jl_val.is::<WithPropagatedLifetimes>());
                     assert!(jl_val.cast::<WithPropagatedLifetimes>().is_ok());

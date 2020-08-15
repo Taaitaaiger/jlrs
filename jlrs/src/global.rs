@@ -16,7 +16,7 @@ pub struct Global<'base>(PhantomData<&'base ()>);
 
 impl<'base> Global<'base> {
     #[doc(hidden)]
-    
+
     pub unsafe fn new() -> Self {
         Global(PhantomData)
     }

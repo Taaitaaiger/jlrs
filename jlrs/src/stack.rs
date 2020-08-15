@@ -62,7 +62,6 @@ impl<'stack, V> StackView<'stack, V> {
         self.stack[0] as _
     }
 
-    
     pub(crate) fn print_memory(&self) {
         println!("{:?}", &self.stack);
     }

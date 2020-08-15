@@ -2,13 +2,15 @@
 
 use super::type_var::TypeVar;
 use super::Value;
-use crate::value::datatype::DataType;
 use crate::error::{JlrsError, JlrsResult};
 use crate::traits::Cast;
+use crate::value::datatype::DataType;
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_unionall_t, jl_unionall_type};
 use std::marker::PhantomData;
 
+/// An iterated union of types. If a struct field has a parametric type with some of its
+/// parameters unknown, its type is represented by a `UnionAll`.
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct UnionAll<'frame>(*mut jl_unionall_t, PhantomData<&'frame ()>);
@@ -23,6 +25,7 @@ impl<'frame> UnionAll<'frame> {
         self.0
     }
 
+    /// The type at the bottom of this `UnionAll`.
     pub fn base_type(self) -> DataType<'frame> {
         let mut b = self;
         while b.body().is::<UnionAll>() {
@@ -34,10 +37,12 @@ impl<'frame> UnionAll<'frame> {
         Value::from(b.body()).cast::<DataType>().unwrap()
     }
 
+    /// The body of this `UnionAll`. This is either another `UnionAll` or a `DataType`.
     pub fn body(self) -> Value<'frame, 'static> {
         unsafe { Value::wrap((&*self.ptr()).body) }
     }
 
+    /// The type variable associated with this "layer" of the `UnionAll`.
     pub fn var(self) -> TypeVar<'frame> {
         unsafe { TypeVar::wrap((&*self.ptr()).var) }
     }

@@ -8,6 +8,8 @@ use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_tvar_t, jl_tvar_type};
 use std::marker::PhantomData;
 
+/// This is a unknown, but possibly restricted, type parameter. In `Array{T, N}`, `T` and `N` are
+/// `TypeVar`s.
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct TypeVar<'frame>(*mut jl_tvar_t, PhantomData<&'frame ()>);
@@ -22,14 +24,17 @@ impl<'frame> TypeVar<'frame> {
         self.0
     }
 
+    /// The name of this `TypeVar`.
     pub fn name(self) -> Symbol<'frame> {
         unsafe { Symbol::wrap((&*self.ptr()).name) }
     }
 
+    /// The lower bound of this `TypeVar`.
     pub fn lower_bound(self) -> Value<'frame, 'static> {
         unsafe { Value::wrap((&*self.ptr()).lb) }
     }
 
+    /// The upper bound of this `TypeVar`.
     pub fn upper_bound(self) -> Value<'frame, 'static> {
         unsafe { Value::wrap((&*self.ptr()).ub) }
     }

@@ -1,7 +1,7 @@
 //! Support for values with the `Core.Expr` type.
 
-use super::symbol::Symbol;
 use super::array::Array;
+use super::symbol::Symbol;
 use super::Value;
 use crate::error::{JlrsError, JlrsResult};
 use crate::traits::Cast;

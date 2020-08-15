@@ -187,7 +187,7 @@ pub struct SizeAlignMismatch {
 #[repr(C)]
 #[jlrs(julia_type = "Main.WithBitsUnion.UnionInTuple")]
 #[derive(Copy, Clone, Debug, JuliaStruct)]
-pub struct UnionInTuple<'frame, 'data>{
+pub struct UnionInTuple<'frame, 'data> {
     pub a: i8,
     pub b: ::jlrs::value::Value<'frame, 'data>,
     pub c: i8,
@@ -206,7 +206,7 @@ where
 #[repr(C)]
 #[jlrs(julia_type = "Main.WithGeneric.WithGenericUnionAll")]
 #[derive(Copy, Clone, Debug, JuliaStruct)]
-pub struct WithGenericUnionAll<'frame, 'data>{
+pub struct WithGenericUnionAll<'frame, 'data> {
     pub a: ::jlrs::value::Value<'frame, 'data>,
 }
 
@@ -223,15 +223,17 @@ where
 #[repr(C)]
 #[jlrs(julia_type = "Main.WithGeneric.WithPropagatedLifetime")]
 #[derive(Copy, Clone, Debug, JuliaStruct)]
-pub struct WithPropagatedLifetime<'frame>{
+pub struct WithPropagatedLifetime<'frame> {
     pub a: WithGenericT<::jlrs::value::module::Module<'frame>>,
 }
 
 #[repr(C)]
 #[jlrs(julia_type = "Main.WithGeneric.WithPropagatedLifetimes")]
 #[derive(Copy, Clone, Debug, JuliaStruct)]
-pub struct WithPropagatedLifetimes<'frame, 'data>{
-    pub a: WithGenericT<::jlrs::value::tuple::Tuple2<i32, WithGenericT<::jlrs::value::array::Array<'frame, 'data>>>>,
+pub struct WithPropagatedLifetimes<'frame, 'data> {
+    pub a: WithGenericT<
+        ::jlrs::value::tuple::Tuple2<i32, WithGenericT<::jlrs::value::array::Array<'frame, 'data>>>,
+    >,
 }
 
 #[repr(C)]
@@ -258,6 +260,6 @@ pub struct WithValueType {
 #[repr(C)]
 #[jlrs(julia_type = "Main.WithNonBitsUnion.NonBitsUnion")]
 #[derive(Copy, Clone, Debug, JuliaStruct)]
-pub struct NonBitsUnion<'frame, 'data>{
+pub struct NonBitsUnion<'frame, 'data> {
     pub a: ::jlrs::value::Value<'frame, 'data>,
 }

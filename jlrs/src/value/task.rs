@@ -1,5 +1,9 @@
-//! Support for values with the `Core.Taskk` type.
-
+//! Support for values with the `Core.Task` type.
+//!
+//! The documentation for this module has been slightly adapted from the comments for this struct
+//! in [`julia.h`]
+//!
+//! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L1727
 use super::symbol::Symbol;
 use super::Value;
 use crate::error::{JlrsError, JlrsResult};
@@ -8,6 +12,7 @@ use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_task_t, jl_task_type};
 use std::marker::PhantomData;
 
+/// A Julia `Task` (coroutine).
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct Task<'frame>(*mut jl_task_t, PhantomData<&'frame ()>);
@@ -22,6 +27,7 @@ impl<'frame> Task<'frame> {
         self.0
     }
 
+    /// Invasive linked list for scheduler
     pub fn next(self) -> Option<Value<'frame, 'static>> {
         unsafe {
             let next = (&*self.ptr()).next;
@@ -33,6 +39,7 @@ impl<'frame> Task<'frame> {
         }
     }
 
+    /// Invasive linked list for scheduler
     pub fn queue(self) -> Option<Value<'frame, 'static>> {
         unsafe {
             let queue = (&*self.ptr()).queue;
@@ -124,6 +131,7 @@ impl<'frame> Task<'frame> {
         }
     }
 
+    /// Record whether this Task can be migrated to a new thread
     pub fn sticky(self) -> u8 {
         unsafe { (&*self.ptr()).sticky }
     }

@@ -67,7 +67,6 @@ impl JlrsError {
 }
 
 impl Display for JlrsError {
-    
     fn fmt(&self, formatter: &mut Formatter) -> FmtResult {
         match self {
             JlrsError::Other(other) => write!(formatter, "An error occurred: {}", other),
@@ -158,7 +157,6 @@ impl Display for JlrsError {
 impl Error for JlrsError {}
 
 impl Into<Box<JlrsError>> for Box<dyn Error + Send + Sync + 'static> {
-    
     fn into(self) -> Box<JlrsError> {
         Box::new(JlrsError::Other(self))
     }

@@ -10,4 +10,4 @@ pub use crate::value::{Value, Values};
 pub use crate::Julia;
 
 #[cfg(feature = "jlrs-derive")]
-pub use jlrs_derive::{JuliaStruct, IntoJulia};
+pub use jlrs_derive::{IntoJulia, JuliaStruct};

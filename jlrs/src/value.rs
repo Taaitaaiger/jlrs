@@ -22,7 +22,8 @@ use crate::frame::Output;
 use crate::global::Global;
 use crate::impl_julia_type;
 use crate::traits::{
-    private::Internal, Cast, Frame, IntoJulia, JuliaType, JuliaTypecheck, TemporarySymbol, ValidLayout
+    private::Internal, Cast, Frame, IntoJulia, JuliaType, JuliaTypecheck, TemporarySymbol,
+    ValidLayout,
 };
 use jl_sys::{
     jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_any_type, jl_apply_array_type,
@@ -43,15 +44,15 @@ pub mod array;
 pub mod code_instance;
 pub mod datatype;
 pub mod expr;
-pub mod string;
-pub mod method_table;
 pub mod method;
 pub mod method_instance;
+pub mod method_table;
 pub mod module;
-pub mod symbol;
-pub mod tuple;
 pub mod simple_vector;
+pub mod string;
+pub mod symbol;
 pub mod task;
+pub mod tuple;
 pub mod type_name;
 pub mod type_var;
 pub mod typemap_entry;
@@ -173,16 +174,16 @@ impl<'frame> Values<'frame> {
 /// New `Value`s can be created from Rust in several ways. Types that implement [`IntoJulia`] can
 /// be converted to a `Value` by calling [`Value::new`]. This trait is implemented by primitive
 /// types like `bool`, `char`, `i16`, and `usize`; string types like `String`, `&str`, and `Cow`;
-/// and you can derive it for your own types by deriving [`JuliaStruct`] and [`JuliaTuple`].
+/// [`tuples`]; and you can derive it for your own types by deriving [`JuliaStruct`]. You should
+/// use `JlrsReflect.jl` rather than doing this manually.
 ///
 /// [`Value`] also has several methods to create an n-dimensional array if the element type
-/// implements [`JuliaType`]. This trait is a restricted version of [`JuliaType`] that is
-/// implemented by all primitive types except `bool` and `char`. Types that derive [`JuliaStruct`]
-/// or [`JuliaTuple`] can derive this trait if is implemented by all of its fields. A new array
-/// whose data is completely managed by Julia can be created by calling [`Value::new_array`]. You
-/// can also transfer the ownership of some `Vec` to Julia and treat it as an n-dimensional array
-/// with [`Value::move_array`]. Finally, you can borrow anything that can be borrowed as a mutable
-/// slice with [`Value::borrow_array`].
+/// implements [`IntoJulia`], this includes primitive types, strings. It is also implemented for
+/// bits types with no type parameters when these bindings are generated with `JlrsReflect.jl`. A
+/// new array whose data is completely managed by Julia can be created by calling
+/// [`Value::new_array`]. You can also transfer the ownership of some `Vec` to Julia and treat it
+/// as an n-dimensional array with [`Value::move_array`]. Finally, you can borrow anything that
+/// can be borrowed as a mutable slice with [`Value::borrow_array`].
 ///
 /// Functions and other global values defined in a module can be accessed through that module.
 /// Please see the documentation for [`Module`] for more information.
@@ -206,7 +207,7 @@ impl<'frame> Values<'frame> {
 /// [`JuliaType`]: ../traits/trait.JuliaType.html
 /// [`Value::new`]: struct.Value.html#method.new
 /// [`JuliaStruct`]: ../traits/trait.JuliaStruct.html
-/// [`JuliaTuple`]: ../traits/trait.JuliaTuple.html
+/// [`tuples`]: ./tuple/index.html
 /// [`Value::datatype`]: struct.Value.html#method.datatype
 /// [`Value::is`]: struct.Value.html#method.is
 /// [`Value::cast`]: struct.Value.html#method.cast
@@ -230,13 +231,13 @@ impl<'frame, 'data> Value<'frame, 'data> {
         self.0
     }
 
-    /// Returns `Nothing` as a `Value`. Because `Nothing` is a singleton this takes no slot on the
+    /// Returns `nothing` as a `Value`. Because `nothing` is a singleton this takes no slot on the
     /// GC stack.
     pub fn nothing<F>(_frame: &mut F) -> Value<'frame, 'static>
     where
         F: Frame<'frame>,
     {
-        unsafe { Value::wrap(null_mut()) }
+        unsafe { Value::wrap(jl_sys::jl_nothing) }
     }
 
     /// Create a new Julia value, any type that implements [`IntoJulia`] can be converted using
@@ -274,9 +275,11 @@ impl<'frame, 'data> Value<'frame, 'data> {
         unsafe { frame.assign_output(output, value.into_julia(), Internal) }
     }
 
-    /// Returns true if the value is `Nothing`.
+    /// Returns true if the value is `nothing`.
     pub fn is_nothing(self) -> bool {
-        unsafe { self.ptr() == null_mut() }
+        unsafe {
+            self.ptr() == null_mut() || jl_typeof(self.ptr()) == jl_sys::jl_nothing_type.cast()
+        }
     }
 
     /// Performs the given type check. For types that represent Julia data, this check comes down
@@ -294,8 +297,8 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// # }
     /// ```
     ///
-    /// More complex types that are specific to Julia, currently [`Array`], [`DataType`],
-    /// [`Module`], and [`Symbol`] are also supported:
+    /// "Special" types in Julia that are defined in C, like [`Array`], [`Module`] and
+    /// [`DataType`], are also supported:
     ///
     /// ```no_run
     /// # use jlrs::prelude::*;
@@ -309,15 +312,14 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// # }
     /// ```
     ///
-    /// If you derive [`JuliaStruct`] or [`JuliaTuple`] for some type, that type will also be
-    /// supported by this method. A full list of supported checks can be found [here].
+    /// If you derive [`JuliaStruct`] for some type, that type will be supported by this method. A
+    /// full list of supported checks can be found [here].
     ///
     /// [`Array`]: array/struct.Array.html
     /// [`DataType`]: datatype/struct.DataType.html
     /// [`Module`]: module/struct.Module.html
     /// [`Symbol`]: symbol/struct.Symbol.html
     /// [`JuliaStruct`]: ../traits/trait.JuliaStruct.html
-    /// [`JuliaTuple`]: ../traits/trait.JuliaTuple.html
     /// [here]: ../traits/trait.JuliaTypecheck.html#implementors
     pub fn is<T: JuliaTypecheck>(self) -> bool {
         if self.is_nothing() {
@@ -327,13 +329,15 @@ impl<'frame, 'data> Value<'frame, 'data> {
         self.datatype().unwrap().is::<T>()
     }
 
-    /// Returns the `DataType` of this value, or `None` if it is `Nothing`.
+    /// Returns the `DataType` of this value, or `None` if the value constains a null pointer.
     pub fn datatype(self) -> Option<DataType<'frame>> {
-        if self.is_nothing() {
-            return None;
-        }
+        unsafe {
+            if self.ptr().is_null() {
+                return None;
+            }
 
-        unsafe { Some(DataType::wrap(jl_typeof(self.ptr()).cast())) }
+            Some(DataType::wrap(jl_typeof(self.ptr()).cast()))
+        }
     }
 
     /// Cast the value to one of the following types: [`Array`], [`DataType`], [`Module`], or
@@ -356,11 +360,10 @@ impl<'frame, 'data> Value<'frame, 'data> {
 
     /// Returns the type name of this value.
     pub fn type_name(self) -> &'frame str {
-        if self.is_nothing() {
-            return "Nothing";
-        }
-
         unsafe {
+            if self.ptr().is_null() {
+                return "null";
+            }
             let type_name = jl_typeof_str(self.ptr());
             let type_name_ref = CStr::from_ptr(type_name);
             type_name_ref.to_str().unwrap()
@@ -876,7 +879,6 @@ impl<'frame, 'data> Value<'frame, 'data> {
 }
 
 impl<'frame, 'data> Debug for Value<'frame, 'data> {
-    
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         f.debug_tuple("Value").field(&self.type_name()).finish()
     }

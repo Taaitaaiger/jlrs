@@ -1,6 +1,6 @@
 use jlrs::prelude::*;
 use jlrs::util::JULIA;
-use jlrs::value::datatype::{Mutable, Tuple};
+use jlrs::value::datatype::Mutable;
 
 #[test]
 fn access_tuple_fields() {

@@ -1,6 +1,6 @@
 //! Generic `Tuple`s of different sizes.
 //!
-//! In this module generic tuple types from `Tuple0` up to and including `Tuple32` are available. 
+//! In this module generic tuple types from `Tuple0` up to and including `Tuple32` are available.
 //! These types can be use to work with tuple values from Julia. A new tuple can be created with
 //! `Value::new` if all fields implement the `IntoJulia` trait:
 //!
@@ -20,6 +20,20 @@
 //! # });
 //! # }
 //! ```
+
+use super::datatype::DataType;
+use crate::traits::JuliaTypecheck;
+use jl_sys::jl_tuple_typename;
+
+/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
+/// a value of this type is a tuple.
+pub struct Tuple;
+
+unsafe impl JuliaTypecheck for Tuple {
+    unsafe fn julia_typecheck(t: DataType) -> bool {
+        (&*t.ptr()).name == jl_tuple_typename
+    }
+}
 
 macro_rules! count {
     ($t:ident, $($x:ident),+) => {

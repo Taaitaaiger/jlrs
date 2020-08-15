@@ -1,15 +1,15 @@
 use jlrs::prelude::*;
 use jlrs::util::JULIA;
+use jlrs::value::code_instance::CodeInstance;
 use jlrs::value::datatype::*;
+use jlrs::value::expr::Expr;
+use jlrs::value::method::Method;
+use jlrs::value::method_instance::MethodInstance;
 use jlrs::value::simple_vector::SimpleVector;
 use jlrs::value::type_name::TypeName;
 use jlrs::value::type_var::TypeVar;
 use jlrs::value::union::Union;
 use jlrs::value::union_all::UnionAll;
-use jlrs::value::expr::Expr;
-use jlrs::value::method_instance::MethodInstance;
-use jlrs::value::code_instance::CodeInstance;
-use jlrs::value::method::Method;
 
 #[test]
 fn datatype_methods() {

@@ -109,7 +109,7 @@ impl<'base> Module<'base> {
     }
 
     /// Set a global value in this module. This is unsafe because if another global value was
-    /// previously assigned to this name, this previous value can become eligible for garbage 
+    /// previously assigned to this name, this previous value can become eligible for garbage
     /// collection. Don't use the previous value after calling this method.
     pub unsafe fn set_global<'frame, N>(
         self,

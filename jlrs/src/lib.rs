@@ -1,7 +1,6 @@
 //! The main goal behind `jlrs` is to provide a simple and safe interface to the Julia C API.
-//! Currently this crate is only tested on Linux and Windows in combination with Julia 1.4.2, if
-//! you try to use it on another OS or with an earlier version of Julia it will likely fail to
-//! generate the bindings or crash when these bindings are used.
+//! Currently this crate is only tested on Linux and Windows in combination with Julia 1.5.0, if
+//! you try to use it with an earlier version of Julia it will fail to generate the bindings.
 //!
 //!
 //! # Features
@@ -11,10 +10,12 @@
 //!  - Access arbitrary Julia modules and their contents.
 //!  - Call arbitrary Julia functions.
 //!  - Include and use your own Julia code.
+//!  - Load a custom system image.
 //!  - Create values that Julia can use, and convert them back to Rust, from Rust.
 //!  - Access the type information and fields of values and check their properties.
-//!  - Support for mapping isbits tuples and structs to Rust structs.
 //!  - Create and use n-dimensional arrays.
+//!  - Support for mapping Julia structs to Rust structs, which can be generated with `JlrsReflect.jl`.
+//!  - Structs that can be mapped to Rust include those with type parameters and bits unions.
 //!
 //!
 //! # Generating the bindings
@@ -153,11 +154,16 @@
 //!
 //! # Custom types
 //!
-//! Two traits can be used to make your own structs work in combination with [`Value::new`] and
-//! [`Value::cast`], [`JuliaTuple`] and [`JuliaStruct`]. The first can be used in combination with
-//! tuple structs in Rust, it will map to a tuple in Julia whose field types match the field types
-//! in Rust. The second can be used in combination with structs with named fields in Rust and must
-//! be explicitly mapped to a struct in Julia.
+//! In order to map a struct in Rust to one in Julia you can derive [`JuliaStruct`]. This will
+//! implement [`Cast`], [`JuliaType`], [`ValidLayout`], and [`JuliaTypecheck`] for that type. If
+//! the struct in Julia has no type parameters and is a bits type you can also derive
+//! [`IntoJulia`], which lets you use the type in combination with [`Value::new`].
+//!
+//! You should not implement these structs manually. The `JlrsReflect.jl` package can generate
+//! generate the correct Rust struct for types that don't include any unions or tuples with type
+//! parameters. The reason for this restriction is that the layout of tuple and union fields can
+//! be very different depending on these parameters in a way that can't be nicely expressed in
+//! Rust.
 //!
 //!
 //! # Lifetimes
@@ -180,13 +186,6 @@
 //! when Julia data is protected by an older frame this data can be used until that frame goes out
 //! of scope.
 //!
-//!
-//! # Limitations
-//!
-//! Calling Julia is entirely single-threaded. You won't be able to use [`Julia`] from another
-//! thread than the thread that has been used to initialize Julia, and while Julia is doing stuff
-//! you won't be able to interact with it.
-//!
 //! [`prelude`]: prelude/index.html
 //! [`Julia`]: struct.Julia.html
 //! [`Julia::init`]: struct.Julia.html#method.init
@@ -199,7 +198,6 @@
 //! [`StaticFrame`]: frame/struct.StaticFrame.html
 //! [`DynamicFrame`]: frame/struct.DynamicFrame.html
 //! [`Frame`]: traits/trait.Frame.html
-//! [`JuliaTuple`]: traits/trait.JuliaTuple.html
 //! [`JuliaStruct`]: traits/trait.JuliaStruct.html
 //! [`Module::function`]: value/module/struct.Module.html#method.function
 //! [`Module::base`]: value/module/struct.Module.html#method.base

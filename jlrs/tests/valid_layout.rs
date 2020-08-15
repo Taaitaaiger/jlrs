@@ -45,9 +45,8 @@ fn valid_layout_array() {
                 let v = Value::new_array::<i32, _, _>(frame, (2, 2))?;
                 assert!(Array::valid_layout(v.datatype().unwrap().into()));
 
-                let ua = Module::base(global)
-                    .global("Array")?;
-                
+                let ua = Module::base(global).global("Array")?;
+
                 assert!(Array::valid_layout(ua));
             }
             Ok(())

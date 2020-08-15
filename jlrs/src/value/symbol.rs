@@ -48,7 +48,7 @@ impl<'base> Symbol<'base> {
     }
 
     #[doc(hidden)]
-    
+
     pub unsafe fn ptr(self) -> *mut jl_sym_t {
         self.0
     }
@@ -66,10 +66,13 @@ impl<'base> Symbol<'base> {
         unsafe { Symbol::wrap(self.ptr()) }
     }
 
+    /// The hash of this `Symbol`.
     pub fn hash(self) -> usize {
         unsafe { (&*self.ptr()).hash }
     }
 
+    /// `Symbol`s are stored using an invasive binary tree, this returns the left branch of the
+    /// current node.
     pub fn left(self) -> Option<Symbol<'base>> {
         unsafe {
             let ref_self = &*self.ptr();
@@ -81,6 +84,8 @@ impl<'base> Symbol<'base> {
         }
     }
 
+    /// `Symbol`s are stored using an invasive binary tree, this returns the right branch of the
+    /// current node.
     pub fn right(self) -> Option<Symbol<'base>> {
         unsafe {
             let ref_self = &*self.ptr();
@@ -124,7 +129,6 @@ where
 }
 
 impl<'scope> Debug for Symbol<'scope> {
-    
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         unsafe {
             let ptr = jl_symbol_name(self.ptr()).cast();
