@@ -199,6 +199,11 @@
 //! [`DynamicFrame`]: frame/struct.DynamicFrame.html
 //! [`Frame`]: traits/trait.Frame.html
 //! [`JuliaStruct`]: traits/trait.JuliaStruct.html
+//! [`Cast`]: traits/trait.Cast.html
+//! [`JuliaType`]: traits/trait.JuliaType.html
+//! [`JuliaTypecheck`]: traits/trait.JuliaTypecheck.html
+//! [`ValidLayout`]: traits/trait.ValidLayout.html
+//! [`IntoJulia`]: traits/trait.IntoJulia.html
 //! [`Module::function`]: value/module/struct.Module.html#method.function
 //! [`Module::base`]: value/module/struct.Module.html#method.base
 //! [`Module::core`]: value/module/struct.Module.html#method.core

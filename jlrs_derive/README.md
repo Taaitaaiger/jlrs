@@ -1,1 +1,1 @@
-This crate defines two custom derives, `JuliaTuple` and `JuliaDerive`, that are offered by `jlrs`. See the documentation of `jlrs` for more information.
+Two custom derive macros are offered by jlrs, `IntoJulia` and `JuliaStruct`. See the documentation of `jlrs` for more information.

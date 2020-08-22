@@ -157,7 +157,7 @@ pub struct DoubleVariant {
     #[jlrs(bits_union)]
     pub b: ::jlrs::value::union::BitsUnion<[::std::mem::MaybeUninit<u8>; 4]>,
     #[jlrs(bits_union_flag)]
-    _b_flag: u8,
+    pub b_flag: u8,
     pub c: i8,
 }
 
@@ -180,7 +180,7 @@ pub struct SizeAlignMismatch {
     #[jlrs(bits_union)]
     pub b: ::jlrs::value::union::BitsUnion<[::std::mem::MaybeUninit<u8>; 6]>,
     #[jlrs(bits_union_flag)]
-    _b_flag: u8,
+    pub b_flag: u8,
     pub c: i8,
 }
 

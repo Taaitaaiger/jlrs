@@ -1,6 +1,6 @@
 //! Julia values and functions.
 //!
-//! When using this crate Julia data will generally be returned as a [`Value`]. A [`Value`] is a
+//! When using this crate Julia data will usually be returned as a [`Value`]. A [`Value`] is a
 //! "generic" wrapper. Type information will generally be available allowing you to safely convert
 //! a [`Value`] to its actual type. Data like arrays and modules can be returned as a [`Value`].
 //! These, and other types with a custom implementation in the C API, can be found in the
@@ -174,7 +174,7 @@ impl<'frame> Values<'frame> {
 /// New `Value`s can be created from Rust in several ways. Types that implement [`IntoJulia`] can
 /// be converted to a `Value` by calling [`Value::new`]. This trait is implemented by primitive
 /// types like `bool`, `char`, `i16`, and `usize`; string types like `String`, `&str`, and `Cow`;
-/// [`tuples`]; and you can derive it for your own types by deriving [`JuliaStruct`]. You should
+/// [`tuples`]; and you can derive it for your own types by deriving [`IntoJulia`]. You should
 /// use `JlrsReflect.jl` rather than doing this manually.
 ///
 /// [`Value`] also has several methods to create an n-dimensional array if the element type
@@ -190,24 +190,31 @@ impl<'frame> Values<'frame> {
 ///
 /// ### Casting values
 ///
-/// A `Value`'s type information can be accessed by calling [`Value::dataype`], this is usually
+/// A `Value`'s type information can be accessed by calling [`Value::datatype`], this is usually
 /// not necessary to determine what kind of data it contains; you can use [`Value::is`] to query
 /// properties of the value's type. You can use [`Value::cast`] to convert the value to the
 /// appropriate type. If a type implements both [`JuliaTypecheck`] and [`Cast`], which are used by
 /// [`Value::is`] and [`Value::cast`] respectively, the former returning `true` when called with
 /// that type as generic parameter indicates that the latter will succeed. For example,
-/// `value.is::<u8>()` returning true means `value.cast::<u8>()` will succeed.
+/// `value.is::<u8>()` returning true means `value.cast::<u8>()` will succeed. You can derive
+/// these traits for custom structs by deriving [`JuliaStruct`].
 ///
 /// The methods that create a new `Value` come in two varieties: `<method>` and `<method>_output`.
 /// The first will use a slot in the current frame to protect the value from garbage collection,
 /// while the latter uses a slot in another active frame.
 ///
 /// [`Value::assume_owned`]: struct.Value.html#method.assume_owned
+/// [`Value`]: struct.Value.html
+/// [`Value::move_array`]: struct.Value.html#method.move_array
+/// [`Value::new_array`]: struct.Value.html#method.new_array
+/// [`Value::borrow_array`]: struct.Value.html#method.borrow_array
 /// [`IntoJulia`]: ../traits/trait.IntoJulia.html
 /// [`JuliaType`]: ../traits/trait.JuliaType.html
 /// [`Value::new`]: struct.Value.html#method.new
+/// [`Value::datatype`]: struct.Value.html#method.datatype
 /// [`JuliaStruct`]: ../traits/trait.JuliaStruct.html
 /// [`tuples`]: ./tuple/index.html
+/// [`Module`]: ./module/struct.Module.html
 /// [`Value::datatype`]: struct.Value.html#method.datatype
 /// [`Value::is`]: struct.Value.html#method.is
 /// [`Value::cast`]: struct.Value.html#method.cast
@@ -340,14 +347,20 @@ impl<'frame, 'data> Value<'frame, 'data> {
         }
     }
 
-    /// Cast the value to one of the following types: [`Array`], [`DataType`], [`Module`], or
-    /// [`Symbol`].
+    /// Cast the contents of this value into a compatible Rust type. Any type which implements
+    /// `Cast` can be used as a target, by default this includes primitive types like `u8`, `f32`
+    /// and `bool`, and builtin types like [`Array`], [`JuliaString`] and [`Symbol`]. You can
+    /// implement this trait for custom types by deriving [`JuliaStruct`].
+    ///
+    /// [`Array`]: array/struct.Array.html
+    /// [`JuliaString`]: string/struct.JuliaString.html
+    /// [`Symbol`]: symbol/struct.Symbol.html
+    /// [`JuliaStruct`]: ../traits/trait.JuliaStruct.html
     pub fn cast<T: Cast<'frame, 'data>>(self) -> JlrsResult<<T as Cast<'frame, 'data>>::Output> {
         T::cast(self)
     }
 
-    /// Cast the value to one of the following types without checking if the cast is valid:
-    /// [`Array`], [`DataType`], [`Module`], or [`Symbol`].
+    /// Cast the contents of this value into a compatible Rust type without checking if the layout is valid.
     ///
     /// Safety:
     ///

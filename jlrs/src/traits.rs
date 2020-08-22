@@ -131,10 +131,18 @@ pub unsafe trait JuliaType {
 }
 
 /// This trait can be derived in order to provide a mapping between a type in Julia and one in
-/// Rust. Rather than manually implement the appropriate structs, you should use `JlrsReflect.jl`
-/// to generate them for you.
+/// Rust. When this trait is derived, the following traits are implemented:
 ///
-/// If you do choose to implement this trait manually, the following rules apply.
+/// - [`JuliaType`]
+/// - [`JuliaTypecheck`]
+/// - [`ValidLayout`]
+/// - [`Cast`]
+///
+/// With these traits implemented you can use [`Value::cast`] with this custom type.
+///
+/// Rather than manually implement the appropriate structs, you should use `JlrsReflect.jl` to
+/// generate them for you.  If you do choose to implement this trait manually, the following rules
+/// apply.
 ///
 /// First, the struct must be annotated with `#[repr(C)]` to ensure the compiler won't change the
 /// layout. Second, the struct must be annotated with `#[jlrs(julia_type = "Path.To.Type")]` where
@@ -170,9 +178,9 @@ pub unsafe trait JuliaType {
 ///
 /// The bits union optimization is not straightforward to map to Rust. In fact, three fields are
 /// required. Unlike normal structs the size of a bits union field doesn't have to be an integer
-/// multiple of its alignment; it will have the alignment of the largest field and is as large as
-/// the largest possible variant. Additionally, there will be another `u8` that is used as a flag
-/// to indicate the active variant.
+/// multiple of its alignment; it will have the alignment of the variant with the largest alignment
+/// and is as large as the largest possible variant. Additionally, there will be another `u8` that
+/// is used as a flag to indicate the active variant.
 ///
 /// The first field is the correct zero-sized `Align#`-type defined in the `union` module. The
 /// second a `BitsUnion` from that same module, its type parameter must be an array of
@@ -184,6 +192,12 @@ pub unsafe trait JuliaType {
 /// Finally, a `TypeVar` field will be mapped to a type parameter in Rust. A parameter that
 /// doesn't affect the layout must be elided. The type parameter must implement both `ValidLayout`
 /// and `Copy`.
+///
+/// [`JuliaType`]: trait.JuliaType.html
+/// [`JuliaTypecheck`]: trait.JuliaTypecheck.html
+/// [`ValidLayout`]: trait.ValidLayout.html
+/// [`Cast`]: trait.Cast.html
+/// [`Value::cast`]: ../value/struct.Value.html#method.cast
 pub unsafe trait JuliaStruct: Copy {}
 
 /// This trait is used in combination with [`Value::is`] and [`DataType::is`]; types that

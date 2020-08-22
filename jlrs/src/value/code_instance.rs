@@ -3,8 +3,8 @@
 //! The documentation for this module has been slightly adapted from the comments for this struct
 //! in [`julia.h`]
 //!
-//! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L339
-//!
+//! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L273
+
 use super::method_instance::MethodInstance;
 use super::Value;
 use crate::error::{JlrsError, JlrsResult};

@@ -5,7 +5,7 @@ platform:
 
 # Only GNU is supported
 environment:
-  julia_version: 1
+  JULIA_VERSION: latest
   JULIA_DIR: C:\julia
   CYGWIN_DIR: C:\cygwin64
   matrix:
