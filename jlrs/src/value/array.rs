@@ -16,7 +16,7 @@ use crate::value::datatype::DataType;
 use crate::value::Value;
 use jl_sys::{
     jl_array_data, jl_array_dim, jl_array_dims, jl_array_eltype, jl_array_ndims, jl_array_nrows,
-    jl_array_ptr_set, jl_array_t, jl_is_array_type, jl_typeof,
+    jl_array_ptr_set, jl_array_t, jl_is_array_type, jl_tparam0, jl_typeof,
 };
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::marker::PhantomData;
@@ -303,6 +303,234 @@ unsafe impl<'frame, 'data> ValidLayout for Array<'frame, 'data> {
             dt.is::<Array>()
         } else if let Ok(ua) = v.cast::<super::union_all::UnionAll>() {
             ua.base_type().is::<Array>()
+        } else {
+            false
+        }
+    }
+}
+
+/// Exactly the same as [`Array`], except it has an explicit element type `T`.
+/// 
+/// [`Array`]: struct.Array.html
+#[derive(Copy, Clone, Debug)]
+#[repr(transparent)]
+pub struct TypedArray<'frame, 'data, T>(
+    *mut jl_array_t,
+    PhantomData<&'frame ()>,
+    PhantomData<&'data ()>,
+    PhantomData<T>,
+)
+where
+    T: Copy + ValidLayout;
+
+impl<'frame, 'data, T: Copy + ValidLayout> TypedArray<'frame, 'data, T> {
+    pub(crate) unsafe fn wrap(array: *mut jl_array_t) -> Self {
+        assert!(T::valid_layout(Value::wrap(
+            jl_array_eltype(array.cast()).cast()
+        )));
+        TypedArray(array, PhantomData, PhantomData, PhantomData)
+    }
+
+    #[doc(hidden)]
+    pub unsafe fn ptr(self) -> *mut jl_array_t {
+        self.0
+    }
+
+    /// Returns the array's dimensions.
+    pub fn dimensions(self) -> Dimensions {
+        unsafe { Dimensions::from_array(self.ptr().cast()) }
+    }
+
+    /// Returns the type of this array's elements.
+    pub fn element_type(self) -> Value<'frame, 'static> {
+        unsafe { Value::wrap(jl_array_eltype(self.ptr().cast()).cast()) }
+    }
+
+    /// Returns true if the elements of the array are stored inline.
+    pub fn is_inline_array(self) -> bool {
+        unsafe { (&*self.ptr()).flags.ptrarray() == 0 }
+    }
+
+    /// Returns true if the elements of the array are stored inline and at least one of the field
+    /// of the inlined type is a pointer.
+    pub fn has_inlined_pointers(self) -> bool {
+        unsafe {
+            let flags = (&*self.ptr()).flags;
+            self.is_inline_array() && flags.hasptr() != 0
+        }
+    }
+
+    /// Returns true if the elements of the array are stored as [`Value`]s.
+    pub fn is_value_array(self) -> bool {
+        !self.is_inline_array()
+    }
+
+    /// Copy the data of an inline array to Rust. Returns `JlrsError::NotInline` if the data is
+    /// not stored inline or `JlrsError::WrongType` if the type of the elements is incorrect.
+    pub fn copy_inline_data(self) -> JlrsResult<CopiedArray<T>> {
+        if !self.is_inline_array() {
+            Err(JlrsError::NotInline)?;
+        }
+
+        unsafe {
+            let jl_data = jl_array_data(self.ptr().cast()).cast();
+            let dimensions = Dimensions::from_array(self.ptr().cast());
+
+            let sz = dimensions.size();
+            let mut data = Vec::with_capacity(sz);
+            let ptr = data.as_mut_ptr();
+            std::ptr::copy_nonoverlapping(jl_data, ptr, sz);
+            data.set_len(sz);
+
+            Ok(CopiedArray::new(data, dimensions))
+        }
+    }
+
+    /// Immutably borrow inline array data, you can borrow data from multiple arrays at the same
+    /// time. Returns `JlrsError::NotInline` if the data is not stored inline or
+    /// `JlrsError::WrongType` if the type of the elements is incorrect.
+    pub fn inline_data<'borrow, 'fr, F>(
+        self,
+        frame: &'borrow F,
+    ) -> JlrsResult<ArrayData<'borrow, 'fr, T, F>>
+    where
+        T: ValidLayout,
+        F: Frame<'fr>,
+    {
+        if !self.is_inline_array() {
+            Err(JlrsError::NotInline)?;
+        }
+
+        unsafe {
+            let jl_data = jl_array_data(self.ptr().cast()).cast();
+            let dimensions = Dimensions::from_array(self.ptr().cast());
+            let data = std::slice::from_raw_parts(jl_data, dimensions.size());
+            Ok(ArrayData::new(data, dimensions, frame))
+        }
+    }
+
+    /// Mutably borrow inline array data, you can mutably borrow a single array at the same time.
+    /// Returns `JlrsError::NotInline` if the data is not stored inline or `JlrsError::WrongType`
+    /// if the type of the elements is incorrect.
+    pub fn inline_data_mut<'borrow, 'fr, F>(
+        self,
+        frame: &'borrow mut F,
+    ) -> JlrsResult<InlineArrayDataMut<'borrow, 'fr, T, F>>
+    where
+        T: ValidLayout,
+        F: Frame<'fr>,
+    {
+        if !self.is_inline_array() {
+            Err(JlrsError::NotInline)?;
+        }
+
+        unsafe {
+            let jl_data = jl_array_data(self.ptr().cast()).cast();
+            let dimensions = Dimensions::from_array(self.ptr().cast());
+            let data = std::slice::from_raw_parts_mut(jl_data, dimensions.size());
+            Ok(InlineArrayDataMut::new(data, dimensions, frame))
+        }
+    }
+
+    /// Immutably borrow the data of this value array, you can borrow data from multiple arrays at
+    /// the same time. The values themselves can be mutable, but you can't replace an element with
+    /// another value. Returns `JlrsError::Inline` if the data is stored inline.
+    ///
+    /// Safety: no slot on the GC stack is required to access and use the values in this array,
+    /// the GC is aware of the array's data. If the element is changed either from Rust or Julia,
+    /// the original value is no longer protected from garbage collection. If you need to keep
+    /// using this value you must protect it by calling [`Value::extend`].
+    ///
+    /// [`Value::extend`]: ../struct.Value.html#method.extend
+    pub unsafe fn value_data<'borrow, 'fr, F>(
+        self,
+        frame: &'borrow F,
+    ) -> JlrsResult<ArrayData<'borrow, 'fr, Value<'frame, 'data>, F>>
+    where
+        F: Frame<'fr>,
+    {
+        if !self.is_value_array() {
+            Err(JlrsError::Inline)?;
+        }
+
+        let jl_data = jl_array_data(self.ptr().cast()).cast();
+        let dimensions = Dimensions::from_array(self.ptr().cast());
+        let data = std::slice::from_raw_parts(jl_data, dimensions.size());
+        Ok(ArrayData::new(data, dimensions, frame))
+    }
+
+    /// Mutably borrow the data of this value array, you can mutably borrow a single array at the
+    /// same time. Returns `JlrsError::Inline` if the data is stored inline.
+    ///
+    /// Safety: no slot on the GC stack is required to access and use the values in this array,
+    /// the GC is aware of the array's data. If the element is changed either from Rust or Julia,
+    /// the original value is no longer protected from garbage collection. If you need to keep
+    /// using this value you must protect it by calling [`Value::extend`].
+    ///
+    /// [`Value::extend`]: ../struct.Value.html#method.extend
+    pub unsafe fn value_data_mut<'borrow, 'fr, F>(
+        self,
+        frame: &'borrow mut F,
+    ) -> JlrsResult<ValueArrayDataMut<'borrow, 'frame, 'data, 'fr, F>>
+    where
+        F: Frame<'fr>,
+    {
+        if !self.is_value_array() {
+            Err(JlrsError::Inline)?;
+        }
+
+        let jl_data = jl_array_data(self.ptr().cast()).cast();
+        let dimensions = Dimensions::from_array(self.ptr().cast());
+        let data = std::slice::from_raw_parts_mut(jl_data, dimensions.size());
+        Ok(ValueArrayDataMut::new(self.into(), data, dimensions, frame))
+    }
+}
+
+unsafe impl<'frame, 'data, T: Copy + ValidLayout> JuliaTypecheck for TypedArray<'frame, 'data, T> {
+    unsafe fn julia_typecheck(t: DataType) -> bool {
+        jl_is_array_type(t.ptr().cast()) && T::valid_layout(Value::wrap(jl_tparam0(t.ptr()).cast()))
+    }
+}
+
+impl<'frame, 'data, T: Copy + ValidLayout> Into<Value<'frame, 'data>>
+    for TypedArray<'frame, 'data, T>
+{
+    fn into(self) -> Value<'frame, 'data> {
+        unsafe { Value::wrap(self.ptr().cast()) }
+    }
+}
+
+impl<'frame, 'data, T: Copy + ValidLayout> Into<Array<'frame, 'data>>
+    for TypedArray<'frame, 'data, T>
+{
+    fn into(self) -> Array<'frame, 'data> {
+        unsafe { Array::wrap(self.ptr()) }
+    }
+}
+
+unsafe impl<'frame, 'data, T: Copy + ValidLayout> Cast<'frame, 'data>
+    for TypedArray<'frame, 'data, T>
+{
+    type Output = Self;
+    fn cast(value: Value<'frame, 'data>) -> JlrsResult<Self::Output> {
+        if value.is::<Self::Output>() {
+            return unsafe { Ok(Self::cast_unchecked(value)) };
+        }
+
+        Err(JlrsError::NotAnArray)?
+    }
+
+    unsafe fn cast_unchecked(value: Value<'frame, 'data>) -> Self::Output {
+        Self::wrap(value.ptr().cast())
+    }
+}
+
+unsafe impl<'frame, 'data, T: Copy + ValidLayout> ValidLayout for TypedArray<'frame, 'data, T> {
+    unsafe fn valid_layout(v: Value) -> bool {
+        if let Ok(dt) = v.cast::<DataType>() {
+            dt.is::<TypedArray<T>>()
+        } else if let Ok(ua) = v.cast::<super::union_all::UnionAll>() {
+            ua.base_type().is::<TypedArray<T>>()
         } else {
             false
         }

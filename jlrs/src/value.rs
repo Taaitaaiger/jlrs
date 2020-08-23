@@ -605,7 +605,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// This function returns an error if there are not enough slots available.
     pub fn new_array<T, D, F>(frame: &mut F, dimensions: D) -> JlrsResult<Value<'frame, 'static>>
     where
-        T: JuliaType,
+        T: IntoJulia + JuliaType,
         D: Into<Dimensions>,
         F: Frame<'frame>,
     {
@@ -628,7 +628,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
         dimensions: D,
     ) -> JlrsResult<Value<'output, 'static>>
     where
-        T: JuliaType,
+        T: IntoJulia + JuliaType,
         D: Into<Dimensions>,
         F: Frame<'frame>,
     {
@@ -651,7 +651,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
         dimensions: D,
     ) -> JlrsResult<Value<'frame, 'data>>
     where
-        T: JuliaType,
+        T: IntoJulia + JuliaType,
         D: Into<Dimensions>,
         V: BorrowMut<[T]>,
         F: Frame<'frame>,
@@ -677,7 +677,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     ) -> JlrsResult<Value<'output, 'borrow>>
     where
         'borrow: 'output,
-        T: JuliaType,
+        T: IntoJulia + JuliaType,
         D: Into<Dimensions>,
         V: BorrowMut<[T]>,
         F: Frame<'frame>,
@@ -701,7 +701,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
         dimensions: D,
     ) -> JlrsResult<Value<'frame, 'static>>
     where
-        T: JuliaType,
+        T: IntoJulia + JuliaType,
         D: Into<Dimensions>,
         F: Frame<'frame>,
     {
@@ -725,7 +725,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
         dimensions: D,
     ) -> JlrsResult<Value<'output, 'static>>
     where
-        T: JuliaType,
+        T: IntoJulia + JuliaType,
         D: Into<Dimensions>,
         F: Frame<'frame>,
     {
@@ -1074,7 +1074,7 @@ impl<'output, 'frame, 'data> WithOutput<'output, Value<'frame, 'data>> {
 
 unsafe fn new_array<'frame, T, D, F>(frame: &mut F, dimensions: D) -> JlrsResult<*mut jl_value_t>
 where
-    T: JuliaType,
+    T: IntoJulia + JuliaType,
     D: Into<Dimensions>,
     F: Frame<'frame>,
 {
@@ -1108,7 +1108,7 @@ unsafe fn borrow_array<'data, 'frame, T, D, V, F>(
     dimensions: D,
 ) -> JlrsResult<*mut jl_value_t>
 where
-    T: JuliaType,
+    T: IntoJulia + JuliaType,
     D: Into<Dimensions>,
     V: BorrowMut<[T]>,
     F: Frame<'frame>,
@@ -1155,7 +1155,7 @@ unsafe fn move_array<'frame, T, D, F>(
     dimensions: D,
 ) -> JlrsResult<*mut jl_value_t>
 where
-    T: JuliaType,
+    T: IntoJulia + JuliaType,
     D: Into<Dimensions>,
     F: Frame<'frame>,
 {

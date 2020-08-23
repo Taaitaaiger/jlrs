@@ -460,3 +460,85 @@ impl Drop for Julia {
         }
     }
 }
+
+/// When you call Rust from Julia with `ccall`, Julia has already been initialized and trying to 
+/// initialize it again would cause a crash. In order to be able to call back from Rust into Julia
+/// and to borrow arrays (if you pass them as `Array` rather than `Ptr{Array}`), you'll need to 
+/// create a frame first. You can use this struct to do so. It must never be used outside 
+/// functions called through `ccall`.
+pub struct CCall {
+    stack: RawStack
+}
+
+impl CCall {
+    /// Create a new `CCall` that provides a stack with `stack_size` slot. This functions the same
+    /// way as `Julia::init` does. This function must never be called outside a function called
+    /// with `ccall` from Julia and must only be called once during that call.
+    pub unsafe fn new(stack_size: usize) -> Self {
+        CCall {
+            stack: RawStack::new(stack_size)
+        }
+    }
+
+    /// Change the stack size to `stack_size`.
+    pub fn set_stack_size(&mut self, stack_size: usize) {
+        unsafe { self.stack = RawStack::new(stack_size) }
+    }
+
+    /// Returns the current stack size.
+    pub fn stack_size(&self) -> usize {
+        self.stack.size()
+    }
+
+    /// Create a [`StaticFrame`] that can hold `capacity` values, and call the given closure.
+    /// Returns the result of this closure, or an error if the new frame can't be created because
+    /// there's not enough space on the GC stack. The number of required slots on the stack is
+    /// `capacity + 2`.
+    ///
+    /// Every output and value you create inside the closure using the [`StaticFrame`], either
+    /// directly or through calling a [`Value`], will reduce the available capacity of the
+    /// [`StaticFrame`] by 1.
+    ///
+    /// [`StaticFrame`]: ../frame/struct.StaticFrame.html
+    /// [`Value`]: ../value/struct.Value.html
+    pub fn frame<'base, 'julia: 'base, T, F>(
+        &'julia mut self,
+        capacity: usize,
+        func: F,
+    ) -> JlrsResult<T>
+    where
+        F: FnOnce(Global<'base>, &mut StaticFrame<'base>) -> JlrsResult<T>,
+    {
+        unsafe {
+            let d = self.stack.as_mut();
+            let global = Global::new();
+            let mut view = StackView::<Static>::new(d);
+            let frame_idx = view.new_frame(capacity)?;
+            let mut frame = StaticFrame::with_capacity(frame_idx, capacity, view);
+            func(global, &mut frame)
+        }
+    }
+
+    /// Create a [`DynamicFrame`] and call the given closure. Returns the result of this closure,
+    /// or an error if the new frame can't be created because the stack is too small. The number
+    /// of required slots on the stack is 2.
+    ///
+    /// Every output and value you create inside the closure using the [`DynamicFrame`], either
+    /// directly or through calling a [`Value`], will occupy a single slot on the GC stack.
+    ///
+    /// [`DynamicFrame`]: ../frame/struct.DynamicFrame.html
+    /// [`Value`]: ../value/struct.Value.html
+    pub fn dynamic_frame<'base, 'julia: 'base, T, F>(&'julia mut self, func: F) -> JlrsResult<T>
+    where
+        F: FnOnce(Global<'base>, &mut DynamicFrame<'base>) -> JlrsResult<T>,
+    {
+        unsafe {
+            let d = self.stack.as_mut();
+            let global = Global::new();
+            let mut view = StackView::<Dynamic>::new(d);
+            let frame_idx = view.new_frame()?;
+            let mut frame = DynamicFrame::new(frame_idx, view);
+            func(global, &mut frame)
+        }
+    }
+}
