@@ -32,7 +32,7 @@
 //! [`DataType::is`]: ../value/datatype/struct.DataType.html#method.is
 
 use crate::error::{AllocError, JlrsError, JlrsResult};
-use crate::frame::{DynamicFrame, Output, StaticFrame};
+use crate::frame::{DynamicFrame, Output, StaticFrame, NullFrame};
 use crate::value::datatype::DataType;
 use crate::value::string::JuliaString;
 use crate::value::symbol::Symbol;
@@ -696,9 +696,48 @@ impl<'frame> Frame<'frame> for DynamicFrame<'frame> {
     }
 }
 
+impl<'frame> Frame<'frame> for NullFrame<'frame> {
+    fn frame<'nested, T, F: FnOnce(&mut StaticFrame<'nested>) -> JlrsResult<T>>(
+        &'nested mut self,
+        _: usize,
+        _: F,
+    ) -> JlrsResult<T> {
+        Err(JlrsError::NullFrame)?
+    }
+
+    fn dynamic_frame<'nested, T, F: FnOnce(&mut DynamicFrame<'nested>) -> JlrsResult<T>>(
+        &'nested mut self,
+        func: F,
+    ) -> JlrsResult<T> {
+        unsafe {
+            let mut view = self.memory.nest_dynamic();
+            let idx = view.new_frame()?;
+            let mut frame = DynamicFrame {
+                idx,
+                len: 0,
+                memory: view,
+            };
+
+            func(&mut frame)
+        }
+    }
+
+    fn output(&mut self) -> JlrsResult<Output<'frame>> {
+        Err(JlrsError::NullFrame)?
+    }
+
+    fn size(&self) -> usize {
+        0
+    }
+
+    fn print_memory(&self) {
+        self.memory.print_memory()
+    }
+}
+
 pub(crate) mod private {
     use crate::error::AllocError;
-    use crate::frame::{DynamicFrame, Output, StaticFrame};
+    use crate::frame::{DynamicFrame, Output, StaticFrame, NullFrame};
     use crate::stack::FrameIdx;
     use crate::value::string::JuliaString;
     use crate::value::symbol::Symbol;
@@ -930,6 +969,41 @@ pub(crate) mod private {
             _: Internal,
         ) -> Value<'output, 'static> {
             unsafe { self.memory.protect_output(output, value.cast()) }
+        }
+    }
+
+    impl<'frame> Frame<'frame> for NullFrame<'frame> {
+        unsafe fn protect(
+            &mut self,
+            _: *mut jl_value_t,
+            _: Internal,
+        ) -> Result<Value<'frame, 'static>, AllocError> {
+            Err(AllocError::FrameOverflow(1, 0))
+        }
+
+        fn create_many<P: super::IntoJulia>(
+            &mut self,
+            values: &[P],
+            _: Internal,
+        ) -> Result<Values<'frame>, AllocError> {
+                Err(AllocError::FrameOverflow(values.len(), 0))
+        }
+
+        fn create_many_dyn(
+            &mut self,
+            values: &[&dyn super::IntoJulia],
+            _: Internal,
+        ) -> Result<Values<'frame>, AllocError> {
+                Err(AllocError::FrameOverflow(values.len(), 0))
+        }
+
+        fn assign_output<'output>(
+            &mut self,
+            _: Output<'output>,
+            _: *mut jl_value_t,
+            _: Internal,
+        ) -> Value<'output, 'static> {
+            unreachable!()
         }
     }
 }

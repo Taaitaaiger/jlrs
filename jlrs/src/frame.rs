@@ -149,3 +149,7 @@ impl<'frame> Output<'frame> {
         }
     }
 }
+
+pub struct NullFrame<'frame> {
+    pub(crate) memory: StackView<'frame, Static>,
+}
