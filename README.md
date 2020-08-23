@@ -7,9 +7,7 @@
 [![License:MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 
-The main goal behind `jlrs` is to provide a simple and safe interface to the Julia C API.
-Currently this crate is only tested on Linux and Windows in combination with Julia 1.5.0 and
-is not compatible with earlier versions of Julia.
+The main goal behind `jlrs` is to provide a simple and safe interface to the Julia C API. Currently this crate is only tested on Linux and Windows in combination with Julia 1.5.0 and is not compatible with earlier versions of Julia.
 
 
 ## Features
