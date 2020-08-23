@@ -1,6 +1,6 @@
 //! The main goal behind `jlrs` is to provide a simple and safe interface to the Julia C API.
-//! Currently this crate is only tested on Linux and Windows in combination with Julia 1.5.0, if
-//! you try to use it with an earlier version of Julia it will fail to generate the bindings.
+//! Currently this crate is only tested on Linux and Windows in combination with Julia 1.5.0 and
+//! is not compatible with earlier versions of Julia.
 //!
 //!
 //! # Features
