@@ -12,3 +12,4 @@ jl-sys/Cargo.lock
 **/*.rs.bk
 
 /.vscode/
+tarpauling-report.html
