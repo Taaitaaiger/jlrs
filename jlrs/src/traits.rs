@@ -32,7 +32,7 @@
 //! [`DataType::is`]: ../value/datatype/struct.DataType.html#method.is
 
 use crate::error::{AllocError, JlrsError, JlrsResult};
-use crate::frame::{DynamicFrame, Output, StaticFrame, NullFrame};
+use crate::frame::{DynamicFrame, NullFrame, Output, StaticFrame};
 use crate::value::datatype::DataType;
 use crate::value::string::JuliaString;
 use crate::value::symbol::Symbol;
@@ -40,13 +40,15 @@ use crate::value::Value;
 use jl_sys::{
     jl_bool_type, jl_box_bool, jl_box_char, jl_box_float32, jl_box_float64, jl_box_int16,
     jl_box_int32, jl_box_int64, jl_box_int8, jl_box_uint16, jl_box_uint32, jl_box_uint64,
-    jl_box_uint8, jl_char_type, jl_datatype_t, jl_float32_type, jl_float64_type, jl_int16_type,
-    jl_int32_type, jl_int64_type, jl_int8_type, jl_pchar_to_string, jl_string_data, jl_string_len,
-    jl_uint16_type, jl_uint32_type, jl_uint64_type, jl_uint8_type, jl_unbox_float32,
-    jl_unbox_float64, jl_unbox_int16, jl_unbox_int32, jl_unbox_int64, jl_unbox_int8,
-    jl_unbox_uint16, jl_unbox_uint32, jl_unbox_uint64, jl_unbox_uint8, jl_value_t,
+    jl_box_uint8, jl_box_voidpointer, jl_char_type, jl_datatype_t, jl_float32_type,
+    jl_float64_type, jl_int16_type, jl_int32_type, jl_int64_type, jl_int8_type, jl_pchar_to_string,
+    jl_string_data, jl_string_len, jl_uint16_type, jl_uint32_type, jl_uint64_type, jl_uint8_type,
+    jl_unbox_float32, jl_unbox_float64, jl_unbox_int16, jl_unbox_int32, jl_unbox_int64,
+    jl_unbox_int8, jl_unbox_uint16, jl_unbox_uint32, jl_unbox_uint64, jl_unbox_uint8,
+    jl_unbox_voidpointer, jl_value_t, jl_voidpointer_type,
 };
 use std::borrow::Cow;
+use std::ffi::c_void;
 
 macro_rules! p {
     ($trait:ident, $type:ty, $($bounds:tt)+) => {
@@ -237,11 +239,27 @@ macro_rules! impl_julia_typecheck {
     ($type:ty) => {
         unsafe impl crate::traits::JuliaTypecheck for $type {
             unsafe fn julia_typecheck(t: crate::value::datatype::DataType) -> bool {
-                t.ptr() == <$type as $crate::value::datatype::JuliaType>::julia_type()
+                t.ptr() == <$type as $crate::traits::JuliaType>::julia_type()
             }
         }
     };
 }
+
+impl_julia_typecheck!(i8);
+impl_julia_typecheck!(i16);
+impl_julia_typecheck!(i32);
+impl_julia_typecheck!(i64);
+impl_julia_typecheck!(isize);
+impl_julia_typecheck!(u8);
+impl_julia_typecheck!(u16);
+impl_julia_typecheck!(u32);
+impl_julia_typecheck!(u64);
+impl_julia_typecheck!(usize);
+impl_julia_typecheck!(f32);
+impl_julia_typecheck!(f64);
+impl_julia_typecheck!(bool);
+impl_julia_typecheck!(char);
+impl_julia_typecheck!(*mut c_void);
 
 /// This trait is implemented by types that a [`Value`] can be converted into by calling
 /// [`Value::cast`]. This includes types like `String`, [`Array`], and `u8`.
@@ -365,6 +383,7 @@ impl_into_julia!(i32, jl_box_int32);
 impl_into_julia!(i64, jl_box_int64);
 impl_into_julia!(f32, jl_box_float32);
 impl_into_julia!(f64, jl_box_float64);
+impl_into_julia!(*mut c_void, jl_box_voidpointer);
 
 #[cfg(not(target_pointer_width = "64"))]
 unsafe impl IntoJulia for usize {
@@ -457,6 +476,7 @@ impl_julia_type!(f32, jl_float32_type);
 impl_julia_type!(f64, jl_float64_type);
 impl_julia_type!(bool, jl_bool_type);
 impl_julia_type!(char, jl_char_type);
+impl_julia_type!(*mut c_void, jl_voidpointer_type);
 
 #[cfg(not(target_pointer_width = "64"))]
 unsafe impl JuliaType for usize {
@@ -516,6 +536,7 @@ impl_primitive_cast!(i32, jl_unbox_int32);
 impl_primitive_cast!(i64, jl_unbox_int64);
 impl_primitive_cast!(f32, jl_unbox_float32);
 impl_primitive_cast!(f64, jl_unbox_float64);
+impl_primitive_cast!(*mut c_void, jl_unbox_voidpointer);
 
 #[cfg(not(target_pointer_width = "64"))]
 impl_primitive_cast!(usize, jl_unbox_uint32);
@@ -707,19 +728,9 @@ impl<'frame> Frame<'frame> for NullFrame<'frame> {
 
     fn dynamic_frame<'nested, T, F: FnOnce(&mut DynamicFrame<'nested>) -> JlrsResult<T>>(
         &'nested mut self,
-        func: F,
+        _: F,
     ) -> JlrsResult<T> {
-        unsafe {
-            let mut view = self.memory.nest_dynamic();
-            let idx = view.new_frame()?;
-            let mut frame = DynamicFrame {
-                idx,
-                len: 0,
-                memory: view,
-            };
-
-            func(&mut frame)
-        }
+        Err(JlrsError::NullFrame)?
     }
 
     fn output(&mut self) -> JlrsResult<Output<'frame>> {
@@ -730,14 +741,12 @@ impl<'frame> Frame<'frame> for NullFrame<'frame> {
         0
     }
 
-    fn print_memory(&self) {
-        self.memory.print_memory()
-    }
+    fn print_memory(&self) {}
 }
 
 pub(crate) mod private {
     use crate::error::AllocError;
-    use crate::frame::{DynamicFrame, Output, StaticFrame, NullFrame};
+    use crate::frame::{DynamicFrame, NullFrame, Output, StaticFrame};
     use crate::stack::FrameIdx;
     use crate::value::string::JuliaString;
     use crate::value::symbol::Symbol;
@@ -986,7 +995,7 @@ pub(crate) mod private {
             values: &[P],
             _: Internal,
         ) -> Result<Values<'frame>, AllocError> {
-                Err(AllocError::FrameOverflow(values.len(), 0))
+            Err(AllocError::FrameOverflow(values.len(), 0))
         }
 
         fn create_many_dyn(
@@ -994,7 +1003,7 @@ pub(crate) mod private {
             values: &[&dyn super::IntoJulia],
             _: Internal,
         ) -> Result<Values<'frame>, AllocError> {
-                Err(AllocError::FrameOverflow(values.len(), 0))
+            Err(AllocError::FrameOverflow(values.len(), 0))
         }
 
         fn assign_output<'output>(

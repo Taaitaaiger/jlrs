@@ -98,7 +98,10 @@ impl Display for JlrsError {
             ),
             JlrsError::InvalidArrayType => write!(formatter, "Invalid array type"),
             JlrsError::InvalidCharacter => write!(formatter, "Invalid character"),
-            JlrsError::NullFrame => write!(formatter, "NullFrames don't support allocations or nesting another NullFrame"),
+            JlrsError::NullFrame => write!(
+                formatter,
+                "NullFrames don't support allocations or nesting another NullFrame"
+            ),
             JlrsError::NotAPointerField(idx) => {
                 write!(formatter, "The field at index {} is stored inline", idx)
             }

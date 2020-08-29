@@ -1,22 +1,27 @@
 //! Frames ensure Julia's garbage collector is properly managed.
 //!
 //! Julia data is freed by the GC when it's not in use. You will need to use frames to do things
-//! like calling Julia functions and creating new values; this ensures the values created with a
+//! like calling Julia functions and creating new values, this ensures the values created with a
 //! specific frame are protected from garbage collection until that frame goes out of scope.
 //!
-//! Frames can be nested, the two frame types that currently exist can be freely mixed. The main
-//! difference between the two is that a [`StaticFrame`] is created with a definite capacity,
-//! while a [`DynamicFrame`] will dynamically grow its capacity whenever a value is created or a
-//! function is called. A [`StaticFrame`] is more efficient, a [`DynamicFrame`] is easier to use.
-//! Creating a nested frame takes no space in the current frame.
+//! Three different kinds of frames exist; [`StaticFrame`], [`DynamicFrame`], and [`NullFrame`].
+//! The first two of them can be nested and freely mixed. The main difference between the two is
+//! that a [`StaticFrame`] is created with a definite capacity, while a [`DynamicFrame`] will
+//! dynamically grow its capacity whenever a value is created or a function is called. A
+//! [`StaticFrame`] is more efficient, a [`DynamicFrame`] is easier to use. Creating a nested
+//! frame takes no space in the current frame.
+//!
+//! The third type, [`NullFrame`] can only be used if you call Rust from Julia. They don't
+//! allocate at all and can only be used to borrow array data.
 //!
 //! Frames have a lifetime, `'frame`. This lifetime ensures that a [`Value`] can only be used as
 //! long as the frame that protects it has not been dropped.
 //!
-//! Most functionality that frames implement is defined in the [`Frame`] trait.
+//! Most functionality that frames implement is defined by the [`Frame`] trait.
 //!
 //! [`StaticFrame`]: struct.StaticFrame.html
 //! [`DynamicFrame`]: struct.DynamicFrame.html
+//! [`NullFrame`]: struct.NullFrame.html
 //! [`Julia::frame`]: ../struct.Julia.html#method.frame
 //! [`Julia::dynamic_frame`]: ../struct.Julia.html#method.dynamic_frame
 //! [`Value`]: ../value/struct.Value.html
@@ -24,6 +29,7 @@
 
 use crate::error::JlrsResult;
 use crate::stack::{Dynamic, FrameIdx, StackView, Static};
+use crate::CCall;
 use std::marker::PhantomData;
 
 /// A `StaticFrame` is a frame that has a definite number of slots on the GC stack. With some
@@ -150,6 +156,14 @@ impl<'frame> Output<'frame> {
     }
 }
 
-pub struct NullFrame<'frame> {
-    pub(crate) memory: StackView<'frame, Static>,
+/// A `NullFrame` can be used if you call Rust from Julia through `ccall` and want to borrow array
+/// data but not perform any allocations. It can't be nested or be used for functions that
+/// allocate (like creating new values or calling functions). Functions that depend on allocation
+/// will return `JlrsError::NullFrame` if you call them with a `NullFrame`.
+pub struct NullFrame<'frame>(PhantomData<&'frame ()>);
+
+impl<'frame> NullFrame<'frame> {
+    pub(crate) unsafe fn new(_: &'frame mut CCall) -> Self {
+        NullFrame(PhantomData)
+    }
 }

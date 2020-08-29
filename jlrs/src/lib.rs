@@ -1,5 +1,5 @@
 //! The main goal behind `jlrs` is to provide a simple and safe interface to the Julia C API.
-//! Currently this crate is only tested on Linux and Windows in combination with Julia 1.5.0 and
+//! Currently this crate is only tested on Linux and Windows in combination with Julia 1.5.1 and
 //! is not compatible with earlier versions of Julia.
 //!
 //!
@@ -16,6 +16,7 @@
 //!  - Create and use n-dimensional arrays.
 //!  - Support for mapping Julia structs to Rust structs, which can be generated with `JlrsReflect.jl`.
 //!  - Structs that can be mapped to Rust include those with type parameters and bits unions.
+//!  - Use all of these features when calling Rust from Julia through `ccall`.
 //!
 //!
 //! # Generating the bindings
@@ -61,11 +62,15 @@
 //! # Using this crate
 //!
 //! The first thing you should do is `use` the [`prelude`]-module with an asterisk, this will
-//! bring all the structs and traits you're likely to need into scope. Before you can use Julia it
-//! must first be initialized. You do this by calling [`Julia::init`]. Note that this method can
-//! only be called once, if you drop [`Julia`] you won't be able to create a new one and have to
-//! restart the entire program. If you want to use a custom system image, you must call
-//! [`Julia::init_with_image`] instead of [`Julia::init`].
+//! bring all the structs and traits you're likely to need into scope. If you're calling Julia
+//! from Rust, you must initialize Julia before you can use it. You can do this by calling
+//! [`Julia::init`]. Note that this method can only be called once, if you drop [`Julia`] you won't
+//! be able to create a new one and have to restart the entire program. If you want to use a
+//! custom system image, you must call [`Julia::init_with_image`] instead of [`Julia::init`].
+//! If you're calling Rust from Julia everything has already been initialized, you can use `CCall`
+//! instead.
+//!
+//! ## Calling Julia from Rust
 //!
 //! You can call [`Julia::include`] to include your own Julia code and either [`Julia::frame`] or
 //! [`Julia::dynamic_frame`] to interact with Julia. If you want to have improved support for
@@ -151,6 +156,70 @@
 //! a frame in order to protect a value from with a specific frame; this value will share that
 //! frame's lifetime.
 //!
+//! ## Calling Rust from Julia
+//!
+//! Julia's `ccall` interface can be used to call `extern "C"` functions defined in Rust. There
+//! are two major ways to use `ccall`, with a pointer to the function or a
+//! `(:function, "library")` pair.
+//!
+//! A function can be cast to a void pointer and converted to a `Value`:
+//!
+//! ```no_run
+//! unsafe extern "C" fn call_me(arg: bool) -> isize {
+//!     if arg {
+//!         1
+//!     } else {
+//!         -1
+//!     }
+//! }
+//!
+//! # use jlrs::prelude::*;
+//! # fn main() {
+//! let mut julia = unsafe { Julia::init(16).unwrap() };
+//! julia.frame(2, |global, frame| {
+//!     // Cast the function to a void point
+//!     let call_me_val = Value::new(frame, call_me as *mut std::ffi::c_void)?;
+//!
+//!     // `myfunc` will call the function pointer
+//!     let func = Module::main(global).function("myfunc")?;
+//!
+//!     // Call the function and unbox the result.  
+//!     let _output = func.call1(frame, call_me_val)?.unwrap();
+//!     Ok(())
+//! }).unwrap();
+//! # }
+//! ```
+//!
+//! This pointer can be called from Julia:
+//!
+//! ```julia
+//! function myfunc(callme::Ptr)::Int
+//!     ccall(callme, Int, (Bool,), true)
+//! end
+//! ```
+//!
+//! You can also use functions defined in `dylib` and `cdylib` libraries. If you want to use
+//! functions defined in these libraries, those functions must be both `extern "C"` functions and
+//! annotated with `#[no_mangle]` to prevent name mangling. If the compiled library is not
+//! directly visible to Julia, you can open it with `Libdl.dlopen` and acquire function pointers
+//! with `Libdl.dlsym`. These pointers can be called the same way as the pointer in the previous
+//! example.
+//!
+//! If the library is visible to Julia you can access it with the library name. If `call_me` is
+//! defined in a crate called `foo`, the following should work:
+//!
+//! ```julia
+//! ccall((:call_me, "libfoo"), Int, (Bool,), false)
+//! ```
+//!
+//! One important aspect of calling Rust from other languages in general is that panicking across
+//! an FFI boundary is undefined behaviour. If you're not sure your code will never panic, wrap it
+//! with `std::panic::catch_unwind`.
+//!
+//! Many features provided by `jlrs` like accessing modules, calling functions, and borrowing
+//! array data require a [`Global`] or a frame. You can access these by creating a [`CCall`]
+//! first.
+//!
 //!
 //! # Custom types
 //!
@@ -164,6 +233,8 @@
 //! parameters. The reason for this restriction is that the layout of tuple and union fields can
 //! be very different depending on these parameters in a way that can't be nicely expressed in
 //! Rust.
+//!
+//! These custom types can also be used when you call Rust from Julia through `ccall`.
 //!
 //!
 //! # Lifetimes
@@ -188,6 +259,7 @@
 //!
 //! [`prelude`]: prelude/index.html
 //! [`Julia`]: struct.Julia.html
+//! [`CCall`]: struct.CCall.html
 //! [`Julia::init`]: struct.Julia.html#method.init
 //! [`Julia::init_with_image`]: struct.Julia.html#method.init_with_image
 //! [`Julia::include`]: struct.Julia.html#method.include
@@ -226,9 +298,9 @@ pub mod util;
 pub mod value;
 
 use error::{JlrsError, JlrsResult};
-use frame::{DynamicFrame, StaticFrame};
+use frame::{DynamicFrame, NullFrame, StaticFrame};
 use global::Global;
-use jl_sys::{jl_atexit_hook, jl_init, jl_init_with_image__threading};
+use jl_sys::{jl_atexit_hook, jl_init, jl_init_with_image__threading, jl_is_initialized};
 use stack::{Dynamic, RawStack, StackView, Static};
 use std::io::{Error as IOError, ErrorKind};
 use std::path::Path;
@@ -267,7 +339,7 @@ impl Julia {
     /// [`StaticFrame`]: frame/struct.StaticFrame.html
     /// [`DynamicFrame`]: frame/struct.DynamicFrame.html
     pub unsafe fn init(stack_size: usize) -> JlrsResult<Self> {
-        if INIT.swap(true, Ordering::SeqCst) {
+        if jl_is_initialized() != 0 || INIT.swap(true, Ordering::SeqCst) {
             return Err(JlrsError::AlreadyInitialized.into());
         }
 
@@ -461,33 +533,50 @@ impl Drop for Julia {
     }
 }
 
-/// When you call Rust from Julia with `ccall`, Julia has already been initialized and trying to 
-/// initialize it again would cause a crash. In order to be able to call back from Rust into Julia
-/// and to borrow arrays (if you pass them as `Array` rather than `Ptr{Array}`), you'll need to 
-/// create a frame first. You can use this struct to do so. It must never be used outside 
+/// When you call Rust from Julia through `ccall`, Julia has already been initialized and trying to
+/// initialize it again would cause a crash. In order to still be able to call Julia from Rust
+/// and to borrow arrays (if you pass them as `Array` rather than `Ptr{Array}`), you'll need to
+/// create a frame first. You can use this struct to do so. It must never be used outside
 /// functions called through `ccall`.
+///
+/// If you only need to use a frame to borrow array data, you can use `CCall::null_frame`. Unlike
+/// `Julia`, `CCall` postpones the allocation of the stack that is used for managing the GC until
+/// a static or dynamic frame is created. In the case of a null frame, this stack isn't allocated
+/// at all. Unlike the other frame types null frames can't be nested.
 pub struct CCall {
-    stack: RawStack
+    stack: Option<RawStack>,
+    stack_size: usize,
 }
 
 impl CCall {
-    /// Create a new `CCall` that provides a stack with `stack_size` slot. This functions the same
-    /// way as `Julia::init` does. This function must never be called outside a function called
-    /// with `ccall` from Julia and must only be called once during that call.
+    /// Create a new `CCall` that provides a stack with `stack_size` slots. This functions the
+    /// same way as `Julia::init` does. This function must never be called outside a function
+    /// called through `ccall` from Julia and must only be called once during that call. The stack
+    /// is not allocated untl a static or dynamic frame is created.
     pub unsafe fn new(stack_size: usize) -> Self {
         CCall {
-            stack: RawStack::new(stack_size)
+            stack: None,
+            stack_size,
         }
+    }
+
+    /// Create a new `CCall` that provides a stack with no slots. This means only creating a null
+    /// frame is supported.
+    pub unsafe fn null() -> Self {
+        CCall::new(0)
     }
 
     /// Change the stack size to `stack_size`.
     pub fn set_stack_size(&mut self, stack_size: usize) {
-        unsafe { self.stack = RawStack::new(stack_size) }
+        self.stack_size = stack_size;
+        if self.stack.is_some() {
+            unsafe { self.stack = Some(RawStack::new(stack_size)) }
+        }
     }
 
     /// Returns the current stack size.
     pub fn stack_size(&self) -> usize {
-        self.stack.size()
+        self.stack_size
     }
 
     /// Create a [`StaticFrame`] that can hold `capacity` values, and call the given closure.
@@ -510,12 +599,16 @@ impl CCall {
         F: FnOnce(Global<'base>, &mut StaticFrame<'base>) -> JlrsResult<T>,
     {
         unsafe {
-            let d = self.stack.as_mut();
-            let global = Global::new();
-            let mut view = StackView::<Static>::new(d);
-            let frame_idx = view.new_frame(capacity)?;
-            let mut frame = StaticFrame::with_capacity(frame_idx, capacity, view);
-            func(global, &mut frame)
+            self.ensure_init_stack()
+                .map(|s| {
+                    let d = s.as_mut();
+                    let global = Global::new();
+                    let mut view = StackView::<Static>::new(d);
+                    let frame_idx = view.new_frame(capacity)?;
+                    let mut frame = StaticFrame::with_capacity(frame_idx, capacity, view);
+                    func(global, &mut frame)
+                })
+                .unwrap_or_else(|| std::hint::unreachable_unchecked()) // The stack is guaranteed to be initialized
         }
     }
 
@@ -533,12 +626,43 @@ impl CCall {
         F: FnOnce(Global<'base>, &mut DynamicFrame<'base>) -> JlrsResult<T>,
     {
         unsafe {
-            let d = self.stack.as_mut();
-            let global = Global::new();
-            let mut view = StackView::<Dynamic>::new(d);
-            let frame_idx = view.new_frame()?;
-            let mut frame = DynamicFrame::new(frame_idx, view);
-            func(global, &mut frame)
+            self.ensure_init_stack()
+                .map(|s| {
+                    let d = s.as_mut();
+                    let global = Global::new();
+                    let mut view = StackView::<Dynamic>::new(d);
+                    let frame_idx = view.new_frame()?;
+                    let mut frame = DynamicFrame::new(frame_idx, view);
+                    func(global, &mut frame)
+                })
+                .unwrap_or_else(|| std::hint::unreachable_unchecked()) // The stack is guaranteed to be initialized
         }
+    }
+
+    /// Create a [`NullFrame`] and call the given closure. A [`NullFrame`] cannot be nested and
+    /// can only be used to (mutably) borrow array data. Unlike the other frame-creating methods,
+    /// no `Global` is provided to the closure.
+    ///
+    /// [`NullFrame`]: ../frame/struct.NullFrame.html
+    /// [`Global`]: ../global/struct.Global.html
+    pub fn null_frame<'base, 'julia: 'base, T, F>(&'julia mut self, func: F) -> JlrsResult<T>
+    where
+        F: FnOnce(&mut NullFrame<'base>) -> JlrsResult<T>,
+    {
+        unsafe {
+            let mut frame = NullFrame::new(self);
+            func(&mut frame)
+        }
+    }
+
+    #[inline(always)]
+    fn ensure_init_stack(&mut self) -> Option<&mut RawStack> {
+        if self.stack.is_none() {
+            unsafe {
+                self.stack = Some(RawStack::new(self.stack_size));
+            }
+        }
+
+        self.stack.as_mut()
     }
 }

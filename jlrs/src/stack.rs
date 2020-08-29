@@ -35,6 +35,7 @@ pub(crate) struct RawStack(Box<[*mut c_void]>);
 
 impl RawStack {
     pub(crate) unsafe fn new(stack_size: usize) -> Self {
+        debug_assert!(stack_size > 0);
         let mut raw = vec![null_mut(); stack_size];
         raw[0] = 1 as _;
         let boxed = raw.into_boxed_slice();

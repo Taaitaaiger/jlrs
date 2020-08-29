@@ -395,7 +395,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// to access their fields with [`Value::get_field`].
     ///
     /// [`Value::get_field`]: struct.Value.html#method.get_field
-    pub fn field_names<'base>(self, _: Global<'base>) -> &[Symbol<'base>] {
+    pub fn field_names(self) -> &'frame [Symbol<'frame>] {
         if self.is_nothing() {
             return &[];
         }

@@ -16,7 +16,7 @@ fn bounds_error() {
 
                     assert_eq!(out.type_name(), "BoundsError");
 
-                    let field_names = out.field_names(global);
+                    let field_names = out.field_names();
                     let f0: String = field_names[0].into();
                     assert_eq!(f0, "a");
                     let f1: String = field_names[1].into();

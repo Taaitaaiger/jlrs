@@ -19,4 +19,8 @@ end
 function datatype()::DataType
     Bool
 end
+
+function callrust(ptr::Ptr)::Bool
+    ccall(ptr, Bool, ())
+end
 end

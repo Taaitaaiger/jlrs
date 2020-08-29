@@ -20,8 +20,7 @@
 //! [`JuliaTypecheck`]: ../../traits/trait.JuliaTypecheck.html
 
 use crate::error::{JlrsError, JlrsResult};
-use crate::global::Global;
-use crate::traits::{Cast, JuliaType, JuliaTypecheck};
+use crate::traits::{Cast, JuliaTypecheck};
 use crate::value::symbol::Symbol;
 use crate::value::type_name::TypeName;
 use crate::value::Value;
@@ -132,7 +131,7 @@ impl<'frame> DataType<'frame> {
     /// to access their fields with [`Value::get_field`].
     ///
     /// [`Value::get_field`]: struct.Value.html#method.get_field
-    pub fn field_names<'base>(self, _: Global<'base>) -> &[Symbol<'base>] {
+    pub fn field_names(self) -> &'frame [Symbol<'frame>] {
         unsafe {
             let field_names = jl_field_names(self.ptr().cast());
             let len = jl_svec_len(field_names);
@@ -335,21 +334,6 @@ unsafe impl JuliaTypecheck for ImmutableDatatype {
         DataType::julia_typecheck(t) && (&*t.ptr()).mutabl == 0
     }
 }
-
-impl_julia_typecheck!(i8);
-impl_julia_typecheck!(i16);
-impl_julia_typecheck!(i32);
-impl_julia_typecheck!(i64);
-impl_julia_typecheck!(isize);
-impl_julia_typecheck!(u8);
-impl_julia_typecheck!(u16);
-impl_julia_typecheck!(u32);
-impl_julia_typecheck!(u64);
-impl_julia_typecheck!(usize);
-impl_julia_typecheck!(f32);
-impl_julia_typecheck!(f64);
-impl_julia_typecheck!(bool);
-impl_julia_typecheck!(char);
 
 /// A typecheck that can be used in combination with `DataType::is`. This method returns true if
 /// a value of this type is a slot.
