@@ -49,7 +49,6 @@ fn check_array_contents_info() {
             assert!(!arr.is_value_array());
             assert_eq!(arr.element_type().cast::<DataType>()?.name(), "Float32");
 
-
             Ok(())
         })
         .unwrap();

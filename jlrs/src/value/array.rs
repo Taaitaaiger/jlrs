@@ -1005,13 +1005,9 @@ where
             Err(JlrsError::InvalidArrayType)?;
         }
 
-        let idx =  self.dimensions.index_of(index)?;
+        let idx = self.dimensions.index_of(index)?;
 
-        jl_array_ptr_set(
-            ptr.cast(),
-            idx,
-            value.ptr().cast(),
-        );
+        jl_array_ptr_set(ptr.cast(), idx, value.ptr().cast());
         Ok(())
     }
 

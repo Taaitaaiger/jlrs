@@ -552,4 +552,3 @@ fn typed_array_unrestricted_value_data_mut() {
         .unwrap();
     })
 }
-
