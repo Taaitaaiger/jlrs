@@ -42,9 +42,14 @@ fn check_array_contents_info() {
             let arr = arr_val.cast::<Array>()?;
             assert!(arr.contains::<f32>());
             assert!(arr.contains_inline::<f32>());
+            assert!(arr.into_typed_array::<f32>().is_ok());
+            assert!(arr.into_typed_array::<f64>().is_err());
             assert!(!arr.has_inlined_pointers());
             assert!(arr.is_inline_array());
             assert!(!arr.is_value_array());
+            assert_eq!(arr.element_type().cast::<DataType>()?.name(), "Float32");
+
+
             Ok(())
         })
         .unwrap();

@@ -48,7 +48,6 @@ impl<'base> Symbol<'base> {
     }
 
     #[doc(hidden)]
-
     pub unsafe fn ptr(self) -> *mut jl_sym_t {
         self.0
     }
