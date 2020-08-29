@@ -17,7 +17,7 @@ before_script:
   - wget https://julialang-s3.julialang.org/bin/linux/x64/1.5/julia-1.5.1-linux-x86_64.tar.gz -O /tmp/julia.tar.gz
   - tar -xvf /tmp/julia.tar.gz
   - export JULIA_DIR=$PWD/julia-1.5.1
-  - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/julia-1.5.0/lib
+  - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/julia-1.5.1/lib
   - export JLRS_ROOT=$TRAVIS_BUILD_DIR
 script:
   - cargo build --verbose
