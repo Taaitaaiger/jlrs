@@ -729,7 +729,10 @@ impl<T, D: Into<Dimensions>> IndexMut<D> for CopiedArray<T> {
 /// with anything that implements `Into<Dimensions>`; see [`Dimensions`] for more information.
 ///
 /// [`Dimensions`]: struct.Dimensions.html
-pub struct ArrayData<'borrow, 'frame, T, F: Frame<'frame>> {
+pub struct ArrayData<'borrow, 'frame, T, F>
+where
+    F: Frame<'frame>,
+{
     data: &'borrow [T],
     dimensions: Dimensions,
     _notsendsync: PhantomData<*const ()>,
@@ -1034,7 +1037,8 @@ where
     }
 }
 
-pub struct UnrestrictedValueArrayDataMut<'borrow, 'value, 'data, 'frame, F: Frame<'frame>> {
+pub struct UnrestrictedValueArrayDataMut<'borrow, 'value, 'data, 'frame, F: Frame<'frame>>
+{
     array: Array<'value, 'data>,
     data: &'borrow mut [Value<'value, 'data>],
     dimensions: Dimensions,

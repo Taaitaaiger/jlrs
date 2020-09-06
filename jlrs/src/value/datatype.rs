@@ -336,6 +336,36 @@ unsafe impl JuliaTypecheck for ImmutableDatatype {
 }
 
 /// A typecheck that can be used in combination with `DataType::is`. This method returns true if
+/// a value of this type is a primitive type.
+pub struct PrimitiveType;
+
+unsafe impl JuliaTypecheck for PrimitiveType {
+    unsafe fn julia_typecheck(t: DataType) -> bool {
+        t.is::<Immutable>() && !(&*t.ptr()).layout.is_null() && t.nfields() == 0 && t.size() > 0
+    }
+}
+
+/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
+/// a value of this type is a struct type.
+pub struct StructType;
+
+unsafe impl JuliaTypecheck for StructType {
+    unsafe fn julia_typecheck(t: DataType) -> bool {
+        !t.is_abstract() && !t.is::<PrimitiveType>()
+    }
+}
+
+/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
+/// a value of this type is a struct type.
+pub struct Singleton;
+
+unsafe impl JuliaTypecheck for Singleton {
+    unsafe fn julia_typecheck(t: DataType) -> bool {
+        t.instance().is_some()
+    }
+}
+
+/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
 /// a value of this type is a slot.
 pub struct Slot;
 

@@ -51,6 +51,8 @@ pub enum JlrsError {
     ZeroDimension,
     OutOfBounds(usize, usize),
     InvalidIndex(Dimensions, Dimensions),
+    Immutable,
+    NotSubtype,
 }
 
 pub fn exception<T>(exc: String) -> JlrsResult<T> {
@@ -119,6 +121,10 @@ impl Display for JlrsError {
             JlrsError::NotAMethodInstance => write!(formatter, "This is not a method instance"),
             JlrsError::NotACodeInstance => write!(formatter, "This is not a code instance"),
             JlrsError::NotAWeakRef => write!(formatter, "This is not a weak ref"),
+            JlrsError::Immutable => write!(formatter, "This value is immutable"),
+            JlrsError::NotSubtype => {
+                write!(formatter, "Value type is not a subtype of the field type")
+            }
             JlrsError::NotATypeMapEntry => write!(formatter, "This is not a typemap entry"),
             JlrsError::NotATypeMapLevel => write!(formatter, "This is not a typemap level"),
             JlrsError::NotAnExpr => write!(formatter, "This is not an expr"),

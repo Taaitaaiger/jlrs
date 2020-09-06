@@ -12,6 +12,12 @@ pub use crate::value::symbol::Symbol;
 pub use crate::value::tuple::*;
 pub use crate::value::{Value, Values};
 pub use crate::{CCall, Julia};
+pub use crate::global::Global;
 
 #[cfg(feature = "jlrs-derive")]
 pub use jlrs_derive::{IntoJulia, JuliaStruct};
+
+#[cfg(feature = "async")]
+pub use crate::multitask::*;
+#[cfg(feature = "async")]
+pub use async_trait::async_trait;

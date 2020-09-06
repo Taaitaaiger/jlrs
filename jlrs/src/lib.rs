@@ -290,8 +290,11 @@ pub mod frame;
 pub mod global;
 #[doc(hidden)]
 pub mod jl_sys_export;
+#[cfg(feature = "async")]
+pub mod multitask;
 pub mod prelude;
 mod stack;
+pub mod sync;
 pub mod traits;
 #[doc(hidden)]
 pub mod util;
@@ -307,6 +310,7 @@ use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use value::module::Module;
 use value::Value;
+use sync::Sync;
 
 static INIT: AtomicBool = AtomicBool::new(false);
 
@@ -473,12 +477,12 @@ impl Julia {
         func: F,
     ) -> JlrsResult<T>
     where
-        F: FnOnce(Global<'base>, &mut StaticFrame<'base>) -> JlrsResult<T>,
+        F: FnOnce(Global<'base>, &mut StaticFrame<'base, Sync>) -> JlrsResult<T>,
     {
         unsafe {
             let d = self.stack.as_mut();
             let global = Global::new();
-            let mut view = StackView::<Static>::new(d);
+            let mut view = StackView::<Sync, Static>::new(d);
             let frame_idx = view.new_frame(capacity)?;
             let mut frame = StaticFrame::with_capacity(frame_idx, capacity, view);
             func(global, &mut frame)
@@ -512,12 +516,12 @@ impl Julia {
     /// [`Value`]: ../value/struct.Value.html
     pub fn dynamic_frame<'base, 'julia: 'base, T, F>(&'julia mut self, func: F) -> JlrsResult<T>
     where
-        F: FnOnce(Global<'base>, &mut DynamicFrame<'base>) -> JlrsResult<T>,
+        F: FnOnce(Global<'base>, &mut DynamicFrame<'base, Sync>) -> JlrsResult<T>,
     {
         unsafe {
             let d = self.stack.as_mut();
             let global = Global::new();
-            let mut view = StackView::<Dynamic>::new(d);
+            let mut view = StackView::<Sync, Dynamic>::new(d);
             let frame_idx = view.new_frame()?;
             let mut frame = DynamicFrame::new(frame_idx, view);
             func(global, &mut frame)
@@ -596,14 +600,14 @@ impl CCall {
         func: F,
     ) -> JlrsResult<T>
     where
-        F: FnOnce(Global<'base>, &mut StaticFrame<'base>) -> JlrsResult<T>,
+        F: FnOnce(Global<'base>, &mut StaticFrame<'base, Sync>) -> JlrsResult<T>,
     {
         unsafe {
             self.ensure_init_stack()
                 .map(|s| {
                     let d = s.as_mut();
                     let global = Global::new();
-                    let mut view = StackView::<Static>::new(d);
+                    let mut view = StackView::<Sync, Static>::new(d);
                     let frame_idx = view.new_frame(capacity)?;
                     let mut frame = StaticFrame::with_capacity(frame_idx, capacity, view);
                     func(global, &mut frame)
@@ -623,14 +627,14 @@ impl CCall {
     /// [`Value`]: ../value/struct.Value.html
     pub fn dynamic_frame<'base, 'julia: 'base, T, F>(&'julia mut self, func: F) -> JlrsResult<T>
     where
-        F: FnOnce(Global<'base>, &mut DynamicFrame<'base>) -> JlrsResult<T>,
+        F: FnOnce(Global<'base>, &mut DynamicFrame<'base, Sync>) -> JlrsResult<T>,
     {
         unsafe {
             self.ensure_init_stack()
                 .map(|s| {
                     let d = s.as_mut();
                     let global = Global::new();
-                    let mut view = StackView::<Dynamic>::new(d);
+                    let mut view = StackView::<Sync, Dynamic>::new(d);
                     let frame_idx = view.new_frame()?;
                     let mut frame = DynamicFrame::new(frame_idx, view);
                     func(global, &mut frame)

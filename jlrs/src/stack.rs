@@ -18,18 +18,15 @@
 // longer than its frame while C can offer no such guarantees.
 
 use crate::error::{AllocError, JlrsResult};
-use crate::frame::Output;
+use crate::frame::{FrameIdx, Output};
+use crate::sync::Mode;
 use crate::value::{Value, Values};
-use jl_sys::jl_get_ptls_states;
 use std::ffi::c_void;
 use std::marker::PhantomData;
 use std::ptr::null_mut;
 
 pub(crate) enum Static {}
 pub(crate) enum Dynamic {}
-
-#[derive(Copy, Clone, Default)]
-pub(crate) struct FrameIdx(usize);
 
 pub(crate) struct RawStack(Box<[*mut c_void]>);
 
@@ -53,12 +50,13 @@ impl RawStack {
     }
 }
 
-pub(crate) struct StackView<'stack, V> {
+pub(crate) struct StackView<'stack, U: Mode, V> {
     stack: &'stack mut [*mut c_void],
-    _marker: PhantomData<V>,
+    _u: PhantomData<U>,
+    _v: PhantomData<V>,
 }
 
-impl<'stack, V> StackView<'stack, V> {
+impl<'stack, M: Mode, V> StackView<'stack, M, V> {
     pub(crate) fn size(&self) -> usize {
         self.stack[0] as _
     }
@@ -68,22 +66,24 @@ impl<'stack, V> StackView<'stack, V> {
     }
 
     pub(crate) unsafe fn pop_frame(&mut self, idx: FrameIdx) {
-        let rtls = &mut *jl_get_ptls_states();
-        rtls.pgcstack = (&*rtls.pgcstack).prev;
-        self.stack[0] = (idx.0 - 2) as _;
+        M::pop_frame(&mut self.stack, idx)
     }
 
-    pub(crate) unsafe fn nest_static<'nested>(&'nested mut self) -> StackView<'nested, Static> {
+    pub(crate) unsafe fn nest_static<'nested>(&'nested mut self) -> StackView<'nested, M, Static> {
         StackView {
             stack: self.stack,
-            _marker: PhantomData,
+            _u: PhantomData,
+            _v: PhantomData,
         }
     }
 
-    pub(crate) unsafe fn nest_dynamic<'nested>(&'nested mut self) -> StackView<'nested, Dynamic> {
+    pub(crate) unsafe fn nest_dynamic<'nested>(
+        &'nested mut self,
+    ) -> StackView<'nested, M, Dynamic> {
         StackView {
             stack: self.stack,
-            _marker: PhantomData,
+            _u: PhantomData,
+            _v: PhantomData,
         }
     }
 
@@ -98,11 +98,15 @@ impl<'stack, V> StackView<'stack, V> {
     }
 }
 
-impl<'stack> StackView<'stack, Dynamic> {
+impl<'stack, M> StackView<'stack, M, Dynamic>
+where
+    M: Mode,
+{
     pub(crate) unsafe fn new(stack: &'stack mut [*mut c_void]) -> Self {
         StackView {
             stack,
-            _marker: PhantomData,
+            _u: PhantomData,
+            _v: PhantomData,
         }
     }
 
@@ -113,16 +117,8 @@ impl<'stack> StackView<'stack, Dynamic> {
             ));
         }
 
-        let rtls = &mut *jl_get_ptls_states();
-        self.stack[self.size()] = 0 as _;
-        self.stack[self.size() + 1] = rtls.pgcstack.cast();
-
-        let sz = self.size();
-        rtls.pgcstack = self.stack[sz + 1..].as_mut_ptr().cast();
-        let idx = FrameIdx(self.size() + 2);
-        self.stack[0] = (self.size() + 2) as _;
-
-        Ok(idx)
+        let size = self.size();
+        Ok(M::new_dynamic_frame(&mut self.stack, size))
     }
 
     pub(crate) unsafe fn new_output<'output>(
@@ -154,6 +150,7 @@ impl<'stack> StackView<'stack, Dynamic> {
         self.stack[self.size()] = value.cast::<_>();
         self.stack[idx.0 - 2] = (self.stack[idx.0 - 2] as usize + 2) as _;
         self.stack[0] = (self.size() + 1) as _;
+
         Ok(Value::wrap(value.cast::<_>()))
     }
 
@@ -167,35 +164,27 @@ impl<'stack> StackView<'stack, Dynamic> {
     }
 }
 
-impl<'stack> StackView<'stack, Static> {
+impl<'stack, M> StackView<'stack, M, Static>
+where
+    M: Mode,
+{
     pub(crate) unsafe fn new(stack: &'stack mut [*mut c_void]) -> Self {
         StackView {
             stack,
-            _marker: PhantomData,
+            _u: PhantomData,
+            _v: PhantomData,
         }
     }
 
     pub(crate) unsafe fn new_frame(&mut self, capacity: usize) -> JlrsResult<FrameIdx> {
-        if self.size() + capacity + 2 >= self.stack.len() {
+        let size = self.size();
+        if size + capacity + 2 >= self.stack.len() {
             return Err(Box::new(
                 AllocError::StackOverflow(capacity + 2, self.stack.len()).into(),
             ));
         }
 
-        let rtls = &mut *jl_get_ptls_states();
-        self.stack[self.size()] = (capacity << 1) as _;
-        self.stack[self.size() + 1] = rtls.pgcstack.cast();
-
-        for i in 0..capacity {
-            self.stack[self.size() + 2 + i] = null_mut();
-        }
-
-        let sz = self.size();
-        rtls.pgcstack = self.stack[sz..].as_mut_ptr().cast();
-        let idx = FrameIdx(self.size() + 2);
-        self.stack[0] = (self.size() + capacity + 2) as _;
-
-        Ok(idx)
+        Ok(M::new_frame(&mut self.stack, size, capacity))
     }
 
     pub(crate) unsafe fn new_output<'output>(

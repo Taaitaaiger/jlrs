@@ -29,9 +29,9 @@ use jl_sys::{
     jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_any_type, jl_apply_array_type,
     jl_apply_tuple_type_v, jl_call, jl_call0, jl_call1, jl_call2, jl_call3, jl_datatype_t,
     jl_exception_occurred, jl_field_index, jl_field_isptr, jl_field_names, jl_fieldref,
-    jl_fieldref_noalloc, jl_get_nth_field, jl_get_nth_field_noalloc, jl_new_array,
-    jl_new_struct_uninit, jl_nfields, jl_ptr_to_array, jl_ptr_to_array_1d, jl_svec_data,
-    jl_svec_len, jl_typeof, jl_typeof_str, jl_value_t,
+    jl_fieldref_noalloc, jl_get_nth_field, jl_get_nth_field_noalloc, jl_is_kind, jl_new_array,
+    jl_new_struct_uninit, jl_nfields, jl_ptr_to_array, jl_ptr_to_array_1d, jl_set_nth_field,
+    jl_subtype, jl_svec_data, jl_svec_len, jl_typeof, jl_typeof_str, jl_value_t,
 };
 use std::borrow::BorrowMut;
 use std::ffi::CStr;
@@ -577,6 +577,27 @@ impl<'frame, 'data> Value<'frame, 'data> {
         Ok(Value::wrap(jl_get_nth_field_noalloc(self.ptr(), idx as _)))
     }
 
+    /// Set the value of the field at `idx`. Returns an error if this value is immutable or if the
+    /// type of `value` is not a subtype of the field type. This is unsafe because the previous
+    /// value of this field can become unrooted if you're directly using it from Rust.
+    pub unsafe fn set_nth_field(self, idx: usize, value: Value) -> JlrsResult<()> {
+        if !self.is::<datatype::Mutable>() {
+            Err(JlrsError::Immutable)?
+        }
+
+        let field_type = self.datatype().unwrap().field_types()[idx];
+        if let Some(dt) = value.datatype() {
+            if Value::subtype(dt.into(), field_type) {
+                jl_set_nth_field(self.ptr(), idx, value.ptr());
+                return Ok(());
+            } else {
+                Err(JlrsError::NotSubtype)?
+            }
+        }
+
+        Err(JlrsError::Nothing)?
+    }
+
     /// If you call a function with one or more borrowed arrays as arguments, its result can only
     /// be used when all the borrows are active. If this result doesn't reference any borrowed
     /// data this function can be used to relax its second lifetime to `'static`.
@@ -594,6 +615,27 @@ impl<'frame, 'data> Value<'frame, 'data> {
         F: Frame<'frame>,
     {
         unsafe { frame.assign_output(output, self.ptr().cast(), Internal) }
+    }
+
+    /// Returns true if `self` is a subtype of `sup`.
+    pub fn subtype(self, sup: Value) -> bool {
+        unsafe { jl_subtype(self.ptr(), sup.ptr()) != 0 }
+    }
+
+    /// Returns true if `self` is the type of a `DataType`, `UnionAll`, `Union`, or `Union{}` (the
+    /// bottom type).
+    pub fn is_kind(self) -> bool {
+        unsafe { jl_is_kind(self.ptr()) }
+    }
+
+    /// Returns true if the value is a type, ie a `DataType`, `UnionAll`, `Union`, or `Union{}`
+    /// (the bottom type).
+    pub fn is_type(self) -> bool {
+        if let Some(dt) = self.datatype() {
+            Value::is_kind(dt.into())
+        } else {
+            false
+        }
     }
 
     /// Allocates a new n-dimensional array in Julia.
@@ -832,6 +874,18 @@ impl<'frame, 'data> Value<'frame, 'data> {
             let res = jl_call(self.ptr().cast(), args.as_mut_ptr().cast(), n as _);
             try_protect(frame, res)
         }
+    }
+
+    #[cfg(feature = "async")]
+    pub async fn call_async<'value, 'borrow, V>(
+        self,
+        frame: &mut crate::multitask::AsyncFrame<'frame>,
+        args: V,
+    ) -> JlrsResult<CallResult<'frame, 'borrow>>
+    where
+        V: AsMut<[Value<'value, 'borrow>]>,
+    {
+        unsafe { Ok(crate::multitask::JuliaFuture::new(frame, self, args)?.await) }
     }
 
     /// Call this value as a function that takes several arguments in a single `Values`, this

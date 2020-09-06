@@ -28,9 +28,13 @@
 //! [`Frame`]: ../traits/trait.Frame.html
 
 use crate::error::JlrsResult;
-use crate::stack::{Dynamic, FrameIdx, StackView, Static};
+use crate::stack::{Dynamic, StackView, Static};
+use crate::sync::Mode;
 use crate::CCall;
 use std::marker::PhantomData;
+
+#[derive(Copy, Clone, Default)]
+pub struct FrameIdx(pub(crate) usize);
 
 /// A `StaticFrame` is a frame that has a definite number of slots on the GC stack. With some
 /// exceptions, creating new `Value`s and calling them require one slot each. Rather than using
@@ -43,19 +47,22 @@ use std::marker::PhantomData;
 /// [`Julia::frame`]: ../struct.Julia.html#method.frame
 /// [`Frame::frame`]: ../traits/trait.Frame.html#method.frame
 /// [`Frame`]: ../traits/trait.Frame.html
-pub struct StaticFrame<'frame> {
+pub struct StaticFrame<'frame, U>
+where
+    U: Mode,
+{
     pub(crate) idx: FrameIdx,
-    pub(crate) memory: StackView<'frame, Static>,
+    pub(crate) memory: StackView<'frame, U, Static>,
     pub(crate) capacity: usize,
     pub(crate) len: usize,
 }
 
-impl<'frame> StaticFrame<'frame> {
+impl<'frame, M: Mode> StaticFrame<'frame, M> {
     pub(crate) unsafe fn with_capacity(
         idx: FrameIdx,
         capacity: usize,
-        memory: StackView<'frame, Static>,
-    ) -> StaticFrame<'frame> {
+        memory: StackView<'frame, M, Static>,
+    ) -> StaticFrame<'frame, M> {
         StaticFrame {
             idx,
             memory,
@@ -67,7 +74,7 @@ impl<'frame> StaticFrame<'frame> {
     pub(crate) unsafe fn nested_frame<'nested>(
         &'nested mut self,
         capacity: usize,
-    ) -> JlrsResult<StaticFrame<'nested>> {
+    ) -> JlrsResult<StaticFrame<'nested, M>> {
         let idx = self.memory.new_frame(capacity)?;
         Ok(StaticFrame {
             idx,
@@ -83,7 +90,10 @@ impl<'frame> StaticFrame<'frame> {
     }
 }
 
-impl<'frame> Drop for StaticFrame<'frame> {
+impl<'frame, U> Drop for StaticFrame<'frame, U>
+where
+    U: Mode,
+{
     fn drop(&mut self) {
         unsafe {
             self.memory.pop_frame(self.idx);
@@ -102,14 +112,17 @@ impl<'frame> Drop for StaticFrame<'frame> {
 /// [`Julia::dynamic_frame`]: ../struct.Julia.html#method.dynamic_frame
 /// [`Frame::dynamic_frame`]: ../traits/trait.Frame.html#method.dynamic_frame
 /// [`Frame`]: ../traits/trait.Frame.html
-pub struct DynamicFrame<'frame> {
+pub struct DynamicFrame<'frame, U>
+where
+    U: Mode,
+{
     pub(crate) idx: FrameIdx,
-    pub(crate) memory: StackView<'frame, Dynamic>,
+    pub(crate) memory: StackView<'frame, U, Dynamic>,
     pub(crate) len: usize,
 }
 
-impl<'frame> DynamicFrame<'frame> {
-    pub(crate) unsafe fn new(idx: FrameIdx, memory: StackView<'frame, Dynamic>) -> Self {
+impl<'frame, M: Mode> DynamicFrame<'frame, M> {
+    pub(crate) unsafe fn new(idx: FrameIdx, memory: StackView<'frame, M, Dynamic>) -> Self {
         DynamicFrame {
             idx,
             memory,
@@ -119,7 +132,7 @@ impl<'frame> DynamicFrame<'frame> {
 
     pub(crate) unsafe fn nested_frame<'nested>(
         &'nested mut self,
-    ) -> JlrsResult<DynamicFrame<'nested>> {
+    ) -> JlrsResult<DynamicFrame<'nested, M>> {
         let idx = self.memory.new_frame()?;
         Ok(DynamicFrame {
             idx,
@@ -129,7 +142,10 @@ impl<'frame> DynamicFrame<'frame> {
     }
 }
 
-impl<'frame> Drop for DynamicFrame<'frame> {
+impl<'frame, U> Drop for DynamicFrame<'frame, U>
+where
+    U: Mode,
+{
     fn drop(&mut self) {
         unsafe {
             self.memory.pop_frame(self.idx);

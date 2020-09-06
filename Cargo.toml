@@ -7,3 +7,7 @@ members = [
     "jlrs_ndarray",
     "jl_sys",
 ]
+
+exclude = [
+    "examples"
+]

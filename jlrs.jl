@@ -6,6 +6,18 @@ struct TracedException
     stacktrace::StackTrace
 end
 
+function runasync(func, wakeptr, args...)
+    result = func(args...)
+    
+    # wakerust is set by jlrs
+    ccall(wakerust, Cvoid, (Ptr{Cvoid}, ), wakeptr)
+    result
+end
+
+function asynccall(func, wakeptr, args...)
+    Base.Threads.@spawn runasync(func, wakeptr, args...)
+end
+
 function tracingcall(func)
     function wrapper(args...)
         try
