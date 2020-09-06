@@ -1,0 +1,12 @@
+[package]
+name = "ccall"
+version = "0.1.0"
+authors = ["Thomas van Doornmalen <thomas.vandoornmalen@gmail.com>"]
+edition = "2018"
+
+[lib]
+# The library type must be cdylib or dylib.
+crate-type = ["cdylib"]
+
+[dependencies]
+jlrs = { path = "../../jlrs" }
