@@ -4,15 +4,20 @@
 //! like calling Julia functions and creating new values, this ensures the values created with a
 //! specific frame are protected from garbage collection until that frame goes out of scope.
 //!
-//! Three different kinds of frames exist; [`StaticFrame`], [`DynamicFrame`], and [`NullFrame`].
-//! The first two of them can be nested and freely mixed. The main difference between the two is
-//! that a [`StaticFrame`] is created with a definite capacity, while a [`DynamicFrame`] will
-//! dynamically grow its capacity whenever a value is created or a function is called. A
-//! [`StaticFrame`] is more efficient, a [`DynamicFrame`] is easier to use. Creating a nested
-//! frame takes no space in the current frame.
+//! Four different kinds of frames exist; [`StaticFrame`], [`DynamicFrame`], [`NullFrame`], and
+//! [`AsyncFrame`]. The first two of them can be nested and freely mixed. The main difference
+//! between those two is that a [`StaticFrame`] is created with a definite capacity, while a
+//! [`DynamicFrame`] will dynamically grow its capacity whenever a value is created or a function
+//!  is called. A [`StaticFrame`] is more efficient, a [`DynamicFrame`] is easier to use. Creating
+//! a nested frame takes no space in the current frame.
 //!
 //! The third type, [`NullFrame`] can only be used if you call Rust from Julia. They don't
 //! allocate at all and can only be used to borrow array data.
+//!
+//! The final type, [`AsyncFrame`] is only available when you use the async runtime. Structs that
+//! implement [`JuliaTask`] can use this kind of frame in the `run`-method. It's essentially a
+//! [`DynamicFrame`] with the additional feature that it can be used to call
+//! [`Value::call_async`].
 //!
 //! Frames have a lifetime, `'frame`. This lifetime ensures that a [`Value`] can only be used as
 //! long as the frame that protects it has not been dropped.
@@ -22,14 +27,17 @@
 //! [`StaticFrame`]: struct.StaticFrame.html
 //! [`DynamicFrame`]: struct.DynamicFrame.html
 //! [`NullFrame`]: struct.NullFrame.html
-//! [`Julia::frame`]: ../struct.Julia.html#method.frame
-//! [`Julia::dynamic_frame`]: ../struct.Julia.html#method.dynamic_frame
+//! [`AsyncFrame`]: struct.AsyncFrame.html
 //! [`Value`]: ../value/struct.Value.html
+//! [`Value::call_async`]: ../value/struct.Value.html#method.call_async
 //! [`Frame`]: ../traits/trait.Frame.html
+//! [`JuliaTask`]: ../traits/multitask/trait.JuliaTask.html
 
 use crate::error::JlrsResult;
+#[cfg(feature = "async")]
+use crate::mode::Async;
+use crate::mode::Mode;
 use crate::stack::{Dynamic, StackView, Static};
-use crate::sync::Mode;
 use crate::CCall;
 use std::marker::PhantomData;
 
@@ -181,5 +189,43 @@ pub struct NullFrame<'frame>(PhantomData<&'frame ()>);
 impl<'frame> NullFrame<'frame> {
     pub(crate) unsafe fn new(_: &'frame mut CCall) -> Self {
         NullFrame(PhantomData)
+    }
+}
+
+/// An `AsyncFrame` is a special kind of `DynamicFrame` that's available when you implement
+/// [`JuliaTask`]. In addition to the capabilities of a `DynamicFrame` it can be used to call
+/// [`Value::call_async`] which lets you call a function in a new thread in Julia. This feature is
+/// only available by using [`AsyncJulia`].
+///
+/// [`Value::call_async`]: ../value/struct.Value.html#method.call_async
+/// [`JuliaTask`]: ../traits/multitask/trait.JuliaTask.html
+/// [`AsyncJulia`]: ../multitask/struct.AsyncJulia.html
+#[cfg(feature = "async")]
+pub struct AsyncFrame<'frame> {
+    pub(crate) idx: FrameIdx,
+    pub(crate) memory: StackView<'frame, Async, Dynamic>,
+    pub(crate) len: usize,
+}
+
+#[cfg(feature = "async")]
+impl<'frame> AsyncFrame<'frame> {
+    pub(crate) unsafe fn nested_frame<'nested>(
+        &'nested mut self,
+    ) -> JlrsResult<DynamicFrame<'nested, Async>> {
+        let idx = self.memory.new_frame()?;
+        Ok(DynamicFrame {
+            idx,
+            memory: self.memory.nest_dynamic(),
+            len: 0,
+        })
+    }
+}
+
+#[cfg(feature = "async")]
+impl<'frame> Drop for AsyncFrame<'frame> {
+    fn drop(&mut self) {
+        unsafe {
+            self.memory.pop_frame(self.idx);
+        }
     }
 }

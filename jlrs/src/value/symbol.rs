@@ -12,7 +12,7 @@ use std::marker::PhantomData;
 
 /// `Symbol`s are used Julia to represent identifiers, `:x` represents the `Symbol` `x`. Things
 /// that can be accessed using a `Symbol` include submodules, functions, and globals. However,
-/// the methods that provide this functionality in `jlrs` can use strings instead.
+/// the methods that provide this functionality in jlrs can use strings instead.
 ///
 /// This struct implements [`JuliaTypecheck`] and [`Cast`]. It can be used in combination with
 /// [`DataType::is`] and [`Value::is`]; if the check returns` true` the [`Value`] can be cast to

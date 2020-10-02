@@ -1037,8 +1037,7 @@ where
     }
 }
 
-pub struct UnrestrictedValueArrayDataMut<'borrow, 'value, 'data, 'frame, F: Frame<'frame>>
-{
+pub struct UnrestrictedValueArrayDataMut<'borrow, 'value, 'data, 'frame, F: Frame<'frame>> {
     array: Array<'value, 'data>,
     data: &'borrow mut [Value<'value, 'data>],
     dimensions: Dimensions,

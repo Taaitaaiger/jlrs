@@ -18,8 +18,8 @@ edition = "2018"
 
 [features]
 default = ["jlrs-derive"]
-docs-rs = ["jl-sys/docs-rs", "jlrs-derive"]
 async = ["futures", "crossbeam-channel", "async-trait", "async-std", "smallvec"]
+docs-rs = ["jl-sys/docs-rs", "jlrs-derive", "async"]
 
 [dependencies]
 jl-sys = {version = "0.9", path = "../jl_sys" }
@@ -31,4 +31,4 @@ async-std = { version = "1.6", features = ["unstable"], optional = true }
 smallvec = { version = "1.4", optional = true }
 
 [package.metadata.docs.rs]
-features = ["docs-rs"]
+features = ["docs-rs", "async"]

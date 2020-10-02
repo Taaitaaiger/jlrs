@@ -31,13 +31,16 @@
 //! [`Value::is`]: ../value/struct.Value.html#method.is
 //! [`DataType::is`]: ../value/datatype/struct.DataType.html#method.is
 
+#[cfg(feature = "async")]
+pub mod multitask;
+
 use crate::error::{AllocError, JlrsError, JlrsResult};
+#[cfg(feature = "async")]
+use crate::frame::AsyncFrame;
 use crate::frame::{DynamicFrame, NullFrame, Output, StaticFrame};
 #[cfg(feature = "async")]
-use crate::multitask::AsyncFrame;
-#[cfg(feature = "async")]
-use crate::sync::Async;
-use crate::sync::{Mode, Sync};
+use crate::mode::Async;
+use crate::mode::{Mode, Sync};
 use crate::value::datatype::DataType;
 use crate::value::string::JuliaString;
 use crate::value::symbol::Symbol;
@@ -797,12 +800,12 @@ impl<'frame> Frame<'frame> for AsyncFrame<'frame> {
 
 pub(crate) mod private {
     use crate::error::AllocError;
+    #[cfg(feature = "async")]
+    use crate::frame::AsyncFrame;
     use crate::frame::{DynamicFrame, FrameIdx, NullFrame, Output, StaticFrame};
     #[cfg(feature = "async")]
-    use crate::multitask::AsyncFrame;
-    #[cfg(feature = "async")]
-    use crate::sync::Async;
-    use crate::sync::{Mode, Sync};
+    use crate::mode::Async;
+    use crate::mode::{Mode, Sync};
     use crate::value::string::JuliaString;
     use crate::value::symbol::Symbol;
     use crate::value::{Value, Values};

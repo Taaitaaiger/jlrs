@@ -39,9 +39,6 @@ impl JuliaTask for MyTask {
         // Get `complexfunc` in `MyModule`, call it asynchronously with `call_async`, and await
         // the result before casting it to an `f64` (which that function returns). A function that
         // is called with `call_async` is executed on a thread created with `Base.threads.@spawn`.
-        // It's important that a function that is called with `call_async` never yields. This
-        // means you cannot call functions like `println` or `sleep` in a function called with
-        // `call_async`. If the task yields, it won't be rescheduled and stops progressing.
         let v = Module::main(global)
             .submodule("MyModule")?
             .function("complexfunc")?
@@ -64,8 +61,8 @@ impl JuliaTask for MyTask {
 fn main() {
     // Initialize the asynchronous runtime. We'll allow a backlog of sixteen pending messages in 
     // the channel that the runtime consumes, two tasks to run simultaneously, give each task a 
-    // stack with sixteen slots to protect data from garbage collection, insert a safepoint every 
-    // millisecond, and provide the path to jlrs.jl.
+    // stack with sixteen slots to protect data from garbage collection, insert a process events
+    // every millisecond, and provide the path to jlrs.jl.
     //
     // Okay, that's a lot to unpack. Let's look at those arguments a bit more closely to see why 
     // we need them.
@@ -85,34 +82,38 @@ fn main() {
     // indicate it has run out of stack space; if it is too large, you will waste memory. You can
     // find the stack space costs of different operations in the documentation of jlrs.
     //
-    // When one or more function are running in other threads but the runtime has no synchronous
-    // work to do, the garbage collector can't run. In order to solve this issue, a safepoint must
-    // periodically be inserted. 
+    // When one or more functions are running in other threads but the runtime has no synchronous
+    // work to do, the garbage collector can't run. Similarly, asynchronous events (such as
+    // rescheduling a task that has yielded after calling `sleep` or `println`) will not be 
+    // handled either. In order to solve this issue, these things are explicitly handled 
+    // periodically.
     //
     // In order to use the asynchronous runtime, custom Julia code defined in jlrs.jl must be 
     // used. Things won't work without it.
     //
     // After calling this function we have a `task_sender` we can use to send tasks and requests
     // to include a file to the runtime, and a handle to the thread where the runtime is running.
-    let (task_sender, handle) =
-        AsyncJulia::init(16, 2, 16, 1, "../../jlrs.jl").expect("Could not init Julia");
+    let (julia, handle) = unsafe { 
+        AsyncJulia::init(16, 2, 16, 1, "../../jlrs.jl")
+            .expect("Could not init Julia") 
+    };
 
     // Let's include the custom code our task needs.
-    task_sender.try_include("MyModule.jl").unwrap();
+    julia.try_include("MyModule.jl").unwrap();
 
     // Create two channels for two tasks (this is not required but helps distinguish which result
-    // belong to which task).
+    // belongs to which task).
     let (sender1, receiver1) = crossbeam_channel::bounded(1);
     let (sender2, receiver2) = crossbeam_channel::bounded(1);
 
     // Send two tasks to the runtime.
-    task_sender.try_send_task(MyTask {
+    julia.try_send_task(MyTask {
         dims: 4,
         iters: 5_000_000,
         sender: sender1,
     }).unwrap();
 
-    task_sender.try_send_task(MyTask {
+    julia.try_send_task(MyTask {
         dims: 6,
         iters: 5_000_000,
         sender: sender2,
@@ -128,6 +129,6 @@ fn main() {
 
     // `task_sender is the only sender, dropping it will cause the runtime to shut down Julia and
     // itself. We join the handle to wait for everything to shut down cleanly.
-    std::mem::drop(task_sender);
-    handle.join().expect("Cannot join");
+    std::mem::drop(julia);
+    handle.join().expect("Cannot join").expect("Unable to init Julia");
 }

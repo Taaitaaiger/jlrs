@@ -876,16 +876,23 @@ impl<'frame, 'data> Value<'frame, 'data> {
         }
     }
 
+    /// Call this value as a function that takes several arguments and execute it on another
+    /// thread in Julia created with `Base.@spawn`, this takes two slots on the GC stack. Returns
+    /// the result of this function call if no exception is thrown, the exception if one is, or an
+    /// error if no space is left on the stack.
+    ///
+    /// This function can only be called with an `AsyncFrame`, while you're waiting for this
+    /// function to complete,
     #[cfg(feature = "async")]
     pub async fn call_async<'value, 'borrow, V>(
         self,
-        frame: &mut crate::multitask::AsyncFrame<'frame>,
+        frame: &mut crate::frame::AsyncFrame<'frame>,
         args: V,
     ) -> JlrsResult<CallResult<'frame, 'borrow>>
     where
         V: AsMut<[Value<'value, 'borrow>]>,
     {
-        unsafe { Ok(crate::multitask::JuliaFuture::new(frame, self, args)?.await) }
+        unsafe { Ok(crate::julia_future::JuliaFuture::new(frame, self, args)?.await) }
     }
 
     /// Call this value as a function that takes several arguments in a single `Values`, this

@@ -7,12 +7,12 @@
 [![License:MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 
-The main goal behind `jlrs` is to provide a simple and safe interface to the Julia C API. Currently this crate is only tested on Linux and Windows in combination with Julia 1.5.0 and is not compatible with earlier versions of Julia.
+The main goal behind jlrs is to provide a simple and safe interface to the Julia C API. Currently this crate is only tested on Linux and Windows in combination with Julia 1.5.0 and is not compatible with earlier versions of Julia.
 
 
 ## Features
 
-An incomplete list of features that are currently supported by `jlrs`:
+An incomplete list of features that are currently supported by jlrs:
 
  - Access arbitrary Julia modules and their contents.
  - Call arbitrary Julia functions.
@@ -59,7 +59,7 @@ You can call `Julia::include` to include your own Julia code and either `Julia::
 
 The other two methods, `Julia::frame` and `Julia::dynamic_frame`, take a closure that provides you with a `Global`, and either a `StaticFrame` or `DynamicFrame` respectively. `Global` is a token that lets you access Julia modules their contents, and other global values, while the frames are used to deal with local Julia data.
 
-Local data must be handled properly: Julia is a programming language with a garbage collector that is unaware of any references to data outside of Julia. In order to make it aware of this usage a stack must be maintained. You choose this stack's size when calling `Julia::init`. The elements of this stack are called stack frames; they contain a pointer to the previous frame, the number of protected values, and that number of pointers to values. The two frame types offered by `jlrs` take care of all the technical details, a `DynamicFrame` will grow to the required size while a `StaticFrame` has a definite number of slots. These frames can be nested (ie stacked) arbitrarily.
+Local data must be handled properly: Julia is a programming language with a garbage collector that is unaware of any references to data outside of Julia. In order to make it aware of this usage a stack must be maintained. You choose this stack's size when calling `Julia::init`. The elements of this stack are called stack frames; they contain a pointer to the previous frame, the number of protected values, and that number of pointers to values. The two frame types offered by jlrs take care of all the technical details, a `DynamicFrame` will grow to the required size while a `StaticFrame` has a definite number of slots. These frames can be nested (ie stacked) arbitrarily.
 
 In order to call a Julia function, you'll need two things: a function to call, and arguments to call it with. You can acquire the function through the module that defines it with `Module::function`; `Module::base` and `Module::core` provide access to Julia's `Base` and `Core` module respectively, while everything you include through `Julia::include` is made available relative to the `Main` module which you can access by calling `Module::main`.
 

@@ -1,4 +1,6 @@
 module Jlrs
+export asynccall, tracingcall, attachstacktrace, TracedException, wakerust
+
 using Base.StackTraces
 
 struct TracedException
@@ -6,41 +8,44 @@ struct TracedException
     stacktrace::StackTrace
 end
 
-function runasync(func, wakeptr, args...)
-    result = func(args...)
-    
-    # wakerust is set by jlrs
-    ccall(wakerust, Cvoid, (Ptr{Cvoid}, ), wakeptr)
-    result
+const wakerust = Ref{Ptr{Cvoid}}(C_NULL)
+
+function runasync(func::Function, wakeptr::Ptr{Cvoid}, args...)::Any
+    try
+        func(args...)
+    finally
+        ccall(wakerust[], Cvoid, (Ptr{Cvoid},), wakeptr)
+    end
 end
 
-function asynccall(func, wakeptr, args...)
+function asynccall(func::Function, wakeptr::Ptr{Cvoid}, args...)::Task
+    @assert wakerust[] != C_NULL "wakerust is null"
     Base.Threads.@spawn runasync(func, wakeptr, args...)
 end
 
-function tracingcall(func)
+function tracingcall(func::Function)::Function
     function wrapper(args...)
         try
             func(args...)
-        catch exc
+        catch
             for s in stacktrace(catch_backtrace(), true)
                 println(stderr, s)
             end
 
-            rethrow(exc)
+            rethrow()
         end
     end
 
     wrapper
 end
 
-function attachstacktrace(func)
+function attachstacktrace(func::Function)::Function
     function wrapper(args...)
         try
             func(args...)
         catch exc
-            st = stacktrace(catch_backtrace(), true)
-            throw(TracedException(exc, st))
+            st::StackTrace = stacktrace(catch_backtrace(), true)
+            rethrow(TracedException(exc, st))
         end
     end
 

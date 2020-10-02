@@ -63,6 +63,10 @@ pub fn other<E: Error + Send + Sync + 'static>(reason: E) -> JlrsResult<()> {
     Err(JlrsError::Other(Box::new(reason)))?
 }
 
+pub fn other_err<E: Error + Send + Sync + 'static>(reason: E) -> JlrsError {
+    JlrsError::Other(Box::new(reason))
+}
+
 impl JlrsError {
     pub(crate) fn other<E: Error + Send + Sync + 'static>(reason: E) -> Self {
         JlrsError::Other(Box::new(reason))

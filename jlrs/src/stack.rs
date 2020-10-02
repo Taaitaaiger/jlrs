@@ -19,7 +19,7 @@
 
 use crate::error::{AllocError, JlrsResult};
 use crate::frame::{FrameIdx, Output};
-use crate::sync::Mode;
+use crate::mode::Mode;
 use crate::value::{Value, Values};
 use std::ffi::c_void;
 use std::marker::PhantomData;
@@ -203,5 +203,169 @@ where
     ) -> Value<'output, 'static> {
         self.stack[idx.0 + offset] = value;
         Value::wrap(value.cast())
+    }
+}
+
+#[cfg(feature = "async")]
+pub(crate) mod multitask {
+    use crate::error::{AllocError, JlrsError, JlrsResult};
+    use crate::traits::multitask::JuliaTask;
+    use async_std::task::JoinHandle;
+    use jl_sys::jl_get_ptls_states;
+    use std::collections::VecDeque;
+    use std::ffi::c_void;
+    use std::ptr::null_mut;
+
+    struct Node<T> {
+        value: T,
+        next: Option<Box<Node<T>>>,
+    }
+
+    struct LinkedList<T> {
+        head: Option<Node<T>>,
+    }
+
+    impl LinkedList<usize> {
+        pub fn new_free_list(n_tasks: usize) -> Self {
+            let mut current = Node {
+                value: n_tasks - 1,
+                next: None,
+            };
+
+            for i in (0..n_tasks - 1).rev() {
+                let new = Node {
+                    value: i,
+                    next: Some(Box::new(current)),
+                };
+
+                current = new;
+            }
+
+            LinkedList {
+                head: Some(current),
+            }
+        }
+    }
+
+    impl<T> LinkedList<T> {
+        pub fn pop(&mut self) -> Option<T> {
+            let Node { value, next } = self.head.take()?;
+            self.head = next.map(|x| *x);
+            Some(value)
+        }
+
+        pub fn push(&mut self, value: T) {
+            let head = Node {
+                value,
+                next: self.head.take().map(Box::new),
+            };
+            self.head = Some(head);
+        }
+    }
+
+    pub(crate) struct TaskStack {
+        pub(crate) raw: Box<[*mut c_void]>,
+    }
+
+    impl TaskStack {
+        pub(crate) unsafe fn new(stack_size: usize) -> Self {
+            let v = vec![null_mut(); stack_size];
+
+            Self {
+                raw: v.into_boxed_slice(),
+            }
+        }
+
+        pub(crate) unsafe fn init(&mut self) -> JlrsResult<()> {
+            if self.raw.len() < 3 {
+                Err(JlrsError::AllocError(AllocError::StackOverflow(
+                    3,
+                    self.raw.len(),
+                )))?;
+            }
+
+            let rtls = &mut *jl_get_ptls_states();
+
+            self.raw[0] = 3 as _;
+            self.raw[2] = rtls.pgcstack as _;
+
+            rtls.pgcstack = self.raw[1..].as_mut_ptr().cast();
+            Ok(())
+        }
+
+        #[allow(dead_code)]
+        pub fn print_memory(&self) {
+            println!("{:?}", self.raw.as_ref());
+        }
+    }
+
+    pub(crate) struct MultitaskStack<T, R> {
+        pub(crate) raw: Box<[Option<TaskStack>]>,
+        queue: VecDeque<Box<dyn JuliaTask<T = T, R = R>>>,
+        free_list: LinkedList<usize>,
+        pub(crate) running: Box<[Option<JoinHandle<()>>]>,
+        pub(crate) n: usize,
+    }
+
+    impl<T, R> MultitaskStack<T, R> {
+        pub(crate) unsafe fn new(n_tasks: usize, stack_size: usize) -> Self {
+            let mut raw = Vec::new();
+
+            for _ in 0..n_tasks + 1 {
+                raw.push(Some(TaskStack::new(stack_size)));
+            }
+
+            let running = raw
+                .iter()
+                .map(|_| None)
+                .collect::<Vec<_>>()
+                .into_boxed_slice();
+
+            for s in raw.iter_mut() {
+                match s {
+                    Some(ref mut s) => s.init().unwrap(),
+                    _ => unreachable!(),
+                }
+            }
+
+            MultitaskStack {
+                raw: raw.into_boxed_slice(),
+                queue: VecDeque::new(),
+                free_list: LinkedList::new_free_list(n_tasks),
+                running,
+                n: 0,
+            }
+        }
+
+        pub(crate) fn acquire_task_frame(&mut self) -> Option<(usize, TaskStack)> {
+            let idx = self.free_list.pop()?;
+            let ts = self.raw[idx]
+                .take()
+                .expect("Memory was corrupted: Task stack is None.");
+            Some((idx, ts))
+        }
+
+        pub(crate) fn return_task_frame(&mut self, frame: usize, ts: TaskStack) {
+            self.free_list.push(frame);
+            self.raw[frame] = Some(ts);
+        }
+
+        pub(crate) fn add_pending(&mut self, jl_task: Box<dyn JuliaTask<T = T, R = R>>) {
+            self.queue.push_back(jl_task);
+        }
+
+        pub(crate) fn pop_pending(&mut self) -> Option<Box<dyn JuliaTask<T = T, R = R>>> {
+            self.queue.pop_front()
+        }
+
+        // keep this around for debugging purposes
+        #[allow(dead_code)]
+        pub(crate) fn print_memory(&self) {
+            println!("[");
+            for stack in self.raw.iter() {
+                stack.as_ref().map(|f| f.print_memory());
+            }
+            println!("]");
+        }
     }
 }
