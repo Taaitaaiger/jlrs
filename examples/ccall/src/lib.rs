@@ -16,9 +16,9 @@ pub unsafe extern "C" fn add(a: i32, b: i32) -> i32 {
 // `Array{Float64}`.
 #[no_mangle]
 pub unsafe extern "C" fn incr_array(a: TypedArray<f64>) {
-    // We want to mutably borrow the array data, but don't need to protect any new values.
-    let mut ccall = CCall::new(0);
-    ccall
+    // We want to mutably borrow the array data but don't need to protect any new values, so we
+    // can use `CCall::null` and `CCall::null_frame` to avoid allocations.
+    CCall::null()
         .null_frame(|frame| {
             let mut data = a.inline_data_mut(frame)?;
 

@@ -882,7 +882,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// error if no space is left on the stack.
     ///
     /// This function can only be called with an `AsyncFrame`, while you're waiting for this
-    /// function to complete,
+    /// function to complete, other tasks are able to progress.
     #[cfg(feature = "async")]
     pub async fn call_async<'value, 'borrow, V>(
         self,

@@ -1,22 +1,25 @@
-//! Memory management for different runtime modes.
+//! Runtime modes.
 
 use crate::frame::FrameIdx;
 use jl_sys::jl_get_ptls_states;
 use std::ffi::c_void;
 use std::ptr::null_mut;
 
-/// Mode used by the synchronous runtime
+/// Mode used by the synchronous runtime.
 pub enum Sync {}
 
 #[cfg(feature = "async")]
-/// Mode used by the asynchronous runtime
+/// Mode used by the asynchronous runtime.
 pub enum Async {}
 
 /// This trait is used to allow pushing and popping GC frames to behave differently in the two
-/// available modes. You must never use its methods directly.
+/// available modes.
 pub unsafe trait Mode: private::Sealed {
+    #[doc(hidden)]
     unsafe fn new_frame(stack: &mut [*mut c_void], size: usize, capacity: usize) -> FrameIdx;
+    #[doc(hidden)]
     unsafe fn new_dynamic_frame(stack: &mut [*mut c_void], size: usize) -> FrameIdx;
+    #[doc(hidden)]
     unsafe fn pop_frame(stack: &mut [*mut c_void], idx: FrameIdx);
 }
 
@@ -71,21 +74,21 @@ unsafe impl Mode for Async {
     //
     // [
     //     [3, 0, 0, 0...],
-    //     [3, 0, pa, 1, p0, x, 0...],
+    //     [6, 0, pa, 1, p0, x, 0...],
     //     [3, 0, p1, 0...],
     //     ...
     // ]
     //
     // [
     //     [3, 0, 0, 0...],
-    //     [3, 0, pb, 1, p0, x, 1, pa, y, 0...],
+    //     [9, 0, pb, 1, p0, x, 1, pa, y, 0...],
     //     [3, 0, p1, 0...],
     //     ...
     // ]
     //
     // [
     //     [3, 0, 0, 0...],
-    //     [3, 0, pc, 1, p0, x, 1, pa, y, 1, pb, z, 0...],
+    //     [12, 0, pc, 1, p0, x, 1, pa, y, 1, pb, z, 0...],
     //     [3, 0, p1, 0...],
     //     ...
     // ]

@@ -107,13 +107,13 @@ fn main() {
     let (sender2, receiver2) = crossbeam_channel::bounded(1);
 
     // Send two tasks to the runtime.
-    julia.try_send_task(MyTask {
+    julia.try_new_task(MyTask {
         dims: 4,
         iters: 5_000_000,
         sender: sender1,
     }).unwrap();
 
-    julia.try_send_task(MyTask {
+    julia.try_new_task(MyTask {
         dims: 6,
         iters: 5_000_000,
         sender: sender2,
