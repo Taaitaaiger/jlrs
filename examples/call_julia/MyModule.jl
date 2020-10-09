@@ -1,9 +1,6 @@
 module MyModule
 function complexfunc(a::Int, b::Int)::Float64
-    @time c(a, b)
-end
 
-function c(a::Int, b::Int)::Float64
     x = rand(Float64, (a, a))
     for i in 1:b
         x += rand(Float64, (a, a))

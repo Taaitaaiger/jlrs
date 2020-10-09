@@ -37,7 +37,7 @@ use std::thread::{self, JoinHandle as ThreadHandle};
 use std::time::Duration;
 
 /// A handle to the async runtime. It can be used to include files and create new tasks. The
-/// runtime shuts down when the last handle has been dropped. The two generic type parameters `T`
+/// runtime shuts down when the last handle is dropped. The two generic type parameters `T`
 /// and `R` are the return type and return channel type respectively, which must be the same across
 /// all different implementations of [`JuliaTask`] that you use.
 ///
@@ -63,7 +63,7 @@ use std::time::Duration;
 pub struct AsyncJulia<T, R>
 where
     T: Send + Sync + 'static,
-    R: ReturnChannel<T = T> + 'static,
+    R: ReturnChannel<T = T>,
 {
     sender: AsyncStdSender<Message<T, R>>,
 }
@@ -71,15 +71,15 @@ where
 impl<T, R> AsyncJulia<T, R>
 where
     T: Send + Sync + 'static,
-    R: ReturnChannel<T = T> + 'static,
+    R: ReturnChannel<T = T>,
 {
-    /// Initializes Julia in a new thread, this function can only be called once. If Julia has
+    /// Initialize Julia in a new thread, this function can only be called once. If Julia has
     /// already been initialized this will return an error, otherwise it will return a handle to
     /// the runtime and a handle to the thread. The runtime is shut down after the final handle to
     /// it has been dropped.
     ///
     /// In addition to the common arguments to initialize the async runtime, you need to provide
-    /// `jlrs_path`. This is the path to `jlrs.jl`, this file is required for `AsyncJulia` to work
+    /// `jlrs_path`. This is the path to `jlrs.jl`, which is required for `AsyncJulia` to work
     /// correctly.
     ///
     /// This function is unsafe because this crate provides you with a way to execute arbitrary
@@ -101,7 +101,7 @@ where
         Ok((julia, handle))
     }
 
-    /// Initializes Julia as a blocking task, this function can only be called once. If Julia was
+    /// Initialize Julia as a blocking task, this function can only be called once. If Julia was
     /// already initialized this will return an error, otherwise it will return a handle to the
     /// runtime and a handle to the task. The runtime is shut down after the final handle to it
     /// has been dropped.
@@ -146,7 +146,7 @@ where
     /// this crate provides you with a way to execute arbitrary Julia code which can't be checked
     /// for correctness.
     ///
-    /// [`AsyncJulia::init`]: struct.Julia.html#init
+    /// [`AsyncJulia::init`]: struct.AsyncJulia.html#method.init
     /// [`PackageCompiler`]: https://julialang.github.io/PackageCompiler.jl/dev/
     pub unsafe fn init_with_image<P, Q>(
         channel_capacity: usize,
@@ -177,10 +177,10 @@ where
         Ok((julia, handle))
     }
 
-    /// Initializes Julia with a custom system image as as a blocking task. A custom image can be
-    /// generated with the [`PackageCompiler`] package for Julia. The main advantage of using a
-    /// custom image over the default one is that it allows you to avoid much of the compilation
-    /// overhead often associated with Julia.
+    /// This function is similar to [`AsyncJulia::init_async`] except that it loads a custom
+    /// system image. A custom image can be generated with the [`PackageCompiler`] package for
+    /// Julia. The main advantage of using a custom image over the default one is that it allows
+    /// you to avoid much of the compilation overhead often associated with Julia.
     ///
     /// In addition to the common arguments to initialize the async runtime, you need to provide
     /// `julia_bindir` and `image_path`. The first must be the absolute path to a directory that
@@ -193,7 +193,7 @@ where
     /// this crate provides you with a way to execute arbitrary Julia code which can't be checked
     /// for correctness.
     ///
-    /// [`AsyncJulia::init`]: struct.Julia.html#init
+    /// [`AsyncJulia::init_async`]: struct.Julia.html#method.init_async
     /// [`PackageCompiler`]: https://julialang.github.io/PackageCompiler.jl/dev/
     pub async unsafe fn init_with_image_async<P, Q>(
         channel_capacity: usize,
@@ -403,9 +403,9 @@ enum Message<T, R> {
     TrySetWakeFn(Arc<(Mutex<Status>, Condvar)>),
 }
 
+struct Wrapper(usize, TaskStack);
 // NB: I'm not sure if this is sound, but the TaskStack is never sent to (or used from) another
 // thread.
-struct Wrapper(usize, TaskStack);
 unsafe impl Send for Wrapper {}
 
 fn run_task<T: Send + Sync + 'static, R>(

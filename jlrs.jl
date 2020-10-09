@@ -1,6 +1,4 @@
 module Jlrs
-export asynccall, tracingcall, attachstacktrace, TracedException, wakerust
-
 using Base.StackTraces
 
 struct TracedException

@@ -8,14 +8,15 @@ fn main() {
     julia.include("MyModule.jl").expect("Could not include file");
     let v = julia.dynamic_frame(|global, frame| {
         let dim = Value::new(frame, 4isize)?;
-        let iters = Value::new(frame, 10_000_000isize)?;
+        let iters = Value::new(frame, 1_000_000isize)?;
 
         Module::main(global)
             .submodule("MyModule")?
             .function("complexfunc")?
             .call2(frame, dim, iters)?
-            .expect("Threw an error")
+            .expect("MyModule.complexfunc threw an error")
             .cast::<f64>()
-    }).expect("Oops");
-    println!("Hello, world! {}", v);
+    }).expect("Result is an error");
+
+    println!("Result: {}", v);
 }

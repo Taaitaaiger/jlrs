@@ -17,7 +17,7 @@
 //!  - Create and use n-dimensional arrays.
 //!  - Support for mapping Julia structs to Rust structs, which can be generated with `JlrsReflect.jl`.
 //!  - Structs that can be mapped to Rust include those with type parameters and bits unions.
-//!  - Use all of these features when calling Rust from Julia through `ccall`.
+//!  - Use these features when calling Rust from Julia through `ccall`.
 //!  - Offload long-running functions to another thread and `.await` the result with the (experimental) async runtime.
 //!
 //!
@@ -75,9 +75,8 @@
 //!
 //! You can call [`Julia::include`] to include your own Julia code and either [`Julia::frame`] or
 //! [`Julia::dynamic_frame`] to interact with Julia. If you want to have improved support for
-//! backtraces `jlrs.jl` must be included. You can find this file in the root of this crate's github
-//! repository. This is necessary because this functionality depends on some Julia code defined in
-//! that file.
+//! backtraces `jlrs.jl` must be included. You can find this file [here]. This is necessary
+//! because this functionality depends on some Julia code defined in that file.
 //!
 //! The other two methods, [`Julia::frame`] and [`Julia::dynamic_frame`], take a closure that
 //! provides you with a [`Global`], and either a [`StaticFrame`] or [`DynamicFrame`] respectively.
@@ -264,15 +263,15 @@
 //! The struct [`AsyncJulia`] is exported by the prelude and lets you initialize the runtime in
 //! two ways, either as a task or as a thread. The first type should be used if you want to
 //! integrate the async runtime into a larger project that uses `async_std`. In order for the
-//! runtime to work correctly, the `JULIA_NUM_THREADS` environment variable must be set to a value
+//! runtime to work correctly the `JULIA_NUM_THREADS` environment variable must be set to a value
 //! larger than 1.
 //!
 //! In order to call Julia with the async runtime you must implement the [`JuliaTask`] trait. The
-//! `run`-method of this trait is highly similar to the closures that are used in the examples
+//! `run`-method of this trait is similar to the closures that are used in the examples
 //! above for the sync runtime; it provides you with a [`Global`] and an [`AsyncFrame`] which
-//! implements [`Frame`]. The [`AsyncFrame`] is required to use [`Value::call_async`] which calls
-//! a function on a new thread by calling `Base.Threads.@spawn` and returns a `Future`. While you
-//! `.await` the result the runtime can handle another task. If you don't use
+//! implements the [`Frame`] trait. The [`AsyncFrame`] is required to use [`Value::call_async`]
+//! which calls a function on a new thread using `Base.Threads.@spawn` and returns a `Future`.
+//! While you await the result the runtime can handle another task. If you don't use
 //! [`Value::call_async`] tasks are handled sequentially.
 //!
 //! It's important to keep in mind that allocating memory in Julia uses a lock, so if you run
@@ -282,7 +281,7 @@
 //! takes a long time to complete but needs to allocate rarely, you should periodically call
 //! `GC.safepoint` in Julia to ensure the garbage collector can run.
 //!
-//! You can find fully commented basic examples in [`the examples directory of the repo`].
+//! You can find fully commented basic examples in [the examples directory of the repo].
 //!
 //!
 //! # Custom types
@@ -351,7 +350,10 @@
 //! [`Value::new`]: value/struct.Value.html#method.new
 //! [`Value::call_async`]: value/struct.Value.html#method.call_async
 //! [`Value::cast`]: value/struct.Value.html#method.cast
-//! [the instructions for compiling Julia on Windows using Cygwin and MinGW]: https://github.com/JuliaLang/julia/blob/v1.4.1/doc/build/windows.md#cygwin-to-mingw-cross-compiling
+//! [`AsyncJulia`]: multitask/struct.AsyncJulia.html
+//! [the instructions for compiling Julia on Windows using Cygwin and MinGW]: https://github.com/JuliaLang/julia/blob/v1.5.2/doc/build/windows.md#cygwin-to-mingw-cross-compiling
+//! [the examples directory of the repo]: https://github.com/Taaitaaiger/jlrs/tree/v0.7/examples
+//! [here]: https://raw.githubusercontent.com/Taaitaaiger/jlrs/v0.7/jlrs.jl
 
 pub mod error;
 pub mod frame;
@@ -613,10 +615,15 @@ impl Drop for Julia {
 /// create a frame first. You can use this struct to do so. It must never be used outside
 /// functions called through `ccall`.
 ///
-/// If you only need to use a frame to borrow array data, you can use `CCall::null_frame`. Unlike
-/// `Julia`, `CCall` postpones the allocation of the stack that is used for managing the GC until
-/// a static or dynamic frame is created. In the case of a null frame, this stack isn't allocated
-/// at all. Unlike the other frame types null frames can't be nested.
+/// If you only need to use a frame to borrow array data, you can use [`CCall::null`] and
+/// [`CCall::null_frame`]. Unlike [`Julia`], `CCall` postpones the allocation of the stack that is
+/// used for managing the GC until a static or dynamic frame is created. In the case of a null
+/// frame, this stack isn't allocated at all. Unlike the other frame types null frames can't be
+/// nested.
+///
+/// [`Julia`]: struct.Julia.html
+/// [`CCall::null_frame`]: struct.CCall.html#method.null_frame
+/// [`CCall::null`]: struct.CCall.html#method.null
 pub struct CCall {
     stack: Option<RawStack>,
     stack_size: usize,
@@ -624,9 +631,11 @@ pub struct CCall {
 
 impl CCall {
     /// Create a new `CCall` that provides a stack with `stack_size` slots. This functions the
-    /// same way as `Julia::init` does. This function must never be called outside a function
+    /// same way as [`Julia::init`] does. This function must never be called outside a function
     /// called through `ccall` from Julia and must only be called once during that call. The stack
     /// is not allocated untl a static or dynamic frame is created.
+    /// 
+    /// [`Julia::init`]: struct.Julia.html#method.init
     pub unsafe fn new(stack_size: usize) -> Self {
         CCall {
             stack: None,
@@ -635,7 +644,9 @@ impl CCall {
     }
 
     /// Create a new `CCall` that provides a stack with no slots. This means only creating a null
-    /// frame is supported.
+    /// frame is supported. This function must never be called outside a function
+    /// called through `ccall` from Julia and must only be called once during that call. The stack
+    /// is not allocated untl a static or dynamic frame is created.
     pub unsafe fn null() -> Self {
         CCall::new(0)
     }

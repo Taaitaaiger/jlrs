@@ -1,16 +1,15 @@
-use jlrs::prelude::*;
-use std::any::Any;
 use crossbeam_channel::Sender;
+use jlrs::prelude::*;
 
 struct MyTask {
     dims: isize,
     iters: isize,
-    sender: Sender<JlrsResult<Box<dyn Any + Send + Sync>>>,
+    sender: Sender<JlrsResult<f64>>,
 }
 
 #[async_trait(?Send)]
 impl JuliaTask for MyTask {
-    type T = Box<dyn Any + Send + Sync>;
+    type T = f64;
     type R = Sender<JlrsResult<Self::T>>;
 
     async fn run<'base>(
@@ -29,7 +28,7 @@ impl JuliaTask for MyTask {
             .unwrap()
             .cast::<f64>()?;
 
-        Ok(Box::new(v))
+        Ok(v)
     }
 
     fn return_channel(&self) -> Option<&Sender<JlrsResult<Self::T>>> {
@@ -67,13 +66,13 @@ mod tests {
             })
             .unwrap();
 
-        assert!(receiver2.recv().unwrap().unwrap().downcast_ref::<f64>().is_some());
-        assert!(receiver1.recv().unwrap().unwrap().downcast_ref::<f64>().is_some());
+        assert_eq!(receiver2.recv().unwrap().unwrap(), 30_000_006.0);
+        assert_eq!(receiver1.recv().unwrap().unwrap(), 20_000_004.0);
 
         std::mem::drop(julia);
         handle
             .join()
             .expect("Cannot join")
-            .expect("Unable to stop Julia");
+            .expect("Unable to start Julia");
     }
 }

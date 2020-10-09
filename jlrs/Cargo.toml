@@ -31,4 +31,4 @@ async-std = { version = "1.6", features = ["unstable"], optional = true }
 smallvec = { version = "1.4", optional = true }
 
 [package.metadata.docs.rs]
-features = ["docs-rs", "async"]
+features = ["docs-rs"]

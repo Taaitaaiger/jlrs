@@ -41,7 +41,7 @@ pub trait JuliaTask: Send + Sync + 'static {
 /// The `ReturnChannel` trait is implemented by types that can send a result back to a caller. It
 /// is implemented for both `async_std::sync::Sender` and `crossbeam_channel::Sender`.
 #[async_trait]
-pub trait ReturnChannel {
+pub trait ReturnChannel: 'static {
     type T: Send + Sync + 'static;
 
     /// Send the result.
