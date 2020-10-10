@@ -8,7 +8,7 @@ use std::ptr::null_mut;
 /// Mode used by the synchronous runtime.
 pub enum Sync {}
 
-#[cfg(feature = "async")]
+#[cfg(all(feature = "async", target_os = "linux"))]
 /// Mode used by the asynchronous runtime.
 pub enum Async {}
 
@@ -60,7 +60,7 @@ unsafe impl Mode for Sync {
     }
 }
 
-#[cfg(feature = "async")]
+#[cfg(all(feature = "async", target_os = "linux"))]
 unsafe impl Mode for Async {
     // In the async mode we're managing multiple stacks at the same time. These stacks are
     // chained together by using a frame with no slots that always exists for each frame.
@@ -131,6 +131,6 @@ mod private {
 
     impl Sealed for super::Sync {}
 
-    #[cfg(feature = "async")]
+    #[cfg(all(feature = "async", target_os = "linux"))]
     impl Sealed for super::Async {}
 }

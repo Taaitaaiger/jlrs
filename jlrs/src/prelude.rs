@@ -18,11 +18,11 @@ pub use crate::{CCall, Julia};
 #[cfg(feature = "jlrs-derive")]
 pub use jlrs_derive::{IntoJulia, JuliaStruct};
 
-#[cfg(feature = "async")]
+#[cfg(all(feature = "async", target_os = "linux"))]
 pub use crate::frame::AsyncFrame;
-#[cfg(feature = "async")]
+#[cfg(all(feature = "async", target_os = "linux"))]
 pub use crate::multitask::*;
-#[cfg(feature = "async")]
+#[cfg(all(feature = "async", target_os = "linux"))]
 pub use crate::traits::multitask::*;
-#[cfg(feature = "async")]
+#[cfg(all(feature = "async", target_os = "linux"))]
 pub use async_trait::async_trait;

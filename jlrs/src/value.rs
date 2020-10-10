@@ -883,7 +883,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     ///
     /// This function can only be called with an `AsyncFrame`, while you're waiting for this
     /// function to complete, other tasks are able to progress.
-    #[cfg(feature = "async")]
+    #[cfg(all(feature = "async", target_os = "linux"))]
     pub async fn call_async<'value, 'borrow, V>(
         self,
         frame: &mut crate::frame::AsyncFrame<'frame>,

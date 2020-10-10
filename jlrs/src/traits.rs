@@ -31,14 +31,14 @@
 //! [`Value::is`]: ../value/struct.Value.html#method.is
 //! [`DataType::is`]: ../value/datatype/struct.DataType.html#method.is
 
-#[cfg(feature = "async")]
+#[cfg(all(feature = "async", target_os = "linux"))]
 pub mod multitask;
 
 use crate::error::{AllocError, JlrsError, JlrsResult};
-#[cfg(feature = "async")]
+#[cfg(all(feature = "async", target_os = "linux"))]
 use crate::frame::AsyncFrame;
 use crate::frame::{DynamicFrame, NullFrame, Output, StaticFrame};
-#[cfg(feature = "async")]
+#[cfg(all(feature = "async", target_os = "linux"))]
 use crate::mode::Async;
 use crate::mode::{Mode, Sync};
 use crate::value::datatype::DataType;
@@ -752,7 +752,7 @@ impl<'frame> Frame<'frame> for NullFrame<'frame> {
     fn print_memory(&self) {}
 }
 
-#[cfg(feature = "async")]
+#[cfg(all(feature = "async", target_os = "linux"))]
 impl<'frame> Frame<'frame> for AsyncFrame<'frame> {
     fn frame<'nested, T, F: FnOnce(&mut StaticFrame<'nested, Async>) -> JlrsResult<T>>(
         &'nested mut self,
@@ -800,10 +800,10 @@ impl<'frame> Frame<'frame> for AsyncFrame<'frame> {
 
 pub(crate) mod private {
     use crate::error::AllocError;
-    #[cfg(feature = "async")]
+    #[cfg(all(feature = "async", target_os = "linux"))]
     use crate::frame::AsyncFrame;
     use crate::frame::{DynamicFrame, FrameIdx, NullFrame, Output, StaticFrame};
-    #[cfg(feature = "async")]
+    #[cfg(all(feature = "async", target_os = "linux"))]
     use crate::mode::Async;
     use crate::mode::{Mode, Sync};
     use crate::value::string::JuliaString;
@@ -1078,7 +1078,7 @@ pub(crate) mod private {
         }
     }
 
-    #[cfg(feature = "async")]
+    #[cfg(all(feature = "async", target_os = "linux"))]
     impl<'frame> Frame<'frame> for AsyncFrame<'frame> {
         type U = Async;
 

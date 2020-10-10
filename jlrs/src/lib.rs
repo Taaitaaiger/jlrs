@@ -260,6 +260,8 @@
 //! jlrs = { version = "0.7", features = ["async"] }
 //! ```
 //!
+//! This features is only supported on Linux.
+//!
 //! The struct [`AsyncJulia`] is exported by the prelude and lets you initialize the runtime in
 //! two ways, either as a task or as a thread. The first type should be used if you want to
 //! integrate the async runtime into a larger project that uses `async_std`. In order for the
@@ -360,10 +362,10 @@ pub mod frame;
 pub mod global;
 #[doc(hidden)]
 pub mod jl_sys_export;
-#[cfg(feature = "async")]
+#[cfg(all(feature = "async", target_os = "linux"))]
 pub mod julia_future;
 pub mod mode;
-#[cfg(feature = "async")]
+#[cfg(all(feature = "async", target_os = "linux"))]
 pub mod multitask;
 pub mod prelude;
 mod stack;

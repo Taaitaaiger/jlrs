@@ -34,7 +34,7 @@
 //! [`JuliaTask`]: ../traits/multitask/trait.JuliaTask.html
 
 use crate::error::JlrsResult;
-#[cfg(feature = "async")]
+#[cfg(all(feature = "async", target_os = "linux"))]
 use crate::mode::Async;
 use crate::mode::Mode;
 use crate::stack::{Dynamic, StackView, Static};
@@ -200,14 +200,14 @@ impl<'frame> NullFrame<'frame> {
 /// [`Value::call_async`]: ../value/struct.Value.html#method.call_async
 /// [`JuliaTask`]: ../traits/multitask/trait.JuliaTask.html
 /// [`AsyncJulia`]: ../multitask/struct.AsyncJulia.html
-#[cfg(feature = "async")]
+#[cfg(all(feature = "async", target_os = "linux"))]
 pub struct AsyncFrame<'frame> {
     pub(crate) idx: FrameIdx,
     pub(crate) memory: StackView<'frame, Async, Dynamic>,
     pub(crate) len: usize,
 }
 
-#[cfg(feature = "async")]
+#[cfg(all(feature = "async", target_os = "linux"))]
 impl<'frame> AsyncFrame<'frame> {
     pub(crate) unsafe fn nested_frame<'nested>(
         &'nested mut self,
@@ -221,7 +221,7 @@ impl<'frame> AsyncFrame<'frame> {
     }
 }
 
-#[cfg(feature = "async")]
+#[cfg(all(feature = "async", target_os = "linux"))]
 impl<'frame> Drop for AsyncFrame<'frame> {
     fn drop(&mut self) {
         unsafe {

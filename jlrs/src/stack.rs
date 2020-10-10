@@ -206,7 +206,7 @@ where
     }
 }
 
-#[cfg(feature = "async")]
+#[cfg(all(feature = "async", target_os = "linux"))]
 pub(crate) mod multitask {
     use crate::error::{AllocError, JlrsError, JlrsResult};
     use crate::traits::multitask::JuliaTask;
