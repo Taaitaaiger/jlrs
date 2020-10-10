@@ -1,6 +1,6 @@
 [package]
 name = "jlrs-ndarray"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Thomas van Doornmalen <thomas.vandoornmalen@gmail.com>"]
 edition = "2018"
 description = """
@@ -15,8 +15,12 @@ repository = "https://github.com/Taaitaaiger/jlrs"
 keywords = ["Julia", "math", "mathematics", "ndarray", "jlrs"]
 license = "MIT"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+docs-rs = ["jlrs/docs-rs"]
 
 [dependencies]
 jlrs = { path = "../jlrs", version = "0.7.0" }
 ndarray = "0.13" 
+
+[package.metadata.docs.rs]
+features = ["docs-rs"]
