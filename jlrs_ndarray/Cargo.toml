@@ -3,9 +3,20 @@ name = "jlrs-ndarray"
 version = "0.1.0"
 authors = ["Thomas van Doornmalen <thomas.vandoornmalen@gmail.com>"]
 edition = "2018"
+description = """
+jlrs is a library built around bindings to the Julia C API that enables Julia code to be called 
+from Rust. jlrs can move many kinds of data from Rust to Julia and back, share n-dimensional 
+numerical arrays between languages, call arbitrary functions, and load code from arbitrary Julia
+source files. jlrs currently supports Linux and Windows.
+"""
+documentation = "https://docs.rs/jlrs-ndarray"
+homepage = "https://github.com/Taaitaaiger/jlrs"
+repository = "https://github.com/Taaitaaiger/jlrs"
+keywords = ["Julia", "math", "mathematics", "ndarray", "jlrs"]
+license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 jlrs = { path = "../jlrs", version = "0.7.0" }
-ndarray = "0.13"
+ndarray = "0.13" 
