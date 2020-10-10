@@ -1378,8 +1378,10 @@ pub unsafe fn jl_array_ptr_set(a: *mut c_void, i: usize, x: *mut c_void) -> *mut
     assert!((&*a).flags.ptrarray() != 0);
     assert!(i < jl_array_len(a));
     let a_data: *mut *mut jl_value_t = jl_array_data(a.cast()).cast();
-    let dest = std::sync::atomic::AtomicPtr::from(a_data.add(i));
-    dest.store(x.cast(), std::sync::atomic::Ordering::Relaxed);
+
+    // This is wrong, should store atomically
+    let out = &mut *a_data.add(i);
+    *out = x.cast();
 
     if !x.is_null() {
         if (&*a).flags.how() == 3 {

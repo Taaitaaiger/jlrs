@@ -31,8 +31,16 @@
 //! [`Value::is`]: ../value/struct.Value.html#method.is
 //! [`DataType::is`]: ../value/datatype/struct.DataType.html#method.is
 
+#[cfg(all(feature = "async", target_os = "linux"))]
+pub mod multitask;
+
 use crate::error::{AllocError, JlrsError, JlrsResult};
-use crate::frame::{DynamicFrame, Output, StaticFrame};
+#[cfg(all(feature = "async", target_os = "linux"))]
+use crate::frame::AsyncFrame;
+use crate::frame::{DynamicFrame, NullFrame, Output, StaticFrame};
+#[cfg(all(feature = "async", target_os = "linux"))]
+use crate::mode::Async;
+use crate::mode::{Mode, Sync};
 use crate::value::datatype::DataType;
 use crate::value::string::JuliaString;
 use crate::value::symbol::Symbol;
@@ -40,13 +48,15 @@ use crate::value::Value;
 use jl_sys::{
     jl_bool_type, jl_box_bool, jl_box_char, jl_box_float32, jl_box_float64, jl_box_int16,
     jl_box_int32, jl_box_int64, jl_box_int8, jl_box_uint16, jl_box_uint32, jl_box_uint64,
-    jl_box_uint8, jl_char_type, jl_datatype_t, jl_float32_type, jl_float64_type, jl_int16_type,
-    jl_int32_type, jl_int64_type, jl_int8_type, jl_pchar_to_string, jl_string_data, jl_string_len,
-    jl_uint16_type, jl_uint32_type, jl_uint64_type, jl_uint8_type, jl_unbox_float32,
-    jl_unbox_float64, jl_unbox_int16, jl_unbox_int32, jl_unbox_int64, jl_unbox_int8,
-    jl_unbox_uint16, jl_unbox_uint32, jl_unbox_uint64, jl_unbox_uint8, jl_value_t,
+    jl_box_uint8, jl_box_voidpointer, jl_char_type, jl_datatype_t, jl_float32_type,
+    jl_float64_type, jl_int16_type, jl_int32_type, jl_int64_type, jl_int8_type, jl_pchar_to_string,
+    jl_string_data, jl_string_len, jl_uint16_type, jl_uint32_type, jl_uint64_type, jl_uint8_type,
+    jl_unbox_float32, jl_unbox_float64, jl_unbox_int16, jl_unbox_int32, jl_unbox_int64,
+    jl_unbox_int8, jl_unbox_uint16, jl_unbox_uint32, jl_unbox_uint64, jl_unbox_uint8,
+    jl_unbox_voidpointer, jl_value_t, jl_voidpointer_type,
 };
 use std::borrow::Cow;
+use std::ffi::c_void;
 
 macro_rules! p {
     ($trait:ident, $type:ty, $($bounds:tt)+) => {
@@ -237,11 +247,27 @@ macro_rules! impl_julia_typecheck {
     ($type:ty) => {
         unsafe impl crate::traits::JuliaTypecheck for $type {
             unsafe fn julia_typecheck(t: crate::value::datatype::DataType) -> bool {
-                t.ptr() == <$type as $crate::value::datatype::JuliaType>::julia_type()
+                t.ptr() == <$type as $crate::traits::JuliaType>::julia_type()
             }
         }
     };
 }
+
+impl_julia_typecheck!(i8);
+impl_julia_typecheck!(i16);
+impl_julia_typecheck!(i32);
+impl_julia_typecheck!(i64);
+impl_julia_typecheck!(isize);
+impl_julia_typecheck!(u8);
+impl_julia_typecheck!(u16);
+impl_julia_typecheck!(u32);
+impl_julia_typecheck!(u64);
+impl_julia_typecheck!(usize);
+impl_julia_typecheck!(f32);
+impl_julia_typecheck!(f64);
+impl_julia_typecheck!(bool);
+impl_julia_typecheck!(char);
+impl_julia_typecheck!(*mut c_void);
 
 /// This trait is implemented by types that a [`Value`] can be converted into by calling
 /// [`Value::cast`]. This includes types like `String`, [`Array`], and `u8`.
@@ -282,7 +308,7 @@ pub trait Frame<'frame>: private::Frame<'frame> {
     /// stack is `capacity + 2`.
     ///
     /// Returns an error if there is not enough space on the stack.
-    fn frame<'nested, T, F: FnOnce(&mut StaticFrame<'nested>) -> JlrsResult<T>>(
+    fn frame<'nested, T, F: FnOnce(&mut StaticFrame<'nested, Self::U>) -> JlrsResult<T>>(
         &'nested mut self,
         capacity: usize,
         func: F,
@@ -293,7 +319,7 @@ pub trait Frame<'frame>: private::Frame<'frame> {
     /// of required slots on the stack is `2`.
     ///
     /// Returns an error if there is not enough space on the stack.
-    fn dynamic_frame<'nested, T, F: FnOnce(&mut DynamicFrame<'nested>) -> JlrsResult<T>>(
+    fn dynamic_frame<'nested, T, F: FnOnce(&mut DynamicFrame<'nested, Self::U>) -> JlrsResult<T>>(
         &'nested mut self,
         func: F,
     ) -> JlrsResult<T>;
@@ -365,6 +391,7 @@ impl_into_julia!(i32, jl_box_int32);
 impl_into_julia!(i64, jl_box_int64);
 impl_into_julia!(f32, jl_box_float32);
 impl_into_julia!(f64, jl_box_float64);
+impl_into_julia!(*mut c_void, jl_box_voidpointer);
 
 #[cfg(not(target_pointer_width = "64"))]
 unsafe impl IntoJulia for usize {
@@ -457,6 +484,7 @@ impl_julia_type!(f32, jl_float32_type);
 impl_julia_type!(f64, jl_float64_type);
 impl_julia_type!(bool, jl_bool_type);
 impl_julia_type!(char, jl_char_type);
+impl_julia_type!(*mut c_void, jl_voidpointer_type);
 
 #[cfg(not(target_pointer_width = "64"))]
 unsafe impl JuliaType for usize {
@@ -516,6 +544,7 @@ impl_primitive_cast!(i32, jl_unbox_int32);
 impl_primitive_cast!(i64, jl_unbox_int64);
 impl_primitive_cast!(f32, jl_unbox_float32);
 impl_primitive_cast!(f64, jl_unbox_float64);
+impl_primitive_cast!(*mut c_void, jl_unbox_voidpointer);
 
 #[cfg(not(target_pointer_width = "64"))]
 impl_primitive_cast!(usize, jl_unbox_uint32);
@@ -601,8 +630,8 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for String {
     }
 }
 
-impl<'frame> Frame<'frame> for StaticFrame<'frame> {
-    fn frame<'nested, T, F: FnOnce(&mut StaticFrame<'nested>) -> JlrsResult<T>>(
+impl<'frame, M: Mode> Frame<'frame> for StaticFrame<'frame, M> {
+    fn frame<'nested, T, F: FnOnce(&mut StaticFrame<'nested, M>) -> JlrsResult<T>>(
         &'nested mut self,
         capacity: usize,
         func: F,
@@ -611,7 +640,7 @@ impl<'frame> Frame<'frame> for StaticFrame<'frame> {
         func(&mut frame)
     }
 
-    fn dynamic_frame<'nested, T, F: FnOnce(&mut DynamicFrame<'nested>) -> JlrsResult<T>>(
+    fn dynamic_frame<'nested, T, F: FnOnce(&mut DynamicFrame<'nested, M>) -> JlrsResult<T>>(
         &'nested mut self,
         func: F,
     ) -> JlrsResult<T> {
@@ -651,8 +680,8 @@ impl<'frame> Frame<'frame> for StaticFrame<'frame> {
     }
 }
 
-impl<'frame> Frame<'frame> for DynamicFrame<'frame> {
-    fn dynamic_frame<'nested, T, F: FnOnce(&mut DynamicFrame<'nested>) -> JlrsResult<T>>(
+impl<'frame, M: Mode> Frame<'frame> for DynamicFrame<'frame, M> {
+    fn dynamic_frame<'nested, T, F: FnOnce(&mut DynamicFrame<'nested, M>) -> JlrsResult<T>>(
         &'nested mut self,
         func: F,
     ) -> JlrsResult<T> {
@@ -660,7 +689,7 @@ impl<'frame> Frame<'frame> for DynamicFrame<'frame> {
         func(&mut frame)
     }
 
-    fn frame<'nested, T, F: FnOnce(&mut StaticFrame<'nested>) -> JlrsResult<T>>(
+    fn frame<'nested, T, F: FnOnce(&mut StaticFrame<'nested, M>) -> JlrsResult<T>>(
         &'nested mut self,
         capacity: usize,
         func: F,
@@ -696,10 +725,87 @@ impl<'frame> Frame<'frame> for DynamicFrame<'frame> {
     }
 }
 
+impl<'frame> Frame<'frame> for NullFrame<'frame> {
+    fn frame<'nested, T, F: FnOnce(&mut StaticFrame<'nested, Sync>) -> JlrsResult<T>>(
+        &'nested mut self,
+        _: usize,
+        _: F,
+    ) -> JlrsResult<T> {
+        Err(JlrsError::NullFrame)?
+    }
+
+    fn dynamic_frame<'nested, T, F: FnOnce(&mut DynamicFrame<'nested, Sync>) -> JlrsResult<T>>(
+        &'nested mut self,
+        _: F,
+    ) -> JlrsResult<T> {
+        Err(JlrsError::NullFrame)?
+    }
+
+    fn output(&mut self) -> JlrsResult<Output<'frame>> {
+        Err(JlrsError::NullFrame)?
+    }
+
+    fn size(&self) -> usize {
+        0
+    }
+
+    fn print_memory(&self) {}
+}
+
+#[cfg(all(feature = "async", target_os = "linux"))]
+impl<'frame> Frame<'frame> for AsyncFrame<'frame> {
+    fn frame<'nested, T, F: FnOnce(&mut StaticFrame<'nested, Async>) -> JlrsResult<T>>(
+        &'nested mut self,
+        capacity: usize,
+        func: F,
+    ) -> JlrsResult<T> {
+        unsafe {
+            let mut view = self.memory.nest_static();
+            let idx = view.new_frame(capacity)?;
+            let mut frame = StaticFrame {
+                idx,
+                capacity,
+                len: 0,
+                memory: view,
+            };
+
+            func(&mut frame)
+        }
+    }
+
+    fn dynamic_frame<'nested, T, F: FnOnce(&mut DynamicFrame<'nested, Async>) -> JlrsResult<T>>(
+        &'nested mut self,
+        func: F,
+    ) -> JlrsResult<T> {
+        let mut frame = unsafe { self.nested_frame().unwrap() };
+        func(&mut frame)
+    }
+
+    fn output(&mut self) -> JlrsResult<Output<'frame>> {
+        unsafe {
+            let out = self.memory.new_output(self.idx)?;
+            self.len += 1;
+            Ok(out)
+        }
+    }
+
+    fn size(&self) -> usize {
+        self.len
+    }
+
+    fn print_memory(&self) {
+        self.memory.print_memory()
+    }
+}
+
 pub(crate) mod private {
     use crate::error::AllocError;
-    use crate::frame::{DynamicFrame, Output, StaticFrame};
-    use crate::stack::FrameIdx;
+    #[cfg(all(feature = "async", target_os = "linux"))]
+    use crate::frame::AsyncFrame;
+    use crate::frame::{DynamicFrame, FrameIdx, NullFrame, Output, StaticFrame};
+    #[cfg(all(feature = "async", target_os = "linux"))]
+    use crate::mode::Async;
+    use crate::mode::{Mode, Sync};
     use crate::value::string::JuliaString;
     use crate::value::symbol::Symbol;
     use crate::value::{Value, Values};
@@ -719,6 +825,7 @@ pub(crate) mod private {
     }
 
     pub trait Frame<'frame> {
+        type U: Mode;
         // protect the value from being garbage collected while this frame is active.
         // safety: the value must be a valid Julia value
         unsafe fn protect(
@@ -796,7 +903,8 @@ pub(crate) mod private {
         }
     }
 
-    impl<'frame> Frame<'frame> for StaticFrame<'frame> {
+    impl<'frame, M: Mode> Frame<'frame> for StaticFrame<'frame, M> {
+        type U = M;
         unsafe fn protect(
             &mut self,
             value: *mut jl_value_t,
@@ -870,7 +978,110 @@ pub(crate) mod private {
         }
     }
 
-    impl<'frame> Frame<'frame> for DynamicFrame<'frame> {
+    impl<'frame, M: Mode> Frame<'frame> for DynamicFrame<'frame, M> {
+        type U = M;
+        unsafe fn protect(
+            &mut self,
+            value: *mut jl_value_t,
+            _: Internal,
+        ) -> Result<Value<'frame, 'static>, AllocError> {
+            let out = self.memory.protect(self.idx, value.cast())?;
+            self.len += 1;
+            Ok(out)
+        }
+
+        fn create_many<P: super::IntoJulia>(
+            &mut self,
+            values: &[P],
+            _: Internal,
+        ) -> Result<Values<'frame>, AllocError> {
+            unsafe {
+                let offset = self.len;
+                // TODO: check capacity
+
+                for value in values {
+                    match self.memory.protect(self.idx, value.into_julia().cast()) {
+                        Ok(_) => (),
+                        Err(AllocError::StackOverflow(_, n)) => {
+                            return Err(AllocError::StackOverflow(values.len(), n))
+                        }
+                        _ => unreachable!(),
+                    }
+                    self.len += 1;
+                }
+
+                Ok(self.memory.as_values(self.idx, offset, values.len()))
+            }
+        }
+
+        fn create_many_dyn(
+            &mut self,
+            values: &[&dyn super::IntoJulia],
+            _: Internal,
+        ) -> Result<Values<'frame>, AllocError> {
+            unsafe {
+                let offset = self.len;
+                // TODO: check capacity in advance
+
+                for value in values {
+                    self.memory.protect(self.idx, value.into_julia().cast())?;
+                    self.len += 1;
+                }
+
+                Ok(self.memory.as_values(self.idx, offset, values.len()))
+            }
+        }
+
+        fn assign_output<'output>(
+            &mut self,
+            output: Output<'output>,
+            value: *mut jl_value_t,
+            _: Internal,
+        ) -> Value<'output, 'static> {
+            unsafe { self.memory.protect_output(output, value.cast()) }
+        }
+    }
+
+    impl<'frame> Frame<'frame> for NullFrame<'frame> {
+        type U = Sync;
+        unsafe fn protect(
+            &mut self,
+            _: *mut jl_value_t,
+            _: Internal,
+        ) -> Result<Value<'frame, 'static>, AllocError> {
+            Err(AllocError::FrameOverflow(1, 0))
+        }
+
+        fn create_many<P: super::IntoJulia>(
+            &mut self,
+            values: &[P],
+            _: Internal,
+        ) -> Result<Values<'frame>, AllocError> {
+            Err(AllocError::FrameOverflow(values.len(), 0))
+        }
+
+        fn create_many_dyn(
+            &mut self,
+            values: &[&dyn super::IntoJulia],
+            _: Internal,
+        ) -> Result<Values<'frame>, AllocError> {
+            Err(AllocError::FrameOverflow(values.len(), 0))
+        }
+
+        fn assign_output<'output>(
+            &mut self,
+            _: Output<'output>,
+            _: *mut jl_value_t,
+            _: Internal,
+        ) -> Value<'output, 'static> {
+            unreachable!()
+        }
+    }
+
+    #[cfg(all(feature = "async", target_os = "linux"))]
+    impl<'frame> Frame<'frame> for AsyncFrame<'frame> {
+        type U = Async;
+
         unsafe fn protect(
             &mut self,
             value: *mut jl_value_t,

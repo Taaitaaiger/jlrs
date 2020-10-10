@@ -141,7 +141,7 @@ fn access_bounds_error_fields() {
 
                 assert_eq!(out.type_name(), "BoundsError");
 
-                let field_names = out.field_names(global);
+                let field_names = out.field_names();
                 let f0: String = field_names[0].into();
                 assert_eq!(f0, "a");
                 let f1: String = field_names[1].into();
@@ -173,7 +173,7 @@ fn access_bounds_error_fields_oob() {
             let func = Module::base(global).function("getindex")?;
             let out = func.call2(frame, array, idx)?.unwrap_err();
 
-            let field_names = out.field_names(global);
+            let field_names = out.field_names();
             assert!(out
                 .get_field(frame, field_names[1])?
                 .get_nth_field(frame, 123)
@@ -197,7 +197,7 @@ fn access_bounds_error_fields_output() {
             let out = func.call2(frame, array, idx)?.unwrap_err();
             let output = frame.output()?;
 
-            let field_names = out.field_names(global);
+            let field_names = out.field_names();
             assert!(out
                 .get_field(frame, field_names[1])?
                 .get_nth_field_output(frame, output, 0)
@@ -221,7 +221,7 @@ fn access_bounds_error_fields_output_oob() {
             let out = func.call2(frame, array, idx)?.unwrap_err();
             let output = frame.output()?;
 
-            let field_names = out.field_names(global);
+            let field_names = out.field_names();
             assert!(out
                 .get_field(frame, field_names[1])?
                 .get_nth_field_output(frame, output, 123)

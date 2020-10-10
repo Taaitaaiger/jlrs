@@ -16,7 +16,7 @@ use crate::value::datatype::DataType;
 use crate::value::Value;
 use jl_sys::{
     jl_array_data, jl_array_dim, jl_array_dims, jl_array_eltype, jl_array_ndims, jl_array_nrows,
-    jl_array_ptr_set, jl_array_t, jl_is_array_type, jl_typeof,
+    jl_array_ptr_set, jl_array_t, jl_is_array_type, jl_tparam0, jl_typeof,
 };
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::marker::PhantomData;
@@ -92,6 +92,18 @@ impl<'frame, 'data> Array<'frame, 'data> {
     #[doc(hidden)]
     pub unsafe fn ptr(self) -> *mut jl_array_t {
         self.0
+    }
+
+    /// Convert this untyped array into a `TypedArray`.
+    pub fn into_typed_array<T>(self) -> JlrsResult<TypedArray<'frame, 'data, T>>
+    where
+        T: Copy + ValidLayout,
+    {
+        if self.contains::<T>() {
+            unsafe { Ok(TypedArray::wrap(self.ptr())) }
+        } else {
+            Err(JlrsError::WrongType)?
+        }
     }
 
     /// Returns the array's dimensions.
@@ -216,6 +228,34 @@ impl<'frame, 'data> Array<'frame, 'data> {
         }
     }
 
+    /// Mutably borrow inline array data without the restriction that only a single array can be
+    /// mutably borrowed. It's your responsibility to ensure you don't create multiple mutable
+    /// references to the same array data.
+    ///
+    /// Returns `JlrsError::NotInline` if the data is not stored inline or `JlrsError::WrongType`
+    /// if the type of the elements is incorrect.
+    pub unsafe fn unrestricted_inline_data_mut<'borrow, 'fr, T, F>(
+        self,
+        frame: &'borrow F,
+    ) -> JlrsResult<UnrestrictedInlineArrayDataMut<'borrow, 'fr, T, F>>
+    where
+        T: ValidLayout,
+        F: Frame<'fr>,
+    {
+        if !self.contains::<T>() {
+            Err(JlrsError::WrongType)?;
+        }
+
+        if !self.is_inline_array() {
+            Err(JlrsError::NotInline)?;
+        }
+
+        let jl_data = jl_array_data(self.ptr().cast()).cast();
+        let dimensions = Dimensions::from_array(self.ptr().cast());
+        let data = std::slice::from_raw_parts_mut(jl_data, dimensions.size());
+        Ok(UnrestrictedInlineArrayDataMut::new(data, dimensions, frame))
+    }
+
     /// Immutably borrow the data of this value array, you can borrow data from multiple arrays at
     /// the same time. The values themselves can be mutable, but you can't replace an element with
     /// another value. Returns `JlrsError::Inline` if the data is stored inline.
@@ -268,6 +308,36 @@ impl<'frame, 'data> Array<'frame, 'data> {
         let data = std::slice::from_raw_parts_mut(jl_data, dimensions.size());
         Ok(ValueArrayDataMut::new(self, data, dimensions, frame))
     }
+
+    /// Mutably borrow the data of this value array without the restriction that only a single
+    /// array can be mutably borrowed. It's your responsibility to ensure you don't create
+    /// multiple mutable references to the same array data. Returns `JlrsError::Inline` if the
+    /// data is stored inline.
+    ///
+    /// Safety: no slot on the GC stack is required to access and use the values in this array,
+    /// the GC is aware of the array's data. If the element is changed either from Rust or Julia,
+    /// the original value is no longer protected from garbage collection. If you need to keep
+    /// using this value you must protect it by calling [`Value::extend`].
+    ///
+    /// [`Value::extend`]: ../struct.Value.html#method.extend
+    pub unsafe fn unrestricted_value_data_mut<'borrow, 'fr, F>(
+        self,
+        frame: &'borrow F,
+    ) -> JlrsResult<UnrestrictedValueArrayDataMut<'borrow, 'frame, 'data, 'fr, F>>
+    where
+        F: Frame<'fr>,
+    {
+        if !self.is_value_array() {
+            Err(JlrsError::Inline)?;
+        }
+
+        let jl_data = jl_array_data(self.ptr().cast()).cast();
+        let dimensions = Dimensions::from_array(self.ptr().cast());
+        let data = std::slice::from_raw_parts_mut(jl_data, dimensions.size());
+        Ok(UnrestrictedValueArrayDataMut::new(
+            self, data, dimensions, frame,
+        ))
+    }
 }
 
 unsafe impl<'frame, 'data> JuliaTypecheck for Array<'frame, 'data> {
@@ -303,6 +373,288 @@ unsafe impl<'frame, 'data> ValidLayout for Array<'frame, 'data> {
             dt.is::<Array>()
         } else if let Ok(ua) = v.cast::<super::union_all::UnionAll>() {
             ua.base_type().is::<Array>()
+        } else {
+            false
+        }
+    }
+}
+
+/// Exactly the same as [`Array`], except it has an explicit element type `T`.
+///
+/// [`Array`]: struct.Array.html
+#[derive(Copy, Clone, Debug)]
+#[repr(transparent)]
+pub struct TypedArray<'frame, 'data, T>(
+    *mut jl_array_t,
+    PhantomData<&'frame ()>,
+    PhantomData<&'data ()>,
+    PhantomData<T>,
+)
+where
+    T: Copy + ValidLayout;
+
+impl<'frame, 'data, T: Copy + ValidLayout> TypedArray<'frame, 'data, T> {
+    pub(crate) unsafe fn wrap(array: *mut jl_array_t) -> Self {
+        assert!(T::valid_layout(Value::wrap(
+            jl_array_eltype(array.cast()).cast()
+        )));
+        TypedArray(array, PhantomData, PhantomData, PhantomData)
+    }
+
+    #[doc(hidden)]
+    pub unsafe fn ptr(self) -> *mut jl_array_t {
+        self.0
+    }
+
+    /// Returns the array's dimensions.
+    pub fn dimensions(self) -> Dimensions {
+        unsafe { Dimensions::from_array(self.ptr().cast()) }
+    }
+
+    /// Returns the type of this array's elements.
+    pub fn element_type(self) -> Value<'frame, 'static> {
+        unsafe { Value::wrap(jl_array_eltype(self.ptr().cast()).cast()) }
+    }
+
+    /// Returns true if the elements of the array are stored inline.
+    pub fn is_inline_array(self) -> bool {
+        unsafe { (&*self.ptr()).flags.ptrarray() == 0 }
+    }
+
+    /// Returns true if the elements of the array are stored inline and at least one of the field
+    /// of the inlined type is a pointer.
+    pub fn has_inlined_pointers(self) -> bool {
+        unsafe {
+            let flags = (&*self.ptr()).flags;
+            self.is_inline_array() && flags.hasptr() != 0
+        }
+    }
+
+    /// Returns true if the elements of the array are stored as [`Value`]s.
+    pub fn is_value_array(self) -> bool {
+        !self.is_inline_array()
+    }
+
+    /// Copy the data of an inline array to Rust. Returns `JlrsError::NotInline` if the data is
+    /// not stored inline or `JlrsError::WrongType` if the type of the elements is incorrect.
+    pub fn copy_inline_data(self) -> JlrsResult<CopiedArray<T>> {
+        if !self.is_inline_array() {
+            Err(JlrsError::NotInline)?;
+        }
+
+        unsafe {
+            let jl_data = jl_array_data(self.ptr().cast()).cast();
+            let dimensions = Dimensions::from_array(self.ptr().cast());
+
+            let sz = dimensions.size();
+            let mut data = Vec::with_capacity(sz);
+            let ptr = data.as_mut_ptr();
+            std::ptr::copy_nonoverlapping(jl_data, ptr, sz);
+            data.set_len(sz);
+
+            Ok(CopiedArray::new(data, dimensions))
+        }
+    }
+
+    /// Immutably borrow inline array data, you can borrow data from multiple arrays at the same
+    /// time. Returns `JlrsError::NotInline` if the data is not stored inline or
+    /// `JlrsError::WrongType` if the type of the elements is incorrect.
+    pub fn inline_data<'borrow, 'fr, F>(
+        self,
+        frame: &'borrow F,
+    ) -> JlrsResult<ArrayData<'borrow, 'fr, T, F>>
+    where
+        F: Frame<'fr>,
+    {
+        if !self.is_inline_array() {
+            Err(JlrsError::NotInline)?;
+        }
+
+        unsafe {
+            let jl_data = jl_array_data(self.ptr().cast()).cast();
+            let dimensions = Dimensions::from_array(self.ptr().cast());
+            let data = std::slice::from_raw_parts(jl_data, dimensions.size());
+            Ok(ArrayData::new(data, dimensions, frame))
+        }
+    }
+
+    /// Mutably borrow inline array data, you can mutably borrow a single array at the same time.
+    /// Returns `JlrsError::NotInline` if the data is not stored inline or `JlrsError::WrongType`
+    /// if the type of the elements is incorrect.
+    pub fn inline_data_mut<'borrow, 'fr, F>(
+        self,
+        frame: &'borrow mut F,
+    ) -> JlrsResult<InlineArrayDataMut<'borrow, 'fr, T, F>>
+    where
+        F: Frame<'fr>,
+    {
+        if !self.is_inline_array() {
+            Err(JlrsError::NotInline)?;
+        }
+
+        unsafe {
+            let jl_data = jl_array_data(self.ptr().cast()).cast();
+            let dimensions = Dimensions::from_array(self.ptr().cast());
+            let data = std::slice::from_raw_parts_mut(jl_data, dimensions.size());
+            Ok(InlineArrayDataMut::new(data, dimensions, frame))
+        }
+    }
+
+    /// Mutably borrow inline array data without the restriction that only a single array can be
+    /// mutably borrowed. It's your responsibility to ensure you don't create multiple mutable
+    /// references to the same array data.
+    ///
+    /// Returns `JlrsError::NotInline` if the data is not stored inline or `JlrsError::WrongType`
+    /// if the type of the elements is incorrect.
+    pub unsafe fn unrestricted_inline_data_mut<'borrow, 'fr, F>(
+        self,
+        frame: &'borrow F,
+    ) -> JlrsResult<UnrestrictedInlineArrayDataMut<'borrow, 'fr, T, F>>
+    where
+        F: Frame<'fr>,
+    {
+        if !self.is_inline_array() {
+            Err(JlrsError::NotInline)?;
+        }
+
+        let jl_data = jl_array_data(self.ptr().cast()).cast();
+        let dimensions = Dimensions::from_array(self.ptr().cast());
+        let data = std::slice::from_raw_parts_mut(jl_data, dimensions.size());
+        Ok(UnrestrictedInlineArrayDataMut::new(data, dimensions, frame))
+    }
+
+    /// Immutably borrow the data of this value array, you can borrow data from multiple arrays at
+    /// the same time. The values themselves can be mutable, but you can't replace an element with
+    /// another value. Returns `JlrsError::Inline` if the data is stored inline.
+    ///
+    /// Safety: no slot on the GC stack is required to access and use the values in this array,
+    /// the GC is aware of the array's data. If the element is changed either from Rust or Julia,
+    /// the original value is no longer protected from garbage collection. If you need to keep
+    /// using this value you must protect it by calling [`Value::extend`].
+    ///
+    /// [`Value::extend`]: ../struct.Value.html#method.extend
+    pub unsafe fn value_data<'borrow, 'fr, F>(
+        self,
+        frame: &'borrow F,
+    ) -> JlrsResult<ArrayData<'borrow, 'fr, Value<'frame, 'data>, F>>
+    where
+        F: Frame<'fr>,
+    {
+        if !self.is_value_array() {
+            Err(JlrsError::Inline)?;
+        }
+
+        let jl_data = jl_array_data(self.ptr().cast()).cast();
+        let dimensions = Dimensions::from_array(self.ptr().cast());
+        let data = std::slice::from_raw_parts(jl_data, dimensions.size());
+        Ok(ArrayData::new(data, dimensions, frame))
+    }
+
+    /// Mutably borrow the data of this value array, you can mutably borrow a single array at the
+    /// same time. Returns `JlrsError::Inline` if the data is stored inline.
+    ///
+    /// Safety: no slot on the GC stack is required to access and use the values in this array,
+    /// the GC is aware of the array's data. If the element is changed either from Rust or Julia,
+    /// the original value is no longer protected from garbage collection. If you need to keep
+    /// using this value you must protect it by calling [`Value::extend`].
+    ///
+    /// [`Value::extend`]: ../struct.Value.html#method.extend
+    pub unsafe fn value_data_mut<'borrow, 'fr, F>(
+        self,
+        frame: &'borrow mut F,
+    ) -> JlrsResult<ValueArrayDataMut<'borrow, 'frame, 'data, 'fr, F>>
+    where
+        F: Frame<'fr>,
+    {
+        if !self.is_value_array() {
+            Err(JlrsError::Inline)?;
+        }
+
+        let jl_data = jl_array_data(self.ptr().cast()).cast();
+        let dimensions = Dimensions::from_array(self.ptr().cast());
+        let data = std::slice::from_raw_parts_mut(jl_data, dimensions.size());
+        Ok(ValueArrayDataMut::new(self.into(), data, dimensions, frame))
+    }
+
+    /// Mutably borrow the data of this value array without the restriction that only a single
+    /// array can be mutably borrowed. It's your responsibility to ensure you don't create
+    /// multiple mutable references to the same array data. Returns `JlrsError::Inline` if the
+    /// data is stored inline.
+    ///
+    /// Safety: no slot on the GC stack is required to access and use the values in this array,
+    /// the GC is aware of the array's data. If the element is changed either from Rust or Julia,
+    /// the original value is no longer protected from garbage collection. If you need to keep
+    /// using this value you must protect it by calling [`Value::extend`].
+    ///
+    /// [`Value::extend`]: ../struct.Value.html#method.extend
+    pub unsafe fn unrestricted_value_data_mut<'borrow, 'fr, F>(
+        self,
+        frame: &'borrow F,
+    ) -> JlrsResult<UnrestrictedValueArrayDataMut<'borrow, 'frame, 'data, 'fr, F>>
+    where
+        F: Frame<'fr>,
+    {
+        if !self.is_value_array() {
+            Err(JlrsError::Inline)?;
+        }
+
+        let jl_data = jl_array_data(self.ptr().cast()).cast();
+        let dimensions = Dimensions::from_array(self.ptr().cast());
+        let data = std::slice::from_raw_parts_mut(jl_data, dimensions.size());
+        Ok(UnrestrictedValueArrayDataMut::new(
+            Array::wrap(self.ptr()),
+            data,
+            dimensions,
+            frame,
+        ))
+    }
+}
+
+unsafe impl<'frame, 'data, T: Copy + ValidLayout> JuliaTypecheck for TypedArray<'frame, 'data, T> {
+    unsafe fn julia_typecheck(t: DataType) -> bool {
+        jl_is_array_type(t.ptr().cast()) && T::valid_layout(Value::wrap(jl_tparam0(t.ptr()).cast()))
+    }
+}
+
+impl<'frame, 'data, T: Copy + ValidLayout> Into<Value<'frame, 'data>>
+    for TypedArray<'frame, 'data, T>
+{
+    fn into(self) -> Value<'frame, 'data> {
+        unsafe { Value::wrap(self.ptr().cast()) }
+    }
+}
+
+impl<'frame, 'data, T: Copy + ValidLayout> Into<Array<'frame, 'data>>
+    for TypedArray<'frame, 'data, T>
+{
+    fn into(self) -> Array<'frame, 'data> {
+        unsafe { Array::wrap(self.ptr()) }
+    }
+}
+
+unsafe impl<'frame, 'data, T: Copy + ValidLayout> Cast<'frame, 'data>
+    for TypedArray<'frame, 'data, T>
+{
+    type Output = Self;
+    fn cast(value: Value<'frame, 'data>) -> JlrsResult<Self::Output> {
+        if value.is::<Self::Output>() {
+            return unsafe { Ok(Self::cast_unchecked(value)) };
+        }
+
+        Err(JlrsError::NotAnArray)?
+    }
+
+    unsafe fn cast_unchecked(value: Value<'frame, 'data>) -> Self::Output {
+        Self::wrap(value.ptr().cast())
+    }
+}
+
+unsafe impl<'frame, 'data, T: Copy + ValidLayout> ValidLayout for TypedArray<'frame, 'data, T> {
+    unsafe fn valid_layout(v: Value) -> bool {
+        if let Ok(dt) = v.cast::<DataType>() {
+            dt.is::<TypedArray<T>>()
+        } else if let Ok(ua) = v.cast::<super::union_all::UnionAll>() {
+            ua.base_type().is::<TypedArray<T>>()
         } else {
             false
         }
@@ -377,11 +729,15 @@ impl<T, D: Into<Dimensions>> IndexMut<D> for CopiedArray<T> {
 /// with anything that implements `Into<Dimensions>`; see [`Dimensions`] for more information.
 ///
 /// [`Dimensions`]: struct.Dimensions.html
-pub struct ArrayData<'borrow, 'frame, T, F: Frame<'frame>> {
+pub struct ArrayData<'borrow, 'frame, T, F>
+where
+    F: Frame<'frame>,
+{
     data: &'borrow [T],
     dimensions: Dimensions,
     _notsendsync: PhantomData<*const ()>,
-    _frame: PhantomData<&'borrow &'frame F>,
+    _borrow: PhantomData<&'borrow F>,
+    _frame: PhantomData<&'frame ()>,
 }
 
 impl<'borrow, 'frame, T, F> ArrayData<'borrow, 'frame, T, F>
@@ -393,6 +749,7 @@ where
             data,
             dimensions,
             _notsendsync: PhantomData,
+            _borrow: PhantomData,
             _frame: PhantomData,
         }
     }
@@ -404,7 +761,12 @@ where
 
     /// Returns the array's data as a slice, the data is in column-major order.
     pub fn as_slice(&self) -> &[T] {
-        &self.data
+        self.data
+    }
+
+    /// Returns the array's data as a slice, the data is in column-major order.
+    pub fn into_slice(self) -> &'borrow [T] {
+        self.data
     }
 
     /// Returns a reference to the array's dimensions.
@@ -433,7 +795,8 @@ pub struct InlineArrayDataMut<'borrow, 'frame, T, F: Frame<'frame>> {
     data: &'borrow mut [T],
     dimensions: Dimensions,
     _notsendsync: PhantomData<*const ()>,
-    _frame: PhantomData<&'borrow &'frame mut F>,
+    _borrow: PhantomData<&'borrow F>,
+    _frame: PhantomData<&'frame ()>,
 }
 
 impl<'borrow, 'frame, T, F> InlineArrayDataMut<'borrow, 'frame, T, F>
@@ -450,6 +813,7 @@ where
             dimensions,
             _notsendsync: PhantomData,
             _frame: PhantomData,
+            _borrow: PhantomData,
         }
     }
 
@@ -465,12 +829,22 @@ where
 
     /// Returns the array's data as a slice, the data is in column-major order.
     pub fn as_slice(&self) -> &[T] {
-        &self.data
+        self.data
+    }
+
+    /// Returns the array's data as a slice, the data is in column-major order.
+    pub fn into_slice(self) -> &'borrow [T] {
+        self.data
     }
 
     /// Returns the array's data as a mutable slice, the data is in column-major order.
     pub fn as_mut_slice(&mut self) -> &mut [T] {
-        &mut self.data
+        self.data
+    }
+
+    /// Returns the array's data as a mutable slice, the data is in column-major order.
+    pub fn into_mut_slice(self) -> &'borrow mut [T] {
+        self.data
     }
 
     /// Returns a reference to the array's dimensions.
@@ -505,12 +879,96 @@ where
     }
 }
 
+/// Mutably borrowed inline array data from Julia. The data has a column-major order and can be
+/// indexed with anything that implements `Into<Dimensions>`; see [`Dimensions`] for more
+/// information.
+///
+/// [`Dimensions`]: struct.Dimensions.html
+pub struct UnrestrictedInlineArrayDataMut<'borrow, 'frame, T, F: Frame<'frame>> {
+    data: &'borrow mut [T],
+    dimensions: Dimensions,
+    _notsendsync: PhantomData<*const ()>,
+    _borrow: PhantomData<&'borrow F>,
+    _frame: PhantomData<&'frame ()>,
+}
+
+impl<'borrow, 'frame, T, F> UnrestrictedInlineArrayDataMut<'borrow, 'frame, T, F>
+where
+    F: Frame<'frame>,
+{
+    pub(crate) unsafe fn new(
+        data: &'borrow mut [T],
+        dimensions: Dimensions,
+        _: &'borrow F,
+    ) -> Self {
+        UnrestrictedInlineArrayDataMut {
+            data,
+            dimensions,
+            _notsendsync: PhantomData,
+            _frame: PhantomData,
+            _borrow: PhantomData,
+        }
+    }
+
+    /// Get a reference to the value at `index`, or `None` if the index is out of bounds.
+    pub fn get<D: Into<Dimensions>>(&self, index: D) -> Option<&T> {
+        Some(&self.data[self.dimensions.index_of(index).ok()?])
+    }
+
+    /// Get a mutable reference to the value at `index`, or `None` if the index is out of bounds.
+    pub fn get_mut<D: Into<Dimensions>>(&mut self, index: D) -> Option<&mut T> {
+        Some(&mut self.data[self.dimensions.index_of(index).ok()?])
+    }
+
+    /// Returns the array's data as a slice, the data is in column-major order.
+    pub fn as_slice(&self) -> &[T] {
+        &self.data
+    }
+
+    /// Returns the array's data as a mutable slice, the data is in column-major order.
+    pub fn as_mut_slice(&mut self) -> &mut [T] {
+        &mut self.data
+    }
+
+    /// Returns a reference to the array's dimensions.
+    pub fn dimensions(&self) -> &Dimensions {
+        &self.dimensions
+    }
+}
+
+/// Mutably borrowed value array data from Julia. The data has a column-major order and can be
+/// indexed with anything that implements `Into<Dimensions>`; see [`Dimensions`] for more
+/// information.
+///
+/// [`Dimensions`]: struct.Dimensions.html
+impl<'borrow, 'frame, T, D, F> Index<D> for UnrestrictedInlineArrayDataMut<'borrow, 'frame, T, F>
+where
+    D: Into<Dimensions>,
+    F: Frame<'frame>,
+{
+    type Output = T;
+    fn index(&self, index: D) -> &Self::Output {
+        &self.data[self.dimensions.index_of(index).unwrap()]
+    }
+}
+
+impl<'borrow, 'frame, T, D, F> IndexMut<D> for UnrestrictedInlineArrayDataMut<'borrow, 'frame, T, F>
+where
+    D: Into<Dimensions>,
+    F: Frame<'frame>,
+{
+    fn index_mut(&mut self, index: D) -> &mut Self::Output {
+        &mut self.data[self.dimensions.index_of(index).unwrap()]
+    }
+}
+
 pub struct ValueArrayDataMut<'borrow, 'value, 'data, 'frame, F: Frame<'frame>> {
     array: Array<'value, 'data>,
     data: &'borrow mut [Value<'value, 'data>],
     dimensions: Dimensions,
     _notsendsync: PhantomData<*const ()>,
-    _frame: PhantomData<&'borrow &'frame mut F>,
+    _borrow: PhantomData<&'borrow mut F>,
+    _frame: PhantomData<&'frame ()>,
 }
 
 impl<'borrow, 'frame, 'data, 'fr, F> ValueArrayDataMut<'borrow, 'frame, 'data, 'fr, F>
@@ -528,6 +986,82 @@ where
             data,
             dimensions,
             _notsendsync: PhantomData,
+            _borrow: PhantomData,
+            _frame: PhantomData,
+        }
+    }
+
+    /// Get a reference to the value at `index`, or `None` if the index is out of bounds.
+    pub fn get<D: Into<Dimensions>>(&self, index: D) -> Option<&Value<'frame, 'data>> {
+        Some(&self.data[self.dimensions.index_of(index).ok()?])
+    }
+
+    pub unsafe fn set<'va, 'da: 'data, D: Into<Dimensions>>(
+        &mut self,
+        index: D,
+        value: Value<'frame, 'da>,
+    ) -> JlrsResult<()> {
+        let ptr = self.array.ptr();
+        let eltype = jl_array_eltype(ptr.cast());
+
+        if eltype != jl_typeof(value.ptr().cast()).cast() {
+            Err(JlrsError::InvalidArrayType)?;
+        }
+
+        let idx = self.dimensions.index_of(index)?;
+
+        jl_array_ptr_set(ptr.cast(), idx, value.ptr().cast());
+        Ok(())
+    }
+
+    /// Returns the array's data as a slice, the data is in column-major order.
+    pub fn as_slice(&self) -> &[Value<'frame, 'data>] {
+        &self.data
+    }
+
+    /// Returns a reference to the array's dimensions.
+    pub fn dimensions(&self) -> &Dimensions {
+        &self.dimensions
+    }
+}
+
+impl<'borrow, 'value, 'data, 'frame, D, F> Index<D>
+    for ValueArrayDataMut<'borrow, 'value, 'data, 'frame, F>
+where
+    D: Into<Dimensions>,
+    F: Frame<'frame>,
+{
+    type Output = Value<'value, 'data>;
+    fn index(&self, index: D) -> &Self::Output {
+        &self.data[self.dimensions.index_of(index).unwrap()]
+    }
+}
+
+pub struct UnrestrictedValueArrayDataMut<'borrow, 'value, 'data, 'frame, F: Frame<'frame>> {
+    array: Array<'value, 'data>,
+    data: &'borrow mut [Value<'value, 'data>],
+    dimensions: Dimensions,
+    _notsendsync: PhantomData<*const ()>,
+    _borrow: PhantomData<&'borrow F>,
+    _frame: PhantomData<&'frame ()>,
+}
+
+impl<'borrow, 'frame, 'data, 'fr, F> UnrestrictedValueArrayDataMut<'borrow, 'frame, 'data, 'fr, F>
+where
+    F: Frame<'fr>,
+{
+    pub(crate) unsafe fn new(
+        array: Array<'frame, 'data>,
+        data: &'borrow mut [Value<'frame, 'data>],
+        dimensions: Dimensions,
+        _: &'borrow F,
+    ) -> Self {
+        UnrestrictedValueArrayDataMut {
+            array,
+            data,
+            dimensions,
+            _notsendsync: PhantomData,
+            _borrow: PhantomData,
             _frame: PhantomData,
         }
     }
@@ -569,7 +1103,7 @@ where
 }
 
 impl<'borrow, 'value, 'data, 'frame, D, F> Index<D>
-    for ValueArrayDataMut<'borrow, 'value, 'data, 'frame, F>
+    for UnrestrictedValueArrayDataMut<'borrow, 'value, 'data, 'frame, F>
 where
     D: Into<Dimensions>,
     F: Frame<'frame>,

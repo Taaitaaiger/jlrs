@@ -357,14 +357,14 @@ fn create_nothing() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame(0, |global, frame| {
+        jlrs.frame(0, |_global, frame| {
             let nothing = Value::nothing(frame);
             assert!(nothing.is_nothing());
             assert!(!nothing.is::<f32>());
             assert!(nothing.datatype().is_some());
             assert_eq!(nothing.type_name(), "Nothing");
             assert!(!nothing.is_array_of::<f32>());
-            assert_eq!(nothing.field_names(global).len(), 0);
+            assert_eq!(nothing.field_names().len(), 0);
             assert_eq!(nothing.n_fields(), 0);
 
             Ok(())
@@ -404,3 +404,32 @@ cannot_cast_wrong_type!(cannot_cast_bool_as_char, true, bool, char);
 cannot_cast_wrong_type!(cannot_cast_char_as_bool, 'a', char, bool);
 cannot_cast_wrong_type!(cannot_cast_f32_as_64, 1f32, f32, f64);
 cannot_cast_wrong_type!(cannot_cast_f64_as_32, 1f64, f64, f32);
+
+unsafe extern "C" fn func() -> bool {
+    true
+}
+
+#[test]
+fn function_pointer() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+
+        jlrs.frame(2, |global, frame| {
+            let val = Value::new(frame, func as *mut std::ffi::c_void)?;
+            assert!(val.is::<*mut std::ffi::c_void>());
+
+            let res = Module::main(global)
+                .submodule("JlrsTests")?
+                .function("callrust")?
+                .call1(frame, val)?
+                .unwrap()
+                .cast::<bool>()?;
+
+            assert!(res);
+            val.cast::<*mut std::ffi::c_void>()?;
+
+            Ok(())
+        })
+        .unwrap();
+    });
+}

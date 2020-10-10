@@ -45,11 +45,14 @@ pub enum JlrsError {
     AllocError(AllocError),
     WrongType,
     NotInline,
+    NullFrame,
     Inline,
     NotAPointerField(usize),
     ZeroDimension,
     OutOfBounds(usize, usize),
     InvalidIndex(Dimensions, Dimensions),
+    Immutable,
+    NotSubtype,
 }
 
 pub fn exception<T>(exc: String) -> JlrsResult<T> {
@@ -58,6 +61,10 @@ pub fn exception<T>(exc: String) -> JlrsResult<T> {
 
 pub fn other<E: Error + Send + Sync + 'static>(reason: E) -> JlrsResult<()> {
     Err(JlrsError::Other(Box::new(reason)))?
+}
+
+pub fn other_err<E: Error + Send + Sync + 'static>(reason: E) -> JlrsError {
+    JlrsError::Other(Box::new(reason))
 }
 
 impl JlrsError {
@@ -97,6 +104,10 @@ impl Display for JlrsError {
             ),
             JlrsError::InvalidArrayType => write!(formatter, "Invalid array type"),
             JlrsError::InvalidCharacter => write!(formatter, "Invalid character"),
+            JlrsError::NullFrame => write!(
+                formatter,
+                "NullFrames don't support allocations or nesting another NullFrame"
+            ),
             JlrsError::NotAPointerField(idx) => {
                 write!(formatter, "The field at index {} is stored inline", idx)
             }
@@ -114,6 +125,10 @@ impl Display for JlrsError {
             JlrsError::NotAMethodInstance => write!(formatter, "This is not a method instance"),
             JlrsError::NotACodeInstance => write!(formatter, "This is not a code instance"),
             JlrsError::NotAWeakRef => write!(formatter, "This is not a weak ref"),
+            JlrsError::Immutable => write!(formatter, "This value is immutable"),
+            JlrsError::NotSubtype => {
+                write!(formatter, "Value type is not a subtype of the field type")
+            }
             JlrsError::NotATypeMapEntry => write!(formatter, "This is not a typemap entry"),
             JlrsError::NotATypeMapLevel => write!(formatter, "This is not a typemap level"),
             JlrsError::NotAnExpr => write!(formatter, "This is not an expr"),

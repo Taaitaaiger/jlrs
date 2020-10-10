@@ -42,9 +42,13 @@ fn check_array_contents_info() {
             let arr = arr_val.cast::<Array>()?;
             assert!(arr.contains::<f32>());
             assert!(arr.contains_inline::<f32>());
+            assert!(arr.into_typed_array::<f32>().is_ok());
+            assert!(arr.into_typed_array::<f64>().is_err());
             assert!(!arr.has_inlined_pointers());
             assert!(arr.is_inline_array());
             assert!(!arr.is_value_array());
+            assert_eq!(arr.element_type().cast::<DataType>()?.name(), "Float32");
+
             Ok(())
         })
         .unwrap();
@@ -77,5 +81,53 @@ fn cannot_unbox_array_with_wrong_type() {
         });
 
         assert!(out.is_err());
+    });
+}
+
+#[test]
+fn typed_array_can_be_cast() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+
+        jlrs.frame(1, |_, frame| {
+            let arr_val = Value::new_array::<f32, _, _>(frame, (1, 2))?;
+            let arr = arr_val.cast::<TypedArray<f32>>();
+            assert!(arr.is_ok());
+            Ok(())
+        })
+        .unwrap();
+    });
+}
+
+#[test]
+fn typed_array_dimensions() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+
+        jlrs.frame(1, |_, frame| {
+            let arr_val = Value::new_array::<f32, _, _>(frame, (1, 2))?;
+            let arr = arr_val.cast::<TypedArray<f32>>()?;
+            let dims = arr.dimensions();
+            assert_eq!(dims.as_slice(), &[1, 2]);
+            Ok(())
+        })
+        .unwrap();
+    });
+}
+
+#[test]
+fn check_typed_array_contents_info() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+
+        jlrs.frame(1, |_, frame| {
+            let arr_val = Value::new_array::<f32, _, _>(frame, (1, 2))?;
+            let arr = arr_val.cast::<TypedArray<f32>>()?;
+            assert!(!arr.has_inlined_pointers());
+            assert!(arr.is_inline_array());
+            assert!(!arr.is_value_array());
+            Ok(())
+        })
+        .unwrap();
     });
 }

@@ -11,7 +11,4 @@ default = ["jlrs/jlrs-derive"]
 
 [dependencies]
 jlrs-derive = { path = "../jlrs_derive" }
-
-[dependencies.jlrs]
-path = "../jlrs"
-default-features = false
+jlrs = { path = "../jlrs" }

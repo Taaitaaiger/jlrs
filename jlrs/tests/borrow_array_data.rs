@@ -308,3 +308,247 @@ fn access_mutable_borrowed_array_dimensions() {
         .unwrap();
     })
 }
+
+#[test]
+fn unrestricted_array_borrow() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+
+        jlrs.frame(2, |_, frame| {
+            unsafe {
+                let arr_val = Value::new_array::<f32, _, _>(frame, (1, 2))?;
+                let arr_val2 = Value::new_array::<f32, _, _>(frame, (1, 2))?;
+                let arr = arr_val.cast::<Array>()?;
+                let arr2 = arr_val2.cast::<Array>()?;
+
+                let data = arr.unrestricted_inline_data_mut::<f32, _>(frame)?;
+                let data2 = arr2.unrestricted_inline_data_mut::<f32, _>(frame)?;
+                assert_eq!(data.dimensions().as_slice(), data2.dimensions().as_slice());
+            }
+
+            Ok(())
+        })
+        .unwrap();
+    })
+}
+
+#[test]
+fn unrestricted_typed_array_borrow() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+
+        jlrs.frame(2, |_, frame| {
+            unsafe {
+                let arr_val = Value::new_array::<f32, _, _>(frame, (1, 2))?;
+                let arr_val2 = Value::new_array::<f32, _, _>(frame, (1, 2))?;
+                let arr = arr_val.cast::<TypedArray<f32>>()?;
+                let arr2 = arr_val2.cast::<TypedArray<f32>>()?;
+
+                let data = arr.unrestricted_inline_data_mut(frame)?;
+                let data2 = arr2.unrestricted_inline_data_mut(frame)?;
+                assert_eq!(data.dimensions().as_slice(), data2.dimensions().as_slice());
+            }
+
+            Ok(())
+        })
+        .unwrap();
+    })
+}
+
+#[test]
+fn value_data() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+
+        jlrs.frame(2, |global, frame| {
+            unsafe {
+                let arr = Module::main(global)
+                    .submodule("JlrsTests")?
+                    .function("vecofmodules")?
+                    .call0(frame)?
+                    .unwrap()
+                    .cast::<Array>()?;
+                let data = arr.value_data(frame)?;
+
+                assert!(data[0].is::<Module>());
+            }
+            Ok(())
+        })
+        .unwrap();
+    })
+}
+
+#[test]
+fn value_data_mut() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+
+        jlrs.frame(3, |global, frame| {
+            unsafe {
+                let submod = Module::main(global).submodule("JlrsTests")?;
+                let arr = submod
+                    .function("vecofmodules")?
+                    .call0(frame)?
+                    .unwrap()
+                    .cast::<Array>()?;
+                let mut data = arr.value_data_mut(frame)?;
+                data.set(0, submod.into())?;
+
+                let getindex = Module::base(global).function("getindex")?;
+                let idx = Value::new(frame, 1usize)?;
+                let entry = getindex
+                    .call2(frame, arr.into(), idx)?
+                    .unwrap()
+                    .cast::<Module>()?;
+
+                assert_eq!(entry.name().hash(), submod.name().hash());
+            }
+            Ok(())
+        })
+        .unwrap();
+    })
+}
+
+#[test]
+fn unrestricted_value_data_mut() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+
+        jlrs.frame(6, |global, frame| {
+            unsafe {
+                let submod = Module::main(global).submodule("JlrsTests")?;
+                let arr1 = submod
+                    .function("vecofmodules")?
+                    .call0(frame)?
+                    .unwrap()
+                    .cast::<Array>()?;
+
+                let arr2 = submod
+                    .function("anothervecofmodules")?
+                    .call0(frame)?
+                    .unwrap()
+                    .cast::<Array>()?;
+
+                let mut data1 = arr1.unrestricted_value_data_mut(frame)?;
+                let mut data2 = arr2.unrestricted_value_data_mut(frame)?;
+                data1.set(0, submod.into())?;
+                data2.set(1, submod.into())?;
+
+                let getindex = Module::base(global).function("getindex")?;
+                let idx1 = Value::new(frame, 1usize)?;
+                let idx2 = Value::new(frame, 2usize)?;
+                let entry1 = getindex
+                    .call2(frame, arr1.into(), idx1)?
+                    .unwrap()
+                    .cast::<Module>()?;
+                let entry2 = getindex
+                    .call2(frame, arr2.into(), idx2)?
+                    .unwrap()
+                    .cast::<Module>()?;
+
+                assert_eq!(entry1.name().hash(), entry2.name().hash());
+            }
+            Ok(())
+        })
+        .unwrap();
+    })
+}
+
+#[test]
+fn typed_array_value_data() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+
+        jlrs.frame(2, |global, frame| {
+            unsafe {
+                let arr = Module::main(global)
+                    .submodule("JlrsTests")?
+                    .function("vecofmodules")?
+                    .call0(frame)?
+                    .unwrap()
+                    .cast::<TypedArray<Module>>()?;
+                let data = arr.value_data(frame)?;
+
+                assert!(data[0].is::<Module>());
+            }
+            Ok(())
+        })
+        .unwrap();
+    })
+}
+
+#[test]
+fn typed_array_value_data_mut() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+
+        jlrs.frame(3, |global, frame| {
+            unsafe {
+                let submod = Module::main(global).submodule("JlrsTests")?;
+                let arr = submod
+                    .function("vecofmodules")?
+                    .call0(frame)?
+                    .unwrap()
+                    .cast::<TypedArray<Module>>()?;
+                let mut data = arr.value_data_mut(frame)?;
+                data.set(0, submod.into())?;
+
+                let getindex = Module::base(global).function("getindex")?;
+                let idx = Value::new(frame, 1usize)?;
+                let entry = getindex
+                    .call2(frame, arr.into(), idx)?
+                    .unwrap()
+                    .cast::<Module>()?;
+
+                assert_eq!(entry.name().hash(), submod.name().hash());
+            }
+            Ok(())
+        })
+        .unwrap();
+    })
+}
+
+#[test]
+fn typed_array_unrestricted_value_data_mut() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+
+        jlrs.frame(6, |global, frame| {
+            unsafe {
+                let submod = Module::main(global).submodule("JlrsTests")?;
+                let arr1 = submod
+                    .function("vecofmodules")?
+                    .call0(frame)?
+                    .unwrap()
+                    .cast::<TypedArray<Module>>()?;
+
+                let arr2 = submod
+                    .function("anothervecofmodules")?
+                    .call0(frame)?
+                    .unwrap()
+                    .cast::<TypedArray<Module>>()?;
+
+                let mut data1 = arr1.unrestricted_value_data_mut(frame)?;
+                let mut data2 = arr2.unrestricted_value_data_mut(frame)?;
+                data1.set(0, submod.into())?;
+                data2.set(1, submod.into())?;
+
+                let getindex = Module::base(global).function("getindex")?;
+                let idx1 = Value::new(frame, 1usize)?;
+                let idx2 = Value::new(frame, 2usize)?;
+                let entry1 = getindex
+                    .call2(frame, arr1.into(), idx1)?
+                    .unwrap()
+                    .cast::<Module>()?;
+                let entry2 = getindex
+                    .call2(frame, arr2.into(), idx2)?
+                    .unwrap()
+                    .cast::<Module>()?;
+
+                assert_eq!(entry1.name().hash(), entry2.name().hash());
+            }
+            Ok(())
+        })
+        .unwrap();
+    })
+}

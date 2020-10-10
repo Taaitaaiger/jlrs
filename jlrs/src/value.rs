@@ -29,9 +29,9 @@ use jl_sys::{
     jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_any_type, jl_apply_array_type,
     jl_apply_tuple_type_v, jl_call, jl_call0, jl_call1, jl_call2, jl_call3, jl_datatype_t,
     jl_exception_occurred, jl_field_index, jl_field_isptr, jl_field_names, jl_fieldref,
-    jl_fieldref_noalloc, jl_get_nth_field, jl_get_nth_field_noalloc, jl_new_array,
-    jl_new_struct_uninit, jl_nfields, jl_ptr_to_array, jl_ptr_to_array_1d, jl_svec_data,
-    jl_svec_len, jl_typeof, jl_typeof_str, jl_value_t,
+    jl_fieldref_noalloc, jl_get_nth_field, jl_get_nth_field_noalloc, jl_is_kind, jl_new_array,
+    jl_new_struct_uninit, jl_nfields, jl_ptr_to_array, jl_ptr_to_array_1d, jl_set_nth_field,
+    jl_subtype, jl_svec_data, jl_svec_len, jl_typeof, jl_typeof_str, jl_value_t,
 };
 use std::borrow::BorrowMut;
 use std::ffi::CStr;
@@ -395,7 +395,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// to access their fields with [`Value::get_field`].
     ///
     /// [`Value::get_field`]: struct.Value.html#method.get_field
-    pub fn field_names<'base>(self, _: Global<'base>) -> &[Symbol<'base>] {
+    pub fn field_names(self) -> &'frame [Symbol<'frame>] {
         if self.is_nothing() {
             return &[];
         }
@@ -577,6 +577,27 @@ impl<'frame, 'data> Value<'frame, 'data> {
         Ok(Value::wrap(jl_get_nth_field_noalloc(self.ptr(), idx as _)))
     }
 
+    /// Set the value of the field at `idx`. Returns an error if this value is immutable or if the
+    /// type of `value` is not a subtype of the field type. This is unsafe because the previous
+    /// value of this field can become unrooted if you're directly using it from Rust.
+    pub unsafe fn set_nth_field(self, idx: usize, value: Value) -> JlrsResult<()> {
+        if !self.is::<datatype::Mutable>() {
+            Err(JlrsError::Immutable)?
+        }
+
+        let field_type = self.datatype().unwrap().field_types()[idx];
+        if let Some(dt) = value.datatype() {
+            if Value::subtype(dt.into(), field_type) {
+                jl_set_nth_field(self.ptr(), idx, value.ptr());
+                return Ok(());
+            } else {
+                Err(JlrsError::NotSubtype)?
+            }
+        }
+
+        Err(JlrsError::Nothing)?
+    }
+
     /// If you call a function with one or more borrowed arrays as arguments, its result can only
     /// be used when all the borrows are active. If this result doesn't reference any borrowed
     /// data this function can be used to relax its second lifetime to `'static`.
@@ -596,6 +617,27 @@ impl<'frame, 'data> Value<'frame, 'data> {
         unsafe { frame.assign_output(output, self.ptr().cast(), Internal) }
     }
 
+    /// Returns true if `self` is a subtype of `sup`.
+    pub fn subtype(self, sup: Value) -> bool {
+        unsafe { jl_subtype(self.ptr(), sup.ptr()) != 0 }
+    }
+
+    /// Returns true if `self` is the type of a `DataType`, `UnionAll`, `Union`, or `Union{}` (the
+    /// bottom type).
+    pub fn is_kind(self) -> bool {
+        unsafe { jl_is_kind(self.ptr()) }
+    }
+
+    /// Returns true if the value is a type, ie a `DataType`, `UnionAll`, `Union`, or `Union{}`
+    /// (the bottom type).
+    pub fn is_type(self) -> bool {
+        if let Some(dt) = self.datatype() {
+            Value::is_kind(dt.into())
+        } else {
+            false
+        }
+    }
+
     /// Allocates a new n-dimensional array in Julia.
     ///
     /// Creating an an array with 1, 2 or 3 dimensions requires one slot on the GC stack. If you
@@ -605,7 +647,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// This function returns an error if there are not enough slots available.
     pub fn new_array<T, D, F>(frame: &mut F, dimensions: D) -> JlrsResult<Value<'frame, 'static>>
     where
-        T: JuliaType,
+        T: IntoJulia + JuliaType,
         D: Into<Dimensions>,
         F: Frame<'frame>,
     {
@@ -628,7 +670,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
         dimensions: D,
     ) -> JlrsResult<Value<'output, 'static>>
     where
-        T: JuliaType,
+        T: IntoJulia + JuliaType,
         D: Into<Dimensions>,
         F: Frame<'frame>,
     {
@@ -651,7 +693,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
         dimensions: D,
     ) -> JlrsResult<Value<'frame, 'data>>
     where
-        T: JuliaType,
+        T: IntoJulia + JuliaType,
         D: Into<Dimensions>,
         V: BorrowMut<[T]>,
         F: Frame<'frame>,
@@ -677,7 +719,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     ) -> JlrsResult<Value<'output, 'borrow>>
     where
         'borrow: 'output,
-        T: JuliaType,
+        T: IntoJulia + JuliaType,
         D: Into<Dimensions>,
         V: BorrowMut<[T]>,
         F: Frame<'frame>,
@@ -701,7 +743,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
         dimensions: D,
     ) -> JlrsResult<Value<'frame, 'static>>
     where
-        T: JuliaType,
+        T: IntoJulia + JuliaType,
         D: Into<Dimensions>,
         F: Frame<'frame>,
     {
@@ -725,7 +767,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
         dimensions: D,
     ) -> JlrsResult<Value<'output, 'static>>
     where
-        T: JuliaType,
+        T: IntoJulia + JuliaType,
         D: Into<Dimensions>,
         F: Frame<'frame>,
     {
@@ -832,6 +874,25 @@ impl<'frame, 'data> Value<'frame, 'data> {
             let res = jl_call(self.ptr().cast(), args.as_mut_ptr().cast(), n as _);
             try_protect(frame, res)
         }
+    }
+
+    /// Call this value as a function that takes several arguments and execute it on another
+    /// thread in Julia created with `Base.@spawn`, this takes two slots on the GC stack. Returns
+    /// the result of this function call if no exception is thrown, the exception if one is, or an
+    /// error if no space is left on the stack.
+    ///
+    /// This function can only be called with an `AsyncFrame`, while you're waiting for this
+    /// function to complete, other tasks are able to progress.
+    #[cfg(all(feature = "async", target_os = "linux"))]
+    pub async fn call_async<'value, 'borrow, V>(
+        self,
+        frame: &mut crate::frame::AsyncFrame<'frame>,
+        args: V,
+    ) -> JlrsResult<CallResult<'frame, 'borrow>>
+    where
+        V: AsMut<[Value<'value, 'borrow>]>,
+    {
+        unsafe { Ok(crate::julia_future::JuliaFuture::new(frame, self, args)?.await) }
     }
 
     /// Call this value as a function that takes several arguments in a single `Values`, this
@@ -1074,7 +1135,7 @@ impl<'output, 'frame, 'data> WithOutput<'output, Value<'frame, 'data>> {
 
 unsafe fn new_array<'frame, T, D, F>(frame: &mut F, dimensions: D) -> JlrsResult<*mut jl_value_t>
 where
-    T: JuliaType,
+    T: IntoJulia + JuliaType,
     D: Into<Dimensions>,
     F: Frame<'frame>,
 {
@@ -1108,7 +1169,7 @@ unsafe fn borrow_array<'data, 'frame, T, D, V, F>(
     dimensions: D,
 ) -> JlrsResult<*mut jl_value_t>
 where
-    T: JuliaType,
+    T: IntoJulia + JuliaType,
     D: Into<Dimensions>,
     V: BorrowMut<[T]>,
     F: Frame<'frame>,
@@ -1155,7 +1216,7 @@ unsafe fn move_array<'frame, T, D, F>(
     dimensions: D,
 ) -> JlrsResult<*mut jl_value_t>
 where
-    T: JuliaType,
+    T: IntoJulia + JuliaType,
     D: Into<Dimensions>,
     F: Frame<'frame>,
 {

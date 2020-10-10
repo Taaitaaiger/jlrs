@@ -1,6 +1,6 @@
 [package]
 name = "jlrs"
-version = "0.6.0"
+version = "0.7.0"
 authors = ["Thomas van Doornmalen <thomas.vandoornmalen@gmail.com>"]
 description = """
 jlrs is a library built around bindings to the Julia C API that enables Julia code to be called 
@@ -18,11 +18,19 @@ edition = "2018"
 
 [features]
 default = ["jlrs-derive"]
-docs-rs = ["jl-sys/docs-rs", "jlrs-derive"]
+async = ["futures", "crossbeam-channel", "async-trait", "async-std", "smallvec"]
+docs-rs = ["jl-sys/docs-rs", "jlrs-derive", "async"]
 
 [dependencies]
-jl-sys = {version = "0.8", path = "../jl_sys" }
+jl-sys = {version = "0.9", path = "../jl_sys" }
 jlrs-derive = { version = "0.2", optional = true, path = "../jlrs_derive" }
+
+[target.'cfg(unix)'.dependencies]
+futures = { version = "0.3", optional = true }
+crossbeam-channel = { version = "0.4", optional = true }
+async-trait = { version = "0.1", optional = true }
+async-std = { version = "1.6", features = ["unstable"], optional = true }
+smallvec = { version = "1.4", optional = true }
 
 [package.metadata.docs.rs]
 features = ["docs-rs"]
