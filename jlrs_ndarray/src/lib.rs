@@ -22,7 +22,7 @@ mod private {
 pub trait NdArray<'borrow, T>: private::Sealed {
     /// Borrow the data in the array as an `ArrayView`. Returns an error if the wrong type is
     /// provided or the data is not stored inline.
-    fn inline_array_view<'frame: 'borrow, F>(
+    fn array_view<'frame: 'borrow, F>(
         self,
         frame: &'borrow F,
     ) -> JlrsResult<ArrayView<'borrow, T, Dim<IxDynImpl>>>
@@ -32,7 +32,7 @@ pub trait NdArray<'borrow, T>: private::Sealed {
 
     /// Mutably borrow the data in the array as an `ArrayViewMut`. Returns an error if the wrong
     /// type is provided or the data is not stored inline.
-    fn inline_array_view_mut<'frame: 'borrow, F>(
+    fn array_view_mut<'frame: 'borrow, F>(
         self,
         frame: &'borrow mut F,
     ) -> JlrsResult<ArrayViewMut<'borrow, T, Dim<IxDynImpl>>>
@@ -44,7 +44,7 @@ pub trait NdArray<'borrow, T>: private::Sealed {
 impl<'frame: 'borrow, 'data: 'borrow, 'borrow, T: ValidLayout + Copy> NdArray<'borrow, T>
     for Array<'frame, 'data>
 {
-    fn inline_array_view<'fr: 'borrow, F>(
+    fn array_view<'fr: 'borrow, F>(
         self,
         frame: &'borrow F,
     ) -> JlrsResult<ArrayView<'borrow, T, Dim<IxDynImpl>>>
@@ -60,7 +60,7 @@ impl<'frame: 'borrow, 'data: 'borrow, 'borrow, T: ValidLayout + Copy> NdArray<'b
         }
     }
 
-    fn inline_array_view_mut<'fr: 'borrow, F>(
+    fn array_view_mut<'fr: 'borrow, F>(
         self,
         frame: &'borrow mut F,
     ) -> JlrsResult<ArrayViewMut<'borrow, T, Dim<IxDynImpl>>>
@@ -81,7 +81,7 @@ impl<'frame: 'borrow, 'data: 'borrow, 'borrow, T: ValidLayout + Copy> NdArray<'b
 impl<'frame: 'borrow, 'data: 'borrow, 'borrow, T: ValidLayout + Copy> NdArray<'borrow, T>
     for TypedArray<'frame, 'data, T>
 {
-    fn inline_array_view<'fr: 'borrow, F>(
+    fn array_view<'fr: 'borrow, F>(
         self,
         frame: &'borrow F,
     ) -> JlrsResult<ArrayView<'borrow, T, Dim<IxDynImpl>>>
@@ -97,7 +97,7 @@ impl<'frame: 'borrow, 'data: 'borrow, 'borrow, T: ValidLayout + Copy> NdArray<'b
         }
     }
 
-    fn inline_array_view_mut<'fr: 'borrow, F>(
+    fn array_view_mut<'fr: 'borrow, F>(
         self,
         frame: &'borrow mut F,
     ) -> JlrsResult<ArrayViewMut<'borrow, T, Dim<IxDynImpl>>>
@@ -141,7 +141,7 @@ mod tests {
                     let jl_array = borrowed.cast::<Array>()?;
                     let x = jl_array.inline_data::<usize, _>(frame)?[(1, 0)];
 
-                    let array: ArrayView<usize, _> = jl_array.inline_array_view(frame)?;
+                    let array: ArrayView<usize, _> = jl_array.array_view(frame)?;
                     assert_eq!(array[IxDyn(&[1, 0])], x);
 
                     Ok(())
@@ -162,7 +162,7 @@ mod tests {
                     let borrowed = Value::borrow_array(frame, slice, (3, 2))?;
 
                     let jl_array = borrowed.cast::<Array>()?;
-                    let view: Result<ArrayView<isize, _>, _> = jl_array.inline_array_view(frame);
+                    let view: Result<ArrayView<isize, _>, _> = jl_array.array_view(frame);
                     assert!(view.is_err());
                     Ok(())
                 })
@@ -188,7 +188,7 @@ mod tests {
                     inline[(1, 0)] = x + 1;
 
                     let mut array: ArrayViewMut<usize, _> =
-                        jl_array.inline_array_view_mut(frame)?;
+                        jl_array.array_view_mut(frame)?;
                     assert_eq!(array[IxDyn(&[1, 0])], x + 1);
                     array[IxDyn(&[1, 0])] -= 1;
 
@@ -213,7 +213,7 @@ mod tests {
 
                     let jl_array = borrowed.cast::<Array>()?;
                     let view: Result<ArrayViewMut<isize, _>, _> =
-                        jl_array.inline_array_view_mut(frame);
+                        jl_array.array_view_mut(frame);
                     assert!(view.is_err());
                     Ok(())
                 })
@@ -235,7 +235,7 @@ mod tests {
                     let jl_array = borrowed.cast::<TypedArray<usize>>()?;
                     let x = jl_array.inline_data(frame)?[(1, 0)];
 
-                    let array: ArrayView<usize, _> = jl_array.inline_array_view(frame)?;
+                    let array: ArrayView<usize, _> = jl_array.array_view(frame)?;
                     assert_eq!(array[IxDyn(&[1, 0])], x);
 
                     Ok(())
@@ -262,7 +262,7 @@ mod tests {
                     inline[(1, 0)] = x + 1;
 
                     let mut array: ArrayViewMut<usize, _> =
-                        jl_array.inline_array_view_mut(frame)?;
+                        jl_array.array_view_mut(frame)?;
                     assert_eq!(array[IxDyn(&[1, 0])], x + 1);
                     array[IxDyn(&[1, 0])] -= 1;
 
@@ -271,6 +271,23 @@ mod tests {
                     Ok(())
                 })
                 .unwrap();
+        });
+    }
+
+    #[test]
+    fn example() {
+        JULIA.with(|j| {
+            let mut julia = j.borrow_mut();
+
+            julia.dynamic_frame(|_global, frame| {
+                let mut data = vec![1usize, 2, 3, 4, 5, 6];
+                let slice = &mut data.as_mut_slice();
+                let borrowed = Value::borrow_array(frame, slice, (3, 2))?;
+        
+                let _array = borrowed.cast::<TypedArray<usize>>()?.array_view(frame)?;
+        
+                Ok(())
+            }).unwrap();
         });
     }
 }

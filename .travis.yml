@@ -31,5 +31,5 @@ branches:
 after_success: |
   if [[ "$TRAVIS_RUST_VERSION" == stable ]]; then
     cargo install cargo-tarpaulin
-    cargo tarpaulin --ciserver travis-ci --coveralls $TRAVIS_JOB_ID --exclude-files jl_sys/* --exclude-files jlrs_derive/* jl_sys/*  -- --test-threads 1
+    cargo tarpaulin --ciserver travis-ci --coveralls $TRAVIS_JOB_ID --exclude-files examples/* --exclude-files jl_sys/* --exclude-files jlrs_derive/* jl_sys/*  -- --test-threads 1
   fi
