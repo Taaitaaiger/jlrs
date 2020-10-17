@@ -5,7 +5,7 @@ use crate::error::{JlrsError, JlrsResult};
 use crate::global::Global;
 use crate::traits::Cast;
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
-use jl_sys::{jl_sym_t, jl_symbol_n, jl_symbol_name, jl_symbol_type};
+use jl_sys::{jl_incomplete_sym, jl_sym_t, jl_symbol_n, jl_symbol_name, jl_symbol_type};
 use std::ffi::CStr;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::marker::PhantomData;
@@ -63,6 +63,10 @@ impl<'base> Symbol<'base> {
     /// method.
     pub fn extend<'global>(self, _: Global<'global>) -> Symbol<'global> {
         unsafe { Symbol::wrap(self.ptr()) }
+    }
+
+    pub fn incomplete_sym(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_incomplete_sym) }
     }
 
     /// The hash of this `Symbol`.

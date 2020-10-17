@@ -2,9 +2,10 @@
 
 use crate::error::{JlrsError, JlrsResult};
 use crate::traits::Cast;
+use crate::global::Global;
 use crate::value::Value;
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
-use jl_sys::{jl_simplevector_type, jl_svec_data, jl_svec_t};
+use jl_sys::{jl_simplevector_type, jl_svec_data, jl_svec_t, jl_emptysvec};
 use std::marker::PhantomData;
 
 /// A `SimpleVector` is a fixed-size array that contains `Value`s.
@@ -30,6 +31,12 @@ impl<'frame> SimpleVector<'frame> {
     /// Returns the data of this `SimpleVector`.
     pub fn data(self) -> &'frame [Value<'frame, 'static>] {
         unsafe { std::slice::from_raw_parts(jl_svec_data(self.ptr()).cast(), self.len()) }
+    }
+}
+
+impl<'base> SimpleVector<'base> {
+    pub fn emptysvec(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_emptysvec) }
     }
 }
 

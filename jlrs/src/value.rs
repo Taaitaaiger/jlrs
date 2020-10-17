@@ -26,12 +26,17 @@ use crate::traits::{
     ValidLayout,
 };
 use jl_sys::{
-    jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_any_type, jl_apply_array_type,
-    jl_apply_tuple_type_v, jl_call, jl_call0, jl_call1, jl_call2, jl_call3, jl_datatype_t,
-    jl_exception_occurred, jl_field_index, jl_field_isptr, jl_field_names, jl_fieldref,
-    jl_fieldref_noalloc, jl_get_nth_field, jl_get_nth_field_noalloc, jl_is_kind, jl_new_array,
-    jl_new_struct_uninit, jl_nfields, jl_ptr_to_array, jl_ptr_to_array_1d, jl_set_nth_field,
-    jl_subtype, jl_svec_data, jl_svec_len, jl_typeof, jl_typeof_str, jl_value_t,
+    jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_an_empty_string,
+    jl_an_empty_vec_any, jl_any_type, jl_apply_array_type, jl_apply_tuple_type_v,
+    jl_array_any_type, jl_array_int32_type, jl_array_symbol_type, jl_array_uint8_type,
+    jl_bottom_type, jl_call, jl_call0, jl_call1, jl_call2, jl_call3, jl_datatype_t,
+    jl_diverror_exception, jl_emptytuple, jl_exception_occurred, jl_false, jl_field_index,
+    jl_field_isptr, jl_field_names, jl_fieldref, jl_fieldref_noalloc, jl_get_nth_field,
+    jl_get_nth_field_noalloc, jl_interrupt_exception, jl_is_kind, jl_memory_exception,
+    jl_new_array, jl_new_struct_uninit, jl_nfields, jl_nothing, jl_ptr_to_array,
+    jl_ptr_to_array_1d, jl_readonlymemory_exception, jl_set_nth_field, jl_stackovf_exception,
+    jl_subtype, jl_svec_data, jl_svec_len, jl_true, jl_typeof, jl_typeof_str,
+    jl_undefref_exception, jl_value_t,
 };
 use std::borrow::BorrowMut;
 use std::ffi::CStr;
@@ -236,15 +241,6 @@ impl<'frame, 'data> Value<'frame, 'data> {
     #[doc(hidden)]
     pub unsafe fn ptr(self) -> *mut jl_value_t {
         self.0
-    }
-
-    /// Returns `nothing` as a `Value`. Because `nothing` is a singleton this takes no slot on the
-    /// GC stack.
-    pub fn nothing<F>(_frame: &mut F) -> Value<'frame, 'static>
-    where
-        F: Frame<'frame>,
-    {
-        unsafe { Value::wrap(jl_sys::jl_nothing) }
     }
 
     /// Create a new Julia value, any type that implements [`IntoJulia`] can be converted using
@@ -949,6 +945,76 @@ impl<'frame, 'data> Value<'frame, 'data> {
             let res = jl_call1(func.ptr(), self.ptr());
             try_protect(frame, res)
         }
+    }
+}
+
+impl<'base> Value<'base, 'static> {
+    pub fn bottom_type(_: Global<'base>) -> Self {
+        unsafe { Value::wrap(jl_bottom_type) }
+    }
+
+    pub fn stackovf_exception(_: Global<'base>) -> Self {
+        unsafe { Value::wrap(jl_stackovf_exception) }
+    }
+
+    pub fn memory_exception(_: Global<'base>) -> Self {
+        unsafe { Value::wrap(jl_memory_exception) }
+    }
+
+    pub fn readonlymemory_exception(_: Global<'base>) -> Self {
+        unsafe { Value::wrap(jl_readonlymemory_exception) }
+    }
+
+    pub fn diverror_exception(_: Global<'base>) -> Self {
+        unsafe { Value::wrap(jl_diverror_exception) }
+    }
+
+    pub fn undefref_exception(_: Global<'base>) -> Self {
+        unsafe { Value::wrap(jl_undefref_exception) }
+    }
+
+    pub fn interrupt_exception(_: Global<'base>) -> Self {
+        unsafe { Value::wrap(jl_interrupt_exception) }
+    }
+
+    pub fn an_empty_vec_any(_: Global<'base>) -> Self {
+        unsafe { Value::wrap(jl_an_empty_vec_any) }
+    }
+
+    pub fn an_empty_string(_: Global<'base>) -> Self {
+        unsafe { Value::wrap(jl_an_empty_string) }
+    }
+
+    pub fn array_uint8_type(_: Global<'base>) -> Self {
+        unsafe { Value::wrap(jl_array_uint8_type) }
+    }
+
+    pub fn array_any_type(_: Global<'base>) -> Self {
+        unsafe { Value::wrap(jl_array_any_type) }
+    }
+
+    pub fn array_symbol_type(_: Global<'base>) -> Self {
+        unsafe { Value::wrap(jl_array_symbol_type) }
+    }
+
+    pub fn array_int32_type(_: Global<'base>) -> Self {
+        unsafe { Value::wrap(jl_array_int32_type) }
+    }
+
+    pub fn emptytuple(_: Global<'base>) -> Self {
+        unsafe { Value::wrap(jl_emptytuple) }
+    }
+
+    pub fn true_v(_: Global<'base>) -> Self {
+        unsafe { Value::wrap(jl_true) }
+    }
+
+    pub fn false_v(_: Global<'base>) -> Self {
+        unsafe { Value::wrap(jl_false) }
+    }
+
+    pub fn nothing(_: Global<'base>) -> Self {
+        unsafe { Value::wrap(jl_nothing) }
     }
 }
 

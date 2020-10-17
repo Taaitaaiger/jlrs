@@ -5,15 +5,19 @@
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L380
 
+use super::array::Array;
 use super::{
     method_table::MethodTable, module::Module, simple_vector::SimpleVector, symbol::Symbol, Value,
 };
-
-use super::array::Array;
 use crate::error::{JlrsError, JlrsResult};
+use crate::global::Global;
 use crate::traits::Cast;
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
-use jl_sys::{jl_typename_t, jl_typename_type};
+use jl_sys::{
+    jl_array_typename, jl_llvmpointer_typename, jl_namedtuple_typename, jl_pointer_typename,
+    jl_tuple_typename, jl_type_typename, jl_typename_t, jl_typename_type, jl_vararg_typename,
+    jl_vecelement_typename,
+};
 use std::marker::PhantomData;
 
 /// Describes the syntactic structure of a type and stores all data common to different
@@ -72,6 +76,40 @@ impl<'frame> TypeName<'frame> {
     /// Incomplete instantiations of this type.
     pub fn partial(self) -> Array<'frame, 'static> {
         unsafe { Array::wrap((&*self.ptr()).partial) }
+    }
+}
+
+impl<'base> TypeName<'base> {
+    pub fn vecelement_typename(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_vecelement_typename) }
+    }
+
+    pub fn array_typename(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_array_typename) }
+    }
+
+    pub fn pointer_typename(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_pointer_typename) }
+    }
+
+    pub fn llvmpointer_typename(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_llvmpointer_typename) }
+    }
+
+    pub fn namedtuple_typename(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_namedtuple_typename) }
+    }
+
+    pub fn vararg_typename(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_vararg_typename) }
+    }
+
+    pub fn type_typename(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_type_typename) }
+    }
+
+    pub fn tuple_typename(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_tuple_typename) }
     }
 }
 
