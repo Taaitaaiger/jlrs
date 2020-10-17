@@ -35,7 +35,8 @@ use jl_sys::{
     jl_get_nth_field_noalloc, jl_interrupt_exception, jl_is_kind, jl_memory_exception,
     jl_new_array, jl_new_struct_uninit, jl_nfields, jl_nothing, jl_ptr_to_array,
     jl_ptr_to_array_1d, jl_readonlymemory_exception, jl_set_nth_field, jl_stackovf_exception,
-    jl_subtype, jl_svec_data, jl_svec_len, jl_true, jl_typeof, jl_typeof_str,
+    jl_subtype, jl_svec_data, jl_svec_len, jl_true, jl_typeof, jl_typeof_str, jl_gc_add_finalizer,
+    jl_finalize,
     jl_undefref_exception, jl_value_t,
 };
 use std::borrow::BorrowMut;
@@ -945,6 +946,14 @@ impl<'frame, 'data> Value<'frame, 'data> {
             let res = jl_call1(func.ptr(), self.ptr());
             try_protect(frame, res)
         }
+    }
+
+    pub unsafe fn add_finalizer(self, f: Value) {
+        jl_gc_add_finalizer(self.ptr(), f.ptr())
+    }
+
+    pub unsafe fn finalize(self) {
+        jl_finalize(self.ptr())
     }
 }
 

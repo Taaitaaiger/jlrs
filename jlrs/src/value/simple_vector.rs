@@ -5,7 +5,7 @@ use crate::traits::Cast;
 use crate::global::Global;
 use crate::value::Value;
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
-use jl_sys::{jl_simplevector_type, jl_svec_data, jl_svec_t, jl_emptysvec};
+use jl_sys::{jl_simplevector_type, jl_svec_data, jl_svec_t, jl_emptysvec, jl_gc_wb};
 use std::marker::PhantomData;
 
 /// A `SimpleVector` is a fixed-size array that contains `Value`s.
@@ -31,6 +31,20 @@ impl<'frame> SimpleVector<'frame> {
     /// Returns the data of this `SimpleVector`.
     pub fn data(self) -> &'frame [Value<'frame, 'static>] {
         unsafe { std::slice::from_raw_parts(jl_svec_data(self.ptr()).cast(), self.len()) }
+    }
+
+    pub unsafe fn set<'data>(self, index: usize, value: Value<'_, 'data>) -> JlrsResult<Value<'frame, 'data>> {
+        if index >= self.len() {
+            Err(JlrsError::OutOfBounds(index, self.len()))?;
+        }
+
+        let mut_slice = std::slice::from_raw_parts_mut(jl_svec_data(self.ptr()).cast(), self.len());
+        mut_slice[index] = value;
+        if value.ptr() != std::ptr::null_mut() {
+            jl_gc_wb(self.ptr().cast(), value.ptr());
+        }
+
+        Ok(Value::wrap(value.ptr()))
     }
 }
 
