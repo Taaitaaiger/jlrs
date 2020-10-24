@@ -13,6 +13,7 @@ macro_rules! llt_align {
 
 use std::ffi::c_void;
 use std::mem::size_of;
+use std::sync::atomic::{AtomicPtr, Ordering};
 
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
@@ -1377,11 +1378,8 @@ pub unsafe fn jl_array_ptr_set(a: *mut c_void, i: usize, x: *mut c_void) -> *mut
     let a: *mut jl_array_t = a.cast();
     assert!((&*a).flags.ptrarray() != 0);
     assert!(i < jl_array_len(a));
-    let a_data: *mut *mut jl_value_t = jl_array_data(a.cast()).cast();
-
-    // This is wrong, should store atomically
-    let out = &mut *a_data.add(i);
-    *out = x.cast();
+    let a_data: *mut AtomicPtr<jl_value_t> = jl_array_data(a.cast()).cast();
+    (&*a_data.add(i)).store(x.cast(), Ordering::Relaxed);
 
     if !x.is_null() {
         if (&*a).flags.how() == 3 {

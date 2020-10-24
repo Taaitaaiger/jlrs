@@ -17,6 +17,7 @@ use self::array::{Array, Dimensions};
 use self::datatype::DataType;
 use self::module::Module;
 use self::symbol::Symbol;
+use self::type_var::TypeVar;
 use crate::error::{JlrsError, JlrsResult};
 use crate::frame::Output;
 use crate::global::Global;
@@ -30,14 +31,13 @@ use jl_sys::{
     jl_an_empty_vec_any, jl_any_type, jl_apply_array_type, jl_apply_tuple_type_v,
     jl_array_any_type, jl_array_int32_type, jl_array_symbol_type, jl_array_uint8_type,
     jl_bottom_type, jl_call, jl_call0, jl_call1, jl_call2, jl_call3, jl_datatype_t,
-    jl_diverror_exception, jl_emptytuple, jl_exception_occurred, jl_false, jl_field_index,
-    jl_field_isptr, jl_field_names, jl_fieldref, jl_fieldref_noalloc, jl_get_nth_field,
-    jl_get_nth_field_noalloc, jl_interrupt_exception, jl_is_kind, jl_memory_exception,
-    jl_new_array, jl_new_struct_uninit, jl_nfields, jl_nothing, jl_ptr_to_array,
-    jl_ptr_to_array_1d, jl_readonlymemory_exception, jl_set_nth_field, jl_stackovf_exception,
-    jl_subtype, jl_svec_data, jl_svec_len, jl_true, jl_typeof, jl_typeof_str, jl_gc_add_finalizer,
-    jl_finalize,
-    jl_undefref_exception, jl_value_t,
+    jl_diverror_exception, jl_egal, jl_emptytuple, jl_exception_occurred, jl_false, jl_field_index,
+    jl_field_isptr, jl_field_names, jl_fieldref, jl_fieldref_noalloc, jl_finalize,
+    jl_gc_add_finalizer, jl_get_nth_field, jl_get_nth_field_noalloc, jl_interrupt_exception,
+    jl_is_kind, jl_memory_exception, jl_new_array, jl_new_struct_uninit, jl_nfields, jl_nothing,
+    jl_object_id, jl_ptr_to_array, jl_ptr_to_array_1d, jl_readonlymemory_exception,
+    jl_set_nth_field, jl_stackovf_exception, jl_subtype, jl_svec_data, jl_svec_len, jl_true,
+    jl_type_union, jl_type_unionall, jl_typeof, jl_typeof_str, jl_undefref_exception, jl_value_t,
 };
 use std::borrow::BorrowMut;
 use std::ffi::CStr;
@@ -954,6 +954,56 @@ impl<'frame, 'data> Value<'frame, 'data> {
 
     pub unsafe fn finalize(self) {
         jl_finalize(self.ptr())
+    }
+
+    pub fn egal(self, other: Value) -> bool {
+        unsafe { jl_egal(self.ptr(), other.ptr()) != 0 }
+    }
+
+    pub fn object_id(self) -> usize {
+        unsafe { jl_object_id(self.ptr()) }
+    }
+}
+
+/// # Constructors
+impl<'frame> Value<'frame, 'static> {
+    /// Returns the union of all types in `types`. For each of these types, [`Value::is_kind`]
+    /// must return `true`. This takes one slot on the GC stack. Note that the result is not
+    /// necessarily a [`Union`], for example the union of a single [`DataType`] is that type, not
+    /// a `Union` with a single variant.
+    ///
+    /// [`Value::is_kind`]: struct.Value.html#method.is_kind
+    /// [`Union`]: union/struct.Union.html
+    /// [`DataType`]: datatype/struct.DataType.html
+    pub fn new_union<F>(frame: &mut F, types: &mut [Value]) -> JlrsResult<Self>
+    where
+        F: Frame<'frame>,
+    {
+        unsafe {
+            if let Some(v) = types
+                .iter()
+                .find_map(|v| if v.is_kind() { None } else { Some(v) })
+            {
+                Err(JlrsError::NotAKind(v.type_name().into()))?;
+            }
+
+            let un = jl_type_union(types.as_mut_ptr().cast(), types.len());
+            frame.protect(un, Internal).map_err(Into::into)
+        }
+    }
+
+    pub fn new_unionall<F>(frame: &mut F, tvar: TypeVar, body: Value) -> JlrsResult<Self>
+    where
+        F: Frame<'frame>,
+    {
+        if !body.is_type() && !body.is::<TypeVar>() {
+            Err(JlrsError::InvalidBody(body.type_name().into()))?;
+        }
+
+        unsafe {
+            let ua = jl_type_unionall(tvar.ptr(), body.ptr());
+            frame.protect(ua, Internal).map_err(Into::into)
+        }
     }
 }
 

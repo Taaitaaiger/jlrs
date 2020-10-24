@@ -1,4 +1,4 @@
-use jl_sys::{jl_gc_enable, jl_gc_is_enabled, jl_gc_collect, jl_gc_collection_t};
+use jl_sys::{jl_gc_collect, jl_gc_collection_t, jl_gc_enable, jl_gc_is_enabled};
 
 use crate::traits::Frame;
 use crate::Julia;
@@ -14,11 +14,9 @@ pub trait Gc: private::Sealed {
     unsafe fn enable_gc(&mut self, on: bool) -> bool {
         jl_gc_enable(on as i32) == 1
     }
-    
+
     fn gc_is_enabled(&mut self) -> bool {
-        unsafe {
-            jl_gc_is_enabled() == 1
-        }
+        unsafe { jl_gc_is_enabled() == 1 }
     }
 
     unsafe fn gc_collect(&mut self, mode: GcCollection) {

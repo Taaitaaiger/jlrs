@@ -187,8 +187,7 @@ mod tests {
 
                     inline[(1, 0)] = x + 1;
 
-                    let mut array: ArrayViewMut<usize, _> =
-                        jl_array.array_view_mut(frame)?;
+                    let mut array: ArrayViewMut<usize, _> = jl_array.array_view_mut(frame)?;
                     assert_eq!(array[IxDyn(&[1, 0])], x + 1);
                     array[IxDyn(&[1, 0])] -= 1;
 
@@ -212,8 +211,7 @@ mod tests {
                     let borrowed = Value::borrow_array(frame, slice, (3, 2))?;
 
                     let jl_array = borrowed.cast::<Array>()?;
-                    let view: Result<ArrayViewMut<isize, _>, _> =
-                        jl_array.array_view_mut(frame);
+                    let view: Result<ArrayViewMut<isize, _>, _> = jl_array.array_view_mut(frame);
                     assert!(view.is_err());
                     Ok(())
                 })
@@ -261,8 +259,7 @@ mod tests {
 
                     inline[(1, 0)] = x + 1;
 
-                    let mut array: ArrayViewMut<usize, _> =
-                        jl_array.array_view_mut(frame)?;
+                    let mut array: ArrayViewMut<usize, _> = jl_array.array_view_mut(frame)?;
                     assert_eq!(array[IxDyn(&[1, 0])], x + 1);
                     array[IxDyn(&[1, 0])] -= 1;
 
@@ -279,15 +276,17 @@ mod tests {
         JULIA.with(|j| {
             let mut julia = j.borrow_mut();
 
-            julia.dynamic_frame(|_global, frame| {
-                let mut data = vec![1usize, 2, 3, 4, 5, 6];
-                let slice = &mut data.as_mut_slice();
-                let borrowed = Value::borrow_array(frame, slice, (3, 2))?;
-        
-                let _array = borrowed.cast::<TypedArray<usize>>()?.array_view(frame)?;
-        
-                Ok(())
-            }).unwrap();
+            julia
+                .dynamic_frame(|_global, frame| {
+                    let mut data = vec![1usize, 2, 3, 4, 5, 6];
+                    let slice = &mut data.as_mut_slice();
+                    let borrowed = Value::borrow_array(frame, slice, (3, 2))?;
+
+                    let _array = borrowed.cast::<TypedArray<usize>>()?.array_view(frame)?;
+
+                    Ok(())
+                })
+                .unwrap();
         });
     }
 }

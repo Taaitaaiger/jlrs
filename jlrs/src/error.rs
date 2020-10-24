@@ -33,6 +33,8 @@ pub enum JlrsError {
     NotATypeName,
     NotATypeVar,
     NotAUnion,
+    InvalidBody(String),
+    NotAKind(String),
     NotAUnionAll,
     FunctionNotFound(String),
     IncludeNotFound(String),
@@ -123,6 +125,12 @@ impl Display for JlrsError {
             JlrsError::NotAUnionAll => write!(formatter, "This is not a UnionAll"),
 
             JlrsError::NotAMethodInstance => write!(formatter, "This is not a method instance"),
+            JlrsError::NotAKind(kind) => write!(formatter, "The type {} is not a kind", kind),
+            JlrsError::InvalidBody(body_ty) => write!(
+                formatter,
+                "The body of a UnionAll must be a type or a TypeVar. Found: {}",
+                body_ty
+            ),
             JlrsError::NotACodeInstance => write!(formatter, "This is not a code instance"),
             JlrsError::NotAWeakRef => write!(formatter, "This is not a weak ref"),
             JlrsError::Immutable => write!(formatter, "This value is immutable"),

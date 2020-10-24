@@ -637,7 +637,7 @@ impl CCall {
     /// same way as [`Julia::init`] does. This function must never be called outside a function
     /// called through `ccall` from Julia and must only be called once during that call. The stack
     /// is not allocated untl a static or dynamic frame is created.
-    /// 
+    ///
     /// [`Julia::init`]: struct.Julia.html#method.init
     pub unsafe fn new(stack_size: usize) -> Self {
         CCall {

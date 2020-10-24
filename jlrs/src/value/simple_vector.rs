@@ -1,11 +1,11 @@
 //! Support for values with the `Core.SimpleVector` (`SVec`) type.
 
 use crate::error::{JlrsError, JlrsResult};
-use crate::traits::Cast;
 use crate::global::Global;
+use crate::traits::Cast;
 use crate::value::Value;
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
-use jl_sys::{jl_simplevector_type, jl_svec_data, jl_svec_t, jl_emptysvec, jl_gc_wb};
+use jl_sys::{jl_emptysvec, jl_gc_wb, jl_simplevector_type, jl_svec_data, jl_svec_t};
 use std::marker::PhantomData;
 
 /// A `SimpleVector` is a fixed-size array that contains `Value`s.
@@ -33,7 +33,11 @@ impl<'frame> SimpleVector<'frame> {
         unsafe { std::slice::from_raw_parts(jl_svec_data(self.ptr()).cast(), self.len()) }
     }
 
-    pub unsafe fn set<'data>(self, index: usize, value: Value<'_, 'data>) -> JlrsResult<Value<'frame, 'data>> {
+    pub unsafe fn set<'data>(
+        self,
+        index: usize,
+        value: Value<'_, 'data>,
+    ) -> JlrsResult<Value<'frame, 'data>> {
         if index >= self.len() {
             Err(JlrsError::OutOfBounds(index, self.len()))?;
         }

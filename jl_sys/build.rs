@@ -297,7 +297,7 @@ fn main() {
         .rustfmt_bindings(true)
         .generate()
         .expect("Unable to generate bindings");
-        
+
     // Write the bindings to the $OUT_DIR/bindings.rs file.
     bindings
         .write_to_file(&out_path)
