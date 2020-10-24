@@ -27,6 +27,7 @@ branches:
   only:
     - master
     - v0.7
+    - v0.8
 
 after_success: |
   if [[ "$TRAVIS_RUST_VERSION" == stable ]]; then
