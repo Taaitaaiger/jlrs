@@ -20,7 +20,7 @@ use crate::stack::{Dynamic, StackView};
 use crate::traits::multitask::{JuliaTask, ReturnChannel};
 use crate::value::module::Module;
 use crate::value::Value;
-use crate::INIT;
+use crate::{INIT, JLRS_JL};
 use async_std::future::timeout;
 use async_std::sync::{
     channel, Condvar as AsyncStdCondvar, Mutex as AsyncStdMutex, Receiver as AsyncStdReceiver,
@@ -28,7 +28,7 @@ use async_std::sync::{
 };
 use async_std::task::{self, JoinHandle as AsyncStdHandle};
 use jl_sys::{jl_atexit_hook, jl_gc_safepoint, jl_init_with_image__threading, jl_is_initialized};
-use std::ffi::c_void;
+use std::ffi::{c_void, CString};
 use std::io::{Error as IOError, ErrorKind};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
@@ -78,24 +78,18 @@ where
     /// the runtime and a handle to the thread. The runtime is shut down after the final handle to
     /// it has been dropped.
     ///
-    /// In addition to the common arguments to initialize the async runtime, you need to provide
-    /// `jlrs_path`. This is the path to `jlrs.jl`, which is required for `AsyncJulia` to work
-    /// correctly.
-    ///
     /// This function is unsafe because this crate provides you with a way to execute arbitrary
     /// Julia code which can't be checked for correctness.
-    pub unsafe fn init<P: AsRef<Path>>(
+    pub unsafe fn init(
         channel_capacity: usize,
         n_threads: usize,
         stack_size: usize,
         process_events_ms: u64,
-        jlrs_path: P,
     ) -> JlrsResult<(Self, ThreadHandle<JlrsResult<()>>)> {
         let (sender, receiver) = channel(channel_capacity);
         let julia = AsyncJulia { sender };
         let handle =
             thread::spawn(move || run_async(n_threads, stack_size, process_events_ms, receiver));
-        julia.try_include(jlrs_path).map_err(other_err)?;
         julia.try_set_wake_fn().map_err(other_err)?;
 
         Ok((julia, handle))
@@ -106,25 +100,19 @@ where
     /// runtime and a handle to the task. The runtime is shut down after the final handle to it
     /// has been dropped.
     ///
-    /// In addition to the common arguments to initialize the async runtime, you need to provide
-    /// `jlrs_path`. This is the path to `jlrs.jl`, this file is required for `AsyncJulia` to work
-    /// correctly.
-    ///
     /// This function is unsafe because this crate provides you with a way to execute arbitrary
     /// Julia code which can't be checked for correctness.
-    pub async unsafe fn init_async<P: AsRef<Path>>(
+    pub async unsafe fn init_async(
         channel_capacity: usize,
         n_threads: usize,
         stack_size: usize,
         process_events_ms: u64,
-        jlrs_path: P,
     ) -> JlrsResult<(Self, AsyncStdHandle<JlrsResult<()>>)> {
         let (sender, receiver) = channel(channel_capacity);
         let julia = AsyncJulia { sender };
         let handle = task::spawn_blocking(move || {
             run_async(n_threads, stack_size, process_events_ms, receiver)
         });
-        julia.include(jlrs_path).await?;
         julia.set_wake_fn().await?;
 
         Ok((julia, handle))
@@ -138,8 +126,7 @@ where
     /// In addition to the common arguments to initialize the async runtime, you need to provide
     /// `julia_bindir` and `image_path`. The first must be the absolute path to a directory that
     /// contains a compatible Julia binary (eg `${JULIA_DIR}/bin`), the second must be either an
-    /// absolute or a relative path to a system image. Note that `jlrs.jl` must be available in
-    /// this custom image in the `Main` module, ie `Main.Jlrs` must exist.
+    /// absolute or a relative path to a system image.
     ///
     /// This function will return an error if either of the two paths does not exist, if Julia has
     /// already been initialized, or if `Main.Jlrs` doesn't exist. This function is unsafe because
@@ -185,8 +172,7 @@ where
     /// In addition to the common arguments to initialize the async runtime, you need to provide
     /// `julia_bindir` and `image_path`. The first must be the absolute path to a directory that
     /// contains a compatible Julia binary (eg `${JULIA_DIR}/bin`), the second must be either an
-    /// absolute or a relative path to a system image. Note that `jlrs.jl` must be available in
-    /// this custom image in the `Main` module, ie `Main.Jlrs` must exist.
+    /// absolute or a relative path to a system image.
     ///
     /// This function will return an error if either of the two paths does not exist, if Julia has
     /// already been initialized, or if `Main.Jlrs` doesn't exist. This function is unsafe because
@@ -467,6 +453,9 @@ where
             }
 
             jl_sys::jl_init();
+            let jlrs_jl = CString::new(JLRS_JL).expect("Invalid Jlrs module");
+            jl_sys::jl_eval_string(jlrs_jl.as_ptr());
+
             MultitaskStack::new(n_threads, stack_size)
         };
 
@@ -567,6 +556,9 @@ where
             let im_rel_path = std::ffi::CString::new(image_path_str).unwrap();
 
             jl_init_with_image__threading(bindir.as_ptr(), im_rel_path.as_ptr());
+
+            let jlrs_jl = CString::new(JLRS_JL).expect("Invalid Jlrs module");
+            jl_sys::jl_eval_string(jlrs_jl.as_ptr());
             MultitaskStack::new(n_threads, stack_size)
         };
 

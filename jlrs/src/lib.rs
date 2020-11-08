@@ -74,9 +74,7 @@
 //! ## Calling Julia from Rust
 //!
 //! You can call [`Julia::include`] to include your own Julia code and either [`Julia::frame`] or
-//! [`Julia::dynamic_frame`] to interact with Julia. If you want to have improved support for
-//! backtraces `jlrs.jl` must be included. You can find this file [here]. This is necessary
-//! because this functionality depends on some Julia code defined in that file.
+//! [`Julia::dynamic_frame`] to interact with Julia.
 //!
 //! The other two methods, [`Julia::frame`] and [`Julia::dynamic_frame`], take a closure that
 //! provides you with a [`Global`], and either a [`StaticFrame`] or [`DynamicFrame`] respectively.
@@ -355,7 +353,6 @@
 //! [`AsyncJulia`]: multitask/struct.AsyncJulia.html
 //! [the instructions for compiling Julia on Windows using Cygwin and MinGW]: https://github.com/JuliaLang/julia/blob/v1.5.2/doc/build/windows.md#cygwin-to-mingw-cross-compiling
 //! [the examples directory of the repo]: https://github.com/Taaitaaiger/jlrs/tree/v0.7/examples
-//! [here]: https://raw.githubusercontent.com/Taaitaaiger/jlrs/v0.7/jlrs.jl
 
 pub mod error;
 pub mod frame;
@@ -388,6 +385,8 @@ use value::module::Module;
 use value::Value;
 
 pub(crate) static INIT: AtomicBool = AtomicBool::new(false);
+
+pub(crate) static JLRS_JL: &'static str = include_str!("../../jlrs.jl");
 
 /// This struct can be created only once during the lifetime of your program. You must create it
 /// with [`Julia::init`] or [`Julia::init_with_image`] before you can do anything related to
@@ -423,10 +422,17 @@ impl Julia {
         }
 
         jl_init();
-
-        Ok(Julia {
+        let mut jl = Julia {
             stack: RawStack::new(stack_size),
+        };
+
+        jl.frame(1, |_, frame| {
+            Value::eval_string(frame, JLRS_JL)?.expect("Could not load Jlrs module");
+            Ok(())
         })
+        .expect("Could not load Jlrs module");
+
+        Ok(jl)
     }
 
     /// This function is similar to [`Julia::init`] except that it loads a custom system image. A
@@ -471,9 +477,17 @@ impl Julia {
 
         jl_init_with_image__threading(bindir.as_ptr(), im_rel_path.as_ptr());
 
-        Ok(Julia {
+        let mut jl = Julia {
             stack: RawStack::new(stack_size),
+        };
+
+        jl.frame(1, |_, frame| {
+            Value::eval_string(frame, JLRS_JL)?.expect("Could not load Jlrs module");
+            Ok(())
         })
+        .expect("Could not load Jlrs module");
+
+        Ok(jl)
     }
 
     /// Change the stack size to `stack_size`.

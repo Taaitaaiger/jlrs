@@ -1031,8 +1031,7 @@ impl<'data> Value<'_, 'data> {
     /// Returns an anonymous function that wraps this value in a try-catch block. Calling this
     /// anonymous function with some arguments will call the value as a function with those
     /// arguments and return its result, or catch the exception, print the stackstrace, and
-    /// rethrow that exception. This takes one slot on the GC stack. You must include `jlrs.jl` to
-    /// use this function.
+    /// rethrow that exception. This takes one slot on the GC stack.
     pub fn tracing_call<'frame, F>(self, frame: &mut F) -> JlrsResult<CallResult<'frame, 'data>>
     where
         F: Frame<'frame>,
@@ -1051,8 +1050,7 @@ impl<'data> Value<'_, 'data> {
     /// anonymous function with some arguments will call the value as a function with those
     /// arguments and return its result, or catch the exception and throw a new one with two
     /// fields, `exc` and `stacktrace`, containing the original exception and the stacktrace
-    /// respectively. This takes one slot on the GC stack. You must include `jlrs.jl` to use this
-    /// function.
+    /// respectively. This takes one slot on the GC stack.
     pub fn attach_stacktrace<'frame, F>(self, frame: &mut F) -> JlrsResult<CallResult<'frame, 'data>>
     where
         F: Frame<'frame>,
@@ -1257,8 +1255,7 @@ unsafe impl<'frame, 'data> ValidLayout for Value<'frame, 'data> {
 /// that was allocated for the output. You can create this by calling [`Value::with_output`].
 ///
 /// Because the result of a function call is stored in an already allocated slot, calling a
-/// function returns the `CallResult` directly rather than wrapping it in a `JlrsResult` except
-/// for the methods that depend on `jlrs.jl`.
+/// function usually returns the `CallResult` directly rather than wrapping it in a `JlrsResult`.
 ///
 /// [`Value::with_output`]: Value.html#method.with_output
 pub struct WithOutput<'output, V> {
@@ -1374,8 +1371,7 @@ impl<'output, 'frame, 'data> WithOutput<'output, Value<'frame, 'data>> {
     /// Returns an anonymous function that wraps the value in a try-catch block. Calling this
     /// anonymous function with some arguments will call the value as a function with those
     /// arguments and return its result, or catch the exception, print the stackstrace, and
-    /// rethrow that exception. The output is used to protect the result. You must include
-    /// `jlrs.jl` to use this function.
+    /// rethrow that exception. The output is used to protect the result.
     pub fn tracing_call<'fr, F>(self, frame: &mut F) -> JlrsResult<CallResult<'output, 'data>>
     where
         F: Frame<'fr>,
@@ -1394,8 +1390,7 @@ impl<'output, 'frame, 'data> WithOutput<'output, Value<'frame, 'data>> {
     /// anonymous function with some arguments will call the value as a function with those
     /// arguments and return its result, or catch the exception and throw a new one with two
     /// fields, `exc` and `stacktrace`, containing the original exception and the stacktrace
-    /// respectively. The output is used to protect the result. You must include `jlrs.jl` to use
-    /// this function.
+    /// respectively. The output is used to protect the result.
     pub fn attach_stacktrace<'fr, F>(self, frame: &mut F) -> JlrsResult<CallResult<'output, 'data>>
     where
         F: Frame<'fr>,

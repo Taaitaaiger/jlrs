@@ -89,10 +89,7 @@ instead.
 #### Calling Julia from Rust
 
 You can call `Julia::include` to include your own Julia code and either `Julia::frame` or
-`Julia::dynamic_frame` to interact with Julia. If you want to have improved support for
-backtraces `jlrs.jl` must be included. You can find this file 
-[here](https://raw.githubusercontent.com/Taaitaaiger/jlrs/v0.7/jlrs.jl). This is necessary
-because this functionality depends on some Julia code defined in that file.
+`Julia::dynamic_frame` to interact with Julia.
 
 The other two methods, `Julia::frame` and `Julia::dynamic_frame`, take a closure that
 provides you with a `Global`, and either a `StaticFrame` or `DynamicFrame` respectively.

@@ -10,7 +10,6 @@ thread_local! {
         use std::env;
         let dir = env::var("JLRS_ROOT").expect("You must set the JLRS_ROOT environement variable to the root of the repository (the directory that contains jlrs, jlrs_derive, etc) in order to run the tests.");
         let r = RefCell::new(unsafe { Julia::init(32).unwrap() });
-        r.borrow_mut().include(format!("{}/jlrs.jl", dir)).unwrap();
         r.borrow_mut().include(format!("{}/jlrs/tests/julia/JlrsTests.jl", dir)).unwrap();
         r
     };
