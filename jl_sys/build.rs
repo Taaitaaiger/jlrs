@@ -79,6 +79,8 @@ fn main() {
         .whitelist_function("jl_alloc_array_1d")
         .whitelist_function("jl_alloc_array_2d")
         .whitelist_function("jl_alloc_array_3d")
+        .whitelist_function("jl_alloc_svec")
+        .whitelist_function("jl_alloc_svec_uninit")
         .whitelist_function("jl_apply_array_type")
         .whitelist_function("jl_apply_tuple_type_v")
         .whitelist_function("jl_apply_type")

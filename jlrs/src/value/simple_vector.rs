@@ -2,10 +2,13 @@
 
 use crate::error::{JlrsError, JlrsResult};
 use crate::global::Global;
-use crate::traits::Cast;
+use crate::traits::{private::Internal, Cast, Frame};
 use crate::value::Value;
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
-use jl_sys::{jl_emptysvec, jl_gc_wb, jl_simplevector_type, jl_svec_data, jl_svec_t};
+use jl_sys::{
+    jl_alloc_svec, jl_alloc_svec_uninit, jl_emptysvec, jl_gc_wb, jl_simplevector_type,
+    jl_svec_data, jl_svec_t,
+};
 use std::marker::PhantomData;
 
 /// A `SimpleVector` is a fixed-size array that contains `Value`s.
@@ -21,6 +24,32 @@ impl<'frame> SimpleVector<'frame> {
     #[doc(hidden)]
     pub unsafe fn ptr(self) -> *mut jl_svec_t {
         self.0
+    }
+
+    pub fn with_capacity<F>(frame: &mut F, n: usize) -> JlrsResult<Self>
+    where
+        F: Frame<'frame>,
+    {
+        unsafe {
+            let svec = jl_alloc_svec(n);
+            if let Err(err) = frame.protect(svec.cast(), Internal) {
+                Err(JlrsError::AllocError(err))?
+            };
+
+            Ok(SimpleVector::wrap(svec))
+        }
+    }
+
+    pub unsafe fn with_capacity_uninit<F>(frame: &mut F, n: usize) -> JlrsResult<Self>
+    where
+        F: Frame<'frame>,
+    {
+        let svec = jl_alloc_svec_uninit(n);
+        if let Err(err) = frame.protect(svec.cast(), Internal) {
+            Err(JlrsError::AllocError(err))?
+        };
+
+        Ok(SimpleVector::wrap(svec))
     }
 
     /// Returns the length of this `SimpleVector`.

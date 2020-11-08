@@ -6,6 +6,7 @@ platform:
 # Only GNU is supported
 environment:
   JULIA_VERSION: 1.5
+  JULIA_NUM_THREADS: 3
   JULIA_DIR: C:\julia
   CYGWIN_DIR: C:\cygwin64
   matrix:
@@ -30,7 +31,6 @@ install:
   - appveyor DownloadFile https://win.rustup.rs/ -FileName rustup-init.exe
   - rustup-init -yv --default-toolchain %channel% --default-host %target%
   - set PATH=%PATH%;%USERPROFILE%\.cargo\bin;C:\julia\bin
-  - set JULIA_NUM_THREADS=3
   - rustc -vV
   - cargo -vV
 
