@@ -64,6 +64,10 @@ impl<'frame> MethodInstance<'frame> {
     pub fn in_inference(self) -> u8 {
         unsafe { (&*self.ptr()).inInference }
     }
+
+    pub fn as_value(self) -> Value<'frame, 'static> {
+        self.into()
+    }
 }
 
 impl<'frame> Into<Value<'frame, 'static>> for MethodInstance<'frame> {

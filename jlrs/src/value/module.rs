@@ -180,6 +180,10 @@ impl<'base> Module<'base> {
     {
         self.global(name)
     }
+
+    pub fn as_value(self) -> Value<'base, 'static> {
+        self.into()
+    }
 }
 
 impl<'base> Into<Value<'base, 'static>> for Module<'base> {

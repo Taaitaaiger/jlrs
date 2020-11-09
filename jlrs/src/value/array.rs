@@ -338,6 +338,10 @@ impl<'frame, 'data> Array<'frame, 'data> {
             self, data, dimensions, frame,
         ))
     }
+
+    pub fn as_value(self) -> Value<'frame, 'data> {
+        self.into()
+    }
 }
 
 unsafe impl<'frame, 'data> JuliaTypecheck for Array<'frame, 'data> {

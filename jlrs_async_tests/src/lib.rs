@@ -44,9 +44,8 @@ mod example {
 
         #[test]
         fn it_works() {
-            let (julia, handle) = unsafe {
-                AsyncJulia::init(16, 2, 16, 1).expect("Could not init Julia")
-            };
+            let (julia, handle) =
+                unsafe { AsyncJulia::init(16, 2, 16, 1).expect("Could not init Julia") };
 
             julia.try_include("MyModule.jl").unwrap();
 

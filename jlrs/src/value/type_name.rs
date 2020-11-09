@@ -77,6 +77,10 @@ impl<'frame> TypeName<'frame> {
     pub fn partial(self) -> Array<'frame, 'static> {
         unsafe { Array::wrap((&*self.ptr()).partial) }
     }
+
+    pub fn as_value(self) -> Value<'frame, 'static> {
+        self.into()
+    }
 }
 
 impl<'base> TypeName<'base> {

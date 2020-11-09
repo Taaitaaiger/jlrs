@@ -258,6 +258,10 @@ impl<'frame> DataType<'frame> {
     pub fn has_concrete_subtype(self) -> bool {
         unsafe { (&*self.ptr()).has_concrete_subtype != 0 }
     }
+
+    pub fn as_value(self) -> Value<'frame, 'static> {
+        self.into()
+    }
 }
 
 impl<'base> DataType<'base> {

@@ -135,6 +135,10 @@ impl<'frame> Task<'frame> {
     pub fn sticky(self) -> u8 {
         unsafe { (&*self.ptr()).sticky }
     }
+
+    pub fn as_value(self) -> Value<'frame, 'static> {
+        self.into()
+    }
 }
 
 impl<'frame> Into<Value<'frame, 'static>> for Task<'frame> {

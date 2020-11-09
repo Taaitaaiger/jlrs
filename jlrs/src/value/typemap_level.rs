@@ -45,6 +45,10 @@ impl<'frame> TypeMapLevel<'frame> {
     pub fn any(self) -> Value<'frame, 'static> {
         unsafe { Value::wrap((&*self.ptr()).any) }
     }
+
+    pub fn as_value(self) -> Value<'frame, 'static> {
+        self.into()
+    }
 }
 
 impl<'frame> Into<Value<'frame, 'static>> for TypeMapLevel<'frame> {

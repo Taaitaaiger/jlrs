@@ -26,6 +26,10 @@ impl<'frame> WeakRef<'frame> {
     pub fn value(self) -> Value<'frame, 'static> {
         unsafe { Value::wrap((&*self.ptr()).value) }
     }
+
+    pub fn as_value(self) -> Value<'frame, 'static> {
+        self.into()
+    }
 }
 
 impl<'frame> Into<Value<'frame, 'static>> for WeakRef<'frame> {

@@ -33,6 +33,10 @@ impl<'frame> Expr<'frame> {
     pub fn args(self) -> Array<'frame, 'static> {
         unsafe { Array::wrap((&*self.ptr()).args) }
     }
+
+    pub fn as_value(self) -> Value<'frame, 'static> {
+        self.into()
+    }
 }
 
 impl<'frame> Into<Value<'frame, 'static>> for Expr<'frame> {

@@ -38,6 +38,10 @@ impl<'frame> TypeVar<'frame> {
     pub fn upper_bound(self) -> Value<'frame, 'static> {
         unsafe { Value::wrap((&*self.ptr()).ub) }
     }
+
+    pub fn as_value(self) -> Value<'frame, 'static> {
+        self.into()
+    }
 }
 
 impl<'frame> Into<Value<'frame, 'static>> for TypeVar<'frame> {

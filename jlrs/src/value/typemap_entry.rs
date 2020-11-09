@@ -81,6 +81,10 @@ impl<'frame> TypeMapEntry<'frame> {
     pub fn is_vararg(self) -> bool {
         unsafe { (&*self.ptr()).va != 0 }
     }
+
+    pub fn as_value(self) -> Value<'frame, 'static> {
+        self.into()
+    }
 }
 
 impl<'frame> Into<Value<'frame, 'static>> for TypeMapEntry<'frame> {

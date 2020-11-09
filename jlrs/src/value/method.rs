@@ -185,6 +185,10 @@ impl<'frame> Method<'frame> {
     pub fn pure(self) -> bool {
         unsafe { (&*self.ptr()).pure_ != 0 }
     }
+
+    pub fn as_value(self) -> Value<'frame, 'static> {
+        self.into()
+    }
 }
 
 impl<'frame> Into<Value<'frame, 'static>> for Method<'frame> {

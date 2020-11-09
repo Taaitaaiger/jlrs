@@ -10,6 +10,11 @@ use std::ffi::CStr;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::marker::PhantomData;
 
+#[cfg(doc)]
+use crate::traits::JuliaTypecheck;
+#[cfg(doc)]
+use crate::value::datatype::DataType;
+
 /// `Symbol`s are used Julia to represent identifiers, `:x` represents the `Symbol` `x`. Things
 /// that can be accessed using a `Symbol` include submodules, functions, and globals. However,
 /// the methods that provide this functionality in jlrs can use strings instead.
@@ -98,6 +103,10 @@ impl<'base> Symbol<'base> {
 
             Some(Symbol::wrap(ref_self.right))
         }
+    }
+
+    pub fn as_value(self) -> Value<'base, 'static> {
+        self.into()
     }
 }
 

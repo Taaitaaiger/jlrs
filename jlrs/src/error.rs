@@ -41,6 +41,7 @@ pub enum JlrsError {
     IncludeError(String, String),
     NoSuchField(String),
     InvalidArrayType,
+    InvalidLayout,
     InvalidCharacter,
     NotAModule(String),
     NotAMethTable,
@@ -55,6 +56,7 @@ pub enum JlrsError {
     InvalidIndex(Dimensions, Dimensions),
     Immutable,
     NotSubtype,
+    NotConcrete(String),
 }
 
 pub fn exception<T>(exc: String) -> JlrsResult<T> {
@@ -123,6 +125,7 @@ impl Display for JlrsError {
             JlrsError::NotATypeVar => write!(formatter, "This is not a type var"),
             JlrsError::NotAUnion => write!(formatter, "This is not a union"),
             JlrsError::NotAUnionAll => write!(formatter, "This is not a UnionAll"),
+            JlrsError::InvalidLayout => write!(formatter, "The layout is invalid"),
 
             JlrsError::NotAMethodInstance => write!(formatter, "This is not a method instance"),
             JlrsError::NotAKind(kind) => write!(formatter, "The type {} is not a kind", kind),
@@ -173,6 +176,9 @@ impl Display for JlrsError {
                 "Index {} is not valid for array with shape {}",
                 idx, sz
             ),
+            JlrsError::NotConcrete(type_name) => {
+                write!(formatter, "{} is not a concrete DataType", type_name)
+            }
         }
     }
 }

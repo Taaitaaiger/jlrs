@@ -52,6 +52,10 @@ impl<'frame> JuliaString<'frame> {
     pub unsafe fn as_str_unchecked(self) -> &'frame str {
         std::str::from_utf8_unchecked(self.as_slice())
     }
+
+    pub fn as_value(self) -> Value<'frame, 'static> {
+        self.into()
+    }
 }
 
 impl<'frame> Into<Value<'frame, 'static>> for JuliaString<'frame> {

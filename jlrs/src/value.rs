@@ -14,10 +14,11 @@
 //! [`Values`]: struct.Values.html
 
 use self::array::{Array, Dimensions};
-use self::datatype::DataType;
+use self::datatype::{Concrete, DataType};
 use self::module::Module;
 use self::symbol::Symbol;
 use self::type_var::TypeVar;
+use self::union_all::UnionAll;
 use crate::error::{JlrsError, JlrsResult};
 use crate::frame::Output;
 use crate::global::Global;
@@ -28,16 +29,17 @@ use crate::traits::{
 };
 use jl_sys::{
     jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_an_empty_string,
-    jl_an_empty_vec_any, jl_any_type, jl_apply_array_type, jl_apply_tuple_type_v,
+    jl_an_empty_vec_any, jl_any_type, jl_apply_array_type, jl_apply_tuple_type_v, jl_apply_type,
     jl_array_any_type, jl_array_int32_type, jl_array_symbol_type, jl_array_uint8_type,
     jl_bottom_type, jl_call, jl_call0, jl_call1, jl_call2, jl_call3, jl_datatype_t,
     jl_diverror_exception, jl_egal, jl_emptytuple, jl_eval_string, jl_exception_occurred, jl_false,
     jl_field_index, jl_field_isptr, jl_field_names, jl_fieldref, jl_fieldref_noalloc, jl_finalize,
     jl_gc_add_finalizer, jl_get_nth_field, jl_get_nth_field_noalloc, jl_interrupt_exception,
-    jl_is_kind, jl_memory_exception, jl_new_array, jl_new_struct_uninit, jl_nfields, jl_nothing,
-    jl_object_id, jl_ptr_to_array, jl_ptr_to_array_1d, jl_readonlymemory_exception,
-    jl_set_nth_field, jl_stackovf_exception, jl_subtype, jl_svec_data, jl_svec_len, jl_true,
-    jl_type_union, jl_type_unionall, jl_typeof, jl_typeof_str, jl_undefref_exception, jl_value_t,
+    jl_is_kind, jl_memory_exception, jl_new_array, jl_new_struct_uninit, jl_new_structv,
+    jl_nfields, jl_nothing, jl_object_id, jl_ptr_to_array, jl_ptr_to_array_1d,
+    jl_readonlymemory_exception, jl_set_nth_field, jl_stackovf_exception, jl_subtype, jl_svec_data,
+    jl_svec_len, jl_true, jl_type_union, jl_type_unionall, jl_typeof, jl_typeof_str,
+    jl_undefref_exception, jl_value_t,
 };
 use std::borrow::BorrowMut;
 use std::ffi::{CStr, CString};
@@ -282,6 +284,26 @@ impl<'frame, 'data> Value<'frame, 'data> {
         unsafe { frame.assign_output(output, value.into_julia(), Internal) }
     }
 
+    /// Create a new instance of a value with `DataType` `ty`, using `values` to set the fields.
+    /// This is essentially a more powerful version of [`Value::new`] and can instantiate
+    /// arbitrary concrete `DataType`s, at the cost that each of its fields must have already been
+    /// allocated as a `Value`. This functions returns an error if the given `DataType` is not
+    /// concrete. One free slot on the GC stack is required for this function to succeed, returns
+    /// an error if no slot is available.
+    pub fn instantiate<F>(frame: &mut F, ty: DataType, values: &mut [Value]) -> JlrsResult<Self>
+    where
+        F: Frame<'frame>,
+    {
+        unsafe {
+            if !ty.is::<Concrete>() {
+                Err(JlrsError::NotConcrete(ty.name().into()))?;
+            }
+
+            let value = jl_new_structv(ty.ptr(), values.as_mut_ptr().cast(), values.len() as _);
+            frame.protect(value, Internal).map_err(Into::into)
+        }
+    }
+
     /// Allocates a new n-dimensional array in Julia.
     ///
     /// Creating an an array with 1, 2 or 3 dimensions requires one slot on the GC stack. If you
@@ -424,7 +446,8 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// Returns the union of all types in `types`. For each of these types, [`Value::is_kind`]
     /// must return `true`. This takes one slot on the GC stack. Note that the result is not
     /// necessarily a [`Union`], for example the union of a single [`DataType`] is that type, not
-    /// a `Union` with a single variant.
+    /// a `Union` with a single variant. One free slot on the GC stack is required for this
+    /// function to succeed, returns an error if no slot is available.
     ///
     /// [`Value::is_kind`]: struct.Value.html#method.is_kind
     /// [`Union`]: union/struct.Union.html
@@ -446,6 +469,8 @@ impl<'frame, 'data> Value<'frame, 'data> {
         }
     }
 
+    /// Create a new `UnionAll`. One free slot on the GC stack is required for this function to
+    /// succeed, returns an error if no slot is available.
     pub fn new_unionall<F>(frame: &mut F, tvar: TypeVar, body: Value) -> JlrsResult<Self>
     where
         F: Frame<'frame>,
@@ -460,11 +485,70 @@ impl<'frame, 'data> Value<'frame, 'data> {
         }
     }
 
-    pub fn apply_types<F>(self, frame: &mut F, types: &mut [Value]) -> JlrsResult<Self>
+    pub fn new_named_tuple<F, S, T>(
+        frame: &mut F,
+        mut field_names: S,
+        values: &mut [Value],
+    ) -> JlrsResult<Self>
+    where
+        F: Frame<'frame>,
+        S: AsMut<[T]>,
+        T: TemporarySymbol,
+    {
+        unsafe {
+            let global = Global::new();
+            let field_names = field_names.as_mut();
+            let mut symbol_type_vec = vec![DataType::symbol_type(global).ptr(); field_names.len()];
+            let symbols_tup =
+                jl_apply_tuple_type_v(symbol_type_vec.as_mut_ptr().cast(), symbol_type_vec.len());
+
+            let mut field_names_vec = field_names
+                .iter()
+                .map(|name| name.temporary_symbol(Internal))
+                .collect::<Vec<_>>();
+
+            let names = Value::wrap(jl_new_structv(
+                symbols_tup,
+                field_names_vec.as_mut_ptr().cast(),
+                field_names_vec.len() as _,
+            ));
+
+            let mut field_types_vec = values
+                .iter()
+                .map(|x| x.datatype().unwrap_or(DataType::nothing_type(global)))
+                .collect::<Vec<_>>();
+
+            let field_type_tup =
+                jl_apply_tuple_type_v(field_types_vec.as_mut_ptr().cast(), field_types_vec.len());
+            let named_tuple_ty = UnionAll::namedtuple_type(global)
+                .as_value()
+                .apply_type(frame, &mut [names, Value::wrap(field_type_tup.cast())])?
+                .cast::<DataType>()?;
+
+            Value::instantiate(frame, named_tuple_ty, values)
+        }
+    }
+
+    /// Apply the given types to `self`.
+    ///
+    /// If `self` is the [`DataType`] `anytuple_type`, calling this function will return a new
+    /// tuple type with the given types as its field types. If it is the [`DataType`]
+    /// `uniontype_type`, calling this function is equivalent to calling [`Value::new_union`]. If
+    /// the value is a `UnionAll`, the given types will be applied and the resulting type is
+    /// returned.
+    ///
+    /// If the types cannot be applied to `self` your program will abort.
+    ///
+    /// One free slot on the GC stack is required for this function to succeed, returns an error
+    /// if no slot is available.
+    pub fn apply_type<F>(self, frame: &mut F, types: &mut [Value]) -> JlrsResult<Self>
     where
         F: Frame<'frame>,
     {
-        todo!()
+        unsafe {
+            let applied = jl_apply_type(self.ptr(), types.as_mut_ptr().cast(), types.len());
+            frame.protect(applied, Internal).map_err(Into::into)
+        }
     }
 }
 
@@ -858,10 +942,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
 impl<'data> Value<'_, 'data> {
     /// Wraps a `Value` so that a function call will not require a slot in the current frame but
     /// uses the one that was allocated for the output.
-    pub fn with_output<'output>(
-        self,
-        output: Output<'output>,
-    ) -> WithOutput<'output, Self> {
+    pub fn with_output<'output>(self, output: Output<'output>) -> WithOutput<'output, Self> {
         WithOutput {
             value: self,
             output,
@@ -1051,7 +1132,10 @@ impl<'data> Value<'_, 'data> {
     /// arguments and return its result, or catch the exception and throw a new one with two
     /// fields, `exc` and `stacktrace`, containing the original exception and the stacktrace
     /// respectively. This takes one slot on the GC stack.
-    pub fn attach_stacktrace<'frame, F>(self, frame: &mut F) -> JlrsResult<CallResult<'frame, 'data>>
+    pub fn attach_stacktrace<'frame, F>(
+        self,
+        frame: &mut F,
+    ) -> JlrsResult<CallResult<'frame, 'data>>
     where
         F: Frame<'frame>,
     {
