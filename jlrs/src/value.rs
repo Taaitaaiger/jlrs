@@ -290,17 +290,50 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// allocated as a `Value`. This functions returns an error if the given `DataType` is not
     /// concrete. One free slot on the GC stack is required for this function to succeed, returns
     /// an error if no slot is available.
-    pub fn instantiate<F>(frame: &mut F, ty: DataType, values: &mut [Value]) -> JlrsResult<Self>
+    pub fn instantiate<'value, 'borrow, F, V>(
+        frame: &mut F,
+        ty: DataType,
+        values: &mut V,
+    ) -> JlrsResult<Value<'frame, 'borrow>>
     where
         F: Frame<'frame>,
+        V: AsMut<[Value<'value, 'borrow>]>,
     {
         unsafe {
             if !ty.is::<Concrete>() {
                 Err(JlrsError::NotConcrete(ty.name().into()))?;
             }
 
+            let values = values.as_mut();
             let value = jl_new_structv(ty.ptr(), values.as_mut_ptr().cast(), values.len() as _);
             frame.protect(value, Internal).map_err(Into::into)
+        }
+    }
+
+    /// Create a new instance of a value with `DataType` `ty`, using `values` to set the fields.
+    /// This is essentially a more powerful version of [`Value::new`] and can instantiate
+    /// arbitrary concrete `DataType`s, at the cost that each of its fields must have already been
+    /// allocated as a `Value`. This functions returns an error if the given `DataType` is not
+    /// concrete. One free slot on the GC stack is required for this function to succeed, returns
+    /// an error if no slot is available.
+    pub fn instantiate_output<'output, 'value, 'borrow, F, V>(
+        frame: &mut F,
+        output: Output<'output>,
+        ty: DataType,
+        values: &mut V,
+    ) -> JlrsResult<Value<'output, 'borrow>>
+    where
+        F: Frame<'frame>,
+        V: AsMut<[Value<'value, 'borrow>]>,
+    {
+        unsafe {
+            if !ty.is::<Concrete>() {
+                Err(JlrsError::NotConcrete(ty.name().into()))?;
+            }
+
+            let values = values.as_mut();
+            let value = jl_new_structv(ty.ptr(), values.as_mut_ptr().cast(), values.len() as _);
+            Ok(frame.assign_output(output, value, Internal))
         }
     }
 
@@ -444,10 +477,10 @@ impl<'frame, 'data> Value<'frame, 'data> {
     }
 
     /// Returns the union of all types in `types`. For each of these types, [`Value::is_kind`]
-    /// must return `true`. This takes one slot on the GC stack. Note that the result is not
-    /// necessarily a [`Union`], for example the union of a single [`DataType`] is that type, not
-    /// a `Union` with a single variant. One free slot on the GC stack is required for this
-    /// function to succeed, returns an error if no slot is available.
+    /// must return `true`. TNote that the result is not necessarily a [`Union`], for example the 
+    /// union of a single [`DataType`] is that type, not a `Union` with a single variant. One free
+    /// slot on the GC stack is required for this function to succeed, returns an error if no slot 
+    /// is available.
     ///
     /// [`Value::is_kind`]: struct.Value.html#method.is_kind
     /// [`Union`]: union/struct.Union.html
@@ -485,48 +518,66 @@ impl<'frame, 'data> Value<'frame, 'data> {
         }
     }
 
-    pub fn new_named_tuple<F, S, T>(
+    pub fn new_named_tuple<'value, 'borrow, F, S, T, V>(
         frame: &mut F,
-        mut field_names: S,
-        values: &mut [Value],
-    ) -> JlrsResult<Self>
+        field_names: &mut S,
+        values: &mut V,
+    ) -> JlrsResult<Value<'frame, 'borrow>>
     where
         F: Frame<'frame>,
         S: AsMut<[T]>,
         T: TemporarySymbol,
+        V: AsMut<[Value<'value, 'borrow>]>,
     {
-        unsafe {
-            let global = Global::new();
-            let field_names = field_names.as_mut();
-            let mut symbol_type_vec = vec![DataType::symbol_type(global).ptr(); field_names.len()];
-            let symbols_tup =
-                jl_apply_tuple_type_v(symbol_type_vec.as_mut_ptr().cast(), symbol_type_vec.len());
+        let output = frame.output()?;
+        frame.frame(4, |frame| {
+            unsafe {
+                let global = Global::new();
+                let field_names = field_names.as_mut();
+                let values_m = values.as_mut();
 
-            let mut field_names_vec = field_names
-                .iter()
-                .map(|name| name.temporary_symbol(Internal))
-                .collect::<Vec<_>>();
+                let n_field_names = field_names.len();
+                let n_values = values_m.len();
 
-            let names = Value::wrap(jl_new_structv(
-                symbols_tup,
-                field_names_vec.as_mut_ptr().cast(),
-                field_names_vec.len() as _,
-            ));
+                if n_field_names != n_values {
+                    Err(JlrsError::NamedTupleSizeMismatch(n_field_names, n_values))?;
+                }
 
-            let mut field_types_vec = values
-                .iter()
-                .map(|x| x.datatype().unwrap_or(DataType::nothing_type(global)))
-                .collect::<Vec<_>>();
+                let symbol_ty = DataType::symbol_type(global).as_value();
+                let mut symbol_type_vec = vec![symbol_ty; n_field_names];
 
-            let field_type_tup =
-                jl_apply_tuple_type_v(field_types_vec.as_mut_ptr().cast(), field_types_vec.len());
-            let named_tuple_ty = UnionAll::namedtuple_type(global)
-                .as_value()
-                .apply_type(frame, &mut [names, Value::wrap(field_type_tup.cast())])?
-                .cast::<DataType>()?;
+                let mut field_names_vec = field_names
+                    .iter()
+                    .map(|name| name.temporary_symbol(Internal).as_value())
+                    .collect::<Vec<_>>();
 
-            Value::instantiate(frame, named_tuple_ty, values)
-        }
+                let names = DataType::anytuple_type(global)
+                    .as_value()
+                    .apply_type(frame, &mut symbol_type_vec)?
+                    .cast::<DataType>()?
+                    .instantiate(frame, &mut field_names_vec)?;
+
+                let mut field_types_vec = values_m
+                    .iter()
+                    .copied()
+                    .map(|val| {
+                        val.datatype()
+                            .unwrap_or(DataType::nothing_type(global))
+                            .as_value()
+                    })
+                    .collect::<Vec<_>>();
+
+                let field_type_tup = DataType::anytuple_type(global)
+                    .as_value()
+                    .apply_type(frame, &mut field_types_vec)?;
+
+                UnionAll::namedtuple_type(global)
+                    .as_value()
+                    .apply_type(frame, &mut [names, field_type_tup])?
+                    .cast::<DataType>()?
+                    .instantiate_output(frame, output, values)
+            }
+        })
     }
 
     /// Apply the given types to `self`.
@@ -541,11 +592,13 @@ impl<'frame, 'data> Value<'frame, 'data> {
     ///
     /// One free slot on the GC stack is required for this function to succeed, returns an error
     /// if no slot is available.
-    pub fn apply_type<F>(self, frame: &mut F, types: &mut [Value]) -> JlrsResult<Self>
+    pub fn apply_type<'value, 'borrow, F, V>(self, frame: &mut F, types: &mut V) -> JlrsResult<Self>
     where
         F: Frame<'frame>,
+        V: AsMut<[Value<'value, 'borrow>]>,
     {
         unsafe {
+            let types = types.as_mut();
             let applied = jl_apply_type(self.ptr(), types.as_mut_ptr().cast(), types.len());
             frame.protect(applied, Internal).map_err(Into::into)
         }

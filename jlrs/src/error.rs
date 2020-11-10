@@ -57,6 +57,7 @@ pub enum JlrsError {
     Immutable,
     NotSubtype,
     NotConcrete(String),
+    NamedTupleSizeMismatch(usize, usize),
 }
 
 pub fn exception<T>(exc: String) -> JlrsResult<T> {
@@ -178,6 +179,14 @@ impl Display for JlrsError {
             ),
             JlrsError::NotConcrete(type_name) => {
                 write!(formatter, "{} is not a concrete DataType", type_name)
+            },
+            JlrsError::NamedTupleSizeMismatch(names, values) => {
+                write!(
+                    formatter, 
+                    "A named tuple must have an equal number of names and values, but {} name(s) and {} values(s) were given", 
+                    names, 
+                    values
+                )
             }
         }
     }
@@ -209,5 +218,14 @@ impl Into<JlrsError> for AllocError {
 impl Into<Box<JlrsError>> for AllocError {
     fn into(self) -> Box<JlrsError> {
         Box::new(self.into())
+    }
+}
+
+impl AllocError {
+    pub fn jlrs_error(self) -> JlrsError {
+        self.into()
+    }
+    pub fn boxed_jlrs_error(self) -> Box<JlrsError> {
+        self.into()
     }
 }

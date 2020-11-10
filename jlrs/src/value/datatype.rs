@@ -1,7 +1,7 @@
 //! Datatypes and properties.
 //!
 //! Julia has an optional typing system. The type information of a [`Value`] is available at
-//! runtime. Additionally, a value can hold type information as its contents. For example,
+//! runtime. Additionally, a value can hold type information as its contents. For example:
 //!
 //! ```julia
 //! truth = true
@@ -20,8 +20,9 @@
 //! [`JuliaTypecheck`]: ../../traits/trait.JuliaTypecheck.html
 
 use crate::error::{JlrsError, JlrsResult};
+use crate::frame::Output;
 use crate::global::Global;
-use crate::traits::{Cast, JuliaTypecheck};
+use crate::traits::{Cast, JuliaTypecheck, Frame};
 use crate::value::symbol::Symbol;
 use crate::value::type_name::TypeName;
 use crate::value::Value;
@@ -259,8 +260,39 @@ impl<'frame> DataType<'frame> {
         unsafe { (&*self.ptr()).has_concrete_subtype != 0 }
     }
 
+    /// Convert `self` to a `Value`.
     pub fn as_value(self) -> Value<'frame, 'static> {
         self.into()
+    }
+
+    /// Intantiate this `DataType` with the given values. The type must be concrete. One free slot
+    /// on the GC stack is required for this function to succeed, returns an error if no slot is
+    /// available or if the type is not concrete.
+    pub fn instantiate<'value, 'borrow, F, V>(
+        self,
+        frame: &mut F,
+        values: &mut V,
+    ) -> JlrsResult<Value<'frame, 'borrow>>
+    where
+        F: Frame<'frame>,
+        V: AsMut<[Value<'value, 'borrow>]>,
+    {
+        Value::instantiate(frame, self, values)
+    }
+
+    /// Intantiate this `DataType` with the given values using the given output. The type must be 
+    /// concrete, returns an error if the type is not concrete.
+    pub fn instantiate_output<'output, 'value, 'borrow, F, V>(
+        self,
+        frame: &mut F,
+        output: Output<'output>,
+        values: &mut V,
+    ) -> JlrsResult<Value<'output, 'borrow>>
+    where
+        F: Frame<'frame>,
+        V: AsMut<[Value<'value, 'borrow>]>,
+    {
+        Value::instantiate_output(frame, output, self, values)
     }
 }
 
