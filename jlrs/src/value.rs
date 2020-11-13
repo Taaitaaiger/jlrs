@@ -28,7 +28,7 @@ use crate::traits::{
     ValidLayout,
 };
 use jl_sys::{
-    jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_an_empty_string,
+    jl_get_kwsorter, jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_an_empty_string,
     jl_an_empty_vec_any, jl_any_type, jl_apply_array_type, jl_apply_tuple_type_v, jl_apply_type,
     jl_array_any_type, jl_array_int32_type, jl_array_symbol_type, jl_array_uint8_type,
     jl_bottom_type, jl_call, jl_call0, jl_call1, jl_call2, jl_call3, jl_datatype_t,
@@ -479,8 +479,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// Returns the union of all types in `types`. For each of these types, [`Value::is_kind`]
     /// must return `true`. TNote that the result is not necessarily a [`Union`], for example the 
     /// union of a single [`DataType`] is that type, not a `Union` with a single variant. One free
-    /// slot on the GC stack is required for this function to succeed, returns an error if no slot 
-    /// is available.
+    /// slot on the GC stack is required for this function to succeed, returns an error if no slot is available.
     ///
     /// [`Value::is_kind`]: struct.Value.html#method.is_kind
     /// [`Union`]: union/struct.Union.html
@@ -1112,7 +1111,7 @@ impl<'data> Value<'_, 'data> {
     pub fn call<'frame, 'value, 'borrow, V, F>(
         self,
         frame: &mut F,
-        mut args: V,
+        args: &mut V,
     ) -> JlrsResult<CallResult<'frame, 'borrow>>
     where
         V: AsMut<[Value<'value, 'borrow>]>,
@@ -1122,6 +1121,32 @@ impl<'data> Value<'_, 'data> {
             let args = args.as_mut();
             let n = args.len();
             let res = jl_call(self.ptr().cast(), args.as_mut_ptr().cast(), n as _);
+            try_protect(frame, res)
+        }
+    }
+
+    /// Call this value as a function that takes several arguments, including keyword arguments.
+    /// 
+    /// Functions that can take keyword arguments are compiled into three separate functions; one
+    /// which takes no keyword arguments, one which takes all keyword arguments, and a special 
+    /// function that takes a named tuple as its first argument which contains all set keyword
+    /// arguments, and then all other arguments. With this function, the last of these functions
+    /// is called. 
+    pub fn call_keywords<'frame, 'value, 'borrow, V, F>(
+        self,
+        frame: &mut F,
+        args: &mut V,
+    ) -> JlrsResult<CallResult<'frame, 'borrow>>
+    where
+        V: AsMut<[Value<'value, 'borrow>]>,
+        F: Frame<'frame>,
+    {
+        unsafe {
+            let func = jl_get_kwsorter(self.ptr());
+            let args = args.as_mut();
+            let n = args.len();
+
+            let res = jl_call(func, args.as_mut_ptr().cast(), n as _);
             try_protect(frame, res)
         }
     }
@@ -1137,7 +1162,7 @@ impl<'data> Value<'_, 'data> {
     pub async fn call_async<'frame, 'value, 'borrow, V>(
         self,
         frame: &mut crate::frame::AsyncFrame<'frame>,
-        args: V,
+        args: &mut V,
     ) -> JlrsResult<CallResult<'frame, 'borrow>>
     where
         V: AsMut<[Value<'value, 'borrow>]>,
@@ -1224,56 +1249,6 @@ impl Value<'_, '_> {
         jl_finalize(self.ptr())
     }
 }
-
-/*
-impl<'frame, 'data> Value<'frame, 'data> {
-    pub fn new_named_tuple<N, S, T, D, F>>(
-        frame: &mut F,
-        names: N,
-        field_types: T,
-        data: D,
-    ) -> JlrsResult<Value<'frame, 'data>>
-        where
-            N: AsMut<[S],
-            S: TemporarySymbol,
-            T: AsMut<[Value<'frame, '_>]>,
-            D: ValidLayout + 'data,
-            F: Frame<'frame>,
-    {
-        unsafe {
-            let out = frame.output()?;
-            frame.frame(2, |frame| {
-                let global = Global::new();
-
-                // Put names into a simple vector. This is the first type parameter needed for the named tuple.
-                let names = names.as_mut();
-                let names_svec = SimpleVector::with_capacity_uninit(frame, names.len());
-                for i in 0..names.len() {
-                    let sym: Value = names.temporary_symbol(Internal).into();
-                    names_svec.set(i, sym);
-                }
-
-                // Generate the tuple type describing the layout of the data and check if the
-                // layout of the data is correct.
-                // TODO: check if the types are all concrete.
-                let tt: Value = DataType::tuple_type(global).into();
-                let field_types_tup = tt.apply_types(frame, field_types.as_mut())?;
-                if !D::valid_layout(field_types_tup) {
-                    Err(...)?;
-                }
-
-                // Create the NamedTuple type
-                let nt_t: Value = UnionAll::namedtuple_type(global).into();
-                nt_t.apply_types(frame, &mut [names_svec, field_types_tup])?
-                    .cast::<DataType>()?
-                    .instantiate(data)
-            })
-
-        }
-    }
-
-}
-*/
 
 /// Constant values.
 impl<'base> Value<'base, 'static> {
@@ -1477,7 +1452,7 @@ impl<'output, 'frame, 'data> WithOutput<'output, Value<'frame, 'data>> {
     pub fn call<'value, 'borrow, 'fr, V, F>(
         self,
         frame: &mut F,
-        mut args: V,
+        args: &mut V,
     ) -> CallResult<'output, 'borrow>
     where
         'borrow: 'output,

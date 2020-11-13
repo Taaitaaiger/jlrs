@@ -39,7 +39,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
     pub(crate) fn new<'value, V>(
         frame: &mut AsyncFrame<'frame>,
         func: Value,
-        mut values: V,
+        values: &mut V,
     ) -> JlrsResult<Self>
     where
         V: AsMut<[Value<'value, 'data>]>,
@@ -66,7 +66,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             let task = Module::main(global)
                 .submodule("Jlrs")?
                 .function("asynccall")?
-                .call(frame, vals)?
+                .call(frame, &mut vals)?
                 .map_err(|e| {
                     exception::<()>(format!("asynccall threw an exception: {:?}", e)).unwrap_err()
                 })?

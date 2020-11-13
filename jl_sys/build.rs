@@ -119,6 +119,7 @@ fn main() {
         .whitelist_function("jl_gc_safepoint")
         .whitelist_function("jl_get_field")
         .whitelist_function("jl_get_global")
+        .whitelist_function("jl_get_kwsorter")
         .whitelist_function("jl_get_nth_field")
         .whitelist_function("jl_get_nth_field_noalloc")
         .whitelist_function("jl_get_ptls_states")

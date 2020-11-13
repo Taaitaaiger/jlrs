@@ -354,6 +354,55 @@
 //! [the instructions for compiling Julia on Windows using Cygwin and MinGW]: https://github.com/JuliaLang/julia/blob/v1.5.2/doc/build/windows.md#cygwin-to-mingw-cross-compiling
 //! [the examples directory of the repo]: https://github.com/Taaitaaiger/jlrs/tree/v0.7/examples
 
+#[macro_export]
+macro_rules! count {
+    ($name:expr => $value:expr) => {
+        2
+    };
+    ($name:expr => $value:expr, $($rest:tt)+) => {
+        count!(2, $($rest)+)
+    };
+    ($n:expr, $name:expr => $value:expr) => {
+        $n + 1
+    };
+    ($n:expr, $name:expr => $value:expr, $($rest:tt)+) => {
+        count!($n + 1, $($rest)+)
+    };
+}
+
+#[macro_export]
+macro_rules! named_tuple {
+    ($frame:expr, $name:expr => $value:expr) => {
+        $crate::value::Value::new_named_tuple($frame, &mut [$name], &mut [$value])
+    };
+    ($frame:expr, $name:expr => $value:expr, $($rest:tt)+) => {
+        {
+            let n = $crate::count!($($rest)+);
+            let mut v1 = Vec::with_capacity(n);
+            let mut v2 = Vec::with_capacity(n);
+            
+            v1.push($name);
+            v2.push($value);
+            $crate::named_tuple!($frame, &mut v1, &mut v2, $($rest)+)
+        }
+    };
+    ($frame:expr, $v1:expr, $v2:expr, $name:expr => $value:expr, $($rest:tt)+) => {
+        {
+            $v1.push($name);
+            $v2.push($value);
+            named_tuple!($frame, $v1, $v2, $($rest)+)
+        }
+    };
+    ($frame:expr, $v1:expr, $v2:expr, $name:expr => $value:expr) => {
+        {
+            $v1.push($name);
+            $v2.push($value);
+            $crate::value::Value::new_named_tuple($frame, $v1, $v2)
+        }
+    };
+}
+
+
 pub mod error;
 pub mod frame;
 pub mod gc;

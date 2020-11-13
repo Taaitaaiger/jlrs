@@ -286,7 +286,7 @@ fn call() {
             let arg1 = Value::new(frame, 2u32)?;
             let arg2 = Value::new(frame, 3u32)?;
             let arg3 = Value::new(frame, 4u32)?;
-            let out = func.call(frame, [arg0, arg1, arg2, arg3])?.unwrap();
+            let out = func.call(frame, &mut [arg0, arg1, arg2, arg3])?.unwrap();
             out.cast::<u32>()
         });
 
@@ -307,7 +307,7 @@ fn call_output() {
             let arg2 = Value::new(frame, 3u32)?;
             let arg3 = Value::new(frame, 4u32)?;
             func.with_output(output)
-                .call(frame, [arg0, arg1, arg2, arg3])
+                .call(frame, &mut [arg0, arg1, arg2, arg3])
                 .unwrap()
                 .cast::<u32>()
         });
@@ -327,7 +327,7 @@ fn call_dynamic() {
             let arg1 = Value::new(frame, 2u32)?;
             let arg2 = Value::new(frame, 3u32)?;
             let arg3 = Value::new(frame, 4u32)?;
-            let out = func.call(frame, [arg0, arg1, arg2, arg3])?.unwrap();
+            let out = func.call(frame, &mut [arg0, arg1, arg2, arg3])?.unwrap();
             out.cast::<u32>()
         });
 
@@ -349,7 +349,7 @@ fn call_dynamic_output() {
             let arg3 = Value::new(frame, 4u32)?;
             let out = func
                 .with_output(output)
-                .call(frame, [arg0, arg1, arg2, arg3])
+                .call(frame, &mut [arg0, arg1, arg2, arg3])
                 .unwrap();
             out.cast::<u32>()
         });

@@ -25,7 +25,7 @@ mod example {
             let v = Module::main(global)
                 .submodule("MyModule")?
                 .function("complexfunc")?
-                .call_async(frame, [dims, iters])
+                .call_async(frame, &mut [dims, iters])
                 .await?
                 .unwrap()
                 .cast::<f64>()?;
