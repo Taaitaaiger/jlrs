@@ -35,11 +35,11 @@ use jl_sys::{
     jl_diverror_exception, jl_egal, jl_emptytuple, jl_eval_string, jl_exception_occurred, jl_false,
     jl_field_index, jl_field_isptr, jl_field_names, jl_fieldref, jl_fieldref_noalloc, jl_finalize,
     jl_gc_add_finalizer, jl_get_kwsorter, jl_get_nth_field, jl_get_nth_field_noalloc,
-    jl_interrupt_exception, jl_is_kind, jl_memory_exception, jl_new_array, jl_new_struct_uninit,
-    jl_new_structv, jl_nfields, jl_nothing, jl_object_id, jl_ptr_to_array, jl_ptr_to_array_1d,
-    jl_readonlymemory_exception, jl_set_nth_field, jl_stackovf_exception, jl_subtype, jl_svec_data,
-    jl_svec_len, jl_true, jl_type_union, jl_type_unionall, jl_typeof, jl_typeof_str,
-    jl_undefref_exception, jl_value_t,
+    jl_interrupt_exception, jl_is_kind, jl_isa, jl_memory_exception, jl_new_array,
+    jl_new_struct_uninit, jl_new_structv, jl_nfields, jl_nothing, jl_object_id, jl_ptr_to_array,
+    jl_ptr_to_array_1d, jl_readonlymemory_exception, jl_set_nth_field, jl_stackovf_exception,
+    jl_subtype, jl_svec_data, jl_svec_len, jl_true, jl_type_union, jl_type_unionall, jl_typeof,
+    jl_typeof_str, jl_undefref_exception, jl_value_t,
 };
 use std::borrow::BorrowMut;
 use std::ffi::{CStr, CString};
@@ -652,6 +652,10 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// Returns the object id of this value.
     pub fn object_id(self) -> usize {
         unsafe { jl_object_id(self.ptr()) }
+    }
+
+    pub fn isa(self, other: Value) -> bool {
+        unsafe { jl_isa(self.ptr(), other.ptr()) != 0 }
     }
 }
 

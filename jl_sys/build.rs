@@ -126,6 +126,7 @@ fn main() {
         .whitelist_function("jl_init__threading")
         .whitelist_function("jl_init_with_image__threading")
         .whitelist_function("jl_is_initialized")
+        .whitelist_function("jl_isa")
         .whitelist_function("jl_islayout_inline")
         .whitelist_function("jl_new_array")
         .whitelist_function("jl_new_struct_uninit")

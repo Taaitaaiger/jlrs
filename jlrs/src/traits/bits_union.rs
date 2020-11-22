@@ -1,3 +1,5 @@
+//! Machinery for bits unions.
+
 /// Trait implemented by the aligning structs, which ensure bits unions are properly aligned.
 /// Used in combination with `BitsUnion` and `Flag` to ensure bits unions are inserted correctly.
 pub unsafe trait Align {

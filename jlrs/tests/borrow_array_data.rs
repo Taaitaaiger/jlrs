@@ -1,5 +1,5 @@
-use jlrs::gc::{Gc, GcCollection};
 use jlrs::prelude::*;
+use jlrs::traits::gc::{Gc, GcCollection};
 use jlrs::util::JULIA;
 
 macro_rules! impl_test {

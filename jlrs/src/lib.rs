@@ -406,7 +406,6 @@ macro_rules! named_tuple {
 
 pub mod error;
 pub mod frame;
-pub mod gc;
 pub mod global;
 #[doc(hidden)]
 pub mod jl_sys_export;

@@ -34,6 +34,7 @@
 pub mod bits_union;
 pub mod cast;
 pub mod frame;
+pub mod gc;
 pub mod into_julia;
 pub mod julia_type;
 pub mod julia_typecheck;
@@ -45,6 +46,7 @@ pub mod valid_layout;
 pub use bits_union::{Align, BitsUnion, Flag};
 pub use cast::Cast;
 pub use frame::Frame;
+pub use gc::Gc;
 pub use into_julia::IntoJulia;
 pub use julia_type::JuliaType;
 pub use julia_typecheck::JuliaTypecheck;
