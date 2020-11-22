@@ -78,6 +78,7 @@ impl<'frame> TypeName<'frame> {
         unsafe { Array::wrap((&*self.ptr()).partial) }
     }
 
+    /// Convert `self` to a `Value`.
     pub fn as_value(self) -> Value<'frame, 'static> {
         self.into()
     }

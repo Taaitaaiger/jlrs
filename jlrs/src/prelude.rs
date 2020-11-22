@@ -13,7 +13,7 @@ pub use crate::value::string::JuliaString;
 pub use crate::value::symbol::Symbol;
 pub use crate::value::tuple::*;
 pub use crate::value::{Value, Values};
-pub use crate::{CCall, Julia, named_tuple};
+pub use crate::{named_tuple, CCall, Julia};
 
 #[cfg(feature = "jlrs-derive")]
 pub use jlrs_derive::{IntoJulia, JuliaStruct};

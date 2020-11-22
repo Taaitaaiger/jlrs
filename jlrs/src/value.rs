@@ -24,19 +24,19 @@ use crate::frame::Output;
 use crate::global::Global;
 use crate::impl_julia_type;
 use crate::traits::{
-    private::Internal, Cast, Frame, IntoJulia, JuliaType, JuliaTypecheck, TemporarySymbol,
-    ValidLayout,
+    private::Internal, valid_layout::ValidLayout, Cast, Frame, IntoJulia, JuliaType,
+    JuliaTypecheck, TemporarySymbol,
 };
 use jl_sys::{
-    jl_get_kwsorter, jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_an_empty_string,
+    jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_an_empty_string,
     jl_an_empty_vec_any, jl_any_type, jl_apply_array_type, jl_apply_tuple_type_v, jl_apply_type,
     jl_array_any_type, jl_array_int32_type, jl_array_symbol_type, jl_array_uint8_type,
     jl_bottom_type, jl_call, jl_call0, jl_call1, jl_call2, jl_call3, jl_datatype_t,
     jl_diverror_exception, jl_egal, jl_emptytuple, jl_eval_string, jl_exception_occurred, jl_false,
     jl_field_index, jl_field_isptr, jl_field_names, jl_fieldref, jl_fieldref_noalloc, jl_finalize,
-    jl_gc_add_finalizer, jl_get_nth_field, jl_get_nth_field_noalloc, jl_interrupt_exception,
-    jl_is_kind, jl_memory_exception, jl_new_array, jl_new_struct_uninit, jl_new_structv,
-    jl_nfields, jl_nothing, jl_object_id, jl_ptr_to_array, jl_ptr_to_array_1d,
+    jl_gc_add_finalizer, jl_get_kwsorter, jl_get_nth_field, jl_get_nth_field_noalloc,
+    jl_interrupt_exception, jl_is_kind, jl_memory_exception, jl_new_array, jl_new_struct_uninit,
+    jl_new_structv, jl_nfields, jl_nothing, jl_object_id, jl_ptr_to_array, jl_ptr_to_array_1d,
     jl_readonlymemory_exception, jl_set_nth_field, jl_stackovf_exception, jl_subtype, jl_svec_data,
     jl_svec_len, jl_true, jl_type_union, jl_type_unionall, jl_typeof, jl_typeof_str,
     jl_undefref_exception, jl_value_t,
@@ -90,7 +90,7 @@ thread_local! {
 /// This type alias is used to encode the result of a function call: `Ok` indicates the call was
 /// successful and contains the function's result, while `Err` indicates an exception was thrown
 /// and contains said exception.
-pub type CallResult<'frame, 'data> = Result<Value<'frame, 'data>, Value<'frame, 'data>>;
+pub type CallResult<'frame, 'data, V = Value<'frame, 'data>> = Result<V, Value<'frame, 'data>>;
 
 /// Several values that are allocated consecutively. This can be used in combination with
 /// [`Value::call_values`] and [`WithOutput::call_values`].
@@ -448,7 +448,20 @@ impl<'frame, 'data> Value<'frame, 'data> {
     {
         unsafe {
             let array = move_array(frame, data, dimensions)?;
-            frame.protect(array, Internal).map_err(Into::into)
+            frame
+                .protect(array, Internal)
+                .map(|v| {
+                    let g = Global::new();
+                    v.add_finalizer(
+                        Module::main(g)
+                            .submodule("Jlrs")
+                            .unwrap()
+                            .function("clean")
+                            .unwrap(),
+                    );
+                    v
+                })
+                .map_err(Into::into)
         }
     }
 
@@ -472,12 +485,21 @@ impl<'frame, 'data> Value<'frame, 'data> {
     {
         unsafe {
             let array = move_array(frame, data, dimensions)?;
-            Ok(frame.assign_output(output, array, Internal))
+            let v = frame.assign_output(output, array, Internal);
+            let g = Global::new();
+            v.add_finalizer(
+                Module::main(g)
+                    .submodule("Jlrs")
+                    .unwrap()
+                    .function("clean")
+                    .unwrap(),
+            );
+            Ok(v)
         }
     }
 
     /// Returns the union of all types in `types`. For each of these types, [`Value::is_kind`]
-    /// must return `true`. TNote that the result is not necessarily a [`Union`], for example the 
+    /// must return `true`. TNote that the result is not necessarily a [`Union`], for example the
     /// union of a single [`DataType`] is that type, not a `Union` with a single variant. One free
     /// slot on the GC stack is required for this function to succeed, returns an error if no slot is available.
     ///
@@ -529,53 +551,51 @@ impl<'frame, 'data> Value<'frame, 'data> {
         V: AsMut<[Value<'value, 'borrow>]>,
     {
         let output = frame.output()?;
-        frame.frame(4, |frame| {
-            unsafe {
-                let global = Global::new();
-                let field_names = field_names.as_mut();
-                let values_m = values.as_mut();
+        frame.frame(4, |frame| unsafe {
+            let global = Global::new();
+            let field_names = field_names.as_mut();
+            let values_m = values.as_mut();
 
-                let n_field_names = field_names.len();
-                let n_values = values_m.len();
+            let n_field_names = field_names.len();
+            let n_values = values_m.len();
 
-                if n_field_names != n_values {
-                    Err(JlrsError::NamedTupleSizeMismatch(n_field_names, n_values))?;
-                }
-
-                let symbol_ty = DataType::symbol_type(global).as_value();
-                let mut symbol_type_vec = vec![symbol_ty; n_field_names];
-
-                let mut field_names_vec = field_names
-                    .iter()
-                    .map(|name| name.temporary_symbol(Internal).as_value())
-                    .collect::<Vec<_>>();
-
-                let names = DataType::anytuple_type(global)
-                    .as_value()
-                    .apply_type(frame, &mut symbol_type_vec)?
-                    .cast::<DataType>()?
-                    .instantiate(frame, &mut field_names_vec)?;
-
-                let mut field_types_vec = values_m
-                    .iter()
-                    .copied()
-                    .map(|val| {
-                        val.datatype()
-                            .unwrap_or(DataType::nothing_type(global))
-                            .as_value()
-                    })
-                    .collect::<Vec<_>>();
-
-                let field_type_tup = DataType::anytuple_type(global)
-                    .as_value()
-                    .apply_type(frame, &mut field_types_vec)?;
-
-                UnionAll::namedtuple_type(global)
-                    .as_value()
-                    .apply_type(frame, &mut [names, field_type_tup])?
-                    .cast::<DataType>()?
-                    .instantiate_output(frame, output, values)
+            if n_field_names != n_values {
+                Err(JlrsError::NamedTupleSizeMismatch(n_field_names, n_values))?;
             }
+
+            let symbol_ty = DataType::symbol_type(global).as_value();
+            let mut symbol_type_vec = vec![symbol_ty; n_field_names];
+
+            let mut field_names_vec = field_names
+                .iter()
+                .map(|name| name.temporary_symbol(Internal).as_value())
+                .collect::<Vec<_>>();
+
+            let names = DataType::anytuple_type(global)
+                .as_value()
+                .apply_type(frame, &mut symbol_type_vec)?
+                .cast::<DataType>()?
+                .instantiate(frame, &mut field_names_vec)?;
+
+            let mut field_types_vec = values_m
+                .iter()
+                .copied()
+                .map(|val| {
+                    val.datatype()
+                        .unwrap_or(DataType::nothing_type(global))
+                        .as_value()
+                })
+                .collect::<Vec<_>>();
+
+            let field_type_tup = DataType::anytuple_type(global)
+                .as_value()
+                .apply_type(frame, &mut field_types_vec)?;
+
+            UnionAll::namedtuple_type(global)
+                .as_value()
+                .apply_type(frame, &mut [names, field_type_tup])?
+                .cast::<DataType>()?
+                .instantiate_output(frame, output, values)
         })
     }
 
@@ -990,7 +1010,8 @@ impl<'frame, 'data> Value<'frame, 'data> {
 /// Several methods are available to call Julia. Raw commands can be executed with `eval_string`
 /// and `eval_cstring`, but these can't take any arguments. In order to call functions that take
 /// arguments, you must use one of the `call` methods which will call that value as a function
-/// with any number of arguments. Calling functions with keyword arguments is not yet supported.
+/// with any number of arguments. One of these, `call_keywords`, lets you call functions with
+/// keyword arguments.
 impl<'data> Value<'_, 'data> {
     /// Wraps a `Value` so that a function call will not require a slot in the current frame but
     /// uses the one that was allocated for the output.
@@ -1051,6 +1072,20 @@ impl<'data> Value<'_, 'data> {
         }
     }
 
+    /// Call this value as a function that takes zero arguments and don't protect the result from
+    /// garbage collection. This is safe if you won't use the result or if you can guarantee it's
+    /// a global value in Julia, e.g. `nothing` or a [`Module`].
+    pub unsafe fn call0_unprotected<'base>(self, _: Global<'base>) -> CallResult<'base, 'static> {
+        let res = jl_call0(self.ptr());
+        let exc = jl_sys::jl_exception_occurred();
+
+        if exc.is_null() {
+            Ok(Value::wrap(res))
+        } else {
+            Err(Value::wrap(exc))
+        }
+    }
+
     /// Call this value as a function that takes one argument, this takes one slot on the GC
     /// stack. Returns the result of this function call if no exception is thrown, the exception
     /// if one is, or an error if no space is left on the stack.
@@ -1065,6 +1100,24 @@ impl<'data> Value<'_, 'data> {
         unsafe {
             let res = jl_call1(self.ptr().cast(), arg.ptr());
             try_protect(frame, res)
+        }
+    }
+
+    /// Call this value as a function that takes one argument and don't protect the result from
+    /// garbage collection. This is safe if you won't use the result or if you can guarantee it's
+    /// a global value in Julia, e.g. `nothing` or a [`Module`].
+    pub unsafe fn call1_unprotected<'base, 'borrow>(
+        self,
+        _: Global<'base>,
+        arg: Value<'_, 'borrow>,
+    ) -> CallResult<'base, 'borrow> {
+        let res = jl_call1(self.ptr().cast(), arg.ptr());
+        let exc = jl_sys::jl_exception_occurred();
+
+        if exc.is_null() {
+            Ok(Value::wrap(res))
+        } else {
+            Err(Value::wrap(exc))
         }
     }
 
@@ -1086,6 +1139,25 @@ impl<'data> Value<'_, 'data> {
         }
     }
 
+    /// Call this value as a function that takes two arguments and don't protect the result from
+    /// garbage collection. This is safe if you won't use the result or if you can guarantee it's
+    /// a global value in Julia, e.g. `nothing` or a [`Module`].
+    pub unsafe fn call2_unprotected<'base, 'borrow>(
+        self,
+        _: Global<'base>,
+        arg0: Value<'_, 'borrow>,
+        arg1: Value<'_, 'borrow>,
+    ) -> CallResult<'base, 'borrow> {
+        let res = jl_call2(self.ptr().cast(), arg0.ptr(), arg1.ptr());
+        let exc = jl_sys::jl_exception_occurred();
+
+        if exc.is_null() {
+            Ok(Value::wrap(res))
+        } else {
+            Err(Value::wrap(exc))
+        }
+    }
+
     /// Call this value as a function that takes three arguments, this takes one slot on the GC
     /// stack. Returns the result of this function call if no exception is thrown, the exception
     /// if one is, or an error if no space is left on the stack.
@@ -1102,6 +1174,26 @@ impl<'data> Value<'_, 'data> {
         unsafe {
             let res = jl_call3(self.ptr().cast(), arg0.ptr(), arg1.ptr(), arg2.ptr());
             try_protect(frame, res)
+        }
+    }
+
+    /// Call this value as a function that takes three arguments and don't protect the result from
+    /// garbage collection. This is safe if you won't use the result or if you can guarantee it's
+    /// a global value in Julia, e.g. `nothing` or a [`Module`].
+    pub unsafe fn call3_unprotected<'base, 'borrow>(
+        self,
+        _: Global<'base>,
+        arg0: Value<'_, 'borrow>,
+        arg1: Value<'_, 'borrow>,
+        arg2: Value<'_, 'borrow>,
+    ) -> CallResult<'base, 'borrow> {
+        let res = jl_call3(self.ptr().cast(), arg0.ptr(), arg1.ptr(), arg2.ptr());
+        let exc = jl_sys::jl_exception_occurred();
+
+        if exc.is_null() {
+            Ok(Value::wrap(res))
+        } else {
+            Err(Value::wrap(exc))
         }
     }
 
@@ -1125,29 +1217,108 @@ impl<'data> Value<'_, 'data> {
         }
     }
 
-    /// Call this value as a function that takes several arguments, including keyword arguments.
-    /// 
-    /// Functions that can take keyword arguments are compiled into three separate functions; one
-    /// which takes no keyword arguments, one which takes all keyword arguments, and a special 
-    /// function that takes a named tuple as its first argument which contains all set keyword
-    /// arguments, and then all other arguments. With this function, the last of these functions
-    /// is called. 
+    /// Call this value as a function that takes several arguments and don't protect the result
+    /// from garbage collection. This is safe if you won't use the result or if you can guarantee
+    /// it's a global value in Julia, e.g. `nothing` or a [`Module`].
+    pub unsafe fn call_unprotected<'base, 'value, 'borrow, V, F>(
+        self,
+        _: Global<'base>,
+        args: &mut V,
+    ) -> CallResult<'base, 'borrow>
+    where
+        V: AsMut<[Value<'value, 'borrow>]>,
+    {
+        let args = args.as_mut();
+        let n = args.len();
+        let res = jl_call(self.ptr().cast(), args.as_mut_ptr().cast(), n as _);
+        let exc = jl_sys::jl_exception_occurred();
+
+        if exc.is_null() {
+            Ok(Value::wrap(res))
+        } else {
+            Err(Value::wrap(exc))
+        }
+    }
+
+    /// Call this value as a function that takes keyword arguments and any number of positional
+    /// arguments.
+    ///
+    /// Functions that can take keyword arguments can be called in two major ways, either with or
+    /// without keyword arguments. The normal call-methods take care of the frst case, this one
+    /// takes care of the second. In order to successfully call this function the first argument
+    /// in `args` must be a `NamedTuple` which contains all the keyword arguments, the second must
+    /// be the function you want to call (ie `self`), and then all positional arguments.
+    ///
+    /// Example:
+    ///
+    /// ```
+    /// # use jlrs::prelude::*;
+    /// # use jlrs::util::JULIA;
+    /// # fn main() {
+    /// # JULIA.with(|j| {
+    /// # let mut julia = j.borrow_mut();
+    ///   julia.frame(4, |global, frame| {
+    ///       let a_value = Value::new(frame, 1isize)?;
+    ///       let b_value = Value::new(frame, 10isize)?;
+    ///       // `funcwithkw` takes a single positional argument of type `Int`, one keyword
+    ///       // argument named `b` of the same type, and returns `a` + `b`.
+    ///       let func = Module::main(global)
+    ///           .submodule("JlrsTests")?
+    ///           .function("funcwithkw")?;
+    ///
+    ///       let kw = named_tuple!(frame, "b" => b_value)?;
+    ///       let res = func.call_keywords(frame, &mut [kw, func, a_value])?
+    ///           .unwrap()
+    ///           .cast::<isize>()?;
+    ///  
+    ///       assert_eq!(res, 11);
+    ///       Ok(())
+    ///   }).unwrap();
+    /// # });
+    /// # }
+    /// ```
     pub fn call_keywords<'frame, 'value, 'borrow, V, F>(
         self,
         frame: &mut F,
         args: &mut V,
     ) -> JlrsResult<CallResult<'frame, 'borrow>>
     where
-        V: AsMut<[Value<'value, 'borrow>]>,
         F: Frame<'frame>,
+        V: AsMut<[Value<'value, 'borrow>]>,
     {
         unsafe {
-            let func = jl_get_kwsorter(self.ptr());
+            let func = jl_get_kwsorter(self.datatype().expect("").ptr().cast());
             let args = args.as_mut();
             let n = args.len();
 
             let res = jl_call(func, args.as_mut_ptr().cast(), n as _);
             try_protect(frame, res)
+        }
+    }
+
+    /// Call this value as a function that takes keyword arguments, any number of positional
+    /// arguments and don't protect the result from garbage collection. This is safe if you won't
+    /// use the result or if you can guarantee it's a global value in Julia, e.g. `nothing` or a
+    /// [`Module`].
+    pub unsafe fn call_keywords_unprotected<'base, 'value, 'borrow, V, F>(
+        self,
+        _: Global<'base>,
+        args: &mut V,
+    ) -> CallResult<'base, 'borrow>
+    where
+        V: AsMut<[Value<'value, 'borrow>]>,
+    {
+        let func = jl_get_kwsorter(self.datatype().expect("").ptr().cast());
+        let args = args.as_mut();
+        let n = args.len();
+
+        let res = jl_call(func, args.as_mut_ptr().cast(), n as _);
+        let exc = jl_sys::jl_exception_occurred();
+
+        if exc.is_null() {
+            Ok(Value::wrap(res))
+        } else {
+            Err(Value::wrap(exc))
         }
     }
 
@@ -1184,6 +1355,24 @@ impl<'data> Value<'_, 'data> {
         unsafe {
             let res = jl_call(self.ptr().cast(), args.ptr(), args.len() as _);
             try_protect(frame, res)
+        }
+    }
+
+    /// Call this value as a function that takes several arguments in a single `Values` and don't
+    /// protect the result from garbage collection. This is safe if you won't use the result or if
+    /// you can guarantee it's a global value in Julia, e.g. `nothing` or a [`Module`].
+    pub unsafe fn call_values_unprotected<'base>(
+        self,
+        _: Global<'base>,
+        args: Values,
+    ) -> CallResult<'base, 'static> {
+        let res = jl_call(self.ptr().cast(), args.ptr(), args.len() as _);
+        let exc = jl_sys::jl_exception_occurred();
+
+        if exc.is_null() {
+            Ok(Value::wrap(res))
+        } else {
+            Err(Value::wrap(exc))
         }
     }
 

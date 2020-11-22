@@ -186,6 +186,7 @@ impl<'frame> Method<'frame> {
         unsafe { (&*self.ptr()).pure_ != 0 }
     }
 
+    /// Convert `self` to a `Value`.
     pub fn as_value(self) -> Value<'frame, 'static> {
         self.into()
     }

@@ -22,7 +22,7 @@
 use crate::error::{JlrsError, JlrsResult};
 use crate::frame::Output;
 use crate::global::Global;
-use crate::traits::{Cast, JuliaTypecheck, Frame};
+use crate::traits::{Cast, Frame, JuliaTypecheck};
 use crate::value::symbol::Symbol;
 use crate::value::type_name::TypeName;
 use crate::value::Value;
@@ -261,6 +261,7 @@ impl<'frame> DataType<'frame> {
     }
 
     /// Convert `self` to a `Value`.
+    /// Convert `self` to a `Value`.
     pub fn as_value(self) -> Value<'frame, 'static> {
         self.into()
     }
@@ -280,7 +281,7 @@ impl<'frame> DataType<'frame> {
         Value::instantiate(frame, self, values)
     }
 
-    /// Intantiate this `DataType` with the given values using the given output. The type must be 
+    /// Intantiate this `DataType` with the given values using the given output. The type must be
     /// concrete, returns an error if the type is not concrete.
     pub fn instantiate_output<'output, 'value, 'borrow, F, V>(
         self,

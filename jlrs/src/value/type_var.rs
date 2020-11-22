@@ -39,6 +39,7 @@ impl<'frame> TypeVar<'frame> {
         unsafe { Value::wrap((&*self.ptr()).ub) }
     }
 
+    /// Convert `self` to a `Value`.
     pub fn as_value(self) -> Value<'frame, 'static> {
         self.into()
     }

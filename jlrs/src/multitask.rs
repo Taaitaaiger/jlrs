@@ -638,6 +638,12 @@ fn call_set_wake_fn(stack: &mut [*mut c_void]) -> JlrsResult<()> {
             .submodule("Jlrs")?
             .global("wakerust")?
             .set_nth_field(0, waker)?;
+
+        let dropper = Value::new(&mut frame, crate::droparray as *mut c_void)?;
+        Module::main(global)
+            .submodule("Jlrs")?
+            .global("droparray")?
+            .set_nth_field(0, dropper)?;
     }
 
     Ok(())

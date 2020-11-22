@@ -7,6 +7,7 @@ struct TracedException
 end
 
 const wakerust = Ref{Ptr{Cvoid}}(C_NULL)
+const droparray = Ref{Ptr{Cvoid}}(C_NULL)
 
 function runasync(func::Function, wakeptr::Ptr{Cvoid}, args...)::Any
     try
@@ -48,5 +49,10 @@ function attachstacktrace(func::Function)::Function
     end
 
     wrapper
+end
+
+function clean(a::Array)
+    @assert droparray[] != C_NULL "droparray is null"
+    ccall(droparray[], Cvoid, (Array,), a)
 end
 end

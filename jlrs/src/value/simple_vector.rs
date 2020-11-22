@@ -80,6 +80,7 @@ impl<'frame> SimpleVector<'frame> {
         Ok(Value::wrap(value.ptr()))
     }
 
+    /// Convert `self` to a `Value`.
     pub fn as_value(self) -> Value<'frame, 'static> {
         self.into()
     }

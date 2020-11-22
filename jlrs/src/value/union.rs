@@ -64,6 +64,7 @@ impl<'frame> Union<'frame> {
         unsafe { Value::wrap((&*self.ptr()).b) }
     }
 
+    /// Convert `self` to a `Value`.
     pub fn as_value(self) -> Value<'frame, 'static> {
         self.into()
     }

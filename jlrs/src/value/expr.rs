@@ -34,6 +34,7 @@ impl<'frame> Expr<'frame> {
         unsafe { Array::wrap((&*self.ptr()).args) }
     }
 
+    /// Convert `self` to a `Value`.
     pub fn as_value(self) -> Value<'frame, 'static> {
         self.into()
     }

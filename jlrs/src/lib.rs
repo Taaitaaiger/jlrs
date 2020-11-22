@@ -354,6 +354,7 @@
 //! [the instructions for compiling Julia on Windows using Cygwin and MinGW]: https://github.com/JuliaLang/julia/blob/v1.5.2/doc/build/windows.md#cygwin-to-mingw-cross-compiling
 //! [the examples directory of the repo]: https://github.com/Taaitaaiger/jlrs/tree/v0.7/examples
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! count {
     ($name:expr => $value:expr) => {
@@ -370,6 +371,7 @@ macro_rules! count {
     };
 }
 
+/// Create a new named tuple.
 #[macro_export]
 macro_rules! named_tuple {
     ($frame:expr, $name:expr => $value:expr) => {
@@ -380,7 +382,7 @@ macro_rules! named_tuple {
             let n = $crate::count!($($rest)+);
             let mut v1 = Vec::with_capacity(n);
             let mut v2 = Vec::with_capacity(n);
-            
+
             v1.push($name);
             v2.push($value);
             $crate::named_tuple!($frame, &mut v1, &mut v2, $($rest)+)
@@ -401,7 +403,6 @@ macro_rules! named_tuple {
         }
     };
 }
-
 
 pub mod error;
 pub mod frame;
@@ -427,9 +428,13 @@ use global::Global;
 use jl_sys::{jl_atexit_hook, jl_init, jl_init_with_image__threading, jl_is_initialized};
 use mode::Sync;
 use stack::{Dynamic, RawStack, StackView, Static};
+use std::ffi::{c_void, CString};
 use std::io::{Error as IOError, ErrorKind};
+use std::mem::MaybeUninit;
 use std::path::Path;
+use std::ptr::null_mut;
 use std::sync::atomic::{AtomicBool, Ordering};
+use value::array::Array;
 use value::module::Module;
 use value::Value;
 
@@ -475,8 +480,15 @@ impl Julia {
             stack: RawStack::new(stack_size),
         };
 
-        jl.frame(1, |_, frame| {
+        jl.frame(2, |global, frame| {
             Value::eval_string(frame, JLRS_JL)?.expect("Could not load Jlrs module");
+
+            let droparray_fn = Value::new(frame, droparray as *mut c_void)?;
+            Module::main(global)
+                .submodule("Jlrs")?
+                .global("droparray")?
+                .set_nth_field(0, droparray_fn)?;
+
             Ok(())
         })
         .expect("Could not load Jlrs module");
@@ -521,8 +533,8 @@ impl Julia {
             return Err(JlrsError::other(io_err))?;
         }
 
-        let bindir = std::ffi::CString::new(julia_bindir_str).unwrap();
-        let im_rel_path = std::ffi::CString::new(image_path_str).unwrap();
+        let bindir = CString::new(julia_bindir_str).unwrap();
+        let im_rel_path = CString::new(image_path_str).unwrap();
 
         jl_init_with_image__threading(bindir.as_ptr(), im_rel_path.as_ptr());
 
@@ -530,8 +542,15 @@ impl Julia {
             stack: RawStack::new(stack_size),
         };
 
-        jl.frame(1, |_, frame| {
+        jl.frame(2, |global, frame| {
             Value::eval_string(frame, JLRS_JL)?.expect("Could not load Jlrs module");
+
+            let droparray_fn = Value::new(frame, droparray as *mut c_void)?;
+            Module::main(global)
+                .submodule("Jlrs")?
+                .global("droparray")?
+                .set_nth_field(0, droparray_fn)?;
+
             Ok(())
         })
         .expect("Could not load Jlrs module");
@@ -816,4 +835,19 @@ impl CCall {
 
         self.stack.as_mut()
     }
+}
+
+unsafe extern "C" fn droparray(a: Array) {
+    // The data of a moved array is allocated by Rust, this function is called by
+    // a finalizer in order to ensure it's also freed by Rust.
+    let arr_ref = &mut *a.ptr();
+
+    if arr_ref.flags.how() != 2 {
+        return;
+    }
+
+    let data_ptr = arr_ref.data.cast::<MaybeUninit<u8>>();
+    arr_ref.data = null_mut();
+    let n_els = arr_ref.elsize as usize * arr_ref.length;
+    Vec::from_raw_parts(data_ptr, n_els, n_els);
 }

@@ -105,6 +105,7 @@ impl<'base> Symbol<'base> {
         }
     }
 
+    /// Convert `self` to a `Value`.
     pub fn as_value(self) -> Value<'base, 'static> {
         self.into()
     }

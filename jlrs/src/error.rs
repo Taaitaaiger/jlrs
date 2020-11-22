@@ -182,9 +182,9 @@ impl Display for JlrsError {
             },
             JlrsError::NamedTupleSizeMismatch(names, values) => {
                 write!(
-                    formatter, 
+                    formatter,
                     "A named tuple must have an equal number of names and values, but {} name(s) and {} values(s) were given", 
-                    names, 
+                    names,
                     values
                 )
             }

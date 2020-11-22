@@ -53,6 +53,7 @@ impl<'frame> JuliaString<'frame> {
         std::str::from_utf8_unchecked(self.as_slice())
     }
 
+    /// Convert `self` to a `Value`.
     pub fn as_value(self) -> Value<'frame, 'static> {
         self.into()
     }

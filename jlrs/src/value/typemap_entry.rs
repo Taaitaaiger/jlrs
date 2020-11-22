@@ -82,6 +82,7 @@ impl<'frame> TypeMapEntry<'frame> {
         unsafe { (&*self.ptr()).va != 0 }
     }
 
+    /// Convert `self` to a `Value`.
     pub fn as_value(self) -> Value<'frame, 'static> {
         self.into()
     }

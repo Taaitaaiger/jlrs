@@ -52,6 +52,7 @@ impl<'frame> UnionAll<'frame> {
         unsafe { TypeVar::wrap((&*self.ptr()).var) }
     }
 
+    /// Convert `self` to a `Value`.
     pub fn as_value(self) -> Value<'frame, 'static> {
         self.into()
     }

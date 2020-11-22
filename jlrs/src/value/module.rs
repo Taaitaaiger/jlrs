@@ -2,9 +2,9 @@
 
 use crate::error::{JlrsError, JlrsResult};
 use crate::global::Global;
-use crate::traits::{private::Internal, Cast, TemporarySymbol};
+use crate::traits::{private::Internal, Cast, Frame, TemporarySymbol};
 use crate::value::symbol::Symbol;
-use crate::value::Value;
+use crate::value::{CallResult, Value};
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{
     jl_base_module, jl_core_module, jl_get_global, jl_main_module, jl_module_t, jl_module_type,
@@ -181,8 +181,67 @@ impl<'base> Module<'base> {
         self.global(name)
     }
 
+    /// Convert `self` to a `Value`.
     pub fn as_value(self) -> Value<'base, 'static> {
         self.into()
+    }
+
+    /// Load a module by calling `Base.require` and return this module if it has been loaded
+    /// successfully. This method can be used to load parts of the standard library like
+    /// `LinearAlgebra`. This requires one slot on the GC stack. Note that the loaded module is
+    /// not made available in the module used to call this method, you can use
+    /// `Module::set_global` to do so..
+    pub fn require<'frame, F, S>(
+        self,
+        frame: &mut F,
+        module: S,
+    ) -> JlrsResult<CallResult<'frame, 'static, Self>>
+    where
+        F: Frame<'frame>,
+        S: TemporarySymbol,
+    {
+        unsafe {
+            let out = Module::wrap(jl_base_module)
+                .function("require")
+                .unwrap()
+                .call2(
+                    frame,
+                    self.as_value(),
+                    module.temporary_symbol(Internal).as_value(),
+                )?
+                // transmute here to change the lifetime from 'frame to 'base.
+                .map(|a| std::mem::transmute(a.cast_unchecked::<Module>()));
+
+            Ok(out)
+        }
+    }
+
+    /// Load a module by calling `Base.require` and return this module if it has been loaded
+    /// successfully. This method can be used to load parts of the standard library like
+    /// `LinearAlgebra`. Unlike `Module::require`, this method will panic if the module cannot
+    /// be loaded. Note that the loaded module is not made available in the module used to call
+    /// this method, you can use `Module::set_global` to do so.
+    pub fn require_or_panic<S>(self, global: Global<'base>, module: S) -> JlrsResult<Self>
+    where
+        S: TemporarySymbol,
+    {
+        unsafe {
+            let out = Module::base(global)
+                .function("require")
+                .unwrap()
+                .call2_unprotected(
+                    global,
+                    self.as_value(),
+                    module.temporary_symbol(Internal).as_value(),
+                )
+                .expect(&format!(
+                    "Could not load ${:?}",
+                    module.temporary_symbol(Internal)
+                ))
+                .cast_unchecked::<Module>();
+
+            Ok(out)
+        }
     }
 }
 

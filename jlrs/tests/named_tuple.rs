@@ -18,7 +18,6 @@ fn create_named_tuple() {
     });
 }
 
-
 #[test]
 fn create_named_tuple_macro() {
     JULIA.with(|j| {

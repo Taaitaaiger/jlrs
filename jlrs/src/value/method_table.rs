@@ -69,6 +69,7 @@ impl<'frame> MethodTable<'frame> {
         unsafe { (&*self.ptr()).frozen }
     }
 
+    /// Convert `self` to a `Value`.
     pub fn as_value(self) -> Value<'frame, 'static> {
         self.into()
     }

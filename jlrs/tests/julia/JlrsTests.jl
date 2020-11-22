@@ -35,4 +35,12 @@ end
 function anothervecofmodules()::Vector{Module}
     [Base; Core; Main]
 end
+
+function funcwithkw(a::Int; b::Int=1)
+    a + b
+end
+
+function funcwithabstractkw(a::Float32; b::Real=1.0f0)
+    a + b
+end
 end
