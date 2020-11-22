@@ -109,6 +109,11 @@ impl<'base> Symbol<'base> {
     pub fn as_value(self) -> Value<'base, 'static> {
         self.into()
     }
+
+    /// Convert `self` to a `String`.
+    pub fn as_string(self) -> String {
+        self.into()
+    }
 }
 
 impl<'base> Into<String> for Symbol<'base> {
