@@ -84,6 +84,42 @@ thread_local! {
 /// and contains said exception.
 pub type CallResult<'frame, 'data> = Result<Value<'frame, 'data>, Value<'frame, 'data>>;
 
+/// Executes the provided string as Julia code in the context of the Main module. For example:
+/// ```rust
+/// # jlrs::util::JULIA.with(|j| {
+/// # let mut julia = j.borrow_mut();
+/// use jlrs::prelude::*;
+/// 
+/// julia.dynamic_frame(|global, frame| {
+///     let result = jlrs::eval_string(global, frame, "2 + 3")?.unwrap();
+///     assert_eq!(result.cast::<isize>().unwrap(), 5);
+/// 
+///     jlrs::eval_string(global, frame, "increase(x) = x + 1")?.unwrap();
+///     let func = Module::main(global).function("increase")?;
+///     let twelve = Value::new(frame, 12isize).unwrap();
+///     let result = func.call1(frame, twelve)?;
+///     assert_eq!(result.unwrap().cast::<isize>().unwrap(), 13isize);
+/// 
+///     Ok(())
+/// })
+/// .unwrap();
+/// # });
+/// ```
+pub fn eval_string<'base, 'frame, F>(
+    _global: Global<'base>,
+    frame: &mut F,
+    string: &str,
+) -> JlrsResult<CallResult<'frame, 'static>>
+where
+    F: Frame<'frame>,
+{
+    let string = std::ffi::CString::new(string).unwrap();
+    unsafe {
+        let res = jl_sys::jl_eval_string(string.as_ptr());
+        try_protect(frame, res)
+    }
+}
+
 /// Several values that are allocated consecutively. This can be used in combination with
 /// [`Value::call_values`] and [`WithOutput::call_values`].
 ///

@@ -374,6 +374,8 @@ pub mod traits;
 pub mod util;
 pub mod value;
 
+pub use value::eval_string;
+
 use error::{JlrsError, JlrsResult};
 use frame::{DynamicFrame, NullFrame, StaticFrame};
 use global::Global;
@@ -636,7 +638,7 @@ impl CCall {
     /// same way as [`Julia::init`] does. This function must never be called outside a function
     /// called through `ccall` from Julia and must only be called once during that call. The stack
     /// is not allocated untl a static or dynamic frame is created.
-    /// 
+    ///
     /// [`Julia::init`]: struct.Julia.html#method.init
     pub unsafe fn new(stack_size: usize) -> Self {
         CCall {
