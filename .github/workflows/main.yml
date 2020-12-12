@@ -36,6 +36,8 @@ jobs:
         # You may pin to the exact commit or the version.
         # uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f
         uses: actions-rs/toolchain@v1.0.6
+        with:
+          toolchain: stable
               
       - name: Run a multi-line script
         run: |
