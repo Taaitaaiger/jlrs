@@ -34,5 +34,10 @@ jobs:
 
       # Runs a single command using the runners shell
       - name: Run a one-line script
-        run: echo "$(which julia )"
+        run: export JULIA_DIR="$(which julia)"/../..
+
+
+      # Runs a single command using the runners shell
+      - name: Run another one-line script
+        run: echo "$PATH  --  $LD_LIBRARY_PATH  --  "
 
