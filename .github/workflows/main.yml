@@ -38,9 +38,12 @@ jobs:
         uses: actions-rs/toolchain@v1.0.6
         with:
           toolchain: stable
-              
+          
+      - name: install bindgen deps
+        run: apt install llvm-dev libclang-dev clang
+
       - name: Run a multi-line script
         run: |
-          export JULIA_DIR="$(which julia)"/../..
+          export JULIA_DIR="$(dirname julia)"/..
           export LD_LIBRARY_PATH="${JULIA_DIR}/lib:${LD_LIBRARY_PATH}"
           echo "$(ls $JULIA_DIR)"
