@@ -39,5 +39,5 @@ jobs:
 
       # Runs a single command using the runners shell
       - name: Run another one-line script
-        run: echo "$PATH  --  $LD_LIBRARY_PATH  --  "
+        run: echo "$PATH  --  $LD_LIBRARY_PATH  --  $JULIA_DIR"
 
