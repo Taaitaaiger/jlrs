@@ -22,7 +22,7 @@ dynamic = ["libc"]
 libc = { version = "0.2", optional = true }
 
 [build-dependencies]
-bindgen = "0.54.0"
+bindgen = "0.56"
 syn = { version = "1", features = ["full", "parsing", "clone-impls", "printing", "extra-traits"] }
 quote = "1"
 
