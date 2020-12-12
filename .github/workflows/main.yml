@@ -47,6 +47,6 @@ jobs:
 
       - name: Run tests
         run: |
-          export JULIA_DIR="$(dirname julia)"/..
+          export JULIA_DIR="$(dirname $(dirname $(which julia)))"
           export LD_LIBRARY_PATH="${JULIA_DIR}/lib:${LD_LIBRARY_PATH}"
           cargo test --verbose -- --test-threads=1
