@@ -36,10 +36,12 @@ impl<'frame> TypeName<'frame> {
         self.0
     }
 
+    /// The `name` field.
     pub fn name(self) -> Symbol<'frame> {
         unsafe { Symbol::wrap((&*self.ptr()).name) }
     }
 
+    /// The `module` field.
     pub fn module(self) -> Module<'frame> {
         unsafe { Module::wrap((&*self.ptr()).module) }
     }
@@ -65,10 +67,12 @@ impl<'frame> TypeName<'frame> {
         unsafe { SimpleVector::wrap((&*self.ptr()).linearcache) }
     }
 
+    /// The `hash` field.
     pub fn hash(self) -> isize {
         unsafe { (&*self.ptr()).hash }
     }
 
+    /// The `mt` field.
     pub fn mt(self) -> MethodTable<'frame> {
         unsafe { MethodTable::wrap((&*self.ptr()).mt) }
     }
@@ -85,34 +89,42 @@ impl<'frame> TypeName<'frame> {
 }
 
 impl<'base> TypeName<'base> {
+    /// The typename of the `UnionAll` `VecElement`.
     pub fn vecelement_typename(_: Global<'base>) -> Self {
         unsafe { Self::wrap(jl_vecelement_typename) }
     }
 
+    /// The typename of the `UnionAll` `Array`.
     pub fn array_typename(_: Global<'base>) -> Self {
         unsafe { Self::wrap(jl_array_typename) }
     }
 
+    /// The typename of the `UnionAll` `Ptr`.
     pub fn pointer_typename(_: Global<'base>) -> Self {
         unsafe { Self::wrap(jl_pointer_typename) }
     }
 
+    /// The typename of the `UnionAll` `LLVMPtr`.
     pub fn llvmpointer_typename(_: Global<'base>) -> Self {
         unsafe { Self::wrap(jl_llvmpointer_typename) }
     }
 
+    /// The typename of the `UnionAll` `NamedTuple`.
     pub fn namedtuple_typename(_: Global<'base>) -> Self {
         unsafe { Self::wrap(jl_namedtuple_typename) }
     }
 
+    /// The typename of the `UnionAll` `Vararg`.
     pub fn vararg_typename(_: Global<'base>) -> Self {
         unsafe { Self::wrap(jl_vararg_typename) }
     }
 
+    /// The typename of the `UnionAll` `Type`.
     pub fn type_typename(_: Global<'base>) -> Self {
         unsafe { Self::wrap(jl_type_typename) }
     }
 
+    /// The typename of the `DataType` `Tuple`.
     pub fn tuple_typename(_: Global<'base>) -> Self {
         unsafe { Self::wrap(jl_tuple_typename) }
     }

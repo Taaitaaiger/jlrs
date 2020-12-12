@@ -102,10 +102,10 @@ async fn main() {
 
     // Create channels for each of the tasks (this is not required but helps distinguish which
     // result belongs to which task).
-    let (sender1, receiver1) = async_std::sync::channel(1);
-    let (sender2, receiver2) = async_std::sync::channel(1);
-    let (sender3, receiver3) = async_std::sync::channel(1);
-    let (sender4, receiver4) = async_std::sync::channel(1);
+    let (sender1, receiver1) = async_std::channel::bounded(1);
+    let (sender2, receiver2) = async_std::channel::bounded(1);
+    let (sender3, receiver3) = async_std::channel::bounded(1);
+    let (sender4, receiver4) = async_std::channel::bounded(1);
 
     // Send four tasks to the runtime.
     julia

@@ -613,6 +613,11 @@ impl<'frame, 'data, T: Copy + ValidLayout> TypedArray<'frame, 'data, T> {
             frame,
         ))
     }
+
+    /// Convert `self` to a `Value`.
+    pub fn as_value(self) -> Value<'frame, 'data> {
+        self.into()
+    }
 }
 
 unsafe impl<'frame, 'data, T: Copy + ValidLayout> JuliaTypecheck for TypedArray<'frame, 'data, T> {

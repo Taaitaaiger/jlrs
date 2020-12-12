@@ -76,6 +76,10 @@ impl JlrsError {
     pub(crate) fn other<E: Error + Send + Sync + 'static>(reason: E) -> Self {
         JlrsError::Other(Box::new(reason))
     }
+
+    pub(crate) fn alloc_error(a: AllocError) -> Self {
+        JlrsError::AllocError(a)
+    }
 }
 
 impl Display for JlrsError {
@@ -179,7 +183,7 @@ impl Display for JlrsError {
             ),
             JlrsError::NotConcrete(type_name) => {
                 write!(formatter, "{} is not a concrete DataType", type_name)
-            },
+            }
             JlrsError::NamedTupleSizeMismatch(names, values) => {
                 write!(
                     formatter,

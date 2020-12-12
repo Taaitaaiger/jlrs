@@ -32,10 +32,12 @@ impl<'frame> MethodTable<'frame> {
         unsafe { Symbol::wrap((&*self.ptr()).name) }
     }
 
+    /// The `defs` field.
     pub fn defs(self) -> Value<'frame, 'static> {
         unsafe { Value::wrap((&*self.ptr()).defs) }
     }
 
+    /// The `cache` field.
     pub fn cache(self) -> Value<'frame, 'static> {
         unsafe { Value::wrap((&*self.ptr()).cache) }
     }
@@ -55,6 +57,7 @@ impl<'frame> MethodTable<'frame> {
         unsafe { Module::wrap((&*self.ptr()).module) }
     }
 
+    /// The `backedges` field.
     pub fn backedges(self) -> Array<'frame, 'static> {
         unsafe { Array::wrap((&*self.ptr()).backedges) }
     }

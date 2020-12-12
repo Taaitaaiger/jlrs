@@ -9,13 +9,13 @@
 //! An incomplete list of features that are currently supported by jlrs:
 //!
 //!  - Access arbitrary Julia modules and their contents.
-//!  - Call arbitrary Julia functions.
+//!  - Call arbitrary Julia functions, including functions that take keyword arguments.
 //!  - Include and use your own Julia code.
 //!  - Load a custom system image.
 //!  - Create values that Julia can use, and convert them back to Rust, from Rust.
 //!  - Access the type information and fields of values and check their properties.
 //!  - Create and use n-dimensional arrays.
-//!  - Support for mapping Julia structs to Rust structs, which can be generated with `JlrsReflect.jl`.
+//!  - Support for mapping Julia structs to Rust structs which can be generated with `JlrsReflect.jl`.
 //!  - Structs that can be mapped to Rust include those with type parameters and bits unions.
 //!  - Use these features when calling Rust from Julia through `ccall`.
 //!  - Offload long-running functions to another thread and `.await` the result with the (experimental) async runtime.
@@ -250,12 +250,12 @@
 //!
 //! The experimental async runtime runs Julia in a separate thread and allows multiple tasks to
 //! run in parallel by offloading functions to a new thread in Julia and waiting for them to
-//! complete without blocking the runtime. To use this feature you must to enable the `async`
-//! feature flag:
+//! complete without blocking the runtime. To use this feature you must enable the `async` feature
+//! flag:
 //!
 //! ```toml
 //! [dependencies]
-//! jlrs = { version = "0.7", features = ["async"] }
+//! jlrs = { version = "0.8", features = ["async"] }
 //! ```
 //!
 //! This features is only supported on Linux.
@@ -292,7 +292,7 @@
 //! [`IntoJulia`], which lets you use the type in combination with [`Value::new`].
 //!
 //! You should not implement these structs manually. The `JlrsReflect.jl` package can generate
-//! generate the correct Rust struct for types that don't include any unions or tuples with type
+//! the correct Rust struct for types that don't include any unions or tuples with type
 //! parameters. The reason for this restriction is that the layout of tuple and union fields can
 //! be very different depending on these parameters in a way that can't be nicely expressed in
 //! Rust.

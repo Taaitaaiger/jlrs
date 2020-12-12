@@ -8,4 +8,4 @@ edition = "2018"
 
 [dependencies]
 jlrs = { path = "../../jlrs", features = ["async"] }
-async-std = { version = "1.7", features = ["unstable", "attributes"], default-features = false}
+async-std = { version = "1.8", features = ["unstable", "attributes"], default-features = false}

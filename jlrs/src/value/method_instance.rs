@@ -56,6 +56,7 @@ impl<'frame> MethodInstance<'frame> {
         unsafe { Array::wrap((&*self.ptr()).backedges) }
     }
 
+    /// The `cache` field.
     pub fn cache(self) -> CodeInstance<'frame> {
         unsafe { CodeInstance::wrap((&*self.ptr()).cache) }
     }

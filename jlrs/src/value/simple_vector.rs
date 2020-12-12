@@ -26,6 +26,7 @@ impl<'frame> SimpleVector<'frame> {
         self.0
     }
 
+    /// Create a new `SimpleVector` that can hold `n` values.
     pub fn with_capacity<F>(frame: &mut F, n: usize) -> JlrsResult<Self>
     where
         F: Frame<'frame>,
@@ -40,6 +41,8 @@ impl<'frame> SimpleVector<'frame> {
         }
     }
 
+    /// Create a new `SimpleVector` that can hold `n` values without initializing its contents.
+    /// The contents must be set before calling Julia again.
     pub unsafe fn with_capacity_uninit<F>(frame: &mut F, n: usize) -> JlrsResult<Self>
     where
         F: Frame<'frame>,

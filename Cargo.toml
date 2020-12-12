@@ -6,7 +6,7 @@ members = [
     "jlrs_derive_tests",
     "jlrs_ndarray",
     "jlrs_async_tests",
-    "jl_sys",
+    "jl_sys"
 ]
 
 exclude = [

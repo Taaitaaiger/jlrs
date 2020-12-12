@@ -3,10 +3,11 @@
 use super::symbol::Symbol;
 use super::Value;
 use crate::error::{JlrsError, JlrsResult};
-use crate::traits::Cast;
+use crate::traits::{private::Internal, Cast, Frame, TemporarySymbol};
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
-use jl_sys::{jl_tvar_t, jl_tvar_type};
+use jl_sys::{jl_new_typevar, jl_tvar_t, jl_tvar_type};
 use std::marker::PhantomData;
+use std::ptr::null_mut;
 
 /// This is a unknown, but possibly restricted, type parameter. In `Array{T, N}`, `T` and `N` are
 /// `TypeVar`s.
@@ -22,6 +23,29 @@ impl<'frame> TypeVar<'frame> {
     #[doc(hidden)]
     pub unsafe fn ptr(self) -> *mut jl_tvar_t {
         self.0
+    }
+
+    /// Create a new `TypeVar`. This requires one slot on the GC stack.
+    pub fn new<F, S>(
+        frame: &mut F,
+        name: S,
+        lower_bound: Option<Value>,
+        upper_bound: Option<Value>,
+    ) -> JlrsResult<Self>
+    where
+        F: Frame<'frame>,
+        S: TemporarySymbol,
+    {
+        unsafe {
+            let name = name.temporary_symbol(Internal);
+            let lb = lower_bound.map_or(null_mut(), |v| v.ptr());
+            let ub = upper_bound.map_or(null_mut(), |v| v.ptr());
+            let tvar = jl_new_typevar(name.ptr(), lb, ub);
+            frame
+                .protect(tvar.cast(), Internal)
+                .map_err(JlrsError::alloc_error)?;
+            Ok(Self::wrap(tvar))
+        }
     }
 
     /// The name of this `TypeVar`.

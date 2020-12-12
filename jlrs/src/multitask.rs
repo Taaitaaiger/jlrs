@@ -21,11 +21,11 @@ use crate::traits::multitask::{JuliaTask, ReturnChannel};
 use crate::value::module::Module;
 use crate::value::Value;
 use crate::{INIT, JLRS_JL};
-use async_std::future::timeout;
-use async_std::sync::{
-    channel, Condvar as AsyncStdCondvar, Mutex as AsyncStdMutex, Receiver as AsyncStdReceiver,
-    RecvError, Sender as AsyncStdSender, TrySendError,
+use async_std::channel::{
+    bounded, Receiver as AsyncStdReceiver, RecvError, Sender as AsyncStdSender, TrySendError,
 };
+use async_std::future::timeout;
+use async_std::sync::{Condvar as AsyncStdCondvar, Mutex as AsyncStdMutex};
 use async_std::task::{self, JoinHandle as AsyncStdHandle};
 use jl_sys::{jl_atexit_hook, jl_gc_safepoint, jl_init_with_image__threading, jl_is_initialized};
 use std::ffi::{c_void, CString};
@@ -86,7 +86,7 @@ where
         stack_size: usize,
         process_events_ms: u64,
     ) -> JlrsResult<(Self, ThreadHandle<JlrsResult<()>>)> {
-        let (sender, receiver) = channel(channel_capacity);
+        let (sender, receiver) = bounded(channel_capacity);
         let julia = AsyncJulia { sender };
         let handle =
             thread::spawn(move || run_async(n_threads, stack_size, process_events_ms, receiver));
@@ -108,7 +108,7 @@ where
         stack_size: usize,
         process_events_ms: u64,
     ) -> JlrsResult<(Self, AsyncStdHandle<JlrsResult<()>>)> {
-        let (sender, receiver) = channel(channel_capacity);
+        let (sender, receiver) = bounded(channel_capacity);
         let julia = AsyncJulia { sender };
         let handle = task::spawn_blocking(move || {
             run_async(n_threads, stack_size, process_events_ms, receiver)
@@ -147,7 +147,7 @@ where
         P: AsRef<Path> + Send + 'static,
         Q: AsRef<Path> + Send + 'static,
     {
-        let (sender, receiver) = channel(channel_capacity);
+        let (sender, receiver) = bounded(channel_capacity);
         let julia = AsyncJulia { sender };
         let handle = thread::spawn(move || {
             run_async_with_image(
@@ -193,7 +193,7 @@ where
         P: AsRef<Path> + Send + 'static,
         Q: AsRef<Path> + Send + 'static,
     {
-        let (sender, receiver) = channel(channel_capacity);
+        let (sender, receiver) = bounded(channel_capacity);
         let julia = AsyncJulia { sender };
         let handle = task::spawn_blocking(move || {
             run_async_with_image(
@@ -216,6 +216,7 @@ where
         self.sender
             .send(Message::Task(Box::new(task), sender))
             .await
+            .expect("Channel was closed");
     }
 
     /// Try to send a new task to the runtime, if there's no room in the channel an error is
@@ -228,8 +229,8 @@ where
                 TrySendError::Full(Message::Task(t, _)) => {
                     Box::new(other_err(TrySendError::Full(t)))
                 }
-                TrySendError::Disconnected(Message::Task(t, _)) => {
-                    Box::new(other_err(TrySendError::Disconnected(t)))
+                TrySendError::Closed(Message::Task(t, _)) => {
+                    Box::new(other_err(TrySendError::Closed(t)))
                 }
                 _ => unreachable!(),
             })
@@ -249,7 +250,8 @@ where
                 path.as_ref().to_path_buf(),
                 completed.clone(),
             ))
-            .await;
+            .await
+            .expect("Channel was closed");
 
         let (lock, cvar) = &*completed;
         let mut completed = lock.lock().await;
@@ -278,8 +280,8 @@ where
                 TrySendError::Full(Message::Include(t, _)) => {
                     Box::new(other_err(TrySendError::Full(t)))
                 }
-                TrySendError::Disconnected(Message::Include(t, _)) => {
-                    Box::new(other_err(TrySendError::Disconnected(t)))
+                TrySendError::Closed(Message::Include(t, _)) => {
+                    Box::new(other_err(TrySendError::Closed(t)))
                 }
                 _ => unreachable!(),
             })
@@ -295,7 +297,7 @@ where
 
     /// Returns the capacity of the channel.
     pub fn capacity(&self) -> usize {
-        self.sender.capacity()
+        self.sender.capacity().unwrap()
     }
 
     /// Returns the number of messages in the channel.
@@ -321,8 +323,8 @@ where
                 TrySendError::Full(Message::TrySetWakeFn(_)) => {
                     Box::new(other_err(TrySendError::Full(())))
                 }
-                TrySendError::Disconnected(Message::TrySetWakeFn(_)) => {
-                    Box::new(other_err(TrySendError::Disconnected(())))
+                TrySendError::Closed(Message::TrySetWakeFn(_)) => {
+                    Box::new(other_err(TrySendError::Closed(())))
                 }
                 _ => unreachable!(),
             })
@@ -340,7 +342,8 @@ where
         let completed = Arc::new((AsyncStdMutex::new(Status::Pending), AsyncStdCondvar::new()));
         self.sender
             .send(Message::SetWakeFn(completed.clone()))
-            .await;
+            .await
+            .expect("Channel was closed");
 
         {
             let (lock, cvar) = &*completed;
@@ -431,7 +434,8 @@ where
             let rt_c = rt_sender.clone();
             rt_sender
                 .send(Message::Complete(Wrapper(task_idx, task_stack), rt_c))
-                .await;
+                .await
+                .expect("Channel was closed");
         })
     }
 }

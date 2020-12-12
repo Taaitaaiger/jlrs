@@ -34,7 +34,7 @@ use jl_sys::{
     jl_bottom_type, jl_call, jl_call0, jl_call1, jl_call2, jl_call3, jl_datatype_t,
     jl_diverror_exception, jl_egal, jl_emptytuple, jl_eval_string, jl_exception_occurred, jl_false,
     jl_field_index, jl_field_isptr, jl_field_names, jl_fieldref, jl_fieldref_noalloc, jl_finalize,
-    jl_gc_add_finalizer, jl_get_kwsorter, jl_get_nth_field, jl_get_nth_field_noalloc,
+    jl_gc_add_finalizer, jl_gc_wb, jl_get_kwsorter, jl_get_nth_field, jl_get_nth_field_noalloc,
     jl_interrupt_exception, jl_is_kind, jl_isa, jl_memory_exception, jl_new_array,
     jl_new_struct_uninit, jl_new_structv, jl_nfields, jl_nothing, jl_object_id, jl_ptr_to_array,
     jl_ptr_to_array_1d, jl_readonlymemory_exception, jl_set_nth_field, jl_stackovf_exception,
@@ -999,6 +999,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
         if let Some(dt) = value.datatype() {
             if Value::subtype(dt.into(), field_type) {
                 jl_set_nth_field(self.ptr(), idx, value.ptr());
+                jl_gc_wb(self.ptr(), value.ptr());
                 return Ok(());
             } else {
                 Err(JlrsError::NotSubtype)?

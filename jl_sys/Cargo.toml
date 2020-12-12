@@ -16,9 +16,15 @@ links = "julia"
 
 [features]
 docs-rs = []
+dynamic = ["libc"]
+
+[dependencies]
+libc = { version = "0.2", optional = true }
 
 [build-dependencies]
 bindgen = "0.54.0"
+syn = { version = "1", features = ["full", "parsing", "clone-impls", "printing", "extra-traits"] }
+quote = "1"
 
 [package.metadata.docs.rs]
 features = ["docs-rs"]
