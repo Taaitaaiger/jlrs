@@ -17,6 +17,9 @@ on:
 jobs:
   # This workflow contains a single job called "build"
   build:
+    env:
+     JULIA_NUM_THREADS: 3
+
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
 
@@ -42,8 +45,8 @@ jobs:
       - name: install bindgen deps
         run: sudo apt-get install llvm-dev libclang-dev clang
 
-      - name: Run a multi-line script
+      - name: Run tests
         run: |
           export JULIA_DIR="$(dirname julia)"/..
           export LD_LIBRARY_PATH="${JULIA_DIR}/lib:${LD_LIBRARY_PATH}"
-          echo "$(ls $JULIA_DIR)"
+          cargo test --verbose -- --test-threads=1
