@@ -40,7 +40,7 @@ jobs:
           toolchain: stable
           
       - name: install bindgen deps
-        run: apt install llvm-dev libclang-dev clang
+        run: sudo apt-get install llvm-dev libclang-dev clang
 
       - name: Run a multi-line script
         run: |
