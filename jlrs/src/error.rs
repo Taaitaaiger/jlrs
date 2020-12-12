@@ -32,6 +32,8 @@ pub enum JlrsError {
     NotAnSSAValue,
     NotATypeName,
     NotATypeVar,
+    NotATypeLB(String),
+    NotATypeUB(String),
     NotAUnion,
     InvalidBody(String),
     NotAKind(String),
@@ -128,6 +130,12 @@ impl Display for JlrsError {
             JlrsError::NotAnSSAValue => write!(formatter, "This is not an SSA value"),
             JlrsError::NotATypeName => write!(formatter, "This is not a typename"),
             JlrsError::NotATypeVar => write!(formatter, "This is not a type var"),
+            JlrsError::NotATypeLB(tv) => {
+                write!(formatter, "The lower bound of {} is not a type", tv)
+            }
+            JlrsError::NotATypeUB(tv) => {
+                write!(formatter, "The upper bound of {} is not a type", tv)
+            }
             JlrsError::NotAUnion => write!(formatter, "This is not a union"),
             JlrsError::NotAUnionAll => write!(formatter, "This is not a UnionAll"),
             JlrsError::InvalidLayout => write!(formatter, "The layout is invalid"),

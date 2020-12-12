@@ -4,6 +4,16 @@ mutable struct MutableStruct
     y::UInt64
 end
 
+struct ParameterStruct{T}
+    a::T
+end
+
+struct ValueTypeStruct{T}
+end
+
+valuedispatch(::ValueTypeStruct{1})::Int = 3
+valuedispatch(::ValueTypeStruct{2})::Float64 = 3.0
+
 function inlinetuple()::Tuple{UInt32, UInt16, Int64}
     (1, 2, 3)
 end
