@@ -43,4 +43,4 @@ jobs:
         run: |
           export JULIA_DIR="$(which julia)"/../..
           export LD_LIBRARY_PATH="${JULIA_DIR}/lib:${LD_LIBRARY_PATH}"
-          echo "$PATH  --  $LD_LIBRARY_PATH  --  $JULIA_DIR ---  $(which cargo)"
+          echo "$(ls $JULIA_DIR)"
