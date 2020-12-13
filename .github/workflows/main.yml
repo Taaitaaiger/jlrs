@@ -27,6 +27,7 @@ jobs:
           version: "10.0"
           directory: ${{ runner.temp }}/llvm
   build:
+    runs-on: ubuntu-latest
     needs: setup
     steps:
       - name: rust-toolchain
