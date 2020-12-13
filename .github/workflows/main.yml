@@ -13,9 +13,14 @@ jobs:
     env:
      JULIA_NUM_THREADS: 3
     runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.allow-fail }}
     strategy:
       matrix:
-        rust: [stable, beta, nightly]
+        rust: [stable, beta]
+        allow-fail: [false]
+        include:
+          - rust: nightly
+            allow-fail: true
     steps:
       - uses: actions/checkout@v2
 
