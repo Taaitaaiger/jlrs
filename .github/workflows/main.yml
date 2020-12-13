@@ -9,12 +9,16 @@ on:
   workflow_dispatch:
 
 jobs:
-  setup:
+  build:
     env:
      JULIA_NUM_THREADS: 3
-
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rust: [stable, beta, nightly]
     steps:
+      - uses: actions/checkout@v2
+
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v1.4.1
         with:
@@ -25,14 +29,7 @@ jobs:
         with:
           version: "10.0"
           directory: ${{ runner.temp }}/llvm
-  build:
-    runs-on: ubuntu-latest
-    needs: setup
-    strategy:
-      matrix:
-        rust: [stable, beta, nightly]
-    steps:
-      - uses: actions/checkout@v2
+
       - name: rust-toolchain
         uses: actions-rs/toolchain@v1.0.6
         with:
