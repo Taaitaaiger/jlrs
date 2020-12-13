@@ -272,7 +272,7 @@ feature flag:
 
 ```toml
 [dependencies]
-jlrs = { version = "0.7", features = ["async"] }
+jlrs = { version = "0.8", features = ["async"] }
 ```
 
 This features is only supported on Linux.

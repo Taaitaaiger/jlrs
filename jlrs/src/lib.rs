@@ -352,7 +352,7 @@
 //! [`Value::cast`]: value/struct.Value.html#method.cast
 //! [`AsyncJulia`]: multitask/struct.AsyncJulia.html
 //! [the instructions for compiling Julia on Windows using Cygwin and MinGW]: https://github.com/JuliaLang/julia/blob/v1.5.2/doc/build/windows.md#cygwin-to-mingw-cross-compiling
-//! [the examples directory of the repo]: https://github.com/Taaitaaiger/jlrs/tree/v0.7/examples
+//! [the examples directory of the repo]: https://github.com/Taaitaaiger/jlrs/tree/v0.8/examples
 
 #[doc(hidden)]
 #[macro_export]
