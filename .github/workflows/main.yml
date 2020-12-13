@@ -43,10 +43,11 @@ jobs:
           toolchain: stable
           
       - name: install bindgen deps
-        run: sudo apt-get install llvm-dev libclang-dev clang
+        run: sudo apt-get install llvm-11-dev libclang-11-dev clang-11
 
       - name: Run tests
         run: |
           export JULIA_DIR="$(dirname $(dirname $(which julia)))"
           export LD_LIBRARY_PATH="${JULIA_DIR}/lib:${LD_LIBRARY_PATH}"
+          sudo apt-get install llvm-dev libclang-dev clang
           cargo test --verbose -- --test-threads=1
