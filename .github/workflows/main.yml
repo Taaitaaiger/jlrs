@@ -1,52 +1,38 @@
-# This is a basic workflow to help you get started with Actions
-
 name: CI
 
-# Controls when the action will run. 
 on:
-  # Triggers the workflow on push or pull request events but only for the master branch
   push:
-    branches: [ v0.8, github-actions ]
+    branches: [ master, v0.8 ]
   pull_request:
-    branches: [ v0.8, github-actions ]
+    branches: [ master, v0.8 ]
 
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
-  build:
+  setup:
     env:
      JULIA_NUM_THREADS: 3
 
-    # The type of runner that the job will run on
     runs-on: ubuntu-latest
-
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
       - name: Setup Julia environment
-        # You may pin to the exact commit or the version.
-        # uses: julia-actions/setup-julia@d3ce119a16594ea9e5d7974813970c73b6ab9e94
         uses: julia-actions/setup-julia@v1.4.1
         with:
-          # The Julia version to download (if necessary) and use. Example: 1.0.4
           version: 1.5.3
 
-      - name: rust-toolchain
-        # You may pin to the exact commit or the version.
-        # uses: actions-rs/toolchain@b2417cde72dcf67f306c0ae8e0828a81bf0b189f
-        uses: actions-rs/toolchain@v1.0.6
-        with:
-          toolchain: stable
-          
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v1
         with:
           version: "10.0"
           directory: ${{ runner.temp }}/llvm
+  build:
+    needs: setup
+    steps:
+      - name: rust-toolchain
+        uses: actions-rs/toolchain@v1.0.6
+        with:
+          toolchain: stable
 
       - name: Run tests
         run: |
