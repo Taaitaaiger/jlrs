@@ -43,7 +43,7 @@ jobs:
           toolchain: stable
           
       - name: install bindgen deps
-        run: sudo apt-get install llvm-11-dev libclang-11-dev clang-11
+        run: sudo apt-get install llvm-10-dev libclang-10-dev clang-10
 
       - name: Run tests
         run: |
