@@ -2,6 +2,7 @@ use crate::error::{AllocError, JlrsError, JlrsResult};
 #[cfg(all(feature = "async", target_os = "linux"))]
 use crate::frame::AsyncFrame;
 use crate::frame::{DynamicFrame, NullFrame, Output, StaticFrame};
+use crate::global::Global;
 #[cfg(all(feature = "async", target_os = "linux"))]
 use crate::mode::Async;
 use crate::mode::{Mode, Sync};
@@ -60,6 +61,14 @@ pub trait Frame<'frame>: private::Frame<'frame> {
     #[doc(hidden)]
     // Exists for debugging purposes, prints the contents of the GC stack.
     fn print_memory(&self);
+
+    /// Create a new `Global` which can be used to access a global in Julia. These globals are 
+    /// limited to the frame's lifetime rather than the base lifetime. 
+    fn global(&self) -> Global<'frame> {
+        unsafe {
+            Global::new()
+        }
+    }
 }
 
 impl<'frame, M: Mode> Frame<'frame> for StaticFrame<'frame, M> {

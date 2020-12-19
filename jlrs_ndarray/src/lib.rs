@@ -56,7 +56,7 @@ impl<'frame: 'borrow, 'data: 'borrow, 'borrow, T: ValidLayout + Copy> NdArray<'b
         let shape = data.dimensions().as_slice().into_dimension().f();
         match ArrayView::from_shape(shape, data.into_slice()) {
             Ok(arr) => Ok(arr),
-            Err(e) => Err(other(e).unwrap_err()),
+            Err(e) => other(e)?,
         }
     }
 
@@ -73,7 +73,7 @@ impl<'frame: 'borrow, 'data: 'borrow, 'borrow, T: ValidLayout + Copy> NdArray<'b
         let raw = data.into_mut_slice();
         match ArrayViewMut::from_shape(shape, raw) {
             Ok(arr) => Ok(arr),
-            Err(e) => Err(other(e).unwrap_err()),
+            Err(e) => other(e)?,
         }
     }
 }
@@ -93,7 +93,7 @@ impl<'frame: 'borrow, 'data: 'borrow, 'borrow, T: ValidLayout + Copy> NdArray<'b
         let shape = data.dimensions().as_slice().into_dimension().f();
         match ArrayView::from_shape(shape, data.into_slice()) {
             Ok(arr) => Ok(arr),
-            Err(e) => Err(other(e).unwrap_err()),
+            Err(e) => other(e)?,
         }
     }
 
@@ -110,7 +110,7 @@ impl<'frame: 'borrow, 'data: 'borrow, 'borrow, T: ValidLayout + Copy> NdArray<'b
         let raw = data.into_mut_slice();
         match ArrayViewMut::from_shape(shape, raw) {
             Ok(arr) => Ok(arr),
-            Err(e) => Err(other(e).unwrap_err()),
+            Err(e) => other(e)?,
         }
     }
 }

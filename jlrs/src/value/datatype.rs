@@ -22,7 +22,7 @@
 use crate::error::{JlrsError, JlrsResult};
 use crate::frame::Output;
 use crate::global::Global;
-use crate::traits::{Cast, Frame, JuliaTypecheck};
+use crate::traits::{Cast, Frame, JuliaTypecheck, private::Internal};
 use crate::value::symbol::Symbol;
 use crate::value::type_name::TypeName;
 use crate::value::Value;
@@ -45,7 +45,7 @@ use jl_sys::{
     jl_tvar_type, jl_typedslot_type, jl_typeerror_type, jl_typemap_entry_type,
     jl_typemap_level_type, jl_typename_str, jl_typename_type, jl_typeofbottom_type, jl_uint16_type,
     jl_uint32_type, jl_uint64_type, jl_uint8_type, jl_undefvarerror_type, jl_unionall_type,
-    jl_uniontype_type, jl_upsilonnode_type, jl_voidpointer_type, jl_weakref_type,
+    jl_uniontype_type, jl_upsilonnode_type, jl_voidpointer_type, jl_weakref_type, jl_new_structv
 };
 use std::ffi::CStr;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
@@ -269,28 +269,36 @@ impl<'frame> DataType<'frame> {
     /// Intantiate this `DataType` with the given values. The type must be concrete. One free slot
     /// on the GC stack is required for this function to succeed, returns an error if no slot is
     /// available or if the type is not concrete.
-    pub fn instantiate<'value, 'borrow, F, V>(
+    pub fn instantiate<'fr, 'value, 'borrow, F, V>(
         self,
         frame: &mut F,
         values: &mut V,
-    ) -> JlrsResult<Value<'frame, 'borrow>>
+    ) -> JlrsResult<Value<'fr, 'borrow>>
     where
-        F: Frame<'frame>,
+        F: Frame<'fr>,
         V: AsMut<[Value<'value, 'borrow>]>,
     {
-        Value::instantiate(frame, self, values)
+        unsafe {
+            if !self.is::<Concrete>() {
+                Err(JlrsError::NotConcrete(self.name().into()))?;
+            }
+
+            let values = values.as_mut();
+            let value = jl_new_structv(self.ptr(), values.as_mut_ptr().cast(), values.len() as _);
+            frame.protect(value, Internal).map_err(Into::into)
+        }
     }
 
     /// Intantiate this `DataType` with the given values using the given output. The type must be
     /// concrete, returns an error if the type is not concrete.
-    pub fn instantiate_output<'output, 'value, 'borrow, F, V>(
+    pub fn instantiate_output<'output, 'fr, 'value, 'borrow, F, V>(
         self,
         frame: &mut F,
         output: Output<'output>,
         values: &mut V,
     ) -> JlrsResult<Value<'output, 'borrow>>
     where
-        F: Frame<'frame>,
+        F: Frame<'fr>,
         V: AsMut<[Value<'value, 'borrow>]>,
     {
         Value::instantiate_output(frame, output, self, values)

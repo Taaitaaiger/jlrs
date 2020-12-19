@@ -3,6 +3,7 @@
 use crate::error::{exception, JlrsResult};
 use crate::frame::AsyncFrame;
 use crate::global::Global;
+use crate::traits::Frame;
 use crate::value::module::Module;
 use crate::value::task::Task;
 use crate::value::{CallResult, Value};
@@ -62,7 +63,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             vals.push(state_ptr_boxed);
             vals.extend_from_slice(values);
 
-            let global = Global::new();
+            let global = frame.global();
             let task = Module::main(global)
                 .submodule("Jlrs")?
                 .function("asynccall")?

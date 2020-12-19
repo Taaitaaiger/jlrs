@@ -371,7 +371,27 @@ macro_rules! count {
     };
 }
 
-/// Create a new named tuple.
+/// Create a new named tuple. You will need a named tuple to call functions with keyword 
+/// arguments. 
+/// 
+/// Example:
+/// 
+/// ```no_run
+/// # use jlrs::prelude::*;
+/// # fn main() {
+/// let mut julia = unsafe { Julia::init(16).unwrap() };
+/// // Three slots; two for the inputs and one for the output.
+/// julia.frame(3, |global, frame| {
+///     // Create the two arguments, each value requires one slot
+///     let i = Value::new(frame, 2u64)?;
+///     let j = Value::new(frame, 1u32)?;
+///
+///     let _nt = named_tuple!(frame, "i" => i, "j" => j);
+///
+///     Ok(())
+/// }).unwrap();
+/// # }
+/// ```
 #[macro_export]
 macro_rules! named_tuple {
     ($frame:expr, $name:expr => $value:expr) => {

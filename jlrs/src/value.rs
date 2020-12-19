@@ -299,15 +299,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
         F: Frame<'frame>,
         V: AsMut<[Value<'value, 'borrow>]>,
     {
-        unsafe {
-            if !ty.is::<Concrete>() {
-                Err(JlrsError::NotConcrete(ty.name().into()))?;
-            }
-
-            let values = values.as_mut();
-            let value = jl_new_structv(ty.ptr(), values.as_mut_ptr().cast(), values.len() as _);
-            frame.protect(value, Internal).map_err(Into::into)
-        }
+        ty.instantiate(frame, values)
     }
 
     /// Create a new instance of a value with `DataType` `ty`, using `values` to set the fields.
@@ -451,7 +443,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
             frame
                 .protect(array, Internal)
                 .map(|v| {
-                    let g = Global::new();
+                    let g = frame.global();
                     v.add_finalizer(
                         Module::main(g)
                             .submodule("Jlrs")
@@ -486,7 +478,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
         unsafe {
             let array = move_array(frame, data, dimensions)?;
             let v = frame.assign_output(output, array, Internal);
-            let g = Global::new();
+            let g = frame.global();
             v.add_finalizer(
                 Module::main(g)
                     .submodule("Jlrs")
@@ -539,6 +531,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
         }
     }
 
+    /// Create a new named tuple, you should use the `named_tuple` macro instead of this method.
     pub fn new_named_tuple<'value, 'borrow, F, S, T, V>(
         frame: &mut F,
         field_names: &mut S,
@@ -552,7 +545,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     {
         let output = frame.output()?;
         frame.frame(4, |frame| unsafe {
-            let global = Global::new();
+            let global = frame.global();
             let field_names = field_names.as_mut();
             let values_m = values.as_mut();
 
@@ -611,9 +604,9 @@ impl<'frame, 'data> Value<'frame, 'data> {
     ///
     /// One free slot on the GC stack is required for this function to succeed, returns an error
     /// if no slot is available.
-    pub fn apply_type<'value, 'borrow, F, V>(self, frame: &mut F, types: &mut V) -> JlrsResult<Self>
+    pub fn apply_type<'fr, 'value, 'borrow, F, V>(self, frame: &mut F, types: &mut V) -> JlrsResult<Value<'fr, 'borrow>>
     where
-        F: Frame<'frame>,
+        F: Frame<'fr>,
         V: AsMut<[Value<'value, 'borrow>]>,
     {
         unsafe {
@@ -1390,7 +1383,7 @@ impl<'data> Value<'_, 'data> {
         F: Frame<'frame>,
     {
         unsafe {
-            let global = Global::new();
+            let global = frame.global();
             let func = Module::main(global)
                 .submodule("Jlrs")?
                 .function("tracingcall")?;
@@ -1412,7 +1405,7 @@ impl<'data> Value<'_, 'data> {
         F: Frame<'frame>,
     {
         unsafe {
-            let global = Global::new();
+            let global = frame.global();
             let func = Module::main(global)
                 .submodule("Jlrs")?
                 .function("attachstacktrace")?;
@@ -1683,7 +1676,7 @@ impl<'output, 'frame, 'data> WithOutput<'output, Value<'frame, 'data>> {
         F: Frame<'fr>,
     {
         unsafe {
-            let global = Global::new();
+            let global = frame.global();
             let func = Module::main(global)
                 .submodule("Jlrs")?
                 .function("tracingcall")?;
@@ -1702,7 +1695,7 @@ impl<'output, 'frame, 'data> WithOutput<'output, Value<'frame, 'data>> {
         F: Frame<'fr>,
     {
         unsafe {
-            let global = Global::new();
+            let global = frame.global();
             let func = Module::main(global)
                 .submodule("Jlrs")?
                 .function("attachstacktrace")?;

@@ -62,14 +62,17 @@ pub enum JlrsError {
     NamedTupleSizeMismatch(usize, usize),
 }
 
+/// Create a new `JlrsError::Exception` and wrap it in a `JlrsResult::Err`.
 pub fn exception<T>(exc: String) -> JlrsResult<T> {
     Err(JlrsError::Exception(exc))?
 }
 
-pub fn other<E: Error + Send + Sync + 'static>(reason: E) -> JlrsResult<()> {
+/// Create a new `JlrsError::Other` and wrap it in a `JlrsResult::Err`.
+pub fn other<T, E: Error + Send + Sync + 'static>(reason: E) -> JlrsResult<T> {
     Err(JlrsError::Other(Box::new(reason)))?
 }
 
+/// Create a new `JlrsError::Other`.
 pub fn other_err<E: Error + Send + Sync + 'static>(reason: E) -> JlrsError {
     JlrsError::Other(Box::new(reason))
 }
