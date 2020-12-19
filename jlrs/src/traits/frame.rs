@@ -62,12 +62,10 @@ pub trait Frame<'frame>: private::Frame<'frame> {
     // Exists for debugging purposes, prints the contents of the GC stack.
     fn print_memory(&self);
 
-    /// Create a new `Global` which can be used to access a global in Julia. These globals are 
-    /// limited to the frame's lifetime rather than the base lifetime. 
+    /// Create a new `Global` which can be used to access a global in Julia. These globals are
+    /// limited to the frame's lifetime rather than the base lifetime.
     fn global(&self) -> Global<'frame> {
-        unsafe {
-            Global::new()
-        }
+        unsafe { Global::new() }
     }
 }
 

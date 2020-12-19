@@ -50,6 +50,10 @@ function funcwithkw(a::Int; b::Int=1)
     a + b
 end
 
+function funcwithkw(a::Int, rest...; b::Int=1)
+    a + sum(rest) + b
+end
+
 function funcwithabstractkw(a::Float32; b::Real=1.0f0)
     a + b
 end

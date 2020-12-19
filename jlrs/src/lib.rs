@@ -371,11 +371,11 @@ macro_rules! count {
     };
 }
 
-/// Create a new named tuple. You will need a named tuple to call functions with keyword 
-/// arguments. 
-/// 
+/// Create a new named tuple. You will need a named tuple to call functions with keyword
+/// arguments.
+///
 /// Example:
-/// 
+///
 /// ```no_run
 /// # use jlrs::prelude::*;
 /// # fn main() {

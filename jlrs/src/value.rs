@@ -36,17 +36,23 @@ use jl_sys::{
     jl_field_index, jl_field_isptr, jl_field_names, jl_fieldref, jl_fieldref_noalloc, jl_finalize,
     jl_gc_add_finalizer, jl_gc_wb, jl_get_kwsorter, jl_get_nth_field, jl_get_nth_field_noalloc,
     jl_interrupt_exception, jl_is_kind, jl_isa, jl_memory_exception, jl_new_array,
-    jl_new_struct_uninit, jl_new_structv, jl_nfields, jl_nothing, jl_object_id, jl_ptr_to_array,
-    jl_ptr_to_array_1d, jl_readonlymemory_exception, jl_set_nth_field, jl_stackovf_exception,
-    jl_subtype, jl_svec_data, jl_svec_len, jl_true, jl_type_union, jl_type_unionall, jl_typeof,
-    jl_typeof_str, jl_undefref_exception, jl_value_t,
+    jl_new_struct_uninit, jl_new_structv, jl_nfields, jl_nothing, jl_nothing_type, jl_object_id,
+    jl_ptr_to_array, jl_ptr_to_array_1d, jl_readonlymemory_exception, jl_set_nth_field,
+    jl_stackovf_exception, jl_subtype, jl_svec_data, jl_svec_len, jl_true, jl_type_union,
+    jl_type_unionall, jl_typeof, jl_typeof_str, jl_undefref_exception, jl_value_t,
 };
+use smallvec::SmallVec;
 use std::borrow::BorrowMut;
+use std::cell::UnsafeCell;
 use std::ffi::{CStr, CString};
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::marker::PhantomData;
 use std::ptr::null_mut;
 use std::slice;
+
+// If a function is called with `MAX_SIZE` or fewer arguments, no allocation is needed to add
+// the additional two arguments that `Jlrs.asynccall` needs.
+const MAX_SIZE: usize = 8;
 
 pub mod array;
 pub mod code_instance;
@@ -73,8 +79,8 @@ thread_local! {
     // Used as a pool to convert dimensions to tuples. Safe because a thread local is initialized
     // when `with` is first called, which happens after `Julia::init` has been called. The C API
     // requires a mutable pointer to this array so an `UnsafeCell` is used to store it.
-    static JL_LONG_TYPE: std::cell::UnsafeCell<[*mut jl_datatype_t; 8]> = unsafe {
-        std::cell::UnsafeCell::new([
+    static JL_LONG_TYPE: UnsafeCell<[*mut jl_datatype_t; 8]> = unsafe {
+        UnsafeCell::new([
             usize::julia_type(),
             usize::julia_type(),
             usize::julia_type(),
@@ -531,7 +537,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
         }
     }
 
-    /// Create a new named tuple, you should use the `named_tuple` macro instead of this method.
+    /// Create a new named tuple, you can use the `named_tuple` macro instead of this method.
     pub fn new_named_tuple<'value, 'borrow, F, S, T, V>(
         frame: &mut F,
         field_names: &mut S,
@@ -604,7 +610,11 @@ impl<'frame, 'data> Value<'frame, 'data> {
     ///
     /// One free slot on the GC stack is required for this function to succeed, returns an error
     /// if no slot is available.
-    pub fn apply_type<'fr, 'value, 'borrow, F, V>(self, frame: &mut F, types: &mut V) -> JlrsResult<Value<'fr, 'borrow>>
+    pub fn apply_type<'fr, 'value, 'borrow, F, V>(
+        self,
+        frame: &mut F,
+        types: &mut V,
+    ) -> JlrsResult<Value<'fr, 'borrow>>
     where
         F: Frame<'fr>,
         V: AsMut<[Value<'value, 'borrow>]>,
@@ -658,7 +668,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// pointer instead of `nothing`, this method return false if the given value is a null
     /// pointer.
     pub fn is_nothing(self) -> bool {
-        unsafe { !self.is_null() && jl_typeof(self.ptr()) == jl_sys::jl_nothing_type.cast() }
+        unsafe { !self.is_null() && jl_typeof(self.ptr()) == jl_nothing_type.cast() }
     }
 
     /// Returns true if the value is a null pointer.
@@ -1010,13 +1020,58 @@ impl<'frame, 'data> Value<'frame, 'data> {
 /// arguments, you must use one of the `call` methods which will call that value as a function
 /// with any number of arguments. One of these, `call_keywords`, lets you call functions with
 /// keyword arguments.
-impl<'data> Value<'_, 'data> {
+impl<'fr, 'data> Value<'fr, 'data> {
     /// Wraps a `Value` so that a function call will not require a slot in the current frame but
     /// uses the one that was allocated for the output.
     pub fn with_output<'output>(self, output: Output<'output>) -> WithOutput<'output, Self> {
         WithOutput {
             value: self,
             output,
+        }
+    }
+
+    /// Provide keywords to this function.
+    ///
+    /// Functions that can take keyword arguments can be called in two major ways, either with or
+    /// without keyword arguments. The normal call-methods take care of the frst case, this one
+    /// takes care of the second.
+    ///
+    /// Example:
+    ///
+    /// ```
+    /// # use jlrs::prelude::*;
+    /// # use jlrs::util::JULIA;
+    /// # fn main() {
+    /// # JULIA.with(|j| {
+    /// # let mut julia = j.borrow_mut();
+    ///   julia.frame(4, |global, frame| {
+    ///       let a_value = Value::new(frame, 1isize)?;
+    ///       let b_value = Value::new(frame, 10isize)?;
+    ///       // `funcwithkw` takes a single positional argument of type `Int`, one keyword
+    ///       // argument named `b` of the same type, and returns `a` + `b`.
+    ///       let func = Module::main(global)
+    ///           .submodule("JlrsTests")?
+    ///           .function("funcwithkw")?;
+    ///
+    ///       let kw = named_tuple!(frame, "b" => b_value)?;
+    ///       let res = func.with_keywords(kw)
+    ///           .call1(frame, a_value)?
+    ///           .unwrap()
+    ///           .cast::<isize>()?;
+    ///  
+    ///       assert_eq!(res, 11);
+    ///       Ok(())
+    ///   }).unwrap();
+    /// # });
+    /// # }
+    /// ```
+    pub fn with_keywords<'kws, 'borrow>(
+        self,
+        keywords: Value<'kws, 'borrow>,
+    ) -> WithKeywords<'fr, 'data, 'kws, 'borrow> {
+        WithKeywords {
+            func: self,
+            kws: keywords,
         }
     }
 
@@ -1040,7 +1095,8 @@ impl<'data> Value<'_, 'data> {
         }
     }
 
-    /// Execute a Julia command `cmd`.
+    /// Execute a Julia command `cmd`. This is equivalent to `Value::eval_string`, but uses a
+    /// null-terminated string.
     pub fn eval_cstring<'frame, F, S>(
         frame: &mut F,
         cmd: S,
@@ -1075,7 +1131,7 @@ impl<'data> Value<'_, 'data> {
     /// a global value in Julia, e.g. `nothing` or a [`Module`].
     pub unsafe fn call0_unprotected<'base>(self, _: Global<'base>) -> CallResult<'base, 'static> {
         let res = jl_call0(self.ptr());
-        let exc = jl_sys::jl_exception_occurred();
+        let exc = jl_exception_occurred();
 
         if exc.is_null() {
             Ok(Value::wrap(res))
@@ -1110,7 +1166,7 @@ impl<'data> Value<'_, 'data> {
         arg: Value<'_, 'borrow>,
     ) -> CallResult<'base, 'borrow> {
         let res = jl_call1(self.ptr().cast(), arg.ptr());
-        let exc = jl_sys::jl_exception_occurred();
+        let exc = jl_exception_occurred();
 
         if exc.is_null() {
             Ok(Value::wrap(res))
@@ -1147,7 +1203,7 @@ impl<'data> Value<'_, 'data> {
         arg1: Value<'_, 'borrow>,
     ) -> CallResult<'base, 'borrow> {
         let res = jl_call2(self.ptr().cast(), arg0.ptr(), arg1.ptr());
-        let exc = jl_sys::jl_exception_occurred();
+        let exc = jl_exception_occurred();
 
         if exc.is_null() {
             Ok(Value::wrap(res))
@@ -1186,7 +1242,7 @@ impl<'data> Value<'_, 'data> {
         arg2: Value<'_, 'borrow>,
     ) -> CallResult<'base, 'borrow> {
         let res = jl_call3(self.ptr().cast(), arg0.ptr(), arg1.ptr(), arg2.ptr());
-        let exc = jl_sys::jl_exception_occurred();
+        let exc = jl_exception_occurred();
 
         if exc.is_null() {
             Ok(Value::wrap(res))
@@ -1229,68 +1285,12 @@ impl<'data> Value<'_, 'data> {
         let args = args.as_mut();
         let n = args.len();
         let res = jl_call(self.ptr().cast(), args.as_mut_ptr().cast(), n as _);
-        let exc = jl_sys::jl_exception_occurred();
+        let exc = jl_exception_occurred();
 
         if exc.is_null() {
             Ok(Value::wrap(res))
         } else {
             Err(Value::wrap(exc))
-        }
-    }
-
-    /// Call this value as a function that takes keyword arguments and any number of positional
-    /// arguments.
-    ///
-    /// Functions that can take keyword arguments can be called in two major ways, either with or
-    /// without keyword arguments. The normal call-methods take care of the frst case, this one
-    /// takes care of the second. In order to successfully call this function the first argument
-    /// in `args` must be a `NamedTuple` which contains all the keyword arguments, the second must
-    /// be the function you want to call (ie `self`), and then all positional arguments.
-    ///
-    /// Example:
-    ///
-    /// ```
-    /// # use jlrs::prelude::*;
-    /// # use jlrs::util::JULIA;
-    /// # fn main() {
-    /// # JULIA.with(|j| {
-    /// # let mut julia = j.borrow_mut();
-    ///   julia.frame(4, |global, frame| {
-    ///       let a_value = Value::new(frame, 1isize)?;
-    ///       let b_value = Value::new(frame, 10isize)?;
-    ///       // `funcwithkw` takes a single positional argument of type `Int`, one keyword
-    ///       // argument named `b` of the same type, and returns `a` + `b`.
-    ///       let func = Module::main(global)
-    ///           .submodule("JlrsTests")?
-    ///           .function("funcwithkw")?;
-    ///
-    ///       let kw = named_tuple!(frame, "b" => b_value)?;
-    ///       let res = func.call_keywords(frame, &mut [kw, func, a_value])?
-    ///           .unwrap()
-    ///           .cast::<isize>()?;
-    ///  
-    ///       assert_eq!(res, 11);
-    ///       Ok(())
-    ///   }).unwrap();
-    /// # });
-    /// # }
-    /// ```
-    pub fn call_keywords<'frame, 'value, 'borrow, V, F>(
-        self,
-        frame: &mut F,
-        args: &mut V,
-    ) -> JlrsResult<CallResult<'frame, 'borrow>>
-    where
-        F: Frame<'frame>,
-        V: AsMut<[Value<'value, 'borrow>]>,
-    {
-        unsafe {
-            let func = jl_get_kwsorter(self.datatype().expect("").ptr().cast());
-            let args = args.as_mut();
-            let n = args.len();
-
-            let res = jl_call(func, args.as_mut_ptr().cast(), n as _);
-            try_protect(frame, res)
         }
     }
 
@@ -1311,7 +1311,7 @@ impl<'data> Value<'_, 'data> {
         let n = args.len();
 
         let res = jl_call(func, args.as_mut_ptr().cast(), n as _);
-        let exc = jl_sys::jl_exception_occurred();
+        let exc = jl_exception_occurred();
 
         if exc.is_null() {
             Ok(Value::wrap(res))
@@ -1365,7 +1365,7 @@ impl<'data> Value<'_, 'data> {
         args: Values,
     ) -> CallResult<'base, 'static> {
         let res = jl_call(self.ptr().cast(), args.ptr(), args.len() as _);
-        let exc = jl_sys::jl_exception_occurred();
+        let exc = jl_exception_occurred();
 
         if exc.is_null() {
             Ok(Value::wrap(res))
@@ -1545,6 +1545,245 @@ unsafe impl<'frame, 'data> ValidLayout for Value<'frame, 'data> {
             !u.isbitsunion()
         } else {
             false
+        }
+    }
+}
+
+/// A function with keyword arguments
+pub struct WithKeywords<'func, 'funcdata, 'kw, 'data> {
+    func: Value<'func, 'funcdata>,
+    kws: Value<'kw, 'data>,
+}
+
+impl<'func, 'funcdata, 'kw, 'kwdata> WithKeywords<'func, 'funcdata, 'kw, 'kwdata> {
+    /// Call this function with keywords with no arguments, this takes one slot on the GC
+    /// stack. Returns the result of this function call if no exception is thrown, the exception
+    /// if one is, or an error if no space is left on the stack.
+    pub fn call0<'frame, F>(self, frame: &mut F) -> JlrsResult<CallResult<'frame, 'static>>
+    where
+        F: Frame<'frame>,
+    {
+        unsafe {
+            let func = jl_get_kwsorter(self.func.datatype().expect("").ptr().cast());
+            let args = &mut [self.kws, self.func];
+            let n = args.len();
+
+            let res = jl_call(func, args.as_mut_ptr().cast(), n as _);
+            try_protect(frame, res)
+        }
+    }
+
+    /// Call this function with keywords with no arguments and don't protect the result from
+    /// garbage collection. This is safe if you won't use the result or if you can guarantee it's
+    /// a global value in Julia, e.g. `nothing` or a [`Module`].
+    pub unsafe fn call0_unprotected<'base>(self, _: Global<'base>) -> CallResult<'base, 'static> {
+        let func = jl_get_kwsorter(self.func.datatype().expect("").ptr().cast());
+        let args = &mut [self.kws, self.func];
+        let n = args.len();
+
+        let res = jl_call(func, args.as_mut_ptr().cast(), n as _);
+        let exc = jl_exception_occurred();
+
+        if exc.is_null() {
+            Ok(Value::wrap(res))
+        } else {
+            Err(Value::wrap(exc))
+        }
+    }
+
+    /// Call this function with keywords with one argument, this takes one slot on the GC
+    /// stack. Returns the result of this function call if no exception is thrown, the exception
+    /// if one is, or an error if no space is left on the stack.
+    pub fn call1<'frame, 'borrow, F>(
+        self,
+        frame: &mut F,
+        arg: Value<'_, 'borrow>,
+    ) -> JlrsResult<CallResult<'frame, 'borrow>>
+    where
+        F: Frame<'frame>,
+    {
+        unsafe {
+            let func = jl_get_kwsorter(self.func.datatype().expect("").ptr().cast());
+            let args = &mut [self.kws, self.func, arg];
+            let n = args.len();
+
+            let res = jl_call(func, args.as_mut_ptr().cast(), n as _);
+            try_protect(frame, res)
+        }
+    }
+
+    /// Call this function with keywords with one argument and don't protect the result from
+    /// garbage collection. This is safe if you won't use the result or if you can guarantee it's
+    /// a global value in Julia, e.g. `nothing` or a [`Module`].
+    pub unsafe fn call1_unprotected<'base, 'borrow>(
+        self,
+        _: Global<'base>,
+        arg: Value<'_, 'borrow>,
+    ) -> CallResult<'base, 'borrow> {
+        let func = jl_get_kwsorter(self.func.datatype().expect("").ptr().cast());
+        let args = &mut [self.kws, self.func, arg];
+        let n = args.len();
+
+        let res = jl_call(func, args.as_mut_ptr().cast(), n as _);
+        let exc = jl_exception_occurred();
+
+        if exc.is_null() {
+            Ok(Value::wrap(res))
+        } else {
+            Err(Value::wrap(exc))
+        }
+    }
+
+    /// Call this function with keywords with two arguments, this takes one slot on the GC
+    /// stack. Returns the result of this function call if no exception is thrown, the exception
+    /// if one is, or an error if no space is left on the stack.
+    pub fn call2<'frame, 'borrow, F>(
+        self,
+        frame: &mut F,
+        arg0: Value<'_, 'borrow>,
+        arg1: Value<'_, 'borrow>,
+    ) -> JlrsResult<CallResult<'frame, 'borrow>>
+    where
+        F: Frame<'frame>,
+    {
+        unsafe {
+            let func = jl_get_kwsorter(self.func.datatype().expect("").ptr().cast());
+            let args = &mut [self.kws, self.func, arg0, arg1];
+            let n = args.len();
+
+            let res = jl_call(func, args.as_mut_ptr().cast(), n as _);
+            try_protect(frame, res)
+        }
+    }
+
+    /// Call this function with keywords with two arguments and don't protect the result from
+    /// garbage collection. This is safe if you won't use the result or if you can guarantee it's
+    /// a global value in Julia, e.g. `nothing` or a [`Module`].
+    pub unsafe fn call2_unprotected<'base, 'borrow>(
+        self,
+        _: Global<'base>,
+        arg0: Value<'_, 'borrow>,
+        arg1: Value<'_, 'borrow>,
+    ) -> CallResult<'base, 'borrow> {
+        let func = jl_get_kwsorter(self.func.datatype().expect("").ptr().cast());
+        let args = &mut [self.kws, self.func, arg0, arg1];
+        let n = args.len();
+
+        let res = jl_call(func, args.as_mut_ptr().cast(), n as _);
+        let exc = jl_exception_occurred();
+
+        if exc.is_null() {
+            Ok(Value::wrap(res))
+        } else {
+            Err(Value::wrap(exc))
+        }
+    }
+
+    /// Call this function with keywords with three arguments, this takes one slot on the GC
+    /// stack. Returns the result of this function call if no exception is thrown, the exception
+    /// if one is, or an error if no space is left on the stack.
+    pub fn call3<'frame, 'borrow, F>(
+        self,
+        frame: &mut F,
+        arg0: Value<'_, 'borrow>,
+        arg1: Value<'_, 'borrow>,
+        arg2: Value<'_, 'borrow>,
+    ) -> JlrsResult<CallResult<'frame, 'borrow>>
+    where
+        F: Frame<'frame>,
+    {
+        unsafe {
+            let func = jl_get_kwsorter(self.func.datatype().expect("").ptr().cast());
+            let args = &mut [self.kws, self.func, arg0, arg1, arg2];
+            let n = args.len();
+
+            let res = jl_call(func, args.as_mut_ptr().cast(), n as _);
+            try_protect(frame, res)
+        }
+    }
+
+    /// Call this function with keywords with three arguments and don't protect the result from
+    /// garbage collection. This is safe if you won't use the result or if you can guarantee it's
+    /// a global value in Julia, e.g. `nothing` or a [`Module`].
+    pub unsafe fn call3_unprotected<'base, 'borrow>(
+        self,
+        _: Global<'base>,
+        arg0: Value<'_, 'borrow>,
+        arg1: Value<'_, 'borrow>,
+        arg2: Value<'_, 'borrow>,
+    ) -> CallResult<'base, 'borrow> {
+        let func = jl_get_kwsorter(self.func.datatype().expect("").ptr().cast());
+        let args = &mut [self.kws, self.func, arg0, arg1, arg2];
+        let n = args.len();
+
+        let res = jl_call(func, args.as_mut_ptr().cast(), n as _);
+        let exc = jl_exception_occurred();
+
+        if exc.is_null() {
+            Ok(Value::wrap(res))
+        } else {
+            Err(Value::wrap(exc))
+        }
+    }
+
+    /// Call this function with keywords with several arguments, this takes one slot on the GC
+    /// stack. Returns the result of this function call if no exception is thrown, the exception
+    /// if one is, or an error if no space is left on the stack.
+    pub fn call<'frame, 'value, 'borrow, V, F>(
+        self,
+        frame: &mut F,
+        args: &mut V,
+    ) -> JlrsResult<CallResult<'frame, 'borrow>>
+    where
+        V: AsMut<[Value<'value, 'borrow>]>,
+        F: Frame<'frame>,
+    {
+        unsafe {
+            let func = jl_get_kwsorter(self.func.datatype().expect("").ptr().cast());
+            let args = args.as_mut();
+            let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + args.len());
+            vals.push(self.kws);
+            vals.push(self.func);
+
+            for arg in args.iter().copied() {
+                vals.push(arg);
+            }
+
+            let n = vals.len();
+            let res = jl_call(func, vals.as_mut_ptr().cast(), n as _);
+            try_protect(frame, res)
+        }
+    }
+
+    /// Call this function with keywords with several arguments and don't protect the result
+    /// from garbage collection. This is safe if you won't use the result or if you can guarantee
+    /// it's a global value in Julia, e.g. `nothing` or a [`Module`].
+    pub unsafe fn call_unprotected<'base, 'value, 'borrow, V, F>(
+        self,
+        _: Global<'base>,
+        args: &mut V,
+    ) -> CallResult<'base, 'borrow>
+    where
+        V: AsMut<[Value<'value, 'borrow>]>,
+    {
+        let func = jl_get_kwsorter(self.func.datatype().expect("").ptr().cast());
+        let args = args.as_mut();
+        let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + args.len());
+        vals.push(self.kws);
+        vals.push(self.func);
+
+        for arg in args.iter().copied() {
+            vals.push(arg);
+        }
+
+        let n = vals.len();
+        let res = jl_call(func, vals.as_mut_ptr().cast(), n as _);
+        let exc = jl_exception_occurred();
+
+        if exc.is_null() {
+            Ok(Value::wrap(res))
+        } else {
+            Err(Value::wrap(exc))
         }
     }
 }
@@ -1835,7 +2074,7 @@ unsafe fn try_protect<'frame, F>(
 where
     F: Frame<'frame>,
 {
-    let exc = jl_sys::jl_exception_occurred();
+    let exc = jl_exception_occurred();
 
     if !exc.is_null() {
         match frame.protect(exc, Internal) {

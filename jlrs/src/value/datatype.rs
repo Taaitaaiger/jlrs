@@ -22,7 +22,7 @@
 use crate::error::{JlrsError, JlrsResult};
 use crate::frame::Output;
 use crate::global::Global;
-use crate::traits::{Cast, Frame, JuliaTypecheck, private::Internal};
+use crate::traits::{private::Internal, Cast, Frame, JuliaTypecheck};
 use crate::value::symbol::Symbol;
 use crate::value::type_name::TypeName;
 use crate::value::Value;
@@ -38,14 +38,14 @@ use jl_sys::{
     jl_gotonode_type, jl_initerror_type, jl_int16_type, jl_int32_type, jl_int64_type, jl_int8_type,
     jl_intrinsic_type, jl_is_cpointer_type, jl_isbits, jl_lineinfonode_type,
     jl_linenumbernode_type, jl_loaderror_type, jl_method_instance_type, jl_method_type,
-    jl_methoderror_type, jl_methtable_type, jl_module_type, jl_namedtuple_typename,
+    jl_methoderror_type, jl_methtable_type, jl_module_type, jl_namedtuple_typename, jl_new_structv,
     jl_newvarnode_type, jl_nothing_type, jl_number_type, jl_phicnode_type, jl_phinode_type,
     jl_pinode_type, jl_quotenode_type, jl_signed_type, jl_simplevector_type, jl_slotnumber_type,
     jl_ssavalue_type, jl_string_type, jl_svec_data, jl_svec_len, jl_symbol_type, jl_task_type,
     jl_tvar_type, jl_typedslot_type, jl_typeerror_type, jl_typemap_entry_type,
     jl_typemap_level_type, jl_typename_str, jl_typename_type, jl_typeofbottom_type, jl_uint16_type,
     jl_uint32_type, jl_uint64_type, jl_uint8_type, jl_undefvarerror_type, jl_unionall_type,
-    jl_uniontype_type, jl_upsilonnode_type, jl_voidpointer_type, jl_weakref_type, jl_new_structv
+    jl_uniontype_type, jl_upsilonnode_type, jl_voidpointer_type, jl_weakref_type,
 };
 use std::ffi::CStr;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
