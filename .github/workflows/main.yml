@@ -70,16 +70,16 @@ jobs:
         with:
           toolchain: ${{ matrix.rust }}
 
+      - name: Set env
+        run: |
+          echo "JULIA_DIR=$(dirname $(dirname $(which julia)))" >> $GITHUB_ENV
+          echo "LD_LIBRARY_PATH=${JULIA_DIR}/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
+
       - name: Run cargo-tarpaulin
         uses: actions-rs/tarpaulin@v0.1
         with:
           version: '0.15.0'
           args: '--exclude-files examples/* --exclude-files jl_sys/* --exclude-files jlrs_derive/* jl_sys/*  -- --test-threads 1'
-
-      - name: Set env
-        run: |
-          echo "JULIA_DIR=$(dirname $(dirname $(which julia)))" >> $GITHUB_ENV
-          echo "LD_LIBRARY_PATH=${JULIA_DIR}/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
 
       - name: Upload to codecov.io
         uses: codecov/codecov-action@v1.0.2
