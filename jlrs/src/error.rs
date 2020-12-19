@@ -32,13 +32,18 @@ pub enum JlrsError {
     NotAnSSAValue,
     NotATypeName,
     NotATypeVar,
+    NotATypeLB(String),
+    NotATypeUB(String),
     NotAUnion,
+    InvalidBody(String),
+    NotAKind(String),
     NotAUnionAll,
     FunctionNotFound(String),
     IncludeNotFound(String),
     IncludeError(String, String),
     NoSuchField(String),
     InvalidArrayType,
+    InvalidLayout,
     InvalidCharacter,
     NotAModule(String),
     NotAMethTable,
@@ -53,16 +58,21 @@ pub enum JlrsError {
     InvalidIndex(Dimensions, Dimensions),
     Immutable,
     NotSubtype,
+    NotConcrete(String),
+    NamedTupleSizeMismatch(usize, usize),
 }
 
+/// Create a new `JlrsError::Exception` and wrap it in a `JlrsResult::Err`.
 pub fn exception<T>(exc: String) -> JlrsResult<T> {
     Err(JlrsError::Exception(exc))?
 }
 
-pub fn other<E: Error + Send + Sync + 'static>(reason: E) -> JlrsResult<()> {
+/// Create a new `JlrsError::Other` and wrap it in a `JlrsResult::Err`.
+pub fn other<T, E: Error + Send + Sync + 'static>(reason: E) -> JlrsResult<T> {
     Err(JlrsError::Other(Box::new(reason)))?
 }
 
+/// Create a new `JlrsError::Other`.
 pub fn other_err<E: Error + Send + Sync + 'static>(reason: E) -> JlrsError {
     JlrsError::Other(Box::new(reason))
 }
@@ -70,6 +80,10 @@ pub fn other_err<E: Error + Send + Sync + 'static>(reason: E) -> JlrsError {
 impl JlrsError {
     pub(crate) fn other<E: Error + Send + Sync + 'static>(reason: E) -> Self {
         JlrsError::Other(Box::new(reason))
+    }
+
+    pub(crate) fn alloc_error(a: AllocError) -> Self {
+        JlrsError::AllocError(a)
     }
 }
 
@@ -119,10 +133,23 @@ impl Display for JlrsError {
             JlrsError::NotAnSSAValue => write!(formatter, "This is not an SSA value"),
             JlrsError::NotATypeName => write!(formatter, "This is not a typename"),
             JlrsError::NotATypeVar => write!(formatter, "This is not a type var"),
+            JlrsError::NotATypeLB(tv) => {
+                write!(formatter, "The lower bound of {} is not a type", tv)
+            }
+            JlrsError::NotATypeUB(tv) => {
+                write!(formatter, "The upper bound of {} is not a type", tv)
+            }
             JlrsError::NotAUnion => write!(formatter, "This is not a union"),
             JlrsError::NotAUnionAll => write!(formatter, "This is not a UnionAll"),
+            JlrsError::InvalidLayout => write!(formatter, "The layout is invalid"),
 
             JlrsError::NotAMethodInstance => write!(formatter, "This is not a method instance"),
+            JlrsError::NotAKind(kind) => write!(formatter, "The type {} is not a kind", kind),
+            JlrsError::InvalidBody(body_ty) => write!(
+                formatter,
+                "The body of a UnionAll must be a type or a TypeVar. Found: {}",
+                body_ty
+            ),
             JlrsError::NotACodeInstance => write!(formatter, "This is not a code instance"),
             JlrsError::NotAWeakRef => write!(formatter, "This is not a weak ref"),
             JlrsError::Immutable => write!(formatter, "This value is immutable"),
@@ -165,6 +192,17 @@ impl Display for JlrsError {
                 "Index {} is not valid for array with shape {}",
                 idx, sz
             ),
+            JlrsError::NotConcrete(type_name) => {
+                write!(formatter, "{} is not a concrete DataType", type_name)
+            }
+            JlrsError::NamedTupleSizeMismatch(names, values) => {
+                write!(
+                    formatter,
+                    "A named tuple must have an equal number of names and values, but {} name(s) and {} values(s) were given", 
+                    names,
+                    values
+                )
+            }
         }
     }
 }
@@ -195,5 +233,14 @@ impl Into<JlrsError> for AllocError {
 impl Into<Box<JlrsError>> for AllocError {
     fn into(self) -> Box<JlrsError> {
         Box::new(self.into())
+    }
+}
+
+impl AllocError {
+    pub fn jlrs_error(self) -> JlrsError {
+        self.into()
+    }
+    pub fn boxed_jlrs_error(self) -> Box<JlrsError> {
+        self.into()
     }
 }

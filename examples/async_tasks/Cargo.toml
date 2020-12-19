@@ -8,4 +8,4 @@ edition = "2018"
 
 [dependencies]
 jlrs = { path = "../../jlrs", features = ["async"] }
-crossbeam-channel = "0.4"
+crossbeam-channel = "0.5"

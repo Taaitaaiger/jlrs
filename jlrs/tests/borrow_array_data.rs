@@ -1,4 +1,5 @@
 use jlrs::prelude::*;
+use jlrs::traits::gc::{Gc, GcCollection};
 use jlrs::util::JULIA;
 
 macro_rules! impl_test {
@@ -37,8 +38,9 @@ macro_rules! impl_test {
                         for second in &[one, two, three] {
                             for first in &[one, two] {
                                 frame.frame(1, |frame| {
-                                    let v =
-                                        gi.call(frame, [array, *first, *second, *third])?.unwrap();
+                                    let v = gi
+                                        .call(frame, &mut [array, *first, *second, *third])?
+                                        .unwrap();
                                     assert_eq!(v.cast::<$value_type>()?, out);
                                     out += 1 as $value_type;
                                     Ok(())
@@ -50,6 +52,10 @@ macro_rules! impl_test {
                     Ok(())
                 })
                 .unwrap();
+
+                unsafe {
+                    jlrs.gc_collect(GcCollection::Full);
+                }
             });
         }
 
@@ -84,8 +90,9 @@ macro_rules! impl_test {
                         for second in &[one, two, three] {
                             for first in &[one, two] {
                                 frame.frame(1, |frame| {
-                                    let v =
-                                        gi.call(frame, [array, *first, *second, *third])?.unwrap();
+                                    let v = gi
+                                        .call(frame, &mut [array, *first, *second, *third])?
+                                        .unwrap();
                                     assert_eq!(v.cast::<$value_type>()?, out);
                                     out += 1 as $value_type;
                                     Ok(())
@@ -257,7 +264,9 @@ fn borrow_nested() {
                     for second in &[one, two, three] {
                         for first in &[one, two] {
                             frame.frame(1, |frame| {
-                                let v = gi.call(frame, [array, *first, *second, *third])?.unwrap();
+                                let v = gi
+                                    .call(frame, &mut [array, *first, *second, *third])?
+                                    .unwrap();
                                 assert_eq!(v.cast::<u8>()?, out);
                                 out += 1 as u8;
                                 Ok(())

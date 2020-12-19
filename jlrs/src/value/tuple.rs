@@ -79,7 +79,7 @@ macro_rules! impl_tuple {
             }
         }
 
-        unsafe impl<$($types),+> $crate::traits::ValidLayout for $name<$($types),+>  where $($types: $crate::traits::ValidLayout + Copy),+ {
+        unsafe impl<$($types),+> $crate::traits::valid_layout::ValidLayout for $name<$($types),+>  where $($types: $crate::traits::valid_layout::ValidLayout + Copy),+ {
             unsafe fn valid_layout(v: $crate::value::Value) -> bool {
                 if let Ok(dt) = v.cast::<$crate::value::datatype::DataType>() {
                     let fieldtypes = dt.field_types();
@@ -97,7 +97,7 @@ macro_rules! impl_tuple {
             }
         }
 
-        unsafe impl<'frame, 'data, $($types),+> $crate::traits::Cast<'frame, 'data> for $name<$($types),+>  where $($types: $crate::traits::ValidLayout + Copy),+ {
+        unsafe impl<'frame, 'data, $($types),+> $crate::traits::Cast<'frame, 'data> for $name<$($types),+>  where $($types: $crate::traits::valid_layout::ValidLayout + Copy),+ {
             type Output = Self;
 
             fn cast(value: $crate::value::Value) -> $crate::error::JlrsResult<Self::Output> {
@@ -106,7 +106,7 @@ macro_rules! impl_tuple {
                 }
 
                 unsafe {
-                    if <Self::Output as $crate::traits::ValidLayout>::valid_layout(value.datatype().unwrap().into()) {
+                    if <Self::Output as $crate::traits::valid_layout::ValidLayout>::valid_layout(value.datatype().unwrap().into()) {
                         Ok(Self::cast_unchecked(value))
                     } else {
                         Err($crate::error::JlrsError::WrongType)?
@@ -144,7 +144,7 @@ macro_rules! impl_tuple {
             }
         }
 
-        unsafe impl $crate::traits::ValidLayout for $name {
+        unsafe impl $crate::traits::valid_layout::ValidLayout for $name {
             unsafe fn valid_layout(v: $crate::value::Value) -> bool {
                 if let Ok(dt) = v.cast::<$crate::value::datatype::DataType>() {
                     if dt.is::<Self>() {
@@ -165,7 +165,7 @@ macro_rules! impl_tuple {
                 }
 
                 unsafe {
-                    if <Self::Output as $crate::traits::ValidLayout>::valid_layout(value.datatype().unwrap().into()) {
+                    if <Self::Output as $crate::traits::valid_layout::ValidLayout>::valid_layout(value.datatype().unwrap().into()) {
                         Ok(Self::cast_unchecked(value))
                     } else {
                         Err($crate::error::JlrsError::WrongType)?

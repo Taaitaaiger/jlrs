@@ -5,15 +5,19 @@
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L380
 
+use super::array::Array;
 use super::{
     method_table::MethodTable, module::Module, simple_vector::SimpleVector, symbol::Symbol, Value,
 };
-
-use super::array::Array;
 use crate::error::{JlrsError, JlrsResult};
+use crate::global::Global;
 use crate::traits::Cast;
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
-use jl_sys::{jl_typename_t, jl_typename_type};
+use jl_sys::{
+    jl_array_typename, jl_llvmpointer_typename, jl_namedtuple_typename, jl_pointer_typename,
+    jl_tuple_typename, jl_type_typename, jl_typename_t, jl_typename_type, jl_vararg_typename,
+    jl_vecelement_typename,
+};
 use std::marker::PhantomData;
 
 /// Describes the syntactic structure of a type and stores all data common to different
@@ -32,10 +36,12 @@ impl<'frame> TypeName<'frame> {
         self.0
     }
 
+    /// The `name` field.
     pub fn name(self) -> Symbol<'frame> {
         unsafe { Symbol::wrap((&*self.ptr()).name) }
     }
 
+    /// The `module` field.
     pub fn module(self) -> Module<'frame> {
         unsafe { Module::wrap((&*self.ptr()).module) }
     }
@@ -61,10 +67,12 @@ impl<'frame> TypeName<'frame> {
         unsafe { SimpleVector::wrap((&*self.ptr()).linearcache) }
     }
 
+    /// The `hash` field.
     pub fn hash(self) -> isize {
         unsafe { (&*self.ptr()).hash }
     }
 
+    /// The `mt` field.
     pub fn mt(self) -> MethodTable<'frame> {
         unsafe { MethodTable::wrap((&*self.ptr()).mt) }
     }
@@ -72,6 +80,53 @@ impl<'frame> TypeName<'frame> {
     /// Incomplete instantiations of this type.
     pub fn partial(self) -> Array<'frame, 'static> {
         unsafe { Array::wrap((&*self.ptr()).partial) }
+    }
+
+    /// Convert `self` to a `Value`.
+    pub fn as_value(self) -> Value<'frame, 'static> {
+        self.into()
+    }
+}
+
+impl<'base> TypeName<'base> {
+    /// The typename of the `UnionAll` `VecElement`.
+    pub fn vecelement_typename(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_vecelement_typename) }
+    }
+
+    /// The typename of the `UnionAll` `Array`.
+    pub fn array_typename(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_array_typename) }
+    }
+
+    /// The typename of the `UnionAll` `Ptr`.
+    pub fn pointer_typename(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_pointer_typename) }
+    }
+
+    /// The typename of the `UnionAll` `LLVMPtr`.
+    pub fn llvmpointer_typename(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_llvmpointer_typename) }
+    }
+
+    /// The typename of the `UnionAll` `NamedTuple`.
+    pub fn namedtuple_typename(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_namedtuple_typename) }
+    }
+
+    /// The typename of the `UnionAll` `Vararg`.
+    pub fn vararg_typename(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_vararg_typename) }
+    }
+
+    /// The typename of the `UnionAll` `Type`.
+    pub fn type_typename(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_type_typename) }
+    }
+
+    /// The typename of the `DataType` `Tuple`.
+    pub fn tuple_typename(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_tuple_typename) }
     }
 }
 

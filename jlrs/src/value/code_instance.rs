@@ -88,6 +88,11 @@ impl<'frame> CodeInstance<'frame> {
     pub fn isspecsig(self) -> bool {
         unsafe { (&*self.ptr()).isspecsig != 0 }
     }
+
+    /// Convert `self` to a `Value`.
+    pub fn as_value(self) -> Value<'frame, 'static> {
+        self.into()
+    }
 }
 
 impl<'frame> Into<Value<'frame, 'static>> for CodeInstance<'frame> {

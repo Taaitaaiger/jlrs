@@ -11,7 +11,7 @@
 //!
 //! [`Array`]: struct.Array.html
 use crate::error::{JlrsError, JlrsResult};
-use crate::traits::{Cast, Frame, JuliaTypecheck, ValidLayout};
+use crate::traits::{valid_layout::ValidLayout, Cast, Frame, JuliaTypecheck};
 use crate::value::datatype::DataType;
 use crate::value::Value;
 use jl_sys::{
@@ -338,6 +338,11 @@ impl<'frame, 'data> Array<'frame, 'data> {
             self, data, dimensions, frame,
         ))
     }
+
+    /// Convert `self` to a `Value`.
+    pub fn as_value(self) -> Value<'frame, 'data> {
+        self.into()
+    }
 }
 
 unsafe impl<'frame, 'data> JuliaTypecheck for Array<'frame, 'data> {
@@ -607,6 +612,11 @@ impl<'frame, 'data, T: Copy + ValidLayout> TypedArray<'frame, 'data, T> {
             dimensions,
             frame,
         ))
+    }
+
+    /// Convert `self` to a `Value`.
+    pub fn as_value(self) -> Value<'frame, 'data> {
+        self.into()
     }
 }
 

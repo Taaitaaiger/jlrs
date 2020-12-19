@@ -14,3 +14,10 @@ jl-sys/Cargo.lock
 
 **/.vscode/
 tarpaulin-report.html
+
+june/native/target
+june/native/index.node
+june/native/artifacts.json
+**/*~
+**/node_modules
+**/.DS_Store

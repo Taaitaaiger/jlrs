@@ -3,7 +3,7 @@
 use crate::error::JlrsResult;
 use crate::frame::AsyncFrame;
 use crate::global::Global;
-use async_std::sync::Sender as AsyncStdSender;
+use async_std::channel::Sender as AsyncStdSender;
 use async_trait::async_trait;
 use crossbeam_channel::Sender as CrossbeamSender;
 
@@ -52,7 +52,7 @@ pub trait ReturnChannel: 'static {
 impl<T: Send + Sync + 'static> ReturnChannel for AsyncStdSender<JlrsResult<T>> {
     type T = T;
     async fn send(&self, response: JlrsResult<Self::T>) {
-        self.send(response).await
+        self.send(response).await.ok();
     }
 }
 

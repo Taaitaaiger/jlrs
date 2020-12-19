@@ -53,10 +53,12 @@ impl<'frame> Method<'frame> {
         unsafe { (&*self.ptr()).line }
     }
 
+    /// The `primary_world` field.
     pub fn primary_world(self) -> usize {
         unsafe { (&*self.ptr()).primary_world }
     }
 
+    /// The `deleted_world` field.
     pub fn deleted_world(self) -> usize {
         unsafe { (&*self.ptr()).deleted_world }
     }
@@ -158,6 +160,7 @@ impl<'frame> Method<'frame> {
         unsafe { Value::wrap((&*self.ptr()).invokes) }
     }
 
+    /// The `n_args` field.
     pub fn n_args(self) -> i32 {
         unsafe { (&*self.ptr()).nargs }
     }
@@ -178,12 +181,19 @@ impl<'frame> Method<'frame> {
         unsafe { (&*self.ptr()).nkw }
     }
 
+    /// The `is_varargs` field.
     pub fn is_varargs(self) -> bool {
         unsafe { (&*self.ptr()).isva != 0 }
     }
 
+    /// The `pure` field.
     pub fn pure(self) -> bool {
         unsafe { (&*self.ptr()).pure_ != 0 }
+    }
+
+    /// Convert `self` to a `Value`.
+    pub fn as_value(self) -> Value<'frame, 'static> {
+        self.into()
     }
 }
 

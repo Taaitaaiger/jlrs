@@ -1,7 +1,7 @@
 //! Datatypes and properties.
 //!
 //! Julia has an optional typing system. The type information of a [`Value`] is available at
-//! runtime. Additionally, a value can hold type information as its contents. For example,
+//! runtime. Additionally, a value can hold type information as its contents. For example:
 //!
 //! ```julia
 //! truth = true
@@ -20,19 +20,32 @@
 //! [`JuliaTypecheck`]: ../../traits/trait.JuliaTypecheck.html
 
 use crate::error::{JlrsError, JlrsResult};
-use crate::traits::{Cast, JuliaTypecheck};
+use crate::frame::Output;
+use crate::global::Global;
+use crate::traits::{private::Internal, Cast, Frame, JuliaTypecheck};
 use crate::value::symbol::Symbol;
 use crate::value::type_name::TypeName;
 use crate::value::Value;
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{
-    jl_any_type, jl_code_info_type, jl_datatype_align, jl_datatype_isinlinealloc,
+    jl_abstractslot_type, jl_abstractstring_type, jl_any_type, jl_anytuple_type,
+    jl_argumenterror_type, jl_bool_type, jl_boundserror_type, jl_builtin_type, jl_char_type,
+    jl_code_info_type, jl_code_instance_type, jl_datatype_align, jl_datatype_isinlinealloc,
     jl_datatype_nbits, jl_datatype_nfields, jl_datatype_size, jl_datatype_t, jl_datatype_type,
-    jl_field_isptr, jl_field_names, jl_field_offset, jl_field_size, jl_get_fieldtypes,
-    jl_globalref_type, jl_gotonode_type, jl_intrinsic_type, jl_is_cpointer_type, jl_isbits,
-    jl_linenumbernode_type, jl_namedtuple_typename, jl_newvarnode_type, jl_phicnode_type,
-    jl_phinode_type, jl_pinode_type, jl_quotenode_type, jl_slotnumber_type, jl_string_type,
-    jl_svec_data, jl_svec_len, jl_typedslot_type, jl_typename_str, jl_upsilonnode_type,
+    jl_emptytuple_type, jl_errorexception_type, jl_expr_type, jl_field_isptr, jl_field_names,
+    jl_field_offset, jl_field_size, jl_float16_type, jl_float32_type, jl_float64_type,
+    jl_floatingpoint_type, jl_function_type, jl_get_fieldtypes, jl_globalref_type,
+    jl_gotonode_type, jl_initerror_type, jl_int16_type, jl_int32_type, jl_int64_type, jl_int8_type,
+    jl_intrinsic_type, jl_is_cpointer_type, jl_isbits, jl_lineinfonode_type,
+    jl_linenumbernode_type, jl_loaderror_type, jl_method_instance_type, jl_method_type,
+    jl_methoderror_type, jl_methtable_type, jl_module_type, jl_namedtuple_typename, jl_new_structv,
+    jl_newvarnode_type, jl_nothing_type, jl_number_type, jl_phicnode_type, jl_phinode_type,
+    jl_pinode_type, jl_quotenode_type, jl_signed_type, jl_simplevector_type, jl_slotnumber_type,
+    jl_ssavalue_type, jl_string_type, jl_svec_data, jl_svec_len, jl_symbol_type, jl_task_type,
+    jl_tvar_type, jl_typedslot_type, jl_typeerror_type, jl_typemap_entry_type,
+    jl_typemap_level_type, jl_typename_str, jl_typename_type, jl_typeofbottom_type, jl_uint16_type,
+    jl_uint32_type, jl_uint64_type, jl_uint8_type, jl_undefvarerror_type, jl_unionall_type,
+    jl_uniontype_type, jl_upsilonnode_type, jl_voidpointer_type, jl_weakref_type,
 };
 use std::ffi::CStr;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
@@ -245,6 +258,392 @@ impl<'frame> DataType<'frame> {
     /// If false, no value will have this type.
     pub fn has_concrete_subtype(self) -> bool {
         unsafe { (&*self.ptr()).has_concrete_subtype != 0 }
+    }
+
+    /// Convert `self` to a `Value`.
+    /// Convert `self` to a `Value`.
+    pub fn as_value(self) -> Value<'frame, 'static> {
+        self.into()
+    }
+
+    /// Intantiate this `DataType` with the given values. The type must be concrete. One free slot
+    /// on the GC stack is required for this function to succeed, returns an error if no slot is
+    /// available or if the type is not concrete.
+    pub fn instantiate<'fr, 'value, 'borrow, F, V>(
+        self,
+        frame: &mut F,
+        values: &mut V,
+    ) -> JlrsResult<Value<'fr, 'borrow>>
+    where
+        F: Frame<'fr>,
+        V: AsMut<[Value<'value, 'borrow>]>,
+    {
+        unsafe {
+            if !self.is::<Concrete>() {
+                Err(JlrsError::NotConcrete(self.name().into()))?;
+            }
+
+            let values = values.as_mut();
+            let value = jl_new_structv(self.ptr(), values.as_mut_ptr().cast(), values.len() as _);
+            frame.protect(value, Internal).map_err(Into::into)
+        }
+    }
+
+    /// Intantiate this `DataType` with the given values using the given output. The type must be
+    /// concrete, returns an error if the type is not concrete.
+    pub fn instantiate_output<'output, 'fr, 'value, 'borrow, F, V>(
+        self,
+        frame: &mut F,
+        output: Output<'output>,
+        values: &mut V,
+    ) -> JlrsResult<Value<'output, 'borrow>>
+    where
+        F: Frame<'fr>,
+        V: AsMut<[Value<'value, 'borrow>]>,
+    {
+        Value::instantiate_output(frame, output, self, values)
+    }
+}
+
+impl<'base> DataType<'base> {
+    /// The type of the bottom type, `Union{}`.
+    pub fn typeofbottom_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_typeofbottom_type) }
+    }
+
+    /// The type `DataType`.
+    pub fn datatype_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_datatype_type) }
+    }
+
+    /// The type `Union`.
+    pub fn uniontype_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_uniontype_type) }
+    }
+
+    /// The type `UnionAll`.
+    pub fn unionall_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_unionall_type) }
+    }
+
+    /// The type `TypeVar`.
+    pub fn tvar_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_tvar_type) }
+    }
+
+    /// The type `Any`.
+    pub fn any_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_any_type) }
+    }
+
+    /// The type `TypeName`.
+    pub fn typename_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_typename_type) }
+    }
+
+    /// The type `Symbol`.
+    pub fn symbol_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_symbol_type) }
+    }
+
+    /// The type `Core.SSAValue`.
+    pub fn ssavalue_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_ssavalue_type) }
+    }
+
+    /// The type `Slot`.
+    pub fn abstractslot_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_abstractslot_type) }
+    }
+
+    /// The type `SlotNumber`.
+    pub fn slotnumber_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_slotnumber_type) }
+    }
+
+    /// The type `TypedSlot`.
+    pub fn typedslot_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_typedslot_type) }
+    }
+
+    /// The type `SimpleVector`, or `SVec`.
+    pub fn simplevector_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_simplevector_type) }
+    }
+
+    /// The type `Tuple`.
+    pub fn anytuple_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_anytuple_type) }
+    }
+
+    /// The type `Tuple`.
+    pub fn tuple_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_anytuple_type) }
+    }
+
+    /// The type of an empty tuple.
+    pub fn emptytuple_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_emptytuple_type) }
+    }
+
+    /// The type `Function`.
+    pub fn function_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_function_type) }
+    }
+
+    /// The type `Builtin`.
+    pub fn builtin_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_builtin_type) }
+    }
+
+    /// The type `MethodInstance`.
+    pub fn method_instance_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_method_instance_type) }
+    }
+
+    /// The type `CodeInstance`.
+    pub fn code_instance_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_code_instance_type) }
+    }
+
+    /// The type `CodeInfo`.
+    pub fn code_info_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_code_info_type) }
+    }
+
+    /// The type `Method`.
+    pub fn method_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_method_type) }
+    }
+
+    /// The type `Module`.
+    pub fn module_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_module_type) }
+    }
+
+    /// The type `WeakRef`.
+    pub fn weakref_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_weakref_type) }
+    }
+
+    /// The type `AbstractString`.
+    pub fn abstractstring_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_abstractstring_type) }
+    }
+
+    /// The type `String`.
+    pub fn string_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_string_type) }
+    }
+
+    /// The type `ErrorException`.
+    pub fn errorexception_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_errorexception_type) }
+    }
+
+    /// The type `ArgumentError`.
+    pub fn argumenterror_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_argumenterror_type) }
+    }
+
+    /// The type `LoadError`.
+    pub fn loaderror_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_loaderror_type) }
+    }
+
+    /// The type `InitError`.
+    pub fn initerror_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_initerror_type) }
+    }
+
+    /// The type `TypeError`.
+    pub fn typeerror_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_typeerror_type) }
+    }
+
+    /// The type `MethodError`.
+    pub fn methoderror_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_methoderror_type) }
+    }
+
+    /// The type `UndefVarError`.
+    pub fn undefvarerror_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_undefvarerror_type) }
+    }
+
+    /// The type `LineInfoNode`.
+    pub fn lineinfonode_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_lineinfonode_type) }
+    }
+
+    /// The type `BoundsError`.
+    pub fn boundserror_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_boundserror_type) }
+    }
+
+    /// The type `Bool`.
+    pub fn bool_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_bool_type) }
+    }
+
+    /// The type `Char`.
+    pub fn char_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_char_type) }
+    }
+
+    /// The type `Int8`.
+    pub fn int8_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_int8_type) }
+    }
+
+    /// The type `UInt8`.
+    pub fn uint8_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_uint8_type) }
+    }
+
+    /// The type `Int16`.
+    pub fn int16_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_int16_type) }
+    }
+
+    /// The type `UInt16`.
+    pub fn uint16_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_uint16_type) }
+    }
+
+    /// The type `Int32`.
+    pub fn int32_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_int32_type) }
+    }
+
+    /// The type `UInt32`.
+    pub fn uint32_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_uint32_type) }
+    }
+
+    /// The type `Int64`.
+    pub fn int64_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_int64_type) }
+    }
+
+    /// The type `UInt64`.
+    pub fn uint64_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_uint64_type) }
+    }
+
+    /// The type `Float16`.
+    pub fn float16_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_float16_type) }
+    }
+
+    /// The type `Float32`.
+    pub fn float32_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_float32_type) }
+    }
+
+    /// The type `Float64`.
+    pub fn float64_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_float64_type) }
+    }
+
+    /// The type `AbstractFloat`.
+    pub fn floatingpoint_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_floatingpoint_type) }
+    }
+
+    /// The type `Number`.
+    pub fn number_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_number_type) }
+    }
+
+    /// The type `Nothing`.
+    pub fn nothing_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_nothing_type) }
+    }
+
+    /// The type `Signed`.
+    pub fn signed_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_signed_type) }
+    }
+
+    /// The type `Ptr{Nothing}`.
+    pub fn voidpointer_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_voidpointer_type) }
+    }
+
+    /// The type `Task`.
+    pub fn task_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_task_type) }
+    }
+
+    /// The type `Expr`.
+    pub fn expr_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_expr_type) }
+    }
+
+    /// The type `GlobalRef`.
+    pub fn globalref_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_globalref_type) }
+    }
+
+    /// The type `LineNumberNode`.
+    pub fn linenumbernode_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_linenumbernode_type) }
+    }
+
+    /// The type `GotoNode`.
+    pub fn gotonode_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_gotonode_type) }
+    }
+
+    /// The type `PhiNode`.
+    pub fn phinode_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_phinode_type) }
+    }
+
+    /// The type `PiNode`.
+    pub fn pinode_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_pinode_type) }
+    }
+
+    /// The type `PhiCNode`.
+    pub fn phicnode_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_phicnode_type) }
+    }
+
+    /// The type `UpsilonNode`.
+    pub fn upsilonnode_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_upsilonnode_type) }
+    }
+
+    /// The type `QuoteNode`.
+    pub fn quotenode_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_quotenode_type) }
+    }
+
+    /// The type `NewVarNode`.
+    pub fn newvarnode_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_newvarnode_type) }
+    }
+
+    /// The type `Intrinsic`.
+    pub fn intrinsic_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_intrinsic_type) }
+    }
+
+    /// The type `MethodTable`.
+    pub fn methtable_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_methtable_type) }
+    }
+
+    /// The type `TypeMapLevel`.
+    pub fn typemap_level_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_typemap_level_type) }
+    }
+
+    /// The type `TypeMapEntry`.
+    pub fn typemap_entry_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_typemap_entry_type) }
     }
 }
 

@@ -3,6 +3,7 @@
 use crate::error::{exception, JlrsResult};
 use crate::frame::AsyncFrame;
 use crate::global::Global;
+use crate::traits::Frame;
 use crate::value::module::Module;
 use crate::value::task::Task;
 use crate::value::{CallResult, Value};
@@ -39,7 +40,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
     pub(crate) fn new<'value, V>(
         frame: &mut AsyncFrame<'frame>,
         func: Value,
-        mut values: V,
+        values: &mut V,
     ) -> JlrsResult<Self>
     where
         V: AsMut<[Value<'value, 'data>]>,
@@ -62,11 +63,11 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             vals.push(state_ptr_boxed);
             vals.extend_from_slice(values);
 
-            let global = Global::new();
+            let global = frame.global();
             let task = Module::main(global)
                 .submodule("Jlrs")?
                 .function("asynccall")?
-                .call(frame, vals)?
+                .call(frame, &mut vals)?
                 .map_err(|e| {
                     exception::<()>(format!("asynccall threw an exception: {:?}", e)).unwrap_err()
                 })?

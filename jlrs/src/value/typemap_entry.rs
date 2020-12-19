@@ -51,18 +51,22 @@ impl<'frame> TypeMapEntry<'frame> {
         unsafe { DataType::wrap((&*self.ptr()).simplesig) }
     }
 
+    /// The `guard_signature` field.
     pub fn guard_signature(self) -> SimpleVector<'frame> {
         unsafe { SimpleVector::wrap((&*self.ptr()).guardsigs) }
     }
 
+    /// The `min_world` field.
     pub fn min_world(self) -> usize {
         unsafe { (&*self.ptr()).min_world }
     }
 
+    /// The `max_world` field.
     pub fn max_world(self) -> usize {
         unsafe { (&*self.ptr()).max_world }
     }
 
+    /// The `func` field.
     pub fn func(self) -> Value<'frame, 'static> {
         unsafe { Value::wrap((&*self.ptr()).func.value) }
     }
@@ -80,6 +84,11 @@ impl<'frame> TypeMapEntry<'frame> {
     /// `isVararg(sig)`
     pub fn is_vararg(self) -> bool {
         unsafe { (&*self.ptr()).va != 0 }
+    }
+
+    /// Convert `self` to a `Value`.
+    pub fn as_value(self) -> Value<'frame, 'static> {
+        self.into()
     }
 }
 

@@ -357,8 +357,8 @@ fn create_nothing() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame(0, |_global, frame| {
-            let nothing = Value::nothing(frame);
+        jlrs.frame(0, |global, _frame| {
+            let nothing = Value::nothing(global);
             assert!(nothing.is_nothing());
             assert!(!nothing.is::<f32>());
             assert!(nothing.datatype().is_some());

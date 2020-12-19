@@ -42,7 +42,7 @@ impl JuliaTask for MyTask {
         let v = Module::main(global)
             .submodule("MyModule")?
             .function("complexfunc")?
-            .call_async(frame, [dims, iters])
+            .call_async(frame, &mut [dims, iters])
             .await?
             .unwrap()
             .cast::<f64>()?;
@@ -61,8 +61,8 @@ impl JuliaTask for MyTask {
 fn main() {
     // Initialize the asynchronous runtime. We'll allow a backlog of sixteen pending messages in 
     // the channel that the runtime consumes, two tasks to run simultaneously, give each task a 
-    // stack with sixteen slots to protect data from garbage collection, insert a process events
-    // every millisecond, and provide the path to jlrs.jl.
+    // stack with sixteen slots to protect data from garbage collection and insert a process events
+    // every millisecond.
     //
     // Okay, that's a lot to unpack. Let's look at those arguments a bit more closely to see why 
     // we need them.
@@ -88,13 +88,10 @@ fn main() {
     // handled either. In order to solve this issue, these things are explicitly handled 
     // periodically.
     //
-    // In order to use the asynchronous runtime, custom Julia code defined in jlrs.jl must be 
-    // used. Things won't work without it.
-    //
     // After calling this function we have a `task_sender` we can use to send tasks and requests
     // to include a file to the runtime, and a handle to the thread where the runtime is running.
     let (julia, handle) = unsafe { 
-        AsyncJulia::init(16, 2, 16, 1, "../../jlrs.jl")
+        AsyncJulia::init(16, 2, 16, 1)
             .expect("Could not init Julia") 
     };
 

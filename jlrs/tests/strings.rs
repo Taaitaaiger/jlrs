@@ -1,5 +1,4 @@
 use jlrs::prelude::*;
-use jlrs::traits::ValidLayout;
 use jlrs::util::JULIA;
 use jlrs::value::string::JuliaString;
 use std::borrow::Cow;

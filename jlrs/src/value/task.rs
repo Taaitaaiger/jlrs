@@ -51,6 +51,7 @@ impl<'frame> Task<'frame> {
         }
     }
 
+    /// The `tls` field.
     pub fn tls(self) -> Value<'frame, 'static> {
         unsafe {
             let tls = (&*self.ptr()).tls;
@@ -58,6 +59,7 @@ impl<'frame> Task<'frame> {
         }
     }
 
+    /// The `state` field.
     pub fn state(self) -> Symbol<'frame> {
         unsafe {
             let state = (&*self.ptr()).state;
@@ -65,6 +67,7 @@ impl<'frame> Task<'frame> {
         }
     }
 
+    /// The `donenotify` field.
     pub fn donenotify(self) -> Option<Value<'frame, 'static>> {
         unsafe {
             let donenotify = (&*self.ptr()).donenotify;
@@ -76,6 +79,7 @@ impl<'frame> Task<'frame> {
         }
     }
 
+    /// The `result` field.
     pub fn result(self) -> Option<Value<'frame, 'static>> {
         unsafe {
             let result = (&*self.ptr()).result;
@@ -87,6 +91,7 @@ impl<'frame> Task<'frame> {
         }
     }
 
+    /// The `exception` field.
     pub fn exception(self) -> Option<Value<'frame, 'static>> {
         unsafe {
             let exception = (&*self.ptr()).exception;
@@ -98,6 +103,7 @@ impl<'frame> Task<'frame> {
         }
     }
 
+    /// The `backtrace` field.
     pub fn backtrace(self) -> Option<Value<'frame, 'static>> {
         unsafe {
             let backtrace = (&*self.ptr()).backtrace;
@@ -134,6 +140,11 @@ impl<'frame> Task<'frame> {
     /// Record whether this Task can be migrated to a new thread
     pub fn sticky(self) -> u8 {
         unsafe { (&*self.ptr()).sticky }
+    }
+
+    /// Convert `self` to a `Value`.
+    pub fn as_value(self) -> Value<'frame, 'static> {
+        self.into()
     }
 }
 

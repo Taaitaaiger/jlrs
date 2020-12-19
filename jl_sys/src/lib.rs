@@ -13,8 +13,45 @@ macro_rules! llt_align {
 
 use std::ffi::c_void;
 use std::mem::size_of;
+use std::sync::atomic::{AtomicPtr, Ordering};
 
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+
+/*mod dynamic {
+    use libc::{dlopen, dlsym, RTLD_NOW, RTLD_GLOBAL, RTLD_NODELETE};
+
+    macro_rules! define_dynamic_function {
+        ($name:ident, ($($args:ty,)+), $out:ty) => {
+            pub static mut $name: ::std::mem::MaybeUninit<unsafe extern "C" fn($(args),+) -> $out> = ::std::mem::MaybeUninit::uninit()
+        };
+        ($name:ident, ($args:ty), $out:ty) => {
+            pub static mut $name: ::std::mem::MaybeUninit<unsafe extern "C" fn($args) -> $out> = ::std::mem::MaybeUninit::uninit();
+        }
+    }
+
+    define_dynamic_function!(jl_eval_string, (*const ::std::os::raw::c_char), *mut super::jl_value_t);
+    // pub static mut jl_eval_string: std::mem::MaybeUninit<unsafe extern "C" fn(*const std::os::raw::c_char) -> *mut super::jl_value_t> = unsafe { std::mem::transmute(std::ptr::null_mut::<std::ffi::c_void>()) };
+
+    pub unsafe fn load() {
+        let path = std::ffi::CStr::from_bytes_with_nul_unchecked(b"/home/thomas/julia-1.5.3/lib/libjulia.so\0");
+        let lib = dlopen(path.as_ptr(), RTLD_NOW | RTLD_GLOBAL | RTLD_NODELETE);
+
+        {
+            let fnname = std::ffi::CStr::from_bytes_with_nul_unchecked(b"jl_eval_string\0");
+            let sym: *mut std::ffi::c_void = dlsym(lib, fnname.as_ptr()).cast();
+            assert!(!sym.is_null());
+            jl_eval_string = std::mem::transmute(sym);
+        }
+    }
+}
+
+pub fn dyn_eval_string() {
+    unsafe {
+        dynamic::load();
+        let s = std::ffi::CStr::from_bytes_with_nul_unchecked(b"println(\"hello dyn\")\0");
+        dynamic::jl_eval_string.assume_init()(s.as_ptr());
+    }
+}*/
 
 // define
 /*
@@ -777,11 +814,11 @@ STATIC_INLINE void jl_gc_wb(void *parent, void *ptr) JL_NOTSAFEPOINT
 */
 #[inline]
 pub unsafe fn jl_gc_wb(parent: *mut jl_value_t, ptr: *mut jl_value_t) {
-    let parent = &*jl_astaggedvalue(parent);
+    let parent_tagged = &*jl_astaggedvalue(parent);
     let ptr = &*jl_astaggedvalue(ptr);
 
-    if parent.__bindgen_anon_1.bits.gc() == 3 && (ptr.__bindgen_anon_1.bits.gc() & 1) == 0 {
-        jl_gc_queue_root(parent as *const jl_taggedvalue_t as *mut jl_value_t)
+    if parent_tagged.__bindgen_anon_1.bits.gc() == 3 && (ptr.__bindgen_anon_1.bits.gc() & 1) == 0 {
+        jl_gc_queue_root(parent)
     }
 }
 
@@ -1377,11 +1414,8 @@ pub unsafe fn jl_array_ptr_set(a: *mut c_void, i: usize, x: *mut c_void) -> *mut
     let a: *mut jl_array_t = a.cast();
     assert!((&*a).flags.ptrarray() != 0);
     assert!(i < jl_array_len(a));
-    let a_data: *mut *mut jl_value_t = jl_array_data(a.cast()).cast();
-
-    // This is wrong, should store atomically
-    let out = &mut *a_data.add(i);
-    *out = x.cast();
+    let a_data: *mut AtomicPtr<jl_value_t> = jl_array_data(a.cast()).cast();
+    (&*a_data.add(i)).store(x.cast(), Ordering::Relaxed);
 
     if !x.is_null() {
         if (&*a).flags.how() == 3 {
@@ -1404,6 +1438,7 @@ mod tests {
             jl_init();
             assert!(jl_is_initialized() != 0);
 
+            //dyn_eval_string();
             assert!(jl_exception_occurred().is_null());
 
             jl_atexit_hook(0);

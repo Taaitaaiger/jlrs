@@ -9,13 +9,13 @@
 //! An incomplete list of features that are currently supported by jlrs:
 //!
 //!  - Access arbitrary Julia modules and their contents.
-//!  - Call arbitrary Julia functions.
+//!  - Call arbitrary Julia functions, including functions that take keyword arguments.
 //!  - Include and use your own Julia code.
 //!  - Load a custom system image.
 //!  - Create values that Julia can use, and convert them back to Rust, from Rust.
 //!  - Access the type information and fields of values and check their properties.
 //!  - Create and use n-dimensional arrays.
-//!  - Support for mapping Julia structs to Rust structs, which can be generated with `JlrsReflect.jl`.
+//!  - Support for mapping Julia structs to Rust structs which can be generated with `JlrsReflect.jl`.
 //!  - Structs that can be mapped to Rust include those with type parameters and bits unions.
 //!  - Use these features when calling Rust from Julia through `ccall`.
 //!  - Offload long-running functions to another thread and `.await` the result with the (experimental) async runtime.
@@ -74,9 +74,7 @@
 //! ## Calling Julia from Rust
 //!
 //! You can call [`Julia::include`] to include your own Julia code and either [`Julia::frame`] or
-//! [`Julia::dynamic_frame`] to interact with Julia. If you want to have improved support for
-//! backtraces `jlrs.jl` must be included. You can find this file [here]. This is necessary
-//! because this functionality depends on some Julia code defined in that file.
+//! [`Julia::dynamic_frame`] to interact with Julia.
 //!
 //! The other two methods, [`Julia::frame`] and [`Julia::dynamic_frame`], take a closure that
 //! provides you with a [`Global`], and either a [`StaticFrame`] or [`DynamicFrame`] respectively.
@@ -252,12 +250,12 @@
 //!
 //! The experimental async runtime runs Julia in a separate thread and allows multiple tasks to
 //! run in parallel by offloading functions to a new thread in Julia and waiting for them to
-//! complete without blocking the runtime. To use this feature you must to enable the `async`
-//! feature flag:
+//! complete without blocking the runtime. To use this feature you must enable the `async` feature
+//! flag:
 //!
 //! ```toml
 //! [dependencies]
-//! jlrs = { version = "0.7", features = ["async"] }
+//! jlrs = { version = "0.8", features = ["async"] }
 //! ```
 //!
 //! This features is only supported on Linux.
@@ -294,7 +292,7 @@
 //! [`IntoJulia`], which lets you use the type in combination with [`Value::new`].
 //!
 //! You should not implement these structs manually. The `JlrsReflect.jl` package can generate
-//! generate the correct Rust struct for types that don't include any unions or tuples with type
+//! the correct Rust struct for types that don't include any unions or tuples with type
 //! parameters. The reason for this restriction is that the layout of tuple and union fields can
 //! be very different depending on these parameters in a way that can't be nicely expressed in
 //! Rust.
@@ -354,8 +352,77 @@
 //! [`Value::cast`]: value/struct.Value.html#method.cast
 //! [`AsyncJulia`]: multitask/struct.AsyncJulia.html
 //! [the instructions for compiling Julia on Windows using Cygwin and MinGW]: https://github.com/JuliaLang/julia/blob/v1.5.2/doc/build/windows.md#cygwin-to-mingw-cross-compiling
-//! [the examples directory of the repo]: https://github.com/Taaitaaiger/jlrs/tree/v0.7/examples
-//! [here]: https://raw.githubusercontent.com/Taaitaaiger/jlrs/v0.7/jlrs.jl
+//! [the examples directory of the repo]: https://github.com/Taaitaaiger/jlrs/tree/v0.8/examples
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! count {
+    ($name:expr => $value:expr) => {
+        2
+    };
+    ($name:expr => $value:expr, $($rest:tt)+) => {
+        count!(2, $($rest)+)
+    };
+    ($n:expr, $name:expr => $value:expr) => {
+        $n + 1
+    };
+    ($n:expr, $name:expr => $value:expr, $($rest:tt)+) => {
+        count!($n + 1, $($rest)+)
+    };
+}
+
+/// Create a new named tuple. You will need a named tuple to call functions with keyword
+/// arguments.
+///
+/// Example:
+///
+/// ```no_run
+/// # use jlrs::prelude::*;
+/// # fn main() {
+/// let mut julia = unsafe { Julia::init(16).unwrap() };
+/// // Three slots; two for the inputs and one for the output.
+/// julia.frame(3, |global, frame| {
+///     // Create the two arguments, each value requires one slot
+///     let i = Value::new(frame, 2u64)?;
+///     let j = Value::new(frame, 1u32)?;
+///
+///     let _nt = named_tuple!(frame, "i" => i, "j" => j);
+///
+///     Ok(())
+/// }).unwrap();
+/// # }
+/// ```
+#[macro_export]
+macro_rules! named_tuple {
+    ($frame:expr, $name:expr => $value:expr) => {
+        $crate::value::Value::new_named_tuple($frame, &mut [$name], &mut [$value])
+    };
+    ($frame:expr, $name:expr => $value:expr, $($rest:tt)+) => {
+        {
+            let n = $crate::count!($($rest)+);
+            let mut v1 = Vec::with_capacity(n);
+            let mut v2 = Vec::with_capacity(n);
+
+            v1.push($name);
+            v2.push($value);
+            $crate::named_tuple!($frame, &mut v1, &mut v2, $($rest)+)
+        }
+    };
+    ($frame:expr, $v1:expr, $v2:expr, $name:expr => $value:expr, $($rest:tt)+) => {
+        {
+            $v1.push($name);
+            $v2.push($value);
+            named_tuple!($frame, $v1, $v2, $($rest)+)
+        }
+    };
+    ($frame:expr, $v1:expr, $v2:expr, $name:expr => $value:expr) => {
+        {
+            $v1.push($name);
+            $v2.push($value);
+            $crate::value::Value::new_named_tuple($frame, $v1, $v2)
+        }
+    };
+}
 
 pub mod error;
 pub mod frame;
@@ -380,13 +447,19 @@ use global::Global;
 use jl_sys::{jl_atexit_hook, jl_init, jl_init_with_image__threading, jl_is_initialized};
 use mode::Sync;
 use stack::{Dynamic, RawStack, StackView, Static};
+use std::ffi::{c_void, CString};
 use std::io::{Error as IOError, ErrorKind};
+use std::mem::MaybeUninit;
 use std::path::Path;
+use std::ptr::null_mut;
 use std::sync::atomic::{AtomicBool, Ordering};
+use value::array::Array;
 use value::module::Module;
 use value::Value;
 
 pub(crate) static INIT: AtomicBool = AtomicBool::new(false);
+
+pub(crate) static JLRS_JL: &'static str = include_str!("../../jlrs.jl");
 
 /// This struct can be created only once during the lifetime of your program. You must create it
 /// with [`Julia::init`] or [`Julia::init_with_image`] before you can do anything related to
@@ -422,10 +495,24 @@ impl Julia {
         }
 
         jl_init();
-
-        Ok(Julia {
+        let mut jl = Julia {
             stack: RawStack::new(stack_size),
+        };
+
+        jl.frame(2, |global, frame| {
+            Value::eval_string(frame, JLRS_JL)?.expect("Could not load Jlrs module");
+
+            let droparray_fn = Value::new(frame, droparray as *mut c_void)?;
+            Module::main(global)
+                .submodule("Jlrs")?
+                .global("droparray")?
+                .set_nth_field(0, droparray_fn)?;
+
+            Ok(())
         })
+        .expect("Could not load Jlrs module");
+
+        Ok(jl)
     }
 
     /// This function is similar to [`Julia::init`] except that it loads a custom system image. A
@@ -465,14 +552,29 @@ impl Julia {
             return Err(JlrsError::other(io_err))?;
         }
 
-        let bindir = std::ffi::CString::new(julia_bindir_str).unwrap();
-        let im_rel_path = std::ffi::CString::new(image_path_str).unwrap();
+        let bindir = CString::new(julia_bindir_str).unwrap();
+        let im_rel_path = CString::new(image_path_str).unwrap();
 
         jl_init_with_image__threading(bindir.as_ptr(), im_rel_path.as_ptr());
 
-        Ok(Julia {
+        let mut jl = Julia {
             stack: RawStack::new(stack_size),
+        };
+
+        jl.frame(2, |global, frame| {
+            Value::eval_string(frame, JLRS_JL)?.expect("Could not load Jlrs module");
+
+            let droparray_fn = Value::new(frame, droparray as *mut c_void)?;
+            Module::main(global)
+                .submodule("Jlrs")?
+                .global("droparray")?
+                .set_nth_field(0, droparray_fn)?;
+
+            Ok(())
         })
+        .expect("Could not load Jlrs module");
+
+        Ok(jl)
     }
 
     /// Change the stack size to `stack_size`.
@@ -636,7 +738,7 @@ impl CCall {
     /// same way as [`Julia::init`] does. This function must never be called outside a function
     /// called through `ccall` from Julia and must only be called once during that call. The stack
     /// is not allocated untl a static or dynamic frame is created.
-    /// 
+    ///
     /// [`Julia::init`]: struct.Julia.html#method.init
     pub unsafe fn new(stack_size: usize) -> Self {
         CCall {
@@ -752,4 +854,19 @@ impl CCall {
 
         self.stack.as_mut()
     }
+}
+
+unsafe extern "C" fn droparray(a: Array) {
+    // The data of a moved array is allocated by Rust, this function is called by
+    // a finalizer in order to ensure it's also freed by Rust.
+    let arr_ref = &mut *a.ptr();
+
+    if arr_ref.flags.how() != 2 {
+        return;
+    }
+
+    let data_ptr = arr_ref.data.cast::<MaybeUninit<u8>>();
+    arr_ref.data = null_mut();
+    let n_els = arr_ref.elsize as usize * arr_ref.length;
+    Vec::from_raw_parts(data_ptr, n_els, n_els);
 }

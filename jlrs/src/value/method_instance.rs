@@ -56,6 +56,7 @@ impl<'frame> MethodInstance<'frame> {
         unsafe { Array::wrap((&*self.ptr()).backedges) }
     }
 
+    /// The `cache` field.
     pub fn cache(self) -> CodeInstance<'frame> {
         unsafe { CodeInstance::wrap((&*self.ptr()).cache) }
     }
@@ -63,6 +64,11 @@ impl<'frame> MethodInstance<'frame> {
     /// Flags to tell if inference is running on this object
     pub fn in_inference(self) -> u8 {
         unsafe { (&*self.ptr()).inInference }
+    }
+
+    /// Convert `self` to a `Value`.
+    pub fn as_value(self) -> Value<'frame, 'static> {
+        self.into()
     }
 }
 

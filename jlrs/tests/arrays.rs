@@ -131,3 +131,161 @@ fn check_typed_array_contents_info() {
         .unwrap();
     });
 }
+
+#[test]
+fn cannot_copy_value_data() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+
+        jlrs.frame(0, |global, _| {
+            let arr_val = unsafe { Value::an_empty_vec_any(global) };
+            assert!(arr_val
+                .cast::<Array>()?
+                .copy_inline_data::<Value>()
+                .is_err());
+            Ok(())
+        })
+        .unwrap();
+    });
+}
+
+#[test]
+fn cannot_access_value_as_inline() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+
+        jlrs.frame(0, |global, frame| {
+            let arr_val = unsafe { Value::an_empty_vec_any(global) };
+            assert!(arr_val
+                .cast::<Array>()?
+                .inline_data::<Value, _>(frame)
+                .is_err());
+            Ok(())
+        })
+        .unwrap();
+    });
+}
+
+#[test]
+fn cannot_access_value_as_inline_mut() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+
+        jlrs.frame(0, |global, frame| {
+            let arr_val = unsafe { Value::an_empty_vec_any(global) };
+            assert!(arr_val
+                .cast::<Array>()?
+                .inline_data_mut::<Value, _>(frame)
+                .is_err());
+            Ok(())
+        })
+        .unwrap();
+    });
+}
+
+#[test]
+fn cannot_access_value_as_unrestricted_inline_mut() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+
+        jlrs.frame(0, |global, frame| unsafe {
+            let arr_val = Value::an_empty_vec_any(global);
+            assert!(arr_val
+                .cast::<Array>()?
+                .unrestricted_inline_data_mut::<Value, _>(frame)
+                .is_err());
+            Ok(())
+        })
+        .unwrap();
+    });
+}
+
+#[test]
+fn cannot_access_value_as_unrestricted_inline_mut_wrong_type() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+
+        jlrs.frame(0, |global, frame| unsafe {
+            let arr_val = Value::an_empty_vec_any(global);
+            assert!(arr_val
+                .cast::<Array>()?
+                .unrestricted_inline_data_mut::<f64, _>(frame)
+                .is_err());
+            Ok(())
+        })
+        .unwrap();
+    });
+}
+
+#[test]
+fn cannot_access_f32_as_value() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+
+        jlrs.frame(1, |_, frame| unsafe {
+            let arr_val = Value::new_array::<f32, _, _>(frame, (1, 2))?;
+            assert!(arr_val.cast::<Array>()?.value_data(frame).is_err());
+            Ok(())
+        })
+        .unwrap();
+    });
+}
+
+#[test]
+fn cannot_access_f32_as_value_mut() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+
+        jlrs.frame(1, |_, frame| unsafe {
+            let arr_val = Value::new_array::<f32, _, _>(frame, (1, 2))?;
+            assert!(arr_val.cast::<Array>()?.value_data_mut(frame).is_err());
+            Ok(())
+        })
+        .unwrap();
+    });
+}
+
+#[test]
+fn cannot_access_f32_as_unrestricted_value_mut() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+
+        jlrs.frame(1, |_, frame| unsafe {
+            let arr_val = Value::new_array::<f32, _, _>(frame, (1, 2))?;
+            assert!(arr_val
+                .cast::<Array>()?
+                .unrestricted_value_data_mut(frame)
+                .is_err());
+            Ok(())
+        })
+        .unwrap();
+    });
+}
+
+#[test]
+fn convert_back_to_value() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+
+        jlrs.frame(0, |global, _| unsafe {
+            let arr_val = Value::an_empty_vec_any(global);
+            arr_val.cast::<Array>()?.as_value().is::<Array>();
+            Ok(())
+        })
+        .unwrap();
+    });
+}
+
+#[test]
+fn invalid_layout() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+
+        jlrs.frame(1, |_, frame| unsafe {
+            let not_arr_val = Value::new(frame, 1usize)?;
+            assert!(!Array::valid_layout(not_arr_val));
+            Ok(())
+        })
+        .unwrap();
+    });
+}

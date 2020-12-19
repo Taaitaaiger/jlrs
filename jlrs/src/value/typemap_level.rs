@@ -30,20 +30,29 @@ impl<'frame> TypeMapLevel<'frame> {
         self.0
     }
 
+    /// The `arg1` field.
     pub fn arg1(self) -> Array<'frame, 'static> {
         unsafe { Array::wrap((&*self.ptr()).arg1) }
     }
 
+    /// The `targ` field.
     pub fn targ(self) -> Array<'frame, 'static> {
         unsafe { Array::wrap((&*self.ptr()).targ) }
     }
 
+    /// The `linear` field.
     pub fn linear(self) -> TypeMapEntry<'frame> {
         unsafe { TypeMapEntry::wrap((&*self.ptr()).linear) }
     }
 
+    /// The `any` field.
     pub fn any(self) -> Value<'frame, 'static> {
         unsafe { Value::wrap((&*self.ptr()).any) }
+    }
+
+    /// Convert `self` to a `Value`.
+    pub fn as_value(self) -> Value<'frame, 'static> {
+        self.into()
     }
 }
 

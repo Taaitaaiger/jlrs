@@ -107,3 +107,275 @@ fn function_returns_datatype() {
         .unwrap();
     })
 }
+
+#[test]
+fn datatype_has_typename() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+        jlrs.frame(0, |global, _| {
+            let dt = DataType::tvar_type(global);
+            let tn = dt.type_name();
+            let s: String = tn.name().into();
+
+            assert_eq!(s, "TypeVar");
+
+            Ok(())
+        })
+        .unwrap();
+    })
+}
+
+#[test]
+fn datatype_has_fieldnames() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+        jlrs.frame(0, |global, _| {
+            let dt = DataType::tvar_type(global);
+            let tn = dt.field_names();
+
+            assert_eq!(tn[0].as_string(), "name");
+            assert_eq!(tn[1].as_string(), "lb");
+            assert_eq!(tn[2].as_string(), "ub");
+
+            Ok(())
+        })
+        .unwrap();
+    })
+}
+
+#[test]
+fn datatype_field_size() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+        jlrs.frame(0, |global, _| {
+            let dt = DataType::tvar_type(global);
+            let sz = dt.field_size(1);
+            assert_eq!(sz, 8);
+
+            Ok(())
+        })
+        .unwrap();
+    })
+}
+
+#[test]
+fn datatype_field_offset() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+        jlrs.frame(0, |global, _| {
+            let dt = DataType::tvar_type(global);
+            let sz = dt.field_offset(1);
+            assert_eq!(sz, 8);
+
+            Ok(())
+        })
+        .unwrap();
+    })
+}
+
+#[test]
+fn datatype_pointer_field() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+        jlrs.frame(0, |global, _| {
+            let dt = DataType::tvar_type(global);
+            assert!(dt.is_pointer_field(1));
+
+            Ok(())
+        })
+        .unwrap();
+    })
+}
+
+#[test]
+fn datatype_isbits() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+        jlrs.frame(0, |global, _| {
+            let dt = DataType::tvar_type(global);
+            assert!(!dt.isbits());
+
+            Ok(())
+        })
+        .unwrap();
+    })
+}
+
+#[test]
+fn datatype_supertype() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+        jlrs.frame(0, |global, _| {
+            let dt = DataType::tvar_type(global);
+            assert!(dt.super_type().is_some());
+
+            Ok(())
+        })
+        .unwrap();
+    })
+}
+
+#[test]
+fn datatype_parameters() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+        jlrs.frame(0, |global, _| {
+            assert_eq!(
+                Value::array_int32_type(global)
+                    .cast::<DataType>()
+                    .unwrap()
+                    .parameters()
+                    .len(),
+                2
+            );
+
+            Ok(())
+        })
+        .unwrap();
+    })
+}
+
+#[test]
+fn datatype_instance() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+        jlrs.frame(0, |global, _| {
+            assert!(Value::array_int32_type(global)
+                .cast::<DataType>()
+                .unwrap()
+                .instance()
+                .is_none());
+
+            assert!(DataType::nothing_type(global).instance().is_some());
+
+            Ok(())
+        })
+        .unwrap();
+    })
+}
+
+#[test]
+fn datatype_ninitialized() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+        jlrs.frame(0, |global, _| {
+            let dt = DataType::tvar_type(global);
+            assert_eq!(dt.n_initialized(), 3);
+
+            Ok(())
+        })
+        .unwrap();
+    })
+}
+
+#[test]
+fn datatype_hash() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+        jlrs.frame(0, |global, _| {
+            let dt = DataType::tvar_type(global);
+            assert!(dt.hash() != 0);
+
+            Ok(())
+        })
+        .unwrap();
+    })
+}
+
+#[test]
+fn datatype_abstract() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+        jlrs.frame(0, |global, _| {
+            let dt = DataType::tvar_type(global);
+            assert!(!dt.is_abstract());
+
+            Ok(())
+        })
+        .unwrap();
+    })
+}
+
+#[test]
+fn datatype_mutable() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+        jlrs.frame(0, |global, _| {
+            let dt = DataType::tvar_type(global);
+            assert!(dt.mutable());
+
+            Ok(())
+        })
+        .unwrap();
+    })
+}
+
+#[test]
+fn datatype_hasfreetypevast() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+        jlrs.frame(0, |global, _| {
+            let dt = DataType::tvar_type(global);
+            assert!(!dt.has_free_type_vars());
+
+            Ok(())
+        })
+        .unwrap();
+    })
+}
+
+#[test]
+fn datatype_concrete() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+        jlrs.frame(0, |global, _| {
+            let dt = DataType::tvar_type(global);
+            assert!(dt.is_concrete_type());
+
+            Ok(())
+        })
+        .unwrap();
+    })
+}
+
+#[test]
+fn datatype_dispatchtuple() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+        jlrs.frame(0, |global, _| {
+            let dt = DataType::tvar_type(global);
+            assert!(!dt.is_dispatch_tuple());
+
+            Ok(())
+        })
+        .unwrap();
+    })
+}
+
+#[test]
+fn datatype_zeroinit() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+        jlrs.frame(0, |global, _| {
+            let dt = DataType::tvar_type(global);
+            assert!(!dt.zeroinit());
+
+            Ok(())
+        })
+        .unwrap();
+    })
+}
+
+#[test]
+fn datatype_concrete_subtype() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+        jlrs.frame(0, |global, _| {
+            let dt = DataType::tvar_type(global);
+            assert!(dt.has_concrete_subtype());
+
+            Ok(())
+        })
+        .unwrap();
+    })
+}
