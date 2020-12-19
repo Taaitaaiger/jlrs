@@ -72,8 +72,9 @@ jobs:
 
       - name: Set env
         run: |
-          echo "JULIA_DIR=$(dirname $(dirname $(which julia)))" >> $GITHUB_ENV
+          export JULIA_DIR=$(dirname $(dirname $(which julia)))
           echo "LD_LIBRARY_PATH=${JULIA_DIR}/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
+          echo "JULIA_DIR=${JULIA_DIR}" >> $GITHUB_ENV
 
       - name: Run cargo-tarpaulin
         uses: actions-rs/tarpaulin@v0.1
