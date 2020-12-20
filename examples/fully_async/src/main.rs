@@ -8,7 +8,7 @@ use std::any::Any;
 struct MyTask {
     dims: isize,
     iters: isize,
-    sender: async_std::sync::Sender<JlrsResult<Box<dyn Any + Send + Sync>>>, //crossbeam_channel::Sender<JlrsResult<Box<dyn Any + Send + Sync>>>,
+    sender: async_std::channel::Sender<JlrsResult<Box<dyn Any + Send + Sync>>>,
 }
 
 // `MyTask` is a task we want to be executed, so we need to implement `JuliaTrait`. This requires
@@ -21,7 +21,7 @@ impl JuliaTask for MyTask {
     type T = Box<dyn Any + Send + Sync>;
     // We use the `Sender` from the crossbeam_channel crate to send back results. Even if this
     // task doesn't return a result to the caller, `R` must be set.
-    type R = async_std::sync::Sender<JlrsResult<Self::T>>;
+    type R = async_std::channel::Sender<JlrsResult<Self::T>>;
 
     // This is the async variation of the closure you give to `Julia::frame` or
     // `Julia::dynamic_frame` when you use the synchronous runtime. The `Global` can be used to
@@ -53,7 +53,7 @@ impl JuliaTask for MyTask {
 
     // Override the default implementation of `return_channel` so the result of this task is sent
     // back.
-    fn return_channel(&self) -> Option<&async_std::sync::Sender<JlrsResult<Self::T>>> {
+    fn return_channel(&self) -> Option<&async_std::channel::Sender<JlrsResult<Self::T>>> {
         Some(&self.sender)
     }
 }

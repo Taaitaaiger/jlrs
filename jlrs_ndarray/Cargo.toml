@@ -19,7 +19,7 @@ license = "MIT"
 docs-rs = ["jlrs/docs-rs"]
 
 [dependencies]
-jlrs = { path = "../jlrs", version = "0.8.0" }
+jlrs = { path = "../jlrs", version = "0.8" }
 ndarray = "0.14" 
 
 [package.metadata.docs.rs]
