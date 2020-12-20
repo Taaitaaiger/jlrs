@@ -22,7 +22,7 @@ async = ["futures", "crossbeam-channel", "async-trait", "async-std"]
 docs-rs = ["jl-sys/docs-rs", "jlrs-derive", "async"]
 
 [dependencies]
-jl-sys = {version = "0.9", path = "../jl_sys" }
+jl-sys = {version = "0.10", path = "../jl_sys" }
 jlrs-derive = { version = "0.2", optional = true, path = "../jlrs_derive" }
 smallvec = "1.5"
 
