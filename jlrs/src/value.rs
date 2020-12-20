@@ -13,6 +13,76 @@
 //! [`Value`]: struct.Value.html
 //! [`Values`]: struct.Values.html
 
+#[doc(hidden)]
+#[macro_export]
+macro_rules! count {
+    ($name:expr => $value:expr) => {
+        2
+    };
+    ($name:expr => $value:expr, $($rest:tt)+) => {
+        count!(2, $($rest)+)
+    };
+    ($n:expr, $name:expr => $value:expr) => {
+        $n + 1
+    };
+    ($n:expr, $name:expr => $value:expr, $($rest:tt)+) => {
+        count!($n + 1, $($rest)+)
+    };
+}
+
+/// Create a new named tuple. You will need a named tuple to call functions with keyword
+/// arguments.
+///
+/// Example:
+///
+/// ```no_run
+/// # use jlrs::prelude::*;
+/// # fn main() {
+/// let mut julia = unsafe { Julia::init(16).unwrap() };
+/// // Three slots; two for the inputs and one for the output.
+/// julia.frame(3, |global, frame| {
+///     // Create the two arguments, each value requires one slot
+///     let i = Value::new(frame, 2u64)?;
+///     let j = Value::new(frame, 1u32)?;
+///
+///     let _nt = named_tuple!(frame, "i" => i, "j" => j);
+///
+///     Ok(())
+/// }).unwrap();
+/// # }
+/// ```
+#[macro_export]
+macro_rules! named_tuple {
+    ($frame:expr, $name:expr => $value:expr) => {
+        $crate::value::Value::new_named_tuple($frame, &mut [$name], &mut [$value])
+    };
+    ($frame:expr, $name:expr => $value:expr, $($rest:tt)+) => {
+        {
+            let n = $crate::count!($($rest)+);
+            let mut names = ::smallvec::SmallVec::<[_; $crate::value::MAX_SIZE]>::with_capacity(n);
+            let mut values = ::smallvec::SmallVec::<[_; $crate::value::MAX_SIZE]>::with_capacity(n);
+
+            names.push($name);
+            values.push($value);
+            $crate::named_tuple!($frame, &mut names, &mut values, $($rest)+)
+        }
+    };
+    ($frame:expr, $names:expr, $values:expr, $name:expr => $value:expr, $($rest:tt)+) => {
+        {
+            $names.push($name);
+            $values.push($value);
+            named_tuple!($frame, $names, $values, $($rest)+)
+        }
+    };
+    ($frame:expr, $names:expr, $values:expr, $name:expr => $value:expr) => {
+        {
+            $names.push($name);
+            $values.push($value);
+            $crate::value::Value::new_named_tuple($frame, $names, $values)
+        }
+    };
+}
+
 use self::array::{Array, Dimensions};
 use self::datatype::{Concrete, DataType};
 use self::module::Module;
@@ -50,9 +120,11 @@ use std::marker::PhantomData;
 use std::ptr::null_mut;
 use std::slice;
 
-// If a function is called with `MAX_SIZE` or fewer arguments, no allocation is needed to add
-// the additional two arguments that `Jlrs.asynccall` needs.
-const MAX_SIZE: usize = 8;
+/// In some cases it's necessary to place one or more arguments in front of the arguments a
+/// function is called with. Examples include `Value::asynccall` and `WithKeywords::call`. If
+/// these functions are called with fewer than `MAX_SIZE` arguments (including the added
+/// arguments), no heap allocation is required to store them.
+pub const MAX_SIZE: usize = 8;
 
 pub mod array;
 pub mod code_instance;

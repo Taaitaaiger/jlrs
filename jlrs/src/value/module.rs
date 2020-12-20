@@ -190,7 +190,7 @@ impl<'base> Module<'base> {
     /// successfully. This method can be used to load parts of the standard library like
     /// `LinearAlgebra`. This requires one slot on the GC stack. Note that the loaded module is
     /// not made available in the module used to call this method, you can use
-    /// `Module::set_global` to do so..
+    /// `Module::set_global` to do so.
     pub fn require<'frame, F, S>(
         self,
         frame: &mut F,

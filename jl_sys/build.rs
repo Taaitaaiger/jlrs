@@ -1,13 +1,8 @@
 #![allow(unused_imports)]
-
-use std::collections::HashSet;
 use std::env;
 use std::fs;
-use std::io::Read;
 use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
-
-use quote::ToTokens;
 
 #[cfg(target_os = "linux")]
 fn find_julia() -> Option<String> {
@@ -50,7 +45,7 @@ fn flags() -> Vec<String> {
             let jl_lib_path = format!("-L{}/lib/", julia_dir);
 
             println!("cargo:rustc-flags={}", &jl_lib_path);
-            vec![jl_include_path, jl_lib_path]
+            vec![jl_include_path]
         }
         None => Vec::new(),
     };
@@ -305,192 +300,4 @@ fn main() {
     bindings
         .write_to_file(&out_path)
         .expect("Couldn't write bindings!");
-
-    if env::var("CARGO_FEATURE_DOCS_RS").is_ok() {
-        rewrite_bindings(&out_path, &functions);
-    }
-}
-
-fn rewrite_bindings(out_path: &PathBuf, functions: &[&str]) {
-    let mut func_set = HashSet::with_capacity(functions.len());
-    for f in functions.iter().copied() {
-        func_set.insert(f);
-    }
-
-    let mut file = fs::File::open(out_path).expect("Unable to open bindings");
-    let mut src = String::new();
-    file.read_to_string(&mut src)
-        .expect("Unable to read bindings");
-    let f = syn::parse_file(&src).expect("Unable to parse bindings");
-
-    let mut func_bindings = Vec::with_capacity(functions.len());
-    let mut static_bindings = Vec::with_capacity(functions.len());
-    let mut general_bindings = Vec::with_capacity(functions.len());
-
-    for item in f.items.iter() {
-        if let syn::Item::ForeignMod(fmod) = item {
-            for item in fmod.items.iter() {
-                if let syn::ForeignItem::Fn(func) = item {
-                    let name = func.sig.ident.to_string();
-                    let name_ref: &str = name.as_ref();
-
-                    if func_set.contains(name_ref) {
-                        let fi = FunctionInfo::from(&func.sig);
-                        func_bindings.push(fi);
-                    } else {
-                        panic!("Unexpected foreign function {:?}", func);
-                    }
-                } else if let syn::ForeignItem::Static(s) = item {
-                    static_bindings.push(s.clone());
-                } else {
-                    panic!("Unexpected foreign item {:?}", item);
-                }
-            }
-        } else {
-            general_bindings.push(item);
-        }
-    }
-
-    let func_name = func_bindings.iter().map(|fi| &fi.name);
-    let func_name_string = func_name.clone().map(|name| name.to_string());
-
-    let func_name_static = func_bindings
-        .iter()
-        .map(|fi| quote::format_ident!("{}_jlsys", &fi.name));
-
-    let func_name_static2 = func_name_static.clone();
-    let func_name_static3 = func_name_static.clone();
-    let func_inputs = func_bindings.iter().map(|fi| &fi.inputs);
-    let func_input_tys = func_inputs.clone().map(|input| {
-        let tys = input.iter().map(|input| match input {
-            syn::FnArg::Typed(pt) => pt.ty.clone(),
-            _ => panic!(),
-        });
-        syn::punctuated::Punctuated::<_, syn::token::Comma>::from_iter(tys)
-    });
-
-    let func_input_names = func_inputs.clone().map(|input| {
-        let tys = input.iter().map(|input| match input {
-            syn::FnArg::Typed(pt) => match pt.pat.as_ref() {
-                syn::Pat::Ident(id) => &id.ident,
-                _ => panic!(),
-            },
-            _ => panic!(),
-        });
-        syn::punctuated::Punctuated::<_, syn::token::Comma>::from_iter(tys)
-    });
-
-    let func_output = func_bindings.iter().map(|fi| &fi.output);
-    let func_output2 = func_output.clone();
-    let general_it = general_bindings.iter();
-
-    let static_name = static_bindings.iter().map(|it| &it.ident);
-    let static_name2 = static_name.clone();
-    let static_name3 = static_name.clone();
-    let static_name_string = static_name3.map(|id| id.to_string());
-    let static_ty = static_bindings.iter().map(|it| &it.ty);
-
-    let rewritten = quote::quote! {
-        #(
-            #general_it
-        )*
-
-        #(
-            static mut #func_name_static: ::std::mem::MaybeUninit<
-                unsafe extern "C" fn(#func_input_tys) #func_output
-            > = ::std::mem::MaybeUninit::uninit();
-        )*
-
-        #(
-            static mut #static_name: #static_ty = ::std::ptr::null_mut();
-        )*
-
-        #(
-            pub unsafe extern "C" fn #func_name(#func_inputs) #func_output2 {
-                #func_name_static2.assume_init()(#func_input_names)
-            }
-        )*
-
-        pub unsafe extern "C" fn init_jlsys(library_path: *const ::std::os::raw::c_char) {
-            let lib = ::libc::dlopen(library_path, ::libc::RTLD_GLOBAL | ::libc::RTLD_NOW | ::libc::RTLD_NODELETE);
-
-            #(
-                {
-                    let symbol = ::std::ffi::CString::new(#func_name_string);
-                    let symbol_ptr = symbol.as_c_str().as_ptr();
-                    let func_ptr = ::libc::dlsym(lib, symbol_ptr);
-                    assert!(!func_ptr.is_null());
-                    #func_name_static3 = ::std::mem::transmute(func_ptr);
-                }
-            )*
-
-            jl_init__threading();
-
-            #(
-                {
-                    let symbol = ::std::ffi::CString::new(#static_name_string);
-                    let symbol_ptr = symbol.as_c_str().as_ptr();
-                    let static_ptr = ::libc::dlsym(lib, symbol_ptr);
-                    assert!(!static_ptr.is_null());
-                    #static_name2 = static_ptr.cast();
-                }
-            )*
-
-            ::libc::dlclose(lib);
-        }
-    };
-
-    let rewritten = rewritten.to_string();
-    eprintln!("Rewritten: {}", rustfmt_string(&rewritten));
-}
-
-struct FunctionInfo {
-    pub name: syn::Ident,
-    pub inputs: syn::punctuated::Punctuated<syn::FnArg, syn::token::Comma>,
-    pub output: syn::ReturnType,
-}
-
-impl From<&syn::Signature> for FunctionInfo {
-    fn from(sig: &syn::Signature) -> Self {
-        FunctionInfo {
-            name: sig.ident.clone(),
-            inputs: sig.inputs.clone(),
-            output: sig.output.clone(),
-        }
-    }
-}
-
-use std::io::{self, Write};
-use std::process::{Command, Stdio};
-fn rustfmt_string(source: &str) -> String {
-    let mut cmd = Command::new("rustfmt");
-
-    cmd.stdin(Stdio::piped()).stdout(Stdio::piped());
-
-    let mut child = cmd.spawn().expect("Cannot spawn process");
-    let mut child_stdin = child.stdin.take().unwrap();
-    let mut child_stdout = child.stdout.take().unwrap();
-
-    let source = source.to_owned();
-
-    // Write to stdin in a new thread, so that we can read from stdout on this
-    // thread. This keeps the child from blocking on writing to its stdout which
-    // might block us from writing to its stdin.
-    let stdin_handle = ::std::thread::spawn(move || {
-        let _ = child_stdin.write_all(source.as_bytes());
-        source
-    });
-
-    let mut output = vec![];
-    io::copy(&mut child_stdout, &mut output).expect("Unable to copy");
-
-    let source = stdin_handle.join().expect(
-        "The thread writing to rustfmt's stdin doesn't do \
-             anything that could panic",
-    );
-
-    match String::from_utf8(output) {
-        Ok(bindings) => bindings,
-        _ => source,
-    }
 }
