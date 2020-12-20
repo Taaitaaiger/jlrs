@@ -396,7 +396,7 @@ use value::Value;
 
 pub(crate) static INIT: AtomicBool = AtomicBool::new(false);
 
-pub(crate) static JLRS_JL: &'static str = include_str!("../../jlrs.jl");
+pub(crate) static JLRS_JL: &'static str = include_str!("jlrs.jl");
 
 /// This struct can be created only once during the lifetime of your program. You must create it
 /// with [`Julia::init`] or [`Julia::init_with_image`] before you can do anything related to
