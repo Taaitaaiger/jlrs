@@ -154,6 +154,13 @@
 //! a frame in order to protect a value from with a specific frame; this value will share that
 //! frame's lifetime.
 //!
+//! ## Standard library and installed packages
+//!
+//! Julia has a standard library that includes modules like `LinearAlgebra` and `Dates`, and comes
+//! with a package manager that makes it easy to install new packages. In order to use these
+//! modules and packages, they must first be loaded. This can be done by calling
+//! [`Module::require`].
+//!
 //! ## Calling Rust from Julia
 //!
 //! Julia's `ccall` interface can be used to call `extern "C"` functions defined in Rust. There
