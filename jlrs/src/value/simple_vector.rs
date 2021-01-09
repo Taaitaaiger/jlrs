@@ -33,7 +33,7 @@ impl<'frame> SimpleVector<'frame> {
     {
         unsafe {
             let svec = jl_alloc_svec(n);
-            if let Err(err) = frame.protect(svec.cast(), Internal) {
+            if let Err(err) = frame.root(svec.cast(), Internal) {
                 Err(JlrsError::AllocError(err))?
             };
 
@@ -48,7 +48,7 @@ impl<'frame> SimpleVector<'frame> {
         F: Frame<'frame>,
     {
         let svec = jl_alloc_svec_uninit(n);
-        if let Err(err) = frame.protect(svec.cast(), Internal) {
+        if let Err(err) = frame.root(svec.cast(), Internal) {
             Err(JlrsError::AllocError(err))?
         };
 

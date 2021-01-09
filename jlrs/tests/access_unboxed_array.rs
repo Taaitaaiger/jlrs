@@ -187,7 +187,7 @@ fn access_copied_array_dimensions() {
         let mut jlrs = j.borrow_mut();
 
         jlrs.frame(1, |_, frame| {
-            let arr_val = Value::new_array::<f32, _, _>(frame, (1, 2))?;
+            let arr_val = Value::new_array::<f32, _, _, _>(frame, (1, 2))?;
             let arr = arr_val.cast::<Array>()?;
 
             let data = arr.copy_inline_data::<f32>()?;

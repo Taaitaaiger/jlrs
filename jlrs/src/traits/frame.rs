@@ -1,66 +1,133 @@
-use crate::error::{AllocError, JlrsError, JlrsResult};
-#[cfg(all(feature = "async", target_os = "linux"))]
-use crate::frame::AsyncFrame;
-use crate::frame::{DynamicFrame, NullFrame, Output, StaticFrame};
-use crate::global::Global;
-#[cfg(all(feature = "async", target_os = "linux"))]
-use crate::mode::Async;
-use crate::mode::{Mode, Sync};
+//! Functionality shared by the different frame types.
 
-/// Functionality shared by [`StaticFrame`] and [`DynamicFrame`]. These structs let you protect
-/// data from garbage collection. The lifetime of a frame is assigned to the values and outputs
+use crate::error::{CallResult, JlrsError, JlrsResult};
+#[cfg(all(feature = "async", target_os = "linux"))]
+use crate::frame::DynamicAsyncFrame;
+use crate::frame::{
+    DynamicFrame, NullFrame, Output, StaticFrame, UnrootedCallResult, UnrootedValue,
+};
+use crate::global::Global;
+use crate::mode::Sync;
+use crate::traits::mode::Mode;
+use crate::traits::root::Root;
+use crate::value::Value;
+
+/// Functionality shared by all frame types. Frames are used to protect data from garbage
+/// collection. The lifetime of a frame is assigned to the values and outputs
 /// that are created using that frame. After a frame is dropped, these items are no longer
 /// protected and cannot be used.
-///
-/// If you need the result of a function call to be valid outside the frame where it is called,
-/// you can call `Frame::output` to create an [`Output`] and use [`Value::with_output`] to use the
-/// output to protect the value rather than the current frame. The result will share the output's
-/// lifetime so it can be used until the output's frame goes out of scope.
-///
-/// [`StaticFrame`]: ../frame/struct.StaticFrame.html
-/// [`DynamicFrame`]: ../frame/struct.DynamicFrame.html
-/// [`Module`]: ../module/struct.Module.html
-/// [`Julia::frame`]: ../struct.Julia.html#method.frame
-/// [`Julia::dynamic_frame`]: ../struct.Julia.html#method.dynamic_frame
-/// [`Output`]: ../frame/struct.Output.html
-/// [`Value::with_output`]: ../value/struct.Value.html#method.with_output
 pub trait Frame<'frame>: private::Frame<'frame> {
+    /// This method takes a mutable reference to a frame and returns it; this method can be used
+    /// as an alternative to reborrowing a frame with `&mut *` when a [`Scope`] is needed.
+    fn as_scope(&mut self) -> &mut Self {
+        self
+    }
+
     /// Create a `StaticFrame` that can hold `capacity` values, and call the given closure.
-    /// Returns the result of this closure, or an error if the new frame can't be created
-    /// because there's not enough space on the GC stack. The number of required slots on the
-    /// stack is `capacity + 2`.
-    ///
-    /// Returns an error if there is not enough space on the stack.
-    fn frame<'nested, T, F: FnOnce(&mut StaticFrame<'nested, Self::U>) -> JlrsResult<T>>(
-        &'nested mut self,
+    /// Returns the result of this closure.
+    fn frame<T, F: for<'nested> FnOnce(&mut StaticFrame<'nested, Self::Mode>) -> JlrsResult<T>>(
+        &mut self,
         capacity: usize,
         func: F,
     ) -> JlrsResult<T>;
 
-    /// Create a `DynamicFrame` and call the given closure.  Returns the result of this closure,
-    /// or an error if the new frame can't be created because the stack is too small. The number
-    /// of required slots on the stack is `2`.
-    ///
-    /// Returns an error if there is not enough space on the stack.
-    fn dynamic_frame<'nested, T, F: FnOnce(&mut DynamicFrame<'nested, Self::U>) -> JlrsResult<T>>(
-        &'nested mut self,
+    /// Create a `DynamicFrame` and call the given closure. Returns the result of this closure. A
+    /// dynamic frame can contain at least 64 values, but is not guaranteed to be able to contain
+    /// more than that.
+    fn dynamic_frame<
+        T,
+        F: for<'nested> FnOnce(&mut DynamicFrame<'nested, Self::Mode>) -> JlrsResult<T>,
+    >(
+        &mut self,
         func: F,
     ) -> JlrsResult<T>;
 
-    /// Returns a new `Output`, this takes one slot on the GC stack. A function that uses this
-    /// output will not use a slot on the GC stack, but the one associated with this output. This
-    /// extends the lifetime of that value to be valid until the frame that created the output
-    /// goes out of scope.
+    /// Create a new `StaticFrame` that can be used to root `capacity` values, an `Output` for the
+    /// current scope, and use them to call the inner closure. The final result is not rooted in
+    /// this newly created frame, but the current frame. The final result must not be the result
+    /// of a function call, use [`Frame::call_frame`] for that purpose instead. If the current
+    /// scope is a mutable reference to a frame, calling this method will require one slot of the
+    /// current frame.
     ///
-    /// Returns an error if there is not enough space on the stack.
-    fn output(&mut self) -> JlrsResult<Output<'frame>>;
+    /// Example:
+    ///
+    /// ```
+    /// # use jlrs::prelude::*;
+    /// # use jlrs::util::JULIA;
+    /// # fn main() {
+    /// # JULIA.with(|j| {
+    /// # let mut julia = j.borrow_mut();
+    ///   julia.frame(1, |global, frame| {
+    ///       let _nt = frame.value_frame(2, |output, frame| {
+    ///           let v1 = Value::new(&mut *frame, 1usize)?;
+    ///           let v2 = Value::new(&mut *frame, 2usize)?;
+    ///
+    ///           let output = output.into_scope(frame);
+    ///           named_tuple!(output, "a" => v1, "b" => v2)
+    ///       })?;
+    ///
+    ///       Ok(())
+    ///   }).unwrap();
+    /// # });
+    /// # }
+    /// ```
+    fn value_frame<'data, F>(
+        &mut self,
+        capacity: usize,
+        func: F,
+    ) -> JlrsResult<Value<'frame, 'data>>
+    where
+        F: for<'nested, 'inner> FnOnce(
+            Output<'frame>,
+            &'inner mut StaticFrame<'nested, Self::Mode>,
+        ) -> JlrsResult<UnrootedValue<'frame, 'data, 'inner>>;
+
+    /// Create a new `StaticFrame` that can be used to root `capacity` values, an `Output` for the
+    /// current scope, and use them to call the inner closure. The final result is not rooted in
+    /// this newly created frame, but the current frame. The final result must be the result of a
+    /// function call, if you want to create a new value use [`Frame::value_frame`] instead. If
+    /// the current scope is a mutable reference to a frame, calling this method will require one
+    /// slot of the current frame.
+    ///
+    /// Example:
+    ///
+    /// ```
+    /// # use jlrs::prelude::*;
+    /// # use jlrs::util::JULIA;
+    /// # fn main() {
+    /// # JULIA.with(|j| {
+    /// # let mut julia = j.borrow_mut();
+    ///   julia.frame(1, |global, frame| {
+    ///       let sum = frame.call_frame(2, |output, frame| {
+    ///           let v1 = Value::new(&mut *frame, 1usize)?;
+    ///           let v2 = Value::new(&mut *frame, 2usize)?;
+    ///
+    ///           let add = Module::base(global).function("+")?;
+    ///
+    ///           let output = output.into_scope(frame);
+    ///           add.call2(output, v1, v2)
+    ///       })?.unwrap().cast::<usize>()?;
+    ///
+    ///       assert_eq!(sum, 3);
+    ///       Ok(())
+    ///   }).unwrap();
+    /// # });
+    /// # }
+    /// ```
+    fn call_frame<'data, F>(
+        &mut self,
+        capacity: usize,
+        func: F,
+    ) -> JlrsResult<CallResult<'frame, 'data>>
+    where
+        F: for<'nested, 'inner> FnOnce(
+            Output<'frame>,
+            &'inner mut StaticFrame<'nested, Self::Mode>,
+        )
+            -> JlrsResult<UnrootedCallResult<'frame, 'data, 'inner>>;
 
     /// Returns the number of values belonging to this frame.
     fn size(&self) -> usize;
-
-    #[doc(hidden)]
-    // Exists for debugging purposes, prints the contents of the GC stack.
-    fn print_memory(&self);
 
     /// Create a new `Global` which can be used to access a global in Julia. These globals are
     /// limited to the frame's lifetime rather than the base lifetime.
@@ -70,360 +137,382 @@ pub trait Frame<'frame>: private::Frame<'frame> {
 }
 
 impl<'frame, M: Mode> Frame<'frame> for StaticFrame<'frame, M> {
-    fn frame<'nested, T, F: FnOnce(&mut StaticFrame<'nested, M>) -> JlrsResult<T>>(
-        &'nested mut self,
+    fn frame<T, F: for<'nested> FnOnce(&mut StaticFrame<'nested, M>) -> JlrsResult<T>>(
+        &mut self,
         capacity: usize,
         func: F,
     ) -> JlrsResult<T> {
-        let mut frame = unsafe { self.nested_frame(capacity).unwrap() };
-        func(&mut frame)
-    }
-
-    fn dynamic_frame<'nested, T, F: FnOnce(&mut DynamicFrame<'nested, M>) -> JlrsResult<T>>(
-        &'nested mut self,
-        func: F,
-    ) -> JlrsResult<T> {
         unsafe {
-            let mut view = self.memory.nest_dynamic();
-            let idx = view.new_frame()?;
-            let mut frame = DynamicFrame {
-                idx,
-                len: 0,
-                memory: view,
-            };
-
+            let mut frame = self.nested_frame(capacity);
             func(&mut frame)
         }
     }
 
-    fn output(&mut self) -> JlrsResult<Output<'frame>> {
-        if self.capacity == self.len {
-            return Err(AllocError::FrameOverflow(1, self.len).into());
+    fn dynamic_frame<T, F: for<'nested> FnOnce(&mut DynamicFrame<'nested, M>) -> JlrsResult<T>>(
+        &mut self,
+        func: F,
+    ) -> JlrsResult<T> {
+        unsafe {
+            let mut frame = self.nested_dynamic_frame();
+            func(&mut frame)
         }
+    }
 
-        let out = unsafe {
-            let out = self.memory.new_output(self.idx, self.len);
-            self.len += 1;
-            out
-        };
+    fn value_frame<'data, F>(
+        &mut self,
+        capacity: usize,
+        func: F,
+    ) -> JlrsResult<Value<'frame, 'data>>
+    where
+        F: for<'nested, 'inner> FnOnce(
+            Output<'frame>,
+            &'inner mut StaticFrame<'nested, Self::Mode>,
+        ) -> JlrsResult<UnrootedValue<'frame, 'data, 'inner>>,
+    {
+        unsafe {
+            let pr = {
+                let mut frame = self.nested_frame(capacity);
+                let out = Output::new();
+                func(out, &mut frame)?.done()
+            };
 
-        Ok(out)
+            Value::root(self, pr)
+        }
+    }
+
+    fn call_frame<'data, F>(
+        &mut self,
+        capacity: usize,
+        func: F,
+    ) -> JlrsResult<CallResult<'frame, 'data>>
+    where
+        F: for<'nested, 'inner> FnOnce(
+            Output<'frame>,
+            &'inner mut StaticFrame<'nested, Self::Mode>,
+        )
+            -> JlrsResult<UnrootedCallResult<'frame, 'data, 'inner>>,
+    {
+        unsafe {
+            let pr = {
+                let mut frame = self.nested_frame(capacity);
+                let out = Output::new();
+                func(out, &mut frame)?.done()
+            };
+
+            CallResult::root(self, pr)
+        }
     }
 
     fn size(&self) -> usize {
-        self.len
-    }
-
-    fn print_memory(&self) {
-        self.memory.print_memory()
+        self.size()
     }
 }
 
 impl<'frame, M: Mode> Frame<'frame> for DynamicFrame<'frame, M> {
-    fn dynamic_frame<'nested, T, F: FnOnce(&mut DynamicFrame<'nested, M>) -> JlrsResult<T>>(
-        &'nested mut self,
-        func: F,
-    ) -> JlrsResult<T> {
-        let mut frame = unsafe { self.nested_frame().unwrap() };
-        func(&mut frame)
-    }
-
-    fn frame<'nested, T, F: FnOnce(&mut StaticFrame<'nested, M>) -> JlrsResult<T>>(
-        &'nested mut self,
+    fn frame<T, F: for<'nested> FnOnce(&mut StaticFrame<'nested, M>) -> JlrsResult<T>>(
+        &mut self,
         capacity: usize,
         func: F,
     ) -> JlrsResult<T> {
         unsafe {
-            let mut view = self.memory.nest_static();
-            let idx = view.new_frame(capacity)?;
-            let mut frame = StaticFrame {
-                idx,
-                capacity,
-                len: 0,
-                memory: view,
-            };
-
+            let mut frame = self.nested_frame(capacity);
             func(&mut frame)
         }
     }
 
-    fn output(&mut self) -> JlrsResult<Output<'frame>> {
+    fn dynamic_frame<T, F: for<'nested> FnOnce(&mut DynamicFrame<'nested, M>) -> JlrsResult<T>>(
+        &mut self,
+        func: F,
+    ) -> JlrsResult<T> {
+        let mut frame = unsafe { self.nested_dynamic_frame() };
+        func(&mut frame)
+    }
+
+    fn value_frame<'data, F>(
+        &mut self,
+        capacity: usize,
+        func: F,
+    ) -> JlrsResult<Value<'frame, 'data>>
+    where
+        F: for<'nested, 'inner> FnOnce(
+            Output<'frame>,
+            &'inner mut StaticFrame<'nested, Self::Mode>,
+        ) -> JlrsResult<UnrootedValue<'frame, 'data, 'inner>>,
+    {
         unsafe {
-            let out = self.memory.new_output(self.idx)?;
-            self.len += 1;
-            Ok(out)
+            let pr = {
+                let mut frame = self.nested_frame(capacity);
+                let out = Output::new();
+                func(out, &mut frame)?.done()
+            };
+
+            Value::root(self, pr)
+        }
+    }
+
+    fn call_frame<'data, F>(
+        &mut self,
+        capacity: usize,
+        func: F,
+    ) -> JlrsResult<CallResult<'frame, 'data>>
+    where
+        F: for<'nested, 'inner> FnOnce(
+            Output<'frame>,
+            &'inner mut StaticFrame<'nested, Self::Mode>,
+        )
+            -> JlrsResult<UnrootedCallResult<'frame, 'data, 'inner>>,
+    {
+        unsafe {
+            let pr = {
+                let mut frame = self.nested_frame(capacity);
+                let out = Output::new();
+                func(out, &mut frame)?.done()
+            };
+
+            CallResult::root(self, pr)
         }
     }
 
     fn size(&self) -> usize {
-        self.len
-    }
-
-    fn print_memory(&self) {
-        self.memory.print_memory()
+        self.size()
     }
 }
 
 impl<'frame> Frame<'frame> for NullFrame<'frame> {
-    fn frame<'nested, T, F: FnOnce(&mut StaticFrame<'nested, Sync>) -> JlrsResult<T>>(
-        &'nested mut self,
+    fn frame<T, F: for<'nested> FnOnce(&mut StaticFrame<'nested, Sync>) -> JlrsResult<T>>(
+        &mut self,
         _: usize,
         _: F,
     ) -> JlrsResult<T> {
         Err(JlrsError::NullFrame)?
     }
 
-    fn dynamic_frame<'nested, T, F: FnOnce(&mut DynamicFrame<'nested, Sync>) -> JlrsResult<T>>(
-        &'nested mut self,
+    fn dynamic_frame<
+        T,
+        F: for<'nested> FnOnce(&mut DynamicFrame<'nested, Sync>) -> JlrsResult<T>,
+    >(
+        &mut self,
         _: F,
     ) -> JlrsResult<T> {
         Err(JlrsError::NullFrame)?
     }
 
-    fn output(&mut self) -> JlrsResult<Output<'frame>> {
+    fn value_frame<'data, F>(
+        &mut self,
+        _capacity: usize,
+        _func: F,
+    ) -> JlrsResult<Value<'frame, 'data>>
+    where
+        F: for<'nested, 'inner> FnOnce(
+            Output<'frame>,
+            &'inner mut StaticFrame<'nested, Sync>,
+        ) -> JlrsResult<UnrootedValue<'frame, 'data, 'inner>>,
+    {
+        Err(JlrsError::NullFrame)?
+    }
+
+    fn call_frame<'data, F>(
+        &mut self,
+        _capacity: usize,
+        _func: F,
+    ) -> JlrsResult<CallResult<'frame, 'data>>
+    where
+        F: for<'nested, 'inner> FnOnce(
+            Output<'frame>,
+            &'inner mut StaticFrame<'nested, Sync>,
+        )
+            -> JlrsResult<UnrootedCallResult<'frame, 'data, 'inner>>,
+    {
         Err(JlrsError::NullFrame)?
     }
 
     fn size(&self) -> usize {
         0
     }
-
-    fn print_memory(&self) {}
 }
 
 #[cfg(all(feature = "async", target_os = "linux"))]
-impl<'frame> Frame<'frame> for AsyncFrame<'frame> {
-    fn frame<'nested, T, F: FnOnce(&mut StaticFrame<'nested, Async>) -> JlrsResult<T>>(
-        &'nested mut self,
+impl<'frame> Frame<'frame> for DynamicAsyncFrame<'frame> {
+    fn frame<T, F: for<'nested> FnOnce(&mut StaticFrame<'nested, Self::Mode>) -> JlrsResult<T>>(
+        &mut self,
         capacity: usize,
         func: F,
     ) -> JlrsResult<T> {
         unsafe {
-            let mut view = self.memory.nest_static();
-            let idx = view.new_frame(capacity)?;
-            let mut frame = StaticFrame {
-                idx,
-                capacity,
-                len: 0,
-                memory: view,
-            };
-
+            let mut frame = self.nested_frame(capacity);
             func(&mut frame)
         }
     }
 
-    fn dynamic_frame<'nested, T, F: FnOnce(&mut DynamicFrame<'nested, Async>) -> JlrsResult<T>>(
-        &'nested mut self,
+    fn dynamic_frame<
+        T,
+        F: for<'nested> FnOnce(&mut DynamicFrame<'nested, Self::Mode>) -> JlrsResult<T>,
+    >(
+        &mut self,
         func: F,
     ) -> JlrsResult<T> {
-        let mut frame = unsafe { self.nested_frame().unwrap() };
+        let mut frame = unsafe { self.nested_dynamic_frame() };
         func(&mut frame)
     }
 
-    fn output(&mut self) -> JlrsResult<Output<'frame>> {
+    fn value_frame<'data, F>(
+        &mut self,
+        capacity: usize,
+        func: F,
+    ) -> JlrsResult<Value<'frame, 'data>>
+    where
+        F: for<'nested, 'inner> FnOnce(
+            Output<'frame>,
+            &'inner mut StaticFrame<'nested, Self::Mode>,
+        ) -> JlrsResult<UnrootedValue<'frame, 'data, 'inner>>,
+    {
         unsafe {
-            let out = self.memory.new_output(self.idx)?;
-            self.len += 1;
-            Ok(out)
+            let pr = {
+                let mut frame = self.nested_frame(capacity);
+                let out = Output::new();
+                func(out, &mut frame)?.done()
+            };
+
+            Value::root(self, pr)
+        }
+    }
+
+    fn call_frame<'data, F>(
+        &mut self,
+        capacity: usize,
+        func: F,
+    ) -> JlrsResult<CallResult<'frame, 'data>>
+    where
+        F: for<'nested, 'inner> FnOnce(
+            Output<'frame>,
+            &'inner mut StaticFrame<'nested, Self::Mode>,
+        )
+            -> JlrsResult<UnrootedCallResult<'frame, 'data, 'inner>>,
+    {
+        unsafe {
+            let pr = {
+                let mut frame = self.nested_frame(capacity);
+                let out = Output::new();
+                func(out, &mut frame)?.done()
+            };
+
+            CallResult::root(self, pr)
         }
     }
 
     fn size(&self) -> usize {
-        self.len
-    }
-
-    fn print_memory(&self) {
-        self.memory.print_memory()
+        self.len()
     }
 }
 
 pub(crate) mod private {
-    use super::super::{private::Internal, IntoJulia};
+    use super::super::private::Internal;
     use crate::error::AllocError;
     #[cfg(all(feature = "async", target_os = "linux"))]
-    use crate::frame::AsyncFrame;
-    use crate::frame::{DynamicFrame, FrameIdx, NullFrame, Output, StaticFrame};
+    use crate::frame::DynamicAsyncFrame;
+    use crate::frame::{DynamicFrame, NullFrame, StaticFrame};
     #[cfg(all(feature = "async", target_os = "linux"))]
     use crate::mode::Async;
-    use crate::mode::{Mode, Sync};
-    use crate::value::{Value, Values};
+    use crate::mode::Sync;
+    use crate::traits::mode::Mode;
+    use crate::value::Value;
     use jl_sys::jl_value_t;
 
     pub trait Frame<'frame> {
-        type U: Mode;
+        type Mode: Mode;
         // protect the value from being garbage collected while this frame is active.
         // safety: the value must be a valid Julia value
-        unsafe fn protect(
+        unsafe fn root(
             &mut self,
             value: *mut jl_value_t,
             _: Internal,
         ) -> Result<Value<'frame, 'static>, AllocError>;
 
-        // Create and protect multiple values from being garbage collected while this frame is active.
-        fn create_many<P: IntoJulia>(
-            &mut self,
-            values: &[P],
+        unsafe fn nested_frame<'nested>(
+            &'nested mut self,
+            capacity: usize,
             _: Internal,
-        ) -> Result<Values<'frame>, AllocError>;
+        ) -> StaticFrame<'nested, Self::Mode>;
 
-        // Create and protect multiple values from being garbage collected while this frame is active.
-        fn create_many_dyn(
-            &mut self,
-            values: &[&dyn IntoJulia],
+        unsafe fn nested_dynamic_frame<'nested>(
+            &'nested mut self,
             _: Internal,
-        ) -> Result<Values<'frame>, AllocError>;
-
-        // Protect a value from being garbage collected while the output's frame is active.
-        fn assign_output<'output>(
-            &mut self,
-            output: Output<'output>,
-            value: *mut jl_value_t,
-            _: Internal,
-        ) -> Value<'output, 'static>;
+        ) -> DynamicFrame<'nested, Self::Mode>;
     }
 
     impl<'frame, M: Mode> Frame<'frame> for StaticFrame<'frame, M> {
-        type U = M;
-        unsafe fn protect(
+        type Mode = M;
+        unsafe fn root(
             &mut self,
             value: *mut jl_value_t,
             _: Internal,
         ) -> Result<Value<'frame, 'static>, AllocError> {
-            if self.capacity == self.len {
-                return Err(AllocError::FrameOverflow(1, self.len));
+            if self.capacity() == self.size() {
+                return Err(AllocError::FrameOverflow(1, self.size()));
             }
 
-            let out = {
-                let out = self.memory.protect(self.idx, self.len, value.cast());
-                self.len += 1;
-                out
-            };
+            let idx = self.size() + 2;
+            let encoded_len = self.raw_frame[0] as usize + 2;
+            self.raw_frame[0] = encoded_len as _;
+            self.raw_frame[idx] = value.cast();
 
-            Ok(out)
+            Ok(Value::wrap(value))
         }
 
-        fn create_many<P: IntoJulia>(
-            &mut self,
-            values: &[P],
+        unsafe fn nested_frame<'nested>(
+            &'nested mut self,
+            capacity: usize,
             _: Internal,
-        ) -> Result<Values<'frame>, AllocError> {
-            unsafe {
-                if self.capacity < self.len + values.len() {
-                    return Err(AllocError::FrameOverflow(values.len(), self.capacity()));
-                }
-
-                let offset = self.len;
-                for value in values {
-                    self.memory
-                        .protect(self.idx, self.len, value.into_julia().cast());
-                    self.len += 1;
-                }
-
-                Ok(self.memory.as_values(self.idx, offset, values.len()))
-            }
+        ) -> StaticFrame<'nested, M> {
+            self.nested_frame(capacity)
         }
 
-        fn create_many_dyn(
-            &mut self,
-            values: &[&dyn IntoJulia],
+        unsafe fn nested_dynamic_frame<'nested>(
+            &'nested mut self,
             _: Internal,
-        ) -> Result<Values<'frame>, AllocError> {
-            unsafe {
-                if self.capacity < self.len + values.len() {
-                    return Err(AllocError::FrameOverflow(values.len(), self.capacity()));
-                }
-
-                let offset = self.len;
-                for value in values {
-                    self.memory
-                        .protect(self.idx, self.len, value.into_julia().cast());
-                    self.len += 1;
-                }
-
-                Ok(self.memory.as_values(self.idx, offset, values.len()))
-            }
-        }
-
-        fn assign_output<'output>(
-            &mut self,
-            output: Output<'output>,
-            value: *mut jl_value_t,
-            _: Internal,
-        ) -> Value<'output, 'static> {
-            unsafe {
-                self.memory
-                    .protect(FrameIdx::default(), output.offset, value.cast())
-            }
+        ) -> DynamicFrame<'nested, M> {
+            self.nested_dynamic_frame()
         }
     }
 
     impl<'frame, M: Mode> Frame<'frame> for DynamicFrame<'frame, M> {
-        type U = M;
-        unsafe fn protect(
+        type Mode = M;
+        unsafe fn root(
             &mut self,
             value: *mut jl_value_t,
             _: Internal,
         ) -> Result<Value<'frame, 'static>, AllocError> {
-            let out = self.memory.protect(self.idx, value.cast())?;
-            self.len += 1;
-            Ok(out)
-        }
-
-        fn create_many<P: IntoJulia>(
-            &mut self,
-            values: &[P],
-            _: Internal,
-        ) -> Result<Values<'frame>, AllocError> {
-            unsafe {
-                let offset = self.len;
-                // TODO: check capacity
-
-                for value in values {
-                    match self.memory.protect(self.idx, value.into_julia().cast()) {
-                        Ok(_) => (),
-                        Err(AllocError::StackOverflow(_, n)) => {
-                            return Err(AllocError::StackOverflow(values.len(), n))
-                        }
-                        _ => unreachable!(),
-                    }
-                    self.len += 1;
-                }
-
-                Ok(self.memory.as_values(self.idx, offset, values.len()))
+            if self.size() + 2 == self.raw_frame.len() {
+                return Err(AllocError::FrameOverflow(1, self.size()));
             }
+
+            let idx = self.size() + 2;
+            let encoded_len = self.raw_frame[0] as usize + 2;
+            self.raw_frame[0] = encoded_len as _;
+            self.raw_frame[idx] = value.cast();
+
+            Ok(Value::wrap(value))
         }
 
-        fn create_many_dyn(
-            &mut self,
-            values: &[&dyn IntoJulia],
+        unsafe fn nested_frame<'nested>(
+            &'nested mut self,
+            capacity: usize,
             _: Internal,
-        ) -> Result<Values<'frame>, AllocError> {
-            unsafe {
-                let offset = self.len;
-                // TODO: check capacity in advance
-
-                for value in values {
-                    self.memory.protect(self.idx, value.into_julia().cast())?;
-                    self.len += 1;
-                }
-
-                Ok(self.memory.as_values(self.idx, offset, values.len()))
-            }
+        ) -> StaticFrame<'nested, M> {
+            self.nested_frame(capacity)
         }
 
-        fn assign_output<'output>(
-            &mut self,
-            output: Output<'output>,
-            value: *mut jl_value_t,
+        unsafe fn nested_dynamic_frame<'nested>(
+            &'nested mut self,
             _: Internal,
-        ) -> Value<'output, 'static> {
-            unsafe { self.memory.protect_output(output, value.cast()) }
+        ) -> DynamicFrame<'nested, M> {
+            self.nested_dynamic_frame()
         }
     }
 
     impl<'frame> Frame<'frame> for NullFrame<'frame> {
-        type U = Sync;
-        unsafe fn protect(
+        type Mode = Sync;
+        unsafe fn root(
             &mut self,
             _: *mut jl_value_t,
             _: Internal,
@@ -431,95 +520,56 @@ pub(crate) mod private {
             Err(AllocError::FrameOverflow(1, 0))
         }
 
-        fn create_many<P: IntoJulia>(
-            &mut self,
-            values: &[P],
+        unsafe fn nested_frame<'nested>(
+            &'nested mut self,
+            _capacity: usize,
             _: Internal,
-        ) -> Result<Values<'frame>, AllocError> {
-            Err(AllocError::FrameOverflow(values.len(), 0))
+        ) -> StaticFrame<'nested, Sync> {
+            unreachable!()
         }
 
-        fn create_many_dyn(
-            &mut self,
-            values: &[&dyn IntoJulia],
+        unsafe fn nested_dynamic_frame<'nested>(
+            &'nested mut self,
             _: Internal,
-        ) -> Result<Values<'frame>, AllocError> {
-            Err(AllocError::FrameOverflow(values.len(), 0))
-        }
-
-        fn assign_output<'output>(
-            &mut self,
-            _: Output<'output>,
-            _: *mut jl_value_t,
-            _: Internal,
-        ) -> Value<'output, 'static> {
+        ) -> DynamicFrame<'nested, Sync> {
             unreachable!()
         }
     }
 
     #[cfg(all(feature = "async", target_os = "linux"))]
-    impl<'frame> Frame<'frame> for AsyncFrame<'frame> {
-        type U = Async;
+    impl<'frame> Frame<'frame> for DynamicAsyncFrame<'frame> {
+        type Mode = Async<'frame>;
 
-        unsafe fn protect(
+        unsafe fn root(
             &mut self,
             value: *mut jl_value_t,
             _: Internal,
         ) -> Result<Value<'frame, 'static>, AllocError> {
-            let out = self.memory.protect(self.idx, value.cast())?;
-            self.len += 1;
-            Ok(out)
-        }
-
-        fn create_many<P: IntoJulia>(
-            &mut self,
-            values: &[P],
-            _: Internal,
-        ) -> Result<Values<'frame>, AllocError> {
-            unsafe {
-                let offset = self.len;
-                // TODO: check capacity
-
-                for value in values {
-                    match self.memory.protect(self.idx, value.into_julia().cast()) {
-                        Ok(_) => (),
-                        Err(AllocError::StackOverflow(_, n)) => {
-                            return Err(AllocError::StackOverflow(values.len(), n))
-                        }
-                        _ => unreachable!(),
-                    }
-                    self.len += 1;
-                }
-
-                Ok(self.memory.as_values(self.idx, offset, values.len()))
+            if self.len() + 2 == self.raw_frame.len() {
+                return Err(AllocError::FrameOverflow(1, self.len()));
             }
+
+            let idx = self.len() + 2;
+            let encoded_len = self.raw_frame[0] as usize + 2;
+            self.raw_frame[0] = encoded_len as _;
+            self.raw_frame[idx] = value.cast();
+
+            Ok(Value::wrap(value))
         }
 
-        fn create_many_dyn(
-            &mut self,
-            values: &[&dyn IntoJulia],
+        unsafe fn nested_frame<'nested>(
+            &'nested mut self,
+            capacity: usize,
             _: Internal,
-        ) -> Result<Values<'frame>, AllocError> {
-            unsafe {
-                let offset = self.len;
-                // TODO: check capacity in advance
-
-                for value in values {
-                    self.memory.protect(self.idx, value.into_julia().cast())?;
-                    self.len += 1;
-                }
-
-                Ok(self.memory.as_values(self.idx, offset, values.len()))
-            }
+        ) -> StaticFrame<'nested, Self::Mode> {
+            todo!() // self.nested_frame(capacity)
         }
 
-        fn assign_output<'output>(
-            &mut self,
-            output: Output<'output>,
-            value: *mut jl_value_t,
+        unsafe fn nested_dynamic_frame<'nested>(
+            &'nested mut self,
             _: Internal,
-        ) -> Value<'output, 'static> {
-            unsafe { self.memory.protect_output(output, value.cast()) }
+        ) -> DynamicFrame<'nested, Self::Mode> {
+            todo!() // self.nested_dynamic_frame()
         }
     }
 }

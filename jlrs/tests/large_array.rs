@@ -7,7 +7,7 @@ fn create_large_array() {
         let mut jlrs = j.borrow_mut();
 
         jlrs.frame(1, |_, frame| {
-            let array = Value::new_array::<f32, _, _>(frame, &[1, 1, 1, 1, 1, 1, 1, 1, 1][..]);
+            let array = Value::new_array::<f32, _, _, _>(frame, &[1, 1, 1, 1, 1, 1, 1, 1, 1][..]);
             assert!(array.is_ok());
             Ok(())
         })
@@ -50,7 +50,7 @@ fn create_large_array_requires_slot() {
         let mut jlrs = j.borrow_mut();
 
         jlrs.frame(0, |_, frame| {
-            let array = Value::new_array::<f32, _, _>(frame, &[1, 1, 1, 1, 1, 1, 1, 1, 1][..]);
+            let array = Value::new_array::<f32, _, _, _>(frame, &[1, 1, 1, 1, 1, 1, 1, 1, 1][..]);
             assert!(array.is_err());
             Ok(())
         })

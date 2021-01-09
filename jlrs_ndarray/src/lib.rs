@@ -5,7 +5,7 @@
 //! It's easier to use this trait with `TypedArray`, you'll likely have to provide type
 //! annotations with `Array`.
 
-use jlrs::error::other;
+use jlrs::error::JlrsError;
 use jlrs::prelude::*;
 use ndarray::{ArrayView, ArrayViewMut, Dim, IntoDimension, IxDynImpl, ShapeBuilder};
 
@@ -52,11 +52,11 @@ impl<'frame: 'borrow, 'data: 'borrow, 'borrow, T: ValidLayout + Copy> NdArray<'b
         F: Frame<'fr>,
         T: ValidLayout + Copy,
     {
-        let data = self.inline_data::<T, _>(frame)?;
+        let data = self.inline_data::<T, _>(&*frame)?;
         let shape = data.dimensions().as_slice().into_dimension().f();
         match ArrayView::from_shape(shape, data.into_slice()) {
             Ok(arr) => Ok(arr),
-            Err(e) => other(e)?,
+            Err(e) => Err(JlrsError::other(e))?,
         }
     }
 
@@ -68,12 +68,12 @@ impl<'frame: 'borrow, 'data: 'borrow, 'borrow, T: ValidLayout + Copy> NdArray<'b
         F: Frame<'fr>,
         T: ValidLayout + Copy,
     {
-        let data = self.inline_data_mut::<T, _>(frame)?;
+        let data = self.inline_data_mut::<T, _>(&mut *frame)?;
         let shape = data.dimensions().as_slice().into_dimension().f();
         let raw = data.into_mut_slice();
         match ArrayViewMut::from_shape(shape, raw) {
             Ok(arr) => Ok(arr),
-            Err(e) => other(e)?,
+            Err(e) => Err(JlrsError::other(e))?,
         }
     }
 }
@@ -89,11 +89,11 @@ impl<'frame: 'borrow, 'data: 'borrow, 'borrow, T: ValidLayout + Copy> NdArray<'b
         F: Frame<'fr>,
         T: ValidLayout,
     {
-        let data = self.inline_data(frame)?;
+        let data = self.inline_data(&*frame)?;
         let shape = data.dimensions().as_slice().into_dimension().f();
         match ArrayView::from_shape(shape, data.into_slice()) {
             Ok(arr) => Ok(arr),
-            Err(e) => other(e)?,
+            Err(e) => Err(JlrsError::other(e))?,
         }
     }
 
@@ -105,12 +105,12 @@ impl<'frame: 'borrow, 'data: 'borrow, 'borrow, T: ValidLayout + Copy> NdArray<'b
         F: Frame<'fr>,
         T: ValidLayout,
     {
-        let data = self.inline_data_mut(frame)?;
+        let data = self.inline_data_mut(&mut *frame)?;
         let shape = data.dimensions().as_slice().into_dimension().f();
         let raw = data.into_mut_slice();
         match ArrayViewMut::from_shape(shape, raw) {
             Ok(arr) => Ok(arr),
-            Err(e) => other(e)?,
+            Err(e) => Err(JlrsError::other(e))?,
         }
     }
 }
@@ -124,7 +124,7 @@ mod tests {
     use std::cell::RefCell;
 
     thread_local! {
-        pub static JULIA: RefCell<Julia> = RefCell::new(unsafe { Julia::init(32).unwrap() });
+        pub static JULIA: RefCell<Julia> = RefCell::new(unsafe { Julia::init().unwrap() });
     }
 
     #[test]
@@ -136,12 +136,12 @@ mod tests {
                 .dynamic_frame(|_global, frame| {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
-                    let borrowed = Value::borrow_array(frame, slice, (3, 2))?;
+                    let borrowed = Value::borrow_array(&mut *frame, slice, (3, 2))?;
 
                     let jl_array = borrowed.cast::<Array>()?;
-                    let x = jl_array.inline_data::<usize, _>(frame)?[(1, 0)];
+                    let x = jl_array.inline_data::<usize, _>(&mut *frame)?[(1, 0)];
 
-                    let array: ArrayView<usize, _> = jl_array.array_view(frame)?;
+                    let array: ArrayView<usize, _> = jl_array.array_view(&mut *frame)?;
                     assert_eq!(array[IxDyn(&[1, 0])], x);
 
                     Ok(())
@@ -159,10 +159,10 @@ mod tests {
                 .dynamic_frame(|_global, frame| {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
-                    let borrowed = Value::borrow_array(frame, slice, (3, 2))?;
+                    let borrowed = Value::borrow_array(&mut *frame, slice, (3, 2))?;
 
                     let jl_array = borrowed.cast::<Array>()?;
-                    let view: Result<ArrayView<isize, _>, _> = jl_array.array_view(frame);
+                    let view: Result<ArrayView<isize, _>, _> = jl_array.array_view(&mut *frame);
                     assert!(view.is_err());
                     Ok(())
                 })
@@ -179,19 +179,19 @@ mod tests {
                 .dynamic_frame(|_global, frame| {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
-                    let borrowed = Value::borrow_array(frame, slice, (3, 2))?;
+                    let borrowed = Value::borrow_array(&mut *frame, slice, (3, 2))?;
 
                     let jl_array = borrowed.cast::<Array>()?;
-                    let mut inline = jl_array.inline_data_mut::<usize, _>(frame)?;
+                    let mut inline = jl_array.inline_data_mut::<usize, _>(&mut *frame)?;
                     let x = inline[(1, 0)];
 
                     inline[(1, 0)] = x + 1;
 
-                    let mut array: ArrayViewMut<usize, _> = jl_array.array_view_mut(frame)?;
+                    let mut array: ArrayViewMut<usize, _> = jl_array.array_view_mut(&mut *frame)?;
                     assert_eq!(array[IxDyn(&[1, 0])], x + 1);
                     array[IxDyn(&[1, 0])] -= 1;
 
-                    let inline = jl_array.inline_data_mut::<usize, _>(frame)?;
+                    let inline = jl_array.inline_data_mut::<usize, _>(&mut *frame)?;
                     assert_eq!(inline[(1, 0)], x);
                     Ok(())
                 })
@@ -208,10 +208,11 @@ mod tests {
                 .dynamic_frame(|_global, frame| {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
-                    let borrowed = Value::borrow_array(frame, slice, (3, 2))?;
+                    let borrowed = Value::borrow_array(&mut *frame, slice, (3, 2))?;
 
                     let jl_array = borrowed.cast::<Array>()?;
-                    let view: Result<ArrayViewMut<isize, _>, _> = jl_array.array_view_mut(frame);
+                    let view: Result<ArrayViewMut<isize, _>, _> =
+                        jl_array.array_view_mut(&mut *frame);
                     assert!(view.is_err());
                     Ok(())
                 })
@@ -228,12 +229,12 @@ mod tests {
                 .dynamic_frame(|_global, frame| {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
-                    let borrowed = Value::borrow_array(frame, slice, (3, 2))?;
+                    let borrowed = Value::borrow_array(&mut *frame, slice, (3, 2))?;
 
                     let jl_array = borrowed.cast::<TypedArray<usize>>()?;
-                    let x = jl_array.inline_data(frame)?[(1, 0)];
+                    let x = jl_array.inline_data(&mut *frame)?[(1, 0)];
 
-                    let array: ArrayView<usize, _> = jl_array.array_view(frame)?;
+                    let array: ArrayView<usize, _> = jl_array.array_view(&mut *frame)?;
                     assert_eq!(array[IxDyn(&[1, 0])], x);
 
                     Ok(())
@@ -251,19 +252,19 @@ mod tests {
                 .dynamic_frame(|_global, frame| {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
-                    let borrowed = Value::borrow_array(frame, slice, (3, 2))?;
+                    let borrowed = Value::borrow_array(&mut *frame, slice, (3, 2))?;
 
                     let jl_array = borrowed.cast::<TypedArray<usize>>()?;
-                    let mut inline = jl_array.inline_data_mut(frame)?;
+                    let mut inline = jl_array.inline_data_mut(&mut *frame)?;
                     let x = inline[(1, 0)];
 
                     inline[(1, 0)] = x + 1;
 
-                    let mut array: ArrayViewMut<usize, _> = jl_array.array_view_mut(frame)?;
+                    let mut array: ArrayViewMut<usize, _> = jl_array.array_view_mut(&mut *frame)?;
                     assert_eq!(array[IxDyn(&[1, 0])], x + 1);
                     array[IxDyn(&[1, 0])] -= 1;
 
-                    let inline = jl_array.inline_data_mut(frame)?;
+                    let inline = jl_array.inline_data_mut(&mut *frame)?;
                     assert_eq!(inline[(1, 0)], x);
                     Ok(())
                 })
@@ -280,9 +281,11 @@ mod tests {
                 .dynamic_frame(|_global, frame| {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
-                    let borrowed = Value::borrow_array(frame, slice, (3, 2))?;
+                    let borrowed = Value::borrow_array(&mut *frame, slice, (3, 2))?;
 
-                    let _array = borrowed.cast::<TypedArray<usize>>()?.array_view(frame)?;
+                    let _array = borrowed
+                        .cast::<TypedArray<usize>>()?
+                        .array_view(&mut *frame)?;
 
                     Ok(())
                 })

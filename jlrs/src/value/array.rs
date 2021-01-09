@@ -33,7 +33,7 @@ use std::ops::{Index, IndexMut};
 /// # JULIA.with(|j| {
 /// # let mut julia = j.borrow_mut();
 /// julia.frame(1, |_global, frame| {
-///     let arr = Value::new_array::<f64, _, _>(frame, (3, 3))?;
+///     let arr = Value::new_array::<f64, _, _, _>(&mut *frame, (3, 3))?;
 ///     assert!(arr.is::<Array>());
 ///     assert!(arr.cast::<Array>().is_ok());
 ///     Ok(())

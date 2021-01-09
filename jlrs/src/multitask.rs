@@ -10,16 +10,15 @@
 //!
 //! [`JuliaTask`]: ../traits/multitask/trait.JuliaTask.html
 
-use crate::error::other_err;
 use crate::error::{JlrsError, JlrsResult};
-use crate::frame::AsyncFrame;
+use crate::frame::DynamicAsyncFrame;
 use crate::global::Global;
 use crate::mode::Async;
-use crate::stack::multitask::{MultitaskStack, TaskStack};
-use crate::stack::{Dynamic, StackView};
 use crate::traits::multitask::{JuliaTask, ReturnChannel};
+use crate::traits::Call;
 use crate::value::module::Module;
 use crate::value::Value;
+use crate::{frame::PAGE_SIZE, prelude::StaticFrame};
 use crate::{INIT, JLRS_JL};
 use async_std::channel::{
     bounded, Receiver as AsyncStdReceiver, RecvError, Sender as AsyncStdSender, TrySendError,
@@ -27,14 +26,23 @@ use async_std::channel::{
 use async_std::future::timeout;
 use async_std::sync::{Condvar as AsyncStdCondvar, Mutex as AsyncStdMutex};
 use async_std::task::{self, JoinHandle as AsyncStdHandle};
-use jl_sys::{jl_atexit_hook, jl_gc_safepoint, jl_init_with_image__threading, jl_is_initialized};
-use std::ffi::{c_void, CString};
-use std::io::{Error as IOError, ErrorKind};
+use jl_sys::{
+    jl_atexit_hook, jl_get_ptls_states, jl_init_with_image__threading, jl_is_initialized,
+};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread::{self, JoinHandle as ThreadHandle};
 use std::time::Duration;
+use std::{
+    cell::Cell,
+    io::{Error as IOError, ErrorKind},
+};
+use std::{
+    collections::VecDeque,
+    ffi::{c_void, CString},
+    ptr::null_mut,
+};
 
 /// A handle to the async runtime. It can be used to include files and create new tasks. The
 /// runtime shuts down when the last handle is dropped. The two generic type parameters `T`
@@ -83,14 +91,12 @@ where
     pub unsafe fn init(
         channel_capacity: usize,
         n_threads: usize,
-        stack_size: usize,
         process_events_ms: u64,
     ) -> JlrsResult<(Self, ThreadHandle<JlrsResult<()>>)> {
         let (sender, receiver) = bounded(channel_capacity);
         let julia = AsyncJulia { sender };
-        let handle =
-            thread::spawn(move || run_async(n_threads, stack_size, process_events_ms, receiver));
-        julia.try_set_wake_fn().map_err(other_err)?;
+        let handle = thread::spawn(move || run_async(n_threads, process_events_ms, receiver));
+        julia.try_set_wake_fn().map_err(JlrsError::other)?;
 
         Ok((julia, handle))
     }
@@ -105,14 +111,12 @@ where
     pub async unsafe fn init_async(
         channel_capacity: usize,
         n_threads: usize,
-        stack_size: usize,
         process_events_ms: u64,
     ) -> JlrsResult<(Self, AsyncStdHandle<JlrsResult<()>>)> {
         let (sender, receiver) = bounded(channel_capacity);
         let julia = AsyncJulia { sender };
-        let handle = task::spawn_blocking(move || {
-            run_async(n_threads, stack_size, process_events_ms, receiver)
-        });
+        let handle =
+            task::spawn_blocking(move || run_async(n_threads, process_events_ms, receiver));
         julia.set_wake_fn().await?;
 
         Ok((julia, handle))
@@ -138,7 +142,6 @@ where
     pub unsafe fn init_with_image<P, Q>(
         channel_capacity: usize,
         n_threads: usize,
-        stack_size: usize,
         process_events_ms: u64,
         julia_bindir: P,
         image_path: Q,
@@ -152,14 +155,13 @@ where
         let handle = thread::spawn(move || {
             run_async_with_image(
                 n_threads,
-                stack_size,
                 process_events_ms,
                 receiver,
                 julia_bindir,
                 image_path,
             )
         });
-        julia.try_set_wake_fn().map_err(other_err)?;
+        julia.try_set_wake_fn().map_err(JlrsError::other)?;
 
         Ok((julia, handle))
     }
@@ -184,7 +186,6 @@ where
     pub async unsafe fn init_with_image_async<P, Q>(
         channel_capacity: usize,
         n_threads: usize,
-        stack_size: usize,
         process_events_ms: u64,
         julia_bindir: P,
         image_path: Q,
@@ -198,7 +199,6 @@ where
         let handle = task::spawn_blocking(move || {
             run_async_with_image(
                 n_threads,
-                stack_size,
                 process_events_ms,
                 receiver,
                 julia_bindir,
@@ -211,7 +211,7 @@ where
     }
 
     /// Send a new task to the runtime, this method waits until there's room in the channel.
-    pub async fn new_task<D: JuliaTask<T = T, R = R>>(&self, task: D) {
+    pub async fn task<D: JuliaTask<T = T, R = R>>(&self, task: D) {
         let sender = self.sender.clone();
         self.sender
             .send(Message::Task(Box::new(task), sender))
@@ -221,16 +221,16 @@ where
 
     /// Try to send a new task to the runtime, if there's no room in the channel an error is
     /// returned immediately.
-    pub fn try_new_task<D: JuliaTask<T = T, R = R>>(&self, task: D) -> JlrsResult<()> {
+    pub fn try_task<D: JuliaTask<T = T, R = R>>(&self, task: D) -> JlrsResult<()> {
         let sender = self.sender.clone();
         self.sender
             .try_send(Message::Task(Box::new(task), sender))
             .map_err(|e| match e {
                 TrySendError::Full(Message::Task(t, _)) => {
-                    Box::new(other_err(TrySendError::Full(t)))
+                    Box::new(JlrsError::other(TrySendError::Full(t)))
                 }
                 TrySendError::Closed(Message::Task(t, _)) => {
-                    Box::new(other_err(TrySendError::Closed(t)))
+                    Box::new(JlrsError::other(TrySendError::Closed(t)))
                 }
                 _ => unreachable!(),
             })
@@ -278,10 +278,10 @@ where
             ))
             .map_err(|e| match e {
                 TrySendError::Full(Message::Include(t, _)) => {
-                    Box::new(other_err(TrySendError::Full(t)))
+                    Box::new(JlrsError::other(TrySendError::Full(t)))
                 }
                 TrySendError::Closed(Message::Include(t, _)) => {
-                    Box::new(other_err(TrySendError::Closed(t)))
+                    Box::new(JlrsError::other(TrySendError::Closed(t)))
                 }
                 _ => unreachable!(),
             })
@@ -321,10 +321,10 @@ where
             .try_send(Message::TrySetWakeFn(completed.clone()))
             .map_err(|e| match e {
                 TrySendError::Full(Message::TrySetWakeFn(_)) => {
-                    Box::new(other_err(TrySendError::Full(())))
+                    Box::new(JlrsError::other(TrySendError::Full(())))
                 }
                 TrySendError::Closed(Message::TrySetWakeFn(_)) => {
-                    Box::new(other_err(TrySendError::Closed(())))
+                    Box::new(JlrsError::other(TrySendError::Closed(())))
                 }
                 _ => unreachable!(),
             })
@@ -354,6 +354,412 @@ where
 
             (&mut *completed).as_jlrs_result()
         }
+    }
+}
+
+#[derive(Debug)]
+struct AsyncStack {
+    top: [Cell<*mut c_void>; 2],
+    stack: Box<[*mut c_void]>,
+}
+
+unsafe impl Send for AsyncStack {}
+unsafe impl Sync for AsyncStack {}
+
+impl AsyncStack {
+    unsafe fn new() -> Box<Self> {
+        let raw = vec![null_mut(); PAGE_SIZE];
+        let stack = AsyncStack {
+            top: [Cell::new(null_mut()), Cell::new(null_mut())],
+            stack: raw.into_boxed_slice(),
+        };
+
+        Box::new(stack)
+    }
+}
+
+unsafe fn link_stacks(stacks: &mut [Option<Box<AsyncStack>>]) {
+    for stack in stacks.iter_mut() {
+        let stack = stack.as_mut().unwrap();
+        let rtls = &mut *jl_get_ptls_states();
+        stack.top[1].set(rtls.pgcstack.cast());
+        rtls.pgcstack = stack.top[0..1].as_mut_ptr().cast();
+    }
+}
+
+fn run_async<T, R>(
+    n_threads: usize,
+    process_events_ms: u64,
+    receiver: AsyncStdReceiver<Message<T, R>>,
+) -> JlrsResult<()>
+where
+    T: Send + Sync + 'static,
+    R: ReturnChannel<T = T> + 'static,
+{
+    task::block_on(async {
+        unsafe {
+            if jl_is_initialized() != 0 || INIT.swap(true, Ordering::SeqCst) {
+                return Err(JlrsError::AlreadyInitialized.into());
+            }
+
+            jl_sys::jl_init();
+            let jlrs_jl = CString::new(JLRS_JL).expect("Invalid Jlrs module");
+            jl_sys::jl_eval_string(jlrs_jl.as_ptr());
+
+            let mut free_stacks = VecDeque::with_capacity(n_threads);
+            for i in 1..n_threads {
+                free_stacks.push_back(i);
+            }
+
+            let mut stacks = Vec::with_capacity(n_threads);
+            for _ in 0..n_threads {
+                stacks.push(Some(AsyncStack::new()));
+            }
+            link_stacks(&mut stacks);
+            let mut stacks = stacks.into_boxed_slice();
+
+            let mut running_tasks = Vec::with_capacity(n_threads);
+            for _ in 0..n_threads {
+                running_tasks.push(None);
+            }
+            let mut running_tasks = running_tasks.into_boxed_slice();
+            let mut pending_tasks = VecDeque::new();
+
+            let mut n_running = 0usize;
+
+            loop {
+                match timeout(Duration::from_millis(process_events_ms), receiver.recv()).await {
+                    Err(_) => {
+                        // periodically insert a safepoint so the GC can run when nothing is happening on
+                        // the main thread but tasks are active
+                        if n_running > 0 {
+                            // jl_process_events inserts a safepoint
+                            jl_sys::jl_process_events();
+                        }
+                    }
+                    Ok(Ok(Message::Task(jl_task, sender))) => {
+                        if let Some(idx) = free_stacks.pop_front() {
+                            n_running += 1;
+                            let stack = stacks[idx].take().expect("Async stack corrupted");
+                            let task = run_task(jl_task, idx, stack, sender);
+                            running_tasks[idx] = Some(task);
+                        } else {
+                            pending_tasks.push_back((jl_task, sender));
+                        }
+                    }
+                    Ok(Ok(Message::Complete(idx, stack))) => {
+                        if let Some((jl_task, sender)) = pending_tasks.pop_front() {
+                            let task = run_task(jl_task, idx, stack, sender);
+                            running_tasks[idx] = Some(task);
+                        } else {
+                            stacks[idx] = Some(stack);
+                            n_running -= 1;
+                            free_stacks.push_front(idx);
+                            running_tasks[idx] = None;
+                        }
+                    }
+                    Ok(Ok(Message::Include(path, completed))) => {
+                        let stack = stacks[0].as_mut().expect("Async stack corrupted");
+                        include(stack, path, completed).await
+                    }
+                    Ok(Ok(Message::TryInclude(path, completed))) => {
+                        let stack = stacks[0].as_mut().expect("Async stack corrupted");
+                        try_include(stack, path, completed)
+                    }
+                    Ok(Ok(Message::SetWakeFn(completed))) => {
+                        let stack = stacks[0].as_mut().expect("Async stack corrupted");
+                        set_wake_fn(stack, completed).await
+                    }
+                    Ok(Ok(Message::TrySetWakeFn(completed))) => {
+                        let stack = stacks[0].as_mut().expect("Async stack corrupted");
+                        try_set_wake_fn(stack, completed)
+                    }
+                    Ok(Err(RecvError)) => break,
+                }
+            }
+
+            for running in running_tasks.iter_mut() {
+                if let Some(handle) = running.take() {
+                    handle.await;
+                }
+            }
+
+            jl_atexit_hook(0);
+        }
+
+        Ok(())
+    })
+}
+
+fn run_async_with_image<T, R, P, Q>(
+    n_threads: usize,
+    process_events_ms: u64,
+    receiver: AsyncStdReceiver<Message<T, R>>,
+    julia_bindir: P,
+    image_path: Q,
+) -> JlrsResult<()>
+where
+    T: Send + Sync + 'static,
+    R: ReturnChannel<T = T> + 'static,
+    P: AsRef<Path>,
+    Q: AsRef<Path>,
+{
+    task::block_on(async {
+        unsafe {
+            if jl_is_initialized() != 0 || INIT.swap(true, Ordering::SeqCst) {
+                return Err(JlrsError::AlreadyInitialized.into());
+            }
+
+            let julia_bindir_str = julia_bindir.as_ref().to_string_lossy().to_string();
+            let image_path_str = image_path.as_ref().to_string_lossy().to_string();
+
+            if !julia_bindir.as_ref().exists() {
+                let io_err = IOError::new(ErrorKind::NotFound, julia_bindir_str);
+                return Err(JlrsError::other(io_err))?;
+            }
+
+            if !image_path.as_ref().exists() {
+                let io_err = IOError::new(ErrorKind::NotFound, image_path_str);
+                return Err(JlrsError::other(io_err))?;
+            }
+
+            let bindir = std::ffi::CString::new(julia_bindir_str).unwrap();
+            let im_rel_path = std::ffi::CString::new(image_path_str).unwrap();
+
+            jl_init_with_image__threading(bindir.as_ptr(), im_rel_path.as_ptr());
+
+            let jlrs_jl = CString::new(JLRS_JL).expect("Invalid Jlrs module");
+            jl_sys::jl_eval_string(jlrs_jl.as_ptr());
+
+            let mut free_stacks = VecDeque::with_capacity(n_threads);
+            for i in 1..n_threads {
+                free_stacks.push_back(i);
+            }
+
+            let mut stacks = Vec::with_capacity(n_threads);
+            for _ in 0..n_threads {
+                stacks.push(Some(AsyncStack::new()));
+            }
+            link_stacks(&mut stacks);
+            let mut stacks = stacks.into_boxed_slice();
+
+            let mut running_tasks = Vec::with_capacity(n_threads);
+            for _ in 0..n_threads {
+                running_tasks.push(None);
+            }
+            let mut running_tasks = running_tasks.into_boxed_slice();
+            let mut pending_tasks = VecDeque::new();
+
+            let mut n_running = 0usize;
+
+            loop {
+                match timeout(Duration::from_millis(process_events_ms), receiver.recv()).await {
+                    Err(_) => {
+                        // periodically insert a safepoint so the GC can run when nothing is happening on
+                        // the main thread but tasks are active
+                        if n_running > 0 {
+                            // jl_process_events inserts a safepoint
+                            jl_sys::jl_process_events();
+                        }
+                    }
+                    Ok(Ok(Message::Task(jl_task, sender))) => {
+                        if let Some(idx) = free_stacks.pop_front() {
+                            n_running += 1;
+                            let stack = stacks[idx].take().expect("Async stack corrupted");
+                            let task = run_task(jl_task, idx, stack, sender);
+                            running_tasks[idx] = Some(task);
+                        } else {
+                            pending_tasks.push_back((jl_task, sender));
+                        }
+                    }
+                    Ok(Ok(Message::Complete(idx, stack))) => {
+                        if let Some((jl_task, sender)) = pending_tasks.pop_front() {
+                            let task = run_task(jl_task, idx, stack, sender);
+                            running_tasks[idx] = Some(task);
+                        } else {
+                            stacks[idx] = Some(stack);
+                            n_running -= 1;
+                            free_stacks.push_front(idx);
+                            running_tasks[idx] = None;
+                        }
+                    }
+                    Ok(Ok(Message::Include(path, completed))) => {
+                        let stack = stacks[0].as_mut().expect("Async stack corrupted");
+                        include(stack, path, completed).await
+                    }
+                    Ok(Ok(Message::TryInclude(path, completed))) => {
+                        let stack = stacks[0].as_mut().expect("Async stack corrupted");
+                        try_include(stack, path, completed)
+                    }
+                    Ok(Ok(Message::SetWakeFn(completed))) => {
+                        let stack = stacks[0].as_mut().expect("Async stack corrupted");
+                        set_wake_fn(stack, completed).await
+                    }
+                    Ok(Ok(Message::TrySetWakeFn(completed))) => {
+                        let stack = stacks[0].as_mut().expect("Async stack corrupted");
+                        try_set_wake_fn(stack, completed)
+                    }
+                    Ok(Err(RecvError)) => break,
+                }
+            }
+
+            for running in running_tasks.iter_mut() {
+                if let Some(handle) = running.take() {
+                    handle.await;
+                }
+            }
+
+            jl_atexit_hook(0);
+        }
+
+        Ok(())
+    })
+}
+
+fn run_task<T: Send + Sync + 'static, R>(
+    mut jl_task: Box<dyn JuliaTask<T = T, R = R>>,
+    task_idx: usize,
+    mut stack: Box<AsyncStack>,
+    rt_sender: AsyncStdSender<Message<T, R>>,
+) -> AsyncStdHandle<()>
+where
+    R: ReturnChannel<T = T> + 'static,
+{
+    unsafe {
+        task::spawn_local(async move {
+            let res = {
+                let mode = Async(&stack.top[1]);
+                let raw = &mut stack.stack;
+                let mut frame = DynamicAsyncFrame::new(raw, mode);
+                let global = Global::new();
+                jl_task.run(global, &mut frame).await
+            };
+
+            if let Some(sender) = jl_task.return_channel() {
+                sender.send(res).await;
+            }
+
+            rt_sender
+                .send(Message::Complete(task_idx, stack))
+                .await
+                .expect("Channel was closed");
+        })
+    }
+}
+
+fn call_include(stack: &mut AsyncStack, path: PathBuf) -> JlrsResult<()> {
+    unsafe {
+        let global = Global::new();
+        let mode = Async(&stack.top[1]);
+        let raw = &mut stack.stack;
+        let mut frame = StaticFrame::new(raw, 1, mode);
+
+        match path.to_str() {
+            Some(path) => {
+                let path = Value::new(&mut frame, path)?;
+                Module::main(global)
+                    .function("include")?
+                    .call1(&mut frame, path)?
+                    .map_err(|_e| {
+                        crate::error::exception::<Value>("Include error".into()).unwrap_err()
+                    })?;
+            }
+            None => {}
+        }
+
+        Ok(())
+    }
+}
+
+async fn include(
+    stack: &mut AsyncStack,
+    path: PathBuf,
+    completed: Arc<(AsyncStdMutex<Status>, AsyncStdCondvar)>,
+) {
+    let res = call_include(stack, path);
+    {
+        let (lock, condvar) = &*completed;
+        let mut completed = lock.lock().await;
+        if res.is_ok() {
+            *completed = Status::Ok;
+        } else {
+            *completed = Status::Err(Some(res.unwrap_err()));
+        }
+
+        condvar.notify_one();
+    }
+}
+fn try_include(stack: &mut AsyncStack, path: PathBuf, completed: Arc<(Mutex<Status>, Condvar)>) {
+    let res = call_include(stack, path);
+
+    {
+        let (lock, condvar) = &*completed;
+        let mut completed = lock.lock().expect("Cannot lock");
+        if res.is_ok() {
+            *completed = Status::Ok;
+        } else {
+            *completed = Status::Err(Some(res.unwrap_err()));
+        }
+
+        condvar.notify_one();
+    }
+}
+
+fn call_set_wake_fn(stack: &mut AsyncStack) -> JlrsResult<()> {
+    unsafe {
+        let global = Global::new();
+        let mode = Async(&stack.top[1]);
+        let raw = &mut stack.stack;
+        let mut frame = StaticFrame::new(raw, 2, mode);
+
+        let waker = Value::new(&mut frame, crate::julia_future::wake_task as *mut c_void)?;
+        Module::main(global)
+            .submodule("Jlrs")?
+            .global("wakerust")?
+            .set_nth_field(0, waker)?;
+
+        let dropper = Value::new(&mut frame, crate::droparray as *mut c_void)?;
+        Module::main(global)
+            .submodule("Jlrs")?
+            .global("droparray")?
+            .set_nth_field(0, dropper)?;
+    }
+
+    Ok(())
+}
+
+async fn set_wake_fn(
+    stack: &mut AsyncStack,
+    completed: Arc<(AsyncStdMutex<Status>, AsyncStdCondvar)>,
+) {
+    let res = call_set_wake_fn(stack);
+
+    {
+        let (lock, condvar) = &*completed;
+        let mut completed = lock.lock().await;
+        if res.is_ok() {
+            *completed = Status::Ok;
+        } else {
+            *completed = Status::Err(Some(res.unwrap_err()));
+        }
+
+        condvar.notify_one();
+    }
+}
+
+fn try_set_wake_fn(stack: &mut AsyncStack, completed: Arc<(Mutex<Status>, Condvar)>) {
+    let res = call_set_wake_fn(stack);
+
+    {
+        let (lock, condvar) = &*completed;
+        let mut completed = lock.lock().expect("Cannot lock");
+        if res.is_ok() {
+            *completed = Status::Ok;
+        } else {
+            *completed = Status::Err(Some(res.unwrap_err()));
+        }
+
+        condvar.notify_one();
     }
 }
 
@@ -387,392 +793,7 @@ enum Message<T, R> {
     ),
     Include(PathBuf, Arc<(AsyncStdMutex<Status>, AsyncStdCondvar)>),
     TryInclude(PathBuf, Arc<(Mutex<Status>, Condvar)>),
-    Complete(Wrapper, AsyncStdSender<Message<T, R>>),
+    Complete(usize, Box<AsyncStack>),
     SetWakeFn(Arc<(AsyncStdMutex<Status>, AsyncStdCondvar)>),
     TrySetWakeFn(Arc<(Mutex<Status>, Condvar)>),
-}
-
-struct Wrapper(usize, TaskStack);
-// NB: I'm not sure if this is sound, but the TaskStack is never sent to (or used from) another
-// thread.
-unsafe impl Send for Wrapper {}
-
-fn run_task<T: Send + Sync + 'static, R>(
-    mut jl_task: Box<dyn JuliaTask<T = T, R = R>>,
-    task_idx: usize,
-    mut task_stack: TaskStack,
-    rt_sender: AsyncStdSender<Message<T, R>>,
-) -> AsyncStdHandle<()>
-where
-    R: ReturnChannel<T = T> + 'static,
-{
-    unsafe {
-        task::spawn_local(async move {
-            let mut tv = StackView::<Async, Dynamic>::new(&mut task_stack.raw);
-
-            match tv.new_frame() {
-                Ok(frame_idx) => {
-                    let global = Global::new();
-                    let mut frame = AsyncFrame {
-                        idx: frame_idx,
-                        memory: tv,
-                        len: 0,
-                    };
-                    let res = jl_task.run(global, &mut frame).await;
-
-                    if let Some(sender) = jl_task.return_channel() {
-                        sender.send(res).await;
-                    }
-                }
-                Err(e) => {
-                    if let Some(sender) = jl_task.return_channel() {
-                        sender.send(Err(e)).await;
-                    }
-                }
-            }
-
-            let rt_c = rt_sender.clone();
-            rt_sender
-                .send(Message::Complete(Wrapper(task_idx, task_stack), rt_c))
-                .await
-                .expect("Channel was closed");
-        })
-    }
-}
-
-fn run_async<T, R>(
-    n_threads: usize,
-    stack_size: usize,
-    process_events_ms: u64,
-    receiver: AsyncStdReceiver<Message<T, R>>,
-) -> JlrsResult<()>
-where
-    T: Send + Sync + 'static,
-    R: ReturnChannel<T = T> + 'static,
-{
-    task::block_on(async {
-        let mut mt_stack: MultitaskStack<T, R> = unsafe {
-            if jl_is_initialized() != 0 || INIT.swap(true, Ordering::SeqCst) {
-                return Err(JlrsError::AlreadyInitialized.into());
-            }
-
-            jl_sys::jl_init();
-            let jlrs_jl = CString::new(JLRS_JL).expect("Invalid Jlrs module");
-            jl_sys::jl_eval_string(jlrs_jl.as_ptr());
-
-            MultitaskStack::new(n_threads, stack_size)
-        };
-
-        loop {
-            match timeout(Duration::from_millis(process_events_ms), receiver.recv()).await {
-                Err(_) => unsafe {
-                    // periodically insert a safepoint so the GC can run when nothing is happening on
-                    // the main thread but tasks are active
-                    if mt_stack.n > 0 {
-                        // jl_process_events inserts a safepoint
-                        jl_sys::jl_process_events();
-                    }
-                },
-                Ok(Ok(Message::Task(jl_task, sender))) => {
-                    if let Some((task_idx, task_stack)) = mt_stack.acquire_task_frame() {
-                        mt_stack.n += 1;
-                        mt_stack.running[task_idx] =
-                            Some(run_task(jl_task, task_idx, task_stack, sender));
-                    } else {
-                        mt_stack.add_pending(jl_task);
-                    }
-                }
-                Ok(Ok(Message::Complete(Wrapper(task_idx, task_stack), sender))) => {
-                    if let Some(jl_task) = mt_stack.pop_pending() {
-                        mt_stack.running[task_idx] =
-                            Some(run_task(jl_task, task_idx, task_stack, sender));
-                    } else {
-                        mt_stack.n -= 1;
-                        mt_stack.running[task_idx] = None;
-                        mt_stack.return_task_frame(task_idx, task_stack);
-                    }
-                }
-                Ok(Ok(Message::Include(path, completed))) => {
-                    include(&mut mt_stack.raw, path, completed).await
-                }
-                Ok(Ok(Message::TryInclude(path, completed))) => {
-                    try_include(&mut mt_stack.raw, path, completed)
-                }
-                Ok(Ok(Message::SetWakeFn(completed))) => {
-                    set_wake_fn(&mut mt_stack.raw, completed).await
-                }
-                Ok(Ok(Message::TrySetWakeFn(completed))) => {
-                    try_set_wake_fn(&mut mt_stack.raw, completed)
-                }
-                Ok(Err(RecvError)) => break,
-            }
-        }
-
-        // Wait for tasks to finish
-        for running in mt_stack.running.iter_mut() {
-            if let Some(handle) = running.take() {
-                handle.await;
-            }
-        }
-
-        unsafe {
-            jl_atexit_hook(0);
-        }
-
-        Ok(())
-    })
-}
-
-fn run_async_with_image<T, R, P, Q>(
-    n_threads: usize,
-    stack_size: usize,
-    process_events_ms: u64,
-    receiver: AsyncStdReceiver<Message<T, R>>,
-    julia_bindir: P,
-    image_path: Q,
-) -> JlrsResult<()>
-where
-    T: Send + Sync + 'static,
-    R: ReturnChannel<T = T> + 'static,
-    P: AsRef<Path>,
-    Q: AsRef<Path>,
-{
-    task::block_on(async {
-        let mut mt_stack: MultitaskStack<T, R> = unsafe {
-            if jl_is_initialized() != 0 || INIT.swap(true, Ordering::SeqCst) {
-                return Err(JlrsError::AlreadyInitialized.into());
-            }
-
-            let julia_bindir_str = julia_bindir.as_ref().to_string_lossy().to_string();
-            let image_path_str = image_path.as_ref().to_string_lossy().to_string();
-
-            if !julia_bindir.as_ref().exists() {
-                let io_err = IOError::new(ErrorKind::NotFound, julia_bindir_str);
-                return Err(other_err(io_err))?;
-            }
-
-            if !image_path.as_ref().exists() {
-                let io_err = IOError::new(ErrorKind::NotFound, image_path_str);
-                return Err(other_err(io_err))?;
-            }
-
-            let bindir = std::ffi::CString::new(julia_bindir_str).unwrap();
-            let im_rel_path = std::ffi::CString::new(image_path_str).unwrap();
-
-            jl_init_with_image__threading(bindir.as_ptr(), im_rel_path.as_ptr());
-
-            let jlrs_jl = CString::new(JLRS_JL).expect("Invalid Jlrs module");
-            jl_sys::jl_eval_string(jlrs_jl.as_ptr());
-            MultitaskStack::new(n_threads, stack_size)
-        };
-
-        loop {
-            match timeout(Duration::from_millis(process_events_ms), receiver.recv()).await {
-                Err(_) => unsafe {
-                    // periodically insert a safepoint so the GC can run when nothing is happening on
-                    // the main thread but tasks are active
-                    if mt_stack.n > 0 {
-                        jl_gc_safepoint();
-                    }
-                },
-                Ok(Ok(Message::Task(jl_task, sender))) => {
-                    if let Some((task_idx, task_stack)) = mt_stack.acquire_task_frame() {
-                        mt_stack.n += 1;
-                        mt_stack.running[task_idx] =
-                            Some(run_task(jl_task, task_idx, task_stack, sender));
-                    } else {
-                        mt_stack.add_pending(jl_task);
-                    }
-                }
-                Ok(Ok(Message::Complete(Wrapper(task_idx, task_stack), sender))) => {
-                    if let Some(jl_task) = mt_stack.pop_pending() {
-                        mt_stack.running[task_idx] =
-                            Some(run_task(jl_task, task_idx, task_stack, sender));
-                    } else {
-                        mt_stack.n -= 1;
-                        mt_stack.running[task_idx] = None;
-                        mt_stack.return_task_frame(task_idx, task_stack);
-                    }
-                }
-                Ok(Ok(Message::Include(path, completed))) => {
-                    include(&mut mt_stack.raw, path, completed).await
-                }
-                Ok(Ok(Message::TryInclude(path, completed))) => {
-                    try_include(&mut mt_stack.raw, path, completed)
-                }
-                Ok(Ok(Message::SetWakeFn(completed))) => {
-                    set_wake_fn(&mut mt_stack.raw, completed).await
-                }
-                Ok(Ok(Message::TrySetWakeFn(completed))) => {
-                    try_set_wake_fn(&mut mt_stack.raw, completed)
-                }
-                Ok(Err(RecvError)) => break,
-            }
-        }
-
-        // Wait for tasks to finish
-        for pending in mt_stack.running.iter_mut() {
-            if let Some(handle) = pending.take() {
-                handle.await;
-            }
-        }
-
-        unsafe {
-            jl_atexit_hook(0);
-        }
-
-        Ok(())
-    })
-}
-
-fn call_set_wake_fn(stack: &mut [*mut c_void]) -> JlrsResult<()> {
-    unsafe {
-        let global = Global::new();
-        let mut view = StackView::<Async, Dynamic>::new(stack);
-        let idx = view.new_frame()?;
-
-        let mut frame = AsyncFrame {
-            idx,
-            len: 0,
-            memory: view,
-        };
-
-        let waker = Value::new(&mut frame, crate::julia_future::wake_task as *mut c_void)?;
-        Module::main(global)
-            .submodule("Jlrs")?
-            .global("wakerust")?
-            .set_nth_field(0, waker)?;
-
-        let dropper = Value::new(&mut frame, crate::droparray as *mut c_void)?;
-        Module::main(global)
-            .submodule("Jlrs")?
-            .global("droparray")?
-            .set_nth_field(0, dropper)?;
-    }
-
-    Ok(())
-}
-
-async fn set_wake_fn(
-    stacks: &mut [Option<TaskStack>],
-    completed: Arc<(AsyncStdMutex<Status>, AsyncStdCondvar)>,
-) {
-    let idx = stacks.len() - 1;
-    let mut stack = stacks[idx].take().expect("GC stack is corrupted.");
-
-    let set_wake_result = call_set_wake_fn(&mut stack.raw);
-
-    stacks[idx] = Some(stack);
-
-    {
-        let (lock, condvar) = &*completed;
-        let mut completed = lock.lock().await;
-        if set_wake_result.is_ok() {
-            *completed = Status::Ok;
-        } else {
-            *completed = Status::Err(Some(set_wake_result.unwrap_err()));
-        }
-        condvar.notify_one();
-    }
-}
-
-fn try_set_wake_fn(stacks: &mut [Option<TaskStack>], completed: Arc<(Mutex<Status>, Condvar)>) {
-    let idx = stacks.len() - 1;
-    let mut stack = stacks[idx].take().expect("GC stack is corrupted.");
-
-    let set_wake_result = call_set_wake_fn(&mut stack.raw);
-
-    stacks[idx] = Some(stack);
-
-    {
-        let (lock, condvar) = &*completed;
-        let mut completed = lock.lock().expect("Cannot lock");
-        if set_wake_result.is_ok() {
-            *completed = Status::Ok;
-        } else {
-            *completed = Status::Err(Some(set_wake_result.unwrap_err()));
-        }
-        condvar.notify_one();
-    }
-}
-
-fn call_include(stack: &mut [*mut c_void], path: PathBuf) -> JlrsResult<()> {
-    unsafe {
-        let global = Global::new();
-        let mut view = StackView::<Async, Dynamic>::new(stack);
-        let idx = view.new_frame()?;
-
-        let mut frame = AsyncFrame {
-            idx,
-            len: 0,
-            memory: view,
-        };
-
-        match path.to_str() {
-            Some(path) => {
-                let path = Value::new(&mut frame, path)?;
-                Module::main(global)
-                    .function("include")?
-                    .call1(&mut frame, path)?
-                    .map_err(|_e| {
-                        crate::error::exception::<Value>("Include error".into()).unwrap_err()
-                    })?;
-            }
-            None => {}
-        }
-
-        Ok(())
-    }
-}
-
-async fn include(
-    stacks: &mut [Option<TaskStack>],
-    path: PathBuf,
-    completed: Arc<(AsyncStdMutex<Status>, AsyncStdCondvar)>,
-) {
-    let idx = stacks.len() - 1;
-    let include_result = {
-        let mut stack = stacks[idx].take().expect("GC stack is corrupted.");
-        let res = call_include(&mut stack.raw, path);
-        stacks[idx] = Some(stack);
-        res
-    };
-
-    {
-        let (lock, condvar) = &*completed;
-        let mut completed = lock.lock().await;
-        if include_result.is_ok() {
-            *completed = Status::Ok;
-        } else {
-            *completed = Status::Err(Some(include_result.unwrap_err()));
-        }
-
-        condvar.notify_one();
-    }
-}
-
-fn try_include(
-    stacks: &mut [Option<TaskStack>],
-    path: PathBuf,
-    completed: Arc<(Mutex<Status>, Condvar)>,
-) {
-    let idx = stacks.len() - 1;
-    let include_result = {
-        let mut stack = stacks[idx].take().expect("GC stack is corrupted.");
-        let res = call_include(&mut stack.raw, path);
-        stacks[idx] = Some(stack);
-        res
-    };
-
-    {
-        let (lock, condvar) = &*completed;
-        let mut completed = lock.lock().expect("Cannot lock");
-        if include_result.is_ok() {
-            *completed = Status::Ok;
-        } else {
-            *completed = Status::Err(Some(include_result.unwrap_err()));
-        }
-
-        condvar.notify_one();
-    }
 }

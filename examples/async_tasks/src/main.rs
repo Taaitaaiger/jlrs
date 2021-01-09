@@ -25,16 +25,16 @@ impl JuliaTask for MyTask {
 
     // This is the async variation of the closure you give to `Julia::frame` or
     // `Julia::dynamic_frame` when you use the synchronous runtime. The `Global` can be used to
-    // access `Module`s and other static data, while the `AsyncFrame` let you create values, call
+    // access `Module`s and other static data, while the `DynamicAsyncFrame` let you create values, call
     // functions, and create nested frames.
     async fn run<'base>(
         &mut self,
         global: Global<'base>,
-        frame: &mut AsyncFrame<'base>,
+        frame: &mut DynamicAsyncFrame<'base>,
     ) -> JlrsResult<Self::T> {
         // Convert the two arguments to values Julia can work with.
-        let dims = Value::new(frame, self.dims)?;
-        let iters = Value::new(frame, self.iters)?;
+        let dims = Value::new(&mut *frame, self.dims)?;
+        let iters = Value::new(&mut *frame, self.iters)?;
 
         // Get `complexfunc` in `MyModule`, call it asynchronously with `call_async`, and await
         // the result before casting it to an `f64` (which that function returns). A function that
@@ -42,7 +42,7 @@ impl JuliaTask for MyTask {
         let v = Module::main(global)
             .submodule("MyModule")?
             .function("complexfunc")?
-            .call_async(frame, &mut [dims, iters])
+            .call_async(&mut *frame, &mut [dims, iters])
             .await?
             .unwrap()
             .cast::<f64>()?;
@@ -60,12 +60,8 @@ impl JuliaTask for MyTask {
 
 fn main() {
     // Initialize the asynchronous runtime. We'll allow a backlog of sixteen pending messages in 
-    // the channel that the runtime consumes, two tasks to run simultaneously, give each task a 
-    // stack with sixteen slots to protect data from garbage collection and insert a process events
+    // the channel that the runtime consumes, two tasks to run simultaneously, and process events
     // every millisecond.
-    //
-    // Okay, that's a lot to unpack. Let's look at those arguments a bit more closely to see why 
-    // we need them.
     //
     // The runtime runs in a separate thread. In order to send it tasks and other commands, a 
     // channel is needed. The runtime will receive these messages, but a backlog can build up if a
@@ -77,11 +73,6 @@ fn main() {
     // threads can be used to offload function calls to, and must be lower than the number of 
     // threads Julia has available to it.
     //
-    // In order to protect the data we get from Julia from being freed by the garbage collector a 
-    // stack is maintained. If the stack is too small, jlrs will eventually return an error to
-    // indicate it has run out of stack space; if it is too large, you will waste memory. You can
-    // find the stack space costs of different operations in the documentation of jlrs.
-    //
     // When one or more functions are running in other threads but the runtime has no synchronous
     // work to do, the garbage collector can't run. Similarly, asynchronous events (such as
     // rescheduling a task that has yielded after calling `sleep` or `println`) will not be 
@@ -91,7 +82,7 @@ fn main() {
     // After calling this function we have a `task_sender` we can use to send tasks and requests
     // to include a file to the runtime, and a handle to the thread where the runtime is running.
     let (julia, handle) = unsafe { 
-        AsyncJulia::init(16, 2, 16, 1)
+        AsyncJulia::init(16, 2, 1)
             .expect("Could not init Julia") 
     };
 
@@ -104,13 +95,13 @@ fn main() {
     let (sender2, receiver2) = crossbeam_channel::bounded(1);
 
     // Send two tasks to the runtime.
-    julia.try_new_task(MyTask {
+    julia.try_task(MyTask {
         dims: 4,
         iters: 5_000_000,
         sender: sender1,
     }).unwrap();
 
-    julia.try_new_task(MyTask {
+    julia.try_task(MyTask {
         dims: 6,
         iters: 5_000_000,
         sender: sender2,

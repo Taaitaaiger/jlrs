@@ -8,7 +8,7 @@ fn array_1d() {
 
         let unboxed = jlrs
             .frame(1, |_, frame| {
-                let new_array = Value::new_array::<f32, _, _>(frame, 3)?;
+                let new_array = Value::new_array::<f32, _, _, _>(&mut *frame, 3)?;
                 new_array.cast::<Array>()?.copy_inline_data::<f32>()
             })
             .unwrap();
@@ -27,9 +27,11 @@ fn array_1d_output() {
 
         let unboxed = jlrs
             .frame(1, |_, frame| {
-                let output = frame.output()?;
-                let new_array = Value::new_array_output::<f32, _, _>(frame, output, 3)?;
-                new_array.cast::<Array>()?.copy_inline_data::<f32>()
+                let array = frame.value_frame(0, |output, frame| {
+                    let output = output.into_scope(frame);
+                    Value::new_array::<f32, _, _, _>(output, 3)
+                })?;
+                array.cast::<Array>()?.copy_inline_data::<f32>()
             })
             .unwrap();
 
@@ -48,7 +50,7 @@ fn array_1d_nested() {
         let unboxed = jlrs
             .frame(0, |_, frame| {
                 frame.frame(1, |frame| {
-                    let new_array = Value::new_array::<f64, _, _>(frame, 3)?;
+                    let new_array = Value::new_array::<f64, _, _, _>(&mut *frame, 3)?;
                     new_array.cast::<Array>()?.copy_inline_data::<f64>()
                 })
             })
@@ -69,7 +71,7 @@ fn array_1d_nested_dynamic() {
         let unboxed = jlrs
             .frame(0, |_, frame| {
                 frame.dynamic_frame(|frame| {
-                    let new_array = Value::new_array::<i8, _, _>(frame, 3)?;
+                    let new_array = Value::new_array::<i8, _, _, _>(&mut *frame, 3)?;
                     new_array.cast::<Array>()?.copy_inline_data::<i8>()
                 })
             })
@@ -89,7 +91,7 @@ fn array_1d_dynamic() {
 
         let unboxed = jlrs
             .dynamic_frame(|_, frame| {
-                let new_array = Value::new_array::<i16, _, _>(frame, 3)?;
+                let new_array = Value::new_array::<i16, _, _, _>(&mut *frame, 3)?;
                 new_array.cast::<Array>()?.copy_inline_data::<i16>()
             })
             .unwrap();
@@ -109,7 +111,7 @@ fn array_1d_dynamic_nested() {
         let unboxed = jlrs
             .dynamic_frame(|_, frame| {
                 frame.frame(1, |frame| {
-                    let new_array = Value::new_array::<i32, _, _>(frame, 3)?;
+                    let new_array = Value::new_array::<i32, _, _, _>(&mut *frame, 3)?;
                     new_array.cast::<Array>()?.copy_inline_data::<i32>()
                 })
             })
@@ -130,7 +132,7 @@ fn array_1d_dynamic_nested_dynamic() {
         let unboxed = jlrs
             .dynamic_frame(|_, frame| {
                 frame.dynamic_frame(|frame| {
-                    let new_array = Value::new_array::<i64, _, _>(frame, 3)?;
+                    let new_array = Value::new_array::<i64, _, _, _>(&mut *frame, 3)?;
                     new_array.cast::<Array>()?.copy_inline_data::<i64>()
                 })
             })
@@ -150,7 +152,7 @@ fn array_2d() {
 
         let unboxed = jlrs
             .frame(1, |_, frame| {
-                let new_array = Value::new_array::<u8, _, _>(frame, (3, 4))?;
+                let new_array = Value::new_array::<u8, _, _, _>(&mut *frame, (3, 4))?;
                 new_array.cast::<Array>()?.copy_inline_data::<u8>()
             })
             .unwrap();
@@ -171,7 +173,7 @@ fn array_2d_nested() {
         let unboxed = jlrs
             .frame(0, |_, frame| {
                 frame.frame(1, |frame| {
-                    let new_array = Value::new_array::<u16, _, _>(frame, (3, 4))?;
+                    let new_array = Value::new_array::<u16, _, _, _>(&mut *frame, (3, 4))?;
                     new_array.cast::<Array>()?.copy_inline_data::<u16>()
                 })
             })
@@ -193,7 +195,7 @@ fn array_2d_nested_dynamic() {
         let unboxed = jlrs
             .frame(0, |_, frame| {
                 frame.dynamic_frame(|frame| {
-                    let new_array = Value::new_array::<u32, _, _>(frame, (3, 4))?;
+                    let new_array = Value::new_array::<u32, _, _, _>(&mut *frame, (3, 4))?;
                     new_array.cast::<Array>()?.copy_inline_data::<u32>()
                 })
             })
@@ -214,7 +216,7 @@ fn array_2d_dynamic() {
 
         let unboxed = jlrs
             .dynamic_frame(|_, frame| {
-                let new_array = Value::new_array::<u64, _, _>(frame, (3, 4))?;
+                let new_array = Value::new_array::<u64, _, _, _>(&mut *frame, (3, 4))?;
                 new_array.cast::<Array>()?.copy_inline_data::<u64>()
             })
             .unwrap();
@@ -235,7 +237,7 @@ fn array_2d_dynamic_nested() {
         let unboxed = jlrs
             .dynamic_frame(|_, frame| {
                 frame.frame(1, |frame| {
-                    let new_array = Value::new_array::<usize, _, _>(frame, (3, 4))?;
+                    let new_array = Value::new_array::<usize, _, _, _>(&mut *frame, (3, 4))?;
                     new_array.cast::<Array>()?.copy_inline_data::<usize>()
                 })
             })
@@ -257,7 +259,7 @@ fn array_2d_dynamic_nested_dynamic() {
         let unboxed = jlrs
             .dynamic_frame(|_, frame| {
                 frame.dynamic_frame(|frame| {
-                    let new_array = Value::new_array::<isize, _, _>(frame, (3, 4))?;
+                    let new_array = Value::new_array::<isize, _, _, _>(&mut *frame, (3, 4))?;
                     new_array.cast::<Array>()?.copy_inline_data::<isize>()
                 })
             })
@@ -278,7 +280,7 @@ fn array_3d() {
 
         let unboxed = jlrs
             .frame(1, |_, frame| {
-                let new_array = Value::new_array::<u8, _, _>(frame, (3, 4, 5))?;
+                let new_array = Value::new_array::<u8, _, _, _>(&mut *frame, (3, 4, 5))?;
                 new_array.cast::<Array>()?.copy_inline_data::<u8>()
             })
             .unwrap();
@@ -300,7 +302,7 @@ fn array_3d_nested() {
         let unboxed = jlrs
             .frame(0, |_, frame| {
                 frame.frame(1, |frame| {
-                    let new_array = Value::new_array::<u16, _, _>(frame, (3, 4, 5))?;
+                    let new_array = Value::new_array::<u16, _, _, _>(&mut *frame, (3, 4, 5))?;
                     new_array.cast::<Array>()?.copy_inline_data::<u16>()
                 })
             })
@@ -323,7 +325,7 @@ fn array_3d_nested_dynamic() {
         let unboxed = jlrs
             .frame(0, |_, frame| {
                 frame.dynamic_frame(|frame| {
-                    let new_array = Value::new_array::<u32, _, _>(frame, (3, 4, 5))?;
+                    let new_array = Value::new_array::<u32, _, _, _>(&mut *frame, (3, 4, 5))?;
                     new_array.cast::<Array>()?.copy_inline_data::<u32>()
                 })
             })
@@ -345,7 +347,7 @@ fn array_3d_dynamic() {
 
         let unboxed = jlrs
             .dynamic_frame(|_, frame| {
-                let new_array = Value::new_array::<u64, _, _>(frame, (3, 4, 5))?;
+                let new_array = Value::new_array::<u64, _, _, _>(&mut *frame, (3, 4, 5))?;
                 new_array.cast::<Array>()?.copy_inline_data::<u64>()
             })
             .unwrap();
@@ -367,7 +369,7 @@ fn array_3d_dynamic_nested() {
         let unboxed = jlrs
             .dynamic_frame(|_, frame| {
                 frame.frame(1, |frame| {
-                    let new_array = Value::new_array::<usize, _, _>(frame, (3, 4, 5))?;
+                    let new_array = Value::new_array::<usize, _, _, _>(&mut *frame, (3, 4, 5))?;
                     new_array.cast::<Array>()?.copy_inline_data::<usize>()
                 })
             })
@@ -390,7 +392,7 @@ fn array_3d_dynamic_nested_dynamic() {
         let unboxed = jlrs
             .dynamic_frame(|_, frame| {
                 frame.dynamic_frame(|frame| {
-                    let new_array = Value::new_array::<isize, _, _>(frame, (3, 4, 5))?;
+                    let new_array = Value::new_array::<isize, _, _, _>(&mut *frame, (3, 4, 5))?;
                     new_array.cast::<Array>()?.copy_inline_data::<isize>()
                 })
             })
@@ -412,7 +414,7 @@ fn array_4d() {
 
         let unboxed = jlrs
             .frame(1, |_, frame| {
-                let new_array = Value::new_array::<u8, _, _>(frame, (3, 4, 5, 6))?;
+                let new_array = Value::new_array::<u8, _, _, _>(&mut *frame, (3, 4, 5, 6))?;
                 new_array.cast::<Array>()?.copy_inline_data::<u8>()
             })
             .unwrap();
@@ -435,7 +437,7 @@ fn array_4d_nested() {
         let unboxed = jlrs
             .frame(0, |_, frame| {
                 frame.frame(1, |frame| {
-                    let new_array = Value::new_array::<u16, _, _>(frame, (3, 4, 5, 6))?;
+                    let new_array = Value::new_array::<u16, _, _, _>(&mut *frame, (3, 4, 5, 6))?;
                     new_array.cast::<Array>()?.copy_inline_data::<u16>()
                 })
             })
@@ -459,7 +461,7 @@ fn array_4d_nested_dynamic() {
         let unboxed = jlrs
             .frame(0, |_, frame| {
                 frame.dynamic_frame(|frame| {
-                    let new_array = Value::new_array::<u32, _, _>(frame, (3, 4, 5, 6))?;
+                    let new_array = Value::new_array::<u32, _, _, _>(&mut *frame, (3, 4, 5, 6))?;
                     new_array.cast::<Array>()?.copy_inline_data::<u32>()
                 })
             })
@@ -482,7 +484,7 @@ fn array_4d_dynamic() {
 
         let unboxed = jlrs
             .dynamic_frame(|_, frame| {
-                let new_array = Value::new_array::<u64, _, _>(frame, (3, 4, 5, 6))?;
+                let new_array = Value::new_array::<u64, _, _, _>(&mut *frame, (3, 4, 5, 6))?;
                 new_array.cast::<Array>()?.copy_inline_data::<u64>()
             })
             .unwrap();
@@ -505,7 +507,7 @@ fn array_4d_dynamic_nested() {
         let unboxed = jlrs
             .dynamic_frame(|_, frame| {
                 frame.frame(1, |frame| {
-                    let new_array = Value::new_array::<usize, _, _>(frame, (3, 4, 5, 6))?;
+                    let new_array = Value::new_array::<usize, _, _, _>(&mut *frame, (3, 4, 5, 6))?;
                     new_array.cast::<Array>()?.copy_inline_data::<usize>()
                 })
             })
@@ -529,7 +531,7 @@ fn array_4d_dynamic_nested_dynamic() {
         let unboxed = jlrs
             .dynamic_frame(|_, frame| {
                 frame.dynamic_frame(|frame| {
-                    let new_array = Value::new_array::<isize, _, _>(frame, (3, 4, 5, 6))?;
+                    let new_array = Value::new_array::<isize, _, _, _>(&mut *frame, (3, 4, 5, 6))?;
                     new_array.cast::<Array>()?.copy_inline_data::<isize>()
                 })
             })
@@ -553,7 +555,7 @@ fn array_of_bools() {
         let unboxed = jlrs
             .dynamic_frame(|_, frame| {
                 frame.dynamic_frame(|frame| {
-                    let new_array = Value::new_array::<bool, _, _>(frame, (3, 4, 5, 6))?;
+                    let new_array = Value::new_array::<bool, _, _, _>(&mut *frame, (3, 4, 5, 6))?;
                     new_array.cast::<Array>()?.copy_inline_data::<bool>()
                 })
             })
@@ -577,7 +579,7 @@ fn array_of_chars() {
         let unboxed = jlrs
             .dynamic_frame(|_, frame| {
                 frame.dynamic_frame(|frame| {
-                    let new_array = Value::new_array::<char, _, _>(frame, (3, 4, 5, 6))?;
+                    let new_array = Value::new_array::<char, _, _, _>(&mut *frame, (3, 4, 5, 6))?;
                     new_array.cast::<Array>()?.copy_inline_data::<char>()
                 })
             })

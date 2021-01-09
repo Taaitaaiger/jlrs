@@ -109,17 +109,17 @@
 //! ```no_run
 //! # use jlrs::prelude::*;
 //! # fn main() {
-//! let mut julia = unsafe { Julia::init(16).unwrap() };
+//! let mut julia = unsafe { Julia::init().unwrap() };
 //! julia.dynamic_frame(|global, frame| {
 //!     // Create the two arguments
-//!     let i = Value::new(frame, 2u64)?;
-//!     let j = Value::new(frame, 1u32)?;
+//!     let i = Value::new(&mut *frame, 2u64)?;
+//!     let j = Value::new(&mut *frame, 1u32)?;
 //!
 //!     // We can find the addition-function in the base module
 //!     let func = Module::base(global).function("+")?;
 //!
 //!     // Call the function and unbox the result
-//!     let output = func.call2(frame, i, j)?.unwrap();
+//!     let output = func.call2(&mut *frame, i, j)?.unwrap();
 //!     output.cast::<u64>()
 //! }).unwrap();
 //! # }
@@ -130,18 +130,18 @@
 //! ```no_run
 //! # use jlrs::prelude::*;
 //! # fn main() {
-//! let mut julia = unsafe { Julia::init(16).unwrap() };
+//! let mut julia = unsafe { Julia::init().unwrap() };
 //! // Three slots; two for the inputs and one for the output.
 //! julia.frame(3, |global, frame| {
 //!     // Create the two arguments, each value requires one slot
-//!     let i = Value::new(frame, 2u64)?;
-//!     let j = Value::new(frame, 1u32)?;
+//!     let i = Value::new(&mut *frame, 2u64)?;
+//!     let j = Value::new(&mut *frame, 1u32)?;
 //!
 //!     // We can find the addition-function in the base module
 //!     let func = Module::base(global).function("+")?;
 //!
 //!     // Call the function and unbox the result.  
-//!     let output = func.call2(frame, i, j)?.unwrap();
+//!     let output = func.call2(&mut *frame, i, j)?.unwrap();
 //!     output.cast::<u64>()
 //! }).unwrap();
 //! # }
@@ -181,16 +181,16 @@
 //! }
 //!
 //! # fn main() {
-//! let mut julia = unsafe { Julia::init(16).unwrap() };
+//! let mut julia = unsafe { Julia::init().unwrap() };
 //! julia.frame(2, |global, frame| {
 //!     // Cast the function to a void pointer
-//!     let call_me_val = Value::new(frame, call_me as *mut std::ffi::c_void)?;
+//!     let call_me_val = Value::new(&mut *frame, call_me as *mut std::ffi::c_void)?;
 //!
 //!     // `myfunc` will call the function pointer, it's defined in the next block of code
 //!     let func = Module::main(global).function("myfunc")?;
 //!
 //!     // Call the function and unbox the result.  
-//!     let output = func.call1(frame, call_me_val)?
+//!     let output = func.call1(&mut *frame, call_me_val)?
 //!         .unwrap()
 //!         .cast::<isize>()?;
 //!
@@ -275,8 +275,8 @@
 //!
 //! In order to call Julia with the async runtime you must implement the [`JuliaTask`] trait. The
 //! `run`-method of this trait is similar to the closures that are used in the examples
-//! above for the sync runtime; it provides you with a [`Global`] and an [`AsyncFrame`] which
-//! implements the [`Frame`] trait. The [`AsyncFrame`] is required to use [`Value::call_async`]
+//! above for the sync runtime; it provides you with a [`Global`] and an [`DynamicAsyncFrame`] which
+//! implements the [`Frame`] trait. The [`DynamicAsyncFrame`] is required to use [`Value::call_async`]
 //! which calls a function on a new thread using `Base.Threads.@spawn` and returns a `Future`.
 //! While you await the result the runtime can handle another task. If you don't use
 //! [`Value::call_async`] tasks are handled sequentially.
@@ -338,7 +338,7 @@
 //! [`Julia::dynamic_frame`]: struct.Julia.html#method.dynamic_frame
 //! [`Global`]: global/struct.Global.html
 //! [`Output`]: frame/struct.Output.html
-//! [`AsyncFrame`]: frame/struct.AsyncFrame.html
+//! [`DynamicAsyncFrame`]: frame/struct.DynamicAsyncFrame.html
 //! [`StaticFrame`]: frame/struct.StaticFrame.html
 //! [`DynamicFrame`]: frame/struct.DynamicFrame.html
 //! [`Frame`]: traits/trait.Frame.html
@@ -372,24 +372,23 @@ pub mod mode;
 #[cfg(all(feature = "async", target_os = "linux"))]
 pub mod multitask;
 pub mod prelude;
-mod stack;
 pub mod traits;
 #[doc(hidden)]
 pub mod util;
 pub mod value;
 
 use error::{JlrsError, JlrsResult};
-use frame::{DynamicFrame, NullFrame, StaticFrame};
+use frame::{DynamicFrame, NullFrame, StaticFrame, PAGE_SIZE};
 use global::Global;
 use jl_sys::{jl_atexit_hook, jl_init, jl_init_with_image__threading, jl_is_initialized};
 use mode::Sync;
-use stack::{Dynamic, RawStack, StackView, Static};
 use std::ffi::{c_void, CString};
 use std::io::{Error as IOError, ErrorKind};
 use std::mem::MaybeUninit;
 use std::path::Path;
 use std::ptr::null_mut;
 use std::sync::atomic::{AtomicBool, Ordering};
+use traits::Call;
 use value::array::Array;
 use value::module::Module;
 use value::Value;
@@ -397,6 +396,25 @@ use value::Value;
 pub(crate) static INIT: AtomicBool = AtomicBool::new(false);
 
 pub(crate) static JLRS_JL: &'static str = include_str!("jlrs.jl");
+
+struct Stack {
+    raw: Box<[*mut c_void]>,
+}
+
+impl Stack {
+    pub(crate) fn new() -> Self {
+        let raw = vec![null_mut(); PAGE_SIZE];
+        Stack {
+            raw: raw.into_boxed_slice(),
+        }
+    }
+}
+
+impl AsMut<[*mut c_void]> for Stack {
+    fn as_mut(&mut self) -> &mut [*mut c_void] {
+        self.raw.as_mut()
+    }
+}
 
 /// This struct can be created only once during the lifetime of your program. You must create it
 /// with [`Julia::init`] or [`Julia::init_with_image`] before you can do anything related to
@@ -406,7 +424,7 @@ pub(crate) static JLRS_JL: &'static str = include_str!("jlrs.jl");
 /// [`Julia::init`]: struct.Julia.html#method.init
 /// [`Julia::init_with_image`]: struct.Julia.html#method.init_with_image
 pub struct Julia {
-    stack: RawStack,
+    stack: Stack,
 }
 
 impl Julia {
@@ -426,14 +444,14 @@ impl Julia {
     ///
     /// [`StaticFrame`]: frame/struct.StaticFrame.html
     /// [`DynamicFrame`]: frame/struct.DynamicFrame.html
-    pub unsafe fn init(stack_size: usize) -> JlrsResult<Self> {
+    pub unsafe fn init() -> JlrsResult<Self> {
         if jl_is_initialized() != 0 || INIT.swap(true, Ordering::SeqCst) {
             return Err(JlrsError::AlreadyInitialized.into());
         }
 
         jl_init();
         let mut jl = Julia {
-            stack: RawStack::new(stack_size),
+            stack: Stack::new(),
         };
 
         jl.frame(2, |global, frame| {
@@ -468,7 +486,6 @@ impl Julia {
     /// [`Julia::init`]: struct.Julia.html#init
     /// [`PackageCompiler`]: https://julialang.github.io/PackageCompiler.jl/dev/
     pub unsafe fn init_with_image<P: AsRef<Path>>(
-        stack_size: usize,
         julia_bindir: P,
         image_path: P,
     ) -> JlrsResult<Self> {
@@ -495,7 +512,7 @@ impl Julia {
         jl_init_with_image__threading(bindir.as_ptr(), im_rel_path.as_ptr());
 
         let mut jl = Julia {
-            stack: RawStack::new(stack_size),
+            stack: Stack::new(),
         };
 
         jl.frame(2, |global, frame| {
@@ -514,16 +531,6 @@ impl Julia {
         Ok(jl)
     }
 
-    /// Change the stack size to `stack_size`.
-    pub fn set_stack_size(&mut self, stack_size: usize) {
-        unsafe { self.stack = RawStack::new(stack_size) }
-    }
-
-    /// Returns the current stack size.
-    pub fn stack_size(&self) -> usize {
-        self.stack.size()
-    }
-
     /// Calls `include` in the `Main` module in Julia, which executes the file's contents in that
     /// module. This has the same effect as calling `include` in the Julia REPL.
     ///
@@ -532,14 +539,14 @@ impl Julia {
     /// ```no_run
     /// # use jlrs::prelude::*;
     /// # fn main() {
-    /// # let mut julia = unsafe { Julia::init(16).unwrap() };
+    /// # let mut julia = unsafe { Julia::init().unwrap() };
     /// julia.include("MyJuliaCode.jl").unwrap();
     /// # }
     /// ```
     pub fn include<P: AsRef<Path>>(&mut self, path: P) -> JlrsResult<()> {
         if path.as_ref().exists() {
             return self.frame(3, |global, frame| {
-                let path_jl_str = Value::new(frame, path.as_ref().to_string_lossy())?;
+                let path_jl_str = Value::new(&mut *frame, path.as_ref().to_string_lossy())?;
                 let include_func = Module::main(global).function("include")?;
                 let res = include_func.call1(frame, path_jl_str)?;
 
@@ -593,11 +600,8 @@ impl Julia {
         F: FnOnce(Global<'base>, &mut StaticFrame<'base, Sync>) -> JlrsResult<T>,
     {
         unsafe {
-            let d = self.stack.as_mut();
             let global = Global::new();
-            let mut view = StackView::<Sync, Static>::new(d);
-            let frame_idx = view.new_frame(capacity)?;
-            let mut frame = StaticFrame::with_capacity(frame_idx, capacity, view);
+            let mut frame = StaticFrame::new(self.stack.as_mut(), capacity, Sync);
             func(global, &mut frame)
         }
     }
@@ -632,11 +636,8 @@ impl Julia {
         F: FnOnce(Global<'base>, &mut DynamicFrame<'base, Sync>) -> JlrsResult<T>,
     {
         unsafe {
-            let d = self.stack.as_mut();
             let global = Global::new();
-            let mut view = StackView::<Sync, Dynamic>::new(d);
-            let frame_idx = view.new_frame()?;
-            let mut frame = DynamicFrame::new(frame_idx, view);
+            let mut frame = DynamicFrame::new(self.stack.as_mut(), Sync);
             func(global, &mut frame)
         }
     }
@@ -666,8 +667,7 @@ impl Drop for Julia {
 /// [`CCall::null_frame`]: struct.CCall.html#method.null_frame
 /// [`CCall::null`]: struct.CCall.html#method.null
 pub struct CCall {
-    stack: Option<RawStack>,
-    stack_size: usize,
+    stack: Option<Stack>,
 }
 
 impl CCall {
@@ -677,11 +677,8 @@ impl CCall {
     /// is not allocated untl a static or dynamic frame is created.
     ///
     /// [`Julia::init`]: struct.Julia.html#method.init
-    pub unsafe fn new(stack_size: usize) -> Self {
-        CCall {
-            stack: None,
-            stack_size,
-        }
+    pub unsafe fn new() -> Self {
+        CCall { stack: None }
     }
 
     /// Create a new `CCall` that provides a stack with no slots. This means only creating a null
@@ -689,20 +686,7 @@ impl CCall {
     /// called through `ccall` from Julia and must only be called once during that call. The stack
     /// is not allocated untl a static or dynamic frame is created.
     pub unsafe fn null() -> Self {
-        CCall::new(0)
-    }
-
-    /// Change the stack size to `stack_size`.
-    pub fn set_stack_size(&mut self, stack_size: usize) {
-        self.stack_size = stack_size;
-        if self.stack.is_some() {
-            unsafe { self.stack = Some(RawStack::new(stack_size)) }
-        }
-    }
-
-    /// Returns the current stack size.
-    pub fn stack_size(&self) -> usize {
-        self.stack_size
+        CCall::new()
     }
 
     /// Create a [`StaticFrame`] that can hold `capacity` values, and call the given closure.
@@ -727,11 +711,8 @@ impl CCall {
         unsafe {
             self.ensure_init_stack()
                 .map(|s| {
-                    let d = s.as_mut();
                     let global = Global::new();
-                    let mut view = StackView::<Sync, Static>::new(d);
-                    let frame_idx = view.new_frame(capacity)?;
-                    let mut frame = StaticFrame::with_capacity(frame_idx, capacity, view);
+                    let mut frame = StaticFrame::new(s.as_mut(), capacity, Sync);
                     func(global, &mut frame)
                 })
                 .unwrap_or_else(|| std::hint::unreachable_unchecked()) // The stack is guaranteed to be initialized
@@ -754,11 +735,8 @@ impl CCall {
         unsafe {
             self.ensure_init_stack()
                 .map(|s| {
-                    let d = s.as_mut();
                     let global = Global::new();
-                    let mut view = StackView::<Sync, Dynamic>::new(d);
-                    let frame_idx = view.new_frame()?;
-                    let mut frame = DynamicFrame::new(frame_idx, view);
+                    let mut frame = DynamicFrame::new(s.as_mut(), Sync);
                     func(global, &mut frame)
                 })
                 .unwrap_or_else(|| std::hint::unreachable_unchecked()) // The stack is guaranteed to be initialized
@@ -782,11 +760,9 @@ impl CCall {
     }
 
     #[inline(always)]
-    fn ensure_init_stack(&mut self) -> Option<&mut RawStack> {
+    fn ensure_init_stack(&mut self) -> Option<&mut Stack> {
         if self.stack.is_none() {
-            unsafe {
-                self.stack = Some(RawStack::new(self.stack_size));
-            }
+            self.stack = Some(Stack::new());
         }
 
         self.stack.as_mut()

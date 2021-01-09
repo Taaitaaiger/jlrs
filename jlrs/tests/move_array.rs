@@ -28,9 +28,11 @@ fn move_array_1d_output() {
 
         let unboxed = jlrs
             .frame(1, |_, frame| {
-                let output = frame.output()?;
                 let data = vec![1.0f32, 2., 3.];
-                let array = Value::move_array_output(frame, output, data, 3)?;
+                let array = frame.value_frame(0, |output, frame| {
+                    let output = output.into_scope(frame);
+                    Value::move_array(output, data, 3)
+                })?;
                 array.cast::<Array>()?.copy_inline_data::<f32>()
             })
             .unwrap();

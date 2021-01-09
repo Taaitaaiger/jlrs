@@ -1,12 +1,12 @@
 use jlrs::prelude::*;
 use jlrs::util::JULIA;
-use jlrs::value::{CallResult, Value};
+use jlrs::value::Value;
 
 fn eval_string(string: &str, with_result: impl for<'f> FnOnce(CallResult<'f, 'static>)) {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
         jlrs.frame(1, |_global, frame| {
-            with_result(Value::eval_string(frame, string)?);
+            with_result(Value::eval_string(&mut *frame, string)?);
             Ok(())
         })
         .unwrap();
@@ -46,8 +46,8 @@ fn define_then_use() {
         let mut jlrs = j.borrow_mut();
         jlrs.frame(4, |global, frame| {
             let func = Module::main(global).function("increase")?;
-            let twelve = Value::new(frame, 12i32).unwrap();
-            let result = func.call1(frame, twelve)?;
+            let twelve = Value::new(&mut *frame, 12i32).unwrap();
+            let result = func.call1(&mut *frame, twelve)?;
             assert_eq!(result.unwrap().cast::<i32>().unwrap(), 13i32);
             Ok(())
         })

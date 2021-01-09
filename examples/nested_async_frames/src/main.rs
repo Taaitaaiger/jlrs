@@ -32,20 +32,28 @@ impl JuliaTask for MyTask {
         global: Global<'base>,
         frame: &mut DynamicAsyncFrame<'base>,
     ) -> JlrsResult<Self::T> {
-        // Convert the two arguments to values Julia can work with.
-        let dims = Value::new(&mut *frame, self.dims)?;
-        let iters = Value::new(&mut *frame, self.iters)?;
+        // Nesting async frames works like nesting on ordinary frame. The main differences are the `async`
+        // block in the closure, and frame is provided by value rather than by mutable reference.
+        let v = unsafe {
+            frame
+            .async_frame(|mut frame| async move {
+                // Convert the two arguments to values Julia can work with.
+                let iters = Value::new(&mut frame, self.iters)?;
+                let dims = Value::new(&mut frame, self.dims)?;
 
-        // Get `complexfunc` in `MyModule`, call it asynchronously with `call_async`, and await
-        // the result before casting it to an `f64` (which that function returns). A function that
-        // is called with `call_async` is executed on a thread created with `Base.threads.@spawn`.
-        let v = Module::main(global)
-            .submodule("MyModule")?
-            .function("complexfunc")?
-            .call_async(&mut *frame, &mut [dims, iters])
+                // Get `complexfunc` in `MyModule`, call it asynchronously with `call_async`, and await
+                // the result before casting it to an `f64` (which that function returns). A function that
+                // is called with `call_async` is executed on a thread created with `Base.threads.@spawn`.
+                Module::main(global)
+                    .submodule("MyModule")?
+                    .function("complexfunc")?
+                    .call_async(&mut frame, &mut [dims, iters])
+                    .await?
+                    .unwrap()
+                    .cast::<f64>()
+            })
             .await?
-            .unwrap()
-            .cast::<f64>()?;
+        };
 
         // Box the result
         Ok(Box::new(v))

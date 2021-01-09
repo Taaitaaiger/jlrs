@@ -42,7 +42,7 @@ fn valid_layout_array() {
         let mut jlrs = j.borrow_mut();
         jlrs.dynamic_frame(|global, frame| {
             unsafe {
-                let v = Value::new_array::<i32, _, _>(frame, (2, 2))?;
+                let v = Value::new_array::<i32, _, _, _>(frame, (2, 2))?;
                 assert!(Array::valid_layout(v.datatype().unwrap().into()));
 
                 let ua = Module::base(global).global("Array")?;

@@ -74,7 +74,7 @@ pub(crate) mod private {
         }
     }
 
-    impl<'s> TemporarySymbol for Symbol<'s> {
+    impl<'frame> TemporarySymbol for Symbol<'frame> {
         unsafe fn temporary_symbol<'symbol>(&self, _: Internal) -> Symbol<'symbol> {
             Symbol::wrap(self.ptr())
         }

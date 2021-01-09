@@ -9,7 +9,7 @@ pub static JLRS_TESTS_JL: &'static str = include_str!("../tests/julia/JlrsTests.
 thread_local! {
     #[doc(hidden)]
     pub static JULIA: RefCell<Julia> = {
-        let r = RefCell::new(unsafe { Julia::init(32).unwrap() });
+        let r = RefCell::new(unsafe { Julia::init().unwrap() });
         r.borrow_mut().frame(1, |_, frame| {
             Value::eval_string(frame, JLRS_TESTS_JL)?.expect("failed to evaluate contents of JlrsTests.jl");
             Ok(())

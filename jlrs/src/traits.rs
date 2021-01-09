@@ -31,25 +31,33 @@
 //! [`Value::is`]: ../value/struct.Value.html#method.is
 //! [`DataType::is`]: ../value/datatype/struct.DataType.html#method.is
 
+#[cfg(all(feature = "async", target_os = "linux"))]
+pub mod async_frame;
 pub mod bits_union;
+pub mod call;
 pub mod cast;
 pub mod frame;
 pub mod gc;
 pub mod into_julia;
 pub mod julia_type;
 pub mod julia_typecheck;
+pub mod mode;
 #[cfg(all(feature = "async", target_os = "linux"))]
 pub mod multitask;
+mod root;
+pub mod scope;
 pub mod temporary_symbol;
 pub mod valid_layout;
 
 pub use bits_union::{Align, BitsUnion, Flag};
+pub use call::Call;
 pub use cast::Cast;
 pub use frame::Frame;
 pub use gc::Gc;
 pub use into_julia::IntoJulia;
 pub use julia_type::JuliaType;
 pub use julia_typecheck::JuliaTypecheck;
+pub use scope::Scope;
 pub use temporary_symbol::TemporarySymbol;
 pub use valid_layout::ValidLayout;
 

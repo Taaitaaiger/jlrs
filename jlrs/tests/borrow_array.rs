@@ -30,8 +30,10 @@ fn borrow_array_1d_output() {
 
         let unboxed = jlrs
             .frame(1, |_, frame| {
-                let output = frame.output()?;
-                let array = Value::borrow_array_output(frame, output, &mut data, 4)?;
+                let array = frame.value_frame(0, |output, frame| {
+                    let output = output.into_scope(frame);
+                    Value::borrow_array(output, &mut data, 4)
+                })?;
                 assert!(array.is_array_of::<u64>());
                 array.cast::<Array>()?.copy_inline_data::<u64>()
             })

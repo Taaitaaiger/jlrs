@@ -125,7 +125,7 @@ As a simple example, let's create two values and add them:
 use jlrs::prelude::*;
 
 fn main() {
-    let mut julia = unsafe { Julia::init(16).unwrap() };
+    let mut julia = unsafe { Julia::init().unwrap() };
     julia.dynamic_frame(|global, frame| {
         // Create the two arguments
         let i = Value::new(frame, 2u64)?;
@@ -147,7 +147,7 @@ You can also do this with a static frame:
 use jlrs::prelude::*;
 
 fn main() {
-    let mut julia = unsafe { Julia::init(16).unwrap() };
+    let mut julia = unsafe { Julia::init().unwrap() };
     // Three slots; two for the inputs and one for the output.
     julia.frame(3, |global, frame| {
         // Create the two arguments, each value requires one slot
@@ -196,7 +196,7 @@ unsafe extern "C" fn call_me(arg: bool) -> isize {
 }
 
 fn main() {
-    let mut julia = unsafe { Julia::init(16).unwrap() };
+    let mut julia = unsafe { Julia::init().unwrap() };
     julia.frame(2, |global, frame| {
         // Cast the function to a void pointer
         let call_me_val = Value::new(frame, call_me as *mut std::ffi::c_void)?;
@@ -290,8 +290,8 @@ larger than 1.
 
 In order to call Julia with the async runtime you must implement the `JuliaTask` trait. The
 `run`-method of this trait is similar to the closures that are used in the examples
-above for the sync runtime; it provides you with a `Global` and an `AsyncFrame` which
-implements the `Frame` trait. The `AsyncFrame` is required to use `Value::call_async`
+above for the sync runtime; it provides you with a `Global` and an `DynamicAsyncFrame` which
+implements the `Frame` trait. The `DynamicAsyncFrame` is required to use `Value::call_async`
 which calls a function on a new thread using `Base.Threads.@spawn` and returns a `Future`.
 While you await the result the runtime can handle another task. If you don't use
 `Value::call_async` tasks are handled sequentially.

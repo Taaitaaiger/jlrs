@@ -160,7 +160,7 @@ fn function_returns_module() {
             let base = Module::main(global)
                 .submodule("JlrsTests")?
                 .function("base")?;
-            let base_val = base.call0(frame)?.unwrap();
+            let base_val = base.call0(&mut *frame)?.unwrap();
 
             assert!(base_val.is::<Module>());
             assert!(base_val.cast::<Module>().is_ok());
@@ -231,7 +231,7 @@ fn set_global() {
         let mut jlrs = j.borrow_mut();
         jlrs.frame(1, |global, frame| {
             let main = Module::main(global);
-            let value = Value::new(frame, 1usize)?;
+            let value = Value::new(&mut *frame, 1usize)?;
             unsafe {
                 main.set_global("one", value);
             }
@@ -250,7 +250,7 @@ fn set_const() {
         let mut jlrs = j.borrow_mut();
         jlrs.frame(1, |global, frame| {
             let main = Module::main(global);
-            let value = Value::new(frame, 2usize)?;
+            let value = Value::new(&mut *frame, 2usize)?;
             main.set_const("ONE", value)?;
 
             let value = main.global("ONE")?;
@@ -267,8 +267,8 @@ fn set_const_twice() {
         let mut jlrs = j.borrow_mut();
         let err = jlrs.frame(2, |global, frame| {
             let main = Module::main(global);
-            let value1 = Value::new(frame, 3usize)?;
-            let value2 = Value::new(frame, 4usize)?;
+            let value1 = Value::new(&mut *frame, 3usize)?;
+            let value2 = Value::new(&mut *frame, 4usize)?;
             main.set_const("TWICE", value1)?;
             main.set_const("TWICE", value2)?;
 

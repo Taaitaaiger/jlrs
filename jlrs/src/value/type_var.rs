@@ -65,7 +65,7 @@ impl<'frame> TypeVar<'frame> {
 
             let tvar = jl_new_typevar(name.ptr(), lb, ub);
             frame
-                .protect(tvar.cast(), Internal)
+                .root(tvar.cast(), Internal)
                 .map_err(JlrsError::alloc_error)?;
 
             Ok(Self::wrap(tvar))

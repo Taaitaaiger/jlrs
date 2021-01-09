@@ -15,8 +15,8 @@ mod tests {
             julia
                 .dynamic_frame(|_global, frame| {
                     let s = BitsTypeBool { a: true };
-                    let v = Value::new(frame, s).unwrap();
-                    let first = v.get_nth_field(frame, 0).unwrap();
+                    let v = Value::new(&mut *frame, s).unwrap();
+                    let first = v.get_nth_field(&mut *frame, 0).unwrap();
 
                     assert_eq!(first.cast::<bool>().unwrap(), true);
                     assert!(v.is::<BitsTypeBool>());
@@ -36,8 +36,8 @@ mod tests {
             julia
                 .dynamic_frame(|_global, frame| {
                     let s = BitsTypeChar { a: 'b' };
-                    let v = Value::new(frame, s).unwrap();
-                    let first = v.get_nth_field(frame, 0).unwrap();
+                    let v = Value::new(&mut *frame, s).unwrap();
+                    let first = v.get_nth_field(&mut *frame, 0).unwrap();
 
                     assert_eq!(first.cast::<char>().unwrap(), 'b');
                     assert!(v.is::<BitsTypeChar>());
@@ -57,8 +57,8 @@ mod tests {
             julia
                 .dynamic_frame(|_global, frame| {
                     let s = BitsTypeUInt8 { a: 1 };
-                    let v = Value::new(frame, s).unwrap();
-                    let first = v.get_nth_field(frame, 0).unwrap();
+                    let v = Value::new(&mut *frame, s).unwrap();
+                    let first = v.get_nth_field(&mut *frame, 0).unwrap();
 
                     assert_eq!(first.cast::<u8>().unwrap(), 1);
                     assert!(v.is::<BitsTypeUInt8>());
@@ -78,8 +78,8 @@ mod tests {
             julia
                 .dynamic_frame(|_global, frame| {
                     let s = BitsTypeUInt16 { a: 2 };
-                    let v = Value::new(frame, s).unwrap();
-                    let first = v.get_nth_field(frame, 0).unwrap();
+                    let v = Value::new(&mut *frame, s).unwrap();
+                    let first = v.get_nth_field(&mut *frame, 0).unwrap();
 
                     assert_eq!(first.cast::<u16>().unwrap(), 2);
                     assert!(v.is::<BitsTypeUInt16>());
@@ -99,8 +99,8 @@ mod tests {
             julia
                 .dynamic_frame(|_global, frame| {
                     let s = BitsTypeUInt32 { a: 3 };
-                    let v = Value::new(frame, s).unwrap();
-                    let first = v.get_nth_field(frame, 0).unwrap();
+                    let v = Value::new(&mut *frame, s).unwrap();
+                    let first = v.get_nth_field(&mut *frame, 0).unwrap();
 
                     assert_eq!(first.cast::<u32>().unwrap(), 3);
                     assert!(v.is::<BitsTypeUInt32>());
@@ -120,8 +120,8 @@ mod tests {
             julia
                 .dynamic_frame(|_global, frame| {
                     let s = BitsTypeUInt64 { a: 4 };
-                    let v = Value::new(frame, s).unwrap();
-                    let first = v.get_nth_field(frame, 0).unwrap();
+                    let v = Value::new(&mut *frame, s).unwrap();
+                    let first = v.get_nth_field(&mut *frame, 0).unwrap();
 
                     assert_eq!(first.cast::<u64>().unwrap(), 4);
                     assert!(v.is::<BitsTypeUInt64>());
@@ -141,8 +141,8 @@ mod tests {
             julia
                 .dynamic_frame(|_global, frame| {
                     let s = BitsTypeUInt { a: 5 };
-                    let v = Value::new(frame, s).unwrap();
-                    let first = v.get_nth_field(frame, 0).unwrap();
+                    let v = Value::new(&mut *frame, s).unwrap();
+                    let first = v.get_nth_field(&mut *frame, 0).unwrap();
 
                     assert_eq!(first.cast::<u64>().unwrap(), 5);
                     assert!(v.is::<BitsTypeUInt>());
@@ -162,8 +162,8 @@ mod tests {
             julia
                 .dynamic_frame(|_global, frame| {
                     let s = BitsTypeInt8 { a: -1 };
-                    let v = Value::new(frame, s).unwrap();
-                    let first = v.get_nth_field(frame, 0).unwrap();
+                    let v = Value::new(&mut *frame, s).unwrap();
+                    let first = v.get_nth_field(&mut *frame, 0).unwrap();
 
                     assert_eq!(first.cast::<i8>().unwrap(), -1);
                     assert!(v.is::<BitsTypeInt8>());
@@ -183,8 +183,8 @@ mod tests {
             julia
                 .dynamic_frame(|_global, frame| {
                     let s = BitsTypeInt16 { a: -2 };
-                    let v = Value::new(frame, s).unwrap();
-                    let first = v.get_nth_field(frame, 0).unwrap();
+                    let v = Value::new(&mut *frame, s).unwrap();
+                    let first = v.get_nth_field(&mut *frame, 0).unwrap();
 
                     assert_eq!(first.cast::<i16>().unwrap(), -2);
                     assert!(v.is::<BitsTypeInt16>());
@@ -204,8 +204,8 @@ mod tests {
             julia
                 .dynamic_frame(|_global, frame| {
                     let s = BitsTypeInt32 { a: -3 };
-                    let v = Value::new(frame, s).unwrap();
-                    let first = v.get_nth_field(frame, 0).unwrap();
+                    let v = Value::new(&mut *frame, s).unwrap();
+                    let first = v.get_nth_field(&mut *frame, 0).unwrap();
 
                     assert_eq!(first.cast::<i32>().unwrap(), -3);
                     assert!(v.is::<BitsTypeInt32>());
@@ -225,8 +225,8 @@ mod tests {
             julia
                 .dynamic_frame(|_global, frame| {
                     let s = BitsTypeInt64 { a: -4 };
-                    let v = Value::new(frame, s).unwrap();
-                    let first = v.get_nth_field(frame, 0).unwrap();
+                    let v = Value::new(&mut *frame, s).unwrap();
+                    let first = v.get_nth_field(&mut *frame, 0).unwrap();
 
                     assert_eq!(first.cast::<i64>().unwrap(), -4);
                     assert!(v.is::<BitsTypeInt64>());
@@ -246,8 +246,8 @@ mod tests {
             julia
                 .dynamic_frame(|_global, frame| {
                     let s = BitsTypeInt { a: -5 };
-                    let v = Value::new(frame, s).unwrap();
-                    let first = v.get_nth_field(frame, 0).unwrap();
+                    let v = Value::new(&mut *frame, s).unwrap();
+                    let first = v.get_nth_field(&mut *frame, 0).unwrap();
 
                     assert_eq!(first.cast::<i64>().unwrap(), -5);
                     assert!(v.is::<BitsTypeInt>());
@@ -267,8 +267,8 @@ mod tests {
             julia
                 .dynamic_frame(|_global, frame| {
                     let s = BitsTypeFloat32 { a: 1.2 };
-                    let v = Value::new(frame, s).unwrap();
-                    let first = v.get_nth_field(frame, 0).unwrap();
+                    let v = Value::new(&mut *frame, s).unwrap();
+                    let first = v.get_nth_field(&mut *frame, 0).unwrap();
 
                     assert_eq!(first.cast::<f32>().unwrap(), 1.2);
                     assert!(v.is::<BitsTypeFloat32>());
@@ -288,8 +288,8 @@ mod tests {
             julia
                 .dynamic_frame(|_global, frame| {
                     let s = BitsTypeFloat64 { a: -2.3 };
-                    let v = Value::new(frame, s).unwrap();
-                    let first = v.get_nth_field(frame, 0).unwrap();
+                    let v = Value::new(&mut *frame, s).unwrap();
+                    let first = v.get_nth_field(&mut *frame, 0).unwrap();
 
                     assert_eq!(first.cast::<f64>().unwrap(), -2.3);
                     assert!(v.is::<BitsTypeFloat64>());
@@ -313,8 +313,8 @@ mod tests {
                         b: 3.0,
                         c: 4.0,
                     };
-                    let v = Value::new(frame, s).unwrap();
-                    let first = v.get_nth_field(frame, 0).unwrap();
+                    let v = Value::new(&mut *frame, s).unwrap();
+                    let first = v.get_nth_field(&mut *frame, 0).unwrap();
 
                     assert_eq!(first.cast::<char>().unwrap(), 'a');
                     assert!(v.is::<BitsCharFloat32Float64>());
@@ -334,8 +334,8 @@ mod tests {
             julia
                 .dynamic_frame(|_global, frame| {
                     let s = BitsIntBool { a: 1, b: true };
-                    let v = Value::new(frame, s).unwrap();
-                    let first = v.get_nth_field(frame, 0).unwrap();
+                    let v = Value::new(&mut *frame, s).unwrap();
+                    let first = v.get_nth_field(&mut *frame, 0).unwrap();
 
                     assert_eq!(first.cast::<i64>().unwrap(), 1);
                     assert!(v.is::<BitsIntBool>());
@@ -358,8 +358,8 @@ mod tests {
                         a: 'a',
                         b: BitsIntChar { a: 1, b: 'b' },
                     };
-                    let v = Value::new(frame, s).unwrap();
-                    let first = v.get_nth_field(frame, 0).unwrap();
+                    let v = Value::new(&mut *frame, s).unwrap();
+                    let first = v.get_nth_field(&mut *frame, 0).unwrap();
                     assert_eq!(first.cast::<char>().unwrap(), 'a');
                     assert!(v.is::<BitsCharBitsIntChar>());
                     assert!(v.cast::<BitsCharBitsIntChar>().is_ok());
@@ -381,10 +381,10 @@ mod tests {
                         a: 0,
                         b: Tuple2(-1, -3),
                     };
-                    let v = Value::new(frame, s).unwrap();
+                    let v = Value::new(&mut *frame, s).unwrap();
 
-                    let first = v.get_nth_field(frame, 0).unwrap();
-                    let second = v.get_nth_field(frame, 1).unwrap();
+                    let first = v.get_nth_field(&mut *frame, 0).unwrap();
+                    let second = v.get_nth_field(&mut *frame, 1).unwrap();
 
                     assert_eq!(first.cast::<u8>().unwrap(), 0);
                     assert_eq!(second.cast::<Tuple2<i32, i64>>().unwrap(), Tuple2(-1, -3));
@@ -408,19 +408,19 @@ mod tests {
                         a: 0,
                         b: Tuple2(-1, Tuple2(-1, 3)),
                     };
-                    let jl_val = Value::new(frame, rs_val).unwrap();
+                    let jl_val = Value::new(&mut *frame, rs_val).unwrap();
 
                     assert!(Module::base(global)
                         .function("typeof")?
-                        .call1(frame, jl_val)?
+                        .call1(&mut *frame, jl_val)?
                         .unwrap()
                         .cast::<DataType>()?
                         .is::<BitsUInt8TupleInt32TupleInt16UInt16>());
 
-                    let first = jl_val.get_nth_field(frame, 0).unwrap();
+                    let first = jl_val.get_nth_field(&mut *frame, 0).unwrap();
                     assert_eq!(first.cast::<u8>().unwrap(), rs_val.a);
 
-                    let second = jl_val.get_nth_field(frame, 1).unwrap();
+                    let second = jl_val.get_nth_field(&mut *frame, 1).unwrap();
                     assert_eq!(
                         second.cast::<Tuple2<i32, Tuple2<i16, u16>>>().unwrap(),
                         rs_val.b
@@ -445,22 +445,22 @@ mod tests {
                     let constr = Module::main(global)
                         .submodule("WithBitsUnion")?
                         .function("SingleVariant")?;
-                    let v1 = Value::new(frame, 1i8)?;
-                    let v2 = Value::new(frame, 2i32)?;
-                    let v3 = Value::new(frame, 3i8)?;
-                    let jl_val = constr.call3(frame, v1, v2, v3)?.unwrap();
+                    let v1 = Value::new(&mut *frame, 1i8)?;
+                    let v2 = Value::new(&mut *frame, 2i32)?;
+                    let v3 = Value::new(&mut *frame, 3i8)?;
+                    let jl_val = constr.call3(&mut *frame, v1, v2, v3)?.unwrap();
 
                     assert!(Module::base(global)
                         .function("typeof")?
-                        .call1(frame, jl_val)?
+                        .call1(&mut *frame, jl_val)?
                         .unwrap()
                         .cast::<DataType>()?
                         .is::<SingleVariant>());
 
-                    let first = jl_val.get_nth_field(frame, 0).unwrap();
+                    let first = jl_val.get_nth_field(&mut *frame, 0).unwrap();
                     assert_eq!(first.cast::<i8>().unwrap(), 1);
 
-                    let third = jl_val.get_nth_field(frame, 2).unwrap();
+                    let third = jl_val.get_nth_field(&mut *frame, 2).unwrap();
                     assert_eq!(third.cast::<i8>().unwrap(), 3);
 
                     assert!(jl_val.is::<SingleVariant>());
@@ -483,25 +483,25 @@ mod tests {
                         .submodule("WithBitsUnion")?
                         .function("DoubleVariant")?;
 
-                    let v1 = Value::new(frame, 1i8)?;
-                    let v2 = Value::new(frame, 2i16)?;
-                    let v3 = Value::new(frame, 3i8)?;
-                    let jl_val = constr.call3(frame, v1, v2, v3)?.unwrap();
+                    let v1 = Value::new(&mut *frame, 1i8)?;
+                    let v2 = Value::new(&mut *frame, 2i16)?;
+                    let v3 = Value::new(&mut *frame, 3i8)?;
+                    let jl_val = constr.call3(&mut *frame, v1, v2, v3)?.unwrap();
 
                     assert!(Module::base(global)
                         .function("typeof")?
-                        .call1(frame, jl_val)?
+                        .call1(&mut *frame, jl_val)?
                         .unwrap()
                         .cast::<DataType>()?
                         .is::<DoubleVariant>());
 
-                    let first = jl_val.get_nth_field(frame, 0).unwrap();
+                    let first = jl_val.get_nth_field(&mut *frame, 0).unwrap();
                     assert_eq!(first.cast::<i8>().unwrap(), 1);
 
-                    let second = jl_val.get_nth_field(frame, 1).unwrap();
+                    let second = jl_val.get_nth_field(&mut *frame, 1).unwrap();
                     assert_eq!(second.cast::<i16>().unwrap(), 2);
 
-                    let third = jl_val.get_nth_field(frame, 2).unwrap();
+                    let third = jl_val.get_nth_field(&mut *frame, 2).unwrap();
                     assert_eq!(third.cast::<i8>().unwrap(), 3);
 
                     assert!(jl_val.is::<DoubleVariant>());
@@ -524,25 +524,25 @@ mod tests {
                         .submodule("WithBitsUnion")?
                         .function("SizeAlignMismatch")?;
 
-                    let v1 = Value::new(frame, 1i8)?;
-                    let v2 = Value::new(frame, 2i32)?;
-                    let v3 = Value::new(frame, 3i8)?;
-                    let jl_val = constr.call3(frame, v1, v2, v3)?.unwrap();
+                    let v1 = Value::new(&mut *frame, 1i8)?;
+                    let v2 = Value::new(&mut *frame, 2i32)?;
+                    let v3 = Value::new(&mut *frame, 3i8)?;
+                    let jl_val = constr.call3(&mut *frame, v1, v2, v3)?.unwrap();
 
                     assert!(Module::base(global)
                         .function("typeof")?
-                        .call1(frame, jl_val)?
+                        .call1(&mut *frame, jl_val)?
                         .unwrap()
                         .cast::<DataType>()?
                         .is::<SizeAlignMismatch>());
 
-                    let first = jl_val.get_nth_field(frame, 0).unwrap();
+                    let first = jl_val.get_nth_field(&mut *frame, 0).unwrap();
                     assert_eq!(first.cast::<i8>().unwrap(), 1);
 
-                    let second = jl_val.get_nth_field(frame, 1).unwrap();
+                    let second = jl_val.get_nth_field(&mut *frame, 1).unwrap();
                     assert_eq!(second.cast::<i32>().unwrap(), 2);
 
-                    let third = jl_val.get_nth_field(frame, 2).unwrap();
+                    let third = jl_val.get_nth_field(&mut *frame, 2).unwrap();
                     assert_eq!(third.cast::<i8>().unwrap(), 3);
 
                     assert!(jl_val.is::<SizeAlignMismatch>());
@@ -565,25 +565,25 @@ mod tests {
                         .submodule("WithBitsUnion")?
                         .function("UnionInTuple")?;
 
-                    let v1 = Value::new(frame, 1i8)?;
-                    let v2 = Value::new(frame, Tuple1(2i16))?;
-                    let v3 = Value::new(frame, 3i8)?;
-                    let jl_val = constr.call3(frame, v1, v2, v3)?.unwrap();
+                    let v1 = Value::new(&mut *frame, 1i8)?;
+                    let v2 = Value::new(&mut *frame, Tuple1(2i16))?;
+                    let v3 = Value::new(&mut *frame, 3i8)?;
+                    let jl_val = constr.call3(&mut *frame, v1, v2, v3)?.unwrap();
 
                     assert!(Module::base(global)
                         .function("typeof")?
-                        .call1(frame, jl_val)?
+                        .call1(&mut *frame, jl_val)?
                         .unwrap()
                         .cast::<DataType>()?
                         .is::<UnionInTuple>());
 
-                    let first = jl_val.get_nth_field(frame, 0).unwrap();
+                    let first = jl_val.get_nth_field(&mut *frame, 0).unwrap();
                     assert_eq!(first.cast::<i8>().unwrap(), 1);
 
-                    let second = jl_val.get_nth_field(frame, 1).unwrap();
+                    let second = jl_val.get_nth_field(&mut *frame, 1).unwrap();
                     assert_eq!(second.cast::<Tuple1<i16>>().unwrap(), Tuple1(2));
 
-                    let third = jl_val.get_nth_field(frame, 2).unwrap();
+                    let third = jl_val.get_nth_field(&mut *frame, 2).unwrap();
                     assert_eq!(third.cast::<i8>().unwrap(), 3);
 
                     assert!(jl_val.is::<UnionInTuple>());
@@ -608,17 +608,17 @@ mod tests {
                         .submodule("WithNonBitsUnion")?
                         .function("NonBitsUnion")?;
 
-                    let v1 = Value::new(frame, 1i8)?;
-                    let jl_val = constr.call1(frame, v1)?.unwrap();
+                    let v1 = Value::new(&mut *frame, 1i8)?;
+                    let jl_val = constr.call1(&mut *frame, v1)?.unwrap();
 
                     assert!(Module::base(global)
                         .function("typeof")?
-                        .call1(frame, jl_val)?
+                        .call1(&mut *frame, jl_val)?
                         .unwrap()
                         .cast::<DataType>()?
                         .is::<NonBitsUnion>());
 
-                    let first = jl_val.get_nth_field(frame, 0).unwrap();
+                    let first = jl_val.get_nth_field(&mut *frame, 0).unwrap();
                     assert_eq!(first.cast::<i8>().unwrap(), 1);
 
                     assert!(jl_val.is::<NonBitsUnion>());
@@ -641,17 +641,17 @@ mod tests {
                         .submodule("WithGeneric")?
                         .function("WithGenericT")?;
 
-                    let v1 = Value::new(frame, 1i32)?;
-                    let jl_val = constr.call1(frame, v1)?.unwrap();
+                    let v1 = Value::new(&mut *frame, 1i32)?;
+                    let jl_val = constr.call1(&mut *frame, v1)?.unwrap();
 
                     assert!(Module::base(global)
                         .function("typeof")?
-                        .call1(frame, jl_val)?
+                        .call1(&mut *frame, jl_val)?
                         .unwrap()
                         .cast::<DataType>()?
                         .is::<WithGenericT<i32>>());
 
-                    let first = jl_val.get_nth_field(frame, 0).unwrap();
+                    let first = jl_val.get_nth_field(&mut *frame, 0).unwrap();
                     assert_eq!(first.cast::<i32>().unwrap(), 1);
 
                     assert!(jl_val.is::<WithGenericT<i32>>());
@@ -674,23 +674,23 @@ mod tests {
                         .submodule("WithGeneric")?
                         .function("WithGenericT")?;
 
-                    let v1 = Value::new(frame, 1i32)?;
-                    let wgt = constr.call1(frame, v1)?.unwrap();
+                    let v1 = Value::new(&mut *frame, 1i32)?;
+                    let wgt = constr.call1(&mut *frame, v1)?.unwrap();
 
                     let constr = Module::main(global)
                         .submodule("WithGeneric")?
                         .function("WithGenericUnionAll")?;
 
-                    let jl_val = constr.call1(frame, wgt)?.unwrap();
+                    let jl_val = constr.call1(&mut *frame, wgt)?.unwrap();
 
                     assert!(Module::base(global)
                         .function("typeof")?
-                        .call1(frame, jl_val)?
+                        .call1(&mut *frame, jl_val)?
                         .unwrap()
                         .cast::<DataType>()?
                         .is::<WithGenericUnionAll>());
 
-                    let first = jl_val.get_nth_field(frame, 0).unwrap();
+                    let first = jl_val.get_nth_field(&mut *frame, 0).unwrap();
                     assert!(first.cast::<WithGenericT<i32>>().is_ok());
 
                     assert!(jl_val.is::<WithGenericUnionAll>());
@@ -713,23 +713,23 @@ mod tests {
                         .submodule("WithGeneric")?
                         .function("WithGenericT")?;
 
-                    let v1 = Value::new(frame, 1i32)?;
-                    let wgt = constr.call1(frame, v1)?.unwrap();
+                    let v1 = Value::new(&mut *frame, 1i32)?;
+                    let wgt = constr.call1(&mut *frame, v1)?.unwrap();
 
                     let constr = Module::main(global)
                         .submodule("WithGeneric")?
                         .function("WithNestedGenericT")?;
 
-                    let jl_val = constr.call1(frame, wgt)?.unwrap();
+                    let jl_val = constr.call1(&mut *frame, wgt)?.unwrap();
 
                     assert!(Module::base(global)
                         .function("typeof")?
-                        .call1(frame, jl_val)?
+                        .call1(&mut *frame, jl_val)?
                         .unwrap()
                         .cast::<DataType>()?
                         .is::<WithNestedGenericT<i32>>());
 
-                    let first = jl_val.get_nth_field(frame, 0).unwrap();
+                    let first = jl_val.get_nth_field(&mut *frame, 0).unwrap();
                     assert!(first.cast::<WithGenericT<i32>>().is_ok());
 
                     assert!(jl_val.is::<WithNestedGenericT<i32>>());
@@ -752,22 +752,24 @@ mod tests {
                         .submodule("WithGeneric")?
                         .function("WithGenericT")?;
 
-                    let wgt = constr.call1(frame, Module::base(global).into())?.unwrap();
+                    let wgt = constr
+                        .call1(&mut *frame, Module::base(global).into())?
+                        .unwrap();
 
                     let constr = Module::main(global)
                         .submodule("WithGeneric")?
                         .function("WithPropagatedLifetime")?;
 
-                    let jl_val = constr.call1(frame, wgt)?.unwrap();
+                    let jl_val = constr.call1(&mut *frame, wgt)?.unwrap();
 
                     assert!(Module::base(global)
                         .function("typeof")?
-                        .call1(frame, jl_val)?
+                        .call1(&mut *frame, jl_val)?
                         .unwrap()
                         .cast::<DataType>()?
                         .is::<WithPropagatedLifetime>());
 
-                    let first = jl_val.get_nth_field(frame, 0).unwrap();
+                    let first = jl_val.get_nth_field(&mut *frame, 0).unwrap();
                     assert!(first.cast::<WithGenericT<Module>>().is_ok());
 
                     assert!(jl_val.is::<WithPropagatedLifetime>());
@@ -786,33 +788,33 @@ mod tests {
 
             julia
                 .dynamic_frame(|global, frame| {
-                    let arr = Value::new_array::<i32, _, _>(frame, (2, 2))?;
+                    let arr = Value::new_array::<i32, _, _, _>(&mut *frame, (2, 2))?;
 
                     let wgt_constr = Module::main(global)
                         .submodule("WithGeneric")?
                         .function("WithGenericT")?;
 
-                    let wgt = wgt_constr.call1(frame, arr)?.unwrap();
+                    let wgt = wgt_constr.call1(&mut *frame, arr)?.unwrap();
 
                     let constr = Module::base(global).function("tuple")?;
-                    let int = Value::new(frame, 2i32)?;
-                    let tup = constr.call2(frame, int, wgt)?.unwrap();
+                    let int = Value::new(&mut *frame, 2i32)?;
+                    let tup = constr.call2(&mut *frame, int, wgt)?.unwrap();
 
-                    let a = wgt_constr.call1(frame, tup)?.unwrap();
+                    let a = wgt_constr.call1(&mut *frame, tup)?.unwrap();
                     let constr = Module::main(global)
                         .submodule("WithGeneric")?
                         .function("WithPropagatedLifetimes")?;
 
-                    let jl_val = constr.call1(frame, a)?.unwrap();
+                    let jl_val = constr.call1(&mut *frame, a)?.unwrap();
 
                     assert!(Module::base(global)
                         .function("typeof")?
-                        .call1(frame, jl_val)?
+                        .call1(&mut *frame, jl_val)?
                         .unwrap()
                         .cast::<DataType>()?
                         .is::<WithPropagatedLifetimes>());
 
-                    let first = jl_val.get_nth_field(frame, 0).unwrap();
+                    let first = jl_val.get_nth_field(&mut *frame, 0).unwrap();
                     assert!(first
                         .cast::<WithGenericT<Tuple2<i32, WithGenericT<Array>>>>()
                         .is_ok());
@@ -837,23 +839,23 @@ mod tests {
                         .submodule("WithGeneric")?
                         .function("WithGenericT")?;
 
-                    let v1 = Value::new(frame, 1i64)?;
-                    let wgt = wgt_constr.call1(frame, v1)?.unwrap();
+                    let v1 = Value::new(&mut *frame, 1i64)?;
+                    let wgt = wgt_constr.call1(&mut *frame, v1)?.unwrap();
 
                     let constr = Module::main(global)
                         .submodule("WithGeneric")?
                         .function("WithSetGeneric")?;
 
-                    let jl_val = constr.call1(frame, wgt)?.unwrap();
+                    let jl_val = constr.call1(&mut *frame, wgt)?.unwrap();
 
                     assert!(Module::base(global)
                         .function("typeof")?
-                        .call1(frame, jl_val)?
+                        .call1(&mut *frame, jl_val)?
                         .unwrap()
                         .cast::<DataType>()?
                         .is::<WithSetGeneric>());
 
-                    let first = jl_val.get_nth_field(frame, 0).unwrap();
+                    let first = jl_val.get_nth_field(&mut *frame, 0).unwrap();
                     assert!(first.cast::<WithGenericT<i64>>().is_ok());
 
                     assert!(jl_val.is::<WithSetGeneric>());
@@ -876,26 +878,26 @@ mod tests {
                         .submodule("WithGeneric")?
                         .function("WithGenericT")?;
 
-                    let v1 = Value::new(frame, 1i64)?;
-                    let wgt = wgt_constr.call1(frame, v1)?.unwrap();
+                    let v1 = Value::new(&mut *frame, 1i64)?;
+                    let wgt = wgt_constr.call1(&mut *frame, v1)?.unwrap();
 
                     let tup_constr = Module::base(global).function("tuple")?;
-                    let v2 = tup_constr.call1(frame, wgt)?.unwrap();
+                    let v2 = tup_constr.call1(&mut *frame, wgt)?.unwrap();
 
                     let constr = Module::main(global)
                         .submodule("WithGeneric")?
                         .function("WithSetGenericTuple")?;
 
-                    let jl_val = constr.call1(frame, v2)?.unwrap();
+                    let jl_val = constr.call1(&mut *frame, v2)?.unwrap();
 
                     assert!(Module::base(global)
                         .function("typeof")?
-                        .call1(frame, jl_val)?
+                        .call1(&mut *frame, jl_val)?
                         .unwrap()
                         .cast::<DataType>()?
                         .is::<WithSetGenericTuple>());
 
-                    let first = jl_val.get_nth_field(frame, 0).unwrap();
+                    let first = jl_val.get_nth_field(&mut *frame, 0).unwrap();
                     assert!(first.cast::<Tuple1<WithGenericT<i64>>>().is_ok());
 
                     assert!(jl_val.is::<WithSetGenericTuple>());
@@ -918,17 +920,17 @@ mod tests {
                         .submodule("WithGeneric")?
                         .function("withvaluetype")?;
 
-                    let v1 = Value::new(frame, 1i64)?;
-                    let jl_val = wvt_constr.call1(frame, v1)?.unwrap();
+                    let v1 = Value::new(&mut *frame, 1i64)?;
+                    let jl_val = wvt_constr.call1(&mut *frame, v1)?.unwrap();
 
                     assert!(Module::base(global)
                         .function("typeof")?
-                        .call1(frame, jl_val)?
+                        .call1(&mut *frame, jl_val)?
                         .unwrap()
                         .cast::<DataType>()?
                         .is::<WithValueType>());
 
-                    let first = jl_val.get_nth_field(frame, 0).unwrap();
+                    let first = jl_val.get_nth_field(&mut *frame, 0).unwrap();
                     assert!(first.cast::<i64>().is_ok());
 
                     assert!(jl_val.is::<WithValueType>());

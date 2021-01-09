@@ -7,12 +7,15 @@ fn call_no_kw() {
         let mut jlrs = j.borrow_mut();
 
         jlrs.frame(2, |global, frame| {
-            let a_value = Value::new(frame, 1isize)?;
+            let a_value = Value::new(&mut *frame, 1isize)?;
             let func = Module::main(global)
                 .submodule("JlrsTests")?
                 .function("funcwithkw")?;
 
-            let v = func.call(frame, &mut [a_value])?.unwrap().cast::<isize>()?;
+            let v = func
+                .call(&mut *frame, &mut [a_value])?
+                .unwrap()
+                .cast::<isize>()?;
 
             assert_eq!(v, 2);
             Ok(())
@@ -27,16 +30,16 @@ fn call_with_kw() {
         let mut jlrs = j.borrow_mut();
 
         jlrs.frame(4, |global, frame| {
-            let a_value = Value::new(frame, 1isize)?;
-            let b_value = Value::new(frame, 10isize)?;
+            let a_value = Value::new(&mut *frame, 1isize)?;
+            let b_value = Value::new(&mut *frame, 10isize)?;
             let func = Module::main(global)
                 .submodule("JlrsTests")?
                 .function("funcwithkw")?;
 
-            let kw = named_tuple!(frame, "b" => b_value)?;
+            let kw = named_tuple!(&mut *frame, "b" => b_value)?;
             let v = func
                 .with_keywords(kw)
-                .call1(frame, a_value)?
+                .call1(&mut *frame, a_value)?
                 .unwrap()
                 .cast::<isize>()?;
 
@@ -53,17 +56,17 @@ fn call_with_kw_and_1_vararg() {
         let mut jlrs = j.borrow_mut();
 
         jlrs.frame(5, |global, frame| {
-            let a_value = Value::new(frame, 1isize)?;
-            let b_value = Value::new(frame, 10isize)?;
-            let c_value = Value::new(frame, 5isize)?;
+            let a_value = Value::new(&mut *frame, 1isize)?;
+            let b_value = Value::new(&mut *frame, 10isize)?;
+            let c_value = Value::new(&mut *frame, 5isize)?;
             let func = Module::main(global)
                 .submodule("JlrsTests")?
                 .function("funcwithkw")?;
 
-            let kw = named_tuple!(frame, "b" => b_value)?;
+            let kw = named_tuple!(&mut *frame, "b" => b_value)?;
             let v = func
                 .with_keywords(kw)
-                .call2(frame, a_value, c_value)?
+                .call2(&mut *frame, a_value, c_value)?
                 .unwrap()
                 .cast::<isize>()?;
 
@@ -80,17 +83,17 @@ fn call_with_kw_and_2_vararg() {
         let mut jlrs = j.borrow_mut();
 
         jlrs.frame(6, |global, frame| {
-            let a_value = Value::new(frame, 1isize)?;
-            let b_value = Value::new(frame, 10isize)?;
-            let c_value = Value::new(frame, 5isize)?;
+            let a_value = Value::new(&mut *frame, 1isize)?;
+            let b_value = Value::new(&mut *frame, 10isize)?;
+            let c_value = Value::new(&mut *frame, 5isize)?;
             let func = Module::main(global)
                 .submodule("JlrsTests")?
                 .function("funcwithkw")?;
 
-            let kw = named_tuple!(frame, "b" => b_value)?;
+            let kw = named_tuple!(&mut *frame, "b" => b_value)?;
             let v = func
                 .with_keywords(kw)
-                .call2(frame, a_value, c_value)?
+                .call2(&mut *frame, a_value, c_value)?
                 .unwrap()
                 .cast::<isize>()?;
 
@@ -107,18 +110,18 @@ fn call_with_kw_and_3_vararg() {
         let mut jlrs = j.borrow_mut();
 
         jlrs.frame(7, |global, frame| {
-            let a_value = Value::new(frame, 1isize)?;
-            let b_value = Value::new(frame, 10isize)?;
-            let c_value = Value::new(frame, 5isize)?;
-            let d_value = Value::new(frame, 4isize)?;
+            let a_value = Value::new(&mut *frame, 1isize)?;
+            let b_value = Value::new(&mut *frame, 10isize)?;
+            let c_value = Value::new(&mut *frame, 5isize)?;
+            let d_value = Value::new(&mut *frame, 4isize)?;
             let func = Module::main(global)
                 .submodule("JlrsTests")?
                 .function("funcwithkw")?;
 
-            let kw = named_tuple!(frame, "b" => b_value)?;
+            let kw = named_tuple!(&mut *frame, "b" => b_value)?;
             let v = func
                 .with_keywords(kw)
-                .call3(frame, a_value, c_value, d_value)?
+                .call3(&mut *frame, a_value, c_value, d_value)?
                 .unwrap()
                 .cast::<isize>()?;
 
@@ -135,19 +138,19 @@ fn call_with_kw_and_4_vararg() {
         let mut jlrs = j.borrow_mut();
 
         jlrs.frame(8, |global, frame| {
-            let a_value = Value::new(frame, 1isize)?;
-            let b_value = Value::new(frame, 10isize)?;
-            let c_value = Value::new(frame, 5isize)?;
-            let d_value = Value::new(frame, 4isize)?;
-            let e_value = Value::new(frame, 2isize)?;
+            let a_value = Value::new(&mut *frame, 1isize)?;
+            let b_value = Value::new(&mut *frame, 10isize)?;
+            let c_value = Value::new(&mut *frame, 5isize)?;
+            let d_value = Value::new(&mut *frame, 4isize)?;
+            let e_value = Value::new(&mut *frame, 2isize)?;
             let func = Module::main(global)
                 .submodule("JlrsTests")?
                 .function("funcwithkw")?;
 
-            let kw = named_tuple!(frame, "b" => b_value)?;
+            let kw = named_tuple!(&mut *frame, "b" => b_value)?;
             let v = func
                 .with_keywords(kw)
-                .call(frame, &mut [a_value, c_value, d_value, e_value])?
+                .call(&mut *frame, &mut [a_value, c_value, d_value, e_value])?
                 .unwrap()
                 .cast::<isize>()?;
 
@@ -164,16 +167,16 @@ fn call_with_abstract_kw_f32() {
         let mut jlrs = j.borrow_mut();
 
         jlrs.frame(4, |global, frame| {
-            let a_value = Value::new(frame, 1f32)?;
-            let b_value = Value::new(frame, 10f32)?;
+            let a_value = Value::new(&mut *frame, 1f32)?;
+            let b_value = Value::new(&mut *frame, 10f32)?;
             let func = Module::main(global)
                 .submodule("JlrsTests")?
                 .function("funcwithabstractkw")?;
 
-            let kw = named_tuple!(frame, "b" => b_value)?;
+            let kw = named_tuple!(&mut *frame, "b" => b_value)?;
             let v = func
                 .with_keywords(kw)
-                .call1(frame, a_value)?
+                .call1(&mut *frame, a_value)?
                 .unwrap()
                 .cast::<f32>()?;
 
@@ -190,16 +193,16 @@ fn call_with_abstract_kw_f64() {
         let mut jlrs = j.borrow_mut();
 
         jlrs.frame(4, |global, frame| {
-            let a_value = Value::new(frame, 1f32)?;
-            let b_value = Value::new(frame, 10f64)?;
+            let a_value = Value::new(&mut *frame, 1f32)?;
+            let b_value = Value::new(&mut *frame, 10f64)?;
             let func = Module::main(global)
                 .submodule("JlrsTests")?
                 .function("funcwithabstractkw")?;
 
-            let kw = named_tuple!(frame, "b" => b_value)?;
+            let kw = named_tuple!(&mut *frame, "b" => b_value)?;
             let v = func
                 .with_keywords(kw)
-                .call1(frame, a_value)?
+                .call1(&mut *frame, a_value)?
                 .unwrap()
                 .cast::<f64>()?;
 

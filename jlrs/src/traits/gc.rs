@@ -2,7 +2,7 @@
 
 use crate::traits::Frame;
 use crate::Julia;
-use jl_sys::{jl_gc_collect, jl_gc_collection_t, jl_gc_enable, jl_gc_is_enabled};
+use jl_sys::{jl_gc_collect, jl_gc_collection_t, jl_gc_enable, jl_gc_is_enabled, jl_gc_safepoint};
 
 /// The different collection modes.
 #[derive(Debug, Copy, Clone)]
@@ -27,6 +27,11 @@ pub trait Gc: private::Gc {
     /// Force a collection.
     unsafe fn gc_collect(&mut self, mode: GcCollection) {
         jl_gc_collect(mode as jl_gc_collection_t)
+    }
+
+    /// Insert a safepoint, i.e. a point where the garbage collector may run.
+    unsafe fn gc_safepoint(&mut self) {
+        jl_gc_safepoint();
     }
 }
 

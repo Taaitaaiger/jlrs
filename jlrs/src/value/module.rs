@@ -1,10 +1,13 @@
 //! Access Julia modules and the globals and functions defined in them.
 
-use crate::error::{JlrsError, JlrsResult};
 use crate::global::Global;
-use crate::traits::{private::Internal, Cast, Frame, TemporarySymbol};
+use crate::traits::{private::Internal, Call, Cast, Frame, TemporarySymbol};
 use crate::value::symbol::Symbol;
-use crate::value::{CallResult, Value};
+use crate::value::Value;
+use crate::{
+    error::{JlrsError, JlrsResult},
+    traits::Scope,
+};
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{
     jl_base_module, jl_core_module, jl_get_global, jl_main_module, jl_module_t, jl_module_type,
@@ -191,28 +194,21 @@ impl<'base> Module<'base> {
     /// `LinearAlgebra`. This requires one slot on the GC stack. Note that the loaded module is
     /// not made available in the module used to call this method, you can use
     /// `Module::set_global` to do so.
-    pub fn require<'frame, F, S>(
-        self,
-        frame: &mut F,
-        module: S,
-    ) -> JlrsResult<CallResult<'frame, 'static, Self>>
+    pub fn require<'scope, 'frame, S, F, M>(self, scope: S, module: M) -> JlrsResult<S::CallResult>
     where
+        S: Scope<'scope, 'frame, 'static, F>,
         F: Frame<'frame>,
-        S: TemporarySymbol,
+        M: TemporarySymbol,
     {
         unsafe {
-            let out = Module::wrap(jl_base_module)
+            Module::wrap(jl_base_module)
                 .function("require")
                 .unwrap()
                 .call2(
-                    frame,
+                    scope,
                     self.as_value(),
                     module.temporary_symbol(Internal).as_value(),
-                )?
-                // transmute here to change the lifetime from 'frame to 'base.
-                .map(|a| std::mem::transmute(a.cast_unchecked::<Module>()));
-
-            Ok(out)
+                )
         }
     }
 
