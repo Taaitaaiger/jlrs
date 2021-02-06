@@ -1,15 +1,10 @@
 //! A `Future` that represents a function call in Julia running on another thread.
 
-use crate::{frame::{DynamicAsyncFrame, UnrootedCallResult}, prelude::JlrsError};
-use crate::global::Global;
-use crate::traits::{Call, Frame};
+use crate::{error::{exception, CallResult, JlrsResult}, value::traits::call::Call};
+use crate::memory::{global::Global, frame::AsyncGcFrame, traits::frame::Frame};
 use crate::value::module::Module;
 use crate::value::task::Task;
 use crate::value::Value;
-use crate::{
-    error::{exception, CallResult, JlrsResult},
-    traits::async_frame::{AsyncFrame, AsyncScope},
-};
 use futures::task::{Context, Poll, Waker};
 use futures::Future;
 use jl_sys::{jl_call1, jl_exception_occurred, jl_nothing};
@@ -29,95 +24,20 @@ pub(crate) struct TaskState<'frame, 'data> {
     task: Option<Task<'frame>>,
     _marker: PhantomData<&'data ()>,
 }
-pub(crate) struct ScopedTaskState<'frame, 'data, 'borrow, F: AsyncFrame<'frame>> {
-    completed: bool,
-    waker: Option<Waker>,
-    task: Option<Task<'frame>>,
-    frame: &'borrow mut F,
-    _marker: PhantomData<&'data ()>,
-}
 
 /// A `Future` that runs a Julia function on a new thread with `Base.Threads.@spawn`. The function
 /// is called as soon as it is created, not when it's polled for the first time. You can create a
-/// `JuliaFuture` by calling [`Value::call_async`].
-///
+/// `JuliaFuture` by calling [`Value::call_async`]. Calling this function uses two slots in 
+/// the current frame. 
+/// 
 /// [`Value::call_async`]: ../value/struct.Value.html#method.call_async
 pub struct JuliaFuture<'frame, 'data> {
     shared_state: Arc<Mutex<TaskState<'frame, 'data>>>,
 }
 
-/// A `Future` that runs a Julia function on a new thread with `Base.Threads.@spawn`. The function
-/// is called as soon as it is created, not when it's polled for the first time. You can create a
-/// `JuliaFuture` by calling [`Value::call_async`].
-///
-/// [`Value::call_async`]: ../value/struct.Value.html#method.call_async
-pub struct ScopedJuliaFuture<'frame, 'data> {
-    shared_state: Arc<Mutex<TaskState<'frame, 'data>>>,
-}
-
-impl<'frame, 'data> ScopedJuliaFuture<'frame, 'data> {
-    pub(crate) fn new<'scope, 'value, V, F>(
-        scope: &mut F,
-        func: Value<'_, 'data>,
-        values: &mut V,
-    ) -> JlrsResult<Self>
-    where
-        V: AsMut<[Value<'value, 'data>]>,
-        F: AsyncFrame<'frame>,
-    {
-        let shared_state = Arc::new(Mutex::new(TaskState {
-            completed: false,
-            waker: None,
-            task: None,
-            _marker: PhantomData,
-        }));
-
-        scope.value_frame(1, |output, frame| unsafe {
-            let values = values.as_mut();
-            let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
-            let state_ptr_boxed = Value::new(&mut *frame, state_ptr)?;
-
-            let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + values.len());
-
-            vals.push(func);
-            vals.push(state_ptr_boxed);
-            vals.extend_from_slice(values);
-
-            let global = frame.global();
-            let output = output.into_scope(frame);
-
-            let task = Module::main(global)
-                .submodule("Jlrs")?
-                .function("asynccall")?
-                .call(output, &mut vals);
-
-            {
-                let locked = shared_state.lock();
-                match task {
-                    Ok(UnrootedCallResult::Ok(a)) => {
-                        match locked {
-                            Ok(mut data) => data.task = Some(Value::wrap(a.0).cast::<Task>()?),
-                            _ => exception("Cannot set task".into())?,
-                        }
-
-                        Ok(a)
-                    }
-                    Ok(UnrootedCallResult::Err(e)) => Err(JlrsError::Exception(format!(
-                        "asynccall threw an exception: {:?}",
-                        Value::wrap(e.0)
-                    )))?,
-                    Err(e) => Err(e)?,
-                }
-            }
-        })?;
-
-        Ok(ScopedJuliaFuture { shared_state })
-    }
-}
-
 impl<'frame, 'data> JuliaFuture<'frame, 'data> {
     pub(crate) fn new<'value, V>(
-        frame: &mut DynamicAsyncFrame<'frame>,
+        frame: &mut AsyncGcFrame<'frame>,
         func: Value,
         values: &mut V,
     ) -> JlrsResult<Self>

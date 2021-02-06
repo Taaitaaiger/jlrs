@@ -19,16 +19,18 @@
 //! [`DataType`]: struct.DataType.html
 //! [`JuliaTypecheck`]: ../../traits/trait.JuliaTypecheck.html
 
-use crate::traits::{Cast, JuliaTypecheck};
+use crate::convert::cast::Cast;
+use crate::layout::julia_typecheck::JuliaTypecheck;
+use crate::memory::traits::frame::Frame;
 use crate::value::symbol::Symbol;
 use crate::value::type_name::TypeName;
 use crate::value::Value;
 use crate::{
     error::{JlrsError, JlrsResult},
-    traits::{Frame, Scope},
+    memory::traits::scope::Scope,
 };
-use crate::{global::Global, traits::private::Internal};
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
+use crate::{memory::global::Global, value::traits::private::Internal};
 use jl_sys::{
     jl_abstractslot_type, jl_abstractstring_type, jl_any_type, jl_anytuple_type,
     jl_argumenterror_type, jl_bool_type, jl_boundserror_type, jl_builtin_type, jl_char_type,
@@ -273,7 +275,7 @@ impl<'frame> DataType<'frame> {
     /// available or if the type is not concrete.
     pub fn instantiate<'scope, 'fr, 'value, 'borrow, S, F, V>(
         self,
-        frame: S,
+        scope: S,
         values: &mut V,
     ) -> JlrsResult<S::Value>
     where
@@ -288,7 +290,7 @@ impl<'frame> DataType<'frame> {
 
             let values = values.as_mut();
             let value = jl_new_structv(self.ptr(), values.as_mut_ptr().cast(), values.len() as _);
-            frame.value(value, Internal)
+            scope.value(value, Internal)
         }
     }
 }

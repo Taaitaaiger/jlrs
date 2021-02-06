@@ -1,8 +1,6 @@
 //! Support for values with the `Core.SimpleVector` (`SVec`) type.
 
-use crate::error::{JlrsError, JlrsResult};
-use crate::global::Global;
-use crate::traits::{private::Internal, Cast, Frame};
+use crate::{convert::cast::Cast, error::{JlrsError, JlrsResult}, memory::{global::Global, traits::frame::Frame}};
 use crate::value::Value;
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{
@@ -10,6 +8,8 @@ use jl_sys::{
     jl_svec_data, jl_svec_t,
 };
 use std::marker::PhantomData;
+
+use super::traits::private::Internal;
 
 /// A `SimpleVector` is a fixed-size array that contains `Value`s.
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]
@@ -33,7 +33,7 @@ impl<'frame> SimpleVector<'frame> {
     {
         unsafe {
             let svec = jl_alloc_svec(n);
-            if let Err(err) = frame.root(svec.cast(), Internal) {
+            if let Err(err) = frame.push_root(svec.cast(), Internal) {
                 Err(JlrsError::AllocError(err))?
             };
 
@@ -48,7 +48,7 @@ impl<'frame> SimpleVector<'frame> {
         F: Frame<'frame>,
     {
         let svec = jl_alloc_svec_uninit(n);
-        if let Err(err) = frame.root(svec.cast(), Internal) {
+        if let Err(err) = frame.push_root(svec.cast(), Internal) {
             Err(JlrsError::AllocError(err))?
         };
 

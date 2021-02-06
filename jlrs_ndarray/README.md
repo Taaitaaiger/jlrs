@@ -11,7 +11,7 @@ use jlrs_ndarray::NdArray;
 
 fn main() {
     let mut julia = unsafe { Julia::init().unwrap() };
-    julia.dynamic_frame(|_global, frame| {
+    julia.frame_with_slots(|_global, frame| {
         let mut data = vec![1usize, 2, 3, 4, 5, 6];
         let slice = &mut data.as_mut_slice();
         let borrowed = Value::borrow_array(frame, slice, (3, 2))?;

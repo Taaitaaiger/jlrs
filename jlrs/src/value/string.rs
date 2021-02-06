@@ -1,7 +1,7 @@
 //! Support for accessing raw Julia strings.
 
 use crate::error::{JlrsError, JlrsResult};
-use crate::traits::Cast;
+use crate::convert::cast::Cast;
 use crate::value::Value;
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::jl_string_type;

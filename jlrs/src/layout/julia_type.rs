@@ -1,3 +1,5 @@
+//! Associate a Rust type with a Julia type.
+
 use jl_sys::{
     jl_bool_type, jl_char_type, jl_datatype_t, jl_float32_type, jl_float64_type, jl_int16_type,
     jl_int32_type, jl_int64_type, jl_int8_type, jl_uint16_type, jl_uint32_type, jl_uint64_type,
@@ -15,14 +17,14 @@ pub unsafe trait JuliaType {
 #[macro_export]
 macro_rules! impl_julia_type {
     ($type:ty, $jl_type:expr) => {
-        unsafe impl crate::traits::JuliaType for $type {
+        unsafe impl crate::layout::julia_type::JuliaType for $type {
             unsafe fn julia_type() -> *mut ::jl_sys::jl_datatype_t {
                 $jl_type
             }
         }
     };
     ($type:ty, $jl_type:expr, $($bounds:tt)+) => {
-        unsafe impl<$($bounds)+> crate::traits::JuliaType for $type {
+        unsafe impl<$($bounds)+> crate::layout::julia_type::JuliaType for $type {
             unsafe fn julia_type() -> *mut ::jl_sys::jl_datatype_t {
                 $jl_type
             }

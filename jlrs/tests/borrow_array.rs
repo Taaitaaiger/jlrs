@@ -8,7 +8,7 @@ fn borrow_array_1d() {
         let mut data = vec![1u64, 2, 3, 4];
 
         let unboxed = jlrs
-            .frame(1, |_, frame| {
+            .frame_with_slots(1, |_, frame| {
                 let array = Value::borrow_array(frame, &mut data, 4)?;
                 assert!(array.is_array_of::<u64>());
                 array.cast::<Array>()?.copy_inline_data::<u64>()
@@ -29,8 +29,8 @@ fn borrow_array_1d_output() {
         let mut data = vec![1u64, 2, 3, 4];
 
         let unboxed = jlrs
-            .frame(1, |_, frame| {
-                let array = frame.value_frame(0, |output, frame| {
+            .frame_with_slots(1, |_, frame| {
+                let array = frame.value_frame_with_slots(0, |output, frame| {
                     let output = output.into_scope(frame);
                     Value::borrow_array(output, &mut data, 4)
                 })?;
@@ -53,7 +53,7 @@ fn borrow_array_1d_dynamic() {
         let mut data = vec![1u64, 2, 3, 4];
 
         let unboxed = jlrs
-            .dynamic_frame(|_, frame| {
+            .frame(|_, frame| {
                 let array = Value::borrow_array(frame, &mut data, 4)?;
                 array.cast::<Array>()?.copy_inline_data::<u64>()
             })
@@ -73,7 +73,7 @@ fn borrow_array_2d() {
         let mut data = vec![1u64, 2, 3, 4];
 
         let unboxed = jlrs
-            .frame(1, |_, frame| {
+            .frame_with_slots(1, |_, frame| {
                 let array = Value::borrow_array(frame, &mut data, (2, 2))?;
                 array.cast::<Array>()?.copy_inline_data::<u64>()
             })
@@ -94,7 +94,7 @@ fn borrow_array_2d_dynamic() {
         let mut data = vec![1u64, 2, 3, 4];
 
         let unboxed = jlrs
-            .dynamic_frame(|_, frame| {
+            .frame(|_, frame| {
                 let array = Value::borrow_array(frame, &mut data, (2, 2))?;
                 array.cast::<Array>()?.copy_inline_data::<u64>()
             })

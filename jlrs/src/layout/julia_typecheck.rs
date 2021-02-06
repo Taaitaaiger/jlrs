@@ -1,3 +1,5 @@
+//! Trait for Julia type properties.
+
 use crate::value::datatype::DataType;
 use std::ffi::c_void;
 
@@ -22,23 +24,23 @@ pub unsafe trait JuliaTypecheck {
 #[macro_export]
 macro_rules! impl_julia_typecheck {
     ($type:ty, $jl_type:expr, $($lt:lifetime),+) => {
-        unsafe impl<$($lt),+> crate::traits::JuliaTypecheck for $type {
+        unsafe impl<$($lt),+> crate::layout::julia_typecheck::JuliaTypecheck for $type {
             unsafe fn julia_typecheck(t: $crate::value::datatype::DataType) -> bool {
                 t.ptr() == $jl_type
             }
         }
     };
     ($type:ty, $jl_type:expr) => {
-        unsafe impl crate::traits::JuliaTypecheck for $type {
+        unsafe impl crate::layout::julia_typecheck::JuliaTypecheck for $type {
             unsafe fn julia_typecheck(t: $crate::value::datatype::DataType) -> bool {
                 t.ptr() == $jl_type
             }
         }
     };
     ($type:ty) => {
-        unsafe impl crate::traits::JuliaTypecheck for $type {
+        unsafe impl crate::layout::julia_typecheck::JuliaTypecheck for $type {
             unsafe fn julia_typecheck(t: crate::value::datatype::DataType) -> bool {
-                t.ptr() == <$type as $crate::traits::JuliaType>::julia_type()
+                t.ptr() == <$type as $crate::layout::julia_type::JuliaType>::julia_type()
             }
         }
     };

@@ -21,7 +21,7 @@ fn ccall_with_array() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.dynamic_frame(|global, frame| {
+        jlrs.frame(|global, frame| {
             let fn_ptr = Value::new(&mut *frame, uses_null_frame as *mut std::ffi::c_void)?;
             let mut arr_data = vec![0.0f64, 1.0f64];
             let arr = Value::borrow_array(&mut *frame, &mut arr_data, 2)?;

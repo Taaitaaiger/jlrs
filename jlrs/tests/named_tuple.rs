@@ -6,7 +6,7 @@ fn create_named_tuple() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame(4, |_, frame| {
+        jlrs.frame_with_slots(4, |_, frame| {
             let name = "foo";
             let value = Value::new(&mut *frame, 1u32)?;
             let nt = Value::new_named_tuple(&mut *frame, &mut [name], &mut [value])?;
@@ -23,7 +23,7 @@ fn create_named_tuple_macro() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame(5, |_, frame| {
+        jlrs.frame_with_slots(5, |_, frame| {
             let a_name = "a";
             let a_value = Value::new(&mut *frame, 1u32)?;
             let b_value = Value::new(&mut *frame, 2u64)?;

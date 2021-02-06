@@ -1,3 +1,5 @@
+//! Trait to check if a Rust type and a Julia type have matching layouts.
+
 use crate::value::Value;
 
 /// Trait implemented as part of `JuliaStruct` that is used to verify this type has the same
@@ -12,7 +14,7 @@ pub unsafe trait ValidLayout {
 #[macro_export]
 macro_rules! impl_valid_layout {
     ($type:ty, $($lt:lifetime),+) => {
-        unsafe impl<$($lt),+> $crate::traits::valid_layout::ValidLayout for $type {
+        unsafe impl<$($lt),+> $crate::layout::valid_layout::ValidLayout for $type {
             unsafe fn valid_layout(v: $crate::value::Value) -> bool {
                 if let Ok(dt) =  v.cast::<$crate::value::datatype::DataType>() {
                     dt.is::<$type>()
@@ -23,7 +25,7 @@ macro_rules! impl_valid_layout {
         }
     };
     ($t:ty) => {
-        unsafe impl $crate::traits::valid_layout::ValidLayout for $t {
+        unsafe impl $crate::layout::valid_layout::ValidLayout for $t {
             unsafe fn valid_layout(v: $crate::value::Value) -> bool {
                 if let Ok(dt) =  v.cast::<$crate::value::datatype::DataType>() {
                     dt.is::<$t>()

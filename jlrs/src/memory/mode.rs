@@ -10,10 +10,10 @@ use std::cell::Cell;
 use std::ffi::c_void;
 
 /// Mode used by the synchronous runtime.
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct Sync;
 
 /// Mode used by the asynchronous runtime.
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 #[cfg(all(feature = "async", target_os = "linux"))]
 pub struct Async<'a>(pub(crate) &'a Cell<*mut c_void>);

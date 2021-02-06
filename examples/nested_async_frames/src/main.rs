@@ -24,35 +24,39 @@ impl JuliaTask for MyTask {
     type R = async_std::channel::Sender<JlrsResult<Self::T>>;
 
     // This is the async variation of the closure you give to `Julia::frame` or
-    // `Julia::dynamic_frame` when you use the synchronous runtime. The `Global` can be used to
-    // access `Module`s and other static data, while the `DynamicAsyncFrame` let you create values, call
+    // `Julia::frame_with_slots` when you use the synchronous runtime. The `Global` can be used to
+    // access `Module`s and other static data, while the `AsyncDynamicFrame` let you create values, call
     // functions, and create nested frames.
     async fn run<'base>(
         &mut self,
         global: Global<'base>,
-        frame: &mut DynamicAsyncFrame<'base>,
+        frame: &mut AsyncDynamicFrame<'base>,
     ) -> JlrsResult<Self::T> {
+
         // Nesting async frames works like nesting on ordinary frame. The main differences are the `async`
         // block in the closure, and frame is provided by value rather than by mutable reference.
         let v = unsafe {
             frame
-            .async_frame(|mut frame| async move {
+            .async_dynamic_value_frame(|output, frame| async move {
                 // Convert the two arguments to values Julia can work with.
-                let iters = Value::new(&mut frame, self.iters)?;
-                let dims = Value::new(&mut frame, self.dims)?;
+                let iters = Value::new(&mut *frame, self.iters)?;
+                let dims = Value::new(&mut *frame, self.dims)?;
 
                 // Get `complexfunc` in `MyModule`, call it asynchronously with `call_async`, and await
                 // the result before casting it to an `f64` (which that function returns). A function that
                 // is called with `call_async` is executed on a thread created with `Base.threads.@spawn`.
-                Module::main(global)
+                let out = Module::main(global)
                     .submodule("MyModule")?
                     .function("complexfunc")?
-                    .call_async(&mut frame, &mut [dims, iters])
+                    .call_async(&mut *frame, &mut [dims, iters])
                     .await?
-                    .unwrap()
-                    .cast::<f64>()
+                    .unwrap();
+
+                let output = output.into_scope(frame);
+                Ok(out.as_unrooted(output))
             })
             .await?
+            .cast::<f64>()?
         };
 
         // Box the result
@@ -91,7 +95,7 @@ async fn main() {
     // After calling this function we have a `task_sender` we can use to send tasks and requests
     // to include a file to the runtime, and a handle to the thread where the runtime is running.
     let (julia, handle) = unsafe {
-        AsyncJulia::init_async(16, 2, 1)
+        AsyncJulia::init_async(16, 4, 1)
             .await
             .expect("Could not init Julia")
     };

@@ -10,7 +10,7 @@ use jlrs::prelude::*;
 use ndarray::{ArrayView, ArrayViewMut, Dim, IntoDimension, IxDynImpl, ShapeBuilder};
 
 mod private {
-    use jlrs::traits::ValidLayout;
+    use jlrs::layout::valid_layout::ValidLayout;
     use jlrs::value::array::{Array, TypedArray};
 
     pub trait Sealed {}
@@ -133,7 +133,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .dynamic_frame(|_global, frame| {
+                .frame(|_global, frame| {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
                     let borrowed = Value::borrow_array(&mut *frame, slice, (3, 2))?;
@@ -156,7 +156,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .dynamic_frame(|_global, frame| {
+                .frame(|_global, frame| {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
                     let borrowed = Value::borrow_array(&mut *frame, slice, (3, 2))?;
@@ -176,7 +176,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .dynamic_frame(|_global, frame| {
+                .frame(|_global, frame| {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
                     let borrowed = Value::borrow_array(&mut *frame, slice, (3, 2))?;
@@ -205,7 +205,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .dynamic_frame(|_global, frame| {
+                .frame(|_global, frame| {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
                     let borrowed = Value::borrow_array(&mut *frame, slice, (3, 2))?;
@@ -226,7 +226,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .dynamic_frame(|_global, frame| {
+                .frame(|_global, frame| {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
                     let borrowed = Value::borrow_array(&mut *frame, slice, (3, 2))?;
@@ -249,7 +249,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .dynamic_frame(|_global, frame| {
+                .frame(|_global, frame| {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
                     let borrowed = Value::borrow_array(&mut *frame, slice, (3, 2))?;
@@ -278,7 +278,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .dynamic_frame(|_global, frame| {
+                .frame(|_global, frame| {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
                     let borrowed = Value::borrow_array(&mut *frame, slice, (3, 2))?;

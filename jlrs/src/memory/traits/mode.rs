@@ -1,11 +1,11 @@
 //! A trait for handling the differences between the runtime modes.
 
 #[cfg(all(feature = "async", target_os = "linux"))]
-use crate::mode::Async;
-use crate::mode::Sync;
+use crate::memory::mode::Async;
+use crate::memory::mode::Sync;
 
 /// This trait handles the differences between the runtime modes.
-pub trait Mode: Clone + private::Mode {}
+pub trait Mode: Copy + private::Mode {}
 
 impl Mode for Sync {}
 
@@ -14,9 +14,8 @@ impl<'a> Mode for Async<'a> {}
 
 pub(crate) mod private {
     #[cfg(all(feature = "async", target_os = "linux"))]
-    use crate::mode::Async;
-    use crate::mode::Sync;
-    use crate::traits::private::Internal;
+    use crate::memory::mode::Async;
+    use crate::{memory::mode::Sync, value::traits::private::Internal};
     use jl_sys::jl_get_ptls_states;
     use std::ffi::c_void;
     use std::ptr::null_mut;

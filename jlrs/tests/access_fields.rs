@@ -6,7 +6,7 @@ use jlrs::value::datatype::Mutable;
 fn access_tuple_fields() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
-        jlrs.frame(4, |global, frame| {
+        jlrs.frame_with_slots(4, |global, frame| {
             // Returns (1, 2, 3) as Tuple{UInt32, UInt16, Int64}
             let func = Module::main(global)
                 .submodule("JlrsTests")?
@@ -17,7 +17,7 @@ fn access_tuple_fields() {
             assert_eq!(tup.n_fields(), 3);
             let v1 = tup.get_nth_field(&mut *frame, 0)?;
             let v2 = tup.get_nth_field(&mut *frame, 1)?;
-            let v3 = frame.value_frame(0, |output, frame| {
+            let v3 = frame.value_frame_with_slots(0, |output, frame| {
                 let output = output.into_scope(frame);
                 tup.get_nth_field(output, 2)
             })?;
@@ -36,7 +36,7 @@ fn access_tuple_fields() {
 fn cannot_access_oob_tuple_field() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
-        jlrs.frame(4, |global, frame| {
+        jlrs.frame_with_slots(4, |global, frame| {
             // Returns (1, 2, 3) as Tuple{UInt32, UInt16, Int64}
             let func = Module::main(global)
                 .submodule("JlrsTests")?
@@ -54,7 +54,7 @@ fn cannot_access_oob_tuple_field() {
 fn access_non_pointer_tuple_field_must_alloc() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
-        jlrs.frame(4, |global, frame| {
+        jlrs.frame_with_slots(4, |global, frame| {
             // Returns (1, 2, 3) as Tuple{UInt32, UInt16, Int64}
             let func = Module::main(global)
                 .submodule("JlrsTests")?
@@ -72,7 +72,7 @@ fn access_non_pointer_tuple_field_must_alloc() {
 fn access_mutable_struct_fields() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
-        jlrs.frame(5, |global, frame| {
+        jlrs.frame_with_slots(5, |global, frame| {
             //mutable struct MutableStruct
             //  x
             //  y::UInt64
@@ -91,7 +91,7 @@ fn access_mutable_struct_fields() {
             let x_val = unsafe { mut_struct.get_field_noalloc("x") };
             assert!(x_val.is_ok());
             assert!(x_val.unwrap().is::<f32>());
-            let _ = frame.value_frame(0, |output, frame| {
+            let _ = frame.value_frame_with_slots(0, |output, frame| {
                 let output = output.into_scope(frame);
                 mut_struct.get_field(output, "y")
             })?;
@@ -107,7 +107,7 @@ fn access_mutable_struct_fields() {
 fn cannot_access_unknown_mutable_struct_field() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
-        jlrs.frame(5, |global, frame| {
+        jlrs.frame_with_slots(5, |global, frame| {
             //mutable struct MutableStruct
             //  x
             //  y::UInt64
@@ -135,7 +135,7 @@ fn access_bounds_error_fields() {
         let mut jlrs = j.borrow_mut();
 
         let oob_idx = jlrs
-            .frame(5, |global, frame| {
+            .frame_with_slots(5, |global, frame| {
                 let idx = Value::new(&mut *frame, 4usize)?;
                 let data = vec![1.0f64, 2., 3.];
                 let array = Value::move_array(&mut *frame, data, 3)?;
@@ -169,7 +169,7 @@ fn access_bounds_error_fields_oob() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame(5, |global, frame| {
+        jlrs.frame_with_slots(5, |global, frame| {
             let idx = Value::new(&mut *frame, 4usize)?;
             let data = vec![1.0f64, 2., 3.];
             let array = Value::move_array(&mut *frame, data, 3)?;
@@ -192,7 +192,7 @@ fn access_bounds_error_fields_output() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame(5, |global, frame| {
+        jlrs.frame_with_slots(5, |global, frame| {
             let idx = Value::new(&mut *frame, 4usize)?;
             let data = vec![1.0f64, 2., 3.];
             let array = Value::move_array(&mut *frame, data, 3)?;
@@ -200,7 +200,7 @@ fn access_bounds_error_fields_output() {
             let out = func.call2(&mut *frame, array, idx)?.unwrap_err();
 
             let field_names = out.field_names();
-            let _ = frame.value_frame(1, |output, frame| {
+            let _ = frame.value_frame_with_slots(1, |output, frame| {
                 let field = out.get_field(&mut *frame, field_names[1])?;
                 let output = output.into_scope(frame);
                 field.get_nth_field(output, 0)
@@ -217,7 +217,7 @@ fn access_bounds_error_fields_output_oob() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame(5, |global, frame| {
+        jlrs.frame_with_slots(5, |global, frame| {
             let idx = Value::new(&mut *frame, 4usize)?;
             let data = vec![1.0f64, 2., 3.];
             let array = Value::move_array(&mut *frame, data, 3)?;
@@ -226,7 +226,7 @@ fn access_bounds_error_fields_output_oob() {
 
             let field_names = out.field_names();
             let _ = frame
-                .value_frame(1, |output, frame| {
+                .value_frame_with_slots(1, |output, frame| {
                     let field = out.get_field(&mut *frame, field_names[1])?;
                     let output = output.into_scope(frame);
                     field.get_nth_field(output, 123)

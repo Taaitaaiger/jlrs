@@ -83,22 +83,26 @@ macro_rules! named_tuple {
     };
 }
 
+pub mod traits;
+
 use self::array::{Array, Dimensions};
 use self::datatype::DataType;
 use self::module::Module;
 use self::symbol::Symbol;
 use self::type_var::TypeVar;
 use self::union_all::UnionAll;
-use crate::global::Global;
-use crate::impl_julia_type;
-use crate::traits::{
-    frame::private::Frame as PFrame, private::Internal, scope::private::Scope as PScope,
-    valid_layout::ValidLayout, Cast, Frame, IntoJulia, JuliaType, JuliaTypecheck, TemporarySymbol,
+use crate::{convert::into_julia::IntoJulia, impl_julia_type};
+use crate::memory::traits::{
+    scope::Scope,
+    frame::private::Frame as PNewFrame, frame::Frame,
+    scope::private::Scope as PScope,
 };
+use crate::layout::{valid_layout::ValidLayout, julia_type::JuliaType, julia_typecheck::JuliaTypecheck};
+use crate::convert::{cast::Cast, temporary_symbol::TemporarySymbol};
 use crate::{
     error::{CallResult, JlrsError, JlrsResult},
-    traits::Scope,
 };
+use crate::memory::{global::Global, output::OutputScope};
 use jl_sys::{
     jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_an_empty_string,
     jl_an_empty_vec_any, jl_any_type, jl_apply_array_type, jl_apply_tuple_type_v, jl_apply_type,
@@ -113,12 +117,15 @@ use jl_sys::{
     jl_subtype, jl_svec_data, jl_svec_len, jl_true, jl_type_union, jl_type_unionall, jl_typeof,
     jl_typeof_str, jl_undefref_exception, jl_value_t,
 };
+use traits::private::Internal;
 use std::cell::UnsafeCell;
 use std::ffi::{CStr, CString};
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::marker::PhantomData;
 use std::ptr::null_mut;
 use std::slice;
+#[cfg(all(feature = "async", target_os = "linux"))]
+use crate::memory::frame::AsyncGcFrame;
 
 /// In some cases it's necessary to place one or more arguments in front of the arguments a
 /// function is called with. Examples include `Value::asynccall` and `WithKeywords::call`. If
@@ -325,13 +332,13 @@ impl<'frame, 'data> Value<'frame, 'data> {
                     .cast(),
                     Internal,
                 ),
-                n if n <= 8 => scope.value_frame(1, |output, frame| {
+                n if n <= 8 => scope.value_frame_with_slots(1, |output, frame| {
                     let tuple = small_dim_tuple(frame, &dims)?;
                     output
                         .into_scope(frame)
                         .value(jl_new_array(array_type, tuple.ptr()).cast(), Internal)
                 }),
-                _ => scope.value_frame(1, |output, frame| {
+                _ => scope.value_frame_with_slots(1, |output, frame| {
                     let tuple = large_dim_tuple(frame, &dims)?;
                     output
                         .into_scope(frame)
@@ -375,7 +382,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
                     .cast(),
                     Internal,
                 ),
-                n if n <= 8 => scope.value_frame(1, |output, frame| {
+                n if n <= 8 => scope.value_frame_with_slots(1, |output, frame| {
                     let tuple = small_dim_tuple(frame, &dims)?;
                     output.into_scope(frame).value(
                         jl_ptr_to_array(
@@ -388,7 +395,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
                         Internal,
                     )
                 }),
-                _ => scope.value_frame(1, |output, frame| {
+                _ => scope.value_frame_with_slots(1, |output, frame| {
                     let tuple = large_dim_tuple(frame, &dims)?;
                     output.into_scope(frame).value(
                         jl_ptr_to_array(
@@ -428,10 +435,10 @@ impl<'frame, 'data> Value<'frame, 'data> {
             let global = scope.global();
             let finalizer = Module::main(global).submodule("Jlrs")?.function("clean")?;
 
-            scope.value_frame(2, |output, frame| {
+            scope.value_frame_with_slots(2, |output, frame| {
                 let array_type = jl_apply_array_type(T::julia_type().cast(), dims.n_dimensions());
                 let _ = frame
-                    .root(array_type, Internal)
+                    .push_root(array_type, Internal)
                     .map_err(JlrsError::alloc_error)?;
 
                 match dims.n_dimensions() {
@@ -538,7 +545,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
         T: TemporarySymbol,
         V: AsMut<[Value<'value, 'data>]>,
     {
-        scope.value_frame(4, |output, frame| unsafe {
+        scope.value_frame_with_slots(4, |output, frame| unsafe {
             let global = frame.global();
             let field_names = field_names.as_mut();
             let values_m = values.as_mut();
@@ -753,6 +760,13 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// Safety: The value must not contain a reference any borrowed data.
     pub unsafe fn assume_owned(self) -> Value<'frame, 'static> {
         Value::wrap(self.ptr())
+    }
+
+    pub fn as_unrooted<'scope, 'borrow, F: Frame<'frame>>(
+        self,
+        _output: OutputScope<'scope, 'frame, 'borrow, F>,
+    ) -> UnrootedValue<'scope, 'data, 'borrow> {
+        unsafe { UnrootedValue::new(self.ptr()) }
     }
 }
 
@@ -1156,37 +1170,19 @@ impl<'fr, 'data> Value<'fr, 'data> {
     /// the result of this function call if no exception is thrown, the exception if one is, or an
     /// error if no space is left on the stack.
     ///
-    /// This function can only be called with an `DynamicAsyncFrame`, while you're waiting for this
+    /// This function can only be called with an `AsyncDynamicFrame`, while you're waiting for this
     /// function to complete, other tasks are able to progress.
     #[cfg(all(feature = "async", target_os = "linux"))]
     pub async fn call_async<'frame, 'value, 'borrow, V>(
         self,
-        frame: &mut crate::frame::DynamicAsyncFrame<'frame>,
+        frame: &mut AsyncGcFrame<'frame>,
         args: &mut V,
     ) -> JlrsResult<CallResult<'frame, 'borrow>>
     where
         V: AsMut<[Value<'value, 'borrow>]>,
     {
-        unsafe { Ok(crate::julia_future::JuliaFuture::new(frame, self, args)?.await) }
+        unsafe { Ok(crate::multitask::julia_future::JuliaFuture::new(frame, self, args)?.await) }
     }
-
-    /*
-    #[cfg(all(feature = "async", target_os = "linux"))]
-    pub async fn call_async<'frame, 'value, 'borrow, V, S, F>(
-        self,
-        scope: S,
-        args: &mut V,
-    ) -> JlrsResult<S::AsyncCallResult>
-    where
-        V: AsMut<[Value<'value, 'borrow>]>,
-        S: AsyncScope<'scope, 'frame, 'borrow>,
-        F: AsyncFrame<'frame>,
-    {
-        scope.async_value_frame(|mut frame| async move {
-            unsafe { Ok(crate::julia_future::JuliaFuture::new(frame, self, args)?.await) }
-        })
-    }
-    */
 
     /// Returns an anonymous function that wraps this value in a try-catch block. Calling this
     /// anonymous function with some arguments will call the value as a function with those
@@ -1379,12 +1375,12 @@ where
     let exc = jl_exception_occurred();
 
     if !exc.is_null() {
-        match frame.root(exc, Internal) {
+        match frame.push_root(exc, Internal) {
             Ok(exc) => Ok(Err(exc)),
             Err(a) => Err(a.into()),
         }
     } else {
-        match frame.root(res, Internal) {
+        match frame.push_root(res, Internal) {
             Ok(v) => Ok(Ok(v)),
             Err(a) => Err(a.into()),
         }
@@ -1403,7 +1399,9 @@ where
     let elem_types = JL_LONG_TYPE.with(|longs| longs.get());
     let tuple_type = jl_apply_tuple_type_v(elem_types.cast(), n);
     let tuple = jl_new_struct_uninit(tuple_type);
-    let v = frame.root(tuple, Internal).map_err(JlrsError::alloc_error)?;
+    let v = frame
+        .push_root(tuple, Internal)
+        .map_err(JlrsError::alloc_error)?;
 
     let usize_ptr: *mut usize = v.ptr().cast();
     std::ptr::copy_nonoverlapping(dims.as_slice().as_ptr(), usize_ptr, n);
@@ -1422,10 +1420,86 @@ where
     let mut elem_types = vec![usize::julia_type(); n];
     let tuple_type = jl_apply_tuple_type_v(elem_types.as_mut_ptr().cast(), n);
     let tuple = jl_new_struct_uninit(tuple_type);
-    let v = frame.root(tuple, Internal).map_err(JlrsError::alloc_error)?;
+    let v = frame
+        .push_root(tuple, Internal)
+        .map_err(JlrsError::alloc_error)?;
 
     let usize_ptr: *mut usize = v.ptr().cast();
     std::ptr::copy_nonoverlapping(dims.as_slice().as_ptr(), usize_ptr, n);
 
     Ok(v)
+}
+
+#[repr(transparent)]
+pub(crate) struct PendingValue<'frame, 'data>(
+    *mut jl_value_t,
+    PhantomData<&'frame ()>,
+    PhantomData<&'data ()>,
+);
+
+impl<'frame, 'data> PendingValue<'frame, 'data> {
+    pub(crate) fn inner(self) -> *mut jl_value_t {
+        self.0
+    }
+
+    pub(crate) fn new(contents: *mut jl_value_t) -> Self {
+        PendingValue(contents, PhantomData, PhantomData)
+    }
+}
+
+/// A `Value` that has not yet been rooted.
+#[repr(transparent)]
+pub struct UnrootedValue<'frame, 'data, 'borrow>(
+    pub(crate) *mut jl_value_t,
+    PhantomData<&'frame ()>,
+    PhantomData<&'data ()>,
+    PhantomData<&'borrow ()>,
+);
+
+impl<'frame, 'data, 'borrow> UnrootedValue<'frame, 'data, 'borrow> {
+    pub(crate) fn into_pending(self) -> PendingValue<'frame, 'data> {
+        PendingValue::new(self.0)
+    }
+
+    pub(crate) fn ptr(self) -> *mut jl_value_t {
+        self.0
+    }
+
+    pub(crate) fn new(contents: *mut jl_value_t) -> Self {
+        UnrootedValue(contents, PhantomData, PhantomData, PhantomData)
+    }
+}
+
+pub(crate) type PendingCallResult<'frame, 'data> =
+    Result<PendingValue<'frame, 'data>, PendingValue<'frame, 'data>>;
+
+/// A `CallResult` that has not yet been rooted.
+pub enum UnrootedCallResult<'frame, 'data, 'inner> {
+    Ok(UnrootedValue<'frame, 'data, 'inner>),
+    Err(UnrootedValue<'frame, 'data, 'inner>),
+}
+
+impl<'frame, 'data, 'inner> UnrootedCallResult<'frame, 'data, 'inner> {
+    pub(crate) fn into_pending(self) -> PendingCallResult<'frame, 'data> {
+        match self {
+            Self::Ok(pov) => Ok(pov.into_pending()),
+            Self::Err(pov) => Err(pov.into_pending()),
+        }
+    }
+
+    #[cfg(all(feature = "async", target_os = "linux"))]
+    pub(crate) fn is_exception(&self) -> bool {
+        match self {
+            Self::Ok(_) => true,
+            Self::Err(_) => false,
+        }
+    }
+
+    #[cfg(all(feature = "async", target_os = "linux"))]
+    pub(crate) fn ptr(self) -> *mut jl_value_t {
+        match self {
+            Self::Ok(pov) => pov.ptr(),
+            Self::Err(pov) => pov.ptr(),
+        }
+    }
 }

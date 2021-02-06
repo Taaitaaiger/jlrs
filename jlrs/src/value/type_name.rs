@@ -10,8 +10,8 @@ use super::{
     method_table::MethodTable, module::Module, simple_vector::SimpleVector, symbol::Symbol, Value,
 };
 use crate::error::{JlrsError, JlrsResult};
-use crate::global::Global;
-use crate::traits::Cast;
+use crate::memory::global::Global;
+use crate::convert::cast::Cast;
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{
     jl_array_typename, jl_llvmpointer_typename, jl_namedtuple_typename, jl_pointer_typename,

@@ -1,8 +1,8 @@
 //! Traits used to implement tasks for the async runtime.
 
 use crate::error::JlrsResult;
-use crate::frame::DynamicAsyncFrame;
-use crate::global::Global;
+use crate::memory::frame::AsyncGcFrame;
+use crate::memory::global::Global;
 use async_std::channel::Sender as AsyncStdSender;
 use async_trait::async_trait;
 use crossbeam_channel::Sender as CrossbeamSender;
@@ -18,7 +18,7 @@ pub trait JuliaTask: Send + Sync + 'static {
     /// caller. Must be the same across all implementations.
     type R: ReturnChannel<T = Self::T>;
 
-    /// The entrypoint of a task. You can use the `Global` and `DynamicAsyncFrame` to call arbitrary
+    /// The entrypoint of a task. You can use the `Global` and `AsyncDynamicFrame` to call arbitrary
     /// functions from Julia. Additionally, [`Value::call_async`] can be used to call a function
     /// on another thread and allow other tasks to progress while awaiting the result.
     /// Implementations that don't use [`Value::call_async`] will block the runtime during
@@ -28,7 +28,7 @@ pub trait JuliaTask: Send + Sync + 'static {
     async fn run<'base>(
         &mut self,
         global: Global<'base>,
-        frame: &mut DynamicAsyncFrame<'base>,
+        frame: &mut AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::T>;
 
     /// The return channel for this task, or `None` if the result doesn't need to be returned.

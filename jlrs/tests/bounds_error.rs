@@ -6,8 +6,8 @@ fn bounds_error() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
         let oob_idx = jlrs
-            .frame(0, |global, frame| {
-                frame.frame(5, |frame| {
+            .frame_with_slots(0, |global, frame| {
+                frame.frame_with_slots(5, |frame| {
                     let idx = Value::new(&mut *frame, 4usize)?;
                     let data = vec![1.0f64, 2., 3.];
                     let array = Value::move_array(&mut *frame, data, 3)?;

@@ -10,15 +10,14 @@
 //!
 //! [`JuliaTask`]: ../traits/multitask/trait.JuliaTask.html
 
-use crate::error::{JlrsError, JlrsResult};
-use crate::frame::DynamicAsyncFrame;
-use crate::global::Global;
-use crate::mode::Async;
-use crate::traits::multitask::{JuliaTask, ReturnChannel};
-use crate::traits::Call;
+pub mod julia_future;
+pub mod julia_task;
+
+use crate::{error::{JlrsError, JlrsResult}, memory::mode::Async, value::traits::call::Call};
+use crate::memory::frame::{AsyncGcFrame, GcFrame, PAGE_SIZE};
+use crate::memory::global::Global;
 use crate::value::module::Module;
 use crate::value::Value;
-use crate::{frame::PAGE_SIZE, prelude::StaticFrame};
 use crate::{INIT, JLRS_JL};
 use async_std::channel::{
     bounded, Receiver as AsyncStdReceiver, RecvError, Sender as AsyncStdSender, TrySendError,
@@ -29,6 +28,7 @@ use async_std::task::{self, JoinHandle as AsyncStdHandle};
 use jl_sys::{
     jl_atexit_hook, jl_get_ptls_states, jl_init_with_image__threading, jl_is_initialized,
 };
+use julia_task::{JuliaTask, ReturnChannel};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Condvar, Mutex};
@@ -357,6 +357,41 @@ where
     }
 }
 
+enum Status {
+    Pending,
+    Ok,
+    Err(Option<Box<JlrsError>>),
+}
+
+impl Status {
+    fn is_pending(&self) -> bool {
+        match self {
+            Status::Pending => true,
+            _ => false,
+        }
+    }
+
+    fn as_jlrs_result(&mut self) -> JlrsResult<()> {
+        match self {
+            Status::Ok => Ok(()),
+            Status::Err(ref mut e) => Err(e.take().expect("Status is Err, but no error is set")),
+            Status::Pending => panic!("Cannot convert Status::Pending to JlrsResult"),
+        }
+    }
+}
+
+enum Message<T, R> {
+    Task(
+        Box<dyn JuliaTask<T = T, R = R>>,
+        AsyncStdSender<Message<T, R>>,
+    ),
+    Include(PathBuf, Arc<(AsyncStdMutex<Status>, AsyncStdCondvar)>),
+    TryInclude(PathBuf, Arc<(Mutex<Status>, Condvar)>),
+    Complete(usize, Box<AsyncStack>),
+    SetWakeFn(Arc<(AsyncStdMutex<Status>, AsyncStdCondvar)>),
+    TrySetWakeFn(Arc<(Mutex<Status>, Condvar)>),
+}
+
 #[derive(Debug)]
 struct AsyncStack {
     top: [Cell<*mut c_void>; 2],
@@ -630,7 +665,7 @@ where
             let res = {
                 let mode = Async(&stack.top[1]);
                 let raw = &mut stack.stack;
-                let mut frame = DynamicAsyncFrame::new(raw, mode);
+                let mut frame = AsyncGcFrame::new(raw, 0, mode);
                 let global = Global::new();
                 jl_task.run(global, &mut frame).await
             };
@@ -652,7 +687,7 @@ fn call_include(stack: &mut AsyncStack, path: PathBuf) -> JlrsResult<()> {
         let global = Global::new();
         let mode = Async(&stack.top[1]);
         let raw = &mut stack.stack;
-        let mut frame = StaticFrame::new(raw, 1, mode);
+        let mut frame = GcFrame::new(raw, 2, mode);
 
         match path.to_str() {
             Some(path) => {
@@ -710,9 +745,9 @@ fn call_set_wake_fn(stack: &mut AsyncStack) -> JlrsResult<()> {
         let global = Global::new();
         let mode = Async(&stack.top[1]);
         let raw = &mut stack.stack;
-        let mut frame = StaticFrame::new(raw, 2, mode);
+        let mut frame = GcFrame::new(raw, 2, mode);
 
-        let waker = Value::new(&mut frame, crate::julia_future::wake_task as *mut c_void)?;
+        let waker = Value::new(&mut frame, julia_future::wake_task as *mut c_void)?;
         Module::main(global)
             .submodule("Jlrs")?
             .global("wakerust")?
@@ -761,39 +796,4 @@ fn try_set_wake_fn(stack: &mut AsyncStack, completed: Arc<(Mutex<Status>, Condva
 
         condvar.notify_one();
     }
-}
-
-enum Status {
-    Pending,
-    Ok,
-    Err(Option<Box<JlrsError>>),
-}
-
-impl Status {
-    fn is_pending(&self) -> bool {
-        match self {
-            Status::Pending => true,
-            _ => false,
-        }
-    }
-
-    fn as_jlrs_result(&mut self) -> JlrsResult<()> {
-        match self {
-            Status::Ok => Ok(()),
-            Status::Err(ref mut e) => Err(e.take().expect("Status is Err, but no error is set")),
-            Status::Pending => panic!("Cannot convert Status::Pending to JlrsResult"),
-        }
-    }
-}
-
-enum Message<T, R> {
-    Task(
-        Box<dyn JuliaTask<T = T, R = R>>,
-        AsyncStdSender<Message<T, R>>,
-    ),
-    Include(PathBuf, Arc<(AsyncStdMutex<Status>, AsyncStdCondvar)>),
-    TryInclude(PathBuf, Arc<(Mutex<Status>, Condvar)>),
-    Complete(usize, Box<AsyncStack>),
-    SetWakeFn(Arc<(AsyncStdMutex<Status>, AsyncStdCondvar)>),
-    TrySetWakeFn(Arc<(Mutex<Status>, Condvar)>),
 }

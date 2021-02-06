@@ -1,4 +1,4 @@
-//! Machinery for bits unions.
+//! Enforce layout requirements of bits union fields.
 
 /// Trait implemented by the aligning structs, which ensure bits unions are properly aligned.
 /// Used in combination with `BitsUnion` and `Flag` to ensure bits unions are inserted correctly.

@@ -13,7 +13,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .dynamic_frame(|_global, frame| {
+                .frame(|_global, frame| {
                     let s = BitsTypeBool { a: true };
                     let v = Value::new(&mut *frame, s).unwrap();
                     let first = v.get_nth_field(&mut *frame, 0).unwrap();
@@ -34,7 +34,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .dynamic_frame(|_global, frame| {
+                .frame(|_global, frame| {
                     let s = BitsTypeChar { a: 'b' };
                     let v = Value::new(&mut *frame, s).unwrap();
                     let first = v.get_nth_field(&mut *frame, 0).unwrap();
@@ -55,7 +55,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .dynamic_frame(|_global, frame| {
+                .frame(|_global, frame| {
                     let s = BitsTypeUInt8 { a: 1 };
                     let v = Value::new(&mut *frame, s).unwrap();
                     let first = v.get_nth_field(&mut *frame, 0).unwrap();
@@ -76,7 +76,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .dynamic_frame(|_global, frame| {
+                .frame(|_global, frame| {
                     let s = BitsTypeUInt16 { a: 2 };
                     let v = Value::new(&mut *frame, s).unwrap();
                     let first = v.get_nth_field(&mut *frame, 0).unwrap();
@@ -97,7 +97,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .dynamic_frame(|_global, frame| {
+                .frame(|_global, frame| {
                     let s = BitsTypeUInt32 { a: 3 };
                     let v = Value::new(&mut *frame, s).unwrap();
                     let first = v.get_nth_field(&mut *frame, 0).unwrap();
@@ -118,7 +118,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .dynamic_frame(|_global, frame| {
+                .frame(|_global, frame| {
                     let s = BitsTypeUInt64 { a: 4 };
                     let v = Value::new(&mut *frame, s).unwrap();
                     let first = v.get_nth_field(&mut *frame, 0).unwrap();
@@ -139,7 +139,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .dynamic_frame(|_global, frame| {
+                .frame(|_global, frame| {
                     let s = BitsTypeUInt { a: 5 };
                     let v = Value::new(&mut *frame, s).unwrap();
                     let first = v.get_nth_field(&mut *frame, 0).unwrap();
@@ -160,7 +160,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .dynamic_frame(|_global, frame| {
+                .frame(|_global, frame| {
                     let s = BitsTypeInt8 { a: -1 };
                     let v = Value::new(&mut *frame, s).unwrap();
                     let first = v.get_nth_field(&mut *frame, 0).unwrap();
@@ -181,7 +181,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .dynamic_frame(|_global, frame| {
+                .frame(|_global, frame| {
                     let s = BitsTypeInt16 { a: -2 };
                     let v = Value::new(&mut *frame, s).unwrap();
                     let first = v.get_nth_field(&mut *frame, 0).unwrap();
@@ -202,7 +202,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .dynamic_frame(|_global, frame| {
+                .frame(|_global, frame| {
                     let s = BitsTypeInt32 { a: -3 };
                     let v = Value::new(&mut *frame, s).unwrap();
                     let first = v.get_nth_field(&mut *frame, 0).unwrap();
@@ -223,7 +223,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .dynamic_frame(|_global, frame| {
+                .frame(|_global, frame| {
                     let s = BitsTypeInt64 { a: -4 };
                     let v = Value::new(&mut *frame, s).unwrap();
                     let first = v.get_nth_field(&mut *frame, 0).unwrap();
@@ -244,7 +244,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .dynamic_frame(|_global, frame| {
+                .frame(|_global, frame| {
                     let s = BitsTypeInt { a: -5 };
                     let v = Value::new(&mut *frame, s).unwrap();
                     let first = v.get_nth_field(&mut *frame, 0).unwrap();
@@ -265,7 +265,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .dynamic_frame(|_global, frame| {
+                .frame(|_global, frame| {
                     let s = BitsTypeFloat32 { a: 1.2 };
                     let v = Value::new(&mut *frame, s).unwrap();
                     let first = v.get_nth_field(&mut *frame, 0).unwrap();
@@ -286,7 +286,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .dynamic_frame(|_global, frame| {
+                .frame(|_global, frame| {
                     let s = BitsTypeFloat64 { a: -2.3 };
                     let v = Value::new(&mut *frame, s).unwrap();
                     let first = v.get_nth_field(&mut *frame, 0).unwrap();
@@ -307,7 +307,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .dynamic_frame(|_global, frame| {
+                .frame(|_global, frame| {
                     let s = BitsCharFloat32Float64 {
                         a: 'a',
                         b: 3.0,
@@ -332,7 +332,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .dynamic_frame(|_global, frame| {
+                .frame(|_global, frame| {
                     let s = BitsIntBool { a: 1, b: true };
                     let v = Value::new(&mut *frame, s).unwrap();
                     let first = v.get_nth_field(&mut *frame, 0).unwrap();
@@ -353,7 +353,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .dynamic_frame(|_global, frame| {
+                .frame(|_global, frame| {
                     let s = BitsCharBitsIntChar {
                         a: 'a',
                         b: BitsIntChar { a: 1, b: 'b' },
@@ -376,7 +376,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .dynamic_frame(|_global, frame| {
+                .frame(|_global, frame| {
                     let s = BitsUInt8TupleInt32Int64 {
                         a: 0,
                         b: Tuple2(-1, -3),
@@ -403,7 +403,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .dynamic_frame(|global, frame| {
+                .frame(|global, frame| {
                     let rs_val = BitsUInt8TupleInt32TupleInt16UInt16 {
                         a: 0,
                         b: Tuple2(-1, Tuple2(-1, 3)),
@@ -441,7 +441,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .dynamic_frame(|global, frame| {
+                .frame(|global, frame| {
                     let constr = Module::main(global)
                         .submodule("WithBitsUnion")?
                         .function("SingleVariant")?;
@@ -478,7 +478,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .dynamic_frame(|global, frame| {
+                .frame(|global, frame| {
                     let constr = Module::main(global)
                         .submodule("WithBitsUnion")?
                         .function("DoubleVariant")?;
@@ -519,7 +519,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .dynamic_frame(|global, frame| {
+                .frame(|global, frame| {
                     let constr = Module::main(global)
                         .submodule("WithBitsUnion")?
                         .function("SizeAlignMismatch")?;
@@ -560,7 +560,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .dynamic_frame(|global, frame| {
+                .frame(|global, frame| {
                     let constr = Module::main(global)
                         .submodule("WithBitsUnion")?
                         .function("UnionInTuple")?;
@@ -603,7 +603,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .dynamic_frame(|global, frame| {
+                .frame(|global, frame| {
                     let constr = Module::main(global)
                         .submodule("WithNonBitsUnion")?
                         .function("NonBitsUnion")?;
@@ -636,7 +636,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .dynamic_frame(|global, frame| {
+                .frame(|global, frame| {
                     let constr = Module::main(global)
                         .submodule("WithGeneric")?
                         .function("WithGenericT")?;
@@ -669,7 +669,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .dynamic_frame(|global, frame| {
+                .frame(|global, frame| {
                     let constr = Module::main(global)
                         .submodule("WithGeneric")?
                         .function("WithGenericT")?;
@@ -708,7 +708,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .dynamic_frame(|global, frame| {
+                .frame(|global, frame| {
                     let constr = Module::main(global)
                         .submodule("WithGeneric")?
                         .function("WithGenericT")?;
@@ -747,7 +747,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .dynamic_frame(|global, frame| {
+                .frame(|global, frame| {
                     let constr = Module::main(global)
                         .submodule("WithGeneric")?
                         .function("WithGenericT")?;
@@ -787,7 +787,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .dynamic_frame(|global, frame| {
+                .frame(|global, frame| {
                     let arr = Value::new_array::<i32, _, _, _>(&mut *frame, (2, 2))?;
 
                     let wgt_constr = Module::main(global)
@@ -834,7 +834,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .dynamic_frame(|global, frame| {
+                .frame(|global, frame| {
                     let wgt_constr = Module::main(global)
                         .submodule("WithGeneric")?
                         .function("WithGenericT")?;
@@ -873,7 +873,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .dynamic_frame(|global, frame| {
+                .frame(|global, frame| {
                     let wgt_constr = Module::main(global)
                         .submodule("WithGeneric")?
                         .function("WithGenericT")?;
@@ -915,7 +915,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .dynamic_frame(|global, frame| {
+                .frame(|global, frame| {
                     let wvt_constr = Module::main(global)
                         .submodule("WithGeneric")?
                         .function("withvaluetype")?;

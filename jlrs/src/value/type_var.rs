@@ -1,11 +1,10 @@
 //! Support for values with the `Core.TypeVar` type.
 
-use super::symbol::Symbol;
+use super::{symbol::Symbol, traits::private::Internal};
 use super::union_all::UnionAll;
 use super::Value;
-use crate::error::{JlrsError, JlrsResult};
-use crate::global::Global;
-use crate::traits::{private::Internal, Cast, Frame, TemporarySymbol};
+use crate::{convert::{cast::Cast, temporary_symbol::TemporarySymbol}, error::{JlrsError, JlrsResult}, memory::traits::frame::Frame};
+use crate::memory::global::Global;
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_any_type, jl_bottom_type, jl_new_typevar, jl_tvar_t, jl_tvar_type};
 use std::marker::PhantomData;
@@ -65,7 +64,7 @@ impl<'frame> TypeVar<'frame> {
 
             let tvar = jl_new_typevar(name.ptr(), lb, ub);
             frame
-                .root(tvar.cast(), Internal)
+                .push_root(tvar.cast(), Internal)
                 .map_err(JlrsError::alloc_error)?;
 
             Ok(Self::wrap(tvar))

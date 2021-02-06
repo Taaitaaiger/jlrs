@@ -1,12 +1,9 @@
 //! Access Julia modules and the globals and functions defined in them.
 
-use crate::global::Global;
-use crate::traits::{private::Internal, Call, Cast, Frame, TemporarySymbol};
-use crate::value::symbol::Symbol;
+use crate::{convert::{cast::Cast, temporary_symbol::TemporarySymbol}, memory::{global::Global, traits::{frame::Frame, scope::Scope}}, value::symbol::Symbol};
 use crate::value::Value;
 use crate::{
     error::{JlrsError, JlrsResult},
-    traits::Scope,
 };
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{
@@ -15,6 +12,8 @@ use jl_sys::{
 };
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::marker::PhantomData;
+
+use super::traits::{call::Call, private::Internal};
 
 /// Functionality in Julia can be accessed through its module system. You can get a handle to the
 /// three standard modules, `Main`, `Base`, and `Core` and access their submodules through them.

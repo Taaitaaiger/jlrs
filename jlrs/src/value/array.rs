@@ -11,7 +11,9 @@
 //!
 //! [`Array`]: struct.Array.html
 use crate::error::{JlrsError, JlrsResult};
-use crate::traits::{valid_layout::ValidLayout, Cast, Frame, JuliaTypecheck};
+use crate::layout::{valid_layout::ValidLayout, julia_typecheck::JuliaTypecheck};
+use crate::memory::traits::frame::Frame;
+use crate::convert::cast::Cast;
 use crate::value::datatype::DataType;
 use crate::value::Value;
 use jl_sys::{

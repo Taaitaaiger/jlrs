@@ -1,8 +1,9 @@
 //! Control the garbage collector.
 
-use crate::traits::Frame;
 use crate::Julia;
 use jl_sys::{jl_gc_collect, jl_gc_collection_t, jl_gc_enable, jl_gc_is_enabled, jl_gc_safepoint};
+
+use super::frame::Frame;
 
 /// The different collection modes.
 #[derive(Debug, Copy, Clone)]

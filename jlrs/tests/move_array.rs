@@ -7,7 +7,7 @@ fn move_array_1d() {
         let mut jlrs = j.borrow_mut();
 
         let unboxed = jlrs
-            .frame(1, |_, frame| {
+            .frame_with_slots(1, |_, frame| {
                 let data = vec![1.0f32, 2., 3.];
                 let array = Value::move_array(frame, data, 3)?;
                 array.cast::<Array>()?.copy_inline_data::<f32>()
@@ -27,9 +27,9 @@ fn move_array_1d_output() {
         let mut jlrs = j.borrow_mut();
 
         let unboxed = jlrs
-            .frame(1, |_, frame| {
+            .frame_with_slots(1, |_, frame| {
                 let data = vec![1.0f32, 2., 3.];
-                let array = frame.value_frame(0, |output, frame| {
+                let array = frame.value_frame_with_slots(0, |output, frame| {
                     let output = output.into_scope(frame);
                     Value::move_array(output, data, 3)
                 })?;
@@ -50,8 +50,8 @@ fn move_array_1d_nested() {
         let mut jlrs = j.borrow_mut();
 
         let unboxed = jlrs
-            .frame(0, |_, frame| {
-                frame.frame(1, |frame| {
+            .frame_with_slots(0, |_, frame| {
+                frame.frame_with_slots(1, |frame| {
                     let data = vec![1.0f64, 2., 3.];
                     let array = Value::move_array(frame, data, 3)?;
                     array.cast::<Array>()?.copy_inline_data::<f64>()
@@ -72,8 +72,8 @@ fn move_array_1d_nested_dynamic() {
         let mut jlrs = j.borrow_mut();
 
         let unboxed = jlrs
-            .frame(0, |_, frame| {
-                frame.dynamic_frame(|frame| {
+            .frame_with_slots(0, |_, frame| {
+                frame.frame(|frame| {
                     let data = vec![1i8, 2, 3];
                     let array = Value::move_array(frame, data, 3)?;
                     array.cast::<Array>()?.copy_inline_data::<i8>()
@@ -94,7 +94,7 @@ fn move_array_1d_dynamic() {
         let mut jlrs = j.borrow_mut();
 
         let unboxed = jlrs
-            .dynamic_frame(|_, frame| {
+            .frame(|_, frame| {
                 let data = vec![1i16, 2, 3];
                 let array = Value::move_array(frame, data, 3)?;
                 array.cast::<Array>()?.copy_inline_data::<i16>()
@@ -114,8 +114,8 @@ fn move_array_1d_dynamic_nested() {
         let mut jlrs = j.borrow_mut();
 
         let unboxed = jlrs
-            .dynamic_frame(|_, frame| {
-                frame.frame(1, |frame| {
+            .frame(|_, frame| {
+                frame.frame_with_slots(1, |frame| {
                     let data = vec![1i32, 2, 3];
                     let array = Value::move_array(frame, data, 3)?;
                     array.cast::<Array>()?.copy_inline_data::<i32>()
@@ -136,8 +136,8 @@ fn move_array_1d_dynamic_nested_dynamic() {
         let mut jlrs = j.borrow_mut();
 
         let unboxed = jlrs
-            .dynamic_frame(|_, frame| {
-                frame.dynamic_frame(|frame| {
+            .frame(|_, frame| {
+                frame.frame(|frame| {
                     let data = vec![1i64, 2, 3];
                     let array = Value::move_array(frame, data, 3)?;
                     array.cast::<Array>()?.copy_inline_data::<i64>()
@@ -158,7 +158,7 @@ fn move_array_2d() {
         let mut jlrs = j.borrow_mut();
 
         let unboxed = jlrs
-            .frame(1, |_, frame| {
+            .frame_with_slots(1, |_, frame| {
                 let data = vec![1u8, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4];
                 let array = Value::move_array(frame, data, (3, 4))?;
                 array.cast::<Array>()?.copy_inline_data::<u8>()
@@ -179,8 +179,8 @@ fn move_array_2d_nested() {
         let mut jlrs = j.borrow_mut();
 
         let unboxed = jlrs
-            .frame(0, |_, frame| {
-                frame.frame(1, |frame| {
+            .frame_with_slots(0, |_, frame| {
+                frame.frame_with_slots(1, |frame| {
                     let data = vec![1u16, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4];
                     let array = Value::move_array(frame, data, (3, 4))?;
                     array.cast::<Array>()?.copy_inline_data::<u16>()
@@ -202,8 +202,8 @@ fn move_array_2d_nested_dynamic() {
         let mut jlrs = j.borrow_mut();
 
         let unboxed = jlrs
-            .frame(0, |_, frame| {
-                frame.dynamic_frame(|frame| {
+            .frame_with_slots(0, |_, frame| {
+                frame.frame(|frame| {
                     let data = vec![1u32, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4];
                     let array = Value::move_array(frame, data, (3, 4))?;
                     array.cast::<Array>()?.copy_inline_data::<u32>()
@@ -225,7 +225,7 @@ fn move_array_2d_dynamic() {
         let mut jlrs = j.borrow_mut();
 
         let unboxed = jlrs
-            .dynamic_frame(|_, frame| {
+            .frame(|_, frame| {
                 let data = vec![1u64, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4];
                 let array = Value::move_array(frame, data, (3, 4))?;
                 array.cast::<Array>()?.copy_inline_data::<u64>()
@@ -246,8 +246,8 @@ fn move_array_2d_dynamic_nested() {
         let mut jlrs = j.borrow_mut();
 
         let unboxed = jlrs
-            .dynamic_frame(|_, frame| {
-                frame.frame(1, |frame| {
+            .frame(|_, frame| {
+                frame.frame_with_slots(1, |frame| {
                     let data = vec![1usize, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4];
                     let array = Value::move_array(frame, data, (3, 4))?;
                     array.cast::<Array>()?.copy_inline_data::<usize>()
@@ -269,8 +269,8 @@ fn move_array_2d_dynamic_nested_dynamic() {
         let mut jlrs = j.borrow_mut();
 
         let unboxed = jlrs
-            .dynamic_frame(|_, frame| {
-                frame.dynamic_frame(|frame| {
+            .frame(|_, frame| {
+                frame.frame(|frame| {
                     let data = vec![1isize, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4];
                     let array = Value::move_array(frame, data, (3, 4))?;
                     array.cast::<Array>()?.copy_inline_data::<isize>()

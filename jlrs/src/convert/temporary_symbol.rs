@@ -1,3 +1,7 @@
+//! Create a temporary symbol.
+//! 
+//! Many things in Julia are accessed with [`Symbol`]s. This traits allows using strings instead.
+
 use crate::value::string::JuliaString;
 use crate::value::symbol::Symbol;
 use std::borrow::Cow;
@@ -23,7 +27,7 @@ impl_temporary_symbol!(Symbol<'s>, 's);
 impl_temporary_symbol!(JuliaString<'frame>, 'frame);
 
 pub(crate) mod private {
-    use super::super::private::Internal;
+    use crate::value::traits::private::Internal;
     use crate::value::string::JuliaString;
     use crate::value::symbol::Symbol;
     use jl_sys::{jl_symbol, jl_symbol_n};

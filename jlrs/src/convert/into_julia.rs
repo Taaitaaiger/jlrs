@@ -1,3 +1,10 @@
+//! Convert a value from Rust to Julia.
+//! 
+//! The trait in this module should be implemented by deriving `IntoJulia`, its methods are 
+//! never called directly but only through [`Value::new`].
+//!
+//! [`Value::new`]: ../value/struct.Value.html#method.new
+
 use jl_sys::{
     jl_box_bool, jl_box_char, jl_box_float32, jl_box_float64, jl_box_int16, jl_box_int32,
     jl_box_int64, jl_box_int8, jl_box_uint16, jl_box_uint32, jl_box_uint64, jl_box_uint8,

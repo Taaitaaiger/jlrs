@@ -8,7 +8,7 @@ macro_rules! impl_test {
             JULIA.with(|j| {
                 let mut jlrs = j.borrow_mut();
 
-                jlrs.frame(1, |_, frame| {
+                jlrs.frame_with_slots(1, |_, frame| {
                     let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
                     let array = Value::move_array(frame, data, (2, 3, 4))?;
@@ -38,7 +38,7 @@ macro_rules! impl_test {
             JULIA.with(|j| {
                 let mut jlrs = j.borrow_mut();
 
-                jlrs.frame(1, |_, frame| {
+                jlrs.frame_with_slots(1, |_, frame| {
                     let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
                     let array = Value::move_array(frame, data, (2, 3, 4))?;
@@ -71,7 +71,7 @@ macro_rules! impl_test {
             JULIA.with(|j| {
                 let mut jlrs = j.borrow_mut();
 
-                jlrs.frame(1, |_, frame| {
+                jlrs.frame_with_slots(1, |_, frame| {
                     let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
                     let array = Value::move_array(frame, data.clone(), (2, 3, 4))?;
@@ -92,7 +92,7 @@ macro_rules! impl_test {
             JULIA.with(|j| {
                 let mut jlrs = j.borrow_mut();
 
-                jlrs.frame(1, |_, frame| {
+                jlrs.frame_with_slots(1, |_, frame| {
                     let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
                     let array = Value::move_array(frame, data.clone(), (2, 3, 4))?;
@@ -186,7 +186,7 @@ fn access_copied_array_dimensions() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame(1, |_, frame| {
+        jlrs.frame_with_slots(1, |_, frame| {
             let arr_val = Value::new_array::<f32, _, _, _>(frame, (1, 2))?;
             let arr = arr_val.cast::<Array>()?;
 

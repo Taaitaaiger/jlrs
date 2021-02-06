@@ -1,9 +1,8 @@
 //! Symbols represent identifiers like module and function names.
 
 use super::Value;
-use crate::error::{JlrsError, JlrsResult};
-use crate::global::Global;
-use crate::traits::Cast;
+use crate::{error::{JlrsError, JlrsResult}, memory::global::Global};
+use crate::convert::cast::Cast;
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_sym_t, jl_symbol_n, jl_symbol_name, jl_symbol_type};
 use std::ffi::CStr;
@@ -11,7 +10,7 @@ use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::marker::PhantomData;
 
 #[cfg(doc)]
-use crate::traits::JuliaTypecheck;
+use crate::layout::julia_typecheck::JuliaTypecheck;
 #[cfg(doc)]
 use crate::value::datatype::DataType;
 

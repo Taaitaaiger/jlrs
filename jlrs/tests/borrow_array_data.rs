@@ -1,5 +1,4 @@
-use jlrs::prelude::*;
-use jlrs::traits::gc::{Gc, GcCollection};
+use jlrs::{memory::traits::gc::{Gc, GcCollection}, prelude::*};
 use jlrs::util::JULIA;
 
 macro_rules! impl_test {
@@ -9,7 +8,7 @@ macro_rules! impl_test {
             JULIA.with(|j| {
                 let mut jlrs = j.borrow_mut();
 
-                jlrs.frame(5, |global, frame| {
+                jlrs.frame_with_slots(5, |global, frame| {
                     let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
                     let array = Value::move_array(&mut *frame, data, (2, 3, 4))?;
@@ -37,7 +36,7 @@ macro_rules! impl_test {
                     for third in &[one, two, three, four] {
                         for second in &[one, two, three] {
                             for first in &[one, two] {
-                                frame.frame(1, |frame| {
+                                frame.frame_with_slots(1, |frame| {
                                     let v = gi
                                         .call(&mut *frame, &mut [array, *first, *second, *third])?
                                         .unwrap();
@@ -64,7 +63,7 @@ macro_rules! impl_test {
             JULIA.with(|j| {
                 let mut jlrs = j.borrow_mut();
 
-                jlrs.frame(5, |global, frame| {
+                jlrs.frame_with_slots(5, |global, frame| {
                     let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
                     let array = Value::move_array(&mut *frame, data, (2, 3, 4))?;
@@ -89,7 +88,7 @@ macro_rules! impl_test {
                     for third in &[one, two, three, four] {
                         for second in &[one, two, three] {
                             for first in &[one, two] {
-                                frame.frame(1, |frame| {
+                                frame.frame_with_slots(1, |frame| {
                                     let v = gi
                                         .call(&mut *frame, &mut [array, *first, *second, *third])?
                                         .unwrap();
@@ -112,7 +111,7 @@ macro_rules! impl_test {
             JULIA.with(|j| {
                 let mut jlrs = j.borrow_mut();
 
-                jlrs.frame(1, |_, frame| {
+                jlrs.frame_with_slots(1, |_, frame| {
                     let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
                     let array = Value::move_array(&mut *frame, data.clone(), (2, 3, 4))?;
@@ -135,7 +134,7 @@ macro_rules! impl_test {
             JULIA.with(|j| {
                 let mut jlrs = j.borrow_mut();
 
-                jlrs.frame(1, |_, frame| {
+                jlrs.frame_with_slots(1, |_, frame| {
                     let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
                     let array = Value::move_array(&mut *frame, data.clone(), (2, 3, 4))?;
@@ -231,12 +230,12 @@ fn borrow_nested() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame(1, |global, frame| {
+        jlrs.frame_with_slots(1, |global, frame| {
             let data: Vec<u8> = (1..=24).map(|x| x as u8).collect();
 
             let array = Value::move_array(&mut *frame, data, (2, 3, 4))?;
 
-            frame.frame(4, |frame| {
+            frame.frame_with_slots(4, |frame| {
                 let d = unsafe {
                     array
                         .cast_unchecked::<Array>()
@@ -263,7 +262,7 @@ fn borrow_nested() {
                 for third in &[one, two, three, four] {
                     for second in &[one, two, three] {
                         for first in &[one, two] {
-                            frame.frame(1, |frame| {
+                            frame.frame_with_slots(1, |frame| {
                                 let v = gi
                                     .call(&mut *frame, &mut [array, *first, *second, *third])?
                                     .unwrap();
@@ -287,7 +286,7 @@ fn access_borrowed_array_dimensions() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame(1, |_, frame| {
+        jlrs.frame_with_slots(1, |_, frame| {
             let arr_val = Value::new_array::<f32, _, _, _>(&mut *frame, (1, 2))?;
             let arr = arr_val.cast::<Array>()?;
 
@@ -305,7 +304,7 @@ fn access_mutable_borrowed_array_dimensions() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame(1, |_, frame| {
+        jlrs.frame_with_slots(1, |_, frame| {
             let arr_val = Value::new_array::<f32, _, _, _>(&mut *frame, (1, 2))?;
             let arr = arr_val.cast::<Array>()?;
 
@@ -323,7 +322,7 @@ fn unrestricted_array_borrow() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame(2, |_, frame| {
+        jlrs.frame_with_slots(2, |_, frame| {
             unsafe {
                 let arr_val = Value::new_array::<f32, _, _, _>(&mut *frame, (1, 2))?;
                 let arr_val2 = Value::new_array::<f32, _, _, _>(&mut *frame, (1, 2))?;
@@ -346,7 +345,7 @@ fn unrestricted_typed_array_borrow() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame(2, |_, frame| {
+        jlrs.frame_with_slots(2, |_, frame| {
             unsafe {
                 let arr_val = Value::new_array::<f32, _, _, _>(&mut *frame, (1, 2))?;
                 let arr_val2 = Value::new_array::<f32, _, _, _>(&mut *frame, (1, 2))?;
@@ -369,7 +368,7 @@ fn value_data() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame(2, |global, frame| {
+        jlrs.frame_with_slots(2, |global, frame| {
             unsafe {
                 let arr = Module::main(global)
                     .submodule("JlrsTests")?
@@ -392,7 +391,7 @@ fn value_data_mut() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame(3, |global, frame| {
+        jlrs.frame_with_slots(3, |global, frame| {
             unsafe {
                 let submod = Module::main(global).submodule("JlrsTests")?;
                 let arr = submod
@@ -423,7 +422,7 @@ fn unrestricted_value_data_mut() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame(6, |global, frame| {
+        jlrs.frame_with_slots(6, |global, frame| {
             unsafe {
                 let submod = Module::main(global).submodule("JlrsTests")?;
                 let arr1 = submod
@@ -468,7 +467,7 @@ fn typed_array_value_data() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame(2, |global, frame| {
+        jlrs.frame_with_slots(2, |global, frame| {
             unsafe {
                 let arr = Module::main(global)
                     .submodule("JlrsTests")?
@@ -491,7 +490,7 @@ fn typed_array_value_data_mut() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame(3, |global, frame| {
+        jlrs.frame_with_slots(3, |global, frame| {
             unsafe {
                 let submod = Module::main(global).submodule("JlrsTests")?;
                 let arr = submod
@@ -522,7 +521,7 @@ fn typed_array_unrestricted_value_data_mut() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame(6, |global, frame| {
+        jlrs.frame_with_slots(6, |global, frame| {
             unsafe {
                 let submod = Module::main(global).submodule("JlrsTests")?;
                 let arr1 = submod

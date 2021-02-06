@@ -1,12 +1,11 @@
-use jlrs::prelude::*;
-use jlrs::traits::{gc::GcCollection, Gc};
+use jlrs::{memory::traits::gc::{Gc, GcCollection}, prelude::*};
 use jlrs::util::JULIA;
 
 #[test]
 fn create_symbol() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
-        jlrs.frame(0, |global, _frame| {
+        jlrs.frame_with_slots(0, |global, _frame| {
             let smb = Symbol::new(global, "a");
             smb.extend(global);
 
@@ -20,7 +19,7 @@ fn create_symbol() {
 fn function_returns_symbol() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
-        jlrs.frame(1, |global, frame| {
+        jlrs.frame_with_slots(1, |global, frame| {
             let smb = Module::main(global)
                 .submodule("JlrsTests")?
                 .function("symbol")?;
@@ -42,7 +41,7 @@ fn function_returns_symbol() {
 fn symbols_are_reused() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
-        jlrs.frame(0, |global, _frame| {
+        jlrs.frame_with_slots(0, |global, _frame| {
             let s1 = Symbol::new(global, "foo");
             let s2 = Symbol::new(global, "foo");
 
@@ -60,7 +59,7 @@ fn symbols_are_reused() {
 fn symbols_are_not_collected() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
-        jlrs.frame(0, |global, frame| {
+        jlrs.frame_with_slots(0, |global, frame| {
             let s1 = Symbol::new(global, "foo");
 
             unsafe {

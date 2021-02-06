@@ -162,7 +162,7 @@ fn impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
         + classified_fields.jl_non_union_field_idxs.len();
 
     let julia_struct_impl = quote! {
-        unsafe impl #generics ::jlrs::traits::ValidLayout for #name #generics #where_clause {
+        unsafe impl #generics ::jlrs::layout::valid_layout::ValidLayout for #name #generics #where_clause {
             unsafe fn valid_layout(v: ::jlrs::value::Value) -> bool {
                 if let Ok(dt) = v.cast::<DataType>() {
                     if dt.nfields() as usize != #n_fields {
@@ -172,7 +172,7 @@ fn impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
                     let field_types = dt.field_types();
 
                     #(
-                        if !<#rs_non_union_fields as ::jlrs::traits::ValidLayout>::valid_layout(field_types[#jl_non_union_field_idxs]) {
+                        if !<#rs_non_union_fields as ::jlrs::layout::valid_layout::ValidLayout>::valid_layout(field_types[#jl_non_union_field_idxs]) {
                             return false;
                         }
                     )*
@@ -194,15 +194,15 @@ fn impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
             }
         }
 
-        unsafe impl #generics ::jlrs::traits::JuliaTypecheck for #name #generics #where_clause {
+        unsafe impl #generics ::jlrs::layout::julia_typecheck::JuliaTypecheck for #name #generics #where_clause {
             unsafe fn julia_typecheck(t: ::jlrs::value::datatype::DataType) -> bool {
-                <Self as ::jlrs::traits::ValidLayout>::valid_layout(t.into())
+                <Self as ::jlrs::layout::valid_layout::ValidLayout>::valid_layout(t.into())
             }
         }
 
-        unsafe impl #generics ::jlrs::traits::JuliaType for #name #generics #where_clause {
+        unsafe impl #generics ::jlrs::layout::julia_type::JuliaType for #name #generics #where_clause {
             unsafe fn julia_type() -> *mut ::jlrs::jl_sys_export::jl_datatype_t {
-                let global = ::jlrs::global::Global::new();
+                let global = ::jlrs::memory::global::Global::new();
 
                 let julia_type = ::jlrs::value::module::Module::#func(global)
                     #(.submodule(#modules_it).expect(&format!("Submodule {} cannot be found", #modules_it_b)))*
@@ -218,7 +218,7 @@ fn impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
             }
         }
 
-        unsafe impl #extended_generics ::jlrs::traits::Cast<'frame, 'data> for #name #generics #where_clause {
+        unsafe impl #extended_generics ::jlrs::convert::cast::Cast<'frame, 'data> for #name #generics #where_clause {
             type Output = Self;
 
             fn cast(value: ::jlrs::value::Value<'frame, 'data>) -> ::jlrs::error::JlrsResult<Self::Output> {
@@ -227,7 +227,7 @@ fn impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
                 }
 
                 unsafe {
-                    if <Self as ::jlrs::traits::ValidLayout>::valid_layout(value.datatype().unwrap().into()) {
+                    if <Self as ::jlrs::layout::valid_layout::ValidLayout>::valid_layout(value.datatype().unwrap().into()) {
                         return Ok(Self::cast_unchecked(value));
                     }
                 }
@@ -252,9 +252,9 @@ fn impl_into_julia(ast: &syn::DeriveInput) -> TokenStream {
     }
 
     let into_julia_impl = quote! {
-        unsafe impl ::jlrs::traits::IntoJulia for #name {
+        unsafe impl ::jlrs::convert::into_julia::IntoJulia for #name {
             unsafe fn into_julia(&self) -> *mut ::jlrs::jl_sys_export::jl_value_t {
-                let ty = <Self as ::jlrs::traits::JuliaType>::julia_type();
+                let ty = <Self as ::jlrs::layout::julia_type::JuliaType>::julia_type();
                 let container = ::jlrs::jl_sys_export::jl_new_struct_uninit(ty.cast());
                 let data: *mut Self = container.cast();
                 ::std::ptr::write(data, *self);

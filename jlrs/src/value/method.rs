@@ -12,7 +12,7 @@ use super::simple_vector::SimpleVector;
 use super::symbol::Symbol;
 use super::Value;
 use crate::error::{JlrsError, JlrsResult};
-use crate::traits::Cast;
+use crate::convert::cast::Cast;
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_method_t, jl_method_type};
 use std::marker::PhantomData;
@@ -66,16 +66,6 @@ impl<'frame> Method<'frame> {
     /// Method's type signature.
     pub fn signature(self) -> Value<'frame, 'static> {
         unsafe { Value::wrap((&*self.ptr()).sig) }
-    }
-
-    /// List of potentially-ambiguous methods (nothing = none, Vector{Any} of TypeMapEntry otherwise)
-    pub fn ambiguous(self) -> Value<'frame, 'static> {
-        unsafe { Value::wrap((&*self.ptr()).ambig) }
-    }
-
-    /// Forward references to later items (typemap entries) which might sort before this one
-    pub fn resorted(self) -> Value<'frame, 'static> {
-        unsafe { Value::wrap((&*self.ptr()).resorted) }
     }
 
     /// Table of all `Method` specializations, allocated as [hashable, ..., NULL, linear, ....]

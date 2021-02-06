@@ -1,8 +1,8 @@
 //! Support for Julia `Union`s and union-fields.
 
 use super::Value;
-use crate::error::{JlrsError, JlrsResult};
-use crate::traits::{Align, BitsUnion as BU, Cast, Flag};
+use crate::{convert::cast::Cast, error::{JlrsError, JlrsResult}};
+use crate::layout::bits_union::{Align, BitsUnion as BU, Flag};
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_islayout_inline, jl_uniontype_t, jl_uniontype_type};
 use std::marker::PhantomData;
