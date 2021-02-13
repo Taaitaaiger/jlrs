@@ -112,7 +112,6 @@ use jl_sys::{
     jl_type_unionall, jl_typeof, jl_typeof_str, jl_undefref_exception, jl_value_t,
 };
 use smallvec::SmallVec;
-use std::borrow::BorrowMut;
 use std::cell::UnsafeCell;
 use std::ffi::{CStr, CString};
 use std::fmt::{Debug, Formatter, Result as FmtResult};
@@ -371,7 +370,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     pub fn instantiate<'value, 'borrow, F, V>(
         frame: &mut F,
         ty: DataType,
-        values: &mut V,
+        values: V,
     ) -> JlrsResult<Value<'frame, 'borrow>>
     where
         F: Frame<'frame>,
@@ -390,7 +389,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
         frame: &mut F,
         output: Output<'output>,
         ty: DataType,
-        values: &mut V,
+        mut values: V,
     ) -> JlrsResult<Value<'output, 'borrow>>
     where
         F: Frame<'frame>,
@@ -458,13 +457,13 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// This function returns an error if there are not enough slots available.
     pub fn borrow_array<T, D, V, F>(
         frame: &mut F,
-        data: &'data mut V,
+        data: V,
         dimensions: D,
     ) -> JlrsResult<Value<'frame, 'data>>
     where
         T: IntoJulia + JuliaType,
         D: Into<Dimensions>,
-        V: BorrowMut<[T]>,
+        V: AsMut<[T]> + 'data,
         F: Frame<'frame>,
     {
         unsafe {
@@ -483,14 +482,14 @@ impl<'frame, 'data> Value<'frame, 'data> {
     pub fn borrow_array_output<'output, 'borrow, T, D, V, F>(
         frame: &mut F,
         output: Output<'output>,
-        data: &'borrow mut V,
+        data: V,
         dimensions: D,
     ) -> JlrsResult<Value<'output, 'borrow>>
     where
         'borrow: 'output,
         T: IntoJulia + JuliaType,
         D: Into<Dimensions>,
-        V: BorrowMut<[T]>,
+        V: AsMut<[T]> + 'borrow,
         F: Frame<'frame>,
     {
         unsafe {
@@ -612,8 +611,8 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// Create a new named tuple, you can use the `named_tuple` macro instead of this method.
     pub fn new_named_tuple<'value, 'borrow, F, S, T, V>(
         frame: &mut F,
-        field_names: &mut S,
-        values: &mut V,
+        mut field_names: S,
+        mut values: V,
     ) -> JlrsResult<Value<'frame, 'borrow>>
     where
         F: Frame<'frame>,
@@ -685,7 +684,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     pub fn apply_type<'fr, 'value, 'borrow, F, V>(
         self,
         frame: &mut F,
-        types: &mut V,
+        mut types: V,
     ) -> JlrsResult<Value<'fr, 'borrow>>
     where
         F: Frame<'fr>,
@@ -1329,7 +1328,7 @@ impl<'fr, 'data> Value<'fr, 'data> {
     pub fn call<'frame, 'value, 'borrow, V, F>(
         self,
         frame: &mut F,
-        args: &mut V,
+        mut args: V,
     ) -> JlrsResult<CallResult<'frame, 'borrow>>
     where
         V: AsMut<[Value<'value, 'borrow>]>,
@@ -1349,7 +1348,7 @@ impl<'fr, 'data> Value<'fr, 'data> {
     pub unsafe fn call_unprotected<'base, 'value, 'borrow, V, F>(
         self,
         _: Global<'base>,
-        args: &mut V,
+        mut args: V,
     ) -> CallResult<'base, 'borrow>
     where
         V: AsMut<[Value<'value, 'borrow>]>,
@@ -1373,7 +1372,7 @@ impl<'fr, 'data> Value<'fr, 'data> {
     pub unsafe fn call_keywords_unprotected<'base, 'value, 'borrow, V, F>(
         self,
         _: Global<'base>,
-        args: &mut V,
+        mut args: V,
     ) -> CallResult<'base, 'borrow>
     where
         V: AsMut<[Value<'value, 'borrow>]>,
@@ -1403,7 +1402,7 @@ impl<'fr, 'data> Value<'fr, 'data> {
     pub async fn call_async<'frame, 'value, 'borrow, V>(
         self,
         frame: &mut crate::frame::AsyncFrame<'frame>,
-        args: &mut V,
+        args: V,
     ) -> JlrsResult<CallResult<'frame, 'borrow>>
     where
         V: AsMut<[Value<'value, 'borrow>]>,
@@ -1804,7 +1803,7 @@ impl<'func, 'funcdata, 'kw, 'kwdata> WithKeywords<'func, 'funcdata, 'kw, 'kwdata
     pub fn call<'frame, 'value, 'borrow, V, F>(
         self,
         frame: &mut F,
-        args: &mut V,
+        mut args: V,
     ) -> JlrsResult<CallResult<'frame, 'borrow>>
     where
         V: AsMut<[Value<'value, 'borrow>]>,
@@ -1833,7 +1832,7 @@ impl<'func, 'funcdata, 'kw, 'kwdata> WithKeywords<'func, 'funcdata, 'kw, 'kwdata
     pub unsafe fn call_unprotected<'base, 'value, 'borrow, V, F>(
         self,
         _: Global<'base>,
-        args: &mut V,
+        mut args: V,
     ) -> CallResult<'base, 'borrow>
     where
         V: AsMut<[Value<'value, 'borrow>]>,
@@ -1950,7 +1949,7 @@ impl<'output, 'frame, 'data> WithOutput<'output, Value<'frame, 'data>> {
     pub fn call<'value, 'borrow, 'fr, V, F>(
         self,
         frame: &mut F,
-        args: &mut V,
+        mut args: V,
     ) -> CallResult<'output, 'borrow>
     where
         'borrow: 'output,
@@ -2048,13 +2047,13 @@ where
 
 unsafe fn borrow_array<'data, 'frame, T, D, V, F>(
     frame: &mut F,
-    data: &'data mut V,
+    mut data: V,
     dimensions: D,
 ) -> JlrsResult<*mut jl_value_t>
 where
     T: IntoJulia + JuliaType,
     D: Into<Dimensions>,
-    V: BorrowMut<[T]>,
+    V: AsMut<[T]> + 'data,
     F: Frame<'frame>,
 {
     let dims = dimensions.into();
@@ -2063,7 +2062,7 @@ where
     match dims.n_dimensions() {
         1 => Ok(jl_ptr_to_array_1d(
             array_type,
-            data.borrow_mut().as_mut_ptr().cast(),
+            data.as_mut().as_mut_ptr().cast(),
             dims.n_elements(0),
             0,
         )
@@ -2073,7 +2072,7 @@ where
 
             Ok(jl_ptr_to_array(
                 array_type,
-                data.borrow_mut().as_mut_ptr().cast(),
+                data.as_mut().as_mut_ptr().cast(),
                 tuple.ptr(),
                 0,
             )
@@ -2084,7 +2083,7 @@ where
 
             Ok(jl_ptr_to_array(
                 array_type,
-                data.borrow_mut().as_mut_ptr().cast(),
+                data.as_mut().as_mut_ptr().cast(),
                 tuple.ptr(),
                 0,
             )
