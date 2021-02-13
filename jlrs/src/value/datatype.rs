@@ -272,7 +272,7 @@ impl<'frame> DataType<'frame> {
     pub fn instantiate<'fr, 'value, 'borrow, F, V>(
         self,
         frame: &mut F,
-        values: &mut V,
+        mut values: V,
     ) -> JlrsResult<Value<'fr, 'borrow>>
     where
         F: Frame<'fr>,
@@ -295,7 +295,7 @@ impl<'frame> DataType<'frame> {
         self,
         frame: &mut F,
         output: Output<'output>,
-        values: &mut V,
+        values: V,
     ) -> JlrsResult<Value<'output, 'borrow>>
     where
         F: Frame<'fr>,
