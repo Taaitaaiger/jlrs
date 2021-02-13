@@ -42,8 +42,8 @@ fn borrow_array_1d_dynamic_type() {
                 let array = match x {
                     true => Value::borrow_array(frame, foo.slice, 8)?,
                     false => unsafe {
-                        let slice =
-                            std::slice::from_raw_parts_mut(foo.slice.as_mut_ptr().cast::<u16>(), 4);
+                        let ptr = foo.slice.as_mut_ptr().cast::<u16>();
+                        let slice = std::slice::from_raw_parts_mut(ptr, 4);
                         Value::borrow_array(frame, slice, 4)?
                     },
                 };
