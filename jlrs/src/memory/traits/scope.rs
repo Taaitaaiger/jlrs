@@ -16,14 +16,14 @@ use crate::{
     memory::{
         frame::GcFrame,
         global::Global,
-        traits::frame::Frame,
         output::{Output, OutputScope},
+        traits::frame::Frame,
     },
     value::{UnrootedCallResult, UnrootedValue},
 };
 
 /// This trait is used to root raw Julia values in the current or an earlier frame. Scopes and
-/// frames are very similar, in fact, all mutable references to frames are scopes: one that 
+/// frames are very similar, in fact, all mutable references to frames are scopes: one that
 /// targets that frame. The other implementor of this trait, [`OutputScope`], targets an earlier
 /// frame. In addition to rooting values, this trait provides several methods that create a new
 /// frame; if the scope is a frame, the frame's implementation of that method is called. If the
@@ -51,8 +51,8 @@ pub trait Scope<'scope, 'frame, 'data, F: Frame<'frame>>:
     /// # fn main() {
     /// # JULIA.with(|j| {
     /// # let mut julia = j.borrow_mut();
-    ///   julia.frame(1, |global, frame| {
-    ///       let _nt = frame.value_frame(2, |output, frame| {
+    ///   julia.frame(|global, frame| {
+    ///       let _nt = frame.value_frame(|output, frame| {
     ///           let v1 = Value::new(&mut *frame, 1usize)?;
     ///           let v2 = Value::new(&mut *frame, 2usize)?;
     ///
@@ -87,8 +87,8 @@ pub trait Scope<'scope, 'frame, 'data, F: Frame<'frame>>:
     /// # fn main() {
     /// # JULIA.with(|j| {
     /// # let mut julia = j.borrow_mut();
-    ///   julia.frame(1, |global, frame| {
-    ///       let sum = frame.call_frame(2, |output, frame| {
+    ///   julia.frame(|global, frame| {
+    ///       let sum = frame.call_frame(|output, frame| {
     ///           let v1 = Value::new(&mut *frame, 1usize)?;
     ///           let v2 = Value::new(&mut *frame, 2usize)?;
     ///
@@ -127,8 +127,8 @@ pub trait Scope<'scope, 'frame, 'data, F: Frame<'frame>>:
     /// # fn main() {
     /// # JULIA.with(|j| {
     /// # let mut julia = j.borrow_mut();
-    ///   julia.frame(1, |global, frame| {
-    ///       let _nt = frame.value_frame(2, |output, frame| {
+    ///   julia.frame(|global, frame| {
+    ///       let _nt = frame.value_frame(|output, frame| {
     ///           let v1 = Value::new(&mut *frame, 1usize)?;
     ///           let v2 = Value::new(&mut *frame, 2usize)?;
     ///
@@ -163,8 +163,8 @@ pub trait Scope<'scope, 'frame, 'data, F: Frame<'frame>>:
     /// # fn main() {
     /// # JULIA.with(|j| {
     /// # let mut julia = j.borrow_mut();
-    ///   julia.frame(1, |global, frame| {
-    ///       let sum = frame.call_frame(2, |output, frame| {
+    ///   julia.frame(|global, frame| {
+    ///       let sum = frame.call_frame(|output, frame| {
     ///           let v1 = Value::new(&mut *frame, 1usize)?;
     ///           let v2 = Value::new(&mut *frame, 2usize)?;
     ///

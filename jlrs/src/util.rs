@@ -1,5 +1,6 @@
 // This module exists for testing purposes, the thread-local instance ensures Julia is only
-// initialized once.
+// initialized once. Note that tests that involve calling Julia functions must always be
+// executed with `cargo test -- --test-threads=1`.
 
 use crate::{value::Value, Julia};
 use std::cell::RefCell;

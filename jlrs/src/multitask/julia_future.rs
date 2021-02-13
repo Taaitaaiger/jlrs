@@ -1,10 +1,13 @@
 //! A `Future` that represents a function call in Julia running on another thread.
 
-use crate::{error::{exception, CallResult, JlrsResult}, value::traits::call::Call};
-use crate::memory::{global::Global, frame::AsyncGcFrame, traits::frame::Frame};
+use crate::memory::{frame::AsyncGcFrame, global::Global, traits::frame::Frame};
 use crate::value::module::Module;
 use crate::value::task::Task;
 use crate::value::Value;
+use crate::{
+    error::{exception, CallResult, JlrsResult},
+    value::traits::call::Call,
+};
 use futures::task::{Context, Poll, Waker};
 use futures::Future;
 use jl_sys::{jl_call1, jl_exception_occurred, jl_nothing};
@@ -27,10 +30,8 @@ pub(crate) struct TaskState<'frame, 'data> {
 
 /// A `Future` that runs a Julia function on a new thread with `Base.Threads.@spawn`. The function
 /// is called as soon as it is created, not when it's polled for the first time. You can create a
-/// `JuliaFuture` by calling [`Value::call_async`]. Calling this function uses two slots in 
-/// the current frame. 
-/// 
-/// [`Value::call_async`]: ../value/struct.Value.html#method.call_async
+/// `JuliaFuture` by calling [`Value::call_async`]. Calling this function uses two slots in
+/// the current frame.
 pub struct JuliaFuture<'frame, 'data> {
     shared_state: Arc<Mutex<TaskState<'frame, 'data>>>,
 }

@@ -138,7 +138,7 @@ fn cannot_copy_value_data() {
         let mut jlrs = j.borrow_mut();
 
         jlrs.frame_with_slots(0, |global, _| {
-            let arr_val = unsafe { Value::an_empty_vec_any(global) };
+            let arr_val = Value::an_empty_vec_any(global);
             assert!(arr_val
                 .cast::<Array>()?
                 .copy_inline_data::<Value>()
@@ -155,7 +155,7 @@ fn cannot_access_value_as_inline() {
         let mut jlrs = j.borrow_mut();
 
         jlrs.frame_with_slots(0, |global, frame| {
-            let arr_val = unsafe { Value::an_empty_vec_any(global) };
+            let arr_val = Value::an_empty_vec_any(global);
             assert!(arr_val
                 .cast::<Array>()?
                 .inline_data::<Value, _>(&mut *frame)
@@ -172,7 +172,7 @@ fn cannot_access_value_as_inline_mut() {
         let mut jlrs = j.borrow_mut();
 
         jlrs.frame_with_slots(0, |global, frame| {
-            let arr_val = unsafe { Value::an_empty_vec_any(global) };
+            let arr_val = Value::an_empty_vec_any(global);
             assert!(arr_val
                 .cast::<Array>()?
                 .inline_data_mut::<Value, _>(&mut *frame)
@@ -270,7 +270,7 @@ fn convert_back_to_value() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame_with_slots(0, |global, _| unsafe {
+        jlrs.frame_with_slots(0, |global, _| {
             let arr_val = Value::an_empty_vec_any(global);
             arr_val.cast::<Array>()?.as_value().is::<Array>();
             Ok(())

@@ -1,4 +1,9 @@
 //! Functionality shared by the different frame types.
+//!
+//! More information about frames and their capabilities can be found in the module
+//! [`jlrs::memory::frame`].
+//!
+//! [`jlrs::memory::frame`]: ../../frame/index.html
 
 #[cfg(all(feature = "async", target_os = "linux"))]
 use crate::memory::frame::AsyncGcFrame;
@@ -12,9 +17,9 @@ use crate::{
 
 use super::{mode::Mode, root::Root};
 
-/// This trait provides the functionality shared by the different frame types. 
+/// This trait provides the functionality shared by the different frame types.
 pub trait Frame<'frame>: private::Frame<'frame> {
-    /// Returns a new `Global`, globals accessed with this token are valid until this frame is 
+    /// Returns a new `Global`, globals accessed with this token are valid until this frame is
     /// dropped.
     fn global(&self) -> Global<'frame> {
         unsafe { Global::new() }
@@ -22,6 +27,8 @@ pub trait Frame<'frame>: private::Frame<'frame> {
 
     /// This method takes a mutable reference to a frame and returns it; this method can be used
     /// as an alternative to reborrowing a frame with `&mut *frame` when a [`Scope`] is needed.
+    ///
+    /// [`Scope`]: ../scope/trait.Scope.html
     fn as_scope(&mut self) -> &mut Self {
         self
     }
@@ -47,14 +54,14 @@ pub trait Frame<'frame>: private::Frame<'frame> {
     ///           let v1 = Value::new(&mut *frame, 1usize)?;
     ///           let v2 = Value::new(&mut *frame, 2usize)?;
     ///
-    ///           Module::base()
+    ///           Module::base(global)
     ///               .function("+")?
     ///               .call2(&mut *frame, v1, v2)?
     ///               .unwrap()
     ///               .cast::<usize>()
     ///       })?;
     ///
-    ///       assert_eq(sum, 3);
+    ///       assert_eq!(sum, 3);
     ///       Ok(())
     ///   }).unwrap();
     /// # });
@@ -81,14 +88,14 @@ pub trait Frame<'frame>: private::Frame<'frame> {
     ///           let v1 = Value::new(&mut *frame, 1usize)?;
     ///           let v2 = Value::new(&mut *frame, 2usize)?;
     ///
-    ///           Module::base()
+    ///           Module::base(global)
     ///               .function("+")?
     ///               .call2(&mut *frame, v1, v2)?
     ///               .unwrap()
     ///               .cast::<usize>()
     ///       })?;
     ///
-    ///       assert_eq(sum, 3);
+    ///       assert_eq!(sum, 3);
     ///       Ok(())
     ///   }).unwrap();
     /// # });
@@ -107,6 +114,7 @@ pub trait Frame<'frame>: private::Frame<'frame> {
     /// ```
     /// # use jlrs::prelude::*;
     /// # use jlrs::util::JULIA;
+    /// use jlrs::value::datatype::NamedTuple;
     /// # fn main() {
     /// # JULIA.with(|j| {
     /// # let mut julia = j.borrow_mut();
@@ -182,7 +190,7 @@ pub trait Frame<'frame>: private::Frame<'frame> {
     /// # JULIA.with(|j| {
     /// # let mut julia = j.borrow_mut();
     ///   julia.frame(|global, frame| {
-    ///       let _sum = frame.call_frame(|output, frame| {
+    ///       let sum = frame.call_frame(|output, frame| {
     ///           let v1 = Value::new(&mut *frame, 1usize)?;
     ///           let v2 = Value::new(&mut *frame, 2usize)?;
     ///
@@ -270,7 +278,8 @@ impl<'frame, M: Mode> Frame<'frame> for GcFrame<'frame, M> {
         T: 'frame,
         for<'nested> F: FnOnce(&mut GcFrame<'nested, Self::Mode>) -> JlrsResult<T>,
     {
-        let mut nested = self.nest(0);
+        // safe: frame is dropped
+        let mut nested = unsafe { self.nest(0) };
         func(&mut nested)
     }
 
@@ -279,7 +288,8 @@ impl<'frame, M: Mode> Frame<'frame> for GcFrame<'frame, M> {
         T: 'frame,
         for<'nested> F: FnOnce(&mut GcFrame<'nested, Self::Mode>) -> JlrsResult<T>,
     {
-        let mut nested = self.nest(capacity);
+        // safe: frame is dropped
+        let mut nested = unsafe { self.nest(capacity) };
         func(&mut nested)
     }
 
@@ -390,7 +400,8 @@ impl<'frame> Frame<'frame> for AsyncGcFrame<'frame> {
         T: 'frame,
         for<'nested> F: FnOnce(&mut GcFrame<'nested, Self::Mode>) -> JlrsResult<T>,
     {
-        let mut nested = self.nest(0);
+        // safe: frame is dropped
+        let mut nested = unsafe { self.nest(0) };
         func(&mut nested)
     }
 
@@ -399,7 +410,8 @@ impl<'frame> Frame<'frame> for AsyncGcFrame<'frame> {
         T: 'frame,
         for<'nested> F: FnOnce(&mut GcFrame<'nested, Self::Mode>) -> JlrsResult<T>,
     {
-        let mut nested = self.nest(capacity);
+        // safe: frame is dropped
+        let mut nested = unsafe { self.nest(capacity) };
         func(&mut nested)
     }
 
@@ -584,7 +596,6 @@ impl<'frame> Frame<'frame> for NullFrame<'frame> {
 }
 
 pub(crate) mod private {
-    use crate::{error::AllocError, value::traits::private::Internal};
     #[cfg(all(feature = "async", target_os = "linux"))]
     use crate::memory::frame::AsyncGcFrame;
     use crate::memory::frame::GcFrame;
@@ -594,6 +605,7 @@ pub(crate) mod private {
     use crate::memory::mode::Sync;
     use crate::memory::traits::mode::Mode;
     use crate::value::Value;
+    use crate::{error::AllocError, value::traits::private::Internal};
     use jl_sys::jl_value_t;
 
     pub trait Frame<'frame> {
@@ -606,7 +618,8 @@ pub(crate) mod private {
             _: Internal,
         ) -> Result<Value<'frame, 'data>, AllocError>;
 
-        fn nest<'nested>(
+        // safety: frame must be dropped
+        unsafe fn nest<'nested>(
             &'nested mut self,
             capacity: usize,
             _: Internal,
@@ -630,7 +643,7 @@ pub(crate) mod private {
             Ok(Value::wrap(value))
         }
 
-        fn nest<'nested>(
+        unsafe fn nest<'nested>(
             &'nested mut self,
             capacity: usize,
             _: Internal,
@@ -657,7 +670,7 @@ pub(crate) mod private {
             Ok(Value::wrap(value))
         }
 
-        fn nest<'nested>(
+        unsafe fn nest<'nested>(
             &'nested mut self,
             capacity: usize,
             _: Internal,
@@ -677,7 +690,7 @@ pub(crate) mod private {
             Err(AllocError::FrameOverflow(1, 0))
         }
 
-        fn nest<'nested>(
+        unsafe fn nest<'nested>(
             &'nested mut self,
             _capacity: usize,
             _: Internal,

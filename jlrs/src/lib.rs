@@ -78,30 +78,30 @@
 //! [`Julia::frame_with_slots`] to interact with Julia.
 //!
 //! The other two methods, [`Julia::frame`] and [`Julia::frame_with_slots`], take a closure that
-//! provides you with a [`Global`] and a mutable reference to a [`GcFrame`]. [`Global`] is a 
-//! token that lets you access Julia modules their contents and other global values, while the 
-//! frame is used to root local values (ie prevent them from being freed by the garbage collector
-//! until the frame is dropped).
+//! provides you with a [`Global`] and a mutable reference to a [`GcFrame`]. [`Global`] is a
+//! token that lets you access Julia modules their contents and other global values, while the
+//! frame is used to root local values which prevents them from being freed by the garbage
+//! collector until the frame is dropped.
 //!
-//! Julia data is represented by a [`Value`]. There are several ways to create a new `Value`. The 
-//! simplest is to call [`Value::new`], which can be used to convert primitive types, but also 
-//! some more complex types like `String`s, from Rust to Julia. This method, and all others that 
-//! create new local values, need something that implements [`Scope`]. A mutable reference to a 
-//! frame is a scope, specifically one that ensures the result is rooted until that frame is 
+//! Julia data is represented by a [`Value`]. There are several ways to create a new `Value`. The
+//! simplest is to call [`Value::new`], which can be used to convert primitive types, but also
+//! some more complex types like `String`s, from Rust to Julia. This method, and all others that
+//! create new local values, need something that implements [`Scope`]. A mutable reference to a
+//! frame is a scope, specifically one that ensures the result is rooted until that frame is
 //! dropped. You'll learn about the other kind of scope a bit later.
 //!
 //! Julia functions, their arguments and their results are all `Value`s too. All `Value`s can be
 //! called as functions, whether this will succeed depends on the value actually being a function.
 //! You can convert data from Julia to Rust by calling [`Value::cast`].
 //!
-//! In order to call a Julia function, you'll need three things: a function to call, a scope, and 
-//! arguments to call the function with. You can acquire the function through the module that 
+//! In order to call a Julia function, you'll need three things: a function to call, a scope, and
+//! arguments to call the function with. You can acquire the function through the module that
 //! defines it with [`Module::function`]; [`Module::base`] and [`Module::core`] provide access to
-//! Julia's `Base` and `Core` module respectively, while everything you include through 
-//! [`Julia::include`] is made available relative to the `Main` module which you can access by 
+//! Julia's `Base` and `Core` module respectively, while everything you include through
+//! [`Julia::include`] is made available relative to the `Main` module which you can access by
 //! calling [`Module::main`]. It's also possible to include a new module by evaluating its
 //! contents with [`Value::eval_string`]. In order to use installed packages, including standard
-//! library packages such as `LinearAlgebra`, they must first be loaded. This can be done by 
+//! library packages such as `LinearAlgebra`, they must first be loaded. This can be done by
 //! calling [`Module::require`].
 //!
 //! As a simple example, let's create two values and add them:
@@ -127,20 +127,20 @@
 //! ```
 //!
 //! An important feature of frames is that they can be stacked. If you need one or more temporary
-//! values to call a function, they don't need to be rooted after that function has been called. 
+//! values to call a function, they don't need to be rooted after that function has been called.
 //! There are three methods that let you use a new frame, stacked on top of the old one: `frame`,
 //! `value_frame`, and `call_frame`. The first is very similar to the previous example, but the
-//! closure only provides you with a frame. Its output can be anything, as long as its guaranteed 
-//! to live at least as long as its parent frame. The other two cases can be used to allocate a 
+//! closure only provides you with a frame. Its output can be anything, as long as its guaranteed
+//! to live at least as long as its parent frame. The other two cases can be used to allocate a
 //! few temporary values and use those to allocate some new value or call a function, rooting this
-//! final result in the parent frame. 
+//! final result in the parent frame.
 //!
-//! This is where the other [`Scope`] is used: the closure that `value_frame` and `call_frame` 
+//! This is where the other [`Scope`] is used: the closure that `value_frame` and `call_frame`
 //! take has two arguments, an `Output` and a mutable reference to a `GcFrame`. The frame can be
 //! used to allocate and root temporary values, the output must be converted to an [`OutputScope`]
-//! before calling the methods whose result should be rooted in the parent frame. 
+//! before calling the methods whose result should be rooted in the parent frame.
 //!
-//! For example, the two values from the previous example can be treated as temporary values, 
+//! For example, the two values from the previous example can be treated as temporary values,
 //! while ensuring their sum is valid until `parent_frame` is dropped:
 //!
 //! ```
@@ -149,7 +149,7 @@
 //! # fn main() {
 //! # JULIA.with(|j| {
 //! # let mut julia = j.borrow_mut();
-//!   julia.frame(|_global, parent_frame| {
+//!   julia.frame(|global, parent_frame| {
 //!       let _sum = parent_frame.call_frame(|output, child_frame| {
 //!           let i = Value::new(&mut *child_frame, 1u64)?;
 //!           let j = Value::new(&mut *child_frame, 2i32)?;
@@ -166,10 +166,10 @@
 //! ```
 //!
 //! This is only a small example, other things can be done with [`Value`] as well: their fields
-//! and type information can be accessed for example, and keywords can be provided to call 
+//! and type information can be accessed for example, and keywords can be provided to call
 //! functions with keyword arguments. Values can also contain more complex data, a Julia function
-//! that returns an array or a module returns it as a [`Value`]. These complex types are also 
-//! compatible with [`Value::cast`]. By casting a [`Value`] that contains an n-dimensional array 
+//! that returns an array or a module returns it as a [`Value`]. These complex types are also
+//! compatible with [`Value::cast`]. By casting a [`Value`] that contains an n-dimensional array
 //! to [`Array`] or [`TypedArray`], it's possible to (mutably) access their contents.
 //!
 //! ## Calling Rust from Julia
@@ -308,7 +308,7 @@
 //! that use `jlrs`. The recommended approach is to create a thread-local static `RefCell`:
 //!
 //! ```no_run
-//! # use crate::prelude::*;
+//! # use jlrs::prelude::*;
 //! # use std::cell::RefCell;
 //! thread_local! {
 //!     pub static JULIA: RefCell<Julia> = {
@@ -325,14 +325,14 @@
 //! Tests that use this construct can only use one thread for testing, so you must use
 //! `cargo test -- --test-threads=1`, otherwise the code above will panic when a test
 //! tries to call `Julia::init` a second time.
-//! 
+//!
 //! If these tests also involve the async runtime, the `JULIA_NUM_THREADS` environment
 //! variable must be set to a value larger than 1.
-//! 
+//!
 //! If you want to run jlrs's tests, both these requirements must be taken into account:
 //! `JULIA_NUM_THREADS=2 cargo test -- --test-threads=1`
-//! 
-//! 
+//!
+//!
 //! # Custom types
 //!
 //! In order to map a struct in Rust to one in Julia you can derive [`JuliaStruct`]. This will
@@ -349,38 +349,22 @@
 //! These custom types can also be used when you call Rust from Julia through `ccall`.
 //!
 //! [their User Guide]: https://rust-lang.github.io/rust-bindgen/requirements.html
-//! [`prelude`]: prelude/index.html
-//! [`Julia`]: struct.Julia.html
-//! [`CCall`]: struct.CCall.html
-//! [`Julia::init`]: struct.Julia.html#method.init
-//! [`Julia::init_with_image`]: struct.Julia.html#method.init_with_image
-//! [`Julia::include`]: struct.Julia.html#method.include
-//! [`Julia::frame`]: struct.Julia.html#method.frame
-//! [`Julia::frame_with_slots`]: struct.Julia.html#method.frame_with_slots
-//! [`Global`]: global/struct.Global.html
-//! [`Output`]: frame/struct.Output.html
-//! [`AsyncGcFrame`]: frame/struct.AsyncGcFrame.html
-//! [`StaticFrame`]: frame/struct.StaticFrame.html
-//! [`DynamicFrame`]: frame/struct.DynamicFrame.html
-//! [`Frame`]: traits/trait.Frame.html
-//! [`JuliaStruct`]: traits/trait.JuliaStruct.html
-//! [`Cast`]: traits/trait.Cast.html
-//! [`JuliaType`]: traits/trait.JuliaType.html
-//! [`JuliaTypecheck`]: traits/trait.JuliaTypecheck.html
-//! [`ValidLayout`]: traits/trait.ValidLayout.html
-//! [`IntoJulia`]: traits/trait.IntoJulia.html
-//! [`Module::function`]: value/module/struct.Module.html#method.function
-//! [`Module::base`]: value/module/struct.Module.html#method.base
-//! [`Module::core`]: value/module/struct.Module.html#method.core
-//! [`Module::main`]: value/module/struct.Module.html#method.main
-//! [`JuliaTask`]: traits/multitask/trait.JuliaTask.html
-//! [`Value`]: value/struct.Value.html
-//! [`Value::new`]: value/struct.Value.html#method.new
-//! [`Value::call_async`]: value/struct.Value.html#method.call_async
-//! [`Value::cast`]: value/struct.Value.html#method.cast
-//! [`AsyncJulia`]: multitask/struct.AsyncJulia.html
 //! [the instructions for compiling Julia on Windows using Cygwin and MinGW]: https://github.com/JuliaLang/julia/blob/v1.5.2/doc/build/windows.md#cygwin-to-mingw-cross-compiling
 //! [the examples directory of the repo]: https://github.com/Taaitaaiger/jlrs/tree/v0.8/examples
+//!
+//! [`IntoJulia`]: ./convert/into_julia/traits.IntoJulia.html
+//! [`JuliaType`]: ./layout/julia_type/traits.JuliaType.html
+//! [`JuliaTypecheck`]: ./layout/julia_typecheck/traits.JuliaTypecheck.html
+//! [`ValidLayout`]: ./layout/valid_layout/traits.ValidLayout.html
+//! [`Cast`]: ./convert/cast/traits.Cast.html
+//! [`JuliaStruct`]: ./value/traits/traits.JuliaStruct.html
+//! [`AsyncGcFrame`]: ./memory/frame/struct.AsyncGcFrame.html
+//! [`Frame`]: ./memory/traits/frame/trait.Frame.html
+//! [`JuliaTask`]: ./multitask/julia_task/trait.JuliaTask.html
+//! [`AsyncJulia`]: ./multitask/struct.AsyncJulia.html
+//! [`TypedArray`]: ./value/array/struct.TypedArray.html
+//! [`OutputScope`]: ./memory/output/struct.OutputScope.html
+//! [`Scope`]: ./memory/traits/scope/struct.Scope.html
 
 pub mod convert;
 pub mod error;
@@ -396,55 +380,41 @@ pub mod util;
 pub mod value;
 
 use error::{JlrsError, JlrsResult};
+use jl_sys::{jl_atexit_hook, jl_init, jl_init_with_image__threading, jl_is_initialized};
 use memory::frame::{GcFrame, NullFrame};
 use memory::global::Global;
-use jl_sys::{jl_atexit_hook, jl_init, jl_init_with_image__threading, jl_is_initialized};
 use memory::mode::Sync;
+use memory::stack::StackPage;
 use std::ffi::{c_void, CString};
 use std::io::{Error as IOError, ErrorKind};
 use std::mem::MaybeUninit;
 use std::path::Path;
 use std::ptr::null_mut;
 use std::sync::atomic::{AtomicBool, Ordering};
-use value::traits::call::Call;
 use value::array::Array;
 use value::module::Module;
+use value::traits::call::Call;
 use value::Value;
-use memory::stack::Stack;
 
 pub(crate) static INIT: AtomicBool = AtomicBool::new(false);
 
 pub(crate) static JLRS_JL: &'static str = include_str!("jlrs.jl");
 
-
 /// This struct can be created only once during the lifetime of your program. You must create it
 /// with [`Julia::init`] or [`Julia::init_with_image`] before you can do anything related to
 /// Julia. While this struct exists, Julia is active; dropping it causes the shutdown code to be
 /// called.
-///
-/// [`Julia::init`]: struct.Julia.html#method.init
-/// [`Julia::init_with_image`]: struct.Julia.html#method.init_with_image
 pub struct Julia {
-    stack: Stack,
+    page: StackPage,
 }
 
 impl Julia {
-    /// Initializes Julia, this function can only be called once. If you call it a second time it
+    /// Initializes Julia, this method can only be called once. If you call it a second time it
     /// will return an error. If this struct is dropped, you will need to restart your program to
     /// be able to call Julia code again.
     ///
-    /// You have to choose a stack size when calling this function. This will be the total number
-    /// of slots that will be available for the GC stack. One of these slots will always be in
-    /// use. Each frame needs two slots of overhead, plus one for every value created with that
-    /// frame. A [`StaticFrame`] preallocates its slots, while a [`DynamicFrame`] grows to the
-    /// required size. If calling a method requires one or more slots, this amount is explicitly
-    /// documented.
-    ///
-    /// This function is unsafe because this crate provides you with a way to execute arbitrary
+    /// This method is unsafe because this crate provides you with a way to execute arbitrary
     /// Julia code which can't be checked for correctness.
-    ///
-    /// [`StaticFrame`]: frame/struct.StaticFrame.html
-    /// [`DynamicFrame`]: frame/struct.DynamicFrame.html
     pub unsafe fn init() -> JlrsResult<Self> {
         if jl_is_initialized() != 0 || INIT.swap(true, Ordering::SeqCst) {
             return Err(JlrsError::AlreadyInitialized.into());
@@ -452,7 +422,7 @@ impl Julia {
 
         jl_init();
         let mut jl = Julia {
-            stack: Stack::new(),
+            page: StackPage::default(),
         };
 
         jl.frame_with_slots(2, |global, frame| {
@@ -471,24 +441,24 @@ impl Julia {
         Ok(jl)
     }
 
-    /// This function is similar to [`Julia::init`] except that it loads a custom system image. A
+    /// This method is similar to [`Julia::init`] except that it loads a custom system image. A
     /// custom image can be generated with the [`PackageCompiler`] package for Julia. The main
     /// advantage of using a custom image over the default one is that it allows you to avoid much
     /// of the compilation overhead often associated with Julia.
     ///
-    /// Two additional arguments are required to call this function compared to [`Julia::init`];
+    /// Two arguments are required to call this method compared to [`Julia::init`];
     /// `julia_bindir` and `image_relative_path`. The first must be the absolute path to a
     /// directory that contains a compatible Julia binary (eg `${JULIA_DIR}/bin`), the second must
     /// be either an absolute or a relative path to a system image.
     ///
-    /// This function will return an error if either of the two paths does not exist or if Julia
-    /// has already been initialized.
+    /// This method will return an error if either of the two paths does not exist or if Julia
+    /// has already been initialized. It is unsafe because this crate provides you with a way to
+    /// execute arbitrary Julia code which can't be checked for correctness.
     ///
-    /// [`Julia::init`]: struct.Julia.html#init
     /// [`PackageCompiler`]: https://julialang.github.io/PackageCompiler.jl/dev/
-    pub unsafe fn init_with_image<P: AsRef<Path>>(
+    pub unsafe fn init_with_image<P: AsRef<Path>, Q: AsRef<Path>>(
         julia_bindir: P,
-        image_path: P,
+        image_path: Q,
     ) -> JlrsResult<Self> {
         if INIT.swap(true, Ordering::SeqCst) {
             Err(JlrsError::AlreadyInitialized)?;
@@ -513,7 +483,7 @@ impl Julia {
         jl_init_with_image__threading(bindir.as_ptr(), im_rel_path.as_ptr());
 
         let mut jl = Julia {
-            stack: Stack::new(),
+            page: StackPage::default(),
         };
 
         jl.frame_with_slots(2, |global, frame| {
@@ -565,14 +535,7 @@ impl Julia {
         Err(JlrsError::IncludeNotFound(path.as_ref().to_string_lossy().into()).into())
     }
 
-    /// Create a [`StaticFrame`] that can hold `capacity` values, and call the given closure.
-    /// Returns the result of this closure, or an error if the new frame can't be created because
-    /// there's not enough space on the GC stack. The number of required slots on the stack is
-    /// `capacity + 2`.
-    ///
-    /// Every output and value you create inside the closure using the [`StaticFrame`], either
-    /// directly or through calling a [`Value`], will reduce the available capacity of the
-    /// [`StaticFrame`] by 1.
+    /// Creates a [`GcFrame`], calls the given closure, and returns the result of this closure.
     ///
     /// Example:
     ///
@@ -582,30 +545,42 @@ impl Julia {
     /// # fn main() {
     /// # JULIA.with(|j| {
     /// # let mut julia = j.borrow_mut();
-    ///   julia.frame(1, |_global, frame| {
-    ///       let i = Value::new(frame, 1u64)?;
+    ///   julia.frame(|_global, frame| {
+    ///       let _i = Value::new(&mut *frame, 1u64)?;
     ///       Ok(())
     ///   }).unwrap();
     /// # });
     /// # }
     /// ```
-    ///
-    /// [`StaticFrame`]: ../frame/struct.StaticFrame.html
-    /// [`Value`]: ../value/struct.Value.html
-    pub fn frame<'base, 'julia: 'base, T, F>(
-        &'julia mut self,
-        func: F,
-    ) -> JlrsResult<T>
+    pub fn frame<'base, 'julia: 'base, T, F>(&'julia mut self, func: F) -> JlrsResult<T>
     where
         F: FnOnce(Global<'base>, &mut GcFrame<'base, Sync>) -> JlrsResult<T>,
     {
         unsafe {
             let global = Global::new();
-            let mut frame = GcFrame::new(self.stack.as_mut(), 0,Sync);
+            let mut frame = GcFrame::new(self.page.as_mut(), 0, Sync);
             func(global, &mut frame)
         }
     }
 
+    /// Creates a [`GcFrame`] with `capacity` slots, calls the given closure, and returns the
+    /// result of this closure.
+    ///
+    /// Example:
+    ///
+    /// ```
+    /// # use jlrs::prelude::*;
+    /// # use jlrs::util::JULIA;
+    /// # fn main() {
+    /// # JULIA.with(|j| {
+    /// # let mut julia = j.borrow_mut();
+    ///   julia.frame_with_slots(1, |_global, frame| {
+    ///       let _i = Value::new(&mut *frame, 1u64)?;
+    ///       Ok(())
+    ///   }).unwrap();
+    /// # });
+    /// # }
+    /// ```
     pub fn frame_with_slots<'base, 'julia: 'base, T, F>(
         &'julia mut self,
         capacity: usize,
@@ -616,47 +591,13 @@ impl Julia {
     {
         unsafe {
             let global = Global::new();
-            let mut frame = GcFrame::new(self.stack.as_mut(), capacity,Sync);
+            if capacity + 2 > self.page.size() {
+                self.page = StackPage::new(capacity + 2);
+            }
+            let mut frame = GcFrame::new(self.page.as_mut(), capacity, Sync);
             func(global, &mut frame)
         }
     }
-
-    /*
-    /// Create a [`DynamicFrame`] and call the given closure. Returns the result of this closure,
-    /// or an error if the new frame can't be created because the stack is too small. The number
-    /// of required slots on the stack is 2.
-    ///
-    /// Every output and value you create inside the closure using the [`DynamicFrame`], either
-    /// directly or through calling a [`Value`], will occupy a single slot on the GC stack.
-    ///
-    /// Example:
-    ///
-    /// ```
-    /// # use jlrs::prelude::*;
-    /// # use jlrs::util::JULIA;
-    /// # fn main() {
-    /// # JULIA.with(|j| {
-    /// # let mut julia = j.borrow_mut();
-    /// julia.frame_with_slots(|_global, frame| {
-    ///     let j = Value::new(frame, 1u64)?;
-    ///     Ok(())
-    /// }).unwrap();
-    /// # });
-    /// # }
-    /// ```
-    ///
-    /// [`DynamicFrame`]: ../frame/struct.DynamicFrame.html
-    /// [`Value`]: ../value/struct.Value.html
-    pub fn frame_with_slots<'base, 'julia: 'base, T, F>(&'julia mut self, func: F) -> JlrsResult<T>
-    where
-        F: FnOnce(Global<'base>, &mut DynamicFrame<'base, Sync>) -> JlrsResult<T>,
-    {
-        unsafe {
-            let global = Global::new();
-            let mut frame = DynamicFrame::new(self.stack.as_mut(), Sync);
-            func(global, &mut frame)
-        }
-    }*/
 }
 
 impl Drop for Julia {
@@ -671,55 +612,26 @@ impl Drop for Julia {
 /// initialize it again would cause a crash. In order to still be able to call Julia from Rust
 /// and to borrow arrays (if you pass them as `Array` rather than `Ptr{Array}`), you'll need to
 /// create a frame first. You can use this struct to do so. It must never be used outside
-/// functions called through `ccall`.
+/// functions called through `ccall`, and only once for each `ccall`ed function.
 ///
-/// If you only need to use a frame to borrow array data, you can use [`CCall::null`] and
-/// [`CCall::null_frame`]. Unlike [`Julia`], `CCall` postpones the allocation of the stack that is
-/// used for managing the GC until a static or dynamic frame is created. In the case of a null
-/// frame, this stack isn't allocated at all. Unlike the other frame types null frames can't be
-/// nested.
-///
-/// [`Julia`]: struct.Julia.html
-/// [`CCall::null_frame`]: struct.CCall.html#method.null_frame
-/// [`CCall::null`]: struct.CCall.html#method.null
+/// If you only need to use a frame to borrow array data, you can use [`CCall::null_frame`].
+/// Unlike [`Julia`], `CCall` postpones the allocation of the stack that is used for managing the
+/// GC until a static or dynamic frame is created. In the case of a null frame, this stack isn't
+/// allocated at all. Unlike the other frame types null frames can't be stacked.
 pub struct CCall {
-    stack: Option<Stack>,
+    page: Option<StackPage>,
 }
 
 impl CCall {
-    /// Create a new `CCall` that provides a stack with `stack_size` slots. This functions the
-    /// same way as [`Julia::init`] does. This function must never be called outside a function
-    /// called through `ccall` from Julia and must only be called once during that call. The stack
-    /// is not allocated untl a static or dynamic frame is created.
-    ///
-    /// [`Julia::init`]: struct.Julia.html#method.init
+    /// Create a new `CCall`. This function must never be called outside a function called through
+    /// `ccall` from Julia and must only be called once during that call. The stack is not
+    /// allocated until a [`GcFrame`] is created.
     pub unsafe fn new() -> Self {
-        CCall { stack: None }
+        CCall { page: None }
     }
 
-    /// Create a new `CCall` that provides a stack with no slots. This means only creating a null
-    /// frame is supported. This function must never be called outside a function
-    /// called through `ccall` from Julia and must only be called once during that call. The stack
-    /// is not allocated untl a static or dynamic frame is created.
-    pub unsafe fn null() -> Self {
-        CCall::new()
-    }
-
-    /// Create a [`StaticFrame`] that can hold `capacity` values, and call the given closure.
-    /// Returns the result of this closure, or an error if the new frame can't be created because
-    /// there's not enough space on the GC stack. The number of required slots on the stack is
-    /// `capacity + 2`.
-    ///
-    /// Every output and value you create inside the closure using the [`StaticFrame`], either
-    /// directly or through calling a [`Value`], will reduce the available capacity of the
-    /// [`StaticFrame`] by 1.
-    ///
-    /// [`StaticFrame`]: ../frame/struct.StaticFrame.html
-    /// [`Value`]: ../value/struct.Value.html
-    pub fn frame<'base, 'julia: 'base, T, F>(
-        &'julia mut self,
-        func: F,
-    ) -> JlrsResult<T>
+    /// Creates a [`GcFrame`], calls the given closure, and returns the result of this closure.
+    pub fn frame<'base, 'julia: 'base, T, F>(&'julia mut self, func: F) -> JlrsResult<T>
     where
         F: FnOnce(Global<'base>, &mut GcFrame<'base, Sync>) -> JlrsResult<T>,
     {
@@ -734,6 +646,8 @@ impl CCall {
         }
     }
 
+    /// Creates a [`GcFrame`] with `capacity` slots, calls the given closure, and returns the
+    /// result of this closure.
     pub fn frame_with_slots<'base, 'julia: 'base, T, F>(
         &'julia mut self,
         capacity: usize,
@@ -746,6 +660,9 @@ impl CCall {
             self.ensure_init_stack()
                 .map(|s| {
                     let global = Global::new();
+                    if capacity + 2 > s.size() {
+                        *s = StackPage::new(capacity + 2);
+                    }
                     let mut frame = GcFrame::new(s.as_mut(), capacity, Sync);
                     func(global, &mut frame)
                 })
@@ -756,9 +673,6 @@ impl CCall {
     /// Create a [`NullFrame`] and call the given closure. A [`NullFrame`] cannot be nested and
     /// can only be used to (mutably) borrow array data. Unlike the other frame-creating methods,
     /// no `Global` is provided to the closure.
-    ///
-    /// [`NullFrame`]: ../frame/struct.NullFrame.html
-    /// [`Global`]: ../global/struct.Global.html
     pub fn null_frame<'base, 'julia: 'base, T, F>(&'julia mut self, func: F) -> JlrsResult<T>
     where
         F: FnOnce(&mut NullFrame<'base>) -> JlrsResult<T>,
@@ -770,12 +684,12 @@ impl CCall {
     }
 
     #[inline(always)]
-    fn ensure_init_stack(&mut self) -> Option<&mut Stack> {
-        if self.stack.is_none() {
-            self.stack = Some(Stack::new());
+    fn ensure_init_stack(&mut self) -> Option<&mut StackPage> {
+        if self.page.is_none() {
+            self.page = Some(StackPage::default());
         }
 
-        self.stack.as_mut()
+        self.page.as_mut()
     }
 }
 

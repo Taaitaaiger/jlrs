@@ -3,8 +3,8 @@
 use super::array::Array;
 use super::symbol::Symbol;
 use super::Value;
-use crate::error::{JlrsError, JlrsResult};
 use crate::convert::cast::Cast;
+use crate::error::{JlrsError, JlrsResult};
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_expr_t, jl_expr_type};
 use std::marker::PhantomData;

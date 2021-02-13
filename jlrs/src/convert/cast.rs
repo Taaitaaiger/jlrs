@@ -1,6 +1,6 @@
 //! Convert a Julia value to Rust.
-//! 
-//! The trait in this module should be implemented by deriving `JuliaStruct`, its methods are 
+//!
+//! The trait in this module should be implemented by deriving `JuliaStruct`, its methods are
 //! never called directly but only through [`Value::cast`] and [`Value::cast_unchecked`].
 
 use crate::error::{JlrsError, JlrsResult};
@@ -15,7 +15,7 @@ use std::ffi::c_void;
 /// This trait is implemented by types that a [`Value`] can be converted into by calling
 /// [`Value::cast`]. This includes types like `String`, [`Array`], and `u8`.
 ///
-/// [`Array`]: ../value/array/struct.Array.html
+/// [`Array`]: ../../value/array/struct.Array.html
 pub unsafe trait Cast<'frame, 'data> {
     type Output;
     #[doc(hidden)]

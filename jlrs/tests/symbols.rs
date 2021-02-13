@@ -1,5 +1,8 @@
-use jlrs::{memory::traits::gc::{Gc, GcCollection}, prelude::*};
 use jlrs::util::JULIA;
+use jlrs::{
+    memory::traits::gc::{Gc, GcCollection},
+    prelude::*,
+};
 
 #[test]
 fn create_symbol() {

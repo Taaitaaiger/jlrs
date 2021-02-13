@@ -8,8 +8,8 @@
 use super::array::Array;
 use super::typemap_entry::TypeMapEntry;
 use super::Value;
-use crate::error::{JlrsError, JlrsResult};
 use crate::convert::cast::Cast;
+use crate::error::{JlrsError, JlrsResult};
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_typemap_level_t, jl_typemap_level_type};
 use std::marker::PhantomData;

@@ -7,17 +7,19 @@
 //! In order to use the async runtime, Julia must be started with more than one thread by setting
 //! the `JULIA_NUM_THREADS` environment variable. In order to create tasks that can be executed
 //! you must implement the [`JuliaTask`] trait.
-//!
-//! [`JuliaTask`]: ../traits/multitask/trait.JuliaTask.html
 
 pub mod julia_future;
 pub mod julia_task;
 
-use crate::{error::{JlrsError, JlrsResult}, memory::mode::Async, value::traits::call::Call};
-use crate::memory::frame::{AsyncGcFrame, GcFrame, PAGE_SIZE};
+use crate::memory::frame::{AsyncGcFrame, GcFrame};
 use crate::memory::global::Global;
 use crate::value::module::Module;
 use crate::value::Value;
+use crate::{
+    error::{JlrsError, JlrsResult},
+    memory::{mode::Async, stack::StackPage},
+    value::traits::call::Call,
+};
 use crate::{INIT, JLRS_JL};
 use async_std::channel::{
     bounded, Receiver as AsyncStdReceiver, RecvError, Sender as AsyncStdSender, TrySendError,
@@ -64,9 +66,6 @@ use std::{
 ///  - `process_events_ms`: to ensure the garbage collector can run and tasks that have yielded in
 ///    Julia are rescheduled, events must be processed periodically when at least one task is
 ///    running.
-///
-/// [`JuliaTask`]: ../traits/multitask/trait.JuliaTask.html
-/// [`ReturnChannel`]: ../traits/multitask/trait.ReturnChannel.html
 #[derive(Clone)]
 pub struct AsyncJulia<T, R>
 where
@@ -137,7 +136,6 @@ where
     /// this crate provides you with a way to execute arbitrary Julia code which can't be checked
     /// for correctness.
     ///
-    /// [`AsyncJulia::init`]: struct.AsyncJulia.html#method.init
     /// [`PackageCompiler`]: https://julialang.github.io/PackageCompiler.jl/dev/
     pub unsafe fn init_with_image<P, Q>(
         channel_capacity: usize,
@@ -181,7 +179,6 @@ where
     /// this crate provides you with a way to execute arbitrary Julia code which can't be checked
     /// for correctness.
     ///
-    /// [`AsyncJulia::init_async`]: struct.Julia.html#method.init_async
     /// [`PackageCompiler`]: https://julialang.github.io/PackageCompiler.jl/dev/
     pub async unsafe fn init_with_image_async<P, Q>(
         channel_capacity: usize,
@@ -395,7 +392,7 @@ enum Message<T, R> {
 #[derive(Debug)]
 struct AsyncStack {
     top: [Cell<*mut c_void>; 2],
-    stack: Box<[*mut c_void]>,
+    page: StackPage,
 }
 
 unsafe impl Send for AsyncStack {}
@@ -403,10 +400,9 @@ unsafe impl Sync for AsyncStack {}
 
 impl AsyncStack {
     unsafe fn new() -> Box<Self> {
-        let raw = vec![null_mut(); PAGE_SIZE];
         let stack = AsyncStack {
             top: [Cell::new(null_mut()), Cell::new(null_mut())],
-            stack: raw.into_boxed_slice(),
+            page: StackPage::default(),
         };
 
         Box::new(stack)
@@ -664,7 +660,7 @@ where
         task::spawn_local(async move {
             let res = {
                 let mode = Async(&stack.top[1]);
-                let raw = &mut stack.stack;
+                let raw = stack.page.as_mut();
                 let mut frame = AsyncGcFrame::new(raw, 0, mode);
                 let global = Global::new();
                 jl_task.run(global, &mut frame).await
@@ -686,7 +682,7 @@ fn call_include(stack: &mut AsyncStack, path: PathBuf) -> JlrsResult<()> {
     unsafe {
         let global = Global::new();
         let mode = Async(&stack.top[1]);
-        let raw = &mut stack.stack;
+        let raw = stack.page.as_mut();
         let mut frame = GcFrame::new(raw, 2, mode);
 
         match path.to_str() {
@@ -744,7 +740,7 @@ fn call_set_wake_fn(stack: &mut AsyncStack) -> JlrsResult<()> {
     unsafe {
         let global = Global::new();
         let mode = Async(&stack.top[1]);
-        let raw = &mut stack.stack;
+        let raw = stack.page.as_mut();
         let mut frame = GcFrame::new(raw, 2, mode);
 
         let waker = Value::new(&mut frame, julia_future::wake_task as *mut c_void)?;

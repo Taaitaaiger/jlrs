@@ -30,7 +30,7 @@ pub trait Gc: private::Gc {
         jl_gc_collect(mode as jl_gc_collection_t)
     }
 
-    /// Insert a safepoint, i.e. a point where the garbage collector may run.
+    /// Insert a safepoint, a point where the garbage collector may run.
     unsafe fn gc_safepoint(&mut self) {
         jl_gc_safepoint();
     }

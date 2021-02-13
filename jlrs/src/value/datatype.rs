@@ -14,10 +14,6 @@
 //! of its counterpart in Julia and lets you perform a large set of checks to find out its
 //! properties. Many of these checks are handled through implementations of the trait
 //! [`JuliaTypecheck`]. Some of these checks can be found in this module.
-//!
-//! [`Value`]: ../struct.Value.html
-//! [`DataType`]: struct.DataType.html
-//! [`JuliaTypecheck`]: ../../traits/trait.JuliaTypecheck.html
 
 use crate::convert::cast::Cast;
 use crate::layout::julia_typecheck::JuliaTypecheck;
@@ -65,7 +61,7 @@ use std::marker::PhantomData;
 /// # fn main() {
 /// # JULIA.with(|j| {
 /// # let mut julia = j.borrow_mut();
-/// julia.frame(2, |global, frame| {
+/// julia.frame(|global, frame| {
 ///     let val = Value::new(&mut *frame, 1u8)?;
 ///     let typeof_func = Module::core(global).function("typeof")?;
 ///     let ty_val = typeof_func.call1(&mut *frame, val)?.unwrap();
@@ -76,17 +72,6 @@ use std::marker::PhantomData;
 /// # });
 /// # }
 /// ```
-///
-/// [`JuliaTypecheck`]: ../../traits/trait.JuliaTypecheck.html
-/// [`Cast`]: ../../traits/trait.Cast.html
-/// [`DataType::is`]: ../datatype/struct.DataType.html#method.is
-/// [`Value::is`]: ../struct.Value.html#method.is
-/// [`Value`]: ../struct.Value.html
-/// [`Value::datatype`]: ../struct.Value.html#method.datatype
-/// [`Value::cast`]: ../struct.Value.html#method.cast
-/// [`JuliaTypecheck`]: ../../traits/trait.JuliaTypecheck.html
-/// [`DataType::is`]: struct.Datatype.html#method.is
-/// [`Value::is`]: struct.Datatype.html#method.is
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct DataType<'frame>(*mut jl_datatype_t, PhantomData<&'frame ()>);
@@ -146,8 +131,6 @@ impl<'frame> DataType<'frame> {
 
     /// Returns the field names of this type as a slice of `Symbol`s. These symbols can be used
     /// to access their fields with [`Value::get_field`].
-    ///
-    /// [`Value::get_field`]: struct.Value.html#method.get_field
     pub fn field_names(self) -> &'frame [Symbol<'frame>] {
         unsafe {
             let field_names = jl_field_names(self.ptr().cast());

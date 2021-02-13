@@ -6,8 +6,8 @@
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L1727
 use super::symbol::Symbol;
 use super::Value;
-use crate::error::{JlrsError, JlrsResult};
 use crate::convert::cast::Cast;
+use crate::error::{JlrsError, JlrsResult};
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_task_t, jl_task_type};
 use std::marker::PhantomData;

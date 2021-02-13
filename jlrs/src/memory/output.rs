@@ -1,3 +1,15 @@
+//! Root a value in an earlier frame.
+//!
+//! In order to prevent temporary values from remaining rooted, it's often desirable to call some
+//! function or create a new value in a new frame and root the final result in the current frame.
+//! This can be done with the methods like [`Frame::call_frame`] and [`Frame::value_frame`]
+//! respectively. These methods take a closure that provides an `Output` and a mutable reference
+//! to a frame. The frame can be used to root temporary values, before converting the [`Output`] to
+//! an [`OutputScope`]. An [`OutputScope`] is a [`Scope`] that roots the result in an earlier
+//! frame and can only be used once, the closure should immediately return this result.
+//!
+//! [`Scope`]: ../traits/scope/trait.Scope.html
+
 use super::{frame::GcFrame, traits::frame::Frame};
 use crate::{
     error::JlrsResult,
@@ -23,6 +35,8 @@ impl<'scope> Output<'scope> {
 }
 
 /// A [`Scope`] that can be used once to root a value in an earlier frame.
+///
+/// [`Scope`]: ../traits/scope/trait.Scope.html
 pub struct OutputScope<'scope, 'frame, 'borrow, F: Frame<'frame>>(
     pub(crate) &'borrow mut F,
     Output<'scope>,
@@ -36,6 +50,8 @@ impl<'scope, 'frame, 'borrow, F: Frame<'frame>> OutputScope<'scope, 'frame, 'bor
 
     /// Nest a `value_frame` and propagate the output to the new frame. See
     /// [`Scope::value_frame`] for more information.
+    ///
+    /// [`Scope::value_frame`]: ../traits/scope/trait.Scope.html#method.value_frame
     pub fn value_frame<'data, G>(self, func: G) -> JlrsResult<UnrootedValue<'scope, 'data, 'borrow>>
     where
         G: for<'nested, 'inner> FnOnce(
@@ -43,13 +59,16 @@ impl<'scope, 'frame, 'borrow, F: Frame<'frame>> OutputScope<'scope, 'frame, 'bor
             &'inner mut GcFrame<'nested, F::Mode>,
         ) -> JlrsResult<UnrootedValue<'scope, 'data, 'inner>>,
     {
-        let mut frame = self.0.nest(0, Internal);
+        // Safe: frame is dropped
+        let mut frame = unsafe { self.0.nest(0, Internal) };
         let out = Output::new();
         func(out, &mut frame).map(|pv| UnrootedValue::new(pv.ptr()))
     }
 
     /// Nest a `value_frame` and propagate the output to the new frame. See
-    /// [`Scope::value_frame`] for more information.
+    /// [`Scope::value_frame_with_slots`] for more information.
+    ///
+    /// [`Scope::value_frame_with_slots`]: ../traits/scope/trait.Scope.html#method.value_frame_with_slots
     pub fn value_frame_with_slots<'data, G>(
         self,
         capacity: usize,
@@ -61,13 +80,16 @@ impl<'scope, 'frame, 'borrow, F: Frame<'frame>> OutputScope<'scope, 'frame, 'bor
             &'inner mut GcFrame<'nested, F::Mode>,
         ) -> JlrsResult<UnrootedValue<'scope, 'data, 'inner>>,
     {
-        let mut frame = self.0.nest(capacity, Internal);
+        // Safe: frame is dropped
+        let mut frame = unsafe { self.0.nest(capacity, Internal) };
         let out = Output::new();
         func(out, &mut frame).map(|pv| UnrootedValue::new(pv.ptr()))
     }
 
     /// Nest a `call_frame` and propagate the output to the new frame. See
-    /// [`Scope::value_frame`] for more information.
+    /// [`Scope::call_frame`] for more information.
+    ///
+    /// [`Scope::call_frame`]: ../traits/scope/trait.Scope.html#method.call_frame
     pub fn call_frame<'data, G>(
         self,
         func: G,
@@ -79,7 +101,8 @@ impl<'scope, 'frame, 'borrow, F: Frame<'frame>> OutputScope<'scope, 'frame, 'bor
         )
             -> JlrsResult<UnrootedCallResult<'scope, 'data, 'inner>>,
     {
-        let mut frame = self.0.nest(0, Internal);
+        // Safe: frame is dropped
+        let mut frame = unsafe { self.0.nest(0, Internal) };
         let out = Output::new();
         func(out, &mut frame).map(|pv| match pv {
             UnrootedCallResult::Ok(pv) => UnrootedCallResult::Ok(UnrootedValue::new(pv.ptr())),
@@ -87,7 +110,9 @@ impl<'scope, 'frame, 'borrow, F: Frame<'frame>> OutputScope<'scope, 'frame, 'bor
         })
     }
     /// Nest a `call_frame` and propagate the output to the new frame. See
-    /// [`Scope::value_frame`] for more information.
+    /// [`Scope::call_frame_with_slots`] for more information.
+    ///
+    /// [`Scope::call_frame_with_slots`]: ../traits/scope/trait.Scope.html#method.call_frame_with_slots
     pub fn call_frame_with_slots<'data, G>(
         self,
         capacity: usize,
@@ -100,7 +125,8 @@ impl<'scope, 'frame, 'borrow, F: Frame<'frame>> OutputScope<'scope, 'frame, 'bor
         )
             -> JlrsResult<UnrootedCallResult<'scope, 'data, 'inner>>,
     {
-        let mut frame = self.0.nest(capacity, Internal);
+        // Safe: frame is dropped
+        let mut frame = unsafe { self.0.nest(capacity, Internal) };
         let out = Output::new();
         func(out, &mut frame).map(|pv| match pv {
             UnrootedCallResult::Ok(pv) => UnrootedCallResult::Ok(UnrootedValue::new(pv.ptr())),

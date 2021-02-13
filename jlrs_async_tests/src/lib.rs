@@ -95,22 +95,22 @@ mod example {
         ) -> JlrsResult<Self::T> {
             let v = unsafe {
                 frame
-                .async_value_frame_with_slots(3, |output, frame| async move {
-                    let iters = Value::new(&mut *frame, self.iters)?;
-                    let dims = Value::new(&mut *frame, self.dims)?;
-    
-                    let out = Module::main(global)
-                        .submodule("MyModule")?
-                        .function("complexfunc")?
-                        .call_async(&mut *frame, &mut [dims, iters])
-                        .await?
-                        .unwrap();
-    
-                    let output = output.into_scope(frame);
-                    Ok(out.as_unrooted(output))
-                })
-                .await?
-                .cast::<f64>()?
+                    .async_value_frame_with_slots(3, |output, frame| async move {
+                        let iters = Value::new(&mut *frame, self.iters)?;
+                        let dims = Value::new(&mut *frame, self.dims)?;
+
+                        let out = Module::main(global)
+                            .submodule("MyModule")?
+                            .function("complexfunc")?
+                            .call_async(&mut *frame, &mut [dims, iters])
+                            .await?
+                            .unwrap();
+
+                        let output = output.into_scope(frame);
+                        Ok(out.as_unrooted(output))
+                    })
+                    .await?
+                    .cast::<f64>()?
             };
 
             Ok(v)
@@ -178,22 +178,22 @@ mod example {
         ) -> JlrsResult<Self::T> {
             let v = unsafe {
                 frame
-                .async_value_frame(|output, frame| async move {
-                    let iters = Value::new(&mut *frame, self.iters)?;
-                    let dims = Value::new(&mut *frame, self.dims)?;
-    
-                    let out = Module::main(global)
-                        .submodule("MyModule")?
-                        .function("complexfunc")?
-                        .call_async(&mut *frame, &mut [dims, iters])
-                        .await?
-                        .unwrap();
-    
-                    let output = output.into_scope(frame);
-                    Ok(out.as_unrooted(output))
-                })
-                .await?
-                .cast::<f64>()?
+                    .async_value_frame(|output, frame| async move {
+                        let iters = Value::new(&mut *frame, self.iters)?;
+                        let dims = Value::new(&mut *frame, self.dims)?;
+
+                        let out = Module::main(global)
+                            .submodule("MyModule")?
+                            .function("complexfunc")?
+                            .call_async(&mut *frame, &mut [dims, iters])
+                            .await?
+                            .unwrap();
+
+                        let output = output.into_scope(frame);
+                        Ok(out.as_unrooted(output))
+                    })
+                    .await?
+                    .cast::<f64>()?
             };
 
             Ok(v)
@@ -203,7 +203,6 @@ mod example {
             Some(&self.sender)
         }
     }
-
 
     #[cfg(test)]
     mod tests {
@@ -224,7 +223,7 @@ mod example {
                 let julia = j.borrow_mut();
 
                 let (sender, receiver) = crossbeam_channel::bounded(1);
-    
+
                 julia
                     .try_task(MyTask {
                         dims: 4,
@@ -232,7 +231,7 @@ mod example {
                         sender: sender,
                     })
                     .unwrap();
-    
+
                 assert_eq!(receiver.recv().unwrap().unwrap(), 20_000_004.0);
             });
         }
@@ -251,11 +250,11 @@ mod example {
                         sender: sender,
                     })
                     .unwrap();
-    
+
                 assert_eq!(receiver.recv().unwrap().unwrap(), 30_000_006.0);
             });
         }
-        
+
         #[test]
         fn test_nesting_value_static_task() {
             JULIA.with(|j| {
@@ -270,7 +269,7 @@ mod example {
                         sender: sender,
                     })
                     .unwrap();
-    
+
                 assert_eq!(receiver.recv().unwrap().unwrap(), 30_000_006.0);
             });
         }
@@ -281,7 +280,7 @@ mod example {
                 let julia = j.borrow_mut();
 
                 let (sender, receiver) = crossbeam_channel::bounded(1);
-    
+
                 julia
                     .try_task(NestingTaskAsyncDynamicFrame {
                         dims: 6,
@@ -289,7 +288,7 @@ mod example {
                         sender: sender,
                     })
                     .unwrap();
-    
+
                 assert_eq!(receiver.recv().unwrap().unwrap(), 30_000_006.0);
             });
         }
@@ -308,7 +307,7 @@ mod example {
                         sender: sender,
                     })
                     .unwrap();
-    
+
                 assert_eq!(receiver.recv().unwrap().unwrap(), 30_000_006.0);
             });
         }

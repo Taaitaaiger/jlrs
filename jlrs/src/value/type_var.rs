@@ -1,10 +1,14 @@
 //! Support for values with the `Core.TypeVar` type.
 
-use super::{symbol::Symbol, traits::private::Internal};
 use super::union_all::UnionAll;
 use super::Value;
-use crate::{convert::{cast::Cast, temporary_symbol::TemporarySymbol}, error::{JlrsError, JlrsResult}, memory::traits::frame::Frame};
+use super::{symbol::Symbol, traits::private::Internal};
 use crate::memory::global::Global;
+use crate::{
+    convert::{cast::Cast, temporary_symbol::TemporarySymbol},
+    error::{JlrsError, JlrsResult},
+    memory::traits::frame::Frame,
+};
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_any_type, jl_bottom_type, jl_new_typevar, jl_tvar_t, jl_tvar_type};
 use std::marker::PhantomData;

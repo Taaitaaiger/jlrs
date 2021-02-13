@@ -1,5 +1,8 @@
-use jlrs::{memory::traits::gc::{Gc, GcCollection}, prelude::*};
 use jlrs::util::JULIA;
+use jlrs::{
+    memory::traits::gc::{Gc, GcCollection},
+    prelude::*,
+};
 
 macro_rules! impl_test {
     ($name:ident, $name_mut:ident, $name_slice:ident, $name_slice_mut:ident, $value_type:ty) => {

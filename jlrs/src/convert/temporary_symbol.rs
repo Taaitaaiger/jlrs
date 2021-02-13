@@ -1,5 +1,5 @@
 //! Create a temporary symbol.
-//! 
+//!
 //! Many things in Julia are accessed with [`Symbol`]s. This traits allows using strings instead.
 
 use crate::value::string::JuliaString;
@@ -15,8 +15,6 @@ macro_rules! impl_temporary_symbol {
     };
 }
 /// Trait implemented by types that can be converted to a temporary [`Symbol`].
-///
-/// [`Symbol`]: ../value/symbol/struct.Symbol.html
 pub unsafe trait TemporarySymbol: private::TemporarySymbol {}
 
 impl_temporary_symbol!(String);
@@ -27,9 +25,9 @@ impl_temporary_symbol!(Symbol<'s>, 's);
 impl_temporary_symbol!(JuliaString<'frame>, 'frame);
 
 pub(crate) mod private {
-    use crate::value::traits::private::Internal;
     use crate::value::string::JuliaString;
     use crate::value::symbol::Symbol;
+    use crate::value::traits::private::Internal;
     use jl_sys::{jl_symbol, jl_symbol_n};
     use std::borrow::Cow;
 

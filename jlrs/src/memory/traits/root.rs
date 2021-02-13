@@ -1,5 +1,8 @@
-use crate::{error::{CallResult, JlrsResult}, value::{Value, traits::private::Internal}};
 use crate::value::{PendingCallResult, PendingValue};
+use crate::{
+    error::{CallResult, JlrsResult},
+    value::{traits::private::Internal, Value},
+};
 
 use super::frame::Frame;
 pub(crate) trait Root<'frame, 'data>: Sized {

@@ -1,6 +1,10 @@
 //! Call Julia functions.
 
-use crate::{error::JlrsResult, memory::traits::{frame::Frame, scope::Scope}, value::{MAX_SIZE, Value, WithKeywords}};
+use crate::{
+    error::JlrsResult,
+    memory::traits::{frame::Frame, scope::Scope},
+    value::{Value, WithKeywords, MAX_SIZE},
+};
 use jl_sys::{
     jl_call, jl_call0, jl_call1, jl_call2, jl_call3, jl_exception_occurred, jl_get_kwsorter,
 };
@@ -9,7 +13,7 @@ use smallvec::SmallVec;
 use super::private::Internal;
 
 /// A trait that allows something to be called as a Julia function. There are currently two types
-/// that implement this struct, [`Value`] and [`WithKeywords`]. In Julia every value can
+/// that implement this trait, [`Value`] and [`WithKeywords`]. In Julia every value can
 /// potentially be a function that can be called, there's no general way to confirm if it is.
 /// [`WithKeywords`] is used to call functions that take keyword arguments, keywords can be
 /// provided to a function by calling [`Value::with_keywords`]. The positional arguments can be

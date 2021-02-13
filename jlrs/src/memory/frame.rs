@@ -29,7 +29,7 @@
 //! one value. By preallocating the slots less work has to be done to root a value, more slots can
 //! be allocated to the frame if necessary. The maximum number of slots that can be allocated to a
 //! frame is its capacity. In general, the capacity of a frame that allocates no slots is at least
-//! 32, while one that does allocates some slots guarantees a capacity of at least that number of
+//! 16, while one that does allocates some slots guarantees a capacity of at least that number of
 //! slots. When a new frame is pushed, it will try to use the current frame's remaining capacity.
 //! If the remaining capacity is insufficient, more stack space is allocated.
 //!
@@ -66,10 +66,13 @@
 //! # });
 //! # }
 //! ```
+//!
+//! [`Scope`]: ../traits/scope/trait.Scope.html
+//! [`Frame`]: ../traits/frame/trait.Frame.html
 
 #[cfg(all(feature = "async", target_os = "linux"))]
 use super::mode::Async;
-use super::traits::mode::Mode;
+use super::{stack::StackPage, traits::mode::Mode};
 #[cfg(all(feature = "async", target_os = "linux"))]
 use crate::{
     error::{AllocError, CallResult, JlrsError, JlrsResult},
@@ -81,23 +84,37 @@ use crate::{value::traits::private::Internal, CCall};
 use jl_sys::jl_value_t;
 #[cfg(all(feature = "async", target_os = "linux"))]
 use std::future::Future;
-use std::{ffi::c_void, marker::PhantomData, mem, ptr::null_mut};
+use std::{ffi::c_void, marker::PhantomData, ptr::null_mut};
 
-pub(crate) const PAGE_SIZE: usize = 4096 / mem::size_of::<usize>();
-pub(crate) const MIN_FRAME_CAPACITY: usize = 32;
+pub(crate) const MIN_FRAME_CAPACITY: usize = 16;
 
-/// A frame that can root values.
+/// A frame that can be used to root values. Methods including [`Julia::frame`],
+/// [`Frame::frame`], [`Frame::value_frame`], [`Frame::call_frame`], and their `_with_slots`
+/// variants create a new `GcFrame`, which is accessible through a mutable reference inside the
+/// closure provided to these methods.
+///
+/// Roots are stored in slots, each slot can contain one root. Frames created with slots will
+/// preallocate that number of slots. Frames created without slots will dynamically create new
+/// slots as needed. If a frame is created without slots it is able to create at least 16 slots.
+///
+/// If there is sufficient capacity available, a new frame will use this remaining capacity. If
+/// the capacity is insufficient, more stack space is allocated.
+///
+/// [`Julia::frame`]: ../../struct.Julia.html#method.frame
+/// [`Frame::frame`]: ../traits/frame/trait.Frame.html#method.frame
+/// [`Frame::value_frame`]: ../traits/frame/trait.Frame.html#method.value_frame
+/// [`Frame::call_frame`]: ../traits/frame/trait.Frame.html#method.call_frame
 pub struct GcFrame<'frame, M: Mode> {
     raw_frame: &'frame mut [*mut c_void],
-    page: Option<Box<[*mut c_void]>>,
-    len: usize,
+    page: Option<StackPage>,
+    n_roots: usize,
     mode: M,
 }
 
 impl<'frame, M: Mode> GcFrame<'frame, M> {
     /// Returns the number of values currently rooted in this frame.
     pub fn n_roots(&self) -> usize {
-        self.len
+        self.n_roots
     }
 
     /// Returns the number of slots that are currently allocated to this frame.
@@ -128,14 +145,13 @@ impl<'frame, M: Mode> GcFrame<'frame, M> {
         true
     }
 
-    pub(crate) fn nest<'nested>(&'nested mut self, capacity: usize) -> GcFrame<'nested, M> {
+    // Safety: this frame must be dropped.
+    pub(crate) unsafe fn nest<'nested>(&'nested mut self, capacity: usize) -> GcFrame<'nested, M> {
         let used = self.n_slots() + 2;
-        let needed = MIN_FRAME_CAPACITY.max(capacity) + 2;
-        let raw_frame = if used + needed > self.raw_frame.len() {
-            if self.page.is_none() || self.page.as_ref().unwrap().len() < needed {
-                let raw = vec![null_mut::<c_void>(); PAGE_SIZE.max(needed)];
-                let page = raw.into_boxed_slice();
-                self.page = Some(page);
+        let new_frame_size = MIN_FRAME_CAPACITY.max(capacity) + 2;
+        let raw_frame = if used + new_frame_size > self.raw_frame.len() {
+            if self.page.is_none() || self.page.as_ref().unwrap().size() < new_frame_size {
+                self.page = Some(StackPage::new(new_frame_size));
             }
 
             self.page.as_mut().unwrap().as_mut()
@@ -146,16 +162,18 @@ impl<'frame, M: Mode> GcFrame<'frame, M> {
         GcFrame::new(raw_frame, capacity, self.mode)
     }
 
-    pub(crate) fn new(raw_frame: &'frame mut [*mut c_void], capacity: usize, mode: M) -> Self {
-        // Is popped when this frame is dropped
-        unsafe {
-            mode.push_frame(raw_frame, capacity, Internal);
-        }
+    // Safety: this frame must be dropped.
+    pub(crate) unsafe fn new(
+        raw_frame: &'frame mut [*mut c_void],
+        capacity: usize,
+        mode: M,
+    ) -> Self {
+        mode.push_frame(raw_frame, capacity, Internal);
 
         GcFrame {
             raw_frame,
             page: None,
-            len: 0,
+            n_roots: 0,
             mode,
         }
     }
@@ -185,22 +203,29 @@ impl<'frame, M: Mode> Drop for GcFrame<'frame, M> {
     }
 }
 
-/// A frame that can root values, and can be used to dispatch function calls to a new thread and
-/// await the result with [`Value::call_async`]. It provides the same public API as [`GcFrame`]
-/// and async versions of `frame(_with_slots)`, `value_frame(_with_slots)`, and
-/// `call_frame(_with_slots)`.
+/// A frame that can be used to root values and dispatch Julia function calls to another thread
+/// with [`Value::call_async`]. An `AsyncGcFrame` is available by implementing the `JuliaTask`
+/// trait, this struct provides several methods that push a new `AsyncGcFrame` to the stack.
+///
+/// Roots are stored in slots, each slot can contain one root. Frames created with slots will
+/// preallocate that number of slots. Frames created without slots will dynamically create new
+/// slots as needed. If a frame is created without slots it is able to create at least 16 slots.
+///
+/// If there is sufficient capacity available, a new frame will use this remaining capacity. If
+/// the capacity is insufficient, more stack space is allocated.
 #[cfg(all(feature = "async", target_os = "linux"))]
 pub struct AsyncGcFrame<'frame> {
     raw_frame: &'frame mut [*mut c_void],
-    len: usize,
-    page: Option<Box<[*mut c_void]>>,
+    n_roots: usize,
+    page: Option<StackPage>,
     output: Option<&'frame mut *mut c_void>,
     mode: Async<'frame>,
 }
 
 #[cfg(all(feature = "async", target_os = "linux"))]
 impl<'frame> AsyncGcFrame<'frame> {
-    /// An async version of `value_frame`.
+    /// An async version of `value_frame`. Rather than a closure, it takes an async closure that
+    /// provides a new `AsyncGcFrame`.
     pub async fn async_value_frame<'nested, 'data, F, G>(
         &'nested mut self,
         func: F,
@@ -224,7 +249,8 @@ impl<'frame> AsyncGcFrame<'frame> {
         }
     }
 
-    /// An async version of `value_frame_with_slots`.
+    /// An async version of `value_frame_with_slots`. Rather than a closure, it takes an async
+    /// closure that provides a new `AsyncGcFrame`.
     pub async fn async_value_frame_with_slots<'nested, 'data, F, G>(
         &'nested mut self,
         capacity: usize,
@@ -249,7 +275,8 @@ impl<'frame> AsyncGcFrame<'frame> {
         }
     }
 
-    /// An async version of `call_frame`.
+    /// An async version of `call_frame`. Rather than a closure, it takes an async
+    /// closure that provides a new `AsyncGcFrame`.
     pub async fn async_call_frame<'nested, 'data, F, G>(
         &'nested mut self,
         func: F,
@@ -279,7 +306,8 @@ impl<'frame> AsyncGcFrame<'frame> {
         }
     }
 
-    /// An async version of `call_frame_with_slots`.
+    /// An async version of `call_frame_with_slots`. Rather than a closure, it takes an async
+    /// closure that provides a new `AsyncGcFrame`.
     pub async fn async_call_frame_with_slots<'nested, 'data, F, G>(
         &'nested mut self,
         capacity: usize,
@@ -310,7 +338,8 @@ impl<'frame> AsyncGcFrame<'frame> {
         }
     }
 
-    /// An async version of `frame`.
+    /// An async version of `frame`. Rather than a closure, it takes an async
+    /// closure that provides a new `AsyncGcFrame`.
     pub async fn async_frame<'nested, T, F, G>(&'nested mut self, func: F) -> JlrsResult<T>
     where
         T: 'frame,
@@ -325,7 +354,8 @@ impl<'frame> AsyncGcFrame<'frame> {
         }
     }
 
-    /// An async version of `frame_with_slots`.
+    /// An async version of `frame_with_slots`. Rather than a closure, it takes an async
+    /// closure that provides a new `AsyncGcFrame`.
     pub async fn async_frame_with_slots<'nested, T, F, G>(
         &'nested mut self,
         capacity: usize,
@@ -346,7 +376,7 @@ impl<'frame> AsyncGcFrame<'frame> {
 
     /// Returns the number of values currently rooted in this frame.
     pub fn n_roots(&self) -> usize {
-        self.len
+        self.n_roots
     }
 
     /// Returns the number of slots that are currently allocated to this frame.
@@ -376,19 +406,18 @@ impl<'frame> AsyncGcFrame<'frame> {
         true
     }
 
-    pub(crate) fn new(
+    // Safety: must be dropped
+    pub(crate) unsafe fn new(
         raw_frame: &'frame mut [*mut c_void],
         capacity: usize,
         mode: Async<'frame>,
     ) -> Self {
         // Is popped when this frame is dropped
-        unsafe {
-            mode.push_frame(raw_frame, capacity, Internal);
-        }
+        mode.push_frame(raw_frame, capacity, Internal);
 
         AsyncGcFrame {
             raw_frame,
-            len: 0,
+            n_roots: 0,
             page: None,
             output: None,
             mode,
@@ -401,17 +430,16 @@ impl<'frame> AsyncGcFrame<'frame> {
         self.raw_frame[0] = (n_slots << 1) as _;
     }
 
-    pub(crate) fn nest<'nested>(
+    // Safety: frame must be dropped
+    pub(crate) unsafe fn nest<'nested>(
         &'nested mut self,
         capacity: usize,
     ) -> GcFrame<'nested, Async<'frame>> {
         let used = self.n_slots() + 2;
         let needed = MIN_FRAME_CAPACITY.max(capacity) + 2;
         let raw_frame = if used + needed > self.raw_frame.len() {
-            if self.page.is_none() || self.page.as_ref().unwrap().len() < needed {
-                let raw = vec![null_mut::<c_void>(); PAGE_SIZE.max(needed)];
-                let page = raw.into_boxed_slice();
-                self.page = Some(page);
+            if self.page.is_none() || self.page.as_ref().unwrap().size() < needed {
+                self.page = Some(StackPage::new(needed));
             }
 
             self.page.as_mut().unwrap().as_mut()
@@ -422,14 +450,16 @@ impl<'frame> AsyncGcFrame<'frame> {
         GcFrame::new(raw_frame, capacity, self.mode)
     }
 
-    pub(crate) fn nest_async<'nested>(&'nested mut self, capacity: usize) -> AsyncGcFrame<'nested> {
+    // Safety: frame must be dropped
+    pub(crate) unsafe fn nest_async<'nested>(
+        &'nested mut self,
+        capacity: usize,
+    ) -> AsyncGcFrame<'nested> {
         let used = self.n_slots() + 2;
         let needed = MIN_FRAME_CAPACITY.max(capacity) + 2;
         let raw_frame = if used + needed > self.raw_frame.len() {
-            if self.page.is_none() || self.page.as_ref().unwrap().len() < needed {
-                let raw = vec![null_mut::<c_void>(); PAGE_SIZE.max(needed)];
-                let page = raw.into_boxed_slice();
-                self.page = Some(page);
+            if self.page.is_none() || self.page.as_ref().unwrap().size() < needed {
+                self.page = Some(StackPage::new(needed));
             }
 
             self.page.as_mut().unwrap().as_mut()
@@ -442,7 +472,6 @@ impl<'frame> AsyncGcFrame<'frame> {
 
     // Safety: n_roots < capacity
     pub(crate) unsafe fn root(&mut self, value: *mut jl_value_t) {
-        println!("{} {} ", self.n_roots(), self.capacity());
         debug_assert!(self.n_roots() < self.capacity());
 
         let n_roots = self.n_roots();
@@ -452,7 +481,8 @@ impl<'frame> AsyncGcFrame<'frame> {
         }
     }
 
-    pub(crate) fn nest_async_with_output<'nested>(
+    // Safety: frame must be dropped
+    pub(crate) unsafe fn nest_async_with_output<'nested>(
         &'nested mut self,
         capacity: usize,
     ) -> JlrsResult<AsyncGcFrame<'nested>> {
@@ -468,10 +498,8 @@ impl<'frame> AsyncGcFrame<'frame> {
             let used = self.n_slots() + 2;
 
             if used + needed > self.raw_frame.len() {
-                if self.page.is_none() || self.page.as_ref().unwrap().len() < needed {
-                    let raw = vec![null_mut::<c_void>(); PAGE_SIZE.max(needed)];
-                    let page = raw.into_boxed_slice();
-                    self.page = Some(page);
+                if self.page.is_none() || self.page.as_ref().unwrap().size() < needed {
+                    self.page = Some(StackPage::new(needed));
                 }
 
                 (output, self.page.as_mut().unwrap().as_mut())
@@ -482,10 +510,8 @@ impl<'frame> AsyncGcFrame<'frame> {
             let used = self.n_slots() + 3;
 
             if used + needed > self.raw_frame.len() {
-                if self.page.is_none() || self.page.as_ref().unwrap().len() < needed {
-                    let raw = vec![null_mut::<c_void>(); PAGE_SIZE.max(needed)];
-                    let page = raw.into_boxed_slice();
-                    self.page = Some(page);
+                if self.page.is_none() || self.page.as_ref().unwrap().size() < needed {
+                    self.page = Some(StackPage::new(needed));
                 }
 
                 (

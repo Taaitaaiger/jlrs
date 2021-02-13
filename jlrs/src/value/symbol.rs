@@ -1,8 +1,11 @@
 //! Symbols represent identifiers like module and function names.
 
-use super::Value;
-use crate::{error::{JlrsError, JlrsResult}, memory::global::Global};
+use super::{LeakedValue, Value};
 use crate::convert::cast::Cast;
+use crate::{
+    error::{JlrsError, JlrsResult},
+    memory::global::Global,
+};
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_sym_t, jl_symbol_n, jl_symbol_name, jl_symbol_type};
 use std::ffi::CStr;
@@ -28,7 +31,7 @@ use crate::value::datatype::DataType;
 /// # fn main() {
 /// # JULIA.with(|j| {
 /// # let mut julia = j.borrow_mut();
-/// julia.frame(2, |global, frame| {
+/// julia.frame(|global, frame| {
 ///     let symbol_func = Module::core(global).function("Symbol")?;
 ///     let symbol_str = Value::new(&mut *frame, "+")?;
 ///     let symbol_val = symbol_func.call1(&mut *frame, symbol_str)?.unwrap();
@@ -103,6 +106,11 @@ impl<'base> Symbol<'base> {
     /// Convert `self` to a `Value`.
     pub fn as_value(self) -> Value<'base, 'static> {
         self.into()
+    }
+
+    /// Convert `self` to a `LeakedValue`.
+    pub fn as_leaked(self) -> LeakedValue {
+        unsafe { LeakedValue::wrap(self.ptr().cast()) }
     }
 
     /// Convert `self` to a `String`.

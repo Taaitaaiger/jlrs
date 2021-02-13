@@ -1,9 +1,9 @@
 //! Convert a value from Rust to Julia.
-//! 
-//! The trait in this module should be implemented by deriving `IntoJulia`, its methods are 
+//!
+//! The trait in this module should be implemented by deriving `IntoJulia`, its methods are
 //! never called directly but only through [`Value::new`].
 //!
-//! [`Value::new`]: ../value/struct.Value.html#method.new
+//! [`Value::new`]: ../../value/struct.Value.html#method.new
 
 use jl_sys::{
     jl_box_bool, jl_box_char, jl_box_float32, jl_box_float64, jl_box_int16, jl_box_int32,
@@ -17,7 +17,7 @@ use std::ffi::c_void;
 /// [`Value::new`]. This trait can be derived for custom bits types that implement
 /// `JuliaStruct`.
 ///
-/// [`Value::new`]: ../value/struct.Value.html#method.new
+/// [`Value::new`]: ../../value/struct.Value.html#method.new
 pub unsafe trait IntoJulia {
     #[doc(hidden)]
     unsafe fn into_julia(&self) -> *mut ::jl_sys::jl_value_t;

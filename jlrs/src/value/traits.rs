@@ -1,35 +1,4 @@
-//! All traits used by this crate.
-//!
-//! Most of these traits are intended for internal use only and you should never manually
-//! implement them for your own types nor call any of their trait methods directly.
-//!
-//! The one major exception is the [`Frame`] trait. This trait is implemented by the two frame
-//! types that are provided, [`StaticFrame`] and [`DynamicFrame`] which are used to ensure the
-//! garbage collector doesn't drop the data that's used from Rust. It provides the common
-//! functionality these frame types offer.
-//!
-//! Two of the traits in this module are available as custom derive traits, [`JuliaStruct`] and
-//! [`IntoJulia`], which can be used to map a struct between Julia and Rust. Deriving the first
-//! will implement [`JuliaType`], [`JuliaTypecheck`], [`ValidLayout`], and [`Cast`], which will let you
-//! safely access the raw contents of a value; [`IntoJulia`] can be derived for bits types and lets
-//! you create new instances of that type using [`Value::new`]. While it's possible to manually
-//! implement and annotate these mapping structs, you should use `JlrsReflect.jl` which can
-//! generate these structs for you. If you do want to do this manually, see the documentation of
-//! [`JuliaStruct`] for instructions.
-//!
-//! [`Frame`]: trait.Frame.html
-//! [`StaticFrame`]: ../frame/struct.StaticFrame.html
-//! [`DynamicFrame`]: ../frame/struct.DynamicFrame.html
-//! [`Value::new`]: ../value/struct.Value.html#method.new
-//! [`Value::cast`]: ../value/struct.Value.html#method.cast
-//! [`JuliaStruct`]: trait.JuliaStruct.html
-//! [`JuliaType`]: trait.JuliaType.html
-//! [`Cast`]: trait.Cast.html
-//! [`ValidLayout`]: trait.ValidLayout.html
-//! [`IntoJulia`]: trait.IntoJulia.html
-//! [`JuliaTypecheck`]: trait.JuliaTypecheck.html
-//! [`Value::is`]: ../value/struct.Value.html#method.is
-//! [`DataType::is`]: ../value/datatype/struct.DataType.html#method.is
+//! Traits to call functions and derivable traits.
 
 pub mod call;
 
@@ -96,11 +65,11 @@ pub mod call;
 /// doesn't affect the layout must be elided. The type parameter must implement both `ValidLayout`
 /// and `Copy`.
 ///
-/// [`JuliaType`]: trait.JuliaType.html
-/// [`JuliaTypecheck`]: trait.JuliaTypecheck.html
-/// [`ValidLayout`]: trait.ValidLayout.html
-/// [`Cast`]: trait.Cast.html
-/// [`Value::cast`]: ../value/struct.Value.html#method.cast
+/// [`JuliaType`]: ../../layout/julia_type/trait.JuliaType.html
+/// [`JuliaTypecheck`]: ../../layout/julia_typecheck/trait.JuliaTypecheck.html
+/// [`ValidLayout`]: ../../layout/valid_layout/trait.ValidLayout.html
+/// [`Cast`]: ../../convert/cast/trait.Cast.html
+/// [`Value::cast`]: ../struct.Value.html#method.cast
 pub unsafe trait JuliaStruct: Copy {}
 
 pub(crate) mod private {

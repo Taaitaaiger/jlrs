@@ -1,9 +1,12 @@
 //! Convert a rooted value or function call result to its unrooted counterpart.
 //!
-//! When the async runtime is used, it can be useful to use [`AsyncGcFrame::async_value_frame`] or 
-//! [`AsyncGcFrame::async_call_frame`] in order to ensure temporary values are unrooted as fast 
-//! as possible. Because the result of an async Julia function call is rooted, it must be unrooted 
-//! before it is returned from the closure.
+//! When the async runtime is used, it can be useful to use [`AsyncGcFrame::async_value_frame`] or
+//! [`AsyncGcFrame::async_call_frame`] in order to ensure temporary values can be freed by the
+//! garbage collector as fast as possible. Because the result of an async Julia function call is
+//! rooted, it must be unrooted before it is returned from the closure.
+//!
+//! [`AsyncGcFrame::async_call_frame`]: ../../frame/struct.AsyncGcFrame.html#method.async_call_frame
+//! [`AsyncGcFrame::async_value_frame`]: ../../frame/struct.AsyncGcFrame.html#method.async_value_frame
 
 use super::frame::Frame;
 use crate::{

@@ -1,9 +1,14 @@
 //! Access Julia modules and the globals and functions defined in them.
 
-use crate::{convert::{cast::Cast, temporary_symbol::TemporarySymbol}, memory::{global::Global, traits::{frame::Frame, scope::Scope}}, value::symbol::Symbol};
+use crate::error::{JlrsError, JlrsResult};
 use crate::value::Value;
 use crate::{
-    error::{JlrsError, JlrsResult},
+    convert::{cast::Cast, temporary_symbol::TemporarySymbol},
+    memory::{
+        global::Global,
+        traits::{frame::Frame, scope::Scope},
+    },
+    value::symbol::Symbol,
 };
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{
@@ -13,7 +18,10 @@ use jl_sys::{
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::marker::PhantomData;
 
-use super::traits::{call::Call, private::Internal};
+use super::{
+    traits::{call::Call, private::Internal},
+    LeakedValue,
+};
 
 /// Functionality in Julia can be accessed through its module system. You can get a handle to the
 /// three standard modules, `Main`, `Base`, and `Core` and access their submodules through them.
@@ -25,11 +33,8 @@ use super::traits::{call::Call, private::Internal};
 ///  `Module`.
 ///
 /// [`Julia::include`]: ../../struct.Julia.html#method.include
-/// [`JuliaTypecheck`]: ../../traits/trait.JuliaTypecheck.html
-/// [`Cast`]: ../../traits/trait.Cast.html
+/// [`JuliaTypecheck`]: ../../layout/julia_typecheck/trait.JuliaTypecheck.html
 /// [`DataType::is`]: ../datatype/struct.DataType.html#method.is
-/// [`Value::is`]: ../struct.Value.html#method.is
-/// [`Value`]: ../struct.Value.html
 #[derive(Copy, Clone)]
 #[repr(transparent)]
 pub struct Module<'base>(*mut jl_module_t, PhantomData<&'base ()>);
@@ -170,12 +175,32 @@ impl<'base> Module<'base> {
         }
     }
 
+    /// Returns the global named `name` in this module as a [`LeakedValue`].
+    /// Returns an error if the global doesn't exist.
+    pub fn leaked_global<N>(self, name: N) -> JlrsResult<LeakedValue>
+    where
+        N: TemporarySymbol,
+    {
+        unsafe {
+            let symbol = name.temporary_symbol(Internal);
+
+            // there doesn't seem to be a way to check if this is actually a
+            // function...
+            let func = jl_get_global(self.ptr(), symbol.ptr());
+            if func.is_null() {
+                return Err(JlrsError::FunctionNotFound(symbol.into()).into());
+            }
+
+            Ok(LeakedValue::wrap(func))
+        }
+    }
+
     /// Returns the function named `name` in this module. Note that all globals defined within the
     /// module will be successfully resolved into a function; Julia will throw an exception if you
     /// try to call something that isn't a function. This means that this method is just an alias
     /// for `Module::global`.
     ///
-    /// Returns an error if th function doesn't exist.
+    /// Returns an error if the function doesn't exist.
     pub fn function<N>(self, name: N) -> JlrsResult<Value<'base, 'static>>
     where
         N: TemporarySymbol,
@@ -183,9 +208,23 @@ impl<'base> Module<'base> {
         self.global(name)
     }
 
+    /// Returns the function named `name` in this module as a [`LeakedValue`].
+    /// Returns an error if the function doesn't exist.
+    pub fn leaked_function<N>(self, name: N) -> JlrsResult<LeakedValue>
+    where
+        N: TemporarySymbol,
+    {
+        self.leaked_global(name)
+    }
+
     /// Convert `self` to a `Value`.
     pub fn as_value(self) -> Value<'base, 'static> {
         self.into()
+    }
+
+    /// Convert `self` to a `LeakedValue`.
+    pub fn as_leaked(self) -> LeakedValue {
+        unsafe { LeakedValue::wrap(self.ptr().cast()) }
     }
 
     /// Load a module by calling `Base.require` and return this module if it has been loaded

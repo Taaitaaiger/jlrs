@@ -1,7 +1,11 @@
 //! Support for values with the `Core.SimpleVector` (`SVec`) type.
 
-use crate::{convert::cast::Cast, error::{JlrsError, JlrsResult}, memory::{global::Global, traits::frame::Frame}};
 use crate::value::Value;
+use crate::{
+    convert::cast::Cast,
+    error::{JlrsError, JlrsResult},
+    memory::{global::Global, traits::frame::Frame},
+};
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{
     jl_alloc_svec, jl_alloc_svec_uninit, jl_emptysvec, jl_gc_wb, jl_simplevector_type,
