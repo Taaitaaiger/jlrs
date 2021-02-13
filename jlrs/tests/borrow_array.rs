@@ -23,6 +23,44 @@ fn borrow_array_1d() {
 }
 
 #[test]
+fn borrow_array_1d_dynamic_type() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+
+        struct Foo<'a> {
+            slice: &'a mut [u8],
+        }
+
+        let foo = Foo {
+            slice: &mut [1, 2, 3, 4, 5, 6, 7, 8],
+        };
+
+        let unboxed = jlrs
+            .frame_with_slots(1, |_, frame| {
+                let x = false;
+
+                let array = match x {
+                    true => Value::borrow_array(frame, foo.slice, 8)?,
+                    false => unsafe {
+                        let slice =
+                            std::slice::from_raw_parts_mut(foo.slice.as_mut_ptr().cast::<u16>(), 4);
+                        Value::borrow_array(frame, slice, 4)?
+                    },
+                };
+
+                assert!(array.is_array_of::<u16>());
+                array.cast::<Array>()?.copy_inline_data::<u16>()
+            })
+            .unwrap();
+
+        let (data, dims) = unboxed.splat();
+        assert_eq!(dims.n_dimensions(), 1);
+        assert_eq!(dims.n_elements(0), 4);
+        assert_eq!(data, vec![513, 1027, 1541, 2055]);
+    });
+}
+
+#[test]
 fn borrow_array_1d_output() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();

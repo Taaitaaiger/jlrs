@@ -259,7 +259,7 @@ impl<'frame> DataType<'frame> {
     pub fn instantiate<'scope, 'fr, 'value, 'borrow, S, F, V>(
         self,
         scope: S,
-        values: &mut V,
+        mut values: V,
     ) -> JlrsResult<S::Value>
     where
         S: Scope<'scope, 'fr, 'borrow, F>,

@@ -243,7 +243,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     pub fn instantiate<'scope, 'value, 'borrow, V, S, F>(
         scope: S,
         ty: DataType,
-        values: &mut V,
+        values: V,
     ) -> JlrsResult<S::Value>
     where
         V: AsMut<[Value<'value, 'borrow>]>,
@@ -315,13 +315,13 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// This function returns an error if there are not enough slots available.
     pub fn borrow_array<'scope, T, D, V, S, F>(
         scope: S,
-        data: &'data mut V,
+        mut data: V,
         dimensions: D,
     ) -> JlrsResult<S::Value>
     where
         T: IntoJulia + JuliaType,
         D: Into<Dimensions>,
-        V: AsMut<[T]>,
+        V: AsMut<[T]> + 'data,
         S: Scope<'scope, 'frame, 'data, F>,
         F: Frame<'frame>,
     {
@@ -491,8 +491,8 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// Create a new named tuple, you can use the `named_tuple` macro instead of this method.
     pub fn new_named_tuple<'scope, 'value, S, F, N, T, V>(
         scope: S,
-        field_names: &mut N,
-        values: &mut V,
+        mut field_names: N,
+        mut values: V,
     ) -> JlrsResult<S::Value>
     where
         S: Scope<'scope, 'frame, 'data, F>,
@@ -566,7 +566,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     pub fn apply_type<'scope, 'fr, 'value, 'borrow, S, F, V>(
         self,
         scope: S,
-        types: &mut V,
+        mut types: V,
     ) -> JlrsResult<S::Value>
     where
         S: Scope<'scope, 'fr, 'borrow, F>,
@@ -1105,7 +1105,7 @@ impl<'fr, 'da> Value<'fr, 'da> {
     pub unsafe fn call_unprotected<'base, 'value, 'data, V, F>(
         self,
         _: Global<'base>,
-        args: &mut V,
+        mut args: V,
     ) -> CallResult<'base, 'data>
     where
         V: AsMut<[Value<'value, 'data>]>,
@@ -1129,7 +1129,7 @@ impl<'fr, 'da> Value<'fr, 'da> {
     pub unsafe fn call_keywords_unprotected<'base, 'value, 'data, V, F>(
         self,
         _: Global<'base>,
-        args: &mut V,
+        mut args: V,
     ) -> CallResult<'base, 'data>
     where
         V: AsMut<[Value<'value, 'data>]>,
@@ -1159,7 +1159,7 @@ impl<'fr, 'da> Value<'fr, 'da> {
     pub async fn call_async<'frame, 'value, 'data, V>(
         self,
         frame: &mut AsyncGcFrame<'frame>,
-        args: &mut V,
+        args: V,
     ) -> JlrsResult<CallResult<'frame, 'data>>
     where
         V: AsMut<[Value<'value, 'data>]>,

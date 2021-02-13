@@ -40,7 +40,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
     pub(crate) fn new<'value, V>(
         frame: &mut AsyncGcFrame<'frame>,
         func: Value,
-        values: &mut V,
+        mut values: V,
     ) -> JlrsResult<Self>
     where
         V: AsMut<[Value<'value, 'data>]>,

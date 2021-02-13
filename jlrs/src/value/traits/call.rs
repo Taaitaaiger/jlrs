@@ -55,7 +55,7 @@ pub trait Call<'scope, 'frame, 'data> {
         F: Frame<'frame>;
 
     /// Call a function with an arbitrary number arguments.
-    fn call<'value, V, S, F>(self, scope: S, args: &mut V) -> JlrsResult<S::CallResult>
+    fn call<'value, V, S, F>(self, scope: S, args: V) -> JlrsResult<S::CallResult>
     where
         V: AsMut<[Value<'value, 'data>]>,
         S: Scope<'scope, 'frame, 'data, F>,
@@ -138,7 +138,7 @@ impl<'scope, 'frame, 'data> Call<'scope, 'frame, 'data> for Value<'_, 'data> {
         }
     }
 
-    fn call<'value, V, S, F>(self, scope: S, args: &mut V) -> JlrsResult<S::CallResult>
+    fn call<'value, V, S, F>(self, scope: S, mut args: V) -> JlrsResult<S::CallResult>
     where
         V: AsMut<[Value<'value, 'data>]>,
         S: Scope<'scope, 'frame, 'data, F>,
@@ -250,7 +250,7 @@ impl<'scope, 'frame, 'data> Call<'scope, 'frame, 'data> for WithKeywords<'_, '_,
         }
     }
 
-    fn call<'value, V, S, F>(self, scope: S, args: &mut V) -> JlrsResult<S::CallResult>
+    fn call<'value, V, S, F>(self, scope: S, mut args: V) -> JlrsResult<S::CallResult>
     where
         V: AsMut<[Value<'value, 'data>]>,
         S: Scope<'scope, 'frame, 'data, F>,
