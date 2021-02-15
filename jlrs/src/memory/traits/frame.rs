@@ -67,10 +67,10 @@ pub trait Frame<'frame>: private::Frame<'frame> {
     /// # });
     /// # }
     /// ```
-    fn frame<T, F>(&mut self, func: F) -> JlrsResult<T>
+    fn frame<'outer, T, F>(&'outer mut self, func: F) -> JlrsResult<T>
     where
-        T: 'frame,
-        for<'nested> F: FnOnce(&mut GcFrame<'nested, Self::Mode>) -> JlrsResult<T>;
+        T: 'outer,
+        for<'inner> F: FnOnce(&mut GcFrame<'inner, Self::Mode>) -> JlrsResult<T>;
 
     /// Create a [`GcFrame`] with `capacity` slots and call the given closure with it. Returns the
     /// result of this closure.
@@ -101,10 +101,10 @@ pub trait Frame<'frame>: private::Frame<'frame> {
     /// # });
     /// # }
     /// ```
-    fn frame_with_slots<T, F>(&mut self, capacity: usize, func: F) -> JlrsResult<T>
+    fn frame_with_slots<'outer, T, F>(&'outer mut self, capacity: usize, func: F) -> JlrsResult<T>
     where
-        T: 'frame,
-        for<'nested> F: FnOnce(&mut GcFrame<'nested, Self::Mode>) -> JlrsResult<T>;
+        T: 'outer,
+        for<'inner> F: FnOnce(&mut GcFrame<'inner, Self::Mode>) -> JlrsResult<T>;
 
     /// Create a new [`Output`] and [`GcFrame`] and call the given closure. The final result of this
     /// closure, an [`UnrootedValue`], is rooted in the current frame.
@@ -273,20 +273,20 @@ impl<'frame, M: Mode> Frame<'frame> for GcFrame<'frame, M> {
         self.alloc_slots(additional)
     }
 
-    fn frame<T, F>(&mut self, func: F) -> JlrsResult<T>
+    fn frame<'outer, T, F>(&'outer mut self, func: F) -> JlrsResult<T>
     where
-        T: 'frame,
-        for<'nested> F: FnOnce(&mut GcFrame<'nested, Self::Mode>) -> JlrsResult<T>,
+        T: 'outer,
+        for<'inner> F: FnOnce(&mut GcFrame<'inner, Self::Mode>) -> JlrsResult<T>,
     {
         // safe: frame is dropped
         let mut nested = unsafe { self.nest(0) };
         func(&mut nested)
     }
 
-    fn frame_with_slots<T, F>(&mut self, capacity: usize, func: F) -> JlrsResult<T>
+    fn frame_with_slots<'outer, T, F>(&'outer mut self, capacity: usize, func: F) -> JlrsResult<T>
     where
-        T: 'frame,
-        for<'nested> F: FnOnce(&mut GcFrame<'nested, Self::Mode>) -> JlrsResult<T>,
+        T: 'outer,
+        for<'inner> F: FnOnce(&mut GcFrame<'inner, Self::Mode>) -> JlrsResult<T>,
     {
         // safe: frame is dropped
         let mut nested = unsafe { self.nest(capacity) };
@@ -395,20 +395,20 @@ impl<'frame> Frame<'frame> for AsyncGcFrame<'frame> {
         self.alloc_slots(additional)
     }
 
-    fn frame<T, F>(&mut self, func: F) -> JlrsResult<T>
+    fn frame<'outer, T, F>(&'outer mut self, func: F) -> JlrsResult<T>
     where
-        T: 'frame,
-        for<'nested> F: FnOnce(&mut GcFrame<'nested, Self::Mode>) -> JlrsResult<T>,
+        T: 'outer,
+        for<'inner> F: FnOnce(&mut GcFrame<'inner, Self::Mode>) -> JlrsResult<T>,
     {
         // safe: frame is dropped
         let mut nested = unsafe { self.nest(0) };
         func(&mut nested)
     }
 
-    fn frame_with_slots<T, F>(&mut self, capacity: usize, func: F) -> JlrsResult<T>
+    fn frame_with_slots<'outer, T, F>(&'outer mut self, capacity: usize, func: F) -> JlrsResult<T>
     where
-        T: 'frame,
-        for<'nested> F: FnOnce(&mut GcFrame<'nested, Self::Mode>) -> JlrsResult<T>,
+        T: 'outer,
+        for<'inner> F: FnOnce(&mut GcFrame<'inner, Self::Mode>) -> JlrsResult<T>,
     {
         // safe: frame is dropped
         let mut nested = unsafe { self.nest(capacity) };
@@ -516,18 +516,18 @@ impl<'frame> Frame<'frame> for NullFrame<'frame> {
         false
     }
 
-    fn frame<T, F>(&mut self, _func: F) -> JlrsResult<T>
+    fn frame<'outer, T, F>(&'outer mut self, _func: F) -> JlrsResult<T>
     where
-        T: 'frame,
-        for<'nested> F: FnOnce(&mut GcFrame<'nested, Self::Mode>) -> JlrsResult<T>,
+        T: 'outer,
+        for<'inner> F: FnOnce(&mut GcFrame<'inner, Self::Mode>) -> JlrsResult<T>,
     {
         Err(JlrsError::NullFrame)?
     }
 
-    fn frame_with_slots<T, F>(&mut self, _capacity: usize, _func: F) -> JlrsResult<T>
+    fn frame_with_slots<'outer, T, F>(&'outer mut self, _capacity: usize, _func: F) -> JlrsResult<T>
     where
-        T: 'frame,
-        for<'nested> F: FnOnce(&mut GcFrame<'nested, Self::Mode>) -> JlrsResult<T>,
+        T: 'outer,
+        for<'inner> F: FnOnce(&mut GcFrame<'inner, Self::Mode>) -> JlrsResult<T>,
     {
         Err(JlrsError::NullFrame)?
     }
