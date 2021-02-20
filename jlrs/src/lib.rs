@@ -312,12 +312,12 @@
 //! # use std::cell::RefCell;
 //! thread_local! {
 //!     pub static JULIA: RefCell<Julia> = {
-//!         let r = RefCell::new(unsafe { Julia::init().unwrap() });
-//!         r.borrow_mut().frame(|_global, _frame| {
+//!         let julia = RefCell::new(unsafe { Julia::init().unwrap() });
+//!         julia.borrow_mut().frame(|_global, _frame| {
 //!             /* include everything you need to use */
 //!             Ok(())
 //!         }).unwrap();
-//!         r
+//!         julia
 //!     };
 //! }
 //! ```
@@ -380,7 +380,9 @@ pub mod util;
 pub mod value;
 
 use error::{JlrsError, JlrsResult};
-use jl_sys::{jl_atexit_hook, jl_init, jl_init_with_image__threading, jl_is_initialized};
+use jl_sys::{
+    jl_atexit_hook, jl_init, jl_init_with_image__threading, jl_is_initialized, uv_async_send,
+};
 use memory::frame::{GcFrame, NullFrame};
 use memory::global::Global;
 use memory::mode::Sync;
@@ -628,6 +630,12 @@ impl CCall {
     /// allocated until a [`GcFrame`] is created.
     pub unsafe fn new() -> Self {
         CCall { page: None }
+    }
+
+    /// Wake the task associated with `handle`. The handle must be the `handle` field of a
+    /// `Base.AsyncCondition` in Julia.
+    pub unsafe fn uv_async_send(handle: *mut c_void) -> bool {
+        uv_async_send(handle.cast()) == 0
     }
 
     /// Creates a [`GcFrame`], calls the given closure, and returns the result of this closure.

@@ -64,6 +64,7 @@ pub enum JlrsError {
     Immutable,
     NotSubtype,
     NotConcrete(String),
+    ArrayNotSupported,
     NamedTupleSizeMismatch(usize, usize),
 }
 
@@ -196,6 +197,14 @@ impl Display for JlrsError {
                     "A named tuple must have an equal number of names and values, but {} name(s) and {} values(s) were given", 
                     names,
                     values
+                )
+            }
+            JlrsError::ArrayNotSupported => {
+                write!(
+                    formatter,
+                    "Array types cannot be instantiated with `DataType::instantiate`, but must \
+                    be created with `Value::new_array`, `Value::move_array`, or \
+                    `Value::borrow_array`.",
                 )
             }
         }

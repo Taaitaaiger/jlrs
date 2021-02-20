@@ -155,6 +155,7 @@ fn main() {
         "jl_unbox_uint64",
         "jl_unbox_uint8",
         "jl_unbox_voidpointer",
+        "uv_async_send",
     ];
 
     let mut builder = bindgen::Builder::default()

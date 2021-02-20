@@ -51,7 +51,7 @@ In order to use the Julia C API from Rust bindings are needed, which are provide
 The bindings provided by jl-sys are very much a C API. Everything is unsafe, it's full of raw pointers which are non-trivial to use correctly, and from a Rust programmer's perspective things have odd names. In order to improve this situation jlrs has several design goals:
 
  - Users should only be able to use the Julia C API after it has been initialized.
- - Users should never work raw pointers from the Julia C API, but rather with wrapper types that have Rustified names.
+ - Users should never work with raw pointers from the Julia C API, but rather wrapper types that have Rustified names.
  - These wrapper types should be rooted automatically, their validity should be expressed through lifetimes.
  - Functions from the C API should be implemented as methods of their corresponding wrapper type, with similarly Rustified names.
  - Methods that are used to convert data between Julia and Rust should be extensible.
@@ -74,8 +74,27 @@ The return types of these closures are constrained in different ways depending o
 
 ### Wrappers for builtin types
 
+Wrappers for the builtin pointer types, like `jl_value_t*` and `jl_array_t*`, are all defined in the `value` module. The wrappers generally have the same name as the types do in Julia, so `jl_array_t*` is wrapped by `Array` and `jl_module_t*` by `Module`. There's one exception: `jl_value_t*` is wrapped by `Value` rather than `Any`. These wrapper types contain the appropriate pointer, and one or two `PhantomData` fields to give them that number of lifetimes. The wrapper is marked as `#[repr(transparent)]`, which ensures the layout and ABI of the struct is guaranteed to match that of the pointer. This means these wrapper types can be used as the arguments of Rust functions called from Julia with `ccall`.
+
+The lifetimes serve two purposes. The first relates to the frame the value has been rooted in, it's normally named `'frame`. A `GcFrame` has a lifetime because it mutably borrows its raw frame from the stack page. This lifetime is inherited by the wrapper which ensures it can't be returned from the closure that provides access to the frame, i.e. the wrapper can only be used while it's rooted. The second is relevant when arrays are involved, it's possible to create a Julia array that is backed by data mutably borrowed from Rust. In this case, a second lifetime is needed to prevent the Julia value from being used after the borrow ends. Whenever a function is called that creates a new value and depends on one or more values, the second lifetime is inherited to ensure the lifetime of a borrow isn't accidentally extended.
+
+Most functionality from the Julia C API is available through `Value`. Other wrapper types that are often used are `Array`, ` DataType`, `JuliaString`, `Module`, `Symbol` and the different `Tuple` types. Less often used are `SimpleVector`, `TypeName`, `TypeVar`, `Union` and `UnionAll`. The other builtin types are available for completeness sake, but using them should generally be avoided.
+
+
+### Typechecks and converting data between languages
+
+In order to use Julia and Rust together, it's often necessary to (safely) convert data between both languages. Traits that deal with this are defined in the `convert` and `layout` modules, but their functionality is mostly used indirectly through methods of `Value`.
+
+The most important of these traits are `IntoJulia` and `Cast`. The first of these is used in combination with `Value::new` and converts data from Rust to Julia. This trait is implemented for all primitive types and strings. The second is used in combination with `Value::cast(_unchecked)` and can convert a `Value` to a more useful type, in the case of casting to a wrapper for a builtin pointer type this amounts to a pointer cast. In most other cases it dereferences the pointer. Before actually casting the value, `Value::cast` checks if the value can be cast to its target. To do so, it calls `Value::is`, which performs a typecheck. Any type that implements `JuliaTypecheck` can be used as a typecheck, if a type also implements `Cast` the typecheck ensures that the value can be successfully cast to that type. Other kinds of checks are also available as typechecks, such as `Concrete` which checks if a `DataType` is concrete, and `Mutable` which checks if it's mutable. These typechecks are how the functionality of the `jl_is_<x>` macros from the C API is made available.
+
+Additional methods are provided by `Value` to create values with types that are not compatible with `Value::new`, such as arrays and named tuples. With `Value::apply_type` arbitrary `DataType`s can be created; concrete types that are not arrays can be instantiated with `Value::instantiate` or `DataType::instantiate`. The methods expose the functions `jl_apply_type` and `jl_new_structv` from the C API.
+
 
 ### Custom types
+
+Several other traits are available in the `layout` module, in particular, `ValidLayout` is used to determine if the layout of the type that implements the trait is compatible with the layout of a value in Julia with some `DataType`. If a struct derives the `JuliaStruct` trait, `ValidLayout`, `Cast`, and `JuliaTypecheck` are implemented for that struct. These custom types can be automatically generated with `JlrsReflect.jl`. `ValidLayout` is implemented by recursively calling itself for each field of the struct, where care is taken to handle bits union fields correctly. Unlike other fields, bits union fields require three separate fields to deal with their size and alignment requirements: unlike "normal" fields, the size of a bits union field is not necessarily a multiple of its alignment. This depends on the traits defined in the `bits_union` submodule of `layout`. `JuliaTypecheck` is implemented by calling `ValidLayout`.
+
+If a type is guaranteed to be a bits-type, `IntoJulia` can also be derived. This happens automatically when `JlrsReflect.jl` is used.
 
 
 ### ccall

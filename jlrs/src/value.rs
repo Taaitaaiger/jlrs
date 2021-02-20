@@ -110,10 +110,10 @@ use jl_sys::{
     jl_field_index, jl_field_isptr, jl_field_names, jl_fieldref, jl_fieldref_noalloc, jl_finalize,
     jl_gc_add_finalizer, jl_gc_wb, jl_get_kwsorter, jl_get_nth_field, jl_get_nth_field_noalloc,
     jl_interrupt_exception, jl_is_kind, jl_isa, jl_memory_exception, jl_new_array,
-    jl_new_struct_uninit, jl_nfields, jl_nothing, jl_nothing_type, jl_object_id, jl_ptr_to_array,
-    jl_ptr_to_array_1d, jl_readonlymemory_exception, jl_set_nth_field, jl_stackovf_exception,
-    jl_subtype, jl_svec_data, jl_svec_len, jl_true, jl_type_union, jl_type_unionall, jl_typeof,
-    jl_typeof_str, jl_undefref_exception, jl_value_t,
+    jl_new_struct_uninit, jl_new_typevar, jl_nfields, jl_nothing, jl_nothing_type, jl_object_id,
+    jl_ptr_to_array, jl_ptr_to_array_1d, jl_readonlymemory_exception, jl_set_nth_field,
+    jl_stackovf_exception, jl_subtype, jl_svec_data, jl_svec_len, jl_true, jl_type_union,
+    jl_type_unionall, jl_typeof, jl_typeof_str, jl_undefref_exception, jl_value_t,
 };
 use std::cell::UnsafeCell;
 use std::ffi::{CStr, CString};
@@ -551,6 +551,48 @@ impl<'frame, 'data> Value<'frame, 'data> {
         })
     }
 
+    /// Create a new `TypeVar`, the optional lower and upper bounds must be subtypes of `Type`,
+    /// their default values are `Union{}` and `Any` respectively.
+    pub fn new_typevar<'scope, S, F, N>(
+        scope: S,
+        name: N,
+        lower_bound: Option<Value>,
+        upper_bound: Option<Value>,
+    ) -> JlrsResult<S::Value>
+    where
+        F: Frame<'frame>,
+        S: Scope<'scope, 'frame, 'data, F>,
+        N: TemporarySymbol,
+    {
+        unsafe {
+            let global = Global::new();
+            let name = name.temporary_symbol(Internal);
+
+            let lb = lower_bound.map_or(jl_bottom_type.cast(), |v| v.ptr());
+            if !Value::wrap(lb)
+                .datatype()
+                .unwrap()
+                .as_value()
+                .subtype(UnionAll::type_type(global).as_value())
+            {
+                Err(JlrsError::NotATypeLB(name.as_string()))?;
+            }
+
+            let ub = upper_bound.map_or(jl_any_type.cast(), |v| v.ptr());
+            if !Value::wrap(ub)
+                .datatype()
+                .unwrap()
+                .as_value()
+                .subtype(UnionAll::type_type(global).as_value())
+            {
+                Err(JlrsError::NotATypeUB(name.as_string()))?;
+            }
+
+            let tvar = jl_new_typevar(name.ptr(), lb, ub);
+            scope.value(tvar.cast(), Internal)
+        }
+    }
+
     /// Apply the given types to `self`.
     ///
     /// If `self` is the [`DataType`] `anytuple_type`, calling this function will return a new
@@ -632,30 +674,36 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// to checking if the data has that type and can be cast to it. This works for primitive
     /// types, for example:
     ///
-    /// ```no_run
+    /// ```
     /// # use jlrs::prelude::*;
+    /// # use jlrs::util::JULIA;
     /// # fn main() {
-    /// # let mut julia = unsafe { Julia::init().unwrap() };
+    /// # JULIA.with(|j| {
+    /// # let mut julia = j.borrow_mut();
     /// julia.frame(|_global, frame| {
     ///     let i = Value::new(frame, 2u64)?;
     ///     assert!(i.is::<u64>());
     ///     Ok(())
     /// }).unwrap();
+    /// # });
     /// # }
     /// ```
     ///
     /// "Special" types in Julia that are defined in C, like [`Array`], [`Module`] and
     /// [`DataType`], are also supported:
     ///
-    /// ```no_run
+    /// ```
     /// # use jlrs::prelude::*;
+    /// # use jlrs::util::JULIA;
     /// # fn main() {
-    /// # let mut julia = unsafe { Julia::init().unwrap() };
+    /// # JULIA.with(|j| {
+    /// # let mut julia = j.borrow_mut();;
     /// julia.frame(|_global, frame| {
     ///     let arr = Value::new_array::<f64, _, _, _>(&mut *frame, (3, 3))?;
     ///     assert!(arr.is::<Array>());
     ///     Ok(())
     /// }).unwrap();
+    /// # });
     /// # }
     /// ```
     ///

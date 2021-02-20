@@ -144,3 +144,24 @@ fn borrow_array_2d_dynamic() {
         assert_eq!(data, vec![1, 2, 3, 4]);
     });
 }
+
+#[test]
+fn call_function_with_borrowed() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+        let mut data = vec![1u64, 2, 3, 4];
+
+        let unboxed = jlrs
+            .frame_with_slots(2, |global, frame| {
+                let array = Value::borrow_array(&mut *frame, &mut data, 4)?;
+                Module::base(global)
+                    .function("sum")?
+                    .call1(&mut *frame, array)?
+                    .unwrap()
+                    .cast::<u64>()
+            })
+            .unwrap();
+
+        assert_eq!(unboxed, 10);
+    });
+}

@@ -50,6 +50,8 @@ use jl_sys::{
 use std::ffi::CStr;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::marker::PhantomData;
+
+use super::array::Array;
 /// Julia type information. You can acquire a [`Value`]'s datatype by by calling
 /// [`Value::datatype`]. This struct implements [`JuliaTypecheck`] and [`Cast`]. It can be used in
 /// combination with [`DataType::is`] and [`Value::is`]; if the check returns `true` the [`Value`]
@@ -269,6 +271,10 @@ impl<'frame> DataType<'frame> {
         unsafe {
             if !self.is::<Concrete>() {
                 Err(JlrsError::NotConcrete(self.name().into()))?;
+            }
+
+            if self.is::<Array>() {
+                Err(JlrsError::ArrayNotSupported)?;
             }
 
             let values = values.as_mut();
