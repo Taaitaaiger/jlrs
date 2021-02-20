@@ -81,7 +81,14 @@ The lifetimes serve two purposes. The first relates to the frame the value has b
 Most functionality from the Julia C API is available through `Value`. Other wrapper types that are often used are `Array`, ` DataType`, `JuliaString`, `Module`, `Symbol` and the different `Tuple` types. Less often used are `SimpleVector`, `TypeName`, `TypeVar`, `Union` and `UnionAll`. The other builtin types are available for completeness sake, but using them should generally be avoided.
 
 
-### Typechecks and converting data between languages
+### Arrays
+
+Julia arrays, `jl_array_t*` in the C API, are generic, multidimensional arrays that store their contents in column-major order, which is also known as Fortran order. The raw pointer is wrapped by `Array` and `TypedArray` in jlrs; the first does not refer to the type of its elements while the latter does. These types don't provide access to their contents directly from Rust, to do so a method like `Array::inline_data` must be called first. The methods that provide access to the array's contents require a `Frame` to ensure no mutable aliasing occurs. 
+
+New arrays can be created from Rust by calling one of the following methods: `Value::new_array`, `Value::move_array`, or `Value::borrow_array`. The first lets Julia allocate the array, the second moves an array from Rust to Julia, and the last borrows its data from Rust. These methods are currently only compatible with types that implement `IntoJulia`. Accessing the data of arrays whose elements are bits-unions is also not supported.
+
+
+### Converting data between languages and typechecks
 
 In order to use Julia and Rust together, it's often necessary to (safely) convert data between both languages. Traits that deal with this are defined in the `convert` and `layout` modules, but their functionality is mostly used indirectly through methods of `Value`.
 
@@ -98,6 +105,8 @@ If a type is guaranteed to be a bits-type, `IntoJulia` can also be derived. This
 
 
 ### ccall
+
+Julia's `ccall` interface is very powerful because it can call arbitrary functions with the C ABI, i.e. functions defined as `extern "C"` in Rust. It's not necessary to use jlrs to write functions in Rust that can be called from Julia with `ccall`, but 
 
 
 ### Async runtime

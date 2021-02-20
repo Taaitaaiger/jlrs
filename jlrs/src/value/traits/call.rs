@@ -1,5 +1,6 @@
 //! Call Julia functions.
 
+use crate::private::Private;
 use crate::{
     error::JlrsResult,
     memory::traits::{frame::Frame, scope::Scope},
@@ -9,8 +10,6 @@ use jl_sys::{
     jl_call, jl_call0, jl_call1, jl_call2, jl_call3, jl_exception_occurred, jl_get_kwsorter,
 };
 use smallvec::SmallVec;
-
-use super::private::Internal;
 
 /// A trait that allows something to be called as a Julia function. There are currently two types
 /// that implement this trait, [`Value`] and [`WithKeywords`]. In Julia every value can
@@ -72,9 +71,9 @@ impl<'scope, 'frame, 'data> Call<'scope, 'frame, 'data> for Value<'_, 'data> {
             let res = jl_call0(self.ptr());
             let exc = jl_exception_occurred();
             if exc.is_null() {
-                scope.call_result(Ok(res), Internal)
+                scope.call_result(Ok(res), Private)
             } else {
-                scope.call_result(Err(exc), Internal)
+                scope.call_result(Err(exc), Private)
             }
         }
     }
@@ -88,9 +87,9 @@ impl<'scope, 'frame, 'data> Call<'scope, 'frame, 'data> for Value<'_, 'data> {
             let res = jl_call1(self.ptr(), arg0.ptr());
             let exc = jl_exception_occurred();
             if exc.is_null() {
-                scope.call_result(Ok(res), Internal)
+                scope.call_result(Ok(res), Private)
             } else {
-                scope.call_result(Err(exc), Internal)
+                scope.call_result(Err(exc), Private)
             }
         }
     }
@@ -109,9 +108,9 @@ impl<'scope, 'frame, 'data> Call<'scope, 'frame, 'data> for Value<'_, 'data> {
             let res = jl_call2(self.ptr(), arg0.ptr(), arg1.ptr());
             let exc = jl_exception_occurred();
             if exc.is_null() {
-                scope.call_result(Ok(res), Internal)
+                scope.call_result(Ok(res), Private)
             } else {
-                scope.call_result(Err(exc), Internal)
+                scope.call_result(Err(exc), Private)
             }
         }
     }
@@ -131,9 +130,9 @@ impl<'scope, 'frame, 'data> Call<'scope, 'frame, 'data> for Value<'_, 'data> {
             let res = jl_call3(self.ptr(), arg0.ptr(), arg1.ptr(), arg2.ptr());
             let exc = jl_exception_occurred();
             if exc.is_null() {
-                scope.call_result(Ok(res), Internal)
+                scope.call_result(Ok(res), Private)
             } else {
-                scope.call_result(Err(exc), Internal)
+                scope.call_result(Err(exc), Private)
             }
         }
     }
@@ -150,9 +149,9 @@ impl<'scope, 'frame, 'data> Call<'scope, 'frame, 'data> for Value<'_, 'data> {
             let res = jl_call(self.ptr().cast(), args.as_mut_ptr().cast(), n as _);
             let exc = jl_exception_occurred();
             if exc.is_null() {
-                scope.call_result(Ok(res), Internal)
+                scope.call_result(Ok(res), Private)
             } else {
-                scope.call_result(Err(exc), Internal)
+                scope.call_result(Err(exc), Private)
             }
         }
     }
@@ -172,9 +171,9 @@ impl<'scope, 'frame, 'data> Call<'scope, 'frame, 'data> for WithKeywords<'_, '_,
             let res = jl_call(func, args.as_mut_ptr().cast(), n as _);
             let exc = jl_exception_occurred();
             if exc.is_null() {
-                scope.call_result(Ok(res), Internal)
+                scope.call_result(Ok(res), Private)
             } else {
-                scope.call_result(Err(exc), Internal)
+                scope.call_result(Err(exc), Private)
             }
         }
     }
@@ -192,9 +191,9 @@ impl<'scope, 'frame, 'data> Call<'scope, 'frame, 'data> for WithKeywords<'_, '_,
             let res = jl_call(func, args.as_mut_ptr().cast(), n as _);
             let exc = jl_exception_occurred();
             if exc.is_null() {
-                scope.call_result(Ok(res), Internal)
+                scope.call_result(Ok(res), Private)
             } else {
-                scope.call_result(Err(exc), Internal)
+                scope.call_result(Err(exc), Private)
             }
         }
     }
@@ -217,9 +216,9 @@ impl<'scope, 'frame, 'data> Call<'scope, 'frame, 'data> for WithKeywords<'_, '_,
             let res = jl_call(func, args.as_mut_ptr().cast(), n as _);
             let exc = jl_exception_occurred();
             if exc.is_null() {
-                scope.call_result(Ok(res), Internal)
+                scope.call_result(Ok(res), Private)
             } else {
-                scope.call_result(Err(exc), Internal)
+                scope.call_result(Err(exc), Private)
             }
         }
     }
@@ -243,9 +242,9 @@ impl<'scope, 'frame, 'data> Call<'scope, 'frame, 'data> for WithKeywords<'_, '_,
             let res = jl_call(func, args.as_mut_ptr().cast(), n as _);
             let exc = jl_exception_occurred();
             if exc.is_null() {
-                scope.call_result(Ok(res), Internal)
+                scope.call_result(Ok(res), Private)
             } else {
-                scope.call_result(Err(exc), Internal)
+                scope.call_result(Err(exc), Private)
             }
         }
     }
@@ -271,9 +270,9 @@ impl<'scope, 'frame, 'data> Call<'scope, 'frame, 'data> for WithKeywords<'_, '_,
             let res = jl_call(func, vals.as_mut_ptr().cast(), n as _);
             let exc = jl_exception_occurred();
             if exc.is_null() {
-                scope.call_result(Ok(res), Internal)
+                scope.call_result(Ok(res), Private)
             } else {
-                scope.call_result(Err(exc), Internal)
+                scope.call_result(Err(exc), Private)
             }
         }
     }

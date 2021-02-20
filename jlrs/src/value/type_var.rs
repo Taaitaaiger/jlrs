@@ -1,9 +1,10 @@
 //! Support for values with the `Core.TypeVar` type.
 
+use super::symbol::Symbol;
 use super::union_all::UnionAll;
 use super::Value;
-use super::{symbol::Symbol, traits::private::Internal};
 use crate::memory::global::Global;
+use crate::private::Private;
 use crate::{
     convert::{cast::Cast, temporary_symbol::TemporarySymbol},
     error::{JlrsError, JlrsResult},
@@ -44,7 +45,7 @@ impl<'frame> TypeVar<'frame> {
     {
         unsafe {
             let global = Global::new();
-            let name = name.temporary_symbol(Internal);
+            let name = name.temporary_symbol(Private);
 
             let lb = lower_bound.map_or(jl_bottom_type.cast(), |v| v.ptr());
             if !Value::wrap(lb)
@@ -68,7 +69,7 @@ impl<'frame> TypeVar<'frame> {
 
             let tvar = jl_new_typevar(name.ptr(), lb, ub);
             frame
-                .push_root(tvar.cast(), Internal)
+                .push_root(tvar.cast(), Private)
                 .map_err(JlrsError::alloc_error)?;
 
             Ok(Self::wrap(tvar))

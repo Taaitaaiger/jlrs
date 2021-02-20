@@ -1,6 +1,8 @@
 //! Access Julia modules and the globals and functions defined in them.
 
+use super::{traits::call::Call, LeakedValue};
 use crate::error::{JlrsError, JlrsResult};
+use crate::private::Private;
 use crate::value::Value;
 use crate::{
     convert::{cast::Cast, temporary_symbol::TemporarySymbol},
@@ -17,11 +19,6 @@ use jl_sys::{
 };
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::marker::PhantomData;
-
-use super::{
-    traits::{call::Call, private::Internal},
-    LeakedValue,
-};
 
 /// Functionality in Julia can be accessed through its module system. You can get a handle to the
 /// three standard modules, `Main`, `Base`, and `Core` and access their submodules through them.
@@ -103,7 +100,7 @@ impl<'base> Module<'base> {
     {
         unsafe {
             // safe because jl_symbol_n copies the contents
-            let symbol = name.temporary_symbol(Internal);
+            let symbol = name.temporary_symbol(Private);
 
             let submodule = jl_get_global(self.ptr(), symbol.ptr());
 
@@ -128,7 +125,7 @@ impl<'base> Module<'base> {
     {
         jl_set_global(
             self.ptr(),
-            name.temporary_symbol(Internal).ptr(),
+            name.temporary_symbol(Private).ptr(),
             value.ptr(),
         );
         Value::wrap(value.ptr())
@@ -144,7 +141,7 @@ impl<'base> Module<'base> {
         N: TemporarySymbol,
     {
         unsafe {
-            let symbol = name.temporary_symbol(Internal);
+            let symbol = name.temporary_symbol(Private);
             if self.global(symbol).is_ok() {
                 Err(JlrsError::ConstAlreadyExists(symbol.into()))?;
             }
@@ -162,7 +159,7 @@ impl<'base> Module<'base> {
         N: TemporarySymbol,
     {
         unsafe {
-            let symbol = name.temporary_symbol(Internal);
+            let symbol = name.temporary_symbol(Private);
 
             // there doesn't seem to be a way to check if this is actually a
             // function...
@@ -182,7 +179,7 @@ impl<'base> Module<'base> {
         N: TemporarySymbol,
     {
         unsafe {
-            let symbol = name.temporary_symbol(Internal);
+            let symbol = name.temporary_symbol(Private);
 
             // there doesn't seem to be a way to check if this is actually a
             // function...
@@ -245,7 +242,7 @@ impl<'base> Module<'base> {
                 .call2(
                     scope,
                     self.as_value(),
-                    module.temporary_symbol(Internal).as_value(),
+                    module.temporary_symbol(Private).as_value(),
                 )
         }
     }
@@ -266,11 +263,11 @@ impl<'base> Module<'base> {
                 .call2_unprotected(
                     global,
                     self.as_value(),
-                    module.temporary_symbol(Internal).as_value(),
+                    module.temporary_symbol(Private).as_value(),
                 )
                 .expect(&format!(
                     "Could not load ${:?}",
-                    module.temporary_symbol(Internal)
+                    module.temporary_symbol(Private)
                 ))
                 .cast_unchecked::<Module>();
 

@@ -357,7 +357,7 @@
 //! [`JuliaTypecheck`]: ./layout/julia_typecheck/traits.JuliaTypecheck.html
 //! [`ValidLayout`]: ./layout/valid_layout/traits.ValidLayout.html
 //! [`Cast`]: ./convert/cast/traits.Cast.html
-//! [`JuliaStruct`]: ./value/traits/traits.JuliaStruct.html
+//! [`JuliaStruct`]: ./value/traits/julia_struct/traits.JuliaStruct.html
 //! [`AsyncGcFrame`]: ./memory/frame/struct.AsyncGcFrame.html
 //! [`Frame`]: ./memory/traits/frame/trait.Frame.html
 //! [`JuliaTask`]: ./multitask/julia_task/trait.JuliaTask.html
@@ -375,6 +375,7 @@ pub mod memory;
 #[cfg(all(feature = "async", target_os = "linux"))]
 pub mod multitask;
 pub mod prelude;
+pub(crate) mod private;
 #[doc(hidden)]
 pub mod util;
 pub mod value;

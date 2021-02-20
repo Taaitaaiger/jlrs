@@ -98,6 +98,7 @@ use crate::memory::global::Global;
 use crate::memory::traits::{
     frame::private::Frame as PNewFrame, frame::Frame, scope::private::Scope as PScope, scope::Scope,
 };
+use crate::private::Private;
 use crate::{convert::into_julia::IntoJulia, impl_julia_type};
 #[cfg(all(feature = "async", target_os = "linux"))]
 use crate::{memory::frame::AsyncGcFrame, multitask::julia_future::JuliaFuture};
@@ -121,7 +122,6 @@ use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::marker::PhantomData;
 use std::ptr::null_mut;
 use std::slice;
-use traits::private::Internal;
 
 /// In some cases it's necessary to place one or more arguments in front of the arguments a
 /// function is called with. Examples include the `named_tuple` macro and `Value::call_async`.
@@ -231,7 +231,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
         S: Scope<'scope, 'frame, 'static, F>,
         F: Frame<'frame>,
     {
-        unsafe { scope.value(value.into_julia(), Internal) }
+        unsafe { scope.value(value.into_julia(), Private) }
     }
 
     /// Create a new instance of a value with `DataType` `ty`, using `values` to set the fields.
@@ -274,11 +274,11 @@ impl<'frame, 'data> Value<'frame, 'data> {
             match dims.n_dimensions() {
                 1 => scope.value(
                     jl_alloc_array_1d(array_type, dims.n_elements(0)).cast(),
-                    Internal,
+                    Private,
                 ),
                 2 => scope.value(
                     jl_alloc_array_2d(array_type, dims.n_elements(0), dims.n_elements(1)).cast(),
-                    Internal,
+                    Private,
                 ),
                 3 => scope.value(
                     jl_alloc_array_3d(
@@ -288,19 +288,19 @@ impl<'frame, 'data> Value<'frame, 'data> {
                         dims.n_elements(2),
                     )
                     .cast(),
-                    Internal,
+                    Private,
                 ),
                 n if n <= 8 => scope.value_frame_with_slots(1, |output, frame| {
                     let tuple = small_dim_tuple(frame, &dims)?;
                     output
                         .into_scope(frame)
-                        .value(jl_new_array(array_type, tuple.ptr()).cast(), Internal)
+                        .value(jl_new_array(array_type, tuple.ptr()).cast(), Private)
                 }),
                 _ => scope.value_frame_with_slots(1, |output, frame| {
                     let tuple = large_dim_tuple(frame, &dims)?;
                     output
                         .into_scope(frame)
-                        .value(jl_new_array(array_type, tuple.ptr()).cast(), Internal)
+                        .value(jl_new_array(array_type, tuple.ptr()).cast(), Private)
                 }),
             }
         }
@@ -338,7 +338,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
                         0,
                     )
                     .cast(),
-                    Internal,
+                    Private,
                 ),
                 n if n <= 8 => scope.value_frame_with_slots(1, |output, frame| {
                     let tuple = small_dim_tuple(frame, &dims)?;
@@ -350,7 +350,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
                             0,
                         )
                         .cast(),
-                        Internal,
+                        Private,
                     )
                 }),
                 _ => scope.value_frame_with_slots(1, |output, frame| {
@@ -363,7 +363,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
                             0,
                         )
                         .cast(),
-                        Internal,
+                        Private,
                     )
                 }),
             }
@@ -396,7 +396,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
             scope.value_frame_with_slots(2, |output, frame| {
                 let array_type = jl_apply_array_type(T::julia_type().cast(), dims.n_dimensions());
                 let _ = frame
-                    .push_root(array_type, Internal)
+                    .push_root(array_type, Private)
                     .map_err(JlrsError::alloc_error)?;
 
                 match dims.n_dimensions() {
@@ -410,7 +410,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
                         .cast();
 
                         jl_gc_add_finalizer(array, finalizer.ptr());
-                        output.into_scope(frame).value(array, Internal)
+                        output.into_scope(frame).value(array, Private)
                     }
                     n if n <= 8 => {
                         let tuple = small_dim_tuple(frame, &dims)?;
@@ -423,7 +423,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
                         .cast();
 
                         jl_gc_add_finalizer(array, finalizer.ptr());
-                        output.into_scope(frame).value(array, Internal)
+                        output.into_scope(frame).value(array, Private)
                     }
                     _ => {
                         let tuple = large_dim_tuple(frame, &dims)?;
@@ -436,7 +436,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
                         .cast();
 
                         jl_gc_add_finalizer(array, finalizer.ptr());
-                        output.into_scope(frame).value(array, Internal)
+                        output.into_scope(frame).value(array, Private)
                     }
                 }
             })
@@ -463,7 +463,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
             }
 
             let un = jl_type_union(types.as_mut_ptr().cast(), types.len());
-            scope.value(un, Internal)
+            scope.value(un, Private)
         }
     }
 
@@ -484,7 +484,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
 
         unsafe {
             let ua = jl_type_unionall(tvar.ptr(), body.ptr());
-            scope.value(ua, Internal)
+            scope.value(ua, Private)
         }
     }
 
@@ -518,7 +518,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
 
             let mut field_names_vec = field_names
                 .iter()
-                .map(|name| name.temporary_symbol(Internal).as_value())
+                .map(|name| name.temporary_symbol(Private).as_value())
                 .collect::<Vec<_>>();
 
             let names = DataType::anytuple_type(global)
@@ -566,7 +566,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     {
         unsafe {
             let global = Global::new();
-            let name = name.temporary_symbol(Internal);
+            let name = name.temporary_symbol(Private);
 
             let lb = lower_bound.map_or(jl_bottom_type.cast(), |v| v.ptr());
             if !Value::wrap(lb)
@@ -589,7 +589,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
             }
 
             let tvar = jl_new_typevar(name.ptr(), lb, ub);
-            scope.value(tvar.cast(), Internal)
+            scope.value(tvar.cast(), Private)
         }
     }
 
@@ -618,7 +618,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
         unsafe {
             let types = types.as_mut();
             let applied = jl_apply_type(self.ptr(), types.as_mut_ptr().cast(), types.len());
-            scope.value(applied, Internal)
+            scope.value(applied, Private)
         }
     }
 }
@@ -865,7 +865,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
                 return Err(JlrsError::OutOfBounds(idx, self.n_fields()).into());
             }
 
-            scope.value(jl_fieldref(self.ptr(), idx), Internal)
+            scope.value(jl_fieldref(self.ptr(), idx), Private)
         }
     }
 
@@ -904,7 +904,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
         F: Frame<'fr>,
     {
         unsafe {
-            let symbol = field_name.temporary_symbol(Internal);
+            let symbol = field_name.temporary_symbol(Private);
 
             if self.is_nothing() {
                 Err(JlrsError::Nothing)?;
@@ -917,7 +917,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
                 return Err(JlrsError::NoSuchField(symbol.into()).into());
             }
 
-            scope.value(jl_get_nth_field(self.ptr(), idx as _), Internal)
+            scope.value(jl_get_nth_field(self.ptr(), idx as _), Private)
         }
     }
 
@@ -933,7 +933,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     where
         N: TemporarySymbol,
     {
-        let symbol = field_name.temporary_symbol(Internal);
+        let symbol = field_name.temporary_symbol(Private);
 
         if self.is_nothing() {
             Err(JlrsError::Nothing)?;
@@ -1408,12 +1408,12 @@ where
     let exc = jl_exception_occurred();
 
     if !exc.is_null() {
-        match frame.push_root(exc, Internal) {
+        match frame.push_root(exc, Private) {
             Ok(exc) => Ok(Err(exc)),
             Err(a) => Err(a.into()),
         }
     } else {
-        match frame.push_root(res, Internal) {
+        match frame.push_root(res, Private) {
             Ok(v) => Ok(Ok(v)),
             Err(a) => Err(a.into()),
         }
@@ -1433,7 +1433,7 @@ where
     let tuple_type = jl_apply_tuple_type_v(elem_types.cast(), n);
     let tuple = jl_new_struct_uninit(tuple_type);
     let v = frame
-        .push_root(tuple, Internal)
+        .push_root(tuple, Private)
         .map_err(JlrsError::alloc_error)?;
 
     let usize_ptr: *mut usize = v.ptr().cast();
@@ -1454,7 +1454,7 @@ where
     let tuple_type = jl_apply_tuple_type_v(elem_types.as_mut_ptr().cast(), n);
     let tuple = jl_new_struct_uninit(tuple_type);
     let v = frame
-        .push_root(tuple, Internal)
+        .push_root(tuple, Private)
         .map_err(JlrsError::alloc_error)?;
 
     let usize_ptr: *mut usize = v.ptr().cast();

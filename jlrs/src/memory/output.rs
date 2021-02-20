@@ -13,7 +13,8 @@
 use super::{frame::GcFrame, traits::frame::Frame};
 use crate::{
     error::JlrsResult,
-    value::{traits::private::Internal, UnrootedCallResult, UnrootedValue},
+    private::Private,
+    value::{UnrootedCallResult, UnrootedValue},
 };
 use std::marker::PhantomData;
 
@@ -60,7 +61,7 @@ impl<'scope, 'frame, 'borrow, F: Frame<'frame>> OutputScope<'scope, 'frame, 'bor
         ) -> JlrsResult<UnrootedValue<'scope, 'data, 'inner>>,
     {
         // Safe: frame is dropped
-        let mut frame = unsafe { self.0.nest(0, Internal) };
+        let mut frame = unsafe { self.0.nest(0, Private) };
         let out = Output::new();
         func(out, &mut frame).map(|pv| UnrootedValue::new(pv.ptr()))
     }
@@ -81,7 +82,7 @@ impl<'scope, 'frame, 'borrow, F: Frame<'frame>> OutputScope<'scope, 'frame, 'bor
         ) -> JlrsResult<UnrootedValue<'scope, 'data, 'inner>>,
     {
         // Safe: frame is dropped
-        let mut frame = unsafe { self.0.nest(capacity, Internal) };
+        let mut frame = unsafe { self.0.nest(capacity, Private) };
         let out = Output::new();
         func(out, &mut frame).map(|pv| UnrootedValue::new(pv.ptr()))
     }
@@ -102,7 +103,7 @@ impl<'scope, 'frame, 'borrow, F: Frame<'frame>> OutputScope<'scope, 'frame, 'bor
             -> JlrsResult<UnrootedCallResult<'scope, 'data, 'inner>>,
     {
         // Safe: frame is dropped
-        let mut frame = unsafe { self.0.nest(0, Internal) };
+        let mut frame = unsafe { self.0.nest(0, Private) };
         let out = Output::new();
         func(out, &mut frame).map(|pv| match pv {
             UnrootedCallResult::Ok(pv) => UnrootedCallResult::Ok(UnrootedValue::new(pv.ptr())),
@@ -126,7 +127,7 @@ impl<'scope, 'frame, 'borrow, F: Frame<'frame>> OutputScope<'scope, 'frame, 'bor
             -> JlrsResult<UnrootedCallResult<'scope, 'data, 'inner>>,
     {
         // Safe: frame is dropped
-        let mut frame = unsafe { self.0.nest(capacity, Internal) };
+        let mut frame = unsafe { self.0.nest(capacity, Private) };
         let out = Output::new();
         func(out, &mut frame).map(|pv| match pv {
             UnrootedCallResult::Ok(pv) => UnrootedCallResult::Ok(UnrootedValue::new(pv.ptr())),

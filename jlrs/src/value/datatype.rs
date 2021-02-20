@@ -26,7 +26,7 @@ use crate::{
     memory::traits::scope::Scope,
 };
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
-use crate::{memory::global::Global, value::traits::private::Internal};
+use crate::{memory::global::Global, private::Private};
 use jl_sys::{
     jl_abstractslot_type, jl_abstractstring_type, jl_any_type, jl_anytuple_type,
     jl_argumenterror_type, jl_bool_type, jl_boundserror_type, jl_builtin_type, jl_char_type,
@@ -279,7 +279,7 @@ impl<'frame> DataType<'frame> {
 
             let values = values.as_mut();
             let value = jl_new_structv(self.ptr(), values.as_mut_ptr().cast(), values.len() as _);
-            scope.value(value, Internal)
+            scope.value(value, Private)
         }
     }
 }

@@ -25,19 +25,19 @@ impl_temporary_symbol!(Symbol<'s>, 's);
 impl_temporary_symbol!(JuliaString<'frame>, 'frame);
 
 pub(crate) mod private {
+    use crate::private::Private;
     use crate::value::string::JuliaString;
     use crate::value::symbol::Symbol;
-    use crate::value::traits::private::Internal;
     use jl_sys::{jl_symbol, jl_symbol_n};
     use std::borrow::Cow;
 
     // safety: never return the symbol to the user without assigning the 'base lifetime.
     pub trait TemporarySymbol {
-        unsafe fn temporary_symbol<'symbol>(&self, _: Internal) -> Symbol<'symbol>;
+        unsafe fn temporary_symbol<'symbol>(&self, _: Private) -> Symbol<'symbol>;
     }
 
     impl<'a> TemporarySymbol for &'a str {
-        unsafe fn temporary_symbol<'symbol>(&self, _: Internal) -> Symbol<'symbol> {
+        unsafe fn temporary_symbol<'symbol>(&self, _: Private) -> Symbol<'symbol> {
             let symbol_ptr = self.as_ptr();
             let symbol = jl_symbol_n(symbol_ptr.cast(), self.len());
             Symbol::wrap(symbol)
@@ -45,7 +45,7 @@ pub(crate) mod private {
     }
 
     impl<'a> TemporarySymbol for Cow<'a, str> {
-        unsafe fn temporary_symbol<'symbol>(&self, _: Internal) -> Symbol<'symbol> {
+        unsafe fn temporary_symbol<'symbol>(&self, _: Private) -> Symbol<'symbol> {
             let symbol_ptr = self.as_ptr().cast();
             let symbol = jl_symbol_n(symbol_ptr, self.len());
             Symbol::wrap(symbol)
@@ -53,7 +53,7 @@ pub(crate) mod private {
     }
 
     impl TemporarySymbol for String {
-        unsafe fn temporary_symbol<'symbol>(&self, _: Internal) -> Symbol<'symbol> {
+        unsafe fn temporary_symbol<'symbol>(&self, _: Private) -> Symbol<'symbol> {
             let symbol_ptr = self.as_ptr().cast();
             let symbol = jl_symbol_n(symbol_ptr, self.len());
             Symbol::wrap(symbol)
@@ -61,7 +61,7 @@ pub(crate) mod private {
     }
 
     impl TemporarySymbol for &dyn AsRef<str> {
-        unsafe fn temporary_symbol<'symbol>(&self, _: Internal) -> Symbol<'symbol> {
+        unsafe fn temporary_symbol<'symbol>(&self, _: Private) -> Symbol<'symbol> {
             let symbol_ptr = self.as_ref().as_ptr().cast();
             let symbol = jl_symbol_n(symbol_ptr, self.as_ref().len());
             Symbol::wrap(symbol)
@@ -69,7 +69,7 @@ pub(crate) mod private {
     }
 
     impl<'frame> TemporarySymbol for JuliaString<'frame> {
-        unsafe fn temporary_symbol<'symbol>(&self, _: Internal) -> Symbol<'symbol> {
+        unsafe fn temporary_symbol<'symbol>(&self, _: Private) -> Symbol<'symbol> {
             let symbol_ptr = self.as_c_str();
             let symbol = jl_symbol(symbol_ptr.as_ptr());
             Symbol::wrap(symbol)
@@ -77,7 +77,7 @@ pub(crate) mod private {
     }
 
     impl<'frame> TemporarySymbol for Symbol<'frame> {
-        unsafe fn temporary_symbol<'symbol>(&self, _: Internal) -> Symbol<'symbol> {
+        unsafe fn temporary_symbol<'symbol>(&self, _: Private) -> Symbol<'symbol> {
             Symbol::wrap(self.ptr())
         }
     }

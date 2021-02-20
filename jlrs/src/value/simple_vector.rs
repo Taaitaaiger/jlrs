@@ -1,5 +1,6 @@
 //! Support for values with the `Core.SimpleVector` (`SVec`) type.
 
+use crate::private::Private;
 use crate::value::Value;
 use crate::{
     convert::cast::Cast,
@@ -12,8 +13,6 @@ use jl_sys::{
     jl_svec_data, jl_svec_t,
 };
 use std::marker::PhantomData;
-
-use super::traits::private::Internal;
 
 /// A `SimpleVector` is a fixed-size array that contains `Value`s.
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]
@@ -37,7 +36,7 @@ impl<'frame> SimpleVector<'frame> {
     {
         unsafe {
             let svec = jl_alloc_svec(n);
-            if let Err(err) = frame.push_root(svec.cast(), Internal) {
+            if let Err(err) = frame.push_root(svec.cast(), Private) {
                 Err(JlrsError::AllocError(err))?
             };
 
@@ -52,7 +51,7 @@ impl<'frame> SimpleVector<'frame> {
         F: Frame<'frame>,
     {
         let svec = jl_alloc_svec_uninit(n);
-        if let Err(err) = frame.push_root(svec.cast(), Internal) {
+        if let Err(err) = frame.push_root(svec.cast(), Private) {
             Err(JlrsError::AllocError(err))?
         };
 

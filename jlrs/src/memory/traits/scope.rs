@@ -286,7 +286,8 @@ pub(crate) mod private {
     use crate::{
         error::{CallResult, JlrsResult},
         memory::{output::OutputScope, traits::frame::Frame},
-        value::{traits::private::Internal, UnrootedCallResult, UnrootedValue},
+        private::Private,
+        value::{UnrootedCallResult, UnrootedValue},
     };
     use jl_sys::jl_value_t;
 
@@ -294,12 +295,12 @@ pub(crate) mod private {
         type Value: Sized;
         type CallResult: Sized;
 
-        unsafe fn value(self, value: *mut jl_value_t, _: Internal) -> JlrsResult<Self::Value>;
+        unsafe fn value(self, value: *mut jl_value_t, _: Private) -> JlrsResult<Self::Value>;
 
         unsafe fn call_result(
             self,
             value: Result<*mut jl_value_t, *mut jl_value_t>,
-            _: Internal,
+            _: Private,
         ) -> JlrsResult<Self::CallResult>;
     }
 
@@ -307,22 +308,22 @@ pub(crate) mod private {
         type Value = Value<'frame, 'data>;
         type CallResult = CallResult<'frame, 'data>;
 
-        unsafe fn value(self, value: *mut jl_value_t, _: Internal) -> JlrsResult<Self::Value> {
-            self.push_root(value, Internal).map_err(Into::into)
+        unsafe fn value(self, value: *mut jl_value_t, _: Private) -> JlrsResult<Self::Value> {
+            self.push_root(value, Private).map_err(Into::into)
         }
 
         unsafe fn call_result(
             self,
             value: Result<*mut jl_value_t, *mut jl_value_t>,
-            _: Internal,
+            _: Private,
         ) -> JlrsResult<Self::CallResult> {
             match value {
                 Ok(v) => self
-                    .push_root(v, Internal)
+                    .push_root(v, Private)
                     .map(|v| Ok(v))
                     .map_err(Into::into),
                 Err(e) => self
-                    .push_root(e, Internal)
+                    .push_root(e, Private)
                     .map(|v| Err(v))
                     .map_err(Into::into),
             }
@@ -335,14 +336,14 @@ pub(crate) mod private {
         type Value = UnrootedValue<'scope, 'data, 'inner>;
         type CallResult = UnrootedCallResult<'scope, 'data, 'inner>;
 
-        unsafe fn value(self, value: *mut jl_value_t, _: Internal) -> JlrsResult<Self::Value> {
+        unsafe fn value(self, value: *mut jl_value_t, _: Private) -> JlrsResult<Self::Value> {
             Ok(UnrootedValue::new(value))
         }
 
         unsafe fn call_result(
             self,
             value: Result<*mut jl_value_t, *mut jl_value_t>,
-            _: Internal,
+            _: Private,
         ) -> JlrsResult<Self::CallResult> {
             match value {
                 Ok(v) => Ok(UnrootedCallResult::Ok(UnrootedValue::new(v))),

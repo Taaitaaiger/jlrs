@@ -80,7 +80,7 @@ use crate::{
     memory::traits::mode::private::Mode as _,
     value::{UnrootedCallResult, UnrootedValue, Value},
 };
-use crate::{value::traits::private::Internal, CCall};
+use crate::{private::Private, CCall};
 use jl_sys::jl_value_t;
 #[cfg(all(feature = "async", target_os = "linux"))]
 use std::future::Future;
@@ -168,7 +168,7 @@ impl<'frame, M: Mode> GcFrame<'frame, M> {
         capacity: usize,
         mode: M,
     ) -> Self {
-        mode.push_frame(raw_frame, capacity, Internal);
+        mode.push_frame(raw_frame, capacity, Private);
 
         GcFrame {
             raw_frame,
@@ -199,7 +199,7 @@ impl<'frame, M: Mode> GcFrame<'frame, M> {
 impl<'frame, M: Mode> Drop for GcFrame<'frame, M> {
     fn drop(&mut self) {
         // The frame was pushed when the frame was created.
-        unsafe { self.mode.pop_frame(self.raw_frame, Internal) }
+        unsafe { self.mode.pop_frame(self.raw_frame, Private) }
     }
 }
 
@@ -413,7 +413,7 @@ impl<'frame> AsyncGcFrame<'frame> {
         mode: Async<'frame>,
     ) -> Self {
         // Is popped when this frame is dropped
-        mode.push_frame(raw_frame, capacity, Internal);
+        mode.push_frame(raw_frame, capacity, Private);
 
         AsyncGcFrame {
             raw_frame,
@@ -533,7 +533,7 @@ impl<'frame> AsyncGcFrame<'frame> {
 impl<'frame> Drop for AsyncGcFrame<'frame> {
     fn drop(&mut self) {
         // The frame was pushed when the frame was created.
-        unsafe { self.mode.pop_frame(self.raw_frame, Internal) }
+        unsafe { self.mode.pop_frame(self.raw_frame, Private) }
     }
 }
 

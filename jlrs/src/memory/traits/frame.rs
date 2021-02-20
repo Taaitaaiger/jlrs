@@ -605,7 +605,7 @@ pub(crate) mod private {
     use crate::memory::mode::Sync;
     use crate::memory::traits::mode::Mode;
     use crate::value::Value;
-    use crate::{error::AllocError, value::traits::private::Internal};
+    use crate::{error::AllocError, private::Private};
     use jl_sys::jl_value_t;
 
     pub trait Frame<'frame> {
@@ -615,14 +615,14 @@ pub(crate) mod private {
         unsafe fn push_root<'data>(
             &mut self,
             value: *mut jl_value_t,
-            _: Internal,
+            _: Private,
         ) -> Result<Value<'frame, 'data>, AllocError>;
 
         // safety: frame must be dropped
         unsafe fn nest<'nested>(
             &'nested mut self,
             capacity: usize,
-            _: Internal,
+            _: Private,
         ) -> GcFrame<'nested, Self::Mode>;
     }
 
@@ -632,7 +632,7 @@ pub(crate) mod private {
         unsafe fn push_root<'data>(
             &mut self,
             value: *mut jl_value_t,
-            _: Internal,
+            _: Private,
         ) -> Result<Value<'frame, 'data>, AllocError> {
             let n_roots = self.n_roots();
             if n_roots == self.capacity() {
@@ -646,7 +646,7 @@ pub(crate) mod private {
         unsafe fn nest<'nested>(
             &'nested mut self,
             capacity: usize,
-            _: Internal,
+            _: Private,
         ) -> GcFrame<'nested, Self::Mode> {
             self.nest(capacity)
         }
@@ -659,7 +659,7 @@ pub(crate) mod private {
         unsafe fn push_root<'data>(
             &mut self,
             value: *mut jl_value_t,
-            _: Internal,
+            _: Private,
         ) -> Result<Value<'frame, 'data>, AllocError> {
             let n_roots = self.n_roots();
             if n_roots == self.capacity() {
@@ -673,7 +673,7 @@ pub(crate) mod private {
         unsafe fn nest<'nested>(
             &'nested mut self,
             capacity: usize,
-            _: Internal,
+            _: Private,
         ) -> GcFrame<'nested, Self::Mode> {
             self.nest(capacity)
         }
@@ -685,7 +685,7 @@ pub(crate) mod private {
         unsafe fn push_root<'data>(
             &mut self,
             _value: *mut jl_value_t,
-            _: Internal,
+            _: Private,
         ) -> Result<Value<'frame, 'data>, AllocError> {
             Err(AllocError::FrameOverflow(1, 0))
         }
@@ -693,7 +693,7 @@ pub(crate) mod private {
         unsafe fn nest<'nested>(
             &'nested mut self,
             _capacity: usize,
-            _: Internal,
+            _: Private,
         ) -> GcFrame<'nested, Self::Mode> {
             unreachable!()
         }

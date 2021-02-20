@@ -15,18 +15,18 @@ impl<'a> Mode for Async<'a> {}
 pub(crate) mod private {
     #[cfg(all(feature = "async", target_os = "linux"))]
     use crate::memory::mode::Async;
-    use crate::{memory::mode::Sync, value::traits::private::Internal};
+    use crate::{memory::mode::Sync, private::Private};
     use jl_sys::jl_get_ptls_states;
     use std::ffi::c_void;
     use std::ptr::null_mut;
 
     pub trait Mode {
-        unsafe fn push_frame(&self, raw_frame: &mut [*mut c_void], capacity: usize, _: Internal);
-        unsafe fn pop_frame(&self, raw_frame: &mut [*mut c_void], _: Internal);
+        unsafe fn push_frame(&self, raw_frame: &mut [*mut c_void], capacity: usize, _: Private);
+        unsafe fn pop_frame(&self, raw_frame: &mut [*mut c_void], _: Private);
     }
 
     impl Mode for Sync {
-        unsafe fn push_frame(&self, raw_frame: &mut [*mut c_void], capacity: usize, _: Internal) {
+        unsafe fn push_frame(&self, raw_frame: &mut [*mut c_void], capacity: usize, _: Private) {
             let rtls = &mut *jl_get_ptls_states();
             raw_frame[0] = (capacity << 1) as _;
             raw_frame[1] = rtls.pgcstack.cast();
@@ -38,7 +38,7 @@ pub(crate) mod private {
             rtls.pgcstack = raw_frame[..].as_mut_ptr().cast();
         }
 
-        unsafe fn pop_frame(&self, _: &mut [*mut c_void], _: Internal) {
+        unsafe fn pop_frame(&self, _: &mut [*mut c_void], _: Private) {
             let rtls = &mut *jl_get_ptls_states();
             rtls.pgcstack = (&*rtls.pgcstack).prev;
         }
@@ -46,7 +46,7 @@ pub(crate) mod private {
 
     #[cfg(all(feature = "async", target_os = "linux"))]
     impl<'a> Mode for Async<'a> {
-        unsafe fn push_frame(&self, raw_frame: &mut [*mut c_void], capacity: usize, _: Internal) {
+        unsafe fn push_frame(&self, raw_frame: &mut [*mut c_void], capacity: usize, _: Private) {
             raw_frame[0] = (capacity << 1) as _;
             raw_frame[1] = self.0.get();
 
@@ -57,7 +57,7 @@ pub(crate) mod private {
             self.0.set(raw_frame[..].as_mut_ptr().cast());
         }
 
-        unsafe fn pop_frame(&self, raw_frame: &mut [*mut c_void], _: Internal) {
+        unsafe fn pop_frame(&self, raw_frame: &mut [*mut c_void], _: Private) {
             self.0.set(raw_frame[1]);
         }
     }
