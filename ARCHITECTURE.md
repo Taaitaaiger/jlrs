@@ -99,14 +99,16 @@ Additional methods are provided by `Value` to create values with types that are 
 
 ### Custom types
 
-Several other traits are available in the `layout` module, in particular, `ValidLayout` is used to determine if the layout of the type that implements the trait is compatible with the layout of a value in Julia with some `DataType`. If a struct derives the `JuliaStruct` trait, `ValidLayout`, `Cast`, and `JuliaTypecheck` are implemented for that struct. These custom types can be automatically generated with `JlrsReflect.jl`. `ValidLayout` is implemented by recursively calling itself for each field of the struct, where care is taken to handle bits union fields correctly. Unlike other fields, bits union fields require three separate fields to deal with their size and alignment requirements: unlike "normal" fields, the size of a bits union field is not necessarily a multiple of its alignment. This depends on the traits defined in the `bits_union` submodule of `layout`. `JuliaTypecheck` is implemented by calling `ValidLayout`.
+Several other traits are defined in the `layout` module. The most important of these is `ValidLayout`, which is used to determine if the layout of the type that implements the trait is compatible with the layout of a value in Julia with some `DataType`. If a struct derives the `JuliaStruct` trait, `ValidLayout`, `Cast`, and `JuliaTypecheck` are implemented for that struct. These custom types can be automatically generated with `JlrsReflect.jl`. `ValidLayout` is implemented by recursively calling itself for each field of the struct, where care is taken to handle bits union fields correctly. Unlike other fields, bits union fields require three separate fields to satisfy their size and alignment requirements: unlike other field kinds, the size of a bits union field is not necessarily a multiple of its alignment. This is handled by the traits defined in the `bits_union` submodule of `layout`. `JuliaTypecheck` is implemented by calling `ValidLayout`.
 
 If a type is guaranteed to be a bits-type, `IntoJulia` can also be derived. This happens automatically when `JlrsReflect.jl` is used.
 
 
 ### ccall
 
-Julia's `ccall` interface is very powerful because it can call arbitrary functions with the C ABI, i.e. functions defined as `extern "C"` in Rust. It's not necessary to use jlrs to write functions in Rust that can be called from Julia with `ccall`, but 
+Julia's `ccall` interface is very powerful because it can call arbitrary functions with the C ABI, i.e. functions defined as `extern "C"` in Rust. It's not necessary to use jlrs to write functions in Rust that can be called from Julia with `ccall`, but its features can be used.
+
+Wrapper types in jlrs are transparent, so they can be used instead of raw pointers. Thanks to this property, a Julia array can be provided as an `Array` or `TypedArray` instead of `*mut jl_array_t`. Because a `Frame` is required to access their contents from Rust, mutable aliasing this data is prevented. Julia is already initialized when a Rust function called from Julia, so rather than initializing `Julia` a `CCall` can be created, which can create new frames.
 
 
 ### Async runtime
