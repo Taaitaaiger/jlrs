@@ -6,7 +6,7 @@ fn create_and_cast_uints() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame_with_slots(5, |_, frame| {
+        jlrs.scope_with_slots(5, |_, frame| {
             let p1 = Value::new(&mut *frame, 1u8)?;
             let p2 = Value::new(&mut *frame, 2u16)?;
             let p3 = Value::new(&mut *frame, 3u32)?;
@@ -36,7 +36,7 @@ fn create_and_cast_uints_dynamic() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame(|_, frame| {
+        jlrs.scope(|_, frame| {
             let p1 = Value::new(&mut *frame, 1u8)?;
             let p2 = Value::new(&mut *frame, 2u16)?;
             let p3 = Value::new(&mut *frame, 3u32)?;
@@ -66,7 +66,7 @@ fn create_and_cast_ints() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame_with_slots(5, |_, frame| {
+        jlrs.scope_with_slots(5, |_, frame| {
             let p1 = Value::new(&mut *frame, 1i8)?;
             let p2 = Value::new(&mut *frame, 2i16)?;
             let p3 = Value::new(&mut *frame, 3i32)?;
@@ -96,7 +96,7 @@ fn create_and_cast_ints_dynamic() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame(|_, frame| {
+        jlrs.scope(|_, frame| {
             let p1 = Value::new(&mut *frame, 1i8)?;
             let p2 = Value::new(&mut *frame, 2i16)?;
             let p3 = Value::new(&mut *frame, 3i32)?;
@@ -126,7 +126,7 @@ fn create_and_cast_floats() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame_with_slots(5, |_, frame| {
+        jlrs.scope_with_slots(5, |_, frame| {
             let p1 = Value::new(&mut *frame, 1f32)?;
             let p2 = Value::new(&mut *frame, 2f64)?;
 
@@ -147,7 +147,7 @@ fn create_and_cast_floats_dynamic() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame(|_, frame| {
+        jlrs.scope(|_, frame| {
             let p1 = Value::new(&mut *frame, 1f32)?;
             let p2 = Value::new(&mut *frame, 2f64)?;
 
@@ -168,7 +168,7 @@ fn create_and_cast_bool() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame_with_slots(5, |_, frame| {
+        jlrs.scope_with_slots(5, |_, frame| {
             let p1 = Value::new(&mut *frame, true)?;
             let u1 = p1.cast::<bool>()?;
             assert_eq!(u1, true);
@@ -183,7 +183,7 @@ fn create_and_cast_bool_dynamic() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame(|_, frame| {
+        jlrs.scope(|_, frame| {
             let p1 = Value::new(&mut *frame, false)?;
             let u1 = p1.cast::<bool>()?;
             assert_eq!(u1, false);
@@ -198,7 +198,7 @@ fn create_and_cast_char() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame_with_slots(5, |_, frame| {
+        jlrs.scope_with_slots(5, |_, frame| {
             let p1 = Value::new(&mut *frame, 'a')?;
             let u1 = p1.cast::<char>()?;
             assert_eq!(u1, 'a');
@@ -213,7 +213,7 @@ fn create_and_cast_char_dynamic() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame(|_, frame| {
+        jlrs.scope(|_, frame| {
             let p1 = Value::new(&mut *frame, 'a')?;
             let u1 = p1.cast::<char>()?;
             assert_eq!(u1, 'a');
@@ -228,7 +228,7 @@ fn create_nothing() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame_with_slots(0, |global, _frame| {
+        jlrs.scope_with_slots(0, |global, _frame| {
             let nothing = Value::nothing(global);
             assert!(nothing.is_nothing());
             assert!(!nothing.is::<f32>());
@@ -251,7 +251,7 @@ macro_rules! cannot_cast_wrong_type {
             JULIA.with(|j| {
                 let mut jlrs = j.borrow_mut();
 
-                jlrs.frame_with_slots(1, |_global, frame| {
+                jlrs.scope_with_slots(1, |_global, frame| {
                     let val = Value::new(&mut *frame, $val)?;
                     assert!(val.is::<$from>());
                     assert!(val.cast::<$to>().is_err());
@@ -285,7 +285,7 @@ fn function_pointer() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame_with_slots(2, |global, frame| {
+        jlrs.scope_with_slots(2, |global, frame| {
             let val = Value::new(&mut *frame, func as *mut std::ffi::c_void)?;
             assert!(val.is::<*mut std::ffi::c_void>());
 

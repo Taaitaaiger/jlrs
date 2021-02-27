@@ -8,7 +8,7 @@ use jlrs::{
 fn create_new_unionall() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
-        jlrs.frame_with_slots(3, |global, frame| {
+        jlrs.scope_with_slots(3, |global, frame| {
             let atype = UnionAll::array_type(global);
             let body = atype.body();
             let tvar = TypeVar::new(
@@ -36,7 +36,7 @@ fn create_new_unionall() {
 fn instantiate_unionall() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
-        jlrs.frame_with_slots(4, |global, frame| {
+        jlrs.scope_with_slots(4, |global, frame| {
             let v = Value::new(&mut *frame, 3i8)?;
             let out = Module::main(global)
                 .submodule("JlrsTests")?
@@ -58,7 +58,7 @@ fn instantiate_unionall() {
 fn apply_value_type() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
-        jlrs.frame_with_slots(8, |global, frame| {
+        jlrs.scope_with_slots(8, |global, frame| {
             let ty1 = Value::new(&mut *frame, 1isize)?;
             let ty2 = Value::new(&mut *frame, 2isize)?;
 

@@ -31,7 +31,7 @@ use crate::value::datatype::DataType;
 /// # fn main() {
 /// # JULIA.with(|j| {
 /// # let mut julia = j.borrow_mut();
-/// julia.frame(|global, frame| {
+/// julia.scope(|global, frame| {
 ///     let symbol_func = Module::core(global).function("Symbol")?;
 ///     let symbol_str = Value::new(&mut *frame, "+")?;
 ///     let symbol_val = symbol_func.call1(&mut *frame, symbol_str)?.unwrap();

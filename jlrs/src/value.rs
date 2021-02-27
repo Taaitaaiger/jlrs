@@ -39,7 +39,7 @@ macro_rules! count {
 /// # JULIA.with(|j| {
 /// # let mut julia = j.borrow_mut();
 /// // Three slots; two for the inputs and one for the output.
-/// julia.frame_with_slots(3, |global, frame| {
+/// julia.scope_with_slots(3, |global, frame| {
 ///     // Create the two arguments, each value requires one slot
 ///     let i = Value::new(&mut *frame, 2u64)?;
 ///     let j = Value::new(&mut *frame, 1u32)?;
@@ -290,13 +290,13 @@ impl<'frame, 'data> Value<'frame, 'data> {
                     .cast(),
                     Private,
                 ),
-                n if n <= 8 => scope.value_frame_with_slots(1, |output, frame| {
+                n if n <= 8 => scope.value_scope_with_slots(1, |output, frame| {
                     let tuple = small_dim_tuple(frame, &dims)?;
                     output
                         .into_scope(frame)
                         .value(jl_new_array(array_type, tuple.ptr()).cast(), Private)
                 }),
-                _ => scope.value_frame_with_slots(1, |output, frame| {
+                _ => scope.value_scope_with_slots(1, |output, frame| {
                     let tuple = large_dim_tuple(frame, &dims)?;
                     output
                         .into_scope(frame)
@@ -340,7 +340,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
                     .cast(),
                     Private,
                 ),
-                n if n <= 8 => scope.value_frame_with_slots(1, |output, frame| {
+                n if n <= 8 => scope.value_scope_with_slots(1, |output, frame| {
                     let tuple = small_dim_tuple(frame, &dims)?;
                     output.into_scope(frame).value(
                         jl_ptr_to_array(
@@ -353,7 +353,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
                         Private,
                     )
                 }),
-                _ => scope.value_frame_with_slots(1, |output, frame| {
+                _ => scope.value_scope_with_slots(1, |output, frame| {
                     let tuple = large_dim_tuple(frame, &dims)?;
                     output.into_scope(frame).value(
                         jl_ptr_to_array(
@@ -393,7 +393,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
             let global = scope.global();
             let finalizer = Module::main(global).submodule("Jlrs")?.function("clean")?;
 
-            scope.value_frame_with_slots(2, |output, frame| {
+            scope.value_scope_with_slots(2, |output, frame| {
                 let array_type = jl_apply_array_type(T::julia_type().cast(), dims.n_dimensions());
                 let _ = frame
                     .push_root(array_type, Private)
@@ -501,7 +501,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
         T: TemporarySymbol,
         V: AsMut<[Value<'value, 'data>]>,
     {
-        scope.value_frame_with_slots(4, |output, frame| unsafe {
+        scope.value_scope_with_slots(4, |output, frame| unsafe {
             let global = frame.global();
             let field_names = field_names.as_mut();
             let values_m = values.as_mut();
@@ -680,7 +680,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// # fn main() {
     /// # JULIA.with(|j| {
     /// # let mut julia = j.borrow_mut();
-    /// julia.frame(|_global, frame| {
+    /// julia.scope(|_global, frame| {
     ///     let i = Value::new(frame, 2u64)?;
     ///     assert!(i.is::<u64>());
     ///     Ok(())
@@ -698,7 +698,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// # fn main() {
     /// # JULIA.with(|j| {
     /// # let mut julia = j.borrow_mut();;
-    /// julia.frame(|_global, frame| {
+    /// julia.scope(|_global, frame| {
     ///     let arr = Value::new_array::<f64, _, _, _>(&mut *frame, (3, 3))?;
     ///     assert!(arr.is::<Array>());
     ///     Ok(())
@@ -1008,7 +1008,7 @@ impl<'fr, 'da> Value<'fr, 'da> {
     /// # fn main() {
     /// # JULIA.with(|j| {
     /// # let mut julia = j.borrow_mut();
-    ///   julia.frame(|global, frame| {
+    ///   julia.scope(|global, frame| {
     ///       let a_value = Value::new(&mut *frame, 1isize)?;
     ///       let b_value = Value::new(&mut *frame, 10isize)?;
     ///       // `funcwithkw` takes a single positional argument of type `Int`, one keyword

@@ -23,8 +23,8 @@ impl JuliaTask for MyTask {
     // task doesn't return a result to the caller, `R` must be set.
     type R = async_std::channel::Sender<JlrsResult<Self::T>>;
 
-    // This is the async variation of the closure you give to `Julia::frame` or
-    // `Julia::frame_with_slots` when you use the synchronous runtime. The `Global` can be used to
+    // This is the async variation of the closure you give to `Julia::scope` or
+    // `Julia::scope_with_slots` when you use the synchronous runtime. The `Global` can be used to
     // access `Module`s and other static data, while the `AsyncDynamicFrame` let you create values, call
     // functions, and create nested frames.
     async fn run<'base>(
@@ -37,7 +37,7 @@ impl JuliaTask for MyTask {
         // block in the closure, and frame is provided by value rather than by mutable reference.
         let v = unsafe {
             frame
-            .async_dynamic_value_frame(|output, frame| async move {
+            .async_dynamic_value_scope(|output, frame| async move {
                 // Convert the two arguments to values Julia can work with.
                 let iters = Value::new(&mut *frame, self.iters)?;
                 let dims = Value::new(&mut *frame, self.dims)?;

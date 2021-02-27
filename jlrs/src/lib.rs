@@ -74,10 +74,10 @@
 //!
 //! ## Calling Julia from Rust
 //!
-//! You can call [`Julia::include`] to include your own Julia code and either [`Julia::frame`] or
-//! [`Julia::frame_with_slots`] to interact with Julia.
+//! You can call [`Julia::include`] to include your own Julia code and either [`Julia::scope`] or
+//! [`Julia::scope_with_slots`] to interact with Julia.
 //!
-//! The other two methods, [`Julia::frame`] and [`Julia::frame_with_slots`], take a closure that
+//! The other two methods, [`Julia::scope`] and [`Julia::scope_with_slots`], take a closure that
 //! provides you with a [`Global`] and a mutable reference to a [`GcFrame`]. [`Global`] is a
 //! token that lets you access Julia modules their contents and other global values, while the
 //! frame is used to root local values which prevents them from being freed by the garbage
@@ -111,7 +111,7 @@
 //! # use jlrs::util::JULIA;
 //! # fn main() {
 //! let mut julia = unsafe { Julia::init().unwrap() };
-//! julia.frame(|global, frame| {
+//! julia.scope(|global, frame| {
 //!     // Create the two arguments
 //!     let i = Value::new(&mut *frame, 2u64)?;
 //!     let j = Value::new(&mut *frame, 1u32)?;
@@ -120,22 +120,21 @@
 //!     let func = Module::base(global).function("+")?;
 //!
 //!     // Call the function and unbox the result
-//!     let output = func.call2(&mut *frame, i, j)?.unwrap();
-//!     output.cast::<u64>()
+//!     func.call2(&mut *frame, i, j)?.into_jlrs_result()?.cast::<u64>()
 //! }).unwrap();
 //! # }
 //! ```
 //!
 //! An important feature of frames is that they can be stacked. If you need one or more temporary
 //! values to call a function, they don't need to be rooted after that function has been called.
-//! There are three methods that let you use a new frame, stacked on top of the old one: `frame`,
-//! `value_frame`, and `call_frame`. The first is very similar to the previous example, but the
+//! There are three methods that let you use a new frame, stacked on top of the old one: `scope`,
+//! `value_scope`, and `call_scope`. The first is very similar to the previous example, but the
 //! closure only provides you with a frame. Its output can be anything, as long as its guaranteed
 //! to live at least as long as its parent frame. The other two cases can be used to allocate a
 //! few temporary values and use those to allocate some new value or call a function, rooting this
 //! final result in the parent frame.
 //!
-//! This is where the other [`Scope`] is used: the closure that `value_frame` and `call_frame`
+//! This is where the other [`Scope`] is used: the closure that `value_scope` and `call_scope`
 //! take has two arguments, an `Output` and a mutable reference to a `GcFrame`. The frame can be
 //! used to allocate and root temporary values, the output must be converted to an [`OutputScope`]
 //! before calling the methods whose result should be rooted in the parent frame.
@@ -149,15 +148,15 @@
 //! # fn main() {
 //! # JULIA.with(|j| {
 //! # let mut julia = j.borrow_mut();
-//!   julia.frame(|global, parent_frame| {
-//!       let _sum = parent_frame.call_frame(|output, child_frame| {
+//!   julia.scope(|global, parent_frame| {
+//!       let _sum = parent_frame.call_scope(|output, child_frame| {
 //!           let i = Value::new(&mut *child_frame, 1u64)?;
 //!           let j = Value::new(&mut *child_frame, 2i32)?;
 //!           let func = Module::base(global).function("+")?;
 //!
 //!           let output_scope = output.into_scope(child_frame);
 //!           func.call2(output_scope, i, j)
-//!       })?.unwrap();
+//!       })?.into_jlrs_result()?;
 //!
 //!       Ok(())
 //!   }).unwrap();
@@ -193,7 +192,7 @@
 //!
 //! # fn main() {
 //! let mut julia = unsafe { Julia::init().unwrap() };
-//! julia.frame(|global, frame| {
+//! julia.scope(|global, frame| {
 //!     // Cast the function to a void pointer
 //!     let call_me_val = Value::new(&mut *frame, call_me as *mut std::ffi::c_void)?;
 //!
@@ -202,7 +201,7 @@
 //!
 //!     // Call the function and unbox the result.  
 //!     let output = func.call1(&mut *frame, call_me_val)?
-//!         .unwrap()
+//!         .into_jlrs_result()?
 //!         .cast::<isize>()?;
 //!
 //!     assert_eq!(output, 1);
@@ -313,7 +312,7 @@
 //! thread_local! {
 //!     pub static JULIA: RefCell<Julia> = {
 //!         let julia = RefCell::new(unsafe { Julia::init().unwrap() });
-//!         julia.borrow_mut().frame(|_global, _frame| {
+//!         julia.borrow_mut().scope(|_global, _frame| {
 //!             /* include everything you need to use */
 //!             Ok(())
 //!         }).unwrap();
@@ -428,7 +427,7 @@ impl Julia {
             page: StackPage::default(),
         };
 
-        jl.frame_with_slots(2, |global, frame| {
+        jl.scope_with_slots(2, |global, frame| {
             Value::eval_string(frame, JLRS_JL)?.expect("Could not load Jlrs module");
 
             let droparray_fn = Value::new(frame, droparray as *mut c_void)?;
@@ -489,7 +488,7 @@ impl Julia {
             page: StackPage::default(),
         };
 
-        jl.frame_with_slots(2, |global, frame| {
+        jl.scope_with_slots(2, |global, frame| {
             Value::eval_string(frame, JLRS_JL)?.expect("Could not load Jlrs module");
 
             let droparray_fn = Value::new(frame, droparray as *mut c_void)?;
@@ -519,7 +518,7 @@ impl Julia {
     /// ```
     pub fn include<P: AsRef<Path>>(&mut self, path: P) -> JlrsResult<()> {
         if path.as_ref().exists() {
-            return self.frame_with_slots(3, |global, frame| {
+            return self.scope_with_slots(3, |global, frame| {
                 let path_jl_str = Value::new(&mut *frame, path.as_ref().to_string_lossy())?;
                 let include_func = Module::main(global).function("include")?;
                 let res = include_func.call1(frame, path_jl_str)?;
@@ -548,14 +547,14 @@ impl Julia {
     /// # fn main() {
     /// # JULIA.with(|j| {
     /// # let mut julia = j.borrow_mut();
-    ///   julia.frame(|_global, frame| {
+    ///   julia.scope(|_global, frame| {
     ///       let _i = Value::new(&mut *frame, 1u64)?;
     ///       Ok(())
     ///   }).unwrap();
     /// # });
     /// # }
     /// ```
-    pub fn frame<'base, 'julia: 'base, T, F>(&'julia mut self, func: F) -> JlrsResult<T>
+    pub fn scope<'base, 'julia: 'base, T, F>(&'julia mut self, func: F) -> JlrsResult<T>
     where
         F: FnOnce(Global<'base>, &mut GcFrame<'base, Sync>) -> JlrsResult<T>,
     {
@@ -577,14 +576,14 @@ impl Julia {
     /// # fn main() {
     /// # JULIA.with(|j| {
     /// # let mut julia = j.borrow_mut();
-    ///   julia.frame_with_slots(1, |_global, frame| {
+    ///   julia.scope_with_slots(1, |_global, frame| {
     ///       let _i = Value::new(&mut *frame, 1u64)?;
     ///       Ok(())
     ///   }).unwrap();
     /// # });
     /// # }
     /// ```
-    pub fn frame_with_slots<'base, 'julia: 'base, T, F>(
+    pub fn scope_with_slots<'base, 'julia: 'base, T, F>(
         &'julia mut self,
         capacity: usize,
         func: F,
@@ -640,7 +639,7 @@ impl CCall {
     }
 
     /// Creates a [`GcFrame`], calls the given closure, and returns the result of this closure.
-    pub fn frame<'base, 'julia: 'base, T, F>(&'julia mut self, func: F) -> JlrsResult<T>
+    pub fn scope<'base, 'julia: 'base, T, F>(&'julia mut self, func: F) -> JlrsResult<T>
     where
         F: FnOnce(Global<'base>, &mut GcFrame<'base, Sync>) -> JlrsResult<T>,
     {
@@ -657,7 +656,7 @@ impl CCall {
 
     /// Creates a [`GcFrame`] with `capacity` slots, calls the given closure, and returns the
     /// result of this closure.
-    pub fn frame_with_slots<'base, 'julia: 'base, T, F>(
+    pub fn scope_with_slots<'base, 'julia: 'base, T, F>(
         &'julia mut self,
         capacity: usize,
         func: F,
@@ -682,7 +681,7 @@ impl CCall {
     /// Create a [`NullFrame`] and call the given closure. A [`NullFrame`] cannot be nested and
     /// can only be used to (mutably) borrow array data. Unlike the other frame-creating methods,
     /// no `Global` is provided to the closure.
-    pub fn null_frame<'base, 'julia: 'base, T, F>(&'julia mut self, func: F) -> JlrsResult<T>
+    pub fn null_scope<'base, 'julia: 'base, T, F>(&'julia mut self, func: F) -> JlrsResult<T>
     where
         F: FnOnce(&mut NullFrame<'base>) -> JlrsResult<T>,
     {

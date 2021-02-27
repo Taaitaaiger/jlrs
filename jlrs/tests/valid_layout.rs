@@ -7,7 +7,7 @@ macro_rules! impl_valid_layout_test {
         fn $name() {
             JULIA.with(|j| {
                 let mut jlrs = j.borrow_mut();
-                jlrs.frame_with_slots(1, |_global, frame| {
+                jlrs.scope_with_slots(1, |_global, frame| {
                     unsafe {
                         let i = $v;
                         let v = Value::new(frame, i)?;
@@ -40,7 +40,7 @@ impl_valid_layout_test!(valid_layout_char, char, 'a');
 fn valid_layout_array() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
-        jlrs.frame(|global, frame| {
+        jlrs.scope(|global, frame| {
             unsafe {
                 let v = Value::new_array::<i32, _, _, _>(frame, (2, 2))?;
                 assert!(Array::valid_layout(v.datatype().unwrap().into()));

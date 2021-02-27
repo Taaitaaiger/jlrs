@@ -1,11 +1,14 @@
 //! Reexports structs and traits you're likely to need.
 
-pub use crate::convert::cast::Cast;
+pub use crate::convert::into_jlrs_result::IntoJlrsResult;
 pub use crate::error::{CallResult, JlrsError, JlrsResult};
 pub use crate::layout::valid_layout::ValidLayout;
 pub use crate::memory::frame::{GcFrame, NullFrame};
 pub use crate::memory::global::Global;
-pub use crate::memory::traits::frame::Frame;
+pub use crate::memory::traits::{
+    frame::Frame,
+    scope::{Scope, ScopeExt},
+};
 pub use crate::value::array::{
     Array, ArrayData, CopiedArray, InlineArrayDataMut, TypedArray, ValueArrayDataMut,
 };

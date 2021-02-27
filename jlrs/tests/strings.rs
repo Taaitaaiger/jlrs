@@ -9,8 +9,8 @@ fn create_and_unbox_str_data() {
         let mut jlrs = j.borrow_mut();
 
         let unwrapped_string = jlrs
-            .frame_with_slots(1, |_, frame| {
-                frame.frame_with_slots(1, |frame| {
+            .scope_with_slots(1, |_, frame| {
+                frame.scope_with_slots(1, |frame| {
                     let string = Value::new(frame, "Hellõ world!")?;
                     string.cast::<String>()
                 })
@@ -27,8 +27,8 @@ fn create_and_unbox_string_data() {
         let mut jlrs = j.borrow_mut();
 
         let unwrapped_string = jlrs
-            .frame_with_slots(1, |_, frame| {
-                frame.frame_with_slots(1, |frame| {
+            .scope_with_slots(1, |_, frame| {
+                frame.scope_with_slots(1, |frame| {
                     let string = Value::new(frame, String::from("Hellõ world!"))?;
                     string.cast::<String>()
                 })
@@ -45,8 +45,8 @@ fn create_and_unbox_cow_data() {
         let mut jlrs = j.borrow_mut();
 
         let unwrapped_string = jlrs
-            .frame_with_slots(1, |_, frame| {
-                frame.frame_with_slots(1, |frame| {
+            .scope_with_slots(1, |_, frame| {
+                frame.scope_with_slots(1, |frame| {
                     let string = Value::new(frame, Cow::from("Hellõ world!"))?;
                     string.cast::<String>()
                 })
@@ -62,7 +62,7 @@ fn create_and_cast_jl_string() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame_with_slots(1, |_global, frame| {
+        jlrs.scope_with_slots(1, |_global, frame| {
             let v = Value::new(frame, "Foo bar")?;
             assert!(v.is::<JuliaString>());
             let string = v.cast::<JuliaString>()?;

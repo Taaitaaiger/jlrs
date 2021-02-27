@@ -133,7 +133,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .frame(|_global, frame| {
+                .scope(|_global, frame| {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
                     let borrowed = Value::borrow_array(&mut *frame, slice, (3, 2))?;
@@ -156,7 +156,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .frame(|_global, frame| {
+                .scope(|_global, frame| {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
                     let borrowed = Value::borrow_array(&mut *frame, slice, (3, 2))?;
@@ -176,7 +176,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .frame(|_global, frame| {
+                .scope(|_global, frame| {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
                     let borrowed = Value::borrow_array(&mut *frame, slice, (3, 2))?;
@@ -205,7 +205,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .frame(|_global, frame| {
+                .scope(|_global, frame| {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
                     let borrowed = Value::borrow_array(&mut *frame, slice, (3, 2))?;
@@ -226,7 +226,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .frame(|_global, frame| {
+                .scope(|_global, frame| {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
                     let borrowed = Value::borrow_array(&mut *frame, slice, (3, 2))?;
@@ -249,7 +249,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .frame(|_global, frame| {
+                .scope(|_global, frame| {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
                     let borrowed = Value::borrow_array(&mut *frame, slice, (3, 2))?;
@@ -278,7 +278,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .frame(|_global, frame| {
+                .scope(|_global, frame| {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
                     let borrowed = Value::borrow_array(&mut *frame, slice, (3, 2))?;

@@ -1,6 +1,6 @@
 //! A `Future` that represents a function call in Julia running on another thread.
 
-use crate::memory::{frame::AsyncGcFrame, global::Global, traits::frame::Frame};
+use crate::memory::{frame::AsyncGcFrame, global::Global, traits::scope::Scope};
 use crate::value::module::Module;
 use crate::value::task::Task;
 use crate::value::Value;

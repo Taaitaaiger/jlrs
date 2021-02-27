@@ -1,21 +1,5 @@
 //! Frames protect values from garbage collection.
 //!
-//! Julia's garbage collector essentially owns all Julia data and frees it when it's no longer in
-//! use. Because it is unaware of values that are created through the C API, users of this API are
-//! responsible for ensuring the garbage collector is made aware what values are in use.
-//! Internally this works by maintaining a stack of garbage collector frames (frames). Each  
-//! frame on this stack contains pointers to values; these values have been rooted in the  
-//! frame. While a frame is on this stack, the values rooted in that frame (and the fields of
-//! these values, and so on) will not be freed by the garbage collector.
-//!
-//! Unlike the raw C API, when a pointer to a value is returned jlrs ensures the value is rooted
-//! before it can be used. Whenever a new value is produced which must be rooted, jlrs will
-//! require you to provide something that implements [`Scope`]. Mutable references to the frame
-//! types that jlrs provides are just that: the resulting value will be rooted in that frame and
-//! can be used while that frame has not been popped from the stack. The main use case for stacking
-//! frames is memory management. The more values that are rooted, the longer it will take the
-//! garbage collector to run.
-//!
 //! Several kinds of frame exist in jlrs. The simplest one is [`NullFrame`], which is only used
 //! when writing `ccall`able functions. It doesn't let you root any values or push another
 //! frame, but can be used to (mutably) borrow array data. If you don't use the async runtime, the
@@ -23,7 +7,7 @@
 //! arbitrary number of values, and new frames can always be pushed on top of it. In the async
 //! runtime the [`AsyncGcFrame`] is often used, this frame type offers the same functionalities
 //! as the non-async version, as well as methods to stack a new async frames on top of the current
-//! one. All of them implement the [`Frame`] trait.
+//! one. All of them implement the [`Frame`], [`Scope`], and [`ScopeExt`] traits.
 //!
 //! Frames that can be used to root values can preallocate a number of slots, each slot can root
 //! one value. By preallocating the slots less work has to be done to root a value, more slots can
@@ -34,11 +18,11 @@
 //! If the remaining capacity is insufficient, more stack space is allocated.
 //!
 //! Frames are pushed to the stack when they're created, and popped when they're dropped. It's not
-//! possible to create a frame directly, but the methods `frame`, `value_frame`, and `call_frame`
+//! possible to create a frame directly, but the methods `scope`, `value_scope`, and `call_scope`
 //! all take a closure which provides you with a mutable reference to a new frame, and in the
 //! latter two cases an [`Output`] as well. This new frame is dropped after the closure has been
 //! called. The first of these methods can return anything which lives at least as long as the
-//! current frame. In order to create a value or call a Julia function in a new frame and root the
+//! current frame. In order to create a value or call a Julia function in a new scope and root the
 //! result in the current frame the latter two methods must be used. This allows you to allocate
 //! temporary values, for example to create an instance of some complex type like a `NamedTuple`:
 //!
@@ -48,13 +32,13 @@
 //! # fn main() {
 //! # JULIA.with(|j| {
 //! # let mut julia = j.borrow_mut();
-//!   julia.frame(|_global, parent_frame| {
-//!       // `value_frame_with_slots` provides you with an output and a mutable reference to a new
+//!   julia.scope(|_global, parent_frame| {
+//!       // `value_scope_with_slots` provides you with an output and a mutable reference to a new
 //!       // frame. This new frame can be used to allocate temporary values, before converting the
 //!       // output into a scope and using it to create a `NamedTuple` and rooting it in the
 //!       // parent frame. Two slots are used in the child frame, one for each of the temporary
 //!       // values. The `NamedTuple` will use a slot of the parent frame.
-//!       let _nt = parent_frame.value_frame_with_slots(2, |output, child_frame| {
+//!       let _nt = parent_frame.value_scope_with_slots(2, |output, child_frame| {
 //!           let i = Value::new(&mut *child_frame, 1u64)?;
 //!           let j = Value::new(&mut *child_frame, 2i32)?;
 //!           let output_scope = output.into_scope(child_frame);
@@ -68,6 +52,7 @@
 //! ```
 //!
 //! [`Scope`]: ../traits/scope/trait.Scope.html
+//! [`ScopeExt`]: ../traits/scope/trait.ScopeExt.html
 //! [`Frame`]: ../traits/frame/trait.Frame.html
 
 #[cfg(all(feature = "async", target_os = "linux"))]
@@ -88,8 +73,8 @@ use std::{ffi::c_void, marker::PhantomData, ptr::null_mut};
 
 pub(crate) const MIN_FRAME_CAPACITY: usize = 16;
 
-/// A frame that can be used to root values. Methods including [`Julia::frame`],
-/// [`Frame::frame`], [`Frame::value_frame`], [`Frame::call_frame`], and their `_with_slots`
+/// A frame that can be used to root values. Methods including [`Julia::scope`],
+/// [`ScopeExt::scope`], [`Scope::value_scope`], [`Scope::call_scope`], and their `_with_slots`
 /// variants create a new `GcFrame`, which is accessible through a mutable reference inside the
 /// closure provided to these methods.
 ///
@@ -100,10 +85,10 @@ pub(crate) const MIN_FRAME_CAPACITY: usize = 16;
 /// If there is sufficient capacity available, a new frame will use this remaining capacity. If
 /// the capacity is insufficient, more stack space is allocated.
 ///
-/// [`Julia::frame`]: ../../struct.Julia.html#method.frame
-/// [`Frame::frame`]: ../traits/frame/trait.Frame.html#method.frame
-/// [`Frame::value_frame`]: ../traits/frame/trait.Frame.html#method.value_frame
-/// [`Frame::call_frame`]: ../traits/frame/trait.Frame.html#method.call_frame
+/// [`Julia::scope`]: ../../struct.Julia.html#method.scope
+/// [`ScopeExt::scope`]: ../traits/scope/trait.ScopeExt.html#method.scope
+/// [`Scope::value_scope`]: ../traits/scope/trait.ScopeExt.html#method.value_scope
+/// [`Scope::call_scope`]: ../traits/scope/trait.ScopeExt.html#method.call_scope
 pub struct GcFrame<'frame, M: Mode> {
     raw_frame: &'frame mut [*mut c_void],
     page: Option<StackPage>,
@@ -224,9 +209,9 @@ pub struct AsyncGcFrame<'frame> {
 
 #[cfg(all(feature = "async", target_os = "linux"))]
 impl<'frame> AsyncGcFrame<'frame> {
-    /// An async version of `value_frame`. Rather than a closure, it takes an async closure that
+    /// An async version of `value_scope`. Rather than a closure, it takes an async closure that
     /// provides a new `AsyncGcFrame`.
-    pub async fn async_value_frame<'nested, 'data, F, G>(
+    pub async fn async_value_scope<'nested, 'data, F, G>(
         &'nested mut self,
         func: F,
     ) -> JlrsResult<Value<'frame, 'data>>
@@ -249,9 +234,9 @@ impl<'frame> AsyncGcFrame<'frame> {
         }
     }
 
-    /// An async version of `value_frame_with_slots`. Rather than a closure, it takes an async
+    /// An async version of `value_scope_with_slots`. Rather than a closure, it takes an async
     /// closure that provides a new `AsyncGcFrame`.
-    pub async fn async_value_frame_with_slots<'nested, 'data, F, G>(
+    pub async fn async_value_scope_with_slots<'nested, 'data, F, G>(
         &'nested mut self,
         capacity: usize,
         func: F,
@@ -275,9 +260,9 @@ impl<'frame> AsyncGcFrame<'frame> {
         }
     }
 
-    /// An async version of `call_frame`. Rather than a closure, it takes an async
+    /// An async version of `call_scope`. Rather than a closure, it takes an async
     /// closure that provides a new `AsyncGcFrame`.
-    pub async fn async_call_frame<'nested, 'data, F, G>(
+    pub async fn async_call_scope<'nested, 'data, F, G>(
         &'nested mut self,
         func: F,
     ) -> JlrsResult<CallResult<'frame, 'data>>
@@ -306,9 +291,9 @@ impl<'frame> AsyncGcFrame<'frame> {
         }
     }
 
-    /// An async version of `call_frame_with_slots`. Rather than a closure, it takes an async
+    /// An async version of `call_scope_with_slots`. Rather than a closure, it takes an async
     /// closure that provides a new `AsyncGcFrame`.
-    pub async fn async_call_frame_with_slots<'nested, 'data, F, G>(
+    pub async fn async_call_scope_with_slots<'nested, 'data, F, G>(
         &'nested mut self,
         capacity: usize,
         func: F,
@@ -340,7 +325,7 @@ impl<'frame> AsyncGcFrame<'frame> {
 
     /// An async version of `frame`. Rather than a closure, it takes an async
     /// closure that provides a new `AsyncGcFrame`.
-    pub async fn async_frame<'nested, T, F, G>(&'nested mut self, func: F) -> JlrsResult<T>
+    pub async fn async_scope<'nested, T, F, G>(&'nested mut self, func: F) -> JlrsResult<T>
     where
         T: 'frame,
         G: Future<Output = JlrsResult<T>>,
@@ -354,9 +339,9 @@ impl<'frame> AsyncGcFrame<'frame> {
         }
     }
 
-    /// An async version of `frame_with_slots`. Rather than a closure, it takes an async
+    /// An async version of `scope_with_slots`. Rather than a closure, it takes an async
     /// closure that provides a new `AsyncGcFrame`.
-    pub async fn async_frame_with_slots<'nested, T, F, G>(
+    pub async fn async_scope_with_slots<'nested, T, F, G>(
         &'nested mut self,
         capacity: usize,
         func: F,

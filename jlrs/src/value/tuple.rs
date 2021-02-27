@@ -10,7 +10,7 @@
 //! # fn main() {
 //! # JULIA.with(|j| {
 //! # let mut julia = j.borrow_mut();
-//! julia.frame(|global, frame| {
+//! julia.scope(|global, frame| {
 //!     let tup = Tuple2(2i32, true);
 //!     let val = Value::new(frame, tup)?;
 //!     assert!(val.is::<Tuple2<i32, bool>>());

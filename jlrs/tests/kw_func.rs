@@ -6,7 +6,7 @@ fn call_no_kw() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame_with_slots(2, |global, frame| {
+        jlrs.scope_with_slots(2, |global, frame| {
             let a_value = Value::new(&mut *frame, 1isize)?;
             let func = Module::main(global)
                 .submodule("JlrsTests")?
@@ -29,7 +29,7 @@ fn call_with_kw() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame_with_slots(4, |global, frame| {
+        jlrs.scope_with_slots(4, |global, frame| {
             let a_value = Value::new(&mut *frame, 1isize)?;
             let b_value = Value::new(&mut *frame, 10isize)?;
             let func = Module::main(global)
@@ -55,7 +55,7 @@ fn call_with_kw_and_1_vararg() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame_with_slots(5, |global, frame| {
+        jlrs.scope_with_slots(5, |global, frame| {
             let a_value = Value::new(&mut *frame, 1isize)?;
             let b_value = Value::new(&mut *frame, 10isize)?;
             let c_value = Value::new(&mut *frame, 5isize)?;
@@ -82,7 +82,7 @@ fn call_with_kw_and_2_vararg() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame_with_slots(6, |global, frame| {
+        jlrs.scope_with_slots(6, |global, frame| {
             let a_value = Value::new(&mut *frame, 1isize)?;
             let b_value = Value::new(&mut *frame, 10isize)?;
             let c_value = Value::new(&mut *frame, 5isize)?;
@@ -109,7 +109,7 @@ fn call_with_kw_and_3_vararg() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame_with_slots(7, |global, frame| {
+        jlrs.scope_with_slots(7, |global, frame| {
             let a_value = Value::new(&mut *frame, 1isize)?;
             let b_value = Value::new(&mut *frame, 10isize)?;
             let c_value = Value::new(&mut *frame, 5isize)?;
@@ -137,7 +137,7 @@ fn call_with_kw_and_4_vararg() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame_with_slots(8, |global, frame| {
+        jlrs.scope_with_slots(8, |global, frame| {
             let a_value = Value::new(&mut *frame, 1isize)?;
             let b_value = Value::new(&mut *frame, 10isize)?;
             let c_value = Value::new(&mut *frame, 5isize)?;
@@ -166,7 +166,7 @@ fn call_with_abstract_kw_f32() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame_with_slots(4, |global, frame| {
+        jlrs.scope_with_slots(4, |global, frame| {
             let a_value = Value::new(&mut *frame, 1f32)?;
             let b_value = Value::new(&mut *frame, 10f32)?;
             let func = Module::main(global)
@@ -192,7 +192,7 @@ fn call_with_abstract_kw_f64() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame_with_slots(4, |global, frame| {
+        jlrs.scope_with_slots(4, |global, frame| {
             let a_value = Value::new(&mut *frame, 1f32)?;
             let b_value = Value::new(&mut *frame, 10f64)?;
             let func = Module::main(global)

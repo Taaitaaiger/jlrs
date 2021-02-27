@@ -6,7 +6,7 @@ fn load_module() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame_with_slots(1, |global, frame| {
+        jlrs.scope_with_slots(1, |global, frame| {
             Module::main(global)
                 .require(&mut *frame, "LinearAlgebra")?
                 .expect("Cannot load LinearAlgebra");
@@ -21,7 +21,7 @@ fn cannot_load_nonexistent_module() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame_with_slots(1, |global, frame| {
+        jlrs.scope_with_slots(1, |global, frame| {
             Module::main(global)
                 .require(&mut *frame, "LnearAlgebra")?
                 .expect_err("Can load LnearAlgebra");
@@ -36,7 +36,7 @@ fn call_function_from_loaded_module() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame_with_slots(4, |global, frame| {
+        jlrs.scope_with_slots(4, |global, frame| {
             let func = Module::base(global)
                 .require(&mut *frame, "LinearAlgebra")?
                 .expect("Cannot load LinearAlgebra")

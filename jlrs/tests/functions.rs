@@ -6,7 +6,7 @@ fn call0() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame_with_slots(1, |global, frame| {
+        jlrs.scope_with_slots(1, |global, frame| {
             let func = Module::base(global).function("vect")?;
             func.call0(&mut *frame)?.unwrap();
             Ok(())
@@ -20,9 +20,9 @@ fn call0_output() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame_with_slots(1, |global, frame| {
+        jlrs.scope_with_slots(1, |global, frame| {
             frame
-                .call_frame_with_slots(24, |output, frame| {
+                .call_scope_with_slots(24, |output, frame| {
                     let func = Module::base(global).function("vect")?;
                     let output = output.into_scope(frame);
                     func.call0(output)
@@ -40,7 +40,7 @@ fn call0_dynamic() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame(|global, frame| {
+        jlrs.scope(|global, frame| {
             let func = Module::base(global).function("vect")?;
             func.call0(&mut *frame)?.unwrap();
             Ok(())
@@ -54,9 +54,9 @@ fn call0_dynamic_output() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame(|global, frame| {
+        jlrs.scope(|global, frame| {
             frame
-                .call_frame_with_slots(24, |output, frame| {
+                .call_scope_with_slots(24, |output, frame| {
                     let func = Module::base(global).function("vect")?;
                     let output = output.into_scope(frame);
                     func.call0(output)
@@ -73,7 +73,7 @@ fn call1() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        let out = jlrs.frame_with_slots(2, |global, frame| {
+        let out = jlrs.scope_with_slots(2, |global, frame| {
             let func = Module::base(global).function("cos")?;
             let angle = Value::new(&mut *frame, std::f32::consts::PI)?;
             let out = func.call1(&mut *frame, angle)?.unwrap();
@@ -89,9 +89,9 @@ fn call1_output() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame_with_slots(2, |global, frame| {
+        jlrs.scope_with_slots(2, |global, frame| {
             let out = frame
-                .call_frame_with_slots(24, |output, frame| {
+                .call_scope_with_slots(24, |output, frame| {
                     let func = Module::base(global).function("cos")?;
                     let angle = Value::new(&mut *frame, std::f32::consts::PI)?;
                     let output = output.into_scope(frame);
@@ -111,9 +111,9 @@ fn call1_dynamic() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame(|global, frame| {
+        jlrs.scope(|global, frame| {
             let out = frame
-                .call_frame_with_slots(24, |output, frame| {
+                .call_scope_with_slots(24, |output, frame| {
                     let func = Module::base(global).function("cos")?;
                     let angle = Value::new(&mut *frame, std::f32::consts::PI)?;
                     let output = output.into_scope(frame);
@@ -133,9 +133,9 @@ fn call1_dynamic_output() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame(|global, frame| {
+        jlrs.scope(|global, frame| {
             let out = frame
-                .call_frame_with_slots(24, |output, frame| {
+                .call_scope_with_slots(24, |output, frame| {
                     let func = Module::base(global).function("cos")?;
                     let angle = Value::new(&mut *frame, std::f32::consts::PI)?;
                     let output = output.into_scope(frame);
@@ -155,7 +155,7 @@ fn call2() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        let out = jlrs.frame_with_slots(3, |global, frame| {
+        let out = jlrs.scope_with_slots(3, |global, frame| {
             let func = Module::base(global).function("+")?;
             let arg0 = Value::new(&mut *frame, 1u32)?;
             let arg1 = Value::new(&mut *frame, 2u32)?;
@@ -172,9 +172,9 @@ fn call2_output() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        let out = jlrs.frame_with_slots(3, |global, frame| {
+        let out = jlrs.scope_with_slots(3, |global, frame| {
             frame
-                .call_frame_with_slots(24, |output, frame| {
+                .call_scope_with_slots(24, |output, frame| {
                     let func = Module::base(global).function("+")?;
                     let arg0 = Value::new(&mut *frame, 1u32)?;
                     let arg1 = Value::new(&mut *frame, 2u32)?;
@@ -194,7 +194,7 @@ fn call2_dynamic() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        let out = jlrs.frame(|global, frame| {
+        let out = jlrs.scope(|global, frame| {
             let func = Module::base(global).function("+")?;
             let arg0 = Value::new(&mut *frame, 1u32)?;
             let arg1 = Value::new(&mut *frame, 2u32)?;
@@ -211,9 +211,9 @@ fn call2_dynamic_output() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        let out = jlrs.frame(|global, frame| {
+        let out = jlrs.scope(|global, frame| {
             frame
-                .call_frame_with_slots(24, |output, frame| {
+                .call_scope_with_slots(24, |output, frame| {
                     let func = Module::base(global).function("+")?;
                     let arg0 = Value::new(&mut *frame, 1u32)?;
                     let arg1 = Value::new(&mut *frame, 2u32)?;
@@ -233,7 +233,7 @@ fn call3() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        let out = jlrs.frame_with_slots(4, |global, frame| {
+        let out = jlrs.scope_with_slots(4, |global, frame| {
             let func = Module::base(global).function("+")?;
             let arg0 = Value::new(&mut *frame, 1u32)?;
             let arg1 = Value::new(&mut *frame, 2u32)?;
@@ -251,9 +251,9 @@ fn call3_output() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        let out = jlrs.frame_with_slots(4, |global, frame| {
+        let out = jlrs.scope_with_slots(4, |global, frame| {
             frame
-                .call_frame_with_slots(24, |output, frame| {
+                .call_scope_with_slots(24, |output, frame| {
                     let func = Module::base(global).function("+")?;
                     let arg0 = Value::new(&mut *frame, 1u32)?;
                     let arg1 = Value::new(&mut *frame, 2u32)?;
@@ -274,7 +274,7 @@ fn call3_dynamic() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        let out = jlrs.frame(|global, frame| {
+        let out = jlrs.scope(|global, frame| {
             let func = Module::base(global).function("+")?;
             let arg0 = Value::new(&mut *frame, 1u32)?;
             let arg1 = Value::new(&mut *frame, 2u32)?;
@@ -292,9 +292,9 @@ fn call3_dynamic_output() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        let out = jlrs.frame(|global, frame| {
+        let out = jlrs.scope(|global, frame| {
             frame
-                .call_frame_with_slots(24, |output, frame| {
+                .call_scope_with_slots(24, |output, frame| {
                     let func = Module::base(global).function("+")?;
                     let arg0 = Value::new(&mut *frame, 1u32)?;
                     let arg1 = Value::new(&mut *frame, 2u32)?;
@@ -315,7 +315,7 @@ fn call() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        let out = jlrs.frame_with_slots(5, |global, frame| {
+        let out = jlrs.scope_with_slots(5, |global, frame| {
             let func = Module::base(global).function("+")?;
             let arg0 = Value::new(&mut *frame, 1u32)?;
             let arg1 = Value::new(&mut *frame, 2u32)?;
@@ -336,9 +336,9 @@ fn call_output() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        let out = jlrs.frame_with_slots(5, |global, frame| {
+        let out = jlrs.scope_with_slots(5, |global, frame| {
             frame
-                .call_frame_with_slots(24, |output, frame| {
+                .call_scope_with_slots(24, |output, frame| {
                     let func = Module::base(global).function("+")?;
                     let arg0 = Value::new(&mut *frame, 1u32)?;
                     let arg1 = Value::new(&mut *frame, 2u32)?;
@@ -360,9 +360,9 @@ fn call_dynamic() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        let out = jlrs.frame(|global, frame| {
+        let out = jlrs.scope(|global, frame| {
             frame
-                .call_frame_with_slots(24, |output, frame| {
+                .call_scope_with_slots(24, |output, frame| {
                     let func = Module::base(global).function("+")?;
                     let arg0 = Value::new(&mut *frame, 1u32)?;
                     let arg1 = Value::new(&mut *frame, 2u32)?;
@@ -384,9 +384,9 @@ fn call_dynamic_output() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        let out = jlrs.frame(|global, frame| {
+        let out = jlrs.scope(|global, frame| {
             frame
-                .call_frame_with_slots(24, |output, frame| {
+                .call_scope_with_slots(24, |output, frame| {
                     let func = Module::base(global).function("+")?;
                     let arg0 = Value::new(&mut *frame, 1u32)?;
                     let arg1 = Value::new(&mut *frame, 2u32)?;

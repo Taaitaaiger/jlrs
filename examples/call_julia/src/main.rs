@@ -6,7 +6,7 @@ fn main() {
     };
 
     julia.include("MyModule.jl").expect("Could not include file");
-    let v = julia.frame_with_slots(|global, frame| {
+    let v = julia.scope_with_slots(|global, frame| {
         let dim = Value::new(&mut *frame, 4isize)?;
         let iters = Value::new(&mut *frame, 1_000_000isize)?;
 

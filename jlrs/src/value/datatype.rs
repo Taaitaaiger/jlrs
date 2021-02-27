@@ -63,7 +63,7 @@ use super::array::Array;
 /// # fn main() {
 /// # JULIA.with(|j| {
 /// # let mut julia = j.borrow_mut();
-/// julia.frame(|global, frame| {
+/// julia.scope(|global, frame| {
 ///     let val = Value::new(&mut *frame, 1u8)?;
 ///     let typeof_func = Module::core(global).function("typeof")?;
 ///     let ty_val = typeof_func.call1(&mut *frame, val)?.unwrap();

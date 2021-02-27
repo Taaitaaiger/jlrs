@@ -1,10 +1,10 @@
 use jlrs::prelude::*;
 use jlrs::util::JULIA;
 
-unsafe extern "C" fn uses_null_frame(array: TypedArray<f64>) -> bool {
+unsafe extern "C" fn uses_null_scope(array: TypedArray<f64>) -> bool {
     let mut ccall = CCall::new();
 
-    let out = ccall.null_frame(|frame| {
+    let out = ccall.null_scope(|frame| {
         let borrowed = array.inline_data(&mut *frame)?;
         Ok(borrowed[1] == 1.0)
     });
@@ -21,8 +21,8 @@ fn ccall_with_array() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame(|global, frame| {
-            let fn_ptr = Value::new(&mut *frame, uses_null_frame as *mut std::ffi::c_void)?;
+        jlrs.scope(|global, frame| {
+            let fn_ptr = Value::new(&mut *frame, uses_null_scope as *mut std::ffi::c_void)?;
             let mut arr_data = vec![0.0f64, 1.0f64];
             let arr = Value::borrow_array(&mut *frame, &mut arr_data, 2)?;
             let func = Module::main(global)
