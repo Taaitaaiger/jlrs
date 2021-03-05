@@ -263,3 +263,10 @@ pub struct WithValueType {
 pub struct NonBitsUnion<'frame, 'data> {
     pub a: ::jlrs::value::Value<'frame, 'data>,
 }
+
+#[repr(C)]
+#[jlrs(julia_type = "Main.WithStrings.WithString")]
+#[derive(Copy, Clone, Debug, JuliaStruct)]
+pub struct WithString<'frame> {
+    pub a: ::jlrs::value::string::JuliaString<'frame>,
+}

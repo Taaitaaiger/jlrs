@@ -1,15 +1,21 @@
 //! Support for values with the `Core.SimpleVector` (`SVec`) type.
 
-use crate::error::{JlrsError, JlrsResult};
-use crate::global::Global;
-use crate::traits::{private::Internal, Cast, Frame};
+use crate::traits::private::Internal;
 use crate::value::Value;
+use crate::{
+    error::{JlrsError, JlrsResult},
+    global::Global,
+    traits::{cast::Cast, frame::Frame},
+};
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{
     jl_alloc_svec, jl_alloc_svec_uninit, jl_emptysvec, jl_gc_wb, jl_simplevector_type,
     jl_svec_data, jl_svec_t,
 };
-use std::marker::PhantomData;
+use std::{
+    fmt::{Debug, Formatter, Result as FmtResult},
+    marker::PhantomData,
+};
 
 /// A `SimpleVector` is a fixed-size array that contains `Value`s.
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]
@@ -92,6 +98,12 @@ impl<'frame> SimpleVector<'frame> {
 impl<'base> SimpleVector<'base> {
     pub fn emptysvec(_: Global<'base>) -> Self {
         unsafe { Self::wrap(jl_emptysvec) }
+    }
+}
+
+impl<'scope> Debug for SimpleVector<'scope> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        f.debug_tuple("SimpleVector").finish()
     }
 }
 

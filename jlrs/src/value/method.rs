@@ -15,7 +15,10 @@ use crate::error::{JlrsError, JlrsResult};
 use crate::traits::Cast;
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_method_t, jl_method_type};
-use std::marker::PhantomData;
+use std::{
+    fmt::{Debug, Formatter, Result as FmtResult},
+    marker::PhantomData,
+};
 
 /// This type describes a single method definition, and stores data shared by the specializations
 /// of a function.
@@ -66,16 +69,6 @@ impl<'frame> Method<'frame> {
     /// Method's type signature.
     pub fn signature(self) -> Value<'frame, 'static> {
         unsafe { Value::wrap((&*self.ptr()).sig) }
-    }
-
-    /// List of potentially-ambiguous methods (nothing = none, Vector{Any} of TypeMapEntry otherwise)
-    pub fn ambiguous(self) -> Value<'frame, 'static> {
-        unsafe { Value::wrap((&*self.ptr()).ambig) }
-    }
-
-    /// Forward references to later items (typemap entries) which might sort before this one
-    pub fn resorted(self) -> Value<'frame, 'static> {
-        unsafe { Value::wrap((&*self.ptr()).resorted) }
     }
 
     /// Table of all `Method` specializations, allocated as [hashable, ..., NULL, linear, ....]
@@ -194,6 +187,12 @@ impl<'frame> Method<'frame> {
     /// Convert `self` to a `Value`.
     pub fn as_value(self) -> Value<'frame, 'static> {
         self.into()
+    }
+}
+
+impl<'scope> Debug for Method<'scope> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        f.debug_tuple("Method").finish()
     }
 }
 
