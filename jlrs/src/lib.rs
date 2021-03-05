@@ -1,8 +1,6 @@
-//! The main goal behind jlrs is to provide a simple and safe interface to the Julia C API that
-//! lets you call code written in Julia from Rust and vice versa. Currently this crate is only
-//! tested on Linux and Windows in combination with Julia 1.5 and is not compatible with earlier
-//! versions of Julia.
-//!
+//! jlrs provides a reasonably safe interface to the Julia C API that lets you call code written
+//! in Julia from Rust and vice versa. Currently this crate is only tested on Linux and Windows in
+//! combination with Julia 1.5 and is not compatible with earlier versions of Julia.
 //!
 //! # Features
 //!
@@ -75,34 +73,33 @@
 //! ## Calling Julia from Rust
 //!
 //! You can call [`Julia::include`] to include your own Julia code and either [`Julia::scope`] or
-//! [`Julia::scope_with_slots`] to interact with Julia.
+//! [`Julia::scope_with_slots`] to interact with Julia. [`Julia::scope`] and 
+//! [`Julia::scope_with_slots`] take a closure that provides you with a [`Global`] and a mutable 
+//! reference to a [`GcFrame`]. [`Global`] is a token that lets you access Julia modules, their
+//! contents and other global values, while the frame is used to root local values which prevents 
+//! them from being freed by the garbage collector until the frame is dropped.
 //!
-//! The other two methods, [`Julia::scope`] and [`Julia::scope_with_slots`], take a closure that
-//! provides you with a [`Global`] and a mutable reference to a [`GcFrame`]. [`Global`] is a
-//! token that lets you access Julia modules their contents and other global values, while the
-//! frame is used to root local values which prevents them from being freed by the garbage
-//! collector until the frame is dropped.
-//!
-//! Julia data is represented by a [`Value`]. There are several ways to create a new `Value`. The
+//! Julia data is represented as a [`Value`]. There are several ways to create a new `Value`. The
 //! simplest is to call [`Value::new`], which can be used to convert primitive types, but also
 //! some more complex types like `String`s, from Rust to Julia. This method, and all others that
-//! create new local values, need something that implements [`Scope`]. A mutable reference to a
-//! frame is a scope, specifically one that ensures the result is rooted until that frame is
-//! dropped. You'll learn about the other kind of scope a bit later.
+//! create new local values, need something that implements [`Scope`]. Mutable references to 
+//! frames implement this trait, in this case it's ensured that the `Value` is rooted until the
+//! closure returns (i.e. until the scope that the frame is associated with ends). There's another
+//! type that implements [`Scope`] which will be introduced a bit later.
 //!
 //! Julia functions, their arguments and their results are all `Value`s too. All `Value`s can be
 //! called as functions, whether this will succeed depends on the value actually being a function.
 //! You can convert data from Julia to Rust by calling [`Value::cast`].
 //!
-//! In order to call a Julia function, you'll need three things: a function to call, a scope, and
-//! arguments to call the function with. You can acquire the function through the module that
-//! defines it with [`Module::function`]; [`Module::base`] and [`Module::core`] provide access to
-//! Julia's `Base` and `Core` module respectively, while everything you include through
-//! [`Julia::include`] is made available relative to the `Main` module which you can access by
-//! calling [`Module::main`]. It's also possible to include a new module by evaluating its
-//! contents with [`Value::eval_string`]. In order to use installed packages, including standard
-//! library packages such as `LinearAlgebra`, they must first be loaded. This can be done by
-//! calling [`Module::require`].
+//! In order to call a Julia function, you'll need three things: a function to call, something 
+//! that implements [`Scope`], and arguments to call the function with. You can acquire the 
+//! function through the module that defines it with [`Module::function`]; [`Module::base`] and 
+//! [`Module::core`] provide access to Julia's `Base` and `Core` module respectively, while 
+//! everything you include through [`Julia::include`] is made available relative to the `Main` 
+//! module can be access by calling [`Module::main`]. It's also possible to include a new module 
+//! or function by evaluating its contents with [`Value::eval_string`]. In order to use installed 
+//! packages, or standard library packages such as `LinearAlgebra`, they must first be loaded. 
+//! This can be done by calling [`Module::require`].
 //!
 //! As a simple example, let's create two values and add them:
 //!

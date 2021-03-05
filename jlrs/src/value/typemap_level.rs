@@ -12,7 +12,7 @@ use crate::convert::cast::Cast;
 use crate::error::{JlrsError, JlrsResult};
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_typemap_level_t, jl_typemap_level_type};
-use std::marker::PhantomData;
+use std::{fmt::{Debug, Formatter, Result as FmtResult}, marker::PhantomData};
 
 /// One level in a TypeMap tree
 /// Indexed by key if it is a sublevel in an array
@@ -53,6 +53,12 @@ impl<'frame> TypeMapLevel<'frame> {
     /// Convert `self` to a `Value`.
     pub fn as_value(self) -> Value<'frame, 'static> {
         self.into()
+    }
+}
+
+impl<'scope> Debug for TypeMapLevel<'scope> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        f.debug_tuple("TypeMapLevel").finish()
     }
 }
 

@@ -280,3 +280,19 @@ fn set_const_twice() {
         assert!(err.is_err());
     })
 }
+
+#[test]
+fn eval_using() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+        let res = jlrs.scope_with_slots(1, |global, frame| {
+            assert!(Module::main(global).global("Hermitian").is_err());
+            Value::eval_string(&mut *frame, "using LinearAlgebra: Hermitian")?.unwrap();
+            assert!(Module::main(global).global("Hermitian").is_ok());
+
+            Ok(())
+        });
+
+        assert!(res.is_ok());
+    })
+}

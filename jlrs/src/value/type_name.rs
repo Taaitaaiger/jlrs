@@ -18,7 +18,7 @@ use jl_sys::{
     jl_tuple_typename, jl_type_typename, jl_typename_t, jl_typename_type, jl_vararg_typename,
     jl_vecelement_typename,
 };
-use std::marker::PhantomData;
+use std::{fmt::{Debug, Formatter, Result as FmtResult}, marker::PhantomData};
 
 /// Describes the syntactic structure of a type and stores all data common to different
 /// instantiations of the type, including a cache for hash-consed allocation of `DataType`s.
@@ -127,6 +127,12 @@ impl<'base> TypeName<'base> {
     /// The typename of the `DataType` `Tuple`.
     pub fn tuple_typename(_: Global<'base>) -> Self {
         unsafe { Self::wrap(jl_tuple_typename) }
+    }
+}
+
+impl<'scope> Debug for TypeName<'scope> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        f.debug_tuple("TypeName").field(&self.name().as_string()).finish()
     }
 }
 

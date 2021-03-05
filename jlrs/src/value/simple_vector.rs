@@ -12,7 +12,7 @@ use jl_sys::{
     jl_alloc_svec, jl_alloc_svec_uninit, jl_emptysvec, jl_gc_wb, jl_simplevector_type,
     jl_svec_data, jl_svec_t,
 };
-use std::marker::PhantomData;
+use std::{fmt::{Debug, Formatter, Result as FmtResult}, marker::PhantomData};
 
 /// A `SimpleVector` is a fixed-size array that contains `Value`s.
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]
@@ -95,6 +95,12 @@ impl<'frame> SimpleVector<'frame> {
 impl<'base> SimpleVector<'base> {
     pub fn emptysvec(_: Global<'base>) -> Self {
         unsafe { Self::wrap(jl_emptysvec) }
+    }
+}
+
+impl<'scope> Debug for SimpleVector<'scope> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        f.debug_tuple("SimpleVector").finish()
     }
 }
 

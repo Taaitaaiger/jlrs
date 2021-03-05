@@ -12,7 +12,7 @@ use crate::convert::cast::Cast;
 use crate::error::{JlrsError, JlrsResult};
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_method_instance_t, jl_method_instance_type};
-use std::marker::PhantomData;
+use std::{fmt::{Debug, Formatter, Result as FmtResult}, marker::PhantomData};
 
 /// This type is a placeholder to cache data for a specType signature specialization of a `Method`
 /// can can be used as a unique dictionary key representation of a call to a particular `Method`
@@ -69,6 +69,12 @@ impl<'frame> MethodInstance<'frame> {
     /// Convert `self` to a `Value`.
     pub fn as_value(self) -> Value<'frame, 'static> {
         self.into()
+    }
+}
+
+impl<'scope> Debug for MethodInstance<'scope> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        f.debug_tuple("MethodInstance").finish()
     }
 }
 

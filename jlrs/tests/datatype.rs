@@ -357,7 +357,11 @@ fn datatype_zeroinit() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
         jlrs.scope_with_slots(0, |global, _| {
-            let dt = DataType::tvar_type(global);
+            let dt = UnionAll::array_type(global)
+                .body()
+                .cast::<UnionAll>()?
+                .body()
+                .cast::<DataType>()?;
             assert!(!dt.zeroinit());
 
             Ok(())

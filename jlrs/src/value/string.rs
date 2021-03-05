@@ -6,7 +6,10 @@ use crate::value::Value;
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::jl_string_type;
 use std::ffi::CStr;
-use std::marker::PhantomData;
+use std::{
+    fmt::{Debug, Formatter, Result as FmtResult},
+    marker::PhantomData,
+};
 use std::mem;
 use std::slice;
 
@@ -56,6 +59,12 @@ impl<'frame> JuliaString<'frame> {
     /// Convert `self` to a `Value`.
     pub fn as_value(self) -> Value<'frame, 'static> {
         self.into()
+    }
+}
+
+impl<'scope> Debug for JuliaString<'scope> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        f.debug_tuple("JuliaString").field(&self.as_str()).finish()
     }
 }
 

@@ -10,7 +10,7 @@ use crate::convert::cast::Cast;
 use crate::error::{JlrsError, JlrsResult};
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_methtable_t, jl_methtable_type};
-use std::marker::PhantomData;
+use std::{fmt::{Debug, Formatter, Result as FmtResult}, marker::PhantomData};
 
 /// contains the TypeMap for one Type
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]
@@ -75,6 +75,12 @@ impl<'frame> MethodTable<'frame> {
     /// Convert `self` to a `Value`.
     pub fn as_value(self) -> Value<'frame, 'static> {
         self.into()
+    }
+}
+
+impl<'scope> Debug for MethodTable<'scope> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        f.debug_tuple("MethodTable").finish()
     }
 }
 
