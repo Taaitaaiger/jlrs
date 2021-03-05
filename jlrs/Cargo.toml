@@ -1,6 +1,6 @@
 [package]
 name = "jlrs"
-version = "0.8.1"
+version = "0.8.2"
 authors = ["Thomas van Doornmalen <thomas.vandoornmalen@gmail.com>"]
 description = """
 jlrs is a library built around bindings to the Julia C API that enables Julia code to be called 
