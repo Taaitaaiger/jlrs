@@ -12,7 +12,10 @@ use jl_sys::{
     jl_llvmpointer_type, jl_namedtuple_type, jl_pointer_type, jl_ref_type, jl_type_type,
     jl_typetype_type, jl_unionall_t, jl_unionall_type, jl_vararg_type,
 };
-use std::marker::PhantomData;
+use std::{
+    fmt::{Debug, Formatter, Result as FmtResult},
+    marker::PhantomData,
+};
 
 /// An iterated union of types. If a struct field has a parametric type with some of its
 /// parameters unknown, its type is represented by a `UnionAll`.
@@ -64,7 +67,7 @@ impl<'base> UnionAll<'base> {
         unsafe { UnionAll::wrap(jl_type_type) }
     }
 
-    /// The `UnionAll` `Type{Type}`.
+    /// The `UnionAll` `Type`.
     pub fn typetype_type(_: Global<'base>) -> Self {
         unsafe { UnionAll::wrap(jl_typetype_type) }
     }
@@ -112,6 +115,12 @@ impl<'base> UnionAll<'base> {
     /// The `UnionAll` `NamedTuple`.
     pub fn namedtuple_type(_: Global<'base>) -> Self {
         unsafe { UnionAll::wrap(jl_namedtuple_type) }
+    }
+}
+
+impl<'scope> Debug for UnionAll<'scope> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        f.debug_tuple("UnionAll").finish()
     }
 }
 

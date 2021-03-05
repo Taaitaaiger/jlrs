@@ -125,6 +125,12 @@ struct NonBitsUnion
 end
 end
 
+module WithStrings
+struct WithString
+    a::String
+end
+end
+
 module WithGeneric
 struct WithGenericT{T}
     a::T

@@ -3,12 +3,18 @@
 use super::symbol::Symbol;
 use super::union_all::UnionAll;
 use super::Value;
-use crate::error::{JlrsError, JlrsResult};
 use crate::global::Global;
-use crate::traits::{private::Internal, Cast, Frame, TemporarySymbol};
+use crate::traits::private::Internal;
+use crate::{
+    error::{JlrsError, JlrsResult},
+    traits::{cast::Cast, frame::Frame, temporary_symbol::TemporarySymbol},
+};
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_any_type, jl_bottom_type, jl_new_typevar, jl_tvar_t, jl_tvar_type};
-use std::marker::PhantomData;
+use std::{
+    fmt::{Debug, Formatter, Result as FmtResult},
+    marker::PhantomData,
+};
 
 /// This is a unknown, but possibly restricted, type parameter. In `Array{T, N}`, `T` and `N` are
 /// `TypeVar`s.
@@ -90,6 +96,14 @@ impl<'frame> TypeVar<'frame> {
     /// Convert `self` to a `Value`.
     pub fn as_value(self) -> Value<'frame, 'static> {
         self.into()
+    }
+}
+
+impl<'scope> Debug for TypeVar<'scope> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        f.debug_tuple("TypeVar")
+            .field(&self.name().as_string())
+            .finish()
     }
 }
 

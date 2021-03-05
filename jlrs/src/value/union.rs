@@ -1,11 +1,17 @@
 //! Support for Julia `Union`s and union-fields.
 
 use super::Value;
-use crate::error::{JlrsError, JlrsResult};
-use crate::traits::{Align, BitsUnion as BU, Cast, Flag};
+use crate::traits::bits_union::{Align, BitsUnion as BU, Flag};
+use crate::{
+    error::{JlrsError, JlrsResult},
+    traits::Cast,
+};
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_islayout_inline, jl_uniontype_t, jl_uniontype_type};
-use std::marker::PhantomData;
+use std::{
+    fmt::{Debug, Formatter, Result as FmtResult},
+    marker::PhantomData,
+};
 
 /// A struct field can have a type that's a union of several types. In this case, the type of this
 /// field is an instance of `Union`.
@@ -67,6 +73,12 @@ impl<'frame> Union<'frame> {
     /// Convert `self` to a `Value`.
     pub fn as_value(self) -> Value<'frame, 'static> {
         self.into()
+    }
+}
+
+impl<'scope> Debug for Union<'scope> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        f.debug_tuple("Union").finish()
     }
 }
 

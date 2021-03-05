@@ -10,7 +10,10 @@ use crate::error::{JlrsError, JlrsResult};
 use crate::traits::Cast;
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_task_t, jl_task_type};
-use std::marker::PhantomData;
+use std::{
+    fmt::{Debug, Formatter, Result as FmtResult},
+    marker::PhantomData,
+};
 
 /// A Julia `Task` (coroutine).
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]
@@ -172,3 +175,9 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for Task<'frame> {
 impl_julia_typecheck!(Task<'frame>, jl_task_type, 'frame);
 impl_julia_type!(Task<'frame>, jl_task_type, 'frame);
 impl_valid_layout!(Task<'frame>, 'frame);
+
+impl<'scope> Debug for Task<'scope> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        f.debug_tuple("Task").finish()
+    }
+}
