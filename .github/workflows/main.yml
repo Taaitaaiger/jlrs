@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ master, v0.8 ]
+    branches: [ master, v0.9 ]
   pull_request:
-    branches: [ master, v0.8 ]
+    branches: [ master, v0.9 ]
 
   workflow_dispatch:
 
@@ -27,7 +27,7 @@ jobs:
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v1.4.1
         with:
-          version: 1.5.3
+          version: 1.6.0
 
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v1
@@ -57,7 +57,7 @@ jobs:
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v1.4.1
         with:
-          version: 1.5.3
+          version: 1.6.0
 
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v1
