@@ -73,33 +73,38 @@
 //! ## Calling Julia from Rust
 //!
 //! You can call [`Julia::include`] to include your own Julia code and either [`Julia::scope`] or
-//! [`Julia::scope_with_slots`] to interact with Julia. [`Julia::scope`] and 
-//! [`Julia::scope_with_slots`] take a closure that provides you with a [`Global`] and a mutable 
+//! [`Julia::scope_with_slots`] to interact with Julia. [`Julia::scope`] and
+//! [`Julia::scope_with_slots`] take a closure that provides you with a [`Global`] and a mutable
 //! reference to a [`GcFrame`]. [`Global`] is a token that lets you access Julia modules, their
-//! contents and other global values, while the frame is used to root local values which prevents 
+//! contents and other global values, while the frame is used to root local values which prevents
 //! them from being freed by the garbage collector until the frame is dropped.
 //!
 //! Julia data is represented as a [`Value`]. There are several ways to create a new `Value`. The
 //! simplest is to call [`Value::new`], which can be used to convert primitive types, but also
 //! some more complex types like `String`s, from Rust to Julia. This method, and all others that
-//! create new local values, need something that implements [`Scope`]. Mutable references to 
+//! create new local values, need something that implements [`Scope`]. Mutable references to
 //! frames implement this trait, in this case it's ensured that the `Value` is rooted until the
 //! closure returns (i.e. until the scope that the frame is associated with ends). There's another
 //! type that implements [`Scope`] which will be introduced a bit later.
 //!
-//! Julia functions, their arguments and their results are all `Value`s too. All `Value`s can be
-//! called as functions, whether this will succeed depends on the value actually being a function.
-//! You can convert data from Julia to Rust by calling [`Value::cast`].
+//! Julia functions are `Value`s too. In fact, `Value`s can be called as functions, whether this
+//! will succeed depends on the value actually being a function. In order to call some `Value` as
+//` a Julia function, three things are needed: the function you want to call, something
+//! that implements [`Scope`], and possibly some arguments to call the function with. The function
+//! can be acquired through the module that defines it with [`Module::function`]; [`Module::base`]
+//! and [`Module::core`] provide access to Julia's `Base` and `Core` module respectively, while
+//! everything you include through [`Julia::include`] is made available relative to the `Main`
+//! module, which can be access by calling [`Module::main`].
 //!
-//! In order to call a Julia function, you'll need three things: a function to call, something 
-//! that implements [`Scope`], and arguments to call the function with. You can acquire the 
-//! function through the module that defines it with [`Module::function`]; [`Module::base`] and 
-//! [`Module::core`] provide access to Julia's `Base` and `Core` module respectively, while 
-//! everything you include through [`Julia::include`] is made available relative to the `Main` 
-//! module can be access by calling [`Module::main`]. It's also possible to include a new module 
-//! or function by evaluating its contents with [`Value::eval_string`]. In order to use installed 
-//! packages, or standard library packages such as `LinearAlgebra`, they must first be loaded. 
-//! This can be done by calling [`Module::require`].
+//! Because a `Value` should only be used while it's rooted, it's not possible to return one from
+//! the closure due to lifetime constraints on the output. In order to convert a `Value` to some
+//! other type, like a `u8` or a `String`, [`Value::cast`] must be used. This method checks if the
+//! value can be converted to that type and performs the conversion if it is, which generally
+//! amounts to a pointer dereference, . This method is also used to convert a `Value` to a builtin
+//! type like [`DataType`] or [`Array`]. These builtin types are subject to the same lifetime
+//! constraints as the `Value` is and can't be returned from the closure, but much of their
+//! functionality is exposed as methods on their more specific type. For example, in order to
+//! access the data in an `Array` from Rust, the `Value` must be cast to an `Array` first.
 //!
 //! As a simple example, let's create two values and add them:
 //!
@@ -116,28 +121,39 @@
 //!     // We can find the addition-function in the base module
 //!     let func = Module::base(global).function("+")?;
 //!
-//!     // Call the function and unbox the result
-//!     func.call2(&mut *frame, i, j)?.into_jlrs_result()?.cast::<u64>()
+//!     // Call the function and cast the result to `u64`. The result is a nested
+//!     // `Result`; the outer error does not refer to any Julia data, while the
+//!     // inner error contains the exception if one is thrown.
+//!     func.call2(&mut *frame, i, j)?
+//!         .into_jlrs_result()?
+//!         .cast::<u64>()
 //! }).unwrap();
 //! # }
 //! ```
 //!
-//! An important feature of frames is that they can be stacked. If you need one or more temporary
-//! values to call a function, they don't need to be rooted after that function has been called.
-//! There are three methods that let you use a new frame, stacked on top of the old one: `scope`,
-//! `value_scope`, and `call_scope`. The first is very similar to the previous example, but the
-//! closure only provides you with a frame. Its output can be anything, as long as its guaranteed
-//! to live at least as long as its parent frame. The other two cases can be used to allocate a
-//! few temporary values and use those to allocate some new value or call a function, rooting this
-//! final result in the parent frame.
+//! In order to use installed packages or standard library packages such as `LinearAlgebra`, they
+//! must first be loaded. This can be done by calling [`Module::require`], but it's also possible
+//! to evaluate `using LinearAlgebra: Hermitian` or similar import commands as a string with
+//! [`Value::eval_string`].
 //!
-//! This is where the other [`Scope`] is used: the closure that `value_scope` and `call_scope`
+//! Scopes can be nested, this is especially useful when you need to create several temporary
+//! values to create a new `Value` or call a Julia function because the nested scope has its own
+//! `GcFrame`. This means these temporary values will not be protected from garbage collection
+//! after returning from the closure. There are three methods that create a nested scope,
+//! [`ScopeExt::scope`], [`Scope::value_scope`] and [`Scope::call_scope`]. The first is very
+//! similar to the previous example and has the same major limitation: its return value can be
+//! anything, as long as its guaranteed to live at least as long as the scope that created it.
+//! This means you can't create a `Value` or call a Julia function and return it to the parent
+//! scope with this method, the other two methods support that use-case.
+//!
+//! This is where the other [`Scope`] appears: the closure that `value_scope` and `call_scope`
 //! take has two arguments, an `Output` and a mutable reference to a `GcFrame`. The frame can be
 //! used to allocate and root temporary values, the output must be converted to an [`OutputScope`]
-//! before calling the methods whose result should be rooted in the parent frame.
+//! before creating the result that should be rooted in the frame belonging to the parent
+//! scope.
 //!
 //! For example, the two values from the previous example can be treated as temporary values,
-//! while ensuring their sum is valid until `parent_frame` is dropped:
+//! while ensuring their sum is rooted until `parent_frame` is dropped:
 //!
 //! ```
 //! # use jlrs::prelude::*;
@@ -146,14 +162,20 @@
 //! # JULIA.with(|j| {
 //! # let mut julia = j.borrow_mut();
 //!   julia.scope(|global, parent_frame| {
-//!       let _sum = parent_frame.call_scope(|output, child_frame| {
+//!       let sum = parent_frame.call_scope(|output, child_frame| {
+//!           // i and j are rooted in child_frame...
 //!           let i = Value::new(&mut *child_frame, 1u64)?;
 //!           let j = Value::new(&mut *child_frame, 2i32)?;
 //!           let func = Module::base(global).function("+")?;
 //!
+//!           // ... while the result is eventually rooted in the parent frame
+//!           // after returning from this closure.
 //!           let output_scope = output.into_scope(child_frame);
 //!           func.call2(output_scope, i, j)
-//!       })?.into_jlrs_result()?;
+//!       })?.into_jlrs_result()?
+//!           .cast::<u64>()?;
+//!
+//!       assert_eq!(sum, 3);
 //!
 //!       Ok(())
 //!   }).unwrap();
@@ -163,10 +185,8 @@
 //!
 //! This is only a small example, other things can be done with [`Value`] as well: their fields
 //! and type information can be accessed for example, and keywords can be provided to call
-//! functions with keyword arguments. Values can also contain more complex data, a Julia function
-//! that returns an array or a module returns it as a [`Value`]. These complex types are also
-//! compatible with [`Value::cast`]. By casting a [`Value`] that contains an n-dimensional array
-//! to [`Array`] or [`TypedArray`], it's possible to (mutably) access their contents.
+//! functions with keyword arguments.
+//!
 //!
 //! ## Calling Rust from Julia
 //!
@@ -178,7 +198,7 @@
 //!
 //! ```no_run
 //! # use jlrs::prelude::*;
-//!
+//! // This function will be provided to Julia as a pointer, so its name can be mangled.
 //! unsafe extern "C" fn call_me(arg: bool) -> isize {
 //!     if arg {
 //!         1
@@ -245,7 +265,8 @@
 //! the pointer in the previous example.
 //!
 //! If the library is visible to Julia you can access it with the library name. If `call_me` is
-//! defined in a crate called `foo`, the following should work:
+//! defined in a crate called `foo`, the following should workif the function is annotated with
+//! `#[no_mangle]`:
 //!
 //! ```julia
 //! ccall((:call_me, "libfoo"), Int, (Bool,), false)
@@ -255,7 +276,7 @@
 //! an FFI boundary is undefined behaviour. If you're not sure your code will never panic, wrap it
 //! with `std::panic::catch_unwind`.
 //!
-//! Many features provided by jlrs including accessing modules, calling functions, and borrowing
+//! Most features provided by jlrs including accessing modules, calling functions, and borrowing
 //! array data require a [`Global`] or a frame. You can access these by creating a [`CCall`]
 //! first.
 //!
@@ -358,6 +379,7 @@
 //! [`Frame`]: ./memory/traits/frame/trait.Frame.html
 //! [`JuliaTask`]: ./multitask/julia_task/trait.JuliaTask.html
 //! [`AsyncJulia`]: ./multitask/struct.AsyncJulia.html
+//! [`DataType`]: ./value/datatype/struct.DataType.html
 //! [`TypedArray`]: ./value/array/struct.TypedArray.html
 //! [`OutputScope`]: ./memory/output/struct.OutputScope.html
 //! [`Scope`]: ./memory/traits/scope/struct.Scope.html

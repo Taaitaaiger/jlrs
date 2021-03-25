@@ -6,12 +6,12 @@ use crate::value::Value;
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::jl_string_type;
 use std::ffi::CStr;
+use std::mem;
+use std::slice;
 use std::{
     fmt::{Debug, Formatter, Result as FmtResult},
     marker::PhantomData,
 };
-use std::mem;
-use std::slice;
 
 /// A raw Julia string.
 #[derive(Copy, Clone)]

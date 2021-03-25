@@ -10,7 +10,10 @@ use crate::convert::cast::Cast;
 use crate::error::{JlrsError, JlrsResult};
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_methtable_t, jl_methtable_type};
-use std::{fmt::{Debug, Formatter, Result as FmtResult}, marker::PhantomData};
+use std::{
+    fmt::{Debug, Formatter, Result as FmtResult},
+    marker::PhantomData,
+};
 
 /// contains the TypeMap for one Type
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]

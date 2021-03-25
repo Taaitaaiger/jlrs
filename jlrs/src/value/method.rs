@@ -15,7 +15,10 @@ use crate::convert::cast::Cast;
 use crate::error::{JlrsError, JlrsResult};
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_method_t, jl_method_type};
-use std::{fmt::{Debug, Formatter, Result as FmtResult}, marker::PhantomData};
+use std::{
+    fmt::{Debug, Formatter, Result as FmtResult},
+    marker::PhantomData,
+};
 
 /// This type describes a single method definition, and stores data shared by the specializations
 /// of a function.

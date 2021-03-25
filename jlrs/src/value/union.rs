@@ -8,7 +8,10 @@ use crate::{
 };
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_islayout_inline, jl_uniontype_t, jl_uniontype_type};
-use std::{fmt::{Debug, Formatter, Result as FmtResult}, marker::PhantomData};
+use std::{
+    fmt::{Debug, Formatter, Result as FmtResult},
+    marker::PhantomData,
+};
 
 /// A struct field can have a type that's a union of several types. In this case, the type of this
 /// field is an instance of `Union`.

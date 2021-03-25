@@ -5,7 +5,10 @@ use crate::convert::cast::Cast;
 use crate::error::{JlrsError, JlrsResult};
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_weakref_t, jl_weakref_type};
-use std::{fmt::{Debug, Formatter, Result as FmtResult}, marker::PhantomData};
+use std::{
+    fmt::{Debug, Formatter, Result as FmtResult},
+    marker::PhantomData,
+};
 
 /// A weak reference.
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]

@@ -908,7 +908,7 @@ pub unsafe fn jl_field_names(st: *mut jl_datatype_t) -> *mut jl_svec_t {
         return st.names;
     }
 
-    st.names = (&mut *st.name).names;
+    st.names = (&*st.name).names;
 
     return st.names;
 }

@@ -12,7 +12,10 @@ use crate::{
 };
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_any_type, jl_bottom_type, jl_new_typevar, jl_tvar_t, jl_tvar_type};
-use std::{fmt::{Debug, Formatter, Result as FmtResult}, marker::PhantomData};
+use std::{
+    fmt::{Debug, Formatter, Result as FmtResult},
+    marker::PhantomData,
+};
 
 /// This is a unknown, but possibly restricted, type parameter. In `Array{T, N}`, `T` and `N` are
 /// `TypeVar`s.
@@ -99,7 +102,9 @@ impl<'frame> TypeVar<'frame> {
 
 impl<'scope> Debug for TypeVar<'scope> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        f.debug_tuple("TypeVar").field(&self.name().as_string()).finish()
+        f.debug_tuple("TypeVar")
+            .field(&self.name().as_string())
+            .finish()
     }
 }
 

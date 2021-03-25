@@ -12,7 +12,10 @@ use jl_sys::{
     jl_alloc_svec, jl_alloc_svec_uninit, jl_emptysvec, jl_gc_wb, jl_simplevector_type,
     jl_svec_data, jl_svec_t,
 };
-use std::{fmt::{Debug, Formatter, Result as FmtResult}, marker::PhantomData};
+use std::{
+    fmt::{Debug, Formatter, Result as FmtResult},
+    marker::PhantomData,
+};
 
 /// A `SimpleVector` is a fixed-size array that contains `Value`s.
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]
