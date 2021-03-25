@@ -95,14 +95,17 @@ impl<'frame, 'data> Future for JuliaFuture<'frame, 'data> {
                 // Ensure the result of the task is set
                 unsafe {
                     let global = Global::new();
-                    let f = Module::base(global).function("wait").unwrap();
-                    jl_call1(f.ptr(), task.ptr().cast());
+                    let f = Module::base(global).function("fetch").unwrap();
+                    let mut res = jl_call1(f.ptr(), task.ptr().cast());
                     let exc = jl_exception_occurred();
 
                     if exc.is_null() {
-                        Poll::Ready(Ok(task.result().unwrap_or(Value::wrap(jl_nothing))))
+                        if res.is_null() {
+                            res = jl_nothing;
+                        }
+                        Poll::Ready(Ok(Value::wrap(res)))
                     } else {
-                        Poll::Ready(Err(task.exception().unwrap_or(Value::wrap(jl_nothing))))
+                        Poll::Ready(Err(Value::wrap(exc)))
                     }
                 }
             } else {

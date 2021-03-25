@@ -1,6 +1,6 @@
 //! The main goal behind jlrs is to provide a simple and safe interface to the Julia C API that
 //! lets you call code written in Julia from Rust and vice versa. Currently this crate is only
-//! tested on Linux and Windows in combination with Julia 1.5 and is not compatible with earlier
+//! tested on Linux and Windows in combination with Julia 1.6 and is not compatible with earlier
 //! versions of Julia.
 //!
 //!

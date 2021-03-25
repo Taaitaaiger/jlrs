@@ -358,7 +358,7 @@ fn datatype_zeroinit() {
         let mut jlrs = j.borrow_mut();
         jlrs.frame(0, |global, _| {
             let dt = DataType::tvar_type(global);
-            assert!(!dt.zeroinit());
+            assert!(dt.zeroinit());
 
             Ok(())
         })

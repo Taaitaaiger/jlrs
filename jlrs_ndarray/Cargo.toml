@@ -1,6 +1,6 @@
 [package]
 name = "jlrs-ndarray"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Thomas van Doornmalen <thomas.vandoornmalen@gmail.com>"]
 edition = "2018"
 description = """
@@ -19,7 +19,7 @@ license = "MIT"
 docs-rs = ["jlrs/docs-rs"]
 
 [dependencies]
-jlrs = { path = "../jlrs", version = "0.8" }
+jlrs = { path = "../jlrs", version = "0.9" }
 ndarray = "0.14" 
 
 [package.metadata.docs.rs]

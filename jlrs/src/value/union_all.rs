@@ -10,7 +10,7 @@ use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{
     jl_abstractarray_type, jl_anytuple_type_type, jl_array_type, jl_densearray_type,
     jl_llvmpointer_type, jl_namedtuple_type, jl_pointer_type, jl_ref_type, jl_type_type,
-    jl_typetype_type, jl_unionall_t, jl_unionall_type, jl_vararg_type,
+    jl_unionall_t, jl_unionall_type, jl_vararg_type,
 };
 use std::{
     fmt::{Debug, Formatter, Result as FmtResult},
@@ -65,11 +65,6 @@ impl<'base> UnionAll<'base> {
     /// The `UnionAll` `Type`.
     pub fn type_type(_: Global<'base>) -> Self {
         unsafe { UnionAll::wrap(jl_type_type) }
-    }
-
-    /// The `UnionAll` `Type`.
-    pub fn typetype_type(_: Global<'base>) -> Self {
-        unsafe { UnionAll::wrap(jl_typetype_type) }
     }
 
     /// `Type{T} where T<:Tuple`

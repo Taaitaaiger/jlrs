@@ -4,7 +4,6 @@
 //! in [`julia.h`]
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L1727
-use super::symbol::Symbol;
 use super::Value;
 use crate::error::{JlrsError, JlrsResult};
 use crate::traits::Cast;
@@ -62,14 +61,6 @@ impl<'frame> Task<'frame> {
         }
     }
 
-    /// The `state` field.
-    pub fn state(self) -> Symbol<'frame> {
-        unsafe {
-            let state = (&*self.ptr()).state;
-            Symbol::wrap(state)
-        }
-    }
-
     /// The `donenotify` field.
     pub fn donenotify(self) -> Option<Value<'frame, 'static>> {
         unsafe {
@@ -90,30 +81,6 @@ impl<'frame> Task<'frame> {
                 None
             } else {
                 Some(Value::wrap(result))
-            }
-        }
-    }
-
-    /// The `exception` field.
-    pub fn exception(self) -> Option<Value<'frame, 'static>> {
-        unsafe {
-            let exception = (&*self.ptr()).exception;
-            if exception.is_null() {
-                None
-            } else {
-                Some(Value::wrap(exception))
-            }
-        }
-    }
-
-    /// The `backtrace` field.
-    pub fn backtrace(self) -> Option<Value<'frame, 'static>> {
-        unsafe {
-            let backtrace = (&*self.ptr()).backtrace;
-            if backtrace.is_null() {
-                None
-            } else {
-                Some(Value::wrap(backtrace))
             }
         }
     }
