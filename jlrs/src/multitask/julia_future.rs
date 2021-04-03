@@ -3,9 +3,9 @@
 use crate::memory::{frame::AsyncGcFrame, global::Global, traits::scope::Scope};
 use crate::value::module::Module;
 use crate::value::task::Task;
-use crate::value::Value;
+use crate::value::{Value, MAX_SIZE};
 use crate::{
-    error::{exception, CallResult, JlrsResult},
+    error::{exception, JlrsResult, JuliaResult},
     value::traits::call::Call,
 };
 use futures::task::{Context, Poll, Waker};
@@ -16,10 +16,6 @@ use std::ffi::c_void;
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
-
-// If a function is called with `MAX_SIZE` or fewer arguments, no allocation is needed to add
-// the additional two arguments that `Jlrs.asynccall` needs.
-const MAX_SIZE: usize = 8;
 
 pub(crate) struct TaskState<'frame, 'data> {
     completed: bool,
@@ -87,7 +83,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
 }
 
 impl<'frame, 'data> Future for JuliaFuture<'frame, 'data> {
-    type Output = CallResult<'frame, 'data>;
+    type Output = JuliaResult<'frame, 'data>;
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut shared_state = self.shared_state.lock().unwrap();
         if shared_state.completed {

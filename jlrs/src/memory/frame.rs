@@ -1,24 +1,24 @@
 //! Frames protect values from garbage collection.
 //!
 //! Several kinds of frame exist in jlrs. The simplest one is [`NullFrame`], which is only used
-//! when writing `ccall`able functions. It doesn't let you root any values or push another
-//! frame, but can be used to (mutably) borrow array data. If you don't use the async runtime, the
-//! only frame type you will use is [`GcFrame`]; this frame can be used to root a relatively
-//! arbitrary number of values, and new frames can always be pushed on top of it. In the async
-//! runtime the [`AsyncGcFrame`] is often used, this frame type offers the same functionalities
-//! as the non-async version, as well as methods to stack a new async frames on top of the current
-//! one. All of them implement the [`Frame`], [`Scope`], and [`ScopeExt`] traits.
+//! when writing `ccall`able functions. It doesn't let you root any values or create a nested
+//! scope, but can be used to (mutably) borrow array data. If you neither use the async runtime
+//! nor write Rust functions that Julia will call, the only frame type you will use is
+//! [`GcFrame`]; this frame can be used to root a relatively arbitrary number of values, and new
+//! frames can always be pushed on top of it.
+//!
+//! In the async runtime the [`AsyncGcFrame`] is often used, this frame type offers the same
+//! functionalities as the non-async version, as well as methods to create a nested async scope.
 //!
 //! Frames that can be used to root values can preallocate a number of slots, each slot can root
 //! one value. By preallocating the slots less work has to be done to root a value, more slots can
 //! be allocated to the frame if necessary. The maximum number of slots that can be allocated to a
-//! frame is its capacity. In general, the capacity of a frame that allocates no slots is at least
-//! 16, while one that does allocates some slots guarantees a capacity of at least that number of
-//! slots. When a new frame is pushed, it will try to use the current frame's remaining capacity.
-//! If the remaining capacity is insufficient, more stack space is allocated.
+//! frame is its capacity. In general, the capacity of a frame is at least 16. When a new frame is
+//! pushed, it will try to use the current frame's remaining capacity. If the remaining capacity
+//! is insufficient, more stack space is allocated.
 //!
 //! Frames are pushed to the stack when they're created, and popped when they're dropped. It's not
-//! possible to create a frame directly, but the methods `scope`, `value_scope`, and `call_scope`
+//! possible to create a frame directly, but the methods `scope`, `value_scope`, and `result_scope`
 //! all take a closure which provides you with a mutable reference to a new frame, and in the
 //! latter two cases an [`Output`] as well. This new frame is dropped after the closure has been
 //! called. The first of these methods can return anything which lives at least as long as the
@@ -60,10 +60,10 @@ use super::mode::Async;
 use super::{stack::StackPage, traits::mode::Mode};
 #[cfg(all(feature = "async", target_os = "linux"))]
 use crate::{
-    error::{AllocError, CallResult, JlrsError, JlrsResult},
+    error::{AllocError, JlrsError, JlrsResult, JuliaResult},
     memory::output::Output,
     memory::traits::mode::private::Mode as _,
-    value::{UnrootedCallResult, UnrootedValue, Value},
+    value::{UnrootedResult, UnrootedValue, Value},
 };
 use crate::{private::Private, CCall};
 use jl_sys::jl_value_t;
@@ -73,10 +73,7 @@ use std::{ffi::c_void, marker::PhantomData, ptr::null_mut};
 
 pub(crate) const MIN_FRAME_CAPACITY: usize = 16;
 
-/// A frame that can be used to root values. Methods including [`Julia::scope`],
-/// [`ScopeExt::scope`], [`Scope::value_scope`], [`Scope::call_scope`], and their `_with_slots`
-/// variants create a new `GcFrame`, which is accessible through a mutable reference inside the
-/// closure provided to these methods.
+/// A frame that can be used to root values.
 ///
 /// Roots are stored in slots, each slot can contain one root. Frames created with slots will
 /// preallocate that number of slots. Frames created without slots will dynamically create new
@@ -88,7 +85,7 @@ pub(crate) const MIN_FRAME_CAPACITY: usize = 16;
 /// [`Julia::scope`]: ../../struct.Julia.html#method.scope
 /// [`ScopeExt::scope`]: ../traits/scope/trait.ScopeExt.html#method.scope
 /// [`Scope::value_scope`]: ../traits/scope/trait.ScopeExt.html#method.value_scope
-/// [`Scope::call_scope`]: ../traits/scope/trait.ScopeExt.html#method.call_scope
+/// [`Scope::result_scope`]: ../traits/scope/trait.ScopeExt.html#method.result_scope
 pub struct GcFrame<'frame, M: Mode> {
     raw_frame: &'frame mut [*mut c_void],
     page: Option<StackPage>,
@@ -190,14 +187,13 @@ impl<'frame, M: Mode> Drop for GcFrame<'frame, M> {
 
 /// A frame that can be used to root values and dispatch Julia function calls to another thread
 /// with [`Value::call_async`]. An `AsyncGcFrame` is available by implementing the `JuliaTask`
-/// trait, this struct provides several methods that push a new `AsyncGcFrame` to the stack.
+/// trait, this struct provides create a nested async scope.
 ///
 /// Roots are stored in slots, each slot can contain one root. Frames created with slots will
 /// preallocate that number of slots. Frames created without slots will dynamically create new
-/// slots as needed. If a frame is created without slots it is able to create at least 16 slots.
-///
-/// If there is sufficient capacity available, a new frame will use this remaining capacity. If
-/// the capacity is insufficient, more stack space is allocated.
+/// slots as needed. A frame is able to create at least 16 slots. If there is sufficient capacity
+/// available, a new frame will use this remaining capacity. If the capacity is insufficient, more
+/// stack space is allocated.
 #[cfg(all(feature = "async", target_os = "linux"))]
 pub struct AsyncGcFrame<'frame> {
     raw_frame: &'frame mut [*mut c_void],
@@ -260,14 +256,14 @@ impl<'frame> AsyncGcFrame<'frame> {
         }
     }
 
-    /// An async version of `call_scope`. Rather than a closure, it takes an async
+    /// An async version of `result_scope`. Rather than a closure, it takes an async
     /// closure that provides a new `AsyncGcFrame`.
-    pub async fn async_call_scope<'nested, 'data, F, G>(
+    pub async fn async_result_scope<'nested, 'data, F, G>(
         &'nested mut self,
         func: F,
-    ) -> JlrsResult<CallResult<'frame, 'data>>
+    ) -> JlrsResult<JuliaResult<'frame, 'data>>
     where
-        G: Future<Output = JlrsResult<UnrootedCallResult<'frame, 'data, 'nested>>>,
+        G: Future<Output = JlrsResult<UnrootedResult<'frame, 'data, 'nested>>>,
         F: FnOnce(Output<'frame>, &'nested mut AsyncGcFrame<'nested>) -> G,
     {
         unsafe {
@@ -284,22 +280,22 @@ impl<'frame> AsyncGcFrame<'frame> {
             }
 
             if is_exc {
-                Ok(CallResult::Ok(Value::wrap(ptr)))
+                Ok(JuliaResult::Ok(Value::wrap(ptr)))
             } else {
-                Ok(CallResult::Err(Value::wrap(ptr)))
+                Ok(JuliaResult::Err(Value::wrap(ptr)))
             }
         }
     }
 
-    /// An async version of `call_scope_with_slots`. Rather than a closure, it takes an async
+    /// An async version of `result_scope_with_slots`. Rather than a closure, it takes an async
     /// closure that provides a new `AsyncGcFrame`.
-    pub async fn async_call_scope_with_slots<'nested, 'data, F, G>(
+    pub async fn async_result_scope_with_slots<'nested, 'data, F, G>(
         &'nested mut self,
         capacity: usize,
         func: F,
-    ) -> JlrsResult<CallResult<'frame, 'data>>
+    ) -> JlrsResult<JuliaResult<'frame, 'data>>
     where
-        G: Future<Output = JlrsResult<UnrootedCallResult<'frame, 'data, 'nested>>>,
+        G: Future<Output = JlrsResult<UnrootedResult<'frame, 'data, 'nested>>>,
         F: FnOnce(Output<'frame>, &'nested mut AsyncGcFrame<'nested>) -> G,
     {
         unsafe {
@@ -316,9 +312,9 @@ impl<'frame> AsyncGcFrame<'frame> {
             }
 
             if is_exc {
-                Ok(CallResult::Ok(Value::wrap(ptr)))
+                Ok(JuliaResult::Ok(Value::wrap(ptr)))
             } else {
-                Ok(CallResult::Err(Value::wrap(ptr)))
+                Ok(JuliaResult::Err(Value::wrap(ptr)))
             }
         }
     }
@@ -523,9 +519,9 @@ impl<'frame> Drop for AsyncGcFrame<'frame> {
 }
 
 /// A `NullFrame` can be used if you call Rust from Julia through `ccall` and want to borrow array
-/// data but not perform any allocations. It can't be stacked or used for functions that
-/// allocate (like creating new values or calling functions). Functions that depend on allocation
-/// will return `JlrsError::NullFrame` if you call them with a `NullFrame`.
+/// data but not perform any allocations. It can't be used to created a nested scope or for functions
+/// that allocate (like creating new values or calling functions). Functions that depend on
+/// allocation will return `JlrsError::NullFrame` if you call them with a `NullFrame`.
 pub struct NullFrame<'frame>(PhantomData<&'frame ()>);
 
 impl<'frame> NullFrame<'frame> {

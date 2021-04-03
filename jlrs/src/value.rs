@@ -1,14 +1,17 @@
 //! Julia values and functions.
 //!
-//! In many cases, methods in jlrs either return a [`Value`] (value) and/or require one or more
-//! values as arguments. A value is similar to `Box<dyn Any>` in Rust; it is a pointer to some
-//! arbitrary data. It's guaranteed that the data which is pointed to is preceded in memory by a
-//! header that contains its type information. This allows the contents of a value to be accessed,
-//! and to convert the value to its underlying type.
+//! Julia data returned by the C API is normally returned as a pointer to a `jl_value_t`, in jlrs
+//! this pointer is wrapped by a [`Value`]. Much functionality offered by the C API is available
+//! through the methods and traits implemented for [`Value`], including creating new Julia values,
+//! accessing their type information and fields, checking if certain properties hold, and
+//! converting the value to another type.
 //!
 //! One special kind of value is the `NamedTuple`. You will need to create values of this type in
 //! order to call functions with keyword arguments. The macro [`named_tuple`] is defined in this
-//! module which provides an easy way to create them.
+//! module which provides an easy way to create values of this type.
+//!
+//! Julia has several builtin types, like `Array`, `Module`, and `Symbol`. These builtin types are
+//! defined in the submodules of this module.
 
 #[doc(hidden)]
 #[macro_export]
@@ -90,7 +93,7 @@ use self::symbol::Symbol;
 use self::type_var::TypeVar;
 use self::union_all::UnionAll;
 use crate::convert::{cast::Cast, temporary_symbol::TemporarySymbol};
-use crate::error::{CallResult, JlrsError, JlrsResult};
+use crate::error::{JlrsError, JlrsResult, JuliaResult};
 use crate::layout::{
     julia_type::JuliaType, julia_typecheck::JuliaTypecheck, valid_layout::ValidLayout,
 };
@@ -152,7 +155,7 @@ pub mod union_all;
 pub mod weak_ref;
 
 thread_local! {
-    // Used as a pool to convert dimensions to tuples. Safe because a thread local is initialized
+    // Used to convert dimensions to tuples. Safe because a thread local is initialized
     // when `with` is first called, which happens after `Julia::init` has been called. The C API
     // requires a mutable pointer to this array so an `UnsafeCell` is used to store it.
     static JL_LONG_TYPE: UnsafeCell<[*mut jl_datatype_t; 8]> = unsafe {
@@ -169,21 +172,13 @@ thread_local! {
     };
 }
 
-/// When working with the Julia C API most data is returned as a raw pointer to a `jl_value_t`.
-/// This pointer is similar to a void pointer in the sense that this pointer can point to data of
-/// any type. It's up to the user to determine the correct type and cast the pointer. In order to
-/// make this possible, data pointed to by a `jl_value_t`-pointer is guaranteed to be preceded in
-/// memory by a fixed-size header that contains its type and layout-information.
-///
-/// A `Value` is a wrapper around the raw pointer to a `jl_value_t` that adds two lifetimes,
-/// `'frame` and `'data`. The first is inherited from the frame used to create the `Value`; frames
-/// ensure a `Value` is protected from garbage collection as long as the frame used to protect it
-/// has not been dropped. As a result, a `Value` can only be used when it can be guaranteed that
-/// the garbage collector won't drop it. The second indicates the lifetime of its contents; it's
-/// usually `'static`, but if you create a `Value` that borrows array data from Rust it's the
-/// lifetime of the borrow. If you call a Julia function the returned `Value` will inherit the
-/// `'data`-lifetime of the `Value`s used as arguments. This ensures that a `Value` that
-/// (possibly) borrows data from Rust can't be used after that borrow ends.
+/// A `Value` is a wrapper around a pointer to some data owned by the Julia garbage collector, it
+/// has two lifetimes: `'frame` and `'data`. The first of these ensures that a `Value` can only be
+/// used while it's rooted in a `GcFrame`, the second accounts for data borrowed from
+/// Rust. The only way to borrow data from Rust is to create an Julia array that borrows its
+/// contents by calling `Value::borrow_array`, if a Julia function is called with such an array as
+/// an argument the result will inherit the second lifetime of the borrowed data to ensure that
+/// such a `Value` can onl be used while the borrow is active.
 #[repr(transparent)]
 #[derive(Copy, Clone)]
 pub struct Value<'frame, 'data>(
@@ -214,12 +209,13 @@ impl<'frame, 'data> Value<'frame, 'data> {
 ///
 /// Data that isn't supported by [`Value::new`] can still be created from Rust in many cases. New
 /// arrays can be created with [`Value::new_array`], if you want to have the array be backed by
-/// data from Rust, [`Value::borrow_array`] and [`Value::move_array`] can be used. It's currently
+/// data from Rust [`Value::borrow_array`] and [`Value::move_array`] can be used. It's currently
 /// only possible to create new arrays if the element type implements [`IntoJulia`] and
 /// [`JuliaType`]. Methods to create new `UnionAll`s and `Union`s are also available.
 ///
 /// Finally, it's possible to instantiate arbitrary concrete types with [`Value::instantiate`],
-/// the type parameters of types that have them can be set with [`Value::apply_type`].
+/// the type parameters of types that have them can be set with [`Value::apply_type`]. These
+/// methods don't support creating new arrays.
 impl<'frame, 'data> Value<'frame, 'data> {
     /// Create a new Julia value, any type that implements [`IntoJulia`] can be converted using
     /// this function. The value will be protected from garbage collection inside the frame used
@@ -988,10 +984,6 @@ impl<'frame, 'data> Value<'frame, 'data> {
 /// When the async runtime is used, the method [`Value::call_async`] is available which calls
 /// that function on another thread in Julia.
 ///
-/// Unlike many other methods that can be used to call Julia functions and create new Julia
-/// values, these methods only accept a mutable reference to a frame rather than any [`Scope`].
-/// This means the result will always be rooted in the frame used to call these methods.
-///
 /// [`Call`]: ./traits/call/trait.Call.html
 impl<'fr, 'da> Value<'fr, 'da> {
     /// Provide keywords to this function.
@@ -1044,7 +1036,7 @@ impl<'fr, 'da> Value<'fr, 'da> {
     pub fn eval_string<'frame, F, S>(
         frame: &mut F,
         cmd: S,
-    ) -> JlrsResult<CallResult<'frame, 'static>>
+    ) -> JlrsResult<JuliaResult<'frame, 'static>>
     where
         F: Frame<'frame>,
         S: AsRef<str>,
@@ -1063,7 +1055,7 @@ impl<'fr, 'da> Value<'fr, 'da> {
     pub fn eval_cstring<'frame, F, S>(
         frame: &mut F,
         cmd: S,
-    ) -> JlrsResult<CallResult<'frame, 'static>>
+    ) -> JlrsResult<JuliaResult<'frame, 'static>>
     where
         F: Frame<'frame>,
         S: AsRef<CStr>,
@@ -1079,7 +1071,7 @@ impl<'fr, 'da> Value<'fr, 'da> {
     /// Call this value as a function that takes zero arguments and don't protect the result from
     /// garbage collection. This is safe if you won't use the result or if you can guarantee it's
     /// a global value in Julia, e.g. `nothing` or a [`Module`].
-    pub unsafe fn call0_unprotected<'base>(self, _: Global<'base>) -> CallResult<'base, 'static> {
+    pub unsafe fn call0_unprotected<'base>(self, _: Global<'base>) -> JuliaResult<'base, 'static> {
         let res = jl_call0(self.ptr());
         let exc = jl_exception_occurred();
 
@@ -1097,7 +1089,7 @@ impl<'fr, 'da> Value<'fr, 'da> {
         self,
         _: Global<'base>,
         arg: Value<'_, 'data>,
-    ) -> CallResult<'base, 'data> {
+    ) -> JuliaResult<'base, 'data> {
         let res = jl_call1(self.ptr().cast(), arg.ptr());
         let exc = jl_exception_occurred();
 
@@ -1116,7 +1108,7 @@ impl<'fr, 'da> Value<'fr, 'da> {
         _: Global<'base>,
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
-    ) -> CallResult<'base, 'data> {
+    ) -> JuliaResult<'base, 'data> {
         let res = jl_call2(self.ptr().cast(), arg0.ptr(), arg1.ptr());
         let exc = jl_exception_occurred();
 
@@ -1136,7 +1128,7 @@ impl<'fr, 'da> Value<'fr, 'da> {
         arg0: Value<'_, 'borrow>,
         arg1: Value<'_, 'borrow>,
         arg2: Value<'_, 'borrow>,
-    ) -> CallResult<'base, 'borrow> {
+    ) -> JuliaResult<'base, 'borrow> {
         let res = jl_call3(self.ptr().cast(), arg0.ptr(), arg1.ptr(), arg2.ptr());
         let exc = jl_exception_occurred();
 
@@ -1154,7 +1146,7 @@ impl<'fr, 'da> Value<'fr, 'da> {
         self,
         _: Global<'base>,
         mut args: V,
-    ) -> CallResult<'base, 'data>
+    ) -> JuliaResult<'base, 'data>
     where
         V: AsMut<[Value<'value, 'data>]>,
     {
@@ -1178,7 +1170,7 @@ impl<'fr, 'da> Value<'fr, 'da> {
         self,
         _: Global<'base>,
         mut args: V,
-    ) -> CallResult<'base, 'data>
+    ) -> JuliaResult<'base, 'data>
     where
         V: AsMut<[Value<'value, 'data>]>,
     {
@@ -1208,7 +1200,7 @@ impl<'fr, 'da> Value<'fr, 'da> {
         self,
         frame: &mut AsyncGcFrame<'frame>,
         args: V,
-    ) -> JlrsResult<CallResult<'frame, 'data>>
+    ) -> JlrsResult<JuliaResult<'frame, 'data>>
     where
         V: AsMut<[Value<'value, 'data>]>,
     {
@@ -1219,7 +1211,7 @@ impl<'fr, 'da> Value<'fr, 'da> {
     /// anonymous function with some arguments will call the value as a function with those
     /// arguments and return its result, or catch the exception, print the stackstrace, and
     /// rethrow that exception. This takes one slot on the GC stack.
-    pub fn tracing_call<'frame, F>(self, frame: &mut F) -> JlrsResult<CallResult<'frame, 'da>>
+    pub fn tracing_call<'frame, F>(self, frame: &mut F) -> JlrsResult<JuliaResult<'frame, 'da>>
     where
         F: Frame<'frame>,
     {
@@ -1238,7 +1230,7 @@ impl<'fr, 'da> Value<'fr, 'da> {
     /// arguments and return its result, or catch the exception and throw a new one with two
     /// fields, `exc` and `stacktrace`, containing the original exception and the stacktrace
     /// respectively. This takes one slot on the GC stack.
-    pub fn attach_stacktrace<'frame, F>(self, frame: &mut F) -> JlrsResult<CallResult<'frame, 'da>>
+    pub fn attach_stacktrace<'frame, F>(self, frame: &mut F) -> JlrsResult<JuliaResult<'frame, 'da>>
     where
         F: Frame<'frame>,
     {
@@ -1401,7 +1393,7 @@ pub struct WithKeywords<'func, 'kw, 'data> {
 unsafe fn try_root<'frame, F>(
     frame: &mut F,
     res: *mut jl_value_t,
-) -> JlrsResult<CallResult<'frame, 'static>>
+) -> JlrsResult<JuliaResult<'frame, 'static>>
 where
     F: Frame<'frame>,
 {
@@ -1506,13 +1498,13 @@ impl<'frame, 'data, 'borrow> UnrootedValue<'frame, 'data, 'borrow> {
 pub(crate) type PendingCallResult<'frame, 'data> =
     Result<PendingValue<'frame, 'data>, PendingValue<'frame, 'data>>;
 
-/// A `CallResult` that has not yet been rooted.
-pub enum UnrootedCallResult<'frame, 'data, 'inner> {
+/// A `JuliaResult` that has not yet been rooted.
+pub enum UnrootedResult<'frame, 'data, 'inner> {
     Ok(UnrootedValue<'frame, 'data, 'inner>),
     Err(UnrootedValue<'frame, 'data, 'inner>),
 }
 
-impl<'frame, 'data, 'inner> UnrootedCallResult<'frame, 'data, 'inner> {
+impl<'frame, 'data, 'inner> UnrootedResult<'frame, 'data, 'inner> {
     pub(crate) fn into_pending(self) -> PendingCallResult<'frame, 'data> {
         match self {
             Self::Ok(pov) => Ok(pov.into_pending()),

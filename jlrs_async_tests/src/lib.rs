@@ -139,7 +139,7 @@ mod example {
         ) -> JlrsResult<Self::T> {
             let v = unsafe {
                 frame
-                    .async_call_scope_with_slots(3, |output, frame| async move {
+                    .async_result_scope_with_slots(3, |output, frame| async move {
                         let iters = Value::new(&mut *frame, self.iters)?;
                         let dims = Value::new(&mut *frame, self.dims)?;
 
@@ -266,7 +266,7 @@ mod example {
         ) -> JlrsResult<Self::T> {
             let v = unsafe {
                 frame
-                    .async_call_scope(|output, frame| async move {
+                    .async_result_scope(|output, frame| async move {
                         let iters = Value::new(&mut *frame, self.iters)?;
                         let dims = Value::new(&mut *frame, self.dims)?;
 

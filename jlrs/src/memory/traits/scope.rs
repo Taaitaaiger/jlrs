@@ -11,7 +11,7 @@
 //! considers the frame to have been moved and you won't be able to use it again. Alternatively,
 //! you can use [`Frame::as_scope`].
 //!
-//! Scopes can be nested. Methods like [`Scope::value_scope`] and [`Scope::call_scope`] can be
+//! Scopes can be nested. Methods like [`Scope::value_scope`] and [`Scope::result_scope`] can be
 //! used to create a value or call a Julia function from new closure and root the result in an
 //! earlier frame, while [`ScopeExt::scope`] can be used to return arbitrary data.
 
@@ -24,7 +24,7 @@ use crate::{
         traits::frame::Frame,
     },
     private::Private,
-    value::{UnrootedCallResult, UnrootedValue},
+    value::{UnrootedResult, UnrootedValue},
 };
 
 /// Provides `scope` and `scope_with_slots` methods to mutable references of types that implement
@@ -140,7 +140,7 @@ pub trait Scope<'scope, 'frame, 'data, F: Frame<'frame>>:
     /// Create a new `GcFrame` that can be used to root `capacity` values, an `Output` for the
     /// current scope, and use them to call the inner closure. The final result is not rooted in
     /// this newly created frame, but the current frame. The final result must not be the result
-    /// of a function call, use [`Scope::call_scope`] for that purpose instead. If the current
+    /// of a function call, use [`Scope::result_scope`] for that purpose instead. If the current
     /// scope is a mutable reference to a frame, calling this method will require one slot of the
     /// current frame.
     ///
@@ -189,7 +189,7 @@ pub trait Scope<'scope, 'frame, 'data, F: Frame<'frame>>:
     /// # JULIA.with(|j| {
     /// # let mut julia = j.borrow_mut();
     ///   julia.scope(|global, frame| {
-    ///       let sum = frame.call_scope(|output, frame| {
+    ///       let sum = frame.result_scope(|output, frame| {
     ///           let v1 = Value::new(&mut *frame, 1usize)?;
     ///           let v2 = Value::new(&mut *frame, 2usize)?;
     ///
@@ -205,18 +205,18 @@ pub trait Scope<'scope, 'frame, 'data, F: Frame<'frame>>:
     /// # });
     /// # }
     /// ```
-    fn call_scope<G>(self, func: G) -> JlrsResult<Self::CallResult>
+    fn result_scope<G>(self, func: G) -> JlrsResult<Self::JuliaResult>
     where
         G: for<'nested, 'inner> FnOnce(
             Output<'scope>,
             &'inner mut GcFrame<'nested, F::Mode>,
         )
-            -> JlrsResult<UnrootedCallResult<'scope, 'data, 'inner>>;
+            -> JlrsResult<UnrootedResult<'scope, 'data, 'inner>>;
 
     /// Create a new `GcFrame` that can be used to root `capacity` values, an `Output` for the
     /// current scope, and use them to call the inner closure. The final result is not rooted in
     /// this newly created frame, but the current frame. The final result must not be the result
-    /// of a function call, use [`Scope::call_scope`] for that purpose instead. If the current
+    /// of a function call, use [`Scope::result_scope`] for that purpose instead. If the current
     /// scope is a mutable reference to a frame, calling this method will require one slot of the
     /// current frame.
     ///
@@ -265,7 +265,7 @@ pub trait Scope<'scope, 'frame, 'data, F: Frame<'frame>>:
     /// # JULIA.with(|j| {
     /// # let mut julia = j.borrow_mut();
     ///   julia.scope(|global, frame| {
-    ///       let sum = frame.call_scope(|output, frame| {
+    ///       let sum = frame.result_scope(|output, frame| {
     ///           let v1 = Value::new(&mut *frame, 1usize)?;
     ///           let v2 = Value::new(&mut *frame, 2usize)?;
     ///
@@ -281,13 +281,13 @@ pub trait Scope<'scope, 'frame, 'data, F: Frame<'frame>>:
     /// # });
     /// # }
     /// ```
-    fn call_scope_with_slots<G>(self, capacity: usize, func: G) -> JlrsResult<Self::CallResult>
+    fn result_scope_with_slots<G>(self, capacity: usize, func: G) -> JlrsResult<Self::JuliaResult>
     where
         G: for<'nested, 'inner> FnOnce(
             Output<'scope>,
             &'inner mut GcFrame<'nested, F::Mode>,
         )
-            -> JlrsResult<UnrootedCallResult<'scope, 'data, 'inner>>;
+            -> JlrsResult<UnrootedResult<'scope, 'data, 'inner>>;
 }
 
 impl<'frame, 'data, F: Frame<'frame>> Scope<'frame, 'frame, 'data, F> for &mut F {
@@ -338,7 +338,7 @@ impl<'frame, 'data, F: Frame<'frame>> Scope<'frame, 'frame, 'data, F> for &mut F
     /// # JULIA.with(|j| {
     /// # let mut julia = j.borrow_mut();
     ///   julia.scope(|global, frame| {
-    ///       let sum = frame.call_scope(|output, frame| {
+    ///       let sum = frame.result_scope(|output, frame| {
     ///           let v1 = Value::new(&mut *frame, 1usize)?;
     ///           let v2 = Value::new(&mut *frame, 2usize)?;
     ///
@@ -356,15 +356,15 @@ impl<'frame, 'data, F: Frame<'frame>> Scope<'frame, 'frame, 'data, F> for &mut F
     /// # });
     /// # }
     /// ```
-    fn call_scope<G>(self, func: G) -> JlrsResult<Self::CallResult>
+    fn result_scope<G>(self, func: G) -> JlrsResult<Self::JuliaResult>
     where
         G: for<'nested, 'inner> FnOnce(
             Output<'frame>,
             &'inner mut GcFrame<'nested, F::Mode>,
         )
-            -> JlrsResult<UnrootedCallResult<'frame, 'data, 'inner>>,
+            -> JlrsResult<UnrootedResult<'frame, 'data, 'inner>>,
     {
-        F::call_scope(self, func, Private)
+        F::result_scope(self, func, Private)
     }
 
     /// Creates a [`GcFrame`] and calls the given closure with it. Returns the result of this
@@ -414,7 +414,7 @@ impl<'frame, 'data, F: Frame<'frame>> Scope<'frame, 'frame, 'data, F> for &mut F
     /// # JULIA.with(|j| {
     /// # let mut julia = j.borrow_mut();
     ///   julia.scope(|global, frame| {
-    ///       let sum = frame.call_scope_with_slots(2, |output, frame| {
+    ///       let sum = frame.result_scope_with_slots(2, |output, frame| {
     ///           let v1 = Value::new(&mut *frame, 1usize)?;
     ///           let v2 = Value::new(&mut *frame, 2usize)?;
     ///
@@ -432,15 +432,15 @@ impl<'frame, 'data, F: Frame<'frame>> Scope<'frame, 'frame, 'data, F> for &mut F
     /// # });
     /// # }
     /// ```
-    fn call_scope_with_slots<G>(self, capacity: usize, func: G) -> JlrsResult<Self::CallResult>
+    fn result_scope_with_slots<G>(self, capacity: usize, func: G) -> JlrsResult<Self::JuliaResult>
     where
         G: for<'nested, 'inner> FnOnce(
             Output<'frame>,
             &'inner mut GcFrame<'nested, F::Mode>,
         )
-            -> JlrsResult<UnrootedCallResult<'frame, 'data, 'inner>>,
+            -> JlrsResult<UnrootedResult<'frame, 'data, 'inner>>,
     {
-        F::call_scope_with_slots(self, capacity, func, Private)
+        F::result_scope_with_slots(self, capacity, func, Private)
     }
 }
 
@@ -458,15 +458,15 @@ impl<'scope, 'frame, 'data, 'borrow, F: Frame<'frame>> Scope<'scope, 'frame, 'da
             .map(|ppv| UnrootedValue::new(ppv.ptr()))
     }
 
-    fn call_scope<G>(self, func: G) -> JlrsResult<Self::CallResult>
+    fn result_scope<G>(self, func: G) -> JlrsResult<Self::JuliaResult>
     where
         G: for<'nested, 'inner> FnOnce(
             Output<'scope>,
             &'inner mut GcFrame<'nested, F::Mode>,
         )
-            -> JlrsResult<UnrootedCallResult<'scope, 'data, 'inner>>,
+            -> JlrsResult<UnrootedResult<'scope, 'data, 'inner>>,
     {
-        self.call_scope(func)
+        self.result_scope(func)
     }
 
     fn value_scope_with_slots<G>(self, capacity: usize, func: G) -> JlrsResult<Self::Value>
@@ -480,31 +480,31 @@ impl<'scope, 'frame, 'data, 'borrow, F: Frame<'frame>> Scope<'scope, 'frame, 'da
             .map(|ppv| UnrootedValue::new(ppv.ptr()))
     }
 
-    fn call_scope_with_slots<G>(self, capacity: usize, func: G) -> JlrsResult<Self::CallResult>
+    fn result_scope_with_slots<G>(self, capacity: usize, func: G) -> JlrsResult<Self::JuliaResult>
     where
         G: for<'nested, 'inner> FnOnce(
             Output<'scope>,
             &'inner mut GcFrame<'nested, F::Mode>,
         )
-            -> JlrsResult<UnrootedCallResult<'scope, 'data, 'inner>>,
+            -> JlrsResult<UnrootedResult<'scope, 'data, 'inner>>,
     {
-        self.call_scope_with_slots(capacity, func)
+        self.result_scope_with_slots(capacity, func)
     }
 }
 
 pub(crate) mod private {
     use crate::value::Value;
     use crate::{
-        error::{CallResult, JlrsResult},
+        error::{JlrsResult, JuliaResult},
         memory::{output::OutputScope, traits::frame::Frame},
         private::Private,
-        value::{UnrootedCallResult, UnrootedValue},
+        value::{UnrootedResult, UnrootedValue},
     };
     use jl_sys::jl_value_t;
 
     pub trait Scope<'scope, 'frame, 'data, F: Frame<'frame>>: Sized {
         type Value: Sized;
-        type CallResult: Sized;
+        type JuliaResult: Sized;
 
         unsafe fn value(self, value: *mut jl_value_t, _: Private) -> JlrsResult<Self::Value>;
 
@@ -512,12 +512,12 @@ pub(crate) mod private {
             self,
             value: Result<*mut jl_value_t, *mut jl_value_t>,
             _: Private,
-        ) -> JlrsResult<Self::CallResult>;
+        ) -> JlrsResult<Self::JuliaResult>;
     }
 
     impl<'frame, 'data, F: Frame<'frame>> Scope<'frame, 'frame, 'data, F> for &mut F {
         type Value = Value<'frame, 'data>;
-        type CallResult = CallResult<'frame, 'data>;
+        type JuliaResult = JuliaResult<'frame, 'data>;
 
         unsafe fn value(self, value: *mut jl_value_t, _: Private) -> JlrsResult<Self::Value> {
             self.push_root(value, Private).map_err(Into::into)
@@ -527,7 +527,7 @@ pub(crate) mod private {
             self,
             value: Result<*mut jl_value_t, *mut jl_value_t>,
             _: Private,
-        ) -> JlrsResult<Self::CallResult> {
+        ) -> JlrsResult<Self::JuliaResult> {
             match value {
                 Ok(v) => self
                     .push_root(v, Private)
@@ -545,7 +545,7 @@ pub(crate) mod private {
         for OutputScope<'scope, 'frame, 'inner, F>
     {
         type Value = UnrootedValue<'scope, 'data, 'inner>;
-        type CallResult = UnrootedCallResult<'scope, 'data, 'inner>;
+        type JuliaResult = UnrootedResult<'scope, 'data, 'inner>;
 
         unsafe fn value(self, value: *mut jl_value_t, _: Private) -> JlrsResult<Self::Value> {
             Ok(UnrootedValue::new(value))
@@ -555,10 +555,10 @@ pub(crate) mod private {
             self,
             value: Result<*mut jl_value_t, *mut jl_value_t>,
             _: Private,
-        ) -> JlrsResult<Self::CallResult> {
+        ) -> JlrsResult<Self::JuliaResult> {
             match value {
-                Ok(v) => Ok(UnrootedCallResult::Ok(UnrootedValue::new(v))),
-                Err(e) => Ok(UnrootedCallResult::Err(UnrootedValue::new(e))),
+                Ok(v) => Ok(UnrootedResult::Ok(UnrootedValue::new(v))),
+                Err(e) => Ok(UnrootedResult::Err(UnrootedValue::new(e))),
             }
         }
     }

@@ -7,12 +7,12 @@
 //! and all other values it contains pointers to will not be freed by the garbage collector.
 //! Several macros are available in C that create a new frame and push it to the stack, and a
 //! macro to pop that frame from the stack. These macros cannot be used in Rust because they use
-//! `alloca` to allocate the raw frame, which has a dynamic size, on the stack. This module
-//! provides a reimplementation of this system which is backed by a stack of pages, each page can
-//! store multiple frames.
+//! `alloca` to allocate the dynamically-sized raw frame on the stack. This module provides a
+//! reimplementation of this system which is backed by a stack of pages, each page can store
+//! multiple frames.
 //!
 //! In order to call Julia from Rust with jlrs, the methods [`Julia::scope`] or
-//! [`Julia::scope_with_slots`] must be used. These methods take a closure that provides a
+//! [`Julia::scope_with_slots`] must be used. These methods take a closure that take a
 //! [`Global`] and mutable reference to a [`GcFrame`]; before calling the closure the frame is
 //! created and pushed the stack, and it's popped when it's dropped. This means that any value
 //! that is rooted in that frame will be protected from garbage collection while inside the
@@ -22,19 +22,13 @@
 //! Most functionality provided by the [`GcFrame`] is available through three traits; [`Frame`],
 //! [`Scope`] and [`ScopeExt`]. [`Frame`] provides access to the number of roots and slots a frame
 //! has, and its capacity, while the other two provide methods to create a nested scope. The
-//! simplest kind of these methods is [`ScopeExt::scope`], like [`Julia::scope`] is creates a new
+//! simplest kind of these methods is [`ScopeExt::scope`], like [`Julia::scope`] it creates a new
 //! frame and pushes it to the stack, calls the given closure with a mutable reference to that new
 //! frame, the frame is popped after the closure returns. The main limitation of this method is
-//! that it can't be used to create a new Julia value and return it from the scope,
-//! Scopes can be nested, a method like [`ScopeExt::scope`] can be used for this purpose. The
-//! [`Frame`] trait is implemented for [`GcFrame`], and also two other frame types which will be
-//! introduced later. Like [`Julia::scope`] this method takes a closure, creates a new frame and
-//! pushes it to the stack, and calls the closure. However, since this method requires that
-//! returned value lives at least as long as the frame that called it, it can't be used to return
-//! a value that has been rooted with the frame provided to the closure. This functionality is
-//! provided by the [`Scope`] trait. The methods [`Scope::value_scope`] and [`Scope::call_scope`]
-//! can be used to return a value or the result of a function call from a closure and postpone
-//! rooting that result until the target frame can be used again.
+//! that it can't be used to create a new Julia value and return it from the scope. This
+//! functionality is provided by the [`Scope`] trait. The methods [`Scope::value_scope`] and
+//! [`Scope::result_scope`] can be used to return a value or the result of a function call from a
+//! closure and postpone rooting that result until the target frame can be used again.
 //!
 //! The closure that these two methods will call doesn't only provide a new frame, but also an
 //! [`Output`]. The closures must return a value of a specific type. The frame can be used
@@ -52,8 +46,9 @@
 //! this data requires a frame to prevent mutable aliasing. The other is available when the
 //! `async` feature flag is enabled. [`AsyncGcFrame`] offers the same methods as [`GcFrame`],
 //! implements the same traits, but also provides async variations of [`Scope::value_scope`],
-//! [`Scope::call_scope`], and [`ScopeExt::scope`]. This frame type can be used by implementing
+//! [`Scope::result_scope`], and [`ScopeExt::scope`]. This frame type can be used by implementing
 //! the [`JuliaTask`] trait.
+
 pub mod frame;
 pub mod global;
 pub mod mode;

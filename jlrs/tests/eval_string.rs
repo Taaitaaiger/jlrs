@@ -2,7 +2,7 @@ use jlrs::prelude::*;
 use jlrs::util::JULIA;
 use jlrs::value::Value;
 
-fn eval_string(string: &str, with_result: impl for<'f> FnOnce(CallResult<'f, 'static>)) {
+fn eval_string(string: &str, with_result: impl for<'f> FnOnce(JuliaResult<'f, 'static>)) {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
         jlrs.scope_with_slots(1, |_global, frame| {

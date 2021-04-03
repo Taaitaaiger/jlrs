@@ -24,16 +24,16 @@ fn nested_value_scope() {
 }
 
 #[test]
-fn nested_call_scope() {
+fn nested_result_scope() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
         let out = jlrs.scope_with_slots(1, |global, frame| {
             frame
-                .call_scope_with_slots(0, |output, frame| {
+                .result_scope_with_slots(0, |output, frame| {
                     output
                         .into_scope(frame)
-                        .call_scope_with_slots(2, |output, frame| {
+                        .result_scope_with_slots(2, |output, frame| {
                             let func = Module::base(global).function("+")?;
                             let v1 = Value::new(frame.as_scope(), 1usize)?;
                             let v2 = Value::new(frame.as_scope(), 2usize)?;

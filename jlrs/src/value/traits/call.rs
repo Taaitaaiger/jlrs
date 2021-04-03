@@ -1,9 +1,9 @@
 //! Call Julia functions.
 
-use crate::private::Private;
 use crate::{
     error::JlrsResult,
     memory::traits::{frame::Frame, scope::Scope},
+    private::Private,
     value::{Value, WithKeywords, MAX_SIZE},
 };
 use jl_sys::{
@@ -19,13 +19,13 @@ use smallvec::SmallVec;
 /// provided with this trait's methods.
 pub trait Call<'scope, 'frame, 'data> {
     /// Call a function with no arguments.
-    fn call0<S, F>(self, scope: S) -> JlrsResult<S::CallResult>
+    fn call0<S, F>(self, scope: S) -> JlrsResult<S::JuliaResult>
     where
         S: Scope<'scope, 'frame, 'data, F>,
         F: Frame<'frame>;
 
     /// Call a function with one argument.
-    fn call1<S, F>(self, scope: S, arg0: Value<'_, 'data>) -> JlrsResult<S::CallResult>
+    fn call1<S, F>(self, scope: S, arg0: Value<'_, 'data>) -> JlrsResult<S::JuliaResult>
     where
         S: Scope<'scope, 'frame, 'data, F>,
         F: Frame<'frame>;
@@ -36,7 +36,7 @@ pub trait Call<'scope, 'frame, 'data> {
         scope: S,
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
-    ) -> JlrsResult<S::CallResult>
+    ) -> JlrsResult<S::JuliaResult>
     where
         S: Scope<'scope, 'frame, 'data, F>,
         F: Frame<'frame>;
@@ -48,13 +48,13 @@ pub trait Call<'scope, 'frame, 'data> {
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
         arg2: Value<'_, 'data>,
-    ) -> JlrsResult<S::CallResult>
+    ) -> JlrsResult<S::JuliaResult>
     where
         S: Scope<'scope, 'frame, 'data, F>,
         F: Frame<'frame>;
 
     /// Call a function with an arbitrary number arguments.
-    fn call<'value, V, S, F>(self, scope: S, args: V) -> JlrsResult<S::CallResult>
+    fn call<'value, V, S, F>(self, scope: S, args: V) -> JlrsResult<S::JuliaResult>
     where
         V: AsMut<[Value<'value, 'data>]>,
         S: Scope<'scope, 'frame, 'data, F>,
@@ -62,7 +62,7 @@ pub trait Call<'scope, 'frame, 'data> {
 }
 
 impl<'scope, 'frame, 'data> Call<'scope, 'frame, 'data> for Value<'_, 'data> {
-    fn call0<S, F>(self, scope: S) -> JlrsResult<S::CallResult>
+    fn call0<S, F>(self, scope: S) -> JlrsResult<S::JuliaResult>
     where
         S: Scope<'scope, 'frame, 'data, F>,
         F: Frame<'frame>,
@@ -78,7 +78,7 @@ impl<'scope, 'frame, 'data> Call<'scope, 'frame, 'data> for Value<'_, 'data> {
         }
     }
 
-    fn call1<S, F>(self, scope: S, arg0: Value<'_, 'data>) -> JlrsResult<S::CallResult>
+    fn call1<S, F>(self, scope: S, arg0: Value<'_, 'data>) -> JlrsResult<S::JuliaResult>
     where
         S: Scope<'scope, 'frame, 'data, F>,
         F: Frame<'frame>,
@@ -99,7 +99,7 @@ impl<'scope, 'frame, 'data> Call<'scope, 'frame, 'data> for Value<'_, 'data> {
         scope: S,
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
-    ) -> JlrsResult<S::CallResult>
+    ) -> JlrsResult<S::JuliaResult>
     where
         S: Scope<'scope, 'frame, 'data, F>,
         F: Frame<'frame>,
@@ -121,7 +121,7 @@ impl<'scope, 'frame, 'data> Call<'scope, 'frame, 'data> for Value<'_, 'data> {
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
         arg2: Value<'_, 'data>,
-    ) -> JlrsResult<S::CallResult>
+    ) -> JlrsResult<S::JuliaResult>
     where
         S: Scope<'scope, 'frame, 'data, F>,
         F: Frame<'frame>,
@@ -137,7 +137,7 @@ impl<'scope, 'frame, 'data> Call<'scope, 'frame, 'data> for Value<'_, 'data> {
         }
     }
 
-    fn call<'value, V, S, F>(self, scope: S, mut args: V) -> JlrsResult<S::CallResult>
+    fn call<'value, V, S, F>(self, scope: S, mut args: V) -> JlrsResult<S::JuliaResult>
     where
         V: AsMut<[Value<'value, 'data>]>,
         S: Scope<'scope, 'frame, 'data, F>,
@@ -158,7 +158,7 @@ impl<'scope, 'frame, 'data> Call<'scope, 'frame, 'data> for Value<'_, 'data> {
 }
 
 impl<'scope, 'frame, 'data> Call<'scope, 'frame, 'data> for WithKeywords<'_, '_, 'data> {
-    fn call0<S, F>(self, scope: S) -> JlrsResult<S::CallResult>
+    fn call0<S, F>(self, scope: S) -> JlrsResult<S::JuliaResult>
     where
         S: Scope<'scope, 'frame, 'data, F>,
         F: Frame<'frame>,
@@ -178,7 +178,7 @@ impl<'scope, 'frame, 'data> Call<'scope, 'frame, 'data> for WithKeywords<'_, '_,
         }
     }
 
-    fn call1<S, F>(self, scope: S, arg0: Value<'_, 'data>) -> JlrsResult<S::CallResult>
+    fn call1<S, F>(self, scope: S, arg0: Value<'_, 'data>) -> JlrsResult<S::JuliaResult>
     where
         S: Scope<'scope, 'frame, 'data, F>,
         F: Frame<'frame>,
@@ -203,7 +203,7 @@ impl<'scope, 'frame, 'data> Call<'scope, 'frame, 'data> for WithKeywords<'_, '_,
         scope: S,
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
-    ) -> JlrsResult<S::CallResult>
+    ) -> JlrsResult<S::JuliaResult>
     where
         S: Scope<'scope, 'frame, 'data, F>,
         F: Frame<'frame>,
@@ -229,7 +229,7 @@ impl<'scope, 'frame, 'data> Call<'scope, 'frame, 'data> for WithKeywords<'_, '_,
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
         arg2: Value<'_, 'data>,
-    ) -> JlrsResult<S::CallResult>
+    ) -> JlrsResult<S::JuliaResult>
     where
         S: Scope<'scope, 'frame, 'data, F>,
         F: Frame<'frame>,
@@ -249,7 +249,7 @@ impl<'scope, 'frame, 'data> Call<'scope, 'frame, 'data> for WithKeywords<'_, '_,
         }
     }
 
-    fn call<'value, V, S, F>(self, scope: S, mut args: V) -> JlrsResult<S::CallResult>
+    fn call<'value, V, S, F>(self, scope: S, mut args: V) -> JlrsResult<S::JuliaResult>
     where
         V: AsMut<[Value<'value, 'data>]>,
         S: Scope<'scope, 'frame, 'data, F>,

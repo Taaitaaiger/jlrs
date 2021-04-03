@@ -10,7 +10,7 @@ pub type JlrsResult<T> = Result<T, Box<JlrsError>>;
 /// This type alias is used to encode the result of a function call: `Ok` indicates the call was
 /// successful and contains the function's result, while `Err` indicates an exception was thrown
 /// and contains said exception.
-pub type CallResult<'frame, 'data, V = Value<'frame, 'data>> = Result<V, Value<'frame, 'data>>;
+pub type JuliaResult<'frame, 'data, V = Value<'frame, 'data>> = Result<V, Value<'frame, 'data>>;
 
 /// All different errors.
 #[derive(Debug)]

@@ -103,10 +103,10 @@ pub(crate) mod private {
     use crate::memory::mode::Async;
     use crate::memory::mode::Sync;
     use crate::memory::traits::{mode::Mode, root::Root};
-    use crate::value::{UnrootedCallResult, UnrootedValue, Value};
+    use crate::value::{UnrootedResult, UnrootedValue, Value};
     use crate::{error::AllocError, private::Private};
     use crate::{
-        error::{CallResult, JlrsError, JlrsResult},
+        error::{JlrsError, JlrsResult, JuliaResult},
         memory::output::Output,
     };
     use jl_sys::jl_value_t;
@@ -153,30 +153,30 @@ pub(crate) mod private {
             )
                 -> JlrsResult<UnrootedValue<'frame, 'data, 'inner>>;
 
-        fn call_scope<'data, F>(
+        fn result_scope<'data, F>(
             &mut self,
             func: F,
             _: Private,
-        ) -> JlrsResult<CallResult<'frame, 'data>>
+        ) -> JlrsResult<JuliaResult<'frame, 'data>>
         where
             for<'nested, 'inner> F: FnOnce(
                 Output<'frame>,
                 &'inner mut GcFrame<'nested, Self::Mode>,
             )
-                -> JlrsResult<UnrootedCallResult<'frame, 'data, 'inner>>;
+                -> JlrsResult<UnrootedResult<'frame, 'data, 'inner>>;
 
-        fn call_scope_with_slots<'data, F>(
+        fn result_scope_with_slots<'data, F>(
             &mut self,
             capacity: usize,
             func: F,
             _: Private,
-        ) -> JlrsResult<CallResult<'frame, 'data>>
+        ) -> JlrsResult<JuliaResult<'frame, 'data>>
         where
             for<'nested, 'inner> F: FnOnce(
                 Output<'frame>,
                 &'inner mut GcFrame<'nested, Self::Mode>,
             )
-                -> JlrsResult<UnrootedCallResult<'frame, 'data, 'inner>>;
+                -> JlrsResult<UnrootedResult<'frame, 'data, 'inner>>;
 
         fn scope<'outer, T, F>(&'outer mut self, func: F, _: Private) -> JlrsResult<T>
         where
@@ -262,17 +262,17 @@ pub(crate) mod private {
             }
         }
 
-        fn call_scope<'data, F>(
+        fn result_scope<'data, F>(
             &mut self,
             func: F,
             _: Private,
-        ) -> JlrsResult<CallResult<'frame, 'data>>
+        ) -> JlrsResult<JuliaResult<'frame, 'data>>
         where
             for<'nested, 'inner> F: FnOnce(
                 Output<'frame>,
                 &'inner mut GcFrame<'nested, Self::Mode>,
             )
-                -> JlrsResult<UnrootedCallResult<'frame, 'data, 'inner>>,
+                -> JlrsResult<UnrootedResult<'frame, 'data, 'inner>>,
         {
             unsafe {
                 let v = {
@@ -281,22 +281,22 @@ pub(crate) mod private {
                     func(out, &mut nested)?.into_pending()
                 };
 
-                CallResult::root(self, v)
+                JuliaResult::root(self, v)
             }
         }
 
-        fn call_scope_with_slots<'data, F>(
+        fn result_scope_with_slots<'data, F>(
             &mut self,
             capacity: usize,
             func: F,
             _: Private,
-        ) -> JlrsResult<CallResult<'frame, 'data>>
+        ) -> JlrsResult<JuliaResult<'frame, 'data>>
         where
             for<'nested, 'inner> F: FnOnce(
                 Output<'frame>,
                 &'inner mut GcFrame<'nested, Self::Mode>,
             )
-                -> JlrsResult<UnrootedCallResult<'frame, 'data, 'inner>>,
+                -> JlrsResult<UnrootedResult<'frame, 'data, 'inner>>,
         {
             unsafe {
                 let v = {
@@ -305,7 +305,7 @@ pub(crate) mod private {
                     func(out, &mut nested)?.into_pending()
                 };
 
-                CallResult::root(self, v)
+                JuliaResult::root(self, v)
             }
         }
 
@@ -404,17 +404,17 @@ pub(crate) mod private {
             }
         }
 
-        fn call_scope<'data, F>(
+        fn result_scope<'data, F>(
             &mut self,
             func: F,
             _: Private,
-        ) -> JlrsResult<CallResult<'frame, 'data>>
+        ) -> JlrsResult<JuliaResult<'frame, 'data>>
         where
             for<'nested, 'inner> F: FnOnce(
                 Output<'frame>,
                 &'inner mut GcFrame<'nested, Self::Mode>,
             )
-                -> JlrsResult<UnrootedCallResult<'frame, 'data, 'inner>>,
+                -> JlrsResult<UnrootedResult<'frame, 'data, 'inner>>,
         {
             unsafe {
                 let v = {
@@ -423,22 +423,22 @@ pub(crate) mod private {
                     func(out, &mut nested)?.into_pending()
                 };
 
-                CallResult::root(self, v)
+                JuliaResult::root(self, v)
             }
         }
 
-        fn call_scope_with_slots<'data, F>(
+        fn result_scope_with_slots<'data, F>(
             &mut self,
             capacity: usize,
             func: F,
             _: Private,
-        ) -> JlrsResult<CallResult<'frame, 'data>>
+        ) -> JlrsResult<JuliaResult<'frame, 'data>>
         where
             for<'nested, 'inner> F: FnOnce(
                 Output<'frame>,
                 &'inner mut GcFrame<'nested, Self::Mode>,
             )
-                -> JlrsResult<UnrootedCallResult<'frame, 'data, 'inner>>,
+                -> JlrsResult<UnrootedResult<'frame, 'data, 'inner>>,
         {
             unsafe {
                 let v = {
@@ -447,7 +447,7 @@ pub(crate) mod private {
                     func(out, &mut nested)?.into_pending()
                 };
 
-                CallResult::root(self, v)
+                JuliaResult::root(self, v)
             }
         }
 
@@ -527,33 +527,33 @@ pub(crate) mod private {
             Err(JlrsError::NullFrame)?
         }
 
-        fn call_scope<'data, F>(
+        fn result_scope<'data, F>(
             &mut self,
             _func: F,
             _: Private,
-        ) -> JlrsResult<CallResult<'frame, 'data>>
+        ) -> JlrsResult<JuliaResult<'frame, 'data>>
         where
             for<'nested, 'inner> F: FnOnce(
                 Output<'frame>,
                 &'inner mut GcFrame<'nested, Self::Mode>,
             )
-                -> JlrsResult<UnrootedCallResult<'frame, 'data, 'inner>>,
+                -> JlrsResult<UnrootedResult<'frame, 'data, 'inner>>,
         {
             Err(JlrsError::NullFrame)?
         }
 
-        fn call_scope_with_slots<'data, F>(
+        fn result_scope_with_slots<'data, F>(
             &mut self,
             _capacity: usize,
             _func: F,
             _: Private,
-        ) -> JlrsResult<CallResult<'frame, 'data>>
+        ) -> JlrsResult<JuliaResult<'frame, 'data>>
         where
             for<'nested, 'inner> F: FnOnce(
                 Output<'frame>,
                 &'inner mut GcFrame<'nested, Self::Mode>,
             )
-                -> JlrsResult<UnrootedCallResult<'frame, 'data, 'inner>>,
+                -> JlrsResult<UnrootedResult<'frame, 'data, 'inner>>,
         {
             Err(JlrsError::NullFrame)?
         }

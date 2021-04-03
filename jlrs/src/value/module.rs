@@ -229,7 +229,7 @@ impl<'base> Module<'base> {
     /// `LinearAlgebra`. This requires one slot on the GC stack. Note that the loaded module is
     /// not made available in the module used to call this method, you can use
     /// `Module::set_global` to do so.
-    pub fn require<'scope, 'frame, S, F, M>(self, scope: S, module: M) -> JlrsResult<S::CallResult>
+    pub fn require<'scope, 'frame, S, F, M>(self, scope: S, module: M) -> JlrsResult<S::JuliaResult>
     where
         S: Scope<'scope, 'frame, 'static, F>,
         F: Frame<'frame>,

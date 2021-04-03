@@ -1,6 +1,6 @@
 //! jlrs provides a reasonably safe interface to the Julia C API that lets you call code written
 //! in Julia from Rust and vice versa. Currently this crate is only tested on Linux and Windows in
-//! combination with Julia 1.5 and is not compatible with earlier versions of Julia.
+//! combination with Julia 1.6 and is not compatible with earlier versions of Julia.
 //!
 //! # Features
 //!
@@ -72,36 +72,42 @@
 //!
 //! ## Calling Julia from Rust
 //!
-//! You can call [`Julia::include`] to include your own Julia code and either [`Julia::scope`] or
-//! [`Julia::scope_with_slots`] to interact with Julia. [`Julia::scope`] and
-//! [`Julia::scope_with_slots`] take a closure that provides you with a [`Global`] and a mutable
-//! reference to a [`GcFrame`]. [`Global`] is a token that lets you access Julia modules, their
-//! contents and other global values, while the frame is used to root local values which prevents
-//! them from being freed by the garbage collector until the frame is dropped.
+//! After initialization you have your [`Julia`] instance, [`Julia::include`] can be used to
+//! include files with custom Julia code. In order to call Julia functions and create new values
+//! that can be used by these functions, [`Julia::scope`] and [`Julia::scope_with_slots`] must be
+//! used. These two methods take a closure with two arguments, a [`Global`] and a mutable reference
+//! to a [`GcFrame`], which is called inside the `scope(_with_slots)`. [`Global`] is a token that
+//! lets you access Julia modules, their contents and other global values, while the frame is used
+//! to root local values. Rooting a value in a frame prevents it from being freed by the garbage
+//! collector until that frame has been dropped.
 //!
 //! Julia data is represented as a [`Value`]. There are several ways to create a new `Value`. The
-//! simplest is to call [`Value::new`], which can be used to convert primitive types, but also
-//! some more complex types like `String`s, from Rust to Julia. This method, and all others that
-//! create new local values, need something that implements [`Scope`]. Mutable references to
-//! frames implement this trait, in this case it's ensured that the `Value` is rooted until the
-//! closure returns (i.e. until the scope that the frame is associated with ends). There's another
-//! type that implements [`Scope`] which will be introduced a bit later.
+//! simplest is to call [`Value::eval_string`], which takes two arguments. Something that
+//! implements the [`Scope`] trait and a string. The string has to be valid Julia, mutable
+//! references to frames implement [`Scope`]. When a frame is used as a scope, the [`Value`] that
+//! is returned is rooted in that frame, and can be used until that scope ends. This method is
+//! relatively limited, it can be used to evaluate simple function call like `sqrt(2.0)`, but it's
+//! major use is importing installed packages by evaluating an `import` or `using` statement. To
+//! create a `Value` directly, other methods like [`Value::new`] are available. [`Value::new`]
+//! supports converting primitive types from Rust to Julia, but can also be used with some more
+//! complex types like `String`s.
 //!
-//! Julia functions are `Value`s too. In fact, `Value`s can be called as functions, whether this
-//! will succeed depends on the value actually being a function. In order to call some `Value` as
-//` a Julia function, three things are needed: the function you want to call, something
-//! that implements [`Scope`], and possibly some arguments to call the function with. The function
-//! can be acquired through the module that defines it with [`Module::function`]; [`Module::base`]
-//! and [`Module::core`] provide access to Julia's `Base` and `Core` module respectively, while
-//! everything you include through [`Julia::include`] is made available relative to the `Main`
-//! module, which can be access by calling [`Module::main`].
+//! Julia functions are `Value`s too. In fact, all `Value`s can be called as functions, whether
+//! this will succeed depends on the value actually being a function that is implemented for the
+//! arguments it's called with. In order to call some `Value` as a Julia function three things are
+//! needed: the function you want to call, something that implements [`Scope`] to root the result,
+//! and possibly some arguments to call the function with. The function can be acquired through
+//! the module that defines it with [`Module::function`]; [`Module::base`] and [`Module::core`]
+//! provide access to Julia's `Base` and `Core` module respectively, while everything you include
+//! through [`Julia::include`] is made available relative to the `Main` module, which can be
+//! access by calling [`Module::main`].
 //!
-//! Because a `Value` should only be used while it's rooted, it's not possible to return one from
-//! the closure due to lifetime constraints on the output. In order to convert a `Value` to some
-//! other type, like a `u8` or a `String`, [`Value::cast`] must be used. This method checks if the
-//! value can be converted to that type and performs the conversion if it is, which generally
-//! amounts to a pointer dereference, . This method is also used to convert a `Value` to a builtin
-//! type like [`DataType`] or [`Array`]. These builtin types are subject to the same lifetime
+//! Because a `Value` must only be used while it's rooted, it's not possible to return one from
+//! the closure due to lifetime constraints on the output. In order to convert a `Value` to
+//! another type, like `u8` or `String`, [`Value::cast`] must be used. This method checks if the
+//! value can be converted to the type it's cast to and performs the conversion if it is, which
+//! generally amounts to a pointer dereference, but for builtin types like [`DataType`] and
+//! [`Array`] it's a  pointer cast. These builtin types are subject to the same lifetime
 //! constraints as the `Value` is and can't be returned from the closure, but much of their
 //! functionality is exposed as methods on their more specific type. For example, in order to
 //! access the data in an `Array` from Rust, the `Value` must be cast to an `Array` first.
@@ -114,15 +120,17 @@
 //! # fn main() {
 //! let mut julia = unsafe { Julia::init().unwrap() };
 //! julia.scope(|global, frame| {
-//!     // Create the two arguments
+//!     // Create the two arguments. Note that the first argument, something that
+//!     // implements Scope, is taken by value and mutable references don't implement
+//!     // Copy, so it's necessary to mutably reborrow the frame.
 //!     let i = Value::new(&mut *frame, 2u64)?;
 //!     let j = Value::new(&mut *frame, 1u32)?;
 //!
-//!     // We can find the addition-function in the base module
+//!     // The `+` function can be found in the base module.
 //!     let func = Module::base(global).function("+")?;
 //!
 //!     // Call the function and cast the result to `u64`. The result is a nested
-//!     // `Result`; the outer error does not refer to any Julia data, while the
+//!     // `Result`; the outer error does not contain to any Julia data, while the
 //!     // inner error contains the exception if one is thrown.
 //!     func.call2(&mut *frame, i, j)?
 //!         .into_jlrs_result()?
@@ -131,29 +139,23 @@
 //! # }
 //! ```
 //!
-//! In order to use installed packages or standard library packages such as `LinearAlgebra`, they
-//! must first be loaded. This can be done by calling [`Module::require`], but it's also possible
-//! to evaluate `using LinearAlgebra: Hermitian` or similar import commands as a string with
-//! [`Value::eval_string`].
-//!
 //! Scopes can be nested, this is especially useful when you need to create several temporary
-//! values to create a new `Value` or call a Julia function because the nested scope has its own
+//! values to create a new `Value` or call a Julia function, because the each scope has its own
 //! `GcFrame`. This means these temporary values will not be protected from garbage collection
 //! after returning from the closure. There are three methods that create a nested scope,
-//! [`ScopeExt::scope`], [`Scope::value_scope`] and [`Scope::call_scope`]. The first is very
+//! [`ScopeExt::scope`], [`Scope::value_scope`] and [`Scope::result_scope`]. The first is very
 //! similar to the previous example and has the same major limitation: its return value can be
-//! anything, as long as its guaranteed to live at least as long as the scope that created it.
-//! This means you can't create a `Value` or call a Julia function and return it to the parent
-//! scope with this method, the other two methods support that use-case.
+//! anything, as long as its guaranteed to live at least as long as the parent scope. This means
+//! you can't create a `Value` or call a Julia function and return its result to the parent scope
+//! with this method. The other two methods support those use-cases.
 //!
-//! This is where the other [`Scope`] appears: the closure that `value_scope` and `call_scope`
-//! take has two arguments, an `Output` and a mutable reference to a `GcFrame`. The frame can be
-//! used to allocate and root temporary values, the output must be converted to an [`OutputScope`]
-//! before creating the result that should be rooted in the frame belonging to the parent
-//! scope.
+//! Another implementation of [`Scope`] appears here: the closure that `value_scope` and
+//! `result_scope` take has two arguments, an `Output` and a mutable reference to a `GcFrame`. The
+//! frame can be used to create temporary values. The output must be converted to an
+//! [`OutputScope`] before creating the value that must be rooted in an earlier frame.
 //!
-//! For example, the two values from the previous example can be treated as temporary values,
-//! while ensuring their sum is rooted until `parent_frame` is dropped:
+//! For example, the two values from the previous example can be treated as temporary values rooted
+//! rooted in some `child_frame, while their sum is rooted in the `parent_frame`:
 //!
 //! ```
 //! # use jlrs::prelude::*;
@@ -162,20 +164,19 @@
 //! # JULIA.with(|j| {
 //! # let mut julia = j.borrow_mut();
 //!   julia.scope(|global, parent_frame| {
-//!       let sum = parent_frame.call_scope(|output, child_frame| {
+//!       let sum_value = parent_frame.result_scope(|output, child_frame| {
 //!           // i and j are rooted in child_frame...
 //!           let i = Value::new(&mut *child_frame, 1u64)?;
 //!           let j = Value::new(&mut *child_frame, 2i32)?;
 //!           let func = Module::base(global).function("+")?;
 //!
-//!           // ... while the result is eventually rooted in the parent frame
+//!           // ... while the result is rooted in the parent frame
 //!           // after returning from this closure.
 //!           let output_scope = output.into_scope(child_frame);
 //!           func.call2(output_scope, i, j)
-//!       })?.into_jlrs_result()?
-//!           .cast::<u64>()?;
+//!       })?.into_jlrs_result()?;
 //!
-//!       assert_eq!(sum, 3);
+//!       assert_eq!(sum_value.cast::<u64>()?, 3);
 //!
 //!       Ok(())
 //!   }).unwrap();
@@ -213,8 +214,11 @@
 //!     // Cast the function to a void pointer
 //!     let call_me_val = Value::new(&mut *frame, call_me as *mut std::ffi::c_void)?;
 //!
-//!     // `myfunc` will call the function pointer, it's defined in the next block of code
-//!     let func = Module::main(global).function("myfunc")?;
+//!     // Value::eval_string can be used to create new functions.
+//!     let func = Value::eval_string(
+//!         &mut *frame,
+//!         "myfunc(callme::Ptr{Cvoid})::Int = ccall(callme, Int, (Bool,), true)"
+//!     )?.unwrap();
 //!
 //!     // Call the function and unbox the result.  
 //!     let output = func.call1(&mut *frame, call_me_val)?
@@ -226,14 +230,6 @@
 //!     Ok(())
 //! }).unwrap();
 //! # }
-//! ```
-//!
-//! This pointer can be called from Julia:
-//!
-//! ```julia
-//! function myfunc(callme::Ptr{Cvoid})::Int
-//!     ccall(callme, Int, (Bool,), true)
-//! end
 //! ```
 //!
 //! You can also use functions defined in `dylib` and `cdylib` libraries. In order to create such
@@ -290,7 +286,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! jlrs = { version = "0.8", features = ["async"] }
+//! jlrs = { version = "0.10", features = ["async"] }
 //! ```
 //!
 //! This features is only supported on Linux.
@@ -304,12 +300,12 @@
 //! In order to call Julia with the async runtime you must implement the [`JuliaTask`] trait. The
 //! `run`-method of this trait is similar to the closures that are used in the examples
 //! above for the sync runtime; it provides you with a [`Global`] and an [`AsyncGcFrame`] which
-//! implements the [`Frame`] trait. The [`AsyncGcFrame`] is required to use [`Value::call_async`]
-//! which calls a function on a new thread using `Base.Threads.@spawn` and returns a `Future`.
-//! While you await the result the runtime can handle another task. If you don't use
-//! [`Value::call_async`] tasks are handled sequentially.
+//! implements the [`Frame`] trait. The [`AsyncGcFrame`] is required to call [`Value::call_async`]
+//! which calls a Julia function on another thread by using `Base.Threads.@spawn` and returns a
+//! `Future`. While awaiting the result the runtime can handle another task. If you don't use
+//! [`Value::call_async`] tasks are executed sequentially.
 //!
-//! It's important to keep in mind that allocating memory in Julia uses a lock, so if you run
+//! It's important to keep in mind that allocating memory in Julia uses a lock, so if you execute
 //! multiple functions at the same time that allocate new values frequently the performance will
 //! drop significantly. The garbage collector can only run when all threads have reached a
 //! safepoint, which is the case whenever a function needs to allocate memory. If your function
@@ -325,8 +321,8 @@
 //! that use `jlrs`. The recommended approach is to create a thread-local static `RefCell`:
 //!
 //! ```no_run
-//! # use jlrs::prelude::*;
-//! # use std::cell::RefCell;
+//! use jlrs::prelude::*;
+//! use std::cell::RefCell;
 //! thread_local! {
 //!     pub static JULIA: RefCell<Julia> = {
 //!         let julia = RefCell::new(unsafe { Julia::init().unwrap() });
@@ -341,7 +337,7 @@
 //!
 //! Tests that use this construct can only use one thread for testing, so you must use
 //! `cargo test -- --test-threads=1`, otherwise the code above will panic when a test
-//! tries to call `Julia::init` a second time.
+//! tries to call `Julia::init` a second time from another thread.
 //!
 //! If these tests also involve the async runtime, the `JULIA_NUM_THREADS` environment
 //! variable must be set to a value larger than 1.
@@ -358,17 +354,15 @@
 //! [`IntoJulia`], which lets you use the type in combination with [`Value::new`].
 //!
 //! You should not implement these structs manually. The `JlrsReflect.jl` package can generate
-//! the correct Rust struct for types that don't include any unions or tuples with type
-//! parameters. The reason for this restriction is that the layout of tuple and union fields can
-//! be very different depending on these parameters in a way that can't be nicely expressed in
-//! Rust.
+//! the correct Rust struct for types that have no tuple or union fields with type parameters.
+//! The reason for this restriction is that the layout of tuple and union fields can be very
+//! different depending on these parameters in a way that can't be nicely expressed in Rust.
 //!
 //! These custom types can also be used when you call Rust from Julia through `ccall`.
 //!
 //! [their User Guide]: https://rust-lang.github.io/rust-bindgen/requirements.html
 //! [the instructions for compiling Julia on Windows using Cygwin and MinGW]: https://github.com/JuliaLang/julia/blob/v1.5.2/doc/build/windows.md#cygwin-to-mingw-cross-compiling
 //! [the examples directory of the repo]: https://github.com/Taaitaaiger/jlrs/tree/v0.8/examples
-//!
 //! [`IntoJulia`]: ./convert/into_julia/traits.IntoJulia.html
 //! [`JuliaType`]: ./layout/julia_type/traits.JuliaType.html
 //! [`JuliaTypecheck`]: ./layout/julia_typecheck/traits.JuliaTypecheck.html
@@ -406,6 +400,7 @@ use memory::frame::{GcFrame, NullFrame};
 use memory::global::Global;
 use memory::mode::Sync;
 use memory::stack::StackPage;
+use prelude::IntoJlrsResult;
 use std::ffi::{c_void, CString};
 use std::io::{Error as IOError, ErrorKind};
 use std::mem::MaybeUninit;
@@ -423,14 +418,14 @@ pub(crate) static JLRS_JL: &'static str = include_str!("jlrs.jl");
 
 /// This struct can be created only once during the lifetime of your program. You must create it
 /// with [`Julia::init`] or [`Julia::init_with_image`] before you can do anything related to
-/// Julia. While this struct exists, Julia is active; dropping it causes the shutdown code to be
-/// called.
+/// Julia. While this struct exists Julia is active, dropping it causes the shutdown code to be
+/// called but this doesn't leave Julia in a state from which it can be reinitialized.
 pub struct Julia {
     page: StackPage,
 }
 
 impl Julia {
-    /// Initializes Julia, this method can only be called once. If you call it a second time it
+    /// Initialize Julia, this method can only be called once. If it's called a second time it
     /// will return an error. If this struct is dropped, you will need to restart your program to
     /// be able to call Julia code again.
     ///
@@ -447,7 +442,7 @@ impl Julia {
         };
 
         jl.scope_with_slots(2, |global, frame| {
-            Value::eval_string(frame, JLRS_JL)?.expect("Could not load Jlrs module");
+            Value::eval_string(frame, JLRS_JL)?.into_jlrs_result()?;
 
             let droparray_fn = Value::new(frame, droparray as *mut c_void)?;
             Module::main(global)
@@ -508,7 +503,7 @@ impl Julia {
         };
 
         jl.scope_with_slots(2, |global, frame| {
-            Value::eval_string(frame, JLRS_JL)?.expect("Could not load Jlrs module");
+            Value::eval_string(frame, JLRS_JL)?.into_jlrs_result()?;
 
             let droparray_fn = Value::new(frame, droparray as *mut c_void)?;
             Module::main(global)
@@ -532,12 +527,12 @@ impl Julia {
     /// # use jlrs::prelude::*;
     /// # fn main() {
     /// # let mut julia = unsafe { Julia::init().unwrap() };
-    /// julia.include("MyJuliaCode.jl").unwrap();
+    /// julia.include("Path/To/MyJuliaCode.jl").unwrap();
     /// # }
     /// ```
     pub fn include<P: AsRef<Path>>(&mut self, path: P) -> JlrsResult<()> {
         if path.as_ref().exists() {
-            return self.scope_with_slots(3, |global, frame| {
+            return self.scope_with_slots(2, |global, frame| {
                 let path_jl_str = Value::new(&mut *frame, path.as_ref().to_string_lossy())?;
                 let include_func = Module::main(global).function("include")?;
                 let res = include_func.call1(frame, path_jl_str)?;
@@ -556,7 +551,9 @@ impl Julia {
         Err(JlrsError::IncludeNotFound(path.as_ref().to_string_lossy().into()).into())
     }
 
-    /// Creates a [`GcFrame`], calls the given closure, and returns the result of this closure.
+    /// This method is a main entrypoint to interact with Julia. It takes a closure with two
+    /// arguments, a `Global` and a mutable reference to a `GcFrame`, and can return arbitrary
+    /// results.
     ///
     /// Example:
     ///
@@ -573,9 +570,9 @@ impl Julia {
     /// # });
     /// # }
     /// ```
-    pub fn scope<'base, 'julia: 'base, T, F>(&'julia mut self, func: F) -> JlrsResult<T>
+    pub fn scope<T, F>(&mut self, func: F) -> JlrsResult<T>
     where
-        F: FnOnce(Global<'base>, &mut GcFrame<'base, Sync>) -> JlrsResult<T>,
+        for<'base> F: FnOnce(Global<'base>, &mut GcFrame<'base, Sync>) -> JlrsResult<T>,
     {
         unsafe {
             let global = Global::new();
@@ -584,8 +581,9 @@ impl Julia {
         }
     }
 
-    /// Creates a [`GcFrame`] with `capacity` slots, calls the given closure, and returns the
-    /// result of this closure.
+    /// This method is a main entrypoint to interact with Julia. It takes a closure with two
+    /// arguments, a `Global` and a mutable reference to a `GcFrame`, and can return arbitrary
+    /// results. The frame will preallocate `slots` slots.
     ///
     /// Example:
     ///
@@ -596,26 +594,25 @@ impl Julia {
     /// # JULIA.with(|j| {
     /// # let mut julia = j.borrow_mut();
     ///   julia.scope_with_slots(1, |_global, frame| {
+    ///       // Uses the preallocated slot
     ///       let _i = Value::new(&mut *frame, 1u64)?;
+    ///       // Allocates a new slot, because only a single slot was preallocated
+    ///       let _j = Value::new(&mut *frame, 1u64)?;
     ///       Ok(())
     ///   }).unwrap();
     /// # });
     /// # }
     /// ```
-    pub fn scope_with_slots<'base, 'julia: 'base, T, F>(
-        &'julia mut self,
-        capacity: usize,
-        func: F,
-    ) -> JlrsResult<T>
+    pub fn scope_with_slots<T, F>(&mut self, slots: usize, func: F) -> JlrsResult<T>
     where
-        F: FnOnce(Global<'base>, &mut GcFrame<'base, Sync>) -> JlrsResult<T>,
+        for<'base> F: FnOnce(Global<'base>, &mut GcFrame<'base, Sync>) -> JlrsResult<T>,
     {
         unsafe {
             let global = Global::new();
-            if capacity + 2 > self.page.size() {
-                self.page = StackPage::new(capacity + 2);
+            if slots + 2 > self.page.size() {
+                self.page = StackPage::new(slots + 2);
             }
-            let mut frame = GcFrame::new(self.page.as_mut(), capacity, Sync);
+            let mut frame = GcFrame::new(self.page.as_mut(), slots, Sync);
             func(global, &mut frame)
         }
     }
@@ -637,8 +634,8 @@ impl Drop for Julia {
 ///
 /// If you only need to use a frame to borrow array data, you can use [`CCall::null_frame`].
 /// Unlike [`Julia`], `CCall` postpones the allocation of the stack that is used for managing the
-/// GC until a static or dynamic frame is created. In the case of a null frame, this stack isn't
-/// allocated at all. Unlike the other frame types null frames can't be stacked.
+/// GC until a `GcFrame` is created. In the case of a null frame, this stack isn't allocated at
+/// all.
 pub struct CCall {
     page: Option<StackPage>,
 }
@@ -652,54 +649,45 @@ impl CCall {
     }
 
     /// Wake the task associated with `handle`. The handle must be the `handle` field of a
-    /// `Base.AsyncCondition` in Julia.
+    /// `Base.AsyncCondition` in Julia. This can be used to call a long-running Rust function from
+    /// Julia with ccall in another thread and wait for it to complete in Julia without blocking,
+    /// there's an example available in the repository: ccall_with_threads.
     pub unsafe fn uv_async_send(handle: *mut c_void) -> bool {
         uv_async_send(handle.cast()) == 0
     }
 
-    /// Creates a [`GcFrame`], calls the given closure, and returns the result of this closure.
-    pub fn scope<'base, 'julia: 'base, T, F>(&'julia mut self, func: F) -> JlrsResult<T>
+    /// Creates a [`GcFrame`], calls the given closure, and returns its result.
+    pub fn scope<T, F>(&mut self, func: F) -> JlrsResult<T>
     where
-        F: FnOnce(Global<'base>, &mut GcFrame<'base, Sync>) -> JlrsResult<T>,
+        for<'base> F: FnOnce(Global<'base>, &mut GcFrame<'base, Sync>) -> JlrsResult<T>,
     {
         unsafe {
-            self.ensure_init_stack()
-                .map(|s| {
-                    let global = Global::new();
-                    let mut frame = GcFrame::new(s.as_mut(), 0, Sync);
-                    func(global, &mut frame)
-                })
-                .unwrap_or_else(|| std::hint::unreachable_unchecked()) // The stack is guaranteed to be initialized
+            let page = self.get_init_page();
+            let global = Global::new();
+            let mut frame = GcFrame::new(page.as_mut(), 0, Sync);
+            func(global, &mut frame)
         }
     }
 
-    /// Creates a [`GcFrame`] with `capacity` slots, calls the given closure, and returns the
-    /// result of this closure.
-    pub fn scope_with_slots<'base, 'julia: 'base, T, F>(
-        &'julia mut self,
-        capacity: usize,
-        func: F,
-    ) -> JlrsResult<T>
+    /// Creates a [`GcFrame`] with `slots` slots, calls the given closure, and returns its result.
+    pub fn scope_with_slots<T, F>(&mut self, slots: usize, func: F) -> JlrsResult<T>
     where
-        F: FnOnce(Global<'base>, &mut GcFrame<'base, Sync>) -> JlrsResult<T>,
+        for<'base> F: FnOnce(Global<'base>, &mut GcFrame<'base, Sync>) -> JlrsResult<T>,
     {
         unsafe {
-            self.ensure_init_stack()
-                .map(|s| {
-                    let global = Global::new();
-                    if capacity + 2 > s.size() {
-                        *s = StackPage::new(capacity + 2);
-                    }
-                    let mut frame = GcFrame::new(s.as_mut(), capacity, Sync);
-                    func(global, &mut frame)
-                })
-                .unwrap_or_else(|| std::hint::unreachable_unchecked()) // The stack is guaranteed to be initialized
+            let page = self.get_init_page();
+            let global = Global::new();
+            if slots + 2 > page.size() {
+                *page = StackPage::new(slots + 2);
+            }
+            let mut frame = GcFrame::new(page.as_mut(), slots, Sync);
+            func(global, &mut frame)
         }
     }
 
     /// Create a [`NullFrame`] and call the given closure. A [`NullFrame`] cannot be nested and
-    /// can only be used to (mutably) borrow array data. Unlike the other frame-creating methods,
-    /// no `Global` is provided to the closure.
+    /// can only be used to (mutably) borrow array data. Unlike other scope-methods, no `Global`
+    /// is provided to the closure.
     pub fn null_scope<'base, 'julia: 'base, T, F>(&'julia mut self, func: F) -> JlrsResult<T>
     where
         F: FnOnce(&mut NullFrame<'base>) -> JlrsResult<T>,
@@ -711,12 +699,12 @@ impl CCall {
     }
 
     #[inline(always)]
-    fn ensure_init_stack(&mut self) -> Option<&mut StackPage> {
+    fn get_init_page(&mut self) -> &mut StackPage {
         if self.page.is_none() {
             self.page = Some(StackPage::default());
         }
 
-        self.page.as_mut()
+        self.page.as_mut().unwrap()
     }
 }
 

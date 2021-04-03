@@ -1,6 +1,6 @@
 use crate::value::{PendingCallResult, PendingValue};
 use crate::{
-    error::{CallResult, JlrsResult},
+    error::{JlrsResult, JuliaResult},
     private::Private,
     value::Value,
 };
@@ -13,7 +13,7 @@ pub(crate) trait Root<'frame, 'data>: Sized {
         -> JlrsResult<Self>;
 }
 
-impl<'frame, 'data> Root<'frame, 'data> for CallResult<'frame, 'data> {
+impl<'frame, 'data> Root<'frame, 'data> for JuliaResult<'frame, 'data> {
     type ClosureOutput = PendingCallResult<'frame, 'data>;
 
     unsafe fn root<F: Frame<'frame>>(frame: &mut F, val: Self::ClosureOutput) -> JlrsResult<Self> {
