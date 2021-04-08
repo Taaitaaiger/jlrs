@@ -165,14 +165,14 @@ mod example {
         }
     }
 
-    struct NestingTaskAsyncDynamicFrame {
+    struct NestingTaskAsyncGcFrame {
         dims: isize,
         iters: isize,
         sender: Sender<JlrsResult<f64>>,
     }
 
     #[async_trait(?Send)]
-    impl JuliaTask for NestingTaskAsyncDynamicFrame {
+    impl JuliaTask for NestingTaskAsyncGcFrame {
         type T = f64;
         type R = Sender<JlrsResult<Self::T>>;
 
@@ -299,7 +299,7 @@ mod example {
 
         thread_local! {
             pub static JULIA: RefCell<AsyncJulia<f64, Sender<JlrsResult<f64>>>> = {
-                let r = RefCell::new(unsafe {  AsyncJulia::init(16, 2, 1).expect("Could not init Julia").0 });
+                let r = RefCell::new(unsafe {  AsyncJulia::init(16, 1).expect("Could not init Julia").0 });
                 r.borrow_mut().try_include("MyModule.jl").unwrap();
                 r
             };
@@ -389,7 +389,7 @@ mod example {
                 let (sender, receiver) = crossbeam_channel::bounded(1);
 
                 julia
-                    .try_task(NestingTaskAsyncDynamicFrame {
+                    .try_task(NestingTaskAsyncGcFrame {
                         dims: 6,
                         iters: 5_000_000,
                         sender: sender,

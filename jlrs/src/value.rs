@@ -1193,7 +1193,7 @@ impl<'fr, 'da> Value<'fr, 'da> {
     /// the result of this function call if no exception is thrown, the exception if one is, or an
     /// error if no space is left on the stack.
     ///
-    /// This function can only be called with an `AsyncDynamicFrame`, while you're waiting for this
+    /// This function can only be called with an `AsyncGcFrame`, while you're waiting for this
     /// function to complete, other tasks are able to progress.
     #[cfg(all(feature = "async", target_os = "linux"))]
     pub async fn call_async<'frame, 'value, 'data, V>(

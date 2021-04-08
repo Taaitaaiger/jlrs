@@ -18,7 +18,7 @@ pub trait JuliaTask: Send + Sync + 'static {
     /// caller. Must be the same across all implementations.
     type R: ReturnChannel<T = Self::T>;
 
-    /// The entrypoint of a task. You can use the `Global` and `AsyncDynamicFrame` to call arbitrary
+    /// The entrypoint of a task. You can use the `Global` and `AsyncGcFrame` to call arbitrary
     /// functions from Julia. Additionally, [`Value::call_async`] can be used to call a function
     /// on another thread and allow other tasks to progress while awaiting the result.
     /// Implementations that don't use [`Value::call_async`] will block the runtime during

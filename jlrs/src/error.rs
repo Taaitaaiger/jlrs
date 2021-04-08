@@ -66,6 +66,7 @@ pub enum JlrsError {
     NotConcrete(String),
     ArrayNotSupported,
     NamedTupleSizeMismatch(usize, usize),
+    MoreThreadsRequired,
 }
 
 /// Create a new `JlrsError::Exception` and wrap it in a `JlrsResult::Err`.
@@ -158,6 +159,10 @@ impl Display for JlrsError {
             JlrsError::NotATask => write!(formatter, "This is not a task"),
 
             JlrsError::Inline => write!(formatter, "The data of this array is stored inline"),
+            JlrsError::MoreThreadsRequired => write!(
+                formatter,
+                "The JULIA_NUM_THREADS environment variable must be set to a value larger than 1"
+            ),
             JlrsError::NotADataType => write!(formatter, "This is not a datatype"),
             JlrsError::NotAMethod => write!(formatter, "This is not a method"),
             JlrsError::NotASymbol => write!(formatter, "This is not a symbol"),

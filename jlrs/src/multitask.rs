@@ -28,7 +28,8 @@ use async_std::future::timeout;
 use async_std::sync::{Condvar as AsyncStdCondvar, Mutex as AsyncStdMutex};
 use async_std::task::{self, JoinHandle as AsyncStdHandle};
 use jl_sys::{
-    jl_atexit_hook, jl_get_ptls_states, jl_init_with_image__threading, jl_is_initialized,
+    jl_atexit_hook, jl_eval_string, jl_get_ptls_states, jl_init, jl_init_with_image__threading,
+    jl_is_initialized,
 };
 use julia_task::{JuliaTask, ReturnChannel};
 use std::path::{Path, PathBuf};
@@ -42,6 +43,7 @@ use std::{
 };
 use std::{
     collections::VecDeque,
+    env,
     ffi::{c_void, CString},
     ptr::null_mut,
 };
@@ -55,14 +57,9 @@ use std::{
 /// must implement the [`ReturnChannel`] trait. This trait is implemented for `Sender` from
 /// `async_std` and `crossbeam_channel`.
 ///
-/// The initialization methods share several arguments:
+/// All initialization methods share two arguments:
 ///
 ///  - `channel_capacity`: the capacity of the channel used to communicate with the runtime.
-///  - `n_threads`: the number of threads that can be used to run tasks at the same time, it must
-///    be less than the number of threads set with the `JULIA_NUM_THREADS` environment variable
-///    (which defaults to 1).
-///  - `stack_size`: the size of a stack that is created for each of the tasks threads and the
-///    main thread (so `n_thread + 1` stacks with `stack_size` slots are created).
 ///  - `process_events_ms`: to ensure the garbage collector can run and tasks that have yielded in
 ///    Julia are rescheduled, events must be processed periodically when at least one task is
 ///    running.
@@ -80,42 +77,56 @@ where
     T: Send + Sync + 'static,
     R: ReturnChannel<T = T>,
 {
-    /// Initialize Julia in a new thread, this function can only be called once. If Julia has
-    /// already been initialized this will return an error, otherwise it will return a handle to
-    /// the runtime and a handle to the thread. The runtime is shut down after the final handle to
-    /// it has been dropped.
+    /// Initialize Julia in a new thread.
     ///
-    /// This function is unsafe because this crate provides you with a way to execute arbitrary
-    /// Julia code which can't be checked for correctness.
+    /// This function will return an error if the  `JULIA_NUM_THREADS` environment variable is not
+    /// set or set to a value smaller than 2, or if Julia has already been initialized. It is
+    /// unsafe because this crate provides you with a way to execute arbitrary Julia code which
+    /// can't be checked for correctness.
     pub unsafe fn init(
         channel_capacity: usize,
-        n_threads: usize,
         process_events_ms: u64,
     ) -> JlrsResult<(Self, ThreadHandle<JlrsResult<()>>)> {
+        let n_threads = env::var("JULIA_NUM_THREADS")
+            .map_err(JlrsError::other)?
+            .parse::<usize>()
+            .map_err(JlrsError::other)?;
+
+        if n_threads <= 1 {
+            Err(JlrsError::MoreThreadsRequired)?;
+        }
+
         let (sender, receiver) = bounded(channel_capacity);
         let julia = AsyncJulia { sender };
-        let handle = thread::spawn(move || run_async(n_threads, process_events_ms, receiver));
-        julia.try_set_wake_fn().map_err(JlrsError::other)?;
+        let handle = thread::spawn(move || run_async(n_threads - 1, process_events_ms, receiver));
+        julia.try_set_wake_fn()?;
 
         Ok((julia, handle))
     }
 
-    /// Initialize Julia as a blocking task, this function can only be called once. If Julia was
-    /// already initialized this will return an error, otherwise it will return a handle to the
-    /// runtime and a handle to the task. The runtime is shut down after the final handle to it
-    /// has been dropped.
+    /// Initialize Julia as a blocking task.
     ///
-    /// This function is unsafe because this crate provides you with a way to execute arbitrary
-    /// Julia code which can't be checked for correctness.
+    /// This function will return an error if the  `JULIA_NUM_THREADS` environment variable is not
+    /// set or set to a value smaller than 2, or if Julia has already been initialized. It is
+    /// unsafe because this crate provides you with a way to execute arbitrary Julia code which
+    /// can't be checked for correctness.
     pub async unsafe fn init_async(
         channel_capacity: usize,
-        n_threads: usize,
         process_events_ms: u64,
     ) -> JlrsResult<(Self, AsyncStdHandle<JlrsResult<()>>)> {
+        let n_threads = env::var("JULIA_NUM_THREADS")
+            .map_err(JlrsError::other)?
+            .parse::<usize>()
+            .map_err(JlrsError::other)?;
+
+        if n_threads <= 1 {
+            Err(JlrsError::MoreThreadsRequired)?;
+        }
+
         let (sender, receiver) = bounded(channel_capacity);
         let julia = AsyncJulia { sender };
         let handle =
-            task::spawn_blocking(move || run_async(n_threads, process_events_ms, receiver));
+            task::spawn_blocking(move || run_async(n_threads - 1, process_events_ms, receiver));
         julia.set_wake_fn().await?;
 
         Ok((julia, handle))
@@ -131,15 +142,14 @@ where
     /// contains a compatible Julia binary (eg `${JULIA_DIR}/bin`), the second must be either an
     /// absolute or a relative path to a system image.
     ///
-    /// This function will return an error if either of the two paths does not exist, if Julia has
-    /// already been initialized, or if `Main.Jlrs` doesn't exist. This function is unsafe because
-    /// this crate provides you with a way to execute arbitrary Julia code which can't be checked
-    /// for correctness.
+    /// This function will return an error if either of the two paths does not exist, if the
+    /// `JULIA_NUM_THREADS` environment variable is not set or set to a value smaller than 2, or
+    /// if Julia has already been initialized. It is unsafe because this crate provides you with
+    /// a way to execute arbitrary Julia code which can't be checked for correctness.
     ///
     /// [`PackageCompiler`]: https://julialang.github.io/PackageCompiler.jl/dev/
     pub unsafe fn init_with_image<P, Q>(
         channel_capacity: usize,
-        n_threads: usize,
         process_events_ms: u64,
         julia_bindir: P,
         image_path: Q,
@@ -148,18 +158,27 @@ where
         P: AsRef<Path> + Send + 'static,
         Q: AsRef<Path> + Send + 'static,
     {
+        let n_threads = env::var("JULIA_NUM_THREADS")
+            .map_err(JlrsError::other)?
+            .parse::<usize>()
+            .map_err(JlrsError::other)?;
+
+        if n_threads <= 1 {
+            Err(JlrsError::MoreThreadsRequired)?;
+        }
+
         let (sender, receiver) = bounded(channel_capacity);
         let julia = AsyncJulia { sender };
         let handle = thread::spawn(move || {
             run_async_with_image(
-                n_threads,
+                n_threads - 1,
                 process_events_ms,
                 receiver,
                 julia_bindir,
                 image_path,
             )
         });
-        julia.try_set_wake_fn().map_err(JlrsError::other)?;
+        julia.try_set_wake_fn()?;
 
         Ok((julia, handle))
     }
@@ -174,15 +193,14 @@ where
     /// contains a compatible Julia binary (eg `${JULIA_DIR}/bin`), the second must be either an
     /// absolute or a relative path to a system image.
     ///
-    /// This function will return an error if either of the two paths does not exist, if Julia has
-    /// already been initialized, or if `Main.Jlrs` doesn't exist. This function is unsafe because
-    /// this crate provides you with a way to execute arbitrary Julia code which can't be checked
-    /// for correctness.
+    /// This function will return an error if either of the two paths does not exist, if the
+    /// `JULIA_NUM_THREADS` environment variable is not set or set to a value smaller than 2, or
+    /// if Julia has already been initialized. It is unsafe because this crate provides you with
+    /// a way to execute arbitrary Julia code which can't be checked for correctness.
     ///
     /// [`PackageCompiler`]: https://julialang.github.io/PackageCompiler.jl/dev/
     pub async unsafe fn init_with_image_async<P, Q>(
         channel_capacity: usize,
-        n_threads: usize,
         process_events_ms: u64,
         julia_bindir: P,
         image_path: Q,
@@ -191,11 +209,20 @@ where
         P: AsRef<Path> + Send + 'static,
         Q: AsRef<Path> + Send + 'static,
     {
+        let n_threads = env::var("JULIA_NUM_THREADS")
+            .map_err(JlrsError::other)?
+            .parse::<usize>()
+            .map_err(JlrsError::other)?;
+
+        if n_threads <= 1 {
+            Err(JlrsError::MoreThreadsRequired)?;
+        }
+
         let (sender, receiver) = bounded(channel_capacity);
         let julia = AsyncJulia { sender };
         let handle = task::spawn_blocking(move || {
             run_async_with_image(
-                n_threads,
+                n_threads - 1,
                 process_events_ms,
                 receiver,
                 julia_bindir,
@@ -433,9 +460,9 @@ where
                 return Err(JlrsError::AlreadyInitialized.into());
             }
 
-            jl_sys::jl_init();
+            jl_init();
             let jlrs_jl = CString::new(JLRS_JL).expect("Invalid Jlrs module");
-            jl_sys::jl_eval_string(jlrs_jl.as_ptr());
+            jl_eval_string(jlrs_jl.as_ptr());
 
             let mut free_stacks = VecDeque::with_capacity(n_threads);
             for i in 1..n_threads {
@@ -560,7 +587,7 @@ where
             jl_init_with_image__threading(bindir.as_ptr(), im_rel_path.as_ptr());
 
             let jlrs_jl = CString::new(JLRS_JL).expect("Invalid Jlrs module");
-            jl_sys::jl_eval_string(jlrs_jl.as_ptr());
+            jl_eval_string(jlrs_jl.as_ptr());
 
             let mut free_stacks = VecDeque::with_capacity(n_threads);
             for i in 1..n_threads {
