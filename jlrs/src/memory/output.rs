@@ -9,7 +9,9 @@
 //! the result in an earlier frame and can only be used once, the closure should immediately
 //! return this result.
 //!
-//! [`Scope`]: ../traits/scope/trait.Scope.html
+//! [`Scope`]: crate::memory::traits::scope::Scope
+//! [`Scope::result_scope`]: crate::memory::traits::scope::Scope::result_scope
+//! [`Scope::value_scope`]: crate::memory::traits::scope::Scope::value_scope
 
 use super::{frame::GcFrame, traits::frame::Frame};
 use crate::{
@@ -38,7 +40,7 @@ impl<'scope> Output<'scope> {
 
 /// A [`Scope`] that can be used once to root a value in an earlier frame.
 ///
-/// [`Scope`]: ../traits/scope/trait.Scope.html
+/// [`Scope`]: crate::memory::traits::scope::Scope
 pub struct OutputScope<'scope, 'frame, 'borrow, F: Frame<'frame>>(
     pub(crate) &'borrow mut F,
     Output<'scope>,
@@ -53,7 +55,7 @@ impl<'scope, 'frame, 'borrow, F: Frame<'frame>> OutputScope<'scope, 'frame, 'bor
     /// Create a new scope and root the output in the current frame. See [`Scope::value_scope`]
     /// for more information.
     ///
-    /// [`Scope::value_scope`]: ../traits/scope/trait.Scope.html#method.value_scope
+    /// [`Scope::value_scope`]: crate::memory::traits::scope::Scope::value_scope
     pub fn value_scope<'data, G>(self, func: G) -> JlrsResult<UnrootedValue<'scope, 'data, 'borrow>>
     where
         G: for<'nested, 'inner> FnOnce(
@@ -70,7 +72,7 @@ impl<'scope, 'frame, 'borrow, F: Frame<'frame>> OutputScope<'scope, 'frame, 'bor
     /// Create a new scope and root the output in the current frame. See
     /// [`Scope::value_scope_with_slots`] for more information.
     ///
-    /// [`Scope::value_scope_with_slots`]: ../traits/scope/trait.Scope.html#method.value_scope_with_slots
+    /// [`Scope::value_scope_with_slots`]: crate::memory::traits::scope::Scope::value_scope_with_slots
     pub fn value_scope_with_slots<'data, G>(
         self,
         capacity: usize,
@@ -91,7 +93,7 @@ impl<'scope, 'frame, 'borrow, F: Frame<'frame>> OutputScope<'scope, 'frame, 'bor
     /// Create a new scope and root the output in the current frame. See [`Scope::result_scope`]
     /// for more information.
     ///
-    /// [`Scope::result_scope`]: ../traits/scope/trait.Scope.html#method.result_scope
+    /// [`Scope::result_scope`]: crate::memory::traits::scope::Scope::result_scope
     pub fn result_scope<'data, G>(
         self,
         func: G,
@@ -115,7 +117,7 @@ impl<'scope, 'frame, 'borrow, F: Frame<'frame>> OutputScope<'scope, 'frame, 'bor
     /// Create a new scope and root the output in the current frame. See
     /// [`Scope::result_scope_with_slots`] for more information.
     ///
-    /// [`Scope::result_scope_with_slots`]: ../traits/scope/trait.Scope.html#method.result_scope_with_slots
+    /// [`Scope::result_scope_with_slots`]: crate::memory::traits::scope::Scope::result_scope_with_slots
     pub fn result_scope_with_slots<'data, G>(
         self,
         capacity: usize,

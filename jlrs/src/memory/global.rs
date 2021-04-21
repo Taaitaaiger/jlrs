@@ -9,8 +9,8 @@ use std::marker::PhantomData;
 ///
 /// [`Symbol`]: ../value/symbol/struct.Symbol.html
 /// [`Module`]: ../value/module/struct.Module.html
-/// [`Julia::scope_with_slots`]: ../struct.Julia.html#method.scope_with_slots
-/// [`Julia::scope`]: ../struct.Julia.html#method.scope
+/// [`Julia::scope_with_slots`]: crate::Julia::scope_with_slots
+/// [`Julia::scope`]: crate::Julia::scope
 #[derive(Copy, Clone)]
 pub struct Global<'base>(PhantomData<&'base ()>);
 

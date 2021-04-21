@@ -5,8 +5,8 @@
 //! garbage collector as fast as possible. Because the result of an async Julia function call is
 //! rooted, it must be unrooted before it is returned from the closure.
 //!
-//! [`AsyncGcFrame::async_result_scope`]: ../../frame/struct.AsyncGcFrame.html#method.async_result_scope
-//! [`AsyncGcFrame::async_value_scope`]: ../../frame/struct.AsyncGcFrame.html#method.async_value_scope
+//! [`AsyncGcFrame::async_result_scope`]: crate::memory::frame::AsyncGcFrame::async_result_scope
+//! [`AsyncGcFrame::async_value_scope`]: crate::memory::frame::AsyncGcFrame::async_value_scope
 
 use super::frame::Frame;
 use crate::{

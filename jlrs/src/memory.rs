@@ -48,6 +48,23 @@
 //! implements the same traits, but also provides async variations of [`Scope::value_scope`],
 //! [`Scope::result_scope`], and [`ScopeExt::scope`]. This frame type can be used by implementing
 //! the [`JuliaTask`] trait.
+//!
+//! [`Julia::scope`]: crate::Julia::scope
+//! [`Julia::scope_with_slots`]: crate::Julia::scope_with_slots
+//! [`Global`]: crate::memory::global::Global
+//! [`GcFrame`]: crate::memory::frame::GcFrame
+//! [`Frame`]: crate::memory::traits::frame::Frame
+//! [`Scope`]: crate::memory::traits::scope::Scope
+//! [`ScopeExt`]: crate::memory::traits::scope::ScopeExt
+//! [`ScopeExt::scope`]: crate::memory::traits::scope::ScopeExt::scope
+//! [`Scope::value_scope`]: crate::memory::traits::scope::Scope::value_scope
+//! [`Scope::result_scope`]: crate::memory::traits::scope::Scope::result_scope
+//! [`Output`]: crate::memory::output::Output
+//! [`OutputScope`]: crate::memory::output::OutputScope
+//! [`Output::into_scope`]: crate::memory::output::Output::into_scope
+//! [`NullFrame`]: crate::memory::frame::NullFrame
+//! [`AsyncGcFrame`]: crate::memory::frame::AsyncGcFrame
+//! [`JuliaTask`]: crate::multitask::julia_task::JuliaTask
 
 pub mod frame;
 pub mod global;

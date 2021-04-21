@@ -10,10 +10,10 @@ use std::ffi::c_void;
 /// [`Array`], and `u8`. In these cases, if the check returns `true` the value can be successfully
 /// cast to that type with [`Value::cast`].
 ///
-/// [`Value::is`]: ../../value/struct.Value.html#method.is
-/// [`Value::cast`]: ../../value/struct.Value.html#method.cast
-/// [`JuliaType`]: ../julia_type/trait.JuliaType.html
-/// [`Array`]: ../../value/array/struct.Array.html
+/// [`Value::is`]: crate::value::Value::is
+/// [`Value::cast`]: crate::value::Value::cast
+/// [`JuliaType`]: crate::layout::julia_type::JuliaType
+/// [`Array`]: crate::value::array::Array
 pub unsafe trait JuliaTypecheck {
     #[doc(hidden)]
     unsafe fn julia_typecheck(t: DataType) -> bool;

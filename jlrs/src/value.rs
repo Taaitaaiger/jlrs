@@ -706,7 +706,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// If you derive [`JuliaStruct`] for some type, that type will be supported by this method. A
     /// full list of supported checks can be found [here].
     ///
-    /// [`JuliaStruct`]: ./traits/trait.JuliaStruct.html
+    /// [`JuliaStruct`]: crate::value::traits::julia_struct::JuliaStruct
     /// [here]: ../layout/julia_typecheck/trait.JuliaTypecheck.html#implementors
     pub fn is<T: JuliaTypecheck>(self) -> bool {
         if self.is_nothing() {
@@ -766,6 +766,17 @@ impl<'frame, 'data> Value<'frame, 'data> {
     pub unsafe fn assume_owned(self) -> Value<'frame, 'static> {
         Value::wrap(self.ptr())
     }
+
+    /// Root the value again in some `scope`.
+    pub fn reroot<'scope, 'f, S, F>(self, scope: S) -> JlrsResult<S::Value>
+    where
+        F: Frame<'f>,
+        S: Scope<'scope, 'f, 'data, F>,
+    {
+        unsafe {
+            scope.value(self.ptr(), Private)
+        }
+    }
 }
 
 /// # Casting to Rust
@@ -776,7 +787,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
 /// After casting, they can be turned back into a [`Value`] by calling the `as_value` method. For
 /// primitive types and structs that derive [`JuliaStruct`], the pointer is dereferenced.
 ///
-/// [`JuliaStruct`]: ./traits/trait.JuliaStruct.html
+/// [`JuliaStruct`]: crate::value::traits::julia_struct::JuliaStruct
 impl<'frame, 'data> Value<'frame, 'data> {
     /// Cast the contents of this value into a compatible Rust type. Any type which implements
     /// `Cast` can be used as a target, by default this includes primitive types like `u8`, `f32`
@@ -784,7 +795,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// implement this trait for custom types by deriving [`JuliaStruct`].
     ///
     /// [`JuliaString`]: ./string/struct.JuliaString.html
-    /// [`JuliaStruct`]: ./traits/trait.JuliaStruct.html
+    /// [`JuliaStruct`]: crate::value::traits::julia_struct::JuliaStruct
     pub fn cast<T: Cast<'frame, 'data>>(self) -> JlrsResult<<T as Cast<'frame, 'data>>::Output> {
         T::cast(self)
     }

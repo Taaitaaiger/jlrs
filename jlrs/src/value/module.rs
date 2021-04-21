@@ -29,9 +29,9 @@ use std::marker::PhantomData;
 /// [`DataType::is`] and [`Value::is`]; if the check returns `true` the [`Value`] can be cast to
 ///  `Module`.
 ///
-/// [`Julia::include`]: ../../struct.Julia.html#method.include
-/// [`JuliaTypecheck`]: ../../layout/julia_typecheck/trait.JuliaTypecheck.html
-/// [`DataType::is`]: ../datatype/struct.DataType.html#method.is
+/// [`Julia::include`]: crate::Julia::include
+/// [`JuliaTypecheck`]: crate::layout::julia_typecheck::JuliaTypecheck
+/// [`DataType::is`]: crate::value::datatype::DataType::is
 #[derive(Copy, Clone)]
 #[repr(transparent)]
 pub struct Module<'base>(*mut jl_module_t, PhantomData<&'base ()>);
@@ -74,7 +74,7 @@ impl<'base> Module<'base> {
     /// [`Julia::include`], handles to functions, globals, and submodules defined in these
     /// included files are available through this module.
     ///
-    /// [`Julia::include`]: ../../struct.Julia.html#method.include
+    /// [`Julia::include`]: crate::Julia::include
     pub fn main(_: Global<'base>) -> Self {
         unsafe { Module::wrap(jl_main_module) }
     }

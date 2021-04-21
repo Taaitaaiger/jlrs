@@ -3,8 +3,8 @@
 //! More information about frames and their capabilities can be found in the modules
 //! [`jlrs::memory`] and [`jlrs::memory::frame`].
 //!
-//! [`jlrs::memory`]: ../../index.html
-//! [`jlrs::memory::frame`]: ../../frame/index.html
+//! [`jlrs::memory`]: crate::memory
+//! [`jlrs::memory::frame`]: crate::memory::frame
 
 use super::mode::Mode;
 #[cfg(all(feature = "async", target_os = "linux"))]
@@ -16,7 +16,7 @@ pub trait Frame<'frame>: private::Frame<'frame> {
     /// This method takes a mutable reference to a frame and returns it; this method can be used
     /// as an alternative to reborrowing a frame with `&mut *frame` when a [`Scope`] is needed.
     ///
-    /// [`Scope`]: ../scope/trait.Scope.html
+    /// [`Scope`]: crate::memory::traits::scope::Scope
     fn as_scope(&mut self) -> &mut Self {
         self
     }

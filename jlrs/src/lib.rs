@@ -363,20 +363,23 @@
 //! [their User Guide]: https://rust-lang.github.io/rust-bindgen/requirements.html
 //! [the instructions for compiling Julia on Windows using Cygwin and MinGW]: https://github.com/JuliaLang/julia/blob/v1.5.2/doc/build/windows.md#cygwin-to-mingw-cross-compiling
 //! [the examples directory of the repo]: https://github.com/Taaitaaiger/jlrs/tree/v0.8/examples
-//! [`IntoJulia`]: ./convert/into_julia/traits.IntoJulia.html
-//! [`JuliaType`]: ./layout/julia_type/traits.JuliaType.html
-//! [`JuliaTypecheck`]: ./layout/julia_typecheck/traits.JuliaTypecheck.html
-//! [`ValidLayout`]: ./layout/valid_layout/traits.ValidLayout.html
-//! [`Cast`]: ./convert/cast/traits.Cast.html
-//! [`JuliaStruct`]: ./value/traits/julia_struct/traits.JuliaStruct.html
-//! [`AsyncGcFrame`]: ./memory/frame/struct.AsyncGcFrame.html
-//! [`Frame`]: ./memory/traits/frame/trait.Frame.html
-//! [`JuliaTask`]: ./multitask/julia_task/trait.JuliaTask.html
-//! [`AsyncJulia`]: ./multitask/struct.AsyncJulia.html
-//! [`DataType`]: ./value/datatype/struct.DataType.html
-//! [`TypedArray`]: ./value/array/struct.TypedArray.html
-//! [`OutputScope`]: ./memory/output/struct.OutputScope.html
-//! [`Scope`]: ./memory/traits/scope/struct.Scope.html
+//! [`IntoJulia`]: crate::convert::into_julia::IntoJulia
+//! [`JuliaType`]: crate::layout::julia_type::JuliaType
+//! [`JuliaTypecheck`]: crate::layout::julia_typecheck::JuliaTypecheck
+//! [`ValidLayout`]: crate::layout::valid_layout::ValidLayout
+//! [`Cast`]: crate::convert::cast::Cast
+//! [`JuliaStruct`]: crate::value::traits::julia_struct::JuliaStruct
+//! [`AsyncGcFrame`]: crate::memory::frame::AsyncGcFrame
+//! [`Frame`]: crate::memory::traits::frame::Frame
+//! [`JuliaTask`]: crate::multitask::julia_task::JuliaTask
+//! [`AsyncJulia`]: crate::multitask::AsyncJulia
+//! [`DataType`]: crate::value::datatype::DataType
+//! [`TypedArray`]: crate::value::array::TypedArray
+//! [`OutputScope`]: crate::memory::output::OutputScope
+//! [`Scope`]: crate::memory::traits::scope::Scope
+//! [`ScopeExt::scope`]: crate::memory::traits::scope::ScopeExt::scope
+//! [`Scope::value_scope`]: crate::memory::traits::scope::Scope::value_scope
+//! [`Scope::result_scope`]: crate::memory::traits::scope::Scope::result_scope
 
 pub mod convert;
 pub mod error;
@@ -632,9 +635,9 @@ impl Drop for Julia {
 /// create a frame first. You can use this struct to do so. It must never be used outside
 /// functions called through `ccall`, and only once for each `ccall`ed function.
 ///
-/// If you only need to use a frame to borrow array data, you can use [`CCall::null_frame`].
+/// If you only need to use a frame to borrow array data, you can use [`CCall::null_scope`].
 /// Unlike [`Julia`], `CCall` postpones the allocation of the stack that is used for managing the
-/// GC until a `GcFrame` is created. In the case of a null frame, this stack isn't allocated at
+/// GC until a `GcFrame` is created. In the case of a null scope, this stack isn't allocated at
 /// all.
 pub struct CCall {
     page: Option<StackPage>,

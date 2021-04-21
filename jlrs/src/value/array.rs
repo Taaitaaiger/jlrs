@@ -247,9 +247,9 @@ impl<'frame, 'data> Array<'frame, 'data> {
     /// Safety: no slot on the GC stack is required to access and use the values in this array,
     /// the GC is aware of the array's data. If the element is changed either from Rust or Julia,
     /// the original value is no longer protected from garbage collection. If you need to keep
-    /// using this value you must protect it by calling [`Value::extend`].
+    /// using this value you must protect it by calling [`Value::reroot`].
     ///
-    /// [`Value::extend`]: ../struct.Value.html#method.extend
+    /// [`Value::reroot`]: crate::value::Value::reroot
     pub unsafe fn value_data<'borrow, 'fr, F>(
         self,
         frame: &'borrow F,
@@ -273,9 +273,9 @@ impl<'frame, 'data> Array<'frame, 'data> {
     /// Safety: no slot on the GC stack is required to access and use the values in this array,
     /// the GC is aware of the array's data. If the element is changed either from Rust or Julia,
     /// the original value is no longer protected from garbage collection. If you need to keep
-    /// using this value you must protect it by calling [`Value::extend`].
+    /// using this value you must protect it by calling [`Value::reroot`].
     ///
-    /// [`Value::extend`]: ../struct.Value.html#method.extend
+    /// [`Value::reroot`]: crate::value::Value::reroot
     pub unsafe fn value_data_mut<'borrow, 'fr, F>(
         self,
         frame: &'borrow mut F,
@@ -301,9 +301,9 @@ impl<'frame, 'data> Array<'frame, 'data> {
     /// Safety: no slot on the GC stack is required to access and use the values in this array,
     /// the GC is aware of the array's data. If the element is changed either from Rust or Julia,
     /// the original value is no longer protected from garbage collection. If you need to keep
-    /// using this value you must protect it by calling [`Value::extend`].
+    /// using this value you must protect it by calling [`Value::reroot`].
     ///
-    /// [`Value::extend`]: ../struct.Value.html#method.extend
+    /// [`Value::reroot`]: crate::value::Value::reroot
     pub unsafe fn unrestricted_value_data_mut<'borrow, 'fr, F>(
         self,
         frame: &'borrow F,
@@ -517,9 +517,9 @@ impl<'frame, 'data, T: Copy + ValidLayout> TypedArray<'frame, 'data, T> {
     /// Safety: no slot on the GC stack is required to access and use the values in this array,
     /// the GC is aware of the array's data. If the element is changed either from Rust or Julia,
     /// the original value is no longer protected from garbage collection. If you need to keep
-    /// using this value you must protect it by calling [`Value::extend`].
+    /// using this value you must protect it by calling [`Value::reroot`].
     ///
-    /// [`Value::extend`]: ../struct.Value.html#method.extend
+    /// [`Value::reroot`]: crate::value::Value::reroot
     pub unsafe fn value_data<'borrow, 'fr, F>(
         self,
         frame: &'borrow F,
@@ -543,9 +543,9 @@ impl<'frame, 'data, T: Copy + ValidLayout> TypedArray<'frame, 'data, T> {
     /// Safety: no slot on the GC stack is required to access and use the values in this array,
     /// the GC is aware of the array's data. If the element is changed either from Rust or Julia,
     /// the original value is no longer protected from garbage collection. If you need to keep
-    /// using this value you must protect it by calling [`Value::extend`].
+    /// using this value you must protect it by calling [`Value::reroot`].
     ///
-    /// [`Value::extend`]: ../struct.Value.html#method.extend
+    /// [`Value::reroot`]: crate::value::Value::reroot
     pub unsafe fn value_data_mut<'borrow, 'fr, F>(
         self,
         frame: &'borrow mut F,
@@ -571,9 +571,9 @@ impl<'frame, 'data, T: Copy + ValidLayout> TypedArray<'frame, 'data, T> {
     /// Safety: no slot on the GC stack is required to access and use the values in this array,
     /// the GC is aware of the array's data. If the element is changed either from Rust or Julia,
     /// the original value is no longer protected from garbage collection. If you need to keep
-    /// using this value you must protect it by calling [`Value::extend`].
+    /// using this value you must protect it by calling [`Value::reroot`].
     ///
-    /// [`Value::extend`]: ../struct.Value.html#method.extend
+    /// [`Value::reroot`]: crate::value::Value::reroot
     pub unsafe fn unrestricted_value_data_mut<'borrow, 'fr, F>(
         self,
         frame: &'borrow F,

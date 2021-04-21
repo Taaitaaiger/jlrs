@@ -51,9 +51,9 @@
 //! # }
 //! ```
 //!
-//! [`Scope`]: ../traits/scope/trait.Scope.html
+//! [`Scope`]: crate::memory::traits::scope::Scope
 //! [`ScopeExt`]: ../traits/scope/trait.ScopeExt.html
-//! [`Frame`]: ../traits/frame/trait.Frame.html
+//! [`Frame`]: crate::memory::traits::frame::Frame
 
 #[cfg(all(feature = "async", target_os = "linux"))]
 use super::mode::Async;
@@ -82,10 +82,10 @@ pub(crate) const MIN_FRAME_CAPACITY: usize = 16;
 /// If there is sufficient capacity available, a new frame will use this remaining capacity. If
 /// the capacity is insufficient, more stack space is allocated.
 ///
-/// [`Julia::scope`]: ../../struct.Julia.html#method.scope
-/// [`ScopeExt::scope`]: ../traits/scope/trait.ScopeExt.html#method.scope
-/// [`Scope::value_scope`]: ../traits/scope/trait.ScopeExt.html#method.value_scope
-/// [`Scope::result_scope`]: ../traits/scope/trait.ScopeExt.html#method.result_scope
+/// [`Julia::scope`]: crate::Julia::scope
+/// [`ScopeExt::scope`]: crate::memory::traits::scope::ScopeExt::scope
+/// [`Scope::value_scope`]: crate::memory::traits::scope::Scope::value_scope
+/// [`Scope::result_scope`]: crate::memory::traits::scope::Scope::result_scope
 pub struct GcFrame<'frame, M: Mode> {
     raw_frame: &'frame mut [*mut c_void],
     page: Option<StackPage>,

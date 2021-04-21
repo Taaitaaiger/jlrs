@@ -15,7 +15,7 @@ use std::ffi::c_void;
 /// This trait is implemented by types that a [`Value`] can be converted into by calling
 /// [`Value::cast`]. This includes types like `String`, [`Array`], and `u8`.
 ///
-/// [`Array`]: ../../value/array/struct.Array.html
+/// [`Array`]: crate::value::array::Array
 pub unsafe trait Cast<'frame, 'data> {
     type Output;
     #[doc(hidden)]

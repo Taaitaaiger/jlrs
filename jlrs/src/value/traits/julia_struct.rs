@@ -63,9 +63,9 @@
 /// doesn't affect the layout must be elided. The type parameter must implement both `ValidLayout`
 /// and `Copy`.
 ///
-/// [`JuliaType`]: ../../layout/julia_type/trait.JuliaType.html
-/// [`JuliaTypecheck`]: ../../layout/julia_typecheck/trait.JuliaTypecheck.html
-/// [`ValidLayout`]: ../../layout/valid_layout/trait.ValidLayout.html
-/// [`Cast`]: ../../convert/cast/trait.Cast.html
-/// [`Value::cast`]: ../struct.Value.html#method.cast
+/// [`JuliaType`]: crate::layout::julia_type::JuliaType
+/// [`JuliaTypecheck`]: crate::layout::julia_typecheck::JuliaTypecheck
+/// [`ValidLayout`]: crate::layout::valid_layout::ValidLayout
+/// [`Cast`]: crate::convert::cast::Cast
+/// [`Value::cast`]: crate::value::Value::cast
 pub unsafe trait JuliaStruct: Copy {}

@@ -24,7 +24,7 @@ pub trait JuliaTask: Send + Sync + 'static {
     /// Implementations that don't use [`Value::call_async`] will block the runtime during
     /// execution.
     ///
-    /// [`Value::call_async`]: ../../value/struct.Value.html#method.call_async
+    /// [`Value::call_async`]: crate::value::Value::call_async
     async fn run<'base>(
         &mut self,
         global: Global<'base>,
