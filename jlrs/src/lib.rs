@@ -398,6 +398,8 @@ pub mod layout;
 pub mod memory;
 #[cfg(all(feature = "async"))]
 pub mod multitask;
+#[cfg(all(feature = "jlrs-ndarray"))]
+pub mod ndarray;
 pub mod prelude;
 pub(crate) mod private;
 #[doc(hidden)]

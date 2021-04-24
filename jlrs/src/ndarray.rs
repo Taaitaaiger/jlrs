@@ -5,13 +5,15 @@
 //! It's easier to use this trait with `TypedArray`, you'll likely have to provide type
 //! annotations with `Array`.
 
-use jlrs::error::JlrsError;
-use jlrs::prelude::*;
+use crate::error::{JlrsError, JlrsResult};
+use crate::layout::valid_layout::ValidLayout;
+use crate::memory::traits::frame::Frame;
+use crate::value::array::{Array, TypedArray};
 use ndarray::{ArrayView, ArrayViewMut, Dim, IntoDimension, IxDynImpl, ShapeBuilder};
 
 mod private {
-    use jlrs::layout::valid_layout::ValidLayout;
-    use jlrs::value::array::{Array, TypedArray};
+    use crate::layout::valid_layout::ValidLayout;
+    use crate::value::array::{Array, TypedArray};
 
     pub trait Sealed {}
     impl<'frame, 'data> Sealed for Array<'frame, 'data> {}
@@ -118,14 +120,10 @@ impl<'frame: 'borrow, 'data: 'borrow, 'borrow, T: ValidLayout + Copy> NdArray<'b
 #[cfg(test)]
 mod tests {
     use super::NdArray;
-    use jlrs::prelude::*;
+    use crate::util::JULIA;
+    use crate::value::array::{Array, TypedArray};
+    use crate::value::Value;
     use ndarray::{ArrayView, ArrayViewMut, IxDyn};
-
-    use std::cell::RefCell;
-
-    thread_local! {
-        pub static JULIA: RefCell<Julia> = RefCell::new(unsafe { Julia::init().unwrap() });
-    }
 
     #[test]
     fn array_view() {

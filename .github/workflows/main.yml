@@ -44,7 +44,7 @@ jobs:
         run: |
           export JULIA_DIR="$(dirname $(dirname $(which julia)))"
           export LD_LIBRARY_PATH="${JULIA_DIR}/lib:${LD_LIBRARY_PATH}"
-          cargo test --verbose -- --test-threads=1
+          cargo test --features async,jlrs-ndarray --verbose -- --test-threads=1
           
   docs:
     runs-on: ubuntu-latest
