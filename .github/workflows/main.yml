@@ -81,4 +81,4 @@ jobs:
         uses: chabad360/htmlproofer@v1.1
         with:
           directory: "target/doc/jlrs"
-          arguments: '--root-dir target/doc --allow_hash_href --url-ignore "/(#\d+|FutureExt|\\:\\:)/" --checks-to-ignore ScriptCheck,ImageCheck'
+          arguments: '--root-dir target/doc --allow_hash_href --url-ignore "/(#\d+|FutureExt|TryFuture|\\:\\:)/" --checks-to-ignore ScriptCheck,ImageCheck'
