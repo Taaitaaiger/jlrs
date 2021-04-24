@@ -17,6 +17,11 @@ use std::sync::atomic::{AtomicPtr, Ordering};
 
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
+#[cfg(target_os = "windows")]
+extern "C" {
+    pub fn uv_async_send(async_: *mut c_void) -> ::std::os::raw::c_int;
+}
+
 /*mod dynamic {
     use libc::{dlopen, dlsym, RTLD_NOW, RTLD_GLOBAL, RTLD_NODELETE};
 
