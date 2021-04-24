@@ -388,6 +388,8 @@
 //! [`Scope::value_scope`]: crate::memory::traits::scope::Scope::value_scope
 //! [`Scope::result_scope`]: crate::memory::traits::scope::Scope::result_scope
 
+#![forbid(broken_intra_doc_links)]
+
 pub mod convert;
 pub mod error;
 #[doc(hidden)]

@@ -27,7 +27,7 @@ jobs:
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v1
         with:
-          version: 1.6
+          version: '1.6'
 
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v1
@@ -57,7 +57,7 @@ jobs:
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v1
         with:
-          version: 1.6
+          version: '1.6'
 
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v1
@@ -81,3 +81,40 @@ jobs:
         with:
           version: '0.16.0'
           args: '--coveralls ${{ secrets.COVERALLS_TOKEN }} --exclude-files examples/* --exclude-files jl_sys/* --exclude-files jlrs_derive/*  -- --test-threads=1'
+
+          
+  docs:
+    runs-on: ubuntu-latest
+    needs: test-linux
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup Julia environment
+        uses: julia-actions/setup-julia@v1
+        with:
+          version: '1.6'
+
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v1
+        with:
+          version: "10.0"
+          directory: ${{ runner.temp }}/llvm
+
+      - name: rust-toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Set env
+        run: |
+          export JULIA_DIR=$(dirname $(dirname $(which julia)))
+          echo "LD_LIBRARY_PATH=${JULIA_DIR}/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
+          echo "JULIA_DIR=${JULIA_DIR}" >> $GITHUB_ENV
+
+      - name: Build Docs
+        run: cargo docs
+      
+      - name: Check Docs
+        uses: chabad360/htmlproofer@v1.1
+        with:
+          directory: "target/docs"
