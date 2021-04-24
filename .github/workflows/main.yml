@@ -80,4 +80,4 @@ jobs:
       - name: Check Docs
         uses: chabad360/htmlproofer@v1.1
         with:
-          directory: "target/docs"
+          directory: "target/doc/jlrs"

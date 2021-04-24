@@ -4,10 +4,7 @@ version = "0.4.0"
 authors = ["Thomas van Doornmalen <thomas.vandoornmalen@gmail.com>"]
 edition = "2018"
 description = """
-jlrs is a library built around bindings to the Julia C API that enables Julia code to be called 
-from Rust. jlrs can move many kinds of data from Rust to Julia and back, share n-dimensional 
-numerical arrays between languages, call arbitrary functions, and load code from arbitrary Julia
-source files. jlrs currently only supports Linux.
+Borrow data from Julia arrays in jlrs as ndarray's `ArrayView` and `ArrayViewMut`.
 """
 documentation = "https://docs.rs/jlrs-ndarray"
 homepage = "https://github.com/Taaitaaiger/jlrs"
