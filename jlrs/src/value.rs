@@ -773,9 +773,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
         F: Frame<'f>,
         S: Scope<'scope, 'f, 'data, F>,
     {
-        unsafe {
-            scope.value(self.ptr(), Private)
-        }
+        unsafe { scope.value(self.ptr(), Private) }
     }
 }
 

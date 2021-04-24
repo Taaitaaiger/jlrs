@@ -62,55 +62,69 @@
 //!
 //! The first thing you should do is `use` the [`prelude`]-module with an asterisk, this will
 //! bring all the structs and traits you're likely to need into scope. If you're calling Julia
-//! from Rust, you must initialize Julia before you can use it. You can do this by calling
-//! [`Julia::init`]. Note that this method can only be called once, if you drop [`Julia`] you won't
-//! be able to create a new one and have to restart the entire program. If you want to use a
-//! custom system image, you must call [`Julia::init_with_image`] instead of [`Julia::init`].
-//! If you're calling Rust from Julia everything has already been initialized, you can use `CCall`
-//! instead.
+//! from Rust, Julia must be initialized before you can use it. You can do this by calling
+//! [`Julia::init`], which provides you with an instance of [`Julia`]. Note that this method can
+//! only be called once, if you drop its result you won't be able to create a new instance but
+//! have to restart the application. If you want to use a custom system image, you must call
+//! [`Julia::init_with_image`] instead of [`Julia::init`]. If you're calling Rust from Julia
+//! everything has already been initialized, you can use `CCall` instead.
 //!
 //!
 //! ## Calling Julia from Rust
 //!
-//! After initialization you have your [`Julia`] instance, [`Julia::include`] can be used to
+//! After initialization you have an instance of [`Julia`]; [`Julia::include`] can be used to
 //! include files with custom Julia code. In order to call Julia functions and create new values
 //! that can be used by these functions, [`Julia::scope`] and [`Julia::scope_with_slots`] must be
-//! used. These two methods take a closure with two arguments, a [`Global`] and a mutable reference
-//! to a [`GcFrame`], which is called inside the `scope(_with_slots)`. [`Global`] is a token that
-//! lets you access Julia modules, their contents and other global values, while the frame is used
-//! to root local values. Rooting a value in a frame prevents it from being freed by the garbage
-//! collector until that frame has been dropped.
+//! used. These two methods take a closure with two arguments, a [`Global`] and a mutable
+//! reference to a [`GcFrame`]. [`Global`] is a token that is used to access Julia modules, their
+//! contents and other global values, while [`GcFrame`] is used to root local values. Rooting a
+//! value in a frame prevents it from being freed by the garbage collector until that frame has
+//! been dropped. The frame is created when `Julia::scope(_with_slots)` is called and dropped
+//! when that method returns.
 //!
-//! Julia data is represented as a [`Value`]. There are several ways to create a new `Value`. The
-//! simplest is to call [`Value::eval_string`], which takes two arguments. Something that
-//! implements the [`Scope`] trait and a string. The string has to be valid Julia, mutable
-//! references to frames implement [`Scope`]. When a frame is used as a scope, the [`Value`] that
-//! is returned is rooted in that frame, and can be used until that scope ends. This method is
-//! relatively limited, it can be used to evaluate simple function call like `sqrt(2.0)`, but it's
-//! major use is importing installed packages by evaluating an `import` or `using` statement. To
-//! create a `Value` directly, other methods like [`Value::new`] are available. [`Value::new`]
-//! supports converting primitive types from Rust to Julia, but can also be used with some more
-//! complex types like `String`s.
+//! Julia data is represented as a [`Value`]. There are several ways to create a new [`Value`].
+//! The simplest is to call [`Value::eval_string`], a method that takes two arguments. The first
+//! must implement the [`Scope`] trait, the second is a string which has to contain valid Julia
+//! code. The most important thing to know about the [`Scope`] trait for now is that it's used
+//! by values that create new values to ensure they're rooted. Mutable references to [`GcFrame`]s
+//! implement [`Scope`], in this case the [`Value`] that is returned is rooted in that frame,
+//! and is protected from garbage collection until the frame is dropped when that scope ends. In
+//! practice, [`Value::eval_string`] is relatively limited. It can be used to evaluate simple
+//! function call like `sqrt(2.0)`, but can't take any arguments. It's important to be aware
+//! though that it can also be used to import installed packages by evaluating an `import` or `
+//! using` statement. To create a `Value` directly, without evaluating Julia code, other methods
+//! like [`Value::new`] are available. [`Value::new`] supports converting primitive types from
+//! Rust to Julia, but can also be used with some more complex types like `String`s. New arrays
+//! can be created with methods like [`Value::new_array`], but it only supports types that can
+//! be converted from Rust to Julia with [`Value::new`].
 //!
 //! Julia functions are `Value`s too. In fact, all `Value`s can be called as functions, whether
 //! this will succeed depends on the value actually being a function that is implemented for the
-//! arguments it's called with. In order to call some `Value` as a Julia function three things are
-//! needed: the function you want to call, something that implements [`Scope`] to root the result,
-//! and possibly some arguments to call the function with. The function can be acquired through
-//! the module that defines it with [`Module::function`]; [`Module::base`] and [`Module::core`]
-//! provide access to Julia's `Base` and `Core` module respectively, while everything you include
-//! through [`Julia::include`] is made available relative to the `Main` module, which can be
-//! access by calling [`Module::main`].
+//! arguments it's called with. Note that calling a Julia function from Rust has a significant
+//! amount of overhead because it needs to figure out what implementation to dispatch to. It's
+//! generally more effective to call a few large Julia function from Rust, than many small ones.
 //!
-//! Because a `Value` must only be used while it's rooted, it's not possible to return one from
-//! the closure due to lifetime constraints on the output. In order to convert a `Value` to
-//! another type, like `u8` or `String`, [`Value::cast`] must be used. This method checks if the
-//! value can be converted to the type it's cast to and performs the conversion if it is, which
-//! generally amounts to a pointer dereference, but for builtin types like [`DataType`] and
-//! [`Array`] it's a  pointer cast. These builtin types are subject to the same lifetime
-//! constraints as the `Value` is and can't be returned from the closure, but much of their
-//! functionality is exposed as methods on their more specific type. For example, in order to
-//! access the data in an `Array` from Rust, the `Value` must be cast to an `Array` first.
+//! In order to call some `Value` as a Julia function three things are needed: the function you
+//! want to call, something that implements [`Scope`] to root the result, and possibly some
+//! arguments the function is called with. The function can be acquired through the module that
+//! defines it with [`Module::function`]; [`Module::base`] and [`Module::core`] provide access to
+//! Julia's `Base` and `Core` module respectively, while everything you include through
+//! [`Julia::include`] or by [`Value::eval_string`] is made available relative to the `Main`
+//! module, which can be accessed by calling [`Module::main`]. To actually call the function,
+//! one of the trait methods of [`Call`] must be used. To call a function that takes keyword
+//! arguments, [`Value::with_keywords`] must be used. See the documentation of that method for
+//! more information.
+//!
+//! Because a `Value` must only be used while it's rooted, it cannot leave the scope it's tied to.
+//! In order to return Julia data from a scope, it must first be converted to another type that
+//! contains no more data owned by the Julia garbage collector, e.g. `u8` and `String`. To do so,
+//! [`Value::cast`] must be used. This method checks if the value can be converted to the type
+//! it's cast to and performs the conversion if it is. This generally amounts to a pointer
+//! dereference, but for builtin types like [`DataType`] and [`Array`] it's a  pointer cast. These
+//! builtin types are still owned by Julia, and as such subject to the same lifetime constraints
+//! as a `Value` is, but much of their functionality is exposed as methods on the more specific
+//! type. For example, in order to access the data in an [`Array`] from Rust, the `Value` must be
+//! cast to an [`Array`] first.
 //!
 //! As a simple example, let's create two values and add them:
 //!
@@ -129,9 +143,9 @@
 //!     // The `+` function can be found in the base module.
 //!     let func = Module::base(global).function("+")?;
 //!
-//!     // Call the function and cast the result to `u64`. The result is a nested
-//!     // `Result`; the outer error does not contain to any Julia data, while the
-//!     // inner error contains the exception if one is thrown.
+//!     // Call the function and cast the result to `u64`. The result of the function
+//!     // call is a nested `Result`; the outer error does not contain to any Julia
+//!     // data, while the inner error contains the exception if one is thrown.
 //!     func.call2(&mut *frame, i, j)?
 //!         .into_jlrs_result()?
 //!         .cast::<u64>()
@@ -140,22 +154,28 @@
 //! ```
 //!
 //! Scopes can be nested, this is especially useful when you need to create several temporary
-//! values to create a new `Value` or call a Julia function, because the each scope has its own
+//! values to create a new `Value` or call a Julia function because each scope has its own
 //! `GcFrame`. This means these temporary values will not be protected from garbage collection
-//! after returning from the closure. There are three methods that create a nested scope,
-//! [`ScopeExt::scope`], [`Scope::value_scope`] and [`Scope::result_scope`]. The first is very
+//! after returning from this new scope. There are three methods that create a nested scope,
+//! [`ScopeExt::scope`], [`Scope::value_scope`] and [`Scope::result_scope`]. Like [`Scope`],
+//! [`ScopeExt`] is implemented for mutable references to [`GcFrame`]s. The first is very
 //! similar to the previous example and has the same major limitation: its return value can be
-//! anything, as long as its guaranteed to live at least as long as the parent scope. This means
-//! you can't create a `Value` or call a Julia function and return its result to the parent scope
-//! with this method. The other two methods support those use-cases.
+//! anything, as long as its guaranteed to live at least as long as it can outlive the current
+//! scope. This means you can't create a `Value` or call a Julia function and return its result
+//! to the parent scope with this method. The other two methods support those use-cases, in
+//! particular [`Scope::value_scope`] can be used to create a [`Value`] in an inner scope and root
+//! it in an outer one, while [`Scope::result_scope`] can do the same for the result of a Julia
+//! function call.
 //!
 //! Another implementation of [`Scope`] appears here: the closure that `value_scope` and
-//! `result_scope` take has two arguments, an `Output` and a mutable reference to a `GcFrame`. The
-//! frame can be used to create temporary values. The output must be converted to an
-//! [`OutputScope`] before creating the value that must be rooted in an earlier frame.
+//! `result_scope` take has two arguments, an [`Output`] and a mutable reference to a [`GcFrame`].
+//! The frame can be used to root temporary values, the output must be converted to an
+//! [`OutputScope`] before creating the value that must be rooted in an earlier frame. This
+//! [`OutputScope`] also implements [`Scope`], but unlike a [`GcFrame`] it's implemented for the
+//! type itself rather than a mutable reference to it so it can only be used once.
 //!
-//! For example, the two values from the previous example can be treated as temporary values rooted
-//! rooted in some `child_frame, while their sum is rooted in the `parent_frame`:
+//! The two values from the previous example can be rooted in an inner scope, while their sum
+//! is returned to and rooted in the outer scope:
 //!
 //! ```
 //! # use jlrs::prelude::*;
@@ -164,13 +184,13 @@
 //! # JULIA.with(|j| {
 //! # let mut julia = j.borrow_mut();
 //!   julia.scope(|global, parent_frame| {
-//!       let sum_value = parent_frame.result_scope(|output, child_frame| {
-//!           // i and j are rooted in child_frame...
+//!       let sum_value: Value = parent_frame.result_scope(|output, child_frame| {
+//!           // i and j are rooted in `child_frame`...
 //!           let i = Value::new(&mut *child_frame, 1u64)?;
 //!           let j = Value::new(&mut *child_frame, 2i32)?;
 //!           let func = Module::base(global).function("+")?;
 //!
-//!           // ... while the result is rooted in the parent frame
+//!           // ... while the result is rooted in `parent_frame`
 //!           // after returning from this closure.
 //!           let output_scope = output.into_scope(child_frame);
 //!           func.call2(output_scope, i, j)
@@ -184,16 +204,17 @@
 //! # }
 //! ```
 //!
-//! This is only a small example, other things can be done with [`Value`] as well: their fields
-//! and type information can be accessed for example, and keywords can be provided to call
-//! functions with keyword arguments.
+//! This is only a small example, other things can be done with [`Value`] as well. Their fields
+//! can be accessed with [`Value::get_field`], properties of the value's type can be checked with
+//! [`Value::is`], and [`Value::apply_type`] lets you construct arbitrary Julia types from Rust,
+//! many of which can be instantiated with [`Value::instantiate`].
 //!
 //!
 //! ## Calling Rust from Julia
 //!
-//! Julia's `ccall` interface can be used to call `extern "C"` functions defined in Rust. There
-//! are two major ways to use `ccall`, with a pointer to the function or a
-//! `(:function, "library")` pair.
+//! Julia's `ccall` interface can be used to call `extern "C"` functions defined in Rust, for most
+//! use cases you shouldn't need jlrs. There are two major ways to use `ccall`, with a pointer to
+//! the function or a `(:function, "library")` pair.
 //!
 //! A function can be cast to a void pointer and converted to a [`Value`]:
 //!
@@ -274,7 +295,12 @@
 //!
 //! Most features provided by jlrs including accessing modules, calling functions, and borrowing
 //! array data require a [`Global`] or a frame. You can access these by creating a [`CCall`]
-//! first.
+//! first. Another method provided by [`CCall`] is [`CCall::uv_async_send`], this method can be
+//! used in combination with `Base.AsyncCondition`. In particular, it lets you write a `ccall`able
+//! function that does its actual work on another thread, return early and `wait` on the async
+//! condition, which happens when [`CCall::uv_async_send`] is called when that work is finished.
+//! The advantage of this is that the long-running function will not block the Julia runtime,
+//! There's an example available on GitHub that shows how to do this.
 //!
 //!
 //! ## Async runtime
@@ -292,7 +318,7 @@
 //! This features is only supported on Linux.
 //!
 //! The struct [`AsyncJulia`] is exported by the prelude and lets you initialize the runtime in
-//! two ways, either as a task or as a thread. The first type should be used if you want to
+//! two ways, either as a task or as a thread. The first way should be used if you want to
 //! integrate the async runtime into a larger project that uses `async_std`. In order for the
 //! runtime to work correctly the `JULIA_NUM_THREADS` environment variable must be set to a value
 //! larger than 1.
@@ -300,10 +326,10 @@
 //! In order to call Julia with the async runtime you must implement the [`JuliaTask`] trait. The
 //! `run`-method of this trait is similar to the closures that are used in the examples
 //! above for the sync runtime; it provides you with a [`Global`] and an [`AsyncGcFrame`] which
-//! implements the [`Frame`] trait. The [`AsyncGcFrame`] is required to call [`Value::call_async`]
-//! which calls a Julia function on another thread by using `Base.Threads.@spawn` and returns a
-//! `Future`. While awaiting the result the runtime can handle another task. If you don't use
-//! [`Value::call_async`] tasks are executed sequentially.
+//! provides mostly the same functionality as [`GcFrame`]. The [`AsyncGcFrame`] is required to
+//! call [`Value::call_async`] which calls a Julia function on another thread by using
+//! `Base.Threads.@spawn` and returns a `Future`. While awaiting the result the runtime can handle
+//! another task. If you don't use [`Value::call_async`] tasks are executed sequentially.
 //!
 //! It's important to keep in mind that allocating memory in Julia uses a lock, so if you execute
 //! multiple functions at the same time that allocate new values frequently the performance will
@@ -312,13 +338,13 @@
 //! takes a long time to complete but needs to allocate rarely, you should periodically call
 //! `GC.safepoint` in Julia to ensure the garbage collector can run.
 //!
-//! You can find fully commented basic examples in [the examples directory of the repo].
+//! You can find basic examples in [the examples directory of the repo].
 //!
 //!
 //! # Testing
 //!
-//! The restriction that Julia can be initialized must be taken into account when running tests
-//! that use `jlrs`. The recommended approach is to create a thread-local static `RefCell`:
+//! The restriction that Julia can be initialized once must be taken into account when running
+//! tests that use `jlrs`. The recommended approach is to create a thread-local static `RefCell`:
 //!
 //! ```no_run
 //! use jlrs::prelude::*;
@@ -358,11 +384,11 @@
 //! The reason for this restriction is that the layout of tuple and union fields can be very
 //! different depending on these parameters in a way that can't be nicely expressed in Rust.
 //!
-//! These custom types can also be used when you call Rust from Julia through `ccall`.
+//! These custom types can also be used when you call Rust from Julia with `ccall`.
 //!
 //! [their User Guide]: https://rust-lang.github.io/rust-bindgen/requirements.html
-//! [the instructions for compiling Julia on Windows using Cygwin and MinGW]: https://github.com/JuliaLang/julia/blob/v1.5.2/doc/build/windows.md#cygwin-to-mingw-cross-compiling
-//! [the examples directory of the repo]: https://github.com/Taaitaaiger/jlrs/tree/v0.8/examples
+//! [the instructions for compiling Julia on Windows using Cygwin and MinGW]: https://github.com/JuliaLang/julia/blob/master/doc/build/windows.md#cygwin-to-mingw-cross-compiling
+//! [the examples directory of the repo]: https://github.com/Taaitaaiger/jlrs/tree/master/examples
 //! [`IntoJulia`]: crate::convert::into_julia::IntoJulia
 //! [`JuliaType`]: crate::layout::julia_type::JuliaType
 //! [`JuliaTypecheck`]: crate::layout::julia_typecheck::JuliaTypecheck
