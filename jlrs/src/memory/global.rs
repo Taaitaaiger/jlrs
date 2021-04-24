@@ -7,8 +7,8 @@ use std::marker::PhantomData;
 /// need this struct to access these values, you acquire it when you create a base frame through
 /// [`Julia::scope`] or [`Julia::scope_with_slots`].
 ///
-/// [`Symbol`]: ../value/symbol/struct.Symbol.html
-/// [`Module`]: ../value/module/struct.Module.html
+/// [`Symbol`]: crate::value::symbol::Symbol
+/// [`Module`]: crate::value::module::Module
 /// [`Julia::scope_with_slots`]: crate::Julia::scope_with_slots
 /// [`Julia::scope`]: crate::Julia::scope
 #[derive(Copy, Clone)]

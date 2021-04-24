@@ -52,7 +52,7 @@
 //! ```
 //!
 //! [`Scope`]: crate::memory::traits::scope::Scope
-//! [`ScopeExt`]: ../traits/scope/trait.ScopeExt.html
+//! [`ScopeExt`]: crate::memory::traits::scope::ScopeExt
 //! [`Frame`]: crate::memory::traits::frame::Frame
 
 #[cfg(feature = "async")]

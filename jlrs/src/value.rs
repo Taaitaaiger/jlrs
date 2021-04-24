@@ -444,7 +444,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// union of a single [`DataType`] is that type, not a `Union` with a single variant. One free
     /// slot on the GC stack is required for this function to succeed, returns an error if no slot is available.
     ///
-    /// [`Union`]: ./union/struct.Union.html
+    /// [`Union`]: crate::value::union::Union
     pub fn new_union<'scope, S, F>(scope: S, types: &mut [Value<'_, 'data>]) -> JlrsResult<S::Value>
     where
         S: Scope<'scope, 'frame, 'data, F>,
@@ -792,7 +792,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// and `bool`, and builtin types like [`Array`], [`JuliaString`] and [`Symbol`]. You can
     /// implement this trait for custom types by deriving [`JuliaStruct`].
     ///
-    /// [`JuliaString`]: ./string/struct.JuliaString.html
+    /// [`JuliaString`]: crate::value::string::JuliaString
     /// [`JuliaStruct`]: crate::value::traits::julia_struct::JuliaStruct
     pub fn cast<T: Cast<'frame, 'data>>(self) -> JlrsResult<<T as Cast<'frame, 'data>>::Output> {
         T::cast(self)
@@ -993,7 +993,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
 /// When the async runtime is used, the method [`Value::call_async`] is available which calls
 /// that function on another thread in Julia.
 ///
-/// [`Call`]: ./traits/call/trait.Call.html
+/// [`Call`]: crate::value::traits::call::Call
 impl<'fr, 'da> Value<'fr, 'da> {
     /// Provide keywords to this function.
     ///
@@ -1031,7 +1031,7 @@ impl<'fr, 'da> Value<'fr, 'da> {
     /// # }
     /// ```
     ///
-    /// [`Call`]: ./traits/call/trait.Call.html
+    /// [`Call`]: crate::value::traits::call::Call
     pub fn with_keywords<'kws>(self, keywords: Value<'kws, 'da>) -> WithKeywords<'fr, 'kws, 'da> {
         WithKeywords {
             func: self,
@@ -1393,7 +1393,7 @@ unsafe impl<'frame, 'data> ValidLayout for Value<'frame, 'data> {
 
 /// A function with keyword arguments. It can be called with the methods of the [`Call`] trait.
 ///
-/// [`Call`]: ./traits/call/trait.Call.html
+/// [`Call`]: crate::value::traits::call::Call
 pub struct WithKeywords<'func, 'kw, 'data> {
     pub(crate) func: Value<'func, 'data>,
     pub(crate) kws: Value<'kw, 'data>,
