@@ -99,7 +99,6 @@ impl<'frame, 'data> Future for JuliaFuture<'frame, 'data> {
                         if res.is_null() {
                             res = jl_nothing;
                         }
-
                         Poll::Ready(Ok(Value::wrap(res)))
                     } else {
                         Poll::Ready(Err(Value::wrap(exc)))

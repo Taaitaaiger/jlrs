@@ -148,3 +148,9 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for Task<'frame> {
 impl_julia_typecheck!(Task<'frame>, jl_task_type, 'frame);
 impl_julia_type!(Task<'frame>, jl_task_type, 'frame);
 impl_valid_layout!(Task<'frame>, 'frame);
+
+impl<'scope> Debug for Task<'scope> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        f.debug_tuple("Task").finish()
+    }
+}
