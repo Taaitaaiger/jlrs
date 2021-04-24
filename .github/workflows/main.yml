@@ -27,7 +27,7 @@ jobs:
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v1.4.1
         with:
-          version: 1.6.0
+          version: 1.6.1
 
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v1
@@ -57,7 +57,7 @@ jobs:
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v1.4.1
         with:
-          version: 1.6.0
+          version: 1.6.1
 
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v1
@@ -79,5 +79,5 @@ jobs:
       - name: Run cargo-tarpaulin
         uses: actions-rs/tarpaulin@v0.1
         with:
-          version: '0.18.0-alpha2'
-          args: '--coveralls ${{ secrets.COVERALLS_TOKEN }} --exclude-files examples/* --exclude-files jl_sys/* --exclude-files jlrs_derive/* jl_sys/*  -- --test-threads 1'
+          version: '0.14.2'
+          args: '--coveralls ${{ secrets.COVERALLS_TOKEN }} --exclude-files examples/* --exclude-files jl_sys/* --exclude-files jlrs_derive/*  -- --test-threads=1'
