@@ -401,9 +401,11 @@
 //! [`AsyncJulia`]: crate::multitask::AsyncJulia
 //! [`DataType`]: crate::value::datatype::DataType
 //! [`TypedArray`]: crate::value::array::TypedArray
+//! [`Output`]: crate::memory::output::Output
 //! [`OutputScope`]: crate::memory::output::OutputScope
-//! [`Scope`]: crate::memory::traits::scope::Scope
+//! [`ScopeExt`]: crate::memory::traits::scope::ScopeExt
 //! [`ScopeExt::scope`]: crate::memory::traits::scope::ScopeExt::scope
+//! [`Scope`]: crate::memory::traits::scope::Scope
 //! [`Scope::value_scope`]: crate::memory::traits::scope::Scope::value_scope
 //! [`Scope::result_scope`]: crate::memory::traits::scope::Scope::result_scope
 
