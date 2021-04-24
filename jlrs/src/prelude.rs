@@ -25,13 +25,13 @@ pub use crate::{named_tuple, CCall, Julia};
 #[cfg(feature = "jlrs-derive")]
 pub use jlrs_derive::{IntoJulia, JuliaStruct};
 
-#[cfg(all(feature = "async", target_os = "linux"))]
+#[cfg(feature = "async")]
 pub use crate::memory::frame::AsyncGcFrame;
-#[cfg(all(feature = "async", target_os = "linux"))]
+#[cfg(feature = "async")]
 pub use crate::memory::traits::as_unrooted::AsUnrooted;
-#[cfg(all(feature = "async", target_os = "linux"))]
+#[cfg(feature = "async")]
 pub use crate::multitask::julia_task::JuliaTask;
-#[cfg(all(feature = "async", target_os = "linux"))]
+#[cfg(feature = "async")]
 pub use crate::multitask::AsyncJulia;
-#[cfg(all(feature = "async", target_os = "linux"))]
+#[cfg(feature = "async")]
 pub use async_trait::async_trait;

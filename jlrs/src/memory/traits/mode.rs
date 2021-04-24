@@ -1,6 +1,6 @@
 //! A trait for handling the differences between the runtime modes.
 
-#[cfg(all(feature = "async", target_os = "linux"))]
+#[cfg(feature = "async")]
 use crate::memory::mode::Async;
 use crate::memory::mode::Sync;
 
@@ -9,11 +9,11 @@ pub trait Mode: Copy + private::Mode {}
 
 impl Mode for Sync {}
 
-#[cfg(all(feature = "async", target_os = "linux"))]
+#[cfg(feature = "async")]
 impl<'a> Mode for Async<'a> {}
 
 pub(crate) mod private {
-    #[cfg(all(feature = "async", target_os = "linux"))]
+    #[cfg(feature = "async")]
     use crate::memory::mode::Async;
     use crate::{memory::mode::Sync, private::Private};
     use jl_sys::jl_get_ptls_states;
@@ -44,7 +44,7 @@ pub(crate) mod private {
         }
     }
 
-    #[cfg(all(feature = "async", target_os = "linux"))]
+    #[cfg(feature = "async")]
     impl<'a> Mode for Async<'a> {
         unsafe fn push_frame(&self, raw_frame: &mut [*mut c_void], capacity: usize, _: Private) {
             raw_frame[0] = (capacity << 1) as _;

@@ -7,7 +7,7 @@
 //! [`jlrs::memory::frame`]: crate::memory::frame
 
 use super::mode::Mode;
-#[cfg(all(feature = "async", target_os = "linux"))]
+#[cfg(feature = "async")]
 use crate::memory::frame::AsyncGcFrame;
 use crate::memory::frame::{GcFrame, NullFrame};
 
@@ -55,7 +55,7 @@ impl<'frame, M: Mode> Frame<'frame> for GcFrame<'frame, M> {
     }
 }
 
-#[cfg(all(feature = "async", target_os = "linux"))]
+#[cfg(feature = "async")]
 impl<'frame> Frame<'frame> for AsyncGcFrame<'frame> {
     #[must_use]
     fn alloc_slots(&mut self, additional: usize) -> bool {
@@ -95,11 +95,11 @@ impl<'frame> Frame<'frame> for NullFrame<'frame> {
 }
 
 pub(crate) mod private {
-    #[cfg(all(feature = "async", target_os = "linux"))]
+    #[cfg(feature = "async")]
     use crate::memory::frame::AsyncGcFrame;
     use crate::memory::frame::GcFrame;
     use crate::memory::frame::NullFrame;
-    #[cfg(all(feature = "async", target_os = "linux"))]
+    #[cfg(feature = "async")]
     use crate::memory::mode::Async;
     use crate::memory::mode::Sync;
     use crate::memory::traits::{mode::Mode, root::Root};
@@ -335,7 +335,7 @@ pub(crate) mod private {
         }
     }
 
-    #[cfg(all(feature = "async", target_os = "linux"))]
+    #[cfg(feature = "async")]
     impl<'frame> Frame<'frame> for AsyncGcFrame<'frame> {
         type Mode = Async<'frame>;
 

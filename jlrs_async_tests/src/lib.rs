@@ -1,4 +1,3 @@
-#[cfg(target_os = "linux")]
 mod example {
     use crossbeam_channel::Sender;
     use jlrs::prelude::*;

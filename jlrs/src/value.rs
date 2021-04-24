@@ -103,7 +103,7 @@ use crate::memory::traits::{
 };
 use crate::private::Private;
 use crate::{convert::into_julia::IntoJulia, impl_julia_type};
-#[cfg(all(feature = "async", target_os = "linux"))]
+#[cfg(feature = "async")]
 use crate::{memory::frame::AsyncGcFrame, multitask::julia_future::JuliaFuture};
 use jl_sys::{
     jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_an_empty_string,
@@ -1204,7 +1204,7 @@ impl<'fr, 'da> Value<'fr, 'da> {
     ///
     /// This function can only be called with an `AsyncGcFrame`, while you're waiting for this
     /// function to complete, other tasks are able to progress.
-    #[cfg(all(feature = "async", target_os = "linux"))]
+    #[cfg(feature = "async")]
     pub async fn call_async<'frame, 'value, 'data, V>(
         self,
         frame: &mut AsyncGcFrame<'frame>,
@@ -1521,7 +1521,7 @@ impl<'frame, 'data, 'inner> UnrootedResult<'frame, 'data, 'inner> {
         }
     }
 
-    #[cfg(all(feature = "async", target_os = "linux"))]
+    #[cfg(feature = "async")]
     pub(crate) fn is_exception(&self) -> bool {
         match self {
             Self::Ok(_) => true,
@@ -1529,7 +1529,7 @@ impl<'frame, 'data, 'inner> UnrootedResult<'frame, 'data, 'inner> {
         }
     }
 
-    #[cfg(all(feature = "async", target_os = "linux"))]
+    #[cfg(feature = "async")]
     pub(crate) fn ptr(self) -> *mut jl_value_t {
         match self {
             Self::Ok(pov) => pov.ptr(),

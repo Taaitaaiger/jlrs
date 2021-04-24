@@ -4,4 +4,4 @@ In order to run this example, you must start Julia with more than one thread. If
 
 `JULIA_NUM_THREADS=3 cargo run`
 
-Because this example uses jlrs, the `JULIA_DIR` environment variable (and in the case of Windows, `CYGWIN_DIR`) must be set, and the library must be available on the library search path.
+Because this example uses jlrs, the `JULIA_DIR` environment variable must be set, and the library must be available on the library search path.

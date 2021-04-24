@@ -1,13 +1,12 @@
 # jlrs
 
 [![Build Status](https://travis-ci.com/Taaitaaiger/jlrs.svg?branch=master)](https://travis-ci.com/Taaitaaiger/jlrs)
-[![Windows Build Status](https://ci.appveyor.com/api/projects/status/github/taaitaaiger/jlrs?branch=master&svg=true)](https://ci.appveyor.com/project/Taaitaaiger/jlrs?branch=master)
 [![Coverage Status](https://coveralls.io/repos/github/Taaitaaiger/jlrs/badge.svg?branch=master)](https://coveralls.io/github/Taaitaaiger/jlrs?branch=master)
 [![Rust Docs](https://docs.rs/jlrs/badge.svg)](https://docs.rs/jlrs)
 [![License:MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 
-The main goal behind jlrs is to provide a simple and safe interface to the Julia C API that lets you call code written in Julia from Rust and vice versa. Currently this crate is only tested on Linux and Windows in combination with Julia 1.6 and is not compatible with earlier versions of Julia.
+The main goal behind jlrs is to provide a simple and safe interface to the Julia C API that lets you call code written in Julia from Rust and vice versa. Currently this crate is only tested on Linux in combination with Julia 1.6 and is not compatible with earlier versions of Julia.
 
 
 ## Features
@@ -46,11 +45,7 @@ In order to ensure the `julia.h` header file can be found, either `/usr/include/
 
 #### Windows
 
-The recommended way to install Julia is to download the installer from the official website, which will install Julia in a folder called `Julia-x.y.z`. This folder contains several other folders, including a `bin` folder containing the `julia.exe` executable. You must set the `JULIA_DIR` environment variable to the `Julia-x.y.z` folder and add `Julia-x.y.z\bin` to the `PATH` environment variable. For example, if Julia is installed at `D:\Julia-x.y.z`, `JULIA_DIR` must be set to `D:\Julia-x.y.z` and `D:\Julia-x.y.z\bin` must be added to `PATH`.
-
-Additionally, MinGW must be installed through Cygwin. To install this and all potentially required dependencies, follow steps 1-4 of [the instructions for compiling Julia on Windows using Cygwin and MinGW](https://github.com/JuliaLang/julia/blob/master/doc/build/windows.md#cygwin-to-mingw-cross-compiling). You must set the `CYGWIN_DIR` environment variable to the installation folder of Cygwin; this folder contains some icons, `Cygwin.bat` and folders with names like `usr` and `bin`. For example, if Cygwin is installed at `D:\cygwin64`, `CYGWIN_DIR` must be set to `D:\cygwin64`.
-
-Julia is compatible with the GNU toolchain on Windows. If you use rustup, you can set the toolchain for a project that depends on `jl-sys` by calling the command `rustup override set stable-gnu` in the project root folder.
+Support for Windows was dropped in jlrs 0.10 due to compilation and dependency issues. 
 
 
 # Using this crate
@@ -182,9 +177,9 @@ or
 crate-type = ["cdylib"]
 ```
 
-respectively to your crate's `Cargo.toml`. Use a `dylib` if you want to use the crate in other Rust crates, but if it's only intended to be called through `ccall` a `cdylib` is the better choice. On Linux, compiling such a crate will be compiled to `lib<crate_name>.so`, on Windows `lib<crate_name>.dll`.
+respectively to your crate's `Cargo.toml`. Use a `dylib` if you want to use the crate in other Rust crates, but if it's only intended to be called through `ccall` a `cdylib` is the better choice. On Linux, compiling such a crate will be compiled to `lib<crate_name>.so`.
 
-The functions you want to use with `ccall` must be both `extern "C"` functions to ensure the C ABI is used, and annotated with `#[no_mangle]` to prevent name mangling. Julia can find libraries in directories that are either on the default library search path or included by setting the `LD_LIBRARY_PATH` environment variable on Linux, or `PATH` on Windows. If the compiled library is not directly visible to Julia, you can open it with `Libdl.dlopen` and acquire function pointers with `Libdl.dlsym`. These pointers can be called the same way as the pointer in the previous example.
+The functions you want to use with `ccall` must be both `extern "C"` functions to ensure the C ABI is used, and annotated with `#[no_mangle]` to prevent name mangling. Julia can find libraries in directories that are either on the default library search path or included by setting the `LD_LIBRARY_PATH` environment variable on Linux. If the compiled library is not directly visible to Julia, you can open it with `Libdl.dlopen` and acquire function pointers with `Libdl.dlsym`. These pointers can be called the same way as the pointer in the previous example.
 
 If the library is visible to Julia you can access it with the library name. If `call_me` is defined in a crate called `foo`, the following should workif the function is annotated with `#[no_mangle]`:
 

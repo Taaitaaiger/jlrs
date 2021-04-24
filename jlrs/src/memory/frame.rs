@@ -55,10 +55,10 @@
 //! [`ScopeExt`]: ../traits/scope/trait.ScopeExt.html
 //! [`Frame`]: crate::memory::traits::frame::Frame
 
-#[cfg(all(feature = "async", target_os = "linux"))]
+#[cfg(feature = "async")]
 use super::mode::Async;
 use super::{stack::StackPage, traits::mode::Mode};
-#[cfg(all(feature = "async", target_os = "linux"))]
+#[cfg(feature = "async")]
 use crate::{
     error::{AllocError, JlrsError, JlrsResult, JuliaResult},
     memory::output::Output,
@@ -67,7 +67,7 @@ use crate::{
 };
 use crate::{private::Private, CCall};
 use jl_sys::jl_value_t;
-#[cfg(all(feature = "async", target_os = "linux"))]
+#[cfg(feature = "async")]
 use std::future::Future;
 use std::{ffi::c_void, marker::PhantomData, ptr::null_mut};
 
@@ -194,7 +194,7 @@ impl<'frame, M: Mode> Drop for GcFrame<'frame, M> {
 /// slots as needed. A frame is able to create at least 16 slots. If there is sufficient capacity
 /// available, a new frame will use this remaining capacity. If the capacity is insufficient, more
 /// stack space is allocated.
-#[cfg(all(feature = "async", target_os = "linux"))]
+#[cfg(feature = "async")]
 pub struct AsyncGcFrame<'frame> {
     raw_frame: &'frame mut [*mut c_void],
     n_roots: usize,
@@ -203,7 +203,7 @@ pub struct AsyncGcFrame<'frame> {
     mode: Async<'frame>,
 }
 
-#[cfg(all(feature = "async", target_os = "linux"))]
+#[cfg(feature = "async")]
 impl<'frame> AsyncGcFrame<'frame> {
     /// An async version of `value_scope`. Rather than a closure, it takes an async closure that
     /// provides a new `AsyncGcFrame`.
@@ -510,7 +510,7 @@ impl<'frame> AsyncGcFrame<'frame> {
     }
 }
 
-#[cfg(all(feature = "async", target_os = "linux"))]
+#[cfg(feature = "async")]
 impl<'frame> Drop for AsyncGcFrame<'frame> {
     fn drop(&mut self) {
         // The frame was pushed when the frame was created.

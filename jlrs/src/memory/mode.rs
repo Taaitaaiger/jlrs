@@ -4,9 +4,9 @@
 //! handling the differences between pushing and popping frames from the GC stack for the
 //! different modes.
 
-#[cfg(all(feature = "async", target_os = "linux"))]
+#[cfg(feature = "async")]
 use std::cell::Cell;
-#[cfg(all(feature = "async", target_os = "linux"))]
+#[cfg(feature = "async")]
 use std::ffi::c_void;
 
 /// Mode used by the synchronous runtime.
@@ -15,5 +15,5 @@ pub struct Sync;
 
 /// Mode used by the asynchronous runtime.
 #[derive(Clone, Copy)]
-#[cfg(all(feature = "async", target_os = "linux"))]
+#[cfg(feature = "async")]
 pub struct Async<'a>(pub(crate) &'a Cell<*mut c_void>);

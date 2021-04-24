@@ -17,47 +17,6 @@ use std::sync::atomic::{AtomicPtr, Ordering};
 
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
-#[cfg(target_os = "windows")]
-extern "C" {
-    pub fn uv_async_send(async_: *mut c_void) -> ::std::os::raw::c_int;
-}
-
-/*mod dynamic {
-    use libc::{dlopen, dlsym, RTLD_NOW, RTLD_GLOBAL, RTLD_NODELETE};
-
-    macro_rules! define_dynamic_function {
-        ($name:ident, ($($args:ty,)+), $out:ty) => {
-            pub static mut $name: ::std::mem::MaybeUninit<unsafe extern "C" fn($(args),+) -> $out> = ::std::mem::MaybeUninit::uninit()
-        };
-        ($name:ident, ($args:ty), $out:ty) => {
-            pub static mut $name: ::std::mem::MaybeUninit<unsafe extern "C" fn($args) -> $out> = ::std::mem::MaybeUninit::uninit();
-        }
-    }
-
-    define_dynamic_function!(jl_eval_string, (*const ::std::os::raw::c_char), *mut super::jl_value_t);
-    // pub static mut jl_eval_string: std::mem::MaybeUninit<unsafe extern "C" fn(*const std::os::raw::c_char) -> *mut super::jl_value_t> = unsafe { std::mem::transmute(std::ptr::null_mut::<std::ffi::c_void>()) };
-
-    pub unsafe fn load() {
-        let path = std::ffi::CStr::from_bytes_with_nul_unchecked(b"/home/thomas/julia-1.5.3/lib/libjulia.so\0");
-        let lib = dlopen(path.as_ptr(), RTLD_NOW | RTLD_GLOBAL | RTLD_NODELETE);
-
-        {
-            let fnname = std::ffi::CStr::from_bytes_with_nul_unchecked(b"jl_eval_string\0");
-            let sym: *mut std::ffi::c_void = dlsym(lib, fnname.as_ptr()).cast();
-            assert!(!sym.is_null());
-            jl_eval_string = std::mem::transmute(sym);
-        }
-    }
-}
-
-pub fn dyn_eval_string() {
-    unsafe {
-        dynamic::load();
-        let s = std::ffi::CStr::from_bytes_with_nul_unchecked(b"println(\"hello dyn\")\0");
-        dynamic::jl_eval_string.assume_init()(s.as_ptr());
-    }
-}*/
-
 // define
 /*
 #define container_of(ptr, type, member) \
