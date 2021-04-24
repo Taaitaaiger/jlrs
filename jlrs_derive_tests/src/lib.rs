@@ -636,22 +636,22 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .dynamic_frame(|global, frame| {
+                .scope(|global, frame| {
                     let constr = Module::main(global)
                         .submodule("WithStrings")?
                         .function("WithString")?;
 
-                    let v1 = Value::new(frame, "foo")?;
-                    let jl_val = constr.call1(frame, v1)?.unwrap();
+                    let v1 = Value::new(&mut *frame, "foo")?;
+                    let jl_val = constr.call1(&mut *frame, v1)?.unwrap();
 
                     assert!(Module::base(global)
                         .function("typeof")?
-                        .call1(frame, jl_val)?
+                        .call1(&mut *frame, jl_val)?
                         .unwrap()
                         .cast::<DataType>()?
                         .is::<WithString>());
 
-                    let first = jl_val.get_nth_field(frame, 0).unwrap();
+                    let first = jl_val.get_nth_field(&mut *frame, 0).unwrap();
                     assert_eq!(first.cast::<String>().unwrap(), "foo");
 
                     assert!(jl_val.is::<WithString>());
