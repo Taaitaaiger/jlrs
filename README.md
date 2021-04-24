@@ -138,26 +138,26 @@ unsafe extern "C" fn call_me(arg: bool) -> isize {
 }
 
 fn main() {
-let mut julia = unsafe { Julia::init().unwrap() };
-julia.scope(|global, frame| {
-    // Cast the function to a void pointer
-    let call_me_val = Value::new(&mut *frame, call_me as *mut std::ffi::c_void)?;
+    let mut julia = unsafe { Julia::init().unwrap() };
+    julia.scope(|global, frame| {
+        // Cast the function to a void pointer
+        let call_me_val = Value::new(&mut *frame, call_me as *mut std::ffi::c_void)?;
 
-    // Value::eval_string can be used to create new functions.
-    let func = Value::eval_string(
-        &mut *frame,
-        "myfunc(callme::Ptr{Cvoid})::Int = ccall(callme, Int, (Bool,), true)"
-    )?.unwrap();
+        // Value::eval_string can be used to create new functions.
+        let func = Value::eval_string(
+            &mut *frame,
+            "myfunc(callme::Ptr{Cvoid})::Int = ccall(callme, Int, (Bool,), true)"
+        )?.unwrap();
 
-    // Call the function and unbox the result.
-    let output = func.call1(&mut *frame, call_me_val)?
-        .into_jlrs_result()?
-        .cast::<isize>()?;
+        // Call the function and unbox the result.
+        let output = func.call1(&mut *frame, call_me_val)?
+            .into_jlrs_result()?
+            .cast::<isize>()?;
 
-    assert_eq!(output, 1);
-    
-    Ok(())
-}).unwrap();
+        assert_eq!(output, 1);
+        
+        Ok(())
+    }).unwrap();
 }
 ```
 

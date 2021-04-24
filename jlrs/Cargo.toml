@@ -20,7 +20,7 @@ edition = "2018"
 default = ["jlrs-derive"]
 async = ["futures", "crossbeam-channel", "async-trait", "async-std"]
 jlrs-ndarray = ["ndarray"]
-docs-rs = ["jl-sys/docs-rs", "jlrs-derive", "async"]
+docs-rs = ["jl-sys/docs-rs", "jlrs-derive", "async", "jlrs-ndarray"]
 
 [dependencies]
 jl-sys = {version = "0.11", path = "../jl_sys" }
