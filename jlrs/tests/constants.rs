@@ -9,7 +9,7 @@ macro_rules! impl_constant_test {
             JULIA.with(|j| {
                 let mut jlrs = j.borrow_mut();
 
-                jlrs.frame(0, |global, _| {
+                jlrs.scope_with_slots(0, |global, _| {
                     let v1 = Value::$func(global);
                     let v2 = Module::core(global).global($tyname)?;
                     assert!(v1.datatype().unwrap().as_value().egal(v2));
@@ -28,7 +28,7 @@ macro_rules! impl_constant_isa_test {
             JULIA.with(|j| {
                 let mut jlrs = j.borrow_mut();
 
-                jlrs.frame(0, |global, _| {
+                jlrs.scope_with_slots(0, |global, _| {
                     #[allow(unused_unsafe)]
                     unsafe {
                         let v1 = Value::$func(global);
@@ -50,7 +50,7 @@ macro_rules! impl_constant_subtype_test {
             JULIA.with(|j| {
                 let mut jlrs = j.borrow_mut();
 
-                jlrs.frame(0, |global, _| {
+                jlrs.scope_with_slots(0, |global, _| {
                     #[allow(unused_unsafe)]
                     unsafe {
                         let v1 = Value::$func(global);
@@ -72,7 +72,7 @@ macro_rules! impl_unionall_constant_test {
             JULIA.with(|j| {
                 let mut jlrs = j.borrow_mut();
 
-                jlrs.frame(0, |global, _| {
+                jlrs.scope_with_slots(0, |global, _| {
                     let v1 = UnionAll::$func(global);
                     let v2 = Module::core(global).global($tyname)?;
                     assert!(v1.as_value().egal(v2));
@@ -91,7 +91,7 @@ macro_rules! impl_unionall_constant_isa_test {
             JULIA.with(|j| {
                 let mut jlrs = j.borrow_mut();
 
-                jlrs.frame(0, |global, _| {
+                jlrs.scope_with_slots(0, |global, _| {
                     let v1 = UnionAll::$func(global);
                     let v2 = Module::core(global).global($tyname)?;
                     assert!(v1.as_value().isa(v2));
@@ -110,7 +110,7 @@ macro_rules! impl_datatype_constant_isa_test {
             JULIA.with(|j| {
                 let mut jlrs = j.borrow_mut();
 
-                jlrs.frame(0, |global, _| {
+                jlrs.scope_with_slots(0, |global, _| {
                     let v1 = DataType::$func(global);
                     let v2 = Module::core(global).global($tyname)?;
                     assert!(v1.as_value().isa(v2));

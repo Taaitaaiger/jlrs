@@ -1,11 +1,16 @@
 //! Everything related to errors.
 
-use crate::value::array::Dimensions;
+use crate::value::{array::Dimensions, Value};
 use std::error::Error;
 use std::fmt::{Display, Formatter, Result as FmtResult};
 
 /// Alias that is used for most `Result`s in this crate.
 pub type JlrsResult<T> = Result<T, Box<JlrsError>>;
+
+/// This type alias is used to encode the result of a function call: `Ok` indicates the call was
+/// successful and contains the function's result, while `Err` indicates an exception was thrown
+/// and contains said exception.
+pub type JuliaResult<'frame, 'data, V = Value<'frame, 'data>> = Result<V, Value<'frame, 'data>>;
 
 /// All different errors.
 #[derive(Debug)]
@@ -59,7 +64,9 @@ pub enum JlrsError {
     Immutable,
     NotSubtype,
     NotConcrete(String),
+    ArrayNotSupported,
     NamedTupleSizeMismatch(usize, usize),
+    MoreThreadsRequired,
 }
 
 /// Create a new `JlrsError::Exception` and wrap it in a `JlrsResult::Err`.
@@ -67,18 +74,8 @@ pub fn exception<T>(exc: String) -> JlrsResult<T> {
     Err(JlrsError::Exception(exc))?
 }
 
-/// Create a new `JlrsError::Other` and wrap it in a `JlrsResult::Err`.
-pub fn other<T, E: Error + Send + Sync + 'static>(reason: E) -> JlrsResult<T> {
-    Err(JlrsError::Other(Box::new(reason)))?
-}
-
-/// Create a new `JlrsError::Other`.
-pub fn other_err<E: Error + Send + Sync + 'static>(reason: E) -> JlrsError {
-    JlrsError::Other(Box::new(reason))
-}
-
 impl JlrsError {
-    pub(crate) fn other<E: Error + Send + Sync + 'static>(reason: E) -> Self {
+    pub fn other<E: Error + Send + Sync + 'static>(reason: E) -> Self {
         JlrsError::Other(Box::new(reason))
     }
 
@@ -162,6 +159,10 @@ impl Display for JlrsError {
             JlrsError::NotATask => write!(formatter, "This is not a task"),
 
             JlrsError::Inline => write!(formatter, "The data of this array is stored inline"),
+            JlrsError::MoreThreadsRequired => write!(
+                formatter,
+                "The JULIA_NUM_THREADS environment variable must be set to a value larger than 1"
+            ),
             JlrsError::NotADataType => write!(formatter, "This is not a datatype"),
             JlrsError::NotAMethod => write!(formatter, "This is not a method"),
             JlrsError::NotASymbol => write!(formatter, "This is not a symbol"),
@@ -203,6 +204,14 @@ impl Display for JlrsError {
                     values
                 )
             }
+            JlrsError::ArrayNotSupported => {
+                write!(
+                    formatter,
+                    "Array types cannot be instantiated with `DataType::instantiate`, but must \
+                    be created with `Value::new_array`, `Value::move_array`, or \
+                    `Value::borrow_array`.",
+                )
+            }
         }
     }
 }
@@ -233,14 +242,5 @@ impl Into<JlrsError> for AllocError {
 impl Into<Box<JlrsError>> for AllocError {
     fn into(self) -> Box<JlrsError> {
         Box::new(self.into())
-    }
-}
-
-impl AllocError {
-    pub fn jlrs_error(self) -> JlrsError {
-        self.into()
-    }
-    pub fn boxed_jlrs_error(self) -> Box<JlrsError> {
-        self.into()
     }
 }

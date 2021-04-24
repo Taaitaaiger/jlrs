@@ -8,7 +8,7 @@ fn borrow_array_1d() {
         let mut data = vec![1u64, 2, 3, 4];
 
         let unboxed = jlrs
-            .frame(1, |_, frame| {
+            .scope_with_slots(1, |_, frame| {
                 let array = Value::borrow_array(frame, &mut data, 4)?;
                 assert!(array.is_array_of::<u64>());
                 array.cast::<Array>()?.copy_inline_data::<u64>()
@@ -23,15 +23,55 @@ fn borrow_array_1d() {
 }
 
 #[test]
+fn borrow_array_1d_dynamic_type() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+
+        struct Foo<'a> {
+            slice: &'a mut [u8],
+        }
+
+        let foo = Foo {
+            slice: &mut [1, 2, 3, 4, 5, 6, 7, 8],
+        };
+
+        let unboxed = jlrs
+            .scope_with_slots(1, |_, frame| {
+                let x = false;
+
+                let array = match x {
+                    true => Value::borrow_array(frame, foo.slice, 8)?,
+                    false => unsafe {
+                        let ptr = foo.slice.as_mut_ptr().cast::<u16>();
+                        let slice = std::slice::from_raw_parts_mut(ptr, 4);
+                        Value::borrow_array(frame, slice, 4)?
+                    },
+                };
+
+                assert!(array.is_array_of::<u16>());
+                array.cast::<Array>()?.copy_inline_data::<u16>()
+            })
+            .unwrap();
+
+        let (data, dims) = unboxed.splat();
+        assert_eq!(dims.n_dimensions(), 1);
+        assert_eq!(dims.n_elements(0), 4);
+        assert_eq!(data, vec![513, 1027, 1541, 2055]);
+    });
+}
+
+#[test]
 fn borrow_array_1d_output() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
         let mut data = vec![1u64, 2, 3, 4];
 
         let unboxed = jlrs
-            .frame(1, |_, frame| {
-                let output = frame.output()?;
-                let array = Value::borrow_array_output(frame, output, &mut data, 4)?;
+            .scope_with_slots(1, |_, frame| {
+                let array = frame.value_scope_with_slots(0, |output, frame| {
+                    let output = output.into_scope(frame);
+                    Value::borrow_array(output, &mut data, 4)
+                })?;
                 assert!(array.is_array_of::<u64>());
                 array.cast::<Array>()?.copy_inline_data::<u64>()
             })
@@ -51,7 +91,7 @@ fn borrow_array_1d_dynamic() {
         let mut data = vec![1u64, 2, 3, 4];
 
         let unboxed = jlrs
-            .dynamic_frame(|_, frame| {
+            .scope(|_, frame| {
                 let array = Value::borrow_array(frame, &mut data, 4)?;
                 array.cast::<Array>()?.copy_inline_data::<u64>()
             })
@@ -71,7 +111,7 @@ fn borrow_array_2d() {
         let mut data = vec![1u64, 2, 3, 4];
 
         let unboxed = jlrs
-            .frame(1, |_, frame| {
+            .scope_with_slots(1, |_, frame| {
                 let array = Value::borrow_array(frame, &mut data, (2, 2))?;
                 array.cast::<Array>()?.copy_inline_data::<u64>()
             })
@@ -92,7 +132,7 @@ fn borrow_array_2d_dynamic() {
         let mut data = vec![1u64, 2, 3, 4];
 
         let unboxed = jlrs
-            .dynamic_frame(|_, frame| {
+            .scope(|_, frame| {
                 let array = Value::borrow_array(frame, &mut data, (2, 2))?;
                 array.cast::<Array>()?.copy_inline_data::<u64>()
             })
@@ -102,5 +142,26 @@ fn borrow_array_2d_dynamic() {
         assert_eq!(dims.n_elements(0), 2);
         assert_eq!(dims.n_elements(1), 2);
         assert_eq!(data, vec![1, 2, 3, 4]);
+    });
+}
+
+#[test]
+fn call_function_with_borrowed() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+        let mut data = vec![1u64, 2, 3, 4];
+
+        let unboxed = jlrs
+            .scope_with_slots(2, |global, frame| {
+                let array = Value::borrow_array(&mut *frame, &mut data, 4)?;
+                Module::base(global)
+                    .function("sum")?
+                    .call1(&mut *frame, array)?
+                    .unwrap()
+                    .cast::<u64>()
+            })
+            .unwrap();
+
+        assert_eq!(unboxed, 10);
     });
 }

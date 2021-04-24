@@ -6,8 +6,8 @@
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L535
 
 use super::{array::Array, module::Module, symbol::Symbol, Value};
+use crate::convert::cast::Cast;
 use crate::error::{JlrsError, JlrsResult};
-use crate::traits::Cast;
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_methtable_t, jl_methtable_type};
 use std::{

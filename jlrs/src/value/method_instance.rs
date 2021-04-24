@@ -8,8 +8,8 @@ use super::array::Array;
 use super::code_instance::CodeInstance;
 use super::simple_vector::SimpleVector;
 use super::Value;
+use crate::convert::cast::Cast;
 use crate::error::{JlrsError, JlrsResult};
-use crate::traits::Cast;
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_method_instance_t, jl_method_instance_type};
 use std::{

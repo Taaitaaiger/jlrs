@@ -44,7 +44,7 @@ jobs:
         run: |
           export JULIA_DIR="$(dirname $(dirname $(which julia)))"
           export LD_LIBRARY_PATH="${JULIA_DIR}/lib:${LD_LIBRARY_PATH}"
-          cargo test --verbose -- --test-threads=1
+          cargo test --features async,jlrs-ndarray --verbose -- --test-threads=1
           
   docs:
     runs-on: ubuntu-latest
@@ -73,6 +73,7 @@ jobs:
           export JULIA_DIR=$(dirname $(dirname $(which julia)))
           echo "LD_LIBRARY_PATH=${JULIA_DIR}/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
           echo "JULIA_DIR=${JULIA_DIR}" >> $GITHUB_ENV
+
       - name: Build Docs
         run: cargo doc
       
@@ -80,4 +81,4 @@ jobs:
         uses: chabad360/htmlproofer@v1.1
         with:
           directory: "target/doc/jlrs"
-          arguments: '--root-dir target/doc --allow_hash_href --url-ignore "/(#\d+|FutureExt|\\:\\:)/" --checks-to-ignore ScriptCheck,ImageCheck'
+          arguments: '--root-dir target/doc --allow_hash_href --url-ignore "/(#\d+|FutureExt|TryFuture|\\:\\:)/" --checks-to-ignore ScriptCheck,ImageCheck'

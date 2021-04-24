@@ -1,7 +1,7 @@
 use jlrs::prelude::*;
 use std::any::Any;
 
-// This struct contains the data we'll need to call one or more Julia functions, in this case
+// This struct contains the data needed to call some Julia functions, in this case
 // `dims` and `iters`. There's also a `sender` that is used to send back the eventual result.
 // For more complex types that don't implement `Copy`, you can wrap them in `Option` and use
 // `Option::take` to extract them from the struct.
@@ -11,7 +11,7 @@ struct MyTask {
     sender: crossbeam_channel::Sender<JlrsResult<Box<dyn Any + Send + Sync>>>,
 }
 
-// `MyTask` is a task we want to be executed, so we need to implement `JuliaTrait`. This requires
+// `MyTask` is a task we want to be executed, so we need to implement `JuliaTask`. This requires
 // `async_trait` because traits with async methods are not yet available in Rust. Because the 
 // task itself is executed on a single thread, it is marked with `?Send`. 
 #[async_trait(?Send)]
@@ -23,31 +23,31 @@ impl JuliaTask for MyTask {
     // task doesn't return a result to the caller, `R` must be set.
     type R = crossbeam_channel::Sender<JlrsResult<Self::T>>;
 
-    // This is the async variation of the closure you give to `Julia::frame` or
-    // `Julia::dynamic_frame` when you use the synchronous runtime. The `Global` can be used to
-    // access `Module`s and other static data, while the `AsyncFrame` let you create values, call
-    // functions, and create nested frames.
+    // This is the async variation of the closure you give to `Julia::scope` or
+    // `Julia::scope_with_slots` when you use the sync runtime: the `Global` can be used to access 
+    // `Module`s and other static data, while the `AsyncGcFrame` let you create values, call
+    // functions, and create nested scopes.
     async fn run<'base>(
         &mut self,
         global: Global<'base>,
-        frame: &mut AsyncFrame<'base>,
+        frame: &mut AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::T> {
         // Convert the two arguments to values Julia can work with.
-        let dims = Value::new(frame, self.dims)?;
-        let iters = Value::new(frame, self.iters)?;
+        let dims = Value::new(&mut *frame, self.dims)?;
+        let iters = Value::new(&mut *frame, self.iters)?;
 
         // Get `complexfunc` in `MyModule`, call it asynchronously with `call_async`, and await
         // the result before casting it to an `f64` (which that function returns). A function that
-        // is called with `call_async` is executed on a thread created with `Base.threads.@spawn`.
+        // is called with `call_async` is executed on another thread by calling 
+        // `Base.threads.@spawn`. 
         let v = Module::main(global)
             .submodule("MyModule")?
             .function("complexfunc")?
-            .call_async(frame, &mut [dims, iters])
+            .call_async(&mut *frame, &mut [dims, iters])
             .await?
             .unwrap()
             .cast::<f64>()?;
 
-        // Box the result
         Ok(Box::new(v))
     }
 
@@ -59,39 +59,24 @@ impl JuliaTask for MyTask {
 }
 
 fn main() {
-    // Initialize the asynchronous runtime. We'll allow a backlog of sixteen pending messages in 
-    // the channel that the runtime consumes, two tasks to run simultaneously, give each task a 
-    // stack with sixteen slots to protect data from garbage collection and insert a process events
-    // every millisecond.
+    // Initialize the async runtime. The `JULIA_NUM_THREADS` environment variable must be set to a
+    // value larger than 1, or an error is returned.
     //
-    // Okay, that's a lot to unpack. Let's look at those arguments a bit more closely to see why 
-    // we need them.
-    //
-    // The runtime runs in a separate thread. In order to send it tasks and other commands, a 
-    // channel is needed. The runtime will receive these messages, but a backlog can build up if a
-    // long-running synchronously called function is blocking it.
-    //
-    // Julia can be started with one or more threads by setting the `JULIA_NUM_THREADS` 
-    // environment variable. By default it's 1, and it must be set to a higher value in order for 
-    // the asynchronous runtime to work. The `n_threads` argument indicates how many of these 
-    // threads can be used to offload function calls to, and must be lower than the number of 
-    // threads Julia has available to it.
-    //
-    // In order to protect the data we get from Julia from being freed by the garbage collector a 
-    // stack is maintained. If the stack is too small, jlrs will eventually return an error to
-    // indicate it has run out of stack space; if it is too large, you will waste memory. You can
-    // find the stack space costs of different operations in the documentation of jlrs.
+    // The runtime runs in a separate thread. It receives messages through a channel, a backlog 
+    // can build up if a task which does a significant amount of work on the main thread is 
+    // blocking the runtime. The queue size of this channel is set with the first argument of
+    // `AsyncJulia::init`. Here we allow for a backlog of 16 messages before the channel is full.
     //
     // When one or more functions are running in other threads but the runtime has no synchronous
-    // work to do, the garbage collector can't run. Similarly, asynchronous events (such as
+    // work to do, the garbage collector can't run. Similarly, async events in Julia (such as
     // rescheduling a task that has yielded after calling `sleep` or `println`) will not be 
-    // handled either. In order to solve this issue, these things are explicitly handled 
-    // periodically.
+    // handled either. In order to fix this, event must be processed. We do so every millisecond.
     //
-    // After calling this function we have a `task_sender` we can use to send tasks and requests
-    // to include a file to the runtime, and a handle to the thread where the runtime is running.
+    // After calling this function we have an instance of `AsyncJulia` that can be used to send 
+    // tasks and requests to include a file to the runtime, and a handle to the thread where the
+    // runtime is running.
     let (julia, handle) = unsafe { 
-        AsyncJulia::init(16, 2, 16, 1)
+        AsyncJulia::init(16, 1)
             .expect("Could not init Julia") 
     };
 
@@ -104,28 +89,28 @@ fn main() {
     let (sender2, receiver2) = crossbeam_channel::bounded(1);
 
     // Send two tasks to the runtime.
-    julia.try_new_task(MyTask {
+    julia.try_task(MyTask {
         dims: 4,
         iters: 5_000_000,
         sender: sender1,
     }).unwrap();
 
-    julia.try_new_task(MyTask {
+    julia.try_task(MyTask {
         dims: 6,
         iters: 5_000_000,
         sender: sender2,
     }).unwrap();
 
-    // Receive the result of the first tasks. `Any::downcast_ref` can be used to convert the 
-    // result to the appropriate type.
+    // Receive the results of the tasks. `Any::downcast_ref` can be used to convert the result to
+    // the appropriate type.
     let x = receiver1.recv().unwrap().unwrap();
     println!("Result of first task: {:?}", x.downcast_ref::<f64>());
     
     let y = receiver2.recv().unwrap().unwrap();
     println!("Result of second task: {:?}", y.downcast_ref::<f64>());
 
-    // `task_sender is the only sender, dropping it will cause the runtime to shut down Julia and
-    // itself. We join the handle to wait for everything to shut down cleanly.
+    // Dropping `julia` causes the runtime to shut down Julia and itself. Join the handle to wait 
+    // for everything to shut down cleanly.
     std::mem::drop(julia);
     handle.join().expect("Cannot join").expect("Unable to init Julia");
 }

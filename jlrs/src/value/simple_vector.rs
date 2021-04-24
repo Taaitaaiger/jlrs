@@ -1,11 +1,11 @@
 //! Support for values with the `Core.SimpleVector` (`SVec`) type.
 
-use crate::traits::private::Internal;
+use crate::private::Private;
 use crate::value::Value;
 use crate::{
+    convert::cast::Cast,
     error::{JlrsError, JlrsResult},
-    global::Global,
-    traits::{cast::Cast, frame::Frame},
+    memory::{global::Global, traits::frame::Frame},
 };
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{
@@ -39,7 +39,7 @@ impl<'frame> SimpleVector<'frame> {
     {
         unsafe {
             let svec = jl_alloc_svec(n);
-            if let Err(err) = frame.protect(svec.cast(), Internal) {
+            if let Err(err) = frame.push_root(svec.cast(), Private) {
                 Err(JlrsError::AllocError(err))?
             };
 
@@ -54,7 +54,7 @@ impl<'frame> SimpleVector<'frame> {
         F: Frame<'frame>,
     {
         let svec = jl_alloc_svec_uninit(n);
-        if let Err(err) = frame.protect(svec.cast(), Internal) {
+        if let Err(err) = frame.push_root(svec.cast(), Private) {
             Err(JlrsError::AllocError(err))?
         };
 

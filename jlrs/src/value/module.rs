@@ -1,10 +1,17 @@
 //! Access Julia modules and the globals and functions defined in them.
 
+use super::{traits::call::Call, LeakedValue};
 use crate::error::{JlrsError, JlrsResult};
-use crate::global::Global;
-use crate::traits::{private::Internal, Cast, Frame, TemporarySymbol};
-use crate::value::symbol::Symbol;
-use crate::value::{CallResult, Value};
+use crate::private::Private;
+use crate::value::Value;
+use crate::{
+    convert::{cast::Cast, temporary_symbol::TemporarySymbol},
+    memory::{
+        global::Global,
+        traits::{frame::Frame, scope::Scope},
+    },
+    value::symbol::Symbol,
+};
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{
     jl_base_module, jl_core_module, jl_get_global, jl_main_module, jl_module_t, jl_module_type,
@@ -22,12 +29,9 @@ use std::marker::PhantomData;
 /// [`DataType::is`] and [`Value::is`]; if the check returns `true` the [`Value`] can be cast to
 ///  `Module`.
 ///
-/// [`Julia::include`]: ../../struct.Julia.html#method.include
-/// [`JuliaTypecheck`]: ../../traits/trait.JuliaTypecheck.html
-/// [`Cast`]: ../../traits/trait.Cast.html
-/// [`DataType::is`]: ../datatype/struct.DataType.html#method.is
-/// [`Value::is`]: ../struct.Value.html#method.is
-/// [`Value`]: ../struct.Value.html
+/// [`Julia::include`]: crate::Julia::include
+/// [`JuliaTypecheck`]: crate::layout::julia_typecheck::JuliaTypecheck
+/// [`DataType::is`]: crate::value::datatype::DataType::is
 #[derive(Copy, Clone)]
 #[repr(transparent)]
 pub struct Module<'base>(*mut jl_module_t, PhantomData<&'base ()>);
@@ -70,7 +74,7 @@ impl<'base> Module<'base> {
     /// [`Julia::include`], handles to functions, globals, and submodules defined in these
     /// included files are available through this module.
     ///
-    /// [`Julia::include`]: ../../struct.Julia.html#method.include
+    /// [`Julia::include`]: crate::Julia::include
     pub fn main(_: Global<'base>) -> Self {
         unsafe { Module::wrap(jl_main_module) }
     }
@@ -96,7 +100,7 @@ impl<'base> Module<'base> {
     {
         unsafe {
             // safe because jl_symbol_n copies the contents
-            let symbol = name.temporary_symbol(Internal);
+            let symbol = name.temporary_symbol(Private);
 
             let submodule = jl_get_global(self.ptr(), symbol.ptr());
 
@@ -121,7 +125,7 @@ impl<'base> Module<'base> {
     {
         jl_set_global(
             self.ptr(),
-            name.temporary_symbol(Internal).ptr(),
+            name.temporary_symbol(Private).ptr(),
             value.ptr(),
         );
         Value::wrap(value.ptr())
@@ -137,7 +141,7 @@ impl<'base> Module<'base> {
         N: TemporarySymbol,
     {
         unsafe {
-            let symbol = name.temporary_symbol(Internal);
+            let symbol = name.temporary_symbol(Private);
             if self.global(symbol).is_ok() {
                 Err(JlrsError::ConstAlreadyExists(symbol.into()))?;
             }
@@ -155,7 +159,7 @@ impl<'base> Module<'base> {
         N: TemporarySymbol,
     {
         unsafe {
-            let symbol = name.temporary_symbol(Internal);
+            let symbol = name.temporary_symbol(Private);
 
             // there doesn't seem to be a way to check if this is actually a
             // function...
@@ -168,12 +172,32 @@ impl<'base> Module<'base> {
         }
     }
 
+    /// Returns the global named `name` in this module as a [`LeakedValue`].
+    /// Returns an error if the global doesn't exist.
+    pub fn leaked_global<N>(self, name: N) -> JlrsResult<LeakedValue>
+    where
+        N: TemporarySymbol,
+    {
+        unsafe {
+            let symbol = name.temporary_symbol(Private);
+
+            // there doesn't seem to be a way to check if this is actually a
+            // function...
+            let func = jl_get_global(self.ptr(), symbol.ptr());
+            if func.is_null() {
+                return Err(JlrsError::FunctionNotFound(symbol.into()).into());
+            }
+
+            Ok(LeakedValue::wrap(func))
+        }
+    }
+
     /// Returns the function named `name` in this module. Note that all globals defined within the
     /// module will be successfully resolved into a function; Julia will throw an exception if you
     /// try to call something that isn't a function. This means that this method is just an alias
     /// for `Module::global`.
     ///
-    /// Returns an error if th function doesn't exist.
+    /// Returns an error if the function doesn't exist.
     pub fn function<N>(self, name: N) -> JlrsResult<Value<'base, 'static>>
     where
         N: TemporarySymbol,
@@ -181,9 +205,23 @@ impl<'base> Module<'base> {
         self.global(name)
     }
 
+    /// Returns the function named `name` in this module as a [`LeakedValue`].
+    /// Returns an error if the function doesn't exist.
+    pub fn leaked_function<N>(self, name: N) -> JlrsResult<LeakedValue>
+    where
+        N: TemporarySymbol,
+    {
+        self.leaked_global(name)
+    }
+
     /// Convert `self` to a `Value`.
     pub fn as_value(self) -> Value<'base, 'static> {
         self.into()
+    }
+
+    /// Convert `self` to a `LeakedValue`.
+    pub fn as_leaked(self) -> LeakedValue {
+        unsafe { LeakedValue::wrap(self.ptr().cast()) }
     }
 
     /// Load a module by calling `Base.require` and return this module if it has been loaded
@@ -191,28 +229,21 @@ impl<'base> Module<'base> {
     /// `LinearAlgebra`. This requires one slot on the GC stack. Note that the loaded module is
     /// not made available in the module used to call this method, you can use
     /// `Module::set_global` to do so.
-    pub fn require<'frame, F, S>(
-        self,
-        frame: &mut F,
-        module: S,
-    ) -> JlrsResult<CallResult<'frame, 'static, Self>>
+    pub fn require<'scope, 'frame, S, F, M>(self, scope: S, module: M) -> JlrsResult<S::JuliaResult>
     where
+        S: Scope<'scope, 'frame, 'static, F>,
         F: Frame<'frame>,
-        S: TemporarySymbol,
+        M: TemporarySymbol,
     {
         unsafe {
-            let out = Module::wrap(jl_base_module)
+            Module::wrap(jl_base_module)
                 .function("require")
                 .unwrap()
                 .call2(
-                    frame,
+                    scope,
                     self.as_value(),
-                    module.temporary_symbol(Internal).as_value(),
-                )?
-                // transmute here to change the lifetime from 'frame to 'base.
-                .map(|a| std::mem::transmute(a.cast_unchecked::<Module>()));
-
-            Ok(out)
+                    module.temporary_symbol(Private).as_value(),
+                )
         }
     }
 
@@ -232,11 +263,11 @@ impl<'base> Module<'base> {
                 .call2_unprotected(
                     global,
                     self.as_value(),
-                    module.temporary_symbol(Internal).as_value(),
+                    module.temporary_symbol(Private).as_value(),
                 )
                 .expect(&format!(
                     "Could not load ${:?}",
-                    module.temporary_symbol(Internal)
+                    module.temporary_symbol(Private)
                 ))
                 .cast_unchecked::<Module>();
 

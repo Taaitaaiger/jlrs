@@ -14,19 +14,19 @@
 //! of its counterpart in Julia and lets you perform a large set of checks to find out its
 //! properties. Many of these checks are handled through implementations of the trait
 //! [`JuliaTypecheck`]. Some of these checks can be found in this module.
-//!
-//! [`Value`]: ../struct.Value.html
-//! [`DataType`]: struct.DataType.html
-//! [`JuliaTypecheck`]: ../../traits/trait.JuliaTypecheck.html
 
-use crate::error::{JlrsError, JlrsResult};
-use crate::frame::Output;
-use crate::global::Global;
-use crate::traits::{private::Internal, Cast, Frame, JuliaTypecheck};
+use crate::convert::cast::Cast;
+use crate::layout::julia_typecheck::JuliaTypecheck;
+use crate::memory::traits::frame::Frame;
 use crate::value::symbol::Symbol;
 use crate::value::type_name::TypeName;
 use crate::value::Value;
+use crate::{
+    error::{JlrsError, JlrsResult},
+    memory::traits::scope::Scope,
+};
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
+use crate::{memory::global::Global, private::Private};
 use jl_sys::{
     jl_abstractslot_type, jl_abstractstring_type, jl_any_type, jl_anytuple_type,
     jl_argumenterror_type, jl_bool_type, jl_boundserror_type, jl_builtin_type, jl_char_type,
@@ -50,6 +50,8 @@ use jl_sys::{
 use std::ffi::CStr;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::marker::PhantomData;
+
+use super::array::Array;
 /// Julia type information. You can acquire a [`Value`]'s datatype by by calling
 /// [`Value::datatype`]. This struct implements [`JuliaTypecheck`] and [`Cast`]. It can be used in
 /// combination with [`DataType::is`] and [`Value::is`]; if the check returns `true` the [`Value`]
@@ -61,10 +63,10 @@ use std::marker::PhantomData;
 /// # fn main() {
 /// # JULIA.with(|j| {
 /// # let mut julia = j.borrow_mut();
-/// julia.frame(2, |global, frame| {
-///     let val = Value::new(frame, 1u8)?;
+/// julia.scope(|global, frame| {
+///     let val = Value::new(&mut *frame, 1u8)?;
 ///     let typeof_func = Module::core(global).function("typeof")?;
-///     let ty_val = typeof_func.call1(frame, val)?.unwrap();
+///     let ty_val = typeof_func.call1(&mut *frame, val)?.unwrap();
 ///     assert!(ty_val.is::<DataType>());
 ///     assert!(ty_val.cast::<DataType>().is_ok());
 ///     Ok(())
@@ -72,17 +74,6 @@ use std::marker::PhantomData;
 /// # });
 /// # }
 /// ```
-///
-/// [`JuliaTypecheck`]: ../../traits/trait.JuliaTypecheck.html
-/// [`Cast`]: ../../traits/trait.Cast.html
-/// [`DataType::is`]: ../datatype/struct.DataType.html#method.is
-/// [`Value::is`]: ../struct.Value.html#method.is
-/// [`Value`]: ../struct.Value.html
-/// [`Value::datatype`]: ../struct.Value.html#method.datatype
-/// [`Value::cast`]: ../struct.Value.html#method.cast
-/// [`JuliaTypecheck`]: ../../traits/trait.JuliaTypecheck.html
-/// [`DataType::is`]: struct.Datatype.html#method.is
-/// [`Value::is`]: struct.Datatype.html#method.is
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct DataType<'frame>(*mut jl_datatype_t, PhantomData<&'frame ()>);
@@ -142,8 +133,6 @@ impl<'frame> DataType<'frame> {
 
     /// Returns the field names of this type as a slice of `Symbol`s. These symbols can be used
     /// to access their fields with [`Value::get_field`].
-    ///
-    /// [`Value::get_field`]: struct.Value.html#method.get_field
     pub fn field_names(self) -> &'frame [Symbol<'frame>] {
         unsafe {
             let field_names = jl_field_names(self.ptr().cast());
@@ -269,12 +258,13 @@ impl<'frame> DataType<'frame> {
     /// Intantiate this `DataType` with the given values. The type must be concrete. One free slot
     /// on the GC stack is required for this function to succeed, returns an error if no slot is
     /// available or if the type is not concrete.
-    pub fn instantiate<'fr, 'value, 'borrow, F, V>(
+    pub fn instantiate<'scope, 'fr, 'value, 'borrow, S, F, V>(
         self,
-        frame: &mut F,
+        scope: S,
         mut values: V,
-    ) -> JlrsResult<Value<'fr, 'borrow>>
+    ) -> JlrsResult<S::Value>
     where
+        S: Scope<'scope, 'fr, 'borrow, F>,
         F: Frame<'fr>,
         V: AsMut<[Value<'value, 'borrow>]>,
     {
@@ -283,25 +273,14 @@ impl<'frame> DataType<'frame> {
                 Err(JlrsError::NotConcrete(self.name().into()))?;
             }
 
+            if self.is::<Array>() {
+                Err(JlrsError::ArrayNotSupported)?;
+            }
+
             let values = values.as_mut();
             let value = jl_new_structv(self.ptr(), values.as_mut_ptr().cast(), values.len() as _);
-            frame.protect(value, Internal).map_err(Into::into)
+            scope.value(value, Private)
         }
-    }
-
-    /// Intantiate this `DataType` with the given values using the given output. The type must be
-    /// concrete, returns an error if the type is not concrete.
-    pub fn instantiate_output<'output, 'fr, 'value, 'borrow, F, V>(
-        self,
-        frame: &mut F,
-        output: Output<'output>,
-        values: V,
-    ) -> JlrsResult<Value<'output, 'borrow>>
-    where
-        F: Frame<'fr>,
-        V: AsMut<[Value<'value, 'borrow>]>,
-    {
-        Value::instantiate_output(frame, output, self, values)
     }
 }
 

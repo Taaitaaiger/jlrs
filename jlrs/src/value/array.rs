@@ -8,10 +8,10 @@
 //! The structs that represent copied or borrowed data can be accessed using an n-dimensional
 //! index written as a tuple. For example, if `a` is a three-dimensional array, a single element
 //! can be accessed with `a[(row, col, z)]`.
-//!
-//! [`Array`]: struct.Array.html
+use crate::convert::cast::Cast;
 use crate::error::{JlrsError, JlrsResult};
-use crate::traits::{valid_layout::ValidLayout, Cast, Frame, JuliaTypecheck};
+use crate::layout::{julia_typecheck::JuliaTypecheck, valid_layout::ValidLayout};
+use crate::memory::traits::frame::Frame;
 use crate::value::datatype::DataType;
 use crate::value::Value;
 use jl_sys::{
@@ -32,8 +32,8 @@ use std::ops::{Index, IndexMut};
 /// # fn main() {
 /// # JULIA.with(|j| {
 /// # let mut julia = j.borrow_mut();
-/// julia.frame(1, |_global, frame| {
-///     let arr = Value::new_array::<f64, _, _>(frame, (3, 3))?;
+/// julia.scope(|_global, frame| {
+///     let arr = Value::new_array::<f64, _, _, _>(&mut *frame, (3, 3))?;
 ///     assert!(arr.is::<Array>());
 ///     assert!(arr.cast::<Array>().is_ok());
 ///     Ok(())
@@ -60,22 +60,6 @@ use std::ops::{Index, IndexMut};
 ///
 /// If the data isn't inlined each element is stored as a [`Value`]. This data can be accessed
 /// using [`Array::value_data`] and [`Array::value_data_mut`] but this is unsafe.
-///
-/// [`JuliaTypecheck`]: ../../traits/trait.JuliaTypecheck.html
-/// [`Cast`]: ../../traits/trait.Cast.html
-/// [`DataType::is`]: ../datatype/struct.DataType.html#method.is
-/// [`Value::is`]: ../struct.Value.html#method.is
-/// [`Value`]: ../struct.Value.html
-/// [`Value::cast`]: ../struct.Value.html#method.cast
-/// [`Array::is_value_array`]: struct.Array.html#method.is_value_array
-/// [`Array::is_inline_array`]: struct.Array.html#method.is_inline_array
-/// [`Array::inline_data`]: struct.Array.html#method.inline_data
-/// [`Array::inline_data_mut`]: struct.Array.html#method.inline_data_mut
-/// [`Array::copy_inline_data`]: struct.Array.html#method.copy_inline_data
-/// [`JuliaTuple`]: ../../traits/trait.JuliaTuple.html
-/// [`JuliaStruct`]: ../../traits/trait.JuliaStruct.html
-/// [`Array::value_data`]: struct.Array.html#method.value_data
-/// [`Array::value_data_mut`]: struct.Array.html#method.value_data_mut
 #[derive(Copy, Clone, Debug)]
 #[repr(transparent)]
 pub struct Array<'frame, 'data>(
@@ -263,9 +247,9 @@ impl<'frame, 'data> Array<'frame, 'data> {
     /// Safety: no slot on the GC stack is required to access and use the values in this array,
     /// the GC is aware of the array's data. If the element is changed either from Rust or Julia,
     /// the original value is no longer protected from garbage collection. If you need to keep
-    /// using this value you must protect it by calling [`Value::extend`].
+    /// using this value you must protect it by calling [`Value::reroot`].
     ///
-    /// [`Value::extend`]: ../struct.Value.html#method.extend
+    /// [`Value::reroot`]: crate::value::Value::reroot
     pub unsafe fn value_data<'borrow, 'fr, F>(
         self,
         frame: &'borrow F,
@@ -289,9 +273,9 @@ impl<'frame, 'data> Array<'frame, 'data> {
     /// Safety: no slot on the GC stack is required to access and use the values in this array,
     /// the GC is aware of the array's data. If the element is changed either from Rust or Julia,
     /// the original value is no longer protected from garbage collection. If you need to keep
-    /// using this value you must protect it by calling [`Value::extend`].
+    /// using this value you must protect it by calling [`Value::reroot`].
     ///
-    /// [`Value::extend`]: ../struct.Value.html#method.extend
+    /// [`Value::reroot`]: crate::value::Value::reroot
     pub unsafe fn value_data_mut<'borrow, 'fr, F>(
         self,
         frame: &'borrow mut F,
@@ -317,9 +301,9 @@ impl<'frame, 'data> Array<'frame, 'data> {
     /// Safety: no slot on the GC stack is required to access and use the values in this array,
     /// the GC is aware of the array's data. If the element is changed either from Rust or Julia,
     /// the original value is no longer protected from garbage collection. If you need to keep
-    /// using this value you must protect it by calling [`Value::extend`].
+    /// using this value you must protect it by calling [`Value::reroot`].
     ///
-    /// [`Value::extend`]: ../struct.Value.html#method.extend
+    /// [`Value::reroot`]: crate::value::Value::reroot
     pub unsafe fn unrestricted_value_data_mut<'borrow, 'fr, F>(
         self,
         frame: &'borrow F,
@@ -385,8 +369,6 @@ unsafe impl<'frame, 'data> ValidLayout for Array<'frame, 'data> {
 }
 
 /// Exactly the same as [`Array`], except it has an explicit element type `T`.
-///
-/// [`Array`]: struct.Array.html
 #[derive(Copy, Clone, Debug)]
 #[repr(transparent)]
 pub struct TypedArray<'frame, 'data, T>(
@@ -535,9 +517,9 @@ impl<'frame, 'data, T: Copy + ValidLayout> TypedArray<'frame, 'data, T> {
     /// Safety: no slot on the GC stack is required to access and use the values in this array,
     /// the GC is aware of the array's data. If the element is changed either from Rust or Julia,
     /// the original value is no longer protected from garbage collection. If you need to keep
-    /// using this value you must protect it by calling [`Value::extend`].
+    /// using this value you must protect it by calling [`Value::reroot`].
     ///
-    /// [`Value::extend`]: ../struct.Value.html#method.extend
+    /// [`Value::reroot`]: crate::value::Value::reroot
     pub unsafe fn value_data<'borrow, 'fr, F>(
         self,
         frame: &'borrow F,
@@ -561,9 +543,9 @@ impl<'frame, 'data, T: Copy + ValidLayout> TypedArray<'frame, 'data, T> {
     /// Safety: no slot on the GC stack is required to access and use the values in this array,
     /// the GC is aware of the array's data. If the element is changed either from Rust or Julia,
     /// the original value is no longer protected from garbage collection. If you need to keep
-    /// using this value you must protect it by calling [`Value::extend`].
+    /// using this value you must protect it by calling [`Value::reroot`].
     ///
-    /// [`Value::extend`]: ../struct.Value.html#method.extend
+    /// [`Value::reroot`]: crate::value::Value::reroot
     pub unsafe fn value_data_mut<'borrow, 'fr, F>(
         self,
         frame: &'borrow mut F,
@@ -589,9 +571,9 @@ impl<'frame, 'data, T: Copy + ValidLayout> TypedArray<'frame, 'data, T> {
     /// Safety: no slot on the GC stack is required to access and use the values in this array,
     /// the GC is aware of the array's data. If the element is changed either from Rust or Julia,
     /// the original value is no longer protected from garbage collection. If you need to keep
-    /// using this value you must protect it by calling [`Value::extend`].
+    /// using this value you must protect it by calling [`Value::reroot`].
     ///
-    /// [`Value::extend`]: ../struct.Value.html#method.extend
+    /// [`Value::reroot`]: crate::value::Value::reroot
     pub unsafe fn unrestricted_value_data_mut<'borrow, 'fr, F>(
         self,
         frame: &'borrow F,
@@ -675,9 +657,6 @@ unsafe impl<'frame, 'data, T: Copy + ValidLayout> ValidLayout for TypedArray<'fr
 /// struct by calling [`Array::copy_inline_data`]. The data has a column-major order and can be
 /// indexed with anything that implements `Into<Dimensions>`; see [`Dimensions`] for more
 /// information.
-///
-/// [`Array::copy_inline_data`]: struct.Array.html#method.copy_inline_data
-/// [`Dimensions`]: struct.Dimensions.html
 #[derive(Debug)]
 pub struct CopiedArray<T> {
     data: Vec<T>,
@@ -737,8 +716,6 @@ impl<T, D: Into<Dimensions>> IndexMut<D> for CopiedArray<T> {
 
 /// Immutably borrowed array data from Julia. The data has a column-major order and can be indexed
 /// with anything that implements `Into<Dimensions>`; see [`Dimensions`] for more information.
-///
-/// [`Dimensions`]: struct.Dimensions.html
 pub struct ArrayData<'borrow, 'frame, T, F>
 where
     F: Frame<'frame>,
@@ -799,8 +776,6 @@ where
 /// Mutably borrowed inline array data from Julia. The data has a column-major order and can be
 /// indexed with anything that implements `Into<Dimensions>`; see [`Dimensions`] for more
 /// information.
-///
-/// [`Dimensions`]: struct.Dimensions.html
 pub struct InlineArrayDataMut<'borrow, 'frame, T, F: Frame<'frame>> {
     data: &'borrow mut [T],
     dimensions: Dimensions,
@@ -866,8 +841,6 @@ where
 /// Mutably borrowed value array data from Julia. The data has a column-major order and can be
 /// indexed with anything that implements `Into<Dimensions>`; see [`Dimensions`] for more
 /// information.
-///
-/// [`Dimensions`]: struct.Dimensions.html
 impl<'borrow, 'frame, T, D, F> Index<D> for InlineArrayDataMut<'borrow, 'frame, T, F>
 where
     D: Into<Dimensions>,
@@ -892,8 +865,6 @@ where
 /// Mutably borrowed inline array data from Julia. The data has a column-major order and can be
 /// indexed with anything that implements `Into<Dimensions>`; see [`Dimensions`] for more
 /// information.
-///
-/// [`Dimensions`]: struct.Dimensions.html
 pub struct UnrestrictedInlineArrayDataMut<'borrow, 'frame, T, F: Frame<'frame>> {
     data: &'borrow mut [T],
     dimensions: Dimensions,
@@ -949,8 +920,6 @@ where
 /// Mutably borrowed value array data from Julia. The data has a column-major order and can be
 /// indexed with anything that implements `Into<Dimensions>`; see [`Dimensions`] for more
 /// information.
-///
-/// [`Dimensions`]: struct.Dimensions.html
 impl<'borrow, 'frame, T, D, F> Index<D> for UnrestrictedInlineArrayDataMut<'borrow, 'frame, T, F>
 where
     D: Into<Dimensions>,

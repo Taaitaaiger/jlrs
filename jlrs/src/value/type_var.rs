@@ -3,11 +3,12 @@
 use super::symbol::Symbol;
 use super::union_all::UnionAll;
 use super::Value;
-use crate::global::Global;
-use crate::traits::private::Internal;
+use crate::memory::global::Global;
+use crate::private::Private;
 use crate::{
+    convert::{cast::Cast, temporary_symbol::TemporarySymbol},
     error::{JlrsError, JlrsResult},
-    traits::{cast::Cast, frame::Frame, temporary_symbol::TemporarySymbol},
+    memory::traits::frame::Frame,
 };
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_any_type, jl_bottom_type, jl_new_typevar, jl_tvar_t, jl_tvar_type};
@@ -47,7 +48,7 @@ impl<'frame> TypeVar<'frame> {
     {
         unsafe {
             let global = Global::new();
-            let name = name.temporary_symbol(Internal);
+            let name = name.temporary_symbol(Private);
 
             let lb = lower_bound.map_or(jl_bottom_type.cast(), |v| v.ptr());
             if !Value::wrap(lb)
@@ -71,7 +72,7 @@ impl<'frame> TypeVar<'frame> {
 
             let tvar = jl_new_typevar(name.ptr(), lb, ub);
             frame
-                .protect(tvar.cast(), Internal)
+                .push_root(tvar.cast(), Private)
                 .map_err(JlrsError::alloc_error)?;
 
             Ok(Self::wrap(tvar))

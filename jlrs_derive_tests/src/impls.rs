@@ -198,7 +198,7 @@ pub struct UnionInTuple<'frame, 'data> {
 #[derive(Copy, Clone, Debug, JuliaStruct)]
 pub struct WithGenericT<T>
 where
-    T: ::jlrs::traits::ValidLayout + Copy,
+    T: ::jlrs::layout::valid_layout::ValidLayout + Copy,
 {
     pub a: T,
 }
@@ -215,7 +215,7 @@ pub struct WithGenericUnionAll<'frame, 'data> {
 #[derive(Copy, Clone, Debug, JuliaStruct)]
 pub struct WithNestedGenericT<T>
 where
-    T: ::jlrs::traits::ValidLayout + Copy,
+    T: ::jlrs::layout::valid_layout::ValidLayout + Copy,
 {
     pub a: WithGenericT<T>,
 }

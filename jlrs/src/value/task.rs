@@ -5,8 +5,8 @@
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L1727
 use super::Value;
+use crate::convert::cast::Cast;
 use crate::error::{JlrsError, JlrsResult};
-use crate::traits::Cast;
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_task_t, jl_task_type};
 use std::{
@@ -118,6 +118,12 @@ impl<'frame> Task<'frame> {
     }
 }
 
+impl<'scope> Debug for Task<'scope> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        f.debug_tuple("Task").finish()
+    }
+}
+
 impl<'frame> Into<Value<'frame, 'static>> for Task<'frame> {
     fn into(self) -> Value<'frame, 'static> {
         unsafe { Value::wrap(self.ptr().cast()) }
@@ -142,9 +148,3 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for Task<'frame> {
 impl_julia_typecheck!(Task<'frame>, jl_task_type, 'frame);
 impl_julia_type!(Task<'frame>, jl_task_type, 'frame);
 impl_valid_layout!(Task<'frame>, 'frame);
-
-impl<'scope> Debug for Task<'scope> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        f.debug_tuple("Task").finish()
-    }
-}

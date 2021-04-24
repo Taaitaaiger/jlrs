@@ -2,9 +2,9 @@
 
 use super::type_var::TypeVar;
 use super::Value;
+use crate::convert::cast::Cast;
 use crate::error::{JlrsError, JlrsResult};
-use crate::global::Global;
-use crate::traits::Cast;
+use crate::memory::global::Global;
 use crate::value::datatype::DataType;
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{

@@ -7,8 +7,8 @@
 
 use super::method_instance::MethodInstance;
 use super::Value;
+use crate::convert::cast::Cast;
 use crate::error::{JlrsError, JlrsResult};
-use crate::traits::Cast;
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_code_instance_t, jl_code_instance_type};
 use std::{

@@ -7,7 +7,7 @@ fn core_module() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame(0, |global, _| {
+        jlrs.scope_with_slots(0, |global, _| {
             let module = Module::core(global);
             let func = module.function("isa");
             let int64 = module.global("Float64");
@@ -24,7 +24,7 @@ fn core_module_dynamic() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.dynamic_frame(|global, _| {
+        jlrs.scope(|global, _| {
             let module = Module::core(global);
             let func = module.function("isa");
             assert!(func.is_ok());
@@ -39,7 +39,7 @@ fn base_module() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame(0, |global, _| {
+        jlrs.scope_with_slots(0, |global, _| {
             let module = Module::base(global);
             let func = module.function("+");
             let int64 = module.global("pi");
@@ -56,7 +56,7 @@ fn base_module_dynamic() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.dynamic_frame(|global, _| {
+        jlrs.scope(|global, _| {
             let module = Module::base(global);
             let func = module.function("+");
             assert!(func.is_ok());
@@ -71,7 +71,7 @@ fn main_module() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame(0, |global, _| {
+        jlrs.scope_with_slots(0, |global, _| {
             let main_module = Module::main(global);
             let jlrs_module = main_module.submodule("Jlrs");
             assert!(jlrs_module.is_ok());
@@ -88,7 +88,7 @@ fn main_module_dynamic() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.dynamic_frame(|global, _| {
+        jlrs.scope(|global, _| {
             let main_module = Module::main(global);
             let jlrs_module = main_module.submodule("Jlrs");
             assert!(jlrs_module.is_ok());
@@ -105,7 +105,7 @@ fn error_nonexistent_function() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame(0, |global, _| {
+        jlrs.scope_with_slots(0, |global, _| {
             assert!(Module::base(global).function("foo").is_err());
             Ok(())
         })
@@ -118,7 +118,7 @@ fn error_nonexistent_function_dynamic() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.dynamic_frame(|global, _| {
+        jlrs.scope(|global, _| {
             assert!(Module::base(global).function("foo").is_err());
             Ok(())
         })
@@ -131,7 +131,7 @@ fn error_nonexistent_submodule() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.frame(0, |global, _| {
+        jlrs.scope_with_slots(0, |global, _| {
             assert!(Module::base(global).submodule("foo").is_err());
             Ok(())
         })
@@ -144,7 +144,7 @@ fn error_nonexistent_submodule_dynamic() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.dynamic_frame(|global, _| {
+        jlrs.scope(|global, _| {
             assert!(Module::base(global).submodule("foo").is_err());
             Ok(())
         })
@@ -156,11 +156,11 @@ fn error_nonexistent_submodule_dynamic() {
 fn function_returns_module() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
-        jlrs.frame(1, |global, frame| {
+        jlrs.scope_with_slots(1, |global, frame| {
             let base = Module::main(global)
                 .submodule("JlrsTests")?
                 .function("base")?;
-            let base_val = base.call0(frame)?.unwrap();
+            let base_val = base.call0(&mut *frame)?.unwrap();
 
             assert!(base_val.is::<Module>());
             assert!(base_val.cast::<Module>().is_ok());
@@ -176,7 +176,7 @@ fn function_returns_module() {
 fn use_string_for_access() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
-        jlrs.frame(1, |global, _frame| {
+        jlrs.scope_with_slots(1, |global, _frame| {
             assert!(Module::main(global)
                 .submodule("JlrsTests".to_string())
                 .is_ok());
@@ -191,7 +191,7 @@ fn use_string_for_access() {
 fn use_cow_for_access() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
-        jlrs.frame(1, |global, _frame| {
+        jlrs.scope_with_slots(1, |global, _frame| {
             assert!(Module::main(global)
                 .submodule(Cow::from("JlrsTests"))
                 .is_ok());
@@ -213,7 +213,7 @@ impl AsRef<str> for MyString {
 fn use_dyn_str_for_access() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
-        jlrs.frame(1, |global, _frame| {
+        jlrs.scope_with_slots(1, |global, _frame| {
             let name = MyString("JlrsTests".to_string());
             assert!(Module::main(global)
                 .submodule(&name as &dyn AsRef<str>)
@@ -229,9 +229,9 @@ fn use_dyn_str_for_access() {
 fn set_global() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
-        jlrs.frame(1, |global, frame| {
+        jlrs.scope_with_slots(1, |global, frame| {
             let main = Module::main(global);
-            let value = Value::new(frame, 1usize)?;
+            let value = Value::new(&mut *frame, 1usize)?;
             unsafe {
                 main.set_global("one", value);
             }
@@ -248,9 +248,9 @@ fn set_global() {
 fn set_const() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
-        jlrs.frame(1, |global, frame| {
+        jlrs.scope_with_slots(1, |global, frame| {
             let main = Module::main(global);
-            let value = Value::new(frame, 2usize)?;
+            let value = Value::new(&mut *frame, 2usize)?;
             main.set_const("ONE", value)?;
 
             let value = main.global("ONE")?;
@@ -265,10 +265,10 @@ fn set_const() {
 fn set_const_twice() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
-        let err = jlrs.frame(2, |global, frame| {
+        let err = jlrs.scope_with_slots(2, |global, frame| {
             let main = Module::main(global);
-            let value1 = Value::new(frame, 3usize)?;
-            let value2 = Value::new(frame, 4usize)?;
+            let value1 = Value::new(&mut *frame, 3usize)?;
+            let value2 = Value::new(&mut *frame, 4usize)?;
             main.set_const("TWICE", value1)?;
             main.set_const("TWICE", value2)?;
 
@@ -278,5 +278,21 @@ fn set_const_twice() {
         });
 
         assert!(err.is_err());
+    })
+}
+
+#[test]
+fn eval_using() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+        let res = jlrs.scope_with_slots(1, |global, frame| {
+            assert!(Module::main(global).global("Hermitian").is_err());
+            Value::eval_string(&mut *frame, "using LinearAlgebra: Hermitian")?.unwrap();
+            assert!(Module::main(global).global("Hermitian").is_ok());
+
+            Ok(())
+        });
+
+        assert!(res.is_ok());
     })
 }
