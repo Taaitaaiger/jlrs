@@ -79,5 +79,5 @@ jobs:
       - name: Run cargo-tarpaulin
         uses: actions-rs/tarpaulin@v0.1
         with:
-          version: '0.17.0'
+          version: '0.18.0-alpha2'
           args: '--coveralls ${{ secrets.COVERALLS_TOKEN }} --exclude-files examples/* --exclude-files jl_sys/* --exclude-files jlrs_derive/* jl_sys/*  -- --test-threads 1'
