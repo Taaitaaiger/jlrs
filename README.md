@@ -48,12 +48,12 @@ In order to ensure the `julia.h` header file can be found, either `/usr/include/
 Support for Windows was dropped in jlrs 0.10 due to compilation and dependency issues. 
 
 
-# Using this crate
+## Using this crate
 
 The first thing you should do is `use` the `prelude`-module with an asterisk, this will bring all the structs and traits you're likely to need into scope. If you're calling Julia from Rust, Julia must be initialized before you can use it. You can do this by calling `Julia::init`, which provides you with an instance of `Julia`. Note that this method can only be called once, if you drop its result you won't be able to create a new instance but have to restart the application. If you want to use a custom system image, you must call `Julia::init_with_image` instead of `Julia::init`. If you're calling Rust from Julia everything has already been initialized, you can use `CCall` instead.
 
 
-## Calling Julia from Rust
+### Calling Julia from Rust
 
 After initialization you have an instance of `Julia`; `Julia::include` can be used to include files with custom Julia code. In order to call Julia functions and create new values that can be used by these functions, `Julia::scope` and `Julia::scope_with_slots` must be used. These two methods take a closure with two arguments, a `Global` and a mutable reference to a `GcFrame`. `Global` is a token that is used to access Julia modules, their contents and other global values, while `GcFrame` is used to root local values. Rooting a value in a frame prevents it from being freed by the garbage collector until that frame has been dropped. The frame is created when `Julia::scope(_with_slots)` is called and dropped when that method returns.
 
@@ -122,7 +122,7 @@ fn main() {
 This is only a small example, other things can be done with `Value` as well. Their fields can be accessed with `Value::get_field`, properties of the value's type can be checked with `Value::is`, and `Value::apply_type` lets you construct arbitrary Julia types from Rust, many of which can be instantiated with `Value::instantiate`.
 
 
-## Calling Rust from Julia
+### Calling Rust from Julia
 
 Julia's `ccall` interface can be used to call `extern "C"` functions defined in Rust, for most use cases you shouldn't need jlrs. There are two major ways to use `ccall`, with a pointer to the function or a `(:function, "library")` pair.
 
@@ -192,7 +192,7 @@ One important aspect of calling Rust from other languages in general is that pan
 Most features provided by jlrs including accessing modules, calling functions, and borrowing array data require a `Global` or a frame. You can access these by creating a `CCall` first. Another method provided by `CCall` is `CCall::uv_async_send`, this method can be used in combination with `Base.AsyncCondition`. In particular, it lets you write a `ccall`able function that does its actual work on another thread, return early and `wait` on the async condition, which happens when `CCall::uv_async_send` is called when that work is finished. The advantage of this is that the long-running function will not block the Julia runtime, There's an example available on GitHub that shows how to do this.
 
 
-## Async runtime
+### Async runtime
 
 The experimental async runtime runs Julia in a separate thread and allows multiple tasks to run in parallel by offloading functions to a new thread in Julia and waiting for them to complete without blocking the runtime. To use this feature you must enable the `async` feature flag:
 
@@ -212,7 +212,7 @@ It's important to keep in mind that allocating memory in Julia uses a lock, so i
 You can find basic examples in [the examples directory of the repo](https://github.com/Taaitaaiger/jlrs/tree/master/examples).
 
 
-# Testing
+## Testing
 
 The restriction that Julia can be initialized once must be taken into account when running tests that use `jlrs`. The recommended approach is to create a thread-local static `RefCell`:
 
@@ -238,7 +238,7 @@ If these tests also involve the async runtime, the `JULIA_NUM_THREADS` environme
 If you want to run jlrs's tests, both these requirements must be taken into account: `JULIA_NUM_THREADS=2 cargo test -- --test-threads=1`
 
 
-# Custom types
+## Custom types
 
 In order to map a struct in Rust to one in Julia you can derive `JuliaStruct`. This will implement `Cast`, `JuliaType`, `ValidLayout`, and `JuliaTypecheck` for that type. If the struct in Julia has no type parameters and is a bits type you can also derive `IntoJulia`, which lets you use the type in combination with `Value::new`.
 
