@@ -3,7 +3,7 @@
 //! This module defines a single trait, `NdArray`, that provides methods that return an immutable
 //! or a mutable view of the array data and is implemented by `Array` and `TypedArray` from jlrs.
 //! It's easier to use this trait with `TypedArray`, you'll likely have to provide type
-//! annotations with `Array`. To make this trait available you must enable the feature 
+//! annotations with `Array`. To make this trait available you must opt into the feature
 //! `jlrs-ndarray`.
 
 use crate::error::{JlrsError, JlrsResult};
