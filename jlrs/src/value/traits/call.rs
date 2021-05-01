@@ -68,7 +68,7 @@ impl<'scope, 'frame, 'data> Call<'scope, 'frame, 'data> for Value<'_, 'data> {
         F: Frame<'frame>,
     {
         unsafe {
-            let res = jl_call0(self.ptr());
+            let res = jl_call0(self.inner().as_ptr());
             let exc = jl_exception_occurred();
             if exc.is_null() {
                 scope.call_result(Ok(res), Private)
@@ -84,7 +84,7 @@ impl<'scope, 'frame, 'data> Call<'scope, 'frame, 'data> for Value<'_, 'data> {
         F: Frame<'frame>,
     {
         unsafe {
-            let res = jl_call1(self.ptr(), arg0.ptr());
+            let res = jl_call1(self.inner().as_ptr(), arg0.inner().as_ptr());
             let exc = jl_exception_occurred();
             if exc.is_null() {
                 scope.call_result(Ok(res), Private)
@@ -105,7 +105,11 @@ impl<'scope, 'frame, 'data> Call<'scope, 'frame, 'data> for Value<'_, 'data> {
         F: Frame<'frame>,
     {
         unsafe {
-            let res = jl_call2(self.ptr(), arg0.ptr(), arg1.ptr());
+            let res = jl_call2(
+                self.inner().as_ptr(),
+                arg0.inner().as_ptr(),
+                arg1.inner().as_ptr(),
+            );
             let exc = jl_exception_occurred();
             if exc.is_null() {
                 scope.call_result(Ok(res), Private)
@@ -127,7 +131,12 @@ impl<'scope, 'frame, 'data> Call<'scope, 'frame, 'data> for Value<'_, 'data> {
         F: Frame<'frame>,
     {
         unsafe {
-            let res = jl_call3(self.ptr(), arg0.ptr(), arg1.ptr(), arg2.ptr());
+            let res = jl_call3(
+                self.inner().as_ptr(),
+                arg0.inner().as_ptr(),
+                arg1.inner().as_ptr(),
+                arg2.inner().as_ptr(),
+            );
             let exc = jl_exception_occurred();
             if exc.is_null() {
                 scope.call_result(Ok(res), Private)
@@ -146,7 +155,11 @@ impl<'scope, 'frame, 'data> Call<'scope, 'frame, 'data> for Value<'_, 'data> {
         unsafe {
             let args = args.as_mut();
             let n = args.len();
-            let res = jl_call(self.ptr().cast(), args.as_mut_ptr().cast(), n as _);
+            let res = jl_call(
+                self.inner().as_ptr().cast(),
+                args.as_mut_ptr().cast(),
+                n as _,
+            );
             let exc = jl_exception_occurred();
             if exc.is_null() {
                 scope.call_result(Ok(res), Private)
@@ -164,7 +177,7 @@ impl<'scope, 'frame, 'data> Call<'scope, 'frame, 'data> for WithKeywords<'_, '_,
         F: Frame<'frame>,
     {
         unsafe {
-            let func = jl_get_kwsorter(self.func.datatype().expect("").ptr().cast());
+            let func = jl_get_kwsorter(self.func.datatype().inner().as_ptr().cast());
             let args = &mut [self.kws, self.func];
             let n = args.len();
 
@@ -184,7 +197,7 @@ impl<'scope, 'frame, 'data> Call<'scope, 'frame, 'data> for WithKeywords<'_, '_,
         F: Frame<'frame>,
     {
         unsafe {
-            let func = jl_get_kwsorter(self.func.datatype().expect("").ptr().cast());
+            let func = jl_get_kwsorter(self.func.datatype().inner().as_ptr().cast());
             let args = &mut [self.kws, self.func, arg0];
             let n = args.len();
 
@@ -209,7 +222,7 @@ impl<'scope, 'frame, 'data> Call<'scope, 'frame, 'data> for WithKeywords<'_, '_,
         F: Frame<'frame>,
     {
         unsafe {
-            let func = jl_get_kwsorter(self.func.datatype().expect("").ptr().cast());
+            let func = jl_get_kwsorter(self.func.datatype().inner().as_ptr().cast());
             let args = &mut [self.kws, self.func, arg0, arg1];
             let n = args.len();
 
@@ -235,7 +248,7 @@ impl<'scope, 'frame, 'data> Call<'scope, 'frame, 'data> for WithKeywords<'_, '_,
         F: Frame<'frame>,
     {
         unsafe {
-            let func = jl_get_kwsorter(self.func.datatype().expect("").ptr().cast());
+            let func = jl_get_kwsorter(self.func.datatype().inner().as_ptr().cast());
             let args = &mut [self.kws, self.func, arg0, arg1, arg2];
             let n = args.len();
 
@@ -256,7 +269,7 @@ impl<'scope, 'frame, 'data> Call<'scope, 'frame, 'data> for WithKeywords<'_, '_,
         F: Frame<'frame>,
     {
         unsafe {
-            let func = jl_get_kwsorter(self.func.datatype().expect("").ptr().cast());
+            let func = jl_get_kwsorter(self.func.datatype().inner().as_ptr().cast());
             let args = args.as_mut();
             let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + args.len());
             vals.push(self.kws);

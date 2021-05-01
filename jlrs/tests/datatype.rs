@@ -18,7 +18,7 @@ fn datatype_methods() {
 
         jlrs.scope_with_slots(1, |_global, frame| {
             let val = Value::new(frame, 3.0f32)?;
-            let dt = val.datatype().unwrap();
+            let dt = val.datatype();
 
             assert_eq!(dt.size(), 4);
             assert_eq!(dt.align(), 4);
@@ -39,7 +39,7 @@ fn datatype_typechecks() {
 
         jlrs.scope_with_slots(1, |_global, frame| {
             let val = Value::new(frame, 3.0f32)?;
-            let dt = val.datatype().unwrap();
+            let dt = val.datatype();
 
             assert!(!dt.is::<Tuple>());
             assert!(!dt.is::<NamedTuple>());
@@ -112,10 +112,15 @@ fn function_returns_datatype() {
 fn datatype_has_typename() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
-        jlrs.scope_with_slots(0, |global, _| {
+        jlrs.scope_with_slots(1, |global, frame| {
             let dt = DataType::tvar_type(global);
             let tn = dt.type_name();
-            let s: String = tn.name().into();
+            let s = frame
+                .root_reference(TypeName::name, tn)
+                .unwrap()
+                .unwrap()
+                .as_string()
+                .unwrap();
 
             assert_eq!(s, "TypeVar");
 
@@ -131,11 +136,13 @@ fn datatype_has_fieldnames() {
         let mut jlrs = j.borrow_mut();
         jlrs.scope_with_slots(0, |global, _| {
             let dt = DataType::tvar_type(global);
-            let tn = dt.field_names();
+            let tn = dt.field_names().data();
 
-            assert_eq!(tn[0].as_string(), "name");
-            assert_eq!(tn[1].as_string(), "lb");
-            assert_eq!(tn[2].as_string(), "ub");
+            unsafe {
+                assert_eq!(tn[0].assume_valid().unwrap().as_string().unwrap(), "name");
+                assert_eq!(tn[1].assume_valid().unwrap().as_string().unwrap(), "lb");
+                assert_eq!(tn[2].assume_valid().unwrap().as_string().unwrap(), "ub");
+            }
 
             Ok(())
         })
@@ -357,12 +364,18 @@ fn datatype_zeroinit() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
         jlrs.scope_with_slots(0, |global, _| {
-            let dt = UnionAll::array_type(global)
-                .body()
-                .cast::<UnionAll>()?
-                .body()
-                .cast::<DataType>()?;
-            assert!(!dt.zeroinit());
+            unsafe {
+                let dt = UnionAll::array_type(global)
+                    .body()
+                    .assume_valid()
+                    .unwrap()
+                    .cast::<UnionAll>()?
+                    .body()
+                    .assume_valid()
+                    .unwrap()
+                    .cast::<DataType>()?;
+                assert!(!dt.zeroinit());
+            }
 
             Ok(())
         })

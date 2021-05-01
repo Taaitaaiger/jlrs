@@ -555,7 +555,7 @@ impl Julia {
                     Ok(_) => Ok(()),
                     Err(e) => Err(JlrsError::IncludeError(
                         path.as_ref().to_string_lossy().into(),
-                        e.type_name().into(),
+                        e.type_name()?.into(),
                     )
                     .into()),
                 };
@@ -725,7 +725,7 @@ impl CCall {
 unsafe extern "C" fn droparray(a: Array) {
     // The data of a moved array is allocated by Rust, this function is called by
     // a finalizer in order to ensure it's also freed by Rust.
-    let arr_ref = &mut *a.ptr();
+    let arr_ref = &mut *a.inner().as_ptr();
 
     if arr_ref.flags.how() != 2 {
         return;

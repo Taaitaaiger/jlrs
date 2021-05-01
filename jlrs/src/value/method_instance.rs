@@ -4,9 +4,7 @@
 //! in [`julia.h`]
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L321
-use super::array::Array;
-use super::code_instance::CodeInstance;
-use super::simple_vector::SimpleVector;
+use super::wrapper_ref::{CodeInstanceRef, SimpleVectorRef, ValueRef};
 use super::Value;
 use crate::convert::cast::Cast;
 use crate::error::{JlrsError, JlrsResult};
@@ -15,6 +13,7 @@ use jl_sys::{jl_method_instance_t, jl_method_instance_type};
 use std::{
     fmt::{Debug, Formatter, Result as FmtResult},
     marker::PhantomData,
+    ptr::NonNull,
 };
 
 /// This type is a placeholder to cache data for a specType signature specialization of a `Method`
@@ -22,51 +21,71 @@ use std::{
 /// with a particular set of argument types
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]
 #[repr(transparent)]
-pub struct MethodInstance<'frame>(*mut jl_method_instance_t, PhantomData<&'frame ()>);
+pub struct MethodInstance<'frame>(NonNull<jl_method_instance_t>, PhantomData<&'frame ()>);
 
 impl<'frame> MethodInstance<'frame> {
     pub(crate) unsafe fn wrap(method_instance: *mut jl_method_instance_t) -> Self {
-        MethodInstance(method_instance, PhantomData)
+        debug_assert!(!method_instance.is_null());
+        MethodInstance(NonNull::new_unchecked(method_instance), PhantomData)
     }
 
     #[doc(hidden)]
-    pub unsafe fn ptr(self) -> *mut jl_method_instance_t {
+    pub unsafe fn inner(self) -> NonNull<jl_method_instance_t> {
         self.0
     }
 
+    /*
+    for (a, b) in zip(fieldnames(Core.MethodInstance), fieldtypes(Core.MethodInstance))
+        println(a, ": ", b)
+    end
+    def: Union{Method, Module}
+    specTypes: Any
+    sparam_vals: Core.SimpleVector
+    uninferred: Any
+    backedges: Any
+    callbacks: Any
+    cache: Core.CodeInstance
+    inInference: Bool
+    */
+
     /// Context for this code
-    pub fn def(self) -> Value<'frame, 'static> {
-        unsafe { Value::wrap((&*self.ptr()).def.value) }
+    pub fn def(self) -> ValueRef<'frame, 'static> {
+        unsafe { ValueRef::wrap((&*self.inner().as_ptr()).def.value) }
     }
 
-    // Argument types this was specialized for
-    pub fn spec_types(self) -> Value<'frame, 'static> {
-        unsafe { Value::wrap((&*self.ptr()).specTypes) }
+    /// Argument types this was specialized for
+    pub fn spec_types(self) -> ValueRef<'frame, 'static> {
+        unsafe { ValueRef::wrap((&*self.inner().as_ptr()).specTypes) }
     }
 
-    // Static parameter values, indexed by def.method->sparam_syms
-    pub fn sparam_vals(self) -> SimpleVector<'frame> {
-        unsafe { SimpleVector::wrap((&*self.ptr()).sparam_vals) }
+    /// Static parameter values, indexed by def.method->sparam_syms
+    pub fn sparam_vals(self) -> SimpleVectorRef<'frame> {
+        unsafe { SimpleVectorRef::wrap((&*self.inner().as_ptr()).sparam_vals) }
     }
 
-    // Cached uncompressed code, for generated functions, top-level thunks, or the interpreter
-    pub fn uninferred(self) -> Value<'frame, 'static> {
-        unsafe { Value::wrap((&*self.ptr()).uninferred) }
+    /// Cached uncompressed code, for generated functions, top-level thunks, or the interpreter
+    pub fn uninferred(self) -> ValueRef<'frame, 'static> {
+        unsafe { ValueRef::wrap((&*self.inner().as_ptr()).uninferred) }
     }
 
     /// List of method-instances which contain a call into this method-instance
-    pub fn backedges(self) -> Array<'frame, 'static> {
-        unsafe { Array::wrap((&*self.ptr()).backedges) }
+    pub fn backedges(self) -> ValueRef<'frame, 'static> {
+        unsafe { ValueRef::wrap((&*self.inner().as_ptr()).backedges.cast()) }
+    }
+
+    /// The `callbacks` field.
+    pub fn callbacks(self) -> ValueRef<'frame, 'static> {
+        unsafe { ValueRef::wrap((&*self.inner().as_ptr()).callbacks.cast()) }
     }
 
     /// The `cache` field.
-    pub fn cache(self) -> CodeInstance<'frame> {
-        unsafe { CodeInstance::wrap((&*self.ptr()).cache) }
+    pub fn cache(self) -> CodeInstanceRef<'frame> {
+        unsafe { CodeInstanceRef::wrap((&*self.inner().as_ptr()).cache) }
     }
 
     /// Flags to tell if inference is running on this object
-    pub fn in_inference(self) -> u8 {
-        unsafe { (&*self.ptr()).inInference }
+    pub fn in_inference(self) -> bool {
+        unsafe { (&*self.inner().as_ptr()).inInference != 0 }
     }
 
     /// Convert `self` to a `Value`.
@@ -83,7 +102,7 @@ impl<'scope> Debug for MethodInstance<'scope> {
 
 impl<'frame> Into<Value<'frame, 'static>> for MethodInstance<'frame> {
     fn into(self) -> Value<'frame, 'static> {
-        unsafe { Value::wrap(self.ptr().cast()) }
+        unsafe { Value::wrap(self.inner().as_ptr().cast()) }
     }
 }
 
@@ -98,7 +117,7 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for MethodInstance<'frame> {
     }
 
     unsafe fn cast_unchecked(value: Value<'frame, 'data>) -> Self::Output {
-        Self::wrap(value.ptr().cast())
+        Self::wrap(value.inner().as_ptr().cast())
     }
 }
 

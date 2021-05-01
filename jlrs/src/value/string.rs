@@ -7,7 +7,6 @@ use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::jl_string_type;
 use std::ffi::CStr;
 use std::mem;
-use std::slice;
 use std::{
     fmt::{Debug, Formatter, Result as FmtResult},
     marker::PhantomData,
@@ -19,6 +18,11 @@ use std::{
 pub struct JuliaString<'frame>(*const u8, PhantomData<&'frame ()>);
 
 impl<'frame> JuliaString<'frame> {
+    pub(crate) unsafe fn wrap(ptr: *const u8) -> Self {
+        debug_assert!(!ptr.is_null());
+        JuliaString(ptr, PhantomData)
+    }
+
     #[doc(hidden)]
     pub unsafe fn ptr(self) -> *const u8 {
         self.0
@@ -39,10 +43,7 @@ impl<'frame> JuliaString<'frame> {
 
     /// Returns the string as a slice of bytes without the terminating `\0`.
     pub fn as_slice(self) -> &'frame [u8] {
-        unsafe {
-            let str_begin = self.0.add(mem::size_of::<usize>());
-            slice::from_raw_parts(str_begin, self.len())
-        }
+        self.as_c_str().to_bytes()
     }
 
     /// Returns the string as a string slice, or an error if it the string contains

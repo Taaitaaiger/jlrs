@@ -10,7 +10,7 @@ fn create_new_unionall() {
         let mut jlrs = j.borrow_mut();
         jlrs.scope_with_slots(3, |global, frame| {
             let atype = UnionAll::array_type(global);
-            let body = atype.body();
+            let body = unsafe { atype.body().assume_valid_unchecked() };
             let tvar = TypeVar::new(
                 frame,
                 "V",
@@ -18,11 +18,13 @@ fn create_new_unionall() {
                 Some(DataType::number_type(global).as_value()),
             )?;
             let ua = Value::new_unionall(&mut *frame, tvar, body)?.cast::<UnionAll>()?;
-            let v = ua.var();
+            let v = unsafe { ua.var().assume_valid().unwrap() };
 
             let equals = Module::base(global)
                 .function("!=")?
-                .call2(&mut *frame, v.as_value(), atype.var().as_value())?
+                .call2(&mut *frame, v.as_value(), unsafe {
+                    atype.var().assume_valid_value_unchecked()
+                })?
                 .unwrap()
                 .cast::<bool>()?;
             assert!(equals);

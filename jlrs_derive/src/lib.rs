@@ -169,16 +169,16 @@ fn impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
                         return false;
                     }
 
-                    let field_types = dt.field_types();
+                    let field_types = dt.field_types().data();
 
                     #(
-                        if !<#rs_non_union_fields as ::jlrs::layout::valid_layout::ValidLayout>::valid_layout(field_types[#jl_non_union_field_idxs]) {
+                        if !<#rs_non_union_fields as ::jlrs::layout::valid_layout::ValidLayout>::valid_layout(field_types[#jl_non_union_field_idxs].assume_valid_unchecked()) {
                             return false;
                         }
                     )*
 
                     #(
-                        if let Ok(u) = field_types[#jl_union_field_idxs].cast::<::jlrs::value::union::Union>() {
+                        if let Ok(u) = field_types[#jl_union_field_idxs].assume_valid_unchecked().cast::<::jlrs::value::union::Union>() {
                             if !::jlrs::value::union::correct_layout_for::<#rs_align_fields, #rs_union_fields, #rs_flag_fields>(u) {
                                 return false
                             }
@@ -209,9 +209,9 @@ fn impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
                     .global(#ty).expect(&format!("Type {} cannot be found in module", #ty));
 
                 if let Ok(dt) = julia_type.cast::<::jlrs::value::datatype::DataType>() {
-                    dt.ptr()
+                    dt.inner().as_ptr()
                 } else if let Ok(ua) = julia_type.cast::<::jlrs::value::union_all::UnionAll>() {
-                    ua.base_type().ptr()
+                    ua.base_type().assume_valid_unchecked().inner().as_ptr()
                 } else {
                     panic!("Invalid type: {:?}", julia_type.datatype());
                 }
@@ -222,12 +222,12 @@ fn impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
             type Output = Self;
 
             fn cast(value: ::jlrs::value::Value<'frame, 'data>) -> ::jlrs::error::JlrsResult<Self::Output> {
-                if value.is_nothing() {
+                if value.is::<::jlrs::value::datatype::Nothing>() {
                     Err(::jlrs::error::JlrsError::Nothing)?
                 }
 
                 unsafe {
-                    if <Self as ::jlrs::layout::valid_layout::ValidLayout>::valid_layout(value.datatype().unwrap().into()) {
+                    if <Self as ::jlrs::layout::valid_layout::ValidLayout>::valid_layout(value.datatype().into()) {
                         return Ok(Self::cast_unchecked(value));
                     }
                 }
@@ -236,7 +236,7 @@ fn impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
             }
 
             unsafe fn cast_unchecked(value: ::jlrs::value::Value<'frame, 'data>) -> Self::Output {
-                *(value.ptr().cast::<Self::Output>())
+                *(value.inner().as_ptr().cast::<Self::Output>())
             }
         }
     };

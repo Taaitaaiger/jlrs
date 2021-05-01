@@ -11,7 +11,7 @@ macro_rules! impl_valid_layout_test {
                     unsafe {
                         let i = $v;
                         let v = Value::new(frame, i)?;
-                        assert!(<$t>::valid_layout(v.datatype().unwrap().into()));
+                        assert!(<$t>::valid_layout(v.datatype().into()));
                     }
                     Ok(())
                 })
@@ -43,7 +43,7 @@ fn valid_layout_array() {
         jlrs.scope(|global, frame| {
             unsafe {
                 let v = Value::new_array::<i32, _, _, _>(frame, (2, 2))?;
-                assert!(Array::valid_layout(v.datatype().unwrap().into()));
+                assert!(Array::valid_layout(v.datatype().into()));
 
                 let ua = Module::base(global).global("Array")?;
 

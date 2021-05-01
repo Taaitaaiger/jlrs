@@ -21,6 +21,7 @@ use jl_sys::{
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::marker::PhantomData;
 use std::ops::{Index, IndexMut};
+use std::ptr::NonNull;
 
 /// An n-dimensional Julia array. This struct implements [`JuliaTypecheck`] and [`Cast`]. It can
 /// be used in combination with [`DataType::is`] and [`Value::is`]; if the check returns `true`
@@ -63,18 +64,19 @@ use std::ops::{Index, IndexMut};
 #[derive(Copy, Clone, Debug)]
 #[repr(transparent)]
 pub struct Array<'frame, 'data>(
-    *mut jl_array_t,
+    NonNull<jl_array_t>,
     PhantomData<&'frame ()>,
     PhantomData<&'data ()>,
 );
 
 impl<'frame, 'data> Array<'frame, 'data> {
     pub(crate) unsafe fn wrap(array: *mut jl_array_t) -> Self {
-        Array(array, PhantomData, PhantomData)
+        debug_assert!(!array.is_null());
+        Array(NonNull::new_unchecked(array), PhantomData, PhantomData)
     }
 
     #[doc(hidden)]
-    pub unsafe fn ptr(self) -> *mut jl_array_t {
+    pub unsafe fn inner(self) -> NonNull<jl_array_t> {
         self.0
     }
 
@@ -84,7 +86,7 @@ impl<'frame, 'data> Array<'frame, 'data> {
         T: Copy + ValidLayout,
     {
         if self.contains::<T>() {
-            unsafe { Ok(TypedArray::wrap(self.ptr())) }
+            unsafe { Ok(TypedArray::wrap(self.inner().as_ptr())) }
         } else {
             Err(JlrsError::WrongType)?
         }
@@ -92,17 +94,21 @@ impl<'frame, 'data> Array<'frame, 'data> {
 
     /// Returns the array's dimensions.
     pub fn dimensions(self) -> Dimensions {
-        unsafe { Dimensions::from_array(self.ptr().cast()) }
+        unsafe { Dimensions::from_array(self.inner().as_ptr().cast()) }
     }
 
     /// Returns the type of this array's elements.
     pub fn element_type(self) -> Value<'frame, 'static> {
-        unsafe { Value::wrap(jl_array_eltype(self.ptr().cast()).cast()) }
+        unsafe { Value::wrap(jl_array_eltype(self.inner().as_ptr().cast()).cast()) }
     }
 
     /// Returns `true` if the type of the elements of this array is `T`.
     pub fn contains<T: ValidLayout>(self) -> bool {
-        unsafe { T::valid_layout(Value::wrap(jl_array_eltype(self.ptr().cast()).cast())) }
+        unsafe {
+            T::valid_layout(Value::wrap(
+                jl_array_eltype(self.inner().as_ptr().cast()).cast(),
+            ))
+        }
     }
 
     /// Returns `true` if the type of the elements of this array is `T` and these elements are
@@ -113,14 +119,14 @@ impl<'frame, 'data> Array<'frame, 'data> {
 
     /// Returns true if the elements of the array are stored inline.
     pub fn is_inline_array(self) -> bool {
-        unsafe { (&*self.ptr()).flags.ptrarray() == 0 }
+        unsafe { (&*self.inner().as_ptr()).flags.ptrarray() == 0 }
     }
 
     /// Returns true if the elements of the array are stored inline and at least one of the field
     /// of the inlined type is a pointer.
     pub fn has_inlined_pointers(self) -> bool {
         unsafe {
-            let flags = (&*self.ptr()).flags;
+            let flags = (&*self.inner().as_ptr()).flags;
             self.is_inline_array() && flags.hasptr() != 0
         }
     }
@@ -145,8 +151,8 @@ impl<'frame, 'data> Array<'frame, 'data> {
         }
 
         unsafe {
-            let jl_data = jl_array_data(self.ptr().cast()).cast();
-            let dimensions = Dimensions::from_array(self.ptr().cast());
+            let jl_data = jl_array_data(self.inner().as_ptr().cast()).cast();
+            let dimensions = Dimensions::from_array(self.inner().as_ptr().cast());
 
             let sz = dimensions.size();
             let mut data = Vec::with_capacity(sz);
@@ -178,8 +184,8 @@ impl<'frame, 'data> Array<'frame, 'data> {
         }
 
         unsafe {
-            let jl_data = jl_array_data(self.ptr().cast()).cast();
-            let dimensions = Dimensions::from_array(self.ptr().cast());
+            let jl_data = jl_array_data(self.inner().as_ptr().cast()).cast();
+            let dimensions = Dimensions::from_array(self.inner().as_ptr().cast());
             let data = std::slice::from_raw_parts(jl_data, dimensions.size());
             Ok(ArrayData::new(data, dimensions, frame))
         }
@@ -205,8 +211,8 @@ impl<'frame, 'data> Array<'frame, 'data> {
         }
 
         unsafe {
-            let jl_data = jl_array_data(self.ptr().cast()).cast();
-            let dimensions = Dimensions::from_array(self.ptr().cast());
+            let jl_data = jl_array_data(self.inner().as_ptr().cast()).cast();
+            let dimensions = Dimensions::from_array(self.inner().as_ptr().cast());
             let data = std::slice::from_raw_parts_mut(jl_data, dimensions.size());
             Ok(InlineArrayDataMut::new(data, dimensions, frame))
         }
@@ -234,8 +240,8 @@ impl<'frame, 'data> Array<'frame, 'data> {
             Err(JlrsError::NotInline)?;
         }
 
-        let jl_data = jl_array_data(self.ptr().cast()).cast();
-        let dimensions = Dimensions::from_array(self.ptr().cast());
+        let jl_data = jl_array_data(self.inner().as_ptr().cast()).cast();
+        let dimensions = Dimensions::from_array(self.inner().as_ptr().cast());
         let data = std::slice::from_raw_parts_mut(jl_data, dimensions.size());
         Ok(UnrestrictedInlineArrayDataMut::new(data, dimensions, frame))
     }
@@ -261,8 +267,8 @@ impl<'frame, 'data> Array<'frame, 'data> {
             Err(JlrsError::Inline)?;
         }
 
-        let jl_data = jl_array_data(self.ptr().cast()).cast();
-        let dimensions = Dimensions::from_array(self.ptr().cast());
+        let jl_data = jl_array_data(self.inner().as_ptr().cast()).cast();
+        let dimensions = Dimensions::from_array(self.inner().as_ptr().cast());
         let data = std::slice::from_raw_parts(jl_data, dimensions.size());
         Ok(ArrayData::new(data, dimensions, frame))
     }
@@ -287,8 +293,8 @@ impl<'frame, 'data> Array<'frame, 'data> {
             Err(JlrsError::Inline)?;
         }
 
-        let jl_data = jl_array_data(self.ptr().cast()).cast();
-        let dimensions = Dimensions::from_array(self.ptr().cast());
+        let jl_data = jl_array_data(self.inner().as_ptr().cast()).cast();
+        let dimensions = Dimensions::from_array(self.inner().as_ptr().cast());
         let data = std::slice::from_raw_parts_mut(jl_data, dimensions.size());
         Ok(ValueArrayDataMut::new(self, data, dimensions, frame))
     }
@@ -315,8 +321,8 @@ impl<'frame, 'data> Array<'frame, 'data> {
             Err(JlrsError::Inline)?;
         }
 
-        let jl_data = jl_array_data(self.ptr().cast()).cast();
-        let dimensions = Dimensions::from_array(self.ptr().cast());
+        let jl_data = jl_array_data(self.inner().as_ptr().cast()).cast();
+        let dimensions = Dimensions::from_array(self.inner().as_ptr().cast());
         let data = std::slice::from_raw_parts_mut(jl_data, dimensions.size());
         Ok(UnrestrictedValueArrayDataMut::new(
             self, data, dimensions, frame,
@@ -331,13 +337,13 @@ impl<'frame, 'data> Array<'frame, 'data> {
 
 unsafe impl<'frame, 'data> JuliaTypecheck for Array<'frame, 'data> {
     unsafe fn julia_typecheck(t: DataType) -> bool {
-        jl_is_array_type(t.ptr().cast())
+        jl_is_array_type(t.inner().as_ptr().cast())
     }
 }
 
 impl<'frame, 'data> Into<Value<'frame, 'data>> for Array<'frame, 'data> {
     fn into(self) -> Value<'frame, 'data> {
-        unsafe { Value::wrap(self.ptr().cast()) }
+        unsafe { Value::wrap(self.inner().as_ptr().cast()) }
     }
 }
 
@@ -352,7 +358,7 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for Array<'frame, 'data> {
     }
 
     unsafe fn cast_unchecked(value: Value<'frame, 'data>) -> Self::Output {
-        Self::wrap(value.ptr().cast())
+        Self::wrap(value.inner().as_ptr().cast())
     }
 }
 
@@ -361,7 +367,7 @@ unsafe impl<'frame, 'data> ValidLayout for Array<'frame, 'data> {
         if let Ok(dt) = v.cast::<DataType>() {
             dt.is::<Array>()
         } else if let Ok(ua) = v.cast::<super::union_all::UnionAll>() {
-            ua.base_type().is::<Array>()
+            ua.base_type().assume_valid_unchecked().is::<Array>()
         } else {
             false
         }
@@ -372,7 +378,7 @@ unsafe impl<'frame, 'data> ValidLayout for Array<'frame, 'data> {
 #[derive(Copy, Clone, Debug)]
 #[repr(transparent)]
 pub struct TypedArray<'frame, 'data, T>(
-    *mut jl_array_t,
+    NonNull<jl_array_t>,
     PhantomData<&'frame ()>,
     PhantomData<&'data ()>,
     PhantomData<T>,
@@ -382,37 +388,43 @@ where
 
 impl<'frame, 'data, T: Copy + ValidLayout> TypedArray<'frame, 'data, T> {
     pub(crate) unsafe fn wrap(array: *mut jl_array_t) -> Self {
-        assert!(T::valid_layout(Value::wrap(
+        debug_assert!(T::valid_layout(Value::wrap(
             jl_array_eltype(array.cast()).cast()
         )));
-        TypedArray(array, PhantomData, PhantomData, PhantomData)
+        debug_assert!(!array.is_null());
+        TypedArray(
+            NonNull::new_unchecked(array),
+            PhantomData,
+            PhantomData,
+            PhantomData,
+        )
     }
 
     #[doc(hidden)]
-    pub unsafe fn ptr(self) -> *mut jl_array_t {
+    pub unsafe fn inner(self) -> NonNull<jl_array_t> {
         self.0
     }
 
     /// Returns the array's dimensions.
     pub fn dimensions(self) -> Dimensions {
-        unsafe { Dimensions::from_array(self.ptr().cast()) }
+        unsafe { Dimensions::from_array(self.inner().as_ptr().cast()) }
     }
 
     /// Returns the type of this array's elements.
     pub fn element_type(self) -> Value<'frame, 'static> {
-        unsafe { Value::wrap(jl_array_eltype(self.ptr().cast()).cast()) }
+        unsafe { Value::wrap(jl_array_eltype(self.inner().as_ptr().cast()).cast()) }
     }
 
     /// Returns true if the elements of the array are stored inline.
     pub fn is_inline_array(self) -> bool {
-        unsafe { (&*self.ptr()).flags.ptrarray() == 0 }
+        unsafe { (&*self.inner().as_ptr()).flags.ptrarray() == 0 }
     }
 
     /// Returns true if the elements of the array are stored inline and at least one of the field
     /// of the inlined type is a pointer.
     pub fn has_inlined_pointers(self) -> bool {
         unsafe {
-            let flags = (&*self.ptr()).flags;
+            let flags = (&*self.inner().as_ptr()).flags;
             self.is_inline_array() && flags.hasptr() != 0
         }
     }
@@ -430,8 +442,8 @@ impl<'frame, 'data, T: Copy + ValidLayout> TypedArray<'frame, 'data, T> {
         }
 
         unsafe {
-            let jl_data = jl_array_data(self.ptr().cast()).cast();
-            let dimensions = Dimensions::from_array(self.ptr().cast());
+            let jl_data = jl_array_data(self.inner().as_ptr().cast()).cast();
+            let dimensions = Dimensions::from_array(self.inner().as_ptr().cast());
 
             let sz = dimensions.size();
             let mut data = Vec::with_capacity(sz);
@@ -458,8 +470,8 @@ impl<'frame, 'data, T: Copy + ValidLayout> TypedArray<'frame, 'data, T> {
         }
 
         unsafe {
-            let jl_data = jl_array_data(self.ptr().cast()).cast();
-            let dimensions = Dimensions::from_array(self.ptr().cast());
+            let jl_data = jl_array_data(self.inner().as_ptr().cast()).cast();
+            let dimensions = Dimensions::from_array(self.inner().as_ptr().cast());
             let data = std::slice::from_raw_parts(jl_data, dimensions.size());
             Ok(ArrayData::new(data, dimensions, frame))
         }
@@ -480,8 +492,8 @@ impl<'frame, 'data, T: Copy + ValidLayout> TypedArray<'frame, 'data, T> {
         }
 
         unsafe {
-            let jl_data = jl_array_data(self.ptr().cast()).cast();
-            let dimensions = Dimensions::from_array(self.ptr().cast());
+            let jl_data = jl_array_data(self.inner().as_ptr().cast()).cast();
+            let dimensions = Dimensions::from_array(self.inner().as_ptr().cast());
             let data = std::slice::from_raw_parts_mut(jl_data, dimensions.size());
             Ok(InlineArrayDataMut::new(data, dimensions, frame))
         }
@@ -504,8 +516,8 @@ impl<'frame, 'data, T: Copy + ValidLayout> TypedArray<'frame, 'data, T> {
             Err(JlrsError::NotInline)?;
         }
 
-        let jl_data = jl_array_data(self.ptr().cast()).cast();
-        let dimensions = Dimensions::from_array(self.ptr().cast());
+        let jl_data = jl_array_data(self.inner().as_ptr().cast()).cast();
+        let dimensions = Dimensions::from_array(self.inner().as_ptr().cast());
         let data = std::slice::from_raw_parts_mut(jl_data, dimensions.size());
         Ok(UnrestrictedInlineArrayDataMut::new(data, dimensions, frame))
     }
@@ -531,8 +543,8 @@ impl<'frame, 'data, T: Copy + ValidLayout> TypedArray<'frame, 'data, T> {
             Err(JlrsError::Inline)?;
         }
 
-        let jl_data = jl_array_data(self.ptr().cast()).cast();
-        let dimensions = Dimensions::from_array(self.ptr().cast());
+        let jl_data = jl_array_data(self.inner().as_ptr().cast()).cast();
+        let dimensions = Dimensions::from_array(self.inner().as_ptr().cast());
         let data = std::slice::from_raw_parts(jl_data, dimensions.size());
         Ok(ArrayData::new(data, dimensions, frame))
     }
@@ -557,8 +569,8 @@ impl<'frame, 'data, T: Copy + ValidLayout> TypedArray<'frame, 'data, T> {
             Err(JlrsError::Inline)?;
         }
 
-        let jl_data = jl_array_data(self.ptr().cast()).cast();
-        let dimensions = Dimensions::from_array(self.ptr().cast());
+        let jl_data = jl_array_data(self.inner().as_ptr().cast()).cast();
+        let dimensions = Dimensions::from_array(self.inner().as_ptr().cast());
         let data = std::slice::from_raw_parts_mut(jl_data, dimensions.size());
         Ok(ValueArrayDataMut::new(self.into(), data, dimensions, frame))
     }
@@ -585,11 +597,11 @@ impl<'frame, 'data, T: Copy + ValidLayout> TypedArray<'frame, 'data, T> {
             Err(JlrsError::Inline)?;
         }
 
-        let jl_data = jl_array_data(self.ptr().cast()).cast();
-        let dimensions = Dimensions::from_array(self.ptr().cast());
+        let jl_data = jl_array_data(self.inner().as_ptr().cast()).cast();
+        let dimensions = Dimensions::from_array(self.inner().as_ptr().cast());
         let data = std::slice::from_raw_parts_mut(jl_data, dimensions.size());
         Ok(UnrestrictedValueArrayDataMut::new(
-            Array::wrap(self.ptr()),
+            Array::wrap(self.inner().as_ptr()),
             data,
             dimensions,
             frame,
@@ -604,7 +616,8 @@ impl<'frame, 'data, T: Copy + ValidLayout> TypedArray<'frame, 'data, T> {
 
 unsafe impl<'frame, 'data, T: Copy + ValidLayout> JuliaTypecheck for TypedArray<'frame, 'data, T> {
     unsafe fn julia_typecheck(t: DataType) -> bool {
-        jl_is_array_type(t.ptr().cast()) && T::valid_layout(Value::wrap(jl_tparam0(t.ptr()).cast()))
+        jl_is_array_type(t.inner().as_ptr().cast())
+            && T::valid_layout(Value::wrap(jl_tparam0(t.inner().as_ptr()).cast()))
     }
 }
 
@@ -612,7 +625,7 @@ impl<'frame, 'data, T: Copy + ValidLayout> Into<Value<'frame, 'data>>
     for TypedArray<'frame, 'data, T>
 {
     fn into(self) -> Value<'frame, 'data> {
-        unsafe { Value::wrap(self.ptr().cast()) }
+        unsafe { Value::wrap(self.inner().as_ptr().cast()) }
     }
 }
 
@@ -620,7 +633,7 @@ impl<'frame, 'data, T: Copy + ValidLayout> Into<Array<'frame, 'data>>
     for TypedArray<'frame, 'data, T>
 {
     fn into(self) -> Array<'frame, 'data> {
-        unsafe { Array::wrap(self.ptr()) }
+        unsafe { Array::wrap(self.inner().as_ptr()) }
     }
 }
 
@@ -637,7 +650,7 @@ unsafe impl<'frame, 'data, T: Copy + ValidLayout> Cast<'frame, 'data>
     }
 
     unsafe fn cast_unchecked(value: Value<'frame, 'data>) -> Self::Output {
-        Self::wrap(value.ptr().cast())
+        Self::wrap(value.inner().as_ptr().cast())
     }
 }
 
@@ -646,7 +659,9 @@ unsafe impl<'frame, 'data, T: Copy + ValidLayout> ValidLayout for TypedArray<'fr
         if let Ok(dt) = v.cast::<DataType>() {
             dt.is::<TypedArray<T>>()
         } else if let Ok(ua) = v.cast::<super::union_all::UnionAll>() {
-            ua.base_type().is::<TypedArray<T>>()
+            ua.base_type()
+                .assume_valid_unchecked()
+                .is::<TypedArray<T>>()
         } else {
             false
         }
@@ -980,16 +995,16 @@ where
         index: D,
         value: Value<'frame, 'da>,
     ) -> JlrsResult<()> {
-        let ptr = self.array.ptr();
+        let ptr = self.array.inner().as_ptr();
         let eltype = jl_array_eltype(ptr.cast());
 
-        if eltype != jl_typeof(value.ptr().cast()).cast() {
+        if eltype != jl_typeof(value.inner().as_ptr().cast()).cast() {
             Err(JlrsError::InvalidArrayType)?;
         }
 
         let idx = self.dimensions.index_of(index)?;
 
-        jl_array_ptr_set(ptr.cast(), idx, value.ptr().cast());
+        jl_array_ptr_set(ptr.cast(), idx, value.inner().as_ptr().cast());
         Ok(())
     }
 
@@ -1055,17 +1070,17 @@ where
         index: D,
         value: Value<'frame, 'da>,
     ) -> JlrsResult<()> {
-        let ptr = self.array.ptr();
+        let ptr = self.array.inner().as_ptr();
         let eltype = jl_array_eltype(ptr.cast());
 
-        if eltype != jl_typeof(value.ptr().cast()).cast() {
+        if eltype != jl_typeof(value.inner().as_ptr().cast()).cast() {
             Err(JlrsError::InvalidArrayType)?;
         }
 
         jl_array_ptr_set(
             ptr.cast(),
             self.dimensions.index_of(index)?,
-            value.ptr().cast(),
+            value.inner().as_ptr().cast(),
         );
         Ok(())
     }

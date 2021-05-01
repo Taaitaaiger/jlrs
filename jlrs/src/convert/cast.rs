@@ -39,7 +39,7 @@ macro_rules! impl_primitive_cast {
             }
 
             unsafe fn cast_unchecked(value: Value<'frame, 'data>) -> Self::Output {
-                $unboxer(value.ptr().cast()) as _
+                $unboxer(value.inner().as_ptr().cast()) as _
             }
         }
     };
@@ -81,7 +81,7 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for bool {
     }
 
     unsafe fn cast_unchecked(value: Value<'frame, 'data>) -> Self::Output {
-        jl_unbox_int8(value.ptr()) != 0
+        jl_unbox_int8(value.inner().as_ptr()) != 0
     }
 }
 
@@ -91,7 +91,7 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for char {
     fn cast(value: Value<'frame, 'data>) -> JlrsResult<Self::Output> {
         if value.is::<char>() {
             unsafe {
-                return std::char::from_u32(jl_unbox_uint32(value.ptr()))
+                return std::char::from_u32(jl_unbox_uint32(value.inner().as_ptr()))
                     .ok_or(JlrsError::InvalidCharacter.into());
             }
         }
@@ -100,7 +100,7 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for char {
     }
 
     unsafe fn cast_unchecked(value: Value<'frame, 'data>) -> Self::Output {
-        std::char::from_u32_unchecked(jl_unbox_uint32(value.ptr()))
+        std::char::from_u32_unchecked(jl_unbox_uint32(value.inner().as_ptr()))
     }
 }
 
@@ -110,14 +110,14 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for String {
     fn cast(value: Value<'frame, 'data>) -> JlrsResult<Self::Output> {
         if value.is::<String>() {
             unsafe {
-                let len = jl_string_len(value.ptr());
+                let len = jl_string_len(value.inner().as_ptr());
 
                 if len == 0 {
                     return Ok(String::new());
                 }
 
                 // Is neither null nor dangling, we've just checked
-                let raw = jl_string_data(value.ptr());
+                let raw = jl_string_data(value.inner().as_ptr());
                 let raw_slice = std::slice::from_raw_parts(raw, len);
                 return Ok(String::from_utf8(raw_slice.into()).map_err(JlrsError::other)?);
             }
@@ -127,14 +127,14 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for String {
     }
 
     unsafe fn cast_unchecked(value: Value<'frame, 'data>) -> Self::Output {
-        let len = jl_string_len(value.ptr());
+        let len = jl_string_len(value.inner().as_ptr());
 
         if len == 0 {
             return String::new();
         }
 
         // Is neither null nor dangling, we've just checked
-        let raw = jl_string_data(value.ptr());
+        let raw = jl_string_data(value.inner().as_ptr());
         let raw_slice = std::slice::from_raw_parts(raw, len);
         let owned_slice = Vec::from(raw_slice);
         String::from_utf8_unchecked(owned_slice)

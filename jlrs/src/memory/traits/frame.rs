@@ -102,7 +102,7 @@ pub(crate) mod private {
     #[cfg(feature = "async")]
     use crate::memory::mode::Async;
     use crate::memory::mode::Sync;
-    use crate::memory::traits::{mode::Mode, root::Root};
+    use crate::memory::traits::{mode::Mode, root_pending::RootPending};
     use crate::value::{UnrootedResult, UnrootedValue, Value};
     use crate::{error::AllocError, private::Private};
     use crate::{
@@ -234,7 +234,7 @@ pub(crate) mod private {
                     func(out, &mut nested)?.into_pending()
                 };
 
-                Value::root(self, v)
+                Value::root_pending(self, v)
             }
         }
 
@@ -258,7 +258,7 @@ pub(crate) mod private {
                     func(out, &mut nested)?.into_pending()
                 };
 
-                Value::root(self, v)
+                Value::root_pending(self, v)
             }
         }
 
@@ -281,7 +281,7 @@ pub(crate) mod private {
                     func(out, &mut nested)?.into_pending()
                 };
 
-                JuliaResult::root(self, v)
+                JuliaResult::root_pending(self, v)
             }
         }
 
@@ -305,7 +305,7 @@ pub(crate) mod private {
                     func(out, &mut nested)?.into_pending()
                 };
 
-                JuliaResult::root(self, v)
+                JuliaResult::root_pending(self, v)
             }
         }
 
@@ -376,7 +376,7 @@ pub(crate) mod private {
                     func(out, &mut nested)?.into_pending()
                 };
 
-                Value::root(self, v)
+                Value::root_pending(self, v)
             }
         }
 
@@ -400,7 +400,7 @@ pub(crate) mod private {
                     func(out, &mut nested)?.into_pending()
                 };
 
-                Value::root(self, v)
+                Value::root_pending(self, v)
             }
         }
 
@@ -423,7 +423,7 @@ pub(crate) mod private {
                     func(out, &mut nested)?.into_pending()
                 };
 
-                JuliaResult::root(self, v)
+                JuliaResult::root_pending(self, v)
             }
         }
 
@@ -447,7 +447,7 @@ pub(crate) mod private {
                     func(out, &mut nested)?.into_pending()
                 };
 
-                JuliaResult::root(self, v)
+                JuliaResult::root_pending(self, v)
             }
         }
 

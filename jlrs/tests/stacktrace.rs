@@ -16,12 +16,12 @@ fn bounds_error() {
                     .unwrap();
                 let out = func.call2(&mut *frame, array, idx)?.unwrap_err();
 
-                assert_eq!(out.type_name(), "TracedException");
+                assert_eq!(out.type_name().unwrap(), "TracedException");
 
                 let field_names = out.field_names();
-                let f0: String = field_names[0].into();
+                let f0: String = field_names[0].as_string().unwrap();
                 assert_eq!(f0, "exc");
-                let f1: String = field_names[1].into();
+                let f1: String = field_names[1].as_string().unwrap();
                 assert_eq!(f1, "stacktrace");
 
                 let stacktrace = out.get_field(&mut *frame, "stacktrace");

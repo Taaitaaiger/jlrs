@@ -5,9 +5,9 @@
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L380
 
-use super::array::Array;
 use super::{
-    method_table::MethodTable, module::Module, simple_vector::SimpleVector, symbol::Symbol, Value,
+    wrapper_ref::{MethodTableRef, ModuleRef, SimpleVectorRef, SymbolRef, ValueRef},
+    Value,
 };
 use crate::convert::cast::Cast;
 use crate::error::{JlrsError, JlrsResult};
@@ -21,68 +21,85 @@ use jl_sys::{
 use std::{
     fmt::{Debug, Formatter, Result as FmtResult},
     marker::PhantomData,
+    ptr::NonNull,
 };
 
 /// Describes the syntactic structure of a type and stores all data common to different
 /// instantiations of the type, including a cache for hash-consed allocation of `DataType`s.
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]
 #[repr(transparent)]
-pub struct TypeName<'frame>(*mut jl_typename_t, PhantomData<&'frame ()>);
+pub struct TypeName<'frame>(NonNull<jl_typename_t>, PhantomData<&'frame ()>);
 
 impl<'frame> TypeName<'frame> {
     pub(crate) unsafe fn wrap(typename: *mut jl_typename_t) -> Self {
-        TypeName(typename, PhantomData)
+        debug_assert!(!typename.is_null());
+        TypeName(NonNull::new_unchecked(typename), PhantomData)
     }
 
     #[doc(hidden)]
-    pub unsafe fn ptr(self) -> *mut jl_typename_t {
+    pub unsafe fn inner(self) -> NonNull<jl_typename_t> {
         self.0
     }
 
+    /*
+    for (a, b) in zip(fieldnames(Core.TypeName), fieldtypes(Core.TypeName))
+        println(a, ": ", b)
+    end
+    name: Symbol
+    module: Module
+    names: Core.SimpleVector
+    wrapper: Type
+    cache: Core.SimpleVector
+    linearcache: Core.SimpleVector
+    hash: Int64
+    mt: Core.MethodTable
+    partial: Any
+    */
+
     /// The `name` field.
-    pub fn name(self) -> Symbol<'frame> {
-        unsafe { Symbol::wrap((&*self.ptr()).name) }
+    pub fn name(self) -> SymbolRef<'frame> {
+        unsafe { SymbolRef::wrap((&*self.inner().as_ptr()).name) }
     }
 
     /// The `module` field.
-    pub fn module(self) -> Module<'frame> {
-        unsafe { Module::wrap((&*self.ptr()).module) }
+    pub fn module(self) -> ModuleRef<'frame> {
+        unsafe { ModuleRef::wrap((&*self.inner().as_ptr()).module) }
     }
 
     /// Field names.
-    pub fn names(self) -> SimpleVector<'frame> {
-        unsafe { SimpleVector::wrap((&*self.ptr()).names) }
+    pub fn names(self) -> SimpleVectorRef<'frame> {
+        unsafe { SimpleVectorRef::wrap((&*self.inner().as_ptr()).names) }
     }
 
     /// Either the only instantiation of the type (if no parameters) or a `UnionAll` accepting
     /// parameters to make an instantiation.
-    pub fn wrapper(self) -> Value<'frame, 'static> {
-        unsafe { Value::wrap((&*self.ptr()).wrapper) }
+    pub fn wrapper(self) -> ValueRef<'frame, 'static> {
+        unsafe { ValueRef::wrap((&*self.inner().as_ptr()).wrapper) }
     }
 
     /// Sorted array.
-    pub fn cache(self) -> SimpleVector<'frame> {
-        unsafe { SimpleVector::wrap((&*self.ptr()).cache) }
+    pub fn cache(self) -> SimpleVectorRef<'frame> {
+        unsafe { SimpleVectorRef::wrap((&*self.inner().as_ptr()).cache) }
     }
 
     /// Unsorted array.
-    pub fn linearcache(self) -> SimpleVector<'frame> {
-        unsafe { SimpleVector::wrap((&*self.ptr()).linearcache) }
+    pub fn linearcache(self) -> SimpleVectorRef<'frame> {
+        unsafe { SimpleVectorRef::wrap((&*self.inner().as_ptr()).linearcache) }
     }
 
     /// The `hash` field.
     pub fn hash(self) -> isize {
-        unsafe { (&*self.ptr()).hash }
+        unsafe { (&*self.inner().as_ptr()).hash }
     }
 
     /// The `mt` field.
-    pub fn mt(self) -> MethodTable<'frame> {
-        unsafe { MethodTable::wrap((&*self.ptr()).mt) }
+    pub fn mt(self) -> MethodTableRef<'frame> {
+        unsafe { MethodTableRef::wrap((&*self.inner().as_ptr()).mt) }
     }
 
     /// Incomplete instantiations of this type.
-    pub fn partial(self) -> Array<'frame, 'static> {
-        unsafe { Array::wrap((&*self.ptr()).partial) }
+    pub fn partial(self) -> ValueRef<'frame, 'static> {
+        unsafe { ValueRef::wrap((&*self.inner().as_ptr()).partial.cast()) }
     }
 
     /// Convert `self` to a `Value`.
@@ -135,15 +152,17 @@ impl<'base> TypeName<'base> {
 
 impl<'scope> Debug for TypeName<'scope> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        f.debug_tuple("TypeName")
-            .field(&self.name().as_string())
-            .finish()
+        unsafe {
+            f.debug_tuple("TypeName")
+                .field(&self.name().assume_valid_unchecked().as_string())
+                .finish()
+        }
     }
 }
 
 impl<'frame> Into<Value<'frame, 'static>> for TypeName<'frame> {
     fn into(self) -> Value<'frame, 'static> {
-        unsafe { Value::wrap(self.ptr().cast()) }
+        unsafe { Value::wrap(self.inner().as_ptr().cast()) }
     }
 }
 
@@ -158,7 +177,7 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for TypeName<'frame> {
     }
 
     unsafe fn cast_unchecked(value: Value<'frame, 'data>) -> Self::Output {
-        Self::wrap(value.ptr().cast())
+        Self::wrap(value.inner().as_ptr().cast())
     }
 }
 

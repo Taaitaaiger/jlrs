@@ -32,7 +32,7 @@ impl<'scope, 'frame, 'data, 'inner> AsUnrooted<'scope, 'frame, 'data, 'inner>
         self,
         _output: OutputScope<'scope, 'frame, 'inner, F>,
     ) -> Self::Unrooted {
-        unsafe { UnrootedValue::new(self.ptr()) }
+        unsafe { UnrootedValue::new(self.inner().as_ptr()) }
     }
 }
 

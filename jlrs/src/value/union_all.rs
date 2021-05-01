@@ -1,7 +1,10 @@
 //! Support for values with the `Core.UnionAll` type.
 
-use super::type_var::TypeVar;
-use super::Value;
+use super::wrapper_ref::DataTypeRef;
+use super::{
+    wrapper_ref::{TypeVarRef, ValueRef},
+    Value,
+};
 use crate::convert::cast::Cast;
 use crate::error::{JlrsError, JlrsResult};
 use crate::memory::global::Global;
@@ -15,44 +18,64 @@ use jl_sys::{
 use std::{
     fmt::{Debug, Formatter, Result as FmtResult},
     marker::PhantomData,
+    ptr::NonNull,
 };
 
 /// An iterated union of types. If a struct field has a parametric type with some of its
 /// parameters unknown, its type is represented by a `UnionAll`.
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]
 #[repr(transparent)]
-pub struct UnionAll<'frame>(*mut jl_unionall_t, PhantomData<&'frame ()>);
+pub struct UnionAll<'frame>(NonNull<jl_unionall_t>, PhantomData<&'frame ()>);
 
 impl<'frame> UnionAll<'frame> {
     pub(crate) unsafe fn wrap(union_all: *mut jl_unionall_t) -> Self {
-        UnionAll(union_all, PhantomData)
+        debug_assert!(!union_all.is_null());
+        UnionAll(NonNull::new_unchecked(union_all), PhantomData)
     }
 
     #[doc(hidden)]
-    pub unsafe fn ptr(self) -> *mut jl_unionall_t {
+    pub unsafe fn inner(self) -> NonNull<jl_unionall_t> {
         self.0
     }
 
     /// The type at the bottom of this `UnionAll`.
-    pub fn base_type(self) -> DataType<'frame> {
+    pub fn base_type(self) -> DataTypeRef<'frame> {
         let mut b = self;
-        while b.body().is::<UnionAll>() {
-            unsafe {
-                b = Value::from(b.body()).cast_unchecked::<UnionAll>();
+        unsafe {
+            while b.body().assume_valid_value_unchecked().is::<UnionAll>() {
+                b = Value::from(b.body().assume_valid_value_unchecked())
+                    .cast_unchecked::<UnionAll>();
             }
         }
 
-        Value::from(b.body()).cast::<DataType>().unwrap()
+        unsafe {
+            DataTypeRef::wrap(
+                b.body()
+                    .assume_valid_value_unchecked()
+                    .cast::<DataType>()
+                    .unwrap()
+                    .inner()
+                    .as_ptr(),
+            )
+        }
     }
 
+    /*
+    for (a,b) in zip(fieldnames(UnionAll), fieldtypes(UnionAll))
+        println(a,": ", b)
+    end
+    var: TypeVar
+    body: Any
+    */
+
     /// The body of this `UnionAll`. This is either another `UnionAll` or a `DataType`.
-    pub fn body(self) -> Value<'frame, 'static> {
-        unsafe { Value::wrap((&*self.ptr()).body) }
+    pub fn body(self) -> ValueRef<'frame, 'static> {
+        unsafe { ValueRef::wrap((&*self.inner().as_ptr()).body) }
     }
 
     /// The type variable associated with this "layer" of the `UnionAll`.
-    pub fn var(self) -> TypeVar<'frame> {
-        unsafe { TypeVar::wrap((&*self.ptr()).var) }
+    pub fn var(self) -> TypeVarRef<'frame> {
+        unsafe { TypeVarRef::wrap((&*self.inner().as_ptr()).var) }
     }
 
     /// Convert `self` to a `Value`.
@@ -121,7 +144,7 @@ impl<'scope> Debug for UnionAll<'scope> {
 
 impl<'frame> Into<Value<'frame, 'static>> for UnionAll<'frame> {
     fn into(self) -> Value<'frame, 'static> {
-        unsafe { Value::wrap(self.ptr().cast()) }
+        unsafe { Value::wrap(self.inner().as_ptr().cast()) }
     }
 }
 
@@ -136,7 +159,7 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for UnionAll<'frame> {
     }
 
     unsafe fn cast_unchecked(value: Value<'frame, 'data>) -> Self::Output {
-        Self::wrap(value.ptr().cast())
+        Self::wrap(value.inner().as_ptr().cast())
     }
 }
 

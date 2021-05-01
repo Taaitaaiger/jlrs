@@ -5,9 +5,7 @@
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#505
 
-use super::datatype::DataType;
-use super::simple_vector::SimpleVector;
-use super::Value;
+use super::{wrapper_ref::ValueRef, Value};
 use crate::convert::cast::Cast;
 use crate::error::{JlrsError, JlrsResult};
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
@@ -15,78 +13,89 @@ use jl_sys::{jl_typemap_entry_t, jl_typemap_entry_type};
 use std::{
     fmt::{Debug, Formatter, Result as FmtResult},
     marker::PhantomData,
+    ptr::NonNull,
 };
 
 /// One Type-to-Value entry
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]
 #[repr(transparent)]
-pub struct TypeMapEntry<'frame>(*mut jl_typemap_entry_t, PhantomData<&'frame ()>);
+pub struct TypeMapEntry<'frame>(NonNull<jl_typemap_entry_t>, PhantomData<&'frame ()>);
 
 impl<'frame> TypeMapEntry<'frame> {
     pub(crate) unsafe fn wrap(typemap_entry: *mut jl_typemap_entry_t) -> Self {
-        TypeMapEntry(typemap_entry, PhantomData)
+        debug_assert!(!typemap_entry.is_null());
+        TypeMapEntry(NonNull::new_unchecked(typemap_entry), PhantomData)
     }
 
     #[doc(hidden)]
-    pub unsafe fn ptr(self) -> *mut jl_typemap_entry_t {
+    pub unsafe fn inner(self) -> NonNull<jl_typemap_entry_t> {
         self.0
     }
 
+    /*
+    for (a,b) in zip(fieldnames(Core.TypeMapEntry), fieldtypes(Core.TypeMapEntry))
+         println(a,": ", b)
+    end
+    next: Any
+    sig: Type
+    simplesig: Any
+    guardsigs: Any
+    min_world: UInt64
+    max_world: UInt64
+    func: Any
+    isleafsig: Bool
+    issimplesig: Bool
+    va: Bool
+    */
+
     /// Invasive linked list
-    pub fn next(self) -> Option<Self> {
-        unsafe {
-            let next = (&*self.ptr()).next;
-            if next.is_null() {
-                None
-            } else {
-                Some(TypeMapEntry::wrap(next))
-            }
-        }
+    pub fn next(self) -> ValueRef<'frame, 'static> {
+        unsafe { ValueRef::wrap((&*self.inner().as_ptr()).next.cast()) }
     }
 
-    /// The type signature for this entry
-    pub fn signature(self) -> DataType<'frame> {
-        unsafe { DataType::wrap((&*self.ptr()).sig) }
+    /// The type sig for this entry
+    pub fn sig(self) -> ValueRef<'frame, 'static> {
+        unsafe { ValueRef::wrap((&*self.inner().as_ptr()).sig.cast()) }
     }
 
     /// A simple signature for fast rejection
-    pub fn simple_signature(self) -> DataType<'frame> {
-        unsafe { DataType::wrap((&*self.ptr()).simplesig) }
+    pub fn simplesig(self) -> ValueRef<'frame, 'static> {
+        unsafe { ValueRef::wrap((&*self.inner().as_ptr()).simplesig.cast()) }
     }
 
-    /// The `guard_signature` field.
-    pub fn guard_signature(self) -> SimpleVector<'frame> {
-        unsafe { SimpleVector::wrap((&*self.ptr()).guardsigs) }
+    /// The `guardsigs` field.
+    pub fn guardsigs(self) -> ValueRef<'frame, 'static> {
+        unsafe { ValueRef::wrap((&*self.inner().as_ptr()).guardsigs.cast()) }
     }
 
     /// The `min_world` field.
     pub fn min_world(self) -> usize {
-        unsafe { (&*self.ptr()).min_world }
+        unsafe { (&*self.inner().as_ptr()).min_world }
     }
 
     /// The `max_world` field.
     pub fn max_world(self) -> usize {
-        unsafe { (&*self.ptr()).max_world }
+        unsafe { (&*self.inner().as_ptr()).max_world }
     }
 
     /// The `func` field.
-    pub fn func(self) -> Value<'frame, 'static> {
-        unsafe { Value::wrap((&*self.ptr()).func.value) }
+    pub fn func(self) -> ValueRef<'frame, 'static> {
+        unsafe { ValueRef::wrap((&*self.inner().as_ptr()).func.value) }
     }
 
     /// `isleaftype(sig) & !any(isType, sig)` : unsorted and very fast
     pub fn is_leaf_signature(self) -> bool {
-        unsafe { (&*self.ptr()).isleafsig != 0 }
+        unsafe { (&*self.inner().as_ptr()).isleafsig != 0 }
     }
 
     /// `all(isleaftype | isAny | isType | isVararg, sig)` : sorted and fast
     pub fn is_simple_signature(self) -> bool {
-        unsafe { (&*self.ptr()).issimplesig != 0 }
+        unsafe { (&*self.inner().as_ptr()).issimplesig != 0 }
     }
 
     /// `isVararg(sig)`
     pub fn is_vararg(self) -> bool {
-        unsafe { (&*self.ptr()).va != 0 }
+        unsafe { (&*self.inner().as_ptr()).va != 0 }
     }
 
     /// Convert `self` to a `Value`.
@@ -103,7 +112,7 @@ impl<'scope> Debug for TypeMapEntry<'scope> {
 
 impl<'frame> Into<Value<'frame, 'static>> for TypeMapEntry<'frame> {
     fn into(self) -> Value<'frame, 'static> {
-        unsafe { Value::wrap(self.ptr().cast()) }
+        unsafe { Value::wrap(self.inner().as_ptr().cast()) }
     }
 }
 
@@ -118,7 +127,7 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for TypeMapEntry<'frame> {
     }
 
     unsafe fn cast_unchecked(value: Value<'frame, 'data>) -> Self::Output {
-        Self::wrap(value.ptr().cast())
+        Self::wrap(value.inner().as_ptr().cast())
     }
 }
 

@@ -87,11 +87,11 @@ macro_rules! named_tuple {
 }
 
 use self::array::{Array, Dimensions};
-use self::datatype::DataType;
 use self::module::Module;
 use self::symbol::Symbol;
 use self::type_var::TypeVar;
 use self::union_all::UnionAll;
+use self::{datatype::DataType, wrapper_ref::ValueRef};
 use crate::convert::{cast::Cast, temporary_symbol::TemporarySymbol};
 use crate::error::{JlrsError, JlrsResult, JuliaResult};
 use crate::layout::{
@@ -114,16 +114,16 @@ use jl_sys::{
     jl_field_index, jl_field_isptr, jl_field_names, jl_fieldref, jl_fieldref_noalloc, jl_finalize,
     jl_gc_add_finalizer, jl_gc_wb, jl_get_kwsorter, jl_get_nth_field, jl_get_nth_field_noalloc,
     jl_interrupt_exception, jl_is_kind, jl_isa, jl_memory_exception, jl_new_array,
-    jl_new_struct_uninit, jl_new_typevar, jl_nfields, jl_nothing, jl_nothing_type, jl_object_id,
-    jl_ptr_to_array, jl_ptr_to_array_1d, jl_readonlymemory_exception, jl_set_nth_field,
-    jl_stackovf_exception, jl_subtype, jl_svec_data, jl_svec_len, jl_true, jl_type_union,
-    jl_type_unionall, jl_typeof, jl_typeof_str, jl_undefref_exception, jl_value_t,
+    jl_new_struct_uninit, jl_new_typevar, jl_nfields, jl_nothing, jl_object_id, jl_ptr_to_array,
+    jl_ptr_to_array_1d, jl_readonlymemory_exception, jl_set_nth_field, jl_stackovf_exception,
+    jl_subtype, jl_svec_data, jl_svec_len, jl_true, jl_type_union, jl_type_unionall, jl_typeof,
+    jl_typeof_str, jl_undefref_exception, jl_value_t,
 };
 use std::cell::UnsafeCell;
 use std::ffi::{CStr, CString};
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::marker::PhantomData;
-use std::ptr::null_mut;
+use std::ptr::NonNull;
 use std::slice;
 
 /// In some cases it's necessary to place one or more arguments in front of the arguments a
@@ -138,6 +138,7 @@ pub mod datatype;
 pub mod expr;
 pub mod method;
 pub mod method_instance;
+pub mod method_match;
 pub mod method_table;
 pub mod module;
 pub mod simple_vector;
@@ -153,6 +154,7 @@ pub mod typemap_level;
 pub mod union;
 pub mod union_all;
 pub mod weak_ref;
+pub mod wrapper_ref;
 
 thread_local! {
     // Used to convert dimensions to tuples. Safe because a thread local is initialized
@@ -182,18 +184,27 @@ thread_local! {
 #[repr(transparent)]
 #[derive(Copy, Clone)]
 pub struct Value<'frame, 'data>(
-    *mut jl_value_t,
+    NonNull<jl_value_t>,
     PhantomData<&'frame ()>,
     PhantomData<&'data ()>,
 );
 
 impl<'frame, 'data> Value<'frame, 'data> {
     pub(crate) unsafe fn wrap(ptr: *mut jl_value_t) -> Value<'frame, 'static> {
-        Value(ptr, PhantomData, PhantomData)
+        debug_assert!(!ptr.is_null(), "Value must be non-null");
+        Value(NonNull::new_unchecked(ptr), PhantomData, PhantomData)
+    }
+
+    pub(crate) unsafe fn wrap_maybe_null(ptr: *mut jl_value_t) -> Option<Value<'frame, 'static>> {
+        if ptr.is_null() {
+            return None;
+        }
+
+        Some(Value(NonNull::new_unchecked(ptr), PhantomData, PhantomData))
     }
 
     #[doc(hidden)]
-    pub unsafe fn ptr(self) -> *mut jl_value_t {
+    pub unsafe fn inner(self) -> NonNull<jl_value_t> {
         self.0
     }
 }
@@ -288,15 +299,17 @@ impl<'frame, 'data> Value<'frame, 'data> {
                 ),
                 n if n <= 8 => scope.value_scope_with_slots(1, |output, frame| {
                     let tuple = small_dim_tuple(frame, &dims)?;
-                    output
-                        .into_scope(frame)
-                        .value(jl_new_array(array_type, tuple.ptr()).cast(), Private)
+                    output.into_scope(frame).value(
+                        jl_new_array(array_type, tuple.inner().as_ptr()).cast(),
+                        Private,
+                    )
                 }),
                 _ => scope.value_scope_with_slots(1, |output, frame| {
                     let tuple = large_dim_tuple(frame, &dims)?;
-                    output
-                        .into_scope(frame)
-                        .value(jl_new_array(array_type, tuple.ptr()).cast(), Private)
+                    output.into_scope(frame).value(
+                        jl_new_array(array_type, tuple.inner().as_ptr()).cast(),
+                        Private,
+                    )
                 }),
             }
         }
@@ -342,7 +355,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
                         jl_ptr_to_array(
                             array_type,
                             data.as_mut().as_mut_ptr().cast(),
-                            tuple.ptr(),
+                            tuple.inner().as_ptr(),
                             0,
                         )
                         .cast(),
@@ -355,7 +368,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
                         jl_ptr_to_array(
                             array_type,
                             data.as_mut().as_mut_ptr().cast(),
-                            tuple.ptr(),
+                            tuple.inner().as_ptr(),
                             0,
                         )
                         .cast(),
@@ -405,7 +418,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
                         )
                         .cast();
 
-                        jl_gc_add_finalizer(array, finalizer.ptr());
+                        jl_gc_add_finalizer(array, finalizer.inner().as_ptr());
                         output.into_scope(frame).value(array, Private)
                     }
                     n if n <= 8 => {
@@ -413,12 +426,12 @@ impl<'frame, 'data> Value<'frame, 'data> {
                         let array = jl_ptr_to_array(
                             array_type,
                             Box::into_raw(data.into_boxed_slice()).cast(),
-                            tuple.ptr(),
+                            tuple.inner().as_ptr(),
                             0,
                         )
                         .cast();
 
-                        jl_gc_add_finalizer(array, finalizer.ptr());
+                        jl_gc_add_finalizer(array, finalizer.inner().as_ptr());
                         output.into_scope(frame).value(array, Private)
                     }
                     _ => {
@@ -426,12 +439,12 @@ impl<'frame, 'data> Value<'frame, 'data> {
                         let array = jl_ptr_to_array(
                             array_type,
                             Box::into_raw(data.into_boxed_slice()).cast(),
-                            tuple.ptr(),
+                            tuple.inner().as_ptr(),
                             0,
                         )
                         .cast();
 
-                        jl_gc_add_finalizer(array, finalizer.ptr());
+                        jl_gc_add_finalizer(array, finalizer.inner().as_ptr());
                         output.into_scope(frame).value(array, Private)
                     }
                 }
@@ -455,7 +468,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
                 .iter()
                 .find_map(|v| if v.is_kind() { None } else { Some(v) })
             {
-                Err(JlrsError::NotAKind(v.type_name().into()))?;
+                Err(JlrsError::NotAKind(v.type_name()?.into()))?;
             }
 
             let un = jl_type_union(types.as_mut_ptr().cast(), types.len());
@@ -475,11 +488,11 @@ impl<'frame, 'data> Value<'frame, 'data> {
         F: Frame<'frame>,
     {
         if !body.is_type() && !body.is::<TypeVar>() {
-            Err(JlrsError::InvalidBody(body.type_name().into()))?;
+            Err(JlrsError::InvalidBody(body.type_name()?.into()))?;
         }
 
         unsafe {
-            let ua = jl_type_unionall(tvar.ptr(), body.ptr());
+            let ua = jl_type_unionall(tvar.inner().as_ptr(), body.inner().as_ptr());
             scope.value(ua, Private)
         }
     }
@@ -526,11 +539,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
             let mut field_types_vec = values_m
                 .iter()
                 .copied()
-                .map(|val| {
-                    val.datatype()
-                        .unwrap_or(DataType::nothing_type(global))
-                        .as_value()
-                })
+                .map(|val| val.datatype().as_value())
                 .collect::<Vec<_>>();
 
             let field_type_tup = DataType::anytuple_type(global)
@@ -564,27 +573,29 @@ impl<'frame, 'data> Value<'frame, 'data> {
             let global = Global::new();
             let name = name.temporary_symbol(Private);
 
-            let lb = lower_bound.map_or(jl_bottom_type.cast(), |v| v.ptr());
+            let lb = lower_bound.map_or(jl_bottom_type.cast(), |v| v.inner().as_ptr());
             if !Value::wrap(lb)
                 .datatype()
-                .unwrap()
                 .as_value()
                 .subtype(UnionAll::type_type(global).as_value())
             {
-                Err(JlrsError::NotATypeLB(name.as_string()))?;
+                Err(JlrsError::NotATypeLB(
+                    name.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+                ))?;
             }
 
-            let ub = upper_bound.map_or(jl_any_type.cast(), |v| v.ptr());
+            let ub = upper_bound.map_or(jl_any_type.cast(), |v| v.inner().as_ptr());
             if !Value::wrap(ub)
                 .datatype()
-                .unwrap()
                 .as_value()
                 .subtype(UnionAll::type_type(global).as_value())
             {
-                Err(JlrsError::NotATypeUB(name.as_string()))?;
+                Err(JlrsError::NotATypeUB(
+                    name.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+                ))?;
             }
 
-            let tvar = jl_new_typevar(name.ptr(), lb, ub);
+            let tvar = jl_new_typevar(name.inner().as_ptr(), lb, ub);
             scope.value(tvar.cast(), Private)
         }
     }
@@ -613,7 +624,11 @@ impl<'frame, 'data> Value<'frame, 'data> {
     {
         unsafe {
             let types = types.as_mut();
-            let applied = jl_apply_type(self.ptr(), types.as_mut_ptr().cast(), types.len());
+            let applied = jl_apply_type(
+                self.inner().as_ptr(),
+                types.as_mut_ptr().cast(),
+                types.len(),
+            );
             scope.value(applied, Private)
         }
     }
@@ -624,26 +639,17 @@ impl<'frame, 'data> Value<'frame, 'data> {
 /// Every non-null value is guaranteed to have a [`DataType`]. This contains all of the value's type
 /// information.
 impl<'frame, 'data> Value<'frame, 'data> {
-    /// Returns the `DataType` of this value, or `None` if the value is a null pointer.
-    pub fn datatype(self) -> Option<DataType<'frame>> {
-        unsafe {
-            if self.is_null() {
-                return None;
-            }
-
-            Some(DataType::wrap(jl_typeof(self.ptr()).cast()))
-        }
+    /// Returns the `DataType` of this value.
+    pub fn datatype(self) -> DataType<'frame> {
+        unsafe { DataType::wrap(jl_typeof(self.inner().as_ptr()).cast()) }
     }
 
     /// Returns the type name of this value as a string slice.
-    pub fn type_name(self) -> &'frame str {
+    pub fn type_name(self) -> JlrsResult<&'frame str> {
         unsafe {
-            if self.ptr().is_null() {
-                return "null";
-            }
-            let type_name = jl_typeof_str(self.ptr());
+            let type_name = jl_typeof_str(self.inner().as_ptr());
             let type_name_ref = CStr::from_ptr(type_name);
-            type_name_ref.to_str().unwrap()
+            Ok(type_name_ref.to_str().map_err(|_| JlrsError::NotUnicode)?)
         }
     }
 }
@@ -654,18 +660,6 @@ impl<'frame, 'data> Value<'frame, 'data> {
 /// important method you will find here is [`Value::is`], which can be used in combination
 /// with anything that implements [`JuliaTypecheck`].
 impl<'frame, 'data> Value<'frame, 'data> {
-    /// Returns true if the value is `nothing`. Note that the Julia C API often returns a null
-    /// pointer instead of `nothing`, this method return false if the given value is a null
-    /// pointer.
-    pub fn is_nothing(self) -> bool {
-        unsafe { !self.is_null() && jl_typeof(self.ptr()) == jl_nothing_type.cast() }
-    }
-
-    /// Returns true if the value is a null pointer.
-    pub fn is_null(self) -> bool {
-        unsafe { self.ptr() == null_mut() }
-    }
-
     /// Performs the given type check. For types that represent Julia data, this check comes down
     /// to checking if the data has that type and can be cast to it. This works for primitive
     /// types, for example:
@@ -709,11 +703,7 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// [`JuliaStruct`]: crate::value::traits::julia_struct::JuliaStruct
     /// [here]: ../layout/julia_typecheck/trait.JuliaTypecheck.html#implementors
     pub fn is<T: JuliaTypecheck>(self) -> bool {
-        if self.is_nothing() {
-            return false;
-        }
-
-        self.datatype().unwrap().is::<T>()
+        self.datatype().is::<T>()
     }
 
     /// Returns true if the value is an array with elements of type `T`.
@@ -726,28 +716,24 @@ impl<'frame, 'data> Value<'frame, 'data> {
 
     /// Returns true if `self` is a subtype of `sup`.
     pub fn subtype(self, sup: Value) -> bool {
-        unsafe { jl_subtype(self.ptr(), sup.ptr()) != 0 }
+        unsafe { jl_subtype(self.inner().as_ptr(), sup.inner().as_ptr()) != 0 }
     }
 
     /// Returns true if `self` is the type of a `DataType`, `UnionAll`, `Union`, or `Union{}` (the
     /// bottom type).
     pub fn is_kind(self) -> bool {
-        unsafe { jl_is_kind(self.ptr()) }
+        unsafe { jl_is_kind(self.inner().as_ptr()) }
     }
 
     /// Returns true if the value is a type, ie a `DataType`, `UnionAll`, `Union`, or `Union{}`
     /// (the bottom type).
     pub fn is_type(self) -> bool {
-        if let Some(dt) = self.datatype() {
-            Value::is_kind(dt.into())
-        } else {
-            false
-        }
+        Value::is_kind(self.datatype().as_value())
     }
 
     /// Returns true if `self` is of type `ty`.
     pub fn isa(self, ty: Value) -> bool {
-        unsafe { jl_isa(self.ptr(), ty.ptr()) != 0 }
+        unsafe { jl_isa(self.inner().as_ptr(), ty.inner().as_ptr()) != 0 }
     }
 }
 
@@ -764,16 +750,16 @@ impl<'frame, 'data> Value<'frame, 'data> {
     ///
     /// Safety: The value must not contain a reference any borrowed data.
     pub unsafe fn assume_owned(self) -> Value<'frame, 'static> {
-        Value::wrap(self.ptr())
+        Value::wrap(self.inner().as_ptr())
     }
 
-    /// Root the value again in some `scope`.
-    pub fn reroot<'scope, 'f, S, F>(self, scope: S) -> JlrsResult<S::Value>
+    /// Root the value in some `scope`.
+    pub fn root<'scope, 'f, S, F>(self, scope: S) -> JlrsResult<S::Value>
     where
         F: Frame<'f>,
         S: Scope<'scope, 'f, 'data, F>,
     {
-        unsafe { scope.value(self.ptr(), Private) }
+        unsafe { scope.value(self.inner().as_ptr(), Private) }
     }
 }
 
@@ -833,15 +819,11 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// Returns the field names of this value as a slice of `Symbol`s. These symbols can be used
     /// to access their fields with [`Value::get_field`].
     pub fn field_names(self) -> &'frame [Symbol<'frame>] {
-        if self.is_nothing() {
-            return &[];
-        }
-
         unsafe {
-            let tp = jl_typeof(self.ptr());
+            let tp = jl_typeof(self.inner().as_ptr());
             let field_names = jl_field_names(tp.cast());
             let len = jl_svec_len(field_names);
-            let items: *mut Symbol = jl_svec_data(field_names).cast();
+            let items = jl_svec_data(field_names);
             slice::from_raw_parts(items.cast(), len)
         }
     }
@@ -849,17 +831,11 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// Returns the number of fields the underlying Julia value has. These fields can be accessed
     /// with [`Value::get_nth_field`].
     pub fn n_fields(self) -> usize {
-        if self.is_nothing() {
-            return 0;
-        }
-
-        unsafe { jl_nfields(self.ptr()) as _ }
+        unsafe { jl_nfields(self.inner().as_ptr()) as _ }
     }
 
     /// Returns the field at index `idx` if it exists. If it does not exist
-    /// `JlrsError::OutOfBounds` is returned. This function assumes the field must be protected
-    /// from garbage collection, so calling this function will take a single slot on the GC stack.
-    /// If there is no slot available `JlrsError::AllocError` is returned.
+    /// `JlrsError::OutOfBounds` is returned.
     pub fn get_nth_field<'scope, 'fr, S, F>(self, scope: S, idx: usize) -> JlrsResult<S::Value>
     where
         S: Scope<'scope, 'fr, 'data, F>,
@@ -870,32 +846,29 @@ impl<'frame, 'data> Value<'frame, 'data> {
                 return Err(JlrsError::OutOfBounds(idx, self.n_fields()).into());
             }
 
-            scope.value(jl_fieldref(self.ptr(), idx), Private)
+            scope.value(jl_fieldref(self.inner().as_ptr(), idx), Private)
         }
     }
 
-    /// Returns the field at index `idx` if it exists and no allocation is required to return it.
-    /// Allocation is not required if the field is a pointer to another value.
+    /// Returns the field at index `idx` if it exists as a `ValueRef`.
     ///
-    /// If the field does not exist `JlrsError::NoSuchField` is returned. If allocating is
-    /// required to return the field, `JlrsError::NotAPointerField` is returned.
-    ///
-    /// This function is unsafe because the value returned as a result will only be valid as long
-    /// as the field is not changed.
-    pub unsafe fn get_nth_field_noalloc(self, idx: usize) -> JlrsResult<Value<'frame, 'data>> {
-        if self.is_nothing() {
-            Err(JlrsError::Nothing)?;
-        }
-
+    /// If the field does not exist `JlrsError::NoSuchField` is returned. If the field can't be
+    /// referenced because it's data is stored inline, `JlrsError::NotAPointerField` is returned.
+    pub fn get_nth_field_noalloc(self, idx: usize) -> JlrsResult<ValueRef<'frame, 'data>> {
         if idx >= self.n_fields() {
             Err(JlrsError::OutOfBounds(idx, self.n_fields()))?
         }
 
-        if !jl_field_isptr(self.datatype().unwrap().ptr(), idx as _) {
-            Err(JlrsError::NotAPointerField(idx))?;
-        }
+        unsafe {
+            if !jl_field_isptr(self.datatype().inner().as_ptr(), idx as _) {
+                Err(JlrsError::NotAPointerField(idx))?;
+            }
 
-        Ok(Value::wrap(jl_fieldref_noalloc(self.ptr(), idx)))
+            Ok(ValueRef::wrap(jl_fieldref_noalloc(
+                self.inner().as_ptr(),
+                idx,
+            )))
+        }
     }
 
     /// Returns the field with the name `field_name` if it exists. If it does not exist
@@ -911,18 +884,17 @@ impl<'frame, 'data> Value<'frame, 'data> {
         unsafe {
             let symbol = field_name.temporary_symbol(Private);
 
-            if self.is_nothing() {
-                Err(JlrsError::Nothing)?;
-            }
-
-            let jl_type = jl_typeof(self.ptr()).cast();
-            let idx = jl_field_index(jl_type, symbol.ptr(), 0);
+            let jl_type = jl_typeof(self.inner().as_ptr()).cast();
+            let idx = jl_field_index(jl_type, symbol.inner().as_ptr(), 0);
 
             if idx < 0 {
-                return Err(JlrsError::NoSuchField(symbol.into()).into());
+                return Err(JlrsError::NoSuchField(
+                    symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+                )
+                .into());
             }
 
-            scope.value(jl_get_nth_field(self.ptr(), idx as _), Private)
+            scope.value(jl_get_nth_field(self.inner().as_ptr(), idx as _), Private)
         }
     }
 
@@ -934,28 +906,32 @@ impl<'frame, 'data> Value<'frame, 'data> {
     ///
     /// This function is unsafe because the value returned as a result will only be valid as long
     /// as the field is not changed.
-    pub unsafe fn get_field_noalloc<N>(self, field_name: N) -> JlrsResult<Value<'frame, 'data>>
+    pub fn get_field_noalloc<N>(self, field_name: N) -> JlrsResult<ValueRef<'frame, 'data>>
     where
         N: TemporarySymbol,
     {
-        let symbol = field_name.temporary_symbol(Private);
+        unsafe {
+            let symbol = field_name.temporary_symbol(Private);
 
-        if self.is_nothing() {
-            Err(JlrsError::Nothing)?;
+            let jl_type = jl_typeof(self.inner().as_ptr()).cast();
+            let idx = jl_field_index(jl_type, symbol.inner().as_ptr(), 0);
+
+            if idx < 0 {
+                return Err(JlrsError::NoSuchField(
+                    symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+                )
+                .into());
+            }
+
+            if !jl_field_isptr(self.datatype().inner().as_ptr(), idx) {
+                Err(JlrsError::NotAPointerField(idx as _))?;
+            }
+
+            Ok(ValueRef::wrap(jl_get_nth_field_noalloc(
+                self.inner().as_ptr(),
+                idx as _,
+            )))
         }
-
-        let jl_type = jl_typeof(self.ptr()).cast();
-        let idx = jl_field_index(jl_type, symbol.ptr(), 0);
-
-        if idx < 0 {
-            return Err(JlrsError::NoSuchField(symbol.into()).into());
-        }
-
-        if !jl_field_isptr(self.datatype().unwrap().ptr(), idx) {
-            Err(JlrsError::NotAPointerField(idx as _))?;
-        }
-
-        Ok(Value::wrap(jl_get_nth_field_noalloc(self.ptr(), idx as _)))
     }
 
     /// Set the value of the field at `idx`. Returns an error if this value is immutable or if the
@@ -966,18 +942,16 @@ impl<'frame, 'data> Value<'frame, 'data> {
             Err(JlrsError::Immutable)?
         }
 
-        let field_type = self.datatype().unwrap().field_types()[idx];
-        if let Some(dt) = value.datatype() {
-            if Value::subtype(dt.into(), field_type) {
-                jl_set_nth_field(self.ptr(), idx, value.ptr());
-                jl_gc_wb(self.ptr(), value.ptr());
-                return Ok(());
-            } else {
-                Err(JlrsError::NotSubtype)?
-            }
-        }
+        let field_type = self.datatype().field_types().data()[idx].assume_valid_value_unchecked();
+        let dt = value.datatype();
 
-        Err(JlrsError::Nothing)?
+        if Value::subtype(dt.as_value(), field_type) {
+            jl_set_nth_field(self.inner().as_ptr(), idx, value.inner().as_ptr());
+            jl_gc_wb(self.inner().as_ptr(), value.inner().as_ptr());
+            Ok(())
+        } else {
+            Err(JlrsError::NotSubtype)?
+        }
     }
 }
 
@@ -1081,7 +1055,7 @@ impl<'fr, 'da> Value<'fr, 'da> {
     /// garbage collection. This is safe if you won't use the result or if you can guarantee it's
     /// a global value in Julia, e.g. `nothing` or a [`Module`].
     pub unsafe fn call0_unprotected<'base>(self, _: Global<'base>) -> JuliaResult<'base, 'static> {
-        let res = jl_call0(self.ptr());
+        let res = jl_call0(self.inner().as_ptr());
         let exc = jl_exception_occurred();
 
         if exc.is_null() {
@@ -1099,7 +1073,7 @@ impl<'fr, 'da> Value<'fr, 'da> {
         _: Global<'base>,
         arg: Value<'_, 'data>,
     ) -> JuliaResult<'base, 'data> {
-        let res = jl_call1(self.ptr().cast(), arg.ptr());
+        let res = jl_call1(self.inner().as_ptr().cast(), arg.inner().as_ptr());
         let exc = jl_exception_occurred();
 
         if exc.is_null() {
@@ -1118,7 +1092,11 @@ impl<'fr, 'da> Value<'fr, 'da> {
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
     ) -> JuliaResult<'base, 'data> {
-        let res = jl_call2(self.ptr().cast(), arg0.ptr(), arg1.ptr());
+        let res = jl_call2(
+            self.inner().as_ptr().cast(),
+            arg0.inner().as_ptr(),
+            arg1.inner().as_ptr(),
+        );
         let exc = jl_exception_occurred();
 
         if exc.is_null() {
@@ -1138,7 +1116,12 @@ impl<'fr, 'da> Value<'fr, 'da> {
         arg1: Value<'_, 'borrow>,
         arg2: Value<'_, 'borrow>,
     ) -> JuliaResult<'base, 'borrow> {
-        let res = jl_call3(self.ptr().cast(), arg0.ptr(), arg1.ptr(), arg2.ptr());
+        let res = jl_call3(
+            self.inner().as_ptr().cast(),
+            arg0.inner().as_ptr(),
+            arg1.inner().as_ptr(),
+            arg2.inner().as_ptr(),
+        );
         let exc = jl_exception_occurred();
 
         if exc.is_null() {
@@ -1161,7 +1144,11 @@ impl<'fr, 'da> Value<'fr, 'da> {
     {
         let args = args.as_mut();
         let n = args.len();
-        let res = jl_call(self.ptr().cast(), args.as_mut_ptr().cast(), n as _);
+        let res = jl_call(
+            self.inner().as_ptr().cast(),
+            args.as_mut_ptr().cast(),
+            n as _,
+        );
         let exc = jl_exception_occurred();
 
         if exc.is_null() {
@@ -1183,7 +1170,7 @@ impl<'fr, 'da> Value<'fr, 'da> {
     where
         V: AsMut<[Value<'value, 'data>]>,
     {
-        let func = jl_get_kwsorter(self.datatype().expect("").ptr().cast());
+        let func = jl_get_kwsorter(self.datatype().as_value().inner().as_ptr());
         let args = args.as_mut();
         let n = args.len();
 
@@ -1229,7 +1216,7 @@ impl<'fr, 'da> Value<'fr, 'da> {
             let func = Module::main(global)
                 .submodule("Jlrs")?
                 .function("tracingcall")?;
-            let res = jl_call1(func.ptr(), self.ptr());
+            let res = jl_call1(func.inner().as_ptr(), self.inner().as_ptr());
             try_root(frame, res)
         }
     }
@@ -1248,7 +1235,7 @@ impl<'fr, 'da> Value<'fr, 'da> {
             let func = Module::main(global)
                 .submodule("Jlrs")?
                 .function("attachstacktrace")?;
-            let res = jl_call1(func.ptr(), self.ptr());
+            let res = jl_call1(func.inner().as_ptr(), self.inner().as_ptr());
             try_root(frame, res)
         }
     }
@@ -1258,12 +1245,12 @@ impl<'fr, 'da> Value<'fr, 'da> {
 impl Value<'_, '_> {
     /// Returns the object id of this value.
     pub fn object_id(self) -> usize {
-        unsafe { jl_object_id(self.ptr()) }
+        unsafe { jl_object_id(self.inner().as_ptr()) }
     }
 
     /// Returns true if `self` and `other` are equal.
     pub fn egal(self, other: Value) -> bool {
-        unsafe { jl_egal(self.ptr(), other.ptr()) != 0 }
+        unsafe { jl_egal(self.inner().as_ptr(), other.inner().as_ptr()) != 0 }
     }
 }
 
@@ -1272,12 +1259,12 @@ impl Value<'_, '_> {
     /// Add a finalizer `f` to this value. The finalizer must be a Julia function, it will be
     /// called when this value is about to be freed by the garbage collector.
     pub unsafe fn add_finalizer(self, f: Value) {
-        jl_gc_add_finalizer(self.ptr(), f.ptr())
+        jl_gc_add_finalizer(self.inner().as_ptr(), f.inner().as_ptr())
     }
 
     /// Call all finalizers.
     pub unsafe fn finalize(self) {
-        jl_finalize(self.ptr())
+        jl_finalize(self.inner().as_ptr())
     }
 }
 
@@ -1384,7 +1371,7 @@ unsafe impl<'frame, 'data> ValidLayout for Value<'frame, 'data> {
         } else if v.cast::<union_all::UnionAll>().is_ok() {
             true
         } else if let Ok(u) = v.cast::<union::Union>() {
-            !u.isbitsunion()
+            !u.is_bits_union()
         } else {
             false
         }
@@ -1414,9 +1401,13 @@ where
             Err(a) => Err(a.into()),
         }
     } else {
-        match frame.push_root(res, Private) {
-            Ok(v) => Ok(Ok(v)),
-            Err(a) => Err(a.into()),
+        if res.is_null() {
+            Ok(Ok(Value::nothing(frame.global())))
+        } else {
+            match frame.push_root(res, Private) {
+                Ok(v) => Ok(Ok(v)),
+                Err(a) => Err(a.into()),
+            }
         }
     }
 }
@@ -1429,7 +1420,7 @@ where
     F: Frame<'frame>,
 {
     let n = dims.n_dimensions();
-    assert!(n <= 8);
+    debug_assert!(n <= 8, "Too many dimensions for small_dim_tuple");
     let elem_types = JL_LONG_TYPE.with(|longs| longs.get());
     let tuple_type = jl_apply_tuple_type_v(elem_types.cast(), n);
     let tuple = jl_new_struct_uninit(tuple_type);
@@ -1437,7 +1428,7 @@ where
         .push_root(tuple, Private)
         .map_err(JlrsError::alloc_error)?;
 
-    let usize_ptr: *mut usize = v.ptr().cast();
+    let usize_ptr: *mut usize = v.inner().as_ptr().cast();
     std::ptr::copy_nonoverlapping(dims.as_slice().as_ptr(), usize_ptr, n);
 
     Ok(v)
@@ -1458,7 +1449,7 @@ where
         .push_root(tuple, Private)
         .map_err(JlrsError::alloc_error)?;
 
-    let usize_ptr: *mut usize = v.ptr().cast();
+    let usize_ptr: *mut usize = v.inner().as_ptr().cast();
     std::ptr::copy_nonoverlapping(dims.as_slice().as_ptr(), usize_ptr, n);
 
     Ok(v)
@@ -1551,6 +1542,6 @@ impl LeakedValue {
     /// Convert this [`LeakedValue`] back to a [`Value`]. This requires a [`Global`], so this
     /// method can only be called inside a closure taken by one of the `frame`-methods.
     pub fn as_value<'base>(self, _: Global<'base>) -> Value<'base, 'static> {
-        unsafe { Value::wrap(self.0.ptr()) }
+        self.0
     }
 }

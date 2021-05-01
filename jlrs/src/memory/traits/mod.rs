@@ -6,5 +6,5 @@ pub mod as_unrooted;
 pub mod frame;
 pub mod gc;
 pub mod mode;
-pub(crate) mod root;
+pub(crate) mod root_pending;
 pub mod scope;

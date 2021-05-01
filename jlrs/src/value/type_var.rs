@@ -1,7 +1,7 @@
 //! Support for values with the `Core.TypeVar` type.
 
-use super::symbol::Symbol;
 use super::union_all::UnionAll;
+use super::wrapper_ref::{SymbolRef, ValueRef};
 use super::Value;
 use crate::memory::global::Global;
 use crate::private::Private;
@@ -15,21 +15,23 @@ use jl_sys::{jl_any_type, jl_bottom_type, jl_new_typevar, jl_tvar_t, jl_tvar_typ
 use std::{
     fmt::{Debug, Formatter, Result as FmtResult},
     marker::PhantomData,
+    ptr::NonNull,
 };
 
 /// This is a unknown, but possibly restricted, type parameter. In `Array{T, N}`, `T` and `N` are
 /// `TypeVar`s.
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]
 #[repr(transparent)]
-pub struct TypeVar<'frame>(*mut jl_tvar_t, PhantomData<&'frame ()>);
+pub struct TypeVar<'frame>(NonNull<jl_tvar_t>, PhantomData<&'frame ()>);
 
 impl<'frame> TypeVar<'frame> {
     pub(crate) unsafe fn wrap(type_var: *mut jl_tvar_t) -> Self {
-        TypeVar(type_var, PhantomData)
+        debug_assert!(!type_var.is_null());
+        TypeVar(NonNull::new_unchecked(type_var), PhantomData)
     }
 
     #[doc(hidden)]
-    pub unsafe fn ptr(self) -> *mut jl_tvar_t {
+    pub unsafe fn inner(self) -> NonNull<jl_tvar_t> {
         self.0
     }
 
@@ -50,27 +52,29 @@ impl<'frame> TypeVar<'frame> {
             let global = Global::new();
             let name = name.temporary_symbol(Private);
 
-            let lb = lower_bound.map_or(jl_bottom_type.cast(), |v| v.ptr());
+            let lb = lower_bound.map_or(jl_bottom_type.cast(), |v| v.inner().as_ptr());
             if !Value::wrap(lb)
                 .datatype()
-                .unwrap()
                 .as_value()
                 .subtype(UnionAll::type_type(global).as_value())
             {
-                Err(JlrsError::NotATypeLB(name.as_string()))?;
+                Err(JlrsError::NotATypeLB(
+                    name.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+                ))?;
             }
 
-            let ub = upper_bound.map_or(jl_any_type.cast(), |v| v.ptr());
+            let ub = upper_bound.map_or(jl_any_type.cast(), |v| v.inner().as_ptr());
             if !Value::wrap(ub)
                 .datatype()
-                .unwrap()
                 .as_value()
                 .subtype(UnionAll::type_type(global).as_value())
             {
-                Err(JlrsError::NotATypeUB(name.as_string()))?;
+                Err(JlrsError::NotATypeUB(
+                    name.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+                ))?;
             }
 
-            let tvar = jl_new_typevar(name.ptr(), lb, ub);
+            let tvar = jl_new_typevar(name.inner().as_ptr(), lb, ub);
             frame
                 .push_root(tvar.cast(), Private)
                 .map_err(JlrsError::alloc_error)?;
@@ -79,19 +83,28 @@ impl<'frame> TypeVar<'frame> {
         }
     }
 
+    /*
+    for (a, b) in zip(fieldnames(TypeVar), fieldtypes(TypeVar))
+        println(a, ": ", b)
+    end
+    name: Symbol
+    lb: Any
+    ub: Any
+    */
+
     /// The name of this `TypeVar`.
-    pub fn name(self) -> Symbol<'frame> {
-        unsafe { Symbol::wrap((&*self.ptr()).name) }
+    pub fn name(self) -> SymbolRef<'frame> {
+        unsafe { SymbolRef::wrap((&*self.inner().as_ptr()).name) }
     }
 
     /// The lower bound of this `TypeVar`.
-    pub fn lower_bound(self) -> Value<'frame, 'static> {
-        unsafe { Value::wrap((&*self.ptr()).lb) }
+    pub fn lower_bound(self) -> ValueRef<'frame, 'static> {
+        unsafe { ValueRef::wrap((&*self.inner().as_ptr()).lb) }
     }
 
     /// The upper bound of this `TypeVar`.
-    pub fn upper_bound(self) -> Value<'frame, 'static> {
-        unsafe { Value::wrap((&*self.ptr()).ub) }
+    pub fn upper_bound(self) -> ValueRef<'frame, 'static> {
+        unsafe { ValueRef::wrap((&*self.inner().as_ptr()).ub) }
     }
 
     /// Convert `self` to a `Value`.
@@ -102,15 +115,17 @@ impl<'frame> TypeVar<'frame> {
 
 impl<'scope> Debug for TypeVar<'scope> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        f.debug_tuple("TypeVar")
-            .field(&self.name().as_string())
-            .finish()
+        unsafe {
+            f.debug_tuple("TypeVar")
+                .field(&self.name().assume_valid_unchecked().as_string())
+                .finish()
+        }
     }
 }
 
 impl<'frame> Into<Value<'frame, 'static>> for TypeVar<'frame> {
     fn into(self) -> Value<'frame, 'static> {
-        unsafe { Value::wrap(self.ptr().cast()) }
+        unsafe { Value::wrap(self.inner().as_ptr().cast()) }
     }
 }
 
@@ -125,7 +140,7 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for TypeVar<'frame> {
     }
 
     unsafe fn cast_unchecked(value: Value<'frame, 'data>) -> Self::Output {
-        Self::wrap(value.ptr().cast())
+        Self::wrap(value.inner().as_ptr().cast())
     }
 }
 

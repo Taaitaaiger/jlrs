@@ -19,6 +19,7 @@ use jl_sys::{
 };
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::marker::PhantomData;
+use std::ptr::NonNull;
 
 /// Functionality in Julia can be accessed through its module system. You can get a handle to the
 /// three standard modules, `Main`, `Base`, and `Core` and access their submodules through them.
@@ -34,40 +35,41 @@ use std::marker::PhantomData;
 /// [`DataType::is`]: crate::value::datatype::DataType::is
 #[derive(Copy, Clone)]
 #[repr(transparent)]
-pub struct Module<'base>(*mut jl_module_t, PhantomData<&'base ()>);
+pub struct Module<'base>(NonNull<jl_module_t>, PhantomData<&'base ()>);
 
 impl<'base> Module<'base> {
     pub(crate) unsafe fn wrap(module: *mut jl_module_t) -> Self {
-        Module(module, PhantomData)
+        debug_assert!(!module.is_null());
+        Module(NonNull::new_unchecked(module), PhantomData)
+    }
+
+    pub(crate) unsafe fn wrap_maybe_null(module: *mut jl_module_t) -> Option<Self> {
+        if module.is_null() {
+            return None;
+        }
+        Some(Module(NonNull::new_unchecked(module), PhantomData))
     }
 
     #[doc(hidden)]
-    pub unsafe fn ptr(self) -> *mut jl_module_t {
+    pub unsafe fn inner(self) -> NonNull<jl_module_t> {
         self.0
     }
 
     /// Returns the name of this module.
     pub fn name(self) -> Symbol<'base> {
-        unsafe { Symbol::wrap((&*(self.ptr())).name) }
+        unsafe { Symbol::wrap((&*(self.inner().as_ptr())).name) }
     }
 
     /// Returns the parent of this module.
     pub fn parent(self) -> Option<Self> {
-        unsafe {
-            let parent = (&*(self.ptr())).parent;
-            if parent.is_null() {
-                return None;
-            }
-
-            Some(Self::wrap(parent))
-        }
+        unsafe { Self::wrap_maybe_null((&*(self.inner().as_ptr())).parent) }
     }
 
     /// Extend the lifetime of this module; if `self` has originally been created by calling some
     /// Julia function the lifetime will be limited to the frame the function is called with. This
     /// can be extended to the lifetime of `Global` by calling this method.
     pub fn extend<'global>(self, _: Global<'global>) -> Module<'global> {
-        unsafe { Module::wrap(self.ptr()) }
+        unsafe { Module::wrap(self.inner().as_ptr()) }
     }
 
     /// Returns a handle to Julia's `Main`-module. If you include your own Julia code by calling
@@ -102,12 +104,15 @@ impl<'base> Module<'base> {
             // safe because jl_symbol_n copies the contents
             let symbol = name.temporary_symbol(Private);
 
-            let submodule = jl_get_global(self.ptr(), symbol.ptr());
+            let submodule = jl_get_global(self.inner().as_ptr(), symbol.inner().as_ptr());
 
             if !submodule.is_null() && jl_typeis(submodule, jl_module_type) {
-                Ok(Module(submodule as *mut jl_module_t, PhantomData))
+                Ok(Module::wrap(submodule.cast()))
             } else {
-                Err(JlrsError::NotAModule(symbol.into()).into())
+                Err(
+                    JlrsError::NotAModule(symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into())
+                        .into(),
+                )
             }
         }
     }
@@ -124,11 +129,11 @@ impl<'base> Module<'base> {
         N: TemporarySymbol,
     {
         jl_set_global(
-            self.ptr(),
-            name.temporary_symbol(Private).ptr(),
-            value.ptr(),
+            self.inner().as_ptr(),
+            name.temporary_symbol(Private).inner().as_ptr(),
+            value.inner().as_ptr(),
         );
-        Value::wrap(value.ptr())
+        Value::wrap(value.inner().as_ptr())
     }
 
     /// Set a constant in this module.
@@ -143,12 +148,18 @@ impl<'base> Module<'base> {
         unsafe {
             let symbol = name.temporary_symbol(Private);
             if self.global(symbol).is_ok() {
-                Err(JlrsError::ConstAlreadyExists(symbol.into()))?;
+                Err(JlrsError::ConstAlreadyExists(
+                    symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+                ))?;
             }
 
-            jl_set_const(self.ptr(), symbol.ptr(), value.ptr());
+            jl_set_const(
+                self.inner().as_ptr(),
+                symbol.inner().as_ptr(),
+                value.inner().as_ptr(),
+            );
 
-            Ok(Value::wrap(value.ptr()))
+            Ok(Value::wrap(value.inner().as_ptr()))
         }
     }
 
@@ -163,9 +174,12 @@ impl<'base> Module<'base> {
 
             // there doesn't seem to be a way to check if this is actually a
             // function...
-            let func = jl_get_global(self.ptr(), symbol.ptr());
+            let func = jl_get_global(self.inner().as_ptr(), symbol.inner().as_ptr());
             if func.is_null() {
-                return Err(JlrsError::FunctionNotFound(symbol.into()).into());
+                return Err(JlrsError::FunctionNotFound(
+                    symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+                )
+                .into());
             }
 
             Ok(Value::wrap(func.cast()))
@@ -183,9 +197,12 @@ impl<'base> Module<'base> {
 
             // there doesn't seem to be a way to check if this is actually a
             // function...
-            let func = jl_get_global(self.ptr(), symbol.ptr());
+            let func = jl_get_global(self.inner().as_ptr(), symbol.inner().as_ptr());
             if func.is_null() {
-                return Err(JlrsError::FunctionNotFound(symbol.into()).into());
+                return Err(JlrsError::FunctionNotFound(
+                    symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+                )
+                .into());
             }
 
             Ok(LeakedValue::wrap(func))
@@ -221,7 +238,7 @@ impl<'base> Module<'base> {
 
     /// Convert `self` to a `LeakedValue`.
     pub fn as_leaked(self) -> LeakedValue {
-        unsafe { LeakedValue::wrap(self.ptr().cast()) }
+        unsafe { LeakedValue::wrap(self.inner().as_ptr().cast()) }
     }
 
     /// Load a module by calling `Base.require` and return this module if it has been loaded
@@ -278,7 +295,7 @@ impl<'base> Module<'base> {
 
 impl<'base> Into<Value<'base, 'static>> for Module<'base> {
     fn into(self) -> Value<'base, 'static> {
-        unsafe { Value::wrap(self.ptr().cast()) }
+        unsafe { Value::wrap(self.inner().as_ptr().cast()) }
     }
 }
 
@@ -293,7 +310,7 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for Module<'frame> {
     }
 
     unsafe fn cast_unchecked(value: Value<'frame, 'data>) -> Self::Output {
-        Self::wrap(value.ptr().cast())
+        Self::wrap(value.inner().as_ptr().cast())
     }
 }
 
@@ -303,7 +320,7 @@ impl_valid_layout!(Module<'frame>, 'frame);
 
 impl<'frame, 'data> Debug for Module<'frame> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        let name: String = self.name().into();
+        let name: String = self.name().as_str().unwrap_or("<Non-UTF8 symbol>").into();
         f.debug_tuple("Module").field(&name).finish()
     }
 }

@@ -92,7 +92,7 @@ impl<'frame, 'data> Future for JuliaFuture<'frame, 'data> {
                 unsafe {
                     let global = Global::new();
                     let f = Module::base(global).function("fetch").unwrap();
-                    let mut res = jl_call1(f.ptr(), task.ptr().cast());
+                    let mut res = jl_call1(f.inner().as_ptr(), task.inner().as_ptr().cast());
                     let exc = jl_exception_occurred();
 
                     if exc.is_null() {

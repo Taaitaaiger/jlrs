@@ -66,7 +66,7 @@ fn create_and_cast_jl_string() {
             let v = Value::new(frame, "Foo bar")?;
             assert!(v.is::<JuliaString>());
             let string = v.cast::<JuliaString>()?;
-            assert!(unsafe { JuliaString::valid_layout(v.datatype().unwrap().into()) });
+            assert!(unsafe { JuliaString::valid_layout(v.datatype().into()) });
             assert_eq!(string.len(), 7);
             assert_eq!(string.as_c_str().to_str().unwrap(), "Foo bar");
             assert_eq!(string.as_str().unwrap(), "Foo bar");

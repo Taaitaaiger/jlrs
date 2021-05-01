@@ -230,10 +230,10 @@ fn create_nothing() {
 
         jlrs.scope_with_slots(0, |global, _frame| {
             let nothing = Value::nothing(global);
-            assert!(nothing.is_nothing());
+            assert!(nothing.is::<Nothing>());
             assert!(!nothing.is::<f32>());
-            assert!(nothing.datatype().is_some());
-            assert_eq!(nothing.type_name(), "Nothing");
+            assert!(nothing.datatype().is::<Nothing>());
+            assert_eq!(nothing.type_name().unwrap(), "Nothing");
             assert!(!nothing.is_array_of::<f32>());
             assert_eq!(nothing.field_names().len(), 0);
             assert_eq!(nothing.n_fields(), 0);

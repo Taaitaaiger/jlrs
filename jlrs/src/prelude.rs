@@ -12,7 +12,7 @@ pub use crate::memory::traits::{
 pub use crate::value::array::{
     Array, ArrayData, CopiedArray, InlineArrayDataMut, TypedArray, ValueArrayDataMut,
 };
-pub use crate::value::datatype::DataType;
+pub use crate::value::datatype::{DataType, Nothing};
 pub use crate::value::module::Module;
 pub use crate::value::string::JuliaString;
 pub use crate::value::symbol::Symbol;

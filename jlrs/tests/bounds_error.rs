@@ -14,12 +14,12 @@ fn bounds_error() {
                     let func = Module::base(global).function("getindex")?;
                     let out = func.call2(&mut *frame, array, idx)?.unwrap_err();
 
-                    assert_eq!(out.type_name(), "BoundsError");
+                    assert_eq!(out.type_name().unwrap(), "BoundsError");
 
                     let field_names = out.field_names();
-                    let f0: String = field_names[0].into();
+                    let f0: String = field_names[0].as_string().unwrap();
                     assert_eq!(f0, "a");
-                    let f1: String = field_names[1].into();
+                    let f1 = field_names[1].as_str().unwrap();
                     assert_eq!(f1, "i");
 
                     out.get_field(&mut *frame, field_names[1])?

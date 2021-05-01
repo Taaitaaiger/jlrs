@@ -25,21 +25,21 @@ macro_rules! impl_julia_typecheck {
     ($type:ty, $jl_type:expr, $($lt:lifetime),+) => {
         unsafe impl<$($lt),+> crate::layout::julia_typecheck::JuliaTypecheck for $type {
             unsafe fn julia_typecheck(t: $crate::value::datatype::DataType) -> bool {
-                t.ptr() == $jl_type
+                t.inner().as_ptr() == $jl_type
             }
         }
     };
     ($type:ty, $jl_type:expr) => {
         unsafe impl crate::layout::julia_typecheck::JuliaTypecheck for $type {
             unsafe fn julia_typecheck(t: $crate::value::datatype::DataType) -> bool {
-                t.ptr() == $jl_type
+                t.inner().as_ptr() == $jl_type
             }
         }
     };
     ($type:ty) => {
         unsafe impl crate::layout::julia_typecheck::JuliaTypecheck for $type {
             unsafe fn julia_typecheck(t: crate::value::datatype::DataType) -> bool {
-                t.ptr() == <$type as $crate::layout::julia_type::JuliaType>::julia_type()
+                t.inner().as_ptr() == <$type as $crate::layout::julia_type::JuliaType>::julia_type()
             }
         }
     };

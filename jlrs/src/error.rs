@@ -35,6 +35,7 @@ pub enum JlrsError {
     NotUnicode,
     NotAnSVec,
     NotAnSSAValue,
+    NotAMethodMatch,
     NotATypeName,
     NotATypeVar,
     NotATypeLB(String),
@@ -126,6 +127,7 @@ impl Display for JlrsError {
                 write!(formatter, "The data of this array is not stored inline")
             }
             JlrsError::NotAMethTable => write!(formatter, "This is not a method table"),
+            JlrsError::NotAMethodMatch => write!(formatter, "This is not a method match"),
             JlrsError::NotAnSVec => write!(formatter, "This is not a simple vector"),
             JlrsError::NotAnSSAValue => write!(formatter, "This is not an SSA value"),
             JlrsError::NotATypeName => write!(formatter, "This is not a typename"),

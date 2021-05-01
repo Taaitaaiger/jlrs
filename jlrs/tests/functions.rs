@@ -16,6 +16,49 @@ fn call0() {
 }
 
 #[test]
+fn retuen_nothing() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+
+        jlrs.scope_with_slots(3, |_global, frame| {
+            let func = Value::eval_string(
+                &mut *frame,
+                "function x(a)::Nothing 
+                    @assert 3 == a;
+                end",
+            )?
+            .into_jlrs_result()?;
+            let v = Value::new(&mut *frame, 3usize)?;
+            let v2 = func.call1(&mut *frame, v)?.into_jlrs_result()?;
+            assert!(v2.is::<Nothing>());
+            Ok(())
+        })
+        .unwrap();
+    })
+}
+
+#[test]
+fn throw_nothing() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+
+        jlrs.scope_with_slots(3, |_global, frame| {
+            let func = Value::eval_string(
+                &mut *frame,
+                "function y()::Nothing 
+                    throw(nothing)
+                end",
+            )?
+            .into_jlrs_result()?;
+            let v = func.call0(&mut *frame)?.unwrap_err();
+            assert!(v.is::<Nothing>());
+            Ok(())
+        })
+        .unwrap();
+    })
+}
+
+#[test]
 fn call0_output() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();

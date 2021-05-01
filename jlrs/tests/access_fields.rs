@@ -60,7 +60,7 @@ fn access_non_pointer_tuple_field_must_alloc() {
                 .submodule("JlrsTests")?
                 .function("inlinetuple")?;
             let tup = func.call0(&mut *frame)?.unwrap();
-            assert!(unsafe { tup.get_nth_field_noalloc(2).is_err() });
+            assert!(tup.get_nth_field_noalloc(2).is_err());
 
             Ok(())
         })
@@ -88,14 +88,16 @@ fn access_mutable_struct_fields() {
             assert!(mut_struct.is::<Mutable>());
 
             assert!(mut_struct.get_field(&mut *frame, "x").is_ok());
-            let x_val = unsafe { mut_struct.get_field_noalloc("x") };
+            let x_val = mut_struct.get_field_noalloc("x");
             assert!(x_val.is_ok());
-            assert!(x_val.unwrap().is::<f32>());
+            unsafe {
+                assert!(x_val.unwrap().assume_valid().unwrap().is::<f32>());
+            }
             let _ = frame.value_scope_with_slots(0, |output, frame| {
                 let output = output.into_scope(frame);
                 mut_struct.get_field(output, "y")
             })?;
-            assert!(unsafe { mut_struct.get_field_noalloc("y").is_err() });
+            assert!(mut_struct.get_field_noalloc("y").is_err());
 
             Ok(())
         })
@@ -142,17 +144,15 @@ fn access_bounds_error_fields() {
                 let func = Module::base(global).function("getindex")?;
                 let out = func.call2(&mut *frame, array, idx)?.unwrap_err();
 
-                assert_eq!(out.type_name(), "BoundsError");
+                assert_eq!(out.type_name().unwrap(), "BoundsError");
 
                 let field_names = out.field_names();
-                let f0: String = field_names[0].into();
+                let f0: String = field_names[0].as_string().unwrap();
                 assert_eq!(f0, "a");
-                let f1: String = field_names[1].into();
+                let f1: String = field_names[1].as_string().unwrap();
                 assert_eq!(f1, "i");
 
-                unsafe {
-                    out.get_field_noalloc("a")?;
-                }
+                out.get_field_noalloc("a")?;
 
                 out.get_field(&mut *frame, field_names[1])?
                     .get_nth_field(&mut *frame, 0)?

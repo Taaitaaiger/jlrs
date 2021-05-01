@@ -11,29 +11,31 @@ use jl_sys::{jl_islayout_inline, jl_uniontype_t, jl_uniontype_type};
 use std::{
     fmt::{Debug, Formatter, Result as FmtResult},
     marker::PhantomData,
+    ptr::NonNull,
 };
 
 /// A struct field can have a type that's a union of several types. In this case, the type of this
 /// field is an instance of `Union`.
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]
 #[repr(transparent)]
-pub struct Union<'frame>(*mut jl_uniontype_t, PhantomData<&'frame ()>);
+pub struct Union<'frame>(NonNull<jl_uniontype_t>, PhantomData<&'frame ()>);
 
 impl<'frame> Union<'frame> {
     pub(crate) unsafe fn wrap(union: *mut jl_uniontype_t) -> Self {
-        Union(union, PhantomData)
+        debug_assert!(!union.is_null());
+        Union(NonNull::new_unchecked(union), PhantomData)
     }
 
     #[doc(hidden)]
-    pub unsafe fn ptr(self) -> *mut jl_uniontype_t {
+    pub unsafe fn inner(self) -> NonNull<jl_uniontype_t> {
         self.0
     }
 
     /// Returns true if all the isbits union optimization applies to this union type.
-    pub fn isbitsunion(self) -> bool {
+    pub fn is_bits_union(self) -> bool {
         unsafe {
             let v: Value = self.into();
-            jl_islayout_inline(v.ptr(), &mut 0, &mut 0) != 0
+            jl_islayout_inline(v.inner().as_ptr(), &mut 0, &mut 0) != 0
         }
     }
 
@@ -43,7 +45,7 @@ impl<'frame> Union<'frame> {
     pub fn isbits_size_align(self, size: &mut usize, align: &mut usize) -> bool {
         unsafe {
             let v: Value = self.into();
-            jl_islayout_inline(v.ptr(), size, align) != 0
+            jl_islayout_inline(v.inner().as_ptr(), size, align) != 0
         }
     }
 
@@ -58,16 +60,24 @@ impl<'frame> Union<'frame> {
         sz
     }
 
+    /*
+    for (a, b) in zip(fieldnames(Union), fieldtypes(Union))
+        println(a, ": ", b)
+    end
+    a: Any
+    b: Any
+    */
+
     /// Unions are stored as binary trees, the arguments are stored as its leaves. This method
     /// returns one of its branches.
     pub fn a(self) -> Value<'frame, 'static> {
-        unsafe { Value::wrap((&*self.ptr()).a) }
+        unsafe { Value::wrap((&*self.inner().as_ptr()).a) }
     }
 
     /// Unions are stored as binary trees, the arguments are stored as its leaves. This method
     /// returns one of its branches.
     pub fn b(self) -> Value<'frame, 'static> {
-        unsafe { Value::wrap((&*self.ptr()).b) }
+        unsafe { Value::wrap((&*self.inner().as_ptr()).b) }
     }
 
     /// Convert `self` to a `Value`.
@@ -84,7 +94,7 @@ impl<'scope> Debug for Union<'scope> {
 
 impl<'frame> Into<Value<'frame, 'static>> for Union<'frame> {
     fn into(self) -> Value<'frame, 'static> {
-        unsafe { Value::wrap(self.ptr().cast()) }
+        unsafe { Value::wrap(self.inner().as_ptr().cast()) }
     }
 }
 
@@ -99,7 +109,7 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for Union<'frame> {
     }
 
     unsafe fn cast_unchecked(value: Value<'frame, 'data>) -> Self::Output {
-        Self::wrap(value.ptr().cast())
+        Self::wrap(value.inner().as_ptr().cast())
     }
 }
 

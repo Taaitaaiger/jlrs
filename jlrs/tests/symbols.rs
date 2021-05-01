@@ -49,7 +49,7 @@ fn symbols_are_reused() {
             let s2 = Symbol::new(global, "foo");
 
             unsafe {
-                assert_eq!(s1.ptr(), s2.ptr());
+                assert_eq!(s1.inner(), s2.inner());
             }
 
             Ok(())
@@ -67,7 +67,7 @@ fn symbols_are_not_collected() {
 
             unsafe {
                 frame.gc_collect(GcCollection::Full);
-                let s1: String = s1.into();
+                let s1: String = s1.as_string().unwrap();
                 assert_eq!(s1, String::from("foo"));
             }
 

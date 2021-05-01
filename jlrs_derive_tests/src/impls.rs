@@ -189,7 +189,7 @@ pub struct SizeAlignMismatch {
 #[derive(Copy, Clone, Debug, JuliaStruct)]
 pub struct UnionInTuple<'frame, 'data> {
     pub a: i8,
-    pub b: ::jlrs::value::Value<'frame, 'data>,
+    pub b: ::jlrs::value::wrapper_ref::ValueRef<'frame, 'data>,
     pub c: i8,
 }
 
@@ -207,7 +207,7 @@ where
 #[jlrs(julia_type = "Main.WithGeneric.WithGenericUnionAll")]
 #[derive(Copy, Clone, Debug, JuliaStruct)]
 pub struct WithGenericUnionAll<'frame, 'data> {
-    pub a: ::jlrs::value::Value<'frame, 'data>,
+    pub a: ::jlrs::value::wrapper_ref::ValueRef<'frame, 'data>,
 }
 
 #[repr(C)]
@@ -261,7 +261,7 @@ pub struct WithValueType {
 #[jlrs(julia_type = "Main.WithNonBitsUnion.NonBitsUnion")]
 #[derive(Copy, Clone, Debug, JuliaStruct)]
 pub struct NonBitsUnion<'frame, 'data> {
-    pub a: ::jlrs::value::Value<'frame, 'data>,
+    pub a: ::jlrs::value::wrapper_ref::ValueRef<'frame, 'data>,
 }
 
 #[repr(C)]

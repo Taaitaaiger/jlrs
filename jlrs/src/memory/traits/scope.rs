@@ -16,6 +16,7 @@
 //! earlier frame, while [`ScopeExt::scope`] can be used to return arbitrary data.
 
 use crate::{
+    convert::cast::Cast,
     error::JlrsResult,
     memory::{
         frame::GcFrame,
@@ -24,7 +25,7 @@ use crate::{
         traits::frame::Frame,
     },
     private::Private,
-    value::{UnrootedResult, UnrootedValue},
+    value::{traits::wrapper::Wrapper, wrapper_ref::WrapperRef, UnrootedResult, UnrootedValue},
 };
 
 /// Provides `scope` and `scope_with_slots` methods to mutable references of types that implement
@@ -101,6 +102,15 @@ where
     where
         T: 'outer,
         for<'inner> G: FnOnce(&mut GcFrame<'inner, F::Mode>) -> JlrsResult<T>;
+
+    fn root_reference<T, U>(
+        self,
+        func: fn(T) -> WrapperRef<'frame, 'data, U>,
+        t: T,
+    ) -> JlrsResult<Option<<U as Cast<'frame, 'data>>::Output>>
+    where
+        T: Wrapper<'frame, 'data>,
+        U: Wrapper<'frame, 'data> + Cast<'frame, 'data>;
 }
 
 impl<'outer, 'frame, 'data, F: Frame<'frame>> ScopeExt<'outer, 'frame, 'frame, 'data, F>
@@ -120,6 +130,27 @@ impl<'outer, 'frame, 'data, F: Frame<'frame>> ScopeExt<'outer, 'frame, 'frame, '
         for<'inner> G: FnOnce(&mut GcFrame<'inner, F::Mode>) -> JlrsResult<T>,
     {
         F::scope_with_slots(self, capacity, func, Private)
+    }
+
+    fn root_reference<T, U>(
+        self,
+        func: fn(T) -> WrapperRef<'frame, 'data, U>,
+        t: T,
+    ) -> JlrsResult<Option<<U as Cast<'frame, 'data>>::Output>>
+    where
+        T: Wrapper<'frame, 'data>,
+        U: Wrapper<'frame, 'data> + Cast<'frame, 'data>,
+    {
+        unsafe {
+            if let Some(v) = func(t).assume_valid_value() {
+                match v.root(self) {
+                    Ok(v) => v.cast::<U>().map(|u| Some(u)),
+                    Err(e) => Err(e),
+                }
+            } else {
+                Ok(None)
+            }
+        }
     }
 }
 

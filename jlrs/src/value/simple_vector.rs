@@ -15,20 +15,33 @@ use jl_sys::{
 use std::{
     fmt::{Debug, Formatter, Result as FmtResult},
     marker::PhantomData,
+    ptr::{null_mut, NonNull},
+};
+
+use super::{
+    traits::wrapper::Wrapper,
+    wrapper_ref::{ValueRef, WrapperRef},
 };
 
 /// A `SimpleVector` is a fixed-size array that contains `Value`s.
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]
 #[repr(transparent)]
-pub struct SimpleVector<'frame>(*mut jl_svec_t, PhantomData<&'frame ()>);
+pub struct SimpleVector<'frame, T = Value<'frame, 'static>>(
+    NonNull<jl_svec_t>,
+    PhantomData<&'frame ()>,
+    PhantomData<T>,
+)
+where
+    T: Wrapper<'frame, 'static>;
 
-impl<'frame> SimpleVector<'frame> {
+impl<'frame, T: Wrapper<'frame, 'static>> SimpleVector<'frame, T> {
     pub(crate) unsafe fn wrap(svec: *mut jl_svec_t) -> Self {
-        SimpleVector(svec, PhantomData)
+        debug_assert!(!svec.is_null());
+        SimpleVector(NonNull::new_unchecked(svec), PhantomData, PhantomData)
     }
 
     #[doc(hidden)]
-    pub unsafe fn ptr(self) -> *mut jl_svec_t {
+    pub unsafe fn inner(self) -> NonNull<jl_svec_t> {
         self.0
     }
 
@@ -63,30 +76,34 @@ impl<'frame> SimpleVector<'frame> {
 
     /// Returns the length of this `SimpleVector`.
     pub fn len(self) -> usize {
-        unsafe { (&*self.ptr()).length }
+        unsafe { (&*self.inner().as_ptr()).length }
     }
 
     /// Returns the data of this `SimpleVector`.
-    pub fn data(self) -> &'frame [Value<'frame, 'static>] {
-        unsafe { std::slice::from_raw_parts(jl_svec_data(self.ptr()).cast(), self.len()) }
+    pub fn data(self) -> &'frame [WrapperRef<'frame, 'static, T>] {
+        unsafe {
+            std::slice::from_raw_parts(jl_svec_data(self.inner().as_ptr()).cast(), self.len())
+        }
     }
 
     pub unsafe fn set<'data>(
         self,
         index: usize,
-        value: Value<'_, 'data>,
-    ) -> JlrsResult<Value<'frame, 'data>> {
+        value: Option<Value<'_, 'data>>,
+    ) -> JlrsResult<ValueRef<'frame, 'static>> {
         if index >= self.len() {
             Err(JlrsError::OutOfBounds(index, self.len()))?;
         }
 
-        let mut_slice = std::slice::from_raw_parts_mut(jl_svec_data(self.ptr()).cast(), self.len());
+        let mut_slice =
+            std::slice::from_raw_parts_mut(jl_svec_data(self.inner().as_ptr()).cast(), self.len());
         mut_slice[index] = value;
-        if value.ptr() != std::ptr::null_mut() {
-            jl_gc_wb(self.ptr().cast(), value.ptr());
+        if let Some(value) = value {
+            jl_gc_wb(self.inner().as_ptr().cast(), value.inner().as_ptr());
         }
 
-        Ok(Value::wrap(value.ptr()))
+        let ptr = value.map(|v| v.inner().as_ptr()).unwrap_or(null_mut());
+        Ok(ValueRef::wrap(ptr))
     }
 
     /// Convert `self` to a `Value`.
@@ -95,25 +112,25 @@ impl<'frame> SimpleVector<'frame> {
     }
 }
 
-impl<'base> SimpleVector<'base> {
+impl<'base, T: Wrapper<'base, 'static>> SimpleVector<'base, T> {
     pub fn emptysvec(_: Global<'base>) -> Self {
         unsafe { Self::wrap(jl_emptysvec) }
     }
 }
 
-impl<'scope> Debug for SimpleVector<'scope> {
+impl<'scope, T: Wrapper<'scope, 'static>> Debug for SimpleVector<'scope, T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         f.debug_tuple("SimpleVector").finish()
     }
 }
 
-impl<'frame> Into<Value<'frame, 'static>> for SimpleVector<'frame> {
+impl<'frame, T: Wrapper<'frame, 'static>> Into<Value<'frame, 'static>> for SimpleVector<'frame, T> {
     fn into(self) -> Value<'frame, 'static> {
-        unsafe { Value::wrap(self.ptr().cast()) }
+        unsafe { Value::wrap(self.inner().as_ptr().cast()) }
     }
 }
 
-unsafe impl<'frame, 'data> Cast<'frame, 'data> for SimpleVector<'frame> {
+unsafe impl<'frame, 'data> Cast<'frame, 'data> for SimpleVector<'frame, Value<'frame, 'static>> {
     type Output = Self;
     fn cast(value: Value<'frame, 'data>) -> JlrsResult<Self::Output> {
         if value.is::<Self::Output>() {
@@ -124,10 +141,10 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for SimpleVector<'frame> {
     }
 
     unsafe fn cast_unchecked(value: Value<'frame, 'data>) -> Self::Output {
-        Self::wrap(value.ptr().cast())
+        Self::wrap(value.inner().as_ptr().cast())
     }
 }
 
-impl_julia_typecheck!(SimpleVector<'frame>, jl_simplevector_type, 'frame);
-impl_julia_type!(SimpleVector<'frame>, jl_simplevector_type, 'frame);
-impl_valid_layout!(SimpleVector<'frame>, 'frame);
+impl_julia_typecheck!(SimpleVector<'frame, Value<'frame, 'static>>, jl_simplevector_type, 'frame);
+impl_julia_type!(SimpleVector<'frame, Value<'frame, 'static>>, jl_simplevector_type, 'frame);
+impl_valid_layout!(SimpleVector<'frame, Value<'frame, 'static>>, 'frame);

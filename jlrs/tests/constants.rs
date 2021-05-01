@@ -12,7 +12,7 @@ macro_rules! impl_constant_test {
                 jlrs.scope_with_slots(0, |global, _| {
                     let v1 = Value::$func(global);
                     let v2 = Module::core(global).global($tyname)?;
-                    assert!(v1.datatype().unwrap().as_value().egal(v2));
+                    assert!(v1.datatype().as_value().egal(v2));
                     Ok(())
                 })
                 .unwrap();

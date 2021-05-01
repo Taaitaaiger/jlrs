@@ -8,14 +8,10 @@ use crate::{
 };
 use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_sym_t, jl_symbol_n, jl_symbol_name, jl_symbol_type};
-use std::ffi::CStr;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::marker::PhantomData;
-
-#[cfg(doc)]
-use crate::layout::julia_typecheck::JuliaTypecheck;
-#[cfg(doc)]
-use crate::value::datatype::DataType;
+use std::ptr::NonNull;
+use std::{convert::TryInto, ffi::CStr};
 
 /// `Symbol`s are used Julia to represent identifiers, `:x` represents the `Symbol` `x`. Things
 /// that can be accessed using a `Symbol` include submodules, functions, and globals. However,
@@ -46,16 +42,16 @@ use crate::value::datatype::DataType;
 /// ```
 #[repr(transparent)]
 #[derive(Copy, Clone)]
-pub struct Symbol<'base>(*mut jl_sym_t, PhantomData<&'base ()>);
+pub struct Symbol<'base>(NonNull<jl_sym_t>, PhantomData<&'base ()>);
 
 impl<'base> Symbol<'base> {
-    pub(crate) unsafe fn wrap(ptr: *mut jl_sym_t) -> Self {
-        assert!(!ptr.is_null());
-        Symbol(ptr, PhantomData)
+    pub(crate) unsafe fn wrap(symbol: *mut jl_sym_t) -> Self {
+        debug_assert!(!symbol.is_null());
+        Symbol(NonNull::new_unchecked(symbol), PhantomData)
     }
 
     #[doc(hidden)]
-    pub unsafe fn ptr(self) -> *mut jl_sym_t {
+    pub unsafe fn inner(self) -> NonNull<jl_sym_t> {
         self.0
     }
 
@@ -69,38 +65,37 @@ impl<'base> Symbol<'base> {
     /// to a `Symbol`. Its lifetime can be safely extended from `'frame` to `'global` using this
     /// method.
     pub fn extend<'global>(self, _: Global<'global>) -> Symbol<'global> {
-        unsafe { Symbol::wrap(self.ptr()) }
+        unsafe { Symbol::wrap(self.inner().as_ptr()) }
     }
 
-    /// The hash of this `Symbol`.
-    pub fn hash(self) -> usize {
-        unsafe { (&*self.ptr()).hash }
+    /// The hash of this `Symbol`. This method is unsafe because it's not accessible from Julia
+    /// except through the C API.
+    pub unsafe fn hash(self) -> usize {
+        (&*self.inner().as_ptr()).hash
     }
 
     /// `Symbol`s are stored using an invasive binary tree, this returns the left branch of the
-    /// current node.
-    pub fn left(self) -> Option<Symbol<'base>> {
-        unsafe {
-            let ref_self = &*self.ptr();
-            if ref_self.left.is_null() {
-                return None;
-            }
-
-            Some(Symbol::wrap(ref_self.left))
+    /// current node. This method is unsafe because it's not accessible from Julia except through
+    /// the C API.
+    pub unsafe fn left(self) -> Option<Symbol<'base>> {
+        let ref_self = &*self.inner().as_ptr();
+        if ref_self.left.is_null() {
+            return None;
         }
+
+        Some(Symbol::wrap(ref_self.left))
     }
 
     /// `Symbol`s are stored using an invasive binary tree, this returns the right branch of the
-    /// current node.
-    pub fn right(self) -> Option<Symbol<'base>> {
-        unsafe {
-            let ref_self = &*self.ptr();
-            if ref_self.right.is_null() {
-                return None;
-            }
-
-            Some(Symbol::wrap(ref_self.right))
+    /// current node. This method is unsafe because it's not accessible from Julia except through
+    /// the C API.
+    pub unsafe fn right(self) -> Option<Symbol<'base>> {
+        let ref_self = &*self.inner().as_ptr();
+        if ref_self.right.is_null() {
+            return None;
         }
+
+        Some(Symbol::wrap(ref_self.right))
     }
 
     /// Convert `self` to a `Value`.
@@ -110,28 +105,43 @@ impl<'base> Symbol<'base> {
 
     /// Convert `self` to a `LeakedValue`.
     pub fn as_leaked(self) -> LeakedValue {
-        unsafe { LeakedValue::wrap(self.ptr().cast()) }
+        unsafe { LeakedValue::wrap(self.inner().as_ptr().cast()) }
     }
 
     /// Convert `self` to a `String`.
-    pub fn as_string(self) -> String {
-        self.into()
+    pub fn as_string(self) -> JlrsResult<String> {
+        self.as_str().map(Into::into)
+    }
+
+    /// View `self` as a string slice. Returns an error if the symbol is not valid UTF8.
+    pub fn as_str(self) -> JlrsResult<&'base str> {
+        self.try_into()
+    }
+
+    /// View `self` as an slice of bytes without the trailing null.
+    pub fn as_slice(self) -> &'base [u8] {
+        unsafe {
+            let ptr = jl_symbol_name(self.inner().as_ptr()).cast();
+            let symbol = CStr::from_ptr(ptr);
+            symbol.to_bytes()
+        }
     }
 }
 
-impl<'base> Into<String> for Symbol<'base> {
-    fn into(self) -> String {
+impl<'base> TryInto<&'base str> for Symbol<'base> {
+    type Error = Box<JlrsError>;
+    fn try_into(self) -> JlrsResult<&'base str> {
         unsafe {
-            let ptr = jl_symbol_name(self.ptr()).cast();
+            let ptr = jl_symbol_name(self.inner().as_ptr()).cast();
             let symbol = CStr::from_ptr(ptr);
-            symbol.to_str().unwrap().into()
+            symbol.to_str().map_err(|_| Box::new(JlrsError::NotUnicode))
         }
     }
 }
 
 impl<'base> Into<Value<'base, 'static>> for Symbol<'base> {
     fn into(self) -> Value<'base, 'static> {
-        unsafe { Value::wrap(self.ptr().cast()) }
+        unsafe { Value::wrap(self.inner().as_ptr().cast()) }
     }
 }
 
@@ -152,7 +162,7 @@ where
 impl<'scope> Debug for Symbol<'scope> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         unsafe {
-            let ptr = jl_symbol_name(self.ptr()).cast();
+            let ptr = jl_symbol_name(self.inner().as_ptr()).cast();
             let symbol = CStr::from_ptr(ptr);
             f.debug_tuple("Symbol").field(&symbol).finish()
         }
@@ -170,7 +180,7 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for Symbol<'frame> {
     }
 
     unsafe fn cast_unchecked(value: Value<'frame, 'data>) -> Self::Output {
-        Self::wrap(value.ptr().cast())
+        Self::wrap(value.inner().as_ptr().cast())
     }
 }
 

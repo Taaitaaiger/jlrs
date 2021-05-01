@@ -23,14 +23,14 @@ fn basic_math() {
 #[test]
 fn runtime_error() {
     eval_string("[1, 2, 3][4]", |result| {
-        assert_eq!(result.unwrap_err().type_name(), "BoundsError");
+        assert_eq!(result.unwrap_err().type_name().unwrap(), "BoundsError");
     });
 }
 
 #[test]
 fn syntax_error() {
     eval_string("asdf fdsa asdf fdsa", |result| {
-        assert_eq!(result.unwrap_err().type_name(), "ErrorException");
+        assert_eq!(result.unwrap_err().type_name().unwrap(), "ErrorException");
     });
 }
 
