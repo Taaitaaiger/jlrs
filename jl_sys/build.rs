@@ -57,6 +57,7 @@ fn main() {
         "jl_apply_tuple_type_v",
         "jl_apply_type",
         "jl_array_eltype",
+        "jl_array_typetagdata",
         "jl_atexit_hook",
         "jl_box_bool",
         "jl_box_char",

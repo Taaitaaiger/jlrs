@@ -6,7 +6,8 @@
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L380
 
 use super::{
-    wrapper_ref::{MethodTableRef, ModuleRef, SimpleVectorRef, SymbolRef, ValueRef},
+    symbol::Symbol,
+    wrapper_ref::{MethodTableRef, ModuleRef, SimpleVectorRef, ValueRef},
     Value,
 };
 use crate::convert::cast::Cast;
@@ -57,8 +58,8 @@ impl<'frame> TypeName<'frame> {
     */
 
     /// The `name` field.
-    pub fn name(self) -> SymbolRef<'frame> {
-        unsafe { SymbolRef::wrap((&*self.inner().as_ptr()).name) }
+    pub fn name(self) -> Symbol<'frame> {
+        unsafe { Symbol::wrap((&*self.inner().as_ptr()).name) }
     }
 
     /// The `module` field.
@@ -152,11 +153,9 @@ impl<'base> TypeName<'base> {
 
 impl<'scope> Debug for TypeName<'scope> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        unsafe {
-            f.debug_tuple("TypeName")
-                .field(&self.name().assume_valid_unchecked().as_string())
-                .finish()
-        }
+        f.debug_tuple("TypeName")
+            .field(&self.name().as_string())
+            .finish()
     }
 }
 

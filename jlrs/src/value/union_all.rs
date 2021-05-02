@@ -42,8 +42,8 @@ impl<'frame> UnionAll<'frame> {
     pub fn base_type(self) -> DataTypeRef<'frame> {
         let mut b = self;
         unsafe {
-            while b.body().assume_valid_value_unchecked().is::<UnionAll>() {
-                b = Value::from(b.body().assume_valid_value_unchecked())
+            while b.body().assume_reachable_value_unchecked().is::<UnionAll>() {
+                b = Value::from(b.body().assume_reachable_value_unchecked())
                     .cast_unchecked::<UnionAll>();
             }
         }
@@ -51,7 +51,7 @@ impl<'frame> UnionAll<'frame> {
         unsafe {
             DataTypeRef::wrap(
                 b.body()
-                    .assume_valid_value_unchecked()
+                    .assume_reachable_value_unchecked()
                     .cast::<DataType>()
                     .unwrap()
                     .inner()

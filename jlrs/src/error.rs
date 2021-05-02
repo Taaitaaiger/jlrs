@@ -20,6 +20,7 @@ pub enum JlrsError {
     AlreadyInitialized,
     ConstAlreadyExists(String),
     NotAnArray,
+    NotAUnionArray,
     Nothing,
     NotADataType,
     NotAMethod,
@@ -94,6 +95,7 @@ impl Display for JlrsError {
             }
             JlrsError::Exception(exc) => write!(formatter, "An exception was thrown: {}", exc),
             JlrsError::NotAnArray => write!(formatter, "This is not an array"),
+            JlrsError::NotAUnionArray => write!(formatter, "This is not a union array"),
             JlrsError::NotAString => write!(formatter, "This is not a string"),
             JlrsError::NotUnicode => write!(formatter, "This string contains invalid characters"),
             JlrsError::Nothing => write!(formatter, "This value is Nothing"),

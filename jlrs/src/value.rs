@@ -942,7 +942,8 @@ impl<'frame, 'data> Value<'frame, 'data> {
             Err(JlrsError::Immutable)?
         }
 
-        let field_type = self.datatype().field_types().data()[idx].assume_valid_value_unchecked();
+        let field_type =
+            self.datatype().field_types().data()[idx].assume_reachable_value_unchecked();
         let dt = value.datatype();
 
         if Value::subtype(dt.as_value(), field_type) {

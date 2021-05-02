@@ -142,7 +142,7 @@ impl<'outer, 'frame, 'data, F: Frame<'frame>> ScopeExt<'outer, 'frame, 'frame, '
         U: Wrapper<'frame, 'data> + Cast<'frame, 'data>,
     {
         unsafe {
-            if let Some(v) = func(t).assume_valid_value() {
+            if let Some(v) = func(t).assume_reachable_value() {
                 match v.root(self) {
                     Ok(v) => v.cast::<U>().map(|u| Some(u)),
                     Err(e) => Err(e),

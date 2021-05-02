@@ -17,6 +17,79 @@ fn array_can_be_cast() {
 }
 
 #[test]
+fn union_array_1d() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+
+        jlrs.scope_with_slots(1, |_global, frame| {
+            let arr_val = Value::eval_string(
+                &mut *frame,
+                "a = Vector{Union{Int32, Float32, Bool}}()
+                push!(a, Int32(1))
+                push!(a, Float32(2.0))
+                push!(a, false)
+                a",
+            )?
+            .unwrap();
+            let arr = arr_val.cast::<Array>();
+            assert!(arr.is_ok());
+            let arr = arr.unwrap();
+            {
+                let ud = arr.union_array_data(frame).unwrap();
+                let v1 = ud.get::<i32, _>(0).unwrap();
+                assert_eq!(v1, 1);
+                let v2 = ud.get::<f32, _>(1).unwrap();
+                assert_eq!(v2, 2.0);
+                let v3 = ud.get::<bool, _>(2).unwrap();
+                assert_eq!(v3, false);
+            }
+
+            Ok(())
+        })
+        .unwrap();
+    });
+}
+
+#[test]
+fn union_array_1d_mut() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+
+        jlrs.scope_with_slots(1, |global, frame| {
+            let arr_val = Value::eval_string(
+                &mut *frame,
+                "a = Vector{Union{Int32, Float32, Bool}}()
+                push!(a, Int32(1))
+                push!(a, Float32(2.0))
+                push!(a, false)
+                a",
+            )?
+            .unwrap();
+            let arr = arr_val.cast::<Array>();
+            assert!(arr.is_ok());
+            let arr = arr.unwrap();
+
+            {
+                let mut mud = arr.union_array_data_mut(frame).unwrap();
+                mud.set(0, DataType::bool_type(global), true).unwrap();
+                mud.set(1, DataType::int32_type(global), 3i32).unwrap();
+                mud.set(2, DataType::float32_type(global), 4.5f32).unwrap();
+
+                let v1 = mud.get::<bool, _>(0).unwrap();
+                assert_eq!(v1, true);
+                let v2 = mud.get::<i32, _>(1).unwrap();
+                assert_eq!(v2, 3);
+                let v3 = mud.get::<f32, _>(2).unwrap();
+                assert_eq!(v3, 4.5f32);
+            }
+
+            Ok(())
+        })
+        .unwrap();
+    });
+}
+
+#[test]
 fn array_dimensions() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();

@@ -112,15 +112,10 @@ fn function_returns_datatype() {
 fn datatype_has_typename() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
-        jlrs.scope_with_slots(1, |global, frame| {
+        jlrs.scope_with_slots(0, |global, _| {
             let dt = DataType::tvar_type(global);
             let tn = dt.type_name();
-            let s = frame
-                .root_reference(TypeName::name, tn)
-                .unwrap()
-                .unwrap()
-                .as_string()
-                .unwrap();
+            let s = tn.name().as_string().unwrap();
 
             assert_eq!(s, "TypeVar");
 
@@ -139,9 +134,12 @@ fn datatype_has_fieldnames() {
             let tn = dt.field_names().data();
 
             unsafe {
-                assert_eq!(tn[0].assume_valid().unwrap().as_string().unwrap(), "name");
-                assert_eq!(tn[1].assume_valid().unwrap().as_string().unwrap(), "lb");
-                assert_eq!(tn[2].assume_valid().unwrap().as_string().unwrap(), "ub");
+                assert_eq!(
+                    tn[0].assume_reachable().unwrap().as_string().unwrap(),
+                    "name"
+                );
+                assert_eq!(tn[1].assume_reachable().unwrap().as_string().unwrap(), "lb");
+                assert_eq!(tn[2].assume_reachable().unwrap().as_string().unwrap(), "ub");
             }
 
             Ok(())
@@ -367,11 +365,11 @@ fn datatype_zeroinit() {
             unsafe {
                 let dt = UnionAll::array_type(global)
                     .body()
-                    .assume_valid()
+                    .assume_reachable()
                     .unwrap()
                     .cast::<UnionAll>()?
                     .body()
-                    .assume_valid()
+                    .assume_reachable()
                     .unwrap()
                     .cast::<DataType>()?;
                 assert!(!dt.zeroinit());

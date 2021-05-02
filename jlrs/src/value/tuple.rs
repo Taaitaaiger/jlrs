@@ -46,10 +46,10 @@ macro_rules! count {
 
 macro_rules! check {
     ($fieldtypes:expr, $n:expr, $t:ident, $($x:ident),+) => {
-        <$t>::valid_layout($fieldtypes[$n - 1 - count!($($x),+)].assume_valid_unchecked()) && check!($fieldtypes, $n, $($x),+)
+        <$t>::valid_layout($fieldtypes[$n - 1 - count!($($x),+)].assume_reachable_unchecked()) && check!($fieldtypes, $n, $($x),+)
     };
     ($fieldtypes:expr, $n:expr, $t:ident) => {
-        <$t>::valid_layout($fieldtypes[$n - 1].assume_valid_unchecked())
+        <$t>::valid_layout($fieldtypes[$n - 1].assume_reachable_unchecked())
     };
 }
 

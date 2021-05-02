@@ -40,6 +40,9 @@ use std::{convert::TryInto, ffi::CStr};
 /// # });
 /// # }
 /// ```
+///
+/// [`JuliaTypecheck`]: crate::layout::julia_typecheck::JuliaTypecheck
+/// [`DataType::is`]: crate::value::datatype::DataType::is
 #[repr(transparent)]
 #[derive(Copy, Clone)]
 pub struct Symbol<'base>(NonNull<jl_sym_t>, PhantomData<&'base ()>);

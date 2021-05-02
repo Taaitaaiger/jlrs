@@ -31,7 +31,7 @@ pub(crate) mod private {
         type Internal: Copy;
         unsafe fn wrap(ptr: *mut Self::Internal, _: Private) -> Self;
 
-        unsafe fn assume_valid_unchecked(
+        unsafe fn assume_reachable_unchecked(
             value_ref: WrapperRef<'scope, 'data, Self>,
             _: Private,
         ) -> Self
@@ -41,7 +41,7 @@ pub(crate) mod private {
             Self::wrap(value_ref.ptr(), Private)
         }
 
-        unsafe fn assume_valid(
+        unsafe fn assume_reachable(
             value_ref: WrapperRef<'scope, 'data, Self>,
             _: Private,
         ) -> Option<Self>
@@ -56,7 +56,7 @@ pub(crate) mod private {
             Some(Self::wrap(ptr, Private))
         }
 
-        unsafe fn assume_valid_value_unchecked(
+        unsafe fn assume_reachable_value_unchecked(
             value_ref: WrapperRef<'scope, 'data, Self>,
             _: Private,
         ) -> Value<'scope, 'data>
@@ -66,7 +66,7 @@ pub(crate) mod private {
             Value::wrap(value_ref.ptr().cast())
         }
 
-        unsafe fn assume_valid_value(
+        unsafe fn assume_reachable_value(
             value_ref: WrapperRef<'scope, 'data, Self>,
             _: Private,
         ) -> Option<Value<'scope, 'data>>

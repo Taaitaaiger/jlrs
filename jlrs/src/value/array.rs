@@ -16,12 +16,17 @@ use crate::value::datatype::DataType;
 use crate::value::Value;
 use jl_sys::{
     jl_array_data, jl_array_dim, jl_array_dims, jl_array_eltype, jl_array_ndims, jl_array_nrows,
-    jl_array_ptr_set, jl_array_t, jl_is_array_type, jl_tparam0, jl_typeof,
+    jl_array_ptr_set, jl_array_t, jl_array_typetagdata, jl_is_array_type, jl_tparam0, jl_typeof,
 };
-use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::marker::PhantomData;
 use std::ops::{Index, IndexMut};
 use std::ptr::NonNull;
+use std::{
+    fmt::{Debug, Display, Formatter, Result as FmtResult},
+    usize,
+};
+
+use super::union::Union;
 
 /// An n-dimensional Julia array. This struct implements [`JuliaTypecheck`] and [`Cast`]. It can
 /// be used in combination with [`DataType::is`] and [`Value::is`]; if the check returns `true`
@@ -80,18 +85,6 @@ impl<'frame, 'data> Array<'frame, 'data> {
         self.0
     }
 
-    /// Convert this untyped array into a `TypedArray`.
-    pub fn into_typed_array<T>(self) -> JlrsResult<TypedArray<'frame, 'data, T>>
-    where
-        T: Copy + ValidLayout,
-    {
-        if self.contains::<T>() {
-            unsafe { Ok(TypedArray::wrap(self.inner().as_ptr())) }
-        } else {
-            Err(JlrsError::WrongType)?
-        }
-    }
-
     /// Returns the array's dimensions.
     pub fn dimensions(self) -> Dimensions {
         unsafe { Dimensions::from_array(self.inner().as_ptr().cast()) }
@@ -122,6 +115,13 @@ impl<'frame, 'data> Array<'frame, 'data> {
         unsafe { (&*self.inner().as_ptr()).flags.ptrarray() == 0 }
     }
 
+    /// Returns true if the elements of the array are stored inline and the element type is a
+    /// union type. In this case the contents of the array can be accessed from Rust with
+    /// [`Array::union_array_data`] and [`Array::union_array_data_mut`].
+    pub fn is_union_array(self) -> bool {
+        self.is_inline_array() && self.element_type().is::<Union>()
+    }
+
     /// Returns true if the elements of the array are stored inline and at least one of the field
     /// of the inlined type is a pointer.
     pub fn has_inlined_pointers(self) -> bool {
@@ -134,6 +134,18 @@ impl<'frame, 'data> Array<'frame, 'data> {
     /// Returns true if the elements of the array are stored as [`Value`]s.
     pub fn is_value_array(self) -> bool {
         !self.is_inline_array()
+    }
+
+    /// Convert this untyped array into a `TypedArray`.
+    pub fn into_typed_array<T>(self) -> JlrsResult<TypedArray<'frame, 'data, T>>
+    where
+        T: Copy + ValidLayout,
+    {
+        if self.contains::<T>() {
+            unsafe { Ok(TypedArray::wrap(self.inner().as_ptr())) }
+        } else {
+            Err(JlrsError::WrongType)?
+        }
     }
 
     /// Copy the data of an inline array to Rust. Returns `JlrsError::NotInline` if the data is
@@ -253,9 +265,9 @@ impl<'frame, 'data> Array<'frame, 'data> {
     /// Safety: no slot on the GC stack is required to access and use the values in this array,
     /// the GC is aware of the array's data. If the element is changed either from Rust or Julia,
     /// the original value is no longer protected from garbage collection. If you need to keep
-    /// using this value you must protect it by calling [`Value::reroot`].
+    /// using this value you must protect it by calling [`Value::root`].
     ///
-    /// [`Value::reroot`]: crate::value::Value::reroot
+    /// [`Value::root`]: crate::value::Value::root
     pub unsafe fn value_data<'borrow, 'fr, F>(
         self,
         frame: &'borrow F,
@@ -279,9 +291,9 @@ impl<'frame, 'data> Array<'frame, 'data> {
     /// Safety: no slot on the GC stack is required to access and use the values in this array,
     /// the GC is aware of the array's data. If the element is changed either from Rust or Julia,
     /// the original value is no longer protected from garbage collection. If you need to keep
-    /// using this value you must protect it by calling [`Value::reroot`].
+    /// using this value you must protect it by calling [`Value::root`].
     ///
-    /// [`Value::reroot`]: crate::value::Value::reroot
+    /// [`Value::root`]: crate::value::Value::root
     pub unsafe fn value_data_mut<'borrow, 'fr, F>(
         self,
         frame: &'borrow mut F,
@@ -307,9 +319,9 @@ impl<'frame, 'data> Array<'frame, 'data> {
     /// Safety: no slot on the GC stack is required to access and use the values in this array,
     /// the GC is aware of the array's data. If the element is changed either from Rust or Julia,
     /// the original value is no longer protected from garbage collection. If you need to keep
-    /// using this value you must protect it by calling [`Value::reroot`].
+    /// using this value you must protect it by calling [`Value::root`].
     ///
-    /// [`Value::reroot`]: crate::value::Value::reroot
+    /// [`Value::root`]: crate::value::Value::root
     pub unsafe fn unrestricted_value_data_mut<'borrow, 'fr, F>(
         self,
         frame: &'borrow F,
@@ -332,6 +344,44 @@ impl<'frame, 'data> Array<'frame, 'data> {
     /// Convert `self` to a `Value`.
     pub fn as_value(self) -> Value<'frame, 'data> {
         self.into()
+    }
+}
+
+impl<'frame> Array<'frame, 'static> {
+    /// Access the contents of a bits-union array.
+    pub fn union_array_data<'borrow, 'fr, F>(
+        self,
+        frame: &'borrow F,
+    ) -> JlrsResult<UnionArray<'borrow, 'frame, 'fr, F>>
+    where
+        F: Frame<'fr>,
+    {
+        if self.is_union_array() {
+            unsafe {
+                let dims = Dimensions::from_array(self.inner().as_ptr().cast());
+                Ok(UnionArray::new(self, dims, frame))
+            }
+        } else {
+            Err(JlrsError::NotAUnionArray)?
+        }
+    }
+
+    /// Mutable access the contents of a bits-union array.
+    pub fn union_array_data_mut<'borrow, 'fr, F>(
+        self,
+        frame: &'borrow mut F,
+    ) -> JlrsResult<UnionArrayMut<'borrow, 'frame, 'fr, F>>
+    where
+        F: Frame<'fr>,
+    {
+        if self.is_union_array() {
+            unsafe {
+                let dims = Dimensions::from_array(self.inner().as_ptr().cast());
+                Ok(UnionArrayMut::new(self, dims, frame))
+            }
+        } else {
+            Err(JlrsError::NotAUnionArray)?
+        }
     }
 }
 
@@ -367,7 +417,7 @@ unsafe impl<'frame, 'data> ValidLayout for Array<'frame, 'data> {
         if let Ok(dt) = v.cast::<DataType>() {
             dt.is::<Array>()
         } else if let Ok(ua) = v.cast::<super::union_all::UnionAll>() {
-            ua.base_type().assume_valid_unchecked().is::<Array>()
+            ua.base_type().assume_reachable_unchecked().is::<Array>()
         } else {
             false
         }
@@ -529,9 +579,9 @@ impl<'frame, 'data, T: Copy + ValidLayout> TypedArray<'frame, 'data, T> {
     /// Safety: no slot on the GC stack is required to access and use the values in this array,
     /// the GC is aware of the array's data. If the element is changed either from Rust or Julia,
     /// the original value is no longer protected from garbage collection. If you need to keep
-    /// using this value you must protect it by calling [`Value::reroot`].
+    /// using this value you must protect it by calling [`Value::root`].
     ///
-    /// [`Value::reroot`]: crate::value::Value::reroot
+    /// [`Value::root`]: crate::value::Value::root
     pub unsafe fn value_data<'borrow, 'fr, F>(
         self,
         frame: &'borrow F,
@@ -555,9 +605,9 @@ impl<'frame, 'data, T: Copy + ValidLayout> TypedArray<'frame, 'data, T> {
     /// Safety: no slot on the GC stack is required to access and use the values in this array,
     /// the GC is aware of the array's data. If the element is changed either from Rust or Julia,
     /// the original value is no longer protected from garbage collection. If you need to keep
-    /// using this value you must protect it by calling [`Value::reroot`].
+    /// using this value you must protect it by calling [`Value::root`].
     ///
-    /// [`Value::reroot`]: crate::value::Value::reroot
+    /// [`Value::root`]: crate::value::Value::root
     pub unsafe fn value_data_mut<'borrow, 'fr, F>(
         self,
         frame: &'borrow mut F,
@@ -583,9 +633,9 @@ impl<'frame, 'data, T: Copy + ValidLayout> TypedArray<'frame, 'data, T> {
     /// Safety: no slot on the GC stack is required to access and use the values in this array,
     /// the GC is aware of the array's data. If the element is changed either from Rust or Julia,
     /// the original value is no longer protected from garbage collection. If you need to keep
-    /// using this value you must protect it by calling [`Value::reroot`].
+    /// using this value you must protect it by calling [`Value::root`].
     ///
-    /// [`Value::reroot`]: crate::value::Value::reroot
+    /// [`Value::root`]: crate::value::Value::root
     pub unsafe fn unrestricted_value_data_mut<'borrow, 'fr, F>(
         self,
         frame: &'borrow F,
@@ -660,11 +710,245 @@ unsafe impl<'frame, 'data, T: Copy + ValidLayout> ValidLayout for TypedArray<'fr
             dt.is::<TypedArray<T>>()
         } else if let Ok(ua) = v.cast::<super::union_all::UnionAll>() {
             ua.base_type()
-                .assume_valid_unchecked()
+                .assume_reachable_unchecked()
                 .is::<TypedArray<T>>()
         } else {
             false
         }
+    }
+}
+
+fn nth_union_component<'frame, 'data>(
+    v: Value<'frame, 'data>,
+    pi: &mut i32,
+) -> Option<Value<'frame, 'data>> {
+    match v.cast::<Union>() {
+        Ok(un) => {
+            let a = nth_union_component(un.a(), pi);
+            if a.is_some() {
+                a
+            } else {
+                *pi -= 1;
+                return nth_union_component(un.b(), pi);
+            }
+        }
+        Err(_) => {
+            if *pi == 0 {
+                Some(v)
+            } else {
+                None
+            }
+        }
+    }
+}
+
+fn find_union_component(haystack: Value, needle: Value, nth: &mut u32) -> bool {
+    unsafe {
+        match haystack.cast::<Union>() {
+            Ok(hs) => {
+                if find_union_component(hs.a(), needle, nth) {
+                    true
+                } else if find_union_component(hs.b(), needle, nth) {
+                    true
+                } else {
+                    false
+                }
+            }
+            Err(_) => {
+                if needle.inner() == haystack.inner() {
+                    return true;
+                } else {
+                    *nth += 1;
+                    false
+                }
+            }
+        }
+    }
+}
+
+/// Immutably borrowed array data from Julia where the element type is a bits-union. The data has
+/// a column-major order and can be indexed with anything that implements `Into<Dimensions>`; see
+/// [`Dimensions`] for more information.
+#[derive(Clone, Debug)]
+pub struct UnionArray<'borrow, 'array: 'borrow + 'frame, 'frame, F>
+where
+    F: Frame<'frame>,
+{
+    array: Array<'array, 'static>,
+    dims: Dimensions,
+    _notsendsync: PhantomData<*const ()>,
+    _borrow: PhantomData<&'borrow F>,
+    _frame: PhantomData<&'frame ()>,
+}
+
+impl<'borrow, 'array: 'borrow + 'frame, 'frame, F: Frame<'frame>>
+    UnionArray<'borrow, 'array, 'frame, F>
+{
+    fn new(array: Array<'array, 'static>, dims: Dimensions, _: &'borrow F) -> Self {
+        UnionArray {
+            array,
+            dims,
+            _notsendsync: PhantomData,
+            _borrow: PhantomData,
+            _frame: PhantomData,
+        }
+    }
+
+    /// Returns the type of the element at index `idx`.
+    pub fn element_type<D: Into<Dimensions>>(
+        &self,
+        idx: D,
+    ) -> JlrsResult<Option<Value<'array, 'static>>> {
+        unsafe {
+            let elty = self.array.element_type();
+            let idx = self.dims.index_of(idx)?;
+
+            let tags = jl_array_typetagdata(self.array.inner().as_ptr());
+            let mut tag = *tags.add(idx) as _;
+
+            Ok(nth_union_component(elty, &mut tag))
+        }
+    }
+
+    /// Get the element at index `idx`. The type `T` must be a valid layout for the type of the
+    /// element stored there.
+    pub fn get<T: ValidLayout + Copy, D: Into<Dimensions>>(&self, idx: D) -> JlrsResult<T> {
+        unsafe {
+            let elty = self.array.element_type();
+            let idx = self.dims.index_of(idx)?;
+
+            let tags = jl_array_typetagdata(self.array.inner().as_ptr());
+            let mut tag = *tags.add(idx) as _;
+
+            if let Some(ty) = nth_union_component(elty, &mut tag) {
+                if T::valid_layout(ty) {
+                    let offset = idx * self.array.inner().as_ref().elsize as usize;
+                    let ptr = self
+                        .array
+                        .inner()
+                        .as_ref()
+                        .data
+                        .cast::<i8>()
+                        .add(offset)
+                        .cast::<T>();
+                    return Ok(*ptr);
+                }
+            }
+
+            Err(JlrsError::WrongType)?
+        }
+    }
+}
+
+/// Mutably borrowed array data from Julia where the element type is a bits-union. The data has a
+/// column-major order and can be indexed with anything that implements `Into<Dimensions>`; see
+/// [`Dimensions`] for more information.
+#[derive(Debug)]
+pub struct UnionArrayMut<'borrow, 'array: 'borrow + 'frame, 'frame, F>
+where
+    F: Frame<'frame>,
+{
+    array: Array<'array, 'static>,
+    dims: Dimensions,
+    _notsendsync: PhantomData<*const ()>,
+    _borrow: PhantomData<&'borrow mut F>,
+    _f: PhantomData<&'frame ()>,
+}
+
+impl<'borrow, 'array: 'borrow + 'frame, 'frame, F: Frame<'frame>>
+    UnionArrayMut<'borrow, 'array, 'frame, F>
+{
+    fn new(array: Array<'array, 'static>, dims: Dimensions, _: &'borrow mut F) -> Self {
+        UnionArrayMut {
+            array,
+            dims,
+            _notsendsync: PhantomData,
+            _borrow: PhantomData,
+            _f: PhantomData,
+        }
+    }
+
+    /// Returns the type of the element at index `idx`.
+    pub fn element_type<D: Into<Dimensions>>(
+        &self,
+        idx: D,
+    ) -> JlrsResult<Option<Value<'array, 'static>>> {
+        unsafe {
+            let elty = self.array.element_type();
+            let idx = self.dims.index_of(idx)?;
+
+            let tags = jl_array_typetagdata(self.array.inner().as_ptr());
+            let mut tag = *tags.add(idx) as _;
+
+            Ok(nth_union_component(elty, &mut tag))
+        }
+    }
+
+    /// Get the element at index `idx`. The type `T` must be a valid layout for the type of the
+    /// element stored there.
+    pub fn get<T: ValidLayout + Copy, D: Into<Dimensions>>(&self, idx: D) -> JlrsResult<T> {
+        unsafe {
+            let elty = self.array.element_type();
+            let idx = self.dims.index_of(idx)?;
+
+            let tags = jl_array_typetagdata(self.array.inner().as_ptr());
+            let mut tag = *tags.add(idx) as _;
+
+            if let Some(ty) = nth_union_component(elty, &mut tag) {
+                if T::valid_layout(ty) {
+                    let offset = idx * self.array.inner().as_ref().elsize as usize;
+                    let ptr = self
+                        .array
+                        .inner()
+                        .as_ref()
+                        .data
+                        .cast::<i8>()
+                        .add(offset)
+                        .cast::<T>();
+                    return Ok(*ptr);
+                }
+            }
+
+            Err(JlrsError::WrongType)?
+        }
+    }
+
+    /// Set the element at index `idx` to `value` with the type `ty`. The type `T` must be a valid
+    /// layout for the value, and `ty` must be a member of the union of all possible element
+    /// types.
+    pub fn set<T: ValidLayout + Copy, D: Into<Dimensions>>(
+        &mut self,
+        idx: D,
+        ty: DataType,
+        value: T,
+    ) -> JlrsResult<()> {
+        unsafe {
+            if !T::valid_layout(ty.as_value()) {
+                Err(JlrsError::InvalidLayout)?;
+            }
+
+            let mut tag = 0;
+            if !find_union_component(self.array.element_type(), ty.as_value(), &mut tag) {
+                Err(JlrsError::InvalidArrayType)?;
+            }
+
+            let idx = self.dims.index_of(idx)?;
+            let offset = idx * self.array.inner().as_ref().elsize as usize;
+            self.array
+                .inner()
+                .as_ref()
+                .data
+                .cast::<i8>()
+                .add(offset)
+                .cast::<T>()
+                .write(value);
+
+            jl_array_typetagdata(self.array.inner().as_ptr())
+                .add(idx)
+                .write(tag as _);
+        }
+
+        Ok(())
     }
 }
 

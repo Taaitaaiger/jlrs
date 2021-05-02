@@ -91,7 +91,7 @@ fn access_mutable_struct_fields() {
             let x_val = mut_struct.get_field_noalloc("x");
             assert!(x_val.is_ok());
             unsafe {
-                assert!(x_val.unwrap().assume_valid().unwrap().is::<f32>());
+                assert!(x_val.unwrap().assume_reachable().unwrap().is::<f32>());
             }
             let _ = frame.value_scope_with_slots(0, |output, frame| {
                 let output = output.into_scope(frame);

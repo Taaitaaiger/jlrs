@@ -117,7 +117,7 @@ impl<'scope> Debug for TypeVar<'scope> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         unsafe {
             f.debug_tuple("TypeVar")
-                .field(&self.name().assume_valid_unchecked().as_string())
+                .field(&self.name().assume_reachable_unchecked().as_string())
                 .finish()
         }
     }

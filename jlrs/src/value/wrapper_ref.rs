@@ -48,7 +48,7 @@ use std::marker::PhantomData;
 /// be taken into account: Julia data can be mutable and this can cause a `WrapperRef` that is in
 /// use to become unreachable from any root. In general, a reference that was just acquired
 /// through a root can be assumed to not have become unreachable and converted to its wrapper type
-/// with [`WrapperRef::assume_valid`] and to a `Value` with [`WrapperRef::assume_valid_value`].
+/// with [`WrapperRef::assume_reachable`] and to a `Value` with [`WrapperRef::assume_reachable_value`].
 ///
 /// [here]: crate::value::traits::julia_struct
 #[derive(Copy, Clone, Debug)]
@@ -137,12 +137,12 @@ impl<'scope, 'data, T: Wrapper<'scope, 'data>> WrapperRef<'scope, 'data, T> {
     /// pointer type. Returns `None` if the reference is undefined.
     ///
     /// Safety: a reference is only valid as long as it's reachable through some rooted value.
-    pub unsafe fn assume_valid(self) -> Option<T> {
+    pub unsafe fn assume_reachable(self) -> Option<T> {
         if self.ptr().is_null() {
             return None;
         }
 
-        T::assume_valid(self, Private)
+        T::assume_reachable(self, Private)
     }
 
     /// Assume the reference still points to valid Julia data and convert it to the appropariate
@@ -150,30 +150,28 @@ impl<'scope, 'data, T: Wrapper<'scope, 'data>> WrapperRef<'scope, 'data, T> {
     ///
     /// Safety: this method does not check if the reference is undefined, a reference is only
     /// valid as long as it's reachable through some rooted value.
-    pub unsafe fn assume_valid_unchecked(self) -> T {
-        T::assume_valid_unchecked(self, Private)
+    pub unsafe fn assume_reachable_unchecked(self) -> T {
+        T::assume_reachable_unchecked(self, Private)
     }
-
-    // pub unsafe fn assume_valid_and_root(self, )
 
     /// Assume the reference still points to valid Julia data and convert it to a `Value`. Returns
     /// `None` if the reference is undefined.
     ///
     /// Safety: a reference is only valid as long as it's reachable through some rooted value.
-    pub unsafe fn assume_valid_value(self) -> Option<Value<'scope, 'data>> {
+    pub unsafe fn assume_reachable_value(self) -> Option<Value<'scope, 'data>> {
         if self.ptr().is_null() {
             return None;
         }
 
-        T::assume_valid_value(self, Private)
+        T::assume_reachable_value(self, Private)
     }
 
     /// Assume the reference still points to valid Julia data and convert it to a `Value`.
     ///
     /// Safety: this method does not check if the reference is undefined, a reference is only
     /// valid as long as it's reachable through some rooted value.
-    pub unsafe fn assume_valid_value_unchecked(self) -> Value<'scope, 'data> {
-        T::assume_valid_value_unchecked(self, Private)
+    pub unsafe fn assume_reachable_value_unchecked(self) -> Value<'scope, 'data> {
+        T::assume_reachable_value_unchecked(self, Private)
     }
 
     pub(crate) fn ptr(self) -> *mut T::Internal {
