@@ -126,12 +126,12 @@
 //!     // The `+` function can be found in the base module.
 //!     let func = Module::base(global).function("+")?;
 //!
-//!     // Call the function and cast the result to `u64`. The result of the function
+//!     // Call the function and unbox the result as a `u64`. The result of the function
 //!     // call is a nested `Result`; the outer error does not contain to any Julia
 //!     // data, while the inner error contains the exception if one is thrown.
 //!     func.call2(&mut *frame, i, j)?
 //!         .into_jlrs_result()?
-//!         .cast::<u64>()
+//!         .unbox::<u64>()
 //! }).unwrap();
 //! # }
 //! ```
@@ -179,7 +179,7 @@
 //!           func.call2(output_scope, i, j)
 //!       })?.into_jlrs_result()?;
 //!
-//!       assert_eq!(sum_value.cast::<u64>()?, 3);
+//!       assert_eq!(sum_value.unbox::<u64>()?, 3);
 //!
 //!       Ok(())
 //!   }).unwrap();
@@ -227,7 +227,7 @@
 //!     // Call the function and unbox the result.  
 //!     let output = func.call1(&mut *frame, call_me_val)?
 //!         .into_jlrs_result()?
-//!         .cast::<isize>()?;
+//!         .unbox::<isize>()?;
 //!
 //!     assert_eq!(output, 1);
 //!     
@@ -355,7 +355,7 @@
 //! # Custom types
 //!
 //! In order to map a struct in Rust to one in Julia you can derive [`JuliaStruct`]. This will
-//! implement [`Cast`], [`JuliaType`], [`ValidLayout`], and [`JuliaTypecheck`] for that type. If
+//! implement [`Cast`], [`ValidLayout`], and [`JuliaTypecheck`] for that type. If
 //! the struct in Julia has no type parameters and is a bits type you can also derive
 //! [`IntoJulia`], which lets you use the type in combination with [`Value::new`].
 //!
@@ -369,7 +369,6 @@
 //! [their User Guide]: https://rust-lang.github.io/rust-bindgen/requirements.html
 //! [the examples directory of the repo]: https://github.com/Taaitaaiger/jlrs/tree/master/examples
 //! [`IntoJulia`]: crate::convert::into_julia::IntoJulia
-//! [`JuliaType`]: crate::layout::julia_type::JuliaType
 //! [`JuliaTypecheck`]: crate::layout::julia_typecheck::JuliaTypecheck
 //! [`ValidLayout`]: crate::layout::valid_layout::ValidLayout
 //! [`Cast`]: crate::convert::cast::Cast

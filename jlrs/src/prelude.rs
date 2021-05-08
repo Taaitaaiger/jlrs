@@ -1,7 +1,7 @@
 //! Reexports structs and traits you're likely to need.
 
 pub use crate::convert::into_jlrs_result::IntoJlrsResult;
-pub use crate::error::{JlrsError, JlrsResult, JuliaResult};
+pub use crate::error::{JlrsResult, JuliaResult};
 pub use crate::layout::valid_layout::ValidLayout;
 pub use crate::memory::frame::{GcFrame, NullFrame};
 pub use crate::memory::global::Global;
@@ -9,9 +9,7 @@ pub use crate::memory::traits::{
     frame::Frame,
     scope::{Scope, ScopeExt},
 };
-pub use crate::value::array::{
-    Array, ArrayData, CopiedArray, InlineArrayDataMut, TypedArray, ValueArrayDataMut,
-};
+pub use crate::value::array::{Array, ArrayData, CopiedArray, TypedArray};
 pub use crate::value::datatype::{DataType, Nothing};
 pub use crate::value::module::Module;
 pub use crate::value::string::JuliaString;

@@ -25,7 +25,7 @@ use crate::{
     error::{JlrsError, JlrsResult},
     memory::traits::scope::Scope,
 };
-use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
+use crate::{impl_julia_typecheck, impl_valid_layout};
 use crate::{memory::global::Global, private::Private};
 use jl_sys::{
     jl_abstractslot_type, jl_abstractstring_type, jl_any_type, jl_anytuple_type,
@@ -645,7 +645,7 @@ impl<'base> DataType<'base> {
 
 impl<'frame> Into<Value<'frame, 'static>> for DataType<'frame> {
     fn into(self) -> Value<'frame, 'static> {
-        unsafe { Value::wrap(self.inner().as_ptr().cast()) }
+        unsafe { Value::wrap_non_null(self.inner().cast()) }
     }
 }
 
@@ -670,7 +670,6 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for DataType<'frame> {
     }
 }
 
-impl_julia_type!(DataType<'frame>, jl_datatype_type, 'frame);
 impl_valid_layout!(DataType<'frame>, 'frame);
 
 /// A typecheck that can be used in combination with `DataType::is`. This method returns true if

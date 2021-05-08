@@ -16,7 +16,7 @@ macro_rules! impl_valid_layout {
     ($type:ty, $($lt:lifetime),+) => {
         unsafe impl<$($lt),+> $crate::layout::valid_layout::ValidLayout for $type {
             unsafe fn valid_layout(v: $crate::value::Value) -> bool {
-                if let Ok(dt) =  v.cast::<$crate::value::datatype::DataType>() {
+                if let Ok(dt) = v.cast::<$crate::value::datatype::DataType>() {
                     dt.is::<$type>()
                 } else {
                     false

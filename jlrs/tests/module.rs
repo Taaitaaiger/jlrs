@@ -237,7 +237,7 @@ fn set_global() {
             }
 
             let value = main.global("one")?;
-            assert_eq!(value.cast::<usize>()?, 1);
+            assert_eq!(value.unbox::<usize>()?, 1);
             Ok(())
         })
         .unwrap();
@@ -254,7 +254,7 @@ fn set_const() {
             main.set_const("ONE", value)?;
 
             let value = main.global("ONE")?;
-            assert_eq!(value.cast::<usize>()?, 2);
+            assert_eq!(value.unbox::<usize>()?, 2);
             Ok(())
         })
         .unwrap();
@@ -273,7 +273,7 @@ fn set_const_twice() {
             main.set_const("TWICE", value2)?;
 
             let value = main.global("TWICE")?;
-            assert_eq!(value.cast::<usize>()?, 2);
+            assert_eq!(value.unbox::<usize>()?, 2);
             Ok(())
         });
 

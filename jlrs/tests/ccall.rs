@@ -30,7 +30,7 @@ fn ccall_with_array() {
                 .function("callrustwitharr")?;
 
             let out = func.call2(&mut *frame, fn_ptr, arr)?.unwrap();
-            let ok = out.cast::<bool>()?;
+            let ok = out.unbox::<bool>()?;
             assert!(ok);
             Ok(())
         })

@@ -3,7 +3,6 @@
 /// This trait can be derived in order to provide a mapping between a type in Julia and one in
 /// Rust. When this trait is derived, the following traits are implemented:
 ///
-/// - [`JuliaType`]
 /// - [`JuliaTypecheck`]
 /// - [`ValidLayout`]
 /// - [`Cast`]
@@ -63,7 +62,6 @@
 /// doesn't affect the layout must be elided. The type parameter must implement both `ValidLayout`
 /// and `Copy`.
 ///
-/// [`JuliaType`]: crate::layout::julia_type::JuliaType
 /// [`JuliaTypecheck`]: crate::layout::julia_typecheck::JuliaTypecheck
 /// [`ValidLayout`]: crate::layout::valid_layout::ValidLayout
 /// [`Cast`]: crate::convert::cast::Cast

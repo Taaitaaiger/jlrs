@@ -120,7 +120,7 @@ fn call1() {
             let func = Module::base(global).function("cos")?;
             let angle = Value::new(&mut *frame, std::f32::consts::PI)?;
             let out = func.call1(&mut *frame, angle)?.unwrap();
-            out.cast::<f32>()
+            out.unbox::<f32>()
         });
 
         assert_eq!(out.unwrap(), -1.);
@@ -141,7 +141,7 @@ fn call1_output() {
                     func.call1(output, angle)
                 })?
                 .unwrap()
-                .cast::<f32>();
+                .unbox::<f32>();
             assert_eq!(out.unwrap(), -1.);
             Ok(())
         })
@@ -163,7 +163,7 @@ fn call1_dynamic() {
                     func.call1(output, angle)
                 })?
                 .unwrap()
-                .cast::<f32>();
+                .unbox::<f32>();
             assert_eq!(out.unwrap(), -1.);
             Ok(())
         })
@@ -185,7 +185,7 @@ fn call1_dynamic_output() {
                     func.call1(output, angle)
                 })?
                 .unwrap()
-                .cast::<f32>();
+                .unbox::<f32>();
             assert_eq!(out.unwrap(), -1.);
             Ok(())
         })
@@ -203,7 +203,7 @@ fn call2() {
             let arg0 = Value::new(&mut *frame, 1u32)?;
             let arg1 = Value::new(&mut *frame, 2u32)?;
             let out = func.call2(&mut *frame, arg0, arg1)?.unwrap();
-            out.cast::<u32>()
+            out.unbox::<u32>()
         });
 
         assert_eq!(out.unwrap(), 3);
@@ -225,7 +225,7 @@ fn call2_output() {
                     func.call2(output, arg0, arg1)
                 })?
                 .unwrap()
-                .cast::<u32>()
+                .unbox::<u32>()
         });
 
         assert_eq!(out.unwrap(), 3);
@@ -242,7 +242,7 @@ fn call2_dynamic() {
             let arg0 = Value::new(&mut *frame, 1u32)?;
             let arg1 = Value::new(&mut *frame, 2u32)?;
             let out = func.call2(&mut *frame, arg0, arg1)?.unwrap();
-            out.cast::<u32>()
+            out.unbox::<u32>()
         });
 
         assert_eq!(out.unwrap(), 3);
@@ -264,7 +264,7 @@ fn call2_dynamic_output() {
                     func.call2(output, arg0, arg1)
                 })?
                 .unwrap()
-                .cast::<u32>()
+                .unbox::<u32>()
         });
 
         assert_eq!(out.unwrap(), 3);
@@ -282,7 +282,7 @@ fn call3() {
             let arg1 = Value::new(&mut *frame, 2u32)?;
             let arg2 = Value::new(&mut *frame, 3u32)?;
             let out = func.call3(&mut *frame, arg0, arg1, arg2)?.unwrap();
-            out.cast::<u32>()
+            out.unbox::<u32>()
         });
 
         assert_eq!(out.unwrap(), 6);
@@ -305,7 +305,7 @@ fn call3_output() {
                     func.call3(output, arg0, arg1, arg2)
                 })?
                 .unwrap()
-                .cast::<u32>()
+                .unbox::<u32>()
         });
 
         assert_eq!(out.unwrap(), 6);
@@ -323,7 +323,7 @@ fn call3_dynamic() {
             let arg1 = Value::new(&mut *frame, 2u32)?;
             let arg2 = Value::new(&mut *frame, 3u32)?;
             let out = func.call3(&mut *frame, arg0, arg1, arg2)?.unwrap();
-            out.cast::<u32>()
+            out.unbox::<u32>()
         });
 
         assert_eq!(out.unwrap(), 6);
@@ -346,7 +346,7 @@ fn call3_dynamic_output() {
                     func.call3(output, arg0, arg1, arg2)
                 })?
                 .unwrap()
-                .cast::<u32>()
+                .unbox::<u32>()
         });
 
         assert_eq!(out.unwrap(), 6);
@@ -367,7 +367,7 @@ fn call() {
             let out = func
                 .call(&mut *frame, &mut [arg0, arg1, arg2, arg3])?
                 .unwrap();
-            out.cast::<u32>()
+            out.unbox::<u32>()
         });
 
         assert_eq!(out.unwrap(), 10);
@@ -391,7 +391,7 @@ fn call_output() {
                     func.call(output, &mut [arg0, arg1, arg2, arg3])
                 })?
                 .unwrap()
-                .cast::<u32>()
+                .unbox::<u32>()
         });
 
         assert_eq!(out.unwrap(), 10);
@@ -415,7 +415,7 @@ fn call_dynamic() {
                     func.call(output, &mut [arg0, arg1, arg2, arg3])
                 })?
                 .unwrap()
-                .cast::<u32>()
+                .unbox::<u32>()
         });
 
         assert_eq!(out.unwrap(), 10);
@@ -439,7 +439,7 @@ fn call_dynamic_output() {
                     func.call(output, &mut [arg0, arg1, arg2, arg3])
                 })?
                 .unwrap()
-                .cast::<u32>()
+                .unbox::<u32>()
         });
 
         assert_eq!(out.unwrap(), 10);

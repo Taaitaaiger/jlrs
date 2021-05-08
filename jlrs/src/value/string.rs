@@ -1,9 +1,9 @@
 //! Support for accessing raw Julia strings.
 
-use crate::convert::cast::Cast;
+use crate::convert::{cast::Cast, unbox::UnboxFn};
 use crate::error::{JlrsError, JlrsResult};
 use crate::value::Value;
-use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
+use crate::{impl_julia_typecheck, impl_valid_layout};
 use jl_sys::jl_string_type;
 use std::ffi::CStr;
 use std::mem;
@@ -91,5 +91,25 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for JuliaString<'frame> {
 }
 
 impl_julia_typecheck!(JuliaString<'frame>, jl_string_type, 'frame);
-impl_julia_type!(JuliaString<'frame>, jl_string_type, 'frame);
+
 impl_valid_layout!(JuliaString<'frame>, 'frame);
+
+unsafe impl<'scope> UnboxFn for JuliaString<'scope> {
+    type Output = Result<String, Vec<u8>>;
+    unsafe fn call_unboxer(value: Value) -> Self::Output {
+        let slice = value.cast_unchecked::<JuliaString>().as_slice();
+        std::str::from_utf8(slice)
+            .map(String::from)
+            .map_err(|_| slice.into())
+    }
+}
+
+unsafe impl UnboxFn for String {
+    type Output = Result<String, Vec<u8>>;
+    unsafe fn call_unboxer(value: Value) -> Self::Output {
+        let slice = value.cast_unchecked::<JuliaString>().as_slice();
+        std::str::from_utf8(slice)
+            .map(String::from)
+            .map_err(|_| slice.into())
+    }
+}

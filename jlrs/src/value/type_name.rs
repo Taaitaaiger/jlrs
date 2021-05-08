@@ -13,7 +13,7 @@ use super::{
 use crate::convert::cast::Cast;
 use crate::error::{JlrsError, JlrsResult};
 use crate::memory::global::Global;
-use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
+use crate::{impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{
     jl_array_typename, jl_llvmpointer_typename, jl_namedtuple_typename, jl_pointer_typename,
     jl_tuple_typename, jl_type_typename, jl_typename_t, jl_typename_type, jl_vararg_typename,
@@ -161,7 +161,7 @@ impl<'scope> Debug for TypeName<'scope> {
 
 impl<'frame> Into<Value<'frame, 'static>> for TypeName<'frame> {
     fn into(self) -> Value<'frame, 'static> {
-        unsafe { Value::wrap(self.inner().as_ptr().cast()) }
+        unsafe { Value::wrap_non_null(self.inner().cast()) }
     }
 }
 
@@ -181,5 +181,5 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for TypeName<'frame> {
 }
 
 impl_julia_typecheck!(TypeName<'frame>, jl_typename_type, 'frame);
-impl_julia_type!(TypeName<'frame>, jl_typename_type, 'frame);
+
 impl_valid_layout!(TypeName<'frame>, 'frame);

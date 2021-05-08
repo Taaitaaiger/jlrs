@@ -7,7 +7,7 @@ use crate::value::{
     union_all::UnionAll, weak_ref::WeakRef, Value,
 };
 use crate::{layout::valid_layout::ValidLayout, private::Private};
-use std::marker::PhantomData;
+use std::{marker::PhantomData, ptr::null_mut};
 
 /// A (possibly undefined or dangling) reference to Julia data.
 ///
@@ -131,6 +131,11 @@ pub type WeakRefRef<'scope> = WrapperRef<'scope, 'static, WeakRef<'scope>>;
 impl<'scope, 'data, T: Wrapper<'scope, 'data>> WrapperRef<'scope, 'data, T> {
     pub(crate) unsafe fn wrap(ptr: *mut T::Internal) -> Self {
         WrapperRef(ptr, PhantomData, PhantomData)
+    }
+
+    /// An undefined reference.
+    pub fn undefined_ref() -> WrapperRef<'scope, 'data, T> {
+        WrapperRef(null_mut(), PhantomData, PhantomData)
     }
 
     /// Assume the reference still points to valid Julia data and convert it to the appropariate

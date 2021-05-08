@@ -24,7 +24,7 @@ fn bounds_error() {
 
                     out.get_field(&mut *frame, field_names[1])?
                         .get_nth_field(&mut *frame, 0)?
-                        .cast::<isize>()
+                        .unbox::<isize>()
                 })
             })
             .unwrap();

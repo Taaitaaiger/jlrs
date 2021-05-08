@@ -18,9 +18,9 @@ mod tests {
                     let v = Value::new(&mut *frame, s).unwrap();
                     let first = v.get_nth_field(&mut *frame, 0).unwrap();
 
-                    assert_eq!(first.cast::<bool>().unwrap(), true);
+                    assert_eq!(first.unbox::<bool>().unwrap(), true);
                     assert!(v.is::<BitsTypeBool>());
-                    assert!(v.cast::<BitsTypeBool>().is_ok());
+                    assert!(v.unbox::<BitsTypeBool>().is_ok());
 
                     Ok(())
                 })
@@ -39,9 +39,9 @@ mod tests {
                     let v = Value::new(&mut *frame, s).unwrap();
                     let first = v.get_nth_field(&mut *frame, 0).unwrap();
 
-                    assert_eq!(first.cast::<char>().unwrap(), 'b');
+                    assert_eq!(first.unbox::<char>().unwrap().try_as_char().unwrap(), 'b');
                     assert!(v.is::<BitsTypeChar>());
-                    assert!(v.cast::<BitsTypeChar>().is_ok());
+                    assert!(v.unbox::<BitsTypeChar>().is_ok());
 
                     Ok(())
                 })
@@ -60,9 +60,9 @@ mod tests {
                     let v = Value::new(&mut *frame, s).unwrap();
                     let first = v.get_nth_field(&mut *frame, 0).unwrap();
 
-                    assert_eq!(first.cast::<u8>().unwrap(), 1);
+                    assert_eq!(first.unbox::<u8>().unwrap(), 1);
                     assert!(v.is::<BitsTypeUInt8>());
-                    assert!(v.cast::<BitsTypeUInt8>().is_ok());
+                    assert!(v.unbox::<BitsTypeUInt8>().is_ok());
 
                     Ok(())
                 })
@@ -81,9 +81,9 @@ mod tests {
                     let v = Value::new(&mut *frame, s).unwrap();
                     let first = v.get_nth_field(&mut *frame, 0).unwrap();
 
-                    assert_eq!(first.cast::<u16>().unwrap(), 2);
+                    assert_eq!(first.unbox::<u16>().unwrap(), 2);
                     assert!(v.is::<BitsTypeUInt16>());
-                    assert!(v.cast::<BitsTypeUInt16>().is_ok());
+                    assert!(v.unbox::<BitsTypeUInt16>().is_ok());
 
                     Ok(())
                 })
@@ -102,9 +102,9 @@ mod tests {
                     let v = Value::new(&mut *frame, s).unwrap();
                     let first = v.get_nth_field(&mut *frame, 0).unwrap();
 
-                    assert_eq!(first.cast::<u32>().unwrap(), 3);
+                    assert_eq!(first.unbox::<u32>().unwrap(), 3);
                     assert!(v.is::<BitsTypeUInt32>());
-                    assert!(v.cast::<BitsTypeUInt32>().is_ok());
+                    assert!(v.unbox::<BitsTypeUInt32>().is_ok());
 
                     Ok(())
                 })
@@ -123,9 +123,9 @@ mod tests {
                     let v = Value::new(&mut *frame, s).unwrap();
                     let first = v.get_nth_field(&mut *frame, 0).unwrap();
 
-                    assert_eq!(first.cast::<u64>().unwrap(), 4);
+                    assert_eq!(first.unbox::<u64>().unwrap(), 4);
                     assert!(v.is::<BitsTypeUInt64>());
-                    assert!(v.cast::<BitsTypeUInt64>().is_ok());
+                    assert!(v.unbox::<BitsTypeUInt64>().is_ok());
 
                     Ok(())
                 })
@@ -144,9 +144,9 @@ mod tests {
                     let v = Value::new(&mut *frame, s).unwrap();
                     let first = v.get_nth_field(&mut *frame, 0).unwrap();
 
-                    assert_eq!(first.cast::<u64>().unwrap(), 5);
+                    assert_eq!(first.unbox::<u64>().unwrap(), 5);
                     assert!(v.is::<BitsTypeUInt>());
-                    assert!(v.cast::<BitsTypeUInt>().is_ok());
+                    assert!(v.unbox::<BitsTypeUInt>().is_ok());
 
                     Ok(())
                 })
@@ -165,9 +165,9 @@ mod tests {
                     let v = Value::new(&mut *frame, s).unwrap();
                     let first = v.get_nth_field(&mut *frame, 0).unwrap();
 
-                    assert_eq!(first.cast::<i8>().unwrap(), -1);
+                    assert_eq!(first.unbox::<i8>().unwrap(), -1);
                     assert!(v.is::<BitsTypeInt8>());
-                    assert!(v.cast::<BitsTypeInt8>().is_ok());
+                    assert!(v.unbox::<BitsTypeInt8>().is_ok());
 
                     Ok(())
                 })
@@ -186,9 +186,9 @@ mod tests {
                     let v = Value::new(&mut *frame, s).unwrap();
                     let first = v.get_nth_field(&mut *frame, 0).unwrap();
 
-                    assert_eq!(first.cast::<i16>().unwrap(), -2);
+                    assert_eq!(first.unbox::<i16>().unwrap(), -2);
                     assert!(v.is::<BitsTypeInt16>());
-                    assert!(v.cast::<BitsTypeInt16>().is_ok());
+                    assert!(v.unbox::<BitsTypeInt16>().is_ok());
 
                     Ok(())
                 })
@@ -207,9 +207,9 @@ mod tests {
                     let v = Value::new(&mut *frame, s).unwrap();
                     let first = v.get_nth_field(&mut *frame, 0).unwrap();
 
-                    assert_eq!(first.cast::<i32>().unwrap(), -3);
+                    assert_eq!(first.unbox::<i32>().unwrap(), -3);
                     assert!(v.is::<BitsTypeInt32>());
-                    assert!(v.cast::<BitsTypeInt32>().is_ok());
+                    assert!(v.unbox::<BitsTypeInt32>().is_ok());
 
                     Ok(())
                 })
@@ -228,9 +228,9 @@ mod tests {
                     let v = Value::new(&mut *frame, s).unwrap();
                     let first = v.get_nth_field(&mut *frame, 0).unwrap();
 
-                    assert_eq!(first.cast::<i64>().unwrap(), -4);
+                    assert_eq!(first.unbox::<i64>().unwrap(), -4);
                     assert!(v.is::<BitsTypeInt64>());
-                    assert!(v.cast::<BitsTypeInt64>().is_ok());
+                    assert!(v.unbox::<BitsTypeInt64>().is_ok());
 
                     Ok(())
                 })
@@ -249,9 +249,9 @@ mod tests {
                     let v = Value::new(&mut *frame, s).unwrap();
                     let first = v.get_nth_field(&mut *frame, 0).unwrap();
 
-                    assert_eq!(first.cast::<i64>().unwrap(), -5);
+                    assert_eq!(first.unbox::<i64>().unwrap(), -5);
                     assert!(v.is::<BitsTypeInt>());
-                    assert!(v.cast::<BitsTypeInt>().is_ok());
+                    assert!(v.unbox::<BitsTypeInt>().is_ok());
 
                     Ok(())
                 })
@@ -270,9 +270,9 @@ mod tests {
                     let v = Value::new(&mut *frame, s).unwrap();
                     let first = v.get_nth_field(&mut *frame, 0).unwrap();
 
-                    assert_eq!(first.cast::<f32>().unwrap(), 1.2);
+                    assert_eq!(first.unbox::<f32>().unwrap(), 1.2);
                     assert!(v.is::<BitsTypeFloat32>());
-                    assert!(v.cast::<BitsTypeFloat32>().is_ok());
+                    assert!(v.unbox::<BitsTypeFloat32>().is_ok());
 
                     Ok(())
                 })
@@ -291,9 +291,9 @@ mod tests {
                     let v = Value::new(&mut *frame, s).unwrap();
                     let first = v.get_nth_field(&mut *frame, 0).unwrap();
 
-                    assert_eq!(first.cast::<f64>().unwrap(), -2.3);
+                    assert_eq!(first.unbox::<f64>().unwrap(), -2.3);
                     assert!(v.is::<BitsTypeFloat64>());
-                    assert!(v.cast::<BitsTypeFloat64>().is_ok());
+                    assert!(v.unbox::<BitsTypeFloat64>().is_ok());
 
                     Ok(())
                 })
@@ -316,9 +316,9 @@ mod tests {
                     let v = Value::new(&mut *frame, s).unwrap();
                     let first = v.get_nth_field(&mut *frame, 0).unwrap();
 
-                    assert_eq!(first.cast::<char>().unwrap(), 'a');
+                    assert_eq!(first.unbox::<char>().unwrap().try_as_char().unwrap(), 'a');
                     assert!(v.is::<BitsCharFloat32Float64>());
-                    assert!(v.cast::<BitsCharFloat32Float64>().is_ok());
+                    assert!(v.unbox::<BitsCharFloat32Float64>().is_ok());
 
                     Ok(())
                 })
@@ -337,9 +337,9 @@ mod tests {
                     let v = Value::new(&mut *frame, s).unwrap();
                     let first = v.get_nth_field(&mut *frame, 0).unwrap();
 
-                    assert_eq!(first.cast::<i64>().unwrap(), 1);
+                    assert_eq!(first.unbox::<i64>().unwrap(), 1);
                     assert!(v.is::<BitsIntBool>());
-                    assert!(v.cast::<BitsIntBool>().is_ok());
+                    assert!(v.unbox::<BitsIntBool>().is_ok());
 
                     Ok(())
                 })
@@ -360,9 +360,9 @@ mod tests {
                     };
                     let v = Value::new(&mut *frame, s).unwrap();
                     let first = v.get_nth_field(&mut *frame, 0).unwrap();
-                    assert_eq!(first.cast::<char>().unwrap(), 'a');
+                    assert_eq!(first.unbox::<char>().unwrap().try_as_char().unwrap(), 'a');
                     assert!(v.is::<BitsCharBitsIntChar>());
-                    assert!(v.cast::<BitsCharBitsIntChar>().is_ok());
+                    assert!(v.unbox::<BitsCharBitsIntChar>().is_ok());
 
                     Ok(())
                 })
@@ -386,10 +386,10 @@ mod tests {
                     let first = v.get_nth_field(&mut *frame, 0).unwrap();
                     let second = v.get_nth_field(&mut *frame, 1).unwrap();
 
-                    assert_eq!(first.cast::<u8>().unwrap(), 0);
-                    assert_eq!(second.cast::<Tuple2<i32, i64>>().unwrap(), Tuple2(-1, -3));
+                    assert_eq!(first.unbox::<u8>().unwrap(), 0);
+                    assert_eq!(second.unbox::<Tuple2<i32, i64>>().unwrap(), Tuple2(-1, -3));
                     assert!(v.is::<BitsUInt8TupleInt32Int64>());
-                    assert!(v.cast::<BitsUInt8TupleInt32Int64>().is_ok());
+                    assert!(v.unbox::<BitsUInt8TupleInt32Int64>().is_ok());
 
                     Ok(())
                 })
@@ -418,16 +418,18 @@ mod tests {
                         .is::<BitsUInt8TupleInt32TupleInt16UInt16>());
 
                     let first = jl_val.get_nth_field(&mut *frame, 0).unwrap();
-                    assert_eq!(first.cast::<u8>().unwrap(), rs_val.a);
+                    assert_eq!(first.unbox::<u8>().unwrap(), rs_val.a);
 
                     let second = jl_val.get_nth_field(&mut *frame, 1).unwrap();
                     assert_eq!(
-                        second.cast::<Tuple2<i32, Tuple2<i16, u16>>>().unwrap(),
+                        second.unbox::<Tuple2<i32, Tuple2<i16, u16>>>().unwrap(),
                         rs_val.b
                     );
 
                     assert!(jl_val.is::<BitsUInt8TupleInt32TupleInt16UInt16>());
-                    assert!(jl_val.cast::<BitsUInt8TupleInt32TupleInt16UInt16>().is_ok());
+                    assert!(jl_val
+                        .unbox::<BitsUInt8TupleInt32TupleInt16UInt16>()
+                        .is_ok());
 
                     Ok(())
                 })
@@ -458,13 +460,13 @@ mod tests {
                         .is::<SingleVariant>());
 
                     let first = jl_val.get_nth_field(&mut *frame, 0).unwrap();
-                    assert_eq!(first.cast::<i8>().unwrap(), 1);
+                    assert_eq!(first.unbox::<i8>().unwrap(), 1);
 
                     let third = jl_val.get_nth_field(&mut *frame, 2).unwrap();
-                    assert_eq!(third.cast::<i8>().unwrap(), 3);
+                    assert_eq!(third.unbox::<i8>().unwrap(), 3);
 
                     assert!(jl_val.is::<SingleVariant>());
-                    assert!(jl_val.cast::<SingleVariant>().is_ok());
+                    assert!(jl_val.unbox::<SingleVariant>().is_ok());
 
                     Ok(())
                 })
@@ -496,16 +498,16 @@ mod tests {
                         .is::<DoubleVariant>());
 
                     let first = jl_val.get_nth_field(&mut *frame, 0).unwrap();
-                    assert_eq!(first.cast::<i8>().unwrap(), 1);
+                    assert_eq!(first.unbox::<i8>().unwrap(), 1);
 
                     let second = jl_val.get_nth_field(&mut *frame, 1).unwrap();
-                    assert_eq!(second.cast::<i16>().unwrap(), 2);
+                    assert_eq!(second.unbox::<i16>().unwrap(), 2);
 
                     let third = jl_val.get_nth_field(&mut *frame, 2).unwrap();
-                    assert_eq!(third.cast::<i8>().unwrap(), 3);
+                    assert_eq!(third.unbox::<i8>().unwrap(), 3);
 
                     assert!(jl_val.is::<DoubleVariant>());
-                    assert!(jl_val.cast::<DoubleVariant>().is_ok());
+                    assert!(jl_val.unbox::<DoubleVariant>().is_ok());
 
                     Ok(())
                 })
@@ -537,16 +539,16 @@ mod tests {
                         .is::<SizeAlignMismatch>());
 
                     let first = jl_val.get_nth_field(&mut *frame, 0).unwrap();
-                    assert_eq!(first.cast::<i8>().unwrap(), 1);
+                    assert_eq!(first.unbox::<i8>().unwrap(), 1);
 
                     let second = jl_val.get_nth_field(&mut *frame, 1).unwrap();
-                    assert_eq!(second.cast::<i32>().unwrap(), 2);
+                    assert_eq!(second.unbox::<i32>().unwrap(), 2);
 
                     let third = jl_val.get_nth_field(&mut *frame, 2).unwrap();
-                    assert_eq!(third.cast::<i8>().unwrap(), 3);
+                    assert_eq!(third.unbox::<i8>().unwrap(), 3);
 
                     assert!(jl_val.is::<SizeAlignMismatch>());
-                    assert!(jl_val.cast::<SizeAlignMismatch>().is_ok());
+                    assert!(jl_val.unbox::<SizeAlignMismatch>().is_ok());
 
                     Ok(())
                 })
@@ -578,16 +580,16 @@ mod tests {
                         .is::<UnionInTuple>());
 
                     let first = jl_val.get_nth_field(&mut *frame, 0).unwrap();
-                    assert_eq!(first.cast::<i8>().unwrap(), 1);
+                    assert_eq!(first.unbox::<i8>().unwrap(), 1);
 
                     let second = jl_val.get_nth_field(&mut *frame, 1).unwrap();
-                    assert_eq!(second.cast::<Tuple1<i16>>().unwrap(), Tuple1(2));
+                    assert_eq!(second.unbox::<Tuple1<i16>>().unwrap(), Tuple1(2));
 
                     let third = jl_val.get_nth_field(&mut *frame, 2).unwrap();
-                    assert_eq!(third.cast::<i8>().unwrap(), 3);
+                    assert_eq!(third.unbox::<i8>().unwrap(), 3);
 
                     assert!(jl_val.is::<UnionInTuple>());
-                    let uit = jl_val.cast::<UnionInTuple>()?;
+                    let uit = jl_val.unbox::<UnionInTuple>()?;
                     assert_eq!(uit.a, 1);
                     assert_eq!(uit.c, 3);
 
@@ -619,10 +621,10 @@ mod tests {
                         .is::<NonBitsUnion>());
 
                     let first = jl_val.get_nth_field(&mut *frame, 0).unwrap();
-                    assert_eq!(first.cast::<i8>().unwrap(), 1);
+                    assert_eq!(first.unbox::<i8>().unwrap(), 1);
 
                     assert!(jl_val.is::<NonBitsUnion>());
-                    assert!(jl_val.cast::<NonBitsUnion>().is_ok());
+                    assert!(jl_val.unbox::<NonBitsUnion>().is_ok());
 
                     Ok(())
                 })
@@ -652,10 +654,10 @@ mod tests {
                         .is::<WithString>());
 
                     let first = jl_val.get_nth_field(&mut *frame, 0).unwrap();
-                    assert_eq!(first.cast::<String>().unwrap(), "foo");
+                    assert_eq!(first.unbox::<String>().unwrap().unwrap(), "foo");
 
                     assert!(jl_val.is::<WithString>());
-                    assert!(jl_val.cast::<WithString>().is_ok());
+                    assert!(jl_val.unbox::<WithString>().is_ok());
 
                     Ok(())
                 })
@@ -685,10 +687,10 @@ mod tests {
                         .is::<WithGenericT<i32>>());
 
                     let first = jl_val.get_nth_field(&mut *frame, 0).unwrap();
-                    assert_eq!(first.cast::<i32>().unwrap(), 1);
+                    assert_eq!(first.unbox::<i32>().unwrap(), 1);
 
                     assert!(jl_val.is::<WithGenericT<i32>>());
-                    assert!(jl_val.cast::<WithGenericT<i32>>().is_ok());
+                    assert!(jl_val.unbox::<WithGenericT<i32>>().is_ok());
 
                     Ok(())
                 })
@@ -724,10 +726,10 @@ mod tests {
                         .is::<WithGenericUnionAll>());
 
                     let first = jl_val.get_nth_field(&mut *frame, 0).unwrap();
-                    assert!(first.cast::<WithGenericT<i32>>().is_ok());
+                    assert!(first.unbox::<WithGenericT<i32>>().is_ok());
 
                     assert!(jl_val.is::<WithGenericUnionAll>());
-                    assert!(jl_val.cast::<WithGenericUnionAll>().is_ok());
+                    assert!(jl_val.unbox::<WithGenericUnionAll>().is_ok());
 
                     Ok(())
                 })
@@ -763,10 +765,10 @@ mod tests {
                         .is::<WithNestedGenericT<i32>>());
 
                     let first = jl_val.get_nth_field(&mut *frame, 0).unwrap();
-                    assert!(first.cast::<WithGenericT<i32>>().is_ok());
+                    assert!(first.unbox::<WithGenericT<i32>>().is_ok());
 
                     assert!(jl_val.is::<WithNestedGenericT<i32>>());
-                    assert!(jl_val.cast::<WithNestedGenericT<i32>>().is_ok());
+                    assert!(jl_val.unbox::<WithNestedGenericT<i32>>().is_ok());
 
                     Ok(())
                 })
@@ -803,10 +805,10 @@ mod tests {
                         .is::<WithPropagatedLifetime>());
 
                     let first = jl_val.get_nth_field(&mut *frame, 0).unwrap();
-                    assert!(first.cast::<WithGenericT<Module>>().is_ok());
+                    assert!(first.unbox::<WithGenericT<Module>>().is_ok());
 
                     assert!(jl_val.is::<WithPropagatedLifetime>());
-                    assert!(jl_val.cast::<WithPropagatedLifetime>().is_ok());
+                    assert!(jl_val.unbox::<WithPropagatedLifetime>().is_ok());
 
                     Ok(())
                 })
@@ -849,11 +851,11 @@ mod tests {
 
                     let first = jl_val.get_nth_field(&mut *frame, 0).unwrap();
                     assert!(first
-                        .cast::<WithGenericT<Tuple2<i32, WithGenericT<Array>>>>()
+                        .unbox::<WithGenericT<Tuple2<i32, WithGenericT<Array>>>>()
                         .is_ok());
 
                     assert!(jl_val.is::<WithPropagatedLifetimes>());
-                    assert!(jl_val.cast::<WithPropagatedLifetimes>().is_ok());
+                    assert!(jl_val.unbox::<WithPropagatedLifetimes>().is_ok());
 
                     Ok(())
                 })
@@ -889,10 +891,10 @@ mod tests {
                         .is::<WithSetGeneric>());
 
                     let first = jl_val.get_nth_field(&mut *frame, 0).unwrap();
-                    assert!(first.cast::<WithGenericT<i64>>().is_ok());
+                    assert!(first.unbox::<WithGenericT<i64>>().is_ok());
 
                     assert!(jl_val.is::<WithSetGeneric>());
-                    assert!(jl_val.cast::<WithSetGeneric>().is_ok());
+                    assert!(jl_val.unbox::<WithSetGeneric>().is_ok());
 
                     Ok(())
                 })
@@ -931,10 +933,11 @@ mod tests {
                         .is::<WithSetGenericTuple>());
 
                     let first = jl_val.get_nth_field(&mut *frame, 0).unwrap();
-                    assert!(first.cast::<Tuple1<WithGenericT<i64>>>().is_ok());
+                    eprintln!("First: {:?}", first);
+                    first.unbox::<Tuple1<WithGenericT<i64>>>().unwrap();
 
                     assert!(jl_val.is::<WithSetGenericTuple>());
-                    assert!(jl_val.cast::<WithSetGenericTuple>().is_ok());
+                    assert!(jl_val.unbox::<WithSetGenericTuple>().is_ok());
 
                     Ok(())
                 })
@@ -964,10 +967,10 @@ mod tests {
                         .is::<WithValueType>());
 
                     let first = jl_val.get_nth_field(&mut *frame, 0).unwrap();
-                    assert!(first.cast::<i64>().is_ok());
+                    assert!(first.unbox::<i64>().is_ok());
 
                     assert!(jl_val.is::<WithValueType>());
-                    assert!(jl_val.cast::<WithValueType>().is_ok());
+                    assert!(jl_val.unbox::<WithValueType>().is_ok());
 
                     Ok(())
                 })

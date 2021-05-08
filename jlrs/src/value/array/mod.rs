@@ -14,19 +14,22 @@ use crate::layout::{julia_typecheck::JuliaTypecheck, valid_layout::ValidLayout};
 use crate::memory::traits::frame::Frame;
 use crate::value::datatype::DataType;
 use crate::value::Value;
-use jl_sys::{
-    jl_array_data, jl_array_dim, jl_array_dims, jl_array_eltype, jl_array_ndims, jl_array_nrows,
-    jl_array_ptr_set, jl_array_t, jl_array_typetagdata, jl_is_array_type, jl_tparam0, jl_typeof,
-};
+use jl_sys::{jl_array_data, jl_array_eltype, jl_array_t, jl_is_array_type, jl_tparam0};
+use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::ops::{Index, IndexMut};
 use std::ptr::NonNull;
-use std::{
-    fmt::{Debug, Display, Formatter, Result as FmtResult},
-    usize,
-};
 
+use self::data::{
+    inline::{InlineArrayDataMut, UnrestrictedInlineArrayDataMut},
+    union::{UnionArrayData, UnionArrayDataMut},
+    value::{UnrestrictedValueArrayDataMut, ValueArrayDataMut},
+};
+use self::dimensions::Dimensions;
 use super::union::Union;
+
+pub mod data;
+pub mod dimensions;
 
 /// An n-dimensional Julia array. This struct implements [`JuliaTypecheck`] and [`Cast`]. It can
 /// be used in combination with [`DataType::is`] and [`Value::is`]; if the check returns `true`
@@ -209,8 +212,9 @@ impl<'frame, 'data> Array<'frame, 'data> {
     pub fn inline_data_mut<'borrow, 'fr, T, F>(
         self,
         frame: &'borrow mut F,
-    ) -> JlrsResult<InlineArrayDataMut<'borrow, 'fr, T, F>>
+    ) -> JlrsResult<InlineArrayDataMut<'borrow, 'frame, 'fr, 'data, T, F>>
     where
+        'borrow: 'data,
         T: ValidLayout,
         F: Frame<'fr>,
     {
@@ -223,10 +227,8 @@ impl<'frame, 'data> Array<'frame, 'data> {
         }
 
         unsafe {
-            let jl_data = jl_array_data(self.inner().as_ptr().cast()).cast();
             let dimensions = Dimensions::from_array(self.inner().as_ptr().cast());
-            let data = std::slice::from_raw_parts_mut(jl_data, dimensions.size());
-            Ok(InlineArrayDataMut::new(data, dimensions, frame))
+            Ok(InlineArrayDataMut::new(self, dimensions, frame))
         }
     }
 
@@ -305,10 +307,8 @@ impl<'frame, 'data> Array<'frame, 'data> {
             Err(JlrsError::Inline)?;
         }
 
-        let jl_data = jl_array_data(self.inner().as_ptr().cast()).cast();
         let dimensions = Dimensions::from_array(self.inner().as_ptr().cast());
-        let data = std::slice::from_raw_parts_mut(jl_data, dimensions.size());
-        Ok(ValueArrayDataMut::new(self, data, dimensions, frame))
+        Ok(ValueArrayDataMut::new(self, dimensions, frame))
     }
 
     /// Mutably borrow the data of this value array without the restriction that only a single
@@ -333,12 +333,8 @@ impl<'frame, 'data> Array<'frame, 'data> {
             Err(JlrsError::Inline)?;
         }
 
-        let jl_data = jl_array_data(self.inner().as_ptr().cast()).cast();
         let dimensions = Dimensions::from_array(self.inner().as_ptr().cast());
-        let data = std::slice::from_raw_parts_mut(jl_data, dimensions.size());
-        Ok(UnrestrictedValueArrayDataMut::new(
-            self, data, dimensions, frame,
-        ))
+        Ok(UnrestrictedValueArrayDataMut::new(self, dimensions, frame))
     }
 
     /// Convert `self` to a `Value`.
@@ -352,14 +348,14 @@ impl<'frame> Array<'frame, 'static> {
     pub fn union_array_data<'borrow, 'fr, F>(
         self,
         frame: &'borrow F,
-    ) -> JlrsResult<UnionArray<'borrow, 'frame, 'fr, F>>
+    ) -> JlrsResult<UnionArrayData<'borrow, 'frame, 'fr, F>>
     where
         F: Frame<'fr>,
     {
         if self.is_union_array() {
             unsafe {
                 let dims = Dimensions::from_array(self.inner().as_ptr().cast());
-                Ok(UnionArray::new(self, dims, frame))
+                Ok(UnionArrayData::new(self, dims, frame))
             }
         } else {
             Err(JlrsError::NotAUnionArray)?
@@ -370,14 +366,14 @@ impl<'frame> Array<'frame, 'static> {
     pub fn union_array_data_mut<'borrow, 'fr, F>(
         self,
         frame: &'borrow mut F,
-    ) -> JlrsResult<UnionArrayMut<'borrow, 'frame, 'fr, F>>
+    ) -> JlrsResult<UnionArrayDataMut<'borrow, 'frame, 'fr, F>>
     where
         F: Frame<'fr>,
     {
         if self.is_union_array() {
             unsafe {
                 let dims = Dimensions::from_array(self.inner().as_ptr().cast());
-                Ok(UnionArrayMut::new(self, dims, frame))
+                Ok(UnionArrayDataMut::new(self, dims, frame))
             }
         } else {
             Err(JlrsError::NotAUnionArray)?
@@ -393,7 +389,7 @@ unsafe impl<'frame, 'data> JuliaTypecheck for Array<'frame, 'data> {
 
 impl<'frame, 'data> Into<Value<'frame, 'data>> for Array<'frame, 'data> {
     fn into(self) -> Value<'frame, 'data> {
-        unsafe { Value::wrap(self.inner().as_ptr().cast()) }
+        unsafe { Value::wrap_non_null(self.inner().cast()) }
     }
 }
 
@@ -533,8 +529,9 @@ impl<'frame, 'data, T: Copy + ValidLayout> TypedArray<'frame, 'data, T> {
     pub fn inline_data_mut<'borrow, 'fr, F>(
         self,
         frame: &'borrow mut F,
-    ) -> JlrsResult<InlineArrayDataMut<'borrow, 'fr, T, F>>
+    ) -> JlrsResult<InlineArrayDataMut<'borrow, 'frame, 'fr, 'data, T, F>>
     where
+        'borrow: 'data,
         F: Frame<'fr>,
     {
         if !self.is_inline_array() {
@@ -542,10 +539,8 @@ impl<'frame, 'data, T: Copy + ValidLayout> TypedArray<'frame, 'data, T> {
         }
 
         unsafe {
-            let jl_data = jl_array_data(self.inner().as_ptr().cast()).cast();
             let dimensions = Dimensions::from_array(self.inner().as_ptr().cast());
-            let data = std::slice::from_raw_parts_mut(jl_data, dimensions.size());
-            Ok(InlineArrayDataMut::new(data, dimensions, frame))
+            Ok(InlineArrayDataMut::new(self.as_array(), dimensions, frame))
         }
     }
 
@@ -619,10 +614,8 @@ impl<'frame, 'data, T: Copy + ValidLayout> TypedArray<'frame, 'data, T> {
             Err(JlrsError::Inline)?;
         }
 
-        let jl_data = jl_array_data(self.inner().as_ptr().cast()).cast();
         let dimensions = Dimensions::from_array(self.inner().as_ptr().cast());
-        let data = std::slice::from_raw_parts_mut(jl_data, dimensions.size());
-        Ok(ValueArrayDataMut::new(self.into(), data, dimensions, frame))
+        Ok(ValueArrayDataMut::new(self.into(), dimensions, frame))
     }
 
     /// Mutably borrow the data of this value array without the restriction that only a single
@@ -647,12 +640,9 @@ impl<'frame, 'data, T: Copy + ValidLayout> TypedArray<'frame, 'data, T> {
             Err(JlrsError::Inline)?;
         }
 
-        let jl_data = jl_array_data(self.inner().as_ptr().cast()).cast();
         let dimensions = Dimensions::from_array(self.inner().as_ptr().cast());
-        let data = std::slice::from_raw_parts_mut(jl_data, dimensions.size());
         Ok(UnrestrictedValueArrayDataMut::new(
             Array::wrap(self.inner().as_ptr()),
-            data,
             dimensions,
             frame,
         ))
@@ -661,6 +651,11 @@ impl<'frame, 'data, T: Copy + ValidLayout> TypedArray<'frame, 'data, T> {
     /// Convert `self` to a `Value`.
     pub fn as_value(self) -> Value<'frame, 'data> {
         self.into()
+    }
+
+    /// Convert `self` to a `Value`.
+    pub fn as_array(self) -> Array<'frame, 'data> {
+        unsafe { Array::wrap(self.inner().as_ptr()) }
     }
 }
 
@@ -675,7 +670,7 @@ impl<'frame, 'data, T: Copy + ValidLayout> Into<Value<'frame, 'data>>
     for TypedArray<'frame, 'data, T>
 {
     fn into(self) -> Value<'frame, 'data> {
-        unsafe { Value::wrap(self.inner().as_ptr().cast()) }
+        unsafe { Value::wrap_non_null(self.inner().cast()) }
     }
 }
 
@@ -715,240 +710,6 @@ unsafe impl<'frame, 'data, T: Copy + ValidLayout> ValidLayout for TypedArray<'fr
         } else {
             false
         }
-    }
-}
-
-fn nth_union_component<'frame, 'data>(
-    v: Value<'frame, 'data>,
-    pi: &mut i32,
-) -> Option<Value<'frame, 'data>> {
-    match v.cast::<Union>() {
-        Ok(un) => {
-            let a = nth_union_component(un.a(), pi);
-            if a.is_some() {
-                a
-            } else {
-                *pi -= 1;
-                return nth_union_component(un.b(), pi);
-            }
-        }
-        Err(_) => {
-            if *pi == 0 {
-                Some(v)
-            } else {
-                None
-            }
-        }
-    }
-}
-
-fn find_union_component(haystack: Value, needle: Value, nth: &mut u32) -> bool {
-    unsafe {
-        match haystack.cast::<Union>() {
-            Ok(hs) => {
-                if find_union_component(hs.a(), needle, nth) {
-                    true
-                } else if find_union_component(hs.b(), needle, nth) {
-                    true
-                } else {
-                    false
-                }
-            }
-            Err(_) => {
-                if needle.inner() == haystack.inner() {
-                    return true;
-                } else {
-                    *nth += 1;
-                    false
-                }
-            }
-        }
-    }
-}
-
-/// Immutably borrowed array data from Julia where the element type is a bits-union. The data has
-/// a column-major order and can be indexed with anything that implements `Into<Dimensions>`; see
-/// [`Dimensions`] for more information.
-#[derive(Clone, Debug)]
-pub struct UnionArray<'borrow, 'array: 'borrow + 'frame, 'frame, F>
-where
-    F: Frame<'frame>,
-{
-    array: Array<'array, 'static>,
-    dims: Dimensions,
-    _notsendsync: PhantomData<*const ()>,
-    _borrow: PhantomData<&'borrow F>,
-    _frame: PhantomData<&'frame ()>,
-}
-
-impl<'borrow, 'array: 'borrow + 'frame, 'frame, F: Frame<'frame>>
-    UnionArray<'borrow, 'array, 'frame, F>
-{
-    fn new(array: Array<'array, 'static>, dims: Dimensions, _: &'borrow F) -> Self {
-        UnionArray {
-            array,
-            dims,
-            _notsendsync: PhantomData,
-            _borrow: PhantomData,
-            _frame: PhantomData,
-        }
-    }
-
-    /// Returns the type of the element at index `idx`.
-    pub fn element_type<D: Into<Dimensions>>(
-        &self,
-        idx: D,
-    ) -> JlrsResult<Option<Value<'array, 'static>>> {
-        unsafe {
-            let elty = self.array.element_type();
-            let idx = self.dims.index_of(idx)?;
-
-            let tags = jl_array_typetagdata(self.array.inner().as_ptr());
-            let mut tag = *tags.add(idx) as _;
-
-            Ok(nth_union_component(elty, &mut tag))
-        }
-    }
-
-    /// Get the element at index `idx`. The type `T` must be a valid layout for the type of the
-    /// element stored there.
-    pub fn get<T: ValidLayout + Copy, D: Into<Dimensions>>(&self, idx: D) -> JlrsResult<T> {
-        unsafe {
-            let elty = self.array.element_type();
-            let idx = self.dims.index_of(idx)?;
-
-            let tags = jl_array_typetagdata(self.array.inner().as_ptr());
-            let mut tag = *tags.add(idx) as _;
-
-            if let Some(ty) = nth_union_component(elty, &mut tag) {
-                if T::valid_layout(ty) {
-                    let offset = idx * self.array.inner().as_ref().elsize as usize;
-                    let ptr = self
-                        .array
-                        .inner()
-                        .as_ref()
-                        .data
-                        .cast::<i8>()
-                        .add(offset)
-                        .cast::<T>();
-                    return Ok(*ptr);
-                }
-            }
-
-            Err(JlrsError::WrongType)?
-        }
-    }
-}
-
-/// Mutably borrowed array data from Julia where the element type is a bits-union. The data has a
-/// column-major order and can be indexed with anything that implements `Into<Dimensions>`; see
-/// [`Dimensions`] for more information.
-#[derive(Debug)]
-pub struct UnionArrayMut<'borrow, 'array: 'borrow + 'frame, 'frame, F>
-where
-    F: Frame<'frame>,
-{
-    array: Array<'array, 'static>,
-    dims: Dimensions,
-    _notsendsync: PhantomData<*const ()>,
-    _borrow: PhantomData<&'borrow mut F>,
-    _f: PhantomData<&'frame ()>,
-}
-
-impl<'borrow, 'array: 'borrow + 'frame, 'frame, F: Frame<'frame>>
-    UnionArrayMut<'borrow, 'array, 'frame, F>
-{
-    fn new(array: Array<'array, 'static>, dims: Dimensions, _: &'borrow mut F) -> Self {
-        UnionArrayMut {
-            array,
-            dims,
-            _notsendsync: PhantomData,
-            _borrow: PhantomData,
-            _f: PhantomData,
-        }
-    }
-
-    /// Returns the type of the element at index `idx`.
-    pub fn element_type<D: Into<Dimensions>>(
-        &self,
-        idx: D,
-    ) -> JlrsResult<Option<Value<'array, 'static>>> {
-        unsafe {
-            let elty = self.array.element_type();
-            let idx = self.dims.index_of(idx)?;
-
-            let tags = jl_array_typetagdata(self.array.inner().as_ptr());
-            let mut tag = *tags.add(idx) as _;
-
-            Ok(nth_union_component(elty, &mut tag))
-        }
-    }
-
-    /// Get the element at index `idx`. The type `T` must be a valid layout for the type of the
-    /// element stored there.
-    pub fn get<T: ValidLayout + Copy, D: Into<Dimensions>>(&self, idx: D) -> JlrsResult<T> {
-        unsafe {
-            let elty = self.array.element_type();
-            let idx = self.dims.index_of(idx)?;
-
-            let tags = jl_array_typetagdata(self.array.inner().as_ptr());
-            let mut tag = *tags.add(idx) as _;
-
-            if let Some(ty) = nth_union_component(elty, &mut tag) {
-                if T::valid_layout(ty) {
-                    let offset = idx * self.array.inner().as_ref().elsize as usize;
-                    let ptr = self
-                        .array
-                        .inner()
-                        .as_ref()
-                        .data
-                        .cast::<i8>()
-                        .add(offset)
-                        .cast::<T>();
-                    return Ok(*ptr);
-                }
-            }
-
-            Err(JlrsError::WrongType)?
-        }
-    }
-
-    /// Set the element at index `idx` to `value` with the type `ty`. The type `T` must be a valid
-    /// layout for the value, and `ty` must be a member of the union of all possible element
-    /// types.
-    pub fn set<T: ValidLayout + Copy, D: Into<Dimensions>>(
-        &mut self,
-        idx: D,
-        ty: DataType,
-        value: T,
-    ) -> JlrsResult<()> {
-        unsafe {
-            if !T::valid_layout(ty.as_value()) {
-                Err(JlrsError::InvalidLayout)?;
-            }
-
-            let mut tag = 0;
-            if !find_union_component(self.array.element_type(), ty.as_value(), &mut tag) {
-                Err(JlrsError::InvalidArrayType)?;
-            }
-
-            let idx = self.dims.index_of(idx)?;
-            let offset = idx * self.array.inner().as_ref().elsize as usize;
-            self.array
-                .inner()
-                .as_ref()
-                .data
-                .cast::<i8>()
-                .add(offset)
-                .cast::<T>()
-                .write(value);
-
-            jl_array_typetagdata(self.array.inner().as_ptr())
-                .add(idx)
-                .write(tag as _);
-        }
-
-        Ok(())
     }
 }
 
@@ -1069,669 +830,5 @@ where
     type Output = T;
     fn index(&self, index: D) -> &Self::Output {
         &self.data[self.dimensions.index_of(index).unwrap()]
-    }
-}
-
-/// Mutably borrowed inline array data from Julia. The data has a column-major order and can be
-/// indexed with anything that implements `Into<Dimensions>`; see [`Dimensions`] for more
-/// information.
-pub struct InlineArrayDataMut<'borrow, 'frame, T, F: Frame<'frame>> {
-    data: &'borrow mut [T],
-    dimensions: Dimensions,
-    _notsendsync: PhantomData<*const ()>,
-    _borrow: PhantomData<&'borrow F>,
-    _frame: PhantomData<&'frame ()>,
-}
-
-impl<'borrow, 'frame, T, F> InlineArrayDataMut<'borrow, 'frame, T, F>
-where
-    F: Frame<'frame>,
-{
-    pub(crate) unsafe fn new(
-        data: &'borrow mut [T],
-        dimensions: Dimensions,
-        _: &'borrow mut F,
-    ) -> Self {
-        InlineArrayDataMut {
-            data,
-            dimensions,
-            _notsendsync: PhantomData,
-            _frame: PhantomData,
-            _borrow: PhantomData,
-        }
-    }
-
-    /// Get a reference to the value at `index`, or `None` if the index is out of bounds.
-    pub fn get<D: Into<Dimensions>>(&self, index: D) -> Option<&T> {
-        Some(&self.data[self.dimensions.index_of(index).ok()?])
-    }
-
-    /// Get a mutable reference to the value at `index`, or `None` if the index is out of bounds.
-    pub fn get_mut<D: Into<Dimensions>>(&mut self, index: D) -> Option<&mut T> {
-        Some(&mut self.data[self.dimensions.index_of(index).ok()?])
-    }
-
-    /// Returns the array's data as a slice, the data is in column-major order.
-    pub fn as_slice(&self) -> &[T] {
-        self.data
-    }
-
-    /// Returns the array's data as a slice, the data is in column-major order.
-    pub fn into_slice(self) -> &'borrow [T] {
-        self.data
-    }
-
-    /// Returns the array's data as a mutable slice, the data is in column-major order.
-    pub fn as_mut_slice(&mut self) -> &mut [T] {
-        self.data
-    }
-
-    /// Returns the array's data as a mutable slice, the data is in column-major order.
-    pub fn into_mut_slice(self) -> &'borrow mut [T] {
-        self.data
-    }
-
-    /// Returns a reference to the array's dimensions.
-    pub fn dimensions(&self) -> &Dimensions {
-        &self.dimensions
-    }
-}
-
-/// Mutably borrowed value array data from Julia. The data has a column-major order and can be
-/// indexed with anything that implements `Into<Dimensions>`; see [`Dimensions`] for more
-/// information.
-impl<'borrow, 'frame, T, D, F> Index<D> for InlineArrayDataMut<'borrow, 'frame, T, F>
-where
-    D: Into<Dimensions>,
-    F: Frame<'frame>,
-{
-    type Output = T;
-    fn index(&self, index: D) -> &Self::Output {
-        &self.data[self.dimensions.index_of(index).unwrap()]
-    }
-}
-
-impl<'borrow, 'frame, T, D, F> IndexMut<D> for InlineArrayDataMut<'borrow, 'frame, T, F>
-where
-    D: Into<Dimensions>,
-    F: Frame<'frame>,
-{
-    fn index_mut(&mut self, index: D) -> &mut Self::Output {
-        &mut self.data[self.dimensions.index_of(index).unwrap()]
-    }
-}
-
-/// Mutably borrowed inline array data from Julia. The data has a column-major order and can be
-/// indexed with anything that implements `Into<Dimensions>`; see [`Dimensions`] for more
-/// information.
-pub struct UnrestrictedInlineArrayDataMut<'borrow, 'frame, T, F: Frame<'frame>> {
-    data: &'borrow mut [T],
-    dimensions: Dimensions,
-    _notsendsync: PhantomData<*const ()>,
-    _borrow: PhantomData<&'borrow F>,
-    _frame: PhantomData<&'frame ()>,
-}
-
-impl<'borrow, 'frame, T, F> UnrestrictedInlineArrayDataMut<'borrow, 'frame, T, F>
-where
-    F: Frame<'frame>,
-{
-    pub(crate) unsafe fn new(
-        data: &'borrow mut [T],
-        dimensions: Dimensions,
-        _: &'borrow F,
-    ) -> Self {
-        UnrestrictedInlineArrayDataMut {
-            data,
-            dimensions,
-            _notsendsync: PhantomData,
-            _frame: PhantomData,
-            _borrow: PhantomData,
-        }
-    }
-
-    /// Get a reference to the value at `index`, or `None` if the index is out of bounds.
-    pub fn get<D: Into<Dimensions>>(&self, index: D) -> Option<&T> {
-        Some(&self.data[self.dimensions.index_of(index).ok()?])
-    }
-
-    /// Get a mutable reference to the value at `index`, or `None` if the index is out of bounds.
-    pub fn get_mut<D: Into<Dimensions>>(&mut self, index: D) -> Option<&mut T> {
-        Some(&mut self.data[self.dimensions.index_of(index).ok()?])
-    }
-
-    /// Returns the array's data as a slice, the data is in column-major order.
-    pub fn as_slice(&self) -> &[T] {
-        &self.data
-    }
-
-    /// Returns the array's data as a mutable slice, the data is in column-major order.
-    pub fn as_mut_slice(&mut self) -> &mut [T] {
-        &mut self.data
-    }
-
-    /// Returns a reference to the array's dimensions.
-    pub fn dimensions(&self) -> &Dimensions {
-        &self.dimensions
-    }
-}
-
-/// Mutably borrowed value array data from Julia. The data has a column-major order and can be
-/// indexed with anything that implements `Into<Dimensions>`; see [`Dimensions`] for more
-/// information.
-impl<'borrow, 'frame, T, D, F> Index<D> for UnrestrictedInlineArrayDataMut<'borrow, 'frame, T, F>
-where
-    D: Into<Dimensions>,
-    F: Frame<'frame>,
-{
-    type Output = T;
-    fn index(&self, index: D) -> &Self::Output {
-        &self.data[self.dimensions.index_of(index).unwrap()]
-    }
-}
-
-impl<'borrow, 'frame, T, D, F> IndexMut<D> for UnrestrictedInlineArrayDataMut<'borrow, 'frame, T, F>
-where
-    D: Into<Dimensions>,
-    F: Frame<'frame>,
-{
-    fn index_mut(&mut self, index: D) -> &mut Self::Output {
-        &mut self.data[self.dimensions.index_of(index).unwrap()]
-    }
-}
-
-pub struct ValueArrayDataMut<'borrow, 'value, 'data, 'frame, F: Frame<'frame>> {
-    array: Array<'value, 'data>,
-    data: &'borrow mut [Value<'value, 'data>],
-    dimensions: Dimensions,
-    _notsendsync: PhantomData<*const ()>,
-    _borrow: PhantomData<&'borrow mut F>,
-    _frame: PhantomData<&'frame ()>,
-}
-
-impl<'borrow, 'frame, 'data, 'fr, F> ValueArrayDataMut<'borrow, 'frame, 'data, 'fr, F>
-where
-    F: Frame<'fr>,
-{
-    pub(crate) unsafe fn new(
-        array: Array<'frame, 'data>,
-        data: &'borrow mut [Value<'frame, 'data>],
-        dimensions: Dimensions,
-        _: &'borrow mut F,
-    ) -> Self {
-        ValueArrayDataMut {
-            array,
-            data,
-            dimensions,
-            _notsendsync: PhantomData,
-            _borrow: PhantomData,
-            _frame: PhantomData,
-        }
-    }
-
-    /// Get a reference to the value at `index`, or `None` if the index is out of bounds.
-    pub fn get<D: Into<Dimensions>>(&self, index: D) -> Option<&Value<'frame, 'data>> {
-        Some(&self.data[self.dimensions.index_of(index).ok()?])
-    }
-
-    pub unsafe fn set<'va, 'da: 'data, D: Into<Dimensions>>(
-        &mut self,
-        index: D,
-        value: Value<'frame, 'da>,
-    ) -> JlrsResult<()> {
-        let ptr = self.array.inner().as_ptr();
-        let eltype = jl_array_eltype(ptr.cast());
-
-        if eltype != jl_typeof(value.inner().as_ptr().cast()).cast() {
-            Err(JlrsError::InvalidArrayType)?;
-        }
-
-        let idx = self.dimensions.index_of(index)?;
-
-        jl_array_ptr_set(ptr.cast(), idx, value.inner().as_ptr().cast());
-        Ok(())
-    }
-
-    /// Returns the array's data as a slice, the data is in column-major order.
-    pub fn as_slice(&self) -> &[Value<'frame, 'data>] {
-        &self.data
-    }
-
-    /// Returns a reference to the array's dimensions.
-    pub fn dimensions(&self) -> &Dimensions {
-        &self.dimensions
-    }
-}
-
-impl<'borrow, 'value, 'data, 'frame, D, F> Index<D>
-    for ValueArrayDataMut<'borrow, 'value, 'data, 'frame, F>
-where
-    D: Into<Dimensions>,
-    F: Frame<'frame>,
-{
-    type Output = Value<'value, 'data>;
-    fn index(&self, index: D) -> &Self::Output {
-        &self.data[self.dimensions.index_of(index).unwrap()]
-    }
-}
-
-pub struct UnrestrictedValueArrayDataMut<'borrow, 'value, 'data, 'frame, F: Frame<'frame>> {
-    array: Array<'value, 'data>,
-    data: &'borrow mut [Value<'value, 'data>],
-    dimensions: Dimensions,
-    _notsendsync: PhantomData<*const ()>,
-    _borrow: PhantomData<&'borrow F>,
-    _frame: PhantomData<&'frame ()>,
-}
-
-impl<'borrow, 'frame, 'data, 'fr, F> UnrestrictedValueArrayDataMut<'borrow, 'frame, 'data, 'fr, F>
-where
-    F: Frame<'fr>,
-{
-    pub(crate) unsafe fn new(
-        array: Array<'frame, 'data>,
-        data: &'borrow mut [Value<'frame, 'data>],
-        dimensions: Dimensions,
-        _: &'borrow F,
-    ) -> Self {
-        UnrestrictedValueArrayDataMut {
-            array,
-            data,
-            dimensions,
-            _notsendsync: PhantomData,
-            _borrow: PhantomData,
-            _frame: PhantomData,
-        }
-    }
-
-    /// Get a reference to the value at `index`, or `None` if the index is out of bounds.
-    pub fn get<D: Into<Dimensions>>(&self, index: D) -> Option<&Value<'frame, 'data>> {
-        Some(&self.data[self.dimensions.index_of(index).ok()?])
-    }
-
-    pub unsafe fn set<'va, 'da: 'data, D: Into<Dimensions>>(
-        &mut self,
-        index: D,
-        value: Value<'frame, 'da>,
-    ) -> JlrsResult<()> {
-        let ptr = self.array.inner().as_ptr();
-        let eltype = jl_array_eltype(ptr.cast());
-
-        if eltype != jl_typeof(value.inner().as_ptr().cast()).cast() {
-            Err(JlrsError::InvalidArrayType)?;
-        }
-
-        jl_array_ptr_set(
-            ptr.cast(),
-            self.dimensions.index_of(index)?,
-            value.inner().as_ptr().cast(),
-        );
-        Ok(())
-    }
-
-    /// Returns the array's data as a slice, the data is in column-major order.
-    pub fn as_slice(&self) -> &[Value<'frame, 'data>] {
-        &self.data
-    }
-
-    /// Returns a reference to the array's dimensions.
-    pub fn dimensions(&self) -> &Dimensions {
-        &self.dimensions
-    }
-}
-
-impl<'borrow, 'value, 'data, 'frame, D, F> Index<D>
-    for UnrestrictedValueArrayDataMut<'borrow, 'value, 'data, 'frame, F>
-where
-    D: Into<Dimensions>,
-    F: Frame<'frame>,
-{
-    type Output = Value<'value, 'data>;
-    fn index(&self, index: D) -> &Self::Output {
-        &self.data[self.dimensions.index_of(index).unwrap()]
-    }
-}
-
-/// The dimensions of an n-dimensional array, they represent either the shape of an array or an
-/// index. Functions that need `Dimensions` as an input, which is currently limited to just
-/// indexing this data, are generic and accept any type that implements `Into<Dimensions>`.
-///
-/// For a single dimension, you can use a `usize` value. For 0 up to and including 8 dimensions,
-/// you can use tuples of `usize`. In general, you can use slices of `usize`:
-///
-/// ```
-/// # use jlrs::value::array::Dimensions;
-/// # fn main() {
-/// let _0d: Dimensions = ().into();
-/// let _1d_value: Dimensions = 42.into();
-/// let _1d_tuple: Dimensions = (42,).into();
-/// let _2d: Dimensions = (42, 6).into();
-/// let _nd: Dimensions = [42, 6, 12, 3].as_ref().into();
-/// # }
-/// ```
-#[derive(Clone)]
-pub enum Dimensions {
-    #[doc(hidden)]
-    Few([usize; 4]),
-    #[doc(hidden)]
-    Many(Box<[usize]>),
-}
-
-impl Dimensions {
-    pub(crate) unsafe fn from_array(array: *mut jl_array_t) -> Self {
-        let n_dims = jl_array_ndims(array);
-        match n_dims {
-            0 => Into::into(()),
-            1 => Into::into(jl_array_nrows(array) as usize),
-            2 => Into::into((jl_array_dim(array, 0), jl_array_dim(array, 1))),
-            3 => Into::into((
-                jl_array_dim(array, 0),
-                jl_array_dim(array, 1),
-                jl_array_dim(array, 2),
-            )),
-            ndims => Into::into(jl_array_dims(array, ndims as _)),
-        }
-    }
-
-    /// Returns the number of dimensions.
-    pub fn n_dimensions(&self) -> usize {
-        match self {
-            Dimensions::Few([n, _, _, _]) => *n,
-            Dimensions::Many(ref dims) => dims[0],
-        }
-    }
-
-    /// Returns the number of elements of the nth dimension. Indexing starts at 0.
-    pub fn n_elements(&self, dimension: usize) -> usize {
-        if self.n_dimensions() == 0 && dimension == 0 {
-            return 0;
-        }
-
-        assert!(dimension < self.n_dimensions());
-
-        let dims = match self {
-            Dimensions::Few(ref dims) => dims,
-            Dimensions::Many(ref dims) => dims.as_ref(),
-        };
-
-        dims[dimension as usize + 1]
-    }
-
-    /// The product of the number of elements of each dimension.
-    pub fn size(&self) -> usize {
-        if self.n_dimensions() == 0 {
-            return 0;
-        }
-
-        let dims = match self {
-            Dimensions::Few(ref dims) => &dims[1..dims[0] as usize + 1],
-            Dimensions::Many(ref dims) => &dims[1..dims[0] as usize + 1],
-        };
-        dims.iter().product()
-    }
-
-    /// Calculates the linear index of `dim_index` corresponding to a multidimensional array of
-    /// shape `self`. Returns an error if the index is not valid for this shape.
-    pub fn index_of<D: Into<Dimensions>>(&self, dim_index: D) -> JlrsResult<usize> {
-        let dim_index = dim_index.into();
-        self.check_bounds(&dim_index)?;
-
-        let idx = match self.n_dimensions() {
-            0 => 0,
-            _ => {
-                let mut d_it = dim_index.as_slice().iter().rev();
-                let acc = d_it.next().unwrap();
-
-                d_it.zip(self.as_slice().iter().rev().skip(1))
-                    .fold(*acc, |acc, (dim, sz)| dim + sz * acc)
-            }
-        };
-
-        Ok(idx)
-    }
-
-    /// Returns the raw dimensions as a slice.
-    pub fn as_slice(&self) -> &[usize] {
-        match self {
-            Dimensions::Few(ref v) => &v[1..v[0] as usize + 1],
-            Dimensions::Many(ref v) => &v[1..],
-        }
-    }
-
-    fn check_bounds(&self, dim_index: &Dimensions) -> JlrsResult<()> {
-        if self.n_dimensions() != dim_index.n_dimensions() {
-            Err(JlrsError::InvalidIndex(dim_index.clone(), self.clone()))?;
-        }
-
-        for i in 0..self.n_dimensions() {
-            if self.n_elements(i) < dim_index.n_elements(i) {
-                Err(JlrsError::InvalidIndex(dim_index.clone(), self.clone()))?;
-            }
-        }
-
-        Ok(())
-    }
-}
-
-impl Debug for Dimensions {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        let mut f = f.debug_tuple("");
-
-        for d in self.as_slice() {
-            f.field(&d);
-        }
-
-        f.finish()
-    }
-}
-
-impl Display for Dimensions {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        let mut f = f.debug_tuple("");
-
-        for d in self.as_slice() {
-            f.field(&d);
-        }
-
-        f.finish()
-    }
-}
-
-impl Into<Dimensions> for usize {
-    fn into(self) -> Dimensions {
-        Dimensions::Few([1, self, 0, 0])
-    }
-}
-
-impl Into<Dimensions> for () {
-    fn into(self) -> Dimensions {
-        Dimensions::Few([0, 0, 0, 0])
-    }
-}
-
-impl Into<Dimensions> for (usize,) {
-    fn into(self) -> Dimensions {
-        Dimensions::Few([1, self.0, 0, 0])
-    }
-}
-
-impl Into<Dimensions> for (usize, usize) {
-    fn into(self) -> Dimensions {
-        Dimensions::Few([2, self.0, self.1, 0])
-    }
-}
-
-impl Into<Dimensions> for (usize, usize, usize) {
-    fn into(self) -> Dimensions {
-        Dimensions::Few([3, self.0, self.1, self.2])
-    }
-}
-
-impl Into<Dimensions> for (usize, usize, usize, usize) {
-    fn into(self) -> Dimensions {
-        Dimensions::Many(Box::new([4, self.0, self.1, self.2, self.3]))
-    }
-}
-
-impl Into<Dimensions> for (usize, usize, usize, usize, usize) {
-    fn into(self) -> Dimensions {
-        Dimensions::Many(Box::new([5, self.0, self.1, self.2, self.3, self.4]))
-    }
-}
-
-impl Into<Dimensions> for (usize, usize, usize, usize, usize, usize) {
-    fn into(self) -> Dimensions {
-        Dimensions::Many(Box::new([
-            6, self.0, self.1, self.2, self.3, self.4, self.5,
-        ]))
-    }
-}
-
-impl Into<Dimensions> for (usize, usize, usize, usize, usize, usize, usize) {
-    fn into(self) -> Dimensions {
-        Dimensions::Many(Box::new([
-            7, self.0, self.1, self.2, self.3, self.4, self.5, self.6,
-        ]))
-    }
-}
-
-impl Into<Dimensions> for (usize, usize, usize, usize, usize, usize, usize, usize) {
-    fn into(self) -> Dimensions {
-        Dimensions::Many(Box::new([
-            8, self.0, self.1, self.2, self.3, self.4, self.5, self.6, self.7,
-        ]))
-    }
-}
-
-impl Into<Dimensions> for &[usize] {
-    fn into(self) -> Dimensions {
-        let nd = self.len();
-        let mut v: Vec<usize> = Vec::with_capacity(nd + 1);
-        v.push(nd);
-        v.extend_from_slice(self);
-        Dimensions::Many(v.into_boxed_slice())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::Dimensions;
-    #[test]
-    fn convert_usize() {
-        let d: Dimensions = 4.into();
-        assert_eq!(d.n_dimensions(), 1);
-        assert_eq!(d.n_elements(0), 4);
-        assert_eq!(d.size(), 4);
-    }
-
-    #[test]
-    fn convert_tuple_0d() {
-        let d: Dimensions = ().into();
-        assert_eq!(d.n_dimensions(), 0);
-        assert_eq!(d.n_elements(0), 0);
-        assert_eq!(d.size(), 0);
-    }
-
-    #[test]
-    fn convert_tuple_1d() {
-        let d: Dimensions = (4,).into();
-        assert_eq!(d.n_dimensions(), 1);
-        assert_eq!(d.n_elements(0), 4);
-        assert_eq!(d.size(), 4);
-    }
-
-    #[test]
-    fn convert_tuple_2d() {
-        let d: Dimensions = (4, 3).into();
-        assert_eq!(d.n_dimensions(), 2);
-        assert_eq!(d.n_elements(0), 4);
-        assert_eq!(d.n_elements(1), 3);
-        assert_eq!(d.size(), 12);
-    }
-
-    #[test]
-    fn convert_tuple_3d() {
-        let d: Dimensions = (4, 3, 2).into();
-        assert_eq!(d.n_dimensions(), 3);
-        assert_eq!(d.n_elements(0), 4);
-        assert_eq!(d.n_elements(1), 3);
-        assert_eq!(d.n_elements(2), 2);
-        assert_eq!(d.size(), 24);
-    }
-
-    #[test]
-    fn convert_tuple_4d() {
-        let d: Dimensions = (4, 3, 2, 1).into();
-        assert_eq!(d.n_dimensions(), 4);
-        assert_eq!(d.n_elements(0), 4);
-        assert_eq!(d.n_elements(1), 3);
-        assert_eq!(d.n_elements(2), 2);
-        assert_eq!(d.n_elements(3), 1);
-        assert_eq!(d.size(), 24);
-    }
-
-    #[test]
-    fn convert_tuple_5d() {
-        let d: Dimensions = (4, 3, 2, 1, 2).into();
-        assert_eq!(d.n_dimensions(), 5);
-        assert_eq!(d.n_elements(0), 4);
-        assert_eq!(d.n_elements(1), 3);
-        assert_eq!(d.n_elements(2), 2);
-        assert_eq!(d.n_elements(3), 1);
-        assert_eq!(d.n_elements(4), 2);
-        assert_eq!(d.size(), 48);
-    }
-
-    #[test]
-    fn convert_tuple_6d() {
-        let d: Dimensions = (4, 3, 2, 1, 2, 3).into();
-        assert_eq!(d.n_dimensions(), 6);
-        assert_eq!(d.n_elements(0), 4);
-        assert_eq!(d.n_elements(1), 3);
-        assert_eq!(d.n_elements(2), 2);
-        assert_eq!(d.n_elements(3), 1);
-        assert_eq!(d.n_elements(4), 2);
-        assert_eq!(d.n_elements(5), 3);
-        assert_eq!(d.size(), 144);
-    }
-
-    #[test]
-    fn convert_tuple_7d() {
-        let d: Dimensions = (4, 3, 2, 1, 2, 3, 2).into();
-        assert_eq!(d.n_dimensions(), 7);
-        assert_eq!(d.n_elements(0), 4);
-        assert_eq!(d.n_elements(1), 3);
-        assert_eq!(d.n_elements(2), 2);
-        assert_eq!(d.n_elements(3), 1);
-        assert_eq!(d.n_elements(4), 2);
-        assert_eq!(d.n_elements(5), 3);
-        assert_eq!(d.n_elements(6), 2);
-        assert_eq!(d.size(), 288);
-    }
-
-    #[test]
-    fn convert_tuple_8d() {
-        let d: Dimensions = (4, 3, 2, 1, 2, 3, 2, 4).into();
-        assert_eq!(d.n_dimensions(), 8);
-        assert_eq!(d.n_elements(0), 4);
-        assert_eq!(d.n_elements(1), 3);
-        assert_eq!(d.n_elements(2), 2);
-        assert_eq!(d.n_elements(3), 1);
-        assert_eq!(d.n_elements(4), 2);
-        assert_eq!(d.n_elements(5), 3);
-        assert_eq!(d.n_elements(6), 2);
-        assert_eq!(d.n_elements(7), 4);
-        assert_eq!(d.size(), 1152);
-    }
-
-    #[test]
-    fn convert_tuple_nd() {
-        let v = [1, 2, 3];
-        let d: Dimensions = v.as_ref().into();
-        assert_eq!(d.n_dimensions(), 3);
-        assert_eq!(d.n_elements(0), 1);
-        assert_eq!(d.n_elements(1), 2);
-        assert_eq!(d.n_elements(2), 3);
-        assert_eq!(d.size(), 6);
     }
 }

@@ -8,7 +8,7 @@
 use super::{wrapper_ref::ValueRef, Value};
 use crate::convert::cast::Cast;
 use crate::error::{JlrsError, JlrsResult};
-use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
+use crate::{impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_typemap_level_t, jl_typemap_level_type};
 use std::{
     fmt::{Debug, Formatter, Result as FmtResult},
@@ -89,7 +89,7 @@ impl<'scope> Debug for TypeMapLevel<'scope> {
 
 impl<'frame> Into<Value<'frame, 'static>> for TypeMapLevel<'frame> {
     fn into(self) -> Value<'frame, 'static> {
-        unsafe { Value::wrap(self.inner().as_ptr().cast()) }
+        unsafe { Value::wrap_non_null(self.inner().cast()) }
     }
 }
 
@@ -109,5 +109,5 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for TypeMapLevel<'frame> {
 }
 
 impl_julia_typecheck!(TypeMapLevel<'frame>, jl_typemap_level_type, 'frame);
-impl_julia_type!(TypeMapLevel<'frame>, jl_typemap_level_type, 'frame);
+
 impl_valid_layout!(TypeMapLevel<'frame>, 'frame);

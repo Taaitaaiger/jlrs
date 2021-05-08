@@ -1,6 +1,6 @@
 //! Everything related to errors.
 
-use crate::value::{array::Dimensions, Value};
+use crate::value::{array::dimensions::Dimensions, Value};
 use std::error::Error;
 use std::fmt::{Display, Formatter, Result as FmtResult};
 
@@ -22,6 +22,7 @@ pub enum JlrsError {
     NotAnArray,
     NotAUnionArray,
     Nothing,
+    NotAType,
     NotADataType,
     NotAMethod,
     NotAMethodInstance,
@@ -168,6 +169,7 @@ impl Display for JlrsError {
                 "The JULIA_NUM_THREADS environment variable must be set to a value larger than 1"
             ),
             JlrsError::NotADataType => write!(formatter, "This is not a datatype"),
+            JlrsError::NotAType => write!(formatter, "This is not a type"),
             JlrsError::NotAMethod => write!(formatter, "This is not a method"),
             JlrsError::NotASymbol => write!(formatter, "This is not a symbol"),
             JlrsError::NotAModule(module) => write!(formatter, "{} is not a module", module),

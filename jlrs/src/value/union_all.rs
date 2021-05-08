@@ -9,7 +9,7 @@ use crate::convert::cast::Cast;
 use crate::error::{JlrsError, JlrsResult};
 use crate::memory::global::Global;
 use crate::value::datatype::DataType;
-use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
+use crate::{impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{
     jl_abstractarray_type, jl_anytuple_type_type, jl_array_type, jl_densearray_type,
     jl_llvmpointer_type, jl_namedtuple_type, jl_pointer_type, jl_ref_type, jl_type_type,
@@ -144,7 +144,7 @@ impl<'scope> Debug for UnionAll<'scope> {
 
 impl<'frame> Into<Value<'frame, 'static>> for UnionAll<'frame> {
     fn into(self) -> Value<'frame, 'static> {
-        unsafe { Value::wrap(self.inner().as_ptr().cast()) }
+        unsafe { Value::wrap_non_null(self.inner().cast()) }
     }
 }
 
@@ -164,5 +164,5 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for UnionAll<'frame> {
 }
 
 impl_julia_typecheck!(UnionAll<'frame>, jl_unionall_type, 'frame);
-impl_julia_type!(UnionAll<'frame>, jl_unionall_type, 'frame);
+
 impl_valid_layout!(UnionAll<'frame>, 'frame);

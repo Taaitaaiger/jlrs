@@ -52,7 +52,7 @@ impl<'scope, 'frame, 'data, 'inner> AsUnrooted<'scope, 'frame, 'data, 'inner>
 }
 
 mod private {
-    use crate::{prelude::JuliaResult, value::Value};
+    use crate::{error::JuliaResult, value::Value};
 
     pub trait AsUnrooted {}
     impl<'frame, 'data> AsUnrooted for Value<'frame, 'data> {}

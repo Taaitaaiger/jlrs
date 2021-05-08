@@ -12,9 +12,10 @@ fn create_and_unbox_str_data() {
             .scope_with_slots(1, |_, frame| {
                 frame.scope_with_slots(1, |frame| {
                     let string = Value::new(frame, "Hellõ world!")?;
-                    string.cast::<String>()
+                    string.unbox::<String>()
                 })
             })
+            .unwrap()
             .unwrap();
 
         assert_eq!(unwrapped_string, "Hellõ world!");
@@ -30,9 +31,10 @@ fn create_and_unbox_string_data() {
             .scope_with_slots(1, |_, frame| {
                 frame.scope_with_slots(1, |frame| {
                     let string = Value::new(frame, String::from("Hellõ world!"))?;
-                    string.cast::<String>()
+                    string.unbox::<String>()
                 })
             })
+            .unwrap()
             .unwrap();
 
         assert_eq!(unwrapped_string, "Hellõ world!");
@@ -48,9 +50,10 @@ fn create_and_unbox_cow_data() {
             .scope_with_slots(1, |_, frame| {
                 frame.scope_with_slots(1, |frame| {
                     let string = Value::new(frame, Cow::from("Hellõ world!"))?;
-                    string.cast::<String>()
+                    string.unbox::<String>()
                 })
             })
+            .unwrap()
             .unwrap();
 
         assert_eq!(unwrapped_string, "Hellõ world!");

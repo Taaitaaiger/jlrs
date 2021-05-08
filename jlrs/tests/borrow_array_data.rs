@@ -43,7 +43,7 @@ macro_rules! impl_test {
                                     let v = gi
                                         .call(&mut *frame, &mut [array, *first, *second, *third])?
                                         .unwrap();
-                                    assert_eq!(v.cast::<$value_type>()?, out);
+                                    assert_eq!(v.unbox::<$value_type>()?, out);
                                     out += 1 as $value_type;
                                     Ok(())
                                 })?;
@@ -95,7 +95,7 @@ macro_rules! impl_test {
                                     let v = gi
                                         .call(&mut *frame, &mut [array, *first, *second, *third])?
                                         .unwrap();
-                                    assert_eq!(v.cast::<$value_type>()?, out);
+                                    assert_eq!(v.unbox::<$value_type>()?, out);
                                     out += 1 as $value_type;
                                     Ok(())
                                 })?;
@@ -269,7 +269,7 @@ fn borrow_nested() {
                                 let v = gi
                                     .call(&mut *frame, &mut [array, *first, *second, *third])?
                                     .unwrap();
-                                assert_eq!(v.cast::<u8>()?, out);
+                                assert_eq!(v.unbox::<u8>()?, out);
                                 out += 1 as u8;
                                 Ok(())
                             })?;
@@ -403,7 +403,7 @@ fn value_data_mut() {
                     .unwrap()
                     .cast::<Array>()?;
                 let mut data = arr.value_data_mut(&mut *frame)?;
-                data.set(0, submod.into())?;
+                data.set(0, submod.as_value().as_ref())?;
 
                 let getindex = Module::base(global).function("getindex")?;
                 let idx = Value::new(&mut *frame, 1usize)?;
@@ -442,8 +442,8 @@ fn unrestricted_value_data_mut() {
 
                 let mut data1 = arr1.unrestricted_value_data_mut(&*frame)?;
                 let mut data2 = arr2.unrestricted_value_data_mut(&*frame)?;
-                data1.set(0, submod.into())?;
-                data2.set(1, submod.into())?;
+                data1.set(0, submod.as_value().as_ref())?;
+                data2.set(1, submod.as_value().as_ref())?;
 
                 let getindex = Module::base(global).function("getindex")?;
                 let idx1 = Value::new(&mut *frame, 1usize)?;
@@ -502,7 +502,7 @@ fn typed_array_value_data_mut() {
                     .unwrap()
                     .cast::<TypedArray<Module>>()?;
                 let mut data = arr.value_data_mut(&mut *frame)?;
-                data.set(0, submod.into())?;
+                data.set(0, submod.as_value().as_ref())?;
 
                 let getindex = Module::base(global).function("getindex")?;
                 let idx = Value::new(&mut *frame, 1usize)?;
@@ -541,8 +541,8 @@ fn typed_array_unrestricted_value_data_mut() {
 
                 let mut data1 = arr1.unrestricted_value_data_mut(&*frame)?;
                 let mut data2 = arr2.unrestricted_value_data_mut(&*frame)?;
-                data1.set(0, submod.into())?;
-                data2.set(1, submod.into())?;
+                data1.set(0, submod.as_value().as_ref())?;
+                data2.set(1, submod.as_value().as_ref())?;
 
                 let getindex = Module::base(global).function("getindex")?;
                 let idx1 = Value::new(&mut *frame, 1usize)?;

@@ -16,7 +16,7 @@ fn nested_value_scope() {
                             Value::new(output, 1usize)
                         })
                 })?
-                .cast::<usize>()
+                .unbox::<usize>()
         });
 
         assert_eq!(out.unwrap(), 1);
@@ -42,7 +42,7 @@ fn nested_result_scope() {
                         })
                 })?
                 .unwrap()
-                .cast::<usize>()
+                .unbox::<usize>()
         });
 
         assert_eq!(out.unwrap(), 3);

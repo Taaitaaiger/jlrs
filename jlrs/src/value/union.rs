@@ -6,7 +6,7 @@ use crate::{
     convert::cast::Cast,
     error::{JlrsError, JlrsResult},
 };
-use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
+use crate::{impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_islayout_inline, jl_uniontype_t, jl_uniontype_type};
 use std::{
     fmt::{Debug, Formatter, Result as FmtResult},
@@ -94,7 +94,7 @@ impl<'scope> Debug for Union<'scope> {
 
 impl<'frame> Into<Value<'frame, 'static>> for Union<'frame> {
     fn into(self) -> Value<'frame, 'static> {
-        unsafe { Value::wrap(self.inner().as_ptr().cast()) }
+        unsafe { Value::wrap_non_null(self.inner().cast()) }
     }
 }
 
@@ -114,7 +114,7 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for Union<'frame> {
 }
 
 impl_julia_typecheck!(Union<'frame>, jl_uniontype_type, 'frame);
-impl_julia_type!(Union<'frame>, jl_uniontype_type, 'frame);
+
 impl_valid_layout!(Union<'frame>, 'frame);
 
 /// Ensures the next field is aligned to 1 byte.
@@ -199,4 +199,52 @@ pub unsafe fn correct_layout_for<A: Align, B: BU, F: Flag>(u: Union) -> bool {
     }
 
     A::ALIGNMENT == jl_align && std::mem::size_of::<B>() == jl_sz
+}
+
+pub(crate) fn nth_union_component<'frame, 'data>(
+    v: Value<'frame, 'data>,
+    pi: &mut i32,
+) -> Option<Value<'frame, 'data>> {
+    match v.cast::<Union>() {
+        Ok(un) => {
+            let a = nth_union_component(un.a(), pi);
+            if a.is_some() {
+                a
+            } else {
+                *pi -= 1;
+                return nth_union_component(un.b(), pi);
+            }
+        }
+        Err(_) => {
+            if *pi == 0 {
+                Some(v)
+            } else {
+                None
+            }
+        }
+    }
+}
+
+pub(crate) fn find_union_component(haystack: Value, needle: Value, nth: &mut u32) -> bool {
+    unsafe {
+        match haystack.cast::<Union>() {
+            Ok(hs) => {
+                if find_union_component(hs.a(), needle, nth) {
+                    true
+                } else if find_union_component(hs.b(), needle, nth) {
+                    true
+                } else {
+                    false
+                }
+            }
+            Err(_) => {
+                if needle.inner() == haystack.inner() {
+                    return true;
+                } else {
+                    *nth += 1;
+                    false
+                }
+            }
+        }
+    }
 }

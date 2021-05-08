@@ -7,7 +7,7 @@ use crate::{
     error::{JlrsError, JlrsResult},
     memory::{global::Global, traits::frame::Frame},
 };
-use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
+use crate::{impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{
     jl_alloc_svec, jl_alloc_svec_uninit, jl_emptysvec, jl_gc_wb, jl_simplevector_type,
     jl_svec_data, jl_svec_t,
@@ -126,7 +126,7 @@ impl<'scope, T: Wrapper<'scope, 'static>> Debug for SimpleVector<'scope, T> {
 
 impl<'frame, T: Wrapper<'frame, 'static>> Into<Value<'frame, 'static>> for SimpleVector<'frame, T> {
     fn into(self) -> Value<'frame, 'static> {
-        unsafe { Value::wrap(self.inner().as_ptr().cast()) }
+        unsafe { Value::wrap_non_null(self.inner().cast()) }
     }
 }
 
@@ -146,5 +146,5 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for SimpleVector<'frame, Value<'f
 }
 
 impl_julia_typecheck!(SimpleVector<'frame, Value<'frame, 'static>>, jl_simplevector_type, 'frame);
-impl_julia_type!(SimpleVector<'frame, Value<'frame, 'static>>, jl_simplevector_type, 'frame);
+
 impl_valid_layout!(SimpleVector<'frame, Value<'frame, 'static>>, 'frame);

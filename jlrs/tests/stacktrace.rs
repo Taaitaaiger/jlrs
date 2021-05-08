@@ -32,7 +32,7 @@ fn bounds_error() {
                 let base = getindex.call2(&mut *frame, stacktrace?, idx)?.unwrap();
                 assert!(base
                     .get_field(&mut *frame, "from_c")?
-                    .cast::<bool>()
+                    .unbox::<bool>()
                     .is_ok());
 
                 Ok(())

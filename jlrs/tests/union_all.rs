@@ -26,7 +26,7 @@ fn create_new_unionall() {
                     atype.var().assume_reachable_value_unchecked()
                 })?
                 .unwrap()
-                .cast::<bool>()?;
+                .unbox::<bool>()?;
             assert!(equals);
             Ok(())
         })
@@ -47,7 +47,7 @@ fn instantiate_unionall() {
                 .cast::<DataType>()?
                 .instantiate(&mut *frame, &mut [v])?
                 .get_field(&mut *frame, "a")?
-                .cast::<i8>()?;
+                .unbox::<i8>()?;
 
             assert_eq!(out, 3);
             Ok(())
@@ -82,8 +82,8 @@ fn apply_value_type() {
                 .submodule("JlrsTests")?
                 .function("valuedispatch")?;
 
-            let o1 = func.call1(&mut *frame, v1)?.unwrap().cast::<isize>()?;
-            let o2 = func.call1(&mut *frame, v2)?.unwrap().cast::<f64>()?;
+            let o1 = func.call1(&mut *frame, v1)?.unwrap().unbox::<isize>()?;
+            let o2 = func.call1(&mut *frame, v2)?.unwrap().unbox::<f64>()?;
 
             assert_eq!(o1, 3isize);
             assert_eq!(o2, 3.0f64);

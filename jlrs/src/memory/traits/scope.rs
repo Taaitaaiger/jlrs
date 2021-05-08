@@ -55,7 +55,7 @@ where
     ///               .function("+")?
     ///               .call2(&mut *frame, v1, v2)?
     ///               .unwrap()
-    ///               .cast::<usize>()
+    ///               .unbox::<usize>()
     ///       })?;
     ///
     ///       assert_eq!(sum, 3);
@@ -89,7 +89,7 @@ where
     ///               .function("+")?
     ///               .call2(&mut *frame, v1, v2)?
     ///               .unwrap()
-    ///               .cast::<usize>()
+    ///               .unbox::<usize>()
     ///       })?;
     ///
     ///       assert_eq!(sum, 3);
@@ -228,7 +228,7 @@ pub trait Scope<'scope, 'frame, 'data, F: Frame<'frame>>:
     ///
     ///           let output = output.into_scope(frame);
     ///           add.call2(output, v1, v2)
-    ///       })?.unwrap().cast::<usize>()?;
+    ///       })?.unwrap().unbox::<usize>()?;
     ///
     ///       assert_eq!(sum, 3);
     ///       Ok(())
@@ -304,7 +304,7 @@ pub trait Scope<'scope, 'frame, 'data, F: Frame<'frame>>:
     ///
     ///           let output = output.into_scope(frame);
     ///           add.call2(output, v1, v2)
-    ///       })?.unwrap().cast::<usize>()?;
+    ///       })?.unwrap().unbox::<usize>()?;
     ///
     ///       assert_eq!(sum, 3);
     ///       Ok(())
@@ -379,7 +379,7 @@ impl<'frame, 'data, F: Frame<'frame>> Scope<'frame, 'frame, 'data, F> for &mut F
     ///               .function("+")?
     ///               .call2(output, v1, v2)
     ///       })?.unwrap()
-    ///           .cast::<usize>()?;
+    ///           .unbox::<usize>()?;
     ///
     ///       assert_eq!(sum, 3);
     ///       Ok(())
@@ -455,7 +455,7 @@ impl<'frame, 'data, F: Frame<'frame>> Scope<'frame, 'frame, 'data, F> for &mut F
     ///               .function("+")?
     ///               .call2(output, v1, v2)
     ///       })?.unwrap()
-    ///           .cast::<usize>()?;
+    ///           .unbox::<usize>()?;
     ///
     ///       assert_eq!(sum, 3);
     ///       Ok(())

@@ -8,7 +8,7 @@ use super::wrapper_ref::{CodeInstanceRef, SimpleVectorRef, ValueRef};
 use super::Value;
 use crate::convert::cast::Cast;
 use crate::error::{JlrsError, JlrsResult};
-use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
+use crate::{impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_method_instance_t, jl_method_instance_type};
 use std::{
     fmt::{Debug, Formatter, Result as FmtResult},
@@ -102,7 +102,7 @@ impl<'scope> Debug for MethodInstance<'scope> {
 
 impl<'frame> Into<Value<'frame, 'static>> for MethodInstance<'frame> {
     fn into(self) -> Value<'frame, 'static> {
-        unsafe { Value::wrap(self.inner().as_ptr().cast()) }
+        unsafe { Value::wrap_non_null(self.inner().cast()) }
     }
 }
 
@@ -122,5 +122,5 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for MethodInstance<'frame> {
 }
 
 impl_julia_typecheck!(MethodInstance<'frame>, jl_method_instance_type, 'frame);
-impl_julia_type!(MethodInstance<'frame>, jl_method_instance_type, 'frame);
+
 impl_valid_layout!(MethodInstance<'frame>, 'frame);

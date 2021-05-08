@@ -12,7 +12,7 @@ use crate::{
     },
     value::symbol::Symbol,
 };
-use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
+use crate::{impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{
     jl_base_module, jl_core_module, jl_get_global, jl_main_module, jl_module_t, jl_module_type,
     jl_set_const, jl_set_global, jl_typeis,
@@ -238,7 +238,7 @@ impl<'base> Module<'base> {
 
     /// Convert `self` to a `LeakedValue`.
     pub fn as_leaked(self) -> LeakedValue {
-        unsafe { LeakedValue::wrap(self.inner().as_ptr().cast()) }
+        unsafe { LeakedValue::wrap_non_null(self.inner().cast()) }
     }
 
     /// Load a module by calling `Base.require` and return this module if it has been loaded
@@ -295,7 +295,7 @@ impl<'base> Module<'base> {
 
 impl<'base> Into<Value<'base, 'static>> for Module<'base> {
     fn into(self) -> Value<'base, 'static> {
-        unsafe { Value::wrap(self.inner().as_ptr().cast()) }
+        unsafe { Value::wrap_non_null(self.inner().cast()) }
     }
 }
 
@@ -315,7 +315,7 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for Module<'frame> {
 }
 
 impl_julia_typecheck!(Module<'frame>, jl_module_type, 'frame);
-impl_julia_type!(Module<'frame>, jl_module_type, 'frame);
+
 impl_valid_layout!(Module<'frame>, 'frame);
 
 impl<'frame, 'data> Debug for Module<'frame> {

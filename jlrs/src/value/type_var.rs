@@ -10,7 +10,7 @@ use crate::{
     error::{JlrsError, JlrsResult},
     memory::traits::frame::Frame,
 };
-use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
+use crate::{impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_any_type, jl_bottom_type, jl_new_typevar, jl_tvar_t, jl_tvar_type};
 use std::{
     fmt::{Debug, Formatter, Result as FmtResult},
@@ -125,7 +125,7 @@ impl<'scope> Debug for TypeVar<'scope> {
 
 impl<'frame> Into<Value<'frame, 'static>> for TypeVar<'frame> {
     fn into(self) -> Value<'frame, 'static> {
-        unsafe { Value::wrap(self.inner().as_ptr().cast()) }
+        unsafe { Value::wrap_non_null(self.inner().cast()) }
     }
 }
 
@@ -145,5 +145,5 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for TypeVar<'frame> {
 }
 
 impl_julia_typecheck!(TypeVar<'frame>, jl_tvar_type, 'frame);
-impl_julia_type!(TypeVar<'frame>, jl_tvar_type, 'frame);
+
 impl_valid_layout!(TypeVar<'frame>, 'frame);

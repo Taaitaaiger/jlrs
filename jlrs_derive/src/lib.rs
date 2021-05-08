@@ -106,20 +106,6 @@ fn impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
     }
 
     let generics = &ast.generics;
-    let jl_type = corresponding_julia_type(ast).expect("JuliaStruct can only be derived if the corresponding Julia type is set with #[julia_type = \"Main.MyModule.Submodule.StructType\"]");
-    let mut type_it = jl_type.split('.');
-    let func = match type_it.next() {
-        Some("Main") => quote::format_ident!("main"),
-        Some("Base") => quote::format_ident!("base"),
-        Some("Core") => quote::format_ident!("core"),
-        _ => panic!("JuliaStruct can only be derived if the first module of \"julia_type\" is either \"Main\", \"Base\" or \"Core\"."),
-    };
-
-    let mut modules = type_it.collect::<Vec<_>>();
-    let ty = modules.pop().expect("JuliaStruct can only be derived if the corresponding Julia type is set with #[jlrs(julia_type = \"Main.MyModule.Submodule.StructType\")]");
-    let modules_it = modules.iter();
-    let modules_it_b = modules_it.clone();
-
     let mut missing_lifetimes = MissingLifetimes(Vec::with_capacity(2));
 
     let data_lt = generics
@@ -200,43 +186,11 @@ fn impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
             }
         }
 
-        unsafe impl #generics ::jlrs::layout::julia_type::JuliaType for #name #generics #where_clause {
-            unsafe fn julia_type() -> *mut ::jlrs::jl_sys_export::jl_datatype_t {
-                let global = ::jlrs::memory::global::Global::new();
-
-                let julia_type = ::jlrs::value::module::Module::#func(global)
-                    #(.submodule(#modules_it).expect(&format!("Submodule {} cannot be found", #modules_it_b)))*
-                    .global(#ty).expect(&format!("Type {} cannot be found in module", #ty));
-
-                if let Ok(dt) = julia_type.cast::<::jlrs::value::datatype::DataType>() {
-                    dt.inner().as_ptr()
-                } else if let Ok(ua) = julia_type.cast::<::jlrs::value::union_all::UnionAll>() {
-                    ua.base_type().assume_reachable_unchecked().inner().as_ptr()
-                } else {
-                    panic!("Invalid type: {:?}", julia_type.datatype());
-                }
-            }
-        }
-
-        unsafe impl #extended_generics ::jlrs::convert::cast::Cast<'frame, 'data> for #name #generics #where_clause {
+        unsafe impl #generics ::jlrs::convert::unbox::UnboxFn for #name #generics #where_clause {
             type Output = Self;
 
-            fn cast(value: ::jlrs::value::Value<'frame, 'data>) -> ::jlrs::error::JlrsResult<Self::Output> {
-                if value.is::<::jlrs::value::datatype::Nothing>() {
-                    Err(::jlrs::error::JlrsError::Nothing)?
-                }
-
-                unsafe {
-                    if <Self as ::jlrs::layout::valid_layout::ValidLayout>::valid_layout(value.datatype().as_value()) {
-                        return Ok(Self::cast_unchecked(value));
-                    }
-                }
-
-                Err(::jlrs::error::JlrsError::WrongType)?
-            }
-
-            unsafe fn cast_unchecked(value: ::jlrs::value::Value<'frame, 'data>) -> Self::Output {
-                *(value.inner().as_ptr().cast::<Self::Output>())
+            unsafe fn call_unboxer(value: ::jlrs::value::Value) -> Self {
+                value.inner().as_ptr().cast::<Self>().read()
             }
         }
     };
@@ -251,15 +205,36 @@ fn impl_into_julia(ast: &syn::DeriveInput) -> TokenStream {
         panic!("IntoJulia can only be derived for types with the attribute #[repr(C)].");
     }
 
+    let jl_type = corresponding_julia_type(ast).expect("JuliaStruct can only be derived if the corresponding Julia type is set with #[julia_type = \"Main.MyModule.Submodule.StructType\"]");
+    let mut type_it = jl_type.split('.');
+    let func = match type_it.next() {
+        Some("Main") => quote::format_ident!("main"),
+        Some("Base") => quote::format_ident!("base"),
+        Some("Core") => quote::format_ident!("core"),
+        _ => panic!("JuliaStruct can only be derived if the first module of \"julia_type\" is either \"Main\", \"Base\" or \"Core\"."),
+    };
+
+    let mut modules = type_it.collect::<Vec<_>>();
+    let ty = modules.pop().expect("JuliaStruct can only be derived if the corresponding Julia type is set with #[jlrs(julia_type = \"Main.MyModule.Submodule.StructType\")]");
+    let modules_it = modules.iter();
+    let modules_it_b = modules_it.clone();
+
     let into_julia_impl = quote! {
         unsafe impl ::jlrs::convert::into_julia::IntoJulia for #name {
-            unsafe fn into_julia(&self) -> *mut ::jlrs::jl_sys_export::jl_value_t {
-                let ty = <Self as ::jlrs::layout::julia_type::JuliaType>::julia_type();
-                let container = ::jlrs::jl_sys_export::jl_new_struct_uninit(ty.cast());
-                let data: *mut Self = container.cast();
-                ::std::ptr::write(data, *self);
+            unsafe fn julia_type() -> *mut ::jlrs::jl_sys_export::jl_datatype_t {
+                let global = ::jlrs::memory::global::Global::new();
 
-                container
+                let julia_type = ::jlrs::value::module::Module::#func(global)
+                    #(.submodule(#modules_it).expect(&format!("Submodule {} cannot be found", #modules_it_b)))*
+                    .global(#ty).expect(&format!("Type {} cannot be found in module", #ty));
+
+                if let Ok(dt) = julia_type.cast::<::jlrs::value::datatype::DataType>() {
+                    dt.inner().as_ptr()
+                } else if let Ok(ua) = julia_type.cast::<::jlrs::value::union_all::UnionAll>() {
+                    ua.base_type().assume_reachable_unchecked().inner().as_ptr()
+                } else {
+                    panic!("Invalid type: {:?}", julia_type);
+                }
             }
         }
     };

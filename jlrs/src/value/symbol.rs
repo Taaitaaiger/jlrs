@@ -6,7 +6,7 @@ use crate::{
     error::{JlrsError, JlrsResult},
     memory::global::Global,
 };
-use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
+use crate::{impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_sym_t, jl_symbol_n, jl_symbol_name, jl_symbol_type};
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::marker::PhantomData;
@@ -108,7 +108,7 @@ impl<'base> Symbol<'base> {
 
     /// Convert `self` to a `LeakedValue`.
     pub fn as_leaked(self) -> LeakedValue {
-        unsafe { LeakedValue::wrap(self.inner().as_ptr().cast()) }
+        unsafe { LeakedValue::wrap_non_null(self.inner().cast()) }
     }
 
     /// Convert `self` to a `String`.
@@ -144,7 +144,7 @@ impl<'base> TryInto<&'base str> for Symbol<'base> {
 
 impl<'base> Into<Value<'base, 'static>> for Symbol<'base> {
     fn into(self) -> Value<'base, 'static> {
-        unsafe { Value::wrap(self.inner().as_ptr().cast()) }
+        unsafe { Value::wrap_non_null(self.inner().cast()) }
     }
 }
 
@@ -188,5 +188,5 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for Symbol<'frame> {
 }
 
 impl_julia_typecheck!(Symbol<'frame>, jl_symbol_type, 'frame);
-impl_julia_type!(Symbol<'frame>, jl_symbol_type, 'frame);
+
 impl_valid_layout!(Symbol<'frame>, 'frame);

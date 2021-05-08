@@ -14,7 +14,7 @@
 //!     let tup = Tuple2(2i32, true);
 //!     let val = Value::new(frame, tup)?;
 //!     assert!(val.is::<Tuple2<i32, bool>>());
-//!     assert!(val.cast::<Tuple2<i32, bool>>().is_ok());
+//!     assert!(val.unbox::<Tuple2<i32, bool>>().is_ok());
 //!     Ok(())
 //! }).unwrap();
 //! # });
@@ -59,23 +59,11 @@ macro_rules! impl_tuple {
         #[derive(Copy, Clone, Debug, PartialEq)]
         pub struct $name<$($types),+>($(pub $types),+);
 
-        unsafe impl<$($types),+> $crate::layout::julia_type::JuliaType for $name<$($types),+> where $($types: $crate::layout::julia_type::JuliaType),+
+        unsafe impl<$($types),+> $crate::convert::into_julia::IntoJulia for $name<$($types),+>  where $($types: $crate::convert::into_julia::IntoJulia + Copy),+
         {
             unsafe fn julia_type() -> *mut $crate::jl_sys_export::jl_datatype_t {
-                let types = &mut [$(<$types as $crate::layout::julia_type::JuliaType>::julia_type()),+];
+                let types = &mut [$(<$types as $crate::convert::into_julia::IntoJulia>::julia_type()),+];
                 $crate::jl_sys_export::jl_apply_tuple_type_v(types.as_mut_ptr().cast(), types.len())
-            }
-        }
-
-        unsafe impl<$($types),+> $crate::convert::into_julia::IntoJulia for $name<$($types),+>  where $($types: $crate::convert::into_julia::IntoJulia + $crate::layout::julia_type::JuliaType + Copy),+
-        {
-            unsafe fn into_julia(&self) -> *mut $crate::jl_sys_export::jl_value_t {
-                let ty = <Self as $crate::layout::julia_type::JuliaType>::julia_type();
-                let tuple = $crate::jl_sys_export::jl_new_struct_uninit(ty.cast());
-                let data: *mut Self = tuple.cast();
-                ::std::ptr::write(data, *self);
-
-                tuple
             }
         }
 
@@ -99,27 +87,17 @@ macro_rules! impl_tuple {
             }
         }
 
-        unsafe impl<'frame, 'data, $($types),+> $crate::convert::cast::Cast<'frame, 'data> for $name<$($types),+>  where $($types: $crate::layout::valid_layout::ValidLayout + Copy),+ {
+        unsafe impl<$($types),+> $crate::convert::unbox::UnboxFn for $name<$($types),+>  where $($types: $crate::layout::valid_layout::ValidLayout + Copy),+ {
             type Output = Self;
 
-            fn cast(value: $crate::value::Value) -> $crate::error::JlrsResult<Self::Output> {
-                unsafe {
-                    if <Self::Output as $crate::layout::valid_layout::ValidLayout>::valid_layout(value.datatype().as_value()) {
-                        Ok(Self::cast_unchecked(value))
-                    } else {
-                        Err($crate::error::JlrsError::WrongType)?
-                    }
-                }
-            }
-
-            unsafe fn cast_unchecked(value: $crate::value::Value) -> Self::Output {
-                *(value.inner().as_ptr() as *mut Self::Output)
+            unsafe fn call_unboxer(value: $crate::value::Value) -> Self::Output {
+                value.inner().as_ptr().cast::<Self::Output>().read()
             }
         }
 
-        unsafe impl<$($types),+> $crate::layout::julia_typecheck::JuliaTypecheck for $name<$($types),+> where $($types: $crate::layout::julia_type::JuliaType),+ {
+        unsafe impl<$($types),+> $crate::layout::julia_typecheck::JuliaTypecheck for $name<$($types),+> where $($types: $crate::layout::valid_layout::ValidLayout + Copy),+ {
             unsafe fn julia_typecheck(t: $crate::value::datatype::DataType) -> bool {
-                t.inner().as_ptr() == <Self as $crate::layout::julia_type::JuliaType>::julia_type()
+                <Self as crate::layout::valid_layout::ValidLayout>::valid_layout(t.as_value())
             }
         }
     };
@@ -128,16 +106,13 @@ macro_rules! impl_tuple {
         #[derive(Copy, Clone, Debug)]
         pub struct $name();
 
-        unsafe impl $crate::value::JuliaType for $name
+        unsafe impl $crate::convert::into_julia::IntoJulia for $name
         {
             unsafe fn julia_type() -> *mut $crate::jl_sys_export::jl_datatype_t {
                 $crate::jl_sys_export::jl_emptytuple_type
             }
-        }
 
-        unsafe impl $crate::convert::into_julia::IntoJulia for $name
-        {
-            unsafe fn into_julia(&self) -> *mut $crate::jl_sys_export::jl_value_t {
+            unsafe fn into_julia(self) -> *mut $crate::jl_sys_export::jl_value_t {
                 $crate::jl_sys_export::jl_emptytuple
             }
         }
@@ -145,9 +120,7 @@ macro_rules! impl_tuple {
         unsafe impl $crate::layout::valid_layout::ValidLayout for $name {
             unsafe fn valid_layout(v: $crate::value::Value) -> bool {
                 if let Ok(dt) = v.cast::<$crate::value::datatype::DataType>() {
-                    if dt.is::<Self>() {
-                        return true;
-                    }
+                    return dt.inner().as_ptr() == ::jl_sys::jl_emptytuple_type
                 }
 
                 false
@@ -174,7 +147,7 @@ macro_rules! impl_tuple {
 
         unsafe impl $crate::layout::julia_typecheck::JuliaTypecheck for $name {
             unsafe fn julia_typecheck(t: $crate::value::datatype::DataType) -> bool {
-                t.inner().as_ptr() == <Self as $crate::layout::julia_type::JuliaType>::julia_type()
+                <Self as crate::layout::valid_layout::ValidLayout>::valid_layout(t.as_value())
             }
         }
     };

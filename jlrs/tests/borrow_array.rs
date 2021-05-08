@@ -158,7 +158,7 @@ fn call_function_with_borrowed() {
                     .function("sum")?
                     .call1(&mut *frame, array)?
                     .unwrap()
-                    .cast::<u64>()
+                    .unbox::<u64>()
             })
             .unwrap();
 

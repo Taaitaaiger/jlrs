@@ -86,23 +86,21 @@ macro_rules! named_tuple {
     };
 }
 
-use self::array::{Array, Dimensions};
+use self::array::{dimensions::Dimensions, Array};
 use self::module::Module;
 use self::symbol::Symbol;
 use self::type_var::TypeVar;
 use self::union_all::UnionAll;
 use self::{datatype::DataType, wrapper_ref::ValueRef};
-use crate::convert::{cast::Cast, temporary_symbol::TemporarySymbol};
+use crate::convert::into_julia::IntoJulia;
+use crate::convert::{cast::Cast, temporary_symbol::TemporarySymbol, unbox::UnboxFn};
 use crate::error::{JlrsError, JlrsResult, JuliaResult};
-use crate::layout::{
-    julia_type::JuliaType, julia_typecheck::JuliaTypecheck, valid_layout::ValidLayout,
-};
+use crate::layout::{julia_typecheck::JuliaTypecheck, valid_layout::ValidLayout};
 use crate::memory::global::Global;
 use crate::memory::traits::{
     frame::private::Frame as PNewFrame, frame::Frame, scope::private::Scope as PScope, scope::Scope,
 };
 use crate::private::Private;
-use crate::{convert::into_julia::IntoJulia, impl_julia_type};
 #[cfg(feature = "async")]
 use crate::{memory::frame::AsyncGcFrame, multitask::julia_future::JuliaFuture};
 use jl_sys::{
@@ -133,6 +131,7 @@ use std::slice;
 pub const MAX_SIZE: usize = 8;
 
 pub mod array;
+pub mod char;
 pub mod code_instance;
 pub mod datatype;
 pub mod expr;
@@ -195,12 +194,20 @@ impl<'frame, 'data> Value<'frame, 'data> {
         Value(NonNull::new_unchecked(ptr), PhantomData, PhantomData)
     }
 
+    pub(crate) unsafe fn wrap_non_null(inner: NonNull<jl_value_t>) -> Value<'frame, 'static> {
+        Value(inner, PhantomData, PhantomData)
+    }
+
     pub(crate) unsafe fn wrap_maybe_null(ptr: *mut jl_value_t) -> Option<Value<'frame, 'static>> {
         if ptr.is_null() {
             return None;
         }
 
         Some(Value(NonNull::new_unchecked(ptr), PhantomData, PhantomData))
+    }
+
+    pub fn as_ref(self) -> ValueRef<'frame, 'data> {
+        unsafe { ValueRef::wrap(self.inner().as_ptr()) }
     }
 
     #[doc(hidden)]
@@ -221,17 +228,14 @@ impl<'frame, 'data> Value<'frame, 'data> {
 /// Data that isn't supported by [`Value::new`] can still be created from Rust in many cases. New
 /// arrays can be created with [`Value::new_array`], if you want to have the array be backed by
 /// data from Rust [`Value::borrow_array`] and [`Value::move_array`] can be used. It's currently
-/// only possible to create new arrays if the element type implements [`IntoJulia`] and
-/// [`JuliaType`]. Methods to create new `UnionAll`s and `Union`s are also available.
+/// only possible to create new arrays if the element type implements [`IntoJulia`]. Methods to create new `UnionAll`s and `Union`s are also available.
 ///
 /// Finally, it's possible to instantiate arbitrary concrete types with [`Value::instantiate`],
 /// the type parameters of types that have them can be set with [`Value::apply_type`]. These
 /// methods don't support creating new arrays.
 impl<'frame, 'data> Value<'frame, 'data> {
     /// Create a new Julia value, any type that implements [`IntoJulia`] can be converted using
-    /// this function. The value will be protected from garbage collection inside the frame used
-    /// to create it. One free slot on the GC stack is required for this function to succeed,
-    /// returns an error if no slot is available.
+    /// this function.
     pub fn new<'scope, V, S, F>(scope: S, value: V) -> JlrsResult<S::Value>
     where
         V: IntoJulia,
@@ -260,16 +264,14 @@ impl<'frame, 'data> Value<'frame, 'data> {
         ty.instantiate(scope, values)
     }
 
-    /// Allocates a new n-dimensional array in Julia.
-    ///
-    /// Creating an an array with 1, 2 or 3 dimensions requires one slot on the GC stack. If you
-    /// create an array with more dimensions an extra frame is created with a single slot,
-    /// temporarily taking 3 additional slots.
-    ///
-    /// This function returns an error if there are not enough slots available.
+    /// Allocates a new n-dimensional array in Julia. This method can only be used in combination
+    /// with types that implement both `IntoJulia`. These traits are implemented
+    /// for primitive types like `u8` and `bool`, and can be derived with `JlrsReflect.jl`. You
+    /// should never implement these traits manually. If you want to create an array for a type
+    /// that does not implement these traits you can use [`Value::new_array_for`].
     pub fn new_array<'scope, T, D, S, F>(scope: S, dimensions: D) -> JlrsResult<S::Value>
     where
-        T: IntoJulia + JuliaType,
+        T: IntoJulia,
         D: Into<Dimensions>,
         S: Scope<'scope, 'frame, 'static, F>,
         F: Frame<'frame>,
@@ -315,20 +317,71 @@ impl<'frame, 'data> Value<'frame, 'data> {
         }
     }
 
+    /// Allocates a new n-dimensional array in Julia for elements of type `ty`, which must be a
+    /// `Union`, `UnionAll` or `DataType`.
+    pub fn new_array_for<'scope, D, S, F>(
+        scope: S,
+        dimensions: D,
+        ty: Value,
+    ) -> JlrsResult<S::Value>
+    where
+        D: Into<Dimensions>,
+        S: Scope<'scope, 'frame, 'static, F>,
+        F: Frame<'frame>,
+    {
+        if !ty.is_type() {
+            Err(JlrsError::NotAType)?
+        }
+
+        unsafe {
+            let dims = dimensions.into();
+            let array_type = jl_apply_array_type(ty.inner().as_ptr(), dims.n_dimensions());
+
+            match dims.n_dimensions() {
+                1 => scope.value(
+                    jl_alloc_array_1d(array_type, dims.n_elements(0)).cast(),
+                    Private,
+                ),
+                2 => scope.value(
+                    jl_alloc_array_2d(array_type, dims.n_elements(0), dims.n_elements(1)).cast(),
+                    Private,
+                ),
+                3 => scope.value(
+                    jl_alloc_array_3d(
+                        array_type,
+                        dims.n_elements(0),
+                        dims.n_elements(1),
+                        dims.n_elements(2),
+                    )
+                    .cast(),
+                    Private,
+                ),
+                n if n <= 8 => scope.value_scope_with_slots(1, |output, frame| {
+                    let tuple = small_dim_tuple(frame, &dims)?;
+                    output.into_scope(frame).value(
+                        jl_new_array(array_type, tuple.inner().as_ptr()).cast(),
+                        Private,
+                    )
+                }),
+                _ => scope.value_scope_with_slots(1, |output, frame| {
+                    let tuple = large_dim_tuple(frame, &dims)?;
+                    output.into_scope(frame).value(
+                        jl_new_array(array_type, tuple.inner().as_ptr()).cast(),
+                        Private,
+                    )
+                }),
+            }
+        }
+    }
+
     /// Borrows an n-dimensional array from Rust for use in Julia.
-    ///
-    /// Borrowing an array with one dimension requires one slot on the GC stack. If you borrow an
-    /// array with more dimensions, an extra frame is created with a single slot slot, temporarily
-    /// taking 3 additional slots.
-    ///
-    /// This function returns an error if there are not enough slots available.
     pub fn borrow_array<'scope, T, D, V, S, F>(
         scope: S,
         mut data: V,
         dimensions: D,
     ) -> JlrsResult<S::Value>
     where
-        T: IntoJulia + JuliaType,
+        T: IntoJulia,
         D: Into<Dimensions>,
         V: AsMut<[T]> + 'data,
         S: Scope<'scope, 'frame, 'data, F>,
@@ -380,19 +433,13 @@ impl<'frame, 'data> Value<'frame, 'data> {
     }
 
     /// Moves an n-dimensional array from Rust to Julia.
-    ///
-    /// Moving an array with one dimension requires one slot on the GC stack. If you move an array
-    /// with more dimensions, an extra frame is created with a single slot slot, temporarily
-    /// taking 3 additional slots.
-    ///
-    /// This function returns an error if there are not enough slots available.
     pub fn move_array<'scope, T, D, S, F>(
         scope: S,
         data: Vec<T>,
         dimensions: D,
     ) -> JlrsResult<S::Value>
     where
-        T: IntoJulia + JuliaType,
+        T: IntoJulia,
         D: Into<Dimensions>,
         S: Scope<'scope, 'frame, 'static, F>,
         F: Frame<'frame>,
@@ -609,9 +656,6 @@ impl<'frame, 'data> Value<'frame, 'data> {
     /// returned.
     ///
     /// If the types cannot be applied to `self` your program will abort.
-    ///
-    /// One free slot on the GC stack is required for this function to succeed, returns an error
-    /// if no slot is available.
     pub fn apply_type<'scope, 'fr, 'value, 'borrow, S, F, V>(
         self,
         scope: S,
@@ -793,6 +837,18 @@ impl<'frame, 'data> Value<'frame, 'data> {
         self,
     ) -> <T as Cast<'frame, 'data>>::Output {
         T::cast_unchecked(self)
+    }
+
+    pub fn unbox<T: UnboxFn + JuliaTypecheck>(self) -> JlrsResult<<T as UnboxFn>::Output> {
+        if !self.is::<T>() {
+            Err(JlrsError::WrongType)?;
+        }
+
+        unsafe { Ok(T::call_unboxer(self)) }
+    }
+
+    pub fn unbox_unchecked<T: UnboxFn>(self) -> <T as UnboxFn>::Output {
+        unsafe { T::call_unboxer(self) }
     }
 }
 
@@ -997,7 +1053,7 @@ impl<'fr, 'da> Value<'fr, 'da> {
     ///       let res = func.with_keywords(kw)
     ///           .call1(&mut *frame, a_value)?
     ///           .unwrap()
-    ///           .cast::<isize>()?;
+    ///           .unbox::<isize>()?;
     ///  
     ///       assert_eq!(res, 11);
     ///       Ok(())
@@ -1363,8 +1419,6 @@ impl<'frame, 'data> Debug for Value<'frame, 'data> {
     }
 }
 
-impl_julia_type!(Value<'frame, 'data>, jl_any_type, 'frame, 'data);
-
 unsafe impl<'frame, 'data> ValidLayout for Value<'frame, 'data> {
     unsafe fn valid_layout(v: Value) -> bool {
         if let Ok(dt) = v.cast::<DataType>() {
@@ -1538,6 +1592,10 @@ pub struct LeakedValue(Value<'static, 'static>);
 impl LeakedValue {
     pub(crate) unsafe fn wrap(ptr: *mut jl_value_t) -> Self {
         LeakedValue(Value::wrap(ptr))
+    }
+
+    pub(crate) unsafe fn wrap_non_null(ptr: NonNull<jl_value_t>) -> Self {
+        LeakedValue(Value::wrap_non_null(ptr))
     }
 
     /// Convert this [`LeakedValue`] back to a [`Value`]. This requires a [`Global`], so this

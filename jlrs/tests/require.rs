@@ -52,7 +52,7 @@ fn call_function_from_loaded_module() {
             let res = func
                 .call2(&mut *frame, arr1_v, arr2_v)?
                 .expect("Cannot call LinearAlgebra.dot")
-                .cast::<f64>()?;
+                .unbox::<f64>()?;
 
             assert_eq!(res, 8.0);
 

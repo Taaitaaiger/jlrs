@@ -11,7 +11,7 @@ use super::{
 };
 use crate::convert::cast::Cast;
 use crate::error::{JlrsError, JlrsResult};
-use crate::{impl_julia_type, impl_julia_typecheck, impl_valid_layout};
+use crate::{impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_methtable_t, jl_methtable_type};
 use std::{
     fmt::{Debug, Formatter, Result as FmtResult},
@@ -117,7 +117,7 @@ impl<'scope> Debug for MethodTable<'scope> {
 
 impl<'frame> Into<Value<'frame, 'static>> for MethodTable<'frame> {
     fn into(self) -> Value<'frame, 'static> {
-        unsafe { Value::wrap(self.inner().as_ptr().cast()) }
+        unsafe { Value::wrap_non_null(self.inner().cast()) }
     }
 }
 
@@ -137,5 +137,5 @@ unsafe impl<'frame, 'data> Cast<'frame, 'data> for MethodTable<'frame> {
 }
 
 impl_julia_typecheck!(MethodTable<'frame>, jl_methtable_type, 'frame);
-impl_julia_type!(MethodTable<'frame>, jl_methtable_type, 'frame);
+
 impl_valid_layout!(MethodTable<'frame>, 'frame);

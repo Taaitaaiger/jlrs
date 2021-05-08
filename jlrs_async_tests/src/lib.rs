@@ -27,7 +27,7 @@ mod example {
                 .call_async(&mut *frame, &mut [dims, iters])
                 .await?
                 .unwrap()
-                .cast::<f64>()?;
+                .unbox::<f64>()?;
 
             Ok(v)
         }
@@ -64,7 +64,7 @@ mod example {
                         .call_async(&mut *frame, &mut [dims, iters])
                         .await?
                         .unwrap()
-                        .cast::<f64>()
+                        .unbox::<f64>()
                 })
                 .await?;
 
@@ -109,7 +109,7 @@ mod example {
                         Ok(out.as_unrooted(output))
                     })
                     .await?
-                    .cast::<f64>()?
+                    .unbox::<f64>()?
             };
 
             Ok(v)
@@ -153,7 +153,7 @@ mod example {
                     })
                     .await?
                     .unwrap()
-                    .cast::<f64>()?
+                    .unbox::<f64>()?
             };
 
             Ok(v)
@@ -191,7 +191,7 @@ mod example {
                         .call_async(&mut *frame, &mut [dims, iters])
                         .await?
                         .unwrap()
-                        .cast::<f64>()
+                        .unbox::<f64>()
                 })
                 .await?;
 
@@ -236,7 +236,7 @@ mod example {
                         Ok(out.as_unrooted(output))
                     })
                     .await?
-                    .cast::<f64>()?
+                    .unbox::<f64>()?
             };
 
             Ok(v)
@@ -280,7 +280,7 @@ mod example {
                     })
                     .await?
                     .unwrap()
-                    .cast::<f64>()?
+                    .unbox::<f64>()?
             };
 
             Ok(v)

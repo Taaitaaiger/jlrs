@@ -15,7 +15,7 @@ fn call_no_kw() {
             let v = func
                 .call(&mut *frame, &mut [a_value])?
                 .unwrap()
-                .cast::<isize>()?;
+                .unbox::<isize>()?;
 
             assert_eq!(v, 2);
             Ok(())
@@ -41,7 +41,7 @@ fn call_with_kw() {
                 .with_keywords(kw)
                 .call1(&mut *frame, a_value)?
                 .unwrap()
-                .cast::<isize>()?;
+                .unbox::<isize>()?;
 
             assert_eq!(v, 11);
             Ok(())
@@ -68,7 +68,7 @@ fn call_with_kw_and_1_vararg() {
                 .with_keywords(kw)
                 .call2(&mut *frame, a_value, c_value)?
                 .unwrap()
-                .cast::<isize>()?;
+                .unbox::<isize>()?;
 
             assert_eq!(v, 16);
             Ok(())
@@ -95,7 +95,7 @@ fn call_with_kw_and_2_vararg() {
                 .with_keywords(kw)
                 .call2(&mut *frame, a_value, c_value)?
                 .unwrap()
-                .cast::<isize>()?;
+                .unbox::<isize>()?;
 
             assert_eq!(v, 16);
             Ok(())
@@ -123,7 +123,7 @@ fn call_with_kw_and_3_vararg() {
                 .with_keywords(kw)
                 .call3(&mut *frame, a_value, c_value, d_value)?
                 .unwrap()
-                .cast::<isize>()?;
+                .unbox::<isize>()?;
 
             assert_eq!(v, 20);
             Ok(())
@@ -152,7 +152,7 @@ fn call_with_kw_and_4_vararg() {
                 .with_keywords(kw)
                 .call(&mut *frame, &mut [a_value, c_value, d_value, e_value])?
                 .unwrap()
-                .cast::<isize>()?;
+                .unbox::<isize>()?;
 
             assert_eq!(v, 22);
             Ok(())
@@ -178,7 +178,7 @@ fn call_with_abstract_kw_f32() {
                 .with_keywords(kw)
                 .call1(&mut *frame, a_value)?
                 .unwrap()
-                .cast::<f32>()?;
+                .unbox::<f32>()?;
 
             assert_eq!(v, 11.0f32);
             Ok(())
@@ -204,7 +204,7 @@ fn call_with_abstract_kw_f64() {
                 .with_keywords(kw)
                 .call1(&mut *frame, a_value)?
                 .unwrap()
-                .cast::<f64>()?;
+                .unbox::<f64>()?;
 
             assert_eq!(v, 11.0f64);
             Ok(())
