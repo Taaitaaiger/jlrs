@@ -1,6 +1,12 @@
 //! Trait to check if a Rust type and a Julia type have matching layouts.
+//!
+//! When working with Julia values, it's always possible to access their `DataType`. This
+//! `DataType` contains all information about the value's fields and their layout. The
+//! [`ValidLayout`] trait defined in this module is used to check if a type has the same layout
+//! as a given Julia type. It is implemented automatically by `JlrsReflect.jl`, you should not
+//! implement it manually.
 
-use crate::value::Value;
+use crate::wrappers::ptr::value::Value;
 
 /// Trait implemented as part of `JuliaStruct` that is used to verify this type has the same
 /// layout as the Julia value.
@@ -15,8 +21,8 @@ pub unsafe trait ValidLayout {
 macro_rules! impl_valid_layout {
     ($type:ty, $($lt:lifetime),+) => {
         unsafe impl<$($lt),+> $crate::layout::valid_layout::ValidLayout for $type {
-            unsafe fn valid_layout(v: $crate::value::Value) -> bool {
-                if let Ok(dt) = v.cast::<$crate::value::datatype::DataType>() {
+            unsafe fn valid_layout(v: $crate::wrappers::ptr::value::Value) -> bool {
+                if let Ok(dt) = v.cast::<$crate::wrappers::ptr::datatype::DataType>() {
                     dt.is::<$type>()
                 } else {
                     false
@@ -26,8 +32,8 @@ macro_rules! impl_valid_layout {
     };
     ($t:ty) => {
         unsafe impl $crate::layout::valid_layout::ValidLayout for $t {
-            unsafe fn valid_layout(v: $crate::value::Value) -> bool {
-                if let Ok(dt) =  v.cast::<$crate::value::datatype::DataType>() {
+            unsafe fn valid_layout(v: $crate::wrappers::ptr::value::Value) -> bool {
+                if let Ok(dt) =  v.cast::<$crate::wrappers::ptr::datatype::DataType>() {
                     dt.is::<$t>()
                 } else {
                     false

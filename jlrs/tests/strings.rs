@@ -1,6 +1,6 @@
 use jlrs::prelude::*;
 use jlrs::util::JULIA;
-use jlrs::value::string::JuliaString;
+use jlrs::wrappers::ptr::string::JuliaString;
 use std::borrow::Cow;
 
 #[test]
@@ -11,7 +11,7 @@ fn create_and_unbox_str_data() {
         let unwrapped_string = jlrs
             .scope_with_slots(1, |_, frame| {
                 frame.scope_with_slots(1, |frame| {
-                    let string = Value::new(frame, "Hellõ world!")?;
+                    let string = Value::new_string(frame, "Hellõ world!")?;
                     string.unbox::<String>()
                 })
             })
@@ -30,7 +30,7 @@ fn create_and_unbox_string_data() {
         let unwrapped_string = jlrs
             .scope_with_slots(1, |_, frame| {
                 frame.scope_with_slots(1, |frame| {
-                    let string = Value::new(frame, String::from("Hellõ world!"))?;
+                    let string = Value::new_string(frame, String::from("Hellõ world!"))?;
                     string.unbox::<String>()
                 })
             })
@@ -49,7 +49,7 @@ fn create_and_unbox_cow_data() {
         let unwrapped_string = jlrs
             .scope_with_slots(1, |_, frame| {
                 frame.scope_with_slots(1, |frame| {
-                    let string = Value::new(frame, Cow::from("Hellõ world!"))?;
+                    let string = Value::new_string(frame, Cow::from("Hellõ world!"))?;
                     string.unbox::<String>()
                 })
             })
@@ -66,10 +66,10 @@ fn create_and_cast_jl_string() {
         let mut jlrs = j.borrow_mut();
 
         jlrs.scope_with_slots(1, |_global, frame| {
-            let v = Value::new(frame, "Foo bar")?;
+            let v = Value::new_string(frame, "Foo bar")?;
             assert!(v.is::<JuliaString>());
             let string = v.cast::<JuliaString>()?;
-            assert!(unsafe { JuliaString::valid_layout(v.datatype().into()) });
+            assert!(unsafe { JuliaString::valid_layout(v.datatype().as_value()) });
             assert_eq!(string.len(), 7);
             assert_eq!(string.as_c_str().to_str().unwrap(), "Foo bar");
             assert_eq!(string.as_str().unwrap(), "Foo bar");

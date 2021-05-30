@@ -149,7 +149,8 @@ fn impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
 
     let julia_struct_impl = quote! {
         unsafe impl #generics ::jlrs::layout::valid_layout::ValidLayout for #name #generics #where_clause {
-            unsafe fn valid_layout(v: ::jlrs::value::Value) -> bool {
+            unsafe fn valid_layout(v: ::jlrs::wrappers::builtin::value::Value) -> bool {
+
                 if let Ok(dt) = v.cast::<DataType>() {
                     if dt.nfields() as usize != #n_fields {
                         return false;
@@ -158,20 +159,21 @@ fn impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
                     let field_types = dt.field_types().data();
 
                     #(
-                        if !<#rs_non_union_fields as ::jlrs::layout::valid_layout::ValidLayout>::valid_layout(field_types[#jl_non_union_field_idxs].assume_reachable_unchecked()) {
+                        if !<#rs_non_union_fields as ::jlrs::layout::valid_layout::ValidLayout>::valid_layout(field_types[#jl_non_union_field_idxs].wrapper_unchecked()) {
                             return false;
                         }
                     )*
 
                     #(
-                        if let Ok(u) = field_types[#jl_union_field_idxs].assume_reachable_unchecked().cast::<::jlrs::value::union::Union>() {
-                            if !::jlrs::value::union::correct_layout_for::<#rs_align_fields, #rs_union_fields, #rs_flag_fields>(u) {
+                        if let Ok(u) = field_types[#jl_union_field_idxs].wrapper_unchecked().cast::<::jlrs::wrappers::builtin::union::Union>() {
+                            if !::jlrs::wrappers::bits::union::correct_layout_for::<#rs_align_fields, #rs_union_fields, #rs_flag_fields>(u) {
                                 return false
                             }
                         } else {
                             return false
                         }
                     )*
+
 
                     return true;
                 }
@@ -180,17 +182,17 @@ fn impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
             }
         }
 
-        unsafe impl #generics ::jlrs::layout::julia_typecheck::JuliaTypecheck for #name #generics #where_clause {
-            unsafe fn julia_typecheck(t: ::jlrs::value::datatype::DataType) -> bool {
+        unsafe impl #generics ::jlrs::layout::typecheck::Typecheck for #name #generics #where_clause {
+            unsafe fn typecheck(t: ::jlrs::wrappers::builtin::datatype::DataType) -> bool {
                 <Self as ::jlrs::layout::valid_layout::ValidLayout>::valid_layout(t.as_value())
             }
         }
 
-        unsafe impl #generics ::jlrs::convert::unbox::UnboxFn for #name #generics #where_clause {
+        unsafe impl #generics ::jlrs::convert::unbox::Unbox for #name #generics #where_clause {
             type Output = Self;
 
-            unsafe fn call_unboxer(value: ::jlrs::value::Value) -> Self {
-                value.inner().as_ptr().cast::<Self>().read()
+            unsafe fn unbox(value: ::jlrs::wrappers::builtin::value::Value) -> Self {
+                value.unwrap_non_null().as_ptr().cast::<Self>().read()
             }
         }
     };
@@ -200,7 +202,6 @@ fn impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
 
 fn impl_into_julia(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
-
     if !is_repr_c(ast) {
         panic!("IntoJulia can only be derived for types with the attribute #[repr(C)].");
     }
@@ -224,14 +225,14 @@ fn impl_into_julia(ast: &syn::DeriveInput) -> TokenStream {
             unsafe fn julia_type() -> *mut ::jlrs::jl_sys_export::jl_datatype_t {
                 let global = ::jlrs::memory::global::Global::new();
 
-                let julia_type = ::jlrs::value::module::Module::#func(global)
+                let julia_type = ::jlrs::wrappers::builtin::module::Module::#func(global)
                     #(.submodule(#modules_it).expect(&format!("Submodule {} cannot be found", #modules_it_b)))*
                     .global(#ty).expect(&format!("Type {} cannot be found in module", #ty));
 
-                if let Ok(dt) = julia_type.cast::<::jlrs::value::datatype::DataType>() {
-                    dt.inner().as_ptr()
-                } else if let Ok(ua) = julia_type.cast::<::jlrs::value::union_all::UnionAll>() {
-                    ua.base_type().assume_reachable_unchecked().inner().as_ptr()
+                if let Ok(dt) = julia_type.cast::<::jlrs::wrappers::builtin::datatype::DataType>() {
+                    dt.unwrap_non_null().as_ptr()
+                } else if let Ok(ua) = julia_type.cast::<::jlrs::wrappers::builtin::union_all::UnionAll>() {
+                    ua.base_type().ptr()
                 } else {
                     panic!("Invalid type: {:?}", julia_type);
                 }

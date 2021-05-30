@@ -9,7 +9,7 @@ mod example {
     }
 
     #[async_trait(?Send)]
-    impl JuliaTask for MyTask {
+    impl AsyncTask for MyTask {
         type T = f64;
         type R = Sender<JlrsResult<Self::T>>;
 
@@ -21,13 +21,18 @@ mod example {
             let dims = Value::new(&mut *frame, self.dims)?;
             let iters = Value::new(&mut *frame, self.iters)?;
 
-            let v = Module::main(global)
-                .submodule("MyModule")?
-                .function("complexfunc")?
-                .call_async(&mut *frame, &mut [dims, iters])
-                .await?
-                .unwrap()
-                .unbox::<f64>()?;
+            let v = unsafe {
+                Module::main(global)
+                    .submodule_ref("MyModule")?
+                    .wrapper_unchecked()
+                    .function_ref("complexfunc")?
+                    .wrapper_unchecked()
+                    .as_value()
+                    .call_async(&mut *frame, &mut [dims, iters])
+                    .await?
+                    .unwrap()
+                    .unbox::<f64>()?
+            };
 
             Ok(v)
         }
@@ -44,7 +49,7 @@ mod example {
     }
 
     #[async_trait(?Send)]
-    impl JuliaTask for NestingTaskAsyncFrame {
+    impl AsyncTask for NestingTaskAsyncFrame {
         type T = f64;
         type R = Sender<JlrsResult<Self::T>>;
 
@@ -58,13 +63,18 @@ mod example {
 
             let v = frame
                 .async_scope_with_slots(1, |frame| async move {
-                    Module::main(global)
-                        .submodule("MyModule")?
-                        .function("complexfunc")?
-                        .call_async(&mut *frame, &mut [dims, iters])
-                        .await?
-                        .unwrap()
-                        .unbox::<f64>()
+                    unsafe {
+                        Module::main(global)
+                            .submodule_ref("MyModule")?
+                            .wrapper_unchecked()
+                            .function_ref("complexfunc")?
+                            .wrapper_unchecked()
+                            .as_value()
+                            .call_async(&mut *frame, &mut [dims, iters])
+                            .await?
+                            .unwrap()
+                            .unbox::<f64>()
+                    }
                 })
                 .await?;
 
@@ -83,7 +93,7 @@ mod example {
     }
 
     #[async_trait(?Send)]
-    impl JuliaTask for NestingTaskAsyncValueFrame {
+    impl AsyncTask for NestingTaskAsyncValueFrame {
         type T = f64;
         type R = Sender<JlrsResult<Self::T>>;
 
@@ -99,8 +109,11 @@ mod example {
                         let dims = Value::new(&mut *frame, self.dims)?;
 
                         let out = Module::main(global)
-                            .submodule("MyModule")?
-                            .function("complexfunc")?
+                            .submodule_ref("MyModule")?
+                            .wrapper_unchecked()
+                            .function_ref("complexfunc")?
+                            .wrapper_unchecked()
+                            .as_value()
                             .call_async(&mut *frame, &mut [dims, iters])
                             .await?
                             .unwrap();
@@ -127,7 +140,7 @@ mod example {
     }
 
     #[async_trait(?Send)]
-    impl JuliaTask for NestingTaskAsyncCallFrame {
+    impl AsyncTask for NestingTaskAsyncCallFrame {
         type T = f64;
         type R = Sender<JlrsResult<Self::T>>;
 
@@ -143,8 +156,11 @@ mod example {
                         let dims = Value::new(&mut *frame, self.dims)?;
 
                         let out = Module::main(global)
-                            .submodule("MyModule")?
-                            .function("complexfunc")?
+                            .submodule_ref("MyModule")?
+                            .wrapper_unchecked()
+                            .function_ref("complexfunc")?
+                            .wrapper_unchecked()
+                            .as_value()
                             .call_async(&mut *frame, &mut [dims, iters])
                             .await?;
 
@@ -171,7 +187,7 @@ mod example {
     }
 
     #[async_trait(?Send)]
-    impl JuliaTask for NestingTaskAsyncGcFrame {
+    impl AsyncTask for NestingTaskAsyncGcFrame {
         type T = f64;
         type R = Sender<JlrsResult<Self::T>>;
 
@@ -185,13 +201,18 @@ mod example {
 
             let v = frame
                 .async_scope(|frame| async move {
-                    Module::main(global)
-                        .submodule("MyModule")?
-                        .function("complexfunc")?
-                        .call_async(&mut *frame, &mut [dims, iters])
-                        .await?
-                        .unwrap()
-                        .unbox::<f64>()
+                    unsafe {
+                        Module::main(global)
+                            .submodule_ref("MyModule")?
+                            .wrapper_unchecked()
+                            .function_ref("complexfunc")?
+                            .wrapper_unchecked()
+                            .as_value()
+                            .call_async(&mut *frame, &mut [dims, iters])
+                            .await?
+                            .unwrap()
+                            .unbox::<f64>()
+                    }
                 })
                 .await?;
 
@@ -210,7 +231,7 @@ mod example {
     }
 
     #[async_trait(?Send)]
-    impl JuliaTask for NestingTaskAsyncDynamicValueFrame {
+    impl AsyncTask for NestingTaskAsyncDynamicValueFrame {
         type T = f64;
         type R = Sender<JlrsResult<Self::T>>;
 
@@ -226,8 +247,11 @@ mod example {
                         let dims = Value::new(&mut *frame, self.dims)?;
 
                         let out = Module::main(global)
-                            .submodule("MyModule")?
-                            .function("complexfunc")?
+                            .submodule_ref("MyModule")?
+                            .wrapper_unchecked()
+                            .function_ref("complexfunc")?
+                            .wrapper_unchecked()
+                            .as_value()
                             .call_async(&mut *frame, &mut [dims, iters])
                             .await?
                             .unwrap();
@@ -254,7 +278,7 @@ mod example {
     }
 
     #[async_trait(?Send)]
-    impl JuliaTask for NestingTaskAsyncDynamicCallFrame {
+    impl AsyncTask for NestingTaskAsyncDynamicCallFrame {
         type T = f64;
         type R = Sender<JlrsResult<Self::T>>;
 
@@ -270,8 +294,11 @@ mod example {
                         let dims = Value::new(&mut *frame, self.dims)?;
 
                         let out = Module::main(global)
-                            .submodule("MyModule")?
-                            .function("complexfunc")?
+                            .submodule_ref("MyModule")?
+                            .wrapper_unchecked()
+                            .function_ref("complexfunc")?
+                            .wrapper_unchecked()
+                            .as_value()
                             .call_async(&mut *frame, &mut [dims, iters])
                             .await?;
 

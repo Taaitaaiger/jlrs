@@ -1,62 +1,63 @@
-#![allow(unused_imports)]
-use std::{ffi::c_void, marker::PhantomData, ptr::NonNull};
+//! Extract the contents of a Julia value.
+//!
+//! A [`Value`] contains a pointer to some data owned by Julia. The layout of this data depends on
+//! the [`DataType`] of the value. In general, the layout is highly predictable. For example, if
+//` the `DataType` is `Int8`, the pointer points to an `i8`. In order to extract the contents of a
+//! [`Value`] it must be unboxed. Unlike [`Cast`], which is used to convert a [`Value`] to another
+//! builtin wrapper type that is still owned by Julia, the [`Unbox`] trait defined in this module
+//! usually dereferences the pointer.
+//!
+//! There are a few exceptions to this rule. In particular, unboxing a `char` or a `bool` results
+//! in a [`Char`] or a [`Bool`] respectively. The reason is that while using invalid `Char`s and
+//! `Bool`s is an error in Julia, it's undefined behavior to create them in Rust. Similarly,
+//! strings in Julia should be UTF-8 encoded, but to account for the possibility that the contents
+//! are invalid the implementation of [`Unbox`] returns a `String` if the contents are valid and a
+//! `Vec<u8>` if they're not.
+//!
+//! [`Cast`]: crate::convert::cast::Cast
+//! [`Bool`]: crate::wrappers::inline::bool::Bool
+//! [`Char`]: crate::wrappers::inline::char::Char
+//! [`DataType`]: crate::wrappers::ptr::datatype::DataType
 
+use crate::{
+    private::Private,
+    wrappers::ptr::{private::Wrapper, value::Value},
+};
 use jl_sys::{
     jl_unbox_float32, jl_unbox_float64, jl_unbox_int16, jl_unbox_int32, jl_unbox_int64,
     jl_unbox_int8, jl_unbox_uint16, jl_unbox_uint32, jl_unbox_uint64, jl_unbox_uint8,
     jl_unbox_voidpointer,
 };
+use std::ffi::c_void;
 
-use crate::{
-    error::JlrsError,
-    value::{
-        datatype::{Immutable, Mutable},
-        Value,
-    },
-};
-use crate::{error::JlrsResult, private::Private};
-
-use self::private::Unbox as _;
-
-/// Converting a value from Julia to Rust is called unboxing. Types that can be converted from
-/// Julia to Rust must implement this trait. By default, it's implemented for primitive types and
+/// Convert a value from Julia to Rust. By default, it's implemented for primitive types and
 /// `String`. You should not implement it manually for custom types, but use `JlrsReflect.jl`
 /// and `jlrs-derive` instead.
-pub unsafe trait UnboxFn {
-    type Output;
-    #[doc(hidden)]
-    unsafe fn call_unboxer(value: Value) -> Self::Output;
-}
+pub unsafe trait Unbox {
+    type Output: Sized + Clone;
 
-pub trait Unbox<T: UnboxFn>: private::Unbox<T> {}
-impl<'scope, 'data, T: UnboxFn> Unbox<T> for Value<'scope, 'data> {}
-
-mod private {
-    use super::UnboxFn;
-    use crate::private::Private;
-    use crate::value::Value;
-
-    pub unsafe trait Unbox<T: UnboxFn> {
-        #[doc(hidden)]
-        unsafe fn unbox(self, _: Private) -> T::Output;
-    }
-
-    unsafe impl<'scope, 'data, T> Unbox<T> for Value<'scope, 'data>
-    where
-        T: UnboxFn,
-    {
-        unsafe fn unbox(self, _: Private) -> T::Output {
-            T::call_unboxer(self)
-        }
+    /// Unbox the value as `Self::Output`.
+    ///
+    /// Safety: The default implementation assumes that `Self::Output` is the correct layout for
+    /// the data that `value` points to.
+    unsafe fn unbox(value: Value) -> Self::Output {
+        value
+            .unwrap_non_null(Private)
+            .cast::<Self::Output>()
+            .as_ref()
+            .clone()
     }
 }
 
 macro_rules! impl_unboxer {
     ($type:ty, $unboxer:expr) => {
-        unsafe impl UnboxFn for $type {
+        unsafe impl Unbox for $type {
             type Output = Self;
-            unsafe fn call_unboxer(value: Value) -> $type {
-                $unboxer(value.inner().as_ptr()) as $type
+            unsafe fn unbox(value: Value) -> $type {
+                $unboxer(<Value as crate::wrappers::ptr::private::Wrapper>::unwrap(
+                    value,
+                    $crate::private::Private,
+                )) as _
             }
         }
     };
@@ -85,11 +86,3 @@ impl_unboxer!(usize, jl_unbox_uint64);
 
 #[cfg(target_pointer_width = "64")]
 impl_unboxer!(isize, jl_unbox_int64);
-
-unsafe impl UnboxFn for bool {
-    type Output = Self;
-
-    unsafe fn call_unboxer(value: Value) -> Self::Output {
-        jl_unbox_int8(value.inner().as_ptr()) != 0
-    }
-}

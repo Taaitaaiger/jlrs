@@ -11,8 +11,8 @@ fn main() {
         let iters = Value::new(&mut *frame, 1_000_000isize)?;
 
         Module::main(global)
-            .submodule("MyModule")?
-            .function("complexfunc")?
+            .submodule_ref("MyModule").wrapper_unchecked()
+            .function_ref("complexfunc")?.wrapper_unchecked()
             .call2(&mut *frame, dim, iters)?
             .expect("MyModule.complexfunc threw an error")
             .cast::<f64>()

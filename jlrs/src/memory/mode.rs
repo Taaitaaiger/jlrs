@@ -1,7 +1,7 @@
 //! The runtime modes
 //!
 //! The structs you find in this module implement the `Mode` trait which is responsible for
-//! handling the differences between pushing and popping frames from the GC stack for the
+//! handling the differences between pushing and popping GC frames from the stack for the
 //! different modes.
 
 #[cfg(feature = "async")]

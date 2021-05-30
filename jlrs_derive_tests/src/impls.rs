@@ -1,4 +1,4 @@
-use jlrs::prelude::*;
+/*use jlrs::prelude::*;
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, JuliaStruct, IntoJulia)]
@@ -21,7 +21,7 @@ pub struct BitsIntChar {
 #[jlrs(julia_type = "Main.BitsWithTuples.BitsUInt8TupleInt32Int64")]
 pub struct BitsUInt8TupleInt32Int64 {
     pub a: u8,
-    pub b: ::jlrs::value::tuple::Tuple2<i32, i64>,
+    pub b: ::jlrs::wrappers::builtin::tuple::Tuple2<i32, i64>,
 }
 
 #[repr(C)]
@@ -29,7 +29,7 @@ pub struct BitsUInt8TupleInt32Int64 {
 #[jlrs(julia_type = "Main.BitsWithTuples.BitsUInt8TupleInt32TupleInt16UInt16")]
 pub struct BitsUInt8TupleInt32TupleInt16UInt16 {
     pub a: u8,
-    pub b: ::jlrs::value::tuple::Tuple2<i32, ::jlrs::value::tuple::Tuple2<i16, u16>>,
+    pub b: ::jlrs::wrappers::builtin::tuple::Tuple2<i32, ::jlrs::wrappers::builtin::tuple::Tuple2<i16, u16>>,
 }
 
 #[repr(C)]
@@ -153,9 +153,9 @@ pub struct BitsTypeUInt8 {
 pub struct DoubleVariant {
     pub a: i8,
     #[jlrs(bits_union_align)]
-    _b_align: ::jlrs::value::union::Align4,
+    _b_align: ::jlrs::wrappers::bits::union::Align4,
     #[jlrs(bits_union)]
-    pub b: ::jlrs::value::union::BitsUnion<[::std::mem::MaybeUninit<u8>; 4]>,
+    pub b: ::jlrs::wrappers::bits::union::Container<4>,
     #[jlrs(bits_union_flag)]
     pub b_flag: u8,
     pub c: i8,
@@ -176,9 +176,9 @@ pub struct SingleVariant {
 pub struct SizeAlignMismatch {
     pub a: i8,
     #[jlrs(bits_union_align)]
-    _b_align: ::jlrs::value::union::Align4,
+    _b_align: ::jlrs::wrappers::bits::union::Align4,
     #[jlrs(bits_union)]
-    pub b: ::jlrs::value::union::BitsUnion<[::std::mem::MaybeUninit<u8>; 6]>,
+    pub b: ::jlrs::wrappers::bits::union::Container<6>,
     #[jlrs(bits_union_flag)]
     pub b_flag: u8,
     pub c: i8,
@@ -189,7 +189,7 @@ pub struct SizeAlignMismatch {
 #[jlrs(julia_type = "Main.WithBitsUnion.UnionInTuple")]
 pub struct UnionInTuple<'frame, 'data> {
     pub a: i8,
-    pub b: ::jlrs::value::wrapper_ref::ValueRef<'frame, 'data>,
+    pub b: ::jlrs::wrappers::ptr::ValueRef<'frame, 'data>,
     pub c: i8,
 }
 
@@ -207,7 +207,7 @@ where
 #[derive(Copy, Clone, Debug, JuliaStruct)]
 #[jlrs(julia_type = "Main.WithGeneric.WithGenericUnionAll")]
 pub struct WithGenericUnionAll<'frame, 'data> {
-    pub a: ::jlrs::value::wrapper_ref::ValueRef<'frame, 'data>,
+    pub a: ::jlrs::wrappers::ptr::ValueRef<'frame, 'data>,
 }
 
 #[repr(C)]
@@ -224,7 +224,7 @@ where
 #[derive(Copy, Clone, Debug, JuliaStruct)]
 #[jlrs(julia_type = "Main.WithGeneric.WithPropagatedLifetime")]
 pub struct WithPropagatedLifetime<'frame> {
-    pub a: WithGenericT<::jlrs::value::module::Module<'frame>>,
+    pub a: WithGenericT<::jlrs::wrappers::builtin::module::Module<'frame>>,
 }
 
 #[repr(C)]
@@ -232,7 +232,7 @@ pub struct WithPropagatedLifetime<'frame> {
 #[jlrs(julia_type = "Main.WithGeneric.WithPropagatedLifetimes")]
 pub struct WithPropagatedLifetimes<'frame, 'data> {
     pub a: WithGenericT<
-        ::jlrs::value::tuple::Tuple2<i32, WithGenericT<::jlrs::value::array::Array<'frame, 'data>>>,
+        ::jlrs::wrappers::builtin::tuple::Tuple2<i32, WithGenericT<::jlrs::wrappers::builtin::array::Array<'frame, 'data>>>,
     >,
 }
 
@@ -247,7 +247,7 @@ pub struct WithSetGeneric {
 #[derive(Copy, Clone, Debug, JuliaStruct, IntoJulia)]
 #[jlrs(julia_type = "Main.WithGeneric.WithSetGenericTuple")]
 pub struct WithSetGenericTuple {
-    pub a: ::jlrs::value::tuple::Tuple1<WithGenericT<i64>>,
+    pub a: ::jlrs::wrappers::builtin::tuple::Tuple1<WithGenericT<i64>>,
 }
 
 #[repr(C)]
@@ -261,12 +261,13 @@ pub struct WithValueType {
 #[derive(Copy, Clone, Debug, JuliaStruct)]
 #[jlrs(julia_type = "Main.WithNonBitsUnion.NonBitsUnion")]
 pub struct NonBitsUnion<'frame, 'data> {
-    pub a: ::jlrs::value::wrapper_ref::ValueRef<'frame, 'data>,
+    pub a: ::jlrs::wrappers::ptr::ValueRef<'frame, 'data>,
 }
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, JuliaStruct)]
 #[jlrs(julia_type = "Main.WithStrings.WithString")]
 pub struct WithString<'frame> {
-    pub a: ::jlrs::value::string::JuliaString<'frame>,
+    pub a: ::jlrs::wrappers::builtin::string::JuliaString<'frame>,
 }
+*/

@@ -9,7 +9,7 @@ fn create_cast_tuple0() {
             let t0 = Tuple0();
             let v = Value::new(frame, t0)?;
             assert!(v.is::<Tuple0>());
-            assert!(v.cast::<Tuple0>().is_ok());
+            assert!(v.unbox::<Tuple0>().is_ok());
             Ok(())
         })
         .unwrap();

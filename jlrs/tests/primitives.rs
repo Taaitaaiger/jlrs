@@ -170,7 +170,7 @@ fn create_and_cast_bool() {
 
         jlrs.scope_with_slots(5, |_, frame| {
             let p1 = Value::new(&mut *frame, true)?;
-            let u1 = p1.unbox::<bool>()?;
+            let u1 = p1.unbox::<bool>()?.as_bool();
             assert_eq!(u1, true);
             Ok(())
         })
@@ -185,7 +185,7 @@ fn create_and_cast_bool_dynamic() {
 
         jlrs.scope(|_, frame| {
             let p1 = Value::new(&mut *frame, false)?;
-            let u1 = p1.unbox::<bool>()?;
+            let u1 = p1.unbox::<bool>()?.as_bool();
             assert_eq!(u1, false);
             Ok(())
         })
@@ -289,12 +289,17 @@ fn function_pointer() {
             let val = Value::new(&mut *frame, func as *mut std::ffi::c_void)?;
             assert!(val.is::<*mut std::ffi::c_void>());
 
-            let res = Module::main(global)
-                .submodule("JlrsTests")?
-                .function("callrust")?
-                .call1(&mut *frame, val)?
-                .unwrap()
-                .unbox::<bool>()?;
+            let res = unsafe {
+                Module::main(global)
+                    .submodule_ref("JlrsTests")?
+                    .wrapper_unchecked()
+                    .function_ref("callrust")?
+                    .wrapper_unchecked()
+                    .call1(&mut *frame, val)?
+                    .unwrap()
+                    .unbox::<bool>()?
+                    .as_bool()
+            };
 
             assert!(res);
             val.unbox::<*mut std::ffi::c_void>()?;

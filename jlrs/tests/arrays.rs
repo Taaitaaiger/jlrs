@@ -1,5 +1,5 @@
-use jlrs::prelude::*;
 use jlrs::util::JULIA;
+use jlrs::{prelude::*, wrappers::ptr::array::dimensions::Dims};
 
 #[test]
 fn array_can_be_cast() {
@@ -35,7 +35,7 @@ fn union_array_1d() {
             assert!(arr.is_ok());
             let arr = arr.unwrap();
             {
-                let ud = arr.union_array_data(frame).unwrap();
+                let ud = arr.union_data(frame).unwrap();
                 let v1 = ud.get::<i32, _>(0).unwrap();
                 assert_eq!(v1, 1);
                 let v2 = ud.get::<f32, _>(1).unwrap();
@@ -70,7 +70,7 @@ fn union_array_1d_mut() {
             let arr = arr.unwrap();
 
             {
-                let mut mud = arr.union_array_data_mut(frame).unwrap();
+                let mut mud = arr.union_data_mut(frame).unwrap();
                 mud.set(0, DataType::bool_type(global), true).unwrap();
                 mud.set(1, DataType::int32_type(global), 3i32).unwrap();
                 mud.set(2, DataType::float32_type(global), 4.5f32).unwrap();
@@ -97,7 +97,7 @@ fn array_dimensions() {
         jlrs.scope_with_slots(1, |_, frame| {
             let arr_val = Value::new_array::<f32, _, _, _>(&mut *frame, (1, 2))?;
             let arr = arr_val.cast::<Array>()?;
-            let dims = arr.dimensions();
+            let dims = arr.dimensions().into_dimensions();
             assert_eq!(dims.as_slice(), &[1, 2]);
             Ok(())
         })
@@ -115,8 +115,8 @@ fn check_array_contents_info() {
             let arr = arr_val.cast::<Array>()?;
             assert!(arr.contains::<f32>());
             assert!(arr.contains_inline::<f32>());
-            assert!(arr.into_typed_array::<f32>().is_ok());
-            assert!(arr.into_typed_array::<f64>().is_err());
+            assert!(arr.as_typed_array::<f32>().is_ok());
+            assert!(arr.as_typed_array::<f64>().is_err());
             assert!(!arr.has_inlined_pointers());
             assert!(arr.is_inline_array());
             assert!(!arr.is_value_array());
@@ -180,7 +180,7 @@ fn typed_array_dimensions() {
         jlrs.scope_with_slots(1, |_, frame| {
             let arr_val = Value::new_array::<f32, _, _, _>(&mut *frame, (1, 2))?;
             let arr = arr_val.cast::<TypedArray<f32>>()?;
-            let dims = arr.dimensions();
+            let dims = arr.dimensions().into_dimensions();
             assert_eq!(dims.as_slice(), &[1, 2]);
             Ok(())
         })
@@ -295,7 +295,7 @@ fn cannot_access_f32_as_value() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.scope_with_slots(1, |_, frame| unsafe {
+        jlrs.scope_with_slots(1, |_, frame| {
             let arr_val = Value::new_array::<f32, _, _, _>(&mut *frame, (1, 2))?;
             assert!(arr_val.cast::<Array>()?.value_data(&mut *frame).is_err());
             Ok(())
@@ -309,7 +309,7 @@ fn cannot_access_f32_as_value_mut() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.scope_with_slots(1, |_, frame| unsafe {
+        jlrs.scope_with_slots(1, |_, frame| {
             let arr_val = Value::new_array::<f32, _, _, _>(&mut *frame, (1, 2))?;
             assert!(arr_val
                 .cast::<Array>()?

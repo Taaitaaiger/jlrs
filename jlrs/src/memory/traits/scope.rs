@@ -16,24 +16,20 @@
 //! earlier frame, while [`ScopeExt::scope`] can be used to return arbitrary data.
 
 use crate::{
-    convert::cast::Cast,
     error::JlrsResult,
     memory::{
         frame::GcFrame,
         global::Global,
-        output::{Output, OutputScope},
+        output::{Output, OutputResult, OutputScope, OutputValue},
         traits::frame::Frame,
     },
     private::Private,
-    value::{traits::wrapper::Wrapper, wrapper_ref::WrapperRef, UnrootedResult, UnrootedValue},
 };
 
 /// Provides `scope` and `scope_with_slots` methods to mutable references of types that implement
 /// [`Frame`].
-pub trait ScopeExt<'outer, 'scope, 'frame, 'data, F: Frame<'frame>>:
-    Scope<'scope, 'frame, 'data, F>
-where
-    Self: 'outer,
+pub trait ScopeExt<'target, 'current, 'data, F: Frame<'current>>:
+    Scope<'target, 'current, 'data, F>
 {
     /// Create a [`GcFrame`] and call the given closure with it. Returns the result of this
     /// closure.
@@ -52,7 +48,7 @@ where
     ///           let v2 = Value::new(&mut *frame, 2usize)?;
     ///
     ///           Module::base(global)
-    ///               .function("+")?
+    ///               .function(&mut *frame, "+")?
     ///               .call2(&mut *frame, v1, v2)?
     ///               .unwrap()
     ///               .unbox::<usize>()
@@ -66,7 +62,6 @@ where
     /// ```
     fn scope<T, G>(self, func: G) -> JlrsResult<T>
     where
-        T: 'outer,
         for<'inner> G: FnOnce(&mut GcFrame<'inner, F::Mode>) -> JlrsResult<T>;
 
     /// Create a [`GcFrame`] with `capacity` slots and call the given closure with it. Returns the
@@ -86,7 +81,7 @@ where
     ///           let v2 = Value::new(&mut *frame, 2usize)?;
     ///
     ///           Module::base(global)
-    ///               .function("+")?
+    ///               .function(&mut *frame, "+")?
     ///               .call2(&mut *frame, v1, v2)?
     ///               .unwrap()
     ///               .unbox::<usize>()
@@ -100,25 +95,12 @@ where
     /// ```
     fn scope_with_slots<T, G>(self, capacity: usize, func: G) -> JlrsResult<T>
     where
-        T: 'outer,
         for<'inner> G: FnOnce(&mut GcFrame<'inner, F::Mode>) -> JlrsResult<T>;
-
-    fn root_reference<T, U>(
-        self,
-        func: fn(T) -> WrapperRef<'frame, 'data, U>,
-        t: T,
-    ) -> JlrsResult<Option<<U as Cast<'frame, 'data>>::Output>>
-    where
-        T: Wrapper<'frame, 'data>,
-        U: Wrapper<'frame, 'data> + Cast<'frame, 'data>;
 }
 
-impl<'outer, 'frame, 'data, F: Frame<'frame>> ScopeExt<'outer, 'frame, 'frame, 'data, F>
-    for &'outer mut F
-{
+impl<'current, 'data, F: Frame<'current>> ScopeExt<'current, 'current, 'data, F> for &mut F {
     fn scope<T, G>(self, func: G) -> JlrsResult<T>
     where
-        T: 'outer,
         for<'inner> G: FnOnce(&mut GcFrame<'inner, F::Mode>) -> JlrsResult<T>,
     {
         F::scope(self, func, Private)
@@ -126,31 +108,9 @@ impl<'outer, 'frame, 'data, F: Frame<'frame>> ScopeExt<'outer, 'frame, 'frame, '
 
     fn scope_with_slots<T, G>(self, capacity: usize, func: G) -> JlrsResult<T>
     where
-        T: 'outer,
         for<'inner> G: FnOnce(&mut GcFrame<'inner, F::Mode>) -> JlrsResult<T>,
     {
         F::scope_with_slots(self, capacity, func, Private)
-    }
-
-    fn root_reference<T, U>(
-        self,
-        func: fn(T) -> WrapperRef<'frame, 'data, U>,
-        t: T,
-    ) -> JlrsResult<Option<<U as Cast<'frame, 'data>>::Output>>
-    where
-        T: Wrapper<'frame, 'data>,
-        U: Wrapper<'frame, 'data> + Cast<'frame, 'data>,
-    {
-        unsafe {
-            if let Some(v) = func(t).assume_reachable_value() {
-                match v.root(self) {
-                    Ok(v) => v.cast::<U>().map(|u| Some(u)),
-                    Err(e) => Err(e),
-                }
-            } else {
-                Ok(None)
-            }
-        }
     }
 }
 
@@ -160,11 +120,13 @@ impl<'outer, 'frame, 'data, F: Frame<'frame>> ScopeExt<'outer, 'frame, 'frame, '
 /// frame. In addition to rooting values, this trait provides several methods that create a new
 /// frame; if the scope is a frame, the frame's implementation of that method is called. If the
 /// scope is an [`OutputScope`], the result is rooted the frame targeted by that scope.
-pub trait Scope<'scope, 'frame, 'data, F: Frame<'frame>>:
-    Sized + private::Scope<'scope, 'frame, 'data, F>
+pub trait Scope<'target, 'current, 'data, F>:
+    Sized + private::Scope<'target, 'current, 'data, F>
+where
+    F: Frame<'current>,
 {
     /// Create a new `Global`.
-    fn global(&self) -> Global<'scope> {
+    fn global(&self) -> Global<'target> {
         unsafe { Global::new() }
     }
 
@@ -200,9 +162,9 @@ pub trait Scope<'scope, 'frame, 'data, F: Frame<'frame>>:
     fn value_scope<G>(self, func: G) -> JlrsResult<Self::Value>
     where
         G: for<'nested, 'inner> FnOnce(
-            Output<'scope>,
+            Output<'target>,
             &'inner mut GcFrame<'nested, F::Mode>,
-        ) -> JlrsResult<UnrootedValue<'scope, 'data, 'inner>>;
+        ) -> JlrsResult<OutputValue<'target, 'data, 'inner>>;
 
     /// Create a new `GcFrame` that can be used to root `capacity` values, an `Output` for the
     /// current scope, and use them to call the inner closure. The final result is not rooted in
@@ -224,7 +186,7 @@ pub trait Scope<'scope, 'frame, 'data, F: Frame<'frame>>:
     ///           let v1 = Value::new(&mut *frame, 1usize)?;
     ///           let v2 = Value::new(&mut *frame, 2usize)?;
     ///
-    ///           let add = Module::base(global).function("+")?;
+    ///           let add = Module::base(global).function(&mut *frame, "+")?;
     ///
     ///           let output = output.into_scope(frame);
     ///           add.call2(output, v1, v2)
@@ -239,10 +201,9 @@ pub trait Scope<'scope, 'frame, 'data, F: Frame<'frame>>:
     fn result_scope<G>(self, func: G) -> JlrsResult<Self::JuliaResult>
     where
         G: for<'nested, 'inner> FnOnce(
-            Output<'scope>,
+            Output<'target>,
             &'inner mut GcFrame<'nested, F::Mode>,
-        )
-            -> JlrsResult<UnrootedResult<'scope, 'data, 'inner>>;
+        ) -> JlrsResult<OutputResult<'target, 'data, 'inner>>;
 
     /// Create a new `GcFrame` that can be used to root `capacity` values, an `Output` for the
     /// current scope, and use them to call the inner closure. The final result is not rooted in
@@ -276,9 +237,9 @@ pub trait Scope<'scope, 'frame, 'data, F: Frame<'frame>>:
     fn value_scope_with_slots<G>(self, capacity: usize, func: G) -> JlrsResult<Self::Value>
     where
         G: for<'nested, 'inner> FnOnce(
-            Output<'scope>,
+            Output<'target>,
             &'inner mut GcFrame<'nested, F::Mode>,
-        ) -> JlrsResult<UnrootedValue<'scope, 'data, 'inner>>;
+        ) -> JlrsResult<OutputValue<'target, 'data, 'inner>>;
 
     /// Create a new `GcFrame` that can be used to root `capacity` values, an `Output` for the
     /// current scope, and use them to call the inner closure. The final result is not rooted in
@@ -300,7 +261,7 @@ pub trait Scope<'scope, 'frame, 'data, F: Frame<'frame>>:
     ///           let v1 = Value::new(&mut *frame, 1usize)?;
     ///           let v2 = Value::new(&mut *frame, 2usize)?;
     ///
-    ///           let add = Module::base(global).function("+")?;
+    ///           let add = Module::base(global).function(&mut *frame, "+")?;
     ///
     ///           let output = output.into_scope(frame);
     ///           add.call2(output, v1, v2)
@@ -315,13 +276,12 @@ pub trait Scope<'scope, 'frame, 'data, F: Frame<'frame>>:
     fn result_scope_with_slots<G>(self, capacity: usize, func: G) -> JlrsResult<Self::JuliaResult>
     where
         G: for<'nested, 'inner> FnOnce(
-            Output<'scope>,
+            Output<'target>,
             &'inner mut GcFrame<'nested, F::Mode>,
-        )
-            -> JlrsResult<UnrootedResult<'scope, 'data, 'inner>>;
+        ) -> JlrsResult<OutputResult<'target, 'data, 'inner>>;
 }
 
-impl<'frame, 'data, F: Frame<'frame>> Scope<'frame, 'frame, 'data, F> for &mut F {
+impl<'current, 'data, F: Frame<'current>> Scope<'current, 'current, 'data, F> for &mut F {
     /// Creates a [`GcFrame`] and calls the given closure with it. Returns the result of this
     /// closure.
     ///
@@ -350,9 +310,9 @@ impl<'frame, 'data, F: Frame<'frame>> Scope<'frame, 'frame, 'data, F> for &mut F
     fn value_scope<G>(self, func: G) -> JlrsResult<Self::Value>
     where
         G: for<'nested, 'inner> FnOnce(
-            Output<'frame>,
+            Output<'current>,
             &'inner mut GcFrame<'nested, F::Mode>,
-        ) -> JlrsResult<UnrootedValue<'frame, 'data, 'inner>>,
+        ) -> JlrsResult<OutputValue<'current, 'data, 'inner>>,
     {
         F::value_scope(self, func, Private)
     }
@@ -373,11 +333,11 @@ impl<'frame, 'data, F: Frame<'frame>> Scope<'frame, 'frame, 'data, F> for &mut F
     ///           let v1 = Value::new(&mut *frame, 1usize)?;
     ///           let v2 = Value::new(&mut *frame, 2usize)?;
     ///
-    ///           let output = output.into_scope(frame);
+    ///           let func = Module::base(global)
+    ///               .function(&mut *frame, "+")?;
     ///
-    ///           Module::base(global)
-    ///               .function("+")?
-    ///               .call2(output, v1, v2)
+    ///           let output = output.into_scope(frame);
+    ///           func.call2(output, v1, v2)
     ///       })?.unwrap()
     ///           .unbox::<usize>()?;
     ///
@@ -390,10 +350,10 @@ impl<'frame, 'data, F: Frame<'frame>> Scope<'frame, 'frame, 'data, F> for &mut F
     fn result_scope<G>(self, func: G) -> JlrsResult<Self::JuliaResult>
     where
         G: for<'nested, 'inner> FnOnce(
-            Output<'frame>,
+            Output<'current>,
             &'inner mut GcFrame<'nested, F::Mode>,
         )
-            -> JlrsResult<UnrootedResult<'frame, 'data, 'inner>>,
+            -> JlrsResult<OutputResult<'current, 'data, 'inner>>,
     {
         F::result_scope(self, func, Private)
     }
@@ -426,9 +386,9 @@ impl<'frame, 'data, F: Frame<'frame>> Scope<'frame, 'frame, 'data, F> for &mut F
     fn value_scope_with_slots<G>(self, capacity: usize, func: G) -> JlrsResult<Self::Value>
     where
         G: for<'nested, 'inner> FnOnce(
-            Output<'frame>,
+            Output<'current>,
             &'inner mut GcFrame<'nested, F::Mode>,
-        ) -> JlrsResult<UnrootedValue<'frame, 'data, 'inner>>,
+        ) -> JlrsResult<OutputValue<'current, 'data, 'inner>>,
     {
         F::value_scope_with_slots(self, capacity, func, Private)
     }
@@ -449,11 +409,12 @@ impl<'frame, 'data, F: Frame<'frame>> Scope<'frame, 'frame, 'data, F> for &mut F
     ///           let v1 = Value::new(&mut *frame, 1usize)?;
     ///           let v2 = Value::new(&mut *frame, 2usize)?;
     ///
-    ///           let output = output.into_scope(frame);
     ///
-    ///           Module::base(global)
-    ///               .function("+")?
-    ///               .call2(output, v1, v2)
+    ///           let func = Module::base(global)
+    ///               .function(&mut *frame, "+")?;
+    ///
+    ///           let output = output.into_scope(frame);
+    ///           func.call2(output, v1, v2)
     ///       })?.unwrap()
     ///           .unbox::<usize>()?;
     ///
@@ -466,36 +427,35 @@ impl<'frame, 'data, F: Frame<'frame>> Scope<'frame, 'frame, 'data, F> for &mut F
     fn result_scope_with_slots<G>(self, capacity: usize, func: G) -> JlrsResult<Self::JuliaResult>
     where
         G: for<'nested, 'inner> FnOnce(
-            Output<'frame>,
+            Output<'current>,
             &'inner mut GcFrame<'nested, F::Mode>,
         )
-            -> JlrsResult<UnrootedResult<'frame, 'data, 'inner>>,
+            -> JlrsResult<OutputResult<'current, 'data, 'inner>>,
     {
         F::result_scope_with_slots(self, capacity, func, Private)
     }
 }
 
-impl<'scope, 'frame, 'data, 'borrow, F: Frame<'frame>> Scope<'scope, 'frame, 'data, F>
-    for OutputScope<'scope, 'frame, 'borrow, F>
+impl<'target, 'current, 'data, 'borrow, F: Frame<'current>> Scope<'target, 'current, 'data, F>
+    for OutputScope<'target, 'current, 'borrow, F>
 {
     fn value_scope<G>(self, func: G) -> JlrsResult<Self::Value>
     where
         G: for<'nested, 'inner> FnOnce(
-            Output<'scope>,
+            Output<'target>,
             &'inner mut GcFrame<'nested, F::Mode>,
-        ) -> JlrsResult<UnrootedValue<'scope, 'data, 'inner>>,
+        ) -> JlrsResult<OutputValue<'target, 'data, 'inner>>,
     {
         self.value_scope(func)
-            .map(|ppv| UnrootedValue::new(ppv.ptr()))
+            .map(|ppv| OutputValue::wrap_non_null(ppv.unwrap_non_null()))
     }
 
     fn result_scope<G>(self, func: G) -> JlrsResult<Self::JuliaResult>
     where
         G: for<'nested, 'inner> FnOnce(
-            Output<'scope>,
+            Output<'target>,
             &'inner mut GcFrame<'nested, F::Mode>,
-        )
-            -> JlrsResult<UnrootedResult<'scope, 'data, 'inner>>,
+        ) -> JlrsResult<OutputResult<'target, 'data, 'inner>>,
     {
         self.result_scope(func)
     }
@@ -503,60 +463,63 @@ impl<'scope, 'frame, 'data, 'borrow, F: Frame<'frame>> Scope<'scope, 'frame, 'da
     fn value_scope_with_slots<G>(self, capacity: usize, func: G) -> JlrsResult<Self::Value>
     where
         G: for<'nested, 'inner> FnOnce(
-            Output<'scope>,
+            Output<'target>,
             &'inner mut GcFrame<'nested, F::Mode>,
-        ) -> JlrsResult<UnrootedValue<'scope, 'data, 'inner>>,
+        ) -> JlrsResult<OutputValue<'target, 'data, 'inner>>,
     {
         self.value_scope_with_slots(capacity, func)
-            .map(|ppv| UnrootedValue::new(ppv.ptr()))
+            .map(|ppv| OutputValue::wrap_non_null(ppv.unwrap_non_null()))
     }
 
     fn result_scope_with_slots<G>(self, capacity: usize, func: G) -> JlrsResult<Self::JuliaResult>
     where
         G: for<'nested, 'inner> FnOnce(
-            Output<'scope>,
+            Output<'target>,
             &'inner mut GcFrame<'nested, F::Mode>,
-        )
-            -> JlrsResult<UnrootedResult<'scope, 'data, 'inner>>,
+        ) -> JlrsResult<OutputResult<'target, 'data, 'inner>>,
     {
         self.result_scope_with_slots(capacity, func)
     }
 }
 
 pub(crate) mod private {
-    use crate::value::Value;
+    use std::ptr::NonNull;
+
+    use crate::wrappers::ptr::value::Value;
     use crate::{
         error::{JlrsResult, JuliaResult},
-        memory::{output::OutputScope, traits::frame::Frame},
+        memory::{
+            output::{OutputResult, OutputScope, OutputValue},
+            traits::frame::Frame,
+        },
         private::Private,
-        value::{UnrootedResult, UnrootedValue},
     };
     use jl_sys::jl_value_t;
 
-    pub trait Scope<'scope, 'frame, 'data, F: Frame<'frame>>: Sized {
+    pub trait Scope<'target, 'current, 'data, F: Frame<'current>>: Sized {
         type Value: Sized;
         type JuliaResult: Sized;
 
-        unsafe fn value(self, value: *mut jl_value_t, _: Private) -> JlrsResult<Self::Value>;
+        unsafe fn value(self, value: NonNull<jl_value_t>, _: Private) -> JlrsResult<Self::Value>;
 
         unsafe fn call_result(
             self,
-            value: Result<*mut jl_value_t, *mut jl_value_t>,
+            value: Result<NonNull<jl_value_t>, NonNull<jl_value_t>>,
             _: Private,
         ) -> JlrsResult<Self::JuliaResult>;
     }
 
-    impl<'frame, 'data, F: Frame<'frame>> Scope<'frame, 'frame, 'data, F> for &mut F {
-        type Value = Value<'frame, 'data>;
-        type JuliaResult = JuliaResult<'frame, 'data>;
+    impl<'current, 'data, F: Frame<'current>> Scope<'current, 'current, 'data, F> for &mut F {
+        type Value = Value<'current, 'data>;
+        type JuliaResult = JuliaResult<'current, 'data>;
 
-        unsafe fn value(self, value: *mut jl_value_t, _: Private) -> JlrsResult<Self::Value> {
-            self.push_root(value, Private).map_err(Into::into)
+        unsafe fn value(self, value: NonNull<jl_value_t>, _: Private) -> JlrsResult<Self::Value> {
+            self.push_root(value.cast(), Private).map_err(Into::into)
         }
 
         unsafe fn call_result(
             self,
-            value: Result<*mut jl_value_t, *mut jl_value_t>,
+            value: Result<NonNull<jl_value_t>, NonNull<jl_value_t>>,
             _: Private,
         ) -> JlrsResult<Self::JuliaResult> {
             match value {
@@ -572,24 +535,24 @@ pub(crate) mod private {
         }
     }
 
-    impl<'scope, 'frame, 'data, 'inner, F: Frame<'frame>> Scope<'scope, 'frame, 'data, F>
-        for OutputScope<'scope, 'frame, 'inner, F>
+    impl<'target, 'current, 'data, 'inner, F: Frame<'current>> Scope<'target, 'current, 'data, F>
+        for OutputScope<'target, 'current, 'inner, F>
     {
-        type Value = UnrootedValue<'scope, 'data, 'inner>;
-        type JuliaResult = UnrootedResult<'scope, 'data, 'inner>;
+        type Value = OutputValue<'target, 'data, 'inner>;
+        type JuliaResult = OutputResult<'target, 'data, 'inner>;
 
-        unsafe fn value(self, value: *mut jl_value_t, _: Private) -> JlrsResult<Self::Value> {
-            Ok(UnrootedValue::new(value))
+        unsafe fn value(self, value: NonNull<jl_value_t>, _: Private) -> JlrsResult<Self::Value> {
+            Ok(OutputValue::wrap_non_null(value))
         }
 
         unsafe fn call_result(
             self,
-            value: Result<*mut jl_value_t, *mut jl_value_t>,
+            value: Result<NonNull<jl_value_t>, NonNull<jl_value_t>>,
             _: Private,
         ) -> JlrsResult<Self::JuliaResult> {
             match value {
-                Ok(v) => Ok(UnrootedResult::Ok(UnrootedValue::new(v))),
-                Err(e) => Ok(UnrootedResult::Err(UnrootedValue::new(e))),
+                Ok(v) => Ok(OutputResult::Ok(OutputValue::wrap_non_null(v))),
+                Err(e) => Ok(OutputResult::Err(OutputValue::wrap_non_null(e))),
             }
         }
     }

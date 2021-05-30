@@ -2,7 +2,7 @@
 // initialized once. Note that tests that involve calling Julia functions must always be
 // executed with `cargo test -- --test-threads=1`.
 
-use crate::{value::Value, Julia};
+use crate::{wrappers::ptr::value::Value, Julia};
 use std::cell::RefCell;
 
 pub static JLRS_TESTS_JL: &'static str = include_str!("../tests/julia/JlrsTests.jl");

@@ -1,0 +1,63 @@
+//! Convert a rooted value or function call result to its unrooted counterpart.
+//!
+//! When the async runtime is used, it can be useful to use [`AsyncGcFrame::async_value_scope`] or
+//! [`AsyncGcFrame::async_result_scope`] in order to ensure temporary values can be freed by the
+//! garbage collector as fast as possible. Because the result of an async Julia function call is
+//! rooted, it must be unrooted before it is returned from the closure.
+//!
+//! [`AsyncGcFrame::async_result_scope`]: crate::memory::frame::AsyncGcFrame::async_result_scope
+//! [`AsyncGcFrame::async_value_scope`]: crate::memory::frame::AsyncGcFrame::async_value_scope
+
+use crate::{
+    error::JuliaResult,
+    memory::{
+        output::{OutputResult, OutputScope, OutputValue},
+        traits::frame::Frame,
+    },
+    private::Private,
+    wrappers::ptr::{private::Wrapper, value::Value},
+};
+
+/// Converts a [`Value`] or [`JuliaResult`] to their unrooted counterparts.
+pub trait AsUnrooted<'scope, 'frame, 'data, 'inner>: private::AsUnrooted {
+    type Unrooted;
+    fn as_unrooted<F: Frame<'frame>>(
+        self,
+        _output: OutputScope<'scope, 'frame, 'inner, F>,
+    ) -> Self::Unrooted;
+}
+
+impl<'scope, 'frame, 'data, 'inner> AsUnrooted<'scope, 'frame, 'data, 'inner>
+    for Value<'frame, 'data>
+{
+    type Unrooted = OutputValue<'scope, 'data, 'inner>;
+    fn as_unrooted<F: Frame<'frame>>(
+        self,
+        _output: OutputScope<'scope, 'frame, 'inner, F>,
+    ) -> Self::Unrooted {
+        unsafe { OutputValue::wrap_non_null(self.unwrap_non_null(Private)) }
+    }
+}
+
+impl<'scope, 'frame, 'data, 'inner> AsUnrooted<'scope, 'frame, 'data, 'inner>
+    for JuliaResult<'frame, 'data>
+{
+    type Unrooted = OutputResult<'scope, 'data, 'inner>;
+    fn as_unrooted<F: Frame<'frame>>(
+        self,
+        output: OutputScope<'scope, 'frame, 'inner, F>,
+    ) -> Self::Unrooted {
+        match self {
+            Ok(v) => OutputResult::Ok(v.as_unrooted(output)),
+            Err(v) => OutputResult::Err(v.as_unrooted(output)),
+        }
+    }
+}
+
+mod private {
+    use crate::{error::JuliaResult, wrappers::ptr::value::Value};
+
+    pub trait AsUnrooted {}
+    impl<'frame, 'data> AsUnrooted for Value<'frame, 'data> {}
+    impl<'frame, 'data> AsUnrooted for JuliaResult<'frame, 'data> {}
+}

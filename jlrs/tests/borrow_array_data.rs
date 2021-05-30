@@ -2,6 +2,7 @@ use jlrs::util::JULIA;
 use jlrs::{
     memory::traits::gc::{Gc, GcCollection},
     prelude::*,
+    wrappers::ptr::array::dimensions::Dims,
 };
 
 macro_rules! impl_test {
@@ -11,7 +12,7 @@ macro_rules! impl_test {
             JULIA.with(|j| {
                 let mut jlrs = j.borrow_mut();
 
-                jlrs.scope_with_slots(5, |global, frame| {
+                jlrs.scope_with_slots(5, |global, frame| unsafe {
                     let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
                     let array = Value::move_array(&mut *frame, data, (2, 3, 4))?;
@@ -23,13 +24,15 @@ macro_rules! impl_test {
                     for third in &[0, 1, 2, 3] {
                         for second in &[0, 1, 2] {
                             for first in &[0, 1] {
-                                assert_eq!(d[(*first, *second, *third)], out);
+                                assert_eq!(d[[*first, *second, *third]], out);
                                 out += 1 as $value_type;
                             }
                         }
                     }
 
-                    let gi = Module::base(global).function("getindex")?;
+                    let gi = Module::base(global)
+                        .function_ref("getindex")?
+                        .wrapper_unchecked();
                     let one = Value::new(&mut *frame, 1usize)?;
                     let two = Value::new(&mut *frame, 2usize)?;
                     let three = Value::new(&mut *frame, 3usize)?;
@@ -66,7 +69,7 @@ macro_rules! impl_test {
             JULIA.with(|j| {
                 let mut jlrs = j.borrow_mut();
 
-                jlrs.scope_with_slots(5, |global, frame| {
+                jlrs.scope_with_slots(5, |global, frame| unsafe {
                     let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
                     let array = Value::move_array(&mut *frame, data, (2, 3, 4))?;
@@ -81,7 +84,9 @@ macro_rules! impl_test {
                             }
                         }
                     }
-                    let gi = Module::base(global).function("getindex")?;
+                    let gi = Module::base(global)
+                        .function_ref("getindex")?
+                        .wrapper_unchecked();
                     let one = Value::new(&mut *frame, 1usize)?;
                     let two = Value::new(&mut *frame, 2usize)?;
                     let three = Value::new(&mut *frame, 3usize)?;
@@ -233,13 +238,13 @@ fn borrow_nested() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.scope_with_slots(1, |global, frame| {
+        jlrs.scope_with_slots(1, |global, frame| unsafe {
             let data: Vec<u8> = (1..=24).map(|x| x as u8).collect();
 
             let array = Value::move_array(&mut *frame, data, (2, 3, 4))?;
 
             frame.scope_with_slots(4, |frame| {
-                let d = unsafe {
+                let d = {
                     array
                         .cast_unchecked::<Array>()
                         .inline_data::<u8, _>(&mut *frame)?
@@ -255,7 +260,9 @@ fn borrow_nested() {
                     }
                 }
 
-                let gi = Module::base(global).function("getindex")?;
+                let gi = Module::base(global)
+                    .function_ref("getindex")?
+                    .wrapper_unchecked();
                 let one = Value::new(&mut *frame, 1usize)?;
                 let two = Value::new(&mut *frame, 2usize)?;
                 let three = Value::new(&mut *frame, 3usize)?;
@@ -294,7 +301,7 @@ fn access_borrowed_array_dimensions() {
             let arr = arr_val.cast::<Array>()?;
 
             let data = arr.inline_data::<f32, _>(&mut *frame)?;
-            assert_eq!(data.dimensions().as_slice(), &[1, 2]);
+            assert_eq!(data.dimensions().into_dimensions().as_slice(), &[1, 2]);
 
             Ok(())
         })
@@ -312,7 +319,7 @@ fn access_mutable_borrowed_array_dimensions() {
             let arr = arr_val.cast::<Array>()?;
 
             let data = arr.inline_data_mut::<f32, _>(&mut *frame)?;
-            assert_eq!(data.dimensions().as_slice(), &[1, 2]);
+            assert_eq!(data.dimensions().into_dimensions().as_slice(), &[1, 2]);
 
             Ok(())
         })
@@ -334,7 +341,10 @@ fn unrestricted_array_borrow() {
 
                 let data = arr.unrestricted_inline_data_mut::<f32, _>(&*frame)?;
                 let data2 = arr2.unrestricted_inline_data_mut::<f32, _>(&*frame)?;
-                assert_eq!(data.dimensions().as_slice(), data2.dimensions().as_slice());
+                assert_eq!(
+                    data.dimensions().into_dimensions().as_slice(),
+                    data2.dimensions().into_dimensions().as_slice()
+                );
             }
 
             Ok(())
@@ -357,7 +367,10 @@ fn unrestricted_typed_array_borrow() {
 
                 let data = arr.unrestricted_inline_data_mut(&*frame)?;
                 let data2 = arr2.unrestricted_inline_data_mut(&*frame)?;
-                assert_eq!(data.dimensions().as_slice(), data2.dimensions().as_slice());
+                assert_eq!(
+                    data.dimensions().into_dimensions().as_slice(),
+                    data2.dimensions().into_dimensions().as_slice()
+                );
             }
 
             Ok(())
@@ -374,14 +387,16 @@ fn value_data() {
         jlrs.scope_with_slots(2, |global, frame| {
             unsafe {
                 let arr = Module::main(global)
-                    .submodule("JlrsTests")?
-                    .function("vecofmodules")?
+                    .submodule_ref("JlrsTests")?
+                    .wrapper_unchecked()
+                    .function_ref("vecofmodules")?
+                    .wrapper_unchecked()
                     .call0(&mut *frame)?
                     .unwrap()
                     .cast::<Array>()?;
                 let data = arr.value_data(&mut *frame)?;
 
-                assert!(data[0].is::<Module>());
+                assert!(data[0].wrapper_unchecked().is::<Module>());
             }
             Ok(())
         })
@@ -396,19 +411,24 @@ fn value_data_mut() {
 
         jlrs.scope_with_slots(3, |global, frame| {
             unsafe {
-                let submod = Module::main(global).submodule("JlrsTests")?;
+                let submod = Module::main(global)
+                    .submodule_ref("JlrsTests")?
+                    .wrapper_unchecked();
                 let arr = submod
-                    .function("vecofmodules")?
+                    .function_ref("vecofmodules")?
+                    .wrapper_unchecked()
                     .call0(&mut *frame)?
                     .unwrap()
                     .cast::<Array>()?;
                 let mut data = arr.value_data_mut(&mut *frame)?;
                 data.set(0, submod.as_value().as_ref())?;
 
-                let getindex = Module::base(global).function("getindex")?;
+                let getindex = Module::base(global)
+                    .function_ref("getindex")?
+                    .wrapper_unchecked();
                 let idx = Value::new(&mut *frame, 1usize)?;
                 let entry = getindex
-                    .call2(&mut *frame, arr.into(), idx)?
+                    .call2(&mut *frame, arr.as_value(), idx)?
                     .unwrap()
                     .cast::<Module>()?;
 
@@ -427,15 +447,19 @@ fn unrestricted_value_data_mut() {
 
         jlrs.scope_with_slots(6, |global, frame| {
             unsafe {
-                let submod = Module::main(global).submodule("JlrsTests")?;
+                let submod = Module::main(global)
+                    .submodule_ref("JlrsTests")?
+                    .wrapper_unchecked();
                 let arr1 = submod
-                    .function("vecofmodules")?
+                    .function_ref("vecofmodules")?
+                    .wrapper_unchecked()
                     .call0(&mut *frame)?
                     .unwrap()
                     .cast::<Array>()?;
 
                 let arr2 = submod
-                    .function("anothervecofmodules")?
+                    .function_ref("anothervecofmodules")?
+                    .wrapper_unchecked()
                     .call0(&mut *frame)?
                     .unwrap()
                     .cast::<Array>()?;
@@ -445,15 +469,17 @@ fn unrestricted_value_data_mut() {
                 data1.set(0, submod.as_value().as_ref())?;
                 data2.set(1, submod.as_value().as_ref())?;
 
-                let getindex = Module::base(global).function("getindex")?;
+                let getindex = Module::base(global)
+                    .function_ref("getindex")?
+                    .wrapper_unchecked();
                 let idx1 = Value::new(&mut *frame, 1usize)?;
                 let idx2 = Value::new(&mut *frame, 2usize)?;
                 let entry1 = getindex
-                    .call2(&mut *frame, arr1.into(), idx1)?
+                    .call2(&mut *frame, arr1.as_value(), idx1)?
                     .unwrap()
                     .cast::<Module>()?;
                 let entry2 = getindex
-                    .call2(&mut *frame, arr2.into(), idx2)?
+                    .call2(&mut *frame, arr2.as_value(), idx2)?
                     .unwrap()
                     .cast::<Module>()?;
 
@@ -473,14 +499,16 @@ fn typed_array_value_data() {
         jlrs.scope_with_slots(2, |global, frame| {
             unsafe {
                 let arr = Module::main(global)
-                    .submodule("JlrsTests")?
-                    .function("vecofmodules")?
+                    .submodule_ref("JlrsTests")?
+                    .wrapper_unchecked()
+                    .function_ref("vecofmodules")?
+                    .wrapper_unchecked()
                     .call0(&mut *frame)?
                     .unwrap()
                     .cast::<TypedArray<Module>>()?;
                 let data = arr.value_data(&mut *frame)?;
 
-                assert!(data[0].is::<Module>());
+                assert!(data[0].wrapper_unchecked().is::<Module>());
             }
             Ok(())
         })
@@ -495,19 +523,24 @@ fn typed_array_value_data_mut() {
 
         jlrs.scope_with_slots(3, |global, frame| {
             unsafe {
-                let submod = Module::main(global).submodule("JlrsTests")?;
+                let submod = Module::main(global)
+                    .submodule_ref("JlrsTests")?
+                    .wrapper_unchecked();
                 let arr = submod
-                    .function("vecofmodules")?
+                    .function_ref("vecofmodules")?
+                    .wrapper_unchecked()
                     .call0(&mut *frame)?
                     .unwrap()
                     .cast::<TypedArray<Module>>()?;
                 let mut data = arr.value_data_mut(&mut *frame)?;
                 data.set(0, submod.as_value().as_ref())?;
 
-                let getindex = Module::base(global).function("getindex")?;
+                let getindex = Module::base(global)
+                    .function_ref("getindex")?
+                    .wrapper_unchecked();
                 let idx = Value::new(&mut *frame, 1usize)?;
                 let entry = getindex
-                    .call2(&mut *frame, arr.into(), idx)?
+                    .call2(&mut *frame, arr.as_value(), idx)?
                     .unwrap()
                     .cast::<Module>()?;
 
@@ -526,15 +559,19 @@ fn typed_array_unrestricted_value_data_mut() {
 
         jlrs.scope_with_slots(6, |global, frame| {
             unsafe {
-                let submod = Module::main(global).submodule("JlrsTests")?;
+                let submod = Module::main(global)
+                    .submodule_ref("JlrsTests")?
+                    .wrapper_unchecked();
                 let arr1 = submod
-                    .function("vecofmodules")?
+                    .function_ref("vecofmodules")?
+                    .wrapper_unchecked()
                     .call0(&mut *frame)?
                     .unwrap()
                     .cast::<TypedArray<Module>>()?;
 
                 let arr2 = submod
-                    .function("anothervecofmodules")?
+                    .function_ref("anothervecofmodules")?
+                    .wrapper_unchecked()
                     .call0(&mut *frame)?
                     .unwrap()
                     .cast::<TypedArray<Module>>()?;
@@ -544,15 +581,17 @@ fn typed_array_unrestricted_value_data_mut() {
                 data1.set(0, submod.as_value().as_ref())?;
                 data2.set(1, submod.as_value().as_ref())?;
 
-                let getindex = Module::base(global).function("getindex")?;
+                let getindex = Module::base(global)
+                    .function_ref("getindex")?
+                    .wrapper_unchecked();
                 let idx1 = Value::new(&mut *frame, 1usize)?;
                 let idx2 = Value::new(&mut *frame, 2usize)?;
                 let entry1 = getindex
-                    .call2(&mut *frame, arr1.into(), idx1)?
+                    .call2(&mut *frame, arr1.as_value(), idx1)?
                     .unwrap()
                     .cast::<Module>()?;
                 let entry2 = getindex
-                    .call2(&mut *frame, arr2.into(), idx2)?
+                    .call2(&mut *frame, arr2.as_value(), idx2)?
                     .unwrap()
                     .cast::<Module>()?;
 

@@ -1,6 +1,6 @@
 //! Everything related to errors.
 
-use crate::value::{array::dimensions::Dimensions, Value};
+use crate::wrappers::ptr::{array::dimensions::Dimensions, value::Value, ValueRef};
 use std::error::Error;
 use std::fmt::{Display, Formatter, Result as FmtResult};
 
@@ -11,6 +11,8 @@ pub type JlrsResult<T> = Result<T, Box<JlrsError>>;
 /// successful and contains the function's result, while `Err` indicates an exception was thrown
 /// and contains said exception.
 pub type JuliaResult<'frame, 'data, V = Value<'frame, 'data>> = Result<V, Value<'frame, 'data>>;
+pub type JuliaResultRef<'frame, 'data, V = ValueRef<'frame, 'data>> =
+    Result<V, ValueRef<'frame, 'data>>;
 
 /// All different errors.
 #[derive(Debug)]
@@ -24,9 +26,11 @@ pub enum JlrsError {
     Nothing,
     NotAType,
     NotADataType,
+    NotAFunction { name: String, ty: String },
     NotAMethod,
     NotAMethodInstance,
     NotACodeInstance,
+    NotANamedTuple,
     NotAWeakRef,
     NotATypeMapEntry,
     NotATypeMapLevel,
@@ -47,6 +51,7 @@ pub enum JlrsError {
     NotAKind(String),
     NotAUnionAll,
     FunctionNotFound(String),
+    GlobalNotFound { name: String, module: String },
     IncludeNotFound(String),
     IncludeError(String, String),
     NoSuchField(String),
@@ -70,6 +75,7 @@ pub enum JlrsError {
     ArrayNotSupported,
     NamedTupleSizeMismatch(usize, usize),
     MoreThreadsRequired,
+    UndefRef,
 }
 
 /// Create a new `JlrsError::Exception` and wrap it in a `JlrsResult::Err`.
@@ -98,6 +104,9 @@ impl Display for JlrsError {
             JlrsError::NotAnArray => write!(formatter, "This is not an array"),
             JlrsError::NotAUnionArray => write!(formatter, "This is not a union array"),
             JlrsError::NotAString => write!(formatter, "This is not a string"),
+            JlrsError::NotAFunction { name, ty } => {
+                write!(formatter, "{} is not a function, but a {}", name, ty)
+            }
             JlrsError::NotUnicode => write!(formatter, "This string contains invalid characters"),
             JlrsError::Nothing => write!(formatter, "This value is Nothing"),
             JlrsError::ConstAlreadyExists(name) => {
@@ -105,6 +114,13 @@ impl Display for JlrsError {
             }
             JlrsError::FunctionNotFound(func) => {
                 write!(formatter, "The function {} could not be found", func)
+            }
+            JlrsError::GlobalNotFound { name, module } => {
+                write!(
+                    formatter,
+                    "The global {} could not be found in module {}",
+                    name, module
+                )
             }
             JlrsError::NoSuchField(field) => {
                 write!(formatter, "The field {} could not be found", field)
@@ -128,6 +144,9 @@ impl Display for JlrsError {
             }
             JlrsError::NotInline => {
                 write!(formatter, "The data of this array is not stored inline")
+            }
+            JlrsError::NotANamedTuple => {
+                write!(formatter, "The provided keywords are not a NamedTuple")
             }
             JlrsError::NotAMethTable => write!(formatter, "This is not a method table"),
             JlrsError::NotAMethodMatch => write!(formatter, "This is not a method match"),
@@ -215,8 +234,11 @@ impl Display for JlrsError {
                     formatter,
                     "Array types cannot be instantiated with `DataType::instantiate`, but must \
                     be created with `Value::new_array`, `Value::move_array`, or \
-                    `Value::borrow_array`.",
+                    `Value::borrow_array`",
                 )
+            }
+            JlrsError::UndefRef => {
+                write!(formatter, "An undefined references cannot be rooted")
             }
         }
     }

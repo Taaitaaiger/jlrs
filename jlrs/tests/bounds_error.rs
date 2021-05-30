@@ -7,11 +7,13 @@ fn bounds_error() {
         let mut jlrs = j.borrow_mut();
         let oob_idx = jlrs
             .scope_with_slots(0, |global, frame| {
-                frame.scope_with_slots(5, |frame| {
+                frame.scope_with_slots(5, |frame| unsafe {
                     let idx = Value::new(&mut *frame, 4usize)?;
                     let data = vec![1.0f64, 2., 3.];
                     let array = Value::move_array(&mut *frame, data, 3)?;
-                    let func = Module::base(global).function("getindex")?;
+                    let func = Module::base(global)
+                        .function_ref("getindex")?
+                        .wrapper_unchecked();
                     let out = func.call2(&mut *frame, array, idx)?.unwrap_err();
 
                     assert_eq!(out.type_name().unwrap(), "BoundsError");

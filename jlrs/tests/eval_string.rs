@@ -1,6 +1,5 @@
 use jlrs::prelude::*;
 use jlrs::util::JULIA;
-use jlrs::value::Value;
 
 fn eval_string(string: &str, with_result: impl for<'f> FnOnce(JuliaResult<'f, 'static>)) {
     JULIA.with(|j| {
@@ -44,8 +43,10 @@ fn define_then_use() {
     });
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
-        jlrs.scope_with_slots(4, |global, frame| {
-            let func = Module::main(global).function("increase")?;
+        jlrs.scope_with_slots(4, |global, frame| unsafe {
+            let func = Module::main(global)
+                .function_ref("increase")?
+                .wrapper_unchecked();
             let twelve = Value::new(&mut *frame, 12i32).unwrap();
             let result = func.call1(&mut *frame, twelve)?;
             assert_eq!(result.unwrap().unbox::<i32>().unwrap(), 13i32);

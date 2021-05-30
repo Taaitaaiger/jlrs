@@ -36,12 +36,13 @@ fn call_function_from_loaded_module() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.scope_with_slots(4, |global, frame| {
+        jlrs.scope_with_slots(4, |global, frame| unsafe {
             let func = Module::base(global)
                 .require(&mut *frame, "LinearAlgebra")?
                 .expect("Cannot load LinearAlgebra")
                 .cast::<Module>()?
-                .function("dot")?;
+                .function_ref("dot")?
+                .wrapper_unchecked();
 
             let mut arr1 = vec![1.0f64, 2.0f64];
             let mut arr2 = vec![2.0f64, 3.0f64];

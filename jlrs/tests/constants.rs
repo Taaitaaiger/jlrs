@@ -1,6 +1,6 @@
 use jlrs::prelude::*;
 use jlrs::util::JULIA;
-use jlrs::value::union_all::UnionAll;
+use jlrs::wrappers::ptr::union_all::UnionAll;
 
 macro_rules! impl_constant_test {
     ($func:ident, $tyname:expr) => {
@@ -11,7 +11,11 @@ macro_rules! impl_constant_test {
 
                 jlrs.scope_with_slots(0, |global, _| {
                     let v1 = Value::$func(global);
-                    let v2 = Module::core(global).global($tyname)?;
+                    let v2 = unsafe {
+                        Module::core(global)
+                            .global_ref($tyname)?
+                            .wrapper_unchecked()
+                    };
                     assert!(v1.datatype().as_value().egal(v2));
                     Ok(())
                 })
@@ -32,7 +36,11 @@ macro_rules! impl_constant_isa_test {
                     #[allow(unused_unsafe)]
                     unsafe {
                         let v1 = Value::$func(global);
-                        let v2 = Module::core(global).global($tyname)?;
+                        let v2 = unsafe {
+                            Module::core(global)
+                                .global_ref($tyname)?
+                                .wrapper_unchecked()
+                        };
                         assert!(v1.isa(v2));
                     }
                     Ok(())
@@ -54,7 +62,11 @@ macro_rules! impl_constant_subtype_test {
                     #[allow(unused_unsafe)]
                     unsafe {
                         let v1 = Value::$func(global);
-                        let v2 = Module::core(global).global($tyname)?;
+                        let v2 = unsafe {
+                            Module::core(global)
+                                .global_ref($tyname)?
+                                .wrapper_unchecked()
+                        };
                         assert!(v1.subtype(v2));
                     }
                     Ok(())
@@ -74,7 +86,11 @@ macro_rules! impl_unionall_constant_test {
 
                 jlrs.scope_with_slots(0, |global, _| {
                     let v1 = UnionAll::$func(global);
-                    let v2 = Module::core(global).global($tyname)?;
+                    let v2 = unsafe {
+                        Module::core(global)
+                            .global_ref($tyname)?
+                            .wrapper_unchecked()
+                    };
                     assert!(v1.as_value().egal(v2));
                     Ok(())
                 })
@@ -93,7 +109,11 @@ macro_rules! impl_unionall_constant_isa_test {
 
                 jlrs.scope_with_slots(0, |global, _| {
                     let v1 = UnionAll::$func(global);
-                    let v2 = Module::core(global).global($tyname)?;
+                    let v2 = unsafe {
+                        Module::core(global)
+                            .global_ref($tyname)?
+                            .wrapper_unchecked()
+                    };
                     assert!(v1.as_value().isa(v2));
                     Ok(())
                 })
@@ -112,7 +132,11 @@ macro_rules! impl_datatype_constant_isa_test {
 
                 jlrs.scope_with_slots(0, |global, _| {
                     let v1 = DataType::$func(global);
-                    let v2 = Module::core(global).global($tyname)?;
+                    let v2 = unsafe {
+                        Module::core(global)
+                            .global_ref($tyname)?
+                            .wrapper_unchecked()
+                    };
                     assert!(v1.as_value().isa(v2));
                     Ok(())
                 })

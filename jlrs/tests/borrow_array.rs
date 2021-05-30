@@ -152,10 +152,11 @@ fn call_function_with_borrowed() {
         let mut data = vec![1u64, 2, 3, 4];
 
         let unboxed = jlrs
-            .scope_with_slots(2, |global, frame| {
+            .scope_with_slots(2, |global, frame| unsafe {
                 let array = Value::borrow_array(&mut *frame, &mut data, 4)?;
                 Module::base(global)
-                    .function("sum")?
+                    .function_ref("sum")?
+                    .wrapper_unchecked()
                     .call1(&mut *frame, array)?
                     .unwrap()
                     .unbox::<u64>()

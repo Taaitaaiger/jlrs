@@ -1,0 +1,130 @@
+//! Wrapper for `Core.TypeVar`.
+
+use super::{datatype::DataType, value::Value};
+use super::{private::Wrapper, Wrapper as _};
+use crate::memory::global::Global;
+use crate::private::Private;
+use crate::wrappers::ptr::{SymbolRef, ValueRef};
+use crate::{
+    convert::temporary_symbol::TemporarySymbol,
+    error::{JlrsError, JlrsResult},
+    memory::traits::frame::Frame,
+};
+use crate::{impl_julia_typecheck, impl_valid_layout};
+use jl_sys::{jl_new_typevar, jl_tvar_t, jl_tvar_type};
+use std::{
+    fmt::{Debug, Formatter, Result as FmtResult},
+    marker::PhantomData,
+    ptr::NonNull,
+};
+
+/// This is a unknown, but possibly restricted, type parameter. In `Array{T, N}`, `T` and `N` are
+/// `TypeVar`s.
+#[derive(Copy, Clone)]
+#[repr(transparent)]
+pub struct TypeVar<'frame>(NonNull<jl_tvar_t>, PhantomData<&'frame ()>);
+
+impl<'frame> TypeVar<'frame> {
+    /// Create a new `TypeVar`, the optional lower and upper bounds must be subtypes of `Type`,
+    /// their default values are `Union{}` and `Any` respectively.
+    pub fn new<F, S>(
+        frame: &mut F,
+        name: S,
+        lower_bound: Option<Value>,
+        upper_bound: Option<Value>,
+    ) -> JlrsResult<Self>
+    where
+        F: Frame<'frame>,
+        S: TemporarySymbol,
+    {
+        unsafe {
+            let global = Global::new();
+            let name = name.temporary_symbol(Private);
+            let bottom = Value::bottom_type(global);
+
+            let lb = lower_bound.unwrap_or(bottom);
+
+            if lb != bottom && !lb.is_type() && !lb.is::<TypeVar>() {
+                Err(JlrsError::NotATypeLB(
+                    name.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+                ))?;
+            }
+
+            let upper = DataType::any_type(global).as_value();
+            let ub = upper_bound.unwrap_or(upper);
+
+            if ub != upper && !ub.is_type() && !ub.is::<TypeVar>() {
+                Err(JlrsError::NotATypeUB(
+                    name.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+                ))?;
+            }
+
+            let tvar = NonNull::new_unchecked(jl_new_typevar(
+                name.unwrap(Private),
+                lb.unwrap(Private),
+                ub.unwrap(Private),
+            ));
+            frame
+                .push_root(tvar.cast(), Private)
+                .map_err(JlrsError::alloc_error)?;
+
+            Ok(Self::wrap_non_null(tvar, Private))
+        }
+    }
+
+    /*
+    for (a, b) in zip(fieldnames(TypeVar), fieldtypes(TypeVar))
+        println(a, ": ", b)
+    end
+    name: Symbol
+    lb: Any
+    ub: Any
+    */
+
+    /// The name of this `TypeVar`.
+    pub fn name(self) -> SymbolRef<'frame> {
+        unsafe { SymbolRef::wrap(self.unwrap_non_null(Private).as_ref().name) }
+    }
+
+    /// The lower bound of this `TypeVar`.
+    pub fn lower_bound(self) -> ValueRef<'frame, 'static> {
+        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().lb) }
+    }
+
+    /// The upper bound of this `TypeVar`.
+    pub fn upper_bound(self) -> ValueRef<'frame, 'static> {
+        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().ub) }
+    }
+}
+
+impl<'scope> Debug for TypeVar<'scope> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        unsafe {
+            f.debug_tuple("TypeVar")
+                .field(
+                    &self
+                        .name()
+                        .wrapper_unchecked()
+                        .as_str()
+                        .unwrap_or("<Non-UTF8 Symbol>"),
+                )
+                .finish()
+        }
+    }
+}
+
+impl_julia_typecheck!(TypeVar<'frame>, jl_tvar_type, 'frame);
+
+impl_valid_layout!(TypeVar<'frame>, 'frame);
+
+impl<'scope> Wrapper<'scope, '_> for TypeVar<'scope> {
+    type Internal = jl_tvar_t;
+
+    unsafe fn wrap_non_null(inner: NonNull<Self::Internal>, _: Private) -> Self {
+        Self(inner, PhantomData)
+    }
+
+    unsafe fn unwrap_non_null(self, _: Private) -> NonNull<Self::Internal> {
+        self.0
+    }
+}

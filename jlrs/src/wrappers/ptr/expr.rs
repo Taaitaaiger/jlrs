@@ -1,0 +1,60 @@
+//! Wrapper for `Core.Expr`.
+
+use super::private::Wrapper;
+use crate::{impl_julia_typecheck, impl_valid_layout};
+use crate::{
+    private::Private,
+    wrappers::ptr::{ArrayRef, SymbolRef},
+};
+use jl_sys::{jl_expr_t, jl_expr_type};
+use std::{
+    fmt::{Debug, Formatter, Result as FmtResult},
+    marker::PhantomData,
+    ptr::NonNull,
+};
+
+/// A compound expression in Julia ASTs.
+#[derive(Copy, Clone)]
+#[repr(transparent)]
+pub struct Expr<'frame>(NonNull<jl_expr_t>, PhantomData<&'frame ()>);
+
+impl<'frame> Expr<'frame> {
+    /*
+    for (a, b) in zip(fieldnames(Expr), fieldtypes(Expr))
+        println(a, ": ", b)
+    end
+    head: Symbol
+    args: Vector{Any}
+    */
+
+    /// Returns the head of the expression.
+    pub fn head(self) -> SymbolRef<'frame> {
+        unsafe { SymbolRef::wrap(self.unwrap_non_null(Private).as_ref().head) }
+    }
+
+    /// Returns the arguments of the expression.
+    pub fn args(self) -> ArrayRef<'frame, 'static> {
+        unsafe { ArrayRef::wrap(self.unwrap_non_null(Private).as_ref().args) }
+    }
+}
+
+impl<'scope> Debug for Expr<'scope> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        f.debug_tuple("Expr").finish()
+    }
+}
+
+impl_julia_typecheck!(Expr<'frame>, jl_expr_type, 'frame);
+impl_valid_layout!(Expr<'frame>, 'frame);
+
+impl<'scope> Wrapper<'scope, '_> for Expr<'scope> {
+    type Internal = jl_expr_t;
+
+    unsafe fn wrap_non_null(inner: NonNull<Self::Internal>, _: Private) -> Self {
+        Self(inner, PhantomData)
+    }
+
+    unsafe fn unwrap_non_null(self, _: Private) -> NonNull<Self::Internal> {
+        self.0
+    }
+}

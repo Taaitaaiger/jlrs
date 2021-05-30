@@ -124,7 +124,7 @@
 //!     let j = Value::new(&mut *frame, 1u32)?;
 //!
 //!     // The `+` function can be found in the base module.
-//!     let func = Module::base(global).function("+")?;
+//!     let func = Module::base(global).function(&mut *frame, "+")?;
 //!
 //!     // Call the function and unbox the result as a `u64`. The result of the function
 //!     // call is a nested `Result`; the outer error does not contain to any Julia
@@ -171,7 +171,7 @@
 //!           // i and j are rooted in `child_frame`...
 //!           let i = Value::new(&mut *child_frame, 1u64)?;
 //!           let j = Value::new(&mut *child_frame, 2i32)?;
-//!           let func = Module::base(global).function("+")?;
+//!           let func = Module::base(global).function(&mut *child_frame, "+")?;
 //!
 //!           // ... while the result is rooted in `parent_frame`
 //!           // after returning from this closure.
@@ -303,7 +303,7 @@
 //! runtime to work correctly the `JULIA_NUM_THREADS` environment variable must be set to a value
 //! larger than 1.
 //!
-//! In order to call Julia with the async runtime you must implement the [`JuliaTask`] trait. The
+//! In order to call Julia with the async runtime you must implement the [`AsyncTask`] trait. The
 //! `run`-method of this trait is similar to the closures that are used in the examples
 //! above for the sync runtime; it provides you with a [`Global`] and an [`AsyncGcFrame`] which
 //! provides mostly the same functionality as [`GcFrame`]. The [`AsyncGcFrame`] is required to
@@ -355,7 +355,7 @@
 //! # Custom types
 //!
 //! In order to map a struct in Rust to one in Julia you can derive [`JuliaStruct`]. This will
-//! implement [`Cast`], [`ValidLayout`], and [`JuliaTypecheck`] for that type. If
+//! implement [`Cast`], [`ValidLayout`], and [`Typecheck`] for that type. If
 //! the struct in Julia has no type parameters and is a bits type you can also derive
 //! [`IntoJulia`], which lets you use the type in combination with [`Value::new`].
 //!
@@ -369,16 +369,16 @@
 //! [their User Guide]: https://rust-lang.github.io/rust-bindgen/requirements.html
 //! [the examples directory of the repo]: https://github.com/Taaitaaiger/jlrs/tree/master/examples
 //! [`IntoJulia`]: crate::convert::into_julia::IntoJulia
-//! [`JuliaTypecheck`]: crate::layout::julia_typecheck::JuliaTypecheck
+//! [`Typecheck`]: crate::layout::typecheck::Typecheck
 //! [`ValidLayout`]: crate::layout::valid_layout::ValidLayout
 //! [`Cast`]: crate::convert::cast::Cast
-//! [`JuliaStruct`]: crate::value::traits::julia_struct::JuliaStruct
+//! [`JuliaStruct`]: crate::wrappers::ptr::traits::julia_struct::JuliaStruct
 //! [`AsyncGcFrame`]: crate::memory::frame::AsyncGcFrame
 //! [`Frame`]: crate::memory::traits::frame::Frame
-//! [`JuliaTask`]: crate::multitask::julia_task::JuliaTask
+//! [`AsyncTask`]: crate::multitask::julia_task::AsyncTask
 //! [`AsyncJulia`]: crate::multitask::AsyncJulia
-//! [`DataType`]: crate::value::datatype::DataType
-//! [`TypedArray`]: crate::value::array::TypedArray
+//! [`DataType`]: crate::wrappers::builtin::datatype::DataType
+//! [`TypedArray`]: crate::wrappers::ptr::array::TypedArray
 //! [`Output`]: crate::memory::output::Output
 //! [`OutputScope`]: crate::memory::output::OutputScope
 //! [`ScopeExt`]: crate::memory::traits::scope::ScopeExt
@@ -389,22 +389,22 @@
 
 #![forbid(broken_intra_doc_links)]
 
+pub mod call;
 pub mod convert;
 pub mod error;
-#[doc(hidden)]
-pub mod jl_sys_export;
+pub mod extensions;
+// #[doc(hidden)]
+// pub mod jl_sys_export;
 pub mod layout;
 pub mod memory;
-#[cfg(all(feature = "async"))]
-pub mod multitask;
-#[cfg(all(feature = "jlrs-ndarray"))]
-pub mod ndarray;
 pub mod prelude;
 pub(crate) mod private;
 #[doc(hidden)]
 pub mod util;
-pub mod value;
+pub mod wrappers;
 
+use call::Call;
+use convert::into_jlrs_result::IntoJlrsResult;
 use error::{JlrsError, JlrsResult};
 use jl_sys::{
     jl_atexit_hook, jl_init, jl_init_with_image__threading, jl_is_initialized, uv_async_send,
@@ -413,17 +413,16 @@ use memory::frame::{GcFrame, NullFrame};
 use memory::global::Global;
 use memory::mode::Sync;
 use memory::stack::StackPage;
-use prelude::IntoJlrsResult;
+use private::Private;
 use std::ffi::{c_void, CString};
 use std::io::{Error as IOError, ErrorKind};
 use std::mem::MaybeUninit;
 use std::path::Path;
 use std::ptr::null_mut;
 use std::sync::atomic::{AtomicBool, Ordering};
-use value::array::Array;
-use value::module::Module;
-use value::traits::call::Call;
-use value::Value;
+use wrappers::ptr::module::Module;
+use wrappers::ptr::value::Value;
+use wrappers::ptr::{array::Array, private::Wrapper};
 
 pub(crate) static INIT: AtomicBool = AtomicBool::new(false);
 
@@ -459,8 +458,10 @@ impl Julia {
 
             let droparray_fn = Value::new(frame, droparray as *mut c_void)?;
             Module::main(global)
-                .submodule("Jlrs")?
-                .global("droparray")?
+                .submodule_ref("Jlrs")?
+                .wrapper_unchecked()
+                .global_ref("droparray")?
+                .wrapper_unchecked()
                 .set_nth_field(0, droparray_fn)?;
 
             Ok(())
@@ -520,8 +521,10 @@ impl Julia {
 
             let droparray_fn = Value::new(frame, droparray as *mut c_void)?;
             Module::main(global)
-                .submodule("Jlrs")?
-                .global("droparray")?
+                .submodule_ref("Jlrs")?
+                .wrapper_unchecked()
+                .global_ref("droparray")?
+                .wrapper_unchecked()
                 .set_nth_field(0, droparray_fn)?;
 
             Ok(())
@@ -546,8 +549,12 @@ impl Julia {
     pub fn include<P: AsRef<Path>>(&mut self, path: P) -> JlrsResult<()> {
         if path.as_ref().exists() {
             return self.scope_with_slots(2, |global, frame| {
-                let path_jl_str = Value::new(&mut *frame, path.as_ref().to_string_lossy())?;
-                let include_func = Module::main(global).function("include")?;
+                let path_jl_str = Value::new_string(&mut *frame, path.as_ref().to_string_lossy())?;
+                let include_func = unsafe {
+                    Module::main(global)
+                        .function_ref("include")?
+                        .wrapper_unchecked()
+                };
                 let res = include_func.call1(frame, path_jl_str)?;
 
                 return match res {
@@ -724,7 +731,8 @@ impl CCall {
 unsafe extern "C" fn droparray(a: Array) {
     // The data of a moved array is allocated by Rust, this function is called by
     // a finalizer in order to ensure it's also freed by Rust.
-    let arr_ref = &mut *a.inner().as_ptr();
+    let mut arr_ptr = a.unwrap_non_null(Private);
+    let arr_ref = arr_ptr.as_mut();
 
     if arr_ref.flags.how() != 2 {
         return;
