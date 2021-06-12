@@ -4,7 +4,7 @@ use crate::layout::typecheck::Typecheck;
 use crate::wrappers::ptr::value::Value;
 use crate::{
     error::{JlrsError, JlrsResult},
-    memory::{global::Global, traits::frame::Frame},
+    memory::{global::Global, frame::Frame},
 };
 use crate::{layout::valid_layout::ValidLayout, private::Private};
 use jl_sys::{
@@ -18,24 +18,24 @@ use std::{
 };
 
 use super::{datatype::DataType, private::Wrapper as WrapperPriv, Wrapper};
-use crate::wrappers::ptr::{Ref, ValueRef};
+use crate::wrappers::ptr::{Ref};
 
 /// A `SimpleVector` is a fixed-size array that contains `Value`s.
 #[derive(Copy, Clone)]
 #[repr(transparent)]
-pub struct SimpleVector<'frame, T = Value<'frame, 'static>>(
+pub struct SimpleVector<'scope, T = Value<'scope, 'static>>(
     NonNull<jl_svec_t>,
-    PhantomData<&'frame ()>,
+    PhantomData<&'scope ()>,
     PhantomData<T>,
 )
 where
-    T: Wrapper<'frame, 'static>;
+    T: Wrapper<'scope, 'static>;
 
-impl<'frame, T: Wrapper<'frame, 'static>> SimpleVector<'frame, T> {
+impl<'scope, T: Wrapper<'scope, 'static>> SimpleVector<'scope, T> {
     /// Create a new `SimpleVector` that can hold `n` values.
     pub fn with_capacity<F>(frame: &mut F, n: usize) -> JlrsResult<Self>
     where
-        F: Frame<'frame>,
+        F: Frame<'scope>,
     {
         unsafe {
             let svec = NonNull::new_unchecked(jl_alloc_svec(n));
@@ -52,7 +52,7 @@ impl<'frame, T: Wrapper<'frame, 'static>> SimpleVector<'frame, T> {
     /// before all elements are set.
     pub unsafe fn with_capacity_uninit<F>(frame: &mut F, n: usize) -> JlrsResult<Self>
     where
-        F: Frame<'frame>,
+        F: Frame<'scope>,
     {
         let svec = NonNull::new_unchecked(jl_alloc_svec_uninit(n));
         if let Err(err) = frame.push_root(svec.cast(), Private) {
@@ -70,32 +70,32 @@ impl<'frame, T: Wrapper<'frame, 'static>> SimpleVector<'frame, T> {
     /// Returns the data of this `SimpleVector`.
     ///
     /// Safety: the type `T` must be the type of all elements in the simple vector.
-    pub unsafe fn data(self) -> &'frame [Ref<'frame, 'static, T>] {
+    pub unsafe fn data(self) -> &'scope [Ref<'scope, 'static, T>] {
         std::slice::from_raw_parts(jl_svec_data(self.unwrap(Private)).cast(), self.len())
     }
 
     /// Set the element at `index` to `value`. This is only safe if the `SimpleVector` has just
     /// been allocated.
-    pub unsafe fn set<'data>(
+    pub unsafe fn set(
         self,
         index: usize,
-        value: Option<Value<'_, 'data>>,
-    ) -> JlrsResult<ValueRef<'frame, 'static>> {
+        value: Option<T>,
+    ) -> JlrsResult<Ref<'scope, 'static, T>> {
         if index >= self.len() {
             Err(JlrsError::OutOfBounds(index, self.len()))?;
         }
 
         jl_svec_data(self.unwrap(Private))
-            .cast::<Option<Value>>()
+            .cast::<Option<T>>()
             .add(index)
             .write(value);
 
         if let Some(value) = value {
-            jl_gc_wb(self.unwrap(Private).cast(), value.unwrap(Private));
+            jl_gc_wb(self.unwrap(Private).cast(), value.unwrap(Private).cast());
         }
 
         let ptr = value.map(|v| v.unwrap(Private)).unwrap_or(null_mut());
-        Ok(ValueRef::wrap(ptr))
+        Ok(Ref::wrap(ptr))
     }
 }
 
@@ -106,24 +106,30 @@ impl<'base, T: Wrapper<'base, 'static>> SimpleVector<'base, T> {
     }
 }
 
-impl<'scope, T: Wrapper<'scope, 'static>> Debug for SimpleVector<'scope, T> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        f.debug_tuple("SimpleVector").finish()
-    }
-}
-
 unsafe impl<'scope, T: Wrapper<'scope, 'static>> Typecheck for SimpleVector<'scope, T> {
-    unsafe fn typecheck(t: DataType) -> bool {
-        t.unwrap(Private) == jl_simplevector_type
+    fn typecheck(t: DataType) -> bool {
+        unsafe {
+            t.unwrap(Private) == jl_simplevector_type
+        }
     }
 }
 
-unsafe impl<'frame, T: Wrapper<'frame, 'static>> ValidLayout for SimpleVector<'frame, T> {
-    unsafe fn valid_layout(v: Value) -> bool {
+unsafe impl<'scope, T: Wrapper<'scope, 'static>> ValidLayout for SimpleVector<'scope, T> {
+    fn valid_layout(v: Value) -> bool {
         if let Ok(dt) = v.cast::<DataType>() {
             dt.is::<SimpleVector>()
         } else {
             false
+        }
+    }
+}
+
+impl<'scope,  T: Wrapper<'scope, 'static>> Debug for SimpleVector<'scope, T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        if let Ok(s) = self.display_string() {
+            f.write_str(&s)
+        } else {
+            f.write_str("<Cannot display value>")
         }
     }
 }

@@ -1,16 +1,18 @@
 //! Wrapper for `Core.TypeVar`.
 
+use super::TypeVarRef;
 use super::{datatype::DataType, value::Value};
 use super::{private::Wrapper, Wrapper as _};
 use crate::memory::global::Global;
+use crate::memory::scope::Scope;
 use crate::private::Private;
 use crate::wrappers::ptr::{SymbolRef, ValueRef};
 use crate::{
     convert::temporary_symbol::TemporarySymbol,
     error::{JlrsError, JlrsResult},
-    memory::traits::frame::Frame,
+    memory::frame::Frame,
 };
-use crate::{impl_julia_typecheck, impl_valid_layout};
+use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_new_typevar, jl_tvar_t, jl_tvar_type};
 use std::{
     fmt::{Debug, Formatter, Result as FmtResult},
@@ -22,20 +24,22 @@ use std::{
 /// `TypeVar`s.
 #[derive(Copy, Clone)]
 #[repr(transparent)]
-pub struct TypeVar<'frame>(NonNull<jl_tvar_t>, PhantomData<&'frame ()>);
+pub struct TypeVar<'scope>(NonNull<jl_tvar_t>, PhantomData<&'scope ()>);
 
-impl<'frame> TypeVar<'frame> {
+impl<'scope> TypeVar<'scope> {
     /// Create a new `TypeVar`, the optional lower and upper bounds must be subtypes of `Type`,
-    /// their default values are `Union{}` and `Any` respectively.
-    pub fn new<F, S>(
-        frame: &mut F,
-        name: S,
+    /// their default values are `Union{}` and `Any` respectively. The returned value can be
+    /// cast to a [`TypeVar`].
+    pub fn new<'target, 'current, N, S, F>(
+        scope: S,
+        name: N,
         lower_bound: Option<Value>,
         upper_bound: Option<Value>,
-    ) -> JlrsResult<Self>
+    ) -> JlrsResult<S::Value>
     where
-        F: Frame<'frame>,
-        S: TemporarySymbol,
+        S: Scope<'target, 'current, 'static, F>,
+        F: Frame<'current>,
+        N: TemporarySymbol,
     {
         unsafe {
             let global = Global::new();
@@ -59,16 +63,56 @@ impl<'frame> TypeVar<'frame> {
                 ))?;
             }
 
-            let tvar = NonNull::new_unchecked(jl_new_typevar(
+            let tvar = jl_new_typevar(
                 name.unwrap(Private),
                 lb.unwrap(Private),
                 ub.unwrap(Private),
-            ));
-            frame
-                .push_root(tvar.cast(), Private)
-                .map_err(JlrsError::alloc_error)?;
+            );
 
-            Ok(Self::wrap_non_null(tvar, Private))
+            scope.value(NonNull::new_unchecked(tvar.cast()), Private)
+        }
+    }
+
+    /// Create a new `TypeVar`, the optional lower and upper bounds must be subtypes of `Type`,
+    /// their default values are `Union{}` and `Any` respectively. Unlike [`TypeVar::new`], this 
+    /// method doesn't root the allocated value.
+    pub fn new_unrooted<'global, N, S, F>(
+        global: Global<'global>,
+        name: N,
+        lower_bound: Option<Value>,
+        upper_bound: Option<Value>,
+    ) -> JlrsResult<TypeVarRef<'scope>>
+    where
+        N: TemporarySymbol,
+    {
+        unsafe {
+            let name = name.temporary_symbol(Private);
+            let bottom = Value::bottom_type(global);
+
+            let lb = lower_bound.unwrap_or(bottom);
+
+            if lb != bottom && !lb.is_type() && !lb.is::<TypeVar>() {
+                Err(JlrsError::NotATypeLB(
+                    name.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+                ))?;
+            }
+
+            let upper = DataType::any_type(global).as_value();
+            let ub = upper_bound.unwrap_or(upper);
+
+            if ub != upper && !ub.is_type() && !ub.is::<TypeVar>() {
+                Err(JlrsError::NotATypeUB(
+                    name.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+                ))?;
+            }
+
+            let tvar = jl_new_typevar(
+                name.unwrap(Private),
+                lb.unwrap(Private),
+                ub.unwrap(Private),
+            );
+
+            Ok(TypeVarRef::wrap(tvar))
         }
     }
 
@@ -82,40 +126,24 @@ impl<'frame> TypeVar<'frame> {
     */
 
     /// The name of this `TypeVar`.
-    pub fn name(self) -> SymbolRef<'frame> {
+    pub fn name(self) -> SymbolRef<'scope> {
         unsafe { SymbolRef::wrap(self.unwrap_non_null(Private).as_ref().name) }
     }
 
     /// The lower bound of this `TypeVar`.
-    pub fn lower_bound(self) -> ValueRef<'frame, 'static> {
+    pub fn lower_bound(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().lb) }
     }
 
     /// The upper bound of this `TypeVar`.
-    pub fn upper_bound(self) -> ValueRef<'frame, 'static> {
+    pub fn upper_bound(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().ub) }
     }
 }
 
-impl<'scope> Debug for TypeVar<'scope> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        unsafe {
-            f.debug_tuple("TypeVar")
-                .field(
-                    &self
-                        .name()
-                        .wrapper_unchecked()
-                        .as_str()
-                        .unwrap_or("<Non-UTF8 Symbol>"),
-                )
-                .finish()
-        }
-    }
-}
-
-impl_julia_typecheck!(TypeVar<'frame>, jl_tvar_type, 'frame);
-
-impl_valid_layout!(TypeVar<'frame>, 'frame);
+impl_julia_typecheck!(TypeVar<'scope>, jl_tvar_type, 'scope);
+impl_debug!(TypeVar<'_>);
+impl_valid_layout!(TypeVar<'scope>, 'scope);
 
 impl<'scope> Wrapper<'scope, '_> for TypeVar<'scope> {
     type Internal = jl_tvar_t;

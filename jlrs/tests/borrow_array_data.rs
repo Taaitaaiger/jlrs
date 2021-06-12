@@ -1,6 +1,6 @@
 use jlrs::util::JULIA;
 use jlrs::{
-    memory::traits::gc::{Gc, GcCollection},
+    memory::gc::{Gc, GcCollection},
     prelude::*,
     wrappers::ptr::array::dimensions::Dims,
 };
@@ -15,7 +15,7 @@ macro_rules! impl_test {
                 jlrs.scope_with_slots(5, |global, frame| unsafe {
                     let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
-                    let array = Value::move_array(&mut *frame, data, (2, 3, 4))?;
+                    let array = Array::from_vec(&mut *frame, data, (2, 3, 4))?;
                     let d = array
                         .cast::<Array>()?
                         .inline_data::<$value_type, _>(&mut *frame)?;
@@ -72,7 +72,7 @@ macro_rules! impl_test {
                 jlrs.scope_with_slots(5, |global, frame| unsafe {
                     let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
-                    let array = Value::move_array(&mut *frame, data, (2, 3, 4))?;
+                    let array = Array::from_vec(&mut *frame, data, (2, 3, 4))?;
                     let mut d = array
                         .cast::<Array>()?
                         .inline_data_mut::<$value_type, _>(&mut *frame)?;
@@ -122,7 +122,7 @@ macro_rules! impl_test {
                 jlrs.scope_with_slots(1, |_, frame| {
                     let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
-                    let array = Value::move_array(&mut *frame, data.clone(), (2, 3, 4))?;
+                    let array = Array::from_vec(&mut *frame, data.clone(), (2, 3, 4))?;
                     let d = array
                         .cast::<Array>()?
                         .inline_data::<$value_type, _>(&mut *frame)?;
@@ -145,7 +145,7 @@ macro_rules! impl_test {
                 jlrs.scope_with_slots(1, |_, frame| {
                     let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
-                    let array = Value::move_array(&mut *frame, data.clone(), (2, 3, 4))?;
+                    let array = Array::from_vec(&mut *frame, data.clone(), (2, 3, 4))?;
                     let mut d = array
                         .cast::<Array>()?
                         .inline_data_mut::<$value_type, _>(&mut *frame)?;
@@ -241,7 +241,7 @@ fn borrow_nested() {
         jlrs.scope_with_slots(1, |global, frame| unsafe {
             let data: Vec<u8> = (1..=24).map(|x| x as u8).collect();
 
-            let array = Value::move_array(&mut *frame, data, (2, 3, 4))?;
+            let array = Array::from_vec(&mut *frame, data, (2, 3, 4))?;
 
             frame.scope_with_slots(4, |frame| {
                 let d = {
@@ -297,7 +297,7 @@ fn access_borrowed_array_dimensions() {
         let mut jlrs = j.borrow_mut();
 
         jlrs.scope_with_slots(1, |_, frame| {
-            let arr_val = Value::new_array::<f32, _, _, _>(&mut *frame, (1, 2))?;
+            let arr_val = Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?;
             let arr = arr_val.cast::<Array>()?;
 
             let data = arr.inline_data::<f32, _>(&mut *frame)?;
@@ -315,7 +315,7 @@ fn access_mutable_borrowed_array_dimensions() {
         let mut jlrs = j.borrow_mut();
 
         jlrs.scope_with_slots(1, |_, frame| {
-            let arr_val = Value::new_array::<f32, _, _, _>(&mut *frame, (1, 2))?;
+            let arr_val = Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?;
             let arr = arr_val.cast::<Array>()?;
 
             let data = arr.inline_data_mut::<f32, _>(&mut *frame)?;
@@ -334,8 +334,8 @@ fn unrestricted_array_borrow() {
 
         jlrs.scope_with_slots(2, |_, frame| {
             unsafe {
-                let arr_val = Value::new_array::<f32, _, _, _>(&mut *frame, (1, 2))?;
-                let arr_val2 = Value::new_array::<f32, _, _, _>(&mut *frame, (1, 2))?;
+                let arr_val = Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?;
+                let arr_val2 = Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?;
                 let arr = arr_val.cast::<Array>()?;
                 let arr2 = arr_val2.cast::<Array>()?;
 
@@ -360,8 +360,8 @@ fn unrestricted_typed_array_borrow() {
 
         jlrs.scope_with_slots(2, |_, frame| {
             unsafe {
-                let arr_val = Value::new_array::<f32, _, _, _>(&mut *frame, (1, 2))?;
-                let arr_val2 = Value::new_array::<f32, _, _, _>(&mut *frame, (1, 2))?;
+                let arr_val = Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?;
+                let arr_val2 = Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?;
                 let arr = arr_val.cast::<TypedArray<f32>>()?;
                 let arr2 = arr_val2.cast::<TypedArray<f32>>()?;
 

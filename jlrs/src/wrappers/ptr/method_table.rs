@@ -6,7 +6,7 @@
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L535
 
 use super::private::Wrapper;
-use crate::{impl_julia_typecheck, impl_valid_layout};
+use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout};
 use crate::{
     private::Private,
     wrappers::ptr::{ArrayRef, ModuleRef, SymbolRef, ValueRef},
@@ -21,9 +21,9 @@ use std::{
 /// contains the TypeMap for one Type
 #[derive(Copy, Clone)]
 #[repr(transparent)]
-pub struct MethodTable<'frame>(NonNull<jl_methtable_t>, PhantomData<&'frame ()>);
+pub struct MethodTable<'scope>(NonNull<jl_methtable_t>, PhantomData<&'scope ()>);
 
-impl<'frame> MethodTable<'frame> {
+impl<'scope> MethodTable<'scope> {
     /*
     for (a, b) in zip(fieldnames(Core.MethodTable), fieldtypes(Core.MethodTable))
         println(a, ": ", b)
@@ -43,22 +43,22 @@ impl<'frame> MethodTable<'frame> {
     */
 
     /// Sometimes a hack used by serialization to handle kwsorter
-    pub fn name(self) -> SymbolRef<'frame> {
+    pub fn name(self) -> SymbolRef<'scope> {
         unsafe { SymbolRef::wrap(self.unwrap_non_null(Private).as_ref().name) }
     }
 
     /// The `defs` field.
-    pub fn defs(self) -> ValueRef<'frame, 'static> {
+    pub fn defs(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().defs) }
     }
 
     /// The `leafcache` field.
-    pub fn leaf_cache(self) -> ValueRef<'frame, 'static> {
+    pub fn leaf_cache(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().leafcache.cast()) }
     }
 
     /// The `cache` field.
-    pub fn cache(self) -> ValueRef<'frame, 'static> {
+    pub fn cache(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().cache) }
     }
 
@@ -68,17 +68,17 @@ impl<'frame> MethodTable<'frame> {
     }
 
     /// Keyword argument sorter function
-    pub fn kw_sorter(self) -> ValueRef<'frame, 'static> {
+    pub fn kw_sorter(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().kwsorter) }
     }
 
     /// Used for incremental serialization to locate original binding
-    pub fn module(self) -> ModuleRef<'frame> {
+    pub fn module(self) -> ModuleRef<'scope> {
         unsafe { ModuleRef::wrap(self.unwrap_non_null(Private).as_ref().module) }
     }
 
     /// The `backedges` field.
-    pub fn backedges(self) -> ArrayRef<'frame, 'static> {
+    pub fn backedges(self) -> ArrayRef<'scope, 'static> {
         unsafe { ArrayRef::wrap(self.unwrap_non_null(Private).as_ref().backedges) }
     }
 
@@ -93,15 +93,9 @@ impl<'frame> MethodTable<'frame> {
     }
 }
 
-impl<'scope> Debug for MethodTable<'scope> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        f.debug_tuple("MethodTable").finish()
-    }
-}
-
-impl_julia_typecheck!(MethodTable<'frame>, jl_methtable_type, 'frame);
-
-impl_valid_layout!(MethodTable<'frame>, 'frame);
+impl_julia_typecheck!(MethodTable<'scope>, jl_methtable_type, 'scope);
+impl_debug!(MethodTable<'_>);
+impl_valid_layout!(MethodTable<'scope>, 'scope);
 
 impl<'scope> Wrapper<'scope, '_> for MethodTable<'scope> {
     type Internal = jl_methtable_t;

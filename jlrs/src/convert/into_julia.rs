@@ -1,10 +1,19 @@
-//! Convert a value from Rust to Julia.
+//! Convert simple data from Rust to Julia.
 //!
-//! The trait in this module should be implemented by deriving `IntoJulia`, its methods are
-//! never called directly but only through [`Value::new`].
+//! In order to use data from Rust in Julia, it must first be converted to a [`Value`]. The
+//! easiest way to do this is by using [`Value::new`], which is compatible with types that
+//! implement the [`IntoJulia`] trait defined in this module. This trait only supports bits-types
+//! with no type parameters, and should not be implemented manually. Rather, you should use
+//! JlrsReflect.jl to automatically derive it for compatible types.
 //!
-//! [`Value::new`]: crate::wrappers::builtin::value::Value::new
+//! [`Value::new`]: crate::wrappers::ptr::value::Value::new
+//! [`Value`]: crate::wrappers::ptr::value::Value
 
+use crate::{
+    memory::global::Global,
+    private::Private,
+    wrappers::ptr::{private::Wrapper, DataTypeRef, ValueRef},
+};
 use jl_sys::{
     jl_bool_type, jl_box_bool, jl_box_char, jl_box_float32, jl_box_float64, jl_box_int16,
     jl_box_int32, jl_box_int64, jl_box_int8, jl_box_uint16, jl_box_uint32, jl_box_uint64,
@@ -14,27 +23,26 @@ use jl_sys::{
 };
 use std::ffi::c_void;
 
-use crate::{
-    memory::global::Global,
-    private::Private,
-    wrappers::ptr::{private::Wrapper, DataTypeRef, ValueRef},
-};
-
 /// Trait implemented by types that can be converted to a Julia value in combination with
-/// [`Value::new`]. This trait can be derived for custom bits types that implement
-/// `JuliaStruct`.
+/// [`Value::new`]. This trait can be derived, it's recommended to use JlrsReflect.jl to
+/// ensure it's implemented correctly.
 ///
-/// [`Value::new`]: crate::wrappers::builtin::value::Value::new
+/// If you do choose to implement it manually, you only need to implement the `julia_type` method
+/// which must return the `DataType` of the type this data will have in Julia. The layout of this 
+/// type and the type in Rust must match exactly. Incompatible layouts will lead to UB. Note that
+/// the type in Rust must always be `#[repr(C)]`.
+///
+/// [`Value::new`]: crate::wrappers::ptr::value::Value::new
 pub unsafe trait IntoJulia: Sized + 'static {
-    /// Returns the associated Julia type of the implementor.
-    ///
-    /// Safety: the layout of this type in Rust and Julia must match exactly.
-    unsafe fn julia_type<'scope>(_: Global<'scope>) -> DataTypeRef<'scope>;
+    /// Returns the associated Julia type of the implementor. The layout of that type and the
+    /// Rust type must match exactly, otherwise the trait is implemented incorrectly.
+    fn julia_type<'scope>(_: Global<'scope>) -> DataTypeRef<'scope>;
 
     #[doc(hidden)]
     unsafe fn into_julia<'scope>(self, global: Global<'scope>) -> ValueRef<'scope, 'static> {
         let ty = Self::julia_type(global)
-            .wrapper_unchecked()
+            .wrapper()
+            .expect("DataTypeRef::wrapper returned None")
             .unwrap_non_null(Private);
         debug_assert!(ty.as_ref().isbitstype != 0);
 
@@ -48,10 +56,12 @@ pub unsafe trait IntoJulia: Sized + 'static {
 macro_rules! impl_into_julia {
     ($type:ty, $boxer:ident, $julia_type:expr) => {
         unsafe impl IntoJulia for $type {
-            unsafe fn julia_type<'scope>(
+            fn julia_type<'scope>(
                 _: Global<'scope>,
             ) -> $crate::wrappers::ptr::DataTypeRef<'scope> {
-                $crate::wrappers::ptr::DataTypeRef::wrap($julia_type)
+                unsafe {
+                    $crate::wrappers::ptr::DataTypeRef::wrap($julia_type)
+                }
             }
 
             unsafe fn into_julia<'scope>(

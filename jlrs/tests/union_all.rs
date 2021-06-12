@@ -12,12 +12,12 @@ fn create_new_unionall() {
             let atype = UnionAll::array_type(global);
             let body = atype.body().wrapper_unchecked();
             let tvar = TypeVar::new(
-                frame,
+                &mut *frame,
                 "V",
                 None,
                 Some(DataType::number_type(global).as_value()),
-            )?;
-            let ua = Value::new_unionall(&mut *frame, tvar, body)?.cast::<UnionAll>()?;
+            )?.cast()?;
+            let ua = UnionAll::new(&mut *frame, tvar, body)?.cast::<UnionAll>()?;
             let v = ua.var().wrapper().unwrap();
 
             let equals = Module::base(global)

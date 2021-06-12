@@ -6,7 +6,7 @@
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#505
 
 use super::private::Wrapper;
-use crate::{impl_julia_typecheck, impl_valid_layout};
+use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout};
 use crate::{private::Private, wrappers::ptr::ValueRef};
 use jl_sys::{jl_typemap_entry_t, jl_typemap_entry_type};
 use std::{
@@ -18,9 +18,9 @@ use std::{
 /// One Type-to-Value entry
 #[derive(Copy, Clone)]
 #[repr(transparent)]
-pub struct TypeMapEntry<'frame>(NonNull<jl_typemap_entry_t>, PhantomData<&'frame ()>);
+pub struct TypeMapEntry<'scope>(NonNull<jl_typemap_entry_t>, PhantomData<&'scope ()>);
 
-impl<'frame> TypeMapEntry<'frame> {
+impl<'scope> TypeMapEntry<'scope> {
     /*
     for (a,b) in zip(fieldnames(Core.TypeMapEntry), fieldtypes(Core.TypeMapEntry))
          println(a,": ", b)
@@ -38,22 +38,22 @@ impl<'frame> TypeMapEntry<'frame> {
     */
 
     /// Invasive linked list
-    pub fn next(self) -> ValueRef<'frame, 'static> {
+    pub fn next(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().next.cast()) }
     }
 
     /// The type sig for this entry
-    pub fn sig(self) -> ValueRef<'frame, 'static> {
+    pub fn sig(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().sig.cast()) }
     }
 
     /// A simple signature for fast rejection
-    pub fn simple_sig(self) -> ValueRef<'frame, 'static> {
+    pub fn simple_sig(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().simplesig.cast()) }
     }
 
     /// The `guardsigs` field.
-    pub fn guard_sigs(self) -> ValueRef<'frame, 'static> {
+    pub fn guard_sigs(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().guardsigs.cast()) }
     }
 
@@ -68,7 +68,7 @@ impl<'frame> TypeMapEntry<'frame> {
     }
 
     /// The `func` field.
-    pub fn func(self) -> ValueRef<'frame, 'static> {
+    pub fn func(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().func.value) }
     }
 
@@ -88,15 +88,9 @@ impl<'frame> TypeMapEntry<'frame> {
     }
 }
 
-impl<'scope> Debug for TypeMapEntry<'scope> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        f.debug_tuple("TypeMapEntry").finish()
-    }
-}
-
-impl_julia_typecheck!(TypeMapEntry<'frame>, jl_typemap_entry_type, 'frame);
-
-impl_valid_layout!(TypeMapEntry<'frame>, 'frame);
+impl_julia_typecheck!(TypeMapEntry<'scope>, jl_typemap_entry_type, 'scope);
+impl_debug!(TypeMapEntry<'_>);
+impl_valid_layout!(TypeMapEntry<'scope>, 'scope);
 
 impl<'scope> Wrapper<'scope, '_> for TypeMapEntry<'scope> {
     type Internal = jl_typemap_entry_t;

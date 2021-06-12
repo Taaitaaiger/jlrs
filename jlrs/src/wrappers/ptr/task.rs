@@ -5,7 +5,7 @@
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L1727
 use super::private::Wrapper;
-use crate::{impl_julia_typecheck, impl_valid_layout};
+use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout};
 use crate::{
     private::Private,
     wrappers::ptr::{TaskRef, ValueRef},
@@ -20,9 +20,9 @@ use std::{
 /// A Julia `Task` (coroutine).
 #[derive(Copy, Clone)]
 #[repr(transparent)]
-pub struct Task<'frame>(NonNull<jl_task_t>, PhantomData<&'frame ()>);
+pub struct Task<'scope>(NonNull<jl_task_t>, PhantomData<&'scope ()>);
 
-impl<'frame> Task<'frame> {
+impl<'scope> Task<'scope> {
     /*
     for (a, b) in zip(fieldnames(Task), fieldtypes(Task))
         println(a, ": ", b)
@@ -40,37 +40,37 @@ impl<'frame> Task<'frame> {
     */
 
     /// Invasive linked list for scheduler
-    pub fn next(self) -> TaskRef<'frame> {
+    pub fn next(self) -> TaskRef<'scope> {
         unsafe { TaskRef::wrap(self.unwrap_non_null(Private).as_ref().next.cast()) }
     }
 
     /// Invasive linked list for scheduler
-    pub fn queue(self) -> ValueRef<'frame, 'static> {
+    pub fn queue(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().queue) }
     }
 
     /// The `tls` field, called `Task.storage` in Julia.
-    pub fn storage(self) -> ValueRef<'frame, 'static> {
+    pub fn storage(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().tls) }
     }
 
     /// The `donenotify` field.
-    pub fn done_notify(self) -> ValueRef<'frame, 'static> {
+    pub fn done_notify(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().donenotify) }
     }
 
     /// The `result` field.
-    pub fn result(self) -> ValueRef<'frame, 'static> {
+    pub fn result(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().result) }
     }
 
     /// The `logstate` field.
-    pub fn log_state(self) -> ValueRef<'frame, 'static> {
+    pub fn log_state(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().logstate) }
     }
 
     /// The `start` field.
-    pub fn start(self) -> ValueRef<'frame, 'static> {
+    pub fn start(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().start) }
     }
 
@@ -90,15 +90,9 @@ impl<'frame> Task<'frame> {
     }
 }
 
-impl<'scope> Debug for Task<'scope> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        f.debug_tuple("Task").finish()
-    }
-}
-
-impl_julia_typecheck!(Task<'frame>, jl_task_type, 'frame);
-
-impl_valid_layout!(Task<'frame>, 'frame);
+impl_julia_typecheck!(Task<'scope>, jl_task_type, 'scope);
+impl_debug!(Task<'_>);
+impl_valid_layout!(Task<'scope>, 'scope);
 
 impl<'scope> Wrapper<'scope, '_> for Task<'scope> {
     type Internal = jl_task_t;

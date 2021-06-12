@@ -9,7 +9,7 @@
 ///
 /// With these traits implemented you can use [`Value::cast`] with this custom type.
 ///
-/// Rather than manually implement the appropriate structs, you should use `JlrsReflect.jl` to
+/// Rather than manually implement the appropriate structs, you should use JlrsReflect.jl to
 /// generate them for you.  If you do choose to implement this trait manually, the following rules
 /// apply.
 ///
@@ -66,4 +66,4 @@
 /// [`ValidLayout`]: crate::layout::valid_layout::ValidLayout
 /// [`Cast`]: crate::convert::cast::Cast
 /// [`Value::cast`]: crate::wrappers::builtin::value::Value::cast
-pub unsafe trait JuliaStruct: Copy {}
+pub unsafe trait JuliaStruct: Clone {}

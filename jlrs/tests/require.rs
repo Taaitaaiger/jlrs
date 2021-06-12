@@ -47,11 +47,11 @@ fn call_function_from_loaded_module() {
             let mut arr1 = vec![1.0f64, 2.0f64];
             let mut arr2 = vec![2.0f64, 3.0f64];
 
-            let arr1_v = Value::borrow_array(&mut *frame, &mut arr1, 2)?;
-            let arr2_v = Value::borrow_array(&mut *frame, &mut arr2, 2)?;
+            let arr1_v = Array::from_slice(&mut *frame, &mut arr1, 2)?;
+            let arr2_v = Array::from_slice(&mut *frame, &mut arr2, 2)?;
 
             let res = func
-                .call2(&mut *frame, arr1_v, arr2_v)?
+                .unsafe_call2(&mut *frame, arr1_v, arr2_v)?
                 .expect("Cannot call LinearAlgebra.dot")
                 .unbox::<f64>()?;
 

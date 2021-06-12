@@ -2,7 +2,7 @@
 
 use crate::{
     error::{JlrsError, JlrsResult},
-    memory::traits::frame::Frame,
+    memory::frame::Frame,
     private::Private,
     wrappers::ptr::{
         array::{

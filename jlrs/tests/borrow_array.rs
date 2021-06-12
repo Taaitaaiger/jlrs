@@ -9,7 +9,7 @@ fn borrow_array_1d() {
 
         let unboxed = jlrs
             .scope_with_slots(1, |_, frame| {
-                let array = Value::borrow_array(frame, &mut data, 4)?;
+                let array = Array::from_slice(frame, &mut data, 4)?;
                 assert!(array.is_array_of::<u64>());
                 array.cast::<Array>()?.copy_inline_data::<u64>()
             })
@@ -40,11 +40,11 @@ fn borrow_array_1d_dynamic_type() {
                 let x = false;
 
                 let array = match x {
-                    true => Value::borrow_array(frame, foo.slice, 8)?,
+                    true => Array::from_slice(frame, foo.slice, 8)?,
                     false => unsafe {
                         let ptr = foo.slice.as_mut_ptr().cast::<u16>();
                         let slice = std::slice::from_raw_parts_mut(ptr, 4);
-                        Value::borrow_array(frame, slice, 4)?
+                        Array::from_slice(frame, slice, 4)?
                     },
                 };
 
@@ -70,7 +70,7 @@ fn borrow_array_1d_output() {
             .scope_with_slots(1, |_, frame| {
                 let array = frame.value_scope_with_slots(0, |output, frame| {
                     let output = output.into_scope(frame);
-                    Value::borrow_array(output, &mut data, 4)
+                    Array::from_slice(output, &mut data, 4)
                 })?;
                 assert!(array.is_array_of::<u64>());
                 array.cast::<Array>()?.copy_inline_data::<u64>()
@@ -92,7 +92,7 @@ fn borrow_array_1d_dynamic() {
 
         let unboxed = jlrs
             .scope(|_, frame| {
-                let array = Value::borrow_array(frame, &mut data, 4)?;
+                let array = Array::from_slice(frame, &mut data, 4)?;
                 array.cast::<Array>()?.copy_inline_data::<u64>()
             })
             .unwrap();
@@ -112,7 +112,7 @@ fn borrow_array_2d() {
 
         let unboxed = jlrs
             .scope_with_slots(1, |_, frame| {
-                let array = Value::borrow_array(frame, &mut data, (2, 2))?;
+                let array = Array::from_slice(frame, &mut data, (2, 2))?;
                 array.cast::<Array>()?.copy_inline_data::<u64>()
             })
             .unwrap();
@@ -133,7 +133,7 @@ fn borrow_array_2d_dynamic() {
 
         let unboxed = jlrs
             .scope(|_, frame| {
-                let array = Value::borrow_array(frame, &mut data, (2, 2))?;
+                let array = Array::from_slice(frame, &mut data, (2, 2))?;
                 array.cast::<Array>()?.copy_inline_data::<u64>()
             })
             .unwrap();
@@ -153,11 +153,11 @@ fn call_function_with_borrowed() {
 
         let unboxed = jlrs
             .scope_with_slots(2, |global, frame| unsafe {
-                let array = Value::borrow_array(&mut *frame, &mut data, 4)?;
+                let array = Array::from_slice(&mut *frame, &mut data, 4)?;
                 Module::base(global)
                     .function_ref("sum")?
                     .wrapper_unchecked()
-                    .call1(&mut *frame, array)?
+                    .unsafe_call1(&mut *frame, array)?
                     .unwrap()
                     .unbox::<u64>()
             })

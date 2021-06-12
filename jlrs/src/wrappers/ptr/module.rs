@@ -4,23 +4,17 @@
 //! modules, `Main`, `Base` and `Core`. Any Julia code that you include in jlrs is made available
 //! relative to the `Main` module, just like in Julia itself.
 
-use crate::{
-    convert::temporary_symbol::TemporarySymbol,
-    error::{JlrsError, JlrsResult},
-    impl_julia_typecheck, impl_valid_layout,
-    memory::{
+use crate::{convert::temporary_symbol::TemporarySymbol, error::{JlrsError, JlrsResult}, impl_debug, impl_julia_typecheck, impl_valid_layout, memory::{
         global::Global,
-        traits::{frame::Frame, scope::Scope},
-    },
-    prelude::Call,
-    private::Private,
-    wrappers::ptr::{
+        scope::Scope,
+        {frame::Frame,},
+    }, private::Private, wrappers::ptr::{
+        call::Call,
         function::Function,
         symbol::Symbol,
         value::{LeakedValue, Value},
         FunctionRef, ModuleRef, ValueRef, Wrapper as _,
-    },
-};
+    }};
 use jl_sys::{
     jl_base_module, jl_core_module, jl_get_global, jl_main_module, jl_module_t, jl_module_type,
     jl_set_const, jl_set_global, jl_typeis,
@@ -40,7 +34,7 @@ use super::private::Wrapper;
 /// returns `true` the [`Value`] can be cast to `Module`.
 ///
 /// The most important methods offered by this struct are those that let you access submodules,
-/// functions, and other global values defined in the module. These come in two flavors: one that
+/// functions, and other global values defined in the module. These come in two variants: one that
 /// roots the result and one that doesn't. If you never redefine the module, it's safe to leave
 /// named functions, constants and submodules unrooted when you use them from Rust. The same holds
 /// true for other global values that are never redefined to point at another value.
@@ -61,9 +55,9 @@ impl<'scope> Module<'scope> {
     }
 
     /// Returns the parent of this module.
-    pub fn parent<'frame, F>(self, frame: &mut F) -> JlrsResult<Module<'frame>>
+    pub fn parent<'target, F>(self, frame: &mut F) -> JlrsResult<Module<'target>>
     where
-        F: Frame<'frame>,
+        F: Frame<'target>,
     {
         unsafe {
             let parent = self.unwrap_non_null(Private).as_ref().parent;
@@ -108,10 +102,10 @@ impl<'scope> Module<'scope> {
     /// access `A` first and then `B`.
     ///
     /// Returns an error if the submodule doesn't exist.
-    pub fn submodule<'frame, N, F>(self, frame: &mut F, name: N) -> JlrsResult<Module<'frame>>
+    pub fn submodule<'target, N, F>(self, frame: &mut F, name: N) -> JlrsResult<Module<'target>>
     where
         N: TemporarySymbol,
-        F: Frame<'frame>,
+        F: Frame<'target>,
     {
         unsafe {
             let symbol = name.temporary_symbol(Private);
@@ -130,9 +124,9 @@ impl<'scope> Module<'scope> {
         }
     }
 
-    /// Returns the submodule named `name` relative to this module. You have to visit this level
-    /// by level: you can't access `Main.A.B` by calling this function with `"A.B"`, but have to
-    /// access `A` first and then `B`.
+    /// Returns the submodule named `name` relative to this module without rooting it. You have to
+    /// access this level by level: you can't access `Main.A.B` by calling this function with 
+    /// `"A.B"`, but have to access `A` first and then `B`.
     ///
     /// Returns an error if the submodule doesn't exist.
     pub fn submodule_ref<N>(self, name: N) -> JlrsResult<ModuleRef<'scope>>
@@ -153,13 +147,12 @@ impl<'scope> Module<'scope> {
         }
     }
 
-    /// Set a global value in this module. This is unsafe because if another global value was
-    /// previously assigned to this name, this previous value can become eligible for garbage
-    /// collection. Don't use the previous value after calling this method.
-    pub fn set_global<'frame, N>(
+    /// Set a global value in this module. Note that if this global already exists, this can
+    /// make the old value unreachable.
+    pub fn set_global<N>(
         self,
         name: N,
-        value: Value<'frame, 'static>,
+        value: Value<'_, 'static>,
     ) -> ValueRef<'scope, 'static>
     where
         N: TemporarySymbol,
@@ -175,10 +168,10 @@ impl<'scope> Module<'scope> {
     }
 
     /// Set a constant in this module.
-    pub fn set_const<'frame, N>(
+    pub fn set_const<N>(
         self,
         name: N,
-        value: Value<'frame, 'static>,
+        value: Value<'_, 'static>,
     ) -> JlrsResult<ValueRef<'scope, 'static>>
     where
         N: TemporarySymbol,
@@ -203,10 +196,10 @@ impl<'scope> Module<'scope> {
 
     /// Returns the global named `name` in this module.
     /// Returns an error if the global doesn't exist.
-    pub fn global<'frame, N, F>(self, frame: &mut F, name: N) -> JlrsResult<Value<'frame, 'static>>
+    pub fn global<'target, N, F>(self, frame: &mut F, name: N) -> JlrsResult<Value<'target, 'static>>
     where
         N: TemporarySymbol,
-        F: Frame<'frame>,
+        F: Frame<'target>,
     {
         unsafe {
             let symbol = name.temporary_symbol(Private);
@@ -225,7 +218,7 @@ impl<'scope> Module<'scope> {
         }
     }
 
-    /// Returns the global named `name` in this module.
+    /// Returns the global named `name` in this module without rooting it.
     /// Returns an error if the global doesn't exist.
     pub fn global_ref<N>(self, name: N) -> JlrsResult<ValueRef<'scope, 'static>>
     where
@@ -272,14 +265,14 @@ impl<'scope> Module<'scope> {
 
     /// Returns the function named `name` in this module.
     /// Returns an error if the function doesn't exist or if it's not a subtype of `Core.Function`.
-    pub fn function<'frame, N, F>(
+    pub fn function<'target, N, F>(
         self,
         frame: &mut F,
         name: N,
-    ) -> JlrsResult<Function<'frame, 'static>>
+    ) -> JlrsResult<Function<'target, 'static>>
     where
         N: TemporarySymbol,
-        F: Frame<'frame>,
+        F: Frame<'target>,
     {
         unsafe {
             let symbol = name.temporary_symbol(Private);
@@ -287,7 +280,7 @@ impl<'scope> Module<'scope> {
 
             if !func.is::<Function>() {
                 let name = symbol.as_str().unwrap_or("<Non-UTF8 string>").into();
-                let ty = func.type_name().unwrap_or("<Non-UTF8 string>").into();
+                let ty = func.datatype_name().unwrap_or("<Non-UTF8 string>").into();
                 Err(JlrsError::NotAFunction { name, ty })?;
             }
 
@@ -295,7 +288,7 @@ impl<'scope> Module<'scope> {
         }
     }
 
-    /// Returns the function named `name` in this module.
+    /// Returns the function named `name` in this module without rooting it.
     /// Returns an error if the function doesn't exist or if it's not a subtype of `Core.Function`.
     pub fn function_ref<N>(self, name: N) -> JlrsResult<FunctionRef<'scope, 'static>>
     where
@@ -307,7 +300,7 @@ impl<'scope> Module<'scope> {
 
             if !func.is::<Function>() {
                 let name = symbol.as_str().unwrap_or("<Non-UTF8 string>").into();
-                let ty = func.type_name().unwrap_or("<Non-UTF8 string>").into();
+                let ty = func.datatype_name().unwrap_or("<Non-UTF8 string>").into();
                 Err(JlrsError::NotAFunction { name, ty })?;
             }
 
@@ -337,14 +330,14 @@ impl<'scope> Module<'scope> {
     ///
     /// Note that when you want to call `using Submodule` in the `Main` module, you can do so by
     /// evaluating the using-statement with [`Value::eval_string`].    
-    pub fn require<'target, 'frame, S, F, N>(
+    pub fn require<'target, 'current, S, F, N>(
         self,
         scope: S,
         module: N,
     ) -> JlrsResult<S::JuliaResult>
     where
-        S: Scope<'target, 'frame, 'static, F>,
-        F: Frame<'frame>,
+        S: Scope<'target, 'current, 'static, F>,
+        F: Frame<'current>,
         N: TemporarySymbol,
     {
         unsafe {
@@ -360,7 +353,6 @@ impl<'scope> Module<'scope> {
         }
     }
 
-    /// TODO: require_ref
     /// Load a module by calling `Base.require` and return this module if it has been loaded
     /// successfully. This method can be used to load parts of the standard library like
     /// `LinearAlgebra`. Unlike `Module::require`, this method will panic if the module cannot
@@ -369,7 +361,7 @@ impl<'scope> Module<'scope> {
     ///
     /// Note that when you want to call `using Submodule` in the `Main` module, you can do so by
     /// evaluating the using-statement with [`Value::eval_string`].
-    pub fn require_or_panic<S>(self, global: Global<'scope>, module: S) -> Self
+    pub fn require_ref<S>(self, global: Global<'scope>, module: S) -> ModuleRef<'scope>
     where
         S: TemporarySymbol,
     {
@@ -389,20 +381,14 @@ impl<'scope> Module<'scope> {
                 ))
                 .wrapper_unchecked()
                 .cast_unchecked::<Module>()
+                .as_ref()
         }
     }
 }
 
-impl_julia_typecheck!(Module<'frame>, jl_module_type, 'frame);
-
-impl_valid_layout!(Module<'frame>, 'frame);
-
-impl<'frame, 'data> Debug for Module<'frame> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        let name = self.name().as_str().unwrap_or("<Non-UTF8 symbol>");
-        f.debug_tuple("Module").field(&name).finish()
-    }
-}
+impl_julia_typecheck!(Module<'target>, jl_module_type, 'target);
+impl_debug!(Module<'_>);
+impl_valid_layout!(Module<'target>, 'target);
 
 impl<'scope> Wrapper<'scope, '_> for Module<'scope> {
     type Internal = jl_module_t;

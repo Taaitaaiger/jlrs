@@ -16,11 +16,12 @@ pub mod julia_future;
 
 use crate::memory::global::Global;
 use crate::wrappers::ptr::module::Module;
+use crate::wrappers::ptr::string::JuliaString;
 use crate::wrappers::ptr::value::Value;
-use crate::{call::Call, memory::frame::GcFrame};
+use crate::{wrappers::ptr::call::Call, memory::frame::GcFrame};
 use crate::{
     error::{JlrsError, JlrsResult},
-    memory::{mode::Async, stack::StackPage},
+    memory::{mode::Async, stack_page::StackPage},
 };
 use crate::{INIT, JLRS_JL};
 use async_std::channel::{
@@ -146,7 +147,7 @@ where
     /// contains a compatible Julia binary (eg `${JULIA_DIR}/bin`), the second must be either an
     /// absolute or a relative path to a system image.
     ///
-    /// This function will return an error if either of the two paths does not exist, if the
+    /// This function will return an error if either of the two paths doesn't  exist, if the
     /// `JULIA_NUM_THREADS` environment variable is not set or set to a value smaller than 2, or
     /// if Julia has already been initialized. It is unsafe because this crate provides you with
     /// a way to execute arbitrary Julia code which can't be checked for correctness.
@@ -197,7 +198,7 @@ where
     /// contains a compatible Julia binary (eg `${JULIA_DIR}/bin`), the second must be either an
     /// absolute or a relative path to a system image.
     ///
-    /// This function will return an error if either of the two paths does not exist, if the
+    /// This function will return an error if either of the two paths doesn't  exist, if the
     /// `JULIA_NUM_THREADS` environment variable is not set or set to a value smaller than 2, or
     /// if Julia has already been initialized. It is unsafe because this crate provides you with
     /// a way to execute arbitrary Julia code which can't be checked for correctness.
@@ -265,7 +266,7 @@ where
     }
 
     /// Include a Julia file. This method waits until the call `Main.include` in Julia has been
-    /// completed. It returns an error if the path does not exist or the call to `Main.include`
+    /// completed. It returns an error if the path doesn't  exist or the call to `Main.include`
     /// throws an exception.
     pub async fn include<P: AsRef<Path>>(&self, path: P) -> JlrsResult<()> {
         if !path.as_ref().exists() {
@@ -291,7 +292,7 @@ where
     }
 
     /// Include a Julia file. This method waits until the call `Main.include` in Julia has been
-    /// completed. It returns an error if the path does not exist, the channel is full, or the
+    /// completed. It returns an error if the path doesn't  exist, the channel is full, or the
     /// call to `Main.include` throws an exception.
     pub fn try_include<P: AsRef<Path>>(&self, path: P) -> JlrsResult<()> {
         if !path.as_ref().exists() {
@@ -718,7 +719,7 @@ fn call_include(stack: &mut AsyncStack, path: PathBuf) -> JlrsResult<()> {
 
         match path.to_str() {
             Some(path) => {
-                let path = Value::new_string(&mut frame, path)?;
+                let path = JuliaString::new(&mut frame, path)?;
                 Module::main(global)
                     .function_ref("include")?
                     .wrapper_unchecked()

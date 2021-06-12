@@ -823,7 +823,7 @@ mod tests {
 
             julia
                 .scope(|global, frame| {
-                    let arr = Value::new_array::<i32, _, _, _>(&mut *frame, (2, 2))?;
+                    let arr = Array::new::<i32, _, _, _>(&mut *frame, (2, 2))?;
 
                     let wgt_constr = Module::main(global)
                         .submodule_ref("WithGeneric").wrapper_unchecked()

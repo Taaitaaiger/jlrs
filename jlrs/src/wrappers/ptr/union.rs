@@ -1,8 +1,8 @@
 //! Wrapper for `Core.Union`.
 
 use super::{private::Wrapper, value::Value, ValueRef, Wrapper as _};
-use crate::{impl_julia_typecheck, impl_valid_layout, private::Private};
-use jl_sys::{jl_islayout_inline, jl_uniontype_t, jl_uniontype_type};
+use crate::{error::{JlrsResult, JlrsError}, impl_debug, impl_julia_typecheck, impl_valid_layout, memory::{frame::Frame, global::Global, scope::Scope}, private::Private};
+use jl_sys::{jl_islayout_inline, jl_type_union, jl_uniontype_t, jl_uniontype_type};
 use std::{
     fmt::{Debug, Formatter, Result as FmtResult},
     marker::PhantomData,
@@ -13,9 +13,58 @@ use std::{
 /// field is an instance of `Union`.
 #[derive(Copy, Clone)]
 #[repr(transparent)]
-pub struct Union<'frame>(NonNull<jl_uniontype_t>, PhantomData<&'frame ()>);
+pub struct Union<'scope>(NonNull<jl_uniontype_t>, PhantomData<&'scope ()>);
 
-impl<'frame> Union<'frame> {
+impl<'scope> Union<'scope> {
+    /// Returns the union of all types in `types`. For each of these types, [`Value::is_kind`]
+    /// must return `true`. Note that the result is not necessarily a [`Union`], for example the
+    /// union of a single [`DataType`] is that type, not a `Union` with a single variant.
+    ///
+    /// [`Union`]: crate::wrappers::ptr::union::Union
+    pub fn new<'target, 'current, V, S, F>(scope: S, mut types: V) -> JlrsResult<S::Value>
+    where
+        V: AsMut<[Value<'scope, 'static>]>,
+        S: Scope<'target, 'current, 'static, F>,
+        F: Frame<'current>,
+    {
+        unsafe {
+            let types = types.as_mut();
+            if let Some(v) = types
+                .iter()
+                .find_map(|v| if v.is_kind() { None } else { Some(v) })
+            {
+                Err(JlrsError::NotAKind(v.datatype_name()?.into()))?;
+            }
+
+            let un = jl_type_union(types.as_mut_ptr().cast(), types.len());
+            scope.value(NonNull::new_unchecked(un), Private)
+        }
+    }
+
+    /// Returns the union of all types in `types`. For each of these types, [`Value::is_kind`]
+    /// must return `true`. Note that the result is not necessarily a [`Union`], for example the
+    /// union of a single [`DataType`] is that type, not a `Union` with a single variant. Unlike
+    /// [`Union::new`] this method doesn't root the allocated value.
+    /// 
+    /// [`Union`]: crate::wrappers::ptr::union::Union
+    pub fn new_unrooted<'global, V>(_: Global<'global>, mut types: V) -> JlrsResult<ValueRef<'global, 'static>>
+    where
+        V: AsMut<[Value<'scope, 'static>]>,
+    {
+        unsafe {
+            let types = types.as_mut();
+            if let Some(v) = types
+                .iter()
+                .find_map(|v| if v.is_kind() { None } else { Some(v) })
+            {
+                Err(JlrsError::NotAKind(v.datatype_name()?.into()))?;
+            }
+
+            let un = jl_type_union(types.as_mut_ptr().cast(), types.len());
+            Ok(ValueRef::wrap(un))
+        }
+    }
+
     /// Returns true if the bits-union optimization applies to this union type.
     pub fn is_bits_union(self) -> bool {
         unsafe {
@@ -46,7 +95,7 @@ impl<'frame> Union<'frame> {
     }
 
     /// Returns a vector of all type variants this union can have.
-    pub fn variants(self) -> Vec<ValueRef<'frame, 'static>> {
+    pub fn variants(self) -> Vec<ValueRef<'scope, 'static>> {
         let mut comps = vec![];
         collect(self.as_value(), &mut comps);
         comps
@@ -62,26 +111,20 @@ impl<'frame> Union<'frame> {
 
     /// Unions are stored as binary trees, the arguments are stored as its leaves. This method
     /// returns one of its branches.
-    pub fn a(self) -> ValueRef<'frame, 'static> {
+    pub fn a(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().a) }
     }
 
     /// Unions are stored as binary trees, the arguments are stored as its leaves. This method
     /// returns one of its branches.
-    pub fn b(self) -> ValueRef<'frame, 'static> {
+    pub fn b(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().b) }
     }
 }
 
-impl<'scope> Debug for Union<'scope> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        f.debug_tuple("Union").finish()
-    }
-}
-
-impl_julia_typecheck!(Union<'frame>, jl_uniontype_type, 'frame);
-
-impl_valid_layout!(Union<'frame>, 'frame);
+impl_julia_typecheck!(Union<'scope>, jl_uniontype_type, 'scope);
+impl_debug!(Union<'_>);
+impl_valid_layout!(Union<'scope>, 'scope);
 
 impl<'scope> Wrapper<'scope, '_> for Union<'scope> {
     type Internal = jl_uniontype_t;
@@ -95,10 +138,10 @@ impl<'scope> Wrapper<'scope, '_> for Union<'scope> {
     }
 }
 
-pub(crate) fn nth_union_component<'frame, 'data>(
-    v: Value<'frame, 'data>,
+pub(crate) fn nth_union_component<'scope, 'data>(
+    v: Value<'scope, 'data>,
     pi: &mut i32,
-) -> Option<Value<'frame, 'data>> {
+) -> Option<Value<'scope, 'data>> {
     unsafe {
         match v.cast::<Union>() {
             Ok(un) => {

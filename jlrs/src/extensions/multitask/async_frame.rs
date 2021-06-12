@@ -1,19 +1,15 @@
-use crate::memory::{
-    mode::Async,
-    stack::StackPage,
-    traits::{frame::Frame, root_pending::RootPending},
-};
+use crate::memory::{frame::Frame, mode::Async, root_pending::RootPending, stack_page::StackPage};
 use crate::{
     error::{AllocError, JlrsError, JlrsResult, JuliaResult},
     memory::{
         frame::{GcFrame, MIN_FRAME_CAPACITY},
+        mode::private::Mode,
         output::{Output, OutputResult, OutputValue},
-        traits::mode::private::Mode,
     },
     private::Private,
     wrappers::ptr::value::Value,
 };
-use crate::{memory::traits::frame::private, wrappers::ptr::private::Wrapper as _};
+use crate::{memory::frame::private, wrappers::ptr::private::Wrapper as _};
 use futures::Future;
 use jl_sys::jl_value_t;
 use std::{
@@ -216,7 +212,7 @@ impl<'frame> AsyncGcFrame<'frame> {
             self.raw_frame[idx] = null_mut();
         }
 
-        // The new number of slots does not exceed the capacity, and the new slots have been cleared
+        // The new number of slots doesn't  exceed the capacity, and the new slots have been cleared
         unsafe { self.set_n_slots(slots + additional) }
         true
     }
@@ -245,8 +241,7 @@ impl<'frame> AsyncGcFrame<'frame> {
         self.raw_frame[0] = (n_slots << 1) as _;
     }
 
-    // Safety: frame must be dropped
-    pub(crate) unsafe fn nest<'nested>(
+    pub(crate) fn nest<'nested>(
         &'nested mut self,
         capacity: usize,
     ) -> GcFrame<'nested, Async<'frame>> {
@@ -387,7 +382,7 @@ impl<'frame> private::Frame<'frame> for AsyncGcFrame<'frame> {
         Ok(Value::wrap_non_null(value, Private))
     }
 
-    unsafe fn nest<'nested>(
+    fn nest<'nested>(
         &'nested mut self,
         capacity: usize,
         _: Private,
@@ -485,8 +480,7 @@ impl<'frame> private::Frame<'frame> for AsyncGcFrame<'frame> {
     where
         for<'inner> F: FnOnce(&mut GcFrame<'inner, Self::Mode>) -> JlrsResult<T>,
     {
-        // safe: frame is dropped
-        let mut nested = unsafe { self.nest(0) };
+        let mut nested = self.nest(0);
         func(&mut nested)
     }
 
@@ -494,8 +488,7 @@ impl<'frame> private::Frame<'frame> for AsyncGcFrame<'frame> {
     where
         for<'inner> F: FnOnce(&mut GcFrame<'inner, Self::Mode>) -> JlrsResult<T>,
     {
-        // safe: frame is dropped
-        let mut nested = unsafe { self.nest(capacity) };
+        let mut nested = self.nest(capacity);
         func(&mut nested)
     }
 }

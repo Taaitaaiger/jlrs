@@ -14,14 +14,14 @@ use super::{
     array::Array, private::Wrapper as WrapperPriv, type_var::TypeVar, DataTypeRef, SimpleVectorRef,
     TypeNameRef, ValueRef, Wrapper,
 };
-use crate::impl_valid_layout;
+use crate::{impl_debug, impl_valid_layout};
 use crate::layout::typecheck::{Concrete, Typecheck};
-use crate::memory::traits::frame::Frame;
+use crate::memory::frame::Frame;
 use crate::wrappers::ptr::symbol::Symbol;
 use crate::wrappers::ptr::value::Value;
 use crate::{
     error::{JlrsError, JlrsResult},
-    memory::traits::scope::Scope,
+    memory::scope::Scope,
 };
 use crate::{memory::global::Global, private::Private};
 use jl_sys::{
@@ -70,9 +70,9 @@ use std::ptr::NonNull;
 /// ```
 #[derive(Copy, Clone)]
 #[repr(transparent)]
-pub struct DataType<'frame>(NonNull<jl_datatype_t>, PhantomData<&'frame ()>);
+pub struct DataType<'scope>(NonNull<jl_datatype_t>, PhantomData<&'scope ()>);
 
-impl<'frame> DataType<'frame> {
+impl<'scope> DataType<'scope> {
     /*
     for (a, b) in zip(fieldnames(DataType), fieldtypes(DataType))
         println(a, ": ", b)
@@ -100,12 +100,12 @@ impl<'frame> DataType<'frame> {
     */
 
     /// Returns the `TypeName` of this type.
-    pub fn type_name(self) -> TypeNameRef<'frame> {
+    pub fn type_name(self) -> TypeNameRef<'scope> {
         unsafe { TypeNameRef::wrap(self.unwrap_non_null(Private).as_ref().name) }
     }
 
     /// Returns the super type of this type.
-    pub fn super_type(self) -> DataTypeRef<'frame> {
+    pub fn super_type(self) -> DataTypeRef<'scope> {
         unsafe {
             let sup = self.unwrap_non_null(Private).as_ref().super_;
             DataTypeRef::wrap(sup)
@@ -113,22 +113,22 @@ impl<'frame> DataType<'frame> {
     }
 
     /// Returns the type parameters of this type.
-    pub fn parameters(self) -> SimpleVectorRef<'frame, TypeVar<'frame>> {
+    pub fn parameters(self) -> SimpleVectorRef<'scope> {
         unsafe { SimpleVectorRef::wrap(self.unwrap_non_null(Private).as_ref().parameters) }
     }
 
     /// Returns the field types of this type.
-    pub fn field_types(self) -> SimpleVectorRef<'frame> {
+    pub fn field_types(self) -> SimpleVectorRef<'scope> {
         unsafe { SimpleVectorRef::wrap(jl_get_fieldtypes(self.unwrap(Private))) }
     }
 
     /// Returns the field names of this type.
-    pub fn field_names(self) -> SimpleVectorRef<'frame, Symbol<'frame>> {
+    pub fn field_names(self) -> SimpleVectorRef<'scope, Symbol<'scope>> {
         unsafe { SimpleVectorRef::wrap(jl_field_names(self.unwrap(Private))) }
     }
 
     /// Returns the instance if this type is a singleton.
-    pub fn instance(self) -> ValueRef<'frame, 'static> {
+    pub fn instance(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().instance) }
     }
 
@@ -198,10 +198,10 @@ impl<'frame> DataType<'frame> {
     }
 }
 
-impl<'frame> DataType<'frame> {
+impl<'scope> DataType<'scope> {
     /// Performs the given typecheck.
     pub fn is<T: Typecheck>(self) -> bool {
-        unsafe { T::typecheck(self) }
+        T::typecheck(self)
     }
 
     /// Returns the alignment of a value of this type in bytes.
@@ -220,7 +220,7 @@ impl<'frame> DataType<'frame> {
     }
 
     /// Returns the name of this type.
-    pub fn name(self) -> &'frame str {
+    pub fn name(self) -> &'scope str {
         unsafe {
             let name = jl_typename_str(self.unwrap(Private).cast());
             CStr::from_ptr(name).to_str().unwrap()
@@ -242,15 +242,18 @@ impl<'frame> DataType<'frame> {
         unsafe { jl_field_isptr(self.unwrap(Private), idx as _) }
     }
 
-    /// Intantiate a value of this `DataType` with the given values. Returns an error if the type
-    /// is not concrete.
-    pub fn instantiate<'scope, 'fr, 'value, 'borrow, S, F, V>(
+    /// Create a new instance of this `DataType`, using `values` to set the fields.
+    /// This is essentially a more powerful version of [`Value::new`] that can instantiate
+    /// arbitrary concrete `DataType`s, at the cost that each of its fields must have already been
+    /// allocated as a `Value`. This functions returns an error if the given `DataType` is not
+    /// concrete or an array type.
+    pub fn instantiate<'target, 'fr, 'value, 'borrow, S, F, V>(
         self,
         scope: S,
         mut values: V,
     ) -> JlrsResult<S::Value>
     where
-        S: Scope<'scope, 'fr, 'borrow, F>,
+        S: Scope<'target, 'fr, 'borrow, F>,
         F: Frame<'fr>,
         V: AsMut<[Value<'value, 'borrow>]>,
     {
@@ -270,6 +273,40 @@ impl<'frame> DataType<'frame> {
                 values.len() as _,
             );
             scope.value(NonNull::new_unchecked(value), Private)
+        }
+    }
+
+    /// Create a new instance of this `DataType`, using `values` to set the fields.
+    /// This is essentially a more powerful version of [`Value::new`] that can instantiate
+    /// arbitrary concrete `DataType`s, at the cost that each of its fields must have already been
+    /// allocated as a `Value`. This functions returns an error if the given `DataType` is not
+    /// concrete or an array type. Unlike [`DataType::instantiate`] this method doesn't root the
+    /// allocated value.
+    pub fn instantiate_unrooted<'global, 'value, 'borrow, V>(
+        self,
+        _: Global<'global>,
+        mut values: V,
+    ) -> JlrsResult<ValueRef<'global, 'borrow>>
+    where
+        V: AsMut<[Value<'value, 'borrow>]>,
+    {
+        unsafe {
+            if !self.is::<Concrete>() {
+                Err(JlrsError::NotConcrete(self.name().into()))?;
+            }
+
+            if self.is::<Array>() {
+                Err(JlrsError::ArrayNotSupported)?;
+            }
+
+            let values = values.as_mut();
+            let value = jl_new_structv(
+                self.unwrap(Private),
+                values.as_mut_ptr().cast(),
+                values.len() as _,
+            );
+
+            Ok(ValueRef::wrap(value))
         }
     }
 }
@@ -629,14 +666,9 @@ impl<'scope, 'data> PartialEq<Value<'scope, 'data>> for DataType<'scope> {
 }
 
 impl<'scope> Eq for DataType<'scope> {}
+impl_debug!(DataType<'_>);
 
-impl<'frame, 'data> Debug for DataType<'frame> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        f.debug_tuple("DataType").field(&self.name()).finish()
-    }
-}
-
-impl_valid_layout!(DataType<'frame>, 'frame);
+impl_valid_layout!(DataType<'scope>, 'scope);
 
 impl<'scope> WrapperPriv<'scope, '_> for DataType<'scope> {
     type Internal = jl_datatype_t;

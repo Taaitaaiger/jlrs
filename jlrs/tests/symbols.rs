@@ -1,6 +1,6 @@
 use jlrs::util::JULIA;
 use jlrs::{
-    memory::traits::gc::{Gc, GcCollection},
+    memory::gc::{Gc, GcCollection},
     prelude::*,
 };
 

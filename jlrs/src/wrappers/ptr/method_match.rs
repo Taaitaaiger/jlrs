@@ -5,7 +5,7 @@
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/f9720dc2ebd6cd9e3086365f281e62506444ef37/src/julia.h#L585
 use super::private::Wrapper;
-use crate::{impl_julia_typecheck, impl_valid_layout};
+use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout};
 use crate::{
     private::Private,
     wrappers::ptr::{MethodRef, SimpleVectorRef, ValueRef},
@@ -19,9 +19,9 @@ use std::{
 
 #[derive(Copy, Clone)]
 #[repr(transparent)]
-pub struct MethodMatch<'frame>(NonNull<jl_method_match_t>, PhantomData<&'frame ()>);
+pub struct MethodMatch<'scope>(NonNull<jl_method_match_t>, PhantomData<&'scope ()>);
 
-impl<'frame> MethodMatch<'frame> {
+impl<'scope> MethodMatch<'scope> {
     /*
     for (a, b) in zip(fieldnames(Core.MethodMatch), fieldtypes(Core.MethodMatch))
         println(a, ": ", b)
@@ -33,17 +33,17 @@ impl<'frame> MethodMatch<'frame> {
     */
 
     /// The `spec_types` field.
-    pub fn spec_types(self) -> ValueRef<'frame, 'static> {
+    pub fn spec_types(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().spec_types.cast()) }
     }
 
     /// The `sparams` field.
-    pub fn sparams(self) -> SimpleVectorRef<'frame> {
+    pub fn sparams(self) -> SimpleVectorRef<'scope> {
         unsafe { SimpleVectorRef::wrap(self.unwrap_non_null(Private).as_ref().sparams) }
     }
 
     /// The `method` field.
-    pub fn method(self) -> MethodRef<'frame> {
+    pub fn method(self) -> MethodRef<'scope> {
         unsafe { MethodRef::wrap(self.unwrap_non_null(Private).as_ref().method) }
     }
 
@@ -54,15 +54,9 @@ impl<'frame> MethodMatch<'frame> {
     }
 }
 
-impl<'scope> Debug for MethodMatch<'scope> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        f.debug_tuple("MethodMatch").finish()
-    }
-}
-
-impl_julia_typecheck!(MethodMatch<'frame>, jl_method_match_type, 'frame);
-
-impl_valid_layout!(MethodMatch<'frame>, 'frame);
+impl_julia_typecheck!(MethodMatch<'scope>, jl_method_match_type, 'scope);
+impl_debug!(MethodMatch<'_>);
+impl_valid_layout!(MethodMatch<'scope>, 'scope);
 
 impl<'scope> Wrapper<'scope, '_> for MethodMatch<'scope> {
     type Internal = jl_method_match_t;

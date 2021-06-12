@@ -1,23 +1,9 @@
 extern crate proc_macro;
 
+use proc_macro2::TokenStream as TS2; 
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{self, Meta};
-
-use syn::visit_mut::VisitMut;
-struct MissingLifetimes(Vec<String>);
-
-impl VisitMut for MissingLifetimes {
-    fn visit_generics_mut(&mut self, def: &mut syn::Generics) {
-        for s in self.0.iter() {
-            let gp = syn::GenericParam::Lifetime(syn::LifetimeDef::new(syn::Lifetime::new(
-                s,
-                ::proc_macro2::Span::call_site(),
-            )));
-            def.params.insert(0, gp);
-        }
-    }
-}
 
 #[derive(Default)]
 struct ClassifiedFields<'a> {
@@ -32,7 +18,7 @@ struct ClassifiedFields<'a> {
 impl<'a> ClassifiedFields<'a> {
     fn classify<I>(fields_iter: I) -> Self
     where
-        I: Iterator<Item = &'a syn::Field> + ExactSizeIterator + Clone,
+        I: Iterator<Item = &'a syn::Field> + ExactSizeIterator,
     {
         let mut rs_flag_fields = vec![];
         let mut rs_align_fields = vec![];
@@ -43,19 +29,19 @@ impl<'a> ClassifiedFields<'a> {
         let mut offset = 0;
 
         'outer: for (idx, field) in fields_iter.enumerate() {
-            for attr in field.attrs.iter() {
-                match JlrsAttr::parse(attr) {
-                    Some(JlrsAttr::BitsUnion) => {
+            for attr in &field.attrs {
+                match JlrsFieldAttr::parse(attr) {
+                    Some(JlrsFieldAttr::BitsUnion) => {
                         rs_union_fields.push(&field.ty);
                         jl_union_field_idxs.push(idx - offset);
                         continue 'outer;
                     }
-                    Some(JlrsAttr::BitsUnionAlign) => {
+                    Some(JlrsFieldAttr::BitsUnionAlign) => {
                         rs_align_fields.push(&field.ty);
                         offset += 1;
                         continue 'outer;
                     }
-                    Some(JlrsAttr::BitsUnionFlag) => {
+                    Some(JlrsFieldAttr::BitsUnionFlag) => {
                         rs_flag_fields.push(&field.ty);
                         offset += 1;
                         continue 'outer;
@@ -79,51 +65,213 @@ impl<'a> ClassifiedFields<'a> {
     }
 }
 
+struct JlrsTypeAttrs {
+    julia_type: Option<String>,
+    zst: bool
+}
+
+impl JlrsTypeAttrs {
+    fn parse(ast: &syn::DeriveInput) -> Self {
+        let mut julia_type = None;
+        let mut zst = false;
+        for attr in &ast.attrs {
+            if attr.path.is_ident("jlrs") {
+                if let Ok(Meta::List(p)) = attr.parse_meta() {
+                    for item in &p.nested {
+                        match item {
+                            syn::NestedMeta::Meta(Meta::NameValue(nv)) => {
+                                if nv.path.is_ident("julia_type") {
+                                    if let syn::Lit::Str(string) = &nv.lit {
+                                        julia_type = Some(string.value())
+                                    }
+                                }
+                            }
+                            syn::NestedMeta::Meta(Meta::Path(pt)) => {
+                                if pt.is_ident("zst") {
+                                    zst = true;
+                                }
+                            }
+                            _ => continue
+                        }
+                    }
+                }
+            }
+        }
+
+        JlrsTypeAttrs {
+            julia_type, zst
+        }
+    }
+}
+
+enum JlrsFieldAttr {
+    BitsUnionAlign,
+    BitsUnion,
+    BitsUnionFlag,
+}
+
+impl JlrsFieldAttr {
+    pub fn parse(attr: &syn::Attribute) -> Option<Self> {
+        if let Ok(Meta::List(p)) = attr.parse_meta() {
+             if let Some(syn::NestedMeta::Meta(syn::Meta::Path(m))) = p.nested.first() {
+                if m.is_ident("bits_union") {
+                    return Some(JlrsFieldAttr::BitsUnion);
+                }
+
+                if m.is_ident("bits_union_align") {
+                    return Some(JlrsFieldAttr::BitsUnionAlign);
+                }
+
+                if m.is_ident("bits_union_flag") {
+                    return Some(JlrsFieldAttr::BitsUnionFlag);
+                }
+            }
+        }
+
+        None
+    }
+}
+
 #[proc_macro_derive(IntoJulia)]
 pub fn into_julia_derive(input: TokenStream) -> TokenStream {
-    // Construct a representation of Rust code as a syntax tree
-    // that we can manipulate
     let ast = syn::parse(input).unwrap();
-
-    // Build the trait implementation
     impl_into_julia(&ast)
 }
 
-#[proc_macro_derive(JuliaStruct, attributes(jlrs))]
-pub fn julia_struct_derive(input: TokenStream) -> TokenStream {
-    // Construct a representation of Rust code as a syntax tree
-    // that we can manipulate
+#[proc_macro_derive(Unbox)]
+pub fn unbox_derive(input: TokenStream) -> TokenStream {
     let ast = syn::parse(input).unwrap();
-
-    // Build the trait implementation
-    impl_julia_struct(&ast)
+    impl_unbox(&ast)
 }
 
-fn impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
+#[proc_macro_derive(Typecheck)]
+pub fn typecheck_derive(input: TokenStream) -> TokenStream {
+    let ast = syn::parse(input).unwrap();
+    impl_typecheck(&ast)
+}
+
+#[proc_macro_derive(ValidLayout)]
+pub fn valid_layout_derive(input: TokenStream) -> TokenStream {
+    let ast = syn::parse(input).unwrap();
+    impl_valid_layout(&ast)
+}
+
+fn impl_into_julia(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
     if !is_repr_c(ast) {
-        panic!("JuliaStruct can only be derived for types with the attribute #[repr(C)].");
+        panic!("IntoJulia can only be derived for types with the attribute #[repr(C)].");
+    }
+
+    let mut attrs = JlrsTypeAttrs::parse(ast);
+    let jl_type = attrs.julia_type
+        .take()
+        .expect("IntoJulia can only be derived if the corresponding Julia type is set with #[julia_type = \"Main.MyModule.Submodule.StructType\"]");
+
+    let mut type_it = jl_type.split('.');
+    let func = match type_it.next() {
+        Some("Main") => quote::format_ident!("main"),
+        Some("Base") => quote::format_ident!("base"),
+        Some("Core") => quote::format_ident!("core"),
+        _ => panic!("IntoJulia can only be derived if the first module of \"julia_type\" is either \"Main\", \"Base\" or \"Core\"."),
+    };
+
+    let mut modules = type_it.collect::<Vec<_>>();
+    let ty = modules.pop().expect("IntoJulia can only be derived if the corresponding Julia type is set with #[jlrs(julia_type = \"Main.MyModule.Submodule.StructType\")]");
+    let modules_it = modules.iter();
+    let modules_it_b = modules_it.clone();
+
+    let into_julia_fn = impl_into_julia_fn(&attrs);
+
+    let into_julia_impl = quote! {
+        unsafe impl ::jlrs::convert::into_julia::IntoJulia for #name {
+            fn julia_type<'target>(global: ::jlrs::memory::global::Global<'target>) -> ::jlrs::wrapper::ptr::DataTypeRef<'target> {
+                unsafe {
+                    ::jlrs::wrappers::ptr::module::Module::#func(global)
+                        #(
+                            .submodule_ref(#modules_it)
+                            .expect(&format!("Submodule {} cannot be found", #modules_it_b))
+                            .wrapper_unchecked()
+                        )*
+                        .global_ref(#ty)
+                        .expect(&format!("Type {} cannot be found in module", #ty))
+                        .value_unchecked()
+                        .cast::<::jlrs::wrapper::ptr::datatype::DataType>()
+                        .expect("Type is not a DataType")
+                        .as_ref()
+                }
+            }
+
+            #into_julia_fn
+        }
+    };
+
+    into_julia_impl.into()
+}
+
+fn impl_into_julia_fn(attrs: &JlrsTypeAttrs) -> TS2 {
+    if attrs.zst {
+        quote! {
+            unsafe fn into_julia<'target>(self, global: ::jlrs::memory::global::Global<'target>) -> ::jlrs::wrapper::ptr::ValueRef<'target, 'static> {
+                let ty = self.julia_type(global);
+                unsafe {
+                    ty.wrapper_unchecked()
+                        .instance()
+                        .value()
+                        .expect("Instance is undefined")
+                        .as_ref()
+                }
+            }
+        }
+    } else {
+        quote! {}
+    }
+}
+
+fn impl_unbox(ast: &syn::DeriveInput) -> TokenStream {
+    let name = &ast.ident;
+    if !is_repr_c(ast) {
+        panic!("Unbox can only be derived for types with the attribute #[repr(C)].");
     }
 
     let generics = &ast.generics;
-    let mut missing_lifetimes = MissingLifetimes(Vec::with_capacity(2));
+    let where_clause = &ast.generics.where_clause;
 
-    let data_lt = generics
-        .lifetimes()
-        .find(|l| l.lifetime.ident.to_string() == "data");
-    if data_lt.is_none() {
-        missing_lifetimes.0.push("'data".into());
+    let unbox_impl = quote! {
+        unsafe impl #generics ::jlrs::convert::unbox::Unbox for #name #generics #where_clause {
+            type Output = Self;
+        }
+    };
+
+    unbox_impl.into()
+}
+
+fn impl_typecheck(ast: &syn::DeriveInput) -> TokenStream {
+    let name = &ast.ident;
+    if !is_repr_c(ast) {
+        panic!("Typecheck can only be derived for types with the attribute #[repr(C)].");
     }
-    let frame_lt = generics
-        .lifetimes()
-        .find(|l| l.lifetime.ident.to_string() == "frame");
-    if frame_lt.is_none() {
-        missing_lifetimes.0.push("'frame".into());
+
+    let generics = &ast.generics;
+    let where_clause = &ast.generics.where_clause;
+
+    let typecheck_impl = quote! {
+        unsafe impl #generics ::jlrs::layout::typecheck::Typecheck for #name #generics #where_clause {
+            fn typecheck(dt: ::jlrs::wrappers::ptr::DataType) -> bool {
+                <Self as ::jlrs::layout::valid_layout::ValidLayout>::valid_layout(t.as_value())
+            }
+        }
+    };
+
+    typecheck_impl.into()
+}
+
+fn impl_valid_layout(ast: &syn::DeriveInput) -> TokenStream {
+    let name = &ast.ident;
+    if !is_repr_c(ast) {
+        panic!("ValidLayout can only be derived for types with the attribute #[repr(C)].");
     }
 
-    let mut extended_generics = generics.clone();
-    missing_lifetimes.visit_generics_mut(&mut extended_generics);
-
+    let generics = &ast.generics;
     let where_clause = &ast.generics.where_clause;
 
     let fields = match &ast.data {
@@ -147,11 +295,10 @@ fn impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
     let n_fields = classified_fields.jl_union_field_idxs.len()
         + classified_fields.jl_non_union_field_idxs.len();
 
-    let julia_struct_impl = quote! {
+    let valid_layout_impl = quote! {
         unsafe impl #generics ::jlrs::layout::valid_layout::ValidLayout for #name #generics #where_clause {
-            unsafe fn valid_layout(v: ::jlrs::wrappers::builtin::value::Value) -> bool {
-
-                if let Ok(dt) = v.cast::<DataType>() {
+            unsafe fn valid_layout(v: ::jlrs::wrappers::ptr::value::Value) -> bool {
+                if let Ok(dt) = v.cast::<::jlrs::wrappers::ptr::datatype::DataType>() {
                     if dt.nfields() as usize != #n_fields {
                         return false;
                     }
@@ -166,7 +313,7 @@ fn impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
 
                     #(
                         if let Ok(u) = field_types[#jl_union_field_idxs].wrapper_unchecked().cast::<::jlrs::wrappers::builtin::union::Union>() {
-                            if !::jlrs::wrappers::bits::union::correct_layout_for::<#rs_align_fields, #rs_union_fields, #rs_flag_fields>(u) {
+                            if !::jlrs::wrappers::inline::union::correct_layout_for::<#rs_align_fields, #rs_union_fields, #rs_flag_fields>(u) {
                                 return false
                             }
                         } else {
@@ -181,66 +328,9 @@ fn impl_julia_struct(ast: &syn::DeriveInput) -> TokenStream {
                 false
             }
         }
-
-        unsafe impl #generics ::jlrs::layout::typecheck::Typecheck for #name #generics #where_clause {
-            unsafe fn typecheck(t: ::jlrs::wrappers::builtin::datatype::DataType) -> bool {
-                <Self as ::jlrs::layout::valid_layout::ValidLayout>::valid_layout(t.as_value())
-            }
-        }
-
-        unsafe impl #generics ::jlrs::convert::unbox::Unbox for #name #generics #where_clause {
-            type Output = Self;
-
-            unsafe fn unbox(value: ::jlrs::wrappers::builtin::value::Value) -> Self {
-                value.unwrap_non_null().as_ptr().cast::<Self>().read()
-            }
-        }
     };
 
-    julia_struct_impl.into()
-}
-
-fn impl_into_julia(ast: &syn::DeriveInput) -> TokenStream {
-    let name = &ast.ident;
-    if !is_repr_c(ast) {
-        panic!("IntoJulia can only be derived for types with the attribute #[repr(C)].");
-    }
-
-    let jl_type = corresponding_julia_type(ast).expect("JuliaStruct can only be derived if the corresponding Julia type is set with #[julia_type = \"Main.MyModule.Submodule.StructType\"]");
-    let mut type_it = jl_type.split('.');
-    let func = match type_it.next() {
-        Some("Main") => quote::format_ident!("main"),
-        Some("Base") => quote::format_ident!("base"),
-        Some("Core") => quote::format_ident!("core"),
-        _ => panic!("JuliaStruct can only be derived if the first module of \"julia_type\" is either \"Main\", \"Base\" or \"Core\"."),
-    };
-
-    let mut modules = type_it.collect::<Vec<_>>();
-    let ty = modules.pop().expect("JuliaStruct can only be derived if the corresponding Julia type is set with #[jlrs(julia_type = \"Main.MyModule.Submodule.StructType\")]");
-    let modules_it = modules.iter();
-    let modules_it_b = modules_it.clone();
-
-    let into_julia_impl = quote! {
-        unsafe impl ::jlrs::convert::into_julia::IntoJulia for #name {
-            unsafe fn julia_type() -> *mut ::jlrs::jl_sys_export::jl_datatype_t {
-                let global = ::jlrs::memory::global::Global::new();
-
-                let julia_type = ::jlrs::wrappers::builtin::module::Module::#func(global)
-                    #(.submodule(#modules_it).expect(&format!("Submodule {} cannot be found", #modules_it_b)))*
-                    .global(#ty).expect(&format!("Type {} cannot be found in module", #ty));
-
-                if let Ok(dt) = julia_type.cast::<::jlrs::wrappers::builtin::datatype::DataType>() {
-                    dt.unwrap_non_null().as_ptr()
-                } else if let Ok(ua) = julia_type.cast::<::jlrs::wrappers::builtin::union_all::UnionAll>() {
-                    ua.base_type().ptr()
-                } else {
-                    panic!("Invalid type: {:?}", julia_type);
-                }
-            }
-        }
-    };
-
-    into_julia_impl.into()
+    valid_layout_impl.into()
 }
 
 fn is_repr_c(ast: &syn::DeriveInput) -> bool {
@@ -257,68 +347,4 @@ fn is_repr_c(ast: &syn::DeriveInput) -> bool {
     }
 
     false
-}
-
-fn corresponding_julia_type(ast: &syn::DeriveInput) -> Option<String> {
-    for attr in &ast.attrs {
-        if attr.path.is_ident("jlrs") {
-            if let Ok(Meta::List(p)) = attr.parse_meta() {
-                if let syn::NestedMeta::Meta(syn::Meta::NameValue(nv)) = p.nested.first().unwrap() {
-                    if nv.path.is_ident("julia_type") {
-                        if let syn::Lit::Str(string) = &nv.lit {
-                            return Some(string.value());
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    None
-}
-
-enum JlrsAttr {
-    Rename(String),
-    Type(String),
-    BitsUnionAlign,
-    BitsUnion,
-    BitsUnionFlag,
-}
-
-impl JlrsAttr {
-    pub fn parse(attr: &syn::Attribute) -> Option<Self> {
-        if let Ok(Meta::List(p)) = attr.parse_meta() {
-            if let syn::NestedMeta::Meta(syn::Meta::NameValue(nv)) = p.nested.first().unwrap() {
-                if nv.path.is_ident("rename") {
-                    if let syn::Lit::Str(string) = &nv.lit {
-                        return Some(JlrsAttr::Rename(string.value()));
-                    }
-                }
-
-                if nv.path.is_ident("julia_type") {
-                    if let syn::Lit::Str(string) = &nv.lit {
-                        return Some(JlrsAttr::Type(string.value()));
-                    }
-                }
-
-                return None;
-            }
-
-            if let Some(syn::NestedMeta::Meta(syn::Meta::Path(m))) = p.nested.first() {
-                if m.is_ident("bits_union") {
-                    return Some(JlrsAttr::BitsUnion);
-                }
-
-                if m.is_ident("bits_union_align") {
-                    return Some(JlrsAttr::BitsUnionAlign);
-                }
-
-                if m.is_ident("bits_union_flag") {
-                    return Some(JlrsAttr::BitsUnionFlag);
-                }
-            }
-        }
-
-        None
-    }
 }

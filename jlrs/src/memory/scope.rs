@@ -1,33 +1,79 @@
-//! Scopes are used to create new values, rooting them in a frame, and setting their lifetimes.
+//! Scopes provide a nestable context in which Julia can be called.
 //!
-//! Two kinds of scopes are provided by jlrs. The simplest are mutable references to things that
-//! implement [`Frame`]. In this case, the value is rooted in the current frame and can be used
-//! until the frame is dropped. The other kind of scope is the [`OutputScope`]. Such a scope
-//! targets an earlier frame, the created value is left unrooted until returning to the targeted
-//! frame.
+//! All interactions with Julia happen inside a scope. A base scope can be created with
+//! [`Julia::scope`] and [`Julia::scope_with_slots`], these methods take a closure which is
+//! called inside these methods after creating the arguments it requires: a [`Global`] and a
+//! mutable reference to a [`GcFrame`]. Each scope has exactly one [`GcFrame`] which is dropped 
+//! when you leave the scope. Any value which is rooted in this frame or can be reached from a
+//! root will not be freed by the garbage collector until the frame has been dropped, it's valid
+//! for the rest of the scope associated with that frame. 
 //!
-//! Methods that use a scope generally use them by value. This ensures an [`OutputScope`] can only
-//! be used once, but also forces you to reborrow frames. If you don't, the Rust compiler
-//! considers the frame to have been moved and you won't be able to use it again. Alternatively,
-//! you can use [`Frame::as_scope`].
+//! Holding on to many roots will slow down the garbage collector. Scanning will be slower because
+//! more values can be reached, and because this data is not freed memory pressure increases 
+//! causing the garbage collector to run more often. In order to manage the number of roots, it's
+//! possible to create nested scopes with their own `GcFrame`. The frames form a stack, when a
+//! nested scope is created the new frame is constructed at the top of this stack. This kind of 
+//! functionality is provided by the two traits in this module, [`Scope`] and [`ScopeExt`].
 //!
-//! Scopes can be nested. Methods like [`Scope::value_scope`] and [`Scope::result_scope`] can be
-//! used to create a value or call a Julia function from new closure and root the result in an
-//! earlier frame, while [`ScopeExt::scope`] can be used to return arbitrary data.
+//! There are several ways to create a nested scope. The easiest is [`ScopeExt::scope`], which 
+//! behaves the same way as [`Julia::scope`]. This method is relatively limited in the sense that
+//! it cannot be used to create a new value inside this new scope and root it in the frame of 
+//! parent scope. Several methods are available to handle that case, which is particularly useful 
+//! if you want to create a new value or call a function with some temporary values. These methods 
+//! are [`Scope::value_scope`], used to allocate a value in a nested scope and root it in the 
+//! frame of a parent scope; [`Scope::result_scope`], used to call a function in a nested scope 
+//! and root the result in the frame of a parent scope; [`ScopeExt::wrapper_scope`] and 
+//! [`ScopeExt::wrapper_result_scope`] are also available, they do the same thing as the previous
+//! two methods but they will cast the result to the given wrapper type before returning it.
+//!
+//! Two traits exist because there are two implementors of [`Scope`] and they behave differently.
+//! The first implementor is all mutable references to types that implement the [`Frame`] trait,
+//! [`ScopeExt`] is also implemented. Methods that create new values that must be rooted usually
+//! take an argument that implements `Scope`, when a mutable reference to a frame is used the
+//! value is rooted in that frame. Because the scope is taken by value and mutable references 
+//! don't implement `Copy`, it's necessary to mutably reborrow the frame when calling these 
+//! methods to prevent the frame from moving. These methods only care about the fact that it's a
+//! mutable reference to a frame, not the duration of that borrow.
+//!
+//! The other implementor, [`OutputScope`], is used in nested scopes that root a value in the 
+//! frame of a parent scope. It doesn't implement [`ScopeExt`]. As mentioned before, frames form a
+//! stack and the frame of a nested scope is constructed on top of its parent. Due to this design,
+//! it's not possible to directly root a value in some ancestral frame. Rather, rooting has to be
+//! postponed until the target frame is the active frame again. 
+//!
+//! Methods that root a value in the frame of a parent scope take a closure with two arguments, an
+//! [`Output`] and a mutable reference to a [`GcFrame`]. The frame can be used to root temporary 
+//! values, once all temporary values have been created and there's nothing else that needs to be
+//! rooted in the current frame, the `Output` can be converted to an `OutputScope`. Unlike frames,
+//! the [`Scope`] trait is not implemented for a mutable reference but for `OutputScope` itself. 
+//! Because it implements this trait it can be nested. In this case the output is propagated to 
+//! the new scope, ie the the result still targets the same scope. An `OutputScope` can be used 
+//! a single time to create a new value, this value is left unrooted until the target scope is 
+//! reached.
+//!
+//! You should always immediately return such an unrooted value from the closure without calling
+//! any function in jlrs, even those that don't take a frame or a scope as an argument. Functions
+//! that call the C API but don't take a scope or frame can still allocate new values internally,
+//! which can trigger a garbage collection cycle. Because an unrooted value exists which is likely
+//! unreachable, such a cycle can free the value that has just been created.
 
 use crate::{
-    error::JlrsResult,
+    error::{JlrsResult, JuliaResult},
+    layout::typecheck::Typecheck,
     memory::{
         frame::GcFrame,
         global::Global,
         output::{Output, OutputResult, OutputScope, OutputValue},
-        traits::frame::Frame,
+        frame::Frame,
     },
     private::Private,
+    wrappers::ptr::Wrapper,
 };
 
-/// Provides `scope` and `scope_with_slots` methods to mutable references of types that implement
-/// [`Frame`].
+/// Extension for [`Scope`] implemented by mutable references to frames. It offers methods like
+/// [`ScopeExt::scope`], [`ScopeExt::wrapper_scope`], and [`ScopeExt::wrapper_result_scope`] that
+/// can be used to create a nested scope that returns arbitrary data, and to automatically call
+/// cast before returning a Julia value or result respectively.
 pub trait ScopeExt<'target, 'current, 'data, F: Frame<'current>>:
     Scope<'target, 'current, 'data, F>
 {
@@ -96,6 +142,51 @@ pub trait ScopeExt<'target, 'current, 'data, F: Frame<'current>>:
     fn scope_with_slots<T, G>(self, capacity: usize, func: G) -> JlrsResult<T>
     where
         for<'inner> G: FnOnce(&mut GcFrame<'inner, F::Mode>) -> JlrsResult<T>;
+
+    /// The same as [`Scope::value_scope`], but the value is cast to `T` before returning it.
+    fn wrapper_scope<T, G>(self, func: G) -> JlrsResult<T>
+    where
+        T: Wrapper<'current, 'data> + Typecheck,
+        for<'nested, 'inner> G: FnOnce(
+            Output<'current>,
+            &'inner mut GcFrame<'nested, F::Mode>,
+        ) -> JlrsResult<OutputValue<'current, 'data, 'inner>>;
+
+    /// The same as [`Scope::value_scope_with_slots`], but the value is cast to `T` before
+    /// returning it.
+    fn wrapper_scope_with_slots<T, G>(self, capacity: usize, func: G) -> JlrsResult<T>
+    where
+        T: Wrapper<'current, 'data> + Typecheck,
+        for<'nested, 'inner> G: FnOnce(
+            Output<'current>,
+            &'inner mut GcFrame<'nested, F::Mode>,
+        ) -> JlrsResult<OutputValue<'current, 'data, 'inner>>;
+
+    /// The same as [`Scope::result_scope`], on success the result is cast to `T` before returning 
+    /// it.
+    fn wrapper_result_scope<T, G>(self, func: G) -> JlrsResult<JuliaResult<'current, 'data, T>>
+    where
+        T: Wrapper<'current, 'data> + Typecheck,
+        for<'nested, 'inner> G: FnOnce(
+            Output<'current>,
+            &'inner mut GcFrame<'nested, F::Mode>,
+        )
+            -> JlrsResult<OutputResult<'current, 'data, 'inner>>;
+
+    /// The same as [`Scope::result_scope_with_slots`], on success the result is cast to `T` 
+    /// before returning it.
+    fn wrapper_result_scope_with_slots<T, G>(
+        self,
+        capacity: usize,
+        func: G,
+    ) -> JlrsResult<JuliaResult<'current, 'data, T>>
+    where
+        T: Wrapper<'current, 'data> + Typecheck,
+        for<'nested, 'inner> G: FnOnce(
+            Output<'current>,
+            &'inner mut GcFrame<'nested, F::Mode>,
+        )
+            -> JlrsResult<OutputResult<'current, 'data, 'inner>>;
 }
 
 impl<'current, 'data, F: Frame<'current>> ScopeExt<'current, 'current, 'data, F> for &mut F {
@@ -112,14 +203,70 @@ impl<'current, 'data, F: Frame<'current>> ScopeExt<'current, 'current, 'data, F>
     {
         F::scope_with_slots(self, capacity, func, Private)
     }
+
+    fn wrapper_scope<T, G>(self, func: G) -> JlrsResult<T>
+    where
+        T: Wrapper<'current, 'data> + Typecheck,
+        for<'nested, 'inner> G: FnOnce(
+            Output<'current>,
+            &'inner mut GcFrame<'nested, F::Mode>,
+        ) -> JlrsResult<OutputValue<'current, 'data, 'inner>>,
+    {
+        F::value_scope(self, func, Private)?.cast::<T>()
+    }
+
+    fn wrapper_scope_with_slots<T, G>(self, capacity: usize, func: G) -> JlrsResult<T>
+    where
+        T: Wrapper<'current, 'data> + Typecheck,
+        for<'nested, 'inner> G: FnOnce(
+            Output<'current>,
+            &'inner mut GcFrame<'nested, F::Mode>,
+        ) -> JlrsResult<OutputValue<'current, 'data, 'inner>>,
+    {
+        F::value_scope_with_slots(self, capacity, func, Private)?.cast::<T>()
+    }
+
+    fn wrapper_result_scope<T, G>(self, func: G) -> JlrsResult<JuliaResult<'current, 'data, T>>
+    where
+        T: Wrapper<'current, 'data> + Typecheck,
+        for<'nested, 'inner> G: FnOnce(
+            Output<'current>,
+            &'inner mut GcFrame<'nested, F::Mode>,
+        )
+            -> JlrsResult<OutputResult<'current, 'data, 'inner>>,
+    {
+        match F::result_scope(self, func, Private)? {
+            Ok(v) => Ok(Ok(v.cast::<T>()?)),
+            Err(e) => Ok(Err(e)),
+        }
+    }
+
+    fn wrapper_result_scope_with_slots<T, G>(
+        self,
+        capacity: usize,
+        func: G,
+    ) -> JlrsResult<JuliaResult<'current, 'data, T>>
+    where
+        T: Wrapper<'current, 'data> + Typecheck,
+        for<'nested, 'inner> G: FnOnce(
+            Output<'current>,
+            &'inner mut GcFrame<'nested, F::Mode>,
+        )
+            -> JlrsResult<OutputResult<'current, 'data, 'inner>>,
+    {
+        match F::result_scope_with_slots(self, capacity, func, Private)? {
+            Ok(v) => Ok(Ok(v.cast::<T>()?)),
+            Err(e) => Ok(Err(e)),
+        }
+    }
 }
 
-/// This trait is used to root raw Julia values in the current or an earlier frame. Scopes and
-/// frames are very similar, in fact, all mutable references to frames are scopes: one that
-/// targets that frame. The other implementor of this trait, [`OutputScope`], targets an earlier
-/// frame. In addition to rooting values, this trait provides several methods that create a new
-/// frame; if the scope is a frame, the frame's implementation of that method is called. If the
-/// scope is an [`OutputScope`], the result is rooted the frame targeted by that scope.
+/// Trait that provides methods to create nested scopes which eventually root a value in the frame 
+/// of a target scope. It's implemented for [`OutputScope`] and mutable references to implementors
+/// of [`Frame`]. In addition to nesting, many methods that allocate a new value take an
+/// implementation of this trait as their first argument. If a mutable reference to a frame is 
+/// used this way, the value is rooted in that frame. If it's an [`OutputScope`], it's rooted in 
+/// the frame for which the [`Output`] was originally created.
 pub trait Scope<'target, 'current, 'data, F>:
     Sized + private::Scope<'target, 'current, 'data, F>
 where
@@ -490,7 +637,7 @@ pub(crate) mod private {
         error::{JlrsResult, JuliaResult},
         memory::{
             output::{OutputResult, OutputScope, OutputValue},
-            traits::frame::Frame,
+            frame::Frame,
         },
         private::Private,
     };
@@ -500,8 +647,10 @@ pub(crate) mod private {
         type Value: Sized;
         type JuliaResult: Sized;
 
+        // safety: the value must be a valid pointer to a Julia value.
         unsafe fn value(self, value: NonNull<jl_value_t>, _: Private) -> JlrsResult<Self::Value>;
 
+        // safety: the value must be a valid pointer to a Julia value.
         unsafe fn call_result(
             self,
             value: Result<NonNull<jl_value_t>, NonNull<jl_value_t>>,

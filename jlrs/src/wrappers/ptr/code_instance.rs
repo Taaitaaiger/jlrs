@@ -6,7 +6,7 @@
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L273
 
 use super::private::Wrapper;
-use crate::{impl_julia_typecheck, impl_valid_layout};
+use crate::{impl_debug, impl_julia_typecheck};
 use crate::{
     private::Private,
     wrappers::ptr::{CodeInstanceRef, MethodInstanceRef, ValueRef},
@@ -21,9 +21,9 @@ use std::{
 /// A `CodeInstance` represents an executable operation.
 #[derive(Copy, Clone)]
 #[repr(transparent)]
-pub struct CodeInstance<'frame>(NonNull<jl_code_instance_t>, PhantomData<&'frame ()>);
+pub struct CodeInstance<'scope>(NonNull<jl_code_instance_t>, PhantomData<&'scope ()>);
 
-impl<'frame> CodeInstance<'frame> {
+impl<'scope> CodeInstance<'scope> {
     /*
     for (a, b) in zip(fieldnames(Core.CodeInstance), fieldtypes(Core.CodeInstance))
         println(a, ": ", b)
@@ -42,12 +42,12 @@ impl<'frame> CodeInstance<'frame> {
     */
 
     /// Method this instance is specialized from.
-    pub fn def(self) -> MethodInstanceRef<'frame> {
+    pub fn def(self) -> MethodInstanceRef<'scope> {
         unsafe { MethodInstanceRef::wrap(self.unwrap_non_null(Private).as_ref().def) }
     }
 
     /// Next cache entry.
-    pub fn next(self) -> CodeInstanceRef<'frame> {
+    pub fn next(self) -> CodeInstanceRef<'scope> {
         unsafe { CodeInstanceRef::wrap(self.unwrap_non_null(Private).as_ref().next) }
     }
 
@@ -62,17 +62,17 @@ impl<'frame> CodeInstance<'frame> {
     }
 
     /// Return type for fptr.
-    pub fn rettype(self) -> ValueRef<'frame, 'static> {
+    pub fn rettype(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().rettype) }
     }
 
     /// Inferred constant return value, or null
-    pub fn rettype_const(self) -> ValueRef<'frame, 'static> {
+    pub fn rettype_const(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().rettype_const) }
     }
 
     /// Inferred `CodeInfo`, `Nothing`, or `None`.
-    pub fn inferred(self) -> ValueRef<'frame, 'static> {
+    pub fn inferred(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().inferred) }
     }
 
@@ -87,14 +87,8 @@ impl<'frame> CodeInstance<'frame> {
     }
 }
 
-impl<'scope> Debug for CodeInstance<'scope> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        f.debug_tuple("CodeInstance").finish()
-    }
-}
-
-impl_julia_typecheck!(CodeInstance<'frame>, jl_code_instance_type, 'frame);
-impl_valid_layout!(CodeInstance<'frame>, 'frame);
+impl_julia_typecheck!(CodeInstance<'scope>, jl_code_instance_type, 'scope);
+impl_debug!(CodeInstance<'_>);
 
 impl<'scope> Wrapper<'scope, '_> for CodeInstance<'scope> {
     type Internal = jl_code_instance_t;

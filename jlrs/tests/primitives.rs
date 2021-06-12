@@ -233,7 +233,7 @@ fn create_nothing() {
             assert!(nothing.is::<Nothing>());
             assert!(!nothing.is::<f32>());
             assert!(nothing.datatype().is::<Nothing>());
-            assert_eq!(nothing.type_name().unwrap(), "Nothing");
+            assert_eq!(nothing.datatype_name().unwrap(), "Nothing");
             assert!(!nothing.is_array_of::<f32>());
             assert_eq!(nothing.field_names().len(), 0);
             assert_eq!(nothing.n_fields(), 0);

@@ -7,7 +7,7 @@
 
 use super::{private::Wrapper, symbol::Symbol, SymbolRef};
 use crate::wrappers::ptr::{MethodTableRef, ModuleRef, SimpleVectorRef, ValueRef};
-use crate::{impl_julia_typecheck, impl_valid_layout};
+use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout};
 use crate::{memory::global::Global, private::Private};
 use jl_sys::{
     jl_array_typename, jl_llvmpointer_typename, jl_namedtuple_typename, jl_pointer_typename,
@@ -24,9 +24,9 @@ use std::{
 /// instantiations of the type, including a cache for hash-consed allocation of `DataType`s.
 #[derive(Copy, Clone)]
 #[repr(transparent)]
-pub struct TypeName<'frame>(NonNull<jl_typename_t>, PhantomData<&'frame ()>);
+pub struct TypeName<'scope>(NonNull<jl_typename_t>, PhantomData<&'scope ()>);
 
-impl<'frame> TypeName<'frame> {
+impl<'scope> TypeName<'scope> {
     /*
     for (a, b) in zip(fieldnames(Core.TypeName), fieldtypes(Core.TypeName))
         println(a, ": ", b)
@@ -43,33 +43,33 @@ impl<'frame> TypeName<'frame> {
     */
 
     /// The `name` field.
-    pub fn name(self) -> SymbolRef<'frame> {
+    pub fn name(self) -> SymbolRef<'scope> {
         unsafe { SymbolRef::wrap(self.unwrap_non_null(Private).as_ref().name) }
     }
 
     /// The `module` field.
-    pub fn module(self) -> ModuleRef<'frame> {
+    pub fn module(self) -> ModuleRef<'scope> {
         unsafe { ModuleRef::wrap(self.unwrap_non_null(Private).as_ref().module) }
     }
 
     /// Field names.
-    pub fn names(self) -> SimpleVectorRef<'frame> {
+    pub fn names(self) -> SimpleVectorRef<'scope> {
         unsafe { SimpleVectorRef::wrap(self.unwrap_non_null(Private).as_ref().names) }
     }
 
     /// Either the only instantiation of the type (if no parameters) or a `UnionAll` accepting
     /// parameters to make an instantiation.
-    pub fn wrapper(self) -> ValueRef<'frame, 'static> {
+    pub fn wrapper(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().wrapper) }
     }
 
     /// Sorted array.
-    pub fn cache(self) -> SimpleVectorRef<'frame> {
+    pub fn cache(self) -> SimpleVectorRef<'scope> {
         unsafe { SimpleVectorRef::wrap(self.unwrap_non_null(Private).as_ref().cache) }
     }
 
     /// Unsorted array.
-    pub fn linear_cache(self) -> SimpleVectorRef<'frame> {
+    pub fn linear_cache(self) -> SimpleVectorRef<'scope> {
         unsafe { SimpleVectorRef::wrap(self.unwrap_non_null(Private).as_ref().linearcache) }
     }
 
@@ -79,12 +79,12 @@ impl<'frame> TypeName<'frame> {
     }
 
     /// The `mt` field.
-    pub fn mt(self) -> MethodTableRef<'frame> {
+    pub fn mt(self) -> MethodTableRef<'scope> {
         unsafe { MethodTableRef::wrap(self.unwrap_non_null(Private).as_ref().mt) }
     }
 
     /// Incomplete instantiations of this type.
-    pub fn partial(self) -> ValueRef<'frame, 'static> {
+    pub fn partial(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().partial.cast()) }
     }
 }
@@ -131,19 +131,9 @@ impl<'base> TypeName<'base> {
     }
 }
 
-impl<'scope> Debug for TypeName<'scope> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        if let Some(name) = unsafe { self.name().wrapper().map(Symbol::as_string) } {
-            f.debug_tuple("TypeName").field(&name).finish()
-        } else {
-            f.debug_tuple("TypeName").field(&"#undef").finish()
-        }
-    }
-}
-
-impl_julia_typecheck!(TypeName<'frame>, jl_typename_type, 'frame);
-
-impl_valid_layout!(TypeName<'frame>, 'frame);
+impl_julia_typecheck!(TypeName<'scope>, jl_typename_type, 'scope);
+impl_debug!(TypeName<'_>);
+impl_valid_layout!(TypeName<'scope>, 'scope);
 
 impl<'scope> Wrapper<'scope, '_> for TypeName<'scope> {
     type Internal = jl_typename_t;

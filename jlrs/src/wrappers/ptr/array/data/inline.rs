@@ -1,7 +1,7 @@
 //! Inline array data borrowed from Julia.
 
 use crate::{
-    memory::traits::frame::Frame,
+    memory::frame::Frame,
     private::Private,
     wrappers::ptr::{
         array::{

@@ -1,10 +1,6 @@
-//! A wrapper around a `Core.SSAValue` in Julia.
+//! Wrapper for `Core.SSAVAlue`.
 
 use crate::{convert::unbox::Unbox, impl_julia_typecheck, impl_valid_layout};
-use crate::{
-    private::Private,
-    wrappers::ptr::{private::Wrapper, value::Value},
-};
 use jl_sys::jl_ssavalue_type;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 
@@ -31,7 +27,4 @@ impl_valid_layout!(SSAValue);
 
 unsafe impl Unbox for SSAValue {
     type Output = Self;
-    unsafe fn unbox(value: Value) -> SSAValue {
-        SSAValue(value.unwrap(Private).cast::<isize>().read())
-    }
 }

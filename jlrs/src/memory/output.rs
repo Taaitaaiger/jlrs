@@ -1,4 +1,4 @@
-//! Root a value in an earlier frame.
+//! Root a value in the frame of an earlier scope.
 //!
 //! In order to prevent temporary values from remaining rooted, it's often desirable to call some
 //! function or create a new value in a new scope but root the final result in the frame of the
@@ -14,7 +14,7 @@
 
 use jl_sys::jl_value_t;
 
-use super::{frame::GcFrame, traits::frame::Frame};
+use super::{frame::GcFrame, frame::Frame};
 use crate::{error::JlrsResult, private::Private};
 use std::{marker::PhantomData, ptr::NonNull};
 
@@ -49,28 +49,19 @@ impl<'scope, 'frame, 'borrow, F: Frame<'frame>> OutputScope<'scope, 'frame, 'bor
         OutputScope(frame, output, PhantomData)
     }
 
-    /// Create a new scope and propagate the output. See [`Scope::value_scope`] for more
-    /// information.
-    ///
-    /// [`Scope::value_scope`]: crate::memory::traits::scope::Scope::value_scope
-    pub fn value_scope<'data, G>(self, func: G) -> JlrsResult<OutputValue<'scope, 'data, 'borrow>>
+    pub(crate) fn value_scope<'data, G>(self, func: G) -> JlrsResult<OutputValue<'scope, 'data, 'borrow>>
     where
         G: for<'nested, 'inner> FnOnce(
             Output<'scope>,
             &'inner mut GcFrame<'nested, F::Mode>,
         ) -> JlrsResult<OutputValue<'scope, 'data, 'inner>>,
     {
-        // Safe: frame is dropped
-        let mut frame = unsafe { self.0.nest(0, Private) };
+        let mut frame = self.0.nest(0, Private);
         let out = Output::new();
         func(out, &mut frame).map(|pv| OutputValue::wrap_non_null(pv.unwrap_non_null()))
     }
 
-    /// Create a new scope and propagate the output. See [`Scope::value_scope_with_slots`] for
-    /// more information.
-    ///
-    /// [`Scope::value_scope_with_slots`]: crate::memory::traits::scope::Scope::value_scope_with_slots
-    pub fn value_scope_with_slots<'data, G>(
+    pub(crate) fn value_scope_with_slots<'data, G>(
         self,
         capacity: usize,
         func: G,
@@ -81,25 +72,19 @@ impl<'scope, 'frame, 'borrow, F: Frame<'frame>> OutputScope<'scope, 'frame, 'bor
             &'inner mut GcFrame<'nested, F::Mode>,
         ) -> JlrsResult<OutputValue<'scope, 'data, 'inner>>,
     {
-        // Safe: frame is dropped
-        let mut frame = unsafe { self.0.nest(capacity, Private) };
+        let mut frame = self.0.nest(capacity, Private);
         let out = Output::new();
         func(out, &mut frame).map(|pv| OutputValue::wrap_non_null(pv.unwrap_non_null()))
     }
 
-    /// Create a new scope and propagate the output. See [`Scope::result_scope`] for more
-    /// information.
-    ///
-    /// [`Scope::result_scope`]: crate::memory::traits::scope::Scope::result_scope
-    pub fn result_scope<'data, G>(self, func: G) -> JlrsResult<OutputResult<'scope, 'data, 'borrow>>
+    pub(crate) fn result_scope<'data, G>(self, func: G) -> JlrsResult<OutputResult<'scope, 'data, 'borrow>>
     where
         G: for<'nested, 'inner> FnOnce(
             Output<'scope>,
             &'inner mut GcFrame<'nested, F::Mode>,
         ) -> JlrsResult<OutputResult<'scope, 'data, 'inner>>,
     {
-        // Safe: frame is dropped
-        let mut frame = unsafe { self.0.nest(0, Private) };
+        let mut frame = self.0.nest(0, Private);
         let out = Output::new();
         func(out, &mut frame).map(|pv| match pv {
             OutputResult::Ok(pv) => {
@@ -111,11 +96,7 @@ impl<'scope, 'frame, 'borrow, F: Frame<'frame>> OutputScope<'scope, 'frame, 'bor
         })
     }
 
-    /// Create a new scope and propagate the output. See [`Scope::result_scope_with_slots`] for
-    /// more information.
-    ///
-    /// [`Scope::result_scope_with_slots`]: crate::memory::traits::scope::Scope::result_scope_with_slots
-    pub fn result_scope_with_slots<'data, G>(
+    pub(crate) fn result_scope_with_slots<'data, G>(
         self,
         capacity: usize,
         func: G,
@@ -126,8 +107,7 @@ impl<'scope, 'frame, 'borrow, F: Frame<'frame>> OutputScope<'scope, 'frame, 'bor
             &'inner mut GcFrame<'nested, F::Mode>,
         ) -> JlrsResult<OutputResult<'scope, 'data, 'inner>>,
     {
-        // Safe: frame is dropped
-        let mut frame = unsafe { self.0.nest(capacity, Private) };
+        let mut frame = self.0.nest(capacity, Private);
         let out = Output::new();
         func(out, &mut frame).map(|pv| match pv {
             OutputResult::Ok(pv) => {

@@ -31,8 +31,10 @@ use jl_sys::jl_tuple_typename;
 pub struct Tuple;
 
 unsafe impl Typecheck for Tuple {
-    unsafe fn typecheck(t: DataType) -> bool {
-        t.unwrap_non_null(Private).as_ref().name == jl_tuple_typename
+    fn typecheck(t: DataType) -> bool {
+        unsafe {
+            t.unwrap_non_null(Private).as_ref().name == jl_tuple_typename
+        }
     }
 }
 
@@ -69,16 +71,18 @@ macro_rules! impl_tuple {
         where
             $($types: $crate::convert::into_julia::IntoJulia + ::std::fmt::Debug + Clone),+
         {
-            unsafe fn julia_type<'scope>(
+            fn julia_type<'scope>(
                 global: $crate::memory::global::Global<'scope>
             ) -> $crate::wrappers::ptr::DataTypeRef<'scope> {
                 let types = &mut [
                     $(<$types as $crate::convert::into_julia::IntoJulia>::julia_type(global)),+
                 ];
 
-                $crate::wrappers::ptr::DataTypeRef::wrap(
-                    ::jl_sys::jl_apply_tuple_type_v(types.as_mut_ptr().cast(), types.len())
-                )
+                unsafe {
+                    $crate::wrappers::ptr::DataTypeRef::wrap(
+                        ::jl_sys::jl_apply_tuple_type_v(types.as_mut_ptr().cast(), types.len())
+                    )
+                }
             }
         }
 
@@ -86,23 +90,25 @@ macro_rules! impl_tuple {
         where
             $($types: $crate::layout::valid_layout::ValidLayout + Clone + ::std::fmt::Debug),+
         {
-            unsafe fn valid_layout(v: $crate::wrappers::ptr::value::Value) -> bool {
-                if let Ok(dt) = v.cast::<$crate::wrappers::ptr::datatype::DataType>() {
-                    let fieldtypes = dt.field_types();
-                    let n = count!($($types),+);
-                    if fieldtypes.wrapper_unchecked().len() != n {
-                        return false;
+            fn valid_layout(v: $crate::wrappers::ptr::value::Value) -> bool {
+                unsafe {
+                    if let Ok(dt) = v.cast::<$crate::wrappers::ptr::datatype::DataType>() {
+                        let fieldtypes = dt.field_types();
+                        let n = count!($($types),+);
+                        if fieldtypes.wrapper_unchecked().len() != n {
+                            return false;
+                        }
+
+                        let types = fieldtypes.wrapper_unchecked().data();
+                        if !check!(types, n, $($types),+) {
+                            return false
+                        }
+
+                        return true
                     }
 
-                    let types = fieldtypes.wrapper_unchecked().data();
-                    if !check!(types, n, $($types),+) {
-                        return false
-                    }
-
-                    return true
+                    false
                 }
-
-                false
             }
         }
 
@@ -117,7 +123,7 @@ macro_rules! impl_tuple {
         where
             $($types: $crate::layout::valid_layout::ValidLayout + Clone + ::std::fmt::Debug),+
         {
-            unsafe fn typecheck(t: $crate::wrappers::ptr::datatype::DataType) -> bool {
+            fn typecheck(t: $crate::wrappers::ptr::datatype::DataType) -> bool {
                 <Self as $crate::layout::valid_layout::ValidLayout>::valid_layout(t.as_value())
             }
         }
@@ -129,7 +135,7 @@ macro_rules! impl_tuple {
 
         unsafe impl $crate::convert::into_julia::IntoJulia for $name
         {
-            unsafe fn julia_type<'scope>(
+            fn julia_type<'scope>(
                 global: $crate::memory::global::Global<'scope>
             ) -> $crate::wrappers::ptr::DataTypeRef<'scope> {
                 $crate::wrappers::ptr::datatype::DataType::emptytuple_type(global).as_ref()
@@ -144,9 +150,9 @@ macro_rules! impl_tuple {
         }
 
         unsafe impl $crate::layout::valid_layout::ValidLayout for $name {
-            unsafe fn valid_layout(v: $crate::wrappers::ptr::value::Value) -> bool {
+            fn valid_layout(v: $crate::wrappers::ptr::value::Value) -> bool {
                 if let Ok(dt) = v.cast::<$crate::wrappers::ptr::datatype::DataType>() {
-                    let global = $crate::memory::global::Global::new();
+                    let global = unsafe {$crate::memory::global::Global::new()};
                     return dt == $crate::wrappers::ptr::datatype::DataType::emptytuple_type(global)
                 }
 
@@ -163,7 +169,7 @@ macro_rules! impl_tuple {
         }
 
         unsafe impl $crate::layout::typecheck::Typecheck for $name {
-            unsafe fn typecheck(t: $crate::wrappers::ptr::datatype::DataType) -> bool {
+            fn typecheck(t: $crate::wrappers::ptr::datatype::DataType) -> bool {
                 <Self as $crate::layout::valid_layout::ValidLayout>::valid_layout(t.as_value())
             }
         }

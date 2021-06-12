@@ -203,7 +203,7 @@ impl Display for JlrsError {
                 n, cap,
             ),
             JlrsError::WrongType => {
-                write!(formatter, "Requested type does not match the found type")
+                write!(formatter, "Requested type doesn't  match the found type")
             }
             JlrsError::ZeroDimension => {
                 write!(formatter, "Cannot handle arrays with zero dimensions")
@@ -233,8 +233,8 @@ impl Display for JlrsError {
                 write!(
                     formatter,
                     "Array types cannot be instantiated with `DataType::instantiate`, but must \
-                    be created with `Value::new_array`, `Value::move_array`, or \
-                    `Value::borrow_array`",
+                    be created with `Array::new`, `Array::from_vec`, or \
+                    `Array::from_slice`",
                 )
             }
             JlrsError::UndefRef => {

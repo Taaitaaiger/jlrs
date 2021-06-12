@@ -9,7 +9,7 @@
 use std::fmt::Debug;
 
 use crate::layout::valid_layout::ValidLayout;
-use crate::memory::traits::frame::Frame;
+use crate::memory::frame::Frame;
 use crate::wrappers::ptr::array::{Array, TypedArray};
 use crate::{
     error::{JlrsError, JlrsResult},
@@ -24,7 +24,7 @@ mod private {
 
     pub trait Sealed {}
     impl<'frame, 'data> Sealed for Array<'frame, 'data> {}
-    impl<'frame, 'data, T> Sealed for TypedArray<'frame, 'data, T> where T: Copy + ValidLayout + Debug {}
+    impl<'frame, 'data, T> Sealed for TypedArray<'frame, 'data, T> where T: Clone + ValidLayout + Debug {}
 }
 
 /// Trait to borrow Julia arrays with inline data as `ndarray`'s `ArrayView` and `ArrayViewMut`.
@@ -37,7 +37,7 @@ pub trait NdArray<'borrow, T>: private::Sealed {
     ) -> JlrsResult<ArrayView<'borrow, T, Dim<IxDynImpl>>>
     where
         F: Frame<'frame>,
-        T: ValidLayout + Copy;
+        T: ValidLayout + Clone;
 
     /// Mutably borrow the data in the array as an `ArrayViewMut`. Returns an error if the wrong
     /// type is provided or the data is not stored inline.
@@ -47,10 +47,10 @@ pub trait NdArray<'borrow, T>: private::Sealed {
     ) -> JlrsResult<ArrayViewMut<'borrow, T, Dim<IxDynImpl>>>
     where
         F: Frame<'frame>,
-        T: ValidLayout + Copy;
+        T: ValidLayout + Clone;
 }
 
-impl<'frame: 'borrow, 'data: 'borrow, 'borrow, T: ValidLayout + Copy> NdArray<'borrow, T>
+impl<'frame: 'borrow, 'data: 'borrow, 'borrow, T: ValidLayout + Clone> NdArray<'borrow, T>
     for Array<'frame, 'data>
 {
     fn array_view<'fr: 'borrow, F>(
@@ -59,7 +59,7 @@ impl<'frame: 'borrow, 'data: 'borrow, 'borrow, T: ValidLayout + Copy> NdArray<'b
     ) -> JlrsResult<ArrayView<'borrow, T, Dim<IxDynImpl>>>
     where
         F: Frame<'fr>,
-        T: ValidLayout + Copy,
+        T: ValidLayout + Clone,
     {
         let data = self.inline_data::<T, _>(&*frame)?;
         let shape = data
@@ -80,7 +80,7 @@ impl<'frame: 'borrow, 'data: 'borrow, 'borrow, T: ValidLayout + Copy> NdArray<'b
     ) -> JlrsResult<ArrayViewMut<'borrow, T, Dim<IxDynImpl>>>
     where
         F: Frame<'fr>,
-        T: ValidLayout + Copy,
+        T: ValidLayout + Clone,
     {
         let data = self.inline_data_mut::<T, _>(&mut *frame)?;
         let shape = data
@@ -97,7 +97,7 @@ impl<'frame: 'borrow, 'data: 'borrow, 'borrow, T: ValidLayout + Copy> NdArray<'b
     }
 }
 
-impl<'frame: 'borrow, 'data: 'borrow, 'borrow, T: ValidLayout + Copy + Debug> NdArray<'borrow, T>
+impl<'frame: 'borrow, 'data: 'borrow, 'borrow, T: ValidLayout + Clone + Debug> NdArray<'borrow, T>
     for TypedArray<'frame, 'data, T>
 {
     fn array_view<'fr: 'borrow, F>(
@@ -161,7 +161,7 @@ mod tests {
                 .scope(|_global, frame| {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
-                    let borrowed = Value::borrow_array(&mut *frame, slice, (3, 2))?;
+                    let borrowed = Array::from_slice(&mut *frame, slice, (3, 2))?;
 
                     let jl_array = borrowed.cast::<Array>()?;
                     let x = jl_array.inline_data::<usize, _>(&mut *frame)?[(1, 0)];
@@ -184,7 +184,7 @@ mod tests {
                 .scope(|_global, frame| {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
-                    let borrowed = Value::borrow_array(&mut *frame, slice, (3, 2))?;
+                    let borrowed = Array::from_slice(&mut *frame, slice, (3, 2))?;
 
                     let jl_array = borrowed.cast::<Array>()?;
                     let view: Result<ArrayView<isize, _>, _> = jl_array.array_view(&mut *frame);
@@ -204,7 +204,7 @@ mod tests {
                 .scope(|_global, frame| {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
-                    let borrowed = Value::borrow_array(&mut *frame, slice, (3, 2))?;
+                    let borrowed = Array::from_slice(&mut *frame, slice, (3, 2))?;
 
                     let jl_array = borrowed.cast::<Array>()?;
                     let mut inline = jl_array.inline_data_mut::<usize, _>(&mut *frame)?;
@@ -233,7 +233,7 @@ mod tests {
                 .scope(|_global, frame| {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
-                    let borrowed = Value::borrow_array(&mut *frame, slice, (3, 2))?;
+                    let borrowed = Array::from_slice(&mut *frame, slice, (3, 2))?;
 
                     let jl_array = borrowed.cast::<Array>()?;
                     let view: Result<ArrayViewMut<isize, _>, _> =
@@ -254,7 +254,7 @@ mod tests {
                 .scope(|_global, frame| {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
-                    let borrowed = Value::borrow_array(&mut *frame, slice, (3, 2))?;
+                    let borrowed = Array::from_slice(&mut *frame, slice, (3, 2))?;
 
                     let jl_array = borrowed.cast::<TypedArray<usize>>()?;
                     let x = jl_array.inline_data(&mut *frame)?[(1, 0)];
@@ -277,7 +277,7 @@ mod tests {
                 .scope(|_global, frame| {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
-                    let borrowed = Value::borrow_array(&mut *frame, slice, (3, 2))?;
+                    let borrowed = Array::from_slice(&mut *frame, slice, (3, 2))?;
 
                     let jl_array = borrowed.cast::<TypedArray<usize>>()?;
                     let mut inline = jl_array.inline_data_mut(&mut *frame)?;
@@ -306,7 +306,7 @@ mod tests {
                 .scope(|_global, frame| {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
-                    let borrowed = Value::borrow_array(&mut *frame, slice, (3, 2))?;
+                    let borrowed = Array::from_slice(&mut *frame, slice, (3, 2))?;
 
                     let _array = borrowed
                         .cast::<TypedArray<usize>>()?

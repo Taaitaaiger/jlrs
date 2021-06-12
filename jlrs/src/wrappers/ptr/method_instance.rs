@@ -5,7 +5,7 @@
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L321
 use super::private::Wrapper;
-use crate::{impl_julia_typecheck, impl_valid_layout};
+use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout};
 use crate::{
     private::Private,
     wrappers::ptr::{CodeInstanceRef, SimpleVectorRef, ValueRef},
@@ -22,9 +22,9 @@ use std::{
 /// with a particular set of argument types
 #[derive(Copy, Clone)]
 #[repr(transparent)]
-pub struct MethodInstance<'frame>(NonNull<jl_method_instance_t>, PhantomData<&'frame ()>);
+pub struct MethodInstance<'scope>(NonNull<jl_method_instance_t>, PhantomData<&'scope ()>);
 
-impl<'frame> MethodInstance<'frame> {
+impl<'scope> MethodInstance<'scope> {
     /*
     for (a, b) in zip(fieldnames(Core.MethodInstance), fieldtypes(Core.MethodInstance))
         println(a, ": ", b)
@@ -40,37 +40,37 @@ impl<'frame> MethodInstance<'frame> {
     */
 
     /// Context for this code
-    pub fn def(self) -> ValueRef<'frame, 'static> {
+    pub fn def(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().def.value) }
     }
 
     /// Argument types this was specialized for
-    pub fn spec_types(self) -> ValueRef<'frame, 'static> {
+    pub fn spec_types(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().specTypes) }
     }
 
     /// Static parameter values, indexed by def.method->sparam_syms
-    pub fn sparam_vals(self) -> SimpleVectorRef<'frame> {
+    pub fn sparam_vals(self) -> SimpleVectorRef<'scope> {
         unsafe { SimpleVectorRef::wrap(self.unwrap_non_null(Private).as_ref().sparam_vals) }
     }
 
     /// Cached uncompressed code, for generated functions, top-level thunks, or the interpreter
-    pub fn uninferred(self) -> ValueRef<'frame, 'static> {
+    pub fn uninferred(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().uninferred) }
     }
 
     /// List of method-instances which contain a call into this method-instance
-    pub fn backedges(self) -> ValueRef<'frame, 'static> {
+    pub fn backedges(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().backedges.cast()) }
     }
 
     /// The `callbacks` field.
-    pub fn callbacks(self) -> ValueRef<'frame, 'static> {
+    pub fn callbacks(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().callbacks.cast()) }
     }
 
     /// The `cache` field.
-    pub fn cache(self) -> CodeInstanceRef<'frame> {
+    pub fn cache(self) -> CodeInstanceRef<'scope> {
         unsafe { CodeInstanceRef::wrap(self.unwrap_non_null(Private).as_ref().cache) }
     }
 
@@ -80,14 +80,9 @@ impl<'frame> MethodInstance<'frame> {
     }
 }
 
-impl<'scope> Debug for MethodInstance<'scope> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        f.debug_tuple("MethodInstance").finish()
-    }
-}
-
-impl_julia_typecheck!(MethodInstance<'frame>, jl_method_instance_type, 'frame);
-impl_valid_layout!(MethodInstance<'frame>, 'frame);
+impl_julia_typecheck!(MethodInstance<'scope>, jl_method_instance_type, 'scope);
+impl_valid_layout!(MethodInstance<'scope>, 'scope);
+impl_debug!(MethodInstance<'_>);
 
 impl<'scope> Wrapper<'scope, '_> for MethodInstance<'scope> {
     type Internal = jl_method_instance_t;

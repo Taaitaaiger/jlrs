@@ -5,7 +5,7 @@
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L273
 
-use crate::{impl_julia_typecheck, impl_valid_layout};
+use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout};
 use crate::{
     private::Private,
     wrappers::ptr::{
@@ -24,9 +24,9 @@ use std::{
 /// of a function.
 #[derive(Copy, Clone)]
 #[repr(transparent)]
-pub struct Method<'frame>(NonNull<jl_method_t>, PhantomData<&'frame ()>);
+pub struct Method<'scope>(NonNull<jl_method_t>, PhantomData<&'scope ()>);
 
-impl<'frame> Method<'frame> {
+impl<'scope> Method<'scope> {
     /*
     for (a, b) in zip(fieldnames(Method), fieldtypes(Method))
         println(a, ": ", b)
@@ -56,17 +56,17 @@ impl<'frame> Method<'frame> {
     */
 
     /// Method name for error reporting
-    pub fn name(self) -> SymbolRef<'frame> {
+    pub fn name(self) -> SymbolRef<'scope> {
         unsafe { SymbolRef::wrap(self.unwrap_non_null(Private).as_ref().name) }
     }
 
     /// Method module
-    pub fn module(self) -> ModuleRef<'frame> {
+    pub fn module(self) -> ModuleRef<'scope> {
         unsafe { ModuleRef::wrap(self.unwrap_non_null(Private).as_ref().module) }
     }
 
     /// Method file
-    pub fn file(self) -> SymbolRef<'frame> {
+    pub fn file(self) -> SymbolRef<'scope> {
         unsafe { SymbolRef::wrap(self.unwrap_non_null(Private).as_ref().file) }
     }
 
@@ -86,54 +86,54 @@ impl<'frame> Method<'frame> {
     }
 
     /// Method's type signature.
-    pub fn signature(self) -> ValueRef<'frame, 'static> {
+    pub fn signature(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().sig) }
     }
 
     /// Table of all `Method` specializations, allocated as [hashable, ..., NULL, linear, ....]
-    pub fn specializations(self) -> SimpleVectorRef<'frame> {
+    pub fn specializations(self) -> SimpleVectorRef<'scope> {
         unsafe { SimpleVectorRef::wrap(self.unwrap_non_null(Private).as_ref().specializations) }
     }
 
     /// Index lookup by hash into specializations
-    pub fn spec_key_set(self) -> ArrayRef<'frame, 'static> {
+    pub fn spec_key_set(self) -> ArrayRef<'scope, 'static> {
         unsafe { ArrayRef::wrap(self.unwrap_non_null(Private).as_ref().speckeyset) }
     }
 
     /// Compacted list of slot names (String)
-    pub fn slot_syms(self) -> ValueRef<'frame, 'static> {
+    pub fn slot_syms(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().slot_syms) }
     }
 
     // Original code template (`Core.CodeInfo`, but may be compressed), `None` for builtins.
-    pub fn source(self) -> ValueRef<'frame, 'static> {
+    pub fn source(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().source) }
     }
 
     /// Unspecialized executable method instance, or `None`
-    pub fn unspecialized(self) -> MethodInstanceRef<'frame> {
+    pub fn unspecialized(self) -> MethodInstanceRef<'scope> {
         unsafe { MethodInstanceRef::wrap(self.unwrap_non_null(Private).as_ref().unspecialized) }
     }
 
     /// Executable code-generating function if available
-    pub fn generator(self) -> ValueRef<'frame, 'static> {
+    pub fn generator(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().generator) }
     }
 
     /// Pointers in generated code (shared to reduce memory), or `None`
-    pub fn roots(self) -> ArrayRef<'frame, 'static> {
+    pub fn roots(self) -> ArrayRef<'scope, 'static> {
         unsafe { ArrayRef::wrap(self.unwrap_non_null(Private).as_ref().roots) }
     }
 
     /// `SimpleVector(rettype, sig)` if a ccallable entry point is requested for this
-    pub fn ccallable(self) -> SimpleVectorRef<'frame> {
+    pub fn ccallable(self) -> SimpleVectorRef<'scope> {
         unsafe { SimpleVectorRef::wrap(self.unwrap_non_null(Private).as_ref().ccallable) }
     }
 
     /// Cache of specializations of this method for invoke(), i.e.
     /// cases where this method was called even though it was not necessarily
     /// the most specific for the argument types.
-    pub fn invokes(self) -> ValueRef<'frame, 'static> {
+    pub fn invokes(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().invokes) }
     }
 
@@ -169,14 +169,9 @@ impl<'frame> Method<'frame> {
     }
 }
 
-impl<'scope> Debug for Method<'scope> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        f.debug_tuple("Method").finish()
-    }
-}
-
-impl_julia_typecheck!(Method<'frame>, jl_method_type, 'frame);
-impl_valid_layout!(Method<'frame>, 'frame);
+impl_julia_typecheck!(Method<'scope>, jl_method_type, 'scope);
+impl_valid_layout!(Method<'scope>, 'scope);
+impl_debug!(Method<'_>);
 
 impl<'scope> Wrapper<'scope, '_> for Method<'scope> {
     type Internal = jl_method_t;

@@ -1,3 +1,5 @@
+# include("./JlrsReflect.jl")
+
 module SingleFieldBits
 struct BitsTypeBool
     a::Bool
@@ -167,40 +169,44 @@ struct WithPropagatedLifetimes
 end
 end
 
-"""
-JlrsReflect.reflect([
-    SingleFieldBits.BitsTypeBool,
-    SingleFieldBits.BitsTypeChar,
-    SingleFieldBits.BitsTypeUInt8,
-    SingleFieldBits.BitsTypeUInt16,
-    SingleFieldBits.BitsTypeUInt32,
-    SingleFieldBits.BitsTypeUInt64,
-    SingleFieldBits.BitsTypeUInt,
-    SingleFieldBits.BitsTypeInt8,
-    SingleFieldBits.BitsTypeInt16,
-    SingleFieldBits.BitsTypeInt32,
-    SingleFieldBits.BitsTypeInt64,
-    SingleFieldBits.BitsTypeInt,
-    SingleFieldBits.BitsTypeFloat32,
-    SingleFieldBits.BitsTypeFloat64,
-    MultiFieldBits.BitsIntBool,
-    MultiFieldBits.BitsCharFloat32Float64,
-    BitsWithCustom.BitsIntChar,
-    BitsWithCustom.BitsCharBitsIntChar,
-    BitsWithTuples.BitsUInt8TupleInt32Int64,
-    BitsWithTuples.BitsUInt8TupleInt32TupleInt16UInt16,
-    WithBitsUnion.SingleVariant,
-    WithBitsUnion.DoubleVariant,
-    WithBitsUnion.SizeAlignMismatch,
-    WithBitsUnion.UnionInTuple,
-    WithNonBitsUnion.NonBitsUnion,
-    WithGeneric.WithGenericT,
-    WithGeneric.WithNestedGenericT,
-    WithGeneric.WithSetGeneric,
-    WithGeneric.WithValueType,
-    WithGeneric.WithGenericUnionAll,
-    WithGeneric.WithSetGenericTuple,
-    WithGeneric.WithPropagatedLifetime,
-    WithGeneric.WithPropagatedLifetimes,
-])
-"""
+module ZST
+struct ZeroSized end
+end
+
+
+# JlrsReflect.reflect([
+#     SingleFieldBits.BitsTypeBool,
+#     SingleFieldBits.BitsTypeChar,
+#     SingleFieldBits.BitsTypeUInt8,
+#     SingleFieldBits.BitsTypeUInt16,
+#     SingleFieldBits.BitsTypeUInt32,
+#     SingleFieldBits.BitsTypeUInt64,
+#     SingleFieldBits.BitsTypeUInt,
+#     SingleFieldBits.BitsTypeInt8,
+#     SingleFieldBits.BitsTypeInt16,
+#     SingleFieldBits.BitsTypeInt32,
+#     SingleFieldBits.BitsTypeInt64,
+#     SingleFieldBits.BitsTypeInt,
+#     SingleFieldBits.BitsTypeFloat32,
+#     SingleFieldBits.BitsTypeFloat64,
+#     MultiFieldBits.BitsIntBool,
+#     MultiFieldBits.BitsCharFloat32Float64,
+#     BitsWithCustom.BitsIntChar,
+#     BitsWithCustom.BitsCharBitsIntChar,
+#     BitsWithTuples.BitsUInt8TupleInt32Int64,
+#     BitsWithTuples.BitsUInt8TupleInt32TupleInt16UInt16,
+#     WithBitsUnion.SingleVariant,
+#     WithBitsUnion.DoubleVariant,
+#     WithBitsUnion.SizeAlignMismatch,
+#     WithBitsUnion.UnionInTuple,
+#     WithNonBitsUnion.NonBitsUnion,
+#     WithGeneric.WithGenericT,
+#     WithGeneric.WithNestedGenericT,
+#     WithGeneric.WithSetGeneric,
+#     WithGeneric.WithValueType,
+#     WithGeneric.WithGenericUnionAll,
+#     WithGeneric.WithSetGenericTuple,
+#     WithGeneric.WithPropagatedLifetime,
+#     WithGeneric.WithPropagatedLifetimes,
+#     ZST.ZeroSized
+# ])

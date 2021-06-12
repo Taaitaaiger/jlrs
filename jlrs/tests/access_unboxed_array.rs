@@ -11,7 +11,7 @@ macro_rules! impl_test {
                 jlrs.scope_with_slots(1, |_, frame| {
                     let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
-                    let array = Value::move_array(frame, data, (2, 3, 4))?;
+                    let array = Array::from_vec(frame, data, (2, 3, 4))?;
                     let d = array.cast::<Array>()?.copy_inline_data::<$value_type>()?;
 
                     let mut out = 1 as $value_type;
@@ -41,7 +41,7 @@ macro_rules! impl_test {
                 jlrs.scope_with_slots(1, |_, frame| {
                     let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
-                    let array = Value::move_array(frame, data, (2, 3, 4))?;
+                    let array = Array::from_vec(frame, data, (2, 3, 4))?;
                     let mut d = array.cast::<Array>()?.copy_inline_data::<$value_type>()?;
 
                     let mut out = 2 as $value_type;
@@ -74,7 +74,7 @@ macro_rules! impl_test {
                 jlrs.scope_with_slots(1, |_, frame| {
                     let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
-                    let array = Value::move_array(frame, data.clone(), (2, 3, 4))?;
+                    let array = Array::from_vec(frame, data.clone(), (2, 3, 4))?;
                     let d = array.cast::<Array>()?.copy_inline_data::<$value_type>()?;
 
                     for (a, b) in data.iter().zip(d.as_slice()) {
@@ -95,7 +95,7 @@ macro_rules! impl_test {
                 jlrs.scope_with_slots(1, |_, frame| {
                     let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
-                    let array = Value::move_array(frame, data.clone(), (2, 3, 4))?;
+                    let array = Array::from_vec(frame, data.clone(), (2, 3, 4))?;
                     let mut d = array.cast::<Array>()?.copy_inline_data::<$value_type>()?;
 
                     for (a, b) in data.iter().zip(d.as_mut_slice()) {
@@ -187,7 +187,7 @@ fn access_copied_array_dimensions() {
         let mut jlrs = j.borrow_mut();
 
         jlrs.scope_with_slots(1, |_, frame| {
-            let arr_val = Value::new_array::<f32, _, _, _>(frame, (1, 2))?;
+            let arr_val = Array::new::<f32, _, _, _>(frame, (1, 2))?;
             let arr = arr_val.cast::<Array>()?;
 
             let data = arr.copy_inline_data::<f32>()?;

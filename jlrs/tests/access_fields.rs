@@ -154,13 +154,13 @@ fn access_bounds_error_fields() {
             .scope_with_slots(5, |global, frame| unsafe {
                 let idx = Value::new(&mut *frame, 4usize)?;
                 let data = vec![1.0f64, 2., 3.];
-                let array = Value::move_array(&mut *frame, data, 3)?;
+                let array = Array::from_vec(&mut *frame, data, 3)?;
                 let func = Module::base(global)
                     .function_ref("getindex")?
                     .wrapper_unchecked();
                 let out = func.call2(&mut *frame, array, idx)?.unwrap_err();
 
-                assert_eq!(out.type_name().unwrap(), "BoundsError");
+                assert_eq!(out.datatype_name().unwrap(), "BoundsError");
 
                 let field_names = out.field_names();
                 let f0: String = field_names[0].as_string().unwrap();
@@ -188,7 +188,7 @@ fn access_bounds_error_fields_oob() {
         jlrs.scope_with_slots(5, |global, frame| unsafe {
             let idx = Value::new(&mut *frame, 4usize)?;
             let data = vec![1.0f64, 2., 3.];
-            let array = Value::move_array(&mut *frame, data, 3)?;
+            let array = Array::from_vec(&mut *frame, data, 3)?;
             let func = Module::base(global)
                 .function_ref("getindex")?
                 .wrapper_unchecked();
@@ -213,7 +213,7 @@ fn access_bounds_error_fields_output() {
         jlrs.scope_with_slots(5, |global, frame| unsafe {
             let idx = Value::new(&mut *frame, 4usize)?;
             let data = vec![1.0f64, 2., 3.];
-            let array = Value::move_array(&mut *frame, data, 3)?;
+            let array = Array::from_vec(&mut *frame, data, 3)?;
             let func = Module::base(global)
                 .function_ref("getindex")?
                 .wrapper_unchecked();
@@ -240,7 +240,7 @@ fn access_bounds_error_fields_output_oob() {
         jlrs.scope_with_slots(5, |global, frame| unsafe {
             let idx = Value::new(&mut *frame, 4usize)?;
             let data = vec![1.0f64, 2., 3.];
-            let array = Value::move_array(&mut *frame, data, 3)?;
+            let array = Array::from_vec(&mut *frame, data, 3)?;
             let func = Module::base(global)
                 .function_ref("getindex")?
                 .wrapper_unchecked();

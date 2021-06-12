@@ -2,7 +2,6 @@
 
 use crate::Julia;
 use jl_sys::{jl_gc_collect, jl_gc_collection_t, jl_gc_enable, jl_gc_is_enabled, jl_gc_safepoint};
-
 use super::frame::Frame;
 
 /// The different collection modes.
@@ -42,6 +41,6 @@ impl<'frame, T: Frame<'frame>> Gc for T {}
 mod private {
     use super::{Frame, Julia};
     pub trait Gc {}
-    impl<'a, T: Frame<'a>> Gc for T {}
+    impl<'a, F: Frame<'a>> Gc for F {}
     impl Gc for Julia {}
 }

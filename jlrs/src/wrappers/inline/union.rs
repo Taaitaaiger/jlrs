@@ -1,13 +1,20 @@
 //! Structs used to represent bits unions.
 
 use std::{
+    ffi::c_void,
     fmt::{Debug, Formatter, Result as FmtResult},
     mem::MaybeUninit,
 };
 
+use jl_sys::jl_bottom_type;
+
 use crate::{
-    layout::bits_union::{Align, BitsUnionContainer, Flag},
-    wrappers::ptr::union::Union,
+    layout::{
+        bits_union::{Align, BitsUnionContainer, Flag},
+        valid_layout::ValidLayout,
+    },
+    private::Private,
+    wrappers::ptr::{private::Wrapper, union::Union, value::Value},
 };
 
 /// Ensures the next field is aligned to 1 byte.
@@ -132,4 +139,20 @@ pub unsafe fn correct_layout_for<A: Align, B: BitsUnionContainer, F: Flag>(u: Un
     }
 
     A::ALIGNMENT == bu_align && std::mem::size_of::<B>() == bu_sz
+}
+
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct EmptyUnion(MaybeUninit<*mut c_void>);
+
+impl Debug for EmptyUnion {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        f.write_str("Union{}")
+    }
+}
+
+unsafe impl ValidLayout for EmptyUnion {
+    fn valid_layout(ty: Value) -> bool {
+        unsafe { ty.unwrap(Private) == jl_bottom_type }
+    }
 }

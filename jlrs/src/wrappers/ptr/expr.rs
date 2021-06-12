@@ -1,7 +1,7 @@
 //! Wrapper for `Core.Expr`.
 
 use super::private::Wrapper;
-use crate::{impl_julia_typecheck, impl_valid_layout};
+use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout};
 use crate::{
     private::Private,
     wrappers::ptr::{ArrayRef, SymbolRef},
@@ -16,9 +16,9 @@ use std::{
 /// A compound expression in Julia ASTs.
 #[derive(Copy, Clone)]
 #[repr(transparent)]
-pub struct Expr<'frame>(NonNull<jl_expr_t>, PhantomData<&'frame ()>);
+pub struct Expr<'scope>(NonNull<jl_expr_t>, PhantomData<&'scope ()>);
 
-impl<'frame> Expr<'frame> {
+impl<'scope> Expr<'scope> {
     /*
     for (a, b) in zip(fieldnames(Expr), fieldtypes(Expr))
         println(a, ": ", b)
@@ -28,24 +28,19 @@ impl<'frame> Expr<'frame> {
     */
 
     /// Returns the head of the expression.
-    pub fn head(self) -> SymbolRef<'frame> {
+    pub fn head(self) -> SymbolRef<'scope> {
         unsafe { SymbolRef::wrap(self.unwrap_non_null(Private).as_ref().head) }
     }
 
     /// Returns the arguments of the expression.
-    pub fn args(self) -> ArrayRef<'frame, 'static> {
+    pub fn args(self) -> ArrayRef<'scope, 'static> {
         unsafe { ArrayRef::wrap(self.unwrap_non_null(Private).as_ref().args) }
     }
 }
 
-impl<'scope> Debug for Expr<'scope> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        f.debug_tuple("Expr").finish()
-    }
-}
-
-impl_julia_typecheck!(Expr<'frame>, jl_expr_type, 'frame);
-impl_valid_layout!(Expr<'frame>, 'frame);
+impl_julia_typecheck!(Expr<'scope>, jl_expr_type, 'scope);
+impl_valid_layout!(Expr<'scope>, 'scope);
+impl_debug!(Expr<'_>);
 
 impl<'scope> Wrapper<'scope, '_> for Expr<'scope> {
     type Internal = jl_expr_t;

@@ -13,7 +13,7 @@
 //!  - Create values that Julia can use, and convert them back to Rust, from Rust.
 //!  - Access the type information and fields of values and check their properties.
 //!  - Create and use n-dimensional arrays.
-//!  - Support for mapping Julia structs to Rust structs which can be generated with `JlrsReflect.jl`.
+//!  - Support for mapping Julia structs to Rust structs which can be generated with JlrsReflect.jl.
 //!  - Structs that can be mapped to Rust include those with type parameters and bits unions.
 //!  - Use these features when calling Rust from Julia through `ccall`.
 //!  - Offload long-running functions to another thread and `.await` the result with the (experimental) async runtime.
@@ -78,7 +78,7 @@
 //! using` statement. To create a `Value` directly, without evaluating Julia code, other methods
 //! like [`Value::new`] are available. [`Value::new`] supports converting primitive types from
 //! Rust to Julia, but can also be used with some more complex types like `String`s. New arrays
-//! can be created with methods like [`Value::new_array`], but it only supports types that can
+//! can be created with methods like [`Array::new`], but it only supports types that can
 //! be converted from Rust to Julia with [`Value::new`].
 //!
 //! Julia functions are `Value`s too. In fact, all `Value`s can be called as functions, whether
@@ -127,7 +127,7 @@
 //!     let func = Module::base(global).function(&mut *frame, "+")?;
 //!
 //!     // Call the function and unbox the result as a `u64`. The result of the function
-//!     // call is a nested `Result`; the outer error does not contain to any Julia
+//!     // call is a nested `Result`; the outer error doesn't  contain to any Julia
 //!     // data, while the inner error contains the exception if one is thrown.
 //!     func.call2(&mut *frame, i, j)?
 //!         .into_jlrs_result()?
@@ -359,7 +359,7 @@
 //! the struct in Julia has no type parameters and is a bits type you can also derive
 //! [`IntoJulia`], which lets you use the type in combination with [`Value::new`].
 //!
-//! You should not implement these structs manually. The `JlrsReflect.jl` package can generate
+//! You should not implement these structs manually. The JlrsReflect.jl package can generate
 //! the correct Rust struct for types that have no tuple or union fields with type parameters.
 //! The reason for this restriction is that the layout of tuple and union fields can be very
 //! different depending on these parameters in a way that can't be nicely expressed in Rust.
@@ -374,7 +374,7 @@
 //! [`Cast`]: crate::convert::cast::Cast
 //! [`JuliaStruct`]: crate::wrappers::ptr::traits::julia_struct::JuliaStruct
 //! [`AsyncGcFrame`]: crate::memory::frame::AsyncGcFrame
-//! [`Frame`]: crate::memory::traits::frame::Frame
+//! [`Frame`]: crate::memory::frame::Frame
 //! [`AsyncTask`]: crate::multitask::julia_task::AsyncTask
 //! [`AsyncJulia`]: crate::multitask::AsyncJulia
 //! [`DataType`]: crate::wrappers::builtin::datatype::DataType
@@ -389,12 +389,9 @@
 
 #![forbid(broken_intra_doc_links)]
 
-pub mod call;
 pub mod convert;
 pub mod error;
 pub mod extensions;
-// #[doc(hidden)]
-// pub mod jl_sys_export;
 pub mod layout;
 pub mod memory;
 pub mod prelude;
@@ -403,7 +400,6 @@ pub(crate) mod private;
 pub mod util;
 pub mod wrappers;
 
-use call::Call;
 use convert::into_jlrs_result::IntoJlrsResult;
 use error::{JlrsError, JlrsResult};
 use jl_sys::{
@@ -412,7 +408,7 @@ use jl_sys::{
 use memory::frame::{GcFrame, NullFrame};
 use memory::global::Global;
 use memory::mode::Sync;
-use memory::stack::StackPage;
+use memory::stack_page::StackPage;
 use private::Private;
 use std::ffi::{c_void, CString};
 use std::io::{Error as IOError, ErrorKind};
@@ -422,7 +418,8 @@ use std::ptr::null_mut;
 use std::sync::atomic::{AtomicBool, Ordering};
 use wrappers::ptr::module::Module;
 use wrappers::ptr::value::Value;
-use wrappers::ptr::{array::Array, private::Wrapper};
+use wrappers::ptr::string::JuliaString;
+use wrappers::ptr::{array::Array, private::Wrapper, call::Call};
 
 pub(crate) static INIT: AtomicBool = AtomicBool::new(false);
 
@@ -454,7 +451,7 @@ impl Julia {
         };
 
         jl.scope_with_slots(2, |global, frame| {
-            Value::eval_string(frame, JLRS_JL)?.into_jlrs_result()?;
+            Value::eval_string(&mut *frame, JLRS_JL)?.into_jlrs_result()?;
 
             let droparray_fn = Value::new(frame, droparray as *mut c_void)?;
             Module::main(global)
@@ -481,7 +478,7 @@ impl Julia {
     /// directory that contains a compatible Julia binary (eg `${JULIA_DIR}/bin`), the second must
     /// be either an absolute or a relative path to a system image.
     ///
-    /// This method will return an error if either of the two paths does not exist or if Julia
+    /// This method will return an error if either of the two paths doesn't  exist or if Julia
     /// has already been initialized. It is unsafe because this crate provides you with a way to
     /// execute arbitrary Julia code which can't be checked for correctness.
     ///
@@ -517,9 +514,9 @@ impl Julia {
         };
 
         jl.scope_with_slots(2, |global, frame| {
-            Value::eval_string(frame, JLRS_JL)?.into_jlrs_result()?;
+            Value::eval_string(&mut *frame, JLRS_JL)?.into_jlrs_result()?;
 
-            let droparray_fn = Value::new(frame, droparray as *mut c_void)?;
+            let droparray_fn = Value::new(&mut *frame, droparray as *mut c_void)?;
             Module::main(global)
                 .submodule_ref("Jlrs")?
                 .wrapper_unchecked()
@@ -549,7 +546,7 @@ impl Julia {
     pub fn include<P: AsRef<Path>>(&mut self, path: P) -> JlrsResult<()> {
         if path.as_ref().exists() {
             return self.scope_with_slots(2, |global, frame| {
-                let path_jl_str = Value::new_string(&mut *frame, path.as_ref().to_string_lossy())?;
+                let path_jl_str = JuliaString::new(&mut *frame, path.as_ref().to_string_lossy())?;
                 let include_func = unsafe {
                     Module::main(global)
                         .function_ref("include")?
@@ -561,7 +558,7 @@ impl Julia {
                     Ok(_) => Ok(()),
                     Err(e) => Err(JlrsError::IncludeError(
                         path.as_ref().to_string_lossy().into(),
-                        e.type_name()?.into(),
+                        e.datatype_name()?.into(),
                     )
                     .into()),
                 };

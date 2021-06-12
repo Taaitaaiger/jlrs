@@ -12,7 +12,7 @@ use crate::{
     error::JuliaResult,
     memory::{
         output::{OutputResult, OutputScope, OutputValue},
-        traits::frame::Frame,
+        frame::Frame,
     },
     private::Private,
     wrappers::ptr::{private::Wrapper, value::Value},

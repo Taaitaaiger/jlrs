@@ -6,7 +6,7 @@
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#525
 
 use super::private::Wrapper;
-use crate::{impl_julia_typecheck, impl_valid_layout};
+use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout};
 use crate::{private::Private, wrappers::ptr::ValueRef};
 use jl_sys::{jl_typemap_level_t, jl_typemap_level_type};
 use std::{
@@ -19,9 +19,9 @@ use std::{
 /// Indexed by key if it is a sublevel in an array
 #[derive(Copy, Clone)]
 #[repr(transparent)]
-pub struct TypeMapLevel<'frame>(NonNull<jl_typemap_level_t>, PhantomData<&'frame ()>);
+pub struct TypeMapLevel<'scope>(NonNull<jl_typemap_level_t>, PhantomData<&'scope ()>);
 
-impl<'frame> TypeMapLevel<'frame> {
+impl<'scope> TypeMapLevel<'scope> {
     /*
     for (a,b) in zip(fieldnames(Core.TypeMapEntry), fieldtypes(Core.TypeMapEntry))
          println(a,": ", b)
@@ -35,45 +35,39 @@ impl<'frame> TypeMapLevel<'frame> {
     */
 
     /// The `arg1` field.
-    pub fn arg1(self) -> ValueRef<'frame, 'static> {
+    pub fn arg1(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().arg1.cast()) }
     }
 
     /// The `targ` field.
-    pub fn targ(self) -> ValueRef<'frame, 'static> {
+    pub fn targ(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().targ.cast()) }
     }
 
     /// The `name1` field.
-    pub fn name1(self) -> ValueRef<'frame, 'static> {
+    pub fn name1(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().name1.cast()) }
     }
 
     /// The `tname` field.
-    pub fn tname(self) -> ValueRef<'frame, 'static> {
+    pub fn tname(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().tname.cast()) }
     }
 
     /// The `linear` field, which is called `list` in `Core.TypemapLevel`.
-    pub fn list(self) -> ValueRef<'frame, 'static> {
+    pub fn list(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().linear.cast()) }
     }
 
     /// The `any` field.
-    pub fn any(self) -> ValueRef<'frame, 'static> {
+    pub fn any(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().any) }
     }
 }
 
-impl<'scope> Debug for TypeMapLevel<'scope> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        f.debug_tuple("TypeMapLevel").finish()
-    }
-}
-
-impl_julia_typecheck!(TypeMapLevel<'frame>, jl_typemap_level_type, 'frame);
-
-impl_valid_layout!(TypeMapLevel<'frame>, 'frame);
+impl_julia_typecheck!(TypeMapLevel<'scope>, jl_typemap_level_type, 'scope);
+impl_debug!(TypeMapLevel<'_>);
+impl_valid_layout!(TypeMapLevel<'scope>, 'scope);
 
 impl<'scope> Wrapper<'scope, '_> for TypeMapLevel<'scope> {
     type Internal = jl_typemap_level_t;

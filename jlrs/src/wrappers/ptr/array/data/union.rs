@@ -3,7 +3,7 @@
 use crate::{
     error::{JlrsError, JlrsResult},
     layout::valid_layout::ValidLayout,
-    memory::traits::frame::Frame,
+    memory::frame::Frame,
     private::Private,
     wrappers::ptr::{
         array::{
@@ -71,7 +71,7 @@ impl<'borrow, 'array> UnionArrayData<'borrow, 'array> {
     /// element stored there.
     pub fn get<T, D>(&self, index: D) -> JlrsResult<T>
     where
-        T: ValidLayout + Copy,
+        T: ValidLayout + Clone,
         D: Dims,
     {
         unsafe {
@@ -93,7 +93,7 @@ impl<'borrow, 'array> UnionArrayData<'borrow, 'array> {
                         .cast::<i8>()
                         .add(offset)
                         .cast::<T>();
-                    return Ok(*ptr);
+                    return Ok((&*ptr).clone());
                 }
             }
 
@@ -153,7 +153,7 @@ impl<'borrow, 'array> UnionArrayDataMut<'borrow, 'array> {
     /// element stored there.
     pub fn get<T, D>(&self, index: D) -> JlrsResult<T>
     where
-        T: ValidLayout + Copy,
+        T: ValidLayout + Clone,
         D: Dims,
     {
         unsafe {
@@ -175,7 +175,7 @@ impl<'borrow, 'array> UnionArrayDataMut<'borrow, 'array> {
                         .cast::<i8>()
                         .add(offset)
                         .cast::<T>();
-                    return Ok(*ptr);
+                    return Ok((&*ptr).clone());
                 }
             }
 
@@ -188,7 +188,7 @@ impl<'borrow, 'array> UnionArrayDataMut<'borrow, 'array> {
     /// types.
     pub fn set<T, D>(&mut self, index: D, ty: DataType, value: T) -> JlrsResult<()>
     where
-        T: ValidLayout + Copy,
+        T: ValidLayout + Clone,
         D: Dims,
     {
         unsafe {
@@ -273,7 +273,7 @@ impl<'borrow, 'array> UnresistrictedUnionArrayDataMut<'borrow, 'array> {
     /// element stored there.
     pub fn get<T, D>(&self, index: D) -> JlrsResult<T>
     where
-        T: ValidLayout + Copy,
+        T: ValidLayout + Clone,
         D: Dims,
     {
         unsafe {
@@ -295,7 +295,7 @@ impl<'borrow, 'array> UnresistrictedUnionArrayDataMut<'borrow, 'array> {
                         .cast::<i8>()
                         .add(offset)
                         .cast::<T>();
-                    return Ok(*ptr);
+                    return Ok((&*ptr).clone());
                 }
             }
 
@@ -308,7 +308,7 @@ impl<'borrow, 'array> UnresistrictedUnionArrayDataMut<'borrow, 'array> {
     /// types.
     pub fn set<T, D>(&mut self, index: D, ty: DataType, value: T) -> JlrsResult<()>
     where
-        T: ValidLayout + Copy,
+        T: ValidLayout + Clone,
         D: Dims,
     {
         unsafe {

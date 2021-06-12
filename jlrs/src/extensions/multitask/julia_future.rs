@@ -1,11 +1,11 @@
 //! A `Future` that represents a function call in Julia running on another thread.
 
+use crate::wrappers::ptr::call::UnsafeCall;
 use crate::wrappers::ptr::module::Module;
 use crate::wrappers::ptr::task::Task;
 use crate::wrappers::ptr::value::{Value, MAX_SIZE};
 use crate::{
-    call::Call,
-    memory::{global::Global, traits::scope::Scope},
+    memory::{global::Global, scope::Scope},
 };
 use crate::{
     error::{exception, JlrsResult, JuliaResult},
@@ -71,7 +71,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                 .wrapper_unchecked()
                 .function_ref("asynccall")?
                 .wrapper_unchecked()
-                .call(frame, &mut vals)?
+                .unsafe_call(frame, &mut vals)?
                 .map_err(|e| {
                     exception::<()>(format!("asynccall threw an exception: {:?}", e)).unwrap_err()
                 })?

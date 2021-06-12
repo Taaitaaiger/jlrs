@@ -55,4 +55,15 @@ function clean(a::Array)
     @assert droparray[] != C_NULL "droparray is null"
     ccall(droparray[], Cvoid, (Array,), a)
 end
+
+@nospecialize
+function displaystring(value)::String
+    try
+        io = IOBuffer()
+        display(TextDisplay(io), value)
+        String(take!(io))
+    catch
+        ""
+    end
+end
 end
