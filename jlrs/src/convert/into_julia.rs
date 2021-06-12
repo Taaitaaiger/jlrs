@@ -28,7 +28,7 @@ use std::ffi::c_void;
 /// ensure it's implemented correctly.
 ///
 /// If you do choose to implement it manually, you only need to implement the `julia_type` method
-/// which must return the `DataType` of the type this data will have in Julia. The layout of this 
+/// which must return the `DataType` of the type this data will have in Julia. The layout of this
 /// type and the type in Rust must match exactly. Incompatible layouts will lead to UB. Note that
 /// the type in Rust must always be `#[repr(C)]`.
 ///
@@ -56,12 +56,8 @@ pub unsafe trait IntoJulia: Sized + 'static {
 macro_rules! impl_into_julia {
     ($type:ty, $boxer:ident, $julia_type:expr) => {
         unsafe impl IntoJulia for $type {
-            fn julia_type<'scope>(
-                _: Global<'scope>,
-            ) -> $crate::wrappers::ptr::DataTypeRef<'scope> {
-                unsafe {
-                    $crate::wrappers::ptr::DataTypeRef::wrap($julia_type)
-                }
+            fn julia_type<'scope>(_: Global<'scope>) -> $crate::wrappers::ptr::DataTypeRef<'scope> {
+                unsafe { $crate::wrappers::ptr::DataTypeRef::wrap($julia_type) }
             }
 
             unsafe fn into_julia<'scope>(

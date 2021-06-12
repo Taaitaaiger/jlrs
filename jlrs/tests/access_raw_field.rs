@@ -211,11 +211,8 @@ fn access_array_field() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
         jlrs.scope(|global, frame| {
-            Value::eval_string(
-                &mut *frame,
-                "struct HasArray a::Array{Float64, 2} end",
-            )?
-            .into_jlrs_result()?;
+            Value::eval_string(&mut *frame, "struct HasArray a::Array{Float64, 2} end")?
+                .into_jlrs_result()?;
 
             let ty = unsafe {
                 Module::main(global)
@@ -238,17 +235,12 @@ fn access_array_field() {
     })
 }
 
-
 #[test]
 fn access_ua_array_field() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
         jlrs.scope(|global, frame| {
-            Value::eval_string(
-                &mut *frame,
-                "struct UaArray a::Array end",
-            )?
-            .into_jlrs_result()?;
+            Value::eval_string(&mut *frame, "struct UaArray a::Array end")?.into_jlrs_result()?;
 
             let ty = unsafe {
                 Module::main(global)
@@ -270,7 +262,6 @@ fn access_ua_array_field() {
         .unwrap();
     })
 }
-
 
 #[test]
 fn access_raw_fields_nonexistent_name() {

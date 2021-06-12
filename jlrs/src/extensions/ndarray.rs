@@ -149,7 +149,6 @@ mod tests {
     use super::NdArray;
     use crate::util::JULIA;
     use crate::wrappers::ptr::array::{Array, TypedArray};
-    use crate::wrappers::ptr::value::Value;
     use ndarray::{ArrayView, ArrayViewMut, IxDyn};
 
     #[test]

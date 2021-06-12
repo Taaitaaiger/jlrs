@@ -4,7 +4,7 @@ use crate::layout::typecheck::Typecheck;
 use crate::wrappers::ptr::value::Value;
 use crate::{
     error::{JlrsError, JlrsResult},
-    memory::{global::Global, frame::Frame},
+    memory::{frame::Frame, global::Global},
 };
 use crate::{layout::valid_layout::ValidLayout, private::Private};
 use jl_sys::{
@@ -18,7 +18,7 @@ use std::{
 };
 
 use super::{datatype::DataType, private::Wrapper as WrapperPriv, Wrapper};
-use crate::wrappers::ptr::{Ref};
+use crate::wrappers::ptr::Ref;
 
 /// A `SimpleVector` is a fixed-size array that contains `Value`s.
 #[derive(Copy, Clone)]
@@ -76,11 +76,7 @@ impl<'scope, T: Wrapper<'scope, 'static>> SimpleVector<'scope, T> {
 
     /// Set the element at `index` to `value`. This is only safe if the `SimpleVector` has just
     /// been allocated.
-    pub unsafe fn set(
-        self,
-        index: usize,
-        value: Option<T>,
-    ) -> JlrsResult<Ref<'scope, 'static, T>> {
+    pub unsafe fn set(self, index: usize, value: Option<T>) -> JlrsResult<Ref<'scope, 'static, T>> {
         if index >= self.len() {
             Err(JlrsError::OutOfBounds(index, self.len()))?;
         }
@@ -108,9 +104,7 @@ impl<'base, T: Wrapper<'base, 'static>> SimpleVector<'base, T> {
 
 unsafe impl<'scope, T: Wrapper<'scope, 'static>> Typecheck for SimpleVector<'scope, T> {
     fn typecheck(t: DataType) -> bool {
-        unsafe {
-            t.unwrap(Private) == jl_simplevector_type
-        }
+        unsafe { t.unwrap(Private) == jl_simplevector_type }
     }
 }
 
@@ -124,7 +118,7 @@ unsafe impl<'scope, T: Wrapper<'scope, 'static>> ValidLayout for SimpleVector<'s
     }
 }
 
-impl<'scope,  T: Wrapper<'scope, 'static>> Debug for SimpleVector<'scope, T> {
+impl<'scope, T: Wrapper<'scope, 'static>> Debug for SimpleVector<'scope, T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         if let Ok(s) = self.display_string() {
             f.write_str(&s)

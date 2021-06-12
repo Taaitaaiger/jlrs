@@ -3,7 +3,7 @@
 //! A [`JuliaResult`] is an alias for `Result` that's used when a function can throw an exception
 //! that can be caught. This is currently limited to calling Julia functions and evaluating raw
 //! Julia code. Inside a scope, the `?` operator can only be used with another alias for `Result`,
-//! [`JlrsError`]. The [`IntoJlrsResult`] trait defined in this module can be used to convert a 
+//! [`JlrsError`]. The [`IntoJlrsResult`] trait defined in this module can be used to convert a
 //! `JuliaResult` to a [`JlrsResult`] to convert the exception to a simple error message which can
 //! be returned from the closure.
 //!

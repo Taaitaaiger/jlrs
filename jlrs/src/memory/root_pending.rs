@@ -1,10 +1,10 @@
+use super::frame::Frame;
 use crate::{
     error::{JlrsResult, JuliaResult},
     memory::output::{PendingResult, PendingValue},
     private::Private,
     wrappers::ptr::value::Value,
 };
-use super::frame::Frame;
 
 pub(crate) trait RootPending<'frame, 'data>: Sized {
     type ClosureOutput;

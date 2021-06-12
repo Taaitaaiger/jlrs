@@ -1,11 +1,15 @@
 //! Wrapper for `Core.Symbol`. Symbols represent identifiers like module and function names.
 
-use crate::{error::{JlrsError, JlrsResult}, impl_debug, memory::global::Global};
+use crate::{
+    error::{JlrsError, JlrsResult},
+    impl_debug,
+    memory::global::Global,
+};
 use crate::{impl_julia_typecheck, impl_valid_layout};
 use crate::{private::Private, wrappers::ptr::value::LeakedValue};
 use jl_sys::{jl_sym_t, jl_symbol_n, jl_symbol_name, jl_symbol_type};
 use std::ffi::CStr;
-use std::fmt::{Debug, Formatter, Result as FmtResult};
+
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 

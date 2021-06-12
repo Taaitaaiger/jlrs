@@ -14,11 +14,7 @@ use crate::{
 };
 use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_new_typevar, jl_tvar_t, jl_tvar_type};
-use std::{
-    fmt::{Debug, Formatter, Result as FmtResult},
-    marker::PhantomData,
-    ptr::NonNull,
-};
+use std::{marker::PhantomData, ptr::NonNull};
 
 /// This is a unknown, but possibly restricted, type parameter. In `Array{T, N}`, `T` and `N` are
 /// `TypeVar`s.
@@ -63,18 +59,14 @@ impl<'scope> TypeVar<'scope> {
                 ))?;
             }
 
-            let tvar = jl_new_typevar(
-                name.unwrap(Private),
-                lb.unwrap(Private),
-                ub.unwrap(Private),
-            );
+            let tvar = jl_new_typevar(name.unwrap(Private), lb.unwrap(Private), ub.unwrap(Private));
 
             scope.value(NonNull::new_unchecked(tvar.cast()), Private)
         }
     }
 
     /// Create a new `TypeVar`, the optional lower and upper bounds must be subtypes of `Type`,
-    /// their default values are `Union{}` and `Any` respectively. Unlike [`TypeVar::new`], this 
+    /// their default values are `Union{}` and `Any` respectively. Unlike [`TypeVar::new`], this
     /// method doesn't root the allocated value.
     pub fn new_unrooted<'global, N, S, F>(
         global: Global<'global>,
@@ -106,11 +98,7 @@ impl<'scope> TypeVar<'scope> {
                 ))?;
             }
 
-            let tvar = jl_new_typevar(
-                name.unwrap(Private),
-                lb.unwrap(Private),
-                ub.unwrap(Private),
-            );
+            let tvar = jl_new_typevar(name.unwrap(Private), lb.unwrap(Private), ub.unwrap(Private));
 
             Ok(TypeVarRef::wrap(tvar))
         }

@@ -1,7 +1,7 @@
 //! Automatically convert strings to symbols.
 //!
 //! Many things in Julia are accessed with [`Symbol`]s, the [`TemporarySymbol`] trait allows for
-//! strings to be used instead. This trait can only be used by jlrs internally, the method that 
+//! strings to be used instead. This trait can only be used by jlrs internally, the method that
 //! performs the conversion is not public.
 
 use crate::wrappers::ptr::string::JuliaString;

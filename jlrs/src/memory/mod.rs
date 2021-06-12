@@ -18,7 +18,7 @@
 //!
 //! In particular, when you use jlrs all interactions with Julia happen inside a scope. A base
 //! scope can be created with the methods [`Julia::scope`] and [`Julia::scope_with_slots`]. These
-//! methods take a closure which is called inside this scope. This closure is provided with its 
+//! methods take a closure which is called inside this scope. This closure is provided with its
 //! two arguments, a [`Global`] and a mutable reference to a [`GcFrame`]. The first of these is an
 //! access token that can be used to access Julia modules and their contents, the second is a new
 //! frame that is used to store roots. The frame is popped from the stack when leaving the scope,

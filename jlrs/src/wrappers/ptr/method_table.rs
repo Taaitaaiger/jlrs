@@ -12,11 +12,7 @@ use crate::{
     wrappers::ptr::{ArrayRef, ModuleRef, SymbolRef, ValueRef},
 };
 use jl_sys::{jl_methtable_t, jl_methtable_type};
-use std::{
-    fmt::{Debug, Formatter, Result as FmtResult},
-    marker::PhantomData,
-    ptr::NonNull,
-};
+use std::{marker::PhantomData, ptr::NonNull};
 
 /// contains the TypeMap for one Type
 #[derive(Copy, Clone)]

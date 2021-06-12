@@ -11,11 +11,7 @@ use crate::{
     wrappers::ptr::{CodeInstanceRef, SimpleVectorRef, ValueRef},
 };
 use jl_sys::{jl_method_instance_t, jl_method_instance_type};
-use std::{
-    fmt::{Debug, Formatter, Result as FmtResult},
-    marker::PhantomData,
-    ptr::NonNull,
-};
+use std::{marker::PhantomData, ptr::NonNull};
 
 /// This type is a placeholder to cache data for a specType signature specialization of a `Method`
 /// can can be used as a unique dictionary key representation of a call to a particular `Method`

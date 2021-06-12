@@ -417,9 +417,9 @@ use std::path::Path;
 use std::ptr::null_mut;
 use std::sync::atomic::{AtomicBool, Ordering};
 use wrappers::ptr::module::Module;
-use wrappers::ptr::value::Value;
 use wrappers::ptr::string::JuliaString;
-use wrappers::ptr::{array::Array, private::Wrapper, call::Call};
+use wrappers::ptr::value::Value;
+use wrappers::ptr::{array::Array, call::Call, private::Wrapper};
 
 pub(crate) static INIT: AtomicBool = AtomicBool::new(false);
 

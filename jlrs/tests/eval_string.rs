@@ -29,7 +29,10 @@ fn runtime_error() {
 #[test]
 fn syntax_error() {
     eval_string("asdf fdsa asdf fdsa", |result| {
-        assert_eq!(result.unwrap_err().datatype_name().unwrap(), "ErrorException");
+        assert_eq!(
+            result.unwrap_err().datatype_name().unwrap(),
+            "ErrorException"
+        );
     });
 }
 

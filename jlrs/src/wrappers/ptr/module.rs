@@ -4,22 +4,25 @@
 //! modules, `Main`, `Base` and `Core`. Any Julia code that you include in jlrs is made available
 //! relative to the `Main` module, just like in Julia itself.
 
-use crate::{convert::temporary_symbol::TemporarySymbol, error::{JlrsError, JlrsResult}, impl_debug, impl_julia_typecheck, impl_valid_layout, memory::{
-        global::Global,
-        scope::Scope,
-        {frame::Frame,},
-    }, private::Private, wrappers::ptr::{
+use crate::{
+    convert::temporary_symbol::TemporarySymbol,
+    error::{JlrsError, JlrsResult},
+    impl_debug, impl_julia_typecheck, impl_valid_layout,
+    memory::{frame::Frame, global::Global, scope::Scope},
+    private::Private,
+    wrappers::ptr::{
         call::Call,
         function::Function,
         symbol::Symbol,
         value::{LeakedValue, Value},
         FunctionRef, ModuleRef, ValueRef, Wrapper as _,
-    }};
+    },
+};
 use jl_sys::{
     jl_base_module, jl_core_module, jl_get_global, jl_main_module, jl_module_t, jl_module_type,
     jl_set_const, jl_set_global, jl_typeis,
 };
-use std::fmt::{Debug, Formatter, Result as FmtResult};
+
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 
@@ -125,7 +128,7 @@ impl<'scope> Module<'scope> {
     }
 
     /// Returns the submodule named `name` relative to this module without rooting it. You have to
-    /// access this level by level: you can't access `Main.A.B` by calling this function with 
+    /// access this level by level: you can't access `Main.A.B` by calling this function with
     /// `"A.B"`, but have to access `A` first and then `B`.
     ///
     /// Returns an error if the submodule doesn't exist.
@@ -149,11 +152,7 @@ impl<'scope> Module<'scope> {
 
     /// Set a global value in this module. Note that if this global already exists, this can
     /// make the old value unreachable.
-    pub fn set_global<N>(
-        self,
-        name: N,
-        value: Value<'_, 'static>,
-    ) -> ValueRef<'scope, 'static>
+    pub fn set_global<N>(self, name: N, value: Value<'_, 'static>) -> ValueRef<'scope, 'static>
     where
         N: TemporarySymbol,
     {
@@ -196,7 +195,11 @@ impl<'scope> Module<'scope> {
 
     /// Returns the global named `name` in this module.
     /// Returns an error if the global doesn't exist.
-    pub fn global<'target, N, F>(self, frame: &mut F, name: N) -> JlrsResult<Value<'target, 'static>>
+    pub fn global<'target, N, F>(
+        self,
+        frame: &mut F,
+        name: N,
+    ) -> JlrsResult<Value<'target, 'static>>
     where
         N: TemporarySymbol,
         F: Frame<'target>,

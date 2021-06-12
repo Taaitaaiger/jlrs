@@ -18,11 +18,11 @@ use crate::memory::global::Global;
 use crate::wrappers::ptr::module::Module;
 use crate::wrappers::ptr::string::JuliaString;
 use crate::wrappers::ptr::value::Value;
-use crate::{wrappers::ptr::call::Call, memory::frame::GcFrame};
 use crate::{
     error::{JlrsError, JlrsResult},
     memory::{mode::Async, stack_page::StackPage},
 };
+use crate::{memory::frame::GcFrame, wrappers::ptr::call::Call};
 use crate::{INIT, JLRS_JL};
 use async_std::channel::{
     bounded, Receiver as AsyncStdReceiver, RecvError, Sender as AsyncStdSender, TrySendError,

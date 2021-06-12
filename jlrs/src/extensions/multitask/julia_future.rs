@@ -1,12 +1,10 @@
 //! A `Future` that represents a function call in Julia running on another thread.
 
+use crate::memory::{global::Global, scope::Scope};
 use crate::wrappers::ptr::call::UnsafeCall;
 use crate::wrappers::ptr::module::Module;
 use crate::wrappers::ptr::task::Task;
 use crate::wrappers::ptr::value::{Value, MAX_SIZE};
-use crate::{
-    memory::{global::Global, scope::Scope},
-};
 use crate::{
     error::{exception, JlrsResult, JuliaResult},
     private::Private,

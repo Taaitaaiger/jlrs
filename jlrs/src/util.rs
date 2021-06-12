@@ -5,6 +5,7 @@
 use crate::{wrappers::ptr::value::Value, Julia};
 use std::cell::RefCell;
 
+#[doc(hidden)]
 pub static JLRS_TESTS_JL: &'static str = include_str!("../tests/julia/JlrsTests.jl");
 
 thread_local! {

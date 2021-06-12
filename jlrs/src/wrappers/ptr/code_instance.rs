@@ -12,11 +12,7 @@ use crate::{
     wrappers::ptr::{CodeInstanceRef, MethodInstanceRef, ValueRef},
 };
 use jl_sys::{jl_code_instance_t, jl_code_instance_type};
-use std::{
-    fmt::{Debug, Formatter, Result as FmtResult},
-    marker::PhantomData,
-    ptr::NonNull,
-};
+use std::{marker::PhantomData, ptr::NonNull};
 
 /// A `CodeInstance` represents an executable operation.
 #[derive(Copy, Clone)]

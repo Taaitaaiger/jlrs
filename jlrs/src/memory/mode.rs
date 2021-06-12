@@ -67,7 +67,6 @@ pub(crate) mod private {
     }
 }
 
-
 /// Mode used by the synchronous runtime.
 #[derive(Clone, Copy)]
 pub struct Sync;

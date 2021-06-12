@@ -14,11 +14,7 @@ use crate::{
     },
 };
 use jl_sys::{jl_method_t, jl_method_type};
-use std::{
-    fmt::{Debug, Formatter, Result as FmtResult},
-    marker::PhantomData,
-    ptr::NonNull,
-};
+use std::{marker::PhantomData, ptr::NonNull};
 
 /// This type describes a single method definition, and stores data shared by the specializations
 /// of a function.

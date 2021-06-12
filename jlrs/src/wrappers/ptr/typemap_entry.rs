@@ -9,11 +9,7 @@ use super::private::Wrapper;
 use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout};
 use crate::{private::Private, wrappers::ptr::ValueRef};
 use jl_sys::{jl_typemap_entry_t, jl_typemap_entry_type};
-use std::{
-    fmt::{Debug, Formatter, Result as FmtResult},
-    marker::PhantomData,
-    ptr::NonNull,
-};
+use std::{marker::PhantomData, ptr::NonNull};
 
 /// One Type-to-Value entry
 #[derive(Copy, Clone)]

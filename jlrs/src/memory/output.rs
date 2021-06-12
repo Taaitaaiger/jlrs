@@ -14,7 +14,7 @@
 
 use jl_sys::jl_value_t;
 
-use super::{frame::GcFrame, frame::Frame};
+use super::{frame::Frame, frame::GcFrame};
 use crate::{error::JlrsResult, private::Private};
 use std::{marker::PhantomData, ptr::NonNull};
 
@@ -49,7 +49,10 @@ impl<'scope, 'frame, 'borrow, F: Frame<'frame>> OutputScope<'scope, 'frame, 'bor
         OutputScope(frame, output, PhantomData)
     }
 
-    pub(crate) fn value_scope<'data, G>(self, func: G) -> JlrsResult<OutputValue<'scope, 'data, 'borrow>>
+    pub(crate) fn value_scope<'data, G>(
+        self,
+        func: G,
+    ) -> JlrsResult<OutputValue<'scope, 'data, 'borrow>>
     where
         G: for<'nested, 'inner> FnOnce(
             Output<'scope>,
@@ -77,7 +80,10 @@ impl<'scope, 'frame, 'borrow, F: Frame<'frame>> OutputScope<'scope, 'frame, 'bor
         func(out, &mut frame).map(|pv| OutputValue::wrap_non_null(pv.unwrap_non_null()))
     }
 
-    pub(crate) fn result_scope<'data, G>(self, func: G) -> JlrsResult<OutputResult<'scope, 'data, 'borrow>>
+    pub(crate) fn result_scope<'data, G>(
+        self,
+        func: G,
+    ) -> JlrsResult<OutputResult<'scope, 'data, 'borrow>>
     where
         G: for<'nested, 'inner> FnOnce(
             Output<'scope>,

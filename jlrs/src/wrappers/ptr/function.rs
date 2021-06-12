@@ -7,11 +7,7 @@
 //! [`Call`]: crate::call::Call
 
 use jl_sys::jl_value_t;
-use std::{
-    fmt::{Debug, Formatter, Result as FmtResult},
-    marker::PhantomData,
-    ptr::NonNull,
-};
+use std::{marker::PhantomData, ptr::NonNull};
 
 use super::{
     call::{private::Call as CallPriv, Call, CallExt, UnsafeCall, UnsafeCallExt, WithKeywords},
@@ -20,10 +16,16 @@ use super::{
     value::Value,
     Wrapper,
 };
-use crate::{error::{JlrsError, JlrsResult, JuliaResult, JuliaResultRef}, impl_debug, layout::{
+use crate::{
+    error::{JlrsError, JlrsResult, JuliaResult, JuliaResultRef},
+    impl_debug,
+    layout::{
         typecheck::{NamedTuple, Typecheck},
         valid_layout::ValidLayout,
-    }, memory::{frame::Frame, global::Global, scope::Scope}, private::Private};
+    },
+    memory::{frame::Frame, global::Global, scope::Scope},
+    private::Private,
+};
 
 #[derive(Clone, Copy)]
 #[repr(transparent)]

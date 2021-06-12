@@ -1,10 +1,7 @@
 //! Wrapper for `Core.UnionAll`.
 
-use super::call::Call;
-use super::module::Module;
-use super::string::JuliaString;
 use super::type_var::TypeVar;
-use super::{private::Wrapper, Wrapper as _, value::Value};
+use super::{private::Wrapper, value::Value};
 use crate::error::{JlrsError, JlrsResult};
 use crate::impl_debug;
 use crate::memory::frame::Frame;
@@ -14,17 +11,13 @@ use crate::wrappers::ptr::DataTypeRef;
 use crate::wrappers::ptr::{TypeVarRef, ValueRef};
 use crate::{impl_julia_typecheck, impl_valid_layout};
 use crate::{memory::global::Global, private::Private};
-use jl_sys::jl_call1;
+
 use jl_sys::{
     jl_abstractarray_type, jl_anytuple_type_type, jl_array_type, jl_densearray_type,
     jl_llvmpointer_type, jl_namedtuple_type, jl_pointer_type, jl_ref_type, jl_type_type,
     jl_type_unionall, jl_unionall_t, jl_unionall_type, jl_vararg_type,
 };
-use std::{
-    fmt::{Debug, Formatter, Result as FmtResult},
-    marker::PhantomData,
-    ptr::NonNull,
-};
+use std::{marker::PhantomData, ptr::NonNull};
 
 /// An iterated union of types. If a struct field has a parametric type with some of its
 /// parameters unknown, its type is represented by a `UnionAll`.

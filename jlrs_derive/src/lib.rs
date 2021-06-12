@@ -1,7 +1,7 @@
 extern crate proc_macro;
 
-use proc_macro2::TokenStream as TS2; 
 use proc_macro::TokenStream;
+use proc_macro2::TokenStream as TS2;
 use quote::quote;
 use syn::{self, Meta};
 
@@ -67,7 +67,7 @@ impl<'a> ClassifiedFields<'a> {
 
 struct JlrsTypeAttrs {
     julia_type: Option<String>,
-    zst: bool
+    zst: bool,
 }
 
 impl JlrsTypeAttrs {
@@ -91,16 +91,14 @@ impl JlrsTypeAttrs {
                                     zst = true;
                                 }
                             }
-                            _ => continue
+                            _ => continue,
                         }
                     }
                 }
             }
         }
 
-        JlrsTypeAttrs {
-            julia_type, zst
-        }
+        JlrsTypeAttrs { julia_type, zst }
     }
 }
 
@@ -113,7 +111,7 @@ enum JlrsFieldAttr {
 impl JlrsFieldAttr {
     pub fn parse(attr: &syn::Attribute) -> Option<Self> {
         if let Ok(Meta::List(p)) = attr.parse_meta() {
-             if let Some(syn::NestedMeta::Meta(syn::Meta::Path(m))) = p.nested.first() {
+            if let Some(syn::NestedMeta::Meta(syn::Meta::Path(m))) = p.nested.first() {
                 if m.is_ident("bits_union") {
                     return Some(JlrsFieldAttr::BitsUnion);
                 }

@@ -3,7 +3,7 @@
 //! This module provides the [`Call`], [`UnsafeCall`], [`CallExt`] and [`UnsafeCallExt`] traits,
 //! the methods of these four traits can be used to call Julia functions in many ways. The safe
 //! and unsafe variants of each trait provide the same functionality, but only the methods of the
-//! unsafe variant can be used when using data that is borrowed from Rust. Calling Julia functions 
+//! unsafe variant can be used when using data that is borrowed from Rust. Calling Julia functions
 //! with such data is unsafe because this data must never be assigned to a global or outlive the
 //! borrow some other way.
 //!
@@ -14,15 +14,12 @@
 //! guarantee that it's reachable while you do.
 //!
 //! Keyword arguments can be provided with [`CallExt::with_keywords`]. The other trait methods let
-//! you wrap the implementor in another function that returns or prints the stack trace if an 
+//! you wrap the implementor in another function that returns or prints the stack trace if an
 //! exception is thrown.
 
 use crate::{
     error::{JlrsResult, JuliaResult, JuliaResultRef},
-    memory::{
-        global::Global, scope::Scope,
-        {frame::Frame},
-    },
+    memory::{frame::Frame, global::Global, scope::Scope},
     private::Private,
     wrappers::ptr::{
         private::Wrapper as _,
@@ -48,9 +45,9 @@ impl<'scope, 'data> WithKeywords<'scope, 'data> {
 
 /// Call the implementor as a Julia function. There are currently three types that implement this
 /// trait: [`Value`], [`Function`] and [`WithKeywords`]. In Julia every value can potentially be
-/// callable as a function, there's no general way to confirm if it is because not everything that 
+/// callable as a function, there's no general way to confirm if it is because not everything that
 /// can be called is guaranteed to be a [`Function`].
-/// 
+///
 /// Note that the methods of this traits do not support values that borrow data from Rust, the
 /// methods from the [`UnsafeCall`] trait must be used for such data instead.
 pub trait Call<'target, 'current>: private::Call {
@@ -135,11 +132,11 @@ pub trait Call<'target, 'current>: private::Call {
 
 /// Call the implementor as a Julia function. There are currently three types that implement this
 /// trait: [`Value`], [`Function`] and [`WithKeywords`]. In Julia every value can potentially be
-/// callable as a function, there's no general way to confirm if it is because not everything that 
+/// callable as a function, there's no general way to confirm if it is because not everything that
 /// can be called is guaranteed to be a [`Function`].
-/// 
+///
 /// Unlike [`Call`], this trait does support working with values that borrow data from Rust. It's
-/// your responsibility to guarantee these values are never used after the borrow ends, they 
+/// your responsibility to guarantee these values are never used after the borrow ends, they
 /// shouldn't be assigned to a global for example.
 pub trait UnsafeCall<'target, 'current, 'data>: private::Call {
     /// Call a function with no arguments and root the result in `scope`.

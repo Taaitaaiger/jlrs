@@ -5,7 +5,7 @@
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L380
 
-use super::{private::Wrapper, symbol::Symbol, SymbolRef};
+use super::{private::Wrapper, SymbolRef};
 use crate::wrappers::ptr::{MethodTableRef, ModuleRef, SimpleVectorRef, ValueRef};
 use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout};
 use crate::{memory::global::Global, private::Private};
@@ -14,11 +14,7 @@ use jl_sys::{
     jl_tuple_typename, jl_type_typename, jl_typename_t, jl_typename_type, jl_vararg_typename,
     jl_vecelement_typename,
 };
-use std::{
-    fmt::{Debug, Formatter, Result as FmtResult},
-    marker::PhantomData,
-    ptr::NonNull,
-};
+use std::{marker::PhantomData, ptr::NonNull};
 
 /// Describes the syntactic structure of a type and stores all data common to different
 /// instantiations of the type, including a cache for hash-consed allocation of `DataType`s.

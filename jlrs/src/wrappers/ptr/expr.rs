@@ -7,11 +7,7 @@ use crate::{
     wrappers::ptr::{ArrayRef, SymbolRef},
 };
 use jl_sys::{jl_expr_t, jl_expr_type};
-use std::{
-    fmt::{Debug, Formatter, Result as FmtResult},
-    marker::PhantomData,
-    ptr::NonNull,
-};
+use std::{marker::PhantomData, ptr::NonNull};
 
 /// A compound expression in Julia ASTs.
 #[derive(Copy, Clone)]

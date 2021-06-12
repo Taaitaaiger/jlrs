@@ -5,9 +5,9 @@
 //! used if the element type implements [`ValidLayout`].
 //!
 //! Several methods are available to create new arrays. [`Array::new`] and [`TypedArray::new`]
-//! let you create a new array for any type that implements [`IntoJulia`], while 
-//! [`Array::new_for`] can be used to create a new array for arbitrary types. These methods 
-//! allocate a new array, it's also possible to use data from Rust directly if it implements 
+//! let you create a new array for any type that implements [`IntoJulia`], while
+//! [`Array::new_for`] can be used to create a new array for arbitrary types. These methods
+//! allocate a new array, it's also possible to use data from Rust directly if it implements
 //! `IntoJulia`. [`Array::from_vec`] and [`TypedArray::from_vec`] can be used to move the data
 //! from Rust to Julia, while [`Array::from_slice`] and [`TypedArray::from_slice`] can be used
 //! to mutably borrow data from Rust as a Julia array.
@@ -20,10 +20,17 @@
 //! trait is implemented for tuples for arrays with four or fewer dimensions, and for
 //! all arrays and array slices in Rust.
 
-use crate::{convert::into_julia::IntoJulia, error::{JlrsError, JlrsResult}, impl_debug, layout::{typecheck::Typecheck, valid_layout::ValidLayout}, memory::{
+use crate::{
+    convert::into_julia::IntoJulia,
+    error::{JlrsError, JlrsResult},
+    impl_debug,
+    layout::{typecheck::Typecheck, valid_layout::ValidLayout},
+    memory::{
         frame::private::Frame as _, frame::Frame, global::Global, scope::private::Scope as _,
         scope::Scope,
-    }, private::Private, wrappers::ptr::{
+    },
+    private::Private,
+    wrappers::ptr::{
         array::{
             data::{
                 copied::CopiedArray,
@@ -39,7 +46,8 @@ use crate::{convert::into_julia::IntoJulia, error::{JlrsError, JlrsResult}, impl
         union::Union,
         value::Value,
         Wrapper,
-    }};
+    },
+};
 use jl_sys::{
     jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_apply_array_type,
     jl_apply_tuple_type_v, jl_array_data, jl_array_eltype, jl_array_t, jl_datatype_t,
@@ -1183,7 +1191,7 @@ unsafe impl<'scope, 'data, T: Clone + ValidLayout + Debug> ValidLayout
     }
 }
 
-impl<T: Clone + ValidLayout + Debug> Debug for TypedArray<'_, '_,  T> {
+impl<T: Clone + ValidLayout + Debug> Debug for TypedArray<'_, '_, T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         if let Ok(s) = self.display_string() {
             f.write_str(&s)

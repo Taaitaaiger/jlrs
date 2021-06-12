@@ -1,8 +1,8 @@
+use jlrs::layout::valid_layout::ValidLayout;
 use jlrs::prelude::*;
 use jlrs::util::JULIA;
 use jlrs::wrappers::ptr::string::JuliaString;
 use std::borrow::Cow;
-use jlrs::layout::valid_layout::ValidLayout;
 
 #[test]
 fn create_and_unbox_str_data() {

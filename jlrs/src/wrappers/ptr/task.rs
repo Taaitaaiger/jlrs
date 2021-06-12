@@ -11,11 +11,7 @@ use crate::{
     wrappers::ptr::{TaskRef, ValueRef},
 };
 use jl_sys::{jl_task_t, jl_task_type};
-use std::{
-    fmt::{Debug, Formatter, Result as FmtResult},
-    marker::PhantomData,
-    ptr::NonNull,
-};
+use std::{marker::PhantomData, ptr::NonNull};
 
 /// A Julia `Task` (coroutine).
 #[derive(Copy, Clone)]

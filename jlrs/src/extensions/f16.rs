@@ -28,7 +28,7 @@ mod tests {
     use crate::util::JULIA;
     use half::f16;
 
-    #[test] 
+    #[test]
     fn one_minus_one_equals_zero() {
         JULIA.with(|j| {
             let mut julia = j.borrow_mut();

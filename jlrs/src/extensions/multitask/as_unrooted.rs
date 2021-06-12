@@ -11,8 +11,8 @@
 use crate::{
     error::JuliaResult,
     memory::{
-        output::{OutputResult, OutputScope, OutputValue},
         frame::Frame,
+        output::{OutputResult, OutputScope, OutputValue},
     },
     private::Private,
     wrappers::ptr::{private::Wrapper, value::Value},

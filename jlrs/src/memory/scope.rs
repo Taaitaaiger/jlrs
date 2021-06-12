@@ -3,26 +3,26 @@
 //! All interactions with Julia happen inside a scope. A base scope can be created with
 //! [`Julia::scope`] and [`Julia::scope_with_slots`], these methods take a closure which is
 //! called inside these methods after creating the arguments it requires: a [`Global`] and a
-//! mutable reference to a [`GcFrame`]. Each scope has exactly one [`GcFrame`] which is dropped 
+//! mutable reference to a [`GcFrame`]. Each scope has exactly one [`GcFrame`] which is dropped
 //! when you leave the scope. Any value which is rooted in this frame or can be reached from a
 //! root will not be freed by the garbage collector until the frame has been dropped, it's valid
-//! for the rest of the scope associated with that frame. 
+//! for the rest of the scope associated with that frame.
 //!
 //! Holding on to many roots will slow down the garbage collector. Scanning will be slower because
-//! more values can be reached, and because this data is not freed memory pressure increases 
+//! more values can be reached, and because this data is not freed memory pressure increases
 //! causing the garbage collector to run more often. In order to manage the number of roots, it's
 //! possible to create nested scopes with their own `GcFrame`. The frames form a stack, when a
-//! nested scope is created the new frame is constructed at the top of this stack. This kind of 
+//! nested scope is created the new frame is constructed at the top of this stack. This kind of
 //! functionality is provided by the two traits in this module, [`Scope`] and [`ScopeExt`].
 //!
-//! There are several ways to create a nested scope. The easiest is [`ScopeExt::scope`], which 
+//! There are several ways to create a nested scope. The easiest is [`ScopeExt::scope`], which
 //! behaves the same way as [`Julia::scope`]. This method is relatively limited in the sense that
-//! it cannot be used to create a new value inside this new scope and root it in the frame of 
-//! parent scope. Several methods are available to handle that case, which is particularly useful 
-//! if you want to create a new value or call a function with some temporary values. These methods 
-//! are [`Scope::value_scope`], used to allocate a value in a nested scope and root it in the 
-//! frame of a parent scope; [`Scope::result_scope`], used to call a function in a nested scope 
-//! and root the result in the frame of a parent scope; [`ScopeExt::wrapper_scope`] and 
+//! it cannot be used to create a new value inside this new scope and root it in the frame of
+//! parent scope. Several methods are available to handle that case, which is particularly useful
+//! if you want to create a new value or call a function with some temporary values. These methods
+//! are [`Scope::value_scope`], used to allocate a value in a nested scope and root it in the
+//! frame of a parent scope; [`Scope::result_scope`], used to call a function in a nested scope
+//! and root the result in the frame of a parent scope; [`ScopeExt::wrapper_scope`] and
 //! [`ScopeExt::wrapper_result_scope`] are also available, they do the same thing as the previous
 //! two methods but they will cast the result to the given wrapper type before returning it.
 //!
@@ -30,25 +30,25 @@
 //! The first implementor is all mutable references to types that implement the [`Frame`] trait,
 //! [`ScopeExt`] is also implemented. Methods that create new values that must be rooted usually
 //! take an argument that implements `Scope`, when a mutable reference to a frame is used the
-//! value is rooted in that frame. Because the scope is taken by value and mutable references 
-//! don't implement `Copy`, it's necessary to mutably reborrow the frame when calling these 
+//! value is rooted in that frame. Because the scope is taken by value and mutable references
+//! don't implement `Copy`, it's necessary to mutably reborrow the frame when calling these
 //! methods to prevent the frame from moving. These methods only care about the fact that it's a
 //! mutable reference to a frame, not the duration of that borrow.
 //!
-//! The other implementor, [`OutputScope`], is used in nested scopes that root a value in the 
+//! The other implementor, [`OutputScope`], is used in nested scopes that root a value in the
 //! frame of a parent scope. It doesn't implement [`ScopeExt`]. As mentioned before, frames form a
 //! stack and the frame of a nested scope is constructed on top of its parent. Due to this design,
 //! it's not possible to directly root a value in some ancestral frame. Rather, rooting has to be
-//! postponed until the target frame is the active frame again. 
+//! postponed until the target frame is the active frame again.
 //!
 //! Methods that root a value in the frame of a parent scope take a closure with two arguments, an
-//! [`Output`] and a mutable reference to a [`GcFrame`]. The frame can be used to root temporary 
+//! [`Output`] and a mutable reference to a [`GcFrame`]. The frame can be used to root temporary
 //! values, once all temporary values have been created and there's nothing else that needs to be
 //! rooted in the current frame, the `Output` can be converted to an `OutputScope`. Unlike frames,
-//! the [`Scope`] trait is not implemented for a mutable reference but for `OutputScope` itself. 
-//! Because it implements this trait it can be nested. In this case the output is propagated to 
-//! the new scope, ie the the result still targets the same scope. An `OutputScope` can be used 
-//! a single time to create a new value, this value is left unrooted until the target scope is 
+//! the [`Scope`] trait is not implemented for a mutable reference but for `OutputScope` itself.
+//! Because it implements this trait it can be nested. In this case the output is propagated to
+//! the new scope, ie the the result still targets the same scope. An `OutputScope` can be used
+//! a single time to create a new value, this value is left unrooted until the target scope is
 //! reached.
 //!
 //! You should always immediately return such an unrooted value from the closure without calling
@@ -61,10 +61,10 @@ use crate::{
     error::{JlrsResult, JuliaResult},
     layout::typecheck::Typecheck,
     memory::{
+        frame::Frame,
         frame::GcFrame,
         global::Global,
         output::{Output, OutputResult, OutputScope, OutputValue},
-        frame::Frame,
     },
     private::Private,
     wrappers::ptr::Wrapper,
@@ -162,7 +162,7 @@ pub trait ScopeExt<'target, 'current, 'data, F: Frame<'current>>:
             &'inner mut GcFrame<'nested, F::Mode>,
         ) -> JlrsResult<OutputValue<'current, 'data, 'inner>>;
 
-    /// The same as [`Scope::result_scope`], on success the result is cast to `T` before returning 
+    /// The same as [`Scope::result_scope`], on success the result is cast to `T` before returning
     /// it.
     fn wrapper_result_scope<T, G>(self, func: G) -> JlrsResult<JuliaResult<'current, 'data, T>>
     where
@@ -173,7 +173,7 @@ pub trait ScopeExt<'target, 'current, 'data, F: Frame<'current>>:
         )
             -> JlrsResult<OutputResult<'current, 'data, 'inner>>;
 
-    /// The same as [`Scope::result_scope_with_slots`], on success the result is cast to `T` 
+    /// The same as [`Scope::result_scope_with_slots`], on success the result is cast to `T`
     /// before returning it.
     fn wrapper_result_scope_with_slots<T, G>(
         self,
@@ -261,11 +261,11 @@ impl<'current, 'data, F: Frame<'current>> ScopeExt<'current, 'current, 'data, F>
     }
 }
 
-/// Trait that provides methods to create nested scopes which eventually root a value in the frame 
+/// Trait that provides methods to create nested scopes which eventually root a value in the frame
 /// of a target scope. It's implemented for [`OutputScope`] and mutable references to implementors
 /// of [`Frame`]. In addition to nesting, many methods that allocate a new value take an
-/// implementation of this trait as their first argument. If a mutable reference to a frame is 
-/// used this way, the value is rooted in that frame. If it's an [`OutputScope`], it's rooted in 
+/// implementation of this trait as their first argument. If a mutable reference to a frame is
+/// used this way, the value is rooted in that frame. If it's an [`OutputScope`], it's rooted in
 /// the frame for which the [`Output`] was originally created.
 pub trait Scope<'target, 'current, 'data, F>:
     Sized + private::Scope<'target, 'current, 'data, F>
@@ -636,8 +636,8 @@ pub(crate) mod private {
     use crate::{
         error::{JlrsResult, JuliaResult},
         memory::{
-            output::{OutputResult, OutputScope, OutputValue},
             frame::Frame,
+            output::{OutputResult, OutputScope, OutputValue},
         },
         private::Private,
     };

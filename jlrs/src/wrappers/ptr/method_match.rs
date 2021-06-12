@@ -11,11 +11,7 @@ use crate::{
     wrappers::ptr::{MethodRef, SimpleVectorRef, ValueRef},
 };
 use jl_sys::{jl_method_match_t, jl_method_match_type};
-use std::{
-    fmt::{Debug, Formatter, Result as FmtResult},
-    marker::PhantomData,
-    ptr::NonNull,
-};
+use std::{marker::PhantomData, ptr::NonNull};
 
 #[derive(Copy, Clone)]
 #[repr(transparent)]

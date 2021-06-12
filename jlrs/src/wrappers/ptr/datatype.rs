@@ -11,10 +11,9 @@
 //! ```
 
 use super::{
-    array::Array, private::Wrapper as WrapperPriv, type_var::TypeVar, DataTypeRef, SimpleVectorRef,
-    TypeNameRef, ValueRef, Wrapper,
+    array::Array, private::Wrapper as WrapperPriv, DataTypeRef, SimpleVectorRef, TypeNameRef,
+    ValueRef, Wrapper,
 };
-use crate::{impl_debug, impl_valid_layout};
 use crate::layout::typecheck::{Concrete, Typecheck};
 use crate::memory::frame::Frame;
 use crate::wrappers::ptr::symbol::Symbol;
@@ -23,6 +22,7 @@ use crate::{
     error::{JlrsError, JlrsResult},
     memory::scope::Scope,
 };
+use crate::{impl_debug, impl_valid_layout};
 use crate::{memory::global::Global, private::Private};
 use jl_sys::{
     jl_abstractslot_type, jl_abstractstring_type, jl_any_type, jl_anytuple_type,
@@ -44,7 +44,7 @@ use jl_sys::{
     jl_uniontype_type, jl_upsilonnode_type, jl_voidpointer_type, jl_weakref_type,
 };
 use std::ffi::CStr;
-use std::fmt::{Debug, Formatter, Result as FmtResult};
+
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 /// Julia type information. You can acquire a [`Value`]'s datatype by by calling

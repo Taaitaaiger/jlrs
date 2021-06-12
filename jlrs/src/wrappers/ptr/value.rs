@@ -95,35 +95,42 @@ macro_rules! named_tuple {
     };
 }
 
-use crate::{convert::{into_julia::IntoJulia, temporary_symbol::TemporarySymbol, unbox::Unbox}, error::{JlrsError, JlrsResult, JuliaResult, JuliaResultRef}, impl_debug, layout::{
+use crate::{
+    convert::{into_julia::IntoJulia, temporary_symbol::TemporarySymbol, unbox::Unbox},
+    error::{JlrsError, JlrsResult, JuliaResult, JuliaResultRef},
+    impl_debug,
+    layout::{
         typecheck::{Mutable, NamedTuple, Typecheck},
         valid_layout::ValidLayout,
-    }, memory::{
-        frame::{private::Frame as _, Frame},
-        global::Global,
-        scope::{private::Scope as _, Scope},
-    }, private::Private, wrappers::ptr::{StringRef, ValueRef, Wrapper, array::{
-            dimensions::{Dimensions, Dims},
-            Array,
-        }, call::{private::Call as CallPriv, Call, CallExt, UnsafeCall, UnsafeCallExt, WithKeywords}, datatype::DataType, module::Module, private::Wrapper as WrapperPriv, string::JuliaString, symbol::Symbol, type_var::TypeVar, union::{nth_union_component, Union}, union_all::UnionAll}};
+    },
+    memory::{frame::Frame, global::Global, scope::Scope},
+    private::Private,
+    wrappers::ptr::{
+        array::Array,
+        call::{private::Call as CallPriv, Call, CallExt, UnsafeCall, UnsafeCallExt, WithKeywords},
+        datatype::DataType,
+        module::Module,
+        private::Wrapper as WrapperPriv,
+        symbol::Symbol,
+        union::{nth_union_component, Union},
+        union_all::UnionAll,
+        ValueRef, Wrapper,
+    },
+};
 use jl_sys::{
-    jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_an_empty_string,
-    jl_an_empty_vec_any, jl_any_type, jl_apply_array_type, jl_apply_tuple_type_v, jl_apply_type,
-    jl_array_any_type, jl_array_int32_type, jl_array_symbol_type, jl_array_uint8_type,
-    jl_bottom_type, jl_call, jl_call0, jl_call1, jl_call2, jl_call3, jl_datatype_t,
-    jl_diverror_exception, jl_egal, jl_emptytuple, jl_eval_string, jl_exception_occurred, jl_false,
-    jl_field_index, jl_field_isptr, jl_field_names, jl_field_offset, jl_fieldref,
-    jl_fieldref_noalloc, jl_finalize, jl_gc_add_finalizer, jl_gc_wb, jl_interrupt_exception,
-    jl_is_kind, jl_isa, jl_memory_exception, jl_new_array, jl_new_struct_uninit, jl_new_typevar,
-    jl_nfields, jl_nothing, jl_object_id, jl_pchar_to_string, jl_ptr_to_array, jl_ptr_to_array_1d,
-    jl_readonlymemory_exception, jl_set_nth_field, jl_stackovf_exception, jl_subtype, jl_svec_data,
-    jl_svec_len, jl_true, jl_type_union, jl_type_unionall, jl_typeof, jl_typeof_str,
-    jl_undefref_exception, jl_value_t,
+    jl_an_empty_string, jl_an_empty_vec_any, jl_apply_type, jl_array_any_type, jl_array_int32_type,
+    jl_array_symbol_type, jl_array_uint8_type, jl_bottom_type, jl_call, jl_call0, jl_call1,
+    jl_call2, jl_call3, jl_datatype_t, jl_diverror_exception, jl_egal, jl_emptytuple,
+    jl_eval_string, jl_exception_occurred, jl_false, jl_field_index, jl_field_isptr,
+    jl_field_names, jl_field_offset, jl_fieldref, jl_fieldref_noalloc, jl_finalize,
+    jl_gc_add_finalizer, jl_gc_wb, jl_interrupt_exception, jl_is_kind, jl_isa, jl_memory_exception,
+    jl_nfields, jl_nothing, jl_object_id, jl_readonlymemory_exception, jl_set_nth_field,
+    jl_stackovf_exception, jl_subtype, jl_svec_data, jl_svec_len, jl_true, jl_typeof,
+    jl_typeof_str, jl_undefref_exception, jl_value_t,
 };
 use std::{
     cell::UnsafeCell,
     ffi::{c_void, CStr, CString},
-    fmt::{Debug, Formatter, Result as FmtResult},
     marker::PhantomData,
     ptr::NonNull,
     slice, usize,
@@ -1623,50 +1630,6 @@ impl<'scope, 'data> WrapperPriv<'scope, 'data> for Value<'scope, 'data> {
     unsafe fn unwrap_non_null(self, _: Private) -> NonNull<Self::Internal> {
         self.0
     }
-}
-
-unsafe fn small_dim_tuple<'scope, F>(
-    frame: &mut F,
-    dims: &Dimensions,
-) -> JlrsResult<Value<'scope, 'static>>
-where
-    F: Frame<'scope>,
-{
-    let n = dims.n_dimensions();
-    debug_assert!(n <= 8, "Too many dimensions for small_dim_tuple");
-    let elem_types = JL_LONG_TYPE.with(|longs| longs.get());
-    let tuple_type = jl_apply_tuple_type_v(elem_types.cast(), n);
-    let tuple = jl_new_struct_uninit(tuple_type);
-    let v = frame
-        .push_root(NonNull::new_unchecked(tuple), Private)
-        .map_err(JlrsError::alloc_error)?;
-
-    let usize_ptr: *mut usize = v.unwrap(Private).cast();
-    std::ptr::copy_nonoverlapping(dims.as_slice().as_ptr(), usize_ptr, n);
-
-    Ok(v)
-}
-
-unsafe fn large_dim_tuple<'scope, F>(
-    frame: &mut F,
-    dims: &Dimensions,
-) -> JlrsResult<Value<'scope, 'static>>
-where
-    F: Frame<'scope>,
-{
-    let n = dims.n_dimensions();
-    let global = frame.global();
-    let mut elem_types = vec![usize::julia_type(global); n];
-    let tuple_type = jl_apply_tuple_type_v(elem_types.as_mut_ptr().cast(), n);
-    let tuple = jl_new_struct_uninit(tuple_type);
-    let v = frame
-        .push_root(NonNull::new_unchecked(tuple), Private)
-        .map_err(JlrsError::alloc_error)?;
-
-    let usize_ptr: *mut usize = v.unwrap(Private).cast();
-    std::ptr::copy_nonoverlapping(dims.as_slice().as_ptr(), usize_ptr, n);
-
-    Ok(v)
 }
 
 /// While jlrs generally enforces that Julia data can only exist and be used while a frame is

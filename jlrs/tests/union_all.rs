@@ -16,7 +16,8 @@ fn create_new_unionall() {
                 "V",
                 None,
                 Some(DataType::number_type(global).as_value()),
-            )?.cast()?;
+            )?
+            .cast()?;
             let ua = UnionAll::new(&mut *frame, tvar, body)?.cast::<UnionAll>()?;
             let v = ua.var().wrapper().unwrap();
 

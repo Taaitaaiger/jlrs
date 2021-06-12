@@ -65,14 +65,39 @@ pub mod union_all;
 pub mod value;
 pub mod weak_ref;
 
-use self::{array::{Array, TypedArray}, call::UnsafeCall, code_instance::CodeInstance, datatype::DataType, expr::Expr, function::Function, method::Method, method_instance::MethodInstance, method_match::MethodMatch, method_table::MethodTable, module::Module, private::Wrapper as _, simple_vector::SimpleVector, string::JuliaString, symbol::Symbol, task::Task, type_name::TypeName, type_var::TypeVar, typemap_entry::TypeMapEntry, typemap_level::TypeMapLevel, union::Union, union_all::UnionAll, value::Value, weak_ref::WeakRef};
+use self::{
+    array::{Array, TypedArray},
+    call::UnsafeCall,
+    code_instance::CodeInstance,
+    datatype::DataType,
+    expr::Expr,
+    function::Function,
+    method::Method,
+    method_instance::MethodInstance,
+    method_match::MethodMatch,
+    method_table::MethodTable,
+    module::Module,
+    private::Wrapper as _,
+    simple_vector::SimpleVector,
+    string::JuliaString,
+    symbol::Symbol,
+    task::Task,
+    type_name::TypeName,
+    type_var::TypeVar,
+    typemap_entry::TypeMapEntry,
+    typemap_level::TypeMapLevel,
+    union::Union,
+    union_all::UnionAll,
+    value::Value,
+    weak_ref::WeakRef,
+};
 use crate::{
     error::{JlrsError, JlrsResult},
     layout::valid_layout::ValidLayout,
     memory::{frame::Frame, global::Global, scope::Scope},
     private::Private,
 };
-use std::{fmt::{Debug}, marker::PhantomData, ptr::null_mut};
+use std::{fmt::Debug, marker::PhantomData, ptr::null_mut};
 
 macro_rules! impl_valid_layout {
     ($ref_type:ident, $type:ident) => {
@@ -89,7 +114,7 @@ macro_rules! impl_valid_layout {
 }
 
 /// Generic behavior shared by all wrappers.
-pub trait Wrapper<'scope, 'data>: private::Wrapper<'scope, 'data>  {
+pub trait Wrapper<'scope, 'data>: private::Wrapper<'scope, 'data> {
     /// The reference type associated with this wrapper.
     type Ref;
 
@@ -101,7 +126,7 @@ pub trait Wrapper<'scope, 'data>: private::Wrapper<'scope, 'data>  {
         unsafe { Value::wrap_non_null(self.unwrap_non_null(Private).cast(), Private) }
     }
 
-    /// Convert the wrapper to its display string, ie the string that is shown by calling 
+    /// Convert the wrapper to its display string, ie the string that is shown by calling
     /// `Base.display`.
     fn display_string(self) -> JlrsResult<String> {
         unsafe {
@@ -123,8 +148,9 @@ pub trait Wrapper<'scope, 'data>: private::Wrapper<'scope, 'data>  {
     }
 }
 
-impl<'scope, 'data, W> Wrapper<'scope, 'data> for W where
-    W: private::Wrapper<'scope, 'data>
+impl<'scope, 'data, W> Wrapper<'scope, 'data> for W
+where
+    W: private::Wrapper<'scope, 'data>,
 {
     type Ref = Ref<'scope, 'data, Self>;
 
@@ -140,13 +166,12 @@ macro_rules! impl_debug {
             fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
                 match <Self as $crate::wrappers::ptr::Wrapper>::display_string(*self) {
                     Ok(s) => f.write_str(&s),
-                    Err(e) => f.write_fmt(format_args!("<Cannot display value: {}>", e))
+                    Err(e) => f.write_fmt(format_args!("<Cannot display value: {}>", e)),
                 }
             }
         }
     };
 }
-
 
 /// A possibly undefined or dangling, unrooted reference to Julia data.
 ///

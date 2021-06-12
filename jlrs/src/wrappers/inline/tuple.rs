@@ -32,9 +32,7 @@ pub struct Tuple;
 
 unsafe impl Typecheck for Tuple {
     fn typecheck(t: DataType) -> bool {
-        unsafe {
-            t.unwrap_non_null(Private).as_ref().name == jl_tuple_typename
-        }
+        unsafe { t.unwrap_non_null(Private).as_ref().name == jl_tuple_typename }
     }
 }
 
