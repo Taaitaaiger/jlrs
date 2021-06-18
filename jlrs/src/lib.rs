@@ -401,7 +401,7 @@ pub mod util;
 pub mod wrappers;
 
 use convert::into_jlrs_result::IntoJlrsResult;
-use error::{JlrsError, JlrsResult};
+use error::{JlrsError, JlrsResult, CANNOT_DISPLAY_VALUE};
 use jl_sys::{
     jl_atexit_hook, jl_init, jl_init_with_image__threading, jl_is_initialized, uv_async_send,
 };
@@ -409,6 +409,7 @@ use memory::frame::{GcFrame, NullFrame};
 use memory::global::Global;
 use memory::mode::Sync;
 use memory::stack_page::StackPage;
+use prelude::Wrapper;
 use private::Private;
 use std::ffi::{c_void, CString};
 use std::io::{Error as IOError, ErrorKind};
@@ -419,7 +420,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use wrappers::ptr::module::Module;
 use wrappers::ptr::string::JuliaString;
 use wrappers::ptr::value::Value;
-use wrappers::ptr::{array::Array, call::Call, private::Wrapper};
+use wrappers::ptr::{array::Array, call::Call, private::Wrapper as _};
 
 pub(crate) static INIT: AtomicBool = AtomicBool::new(false);
 
@@ -556,16 +557,17 @@ impl Julia {
 
                 return match res {
                     Ok(_) => Ok(()),
-                    Err(e) => Err(JlrsError::IncludeError(
-                        path.as_ref().to_string_lossy().into(),
-                        e.datatype_name()?.into(),
-                    )
-                    .into()),
+                    Err(e) => Err(JlrsError::IncludeError {
+                        path: path.as_ref().to_string_lossy().into(),
+                        msg: e.display_string_or(CANNOT_DISPLAY_VALUE),
+                    })?,
                 };
             });
         }
 
-        Err(JlrsError::IncludeNotFound(path.as_ref().to_string_lossy().into()).into())
+        Err(JlrsError::IncludeNotFound {
+            path: path.as_ref().to_string_lossy().into(),
+        })?
     }
 
     /// This method is a main entrypoint to interact with Julia. It takes a closure with two

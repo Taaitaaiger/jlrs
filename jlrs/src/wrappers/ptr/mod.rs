@@ -137,7 +137,9 @@ pub trait Wrapper<'scope, 'data>: private::Wrapper<'scope, 'data> {
                 .function_ref("displaystring")?
                 .wrapper_unchecked()
                 .unsafe_call1_unrooted(global, self.as_value())
-                .map_err(|_| JlrsError::Exception("Jlrs.displaystring failed".into()))?
+                .map_err(|e| JlrsError::Exception {
+                    msg: format!("Jlrs.displaystring failed: {:?}", e.value_unchecked()),
+                })?
                 .value_unchecked()
                 .cast::<JuliaString>()?
                 .as_str()?
@@ -145,6 +147,12 @@ pub trait Wrapper<'scope, 'data>: private::Wrapper<'scope, 'data> {
 
             Ok(s)
         }
+    }
+
+    /// Convert the wrapper to its display string, ie the string that is shown by calling
+    /// `Base.display`.
+    fn display_string_or(self, default: &str) -> String {
+        self.display_string().unwrap_or(default.into())
     }
 }
 

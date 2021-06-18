@@ -22,7 +22,7 @@
 
 use crate::{
     convert::into_julia::IntoJulia,
-    error::{JlrsError, JlrsResult},
+    error::{JlrsError, JlrsResult, CANNOT_DISPLAY_TYPE, CANNOT_DISPLAY_VALUE},
     impl_debug,
     layout::{typecheck::Typecheck, valid_layout::ValidLayout},
     memory::{
@@ -181,7 +181,8 @@ impl<'data> Array<'_, 'data> {
         F: Frame<'current>,
     {
         if !ty.is_type() {
-            Err(JlrsError::NotAType)?
+            let type_str = ty.display_string_or(CANNOT_DISPLAY_VALUE);
+            Err(JlrsError::NotAType { type_str })?
         }
 
         unsafe {
@@ -445,7 +446,9 @@ impl<'scope, 'data> Array<'scope, 'data> {
                 ))
             }
         } else {
-            Err(JlrsError::WrongType)?
+            Err(JlrsError::WrongType {
+                value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?
         }
     }
 
@@ -456,11 +459,15 @@ impl<'scope, 'data> Array<'scope, 'data> {
         T: ValidLayout,
     {
         if !self.contains::<T>() {
-            Err(JlrsError::WrongType)?;
+            Err(JlrsError::WrongType {
+                value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
         }
 
         if !self.is_inline_array() {
-            Err(JlrsError::NotInline)?;
+            Err(JlrsError::NotInline {
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
         }
 
         unsafe {
@@ -489,11 +496,15 @@ impl<'scope, 'data> Array<'scope, 'data> {
         F: Frame<'frame>,
     {
         if !self.contains::<T>() {
-            Err(JlrsError::WrongType)?;
+            Err(JlrsError::WrongType {
+                value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
         }
 
         if !self.is_inline_array() {
-            Err(JlrsError::NotInline)?;
+            Err(JlrsError::NotInline {
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
         }
 
         unsafe { Ok(InlineArrayData::new(self, frame)) }
@@ -512,11 +523,15 @@ impl<'scope, 'data> Array<'scope, 'data> {
         F: Frame<'frame>,
     {
         if !self.contains::<T>() {
-            Err(JlrsError::WrongType)?;
+            Err(JlrsError::WrongType {
+                value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
         }
 
         if !self.is_inline_array() {
-            Err(JlrsError::NotInline)?;
+            Err(JlrsError::NotInline {
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
         }
 
         unsafe { Ok(InlineArrayDataMut::new(self, frame)) }
@@ -537,11 +552,15 @@ impl<'scope, 'data> Array<'scope, 'data> {
         F: Frame<'frame>,
     {
         if !self.contains::<T>() {
-            Err(JlrsError::WrongType)?;
+            Err(JlrsError::WrongType {
+                value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
         }
 
         if !self.is_inline_array() {
-            Err(JlrsError::NotInline)?;
+            Err(JlrsError::NotInline {
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
         }
 
         Ok(UnrestrictedInlineArrayDataMut::new(self, frame))
@@ -559,7 +578,9 @@ impl<'scope, 'data> Array<'scope, 'data> {
     {
         unsafe {
             if !self.is_value_array() {
-                Err(JlrsError::Inline)?;
+                Err(JlrsError::Inline {
+                    element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+                })?;
             }
 
             Ok(ValueArrayData::new(self, frame))
@@ -580,7 +601,9 @@ impl<'scope, 'data> Array<'scope, 'data> {
     {
         unsafe {
             if !self.contains::<T::Ref>() {
-                Err(JlrsError::WrongType)?;
+                Err(JlrsError::WrongType {
+                    value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+                })?;
             }
 
             Ok(ValueArrayData::new(self, frame))
@@ -598,7 +621,9 @@ impl<'scope, 'data> Array<'scope, 'data> {
     {
         unsafe {
             if !self.is_value_array() {
-                Err(JlrsError::Inline)?;
+                Err(JlrsError::Inline {
+                    element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+                })?;
             }
 
             Ok(ValueArrayDataMut::new(self, frame))
@@ -618,7 +643,9 @@ impl<'scope, 'data> Array<'scope, 'data> {
     {
         unsafe {
             if !self.contains::<T::Ref>() {
-                Err(JlrsError::WrongType)?;
+                Err(JlrsError::WrongType {
+                    value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+                })?;
             }
 
             Ok(ValueArrayDataMut::new(self, frame))
@@ -637,7 +664,9 @@ impl<'scope, 'data> Array<'scope, 'data> {
         F: Frame<'frame>,
     {
         if !self.is_value_array() {
-            Err(JlrsError::Inline)?;
+            Err(JlrsError::Inline {
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
         }
 
         Ok(UnrestrictedValueArrayDataMut::new(self, frame))
@@ -656,7 +685,9 @@ impl<'scope, 'data> Array<'scope, 'data> {
         T: Wrapper<'scope, 'data>,
     {
         if !self.is_value_array() {
-            Err(JlrsError::WrongType)?;
+            Err(JlrsError::WrongType {
+                value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
         }
 
         Ok(UnrestrictedValueArrayDataMut::new(self, frame))
@@ -675,7 +706,9 @@ impl<'scope> Array<'scope, 'static> {
         if self.is_union_array() {
             Ok(UnionArrayData::new(self, frame))
         } else {
-            Err(JlrsError::NotAUnionArray)?
+            let elem_ty = self.element_type().display_string_or(CANNOT_DISPLAY_TYPE);
+            let inline = !self.is_value_array();
+            Err(JlrsError::NotAUnionArray { elem_ty, inline })?
         }
     }
 
@@ -691,7 +724,9 @@ impl<'scope> Array<'scope, 'static> {
         if self.is_union_array() {
             Ok(UnionArrayDataMut::new(self, frame))
         } else {
-            Err(JlrsError::NotAUnionArray)?
+            let elem_ty = self.element_type().display_string_or(CANNOT_DISPLAY_TYPE);
+            let inline = !self.is_value_array();
+            Err(JlrsError::NotAUnionArray { elem_ty, inline })?
         }
     }
 
@@ -708,7 +743,11 @@ impl<'scope> Array<'scope, 'static> {
         if self.is_union_array() {
             Ok(UnresistrictedUnionArrayDataMut::new(self, frame))
         } else {
-            Err(JlrsError::NotAUnionArray)?
+            let elem_ty = self
+                .element_type()
+                .display_string_or("<Cannot display element type>");
+            let inline = !self.is_value_array();
+            Err(JlrsError::NotAUnionArray { elem_ty, inline })?
         }
     }
 }
@@ -1002,7 +1041,9 @@ impl<'scope, 'data, T: Clone + ValidLayout + Debug> TypedArray<'scope, 'data, T>
     /// not stored inline or `JlrsError::WrongType` if the type of the elements is incorrect.
     pub fn copy_inline_data(self) -> JlrsResult<CopiedArray<T>> {
         if !self.is_inline_array() {
-            Err(JlrsError::NotInline)?;
+            Err(JlrsError::NotInline {
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
         }
 
         unsafe {
@@ -1030,7 +1071,9 @@ impl<'scope, 'data, T: Clone + ValidLayout + Debug> TypedArray<'scope, 'data, T>
         F: Frame<'frame>,
     {
         if !self.is_inline_array() {
-            Err(JlrsError::NotInline)?;
+            Err(JlrsError::NotInline {
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
         }
 
         unsafe { Ok(InlineArrayData::new(self.as_array(), frame)) }
@@ -1048,7 +1091,9 @@ impl<'scope, 'data, T: Clone + ValidLayout + Debug> TypedArray<'scope, 'data, T>
         F: Frame<'frame>,
     {
         if !self.is_inline_array() {
-            Err(JlrsError::NotInline)?;
+            Err(JlrsError::NotInline {
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
         }
 
         unsafe { Ok(InlineArrayDataMut::new(self.as_array(), frame)) }
@@ -1068,7 +1113,9 @@ impl<'scope, 'data, T: Clone + ValidLayout + Debug> TypedArray<'scope, 'data, T>
         F: Frame<'frame>,
     {
         if !self.is_inline_array() {
-            Err(JlrsError::NotInline)?;
+            Err(JlrsError::NotInline {
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
         }
 
         Ok(UnrestrictedInlineArrayDataMut::new(self.as_array(), frame))
@@ -1193,10 +1240,9 @@ unsafe impl<'scope, 'data, T: Clone + ValidLayout + Debug> ValidLayout
 
 impl<T: Clone + ValidLayout + Debug> Debug for TypedArray<'_, '_, T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        if let Ok(s) = self.display_string() {
-            f.write_str(&s)
-        } else {
-            f.write_str("<Cannot display value>")
+        match self.display_string() {
+            Ok(s) => write!(f, "{}", s),
+            Err(e) => write!(f, "<Cannot display value: {}>", e),
         }
     }
 }

@@ -1,7 +1,7 @@
 //! Bits-union array data borrowed from Julia.
 
 use crate::{
-    error::{JlrsError, JlrsResult},
+    error::{JlrsError, JlrsResult, CANNOT_DISPLAY_TYPE},
     layout::valid_layout::ValidLayout,
     memory::frame::Frame,
     private::Private,
@@ -95,9 +95,16 @@ impl<'borrow, 'array> UnionArrayData<'borrow, 'array> {
                         .cast::<T>();
                     return Ok((&*ptr).clone());
                 }
+
+                Err(JlrsError::WrongType {
+                    value_type: ty.display_string_or(CANNOT_DISPLAY_TYPE),
+                })?
             }
 
-            Err(JlrsError::WrongType)?
+            Err(JlrsError::IllegalUnionTag {
+                union_type: elty.display_string_or(CANNOT_DISPLAY_TYPE),
+                tag: tag as usize,
+            })?
         }
     }
 }
@@ -177,9 +184,15 @@ impl<'borrow, 'array> UnionArrayDataMut<'borrow, 'array> {
                         .cast::<T>();
                     return Ok((&*ptr).clone());
                 }
+                Err(JlrsError::WrongType {
+                    value_type: ty.display_string_or(CANNOT_DISPLAY_TYPE),
+                })?
             }
 
-            Err(JlrsError::WrongType)?
+            Err(JlrsError::IllegalUnionTag {
+                union_type: elty.display_string_or(CANNOT_DISPLAY_TYPE),
+                tag: tag as usize,
+            })?
         }
     }
 
@@ -193,12 +206,21 @@ impl<'borrow, 'array> UnionArrayDataMut<'borrow, 'array> {
     {
         unsafe {
             if !T::valid_layout(ty.as_value()) {
-                Err(JlrsError::InvalidLayout)?;
+                let value_type_str = ty.display_string_or(CANNOT_DISPLAY_TYPE).into();
+                Err(JlrsError::InvalidLayout { value_type_str })?;
             }
 
             let mut tag = 0;
             if !find_union_component(self.array.element_type(), ty.as_value(), &mut tag) {
-                Err(JlrsError::InvalidArrayType)?;
+                let element_type_str = self
+                    .array
+                    .element_type()
+                    .display_string_or(CANNOT_DISPLAY_TYPE);
+                let value_type_str = ty.display_string_or(CANNOT_DISPLAY_TYPE);
+                Err(JlrsError::ElementTypeError {
+                    element_type_str,
+                    value_type_str,
+                })?;
             }
 
             let dims = ArrayDimensions::new(self.array);
@@ -297,9 +319,15 @@ impl<'borrow, 'array> UnresistrictedUnionArrayDataMut<'borrow, 'array> {
                         .cast::<T>();
                     return Ok((&*ptr).clone());
                 }
+                Err(JlrsError::WrongType {
+                    value_type: ty.display_string_or(CANNOT_DISPLAY_TYPE),
+                })?
             }
 
-            Err(JlrsError::WrongType)?
+            Err(JlrsError::IllegalUnionTag {
+                union_type: elty.display_string_or(CANNOT_DISPLAY_TYPE),
+                tag: tag as usize,
+            })?
         }
     }
 
@@ -313,12 +341,21 @@ impl<'borrow, 'array> UnresistrictedUnionArrayDataMut<'borrow, 'array> {
     {
         unsafe {
             if !T::valid_layout(ty.as_value()) {
-                Err(JlrsError::InvalidLayout)?;
+                let value_type_str = ty.display_string_or(CANNOT_DISPLAY_TYPE).into();
+                Err(JlrsError::InvalidLayout { value_type_str })?;
             }
 
             let mut tag = 0;
             if !find_union_component(self.array.element_type(), ty.as_value(), &mut tag) {
-                Err(JlrsError::InvalidArrayType)?;
+                let element_type_str = self
+                    .array
+                    .element_type()
+                    .display_string_or(CANNOT_DISPLAY_TYPE);
+                let value_type_str = ty.display_string_or(CANNOT_DISPLAY_TYPE);
+                Err(JlrsError::ElementTypeError {
+                    element_type_str,
+                    value_type_str,
+                })?;
             }
 
             let dims = ArrayDimensions::new(self.array);

@@ -17,7 +17,7 @@ use super::{
     Wrapper,
 };
 use crate::{
-    error::{JlrsError, JlrsResult, JuliaResult, JuliaResultRef},
+    error::{JlrsError, JlrsResult, JuliaResult, JuliaResultRef, CANNOT_DISPLAY_TYPE},
     impl_debug,
     layout::{
         typecheck::{NamedTuple, Typecheck},
@@ -310,7 +310,8 @@ impl<'target, 'current, 'value> CallExt<'target, 'current, 'value> for Function<
         kws: Value<'value, 'static>,
     ) -> JlrsResult<WithKeywords<'value, 'static>> {
         if !kws.is::<NamedTuple>() {
-            Err(JlrsError::NotANamedTuple)?
+            let type_str = kws.datatype().display_string_or(CANNOT_DISPLAY_TYPE);
+            Err(JlrsError::NotANamedTuple { type_str })?
         }
         Ok(WithKeywords::new(self.as_value(), kws))
     }
@@ -358,7 +359,8 @@ impl<'target, 'current, 'value, 'data> UnsafeCallExt<'target, 'current, 'value, 
         kws: Value<'value, 'data>,
     ) -> JlrsResult<WithKeywords<'value, 'data>> {
         if !kws.is::<NamedTuple>() {
-            Err(JlrsError::NotANamedTuple)?
+            let type_str = kws.datatype().display_string_or(CANNOT_DISPLAY_TYPE);
+            Err(JlrsError::NotANamedTuple { type_str })?
         }
         Ok(WithKeywords::new(self.as_value(), kws))
     }

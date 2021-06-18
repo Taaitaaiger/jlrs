@@ -41,10 +41,10 @@ pub trait Dims: Sized + Debug {
     /// default implementation is generally correct and should not be overridden.
     fn index_of<D: Dims>(&self, dim_index: D) -> JlrsResult<usize> {
         if self.n_dimensions() != dim_index.n_dimensions() {
-            Err(JlrsError::InvalidIndex(
-                dim_index.into_dimensions(),
-                self.into_dimensions(),
-            ))?;
+            Err(JlrsError::InvalidIndex {
+                idx: dim_index.into_dimensions(),
+                sz: self.into_dimensions(),
+            })?;
         }
 
         if self.n_dimensions() == 0 {
@@ -54,10 +54,10 @@ pub trait Dims: Sized + Debug {
         let n_dims = self.n_dimensions();
         for dim in 0..n_dims {
             if self.n_elements(dim) <= dim_index.n_elements(dim) {
-                Err(JlrsError::InvalidIndex(
-                    dim_index.into_dimensions(),
-                    self.into_dimensions(),
-                ))?;
+                Err(JlrsError::InvalidIndex {
+                    idx: dim_index.into_dimensions(),
+                    sz: self.into_dimensions(),
+                })?;
             }
         }
 

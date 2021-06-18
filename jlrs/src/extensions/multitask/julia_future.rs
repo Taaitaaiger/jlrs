@@ -1,14 +1,16 @@
 //! A `Future` that represents a function call in Julia running on another thread.
 
+use crate::error::CANNOT_DISPLAY_VALUE;
 use crate::memory::{global::Global, scope::Scope};
 use crate::wrappers::ptr::call::UnsafeCall;
 use crate::wrappers::ptr::module::Module;
 use crate::wrappers::ptr::task::Task;
 use crate::wrappers::ptr::value::{Value, MAX_SIZE};
+use crate::wrappers::ptr::Wrapper;
 use crate::{
-    error::{exception, JlrsResult, JuliaResult},
+    error::{exception, JlrsError, JlrsResult, JuliaResult},
     private::Private,
-    wrappers::ptr::private::Wrapper,
+    wrappers::ptr::private::Wrapper as _,
 };
 use futures::task::{Context, Poll, Waker};
 use futures::Future;
@@ -71,7 +73,10 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                 .wrapper_unchecked()
                 .unsafe_call(frame, &mut vals)?
                 .map_err(|e| {
-                    exception::<()>(format!("asynccall threw an exception: {:?}", e)).unwrap_err()
+                    let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
+                    JlrsError::Exception {
+                        msg: format!("asynccall threw an exception: {}", msg),
+                    }
                 })?
                 .cast_unchecked::<Task>();
 

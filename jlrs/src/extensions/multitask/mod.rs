@@ -270,7 +270,9 @@ where
     /// throws an exception.
     pub async fn include<P: AsRef<Path>>(&self, path: P) -> JlrsResult<()> {
         if !path.as_ref().exists() {
-            return Err(JlrsError::IncludeNotFound(path.as_ref().to_string_lossy().into()).into());
+            Err(JlrsError::IncludeNotFound {
+                path: path.as_ref().to_string_lossy().into(),
+            })?
         }
 
         let completed = Arc::new((AsyncStdMutex::new(Status::Pending), AsyncStdCondvar::new()));
@@ -296,7 +298,9 @@ where
     /// call to `Main.include` throws an exception.
     pub fn try_include<P: AsRef<Path>>(&self, path: P) -> JlrsResult<()> {
         if !path.as_ref().exists() {
-            return Err(JlrsError::IncludeNotFound(path.as_ref().to_string_lossy().into()).into());
+            Err(JlrsError::IncludeNotFound {
+                path: path.as_ref().to_string_lossy().into(),
+            })?
         }
 
         let completed = Arc::new((Mutex::new(Status::Pending), Condvar::new()));
@@ -724,8 +728,8 @@ fn call_include(stack: &mut AsyncStack, path: PathBuf) -> JlrsResult<()> {
                     .function_ref("include")?
                     .wrapper_unchecked()
                     .call1_unrooted(global, path)
-                    .map_err(|_e| {
-                        crate::error::exception::<Value>("Include error".into()).unwrap_err()
+                    .map_err(|e| JlrsError::Exception {
+                        msg: format!("Include error: {:?}", e.value_unchecked()),
                     })?;
             }
             None => {}

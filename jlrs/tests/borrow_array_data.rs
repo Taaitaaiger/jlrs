@@ -421,7 +421,7 @@ fn value_data_mut() {
                     .unwrap()
                     .cast::<Array>()?;
                 let mut data = arr.value_data_mut(&mut *frame)?;
-                data.set(0, submod.as_value().as_ref())?;
+                data.set(0, Some(submod.as_value()))?;
 
                 let getindex = Module::base(global)
                     .function_ref("getindex")?
@@ -466,8 +466,8 @@ fn unrestricted_value_data_mut() {
 
                 let mut data1 = arr1.unrestricted_value_data_mut(&*frame)?;
                 let mut data2 = arr2.unrestricted_value_data_mut(&*frame)?;
-                data1.set(0, submod.as_value().as_ref())?;
-                data2.set(1, submod.as_value().as_ref())?;
+                data1.set(0, Some(submod.as_value()))?;
+                data2.set(1, Some(submod.as_value()))?;
 
                 let getindex = Module::base(global)
                     .function_ref("getindex")?
@@ -533,7 +533,7 @@ fn typed_array_value_data_mut() {
                     .unwrap()
                     .cast::<TypedArray<Module>>()?;
                 let mut data = arr.value_data_mut(&mut *frame)?;
-                data.set(0, submod.as_value().as_ref())?;
+                data.set(0, Some(submod.as_value()))?;
 
                 let getindex = Module::base(global)
                     .function_ref("getindex")?
@@ -578,8 +578,8 @@ fn typed_array_unrestricted_value_data_mut() {
 
                 let mut data1 = arr1.unrestricted_value_data_mut(&*frame)?;
                 let mut data2 = arr2.unrestricted_value_data_mut(&*frame)?;
-                data1.set(0, submod.as_value().as_ref())?;
-                data2.set(1, submod.as_value().as_ref())?;
+                data1.set(0, Some(submod.as_value()))?;
+                data2.set(1, Some(submod.as_value()))?;
 
                 let getindex = Module::base(global)
                     .function_ref("getindex")?

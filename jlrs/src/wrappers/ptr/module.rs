@@ -6,7 +6,7 @@
 
 use crate::{
     convert::temporary_symbol::TemporarySymbol,
-    error::{JlrsError, JlrsResult},
+    error::{JlrsError, JlrsResult, CANNOT_DISPLAY_VALUE},
     impl_debug, impl_julia_typecheck, impl_valid_layout,
     memory::{frame::Frame, global::Global, scope::Scope},
     private::Private,
@@ -64,6 +64,7 @@ impl<'scope> Module<'scope> {
     {
         unsafe {
             let parent = self.unwrap_non_null(Private).as_ref().parent;
+            debug_assert!(!parent.is_null());
             frame
                 .push_root(NonNull::new_unchecked(parent.cast()), Private)
                 .map(|v| v.cast_unchecked::<Module>())
@@ -120,9 +121,9 @@ impl<'scope> Module<'scope> {
                     .map(|v| v.cast_unchecked())
                     .map_err(Into::into)
             } else {
-                Err(JlrsError::NotAModule(
-                    symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
-                ))?
+                Err(JlrsError::NotAModule {
+                    name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+                })?
             }
         }
     }
@@ -143,9 +144,9 @@ impl<'scope> Module<'scope> {
             if !submodule.is_null() && jl_typeis(submodule, jl_module_type) {
                 Ok(ModuleRef::wrap(submodule.cast()))
             } else {
-                Err(JlrsError::NotAModule(
-                    symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
-                ))?
+                Err(JlrsError::NotAModule {
+                    name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+                })?
             }
         }
     }
@@ -177,10 +178,18 @@ impl<'scope> Module<'scope> {
     {
         unsafe {
             let symbol = name.temporary_symbol(Private);
-            if self.global_ref(symbol).is_ok() {
-                Err(JlrsError::ConstAlreadyExists(
-                    symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
-                ))?;
+            if let Ok(v) = self.global_ref(symbol) {
+                let module = self
+                    .name()
+                    .as_str()
+                    .unwrap_or("<Cannot display symbol>")
+                    .into();
+                let value = v.value_unchecked().display_string_or(CANNOT_DISPLAY_VALUE);
+                Err(JlrsError::ConstAlreadyExists {
+                    name: symbol.as_str().unwrap_or("<Cannot display symbol>").into(),
+                    module,
+                    value,
+                })?;
             }
 
             jl_set_const(
@@ -232,11 +241,10 @@ impl<'scope> Module<'scope> {
 
             let global = jl_get_global(self.unwrap(Private), symbol.unwrap(Private));
             if global.is_null() {
-                return Err(JlrsError::GlobalNotFound {
+                Err(JlrsError::GlobalNotFound {
                     name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
                     module: self.name().as_str().unwrap_or("<Non-UTF8 symbol>").into(),
-                }
-                .into());
+                })?;
             }
 
             Ok(ValueRef::wrap(global))
@@ -256,10 +264,10 @@ impl<'scope> Module<'scope> {
             // function...
             let func = jl_get_global(self.unwrap(Private), symbol.unwrap(Private));
             if func.is_null() {
-                return Err(JlrsError::FunctionNotFound(
-                    symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
-                )
-                .into());
+                Err(JlrsError::GlobalNotFound {
+                    name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+                    module: self.name().as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+                })?;
             }
 
             Ok(LeakedValue::wrap(func))
@@ -283,7 +291,7 @@ impl<'scope> Module<'scope> {
 
             if !func.is::<Function>() {
                 let name = symbol.as_str().unwrap_or("<Non-UTF8 string>").into();
-                let ty = func.datatype_name().unwrap_or("<Non-UTF8 string>").into();
+                let ty = func.datatype().display_string_or(CANNOT_DISPLAY_VALUE);
                 Err(JlrsError::NotAFunction { name, ty })?;
             }
 

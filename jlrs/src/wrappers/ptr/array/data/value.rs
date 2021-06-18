@@ -1,7 +1,7 @@
 //! Value array data borrowed from Julia.
 
 use crate::{
-    error::{JlrsError, JlrsResult},
+    error::{JlrsError, JlrsResult, CANNOT_DISPLAY_TYPE},
     memory::frame::Frame,
     private::Private,
     wrappers::ptr::{
@@ -43,7 +43,7 @@ where
     }
 
     /// Get a reference to the value at `index`, or `None` if the index is out of bounds.
-    pub fn get<D>(&self, index: D) -> Option<&Ref<'array, 'data, T>>
+    pub fn get<D>(&self, index: D) -> Option<Ref<'array, 'data, T>>
     where
         D: Dims,
     {
@@ -54,6 +54,7 @@ where
                 .cast::<Ref<T>>()
                 .add(idx)
                 .as_ref()
+                .cloned()
         }
     }
 
@@ -119,7 +120,7 @@ where
     }
 
     /// Get a reference to the value at `index`, or `None` if the index is out of bounds.
-    pub fn get<D>(&self, index: D) -> Option<&Ref<'array, 'data, T>>
+    pub fn get<D>(&self, index: D) -> Option<Ref<'array, 'data, T>>
     where
         D: Dims,
     {
@@ -130,11 +131,12 @@ where
                 .cast::<Ref<T>>()
                 .add(idx)
                 .as_ref()
+                .cloned()
         }
     }
 
     /// Set the value at `index` to `value` if `value` has a type that's compatible with this array.
-    pub fn set<'va, 'da: 'data, D>(&mut self, index: D, value: ValueRef<'va, 'da>) -> JlrsResult<()>
+    pub fn set<D>(&mut self, index: D, value: Option<Value<'_, 'data>>) -> JlrsResult<()>
     where
         D: Dims,
     {
@@ -143,13 +145,21 @@ where
             let dims = ArrayDimensions::new(self.array);
             let idx = dims.index_of(index)?;
 
-            let data_ptr = if let Some(value) = value.wrapper() {
+            let data_ptr = if let Some(value) = value {
                 if !self
                     .array
                     .element_type()
                     .subtype(value.datatype().as_value())
                 {
-                    Err(JlrsError::InvalidArrayType)?;
+                    let element_type_str = self
+                        .array
+                        .element_type()
+                        .display_string_or(CANNOT_DISPLAY_TYPE);
+                    let value_type_str = value.datatype().display_string_or(CANNOT_DISPLAY_TYPE);
+                    Err(JlrsError::ElementTypeError {
+                        element_type_str,
+                        value_type_str,
+                    })?;
                 }
 
                 value.unwrap(Private)
@@ -223,7 +233,7 @@ where
     }
 
     /// Get a reference to the value at `index`, or `None` if the index is out of bounds.
-    pub fn get<D>(&self, index: D) -> Option<&Ref<'array, 'data, T>>
+    pub fn get<D>(&self, index: D) -> Option<Ref<'array, 'data, T>>
     where
         D: Dims,
     {
@@ -234,11 +244,12 @@ where
                 .cast::<Ref<T>>()
                 .add(idx)
                 .as_ref()
+                .cloned()
         }
     }
 
     /// Set the value at `index` to `value` if `value` has a type that's compatible with this array.
-    pub fn set<'va, 'da: 'data, D>(&mut self, index: D, value: ValueRef<'va, 'da>) -> JlrsResult<()>
+    pub fn set<D>(&mut self, index: D, value: Option<Value<'_, 'data>>) -> JlrsResult<()>
     where
         D: Dims,
     {
@@ -247,13 +258,21 @@ where
             let dims = ArrayDimensions::new(self.array);
             let idx = dims.index_of(index)?;
 
-            let data_ptr = if let Some(value) = value.wrapper() {
+            let data_ptr = if let Some(value) = value {
                 if !self
                     .array
                     .element_type()
                     .subtype(value.datatype().as_value())
                 {
-                    Err(JlrsError::InvalidArrayType)?;
+                    let element_type_str = self
+                        .array
+                        .element_type()
+                        .display_string_or(CANNOT_DISPLAY_TYPE);
+                    let value_type_str = value.datatype().display_string_or(CANNOT_DISPLAY_TYPE);
+                    Err(JlrsError::ElementTypeError {
+                        element_type_str,
+                        value_type_str,
+                    })?;
                 }
 
                 value.unwrap(Private)

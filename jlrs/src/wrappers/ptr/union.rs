@@ -34,7 +34,9 @@ impl<'scope> Union<'scope> {
                 .iter()
                 .find_map(|v| if v.is_kind() { None } else { Some(v) })
             {
-                Err(JlrsError::NotAKind(v.datatype_name()?.into()))?;
+                Err(JlrsError::NotAKind {
+                    type_name: v.datatype_name()?.into(),
+                })?;
             }
 
             let un = jl_type_union(types.as_mut_ptr().cast(), types.len());
@@ -61,7 +63,9 @@ impl<'scope> Union<'scope> {
                 .iter()
                 .find_map(|v| if v.is_kind() { None } else { Some(v) })
             {
-                Err(JlrsError::NotAKind(v.datatype_name()?.into()))?;
+                Err(JlrsError::NotAKind {
+                    type_name: v.datatype_name()?.into(),
+                })?;
             }
 
             let un = jl_type_union(types.as_mut_ptr().cast(), types.len());

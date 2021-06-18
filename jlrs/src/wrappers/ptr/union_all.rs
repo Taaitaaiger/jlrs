@@ -37,7 +37,9 @@ impl<'scope> UnionAll<'scope> {
         F: Frame<'current>,
     {
         if !body.is_type() && !body.is::<TypeVar>() {
-            Err(JlrsError::InvalidBody(body.datatype_name()?.into()))?;
+            Err(JlrsError::InvalidBody {
+                body_type_name: body.datatype_name()?.into(),
+            })?;
         }
 
         unsafe {
@@ -53,7 +55,9 @@ impl<'scope> UnionAll<'scope> {
         body: Value<'_, 'static>,
     ) -> JlrsResult<ValueRef<'global, 'static>> {
         if !body.is_type() && !body.is::<TypeVar>() {
-            Err(JlrsError::InvalidBody(body.datatype_name()?.into()))?;
+            Err(JlrsError::InvalidBody {
+                body_type_name: body.datatype_name()?.into(),
+            })?;
         }
 
         unsafe {

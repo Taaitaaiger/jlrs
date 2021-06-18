@@ -45,18 +45,18 @@ impl<'scope> TypeVar<'scope> {
             let lb = lower_bound.unwrap_or(bottom);
 
             if lb != bottom && !lb.is_type() && !lb.is::<TypeVar>() {
-                Err(JlrsError::NotATypeLB(
-                    name.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
-                ))?;
+                Err(JlrsError::NotATypeLB {
+                    typevar_name: name.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+                })?;
             }
 
             let upper = DataType::any_type(global).as_value();
             let ub = upper_bound.unwrap_or(upper);
 
             if ub != upper && !ub.is_type() && !ub.is::<TypeVar>() {
-                Err(JlrsError::NotATypeUB(
-                    name.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
-                ))?;
+                Err(JlrsError::NotATypeUB {
+                    typevar_name: name.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+                })?;
             }
 
             let tvar = jl_new_typevar(name.unwrap(Private), lb.unwrap(Private), ub.unwrap(Private));
@@ -84,18 +84,18 @@ impl<'scope> TypeVar<'scope> {
             let lb = lower_bound.unwrap_or(bottom);
 
             if lb != bottom && !lb.is_type() && !lb.is::<TypeVar>() {
-                Err(JlrsError::NotATypeLB(
-                    name.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
-                ))?;
+                Err(JlrsError::NotATypeLB {
+                    typevar_name: name.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+                })?;
             }
 
             let upper = DataType::any_type(global).as_value();
             let ub = upper_bound.unwrap_or(upper);
 
             if ub != upper && !ub.is_type() && !ub.is::<TypeVar>() {
-                Err(JlrsError::NotATypeUB(
-                    name.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
-                ))?;
+                Err(JlrsError::NotATypeUB {
+                    typevar_name: name.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+                })?;
             }
 
             let tvar = jl_new_typevar(name.unwrap(Private), lb.unwrap(Private), ub.unwrap(Private));

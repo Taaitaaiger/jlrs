@@ -78,7 +78,10 @@ impl<'scope, T: Wrapper<'scope, 'static>> SimpleVector<'scope, T> {
     /// been allocated.
     pub unsafe fn set(self, index: usize, value: Option<T>) -> JlrsResult<Ref<'scope, 'static, T>> {
         if index >= self.len() {
-            Err(JlrsError::OutOfBounds(index, self.len()))?;
+            Err(JlrsError::OutOfBoundsSVec {
+                idx: index,
+                n_fields: self.len(),
+            })?
         }
 
         jl_svec_data(self.unwrap(Private))
@@ -120,10 +123,9 @@ unsafe impl<'scope, T: Wrapper<'scope, 'static>> ValidLayout for SimpleVector<'s
 
 impl<'scope, T: Wrapper<'scope, 'static>> Debug for SimpleVector<'scope, T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        if let Ok(s) = self.display_string() {
-            f.write_str(&s)
-        } else {
-            f.write_str("<Cannot display value>")
+        match self.display_string() {
+            Ok(s) => write!(f, "{}", s),
+            Err(e) => write!(f, "<Cannot display value: {}>", e),
         }
     }
 }

@@ -14,6 +14,7 @@ use super::{
     array::Array, private::Wrapper as WrapperPriv, DataTypeRef, SimpleVectorRef, TypeNameRef,
     ValueRef, Wrapper,
 };
+use crate::error::CANNOT_DISPLAY_TYPE;
 use crate::layout::typecheck::{Concrete, Typecheck};
 use crate::memory::frame::Frame;
 use crate::wrappers::ptr::symbol::Symbol;
@@ -259,7 +260,9 @@ impl<'scope> DataType<'scope> {
     {
         unsafe {
             if !self.is::<Concrete>() {
-                Err(JlrsError::NotConcrete(self.name().into()))?;
+                Err(JlrsError::NotConcrete {
+                    value_type: self.display_string_or(CANNOT_DISPLAY_TYPE),
+                })?;
             }
 
             if self.is::<Array>() {
@@ -292,7 +295,9 @@ impl<'scope> DataType<'scope> {
     {
         unsafe {
             if !self.is::<Concrete>() {
-                Err(JlrsError::NotConcrete(self.name().into()))?;
+                Err(JlrsError::NotConcrete {
+                    value_type: self.display_string_or(CANNOT_DISPLAY_TYPE),
+                })?;
             }
 
             if self.is::<Array>() {
