@@ -31,6 +31,7 @@ impl_valid_layout!(WeakRef<'scope>, 'scope);
 
 impl<'scope> Wrapper<'scope, '_> for WeakRef<'scope> {
     type Internal = jl_weakref_t;
+    const NAME: &'static str = "WeakRef";
 
     unsafe fn wrap_non_null(inner: NonNull<Self::Internal>, _: Private) -> Self {
         Self(inner, PhantomData)

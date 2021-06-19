@@ -107,7 +107,7 @@ use crate::{
     private::Private,
     wrappers::ptr::{
         array::Array,
-        call::{private::Call as CallPriv, Call, CallExt, UnsafeCall, UnsafeCallExt, WithKeywords},
+        call::{private::Call as CallPriv, Call, CallExt, WithKeywords},
         datatype::DataType,
         module::Module,
         private::Wrapper as WrapperPriv,
@@ -1104,10 +1104,10 @@ unsafe impl<'scope, 'data> ValidLayout for Value<'scope, 'data> {
 
 impl CallPriv for Value<'_, '_> {}
 
-impl<'target, 'current> Call<'target, 'current> for Value<'_, 'static> {
+impl<'target, 'current, 'data> Call<'target, 'current, 'data> for Value<'_, 'data> {
     fn call0<S, F>(self, scope: S) -> JlrsResult<S::JuliaResult>
     where
-        S: Scope<'target, 'current, 'static, F>,
+        S: Scope<'target, 'current, 'data, F>,
         F: Frame<'current>,
     {
         unsafe {
@@ -1122,9 +1122,9 @@ impl<'target, 'current> Call<'target, 'current> for Value<'_, 'static> {
         }
     }
 
-    fn call1<S, F>(self, scope: S, arg0: Value<'_, 'static>) -> JlrsResult<S::JuliaResult>
+    fn call1<S, F>(self, scope: S, arg0: Value<'_, 'data>) -> JlrsResult<S::JuliaResult>
     where
-        S: Scope<'target, 'current, 'static, F>,
+        S: Scope<'target, 'current, 'data, F>,
         F: Frame<'current>,
     {
         unsafe {
@@ -1142,11 +1142,11 @@ impl<'target, 'current> Call<'target, 'current> for Value<'_, 'static> {
     fn call2<S, F>(
         self,
         scope: S,
-        arg0: Value<'_, 'static>,
-        arg1: Value<'_, 'static>,
+        arg0: Value<'_, 'data>,
+        arg1: Value<'_, 'data>,
     ) -> JlrsResult<S::JuliaResult>
     where
-        S: Scope<'target, 'current, 'static, F>,
+        S: Scope<'target, 'current, 'data, F>,
         F: Frame<'current>,
     {
         unsafe {
@@ -1168,12 +1168,12 @@ impl<'target, 'current> Call<'target, 'current> for Value<'_, 'static> {
     fn call3<S, F>(
         self,
         scope: S,
-        arg0: Value<'_, 'static>,
-        arg1: Value<'_, 'static>,
-        arg2: Value<'_, 'static>,
+        arg0: Value<'_, 'data>,
+        arg1: Value<'_, 'data>,
+        arg2: Value<'_, 'data>,
     ) -> JlrsResult<S::JuliaResult>
     where
-        S: Scope<'target, 'current, 'static, F>,
+        S: Scope<'target, 'current, 'data, F>,
         F: Frame<'current>,
     {
         unsafe {
@@ -1195,8 +1195,8 @@ impl<'target, 'current> Call<'target, 'current> for Value<'_, 'static> {
 
     fn call<'value, V, S, F>(self, scope: S, mut args: V) -> JlrsResult<S::JuliaResult>
     where
-        V: AsMut<[Value<'value, 'static>]>,
-        S: Scope<'target, 'current, 'static, F>,
+        V: AsMut<[Value<'value, 'data>]>,
+        S: Scope<'target, 'current, 'data, F>,
         F: Frame<'current>,
     {
         unsafe {
@@ -1217,7 +1217,7 @@ impl<'target, 'current> Call<'target, 'current> for Value<'_, 'static> {
         }
     }
 
-    fn call0_unrooted(self, _: Global<'target>) -> JuliaResultRef<'target, 'static> {
+    fn call0_unrooted(self, _: Global<'target>) -> JuliaResultRef<'target, 'data> {
         unsafe {
             let res = jl_call0(self.unwrap(Private));
             let exc = jl_exception_occurred();
@@ -1233,8 +1233,8 @@ impl<'target, 'current> Call<'target, 'current> for Value<'_, 'static> {
     fn call1_unrooted(
         self,
         _: Global<'target>,
-        arg0: Value<'_, 'static>,
-    ) -> JuliaResultRef<'target, 'static> {
+        arg0: Value<'_, 'data>,
+    ) -> JuliaResultRef<'target, 'data> {
         unsafe {
             let res = jl_call1(self.unwrap(Private), arg0.unwrap(Private));
             let exc = jl_exception_occurred();
@@ -1250,9 +1250,9 @@ impl<'target, 'current> Call<'target, 'current> for Value<'_, 'static> {
     fn call2_unrooted(
         self,
         _: Global<'target>,
-        arg0: Value<'_, 'static>,
-        arg1: Value<'_, 'static>,
-    ) -> JuliaResultRef<'target, 'static> {
+        arg0: Value<'_, 'data>,
+        arg1: Value<'_, 'data>,
+    ) -> JuliaResultRef<'target, 'data> {
         unsafe {
             let res = jl_call2(
                 self.unwrap(Private),
@@ -1272,10 +1272,10 @@ impl<'target, 'current> Call<'target, 'current> for Value<'_, 'static> {
     fn call3_unrooted(
         self,
         _: Global<'target>,
-        arg0: Value<'_, 'static>,
-        arg1: Value<'_, 'static>,
-        arg2: Value<'_, 'static>,
-    ) -> JuliaResultRef<'target, 'static> {
+        arg0: Value<'_, 'data>,
+        arg1: Value<'_, 'data>,
+        arg2: Value<'_, 'data>,
+    ) -> JuliaResultRef<'target, 'data> {
         unsafe {
             let res = jl_call3(
                 self.unwrap(Private),
@@ -1297,9 +1297,9 @@ impl<'target, 'current> Call<'target, 'current> for Value<'_, 'static> {
         self,
         _: Global<'target>,
         mut args: V,
-    ) -> JuliaResultRef<'target, 'static>
+    ) -> JuliaResultRef<'target, 'data>
     where
-        V: AsMut<[Value<'value, 'static>]>,
+        V: AsMut<[Value<'value, 'data>]>,
     {
         unsafe {
             let args = args.as_mut();
@@ -1320,212 +1320,10 @@ impl<'target, 'current> Call<'target, 'current> for Value<'_, 'static> {
     }
 }
 
-impl<'target, 'current, 'data> UnsafeCall<'target, 'current, 'data> for Value<'_, 'data> {
-    unsafe fn unsafe_call0<S, F>(self, scope: S) -> JlrsResult<S::JuliaResult>
-    where
-        S: Scope<'target, 'current, 'data, F>,
-        F: Frame<'current>,
-    {
-        let res = jl_call0(self.unwrap(Private));
-        let exc = jl_exception_occurred();
-
-        if exc.is_null() {
-            scope.call_result(Ok(NonNull::new_unchecked(res)), Private)
-        } else {
-            scope.call_result(Err(NonNull::new_unchecked(exc)), Private)
-        }
-    }
-
-    unsafe fn unsafe_call1<S, F>(
-        self,
-        scope: S,
-        arg0: Value<'_, 'data>,
-    ) -> JlrsResult<S::JuliaResult>
-    where
-        S: Scope<'target, 'current, 'data, F>,
-        F: Frame<'current>,
-    {
-        let res = jl_call1(self.unwrap(Private), arg0.unwrap(Private));
-        let exc = jl_exception_occurred();
-
-        if exc.is_null() {
-            scope.call_result(Ok(NonNull::new_unchecked(res)), Private)
-        } else {
-            scope.call_result(Err(NonNull::new_unchecked(exc)), Private)
-        }
-    }
-
-    unsafe fn unsafe_call2<S, F>(
-        self,
-        scope: S,
-        arg0: Value<'_, 'data>,
-        arg1: Value<'_, 'data>,
-    ) -> JlrsResult<S::JuliaResult>
-    where
-        S: Scope<'target, 'current, 'data, F>,
-        F: Frame<'current>,
-    {
-        let res = jl_call2(
-            self.unwrap(Private),
-            arg0.unwrap(Private),
-            arg1.unwrap(Private),
-        );
-        let exc = jl_exception_occurred();
-
-        if exc.is_null() {
-            scope.call_result(Ok(NonNull::new_unchecked(res)), Private)
-        } else {
-            scope.call_result(Err(NonNull::new_unchecked(exc)), Private)
-        }
-    }
-
-    unsafe fn unsafe_call3<S, F>(
-        self,
-        scope: S,
-        arg0: Value<'_, 'data>,
-        arg1: Value<'_, 'data>,
-        arg2: Value<'_, 'data>,
-    ) -> JlrsResult<S::JuliaResult>
-    where
-        S: Scope<'target, 'current, 'data, F>,
-        F: Frame<'current>,
-    {
-        let res = jl_call3(
-            self.unwrap(Private),
-            arg0.unwrap(Private),
-            arg1.unwrap(Private),
-            arg2.unwrap(Private),
-        );
-        let exc = jl_exception_occurred();
-
-        if exc.is_null() {
-            scope.call_result(Ok(NonNull::new_unchecked(res)), Private)
-        } else {
-            scope.call_result(Err(NonNull::new_unchecked(exc)), Private)
-        }
-    }
-
-    unsafe fn unsafe_call<'value, V, S, F>(
-        self,
-        scope: S,
-        mut args: V,
-    ) -> JlrsResult<S::JuliaResult>
-    where
-        V: AsMut<[Value<'value, 'data>]>,
-        S: Scope<'target, 'current, 'data, F>,
-        F: Frame<'current>,
-    {
-        let args = args.as_mut();
-        let n = args.len();
-        let res = jl_call(
-            self.unwrap(Private).cast(),
-            args.as_mut_ptr().cast(),
-            n as _,
-        );
-        let exc = jl_exception_occurred();
-
-        if exc.is_null() {
-            scope.call_result(Ok(NonNull::new_unchecked(res)), Private)
-        } else {
-            scope.call_result(Err(NonNull::new_unchecked(exc)), Private)
-        }
-    }
-
-    unsafe fn unsafe_call0_unrooted(self, _: Global<'target>) -> JuliaResultRef<'target, 'data> {
-        let res = jl_call0(self.unwrap(Private));
-        let exc = jl_exception_occurred();
-
-        if exc.is_null() {
-            Ok(ValueRef::wrap(res))
-        } else {
-            Err(ValueRef::wrap(exc))
-        }
-    }
-
-    unsafe fn unsafe_call1_unrooted(
-        self,
-        _: Global<'target>,
-        arg0: Value<'_, 'data>,
-    ) -> JuliaResultRef<'target, 'data> {
-        let res = jl_call1(self.unwrap(Private), arg0.unwrap(Private));
-        let exc = jl_exception_occurred();
-
-        if exc.is_null() {
-            Ok(ValueRef::wrap(res))
-        } else {
-            Err(ValueRef::wrap(exc))
-        }
-    }
-
-    unsafe fn unsafe_call2_unrooted(
-        self,
-        _: Global<'target>,
-        arg0: Value<'_, 'data>,
-        arg1: Value<'_, 'data>,
-    ) -> JuliaResultRef<'target, 'data> {
-        let res = jl_call2(
-            self.unwrap(Private),
-            arg0.unwrap(Private),
-            arg1.unwrap(Private),
-        );
-        let exc = jl_exception_occurred();
-
-        if exc.is_null() {
-            Ok(ValueRef::wrap(res))
-        } else {
-            Err(ValueRef::wrap(exc))
-        }
-    }
-
-    unsafe fn unsafe_call3_unrooted(
-        self,
-        _: Global<'target>,
-        arg0: Value<'_, 'data>,
-        arg1: Value<'_, 'data>,
-        arg2: Value<'_, 'data>,
-    ) -> JuliaResultRef<'target, 'data> {
-        let res = jl_call3(
-            self.unwrap(Private),
-            arg0.unwrap(Private),
-            arg1.unwrap(Private),
-            arg2.unwrap(Private),
-        );
-        let exc = jl_exception_occurred();
-
-        if exc.is_null() {
-            Ok(ValueRef::wrap(res))
-        } else {
-            Err(ValueRef::wrap(exc))
-        }
-    }
-
-    unsafe fn unsafe_call_unrooted<'value, V>(
-        self,
-        _: Global<'target>,
-        mut args: V,
-    ) -> JuliaResultRef<'target, 'data>
-    where
-        V: AsMut<[Value<'value, 'data>]>,
-    {
-        let args = args.as_mut();
-        let n = args.len();
-        let res = jl_call(
-            self.unwrap(Private).cast(),
-            args.as_mut_ptr().cast(),
-            n as _,
-        );
-        let exc = jl_exception_occurred();
-
-        if exc.is_null() {
-            Ok(ValueRef::wrap(res))
-        } else {
-            Err(ValueRef::wrap(exc))
-        }
-    }
-}
-
-impl<'target, 'current, 'value> CallExt<'target, 'current, 'value> for Value<'value, 'static> {
-    fn attach_stacktrace<F>(self, frame: &mut F) -> JlrsResult<JuliaResult<'current, 'static>>
+impl<'target, 'current, 'value, 'data> CallExt<'target, 'current, 'value, 'data>
+    for Value<'value, 'data>
+{
+    fn attach_stacktrace<F>(self, frame: &mut F) -> JlrsResult<JuliaResult<'current, 'data>>
     where
         F: Frame<'current>,
     {
@@ -1540,7 +1338,7 @@ impl<'target, 'current, 'value> CallExt<'target, 'current, 'value> for Value<'va
         }
     }
 
-    fn tracing_call<F>(self, frame: &mut F) -> JlrsResult<JuliaResult<'current, 'static>>
+    fn tracing_call<F>(self, frame: &mut F) -> JlrsResult<JuliaResult<'current, 'data>>
     where
         F: Frame<'current>,
     {
@@ -1558,7 +1356,7 @@ impl<'target, 'current, 'value> CallExt<'target, 'current, 'value> for Value<'va
     fn tracing_call_unrooted(
         self,
         global: Global<'target>,
-    ) -> JlrsResult<JuliaResultRef<'target, 'static>> {
+    ) -> JlrsResult<JuliaResultRef<'target, 'data>> {
         unsafe {
             let func = Module::main(global)
                 .submodule_ref("Jlrs")?
@@ -1574,7 +1372,7 @@ impl<'target, 'current, 'value> CallExt<'target, 'current, 'value> for Value<'va
     fn attach_stacktrace_unrooted(
         self,
         global: Global<'target>,
-    ) -> JlrsResult<JuliaResultRef<'target, 'static>> {
+    ) -> JlrsResult<JuliaResultRef<'target, 'data>> {
         unsafe {
             let func = Module::main(global)
                 .submodule_ref("Jlrs")?
@@ -1587,10 +1385,7 @@ impl<'target, 'current, 'value> CallExt<'target, 'current, 'value> for Value<'va
         }
     }
 
-    fn with_keywords(
-        self,
-        kws: Value<'value, 'static>,
-    ) -> JlrsResult<WithKeywords<'value, 'static>> {
+    fn with_keywords(self, kws: Value<'value, 'data>) -> JlrsResult<WithKeywords<'value, 'data>> {
         if !kws.is::<NamedTuple>() {
             let type_str = kws.datatype().display_string_or(CANNOT_DISPLAY_TYPE);
             Err(JlrsError::NotANamedTuple { type_str })?
@@ -1601,83 +1396,9 @@ impl<'target, 'current, 'value> CallExt<'target, 'current, 'value> for Value<'va
 
 impl_debug!(Value<'_, '_>);
 
-impl<'target, 'current, 'value, 'data> UnsafeCallExt<'target, 'current, 'value, 'data>
-    for Value<'value, 'data>
-{
-    unsafe fn unsafe_attach_stacktrace<F>(
-        self,
-        frame: &mut F,
-    ) -> JlrsResult<JuliaResult<'current, 'data>>
-    where
-        F: Frame<'current>,
-    {
-        let global = frame.global();
-        Module::main(global)
-            .submodule_ref("Jlrs")?
-            .wrapper_unchecked()
-            .function_ref("attachstacktrace")?
-            .wrapper_unchecked()
-            .unsafe_call1(&mut *frame, self.as_value())
-    }
-
-    unsafe fn unsafe_tracing_call<F>(
-        self,
-        frame: &mut F,
-    ) -> JlrsResult<JuliaResult<'current, 'data>>
-    where
-        F: Frame<'current>,
-    {
-        let global = frame.global();
-        Module::main(global)
-            .submodule_ref("Jlrs")?
-            .wrapper_unchecked()
-            .function_ref("tracingcall")?
-            .wrapper_unchecked()
-            .unsafe_call1(&mut *frame, self.as_value())
-    }
-
-    unsafe fn unsafe_tracing_call_unrooted(
-        self,
-        global: Global<'target>,
-    ) -> JlrsResult<JuliaResultRef<'target, 'data>> {
-        let func = Module::main(global)
-            .submodule_ref("Jlrs")?
-            .wrapper_unchecked()
-            .function_ref("tracingcall")?
-            .wrapper_unchecked()
-            .unsafe_call1_unrooted(global, self.as_value());
-
-        Ok(func)
-    }
-
-    unsafe fn unsafe_attach_stacktrace_unrooted(
-        self,
-        global: Global<'target>,
-    ) -> JlrsResult<JuliaResultRef<'target, 'data>> {
-        let func = Module::main(global)
-            .submodule_ref("Jlrs")?
-            .wrapper_unchecked()
-            .function_ref("attachstacktrace")?
-            .wrapper_unchecked()
-            .unsafe_call1_unrooted(global, self.as_value());
-
-        Ok(func)
-    }
-
-    unsafe fn unsafe_with_keywords(
-        self,
-        kws: Value<'value, 'data>,
-    ) -> JlrsResult<WithKeywords<'value, 'data>> {
-        if !kws.is::<NamedTuple>() {
-            let type_str = kws.datatype().display_string_or(CANNOT_DISPLAY_TYPE);
-            Err(JlrsError::NotANamedTuple { type_str })?
-        }
-        Ok(WithKeywords::new(self, kws))
-    }
-}
-
 impl<'scope, 'data> WrapperPriv<'scope, 'data> for Value<'scope, 'data> {
     type Internal = jl_value_t;
+    const NAME: &'static str = "Value";
 
     unsafe fn wrap_non_null(inner: NonNull<Self::Internal>, _: Private) -> Self {
         Self(inner, PhantomData, PhantomData)

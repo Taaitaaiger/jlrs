@@ -132,6 +132,7 @@ impl<'scope, T: Wrapper<'scope, 'static>> Debug for SimpleVector<'scope, T> {
 
 impl<'scope, T: Wrapper<'scope, 'static>> WrapperPriv<'scope, '_> for SimpleVector<'scope, T> {
     type Internal = jl_svec_t;
+    const NAME: &'static str = "SimpleVector";
 
     unsafe fn wrap_non_null(inner: NonNull<Self::Internal>, _: Private) -> Self {
         Self(inner, PhantomData, PhantomData)

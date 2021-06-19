@@ -28,6 +28,8 @@ use jl_sys::jl_tuple_typename;
 
 /// A typecheck that can be used in combination with `DataType::is`. This method returns true if
 /// a value of this type is a tuple.
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Tuple;
 
 unsafe impl Typecheck for Tuple {
@@ -57,7 +59,7 @@ macro_rules! check {
 macro_rules! impl_tuple {
     ($name:ident, $($types:tt),+) => {
         #[repr(C)]
-        #[derive(Clone, Debug)]
+        #[derive(Clone, Debug, PartialEq, Eq)]
         pub struct $name<$($types: Clone + ::std::fmt::Debug),+>($(pub $types),+);
 
         impl<$($types),+> Copy for $name<$($types),+>

@@ -90,6 +90,7 @@ impl_valid_layout!(TypeMapEntry<'scope>, 'scope);
 
 impl<'scope> Wrapper<'scope, '_> for TypeMapEntry<'scope> {
     type Internal = jl_typemap_entry_t;
+    const NAME: &'static str = "TypeMapEntry";
 
     unsafe fn wrap_non_null(inner: NonNull<Self::Internal>, _: Private) -> Self {
         Self(inner, PhantomData)

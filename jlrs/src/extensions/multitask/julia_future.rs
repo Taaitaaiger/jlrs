@@ -2,7 +2,7 @@
 
 use crate::error::CANNOT_DISPLAY_VALUE;
 use crate::memory::{global::Global, scope::Scope};
-use crate::wrappers::ptr::call::UnsafeCall;
+use crate::wrappers::ptr::call::Call;
 use crate::wrappers::ptr::module::Module;
 use crate::wrappers::ptr::task::Task;
 use crate::wrappers::ptr::value::{Value, MAX_SIZE};
@@ -71,7 +71,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                 .wrapper_unchecked()
                 .function_ref("asynccall")?
                 .wrapper_unchecked()
-                .unsafe_call(frame, &mut vals)?
+                .call(frame, &mut vals)?
                 .map_err(|e| {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
                     JlrsError::Exception {

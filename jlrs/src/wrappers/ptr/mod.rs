@@ -67,7 +67,7 @@ pub mod weak_ref;
 
 use self::{
     array::{Array, TypedArray},
-    call::UnsafeCall,
+    call::Call,
     code_instance::CodeInstance,
     datatype::DataType,
     expr::Expr,
@@ -97,7 +97,11 @@ use crate::{
     memory::{frame::Frame, global::Global, scope::Scope},
     private::Private,
 };
-use std::{fmt::Debug, marker::PhantomData, ptr::null_mut};
+use std::{
+    fmt::{Debug, Formatter, Result as FmtResult},
+    marker::PhantomData,
+    ptr::null_mut,
+};
 
 macro_rules! impl_valid_layout {
     ($ref_type:ident, $type:ident) => {
@@ -136,7 +140,7 @@ pub trait Wrapper<'scope, 'data>: private::Wrapper<'scope, 'data> {
                 .wrapper_unchecked()
                 .function_ref("displaystring")?
                 .wrapper_unchecked()
-                .unsafe_call1_unrooted(global, self.as_value())
+                .call1_unrooted(global, self.as_value())
                 .map_err(|e| JlrsError::Exception {
                     msg: format!("Jlrs.displaystring failed: {:?}", e.value_unchecked()),
                 })?
@@ -149,9 +153,9 @@ pub trait Wrapper<'scope, 'data>: private::Wrapper<'scope, 'data> {
         }
     }
 
-    /// Convert the wrapper to its display string, ie the string that is shown by calling
-    /// `Base.display`.
-    fn display_string_or(self, default: &str) -> String {
+    /// Convert the wrapper to its display string, i.e. the string that is shown by calling
+    /// `Base.display`, or some default value.
+    fn display_string_or<S: Into<String>>(self, default: S) -> String {
         self.display_string().unwrap_or(default.into())
     }
 }
@@ -218,13 +222,19 @@ macro_rules! impl_debug {
 /// its parent as long as it's not an undefined reference, but there's one important restriction
 /// that must be taken into account: Julia data can be mutable and this can cause a `Ref` that is
 /// in use to become unreachable from any root.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone)]
 #[repr(transparent)]
 pub struct Ref<'scope, 'data, T: Wrapper<'scope, 'data>>(
     *mut T::Internal,
     PhantomData<&'scope ()>,
     PhantomData<&'data ()>,
 );
+
+impl<'scope, 'data, T: Wrapper<'scope, 'data>> Debug for Ref<'scope, 'data, T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "Ref<{}>", T::NAME)
+    }
+}
 
 /// A reference to a [`Value`]
 pub type ValueRef<'scope, 'data> = Ref<'scope, 'data, Value<'scope, 'data>>;
@@ -453,6 +463,7 @@ pub(crate) mod private {
 
     pub trait Wrapper<'scope, 'data>: Sized + Copy + Debug {
         type Internal: Copy;
+        const NAME: &'static str;
 
         unsafe fn wrap_non_null(inner: NonNull<Self::Internal>, _: Private) -> Self;
 

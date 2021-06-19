@@ -163,6 +163,7 @@ impl_valid_layout!(UnionAll<'scope>, 'scope);
 
 impl<'scope> Wrapper<'scope, '_> for UnionAll<'scope> {
     type Internal = jl_unionall_t;
+    const NAME: &'static str = "UnionAll";
 
     unsafe fn wrap_non_null(inner: NonNull<Self::Internal>, _: Private) -> Self {
         Self(inner, PhantomData)

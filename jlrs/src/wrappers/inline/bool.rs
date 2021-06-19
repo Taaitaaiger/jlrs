@@ -17,6 +17,10 @@ use std::fmt::{Debug, Formatter, Result as FmtResult};
 pub struct Bool(i8);
 
 impl Bool {
+    pub fn new(val: bool) -> Self {
+        Bool(val as i8)
+    }
+
     /// Returns the value of the `Bool` as a `i8`.
     pub fn as_i8(self) -> i8 {
         self.0

@@ -92,6 +92,7 @@ impl_valid_layout!(Task<'scope>, 'scope);
 
 impl<'scope> Wrapper<'scope, '_> for Task<'scope> {
     type Internal = jl_task_t;
+    const NAME: &'static str = "Task";
 
     unsafe fn wrap_non_null(inner: NonNull<Self::Internal>, _: Private) -> Self {
         Self(inner, PhantomData)

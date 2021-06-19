@@ -403,6 +403,7 @@ impl_valid_layout!(Module<'target>, 'target);
 
 impl<'scope> Wrapper<'scope, '_> for Module<'scope> {
     type Internal = jl_module_t;
+    const NAME: &'static str = "Module";
 
     unsafe fn wrap_non_null(inner: NonNull<Self::Internal>, _: Private) -> Self {
         Self(inner, PhantomData)

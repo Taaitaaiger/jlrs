@@ -40,6 +40,7 @@ impl_debug!(Expr<'_>);
 
 impl<'scope> Wrapper<'scope, '_> for Expr<'scope> {
     type Internal = jl_expr_t;
+    const NAME: &'static str = "Expr";
 
     unsafe fn wrap_non_null(inner: NonNull<Self::Internal>, _: Private) -> Self {
         Self(inner, PhantomData)

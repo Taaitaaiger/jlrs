@@ -51,7 +51,7 @@ fn call_function_from_loaded_module() {
             let arr2_v = Array::from_slice(&mut *frame, &mut arr2, 2)?;
 
             let res = func
-                .unsafe_call2(&mut *frame, arr1_v, arr2_v)?
+                .call2(&mut *frame, arr1_v, arr2_v)?
                 .expect("Cannot call LinearAlgebra.dot")
                 .unbox::<f64>()?;
 

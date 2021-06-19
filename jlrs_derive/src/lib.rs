@@ -130,25 +130,25 @@ impl JlrsFieldAttr {
     }
 }
 
-#[proc_macro_derive(IntoJulia)]
+#[proc_macro_derive(IntoJulia, attributes(jlrs))]
 pub fn into_julia_derive(input: TokenStream) -> TokenStream {
     let ast = syn::parse(input).unwrap();
     impl_into_julia(&ast)
 }
 
-#[proc_macro_derive(Unbox)]
+#[proc_macro_derive(Unbox, attributes(jlrs))]
 pub fn unbox_derive(input: TokenStream) -> TokenStream {
     let ast = syn::parse(input).unwrap();
     impl_unbox(&ast)
 }
 
-#[proc_macro_derive(Typecheck)]
+#[proc_macro_derive(Typecheck, attributes(jlrs))]
 pub fn typecheck_derive(input: TokenStream) -> TokenStream {
     let ast = syn::parse(input).unwrap();
     impl_typecheck(&ast)
 }
 
-#[proc_macro_derive(ValidLayout)]
+#[proc_macro_derive(ValidLayout, attributes(jlrs))]
 pub fn valid_layout_derive(input: TokenStream) -> TokenStream {
     let ast = syn::parse(input).unwrap();
     impl_valid_layout(&ast)
@@ -182,7 +182,7 @@ fn impl_into_julia(ast: &syn::DeriveInput) -> TokenStream {
 
     let into_julia_impl = quote! {
         unsafe impl ::jlrs::convert::into_julia::IntoJulia for #name {
-            fn julia_type<'target>(global: ::jlrs::memory::global::Global<'target>) -> ::jlrs::wrapper::ptr::DataTypeRef<'target> {
+            fn julia_type<'target>(global: ::jlrs::memory::global::Global<'target>) -> ::jlrs::wrappers::ptr::DataTypeRef<'target> {
                 unsafe {
                     ::jlrs::wrappers::ptr::module::Module::#func(global)
                         #(
@@ -193,7 +193,7 @@ fn impl_into_julia(ast: &syn::DeriveInput) -> TokenStream {
                         .global_ref(#ty)
                         .expect(&format!("Type {} cannot be found in module", #ty))
                         .value_unchecked()
-                        .cast::<::jlrs::wrapper::ptr::datatype::DataType>()
+                        .cast::<::jlrs::wrappers::ptr::datatype::DataType>()
                         .expect("Type is not a DataType")
                         .as_ref()
                 }
@@ -206,10 +206,10 @@ fn impl_into_julia(ast: &syn::DeriveInput) -> TokenStream {
     into_julia_impl.into()
 }
 
-fn impl_into_julia_fn(attrs: &JlrsTypeAttrs) -> TS2 {
+fn impl_into_julia_fn(attrs: &JlrsTypeAttrs) -> Option<TS2> {
     if attrs.zst {
-        quote! {
-            unsafe fn into_julia<'target>(self, global: ::jlrs::memory::global::Global<'target>) -> ::jlrs::wrapper::ptr::ValueRef<'target, 'static> {
+        Some(quote! {
+            unsafe fn into_julia<'target>(self, global: ::jlrs::memory::global::Global<'target>) -> ::jlrs::wrappers::ptr::ValueRef<'target, 'static> {
                 let ty = self.julia_type(global);
                 unsafe {
                     ty.wrapper_unchecked()
@@ -219,9 +219,9 @@ fn impl_into_julia_fn(attrs: &JlrsTypeAttrs) -> TS2 {
                         .as_ref()
                 }
             }
-        }
+        })
     } else {
-        quote! {}
+        None
     }
 }
 
@@ -254,8 +254,8 @@ fn impl_typecheck(ast: &syn::DeriveInput) -> TokenStream {
 
     let typecheck_impl = quote! {
         unsafe impl #generics ::jlrs::layout::typecheck::Typecheck for #name #generics #where_clause {
-            fn typecheck(dt: ::jlrs::wrappers::ptr::DataType) -> bool {
-                <Self as ::jlrs::layout::valid_layout::ValidLayout>::valid_layout(t.as_value())
+            fn typecheck(dt: ::jlrs::wrappers::ptr::datatype::DataType) -> bool {
+                <Self as ::jlrs::layout::valid_layout::ValidLayout>::valid_layout(dt.as_value())
             }
         }
     };
@@ -295,32 +295,34 @@ fn impl_valid_layout(ast: &syn::DeriveInput) -> TokenStream {
 
     let valid_layout_impl = quote! {
         unsafe impl #generics ::jlrs::layout::valid_layout::ValidLayout for #name #generics #where_clause {
-            unsafe fn valid_layout(v: ::jlrs::wrappers::ptr::value::Value) -> bool {
-                if let Ok(dt) = v.cast::<::jlrs::wrappers::ptr::datatype::DataType>() {
-                    if dt.nfields() as usize != #n_fields {
-                        return false;
-                    }
-
-                    let field_types = dt.field_types().data();
-
-                    #(
-                        if !<#rs_non_union_fields as ::jlrs::layout::valid_layout::ValidLayout>::valid_layout(field_types[#jl_non_union_field_idxs].wrapper_unchecked()) {
+            fn valid_layout(v: ::jlrs::wrappers::ptr::value::Value) -> bool {
+                unsafe {
+                    if let Ok(dt) = v.cast::<::jlrs::wrappers::ptr::datatype::DataType>() {
+                        if dt.n_fields() as usize != #n_fields {
                             return false;
                         }
-                    )*
 
-                    #(
-                        if let Ok(u) = field_types[#jl_union_field_idxs].wrapper_unchecked().cast::<::jlrs::wrappers::builtin::union::Union>() {
-                            if !::jlrs::wrappers::inline::union::correct_layout_for::<#rs_align_fields, #rs_union_fields, #rs_flag_fields>(u) {
+                        let field_types = dt.field_types().wrapper_unchecked().data();
+
+                        #(
+                            if !<#rs_non_union_fields as ::jlrs::layout::valid_layout::ValidLayout>::valid_layout(field_types[#jl_non_union_field_idxs].wrapper_unchecked()) {
+                                return false;
+                            }
+                        )*
+
+                        #(
+                            if let Ok(u) = field_types[#jl_union_field_idxs].wrapper_unchecked().cast::<::jlrs::wrappers::ptr::union::Union>() {
+                                if !::jlrs::wrappers::inline::union::correct_layout_for::<#rs_align_fields, #rs_union_fields, #rs_flag_fields>(u) {
+                                    return false
+                                }
+                            } else {
                                 return false
                             }
-                        } else {
-                            return false
-                        }
-                    )*
+                        )*
 
 
-                    return true;
+                        return true;
+                    }
                 }
 
                 false

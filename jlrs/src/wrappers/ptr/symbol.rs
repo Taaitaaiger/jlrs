@@ -132,6 +132,7 @@ impl_valid_layout!(Symbol<'scope>, 'scope);
 
 impl<'scope> Wrapper<'scope, '_> for Symbol<'scope> {
     type Internal = jl_sym_t;
+    const NAME: &'static str = "Symbol";
 
     unsafe fn wrap_non_null(inner: NonNull<Self::Internal>, _: Private) -> Self {
         Self(inner, PhantomData)

@@ -31,7 +31,7 @@ fn ccall_with_array() {
                 .function_ref("callrustwitharr")?
                 .wrapper_unchecked();
 
-            let out = func.unsafe_call2(&mut *frame, fn_ptr, arr)?.unwrap();
+            let out = func.call2(&mut *frame, fn_ptr, arr)?.unwrap();
             let ok = out.unbox::<bool>()?.as_bool();
             assert!(ok);
             Ok(())

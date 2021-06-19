@@ -136,6 +136,7 @@ impl_valid_layout!(Union<'scope>, 'scope);
 
 impl<'scope> Wrapper<'scope, '_> for Union<'scope> {
     type Internal = jl_uniontype_t;
+    const NAME: &'static str = "Union";
 
     unsafe fn wrap_non_null(inner: NonNull<Self::Internal>, _: Private) -> Self {
         Self(inner, PhantomData)

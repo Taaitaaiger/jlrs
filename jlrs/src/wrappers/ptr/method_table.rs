@@ -95,6 +95,7 @@ impl_valid_layout!(MethodTable<'scope>, 'scope);
 
 impl<'scope> Wrapper<'scope, '_> for MethodTable<'scope> {
     type Internal = jl_methtable_t;
+    const NAME: &'static str = "<MethodTable";
 
     unsafe fn wrap_non_null(inner: NonNull<Self::Internal>, _: Private) -> Self {
         Self(inner, PhantomData)

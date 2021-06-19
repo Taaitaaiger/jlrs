@@ -17,6 +17,10 @@ use std::fmt::{Debug, Formatter, Result as FmtResult, Write};
 pub struct Char(u32);
 
 impl Char {
+    pub fn new(val: char) -> Self {
+        Char(val as u32)
+    }
+
     /// Returns the value of the `Char` as a `u32`.
     pub fn as_u32(self) -> u32 {
         self.0

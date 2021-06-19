@@ -157,7 +157,7 @@ fn call_function_with_borrowed() {
                 Module::base(global)
                     .function_ref("sum")?
                     .wrapper_unchecked()
-                    .unsafe_call1(&mut *frame, array)?
+                    .call1(&mut *frame, array)?
                     .unwrap()
                     .unbox::<u64>()
             })

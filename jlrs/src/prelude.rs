@@ -11,10 +11,10 @@ pub use crate::{
     },
     named_tuple,
     wrappers::{
-        inline::tuple::*,
+        inline::{bool::Bool, char::Char, tuple::*},
         ptr::{
             array::{dimensions::Dims, Array, TypedArray},
-            call::{Call, CallExt, UnsafeCall, UnsafeCallExt},
+            call::{Call, CallExt},
             datatype::DataType,
             module::Module,
             string::JuliaString,
@@ -27,7 +27,7 @@ pub use crate::{
 };
 
 #[cfg(feature = "jlrs-derive")]
-pub use jlrs_derive::{IntoJulia, Typecheck, Unbox, ValidLayout};
+pub use jlrs_derive::*;
 
 #[cfg(feature = "async")]
 pub use crate::extensions::multitask::{

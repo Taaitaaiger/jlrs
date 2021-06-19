@@ -109,6 +109,7 @@ impl Debug for JuliaString<'_> {
 
 impl<'scope> WrapperPriv<'scope, '_> for JuliaString<'scope> {
     type Internal = u8;
+    const NAME: &'static str = "String";
 
     unsafe fn wrap_non_null(inner: NonNull<Self::Internal>, _: Private) -> Self {
         JuliaString(inner.as_ptr(), PhantomData)

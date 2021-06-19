@@ -67,6 +67,7 @@ impl_valid_layout!(TypeMapLevel<'scope>, 'scope);
 
 impl<'scope> Wrapper<'scope, '_> for TypeMapLevel<'scope> {
     type Internal = jl_typemap_level_t;
+    const NAME: &'static str = "TypeMapLevel";
 
     unsafe fn wrap_non_null(inner: NonNull<Self::Internal>, _: Private) -> Self {
         Self(inner, PhantomData)

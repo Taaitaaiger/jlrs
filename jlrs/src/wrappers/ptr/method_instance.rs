@@ -82,6 +82,7 @@ impl_debug!(MethodInstance<'_>);
 
 impl<'scope> Wrapper<'scope, '_> for MethodInstance<'scope> {
     type Internal = jl_method_instance_t;
+    const NAME: &'static str = "MethodInstance";
 
     unsafe fn wrap_non_null(inner: NonNull<Self::Internal>, _: Private) -> Self {
         Self(inner, PhantomData)

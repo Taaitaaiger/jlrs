@@ -88,6 +88,7 @@ impl_debug!(CodeInstance<'_>);
 
 impl<'scope> Wrapper<'scope, '_> for CodeInstance<'scope> {
     type Internal = jl_code_instance_t;
+    const NAME: &'static str = "CodeInstance";
 
     unsafe fn wrap_non_null(inner: NonNull<Self::Internal>, _: Private) -> Self {
         Self(inner, ::std::marker::PhantomData)

@@ -743,9 +743,7 @@ impl<'scope> Array<'scope, 'static> {
         if self.is_union_array() {
             Ok(UnresistrictedUnionArrayDataMut::new(self, frame))
         } else {
-            let elem_ty = self
-                .element_type()
-                .display_string_or("<Cannot display element type>");
+            let elem_ty = self.element_type().display_string_or(CANNOT_DISPLAY_TYPE);
             let inline = !self.is_value_array();
             Err(JlrsError::NotAUnionArray { elem_ty, inline })?
         }
@@ -774,6 +772,7 @@ impl_debug!(Array<'_, '_>);
 
 impl<'scope, 'data> WrapperPriv<'scope, 'data> for Array<'scope, 'data> {
     type Internal = jl_array_t;
+    const NAME: &'static str = "Array";
 
     unsafe fn wrap_non_null(inner: NonNull<Self::Internal>, _: Private) -> Self {
         Self(inner, PhantomData, PhantomData)
@@ -1251,6 +1250,7 @@ impl<'scope, 'data, T: Clone + ValidLayout + Debug> WrapperPriv<'scope, 'data>
     for TypedArray<'scope, 'data, T>
 {
     type Internal = jl_array_t;
+    const NAME: &'static str = "Array";
 
     unsafe fn wrap_non_null(inner: NonNull<Self::Internal>, _: Private) -> Self {
         Self(inner, PhantomData, PhantomData, PhantomData)
