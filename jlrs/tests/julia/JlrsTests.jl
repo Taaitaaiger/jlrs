@@ -57,4 +57,15 @@ end
 function funcwithabstractkw(a::Float32; b::Real=1.0f0)
     a + b
 end
+
+function throws_exception(args...; kwargs...)
+    throw("This should happen")
+end
+
+struct ModuleOrNothing
+    a::Union{Module, Nothing}
+end
+
+has_nothing = ModuleOrNothing(nothing)
+has_module = ModuleOrNothing(Base)
 end

@@ -1,4 +1,4 @@
-//! Wrappers for Julia data that is stored inline in structs.
+//! Wrappers for inline types
 
 pub mod bool;
 pub mod char;

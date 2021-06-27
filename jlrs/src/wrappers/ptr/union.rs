@@ -1,4 +1,4 @@
-//! Wrapper for `Core.Union`.
+//! Wrapper for `Union`.
 
 use super::{private::Wrapper, value::Value, ValueRef, Wrapper as _};
 use crate::{

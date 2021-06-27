@@ -1,4 +1,4 @@
-//! Wrapper for `Core.Symbol`. Symbols represent identifiers like module and function names.
+//! Wrapper for `Symbol`. Symbols represent identifiers like module and function names.
 
 use crate::{
     error::{JlrsError, JlrsResult},
@@ -17,31 +17,11 @@ use super::private::Wrapper;
 
 /// `Symbol`s are used Julia to represent identifiers, `:x` represents the `Symbol` `x`. Things
 /// that can be accessed using a `Symbol` include submodules, functions, and globals. However,
-/// the methods that provide this functionality in jlrs can use strings instead.
+/// the methods that provide this functionality in jlrs can use strings instead. They're also used
+/// as the building-block of expressions.
 ///
-/// This struct can be used in combination with [`DataType::is`] and [`Value::is`], if the check
-/// returns` true` the [`Value`] can be cast to `Symbol`:
-///
-/// ```
-/// # use jlrs::prelude::*;
-/// # use jlrs::util::JULIA;
-/// # fn main() {
-/// # JULIA.with(|j| {
-/// # let mut julia = j.borrow_mut();
-/// julia.scope(|global, frame| {
-///     let symbol_v = Symbol::new(global, "+").as_value();
-///     assert!(symbol_v.is::<Symbol>());
-///
-///     let symbol = symbol_v.cast::<Symbol>()?;
-///     assert!(Module::base(global).global(&mut *frame, symbol).is_ok());
-///     Ok(())
-/// }).unwrap();
-/// # });
-/// # }
-/// ```
-///
-/// [`value::is`]: crate::wrappers::builtin::value::Value::is
-/// [`DataType::is`]: crate::wrappers::builtin::datatype::DataType::is
+/// One special property of `Symbol`s is that they're never freed by the garbage collector after
+/// they've been created.
 #[repr(transparent)]
 #[derive(Copy, Clone)]
 pub struct Symbol<'scope>(NonNull<jl_sym_t>, PhantomData<&'scope ()>);
@@ -56,10 +36,10 @@ impl<'scope> Symbol<'scope> {
         }
     }
 
-    /// Extend the `Symbol`'s lifetime. `Symbol`s are not garbage collected, but a `Symbol`
-    /// returned as a [`Value`] from a Julia function inherits the frame's lifetime when it's cast
-    /// to a `Symbol`. Its lifetime can be safely extended from `'scope` to `'global` using this
-    /// method.
+    /// Extend the `Symbol`'s lifetime. `Symbol`s are never freed by the garbage collector, but a
+    /// `Symbol` returned as a [`Value`] from a Julia function inherits the frame's lifetime when
+    /// it's cast to a `Symbol`. Its lifetime can be safely extended from `'scope` to `'global`
+    /// using this method.
     pub fn extend<'global>(self, _: Global<'global>) -> Symbol<'global> {
         unsafe { Symbol::wrap_non_null(self.unwrap_non_null(Private), Private) }
     }
@@ -112,7 +92,7 @@ impl<'scope> Symbol<'scope> {
         unsafe {
             let ptr = jl_symbol_name(self.unwrap(Private)).cast();
             let symbol = CStr::from_ptr(ptr);
-            symbol.to_str().map_err(|_| Box::new(JlrsError::NotUnicode))
+            symbol.to_str().map_err(|_| Box::new(JlrsError::NotUTF8))
         }
     }
 

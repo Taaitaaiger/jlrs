@@ -1,4 +1,4 @@
-//! Wrapper for `Core.Expr`.
+//! Wrapper for `Expr`.
 
 use super::private::Wrapper;
 use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout};

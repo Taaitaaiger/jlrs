@@ -8,9 +8,9 @@
 //! [`Output`] can be converted to an [`OutputScope`]. An [`OutputScope`] is a [`Scope`] that
 //! roots the result in an earlier frame and can only be used once.
 //!
-//! [`Scope`]: crate::memory::traits::scope::Scope
-//! [`Scope::result_scope`]: crate::memory::traits::scope::Scope::result_scope
-//! [`Scope::value_scope`]: crate::memory::traits::scope::Scope::value_scope
+//! [`Scope`]: crate::memory::scope::Scope
+//! [`Scope::result_scope`]: crate::memory::scope::Scope::result_scope
+//! [`Scope::value_scope`]: crate::memory::scope::Scope::value_scope
 
 use jl_sys::jl_value_t;
 
@@ -37,7 +37,7 @@ impl<'scope> Output<'scope> {
 
 /// A [`Scope`] that can be used once to root a value in an earlier frame.
 ///
-/// [`Scope`]: crate::memory::traits::scope::Scope
+/// [`Scope`]: crate::memory::scope::Scope
 pub struct OutputScope<'scope, 'frame, 'borrow, F: Frame<'frame>>(
     pub(crate) &'borrow mut F,
     Output<'scope>,

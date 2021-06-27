@@ -1,4 +1,4 @@
-//! Wrapper for `Core.Method`.
+//! Wrapper for `Method`.
 //!
 //! The documentation for this module has been slightly adapted from the comments for this struct
 //! in [`julia.h`]

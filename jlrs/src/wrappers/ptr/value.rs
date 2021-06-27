@@ -1,18 +1,18 @@
 //! Wrapper for arbitrary Julia data.
 //!
-//! Julia data returned by the C API is normally returned as a pointer to `jl_value_t`, which is
+//! Julia data returned by the C API is often returned as a pointer to `jl_value_t`, which is
 //! an opaque type. This pointer is wrapped in jlrs by [`Value`]. The layout of the data that is
 //! pointed to depends on its underlying type. Julia guarantees that the data is preceded in
 //! memory by a header which contains a pointer to the data's type information, its [`DataType`].
 //!
-//! For example, if the `DataType` is `Core.UInt8`, the pointer points to a `u8`. If the
-//! `DataType` is some Julia array type like `Core.Array{Core.Int, 2}`, the pointer points to
+//! For example, if the `DataType` is `UInt8`, the pointer points to a `u8`. If the
+//! `DataType` is some Julia array type like `Array{Int, 2}`, the pointer points to
 //! Julia's internal array type, `jl_array_t`. In the first case tha value can be unboxed as a
 //! `u8`, in the second case it can be cast to [`Array`] or [`TypedArray<isize>`].
 //!
 //! The `Value` wrapper is very commonly used in jlrs. A `Value` can be called as a Julia
 //! function, the arguments such a function takes are all `Value`s, and it will return either a
-//! `Value` or an exception which is also a `Value`. This struct also provides methods to create
+//! `Value` or an exception which is also a `Value`. This wrapper also provides methods to create
 //! new `Value`s, access their fields, cast them to the appropriate pointer wrapper type, and
 //! unbox their contents.
 //!
@@ -107,7 +107,7 @@ use crate::{
     private::Private,
     wrappers::ptr::{
         array::Array,
-        call::{private::Call as CallPriv, Call, CallExt, WithKeywords},
+        call::{Call, CallExt, WithKeywords},
         datatype::DataType,
         module::Module,
         private::Wrapper as WrapperPriv,
@@ -148,7 +148,7 @@ pub const MAX_SIZE: usize = 8;
 /// `Value` can only be used while it's rooted, the second accounts for data borrowed from Rust.
 /// The only way to borrow data from Rust is to create an Julia array that borrows its contents
 ///  by calling [`Array::from_slice`]; if a Julia function is called with such an array as an
-/// argument the result will "inherit" the second lifetime of the borrowed data to ensure that
+/// argument the result will inherit the second lifetime of the borrowed data to ensure that
 /// such a `Value` can only be used while the borrow is active.
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -162,14 +162,10 @@ pub struct Value<'scope, 'data>(
 ///
 /// Several methods are available to create new values. The simplest of these is [`Value::new`],
 /// which can be used to convert relatively simple data from Rust to Julia. Data that can be
-/// converted this way must implement [`IntoJulia`], which is the case for some simple types like
+/// converted this way must implement [`IntoJulia`], which is the case for types like the
 /// primitive number types. This trait is also automatically derived by JlrsReflect.jl for types
 /// that are trivially guaranteed to be bits-types: the type must have no type parameters, no
 /// unions, and all fields must be immutable bits-types themselves.
-///
-/// It's possible to instantiate arbitrary concrete types with [`Value::instantiate`],
-/// the type parameters of types that have them can be set with [`Value::apply_type`]. These
-/// methods don't support creating new arrays.
 impl<'scope, 'data> Value<'scope, 'data> {
     /// Create a new Julia value, any type that implements [`IntoJulia`] can be converted using
     /// this function.
@@ -261,9 +257,9 @@ impl<'scope, 'data> Value<'scope, 'data> {
 
     /// Apply the given types to `self`.
     ///
-    /// If `self` is the [`DataType`] `anytuple_type`, calling this function will return a new
+    /// If `self` is the [`DataType`] `anytuple_type`, calling this method will return a new
     /// tuple type with the given types as its field types. If it is the [`DataType`]
-    /// `uniontype_type`, calling this function is equivalent to calling [`Value::new_union`]. If
+    /// `uniontype_type`, calling this method is equivalent to calling [`Value::new_union`]. If
     /// the value is a `UnionAll`, the given types will be applied and the resulting type is
     /// returned.
     ///
@@ -302,7 +298,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
         unsafe {
             let type_name = jl_typeof_str(self.unwrap(Private));
             let type_name_ref = CStr::from_ptr(type_name);
-            Ok(type_name_ref.to_str().map_err(|_| JlrsError::NotUnicode)?)
+            Ok(type_name_ref.to_str().map_err(|_| JlrsError::NotUTF8)?)
         }
     }
 }
@@ -312,8 +308,8 @@ impl<'scope, 'data> Value<'scope, 'data> {
 /// Many properties of Julia types can be checked, including whether instances of the type are
 /// mutable, if the value is an array, and so on. The method [`Value::is`] can be used to perform
 /// these checks. All these checks implement the [`Typecheck`] trait. If the type that implements
-/// this trait also implements `ValidLayout`, the typecheck indicates whether or not the value can
-/// be cast to or unboxed as that type.
+/// this trait also implements [`ValidLayout`], the typecheck indicates whether or not the value
+/// can be cast to or unboxed as that type.
 impl Value<'_, '_> {
     /// Performs the given typecheck:
     ///
@@ -332,8 +328,7 @@ impl Value<'_, '_> {
     /// # }
     /// ```
     ///
-    /// If you derive [`JuliaStruct`] for some type, that type will be supported by this method. A
-    /// full list of supported checks can be found [here].
+    /// A full list of supported checks can be found [here].
     ///
     /// [`JuliaStruct`]: crate::wrappers::ptr::traits::julia_struct::JuliaStruct
     /// [here]: ../layout/typecheck/trait.Typecheck.html#implementors
@@ -379,22 +374,13 @@ impl Value<'_, '_> {
 /// Rust are also restricted by the lifetime of that borrow. This second restriction can be
 /// relaxed with [`Value::assume_owned`] if it doesn't borrow any data from Rust.
 impl<'scope, 'data> Value<'scope, 'data> {
-    /// If you call a function with one or more borrowed arrays as arguments, its result can only
-    /// be used when all the borrows are active. If this result doesn't contain any borrowed
+    /// If you call a Julia function with one or more borrowed arrays as arguments, its result can
+    /// only be used when all the borrows are active. If this result doesn't contain any borrowed
     /// data this function can be used to relax its second lifetime to `'static`.
     ///
     /// Safety: The value must not contain any data borrowed from Rust.
     pub unsafe fn assume_owned(self) -> Value<'scope, 'static> {
         Value::wrap_non_null(self.unwrap_non_null(Private), Private)
-    }
-
-    /// Root the value in some `scope`.
-    pub fn root<'target, 'current, S, F>(self, scope: S) -> JlrsResult<S::Value>
-    where
-        S: Scope<'target, 'current, 'data, F>,
-        F: Frame<'current>,
-    {
-        unsafe { scope.value(self.unwrap_non_null(Private), Private) }
     }
 }
 
@@ -475,11 +461,10 @@ impl<'scope, 'data> Value<'scope, 'data> {
 ///
 /// it will have two fields, `fielda` and `fieldb`. The first field is a pointer field, the second
 /// is stored inline as a `u32`. It's possible to safely access the raw contents of these fields
-/// with the methods [`Value::unbox_field`] and [`Value::unbox_nth_field`]. The first field can be
+/// with the methods [`Value::raw_field`] and [`Value::unbox_nth_field`]. The first field can be
 /// accessed as a [`ValueRef`], the second as a `u32`.
 impl<'scope, 'data> Value<'scope, 'data> {
-    /// Returns the field names of this value as a slice of `Symbol`s. These symbols can be used
-    /// to access their fields with [`Value::get_field`].
+    /// Returns the field names of this value as a slice of `Symbol`s.
     pub fn field_names(self) -> &'scope [Symbol<'scope>] {
         unsafe {
             let tp = jl_typeof(self.unwrap(Private));
@@ -490,8 +475,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
         }
     }
 
-    /// Returns the number of fields the underlying Julia value has. These fields can be accessed
-    /// with [`Value::get_nth_field`].
+    /// Returns the number of fields the underlying Julia value has.
     pub fn n_fields(self) -> usize {
         unsafe { jl_nfields(self.unwrap(Private)) as _ }
     }
@@ -512,7 +496,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
                 })?
             }
 
-            self.deref_field(idx as _)
+            self.read_field(idx as _)
         }
     }
 
@@ -536,7 +520,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// Unbox the contents of the field with the name `field_name`. If the field is a bits union,
     /// this method will try to unbox the active variant. Returns an error if the field doesn't
     /// exist, or if the layout of `T` is incompatible with the layout of that field in Julia.
-    pub fn unbox_field<T, N>(self, field_name: N) -> JlrsResult<T>
+    pub fn raw_field<T, N>(self, field_name: N) -> JlrsResult<T>
     where
         T: ValidLayout,
         N: TemporarySymbol,
@@ -554,15 +538,15 @@ impl<'scope, 'data> Value<'scope, 'data> {
                 })?
             }
 
-            self.deref_field(idx)
+            self.read_field(idx)
         }
     }
 
     /// Unbox the contents of the field with the name `field_name` without checking if the layouts
-    /// of the types are compatible. Returns an error if the field doesn't exist.
+    /// of the types are compatible. Panics if the field doesn't exist.
     ///
     /// Safety: the layout out `T` must be compatible with the layout of the field.
-    pub unsafe fn unbox_field_unchecked<T, N>(self, field_name: N) -> JlrsResult<T>
+    pub unsafe fn raw_field_unchecked<T, N>(self, field_name: N) -> T
     where
         N: TemporarySymbol,
     {
@@ -571,20 +555,14 @@ impl<'scope, 'data> Value<'scope, 'data> {
         let jl_type = ty.unwrap(Private);
         let idx = jl_field_index(jl_type, symbol.unwrap(Private), 0);
 
-        if idx < 0 {
-            Err(JlrsError::NoSuchField {
-                type_name: ty.display_string_or(CANNOT_DISPLAY_TYPE),
-                field_name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
-            })?
-        }
+        assert!(idx >= 0, "Field {:?} doesn't exist", symbol);
 
         let field_offset = jl_field_offset(jl_type, idx as _);
-        Ok(self
-            .unwrap(Private)
+        self.unwrap(Private)
             .cast::<u8>()
             .add(field_offset as usize)
             .cast::<T>()
-            .read())
+            .read()
     }
 
     /// Roots the field at index `idx` if it exists and returns it, or
@@ -868,7 +846,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
         }
     }
 
-    unsafe fn deref_field<T>(self, idx: i32) -> JlrsResult<T>
+    unsafe fn read_field<T>(self, idx: i32) -> JlrsResult<T>
     where
         T: ValidLayout,
     {
@@ -1000,44 +978,44 @@ impl Value<'_, '_> {
 
 /// # Constant values.
 impl<'scope> Value<'scope, 'static> {
-    /// `Core.Union{}`.
+    /// `Union{}`.
     pub fn bottom_type(_: Global<'scope>) -> Self {
         unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_bottom_type), Private) }
     }
 
-    /// `Core.StackOverflowError`.
+    /// `StackOverflowError`.
     pub fn stackovf_exception(_: Global<'scope>) -> Self {
         unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_stackovf_exception), Private) }
     }
 
-    /// `Core.OutOfMemoryError`.
+    /// `OutOfMemoryError`.
     pub fn memory_exception(_: Global<'scope>) -> Self {
         unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_memory_exception), Private) }
     }
 
-    /// `Core.ReadOnlyMemoryError`.
+    /// `ReadOnlyMemoryError`.
     pub fn readonlymemory_exception(_: Global<'scope>) -> Self {
         unsafe {
             Value::wrap_non_null(NonNull::new_unchecked(jl_readonlymemory_exception), Private)
         }
     }
 
-    /// `Core.DivideError`.
+    /// `DivideError`.
     pub fn diverror_exception(_: Global<'scope>) -> Self {
         unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_diverror_exception), Private) }
     }
 
-    /// `Core.UndefRefError`.
+    /// `UndefRefError`.
     pub fn undefref_exception(_: Global<'scope>) -> Self {
         unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_undefref_exception), Private) }
     }
 
-    /// `Core.InterruptException`.
+    /// `InterruptException`.
     pub fn interrupt_exception(_: Global<'scope>) -> Self {
         unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_interrupt_exception), Private) }
     }
 
-    /// An empty `Core.Array{Any, 1}.
+    /// An empty `Array{Any, 1}.
     pub fn an_empty_vec_any(_: Global<'scope>) -> Self {
         unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_an_empty_vec_any), Private) }
     }
@@ -1047,22 +1025,22 @@ impl<'scope> Value<'scope, 'static> {
         unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_an_empty_string), Private) }
     }
 
-    /// `Core.Array{UInt8, 1}`
+    /// `Array{UInt8, 1}`
     pub fn array_uint8_type(_: Global<'scope>) -> Self {
         unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_array_uint8_type), Private) }
     }
 
-    /// `Core.Array{Any, 1}`
+    /// `Array{Any, 1}`
     pub fn array_any_type(_: Global<'scope>) -> Self {
         unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_array_any_type), Private) }
     }
 
-    /// `Core.Array{Symbol, 1}`
+    /// `Array{Symbol, 1}`
     pub fn array_symbol_type(_: Global<'scope>) -> Self {
         unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_array_symbol_type), Private) }
     }
 
-    /// `Core.Array{Int32, 1}`
+    /// `Array{Int32, 1}`
     pub fn array_int32_type(_: Global<'scope>) -> Self {
         unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_array_int32_type), Private) }
     }
@@ -1082,7 +1060,7 @@ impl<'scope> Value<'scope, 'static> {
         unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_false), Private) }
     }
 
-    /// The instance of `Core.Nothing`, `nothing`.
+    /// The instance of `Nothing`, `nothing`.
     pub fn nothing(_: Global<'scope>) -> Self {
         unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_nothing), Private) }
     }
@@ -1102,10 +1080,8 @@ unsafe impl<'scope, 'data> ValidLayout for Value<'scope, 'data> {
     }
 }
 
-impl CallPriv for Value<'_, '_> {}
-
-impl<'target, 'current, 'data> Call<'target, 'current, 'data> for Value<'_, 'data> {
-    fn call0<S, F>(self, scope: S) -> JlrsResult<S::JuliaResult>
+impl<'data> Call<'data> for Value<'_, 'data> {
+    fn call0<'target, 'current, S, F>(self, scope: S) -> JlrsResult<S::JuliaResult>
     where
         S: Scope<'target, 'current, 'data, F>,
         F: Frame<'current>,
@@ -1122,7 +1098,7 @@ impl<'target, 'current, 'data> Call<'target, 'current, 'data> for Value<'_, 'dat
         }
     }
 
-    fn call1<S, F>(self, scope: S, arg0: Value<'_, 'data>) -> JlrsResult<S::JuliaResult>
+    fn call1<'target, 'current, S, F>(self, scope: S, arg0: Value<'_, 'data>) -> JlrsResult<S::JuliaResult>
     where
         S: Scope<'target, 'current, 'data, F>,
         F: Frame<'current>,
@@ -1139,7 +1115,7 @@ impl<'target, 'current, 'data> Call<'target, 'current, 'data> for Value<'_, 'dat
         }
     }
 
-    fn call2<S, F>(
+    fn call2<'target, 'current, S, F>(
         self,
         scope: S,
         arg0: Value<'_, 'data>,
@@ -1165,7 +1141,7 @@ impl<'target, 'current, 'data> Call<'target, 'current, 'data> for Value<'_, 'dat
         }
     }
 
-    fn call3<S, F>(
+    fn call3<'target, 'current, S, F>(
         self,
         scope: S,
         arg0: Value<'_, 'data>,
@@ -1193,7 +1169,7 @@ impl<'target, 'current, 'data> Call<'target, 'current, 'data> for Value<'_, 'dat
         }
     }
 
-    fn call<'value, V, S, F>(self, scope: S, mut args: V) -> JlrsResult<S::JuliaResult>
+    fn call<'target, 'current, 'value, V, S, F>(self, scope: S, mut args: V) -> JlrsResult<S::JuliaResult>
     where
         V: AsMut<[Value<'value, 'data>]>,
         S: Scope<'target, 'current, 'data, F>,
@@ -1217,7 +1193,7 @@ impl<'target, 'current, 'data> Call<'target, 'current, 'data> for Value<'_, 'dat
         }
     }
 
-    fn call0_unrooted(self, _: Global<'target>) -> JuliaResultRef<'target, 'data> {
+    fn call0_unrooted<'target>(self, _: Global<'target>) -> JuliaResultRef<'target, 'data> {
         unsafe {
             let res = jl_call0(self.unwrap(Private));
             let exc = jl_exception_occurred();
@@ -1230,7 +1206,7 @@ impl<'target, 'current, 'data> Call<'target, 'current, 'data> for Value<'_, 'dat
         }
     }
 
-    fn call1_unrooted(
+    fn call1_unrooted<'target>(
         self,
         _: Global<'target>,
         arg0: Value<'_, 'data>,
@@ -1247,7 +1223,7 @@ impl<'target, 'current, 'data> Call<'target, 'current, 'data> for Value<'_, 'dat
         }
     }
 
-    fn call2_unrooted(
+    fn call2_unrooted<'target>(
         self,
         _: Global<'target>,
         arg0: Value<'_, 'data>,
@@ -1269,7 +1245,7 @@ impl<'target, 'current, 'data> Call<'target, 'current, 'data> for Value<'_, 'dat
         }
     }
 
-    fn call3_unrooted(
+    fn call3_unrooted<'target>(
         self,
         _: Global<'target>,
         arg0: Value<'_, 'data>,
@@ -1293,7 +1269,7 @@ impl<'target, 'current, 'data> Call<'target, 'current, 'data> for Value<'_, 'dat
         }
     }
 
-    fn call_unrooted<'value, V>(
+    fn call_unrooted<'target, 'value, V>(
         self,
         _: Global<'target>,
         mut args: V,
@@ -1424,7 +1400,7 @@ impl LeakedValue {
     }
 
     /// Convert this [`LeakedValue`] back to a [`Value`]. This requires a [`Global`], so this
-    /// method can only be called inside a closure taken by one of the `frame`-methods.
+    /// method can only be called inside a closure taken by one of the `scope`-methods.
     ///
     /// Safety: you must guarantee this value has not been freed by the garbage collector. While
     /// `Symbol`s are never garbage collected, modules and their contents can be redefined.

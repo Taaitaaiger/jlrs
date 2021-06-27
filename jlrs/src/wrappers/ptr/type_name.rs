@@ -1,4 +1,4 @@
-//! Wrapper for `Core.TypeName`.
+//! Wrapper for `TypeName`.
 //!
 //! The documentation for this module has been slightly adapted from the comments for this struct
 //! in [`julia.h`]
@@ -17,7 +17,7 @@ use jl_sys::{
 use std::{marker::PhantomData, ptr::NonNull};
 
 /// Describes the syntactic structure of a type and stores all data common to different
-/// instantiations of the type, including a cache for hash-consed allocation of `DataType`s.
+/// instantiations of the type.
 #[derive(Copy, Clone)]
 #[repr(transparent)]
 pub struct TypeName<'scope>(NonNull<jl_typename_t>, PhantomData<&'scope ()>);

@@ -1,4 +1,4 @@
-//! Wrapper for `Core.TypeVar`.
+//! Wrapper for `TypeVar`.
 
 use super::TypeVarRef;
 use super::{datatype::DataType, value::Value};
@@ -16,7 +16,7 @@ use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_new_typevar, jl_tvar_t, jl_tvar_type};
 use std::{marker::PhantomData, ptr::NonNull};
 
-/// This is a unknown, but possibly restricted, type parameter. In `Array{T, N}`, `T` and `N` are
+/// An unknown, but possibly restricted, type parameter. In `Array{T, N}`, `T` and `N` are
 /// `TypeVar`s.
 #[derive(Copy, Clone)]
 #[repr(transparent)]

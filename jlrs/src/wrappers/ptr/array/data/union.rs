@@ -114,7 +114,7 @@ impl<'borrow, 'array> UnionArrayData<'borrow, 'array> {
 #[repr(transparent)]
 pub struct UnionArrayDataMut<'borrow, 'array> {
     array: Array<'array, 'static>,
-    _marker: PhantomData<&'borrow ()>,
+    _marker: PhantomData<&'borrow mut ()>,
 }
 
 impl<'borrow, 'array> UnionArrayDataMut<'borrow, 'array> {
@@ -249,7 +249,7 @@ impl<'borrow, 'array> UnionArrayDataMut<'borrow, 'array> {
 #[repr(transparent)]
 pub struct UnresistrictedUnionArrayDataMut<'borrow, 'array> {
     array: Array<'array, 'static>,
-    _marker: PhantomData<&'borrow ()>,
+    _marker: PhantomData<&'borrow mut ()>,
 }
 
 impl<'borrow, 'array> UnresistrictedUnionArrayDataMut<'borrow, 'array> {

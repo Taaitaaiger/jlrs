@@ -1,4 +1,4 @@
-//! Wrapper for `Core.SimpleVector`.
+//! Wrapper for `SimpleVector`.
 
 use crate::layout::typecheck::Typecheck;
 use crate::wrappers::ptr::value::Value;

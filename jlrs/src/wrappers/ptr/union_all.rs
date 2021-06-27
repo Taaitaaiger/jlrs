@@ -1,4 +1,4 @@
-//! Wrapper for `Core.UnionAll`.
+//! Wrapper for `UnionAll`, A union of types over all values of a type parameter.
 
 use super::type_var::TypeVar;
 use super::{private::Wrapper, value::Value};
@@ -48,7 +48,8 @@ impl<'scope> UnionAll<'scope> {
         }
     }
 
-    /// Create a new `UnionAll`.
+    /// Create a new `UnionAll`. Unlike [`UnionAll::new`] this method doesn't root the allocated
+    /// value.
     pub fn new_unrooted<'global>(
         _: Global<'global>,
         tvar: TypeVar,

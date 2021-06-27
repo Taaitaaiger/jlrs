@@ -110,7 +110,7 @@ where
 #[repr(transparent)]
 pub struct InlineArrayDataMut<'borrow, 'array, 'data, T> {
     array: Array<'array, 'data>,
-    _marker: PhantomData<&'borrow [T]>,
+    _marker: PhantomData<&'borrow mut [T]>,
 }
 
 impl<'borrow, 'array, 'data, T> InlineArrayDataMut<'borrow, 'array, 'data, T> {
@@ -242,7 +242,7 @@ where
 #[repr(transparent)]
 pub struct UnrestrictedInlineArrayDataMut<'borrow, 'array, 'data, T> {
     array: Array<'array, 'data>,
-    _marker: PhantomData<&'borrow [T]>,
+    _marker: PhantomData<&'borrow mut [T]>,
 }
 
 impl<'borrow, 'array, 'data, T> UnrestrictedInlineArrayDataMut<'borrow, 'array, 'data, T> {

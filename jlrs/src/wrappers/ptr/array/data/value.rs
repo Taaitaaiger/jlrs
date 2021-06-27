@@ -102,7 +102,7 @@ where
     T: Wrapper<'array, 'data>,
 {
     array: Array<'array, 'data>,
-    _marker: PhantomData<&'borrow [Ref<'array, 'data, T>]>,
+    _marker: PhantomData<&'borrow mut [Ref<'array, 'data, T>]>,
 }
 
 impl<'borrow, 'array, 'data, T> ValueArrayDataMut<'borrow, 'array, 'data, T>
@@ -215,7 +215,7 @@ where
     T: Wrapper<'array, 'data>,
 {
     array: Array<'array, 'data>,
-    _marker: PhantomData<&'borrow [Ref<'array, 'data, T>]>,
+    _marker: PhantomData<&'borrow mut [Ref<'array, 'data, T>]>,
 }
 
 impl<'borrow, 'array, 'data, T> UnrestrictedValueArrayDataMut<'borrow, 'array, 'data, T>

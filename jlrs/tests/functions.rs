@@ -2,23 +2,7 @@ use jlrs::prelude::*;
 use jlrs::util::JULIA;
 
 #[test]
-fn call0() {
-    JULIA.with(|j| {
-        let mut jlrs = j.borrow_mut();
-
-        jlrs.scope_with_slots(1, |global, frame| unsafe {
-            let func = Module::base(global)
-                .function_ref("vect")?
-                .wrapper_unchecked();
-            func.call0(&mut *frame)?.unwrap();
-            Ok(())
-        })
-        .unwrap();
-    });
-}
-
-#[test]
-fn retuen_nothing() {
+fn return_nothing() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
@@ -59,6 +43,23 @@ fn throw_nothing() {
         .unwrap();
     })
 }
+
+#[test]
+fn call0() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+
+        jlrs.scope_with_slots(1, |global, frame| unsafe {
+            let func = Module::base(global)
+                .function_ref("vect")?
+                .wrapper_unchecked();
+            func.call0(&mut *frame)?.unwrap();
+            Ok(())
+        })
+        .unwrap();
+    });
+}
+
 
 #[test]
 fn call0_output() {

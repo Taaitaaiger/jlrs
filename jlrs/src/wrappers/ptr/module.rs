@@ -1,4 +1,4 @@
-//! Wrapper for `Core.Module`, which provides access to Julia's modules and their contents.
+//! Wrapper for `Module`, which provides access to Julia's modules and their contents.
 //!
 //! In Julia, each module introduces a separate global scope. There are three important "root"
 //! modules, `Main`, `Base` and `Core`. Any Julia code that you include in jlrs is made available
@@ -33,17 +33,13 @@ use super::private::Wrapper;
 /// If you include your own Julia code with [`Julia::include`], its contents are made available
 /// relative to `Main`.
 ///
-/// This struct can be used in combination with [`DataType::is`] and [`Value::is`]; if the check
-/// returns `true` the [`Value`] can be cast to `Module`.
-///
-/// The most important methods offered by this struct are those that let you access submodules,
+/// The most important methods offered by this wrapper are those that let you access submodules,
 /// functions, and other global values defined in the module. These come in two variants: one that
 /// roots the result and one that doesn't. If you never redefine the module, it's safe to leave
 /// named functions, constants and submodules unrooted when you use them from Rust. The same holds
 /// true for other global values that are never redefined to point at another value.
 ///
 /// [`Julia::include`]: crate::Julia::include
-/// [`DataType::is`]: crate::wrappers::builtin::datatype::DataType::is
 #[derive(Copy, Clone)]
 #[repr(transparent)]
 pub struct Module<'scope>(NonNull<jl_module_t>, PhantomData<&'scope ()>);
@@ -275,7 +271,7 @@ impl<'scope> Module<'scope> {
     }
 
     /// Returns the function named `name` in this module.
-    /// Returns an error if the function doesn't exist or if it's not a subtype of `Core.Function`.
+    /// Returns an error if the function doesn't exist or if it's not a subtype of `Function`.
     pub fn function<'target, N, F>(
         self,
         frame: &mut F,
@@ -300,7 +296,7 @@ impl<'scope> Module<'scope> {
     }
 
     /// Returns the function named `name` in this module without rooting it.
-    /// Returns an error if the function doesn't exist or if it's not a subtype of `Core.Function`.
+    /// Returns an error if the function doesn't exist or if it's not a subtype of `Function`.
     pub fn function_ref<N>(self, name: N) -> JlrsResult<FunctionRef<'scope, 'static>>
     where
         N: TemporarySymbol,
@@ -317,15 +313,6 @@ impl<'scope> Module<'scope> {
 
             Ok(FunctionRef::wrap(func.unwrap(Private)))
         }
-    }
-
-    /// Returns the function named `name` in this module as a [`LeakedValue`].
-    /// Returns an error if the function doesn't exist.
-    pub fn leaked_function<N>(self, name: N) -> JlrsResult<LeakedValue>
-    where
-        N: TemporarySymbol,
-    {
-        self.leaked_global(name)
     }
 
     /// Convert `self` to a `LeakedValue`.

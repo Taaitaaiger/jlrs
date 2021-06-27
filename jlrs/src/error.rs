@@ -44,7 +44,7 @@ pub enum JlrsError {
     NotANamedTuple {
         type_str: String,
     },
-    NotUnicode,
+    NotUTF8,
     NotATypeLB {
         typevar_name: String,
     },
@@ -131,6 +131,10 @@ pub enum JlrsError {
         n_names: usize,
         n_values: usize,
     },
+    ArraySizeMismatch {
+        dim_size: usize,
+        vec_size: usize,
+    },
     MoreThreadsRequired,
     UndefRef,
 }
@@ -153,6 +157,13 @@ impl JlrsError {
 impl Display for JlrsError {
     fn fmt(&self, formatter: &mut Formatter) -> FmtResult {
         match self {
+            JlrsError::ArraySizeMismatch { dim_size, vec_size } => {
+                write!(
+                    formatter,
+                    "The array has {} elements, but {} have been provided",
+                    dim_size, vec_size
+                )
+            }
             JlrsError::Other(other) => write!(formatter, "An error occurred: {}", other),
             JlrsError::AlreadyInitialized => {
                 write!(formatter, "The runtime was already initialized, it can only be initialized once in a process")
@@ -169,7 +180,7 @@ impl Display for JlrsError {
             JlrsError::NotAFunction { name, ty } => {
                 write!(formatter, "{} is not a function, but a {}", name, ty)
             }
-            JlrsError::NotUnicode => write!(formatter, "The string contains invalid characters"),
+            JlrsError::NotUTF8 => write!(formatter, "The string contains invalid characters"),
             JlrsError::ConstAlreadyExists {
                 name,
                 module,

@@ -1,11 +1,7 @@
 //! Call Julia functions.
 //!
-//! This module provides the [`Call`], [`UnsafeCall`], [`CallExt`] and [`UnsafeCallExt`] traits,
-//! the methods of these four traits can be used to call Julia functions in many ways. The safe
-//! and unsafe variants of each trait provide the same functionality, but only the methods of the
-//! unsafe variant can be used when using data that is borrowed from Rust. Calling Julia functions
-//! with such data is unsafe because this data must never be assigned to a global or outlive the
-//! borrow some other way.
+//! This module provides the [`Call`] and [`CallExt`] traits, their methods can be used to call
+//! Julia functions.
 //!
 //! The methods provided by `Call` are used to call the implementor as a Julia function with zero
 //! or more positional arguments. These methods also have two variants, either the return value of
@@ -47,24 +43,21 @@ impl<'scope, 'data> WithKeywords<'scope, 'data> {
 /// trait: [`Value`], [`Function`] and [`WithKeywords`]. In Julia every value can potentially be
 /// callable as a function, there's no general way to confirm if it is because not everything that
 /// can be called is guaranteed to be a [`Function`].
-///
-/// Note that the methods of this traits do not support values that borrow data from Rust, the
-/// methods from the [`UnsafeCall`] trait must be used for such data instead.
-pub trait Call<'target, 'current, 'data>: private::Call {
+pub trait Call<'data>: private::Call {
     /// Call a function with no arguments and root the result in `scope`.
-    fn call0<S, F>(self, scope: S) -> JlrsResult<S::JuliaResult>
+    fn call0<'target, 'current, S, F>(self, scope: S) -> JlrsResult<S::JuliaResult>
     where
         S: Scope<'target, 'current, 'data, F>,
         F: Frame<'current>;
 
     /// Call a function with one argument and root the result in `scope`.
-    fn call1<S, F>(self, scope: S, arg0: Value<'_, 'data>) -> JlrsResult<S::JuliaResult>
+    fn call1<'target, 'current, S, F>(self, scope: S, arg0: Value<'_, 'data>) -> JlrsResult<S::JuliaResult>
     where
         S: Scope<'target, 'current, 'data, F>,
         F: Frame<'current>;
 
     /// Call a function with two arguments and root the result in `scope`.
-    fn call2<S, F>(
+    fn call2<'target, 'current, S, F>(
         self,
         scope: S,
         arg0: Value<'_, 'data>,
@@ -75,7 +68,7 @@ pub trait Call<'target, 'current, 'data>: private::Call {
         F: Frame<'current>;
 
     /// Call a function with three arguments and root the result in `scope`.
-    fn call3<S, F>(
+    fn call3<'target, 'current, S, F>(
         self,
         scope: S,
         arg0: Value<'_, 'data>,
@@ -87,24 +80,24 @@ pub trait Call<'target, 'current, 'data>: private::Call {
         F: Frame<'current>;
 
     /// Call a function with an arbitrary number arguments and root the result in `scope`.
-    fn call<'value, V, S, F>(self, scope: S, args: V) -> JlrsResult<S::JuliaResult>
+    fn call<'target, 'current, 'value, V, S, F>(self, scope: S, args: V) -> JlrsResult<S::JuliaResult>
     where
         V: AsMut<[Value<'value, 'data>]>,
         S: Scope<'target, 'current, 'data, F>,
         F: Frame<'current>;
 
     /// Call a function with no arguments without rooting the result.
-    fn call0_unrooted(self, _: Global<'target>) -> JuliaResultRef<'target, 'data>;
+    fn call0_unrooted<'target>(self, _: Global<'target>) -> JuliaResultRef<'target, 'data>;
 
     /// Call a function with one argument without rooting the result.
-    fn call1_unrooted(
+    fn call1_unrooted<'target>(
         self,
         _: Global<'target>,
         arg0: Value<'_, 'data>,
     ) -> JuliaResultRef<'target, 'data>;
 
     /// Call a function with two arguments without rooting the result.
-    fn call2_unrooted(
+    fn call2_unrooted<'target>(
         self,
         _: Global<'target>,
         arg0: Value<'_, 'data>,
@@ -112,7 +105,7 @@ pub trait Call<'target, 'current, 'data>: private::Call {
     ) -> JuliaResultRef<'target, 'data>;
 
     /// Call a function with three arguments without rooting the result.
-    fn call3_unrooted(
+    fn call3_unrooted<'target>(
         self,
         _: Global<'target>,
         arg0: Value<'_, 'data>,
@@ -121,7 +114,7 @@ pub trait Call<'target, 'current, 'data>: private::Call {
     ) -> JuliaResultRef<'target, 'data>;
 
     /// Call a function with an abitrary number of arguments without rooting the result.
-    fn call_unrooted<'value, V>(
+    fn call_unrooted<'target, 'value, V>(
         self,
         _: Global<'target>,
         args: V,
@@ -131,7 +124,7 @@ pub trait Call<'target, 'current, 'data>: private::Call {
 }
 
 /// Several additional methods that are only implemented by [`Function`] and [`Value`].
-pub trait CallExt<'target, 'current, 'value, 'data>: Call<'target, 'current, 'data> {
+pub trait CallExt<'target, 'current, 'value, 'data>: Call<'data> {
     /// Returns a new Julia function that prints the stacktrace if an exception is thrown.
     fn tracing_call<F>(self, frame: &mut F) -> JlrsResult<JuliaResult<'current, 'data>>
     where
@@ -190,10 +183,8 @@ pub trait CallExt<'target, 'current, 'value, 'data>: Call<'target, 'current, 'da
     fn with_keywords(self, kws: Value<'value, 'data>) -> JlrsResult<WithKeywords<'value, 'data>>;
 }
 
-impl private::Call for WithKeywords<'_, '_> {}
-
-impl<'target, 'current, 'data> Call<'target, 'current, 'data> for WithKeywords<'_, 'data> {
-    fn call0<S, F>(self, scope: S) -> JlrsResult<S::JuliaResult>
+impl<'data> Call<'data> for WithKeywords<'_, 'data> {
+    fn call0<'target, 'current, S, F>(self, scope: S) -> JlrsResult<S::JuliaResult>
     where
         S: Scope<'target, 'current, 'data, F>,
         F: Frame<'current>,
@@ -214,7 +205,7 @@ impl<'target, 'current, 'data> Call<'target, 'current, 'data> for WithKeywords<'
         }
     }
 
-    fn call1<S, F>(self, scope: S, arg0: Value<'_, 'data>) -> JlrsResult<S::JuliaResult>
+    fn call1<'target, 'current, S, F>(self, scope: S, arg0: Value<'_, 'data>) -> JlrsResult<S::JuliaResult>
     where
         S: Scope<'target, 'current, 'data, F>,
         F: Frame<'current>,
@@ -235,7 +226,7 @@ impl<'target, 'current, 'data> Call<'target, 'current, 'data> for WithKeywords<'
         }
     }
 
-    fn call2<S, F>(
+    fn call2<'target, 'current, S, F>(
         self,
         scope: S,
         arg0: Value<'_, 'data>,
@@ -261,7 +252,7 @@ impl<'target, 'current, 'data> Call<'target, 'current, 'data> for WithKeywords<'
         }
     }
 
-    fn call3<S, F>(
+    fn call3<'target, 'current, S, F>(
         self,
         scope: S,
         arg0: Value<'_, 'data>,
@@ -288,7 +279,7 @@ impl<'target, 'current, 'data> Call<'target, 'current, 'data> for WithKeywords<'
         }
     }
 
-    fn call<'value, V, S, F>(self, scope: S, mut args: V) -> JlrsResult<S::JuliaResult>
+    fn call<'target, 'current, 'value, V, S, F>(self, scope: S, mut args: V) -> JlrsResult<S::JuliaResult>
     where
         V: AsMut<[Value<'value, 'data>]>,
         S: Scope<'target, 'current, 'data, F>,
@@ -317,7 +308,7 @@ impl<'target, 'current, 'data> Call<'target, 'current, 'data> for WithKeywords<'
         }
     }
 
-    fn call0_unrooted(self, _: Global<'target>) -> JuliaResultRef<'target, 'data> {
+    fn call0_unrooted<'target>(self, _: Global<'target>) -> JuliaResultRef<'target, 'data> {
         unsafe {
             let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
             let args = &mut [self.kws, self.func];
@@ -333,7 +324,7 @@ impl<'target, 'current, 'data> Call<'target, 'current, 'data> for WithKeywords<'
         }
     }
 
-    fn call1_unrooted(
+    fn call1_unrooted<'target>(
         self,
         _: Global<'target>,
         arg0: Value<'_, 'data>,
@@ -353,7 +344,7 @@ impl<'target, 'current, 'data> Call<'target, 'current, 'data> for WithKeywords<'
         }
     }
 
-    fn call2_unrooted(
+    fn call2_unrooted<'target>(
         self,
         _: Global<'target>,
         arg0: Value<'_, 'data>,
@@ -374,7 +365,7 @@ impl<'target, 'current, 'data> Call<'target, 'current, 'data> for WithKeywords<'
         }
     }
 
-    fn call3_unrooted(
+    fn call3_unrooted<'target>(
         self,
         _: Global<'target>,
         arg0: Value<'_, 'data>,
@@ -396,7 +387,7 @@ impl<'target, 'current, 'data> Call<'target, 'current, 'data> for WithKeywords<'
         }
     }
 
-    fn call_unrooted<'value, V>(
+    fn call_unrooted<'target, 'value, V>(
         self,
         _: Global<'target>,
         mut args: V,
@@ -429,5 +420,11 @@ impl<'target, 'current, 'data> Call<'target, 'current, 'data> for WithKeywords<'
 }
 
 pub(crate) mod private {
+    use crate::wrappers::ptr::{function::Function, value::Value};
+
+    use super::WithKeywords;
     pub trait Call {}
+    impl Call for WithKeywords<'_, '_> {}
+    impl Call for Function<'_, '_> {}
+    impl Call for Value<'_, '_> {}
 }

@@ -1,4 +1,4 @@
-//! Wrapper for `Core.MethodMatch`.
+//! Wrapper for `MethodMatch`.
 //!
 //! The documentation for this module has been slightly adapted from the comments for this struct
 //! in [`julia.h`]
@@ -13,6 +13,7 @@ use crate::{
 use jl_sys::{jl_method_match_t, jl_method_match_type};
 use std::{marker::PhantomData, ptr::NonNull};
 
+/// Wrapper for `MethodMatch`.
 #[derive(Copy, Clone)]
 #[repr(transparent)]
 pub struct MethodMatch<'scope>(NonNull<jl_method_match_t>, PhantomData<&'scope ()>);

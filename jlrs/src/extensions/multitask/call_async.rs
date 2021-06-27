@@ -26,7 +26,7 @@ impl<'data> CallAsync<'data> for Value<'_, 'data> {
     where
         V: AsMut<[Value<'value, 'data>]>,
     {
-        unsafe { Ok(JuliaFuture::new(frame, self, args)?.await) }
+        Ok(JuliaFuture::new(frame, self, args)?.await)
     }
 }
 
@@ -40,6 +40,6 @@ impl<'data> CallAsync<'data> for Function<'_, 'data> {
     where
         V: AsMut<[Value<'value, 'data>]>,
     {
-        unsafe { Ok(JuliaFuture::new(frame, self.as_value(), args)?.await) }
+        Ok(JuliaFuture::new(frame, self.as_value(), args)?.await)
     }
 }

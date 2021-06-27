@@ -1,4 +1,4 @@
-//! Wrapper for `Core.MethodInstance`.
+//! Wrapper for `MethodInstance`.
 //!
 //! The documentation for this module has been slightly adapted from the comments for this struct
 //! in [`julia.h`]
@@ -15,7 +15,7 @@ use std::{marker::PhantomData, ptr::NonNull};
 
 /// This type is a placeholder to cache data for a specType signature specialization of a `Method`
 /// can can be used as a unique dictionary key representation of a call to a particular `Method`
-/// with a particular set of argument types
+/// with a particular set of argument types.
 #[derive(Copy, Clone)]
 #[repr(transparent)]
 pub struct MethodInstance<'scope>(NonNull<jl_method_instance_t>, PhantomData<&'scope ()>);

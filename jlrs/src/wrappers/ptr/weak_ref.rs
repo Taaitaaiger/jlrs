@@ -1,4 +1,4 @@
-//! Wrapper for `Core.WeakRef`.
+//! Wrapper for `WeakRef`.
 
 use super::private::Wrapper;
 use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout};

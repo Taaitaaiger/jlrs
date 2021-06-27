@@ -1,6 +1,6 @@
-//! Wrapper for `Core.Function`, the super type of all Julia functions.
+//! Wrapper for `Function`, the super type of all Julia functions.
 //!
-//! All Julia functions are subtypes of `Core.Function`, a function can be called with the methods
+//! All Julia functions are subtypes of `Function`, a function can be called with the methods
 //! of the [`Call`] trait. Note that you don't need to cast a [`Value`] to a [`Function`] in order
 //! to call it because [`Value`] also implements [`Call`].
 //!
@@ -10,7 +10,7 @@ use jl_sys::jl_value_t;
 use std::{marker::PhantomData, ptr::NonNull};
 
 use super::{
-    call::{private::Call as CallPriv, Call, CallExt, WithKeywords},
+    call::{Call, CallExt, WithKeywords},
     datatype::DataType,
     private::Wrapper as WrapperPriv,
     value::Value,
@@ -27,6 +27,7 @@ use crate::{
     private::Private,
 };
 
+/// A Julia function.
 #[derive(Clone, Copy)]
 #[repr(transparent)]
 pub struct Function<'scope, 'data> {
@@ -75,10 +76,8 @@ impl<'scope, 'data> WrapperPriv<'scope, 'data> for Function<'scope, 'data> {
     }
 }
 
-impl CallPriv for Function<'_, '_> {}
-
-impl<'target, 'current, 'data> Call<'target, 'current, 'data> for Function<'_, 'data> {
-    fn call0<S, F>(self, scope: S) -> JlrsResult<S::JuliaResult>
+impl<'data> Call<'data> for Function<'_, 'data> {
+    fn call0<'target, 'current, S, F>(self, scope: S) -> JlrsResult<S::JuliaResult>
     where
         S: Scope<'target, 'current, 'data, F>,
         F: Frame<'current>,
@@ -86,7 +85,7 @@ impl<'target, 'current, 'data> Call<'target, 'current, 'data> for Function<'_, '
         self.as_value().call0(scope)
     }
 
-    fn call1<S, F>(self, scope: S, arg0: Value<'_, 'data>) -> JlrsResult<S::JuliaResult>
+    fn call1<'target, 'current, S, F>(self, scope: S, arg0: Value<'_, 'data>) -> JlrsResult<S::JuliaResult>
     where
         S: Scope<'target, 'current, 'data, F>,
         F: Frame<'current>,
@@ -94,7 +93,7 @@ impl<'target, 'current, 'data> Call<'target, 'current, 'data> for Function<'_, '
         self.as_value().call1(scope, arg0)
     }
 
-    fn call2<S, F>(
+    fn call2<'target, 'current, S, F>(
         self,
         scope: S,
         arg0: Value<'_, 'data>,
@@ -107,7 +106,7 @@ impl<'target, 'current, 'data> Call<'target, 'current, 'data> for Function<'_, '
         self.as_value().call2(scope, arg0, arg1)
     }
 
-    fn call3<S, F>(
+    fn call3<'target, 'current, S, F>(
         self,
         scope: S,
         arg0: Value<'_, 'data>,
@@ -121,7 +120,7 @@ impl<'target, 'current, 'data> Call<'target, 'current, 'data> for Function<'_, '
         self.as_value().call3(scope, arg0, arg1, arg2)
     }
 
-    fn call<'value, V, S, F>(self, scope: S, args: V) -> JlrsResult<S::JuliaResult>
+    fn call<'target, 'current, 'value, V, S, F>(self, scope: S, args: V) -> JlrsResult<S::JuliaResult>
     where
         V: AsMut<[Value<'value, 'data>]>,
         S: Scope<'target, 'current, 'data, F>,
@@ -130,11 +129,11 @@ impl<'target, 'current, 'data> Call<'target, 'current, 'data> for Function<'_, '
         self.as_value().call(scope, args)
     }
 
-    fn call0_unrooted(self, global: Global<'target>) -> JuliaResultRef<'target, 'data> {
+    fn call0_unrooted<'target>(self, global: Global<'target>) -> JuliaResultRef<'target, 'data> {
         self.as_value().call0_unrooted(global)
     }
 
-    fn call1_unrooted(
+    fn call1_unrooted<'target>(
         self,
         global: Global<'target>,
         arg0: Value<'_, 'data>,
@@ -142,7 +141,7 @@ impl<'target, 'current, 'data> Call<'target, 'current, 'data> for Function<'_, '
         self.as_value().call1_unrooted(global, arg0)
     }
 
-    fn call2_unrooted(
+    fn call2_unrooted<'target>(
         self,
         global: Global<'target>,
         arg0: Value<'_, 'data>,
@@ -151,7 +150,7 @@ impl<'target, 'current, 'data> Call<'target, 'current, 'data> for Function<'_, '
         self.as_value().call2_unrooted(global, arg0, arg1)
     }
 
-    fn call3_unrooted(
+    fn call3_unrooted<'target>(
         self,
         global: Global<'target>,
         arg0: Value<'_, 'data>,
@@ -161,7 +160,7 @@ impl<'target, 'current, 'data> Call<'target, 'current, 'data> for Function<'_, '
         self.as_value().call3_unrooted(global, arg0, arg1, arg2)
     }
 
-    fn call_unrooted<'value, V>(
+    fn call_unrooted<'target, 'value, V>(
         self,
         global: Global<'target>,
         args: V,

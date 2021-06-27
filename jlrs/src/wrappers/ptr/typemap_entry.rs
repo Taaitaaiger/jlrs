@@ -1,4 +1,4 @@
-//! Wrapper for `Core.TypeMapEntry`.
+//! Wrapper for `TypeMapEntry`.
 //!
 //! The documentation for this module has been slightly adapted from the comments for this struct
 //! in [`julia.h`]

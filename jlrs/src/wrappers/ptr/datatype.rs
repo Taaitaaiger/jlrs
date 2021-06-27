@@ -1,14 +1,4 @@
-//! Wrapper for `Core.DataType`, which provides access to type properties.
-//!
-//! Julia has an optional typing system. The type information of a [`Value`] is available at
-//! runtime. Additionally, a value can hold type information as its contents. For example:
-//!
-//! ```julia
-//! truth = true
-//! truthtype = typeof(truth)
-//! @assert(truthtype == Bool)
-//! @assert(truthtype isa DataType)
-//! ```
+//! Wrapper for `DataType`, which provides access to type properties.
 
 use super::{
     array::Array, private::Wrapper as WrapperPriv, DataTypeRef, SimpleVectorRef, TypeNameRef,
@@ -23,8 +13,7 @@ use crate::{
     error::{JlrsError, JlrsResult},
     memory::scope::Scope,
 };
-use crate::{impl_debug, impl_valid_layout};
-use crate::{memory::global::Global, private::Private};
+use crate::{impl_debug, impl_valid_layout, memory::global::Global, private::Private};
 use jl_sys::{
     jl_abstractslot_type, jl_abstractstring_type, jl_any_type, jl_anytuple_type,
     jl_argumenterror_type, jl_bool_type, jl_boundserror_type, jl_builtin_type, jl_char_type,
@@ -44,31 +33,11 @@ use jl_sys::{
     jl_uint32_type, jl_uint64_type, jl_uint8_type, jl_undefvarerror_type, jl_unionall_type,
     jl_uniontype_type, jl_upsilonnode_type, jl_voidpointer_type, jl_weakref_type,
 };
-use std::ffi::CStr;
+use std::{ffi::CStr, marker::PhantomData, ptr::NonNull};
 
-use std::marker::PhantomData;
-use std::ptr::NonNull;
 /// Julia type information. You can acquire a [`Value`]'s datatype by by calling
-/// [`Value::datatype`].It can be used in combination with [`DataType::is`] and [`Value::is`], if
-/// the check returns `true` the [`Value`] can be cast to `DataType`:
-///
-/// ```
-/// # use jlrs::prelude::*;
-/// # use jlrs::util::JULIA;
-/// # fn main() {
-/// # JULIA.with(|j| {
-/// # let mut julia = j.borrow_mut();
-/// julia.scope(|global, frame| {
-///     let val = Value::new(&mut *frame, 1u8)?;
-///     let typeof_func = Module::core(global).function(&mut *frame, "typeof")?;
-///     let ty_val = typeof_func.call1(&mut *frame, val)?.unwrap();
-///     assert!(ty_val.is::<DataType>());
-///     assert!(ty_val.cast::<DataType>().is_ok());
-///     Ok(())
-/// }).unwrap();
-/// # });
-/// # }
-/// ```
+/// [`Value::datatype`]. If a `DataType` is concrete and not a subtype of `Array` a new instance
+/// can be created with [`DataType::instantiate`].
 #[derive(Copy, Clone)]
 #[repr(transparent)]
 pub struct DataType<'scope>(NonNull<jl_datatype_t>, PhantomData<&'scope ()>);
@@ -200,7 +169,7 @@ impl<'scope> DataType<'scope> {
 }
 
 impl<'scope> DataType<'scope> {
-    /// Performs the given typecheck.
+    /// Performs the given typecheck on this type.
     pub fn is<T: Typecheck>(self) -> bool {
         T::typecheck(self)
     }
@@ -246,8 +215,8 @@ impl<'scope> DataType<'scope> {
     /// Create a new instance of this `DataType`, using `values` to set the fields.
     /// This is essentially a more powerful version of [`Value::new`] that can instantiate
     /// arbitrary concrete `DataType`s, at the cost that each of its fields must have already been
-    /// allocated as a `Value`. This functions returns an error if the given `DataType` is not
-    /// concrete or an array type.
+    /// allocated as a `Value`. This functions returns an error if the given `DataType` isn't
+    /// concrete or is an array type. For custom array types you must use [`Array::new_for`].
     pub fn instantiate<'target, 'fr, 'value, 'borrow, S, F, V>(
         self,
         scope: S,
@@ -357,7 +326,7 @@ impl<'base> DataType<'base> {
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_symbol_type), Private) }
     }
 
-    /// The type `Core.SSAValue`.
+    /// The type `SSAValue`.
     pub fn ssavalue_type(_: Global<'base>) -> Self {
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_ssavalue_type), Private) }
     }
@@ -377,7 +346,7 @@ impl<'base> DataType<'base> {
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_typedslot_type), Private) }
     }
 
-    /// The type `SimpleVector`, or `SVec`.
+    /// The type `SimpleVector`.
     pub fn simplevector_type(_: Global<'base>) -> Self {
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_simplevector_type), Private) }
     }

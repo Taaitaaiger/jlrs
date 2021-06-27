@@ -1,4 +1,4 @@
-//! N-dimensional index.
+//! N-dimensional indexing.
 //!
 //! In order to access the data of an n-dimensional array, you'll need to use an n-dimensional
 //! index. This functionality is provided by the [`Dims`] trait, any implementor of this trait
@@ -310,7 +310,7 @@ impl Dims for Dimensions {
 
 impl Debug for Dimensions {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        let mut f = f.debug_tuple("");
+        let mut f = f.debug_tuple("Dimensions");
 
         for d in self.as_slice() {
             f.field(&d);
@@ -322,13 +322,7 @@ impl Debug for Dimensions {
 
 impl Display for Dimensions {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        let mut f = f.debug_tuple("");
-
-        for d in self.as_slice() {
-            f.field(&d);
-        }
-
-        f.finish()
+        <Self as Debug>::fmt(self, f)
     }
 }
 

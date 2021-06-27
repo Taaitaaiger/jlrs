@@ -1,4 +1,4 @@
-//! Wrappers for `Core.Array`, support for accessing n-dimensional Julia arrays from Rust.
+//! Wrappers for `Array`, create and access n-dimensional Julia arrays from Rust.
 //!
 //! You will find two wrappers in this module that can be used to work with Julia arrays from
 //! Rust. An [`Array`] is the Julia array itself, [`TypedArray`] is also available which can be
@@ -14,11 +14,12 @@
 //!
 //! How the contents of the array must be accessed from Rust depends on the type of the elements.
 //! [`Array`] provides methods to (mutably) access their contents for all three possible
-//! "layouts": inline, value, and bits unions.
+//! "layouts" of the elements: inline, pointer, and bits union.
 //!
-//! The [`Dims`] trait is available to work with n-dimensional indexes for these arrays. This
-//! trait is implemented for tuples for arrays with four or fewer dimensions, and for
-//! all arrays and array slices in Rust.
+//! Accessing the contents of an array requires an n-dimensional index. The [`Dims`] trait is
+//! available for this purpose. This trait is implemented for tuples of four or fewer `usize`s;
+//! `[usize; N]` and `&[usize; N]` implement it for all `N`, `&[usize]` can be used if `N` is not
+//! a constant at compile time.
 
 use crate::{
     convert::into_julia::IntoJulia,
@@ -237,7 +238,7 @@ impl<'data> Array<'_, 'data> {
     }
 
     /// Borrows an n-dimensional array from Rust for use in Julia with dimensions `dims`. If
-    /// `dims = (4, 2)` a two-dimensional array with 4 rows and 2 columns is created.
+    /// `dims` = (4, 2)` a two-dimensional array with 4 rows and 2 columns is created.
     pub fn from_slice<'target, 'current, T, D, S, F>(
         scope: S,
         data: &'data mut [T],
@@ -249,6 +250,13 @@ impl<'data> Array<'_, 'data> {
         S: Scope<'target, 'current, 'data, F>,
         F: Frame<'current>,
     {
+        if dims.size() != data.len() {
+            Err(JlrsError::ArraySizeMismatch {
+                vec_size: data.len(),
+                dim_size: dims.size(),
+            })?;
+        }
+
         unsafe {
             let global = scope.global();
             let array_type =
@@ -314,6 +322,13 @@ impl<'data> Array<'_, 'data> {
         S: Scope<'target, 'current, 'static, F>,
         F: Frame<'current>,
     {
+        if dims.size() != data.len() {
+            Err(JlrsError::ArraySizeMismatch {
+                vec_size: data.len(),
+                dim_size: dims.size(),
+            })?;
+        }
+
         unsafe {
             let global = scope.global();
             let finalizer = Module::main(global)
@@ -876,6 +891,13 @@ where
         S: Scope<'target, 'current, 'data, F>,
         F: Frame<'current>,
     {
+        if dims.size() != data.len() {
+            Err(JlrsError::ArraySizeMismatch {
+                vec_size: data.len(),
+                dim_size: dims.size(),
+            })?;
+        }
+
         unsafe {
             let global = scope.global();
             let array_type =
@@ -940,6 +962,13 @@ where
         S: Scope<'target, 'current, 'static, F>,
         F: Frame<'current>,
     {
+        if dims.size() != data.len() {
+            Err(JlrsError::ArraySizeMismatch {
+                vec_size: data.len(),
+                dim_size: dims.size(),
+            })?;
+        }
+
         unsafe {
             let global = scope.global();
             let finalizer = Module::main(global)
@@ -1127,88 +1156,84 @@ impl<'scope, 'data, T: Clone + ValidLayout + Debug> TypedArray<'scope, 'data, T>
 }
 
 impl<'scope, 'data, T: Wrapper<'scope, 'data> + ValidLayout> TypedArray<'scope, 'data, T> {
-    /// Immutably borrow the data of this array of values, you can borrow data from multiple
-    /// arrays at the same time. The values themselves can be mutable, but you can't replace an
-    /// element with another value. Returns `JlrsError::Inline` if the data is stored inline.
+    /// Immutably borrow the data of this array as an array of values, you can borrow data
+    /// from multiple arrays at the same time.
     pub fn value_data<'borrow, 'frame, F>(
         self,
         frame: &'borrow F,
-    ) -> JlrsResult<ValueArrayData<'borrow, 'scope, 'data>>
+    ) -> ValueArrayData<'borrow, 'scope, 'data>
     where
         F: Frame<'frame>,
     {
-        unsafe { Ok(ValueArrayData::new(self.as_array(), frame)) }
+        unsafe { ValueArrayData::new(self.as_array(), frame) }
     }
 
     /// Immutably borrow the data of this array of wrappers, you can borrow data from multiple
-    /// arrays at the same time. The values themselves can be mutable, but you can't replace an
-    /// element with another value. Returns `JlrsError::Inline` if the data is stored inline.
+    /// arrays at the same time.
     pub fn wrapper_data<'borrow, 'frame, F>(
         self,
         frame: &'borrow F,
-    ) -> JlrsResult<ValueArrayData<'borrow, 'scope, 'data, T>>
+    ) -> ValueArrayData<'borrow, 'scope, 'data, T>
     where
         F: Frame<'frame>,
     {
-        unsafe { Ok(ValueArrayData::new(self.as_array(), frame)) }
+        unsafe { ValueArrayData::new(self.as_array(), frame) }
     }
 
-    /// Mutably borrow the data of this array of values, you can mutably borrow a single array at
-    /// the same time. Returns `JlrsError::Inline` if the data is stored inline.
+    /// Mutably borrow the data of this array as an array of values, you can mutably borrow a
+    /// single array at the same time.
     pub fn value_data_mut<'borrow, 'frame, F>(
         self,
         frame: &'borrow mut F,
-    ) -> JlrsResult<ValueArrayDataMut<'borrow, 'scope, 'data>>
+    ) -> ValueArrayDataMut<'borrow, 'scope, 'data>
     where
         F: Frame<'frame>,
     {
-        unsafe { Ok(ValueArrayDataMut::new(self.as_array(), frame)) }
+        unsafe { ValueArrayDataMut::new(self.as_array(), frame) }
     }
 
     /// Mutably borrow the data of this array of wrappers, you can mutably borrow a single array
-    /// at the same time. Returns `JlrsError::Inline` if the data is stored inline.
+    /// at the same time.
     pub fn wrapper_data_mut<'borrow, 'frame, F>(
         self,
         frame: &'borrow mut F,
-    ) -> JlrsResult<ValueArrayDataMut<'borrow, 'scope, 'data, T>>
+    ) -> ValueArrayDataMut<'borrow, 'scope, 'data, T>
     where
         F: Frame<'frame>,
     {
-        unsafe { Ok(ValueArrayDataMut::new(self.as_array(), frame)) }
+        unsafe { ValueArrayDataMut::new(self.as_array(), frame) }
     }
 
-    /// Mutably borrow the data of this array of values without the restriction that only a single
-    /// array can be mutably borrowed. It's your responsibility to ensure you don't create
-    /// multiple mutable references to the same array data. Returns `JlrsError::Inline` if the
-    /// data is stored inline.
+    /// Mutably borrow the data of this array as an array of values without the restriction that
+    /// only a single array can be mutably borrowed. It's your responsibility to ensure you don't
+    /// create multiple mutable references to the same array data.
     pub unsafe fn unrestricted_value_data_mut<'borrow, 'frame, F>(
         self,
         frame: &'borrow F,
-    ) -> JlrsResult<UnrestrictedValueArrayDataMut<'borrow, 'scope, 'data>>
+    ) -> UnrestrictedValueArrayDataMut<'borrow, 'scope, 'data>
     where
         F: Frame<'frame>,
     {
-        Ok(UnrestrictedValueArrayDataMut::new(
+        UnrestrictedValueArrayDataMut::new(
             Array::wrap_non_null(self.unwrap_non_null(Private), Private),
             frame,
-        ))
+        )
     }
 
     /// Mutably borrow the data of this array of wrappers without the restriction that only a
     /// single array can be mutably borrowed. It's your responsibility to ensure you don't create
-    /// multiple mutable references to the same array data. Returns `JlrsError::Inline` if the
-    /// data is stored inline.
+    /// multiple mutable references to the same array data.
     pub unsafe fn unrestricted_wrapper_data_mut<'borrow, 'frame, F>(
         self,
         frame: &'borrow F,
-    ) -> JlrsResult<UnrestrictedValueArrayDataMut<'borrow, 'scope, 'data, T>>
+    ) -> UnrestrictedValueArrayDataMut<'borrow, 'scope, 'data, T>
     where
         F: Frame<'frame>,
     {
-        Ok(UnrestrictedValueArrayDataMut::new(
+        UnrestrictedValueArrayDataMut::new(
             Array::wrap_non_null(self.unwrap_non_null(Private), Private),
             frame,
-        ))
+        )
     }
 }
 

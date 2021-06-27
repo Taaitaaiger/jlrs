@@ -24,10 +24,10 @@ fn access_raw_fields_bits() {
                 .cast::<DataType>()?
                 .instantiate(&mut *frame, &mut [arg1, arg2])?;
 
-            let a = instance.unbox_field::<i16, _>("a")?;
+            let a = instance.raw_field::<i16, _>("a")?;
             assert_eq!(a, 3);
 
-            let b = instance.unbox_field::<i32, _>("b")?;
+            let b = instance.raw_field::<i32, _>("b")?;
             assert_eq!(b, -3);
 
             Ok(())
@@ -58,10 +58,10 @@ fn access_raw_fields_bits_and_ptr() {
                 .cast::<DataType>()?
                 .instantiate(&mut *frame, &mut [arg1, arg2.as_value()])?;
 
-            let a = instance.unbox_field::<i16, _>("a")?;
+            let a = instance.raw_field::<i16, _>("a")?;
             assert_eq!(a, 3);
 
-            let b = instance.unbox_field::<DataTypeRef, _>("b")?;
+            let b = instance.raw_field::<DataTypeRef, _>("b")?;
             assert_eq!(unsafe { b.wrapper_unchecked() }, arg2);
 
             Ok(())
@@ -92,10 +92,10 @@ fn access_raw_fields_bits_and_bits_union() {
                 .cast::<DataType>()?
                 .instantiate(&mut *frame, &mut [arg1, arg2])?;
 
-            let a = instance.unbox_field::<i16, _>("a")?;
+            let a = instance.raw_field::<i16, _>("a")?;
             assert_eq!(a, 3);
 
-            let b = instance.unbox_field::<i32, _>("b")?;
+            let b = instance.raw_field::<i32, _>("b")?;
             assert_eq!(b, -3);
 
             Ok(())
@@ -126,10 +126,10 @@ fn access_raw_fields_ptr_and_bits_union() {
                 .cast::<DataType>()?
                 .instantiate(&mut *frame, &mut [arg1.as_value(), arg2])?;
 
-            let a = instance.unbox_field::<DataTypeRef, _>("a")?;
+            let a = instance.raw_field::<DataTypeRef, _>("a")?;
             assert_eq!(unsafe { a.wrapper_unchecked() }, arg1);
 
-            let b = instance.unbox_field::<i32, _>("b")?;
+            let b = instance.raw_field::<i32, _>("b")?;
             assert_eq!(b, -3);
 
             Ok(())
@@ -160,10 +160,10 @@ fn access_raw_fields_ptr_and_non_bits_union() {
                 .cast::<DataType>()?
                 .instantiate(&mut *frame, &mut [arg1.as_value(), arg2])?;
 
-            let a = instance.unbox_field::<DataTypeRef, _>("a")?;
+            let a = instance.raw_field::<DataTypeRef, _>("a")?;
             assert_eq!(unsafe { a.wrapper_unchecked() }, arg1);
 
-            let b = instance.unbox_field::<ValueRef, _>("b")?;
+            let b = instance.raw_field::<ValueRef, _>("b")?;
             let v = unsafe { b.value_unchecked().unbox::<i32>() }?;
             assert_eq!(v, -3);
 
@@ -195,9 +195,9 @@ fn access_raw_fields_wrong_ty() {
                 .cast::<DataType>()?
                 .instantiate(&mut *frame, &mut [arg1.as_value(), arg2])?;
 
-            assert!(instance.unbox_field::<ArrayRef, _>("a").is_err());
+            assert!(instance.raw_field::<ArrayRef, _>("a").is_err());
 
-            let b = instance.unbox_field::<ValueRef, _>("b")?;
+            let b = instance.raw_field::<ValueRef, _>("b")?;
             assert!(unsafe { b.value_unchecked().unbox::<i16>() }.is_err());
 
             Ok(())
@@ -225,9 +225,9 @@ fn access_array_field() {
                 .cast::<DataType>()?
                 .instantiate(&mut *frame, &mut [arg1])?;
 
-            assert!(instance.unbox_field::<ArrayRef, _>("a").is_ok());
-            assert!(instance.unbox_field::<TypedArrayRef<f64>, _>("a").is_ok());
-            assert!(instance.unbox_field::<TypedArrayRef<f32>, _>("a").is_err());
+            assert!(instance.raw_field::<ArrayRef, _>("a").is_ok());
+            assert!(instance.raw_field::<TypedArrayRef<f64>, _>("a").is_ok());
+            assert!(instance.raw_field::<TypedArrayRef<f32>, _>("a").is_err());
 
             Ok(())
         })
@@ -253,9 +253,9 @@ fn access_ua_array_field() {
                 .cast::<DataType>()?
                 .instantiate(&mut *frame, &mut [arg1])?;
 
-            assert!(instance.unbox_field::<ArrayRef, _>("a").is_ok());
-            assert!(instance.unbox_field::<TypedArrayRef<f64>, _>("a").is_ok());
-            assert!(instance.unbox_field::<TypedArrayRef<f32>, _>("a").is_err());
+            assert!(instance.raw_field::<ArrayRef, _>("a").is_ok());
+            assert!(instance.raw_field::<TypedArrayRef<f64>, _>("a").is_ok());
+            assert!(instance.raw_field::<TypedArrayRef<f32>, _>("a").is_err());
 
             Ok(())
         })
@@ -285,7 +285,7 @@ fn access_raw_fields_nonexistent_name() {
                 .cast::<DataType>()?
                 .instantiate(&mut *frame, &mut [arg1.as_value(), arg2])?;
 
-            assert!(instance.unbox_field::<DataTypeRef, _>("c").is_err());
+            assert!(instance.raw_field::<DataTypeRef, _>("c").is_err());
             Ok(())
         })
         .unwrap();

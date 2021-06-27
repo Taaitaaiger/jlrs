@@ -1,7 +1,7 @@
 //! Reexports structs and traits you're likely to need.
 
 pub use crate::{
-    convert::into_jlrs_result::IntoJlrsResult,
+    convert::{as_unrooted::AsUnrooted, into_jlrs_result::IntoJlrsResult},
     error::{JlrsResult, JuliaResult},
     layout::typecheck::Nothing,
     memory::{
@@ -31,8 +31,7 @@ pub use jlrs_derive::*;
 
 #[cfg(feature = "async")]
 pub use crate::extensions::multitask::{
-    as_unrooted::AsUnrooted, async_frame::AsyncGcFrame, async_task::AsyncTask,
-    call_async::CallAsync, AsyncJulia,
+    async_frame::AsyncGcFrame, async_task::AsyncTask, call_async::CallAsync, AsyncJulia,
 };
 #[cfg(feature = "async")]
 pub use async_trait::async_trait;

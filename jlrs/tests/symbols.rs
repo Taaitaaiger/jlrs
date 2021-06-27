@@ -76,3 +76,17 @@ fn symbols_are_not_collected() {
         .unwrap();
     })
 }
+
+#[test]
+fn jl_string_as_symbol() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+        jlrs.scope_with_slots(1, |global, frame| {
+            let string = JuliaString::new(&mut *frame, "+")?.cast::<JuliaString>()?;
+            assert!(Module::base(global).function_ref(string).is_ok());
+
+            Ok(())
+        })
+        .unwrap();
+    })
+}

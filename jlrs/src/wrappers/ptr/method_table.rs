@@ -1,4 +1,4 @@
-//! Wrapper for `Core.MethodTable`.
+//! Wrapper for `MethodTable`.
 //!
 //! The documentation for this module has been slightly adapted from the comments for this struct
 //! in [`julia.h`]

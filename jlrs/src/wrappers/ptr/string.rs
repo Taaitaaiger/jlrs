@@ -1,4 +1,4 @@
-//! Wrapper for `Core.String`.
+//! Wrapper for `String`.
 
 use crate::error::{JlrsError, JlrsResult};
 use crate::memory::frame::Frame;
@@ -8,14 +8,14 @@ use crate::wrappers::ptr::{private::Wrapper as WrapperPriv, value::Value, String
 use crate::{convert::unbox::Unbox, private::Private};
 use crate::{impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_pchar_to_string, jl_string_type};
-use std::mem;
 use std::{ffi::CStr, ptr::NonNull};
 use std::{
     fmt::{Debug, Formatter, Result as FmtResult},
     marker::PhantomData,
+    mem, str,
 };
 
-/// A raw Julia string.
+/// A Julia string.
 #[derive(Copy, Clone)]
 #[repr(transparent)]
 pub struct JuliaString<'scope>(*const u8, PhantomData<&'scope ()>);
@@ -71,12 +71,12 @@ impl<'scope> JuliaString<'scope> {
     /// Returns the string as a string slice, or an error if it the string contains
     /// invalid characters
     pub fn as_str(self) -> JlrsResult<&'scope str> {
-        Ok(std::str::from_utf8(self.as_slice()).or(Err(JlrsError::NotUnicode))?)
+        Ok(str::from_utf8(self.as_slice()).or(Err(JlrsError::NotUTF8))?)
     }
 
     /// Returns the string as a string slice without checking if the string is properly encoded.
     pub unsafe fn as_str_unchecked(self) -> &'scope str {
-        std::str::from_utf8_unchecked(self.as_slice())
+        str::from_utf8_unchecked(self.as_slice())
     }
 }
 
@@ -88,7 +88,7 @@ unsafe impl<'scope> Unbox for JuliaString<'scope> {
     type Output = Result<String, Vec<u8>>;
     unsafe fn unbox(value: Value) -> Self::Output {
         let slice = value.cast_unchecked::<JuliaString>().as_slice();
-        std::str::from_utf8(slice)
+        str::from_utf8(slice)
             .map(String::from)
             .map_err(|_| slice.into())
     }
@@ -116,6 +116,6 @@ impl<'scope> WrapperPriv<'scope, '_> for JuliaString<'scope> {
     }
 
     unsafe fn unwrap_non_null(self, _: Private) -> NonNull<Self::Internal> {
-        std::mem::transmute(self.0)
+        mem::transmute(self.0)
     }
 }

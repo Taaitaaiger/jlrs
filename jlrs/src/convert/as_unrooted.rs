@@ -1,4 +1,4 @@
-//! Convert a rooted value or function call result to its unrooted counterpart.
+//! Convert a rooted value or result to its unrooted counterpart.
 //!
 //! When the async runtime is used, it can be useful to use [`AsyncGcFrame::async_value_scope`] or
 //! [`AsyncGcFrame::async_result_scope`] in order to ensure temporary values can be freed by the

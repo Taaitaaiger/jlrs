@@ -24,9 +24,9 @@
 //! the remaining capacity is insufficient more stack space is allocated, this doesn't  affect the
 //! existing frames.
 //!
-//! [`Scope::value_scope`]: crate::memory::traits::scope::Scope::value_scope
-//! [`Scope::result_scope`]: crate::memory::traits::scope::Scope::result_scope
-//! [`ScopeExt::scope`]: crate::memory::traits::scope::ScopeExt::scope
+//! [`Scope::value_scope`]: crate::memory::scope::Scope::value_scope
+//! [`Scope::result_scope`]: crate::memory::scope::Scope::result_scope
+//! [`ScopeExt::scope`]: crate::memory::scope::ScopeExt::scope
 
 use super::{mode::Mode, stack_page::StackPage};
 use crate::{private::Private, CCall};
@@ -157,7 +157,7 @@ pub trait Frame<'frame>: private::Frame<'frame> {
     /// This method takes a mutable reference to a frame and returns it; this method can be used
     /// as an alternative to reborrowing a frame with `&mut *frame` when a [`Scope`] is needed.
     ///
-    /// [`Scope`]: crate::memory::traits::scope::Scope
+    /// [`Scope`]: crate::memory::scope::Scope
     fn as_scope(&mut self) -> &mut Self {
         self
     }

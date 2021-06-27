@@ -8,7 +8,6 @@
 //! the `JULIA_NUM_THREADS` environment variable. In order to create tasks that can be executed
 //! you must implement the [`AsyncTask`] trait.
 
-pub mod as_unrooted;
 pub mod async_frame;
 pub mod async_task;
 pub mod call_async;

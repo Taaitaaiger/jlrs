@@ -1,44 +1,22 @@
 //! Wrappers for builtin pointer types.
 //!
-//! Some of the most important types in Julia are builtin pointer types, these are types that are
-//! defined in C rather than pure Julia. When such types are used as the field types of a struct
-//! they're stored as a pointer rather than inline. Rather than dealing with raw pointers to data
-//! to such types, jlrs provides wrappers with lifetimes that ensure they can only be used while
-//! they're guaranteed to be reachable by the garbage collector. While there are more than twenty
-//! of these wrapper types, most of them are available for completeness sake and can be ignored.
+//! In this module you'll find wrappers for all builtin pointer types. These are types like
+//! [`Module`], [`DataType`], and [`Array`]. These types often provide access to some specific
+//! functionality from the C API. For example, the [`Module`] wrapper provides access to the
+//! contents of Julia modules, and the [`Array`] wrapper access to the contents of n-dimensional
+//! Julia arrays.
 //!
-//! All wrappers implement the [`Wrapper`] trait. The most important wrappers are
-//! [`Value`], [`Module`] and [`Array`]. The first of these represents generic Julia
-//! data. For example, when you call a Julia function its arguments must be `Value`s and it will
-//! return one, too. A significant part of the Julia C API is available through methods
-//! implemented by this type, including methods are available to create new values, access their
-//! fields and convert them to other types. See the [`value`] module for more information.
+//! The most common of these wrappers is [`Value`], it represents some arbitrary data that Julia
+//! can use. Whenever you call a Julia function its arguments must be of this type, and a new one
+//! is returned. All pointer wrappers are valid [`Value`]s.
 //!
-//! In order to even call a Julia function, though, we need to have one first. All Julia functions
-//! are defined in some module, you will need to use [`Module`] which provides access to their
-//! contents. Anything that implements [`Call`] or [`UnsafeCall`] can be called as a Julia
-//! function.
+//! One useful guarantee provided by wrappers is that they point to an existing value and are
+//! rooted. If a wrapper is returned that isn't rooted, jlrs will return a [`Ref`]. Unlike a
+//! wrapper a ref can be undefined, and since it's not rooted it's not guaranteed to remain valid
+//! while it can be used. For more information about rooting please see the documentation of the
+//! [`memory`] module.
 //!
-//! The [`Array`] wrapper lets you work with Julia's n-dimensional array type. This wrapper is
-//! rarely returned directly. Rather, if a [`Value`] is an array, it can be cast to `Array` by
-//! calling [`Value::cast`]. This method can generally be used to convert a `Value` to some
-//! other wrapper if the value is of that type. Similarly, all these types can be converted back
-//! to a `Value` by calling [`Wrapper::as_value`].
-//!
-//! Other wrappers you are likely to use are [`Function`], a wrapper for Julia functions;
-//! [`DataType`], a wrapper for a value's type information; and [`JuliaString`], Julia's internal
-//! string-type.
-//!
-//! Whenever jlrs returns a wrapper directly, it's guaranteed that the wrapper is rooted while it
-//! can be used. Rooting data you're using isn't always necessary, though. For example, a function
-//! defined in some module doesn't need to be rooted as long as you can guarantee that it's never
-//! used after the module replaced. If you never replace the module, the function can safely be
-//! used without rooting it. It's also possible that you want to call a function but don't care
-//! about its return value (the function might always return `nothing`). Finally, any pointer
-//! field of a value that can be reached through some root is itself reachable, so it doesn't need
-//! to be rooted as long as you can guarantee the value won't become unreachable due to mutation.
-//! The [`Ref`] struct and its aliases defined in this module are available for these
-//! purposes.
+//! [`memory`]: crate::memory
 
 pub mod array;
 pub mod call;
@@ -55,7 +33,6 @@ pub mod simple_vector;
 pub mod string;
 pub mod symbol;
 pub mod task;
-pub mod traits;
 pub mod type_name;
 pub mod type_var;
 pub mod typemap_entry;
@@ -117,7 +94,7 @@ macro_rules! impl_valid_layout {
     };
 }
 
-/// Generic behavior shared by all wrappers.
+/// Methods shared by all builtin pointer wrappers.
 pub trait Wrapper<'scope, 'data>: private::Wrapper<'scope, 'data> {
     /// The reference type associated with this wrapper.
     type Ref;
@@ -185,43 +162,13 @@ macro_rules! impl_debug {
     };
 }
 
-/// A possibly undefined or dangling, unrooted reference to Julia data.
+/// An unrooted reference to Julia data.
 ///
-/// When dealing with Julia data from Rust care must be taken that the garbage collector doesn't
-/// free data that is still in use. Normally when you create Julia data with jlrs, the result is
-/// returned as a `Value` which is explicitly rooted in a frame. These values can have fields,
-/// the contents of each field are either stored inline or as a pointer. For example, a field that
-/// contains a `UInt8` is stored inline, while a field that's untyped is stored as a pointer to
-/// its contents. All wrapper types, such as `Array` and `Module` are generally stored as pointers
-/// when they're used as fields.
-///
-/// When a field is stored as a pointer, the data that is pointed to is either valid Julia data
-/// itself, or an undefined reference. An easy way to see this in action is through the `instance`
-/// field of a `DataType`:
-///
-/// ```ignore
-/// julia> println(Nothing.instance)
-/// nothing
-///
-/// julia> println(DataType.instance)
-/// ERROR: UndefRefError: access to undefined reference
-/// Stacktrace:
-///  [1] getproperty(x::Type, f::Symbol)
-///    @ Base ./Base.jl:28
-///  [2] top-level scope
-///    @ REPL[13]:1
-/// ```
-///
-/// An undefined reference is stored as a null pointer, and as you can see in the example above
-/// trying to use an undefined reference causes an error. If it does point to valid Julia data
-/// and the parent is rooted, the garbage collector wil not free that data until the parent is
-/// no longer rooted. Similarly, if the data it points to contains pointer fields itself those
-/// will also be protected.
-///
-/// This means that any pointer field can normally be used as a `Value` with the same lifetimes as
-/// its parent as long as it's not an undefined reference, but there's one important restriction
-/// that must be taken into account: Julia data can be mutable and this can cause a `Ref` that is
-/// in use to become unreachable from any root.
+/// Pointer wrappers are generally guaranteed to wrap valid, rooted data. In some cases this
+/// guarantee is too strong. The garbage collector uses the roots as a starting point to
+/// determine what values can be reached, as long as you can guarantee a value is reachable it's
+/// safe to use. Whenever data is not rooted jlrs returns a `Ref`. Because it's not rooted it's
+/// unsafe to use.
 #[derive(Copy, Clone)]
 #[repr(transparent)]
 pub struct Ref<'scope, 'data, T: Wrapper<'scope, 'data>>(
@@ -338,6 +285,8 @@ unsafe impl<'scope, T: Wrapper<'scope, 'static>> ValidLayout for SimpleVectorRef
     fn valid_layout(v: Value) -> bool {
         if let Ok(dt) = v.cast::<DataType>() {
             dt.is::<SimpleVector>()
+
+            // FIXME: Check if all elements are T
         } else {
             false
         }
@@ -385,7 +334,7 @@ impl<'scope, 'data, T: Wrapper<'scope, 'data>> Ref<'scope, 'data, T> {
         Ref(ptr, PhantomData, PhantomData)
     }
 
-    /// An undefined reference.
+    /// An undefined reference, i.e. a null pointer.
     pub fn undefined_ref() -> Ref<'scope, 'data, T> {
         Ref(null_mut(), PhantomData, PhantomData)
     }
@@ -395,8 +344,8 @@ impl<'scope, 'data, T: Wrapper<'scope, 'data>> Ref<'scope, 'data, T> {
         self.0.is_null()
     }
 
-    /// Assume the reference still points to valid Julia data and convert it to the appropariate
-    /// pointer type. Returns `None` if the reference is undefined.
+    /// Assume the reference still points to valid Julia data and convert it to its wrapper type.
+    /// Returns `None` if the reference is undefined.
     ///
     /// Safety: a reference is only valid as long as it's reachable through some rooted value.
     /// It's the caller's responsibility to ensure the result is never used after it becomes
@@ -405,8 +354,7 @@ impl<'scope, 'data, T: Wrapper<'scope, 'data>> Ref<'scope, 'data, T> {
         T::wrapper(self, Private)
     }
 
-    /// Assume the reference still points to valid Julia data and convert it to the appropariate
-    /// pointer type. Returns `None` if the reference is undefined.
+    /// Assume the reference still points to valid Julia data and convert it to its wrapper type.
     ///
     /// Safety: this method doesn't  check if the reference is undefined, a reference is only
     /// valid as long as it's reachable through some rooted value.  It's the caller's
