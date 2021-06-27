@@ -1,1 +1,0 @@
-[000055a333885cf0] main stream debug:  (path: /home/thomas/.local/share/vlc/ml.xspf)
