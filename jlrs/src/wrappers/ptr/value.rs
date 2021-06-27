@@ -259,11 +259,13 @@ impl<'scope, 'data> Value<'scope, 'data> {
     ///
     /// If `self` is the [`DataType`] `anytuple_type`, calling this method will return a new
     /// tuple type with the given types as its field types. If it is the [`DataType`]
-    /// `uniontype_type`, calling this method is equivalent to calling [`Value::new_union`]. If
+    /// `uniontype_type`, calling this method is equivalent to calling [`Union::new`]. If
     /// the value is a `UnionAll`, the given types will be applied and the resulting type is
     /// returned.
     ///
     /// If the types cannot be applied to `self` your program will abort.
+    ///
+    /// [`Union::new`]: crate::wrappers::ptr::union::Union::new
     pub fn apply_type<'target, 'current, S, F, V>(
         self,
         scope: S,
@@ -331,7 +333,7 @@ impl Value<'_, '_> {
     /// A full list of supported checks can be found [here].
     ///
     /// [`JuliaStruct`]: crate::wrappers::ptr::traits::julia_struct::JuliaStruct
-    /// [here]: ../layout/typecheck/trait.Typecheck.html#implementors
+    /// [here]: ../../../layout/typecheck/trait.Typecheck.html#implementors
     pub fn is<T: Typecheck>(self) -> bool {
         self.datatype().is::<T>()
     }
@@ -461,7 +463,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
 ///
 /// it will have two fields, `fielda` and `fieldb`. The first field is a pointer field, the second
 /// is stored inline as a `u32`. It's possible to safely access the raw contents of these fields
-/// with the methods [`Value::raw_field`] and [`Value::unbox_nth_field`]. The first field can be
+/// with the methods [`Value::get_raw_field`] and [`Value::get_nth_raw_field`]. The first field can be
 /// accessed as a [`ValueRef`], the second as a `u32`.
 impl<'scope, 'data> Value<'scope, 'data> {
     /// Returns the field names of this value as a slice of `Symbol`s.
@@ -483,7 +485,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// Unbox the contents of the field at index `idx`. If the field is a bits union, this method
     /// will try to unbox the active variant. Returns an error if the index is out of bounds or
     /// if the layout of `T` is incompatible with the layout of that field in Julia.
-    pub fn unbox_nth_field<T>(self, idx: usize) -> JlrsResult<T>
+    pub fn get_nth_raw_field<T>(self, idx: usize) -> JlrsResult<T>
     where
         T: ValidLayout,
     {
@@ -505,7 +507,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     ///
     /// Safety: the layout out `T` must be compatible with the layout of the field and `idx` must
     /// not be out of bounds.
-    pub unsafe fn unbox_nth_field_unchecked<T>(self, idx: usize) -> T {
+    pub unsafe fn get_nth_raw_field_unchecked<T>(self, idx: usize) -> T {
         let ty = self.datatype();
         let jl_type = ty.unwrap(Private);
         let field_offset = jl_field_offset(jl_type, idx as _);
@@ -520,7 +522,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// Unbox the contents of the field with the name `field_name`. If the field is a bits union,
     /// this method will try to unbox the active variant. Returns an error if the field doesn't
     /// exist, or if the layout of `T` is incompatible with the layout of that field in Julia.
-    pub fn raw_field<T, N>(self, field_name: N) -> JlrsResult<T>
+    pub fn get_raw_field<T, N>(self, field_name: N) -> JlrsResult<T>
     where
         T: ValidLayout,
         N: TemporarySymbol,
@@ -546,7 +548,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// of the types are compatible. Panics if the field doesn't exist.
     ///
     /// Safety: the layout out `T` must be compatible with the layout of the field.
-    pub unsafe fn raw_field_unchecked<T, N>(self, field_name: N) -> T
+    pub unsafe fn get_raw_field_unchecked<T, N>(self, field_name: N) -> T
     where
         N: TemporarySymbol,
     {
@@ -1087,31 +1089,23 @@ impl<'data> Call<'data> for Value<'_, 'data> {
         F: Frame<'current>,
     {
         unsafe {
-            let res = jl_call0(self.unwrap(Private));
-            let exc = jl_exception_occurred();
-
-            if exc.is_null() {
-                scope.call_result(Ok(NonNull::new_unchecked(res)), Private)
-            } else {
-                scope.call_result(Err(NonNull::new_unchecked(exc)), Private)
-            }
+            let res = self.call0_unrooted(scope.global());
+            scope.unrooted_call_result(res, Private)
         }
     }
 
-    fn call1<'target, 'current, S, F>(self, scope: S, arg0: Value<'_, 'data>) -> JlrsResult<S::JuliaResult>
+    fn call1<'target, 'current, S, F>(
+        self,
+        scope: S,
+        arg0: Value<'_, 'data>,
+    ) -> JlrsResult<S::JuliaResult>
     where
         S: Scope<'target, 'current, 'data, F>,
         F: Frame<'current>,
     {
         unsafe {
-            let res = jl_call1(self.unwrap(Private), arg0.unwrap(Private));
-            let exc = jl_exception_occurred();
-
-            if exc.is_null() {
-                scope.call_result(Ok(NonNull::new_unchecked(res)), Private)
-            } else {
-                scope.call_result(Err(NonNull::new_unchecked(exc)), Private)
-            }
+            let res = self.call1_unrooted(scope.global(), arg0);
+            scope.unrooted_call_result(res, Private)
         }
     }
 
@@ -1126,18 +1120,8 @@ impl<'data> Call<'data> for Value<'_, 'data> {
         F: Frame<'current>,
     {
         unsafe {
-            let res = jl_call2(
-                self.unwrap(Private),
-                arg0.unwrap(Private),
-                arg1.unwrap(Private),
-            );
-            let exc = jl_exception_occurred();
-
-            if exc.is_null() {
-                scope.call_result(Ok(NonNull::new_unchecked(res)), Private)
-            } else {
-                scope.call_result(Err(NonNull::new_unchecked(exc)), Private)
-            }
+            let res = self.call2_unrooted(scope.global(), arg0, arg1);
+            scope.unrooted_call_result(res, Private)
         }
     }
 
@@ -1153,43 +1137,24 @@ impl<'data> Call<'data> for Value<'_, 'data> {
         F: Frame<'current>,
     {
         unsafe {
-            let res = jl_call3(
-                self.unwrap(Private),
-                arg0.unwrap(Private),
-                arg1.unwrap(Private),
-                arg2.unwrap(Private),
-            );
-            let exc = jl_exception_occurred();
-
-            if exc.is_null() {
-                scope.call_result(Ok(NonNull::new_unchecked(res)), Private)
-            } else {
-                scope.call_result(Err(NonNull::new_unchecked(exc)), Private)
-            }
+            let res = self.call3_unrooted(scope.global(), arg0, arg1, arg2);
+            scope.unrooted_call_result(res, Private)
         }
     }
 
-    fn call<'target, 'current, 'value, V, S, F>(self, scope: S, mut args: V) -> JlrsResult<S::JuliaResult>
+    fn call<'target, 'current, 'value, V, S, F>(
+        self,
+        scope: S,
+        args: V,
+    ) -> JlrsResult<S::JuliaResult>
     where
         V: AsMut<[Value<'value, 'data>]>,
         S: Scope<'target, 'current, 'data, F>,
         F: Frame<'current>,
     {
         unsafe {
-            let args = args.as_mut();
-            let n = args.len();
-            let res = jl_call(
-                self.unwrap(Private).cast(),
-                args.as_mut_ptr().cast(),
-                n as _,
-            );
-            let exc = jl_exception_occurred();
-
-            if exc.is_null() {
-                scope.call_result(Ok(NonNull::new_unchecked(res)), Private)
-            } else {
-                scope.call_result(Err(NonNull::new_unchecked(exc)), Private)
-            }
+            let res = self.call_unrooted(scope.global(), args);
+            scope.unrooted_call_result(res, Private)
         }
     }
 

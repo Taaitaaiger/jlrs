@@ -5,6 +5,8 @@
 //! [`ValidLayout`] trait defined in this module is used to check if a type has the same layout
 //! as a given Julia type. It is implemented automatically by JlrsReflect.jl, you should not
 //! implement it manually.
+//!
+//! [`DataType`]: crate::wrappers::ptr::datatype::DataType
 
 use crate::wrappers::ptr::value::Value;
 

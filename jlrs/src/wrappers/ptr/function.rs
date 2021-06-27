@@ -4,7 +4,7 @@
 //! of the [`Call`] trait. Note that you don't need to cast a [`Value`] to a [`Function`] in order
 //! to call it because [`Value`] also implements [`Call`].
 //!
-//! [`Call`]: crate::call::Call
+//! [`Call`]: crate::wrappers::ptr::call::Call
 
 use jl_sys::jl_value_t;
 use std::{marker::PhantomData, ptr::NonNull};

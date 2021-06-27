@@ -6,6 +6,8 @@ use std::ops::{Index, IndexMut};
 /// An n-dimensional array whose contents have been copied from Julia to Rust. You can create this
 /// struct by calling [`Array::copy_inline_data`]. The data has a column-major order and can be
 /// indexed with anything that implements [`Dims`].
+///
+/// [`Array::copy_inline_data`]: crate::wrappers::ptr::array::Array::copy_inline_data
 #[derive(Debug)]
 pub struct CopiedArray<T> {
     data: Vec<T>,

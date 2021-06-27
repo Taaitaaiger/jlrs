@@ -111,7 +111,7 @@ impl<'data> Array<'_, 'data> {
     /// Allocates a new n-dimensional array in Julia of dimensions `dims`. If `dims = (4, 2)` a
     /// two-dimensional array with 4 rows and 2 columns is created. This method can only be used
     /// in combination with types that implement `IntoJulia`. If you want to create an array for a
-    /// type that doesn't implement this trait you must use [`Value::new_array_for`].
+    /// type that doesn't implement this trait you must use [`Array::new_for`].
     pub fn new<'target, 'current, T, D, S, F>(scope: S, dims: D) -> JlrsResult<S::Value>
     where
         T: IntoJulia,
@@ -429,7 +429,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
 
     /// Returns true if the elements of the array are stored inline and the element type is a
     /// union type. In this case the contents of the array can be accessed from Rust with
-    /// [`Array::union_array_data`] and [`Array::union_array_data_mut`].
+    /// [`Array::union_data`] and [`Array::union_data_mut`].
     pub fn is_union_array(self) -> bool {
         self.is_inline_array() && self.element_type().is::<Union>()
     }
@@ -819,7 +819,7 @@ where
     /// Allocates a new n-dimensional array in Julia of dimensions `dims`. If `dims = (4, 2)` a
     /// two-dimensional array with 4 rows and 2 columns is created. This method can only be used
     /// in combination with types that implement `IntoJulia`. If you want to create an array for a
-    /// type that doesn't implement this trait you must use [`Value::new_array_for`].
+    /// type that doesn't implement this trait you must use [`Array::new_for`].
     pub fn new<'target, 'current, D, S, F>(scope: S, dims: D) -> JlrsResult<S::Value>
     where
         D: Dims,

@@ -35,12 +35,12 @@
 //! [`Julia::scope_with_slots`]: crate::Julia::scope_with_slots
 //! [`Global`]: global::Global
 //! [`GcFrame`]: frame::GcFrame
-//! [`Scope`]: traits::scope::Scope
+//! [`Scope`]: scope::Scope
 //! [`Frame`]: frame::Frame
-//! [`ScopeExt::scope`]: traits::scope::Scope::scope
-//! [`ScopeExt`]: traits::scope::ScopeExt
-//! [`Scope::value_scope`]: traits::scope::Scope::value_scope
-//! [`Scope::result_scope`]: traits::scope::Scope::result_scope
+//! [`ScopeExt::scope`]: scope::Scope::scope
+//! [`ScopeExt`]: scope::ScopeExt
+//! [`Scope::value_scope`]: scope::Scope::value_scope
+//! [`Scope::result_scope`]: scope::Scope::result_scope
 //! [`Output`]: output::Output
 //! [`OutputScope`]: output::OutputScope
 //! [`Output::into_scope`]: output::Output::into_scope

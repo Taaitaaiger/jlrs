@@ -32,8 +32,10 @@ pub(crate) struct TaskState<'frame, 'data> {
 
 /// A `Future` that runs a Julia function on a new thread with `Base.Threads.@spawn`. The function
 /// is called as soon as it is created, not when it's polled for the first time. You can create a
-/// `JuliaFuture` by calling [`Value::call_async`]. Calling this function uses two slots in
+/// `JuliaFuture` by calling[`CallAsync::call_async`]. Calling this function uses two slots in
 /// the current frame.
+///
+/// [`CallAsync::call_async`]: crate::extensions::multitask::call_async::CallAsync
 pub struct JuliaFuture<'frame, 'data> {
     shared_state: Arc<Mutex<TaskState<'frame, 'data>>>,
 }

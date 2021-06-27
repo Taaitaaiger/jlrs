@@ -38,22 +38,45 @@ fn call0_dynamic() {
 }
 
 #[test]
-fn call1() {
+fn call0_nested_as_unrooted() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs
-            .scope_with_slots(2, |global, frame| unsafe {
-                let angle = Value::new(&mut *frame, std::f32::consts::PI)?;
+        jlrs.scope(|global, frame| {
+            frame.result_scope(|output, frame| unsafe {
                 let func = Module::main(global)
                     .submodule_ref("JlrsTests")?
                     .wrapper_unchecked()
                     .function_ref("throws_exception")?
                     .wrapper_unchecked();
-                func.call1(&mut *frame, angle)?.into_jlrs_result()?;
-                Ok(())
-            })
-            .unwrap_err();
+                let res = func.call0(&mut *frame)?;
+
+                let os = output.into_scope(frame);
+                Ok(res.as_unrooted(os))
+            })?.unwrap_err();
+
+            Ok(())
+        })
+        .unwrap();
+    });
+}
+
+#[test]
+fn call1() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+
+        jlrs.scope_with_slots(2, |global, frame| unsafe {
+            let angle = Value::new(&mut *frame, std::f32::consts::PI)?;
+            let func = Module::main(global)
+                .submodule_ref("JlrsTests")?
+                .wrapper_unchecked()
+                .function_ref("throws_exception")?
+                .wrapper_unchecked();
+            func.call1(&mut *frame, angle)?.into_jlrs_result()?;
+            Ok(())
+        })
+        .unwrap_err();
     });
 }
 
@@ -126,7 +149,8 @@ fn call3() {
                 .wrapper_unchecked()
                 .function_ref("throws_exception")?
                 .wrapper_unchecked();
-            func.call3(&mut *frame, angle, angle, angle)?.into_jlrs_result()?;
+            func.call3(&mut *frame, angle, angle, angle)?
+                .into_jlrs_result()?;
             Ok(())
         })
         .unwrap_err();
@@ -145,7 +169,8 @@ fn call3_dynamic() {
                 .wrapper_unchecked()
                 .function_ref("throws_exception")?
                 .wrapper_unchecked();
-            func.call3(&mut *frame, angle, angle, angle)?.into_jlrs_result()?;
+            func.call3(&mut *frame, angle, angle, angle)?
+                .into_jlrs_result()?;
             Ok(())
         })
         .unwrap_err();
@@ -164,7 +189,8 @@ fn call() {
                 .wrapper_unchecked()
                 .function_ref("throws_exception")?
                 .wrapper_unchecked();
-            func.call(&mut *frame, &mut [angle, angle, angle])?.into_jlrs_result()?;
+            func.call(&mut *frame, &mut [angle, angle, angle])?
+                .into_jlrs_result()?;
             Ok(())
         })
         .unwrap_err();
@@ -207,7 +233,8 @@ fn call_dynamic() {
                 .wrapper_unchecked()
                 .function_ref("throws_exception")?
                 .wrapper_unchecked();
-            func.call(&mut *frame, &mut [angle, angle, angle])?.into_jlrs_result()?;
+            func.call(&mut *frame, &mut [angle, angle, angle])?
+                .into_jlrs_result()?;
             Ok(())
         })
         .unwrap_err();

@@ -43,6 +43,8 @@ impl<'scope, 'data> WithKeywords<'scope, 'data> {
 /// trait: [`Value`], [`Function`] and [`WithKeywords`]. In Julia every value can potentially be
 /// callable as a function, there's no general way to confirm if it is because not everything that
 /// can be called is guaranteed to be a [`Function`].
+///
+/// [`Function`]: crate::wrappers::ptr::function::Function
 pub trait Call<'data>: private::Call {
     /// Call a function with no arguments and root the result in `scope`.
     fn call0<'target, 'current, S, F>(self, scope: S) -> JlrsResult<S::JuliaResult>
@@ -124,6 +126,8 @@ pub trait Call<'data>: private::Call {
 }
 
 /// Several additional methods that are only implemented by [`Function`] and [`Value`].
+///
+/// [`Function`]: crate::wrappers::ptr::function::Function
 pub trait CallExt<'target, 'current, 'value, 'data>: Call<'data> {
     /// Returns a new Julia function that prints the stacktrace if an exception is thrown.
     fn tracing_call<F>(self, frame: &mut F) -> JlrsResult<JuliaResult<'current, 'data>>

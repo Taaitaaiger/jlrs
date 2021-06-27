@@ -301,6 +301,8 @@
 //! [`IntoJulia`]: crate::convert::into_julia::IntoJulia
 //! [`Typecheck`]: crate::layout::typecheck::Typecheck
 //! [`ValidLayout`]: crate::layout::valid_layout::ValidLayout
+//! [`Unbox`]: crate::convert::unbox::Unbox
+//! [`CallAsync::call_async`]: crate::extensions::multitask::call_async::CallAsync
 //! [`AsyncGcFrame`]: crate::extensions::multitask::async_frame::AsyncGcFrame
 //! [`Frame`]: crate::memory::frame::Frame
 //! [`AsyncTask`]: crate::extensions::multitask::async_task::AsyncTask

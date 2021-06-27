@@ -19,12 +19,12 @@ pub trait AsyncTask: Send + Sync + 'static {
     type R: ReturnChannel<T = Self::T>;
 
     /// The entrypoint of a task. You can use the `Global` and `AsyncGcFrame` to call arbitrary
-    /// functions from Julia. Additionally, [`Value::call_async`] can be used to call a function
+    /// functions from Julia. Additionally, [`CallAsync::call_async`] can be used to call a function
     /// on another thread and allow other tasks to progress while awaiting the result.
-    /// Implementations that don't use [`Value::call_async`] will block the runtime during
+    /// Implementations that don't use [`CallAsync::call_async`] will block the runtime during
     /// execution.
     ///
-    /// [`Value::call_async`]: crate::wrappers::ptr::value::Value::call_async
+    /// [`CallAsync::call_async`]: crate::extensions::multitask::call_async::CallAsync
     async fn run<'base>(
         &mut self,
         global: Global<'base>,

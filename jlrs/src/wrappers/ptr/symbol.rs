@@ -40,6 +40,8 @@ impl<'scope> Symbol<'scope> {
     /// `Symbol` returned as a [`Value`] from a Julia function inherits the frame's lifetime when
     /// it's cast to a `Symbol`. Its lifetime can be safely extended from `'scope` to `'global`
     /// using this method.
+    ///
+    /// [`Value`]: crate::wrappers::ptr::value::Value
     pub fn extend<'global>(self, _: Global<'global>) -> Symbol<'global> {
         unsafe { Symbol::wrap_non_null(self.unwrap_non_null(Private), Private) }
     }

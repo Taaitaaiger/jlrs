@@ -56,6 +56,9 @@
 //! that call the C API but don't take a scope or frame can still allocate new values internally,
 //! which can trigger a garbage collection cycle. Because an unrooted value exists which is likely
 //! unreachable, such a cycle can free the value that has just been created.
+//!
+//! [`Julia::scope`]: crate::Julia::scope
+//! [`Julia::scope_with_slots`]: crate::Julia::scope_with_slots
 
 use crate::{
     error::{JlrsResult, JuliaResult},
@@ -632,7 +635,9 @@ impl<'target, 'current, 'data, 'borrow, F: Frame<'current>> Scope<'target, 'curr
 pub(crate) mod private {
     use std::ptr::NonNull;
 
+    use crate::wrappers::ptr::private::Wrapper;
     use crate::wrappers::ptr::value::Value;
+    use crate::wrappers::ptr::ValueRef;
     use crate::{
         error::{JlrsResult, JuliaResult},
         memory::{
@@ -656,6 +661,25 @@ pub(crate) mod private {
             value: Result<NonNull<jl_value_t>, NonNull<jl_value_t>>,
             _: Private,
         ) -> JlrsResult<Self::JuliaResult>;
+
+        unsafe fn unrooted_call_result(
+            self,
+            value: Result<ValueRef, ValueRef>,
+            _: Private,
+        ) -> JlrsResult<Self::JuliaResult> {
+            let value = match value {
+                Ok(v) => Ok(v
+                    .value()
+                    .expect("Expected non-null pointer")
+                    .unwrap_non_null(Private)),
+                Err(e) => Err(e
+                    .value()
+                    .expect("Expected non-null pointer")
+                    .unwrap_non_null(Private)),
+            };
+
+            self.call_result(value, Private)
+        }
     }
 
     impl<'current, 'data, F: Frame<'current>> Scope<'current, 'current, 'data, F> for &mut F {

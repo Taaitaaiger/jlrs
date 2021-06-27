@@ -22,6 +22,7 @@ impl<'scope> Union<'scope> {
     /// union of a single [`DataType`] is that type, not a `Union` with a single variant.
     ///
     /// [`Union`]: crate::wrappers::ptr::union::Union
+    /// [`DataType`]: crate::wrappers::ptr::datatype::DataType
     pub fn new<'target, 'current, V, S, F>(scope: S, mut types: V) -> JlrsResult<S::Value>
     where
         V: AsMut<[Value<'scope, 'static>]>,
@@ -50,6 +51,7 @@ impl<'scope> Union<'scope> {
     /// [`Union::new`] this method doesn't root the allocated value.
     ///
     /// [`Union`]: crate::wrappers::ptr::union::Union
+    /// [`DataType`]: crate::wrappers::ptr::datatype::DataType
     pub fn new_unrooted<'global, V>(
         _: Global<'global>,
         mut types: V,

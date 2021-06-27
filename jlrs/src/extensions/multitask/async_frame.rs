@@ -18,7 +18,7 @@ use std::{
 };
 
 /// A frame that can be used to root values and dispatch Julia function calls to another thread
-/// with [`Value::call_async`]. An `AsyncGcFrame` is available by implementing the `AsyncTask`
+/// with [`CallAsync::call_async`]. An `AsyncGcFrame` is available by implementing the `AsyncTask`
 /// trait, this struct provides create a nested async scope.
 ///
 /// Roots are stored in slots, each slot can contain one root. Frames created with slots will
@@ -26,6 +26,8 @@ use std::{
 /// slots as needed. A frame is able to create at least 16 slots. If there is sufficient capacity
 /// available, a new frame will use this remaining capacity. If the capacity is insufficient, more
 /// stack space is allocated.
+///
+/// [`CallAsync::call_async`]: crate::extensions::multitask::call_async::CallAsync
 pub struct AsyncGcFrame<'frame> {
     raw_frame: &'frame mut [*mut c_void],
     n_roots: usize,

@@ -12,7 +12,7 @@ fn ptr_union_fields_access_something() {
                 .wrapper_unchecked()
                 .global_ref("has_module")?
                 .value_unchecked()
-                .raw_field::<ValueRef, _>("a")?;
+                .get_raw_field::<ValueRef, _>("a")?;
 
             assert!(!field.is_undefined());
             assert!(field.value_unchecked().is::<Module>());
@@ -33,7 +33,7 @@ fn ptr_union_fields_nothing_is_not_null() {
                 .wrapper_unchecked()
                 .global_ref("has_nothing")?
                 .value_unchecked()
-                .raw_field::<ValueRef, _>("a")?;
+                .get_raw_field::<ValueRef, _>("a")?;
 
             assert!(!field.is_undefined());
             assert!(field.value_unchecked().is::<Nothing>());

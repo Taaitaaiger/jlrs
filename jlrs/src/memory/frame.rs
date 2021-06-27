@@ -24,6 +24,9 @@
 //! the remaining capacity is insufficient more stack space is allocated, this doesn't  affect the
 //! existing frames.
 //!
+//! [`scope`]: crate::memory::scope
+//! [`Scope`]: crate::memory::scope::Scope
+//! [`ScopeExt`]: crate::memory::scope::ScopeExt
 //! [`Scope::value_scope`]: crate::memory::scope::Scope::value_scope
 //! [`Scope::result_scope`]: crate::memory::scope::Scope::result_scope
 //! [`ScopeExt::scope`]: crate::memory::scope::ScopeExt::scope
