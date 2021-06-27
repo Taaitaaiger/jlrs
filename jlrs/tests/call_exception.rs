@@ -43,17 +43,19 @@ fn call0_nested_as_unrooted() {
         let mut jlrs = j.borrow_mut();
 
         jlrs.scope(|global, frame| {
-            frame.result_scope(|output, frame| unsafe {
-                let func = Module::main(global)
-                    .submodule_ref("JlrsTests")?
-                    .wrapper_unchecked()
-                    .function_ref("throws_exception")?
-                    .wrapper_unchecked();
-                let res = func.call0(&mut *frame)?;
+            frame
+                .result_scope(|output, frame| unsafe {
+                    let func = Module::main(global)
+                        .submodule_ref("JlrsTests")?
+                        .wrapper_unchecked()
+                        .function_ref("throws_exception")?
+                        .wrapper_unchecked();
+                    let res = func.call0(&mut *frame)?;
 
-                let os = output.into_scope(frame);
-                Ok(res.as_unrooted(os))
-            })?.unwrap_err();
+                    let os = output.into_scope(frame);
+                    Ok(res.as_unrooted(os))
+                })?
+                .unwrap_err();
 
             Ok(())
         })

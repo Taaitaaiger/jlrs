@@ -12,8 +12,8 @@ struct MyTask {
 }
 
 // `MyTask` is a task we want to be executed, so we need to implement `AsyncTask`. This requires
-// `async_trait` because traits with async methods are not yet available in Rust. Because the 
-// task itself is executed on a single thread, it is marked with `?Send`. 
+// `async_trait` because traits with async methods are not yet available in Rust. Because the
+// task itself is executed on a single thread, it is marked with `?Send`.
 #[async_trait(?Send)]
 impl AsyncTask for MyTask {
     // If successful, the data is returned as a boxed `Any`. This way we can have different tasks
@@ -24,7 +24,7 @@ impl AsyncTask for MyTask {
     type R = async_std::channel::Sender<JlrsResult<Self::T>>;
 
     // This is the async variation of the closure you give to `Julia::scope` or
-    // `Julia::scope_with_slots` when you use the sync runtime: the `Global` can be used to access 
+    // `Julia::scope_with_slots` when you use the sync runtime: the `Global` can be used to access
     // `Module`s and other static data, while the `AsyncGcFrame` let you create values, call
     // functions, and create nested scopes.
     async fn run<'base>(
@@ -38,15 +38,19 @@ impl AsyncTask for MyTask {
 
         // Get `complexfunc` in `MyModule`, call it asynchronously with `call_async`, and await
         // the result before casting it to an `f64` (which that function returns). A function that
-        // is called with `call_async` is executed on another thread by calling 
-        // `Base.threads.@spawn`. 
-        let v = Module::main(global)
-            .submodule_ref("MyModule").wrapper_unchecked()
-            .function_ref("complexfunc")?.wrapper_unchecked()
-            .call_async(&mut *frame, &mut [dims, iters])
-            .await?
-            .unwrap()
-            .cast::<f64>()?;
+        // is called with `call_async` is executed on another thread by calling
+        // `Base.threads.@spawn`.
+        let v = unsafe {
+            Module::main(global)
+                .submodule_ref("MyModule")?
+                .wrapper_unchecked()
+                .function_ref("complexfunc")?
+                .wrapper_unchecked()
+                .call_async(&mut *frame, &mut [dims, iters])
+                .await?
+                .unwrap()
+                .unbox::<f64>()?
+        };
 
         // Box the result
         Ok(Box::new(v))
@@ -64,17 +68,17 @@ async fn main() {
     // Initialize the async runtime. The `JULIA_NUM_THREADS` environment variable must be set to a
     // value larger than 1, or an error is returned.
     //
-    // The runtime runs in a separate thread. It receives messages through a channel, a backlog 
-    // can build up if a task which does a significant amount of work on the main thread is 
+    // The runtime runs in a separate thread. It receives messages through a channel, a backlog
+    // can build up if a task which does a significant amount of work on the main thread is
     // blocking the runtime. The queue size of this channel is set with the first argument of
     // `AsyncJulia::init`. Here we allow for a backlog of 16 messages before the channel is full.
     //
     // When one or more functions are running in other threads but the runtime has no synchronous
     // work to do, the garbage collector can't run. Similarly, async events in Julia (such as
-    // rescheduling a task that has yielded after calling `sleep` or `println`) will not be 
+    // rescheduling a task that has yielded after calling `sleep` or `println`) will not be
     // handled either. In order to fix this, event must be processed. We do so every millisecond.
     //
-    // After calling this function we have an instance of `AsyncJulia` that can be used to send 
+    // After calling this function we have an instance of `AsyncJulia` that can be used to send
     // tasks and requests to include a file to the runtime, and a handle to the thread where the
     // runtime is running.
     let (julia, handle) = unsafe {
@@ -137,7 +141,7 @@ async fn main() {
     let res4 = receiver4.recv().await.unwrap().unwrap();
     println!("Result of fourth task: {:?}", res4.downcast_ref::<f64>());
 
-    // Dropping `julia` causes the runtime to shut down Julia and itself if it was the final 
+    // Dropping `julia` causes the runtime to shut down Julia and itself if it was the final
     // handle to the runtime.
     std::mem::drop(julia);
     handle.await.expect("Julia exited with an error");

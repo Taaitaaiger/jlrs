@@ -53,7 +53,11 @@ pub trait Call<'data>: private::Call {
         F: Frame<'current>;
 
     /// Call a function with one argument and root the result in `scope`.
-    fn call1<'target, 'current, S, F>(self, scope: S, arg0: Value<'_, 'data>) -> JlrsResult<S::JuliaResult>
+    fn call1<'target, 'current, S, F>(
+        self,
+        scope: S,
+        arg0: Value<'_, 'data>,
+    ) -> JlrsResult<S::JuliaResult>
     where
         S: Scope<'target, 'current, 'data, F>,
         F: Frame<'current>;
@@ -82,7 +86,11 @@ pub trait Call<'data>: private::Call {
         F: Frame<'current>;
 
     /// Call a function with an arbitrary number arguments and root the result in `scope`.
-    fn call<'target, 'current, 'value, V, S, F>(self, scope: S, args: V) -> JlrsResult<S::JuliaResult>
+    fn call<'target, 'current, 'value, V, S, F>(
+        self,
+        scope: S,
+        args: V,
+    ) -> JlrsResult<S::JuliaResult>
     where
         V: AsMut<[Value<'value, 'data>]>,
         S: Scope<'target, 'current, 'data, F>,
@@ -209,7 +217,11 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
         }
     }
 
-    fn call1<'target, 'current, S, F>(self, scope: S, arg0: Value<'_, 'data>) -> JlrsResult<S::JuliaResult>
+    fn call1<'target, 'current, S, F>(
+        self,
+        scope: S,
+        arg0: Value<'_, 'data>,
+    ) -> JlrsResult<S::JuliaResult>
     where
         S: Scope<'target, 'current, 'data, F>,
         F: Frame<'current>,
@@ -283,7 +295,11 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
         }
     }
 
-    fn call<'target, 'current, 'value, V, S, F>(self, scope: S, mut args: V) -> JlrsResult<S::JuliaResult>
+    fn call<'target, 'current, 'value, V, S, F>(
+        self,
+        scope: S,
+        mut args: V,
+    ) -> JlrsResult<S::JuliaResult>
     where
         V: AsMut<[Value<'value, 'data>]>,
         S: Scope<'target, 'current, 'data, F>,

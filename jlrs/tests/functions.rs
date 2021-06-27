@@ -60,7 +60,6 @@ fn call0() {
     });
 }
 
-
 #[test]
 fn call0_output() {
     JULIA.with(|j| {

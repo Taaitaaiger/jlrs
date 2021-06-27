@@ -85,7 +85,11 @@ impl<'data> Call<'data> for Function<'_, 'data> {
         self.as_value().call0(scope)
     }
 
-    fn call1<'target, 'current, S, F>(self, scope: S, arg0: Value<'_, 'data>) -> JlrsResult<S::JuliaResult>
+    fn call1<'target, 'current, S, F>(
+        self,
+        scope: S,
+        arg0: Value<'_, 'data>,
+    ) -> JlrsResult<S::JuliaResult>
     where
         S: Scope<'target, 'current, 'data, F>,
         F: Frame<'current>,
@@ -120,7 +124,11 @@ impl<'data> Call<'data> for Function<'_, 'data> {
         self.as_value().call3(scope, arg0, arg1, arg2)
     }
 
-    fn call<'target, 'current, 'value, V, S, F>(self, scope: S, args: V) -> JlrsResult<S::JuliaResult>
+    fn call<'target, 'current, 'value, V, S, F>(
+        self,
+        scope: S,
+        args: V,
+    ) -> JlrsResult<S::JuliaResult>
     where
         V: AsMut<[Value<'value, 'data>]>,
         S: Scope<'target, 'current, 'data, F>,

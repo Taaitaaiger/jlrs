@@ -205,7 +205,9 @@ fn access_array_field() {
 
             assert!(instance.get_raw_field::<ArrayRef, _>("a").is_ok());
             assert!(instance.get_raw_field::<TypedArrayRef<f64>, _>("a").is_ok());
-            assert!(instance.get_raw_field::<TypedArrayRef<f32>, _>("a").is_err());
+            assert!(instance
+                .get_raw_field::<TypedArrayRef<f32>, _>("a")
+                .is_err());
 
             Ok(())
         })
@@ -233,7 +235,9 @@ fn access_ua_array_field() {
 
             assert!(instance.get_raw_field::<ArrayRef, _>("a").is_ok());
             assert!(instance.get_raw_field::<TypedArrayRef<f64>, _>("a").is_ok());
-            assert!(instance.get_raw_field::<TypedArrayRef<f32>, _>("a").is_err());
+            assert!(instance
+                .get_raw_field::<TypedArrayRef<f32>, _>("a")
+                .is_err());
 
             Ok(())
         })

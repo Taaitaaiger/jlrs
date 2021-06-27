@@ -40,13 +40,17 @@ impl AsyncTask for MyTask {
         // the result before casting it to an `f64` (which that function returns). A function that
         // is called with `call_async` is executed on another thread by calling 
         // `Base.threads.@spawn`. 
-        let v = Module::main(global)
-            .submodule_ref("MyModule").wrapper_unchecked()
-            .function_ref("complexfunc")?.wrapper_unchecked()
+        let v = unsafe {
+            Module::main(global)
+            .submodule_ref("MyModule")?
+            .wrapper_unchecked()
+            .function_ref("complexfunc")?
+            .wrapper_unchecked()
             .call_async(&mut *frame, &mut [dims, iters])
             .await?
             .unwrap()
-            .unbox::<f64>()?;
+            .unbox::<f64>()?
+        };
 
         Ok(Box::new(v))
     }

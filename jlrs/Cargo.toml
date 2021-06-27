@@ -21,6 +21,7 @@ default = ["jlrs-derive"]
 async = ["futures", "crossbeam-channel", "async-trait", "async-std"]
 jlrs-ndarray = ["ndarray"]
 f16 = ["half"]
+coverage = []
 docs-rs = ["jl-sys/docs-rs", "jlrs-derive", "async", "jlrs-ndarray"]
 
 [dependencies]
