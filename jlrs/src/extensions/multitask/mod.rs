@@ -1,17 +1,24 @@
 //! Run Julia in a separate thread and execute tasks in parallel.
 //!
 //! While access to Julia with the C API is entirely single-threaded, it's possible to offload a
-//! function call to another thread by using `Base.Threads.@spawn`. The experimental async runtime
+//! function call to another thread by using `Threads.@spawn`. The experimental async runtime
 //! offered by jlrs combines this feature with Rust's async/.await syntax.
 //!
-//! In order to use the async runtime, Julia must be started with more than one thread by setting
+//! In order to use the async runtime, Julia must be started with three or more threads by setting
 //! the `JULIA_NUM_THREADS` environment variable. In order to create tasks that can be executed
 //! you must implement the [`AsyncTask`] trait.
+//!
+//! Examples that show how to use the async runtime and implement async tasks can be found in the
+//! [`examples`] directory of the repository.
+//!
+//! [`examples`]: https://github.com/Taaitaaiger/jlrs/tree/master/examples
 
 pub mod async_frame;
 pub mod async_task;
 pub mod call_async;
-pub mod julia_future;
+pub(crate) mod julia_future;
+pub mod mode;
+pub(crate) mod output_result_ext;
 
 use crate::memory::global::Global;
 use crate::wrappers::ptr::module::Module;
@@ -19,7 +26,7 @@ use crate::wrappers::ptr::string::JuliaString;
 use crate::wrappers::ptr::value::Value;
 use crate::{
     error::{JlrsError, JlrsResult},
-    memory::{mode::Async, stack_page::StackPage},
+    memory::stack_page::StackPage,
 };
 use crate::{memory::frame::GcFrame, wrappers::ptr::call::Call};
 use crate::{INIT, JLRS_JL};
@@ -34,6 +41,7 @@ use jl_sys::{
     jl_atexit_hook, jl_eval_string, jl_get_ptls_states, jl_init, jl_init_with_image__threading,
     jl_is_initialized,
 };
+use mode::Async;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Condvar, Mutex};
@@ -52,7 +60,7 @@ use std::{
 
 use self::async_frame::AsyncGcFrame;
 
-/// A handle to the async runtime. It can be used to include files and create new tasks. The
+/// A handle to the async runtime. It can be used to include files and send new tasks. The
 /// runtime shuts down when the last handle is dropped. The two generic type parameters `T`
 /// and `R` are the return type and return channel type respectively, which must be the same across
 /// all different implementations of [`AsyncTask`] that you use.
@@ -76,6 +84,15 @@ where
     sender: AsyncStdSender<Message<T, R>>,
 }
 
+// Ensure AsyncJulia can be sent to other threads.
+trait RequireSendSync: Send + Sync {}
+impl<T, R> RequireSendSync for AsyncJulia<T, R>
+where
+    T: Send + Sync + 'static,
+    R: ReturnChannel<T = T>,
+{
+}
+
 impl<T, R> AsyncJulia<T, R>
 where
     T: Send + Sync + 'static,
@@ -84,7 +101,7 @@ where
     /// Initialize Julia in a new thread.
     ///
     /// This function will return an error if the  `JULIA_NUM_THREADS` environment variable is not
-    /// set or set to a value smaller than 2, or if Julia has already been initialized. It is
+    /// set or set to a value smaller than 3, or if Julia has already been initialized. It is
     /// unsafe because this crate provides you with a way to execute arbitrary Julia code which
     /// can't be checked for correctness.
     pub unsafe fn init(
@@ -96,7 +113,7 @@ where
             .parse::<usize>()
             .map_err(JlrsError::other)?;
 
-        if n_threads <= 1 {
+        if n_threads <= 2 {
             Err(JlrsError::MoreThreadsRequired)?;
         }
 
@@ -111,7 +128,7 @@ where
     /// Initialize Julia as a blocking task.
     ///
     /// This function will return an error if the  `JULIA_NUM_THREADS` environment variable is not
-    /// set or set to a value smaller than 2, or if Julia has already been initialized. It is
+    /// set or set to a value smaller than 3, or if Julia has already been initialized. It is
     /// unsafe because this crate provides you with a way to execute arbitrary Julia code which
     /// can't be checked for correctness.
     pub async unsafe fn init_async(
@@ -123,7 +140,7 @@ where
             .parse::<usize>()
             .map_err(JlrsError::other)?;
 
-        if n_threads <= 1 {
+        if n_threads <= 2 {
             Err(JlrsError::MoreThreadsRequired)?;
         }
 
@@ -147,7 +164,7 @@ where
     /// absolute or a relative path to a system image.
     ///
     /// This function will return an error if either of the two paths doesn't  exist, if the
-    /// `JULIA_NUM_THREADS` environment variable is not set or set to a value smaller than 2, or
+    /// `JULIA_NUM_THREADS` environment variable is not set or set to a value smaller than 3, or
     /// if Julia has already been initialized. It is unsafe because this crate provides you with
     /// a way to execute arbitrary Julia code which can't be checked for correctness.
     ///
@@ -167,7 +184,7 @@ where
             .parse::<usize>()
             .map_err(JlrsError::other)?;
 
-        if n_threads <= 1 {
+        if n_threads <= 2 {
             Err(JlrsError::MoreThreadsRequired)?;
         }
 
@@ -198,7 +215,7 @@ where
     /// absolute or a relative path to a system image.
     ///
     /// This function will return an error if either of the two paths doesn't  exist, if the
-    /// `JULIA_NUM_THREADS` environment variable is not set or set to a value smaller than 2, or
+    /// `JULIA_NUM_THREADS` environment variable is not set or set to a value smaller than 3, or
     /// if Julia has already been initialized. It is unsafe because this crate provides you with
     /// a way to execute arbitrary Julia code which can't be checked for correctness.
     ///
@@ -218,7 +235,7 @@ where
             .parse::<usize>()
             .map_err(JlrsError::other)?;
 
-        if n_threads <= 1 {
+        if n_threads <= 2 {
             Err(JlrsError::MoreThreadsRequired)?;
         }
 
@@ -419,23 +436,25 @@ enum Message<T, R> {
     ),
     Include(PathBuf, Arc<(AsyncStdMutex<Status>, AsyncStdCondvar)>),
     TryInclude(PathBuf, Arc<(Mutex<Status>, Condvar)>),
-    Complete(usize, Box<AsyncStack>),
+    Complete(usize, Box<AsyncStackPage>),
     SetWakeFn(Arc<(AsyncStdMutex<Status>, AsyncStdCondvar)>),
     TrySetWakeFn(Arc<(Mutex<Status>, Condvar)>),
 }
 
 #[derive(Debug)]
-struct AsyncStack {
+struct AsyncStackPage {
     top: [Cell<*mut c_void>; 2],
     page: StackPage,
 }
 
-unsafe impl Send for AsyncStack {}
-unsafe impl Sync for AsyncStack {}
+// Not actually true, but we need to be able to send a page back after completing a task. The page
+//is (and must) never shared across threads.
+unsafe impl Send for AsyncStackPage {}
+unsafe impl Sync for AsyncStackPage {}
 
-impl AsyncStack {
+impl AsyncStackPage {
     unsafe fn new() -> Box<Self> {
-        let stack = AsyncStack {
+        let stack = AsyncStackPage {
             top: [Cell::new(null_mut()), Cell::new(null_mut())],
             page: StackPage::default(),
         };
@@ -444,7 +463,7 @@ impl AsyncStack {
     }
 }
 
-unsafe fn link_stacks(stacks: &mut [Option<Box<AsyncStack>>]) {
+unsafe fn link_stacks(stacks: &mut [Option<Box<AsyncStackPage>>]) {
     for stack in stacks.iter_mut() {
         let stack = stack.as_mut().unwrap();
         let rtls = &mut *jl_get_ptls_states();
@@ -479,7 +498,7 @@ where
 
             let mut stacks = Vec::with_capacity(n_threads);
             for _ in 0..n_threads {
-                stacks.push(Some(AsyncStack::new()));
+                stacks.push(Some(AsyncStackPage::new()));
             }
             link_stacks(&mut stacks);
             let mut stacks = stacks.into_boxed_slice();
@@ -604,7 +623,7 @@ where
 
             let mut stacks = Vec::with_capacity(n_threads);
             for _ in 0..n_threads {
-                stacks.push(Some(AsyncStack::new()));
+                stacks.push(Some(AsyncStackPage::new()));
             }
             link_stacks(&mut stacks);
             let mut stacks = stacks.into_boxed_slice();
@@ -685,7 +704,7 @@ where
 fn run_task<T: Send + Sync + 'static, R>(
     mut jl_task: Box<dyn AsyncTask<T = T, R = R>>,
     task_idx: usize,
-    mut stack: Box<AsyncStack>,
+    mut stack: Box<AsyncStackPage>,
     rt_sender: AsyncStdSender<Message<T, R>>,
 ) -> AsyncStdHandle<()>
 where
@@ -713,7 +732,7 @@ where
     }
 }
 
-fn call_include(stack: &mut AsyncStack, path: PathBuf) -> JlrsResult<()> {
+fn call_include(stack: &mut AsyncStackPage, path: PathBuf) -> JlrsResult<()> {
     unsafe {
         let global = Global::new();
         let mode = Async(&stack.top[1]);
@@ -739,7 +758,7 @@ fn call_include(stack: &mut AsyncStack, path: PathBuf) -> JlrsResult<()> {
 }
 
 async fn include(
-    stack: &mut AsyncStack,
+    stack: &mut AsyncStackPage,
     path: PathBuf,
     completed: Arc<(AsyncStdMutex<Status>, AsyncStdCondvar)>,
 ) {
@@ -756,7 +775,11 @@ async fn include(
         condvar.notify_one();
     }
 }
-fn try_include(stack: &mut AsyncStack, path: PathBuf, completed: Arc<(Mutex<Status>, Condvar)>) {
+fn try_include(
+    stack: &mut AsyncStackPage,
+    path: PathBuf,
+    completed: Arc<(Mutex<Status>, Condvar)>,
+) {
     let res = call_include(stack, path);
 
     {
@@ -772,7 +795,7 @@ fn try_include(stack: &mut AsyncStack, path: PathBuf, completed: Arc<(Mutex<Stat
     }
 }
 
-fn call_set_wake_fn(stack: &mut AsyncStack) -> JlrsResult<()> {
+fn call_set_wake_fn(stack: &mut AsyncStackPage) -> JlrsResult<()> {
     unsafe {
         let global = Global::new();
         let mode = Async(&stack.top[1]);
@@ -800,7 +823,7 @@ fn call_set_wake_fn(stack: &mut AsyncStack) -> JlrsResult<()> {
 }
 
 async fn set_wake_fn(
-    stack: &mut AsyncStack,
+    stack: &mut AsyncStackPage,
     completed: Arc<(AsyncStdMutex<Status>, AsyncStdCondvar)>,
 ) {
     let res = call_set_wake_fn(stack);
@@ -818,7 +841,7 @@ async fn set_wake_fn(
     }
 }
 
-fn try_set_wake_fn(stack: &mut AsyncStack, completed: Arc<(Mutex<Status>, Condvar)>) {
+fn try_set_wake_fn(stack: &mut AsyncStackPage, completed: Arc<(Mutex<Status>, Condvar)>) {
     let res = call_set_wake_fn(stack);
 
     {

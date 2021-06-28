@@ -1,4 +1,8 @@
-use crate::memory::{frame::Frame, mode::Async, root_pending::RootPending, stack_page::StackPage};
+//! Frame that can be used with async functions.
+
+use super::mode::Async;
+use super::output_result_ext::OutputResultExt;
+use crate::memory::{frame::Frame, root_pending::RootPending, stack_page::StackPage};
 use crate::{
     error::{AllocError, JlrsError, JlrsResult, JuliaResult},
     memory::{
@@ -37,8 +41,10 @@ pub struct AsyncGcFrame<'frame> {
 }
 
 impl<'frame> AsyncGcFrame<'frame> {
-    /// An async version of `value_scope`. Rather than a closure, it takes an async closure that
-    /// provides a new `AsyncGcFrame`.
+    /// An async version of [`Scope::value_scope`]. Rather than a closure, it takes an async
+    /// closure that provides a new `AsyncGcFrame`.
+    ///
+    /// [`Scope::value_scope`]: crate::memory::scope::Scope::value_scope
     pub async fn async_value_scope<'nested, 'data, F, G>(
         &'nested mut self,
         func: F,
@@ -62,8 +68,10 @@ impl<'frame> AsyncGcFrame<'frame> {
         }
     }
 
-    /// An async version of `value_scope_with_slots`. Rather than a closure, it takes an async
-    /// closure that provides a new `AsyncGcFrame`.
+    /// An async version of [`Scope::value_scope_with_slots`]. Rather than a closure, it takes an
+    /// async closure that provides a new `AsyncGcFrame`.
+    ///
+    /// [`Scope::value_scope_with_slots`]: crate::memory::scope::Scope::value_scope_with_slots
     pub async fn async_value_scope_with_slots<'nested, 'data, F, G>(
         &'nested mut self,
         capacity: usize,
@@ -88,8 +96,10 @@ impl<'frame> AsyncGcFrame<'frame> {
         }
     }
 
-    /// An async version of `result_scope`. Rather than a closure, it takes an async
+    /// An async version of [`Scope::result_scope`]. Rather than a closure, it takes an async
     /// closure that provides a new `AsyncGcFrame`.
+    ///
+    /// [`Scope::result_scope`]: crate::memory::scope::Scope::result_scope
     pub async fn async_result_scope<'nested, 'data, F, G>(
         &'nested mut self,
         func: F,
@@ -119,8 +129,10 @@ impl<'frame> AsyncGcFrame<'frame> {
         }
     }
 
-    /// An async version of `result_scope_with_slots`. Rather than a closure, it takes an async
-    /// closure that provides a new `AsyncGcFrame`.
+    /// An async version of [`Scope::result_scope_with_slots`]. Rather than a closure, it takes an
+    /// async closure that provides a new `AsyncGcFrame`.
+    ///
+    /// [`Scope::result_scope_with_slots`]: crate::memory::scope::Scope::result_scope_with_slots
     pub async fn async_result_scope_with_slots<'nested, 'data, F, G>(
         &'nested mut self,
         capacity: usize,
@@ -151,8 +163,10 @@ impl<'frame> AsyncGcFrame<'frame> {
         }
     }
 
-    /// An async version of `frame`. Rather than a closure, it takes an async
-    /// closure that provides a new `AsyncGcFrame`.
+    /// An async version of [`ScopeExt::scope`]. Rather than a closure, it takes an async closure
+    /// that provides a new `AsyncGcFrame`.
+    ///
+    /// [`ScopeExt::scope`]: crate::memory::scope::ScopeExt::scope
     pub async fn async_scope<'nested, T, F, G>(&'nested mut self, func: F) -> JlrsResult<T>
     where
         T: 'frame,
@@ -167,8 +181,10 @@ impl<'frame> AsyncGcFrame<'frame> {
         }
     }
 
-    /// An async version of `scope_with_slots`. Rather than a closure, it takes an async
-    /// closure that provides a new `AsyncGcFrame`.
+    /// An async version of [`ScopeExt::scope_with_slots`]. Rather than a closure, it takes an
+    /// async closure that provides a new `AsyncGcFrame`.
+    ///
+    /// [`ScopeExt::scope_with_slots`]: crate::memory::scope::ScopeExt::scope_with_slots
     pub async fn async_scope_with_slots<'nested, T, F, G>(
         &'nested mut self,
         capacity: usize,

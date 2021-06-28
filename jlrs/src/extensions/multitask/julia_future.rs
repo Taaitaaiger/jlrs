@@ -1,8 +1,6 @@
-//! A `Future` that represents a function call in Julia running on another thread.
-
 use crate::error::CANNOT_DISPLAY_VALUE;
 use crate::memory::{global::Global, scope::Scope};
-use crate::wrappers::ptr::call::Call;
+use crate::wrappers::ptr::call::{Call, CallExt, WithKeywords};
 use crate::wrappers::ptr::module::Module;
 use crate::wrappers::ptr::task::Task;
 use crate::wrappers::ptr::value::{Value, MAX_SIZE};
@@ -30,12 +28,6 @@ pub(crate) struct TaskState<'frame, 'data> {
     _marker: PhantomData<&'data ()>,
 }
 
-/// A `Future` that runs a Julia function on a new thread with `Base.Threads.@spawn`. The function
-/// is called as soon as it is created, not when it's polled for the first time. You can create a
-/// `JuliaFuture` by calling[`CallAsync::call_async`]. Calling this function uses two slots in
-/// the current frame.
-///
-/// [`CallAsync::call_async`]: crate::extensions::multitask::call_async::CallAsync
 pub struct JuliaFuture<'frame, 'data> {
     shared_state: Arc<Mutex<TaskState<'frame, 'data>>>,
 }
@@ -73,6 +65,60 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                 .wrapper_unchecked()
                 .function_ref("asynccall")?
                 .wrapper_unchecked()
+                .call(frame, &mut vals)?
+                .map_err(|e| {
+                    let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
+                    JlrsError::Exception {
+                        msg: format!("asynccall threw an exception: {}", msg),
+                    }
+                })?
+                .cast_unchecked::<Task>();
+
+            {
+                let locked = shared_state.lock();
+                match locked {
+                    Ok(mut data) => data.task = Some(task),
+                    _ => exception("Cannot set task".into())?,
+                }
+            }
+
+            Ok(JuliaFuture { shared_state })
+        }
+    }
+
+    pub(crate) fn new_with_keywords<'value, V>(
+        frame: &mut AsyncGcFrame<'frame>,
+        func: WithKeywords,
+        mut values: V,
+    ) -> JlrsResult<Self>
+    where
+        V: AsMut<[Value<'value, 'data>]>,
+    {
+        let shared_state = Arc::new(Mutex::new(TaskState {
+            completed: false,
+            waker: None,
+            task: None,
+            _marker: PhantomData,
+        }));
+
+        unsafe {
+            let values = values.as_mut();
+            let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
+            let state_ptr_boxed = Value::new(&mut *frame, state_ptr)?;
+
+            let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + values.len());
+
+            vals.push(func.function());
+            vals.push(state_ptr_boxed);
+            vals.extend_from_slice(values);
+
+            let global = frame.global();
+            let task = Module::main(global)
+                .submodule_ref("Jlrs")?
+                .wrapper_unchecked()
+                .function_ref("asynccall")?
+                .wrapper_unchecked()
+                .with_keywords(func.keywords())?
                 .call(frame, &mut vals)?
                 .map_err(|e| {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);

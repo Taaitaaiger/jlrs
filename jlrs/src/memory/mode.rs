@@ -1,24 +1,15 @@
-//! The runtime modes
-//!
-//! The structs you find in this module implement the [`Mode`] trait which is responsible for
-//! handling the differences between the different modes.
+//! Mostly internal trait to handle differences between the different runtime modes.
 
-#[cfg(feature = "async")]
-use std::cell::Cell;
-#[cfg(feature = "async")]
-use std::ffi::c_void;
+/// Mode used by the synchronous runtime.
+#[derive(Clone, Copy)]
+pub struct Sync;
 
 /// This trait handles the differences between the runtime modes.
 pub trait Mode: Copy + private::Mode {}
 
 impl Mode for Sync {}
 
-#[cfg(feature = "async")]
-impl<'a> Mode for Async<'a> {}
-
 pub(crate) mod private {
-    #[cfg(feature = "async")]
-    use crate::memory::mode::Async;
     use crate::{memory::mode::Sync, private::Private};
     use jl_sys::jl_get_ptls_states;
     use std::ffi::c_void;
@@ -47,31 +38,4 @@ pub(crate) mod private {
             rtls.pgcstack = (&*rtls.pgcstack).prev;
         }
     }
-
-    #[cfg(feature = "async")]
-    impl<'a> Mode for Async<'a> {
-        unsafe fn push_frame(&self, raw_frame: &mut [*mut c_void], capacity: usize, _: Private) {
-            raw_frame[0] = (capacity << 1) as _;
-            raw_frame[1] = self.0.get();
-
-            for i in 0..capacity {
-                raw_frame[2 + i] = null_mut();
-            }
-
-            self.0.set(raw_frame[..].as_mut_ptr().cast());
-        }
-
-        unsafe fn pop_frame(&self, raw_frame: &mut [*mut c_void], _: Private) {
-            self.0.set(raw_frame[1]);
-        }
-    }
 }
-
-/// Mode used by the synchronous runtime.
-#[derive(Clone, Copy)]
-pub struct Sync;
-
-/// Mode used by the asynchronous runtime.
-#[derive(Clone, Copy)]
-#[cfg(feature = "async")]
-pub struct Async<'a>(pub(crate) &'a Cell<*mut c_void>);

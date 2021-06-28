@@ -37,6 +37,16 @@ impl<'scope, 'data> WithKeywords<'scope, 'data> {
     pub(crate) fn new(func: Value<'scope, 'data>, kws: Value<'scope, 'data>) -> Self {
         WithKeywords { func, kws }
     }
+
+    /// Returns the function.
+    pub fn function(&self) -> Value<'scope, 'data> {
+        self.func
+    }
+
+    /// Returns the keywords.
+    pub fn keywords(&self) -> Value<'scope, 'data> {
+        self.kws
+    }
 }
 
 /// Call the implementor as a Julia function. There are currently three types that implement this

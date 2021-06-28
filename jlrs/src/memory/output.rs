@@ -163,19 +163,11 @@ impl<'frame, 'data, 'inner> OutputResult<'frame, 'data, 'inner> {
         }
     }
 
-    #[cfg(feature = "async")]
-    pub(crate) fn is_exception(&self) -> bool {
+    /// Returns true if the result is an exception.
+    pub fn is_exception(&self) -> bool {
         match self {
             Self::Ok(_) => true,
             Self::Err(_) => false,
-        }
-    }
-
-    #[cfg(feature = "async")]
-    pub(crate) fn unwrap_non_null(self) -> NonNull<jl_value_t> {
-        match self {
-            Self::Ok(pov) => pov.unwrap_non_null(),
-            Self::Err(pov) => pov.unwrap_non_null(),
         }
     }
 }
