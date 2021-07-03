@@ -42,7 +42,10 @@
 //!
 //! #### Windows
 //!
-//! Support for Windows was dropped in jlrs 0.10 due to compilation and dependency issues.
+//! Support for Windows was dropped in jlrs 0.10 due to compilation and dependency issues. If you 
+//! want to use jlrs on Windows you must use WSL. An installation guide to install WSL on Windows
+//! can be found [on Microsoft's website]. After installing a Linux distribution, follow the 
+//! installation instructions for Linux.
 //!
 //! # Using this crate
 //!
@@ -309,6 +312,7 @@
 //! These custom types can also be used when you call Rust from Julia with `ccall`.
 //!
 //! [their User Guide]: https://rust-lang.github.io/rust-bindgen/requirements.html
+//! [on Microsoft's website]: https://docs.microsoft.com/en-us/windows/wsl/install-win10
 //! [the examples directory of the repo]: https://github.com/Taaitaaiger/jlrs/tree/master/examples
 //! [`IntoJulia`]: crate::convert::into_julia::IntoJulia
 //! [`Typecheck`]: crate::layout::typecheck::Typecheck

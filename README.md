@@ -43,7 +43,7 @@ In order to ensure the `julia.h` header file can be found, either `/usr/include/
 
 #### Windows
 
-Support for Windows was dropped in jlrs 0.10 due to compilation and dependency issues. 
+Support for Windows was dropped in jlrs 0.10 due to compilation and dependency issues. If you  want to use jlrs on Windows you must use WSL. An installation guide to install WSL on Windows can be found [on Microsoft's website](https://docs.microsoft.com/en-us/windows/wsl/install-win10). After installing a Linux distribution, follow the installation instructions for Linux.
 
 
 ## Using this crate
