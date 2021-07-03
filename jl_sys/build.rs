@@ -143,7 +143,6 @@ fn main() {
         "jlrs_alloc_array_3d",
         "jlrs_apply_array_type",
         "jlrs_apply_type",
-        "jlrs_compute_fieldtypes",
         "jlrs_get_nth_field",
         "jlrs_new_array",
         "jlrs_new_structv",

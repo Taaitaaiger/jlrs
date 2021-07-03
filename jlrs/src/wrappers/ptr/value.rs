@@ -520,6 +520,8 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// will try to unbox the active variant. Pointer fields can also be accessed by using the
     /// approriate [`Ref`]. Returns an error if the index is out of bounds or if the layout of `T`
     /// is incompatible with the layout of that field in Julia.
+    ///
+    /// [`Ref`]: crate::wrappers::ptr::Ref
     pub fn get_nth_raw_field<T>(self, idx: usize) -> JlrsResult<T>
     where
         T: ValidLayout,

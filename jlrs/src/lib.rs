@@ -225,7 +225,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! jlrs = { version = "0.10", features = ["async"] }
+//! jlrs = { version = "0.11", features = ["async"] }
 //! ```
 //!
 //! The struct [`AsyncJulia`] is exported by the prelude and lets you initialize the runtime in
