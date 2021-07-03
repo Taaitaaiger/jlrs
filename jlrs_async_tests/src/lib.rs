@@ -102,13 +102,13 @@ mod example {
             global: Global<'base>,
             frame: &mut AsyncGcFrame<'base>,
         ) -> JlrsResult<Self::T> {
-            let v = unsafe {
-                frame
-                    .async_value_scope_with_slots(3, |output, frame| async move {
-                        let iters = Value::new(&mut *frame, self.iters)?;
-                        let dims = Value::new(&mut *frame, self.dims)?;
+            let v = frame
+                .async_value_scope_with_slots(3, |output, frame| async move {
+                    let iters = Value::new(&mut *frame, self.iters)?;
+                    let dims = Value::new(&mut *frame, self.dims)?;
 
-                        let out = Module::main(global)
+                    let out = unsafe {
+                        Module::main(global)
                             .submodule_ref("MyModule")?
                             .wrapper_unchecked()
                             .function_ref("complexfunc")?
@@ -116,14 +116,14 @@ mod example {
                             .as_value()
                             .call_async(&mut *frame, &mut [dims, iters])
                             .await?
-                            .unwrap();
+                            .unwrap()
+                    };
 
-                        let output = output.into_scope(frame);
-                        Ok(out.as_unrooted(output))
-                    })
-                    .await?
-                    .unbox::<f64>()?
-            };
+                    let output = output.into_scope(frame);
+                    Ok(out.as_unrooted(output))
+                })
+                .await?
+                .unbox::<f64>()?;
 
             Ok(v)
         }
@@ -149,28 +149,28 @@ mod example {
             global: Global<'base>,
             frame: &mut AsyncGcFrame<'base>,
         ) -> JlrsResult<Self::T> {
-            let v = unsafe {
-                frame
-                    .async_result_scope_with_slots(3, |output, frame| async move {
-                        let iters = Value::new(&mut *frame, self.iters)?;
-                        let dims = Value::new(&mut *frame, self.dims)?;
+            let v = frame
+                .async_result_scope_with_slots(3, |output, frame| async move {
+                    let iters = Value::new(&mut *frame, self.iters)?;
+                    let dims = Value::new(&mut *frame, self.dims)?;
 
-                        let out = Module::main(global)
+                    let out = unsafe {
+                        Module::main(global)
                             .submodule_ref("MyModule")?
                             .wrapper_unchecked()
                             .function_ref("complexfunc")?
                             .wrapper_unchecked()
                             .as_value()
                             .call_async(&mut *frame, &mut [dims, iters])
-                            .await?;
+                            .await?
+                    };
 
-                        let output = output.into_scope(frame);
-                        Ok(out.as_unrooted(output))
-                    })
-                    .await?
-                    .unwrap()
-                    .unbox::<f64>()?
-            };
+                    let output = output.into_scope(frame);
+                    Ok(out.as_unrooted(output))
+                })
+                .await?
+                .unwrap()
+                .unbox::<f64>()?;
 
             Ok(v)
         }
@@ -240,13 +240,13 @@ mod example {
             global: Global<'base>,
             frame: &mut AsyncGcFrame<'base>,
         ) -> JlrsResult<Self::T> {
-            let v = unsafe {
-                frame
-                    .async_value_scope(|output, frame| async move {
-                        let iters = Value::new(&mut *frame, self.iters)?;
-                        let dims = Value::new(&mut *frame, self.dims)?;
+            let v = frame
+                .async_value_scope(|output, frame| async move {
+                    let iters = Value::new(&mut *frame, self.iters)?;
+                    let dims = Value::new(&mut *frame, self.dims)?;
 
-                        let out = Module::main(global)
+                    let out = unsafe {
+                        Module::main(global)
                             .submodule_ref("MyModule")?
                             .wrapper_unchecked()
                             .function_ref("complexfunc")?
@@ -254,14 +254,14 @@ mod example {
                             .as_value()
                             .call_async(&mut *frame, &mut [dims, iters])
                             .await?
-                            .unwrap();
+                            .unwrap()
+                    };
 
-                        let output = output.into_scope(frame);
-                        Ok(out.as_unrooted(output))
-                    })
-                    .await?
-                    .unbox::<f64>()?
-            };
+                    let output = output.into_scope(frame);
+                    Ok(out.as_unrooted(output))
+                })
+                .await?
+                .unbox::<f64>()?;
 
             Ok(v)
         }
@@ -287,28 +287,28 @@ mod example {
             global: Global<'base>,
             frame: &mut AsyncGcFrame<'base>,
         ) -> JlrsResult<Self::T> {
-            let v = unsafe {
-                frame
-                    .async_result_scope(|output, frame| async move {
-                        let iters = Value::new(&mut *frame, self.iters)?;
-                        let dims = Value::new(&mut *frame, self.dims)?;
+            let v = frame
+                .async_result_scope(|output, frame| async move {
+                    let iters = Value::new(&mut *frame, self.iters)?;
+                    let dims = Value::new(&mut *frame, self.dims)?;
 
-                        let out = Module::main(global)
+                    let out = unsafe {
+                        Module::main(global)
                             .submodule_ref("MyModule")?
                             .wrapper_unchecked()
                             .function_ref("complexfunc")?
                             .wrapper_unchecked()
                             .as_value()
                             .call_async(&mut *frame, &mut [dims, iters])
-                            .await?;
+                            .await?
+                    };
 
-                        let output = output.into_scope(frame);
-                        Ok(out.as_unrooted(output))
-                    })
-                    .await?
-                    .unwrap()
-                    .unbox::<f64>()?
-            };
+                    let output = output.into_scope(frame);
+                    Ok(out.as_unrooted(output))
+                })
+                .await?
+                .unwrap()
+                .unbox::<f64>()?;
 
             Ok(v)
         }

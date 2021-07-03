@@ -13,12 +13,20 @@ fn main() {
 
             unsafe {
                 Module::main(global)
+                    // the submodule doesn't have to be rooted because it's never reloaded.
                     .submodule_ref("MyModule")?
                     .wrapper_unchecked()
+                    // the same holds true for the function: the module is never reloaded so it's
+                    // globally rooted
                     .function_ref("complexfunc")?
                     .wrapper_unchecked()
+                    // Call the function with the two arguments it takes
                     .call2(&mut *frame, dim, iters)?
-                    .expect("MyModule.complexfunc threw an error")
+                    // If you don't want to use the exception, it can be converted to a `JlrsError`
+                    // In this case the error message will contain the message that calling
+                    // `display` in Julia would show
+                    .into_jlrs_result()?
+                    // The function that was called returns a `Float64`, which can be unboxed as `f64`
                     .unbox::<f64>()
             }
         })

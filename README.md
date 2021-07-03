@@ -4,7 +4,7 @@
 [![License:MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 
-jlrs is a crate that provides access to most of the Julia C API, it can be used to embed Julia in Rust applications and to use functionality from the Julia C API when  writing `ccall`able functions in Rust. Currently this crate is only tested on Linux in combination with Julia 1.6 and is not compatible with earlier versions of Julia.
+jlrs is a crate that provides access to most of the Julia C API, it can be used to embed Julia in Rust applications and to use functionality from the Julia C API when writing `ccall`able functions in Rust. Currently this crate is only tested on Linux in combination with Julia 1.6 and is not compatible with earlier versions of Julia.
 
 
 ## Features
@@ -59,13 +59,18 @@ The simplest is to call `Value::eval_string`, a method that takes two arguments.
 
 In practice, `Value::eval_string` is relatively limited. It can be used to evaluate simple function calls like `sqrt(2.0)`, but can't take any arguments. Its most important use-case is importing installed packages by evaluating an `import` or `using` statement. A more interesting method, `Value::new`, can be used with data of any type that implements `IntoJulia`. This trait is implemented by primitive types like `i8` and `char`. Any type that implements `IntoJulia` also implements `Unbox` which is used to extract the contents of a Julia value.
 
+In addition to evaluating raw commands with `Value::eval_string`, it's possible to call anything that implements `Call` as a Julia function. `Value` implements this trait because any Julia value is potentially callable as a function. Functions can be called with any number of positional arguments and be provided with keyword arguments. Both `Value::eval_string` and the trait methods of `Call` are unsafe. It's trivial to write a function like `boom() = unsafe_load(Ptr{Float64}(C_NULL))`, which causes a segfault when it's called, and call it with these methods.
+
 As a simple example, let's convert two numbers to Julia values and add them:
 
 ```rust
 use jlrs::prelude::*;
 
 fn main() {
+    // Initializing Julia is unsafe because it can race with another crate that does 
+    // the same. 
     let mut julia = unsafe { Julia::init().unwrap() };
+
     let res = julia.scope(|global, frame| {
         // Create the two arguments. Note that the first argument, something that
         // implements Scope, is taken by value and mutable references don't implement
@@ -80,9 +85,11 @@ fn main() {
         // call is a nested `Result`; the outer error doesn't  contain to any Julia
         // data, while the inner error contains the exception if one is thrown. Here we
         // explicitly convert the exception to an error that is compatible with `?`.
-        func.call2(&mut *frame, i, j)?
-            .into_jlrs_result()?
-            .unbox::<u64>()
+        unsafe {
+            func.call2(&mut *frame, i, j)?
+                .into_jlrs_result()?
+                .unbox::<u64>()
+        }
     }).unwrap();
     
     assert_eq!(res, 3);

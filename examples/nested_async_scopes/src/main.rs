@@ -34,31 +34,32 @@ impl AsyncTask for MyTask {
     ) -> JlrsResult<Self::T> {
         // Nesting async frames works like nesting on ordinary frame. The main differences are the `async`
         // block in the closure, and frame is provided by value rather than by mutable reference.
-        let v = unsafe {
-            frame
-                .async_value_scope(|output, frame| async move {
-                    // Convert the two arguments to values Julia can work with.
-                    let iters = Value::new(&mut *frame, self.iters)?;
-                    let dims = Value::new(&mut *frame, self.dims)?;
+        let v = frame
+            .async_value_scope(|output, frame| async move {
+                // Convert the two arguments to values Julia can work with.
+                let iters = Value::new(&mut *frame, self.iters)?;
+                let dims = Value::new(&mut *frame, self.dims)?;
 
-                    // Get `complexfunc` in `MyModule`, call it asynchronously with `call_async`, and await
-                    // the result before casting it to an `f64` (which that function returns). A function that
-                    // is called with `call_async` is executed on a thread created with `Base.threads.@spawn`.
-                    let out = Module::main(global)
+                // Get `complexfunc` in `MyModule`, call it asynchronously with `call_async`, and await
+                // the result before casting it to an `f64` (which that function returns). A function that
+                // is called with `call_async` is executed on a thread created with `Base.threads.@spawn`.
+                // The module and function don't have to be rooted because the module is never redefined.
+                let out = unsafe {
+                    Module::main(global)
                         .submodule_ref("MyModule")?
                         .wrapper_unchecked()
                         .function_ref("complexfunc")?
                         .wrapper_unchecked()
                         .call_async(&mut *frame, &mut [dims, iters])
                         .await?
-                        .unwrap();
+                        .unwrap()
+                };
 
-                    let output = output.into_scope(frame);
-                    Ok(out.as_unrooted(output))
-                })
-                .await?
-                .unbox::<f64>()?
-        };
+                let output = output.into_scope(frame);
+                Ok(out.as_unrooted(output))
+            })
+            .await?
+            .unbox::<f64>()?;
 
         // Box the result
         Ok(Box::new(v))

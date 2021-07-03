@@ -77,7 +77,7 @@ impl<'scope, 'data> WrapperPriv<'scope, 'data> for Function<'scope, 'data> {
 }
 
 impl<'data> Call<'data> for Function<'_, 'data> {
-    fn call0<'target, 'current, S, F>(self, scope: S) -> JlrsResult<S::JuliaResult>
+    unsafe fn call0<'target, 'current, S, F>(self, scope: S) -> JlrsResult<S::JuliaResult>
     where
         S: Scope<'target, 'current, 'data, F>,
         F: Frame<'current>,
@@ -85,7 +85,7 @@ impl<'data> Call<'data> for Function<'_, 'data> {
         self.as_value().call0(scope)
     }
 
-    fn call1<'target, 'current, S, F>(
+    unsafe fn call1<'target, 'current, S, F>(
         self,
         scope: S,
         arg0: Value<'_, 'data>,
@@ -97,7 +97,7 @@ impl<'data> Call<'data> for Function<'_, 'data> {
         self.as_value().call1(scope, arg0)
     }
 
-    fn call2<'target, 'current, S, F>(
+    unsafe fn call2<'target, 'current, S, F>(
         self,
         scope: S,
         arg0: Value<'_, 'data>,
@@ -110,7 +110,7 @@ impl<'data> Call<'data> for Function<'_, 'data> {
         self.as_value().call2(scope, arg0, arg1)
     }
 
-    fn call3<'target, 'current, S, F>(
+    unsafe fn call3<'target, 'current, S, F>(
         self,
         scope: S,
         arg0: Value<'_, 'data>,
@@ -124,7 +124,7 @@ impl<'data> Call<'data> for Function<'_, 'data> {
         self.as_value().call3(scope, arg0, arg1, arg2)
     }
 
-    fn call<'target, 'current, 'value, V, S, F>(
+    unsafe fn call<'target, 'current, 'value, V, S, F>(
         self,
         scope: S,
         args: V,
@@ -137,11 +137,14 @@ impl<'data> Call<'data> for Function<'_, 'data> {
         self.as_value().call(scope, args)
     }
 
-    fn call0_unrooted<'target>(self, global: Global<'target>) -> JuliaResultRef<'target, 'data> {
+    unsafe fn call0_unrooted<'target>(
+        self,
+        global: Global<'target>,
+    ) -> JuliaResultRef<'target, 'data> {
         self.as_value().call0_unrooted(global)
     }
 
-    fn call1_unrooted<'target>(
+    unsafe fn call1_unrooted<'target>(
         self,
         global: Global<'target>,
         arg0: Value<'_, 'data>,
@@ -149,7 +152,7 @@ impl<'data> Call<'data> for Function<'_, 'data> {
         self.as_value().call1_unrooted(global, arg0)
     }
 
-    fn call2_unrooted<'target>(
+    unsafe fn call2_unrooted<'target>(
         self,
         global: Global<'target>,
         arg0: Value<'_, 'data>,
@@ -158,7 +161,7 @@ impl<'data> Call<'data> for Function<'_, 'data> {
         self.as_value().call2_unrooted(global, arg0, arg1)
     }
 
-    fn call3_unrooted<'target>(
+    unsafe fn call3_unrooted<'target>(
         self,
         global: Global<'target>,
         arg0: Value<'_, 'data>,
@@ -168,7 +171,7 @@ impl<'data> Call<'data> for Function<'_, 'data> {
         self.as_value().call3_unrooted(global, arg0, arg1, arg2)
     }
 
-    fn call_unrooted<'target, 'value, V>(
+    unsafe fn call_unrooted<'target, 'value, V>(
         self,
         global: Global<'target>,
         args: V,

@@ -34,7 +34,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .scope(|global, frame| {
+                .scope(|global, frame| unsafe {
                     let one = Value::new(&mut *frame, f16::ONE)?;
                     let func = Module::base(global).function(&mut *frame, "-")?;
                     let res = func

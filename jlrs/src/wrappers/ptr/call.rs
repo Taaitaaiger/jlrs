@@ -54,16 +54,33 @@ impl<'scope, 'data> WithKeywords<'scope, 'data> {
 /// callable as a function, there's no general way to confirm if it is because not everything that
 /// can be called is guaranteed to be a [`Function`].
 ///
+/// Note that all of these methods are unsafe. There are several reasons for this. First and
+/// foremost these methods let you call arbitrary Julia functions which can't be checked for
+/// correctness. If the second lifetime of an argument is not `'static`, it must never be assigned
+/// to a global. If the function returns a task that performs IO, it's not automatically
+/// rescheduled.
+///
 /// [`Function`]: crate::wrappers::ptr::function::Function
 pub trait Call<'data>: private::Call {
     /// Call a function with no arguments and root the result in `scope`.
-    fn call0<'target, 'current, S, F>(self, scope: S) -> JlrsResult<S::JuliaResult>
+    ///
+    /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
+    /// correctness. If the function returns a task that performs IO, it's not automatically
+    /// rescheduled. If the scope is an `OutputScope`, the result must be returned from the
+    /// closure immediately.
+    unsafe fn call0<'target, 'current, S, F>(self, scope: S) -> JlrsResult<S::JuliaResult>
     where
         S: Scope<'target, 'current, 'data, F>,
         F: Frame<'current>;
 
     /// Call a function with one argument and root the result in `scope`.
-    fn call1<'target, 'current, S, F>(
+    ///
+    /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
+    /// correctness. If the second lifetime of an argument is not `'static`, it must never be
+    /// assigned to a global. If the function returns a task that performs IO, it's not
+    /// automatically rescheduled. If the scope is an `OutputScope`, the result must be returned
+    /// from the closure immediately.
+    unsafe fn call1<'target, 'current, S, F>(
         self,
         scope: S,
         arg0: Value<'_, 'data>,
@@ -73,7 +90,13 @@ pub trait Call<'data>: private::Call {
         F: Frame<'current>;
 
     /// Call a function with two arguments and root the result in `scope`.
-    fn call2<'target, 'current, S, F>(
+    ///
+    /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
+    /// correctness. If the second lifetime of an argument is not `'static`, it must never be
+    /// assigned to a global. If the function returns a task that performs IO, it's not
+    /// automatically rescheduled. If the scope is an `OutputScope`, the result must be returned
+    /// from the closure immediately.
+    unsafe fn call2<'target, 'current, S, F>(
         self,
         scope: S,
         arg0: Value<'_, 'data>,
@@ -84,7 +107,13 @@ pub trait Call<'data>: private::Call {
         F: Frame<'current>;
 
     /// Call a function with three arguments and root the result in `scope`.
-    fn call3<'target, 'current, S, F>(
+    ///
+    /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
+    /// correctness. If the second lifetime of an argument is not `'static`, it must never be
+    /// assigned to a global. If the function returns a task that performs IO, it's not
+    /// automatically rescheduled. If the scope is an `OutputScope`, the result must be returned
+    /// from the closure immediately.
+    unsafe fn call3<'target, 'current, S, F>(
         self,
         scope: S,
         arg0: Value<'_, 'data>,
@@ -96,7 +125,13 @@ pub trait Call<'data>: private::Call {
         F: Frame<'current>;
 
     /// Call a function with an arbitrary number arguments and root the result in `scope`.
-    fn call<'target, 'current, 'value, V, S, F>(
+    ///
+    /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
+    /// correctness. If the second lifetime of an argument is not `'static`, it must never be
+    /// assigned to a global. If the function returns a task that performs IO, it's not
+    /// automatically rescheduled. If the scope is an `OutputScope`, the result must be returned
+    /// from the closure immediately.
+    unsafe fn call<'target, 'current, 'value, V, S, F>(
         self,
         scope: S,
         args: V,
@@ -107,17 +142,34 @@ pub trait Call<'data>: private::Call {
         F: Frame<'current>;
 
     /// Call a function with no arguments without rooting the result.
-    fn call0_unrooted<'target>(self, _: Global<'target>) -> JuliaResultRef<'target, 'data>;
+    ///
+    /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
+    /// correctness. If the function returns a task that performs IO, it's not automatically
+    /// rescheduled. If the scope is an `OutputScope`, the result must be returned from the
+    /// closure immediately.
+    unsafe fn call0_unrooted<'target>(self, _: Global<'target>) -> JuliaResultRef<'target, 'data>;
 
     /// Call a function with one argument without rooting the result.
-    fn call1_unrooted<'target>(
+    ///
+    /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
+    /// correctness. If the second lifetime of an argument is not `'static`, it must never be
+    /// assigned to a global. If the function returns a task that performs IO, it's not
+    /// automatically rescheduled. If the scope is an `OutputScope`, the result must be returned
+    /// from the closure immediately.
+    unsafe fn call1_unrooted<'target>(
         self,
         _: Global<'target>,
         arg0: Value<'_, 'data>,
     ) -> JuliaResultRef<'target, 'data>;
 
     /// Call a function with two arguments without rooting the result.
-    fn call2_unrooted<'target>(
+    ///
+    /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
+    /// correctness. If the second lifetime of an argument is not `'static`, it must never be
+    /// assigned to a global. If the function returns a task that performs IO, it's not
+    /// automatically rescheduled. If the scope is an `OutputScope`, the result must be returned
+    /// from the closure immediately.
+    unsafe fn call2_unrooted<'target>(
         self,
         _: Global<'target>,
         arg0: Value<'_, 'data>,
@@ -125,7 +177,13 @@ pub trait Call<'data>: private::Call {
     ) -> JuliaResultRef<'target, 'data>;
 
     /// Call a function with three arguments without rooting the result.
-    fn call3_unrooted<'target>(
+    ///
+    /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
+    /// correctness. If the second lifetime of an argument is not `'static`, it must never be
+    /// assigned to a global. If the function returns a task that performs IO, it's not
+    /// automatically rescheduled. If the scope is an `OutputScope`, the result must be returned
+    /// from the closure immediately.
+    unsafe fn call3_unrooted<'target>(
         self,
         _: Global<'target>,
         arg0: Value<'_, 'data>,
@@ -134,7 +192,13 @@ pub trait Call<'data>: private::Call {
     ) -> JuliaResultRef<'target, 'data>;
 
     /// Call a function with an abitrary number of arguments without rooting the result.
-    fn call_unrooted<'target, 'value, V>(
+    ///
+    /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
+    /// correctness. If the second lifetime of an argument is not `'static`, it must never be
+    /// assigned to a global. If the function returns a task that performs IO, it's not
+    /// automatically rescheduled. If the scope is an `OutputScope`, the result must be returned
+    /// from the closure immediately.
+    unsafe fn call_unrooted<'target, 'value, V>(
         self,
         _: Global<'target>,
         args: V,
@@ -183,7 +247,7 @@ pub trait CallExt<'target, 'current, 'value, 'data>: Call<'data> {
     /// # fn main() {
     /// # JULIA.with(|j| {
     /// # let mut julia = j.borrow_mut();
-    ///   julia.scope(|global, frame| {
+    ///   julia.scope(|global, frame| unsafe {
     ///       let func = Value::eval_string(&mut *frame, "func(; a=3, b=4, c=5) = a + b + c")?
     ///           .into_jlrs_result()?;
     ///
@@ -206,28 +270,26 @@ pub trait CallExt<'target, 'current, 'value, 'data>: Call<'data> {
 }
 
 impl<'data> Call<'data> for WithKeywords<'_, 'data> {
-    fn call0<'target, 'current, S, F>(self, scope: S) -> JlrsResult<S::JuliaResult>
+    unsafe fn call0<'target, 'current, S, F>(self, scope: S) -> JlrsResult<S::JuliaResult>
     where
         S: Scope<'target, 'current, 'data, F>,
         F: Frame<'current>,
     {
-        unsafe {
-            let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
-            let args = &mut [self.kws, self.func];
-            let n = args.len();
+        let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
+        let args = &mut [self.kws, self.func];
+        let n = args.len();
 
-            let res = jl_call(func, args.as_mut_ptr().cast(), n as _);
-            let exc = jl_exception_occurred();
+        let res = jl_call(func, args.as_mut_ptr().cast(), n as _);
+        let exc = jl_exception_occurred();
 
-            if exc.is_null() {
-                scope.call_result(Ok(NonNull::new_unchecked(res)), Private)
-            } else {
-                scope.call_result(Err(NonNull::new_unchecked(exc)), Private)
-            }
+        if exc.is_null() {
+            scope.call_result(Ok(NonNull::new_unchecked(res)), Private)
+        } else {
+            scope.call_result(Err(NonNull::new_unchecked(exc)), Private)
         }
     }
 
-    fn call1<'target, 'current, S, F>(
+    unsafe fn call1<'target, 'current, S, F>(
         self,
         scope: S,
         arg0: Value<'_, 'data>,
@@ -236,23 +298,21 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
         S: Scope<'target, 'current, 'data, F>,
         F: Frame<'current>,
     {
-        unsafe {
-            let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
-            let args = &mut [self.kws, self.func, arg0];
-            let n = args.len();
+        let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
+        let args = &mut [self.kws, self.func, arg0];
+        let n = args.len();
 
-            let res = jl_call(func, args.as_mut_ptr().cast(), n as _);
-            let exc = jl_exception_occurred();
+        let res = jl_call(func, args.as_mut_ptr().cast(), n as _);
+        let exc = jl_exception_occurred();
 
-            if exc.is_null() {
-                scope.call_result(Ok(NonNull::new_unchecked(res)), Private)
-            } else {
-                scope.call_result(Err(NonNull::new_unchecked(exc)), Private)
-            }
+        if exc.is_null() {
+            scope.call_result(Ok(NonNull::new_unchecked(res)), Private)
+        } else {
+            scope.call_result(Err(NonNull::new_unchecked(exc)), Private)
         }
     }
 
-    fn call2<'target, 'current, S, F>(
+    unsafe fn call2<'target, 'current, S, F>(
         self,
         scope: S,
         arg0: Value<'_, 'data>,
@@ -262,23 +322,21 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
         S: Scope<'target, 'current, 'data, F>,
         F: Frame<'current>,
     {
-        unsafe {
-            let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
-            let args = &mut [self.kws, self.func, arg0, arg1];
-            let n = args.len();
+        let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
+        let args = &mut [self.kws, self.func, arg0, arg1];
+        let n = args.len();
 
-            let res = jl_call(func, args.as_mut_ptr().cast(), n as _);
-            let exc = jl_exception_occurred();
+        let res = jl_call(func, args.as_mut_ptr().cast(), n as _);
+        let exc = jl_exception_occurred();
 
-            if exc.is_null() {
-                scope.call_result(Ok(NonNull::new_unchecked(res)), Private)
-            } else {
-                scope.call_result(Err(NonNull::new_unchecked(exc)), Private)
-            }
+        if exc.is_null() {
+            scope.call_result(Ok(NonNull::new_unchecked(res)), Private)
+        } else {
+            scope.call_result(Err(NonNull::new_unchecked(exc)), Private)
         }
     }
 
-    fn call3<'target, 'current, S, F>(
+    unsafe fn call3<'target, 'current, S, F>(
         self,
         scope: S,
         arg0: Value<'_, 'data>,
@@ -289,23 +347,21 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
         S: Scope<'target, 'current, 'data, F>,
         F: Frame<'current>,
     {
-        unsafe {
-            let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
-            let args = &mut [self.kws, self.func, arg0, arg1, arg2];
-            let n = args.len();
+        let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
+        let args = &mut [self.kws, self.func, arg0, arg1, arg2];
+        let n = args.len();
 
-            let res = jl_call(func, args.as_mut_ptr().cast(), n as _);
-            let exc = jl_exception_occurred();
+        let res = jl_call(func, args.as_mut_ptr().cast(), n as _);
+        let exc = jl_exception_occurred();
 
-            if exc.is_null() {
-                scope.call_result(Ok(NonNull::new_unchecked(res)), Private)
-            } else {
-                scope.call_result(Err(NonNull::new_unchecked(exc)), Private)
-            }
+        if exc.is_null() {
+            scope.call_result(Ok(NonNull::new_unchecked(res)), Private)
+        } else {
+            scope.call_result(Err(NonNull::new_unchecked(exc)), Private)
         }
     }
 
-    fn call<'target, 'current, 'value, V, S, F>(
+    unsafe fn call<'target, 'current, 'value, V, S, F>(
         self,
         scope: S,
         mut args: V,
@@ -315,109 +371,99 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
         S: Scope<'target, 'current, 'data, F>,
         F: Frame<'current>,
     {
-        unsafe {
-            let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
-            let args = args.as_mut();
-            let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + args.len());
-            vals.push(self.kws);
-            vals.push(self.func);
+        let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
+        let args = args.as_mut();
+        let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + args.len());
+        vals.push(self.kws);
+        vals.push(self.func);
 
-            for arg in args.iter().copied() {
-                vals.push(arg);
-            }
+        for arg in args.iter().copied() {
+            vals.push(arg);
+        }
 
-            let n = vals.len();
-            let res = jl_call(func, vals.as_mut_ptr().cast(), n as _);
-            let exc = jl_exception_occurred();
+        let n = vals.len();
+        let res = jl_call(func, vals.as_mut_ptr().cast(), n as _);
+        let exc = jl_exception_occurred();
 
-            if exc.is_null() {
-                scope.call_result(Ok(NonNull::new_unchecked(res)), Private)
-            } else {
-                scope.call_result(Err(NonNull::new_unchecked(exc)), Private)
-            }
+        if exc.is_null() {
+            scope.call_result(Ok(NonNull::new_unchecked(res)), Private)
+        } else {
+            scope.call_result(Err(NonNull::new_unchecked(exc)), Private)
         }
     }
 
-    fn call0_unrooted<'target>(self, _: Global<'target>) -> JuliaResultRef<'target, 'data> {
-        unsafe {
-            let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
-            let args = &mut [self.kws, self.func];
+    unsafe fn call0_unrooted<'target>(self, _: Global<'target>) -> JuliaResultRef<'target, 'data> {
+        let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
+        let args = &mut [self.kws, self.func];
 
-            let res = jl_call(func, args.as_mut_ptr().cast(), 2);
-            let exc = jl_exception_occurred();
+        let res = jl_call(func, args.as_mut_ptr().cast(), 2);
+        let exc = jl_exception_occurred();
 
-            if exc.is_null() {
-                Ok(ValueRef::wrap(res))
-            } else {
-                Ok(ValueRef::wrap(exc))
-            }
+        if exc.is_null() {
+            Ok(ValueRef::wrap(res))
+        } else {
+            Ok(ValueRef::wrap(exc))
         }
     }
 
-    fn call1_unrooted<'target>(
+    unsafe fn call1_unrooted<'target>(
         self,
         _: Global<'target>,
         arg0: Value<'_, 'data>,
     ) -> JuliaResultRef<'target, 'data> {
-        unsafe {
-            let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
-            let args = &mut [self.kws, self.func, arg0];
+        let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
+        let args = &mut [self.kws, self.func, arg0];
 
-            let res = jl_call(func, args.as_mut_ptr().cast(), 3);
-            let exc = jl_exception_occurred();
+        let res = jl_call(func, args.as_mut_ptr().cast(), 3);
+        let exc = jl_exception_occurred();
 
-            if exc.is_null() {
-                Ok(ValueRef::wrap(res))
-            } else {
-                Ok(ValueRef::wrap(exc))
-            }
+        if exc.is_null() {
+            Ok(ValueRef::wrap(res))
+        } else {
+            Ok(ValueRef::wrap(exc))
         }
     }
 
-    fn call2_unrooted<'target>(
+    unsafe fn call2_unrooted<'target>(
         self,
         _: Global<'target>,
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
     ) -> JuliaResultRef<'target, 'data> {
-        unsafe {
-            let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
-            let args = &mut [self.kws, self.func, arg0, arg1];
+        let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
+        let args = &mut [self.kws, self.func, arg0, arg1];
 
-            let res = jl_call(func, args.as_mut_ptr().cast(), 4);
-            let exc = jl_exception_occurred();
+        let res = jl_call(func, args.as_mut_ptr().cast(), 4);
+        let exc = jl_exception_occurred();
 
-            if exc.is_null() {
-                Ok(ValueRef::wrap(res))
-            } else {
-                Ok(ValueRef::wrap(exc))
-            }
+        if exc.is_null() {
+            Ok(ValueRef::wrap(res))
+        } else {
+            Ok(ValueRef::wrap(exc))
         }
     }
 
-    fn call3_unrooted<'target>(
+    unsafe fn call3_unrooted<'target>(
         self,
         _: Global<'target>,
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
         arg2: Value<'_, 'data>,
     ) -> JuliaResultRef<'target, 'data> {
-        unsafe {
-            let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
-            let args = &mut [self.kws, self.func, arg0, arg1, arg2];
+        let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
+        let args = &mut [self.kws, self.func, arg0, arg1, arg2];
 
-            let res = jl_call(func, args.as_mut_ptr().cast(), 5);
-            let exc = jl_exception_occurred();
+        let res = jl_call(func, args.as_mut_ptr().cast(), 5);
+        let exc = jl_exception_occurred();
 
-            if exc.is_null() {
-                Ok(ValueRef::wrap(res))
-            } else {
-                Ok(ValueRef::wrap(exc))
-            }
+        if exc.is_null() {
+            Ok(ValueRef::wrap(res))
+        } else {
+            Ok(ValueRef::wrap(exc))
         }
     }
 
-    fn call_unrooted<'target, 'value, V>(
+    unsafe fn call_unrooted<'target, 'value, V>(
         self,
         _: Global<'target>,
         mut args: V,
@@ -425,26 +471,24 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
     where
         V: AsMut<[Value<'value, 'data>]>,
     {
-        unsafe {
-            let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
-            let args = args.as_mut();
-            let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + args.len());
-            vals.push(self.kws);
-            vals.push(self.func);
+        let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
+        let args = args.as_mut();
+        let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + args.len());
+        vals.push(self.kws);
+        vals.push(self.func);
 
-            for arg in args.iter().copied() {
-                vals.push(arg);
-            }
+        for arg in args.iter().copied() {
+            vals.push(arg);
+        }
 
-            let n = vals.len();
-            let res = jl_call(func, vals.as_mut_ptr().cast(), n as _);
-            let exc = jl_exception_occurred();
+        let n = vals.len();
+        let res = jl_call(func, vals.as_mut_ptr().cast(), n as _);
+        let exc = jl_exception_occurred();
 
-            if exc.is_null() {
-                Ok(ValueRef::wrap(res))
-            } else {
-                Ok(ValueRef::wrap(exc))
-            }
+        if exc.is_null() {
+            Ok(ValueRef::wrap(res))
+        } else {
+            Ok(ValueRef::wrap(exc))
         }
     }
 }

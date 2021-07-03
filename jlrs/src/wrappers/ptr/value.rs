@@ -1094,47 +1094,55 @@ impl<'scope, 'data> Value<'scope, 'data> {
 impl Value<'_, '_> {
     /// Execute a Julia command `cmd`, for example `Value::eval_string(&mut *frame, "sqrt(2)")` or
     /// `Value::eval_string(&mut *frame, "using LinearAlgebra")`.
-    pub fn eval_string<'target, 'current, C, S, F>(scope: S, cmd: C) -> JlrsResult<S::JuliaResult>
+    ///
+    /// Safety: The command can't be checked for correctness, nothing prevents you from causing a
+    /// segmentation fault with a command like `unsafe_load(Ptr{Float64}(C_NULL))`.
+    pub unsafe fn eval_string<'target, 'current, C, S, F>(
+        scope: S,
+        cmd: C,
+    ) -> JlrsResult<S::JuliaResult>
     where
         C: AsRef<str>,
         S: Scope<'target, 'current, 'static, F>,
         F: Frame<'current>,
     {
-        unsafe {
-            let cmd = cmd.as_ref();
-            let cmd_cstring = CString::new(cmd).map_err(JlrsError::other)?;
-            let cmd_ptr = cmd_cstring.as_ptr();
-            let res = jl_eval_string(cmd_ptr);
-            let exc = jl_exception_occurred();
-            let output = if exc.is_null() {
-                Ok(NonNull::new_unchecked(res))
-            } else {
-                Err(NonNull::new_unchecked(exc))
-            };
-            scope.call_result(output, Private)
-        }
+        let cmd = cmd.as_ref();
+        let cmd_cstring = CString::new(cmd).map_err(JlrsError::other)?;
+        let cmd_ptr = cmd_cstring.as_ptr();
+        let res = jl_eval_string(cmd_ptr);
+        let exc = jl_exception_occurred();
+        let output = if exc.is_null() {
+            Ok(NonNull::new_unchecked(res))
+        } else {
+            Err(NonNull::new_unchecked(exc))
+        };
+        scope.call_result(output, Private)
     }
 
     /// Execute a Julia command `cmd`. This is equivalent to `Value::eval_string`, but uses a
     /// null-terminated string.
-    pub fn eval_cstring<'target, 'current, C, S, F>(scope: S, cmd: C) -> JlrsResult<S::JuliaResult>
+    ///
+    /// Safety: The command can't be checked for correctness, nothing prevents you from causing a
+    /// segmentation fault with a command like `unsafe_load(Ptr{Float64}(C_NULL))`.
+    pub unsafe fn eval_cstring<'target, 'current, C, S, F>(
+        scope: S,
+        cmd: C,
+    ) -> JlrsResult<S::JuliaResult>
     where
         C: AsRef<CStr>,
         S: Scope<'target, 'current, 'static, F>,
         F: Frame<'current>,
     {
-        unsafe {
-            let cmd = cmd.as_ref();
-            let cmd_ptr = cmd.as_ptr();
-            let res = jl_eval_string(cmd_ptr);
-            let exc = jl_exception_occurred();
-            let output = if exc.is_null() {
-                Ok(NonNull::new_unchecked(res))
-            } else {
-                Err(NonNull::new_unchecked(exc))
-            };
-            scope.call_result(output, Private)
-        }
+        let cmd = cmd.as_ref();
+        let cmd_ptr = cmd.as_ptr();
+        let res = jl_eval_string(cmd_ptr);
+        let exc = jl_exception_occurred();
+        let output = if exc.is_null() {
+            Ok(NonNull::new_unchecked(res))
+        } else {
+            Err(NonNull::new_unchecked(exc))
+        };
+        scope.call_result(output, Private)
     }
 }
 
@@ -1270,18 +1278,16 @@ unsafe impl<'scope, 'data> ValidLayout for Value<'scope, 'data> {
 }
 
 impl<'data> Call<'data> for Value<'_, 'data> {
-    fn call0<'target, 'current, S, F>(self, scope: S) -> JlrsResult<S::JuliaResult>
+    unsafe fn call0<'target, 'current, S, F>(self, scope: S) -> JlrsResult<S::JuliaResult>
     where
         S: Scope<'target, 'current, 'data, F>,
         F: Frame<'current>,
     {
-        unsafe {
-            let res = self.call0_unrooted(scope.global());
-            scope.unrooted_call_result(res, Private)
-        }
+        let res = self.call0_unrooted(scope.global());
+        scope.unrooted_call_result(res, Private)
     }
 
-    fn call1<'target, 'current, S, F>(
+    unsafe fn call1<'target, 'current, S, F>(
         self,
         scope: S,
         arg0: Value<'_, 'data>,
@@ -1290,13 +1296,11 @@ impl<'data> Call<'data> for Value<'_, 'data> {
         S: Scope<'target, 'current, 'data, F>,
         F: Frame<'current>,
     {
-        unsafe {
-            let res = self.call1_unrooted(scope.global(), arg0);
-            scope.unrooted_call_result(res, Private)
-        }
+        let res = self.call1_unrooted(scope.global(), arg0);
+        scope.unrooted_call_result(res, Private)
     }
 
-    fn call2<'target, 'current, S, F>(
+    unsafe fn call2<'target, 'current, S, F>(
         self,
         scope: S,
         arg0: Value<'_, 'data>,
@@ -1306,13 +1310,11 @@ impl<'data> Call<'data> for Value<'_, 'data> {
         S: Scope<'target, 'current, 'data, F>,
         F: Frame<'current>,
     {
-        unsafe {
-            let res = self.call2_unrooted(scope.global(), arg0, arg1);
-            scope.unrooted_call_result(res, Private)
-        }
+        let res = self.call2_unrooted(scope.global(), arg0, arg1);
+        scope.unrooted_call_result(res, Private)
     }
 
-    fn call3<'target, 'current, S, F>(
+    unsafe fn call3<'target, 'current, S, F>(
         self,
         scope: S,
         arg0: Value<'_, 'data>,
@@ -1323,13 +1325,11 @@ impl<'data> Call<'data> for Value<'_, 'data> {
         S: Scope<'target, 'current, 'data, F>,
         F: Frame<'current>,
     {
-        unsafe {
-            let res = self.call3_unrooted(scope.global(), arg0, arg1, arg2);
-            scope.unrooted_call_result(res, Private)
-        }
+        let res = self.call3_unrooted(scope.global(), arg0, arg1, arg2);
+        scope.unrooted_call_result(res, Private)
     }
 
-    fn call<'target, 'current, 'value, V, S, F>(
+    unsafe fn call<'target, 'current, 'value, V, S, F>(
         self,
         scope: S,
         args: V,
@@ -1339,89 +1339,79 @@ impl<'data> Call<'data> for Value<'_, 'data> {
         S: Scope<'target, 'current, 'data, F>,
         F: Frame<'current>,
     {
-        unsafe {
-            let res = self.call_unrooted(scope.global(), args);
-            scope.unrooted_call_result(res, Private)
+        let res = self.call_unrooted(scope.global(), args);
+        scope.unrooted_call_result(res, Private)
+    }
+
+    unsafe fn call0_unrooted<'target>(self, _: Global<'target>) -> JuliaResultRef<'target, 'data> {
+        let res = jl_call0(self.unwrap(Private));
+        let exc = jl_exception_occurred();
+
+        if exc.is_null() {
+            Ok(ValueRef::wrap(res))
+        } else {
+            Err(ValueRef::wrap(exc))
         }
     }
 
-    fn call0_unrooted<'target>(self, _: Global<'target>) -> JuliaResultRef<'target, 'data> {
-        unsafe {
-            let res = jl_call0(self.unwrap(Private));
-            let exc = jl_exception_occurred();
-
-            if exc.is_null() {
-                Ok(ValueRef::wrap(res))
-            } else {
-                Err(ValueRef::wrap(exc))
-            }
-        }
-    }
-
-    fn call1_unrooted<'target>(
+    unsafe fn call1_unrooted<'target>(
         self,
         _: Global<'target>,
         arg0: Value<'_, 'data>,
     ) -> JuliaResultRef<'target, 'data> {
-        unsafe {
-            let res = jl_call1(self.unwrap(Private), arg0.unwrap(Private));
-            let exc = jl_exception_occurred();
+        let res = jl_call1(self.unwrap(Private), arg0.unwrap(Private));
+        let exc = jl_exception_occurred();
 
-            if exc.is_null() {
-                Ok(ValueRef::wrap(res))
-            } else {
-                Err(ValueRef::wrap(exc))
-            }
+        if exc.is_null() {
+            Ok(ValueRef::wrap(res))
+        } else {
+            Err(ValueRef::wrap(exc))
         }
     }
 
-    fn call2_unrooted<'target>(
+    unsafe fn call2_unrooted<'target>(
         self,
         _: Global<'target>,
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
     ) -> JuliaResultRef<'target, 'data> {
-        unsafe {
-            let res = jl_call2(
-                self.unwrap(Private),
-                arg0.unwrap(Private),
-                arg1.unwrap(Private),
-            );
-            let exc = jl_exception_occurred();
+        let res = jl_call2(
+            self.unwrap(Private),
+            arg0.unwrap(Private),
+            arg1.unwrap(Private),
+        );
+        let exc = jl_exception_occurred();
 
-            if exc.is_null() {
-                Ok(ValueRef::wrap(res))
-            } else {
-                Err(ValueRef::wrap(exc))
-            }
+        if exc.is_null() {
+            Ok(ValueRef::wrap(res))
+        } else {
+            Err(ValueRef::wrap(exc))
         }
     }
 
-    fn call3_unrooted<'target>(
+    unsafe fn call3_unrooted<'target>(
         self,
         _: Global<'target>,
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
         arg2: Value<'_, 'data>,
     ) -> JuliaResultRef<'target, 'data> {
-        unsafe {
-            let res = jl_call3(
-                self.unwrap(Private),
-                arg0.unwrap(Private),
-                arg1.unwrap(Private),
-                arg2.unwrap(Private),
-            );
-            let exc = jl_exception_occurred();
+        let res = jl_call3(
+            self.unwrap(Private),
+            arg0.unwrap(Private),
+            arg1.unwrap(Private),
+            arg2.unwrap(Private),
+        );
+        let exc = jl_exception_occurred();
 
-            if exc.is_null() {
-                Ok(ValueRef::wrap(res))
-            } else {
-                Err(ValueRef::wrap(exc))
-            }
+        if exc.is_null() {
+            Ok(ValueRef::wrap(res))
+        } else {
+            Err(ValueRef::wrap(exc))
         }
     }
 
-    fn call_unrooted<'target, 'value, V>(
+    unsafe fn call_unrooted<'target, 'value, V>(
         self,
         _: Global<'target>,
         mut args: V,
@@ -1429,21 +1419,19 @@ impl<'data> Call<'data> for Value<'_, 'data> {
     where
         V: AsMut<[Value<'value, 'data>]>,
     {
-        unsafe {
-            let args = args.as_mut();
-            let n = args.len();
-            let res = jl_call(
-                self.unwrap(Private).cast(),
-                args.as_mut_ptr().cast(),
-                n as _,
-            );
-            let exc = jl_exception_occurred();
+        let args = args.as_mut();
+        let n = args.len();
+        let res = jl_call(
+            self.unwrap(Private).cast(),
+            args.as_mut_ptr().cast(),
+            n as _,
+        );
+        let exc = jl_exception_occurred();
 
-            if exc.is_null() {
-                Ok(ValueRef::wrap(res))
-            } else {
-                Err(ValueRef::wrap(exc))
-            }
+        if exc.is_null() {
+            Ok(ValueRef::wrap(res))
+        } else {
+            Err(ValueRef::wrap(exc))
         }
     }
 }

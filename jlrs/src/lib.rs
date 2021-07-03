@@ -89,12 +89,22 @@
 //! that implements [`IntoJulia`] also implements [`Unbox`] which is used to extract the contents
 //! of a Julia value.
 //!
+//! In addition to evaluating raw commands with `Value::eval_string`, it's possible to call
+//! anything that implements [`Call`] as a Julia function, `Value` implements this trait because
+//! any Julia value is potentially callable as a function. Functions can be called with any number
+//! of positional arguments and be provided with keyword arguments. Both `Value::eval_string` and
+//! the trait methods of `Call` are all unsafe. It's trivial to write a function like
+//! `boom() = unsafe_load(Ptr{Float64}(C_NULL))`, which causes a segfault when it's called, and
+//! call it with these methods.
+//!
 //! As a simple example, let's convert two numbers to Julia values and add them:
 //!
 //! ```no_run
 //! use jlrs::prelude::*;
 //!
 //! # fn main() {
+//! // Initializing Julia is unsafe because it can race with another crate that does
+//! // the same.
 //! let mut julia = unsafe { Julia::init().unwrap() };
 //! let res = julia.scope(|global, frame| {
 //!     // Create the two arguments. Note that the first argument, something that
@@ -110,9 +120,11 @@
 //!     // call is a nested `Result`; the outer error doesn't  contain to any Julia
 //!     // data, while the inner error contains the exception if one is thrown. Here we
 //!     // explicitly convert the exception to an error that is compatible with `?`.
-//!     func.call2(&mut *frame, i, j)?
-//!         .into_jlrs_result()?
-//!         .unbox::<u64>()
+//!     unsafe {
+//!         func.call2(&mut *frame, i, j)?
+//!             .into_jlrs_result()?
+//!             .unbox::<u64>()
+//!     }
 //! }).unwrap();
 //!
 //! assert_eq!(res, 3);
@@ -145,7 +157,7 @@
 //!
 //! # fn main() {
 //! let mut julia = unsafe { Julia::init().unwrap() };
-//! julia.scope(|global, frame| {
+//! julia.scope(|global, frame| unsafe {
 //!     // Cast the function to a void pointer
 //!     let call_me_val = Value::new(&mut *frame, call_me as *mut std::ffi::c_void)?;
 //!
@@ -474,13 +486,12 @@ impl Julia {
     /// ```
     pub fn include<P: AsRef<Path>>(&mut self, path: P) -> JlrsResult<()> {
         if path.as_ref().exists() {
-            return self.scope_with_slots(2, |global, frame| {
+            return self.scope_with_slots(2, |global, frame| unsafe {
                 let path_jl_str = JuliaString::new(&mut *frame, path.as_ref().to_string_lossy())?;
-                let include_func = unsafe {
-                    Module::main(global)
-                        .function_ref("include")?
-                        .wrapper_unchecked()
-                };
+                let include_func = Module::main(global)
+                    .function_ref("include")?
+                    .wrapper_unchecked();
+
                 let res = include_func.call1(frame, path_jl_str)?;
 
                 return match res {

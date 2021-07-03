@@ -40,6 +40,7 @@ impl AsyncTask for MyTask {
         // the result before casting it to an `f64` (which that function returns). A function that
         // is called with `call_async` is executed on another thread by calling
         // `Base.threads.@spawn`.
+        // The module and function don't have to be rooted because the module is never redefined.
         let v = unsafe {
             Module::main(global)
                 .submodule_ref("MyModule")?

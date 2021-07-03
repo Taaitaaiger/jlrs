@@ -12,7 +12,7 @@ thread_local! {
     #[doc(hidden)]
     pub static JULIA: RefCell<Julia> = {
         let r = RefCell::new(unsafe { Julia::init().unwrap() });
-        r.borrow_mut().scope_with_slots(1, |_, frame| {
+        r.borrow_mut().scope_with_slots(1, |_, frame| unsafe {
             Value::eval_string(frame, JLRS_TESTS_JL)?.expect("failed to evaluate contents of JlrsTests.jl");
             Ok(())
         }).unwrap();

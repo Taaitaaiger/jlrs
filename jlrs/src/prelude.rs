@@ -2,7 +2,7 @@
 
 pub use crate::{
     convert::{as_unrooted::AsUnrooted, into_jlrs_result::IntoJlrsResult},
-    error::{JlrsResult, JuliaResult},
+    error::JlrsResult,
     layout::typecheck::Nothing,
     memory::{
         frame::{Frame, GcFrame, NullFrame},

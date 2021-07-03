@@ -22,7 +22,7 @@ fn union_array_1d() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.scope_with_slots(1, |_global, frame| {
+        jlrs.scope_with_slots(1, |_global, frame| unsafe {
             let arr_val = Value::eval_string(
                 &mut *frame,
                 "a = Vector{Union{Int32, Float32, Bool}}()

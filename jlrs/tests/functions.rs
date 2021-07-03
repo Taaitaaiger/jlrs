@@ -6,7 +6,7 @@ fn return_nothing() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.scope_with_slots(3, |_global, frame| {
+        jlrs.scope_with_slots(3, |_global, frame| unsafe {
             let func = Value::eval_string(
                 &mut *frame,
                 "function x(a)::Nothing 
@@ -28,7 +28,7 @@ fn throw_nothing() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.scope_with_slots(3, |_global, frame| {
+        jlrs.scope_with_slots(3, |_global, frame| unsafe {
             let func = Value::eval_string(
                 &mut *frame,
                 "function y()::Nothing 

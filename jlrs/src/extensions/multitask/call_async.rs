@@ -21,7 +21,7 @@ pub trait CallAsync<'data>: Call<'data> {
     /// While `await`ing the result the async runtime can work on other tasks, the current task
     /// resumes after the function call on the other thread completes (either by returning or
     /// throwing).
-    async fn call_async<'frame, 'value, V>(
+    async unsafe fn call_async<'frame, 'value, V>(
         self,
         frame: &mut AsyncGcFrame<'frame>,
         args: V,
@@ -32,7 +32,7 @@ pub trait CallAsync<'data>: Call<'data> {
 
 #[async_trait(?Send)]
 impl<'data> CallAsync<'data> for Value<'_, 'data> {
-    async fn call_async<'frame, 'value, V>(
+    async unsafe fn call_async<'frame, 'value, V>(
         self,
         frame: &mut AsyncGcFrame<'frame>,
         args: V,
@@ -46,7 +46,7 @@ impl<'data> CallAsync<'data> for Value<'_, 'data> {
 
 #[async_trait(?Send)]
 impl<'data> CallAsync<'data> for Function<'_, 'data> {
-    async fn call_async<'frame, 'value, V>(
+    async unsafe fn call_async<'frame, 'value, V>(
         self,
         frame: &mut AsyncGcFrame<'frame>,
         args: V,
@@ -60,7 +60,7 @@ impl<'data> CallAsync<'data> for Function<'_, 'data> {
 
 #[async_trait(?Send)]
 impl<'data> CallAsync<'data> for WithKeywords<'_, 'data> {
-    async fn call_async<'frame, 'value, V>(
+    async unsafe fn call_async<'frame, 'value, V>(
         self,
         frame: &mut AsyncGcFrame<'frame>,
         args: V,

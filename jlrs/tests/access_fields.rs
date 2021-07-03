@@ -6,15 +6,13 @@ use jlrs::util::JULIA;
 fn access_tuple_fields() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
-        jlrs.scope_with_slots(4, |global, frame| {
+        jlrs.scope_with_slots(4, |global, frame| unsafe {
             // Returns (1, 2, 3) as Tuple{UInt32, UInt16, Int64}
-            let func = unsafe {
-                Module::main(global)
-                    .submodule_ref("JlrsTests")?
-                    .wrapper_unchecked()
-                    .function_ref("inlinetuple")?
-                    .wrapper_unchecked()
-            };
+            let func = Module::main(global)
+                .submodule_ref("JlrsTests")?
+                .wrapper_unchecked()
+                .function_ref("inlinetuple")?
+                .wrapper_unchecked();
             let tup = func.call0(&mut *frame)?.unwrap();
 
             assert!(tup.is::<Tuple>());

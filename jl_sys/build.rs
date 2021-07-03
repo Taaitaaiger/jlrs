@@ -1,7 +1,5 @@
-#![allow(unused_imports)]
 use std::env;
 use std::fs;
-use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
 
 fn find_julia() -> Option<String> {
@@ -29,7 +27,6 @@ fn flags() -> Vec<String> {
     };
 
     println!("cargo:rustc-link-lib=julia");
-    println!("cargo:rustc-link-lib=jlrs_c");
     flags
 }
 
@@ -37,8 +34,8 @@ fn main() {
     let mut out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
     out_path.push("bindings.rs");
 
-    println!("cargo:rerun-if-changed=jlrs_c.c");
-    println!("cargo:rerun-if-changed=jlrs_c.h");
+    println!("cargo:rerun-if-changed=src/jlrs_c.c");
+    println!("cargo:rerun-if-changed=src/jlrs_c.h");
     println!("cargo:rerun-if-env-changed=JULIA_DIR");
 
     if env::var("CARGO_FEATURE_DOCS_RS").is_ok() {
@@ -49,10 +46,15 @@ fn main() {
 
     let flags = flags();
 
-    cc::Build::new()
-        .file("jlrs_c.c")
-        .include(&flags[0][2..])
-        .compile("jlrs_c");
+    let mut c = cc::Build::new();
+    c.file("src/jlrs_c.c");
+    c.static_flag(true);
+
+    if flags.len() == 1 {
+        c.include(&flags[0][2..]);
+    }
+
+    c.compile("jlrs_c");
 
     let functions = vec![
         "jl_alloc_array_1d",
@@ -156,7 +158,7 @@ fn main() {
 
     let mut builder = bindgen::Builder::default()
         .clang_args(&flags)
-        .header("jlrs_c.h")
+        .header("src/jlrs_c.h")
         .size_t_is_usize(true);
 
     for func in functions.iter().copied() {

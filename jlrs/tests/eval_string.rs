@@ -1,8 +1,8 @@
 use jlrs::prelude::*;
-use jlrs::util::JULIA;
+use jlrs::{error::JuliaResult, util::JULIA};
 
 fn eval_string(string: &str, with_result: impl for<'f> FnOnce(JuliaResult<'f, 'static>)) {
-    JULIA.with(|j| {
+    JULIA.with(|j| unsafe {
         let mut jlrs = j.borrow_mut();
         jlrs.scope_with_slots(1, |_global, frame| {
             with_result(Value::eval_string(&mut *frame, string)?);

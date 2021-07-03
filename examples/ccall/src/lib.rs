@@ -6,7 +6,7 @@ use jlrs::prelude::*;
 
 // Add two 32-bit signed integers, it can be called from Julia with:
 // `ccall((:add, "libccall"), Int32, (Int32, Int32), a, b)` where `a` and `b` are `Int32`s.
-// Note that you can write this function and use it from Julia *without* jlrs. 
+// Note that you can write this function and use it from Julia *without* jlrs.
 #[no_mangle]
 pub unsafe extern "C" fn add(a: i32, b: i32) -> i32 {
     a + b

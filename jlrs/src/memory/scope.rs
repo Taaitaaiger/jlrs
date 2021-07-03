@@ -96,11 +96,13 @@ pub trait ScopeExt<'target, 'current, 'data, F: Frame<'current>>:
     ///           let v1 = Value::new(&mut *frame, 1usize)?;
     ///           let v2 = Value::new(&mut *frame, 2usize)?;
     ///
-    ///           Module::base(global)
-    ///               .function(&mut *frame, "+")?
-    ///               .call2(&mut *frame, v1, v2)?
-    ///               .unwrap()
-    ///               .unbox::<usize>()
+    ///           unsafe {
+    ///               Module::base(global)
+    ///                   .function(&mut *frame, "+")?
+    ///                   .call2(&mut *frame, v1, v2)?
+    ///                   .unwrap()
+    ///                   .unbox::<usize>()
+    ///           }
     ///       })?;
     ///
     ///       assert_eq!(sum, 3);
@@ -128,12 +130,14 @@ pub trait ScopeExt<'target, 'current, 'data, F: Frame<'current>>:
     ///       let sum = frame.scope_with_slots(3, |frame| {
     ///           let v1 = Value::new(&mut *frame, 1usize)?;
     ///           let v2 = Value::new(&mut *frame, 2usize)?;
-    ///
-    ///           Module::base(global)
-    ///               .function(&mut *frame, "+")?
-    ///               .call2(&mut *frame, v1, v2)?
-    ///               .unwrap()
-    ///               .unbox::<usize>()
+    ///             
+    ///           unsafe {
+    ///               Module::base(global)
+    ///                   .function(&mut *frame, "+")?
+    ///                   .call2(&mut *frame, v1, v2)?
+    ///                   .unwrap()
+    ///                   .unbox::<usize>()
+    ///           }
     ///       })?;
     ///
     ///       assert_eq!(sum, 3);
@@ -339,7 +343,7 @@ where
     ///           let add = Module::base(global).function(&mut *frame, "+")?;
     ///
     ///           let output = output.into_scope(frame);
-    ///           add.call2(output, v1, v2)
+    ///           unsafe { add.call2(output, v1, v2) }
     ///       })?.unwrap().unbox::<usize>()?;
     ///
     ///       assert_eq!(sum, 3);
@@ -414,7 +418,7 @@ where
     ///           let add = Module::base(global).function(&mut *frame, "+")?;
     ///
     ///           let output = output.into_scope(frame);
-    ///           add.call2(output, v1, v2)
+    ///           unsafe { add.call2(output, v1, v2) }
     ///       })?.unwrap().unbox::<usize>()?;
     ///
     ///       assert_eq!(sum, 3);
@@ -487,7 +491,7 @@ impl<'current, 'data, F: Frame<'current>> Scope<'current, 'current, 'data, F> fo
     ///               .function(&mut *frame, "+")?;
     ///
     ///           let output = output.into_scope(frame);
-    ///           func.call2(output, v1, v2)
+    ///           unsafe { func.call2(output, v1, v2) }
     ///       })?.unwrap()
     ///           .unbox::<usize>()?;
     ///
@@ -564,7 +568,7 @@ impl<'current, 'data, F: Frame<'current>> Scope<'current, 'current, 'data, F> fo
     ///               .function(&mut *frame, "+")?;
     ///
     ///           let output = output.into_scope(frame);
-    ///           func.call2(output, v1, v2)
+    ///           unsafe { func.call2(output, v1, v2) }
     ///       })?.unwrap()
     ///           .unbox::<usize>()?;
     ///
