@@ -342,15 +342,13 @@ pub(crate) mod private {
             )
                 -> JlrsResult<OutputValue<'frame, 'data, 'inner>>,
         {
-            unsafe {
-                let v = {
-                    let mut nested = self.nest(0);
-                    let out = Output::new();
-                    func(out, &mut nested)?.into_pending()
-                };
+            let v = {
+                let mut nested = self.nest(0);
+                let out = Output::new();
+                func(out, &mut nested)?.into_pending()
+            };
 
-                Value::root_pending(self, v)
-            }
+            unsafe { Value::root_pending(self, v) }
         }
 
         fn value_scope_with_slots<'data, F>(
@@ -366,15 +364,13 @@ pub(crate) mod private {
             )
                 -> JlrsResult<OutputValue<'frame, 'data, 'inner>>,
         {
-            unsafe {
-                let v = {
-                    let mut nested = self.nest(capacity);
-                    let out = Output::new();
-                    func(out, &mut nested)?.into_pending()
-                };
+            let v = {
+                let mut nested = self.nest(capacity);
+                let out = Output::new();
+                func(out, &mut nested)?.into_pending()
+            };
 
-                Value::root_pending(self, v)
-            }
+            unsafe { Value::root_pending(self, v) }
         }
 
         fn result_scope<'data, F>(
@@ -389,15 +385,13 @@ pub(crate) mod private {
             )
                 -> JlrsResult<OutputResult<'frame, 'data, 'inner>>,
         {
-            unsafe {
-                let v = {
-                    let mut nested = self.nest(0);
-                    let out = Output::new();
-                    func(out, &mut nested)?.into_pending()
-                };
+            let v = {
+                let mut nested = self.nest(0);
+                let out = Output::new();
+                func(out, &mut nested)?.into_pending()
+            };
 
-                JuliaResult::root_pending(self, v)
-            }
+            unsafe { JuliaResult::root_pending(self, v) }
         }
 
         fn result_scope_with_slots<'data, F>(
@@ -413,15 +407,13 @@ pub(crate) mod private {
             )
                 -> JlrsResult<OutputResult<'frame, 'data, 'inner>>,
         {
-            unsafe {
-                let v = {
-                    let mut nested = self.nest(capacity);
-                    let out = Output::new();
-                    func(out, &mut nested)?.into_pending()
-                };
+            let v = {
+                let mut nested = self.nest(capacity);
+                let out = Output::new();
+                func(out, &mut nested)?.into_pending()
+            };
 
-                JuliaResult::root_pending(self, v)
-            }
+            unsafe { JuliaResult::root_pending(self, v) }
         }
 
         fn scope<T, F>(&mut self, func: F, _: Private) -> JlrsResult<T>

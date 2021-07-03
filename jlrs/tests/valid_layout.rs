@@ -41,7 +41,7 @@ fn valid_layout_array() {
         let mut jlrs = j.borrow_mut();
         jlrs.scope(|global, frame| {
             unsafe {
-                let v = Array::new::<i32, _, _, _>(frame, (2, 2))?;
+                let v = Array::new::<i32, _, _, _>(frame, (2, 2))?.into_jlrs_result()?;
                 assert!(Array::valid_layout(v.datatype().as_value()));
 
                 let ua = Module::base(global)

@@ -5,14 +5,15 @@
 //! [`Global`] in order to prevent it from being accessed before Julia has been initialized.
 //!
 //! Another use-case for [`Global`] is calling Julia functions without rooting the result.
+
 use std::marker::PhantomData;
 
 /// Access token required for accessing global Julia data, also used to call Julia function
 /// without rooting the result.
 #[derive(Copy, Clone)]
-pub struct Global<'base>(PhantomData<&'base ()>);
+pub struct Global<'global>(PhantomData<&'global ()>);
 
-impl<'base> Global<'base> {
+impl<'global> Global<'global> {
     #[doc(hidden)]
 
     pub unsafe fn new() -> Self {

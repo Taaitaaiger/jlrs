@@ -4,7 +4,7 @@ use super::{
     array::Array, private::Wrapper as WrapperPriv, DataTypeRef, SimpleVectorRef, TypeNameRef,
     ValueRef, Wrapper,
 };
-use crate::error::CANNOT_DISPLAY_TYPE;
+use crate::error::{JuliaResultRef, CANNOT_DISPLAY_TYPE};
 use crate::layout::typecheck::{Concrete, Typecheck};
 use crate::memory::frame::Frame;
 use crate::wrappers::ptr::symbol::Symbol;
@@ -31,7 +31,8 @@ use jl_sys::{
     jl_task_type, jl_tvar_type, jl_typedslot_type, jl_typeerror_type, jl_typemap_entry_type,
     jl_typemap_level_type, jl_typename_str, jl_typename_type, jl_typeofbottom_type, jl_uint16_type,
     jl_uint32_type, jl_uint64_type, jl_uint8_type, jl_undefvarerror_type, jl_unionall_type,
-    jl_uniontype_type, jl_upsilonnode_type, jl_voidpointer_type, jl_weakref_type,
+    jl_uniontype_type, jl_upsilonnode_type, jl_voidpointer_type, jl_weakref_type, jlrs_new_structv,
+    jlrs_result_tag_t_JLRS_RESULT_ERR,
 };
 use std::{ffi::CStr, marker::PhantomData, ptr::NonNull};
 
@@ -217,14 +218,14 @@ impl<'scope> DataType<'scope> {
     /// arbitrary concrete `DataType`s, at the cost that each of its fields must have already been
     /// allocated as a `Value`. This functions returns an error if the given `DataType` isn't
     /// concrete or is an array type. For custom array types you must use [`Array::new_for`].
-    pub fn instantiate<'target, 'fr, 'value, 'borrow, S, F, V>(
+    pub fn instantiate<'target, 'frame, 'value, 'borrow, V, S, F>(
         self,
         scope: S,
         mut values: V,
-    ) -> JlrsResult<S::Value>
+    ) -> JlrsResult<S::JuliaResult>
     where
-        S: Scope<'target, 'fr, 'borrow, F>,
-        F: Frame<'fr>,
+        S: Scope<'target, 'frame, 'borrow, F>,
+        F: Frame<'frame>,
         V: AsMut<[Value<'value, 'borrow>]>,
     {
         unsafe {
@@ -239,12 +240,19 @@ impl<'scope> DataType<'scope> {
             }
 
             let values = values.as_mut();
-            let value = jl_new_structv(
+            let res = jlrs_new_structv(
                 self.unwrap(Private),
                 values.as_mut_ptr().cast(),
                 values.len() as _,
             );
-            scope.value(NonNull::new_unchecked(value), Private)
+
+            let out = if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
+                Err(NonNull::new_unchecked(res.data))
+            } else {
+                Ok(NonNull::new_unchecked(res.data))
+            };
+
+            scope.call_result(out, Private)
         }
     }
 
@@ -258,7 +266,7 @@ impl<'scope> DataType<'scope> {
         self,
         _: Global<'global>,
         mut values: V,
-    ) -> JlrsResult<ValueRef<'global, 'borrow>>
+    ) -> JlrsResult<JuliaResultRef<'global, 'borrow>>
     where
         V: AsMut<[Value<'value, 'borrow>]>,
     {
@@ -274,13 +282,72 @@ impl<'scope> DataType<'scope> {
             }
 
             let values = values.as_mut();
+            let res = jlrs_new_structv(
+                self.unwrap(Private),
+                values.as_mut_ptr().cast(),
+                values.len() as _,
+            );
+
+            if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
+                Ok(Err(ValueRef::wrap(res.data)))
+            } else {
+                Ok(Ok(ValueRef::wrap(res.data)))
+            }
+        }
+    }
+
+    /// Create a new instance of this `DataType`, using `values` to set the fields.
+    /// This is essentially a more powerful version of [`Value::new`] that can instantiate
+    /// arbitrary concrete `DataType`s, at the cost that each of its fields must have already been
+    /// allocated as a `Value`.
+    ///
+    /// This method performs no checks whether or not the value can be constructed with these
+    /// values. If Julia throws an exception the process aborts.
+    pub fn instantiate_unchecked<'target, 'frame, 'value, 'borrow, V, S, F>(
+        self,
+        scope: S,
+        mut values: V,
+    ) -> JlrsResult<S::Value>
+    where
+        S: Scope<'target, 'frame, 'borrow, F>,
+        F: Frame<'frame>,
+        V: AsMut<[Value<'value, 'borrow>]>,
+    {
+        unsafe {
+            let values = values.as_mut();
+            let value = jl_new_structv(
+                self.unwrap(Private),
+                values.as_mut_ptr().cast(),
+                values.len() as _,
+            );
+            scope.value(NonNull::new_unchecked(value), Private)
+        }
+    }
+
+    /// Create a new instance of this `DataType`, using `values` to set the fields.
+    /// This is essentially a more powerful version of [`Value::new`] that can instantiate
+    /// arbitrary concrete `DataType`s, at the cost that each of its fields must have already been
+    /// allocated as a `Value`.
+    ///
+    /// This method performs no checks whether or not the value can be constructed with these
+    /// values. If Julia throws an exception the process aborts.
+    pub fn instantiate_unrooted_unchecked<'global, 'value, 'borrow, V>(
+        self,
+        _: Global<'global>,
+        mut values: V,
+    ) -> ValueRef<'global, 'borrow>
+    where
+        V: AsMut<[Value<'value, 'borrow>]>,
+    {
+        unsafe {
+            let values = values.as_mut();
             let value = jl_new_structv(
                 self.unwrap(Private),
                 values.as_mut_ptr().cast(),
                 values.len() as _,
             );
 
-            Ok(ValueRef::wrap(value))
+            ValueRef::wrap(value)
         }
     }
 }

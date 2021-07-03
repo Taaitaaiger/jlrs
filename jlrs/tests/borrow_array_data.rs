@@ -297,7 +297,7 @@ fn access_borrowed_array_dimensions() {
         let mut jlrs = j.borrow_mut();
 
         jlrs.scope_with_slots(1, |_, frame| {
-            let arr_val = Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?;
+            let arr_val = Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?.into_jlrs_result()?;
             let arr = arr_val.cast::<Array>()?;
 
             let data = arr.inline_data::<f32, _>(&mut *frame)?;
@@ -315,7 +315,7 @@ fn access_mutable_borrowed_array_dimensions() {
         let mut jlrs = j.borrow_mut();
 
         jlrs.scope_with_slots(1, |_, frame| {
-            let arr_val = Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?;
+            let arr_val = Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?.into_jlrs_result()?;
             let arr = arr_val.cast::<Array>()?;
 
             let data = arr.inline_data_mut::<f32, _>(&mut *frame)?;
@@ -334,8 +334,10 @@ fn unrestricted_array_borrow() {
 
         jlrs.scope_with_slots(2, |_, frame| {
             unsafe {
-                let arr_val = Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?;
-                let arr_val2 = Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?;
+                let arr_val =
+                    Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?.into_jlrs_result()?;
+                let arr_val2 =
+                    Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?.into_jlrs_result()?;
                 let arr = arr_val.cast::<Array>()?;
                 let arr2 = arr_val2.cast::<Array>()?;
 
@@ -360,8 +362,10 @@ fn unrestricted_typed_array_borrow() {
 
         jlrs.scope_with_slots(2, |_, frame| {
             unsafe {
-                let arr_val = Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?;
-                let arr_val2 = Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?;
+                let arr_val =
+                    Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?.into_jlrs_result()?;
+                let arr_val2 =
+                    Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?.into_jlrs_result()?;
                 let arr = arr_val.cast::<TypedArray<f32>>()?;
                 let arr2 = arr_val2.cast::<TypedArray<f32>>()?;
 

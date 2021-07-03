@@ -17,8 +17,11 @@ fn create_new_unionall() {
                 None,
                 Some(DataType::number_type(global).as_value()),
             )?
+            .into_jlrs_result()?
             .cast()?;
-            let ua = UnionAll::new(&mut *frame, tvar, body)?.cast::<UnionAll>()?;
+            let ua = UnionAll::new(&mut *frame, tvar, body)?
+                .into_jlrs_result()?
+                .cast::<UnionAll>()?;
             let v = ua.var().wrapper().unwrap();
 
             let equals = Module::base(global)
@@ -47,8 +50,10 @@ fn instantiate_unionall() {
                 .global_ref("ParameterStruct")?
                 .wrapper_unchecked()
                 .apply_type(&mut *frame, &mut [DataType::int8_type(global).as_value()])?
+                .into_jlrs_result()?
                 .cast::<DataType>()?
                 .instantiate(&mut *frame, &mut [v])?
+                .into_jlrs_result()?
                 .get_field(&mut *frame, "a")?
                 .unbox::<i8>()?;
 
@@ -75,13 +80,17 @@ fn apply_value_type() {
 
             let v1 = vts
                 .apply_type(&mut *frame, &mut [ty1])?
+                .into_jlrs_result()?
                 .cast::<DataType>()?
-                .instantiate(&mut *frame, &mut [])?;
+                .instantiate(&mut *frame, &mut [])?
+                .into_jlrs_result()?;
 
             let v2 = vts
                 .apply_type(&mut *frame, &mut [ty2])?
+                .into_jlrs_result()?
                 .cast::<DataType>()?
-                .instantiate(&mut *frame, &mut [])?;
+                .instantiate(&mut *frame, &mut [])?
+                .into_jlrs_result()?;
 
             let func = Module::main(global)
                 .submodule_ref("JlrsTests")?

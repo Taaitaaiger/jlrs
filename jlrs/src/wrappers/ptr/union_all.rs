@@ -2,7 +2,7 @@
 
 use super::type_var::TypeVar;
 use super::{private::Wrapper, value::Value};
-use crate::error::{JlrsError, JlrsResult};
+use crate::error::{JlrsResult, JuliaResultRef};
 use crate::impl_debug;
 use crate::memory::frame::Frame;
 use crate::memory::scope::Scope;
@@ -16,6 +16,7 @@ use jl_sys::{
     jl_abstractarray_type, jl_anytuple_type_type, jl_array_type, jl_densearray_type,
     jl_llvmpointer_type, jl_namedtuple_type, jl_pointer_type, jl_ref_type, jl_type_type,
     jl_type_unionall, jl_unionall_t, jl_unionall_type, jl_vararg_type,
+    jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_type_unionall,
 };
 use std::{marker::PhantomData, ptr::NonNull};
 
@@ -26,8 +27,28 @@ use std::{marker::PhantomData, ptr::NonNull};
 pub struct UnionAll<'scope>(NonNull<jl_unionall_t>, PhantomData<&'scope ()>);
 
 impl<'scope> UnionAll<'scope> {
-    /// Create a new `UnionAll`.
+    /// Create a new `UnionAll`. If an exception is thrown, it's caught and returned.
     pub fn new<'target, 'current, S, F>(
+        scope: S,
+        tvar: TypeVar,
+        body: Value<'_, 'static>,
+    ) -> JlrsResult<S::JuliaResult>
+    where
+        S: Scope<'target, 'current, 'static, F>,
+        F: Frame<'current>,
+    {
+        unsafe {
+            let ua = jlrs_type_unionall(tvar.unwrap(Private), body.unwrap(Private));
+            if ua.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
+                scope.call_result(Err(NonNull::new_unchecked(ua.data)), Private)
+            } else {
+                scope.call_result(Ok(NonNull::new_unchecked(ua.data)), Private)
+            }
+        }
+    }
+
+    /// Create a new `UnionAll`. If an exception is thrown the process aborts.
+    pub fn new_unchecked<'target, 'current, S, F>(
         scope: S,
         tvar: TypeVar,
         body: Value<'_, 'static>,
@@ -36,12 +57,6 @@ impl<'scope> UnionAll<'scope> {
         S: Scope<'target, 'current, 'static, F>,
         F: Frame<'current>,
     {
-        if !body.is_type() && !body.is::<TypeVar>() {
-            Err(JlrsError::InvalidBody {
-                body_type_name: body.datatype_name()?.into(),
-            })?;
-        }
-
         unsafe {
             let ua = jl_type_unionall(tvar.unwrap(Private), body.unwrap(Private));
             scope.value(NonNull::new_unchecked(ua), Private)
@@ -49,21 +64,32 @@ impl<'scope> UnionAll<'scope> {
     }
 
     /// Create a new `UnionAll`. Unlike [`UnionAll::new`] this method doesn't root the allocated
-    /// value.
+    /// value or exception.
     pub fn new_unrooted<'global>(
         _: Global<'global>,
         tvar: TypeVar,
         body: Value<'_, 'static>,
-    ) -> JlrsResult<ValueRef<'global, 'static>> {
-        if !body.is_type() && !body.is::<TypeVar>() {
-            Err(JlrsError::InvalidBody {
-                body_type_name: body.datatype_name()?.into(),
-            })?;
+    ) -> JuliaResultRef<'global, 'static> {
+        unsafe {
+            let ua = jlrs_type_unionall(tvar.unwrap(Private), body.unwrap(Private));
+            if ua.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
+                Err(ValueRef::wrap(ua.data))
+            } else {
+                Ok(ValueRef::wrap(ua.data))
+            }
         }
+    }
 
+    /// Create a new `UnionAll`. Unlike [`UnionAll::new_unchecked`] this method doesn't root the
+    /// allocated value. If an exception is thrown the process aborts.
+    pub fn new_unrooted_unchecked<'global>(
+        _: Global<'global>,
+        tvar: TypeVar,
+        body: Value<'_, 'static>,
+    ) -> ValueRef<'global, 'static> {
         unsafe {
             let ua = jl_type_unionall(tvar.unwrap(Private), body.unwrap(Private));
-            Ok(ValueRef::wrap(ua))
+            ValueRef::wrap(ua)
         }
     }
 

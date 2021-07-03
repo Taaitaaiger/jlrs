@@ -2,12 +2,15 @@
 
 use super::{private::Wrapper, value::Value, ValueRef, Wrapper as _};
 use crate::{
-    error::{JlrsError, JlrsResult},
+    error::{JlrsResult, JuliaResultRef},
     impl_debug, impl_julia_typecheck, impl_valid_layout,
     memory::{frame::Frame, global::Global, scope::Scope},
     private::Private,
 };
-use jl_sys::{jl_islayout_inline, jl_type_union, jl_uniontype_t, jl_uniontype_type};
+use jl_sys::{
+    jl_islayout_inline, jl_type_union, jl_uniontype_t, jl_uniontype_type,
+    jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_type_union,
+};
 use std::{marker::PhantomData, ptr::NonNull};
 
 /// A struct field can have a type that's a union of several types. In this case, the type of this
@@ -21,9 +24,11 @@ impl<'scope> Union<'scope> {
     /// must return `true`. Note that the result is not necessarily a [`Union`], for example the
     /// union of a single [`DataType`] is that type, not a `Union` with a single variant.
     ///
+    /// If an exception is thrown, it's caught and returned.
+    ///
     /// [`Union`]: crate::wrappers::ptr::union::Union
     /// [`DataType`]: crate::wrappers::ptr::datatype::DataType
-    pub fn new<'target, 'current, V, S, F>(scope: S, mut types: V) -> JlrsResult<S::Value>
+    pub fn new<'target, 'current, V, S, F>(scope: S, mut types: V) -> JlrsResult<S::JuliaResult>
     where
         V: AsMut<[Value<'scope, 'static>]>,
         S: Scope<'target, 'current, 'static, F>,
@@ -31,15 +36,31 @@ impl<'scope> Union<'scope> {
     {
         unsafe {
             let types = types.as_mut();
-            if let Some(v) = types
-                .iter()
-                .find_map(|v| if v.is_kind() { None } else { Some(v) })
-            {
-                Err(JlrsError::NotAKind {
-                    type_name: v.datatype_name()?.into(),
-                })?;
+            let un = jlrs_type_union(types.as_mut_ptr().cast(), types.len());
+            if un.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
+                scope.call_result(Err(NonNull::new_unchecked(un.data)), Private)
+            } else {
+                scope.call_result(Ok(NonNull::new_unchecked(un.data)), Private)
             }
+        }
+    }
 
+    /// Returns the union of all types in `types`. For each of these types, [`Value::is_kind`]
+    /// must return `true`. Note that the result is not necessarily a [`Union`], for example the
+    /// union of a single [`DataType`] is that type, not a `Union` with a single variant.
+    ///
+    /// If an exception is thrown the process aborts.
+    ///
+    /// [`Union`]: crate::wrappers::ptr::union::Union
+    /// [`DataType`]: crate::wrappers::ptr::datatype::DataType
+    pub fn new_unchecked<'target, 'current, V, S, F>(scope: S, mut types: V) -> JlrsResult<S::Value>
+    where
+        V: AsMut<[Value<'scope, 'static>]>,
+        S: Scope<'target, 'current, 'static, F>,
+        F: Frame<'current>,
+    {
+        unsafe {
+            let types = types.as_mut();
             let un = jl_type_union(types.as_mut_ptr().cast(), types.len());
             scope.value(NonNull::new_unchecked(un), Private)
         }
@@ -48,30 +69,48 @@ impl<'scope> Union<'scope> {
     /// Returns the union of all types in `types`. For each of these types, [`Value::is_kind`]
     /// must return `true`. Note that the result is not necessarily a [`Union`], for example the
     /// union of a single [`DataType`] is that type, not a `Union` with a single variant. Unlike
-    /// [`Union::new`] this method doesn't root the allocated value.
+    /// [`Union::new`] this method doesn't root the allocated value or exception.
     ///
     /// [`Union`]: crate::wrappers::ptr::union::Union
     /// [`DataType`]: crate::wrappers::ptr::datatype::DataType
     pub fn new_unrooted<'global, V>(
         _: Global<'global>,
         mut types: V,
-    ) -> JlrsResult<ValueRef<'global, 'static>>
+    ) -> JuliaResultRef<'global, 'static>
     where
         V: AsMut<[Value<'scope, 'static>]>,
     {
         unsafe {
             let types = types.as_mut();
-            if let Some(v) = types
-                .iter()
-                .find_map(|v| if v.is_kind() { None } else { Some(v) })
-            {
-                Err(JlrsError::NotAKind {
-                    type_name: v.datatype_name()?.into(),
-                })?;
+            let un = jlrs_type_union(types.as_mut_ptr().cast(), types.len());
+            if un.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
+                Err(ValueRef::wrap(un.data))
+            } else {
+                Ok(ValueRef::wrap(un.data))
             }
+        }
+    }
 
+    /// Returns the union of all types in `types`. For each of these types, [`Value::is_kind`]
+    /// must return `true`. Note that the result is not necessarily a [`Union`], for example the
+    /// union of a single [`DataType`] is that type, not a `Union` with a single variant. Unlike
+    /// [`Union::new`] this method doesn't root the allocated value.
+    ///
+    /// If an exception is thrown the process aborts.
+    ///
+    /// [`Union`]: crate::wrappers::ptr::union::Union
+    /// [`DataType`]: crate::wrappers::ptr::datatype::DataType
+    pub fn new_unrooted_unchecked<'global, V>(
+        _: Global<'global>,
+        mut types: V,
+    ) -> ValueRef<'global, 'static>
+    where
+        V: AsMut<[Value<'scope, 'static>]>,
+    {
+        unsafe {
+            let types = types.as_mut();
             let un = jl_type_union(types.as_mut_ptr().cast(), types.len());
-            Ok(ValueRef::wrap(un))
+            ValueRef::wrap(un)
         }
     }
 

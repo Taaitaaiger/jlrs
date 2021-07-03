@@ -808,7 +808,7 @@ fn call_set_wake_fn(stack: &mut AsyncStackPage) -> JlrsResult<()> {
             .wrapper_unchecked()
             .global_ref("wakerust")?
             .wrapper_unchecked()
-            .set_nth_field(0, waker)?;
+            .set_nth_field_unchecked(0, waker);
 
         let dropper = Value::new(&mut frame, crate::droparray as *mut c_void)?;
         Module::main(global)
@@ -816,7 +816,7 @@ fn call_set_wake_fn(stack: &mut AsyncStackPage) -> JlrsResult<()> {
             .wrapper_unchecked()
             .global_ref("droparray")?
             .wrapper_unchecked()
-            .set_nth_field(0, dropper)?;
+            .set_nth_field_unchecked(0, dropper);
     }
 
     Ok(())

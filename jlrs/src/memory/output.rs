@@ -166,8 +166,8 @@ impl<'frame, 'data, 'inner> OutputResult<'frame, 'data, 'inner> {
     /// Returns true if the result is an exception.
     pub fn is_exception(&self) -> bool {
         match self {
-            Self::Ok(_) => true,
-            Self::Err(_) => false,
+            Self::Ok(_) => false,
+            Self::Err(_) => true,
         }
     }
 }

@@ -1,12 +1,9 @@
 [package]
 name = "jlrs"
-version = "0.10.0"
+version = "0.11.0"
 authors = ["Thomas van Doornmalen <thomas.vandoornmalen@gmail.com>"]
 description = """
-jlrs is a library built around bindings to the Julia C API that enables Julia code to be called 
-from Rust. jlrs can move many kinds of data from Rust to Julia and back, share n-dimensional 
-numerical arrays between languages, call arbitrary functions, and load code from arbitrary Julia
-source files. jlrs currently supports Linux and Windows.
+jlrs provides bindings to the Julia C API that enables Julia code to be called from Rust and more.
 """
 documentation = "https://docs.rs/jlrs"
 homepage = "https://github.com/Taaitaaiger/jlrs"
@@ -22,10 +19,10 @@ async = ["futures", "crossbeam-channel", "async-trait", "async-std"]
 jlrs-ndarray = ["ndarray"]
 f16 = ["half"]
 coverage = []
-docs-rs = ["jl-sys/docs-rs", "jlrs-derive", "async", "jlrs-ndarray"]
+docs-rs = ["jl-sys/docs-rs", "jlrs-derive", "async", "jlrs-ndarray", "f16"]
 
 [dependencies]
-jl-sys = {version = "0.11", path = "../jl_sys" }
+jl-sys = {version = "0.12", path = "../jl_sys" }
 jlrs-derive = { version = "0.2", optional = true, path = "../jlrs_derive" }
 smallvec = "1"
 futures = { version = "0.3", optional = true }

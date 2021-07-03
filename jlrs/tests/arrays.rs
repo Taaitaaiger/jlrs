@@ -8,7 +8,7 @@ fn array_can_be_cast() {
         let mut jlrs = j.borrow_mut();
 
         jlrs.scope_with_slots(1, |_, frame| {
-            let arr_val = Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?;
+            let arr_val = Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?.into_jlrs_result()?;
             let arr = arr_val.cast::<Array>();
             assert!(arr.is_ok());
             Ok(())
@@ -52,51 +52,12 @@ fn union_array_1d() {
 }
 
 #[test]
-fn union_array_1d_mut() {
-    JULIA.with(|j| {
-        let mut jlrs = j.borrow_mut();
-
-        jlrs.scope_with_slots(1, |global, frame| {
-            let arr_val = Value::eval_string(
-                &mut *frame,
-                "a = Vector{Union{Int32, Float32, Bool}}()
-                push!(a, Int32(1))
-                push!(a, Float32(2.0))
-                push!(a, false)
-                a",
-            )?
-            .unwrap();
-            let arr = arr_val.cast::<Array>();
-            assert!(arr.is_ok());
-            let arr = arr.unwrap();
-
-            {
-                let mut mud = arr.union_data_mut(frame).unwrap();
-                mud.set(0, DataType::bool_type(global), true).unwrap();
-                mud.set(1, DataType::int32_type(global), 3i32).unwrap();
-                mud.set(2, DataType::float32_type(global), 4.5f32).unwrap();
-
-                let v1 = mud.get::<bool, _>(0).unwrap();
-                assert_eq!(v1, true);
-                let v2 = mud.get::<i32, _>(1).unwrap();
-                assert_eq!(v2, 3);
-                let v3 = mud.get::<f32, _>(2).unwrap();
-                assert_eq!(v3, 4.5f32);
-            }
-
-            Ok(())
-        })
-        .unwrap();
-    });
-}
-
-#[test]
 fn array_dimensions() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
         jlrs.scope_with_slots(1, |_, frame| {
-            let arr_val = Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?;
+            let arr_val = Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?.into_jlrs_result()?;
             let arr = arr_val.cast::<Array>()?;
             let dims = arr.dimensions().into_dimensions();
             assert_eq!(dims.as_slice(), &[1, 2]);
@@ -112,7 +73,7 @@ fn check_array_contents_info() {
         let mut jlrs = j.borrow_mut();
 
         jlrs.scope_with_slots(1, |_, frame| {
-            let arr_val = Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?;
+            let arr_val = Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?.into_jlrs_result()?;
             let arr = arr_val.cast::<Array>()?;
             assert!(arr.contains::<f32>());
             assert!(arr.contains_inline::<f32>());
@@ -150,7 +111,7 @@ fn cannot_unbox_array_with_wrong_type() {
         let mut jlrs = j.borrow_mut();
 
         let out = jlrs.scope_with_slots(1, |_, frame| {
-            let array = Array::new::<f32, _, _, _>(&mut *frame, (3, 1))?;
+            let array = Array::new::<f32, _, _, _>(&mut *frame, (3, 1))?.into_jlrs_result()?;
             array.cast::<Array>()?.copy_inline_data::<u8>()
         });
 
@@ -164,7 +125,7 @@ fn typed_array_can_be_cast() {
         let mut jlrs = j.borrow_mut();
 
         jlrs.scope_with_slots(1, |_, frame| {
-            let arr_val = Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?;
+            let arr_val = Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?.into_jlrs_result()?;
             let arr = arr_val.cast::<TypedArray<f32>>();
             assert!(arr.is_ok());
             Ok(())
@@ -179,7 +140,7 @@ fn typed_array_dimensions() {
         let mut jlrs = j.borrow_mut();
 
         jlrs.scope_with_slots(1, |_, frame| {
-            let arr_val = Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?;
+            let arr_val = Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?.into_jlrs_result()?;
             let arr = arr_val.cast::<TypedArray<f32>>()?;
             let dims = arr.dimensions().into_dimensions();
             assert_eq!(dims.as_slice(), &[1, 2]);
@@ -195,7 +156,7 @@ fn check_typed_array_contents_info() {
         let mut jlrs = j.borrow_mut();
 
         jlrs.scope_with_slots(1, |_, frame| {
-            let arr_val = Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?;
+            let arr_val = Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?.into_jlrs_result()?;
             let arr = arr_val.cast::<TypedArray<f32>>()?;
             assert!(!arr.has_inlined_pointers());
             assert!(arr.is_inline_array());
@@ -297,7 +258,7 @@ fn cannot_access_f32_as_value() {
         let mut jlrs = j.borrow_mut();
 
         jlrs.scope_with_slots(1, |_, frame| {
-            let arr_val = Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?;
+            let arr_val = Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?.into_jlrs_result()?;
             assert!(arr_val.cast::<Array>()?.value_data(&mut *frame).is_err());
             Ok(())
         })
@@ -311,7 +272,7 @@ fn cannot_access_f32_as_value_mut() {
         let mut jlrs = j.borrow_mut();
 
         jlrs.scope_with_slots(1, |_, frame| {
-            let arr_val = Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?;
+            let arr_val = Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?.into_jlrs_result()?;
             assert!(arr_val
                 .cast::<Array>()?
                 .value_data_mut(&mut *frame)
@@ -328,7 +289,7 @@ fn cannot_access_f32_as_unrestricted_value_mut() {
         let mut jlrs = j.borrow_mut();
 
         jlrs.scope_with_slots(1, |_, frame| unsafe {
-            let arr_val = Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?;
+            let arr_val = Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?.into_jlrs_result()?;
             assert!(arr_val
                 .cast::<Array>()?
                 .unrestricted_value_data_mut(&mut *frame)

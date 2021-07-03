@@ -1,4 +1,4 @@
-//! Mostly internal trait to handle differences between the different runtime modes.
+//! Modes handle differences between the different runtime modes.
 
 /// Mode used by the synchronous runtime.
 #[derive(Clone, Copy)]

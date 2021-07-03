@@ -6,7 +6,7 @@
 
 use crate::{
     convert::temporary_symbol::TemporarySymbol,
-    error::{JlrsError, JlrsResult, CANNOT_DISPLAY_VALUE},
+    error::{JlrsError, JlrsResult, JuliaResult, JuliaResultRef, CANNOT_DISPLAY_VALUE},
     impl_debug, impl_julia_typecheck, impl_valid_layout,
     memory::{frame::Frame, global::Global, scope::Scope},
     private::Private,
@@ -20,7 +20,8 @@ use crate::{
 };
 use jl_sys::{
     jl_base_module, jl_core_module, jl_get_global, jl_main_module, jl_module_t, jl_module_type,
-    jl_set_const, jl_set_global, jl_typeis,
+    jl_set_const, jl_set_global, jl_typeis, jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_set_const,
+    jlrs_set_global,
 };
 
 use std::marker::PhantomData;
@@ -148,45 +149,169 @@ impl<'scope> Module<'scope> {
     }
 
     /// Set a global value in this module. Note that if this global already exists, this can
-    /// make the old value unreachable.
-    pub fn set_global<N>(self, name: N, value: Value<'_, 'static>) -> ValueRef<'scope, 'static>
+    /// make the old value unreachable. If an excection is thrown, it's caught, rooted and
+    /// returned.
+    pub fn set_global<'frame, N, F>(
+        self,
+        frame: &mut F,
+        name: N,
+        value: Value<'_, 'static>,
+    ) -> JlrsResult<JuliaResult<'frame, 'static, ValueRef<'scope, 'static>>>
     where
         N: TemporarySymbol,
+        F: Frame<'frame>,
     {
         unsafe {
-            jl_set_global(
+            let symbol = name.temporary_symbol(Private);
+
+            let res = jlrs_set_global(
                 self.unwrap(Private),
-                name.temporary_symbol(Private).unwrap(Private),
+                symbol.unwrap(Private),
                 value.unwrap(Private),
             );
-            ValueRef::wrap(value.unwrap(Private))
+
+            let data = res.data;
+
+            if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
+                let v = frame
+                    .push_root(NonNull::new_unchecked(data), Private)
+                    .map_err(|e| JlrsError::AllocError(e))?;
+                Ok(Err(v))
+            } else {
+                Ok(Ok(ValueRef::wrap(data)))
+            }
         }
     }
 
-    /// Set a constant in this module.
-    pub fn set_const<N>(
+    /// Set a global value in this module. Note that if this global already exists, this can
+    /// make the old value unreachable. If an exception is thrown it's caught but not rooted and
+    /// returned.
+    pub fn set_global_unrooted<N>(
         self,
         name: N,
         value: Value<'_, 'static>,
-    ) -> JlrsResult<ValueRef<'scope, 'static>>
+    ) -> JuliaResultRef<'scope, 'static>
     where
         N: TemporarySymbol,
     {
         unsafe {
             let symbol = name.temporary_symbol(Private);
-            if let Ok(v) = self.global_ref(symbol) {
-                let module = self
-                    .name()
-                    .as_str()
-                    .unwrap_or("<Cannot display symbol>")
-                    .into();
-                let value = v.value_unchecked().display_string_or(CANNOT_DISPLAY_VALUE);
-                Err(JlrsError::ConstAlreadyExists {
-                    name: symbol.as_str().unwrap_or("<Cannot display symbol>").into(),
-                    module,
-                    value,
-                })?;
+
+            let res = jlrs_set_global(
+                self.unwrap(Private),
+                symbol.unwrap(Private),
+                value.unwrap(Private),
+            );
+
+            let data = res.data;
+
+            if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
+                Err(ValueRef::wrap(data))
+            } else {
+                Ok(ValueRef::wrap(data))
             }
+        }
+    }
+
+    /// Set a global value in this module. Note that if this global already exists, this can
+    /// make the old value unreachable. If an exception is thrown the process aborts.
+    pub fn set_global_unchecked<N>(
+        self,
+        name: N,
+        value: Value<'_, 'static>,
+    ) -> ValueRef<'scope, 'static>
+    where
+        N: TemporarySymbol,
+    {
+        unsafe {
+            let symbol = name.temporary_symbol(Private);
+
+            jl_set_global(
+                self.unwrap(Private),
+                symbol.unwrap(Private),
+                value.unwrap(Private),
+            );
+
+            ValueRef::wrap(value.unwrap(Private))
+        }
+    }
+
+    /// Set a constant in this module. If Julia throws an exception it's caught and rooted in the
+    /// current frame, if the exception can't be rooted a `JlrsError::AllocError` is returned. If
+    /// no exception is thrown an unrooted reference to the constant is returned.
+    pub fn set_const<'frame, N, F>(
+        self,
+        frame: &mut F,
+        name: N,
+        value: Value<'_, 'static>,
+    ) -> JlrsResult<JuliaResult<'frame, 'static, ValueRef<'scope, 'static>>>
+    where
+        N: TemporarySymbol,
+        F: Frame<'frame>,
+    {
+        unsafe {
+            let symbol = name.temporary_symbol(Private);
+
+            let res = jlrs_set_const(
+                self.unwrap(Private),
+                symbol.unwrap(Private),
+                value.unwrap(Private),
+            );
+
+            let data = res.data;
+
+            if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
+                let v = frame
+                    .push_root(NonNull::new_unchecked(data), Private)
+                    .map_err(|e| JlrsError::AllocError(e))?;
+                Ok(Err(v))
+            } else {
+                Ok(Ok(ValueRef::wrap(data)))
+            }
+        }
+    }
+
+    /// Set a constant in this module. If Julia throws an exception it's caught. Otherwise an
+    /// unrooted reference to the constant is returned.
+    pub fn set_const_unrooted<N>(
+        self,
+        name: N,
+        value: Value<'_, 'static>,
+    ) -> JuliaResultRef<'scope, 'static>
+    where
+        N: TemporarySymbol,
+    {
+        unsafe {
+            let symbol = name.temporary_symbol(Private);
+
+            let res = jlrs_set_const(
+                self.unwrap(Private),
+                symbol.unwrap(Private),
+                value.unwrap(Private),
+            );
+
+            let data = res.data;
+
+            if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
+                Err(ValueRef::wrap(data))
+            } else {
+                Ok(ValueRef::wrap(data))
+            }
+        }
+    }
+
+    /// Set a constant in this module. If the constant already exists the process aborts,
+    /// otherwise an unrooted reference to the constant is returned.
+    pub fn set_const_unchecked<N>(
+        self,
+        name: N,
+        value: Value<'_, 'static>,
+    ) -> ValueRef<'scope, 'static>
+    where
+        N: TemporarySymbol,
+    {
+        unsafe {
+            let symbol = name.temporary_symbol(Private);
 
             jl_set_const(
                 self.unwrap(Private),
@@ -194,7 +319,7 @@ impl<'scope> Module<'scope> {
                 value.unwrap(Private),
             );
 
-            Ok(ValueRef::wrap(value.unwrap(Private)))
+            ValueRef::wrap(value.unwrap(Private))
         }
     }
 

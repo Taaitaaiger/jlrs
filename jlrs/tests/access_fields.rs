@@ -95,7 +95,9 @@ fn access_mutable_struct_fields() {
             let x = Value::new(&mut *frame, 2.0f32)?;
             let y = Value::new(&mut *frame, 3u64)?;
 
-            let mut_struct = func.instantiate(&mut *frame, &mut [x, y])?;
+            let mut_struct = func
+                .instantiate(&mut *frame, &mut [x, y])?
+                .into_jlrs_result()?;
             assert!(mut_struct.is::<Mutable>());
 
             assert!(mut_struct.get_field(&mut *frame, "x").is_ok());
@@ -135,7 +137,9 @@ fn cannot_access_unknown_mutable_struct_field() {
             let x = Value::new(&mut *frame, 2.0f32)?;
             let y = Value::new(&mut *frame, 3u64)?;
 
-            let mut_struct = func.instantiate(&mut *frame, &mut [x, y])?;
+            let mut_struct = func
+                .instantiate(&mut *frame, &mut [x, y])?
+                .into_jlrs_result()?;
             assert!(mut_struct.is::<Mutable>());
 
             assert!(mut_struct.get_field(&mut *frame, "z").is_err());

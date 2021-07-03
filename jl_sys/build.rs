@@ -29,6 +29,7 @@ fn flags() -> Vec<String> {
     };
 
     println!("cargo:rustc-link-lib=julia");
+    println!("cargo:rustc-link-lib=jlrs_c");
     flags
 }
 
@@ -36,7 +37,8 @@ fn main() {
     let mut out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
     out_path.push("bindings.rs");
 
-    println!("cargo:rerun-if-changed=wrapper.h");
+    println!("cargo:rerun-if-changed=jlrs_c.c");
+    println!("cargo:rerun-if-changed=jlrs_c.h");
     println!("cargo:rerun-if-env-changed=JULIA_DIR");
 
     if env::var("CARGO_FEATURE_DOCS_RS").is_ok() {
@@ -46,6 +48,11 @@ fn main() {
     }
 
     let flags = flags();
+
+    cc::Build::new()
+        .file("jlrs_c.c")
+        .include(&flags[0][2..])
+        .compile("jlrs_c");
 
     let functions = vec![
         "jl_alloc_array_1d",
@@ -82,7 +89,6 @@ fn main() {
         "jl_eval_string",
         "jl_exception_occurred",
         "jl_field_index",
-        "jl_field_isdefined",
         "jl_finalize",
         "jl_gc_add_finalizer",
         "jl_gc_collect",
@@ -90,7 +96,6 @@ fn main() {
         "jl_gc_is_enabled",
         "jl_gc_queue_root",
         "jl_gc_safepoint",
-        "jl_get_field",
         "jl_get_global",
         "jl_get_kwsorter",
         "jl_get_nth_field",
@@ -117,7 +122,6 @@ fn main() {
         "jl_subtype",
         "jl_symbol",
         "jl_symbol_n",
-        "jl_tupletype_fill",
         "jl_typename_str",
         "jl_typeof_str",
         "jl_type_union",
@@ -134,11 +138,26 @@ fn main() {
         "jl_unbox_uint8",
         "jl_unbox_voidpointer",
         "uv_async_send",
+        "jlrs_alloc_array_1d",
+        "jlrs_alloc_array_2d",
+        "jlrs_alloc_array_3d",
+        "jlrs_apply_array_type",
+        "jlrs_apply_type",
+        "jlrs_compute_fieldtypes",
+        "jlrs_get_nth_field",
+        "jlrs_new_array",
+        "jlrs_new_structv",
+        "jlrs_new_typevar",
+        "jlrs_set_const",
+        "jlrs_set_global",
+        "jlrs_set_nth_field",
+        "jlrs_type_union",
+        "jlrs_type_unionall",
     ];
 
     let mut builder = bindgen::Builder::default()
         .clang_args(&flags)
-        .header("wrapper.h")
+        .header("jlrs_c.h")
         .size_t_is_usize(true);
 
     for func in functions.iter().copied() {

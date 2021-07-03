@@ -100,7 +100,7 @@ use crate::{
     error::{JlrsError, JlrsResult, JuliaResult, JuliaResultRef, CANNOT_DISPLAY_TYPE},
     impl_debug,
     layout::{
-        typecheck::{Mutable, NamedTuple, Typecheck},
+        typecheck::{NamedTuple, Typecheck},
         valid_layout::ValidLayout,
     },
     memory::{frame::Frame, global::Global, scope::Scope},
@@ -122,11 +122,11 @@ use jl_sys::{
     jl_array_symbol_type, jl_array_uint8_type, jl_bottom_type, jl_call, jl_call0, jl_call1,
     jl_call2, jl_call3, jl_diverror_exception, jl_egal, jl_emptytuple, jl_eval_string,
     jl_exception_occurred, jl_false, jl_field_index, jl_field_isptr, jl_field_names,
-    jl_field_offset, jl_fieldref, jl_fieldref_noalloc, jl_finalize, jl_gc_add_finalizer, jl_gc_wb,
+    jl_field_offset, jl_fieldref, jl_fieldref_noalloc, jl_finalize, jl_gc_add_finalizer,
     jl_interrupt_exception, jl_is_kind, jl_isa, jl_memory_exception, jl_nfields, jl_nothing,
     jl_object_id, jl_readonlymemory_exception, jl_set_nth_field, jl_stackovf_exception, jl_subtype,
     jl_svec_data, jl_svec_len, jl_true, jl_typeof, jl_typeof_str, jl_undefref_exception,
-    jl_value_t,
+    jl_value_t, jlrs_apply_type, jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_set_nth_field,
 };
 use std::{
     ffi::{c_void, CStr, CString},
@@ -231,9 +231,9 @@ impl<'scope, 'data> Value<'scope, 'data> {
 
             let names = DataType::anytuple_type(global)
                 .as_value()
-                .apply_type(&mut *frame, &mut symbol_type_vec)?
+                .apply_type_unchecked(&mut *frame, &mut symbol_type_vec)?
                 .cast::<DataType>()?
-                .instantiate(&mut *frame, &mut field_names_vec)?;
+                .instantiate_unchecked(&mut *frame, &mut field_names_vec)?;
 
             let mut field_types_vec = values_m
                 .iter()
@@ -243,15 +243,15 @@ impl<'scope, 'data> Value<'scope, 'data> {
 
             let field_type_tup = DataType::anytuple_type(global)
                 .as_value()
-                .apply_type(&mut *frame, &mut field_types_vec)?;
+                .apply_type_unchecked(&mut *frame, &mut field_types_vec)?;
 
             let ty = UnionAll::namedtuple_type(global)
                 .as_value()
-                .apply_type(&mut *frame, &mut [names, field_type_tup])?
+                .apply_type_unchecked(&mut *frame, &mut [names, field_type_tup])?
                 .cast::<DataType>()?;
 
             let output = output.into_scope(frame);
-            ty.instantiate(output, values)
+            ty.instantiate_unchecked(output, values)
         })
     }
 
@@ -263,10 +263,44 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// the value is a `UnionAll`, the given types will be applied and the resulting type is
     /// returned.
     ///
-    /// If the types cannot be applied to `self` your program will abort.
+    /// If the types can't be applied to `self` this methods catches and returns the exception.
     ///
     /// [`Union::new`]: crate::wrappers::ptr::union::Union::new
     pub fn apply_type<'target, 'current, S, F, V>(
+        self,
+        scope: S,
+        mut types: V,
+    ) -> JlrsResult<S::JuliaResult>
+    where
+        S: Scope<'target, 'current, 'data, F>,
+        F: Frame<'current>,
+        V: AsMut<[Value<'scope, 'data>]>,
+    {
+        unsafe {
+            let types = types.as_mut();
+            let applied =
+                jlrs_apply_type(self.unwrap(Private), types.as_mut_ptr().cast(), types.len());
+
+            if applied.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
+                scope.call_result(Err(NonNull::new_unchecked(applied.data)), Private)
+            } else {
+                scope.call_result(Ok(NonNull::new_unchecked(applied.data)), Private)
+            }
+        }
+    }
+
+    /// Apply the given types to `self`.
+    ///
+    /// If `self` is the [`DataType`] `anytuple_type`, calling this method will return a new
+    /// tuple type with the given types as its field types. If it is the [`DataType`]
+    /// `uniontype_type`, calling this method is equivalent to calling [`Union::new`]. If
+    /// the value is a `UnionAll`, the given types will be applied and the resulting type is
+    /// returned.
+    ///
+    /// If the types can't be applied to `self` the program will abort.
+    ///
+    /// [`Union::new`]: crate::wrappers::ptr::union::Union::new
+    pub fn apply_type_unchecked<'target, 'current, S, F, V>(
         self,
         scope: S,
         mut types: V,
@@ -482,9 +516,10 @@ impl<'scope, 'data> Value<'scope, 'data> {
         unsafe { jl_nfields(self.unwrap(Private)) as _ }
     }
 
-    /// Unbox the contents of the field at index `idx`. If the field is a bits union, this method
-    /// will try to unbox the active variant. Returns an error if the index is out of bounds or
-    /// if the layout of `T` is incompatible with the layout of that field in Julia.
+    /// Access the contents of the field at index `idx`. If the field is a bits union, this method
+    /// will try to unbox the active variant. Pointer fields can also be accessed by using the
+    /// approriate [`Ref`]. Returns an error if the index is out of bounds or if the layout of `T`
+    /// is incompatible with the layout of that field in Julia.
     pub fn get_nth_raw_field<T>(self, idx: usize) -> JlrsResult<T>
     where
         T: ValidLayout,
@@ -502,7 +537,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
         }
     }
 
-    /// Unbox the contents of the field at index `idx` without checking bounds or if the layouts
+    /// Access the contents of the field at index `idx` without checking bounds or if the layouts
     /// of the types are compatible.
     ///
     /// Safety: the layout out `T` must be compatible with the layout of the field and `idx` must
@@ -519,9 +554,10 @@ impl<'scope, 'data> Value<'scope, 'data> {
             .read()
     }
 
-    /// Unbox the contents of the field with the name `field_name`. If the field is a bits union,
-    /// this method will try to unbox the active variant. Returns an error if the field doesn't
-    /// exist, or if the layout of `T` is incompatible with the layout of that field in Julia.
+    /// Access the contents of the field with the name `field_name`. If the field is a bits union,
+    /// this method will try to unbox the active variant. Pointer fields can also be accessed by
+    /// using the approriate [`Ref`]. Returns an error if there's no field with the given name or
+    /// if the layout of `T` is incompatible with the layout of that field in Julia.
     pub fn get_raw_field<T, N>(self, field_name: N) -> JlrsResult<T>
     where
         T: ValidLayout,
@@ -544,7 +580,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
         }
     }
 
-    /// Unbox the contents of the field with the name `field_name` without checking if the layouts
+    /// Access the contents of the field with the name `field_name` without checking if the layouts
     /// of the types are compatible. Panics if the field doesn't exist.
     ///
     /// Safety: the layout out `T` must be compatible with the layout of the field.
@@ -648,7 +684,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// Returns the field at index `idx` if it exists as a `ValueRef`. If the field is an inline
     /// field a new value is allocated which is left unrooted.
     ///
-    /// If the field doesn't  exist `JlrsError::OutOfBounds` is returned.
+    /// If the field doesn't exist `JlrsError::OutOfBounds` is returned.
     pub fn get_nth_field_unrooted(self, idx: usize) -> JlrsResult<ValueRef<'scope, 'data>> {
         if idx >= self.n_fields() {
             Err(JlrsError::OutOfBounds {
@@ -771,81 +807,228 @@ impl<'scope, 'data> Value<'scope, 'data> {
         }
     }
 
-    /// Set the value of the field at `idx`. Returns an error if this value is immutable, `idx` is
-    /// out of bounds, or if the type of `value` is not a subtype of the field type.
-    pub fn set_nth_field(self, idx: usize, value: Value<'_, 'data>) -> JlrsResult<()> {
-        if !self.is::<Mutable>() {
-            Err(JlrsError::Immutable {
-                value_type: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?
-        }
-
-        if idx >= self.n_fields() {
+    /// Set the value of the field at `idx`. If Julia throws an exception it's caught, rooted in
+    /// the frame, and returned. If the index is out of bounds or the value is not a subtype of
+    /// the field an error is returned,
+    ///
+    /// Safety: Mutating things that should absolutely not be mutated, like the fields of a
+    /// `DataType`, is not prevented.
+    pub unsafe fn set_nth_field<'frame, F>(
+        self,
+        frame: &mut F,
+        idx: usize,
+        value: Value<'_, 'data>,
+    ) -> JlrsResult<JuliaResult<'frame, 'data, ()>>
+    where
+        F: Frame<'frame>,
+    {
+        let n_fields = self.n_fields();
+        if n_fields <= idx {
             Err(JlrsError::OutOfBounds {
                 idx,
-                n_fields: self.n_fields(),
+                n_fields,
                 value_type: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
+        }
+
+        let field_type = self.datatype().field_types().wrapper_unchecked().data()[idx as usize]
+            .value_unchecked();
+        let dt = value.datatype();
+
+        if !Value::subtype(dt.as_value(), field_type) {
+            Err(JlrsError::NotSubtype {
+                field_type: field_type.display_string_or(CANNOT_DISPLAY_TYPE),
+                value_type: value.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
             })?
         }
 
-        unsafe {
-            let field_type =
-                self.datatype().field_types().wrapper_unchecked().data()[idx].value_unchecked();
-            let dt = value.datatype();
-
-            if Value::subtype(dt.as_value(), field_type) {
-                jl_set_nth_field(self.unwrap(Private), idx, value.unwrap(Private));
-                jl_gc_wb(self.unwrap(Private), value.unwrap(Private));
-                Ok(())
-            } else {
-                Err(JlrsError::NotSubtype {
-                    field_type: field_type.display_string_or(CANNOT_DISPLAY_TYPE),
-                    value_type: value.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
-                })?
-            }
+        let res = jlrs_set_nth_field(self.unwrap(Private), idx, value.unwrap(Private));
+        if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
+            let ptr = res.data;
+            let err = crate::memory::scope::private::Scope::value(
+                frame,
+                NonNull::new_unchecked(ptr),
+                Private,
+            )?;
+            Ok(Err(err))
+        } else {
+            Ok(Ok(()))
         }
     }
 
-    /// Set the value of the `field_name`. Returns an error if this value is immutable, the field
-    /// doesn't exist, or if the type of `value` is not a subtype of the field type.
-    pub fn set_field<N>(self, field_name: N, value: Value<'_, 'data>) -> JlrsResult<()>
-    where
-        N: TemporarySymbol,
-    {
-        if !self.is::<Mutable>() {
-            Err(JlrsError::Immutable {
+    /// Set the value of the field at `idx`. If Julia throws an exception it's caught and
+    /// returned but not rooted. If the index is out of bounds or the value is not a subtype of
+    /// the field an error is returned,
+    ///
+    /// Safety: Mutating things that should absolutely not be mutated, like the fields of a
+    /// `DataType`, is not prevented.
+    pub unsafe fn set_nth_field_unrooted(
+        self,
+        idx: usize,
+        value: Value<'_, 'data>,
+    ) -> JlrsResult<JuliaResultRef<'scope, 'data, ()>> {
+        let n_fields = self.n_fields();
+        if n_fields <= idx {
+            Err(JlrsError::OutOfBounds {
+                idx,
+                n_fields,
                 value_type: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
+        }
+
+        let field_type = self.datatype().field_types().wrapper_unchecked().data()[idx as usize]
+            .value_unchecked();
+        let dt = value.datatype();
+
+        if !Value::subtype(dt.as_value(), field_type) {
+            Err(JlrsError::NotSubtype {
+                field_type: field_type.display_string_or(CANNOT_DISPLAY_TYPE),
+                value_type: value.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
             })?
         }
 
-        unsafe {
-            let symbol = field_name.temporary_symbol(Private);
-
-            let jl_type = jl_typeof(self.unwrap(Private)).cast();
-            let idx = jl_field_index(jl_type, symbol.unwrap(Private), 0);
-
-            if idx < 0 {
-                Err(JlrsError::NoSuchField {
-                    type_name: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
-                    field_name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
-                })?
-            }
-
-            let field_type = self.datatype().field_types().wrapper_unchecked().data()[idx as usize]
-                .value_unchecked();
-            let dt = value.datatype();
-
-            if Value::subtype(dt.as_value(), field_type) {
-                jl_set_nth_field(self.unwrap(Private), idx as _, value.unwrap(Private));
-                jl_gc_wb(self.unwrap(Private), value.unwrap(Private));
-                Ok(())
-            } else {
-                Err(JlrsError::NotSubtype {
-                    field_type: field_type.display_string_or(CANNOT_DISPLAY_TYPE),
-                    value_type: value.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
-                })?
-            }
+        let res = jlrs_set_nth_field(self.unwrap(Private), idx, value.unwrap(Private));
+        if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
+            Ok(Err(ValueRef::wrap(res.data)))
+        } else {
+            Ok(Ok(()))
         }
+    }
+
+    /// Set the value of the field at `idx`. If Julia throws an exception the process aborts.
+    ///
+    /// Safety: this method doesn't check if the type of the value is a subtype of the field's
+    /// type. Mutating things that should absolutely not be mutated, like the fields of a
+    /// `DataType`, is also not prevented.
+    pub unsafe fn set_nth_field_unchecked(self, idx: usize, value: Value<'_, 'data>) {
+        jl_set_nth_field(self.unwrap(Private), idx, value.unwrap(Private))
+    }
+
+    /// Set the value of the field with the name `field_name`. If Julia throws an exception it's
+    /// caught, rooted in the frame, and returned. If there's no field with the given name or the
+    /// value is not a subtype of the field an error is returned,
+    ///
+    /// Safety: Mutating things that should absolutely not be mutated, like the fields of a
+    /// `DataType`, is not prevented.
+    pub unsafe fn set_field<'frame, F, N>(
+        self,
+        frame: &mut F,
+        field_name: N,
+        value: Value<'_, 'data>,
+    ) -> JlrsResult<JuliaResult<'frame, 'data, ()>>
+    where
+        F: Frame<'frame>,
+        N: TemporarySymbol,
+    {
+        let symbol = field_name.temporary_symbol(Private);
+        let jl_type = jl_typeof(self.unwrap(Private)).cast();
+        let idx = jl_field_index(jl_type, symbol.unwrap(Private), 0);
+
+        if idx < 0 {
+            Err(JlrsError::NoSuchField {
+                type_name: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
+                field_name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+            })?
+        }
+
+        let field_type = self.datatype().field_types().wrapper_unchecked().data()[idx as usize]
+            .value_unchecked();
+        let dt = value.datatype();
+
+        if !Value::subtype(dt.as_value(), field_type) {
+            Err(JlrsError::NotSubtype {
+                field_type: field_type.display_string_or(CANNOT_DISPLAY_TYPE),
+                value_type: value.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?
+        }
+
+        let res = jlrs_set_nth_field(self.unwrap(Private), idx as usize, value.unwrap(Private));
+        if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
+            let ptr = res.data;
+            let err = crate::memory::scope::private::Scope::value(
+                frame,
+                NonNull::new_unchecked(ptr),
+                Private,
+            )?;
+            Ok(Err(err))
+        } else {
+            Ok(Ok(()))
+        }
+    }
+
+    /// Set the value of the field with the name `field_name`. If Julia throws an exception it's
+    /// caught, and returned but not rooted. If there's no field with the given name or the value
+    /// is not a subtype of the field an error is returned,
+    ///
+    /// Safety: Mutating things that should absolutely not be mutated, like the fields of a
+    /// `DataType`, is not prevented.
+    pub unsafe fn set_field_unrooted<N>(
+        self,
+        field_name: N,
+        value: Value<'_, 'data>,
+    ) -> JlrsResult<JuliaResultRef<'scope, 'data, ()>>
+    where
+        N: TemporarySymbol,
+    {
+        let symbol = field_name.temporary_symbol(Private);
+        let jl_type = jl_typeof(self.unwrap(Private)).cast();
+        let idx = jl_field_index(jl_type, symbol.unwrap(Private), 0);
+
+        if idx < 0 {
+            Err(JlrsError::NoSuchField {
+                type_name: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
+                field_name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+            })?
+        }
+
+        let field_type = self.datatype().field_types().wrapper_unchecked().data()[idx as usize]
+            .value_unchecked();
+        let dt = value.datatype();
+
+        if !Value::subtype(dt.as_value(), field_type) {
+            Err(JlrsError::NotSubtype {
+                field_type: field_type.display_string_or(CANNOT_DISPLAY_TYPE),
+                value_type: value.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?
+        }
+
+        let res = jlrs_set_nth_field(self.unwrap(Private), idx as usize, value.unwrap(Private));
+        if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
+            Ok(Err(ValueRef::wrap(res.data)))
+        } else {
+            Ok(Ok(()))
+        }
+    }
+
+    /// Set the value of the field with the name `field_name`. If Julia throws an exception the
+    /// process aborts. If there's no field with the given name an error is returned.
+    ///
+    /// Safety: this method doesn't check if the type of the value is a subtype of the field's
+    /// type. Mutating things that should absolutely not be mutated, like the fields of a
+    /// `DataType`, is also not prevented.
+    pub unsafe fn set_field_unchecked<N>(
+        self,
+        field_name: N,
+        value: Value<'_, 'data>,
+    ) -> JlrsResult<()>
+    where
+        N: TemporarySymbol,
+    {
+        let symbol = field_name.temporary_symbol(Private);
+        let jl_type = jl_typeof(self.unwrap(Private)).cast();
+        let idx = jl_field_index(jl_type, symbol.unwrap(Private), 0);
+
+        if idx < 0 {
+            Err(JlrsError::NoSuchField {
+                type_name: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
+                field_name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+            })?
+        }
+        Ok(jl_set_nth_field(
+            self.unwrap(Private),
+            idx as usize,
+            value.unwrap(Private),
+        ))
     }
 
     unsafe fn read_field<T>(self, idx: i32) -> JlrsResult<T>

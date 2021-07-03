@@ -122,9 +122,9 @@ impl<'frame> AsyncGcFrame<'frame> {
             }
 
             if is_exc {
-                Ok(JuliaResult::Ok(Value::wrap_non_null(ptr, Private)))
-            } else {
                 Ok(JuliaResult::Err(Value::wrap_non_null(ptr, Private)))
+            } else {
+                Ok(JuliaResult::Ok(Value::wrap_non_null(ptr, Private)))
             }
         }
     }
@@ -156,9 +156,9 @@ impl<'frame> AsyncGcFrame<'frame> {
             }
 
             if is_exc {
-                Ok(JuliaResult::Ok(Value::wrap_non_null(ptr, Private)))
-            } else {
                 Ok(JuliaResult::Err(Value::wrap_non_null(ptr, Private)))
+            } else {
+                Ok(JuliaResult::Ok(Value::wrap_non_null(ptr, Private)))
             }
         }
     }

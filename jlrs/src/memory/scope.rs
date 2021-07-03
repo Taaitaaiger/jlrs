@@ -4,9 +4,8 @@
 //! [`Julia::scope`] and [`Julia::scope_with_slots`], these methods take a closure which is
 //! called inside these methods after creating the arguments it requires: a [`Global`] and a
 //! mutable reference to a [`GcFrame`]. Each scope has exactly one [`GcFrame`] which is dropped
-//! when you leave the scope. Any value which is rooted in this frame or can be reached from a
-//! root will not be freed by the garbage collector until the frame has been dropped, it's valid
-//! for the rest of the scope associated with that frame.
+//! when you leave the scope. Any value which is rooted in a frame or can be reached from a root
+//! isn't freed by the garbage collector until it becomes unreachable.
 //!
 //! Holding on to many roots will slow down the garbage collector. Scanning will be slower because
 //! more values can be reached, and because this data is not freed memory pressure increases
@@ -37,11 +36,12 @@
 //!
 //! The other implementor, [`OutputScope`], is used in nested scopes that root a value in the
 //! frame of a parent scope. It doesn't implement [`ScopeExt`]. As mentioned before, frames form a
-//! stack and the frame of a nested scope is constructed on top of its parent. Due to this design,
-//! it's not possible to directly root a value in some ancestral frame. Rather, rooting has to be
-//! postponed until the target frame is the active frame again.
+//! stack and the frame of a nested scope is constructed on top of its parent but can't access it,
+//! or any other ancestral frame. Due to this design, it's not possible to directly root a value
+//! in some ancestral frame. Rather, rooting has to be postponed until the target frame is the
+//! current frame again.
 //!
-//! Methods that root a value in the frame of a parent scope take a closure with two arguments, an
+//! Scopes that root a value in an ancestral frame take a closure with two arguments, an
 //! [`Output`] and a mutable reference to a [`GcFrame`]. The frame can be used to root temporary
 //! values, once all temporary values have been created and there's nothing else that needs to be
 //! rooted in the current frame, the `Output` can be converted to an `OutputScope`. Unlike frames,

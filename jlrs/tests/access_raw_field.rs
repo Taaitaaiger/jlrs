@@ -21,7 +21,8 @@ fn access_raw_fields_bits() {
             let arg2 = Value::new(&mut *frame, -3i32)?;
             let instance = ty
                 .cast::<DataType>()?
-                .instantiate(&mut *frame, &mut [arg1, arg2])?;
+                .instantiate(&mut *frame, &mut [arg1, arg2])?
+                .into_jlrs_result()?;
 
             let a = instance.get_raw_field::<i16, _>("a")?;
             assert_eq!(a, 3);
@@ -51,7 +52,8 @@ fn access_raw_fields_bits_and_ptr() {
             let arg2 = DataType::bool_type(global);
             let instance = ty
                 .cast::<DataType>()?
-                .instantiate(&mut *frame, &mut [arg1, arg2.as_value()])?;
+                .instantiate(&mut *frame, &mut [arg1, arg2.as_value()])?
+                .into_jlrs_result()?;
 
             let a = instance.get_raw_field::<i16, _>("a")?;
             assert_eq!(a, 3);
@@ -81,7 +83,8 @@ fn access_raw_fields_bits_and_bits_union() {
             let arg2 = Value::new(&mut *frame, -3i32)?;
             let instance = ty
                 .cast::<DataType>()?
-                .instantiate(&mut *frame, &mut [arg1, arg2])?;
+                .instantiate(&mut *frame, &mut [arg1, arg2])?
+                .into_jlrs_result()?;
 
             let a = instance.get_raw_field::<i16, _>("a")?;
             assert_eq!(a, 3);
@@ -111,7 +114,8 @@ fn access_raw_fields_ptr_and_bits_union() {
             let arg2 = Value::new(&mut *frame, -3i32)?;
             let instance = ty
                 .cast::<DataType>()?
-                .instantiate(&mut *frame, &mut [arg1.as_value(), arg2])?;
+                .instantiate(&mut *frame, &mut [arg1.as_value(), arg2])?
+                .into_jlrs_result()?;
 
             let a = instance.get_raw_field::<DataTypeRef, _>("a")?;
             assert_eq!(unsafe { a.wrapper_unchecked() }, arg1);
@@ -141,7 +145,8 @@ fn access_raw_fields_ptr_and_non_bits_union() {
             let arg2 = Value::new(&mut *frame, -3i32)?;
             let instance = ty
                 .cast::<DataType>()?
-                .instantiate(&mut *frame, &mut [arg1.as_value(), arg2])?;
+                .instantiate(&mut *frame, &mut [arg1.as_value(), arg2])?
+                .into_jlrs_result()?;
 
             let a = instance.get_raw_field::<DataTypeRef, _>("a")?;
             assert_eq!(unsafe { a.wrapper_unchecked() }, arg1);
@@ -172,7 +177,8 @@ fn access_raw_fields_wrong_ty() {
             let arg2 = Value::new(&mut *frame, -3i32)?;
             let instance = ty
                 .cast::<DataType>()?
-                .instantiate(&mut *frame, &mut [arg1.as_value(), arg2])?;
+                .instantiate(&mut *frame, &mut [arg1.as_value(), arg2])?
+                .into_jlrs_result()?;
 
             assert!(instance.get_raw_field::<ArrayRef, _>("a").is_err());
 
@@ -201,7 +207,8 @@ fn access_array_field() {
             let arg1 = Array::from_vec(&mut *frame, data, (2, 2))?;
             let instance = ty
                 .cast::<DataType>()?
-                .instantiate(&mut *frame, &mut [arg1])?;
+                .instantiate(&mut *frame, &mut [arg1])?
+                .into_jlrs_result()?;
 
             assert!(instance.get_raw_field::<ArrayRef, _>("a").is_ok());
             assert!(instance.get_raw_field::<TypedArrayRef<f64>, _>("a").is_ok());
@@ -231,7 +238,8 @@ fn access_ua_array_field() {
             let arg1 = Array::from_vec(&mut *frame, data, (2, 2))?;
             let instance = ty
                 .cast::<DataType>()?
-                .instantiate(&mut *frame, &mut [arg1])?;
+                .instantiate(&mut *frame, &mut [arg1])?
+                .into_jlrs_result()?;
 
             assert!(instance.get_raw_field::<ArrayRef, _>("a").is_ok());
             assert!(instance.get_raw_field::<TypedArrayRef<f64>, _>("a").is_ok());
@@ -261,7 +269,8 @@ fn access_raw_fields_nonexistent_name() {
             let arg2 = Value::new(&mut *frame, -3i32)?;
             let instance = ty
                 .cast::<DataType>()?
-                .instantiate(&mut *frame, &mut [arg1.as_value(), arg2])?;
+                .instantiate(&mut *frame, &mut [arg1.as_value(), arg2])?
+                .into_jlrs_result()?;
 
             assert!(instance.get_raw_field::<DataTypeRef, _>("c").is_err());
             Ok(())
@@ -286,7 +295,8 @@ fn access_nth_raw_fields_bits() {
             let arg2 = Value::new(&mut *frame, -3i32)?;
             let instance = ty
                 .cast::<DataType>()?
-                .instantiate(&mut *frame, &mut [arg1, arg2])?;
+                .instantiate(&mut *frame, &mut [arg1, arg2])?
+                .into_jlrs_result()?;
 
             let a = instance.get_nth_raw_field::<i16>(0)?;
             assert_eq!(a, 3);
@@ -316,7 +326,8 @@ fn access_nth_raw_fields_bits_and_ptr() {
             let arg2 = DataType::bool_type(global);
             let instance = ty
                 .cast::<DataType>()?
-                .instantiate(&mut *frame, &mut [arg1, arg2.as_value()])?;
+                .instantiate(&mut *frame, &mut [arg1, arg2.as_value()])?
+                .into_jlrs_result()?;
 
             let a = instance.get_nth_raw_field::<i16>(0)?;
             assert_eq!(a, 3);
@@ -346,7 +357,8 @@ fn access_nth_raw_fields_bits_and_bits_union() {
             let arg2 = Value::new(&mut *frame, -3i32)?;
             let instance = ty
                 .cast::<DataType>()?
-                .instantiate(&mut *frame, &mut [arg1, arg2])?;
+                .instantiate(&mut *frame, &mut [arg1, arg2])?
+                .into_jlrs_result()?;
 
             let a = instance.get_nth_raw_field::<i16>(0)?;
             assert_eq!(a, 3);
@@ -376,7 +388,8 @@ fn access_nth_raw_fields_ptr_and_non_bits_union() {
             let arg2 = Value::new(&mut *frame, -3i32)?;
             let instance = ty
                 .cast::<DataType>()?
-                .instantiate(&mut *frame, &mut [arg1.as_value(), arg2])?;
+                .instantiate(&mut *frame, &mut [arg1.as_value(), arg2])?
+                .into_jlrs_result()?;
 
             let a = instance.get_nth_raw_field::<DataTypeRef>(0)?;
             assert_eq!(unsafe { a.wrapper_unchecked() }, arg1);
@@ -407,7 +420,8 @@ fn access_nth_raw_fields_wrong_ty() {
             let arg2 = Value::new(&mut *frame, -3i32)?;
             let instance = ty
                 .cast::<DataType>()?
-                .instantiate(&mut *frame, &mut [arg1.as_value(), arg2])?;
+                .instantiate(&mut *frame, &mut [arg1.as_value(), arg2])?
+                .into_jlrs_result()?;
 
             assert!(instance.get_nth_raw_field::<ArrayRef>(0).is_err());
 
@@ -436,7 +450,8 @@ fn access_nth_array_field() {
             let arg1 = Array::from_vec(&mut *frame, data, (2, 2))?;
             let instance = ty
                 .cast::<DataType>()?
-                .instantiate(&mut *frame, &mut [arg1])?;
+                .instantiate(&mut *frame, &mut [arg1])?
+                .into_jlrs_result()?;
 
             assert!(instance.get_nth_raw_field::<ArrayRef>(0).is_ok());
             assert!(instance.get_nth_raw_field::<TypedArrayRef<f64>>(0).is_ok());
@@ -464,7 +479,8 @@ fn access_ua_array_field_by_idx() {
             let arg1 = Array::from_vec(&mut *frame, data, (2, 2))?;
             let instance = ty
                 .cast::<DataType>()?
-                .instantiate(&mut *frame, &mut [arg1])?;
+                .instantiate(&mut *frame, &mut [arg1])?
+                .into_jlrs_result()?;
 
             assert!(instance.get_nth_raw_field::<ArrayRef>(0).is_ok());
             assert!(instance.get_nth_raw_field::<TypedArrayRef<f64>>(0).is_ok());
@@ -492,7 +508,8 @@ fn access_raw_fields_nonexistent_idx() {
             let arg2 = Value::new(&mut *frame, -3i32)?;
             let instance = ty
                 .cast::<DataType>()?
-                .instantiate(&mut *frame, &mut [arg1.as_value(), arg2])?;
+                .instantiate(&mut *frame, &mut [arg1.as_value(), arg2])?
+                .into_jlrs_result()?;
 
             assert!(instance.get_nth_raw_field::<DataTypeRef>(2).is_err());
             Ok(())

@@ -23,11 +23,15 @@
 
 use crate::{
     convert::into_julia::IntoJulia,
-    error::{JlrsError, JlrsResult, CANNOT_DISPLAY_TYPE, CANNOT_DISPLAY_VALUE},
+    error::{JlrsError, JlrsResult, CANNOT_DISPLAY_TYPE},
     impl_debug,
     layout::{typecheck::Typecheck, valid_layout::ValidLayout},
     memory::{
-        frame::private::Frame as _, frame::Frame, global::Global, scope::private::Scope as _,
+        frame::private::Frame as _,
+        frame::Frame,
+        global::Global,
+        output::{OutputResult, OutputValue},
+        scope::private::Scope as _,
         scope::Scope,
     },
     private::Private,
@@ -53,7 +57,8 @@ use jl_sys::{
     jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_apply_array_type,
     jl_apply_tuple_type_v, jl_array_data, jl_array_eltype, jl_array_t, jl_datatype_t,
     jl_gc_add_finalizer, jl_is_array_type, jl_new_array, jl_new_struct_uninit, jl_ptr_to_array,
-    jl_ptr_to_array_1d, jl_tparam0,
+    jl_ptr_to_array_1d, jl_tparam0, jlrs_alloc_array_1d, jlrs_alloc_array_2d, jlrs_alloc_array_3d,
+    jlrs_new_array, jlrs_result_tag_t_JLRS_RESULT_ERR,
 };
 use std::{
     cell::UnsafeCell,
@@ -75,7 +80,9 @@ pub mod dimensions;
 /// # JULIA.with(|j| {
 /// # let mut julia = j.borrow_mut();
 /// julia.scope(|_global, frame| {
-///     let arr = Array::new::<f64, _, _, _>(&mut *frame, (3, 3))?;
+///     let arr = Array::new::<f64, _, _, _>(&mut *frame, (3, 3))?
+///         .into_jlrs_result()?;
+///
 ///     assert!(arr.is::<Array>());
 ///     assert!(arr.cast::<Array>().is_ok());
 ///     Ok(())
@@ -112,7 +119,62 @@ impl<'data> Array<'_, 'data> {
     /// two-dimensional array with 4 rows and 2 columns is created. This method can only be used
     /// in combination with types that implement `IntoJulia`. If you want to create an array for a
     /// type that doesn't implement this trait you must use [`Array::new_for`].
-    pub fn new<'target, 'current, T, D, S, F>(scope: S, dims: D) -> JlrsResult<S::Value>
+    ///
+    /// If the array size is too large, Julia will throw an error. This error is caught and
+    /// returned.
+    pub fn new<'target, 'current, T, D, S, F>(scope: S, dims: D) -> JlrsResult<S::JuliaResult>
+    where
+        T: IntoJulia,
+        D: Dims,
+        S: Scope<'target, 'current, 'static, F>,
+        F: Frame<'current>,
+    {
+        unsafe {
+            scope.result_scope_with_slots(2, |_, frame| {
+                let global = frame.global();
+                let elty_ptr = T::julia_type(global).ptr();
+                let array_type = jl_apply_array_type(elty_ptr.cast(), dims.n_dimensions());
+                (&mut *frame).value(NonNull::new_unchecked(array_type), Private)?;
+
+                let array = match dims.n_dimensions() {
+                    1 => jlrs_alloc_array_1d(array_type, dims.n_elements(0)),
+                    2 => jlrs_alloc_array_2d(array_type, dims.n_elements(0), dims.n_elements(1)),
+                    3 => jlrs_alloc_array_3d(
+                        array_type,
+                        dims.n_elements(0),
+                        dims.n_elements(1),
+                        dims.n_elements(2),
+                    ),
+                    n if n <= 8 => {
+                        let tuple = small_dim_tuple(frame, dims)?;
+                        jlrs_new_array(array_type, tuple.unwrap(Private))
+                    }
+                    _ => {
+                        let tuple = large_dim_tuple(frame, dims)?;
+                        jlrs_new_array(array_type, tuple.unwrap(Private))
+                    }
+                };
+
+                if array.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
+                    Ok(OutputResult::Err(OutputValue::wrap_non_null(
+                        NonNull::new_unchecked(array.data),
+                    )))
+                } else {
+                    Ok(OutputResult::Ok(OutputValue::wrap_non_null(
+                        NonNull::new_unchecked(array.data),
+                    )))
+                }
+            })
+        }
+    }
+
+    /// Allocates a new n-dimensional array in Julia of dimensions `dims`. If `dims = (4, 2)` a
+    /// two-dimensional array with 4 rows and 2 columns is created. This method can only be used
+    /// in combination with types that implement `IntoJulia`. If you want to create an array for a
+    /// type that doesn't implement this trait you must use [`Array::new_for`].
+    ///
+    /// If the array size is too large, the process will abort.
+    pub fn new_unchecked<'target, 'current, T, D, S, F>(scope: S, dims: D) -> JlrsResult<S::Value>
     where
         T: IntoJulia,
         D: Dims,
@@ -174,18 +236,69 @@ impl<'data> Array<'_, 'data> {
 
     /// Allocates a new n-dimensional array in Julia for elements of type `ty`, which must be a
     /// `Union`, `UnionAll` or `DataType`, and dimensions `dims`. If `dims = (4, 2)` a
-    /// two-dimensional array with 4 rows and 2 columns is created.
-    pub fn new_for<'target, 'current, D, S, F>(scope: S, dims: D, ty: Value) -> JlrsResult<S::Value>
+    /// two-dimensional array with 4 rows and 2 columns is created. If an exception is thrown due
+    /// to either the type or dimensions being invalid it's caught and returned.
+    pub fn new_for<'target, 'current, D, S, F>(
+        scope: S,
+        dims: D,
+        ty: Value,
+    ) -> JlrsResult<S::JuliaResult>
     where
         D: Dims,
         S: Scope<'target, 'current, 'static, F>,
         F: Frame<'current>,
     {
-        if !ty.is_type() {
-            let type_str = ty.display_string_or(CANNOT_DISPLAY_VALUE);
-            Err(JlrsError::NotAType { type_str })?
-        }
+        unsafe {
+            scope.result_scope_with_slots(2, |_, frame| {
+                let array_type = jl_apply_array_type(ty.unwrap(Private), dims.n_dimensions());
+                (&mut *frame).value(NonNull::new_unchecked(array_type), Private)?;
 
+                let array = match dims.n_dimensions() {
+                    1 => jlrs_alloc_array_1d(array_type, dims.n_elements(0)),
+                    2 => jlrs_alloc_array_2d(array_type, dims.n_elements(0), dims.n_elements(1)),
+                    3 => jlrs_alloc_array_3d(
+                        array_type,
+                        dims.n_elements(0),
+                        dims.n_elements(1),
+                        dims.n_elements(2),
+                    ),
+                    n if n <= 8 => {
+                        let tuple = small_dim_tuple(frame, dims)?;
+                        jlrs_new_array(array_type, tuple.unwrap(Private))
+                    }
+                    _ => {
+                        let tuple = large_dim_tuple(frame, dims)?;
+                        jlrs_new_array(array_type, tuple.unwrap(Private))
+                    }
+                };
+
+                if array.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
+                    Ok(OutputResult::Err(OutputValue::wrap_non_null(
+                        NonNull::new_unchecked(array.data),
+                    )))
+                } else {
+                    Ok(OutputResult::Ok(OutputValue::wrap_non_null(
+                        NonNull::new_unchecked(array.data),
+                    )))
+                }
+            })
+        }
+    }
+
+    /// Allocates a new n-dimensional array in Julia for elements of type `ty`, which must be a
+    /// `Union`, `UnionAll` or `DataType`, and dimensions `dims`. If `dims = (4, 2)` a
+    /// two-dimensional array with 4 rows and 2 columns is created. If an exception is thrown due
+    /// to either the type or dimensions being invalid the process aborts.
+    pub fn new_for_unchecked<'target, 'current, D, S, F>(
+        scope: S,
+        dims: D,
+        ty: Value,
+    ) -> JlrsResult<S::Value>
+    where
+        D: Dims,
+        S: Scope<'target, 'current, 'static, F>,
+        F: Frame<'current>,
+    {
         unsafe {
             let array_type = jl_apply_array_type(ty.unwrap(Private), dims.n_dimensions());
 

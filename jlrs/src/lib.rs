@@ -388,7 +388,7 @@ impl Julia {
                 .wrapper_unchecked()
                 .global_ref("droparray")?
                 .wrapper_unchecked()
-                .set_nth_field(0, droparray_fn)?;
+                .set_nth_field_unchecked(0, droparray_fn);
 
             Ok(())
         })
@@ -451,7 +451,7 @@ impl Julia {
                 .wrapper_unchecked()
                 .global_ref("droparray")?
                 .wrapper_unchecked()
-                .set_nth_field(0, droparray_fn)?;
+                .set_nth_field_unchecked(0, droparray_fn);
 
             Ok(())
         })

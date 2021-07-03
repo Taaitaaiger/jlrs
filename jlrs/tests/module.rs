@@ -235,7 +235,7 @@ fn set_global() {
             let main = Module::main(global);
             let value = Value::new(&mut *frame, 1usize)?;
 
-            main.set_global("one", value);
+            main.set_global(frame, "one", value)?.into_jlrs_result()?;
 
             let value = main.global_ref("one")?.wrapper_unchecked();
             assert_eq!(value.unbox::<usize>()?, 1);
@@ -252,7 +252,7 @@ fn set_const() {
         jlrs.scope_with_slots(1, |global, frame| unsafe {
             let main = Module::main(global);
             let value = Value::new(&mut *frame, 2usize)?;
-            main.set_const("ONE", value)?;
+            main.set_const(frame, "ONE", value)?.into_jlrs_result()?;
 
             let value = main.global_ref("ONE")?.wrapper_unchecked();
             assert_eq!(value.unbox::<usize>()?, 2);
@@ -266,15 +266,13 @@ fn set_const() {
 fn set_const_twice() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
-        let err = jlrs.scope_with_slots(2, |global, frame| unsafe {
+        let err = jlrs.scope_with_slots(2, |global, frame| {
             let main = Module::main(global);
             let value1 = Value::new(&mut *frame, 3usize)?;
             let value2 = Value::new(&mut *frame, 4usize)?;
-            main.set_const("TWICE", value1)?;
-            main.set_const("TWICE", value2)?;
-
-            let value = main.global_ref("TWICE")?.wrapper_unchecked();
-            assert_eq!(value.unbox::<usize>()?, 2);
+            main.set_const_unrooted("TWICE", value1)
+                .into_jlrs_result()?;
+            main.set_const(frame, "TWICE", value2)?.into_jlrs_result()?;
             Ok(())
         });
 

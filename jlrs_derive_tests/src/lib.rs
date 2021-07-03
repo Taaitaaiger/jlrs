@@ -503,7 +503,9 @@ mod tests {
                     let v1 = Value::new(&mut *frame, 1i8)?;
                     let v2 = Value::new(&mut *frame, 2i16)?;
                     let v3 = Value::new(&mut *frame, 3i8)?;
-                    let jl_val = constr.instantiate(&mut *frame, &mut [v1, v2, v3])?;
+                    let jl_val = constr
+                        .instantiate(&mut *frame, &mut [v1, v2, v3])?
+                        .into_jlrs_result()?;
 
                     assert!(Module::base(global)
                         .function_ref("typeof")?
@@ -868,7 +870,8 @@ mod tests {
 
             julia
                 .scope(|global, frame| unsafe {
-                    let arr = Array::new::<i32, _, _, _>(&mut *frame, (2, 2))?;
+                    let arr =
+                        Array::new::<i32, _, _, _>(&mut *frame, (2, 2))?.into_jlrs_result()?;
 
                     let wgt_constr = Module::main(global)
                         .submodule_ref("WithGeneric")?
