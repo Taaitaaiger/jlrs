@@ -933,7 +933,61 @@ where
     /// two-dimensional array with 4 rows and 2 columns is created. This method can only be used
     /// in combination with types that implement `IntoJulia`. If you want to create an array for a
     /// type that doesn't implement this trait you must use [`Array::new_for`].
-    pub fn new<'target, 'current, D, S, F>(scope: S, dims: D) -> JlrsResult<S::Value>
+    ///
+    /// If the array size is too large, Julia will throw an error. This error is caught and
+    /// returned.
+    pub fn new<'target, 'current, D, S, F>(scope: S, dims: D) -> JlrsResult<S::JuliaResult>
+    where
+        D: Dims,
+        S: Scope<'target, 'current, 'static, F>,
+        F: Frame<'current>,
+    {
+        unsafe {
+            scope.result_scope_with_slots(2, |_, frame| {
+                let global = frame.global();
+                let elty_ptr = T::julia_type(global).ptr();
+                let array_type = jl_apply_array_type(elty_ptr.cast(), dims.n_dimensions());
+                (&mut *frame).value(NonNull::new_unchecked(array_type), Private)?;
+
+                let array = match dims.n_dimensions() {
+                    1 => jlrs_alloc_array_1d(array_type, dims.n_elements(0)),
+                    2 => jlrs_alloc_array_2d(array_type, dims.n_elements(0), dims.n_elements(1)),
+                    3 => jlrs_alloc_array_3d(
+                        array_type,
+                        dims.n_elements(0),
+                        dims.n_elements(1),
+                        dims.n_elements(2),
+                    ),
+                    n if n <= 8 => {
+                        let tuple = small_dim_tuple(frame, dims)?;
+                        jlrs_new_array(array_type, tuple.unwrap(Private))
+                    }
+                    _ => {
+                        let tuple = large_dim_tuple(frame, dims)?;
+                        jlrs_new_array(array_type, tuple.unwrap(Private))
+                    }
+                };
+
+                if array.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
+                    Ok(OutputResult::Err(OutputValue::wrap_non_null(
+                        NonNull::new_unchecked(array.data),
+                    )))
+                } else {
+                    Ok(OutputResult::Ok(OutputValue::wrap_non_null(
+                        NonNull::new_unchecked(array.data),
+                    )))
+                }
+            })
+        }
+    }
+
+    /// Allocates a new n-dimensional array in Julia of dimensions `dims`. If `dims = (4, 2)` a
+    /// two-dimensional array with 4 rows and 2 columns is created. This method can only be used
+    /// in combination with types that implement `IntoJulia`. If you want to create an array for a
+    /// type that doesn't implement this trait you must use [`Array::new_for`].
+    ///
+    /// If the array size is too large, the process will abort.
+    pub fn new_unchecked<'target, 'current, D, S, F>(scope: S, dims: D) -> JlrsResult<S::Value>
     where
         D: Dims,
         S: Scope<'target, 'current, 'static, F>,
