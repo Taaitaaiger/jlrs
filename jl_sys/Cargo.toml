@@ -10,6 +10,7 @@ homepage = "https://github.com/Taaitaaiger/jlrs"
 repository = "https://github.com/Taaitaaiger/jlrs"
 readme = "README.md"
 keywords = ["Julia", "math", "mathematics", "bindings", "ffi"]
+categories = ["external-ffi-bindings"]
 license = "MIT"
 edition = "2018"
 links = "julia"

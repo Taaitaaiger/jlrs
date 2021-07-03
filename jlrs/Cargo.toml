@@ -10,6 +10,7 @@ homepage = "https://github.com/Taaitaaiger/jlrs"
 repository = "https://github.com/Taaitaaiger/jlrs"
 readme = "../README.md"
 keywords = ["Julia", "math", "mathematics", "bindings", "ffi"]
+categories = ["api-bindings", "mathematics"]
 license = "MIT"
 edition = "2018"
 
@@ -23,7 +24,7 @@ docs-rs = ["jl-sys/docs-rs", "jlrs-derive", "async", "jlrs-ndarray", "f16"]
 
 [dependencies]
 jl-sys = {version = "0.12", path = "../jl_sys" }
-jlrs-derive = { version = "0.2", optional = true, path = "../jlrs_derive" }
+jlrs-derive = { version = "0.3", optional = true, path = "../jlrs_derive" }
 smallvec = "1"
 futures = { version = "0.3", optional = true }
 crossbeam-channel = { version = "0.5", optional = true }
