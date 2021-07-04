@@ -11,7 +11,7 @@ impl Mode for Sync {}
 
 pub(crate) mod private {
     use crate::{memory::mode::Sync, private::Private};
-    use jl_sys::jl_get_ptls_states;
+    use jl_sys::jlrs_current_task;
     use std::ffi::c_void;
     use std::ptr::null_mut;
 
@@ -22,20 +22,20 @@ pub(crate) mod private {
 
     impl Mode for Sync {
         unsafe fn push_frame(&self, raw_frame: &mut [*mut c_void], capacity: usize, _: Private) {
-            let rtls = &mut *jl_get_ptls_states();
+            let rtls = &mut *jlrs_current_task();
             raw_frame[0] = (capacity << 1) as _;
-            raw_frame[1] = rtls.pgcstack.cast();
+            raw_frame[1] = rtls.gcstack.cast();
 
             for i in 0..capacity {
                 raw_frame[2 + i] = null_mut();
             }
 
-            rtls.pgcstack = raw_frame[..].as_mut_ptr().cast();
+            rtls.gcstack = raw_frame[..].as_mut_ptr().cast();
         }
 
         unsafe fn pop_frame(&self, _: &mut [*mut c_void], _: Private) {
-            let rtls = &mut *jl_get_ptls_states();
-            rtls.pgcstack = (&*rtls.pgcstack).prev;
+            let rtls = &mut *jlrs_current_task();
+            rtls.gcstack = (&*rtls.gcstack).prev;
         }
     }
 }

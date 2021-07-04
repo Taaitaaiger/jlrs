@@ -366,14 +366,6 @@ pub unsafe fn jl_datatype_nfields(t: *mut jl_datatype_t) -> u32 {
 }
 
 /*
-#define jl_datatype_isinlinealloc(t) (((jl_datatype_t *)(t))->isinlinealloc)
-*/
-#[inline(always)]
-pub unsafe fn jl_datatype_isinlinealloc(t: *mut jl_datatype_t) -> u8 {
-    (&*(t)).isinlinealloc
-}
-
-/*
 #define jl_symbol_name(s) jl_symbol_name_(s)
 */
 // Not implemented
@@ -439,14 +431,6 @@ pub unsafe fn jl_is_datatype(v: *mut jl_value_t) -> bool {
 #define jl_is_mutable_datatype(t) (jl_is_datatype(t) && (((jl_datatype_t*)t)->mutabl))
 */
 // Not implemented
-
-/*
-#define jl_is_immutable(t)   (!((jl_datatype_t*)t)->mutabl)
-*/
-#[inline(always)]
-pub unsafe fn jl_is_immutable(v: *mut jl_value_t) -> bool {
-    (&*jl_typeof(v).cast::<jl_datatype_t>()).mutabl == 0
-}
 
 /*
 #define jl_is_immutable_datatype(t) (jl_is_datatype(t) && (!((jl_datatype_t*)t)->mutabl))
@@ -697,19 +681,6 @@ pub unsafe fn jl_array_isbitsunion(a: *mut jl_array_t) -> bool {
 // Not implemented
 
 /*
-#define julia_init julia_init__threading
-*/
-// Not implemented
-
-/*
-#define jl_init jl_init__threading
-*/
-#[inline(always)]
-pub unsafe fn jl_init() {
-    jl_init__threading()
-}
-
-/*
 #define jl_init_with_image jl_init_with_image__threading
 */
 // Not implemented
@@ -858,6 +829,11 @@ STATIC_INLINE void jl_array_uint8_set(void *a, size_t i, uint8_t x) JL_NOTSAFEPO
 */
 // Not implemented
 
+#[inline(always)]
+pub unsafe fn jl_is_immutable(v: *mut jl_value_t) -> bool {
+    (&*(&*jl_typeof(v).cast::<jl_datatype_t>()).name).mutabl() == 0
+}
+
 /*STATIC_INLINE jl_svec_t *jl_field_names(jl_datatype_t *st) JL_NOTSAFEPOINT
 {
     jl_svec_t *names = st->names;
@@ -867,14 +843,8 @@ STATIC_INLINE void jl_array_uint8_set(void *a, size_t i, uint8_t x) JL_NOTSAFEPO
 }*/
 #[inline]
 pub unsafe fn jl_field_names(st: *mut jl_datatype_t) -> *mut jl_svec_t {
-    let mut st = &mut *st;
-    if !st.names.is_null() {
-        return st.names;
-    }
-
-    st.names = (&*st.name).names;
-
-    return st.names;
+    let st = &mut *st;
+    return (&*st.name).names;
 }
 
 /*
@@ -970,7 +940,7 @@ STATIC_INLINE int jl_is_structtype(void *v) JL_NOTSAFEPOINT
 pub unsafe fn jl_is_structtype(v: *mut jl_value_t) -> bool {
     jl_is_datatype(v)
         && jl_is_immutable(v)
-        && (&*v.cast::<jl_datatype_t>()).abstract_ == 0
+        && (&*(&*jl_typeof(v).cast::<jl_datatype_t>()).name).abstract_() == 0
         && jl_datatype_nfields(v.cast()) == 0
         && jl_datatype_size(v.cast()) > 0
 }
@@ -983,7 +953,7 @@ STATIC_INLINE int jl_isbits(void *t) JL_NOTSAFEPOINT // corresponding to isbits(
 */
 #[inline]
 pub unsafe fn jl_isbits(t: *mut c_void) -> bool {
-    jl_is_datatype(t.cast()) && (&*t.cast::<jl_datatype_t>()).isbitstype != 0
+    jl_is_datatype(t.cast()) && (&*t.cast::<jl_datatype_t>()).isbitstype() != 0
 }
 
 /*
@@ -1005,7 +975,8 @@ STATIC_INLINE int jl_is_abstracttype(void *v) JL_NOTSAFEPOINT
 */
 #[inline]
 pub unsafe fn jl_is_abstracttype(v: *mut c_void) -> bool {
-    jl_is_datatype(v.cast()) && (&*v.cast::<jl_datatype_t>()).abstract_ > 0
+    jl_is_datatype(v.cast())
+        && (&*(&*jl_typeof(v.cast()).cast::<jl_datatype_t>()).name).abstract_() == 0
 }
 
 /*

@@ -117,7 +117,14 @@ pub struct Mutable;
 
 unsafe impl Typecheck for Mutable {
     fn typecheck(t: DataType) -> bool {
-        unsafe { t.unwrap_non_null(Private).as_ref().mutabl != 0 }
+        unsafe {
+            t.type_name()
+                .wrapper_unchecked()
+                .unwrap_non_null(Private)
+                .as_ref()
+                .mutabl()
+                != 0
+        }
     }
 }
 
@@ -127,7 +134,14 @@ pub struct MutableDatatype;
 
 unsafe impl Typecheck for MutableDatatype {
     fn typecheck(t: DataType) -> bool {
-        unsafe { DataType::typecheck(t) && t.unwrap_non_null(Private).as_ref().mutabl != 0 }
+        unsafe {
+            t.type_name()
+                .wrapper_unchecked()
+                .unwrap_non_null(Private)
+                .as_ref()
+                .mutabl()
+                != 0
+        }
     }
 }
 /// A typecheck that can be used in combination with `DataType::is`. This method returns true if
@@ -141,7 +155,14 @@ pub struct Immutable;
 
 unsafe impl Typecheck for Immutable {
     fn typecheck(t: DataType) -> bool {
-        unsafe { t.unwrap_non_null(Private).as_ref().mutabl == 0 }
+        unsafe {
+            t.type_name()
+                .wrapper_unchecked()
+                .unwrap_non_null(Private)
+                .as_ref()
+                .mutabl()
+                == 0
+        }
     }
 }
 
@@ -151,7 +172,14 @@ pub struct ImmutableDatatype;
 
 unsafe impl Typecheck for ImmutableDatatype {
     fn typecheck(t: DataType) -> bool {
-        unsafe { DataType::typecheck(t) && t.unwrap_non_null(Private).as_ref().mutabl == 0 }
+        unsafe {
+            t.type_name()
+                .wrapper_unchecked()
+                .unwrap_non_null(Private)
+                .as_ref()
+                .mutabl()
+                == 0
+        }
     }
 }
 
@@ -271,6 +299,6 @@ impl_julia_typecheck!(Intrinsic, jl_intrinsic_type);
 pub struct Concrete;
 unsafe impl Typecheck for Concrete {
     fn typecheck(t: DataType) -> bool {
-        unsafe { t.unwrap_non_null(Private).as_ref().isconcretetype != 0 }
+        unsafe { t.unwrap_non_null(Private).as_ref().isconcretetype() != 0 }
     }
 }

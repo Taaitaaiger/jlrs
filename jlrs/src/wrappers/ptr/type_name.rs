@@ -11,8 +11,7 @@ use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout};
 use crate::{memory::global::Global, private::Private};
 use jl_sys::{
     jl_array_typename, jl_llvmpointer_typename, jl_namedtuple_typename, jl_pointer_typename,
-    jl_tuple_typename, jl_type_typename, jl_typename_t, jl_typename_type, jl_vararg_typename,
-    jl_vecelement_typename,
+    jl_tuple_typename, jl_type_typename, jl_typename_t, jl_typename_type, jl_vecelement_typename,
 };
 use std::{marker::PhantomData, ptr::NonNull};
 
@@ -53,6 +52,11 @@ impl<'scope> TypeName<'scope> {
         unsafe { SimpleVectorRef::wrap(self.unwrap_non_null(Private).as_ref().names) }
     }
 
+    /// The `atomicfields` field.
+    pub fn atomicfields(self) -> *const u32 {
+        unsafe { self.unwrap_non_null(Private).as_ref().atomicfields }
+    }
+
     /// Either the only instantiation of the type (if no parameters) or a `UnionAll` accepting
     /// parameters to make an instantiation.
     pub fn wrapper(self) -> ValueRef<'scope, 'static> {
@@ -83,6 +87,11 @@ impl<'scope> TypeName<'scope> {
     pub fn partial(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().partial.cast()) }
     }
+
+    /// The `n-uninitialized` field.
+    pub fn n_uninitialized(self) -> i32 {
+        unsafe { self.unwrap_non_null(Private).as_ref().n_uninitialized }
+    }
 }
 
 impl<'base> TypeName<'base> {
@@ -109,11 +118,6 @@ impl<'base> TypeName<'base> {
     /// The typename of the `UnionAll` `NamedTuple`.
     pub fn namedtuple_typename(_: Global<'base>) -> Self {
         unsafe { Self::wrap(jl_namedtuple_typename, Private) }
-    }
-
-    /// The typename of the `UnionAll` `Vararg`.
-    pub fn vararg_typename(_: Global<'base>) -> Self {
-        unsafe { Self::wrap(jl_vararg_typename, Private) }
     }
 
     /// The typename of the `UnionAll` `Type`.

@@ -38,8 +38,8 @@ use async_std::sync::{Condvar as AsyncStdCondvar, Mutex as AsyncStdMutex};
 use async_std::task::{self, JoinHandle as AsyncStdHandle};
 use async_task::{AsyncTask, ReturnChannel};
 use jl_sys::{
-    jl_atexit_hook, jl_eval_string, jl_get_ptls_states, jl_init, jl_init_with_image__threading,
-    jl_is_initialized,
+    jl_atexit_hook, jl_eval_string, jl_init, jl_init_with_image, jl_is_initialized,
+    jlrs_current_task,
 };
 use mode::Async;
 use std::path::{Path, PathBuf};
@@ -466,9 +466,9 @@ impl AsyncStackPage {
 unsafe fn link_stacks(stacks: &mut [Option<Box<AsyncStackPage>>]) {
     for stack in stacks.iter_mut() {
         let stack = stack.as_mut().unwrap();
-        let rtls = &mut *jl_get_ptls_states();
-        stack.top[1].set(rtls.pgcstack.cast());
-        rtls.pgcstack = stack.top[0..1].as_mut_ptr().cast();
+        let rtls = &mut *jlrs_current_task();
+        stack.top[1].set(rtls.gcstack.cast());
+        rtls.gcstack = stack.top[0..1].as_mut_ptr().cast();
     }
 }
 
@@ -611,7 +611,7 @@ where
             let bindir = std::ffi::CString::new(julia_bindir_str).unwrap();
             let im_rel_path = std::ffi::CString::new(image_path_str).unwrap();
 
-            jl_init_with_image__threading(bindir.as_ptr(), im_rel_path.as_ptr());
+            jl_init_with_image(bindir.as_ptr(), im_rel_path.as_ptr());
 
             let jlrs_jl = CString::new(JLRS_JL).expect("Invalid Jlrs module");
             jl_eval_string(jlrs_jl.as_ptr());

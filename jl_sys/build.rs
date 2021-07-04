@@ -52,6 +52,7 @@ fn main() {
 
     if flags.len() == 1 {
         c.include(&flags[0][2..]);
+        c.include("/home/thomas/Projects/C/julia/src");
     }
 
     c.compile("jlrs_c");
@@ -102,9 +103,8 @@ fn main() {
         "jl_get_kwsorter",
         "jl_get_nth_field",
         "jl_get_nth_field_noalloc",
-        "jl_get_ptls_states",
-        "jl_init__threading",
-        "jl_init_with_image__threading",
+        "jl_init",
+        "jl_init_with_image",
         "jl_is_initialized",
         "jl_isa",
         "jl_islayout_inline",
@@ -114,7 +114,7 @@ fn main() {
         "jl_new_typevar",
         "jl_object_id",
         "jl_pchar_to_string",
-        "jl_pgcstack",
+        "jl_get_pgcstack",
         "jl_process_events",
         "jl_ptr_to_array",
         "jl_ptr_to_array_1d",
@@ -154,6 +154,7 @@ fn main() {
         "jlrs_set_nth_field",
         "jlrs_type_union",
         "jlrs_type_unionall",
+        "jlrs_current_task",
     ];
 
     let mut builder = bindgen::Builder::default()
@@ -206,6 +207,7 @@ fn main() {
         .allowlist_var("jl_code_info_type")
         .allowlist_var("jl_code_instance_type")
         .allowlist_var("jl_core_module")
+        .allowlist_var("jl_pgcstack")
         .allowlist_var("jl_datatype_type")
         .allowlist_var("jl_densearray_type")
         .allowlist_var("jl_diverror_exception")

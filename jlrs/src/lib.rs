@@ -350,7 +350,7 @@ use convert::into_jlrs_result::IntoJlrsResult;
 use error::{JlrsError, JlrsResult, CANNOT_DISPLAY_VALUE};
 #[cfg(not(feature = "coverage"))]
 use jl_sys::uv_async_send;
-use jl_sys::{jl_atexit_hook, jl_init, jl_init_with_image__threading, jl_is_initialized};
+use jl_sys::{jl_atexit_hook, jl_init, jl_init_with_image, jl_is_initialized};
 use memory::frame::{GcFrame, NullFrame};
 use memory::global::Global;
 use memory::mode::Sync;
@@ -452,7 +452,7 @@ impl Julia {
         let bindir = CString::new(julia_bindir_str).unwrap();
         let im_rel_path = CString::new(image_path_str).unwrap();
 
-        jl_init_with_image__threading(bindir.as_ptr(), im_rel_path.as_ptr());
+        jl_init_with_image(bindir.as_ptr(), im_rel_path.as_ptr());
 
         let mut jl = Julia {
             page: StackPage::default(),
