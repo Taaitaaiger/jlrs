@@ -82,7 +82,6 @@ impl<'scope> DataType<'scope> {
         unsafe { SimpleVectorRef::wrap(jl_get_fieldtypes(self.unwrap(Private))) }
     }
 
-    // XXX -> TypeName
     /// Returns the field names of this type.
     pub fn field_names(self) -> SimpleVectorRef<'scope, Symbol<'scope>> {
         unsafe { SimpleVectorRef::wrap(jl_field_names(self.unwrap(Private))) }
@@ -103,7 +102,6 @@ impl<'scope> DataType<'scope> {
         unsafe { self.unwrap_non_null(Private).as_ref().hash }
     }
 
-    //// XXX -> TypeName
     /// Returns true if this is an abstract type.
     pub fn is_abstract(self) -> bool {
         unsafe {
@@ -153,7 +151,6 @@ impl<'scope> DataType<'scope> {
         unsafe { self.unwrap_non_null(Private).as_ref().zeroinit() != 0 }
     }
 
-    // XXX
     /// Returns true if a value of this type stores its data inline.
     pub fn is_inline_alloc(self) -> bool {
         unsafe {
@@ -163,8 +160,8 @@ impl<'scope> DataType<'scope> {
                 .as_ref()
                 .mayinlinealloc()
                 != 0
+                && !self.unwrap_non_null(Private).as_ref().layout.is_null()
         }
-        // unsafe { jl_datatype_isinlinealloc(self.unwrap(Private)) != 0 }
     }
 
     /// If false, no value will have this type.

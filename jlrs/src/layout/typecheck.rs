@@ -135,12 +135,13 @@ pub struct MutableDatatype;
 unsafe impl Typecheck for MutableDatatype {
     fn typecheck(t: DataType) -> bool {
         unsafe {
-            t.type_name()
-                .wrapper_unchecked()
-                .unwrap_non_null(Private)
-                .as_ref()
-                .mutabl()
-                != 0
+            DataType::typecheck(t)
+                && t.type_name()
+                    .wrapper_unchecked()
+                    .unwrap_non_null(Private)
+                    .as_ref()
+                    .mutabl()
+                    != 0
         }
     }
 }
@@ -173,12 +174,13 @@ pub struct ImmutableDatatype;
 unsafe impl Typecheck for ImmutableDatatype {
     fn typecheck(t: DataType) -> bool {
         unsafe {
-            t.type_name()
-                .wrapper_unchecked()
-                .unwrap_non_null(Private)
-                .as_ref()
-                .mutabl()
-                == 0
+            DataType::typecheck(t)
+                && t.type_name()
+                    .wrapper_unchecked()
+                    .unwrap_non_null(Private)
+                    .as_ref()
+                    .mutabl()
+                    == 0
         }
     }
 }

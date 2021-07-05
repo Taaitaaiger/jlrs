@@ -37,6 +37,4 @@ jlrs_result_t jlrs_set_nth_field(jl_value_t *v, size_t i, jl_value_t *rhs);
 jlrs_result_t jlrs_type_union(jl_value_t **ts, size_t n);
 jlrs_result_t jlrs_type_unionall(jl_tvar_t *v, jl_value_t *body);
 
-JL_DLLEXPORT JL_CONST_FUNC jl_gcframe_t **jl_get_pgcstack(void) JL_GLOBALLY_ROOTED JL_NOTSAFEPOINT;
-
 jl_task_t *jlrs_current_task();
