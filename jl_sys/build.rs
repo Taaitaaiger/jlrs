@@ -52,7 +52,6 @@ fn main() {
 
     if flags.len() == 1 {
         c.include(&flags[0][2..]);
-        c.include("/home/thomas/Projects/C/julia/src");
     }
 
     c.compile("jlrs_c");
