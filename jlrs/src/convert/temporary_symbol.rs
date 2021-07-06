@@ -1,84 +1,51 @@
-//! Create a temporary symbol.
+//! Automatically convert strings to symbols.
 //!
-//! Many things in Julia are accessed with [`Symbol`]s. This traits allows using strings instead.
+//! Many things in Julia are accessed with [`Symbol`]s, the [`TemporarySymbol`] trait allows for
+//! strings to be used instead. This trait can only be used by jlrs internally, the method that
+//! performs the conversion is not public.
 
-use crate::value::string::JuliaString;
-use crate::value::symbol::Symbol;
-use std::borrow::Cow;
+use crate::wrappers::ptr::string::JuliaString;
+use crate::wrappers::ptr::symbol::Symbol;
 
-macro_rules! impl_temporary_symbol {
-    ($type:ty, $($bounds:tt)+) => {
-        unsafe impl<$($bounds)+> TemporarySymbol for $type {}
-    };
-    ($type:ty) => {
-        unsafe impl TemporarySymbol for $type {}
-    };
-}
-/// Trait implemented by types that can be converted to a temporary [`Symbol`].
-pub unsafe trait TemporarySymbol: private::TemporarySymbol {}
-
-impl_temporary_symbol!(String);
-impl_temporary_symbol!(&dyn AsRef<str>);
-impl_temporary_symbol!(&'a str, 'a);
-impl_temporary_symbol!(Cow<'a, str>, 'a);
-impl_temporary_symbol!(Symbol<'s>, 's);
-impl_temporary_symbol!(JuliaString<'frame>, 'frame);
+/// Trait implemented by types that can be converted to a [`Symbol`]. Note that the method that
+/// actually performs the conversion is inaccessible outside of jlrs, it's for internal use only.
+pub trait TemporarySymbol: private::TemporarySymbol {}
+impl<T: AsRef<str>> TemporarySymbol for T {}
+impl TemporarySymbol for Symbol<'_> {}
+impl TemporarySymbol for JuliaString<'_> {}
 
 pub(crate) mod private {
     use crate::private::Private;
-    use crate::value::string::JuliaString;
-    use crate::value::symbol::Symbol;
+    use crate::wrappers::ptr::private::Wrapper;
+    use crate::wrappers::ptr::string::JuliaString;
+    use crate::wrappers::ptr::symbol::Symbol;
     use jl_sys::{jl_symbol, jl_symbol_n};
-    use std::borrow::Cow;
+    use std::ptr::NonNull;
 
-    // safety: never return the symbol to the user without assigning the 'base lifetime.
     pub trait TemporarySymbol {
+        // Safety: don't call this method before Julia has been initialized.
         unsafe fn temporary_symbol<'symbol>(&self, _: Private) -> Symbol<'symbol>;
     }
 
-    impl<'a> TemporarySymbol for &'a str {
-        unsafe fn temporary_symbol<'symbol>(&self, _: Private) -> Symbol<'symbol> {
-            let symbol_ptr = self.as_ptr();
-            let symbol = jl_symbol_n(symbol_ptr.cast(), self.len());
-            Symbol::wrap(symbol)
-        }
-    }
-
-    impl<'a> TemporarySymbol for Cow<'a, str> {
-        unsafe fn temporary_symbol<'symbol>(&self, _: Private) -> Symbol<'symbol> {
-            let symbol_ptr = self.as_ptr().cast();
-            let symbol = jl_symbol_n(symbol_ptr, self.len());
-            Symbol::wrap(symbol)
-        }
-    }
-
-    impl TemporarySymbol for String {
-        unsafe fn temporary_symbol<'symbol>(&self, _: Private) -> Symbol<'symbol> {
-            let symbol_ptr = self.as_ptr().cast();
-            let symbol = jl_symbol_n(symbol_ptr, self.len());
-            Symbol::wrap(symbol)
-        }
-    }
-
-    impl TemporarySymbol for &dyn AsRef<str> {
+    impl<T: AsRef<str>> TemporarySymbol for T {
         unsafe fn temporary_symbol<'symbol>(&self, _: Private) -> Symbol<'symbol> {
             let symbol_ptr = self.as_ref().as_ptr().cast();
             let symbol = jl_symbol_n(symbol_ptr, self.as_ref().len());
-            Symbol::wrap(symbol)
+            Symbol::wrap_non_null(NonNull::new_unchecked(symbol), Private)
         }
     }
 
-    impl<'frame> TemporarySymbol for JuliaString<'frame> {
+    impl TemporarySymbol for JuliaString<'_> {
         unsafe fn temporary_symbol<'symbol>(&self, _: Private) -> Symbol<'symbol> {
             let symbol_ptr = self.as_c_str();
             let symbol = jl_symbol(symbol_ptr.as_ptr());
-            Symbol::wrap(symbol)
+            Symbol::wrap_non_null(NonNull::new_unchecked(symbol), Private)
         }
     }
 
-    impl<'frame> TemporarySymbol for Symbol<'frame> {
+    impl TemporarySymbol for Symbol<'_> {
         unsafe fn temporary_symbol<'symbol>(&self, _: Private) -> Symbol<'symbol> {
-            Symbol::wrap(self.ptr())
+            Symbol::wrap_non_null(self.unwrap_non_null(Private), Private)
         }
     }
 }

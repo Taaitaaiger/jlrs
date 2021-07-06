@@ -1,15 +1,15 @@
+use jlrs::layout::typecheck::*;
 use jlrs::prelude::*;
 use jlrs::util::JULIA;
-use jlrs::value::code_instance::CodeInstance;
-use jlrs::value::datatype::*;
-use jlrs::value::expr::Expr;
-use jlrs::value::method::Method;
-use jlrs::value::method_instance::MethodInstance;
-use jlrs::value::simple_vector::SimpleVector;
-use jlrs::value::type_name::TypeName;
-use jlrs::value::type_var::TypeVar;
-use jlrs::value::union::Union;
-use jlrs::value::union_all::UnionAll;
+use jlrs::wrappers::ptr::code_instance::CodeInstance;
+use jlrs::wrappers::ptr::expr::Expr;
+use jlrs::wrappers::ptr::method::Method;
+use jlrs::wrappers::ptr::method_instance::MethodInstance;
+use jlrs::wrappers::ptr::simple_vector::SimpleVector;
+use jlrs::wrappers::ptr::type_name::TypeName;
+use jlrs::wrappers::ptr::type_var::TypeVar;
+use jlrs::wrappers::ptr::union::Union;
+use jlrs::wrappers::ptr::union_all::UnionAll;
 
 #[test]
 fn datatype_methods() {
@@ -18,13 +18,13 @@ fn datatype_methods() {
 
         jlrs.scope_with_slots(1, |_global, frame| {
             let val = Value::new(frame, 3.0f32)?;
-            let dt = val.datatype().unwrap();
+            let dt = val.datatype();
 
             assert_eq!(dt.size(), 4);
             assert_eq!(dt.align(), 4);
-            assert_eq!(dt.nbits(), 32);
-            assert_eq!(dt.nfields(), 0);
-            assert!(dt.isinlinealloc());
+            assert_eq!(dt.n_bits(), 32);
+            assert_eq!(dt.n_fields(), 0);
+            assert!(dt.is_inline_alloc());
 
             Ok(())
         })
@@ -39,7 +39,7 @@ fn datatype_typechecks() {
 
         jlrs.scope_with_slots(1, |_global, frame| {
             let val = Value::new(frame, 3.0f32)?;
-            let dt = val.datatype().unwrap();
+            let dt = val.datatype();
 
             assert!(!dt.is::<Tuple>());
             assert!(!dt.is::<NamedTuple>());
@@ -93,10 +93,12 @@ fn datatype_typechecks() {
 fn function_returns_datatype() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
-        jlrs.scope_with_slots(1, |global, frame| {
+        jlrs.scope_with_slots(1, |global, frame| unsafe {
             let dt = Module::main(global)
-                .submodule("JlrsTests")?
-                .function("datatype")?;
+                .submodule_ref("JlrsTests")?
+                .wrapper_unchecked()
+                .function_ref("datatype")?
+                .wrapper_unchecked();
             let dt_val = dt.call0(frame)?.unwrap();
 
             assert!(dt_val.is::<DataType>());
@@ -112,10 +114,10 @@ fn function_returns_datatype() {
 fn datatype_has_typename() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
-        jlrs.scope_with_slots(0, |global, _| {
+        jlrs.scope_with_slots(0, |global, _| unsafe {
             let dt = DataType::tvar_type(global);
-            let tn = dt.type_name();
-            let s: String = tn.name().into();
+            let tn = dt.type_name().wrapper_unchecked();
+            let s = tn.name().wrapper_unchecked().as_string().unwrap();
 
             assert_eq!(s, "TypeVar");
 
@@ -129,13 +131,13 @@ fn datatype_has_typename() {
 fn datatype_has_fieldnames() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
-        jlrs.scope_with_slots(0, |global, _| {
+        jlrs.scope_with_slots(0, |global, _| unsafe {
             let dt = DataType::tvar_type(global);
-            let tn = dt.field_names();
+            let tn = dt.field_names().wrapper_unchecked().data();
 
-            assert_eq!(tn[0].as_string(), "name");
-            assert_eq!(tn[1].as_string(), "lb");
-            assert_eq!(tn[2].as_string(), "ub");
+            assert_eq!(tn[0].wrapper().unwrap().as_string().unwrap(), "name");
+            assert_eq!(tn[1].wrapper().unwrap().as_string().unwrap(), "lb");
+            assert_eq!(tn[2].wrapper().unwrap().as_string().unwrap(), "ub");
 
             Ok(())
         })
@@ -193,7 +195,7 @@ fn datatype_isbits() {
         let mut jlrs = j.borrow_mut();
         jlrs.scope_with_slots(0, |global, _| {
             let dt = DataType::tvar_type(global);
-            assert!(!dt.isbits());
+            assert!(!dt.is_bits());
 
             Ok(())
         })
@@ -207,7 +209,7 @@ fn datatype_supertype() {
         let mut jlrs = j.borrow_mut();
         jlrs.scope_with_slots(0, |global, _| {
             let dt = DataType::tvar_type(global);
-            assert!(dt.super_type().is_some());
+            assert!(!dt.super_type().is_undefined());
 
             Ok(())
         })
@@ -219,12 +221,13 @@ fn datatype_supertype() {
 fn datatype_parameters() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
-        jlrs.scope_with_slots(0, |global, _| {
+        jlrs.scope_with_slots(0, |global, _| unsafe {
             assert_eq!(
                 Value::array_int32_type(global)
                     .cast::<DataType>()
                     .unwrap()
                     .parameters()
+                    .wrapper_unchecked()
                     .len(),
                 2
             );
@@ -244,9 +247,9 @@ fn datatype_instance() {
                 .cast::<DataType>()
                 .unwrap()
                 .instance()
-                .is_none());
+                .is_undefined());
 
-            assert!(DataType::nothing_type(global).instance().is_some());
+            assert!(!DataType::nothing_type(global).instance().is_undefined());
 
             Ok(())
         })
@@ -357,12 +360,18 @@ fn datatype_zeroinit() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
         jlrs.scope_with_slots(0, |global, _| {
-            let dt = UnionAll::array_type(global)
-                .body()
-                .cast::<UnionAll>()?
-                .body()
-                .cast::<DataType>()?;
-            assert!(!dt.zeroinit());
+            unsafe {
+                let dt = UnionAll::array_type(global)
+                    .body()
+                    .wrapper()
+                    .unwrap()
+                    .cast::<UnionAll>()?
+                    .body()
+                    .wrapper()
+                    .unwrap()
+                    .cast::<DataType>()?;
+                assert!(!dt.zero_init());
+            }
 
             Ok(())
         })

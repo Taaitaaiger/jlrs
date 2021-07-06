@@ -13,11 +13,11 @@ fn create_and_cast_uints() {
             let p4 = Value::new(&mut *frame, 4u64)?;
             let p5 = Value::new(&mut *frame, 5usize)?;
 
-            let u1 = p1.cast::<u8>()?;
-            let u2 = p2.cast::<u16>()?;
-            let u3 = p3.cast::<u32>()?;
-            let u4 = p4.cast::<u64>()?;
-            let u5 = p5.cast::<usize>()?;
+            let u1 = p1.unbox::<u8>()?;
+            let u2 = p2.unbox::<u16>()?;
+            let u3 = p3.unbox::<u32>()?;
+            let u4 = p4.unbox::<u64>()?;
+            let u5 = p5.unbox::<usize>()?;
 
             assert_eq!(u1, 1);
             assert_eq!(u2, 2);
@@ -43,11 +43,11 @@ fn create_and_cast_uints_dynamic() {
             let p4 = Value::new(&mut *frame, 4u64)?;
             let p5 = Value::new(&mut *frame, 5usize)?;
 
-            let u1 = p1.cast::<u8>()?;
-            let u2 = p2.cast::<u16>()?;
-            let u3 = p3.cast::<u32>()?;
-            let u4 = p4.cast::<u64>()?;
-            let u5 = p5.cast::<usize>()?;
+            let u1 = p1.unbox::<u8>()?;
+            let u2 = p2.unbox::<u16>()?;
+            let u3 = p3.unbox::<u32>()?;
+            let u4 = p4.unbox::<u64>()?;
+            let u5 = p5.unbox::<usize>()?;
 
             assert_eq!(u1, 1);
             assert_eq!(u2, 2);
@@ -73,11 +73,11 @@ fn create_and_cast_ints() {
             let p4 = Value::new(&mut *frame, 4i64)?;
             let p5 = Value::new(&mut *frame, 5isize)?;
 
-            let u1 = p1.cast::<i8>()?;
-            let u2 = p2.cast::<i16>()?;
-            let u3 = p3.cast::<i32>()?;
-            let u4 = p4.cast::<i64>()?;
-            let u5 = p5.cast::<isize>()?;
+            let u1 = p1.unbox::<i8>()?;
+            let u2 = p2.unbox::<i16>()?;
+            let u3 = p3.unbox::<i32>()?;
+            let u4 = p4.unbox::<i64>()?;
+            let u5 = p5.unbox::<isize>()?;
 
             assert_eq!(u1, 1);
             assert_eq!(u2, 2);
@@ -103,11 +103,11 @@ fn create_and_cast_ints_dynamic() {
             let p4 = Value::new(&mut *frame, 4i64)?;
             let p5 = Value::new(&mut *frame, 5isize)?;
 
-            let u1 = p1.cast::<i8>()?;
-            let u2 = p2.cast::<i16>()?;
-            let u3 = p3.cast::<i32>()?;
-            let u4 = p4.cast::<i64>()?;
-            let u5 = p5.cast::<isize>()?;
+            let u1 = p1.unbox::<i8>()?;
+            let u2 = p2.unbox::<i16>()?;
+            let u3 = p3.unbox::<i32>()?;
+            let u4 = p4.unbox::<i64>()?;
+            let u5 = p5.unbox::<isize>()?;
 
             assert_eq!(u1, 1);
             assert_eq!(u2, 2);
@@ -130,8 +130,8 @@ fn create_and_cast_floats() {
             let p1 = Value::new(&mut *frame, 1f32)?;
             let p2 = Value::new(&mut *frame, 2f64)?;
 
-            let u1 = p1.cast::<f32>()?;
-            let u2 = p2.cast::<f64>()?;
+            let u1 = p1.unbox::<f32>()?;
+            let u2 = p2.unbox::<f64>()?;
 
             assert_eq!(u1, 1.);
             assert_eq!(u2, 2.);
@@ -151,8 +151,8 @@ fn create_and_cast_floats_dynamic() {
             let p1 = Value::new(&mut *frame, 1f32)?;
             let p2 = Value::new(&mut *frame, 2f64)?;
 
-            let u1 = p1.cast::<f32>()?;
-            let u2 = p2.cast::<f64>()?;
+            let u1 = p1.unbox::<f32>()?;
+            let u2 = p2.unbox::<f64>()?;
 
             assert_eq!(u1, 1.);
             assert_eq!(u2, 2.);
@@ -170,7 +170,7 @@ fn create_and_cast_bool() {
 
         jlrs.scope_with_slots(5, |_, frame| {
             let p1 = Value::new(&mut *frame, true)?;
-            let u1 = p1.cast::<bool>()?;
+            let u1 = p1.unbox::<bool>()?.as_bool();
             assert_eq!(u1, true);
             Ok(())
         })
@@ -185,7 +185,7 @@ fn create_and_cast_bool_dynamic() {
 
         jlrs.scope(|_, frame| {
             let p1 = Value::new(&mut *frame, false)?;
-            let u1 = p1.cast::<bool>()?;
+            let u1 = p1.unbox::<bool>()?.as_bool();
             assert_eq!(u1, false);
             Ok(())
         })
@@ -200,8 +200,8 @@ fn create_and_cast_char() {
 
         jlrs.scope_with_slots(5, |_, frame| {
             let p1 = Value::new(&mut *frame, 'a')?;
-            let u1 = p1.cast::<char>()?;
-            assert_eq!(u1, 'a');
+            let u1 = p1.unbox::<char>()?.try_as_char();
+            assert_eq!(u1, Some('a'));
             Ok(())
         })
         .unwrap();
@@ -215,8 +215,8 @@ fn create_and_cast_char_dynamic() {
 
         jlrs.scope(|_, frame| {
             let p1 = Value::new(&mut *frame, 'a')?;
-            let u1 = p1.cast::<char>()?;
-            assert_eq!(u1, 'a');
+            let u1 = p1.unbox::<char>()?.try_as_char();
+            assert_eq!(u1, Some('a'));
             Ok(())
         })
         .unwrap();
@@ -230,10 +230,10 @@ fn create_nothing() {
 
         jlrs.scope_with_slots(0, |global, _frame| {
             let nothing = Value::nothing(global);
-            assert!(nothing.is_nothing());
+            assert!(nothing.is::<Nothing>());
             assert!(!nothing.is::<f32>());
-            assert!(nothing.datatype().is_some());
-            assert_eq!(nothing.type_name(), "Nothing");
+            assert!(nothing.datatype().is::<Nothing>());
+            assert_eq!(nothing.datatype_name().unwrap(), "Nothing");
             assert!(!nothing.is_array_of::<f32>());
             assert_eq!(nothing.field_names().len(), 0);
             assert_eq!(nothing.n_fields(), 0);
@@ -254,7 +254,7 @@ macro_rules! cannot_cast_wrong_type {
                 jlrs.scope_with_slots(1, |_global, frame| {
                     let val = Value::new(&mut *frame, $val)?;
                     assert!(val.is::<$from>());
-                    assert!(val.cast::<$to>().is_err());
+                    assert!(val.unbox::<$to>().is_err());
                     Ok(())
                 })
                 .unwrap();
@@ -289,15 +289,20 @@ fn function_pointer() {
             let val = Value::new(&mut *frame, func as *mut std::ffi::c_void)?;
             assert!(val.is::<*mut std::ffi::c_void>());
 
-            let res = Module::main(global)
-                .submodule("JlrsTests")?
-                .function("callrust")?
-                .call1(&mut *frame, val)?
-                .unwrap()
-                .cast::<bool>()?;
+            let res = unsafe {
+                Module::main(global)
+                    .submodule_ref("JlrsTests")?
+                    .wrapper_unchecked()
+                    .function_ref("callrust")?
+                    .wrapper_unchecked()
+                    .call1(&mut *frame, val)?
+                    .unwrap()
+                    .unbox::<bool>()?
+                    .as_bool()
+            };
 
             assert!(res);
-            val.cast::<*mut std::ffi::c_void>()?;
+            val.unbox::<*mut std::ffi::c_void>()?;
 
             Ok(())
         })

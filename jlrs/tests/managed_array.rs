@@ -8,7 +8,7 @@ fn array_1d() {
 
         let unboxed = jlrs
             .scope_with_slots(1, |_, frame| {
-                let new_array = Value::new_array::<f32, _, _, _>(&mut *frame, 3)?;
+                let new_array = Array::new::<f32, _, _, _>(&mut *frame, 3)?.into_jlrs_result()?;
                 new_array.cast::<Array>()?.copy_inline_data::<f32>()
             })
             .unwrap();
@@ -27,10 +27,12 @@ fn array_1d_output() {
 
         let unboxed = jlrs
             .scope_with_slots(1, |_, frame| {
-                let array = frame.value_scope_with_slots(0, |output, frame| {
-                    let output = output.into_scope(frame);
-                    Value::new_array::<f32, _, _, _>(output, 3)
-                })?;
+                let array = frame
+                    .result_scope_with_slots(0, |output, frame| {
+                        let output = output.into_scope(frame);
+                        Array::new::<f32, _, _, _>(output, 3)
+                    })?
+                    .into_jlrs_result()?;
                 array.cast::<Array>()?.copy_inline_data::<f32>()
             })
             .unwrap();
@@ -50,7 +52,8 @@ fn array_1d_nested() {
         let unboxed = jlrs
             .scope_with_slots(0, |_, frame| {
                 frame.scope_with_slots(1, |frame| {
-                    let new_array = Value::new_array::<f64, _, _, _>(&mut *frame, 3)?;
+                    let new_array =
+                        Array::new::<f64, _, _, _>(&mut *frame, 3)?.into_jlrs_result()?;
                     new_array.cast::<Array>()?.copy_inline_data::<f64>()
                 })
             })
@@ -71,7 +74,8 @@ fn array_1d_nested_dynamic() {
         let unboxed = jlrs
             .scope_with_slots(0, |_, frame| {
                 frame.scope(|frame| {
-                    let new_array = Value::new_array::<i8, _, _, _>(&mut *frame, 3)?;
+                    let new_array =
+                        Array::new::<i8, _, _, _>(&mut *frame, 3)?.into_jlrs_result()?;
                     new_array.cast::<Array>()?.copy_inline_data::<i8>()
                 })
             })
@@ -91,7 +95,7 @@ fn array_1d_dynamic() {
 
         let unboxed = jlrs
             .scope(|_, frame| {
-                let new_array = Value::new_array::<i16, _, _, _>(&mut *frame, 3)?;
+                let new_array = Array::new::<i16, _, _, _>(&mut *frame, 3)?.into_jlrs_result()?;
                 new_array.cast::<Array>()?.copy_inline_data::<i16>()
             })
             .unwrap();
@@ -111,7 +115,8 @@ fn array_1d_dynamic_nested() {
         let unboxed = jlrs
             .scope(|_, frame| {
                 frame.scope_with_slots(1, |frame| {
-                    let new_array = Value::new_array::<i32, _, _, _>(&mut *frame, 3)?;
+                    let new_array =
+                        Array::new::<i32, _, _, _>(&mut *frame, 3)?.into_jlrs_result()?;
                     new_array.cast::<Array>()?.copy_inline_data::<i32>()
                 })
             })
@@ -132,7 +137,8 @@ fn array_1d_dynamic_nested_dynamic() {
         let unboxed = jlrs
             .scope(|_, frame| {
                 frame.scope(|frame| {
-                    let new_array = Value::new_array::<i64, _, _, _>(&mut *frame, 3)?;
+                    let new_array =
+                        Array::new::<i64, _, _, _>(&mut *frame, 3)?.into_jlrs_result()?;
                     new_array.cast::<Array>()?.copy_inline_data::<i64>()
                 })
             })
@@ -152,7 +158,8 @@ fn array_2d() {
 
         let unboxed = jlrs
             .scope_with_slots(1, |_, frame| {
-                let new_array = Value::new_array::<u8, _, _, _>(&mut *frame, (3, 4))?;
+                let new_array =
+                    Array::new::<u8, _, _, _>(&mut *frame, (3, 4))?.into_jlrs_result()?;
                 new_array.cast::<Array>()?.copy_inline_data::<u8>()
             })
             .unwrap();
@@ -173,7 +180,8 @@ fn array_2d_nested() {
         let unboxed = jlrs
             .scope_with_slots(0, |_, frame| {
                 frame.scope_with_slots(1, |frame| {
-                    let new_array = Value::new_array::<u16, _, _, _>(&mut *frame, (3, 4))?;
+                    let new_array =
+                        Array::new::<u16, _, _, _>(&mut *frame, (3, 4))?.into_jlrs_result()?;
                     new_array.cast::<Array>()?.copy_inline_data::<u16>()
                 })
             })
@@ -195,7 +203,8 @@ fn array_2d_nested_dynamic() {
         let unboxed = jlrs
             .scope_with_slots(0, |_, frame| {
                 frame.scope(|frame| {
-                    let new_array = Value::new_array::<u32, _, _, _>(&mut *frame, (3, 4))?;
+                    let new_array =
+                        Array::new::<u32, _, _, _>(&mut *frame, (3, 4))?.into_jlrs_result()?;
                     new_array.cast::<Array>()?.copy_inline_data::<u32>()
                 })
             })
@@ -216,7 +225,8 @@ fn array_2d_dynamic() {
 
         let unboxed = jlrs
             .scope(|_, frame| {
-                let new_array = Value::new_array::<u64, _, _, _>(&mut *frame, (3, 4))?;
+                let new_array =
+                    Array::new::<u64, _, _, _>(&mut *frame, (3, 4))?.into_jlrs_result()?;
                 new_array.cast::<Array>()?.copy_inline_data::<u64>()
             })
             .unwrap();
@@ -237,7 +247,8 @@ fn array_2d_dynamic_nested() {
         let unboxed = jlrs
             .scope(|_, frame| {
                 frame.scope_with_slots(1, |frame| {
-                    let new_array = Value::new_array::<usize, _, _, _>(&mut *frame, (3, 4))?;
+                    let new_array =
+                        Array::new::<usize, _, _, _>(&mut *frame, (3, 4))?.into_jlrs_result()?;
                     new_array.cast::<Array>()?.copy_inline_data::<usize>()
                 })
             })
@@ -259,7 +270,8 @@ fn array_2d_dynamic_nested_dynamic() {
         let unboxed = jlrs
             .scope(|_, frame| {
                 frame.scope(|frame| {
-                    let new_array = Value::new_array::<isize, _, _, _>(&mut *frame, (3, 4))?;
+                    let new_array =
+                        Array::new::<isize, _, _, _>(&mut *frame, (3, 4))?.into_jlrs_result()?;
                     new_array.cast::<Array>()?.copy_inline_data::<isize>()
                 })
             })
@@ -280,7 +292,8 @@ fn array_3d() {
 
         let unboxed = jlrs
             .scope_with_slots(1, |_, frame| {
-                let new_array = Value::new_array::<u8, _, _, _>(&mut *frame, (3, 4, 5))?;
+                let new_array =
+                    Array::new::<u8, _, _, _>(&mut *frame, (3, 4, 5))?.into_jlrs_result()?;
                 new_array.cast::<Array>()?.copy_inline_data::<u8>()
             })
             .unwrap();
@@ -302,7 +315,8 @@ fn array_3d_nested() {
         let unboxed = jlrs
             .scope_with_slots(0, |_, frame| {
                 frame.scope_with_slots(1, |frame| {
-                    let new_array = Value::new_array::<u16, _, _, _>(&mut *frame, (3, 4, 5))?;
+                    let new_array =
+                        Array::new::<u16, _, _, _>(&mut *frame, (3, 4, 5))?.into_jlrs_result()?;
                     new_array.cast::<Array>()?.copy_inline_data::<u16>()
                 })
             })
@@ -325,7 +339,8 @@ fn array_3d_nested_dynamic() {
         let unboxed = jlrs
             .scope_with_slots(0, |_, frame| {
                 frame.scope(|frame| {
-                    let new_array = Value::new_array::<u32, _, _, _>(&mut *frame, (3, 4, 5))?;
+                    let new_array =
+                        Array::new::<u32, _, _, _>(&mut *frame, (3, 4, 5))?.into_jlrs_result()?;
                     new_array.cast::<Array>()?.copy_inline_data::<u32>()
                 })
             })
@@ -347,7 +362,8 @@ fn array_3d_dynamic() {
 
         let unboxed = jlrs
             .scope(|_, frame| {
-                let new_array = Value::new_array::<u64, _, _, _>(&mut *frame, (3, 4, 5))?;
+                let new_array =
+                    Array::new::<u64, _, _, _>(&mut *frame, (3, 4, 5))?.into_jlrs_result()?;
                 new_array.cast::<Array>()?.copy_inline_data::<u64>()
             })
             .unwrap();
@@ -369,7 +385,8 @@ fn array_3d_dynamic_nested() {
         let unboxed = jlrs
             .scope(|_, frame| {
                 frame.scope_with_slots(1, |frame| {
-                    let new_array = Value::new_array::<usize, _, _, _>(&mut *frame, (3, 4, 5))?;
+                    let new_array =
+                        Array::new::<usize, _, _, _>(&mut *frame, (3, 4, 5))?.into_jlrs_result()?;
                     new_array.cast::<Array>()?.copy_inline_data::<usize>()
                 })
             })
@@ -392,7 +409,8 @@ fn array_3d_dynamic_nested_dynamic() {
         let unboxed = jlrs
             .scope(|_, frame| {
                 frame.scope(|frame| {
-                    let new_array = Value::new_array::<isize, _, _, _>(&mut *frame, (3, 4, 5))?;
+                    let new_array =
+                        Array::new::<isize, _, _, _>(&mut *frame, (3, 4, 5))?.into_jlrs_result()?;
                     new_array.cast::<Array>()?.copy_inline_data::<isize>()
                 })
             })
@@ -414,7 +432,8 @@ fn array_4d() {
 
         let unboxed = jlrs
             .scope_with_slots(1, |_, frame| {
-                let new_array = Value::new_array::<u8, _, _, _>(&mut *frame, (3, 4, 5, 6))?;
+                let new_array =
+                    Array::new::<u8, _, _, _>(&mut *frame, (3, 4, 5, 6))?.into_jlrs_result()?;
                 new_array.cast::<Array>()?.copy_inline_data::<u8>()
             })
             .unwrap();
@@ -437,7 +456,8 @@ fn array_4d_nested() {
         let unboxed = jlrs
             .scope_with_slots(0, |_, frame| {
                 frame.scope_with_slots(1, |frame| {
-                    let new_array = Value::new_array::<u16, _, _, _>(&mut *frame, (3, 4, 5, 6))?;
+                    let new_array = Array::new::<u16, _, _, _>(&mut *frame, (3, 4, 5, 6))?
+                        .into_jlrs_result()?;
                     new_array.cast::<Array>()?.copy_inline_data::<u16>()
                 })
             })
@@ -461,7 +481,8 @@ fn array_4d_nested_dynamic() {
         let unboxed = jlrs
             .scope_with_slots(0, |_, frame| {
                 frame.scope(|frame| {
-                    let new_array = Value::new_array::<u32, _, _, _>(&mut *frame, (3, 4, 5, 6))?;
+                    let new_array = Array::new::<u32, _, _, _>(&mut *frame, (3, 4, 5, 6))?
+                        .into_jlrs_result()?;
                     new_array.cast::<Array>()?.copy_inline_data::<u32>()
                 })
             })
@@ -484,7 +505,8 @@ fn array_4d_dynamic() {
 
         let unboxed = jlrs
             .scope(|_, frame| {
-                let new_array = Value::new_array::<u64, _, _, _>(&mut *frame, (3, 4, 5, 6))?;
+                let new_array =
+                    Array::new::<u64, _, _, _>(&mut *frame, (3, 4, 5, 6))?.into_jlrs_result()?;
                 new_array.cast::<Array>()?.copy_inline_data::<u64>()
             })
             .unwrap();
@@ -507,7 +529,8 @@ fn array_4d_dynamic_nested() {
         let unboxed = jlrs
             .scope(|_, frame| {
                 frame.scope_with_slots(1, |frame| {
-                    let new_array = Value::new_array::<usize, _, _, _>(&mut *frame, (3, 4, 5, 6))?;
+                    let new_array = Array::new::<usize, _, _, _>(&mut *frame, (3, 4, 5, 6))?
+                        .into_jlrs_result()?;
                     new_array.cast::<Array>()?.copy_inline_data::<usize>()
                 })
             })
@@ -531,7 +554,8 @@ fn array_4d_dynamic_nested_dynamic() {
         let unboxed = jlrs
             .scope(|_, frame| {
                 frame.scope(|frame| {
-                    let new_array = Value::new_array::<isize, _, _, _>(&mut *frame, (3, 4, 5, 6))?;
+                    let new_array = Array::new::<isize, _, _, _>(&mut *frame, (3, 4, 5, 6))?
+                        .into_jlrs_result()?;
                     new_array.cast::<Array>()?.copy_inline_data::<isize>()
                 })
             })
@@ -555,7 +579,8 @@ fn array_of_bools() {
         let unboxed = jlrs
             .scope(|_, frame| {
                 frame.scope(|frame| {
-                    let new_array = Value::new_array::<bool, _, _, _>(&mut *frame, (3, 4, 5, 6))?;
+                    let new_array = Array::new::<bool, _, _, _>(&mut *frame, (3, 4, 5, 6))?
+                        .into_jlrs_result()?;
                     new_array.cast::<Array>()?.copy_inline_data::<bool>()
                 })
             })
@@ -579,7 +604,8 @@ fn array_of_chars() {
         let unboxed = jlrs
             .scope(|_, frame| {
                 frame.scope(|frame| {
-                    let new_array = Value::new_array::<char, _, _, _>(&mut *frame, (3, 4, 5, 6))?;
+                    let new_array = Array::new::<char, _, _, _>(&mut *frame, (3, 4, 5, 6))?
+                        .into_jlrs_result()?;
                     new_array.cast::<Array>()?.copy_inline_data::<char>()
                 })
             })

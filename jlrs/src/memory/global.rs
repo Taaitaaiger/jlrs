@@ -1,20 +1,19 @@
 //! Access token for global Julia data.
+//!
+//! Some data in Julia is globally rooted. This includes the `Main`, `Base` and `Core` modules,
+//! symbols, and `DataType`s of builtin types. In order to access this data, jlrs requires a
+//! [`Global`] in order to prevent it from being accessed before Julia has been initialized.
+//!
+//! Another use-case for [`Global`] is calling Julia functions without rooting the result.
 
 use std::marker::PhantomData;
 
-/// Some kinds of values don't need to be protected from garbage collection, including
-/// [`Symbol`]s, [`Module`]s, and functions and other globals defined in those modules. You will
-/// need this struct to access these values, you acquire it when you create a base frame through
-/// [`Julia::scope`] or [`Julia::scope_with_slots`].
-///
-/// [`Symbol`]: crate::value::symbol::Symbol
-/// [`Module`]: crate::value::module::Module
-/// [`Julia::scope_with_slots`]: crate::Julia::scope_with_slots
-/// [`Julia::scope`]: crate::Julia::scope
+/// Access token required for accessing global Julia data, also used to call Julia function
+/// without rooting the result.
 #[derive(Copy, Clone)]
-pub struct Global<'base>(PhantomData<&'base ()>);
+pub struct Global<'global>(PhantomData<&'global ()>);
 
-impl<'base> Global<'base> {
+impl<'global> Global<'global> {
     #[doc(hidden)]
 
     pub unsafe fn new() -> Self {

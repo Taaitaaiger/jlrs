@@ -1,3 +1,4 @@
+use jlrs::layout::valid_layout::ValidLayout;
 use jlrs::prelude::*;
 use jlrs::util::JULIA;
 
@@ -8,11 +9,9 @@ macro_rules! impl_valid_layout_test {
             JULIA.with(|j| {
                 let mut jlrs = j.borrow_mut();
                 jlrs.scope_with_slots(1, |_global, frame| {
-                    unsafe {
-                        let i = $v;
-                        let v = Value::new(frame, i)?;
-                        assert!(<$t>::valid_layout(v.datatype().unwrap().into()));
-                    }
+                    let i = $v;
+                    let v = Value::new(frame, i)?;
+                    assert!(<$t>::valid_layout(v.datatype().as_value()));
                     Ok(())
                 })
                 .unwrap();
@@ -42,10 +41,12 @@ fn valid_layout_array() {
         let mut jlrs = j.borrow_mut();
         jlrs.scope(|global, frame| {
             unsafe {
-                let v = Value::new_array::<i32, _, _, _>(frame, (2, 2))?;
-                assert!(Array::valid_layout(v.datatype().unwrap().into()));
+                let v = Array::new::<i32, _, _, _>(frame, (2, 2))?.into_jlrs_result()?;
+                assert!(Array::valid_layout(v.datatype().as_value()));
 
-                let ua = Module::base(global).global("Array")?;
+                let ua = Module::base(global)
+                    .global_ref("Array")?
+                    .wrapper_unchecked();
 
                 assert!(Array::valid_layout(ua));
             }

@@ -21,16 +21,18 @@ fn ccall_with_array() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
 
-        jlrs.scope(|global, frame| {
+        jlrs.scope(|global, frame| unsafe {
             let fn_ptr = Value::new(&mut *frame, uses_null_scope as *mut std::ffi::c_void)?;
             let mut arr_data = vec![0.0f64, 1.0f64];
-            let arr = Value::borrow_array(&mut *frame, &mut arr_data, 2)?;
+            let arr = Array::from_slice(&mut *frame, &mut arr_data, 2)?;
             let func = Module::main(global)
-                .submodule("JlrsTests")?
-                .function("callrustwitharr")?;
+                .submodule_ref("JlrsTests")?
+                .wrapper_unchecked()
+                .function_ref("callrustwitharr")?
+                .wrapper_unchecked();
 
             let out = func.call2(&mut *frame, fn_ptr, arr)?.unwrap();
-            let ok = out.cast::<bool>()?;
+            let ok = out.unbox::<bool>()?.as_bool();
             assert!(ok);
             Ok(())
         })

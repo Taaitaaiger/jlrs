@@ -9,7 +9,7 @@ fn move_array_1d() {
         let unboxed = jlrs
             .scope_with_slots(1, |_, frame| {
                 let data = vec![1.0f32, 2., 3.];
-                let array = Value::move_array(frame, data, 3)?;
+                let array = Array::from_vec(frame, data, 3)?;
                 array.cast::<Array>()?.copy_inline_data::<f32>()
             })
             .unwrap();
@@ -31,7 +31,7 @@ fn move_array_1d_output() {
                 let data = vec![1.0f32, 2., 3.];
                 let array = frame.value_scope_with_slots(0, |output, frame| {
                     let output = output.into_scope(frame);
-                    Value::move_array(output, data, 3)
+                    Array::from_vec(output, data, 3)
                 })?;
                 array.cast::<Array>()?.copy_inline_data::<f32>()
             })
@@ -53,7 +53,7 @@ fn move_array_1d_nested() {
             .scope_with_slots(0, |_, frame| {
                 frame.scope_with_slots(1, |frame| {
                     let data = vec![1.0f64, 2., 3.];
-                    let array = Value::move_array(frame, data, 3)?;
+                    let array = Array::from_vec(frame, data, 3)?;
                     array.cast::<Array>()?.copy_inline_data::<f64>()
                 })
             })
@@ -75,7 +75,7 @@ fn move_array_1d_nested_dynamic() {
             .scope_with_slots(0, |_, frame| {
                 frame.scope(|frame| {
                     let data = vec![1i8, 2, 3];
-                    let array = Value::move_array(frame, data, 3)?;
+                    let array = Array::from_vec(frame, data, 3)?;
                     array.cast::<Array>()?.copy_inline_data::<i8>()
                 })
             })
@@ -96,7 +96,7 @@ fn move_array_1d_dynamic() {
         let unboxed = jlrs
             .scope(|_, frame| {
                 let data = vec![1i16, 2, 3];
-                let array = Value::move_array(frame, data, 3)?;
+                let array = Array::from_vec(frame, data, 3)?;
                 array.cast::<Array>()?.copy_inline_data::<i16>()
             })
             .unwrap();
@@ -117,7 +117,7 @@ fn move_array_1d_dynamic_nested() {
             .scope(|_, frame| {
                 frame.scope_with_slots(1, |frame| {
                     let data = vec![1i32, 2, 3];
-                    let array = Value::move_array(frame, data, 3)?;
+                    let array = Array::from_vec(frame, data, 3)?;
                     array.cast::<Array>()?.copy_inline_data::<i32>()
                 })
             })
@@ -139,7 +139,7 @@ fn move_array_1d_dynamic_nested_dynamic() {
             .scope(|_, frame| {
                 frame.scope(|frame| {
                     let data = vec![1i64, 2, 3];
-                    let array = Value::move_array(frame, data, 3)?;
+                    let array = Array::from_vec(frame, data, 3)?;
                     array.cast::<Array>()?.copy_inline_data::<i64>()
                 })
             })
@@ -160,7 +160,7 @@ fn move_array_2d() {
         let unboxed = jlrs
             .scope_with_slots(1, |_, frame| {
                 let data = vec![1u8, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4];
-                let array = Value::move_array(frame, data, (3, 4))?;
+                let array = Array::from_vec(frame, data, (3, 4))?;
                 array.cast::<Array>()?.copy_inline_data::<u8>()
             })
             .unwrap();
@@ -182,7 +182,7 @@ fn move_array_2d_nested() {
             .scope_with_slots(0, |_, frame| {
                 frame.scope_with_slots(1, |frame| {
                     let data = vec![1u16, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4];
-                    let array = Value::move_array(frame, data, (3, 4))?;
+                    let array = Array::from_vec(frame, data, (3, 4))?;
                     array.cast::<Array>()?.copy_inline_data::<u16>()
                 })
             })
@@ -205,7 +205,7 @@ fn move_array_2d_nested_dynamic() {
             .scope_with_slots(0, |_, frame| {
                 frame.scope(|frame| {
                     let data = vec![1u32, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4];
-                    let array = Value::move_array(frame, data, (3, 4))?;
+                    let array = Array::from_vec(frame, data, (3, 4))?;
                     array.cast::<Array>()?.copy_inline_data::<u32>()
                 })
             })
@@ -227,7 +227,7 @@ fn move_array_2d_dynamic() {
         let unboxed = jlrs
             .scope(|_, frame| {
                 let data = vec![1u64, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4];
-                let array = Value::move_array(frame, data, (3, 4))?;
+                let array = Array::from_vec(frame, data, (3, 4))?;
                 array.cast::<Array>()?.copy_inline_data::<u64>()
             })
             .unwrap();
@@ -249,7 +249,7 @@ fn move_array_2d_dynamic_nested() {
             .scope(|_, frame| {
                 frame.scope_with_slots(1, |frame| {
                     let data = vec![1usize, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4];
-                    let array = Value::move_array(frame, data, (3, 4))?;
+                    let array = Array::from_vec(frame, data, (3, 4))?;
                     array.cast::<Array>()?.copy_inline_data::<usize>()
                 })
             })
@@ -272,7 +272,7 @@ fn move_array_2d_dynamic_nested_dynamic() {
             .scope(|_, frame| {
                 frame.scope(|frame| {
                     let data = vec![1isize, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4];
-                    let array = Value::move_array(frame, data, (3, 4))?;
+                    let array = Array::from_vec(frame, data, (3, 4))?;
                     array.cast::<Array>()?.copy_inline_data::<isize>()
                 })
             })

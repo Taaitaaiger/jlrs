@@ -1,6 +1,6 @@
 [package]
 name = "jlrs-derive"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Thomas van Doornmalen <thomas.vandoornmalen@gmail.com>"]
 description = """
 jlrs-derive contains the custom derives offered by jlrs.
@@ -13,12 +13,10 @@ keywords = ["Julia", "math", "mathematics", "bindings", "ffi"]
 license = "MIT"
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [lib]
 proc-macro = true
 
 [dependencies]
 proc-macro2 = "1"
-syn = { version = "1", features = ["visit-mut"] }
+syn = "1"
 quote = "1"

@@ -1,5 +1,5 @@
-use jlrs::prelude::*;
 use jlrs::util::JULIA;
+use jlrs::{layout::typecheck::NamedTuple, prelude::*};
 
 #[test]
 fn create_named_tuple() {
@@ -10,8 +10,8 @@ fn create_named_tuple() {
             let name = "foo";
             let value = Value::new(&mut *frame, 1u32)?;
             let nt = Value::new_named_tuple(&mut *frame, &mut [name], &mut [value])?;
-            assert!(nt.is::<jlrs::value::datatype::NamedTuple>());
-            assert_eq!(nt.get_field(&mut *frame, "foo")?.cast::<u32>()?, 1u32);
+            assert!(nt.is::<NamedTuple>());
+            assert_eq!(nt.get_field(&mut *frame, "foo")?.unbox::<u32>()?, 1u32);
             Ok(())
         })
         .unwrap();
@@ -28,9 +28,9 @@ fn create_named_tuple_macro() {
             let a_value = Value::new(&mut *frame, 1u32)?;
             let b_value = Value::new(&mut *frame, 2u64)?;
             let nt = named_tuple!(&mut *frame, a_name => a_value, "b" => b_value)?;
-            assert!(nt.is::<jlrs::value::datatype::NamedTuple>());
-            assert_eq!(nt.get_field(&mut *frame, a_name)?.cast::<u32>()?, 1u32);
-            assert_eq!(nt.get_field(&mut *frame, "b")?.cast::<u64>()?, 2u64);
+            assert!(nt.is::<NamedTuple>());
+            assert_eq!(nt.get_field(&mut *frame, a_name)?.unbox::<u32>()?, 1u32);
+            assert_eq!(nt.get_field(&mut *frame, "b")?.unbox::<u64>()?, 2u64);
             Ok(())
         })
         .unwrap();

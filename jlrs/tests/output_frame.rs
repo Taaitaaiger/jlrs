@@ -16,7 +16,7 @@ fn nested_value_scope() {
                             Value::new(output, 1usize)
                         })
                 })?
-                .cast::<usize>()
+                .unbox::<usize>()
         });
 
         assert_eq!(out.unwrap(), 1);
@@ -33,8 +33,8 @@ fn nested_result_scope() {
                 .result_scope_with_slots(0, |output, frame| {
                     output
                         .into_scope(frame)
-                        .result_scope_with_slots(2, |output, frame| {
-                            let func = Module::base(global).function("+")?;
+                        .result_scope_with_slots(2, |output, frame| unsafe {
+                            let func = Module::base(global).function_ref("+")?.wrapper_unchecked();
                             let v1 = Value::new(frame.as_scope(), 1usize)?;
                             let v2 = Value::new(frame.as_scope(), 2usize)?;
                             let output = output.into_scope(frame);
@@ -42,7 +42,7 @@ fn nested_result_scope() {
                         })
                 })?
                 .unwrap()
-                .cast::<usize>()
+                .unbox::<usize>()
         });
 
         assert_eq!(out.unwrap(), 3);

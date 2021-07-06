@@ -2,7 +2,7 @@ use jlrs::prelude::*;
 use std::{ffi::c_void, thread, time::Duration};
 use thread::JoinHandle;
 
-// NB: This crate is called `ccall_with_threads`, so the library is called 
+// NB: This crate is called `ccall_with_threads`, so the library is called
 // `libccall_with_threads`. The functions are  annotated with `no_mangle` to prevent name mangling
 // and `extern "C"` to make them callable with the C ABI.
 

@@ -11,11 +11,11 @@ struct MyTask {
     sender: crossbeam_channel::Sender<JlrsResult<Box<dyn Any + Send + Sync>>>,
 }
 
-// `MyTask` is a task we want to be executed, so we need to implement `JuliaTask`. This requires
+// `MyTask` is a task we want to be executed, so we need to implement `AsyncTask`. This requires
 // `async_trait` because traits with async methods are not yet available in Rust. Because the 
 // task itself is executed on a single thread, it is marked with `?Send`. 
 #[async_trait(?Send)]
-impl JuliaTask for MyTask {
+impl AsyncTask for MyTask {
     // If successful, the data is returned as a boxed `Any`. This way we can have different tasks
     // that return data of different types.
     type T = Box<dyn Any + Send + Sync>;
@@ -40,13 +40,18 @@ impl JuliaTask for MyTask {
         // the result before casting it to an `f64` (which that function returns). A function that
         // is called with `call_async` is executed on another thread by calling 
         // `Base.threads.@spawn`. 
-        let v = Module::main(global)
-            .submodule("MyModule")?
-            .function("complexfunc")?
+        // The module and function don't have to be rooted because the module is never redefined.
+        let v = unsafe {
+            Module::main(global)
+            .submodule_ref("MyModule")?
+            .wrapper_unchecked()
+            .function_ref("complexfunc")?
+            .wrapper_unchecked()
             .call_async(&mut *frame, &mut [dims, iters])
             .await?
             .unwrap()
-            .cast::<f64>()?;
+            .unbox::<f64>()?
+        };
 
         Ok(Box::new(v))
     }

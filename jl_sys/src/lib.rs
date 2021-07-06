@@ -1351,6 +1351,11 @@ pub unsafe fn jl_array_dims<'a>(array: *mut jl_array_t, ndims: usize) -> &'a [us
     std::slice::from_raw_parts(x, ndims)
 }
 
+#[inline(always)]
+pub unsafe fn jl_array_dims_ptr<'a>(array: *mut jl_array_t) -> *mut usize {
+    &mut (&mut *array).nrows
+}
+
 /*#define jl_array_ptr_data(a)  ((jl_value_t**)((jl_array_t*)(a))->data)
 STATIC_INLINE jl_value_t *jl_array_ptr_ref(void *a JL_PROPAGATES_ROOT, size_t i) JL_NOTSAFEPOINT
 {

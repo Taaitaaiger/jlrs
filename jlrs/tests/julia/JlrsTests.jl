@@ -57,4 +57,48 @@ end
 function funcwithabstractkw(a::Float32; b::Real=1.0f0)
     a + b
 end
+
+function throws_exception(args...; kwargs...)
+    throw("This should happen")
+end
+
+struct ModuleOrNothing
+    a::Union{Module, Nothing}
+end
+
+has_nothing = ModuleOrNothing(nothing)
+has_module = ModuleOrNothing(Base)
+
+struct NoUnionsBits 
+    a::Int16
+    b::Int32 
+end
+
+struct NoUnionsBitsPtr 
+    a::Int16
+    b::DataType 
+end
+
+struct BitsBitsUnion 
+    a::Int16
+    b::Union{Int16, Int32} 
+end
+
+struct PtrBitsUnion 
+    a::DataType
+    b::Union{Int16, Int32} 
+end
+
+struct PtrNonBitsUnion
+    a::DataType
+    b::Union{Int16, Int32, DataType} 
+end
+
+struct HasArray 
+    a::Array{Float64, 2} 
+end
+
+struct UaArray 
+    a::Array 
+end
 end
