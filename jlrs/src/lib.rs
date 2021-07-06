@@ -42,10 +42,9 @@
 //!
 //! #### Windows
 //!
-//! Support for Windows was dropped in jlrs 0.10 due to compilation and dependency issues. If you
-//! want to use jlrs on Windows you must use WSL. An installation guide to install WSL on Windows
-//! can be found [on Microsoft's website]. After installing a Linux distribution, follow the
-//! installation instructions for Linux.
+//! If you want to use jlrs on Windows you must use WSL. An installation guide to install WSL on 
+//! Windows can be found [on Microsoft's website]. After installing a Linux distribution, follow 
+//! the installation instructions for Linux.
 //!
 //! # Using this crate
 //!
