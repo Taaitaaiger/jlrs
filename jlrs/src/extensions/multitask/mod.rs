@@ -38,12 +38,12 @@ use async_std::sync::{Condvar as AsyncStdCondvar, Mutex as AsyncStdMutex};
 use async_std::task::{self, JoinHandle as AsyncStdHandle};
 use async_task::{AsyncTask, ReturnChannel};
 use jl_sys::{
-    jl_atexit_hook, jl_eval_string, jl_init, jl_init_with_image, jl_is_initialized,
-    jlrs_current_task,
+    jl_atexit_hook, jl_call0, jl_eval_string, jl_init, jl_init_with_image, jl_is_initialized,
+    jl_value_t, jlrs_current_task, uv_async_send,
 };
 use mode::Async;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicPtr, AtomicU8, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread::{self, JoinHandle as ThreadHandle};
 use std::time::Duration;
@@ -59,6 +59,11 @@ use std::{
 };
 
 use self::async_frame::AsyncGcFrame;
+
+static ASYNC_CONDITION_HANDLE: AtomicPtr<c_void> = AtomicPtr::new(null_mut());
+static ASYNC_STATUS: AtomicU8 = AtomicU8::new(IN_RUST);
+const IN_RUST: u8 = 0;
+const IN_JULIA: u8 = 1;
 
 /// A handle to the async runtime. It can be used to include files and send new tasks. The
 /// runtime shuts down when the last handle is dropped. The two generic type parameters `T`
@@ -113,14 +118,14 @@ where
             .parse::<usize>()
             .map_err(JlrsError::other)?;
 
-        if n_threads <= 2 {
+        if n_threads <= 0 {
             Err(JlrsError::MoreThreadsRequired)?;
         }
 
         let (sender, receiver) = bounded(channel_capacity);
         let julia = AsyncJulia { sender };
-        let handle = thread::spawn(move || run_async(n_threads - 1, process_events_ms, receiver));
-        julia.try_set_wake_fn()?;
+        let handle = thread::spawn(move || run_async(n_threads, process_events_ms, receiver));
+        julia.try_set_custom_fns()?;
 
         Ok((julia, handle))
     }
@@ -140,15 +145,15 @@ where
             .parse::<usize>()
             .map_err(JlrsError::other)?;
 
-        if n_threads <= 2 {
+        if n_threads <= 0 {
             Err(JlrsError::MoreThreadsRequired)?;
         }
 
         let (sender, receiver) = bounded(channel_capacity);
         let julia = AsyncJulia { sender };
         let handle =
-            task::spawn_blocking(move || run_async(n_threads - 1, process_events_ms, receiver));
-        julia.set_wake_fn().await?;
+            task::spawn_blocking(move || run_async(n_threads, process_events_ms, receiver));
+        julia.set_custom_fns().await?;
 
         Ok((julia, handle))
     }
@@ -184,7 +189,7 @@ where
             .parse::<usize>()
             .map_err(JlrsError::other)?;
 
-        if n_threads <= 2 {
+        if n_threads <= 0 {
             Err(JlrsError::MoreThreadsRequired)?;
         }
 
@@ -192,14 +197,14 @@ where
         let julia = AsyncJulia { sender };
         let handle = thread::spawn(move || {
             run_async_with_image(
-                n_threads - 1,
+                n_threads,
                 process_events_ms,
                 receiver,
                 julia_bindir,
                 image_path,
             )
         });
-        julia.try_set_wake_fn()?;
+        julia.try_set_custom_fns()?;
 
         Ok((julia, handle))
     }
@@ -235,7 +240,7 @@ where
             .parse::<usize>()
             .map_err(JlrsError::other)?;
 
-        if n_threads <= 2 {
+        if n_threads <= 0 {
             Err(JlrsError::MoreThreadsRequired)?;
         }
 
@@ -243,14 +248,14 @@ where
         let julia = AsyncJulia { sender };
         let handle = task::spawn_blocking(move || {
             run_async_with_image(
-                n_threads - 1,
+                n_threads,
                 process_events_ms,
                 receiver,
                 julia_bindir,
                 image_path,
             )
         });
-        julia.set_wake_fn().await?;
+        julia.set_custom_fns().await?;
 
         Ok((julia, handle))
     }
@@ -262,6 +267,10 @@ where
             .send(Message::Task(Box::new(task), sender))
             .await
             .expect("Channel was closed");
+
+        unsafe {
+            wake_julia();
+        }
     }
 
     /// Try to send a new task to the runtime, if there's no room in the channel an error is
@@ -270,6 +279,12 @@ where
         let sender = self.sender.clone();
         self.sender
             .try_send(Message::Task(Box::new(task), sender))
+            .map(|v| {
+                unsafe {
+                    wake_julia();
+                }
+                v
+            })
             .map_err(|e| match e {
                 TrySendError::Full(Message::Task(t, _)) => {
                     Box::new(JlrsError::other(TrySendError::Full(t)))
@@ -299,6 +314,10 @@ where
             ))
             .await
             .expect("Channel was closed");
+
+        unsafe {
+            wake_julia();
+        }
 
         let (lock, cvar) = &*completed;
         let mut completed = lock.lock().await;
@@ -335,6 +354,10 @@ where
                 _ => unreachable!(),
             })
             .and_then(|_| {
+                unsafe {
+                    wake_julia();
+                }
+
                 let (lock, cvar) = &*completed;
                 let mut completed = lock.lock().unwrap();
                 while (&*completed).is_pending() {
@@ -364,15 +387,15 @@ where
         self.sender.is_full()
     }
 
-    fn try_set_wake_fn(&self) -> JlrsResult<()> {
+    fn try_set_custom_fns(&self) -> JlrsResult<()> {
         let completed = Arc::new((Mutex::new(Status::Pending), Condvar::new()));
         self.sender
-            .try_send(Message::TrySetWakeFn(completed.clone()))
+            .try_send(Message::TrySetCustomFns(completed.clone()))
             .map_err(|e| match e {
-                TrySendError::Full(Message::TrySetWakeFn(_)) => {
+                TrySendError::Full(Message::TrySetCustomFns(_)) => {
                     Box::new(JlrsError::other(TrySendError::Full(())))
                 }
-                TrySendError::Closed(Message::TrySetWakeFn(_)) => {
+                TrySendError::Closed(Message::TrySetCustomFns(_)) => {
                     Box::new(JlrsError::other(TrySendError::Closed(())))
                 }
                 _ => unreachable!(),
@@ -387,10 +410,10 @@ where
             })
     }
 
-    async fn set_wake_fn(&self) -> JlrsResult<()> {
+    async fn set_custom_fns(&self) -> JlrsResult<()> {
         let completed = Arc::new((AsyncStdMutex::new(Status::Pending), AsyncStdCondvar::new()));
         self.sender
-            .send(Message::SetWakeFn(completed.clone()))
+            .send(Message::SetCustomFns(completed.clone()))
             .await
             .expect("Channel was closed");
 
@@ -437,8 +460,8 @@ enum Message<T, R> {
     Include(PathBuf, Arc<(AsyncStdMutex<Status>, AsyncStdCondvar)>),
     TryInclude(PathBuf, Arc<(Mutex<Status>, Condvar)>),
     Complete(usize, Box<AsyncStackPage>),
-    SetWakeFn(Arc<(AsyncStdMutex<Status>, AsyncStdCondvar)>),
-    TrySetWakeFn(Arc<(Mutex<Status>, Condvar)>),
+    SetCustomFns(Arc<(AsyncStdMutex<Status>, AsyncStdCondvar)>),
+    TrySetCustomFns(Arc<(Mutex<Status>, Condvar)>),
 }
 
 #[derive(Debug)]
@@ -496,12 +519,14 @@ where
                 free_stacks.push_back(i);
             }
 
-            let mut stacks = Vec::with_capacity(n_threads);
-            for _ in 0..n_threads {
-                stacks.push(Some(AsyncStackPage::new()));
-            }
-            link_stacks(&mut stacks);
-            let mut stacks = stacks.into_boxed_slice();
+            let mut stacks = {
+                let mut stacks = Vec::with_capacity(n_threads);
+                for _ in 0..n_threads {
+                    stacks.push(Some(AsyncStackPage::new()));
+                }
+                link_stacks(&mut stacks);
+                stacks.into_boxed_slice()
+            };
 
             let mut running_tasks = Vec::with_capacity(n_threads);
             for _ in 0..n_threads {
@@ -509,24 +534,30 @@ where
             }
             let mut running_tasks = running_tasks.into_boxed_slice();
             let mut pending_tasks = VecDeque::new();
+            let mut func = null_mut();
 
-            let mut n_running = 0usize;
+            let mut n_running = 0;
 
             loop {
-                match timeout(Duration::from_millis(process_events_ms), receiver.recv()).await {
+                let wait_time = if n_running > 0 {
+                    process_events_ms
+                } else {
+                    u64::MAX
+                };
+                match timeout(Duration::from_millis(wait_time), receiver.recv()).await {
                     Err(_) => {
-                        // periodically insert a safepoint so the GC can run when nothing is happening on
-                        // the main thread but tasks are active
                         if n_running > 0 {
-                            // jl_process_events inserts a safepoint
-                            jl_sys::jl_process_events();
+                            debug_assert!(func != null_mut());
+                            ASYNC_STATUS.store(IN_JULIA, Ordering::Release);
+                            jl_call0(func);
+                            ASYNC_STATUS.store(IN_RUST, Ordering::Release);
                         }
                     }
                     Ok(Ok(Message::Task(jl_task, sender))) => {
                         if let Some(idx) = free_stacks.pop_front() {
-                            n_running += 1;
                             let stack = stacks[idx].take().expect("Async stack corrupted");
                             let task = run_task(jl_task, idx, stack, sender);
+                            n_running += 1;
                             running_tasks[idx] = Some(task);
                         } else {
                             pending_tasks.push_back((jl_task, sender));
@@ -538,8 +569,8 @@ where
                             running_tasks[idx] = Some(task);
                         } else {
                             stacks[idx] = Some(stack);
-                            n_running -= 1;
                             free_stacks.push_front(idx);
+                            n_running -= 1;
                             running_tasks[idx] = None;
                         }
                     }
@@ -551,13 +582,17 @@ where
                         let stack = stacks[0].as_mut().expect("Async stack corrupted");
                         try_include(stack, path, completed)
                     }
-                    Ok(Ok(Message::SetWakeFn(completed))) => {
+                    Ok(Ok(Message::SetCustomFns(completed))) => {
                         let stack = stacks[0].as_mut().expect("Async stack corrupted");
-                        set_wake_fn(stack, completed).await
+                        if let Some(wait_func) = set_custom_fns(stack, completed).await {
+                            func = wait_func;
+                        }
                     }
-                    Ok(Ok(Message::TrySetWakeFn(completed))) => {
+                    Ok(Ok(Message::TrySetCustomFns(completed))) => {
                         let stack = stacks[0].as_mut().expect("Async stack corrupted");
-                        try_set_wake_fn(stack, completed)
+                        if let Some(wait_func) = try_set_custom_fns(stack, completed) {
+                            func = wait_func;
+                        }
                     }
                     Ok(Err(RecvError)) => break,
                 }
@@ -621,12 +656,14 @@ where
                 free_stacks.push_back(i);
             }
 
-            let mut stacks = Vec::with_capacity(n_threads);
-            for _ in 0..n_threads {
-                stacks.push(Some(AsyncStackPage::new()));
-            }
-            link_stacks(&mut stacks);
-            let mut stacks = stacks.into_boxed_slice();
+            let mut stacks = {
+                let mut stacks = Vec::with_capacity(n_threads);
+                for _ in 0..n_threads {
+                    stacks.push(Some(AsyncStackPage::new()));
+                }
+                link_stacks(&mut stacks);
+                stacks.into_boxed_slice()
+            };
 
             let mut running_tasks = Vec::with_capacity(n_threads);
             for _ in 0..n_threads {
@@ -636,15 +673,21 @@ where
             let mut pending_tasks = VecDeque::new();
 
             let mut n_running = 0usize;
+            let mut func = null_mut();
 
             loop {
-                match timeout(Duration::from_millis(process_events_ms), receiver.recv()).await {
+                let wait_time = if n_running > 0 {
+                    process_events_ms
+                } else {
+                    u64::MAX
+                };
+                match timeout(Duration::from_millis(wait_time), receiver.recv()).await {
                     Err(_) => {
-                        // periodically insert a safepoint so the GC can run when nothing is happening on
-                        // the main thread but tasks are active
                         if n_running > 0 {
-                            // jl_process_events inserts a safepoint
-                            jl_sys::jl_process_events();
+                            debug_assert!(func != null_mut());
+                            ASYNC_STATUS.store(IN_JULIA, Ordering::Release);
+                            jl_call0(func);
+                            ASYNC_STATUS.store(IN_RUST, Ordering::Release);
                         }
                     }
                     Ok(Ok(Message::Task(jl_task, sender))) => {
@@ -676,13 +719,17 @@ where
                         let stack = stacks[0].as_mut().expect("Async stack corrupted");
                         try_include(stack, path, completed)
                     }
-                    Ok(Ok(Message::SetWakeFn(completed))) => {
+                    Ok(Ok(Message::SetCustomFns(completed))) => {
                         let stack = stacks[0].as_mut().expect("Async stack corrupted");
-                        set_wake_fn(stack, completed).await
+                        if let Some(wait_func) = set_custom_fns(stack, completed).await {
+                            func = wait_func;
+                        }
                     }
-                    Ok(Ok(Message::TrySetWakeFn(completed))) => {
+                    Ok(Ok(Message::TrySetCustomFns(completed))) => {
                         let stack = stacks[0].as_mut().expect("Async stack corrupted");
-                        try_set_wake_fn(stack, completed)
+                        if let Some(wait_func) = try_set_custom_fns(stack, completed) {
+                            func = wait_func;
+                        }
                     }
                     Ok(Err(RecvError)) => break,
                 }
@@ -795,64 +842,96 @@ fn try_include(
     }
 }
 
-fn call_set_wake_fn(stack: &mut AsyncStackPage) -> JlrsResult<()> {
-    unsafe {
+fn call_set_custom_fns(stack: &mut AsyncStackPage) -> JlrsResult<*mut jl_value_t> {
+    let waiter = unsafe {
         let global = Global::new();
         let mode = Async(&stack.top[1]);
         let raw = stack.page.as_mut();
         let mut frame = GcFrame::new(raw, 2, mode);
 
         let waker = Value::new(&mut frame, julia_future::wake_task as *mut c_void)?;
-        Module::main(global)
+        let jlrs_mod = Module::main(global)
             .submodule_ref("Jlrs")?
-            .wrapper_unchecked()
+            .wrapper_unchecked();
+
+        jlrs_mod
             .global_ref("wakerust")?
             .wrapper_unchecked()
             .set_nth_field_unchecked(0, waker);
 
         let dropper = Value::new(&mut frame, crate::droparray as *mut c_void)?;
-        Module::main(global)
-            .submodule_ref("Jlrs")?
-            .wrapper_unchecked()
+        jlrs_mod
             .global_ref("droparray")?
             .wrapper_unchecked()
             .set_nth_field_unchecked(0, dropper);
-    }
 
-    Ok(())
+        let async_cond_handle = jlrs_mod
+            .global_ref("condition")?
+            .value_unchecked()
+            .get_raw_field_unchecked::<*mut c_void, _>("handle");
+
+        ASYNC_CONDITION_HANDLE.store(async_cond_handle, Ordering::Release);
+
+        jlrs_mod
+            .global_ref("awaitcondition")?
+            .value_unchecked()
+            .data_ptr()
+    };
+
+    Ok(waiter.as_ptr().cast())
 }
 
-async fn set_wake_fn(
+async fn set_custom_fns(
     stack: &mut AsyncStackPage,
     completed: Arc<(AsyncStdMutex<Status>, AsyncStdCondvar)>,
-) {
-    let res = call_set_wake_fn(stack);
-
-    {
-        let (lock, condvar) = &*completed;
-        let mut completed = lock.lock().await;
-        if res.is_ok() {
+) -> Option<*mut jl_value_t> {
+    let res = match call_set_custom_fns(stack) {
+        Ok(v) => {
+            let (lock, condvar) = &*completed;
+            let mut completed = lock.lock().await;
             *completed = Status::Ok;
-        } else {
-            *completed = Status::Err(Some(res.unwrap_err()));
+            condvar.notify_one();
+            Some(v)
         }
+        Err(e) => {
+            let (lock, condvar) = &*completed;
+            let mut completed = lock.lock().await;
+            *completed = Status::Err(Some(e));
+            condvar.notify_one();
+            None
+        }
+    };
 
-        condvar.notify_one();
-    }
+    res
 }
 
-fn try_set_wake_fn(stack: &mut AsyncStackPage, completed: Arc<(Mutex<Status>, Condvar)>) {
-    let res = call_set_wake_fn(stack);
-
-    {
-        let (lock, condvar) = &*completed;
-        let mut completed = lock.lock().expect("Cannot lock");
-        if res.is_ok() {
+fn try_set_custom_fns(
+    stack: &mut AsyncStackPage,
+    completed: Arc<(Mutex<Status>, Condvar)>,
+) -> Option<*mut jl_value_t> {
+    let res = match call_set_custom_fns(stack) {
+        Ok(v) => {
+            let (lock, condvar) = &*completed;
+            let mut completed = lock.lock().expect("Cannot lock");
             *completed = Status::Ok;
-        } else {
-            *completed = Status::Err(Some(res.unwrap_err()));
+            condvar.notify_one();
+            Some(v)
         }
+        Err(e) => {
+            let (lock, condvar) = &*completed;
+            let mut completed = lock.lock().expect("Cannot lock");
+            *completed = Status::Err(Some(e));
+            condvar.notify_one();
+            None
+        }
+    };
 
-        condvar.notify_one();
+    res
+}
+
+pub(crate) unsafe fn wake_julia() {
+    if ASYNC_STATUS.load(Ordering::Acquire) == IN_JULIA {
+        let handle = ASYNC_CONDITION_HANDLE.load(Ordering::Acquire);
+        uv_async_send(handle.cast());
     }
 }

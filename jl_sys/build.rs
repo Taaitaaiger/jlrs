@@ -19,14 +19,24 @@ fn flags() -> Vec<String> {
         Some(julia_dir) => {
             let jl_include_path = format!("-I{}/include/julia/", julia_dir);
             let jl_lib_path = format!("-L{}/lib/", julia_dir);
+            // Needed to link libuv
+            let jl_internal_lib_path = format!("-L{}/lib/julia", julia_dir);
 
             println!("cargo:rustc-flags={}", &jl_lib_path);
+            if env::var("CARGO_FEATURE_ASYNC").is_ok() {
+                println!("cargo:rustc-flags={}", &jl_internal_lib_path);
+            }
+
             vec![jl_include_path]
         }
         None => Vec::new(),
     };
 
     println!("cargo:rustc-link-lib=julia");
+    if env::var("CARGO_FEATURE_ASYNC").is_ok() {
+        println!("cargo:rustc-link-lib=uv");
+    }
+
     flags
 }
 
@@ -63,6 +73,7 @@ fn main() {
         "jl_alloc_svec",
         "jl_alloc_svec_uninit",
         "jl_apply_array_type",
+        "jl_apply_generic",
         "jl_apply_tuple_type_v",
         "jl_apply_type",
         "jl_array_eltype",

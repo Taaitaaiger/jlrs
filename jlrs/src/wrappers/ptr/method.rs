@@ -170,14 +170,14 @@ impl_valid_layout!(Method<'scope>, 'scope);
 impl_debug!(Method<'_>);
 
 impl<'scope> Wrapper<'scope, '_> for Method<'scope> {
-    type Internal = jl_method_t;
+    type Wraps = jl_method_t;
     const NAME: &'static str = "Method";
 
-    unsafe fn wrap_non_null(inner: NonNull<Self::Internal>, _: Private) -> Self {
+    unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, ::std::marker::PhantomData)
     }
 
-    unsafe fn unwrap_non_null(self, _: Private) -> NonNull<Self::Internal> {
+    fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
 }

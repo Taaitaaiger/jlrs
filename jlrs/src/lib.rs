@@ -333,7 +333,7 @@
 //! [`Scope::value_scope`]: crate::memory::scope::Scope::value_scope
 //! [`Scope::result_scope`]: crate::memory::scope::Scope::result_scope
 
-#![forbid(broken_intra_doc_links)]
+#![forbid(rustdoc::broken_intra_doc_links)]
 
 pub mod convert;
 pub mod error;

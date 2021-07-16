@@ -27,8 +27,10 @@ use jl_sys::{
 };
 
 use crate::{
+    convert::into_julia::IntoJulia,
+    memory::global::Global,
     private::Private,
-    wrappers::ptr::{datatype::DataType, private::Wrapper as _},
+    wrappers::ptr::{datatype::DataType, private::Wrapper as _, type_name::TypeName},
 };
 use std::ffi::c_void;
 
@@ -98,6 +100,31 @@ impl_julia_typecheck!(f64);
 impl_julia_typecheck!(bool);
 impl_julia_typecheck!(char);
 impl_julia_typecheck!(*mut c_void);
+
+unsafe impl<T: IntoJulia> Typecheck for *mut T {
+    fn typecheck(t: DataType) -> bool {
+        unsafe {
+            let global = Global::new();
+            let ptr_tname = TypeName::pointer_typename(global);
+
+            if t.type_name().wrapper_unchecked() != ptr_tname {
+                return false;
+            }
+
+            let params = t.parameters().wrapper_unchecked().data();
+            if params.len() != 1 {
+                return false;
+            }
+
+            let inner_ty = T::julia_type(global);
+            if params[0].value_unchecked() != inner_ty.value_unchecked() {
+                return false;
+            }
+
+            true
+        }
+    }
+}
 
 /// A typecheck that can be used in combination with `DataType::is`. This method returns true if
 /// a value of this type is a named tuple.

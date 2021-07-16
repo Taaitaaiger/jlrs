@@ -56,14 +56,14 @@ impl_debug!(MethodMatch<'_>);
 impl_valid_layout!(MethodMatch<'scope>, 'scope);
 
 impl<'scope> Wrapper<'scope, '_> for MethodMatch<'scope> {
-    type Internal = jl_method_match_t;
+    type Wraps = jl_method_match_t;
     const NAME: &'static str = "MethodMatch";
 
-    unsafe fn wrap_non_null(inner: NonNull<Self::Internal>, _: Private) -> Self {
+    unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData)
     }
 
-    unsafe fn unwrap_non_null(self, _: Private) -> NonNull<Self::Internal> {
+    fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
 }

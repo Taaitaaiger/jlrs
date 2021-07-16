@@ -17,7 +17,7 @@ use std::{marker::PhantomData, ptr::NonNull};
 
 /// Describes the syntactic structure of a type and stores all data common to different
 /// instantiations of the type.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 #[repr(transparent)]
 pub struct TypeName<'scope>(NonNull<jl_typename_t>, PhantomData<&'scope ()>);
 
@@ -136,14 +136,14 @@ impl_debug!(TypeName<'_>);
 impl_valid_layout!(TypeName<'scope>, 'scope);
 
 impl<'scope> Wrapper<'scope, '_> for TypeName<'scope> {
-    type Internal = jl_typename_t;
+    type Wraps = jl_typename_t;
     const NAME: &'static str = "TypeName";
 
-    unsafe fn wrap_non_null(inner: NonNull<Self::Internal>, _: Private) -> Self {
+    unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData)
     }
 
-    unsafe fn unwrap_non_null(self, _: Private) -> NonNull<Self::Internal> {
+    fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
 }

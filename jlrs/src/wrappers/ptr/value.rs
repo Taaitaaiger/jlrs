@@ -185,15 +185,11 @@ impl<'scope, 'data> Value<'scope, 'data> {
 
     /// Create a new Julia value, any type that implements [`IntoJulia`] can be converted using
     /// this function. Unlike [`Value::new`] this method doesn't root the allocated value.
-    pub fn new_unrooted<'global, V>(global: Global, value: V) -> ValueRef<'global, 'static>
+    pub fn new_unrooted<'global, V>(global: Global<'global>, value: V) -> ValueRef<'global, 'static>
     where
         V: IntoJulia,
     {
-        unsafe {
-            let v = value.into_julia(global).ptr();
-            debug_assert!(!v.is_null());
-            ValueRef::wrap(v)
-        }
+        unsafe { value.into_julia(global) }
     }
 
     /// Create a new named tuple, you should use the `named_tuple` macro rather than this method.
@@ -480,7 +476,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// than the implementation type and you have to write a custom unboxing function. It's your
     /// responsibility this pointer is used correctly.
     pub fn data_ptr(self) -> NonNull<c_void> {
-        unsafe { self.unwrap_non_null(Private).cast() }
+        self.unwrap_non_null(Private).cast()
     }
 }
 
@@ -1513,14 +1509,14 @@ impl<'target, 'current, 'value, 'data> CallExt<'target, 'current, 'value, 'data>
 impl_debug!(Value<'_, '_>);
 
 impl<'scope, 'data> WrapperPriv<'scope, 'data> for Value<'scope, 'data> {
-    type Internal = jl_value_t;
+    type Wraps = jl_value_t;
     const NAME: &'static str = "Value";
 
-    unsafe fn wrap_non_null(inner: NonNull<Self::Internal>, _: Private) -> Self {
+    unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData, PhantomData)
     }
 
-    unsafe fn unwrap_non_null(self, _: Private) -> NonNull<Self::Internal> {
+    fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
 }

@@ -131,14 +131,14 @@ impl<'scope, T: Wrapper<'scope, 'static>> Debug for SimpleVector<'scope, T> {
 }
 
 impl<'scope, T: Wrapper<'scope, 'static>> WrapperPriv<'scope, '_> for SimpleVector<'scope, T> {
-    type Internal = jl_svec_t;
+    type Wraps = jl_svec_t;
     const NAME: &'static str = "SimpleVector";
 
-    unsafe fn wrap_non_null(inner: NonNull<Self::Internal>, _: Private) -> Self {
+    unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData, PhantomData)
     }
 
-    unsafe fn unwrap_non_null(self, _: Private) -> NonNull<Self::Internal> {
+    fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
 }

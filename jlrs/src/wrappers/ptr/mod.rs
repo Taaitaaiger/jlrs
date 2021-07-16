@@ -172,7 +172,7 @@ macro_rules! impl_debug {
 #[derive(Copy, Clone)]
 #[repr(transparent)]
 pub struct Ref<'scope, 'data, T: Wrapper<'scope, 'data>>(
-    *mut T::Internal,
+    *mut T::Wraps,
     PhantomData<&'scope ()>,
     PhantomData<&'data ()>,
 );
@@ -330,7 +330,7 @@ pub type WeakRefRef<'scope> = Ref<'scope, 'static, WeakRef<'scope>>;
 impl_valid_layout!(WeakRefRef, WeakRef);
 
 impl<'scope, 'data, T: Wrapper<'scope, 'data>> Ref<'scope, 'data, T> {
-    pub(crate) unsafe fn wrap(ptr: *mut T::Internal) -> Self {
+    pub(crate) unsafe fn wrap(ptr: *mut T::Wraps) -> Self {
         Ref(ptr, PhantomData, PhantomData)
     }
 
@@ -399,7 +399,7 @@ impl<'scope, 'data, T: Wrapper<'scope, 'data>> Ref<'scope, 'data, T> {
         T::value_unchecked(self, Private)
     }
 
-    pub(crate) fn ptr(self) -> *mut T::Internal {
+    pub(crate) fn ptr(self) -> *mut T::Wraps {
         self.0
     }
 }
@@ -410,19 +410,19 @@ pub(crate) mod private {
     use std::{fmt::Debug, ptr::NonNull};
 
     pub trait Wrapper<'scope, 'data>: Sized + Copy + Debug {
-        type Internal: Copy;
+        type Wraps: Copy;
         const NAME: &'static str;
 
-        unsafe fn wrap_non_null(inner: NonNull<Self::Internal>, _: Private) -> Self;
+        unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self;
 
-        unsafe fn wrap(ptr: *mut Self::Internal, _: Private) -> Self {
+        unsafe fn wrap(ptr: *mut Self::Wraps, _: Private) -> Self {
             debug_assert!(!ptr.is_null());
             Self::wrap_non_null(NonNull::new_unchecked(ptr), Private)
         }
 
-        unsafe fn unwrap_non_null(self, _: Private) -> NonNull<Self::Internal>;
+        fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps>;
 
-        unsafe fn unwrap(self, _: Private) -> *mut Self::Internal {
+        fn unwrap(self, _: Private) -> *mut Self::Wraps {
             self.unwrap_non_null(Private).as_ptr()
         }
 

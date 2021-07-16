@@ -9,6 +9,12 @@ end
 const wakerust = Ref{Ptr{Cvoid}}(C_NULL)
 const droparray = Ref{Ptr{Cvoid}}(C_NULL)
 
+const condition = Base.AsyncCondition()
+
+function awaitcondition()
+    wait(condition)
+end
+
 function runasync(func::Function, wakeptr::Ptr{Cvoid}, args...; kwargs...)::Any
     try
         func(args...; kwargs...)
@@ -20,6 +26,11 @@ end
 function asynccall(func::Function, wakeptr::Ptr{Cvoid}, args...; kwargs...)::Task
     @assert wakerust[] != C_NULL "wakerust is null"
     Base.Threads.@spawn runasync(func, wakeptr, args...; kwargs...)
+end
+
+function localasynccall(func::Function, wakeptr::Ptr{Cvoid}, args...; kwargs...)::Task
+    @assert wakerust[] != C_NULL "wakerust is null"
+    @async runasync(func, wakeptr, args...; kwargs...)
 end
 
 function tracingcall(func::Function)::Function
@@ -56,14 +67,9 @@ function clean(a::Array)
     ccall(droparray[], Cvoid, (Array,), a)
 end
 
-@nospecialize
 function displaystring(value)::String
-    try
-        io = IOBuffer()
-        display(TextDisplay(io), value)
-        String(take!(io))
-    catch
-        ""
-    end
+    io = IOBuffer()
+    display(TextDisplay(io), value)
+    String(take!(io))
 end
 end

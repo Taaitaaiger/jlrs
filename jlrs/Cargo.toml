@@ -16,10 +16,9 @@ edition = "2018"
 
 [features]
 default = ["jlrs-derive"]
-async = ["futures", "crossbeam-channel", "async-trait", "async-std"]
+async = ["futures", "crossbeam-channel", "async-trait", "async-std", "jl-sys/async"]
 jlrs-ndarray = ["ndarray"]
 f16 = ["half"]
-coverage = []
 docs-rs = ["jl-sys/docs-rs", "jlrs-derive", "async", "jlrs-ndarray", "f16"]
 
 [dependencies]

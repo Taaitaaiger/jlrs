@@ -60,10 +60,10 @@ unsafe impl Typecheck for Function<'_, '_> {
 impl_debug!(Function<'_, '_>);
 
 impl<'scope, 'data> WrapperPriv<'scope, 'data> for Function<'scope, 'data> {
-    type Internal = jl_value_t;
+    type Wraps = jl_value_t;
     const NAME: &'static str = "Function";
 
-    unsafe fn wrap_non_null(inner: NonNull<Self::Internal>, _: Private) -> Self {
+    unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self {
             inner,
             _scope: PhantomData,
@@ -71,7 +71,7 @@ impl<'scope, 'data> WrapperPriv<'scope, 'data> for Function<'scope, 'data> {
         }
     }
 
-    unsafe fn unwrap_non_null(self, _: Private) -> NonNull<Self::Internal> {
+    fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.inner
     }
 }

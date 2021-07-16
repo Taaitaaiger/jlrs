@@ -899,14 +899,14 @@ unsafe impl<'scope, 'data> ValidLayout for Array<'scope, 'data> {
 impl_debug!(Array<'_, '_>);
 
 impl<'scope, 'data> WrapperPriv<'scope, 'data> for Array<'scope, 'data> {
-    type Internal = jl_array_t;
+    type Wraps = jl_array_t;
     const NAME: &'static str = "Array";
 
-    unsafe fn wrap_non_null(inner: NonNull<Self::Internal>, _: Private) -> Self {
+    unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData, PhantomData)
     }
 
-    unsafe fn unwrap_non_null(self, _: Private) -> NonNull<Self::Internal> {
+    fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
 }
@@ -1441,14 +1441,14 @@ impl<T: Clone + ValidLayout + Debug> Debug for TypedArray<'_, '_, T> {
 impl<'scope, 'data, T: Clone + ValidLayout + Debug> WrapperPriv<'scope, 'data>
     for TypedArray<'scope, 'data, T>
 {
-    type Internal = jl_array_t;
+    type Wraps = jl_array_t;
     const NAME: &'static str = "Array";
 
-    unsafe fn wrap_non_null(inner: NonNull<Self::Internal>, _: Private) -> Self {
+    unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData, PhantomData, PhantomData)
     }
 
-    unsafe fn unwrap_non_null(self, _: Private) -> NonNull<Self::Internal> {
+    fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
 }

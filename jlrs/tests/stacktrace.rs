@@ -6,16 +6,24 @@ fn bounds_error() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
         jlrs.scope_with_slots(0, |global, frame| unsafe {
-            frame.scope_with_slots(8, |frame| {
+            frame.scope(|frame| {
                 let idx = Value::new(&mut *frame, 4usize)?;
-                let data = vec![1.0f64, 2., 3.];
-                let array = Array::from_vec(&mut *frame, data, 3)?;
+                let array = TypedArray::<f64>::new(&mut *frame, 3)?
+                    .unwrap()
+                    .cast_unchecked::<TypedArray<f64>>();
+                {
+                    let mut d = array.inline_data_mut(frame)?;
+                    d[0] = 1.0;
+                    d[1] = 2.0;
+                    d[2] = 3.0;
+                }
+
                 let func = Module::base(global)
                     .function_ref("getindex")?
                     .wrapper_unchecked()
                     .attach_stacktrace(&mut *frame)?
                     .unwrap();
-                let out = func.call2(&mut *frame, array, idx)?.unwrap_err();
+                let out = func.call2(&mut *frame, array.as_value(), idx)?.unwrap_err();
 
                 assert_eq!(out.datatype_name().unwrap(), "TracedException");
 

@@ -35,7 +35,7 @@ impl<'scope, 'frame, 'data, 'inner> AsUnrooted<'scope, 'frame, 'data, 'inner>
         self,
         _output: OutputScope<'scope, 'frame, 'inner, F>,
     ) -> Self::Unrooted {
-        unsafe { OutputValue::wrap_non_null(self.unwrap_non_null(Private)) }
+        OutputValue::wrap_non_null(self.unwrap_non_null(Private))
     }
 }
 
