@@ -19,7 +19,7 @@ use async_trait::async_trait;
 #[async_trait(?Send)]
 pub trait CallAsync<'data>: Call<'data> {
     /// Call a function on another thread with the given arguments. This method uses
-    /// `Threads.@spawn` to call the given function on another thread but return immediately.
+    /// `Base.Threads.@spawn` to call the given function on another thread but return immediately.
     /// While `await`ing the result the async runtime can work on other tasks, the current task
     /// resumes after the function call on the other thread completes.
     ///

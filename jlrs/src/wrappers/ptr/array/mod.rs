@@ -447,7 +447,7 @@ impl<'data> Array<'_, 'data> {
             let finalizer = Module::main(global)
                 .submodule_ref("Jlrs")?
                 .wrapper_unchecked()
-                .function_ref("clean")?
+                .function_ref("finalizearray")?
                 .wrapper_unchecked();
 
             scope.value_scope_with_slots(2, |output, frame| {
@@ -1141,7 +1141,7 @@ where
             let finalizer = Module::main(global)
                 .submodule_ref("Jlrs")?
                 .wrapper_unchecked()
-                .function_ref("clean")?
+                .function_ref("finalizearray")?
                 .wrapper_unchecked();
 
             scope.value_scope_with_slots(2, |output, frame| {

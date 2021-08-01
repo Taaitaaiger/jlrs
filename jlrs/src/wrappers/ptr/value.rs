@@ -1169,6 +1169,12 @@ impl Value<'_, '_> {
     }
 }
 
+impl<'scope> Value<'static, 'static> {
+    pub fn as_unborrowed(self) -> UnborrowedValue {
+        UnborrowedValue::new(self)
+    }
+}
+
 /// # Constant values.
 impl<'scope> Value<'scope, 'static> {
     /// `Union{}`.
@@ -1541,6 +1547,20 @@ impl LeakedValue {
     /// Safety: you must guarantee this value has not been freed by the garbage collector. While
     /// `Symbol`s are never garbage collected, modules and their contents can be redefined.
     pub unsafe fn as_value<'scope>(self, _: Global<'scope>) -> Value<'scope, 'static> {
+        self.0
+    }
+}
+
+/// A value whose second lifetime is explicitly set to `'static`.
+#[derive(Debug, Clone, Copy)]
+pub struct UnborrowedValue(Value<'static, 'static>);
+
+impl UnborrowedValue {
+    pub(crate) fn new(value: Value<'static, 'static>) -> Self {
+        UnborrowedValue(value)
+    }
+
+    pub fn as_value(self) -> Value<'static, 'static> {
         self.0
     }
 }

@@ -1,17 +1,43 @@
 //! Run Julia in a separate thread and execute tasks in parallel.
 //!
-//! While access to Julia with the C API is entirely single-threaded, it's possible to offload a
-//! function call to another thread by using `Threads.@spawn`. The experimental async runtime
-//! offered by jlrs combines this feature with Rust's async/.await syntax.
+//! The Julia C API can only be called from a single thread, and the interface provided by
+//! [`Julia`] doesn't play nicely with Julia's task system. The async runtime provided by this
+//! extension initializes Julia in a new thread and returns a handle, [`AsyncJulia`], that can
+//! be cloned and used across threads. Unlike `Julia` there's no `scope` method, rather you will
+//!  need to implement the [`AsyncTask`] and [`GeneratorTask`] traits and use the handle to send
+//! such tasks to the async runtime.
+//!
+//! The `AsyncTask` and `GeneratorTask` traits are async traits, their async `run` methods take
+//! the place of the closure that `scope` methods take in the sync runtime. Like the `scope`
+//! methods, `run` takes a [`Global`] and an [`AsyncGcFrame`]. The latter provides the same
+//! functionality as a [`GcFrame`] and adds a few methods to create nested async scopes. An
+//! [`AsyncTask`] is run once, while a [`GeneratorTask`] can be called multiple times. In addition
+//! to a run method, the `GeneratorTask` trait requires that you implement the `init` method; this
+//! method can also call Julia, its result is provided to `run` whenever the `GeneratorTask`
+//! is called. The frame of the `init` method is not dropped until the `GeneratorTask` is dropped,
+//! rather each time `run` is called a nested scope is created, so the result of `init` can
+//! contain Julia data.
+//!
+//! The [`CallAsync`] trait extends [`Call`], it provides methods that can be used to create new
+//! Julia tasks and schedule them to run on a new thread or the main thread. These methods return
+//! a `Future` that can be awaited. While the `Future` hasn't resolved the async runtime doesn't
+//! block but can handle other tasks. If there's nothing to do, control of the thread is yielded
+//! to Julia allowing the garbage collector and scheduler to run. Note that a task scheduled on
+//! the main thread will block the runtime when it's running, so this should only be used with
+//! functions that do very little computational work but are mostly waiting for something like IO.
 //!
 //! In order to use the async runtime, Julia must be started with three or more threads by setting
-//! the `JULIA_NUM_THREADS` environment variable. In order to create tasks that can be executed
-//! you must implement the [`AsyncTask`] trait.
+//! the `JULIA_NUM_THREADS` environment variable. If this environment variable is not set it's set
+//! to `auto`. If it's set to `auto` it's assumed this results in Julia using three or more
+//! threads.
 //!
 //! Examples that show how to use the async runtime and implement async tasks can be found in the
 //! [`examples`] directory of the repository.
 //!
 //! [`examples`]: https://github.com/Taaitaaiger/jlrs/tree/master/examples
+//! [`Julia`]: crate::Julia
+//! [`AsyncGcFrame`]: crate::extensions::multitask::async_frame::AsyncGcFrame
+//! [`CallAsync`]: crate::extensions::multitask::call_async::CallAsync
 
 pub mod async_frame;
 pub mod async_task;
@@ -19,38 +45,36 @@ pub mod call_async;
 pub(crate) mod julia_future;
 pub mod mode;
 pub(crate) mod output_result_ext;
+pub mod return_channel;
 
+use crate::error::{JlrsError, JlrsResult};
+use crate::extensions::multitask::async_task::{PendingTask, Task};
 use crate::memory::global::Global;
+use crate::memory::stack_page::StackPage;
 use crate::wrappers::ptr::module::Module;
 use crate::wrappers::ptr::string::JuliaString;
 use crate::wrappers::ptr::value::Value;
-use crate::{
-    error::{JlrsError, JlrsResult},
-    memory::stack_page::StackPage,
-};
 use crate::{memory::frame::GcFrame, wrappers::ptr::call::Call};
 use crate::{INIT, JLRS_JL};
 use async_std::channel::{
-    bounded, Receiver as AsyncStdReceiver, RecvError, Sender as AsyncStdSender, TrySendError,
+    bounded, unbounded, Receiver as AsyncStdReceiver, RecvError, Sender as AsyncStdSender,
+    TrySendError,
 };
 use async_std::future::timeout;
 use async_std::sync::{Condvar as AsyncStdCondvar, Mutex as AsyncStdMutex};
 use async_std::task::{self, JoinHandle as AsyncStdHandle};
-use async_task::{AsyncTask, ReturnChannel};
 use jl_sys::{
     jl_atexit_hook, jl_call0, jl_eval_string, jl_init, jl_init_with_image, jl_is_initialized,
     jl_value_t, jlrs_current_task, uv_async_send,
 };
 use mode::Async;
+use std::cell::Cell;
+use std::io::{Error as IOError, ErrorKind};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicPtr, AtomicU8, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread::{self, JoinHandle as ThreadHandle};
 use std::time::Duration;
-use std::{
-    cell::Cell,
-    io::{Error as IOError, ErrorKind},
-};
 use std::{
     collections::VecDeque,
     env,
@@ -58,7 +82,8 @@ use std::{
     ptr::null_mut,
 };
 
-use self::async_frame::AsyncGcFrame;
+use self::async_task::{AsyncTask, Generator, GeneratorHandle, GeneratorTask, GenericPendingTask};
+use self::return_channel::ReturnChannel;
 
 static ASYNC_CONDITION_HANDLE: AtomicPtr<c_void> = AtomicPtr::new(null_mut());
 static ASYNC_STATUS: AtomicU8 = AtomicU8::new(IN_RUST);
@@ -66,65 +91,52 @@ const IN_RUST: u8 = 0;
 const IN_JULIA: u8 = 1;
 
 /// A handle to the async runtime. It can be used to include files and send new tasks. The
-/// runtime shuts down when the last handle is dropped. The two generic type parameters `T`
-/// and `R` are the return type and return channel type respectively, which must be the same across
-/// all different implementations of [`AsyncTask`] that you use.
-///
-/// The easiest way to get started is to use `T = Box<dyn Any + Send + Sync>`, the return channel
-/// must implement the [`ReturnChannel`] trait. This trait is implemented for `Sender` from
-/// `async_std` and `crossbeam_channel`.
+/// runtime shuts down when the last handle is dropped.
 ///
 /// All initialization methods share two arguments:
 ///
-///  - `channel_capacity`: the capacity of the channel used to communicate with the runtime.
-///  - `process_events_ms`: to ensure the garbage collector can run and tasks that have yielded in
-///    Julia are rescheduled, events must be processed periodically when at least one task is
-///    running.
+///  - `max_n_tasks`: the maximum number of tasks that can run at the same time.
+///  - `channel_capacity`: the capacity of the channel used to communicate with the runtime. If it's 0
+///    an unbounded channel is used.
+///  - `recv_timeout_ms`: timeout used when receiving messages on the communication channel. If no
+///    new message is received before the timeout, control of the thread is yielded to Julia if
+///    uncompleted tasks exist.
 #[derive(Clone)]
-pub struct AsyncJulia<T, R>
-where
-    T: Send + Sync + 'static,
-    R: ReturnChannel<T = T>,
-{
-    sender: AsyncStdSender<Message<T, R>>,
+pub struct AsyncJulia {
+    sender: AsyncStdSender<Message>,
 }
 
 // Ensure AsyncJulia can be sent to other threads.
 trait RequireSendSync: Send + Sync {}
-impl<T, R> RequireSendSync for AsyncJulia<T, R>
-where
-    T: Send + Sync + 'static,
-    R: ReturnChannel<T = T>,
-{
-}
+impl RequireSendSync for AsyncJulia {}
 
-impl<T, R> AsyncJulia<T, R>
-where
-    T: Send + Sync + 'static,
-    R: ReturnChannel<T = T>,
-{
+impl AsyncJulia {
     /// Initialize Julia in a new thread.
     ///
-    /// This function will return an error if the  `JULIA_NUM_THREADS` environment variable is not
-    /// set or set to a value smaller than 3, or if Julia has already been initialized. It is
-    /// unsafe because this crate provides you with a way to execute arbitrary Julia code which
-    /// can't be checked for correctness.
+    /// This function returns an error if the `JULIA_NUM_THREADS` environment variable is set
+    /// to a value smaller than 3 or some invalid value, or if Julia has already been initialized.
+    /// If the `JULIA_NUM_THREADS` environment variable is set to `auto`, it's assumed that three
+    /// or more threads will be available. If the environment variable is not set, it's set to
+    /// `auto`. See the [struct-level] documentation for more info about this method's arguments.
+    ///
+    /// Safety: this method can race with other crates that try to initialize Julia at the same
+    /// time.
+    ///
+    /// [struct-level]: crate::extensions::multitask::AsyncJulia
     pub unsafe fn init(
+        max_n_tasks: usize,
         channel_capacity: usize,
-        process_events_ms: u64,
+        recv_timeout_ms: u64,
     ) -> JlrsResult<(Self, ThreadHandle<JlrsResult<()>>)> {
-        let n_threads = env::var("JULIA_NUM_THREADS")
-            .map_err(JlrsError::other)?
-            .parse::<usize>()
-            .map_err(JlrsError::other)?;
+        check_threads_var()?;
 
-        if n_threads <= 0 {
-            Err(JlrsError::MoreThreadsRequired)?;
-        }
-
-        let (sender, receiver) = bounded(channel_capacity);
+        let (sender, receiver) = if channel_capacity == 0 {
+            unbounded()
+        } else {
+            bounded(channel_capacity)
+        };
         let julia = AsyncJulia { sender };
-        let handle = thread::spawn(move || run_async(n_threads, process_events_ms, receiver));
+        let handle = thread::spawn(move || run_async(max_n_tasks, recv_timeout_ms, receiver));
         julia.try_set_custom_fns()?;
 
         Ok((julia, handle))
@@ -132,27 +144,32 @@ where
 
     /// Initialize Julia as a blocking task.
     ///
-    /// This function will return an error if the  `JULIA_NUM_THREADS` environment variable is not
-    /// set or set to a value smaller than 3, or if Julia has already been initialized. It is
-    /// unsafe because this crate provides you with a way to execute arbitrary Julia code which
-    /// can't be checked for correctness.
+    /// This function returns an error if the `JULIA_NUM_THREADS` environment variable is set
+    /// to a value smaller than 3 or some invalid value, or if Julia has already been initialized.
+    /// If the `JULIA_NUM_THREADS` environment variable is set to `auto`, it's assumed that three
+    /// or more threads will be available. If the environment variable is not set, it's set to
+    /// `auto`. See the [struct-level] documentation for more info about this method's arguments.
+    ///
+    /// Safety: this method can race with other crates that try to initialize Julia at the same
+    /// time.
+    ///
+    /// [struct-level]: crate::extensions::multitask::AsyncJulia
     pub async unsafe fn init_async(
+        max_n_tasks: usize,
         channel_capacity: usize,
-        process_events_ms: u64,
+        recv_timeout_ms: u64,
     ) -> JlrsResult<(Self, AsyncStdHandle<JlrsResult<()>>)> {
-        let n_threads = env::var("JULIA_NUM_THREADS")
-            .map_err(JlrsError::other)?
-            .parse::<usize>()
-            .map_err(JlrsError::other)?;
+        check_threads_var()?;
 
-        if n_threads <= 0 {
-            Err(JlrsError::MoreThreadsRequired)?;
-        }
+        let (sender, receiver) = if channel_capacity == 0 {
+            unbounded()
+        } else {
+            bounded(channel_capacity)
+        };
 
-        let (sender, receiver) = bounded(channel_capacity);
         let julia = AsyncJulia { sender };
         let handle =
-            task::spawn_blocking(move || run_async(n_threads, process_events_ms, receiver));
+            task::spawn_blocking(move || run_async(max_n_tasks, recv_timeout_ms, receiver));
         julia.set_custom_fns().await?;
 
         Ok((julia, handle))
@@ -168,15 +185,21 @@ where
     /// contains a compatible Julia binary (eg `${JULIA_DIR}/bin`), the second must be either an
     /// absolute or a relative path to a system image.
     ///
-    /// This function will return an error if either of the two paths doesn't  exist, if the
-    /// `JULIA_NUM_THREADS` environment variable is not set or set to a value smaller than 3, or
-    /// if Julia has already been initialized. It is unsafe because this crate provides you with
-    /// a way to execute arbitrary Julia code which can't be checked for correctness.
+    /// This function returns an error if either of the two paths doesn't exist, if the
+    /// `JULIA_NUM_THREADS` environment variable is set to a value smaller than 3 or some invalid
+    /// value, or if Julia has already been initialized. If the `JULIA_NUM_THREADS` environment
+    /// variable is set to `auto`, it's assumed that three or more threads will be available. If
+    /// the environment variable is not set, it's set to `auto`. See the [struct-level]
+    /// documentation for more info about this method's arguments.
+    ///
+    /// Safety: this method can race with other crates that try to initialize Julia at the same
+    /// time.
     ///
     /// [`PackageCompiler`]: https://julialang.github.io/PackageCompiler.jl/dev/
     pub unsafe fn init_with_image<P, Q>(
+        max_n_tasks: usize,
         channel_capacity: usize,
-        process_events_ms: u64,
+        recv_timeout_ms: u64,
         julia_bindir: P,
         image_path: Q,
     ) -> JlrsResult<(Self, ThreadHandle<JlrsResult<()>>)>
@@ -184,21 +207,18 @@ where
         P: AsRef<Path> + Send + 'static,
         Q: AsRef<Path> + Send + 'static,
     {
-        let n_threads = env::var("JULIA_NUM_THREADS")
-            .map_err(JlrsError::other)?
-            .parse::<usize>()
-            .map_err(JlrsError::other)?;
+        check_threads_var()?;
 
-        if n_threads <= 0 {
-            Err(JlrsError::MoreThreadsRequired)?;
-        }
-
-        let (sender, receiver) = bounded(channel_capacity);
+        let (sender, receiver) = if channel_capacity == 0 {
+            unbounded()
+        } else {
+            bounded(channel_capacity)
+        };
         let julia = AsyncJulia { sender };
         let handle = thread::spawn(move || {
             run_async_with_image(
-                n_threads,
-                process_events_ms,
+                max_n_tasks,
+                recv_timeout_ms,
                 receiver,
                 julia_bindir,
                 image_path,
@@ -219,15 +239,21 @@ where
     /// contains a compatible Julia binary (eg `${JULIA_DIR}/bin`), the second must be either an
     /// absolute or a relative path to a system image.
     ///
-    /// This function will return an error if either of the two paths doesn't  exist, if the
-    /// `JULIA_NUM_THREADS` environment variable is not set or set to a value smaller than 3, or
-    /// if Julia has already been initialized. It is unsafe because this crate provides you with
-    /// a way to execute arbitrary Julia code which can't be checked for correctness.
+    /// This function returns an error if either of the two paths doesn't exist, if the
+    /// `JULIA_NUM_THREADS` environment variable is set to a value smaller than 3 or some invalid
+    /// value, or if Julia has already been initialized. If the `JULIA_NUM_THREADS` environment
+    /// variable is set to `auto`, it's assumed that three or more threads will be available. If
+    /// the environment variable is not set, it's set to `auto`. See the [struct-level]
+    /// documentation for more info about this method's arguments.
+    ///
+    /// Safety: this method can race with other crates that try to initialize Julia at the same
+    /// time.
     ///
     /// [`PackageCompiler`]: https://julialang.github.io/PackageCompiler.jl/dev/
     pub async unsafe fn init_with_image_async<P, Q>(
+        max_n_tasks: usize,
         channel_capacity: usize,
-        process_events_ms: u64,
+        recv_timeout_ms: u64,
         julia_bindir: P,
         image_path: Q,
     ) -> JlrsResult<(Self, AsyncStdHandle<JlrsResult<()>>)>
@@ -235,21 +261,18 @@ where
         P: AsRef<Path> + Send + 'static,
         Q: AsRef<Path> + Send + 'static,
     {
-        let n_threads = env::var("JULIA_NUM_THREADS")
-            .map_err(JlrsError::other)?
-            .parse::<usize>()
-            .map_err(JlrsError::other)?;
+        check_threads_var()?;
 
-        if n_threads <= 0 {
-            Err(JlrsError::MoreThreadsRequired)?;
-        }
-
-        let (sender, receiver) = bounded(channel_capacity);
+        let (sender, receiver) = if channel_capacity == 0 {
+            unbounded()
+        } else {
+            bounded(channel_capacity)
+        };
         let julia = AsyncJulia { sender };
         let handle = task::spawn_blocking(move || {
             run_async_with_image(
-                n_threads,
-                process_events_ms,
+                max_n_tasks,
+                recv_timeout_ms,
                 receiver,
                 julia_bindir,
                 image_path,
@@ -260,11 +283,19 @@ where
         Ok((julia, handle))
     }
 
-    /// Send a new task to the runtime, this method waits until there's room in the channel.
-    pub async fn task<D: AsyncTask<T = T, R = R>>(&self, task: D) {
+    /// Send a new task to the runtime, this method waits if there's no room in the channel. This
+    /// method takes two arguments, the task and the sending half of a channel which is used to
+    /// send the result back after the task has completed.
+    pub async fn task<T, R>(&self, task: T, res_sender: R)
+    where
+        T: AsyncTask,
+        R: ReturnChannel<T = T::Output>,
+    {
         let sender = self.sender.clone();
+        let msg = PendingTask::<_, _, Task>::new(task, res_sender);
+        let boxed = Box::new(msg);
         self.sender
-            .send(Message::Task(Box::new(task), sender))
+            .send(Message::Task(boxed, sender))
             .await
             .expect("Channel was closed");
 
@@ -274,11 +305,18 @@ where
     }
 
     /// Try to send a new task to the runtime, if there's no room in the channel an error is
-    /// returned immediately.
-    pub fn try_task<D: AsyncTask<T = T, R = R>>(&self, task: D) -> JlrsResult<()> {
+    /// returned immediately. This method takes two arguments, the task and the sending half of a
+    /// channel which is used to send the result back after the task has completed.
+    pub fn try_task<T, R>(&self, task: T, res_sender: R) -> JlrsResult<()>
+    where
+        T: AsyncTask,
+        R: ReturnChannel<T = T::Output>,
+    {
         let sender = self.sender.clone();
+        let msg = PendingTask::<_, _, Task>::new(task, res_sender);
+        let boxed = Box::new(msg);
         self.sender
-            .try_send(Message::Task(Box::new(task), sender))
+            .try_send(Message::Task(boxed, sender))
             .map(|v| {
                 unsafe {
                     wake_julia();
@@ -296,8 +334,70 @@ where
             })
     }
 
-    /// Include a Julia file. This method waits until the call `Main.include` in Julia has been
-    /// completed. It returns an error if the path doesn't  exist or the call to `Main.include`
+    /// Send a new generator to the runtime, this method waits if there's no room in the channel.
+    /// This method takes a single argument, the generator. It returns after
+    /// [`GeneratorTask::init`] has been called, a [`GeneratorHandle`] to the generator is
+    /// returned if this method completes successfully, and the error if it doesn't.
+    pub async fn generator<T>(&self, task: T) -> JlrsResult<GeneratorHandle<T>>
+    where
+        T: GeneratorTask,
+    {
+        let rt_sender = self.sender.clone();
+        let (init_sender, init_recv) = async_std::channel::bounded(1);
+        let msg = PendingTask::<_, _, Generator>::new(task, init_sender);
+        let boxed = Box::new(msg);
+
+        self.sender
+            .send(Message::Task(boxed, rt_sender))
+            .await
+            .expect("Channel was closed");
+
+        unsafe {
+            wake_julia();
+        }
+
+        match init_recv.recv().await {
+            Ok(Ok(gh)) => Ok(gh),
+            Ok(Err(e)) => Err(e)?,
+            Err(e) => Err(JlrsError::other(e))?,
+        }
+    }
+
+    /// Send a new generator to the runtime, if there's no room in the channel an error is
+    /// returned immediately. This method takes a single argument, the generator. It returns after
+    /// [`GeneratorTask::init`] has been called, a [`GeneratorHandle`] to the generator is
+    /// returned if this method completes successfully, and the error if it doesn't.
+    pub fn try_generator<T>(&self, task: T) -> JlrsResult<GeneratorHandle<T>>
+    where
+        T: GeneratorTask,
+    {
+        let rt_sender = self.sender.clone();
+        let (init_sender, init_recv) = crossbeam_channel::bounded(1);
+        let msg = PendingTask::<_, _, Generator>::new(task, init_sender);
+        let boxed = Box::new(msg);
+
+        match self.sender.try_send(Message::Task(boxed, rt_sender)) {
+            Ok(_) => unsafe { wake_julia() },
+            Err(e) => match e {
+                TrySendError::Full(Message::Task(t, _)) => {
+                    Err(JlrsError::other(TrySendError::Full(t)))?;
+                }
+                TrySendError::Closed(Message::Task(t, _)) => {
+                    Err(JlrsError::other(TrySendError::Closed(t)))?;
+                }
+                _ => unreachable!(),
+            },
+        }
+
+        match init_recv.recv() {
+            Ok(Ok(gh)) => Ok(gh),
+            Ok(Err(e)) => Err(e)?,
+            Err(e) => Err(JlrsError::other(e))?,
+        }
+    }
+
+    /// Include a Julia file. This method waits until the call to `Main.include` in Julia has been
+    /// completed. It returns an error if the path doesn't exist or the call to `Main.include`
     /// throws an exception.
     pub async fn include<P: AsRef<Path>>(&self, path: P) -> JlrsResult<()> {
         if !path.as_ref().exists() {
@@ -429,7 +529,7 @@ where
     }
 }
 
-enum Status {
+pub(crate) enum Status {
     Pending,
     Ok,
     Err(Option<Box<JlrsError>>),
@@ -452,11 +552,8 @@ impl Status {
     }
 }
 
-enum Message<T, R> {
-    Task(
-        Box<dyn AsyncTask<T = T, R = R>>,
-        AsyncStdSender<Message<T, R>>,
-    ),
+pub(crate) enum Message {
+    Task(Box<dyn GenericPendingTask>, AsyncStdSender<Message>),
     Include(PathBuf, Arc<(AsyncStdMutex<Status>, AsyncStdCondvar)>),
     TryInclude(PathBuf, Arc<(Mutex<Status>, Condvar)>),
     Complete(usize, Box<AsyncStackPage>),
@@ -465,7 +562,7 @@ enum Message<T, R> {
 }
 
 #[derive(Debug)]
-struct AsyncStackPage {
+pub(crate) struct AsyncStackPage {
     top: [Cell<*mut c_void>; 2],
     page: StackPage,
 }
@@ -495,15 +592,11 @@ unsafe fn link_stacks(stacks: &mut [Option<Box<AsyncStackPage>>]) {
     }
 }
 
-fn run_async<T, R>(
-    n_threads: usize,
-    process_events_ms: u64,
-    receiver: AsyncStdReceiver<Message<T, R>>,
-) -> JlrsResult<()>
-where
-    T: Send + Sync + 'static,
-    R: ReturnChannel<T = T> + 'static,
-{
+fn run_async(
+    max_n_tasks: usize,
+    recv_timeout_ms: u64,
+    receiver: AsyncStdReceiver<Message>,
+) -> JlrsResult<()> {
     task::block_on(async {
         unsafe {
             if jl_is_initialized() != 0 || INIT.swap(true, Ordering::SeqCst) {
@@ -514,22 +607,22 @@ where
             let jlrs_jl = CString::new(JLRS_JL).expect("Invalid Jlrs module");
             jl_eval_string(jlrs_jl.as_ptr());
 
-            let mut free_stacks = VecDeque::with_capacity(n_threads);
-            for i in 1..n_threads {
+            let mut free_stacks = VecDeque::with_capacity(max_n_tasks);
+            for i in 1..max_n_tasks {
                 free_stacks.push_back(i);
             }
 
             let mut stacks = {
-                let mut stacks = Vec::with_capacity(n_threads);
-                for _ in 0..n_threads {
+                let mut stacks = Vec::with_capacity(max_n_tasks);
+                for _ in 0..max_n_tasks {
                     stacks.push(Some(AsyncStackPage::new()));
                 }
                 link_stacks(&mut stacks);
                 stacks.into_boxed_slice()
             };
 
-            let mut running_tasks = Vec::with_capacity(n_threads);
-            for _ in 0..n_threads {
+            let mut running_tasks = Vec::with_capacity(max_n_tasks);
+            for _ in 0..max_n_tasks {
                 running_tasks.push(None);
             }
             let mut running_tasks = running_tasks.into_boxed_slice();
@@ -540,7 +633,7 @@ where
 
             loop {
                 let wait_time = if n_running > 0 {
-                    process_events_ms
+                    recv_timeout_ms
                 } else {
                     u64::MAX
                 };
@@ -553,19 +646,19 @@ where
                             ASYNC_STATUS.store(IN_RUST, Ordering::Release);
                         }
                     }
-                    Ok(Ok(Message::Task(jl_task, sender))) => {
+                    Ok(Ok(Message::Task(task, sender))) => {
                         if let Some(idx) = free_stacks.pop_front() {
                             let stack = stacks[idx].take().expect("Async stack corrupted");
-                            let task = run_task(jl_task, idx, stack, sender);
+                            let task = task::spawn_local(task.call(idx, stack, sender));
                             n_running += 1;
                             running_tasks[idx] = Some(task);
                         } else {
-                            pending_tasks.push_back((jl_task, sender));
+                            pending_tasks.push_back((task, sender));
                         }
                     }
                     Ok(Ok(Message::Complete(idx, stack))) => {
                         if let Some((jl_task, sender)) = pending_tasks.pop_front() {
-                            let task = run_task(jl_task, idx, stack, sender);
+                            let task = task::spawn_local(jl_task.call(idx, stack, sender));
                             running_tasks[idx] = Some(task);
                         } else {
                             stacks[idx] = Some(stack);
@@ -611,16 +704,14 @@ where
     })
 }
 
-fn run_async_with_image<T, R, P, Q>(
-    n_threads: usize,
-    process_events_ms: u64,
-    receiver: AsyncStdReceiver<Message<T, R>>,
+fn run_async_with_image<P, Q>(
+    max_n_tasks: usize,
+    recv_timeout_ms: u64,
+    receiver: AsyncStdReceiver<Message>,
     julia_bindir: P,
     image_path: Q,
 ) -> JlrsResult<()>
 where
-    T: Send + Sync + 'static,
-    R: ReturnChannel<T = T> + 'static,
     P: AsRef<Path>,
     Q: AsRef<Path>,
 {
@@ -651,22 +742,22 @@ where
             let jlrs_jl = CString::new(JLRS_JL).expect("Invalid Jlrs module");
             jl_eval_string(jlrs_jl.as_ptr());
 
-            let mut free_stacks = VecDeque::with_capacity(n_threads);
-            for i in 1..n_threads {
+            let mut free_stacks = VecDeque::with_capacity(max_n_tasks);
+            for i in 1..max_n_tasks {
                 free_stacks.push_back(i);
             }
 
             let mut stacks = {
-                let mut stacks = Vec::with_capacity(n_threads);
-                for _ in 0..n_threads {
+                let mut stacks = Vec::with_capacity(max_n_tasks);
+                for _ in 0..max_n_tasks {
                     stacks.push(Some(AsyncStackPage::new()));
                 }
                 link_stacks(&mut stacks);
                 stacks.into_boxed_slice()
             };
 
-            let mut running_tasks = Vec::with_capacity(n_threads);
-            for _ in 0..n_threads {
+            let mut running_tasks = Vec::with_capacity(max_n_tasks);
+            for _ in 0..max_n_tasks {
                 running_tasks.push(None);
             }
             let mut running_tasks = running_tasks.into_boxed_slice();
@@ -677,7 +768,7 @@ where
 
             loop {
                 let wait_time = if n_running > 0 {
-                    process_events_ms
+                    recv_timeout_ms
                 } else {
                     u64::MAX
                 };
@@ -690,19 +781,19 @@ where
                             ASYNC_STATUS.store(IN_RUST, Ordering::Release);
                         }
                     }
-                    Ok(Ok(Message::Task(jl_task, sender))) => {
+                    Ok(Ok(Message::Task(task, sender))) => {
                         if let Some(idx) = free_stacks.pop_front() {
-                            n_running += 1;
                             let stack = stacks[idx].take().expect("Async stack corrupted");
-                            let task = run_task(jl_task, idx, stack, sender);
+                            let task = task::spawn_local(task.call(idx, stack, sender));
+                            n_running += 1;
                             running_tasks[idx] = Some(task);
                         } else {
-                            pending_tasks.push_back((jl_task, sender));
+                            pending_tasks.push_back((task, sender));
                         }
                     }
                     Ok(Ok(Message::Complete(idx, stack))) => {
                         if let Some((jl_task, sender)) = pending_tasks.pop_front() {
-                            let task = run_task(jl_task, idx, stack, sender);
+                            let task = task::spawn_local(jl_task.call(idx, stack, sender));
                             running_tasks[idx] = Some(task);
                         } else {
                             stacks[idx] = Some(stack);
@@ -746,37 +837,6 @@ where
 
         Ok(())
     })
-}
-
-fn run_task<T: Send + Sync + 'static, R>(
-    mut jl_task: Box<dyn AsyncTask<T = T, R = R>>,
-    task_idx: usize,
-    mut stack: Box<AsyncStackPage>,
-    rt_sender: AsyncStdSender<Message<T, R>>,
-) -> AsyncStdHandle<()>
-where
-    R: ReturnChannel<T = T> + 'static,
-{
-    unsafe {
-        task::spawn_local(async move {
-            let res = {
-                let mode = Async(&stack.top[1]);
-                let raw = stack.page.as_mut();
-                let mut frame = AsyncGcFrame::new(raw, 0, mode);
-                let global = Global::new();
-                jl_task.run(global, &mut frame).await
-            };
-
-            if let Some(sender) = jl_task.return_channel() {
-                sender.send(res).await;
-            }
-
-            rt_sender
-                .send(Message::Complete(task_idx, stack))
-                .await
-                .expect("Channel was closed");
-        })
-    }
 }
 
 fn call_include(stack: &mut AsyncStackPage, path: PathBuf) -> JlrsResult<()> {
@@ -934,4 +994,25 @@ pub(crate) unsafe fn wake_julia() {
         let handle = ASYNC_CONDITION_HANDLE.load(Ordering::Acquire);
         uv_async_send(handle.cast());
     }
+}
+
+fn check_threads_var() -> JlrsResult<()> {
+    match env::var("JULIA_NUM_THREADS") {
+        Ok(n_threads) => {
+            if n_threads != "auto" {
+                let n_threads = n_threads
+                    .parse::<usize>()
+                    .map_err(|_| JlrsError::NumThreadsVar { value: n_threads })?;
+
+                if n_threads < 3 {
+                    Err(JlrsError::MoreThreadsRequired)?;
+                }
+            }
+        }
+        Err(_) => {
+            env::set_var("JULIA_NUM_THREADS", "auto");
+        }
+    };
+
+    Ok(())
 }

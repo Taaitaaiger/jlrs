@@ -16,6 +16,7 @@ function awaitcondition()
 end
 
 function runasync(func::Function, wakeptr::Ptr{Cvoid}, args...; kwargs...)::Any
+    @nospecialize func, wakeptr, args, kwargs
     try
         func(args...; kwargs...)
     finally
@@ -24,33 +25,38 @@ function runasync(func::Function, wakeptr::Ptr{Cvoid}, args...; kwargs...)::Any
 end
 
 function asynccall(func::Function, wakeptr::Ptr{Cvoid}, args...; kwargs...)::Task
+    @nospecialize func, wakeptr, args, kwargs
     @assert wakerust[] != C_NULL "wakerust is null"
     Base.Threads.@spawn runasync(func, wakeptr, args...; kwargs...)
 end
 
 function localasynccall(func::Function, wakeptr::Ptr{Cvoid}, args...; kwargs...)::Task
+    @nospecialize func, wakeptr, args, kwargs
     @assert wakerust[] != C_NULL "wakerust is null"
     @async runasync(func, wakeptr, args...; kwargs...)
 end
 
-function tracingcall(func::Function)::Function
-    function wrapper(args...; kwargs...)
+function tracingcall(@nospecialize(func::Function))::Function
+    function (args...; kwargs...)
+        @nospecialize args, kwargs
+
         try
             func(args...; kwargs...)
         catch
-            for s in stacktrace(catch_backtrace(), true)
-                println(stderr, s)
+            for (exc, bt) in Base.catch_stack()
+                showerror(stderr, exc, bt)
+                println(stderr)
             end
 
             rethrow()
         end
     end
-
-    wrapper
 end
 
-function attachstacktrace(func::Function)::Function
-    function wrapper(args...; kwargs...)
+function attachstacktrace(@nospecialize(func::Function))::Function
+    function (args...; kwargs...)
+        @nospecialize args, kwargs
+
         try
             func(args...; kwargs...)
         catch exc
@@ -58,18 +64,22 @@ function attachstacktrace(func::Function)::Function
             rethrow(TracedException(exc, st))
         end
     end
-
-    wrapper
 end
 
-function clean(a::Array)
+function finalizearray(@nospecialize(a::Array))
     @assert droparray[] != C_NULL "droparray is null"
     ccall(droparray[], Cvoid, (Array,), a)
 end
 
-function displaystring(value)::String
+function valuestring(@nospecialize(value))::String
     io = IOBuffer()
-    display(TextDisplay(io), value)
+    show(io, "text/plain", value)
+    String(take!(io))
+end
+
+function errorstring(@nospecialize(value))::String
+    io = IOBuffer()
+    showerror(io, value)
     String(take!(io))
 end
 end

@@ -107,19 +107,42 @@ pub trait Wrapper<'scope, 'data>: private::Wrapper<'scope, 'data> {
         unsafe { Value::wrap_non_null(self.unwrap_non_null(Private).cast(), Private) }
     }
 
-    /// Convert the wrapper to its display string, ie the string that is shown by calling
-    /// `Base.display`.
+    /// Convert the wrapper to its display string, ie the string that is shown when this value is
+    /// thrown as an exception.
     fn display_string(self) -> JlrsResult<String> {
         unsafe {
             let global = Global::new();
             let s = Module::main(global)
                 .submodule_ref("Jlrs")?
                 .wrapper_unchecked()
-                .function_ref("displaystring")?
+                .function_ref("valuestring")?
                 .wrapper_unchecked()
                 .call1_unrooted(global, self.as_value())
                 .map_err(|e| JlrsError::Exception {
-                    msg: format!("Jlrs.displaystring failed: {:?}", e.value_unchecked()),
+                    msg: format!("Jlrs.valuestring failed: {:?}", e.value_unchecked()),
+                })?
+                .value_unchecked()
+                .cast::<JuliaString>()?
+                .as_str()?
+                .to_string();
+
+            Ok(s)
+        }
+    }
+
+    /// Convert the wrapper to its error string, ie the string that is shown by calling
+    /// `Base.display`.
+    fn error_string(self) -> JlrsResult<String> {
+        unsafe {
+            let global = Global::new();
+            let s = Module::main(global)
+                .submodule_ref("Jlrs")?
+                .wrapper_unchecked()
+                .function_ref("errorstring")?
+                .wrapper_unchecked()
+                .call1_unrooted(global, self.as_value())
+                .map_err(|e| JlrsError::Exception {
+                    msg: format!("Jlrs.errorstring failed: {:?}", e.value_unchecked()),
                 })?
                 .value_unchecked()
                 .cast::<JuliaString>()?
@@ -134,6 +157,12 @@ pub trait Wrapper<'scope, 'data>: private::Wrapper<'scope, 'data> {
     /// `Base.display`, or some default value.
     fn display_string_or<S: Into<String>>(self, default: S) -> String {
         self.display_string().unwrap_or(default.into())
+    }
+
+    /// Convert the wrapper to its error string, i.e. the string that is shown when this value is
+    /// thrown as an exception, or some default value.
+    fn error_string_or<S: Into<String>>(self, default: S) -> String {
+        self.error_string().unwrap_or(default.into())
     }
 }
 

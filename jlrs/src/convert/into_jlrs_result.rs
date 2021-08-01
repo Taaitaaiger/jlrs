@@ -9,7 +9,10 @@
 //!
 //! [`JlrsError`]: crate::error::JlrsError
 
-use crate::error::{exception, JlrsResult, JuliaResult, JuliaResultRef};
+use crate::{
+    error::{exception, JlrsResult, JuliaResult, JuliaResultRef, CANNOT_DISPLAY_VALUE},
+    prelude::Wrapper,
+};
 
 /// Extension trait that lets you convert a `JuliaResult` to a `JlrsResult`.
 pub trait IntoJlrsResult<T>: private::IntoJlrsResult {
@@ -21,16 +24,18 @@ impl<T> IntoJlrsResult<T> for JuliaResult<'_, '_, T> {
     fn into_jlrs_result(self) -> JlrsResult<T> {
         match self {
             Ok(v) => Ok(v),
-            Err(e) => exception(format!("{:?}", e)),
+            Err(e) => exception(e.error_string_or(CANNOT_DISPLAY_VALUE)),
         }
     }
 }
 
 impl<T> IntoJlrsResult<T> for JuliaResultRef<'_, '_, T> {
     fn into_jlrs_result(self) -> JlrsResult<T> {
-        match self {
-            Ok(v) => Ok(v),
-            Err(e) => exception(format!("Unrooted exception {:?}", e)),
+        unsafe {
+            match self {
+                Ok(v) => Ok(v),
+                Err(e) => exception(e.value_unchecked().error_string_or(CANNOT_DISPLAY_VALUE)),
+            }
         }
     }
 }

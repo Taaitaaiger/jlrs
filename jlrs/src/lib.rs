@@ -240,29 +240,31 @@
 //!
 //! ```toml
 //! [dependencies]
-//! jlrs = { version = "0.11", features = ["async"] }
+//! jlrs = { version = "0.12", features = ["async"] }
 //! ```
 //!
 //! The struct [`AsyncJulia`] is exported by the prelude and lets you initialize the runtime in
 //! two ways, either as a task or as a thread. The first way should be used if you want to
 //! integrate the async runtime into a larger project that uses `async_std`. In order for the
-//! runtime to work correctly the `JULIA_NUM_THREADS` environment variable must be set to a value
-//! larger than 2.
+//! runtime to work correctly the `JULIA_NUM_THREADS` environment variable must be set to 3 or
+//! more, or `auto`.
 //!
-//! In order to call Julia with the async runtime you must implement the [`AsyncTask`] trait. The
-//! `run`-method of this trait is similar to the closures that are used in the example
-//! above for the sync runtime; it provides you with a [`Global`] and an [`AsyncGcFrame`] which
-//! provides mostly the same functionality as [`GcFrame`]. The `AsyncGcFrame` is required to
-//! call [`CallAsync::call_async`] which calls a Julia function on another thread by using
-//! `Base.Threads.@spawn` and returns a `Future`. While awaiting the result the runtime can handle
-//! another task. If you don't use [`CallAsync::call_async`] tasks are executed sequentially.
+//! In order to call Julia with the async runtime you must implement the either the [`AsyncTask`]
+//! or [`GeneratorTask`] trait. An `AsyncTask` can be called once, its `run` is similar to the
+//! closures that are used in the examples above for the sync runtime; it provides you with a
+//! `Global` and an [`AsyncGcFrame`] which provides mostly the same functionality as `GcFrame`.
+//! The `AsyncGcFrame` is required to call [`CallAsync::call_async`] which calls a Julia function
+//! on another thread by using `Base.Threads.@spawn` and returns a `Future`. While awaiting the
+//! result the runtime can handle another task. If you don't use `CallAsync::call_async` tasks are
+//!  executed sequentially.
 //!
-//! It's important to keep in mind that allocating memory in Julia uses a lock, so if you execute
-//! multiple functions at the same time that allocate new values frequently the performance will
-//! drop significantly. The garbage collector can only run when all threads have reached a
-//! safepoint, which is the case whenever a function needs to allocate memory. If your function
-//! takes a long time to complete but needs to allocate rarely, you should periodically call
-//! `GC.safepoint` in Julia to ensure the garbage collector can run.
+//! A `GeneratorTask` is more powerful. It has two methods, `init` and `run`, `init` is called
+//! when the `GeneratorTask` is started and can be used to prepare the initial state of the
+//! generator. The frame provided to `init` is not dropped after it has completed, which means
+//! this initial state can contain Julia data. Whenever a `GeneratorTask` is created, a
+//! [`GeneratorHandle`] is returned. This handle can be used to call the `GeneratorTask` which
+//! calls its `run` method once. A `GeneratorHandle` can be reused and used from different
+//! threads.
 //!
 //! You can find basic examples in [the examples directory of the repo].
 //!
@@ -322,6 +324,8 @@
 //! [`AsyncGcFrame`]: crate::extensions::multitask::async_frame::AsyncGcFrame
 //! [`Frame`]: crate::memory::frame::Frame
 //! [`AsyncTask`]: crate::extensions::multitask::async_task::AsyncTask
+//! [`GeneratorTask`]: crate::extensions::multitask::async_task::GeneratorTask
+//! [`GeneratorHandle`]: crate::extensions::multitask::async_task::GeneratorHandle
 //! [`AsyncJulia`]: crate::extensions::multitask::AsyncJulia
 //! [`DataType`]: crate::wrappers::ptr::datatype::DataType
 //! [`TypedArray`]: crate::wrappers::ptr::array::TypedArray
@@ -350,7 +354,10 @@ use convert::into_jlrs_result::IntoJlrsResult;
 use error::{JlrsError, JlrsResult, CANNOT_DISPLAY_VALUE};
 #[cfg(not(feature = "coverage"))]
 use jl_sys::uv_async_send;
-use jl_sys::{jl_atexit_hook, jl_init, jl_init_with_image, jl_is_initialized};
+use jl_sys::{
+    jl_array_dims_ptr, jl_array_ndims, jl_atexit_hook, jl_init, jl_init_with_image,
+    jl_is_initialized,
+};
 use memory::frame::{GcFrame, NullFrame};
 use memory::global::Global;
 use memory::mode::Sync;
@@ -359,9 +366,10 @@ use prelude::Wrapper;
 use private::Private;
 use std::ffi::{c_void, CString};
 use std::io::{Error as IOError, ErrorKind};
-use std::mem::MaybeUninit;
+use std::mem::{self, MaybeUninit};
 use std::path::Path;
 use std::ptr::null_mut;
+use std::slice;
 use std::sync::atomic::{AtomicBool, Ordering};
 use wrappers::ptr::module::Module;
 use wrappers::ptr::string::JuliaString;
@@ -674,15 +682,28 @@ impl CCall {
 unsafe extern "C" fn droparray(a: Array) {
     // The data of a moved array is allocated by Rust, this function is called by
     // a finalizer in order to ensure it's also freed by Rust.
-    let mut arr_ptr = a.unwrap_non_null(Private);
-    let arr_ref = arr_ptr.as_mut();
+    let mut arr_nn_ptr = a.unwrap_non_null(Private);
+    let arr_ref = arr_nn_ptr.as_mut();
 
     if arr_ref.flags.how() != 2 {
         return;
     }
 
+    // Set data to null pointer
     let data_ptr = arr_ref.data.cast::<MaybeUninit<u8>>();
     arr_ref.data = null_mut();
+
+    // Set all dims to 0
+    let arr_ptr = arr_nn_ptr.as_ptr();
+    let dims_ptr = jl_array_dims_ptr(arr_ptr);
+    let n_dims = jl_array_ndims(arr_ptr);
+    let mut_dims_slice = slice::from_raw_parts_mut(dims_ptr, n_dims as _);
+    for dim in mut_dims_slice {
+        *dim = 0;
+    }
+
+    // Drop the data
     let n_els = arr_ref.elsize as usize * arr_ref.length;
-    Vec::from_raw_parts(data_ptr, n_els, n_els);
+    let data = Vec::from_raw_parts(data_ptr, n_els, n_els);
+    mem::drop(data);
 }

@@ -48,10 +48,10 @@ pub(crate) const MIN_FRAME_CAPACITY: usize = 16;
 /// preallocate that number of slots. Frames created without slots will dynamically create new
 /// slots as needed. A frame's capacity is at least 16.
 pub struct GcFrame<'frame, M: Mode> {
-    raw_frame: &'frame mut [*mut c_void],
-    page: Option<StackPage>,
-    n_roots: usize,
-    mode: M,
+    pub(crate) raw_frame: &'frame mut [*mut c_void],
+    pub(crate) page: Option<StackPage>,
+    pub(crate) n_roots: usize,
+    pub(crate) mode: M,
 }
 
 impl<'frame, M: Mode> GcFrame<'frame, M> {
