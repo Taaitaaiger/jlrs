@@ -10,30 +10,31 @@ use crossbeam_channel::Sender as CrossbeamSender;
 /// implemented for `()`, in this case nothing is sent back.
 #[async_trait]
 pub trait ReturnChannel: 'static + Send + Sync + Sized {
-    type T: 'static + Send + Sync;
+    type Output: 'static + Send;
 
     /// Send the result.
-    async fn send(&self, response: JlrsResult<Self::T>);
+    async fn send(&self, response: JlrsResult<Self::Output>);
 }
+
 #[async_trait]
-impl<T: 'static + Send + Sync> ReturnChannel for AsyncStdSender<JlrsResult<T>> {
-    type T = T;
-    async fn send(&self, response: JlrsResult<Self::T>) {
+impl<T: 'static + Send> ReturnChannel for AsyncStdSender<JlrsResult<T>> {
+    type Output = T;
+    async fn send(&self, response: JlrsResult<Self::Output>) {
         self.send(response).await.ok();
     }
 }
 
 #[async_trait]
-impl<T: 'static + Send + Sync> ReturnChannel for CrossbeamSender<JlrsResult<T>> {
-    type T = T;
+impl<T: 'static + Send> ReturnChannel for CrossbeamSender<JlrsResult<T>> {
+    type Output = T;
 
-    async fn send(&self, response: JlrsResult<Self::T>) {
+    async fn send(&self, response: JlrsResult<Self::Output>) {
         self.send(response).ok();
     }
 }
 
 #[async_trait]
 impl ReturnChannel for () {
-    type T = ();
+    type Output = ();
     async fn send(&self, _: JlrsResult<()>) {}
 }

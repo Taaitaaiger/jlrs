@@ -20,10 +20,9 @@ use std::marker::PhantomData;
 use super::async_frame::AsyncGcFrame;
 use super::mode::Async;
 use super::return_channel::ReturnChannel;
-use super::RequireSendSync;
+use super::{wake_julia, RequireSendSync};
 use super::{AsyncStackPage, Message};
 use crate::error::{JlrsError, JlrsResult};
-use crate::memory::frame::GcFrame;
 use crate::memory::global::Global;
 use async_std::channel::Sender as AsyncStdSender;
 use async_trait::async_trait;
@@ -41,6 +40,23 @@ pub trait AsyncTask: 'static + Send + Sync {
     /// The number of slots preallocated for the `AsyncGcFrame` provided to `run`.
     const RUN_SLOTS: usize = 0;
 
+    /// The number of slots preallocated for the `AsyncGcFrame` provided to `register`.
+    const REGISTER_SLOTS: usize = 0;
+
+    /// Register the task. Note that this method is not called automatically, but only if
+    /// [`AsyncJulia::register_task`] or [`AsyncJulia::try_register_task`] is used. This method
+    /// can be implemented to take care of everything required to execute the task successfully,
+    /// like loading packages or defining a type.
+    ///
+    /// [`AsyncJulia::register_task`]: crate::extensions::multitask::AsyncJulia::register_task
+    /// [`AsyncJulia::try_register_task`]: crate::extensions::multitask::AsyncJulia::try_register_task
+    async fn register<'frame>(
+        _global: Global<'frame>,
+        _frame: &mut AsyncGcFrame<'frame>,
+    ) -> JlrsResult<()> {
+        Ok(())
+    }
+
     /// Run this task. This method takes a `Global` and a mutable reference to an `AsyncGcFrame`,
     /// which lets you interact with Julia.
     async fn run<'base>(
@@ -57,59 +73,84 @@ pub trait AsyncTask: 'static + Send + Sync {
 /// [`AsyncJulia::try_generator`]: crate::extensions::multitask::AsyncJulia::try_generator
 #[async_trait(?Send)]
 pub trait GeneratorTask: 'static + Send + Sync {
-    /// The type of the result which is returned if `init` completes successfully. It's provided
-    /// to every call of `run`. Because `init` takes a frame with the `'static` lifetime, this
-    /// type can contain Julia data.
-    type InitData: 'static + Clone;
+    /// The type of the result which is returned if `init` completes successfully. This data is
+    /// provided to every call of `run`. Because `init` takes a frame with the `'static` lifetime,
+    /// this type can contain Julia data.
+    type State: 'static;
 
-    /// The type of the data that must be provided when calling this generator.
-    type CallData: 'static + Send + Sync;
+    /// The type of the data that must be provided when calling this generator through its handle.
+    type Input: 'static + Send + Sync;
 
     /// The type of the result which is returned if `run` completes successfully.
     type Output: 'static + Send + Sync;
 
-    /// The capacity of the channel the `GeneratorHandle` uses to communicate with this generator.
+    /// The capacity of the channel the [`GeneratorHandle`] uses to communicate with this
+    /// generator.
+    ///
     /// If it's set to 0, the channel is unbounded.
     const CHANNEL_CAPACITY: usize = 0;
 
-    /// The number of slots preallocated for the `GcFrame` provided to `init`.
+    /// The number of slots preallocated for the `AsyncGcFrame` provided to `register`.
+    const REGISTER_SLOTS: usize = 0;
+
+    /// The number of slots preallocated for the `AsyncGcFrame` provided to `init`.
     const INIT_SLOTS: usize = 0;
 
     /// The number of slots preallocated for the `AsyncGcFrame` provided to `run`.
     const RUN_SLOTS: usize = 0;
 
+    // NB: `init` and `run` have an explicit 'inner lifetime . If this lifetime is elided
+    // `GeneratorTask`s can be implemented in bin crates but not in lib crates (rustc 1.54.0)
+
+    /// Register this generator. Note that this method is not called automatically, but only if
+    /// [`AsyncJulia::register_generator`] or [`AsyncJulia::try_register_generator`] is used. This
+    /// method can be implemented to take care of everything required to execute the task
+    /// successfully, like loading packages or defining a type.
+    ///
+    /// [`AsyncJulia::register_generator`]: crate::extensions::multitask::AsyncJulia::register_generator
+    /// [`AsyncJulia::try_register_generator`]: crate::extensions::multitask::AsyncJulia::try_register_generator
+    async fn register<'frame>(
+        _global: Global<'frame>,
+        _frame: &mut AsyncGcFrame<'frame>,
+    ) -> JlrsResult<()> {
+        Ok(())
+    }
+
     /// Initialize the generator. You can interact with Julia inside this method, the frame is
-    /// not dropped until the generator itself is dropped. This means that `InitData` can contain
+    /// not dropped until the generator itself is dropped. This means that `State` can contain
     /// arbitrary Julia data rooted in this frame. This data is provided to every call to `run`.
-    fn init(
-        &mut self,
+    async fn init<'inner>(
+        &'inner mut self,
         global: Global<'static>,
-        frame: &mut GcFrame<'static, Async<'static>>,
-    ) -> JlrsResult<Self::InitData>;
+        frame: &'inner mut AsyncGcFrame<'static>,
+    ) -> JlrsResult<Self::State>;
 
     /// Run the generator. This method takes a `Global` and a mutable reference to an
-    /// `AsyncGcFrame`, which lets you interact with Julia. It's also provided with the result
-    /// of `init` and the `call_data` provided by the caller.
-    async fn run<'nested>(
-        &mut self,
-        global: Global<'nested>,
-        frame: &mut AsyncGcFrame<'nested>,
-        init_data: Self::InitData,
-        call_data: Self::CallData,
+    /// `AsyncGcFrame`, which lets you interact with Julia. It's also provided with a mutable
+    /// reference to its `state` and the `input` provided by the caller. While the state is
+    /// mutable, it's not possible to allocate a new Julia value in `run` and assign it to the
+    /// state because the frame doesn't live long enough.
+    async fn run<'inner, 'frame>(
+        &'inner mut self,
+        global: Global<'frame>,
+        frame: &'inner mut AsyncGcFrame<'frame>,
+        state: &'inner mut Self::State,
+        input: Self::Input,
     ) -> JlrsResult<Self::Output>;
 }
 
 type HandleSender<GT> = AsyncStdSender<
     Box<
         dyn GenericCallGeneratorMessage<
-            Data = <GT as GeneratorTask>::CallData,
+            Input = <GT as GeneratorTask>::Input,
             Output = <GT as GeneratorTask>::Output,
         >,
     >,
 >;
 
-/// A handle to a `GeneratorTask`. This handle can be used to call the generator, and can be used
-/// from multiple threads. The `GeneratorTask` is dropped when its final handle has been dropped.
+/// A handle to a [`GeneratorTask`]. This handle can be used to call the generator and shared
+/// across threads. The `GeneratorTask` is dropped when its final handle has been dropped and all
+/// remaining pending calls have completed.
 #[derive(Clone)]
 pub struct GeneratorHandle<GT>
 where
@@ -127,177 +168,249 @@ where
     }
 
     /// Call the generator, this method waits until there's room available in the channel.
-    pub async fn call<R>(&self, data: GT::CallData, sender: R)
+    pub async fn call<R>(&self, input: GT::Input, sender: R)
     where
-        R: ReturnChannel<T = GT::Output>,
+        R: ReturnChannel<Output = GT::Output>,
     {
         self.sender
             .send(Box::new(CallGeneratorMessage {
-                data: Some(data),
+                input: Some(input),
                 sender,
             }))
             .await
+            .map(|_| unsafe { wake_julia() })
             .expect("Channel was closed")
     }
 
-    /// Call the generator, this method returns an error immediately if there's room available in
-    /// the channel.
-    pub fn try_call<R>(&self, data: GT::CallData, sender: R) -> JlrsResult<()>
+    /// Call the generator, this method returns an error immediately if there's NO room available
+    /// in the channel.
+    pub fn try_call<R>(&self, input: GT::Input, sender: R) -> JlrsResult<()>
     where
-        R: ReturnChannel<T = GT::Output>,
+        R: ReturnChannel<Output = GT::Output>,
     {
         match self.sender.try_send(Box::new(CallGeneratorMessage {
-            data: Some(data),
+            input: Some(input),
             sender,
         })) {
-            Ok(_) => Ok(()),
+            Ok(_) => unsafe {
+                wake_julia();
+                Ok(())
+            },
             Err(e) => Err(JlrsError::other(e))?,
         }
     }
 
-    /// Returns the capacity of the channel used to communicate with the generator if a bounded
-    /// channel is used, or `None` if it's unbounded.
+    /// Returns the capacity of the backing channel if a bounded channel is used, or `None` if
+    /// it's unbounded.
     pub fn capacity(&self) -> Option<usize> {
         self.sender.capacity()
     }
 
-    /// Returns the number of messages in the channel used to communicate with the generator.
+    /// Returns the number of messages in the backing channel.
     pub fn len(&self) -> usize {
         self.sender.len()
     }
+
+    /// Returns the number of handles that exist for this generator.
+    pub fn handle_count(&self) -> usize {
+        self.sender.sender_count()
+    }
+
+    /// Returns `true` if the backing channel is empty.
+    pub fn is_empty(&self) -> bool {
+        self.sender.is_empty()
+    }
+
+    /// Returns `true` if the backing channel is full.
+    pub fn is_full(&self) -> bool {
+        self.sender.is_full()
+    }
+
+    /// Closes the backing channel.
+    ///
+    /// Returns `true` if this call has closed the channel and it was not closed already.
+    ///
+    /// Pending calls will be executed before the generator completes, but it can't be called
+    /// again.
+    pub fn close(&self) -> bool {
+        self.sender.close()
+    }
 }
 
+// Ensure the handle can be shared across threads
 impl<GT: GeneratorTask> RequireSendSync for GeneratorHandle<GT> {}
 
-pub(crate) enum Generator {}
+// What follows is a significant amount of indirection to allow different tasks to have a
+// different Output, and allow users to provide an arbitrary sender that implements ReturnChannel.
 pub(crate) enum Task {}
+pub(crate) enum RegisterTask {}
+pub(crate) enum Generator {}
+pub(crate) enum RegisterGenerator {}
 
-pub(crate) struct PendingTask<RC, AT, Kind> {
-    task: AT,
+pub(crate) struct PendingTask<RC, T, Kind> {
+    task: Option<T>,
     sender: RC,
     _kind: PhantomData<Kind>,
 }
 
 impl<RC, AT> PendingTask<RC, AT, Task>
 where
-    RC: ReturnChannel<T = AT::Output>,
+    RC: ReturnChannel<Output = AT::Output>,
     AT: AsyncTask,
 {
     pub(crate) fn new(task: AT, sender: RC) -> Self {
         PendingTask {
-            task,
+            task: Some(task),
             sender,
             _kind: PhantomData,
         }
     }
 
     pub(crate) fn split(self) -> (AT, RC) {
-        (self.task, self.sender)
+        (self.task.unwrap(), self.sender)
     }
 }
 
 impl<IRC, GT> PendingTask<IRC, GT, Generator>
 where
-    IRC: ReturnChannel<T = GeneratorHandle<GT>>,
+    IRC: ReturnChannel<Output = GeneratorHandle<GT>>,
     GT: GeneratorTask,
 {
     pub(crate) fn new(task: GT, sender: IRC) -> Self {
         PendingTask {
-            task,
+            task: Some(task),
             sender,
             _kind: PhantomData,
         }
     }
 
     pub(crate) fn split(self) -> (GT, IRC) {
-        (self.task, self.sender)
+        (self.task.unwrap(), self.sender)
     }
 }
 
-struct CallGeneratorMessage<CD, O, RC>
+impl<RC, AT> PendingTask<RC, AT, RegisterTask>
 where
-    CD: 'static + Send + Sync,
-    O: 'static + Send + Sync,
-    RC: ReturnChannel<T = O>,
+    RC: ReturnChannel<Output = ()>,
+    AT: AsyncTask,
+{
+    pub(crate) fn new(sender: RC) -> Self {
+        PendingTask {
+            task: None,
+            sender,
+            _kind: PhantomData,
+        }
+    }
+
+    pub(crate) fn sender(self) -> RC {
+        self.sender
+    }
+}
+
+impl<RC, GT> PendingTask<RC, GT, RegisterGenerator>
+where
+    RC: ReturnChannel<Output = ()>,
+    GT: GeneratorTask,
+{
+    pub(crate) fn new(sender: RC) -> Self {
+        PendingTask {
+            task: None,
+            sender,
+            _kind: PhantomData,
+        }
+    }
+
+    pub(crate) fn sender(self) -> RC {
+        self.sender
+    }
+}
+
+struct CallGeneratorMessage<I, O, RC>
+where
+    I: Send + Sync,
+    O: Send + Sync,
+    RC: ReturnChannel<Output = O>,
 {
     sender: RC,
-    data: Option<CD>,
+    input: Option<I>,
 }
 
 #[async_trait(?Send)]
-trait GenericCallGeneratorMessage: 'static + Send + Sync {
-    type Data;
+trait GenericCallGeneratorMessage: Send + Sync {
+    type Input;
     type Output;
 
-    async fn send(&self, result: JlrsResult<Self::Output>);
-    fn data(&mut self) -> Self::Data;
+    async fn respond(&self, result: JlrsResult<Self::Output>);
+    fn input(&mut self) -> Self::Input;
 }
 
 #[async_trait(?Send)]
-impl<CD, O, RC> GenericCallGeneratorMessage for CallGeneratorMessage<CD, O, RC>
+impl<I, O, RC> GenericCallGeneratorMessage for CallGeneratorMessage<I, O, RC>
 where
-    CD: 'static + Send + Sync,
-    O: 'static + Send + Sync,
-    RC: ReturnChannel<T = O>,
+    I: Send + Sync,
+    O: Send + Sync,
+    RC: ReturnChannel<Output = O>,
 {
-    type Data = CD;
+    type Input = I;
     type Output = O;
 
-    async fn send(&self, result: JlrsResult<Self::Output>) {
+    async fn respond(&self, result: JlrsResult<Self::Output>) {
         self.sender.send(result).await
     }
 
-    fn data(&mut self) -> Self::Data {
-        self.data.take().unwrap()
+    fn input(&mut self) -> Self::Input {
+        self.input.take().unwrap()
     }
 }
 
 #[async_trait(?Send)]
-trait GenericAsyncTask: Send + Sync + Sized {
+trait GenericAsyncTask: Send + Sync {
     type AT: AsyncTask + Send + Sync;
 
-    async fn call_run(
-        &mut self,
+    async fn call_run<'inner>(
+        &'inner mut self,
         global: Global<'static>,
-        frame: GcFrame<'static, Async<'static>>,
+        frame: &'inner mut AsyncGcFrame<'static>,
     ) -> JlrsResult<<Self::AT as AsyncTask>::Output>;
 }
 
 #[async_trait(?Send)]
 impl<AT: AsyncTask> GenericAsyncTask for AT {
     type AT = Self;
-    async fn call_run(
-        &mut self,
+    async fn call_run<'inner>(
+        &'inner mut self,
         global: Global<'static>,
-        mut frame: GcFrame<'static, Async<'static>>,
+        frame: &'inner mut AsyncGcFrame<'static>,
     ) -> JlrsResult<<Self::AT as AsyncTask>::Output> {
-        unsafe {
-            let mut frame = AsyncGcFrame::new_from(&mut frame, AT::RUN_SLOTS);
-            self.run(global, &mut frame).await
-        }
+        unsafe { self.run(global, frame).await }
     }
 }
 
+trait GenericRegisterAsyncTask: Send + Sync {
+    type AT: AsyncTask + Send + Sync;
+}
+
+impl<AT: AsyncTask> GenericRegisterAsyncTask for AT {
+    type AT = Self;
+}
+
 #[async_trait(?Send)]
-trait GenericGeneratorTask: Send + Sync + Sized {
+trait GenericGeneratorTask: Send + Sync {
     type GT: GeneratorTask + Send + Sync;
 
-    unsafe fn call_init(
-        &mut self,
+    async unsafe fn call_init<'inner>(
+        &'inner mut self,
         global: Global<'static>,
-        frame: &mut GcFrame<'static, Async<'static>>,
-    ) -> JlrsResult<<Self::GT as GeneratorTask>::InitData>;
+        frame: &'inner mut AsyncGcFrame<'static>,
+    ) -> JlrsResult<<Self::GT as GeneratorTask>::State>;
 
-    async fn call_run(
-        &mut self,
+    async unsafe fn call_run<'inner>(
+        &'inner mut self,
         global: Global<'static>,
-        frame: GcFrame<'static, Async<'static>>,
-        init_data: <Self::GT as GeneratorTask>::InitData,
-        call_data: <Self::GT as GeneratorTask>::CallData,
-    ) -> (
-        GcFrame<'static, Async<'static>>,
-        JlrsResult<<Self::GT as GeneratorTask>::Output>,
-    );
+        frame: &'inner mut AsyncGcFrame<'static>,
+        state: &'inner mut <Self::GT as GeneratorTask>::State,
+        input: <Self::GT as GeneratorTask>::Input,
+    ) -> JlrsResult<<Self::GT as GeneratorTask>::Output>;
 
     fn create_handle(&self, sender: HandleSender<Self::GT>) -> GeneratorHandle<Self::GT>;
 }
@@ -309,37 +422,44 @@ where
 {
     type GT = Self;
 
-    unsafe fn call_init(
-        &mut self,
+    async unsafe fn call_init<'inner>(
+        &'inner mut self,
         global: Global<'static>,
-        frame: &mut GcFrame<'static, Async<'static>>,
-    ) -> JlrsResult<<Self::GT as GeneratorTask>::InitData> {
-        self.init(global, frame)
+        frame: &'inner mut AsyncGcFrame<'static>,
+    ) -> JlrsResult<<Self::GT as GeneratorTask>::State> {
+        {
+            self.init(global, frame).await
+        }
     }
 
-    async fn call_run(
-        &mut self,
+    async unsafe fn call_run<'inner>(
+        &'inner mut self,
         global: Global<'static>,
-        mut frame: GcFrame<'static, Async<'static>>,
-        init_data: <Self::GT as GeneratorTask>::InitData,
-        call_data: <Self::GT as GeneratorTask>::CallData,
-    ) -> (
-        GcFrame<'static, Async<'static>>,
-        JlrsResult<<Self::GT as GeneratorTask>::Output>,
-    ) {
+        frame: &'inner mut AsyncGcFrame<'static>,
+        state: &'inner mut <Self::GT as GeneratorTask>::State,
+        input: <Self::GT as GeneratorTask>::Input,
+    ) -> JlrsResult<<Self::GT as GeneratorTask>::Output> {
         unsafe {
             let output = {
-                let mut frame = AsyncGcFrame::new_from(&mut frame, GT::RUN_SLOTS);
-                self.run(global, &mut frame, init_data, call_data).await
+                let mut nested = frame.nest_async(Self::RUN_SLOTS);
+                self.run(global, &mut nested, state, input).await
             };
 
-            (frame, output)
+            output
         }
     }
 
     fn create_handle(&self, sender: HandleSender<Self>) -> GeneratorHandle<Self> {
         GeneratorHandle::new(sender)
     }
+}
+
+trait GenericRegisterGeneratorTask: Send + Sync {
+    type GT: GeneratorTask + Send + Sync;
+}
+
+impl<GT: GeneratorTask> GenericRegisterGeneratorTask for GT {
+    type GT = Self;
 }
 
 #[async_trait(?Send)]
@@ -355,7 +475,7 @@ pub(crate) trait GenericPendingTask: Send + Sync {
 #[async_trait(?Send)]
 impl<RC, AT> GenericPendingTask for PendingTask<RC, AT, Task>
 where
-    RC: ReturnChannel<T = AT::Output>,
+    RC: ReturnChannel<Output = AT::Output>,
     AT: AsyncTask,
 {
     async fn call(
@@ -368,15 +488,76 @@ where
             let (mut task, result_sender) = self.split();
 
             // Transmute to get static lifetimes. Should be okay because tasks can't leak
-            // Julia data and the frame is not dropped until the task is dropped.
-            // TODO: call_run creates a new frame, "upgrade" this one instead.
+            // Julia data and the frame is not dropped until the generator is dropped.
             let mode = Async(std::mem::transmute(&stack.top[1]));
             let raw = std::mem::transmute(stack.page.as_mut());
-            let frame = GcFrame::new(raw, 0, mode);
+            let mut frame = AsyncGcFrame::new(raw, 0, mode);
             let global = Global::new();
 
-            let res = GenericAsyncTask::call_run(&mut task, global, frame).await;
+            let res = task.call_run(global, &mut frame).await;
             result_sender.send(res).await;
+        }
+
+        rt_sender
+            .send(Message::Complete(task_idx, stack))
+            .await
+            .expect("Channel was closed");
+    }
+}
+
+#[async_trait(?Send)]
+impl<RC, AT> GenericPendingTask for PendingTask<RC, AT, RegisterTask>
+where
+    RC: ReturnChannel<Output = ()>,
+    AT: AsyncTask,
+{
+    async fn call(
+        mut self: Box<Self>,
+        task_idx: usize,
+        mut stack: Box<AsyncStackPage>,
+        rt_sender: AsyncStdSender<Message>,
+    ) {
+        unsafe {
+            let sender = self.sender();
+
+            let mode = Async(&stack.top[1]);
+            let raw = stack.page.as_mut();
+            let mut frame = AsyncGcFrame::new(raw, 0, mode);
+            let global = Global::new();
+
+            let res = AT::register(global, &mut frame).await;
+            sender.send(res).await;
+        }
+
+        rt_sender
+            .send(Message::Complete(task_idx, stack))
+            .await
+            .expect("Channel was closed");
+    }
+}
+
+#[async_trait(?Send)]
+impl<RC, GT> GenericPendingTask for PendingTask<RC, GT, RegisterGenerator>
+where
+    RC: ReturnChannel<Output = ()>,
+    GT: GeneratorTask,
+{
+    async fn call(
+        mut self: Box<Self>,
+        task_idx: usize,
+        mut stack: Box<AsyncStackPage>,
+        rt_sender: AsyncStdSender<Message>,
+    ) {
+        unsafe {
+            let sender = self.sender();
+
+            let mode = Async(&stack.top[1]);
+            let raw = stack.page.as_mut();
+            let mut frame = AsyncGcFrame::new(raw, 0, mode);
+            let global = Global::new();
+
+            let res = GT::register(global, &mut frame).await;
+            sender.send(res).await;
         }
 
         rt_sender
@@ -389,7 +570,7 @@ where
 #[async_trait(?Send)]
 impl<IRC, GT> GenericPendingTask for PendingTask<IRC, GT, Generator>
 where
-    IRC: ReturnChannel<T = GeneratorHandle<GT>>,
+    IRC: ReturnChannel<Output = GeneratorHandle<GT>>,
     GT: GeneratorTask,
 {
     async fn call(
@@ -399,64 +580,48 @@ where
         rt_sender: AsyncStdSender<Message>,
     ) {
         unsafe {
-            {
-                let (mut generator, handle_sender) = self.split();
+            let (mut generator, handle_sender) = self.split();
 
-                // Transmute to get static lifetimes. Should be okay because tasks can't leak
-                // Julia data and the frame is not dropped until the generator is dropped.
-                let mode = Async(std::mem::transmute(&stack.top[1]));
-                let raw = std::mem::transmute(stack.page.as_mut());
-                let mut frame = GcFrame::new(raw, GT::INIT_SLOTS, mode);
-                let global = Global::new();
+            // Transmute to get static lifetimes. Should be okay because tasks can't leak
+            // Julia data and the frame is not dropped until the generator is dropped.
+            let mode = Async(std::mem::transmute(&stack.top[1]));
+            let raw = std::mem::transmute(stack.page.as_mut());
+            let mut frame = AsyncGcFrame::new(raw, GT::INIT_SLOTS, mode);
+            let global = Global::new();
 
-                match GenericGeneratorTask::call_init(&mut generator, global, &mut frame) {
-                    Ok(init_data) => {
-                        let (sender, receiver) = if GT::CHANNEL_CAPACITY == 0 {
-                            async_std::channel::unbounded()
-                        } else {
-                            async_std::channel::bounded(GT::CHANNEL_CAPACITY)
+            match generator.call_init(global, &mut frame).await {
+                Ok(mut state) => {
+                    let (sender, receiver) = if GT::CHANNEL_CAPACITY == 0 {
+                        async_std::channel::unbounded()
+                    } else {
+                        async_std::channel::bounded(GT::CHANNEL_CAPACITY)
+                    };
+
+                    let handle = generator.create_handle(sender);
+                    handle_sender.send(Ok(handle)).await;
+
+                    loop {
+                        let mut msg = match receiver.recv().await {
+                            Ok(msg) => msg,
+                            Err(_) => break,
                         };
 
-                        let handle = GenericGeneratorTask::create_handle(&generator, sender);
-                        handle_sender.send(Ok(handle)).await;
+                        let res = generator
+                            .call_run(global, &mut frame, &mut state, msg.input())
+                            .await;
 
-                        loop {
-                            let mut msg = match receiver.recv().await {
-                                Ok(msg) => msg,
-                                Err(_) => break,
-                            };
-
-                            let data = msg.data();
-                            match GenericGeneratorTask::call_run(
-                                &mut generator,
-                                global,
-                                frame,
-                                init_data.clone(),
-                                data,
-                            )
-                            .await
-                            {
-                                (fr, Ok(res)) => {
-                                    frame = fr;
-                                    msg.send(Ok(res)).await;
-                                }
-                                (fr, Err(e)) => {
-                                    frame = fr;
-                                    msg.send(Err(e)).await;
-                                }
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        handle_sender.send(Err(e)).await;
+                        msg.respond(res).await;
                     }
                 }
+                Err(e) => {
+                    handle_sender.send(Err(e)).await;
+                }
             }
-
-            rt_sender
-                .send(Message::Complete(task_idx, stack))
-                .await
-                .expect("Channel was closed");
         }
+
+        rt_sender
+            .send(Message::Complete(task_idx, stack))
+            .await
+            .expect("Channel was closed");
     }
 }

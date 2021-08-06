@@ -309,57 +309,67 @@ mod example {
         }
     }
 
-    struct AccGeneratorTask {
-        start: usize,
+    struct AccumulatorTask {
+        init_value: f64,
     }
 
     #[async_trait(?Send)]
-    impl GeneratorTask for AccGeneratorTask {
-        type InitData = UnborrowedValue;
-        type CallData = usize;
-        type Output = usize;
+    impl GeneratorTask for AccumulatorTask {
+        type State = Value<'static, 'static>;
+        type Input = f64;
+        type Output = f64;
 
-        fn init(
-            &mut self,
-            global: Global<'static>,
-            frame: &mut GcFrame<'static, Async<'static>>,
-        ) -> JlrsResult<Self::InitData> {
+        const REGISTER_SLOTS: usize = 1;
+        const INIT_SLOTS: usize = 1;
+        const RUN_SLOTS: usize = 1;
+        const CHANNEL_CAPACITY: usize = 2;
+
+        async fn register<'frame>(
+            _global: Global<'frame>,
+            frame: &mut AsyncGcFrame<'frame>,
+        ) -> JlrsResult<()> {
             unsafe {
-                Value::eval_string(&mut *frame, "mutable struct MutUInt v::UInt end")
-                    .unwrap()
-                    .unwrap();
+                Value::eval_string(&mut *frame, "mutable struct MutFloat64 v::Float64 end")?
+                    .into_jlrs_result()?;
+            }
+            Ok(())
+        }
 
-                let init_v = frame
+        async fn init<'inner>(
+            &'inner mut self,
+            global: Global<'static>,
+            frame: &'inner mut AsyncGcFrame<'static>,
+        ) -> JlrsResult<Value<'static, 'static>> {
+            unsafe {
+                frame
                     .result_scope_with_slots(1, |output, frame| {
+                        // A nested scope is used to only root a single value in the frame provided to
+                        // init, rather than two.
                         let func = Module::main(global)
-                            .global_ref("MutUInt")
-                            .unwrap()
+                            .global_ref("MutFloat64")?
                             .value_unchecked();
-                        let init_v = Value::new(&mut *frame, self.start)?;
+                        let init_v = Value::new(&mut *frame, self.init_value)?;
 
                         let os = output.into_scope(frame);
 
                         func.call1(os, init_v)
                     })?
-                    .unwrap();
-
-                Ok(init_v.as_unborrowed())
+                    .into_jlrs_result()
             }
         }
 
-        async fn run<'nested>(
-            &mut self,
-            _global: Global<'nested>,
-            frame: &mut AsyncGcFrame<'nested>,
-            init_data: Self::InitData,
-            call_data: Self::CallData,
+        async fn run<'inner, 'frame>(
+            &'inner mut self,
+            _global: Global<'frame>,
+            frame: &'inner mut AsyncGcFrame<'frame>,
+            state: &'inner mut Self::State,
+            input: Self::Input,
         ) -> JlrsResult<Self::Output> {
-            let acc = init_data.as_value();
-            let value = acc.get_raw_field::<usize, _>("v")? + call_data;
-            let jlvalue = Value::new(&mut *frame, value)?;
+            let value = state.get_raw_field::<f64, _>("v")? + input;
+            let new_value = Value::new(&mut *frame, value)?;
 
             unsafe {
-                acc.set_field(frame, "v", jlvalue)?.into_jlrs_result()?;
+                state.set_field(frame, "v", new_value)?.into_jlrs_result()?;
             }
 
             Ok(value)
@@ -405,15 +415,23 @@ mod example {
             JULIA.with(|j| {
                 let julia = j.borrow_mut();
 
+                let (is, ir) = crossbeam_channel::bounded(1);
+                julia
+                    .try_register_generator::<AccumulatorTask, _>(is)
+                    .unwrap();
+                ir.recv().unwrap().unwrap();
+
                 let (sender, receiver) = crossbeam_channel::bounded(1);
 
-                let handle = julia.try_generator(AccGeneratorTask { start: 5 }).unwrap();
+                let handle = julia
+                    .try_generator(AccumulatorTask { init_value: 5.0 })
+                    .unwrap();
 
-                handle.try_call(7, sender.clone()).unwrap();
-                assert_eq!(receiver.recv().unwrap().unwrap(), 12);
+                handle.try_call(7.0, sender.clone()).unwrap();
+                assert_eq!(receiver.recv().unwrap().unwrap(), 12.0);
 
-                handle.try_call(12, sender).unwrap();
-                assert_eq!(receiver.recv().unwrap().unwrap(), 24);
+                handle.try_call(12.0, sender).unwrap();
+                assert_eq!(receiver.recv().unwrap().unwrap(), 24.0);
             });
         }
 

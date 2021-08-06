@@ -47,8 +47,13 @@ pub mod mode;
 pub(crate) mod output_result_ext;
 pub mod return_channel;
 
+use self::mode::Async;
+use self::return_channel::ReturnChannel;
 use crate::error::{JlrsError, JlrsResult};
-use crate::extensions::multitask::async_task::{PendingTask, Task};
+use crate::extensions::multitask::async_task::{
+    AsyncTask, Generator, GeneratorHandle, GeneratorTask, GenericPendingTask, PendingTask,
+    RegisterGenerator, RegisterTask, Task,
+};
 use crate::memory::global::Global;
 use crate::memory::stack_page::StackPage;
 use crate::wrappers::ptr::module::Module;
@@ -67,11 +72,10 @@ use jl_sys::{
     jl_atexit_hook, jl_call0, jl_eval_string, jl_init, jl_init_with_image, jl_is_initialized,
     jl_value_t, jlrs_current_task, uv_async_send,
 };
-use mode::Async;
 use std::cell::Cell;
 use std::io::{Error as IOError, ErrorKind};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicPtr, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicPtr, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread::{self, JoinHandle as ThreadHandle};
 use std::time::Duration;
@@ -82,13 +86,7 @@ use std::{
     ptr::null_mut,
 };
 
-use self::async_task::{AsyncTask, Generator, GeneratorHandle, GeneratorTask, GenericPendingTask};
-use self::return_channel::ReturnChannel;
-
 static ASYNC_CONDITION_HANDLE: AtomicPtr<c_void> = AtomicPtr::new(null_mut());
-static ASYNC_STATUS: AtomicU8 = AtomicU8::new(IN_RUST);
-const IN_RUST: u8 = 0;
-const IN_JULIA: u8 = 1;
 
 /// A handle to the async runtime. It can be used to include files and send new tasks. The
 /// runtime shuts down when the last handle is dropped.
@@ -289,7 +287,7 @@ impl AsyncJulia {
     pub async fn task<T, R>(&self, task: T, res_sender: R)
     where
         T: AsyncTask,
-        R: ReturnChannel<T = T::Output>,
+        R: ReturnChannel<Output = T::Output>,
     {
         let sender = self.sender.clone();
         let msg = PendingTask::<_, _, Task>::new(task, res_sender);
@@ -310,10 +308,61 @@ impl AsyncJulia {
     pub fn try_task<T, R>(&self, task: T, res_sender: R) -> JlrsResult<()>
     where
         T: AsyncTask,
-        R: ReturnChannel<T = T::Output>,
+        R: ReturnChannel<Output = T::Output>,
     {
         let sender = self.sender.clone();
         let msg = PendingTask::<_, _, Task>::new(task, res_sender);
+        let boxed = Box::new(msg);
+        self.sender
+            .try_send(Message::Task(boxed, sender))
+            .map(|v| {
+                unsafe {
+                    wake_julia();
+                }
+                v
+            })
+            .map_err(|e| match e {
+                TrySendError::Full(Message::Task(t, _)) => {
+                    Box::new(JlrsError::other(TrySendError::Full(t)))
+                }
+                TrySendError::Closed(Message::Task(t, _)) => {
+                    Box::new(JlrsError::other(TrySendError::Closed(t)))
+                }
+                _ => unreachable!(),
+            })
+    }
+
+    /// Register a task, this method waits if there's no room in the channel. This method takes
+    /// one argument, the sending half of a channel which is used to send the result back after
+    /// the registration has completed.
+    pub async fn register_task<T, R>(&self, res_sender: R)
+    where
+        T: AsyncTask,
+        R: ReturnChannel<Output = ()>,
+    {
+        let sender = self.sender.clone();
+        let msg = PendingTask::<_, T, RegisterTask>::new(res_sender);
+        let boxed = Box::new(msg);
+        self.sender
+            .send(Message::Task(boxed, sender))
+            .await
+            .expect("Channel was closed");
+
+        unsafe {
+            wake_julia();
+        }
+    }
+
+    /// Try to register a task, if there's no room in the channel an error is returned
+    /// immediately. This method takes one argument, the sending half of a channel which is used
+    /// to send the result back after the registration has completed.
+    pub fn try_register_task<T, R>(&self, res_sender: R) -> JlrsResult<()>
+    where
+        T: AsyncTask,
+        R: ReturnChannel<Output = ()>,
+    {
+        let sender = self.sender.clone();
+        let msg = PendingTask::<_, T, RegisterTask>::new(res_sender);
         let boxed = Box::new(msg);
         self.sender
             .try_send(Message::Task(boxed, sender))
@@ -394,6 +443,57 @@ impl AsyncJulia {
             Ok(Err(e)) => Err(e)?,
             Err(e) => Err(JlrsError::other(e))?,
         }
+    }
+
+    /// Register a generator, this method waits if there's no room in the channel. This method
+    /// takes one argument, the sending half of a channel which is used to send the result back
+    /// after the registration has completed.
+    pub async fn register_generator<T, R>(&self, res_sender: R)
+    where
+        T: GeneratorTask,
+        R: ReturnChannel<Output = ()>,
+    {
+        let sender = self.sender.clone();
+        let msg = PendingTask::<_, T, RegisterGenerator>::new(res_sender);
+        let boxed = Box::new(msg);
+        self.sender
+            .send(Message::Task(boxed, sender))
+            .await
+            .expect("Channel was closed");
+
+        unsafe {
+            wake_julia();
+        }
+    }
+
+    /// Try to register a generator, if there's no room in the channel an error is returned
+    /// immediately. This method takes one argument, the sending half of a channel which is used
+    /// to send the result back after the registration has completed.
+    pub fn try_register_generator<T, R>(&self, res_sender: R) -> JlrsResult<()>
+    where
+        T: GeneratorTask,
+        R: ReturnChannel<Output = ()>,
+    {
+        let sender = self.sender.clone();
+        let msg = PendingTask::<_, T, RegisterGenerator>::new(res_sender);
+        let boxed = Box::new(msg);
+        self.sender
+            .try_send(Message::Task(boxed, sender))
+            .map(|v| {
+                unsafe {
+                    wake_julia();
+                }
+                v
+            })
+            .map_err(|e| match e {
+                TrySendError::Full(Message::Task(t, _)) => {
+                    Box::new(JlrsError::other(TrySendError::Full(t)))
+                }
+                TrySendError::Closed(Message::Task(t, _)) => {
+                    Box::new(JlrsError::other(TrySendError::Closed(t)))
+                }
+                _ => unreachable!(),
+            })
     }
 
     /// Include a Julia file. This method waits until the call to `Main.include` in Julia has been
@@ -641,9 +741,7 @@ fn run_async(
                     Err(_) => {
                         if n_running > 0 {
                             debug_assert!(func != null_mut());
-                            ASYNC_STATUS.store(IN_JULIA, Ordering::Release);
                             jl_call0(func);
-                            ASYNC_STATUS.store(IN_RUST, Ordering::Release);
                         }
                     }
                     Ok(Ok(Message::Task(task, sender))) => {
@@ -776,9 +874,7 @@ where
                     Err(_) => {
                         if n_running > 0 {
                             debug_assert!(func != null_mut());
-                            ASYNC_STATUS.store(IN_JULIA, Ordering::Release);
                             jl_call0(func);
-                            ASYNC_STATUS.store(IN_RUST, Ordering::Release);
                         }
                     }
                     Ok(Ok(Message::Task(task, sender))) => {
@@ -990,10 +1086,8 @@ fn try_set_custom_fns(
 }
 
 pub(crate) unsafe fn wake_julia() {
-    if ASYNC_STATUS.load(Ordering::Acquire) == IN_JULIA {
-        let handle = ASYNC_CONDITION_HANDLE.load(Ordering::Acquire);
-        uv_async_send(handle.cast());
-    }
+    let handle = ASYNC_CONDITION_HANDLE.load(Ordering::Acquire);
+    uv_async_send(handle.cast());
 }
 
 fn check_threads_var() -> JlrsResult<()> {

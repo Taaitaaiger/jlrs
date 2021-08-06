@@ -2,11 +2,11 @@ use jlrs::prelude::*;
 use std::{ffi::c_void, thread, time::Duration};
 use thread::JoinHandle;
 
-// NB: This crate is called `ccall_with_threads`, so the library is called
+// This crate is called `ccall_with_threads`, so the library is called
 // `libccall_with_threads`. The functions are  annotated with `no_mangle` to prevent name mangling
 // and `extern "C"` to make them callable with the C ABI.
 
-// A pointer of type T that always implements `Send`. This is highly unsafe.
+// A pointer of type T that always implements `Send`..
 #[repr(transparent)]
 pub struct SendablePtr<T>(*mut T);
 unsafe impl<T> Send for SendablePtr<T> {}
@@ -17,7 +17,7 @@ pub unsafe extern "C" fn multithreaded(
     handle: SendablePtr<c_void>,
 ) -> *mut c_void {
     let handle = thread::spawn(move || {
-        // NB: do NOT call Julia from this thread
+        // Never call Julia from this thread!
 
         // Pretend we're doing something expensive
         thread::sleep(Duration::from_secs(1));

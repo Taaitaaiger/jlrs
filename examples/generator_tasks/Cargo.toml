@@ -1,11 +1,10 @@
 [package]
-name = "async-tasks"
+name = "generator_tasks"
 version = "0.1.0"
-authors = ["Thomas van Doornmalen <thomas.vandoornmalen@gmail.com>"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 jlrs = { path = "../../jlrs", features = ["async"] }
-async-std = { version = "1.9", features = ["unstable", "attributes"], default-features = false}
+crossbeam-channel = "0.5"

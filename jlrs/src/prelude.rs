@@ -34,10 +34,7 @@ pub use crate::extensions::multitask::{
     async_frame::AsyncGcFrame,
     async_task::{AsyncTask, GeneratorTask},
     call_async::CallAsync,
-    mode::Async,
     AsyncJulia,
 };
-#[cfg(feature = "async")]
-pub use crate::wrappers::ptr::value::UnborrowedValue;
 #[cfg(feature = "async")]
 pub use async_trait::async_trait;

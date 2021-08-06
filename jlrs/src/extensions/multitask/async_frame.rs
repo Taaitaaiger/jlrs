@@ -253,25 +253,6 @@ impl<'frame> AsyncGcFrame<'frame> {
         }
     }
 
-    pub(crate) unsafe fn new_from<'f>(
-        frame: &'frame mut GcFrame<'f, Async<'f>>,
-        capacity: usize,
-    ) -> Self {
-        let used = frame.n_slots() + 2;
-        let needed = MIN_FRAME_CAPACITY.max(capacity) + 2;
-        let raw_frame = if used + needed > frame.raw_frame.len() {
-            if frame.page.is_none() || frame.page.as_ref().unwrap().size() < needed {
-                frame.page = Some(StackPage::new(needed));
-            }
-
-            frame.page.as_mut().unwrap().as_mut()
-        } else {
-            &mut frame.raw_frame[used..]
-        };
-
-        AsyncGcFrame::new(raw_frame, capacity, frame.mode)
-    }
-
     // Safety: capacity >= n_slots
     pub(crate) unsafe fn set_n_slots(&mut self, n_slots: usize) {
         debug_assert!(n_slots <= self.capacity());

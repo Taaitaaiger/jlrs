@@ -104,6 +104,7 @@ use crate::{
         valid_layout::ValidLayout,
     },
     memory::{frame::Frame, global::Global, scope::Scope},
+    prelude::JuliaString,
     private::Private,
     wrappers::ptr::{
         array::Array,
@@ -131,6 +132,7 @@ use jl_sys::{
 use std::{
     ffi::{c_void, CStr, CString},
     marker::PhantomData,
+    path::Path,
     ptr::NonNull,
     slice, usize,
 };
@@ -1140,6 +1142,35 @@ impl Value<'_, '_> {
         };
         scope.call_result(output, Private)
     }
+
+    /// Calls `include` in the `Main` module in Julia, which evaluates the file's contents in that
+    /// module. This has the same effect as calling `include` in the Julia REPL.
+    pub unsafe fn include<'target, 'current, P, S, F>(
+        scope: S,
+        path: P,
+    ) -> JlrsResult<S::JuliaResult>
+    where
+        P: AsRef<Path>,
+        S: Scope<'target, 'current, 'static, F>,
+        F: Frame<'current>,
+    {
+        if path.as_ref().exists() {
+            return scope.result_scope(|output, frame| {
+                let global = frame.global();
+                let path_jl_str = JuliaString::new(&mut *frame, path.as_ref().to_string_lossy())?;
+                let include_func = Module::main(global)
+                    .function_ref("include")?
+                    .wrapper_unchecked();
+
+                let scope = output.into_scope(frame);
+                include_func.call1(scope, path_jl_str)
+            });
+        }
+
+        Err(JlrsError::IncludeNotFound {
+            path: path.as_ref().to_string_lossy().into(),
+        })?
+    }
 }
 
 /// # Equality
@@ -1166,12 +1197,6 @@ impl Value<'_, '_> {
     /// Call all finalizers.
     pub unsafe fn finalize(self) {
         jl_finalize(self.unwrap(Private))
-    }
-}
-
-impl<'scope> Value<'static, 'static> {
-    pub fn as_unborrowed(self) -> UnborrowedValue {
-        UnborrowedValue::new(self)
     }
 }
 
@@ -1547,20 +1572,6 @@ impl LeakedValue {
     /// Safety: you must guarantee this value has not been freed by the garbage collector. While
     /// `Symbol`s are never garbage collected, modules and their contents can be redefined.
     pub unsafe fn as_value<'scope>(self, _: Global<'scope>) -> Value<'scope, 'static> {
-        self.0
-    }
-}
-
-/// A value whose second lifetime is explicitly set to `'static`.
-#[derive(Debug, Clone, Copy)]
-pub struct UnborrowedValue(Value<'static, 'static>);
-
-impl UnborrowedValue {
-    pub(crate) fn new(value: Value<'static, 'static>) -> Self {
-        UnborrowedValue(value)
-    }
-
-    pub fn as_value(self) -> Value<'static, 'static> {
         self.0
     }
 }
