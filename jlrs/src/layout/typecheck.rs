@@ -105,7 +105,7 @@ unsafe impl<T: IntoJulia> Typecheck for *mut T {
     fn typecheck(t: DataType) -> bool {
         unsafe {
             let global = Global::new();
-            let ptr_tname = TypeName::pointer_typename(global);
+            let ptr_tname = TypeName::of_pointer(global);
 
             if t.type_name().wrapper_unchecked() != ptr_tname {
                 return false;

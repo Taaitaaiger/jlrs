@@ -170,7 +170,7 @@ where
     /// Call the generator, this method waits until there's room available in the channel.
     pub async fn call<R>(&self, input: GT::Input, sender: R)
     where
-        R: ReturnChannel<Output = GT::Output>,
+        R: ReturnChannel<Success = GT::Output>,
     {
         self.sender
             .send(Box::new(CallGeneratorMessage {
@@ -186,7 +186,7 @@ where
     /// in the channel.
     pub fn try_call<R>(&self, input: GT::Input, sender: R) -> JlrsResult<()>
     where
-        R: ReturnChannel<Output = GT::Output>,
+        R: ReturnChannel<Success = GT::Output>,
     {
         match self.sender.try_send(Box::new(CallGeneratorMessage {
             input: Some(input),
@@ -241,95 +241,18 @@ where
 impl<GT: GeneratorTask> RequireSendSync for GeneratorHandle<GT> {}
 
 // What follows is a significant amount of indirection to allow different tasks to have a
-// different Output, and allow users to provide an arbitrary sender that implements ReturnChannel.
+// different Output, and allow users to provide an arbitrary sender that implements ReturnChannel
+// to return some result.
 pub(crate) enum Task {}
 pub(crate) enum RegisterTask {}
 pub(crate) enum Generator {}
 pub(crate) enum RegisterGenerator {}
 
-pub(crate) struct PendingTask<RC, T, Kind> {
-    task: Option<T>,
-    sender: RC,
-    _kind: PhantomData<Kind>,
-}
-
-impl<RC, AT> PendingTask<RC, AT, Task>
-where
-    RC: ReturnChannel<Output = AT::Output>,
-    AT: AsyncTask,
-{
-    pub(crate) fn new(task: AT, sender: RC) -> Self {
-        PendingTask {
-            task: Some(task),
-            sender,
-            _kind: PhantomData,
-        }
-    }
-
-    pub(crate) fn split(self) -> (AT, RC) {
-        (self.task.unwrap(), self.sender)
-    }
-}
-
-impl<IRC, GT> PendingTask<IRC, GT, Generator>
-where
-    IRC: ReturnChannel<Output = GeneratorHandle<GT>>,
-    GT: GeneratorTask,
-{
-    pub(crate) fn new(task: GT, sender: IRC) -> Self {
-        PendingTask {
-            task: Some(task),
-            sender,
-            _kind: PhantomData,
-        }
-    }
-
-    pub(crate) fn split(self) -> (GT, IRC) {
-        (self.task.unwrap(), self.sender)
-    }
-}
-
-impl<RC, AT> PendingTask<RC, AT, RegisterTask>
-where
-    RC: ReturnChannel<Output = ()>,
-    AT: AsyncTask,
-{
-    pub(crate) fn new(sender: RC) -> Self {
-        PendingTask {
-            task: None,
-            sender,
-            _kind: PhantomData,
-        }
-    }
-
-    pub(crate) fn sender(self) -> RC {
-        self.sender
-    }
-}
-
-impl<RC, GT> PendingTask<RC, GT, RegisterGenerator>
-where
-    RC: ReturnChannel<Output = ()>,
-    GT: GeneratorTask,
-{
-    pub(crate) fn new(sender: RC) -> Self {
-        PendingTask {
-            task: None,
-            sender,
-            _kind: PhantomData,
-        }
-    }
-
-    pub(crate) fn sender(self) -> RC {
-        self.sender
-    }
-}
-
 struct CallGeneratorMessage<I, O, RC>
 where
     I: Send + Sync,
     O: Send + Sync,
-    RC: ReturnChannel<Output = O>,
+    RC: ReturnChannel<Success = O>,
 {
     sender: RC,
     input: Option<I>,
@@ -349,7 +272,7 @@ impl<I, O, RC> GenericCallGeneratorMessage for CallGeneratorMessage<I, O, RC>
 where
     I: Send + Sync,
     O: Send + Sync,
-    RC: ReturnChannel<Output = O>,
+    RC: ReturnChannel<Success = O>,
 {
     type Input = I;
     type Output = O;
@@ -462,6 +385,84 @@ impl<GT: GeneratorTask> GenericRegisterGeneratorTask for GT {
     type GT = Self;
 }
 
+pub(crate) struct PendingTask<RC, T, Kind> {
+    task: Option<T>,
+    sender: RC,
+    _kind: PhantomData<Kind>,
+}
+
+impl<RC, AT> PendingTask<RC, AT, Task>
+where
+    RC: ReturnChannel<Success = AT::Output>,
+    AT: AsyncTask,
+{
+    pub(crate) fn new(task: AT, sender: RC) -> Self {
+        PendingTask {
+            task: Some(task),
+            sender,
+            _kind: PhantomData,
+        }
+    }
+
+    pub(crate) fn split(self) -> (AT, RC) {
+        (self.task.unwrap(), self.sender)
+    }
+}
+
+impl<IRC, GT> PendingTask<IRC, GT, Generator>
+where
+    IRC: ReturnChannel<Success = GeneratorHandle<GT>>,
+    GT: GeneratorTask,
+{
+    pub(crate) fn new(task: GT, sender: IRC) -> Self {
+        PendingTask {
+            task: Some(task),
+            sender,
+            _kind: PhantomData,
+        }
+    }
+
+    pub(crate) fn split(self) -> (GT, IRC) {
+        (self.task.unwrap(), self.sender)
+    }
+}
+
+impl<RC, AT> PendingTask<RC, AT, RegisterTask>
+where
+    RC: ReturnChannel<Success = ()>,
+    AT: AsyncTask,
+{
+    pub(crate) fn new(sender: RC) -> Self {
+        PendingTask {
+            task: None,
+            sender,
+            _kind: PhantomData,
+        }
+    }
+
+    pub(crate) fn sender(self) -> RC {
+        self.sender
+    }
+}
+
+impl<RC, GT> PendingTask<RC, GT, RegisterGenerator>
+where
+    RC: ReturnChannel<Success = ()>,
+    GT: GeneratorTask,
+{
+    pub(crate) fn new(sender: RC) -> Self {
+        PendingTask {
+            task: None,
+            sender,
+            _kind: PhantomData,
+        }
+    }
+
+    pub(crate) fn sender(self) -> RC {
+        self.sender
+    }
+}
+
 #[async_trait(?Send)]
 pub(crate) trait GenericPendingTask: Send + Sync {
     async fn call(
@@ -475,7 +476,7 @@ pub(crate) trait GenericPendingTask: Send + Sync {
 #[async_trait(?Send)]
 impl<RC, AT> GenericPendingTask for PendingTask<RC, AT, Task>
 where
-    RC: ReturnChannel<Output = AT::Output>,
+    RC: ReturnChannel<Success = AT::Output>,
     AT: AsyncTask,
 {
     async fn call(
@@ -508,7 +509,7 @@ where
 #[async_trait(?Send)]
 impl<RC, AT> GenericPendingTask for PendingTask<RC, AT, RegisterTask>
 where
-    RC: ReturnChannel<Output = ()>,
+    RC: ReturnChannel<Success = ()>,
     AT: AsyncTask,
 {
     async fn call(
@@ -539,7 +540,7 @@ where
 #[async_trait(?Send)]
 impl<RC, GT> GenericPendingTask for PendingTask<RC, GT, RegisterGenerator>
 where
-    RC: ReturnChannel<Output = ()>,
+    RC: ReturnChannel<Success = ()>,
     GT: GeneratorTask,
 {
     async fn call(
@@ -570,7 +571,7 @@ where
 #[async_trait(?Send)]
 impl<IRC, GT> GenericPendingTask for PendingTask<IRC, GT, Generator>
 where
-    IRC: ReturnChannel<Output = GeneratorHandle<GT>>,
+    IRC: ReturnChannel<Success = GeneratorHandle<GT>>,
     GT: GeneratorTask,
 {
     async fn call(

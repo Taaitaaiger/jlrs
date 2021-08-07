@@ -29,6 +29,7 @@ pub mod method_instance;
 pub mod method_match;
 pub mod method_table;
 pub mod module;
+pub mod opaque_closure;
 pub mod simple_vector;
 pub mod string;
 pub mod symbol;
@@ -40,6 +41,7 @@ pub mod typemap_level;
 pub mod union;
 pub mod union_all;
 pub mod value;
+pub mod vararg;
 pub mod weak_ref;
 
 use self::{

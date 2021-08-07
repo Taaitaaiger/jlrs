@@ -10,8 +10,9 @@ use crate::wrappers::ptr::{MethodTableRef, ModuleRef, SimpleVectorRef, ValueRef}
 use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout};
 use crate::{memory::global::Global, private::Private};
 use jl_sys::{
-    jl_array_typename, jl_llvmpointer_typename, jl_namedtuple_typename, jl_pointer_typename,
-    jl_tuple_typename, jl_type_typename, jl_typename_t, jl_typename_type, jl_vecelement_typename,
+    jl_array_typename, jl_llvmpointer_typename, jl_namedtuple_typename, jl_opaque_closure_typename,
+    jl_pointer_typename, jl_tuple_typename, jl_type_typename, jl_typename_t, jl_typename_type,
+    jl_vecelement_typename,
 };
 use std::{marker::PhantomData, ptr::NonNull};
 
@@ -96,37 +97,42 @@ impl<'scope> TypeName<'scope> {
 
 impl<'base> TypeName<'base> {
     /// The typename of the `UnionAll` `VecElement`.
-    pub fn vecelement_typename(_: Global<'base>) -> Self {
+    pub fn of_vecelement(_: Global<'base>) -> Self {
         unsafe { Self::wrap(jl_vecelement_typename, Private) }
     }
 
     /// The typename of the `UnionAll` `Array`.
-    pub fn array_typename(_: Global<'base>) -> Self {
+    pub fn of_array(_: Global<'base>) -> Self {
         unsafe { Self::wrap(jl_array_typename, Private) }
     }
 
     /// The typename of the `UnionAll` `Ptr`.
-    pub fn pointer_typename(_: Global<'base>) -> Self {
+    pub fn of_opaque_closure(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_opaque_closure_typename, Private) }
+    }
+
+    /// The typename of the `UnionAll` `Ptr`.
+    pub fn of_pointer(_: Global<'base>) -> Self {
         unsafe { Self::wrap(jl_pointer_typename, Private) }
     }
 
     /// The typename of the `UnionAll` `LLVMPtr`.
-    pub fn llvmpointer_typename(_: Global<'base>) -> Self {
+    pub fn of_llvmpointer(_: Global<'base>) -> Self {
         unsafe { Self::wrap(jl_llvmpointer_typename, Private) }
     }
 
     /// The typename of the `UnionAll` `NamedTuple`.
-    pub fn namedtuple_typename(_: Global<'base>) -> Self {
+    pub fn of_namedtuple(_: Global<'base>) -> Self {
         unsafe { Self::wrap(jl_namedtuple_typename, Private) }
     }
 
     /// The typename of the `UnionAll` `Type`.
-    pub fn type_typename(_: Global<'base>) -> Self {
+    pub fn of_type(_: Global<'base>) -> Self {
         unsafe { Self::wrap(jl_type_typename, Private) }
     }
 
     /// The typename of the `DataType` `Tuple`.
-    pub fn tuple_typename(_: Global<'base>) -> Self {
+    pub fn of_tuple(_: Global<'base>) -> Self {
         unsafe { Self::wrap(jl_tuple_typename, Private) }
     }
 }

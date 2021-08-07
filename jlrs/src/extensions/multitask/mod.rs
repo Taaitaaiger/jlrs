@@ -128,11 +128,7 @@ impl AsyncJulia {
     ) -> JlrsResult<(Self, ThreadHandle<JlrsResult<()>>)> {
         check_threads_var()?;
 
-        let (sender, receiver) = if channel_capacity == 0 {
-            unbounded()
-        } else {
-            bounded(channel_capacity)
-        };
+        let (sender, receiver) = channel(channel_capacity);
         let julia = AsyncJulia { sender };
         let handle = thread::spawn(move || run_async(max_n_tasks, recv_timeout_ms, receiver));
         julia.try_set_custom_fns()?;
@@ -159,12 +155,7 @@ impl AsyncJulia {
     ) -> JlrsResult<(Self, AsyncStdHandle<JlrsResult<()>>)> {
         check_threads_var()?;
 
-        let (sender, receiver) = if channel_capacity == 0 {
-            unbounded()
-        } else {
-            bounded(channel_capacity)
-        };
-
+        let (sender, receiver) = channel(channel_capacity);
         let julia = AsyncJulia { sender };
         let handle =
             task::spawn_blocking(move || run_async(max_n_tasks, recv_timeout_ms, receiver));
@@ -207,11 +198,7 @@ impl AsyncJulia {
     {
         check_threads_var()?;
 
-        let (sender, receiver) = if channel_capacity == 0 {
-            unbounded()
-        } else {
-            bounded(channel_capacity)
-        };
+        let (sender, receiver) = channel(channel_capacity);
         let julia = AsyncJulia { sender };
         let handle = thread::spawn(move || {
             run_async_with_image(
@@ -261,11 +248,7 @@ impl AsyncJulia {
     {
         check_threads_var()?;
 
-        let (sender, receiver) = if channel_capacity == 0 {
-            unbounded()
-        } else {
-            bounded(channel_capacity)
-        };
+        let (sender, receiver) = channel(channel_capacity);
         let julia = AsyncJulia { sender };
         let handle = task::spawn_blocking(move || {
             run_async_with_image(
@@ -284,10 +267,10 @@ impl AsyncJulia {
     /// Send a new task to the runtime, this method waits if there's no room in the channel. This
     /// method takes two arguments, the task and the sending half of a channel which is used to
     /// send the result back after the task has completed.
-    pub async fn task<T, R>(&self, task: T, res_sender: R)
+    pub async fn task<AT, R>(&self, task: AT, res_sender: R)
     where
-        T: AsyncTask,
-        R: ReturnChannel<Output = T::Output>,
+        AT: AsyncTask,
+        R: ReturnChannel<Success = AT::Output>,
     {
         let sender = self.sender.clone();
         let msg = PendingTask::<_, _, Task>::new(task, res_sender);
@@ -305,43 +288,33 @@ impl AsyncJulia {
     /// Try to send a new task to the runtime, if there's no room in the channel an error is
     /// returned immediately. This method takes two arguments, the task and the sending half of a
     /// channel which is used to send the result back after the task has completed.
-    pub fn try_task<T, R>(&self, task: T, res_sender: R) -> JlrsResult<()>
+    pub fn try_task<AT, R>(&self, task: AT, res_sender: R) -> JlrsResult<()>
     where
-        T: AsyncTask,
-        R: ReturnChannel<Output = T::Output>,
+        AT: AsyncTask,
+        R: ReturnChannel<Success = AT::Output>,
     {
         let sender = self.sender.clone();
         let msg = PendingTask::<_, _, Task>::new(task, res_sender);
         let boxed = Box::new(msg);
-        self.sender
-            .try_send(Message::Task(boxed, sender))
-            .map(|v| {
-                unsafe {
-                    wake_julia();
-                }
-                v
-            })
-            .map_err(|e| match e {
-                TrySendError::Full(Message::Task(t, _)) => {
-                    Box::new(JlrsError::other(TrySendError::Full(t)))
-                }
-                TrySendError::Closed(Message::Task(t, _)) => {
-                    Box::new(JlrsError::other(TrySendError::Closed(t)))
-                }
-                _ => unreachable!(),
-            })
+        match self.sender.try_send(Message::Task(boxed, sender)) {
+            Ok(_) => unsafe { wake_julia() },
+            Err(TrySendError::Full(_)) => Err(Box::new(JlrsError::other(TrySendError::Full(()))))?,
+            Err(_) => Err(Box::new(JlrsError::other(TrySendError::Closed(()))))?,
+        }
+
+        Ok(())
     }
 
     /// Register a task, this method waits if there's no room in the channel. This method takes
     /// one argument, the sending half of a channel which is used to send the result back after
     /// the registration has completed.
-    pub async fn register_task<T, R>(&self, res_sender: R)
+    pub async fn register_task<AT, R>(&self, res_sender: R)
     where
-        T: AsyncTask,
-        R: ReturnChannel<Output = ()>,
+        AT: AsyncTask,
+        R: ReturnChannel<Success = ()>,
     {
         let sender = self.sender.clone();
-        let msg = PendingTask::<_, T, RegisterTask>::new(res_sender);
+        let msg = PendingTask::<_, AT, RegisterTask>::new(res_sender);
         let boxed = Box::new(msg);
         self.sender
             .send(Message::Task(boxed, sender))
@@ -356,40 +329,30 @@ impl AsyncJulia {
     /// Try to register a task, if there's no room in the channel an error is returned
     /// immediately. This method takes one argument, the sending half of a channel which is used
     /// to send the result back after the registration has completed.
-    pub fn try_register_task<T, R>(&self, res_sender: R) -> JlrsResult<()>
+    pub fn try_register_task<AT, R>(&self, res_sender: R) -> JlrsResult<()>
     where
-        T: AsyncTask,
-        R: ReturnChannel<Output = ()>,
+        AT: AsyncTask,
+        R: ReturnChannel<Success = ()>,
     {
         let sender = self.sender.clone();
-        let msg = PendingTask::<_, T, RegisterTask>::new(res_sender);
+        let msg = PendingTask::<_, AT, RegisterTask>::new(res_sender);
         let boxed = Box::new(msg);
-        self.sender
-            .try_send(Message::Task(boxed, sender))
-            .map(|v| {
-                unsafe {
-                    wake_julia();
-                }
-                v
-            })
-            .map_err(|e| match e {
-                TrySendError::Full(Message::Task(t, _)) => {
-                    Box::new(JlrsError::other(TrySendError::Full(t)))
-                }
-                TrySendError::Closed(Message::Task(t, _)) => {
-                    Box::new(JlrsError::other(TrySendError::Closed(t)))
-                }
-                _ => unreachable!(),
-            })
+        match self.sender.try_send(Message::Task(boxed, sender)) {
+            Ok(_) => unsafe { wake_julia() },
+            Err(TrySendError::Full(_)) => Err(Box::new(JlrsError::other(TrySendError::Full(()))))?,
+            Err(_) => Err(Box::new(JlrsError::other(TrySendError::Closed(()))))?,
+        }
+
+        Ok(())
     }
 
     /// Send a new generator to the runtime, this method waits if there's no room in the channel.
     /// This method takes a single argument, the generator. It returns after
     /// [`GeneratorTask::init`] has been called, a [`GeneratorHandle`] to the generator is
     /// returned if this method completes successfully, and the error if it doesn't.
-    pub async fn generator<T>(&self, task: T) -> JlrsResult<GeneratorHandle<T>>
+    pub async fn generator<GT>(&self, task: GT) -> JlrsResult<GeneratorHandle<GT>>
     where
-        T: GeneratorTask,
+        GT: GeneratorTask,
     {
         let rt_sender = self.sender.clone();
         let (init_sender, init_recv) = async_std::channel::bounded(1);
@@ -416,26 +379,18 @@ impl AsyncJulia {
     /// returned immediately. This method takes a single argument, the generator. It returns after
     /// [`GeneratorTask::init`] has been called, a [`GeneratorHandle`] to the generator is
     /// returned if this method completes successfully, and the error if it doesn't.
-    pub fn try_generator<T>(&self, task: T) -> JlrsResult<GeneratorHandle<T>>
+    pub fn try_generator<GT>(&self, task: GT) -> JlrsResult<GeneratorHandle<GT>>
     where
-        T: GeneratorTask,
+        GT: GeneratorTask,
     {
-        let rt_sender = self.sender.clone();
+        let sender = self.sender.clone();
         let (init_sender, init_recv) = crossbeam_channel::bounded(1);
         let msg = PendingTask::<_, _, Generator>::new(task, init_sender);
         let boxed = Box::new(msg);
-
-        match self.sender.try_send(Message::Task(boxed, rt_sender)) {
+        match self.sender.try_send(Message::Task(boxed, sender)) {
             Ok(_) => unsafe { wake_julia() },
-            Err(e) => match e {
-                TrySendError::Full(Message::Task(t, _)) => {
-                    Err(JlrsError::other(TrySendError::Full(t)))?;
-                }
-                TrySendError::Closed(Message::Task(t, _)) => {
-                    Err(JlrsError::other(TrySendError::Closed(t)))?;
-                }
-                _ => unreachable!(),
-            },
+            Err(TrySendError::Full(_)) => Err(Box::new(JlrsError::other(TrySendError::Full(()))))?,
+            Err(_) => Err(Box::new(JlrsError::other(TrySendError::Closed(()))))?,
         }
 
         match init_recv.recv() {
@@ -448,13 +403,13 @@ impl AsyncJulia {
     /// Register a generator, this method waits if there's no room in the channel. This method
     /// takes one argument, the sending half of a channel which is used to send the result back
     /// after the registration has completed.
-    pub async fn register_generator<T, R>(&self, res_sender: R)
+    pub async fn register_generator<GT, R>(&self, res_sender: R)
     where
-        T: GeneratorTask,
-        R: ReturnChannel<Output = ()>,
+        GT: GeneratorTask,
+        R: ReturnChannel<Success = ()>,
     {
         let sender = self.sender.clone();
-        let msg = PendingTask::<_, T, RegisterGenerator>::new(res_sender);
+        let msg = PendingTask::<_, GT, RegisterGenerator>::new(res_sender);
         let boxed = Box::new(msg);
         self.sender
             .send(Message::Task(boxed, sender))
@@ -469,31 +424,21 @@ impl AsyncJulia {
     /// Try to register a generator, if there's no room in the channel an error is returned
     /// immediately. This method takes one argument, the sending half of a channel which is used
     /// to send the result back after the registration has completed.
-    pub fn try_register_generator<T, R>(&self, res_sender: R) -> JlrsResult<()>
+    pub fn try_register_generator<GT, R>(&self, res_sender: R) -> JlrsResult<()>
     where
-        T: GeneratorTask,
-        R: ReturnChannel<Output = ()>,
+        GT: GeneratorTask,
+        R: ReturnChannel<Success = ()>,
     {
         let sender = self.sender.clone();
-        let msg = PendingTask::<_, T, RegisterGenerator>::new(res_sender);
+        let msg = PendingTask::<_, GT, RegisterGenerator>::new(res_sender);
         let boxed = Box::new(msg);
-        self.sender
-            .try_send(Message::Task(boxed, sender))
-            .map(|v| {
-                unsafe {
-                    wake_julia();
-                }
-                v
-            })
-            .map_err(|e| match e {
-                TrySendError::Full(Message::Task(t, _)) => {
-                    Box::new(JlrsError::other(TrySendError::Full(t)))
-                }
-                TrySendError::Closed(Message::Task(t, _)) => {
-                    Box::new(JlrsError::other(TrySendError::Closed(t)))
-                }
-                _ => unreachable!(),
-            })
+        match self.sender.try_send(Message::Task(boxed, sender)) {
+            Ok(_) => unsafe { wake_julia() },
+            Err(TrySendError::Full(_)) => Err(Box::new(JlrsError::other(TrySendError::Full(()))))?,
+            Err(_) => Err(Box::new(JlrsError::other(TrySendError::Closed(()))))?,
+        }
+
+        Ok(())
     }
 
     /// Include a Julia file. This method waits until the call to `Main.include` in Julia has been
@@ -626,6 +571,14 @@ impl AsyncJulia {
 
             (&mut *completed).as_jlrs_result()
         }
+    }
+}
+
+fn channel(channel_capacity: usize) -> (AsyncStdSender<Message>, AsyncStdReceiver<Message>) {
+    if channel_capacity == 0 {
+        unbounded()
+    } else {
+        bounded(channel_capacity)
     }
 }
 
@@ -795,6 +748,11 @@ fn run_async(
                 }
             }
 
+            debug_assert!(
+                pending_tasks.len() == 0,
+                "Tasks are still active but the runtime is shutting down"
+            );
+
             jl_atexit_hook(0);
         }
 
@@ -870,6 +828,7 @@ where
                 } else {
                     u64::MAX
                 };
+
                 match timeout(Duration::from_millis(wait_time), receiver.recv()).await {
                     Err(_) => {
                         if n_running > 0 {
@@ -927,6 +886,11 @@ where
                     handle.await;
                 }
             }
+
+            debug_assert!(
+                pending_tasks.len() == 0,
+                "Tasks are still active but the runtime is shutting down"
+            );
 
             jl_atexit_hook(0);
         }
@@ -999,49 +963,51 @@ fn try_include(
 }
 
 fn call_set_custom_fns(stack: &mut AsyncStackPage) -> JlrsResult<*mut jl_value_t> {
-    let waiter = unsafe {
+    unsafe {
         let global = Global::new();
         let mode = Async(&stack.top[1]);
         let raw = stack.page.as_mut();
         let mut frame = GcFrame::new(raw, 2, mode);
 
-        let waker = Value::new(&mut frame, julia_future::wake_task as *mut c_void)?;
         let jlrs_mod = Module::main(global)
             .submodule_ref("Jlrs")?
             .wrapper_unchecked();
 
+        let wake_rust = Value::new(&mut frame, julia_future::wake_task as *mut c_void)?;
         jlrs_mod
             .global_ref("wakerust")?
             .wrapper_unchecked()
-            .set_nth_field_unchecked(0, waker);
+            .set_nth_field_unchecked(0, wake_rust);
 
-        let dropper = Value::new(&mut frame, crate::droparray as *mut c_void)?;
+        let drop_array = Value::new(&mut frame, crate::droparray as *mut c_void)?;
         jlrs_mod
             .global_ref("droparray")?
             .wrapper_unchecked()
-            .set_nth_field_unchecked(0, dropper);
+            .set_nth_field_unchecked(0, drop_array);
 
-        let async_cond_handle = jlrs_mod
+        let async_condition_handle = jlrs_mod
             .global_ref("condition")?
             .value_unchecked()
             .get_raw_field_unchecked::<*mut c_void, _>("handle");
 
-        ASYNC_CONDITION_HANDLE.store(async_cond_handle, Ordering::Release);
+        ASYNC_CONDITION_HANDLE.store(async_condition_handle, Ordering::Release);
 
-        jlrs_mod
+        let wait_func = jlrs_mod
             .global_ref("awaitcondition")?
             .value_unchecked()
             .data_ptr()
-    };
+            .as_ptr()
+            .cast();
 
-    Ok(waiter.as_ptr().cast())
+        Ok(wait_func)
+    }
 }
 
 async fn set_custom_fns(
     stack: &mut AsyncStackPage,
     completed: Arc<(AsyncStdMutex<Status>, AsyncStdCondvar)>,
 ) -> Option<*mut jl_value_t> {
-    let res = match call_set_custom_fns(stack) {
+    match call_set_custom_fns(stack) {
         Ok(v) => {
             let (lock, condvar) = &*completed;
             let mut completed = lock.lock().await;
@@ -1056,16 +1022,14 @@ async fn set_custom_fns(
             condvar.notify_one();
             None
         }
-    };
-
-    res
+    }
 }
 
 fn try_set_custom_fns(
     stack: &mut AsyncStackPage,
     completed: Arc<(Mutex<Status>, Condvar)>,
 ) -> Option<*mut jl_value_t> {
-    let res = match call_set_custom_fns(stack) {
+    match call_set_custom_fns(stack) {
         Ok(v) => {
             let (lock, condvar) = &*completed;
             let mut completed = lock.lock().expect("Cannot lock");
@@ -1080,9 +1044,7 @@ fn try_set_custom_fns(
             condvar.notify_one();
             None
         }
-    };
-
-    res
+    }
 }
 
 pub(crate) unsafe fn wake_julia() {

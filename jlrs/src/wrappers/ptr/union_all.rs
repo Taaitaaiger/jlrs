@@ -14,9 +14,9 @@ use crate::{memory::global::Global, private::Private};
 
 use jl_sys::{
     jl_abstractarray_type, jl_anytuple_type_type, jl_array_type, jl_densearray_type,
-    jl_llvmpointer_type, jl_namedtuple_type, jl_pointer_type, jl_ref_type, jl_type_type,
-    jl_type_unionall, jl_unionall_t, jl_unionall_type, jlrs_result_tag_t_JLRS_RESULT_ERR,
-    jlrs_type_unionall,
+    jl_llvmpointer_type, jl_namedtuple_type, jl_opaque_closure_type, jl_pointer_type, jl_ref_type,
+    jl_type_type, jl_type_unionall, jl_unionall_t, jl_unionall_type,
+    jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_type_unionall,
 };
 use std::{marker::PhantomData, ptr::NonNull};
 
@@ -156,6 +156,11 @@ impl<'base> UnionAll<'base> {
     /// The `UnionAll` `Array`.
     pub fn array_type(_: Global<'base>) -> Self {
         unsafe { UnionAll::wrap(jl_array_type, Private) }
+    }
+
+    /// The `UnionAll` `OpaqueClosure`.
+    pub fn opaque_closure(_: Global<'base>) -> Self {
+        unsafe { UnionAll::wrap(jl_opaque_closure_type, Private) }
     }
 
     /// The `UnionAll` `Ptr`.

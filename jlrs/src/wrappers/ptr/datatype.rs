@@ -31,7 +31,7 @@ use jl_sys::{
     jl_typedslot_type, jl_typeerror_type, jl_typemap_entry_type, jl_typemap_level_type,
     jl_typename_str, jl_typename_type, jl_typeofbottom_type, jl_uint16_type, jl_uint32_type,
     jl_uint64_type, jl_uint8_type, jl_undefvarerror_type, jl_unionall_type, jl_uniontype_type,
-    jl_upsilonnode_type, jl_voidpointer_type, jl_weakref_type, jlrs_new_structv,
+    jl_upsilonnode_type, jl_vararg_type, jl_voidpointer_type, jl_weakref_type, jlrs_new_structv,
     jlrs_result_tag_t_JLRS_RESULT_ERR,
 };
 use std::{ffi::CStr, marker::PhantomData, ptr::NonNull};
@@ -442,6 +442,11 @@ impl<'base> DataType<'base> {
     /// The type of an empty tuple.
     pub fn emptytuple_type(_: Global<'base>) -> Self {
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_emptytuple_type), Private) }
+    }
+
+    /// The type of a `Vararg` like `Vararg{Int}` or `Vararg{Int, 4}.
+    pub fn vararg_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_vararg_type), Private) }
     }
 
     /// The type `Function`.
