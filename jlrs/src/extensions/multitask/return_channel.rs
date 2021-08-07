@@ -15,31 +15,31 @@ use crossbeam_channel::Sender as CrossbeamSender;
 #[async_trait(?Send)]
 pub trait ReturnChannel: 'static + Send + Sync + Sized {
     /// The type of data that is sent if the result was computed successfully.
-    type Success: 'static + Send;
+    type Ok: 'static + Send;
 
     /// Send the result.
-    async fn send(&self, response: JlrsResult<Self::Success>);
+    async fn send(&self, response: JlrsResult<Self::Ok>);
 }
 
 #[async_trait(?Send)]
 impl<T: 'static + Send> ReturnChannel for AsyncStdSender<JlrsResult<T>> {
-    type Success = T;
-    async fn send(&self, response: JlrsResult<Self::Success>) {
+    type Ok = T;
+    async fn send(&self, response: JlrsResult<Self::Ok>) {
         self.send(response).await.ok();
     }
 }
 
 #[async_trait(?Send)]
 impl<T: 'static + Send> ReturnChannel for CrossbeamSender<JlrsResult<T>> {
-    type Success = T;
+    type Ok = T;
 
-    async fn send(&self, response: JlrsResult<Self::Success>) {
+    async fn send(&self, response: JlrsResult<Self::Ok>) {
         self.send(response).ok();
     }
 }
 
 #[async_trait(?Send)]
 impl ReturnChannel for () {
-    type Success = ();
+    type Ok = ();
     async fn send(&self, _: JlrsResult<()>) {}
 }

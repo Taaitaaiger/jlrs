@@ -270,7 +270,7 @@ impl AsyncJulia {
     pub async fn task<AT, R>(&self, task: AT, res_sender: R)
     where
         AT: AsyncTask,
-        R: ReturnChannel<Success = AT::Output>,
+        R: ReturnChannel<Ok = AT::Output>,
     {
         let sender = self.sender.clone();
         let msg = PendingTask::<_, _, Task>::new(task, res_sender);
@@ -291,7 +291,7 @@ impl AsyncJulia {
     pub fn try_task<AT, R>(&self, task: AT, res_sender: R) -> JlrsResult<()>
     where
         AT: AsyncTask,
-        R: ReturnChannel<Success = AT::Output>,
+        R: ReturnChannel<Ok = AT::Output>,
     {
         let sender = self.sender.clone();
         let msg = PendingTask::<_, _, Task>::new(task, res_sender);
@@ -311,7 +311,7 @@ impl AsyncJulia {
     pub async fn register_task<AT, R>(&self, res_sender: R)
     where
         AT: AsyncTask,
-        R: ReturnChannel<Success = ()>,
+        R: ReturnChannel<Ok = ()>,
     {
         let sender = self.sender.clone();
         let msg = PendingTask::<_, AT, RegisterTask>::new(res_sender);
@@ -332,7 +332,7 @@ impl AsyncJulia {
     pub fn try_register_task<AT, R>(&self, res_sender: R) -> JlrsResult<()>
     where
         AT: AsyncTask,
-        R: ReturnChannel<Success = ()>,
+        R: ReturnChannel<Ok = ()>,
     {
         let sender = self.sender.clone();
         let msg = PendingTask::<_, AT, RegisterTask>::new(res_sender);
@@ -406,7 +406,7 @@ impl AsyncJulia {
     pub async fn register_generator<GT, R>(&self, res_sender: R)
     where
         GT: GeneratorTask,
-        R: ReturnChannel<Success = ()>,
+        R: ReturnChannel<Ok = ()>,
     {
         let sender = self.sender.clone();
         let msg = PendingTask::<_, GT, RegisterGenerator>::new(res_sender);
@@ -427,7 +427,7 @@ impl AsyncJulia {
     pub fn try_register_generator<GT, R>(&self, res_sender: R) -> JlrsResult<()>
     where
         GT: GeneratorTask,
-        R: ReturnChannel<Success = ()>,
+        R: ReturnChannel<Ok = ()>,
     {
         let sender = self.sender.clone();
         let msg = PendingTask::<_, GT, RegisterGenerator>::new(res_sender);

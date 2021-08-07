@@ -170,7 +170,7 @@ where
     /// Call the generator, this method waits until there's room available in the channel.
     pub async fn call<R>(&self, input: GT::Input, sender: R)
     where
-        R: ReturnChannel<Success = GT::Output>,
+        R: ReturnChannel<Ok = GT::Output>,
     {
         self.sender
             .send(Box::new(CallGeneratorMessage {
@@ -186,7 +186,7 @@ where
     /// in the channel.
     pub fn try_call<R>(&self, input: GT::Input, sender: R) -> JlrsResult<()>
     where
-        R: ReturnChannel<Success = GT::Output>,
+        R: ReturnChannel<Ok = GT::Output>,
     {
         match self.sender.try_send(Box::new(CallGeneratorMessage {
             input: Some(input),
@@ -252,7 +252,7 @@ struct CallGeneratorMessage<I, O, RC>
 where
     I: Send + Sync,
     O: Send + Sync,
-    RC: ReturnChannel<Success = O>,
+    RC: ReturnChannel<Ok = O>,
 {
     sender: RC,
     input: Option<I>,
@@ -272,7 +272,7 @@ impl<I, O, RC> GenericCallGeneratorMessage for CallGeneratorMessage<I, O, RC>
 where
     I: Send + Sync,
     O: Send + Sync,
-    RC: ReturnChannel<Success = O>,
+    RC: ReturnChannel<Ok = O>,
 {
     type Input = I;
     type Output = O;
@@ -393,7 +393,7 @@ pub(crate) struct PendingTask<RC, T, Kind> {
 
 impl<RC, AT> PendingTask<RC, AT, Task>
 where
-    RC: ReturnChannel<Success = AT::Output>,
+    RC: ReturnChannel<Ok = AT::Output>,
     AT: AsyncTask,
 {
     pub(crate) fn new(task: AT, sender: RC) -> Self {
@@ -411,7 +411,7 @@ where
 
 impl<IRC, GT> PendingTask<IRC, GT, Generator>
 where
-    IRC: ReturnChannel<Success = GeneratorHandle<GT>>,
+    IRC: ReturnChannel<Ok = GeneratorHandle<GT>>,
     GT: GeneratorTask,
 {
     pub(crate) fn new(task: GT, sender: IRC) -> Self {
@@ -429,7 +429,7 @@ where
 
 impl<RC, AT> PendingTask<RC, AT, RegisterTask>
 where
-    RC: ReturnChannel<Success = ()>,
+    RC: ReturnChannel<Ok = ()>,
     AT: AsyncTask,
 {
     pub(crate) fn new(sender: RC) -> Self {
@@ -447,7 +447,7 @@ where
 
 impl<RC, GT> PendingTask<RC, GT, RegisterGenerator>
 where
-    RC: ReturnChannel<Success = ()>,
+    RC: ReturnChannel<Ok = ()>,
     GT: GeneratorTask,
 {
     pub(crate) fn new(sender: RC) -> Self {
@@ -476,7 +476,7 @@ pub(crate) trait GenericPendingTask: Send + Sync {
 #[async_trait(?Send)]
 impl<RC, AT> GenericPendingTask for PendingTask<RC, AT, Task>
 where
-    RC: ReturnChannel<Success = AT::Output>,
+    RC: ReturnChannel<Ok = AT::Output>,
     AT: AsyncTask,
 {
     async fn call(
@@ -509,7 +509,7 @@ where
 #[async_trait(?Send)]
 impl<RC, AT> GenericPendingTask for PendingTask<RC, AT, RegisterTask>
 where
-    RC: ReturnChannel<Success = ()>,
+    RC: ReturnChannel<Ok = ()>,
     AT: AsyncTask,
 {
     async fn call(
@@ -540,7 +540,7 @@ where
 #[async_trait(?Send)]
 impl<RC, GT> GenericPendingTask for PendingTask<RC, GT, RegisterGenerator>
 where
-    RC: ReturnChannel<Success = ()>,
+    RC: ReturnChannel<Ok = ()>,
     GT: GeneratorTask,
 {
     async fn call(
@@ -571,7 +571,7 @@ where
 #[async_trait(?Send)]
 impl<IRC, GT> GenericPendingTask for PendingTask<IRC, GT, Generator>
 where
-    IRC: ReturnChannel<Success = GeneratorHandle<GT>>,
+    IRC: ReturnChannel<Ok = GeneratorHandle<GT>>,
     GT: GeneratorTask,
 {
     async fn call(
