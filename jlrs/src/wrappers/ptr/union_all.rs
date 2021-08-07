@@ -143,6 +143,11 @@ impl<'base> UnionAll<'base> {
         unsafe { UnionAll::wrap(jl_anytuple_type_type, Private) }
     }
 
+    /// The `UnionAll` `OpaqueClosure`.
+    pub fn opaque_closure(_: Global<'base>) -> Self {
+        unsafe { UnionAll::wrap(jl_opaque_closure_type, Private) }
+    }
+
     /// The `UnionAll` `AbstractArray`.
     pub fn abstractarray_type(_: Global<'base>) -> Self {
         unsafe { UnionAll::wrap(jl_abstractarray_type, Private) }
@@ -156,11 +161,6 @@ impl<'base> UnionAll<'base> {
     /// The `UnionAll` `Array`.
     pub fn array_type(_: Global<'base>) -> Self {
         unsafe { UnionAll::wrap(jl_array_type, Private) }
-    }
-
-    /// The `UnionAll` `OpaqueClosure`.
-    pub fn opaque_closure(_: Global<'base>) -> Self {
-        unsafe { UnionAll::wrap(jl_opaque_closure_type, Private) }
     }
 
     /// The `UnionAll` `Ptr`.

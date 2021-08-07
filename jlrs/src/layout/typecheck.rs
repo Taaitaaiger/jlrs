@@ -21,16 +21,19 @@
 //! [`ValidLayout`]: crate::layout::valid_layout::ValidLayout
 use jl_sys::{
     jl_code_info_type, jl_datatype_type, jl_globalref_type, jl_gotonode_type, jl_intrinsic_type,
-    jl_is_cpointer_type, jl_linenumbernode_type, jl_namedtuple_typename, jl_newvarnode_type,
-    jl_nothing_type, jl_phicnode_type, jl_phinode_type, jl_pinode_type, jl_quotenode_type,
-    jl_slotnumber_type, jl_string_type, jl_typedslot_type, jl_upsilonnode_type,
+    jl_linenumbernode_type, jl_namedtuple_typename, jl_newvarnode_type, jl_nothing_type,
+    jl_phicnode_type, jl_phinode_type, jl_pinode_type, jl_quotenode_type, jl_slotnumber_type,
+    jl_string_type, jl_typedslot_type, jl_upsilonnode_type,
 };
 
 use crate::{
     convert::into_julia::IntoJulia,
     memory::global::Global,
+    prelude::Wrapper,
     private::Private,
-    wrappers::ptr::{datatype::DataType, private::Wrapper as _, type_name::TypeName},
+    wrappers::ptr::{
+        datatype::DataType, private::Wrapper as _, type_name::TypeName, union_all::UnionAll,
+    },
 };
 use std::ffi::c_void;
 
@@ -127,9 +130,88 @@ unsafe impl<T: IntoJulia> Typecheck for *mut T {
 }
 
 /// A typecheck that can be used in combination with `DataType::is`. This method returns true if
+/// the `DataType` (or the `DataType` of the `Value`) is a kind, i.e. its the type of a
+/// `DataType`, a `UnionAll`, a `Union` or a `Union{}`.
+pub struct Type;
+unsafe impl Typecheck for Type {
+    fn typecheck(t: DataType) -> bool {
+        t.as_value().is_kind()
+    }
+}
+
+/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
+/// the `DataType` (or the `DataType` of the `Value`) is a bits type.
+pub struct Bits;
+unsafe impl Typecheck for Bits {
+    fn typecheck(t: DataType) -> bool {
+        t.is_bits()
+    }
+}
+
+/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
+/// the `DataType` is abstract. If it's invoked through `Value::is` it will always return false.
+pub struct Abstract;
+unsafe impl Typecheck for Abstract {
+    fn typecheck(t: DataType) -> bool {
+        t.is_abstract()
+    }
+}
+
+/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
+/// the value is a `Ref`.
+pub struct AbstractRef;
+unsafe impl Typecheck for AbstractRef {
+    fn typecheck(t: DataType) -> bool {
+        unsafe {
+            t.type_name().wrapper_unchecked()
+                == UnionAll::ref_type(Global::new())
+                    .body()
+                    .value_unchecked()
+                    .cast_unchecked::<DataType>()
+                    .type_name()
+                    .wrapper_unchecked()
+        }
+    }
+}
+
+/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
+/// the value is a `VecElement`.
+pub struct VecElement;
+unsafe impl Typecheck for VecElement {
+    fn typecheck(t: DataType) -> bool {
+        unsafe { t.type_name().wrapper_unchecked() == TypeName::of_vecelement(Global::new()) }
+    }
+}
+
+/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
+/// the value is a `Type{T}`.
+pub struct TypeType;
+unsafe impl Typecheck for TypeType {
+    fn typecheck(t: DataType) -> bool {
+        unsafe {
+            t.type_name().wrapper_unchecked()
+                == UnionAll::type_type(Global::new())
+                    .body()
+                    .value_unchecked()
+                    .cast_unchecked::<DataType>()
+                    .type_name()
+                    .wrapper_unchecked()
+        }
+    }
+}
+
+/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
+/// the value is a dispatch tuple.
+pub struct DispatchTuple;
+unsafe impl Typecheck for DispatchTuple {
+    fn typecheck(t: DataType) -> bool {
+        t.is_dispatch_tuple()
+    }
+}
+
+/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
 /// a value of this type is a named tuple.
 pub struct NamedTuple;
-
 unsafe impl Typecheck for NamedTuple {
     fn typecheck(t: DataType) -> bool {
         unsafe { t.unwrap_non_null(Private).as_ref().name == jl_namedtuple_typename }
@@ -141,7 +223,6 @@ impl_julia_typecheck!(DataType<'frame>, jl_datatype_type, 'frame);
 /// A typecheck that can be used in combination with `DataType::is`. This method returns true if
 /// the fields of a value of this type can be modified.
 pub struct Mutable;
-
 unsafe impl Typecheck for Mutable {
     fn typecheck(t: DataType) -> bool {
         unsafe {
@@ -158,7 +239,6 @@ unsafe impl Typecheck for Mutable {
 /// A typecheck that can be used in combination with `DataType::is`. This method returns true if
 /// the datatype is a mutable datatype.
 pub struct MutableDatatype;
-
 unsafe impl Typecheck for MutableDatatype {
     fn typecheck(t: DataType) -> bool {
         unsafe {
@@ -180,7 +260,6 @@ impl_julia_typecheck!(Nothing, jl_nothing_type);
 /// A typecheck that can be used in combination with `DataType::is`. This method returns true if
 /// the fields of a value of this type cannot be modified.
 pub struct Immutable;
-
 unsafe impl Typecheck for Immutable {
     fn typecheck(t: DataType) -> bool {
         unsafe {
@@ -197,7 +276,6 @@ unsafe impl Typecheck for Immutable {
 /// A typecheck that can be used in combination with `DataType::is`. This method returns true if
 /// the datatype is an immutable datatype.
 pub struct ImmutableDatatype;
-
 unsafe impl Typecheck for ImmutableDatatype {
     fn typecheck(t: DataType) -> bool {
         unsafe {
@@ -215,7 +293,6 @@ unsafe impl Typecheck for ImmutableDatatype {
 /// A typecheck that can be used in combination with `DataType::is`. This method returns true if
 /// a value of this type is a primitive type.
 pub struct PrimitiveType;
-
 unsafe impl Typecheck for PrimitiveType {
     fn typecheck(t: DataType) -> bool {
         unsafe {
@@ -230,7 +307,6 @@ unsafe impl Typecheck for PrimitiveType {
 /// A typecheck that can be used in combination with `DataType::is`. This method returns true if
 /// a value of this type is a struct type.
 pub struct StructType;
-
 unsafe impl Typecheck for StructType {
     fn typecheck(t: DataType) -> bool {
         !t.is_abstract() && !t.is::<PrimitiveType>()
@@ -240,7 +316,6 @@ unsafe impl Typecheck for StructType {
 /// A typecheck that can be used in combination with `DataType::is`. This method returns true if
 /// a value of this type is a struct type.
 pub struct Singleton;
-
 unsafe impl Typecheck for Singleton {
     fn typecheck(t: DataType) -> bool {
         !t.instance().is_undefined()
@@ -250,7 +325,6 @@ unsafe impl Typecheck for Singleton {
 /// A typecheck that can be used in combination with `DataType::is`. This method returns true if
 /// a value of this type is a slot.
 pub struct Slot;
-
 unsafe impl Typecheck for Slot {
     fn typecheck(t: DataType) -> bool {
         unsafe { t.unwrap(Private) == jl_slotnumber_type || t.unwrap(Private) == jl_typedslot_type }
@@ -314,7 +388,16 @@ impl_julia_typecheck!(String, jl_string_type);
 pub struct Pointer;
 unsafe impl Typecheck for Pointer {
     fn typecheck(t: DataType) -> bool {
-        unsafe { jl_is_cpointer_type(t.unwrap(Private).cast()) }
+        unsafe { t.type_name().wrapper_unchecked() == TypeName::of_pointer(Global::new()) }
+    }
+}
+
+/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
+/// a value of this type is an LLVM pointer.
+pub struct LLVMPointer;
+unsafe impl Typecheck for LLVMPointer {
+    fn typecheck(t: DataType) -> bool {
+        unsafe { t.type_name().wrapper_unchecked() == TypeName::of_llvmpointer(Global::new()) }
     }
 }
 

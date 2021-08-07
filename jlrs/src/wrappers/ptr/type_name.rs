@@ -96,6 +96,16 @@ impl<'scope> TypeName<'scope> {
 }
 
 impl<'base> TypeName<'base> {
+    /// The typename of the `UnionAll` `Type`.
+    pub fn of_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_type_typename, Private) }
+    }
+
+    /// The typename of the `DataType` `Tuple`.
+    pub fn of_tuple(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_tuple_typename, Private) }
+    }
+
     /// The typename of the `UnionAll` `VecElement`.
     pub fn of_vecelement(_: Global<'base>) -> Self {
         unsafe { Self::wrap(jl_vecelement_typename, Private) }
@@ -124,16 +134,6 @@ impl<'base> TypeName<'base> {
     /// The typename of the `UnionAll` `NamedTuple`.
     pub fn of_namedtuple(_: Global<'base>) -> Self {
         unsafe { Self::wrap(jl_namedtuple_typename, Private) }
-    }
-
-    /// The typename of the `UnionAll` `Type`.
-    pub fn of_type(_: Global<'base>) -> Self {
-        unsafe { Self::wrap(jl_type_typename, Private) }
-    }
-
-    /// The typename of the `DataType` `Tuple`.
-    pub fn of_tuple(_: Global<'base>) -> Self {
-        unsafe { Self::wrap(jl_tuple_typename, Private) }
     }
 }
 

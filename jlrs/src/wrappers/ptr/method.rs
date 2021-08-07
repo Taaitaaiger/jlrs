@@ -154,7 +154,7 @@ impl<'scope> Method<'scope> {
         unsafe { self.unwrap_non_null(Private).as_ref().nkw }
     }
 
-    /// The `is_varargs` field.
+    /// The `isva` field.
     pub fn is_varargs(self) -> bool {
         unsafe { self.unwrap_non_null(Private).as_ref().isva != 0 }
     }

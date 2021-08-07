@@ -556,6 +556,23 @@ impl<'scope, 'data> Array<'scope, 'data> {
         }
     }
 
+    /// Returns `true` if elements of this array are zero-initialized.
+    pub fn zero_init(self) -> bool {
+        unsafe {
+            let flags = self.unwrap_non_null(Private).as_ref().flags;
+            if flags.ptrarray() == 1 || flags.hasptr() == 1 {
+                return true;
+            }
+
+            let elty = self.element_type();
+            if let Ok(dt) = elty.cast::<DataType>() {
+                return dt.zero_init();
+            } else {
+                false
+            }
+        }
+    }
+
     /// Returns true if the elements of the array are stored as [`Value`]s.
     pub fn is_value_array(self) -> bool {
         !self.is_inline_array()
