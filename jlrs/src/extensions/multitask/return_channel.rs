@@ -13,7 +13,7 @@ use crossbeam_channel::Sender as CrossbeamSender;
 /// provided implementations, which only fail if the channel has been disconnected and no result
 /// can ever be successfully sent back to the receiving end.
 #[async_trait(?Send)]
-pub trait ReturnChannel: 'static + Send + Sync + Sized {
+pub trait ReturnChannel: 'static + Send + Sync {
     /// The type of data that is sent if the result was computed successfully.
     type Ok: 'static + Send;
 

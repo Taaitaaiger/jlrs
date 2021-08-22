@@ -376,7 +376,7 @@ impl Display for JlrsError {
                 write!(formatter, "An undefined reference cannot be rooted")
             }
             JlrsError::NumThreadsVar { value } => {
-                write!(formatter, "The environment variable must be set to a value larger than 2 or auto, but its value is: {}", value)
+                write!(formatter, "The `JULIA_NUM_THREADS` environment variable must be set to a value larger than 2 or auto, but its value is: {}", value)
             }
         }
     }

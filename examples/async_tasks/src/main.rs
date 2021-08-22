@@ -1,4 +1,5 @@
 use jlrs::prelude::*;
+use std::time::Duration;
 
 // This struct contains the data our task will need. This struct must be `Send`, `Sync`, and
 // contain no borrowed data.
@@ -61,7 +62,7 @@ fn main() {
     // After calling this method we have an instance of `AsyncJulia` that can be used to send
     // tasks and requests to include a file to the runtime, and a handle to the thread where the
     // runtime is running.
-    let (julia, handle) = unsafe { AsyncJulia::init(4, 16, 1).expect("Could not init Julia") };
+    let (julia, handle) = unsafe { AsyncJulia::init(4, 16, Duration::from_millis(1)).expect("Could not init Julia") };
 
     // Include the custom code MyTask needs.
     julia.try_include("MyModule.jl").unwrap();

@@ -124,10 +124,11 @@ use jl_sys::{
     jl_call2, jl_call3, jl_diverror_exception, jl_egal, jl_emptytuple, jl_eval_string,
     jl_exception_occurred, jl_false, jl_field_index, jl_field_isptr, jl_field_names,
     jl_field_offset, jl_fieldref, jl_fieldref_noalloc, jl_finalize, jl_gc_add_finalizer,
-    jl_interrupt_exception, jl_is_kind, jl_isa, jl_memory_exception, jl_nfields, jl_nothing,
-    jl_object_id, jl_readonlymemory_exception, jl_set_nth_field, jl_stackovf_exception, jl_subtype,
-    jl_svec_data, jl_svec_len, jl_true, jl_typeof, jl_typeof_str, jl_undefref_exception,
-    jl_value_t, jlrs_apply_type, jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_set_nth_field,
+    jl_gc_add_ptr_finalizer, jl_interrupt_exception, jl_is_kind, jl_isa, jl_memory_exception,
+    jl_nfields, jl_nothing, jl_object_id, jl_readonlymemory_exception, jl_set_nth_field,
+    jl_stackovf_exception, jl_stderr_obj, jl_stdout_obj, jl_subtype, jl_svec_data, jl_svec_len,
+    jl_true, jl_typeof, jl_typeof_str, jl_undefref_exception, jl_value_t, jlrs_apply_type,
+    jlrs_current_task, jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_set_nth_field,
 };
 use std::{
     ffi::{c_void, CStr, CString},
@@ -1194,6 +1195,16 @@ impl Value<'_, '_> {
         jl_gc_add_finalizer(self.unwrap(Private), f.unwrap(Private))
     }
 
+    /// Add a finalizer `f` to this value. The finalizer must be an `extern "C"` function that
+    /// takes one argument, the value as a void pointer.
+    pub unsafe fn add_ptr_finalizer(self, f: unsafe extern "C" fn(*mut c_void) -> ()) {
+        jl_gc_add_ptr_finalizer(
+            jlrs_current_task().as_ref().unwrap().ptls,
+            self.unwrap(Private),
+            f as *mut c_void,
+        )
+    }
+
     /// Call all finalizers.
     pub unsafe fn finalize(self) {
         jl_finalize(self.unwrap(Private))
@@ -1287,6 +1298,16 @@ impl<'scope> Value<'scope, 'static> {
     /// The instance of `Nothing`, `nothing`.
     pub fn nothing(_: Global<'scope>) -> Self {
         unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_nothing), Private) }
+    }
+
+    /// The handle to `stdout` as a Julia value.
+    pub fn stdout(_: Global<'scope>) -> Self {
+        unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_stdout_obj()), Private) }
+    }
+
+    /// The handle to `stderr` as a Julia value.
+    pub fn stderr(_: Global<'scope>) -> Self {
+        unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_stderr_obj()), Private) }
     }
 }
 
@@ -1466,68 +1487,6 @@ impl<'data> Call<'data> for Value<'_, 'data> {
 impl<'target, 'current, 'value, 'data> CallExt<'target, 'current, 'value, 'data>
     for Value<'value, 'data>
 {
-    fn attach_stacktrace<F>(self, frame: &mut F) -> JlrsResult<JuliaResult<'current, 'data>>
-    where
-        F: Frame<'current>,
-    {
-        unsafe {
-            let global = frame.global();
-            Module::main(global)
-                .submodule_ref("Jlrs")?
-                .wrapper_unchecked()
-                .function_ref("attachstacktrace")?
-                .wrapper_unchecked()
-                .call1(&mut *frame, self.as_value())
-        }
-    }
-
-    fn tracing_call<F>(self, frame: &mut F) -> JlrsResult<JuliaResult<'current, 'data>>
-    where
-        F: Frame<'current>,
-    {
-        unsafe {
-            let global = frame.global();
-            Module::main(global)
-                .submodule_ref("Jlrs")?
-                .wrapper_unchecked()
-                .function_ref("tracingcall")?
-                .wrapper_unchecked()
-                .call1(&mut *frame, self.as_value())
-        }
-    }
-
-    fn tracing_call_unrooted(
-        self,
-        global: Global<'target>,
-    ) -> JlrsResult<JuliaResultRef<'target, 'data>> {
-        unsafe {
-            let func = Module::main(global)
-                .submodule_ref("Jlrs")?
-                .wrapper_unchecked()
-                .function_ref("tracingcall")?
-                .wrapper_unchecked()
-                .call1_unrooted(global, self.as_value());
-
-            Ok(func)
-        }
-    }
-
-    fn attach_stacktrace_unrooted(
-        self,
-        global: Global<'target>,
-    ) -> JlrsResult<JuliaResultRef<'target, 'data>> {
-        unsafe {
-            let func = Module::main(global)
-                .submodule_ref("Jlrs")?
-                .wrapper_unchecked()
-                .function_ref("attachstacktrace")?
-                .wrapper_unchecked()
-                .call1_unrooted(global, self.as_value());
-
-            Ok(func)
-        }
-    }
-
     fn with_keywords(self, kws: Value<'value, 'data>) -> JlrsResult<WithKeywords<'value, 'data>> {
         if !kws.is::<NamedTuple>() {
             let type_str = kws.datatype().display_string_or(CANNOT_DISPLAY_TYPE);

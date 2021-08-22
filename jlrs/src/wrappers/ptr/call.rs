@@ -14,7 +14,7 @@
 //! exception is thrown.
 
 use crate::{
-    error::{JlrsResult, JuliaResult, JuliaResultRef},
+    error::{JlrsResult, JuliaResultRef},
     memory::{frame::Frame, global::Global, scope::Scope},
     private::Private,
     wrappers::ptr::{
@@ -211,32 +211,6 @@ pub trait Call<'data>: private::Call {
 ///
 /// [`Function`]: crate::wrappers::ptr::function::Function
 pub trait CallExt<'target, 'current, 'value, 'data>: Call<'data> {
-    /// Returns a new Julia function that prints the stacktrace if an exception is thrown.
-    fn tracing_call<F>(self, frame: &mut F) -> JlrsResult<JuliaResult<'current, 'data>>
-    where
-        F: Frame<'current>;
-
-    /// Returns a new Julia function that catches the exception if one is thrown and throws a new
-    /// exception, a `Jlrs.TracedException` which has two fields, `exc` and `stacktrace`.
-    fn attach_stacktrace<F>(self, frame: &mut F) -> JlrsResult<JuliaResult<'current, 'data>>
-    where
-        F: Frame<'current>;
-
-    /// Returns a new Julia function that prints the stacktrace if an exception is thrown, the new
-    /// function is not rooted.
-    fn tracing_call_unrooted(
-        self,
-        global: Global<'target>,
-    ) -> JlrsResult<JuliaResultRef<'target, 'data>>;
-
-    /// Returns a new Julia function that catches the exception if one is thrown and throws a new
-    /// exception, a `Jlrs.TracedException` which has two fields, `exc` and `stacktrace`. The new
-    /// function is not rooted.
-    fn attach_stacktrace_unrooted(
-        self,
-        global: Global<'target>,
-    ) -> JlrsResult<JuliaResultRef<'target, 'data>>;
-
     /// Provide keyword arguments to the function. The keyword arguments must be a `NamedTuple`.
     ///
     /// Example:

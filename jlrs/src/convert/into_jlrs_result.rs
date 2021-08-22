@@ -1,22 +1,21 @@
 //! Convert a `JuliaResult` to a `JlrsResult`.
 //!
-//! A [`JuliaResult`] is an alias for `Result` that's used when a function can throw an exception
-//! that can be caught. This is currently limited to calling Julia functions and evaluating raw
-//! Julia code. Inside a scope, the `?` operator can only be used with another alias for `Result`,
-//! [`JlrsError`]. The [`IntoJlrsResult`] trait defined in this module can be used to convert a
-//! `JuliaResult` to a [`JlrsResult`] to convert the exception to a simple error message which can
-//! be returned from the closure.
-//!
-//! [`JlrsError`]: crate::error::JlrsError
+//! Methods that call the Julia C API and can throw an exception generally return a nested
+//! `Result`. The outer error contains no Julia data, while the inner error contains the thrown
+//! exception. The `IntoJlrsResult` trait can be used to convert the inner error into the outer
+//! error.
 
 use crate::{
-    error::{exception, JlrsResult, JuliaResult, JuliaResultRef, CANNOT_DISPLAY_VALUE},
+    error::{exception, JlrsResult, JuliaResult, CANNOT_DISPLAY_VALUE},
     prelude::Wrapper,
 };
 
-/// Extension trait that lets you convert a `JuliaResult` to a `JlrsResult`.
+/// Extension trait that lets you convert a `JuliaResult` to a `JlrsResult`. If an exception
+/// is thrown, this method converts the exception to an error message by calling
+/// `Base.showerror`.
 pub trait IntoJlrsResult<T>: private::IntoJlrsResult {
-    /// Convert `self` to `JlrsResult`.
+    /// Convert `self` to `JlrsResult` by calling `Base.showerror` if an exception has been
+    /// thrown.
     fn into_jlrs_result(self) -> JlrsResult<T>;
 }
 
@@ -29,21 +28,9 @@ impl<T> IntoJlrsResult<T> for JuliaResult<'_, '_, T> {
     }
 }
 
-impl<T> IntoJlrsResult<T> for JuliaResultRef<'_, '_, T> {
-    fn into_jlrs_result(self) -> JlrsResult<T> {
-        unsafe {
-            match self {
-                Ok(v) => Ok(v),
-                Err(e) => exception(e.value_unchecked().error_string_or(CANNOT_DISPLAY_VALUE)),
-            }
-        }
-    }
-}
-
 mod private {
-    use crate::error::{JuliaResult, JuliaResultRef};
+    use crate::error::JuliaResult;
 
     pub trait IntoJlrsResult {}
     impl<T> IntoJlrsResult for JuliaResult<'_, '_, T> {}
-    impl<T> IntoJlrsResult for JuliaResultRef<'_, '_, T> {}
 }

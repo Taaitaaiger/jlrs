@@ -1,9 +1,8 @@
-//! Traits used to implement tasks for the async runtime.
+//! Traits to implement non-blocking tasks for the async runtime.
 //!
-//! While the sync runtime can call Julia inside a closure, using the async runtime takes a bit
-//! more effort. The async runtime must be sent tasks which fall into two categories: tasks that
-//! can be called once implement [`AsyncTask`], tasks that can be called multiple times implement
-//! [`GeneratorTask`].
+//! In addition to blocking tasks, the async runtime supports non-blocking tasks which fall into
+//! two categories: tasks that can be called once implement [`AsyncTask`], tasks that can be
+//! called multiple times implement [`GeneratorTask`].
 //!
 //! Both of these traits require that you implement an async `run` method. This method essentially
 //! replaces the closures of the sync runtime. Rather than a mutable reference to a [`GcFrame`] it
@@ -20,9 +19,10 @@ use std::marker::PhantomData;
 use super::async_frame::AsyncGcFrame;
 use super::mode::Async;
 use super::return_channel::ReturnChannel;
-use super::{wake_julia, RequireSendSync};
+use super::RequireSendSync;
 use super::{AsyncStackPage, Message};
 use crate::error::{JlrsError, JlrsResult};
+use crate::memory::frame::GcFrame;
 use crate::memory::global::Global;
 use async_std::channel::Sender as AsyncStdSender;
 use async_trait::async_trait;
@@ -46,7 +46,7 @@ pub trait AsyncTask: 'static + Send + Sync {
     /// Register the task. Note that this method is not called automatically, but only if
     /// [`AsyncJulia::register_task`] or [`AsyncJulia::try_register_task`] is used. This method
     /// can be implemented to take care of everything required to execute the task successfully,
-    /// like loading packages or defining a type.
+    /// like loading packages.
     ///
     /// [`AsyncJulia::register_task`]: crate::extensions::multitask::AsyncJulia::register_task
     /// [`AsyncJulia::try_register_task`]: crate::extensions::multitask::AsyncJulia::try_register_task
@@ -105,7 +105,7 @@ pub trait GeneratorTask: 'static + Send + Sync {
     /// Register this generator. Note that this method is not called automatically, but only if
     /// [`AsyncJulia::register_generator`] or [`AsyncJulia::try_register_generator`] is used. This
     /// method can be implemented to take care of everything required to execute the task
-    /// successfully, like loading packages or defining a type.
+    /// successfully, like loading packages.
     ///
     /// [`AsyncJulia::register_generator`]: crate::extensions::multitask::AsyncJulia::register_generator
     /// [`AsyncJulia::try_register_generator`]: crate::extensions::multitask::AsyncJulia::try_register_generator
@@ -151,7 +151,7 @@ type HandleSender<GT> = AsyncStdSender<
 /// A handle to a [`GeneratorTask`]. This handle can be used to call the generator and shared
 /// across threads. The `GeneratorTask` is dropped when its final handle has been dropped and all
 /// remaining pending calls have completed.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct GeneratorHandle<GT>
 where
     GT: GeneratorTask,
@@ -178,7 +178,6 @@ where
                 sender,
             }))
             .await
-            .map(|_| unsafe { wake_julia() })
             .expect("Channel was closed")
     }
 
@@ -192,10 +191,7 @@ where
             input: Some(input),
             sender,
         })) {
-            Ok(_) => unsafe {
-                wake_julia();
-                Ok(())
-            },
+            Ok(_) => Ok(()),
             Err(e) => Err(JlrsError::other(e))?,
         }
     }
@@ -396,7 +392,7 @@ where
     RC: ReturnChannel<Ok = AT::Output>,
     AT: AsyncTask,
 {
-    pub(crate) fn new(task: AT, sender: RC) -> Self {
+    pub(super) fn new(task: AT, sender: RC) -> Self {
         PendingTask {
             task: Some(task),
             sender,
@@ -404,7 +400,7 @@ where
         }
     }
 
-    pub(crate) fn split(self) -> (AT, RC) {
+    fn split(self) -> (AT, RC) {
         (self.task.unwrap(), self.sender)
     }
 }
@@ -414,7 +410,7 @@ where
     IRC: ReturnChannel<Ok = GeneratorHandle<GT>>,
     GT: GeneratorTask,
 {
-    pub(crate) fn new(task: GT, sender: IRC) -> Self {
+    pub(super) fn new(task: GT, sender: IRC) -> Self {
         PendingTask {
             task: Some(task),
             sender,
@@ -422,7 +418,7 @@ where
         }
     }
 
-    pub(crate) fn split(self) -> (GT, IRC) {
+    fn split(self) -> (GT, IRC) {
         (self.task.unwrap(), self.sender)
     }
 }
@@ -432,7 +428,7 @@ where
     RC: ReturnChannel<Ok = ()>,
     AT: AsyncTask,
 {
-    pub(crate) fn new(sender: RC) -> Self {
+    pub(super) fn new(sender: RC) -> Self {
         PendingTask {
             task: None,
             sender,
@@ -440,7 +436,7 @@ where
         }
     }
 
-    pub(crate) fn sender(self) -> RC {
+    fn sender(self) -> RC {
         self.sender
     }
 }
@@ -450,7 +446,7 @@ where
     RC: ReturnChannel<Ok = ()>,
     GT: GeneratorTask,
 {
-    pub(crate) fn new(sender: RC) -> Self {
+    pub(super) fn new(sender: RC) -> Self {
         PendingTask {
             task: None,
             sender,
@@ -458,7 +454,7 @@ where
         }
     }
 
-    pub(crate) fn sender(self) -> RC {
+    fn sender(self) -> RC {
         self.sender
     }
 }
@@ -624,5 +620,57 @@ where
             .send(Message::Complete(task_idx, stack))
             .await
             .expect("Channel was closed");
+    }
+}
+
+pub(crate) struct BlockingTask<F, RC, T> {
+    func: F,
+    sender: RC,
+    _res: PhantomData<T>,
+}
+
+impl<F, RC, T> BlockingTask<F, RC, T>
+where
+    for<'base> F:
+        Send + Sync + FnOnce(Global<'base>, &mut GcFrame<'base, Async<'base>>) -> JlrsResult<T>,
+    RC: ReturnChannel<Ok = T>,
+    T: Send + Sync + 'static,
+{
+    pub(crate) fn new(func: F, sender: RC) -> Self {
+        Self {
+            func,
+            sender,
+            _res: PhantomData,
+        }
+    }
+
+    fn call<'scope>(
+        self: Box<Self>,
+        frame: &mut GcFrame<'scope, Async<'scope>>,
+    ) -> (JlrsResult<T>, RC) {
+        let global = unsafe { Global::new() };
+        let func = self.func;
+        let res = func(global, frame);
+        (res, self.sender)
+    }
+}
+
+pub(crate) trait GenericBlockingTask: Send + Sync {
+    fn call(self: Box<Self>, stack: &mut AsyncStackPage);
+}
+
+impl<F, RC, T> GenericBlockingTask for BlockingTask<F, RC, T>
+where
+    for<'base> F:
+        Send + Sync + FnOnce(Global<'base>, &mut GcFrame<'base, Async<'base>>) -> JlrsResult<T>,
+    RC: ReturnChannel<Ok = T>,
+    T: Send + Sync + 'static,
+{
+    fn call(self: Box<Self>, stack: &mut AsyncStackPage) {
+        let mode = Async(&stack.top[1]);
+        let raw = stack.page.as_mut();
+        let mut frame = GcFrame::new(raw, 0, mode);
+        let (res, ch) = self.call(&mut frame);
+        async_std::task::spawn_local(async move { ch.send(res).await });
     }
 }

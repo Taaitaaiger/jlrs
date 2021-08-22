@@ -17,7 +17,7 @@ use super::{
     Wrapper,
 };
 use crate::{
-    error::{JlrsError, JlrsResult, JuliaResult, JuliaResultRef, CANNOT_DISPLAY_TYPE},
+    error::{JlrsError, JlrsResult, JuliaResultRef, CANNOT_DISPLAY_TYPE},
     impl_debug,
     layout::{
         typecheck::{NamedTuple, Typecheck},
@@ -186,34 +186,6 @@ impl<'data> Call<'data> for Function<'_, 'data> {
 impl<'target, 'current, 'value, 'data> CallExt<'target, 'current, 'value, 'data>
     for Function<'value, 'data>
 {
-    fn attach_stacktrace<F>(self, frame: &mut F) -> JlrsResult<JuliaResult<'current, 'data>>
-    where
-        F: Frame<'current>,
-    {
-        self.as_value().attach_stacktrace(frame)
-    }
-
-    fn tracing_call<F>(self, frame: &mut F) -> JlrsResult<JuliaResult<'current, 'data>>
-    where
-        F: Frame<'current>,
-    {
-        self.as_value().tracing_call(frame)
-    }
-
-    fn tracing_call_unrooted(
-        self,
-        global: Global<'target>,
-    ) -> JlrsResult<JuliaResultRef<'target, 'data>> {
-        self.as_value().tracing_call_unrooted(global)
-    }
-
-    fn attach_stacktrace_unrooted(
-        self,
-        global: Global<'target>,
-    ) -> JlrsResult<JuliaResultRef<'target, 'data>> {
-        self.as_value().attach_stacktrace_unrooted(global)
-    }
-
     fn with_keywords(self, kws: Value<'value, 'data>) -> JlrsResult<WithKeywords<'value, 'data>> {
         if !kws.is::<NamedTuple>() {
             let type_str = kws.datatype().display_string_or(CANNOT_DISPLAY_TYPE);

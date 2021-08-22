@@ -69,6 +69,68 @@ mod example {
         }
     }
 
+    struct KwTask {
+        dims: isize,
+        iters: isize,
+    }
+
+    #[async_trait(?Send)]
+    impl AsyncTask for KwTask {
+        type Output = f32;
+
+        async fn run<'base>(
+            &mut self,
+            global: Global<'base>,
+            frame: &mut AsyncGcFrame<'base>,
+        ) -> JlrsResult<Self::Output> {
+            let dims = Value::new(&mut *frame, self.dims)?;
+            let iters = Value::new(&mut *frame, self.iters)?;
+            let kw = Value::new(&mut *frame, 5.0f64)?;
+            let nt = named_tuple!(&mut *frame, "kw" => kw)?;
+
+            let v = unsafe {
+                Module::main(global)
+                    .submodule_ref("MyModule")?
+                    .wrapper_unchecked()
+                    .function_ref("kwfunc")?
+                    .wrapper_unchecked()
+                    .with_keywords(nt)?
+                    .call_async(&mut *frame, &mut [dims, iters])
+                    .await?
+                    .unwrap()
+                    .unbox::<f64>()? as f32
+            };
+
+            Ok(v)
+        }
+    }
+    struct ThrowingTask;
+
+    #[async_trait(?Send)]
+    impl AsyncTask for ThrowingTask {
+        type Output = f32;
+
+        async fn run<'base>(
+            &mut self,
+            global: Global<'base>,
+            frame: &mut AsyncGcFrame<'base>,
+        ) -> JlrsResult<Self::Output> {
+            let v = unsafe {
+                Module::main(global)
+                    .submodule_ref("MyModule")?
+                    .wrapper_unchecked()
+                    .function_ref("throwingfunc")?
+                    .wrapper_unchecked()
+                    .call_async(&mut *frame, [])
+                    .await?
+                    .into_jlrs_result()?
+                    .unbox::<f64>()? as f32
+            };
+
+            Ok(v)
+        }
+    }
+
     struct NestingTaskAsyncFrame {
         dims: isize,
         iters: isize,
@@ -376,14 +438,83 @@ mod example {
         }
     }
 
+    struct LocalTask {
+        dims: isize,
+        iters: isize,
+    }
+
+    #[async_trait(?Send)]
+    impl AsyncTask for LocalTask {
+        type Output = f32;
+
+        async fn run<'base>(
+            &mut self,
+            global: Global<'base>,
+            frame: &mut AsyncGcFrame<'base>,
+        ) -> JlrsResult<Self::Output> {
+            let dims = Value::new(&mut *frame, self.dims)?;
+            let iters = Value::new(&mut *frame, self.iters)?;
+
+            let v = unsafe {
+                Module::main(global)
+                    .submodule_ref("MyModule")?
+                    .wrapper_unchecked()
+                    .function_ref("complexfunc")?
+                    .wrapper_unchecked()
+                    .call_async_local(&mut *frame, &mut [dims, iters])
+                    .await?
+                    .unwrap()
+                    .unbox::<f64>()? as f32
+            };
+
+            Ok(v)
+        }
+    }
+
+    struct LocalKwTask {
+        dims: isize,
+        iters: isize,
+    }
+
+    #[async_trait(?Send)]
+    impl AsyncTask for LocalKwTask {
+        type Output = f32;
+
+        async fn run<'base>(
+            &mut self,
+            global: Global<'base>,
+            frame: &mut AsyncGcFrame<'base>,
+        ) -> JlrsResult<Self::Output> {
+            let dims = Value::new(&mut *frame, self.dims)?;
+            let iters = Value::new(&mut *frame, self.iters)?;
+            let kw = Value::new(&mut *frame, 5.0f64)?;
+            let nt = named_tuple!(&mut *frame, "kw" => kw)?;
+
+            let v = unsafe {
+                Module::main(global)
+                    .submodule_ref("MyModule")?
+                    .wrapper_unchecked()
+                    .function_ref("kwfunc")?
+                    .wrapper_unchecked()
+                    .with_keywords(nt)?
+                    .call_async_local(&mut *frame, &mut [dims, iters])
+                    .await?
+                    .unwrap()
+                    .unbox::<f64>()? as f32
+            };
+
+            Ok(v)
+        }
+    }
+
     #[cfg(test)]
     mod tests {
         use super::*;
-        use std::cell::RefCell;
+        use std::{cell::RefCell, time::Duration};
 
         thread_local! {
             pub static JULIA: RefCell<AsyncJulia> = {
-                let r = RefCell::new(unsafe {  AsyncJulia::init(4, 16, 1).expect("Could not init Julia").0 });
+                let r = RefCell::new(unsafe {  AsyncJulia::init(4, 16, Duration::from_millis(1)).expect("Could not init Julia").0 });
                 r.borrow_mut().try_include("MyModule.jl").unwrap();
                 r
             };
@@ -453,6 +584,83 @@ mod example {
                     .unwrap();
 
                 assert_eq!(receiver.recv().unwrap().unwrap(), 20_000_004.0);
+            });
+        }
+
+        #[test]
+        fn test_local_task() {
+            JULIA.with(|j| {
+                let julia = j.borrow_mut();
+                julia.try_error_color(true).unwrap();
+
+                let (sender, receiver) = crossbeam_channel::bounded(1);
+
+                julia
+                    .try_task(
+                        LocalTask {
+                            dims: 4,
+                            iters: 5_000,
+                        },
+                        sender,
+                    )
+                    .unwrap();
+
+                assert_eq!(receiver.recv().unwrap().unwrap(), 20_004.0);
+            });
+        }
+
+        #[test]
+        fn test_kw_task() {
+            JULIA.with(|j| {
+                let julia = j.borrow_mut();
+
+                let (sender, receiver) = crossbeam_channel::bounded(1);
+
+                julia
+                    .try_task(
+                        KwTask {
+                            dims: 4,
+                            iters: 5_000,
+                        },
+                        sender,
+                    )
+                    .unwrap();
+
+                assert_eq!(receiver.recv().unwrap().unwrap(), 20_009.0);
+            });
+        }
+
+        #[test]
+        fn test_throwing_task() {
+            JULIA.with(|j| {
+                let julia = j.borrow_mut();
+
+                let (sender, receiver) = crossbeam_channel::bounded(1);
+
+                julia.try_task(ThrowingTask, sender).unwrap();
+
+                assert!(receiver.recv().unwrap().is_err());
+            });
+        }
+
+        #[test]
+        fn test_local_kw_task() {
+            JULIA.with(|j| {
+                let julia = j.borrow_mut();
+
+                let (sender, receiver) = crossbeam_channel::bounded(1);
+
+                julia
+                    .try_task(
+                        LocalKwTask {
+                            dims: 4,
+                            iters: 5_000,
+                        },
+                        sender,
+                    )
+                    .unwrap();
+
+                assert_eq!(receiver.recv().unwrap().unwrap(), 20_009.0);
             });
         }
 

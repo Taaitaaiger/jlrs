@@ -98,6 +98,14 @@ impl<'scope> Symbol<'scope> {
         }
     }
 
+    /// View `self` as a `Cstr`.
+    pub fn as_cstr(self) -> &'scope CStr {
+        unsafe {
+            let ptr = jl_symbol_name(self.unwrap(Private)).cast();
+            &CStr::from_ptr(ptr)
+        }
+    }
+
     /// View `self` as an slice of bytes without the trailing null.
     pub fn as_slice(self) -> &'scope [u8] {
         unsafe {

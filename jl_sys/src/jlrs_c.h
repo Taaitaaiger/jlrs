@@ -36,5 +36,10 @@ jlrs_result_t jlrs_set_global(jl_module_t *m JL_ROOTING_ARGUMENT, jl_sym_t *var,
 jlrs_result_t jlrs_set_nth_field(jl_value_t *v, size_t i, jl_value_t *rhs);
 jlrs_result_t jlrs_type_union(jl_value_t **ts, size_t n);
 jlrs_result_t jlrs_type_unionall(jl_tvar_t *v, jl_value_t *body);
+jlrs_result_t jlrs_reshape_array(jl_value_t *atype, jl_array_t *data, jl_value_t *_dims);
+jlrs_result_t jlrs_array_grow_end(jl_array_t *a, size_t inc);
+jlrs_result_t jlrs_array_del_end(jl_array_t *a, size_t dec);
+jlrs_result_t jlrs_array_grow_beg(jl_array_t *a, size_t inc);
+jlrs_result_t jlrs_array_del_beg(jl_array_t *a, size_t dec);
 
-jl_task_t *jlrs_current_task();
+jl_task_t *jlrs_current_task(void);

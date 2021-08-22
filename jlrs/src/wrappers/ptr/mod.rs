@@ -56,6 +56,7 @@ use self::{
     method_match::MethodMatch,
     method_table::MethodTable,
     module::Module,
+    opaque_closure::OpaqueClosure,
     private::Wrapper as _,
     simple_vector::SimpleVector,
     string::JuliaString,
@@ -68,10 +69,11 @@ use self::{
     union::Union,
     union_all::UnionAll,
     value::Value,
+    vararg::Vararg,
     weak_ref::WeakRef,
 };
 use crate::{
-    error::{JlrsError, JlrsResult},
+    error::{JlrsError, JlrsResult, CANNOT_DISPLAY_VALUE},
     layout::valid_layout::ValidLayout,
     memory::{frame::Frame, global::Global, scope::Scope},
     private::Private,
@@ -109,8 +111,8 @@ pub trait Wrapper<'scope, 'data>: private::Wrapper<'scope, 'data> {
         unsafe { Value::wrap_non_null(self.unwrap_non_null(Private).cast(), Private) }
     }
 
-    /// Convert the wrapper to its display string, ie the string that is shown when this value is
-    /// thrown as an exception.
+    /// Convert the wrapper to its display string, i.e. the string that is shown when calling
+    /// `Base.show`.
     fn display_string(self) -> JlrsResult<String> {
         unsafe {
             let global = Global::new();
@@ -121,7 +123,10 @@ pub trait Wrapper<'scope, 'data>: private::Wrapper<'scope, 'data> {
                 .wrapper_unchecked()
                 .call1_unrooted(global, self.as_value())
                 .map_err(|e| JlrsError::Exception {
-                    msg: format!("Jlrs.valuestring failed: {:?}", e.value_unchecked()),
+                    msg: format!(
+                        "Jlrs.valuestring failed: {}",
+                        e.value_unchecked().error_string_or(CANNOT_DISPLAY_VALUE)
+                    ),
                 })?
                 .value_unchecked()
                 .cast::<JuliaString>()?
@@ -132,8 +137,9 @@ pub trait Wrapper<'scope, 'data>: private::Wrapper<'scope, 'data> {
         }
     }
 
-    /// Convert the wrapper to its error string, ie the string that is shown by calling
-    /// `Base.display`.
+    /// Convert the wrapper to its error string, i.e. the string that is shown when calling
+    /// `Base.showerror`. This string can contain ANSI color codes if this is enabled by calling
+    /// [`Julia::error_color`].
     fn error_string(self) -> JlrsResult<String> {
         unsafe {
             let global = Global::new();
@@ -144,7 +150,10 @@ pub trait Wrapper<'scope, 'data>: private::Wrapper<'scope, 'data> {
                 .wrapper_unchecked()
                 .call1_unrooted(global, self.as_value())
                 .map_err(|e| JlrsError::Exception {
-                    msg: format!("Jlrs.errorstring failed: {:?}", e.value_unchecked()),
+                    msg: format!(
+                        "Jlrs.errorstring failed: {}",
+                        e.value_unchecked().error_string_or(CANNOT_DISPLAY_VALUE)
+                    ),
                 })?
                 .value_unchecked()
                 .cast::<JuliaString>()?
@@ -308,6 +317,10 @@ impl_valid_layout!(MethodMatchRef, MethodMatch);
 pub type MethodTableRef<'scope> = Ref<'scope, 'static, MethodTable<'scope>>;
 impl_valid_layout!(MethodTableRef, MethodTable);
 
+/// A reference to a [`OpaqueClosure`]
+pub type OpaqueClosureRef<'scope> = Ref<'scope, 'static, OpaqueClosure<'scope>>;
+impl_valid_layout!(OpaqueClosureRef, OpaqueClosure);
+
 /// A reference to a [`SimpleVector`]
 pub type SimpleVectorRef<'scope, T = Value<'scope, 'static>> =
     Ref<'scope, 'static, SimpleVector<'scope, T>>;
@@ -355,6 +368,10 @@ impl_valid_layout!(UnionRef, Union);
 /// A reference to a [`UnionAll`]
 pub type UnionAllRef<'scope> = Ref<'scope, 'static, UnionAll<'scope>>;
 impl_valid_layout!(UnionAllRef, UnionAll);
+
+/// A reference to a [`Vararg`]
+pub type VarargRef<'scope> = Ref<'scope, 'static, Vararg<'scope>>;
+impl_valid_layout!(VarargRef, Vararg);
 
 /// A reference to a [`WeakRef`]
 pub type WeakRefRef<'scope> = Ref<'scope, 'static, WeakRef<'scope>>;

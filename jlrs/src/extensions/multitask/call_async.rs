@@ -1,21 +1,27 @@
-//! Call a Julia function asynchronously and await the result.
+//! Create, schedule and `await` Julia `Task`s.
 
 use super::{async_frame::AsyncGcFrame, julia_future::JuliaFuture};
 use crate::{
     error::{JlrsResult, JuliaResult},
+    memory::scope::Scope,
+    prelude::CallExt,
     wrappers::ptr::{
         call::{Call, WithKeywords},
         function::Function,
-        value::Value,
+        module::Module,
+        task::Task,
+        value::{Value, MAX_SIZE},
         Wrapper,
     },
 };
 use async_trait::async_trait;
+use smallvec::SmallVec;
 
-/// This trait provides methods that create and start new Julia tasks, and return a `Future` that
-/// resolves when the task is completed. The task can either be scheduled on the main thread or on
-/// another thread. Note that tasks running on the main thread will block the runtime unless it's
-/// waiting for something like IO.
+/// This trait provides async methods to create and schedule `Task`s that resolve when the `Task`
+/// has completed. Non-async methods are also provided which only schedule the `Task`, those
+/// methods should only be used from [`GeneratorTask::init`].
+///
+/// [`GeneratorTask::init`]: crate::extensions::multitask::async_task::GeneratorTask::init
 #[async_trait(?Send)]
 pub trait CallAsync<'data>: Call<'data> {
     /// Call a function on another thread with the given arguments. This method uses
@@ -34,10 +40,27 @@ pub trait CallAsync<'data>: Call<'data> {
     where
         V: AsMut<[Value<'value, 'data>]>;
 
-    /// Call a function with the given arguments in an `@async` block. Unlike `call_async`,
-    /// the function is not executed on another thread, but on the main thread. This method
-    /// should only be used with functions that do very little computational work but mostly
-    /// spend their time waiting on IO.
+    /// Does the same thing as [`CallAsync::call_async`], but the task is returned rather than an
+    /// awaitable `Future`. This method should only be called in [`GeneratorTask::init`],
+    /// otherwise it's not guaranteed this task can progress.
+    ///
+    /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
+    /// correctness. If the second lifetime of an argument is not `'static`, it must never be
+    /// assigned to a global.
+    ///
+    /// [`GeneratorTask::init`]: crate::extensions::multitask::async_task::GeneratorTask::init
+    unsafe fn schedule_async<'frame, 'value, V>(
+        self,
+        frame: &mut AsyncGcFrame<'frame>,
+        args: V,
+    ) -> JlrsResult<JuliaResult<Task<'frame>, 'frame, 'data>>
+    where
+        V: AsMut<[Value<'value, 'data>]>;
+
+    /// Call a function with the given arguments in an `@async` block. Like `call_async`, the
+    /// function is not called on the main thread, but on a separate thread that handles all
+    /// tasks created by this method. This method should only be used with functions that do very
+    /// little computational work but mostly spend their time waiting on IO.
     ///
     /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
     /// correctness. If the second lifetime of an argument is not `'static`, it must never be
@@ -47,6 +70,23 @@ pub trait CallAsync<'data>: Call<'data> {
         frame: &mut AsyncGcFrame<'frame>,
         args: V,
     ) -> JlrsResult<JuliaResult<'frame, 'data>>
+    where
+        V: AsMut<[Value<'value, 'data>]>;
+
+    /// Does the same thing as [`CallAsync::call_async_local`], but the task is returned rather
+    /// than an awaitable `Future`. This method should only be called in [`GeneratorTask::init`],
+    /// otherwise it's not guaranteed this task can progress.
+    ///
+    /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
+    /// correctness. If the second lifetime of an argument is not `'static`, it must never be
+    /// assigned to a global.
+    ///
+    /// [`GeneratorTask::init`]: crate::extensions::multitask::async_task::GeneratorTask::init
+    unsafe fn schedule_async_local<'frame, 'value, V>(
+        self,
+        frame: &mut AsyncGcFrame<'frame>,
+        args: V,
+    ) -> JlrsResult<JuliaResult<Task<'frame>, 'frame, 'data>>
     where
         V: AsMut<[Value<'value, 'data>]>;
 }
@@ -64,6 +104,34 @@ impl<'data> CallAsync<'data> for Value<'_, 'data> {
         Ok(JuliaFuture::new(frame, self, args)?.await)
     }
 
+    unsafe fn schedule_async<'frame, 'value, V>(
+        self,
+        frame: &mut AsyncGcFrame<'frame>,
+        mut args: V,
+    ) -> JlrsResult<JuliaResult<Task<'frame>, 'frame, 'data>>
+    where
+        V: AsMut<[Value<'value, 'data>]>,
+    {
+        let values = args.as_mut();
+        let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(1 + values.len());
+
+        vals.push(self);
+        vals.extend_from_slice(values);
+
+        let global = frame.global();
+        let task = Module::main(global)
+            .submodule_ref("Jlrs")?
+            .wrapper_unchecked()
+            .function_ref("asynccall")?
+            .wrapper_unchecked()
+            .call(frame, &mut vals)?;
+
+        match task {
+            Ok(t) => Ok(Ok(t.cast_unchecked::<Task>())),
+            Err(e) => Ok(Err(e)),
+        }
+    }
+
     async unsafe fn call_async_local<'frame, 'value, V>(
         self,
         frame: &mut AsyncGcFrame<'frame>,
@@ -73,6 +141,34 @@ impl<'data> CallAsync<'data> for Value<'_, 'data> {
         V: AsMut<[Value<'value, 'data>]>,
     {
         Ok(JuliaFuture::new_local(frame, self, args)?.await)
+    }
+
+    unsafe fn schedule_async_local<'frame, 'value, V>(
+        self,
+        frame: &mut AsyncGcFrame<'frame>,
+        mut args: V,
+    ) -> JlrsResult<JuliaResult<Task<'frame>, 'frame, 'data>>
+    where
+        V: AsMut<[Value<'value, 'data>]>,
+    {
+        let values = args.as_mut();
+        let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(1 + values.len());
+
+        vals.push(self);
+        vals.extend_from_slice(values);
+
+        let global = frame.global();
+        let task = Module::main(global)
+            .submodule_ref("Jlrs")?
+            .wrapper_unchecked()
+            .function_ref("scheduleasync")?
+            .wrapper_unchecked()
+            .call(frame, &mut vals)?;
+
+        match task {
+            Ok(t) => Ok(Ok(t.cast_unchecked::<Task>())),
+            Err(e) => Ok(Err(e)),
+        }
     }
 }
 
@@ -89,6 +185,17 @@ impl<'data> CallAsync<'data> for Function<'_, 'data> {
         Ok(JuliaFuture::new(frame, self.as_value(), args)?.await)
     }
 
+    unsafe fn schedule_async<'frame, 'value, V>(
+        self,
+        frame: &mut AsyncGcFrame<'frame>,
+        args: V,
+    ) -> JlrsResult<JuliaResult<Task<'frame>, 'frame, 'data>>
+    where
+        V: AsMut<[Value<'value, 'data>]>,
+    {
+        self.as_value().schedule_async(frame, args)
+    }
+
     async unsafe fn call_async_local<'frame, 'value, V>(
         self,
         frame: &mut AsyncGcFrame<'frame>,
@@ -98,6 +205,17 @@ impl<'data> CallAsync<'data> for Function<'_, 'data> {
         V: AsMut<[Value<'value, 'data>]>,
     {
         Ok(JuliaFuture::new_local(frame, self.as_value(), args)?.await)
+    }
+
+    unsafe fn schedule_async_local<'frame, 'value, V>(
+        self,
+        frame: &mut AsyncGcFrame<'frame>,
+        args: V,
+    ) -> JlrsResult<JuliaResult<Task<'frame>, 'frame, 'data>>
+    where
+        V: AsMut<[Value<'value, 'data>]>,
+    {
+        self.as_value().schedule_async_local(frame, args)
     }
 }
 
@@ -114,6 +232,35 @@ impl<'data> CallAsync<'data> for WithKeywords<'_, 'data> {
         Ok(JuliaFuture::new_with_keywords(frame, self, args)?.await)
     }
 
+    unsafe fn schedule_async<'frame, 'value, V>(
+        self,
+        frame: &mut AsyncGcFrame<'frame>,
+        mut args: V,
+    ) -> JlrsResult<JuliaResult<Task<'frame>, 'frame, 'data>>
+    where
+        V: AsMut<[Value<'value, 'data>]>,
+    {
+        let values = args.as_mut();
+        let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(1 + values.len());
+
+        vals.push(self.function());
+        vals.extend_from_slice(values);
+
+        let global = frame.global();
+        let task = Module::main(global)
+            .submodule_ref("Jlrs")?
+            .wrapper_unchecked()
+            .function_ref("asynccall")?
+            .wrapper_unchecked()
+            .with_keywords(self.keywords())?
+            .call(frame, &mut vals)?;
+
+        match task {
+            Ok(t) => Ok(Ok(t.cast_unchecked::<Task>())),
+            Err(e) => Ok(Err(e)),
+        }
+    }
+
     async unsafe fn call_async_local<'frame, 'value, V>(
         self,
         frame: &mut AsyncGcFrame<'frame>,
@@ -123,5 +270,34 @@ impl<'data> CallAsync<'data> for WithKeywords<'_, 'data> {
         V: AsMut<[Value<'value, 'data>]>,
     {
         Ok(JuliaFuture::new_local_with_keywords(frame, self, args)?.await)
+    }
+
+    unsafe fn schedule_async_local<'frame, 'value, V>(
+        self,
+        frame: &mut AsyncGcFrame<'frame>,
+        mut args: V,
+    ) -> JlrsResult<JuliaResult<Task<'frame>, 'frame, 'data>>
+    where
+        V: AsMut<[Value<'value, 'data>]>,
+    {
+        let values = args.as_mut();
+        let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(1 + values.len());
+
+        vals.push(self.function());
+        vals.extend_from_slice(values);
+
+        let global = frame.global();
+        let task = Module::main(global)
+            .submodule_ref("Jlrs")?
+            .wrapper_unchecked()
+            .function_ref("scheduleasync")?
+            .wrapper_unchecked()
+            .with_keywords(self.keywords())?
+            .call(frame, &mut vals)?;
+
+        match task {
+            Ok(t) => Ok(Ok(t.cast_unchecked::<Task>())),
+            Err(e) => Ok(Err(e)),
+        }
     }
 }

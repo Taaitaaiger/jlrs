@@ -47,11 +47,11 @@ pub trait Dims: Sized + Debug {
             })?;
         }
 
+        let n_dims = self.n_dimensions();
         if self.n_dimensions() == 0 {
             return Ok(0);
         }
 
-        let n_dims = self.n_dimensions();
         for dim in 0..n_dims {
             if self.n_elements(dim) <= dim_index.n_elements(dim) {
                 Err(JlrsError::InvalidIndex {
@@ -69,6 +69,8 @@ pub trait Dims: Sized + Debug {
         Ok(idx)
     }
 
+    /// Convert the dimensions into a generic `Dimensions` struct. The default implementation
+    /// should not be overridden.
     fn into_dimensions(&self) -> Dimensions {
         Dimensions::from_dims(self)
     }
@@ -79,7 +81,7 @@ pub trait Dims: Sized + Debug {
 pub struct ArrayDimensions<'scope> {
     n: usize,
     ptr: *mut usize,
-    _marker: PhantomData<&'scope ()>,
+    _marker: PhantomData<&'scope [usize]>,
 }
 
 impl<'scope> ArrayDimensions<'scope> {

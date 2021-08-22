@@ -62,6 +62,7 @@
 
 use crate::{
     error::{JlrsResult, JuliaResult},
+    info::Info,
     layout::typecheck::Typecheck,
     memory::{
         frame::Frame,
@@ -282,6 +283,11 @@ where
     /// Create a new `Global`.
     fn global(&self) -> Global<'target> {
         unsafe { Global::new() }
+    }
+
+    /// Provides access to global information.
+    fn info(&self) -> Info {
+        Info::new()
     }
 
     /// Create a new `GcFrame` that can be used to root `capacity` values, an `Output` for the
