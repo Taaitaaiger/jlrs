@@ -71,7 +71,7 @@ jobs:
       - name: Set env
         run: |
           export JULIA_DIR=$(dirname $(dirname $(which julia)))
-          echo "LD_LIBRARY_PATH=${JULIA_DIR}/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
+          echo "LD_LIBRARY_PATH=${JULIA_DIR}/lib:${JULIA_DIR}/lib/julia:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
           echo "JULIA_DIR=${JULIA_DIR}" >> $GITHUB_ENV
 
       - name: Build Docs

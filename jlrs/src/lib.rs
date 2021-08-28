@@ -41,8 +41,8 @@
 //! In order to ensure the `julia.h` header file can be found, either `/usr/include/julia/julia.h`
 //! must exist, or you have to set the `JULIA_DIR` environment variable to `/path/to/julia-x.y.z`.
 //! This environment variable can be used to override the default. Similarly, in order to load
-//! `libjulia.so` you must add `/path/to/julia-x.y.z/lib` to the `LD_LIBRARY_PATH` environment
-//! variable.
+//! `libjulia.so` and `libuv.so` you must add `/path/to/julia-x.y.z/lib` and
+//! `/path/to/julia-x.y.z/lib/julia` to the `LD_LIBRARY_PATH` environment variable.
 //!
 //! #### Windows
 //!
