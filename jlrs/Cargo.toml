@@ -15,12 +15,14 @@ license = "MIT"
 edition = "2018"
 
 [features]
-default = ["jlrs-derive"]
+default = ["jlrs-derive", "use-dummy"]
 uv = ["jl-sys/uv"]
 async = ["futures", "crossbeam-channel", "async-trait", "async-std"]
 jlrs-ndarray = ["ndarray"]
 f16 = ["half"]
-docs-rs = ["jl-sys/docs-rs", "jlrs-derive", "async", "jlrs-ndarray", "f16"]
+docs-rs = ["jl-sys/docs-rs", "jlrs-derive", "async", "jlrs-ndarray", "f16", "uv"]
+use-dummy = ["jl-sys/use-dummy"]
+use-bindgen = ["jl-sys/use-bindgen"]
 
 [dependencies]
 jl-sys = {version = "0.13", path = "../jl_sys" }

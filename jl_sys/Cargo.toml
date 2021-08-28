@@ -18,11 +18,13 @@ links = "julia"
 [features]
 docs-rs = []
 uv = []
+use-dummy = []
+use-bindgen = ["bindgen"]
 
 [dependencies]
 
 [build-dependencies]
-bindgen = "0.59"
+bindgen = { version = "0.59", optional = true }
 cc = "1"
 
 [package.metadata.docs.rs]
