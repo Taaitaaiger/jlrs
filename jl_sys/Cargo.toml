@@ -16,9 +16,8 @@ edition = "2018"
 links = "julia"
 
 [features]
-docs-rs = ["use-dummy"]
+docs-rs = []
 uv = []
-use-dummy = []
 use-bindgen = ["bindgen"]
 
 [dependencies]
