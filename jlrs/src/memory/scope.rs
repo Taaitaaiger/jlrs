@@ -62,6 +62,7 @@
 
 use crate::{
     error::{JlrsResult, JuliaResult},
+    info::Info,
     layout::typecheck::Typecheck,
     memory::{
         frame::Frame,
@@ -130,7 +131,7 @@ pub trait ScopeExt<'target, 'current, 'data, F: Frame<'current>>:
     ///       let sum = frame.scope_with_slots(3, |frame| {
     ///           let v1 = Value::new(&mut *frame, 1usize)?;
     ///           let v2 = Value::new(&mut *frame, 2usize)?;
-    ///             
+    ///
     ///           unsafe {
     ///               Module::base(global)
     ///                   .function(&mut *frame, "+")?
@@ -282,6 +283,11 @@ where
     /// Create a new `Global`.
     fn global(&self) -> Global<'target> {
         unsafe { Global::new() }
+    }
+
+    /// Provides access to global information.
+    fn info(&self) -> Info {
+        Info::new()
     }
 
     /// Create a new `GcFrame` that can be used to root `capacity` values, an `Output` for the
@@ -451,7 +457,7 @@ impl<'current, 'data, F: Frame<'current>> Scope<'current, 'current, 'data, F> fo
     ///     let _nt = frame.value_scope(|output, frame| {
     ///         let i = Value::new(&mut *frame, 2u64)?;
     ///         let j = Value::new(&mut *frame, 1u32)?;
-    ///    
+    ///
     ///         let output = output.into_scope(frame);
     ///         named_tuple!(output, "i" => i, "j" => j)
     ///     })?;
@@ -527,7 +533,7 @@ impl<'current, 'data, F: Frame<'current>> Scope<'current, 'current, 'data, F> fo
     ///     let _nt = frame.value_scope_with_slots(2, |output, frame| {
     ///         let i = Value::new(&mut *frame, 2u64)?;
     ///         let j = Value::new(&mut *frame, 1u32)?;
-    ///    
+    ///
     ///         let output = output.into_scope(frame);
     ///         named_tuple!(output, "i" => i, "j" => j)
     ///     })?;

@@ -1,6 +1,6 @@
-use std::{ffi::c_void, mem, ptr::null_mut};
+use std::{ffi::c_void, ptr::null_mut};
 
-const MIN_PAGE_SIZE: usize = 512 / mem::size_of::<usize>();
+const MIN_PAGE_SIZE: usize = 64;
 
 #[derive(Debug)]
 pub(crate) struct StackPage {

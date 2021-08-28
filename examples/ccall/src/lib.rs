@@ -1,6 +1,6 @@
 use jlrs::prelude::*;
 
-// NB: This crate is called `ccall`, so the library is called `libccall`. The functions are
+// This crate is called `ccall`, so the library is called `libccall`. The functions are
 // annotated with `no_mangle` to prevent name mangling and `extern "C"` to make them callable
 // with the C ABI.
 

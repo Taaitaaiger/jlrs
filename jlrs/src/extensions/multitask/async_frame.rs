@@ -21,17 +21,16 @@ use std::{
     ptr::{null_mut, NonNull},
 };
 
-/// A frame that can be used to root values and dispatch Julia function calls to another thread
-/// with [`CallAsync::call_async`]. An `AsyncGcFrame` is available by implementing the `AsyncTask`
-/// trait, this struct provides create a nested async scope.
+/// A frame is used to root Julia data, which guarantees the garbage collector doesn't free the
+/// data while the frame has not been dropped. More information about this topic can be found in
+/// the [`memory`] module.
 ///
-/// Roots are stored in slots, each slot can contain one root. Frames created with slots will
-/// preallocate that number of slots. Frames created without slots will dynamically create new
-/// slots as needed. A frame is able to create at least 16 slots. If there is sufficient capacity
-/// available, a new frame will use this remaining capacity. If the capacity is insufficient, more
-/// stack space is allocated.
+/// An `AsyncGcFrame` offers the same functionality as a [`GcFrame`], and some additional async
+/// methods that can be used to create nested async scopes. It can also be used to call the trait
+/// methods of [`CallAsync`].
 ///
-/// [`CallAsync::call_async`]: crate::extensions::multitask::call_async::CallAsync
+/// [`CallAsync`]: crate::extensions::multitask::call_async::CallAsync
+/// [`memory`]: crate::memory
 pub struct AsyncGcFrame<'frame> {
     raw_frame: &'frame mut [*mut c_void],
     n_roots: usize,
@@ -227,7 +226,9 @@ impl<'frame> AsyncGcFrame<'frame> {
         }
 
         for idx in slots + 2..slots + additional + 2 {
-            self.raw_frame[idx] = null_mut();
+            unsafe {
+                *self.raw_frame.get_unchecked_mut(idx) = null_mut();
+            }
         }
 
         // The new number of slots doesn't  exceed the capacity, and the new slots have been cleared
@@ -235,7 +236,8 @@ impl<'frame> AsyncGcFrame<'frame> {
         true
     }
 
-    // Safety: must be dropped
+    // Safety: this frame must be dropped in the same scope it has been created and raw_frame must
+    // have 2 + slots capacity available.
     pub(crate) unsafe fn new(
         raw_frame: &'frame mut [*mut c_void],
         capacity: usize,
@@ -256,43 +258,52 @@ impl<'frame> AsyncGcFrame<'frame> {
     // Safety: capacity >= n_slots
     pub(crate) unsafe fn set_n_slots(&mut self, n_slots: usize) {
         debug_assert!(n_slots <= self.capacity());
-        self.raw_frame[0] = (n_slots << 1) as _;
+        *self.raw_frame.get_unchecked_mut(0) = (n_slots << 1) as _;
     }
 
-    pub(crate) fn nest<'nested>(
+    // Safety: this frame must be dropped in the same scope it has been created.
+    pub(crate) unsafe fn nest<'nested>(
         &'nested mut self,
         capacity: usize,
     ) -> GcFrame<'nested, Async<'frame>> {
         let used = self.n_slots() + 2;
-        let needed = MIN_FRAME_CAPACITY.max(capacity) + 2;
-        let raw_frame = if used + needed > self.raw_frame.len() {
-            if self.page.is_none() || self.page.as_ref().unwrap().size() < needed {
-                self.page = Some(StackPage::new(needed));
+        let new_frame_size = MIN_FRAME_CAPACITY.max(capacity) + 2;
+        let raw_frame = if self.page.is_some() {
+            if new_frame_size <= self.page.as_ref().unwrap().size() {
+                self.page.as_mut().unwrap().as_mut()
+            } else {
+                self.page = Some(StackPage::new(new_frame_size));
+                self.page.as_mut().unwrap().as_mut()
             }
-
-            self.page.as_mut().unwrap().as_mut()
-        } else {
+        } else if used + new_frame_size <= self.raw_frame.len() {
             &mut self.raw_frame[used..]
+        } else {
+            self.page = Some(StackPage::new(new_frame_size));
+            self.page.as_mut().unwrap().as_mut()
         };
 
         GcFrame::new(raw_frame, capacity, self.mode)
     }
 
-    // Safety: frame must be dropped
+    // Safety: this frame must be dropped in the same scope it has been created.
     pub(crate) unsafe fn nest_async<'nested>(
         &'nested mut self,
         capacity: usize,
     ) -> AsyncGcFrame<'nested> {
         let used = self.n_slots() + 2;
-        let needed = MIN_FRAME_CAPACITY.max(capacity) + 2;
-        let raw_frame = if used + needed > self.raw_frame.len() {
-            if self.page.is_none() || self.page.as_ref().unwrap().size() < needed {
-                self.page = Some(StackPage::new(needed));
+        let new_frame_size = MIN_FRAME_CAPACITY.max(capacity) + 2;
+        let raw_frame = if self.page.is_some() {
+            if new_frame_size <= self.page.as_ref().unwrap().size() {
+                self.page.as_mut().unwrap().as_mut()
+            } else {
+                self.page = Some(StackPage::new(new_frame_size));
+                self.page.as_mut().unwrap().as_mut()
             }
-
-            self.page.as_mut().unwrap().as_mut()
-        } else {
+        } else if used + new_frame_size <= self.raw_frame.len() {
             &mut self.raw_frame[used..]
+        } else {
+            self.page = Some(StackPage::new(new_frame_size));
+            self.page.as_mut().unwrap().as_mut()
         };
 
         AsyncGcFrame::new(raw_frame, capacity, self.mode)
@@ -303,13 +314,13 @@ impl<'frame> AsyncGcFrame<'frame> {
         debug_assert!(self.n_roots() < self.capacity());
 
         let n_roots = self.n_roots();
-        self.raw_frame[n_roots + 2] = value.cast().as_ptr();
+        *self.raw_frame.get_unchecked_mut(n_roots + 2) = value.cast().as_ptr();
         if n_roots == self.n_slots() {
             self.set_n_slots(n_roots + 1);
         }
     }
 
-    // Safety: frame must be dropped
+    // Safety: this frame must be dropped in the same scope it has been created.
     pub(crate) unsafe fn nest_async_with_output<'nested>(
         &'nested mut self,
         capacity: usize,
@@ -321,33 +332,46 @@ impl<'frame> AsyncGcFrame<'frame> {
             )))?
         }
 
-        let needed = MIN_FRAME_CAPACITY.max(capacity) + 2;
+        let new_frame_size = MIN_FRAME_CAPACITY.max(capacity) + 2;
         let (output, raw_frame) = if let Some(output) = self.output.take() {
             let used = self.n_slots() + 2;
 
-            if used + needed > self.raw_frame.len() {
-                if self.page.is_none() || self.page.as_ref().unwrap().size() < needed {
-                    self.page = Some(StackPage::new(needed));
+            let new_frame_size = MIN_FRAME_CAPACITY.max(capacity) + 2;
+            let raw_frame = if self.page.is_some() {
+                if new_frame_size <= self.page.as_ref().unwrap().size() {
+                    self.page.as_mut().unwrap().as_mut()
+                } else {
+                    self.page = Some(StackPage::new(new_frame_size));
+                    self.page.as_mut().unwrap().as_mut()
                 }
-
-                (output, self.page.as_mut().unwrap().as_mut())
+            } else if used + new_frame_size <= self.raw_frame.len() {
+                &mut self.raw_frame[used..]
             } else {
-                (output, &mut self.raw_frame[used..])
-            }
+                self.page = Some(StackPage::new(new_frame_size));
+                self.page.as_mut().unwrap().as_mut()
+            };
+
+            (output, raw_frame)
         } else {
             let used = self.n_slots() + 3;
 
-            if used + needed > self.raw_frame.len() {
-                if self.page.is_none() || self.page.as_ref().unwrap().size() < needed {
-                    self.page = Some(StackPage::new(needed));
+            if self.page.is_some() {
+                if new_frame_size > self.page.as_ref().unwrap().size() {
+                    self.page = Some(StackPage::new(new_frame_size));
                 }
 
                 (
                     &mut self.raw_frame[used],
                     self.page.as_mut().unwrap().as_mut(),
                 )
-            } else {
+            } else if used + new_frame_size <= self.raw_frame.len() {
                 self.raw_frame[used..].split_first_mut().unwrap()
+            } else {
+                self.page = Some(StackPage::new(new_frame_size));
+                (
+                    &mut self.raw_frame[used],
+                    self.page.as_mut().unwrap().as_mut(),
+                )
             }
         };
 
@@ -400,7 +424,7 @@ impl<'frame> private::Frame<'frame> for AsyncGcFrame<'frame> {
         Ok(Value::wrap_non_null(value, Private))
     }
 
-    fn nest<'nested>(
+    unsafe fn nest<'nested>(
         &'nested mut self,
         capacity: usize,
         _: Private,
@@ -498,7 +522,7 @@ impl<'frame> private::Frame<'frame> for AsyncGcFrame<'frame> {
     where
         for<'inner> F: FnOnce(&mut GcFrame<'inner, Self::Mode>) -> JlrsResult<T>,
     {
-        let mut nested = self.nest(0);
+        let mut nested = unsafe { self.nest(0) };
         func(&mut nested)
     }
 
@@ -506,7 +530,7 @@ impl<'frame> private::Frame<'frame> for AsyncGcFrame<'frame> {
     where
         for<'inner> F: FnOnce(&mut GcFrame<'inner, Self::Mode>) -> JlrsResult<T>,
     {
-        let mut nested = self.nest(capacity);
+        let mut nested = unsafe { self.nest(capacity) };
         func(&mut nested)
     }
 }

@@ -86,6 +86,59 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         }
     }
 
+    pub(crate) fn new_local<'value, V>(
+        frame: &mut AsyncGcFrame<'frame>,
+        func: Value,
+        mut values: V,
+    ) -> JlrsResult<Self>
+    where
+        V: AsMut<[Value<'value, 'data>]>,
+    {
+        let shared_state = Arc::new(Mutex::new(TaskState {
+            completed: false,
+            waker: None,
+            task: None,
+            _marker: PhantomData,
+        }));
+
+        unsafe {
+            let values = values.as_mut();
+            let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
+            let state_ptr_boxed = Value::new(&mut *frame, state_ptr)?;
+
+            let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + values.len());
+
+            vals.push(func);
+            vals.push(state_ptr_boxed);
+            vals.extend_from_slice(values);
+
+            let global = frame.global();
+            let task = Module::main(global)
+                .submodule_ref("Jlrs")?
+                .wrapper_unchecked()
+                .function_ref("scheduleasync")?
+                .wrapper_unchecked()
+                .call(frame, &mut vals)?
+                .map_err(|e| {
+                    let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
+                    JlrsError::Exception {
+                        msg: format!("scheduleasync threw an exception: {}", msg),
+                    }
+                })?
+                .cast_unchecked::<Task>();
+
+            {
+                let locked = shared_state.lock();
+                match locked {
+                    Ok(mut data) => data.task = Some(task),
+                    _ => exception("Cannot set task".into())?,
+                }
+            }
+
+            Ok(JuliaFuture { shared_state })
+        }
+    }
+
     pub(crate) fn new_with_keywords<'value, V>(
         frame: &mut AsyncGcFrame<'frame>,
         func: WithKeywords,
@@ -139,6 +192,60 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             Ok(JuliaFuture { shared_state })
         }
     }
+
+    pub(crate) fn new_local_with_keywords<'value, V>(
+        frame: &mut AsyncGcFrame<'frame>,
+        func: WithKeywords,
+        mut values: V,
+    ) -> JlrsResult<Self>
+    where
+        V: AsMut<[Value<'value, 'data>]>,
+    {
+        let shared_state = Arc::new(Mutex::new(TaskState {
+            completed: false,
+            waker: None,
+            task: None,
+            _marker: PhantomData,
+        }));
+
+        unsafe {
+            let values = values.as_mut();
+            let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
+            let state_ptr_boxed = Value::new(&mut *frame, state_ptr)?;
+
+            let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + values.len());
+
+            vals.push(func.function());
+            vals.push(state_ptr_boxed);
+            vals.extend_from_slice(values);
+
+            let global = frame.global();
+            let task = Module::main(global)
+                .submodule_ref("Jlrs")?
+                .wrapper_unchecked()
+                .function_ref("scheduleasync")?
+                .wrapper_unchecked()
+                .with_keywords(func.keywords())?
+                .call(frame, &mut vals)?
+                .map_err(|e| {
+                    let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
+                    JlrsError::Exception {
+                        msg: format!("scheduleasync threw an exception: {}", msg),
+                    }
+                })?
+                .cast_unchecked::<Task>();
+
+            {
+                let locked = shared_state.lock();
+                match locked {
+                    Ok(mut data) => data.task = Some(task),
+                    _ => exception("Cannot set task".into())?,
+                }
+            }
+
+            Ok(JuliaFuture { shared_state })
+        }
+    }
 }
 
 impl<'frame, 'data> Future for JuliaFuture<'frame, 'data> {
@@ -168,8 +275,10 @@ impl<'frame, 'data> Future for JuliaFuture<'frame, 'data> {
                 // JuliaFuture is not created if task cannot be set
                 unreachable!()
             }
-        } else {
+        } else if shared_state.waker.is_none() {
             shared_state.waker = Some(cx.waker().clone());
+            Poll::Pending
+        } else {
             Poll::Pending
         }
     }

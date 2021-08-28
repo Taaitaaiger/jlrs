@@ -91,14 +91,14 @@ impl_debug!(Task<'_>);
 impl_valid_layout!(Task<'scope>, 'scope);
 
 impl<'scope> Wrapper<'scope, '_> for Task<'scope> {
-    type Internal = jl_task_t;
+    type Wraps = jl_task_t;
     const NAME: &'static str = "Task";
 
-    unsafe fn wrap_non_null(inner: NonNull<Self::Internal>, _: Private) -> Self {
+    unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData)
     }
 
-    unsafe fn unwrap_non_null(self, _: Private) -> NonNull<Self::Internal> {
+    fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
 }

@@ -166,7 +166,6 @@ impl_constant_isa_test!(nothing, "Nothing");
 
 impl_unionall_constant_test!(type_type, "Type");
 impl_unionall_constant_isa_test!(anytuple_type_type, "Type");
-impl_unionall_constant_test!(vararg_type, "Vararg");
 impl_unionall_constant_isa_test!(abstractarray_type, "Type");
 impl_unionall_constant_isa_test!(densearray_type, "Type");
 impl_unionall_constant_isa_test!(array_type, "Type");

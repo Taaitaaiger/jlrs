@@ -98,6 +98,14 @@ impl<'scope> Symbol<'scope> {
         }
     }
 
+    /// View `self` as a `Cstr`.
+    pub fn as_cstr(self) -> &'scope CStr {
+        unsafe {
+            let ptr = jl_symbol_name(self.unwrap(Private)).cast();
+            &CStr::from_ptr(ptr)
+        }
+    }
+
     /// View `self` as an slice of bytes without the trailing null.
     pub fn as_slice(self) -> &'scope [u8] {
         unsafe {
@@ -113,14 +121,14 @@ impl_debug!(Symbol<'_>);
 impl_valid_layout!(Symbol<'scope>, 'scope);
 
 impl<'scope> Wrapper<'scope, '_> for Symbol<'scope> {
-    type Internal = jl_sym_t;
+    type Wraps = jl_sym_t;
     const NAME: &'static str = "Symbol";
 
-    unsafe fn wrap_non_null(inner: NonNull<Self::Internal>, _: Private) -> Self {
+    unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData)
     }
 
-    unsafe fn unwrap_non_null(self, _: Private) -> NonNull<Self::Internal> {
+    fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
 }

@@ -6,20 +6,21 @@
 //! annotations with `Array`. To make this trait available you must opt into the feature
 //! `jlrs-ndarray`.
 
-use std::fmt::Debug;
-
-use crate::layout::valid_layout::ValidLayout;
-use crate::memory::frame::Frame;
-use crate::wrappers::ptr::array::{Array, TypedArray};
 use crate::{
     error::{JlrsError, JlrsResult},
+    layout::valid_layout::ValidLayout,
+    memory::frame::Frame,
     wrappers::ptr::array::dimensions::Dims,
+    wrappers::ptr::array::{Array, TypedArray},
 };
 use ndarray::{ArrayView, ArrayViewMut, Dim, IntoDimension, IxDynImpl, ShapeBuilder};
+use std::fmt::Debug;
 
 mod private {
-    use crate::layout::valid_layout::ValidLayout;
-    use crate::wrappers::ptr::array::{Array, TypedArray};
+    use crate::{
+        layout::valid_layout::ValidLayout,
+        wrappers::ptr::array::{Array, TypedArray},
+    };
     use std::fmt::Debug;
 
     pub trait Sealed {}

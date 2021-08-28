@@ -87,14 +87,14 @@ impl_julia_typecheck!(CodeInstance<'scope>, jl_code_instance_type, 'scope);
 impl_debug!(CodeInstance<'_>);
 
 impl<'scope> Wrapper<'scope, '_> for CodeInstance<'scope> {
-    type Internal = jl_code_instance_t;
+    type Wraps = jl_code_instance_t;
     const NAME: &'static str = "CodeInstance";
 
-    unsafe fn wrap_non_null(inner: NonNull<Self::Internal>, _: Private) -> Self {
+    unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, ::std::marker::PhantomData)
     }
 
-    unsafe fn unwrap_non_null(self, _: Private) -> NonNull<Self::Internal> {
+    fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
 }

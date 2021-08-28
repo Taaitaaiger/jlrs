@@ -591,28 +591,19 @@ mod tests {
                         .wrapper_unchecked();
 
                     let v1 = Value::new(&mut *frame, 1i8)?;
-                    let v2 = Value::new(&mut *frame, Tuple1(2i16))?;
+                    let v2 = Value::new(&mut *frame, Tuple1(2i32))?;
                     let v3 = Value::new(&mut *frame, 3i8)?;
                     let jl_val = constr.call3(&mut *frame, v1, v2, v3)?.unwrap();
-
-                    assert!(Module::base(global)
-                        .function_ref("typeof")?
-                        .wrapper_unchecked()
-                        .call1(&mut *frame, jl_val)?
-                        .unwrap()
-                        .cast::<DataType>()?
-                        .is::<UnionInTuple>());
 
                     let first = jl_val.get_nth_field(&mut *frame, 0).unwrap();
                     assert_eq!(first.unbox::<i8>().unwrap(), 1);
 
                     let second = jl_val.get_nth_field(&mut *frame, 1).unwrap();
-                    assert_eq!(second.unbox::<Tuple1<i16>>().unwrap(), Tuple1(2));
+                    assert_eq!(second.unbox::<Tuple1<i32>>().unwrap(), Tuple1(2));
 
                     let third = jl_val.get_nth_field(&mut *frame, 2).unwrap();
                     assert_eq!(third.unbox::<i8>().unwrap(), 3);
 
-                    assert!(jl_val.is::<UnionInTuple>());
                     let uit = jl_val.unbox::<UnionInTuple>()?;
                     assert_eq!(uit.a, 1);
                     assert_eq!(uit.c, 3);
@@ -1000,7 +991,6 @@ mod tests {
                         .is::<WithSetGenericTuple>());
 
                     let first = jl_val.get_nth_field(&mut *frame, 0).unwrap();
-                    eprintln!("First: {:?}", first);
                     first.unbox::<Tuple1<WithGenericT<i64>>>().unwrap();
 
                     assert!(jl_val.is::<WithSetGenericTuple>());

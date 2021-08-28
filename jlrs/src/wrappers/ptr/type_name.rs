@@ -11,14 +11,13 @@ use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout};
 use crate::{memory::global::Global, private::Private};
 use jl_sys::{
     jl_array_typename, jl_llvmpointer_typename, jl_namedtuple_typename, jl_pointer_typename,
-    jl_tuple_typename, jl_type_typename, jl_typename_t, jl_typename_type, jl_vararg_typename,
-    jl_vecelement_typename,
+    jl_tuple_typename, jl_type_typename, jl_typename_t, jl_typename_type, jl_vecelement_typename,
 };
 use std::{marker::PhantomData, ptr::NonNull};
 
 /// Describes the syntactic structure of a type and stores all data common to different
 /// instantiations of the type.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 #[repr(transparent)]
 pub struct TypeName<'scope>(NonNull<jl_typename_t>, PhantomData<&'scope ()>);
 
@@ -86,44 +85,39 @@ impl<'scope> TypeName<'scope> {
 }
 
 impl<'base> TypeName<'base> {
-    /// The typename of the `UnionAll` `VecElement`.
-    pub fn vecelement_typename(_: Global<'base>) -> Self {
-        unsafe { Self::wrap(jl_vecelement_typename, Private) }
-    }
-
-    /// The typename of the `UnionAll` `Array`.
-    pub fn array_typename(_: Global<'base>) -> Self {
-        unsafe { Self::wrap(jl_array_typename, Private) }
-    }
-
-    /// The typename of the `UnionAll` `Ptr`.
-    pub fn pointer_typename(_: Global<'base>) -> Self {
-        unsafe { Self::wrap(jl_pointer_typename, Private) }
-    }
-
-    /// The typename of the `UnionAll` `LLVMPtr`.
-    pub fn llvmpointer_typename(_: Global<'base>) -> Self {
-        unsafe { Self::wrap(jl_llvmpointer_typename, Private) }
-    }
-
-    /// The typename of the `UnionAll` `NamedTuple`.
-    pub fn namedtuple_typename(_: Global<'base>) -> Self {
-        unsafe { Self::wrap(jl_namedtuple_typename, Private) }
-    }
-
-    /// The typename of the `UnionAll` `Vararg`.
-    pub fn vararg_typename(_: Global<'base>) -> Self {
-        unsafe { Self::wrap(jl_vararg_typename, Private) }
-    }
-
     /// The typename of the `UnionAll` `Type`.
-    pub fn type_typename(_: Global<'base>) -> Self {
+    pub fn of_type(_: Global<'base>) -> Self {
         unsafe { Self::wrap(jl_type_typename, Private) }
     }
 
     /// The typename of the `DataType` `Tuple`.
-    pub fn tuple_typename(_: Global<'base>) -> Self {
+    pub fn of_tuple(_: Global<'base>) -> Self {
         unsafe { Self::wrap(jl_tuple_typename, Private) }
+    }
+
+    /// The typename of the `UnionAll` `VecElement`.
+    pub fn of_vecelement(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_vecelement_typename, Private) }
+    }
+
+    /// The typename of the `UnionAll` `Array`.
+    pub fn of_array(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_array_typename, Private) }
+    }
+
+    /// The typename of the `UnionAll` `Ptr`.
+    pub fn of_pointer(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_pointer_typename, Private) }
+    }
+
+    /// The typename of the `UnionAll` `LLVMPtr`.
+    pub fn of_llvmpointer(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_llvmpointer_typename, Private) }
+    }
+
+    /// The typename of the `UnionAll` `NamedTuple`.
+    pub fn of_namedtuple(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_namedtuple_typename, Private) }
     }
 }
 
@@ -132,14 +126,14 @@ impl_debug!(TypeName<'_>);
 impl_valid_layout!(TypeName<'scope>, 'scope);
 
 impl<'scope> Wrapper<'scope, '_> for TypeName<'scope> {
-    type Internal = jl_typename_t;
+    type Wraps = jl_typename_t;
     const NAME: &'static str = "TypeName";
 
-    unsafe fn wrap_non_null(inner: NonNull<Self::Internal>, _: Private) -> Self {
+    unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData)
     }
 
-    unsafe fn unwrap_non_null(self, _: Private) -> NonNull<Self::Internal> {
+    fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
 }

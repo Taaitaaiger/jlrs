@@ -48,10 +48,10 @@ pub(crate) const MIN_FRAME_CAPACITY: usize = 16;
 /// preallocate that number of slots. Frames created without slots will dynamically create new
 /// slots as needed. A frame's capacity is at least 16.
 pub struct GcFrame<'frame, M: Mode> {
-    raw_frame: &'frame mut [*mut c_void],
-    page: Option<StackPage>,
-    n_roots: usize,
-    mode: M,
+    pub(crate) raw_frame: &'frame mut [*mut c_void],
+    pub(crate) page: Option<StackPage>,
+    pub(crate) n_roots: usize,
+    pub(crate) mode: M,
 }
 
 impl<'frame, M: Mode> GcFrame<'frame, M> {
@@ -89,40 +89,43 @@ impl<'frame, M: Mode> GcFrame<'frame, M> {
     }
 
     // Safety: this frame must be dropped in the same scope it has been created.
-    pub(crate) fn nest<'nested>(&'nested mut self, capacity: usize) -> GcFrame<'nested, M> {
+    pub(crate) unsafe fn nest<'nested>(&'nested mut self, capacity: usize) -> GcFrame<'nested, M> {
         let used = self.n_slots() + 2;
         let new_frame_size = MIN_FRAME_CAPACITY.max(capacity) + 2;
-        let raw_frame = if used + new_frame_size > self.raw_frame.len() {
-            if self.page.is_none() || self.page.as_ref().unwrap().size() < new_frame_size {
+        let raw_frame = if self.page.is_some() {
+            if new_frame_size <= self.page.as_ref().unwrap().size() {
+                self.page.as_mut().unwrap().as_mut()
+            } else {
                 self.page = Some(StackPage::new(new_frame_size));
+                self.page.as_mut().unwrap().as_mut()
             }
-
-            self.page.as_mut().unwrap().as_mut()
-        } else {
+        } else if used + new_frame_size <= self.raw_frame.len() {
             &mut self.raw_frame[used..]
+        } else {
+            self.page = Some(StackPage::new(new_frame_size));
+            self.page.as_mut().unwrap().as_mut()
         };
 
         GcFrame::new(raw_frame, capacity, self.mode)
     }
 
-    // Safety: this frame must be dropped in the same scope it has been created.
-    pub(crate) fn new(raw_frame: &'frame mut [*mut c_void], slots: usize, mode: M) -> Self {
-        unsafe {
-            mode.push_frame(raw_frame, slots, Private);
+    // Safety: this frame must be dropped in the same scope it has been created and raw_frame must
+    // have 2 + slots capacity available.
+    pub(crate) unsafe fn new(raw_frame: &'frame mut [*mut c_void], slots: usize, mode: M) -> Self {
+        mode.push_frame(raw_frame, slots, Private);
 
-            GcFrame {
-                raw_frame,
-                page: None,
-                n_roots: 0,
-                mode,
-            }
+        GcFrame {
+            raw_frame,
+            page: None,
+            n_roots: 0,
+            mode,
         }
     }
 
     // Safety: capacity >= n_slots
     pub(crate) unsafe fn set_n_slots(&mut self, n_slots: usize) {
         debug_assert!(self.capacity() >= n_slots);
-        self.raw_frame[0] = (n_slots << 1) as _;
+        *self.raw_frame.get_unchecked_mut(0) = (n_slots << 1) as _;
     }
 
     // Safety: capacity > n_roots
@@ -130,7 +133,7 @@ impl<'frame, M: Mode> GcFrame<'frame, M> {
         debug_assert!(self.n_roots() < self.capacity());
 
         let n_roots = self.n_roots();
-        self.raw_frame[n_roots + 2] = value.cast().as_ptr();
+        *self.raw_frame.get_unchecked_mut(n_roots + 2) = value.cast().as_ptr();
         if n_roots == self.n_slots() {
             self.set_n_slots(n_roots + 1);
         }
@@ -244,7 +247,7 @@ pub(crate) mod private {
             _: Private,
         ) -> Result<Value<'frame, 'data>, AllocError>;
 
-        fn nest<'nested>(
+        unsafe fn nest<'nested>(
             &'nested mut self,
             capacity: usize,
             _: Private,
@@ -326,7 +329,7 @@ pub(crate) mod private {
             Ok(Value::wrap_non_null(value, Private))
         }
 
-        fn nest<'nested>(
+        unsafe fn nest<'nested>(
             &'nested mut self,
             capacity: usize,
             _: Private,
@@ -343,7 +346,7 @@ pub(crate) mod private {
                 -> JlrsResult<OutputValue<'frame, 'data, 'inner>>,
         {
             let v = {
-                let mut nested = self.nest(0);
+                let mut nested = unsafe { self.nest(0) };
                 let out = Output::new();
                 func(out, &mut nested)?.into_pending()
             };
@@ -365,7 +368,7 @@ pub(crate) mod private {
                 -> JlrsResult<OutputValue<'frame, 'data, 'inner>>,
         {
             let v = {
-                let mut nested = self.nest(capacity);
+                let mut nested = unsafe { self.nest(capacity) };
                 let out = Output::new();
                 func(out, &mut nested)?.into_pending()
             };
@@ -386,7 +389,7 @@ pub(crate) mod private {
                 -> JlrsResult<OutputResult<'frame, 'data, 'inner>>,
         {
             let v = {
-                let mut nested = self.nest(0);
+                let mut nested = unsafe { self.nest(0) };
                 let out = Output::new();
                 func(out, &mut nested)?.into_pending()
             };
@@ -408,7 +411,7 @@ pub(crate) mod private {
                 -> JlrsResult<OutputResult<'frame, 'data, 'inner>>,
         {
             let v = {
-                let mut nested = self.nest(capacity);
+                let mut nested = unsafe { self.nest(capacity) };
                 let out = Output::new();
                 func(out, &mut nested)?.into_pending()
             };
@@ -420,7 +423,7 @@ pub(crate) mod private {
         where
             for<'inner> F: FnOnce(&mut GcFrame<'inner, Self::Mode>) -> JlrsResult<T>,
         {
-            let mut nested = self.nest(0);
+            let mut nested = unsafe { self.nest(0) };
             func(&mut nested)
         }
 
@@ -428,7 +431,7 @@ pub(crate) mod private {
         where
             for<'inner> F: FnOnce(&mut GcFrame<'inner, Self::Mode>) -> JlrsResult<T>,
         {
-            let mut nested = self.nest(capacity);
+            let mut nested = unsafe { self.nest(capacity) };
             func(&mut nested)
         }
     }
@@ -444,7 +447,7 @@ pub(crate) mod private {
             Err(AllocError::FrameOverflow(1, 0))
         }
 
-        fn nest<'nested>(
+        unsafe fn nest<'nested>(
             &'nested mut self,
             _capacity: usize,
             _: Private,

@@ -31,7 +31,10 @@ pub use jlrs_derive::*;
 
 #[cfg(feature = "async")]
 pub use crate::extensions::multitask::{
-    async_frame::AsyncGcFrame, async_task::AsyncTask, call_async::CallAsync, AsyncJulia,
+    async_frame::AsyncGcFrame,
+    async_task::{AsyncTask, GeneratorTask},
+    call_async::CallAsync,
+    AsyncJulia,
 };
 #[cfg(feature = "async")]
 pub use async_trait::async_trait;
