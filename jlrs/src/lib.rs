@@ -41,8 +41,9 @@
 //! In order to ensure the `julia.h` header file can be found, either `/usr/include/julia/julia.h`
 //! must exist, or you have to set the `JULIA_DIR` environment variable to `/path/to/julia-x.y.z`.
 //! This environment variable can be used to override the default. Similarly, in order to load
-//! `libjulia.so` and `libuv.so` you must add `/path/to/julia-x.y.z/lib` and
-//! `/path/to/julia-x.y.z/lib/julia` to the `LD_LIBRARY_PATH` environment variable.
+//! `libjulia.so` you must add `/path/to/julia-x.y.z/lib` to the `LD_LIBRARY_PATH` environment
+//! variable. When the `uv` feature is enabled, `/path/to/julia-x.y.z/lib/julia` must also be
+//! added to `LD_LIBRARY_PATH`.
 //!
 //! #### Windows
 //!
@@ -374,7 +375,7 @@ use memory::mode::Sync;
 use memory::stack_page::StackPage;
 use prelude::Wrapper;
 use private::Private;
-use std::ffi::{CString};
+use std::ffi::CString;
 use std::io::{Error as IOError, ErrorKind};
 use std::mem::{self, MaybeUninit};
 use std::path::Path;
@@ -641,6 +642,8 @@ impl CCall {
     /// `Base.AsyncCondition` in Julia. This can be used to call a long-running Rust function from
     /// Julia with ccall in another thread and wait for it to complete in Julia without blocking,
     /// there's an example available in the repository: ccall_with_threads.
+    ///
+    /// This method is only available if the `uv` feature is enabled.
     #[cfg(feature = "uv")]
     pub unsafe fn uv_async_send(handle: *mut std::ffi::c_void) -> bool {
         uv_async_send(handle.cast()) == 0
