@@ -258,20 +258,6 @@ fn datatype_instance() {
 }
 
 #[test]
-fn datatype_ninitialized() {
-    JULIA.with(|j| {
-        let mut jlrs = j.borrow_mut();
-        jlrs.scope_with_slots(0, |global, _| {
-            let dt = DataType::tvar_type(global);
-            assert_eq!(dt.n_initialized(), 3);
-
-            Ok(())
-        })
-        .unwrap();
-    })
-}
-
-#[test]
 fn datatype_hash() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();

@@ -19,9 +19,9 @@ use crate::{
     },
 };
 use jl_sys::{
-    jl_base_module, jl_core_module, jl_get_global, jl_main_module, jl_module_t, jl_module_type,
-    jl_set_const, jl_set_global, jl_typeis, jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_set_const,
-    jlrs_set_global,
+    jl_base_module, jl_core_module, jl_get_global, jl_is_imported, jl_main_module, jl_module_t,
+    jl_module_type, jl_set_const, jl_set_global, jl_typeis, jlrs_result_tag_t_JLRS_RESULT_ERR,
+    jlrs_set_const, jlrs_set_global,
 };
 
 use std::marker::PhantomData;
@@ -96,6 +96,14 @@ impl<'scope> Module<'scope> {
     /// Returns a handle to Julia's `Base`-module.
     pub fn base(_: Global<'scope>) -> Self {
         unsafe { Module::wrap(jl_base_module, Private) }
+    }
+
+    /// Returns `true` if `self` has imported `sym`.
+    pub fn is_imported<N: TemporarySymbol>(self, sym: N) -> bool {
+        unsafe {
+            let sym = sym.temporary_symbol(Private);
+            jl_is_imported(self.unwrap(Private), sym.unwrap(Private)) != 0
+        }
     }
 
     /// Returns the submodule named `name` relative to this module. You have to visit this level
@@ -452,7 +460,7 @@ impl<'scope> Module<'scope> {
     /// `Module::set_global` to do so.
     ///
     /// Note that when you want to call `using Submodule` in the `Main` module, you can do so by
-    /// evaluating the using-statement with [`Value::eval_string`].    
+    /// evaluating the using-statement with [`Value::eval_string`].
     pub fn require<'target, 'current, S, F, N>(
         self,
         scope: S,
@@ -514,14 +522,14 @@ impl_debug!(Module<'_>);
 impl_valid_layout!(Module<'target>, 'target);
 
 impl<'scope> Wrapper<'scope, '_> for Module<'scope> {
-    type Internal = jl_module_t;
+    type Wraps = jl_module_t;
     const NAME: &'static str = "Module";
 
-    unsafe fn wrap_non_null(inner: NonNull<Self::Internal>, _: Private) -> Self {
+    unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData)
     }
 
-    unsafe fn unwrap_non_null(self, _: Private) -> NonNull<Self::Internal> {
+    fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
 }

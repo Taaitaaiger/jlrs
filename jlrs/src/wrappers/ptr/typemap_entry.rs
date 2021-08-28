@@ -89,14 +89,14 @@ impl_debug!(TypeMapEntry<'_>);
 impl_valid_layout!(TypeMapEntry<'scope>, 'scope);
 
 impl<'scope> Wrapper<'scope, '_> for TypeMapEntry<'scope> {
-    type Internal = jl_typemap_entry_t;
+    type Wraps = jl_typemap_entry_t;
     const NAME: &'static str = "TypeMapEntry";
 
-    unsafe fn wrap_non_null(inner: NonNull<Self::Internal>, _: Private) -> Self {
+    unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData)
     }
 
-    unsafe fn unwrap_non_null(self, _: Private) -> NonNull<Self::Internal> {
+    fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
 }

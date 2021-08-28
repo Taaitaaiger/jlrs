@@ -1,12 +1,15 @@
 use jlrs::prelude::*;
 
 fn main() {
+    // Julia must be initialized before it can be used.
     let mut julia = unsafe { Julia::init().expect("Could not init Julia") };
 
+    // Include some custom code defined in MyModule.jl
     julia
         .include("MyModule.jl")
         .expect("Could not include file");
-    let v = julia
+
+    let result = julia
         .scope(|global, frame| {
             let dim = Value::new(&mut *frame, 4isize)?;
             let iters = Value::new(&mut *frame, 1_000_000isize)?;
@@ -32,5 +35,5 @@ fn main() {
         })
         .expect("Result is an error");
 
-    println!("Result: {}", v);
+    println!("Result: {}", result);
 }

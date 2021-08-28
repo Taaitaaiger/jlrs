@@ -7,28 +7,29 @@ use super::{
 use crate::error::{JuliaResultRef, CANNOT_DISPLAY_TYPE};
 use crate::layout::typecheck::{Concrete, Typecheck};
 use crate::memory::frame::Frame;
-use crate::wrappers::ptr::symbol::Symbol;
 use crate::wrappers::ptr::value::Value;
+use crate::wrappers::ptr::{simple_vector::SimpleVector, symbol::Symbol};
 use crate::{
     error::{JlrsError, JlrsResult},
     memory::scope::Scope,
 };
 use crate::{impl_debug, impl_valid_layout, memory::global::Global, private::Private};
 use jl_sys::{
-    jl_abstractslot_type, jl_abstractstring_type, jl_any_type, jl_anytuple_type,
+    jl_abstractslot_type, jl_abstractstring_type, jl_any_type, jl_anytuple_type, jl_argument_type,
     jl_argumenterror_type, jl_bool_type, jl_boundserror_type, jl_builtin_type, jl_char_type,
-    jl_code_info_type, jl_code_instance_type, jl_datatype_align, jl_datatype_isinlinealloc,
-    jl_datatype_nbits, jl_datatype_nfields, jl_datatype_size, jl_datatype_t, jl_datatype_type,
-    jl_emptytuple_type, jl_errorexception_type, jl_expr_type, jl_field_isptr, jl_field_names,
-    jl_field_offset, jl_field_size, jl_float16_type, jl_float32_type, jl_float64_type,
-    jl_floatingpoint_type, jl_function_type, jl_get_fieldtypes, jl_globalref_type,
-    jl_gotonode_type, jl_initerror_type, jl_int16_type, jl_int32_type, jl_int64_type, jl_int8_type,
+    jl_code_info_type, jl_code_instance_type, jl_const_type, jl_datatype_align, jl_datatype_nbits,
+    jl_datatype_nfields, jl_datatype_size, jl_datatype_t, jl_datatype_type, jl_emptytuple_type,
+    jl_errorexception_type, jl_expr_type, jl_field_isptr, jl_field_names, jl_field_offset,
+    jl_field_size, jl_float16_type, jl_float32_type, jl_float64_type, jl_floatingpoint_type,
+    jl_function_type, jl_get_fieldtypes, jl_globalref_type, jl_gotoifnot_type, jl_gotonode_type,
+    jl_initerror_type, jl_int16_type, jl_int32_type, jl_int64_type, jl_int8_type,
     jl_intrinsic_type, jl_isbits, jl_lineinfonode_type, jl_linenumbernode_type, jl_loaderror_type,
-    jl_method_instance_type, jl_method_type, jl_methoderror_type, jl_methtable_type,
-    jl_module_type, jl_new_structv, jl_newvarnode_type, jl_nothing_type, jl_number_type,
-    jl_phicnode_type, jl_phinode_type, jl_pinode_type, jl_quotenode_type, jl_signed_type,
-    jl_simplevector_type, jl_slotnumber_type, jl_ssavalue_type, jl_string_type, jl_symbol_type,
-    jl_task_type, jl_tvar_type, jl_typedslot_type, jl_typeerror_type, jl_typemap_entry_type,
+    jl_method_instance_type, jl_method_match_type, jl_method_type, jl_methoderror_type,
+    jl_methtable_type, jl_module_type, jl_new_structv, jl_newvarnode_type, jl_nothing_type,
+    jl_number_type, jl_partial_struct_type, jl_phicnode_type, jl_phinode_type, jl_pinode_type,
+    jl_quotenode_type, jl_returnnode_type, jl_signed_type, jl_simplevector_type,
+    jl_slotnumber_type, jl_ssavalue_type, jl_string_type, jl_symbol_type, jl_task_type,
+    jl_tvar_type, jl_typedslot_type, jl_typeerror_type, jl_typemap_entry_type,
     jl_typemap_level_type, jl_typename_str, jl_typename_type, jl_typeofbottom_type, jl_uint16_type,
     jl_uint32_type, jl_uint64_type, jl_uint8_type, jl_undefvarerror_type, jl_unionall_type,
     jl_uniontype_type, jl_upsilonnode_type, jl_voidpointer_type, jl_weakref_type, jlrs_new_structv,
@@ -52,22 +53,11 @@ impl<'scope> DataType<'scope> {
     super: DataType
     parameters: Core.SimpleVector
     types: Core.SimpleVector
-    names: Core.SimpleVector
     instance: Any
     layout: Ptr{Nothing}
     size: Int32
-    ninitialized: Int32
     hash: Int32
-    abstract: Bool
-    mutable: Bool
-    hasfreetypevars: Bool
-    isconcretetype: Bool
-    isdispatchtuple: Bool
-    isbitstype: Bool
-    zeroinit: Bool
-    isinlinealloc: Bool
-    has_concrete_subtype: Bool
-    cached_by_hash: Bool
+    flags: UInt8
     */
 
     /// Returns the `TypeName` of this type.
@@ -88,14 +78,79 @@ impl<'scope> DataType<'scope> {
         unsafe { SimpleVectorRef::wrap(self.unwrap_non_null(Private).as_ref().parameters) }
     }
 
+    /// Returns the number of type parameters.
+    pub fn n_parameters(self) -> usize {
+        unsafe {
+            let params = self.unwrap_non_null(Private).as_ref().parameters;
+            SimpleVector::<Value>::wrap(params, Private).len()
+        }
+    }
+
+    /// Returns the type parameter at position `idx`, or `None` if the index is out of bounds.
+    pub fn parameter(self, idx: usize) -> Option<ValueRef<'scope, 'static>> {
+        unsafe {
+            let params = self.unwrap_non_null(Private).as_ref().parameters;
+            SimpleVector::<Value>::wrap(params, Private)
+                .data()
+                .get(idx)
+                .copied()
+        }
+    }
+
     /// Returns the field types of this type.
     pub fn field_types(self) -> SimpleVectorRef<'scope> {
         unsafe { SimpleVectorRef::wrap(jl_get_fieldtypes(self.unwrap(Private))) }
     }
 
+    /// Returns the field type of the field at position `idx`.
+    pub fn field_type(self, idx: usize) -> Option<ValueRef<'scope, 'static>> {
+        unsafe {
+            self.field_types()
+                .wrapper_unchecked()
+                .data()
+                .get(idx)
+                .copied()
+        }
+    }
+
+    /// Returns the field type of the field at position `idx` if `self` is a concrete datatype.
+    pub fn field_type_concrete(self, idx: usize) -> Option<ValueRef<'scope, 'static>> {
+        unsafe {
+            if !self.is_concrete_type() {
+                return None;
+            }
+
+            SimpleVector::<Value>::wrap(self.unwrap_non_null(Private).as_ref().types, Private)
+                .data()
+                .get(idx)
+                .copied()
+        }
+    }
+
     /// Returns the field names of this type.
     pub fn field_names(self) -> SimpleVectorRef<'scope, Symbol<'scope>> {
         unsafe { SimpleVectorRef::wrap(jl_field_names(self.unwrap(Private))) }
+    }
+
+    /// Returns the name of the field at position `idx`.
+    pub fn field_name(self, idx: usize) -> Option<Symbol<'scope>> {
+        unsafe {
+            self.field_names()
+                .wrapper_unchecked()
+                .data()
+                .get(idx)
+                .copied()
+                .map(|s| s.wrapper_unchecked())
+        }
+    }
+
+    /// Returns the name of the field at position `idx`.
+    pub fn field_name_str(self, idx: usize) -> Option<&'scope str> {
+        if let Some(sym) = self.field_name(idx) {
+            return sym.as_str().ok();
+        }
+
+        None
     }
 
     /// Returns the instance if this type is a singleton.
@@ -106,11 +161,6 @@ impl<'scope> DataType<'scope> {
     /// Returns the size of a value of this type in bytes.
     pub fn size(self) -> i32 {
         unsafe { jl_datatype_size(self.unwrap(Private)) }
-    }
-
-    /// Returns the number of initialized fields.
-    pub fn n_initialized(self) -> i32 {
-        unsafe { self.unwrap_non_null(Private).as_ref().ninitialized }
     }
 
     /// Returns the hash of this type.
@@ -148,24 +198,22 @@ impl<'scope> DataType<'scope> {
         unsafe { jl_isbits(self.unwrap(Private).cast()) }
     }
 
-    /// Returns true if one or more fields require zero-initialization.
+    /// Returns true if values of this type are zero-initialized.
     pub fn zero_init(self) -> bool {
         unsafe { self.unwrap_non_null(Private).as_ref().zeroinit != 0 }
     }
 
     /// Returns true if a value of this type stores its data inline.
     pub fn is_inline_alloc(self) -> bool {
-        unsafe { jl_datatype_isinlinealloc(self.unwrap(Private)) != 0 }
+        unsafe {
+            self.unwrap_non_null(Private).as_ref().isinlinealloc != 0
+                && !self.unwrap_non_null(Private).as_ref().layout.is_null()
+        }
     }
 
     /// If false, no value will have this type.
     pub fn has_concrete_subtype(self) -> bool {
         unsafe { self.unwrap_non_null(Private).as_ref().has_concrete_subtype != 0 }
-    }
-
-    /// stored in hash-based set cache (instead of linear cache)
-    pub fn cached_by_hash(self) -> bool {
-        unsafe { self.unwrap_non_null(Private).as_ref().cached_by_hash != 0 }
     }
 }
 
@@ -413,6 +461,26 @@ impl<'base> DataType<'base> {
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_typedslot_type), Private) }
     }
 
+    /// The type `Core.Argument`
+    pub fn argument_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_argument_type), Private) }
+    }
+
+    /// The type `Core.Const`
+    pub fn const_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_const_type), Private) }
+    }
+
+    /// The type `Core.PartialStruct`
+    pub fn partial_struct_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_partial_struct_type), Private) }
+    }
+
+    /// The type `MethodMatch`
+    pub fn method_match_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_method_match_type), Private) }
+    }
+
     /// The type `SimpleVector`.
     pub fn simplevector_type(_: Global<'base>) -> Self {
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_simplevector_type), Private) }
@@ -423,14 +491,14 @@ impl<'base> DataType<'base> {
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_anytuple_type), Private) }
     }
 
-    /// The type `Tuple`.
-    pub fn tuple_type(_: Global<'base>) -> Self {
-        unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_anytuple_type), Private) }
-    }
-
     /// The type of an empty tuple.
     pub fn emptytuple_type(_: Global<'base>) -> Self {
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_emptytuple_type), Private) }
+    }
+
+    /// The type `Tuple`.
+    pub fn tuple_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_anytuple_type), Private) }
     }
 
     /// The type `Function`.
@@ -643,6 +711,16 @@ impl<'base> DataType<'base> {
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_gotonode_type), Private) }
     }
 
+    /// The type `GotoIfNot`.
+    pub fn gotoifnot_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_gotoifnot_type), Private) }
+    }
+
+    /// The type `ReturnNode`.
+    pub fn returnnode_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_returnnode_type), Private) }
+    }
+
     /// The type `PhiNode`.
     pub fn phinode_type(_: Global<'base>) -> Self {
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_phinode_type), Private) }
@@ -712,14 +790,14 @@ impl_debug!(DataType<'_>);
 impl_valid_layout!(DataType<'scope>, 'scope);
 
 impl<'scope> WrapperPriv<'scope, '_> for DataType<'scope> {
-    type Internal = jl_datatype_t;
+    type Wraps = jl_datatype_t;
     const NAME: &'static str = "DataType";
 
-    unsafe fn wrap_non_null(inner: NonNull<Self::Internal>, _: Private) -> Self {
+    unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, ::std::marker::PhantomData)
     }
 
-    unsafe fn unwrap_non_null(self, _: Private) -> NonNull<Self::Internal> {
+    fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
 }

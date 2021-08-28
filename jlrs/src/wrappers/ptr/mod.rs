@@ -69,7 +69,7 @@ use self::{
     weak_ref::WeakRef,
 };
 use crate::{
-    error::{JlrsError, JlrsResult},
+    error::{JlrsError, JlrsResult, CANNOT_DISPLAY_VALUE},
     layout::valid_layout::ValidLayout,
     memory::{frame::Frame, global::Global, scope::Scope},
     private::Private,
@@ -107,19 +107,51 @@ pub trait Wrapper<'scope, 'data>: private::Wrapper<'scope, 'data> {
         unsafe { Value::wrap_non_null(self.unwrap_non_null(Private).cast(), Private) }
     }
 
-    /// Convert the wrapper to its display string, ie the string that is shown by calling
-    /// `Base.display`.
+    /// Convert the wrapper to its display string, i.e. the string that is shown when calling
+    /// `Base.show`.
     fn display_string(self) -> JlrsResult<String> {
         unsafe {
             let global = Global::new();
             let s = Module::main(global)
                 .submodule_ref("Jlrs")?
                 .wrapper_unchecked()
-                .function_ref("displaystring")?
+                .function_ref("valuestring")?
                 .wrapper_unchecked()
                 .call1_unrooted(global, self.as_value())
                 .map_err(|e| JlrsError::Exception {
-                    msg: format!("Jlrs.displaystring failed: {:?}", e.value_unchecked()),
+                    msg: format!(
+                        "Jlrs.valuestring failed: {}",
+                        e.value_unchecked().error_string_or(CANNOT_DISPLAY_VALUE)
+                    ),
+                })?
+                .value_unchecked()
+                .cast::<JuliaString>()?
+                .as_str()?
+                .to_string();
+
+            Ok(s)
+        }
+    }
+
+    /// Convert the wrapper to its error string, i.e. the string that is shown when calling
+    /// `Base.showerror`. This string can contain ANSI color codes if this is enabled by calling
+    /// [`Julia::error_color`].
+    ///
+    /// [`Julia::error_color`]: crate::Julia::error_color
+    fn error_string(self) -> JlrsResult<String> {
+        unsafe {
+            let global = Global::new();
+            let s = Module::main(global)
+                .submodule_ref("Jlrs")?
+                .wrapper_unchecked()
+                .function_ref("errorstring")?
+                .wrapper_unchecked()
+                .call1_unrooted(global, self.as_value())
+                .map_err(|e| JlrsError::Exception {
+                    msg: format!(
+                        "Jlrs.errorstring failed: {}",
+                        e.value_unchecked().error_string_or(CANNOT_DISPLAY_VALUE)
+                    ),
                 })?
                 .value_unchecked()
                 .cast::<JuliaString>()?
@@ -134,6 +166,12 @@ pub trait Wrapper<'scope, 'data>: private::Wrapper<'scope, 'data> {
     /// `Base.display`, or some default value.
     fn display_string_or<S: Into<String>>(self, default: S) -> String {
         self.display_string().unwrap_or(default.into())
+    }
+
+    /// Convert the wrapper to its error string, i.e. the string that is shown when this value is
+    /// thrown as an exception, or some default value.
+    fn error_string_or<S: Into<String>>(self, default: S) -> String {
+        self.error_string().unwrap_or(default.into())
     }
 }
 
@@ -172,7 +210,7 @@ macro_rules! impl_debug {
 #[derive(Copy, Clone)]
 #[repr(transparent)]
 pub struct Ref<'scope, 'data, T: Wrapper<'scope, 'data>>(
-    *mut T::Internal,
+    *mut T::Wraps,
     PhantomData<&'scope ()>,
     PhantomData<&'data ()>,
 );
@@ -330,7 +368,7 @@ pub type WeakRefRef<'scope> = Ref<'scope, 'static, WeakRef<'scope>>;
 impl_valid_layout!(WeakRefRef, WeakRef);
 
 impl<'scope, 'data, T: Wrapper<'scope, 'data>> Ref<'scope, 'data, T> {
-    pub(crate) unsafe fn wrap(ptr: *mut T::Internal) -> Self {
+    pub(crate) unsafe fn wrap(ptr: *mut T::Wraps) -> Self {
         Ref(ptr, PhantomData, PhantomData)
     }
 
@@ -399,7 +437,7 @@ impl<'scope, 'data, T: Wrapper<'scope, 'data>> Ref<'scope, 'data, T> {
         T::value_unchecked(self, Private)
     }
 
-    pub(crate) fn ptr(self) -> *mut T::Internal {
+    pub(crate) fn ptr(self) -> *mut T::Wraps {
         self.0
     }
 }
@@ -410,19 +448,19 @@ pub(crate) mod private {
     use std::{fmt::Debug, ptr::NonNull};
 
     pub trait Wrapper<'scope, 'data>: Sized + Copy + Debug {
-        type Internal: Copy;
+        type Wraps: Copy;
         const NAME: &'static str;
 
-        unsafe fn wrap_non_null(inner: NonNull<Self::Internal>, _: Private) -> Self;
+        unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self;
 
-        unsafe fn wrap(ptr: *mut Self::Internal, _: Private) -> Self {
+        unsafe fn wrap(ptr: *mut Self::Wraps, _: Private) -> Self {
             debug_assert!(!ptr.is_null());
             Self::wrap_non_null(NonNull::new_unchecked(ptr), Private)
         }
 
-        unsafe fn unwrap_non_null(self, _: Private) -> NonNull<Self::Internal>;
+        fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps>;
 
-        unsafe fn unwrap(self, _: Private) -> *mut Self::Internal {
+        fn unwrap(self, _: Private) -> *mut Self::Wraps {
             self.unwrap_non_null(Private).as_ptr()
         }
 

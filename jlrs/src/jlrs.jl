@@ -1,69 +1,73 @@
 module Jlrs
-using Base.StackTraces
-
-struct TracedException
-    exc
-    stacktrace::StackTrace
+struct LocalTask
+    func::Function
+    args::Tuple
+    kwargs
+    wakeptr::Ptr{Cvoid}
 end
 
+const color = Ref{Bool}(false)
 const wakerust = Ref{Ptr{Cvoid}}(C_NULL)
-const droparray = Ref{Ptr{Cvoid}}(C_NULL)
-
-function runasync(func::Function, wakeptr::Ptr{Cvoid}, args...; kwargs...)::Any
-    try
-        func(args...; kwargs...)
-    finally
-        ccall(wakerust[], Cvoid, (Ptr{Cvoid},), wakeptr)
-    end
-end
 
 function asynccall(func::Function, wakeptr::Ptr{Cvoid}, args...; kwargs...)::Task
-    @assert wakerust[] != C_NULL "wakerust is null"
-    Base.Threads.@spawn runasync(func, wakeptr, args...; kwargs...)
-end
-
-function tracingcall(func::Function)::Function
-    function wrapper(args...; kwargs...)
+    @nospecialize func wakeptr args kwargs
+    Base.Threads.@spawn begin
         try
             func(args...; kwargs...)
-        catch
-            for s in stacktrace(catch_backtrace(), true)
-                println(stderr, s)
+        finally
+            if wakeptr != C_NULL
+                ccall(wakerust[], Cvoid, (Ptr{Cvoid},), wakeptr)
             end
-
-            rethrow()
         end
     end
-
-    wrapper
 end
 
-function attachstacktrace(func::Function)::Function
-    function wrapper(args...; kwargs...)
-        try
-            func(args...; kwargs...)
-        catch exc
-            st::StackTrace = stacktrace(catch_backtrace(), true)
-            rethrow(TracedException(exc, st))
+function asynccall(func::Function, args...; kwargs...)::Task
+    @nospecialize func args kwargs
+    Base.Threads.@spawn func(args...; kwargs...)
+end
+
+const inchannel = Channel{LocalTask}(1)
+const outchannel = Channel{Task}(1)
+Base.Threads.@spawn begin
+    while true
+        local_task::LocalTask = take!(inchannel)
+        task::Task = @async begin
+            try
+                local_task.func(local_task.args...; local_task.kwargs...)
+            finally
+                if local_task.wakeptr != C_NULL
+                    ccall(wakerust[], Cvoid, (Ptr{Cvoid},), local_task.wakeptr)
+                end
+            end
         end
+        put!(outchannel, task)
     end
-
-    wrapper
 end
 
-function clean(a::Array)
-    @assert droparray[] != C_NULL "droparray is null"
-    ccall(droparray[], Cvoid, (Array,), a)
+function scheduleasync(func::Function, wakeptr::Ptr{Cvoid}, args...; kwargs...)::Task
+    @nospecialize func wakeptr args kwargs
+    task::LocalTask = LocalTask(func, args, kwargs, wakeptr)
+    put!(inchannel, task)
+    take!(outchannel)
 end
 
-@nospecialize
-function displaystring(value)::String
-    try
-        io = IOBuffer()
-        display(TextDisplay(io), value)
-        String(take!(io))
-    catch
-        ""
-    end
+function scheduleasync(func::Function, args...; kwargs...)::Task
+    @nospecialize func args kwargs
+    task::LocalTask = LocalTask(func, args, kwargs, C_NULL)
+    put!(inchannel, task)
+    take!(outchannel)
+end
+
+function valuestring(@nospecialize(value::Any))::String
+    io = IOBuffer()
+    show(io, "text/plain", value)
+    String(take!(io))
+end
+
+function errorstring(@nospecialize(value::Any))::String
+    io = IOBuffer()
+    showerror(IOContext(io, :color => color[]), value)
+    String(take!(io))
 end
 end

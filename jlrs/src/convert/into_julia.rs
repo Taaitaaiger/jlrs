@@ -12,16 +12,20 @@
 use crate::{
     memory::global::Global,
     private::Private,
-    wrappers::ptr::{private::Wrapper, DataTypeRef, ValueRef},
+    wrappers::ptr::{
+        datatype::DataType, private::Wrapper as WrapperPriv, union_all::UnionAll, value::Value,
+        DataTypeRef, ValueRef, Wrapper,
+    },
 };
 use jl_sys::{
-    jl_bool_type, jl_box_bool, jl_box_char, jl_box_float32, jl_box_float64, jl_box_int16,
-    jl_box_int32, jl_box_int64, jl_box_int8, jl_box_uint16, jl_box_uint32, jl_box_uint64,
-    jl_box_uint8, jl_box_voidpointer, jl_char_type, jl_float32_type, jl_float64_type,
-    jl_int16_type, jl_int32_type, jl_int64_type, jl_int8_type, jl_new_struct_uninit,
-    jl_uint16_type, jl_uint32_type, jl_uint64_type, jl_uint8_type, jl_voidpointer_type,
+    jl_apply_type, jl_bool_type, jl_box_bool, jl_box_char, jl_box_float32, jl_box_float64,
+    jl_box_int16, jl_box_int32, jl_box_int64, jl_box_int8, jl_box_uint16, jl_box_uint32,
+    jl_box_uint64, jl_box_uint8, jl_box_voidpointer, jl_char_type, jl_float32_type,
+    jl_float64_type, jl_int16_type, jl_int32_type, jl_int64_type, jl_int8_type,
+    jl_new_struct_uninit, jl_uint16_type, jl_uint32_type, jl_uint64_type, jl_uint8_type,
+    jl_voidpointer_type,
 };
-use std::ffi::c_void;
+use std::{ffi::c_void, ptr::NonNull};
 
 /// Trait implemented by types that can be converted to a Julia value in combination with
 /// [`Value::new`]. This trait can be derived, it's recommended to use JlrsReflect.jl to
@@ -95,3 +99,26 @@ impl_into_julia!(isize, jl_box_int32, jl_int32_type);
 
 #[cfg(target_pointer_width = "64")]
 impl_into_julia!(isize, jl_box_int64, jl_int64_type);
+
+unsafe impl<T: IntoJulia> IntoJulia for *mut T {
+    fn julia_type<'scope>(global: Global<'scope>) -> DataTypeRef<'scope> {
+        let ptr_ua = UnionAll::pointer_type(global);
+        let inner_ty = T::julia_type(global);
+        let params = &mut [inner_ty];
+        let param_ptr = params.as_mut_ptr().cast();
+
+        unsafe {
+            let applied = jl_apply_type(ptr_ua.unwrap(Private).cast(), param_ptr, 1);
+
+            if applied.is_null() {
+                return DataTypeRef::undefined_ref();
+            }
+
+            match Value::wrap_non_null(NonNull::new_unchecked(applied), Private).cast::<DataType>()
+            {
+                Ok(dt) => dt.as_ref(),
+                Err(_e) => return DataTypeRef::undefined_ref(),
+            }
+        }
+    }
+}

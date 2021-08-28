@@ -69,36 +69,36 @@ end
 has_nothing = ModuleOrNothing(nothing)
 has_module = ModuleOrNothing(Base)
 
-struct NoUnionsBits 
+struct NoUnionsBits
     a::Int16
-    b::Int32 
+    b::Int32
 end
 
-struct NoUnionsBitsPtr 
+struct NoUnionsBitsPtr
     a::Int16
-    b::DataType 
+    b::DataType
 end
 
-struct BitsBitsUnion 
+struct BitsBitsUnion
     a::Int16
-    b::Union{Int16, Int32} 
+    b::Union{Int16, Int32}
 end
 
-struct PtrBitsUnion 
+struct PtrBitsUnion
     a::DataType
-    b::Union{Int16, Int32} 
+    b::Union{Int16, Int32}
 end
 
 struct PtrNonBitsUnion
     a::DataType
-    b::Union{Int16, Int32, DataType} 
+    b::Union{Int16, Int32, DataType}
 end
 
-struct HasArray 
-    a::Array{Float64, 2} 
+struct HasArray
+    a::Array{Float64, 2}
 end
 
-struct UaArray 
-    a::Array 
+struct UaArray
+    a::Array
 end
 end

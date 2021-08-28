@@ -108,14 +108,14 @@ impl Debug for JuliaString<'_> {
 }
 
 impl<'scope> WrapperPriv<'scope, '_> for JuliaString<'scope> {
-    type Internal = u8;
+    type Wraps = u8;
     const NAME: &'static str = "String";
 
-    unsafe fn wrap_non_null(inner: NonNull<Self::Internal>, _: Private) -> Self {
+    unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         JuliaString(inner.as_ptr(), PhantomData)
     }
 
-    unsafe fn unwrap_non_null(self, _: Private) -> NonNull<Self::Internal> {
-        mem::transmute(self.0)
+    fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
+        unsafe { NonNull::new_unchecked(self.0 as *mut _) }
     }
 }

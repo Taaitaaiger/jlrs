@@ -135,6 +135,9 @@ pub enum JlrsError {
         dim_size: usize,
         vec_size: usize,
     },
+    NumThreadsVar {
+        value: String,
+    },
     MoreThreadsRequired,
     UndefRef,
 }
@@ -145,7 +148,7 @@ pub fn exception<T>(exc: String) -> JlrsResult<T> {
 }
 
 impl JlrsError {
-    pub fn other<E: Error + Send + Sync + 'static>(reason: E) -> Self {
+    pub fn other<E: Error + 'static + Send + Sync>(reason: E) -> Self {
         JlrsError::Other(Box::new(reason))
     }
 
@@ -357,7 +360,7 @@ impl Display for JlrsError {
             JlrsError::NamedTupleSizeMismatch { n_names, n_values } => {
                 write!(
                     formatter,
-                    "A named tuple must have an equal number of names and values, but {} name(s) and {} values(s) were given", 
+                    "A named tuple must have an equal number of names and values, but {} name(s) and {} values(s) were given",
                     n_names,
                     n_values
                 )
@@ -372,13 +375,16 @@ impl Display for JlrsError {
             JlrsError::UndefRef => {
                 write!(formatter, "An undefined reference cannot be rooted")
             }
+            JlrsError::NumThreadsVar { value } => {
+                write!(formatter, "The `JULIA_NUM_THREADS` environment variable must be set to a value larger than 2 or auto, but its value is: {}", value)
+            }
         }
     }
 }
 
 impl Error for JlrsError {}
 
-impl Into<Box<JlrsError>> for Box<dyn Error + Send + Sync + 'static> {
+impl Into<Box<JlrsError>> for Box<dyn Error + 'static + Send + Sync> {
     fn into(self) -> Box<JlrsError> {
         Box::new(JlrsError::Other(self))
     }

@@ -75,7 +75,7 @@ fn main_module() {
             let main_module = Module::main(global);
             let jlrs_module = main_module.submodule(frame, "Jlrs");
             assert!(jlrs_module.is_ok());
-            let func = jlrs_module.unwrap().function(frame, "attachstacktrace");
+            let func = jlrs_module.unwrap().function(frame, "valuestring");
             assert!(func.is_ok());
             Ok(())
         })
@@ -92,7 +92,7 @@ fn main_module_dynamic() {
             let main_module = Module::main(global);
             let jlrs_module = main_module.submodule(frame, "Jlrs");
             assert!(jlrs_module.is_ok());
-            let func = jlrs_module.unwrap().function(frame, "attachstacktrace");
+            let func = jlrs_module.unwrap().function(frame, "valuestring");
             assert!(func.is_ok());
             Ok(())
         })
@@ -266,11 +266,13 @@ fn set_const() {
 fn set_const_twice() {
     JULIA.with(|j| {
         let mut jlrs = j.borrow_mut();
+        jlrs.error_color(true).unwrap();
         let err = jlrs.scope_with_slots(2, |global, frame| {
             let main = Module::main(global);
             let value1 = Value::new(&mut *frame, 3usize)?;
             let value2 = Value::new(&mut *frame, 4usize)?;
             main.set_const_unrooted("TWICE", value1)
+                .map_err(|v| unsafe { v.value_unchecked() })
                 .into_jlrs_result()?;
             main.set_const(frame, "TWICE", value2)?.into_jlrs_result()?;
             Ok(())

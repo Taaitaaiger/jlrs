@@ -19,14 +19,25 @@ fn flags() -> Vec<String> {
         Some(julia_dir) => {
             let jl_include_path = format!("-I{}/include/julia/", julia_dir);
             let jl_lib_path = format!("-L{}/lib/", julia_dir);
+            // Needed to link libuv
 
             println!("cargo:rustc-flags={}", &jl_lib_path);
+
+            if env::var("CARGO_FEATURE_UV").is_ok() {
+                let jl_internal_lib_path = format!("-L{}/lib/julia", julia_dir);
+                println!("cargo:rustc-flags={}", &jl_internal_lib_path);
+            }
+
             vec![jl_include_path]
         }
         None => Vec::new(),
     };
 
     println!("cargo:rustc-link-lib=julia");
+    if env::var("CARGO_FEATURE_UV").is_ok() {
+        println!("cargo:rustc-link-lib=uv");
+    }
+
     flags
 }
 
@@ -63,6 +74,7 @@ fn main() {
         "jl_alloc_svec",
         "jl_alloc_svec_uninit",
         "jl_apply_array_type",
+        "jl_apply_generic",
         "jl_apply_tuple_type_v",
         "jl_apply_type",
         "jl_array_eltype",
@@ -87,25 +99,41 @@ fn main() {
         "jl_call2",
         "jl_call3",
         "jl_compute_fieldtypes",
+        "jl_cpu_threads",
         "jl_egal",
         "jl_eval_string",
         "jl_exception_occurred",
+        "jl_environ",
         "jl_field_index",
         "jl_finalize",
+        "jl_flush_cstdio",
         "jl_gc_add_finalizer",
+        "jl_gc_add_ptr_finalizer",
         "jl_gc_collect",
         "jl_gc_enable",
         "jl_gc_is_enabled",
         "jl_gc_queue_root",
         "jl_gc_safepoint",
+        "jl_getallocationgranularity",
         "jl_get_global",
+        "jl_get_libllvm",
         "jl_get_kwsorter",
         "jl_get_nth_field",
         "jl_get_nth_field_noalloc",
         "jl_get_ptls_states",
+        "jl_get_ARCH",
+        "jl_get_UNAME",
+        "jl_getpagesize",
+        "jl_git_branch",
+        "jl_git_commit",
+        "jl_init",
         "jl_init__threading",
+        "jl_init_with_image",
         "jl_init_with_image__threading",
+        "jl_is_debugbuild",
+        "jl_is_imported",
         "jl_is_initialized",
+        "jl_ver_is_release",
         "jl_isa",
         "jl_islayout_inline",
         "jl_new_array",
@@ -113,14 +141,16 @@ fn main() {
         "jl_new_structv",
         "jl_new_typevar",
         "jl_object_id",
+        "jl_pchar_to_array",
         "jl_pchar_to_string",
-        "jl_pgcstack",
         "jl_process_events",
         "jl_ptr_to_array",
         "jl_ptr_to_array_1d",
         "jl_set_const",
         "jl_set_global",
         "jl_set_nth_field",
+        "jl_stderr_obj",
+        "jl_stdout_obj",
         "jl_subtype",
         "jl_symbol",
         "jl_symbol_n",
@@ -139,6 +169,11 @@ fn main() {
         "jl_unbox_uint64",
         "jl_unbox_uint8",
         "jl_unbox_voidpointer",
+        "jl_ver_is_released",
+        "jl_ver_major",
+        "jl_ver_minor",
+        "jl_ver_patch",
+        "jl_ver_string",
         "uv_async_send",
         "jlrs_alloc_array_1d",
         "jlrs_alloc_array_2d",
@@ -154,6 +189,15 @@ fn main() {
         "jlrs_set_nth_field",
         "jlrs_type_union",
         "jlrs_type_unionall",
+        "jlrs_reshape_array",
+        "jlrs_array_grow_end",
+        "jlrs_array_del_end",
+        "jlrs_array_grow_beg",
+        "jlrs_array_del_beg",
+        "jlrs_array_sizehint",
+        "jlrs_array_ptr_1d_push",
+        "jlrs_array_ptr_1d_append",
+        "jlrs_current_task",
     ];
 
     let mut builder = bindgen::Builder::default()
@@ -174,16 +218,27 @@ fn main() {
         .allowlist_type("jl_fielddesc8_t")
         .allowlist_type("jl_method_match_t")
         .allowlist_type("jl_methtable_t")
+        .allowlist_type("jl_opaque_closure_t")
         .allowlist_type("jl_taggedvalue_t")
         .allowlist_type("jl_task_t")
         .allowlist_type("jl_typemap_entry_t")
         .allowlist_type("jl_typemap_level_t")
         .allowlist_type("jl_uniontype_t")
         .allowlist_type("jl_value_t")
+        .allowlist_type("jl_vararg_t")
         .allowlist_type("jl_weakref_t")
         .allowlist_var("jl_abstractarray_type")
         .allowlist_var("jl_abstractslot_type")
         .allowlist_var("jl_abstractstring_type")
+        .allowlist_var("jl_argument_type")
+        .allowlist_var("jl_const_type")
+        .allowlist_var("jl_partial_struct_type")
+        .allowlist_var("jl_partial_opaque_type")
+        .allowlist_var("jl_interconditional_type")
+        .allowlist_var("jl_method_match_type")
+        .allowlist_var("jl_atomicerror_type")
+        .allowlist_var("jl_gotoifnot_type")
+        .allowlist_var("jl_returnnode_type")
         .allowlist_var("jl_addrspace_pointer_typename")
         .allowlist_var("jl_an_empty_string")
         .allowlist_var("jl_an_empty_vec_any")
@@ -206,6 +261,7 @@ fn main() {
         .allowlist_var("jl_code_info_type")
         .allowlist_var("jl_code_instance_type")
         .allowlist_var("jl_core_module")
+        .allowlist_var("jl_pgcstack")
         .allowlist_var("jl_datatype_type")
         .allowlist_var("jl_densearray_type")
         .allowlist_var("jl_diverror_exception")
@@ -243,12 +299,15 @@ fn main() {
         .allowlist_var("jl_method_type")
         .allowlist_var("jl_methtable_type")
         .allowlist_var("jl_module_type")
+        .allowlist_var("jl_n_threads")
         .allowlist_var("jl_namedtuple_type")
         .allowlist_var("jl_namedtuple_typename")
         .allowlist_var("jl_newvarnode_type")
         .allowlist_var("jl_nothing")
         .allowlist_var("jl_nothing_type")
         .allowlist_var("jl_number_type")
+        .allowlist_var("jl_opaque_closure_type")
+        .allowlist_var("jl_opaque_closure_typename")
         .allowlist_var("jl_phicnode_type")
         .allowlist_var("jl_phinode_type")
         .allowlist_var("jl_pinode_type")
