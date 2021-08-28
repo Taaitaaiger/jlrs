@@ -1,5 +1,4 @@
 use std::env;
-use std::fs;
 use std::path::{Path, PathBuf};
 
 fn find_julia() -> Option<String> {
@@ -42,18 +41,16 @@ fn flags() -> Vec<String> {
 }
 
 fn main() {
+    if env::var("DOCS_RS").is_ok() {
+        return;
+    }
+
     let mut out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
     out_path.push("bindings.rs");
 
     println!("cargo:rerun-if-changed=src/jlrs_c.c");
     println!("cargo:rerun-if-changed=src/jlrs_c.h");
     println!("cargo:rerun-if-env-changed=JULIA_DIR");
-
-    if env::var("CARGO_FEATURE_DOCS_RS").is_ok() {
-        fs::copy("dummy-bindings.rs", &out_path)
-            .expect("Couldn't create bindings from dummy bindings.");
-        return;
-    }
 
     let flags = flags();
 
@@ -66,16 +63,6 @@ fn main() {
     }
 
     c.compile("jlrs_c");
-
-    #[cfg(feature = "use-dummy")]
-    {
-        #[cfg(not(feature = "use-bindgen"))]
-        {
-            fs::copy("src/dummy-bindings.rs", &out_path)
-                .expect("Couldn't create bindings from dummy bindings.");
-            return;
-        }
-    }
 
     #[cfg(feature = "use-bindgen")]
     {

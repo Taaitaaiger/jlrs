@@ -15,6 +15,15 @@ use std::ffi::c_void;
 use std::mem::size_of;
 use std::sync::atomic::{AtomicPtr, Ordering};
 
+#[cfg(feature = "use-dummy")]
+#[cfg(not(feature = "use-bindgen"))]
+pub mod bindings;
+
+#[cfg(feature = "use-dummy")]
+#[cfg(not(feature = "use-bindgen"))]
+pub use bindings::*;
+
+#[cfg(feature = "use-bindgen")]
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 // define

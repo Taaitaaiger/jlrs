@@ -75,4 +75,4 @@ jobs:
           echo "JULIA_DIR=${JULIA_DIR}" >> $GITHUB_ENV
 
       - name: Build Docs
-        run: cargo doc
+        run: cargo doc --features uv
