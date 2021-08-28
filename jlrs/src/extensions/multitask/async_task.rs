@@ -24,6 +24,7 @@ use super::{AsyncStackPage, Message};
 use crate::error::{JlrsError, JlrsResult};
 use crate::memory::frame::GcFrame;
 use crate::memory::global::Global;
+use crate::memory::stack_page::StackPage;
 use async_std::channel::Sender as AsyncStdSender;
 use async_trait::async_trait;
 
@@ -487,6 +488,9 @@ where
             // Transmute to get static lifetimes. Should be okay because tasks can't leak
             // Julia data and the frame is not dropped until the generator is dropped.
             let mode = Async(std::mem::transmute(&stack.top[1]));
+            if stack.page.size() < AT::RUN_SLOTS + 2 {
+                stack.page = StackPage::new(AT::RUN_SLOTS + 2);
+            }
             let raw = std::mem::transmute(stack.page.as_mut());
             let mut frame = AsyncGcFrame::new(raw, 0, mode);
             let global = Global::new();
@@ -518,6 +522,10 @@ where
             let sender = self.sender();
 
             let mode = Async(&stack.top[1]);
+            if stack.page.size() < AT::REGISTER_SLOTS + 2 {
+                stack.page = StackPage::new(AT::REGISTER_SLOTS + 2);
+            }
+
             let raw = stack.page.as_mut();
             let mut frame = AsyncGcFrame::new(raw, 0, mode);
             let global = Global::new();
@@ -549,6 +557,10 @@ where
             let sender = self.sender();
 
             let mode = Async(&stack.top[1]);
+            if stack.page.size() < GT::REGISTER_SLOTS + 2 {
+                stack.page = StackPage::new(GT::REGISTER_SLOTS + 2);
+            }
+
             let raw = stack.page.as_mut();
             let mut frame = AsyncGcFrame::new(raw, 0, mode);
             let global = Global::new();
@@ -582,6 +594,10 @@ where
             // Transmute to get static lifetimes. Should be okay because tasks can't leak
             // Julia data and the frame is not dropped until the generator is dropped.
             let mode = Async(std::mem::transmute(&stack.top[1]));
+            if stack.page.size() < GT::INIT_SLOTS + 2 {
+                stack.page = StackPage::new(GT::INIT_SLOTS + 2);
+            }
+
             let raw = std::mem::transmute(stack.page.as_mut());
             let mut frame = AsyncGcFrame::new(raw, GT::INIT_SLOTS, mode);
             let global = Global::new();
@@ -626,6 +642,7 @@ where
 pub(crate) struct BlockingTask<F, RC, T> {
     func: F,
     sender: RC,
+    slots: usize,
     _res: PhantomData<T>,
 }
 
@@ -636,10 +653,11 @@ where
     RC: ReturnChannel<Ok = T>,
     T: Send + Sync + 'static,
 {
-    pub(crate) fn new(func: F, sender: RC) -> Self {
+    pub(crate) fn new(func: F, sender: RC, slots: usize) -> Self {
         Self {
             func,
             sender,
+            slots,
             _res: PhantomData,
         }
     }
@@ -668,8 +686,11 @@ where
 {
     fn call(self: Box<Self>, stack: &mut AsyncStackPage) {
         let mode = Async(&stack.top[1]);
+        if stack.page.size() < self.slots + 2 {
+            stack.page = StackPage::new(self.slots + 2);
+        }
         let raw = stack.page.as_mut();
-        let mut frame = GcFrame::new(raw, 0, mode);
+        let mut frame = unsafe { GcFrame::new(raw, self.slots, mode) };
         let (res, ch) = self.call(&mut frame);
         async_std::task::spawn_local(async move { ch.send(res).await });
     }

@@ -330,7 +330,7 @@ impl AsyncJulia {
         R: ReturnChannel<Ok = T>,
         T: Send + Sync + 'static,
     {
-        let msg = BlockingTask::new(task, res_sender);
+        let msg = BlockingTask::new(task, res_sender, 0);
         let boxed = Box::new(msg);
         self.sender
             .send(Message::BlockingTask(boxed))
@@ -352,7 +352,57 @@ impl AsyncJulia {
         R: ReturnChannel<Ok = T>,
         T: Send + Sync + 'static,
     {
-        let msg = BlockingTask::new(task, res_sender);
+        let msg = BlockingTask::new(task, res_sender, 0);
+        let boxed = Box::new(msg);
+        match self.sender.try_send(Message::BlockingTask(boxed)) {
+            Ok(_) => Ok(()),
+            Err(TrySendError::Full(_)) => Err(Box::new(JlrsError::other(TrySendError::Full(()))))?,
+            Err(_) => Err(Box::new(JlrsError::other(TrySendError::Closed(()))))?,
+        }
+    }
+
+    /// Sends a blocking task to the async runtime, if there's no room in the channel an error is
+    /// returned immediately. A blocking task is a closure that takes two arguments, a `Global`
+    /// and mutable reference to a `GcFrame`, and must return a `JlrsResult` whose inner type is
+    /// both `Send` and `Sync`. This task is executed as soon as possible and can't call async
+    /// methods, so it block the runtime. The result of the closure is sent to `res_sender`.
+    pub async fn blocking_task_with_slots<T, R, F>(&self, task: F, res_sender: R, slots: usize)
+    where
+        for<'base> F: 'static
+            + Send
+            + Sync
+            + FnOnce(Global<'base>, &mut GcFrame<'base, Async<'base>>) -> JlrsResult<T>,
+        R: ReturnChannel<Ok = T>,
+        T: Send + Sync + 'static,
+    {
+        let msg = BlockingTask::new(task, res_sender, slots);
+        let boxed = Box::new(msg);
+        self.sender
+            .send(Message::BlockingTask(boxed))
+            .await
+            .expect("Channel was closed");
+    }
+
+    /// Sends a blocking task to the async runtime, this method waits if there's no room in the
+    /// channel. A blocking task is a closure that takes two arguments, a `Global` and mutable
+    /// reference to a `GcFrame`, and must return a `JlrsResult` whose inner type is both `Send`
+    /// and `Sync`. This task is executed as soon as possible and can't call async methods, so it
+    /// block the runtime. The result of the closure is sent to `res_sender`.
+    pub fn try_blocking_task_with_slots<T, R, F>(
+        &self,
+        task: F,
+        res_sender: R,
+        slots: usize,
+    ) -> JlrsResult<()>
+    where
+        for<'base> F: 'static
+            + Send
+            + Sync
+            + FnOnce(Global<'base>, &mut GcFrame<'base, Async<'base>>) -> JlrsResult<T>,
+        R: ReturnChannel<Ok = T>,
+        T: Send + Sync + 'static,
+    {
+        let msg = BlockingTask::new(task, res_sender, slots);
         let boxed = Box::new(msg);
         match self.sender.try_send(Message::BlockingTask(boxed)) {
             Ok(_) => Ok(()),
