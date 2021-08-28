@@ -460,7 +460,7 @@ impl<'scope> Module<'scope> {
     /// `Module::set_global` to do so.
     ///
     /// Note that when you want to call `using Submodule` in the `Main` module, you can do so by
-    /// evaluating the using-statement with [`Value::eval_string`].    
+    /// evaluating the using-statement with [`Value::eval_string`].
     pub fn require<'target, 'current, S, F, N>(
         self,
         scope: S,

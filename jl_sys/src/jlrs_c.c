@@ -273,7 +273,7 @@ jlrs_result_t jlrs_reshape_array(jl_value_t *atype, jl_array_t *data, jl_value_t
     return out;
 }
 
-jlrs_result_t jlrs_array_grow_end(jl_array_t *a, size_t inc) 
+jlrs_result_t jlrs_array_grow_end(jl_array_t *a, size_t inc)
 {
     jlrs_result_t out;
 
@@ -313,7 +313,7 @@ jlrs_result_t jlrs_array_del_end(jl_array_t *a, size_t dec)
     return out;
 }
 
-jlrs_result_t jlrs_array_grow_beg(jl_array_t *a, size_t inc) 
+jlrs_result_t jlrs_array_grow_beg(jl_array_t *a, size_t inc)
 {
     jlrs_result_t out;
 
@@ -351,9 +351,4 @@ jlrs_result_t jlrs_array_del_beg(jl_array_t *a, size_t dec)
     jl_exception_clear();
 
     return out;
-}
-
-jl_task_t *jlrs_current_task(void)
-{
-    return jl_current_task;
 }

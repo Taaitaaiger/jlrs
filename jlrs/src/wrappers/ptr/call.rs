@@ -468,12 +468,11 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
 }
 
 pub(crate) mod private {
-    use crate::wrappers::ptr::{function::Function, opaque_closure::OpaqueClosure, value::Value};
+    use crate::wrappers::ptr::{function::Function, value::Value};
 
     use super::WithKeywords;
     pub trait Call {}
     impl Call for WithKeywords<'_, '_> {}
     impl Call for Function<'_, '_> {}
     impl Call for Value<'_, '_> {}
-    impl Call for OpaqueClosure<'_> {}
 }

@@ -4,13 +4,12 @@
 //! Rust. An [`Array`] is the Julia array itself, [`TypedArray`] is also available which can be
 //! used if the element type implements [`ValidLayout`].
 //!
-//! Several methods are available to create new arrays. [`Array::new`] and [`TypedArray::new`]
-//! let you create a new array for any type that implements [`IntoJulia`], while
-//! [`Array::new_for`] can be used to create a new array for arbitrary types. These methods
-//! allocate a new array, it's also possible to use data from Rust directly if it implements
-//! `IntoJulia`. [`Array::from_vec`] and [`TypedArray::from_vec`] can be used to move the data
-//! from Rust to Julia, while [`Array::from_slice`] and [`TypedArray::from_slice`] can be used
-//! to mutably borrow data from Rust as a Julia array.
+//! Several methods are available to create new arrays. [`Array::new`] lets you create a new array
+//! for any type that implements [`IntoJulia`], while [`Array::new_for`] can be used to create a
+//! new array for arbitrary types. These methods allocate a new array, it's also possible to use
+//! data from Rust directly if it implements `IntoJulia`. [`Array::from_vec`] and can be used to
+//! move the data from Rust to Julia, while [`Array::from_slice`] can be used to mutably borrow
+//! data from Rust as a Julia array.
 //!
 //! How the contents of the array must be accessed from Rust depends on the type of the elements.
 //! [`Array`] provides methods to (mutably) access their contents for all three possible
@@ -56,10 +55,10 @@ use crate::{
 use jl_sys::{
     jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_apply_array_type,
     jl_apply_tuple_type_v, jl_array_data, jl_array_eltype, jl_array_t, jl_datatype_t,
-    jl_gc_add_ptr_finalizer, jl_is_array_type, jl_new_array, jl_new_struct_uninit,
-    jl_pchar_to_array, jl_ptr_to_array, jl_ptr_to_array_1d, jl_tparam0, jlrs_alloc_array_1d,
-    jlrs_alloc_array_2d, jlrs_alloc_array_3d, jlrs_array_del_beg, jlrs_array_del_end,
-    jlrs_array_grow_beg, jlrs_array_grow_end, jlrs_current_task, jlrs_new_array,
+    jl_gc_add_ptr_finalizer, jl_get_ptls_states, jl_is_array_type, jl_new_array,
+    jl_new_struct_uninit, jl_pchar_to_array, jl_ptr_to_array, jl_ptr_to_array_1d, jl_tparam0,
+    jlrs_alloc_array_1d, jlrs_alloc_array_2d, jlrs_alloc_array_3d, jlrs_array_del_beg,
+    jlrs_array_del_end, jlrs_array_grow_beg, jlrs_array_grow_end, jlrs_new_array,
     jlrs_reshape_array, jlrs_result_tag_t_JLRS_RESULT_ERR,
 };
 use std::{
@@ -466,7 +465,7 @@ impl<'data> Array<'_, 'data> {
                         .cast();
 
                         jl_gc_add_ptr_finalizer(
-                            jlrs_current_task().as_ref().unwrap().ptls,
+                            jl_get_ptls_states(),
                             array,
                             droparray as *mut c_void,
                         );
@@ -486,7 +485,7 @@ impl<'data> Array<'_, 'data> {
                         .cast();
 
                         jl_gc_add_ptr_finalizer(
-                            jlrs_current_task().as_ref().unwrap().ptls,
+                            jl_get_ptls_states(),
                             array,
                             droparray as *mut c_void,
                         );
@@ -506,7 +505,7 @@ impl<'data> Array<'_, 'data> {
                         .cast();
 
                         jl_gc_add_ptr_finalizer(
-                            jlrs_current_task().as_ref().unwrap().ptls,
+                            jl_get_ptls_states(),
                             array,
                             droparray as *mut c_void,
                         );

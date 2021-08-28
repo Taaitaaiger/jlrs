@@ -49,9 +49,9 @@ impl GeneratorTask for AccumulatorTask {
         Ok(())
     }
 
-    // Initialize the generator. Because the frame is not dropped until all handles to the task 
-    // have been dropped and every pending call has completed, Julia data rooted in this frame 
-    // can be returned as State. Here, the value we'll use as an accumulator is created and 
+    // Initialize the generator. Because the frame is not dropped until all handles to the task
+    // have been dropped and every pending call has completed, Julia data rooted in this frame
+    // can be returned as State. Here, the value we'll use as an accumulator is created and
     // returned.
     async fn init<'inner>(
         &'inner mut self,
@@ -77,7 +77,7 @@ impl GeneratorTask for AccumulatorTask {
     }
 
     // Call the generator once. Note that while the state can be mutated, you can't replace any
-    // Julia data that it contains with newly allocated data because it's called in a nested 
+    // Julia data that it contains with newly allocated data because it's called in a nested
     // scope.
     async fn run<'inner, 'frame>(
         &'inner mut self,
@@ -118,13 +118,13 @@ fn main() {
         init_receiver.recv().unwrap().unwrap();
     }
 
-    // Create a new AccumulatorTask, if AccumulatorTask::init completes successfully a handle to 
+    // Create a new AccumulatorTask, if AccumulatorTask::init completes successfully a handle to
     // the generator is returned.
     let generator = julia
         .try_generator(AccumulatorTask { init_value: 5.0 })
         .expect("AccumulatorTask::init failed");
 
-    // Call the generator twice. Because AccumulatorTask::Input is f64, that data must be 
+    // Call the generator twice. Because AccumulatorTask::Input is f64, that data must be
     // provided here.
     let (sender1, receiver1) = crossbeam_channel::bounded(1);
     generator.try_call(5.0, sender1).unwrap();
@@ -138,7 +138,7 @@ fn main() {
     let y = receiver2.recv().unwrap().unwrap();
     println!("Result of second task: {}", y);
 
-    // Dropping the generator and `julia` causes the runtime to shut down Julia and itself. Join 
+    // Dropping the generator and `julia` causes the runtime to shut down Julia and itself. Join
     // the handle to wait for everything to shut down cleanly.
     std::mem::drop(generator);
     std::mem::drop(julia);

@@ -9,7 +9,7 @@ fn return_nothing() {
         jlrs.scope_with_slots(3, |_global, frame| unsafe {
             let func = Value::eval_string(
                 &mut *frame,
-                "function x(a)::Nothing 
+                "function x(a)::Nothing
                     @assert 3 == a;
                 end",
             )?
@@ -31,7 +31,7 @@ fn throw_nothing() {
         jlrs.scope_with_slots(3, |_global, frame| unsafe {
             let func = Value::eval_string(
                 &mut *frame,
-                "function y()::Nothing 
+                "function y()::Nothing
                     throw(nothing)
                 end",
             )?

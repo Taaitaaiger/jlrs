@@ -2,7 +2,7 @@ module Jlrs
 struct LocalTask
     func::Function
     args::Tuple
-    kwargs::Base.Pairs
+    kwargs
     wakeptr::Ptr{Cvoid}
 end
 

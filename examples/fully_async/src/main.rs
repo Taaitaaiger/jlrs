@@ -1,7 +1,7 @@
 use jlrs::prelude::*;
 use std::time::Duration;
 
-// This struct contains the data our task will need. This struct must be `Send`, `Sync`, and 
+// This struct contains the data our task will need. This struct must be `Send`, `Sync`, and
 // contain no borrowed data.
 struct MyTask {
     dims: isize,
@@ -13,11 +13,11 @@ struct MyTask {
 // task itself is executed on a single thread, it is marked with `?Send`.
 #[async_trait(?Send)]
 impl AsyncTask for MyTask {
-    // Different tasks can return different results. If successful, this task returns an `f64`. 
+    // Different tasks can return different results. If successful, this task returns an `f64`.
     type Output = f64;
 
-    // This is the async variation of the closure you provide `Julia::scope` when using the sync 
-    // runtime. The `Global` can be used to access `Module`s and other static data, while the 
+    // This is the async variation of the closure you provide `Julia::scope` when using the sync
+    // runtime. The `Global` can be used to access `Module`s and other static data, while the
     // `AsyncGcFrame` lets you create new Julia values, call functions, and create nested scopes.
     async fn run<'base>(
         &mut self,
@@ -32,7 +32,7 @@ impl AsyncTask for MyTask {
         // the result before casting it to an `f64` (which that function returns). A function that
         // is called with `call_async` is executed on another thread by calling
         // `Base.threads.@spawn`.
-        // The module and function don't have to be rooted because the module is never redefined, 
+        // The module and function don't have to be rooted because the module is never redefined,
         // so they're globally rooted.
         unsafe {
             Module::main(global)
@@ -51,13 +51,13 @@ impl AsyncTask for MyTask {
 #[async_std::main]
 async fn main() {
     // The first thing we need to do is initialize Julia in a separate thread, to do so the method
-    // AsyncJulia::init is used. This method takes three arguments: the maximum number of active 
-    // tasks, the capacity of the channel used to communicate with the async runtime, and the 
-    // timeout in ms that is used when trying to receive a new message. If the timeout happens 
+    // AsyncJulia::init is used. This method takes three arguments: the maximum number of active
+    // tasks, the capacity of the channel used to communicate with the async runtime, and the
+    // timeout in ms that is used when trying to receive a new message. If the timeout happens
     // while there are active tasks, control of the thread is yielded to Julia, this allows the
-    // garbage collector and scheduler to run. 
-    // 
-    // Here we allow four tasks to be running concurrently, a backlog of sixteen messages before 
+    // garbage collector and scheduler to run.
+    //
+    // Here we allow four tasks to be running concurrently, a backlog of sixteen messages before
     // the channel is full, and yield control of the thread to Julia after one ms.
     //
     // After calling this method we have an instance of `AsyncJulia` that can be used to send

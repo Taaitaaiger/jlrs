@@ -831,7 +831,12 @@ STATIC_INLINE void jl_array_uint8_set(void *a, size_t i, uint8_t x) JL_NOTSAFEPO
 
 #[inline(always)]
 pub unsafe fn jl_is_immutable(v: *mut jl_value_t) -> bool {
-    (&*(&*jl_typeof(v).cast::<jl_datatype_t>()).name).mutabl() == 0
+    jl_typeof(v)
+        .cast::<jl_datatype_t>()
+        .as_ref()
+        .unwrap()
+        .mutabl
+        == 0
 }
 
 /*STATIC_INLINE jl_svec_t *jl_field_names(jl_datatype_t *st) JL_NOTSAFEPOINT
@@ -940,7 +945,12 @@ STATIC_INLINE int jl_is_structtype(void *v) JL_NOTSAFEPOINT
 pub unsafe fn jl_is_structtype(v: *mut jl_value_t) -> bool {
     jl_is_datatype(v)
         && jl_is_immutable(v)
-        && (&*(&*jl_typeof(v).cast::<jl_datatype_t>()).name).abstract_() == 0
+        && jl_typeof(v)
+            .cast::<jl_datatype_t>()
+            .as_ref()
+            .unwrap()
+            .abstract_
+            == 0
         && jl_datatype_nfields(v.cast()) == 0
         && jl_datatype_size(v.cast()) > 0
 }
@@ -953,7 +963,7 @@ STATIC_INLINE int jl_isbits(void *t) JL_NOTSAFEPOINT // corresponding to isbits(
 */
 #[inline]
 pub unsafe fn jl_isbits(t: *mut c_void) -> bool {
-    jl_is_datatype(t.cast()) && (&*t.cast::<jl_datatype_t>()).isbitstype() != 0
+    jl_is_datatype(t.cast()) && (&*t.cast::<jl_datatype_t>()).isbitstype != 0
 }
 
 /*
@@ -976,7 +986,12 @@ STATIC_INLINE int jl_is_abstracttype(void *v) JL_NOTSAFEPOINT
 #[inline]
 pub unsafe fn jl_is_abstracttype(v: *mut c_void) -> bool {
     jl_is_datatype(v.cast())
-        && (&*(&*jl_typeof(v.cast()).cast::<jl_datatype_t>()).name).abstract_() == 0
+        && jl_typeof(v.cast())
+            .cast::<jl_datatype_t>()
+            .as_ref()
+            .unwrap()
+            .mutabl
+            != 0
 }
 
 /*
@@ -1366,6 +1381,17 @@ pub unsafe fn jl_array_ptr_set(a: *mut c_void, i: usize, x: *mut c_void) -> *mut
     }
 
     x.cast()
+}
+
+pub unsafe fn jl_init() {
+    jl_init__threading()
+}
+
+pub unsafe fn jl_init_with_image(
+    julia_bindir: *const ::std::os::raw::c_char,
+    image_relative_path: *const ::std::os::raw::c_char,
+) {
+    jl_init_with_image__threading(julia_bindir, image_relative_path)
 }
 
 #[cfg(test)]

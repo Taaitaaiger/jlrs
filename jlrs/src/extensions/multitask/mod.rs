@@ -22,7 +22,7 @@
 //! the `Sender`s from async-std and crossbeam-channel, the empty tuple `()` can be used if you're
 //! not interested in the result and the task returns `()` if successful.
 //!
-//! Because blocking tasks are essentially equivalent to using [`Julia:scope`], using blocking
+//! Because blocking tasks are essentially equivalent to using [`Julia::scope`], using blocking
 //! threads to schedule new `Task`s doesn't work. It's also not possible to have multiple blocking
 //! tasks running at the same time because they block the main thread.
 //!
@@ -57,6 +57,7 @@
 //!
 //! [`examples`]: https://github.com/Taaitaaiger/jlrs/tree/master/examples
 //! [`Julia`]: crate::Julia
+//! [`Julia::scope`]: crate::Julia::scope
 //! [`AsyncGcFrame`]: crate::extensions::multitask::async_frame::AsyncGcFrame
 //! [`CallAsync`]: crate::extensions::multitask::call_async::CallAsync
 //! [`Task`]: crate::wrappers::ptr::task::Task
@@ -93,8 +94,8 @@ use async_std::future::timeout;
 use async_std::sync::{Condvar as AsyncStdCondvar, Mutex as AsyncStdMutex};
 use async_std::task::{self, JoinHandle as AsyncStdHandle};
 use jl_sys::{
-    jl_atexit_hook, jl_eval_string, jl_init, jl_init_with_image, jl_is_initialized,
-    jl_process_events, jlrs_current_task,
+    jl_atexit_hook, jl_eval_string, jl_get_ptls_states, jl_init, jl_init_with_image,
+    jl_is_initialized, jl_process_events,
 };
 use std::cell::Cell;
 use std::io::{Error as IOError, ErrorKind};
@@ -707,9 +708,9 @@ impl AsyncStackPage {
 unsafe fn link_stacks(stacks: &mut [Option<Box<AsyncStackPage>>]) {
     for stack in stacks.iter_mut() {
         let stack = stack.as_mut().unwrap();
-        let rtls = &mut *jlrs_current_task();
-        stack.top[1].set(rtls.gcstack.cast());
-        rtls.gcstack = stack.top[0..1].as_mut_ptr().cast();
+        let rtls = &mut *jl_get_ptls_states();
+        stack.top[1].set(rtls.pgcstack.cast());
+        rtls.pgcstack = stack.top[0..1].as_mut_ptr().cast();
     }
 }
 

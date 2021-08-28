@@ -124,11 +124,11 @@ use jl_sys::{
     jl_call2, jl_call3, jl_diverror_exception, jl_egal, jl_emptytuple, jl_eval_string,
     jl_exception_occurred, jl_false, jl_field_index, jl_field_isptr, jl_field_names,
     jl_field_offset, jl_fieldref, jl_fieldref_noalloc, jl_finalize, jl_gc_add_finalizer,
-    jl_gc_add_ptr_finalizer, jl_interrupt_exception, jl_is_kind, jl_isa, jl_memory_exception,
-    jl_nfields, jl_nothing, jl_object_id, jl_readonlymemory_exception, jl_set_nth_field,
-    jl_stackovf_exception, jl_stderr_obj, jl_stdout_obj, jl_subtype, jl_svec_data, jl_svec_len,
-    jl_true, jl_typeof, jl_typeof_str, jl_undefref_exception, jl_value_t, jlrs_apply_type,
-    jlrs_current_task, jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_set_nth_field,
+    jl_gc_add_ptr_finalizer, jl_get_ptls_states, jl_interrupt_exception, jl_is_kind, jl_isa,
+    jl_memory_exception, jl_nfields, jl_nothing, jl_object_id, jl_readonlymemory_exception,
+    jl_set_nth_field, jl_stackovf_exception, jl_stderr_obj, jl_stdout_obj, jl_subtype,
+    jl_svec_data, jl_svec_len, jl_true, jl_typeof, jl_typeof_str, jl_undefref_exception,
+    jl_value_t, jlrs_apply_type, jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_set_nth_field,
 };
 use std::{
     ffi::{c_void, CStr, CString},
@@ -1198,11 +1198,7 @@ impl Value<'_, '_> {
     /// Add a finalizer `f` to this value. The finalizer must be an `extern "C"` function that
     /// takes one argument, the value as a void pointer.
     pub unsafe fn add_ptr_finalizer(self, f: unsafe extern "C" fn(*mut c_void) -> ()) {
-        jl_gc_add_ptr_finalizer(
-            jlrs_current_task().as_ref().unwrap().ptls,
-            self.unwrap(Private),
-            f as *mut c_void,
-        )
+        jl_gc_add_ptr_finalizer(jl_get_ptls_states(), self.unwrap(Private), f as *mut c_void)
     }
 
     /// Call all finalizers.

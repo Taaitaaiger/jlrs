@@ -29,7 +29,6 @@ pub mod method_instance;
 pub mod method_match;
 pub mod method_table;
 pub mod module;
-pub mod opaque_closure;
 pub mod simple_vector;
 pub mod string;
 pub mod symbol;
@@ -41,7 +40,6 @@ pub mod typemap_level;
 pub mod union;
 pub mod union_all;
 pub mod value;
-pub mod vararg;
 pub mod weak_ref;
 
 use self::{
@@ -56,7 +54,6 @@ use self::{
     method_match::MethodMatch,
     method_table::MethodTable,
     module::Module,
-    opaque_closure::OpaqueClosure,
     private::Wrapper as _,
     simple_vector::SimpleVector,
     string::JuliaString,
@@ -69,7 +66,6 @@ use self::{
     union::Union,
     union_all::UnionAll,
     value::Value,
-    vararg::Vararg,
     weak_ref::WeakRef,
 };
 use crate::{
@@ -140,6 +136,8 @@ pub trait Wrapper<'scope, 'data>: private::Wrapper<'scope, 'data> {
     /// Convert the wrapper to its error string, i.e. the string that is shown when calling
     /// `Base.showerror`. This string can contain ANSI color codes if this is enabled by calling
     /// [`Julia::error_color`].
+    ///
+    /// [`Julia::error_color`]: crate::Julia::error_color
     fn error_string(self) -> JlrsResult<String> {
         unsafe {
             let global = Global::new();
@@ -317,10 +315,6 @@ impl_valid_layout!(MethodMatchRef, MethodMatch);
 pub type MethodTableRef<'scope> = Ref<'scope, 'static, MethodTable<'scope>>;
 impl_valid_layout!(MethodTableRef, MethodTable);
 
-/// A reference to a [`OpaqueClosure`]
-pub type OpaqueClosureRef<'scope> = Ref<'scope, 'static, OpaqueClosure<'scope>>;
-impl_valid_layout!(OpaqueClosureRef, OpaqueClosure);
-
 /// A reference to a [`SimpleVector`]
 pub type SimpleVectorRef<'scope, T = Value<'scope, 'static>> =
     Ref<'scope, 'static, SimpleVector<'scope, T>>;
@@ -368,10 +362,6 @@ impl_valid_layout!(UnionRef, Union);
 /// A reference to a [`UnionAll`]
 pub type UnionAllRef<'scope> = Ref<'scope, 'static, UnionAll<'scope>>;
 impl_valid_layout!(UnionAllRef, UnionAll);
-
-/// A reference to a [`Vararg`]
-pub type VarargRef<'scope> = Ref<'scope, 'static, Vararg<'scope>>;
-impl_valid_layout!(VarargRef, Vararg);
 
 /// A reference to a [`WeakRef`]
 pub type WeakRefRef<'scope> = Ref<'scope, 'static, WeakRef<'scope>>;
