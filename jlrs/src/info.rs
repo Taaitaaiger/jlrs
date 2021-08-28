@@ -1,4 +1,5 @@
-/// System and Julia version information.
+//! System and Julia version information.
+
 use crate::{
     memory::global::Global,
     private::Private,

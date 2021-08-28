@@ -362,7 +362,7 @@ pub mod wrappers;
 use convert::into_jlrs_result::IntoJlrsResult;
 use error::{JlrsError, JlrsResult, CANNOT_DISPLAY_VALUE};
 use info::Info;
-#[cfg(not(feature = "coverage"))]
+#[cfg(feature = "uv")]
 use jl_sys::uv_async_send;
 use jl_sys::{
     jl_array_dims_ptr, jl_array_ndims, jl_atexit_hook, jl_init, jl_init_with_image,
@@ -374,7 +374,7 @@ use memory::mode::Sync;
 use memory::stack_page::StackPage;
 use prelude::Wrapper;
 use private::Private;
-use std::ffi::{c_void, CString};
+use std::ffi::{CString};
 use std::io::{Error as IOError, ErrorKind};
 use std::mem::{self, MaybeUninit};
 use std::path::Path;
@@ -641,8 +641,8 @@ impl CCall {
     /// `Base.AsyncCondition` in Julia. This can be used to call a long-running Rust function from
     /// Julia with ccall in another thread and wait for it to complete in Julia without blocking,
     /// there's an example available in the repository: ccall_with_threads.
-    #[cfg(not(feature = "coverage"))]
-    pub unsafe fn uv_async_send(handle: *mut c_void) -> bool {
+    #[cfg(feature = "uv")]
+    pub unsafe fn uv_async_send(handle: *mut std::ffi::c_void) -> bool {
         uv_async_send(handle.cast()) == 0
     }
 

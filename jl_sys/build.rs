@@ -20,10 +20,13 @@ fn flags() -> Vec<String> {
             let jl_include_path = format!("-I{}/include/julia/", julia_dir);
             let jl_lib_path = format!("-L{}/lib/", julia_dir);
             // Needed to link libuv
-            let jl_internal_lib_path = format!("-L{}/lib/julia", julia_dir);
 
             println!("cargo:rustc-flags={}", &jl_lib_path);
-            println!("cargo:rustc-flags={}", &jl_internal_lib_path);
+
+            if env::var("CARGO_FEATURE_UV").is_ok() {
+                let jl_internal_lib_path = format!("-L{}/lib/julia", julia_dir);
+                println!("cargo:rustc-flags={}", &jl_internal_lib_path);
+            }
 
             vec![jl_include_path]
         }
@@ -31,7 +34,9 @@ fn flags() -> Vec<String> {
     };
 
     println!("cargo:rustc-link-lib=julia");
-    println!("cargo:rustc-link-lib=uv");
+    if env::var("CARGO_FEATURE_UV").is_ok() {
+        println!("cargo:rustc-link-lib=uv");
+    }
 
     flags
 }

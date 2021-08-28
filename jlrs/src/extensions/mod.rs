@@ -1,3 +1,5 @@
+//! Optional extensions
+
 #[cfg(feature = "f16")]
 pub mod f16;
 #[cfg(feature = "async")]
