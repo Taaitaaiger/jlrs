@@ -27,12 +27,12 @@ jobs:
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v1
         with:
-          version: '1.6'
+          version: '1.7-nightly'
 
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v1
         with:
-          version: "10.0"
+          version: "12.0"
           directory: ${{ runner.temp }}/llvm
 
       - name: rust-toolchain
@@ -55,12 +55,12 @@ jobs:
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v1
         with:
-          version: '1.6'
+          version: '1.7-nightly'
 
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v1
         with:
-          version: "10.0"
+          version: "12.0"
           directory: ${{ runner.temp }}/llvm
 
       - name: rust-toolchain
@@ -75,4 +75,4 @@ jobs:
           echo "JULIA_DIR=${JULIA_DIR}" >> $GITHUB_ENV
 
       - name: Build Docs
-        run: cargo doc --features uv
+        run: cargo doc --features docs-rs
