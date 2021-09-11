@@ -16,8 +16,13 @@ use std::mem::size_of;
 use std::ptr::{null_mut, NonNull};
 use std::sync::atomic::{AtomicPtr, Ordering};
 
-#[cfg(not(feature = "use-bindgen"))]
+#[cfg(all(not(feature = "use-bindgen"), target_os = "linux"))]
 pub mod bindings;
+
+#[cfg(all(not(feature = "use-bindgen"), target_os = "windows"))]
+pub mod bindings_win;
+#[cfg(all(not(feature = "use-bindgen"), target_os = "windows"))]
+use bindings_win as bindings;
 
 #[cfg(not(feature = "use-bindgen"))]
 pub use bindings::*;
