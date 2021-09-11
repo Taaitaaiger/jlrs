@@ -14,3 +14,4 @@ examples/**/target/
 tarpaulin-report.html
 
 **/*.profraw
+**/*.o
