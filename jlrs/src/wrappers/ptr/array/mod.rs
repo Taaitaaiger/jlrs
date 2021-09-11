@@ -55,11 +55,11 @@ use crate::{
 use jl_sys::{
     jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_apply_array_type,
     jl_apply_tuple_type_v, jl_array_data, jl_array_eltype, jl_array_t, jl_datatype_t,
-    jl_gc_add_ptr_finalizer, jl_get_ptls_states, jl_is_array_type, jl_new_array,
-    jl_new_struct_uninit, jl_pchar_to_array, jl_ptr_to_array, jl_ptr_to_array_1d, jl_tparam0,
-    jlrs_alloc_array_1d, jlrs_alloc_array_2d, jlrs_alloc_array_3d, jlrs_array_del_beg,
-    jlrs_array_del_end, jlrs_array_grow_beg, jlrs_array_grow_end, jlrs_new_array,
-    jlrs_reshape_array, jlrs_result_tag_t_JLRS_RESULT_ERR,
+    jl_gc_add_ptr_finalizer, jl_new_array, jl_new_struct_uninit, jl_pchar_to_array,
+    jl_ptr_to_array, jl_ptr_to_array_1d, jlrs_alloc_array_1d, jlrs_alloc_array_2d,
+    jlrs_alloc_array_3d, jlrs_array_del_beg, jlrs_array_del_end, jlrs_array_grow_beg,
+    jlrs_array_grow_end, jlrs_current_task, jlrs_new_array, jlrs_reshape_array,
+    jlrs_result_tag_t_JLRS_RESULT_ERR,
 };
 use std::{
     cell::UnsafeCell,
@@ -68,6 +68,8 @@ use std::{
     marker::PhantomData,
     ptr::NonNull,
 };
+
+use super::type_name::TypeName;
 
 pub mod data;
 pub mod dimensions;
@@ -465,7 +467,7 @@ impl<'data> Array<'_, 'data> {
                         .cast();
 
                         jl_gc_add_ptr_finalizer(
-                            jl_get_ptls_states(),
+                            NonNull::new_unchecked(jlrs_current_task()).as_ref().ptls,
                             array,
                             droparray as *mut c_void,
                         );
@@ -485,7 +487,7 @@ impl<'data> Array<'_, 'data> {
                         .cast();
 
                         jl_gc_add_ptr_finalizer(
-                            jl_get_ptls_states(),
+                            NonNull::new_unchecked(jlrs_current_task()).as_ref().ptls,
                             array,
                             droparray as *mut c_void,
                         );
@@ -505,7 +507,7 @@ impl<'data> Array<'_, 'data> {
                         .cast();
 
                         jl_gc_add_ptr_finalizer(
-                            jl_get_ptls_states(),
+                            NonNull::new_unchecked(jlrs_current_task()).as_ref().ptls,
                             array,
                             droparray as *mut c_void,
                         );
@@ -1068,7 +1070,7 @@ impl<'scope> Array<'scope, 'static> {
 
 unsafe impl<'scope, 'data> Typecheck for Array<'scope, 'data> {
     fn typecheck(t: DataType) -> bool {
-        unsafe { jl_is_array_type(t.unwrap(Private).cast()) }
+        unsafe { t.type_name().wrapper_unchecked() == TypeName::of_array(Global::new()) }
     }
 }
 
@@ -1402,8 +1404,10 @@ unsafe impl<'scope, 'data, T: Clone + ValidLayout + Debug> Typecheck
 {
     fn typecheck(t: DataType) -> bool {
         unsafe {
-            jl_is_array_type(t.unwrap(Private).cast())
-                && T::valid_layout(Value::wrap(jl_tparam0(t.unwrap(Private)).cast(), Private))
+            t.is::<Array>()
+                && T::valid_layout(
+                    t.parameters().wrapper_unchecked().data_unchecked()[0].as_value(),
+                )
         }
     }
 }

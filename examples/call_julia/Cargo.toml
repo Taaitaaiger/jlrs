@@ -1,5 +1,5 @@
 [package]
-name = "call_julia"
+name = "call-julia"
 version = "0.1.0"
 authors = ["Thomas van Doornmalen <thomas.vandoornmalen@gmail.com>"]
 edition = "2018"

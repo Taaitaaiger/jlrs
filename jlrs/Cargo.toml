@@ -17,10 +17,13 @@ edition = "2018"
 [features]
 default = ["jlrs-derive"]
 uv = ["jl-sys/uv"]
-async = ["futures", "crossbeam-channel", "async-trait", "async-std"]
+async = ["futures", "crossbeam-channel", "async-trait"]
+async-std-rt = ["async", "async-std"]
+tokio-rt = ["async", "tokio"]
 jlrs-ndarray = ["ndarray"]
 f16 = ["half"]
-docs-rs = ["jl-sys/docs-rs", "jlrs-derive", "async", "jlrs-ndarray", "f16", "uv"]
+docs-rs = ["jl-sys/docs-rs", "uv","async-std-rt","async","tokio","f16","uv","jlrs-ndarray","jlrs-derive","docs"]
+docs = []
 use-bindgen = ["jl-sys/use-bindgen"]
 
 [dependencies]
@@ -33,6 +36,7 @@ async-trait = { version = "0.1", optional = true }
 async-std = { version = "1.10", features = ["unstable"], optional = true }
 ndarray = { version = "0.15", optional = true }
 half = { version = "1", optional = true }
+tokio = { version = "1", optional = true, features = ["rt", "time", "sync"]}
 
 [package.metadata.docs.rs]
 features = ["docs-rs"]

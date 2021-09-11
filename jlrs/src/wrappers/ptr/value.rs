@@ -120,22 +120,21 @@ use crate::{
 };
 use jl_sys::{
     jl_an_empty_string, jl_an_empty_vec_any, jl_apply_type, jl_array_any_type, jl_array_int32_type,
-    jl_array_symbol_type, jl_array_uint8_type, jl_bottom_type, jl_call, jl_call0, jl_call1,
-    jl_call2, jl_call3, jl_diverror_exception, jl_egal, jl_emptytuple, jl_eval_string,
-    jl_exception_occurred, jl_false, jl_field_index, jl_field_isptr, jl_field_names,
-    jl_field_offset, jl_fieldref, jl_fieldref_noalloc, jl_finalize, jl_gc_add_finalizer,
-    jl_gc_add_ptr_finalizer, jl_get_ptls_states, jl_interrupt_exception, jl_is_kind, jl_isa,
-    jl_memory_exception, jl_nfields, jl_nothing, jl_object_id, jl_readonlymemory_exception,
-    jl_set_nth_field, jl_stackovf_exception, jl_stderr_obj, jl_stdout_obj, jl_subtype,
-    jl_svec_data, jl_svec_len, jl_true, jl_typeof, jl_typeof_str, jl_undefref_exception,
-    jl_value_t, jlrs_apply_type, jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_set_nth_field,
+    jl_array_symbol_type, jl_array_uint8_type, jl_astaggedvalue, jl_bottom_type, jl_call, jl_call0,
+    jl_call1, jl_call2, jl_call3, jl_diverror_exception, jl_egal, jl_emptytuple, jl_eval_string,
+    jl_exception_occurred, jl_false, jl_field_index, jl_field_isptr, jl_field_offset, jl_finalize,
+    jl_gc_add_finalizer, jl_gc_add_ptr_finalizer, jl_get_nth_field, jl_get_nth_field_noalloc,
+    jl_interrupt_exception, jl_isa, jl_memory_exception, jl_nothing, jl_object_id,
+    jl_readonlymemory_exception, jl_set_nth_field, jl_stackovf_exception, jl_stderr_obj,
+    jl_stdout_obj, jl_subtype, jl_true, jl_typeof_str, jl_undefref_exception, jl_value_t,
+    jlrs_apply_type, jlrs_current_task, jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_set_nth_field,
 };
 use std::{
     ffi::{c_void, CStr, CString},
     marker::PhantomData,
     path::Path,
     ptr::NonNull,
-    slice, usize,
+    usize,
 };
 
 /// In some cases it's necessary to place one or more arguments in front of the arguments a
@@ -325,7 +324,13 @@ impl<'scope, 'data> Value<'scope, 'data> {
 impl<'scope, 'data> Value<'scope, 'data> {
     /// Returns the `DataType` of this value.
     pub fn datatype(self) -> DataType<'scope> {
-        unsafe { DataType::wrap(jl_typeof(self.unwrap(Private)).cast(), Private) }
+        unsafe {
+            let ptr = ((*jl_astaggedvalue(self.unwrap(Private)))
+                .__bindgen_anon_1
+                .header as usize
+                & !15usize) as *mut jl_value_t;
+            DataType::wrap(ptr.cast(), Private)
+        }
     }
 
     /// Returns the name of this value's [`DataType`] as a string slice.
@@ -387,7 +392,14 @@ impl Value<'_, '_> {
     /// Returns true if `self` is the type of a `DataType`, `UnionAll`, `Union`, or `Union{}` (the
     /// bottom type).
     pub fn is_kind(self) -> bool {
-        unsafe { jl_is_kind(self.unwrap(Private)) }
+        unsafe {
+            let global = Global::new();
+            let ptr = self.unwrap(Private);
+            ptr == DataType::datatype_type(global).unwrap(Private).cast()
+                || ptr == DataType::unionall_type(global).unwrap(Private).cast()
+                || ptr == DataType::uniontype_type(global).unwrap(Private).cast()
+                || ptr == DataType::typeofbottom_type(global).unwrap(Private).cast()
+        }
     }
 
     /// Returns true if the value is a type, ie a `DataType`, `UnionAll`, `Union`, or `Union{}`
@@ -502,17 +514,16 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// Returns the field names of this value as a slice of `Symbol`s.
     pub fn field_names(self) -> &'scope [Symbol<'scope>] {
         unsafe {
-            let tp = jl_typeof(self.unwrap(Private));
-            let field_names = jl_field_names(tp.cast());
-            let len = jl_svec_len(field_names);
-            let items = jl_svec_data(field_names);
-            slice::from_raw_parts(items.cast(), len)
+            self.datatype()
+                .field_names()
+                .wrapper_unchecked()
+                .data_unchecked()
         }
     }
 
     /// Returns the number of fields the underlying Julia value has.
     pub fn n_fields(self) -> usize {
-        unsafe { jl_nfields(self.unwrap(Private)) as _ }
+        self.datatype().n_fields() as _
     }
 
     /// Access the contents of the field at index `idx`. If the field is a bits union, this method
@@ -626,7 +637,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
                 })?
             }
 
-            let fld_ptr = jl_fieldref(self.unwrap(Private), idx as _);
+            let fld_ptr = jl_get_nth_field(self.unwrap(Private), idx as _);
             if fld_ptr.is_null() {
                 Err(JlrsError::UndefRef)?;
             }
@@ -677,7 +688,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
                 })?
             }
 
-            Ok(ValueRef::wrap(jl_fieldref_noalloc(
+            Ok(ValueRef::wrap(jl_get_nth_field_noalloc(
                 self.unwrap(Private),
                 idx,
             )))
@@ -697,7 +708,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
             })?
         }
 
-        unsafe { Ok(ValueRef::wrap(jl_fieldref(self.unwrap(Private), idx))) }
+        unsafe { Ok(ValueRef::wrap(jl_get_nth_field(self.unwrap(Private), idx))) }
     }
 
     /// Roots the field with the name `field_name` if it exists and returns it, or
@@ -714,9 +725,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     {
         unsafe {
             let symbol = field_name.temporary_symbol(Private);
-
-            let jl_type = jl_typeof(self.unwrap(Private)).cast();
-            let idx = jl_field_index(jl_type, symbol.unwrap(Private), 0);
+            let idx = jl_field_index(self.datatype().unwrap(Private), symbol.unwrap(Private), 0);
 
             if idx < 0 {
                 Err(JlrsError::NoSuchField {
@@ -725,7 +734,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
                 })?
             }
 
-            let fld_ptr = jl_fieldref(self.unwrap(Private), idx as _);
+            let fld_ptr = jl_get_nth_field(self.unwrap(Private), idx as _);
             if fld_ptr.is_null() {
                 Err(JlrsError::UndefRef)?;
             }
@@ -745,13 +754,11 @@ impl<'scope, 'data> Value<'scope, 'data> {
         unsafe {
             let symbol = field_name.temporary_symbol(Private);
             let ty = self.datatype();
-
-            let jl_type = jl_typeof(self.unwrap(Private)).cast();
-            let idx = jl_field_index(jl_type, symbol.unwrap(Private), 0);
+            let idx = jl_field_index(ty.unwrap(Private), symbol.unwrap(Private), 0);
 
             if idx < 0 {
                 Err(JlrsError::NoSuchField {
-                    type_name: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
+                    type_name: ty.display_string_or(CANNOT_DISPLAY_TYPE),
                     field_name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
                 })?
             }
@@ -778,7 +785,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
                 })?
             }
 
-            Ok(ValueRef::wrap(jl_fieldref_noalloc(
+            Ok(ValueRef::wrap(jl_get_nth_field_noalloc(
                 self.unwrap(Private),
                 idx as _,
             )))
@@ -795,9 +802,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     {
         unsafe {
             let symbol = field_name.temporary_symbol(Private);
-
-            let jl_type = jl_typeof(self.unwrap(Private)).cast();
-            let idx = jl_field_index(jl_type, symbol.unwrap(Private), 0);
+            let idx = jl_field_index(self.datatype().unwrap(Private), symbol.unwrap(Private), 0);
 
             if idx < 0 {
                 Err(JlrsError::NoSuchField {
@@ -806,7 +811,10 @@ impl<'scope, 'data> Value<'scope, 'data> {
                 })?
             }
 
-            Ok(ValueRef::wrap(jl_fieldref(self.unwrap(Private), idx as _)))
+            Ok(ValueRef::wrap(jl_get_nth_field(
+                self.unwrap(Private),
+                idx as _,
+            )))
         }
     }
 
@@ -924,8 +932,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
         N: TemporarySymbol,
     {
         let symbol = field_name.temporary_symbol(Private);
-        let jl_type = jl_typeof(self.unwrap(Private)).cast();
-        let idx = jl_field_index(jl_type, symbol.unwrap(Private), 0);
+        let idx = jl_field_index(self.datatype().unwrap(Private), symbol.unwrap(Private), 0);
 
         if idx < 0 {
             Err(JlrsError::NoSuchField {
@@ -974,8 +981,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
         N: TemporarySymbol,
     {
         let symbol = field_name.temporary_symbol(Private);
-        let jl_type = jl_typeof(self.unwrap(Private)).cast();
-        let idx = jl_field_index(jl_type, symbol.unwrap(Private), 0);
+        let idx = jl_field_index(self.datatype().unwrap(Private), symbol.unwrap(Private), 0);
 
         if idx < 0 {
             Err(JlrsError::NoSuchField {
@@ -1018,8 +1024,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
         N: TemporarySymbol,
     {
         let symbol = field_name.temporary_symbol(Private);
-        let jl_type = jl_typeof(self.unwrap(Private)).cast();
-        let idx = jl_field_index(jl_type, symbol.unwrap(Private), 0);
+        let idx = jl_field_index(self.datatype().unwrap(Private), symbol.unwrap(Private), 0);
 
         if idx < 0 {
             Err(JlrsError::NoSuchField {
@@ -1198,7 +1203,11 @@ impl Value<'_, '_> {
     /// Add a finalizer `f` to this value. The finalizer must be an `extern "C"` function that
     /// takes one argument, the value as a void pointer.
     pub unsafe fn add_ptr_finalizer(self, f: unsafe extern "C" fn(*mut c_void) -> ()) {
-        jl_gc_add_ptr_finalizer(jl_get_ptls_states(), self.unwrap(Private), f as *mut c_void)
+        jl_gc_add_ptr_finalizer(
+            NonNull::new_unchecked(jlrs_current_task()).as_ref().ptls,
+            self.unwrap(Private),
+            f as *mut c_void,
+        )
     }
 
     /// Call all finalizers.

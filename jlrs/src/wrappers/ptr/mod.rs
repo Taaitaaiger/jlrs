@@ -29,6 +29,7 @@ pub mod method_instance;
 pub mod method_match;
 pub mod method_table;
 pub mod module;
+pub mod opaque_closure;
 pub mod simple_vector;
 pub mod string;
 pub mod symbol;
@@ -40,6 +41,7 @@ pub mod typemap_level;
 pub mod union;
 pub mod union_all;
 pub mod value;
+pub mod vararg;
 pub mod weak_ref;
 
 use self::{
@@ -54,6 +56,7 @@ use self::{
     method_match::MethodMatch,
     method_table::MethodTable,
     module::Module,
+    opaque_closure::OpaqueClosure,
     private::Wrapper as _,
     simple_vector::SimpleVector,
     string::JuliaString,
@@ -66,6 +69,7 @@ use self::{
     union::Union,
     union_all::UnionAll,
     value::Value,
+    vararg::Vararg,
     weak_ref::WeakRef,
 };
 use crate::{
@@ -315,6 +319,10 @@ impl_valid_layout!(MethodMatchRef, MethodMatch);
 pub type MethodTableRef<'scope> = Ref<'scope, 'static, MethodTable<'scope>>;
 impl_valid_layout!(MethodTableRef, MethodTable);
 
+/// A reference to an [`OpaqueClosure`]
+pub type OpaqueClosureRef<'scope> = Ref<'scope, 'static, OpaqueClosure<'scope>>;
+impl_valid_layout!(OpaqueClosureRef, OpaqueClosure);
+
 /// A reference to a [`SimpleVector`]
 pub type SimpleVectorRef<'scope, T = Value<'scope, 'static>> =
     Ref<'scope, 'static, SimpleVector<'scope, T>>;
@@ -362,6 +370,10 @@ impl_valid_layout!(UnionRef, Union);
 /// A reference to a [`UnionAll`]
 pub type UnionAllRef<'scope> = Ref<'scope, 'static, UnionAll<'scope>>;
 impl_valid_layout!(UnionAllRef, UnionAll);
+
+/// A reference to a [`Vararg`]
+pub type VarargRef<'scope> = Ref<'scope, 'static, Vararg<'scope>>;
+impl_valid_layout!(VarargRef, Vararg);
 
 /// A reference to a [`WeakRef`]
 pub type WeakRefRef<'scope> = Ref<'scope, 'static, WeakRef<'scope>>;

@@ -352,3 +352,8 @@ jlrs_result_t jlrs_array_del_beg(jl_array_t *a, size_t dec)
 
     return out;
 }
+
+jl_task_t *jlrs_current_task(void)
+{
+    return jl_current_task;
+}

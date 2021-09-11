@@ -20,8 +20,8 @@ use crate::{
 };
 use jl_sys::{
     jl_base_module, jl_core_module, jl_get_global, jl_is_imported, jl_main_module, jl_module_t,
-    jl_module_type, jl_set_const, jl_set_global, jl_typeis, jlrs_result_tag_t_JLRS_RESULT_ERR,
-    jlrs_set_const, jlrs_set_global,
+    jl_module_type, jl_set_const, jl_set_global, jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_set_const,
+    jlrs_set_global,
 };
 
 use std::marker::PhantomData;
@@ -119,10 +119,18 @@ impl<'scope> Module<'scope> {
         unsafe {
             let symbol = name.temporary_symbol(Private);
             let submodule = jl_get_global(self.unwrap(Private), symbol.unwrap(Private));
+            if submodule.is_null() {
+                Err(JlrsError::GlobalNotFound {
+                    name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+                    module: self.name().as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+                })?
+            }
 
-            if !submodule.is_null() && jl_typeis(submodule, jl_module_type) {
+            let submodule = Value::wrap_non_null(NonNull::new_unchecked(submodule), Private);
+
+            if submodule.is::<Self>() {
                 frame
-                    .push_root(NonNull::new_unchecked(submodule), Private)
+                    .push_root(submodule.unwrap_non_null(Private), Private)
                     .map(|v| v.cast_unchecked())
                     .map_err(Into::into)
             } else {
@@ -145,9 +153,17 @@ impl<'scope> Module<'scope> {
         unsafe {
             let symbol = name.temporary_symbol(Private);
             let submodule = jl_get_global(self.unwrap(Private), symbol.unwrap(Private));
+            if submodule.is_null() {
+                Err(JlrsError::GlobalNotFound {
+                    name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+                    module: self.name().as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+                })?
+            }
 
-            if !submodule.is_null() && jl_typeis(submodule, jl_module_type) {
-                Ok(ModuleRef::wrap(submodule.cast()))
+            let submodule = Value::wrap_non_null(NonNull::new_unchecked(submodule), Private);
+
+            if let Ok(submodule) = submodule.cast::<Self>() {
+                Ok(submodule.as_ref())
             } else {
                 Err(JlrsError::NotAModule {
                     name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),

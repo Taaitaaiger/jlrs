@@ -14,19 +14,25 @@
 //! [`GcFrame`]: crate::memory::frame::GcFrame
 //! [`CallAsync`]: crate::extensions::multitask::call_async::CallAsync
 
+use std::fmt;
 use std::marker::PhantomData;
+use std::sync::Arc;
 
 use super::async_frame::AsyncGcFrame;
 use super::mode::Async;
-use super::return_channel::ReturnChannel;
+use super::result_sender::ResultSender;
+use super::AsyncStackPage;
 use super::RequireSendSync;
-use super::{AsyncStackPage, Message};
 use crate::error::{JlrsError, JlrsResult};
 use crate::memory::frame::GcFrame;
 use crate::memory::global::Global;
 use crate::memory::stack_page::StackPage;
-use async_std::channel::Sender as AsyncStdSender;
 use async_trait::async_trait;
+
+#[cfg(feature = "async-std-rt")]
+use crate::extensions::multitask::runtime::async_std_rt::{channel, HandleSender};
+#[cfg(feature = "tokio-rt")]
+use crate::extensions::multitask::runtime::tokio_rt::{channel, HandleSender};
 
 /// A task that returns once. In order to schedule the task you must use [`AsyncJulia::task`] or
 /// [`AsyncJulia::try_task`].
@@ -140,19 +146,33 @@ pub trait GeneratorTask: 'static + Send + Sync {
     ) -> JlrsResult<Self::Output>;
 }
 
-type HandleSender<GT> = AsyncStdSender<
-    Box<
-        dyn GenericCallGeneratorMessage<
-            Input = <GT as GeneratorTask>::Input,
-            Output = <GT as GeneratorTask>::Output,
-        >,
+pub struct GeneratorMessage<GT>
+where
+    GT: GeneratorTask,
+{
+    msg: InnerGeneratorMessage<GT>,
+}
+
+impl<GT> fmt::Debug for GeneratorMessage<GT>
+where
+    GT: GeneratorTask,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("GeneratorMessage")
+    }
+}
+
+type InnerGeneratorMessage<GT> = Box<
+    dyn GenericCallGeneratorMessage<
+        Input = <GT as GeneratorTask>::Input,
+        Output = <GT as GeneratorTask>::Output,
     >,
 >;
 
 /// A handle to a [`GeneratorTask`]. This handle can be used to call the generator and shared
 /// across threads. The `GeneratorTask` is dropped when its final handle has been dropped and all
 /// remaining pending calls have completed.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct GeneratorHandle<GT>
 where
     GT: GeneratorTask,
@@ -171,13 +191,16 @@ where
     /// Call the generator, this method waits until there's room available in the channel.
     pub async fn call<R>(&self, input: GT::Input, sender: R)
     where
-        R: ReturnChannel<Ok = GT::Output>,
+        R: ResultSender<JlrsResult<GT::Output>>,
     {
         self.sender
-            .send(Box::new(CallGeneratorMessage {
-                input: Some(input),
-                sender,
-            }))
+            .send(GeneratorMessage {
+                msg: Box::new(CallGeneratorMessage {
+                    input: Some(input),
+                    sender,
+                    _marker: PhantomData,
+                }),
+            })
             .await
             .expect("Channel was closed")
     }
@@ -186,51 +209,18 @@ where
     /// in the channel.
     pub fn try_call<R>(&self, input: GT::Input, sender: R) -> JlrsResult<()>
     where
-        R: ReturnChannel<Ok = GT::Output>,
+        R: ResultSender<JlrsResult<GT::Output>>,
     {
-        match self.sender.try_send(Box::new(CallGeneratorMessage {
-            input: Some(input),
-            sender,
-        })) {
+        match self.sender.try_send(GeneratorMessage {
+            msg: Box::new(CallGeneratorMessage {
+                input: Some(input),
+                sender,
+                _marker: PhantomData,
+            }),
+        }) {
             Ok(_) => Ok(()),
             Err(e) => Err(JlrsError::other(e))?,
         }
-    }
-
-    /// Returns the capacity of the backing channel if a bounded channel is used, or `None` if
-    /// it's unbounded.
-    pub fn capacity(&self) -> Option<usize> {
-        self.sender.capacity()
-    }
-
-    /// Returns the number of messages in the backing channel.
-    pub fn len(&self) -> usize {
-        self.sender.len()
-    }
-
-    /// Returns the number of handles that exist for this generator.
-    pub fn handle_count(&self) -> usize {
-        self.sender.sender_count()
-    }
-
-    /// Returns `true` if the backing channel is empty.
-    pub fn is_empty(&self) -> bool {
-        self.sender.is_empty()
-    }
-
-    /// Returns `true` if the backing channel is full.
-    pub fn is_full(&self) -> bool {
-        self.sender.is_full()
-    }
-
-    /// Closes the backing channel.
-    ///
-    /// Returns `true` if this call has closed the channel and it was not closed already.
-    ///
-    /// Pending calls will be executed before the generator completes, but it can't be called
-    /// again.
-    pub fn close(&self) -> bool {
-        self.sender.close()
     }
 }
 
@@ -248,11 +238,12 @@ pub(crate) enum RegisterGenerator {}
 struct CallGeneratorMessage<I, O, RC>
 where
     I: Send + Sync,
-    O: Send + Sync,
-    RC: ReturnChannel<Ok = O>,
+    O: Send + Sync + 'static,
+    RC: ResultSender<JlrsResult<O>>,
 {
     sender: RC,
     input: Option<I>,
+    _marker: PhantomData<O>,
 }
 
 #[async_trait(?Send)]
@@ -260,7 +251,7 @@ trait GenericCallGeneratorMessage: Send + Sync {
     type Input;
     type Output;
 
-    async fn respond(&self, result: JlrsResult<Self::Output>);
+    async fn respond(self: Box<Self>, result: JlrsResult<Self::Output>);
     fn input(&mut self) -> Self::Input;
 }
 
@@ -269,13 +260,13 @@ impl<I, O, RC> GenericCallGeneratorMessage for CallGeneratorMessage<I, O, RC>
 where
     I: Send + Sync,
     O: Send + Sync,
-    RC: ReturnChannel<Ok = O>,
+    RC: ResultSender<JlrsResult<O>>,
 {
     type Input = I;
     type Output = O;
 
-    async fn respond(&self, result: JlrsResult<Self::Output>) {
-        self.sender.send(result).await
+    async fn respond(self: Box<Self>, result: JlrsResult<Self::Output>) {
+        Box::new(self.sender).send(result).await
     }
 
     fn input(&mut self) -> Self::Input {
@@ -302,7 +293,7 @@ impl<AT: AsyncTask> GenericAsyncTask for AT {
         global: Global<'static>,
         frame: &'inner mut AsyncGcFrame<'static>,
     ) -> JlrsResult<<Self::AT as AsyncTask>::Output> {
-        unsafe { self.run(global, frame).await }
+        self.run(global, frame).await
     }
 }
 
@@ -390,7 +381,7 @@ pub(crate) struct PendingTask<RC, T, Kind> {
 
 impl<RC, AT> PendingTask<RC, AT, Task>
 where
-    RC: ReturnChannel<Ok = AT::Output>,
+    RC: ResultSender<JlrsResult<AT::Output>>,
     AT: AsyncTask,
 {
     pub(super) fn new(task: AT, sender: RC) -> Self {
@@ -408,7 +399,7 @@ where
 
 impl<IRC, GT> PendingTask<IRC, GT, Generator>
 where
-    IRC: ReturnChannel<Ok = GeneratorHandle<GT>>,
+    IRC: ResultSender<JlrsResult<GeneratorHandle<GT>>>,
     GT: GeneratorTask,
 {
     pub(super) fn new(task: GT, sender: IRC) -> Self {
@@ -426,7 +417,7 @@ where
 
 impl<RC, AT> PendingTask<RC, AT, RegisterTask>
 where
-    RC: ReturnChannel<Ok = ()>,
+    RC: ResultSender<JlrsResult<()>>,
     AT: AsyncTask,
 {
     pub(super) fn new(sender: RC) -> Self {
@@ -444,7 +435,7 @@ where
 
 impl<RC, GT> PendingTask<RC, GT, RegisterGenerator>
 where
-    RC: ReturnChannel<Ok = ()>,
+    RC: ResultSender<JlrsResult<()>>,
     GT: GeneratorTask,
 {
     pub(super) fn new(sender: RC) -> Self {
@@ -462,26 +453,16 @@ where
 
 #[async_trait(?Send)]
 pub(crate) trait GenericPendingTask: Send + Sync {
-    async fn call(
-        mut self: Box<Self>,
-        task_idx: usize,
-        mut stack: Box<AsyncStackPage>,
-        rt_sender: AsyncStdSender<Message>,
-    );
+    async fn call(mut self: Box<Self>, mut stack: &mut AsyncStackPage);
 }
 
 #[async_trait(?Send)]
 impl<RC, AT> GenericPendingTask for PendingTask<RC, AT, Task>
 where
-    RC: ReturnChannel<Ok = AT::Output>,
+    RC: ResultSender<JlrsResult<AT::Output>>,
     AT: AsyncTask,
 {
-    async fn call(
-        mut self: Box<Self>,
-        task_idx: usize,
-        mut stack: Box<AsyncStackPage>,
-        rt_sender: AsyncStdSender<Message>,
-    ) {
+    async fn call(mut self: Box<Self>, mut stack: &mut AsyncStackPage) {
         unsafe {
             let (mut task, result_sender) = self.split();
 
@@ -496,28 +477,18 @@ where
             let global = Global::new();
 
             let res = task.call_run(global, &mut frame).await;
-            result_sender.send(res).await;
+            Box::new(result_sender).send(res).await;
         }
-
-        rt_sender
-            .send(Message::Complete(task_idx, stack))
-            .await
-            .expect("Channel was closed");
     }
 }
 
 #[async_trait(?Send)]
 impl<RC, AT> GenericPendingTask for PendingTask<RC, AT, RegisterTask>
 where
-    RC: ReturnChannel<Ok = ()>,
+    RC: ResultSender<JlrsResult<()>>,
     AT: AsyncTask,
 {
-    async fn call(
-        mut self: Box<Self>,
-        task_idx: usize,
-        mut stack: Box<AsyncStackPage>,
-        rt_sender: AsyncStdSender<Message>,
-    ) {
+    async fn call(mut self: Box<Self>, mut stack: &mut AsyncStackPage) {
         unsafe {
             let sender = self.sender();
 
@@ -531,28 +502,18 @@ where
             let global = Global::new();
 
             let res = AT::register(global, &mut frame).await;
-            sender.send(res).await;
+            Box::new(sender).send(res).await;
         }
-
-        rt_sender
-            .send(Message::Complete(task_idx, stack))
-            .await
-            .expect("Channel was closed");
     }
 }
 
 #[async_trait(?Send)]
 impl<RC, GT> GenericPendingTask for PendingTask<RC, GT, RegisterGenerator>
 where
-    RC: ReturnChannel<Ok = ()>,
+    RC: ResultSender<JlrsResult<()>>,
     GT: GeneratorTask,
 {
-    async fn call(
-        mut self: Box<Self>,
-        task_idx: usize,
-        mut stack: Box<AsyncStackPage>,
-        rt_sender: AsyncStdSender<Message>,
-    ) {
+    async fn call(mut self: Box<Self>, mut stack: &mut AsyncStackPage) {
         unsafe {
             let sender = self.sender();
 
@@ -566,30 +527,21 @@ where
             let global = Global::new();
 
             let res = GT::register(global, &mut frame).await;
-            sender.send(res).await;
+            Box::new(sender).send(res).await;
         }
-
-        rt_sender
-            .send(Message::Complete(task_idx, stack))
-            .await
-            .expect("Channel was closed");
     }
 }
 
 #[async_trait(?Send)]
 impl<IRC, GT> GenericPendingTask for PendingTask<IRC, GT, Generator>
 where
-    IRC: ReturnChannel<Ok = GeneratorHandle<GT>>,
+    IRC: ResultSender<JlrsResult<GeneratorHandle<GT>>>,
     GT: GeneratorTask,
 {
-    async fn call(
-        mut self: Box<Self>,
-        task_idx: usize,
-        mut stack: Box<AsyncStackPage>,
-        rt_sender: AsyncStdSender<Message>,
-    ) {
+    async fn call(mut self: Box<Self>, mut stack: &mut AsyncStackPage) {
         unsafe {
             let (mut generator, handle_sender) = self.split();
+            let handle_sender = Box::new(handle_sender);
 
             // Transmute to get static lifetimes. Should be okay because tasks can't leak
             // Julia data and the frame is not dropped until the generator is dropped.
@@ -604,19 +556,23 @@ where
 
             match generator.call_init(global, &mut frame).await {
                 Ok(mut state) => {
-                    let (sender, receiver) = if GT::CHANNEL_CAPACITY == 0 {
-                        async_std::channel::unbounded()
-                    } else {
-                        async_std::channel::bounded(GT::CHANNEL_CAPACITY)
-                    };
+                    #[allow(unused_mut)]
+                    let (sender, mut receiver) = channel(GT::CHANNEL_CAPACITY);
 
-                    let handle = generator.create_handle(sender);
+                    let handle = generator.create_handle(Arc::new(sender));
                     handle_sender.send(Ok(handle)).await;
 
                     loop {
+                        #[cfg(feature = "async-std-rt")]
                         let mut msg = match receiver.recv().await {
-                            Ok(msg) => msg,
+                            Ok(msg) => msg.msg,
                             Err(_) => break,
+                        };
+
+                        #[cfg(feature = "tokio-rt")]
+                        let mut msg = match receiver.recv().await {
+                            Some(msg) => msg.msg,
+                            None => break,
                         };
 
                         let res = generator
@@ -631,11 +587,6 @@ where
                 }
             }
         }
-
-        rt_sender
-            .send(Message::Complete(task_idx, stack))
-            .await
-            .expect("Channel was closed");
     }
 }
 
@@ -650,7 +601,7 @@ impl<F, RC, T> BlockingTask<F, RC, T>
 where
     for<'base> F:
         Send + Sync + FnOnce(Global<'base>, &mut GcFrame<'base, Async<'base>>) -> JlrsResult<T>,
-    RC: ReturnChannel<Ok = T>,
+    RC: ResultSender<JlrsResult<T>>,
     T: Send + Sync + 'static,
 {
     pub(crate) fn new(func: F, sender: RC, slots: usize) -> Self {
@@ -681,7 +632,7 @@ impl<F, RC, T> GenericBlockingTask for BlockingTask<F, RC, T>
 where
     for<'base> F:
         Send + Sync + FnOnce(Global<'base>, &mut GcFrame<'base, Async<'base>>) -> JlrsResult<T>,
-    RC: ReturnChannel<Ok = T>,
+    RC: ResultSender<JlrsResult<T>>,
     T: Send + Sync + 'static,
 {
     fn call(self: Box<Self>, stack: &mut AsyncStackPage) {
@@ -692,6 +643,19 @@ where
         let raw = stack.page.as_mut();
         let mut frame = unsafe { GcFrame::new(raw, self.slots, mode) };
         let (res, ch) = self.call(&mut frame);
-        async_std::task::spawn_local(async move { ch.send(res).await });
+
+        #[cfg(feature = "tokio-rt")]
+        {
+            tokio::task::spawn_local(async {
+                Box::new(ch).send(res).await;
+            });
+        }
+
+        #[cfg(feature = "async-std-rt")]
+        {
+            async_std::task::spawn_local(async {
+                Box::new(ch).send(res).await;
+            });
+        }
     }
 }
