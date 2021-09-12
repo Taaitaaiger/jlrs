@@ -41,5 +41,6 @@ jlrs_result_t jlrs_array_grow_end(jl_array_t *a, size_t inc);
 jlrs_result_t jlrs_array_del_end(jl_array_t *a, size_t dec);
 jlrs_result_t jlrs_array_grow_beg(jl_array_t *a, size_t inc);
 jlrs_result_t jlrs_array_del_beg(jl_array_t *a, size_t dec);
+uint_t jlrs_array_data_owner_offset(uint16_t n_dims);
 
 jl_task_t *jlrs_current_task(void);

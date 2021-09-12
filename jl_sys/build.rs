@@ -196,6 +196,7 @@ fn main() {
             "jlrs_array_sizehint",
             "jlrs_array_ptr_1d_push",
             "jlrs_array_ptr_1d_append",
+            "jlrs_array_data_owner_offset",
             "jlrs_current_task",
         ];
 

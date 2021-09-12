@@ -16,13 +16,8 @@ use std::mem::size_of;
 use std::ptr::{null_mut, NonNull};
 use std::sync::atomic::{AtomicPtr, Ordering};
 
-#[cfg(all(not(feature = "use-bindgen"), target_os = "linux"))]
+#[cfg(not(feature = "use-bindgen"))]
 pub mod bindings;
-
-#[cfg(all(not(feature = "use-bindgen"), target_os = "windows"))]
-pub mod bindings_win;
-#[cfg(all(not(feature = "use-bindgen"), target_os = "windows"))]
-use bindings_win as bindings;
 
 #[cfg(not(feature = "use-bindgen"))]
 pub use bindings::*;
@@ -63,30 +58,9 @@ pub unsafe fn jl_array_ndims(array: *mut jl_array_t) -> u16 {
 }
 
 #[inline(always)]
-pub unsafe fn jl_array_data_owner_offset(ndims: u16) -> usize {
-    // While there is a memoffset crate which provides the functionality offsetof does, it's UB.
-    // Until a sound alternative is available, calculate the offset manually.
-    // Assumption: JL_ARRAY_LEN is defined.
-
-    // data
-    size_of::<*mut c_void>() +
-    // length
-    size_of::<usize>() +
-    // flags
-    size_of::<jl_array_flags_t>() +
-    //elsize
-    2 +
-    // offset
-    4 +
-    // nrows
-    size_of::<usize>() +
-    size_of::<usize>() * (1 + jl_array_ndimwords(ndims as _)) as usize
-}
-
-#[inline(always)]
 pub unsafe fn jl_array_data_owner(a: *mut jl_array_t) -> *mut jl_value_t {
     a.cast::<u8>()
-        .add(jl_array_data_owner_offset(jl_array_ndims(a)))
+        .add(jlrs_array_data_owner_offset(jl_array_ndims(a)) as usize)
         .cast::<jl_value_t>()
 }
 
@@ -103,11 +77,6 @@ pub unsafe fn jl_get_fieldtypes(st: *mut jl_datatype_t) -> *mut jl_svec_t {
 #[inline(always)]
 pub unsafe fn jl_dt_layout_fields(d: *const u8) -> *const u8 {
     d.add(size_of::<jl_datatype_layout_t>())
-}
-
-#[inline(always)]
-pub unsafe fn jl_symbol_name(s: *mut jl_sym_t) -> *mut u8 {
-    jl_symbol_name_(s)
 }
 
 #[inline(always)]

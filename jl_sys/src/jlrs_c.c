@@ -353,6 +353,10 @@ jlrs_result_t jlrs_array_del_beg(jl_array_t *a, size_t dec)
     return out;
 }
 
+uint_t jlrs_array_data_owner_offset(uint16_t n_dims) {
+    return jl_array_data_owner_offset(n_dims);
+}
+
 jl_task_t *jlrs_current_task(void)
 {
     return jl_current_task;

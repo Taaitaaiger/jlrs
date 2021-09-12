@@ -733,8 +733,7 @@ unsafe extern "C" fn droparray(a: Array) {
     let arr_ptr = arr_nn_ptr.as_ptr();
     let dims_ptr = jl_array_dims_ptr(arr_ptr);
     let n_dims = jl_array_ndims(arr_ptr);
-    let mut_dims_slice = slice::from_raw_parts_mut(dims_ptr, n_dims as _);
-    for dim in mut_dims_slice {
+    for dim in slice::from_raw_parts_mut(dims_ptr, n_dims as _) {
         *dim = 0;
     }
 

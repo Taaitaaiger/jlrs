@@ -843,6 +843,7 @@ fn bindgen_test_layout_pthread_rwlock_t() {
         )
     );
 }
+pub type uint_t = u64;
 pub type sig_atomic_t = __sig_atomic_t;
 pub type __jmp_buf = [::std::os::raw::c_long; 8usize];
 #[repr(C)]
@@ -7399,6 +7400,9 @@ extern "C" {
 }
 extern "C" {
     pub fn jlrs_array_del_beg(a: *mut jl_array_t, dec: usize) -> jlrs_result_t;
+}
+extern "C" {
+    pub fn jlrs_array_data_owner_offset(n_dims: u16) -> uint_t;
 }
 extern "C" {
     pub fn jlrs_current_task() -> *mut jl_task_t;
