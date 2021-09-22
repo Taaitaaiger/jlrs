@@ -192,10 +192,12 @@ impl<'scope> Wrapper<'scope, '_> for UnionAll<'scope> {
     type Wraps = jl_unionall_t;
     const NAME: &'static str = "UnionAll";
 
+    #[inline(always)]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData)
     }
 
+    #[inline(always)]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }

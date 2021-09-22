@@ -103,10 +103,12 @@ impl<'scope> Wrapper<'scope, 'static> for OpaqueClosure<'scope> {
     type Wraps = jl_opaque_closure_t;
     const NAME: &'static str = "OpaqueClosure";
 
+    #[inline(always)]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData)
     }
 
+    #[inline(always)]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }

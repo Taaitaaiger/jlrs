@@ -1,6 +1,30 @@
-use jlrs::layout::typecheck::Mutable;
 use jlrs::prelude::*;
 use jlrs::util::JULIA;
+use jlrs::{layout::typecheck::Mutable, wrappers::inline::union::EmptyUnion};
+
+#[test]
+fn empty_union_field() {
+    JULIA.with(|j| {
+        let mut jlrs = j.borrow_mut();
+        jlrs.scope(|global, frame| unsafe {
+            let mut tys = [Value::new(&mut *frame, 0usize)?];
+            let res = Module::main(global)
+                .submodule_ref("JlrsTests")?
+                .wrapper_unchecked()
+                .global_ref("WithEmpty")?
+                .wrapper_unchecked()
+                .apply_type(&mut *frame, &mut tys)?
+                .into_jlrs_result()?
+                .cast::<DataType>()?
+                .instantiate(&mut *frame, &mut [])?
+                .into_jlrs_result()?;
+
+            assert!(res.get_nth_raw_field::<EmptyUnion>(1).is_ok());
+            Ok(())
+        })
+        .unwrap()
+    })
+}
 
 #[test]
 fn access_tuple_fields() {

@@ -42,7 +42,7 @@ impl AsyncTask for MyTask {
                 .wrapper_unchecked()
                 .call_async(&mut *frame, &mut [dims, iters])
                 .await?
-                .unwrap()
+                .into_jlrs_result()?
                 .unbox::<f64>()
         }
     }
@@ -109,13 +109,13 @@ async fn main() {
 
     // Receive the results of the tasks.
     let res1 = receiver1.await.unwrap().unwrap();
-    println!("Result of first task: {:?}", res1);
+    println!("Result of first task: {}", res1);
     let res2 = receiver2.await.unwrap().unwrap();
-    println!("Result of second task: {:?}", res2);
+    println!("Result of second task: {}", res2);
     let res3 = receiver3.await.unwrap().unwrap();
-    println!("Result of third task: {:?}", res3);
+    println!("Result of third task: {}", res3);
     let res4 = receiver4.await.unwrap().unwrap();
-    println!("Result of fourth task: {:?}", res4);
+    println!("Result of fourth task: {}", res4);
 
     // Dropping `julia` causes the runtime to shut down Julia and itself if it was the final
     // handle to the runtime.

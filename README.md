@@ -4,7 +4,7 @@
 [![License:MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 
-jlrs is a crate that provides access to most of the Julia C API, it can be used to embed Julia in Rust applications and to use functionality from the Julia C API when writing `ccall`able functions in Rust. Currently this crate is only tested on Linux in combination with Julia 1.6 and is not compatible with earlier versions of Julia.
+jlrs is a crate that provides access to most of the Julia C API, it can be used to embed Julia in Rust applications and to use functionality from the Julia C API when writing `ccall`able functions in Rust. Currently this crate is only tested on Linux in combination with Julia 1.7 and is not compatible with earlier versions of Julia.
 
 
 ## Features

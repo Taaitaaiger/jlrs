@@ -465,6 +465,7 @@ pub(crate) mod private {
 
         unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self;
 
+        #[inline(always)]
         unsafe fn wrap(ptr: *mut Self::Wraps, _: Private) -> Self {
             debug_assert!(!ptr.is_null());
             Self::wrap_non_null(NonNull::new_unchecked(ptr), Private)
@@ -472,6 +473,7 @@ pub(crate) mod private {
 
         fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps>;
 
+        #[inline(always)]
         fn unwrap(self, _: Private) -> *mut Self::Wraps {
             self.unwrap_non_null(Private).as_ptr()
         }

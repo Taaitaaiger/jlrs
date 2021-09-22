@@ -1092,10 +1092,12 @@ impl<'scope, 'data> WrapperPriv<'scope, 'data> for Array<'scope, 'data> {
     type Wraps = jl_array_t;
     const NAME: &'static str = "Array";
 
+    #[inline(always)]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData, PhantomData)
     }
 
+    #[inline(always)]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }

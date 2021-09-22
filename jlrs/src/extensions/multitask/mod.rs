@@ -310,7 +310,7 @@ mod impl_async_std {
             let msg = PendingTask::<_, _, Task>::new(task, res_sender);
             let boxed = Box::new(msg);
             self.sender
-                .send(InnerMessage::Task(boxed, sender).wrap())
+                .send(MessageInner::Task(boxed, sender).wrap())
                 .await
                 .expect("Channel was closed");
         }
@@ -328,7 +328,7 @@ mod impl_async_std {
             let boxed = Box::new(msg);
             match self
                 .sender
-                .try_send(InnerMessage::Task(boxed, sender).wrap())
+                .try_send(MessageInner::Task(boxed, sender).wrap())
             {
                 Ok(_) => Ok(()),
                 Err(::async_std::channel::TrySendError::Full(_)) => {
@@ -355,7 +355,7 @@ mod impl_async_std {
             let msg = BlockingTask::<_, _, _>::new(task, res_sender, 0);
             let boxed = Box::new(msg);
             self.sender
-                .send(InnerMessage::BlockingTask(boxed).wrap())
+                .send(MessageInner::BlockingTask(boxed).wrap())
                 .await
                 .expect("Channel was closed");
         }
@@ -378,7 +378,7 @@ mod impl_async_std {
             let boxed = Box::new(msg);
             match self
                 .sender
-                .try_send(InnerMessage::BlockingTask(boxed).wrap())
+                .try_send(MessageInner::BlockingTask(boxed).wrap())
             {
                 Ok(_) => Ok(()),
                 Err(::async_std::channel::TrySendError::Full(_)) => {
@@ -405,7 +405,7 @@ mod impl_async_std {
             let msg = BlockingTask::<_, _, _>::new(task, res_sender, slots);
             let boxed = Box::new(msg);
             self.sender
-                .send(InnerMessage::BlockingTask(boxed).wrap())
+                .send(MessageInner::BlockingTask(boxed).wrap())
                 .await
                 .expect("Channel was closed");
         }
@@ -433,7 +433,7 @@ mod impl_async_std {
             let boxed = Box::new(msg);
             match self
                 .sender
-                .try_send(InnerMessage::BlockingTask(boxed).wrap())
+                .try_send(MessageInner::BlockingTask(boxed).wrap())
             {
                 Ok(_) => Ok(()),
                 Err(::async_std::channel::TrySendError::Full(_)) => {
@@ -455,7 +455,7 @@ mod impl_async_std {
             let msg = PendingTask::<_, AT, RegisterTask>::new(res_sender);
             let boxed = Box::new(msg);
             self.sender
-                .send(InnerMessage::Task(boxed, sender).wrap())
+                .send(MessageInner::Task(boxed, sender).wrap())
                 .await
                 .expect("Channel was closed");
         }
@@ -473,7 +473,7 @@ mod impl_async_std {
             let boxed = Box::new(msg);
             match self
                 .sender
-                .try_send(InnerMessage::Task(boxed, sender).wrap())
+                .try_send(MessageInner::Task(boxed, sender).wrap())
             {
                 Ok(_) => (),
                 Err(::async_std::channel::TrySendError::Full(_)) => {
@@ -499,7 +499,7 @@ mod impl_async_std {
             let boxed = Box::new(msg);
 
             self.sender
-                .send(InnerMessage::Task(boxed, rt_sender).wrap())
+                .send(MessageInner::Task(boxed, rt_sender).wrap())
                 .await
                 .expect("Channel was closed");
 
@@ -523,7 +523,7 @@ mod impl_async_std {
             let boxed = Box::new(msg);
             match self
                 .sender
-                .try_send(InnerMessage::Task(boxed, sender).wrap())
+                .try_send(MessageInner::Task(boxed, sender).wrap())
             {
                 Ok(_) => (),
                 Err(::async_std::channel::TrySendError::Full(_)) => {
@@ -550,7 +550,7 @@ mod impl_async_std {
             let msg = PendingTask::<_, GT, RegisterGenerator>::new(res_sender);
             let boxed = Box::new(msg);
             self.sender
-                .send(InnerMessage::Task(boxed, sender).wrap())
+                .send(MessageInner::Task(boxed, sender).wrap())
                 .await
                 .expect("Channel was closed");
         }
@@ -568,7 +568,7 @@ mod impl_async_std {
             let boxed = Box::new(msg);
             match self
                 .sender
-                .try_send(InnerMessage::Task(boxed, sender).wrap())
+                .try_send(MessageInner::Task(boxed, sender).wrap())
             {
                 Ok(_) => (),
                 Err(::async_std::channel::TrySendError::Full(_)) => {
@@ -592,7 +592,7 @@ mod impl_async_std {
 
             let (sender, receiver) = oneshot_channel();
             self.sender
-                .send(InnerMessage::Include(path.as_ref().to_path_buf(), Box::new(sender)).wrap())
+                .send(MessageInner::Include(path.as_ref().to_path_buf(), Box::new(sender)).wrap())
                 .await
                 .expect("Channel was closed");
 
@@ -611,7 +611,7 @@ mod impl_async_std {
 
             let (sender, receiver) = crossbeam_channel::bounded(1);
             self.sender
-                .try_send(InnerMessage::TryInclude(path.as_ref().to_path_buf(), sender).wrap())
+                .try_send(MessageInner::TryInclude(path.as_ref().to_path_buf(), sender).wrap())
                 .map_err(|e| match e {
                     ::async_std::channel::TrySendError::Full(_) => {
                         Box::new(JlrsError::other(TrySendError::Full(())))
@@ -629,7 +629,7 @@ mod impl_async_std {
         pub async fn error_color(&self, enable: bool) -> JlrsResult<()> {
             let (sender, receiver) = oneshot_channel();
             self.sender
-                .send(InnerMessage::ErrorColor(enable, Box::new(sender)).wrap())
+                .send(MessageInner::ErrorColor(enable, Box::new(sender)).wrap())
                 .await
                 .expect("Channel was closed");
 
@@ -642,7 +642,7 @@ mod impl_async_std {
         pub fn try_error_color(&self, enable: bool) -> JlrsResult<()> {
             let (sender, receiver) = crossbeam_channel::bounded(1);
             self.sender
-                .try_send(InnerMessage::TryErrorColor(enable, sender).wrap())
+                .try_send(MessageInner::TryErrorColor(enable, sender).wrap())
                 .map_err(|e| match e {
                     ::async_std::channel::TrySendError::Full(_) => {
                         Box::new(JlrsError::other(TrySendError::Full(())))
@@ -662,7 +662,7 @@ mod impl_async_std {
         fn try_set_custom_fns(&self) -> JlrsResult<()> {
             let (sender, receiver) = crossbeam_channel::bounded(1);
             self.sender
-                .try_send(InnerMessage::TrySetCustomFns(sender).wrap())
+                .try_send(MessageInner::TrySetCustomFns(sender).wrap())
                 .map_err(|e| match e {
                     ::async_std::channel::TrySendError::Full(_) => {
                         Box::new(JlrsError::other(TrySendError::Full(())))
@@ -677,7 +677,7 @@ mod impl_async_std {
         async fn set_custom_fns(&self) -> JlrsResult<()> {
             let (sender, receiver) = oneshot_channel();
             self.sender
-                .send(InnerMessage::SetCustomFns(Box::new(sender)).wrap())
+                .send(MessageInner::SetCustomFns(Box::new(sender)).wrap())
                 .await
                 .expect("Channel was closed");
 
@@ -739,14 +739,14 @@ mod impl_async_std {
                             jl_process_events();
                         }
                         Ok(Ok(msg)) => match msg.unwrap() {
-                            InnerMessage::Task(task, sender) => {
+                            MessageInner::Task(task, sender) => {
                                 if let Some(idx) = free_stacks.pop_front() {
                                     let mut stack =
                                         stacks[idx].take().expect("Async stack corrupted");
                                     let task = task::spawn_local(async move {
                                         task.call(&mut stack).await;
                                         sender
-                                            .send(InnerMessage::Complete(idx, stack).wrap())
+                                            .send(MessageInner::Complete(idx, stack).wrap())
                                             .await
                                             .ok();
                                     });
@@ -756,12 +756,12 @@ mod impl_async_std {
                                     pending_tasks.push_back((task, sender));
                                 }
                             }
-                            InnerMessage::Complete(idx, mut stack) => {
+                            MessageInner::Complete(idx, mut stack) => {
                                 if let Some((jl_task, sender)) = pending_tasks.pop_front() {
                                     let task = task::spawn_local(async move {
                                         jl_task.call(&mut stack).await;
                                         sender
-                                            .send(InnerMessage::Complete(idx, stack).wrap())
+                                            .send(MessageInner::Complete(idx, stack).wrap())
                                             .await
                                             .ok();
                                     });
@@ -773,34 +773,34 @@ mod impl_async_std {
                                     running_tasks[idx] = None;
                                 }
                             }
-                            InnerMessage::Include(path, sender) => {
+                            MessageInner::Include(path, sender) => {
                                 let stack = stacks[0].as_mut().expect("Async stack corrupted");
                                 let res = call_include(stack, path);
                                 sender.send(res).await;
                             }
-                            InnerMessage::TryInclude(path, sender) => {
+                            MessageInner::TryInclude(path, sender) => {
                                 let stack = stacks[0].as_mut().expect("Async stack corrupted");
                                 let res = call_include(stack, path);
                                 (&sender).send(res).ok();
                             }
-                            InnerMessage::BlockingTask(task) => {
+                            MessageInner::BlockingTask(task) => {
                                 let stack = stacks[0].as_mut().expect("Async stack corrupted");
                                 task.call(stack)
                             }
-                            InnerMessage::ErrorColor(enable, sender) => {
+                            MessageInner::ErrorColor(enable, sender) => {
                                 let res = call_error_color(enable);
                                 sender.send(res).await;
                             }
-                            InnerMessage::TryErrorColor(enable, sender) => {
+                            MessageInner::TryErrorColor(enable, sender) => {
                                 let res = call_error_color(enable);
                                 (&sender).send(res).ok();
                             }
-                            InnerMessage::SetCustomFns(sender) => {
+                            MessageInner::SetCustomFns(sender) => {
                                 let stack = stacks[0].as_mut().expect("Async stack corrupted");
                                 let res = call_set_custom_fns(stack);
                                 sender.send(res).await;
                             }
-                            InnerMessage::TrySetCustomFns(sender) => {
+                            MessageInner::TrySetCustomFns(sender) => {
                                 let stack = stacks[0].as_mut().expect("Async stack corrupted");
                                 let res = call_set_custom_fns(stack);
                                 (&sender).send(res).ok();
@@ -899,14 +899,14 @@ mod impl_async_std {
                             jl_process_events();
                         }
                         Ok(Ok(msg)) => match msg.unwrap() {
-                            InnerMessage::Task(task, sender) => {
+                            MessageInner::Task(task, sender) => {
                                 if let Some(idx) = free_stacks.pop_front() {
                                     let mut stack =
                                         stacks[idx].take().expect("Async stack corrupted");
                                     let task = task::spawn_local(async move {
                                         task.call(&mut stack).await;
                                         sender
-                                            .send(InnerMessage::Complete(idx, stack).wrap())
+                                            .send(MessageInner::Complete(idx, stack).wrap())
                                             .await
                                             .ok();
                                     });
@@ -916,12 +916,12 @@ mod impl_async_std {
                                     pending_tasks.push_back((task, sender));
                                 }
                             }
-                            InnerMessage::Complete(idx, mut stack) => {
+                            MessageInner::Complete(idx, mut stack) => {
                                 if let Some((jl_task, sender)) = pending_tasks.pop_front() {
                                     let task = task::spawn_local(async move {
                                         jl_task.call(&mut stack).await;
                                         sender
-                                            .send(InnerMessage::Complete(idx, stack).wrap())
+                                            .send(MessageInner::Complete(idx, stack).wrap())
                                             .await
                                             .ok();
                                     });
@@ -933,34 +933,34 @@ mod impl_async_std {
                                     running_tasks[idx] = None;
                                 }
                             }
-                            InnerMessage::Include(path, sender) => {
+                            MessageInner::Include(path, sender) => {
                                 let stack = stacks[0].as_mut().expect("Async stack corrupted");
                                 let res = call_include(stack, path);
                                 sender.send(res).await;
                             }
-                            InnerMessage::TryInclude(path, sender) => {
+                            MessageInner::TryInclude(path, sender) => {
                                 let stack = stacks[0].as_mut().expect("Async stack corrupted");
                                 let res = call_include(stack, path);
                                 (&sender).send(res).ok();
                             }
-                            InnerMessage::BlockingTask(task) => {
+                            MessageInner::BlockingTask(task) => {
                                 let stack = stacks[0].as_mut().expect("Async stack corrupted");
                                 task.call(stack)
                             }
-                            InnerMessage::ErrorColor(enable, sender) => {
+                            MessageInner::ErrorColor(enable, sender) => {
                                 let res = call_error_color(enable);
                                 sender.send(res).await;
                             }
-                            InnerMessage::TryErrorColor(enable, sender) => {
+                            MessageInner::TryErrorColor(enable, sender) => {
                                 let res = call_error_color(enable);
                                 (&sender).send(res).ok();
                             }
-                            InnerMessage::SetCustomFns(sender) => {
+                            MessageInner::SetCustomFns(sender) => {
                                 let stack = stacks[0].as_mut().expect("Async stack corrupted");
                                 let res = call_set_custom_fns(stack);
                                 sender.send(res).await;
                             }
-                            InnerMessage::TrySetCustomFns(sender) => {
+                            MessageInner::TrySetCustomFns(sender) => {
                                 let stack = stacks[0].as_mut().expect("Async stack corrupted");
                                 let res = call_set_custom_fns(stack);
                                 (&sender).send(res).ok();
@@ -983,7 +983,7 @@ mod impl_async_std {
         })
     }
 
-    pub(crate) enum InnerMessage {
+    pub(crate) enum MessageInner {
         Task(Box<dyn GenericPendingTask>, Arc<Sender<Message>>),
         BlockingTask(Box<dyn GenericBlockingTask>),
         Include(PathBuf, Box<dyn ResultSender<JlrsResult<()>>>),
@@ -1001,16 +1001,15 @@ trait RequireSendSync: 'static + Send + Sync {}
 
 #[cfg(feature = "tokio-rt")]
 pub mod impl_tokio {
-    pub(super) use super::runtime::tokio_rt::{channel, oneshot_channel};
-    use super::runtime::tokio_rt::{MaybeUnboundedReceiver, MaybeUnboundedSender, Tokio};
-    use super::runtime::TrySendError;
-    use super::Message;
-    use super::*;
-    use crate::extensions::multitask::async_task::{
+    use super::async_task::{
         AsyncTask, BlockingTask, Generator, GeneratorHandle, GeneratorTask, PendingTask,
         RegisterGenerator, RegisterTask, Task,
     };
-    use crate::prelude::JlrsResult;
+    pub(super) use super::runtime::tokio_rt::{channel, oneshot_channel};
+    use super::runtime::tokio_rt::{MaybeUnboundedReceiver, MaybeUnboundedSender, Tokio};
+    use super::runtime::TrySendError;
+    use super::*;
+    use crate::error::JlrsResult;
     use std::sync::Arc;
     use std::thread::{self, JoinHandle as ThreadHandle};
     use std::time::Duration;
@@ -1202,7 +1201,7 @@ pub mod impl_tokio {
             let msg = PendingTask::<_, _, Task>::new(task, res_sender);
             let boxed = Box::new(msg);
             self.sender
-                .send(InnerMessage::Task(boxed, sender).wrap())
+                .send(MessageInner::Task(boxed, sender).wrap())
                 .await
                 .expect("Channel was closed");
         }
@@ -1220,7 +1219,7 @@ pub mod impl_tokio {
             let boxed = Box::new(msg);
             match self
                 .sender
-                .try_send(InnerMessage::Task(boxed, sender).wrap())
+                .try_send(MessageInner::Task(boxed, sender).wrap())
             {
                 Ok(_) => Ok(()),
                 Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
@@ -1247,7 +1246,7 @@ pub mod impl_tokio {
             let msg = BlockingTask::<_, _, _>::new(task, res_sender, 0);
             let boxed = Box::new(msg);
             self.sender
-                .send(InnerMessage::BlockingTask(boxed).wrap())
+                .send(MessageInner::BlockingTask(boxed).wrap())
                 .await
                 .expect("Channel was closed");
         }
@@ -1270,7 +1269,7 @@ pub mod impl_tokio {
             let boxed = Box::new(msg);
             match self
                 .sender
-                .try_send(InnerMessage::BlockingTask(boxed).wrap())
+                .try_send(MessageInner::BlockingTask(boxed).wrap())
             {
                 Ok(_) => Ok(()),
                 Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
@@ -1297,7 +1296,7 @@ pub mod impl_tokio {
             let msg = BlockingTask::<_, _, _>::new(task, res_sender, slots);
             let boxed = Box::new(msg);
             self.sender
-                .send(InnerMessage::BlockingTask(boxed).wrap())
+                .send(MessageInner::BlockingTask(boxed).wrap())
                 .await
                 .expect("Channel was closed");
         }
@@ -1325,7 +1324,7 @@ pub mod impl_tokio {
             let boxed = Box::new(msg);
             match self
                 .sender
-                .try_send(InnerMessage::BlockingTask(boxed).wrap())
+                .try_send(MessageInner::BlockingTask(boxed).wrap())
             {
                 Ok(_) => Ok(()),
                 Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
@@ -1347,7 +1346,7 @@ pub mod impl_tokio {
             let msg = PendingTask::<_, AT, RegisterTask>::new(res_sender);
             let boxed = Box::new(msg);
             self.sender
-                .send(InnerMessage::Task(boxed, sender).wrap())
+                .send(MessageInner::Task(boxed, sender).wrap())
                 .await
                 .expect("Channel was closed");
         }
@@ -1365,7 +1364,7 @@ pub mod impl_tokio {
             let boxed = Box::new(msg);
             match self
                 .sender
-                .try_send(InnerMessage::Task(boxed, sender).wrap())
+                .try_send(MessageInner::Task(boxed, sender).wrap())
             {
                 Ok(_) => (),
                 Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
@@ -1391,7 +1390,7 @@ pub mod impl_tokio {
             let boxed = Box::new(msg);
 
             self.sender
-                .send(InnerMessage::Task(boxed, rt_sender).wrap())
+                .send(MessageInner::Task(boxed, rt_sender).wrap())
                 .await
                 .expect("Channel was closed");
 
@@ -1415,7 +1414,7 @@ pub mod impl_tokio {
             let boxed = Box::new(msg);
             match self
                 .sender
-                .try_send(InnerMessage::Task(boxed, sender).wrap())
+                .try_send(MessageInner::Task(boxed, sender).wrap())
             {
                 Ok(_) => (),
                 Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
@@ -1442,7 +1441,7 @@ pub mod impl_tokio {
             let msg = PendingTask::<_, GT, RegisterGenerator>::new(res_sender);
             let boxed = Box::new(msg);
             self.sender
-                .send(InnerMessage::Task(boxed, sender).wrap())
+                .send(MessageInner::Task(boxed, sender).wrap())
                 .await
                 .expect("Channel was closed");
         }
@@ -1460,7 +1459,7 @@ pub mod impl_tokio {
             let boxed = Box::new(msg);
             match self
                 .sender
-                .try_send(InnerMessage::Task(boxed, sender).wrap())
+                .try_send(MessageInner::Task(boxed, sender).wrap())
             {
                 Ok(_) => (),
                 Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
@@ -1484,7 +1483,7 @@ pub mod impl_tokio {
 
             let (sender, receiver) = oneshot_channel();
             self.sender
-                .send(InnerMessage::Include(path.as_ref().to_path_buf(), Box::new(sender)).wrap())
+                .send(MessageInner::Include(path.as_ref().to_path_buf(), Box::new(sender)).wrap())
                 .await
                 .expect("Channel was closed");
 
@@ -1503,7 +1502,7 @@ pub mod impl_tokio {
 
             let (sender, receiver) = crossbeam_channel::bounded(1);
             self.sender
-                .try_send(InnerMessage::TryInclude(path.as_ref().to_path_buf(), sender).wrap())
+                .try_send(MessageInner::TryInclude(path.as_ref().to_path_buf(), sender).wrap())
                 .map_err(|e| match e {
                     tokio::sync::mpsc::error::TrySendError::Full(_) => {
                         Box::new(JlrsError::other(TrySendError::Full(())))
@@ -1521,7 +1520,7 @@ pub mod impl_tokio {
         pub async fn error_color(&self, enable: bool) -> JlrsResult<()> {
             let (sender, receiver) = oneshot_channel();
             self.sender
-                .send(InnerMessage::ErrorColor(enable, Box::new(sender)).wrap())
+                .send(MessageInner::ErrorColor(enable, Box::new(sender)).wrap())
                 .await
                 .expect("Channel was closed");
 
@@ -1534,7 +1533,7 @@ pub mod impl_tokio {
         pub fn try_error_color(&self, enable: bool) -> JlrsResult<()> {
             let (sender, receiver) = crossbeam_channel::bounded(1);
             self.sender
-                .try_send(InnerMessage::TryErrorColor(enable, sender).wrap())
+                .try_send(MessageInner::TryErrorColor(enable, sender).wrap())
                 .map_err(|e| match e {
                     tokio::sync::mpsc::error::TrySendError::Full(_) => {
                         Box::new(JlrsError::other(TrySendError::Full(())))
@@ -1549,7 +1548,7 @@ pub mod impl_tokio {
         fn try_set_custom_fns(&self) -> JlrsResult<()> {
             let (sender, receiver) = crossbeam_channel::bounded(1);
             self.sender
-                .try_send(InnerMessage::TrySetCustomFns(sender).wrap())
+                .try_send(MessageInner::TrySetCustomFns(sender).wrap())
                 .map_err(|e| match e {
                     tokio::sync::mpsc::error::TrySendError::Full(_) => {
                         Box::new(JlrsError::other(TrySendError::Full(())))
@@ -1564,7 +1563,7 @@ pub mod impl_tokio {
         async fn set_custom_fns(&self) -> JlrsResult<()> {
             let (sender, receiver) = oneshot_channel();
             self.sender
-                .send(InnerMessage::SetCustomFns(Box::new(sender)).wrap())
+                .send(MessageInner::SetCustomFns(Box::new(sender)).wrap())
                 .await
                 .expect("Channel was closed");
 
@@ -1575,7 +1574,7 @@ pub mod impl_tokio {
     fn run_async(
         max_n_tasks: usize,
         recv_timeout: Duration,
-        mut receiver: MaybeUnboundedReceiver<Message>,
+        receiver: MaybeUnboundedReceiver<Message>,
     ) -> JlrsResult<()> {
         let rt = Tokio::new();
         rt.block_on(async {
@@ -1585,126 +1584,7 @@ pub mod impl_tokio {
                 }
 
                 jl_init();
-                if Info::new().n_threads() < 3 {
-                    Err(JlrsError::MoreThreadsRequired)?;
-                }
-
-                let jlrs_jl = CString::new(JLRS_JL).expect("Invalid Jlrs module");
-                jl_eval_string(jlrs_jl.as_ptr());
-
-                let mut free_stacks = VecDeque::with_capacity(max_n_tasks);
-                for i in 1..max_n_tasks {
-                    free_stacks.push_back(i);
-                }
-
-                let mut stacks = {
-                    let mut stacks = Vec::with_capacity(max_n_tasks);
-                    for _ in 0..max_n_tasks {
-                        stacks.push(Some(AsyncStackPage::new()));
-                    }
-                    link_stacks(&mut stacks);
-                    stacks.into_boxed_slice()
-                };
-
-                let mut running_tasks = Vec::with_capacity(max_n_tasks);
-                for _ in 0..max_n_tasks {
-                    running_tasks.push(None);
-                }
-                let mut running_tasks = running_tasks.into_boxed_slice();
-                let mut pending_tasks = VecDeque::new();
-
-                let mut n_running = 0;
-
-                loop {
-                    let wait_time = if n_running > 0 {
-                        recv_timeout
-                    } else {
-                        Duration::from_secs(2 << 32)
-                    };
-
-                    match timeout(wait_time, receiver.recv()).await {
-                        Err(_) => {
-                            jl_process_events();
-                        }
-                        Ok(Some(msg)) => match msg.unwrap() {
-                            InnerMessage::Task(task, sender) => {
-                                if let Some(idx) = free_stacks.pop_front() {
-                                    let mut stack =
-                                        stacks[idx].take().expect("Async stack corrupted");
-                                    let task = task::spawn_local(async move {
-                                        task.call(&mut stack).await;
-                                        sender
-                                            .send(InnerMessage::Complete(idx, stack).wrap())
-                                            .await
-                                            .ok();
-                                    });
-                                    n_running += 1;
-                                    running_tasks[idx] = Some(task);
-                                } else {
-                                    pending_tasks.push_back((task, sender));
-                                }
-                            }
-                            InnerMessage::Complete(idx, mut stack) => {
-                                if let Some((jl_task, sender)) = pending_tasks.pop_front() {
-                                    let task = task::spawn_local(async move {
-                                        jl_task.call(&mut stack).await;
-                                        sender
-                                            .send(InnerMessage::Complete(idx, stack).wrap())
-                                            .await
-                                            .ok();
-                                    });
-                                    running_tasks[idx] = Some(task);
-                                } else {
-                                    stacks[idx] = Some(stack);
-                                    free_stacks.push_front(idx);
-                                    n_running -= 1;
-                                    running_tasks[idx] = None;
-                                }
-                            }
-                            InnerMessage::Include(path, sender) => {
-                                let stack = stacks[0].as_mut().expect("Async stack corrupted");
-                                let res = call_include(stack, path);
-                                sender.send(res).await;
-                            }
-                            InnerMessage::TryInclude(path, sender) => {
-                                let stack = stacks[0].as_mut().expect("Async stack corrupted");
-                                let res = call_include(stack, path);
-                                (&sender).send(res).ok();
-                            }
-                            InnerMessage::BlockingTask(task) => {
-                                let stack = stacks[0].as_mut().expect("Async stack corrupted");
-                                task.call(stack)
-                            }
-                            InnerMessage::ErrorColor(enable, sender) => {
-                                let res = call_error_color(enable);
-                                sender.send(res).await;
-                            }
-                            InnerMessage::TryErrorColor(enable, sender) => {
-                                let res = call_error_color(enable);
-                                (&sender).send(res).ok();
-                            }
-                            InnerMessage::SetCustomFns(sender) => {
-                                let stack = stacks[0].as_mut().expect("Async stack corrupted");
-                                let res = call_set_custom_fns(stack);
-                                sender.send(res).await;
-                            }
-                            InnerMessage::TrySetCustomFns(sender) => {
-                                let stack = stacks[0].as_mut().expect("Async stack corrupted");
-                                let res = call_set_custom_fns(stack);
-                                (&sender).send(res).ok();
-                            }
-                        },
-                        Ok(None) => break,
-                    }
-                }
-
-                for running in running_tasks.iter_mut() {
-                    if let Some(handle) = running.take() {
-                        handle.await.ok();
-                    }
-                }
-
-                jl_atexit_hook(0);
+                run_inner(max_n_tasks, recv_timeout, receiver).await?;
             }
 
             Ok(())
@@ -1714,7 +1594,7 @@ pub mod impl_tokio {
     fn run_async_with_image<P, Q>(
         max_n_tasks: usize,
         recv_timeout: Duration,
-        mut receiver: MaybeUnboundedReceiver<Message>,
+        receiver: MaybeUnboundedReceiver<Message>,
         julia_bindir: P,
         image_path: Q,
     ) -> JlrsResult<()>
@@ -1746,134 +1626,142 @@ pub mod impl_tokio {
                 let im_rel_path = std::ffi::CString::new(image_path_str).unwrap();
 
                 jl_init_with_image(bindir.as_ptr(), im_rel_path.as_ptr());
-                if Info::new().n_threads() < 3 {
-                    Err(JlrsError::MoreThreadsRequired)?;
-                }
-
-                let jlrs_jl = CString::new(JLRS_JL).expect("Invalid Jlrs module");
-                jl_eval_string(jlrs_jl.as_ptr());
-
-                let mut free_stacks = VecDeque::with_capacity(max_n_tasks);
-                for i in 1..max_n_tasks {
-                    free_stacks.push_back(i);
-                }
-
-                let mut stacks = {
-                    let mut stacks = Vec::with_capacity(max_n_tasks);
-                    for _ in 0..max_n_tasks {
-                        stacks.push(Some(AsyncStackPage::new()));
-                    }
-                    link_stacks(&mut stacks);
-                    stacks.into_boxed_slice()
-                };
-
-                let mut running_tasks = Vec::with_capacity(max_n_tasks);
-                for _ in 0..max_n_tasks {
-                    running_tasks.push(None);
-                }
-                let mut running_tasks = running_tasks.into_boxed_slice();
-                let mut pending_tasks = VecDeque::new();
-
-                let mut n_running = 0usize;
-
-                loop {
-                    let wait_time = if n_running > 0 {
-                        recv_timeout
-                    } else {
-                        Duration::from_secs(u64::MAX)
-                    };
-
-                    match timeout(wait_time, receiver.recv()).await {
-                        Err(_) => {
-                            jl_process_events();
-                        }
-                        Ok(Some(msg)) => match msg.unwrap() {
-                            InnerMessage::Task(task, sender) => {
-                                if let Some(idx) = free_stacks.pop_front() {
-                                    let mut stack =
-                                        stacks[idx].take().expect("Async stack corrupted");
-                                    let task = task::spawn_local(async move {
-                                        task.call(&mut stack).await;
-                                        sender
-                                            .as_ref()
-                                            .send(InnerMessage::Complete(idx, stack).wrap())
-                                            .await
-                                            .ok();
-                                    });
-                                    n_running += 1;
-                                    running_tasks[idx] = Some(task);
-                                } else {
-                                    pending_tasks.push_back((task, sender));
-                                }
-                            }
-                            InnerMessage::Complete(idx, mut stack) => {
-                                if let Some((jl_task, sender)) = pending_tasks.pop_front() {
-                                    let task = task::spawn_local(async move {
-                                        jl_task.call(&mut stack).await;
-                                        sender
-                                            .send(InnerMessage::Complete(idx, stack).wrap())
-                                            .await
-                                            .ok();
-                                    });
-                                    running_tasks[idx] = Some(task);
-                                } else {
-                                    stacks[idx] = Some(stack);
-                                    n_running -= 1;
-                                    free_stacks.push_front(idx);
-                                    running_tasks[idx] = None;
-                                }
-                            }
-                            InnerMessage::Include(path, sender) => {
-                                let stack = stacks[0].as_mut().expect("Async stack corrupted");
-                                let res = call_include(stack, path);
-                                sender.send(res).await;
-                            }
-                            InnerMessage::TryInclude(path, sender) => {
-                                let stack = stacks[0].as_mut().expect("Async stack corrupted");
-                                let res = call_include(stack, path);
-                                (&sender).send(res).ok();
-                            }
-                            InnerMessage::BlockingTask(task) => {
-                                let stack = stacks[0].as_mut().expect("Async stack corrupted");
-                                task.call(stack)
-                            }
-                            InnerMessage::ErrorColor(enable, sender) => {
-                                let res = call_error_color(enable);
-                                sender.send(res).await;
-                            }
-                            InnerMessage::TryErrorColor(enable, sender) => {
-                                let res = call_error_color(enable);
-                                (&sender).send(res).ok();
-                            }
-                            InnerMessage::SetCustomFns(sender) => {
-                                let stack = stacks[0].as_mut().expect("Async stack corrupted");
-                                let res = call_set_custom_fns(stack);
-                                sender.send(res).await;
-                            }
-                            InnerMessage::TrySetCustomFns(sender) => {
-                                let stack = stacks[0].as_mut().expect("Async stack corrupted");
-                                let res = call_set_custom_fns(stack);
-                                (&sender).send(res).ok();
-                            }
-                        },
-                        Ok(None) => break,
-                    }
-                }
-
-                for running in running_tasks.iter_mut() {
-                    if let Some(handle) = running.take() {
-                        handle.await.ok();
-                    }
-                }
-
-                jl_atexit_hook(0);
+                run_inner(max_n_tasks, recv_timeout, receiver).await?;
             }
 
             Ok(())
         })
     }
 
-    pub(crate) enum InnerMessage {
+    async unsafe fn run_inner(
+        max_n_tasks: usize,
+        recv_timeout: Duration,
+        mut receiver: MaybeUnboundedReceiver<Message>,
+    ) -> Result<(), Box<JlrsError>> {
+        if Info::new().n_threads() < 3 {
+            Err(JlrsError::MoreThreadsRequired)?;
+        }
+
+        let jlrs_jl = CString::new(JLRS_JL).expect("Invalid Jlrs module");
+        jl_eval_string(jlrs_jl.as_ptr());
+
+        let mut free_stacks = VecDeque::with_capacity(max_n_tasks);
+        for i in 1..max_n_tasks {
+            free_stacks.push_back(i);
+        }
+
+        let mut stacks = {
+            let mut stacks = Vec::with_capacity(max_n_tasks);
+            for _ in 0..max_n_tasks {
+                stacks.push(Some(AsyncStackPage::new()));
+            }
+            link_stacks(&mut stacks);
+            stacks.into_boxed_slice()
+        };
+
+        let mut running_tasks = Vec::with_capacity(max_n_tasks);
+        for _ in 0..max_n_tasks {
+            running_tasks.push(None);
+        }
+
+        let mut running_tasks = running_tasks.into_boxed_slice();
+        let mut pending_tasks = VecDeque::new();
+        let mut n_running = 0usize;
+
+        loop {
+            let wait_time = if n_running > 0 {
+                recv_timeout
+            } else {
+                Duration::from_secs(u64::MAX)
+            };
+
+            match timeout(wait_time, receiver.recv()).await {
+                Err(_) => {
+                    jl_process_events();
+                }
+                Ok(Some(msg)) => match msg.unwrap() {
+                    MessageInner::Task(task, sender) => {
+                        if let Some(idx) = free_stacks.pop_front() {
+                            let mut stack = stacks[idx].take().expect("Async stack corrupted");
+                            let task = task::spawn_local(async move {
+                                task.call(&mut stack).await;
+                                sender
+                                    .as_ref()
+                                    .send(MessageInner::Complete(idx, stack).wrap())
+                                    .await
+                                    .ok();
+                            });
+                            n_running += 1;
+                            running_tasks[idx] = Some(task);
+                        } else {
+                            pending_tasks.push_back((task, sender));
+                        }
+                    }
+                    MessageInner::Complete(idx, mut stack) => {
+                        if let Some((jl_task, sender)) = pending_tasks.pop_front() {
+                            let task = task::spawn_local(async move {
+                                jl_task.call(&mut stack).await;
+                                sender
+                                    .send(MessageInner::Complete(idx, stack).wrap())
+                                    .await
+                                    .ok();
+                            });
+                            running_tasks[idx] = Some(task);
+                        } else {
+                            stacks[idx] = Some(stack);
+                            n_running -= 1;
+                            free_stacks.push_front(idx);
+                            running_tasks[idx] = None;
+                        }
+                    }
+                    MessageInner::Include(path, sender) => {
+                        let stack = stacks[0].as_mut().expect("Async stack corrupted");
+                        let res = call_include(stack, path);
+                        sender.send(res).await;
+                    }
+                    MessageInner::TryInclude(path, sender) => {
+                        let stack = stacks[0].as_mut().expect("Async stack corrupted");
+                        let res = call_include(stack, path);
+                        (&sender).send(res).ok();
+                    }
+                    MessageInner::BlockingTask(task) => {
+                        let stack = stacks[0].as_mut().expect("Async stack corrupted");
+                        task.call(stack)
+                    }
+                    MessageInner::ErrorColor(enable, sender) => {
+                        let res = call_error_color(enable);
+                        sender.send(res).await;
+                    }
+                    MessageInner::TryErrorColor(enable, sender) => {
+                        let res = call_error_color(enable);
+                        (&sender).send(res).ok();
+                    }
+                    MessageInner::SetCustomFns(sender) => {
+                        let stack = stacks[0].as_mut().expect("Async stack corrupted");
+                        let res = call_set_custom_fns(stack);
+                        sender.send(res).await;
+                    }
+                    MessageInner::TrySetCustomFns(sender) => {
+                        let stack = stacks[0].as_mut().expect("Async stack corrupted");
+                        let res = call_set_custom_fns(stack);
+                        (&sender).send(res).ok();
+                    }
+                },
+                Ok(None) => break,
+            }
+        }
+
+        for running in running_tasks.iter_mut() {
+            if let Some(handle) = running.take() {
+                handle.await.ok();
+            }
+        }
+
+        jl_atexit_hook(0);
+        Ok(())
+    }
+
+    pub(crate) enum MessageInner {
         Task(
             Box<dyn GenericPendingTask>,
             Arc<MaybeUnboundedSender<Message>>,
@@ -1896,11 +1784,11 @@ pub use impl_async_std::*;
 pub use impl_tokio::*;
 
 pub struct Message {
-    inner: InnerMessage,
+    inner: MessageInner,
 }
 
 impl Message {
-    pub(crate) fn unwrap(self) -> InnerMessage {
+    pub(crate) fn unwrap(self) -> MessageInner {
         self.inner
     }
 }
@@ -1911,7 +1799,7 @@ impl fmt::Debug for Message {
     }
 }
 
-impl InnerMessage {
+impl MessageInner {
     pub(crate) fn wrap(self) -> Message {
         Message { inner: self }
     }

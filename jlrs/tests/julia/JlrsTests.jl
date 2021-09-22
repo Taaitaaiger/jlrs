@@ -101,4 +101,11 @@ end
 struct UaArray
     a::Array
 end
+
+struct WithEmpty{T}
+    a::UInt
+    b::T
+    c::UInt
+    WithEmpty{T}() where T = new()
+end
 end

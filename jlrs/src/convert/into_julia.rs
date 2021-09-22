@@ -43,6 +43,7 @@ pub unsafe trait IntoJulia: Sized + 'static {
     fn julia_type<'scope>(_: Global<'scope>) -> DataTypeRef<'scope>;
 
     #[doc(hidden)]
+    #[inline(always)]
     unsafe fn into_julia<'scope>(self, global: Global<'scope>) -> ValueRef<'scope, 'static> {
         let ty = Self::julia_type(global)
             .wrapper()
@@ -60,10 +61,12 @@ pub unsafe trait IntoJulia: Sized + 'static {
 macro_rules! impl_into_julia {
     ($type:ty, $boxer:ident, $julia_type:expr) => {
         unsafe impl IntoJulia for $type {
+            #[inline(always)]
             fn julia_type<'scope>(_: Global<'scope>) -> $crate::wrappers::ptr::DataTypeRef<'scope> {
                 unsafe { $crate::wrappers::ptr::DataTypeRef::wrap($julia_type) }
             }
 
+            #[inline(always)]
             unsafe fn into_julia<'scope>(
                 self,
                 _: Global<'scope>,
@@ -108,6 +111,8 @@ unsafe impl<T: IntoJulia> IntoJulia for *mut T {
         let param_ptr = params.as_mut_ptr().cast();
 
         unsafe {
+            // Not rooting the result should be fine. The result must be a concrete type, which
+            // means `applied` can't have any free type parameters, so it should be cached.
             let applied = jl_apply_type(ptr_ua.unwrap(Private).cast(), param_ptr, 1);
 
             if applied.is_null() {

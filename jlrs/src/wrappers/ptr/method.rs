@@ -173,10 +173,12 @@ impl<'scope> Wrapper<'scope, '_> for Method<'scope> {
     type Wraps = jl_method_t;
     const NAME: &'static str = "Method";
 
+    #[inline(always)]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, ::std::marker::PhantomData)
     }
 
+    #[inline(always)]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }

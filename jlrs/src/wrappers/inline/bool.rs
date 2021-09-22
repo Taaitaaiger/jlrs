@@ -17,15 +17,18 @@ use std::fmt::{Debug, Formatter, Result as FmtResult};
 pub struct Bool(i8);
 
 impl Bool {
+    #[inline(always)]
     pub fn new(val: bool) -> Self {
         Bool(val as i8)
     }
 
+    #[inline(always)]
     /// Returns the value of the `Bool` as a `i8`.
     pub fn as_i8(self) -> i8 {
         self.0
     }
 
+    #[inline(always)]
     /// Returns the value of the `Bool` as a `bool` if it's 0 or 1, `None` if it isn't.
     pub fn try_as_bool(self) -> Option<bool> {
         match self.0 {
@@ -36,6 +39,7 @@ impl Bool {
     }
 
     /// Returns the value of the `Bool` as a `bool`.
+    #[inline(always)]
     pub fn as_bool(self) -> bool {
         self.0 != 0
     }
@@ -56,6 +60,8 @@ impl_valid_layout!(Bool);
 
 unsafe impl Unbox for Bool {
     type Output = Self;
+
+    #[inline(always)]
     unsafe fn unbox(value: Value) -> Bool {
         Bool(jl_unbox_int8(value.unwrap(Private).cast()))
     }
@@ -63,6 +69,8 @@ unsafe impl Unbox for Bool {
 
 unsafe impl Unbox for bool {
     type Output = Bool;
+
+    #[inline(always)]
     unsafe fn unbox(value: Value) -> Bool {
         Bool(jl_unbox_int8(value.unwrap(Private).cast()))
     }

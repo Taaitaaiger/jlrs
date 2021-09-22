@@ -144,6 +144,14 @@ pub trait GeneratorTask: 'static + Send + Sync {
         state: &'inner mut Self::State,
         input: Self::Input,
     ) -> JlrsResult<Self::Output>;
+
+    async fn exit<'inner>(
+        &'inner mut self,
+        _global: Global<'static>,
+        _frame: &'inner mut AsyncGcFrame<'static>,
+        _state: &'inner mut Self::State,
+    ) {
+    }
 }
 
 pub struct GeneratorMessage<GT>
@@ -581,6 +589,8 @@ where
 
                         msg.respond(res).await;
                     }
+
+                    generator.exit(global, &mut frame, &mut state).await
                 }
                 Err(e) => {
                     handle_sender.send(Err(e)).await;

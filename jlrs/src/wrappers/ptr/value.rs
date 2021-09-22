@@ -122,7 +122,7 @@ use jl_sys::{
     jl_an_empty_string, jl_an_empty_vec_any, jl_apply_type, jl_array_any_type, jl_array_int32_type,
     jl_array_symbol_type, jl_array_uint8_type, jl_astaggedvalue, jl_bottom_type, jl_call, jl_call0,
     jl_call1, jl_call2, jl_call3, jl_diverror_exception, jl_egal, jl_emptytuple, jl_eval_string,
-    jl_exception_occurred, jl_false, jl_field_index, jl_field_isptr, jl_field_offset, jl_finalize,
+    jl_exception_occurred, jl_false, jl_field_index, jl_field_isptr, jl_field_offset,
     jl_gc_add_finalizer, jl_gc_add_ptr_finalizer, jl_get_nth_field, jl_get_nth_field_noalloc,
     jl_interrupt_exception, jl_isa, jl_memory_exception, jl_nothing, jl_object_id,
     jl_readonlymemory_exception, jl_set_nth_field, jl_stackovf_exception, jl_stderr_obj,
@@ -1209,11 +1209,6 @@ impl Value<'_, '_> {
             f as *mut c_void,
         )
     }
-
-    /// Call all finalizers.
-    pub unsafe fn finalize(self) {
-        jl_finalize(self.unwrap(Private))
-    }
 }
 
 /// # Constant values.
@@ -1331,6 +1326,7 @@ unsafe impl<'scope, 'data> ValidLayout for Value<'scope, 'data> {
 }
 
 impl<'data> Call<'data> for Value<'_, 'data> {
+    #[inline(always)]
     unsafe fn call0<'target, 'current, S, F>(self, scope: S) -> JlrsResult<S::JuliaResult>
     where
         S: Scope<'target, 'current, 'data, F>,
@@ -1340,6 +1336,7 @@ impl<'data> Call<'data> for Value<'_, 'data> {
         scope.unrooted_call_result(res, Private)
     }
 
+    #[inline(always)]
     unsafe fn call1<'target, 'current, S, F>(
         self,
         scope: S,
@@ -1353,6 +1350,7 @@ impl<'data> Call<'data> for Value<'_, 'data> {
         scope.unrooted_call_result(res, Private)
     }
 
+    #[inline(always)]
     unsafe fn call2<'target, 'current, S, F>(
         self,
         scope: S,
@@ -1367,6 +1365,7 @@ impl<'data> Call<'data> for Value<'_, 'data> {
         scope.unrooted_call_result(res, Private)
     }
 
+    #[inline(always)]
     unsafe fn call3<'target, 'current, S, F>(
         self,
         scope: S,
@@ -1382,6 +1381,7 @@ impl<'data> Call<'data> for Value<'_, 'data> {
         scope.unrooted_call_result(res, Private)
     }
 
+    #[inline(always)]
     unsafe fn call<'target, 'current, 'value, V, S, F>(
         self,
         scope: S,
@@ -1396,6 +1396,7 @@ impl<'data> Call<'data> for Value<'_, 'data> {
         scope.unrooted_call_result(res, Private)
     }
 
+    #[inline(always)]
     unsafe fn call0_unrooted<'target>(self, _: Global<'target>) -> JuliaResultRef<'target, 'data> {
         let res = jl_call0(self.unwrap(Private));
         let exc = jl_exception_occurred();
@@ -1407,6 +1408,7 @@ impl<'data> Call<'data> for Value<'_, 'data> {
         }
     }
 
+    #[inline(always)]
     unsafe fn call1_unrooted<'target>(
         self,
         _: Global<'target>,
@@ -1422,6 +1424,7 @@ impl<'data> Call<'data> for Value<'_, 'data> {
         }
     }
 
+    #[inline(always)]
     unsafe fn call2_unrooted<'target>(
         self,
         _: Global<'target>,
@@ -1442,6 +1445,7 @@ impl<'data> Call<'data> for Value<'_, 'data> {
         }
     }
 
+    #[inline(always)]
     unsafe fn call3_unrooted<'target>(
         self,
         _: Global<'target>,
@@ -1464,6 +1468,7 @@ impl<'data> Call<'data> for Value<'_, 'data> {
         }
     }
 
+    #[inline(always)]
     unsafe fn call_unrooted<'target, 'value, V>(
         self,
         _: Global<'target>,
@@ -1507,10 +1512,12 @@ impl<'scope, 'data> WrapperPriv<'scope, 'data> for Value<'scope, 'data> {
     type Wraps = jl_value_t;
     const NAME: &'static str = "Value";
 
+    #[inline(always)]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData, PhantomData)
     }
 
+    #[inline(always)]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
@@ -1522,10 +1529,12 @@ impl<'scope, 'data> WrapperPriv<'scope, 'data> for Value<'scope, 'data> {
 pub struct LeakedValue(Value<'static, 'static>);
 
 impl LeakedValue {
+    #[inline(always)]
     pub(crate) unsafe fn wrap(ptr: *mut jl_value_t) -> Self {
         LeakedValue(Value::wrap(ptr, Private))
     }
 
+    #[inline(always)]
     pub(crate) unsafe fn wrap_non_null(ptr: NonNull<jl_value_t>) -> Self {
         LeakedValue(Value::wrap_non_null(ptr, Private))
     }
@@ -1535,6 +1544,7 @@ impl LeakedValue {
     ///
     /// Safety: you must guarantee this value has not been freed by the garbage collector. While
     /// `Symbol`s are never garbage collected, modules and their contents can be redefined.
+    #[inline(always)]
     pub unsafe fn as_value<'scope>(self, _: Global<'scope>) -> Value<'scope, 'static> {
         self.0
     }

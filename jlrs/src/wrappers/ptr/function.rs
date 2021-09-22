@@ -63,6 +63,7 @@ impl<'scope, 'data> WrapperPriv<'scope, 'data> for Function<'scope, 'data> {
     type Wraps = jl_value_t;
     const NAME: &'static str = "Function";
 
+    #[inline(always)]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self {
             inner,
@@ -71,6 +72,7 @@ impl<'scope, 'data> WrapperPriv<'scope, 'data> for Function<'scope, 'data> {
         }
     }
 
+    #[inline(always)]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.inner
     }

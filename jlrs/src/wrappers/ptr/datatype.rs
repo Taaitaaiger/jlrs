@@ -846,10 +846,12 @@ impl<'scope> WrapperPriv<'scope, '_> for DataType<'scope> {
     type Wraps = jl_datatype_t;
     const NAME: &'static str = "DataType";
 
+    #[inline(always)]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, ::std::marker::PhantomData)
     }
 
+    #[inline(always)]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }

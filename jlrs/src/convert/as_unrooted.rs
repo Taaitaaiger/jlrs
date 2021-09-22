@@ -31,6 +31,7 @@ impl<'scope, 'frame, 'data, 'inner> AsUnrooted<'scope, 'frame, 'data, 'inner>
     for Value<'frame, 'data>
 {
     type Unrooted = OutputValue<'scope, 'data, 'inner>;
+    #[inline(always)]
     fn as_unrooted<F: Frame<'frame>>(
         self,
         _output: OutputScope<'scope, 'frame, 'inner, F>,
@@ -43,6 +44,7 @@ impl<'scope, 'frame, 'data, 'inner> AsUnrooted<'scope, 'frame, 'data, 'inner>
     for JuliaResult<'frame, 'data>
 {
     type Unrooted = OutputResult<'scope, 'data, 'inner>;
+    #[inline(always)]
     fn as_unrooted<F: Frame<'frame>>(
         self,
         output: OutputScope<'scope, 'frame, 'inner, F>,

@@ -2,28 +2,32 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 
-//! The documentation found on docs.rs corresponds to Julia version 1.4.1, however when
-//! compiled locally, the bindings will match the version installed locally.
-
-macro_rules! llt_align {
-    ($x:expr, $sz:expr) => {
-        (($x) + ($sz) - 1) & !(($sz) - 1)
-    };
-}
+//! The documentation found on docs.rs corresponds to Julia version 1.7.0.
 
 use std::ffi::c_void;
 use std::mem::size_of;
 use std::ptr::{null_mut, NonNull};
 use std::sync::atomic::{AtomicPtr, Ordering};
 
-#[cfg(not(feature = "use-bindgen"))]
+#[cfg(all(not(feature = "use-bindgen"), target_os = "linux"))]
 pub mod bindings;
 
-#[cfg(not(feature = "use-bindgen"))]
+#[cfg(all(not(feature = "use-bindgen"), target_os = "linux"))]
 pub use bindings::*;
 
-#[cfg(feature = "use-bindgen")]
+#[cfg(target_os = "windows")]
+pub mod bindings_win;
+
+#[cfg(target_os = "windows")]
+pub use bindings_win::*;
+
+#[cfg(all(feature = "use-bindgen", target_os = "linux"))]
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+
+#[inline(always)]
+fn llt_align(x: usize, sz: usize) -> usize {
+    (x + sz - 1) & !(sz - 1)
+}
 
 #[inline(always)]
 pub unsafe fn jl_astaggedvalue(v: *mut jl_value_t) -> *mut jl_taggedvalue_t {
@@ -101,7 +105,7 @@ pub unsafe fn jl_gc_wb(parent: *mut jl_value_t, ptr: *mut jl_value_t) {
 #[inline(always)]
 pub unsafe fn jl_symbol_name_(s: *mut jl_sym_t) -> *mut u8 {
     s.cast::<u8>()
-        .add(llt_align!(size_of::<jl_sym_t>(), size_of::<*mut c_void>()))
+        .add(llt_align(size_of::<jl_sym_t>(), size_of::<*mut c_void>()))
 }
 
 #[inline(always)]
@@ -125,6 +129,8 @@ pub unsafe fn jl_field_isptr(st: *mut jl_datatype_t, i: i32) -> bool {
     .isptr()
         != 0
 }
+
+#[inline(always)]
 pub unsafe fn jl_field_size(st: *mut jl_datatype_t, i: isize) -> u32 {
     let ly = NonNull::new_unchecked(
         NonNull::new_unchecked(st).as_ref().layout as *mut jl_datatype_layout_t,
@@ -147,6 +153,7 @@ pub unsafe fn jl_field_size(st: *mut jl_datatype_t, i: isize) -> u32 {
     }
 }
 
+#[inline(always)]
 pub unsafe fn jl_field_offset(st: *mut jl_datatype_t, i: isize) -> u32 {
     let ly = &*(&*st).layout;
     assert!(i >= 0 && (i as u32) < ly.nfields);
@@ -177,6 +184,7 @@ pub unsafe fn jl_array_dims_ptr<'a>(array: *mut jl_array_t) -> *mut usize {
     &mut NonNull::new_unchecked(array).as_mut().nrows
 }
 
+#[inline(always)]
 pub unsafe fn jl_array_ptr_set(a: *mut jl_array_t, i: usize, x: *mut c_void) -> *mut jl_value_t {
     assert!(NonNull::new_unchecked(a).as_ref().flags.ptrarray() != 0);
     let a_data: *mut AtomicPtr<jl_value_t> = jl_array_data(a.cast()).cast();
@@ -198,6 +206,8 @@ pub unsafe fn jl_array_ptr_set(a: *mut jl_array_t, i: usize, x: *mut c_void) -> 
 
 #[cfg(test)]
 mod tests {
+    use std::ffi::CString;
+
     use super::*;
 
     #[test]
@@ -205,6 +215,8 @@ mod tests {
         unsafe {
             jl_init();
             assert!(jl_is_initialized() != 0);
+            let cmd = CString::new("sqrt(2.0)").unwrap();
+            jl_eval_string(cmd.as_ptr());
             assert!(jl_exception_occurred().is_null());
             jl_atexit_hook(0);
         }

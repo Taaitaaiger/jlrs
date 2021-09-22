@@ -18,9 +18,14 @@ fn flags() -> Vec<String> {
         Some(julia_dir) => {
             let jl_include_path = format!("-I{}/include/julia/", julia_dir);
             let jl_lib_path = format!("-L{}/lib/", julia_dir);
-            // Needed to link libuv
 
             println!("cargo:rustc-flags={}", &jl_lib_path);
+
+            #[cfg(target_os = "windows")]
+            {
+                let jl_internal_lib_path = format!("-L{}/lib/julia", julia_dir);
+                println!("cargo:rustc-flags={}", &jl_internal_lib_path);
+            }
 
             if env::var("CARGO_FEATURE_UV").is_ok() {
                 let jl_internal_lib_path = format!("-L{}/lib/julia", julia_dir);
@@ -104,8 +109,6 @@ fn main() {
             "jl_exception_occurred",
             "jl_environ",
             "jl_field_index",
-            "jl_finalize",
-            "jl_flush_cstdio",
             "jl_gc_add_finalizer",
             "jl_gc_add_ptr_finalizer",
             "jl_gc_collect",
@@ -353,6 +356,7 @@ fn main() {
             .allowlist_var("jl_weakref_type")
             .allowlist_var("jl_weakref_typejl_abstractslot_type")
             .rustfmt_bindings(true)
+            .dynamic_link_require_all(true)
             .generate()
             .expect("Unable to generate bindings");
 

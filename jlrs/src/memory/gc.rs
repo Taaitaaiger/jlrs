@@ -2,10 +2,7 @@
 
 use super::frame::Frame;
 use crate::Julia;
-use jl_sys::{
-    jl_flush_cstdio, jl_gc_collect, jl_gc_collection_t, jl_gc_enable, jl_gc_is_enabled,
-    jl_gc_safepoint,
-};
+use jl_sys::{jl_gc_collect, jl_gc_collection_t, jl_gc_enable, jl_gc_is_enabled, jl_gc_safepoint};
 
 /// The different collection modes.
 #[derive(Debug, Copy, Clone)]
@@ -35,11 +32,6 @@ pub trait Gc: private::Gc {
     /// Insert a safepoint, a point where the garbage collector may run.
     unsafe fn gc_safepoint(&mut self) {
         jl_gc_safepoint();
-    }
-
-    /// Flush C stdio.
-    fn flush_io(&mut self) {
-        unsafe { jl_flush_cstdio() }
     }
 }
 

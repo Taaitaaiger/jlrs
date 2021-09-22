@@ -164,10 +164,12 @@ impl<'scope> Wrapper<'scope, '_> for TypeName<'scope> {
     type Wraps = jl_typename_t;
     const NAME: &'static str = "TypeName";
 
+    #[inline(always)]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData)
     }
 
+    #[inline(always)]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }

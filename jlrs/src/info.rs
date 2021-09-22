@@ -1,15 +1,10 @@
 //! System and Julia version information.
 
-use crate::{
-    memory::global::Global,
-    private::Private,
-    wrappers::ptr::private::Wrapper,
-    wrappers::ptr::{symbol::Symbol, value::Value},
-};
+use crate::{private::Private, wrappers::ptr::private::Wrapper, wrappers::ptr::symbol::Symbol};
 use jl_sys::{
-    jl_cpu_threads, jl_get_ARCH, jl_get_UNAME, jl_get_libllvm, jl_getallocationgranularity,
-    jl_getpagesize, jl_git_branch, jl_git_commit, jl_is_debugbuild, jl_n_threads,
-    jl_ver_is_release, jl_ver_major, jl_ver_minor, jl_ver_patch, jl_ver_string,
+    jl_cpu_threads, jl_get_ARCH, jl_get_UNAME, jl_getallocationgranularity, jl_getpagesize,
+    jl_git_branch, jl_git_commit, jl_is_debugbuild, jl_n_threads, jl_ver_is_release, jl_ver_major,
+    jl_ver_minor, jl_ver_patch, jl_ver_string,
 };
 use std::{ffi::CStr, marker::PhantomData};
 
@@ -71,26 +66,6 @@ impl Info {
             } else {
                 Err(cstr.to_bytes())
             }
-        }
-    }
-
-    /// The path to the llvm library used by Julia.
-    pub fn libllvm_path(&self) -> Option<StrOrBytes<'static>> {
-        unsafe {
-            let sym = jl_get_libllvm();
-            if sym == Value::nothing(Global::new()).unwrap(Private) {
-                return None;
-            }
-
-            let cstr = Symbol::wrap(sym.cast(), Private).as_cstr();
-
-            let v = if let Ok(rstr) = cstr.to_str() {
-                Ok(rstr)
-            } else {
-                Err(cstr.to_bytes())
-            };
-
-            Some(v)
         }
     }
 

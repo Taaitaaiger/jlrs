@@ -42,7 +42,7 @@ impl AsyncTask for MyTask {
                 .wrapper_unchecked()
                 .call_async(&mut *frame, &mut [dims, iters])
                 .await?
-                .unwrap()
+                .into_jlrs_result()?
                 .unbox::<f64>()
         }
     }

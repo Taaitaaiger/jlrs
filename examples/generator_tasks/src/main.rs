@@ -109,12 +109,15 @@ fn main() {
     //
     // Here we allow four tasks to be running concurrently, a backlog of sixteen messages before
     // the channel is full, and yield control of the thread to Julia after one ms.
-    let (julia, thread_handle) = unsafe { AsyncJulia::init(4, 16, Duration::from_millis(1)).expect("Could not init Julia") };
+    let (julia, thread_handle) =
+        unsafe { AsyncJulia::init(4, 16, Duration::from_millis(1)).expect("Could not init Julia") };
 
     {
         // Register AccumulatorTask, otherwise AccumulatorTask::init returns an error.
         let (init_sender, init_receiver) = crossbeam_channel::bounded(1);
-        julia.try_register_generator::<AccumulatorTask, _>(init_sender).unwrap();
+        julia
+            .try_register_generator::<AccumulatorTask, _>(init_sender)
+            .unwrap();
         init_receiver.recv().unwrap().unwrap();
     }
 
