@@ -15,7 +15,7 @@ license = "MIT"
 edition = "2018"
 
 [features]
-default = ["jlrs-derive"]
+default = []
 uv = ["jl-sys/uv"]
 async = ["futures", "crossbeam-channel", "async-trait"]
 async-std-rt = ["async", "async-std"]

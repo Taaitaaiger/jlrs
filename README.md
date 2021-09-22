@@ -220,7 +220,7 @@ If you want to run jlrs's tests, both these requirements must be taken into acco
 
 ## Custom types
 
-In order to map a struct in Rust to one in Julia you can derive or implement `ValidLayout`, `Unbox`, and `Typecheck`. If the struct in Julia has no type parameters and is a bits type you can also derive `IntoJulia`, which lets you use the type in combination with `Value::new`.
+In order to map a struct in Rust to one in Julia you can derive or implement `ValidLayout`, `Unbox`, and `Typecheck` when the `jlrs-derive` feature is enabled. If the struct in Julia has no type parameters and is a bits type you can also derive `IntoJulia`, which lets you use the type in combination with `Value::new`.
 
 You should normally not need to implement these structs or traits manually. The JlrsReflect.jl package can generate the correct Rust struct and automatically derive the supported traits for types that have no tuple or union fields with type parameters. The reason for this restriction is that the layout of tuple and union fields can be very different depending on these parameters in a way that can't be expressed in Rust.
 
@@ -231,8 +231,9 @@ These custom types can also be used when you call Rust from Julia with `ccall`.
 
 Several opt-in features are available, most of which have already been mentioned. They are:
 
- - `jlrs-derive`: enables the custom derive macros. This is the only feature which is enabled  by default.
+ - `jlrs-derive`: enables the custom derive macros.
  - `async-std-rt` / `tokio-rt`: enables the async runtime, backed by either async-std or tokio.
- - `jlrs-ndarray`: enables borrowing Julia array data as a (mutable) array view from ndarray.
+ - `jlrs-ndarray`: enables borrowing Julia array data as an `ArrayView(Mut)` from ndarray.
  - `f16`: enables support for working with Julia's `Float16` type.
  - `uv`: enables `CCall::uv_async_send`, which can be used to wake an `AsyncCondition`.
+ - `use-bindgen`: use bindgen to generate the bindings to the Julia C API rather than using the provided bindings.
