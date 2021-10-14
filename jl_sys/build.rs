@@ -10,6 +10,10 @@ fn find_julia() -> Option<String> {
         return Some("/usr".to_string());
     }
 
+    if Path::new("/usr/local/include/julia/julia.h").exists() {
+        return Some("/usr/local".to_string());
+    }
+
     None
 }
 
