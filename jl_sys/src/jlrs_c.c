@@ -1,5 +1,9 @@
-#include <julia/julia.h>
 #include "jlrs_c.h"
+#if __has_include(<julia.h>)
+#include <julia.h>
+#else
+#inlucde <julia/julia.h>
+#endif
 
 jlrs_result_t jlrs_alloc_array_1d(jl_value_t *atype, size_t nr)
 {
