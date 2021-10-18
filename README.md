@@ -39,7 +39,7 @@ This crate depends on jl-sys which contains the raw bindings to the Julia C API,
 
 The recommended way to install Julia is to download the binaries from the official website, which is distributed in an archive containing a directory called `julia-x.y.z`. This directory contains several other directories, including a `bin` directory containing the `julia` executable.
 
-In order to ensure the `julia.h` header file can be found, either `/usr/include/julia/julia.h` must exist, or you have to set the `JULIA_DIR` environment variable to `/path/to/julia-x.y.z`. This environment variable can be used to override the default. Similarly, in order to load `libjulia.so` you must add `/path/to/julia-x.y.z/lib` to the `LD_LIBRARY_PATH` environment variable. When the `uv` feature is enabled, `/path/to/julia-x.y.z/lib/julia` must also be added to `LD_LIBRARY_PATH`.
+In order to ensure the `julia.h` header file can be found, either `/usr/include/julia/julia.h` or `/usr/local/include/julia/julia.h` must exist, or you have to set the `JULIA_DIR` environment variable to `/path/to/julia-x.y.z`. This environment variable can be used to override the default. Similarly, in order to load `libjulia.so` you must add `/path/to/julia-x.y.z/lib` to the `LD_LIBRARY_PATH` environment variable. When the `uv` feature is enabled, `/path/to/julia-x.y.z/lib/julia` must also be added to `LD_LIBRARY_PATH`.
 
 #### Windows
 
