@@ -116,8 +116,8 @@ pub trait ScopeExt<'target, 'current, 'data, F: Frame<'current>>:
     where
         for<'inner> G: FnOnce(&mut GcFrame<'inner, F::Mode>) -> JlrsResult<T>;
 
-    /// Create a [`GcFrame`] with `capacity` slots and call the given closure with it. Returns the
-    /// result of this closure.
+    /// Create a [`GcFrame`] with capacity for at least `capacity` roots and call the given
+    /// closure with it. Returns the result of this closure.
     ///
     /// Example:
     ///
