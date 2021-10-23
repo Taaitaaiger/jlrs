@@ -40,6 +40,10 @@ fn flags() -> Vec<String> {
     if env::var("CARGO_FEATURE_DEBUG").is_ok() {
         println!("cargo:rustc-link-lib=julia-debug");
     } else {
+        #[cfg(target_os = "windows")]
+        println!("cargo:rustc-link-lib=static=julia");
+
+        #[cfg(target_os = "linux")]
         println!("cargo:rustc-link-lib=julia");
     }
 
@@ -71,6 +75,7 @@ fn main() {
     if flags.len() == 1 {
         c.include(&flags[0][2..]);
     }
+
 
     c.compile("jlrs_c");
 

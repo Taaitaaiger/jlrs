@@ -37,7 +37,7 @@ use crate::{
     private::Private,
     CCall,
 };
-use jl_sys::jl_value_t;
+use jl_sys::{jl_value_t, jlrs_current_task};
 use std::{cell::Cell, ffi::c_void, marker::PhantomData, ptr::NonNull};
 
 pub(crate) const MIN_FRAME_CAPACITY: usize = 16;
@@ -57,6 +57,11 @@ impl<'frame, M: Mode> GcFrame<'frame, M> {
     /// Returns the number of values currently rooted in this frame.
     pub fn n_roots(&self) -> usize {
         self.raw_frame[0].get() as usize >> 1
+    }
+
+    pub unsafe fn print_stack(&self) {
+        let last = jlrs_current_task();
+        jl_sys::jlrs_print_stack(NonNull::new_unchecked(last).as_ref().gcstack);
     }
 
     /// Returns the maximum number of slots this frame can use.

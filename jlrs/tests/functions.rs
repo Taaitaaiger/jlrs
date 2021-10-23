@@ -33,7 +33,7 @@ fn throw_nothing() {
             let func = Value::eval_string(
                 &mut *frame,
                 "function y()::Nothing
-                    throw(nothing)
+                throw(nothing)
                 end",
             )?
             .into_jlrs_result()?;
