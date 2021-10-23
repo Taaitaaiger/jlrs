@@ -49,7 +49,11 @@ pub unsafe trait IntoJulia: Sized + 'static {
             .wrapper()
             .expect("DataTypeRef::wrapper returned None")
             .unwrap_non_null(Private);
+
+        #[cfg(not(feature = "lts"))]
         debug_assert!(ty.as_ref().isbitstype() != 0);
+        #[cfg(feature = "lts")]
+        debug_assert!(ty.as_ref().isbitstype != 0);
 
         let container = jl_new_struct_uninit(ty.as_ptr());
         container.cast::<Self>().write(self);

@@ -1,6 +1,7 @@
 use jlrs::prelude::*;
-use jlrs::util::JULIA;
+mod util;
 use jlrs::wrappers::ptr::union_all::UnionAll;
+use util::JULIA;
 
 macro_rules! impl_constant_test {
     ($func:ident, $tyname:expr) => {

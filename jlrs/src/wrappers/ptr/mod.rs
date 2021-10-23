@@ -29,6 +29,7 @@ pub mod method_instance;
 pub mod method_match;
 pub mod method_table;
 pub mod module;
+#[cfg(not(feature = "lts"))]
 pub mod opaque_closure;
 pub mod simple_vector;
 pub mod string;
@@ -41,6 +42,7 @@ pub mod typemap_level;
 pub mod union;
 pub mod union_all;
 pub mod value;
+#[cfg(not(feature = "lts"))]
 pub mod vararg;
 pub mod weak_ref;
 
@@ -56,7 +58,6 @@ use self::{
     method_match::MethodMatch,
     method_table::MethodTable,
     module::Module,
-    opaque_closure::OpaqueClosure,
     private::Wrapper as _,
     simple_vector::SimpleVector,
     string::JuliaString,
@@ -69,9 +70,11 @@ use self::{
     union::Union,
     union_all::UnionAll,
     value::Value,
-    vararg::Vararg,
     weak_ref::WeakRef,
 };
+
+#[cfg(not(feature = "lts"))]
+use self::{opaque_closure::OpaqueClosure, vararg::Vararg};
 use crate::{
     error::{JlrsError, JlrsResult, CANNOT_DISPLAY_VALUE},
     layout::valid_layout::ValidLayout,
@@ -82,6 +85,7 @@ use std::{
     fmt::{Debug, Formatter, Result as FmtResult},
     marker::PhantomData,
     ptr::null_mut,
+    str::FromStr,
 };
 
 macro_rules! impl_valid_layout {
@@ -130,8 +134,9 @@ pub trait Wrapper<'scope, 'data>: private::Wrapper<'scope, 'data> {
                 })?
                 .value_unchecked()
                 .cast::<JuliaString>()?
-                .as_str()?
-                .to_string();
+                .as_str()?;
+
+            let s = String::from_str(s).unwrap();
 
             Ok(s)
         }
@@ -320,7 +325,9 @@ pub type MethodTableRef<'scope> = Ref<'scope, 'static, MethodTable<'scope>>;
 impl_valid_layout!(MethodTableRef, MethodTable);
 
 /// A reference to an [`OpaqueClosure`]
+#[cfg(not(feature = "lts"))]
 pub type OpaqueClosureRef<'scope> = Ref<'scope, 'static, OpaqueClosure<'scope>>;
+#[cfg(not(feature = "lts"))]
 impl_valid_layout!(OpaqueClosureRef, OpaqueClosure);
 
 /// A reference to a [`SimpleVector`]
@@ -372,7 +379,9 @@ pub type UnionAllRef<'scope> = Ref<'scope, 'static, UnionAll<'scope>>;
 impl_valid_layout!(UnionAllRef, UnionAll);
 
 /// A reference to a [`Vararg`]
+#[cfg(not(feature = "lts"))]
 pub type VarargRef<'scope> = Ref<'scope, 'static, Vararg<'scope>>;
+#[cfg(not(feature = "lts"))]
 impl_valid_layout!(VarargRef, Vararg);
 
 /// A reference to a [`WeakRef`]

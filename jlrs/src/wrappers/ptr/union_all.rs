@@ -14,10 +14,16 @@ use crate::{memory::global::Global, private::Private};
 
 use jl_sys::{
     jl_abstractarray_type, jl_anytuple_type_type, jl_array_type, jl_densearray_type,
-    jl_llvmpointer_type, jl_namedtuple_type, jl_opaque_closure_type, jl_pointer_type, jl_ref_type,
-    jl_type_type, jl_type_unionall, jl_unionall_t, jl_unionall_type,
-    jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_type_unionall,
+    jl_llvmpointer_type, jl_namedtuple_type, jl_pointer_type, jl_ref_type, jl_type_type,
+    jl_type_unionall, jl_unionall_t, jl_unionall_type, jlrs_result_tag_t_JLRS_RESULT_ERR,
+    jlrs_type_unionall,
 };
+
+#[cfg(not(feature = "lts"))]
+use jl_sys::jl_opaque_closure_type;
+#[cfg(feature = "lts")]
+use jl_sys::jl_vararg_type;
+
 use std::{marker::PhantomData, ptr::NonNull};
 
 /// An iterated union of types. If a struct field has a parametric type with some of its
@@ -143,12 +149,19 @@ impl<'base> UnionAll<'base> {
         unsafe { UnionAll::wrap(jl_anytuple_type_type, Private) }
     }
 
+    /// The `UnionAll` `Vararg`.
+    #[cfg(feature = "lts")]
+    pub fn vararg_type(_: Global<'base>) -> Self {
+        unsafe { UnionAll::wrap(jl_vararg_type, Private) }
+    }
+
     /// The `UnionAll` `AbstractArray`.
     pub fn abstractarray_type(_: Global<'base>) -> Self {
         unsafe { UnionAll::wrap(jl_abstractarray_type, Private) }
     }
 
     /// The `UnionAll` `OpaqueClosure`.
+    #[cfg(not(feature = "lts"))]
     pub fn opaque_closure_type(_: Global<'base>) -> Self {
         unsafe { UnionAll::wrap(jl_opaque_closure_type, Private) }
     }

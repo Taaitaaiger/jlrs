@@ -43,15 +43,15 @@
 //!
 //! Like a blocking task, an `AsyncTask` runs once and eventually sends back its result through a
 //! provided channel. In many cases it's more useful to set up some initial state and interact
-//! with this task. For this purpose the [`GeneratorTask`] trait can be implemented. It has three
+//! with this task. For this purpose the [`PersistentTask`] trait can be implemented. It has three
 //! async methods: `register`, `init`, and `run`; both `init` and `run` must be implemented. When
-//! a `GeneratorTask` starts executing `init` is called, which returns the initial state of the
-//! generator. Because the frame provided to this method isn't dropped after it has completed, the
+//! a `PersistentTask` starts executing `init` is called, which returns the initial state of the
+//! persistent. Because the frame provided to this method isn't dropped after it has completed, the
 //! initial state can contain Julia data rooted in that frame. After `init` has completed a handle
-//! to the generator is returned. This handle can be used to call the generator's `run` method.
+//! to the task is returned. This handle can be used to call the task's `run` method.
 //! This method is similar to [`AsyncTask::run`], except that it's also provided with a mutable
-//! reference to the generator's state and the additional data that must be provided when calling
-//! the generator using its handle.
+//! reference to the task's state and the additional data that must be provided when calling
+//! the task using its handle.
 //!
 //! Examples that show how to use the async runtime and implement tasks can be found in the
 //! [`examples`] directory of the repository.
@@ -61,7 +61,7 @@
 //! [`Julia::scope`]: crate::Julia::scope
 //! [`AsyncGcFrame`]: crate::extensions::multitask::async_frame::AsyncGcFrame
 //! [`CallAsync`]: crate::extensions::multitask::call_async::CallAsync
-//! [`GeneratorTask`]: crate::extensions::multitask::async_task::GeneratorTask
+//! [`PersistentTask`]: crate::extensions::multitask::async_task::PersistentTask
 //! [`AsyncTask`]: crate::extensions::multitask::async_task::AsyncTask
 //! [`AsyncTask::run`]: crate::extensions::multitask::async_task::AsyncTask::run
 //! [`Task`]: crate::wrappers::ptr::task::Task
@@ -75,55 +75,72 @@ pub(crate) mod output_result_ext;
 pub mod result_sender;
 mod runtime;
 
-use self::async_task::GenericBlockingTask;
-use self::mode::Async;
-use self::result_sender::ResultSender;
-use crate::error::{JlrsError, JlrsResult};
-use crate::extensions::multitask::async_task::GenericPendingTask;
-use crate::info::Info;
-use crate::memory::global::Global;
-use crate::memory::stack_page::StackPage;
-use crate::wrappers::ptr::module::Module;
-use crate::wrappers::ptr::string::JuliaString;
-use crate::wrappers::ptr::value::Value;
-use crate::{memory::frame::GcFrame, wrappers::ptr::call::Call};
-use crate::{INIT, JLRS_JL};
-use jl_sys::{
-    jl_atexit_hook, jl_eval_string, jl_init, jl_init_with_image, jl_is_initialized,
-    jl_process_events, jlrs_current_task,
+use crate::{
+    error::{JlrsError, JlrsResult},
+    extensions::multitask::{
+        async_frame::AsyncGcFrame,
+        async_task::{GenericBlockingTask, GenericPendingTask},
+        mode::Async,
+        result_sender::ResultSender,
+    },
+    info::Info,
+    init_jlrs,
+    memory::{frame::GcFrame, global::Global, stack_page::StackPage},
+    wrappers::ptr::{call::Call, module::Module, string::JuliaString, value::Value, Wrapper},
+    INIT,
 };
-use std::cell::Cell;
-use std::fmt;
-use std::io::{Error as IOError, ErrorKind};
-use std::path::{Path, PathBuf};
-use std::ptr::NonNull;
-use std::sync::atomic::Ordering;
+use jl_sys::{
+    jl_atexit_hook, jl_init, jl_init_with_image, jl_is_initialized, jl_process_events, jl_yield,
+    jlrs_current_task,
+};
 use std::{
     collections::VecDeque,
     env,
-    ffi::{c_void, CString},
+    ffi::c_void,
+    fmt,
+    io::{Error as IOError, ErrorKind},
+    path::{Path, PathBuf},
     ptr::null_mut,
+    ptr::NonNull,
+    sync::atomic::Ordering,
+    {cell::Cell, pin::Pin},
 };
+
+/// Yield the current task.
+pub fn yield_task(_: &mut AsyncGcFrame) {
+    unsafe {
+        jl_process_events();
+        jl_yield();
+    }
+}
+
+// Ensure AsyncJulia can be sent to other threads.
+trait RequireSendSync: 'static + Send + Sync {}
+
+init_fn!(init_multitask, JLRS_MULTITASK_JL, "JlrsMultitask.jl");
 
 #[cfg(feature = "async-std-rt")]
 mod impl_async_std {
-    use std::sync::Arc;
-    use std::time::Duration;
-
-    use super::runtime::TrySendError;
-    use super::Message;
-    use crate::extensions::multitask::async_task::{
-        AsyncTask, BlockingTask, Generator, GeneratorHandle, GeneratorTask, PendingTask,
-        RegisterGenerator, RegisterTask, Task,
-    };
-    use crate::prelude::JlrsResult;
-    use std::thread::{self, JoinHandle as ThreadHandle};
-
-    pub(super) use super::runtime::async_std_rt::{channel, oneshot_channel};
     use super::*;
-    use async_std::channel::{Receiver, Sender};
-    use async_std::future::timeout;
-    use async_std::task::{self, JoinHandle};
+    use crate::error::JlrsResult;
+    use crate::extensions::multitask::async_task::{
+        AsyncTask, BlockingTask, PendingTask, Persistent, PersistentHandle, PersistentTask,
+        RegisterPersistent, RegisterTask, Task,
+    };
+    use async_std::{
+        channel::{Receiver, Sender},
+        future::timeout,
+        task::{self, JoinHandle},
+    };
+    use runtime::{
+        async_std_rt::{channel, oneshot_channel},
+        TrySendError,
+    };
+    use std::{
+        sync::Arc,
+        thread::{self, JoinHandle as ThreadHandle},
+        time::Duration,
+    };
 
     /// A handle to the async runtime. It can be used to include files and send new tasks. The
     /// runtime shuts down when the last handle is dropped.
@@ -485,17 +502,17 @@ mod impl_async_std {
             Ok(())
         }
 
-        /// Send a new generator to the runtime, this method waits if there's no room in the channel.
-        /// This method takes a single argument, the generator. It returns after
-        /// [`GeneratorTask::init`] has been called, a [`GeneratorHandle`] to the generator is
+        /// Send a new persistent to the runtime, this method waits if there's no room in the channel.
+        /// This method takes a single argument, the task. It returns after
+        /// [`PersistentTask::init`] has been called, a [`PersistentHandle`] to the task is
         /// returned if this method completes successfully, and the error if it doesn't.
-        pub async fn generator<GT>(&self, task: GT) -> JlrsResult<GeneratorHandle<GT>>
+        pub async fn persistent<GT>(&self, task: GT) -> JlrsResult<PersistentHandle<GT>>
         where
-            GT: GeneratorTask,
+            GT: PersistentTask,
         {
             let (init_sender, init_recv) = oneshot_channel();
             let rt_sender = self.sender.clone();
-            let msg = PendingTask::<_, _, Generator>::new(task, init_sender);
+            let msg = PendingTask::<_, _, Persistent>::new(task, init_sender);
             let boxed = Box::new(msg);
 
             self.sender
@@ -509,17 +526,17 @@ mod impl_async_std {
             }
         }
 
-        /// Send a new generator to the runtime, if there's no room in the channel an error is
-        /// returned immediately. This method takes a single argument, the generator. It returns after
-        /// [`GeneratorTask::init`] has been called, a [`GeneratorHandle`] to the generator is
+        /// Send a new persistent to the runtime, if there's no room in the channel an error is
+        /// returned immediately. This method takes a single argument, the task. It returns after
+        /// [`PersistentTask::init`] has been called, a [`PersistentHandle`] to the task is
         /// returned if this method completes successfully, and the error if it doesn't.
-        pub fn try_generator<GT>(&self, task: GT) -> JlrsResult<GeneratorHandle<GT>>
+        pub fn try_persistent<GT>(&self, task: GT) -> JlrsResult<PersistentHandle<GT>>
         where
-            GT: GeneratorTask,
+            GT: PersistentTask,
         {
             let (init_sender, init_receiver) = crossbeam_channel::bounded(1);
             let sender = self.sender.clone();
-            let msg = PendingTask::<_, _, Generator>::new(task, init_sender);
+            let msg = PendingTask::<_, _, Persistent>::new(task, init_sender);
             let boxed = Box::new(msg);
             match self
                 .sender
@@ -538,16 +555,16 @@ mod impl_async_std {
             }
         }
 
-        /// Register a generator, this method waits if there's no room in the channel. This method
+        /// Register a persistent, this method waits if there's no room in the channel. This method
         /// takes one argument, the sending half of a channel which is used to send the result back
         /// after the registration has completed.
-        pub async fn register_generator<GT, R>(&self, res_sender: R)
+        pub async fn register_persistent<GT, R>(&self, res_sender: R)
         where
-            GT: GeneratorTask,
+            GT: PersistentTask,
             R: ResultSender<JlrsResult<()>>,
         {
             let sender = self.sender.clone();
-            let msg = PendingTask::<_, GT, RegisterGenerator>::new(res_sender);
+            let msg = PendingTask::<_, GT, RegisterPersistent>::new(res_sender);
             let boxed = Box::new(msg);
             self.sender
                 .send(MessageInner::Task(boxed, sender).wrap())
@@ -555,16 +572,16 @@ mod impl_async_std {
                 .expect("Channel was closed");
         }
 
-        /// Try to register a generator, if there's no room in the channel an error is returned
+        /// Try to register a persistent, if there's no room in the channel an error is returned
         /// immediately. This method takes one argument, the sending half of a channel which is used
         /// to send the result back after the registration has completed.
-        pub fn try_register_generator<GT, R>(&self, res_sender: R) -> JlrsResult<()>
+        pub fn try_register_persistent<GT, R>(&self, res_sender: R) -> JlrsResult<()>
         where
-            GT: GeneratorTask,
+            GT: PersistentTask,
             R: ResultSender<JlrsResult<()>>,
         {
             let sender = self.sender.clone();
-            let msg = PendingTask::<_, GT, RegisterGenerator>::new(res_sender);
+            let msg = PendingTask::<_, GT, RegisterPersistent>::new(res_sender);
             let boxed = Box::new(msg);
             match self
                 .sender
@@ -700,9 +717,6 @@ mod impl_async_std {
                 if Info::new().n_threads() < 3 {
                     Err(JlrsError::MoreThreadsRequired)?;
                 }
-
-                let jlrs_jl = CString::new(JLRS_JL).expect("Invalid Jlrs module");
-                jl_eval_string(jlrs_jl.as_ptr());
 
                 let mut free_stacks = VecDeque::with_capacity(max_n_tasks);
                 for i in 1..max_n_tasks {
@@ -861,9 +875,6 @@ mod impl_async_std {
                     Err(JlrsError::MoreThreadsRequired)?;
                 }
 
-                let jlrs_jl = CString::new(JLRS_JL).expect("Invalid Jlrs module");
-                jl_eval_string(jlrs_jl.as_ptr());
-
                 let mut free_stacks = VecDeque::with_capacity(max_n_tasks);
                 for i in 1..max_n_tasks {
                     free_stacks.push_back(i);
@@ -990,31 +1001,33 @@ mod impl_async_std {
         TryInclude(PathBuf, crossbeam_channel::Sender<JlrsResult<()>>),
         ErrorColor(bool, Box<dyn ResultSender<JlrsResult<()>>>),
         TryErrorColor(bool, crossbeam_channel::Sender<JlrsResult<()>>),
-        Complete(usize, Box<AsyncStackPage>),
+        Complete(usize, Pin<Box<AsyncStackPage>>),
         SetCustomFns(Box<dyn ResultSender<JlrsResult<()>>>),
         TrySetCustomFns(crossbeam_channel::Sender<JlrsResult<()>>),
     }
 }
 
-// Ensure AsyncJulia can be sent to other threads.
-trait RequireSendSync: 'static + Send + Sync {}
-
 #[cfg(feature = "tokio-rt")]
 pub mod impl_tokio {
-    use super::async_task::{
-        AsyncTask, BlockingTask, Generator, GeneratorHandle, GeneratorTask, PendingTask,
-        RegisterGenerator, RegisterTask, Task,
-    };
-    pub(super) use super::runtime::tokio_rt::{channel, oneshot_channel};
-    use super::runtime::tokio_rt::{MaybeUnboundedReceiver, MaybeUnboundedSender, Tokio};
-    use super::runtime::TrySendError;
     use super::*;
     use crate::error::JlrsResult;
-    use std::sync::Arc;
-    use std::thread::{self, JoinHandle as ThreadHandle};
-    use std::time::Duration;
-    use tokio::task::{self, JoinHandle};
-    use tokio::time::timeout;
+    use async_task::{
+        AsyncTask, BlockingTask, PendingTask, Persistent, PersistentHandle, PersistentTask,
+        RegisterPersistent, RegisterTask, Task,
+    };
+    use runtime::{
+        tokio_rt::{channel, oneshot_channel, MaybeUnboundedReceiver, MaybeUnboundedSender, Tokio},
+        TrySendError,
+    };
+    use std::{
+        sync::Arc,
+        thread::{self, JoinHandle as ThreadHandle},
+        time::Duration,
+    };
+    use tokio::{
+        task::{self, JoinHandle},
+        time::timeout,
+    };
 
     /// A handle to the async runtime. It can be used to include files and send new tasks. The
     /// runtime shuts down when the last handle is dropped.
@@ -1376,17 +1389,17 @@ pub mod impl_tokio {
             Ok(())
         }
 
-        /// Send a new generator to the runtime, this method waits if there's no room in the channel.
-        /// This method takes a single argument, the generator. It returns after
-        /// [`GeneratorTask::init`] has been called, a [`GeneratorHandle`] to the generator is
+        /// Send a new persistent to the runtime, this method waits if there's no room in the channel.
+        /// This method takes a single argument, the task. It returns after
+        /// [`PersistentTask::init`] has been called, a [`PersistentHandle`] to the task is
         /// returned if this method completes successfully, and the error if it doesn't.
-        pub async fn generator<GT>(&self, task: GT) -> JlrsResult<GeneratorHandle<GT>>
+        pub async fn persistent<GT>(&self, task: GT) -> JlrsResult<PersistentHandle<GT>>
         where
-            GT: GeneratorTask,
+            GT: PersistentTask,
         {
             let (init_sender, init_recv) = oneshot_channel();
             let rt_sender = self.sender.clone();
-            let msg = PendingTask::<_, _, Generator>::new(task, init_sender);
+            let msg = PendingTask::<_, _, Persistent>::new(task, init_sender);
             let boxed = Box::new(msg);
 
             self.sender
@@ -1400,17 +1413,17 @@ pub mod impl_tokio {
             }
         }
 
-        /// Send a new generator to the runtime, if there's no room in the channel an error is
-        /// returned immediately. This method takes a single argument, the generator. It returns after
-        /// [`GeneratorTask::init`] has been called, a [`GeneratorHandle`] to the generator is
+        /// Send a new persistent to the runtime, if there's no room in the channel an error is
+        /// returned immediately. This method takes a single argument, the task. It returns after
+        /// [`PersistentTask::init`] has been called, a [`PersistentHandle`] to the task is
         /// returned if this method completes successfully, and the error if it doesn't.
-        pub fn try_generator<GT>(&self, task: GT) -> JlrsResult<GeneratorHandle<GT>>
+        pub fn try_persistent<GT>(&self, task: GT) -> JlrsResult<PersistentHandle<GT>>
         where
-            GT: GeneratorTask,
+            GT: PersistentTask,
         {
             let (init_sender, init_receiver) = crossbeam_channel::bounded(1);
             let sender = self.sender.clone();
-            let msg = PendingTask::<_, _, Generator>::new(task, init_sender);
+            let msg = PendingTask::<_, _, Persistent>::new(task, init_sender);
             let boxed = Box::new(msg);
             match self
                 .sender
@@ -1429,16 +1442,16 @@ pub mod impl_tokio {
             }
         }
 
-        /// Register a generator, this method waits if there's no room in the channel. This method
+        /// Register a persistent, this method waits if there's no room in the channel. This method
         /// takes one argument, the sending half of a channel which is used to send the result back
         /// after the registration has completed.
-        pub async fn register_generator<GT, R>(&self, res_sender: R)
+        pub async fn register_persistent<GT, R>(&self, res_sender: R)
         where
-            GT: GeneratorTask,
+            GT: PersistentTask,
             R: ResultSender<JlrsResult<()>>,
         {
             let sender = self.sender.clone();
-            let msg = PendingTask::<_, GT, RegisterGenerator>::new(res_sender);
+            let msg = PendingTask::<_, GT, RegisterPersistent>::new(res_sender);
             let boxed = Box::new(msg);
             self.sender
                 .send(MessageInner::Task(boxed, sender).wrap())
@@ -1446,16 +1459,16 @@ pub mod impl_tokio {
                 .expect("Channel was closed");
         }
 
-        /// Try to register a generator, if there's no room in the channel an error is returned
+        /// Try to register a persistent, if there's no room in the channel an error is returned
         /// immediately. This method takes one argument, the sending half of a channel which is used
         /// to send the result back after the registration has completed.
-        pub fn try_register_generator<GT, R>(&self, res_sender: R) -> JlrsResult<()>
+        pub fn try_register_persistent<GT, R>(&self, res_sender: R) -> JlrsResult<()>
         where
-            GT: GeneratorTask,
+            GT: PersistentTask,
             R: ResultSender<JlrsResult<()>>,
         {
             let sender = self.sender.clone();
-            let msg = PendingTask::<_, GT, RegisterGenerator>::new(res_sender);
+            let msg = PendingTask::<_, GT, RegisterPersistent>::new(res_sender);
             let boxed = Box::new(msg);
             match self
                 .sender
@@ -1642,9 +1655,6 @@ pub mod impl_tokio {
             Err(JlrsError::MoreThreadsRequired)?;
         }
 
-        let jlrs_jl = CString::new(JLRS_JL).expect("Invalid Jlrs module");
-        jl_eval_string(jlrs_jl.as_ptr());
-
         let mut free_stacks = VecDeque::with_capacity(max_n_tasks);
         for i in 1..max_n_tasks {
             free_stacks.push_back(i);
@@ -1678,6 +1688,7 @@ pub mod impl_tokio {
             match timeout(wait_time, receiver.recv()).await {
                 Err(_) => {
                     jl_process_events();
+                    jl_sys::jl_yield();
                 }
                 Ok(Some(msg)) => match msg.unwrap() {
                     MessageInner::Task(task, sender) => {
@@ -1771,7 +1782,7 @@ pub mod impl_tokio {
         TryInclude(PathBuf, crossbeam_channel::Sender<JlrsResult<()>>),
         ErrorColor(bool, Box<dyn ResultSender<JlrsResult<()>>>),
         TryErrorColor(bool, crossbeam_channel::Sender<JlrsResult<()>>),
-        Complete(usize, Box<AsyncStackPage>),
+        Complete(usize, Pin<Box<AsyncStackPage>>),
         SetCustomFns(Box<dyn ResultSender<JlrsResult<()>>>),
         TrySetCustomFns(crossbeam_channel::Sender<JlrsResult<()>>),
     }
@@ -1807,7 +1818,7 @@ impl MessageInner {
 
 #[derive(Debug)]
 pub(crate) struct AsyncStackPage {
-    top: [Cell<*mut c_void>; 2],
+    top: Pin<Box<[Cell<*mut c_void>; 2]>>,
     page: StackPage,
 }
 
@@ -1817,23 +1828,24 @@ unsafe impl Send for AsyncStackPage {}
 unsafe impl Sync for AsyncStackPage {}
 
 impl AsyncStackPage {
-    unsafe fn new() -> Box<Self> {
+    unsafe fn new() -> Pin<Box<Self>> {
         let stack = AsyncStackPage {
-            top: [Cell::new(null_mut()), Cell::new(null_mut())],
+            top: Box::pin([Cell::new(null_mut()), Cell::new(null_mut())]),
             page: StackPage::default(),
         };
 
-        Box::new(stack)
+        Box::pin(stack)
     }
 }
 
-unsafe fn link_stacks(stacks: &mut [Option<Box<AsyncStackPage>>]) {
+unsafe fn link_stacks(stacks: &mut [Option<Pin<Box<AsyncStackPage>>>]) {
     for stack in stacks.iter_mut() {
         let stack = stack.as_mut().unwrap();
         let task = NonNull::new_unchecked(jlrs_current_task()).as_mut();
 
         stack.top[1].set(task.gcstack.cast());
-        task.gcstack = stack.top[0..1].as_mut_ptr().cast();
+
+        task.gcstack = stack.top[0..].as_mut_ptr().cast();
     }
 }
 
@@ -1842,7 +1854,7 @@ fn call_include(stack: &mut AsyncStackPage, path: PathBuf) -> JlrsResult<()> {
         let global = Global::new();
         let mode = Async(&stack.top[1]);
         let raw = stack.page.as_mut();
-        let mut frame = GcFrame::new(raw, 1, mode);
+        let mut frame = GcFrame::new(raw, mode);
 
         match path.to_str() {
             Some(path) => {
@@ -1888,10 +1900,13 @@ fn call_set_custom_fns(stack: &mut AsyncStackPage) -> JlrsResult<()> {
         let global = Global::new();
         let mode = Async(&stack.top[1]);
         let raw = stack.page.as_mut();
-        let mut frame = GcFrame::new(raw, 1, mode);
+        let mut frame = GcFrame::new(raw, mode);
+
+        init_jlrs(&mut frame);
+        init_multitask(&mut frame);
 
         let jlrs_mod = Module::main(global)
-            .submodule_ref("Jlrs")?
+            .submodule_ref("JlrsMultitask")?
             .wrapper_unchecked();
 
         let wake_rust = Value::new(&mut frame, julia_future::wake_task as *mut c_void)?;
@@ -1899,6 +1914,9 @@ fn call_set_custom_fns(stack: &mut AsyncStackPage) -> JlrsResult<()> {
             .global_ref("wakerust")?
             .wrapper_unchecked()
             .set_nth_field_unchecked(0, wake_rust);
+
+        #[cfg(feature = "pyplot")]
+        crate::extensions::pyplot::init_jlrs_py_plot(&mut frame);
 
         Ok(())
     }

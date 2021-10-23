@@ -29,8 +29,8 @@ use jl_sys::{
 use crate::{
     convert::into_julia::IntoJulia,
     memory::global::Global,
-    prelude::Wrapper,
     private::Private,
+    wrappers::ptr::Wrapper,
     wrappers::ptr::{
         datatype::DataType, private::Wrapper as _, type_name::TypeName, union_all::UnionAll,
     },

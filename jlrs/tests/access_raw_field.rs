@@ -1,9 +1,10 @@
 use jlrs::prelude::*;
-use jlrs::util::JULIA;
+mod util;
 use jlrs::wrappers::ptr::ArrayRef;
 use jlrs::wrappers::ptr::DataTypeRef;
 use jlrs::wrappers::ptr::TypedArrayRef;
 use jlrs::wrappers::ptr::ValueRef;
+use util::JULIA;
 
 #[test]
 fn access_raw_fields_bits() {

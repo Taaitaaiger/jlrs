@@ -6206,6 +6206,9 @@ extern "C" {
         c: *mut jl_value_t,
     ) -> *mut jl_value_t;
 }
+extern "C" {
+    pub fn jl_yield();
+}
 pub type jl_timing_block_t = _jl_timing_block_t;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -6755,6 +6758,9 @@ fn bindgen_test_layout_jlrs_result_t() {
             stringify!(data)
         )
     );
+}
+extern "C" {
+    pub fn jlrs_print_stack(frame: *mut jl_gcframe_t);
 }
 extern "C" {
     pub fn jlrs_alloc_array_1d(atype: *mut jl_value_t, nr: usize) -> jlrs_result_t;

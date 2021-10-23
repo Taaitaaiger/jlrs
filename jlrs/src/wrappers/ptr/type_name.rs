@@ -6,15 +6,19 @@
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L380
 
 use super::{private::Wrapper, SymbolRef};
-use crate::prelude::Symbol;
+use crate::wrappers::ptr::symbol::Symbol;
 use crate::wrappers::ptr::{MethodTableRef, ModuleRef, SimpleVectorRef, ValueRef};
 use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout};
 use crate::{memory::global::Global, private::Private};
 use jl_sys::{
-    jl_array_typename, jl_llvmpointer_typename, jl_namedtuple_typename, jl_opaque_closure_typename,
-    jl_pointer_typename, jl_tuple_typename, jl_type_typename, jl_typename_t, jl_typename_type,
-    jl_vecelement_typename,
+    jl_array_typename, jl_llvmpointer_typename, jl_namedtuple_typename, jl_pointer_typename,
+    jl_tuple_typename, jl_type_typename, jl_typename_t, jl_typename_type, jl_vecelement_typename,
 };
+
+#[cfg(not(feature = "lts"))]
+use jl_sys::jl_opaque_closure_typename;
+#[cfg(feature = "lts")]
+use jl_sys::jl_vararg_typename;
 use std::{marker::PhantomData, ptr::NonNull};
 
 /// Describes the syntactic structure of a type and stores all data common to different
@@ -58,6 +62,7 @@ impl<'scope> TypeName<'scope> {
     }
 
     /// The `atomicfields` field.
+    #[cfg(not(feature = "lts"))]
     pub fn atomicfields(self) -> *const u32 {
         unsafe { self.unwrap_non_null(Private).as_ref().atomicfields }
     }
@@ -94,21 +99,25 @@ impl<'scope> TypeName<'scope> {
     }
 
     /// The `n_uninitialized` field.
+    #[cfg(not(feature = "lts"))]
     pub fn n_uninitialized(self) -> i32 {
         unsafe { self.unwrap_non_null(Private).as_ref().n_uninitialized }
     }
 
     /// The `abstract` field.
+    #[cfg(not(feature = "lts"))]
     pub fn abstract_(self) -> bool {
         unsafe { self.unwrap_non_null(Private).as_ref().abstract_() != 0 }
     }
 
     /// The `mutabl` field.
+    #[cfg(not(feature = "lts"))]
     pub fn mutabl(self) -> bool {
         unsafe { self.unwrap_non_null(Private).as_ref().mutabl() != 0 }
     }
 
     /// The `mayinlinealloc` field.
+    #[cfg(not(feature = "lts"))]
     pub fn mayinlinealloc(self) -> bool {
         unsafe { self.unwrap_non_null(Private).as_ref().mayinlinealloc() != 0 }
     }
@@ -130,12 +139,19 @@ impl<'base> TypeName<'base> {
         unsafe { Self::wrap(jl_vecelement_typename, Private) }
     }
 
+    /// The typename of the `UnionAll` `Vararg`.
+    #[cfg(feature = "lts")]
+    pub fn of_vararg(_: Global<'base>) -> Self {
+        unsafe { Self::wrap(jl_vararg_typename, Private) }
+    }
+
     /// The typename of the `UnionAll` `Array`.
     pub fn of_array(_: Global<'base>) -> Self {
         unsafe { Self::wrap(jl_array_typename, Private) }
     }
 
     /// The typename of the `UnionAll` `Ptr`.
+    #[cfg(not(feature = "lts"))]
     pub fn of_opaque_closure(_: Global<'base>) -> Self {
         unsafe { Self::wrap(jl_opaque_closure_typename, Private) }
     }

@@ -1,6 +1,7 @@
 use jlrs::layout::valid_layout::ValidLayout;
-use jlrs::util::JULIA;
+mod util;
 use jlrs::{prelude::*, wrappers::ptr::array::dimensions::Dims};
+use util::JULIA;
 
 #[test]
 fn array_can_be_cast() {

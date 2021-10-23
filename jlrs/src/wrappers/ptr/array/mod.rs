@@ -29,6 +29,7 @@ use crate::{
     memory::{
         frame::private::Frame as _,
         frame::Frame,
+        get_tls,
         global::Global,
         output::{OutputResult, OutputValue},
         scope::private::Scope as _,
@@ -58,8 +59,7 @@ use jl_sys::{
     jl_gc_add_ptr_finalizer, jl_new_array, jl_new_struct_uninit, jl_pchar_to_array,
     jl_ptr_to_array, jl_ptr_to_array_1d, jlrs_alloc_array_1d, jlrs_alloc_array_2d,
     jlrs_alloc_array_3d, jlrs_array_del_beg, jlrs_array_del_end, jlrs_array_grow_beg,
-    jlrs_array_grow_end, jlrs_current_task, jlrs_new_array, jlrs_reshape_array,
-    jlrs_result_tag_t_JLRS_RESULT_ERR,
+    jlrs_array_grow_end, jlrs_new_array, jlrs_reshape_array, jlrs_result_tag_t_JLRS_RESULT_ERR,
 };
 use std::{
     cell::UnsafeCell,
@@ -466,11 +466,7 @@ impl<'data> Array<'_, 'data> {
                         )
                         .cast();
 
-                        jl_gc_add_ptr_finalizer(
-                            NonNull::new_unchecked(jlrs_current_task()).as_ref().ptls,
-                            array,
-                            droparray as *mut c_void,
-                        );
+                        jl_gc_add_ptr_finalizer(get_tls(), array, droparray as *mut c_void);
 
                         output
                             .into_scope(frame)
@@ -486,11 +482,7 @@ impl<'data> Array<'_, 'data> {
                         )
                         .cast();
 
-                        jl_gc_add_ptr_finalizer(
-                            NonNull::new_unchecked(jlrs_current_task()).as_ref().ptls,
-                            array,
-                            droparray as *mut c_void,
-                        );
+                        jl_gc_add_ptr_finalizer(get_tls(), array, droparray as *mut c_void);
 
                         output
                             .into_scope(frame)
@@ -506,11 +498,7 @@ impl<'data> Array<'_, 'data> {
                         )
                         .cast();
 
-                        jl_gc_add_ptr_finalizer(
-                            NonNull::new_unchecked(jlrs_current_task()).as_ref().ptls,
-                            array,
-                            droparray as *mut c_void,
-                        );
+                        jl_gc_add_ptr_finalizer(get_tls(), array, droparray as *mut c_void);
 
                         output
                             .into_scope(frame)

@@ -1,8 +1,9 @@
-use jlrs::util::JULIA;
+mod util;
 use jlrs::{
     prelude::*,
     wrappers::ptr::{type_var::TypeVar, union_all::UnionAll},
 };
+use util::JULIA;
 
 #[test]
 fn create_new_unionall() {

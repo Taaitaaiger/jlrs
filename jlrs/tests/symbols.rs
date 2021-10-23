@@ -1,8 +1,9 @@
-use jlrs::util::JULIA;
+mod util;
 use jlrs::{
     memory::gc::{Gc, GcCollection},
     prelude::*,
 };
+use util::JULIA;
 
 #[test]
 fn create_symbol() {

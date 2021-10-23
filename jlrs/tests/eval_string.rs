@@ -1,5 +1,7 @@
+use jlrs::error::JuliaResult;
 use jlrs::prelude::*;
-use jlrs::{error::JuliaResult, util::JULIA};
+mod util;
+use util::JULIA;
 
 fn eval_string(string: &str, with_result: impl for<'f> FnOnce(JuliaResult<'f, 'static>)) {
     JULIA.with(|j| unsafe {

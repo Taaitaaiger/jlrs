@@ -1,6 +1,7 @@
 use jlrs::prelude::*;
-use jlrs::util::JULIA;
+mod util;
 use jlrs::{layout::typecheck::Mutable, wrappers::inline::union::EmptyUnion};
+use util::JULIA;
 
 #[test]
 fn empty_union_field() {

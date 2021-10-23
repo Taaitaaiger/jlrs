@@ -1,6 +1,6 @@
 [package]
 name = "jlrs"
-version = "0.12.0"
+version = "0.13.0"
 authors = ["Thomas van Doornmalen <thomas.vandoornmalen@gmail.com>"]
 description = """
 jlrs provides bindings to the Julia C API that enables Julia code to be called from Rust and more.
@@ -12,18 +12,21 @@ readme = "../README.md"
 keywords = ["Julia", "math", "mathematics", "bindings", "ffi"]
 categories = ["api-bindings", "mathematics"]
 license = "MIT"
-edition = "2018"
+edition = "2021"
 
 [features]
 default = []
+debug = ["jl-sys/debug"]
 uv = ["jl-sys/uv"]
 async = ["futures", "crossbeam-channel", "async-trait"]
 async-std-rt = ["async", "async-std"]
 tokio-rt = ["async", "tokio"]
 jlrs-ndarray = ["ndarray"]
 f16 = ["half"]
-docs-rs = ["jl-sys/docs-rs", "uv","async-std-rt","async","tokio","f16","uv","jlrs-ndarray","jlrs-derive","docs"]
+pyplot = []
+docs-rs = ["jl-sys/docs-rs", "uv", "async-std-rt", "async", "tokio", "f16", "jlrs-ndarray", "jlrs-derive", "docs"]
 docs = []
+lts = ["jl-sys/lts"]
 use-bindgen = ["jl-sys/use-bindgen"]
 
 [dependencies]

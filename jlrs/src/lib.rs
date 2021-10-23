@@ -251,7 +251,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! jlrs = { version = "0.12", features = ["tokio-rt"] }
+//! jlrs = { version = "0.13", features = ["tokio-rt"] }
 //! ```
 //!
 //! The struct [`AsyncJulia`] is exported by the prelude and lets you initialize the runtime in
@@ -264,14 +264,14 @@
 //! that schedule a function call as a new Julia `Task` can't be used.
 //!
 //! In order to write non-blocking tasks, you must implement either the [`AsyncTask`] or
-//! [`GeneratorTask`] trait. An `AsyncTask` can be called once, its async `run` method replaces
+//! [`PersistentTask`] trait. An `AsyncTask` can be called once, its async `run` method replaces
 //! the closure; this method takes a `Global` and a mutable reference [`AsyncGcFrame`]. The
 //! `AsyncGcFrame` provides mostly the same functionality as `GcFrame`, but can also be used to
 //! call the methods of the [`CallAsync`] trait. These methods schedule the function call on
 //! another thread and return a `Future`. While awaiting the result the runtime can handle another
 //! task.
 //!
-//! A `GeneratorTask` can be called multiple times. In addition to `run` it also has an async `init` method. This method is called when the `GeneratorTask` is created and can be used to prepare the initial state of the task. The frame provided to `init` is not dropped after this method returns, which means this initial state can contain Julia data. Whenever a `GeneratorTask` is successfully created a `GeneratorHandle` is returned. This handle can be used to call the `GeneratorTask` which calls its `run` method once. A `GeneratorHandle` can be cloned and shared across threads.
+//! A `PersistentTask` can be called multiple times. In addition to `run` it also has an async `init` method. This method is called when the `PersistentTask` is created and can be used to prepare the initial state of the task. The frame provided to `init` is not dropped after this method returns, which means this initial state can contain Julia data. Whenever a `PersistentTask` is successfully created a `PersistentHandle` is returned. This handle can be used to call the `PersistentTask` which calls its `run` method once. A `PersistentHandle` can be cloned and shared across threads.
 //!
 //! You can find basic examples that show how to implement these traits in
 //! [the examples directory of the GitHub repository].
@@ -323,17 +323,19 @@
 //!
 //! These custom types can also be used when you call Rust from Julia with `ccall`.
 //!
-//! # Features
+//! # Opt-in features
 //!
-//! Several opt-in features are available, most of which have already been mentioned. They are:
+//! Several opt-in features are available, some of which have already been mentioned. They are:
 //!
-//!  - `jlrs-derive`: enables the custom derive macros. This is the only feature which is enabled
-//!    by default.
+//!  - `jlrs-derive`: enables the custom derive macros.
 //!  - `async-std-rt` / `tokio-rt`: enables the async runtime, backed by either async-std or
 //!    tokio.
-//!  - `jlrs-ndarray`: enables borrowing Julia array data as a (mutable) array view from ndarray.
+//!  - `jlrs-ndarray`: enables borrowing Julia array data as an `ArrayView(Mut)` from ndarray.
+//!  - `pyplot`: enables plotting with Plots.jl and PyPlot.jl.
 //!  - `f16`: enables support for working with Julia's `Float16` type.
 //!  - `uv`: enables `CCall::uv_async_send`, which can be used to wake an `AsyncCondition`.
+//!  - `use-bindgen`: use bindgen to generate the Julia C API bindings.
+//!  - `debug`: link `julia-debug` instead of `julia`.
 //!
 //! [their User Guide]: https://rust-lang.github.io/rust-bindgen/requirements.html
 //! [on Microsoft's website]: https://docs.microsoft.com/en-us/windows/wsl/install-win10
@@ -346,8 +348,8 @@
 //! [`AsyncGcFrame`]: crate::extensions::multitask::async_frame::AsyncGcFrame
 //! [`Frame`]: crate::memory::frame::Frame
 //! [`AsyncTask`]: crate::extensions::multitask::async_task::AsyncTask
-//! [`GeneratorTask`]: crate::extensions::multitask::async_task::GeneratorTask
-//! [`GeneratorHandle`]: crate::extensions::multitask::async_task::GeneratorHandle
+//! [`PersistentTask`]: crate::extensions::multitask::async_task::PersistentTask
+//! [`PersistentHandle`]: crate::extensions::multitask::async_task::PersistentHandle
 //! [`AsyncJulia`]: crate::extensions::multitask::AsyncJulia
 //! [`CallAsync`]: crate::extensions::multitask::call_async::CallAsync
 //! [`DataType`]: crate::wrappers::ptr::datatype::DataType
@@ -362,6 +364,23 @@
 
 #![forbid(rustdoc::broken_intra_doc_links)]
 
+macro_rules! init_fn {
+    ($name:ident, $include:ident, $file:expr) => {
+        pub(crate) static $include: &'static str = include_str!($file);
+        pub(crate) fn $name<'frame, F: $crate::memory::frame::Frame<'frame>>(frame: &mut F) -> () {
+            unsafe {
+                match $crate::wrappers::ptr::value::Value::eval_string(frame, $include) {
+                    Ok(Ok(_)) => (),
+                    Ok(Err(e)) => {
+                        panic!("{}", e.error_string_or($crate::error::CANNOT_DISPLAY_VALUE))
+                    }
+                    Err(_) => panic!("AllocError during initialization of {}", $file),
+                }
+            }
+        }
+    };
+}
+
 pub mod convert;
 pub mod error;
 pub mod extensions;
@@ -374,7 +393,6 @@ pub(crate) mod private;
 pub mod util;
 pub mod wrappers;
 
-use convert::into_jlrs_result::IntoJlrsResult;
 use error::{JlrsError, JlrsResult, CANNOT_DISPLAY_VALUE};
 use info::Info;
 #[cfg(feature = "uv")]
@@ -383,27 +401,30 @@ use jl_sys::{
     jl_array_dims_ptr, jl_array_ndims, jl_atexit_hook, jl_init, jl_init_with_image,
     jl_is_initialized,
 };
-use memory::frame::{GcFrame, NullFrame};
-use memory::global::Global;
-use memory::mode::Sync;
-use memory::stack_page::StackPage;
-use prelude::Wrapper;
+use memory::{
+    frame::{GcFrame, NullFrame},
+    global::Global,
+    mode::Sync,
+    stack_page::StackPage,
+};
 use private::Private;
-use std::ffi::CString;
-use std::io::{Error as IOError, ErrorKind};
-use std::mem::{self, MaybeUninit};
-use std::path::Path;
-use std::ptr::null_mut;
-use std::slice;
-use std::sync::atomic::{AtomicBool, Ordering};
-use wrappers::ptr::module::Module;
-use wrappers::ptr::string::JuliaString;
-use wrappers::ptr::value::Value;
-use wrappers::ptr::{array::Array, call::Call, private::Wrapper as _};
+use std::{
+    ffi::CString,
+    io::{Error as IOError, ErrorKind},
+    mem::{self, MaybeUninit},
+    path::Path,
+    ptr::null_mut,
+    slice,
+    sync::atomic::{AtomicBool, Ordering},
+};
+use wrappers::ptr::{
+    array::Array, call::Call, module::Module, private::Wrapper as _, string::JuliaString,
+    value::Value, Wrapper,
+};
 
 pub(crate) static INIT: AtomicBool = AtomicBool::new(false);
 
-pub(crate) static JLRS_JL: &'static str = include_str!("jlrs.jl");
+init_fn!(init_jlrs, JLRS_JL, "Jlrs.jl");
 
 /// A Julia instance. You must create it with [`Julia::init`] or [`Julia::init_with_image`]
 /// before you can do anything related to Julia. While this struct exists Julia is active,
@@ -428,8 +449,12 @@ impl Julia {
             page: StackPage::default(),
         };
 
-        jl.scope_with_slots(1, |_, frame| {
-            Value::eval_string(&mut *frame, JLRS_JL)?.into_jlrs_result()?;
+        jl.scope(|_, frame| {
+            init_jlrs(&mut *frame);
+
+            #[cfg(feature = "pyplot")]
+            crate::extensions::pyplot::init_jlrs_py_plot(&mut *frame);
+
             Ok(())
         })
         .expect("Could not load Jlrs module");
@@ -482,8 +507,12 @@ impl Julia {
             page: StackPage::default(),
         };
 
-        jl.scope_with_slots(1, |_, frame| {
-            Value::eval_string(&mut *frame, JLRS_JL)?.into_jlrs_result()?;
+        jl.scope(|_, frame| {
+            init_jlrs(&mut *frame);
+
+            #[cfg(feature = "pyplot")]
+            crate::extensions::pyplot::init_jlrs_py_plot(&mut *frame);
+
             Ok(())
         })
         .expect("Could not load Jlrs module");
@@ -527,7 +556,7 @@ impl Julia {
     /// ```
     pub fn include<P: AsRef<Path>>(&mut self, path: P) -> JlrsResult<()> {
         if path.as_ref().exists() {
-            return self.scope_with_slots(2, |global, frame| unsafe {
+            return self.scope(|global, frame| unsafe {
                 let path_jl_str = JuliaString::new(&mut *frame, path.as_ref().to_string_lossy())?;
                 let include_func = Module::main(global)
                     .function_ref("include")?
@@ -575,14 +604,14 @@ impl Julia {
     {
         unsafe {
             let global = Global::new();
-            let mut frame = GcFrame::new(self.page.as_mut(), 0, Sync);
+            let mut frame = GcFrame::new(self.page.as_mut(), Sync);
             func(global, &mut frame)
         }
     }
 
     /// This method is a main entrypoint to interact with Julia. It takes a closure with two
     /// arguments, a `Global` and a mutable reference to a `GcFrame`, and can return arbitrary
-    /// results. The frame will preallocate `slots` slots.
+    /// results. The frame will have capacity for at least `slots` roots.
     ///
     /// Example:
     ///
@@ -593,10 +622,7 @@ impl Julia {
     /// # JULIA.with(|j| {
     /// # let mut julia = j.borrow_mut();
     ///   julia.scope_with_slots(1, |_global, frame| {
-    ///       // Uses the preallocated slot
     ///       let _i = Value::new(&mut *frame, 1u64)?;
-    ///       // Allocates a new slot, because only a single slot was preallocated
-    ///       let _j = Value::new(&mut *frame, 1u64)?;
     ///       Ok(())
     ///   }).unwrap();
     /// # });
@@ -611,7 +637,7 @@ impl Julia {
             if slots + 2 > self.page.size() {
                 self.page = StackPage::new(slots + 2);
             }
-            let mut frame = GcFrame::new(self.page.as_mut(), slots, Sync);
+            let mut frame = GcFrame::new(self.page.as_mut(), Sync);
             func(global, &mut frame)
         }
     }
@@ -619,6 +645,11 @@ impl Julia {
     /// Provides access to global information.
     pub fn info(&self) -> Info {
         Info::new()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn get_page(&mut self) -> &mut StackPage {
+        &mut self.page
     }
 }
 
@@ -671,12 +702,13 @@ impl CCall {
         unsafe {
             let page = self.get_init_page();
             let global = Global::new();
-            let mut frame = GcFrame::new(page.as_mut(), 0, Sync);
+            let mut frame = GcFrame::new(page.as_mut(), Sync);
             func(global, &mut frame)
         }
     }
 
-    /// Creates a [`GcFrame`] with `slots` slots, calls the given closure, and returns its result.
+    /// Creates a [`GcFrame`] with  capacity for at least `slots` roots, calls the given closure,
+    /// and returns its result.
     pub fn scope_with_slots<T, F>(&mut self, slots: usize, func: F) -> JlrsResult<T>
     where
         for<'base> F: FnOnce(Global<'base>, &mut GcFrame<'base, Sync>) -> JlrsResult<T>,
@@ -687,7 +719,7 @@ impl CCall {
             if slots + 2 > page.size() {
                 *page = StackPage::new(slots + 2);
             }
-            let mut frame = GcFrame::new(page.as_mut(), slots, Sync);
+            let mut frame = GcFrame::new(page.as_mut(), Sync);
             func(global, &mut frame)
         }
     }

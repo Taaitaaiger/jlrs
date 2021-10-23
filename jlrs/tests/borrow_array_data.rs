@@ -1,9 +1,10 @@
-use jlrs::util::JULIA;
+mod util;
 use jlrs::{
     memory::gc::{Gc, GcCollection},
     prelude::*,
     wrappers::ptr::array::dimensions::Dims,
 };
+use util::JULIA;
 
 macro_rules! impl_test {
     ($name:ident, $name_mut:ident, $name_slice:ident, $name_slice_mut:ident, $value_type:ty) => {

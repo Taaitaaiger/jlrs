@@ -37,7 +37,12 @@ fn flags() -> Vec<String> {
         None => Vec::new(),
     };
 
-    println!("cargo:rustc-link-lib=julia");
+    if env::var("CARGO_FEATURE_DEBUG").is_ok() {
+        println!("cargo:rustc-link-lib=julia-debug");
+    } else {
+        println!("cargo:rustc-link-lib=julia");
+    }
+
     if env::var("CARGO_FEATURE_UV").is_ok() {
         println!("cargo:rustc-link-lib=uv");
     }
@@ -176,6 +181,7 @@ fn main() {
             "jl_ver_minor",
             "jl_ver_patch",
             "jl_ver_string",
+            "jl_yield",
             "uv_async_send",
             "jlrs_alloc_array_1d",
             "jlrs_alloc_array_2d",
@@ -200,6 +206,7 @@ fn main() {
             "jlrs_array_ptr_1d_push",
             "jlrs_array_ptr_1d_append",
             "jlrs_array_data_owner_offset",
+            "jlrs_print_stack",
             "jlrs_current_task",
         ];
 

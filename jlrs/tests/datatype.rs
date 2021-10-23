@@ -1,6 +1,6 @@
 use jlrs::layout::typecheck::*;
 use jlrs::prelude::*;
-use jlrs::util::JULIA;
+mod util;
 use jlrs::wrappers::ptr::code_instance::CodeInstance;
 use jlrs::wrappers::ptr::expr::Expr;
 use jlrs::wrappers::ptr::method::Method;
@@ -10,6 +10,7 @@ use jlrs::wrappers::ptr::type_name::TypeName;
 use jlrs::wrappers::ptr::type_var::TypeVar;
 use jlrs::wrappers::ptr::union::Union;
 use jlrs::wrappers::ptr::union_all::UnionAll;
+use util::JULIA;
 
 #[test]
 fn datatype_methods() {

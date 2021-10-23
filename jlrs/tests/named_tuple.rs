@@ -1,5 +1,6 @@
-use jlrs::util::JULIA;
+mod util;
 use jlrs::{layout::typecheck::NamedTuple, prelude::*};
+use util::JULIA;
 
 #[test]
 fn create_named_tuple() {

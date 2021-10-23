@@ -185,9 +185,9 @@ The struct `AsyncJulia` is exported by the prelude and lets you initialize the r
 
 The easiest way to interact with Julia when using the async runtime is by using `AsyncJulia::blocking_task`, which can be used to send a closure like the one in the first example and call it. While this closure has not completed the runtime is blocked, the methods that schedule a function call as a new Julia `Task` can't be used.
 
-In order to write non-blocking tasks, you must implement either the `AsyncTask` or `GeneratorTask` trait. An `AsyncTask` can be called once, its async `run` method replaces the closure; this method takes a `Global` and a mutable reference `AsyncGcFrame`. The `AsyncGcFrame` provides mostly the same functionality as `GcFrame`, but can also be used to call the methods of the `CallAsync` trait. These methods schedule the function call on another thread and return a `Future`. While awaiting the result the runtime can handle another task.
+In order to write non-blocking tasks, you must implement either the `AsyncTask` or `PersistentTask` trait. An `AsyncTask` can be called once, its async `run` method replaces the closure; this method takes a `Global` and a mutable reference `AsyncGcFrame`. The `AsyncGcFrame` provides mostly the same functionality as `GcFrame`, but can also be used to call the methods of the `CallAsync` trait. These methods schedule the function call on another thread and return a `Future`. While awaiting the result the runtime can handle another task.
 
-A `GeneratorTask` can be called multiple times. In addition to `run` it also has an async `init` method. This method is called when the `GeneratorTask` is created and can be used to prepare the initial state of the task. The frame provided to `init` is not dropped after this method returns, which means this initial state can contain Julia data. Whenever a `GeneratorTask` is successfully created a `GeneratorHandle` is returned. This handle can be used to call the `GeneratorTask` which calls its `run` method once. A `GeneratorHandle` can be cloned and shared across threads.
+A `PersistentTask` can be called multiple times. In addition to `run` it also has an async `init` method. This method is called when the `PersistentTask` is created and can be used to prepare the initial state of the task. The frame provided to `init` is not dropped after this method returns, which means this initial state can contain Julia data. Whenever a `PersistentTask` is successfully created a `PersistentHandle` is returned. This handle can be used to call the `PersistentTask` which calls its `run` method once. A `PersistentHandle` can be cloned and shared across threads.
 
 You can find basic examples that show how to implement these traits in [the examples directory of the GitHub repository](https://github.com/Taaitaaiger/jlrs/tree/master/examples).
 
@@ -237,3 +237,4 @@ Several opt-in features are available, most of which have already been mentioned
  - `f16`: enables support for working with Julia's `Float16` type.
  - `uv`: enables `CCall::uv_async_send`, which can be used to wake an `AsyncCondition`.
  - `use-bindgen`: use bindgen to generate the bindings to the Julia C API rather than using the provided bindings.
+ - `debug`: link a debug build of Julia, i.e. `julia-debug`, rather than a release build.

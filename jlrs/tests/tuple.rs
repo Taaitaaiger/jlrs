@@ -1,5 +1,6 @@
 use jlrs::prelude::*;
-use jlrs::util::JULIA;
+mod util;
+use util::JULIA;
 
 #[test]
 fn create_cast_tuple0() {

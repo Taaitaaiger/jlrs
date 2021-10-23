@@ -1,4 +1,4 @@
-use crate::extensions::multitask::async_task::GeneratorMessage;
+use crate::extensions::multitask::async_task::PersistentMessage;
 use crate::extensions::multitask::result_sender::ResultSender;
 use async_trait::async_trait;
 use futures::Future;
@@ -18,9 +18,6 @@ pub(crate) struct Tokio {
     runtime: TokioRuntime,
     local_set: LocalSet,
 }
-
-unsafe impl Send for Tokio {}
-unsafe impl Sync for Tokio {}
 
 impl Tokio {
     pub(crate) fn new() -> Self {
@@ -162,4 +159,4 @@ pub(crate) fn oneshot_channel<T>() -> (OneshotSender<T>, OneshotReceiver<T>) {
     tokio::sync::oneshot::channel()
 }
 
-pub(crate) type HandleSender<GT> = Arc<MaybeUnboundedSender<GeneratorMessage<GT>>>;
+pub(crate) type HandleSender<GT> = Arc<MaybeUnboundedSender<PersistentMessage<GT>>>;

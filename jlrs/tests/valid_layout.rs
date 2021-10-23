@@ -1,6 +1,7 @@
 use jlrs::layout::valid_layout::ValidLayout;
 use jlrs::prelude::*;
-use jlrs::util::JULIA;
+mod util;
+use util::JULIA;
 
 macro_rules! impl_valid_layout_test {
     ($name:ident, $t:ty, $v:expr) => {

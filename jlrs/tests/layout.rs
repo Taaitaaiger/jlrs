@@ -1,6 +1,7 @@
 use jlrs::prelude::*;
-use jlrs::util::JULIA;
+mod util;
 use jlrs::wrappers::ptr::ValueRef;
+use util::JULIA;
 
 #[test]
 fn ptr_union_fields_access_something() {

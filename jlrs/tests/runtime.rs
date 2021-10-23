@@ -1,5 +1,6 @@
 use jlrs::prelude::*;
-use jlrs::util::JULIA;
+mod util;
+use util::JULIA;
 
 #[test]
 fn error_include_nonexistent() {

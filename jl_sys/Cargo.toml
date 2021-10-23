@@ -18,6 +18,8 @@ links = "julia"
 [features]
 docs-rs = []
 uv = []
+debug = []
+lts = []
 use-bindgen = ["bindgen"]
 
 [dependencies]

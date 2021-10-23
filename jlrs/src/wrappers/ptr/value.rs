@@ -103,8 +103,7 @@ use crate::{
         typecheck::{NamedTuple, Typecheck},
         valid_layout::ValidLayout,
     },
-    memory::{frame::Frame, global::Global, scope::Scope},
-    prelude::JuliaString,
+    memory::{frame::Frame, get_tls, global::Global, scope::Scope},
     private::Private,
     wrappers::ptr::{
         array::Array,
@@ -112,6 +111,7 @@ use crate::{
         datatype::DataType,
         module::Module,
         private::Wrapper as WrapperPriv,
+        string::JuliaString,
         symbol::Symbol,
         union::{nth_union_component, Union},
         union_all::UnionAll,
@@ -127,7 +127,7 @@ use jl_sys::{
     jl_interrupt_exception, jl_isa, jl_memory_exception, jl_nothing, jl_object_id,
     jl_readonlymemory_exception, jl_set_nth_field, jl_stackovf_exception, jl_stderr_obj,
     jl_stdout_obj, jl_subtype, jl_true, jl_typeof_str, jl_undefref_exception, jl_value_t,
-    jlrs_apply_type, jlrs_current_task, jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_set_nth_field,
+    jlrs_apply_type, jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_set_nth_field,
 };
 use std::{
     ffi::{c_void, CStr, CString},
@@ -1203,11 +1203,7 @@ impl Value<'_, '_> {
     /// Add a finalizer `f` to this value. The finalizer must be an `extern "C"` function that
     /// takes one argument, the value as a void pointer.
     pub unsafe fn add_ptr_finalizer(self, f: unsafe extern "C" fn(*mut c_void) -> ()) {
-        jl_gc_add_ptr_finalizer(
-            NonNull::new_unchecked(jlrs_current_task()).as_ref().ptls,
-            self.unwrap(Private),
-            f as *mut c_void,
-        )
+        jl_gc_add_ptr_finalizer(get_tls(), self.unwrap(Private), f as *mut c_void)
     }
 }
 

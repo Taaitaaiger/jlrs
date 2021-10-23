@@ -23,6 +23,8 @@ typedef struct
     jl_value_t *data;
 } jlrs_result_t;
 
+void jlrs_print_stack(jl_gcframe_t *frame);
+
 jlrs_result_t jlrs_alloc_array_1d(jl_value_t *atype, size_t nr);
 jlrs_result_t jlrs_alloc_array_2d(jl_value_t *atype, size_t nr, size_t nc);
 jlrs_result_t jlrs_alloc_array_3d(jl_value_t *atype, size_t nr, size_t nc, size_t z);

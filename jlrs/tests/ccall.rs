@@ -1,5 +1,6 @@
 use jlrs::prelude::*;
-use jlrs::util::JULIA;
+mod util;
+use util::JULIA;
 
 unsafe extern "C" fn uses_null_scope(array: TypedArray<f64>) -> bool {
     let mut ccall = CCall::new();

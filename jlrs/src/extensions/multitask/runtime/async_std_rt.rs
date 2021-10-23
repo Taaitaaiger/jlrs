@@ -1,4 +1,4 @@
-use crate::extensions::multitask::async_task::GeneratorMessage;
+use crate::extensions::multitask::async_task::PersistentMessage;
 use crate::extensions::multitask::result_sender::ResultSender;
 use async_std::channel::{Receiver, Sender};
 use async_trait::async_trait;
@@ -23,4 +23,4 @@ pub(crate) fn oneshot_channel<T>() -> (Sender<T>, Receiver<T>) {
     async_std::channel::bounded(1)
 }
 
-pub(crate) type HandleSender<GT> = Arc<Sender<GeneratorMessage<GT>>>;
+pub(crate) type HandleSender<GT> = Arc<Sender<PersistentMessage<GT>>>;
