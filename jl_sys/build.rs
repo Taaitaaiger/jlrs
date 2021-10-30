@@ -17,19 +17,22 @@ fn flags() -> Vec<String> {
     let flags = match find_julia() {
         Some(julia_dir) => {
             let jl_include_path = format!("-I{}/include/julia/", julia_dir);
-            let jl_lib_path = format!("-L{}/lib/", julia_dir);
 
-            println!("cargo:rustc-flags={}", &jl_lib_path);
+            #[cfg(target_os = "linux")]
+            {
+                let jl_lib_path = format!("-L{}/lib/", julia_dir);
+                println!("cargo:rustc-flags={}", &jl_lib_path);
+
+                if env::var("CARGO_FEATURE_UV").is_ok() {
+                    let jl_internal_lib_path = format!("-L{}/lib/julia", julia_dir);
+                    println!("cargo:rustc-flags={}", &jl_internal_lib_path);
+                }
+            }
 
             #[cfg(target_os = "windows")]
             {
-                let jl_internal_lib_path = format!("-L{}/lib/julia", julia_dir);
-                println!("cargo:rustc-flags={}", &jl_internal_lib_path);
-            }
-
-            if env::var("CARGO_FEATURE_UV").is_ok() {
-                let jl_internal_lib_path = format!("-L{}/lib/julia", julia_dir);
-                println!("cargo:rustc-flags={}", &jl_internal_lib_path);
+                let jl_lib_path = format!("-L{}/bin/", julia_dir);
+                println!("cargo:rustc-flags={}", &jl_lib_path);
             }
 
             vec![jl_include_path]
@@ -40,15 +43,19 @@ fn flags() -> Vec<String> {
     if env::var("CARGO_FEATURE_DEBUG").is_ok() {
         println!("cargo:rustc-link-lib=julia-debug");
     } else {
-        #[cfg(target_os = "windows")]
-        println!("cargo:rustc-link-lib=static=julia");
-
-        #[cfg(target_os = "linux")]
         println!("cargo:rustc-link-lib=julia");
     }
 
     if env::var("CARGO_FEATURE_UV").is_ok() {
-        println!("cargo:rustc-link-lib=uv");
+        #[cfg(target_os = "windows")]
+        {
+            println!("cargo:rustc-link-lib=uv-2");
+        }
+
+        #[cfg(target_os = "linux")]
+        {
+            println!("cargo:rustc-link-lib=uv");
+        }
     }
 
     flags
@@ -70,12 +77,10 @@ fn main() {
 
     let mut c = cc::Build::new();
     c.file("src/jlrs_c.c");
-    c.static_flag(true);
 
     if flags.len() == 1 {
         c.include(&flags[0][2..]);
     }
-
 
     c.compile("jlrs_c");
 
