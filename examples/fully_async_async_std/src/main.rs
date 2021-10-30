@@ -81,31 +81,43 @@ async fn main() {
 
     // Send four tasks to the runtime.
     julia
-        .task(MyTask {
-            dims: 4,
-            iters: 100_000_000,
-        }, sender1)
+        .task(
+            MyTask {
+                dims: 4,
+                iters: 100_000_000,
+            },
+            sender1,
+        )
         .await;
 
     julia
-        .task(MyTask {
-            dims: 4,
-            iters: 200_000_000,
-        }, sender2)
+        .task(
+            MyTask {
+                dims: 4,
+                iters: 200_000_000,
+            },
+            sender2,
+        )
         .await;
 
     julia
-        .task(MyTask {
-            dims: 4,
-            iters: 300_000_000,
-        }, sender3)
+        .task(
+            MyTask {
+                dims: 4,
+                iters: 300_000_000,
+            },
+            sender3,
+        )
         .await;
 
     julia
-        .task(MyTask {
-            dims: 4,
-            iters: 400_000_000,
-        }, sender4)
+        .task(
+            MyTask {
+                dims: 4,
+                iters: 400_000_000,
+            },
+            sender4,
+        )
         .await;
 
     // Receive the results of the tasks.

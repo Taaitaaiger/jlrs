@@ -12,7 +12,7 @@ readme = "README.md"
 keywords = ["Julia", "math", "mathematics", "bindings", "ffi"]
 categories = ["external-ffi-bindings"]
 license = "MIT"
-edition = "2018"
+edition = "2021"
 links = "julia"
 
 [features]

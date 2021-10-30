@@ -2,7 +2,7 @@
 name = "jlrs-async-tests"
 version = "0.1.0"
 authors = ["Thomas van Doornmalen <thomas.vandoornmalen@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 jlrs = { path = "../jlrs", features = ["async"] }
