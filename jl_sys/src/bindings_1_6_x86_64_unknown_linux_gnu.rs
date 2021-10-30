@@ -7043,9 +7043,6 @@ extern "C" {
 extern "C" {
     pub fn jlrs_array_data_owner_offset(n_dims: u16) -> uint_t;
 }
-extern "C" {
-    pub fn jlrs_current_task() -> *mut jl_task_t;
-}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct _mallocarray_t {

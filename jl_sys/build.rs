@@ -1,26 +1,29 @@
-use std::env;
-use std::path::{Path, PathBuf};
+use std::{env, process::Command};
+use std::{ffi::OsStr, os::unix::prelude::OsStrExt, path::PathBuf};
 
 fn find_julia() -> Option<String> {
     if let Ok(path) = env::var("JULIA_DIR") {
         return Some(path);
     }
 
-    if Path::new("/usr/include/julia/julia.h").exists() {
-        return Some("/usr".to_string());
+    let out = Command::new("which").arg("julia").output().ok()?.stdout;
+
+    let mut julia_path = PathBuf::from(OsStr::from_bytes(out.as_ref()));
+    if !julia_path.pop() {
+        return None;
     }
 
-    if Path::new("/usr/local/include/julia/julia.h").exists() {
-        return Some("/usr/local".to_string());
+    if !julia_path.pop() {
+        return None;
     }
 
-    None
+    Some(julia_path.to_string_lossy().to_string())
 }
 
-fn flags() -> Vec<String> {
-    let flags = match find_julia() {
+fn flags() -> String {
+    match find_julia() {
         Some(julia_dir) => {
-            let jl_include_path = format!("-I{}/include/julia/", julia_dir);
+            let jl_include_path = format!("{}/include/julia/", julia_dir);
 
             #[cfg(target_os = "linux")]
             {
@@ -39,30 +42,28 @@ fn flags() -> Vec<String> {
                 println!("cargo:rustc-flags={}", &jl_lib_path);
             }
 
-            vec![jl_include_path]
-        }
-        None => Vec::new(),
-    };
+            if env::var("CARGO_FEATURE_DEBUG").is_ok() {
+                println!("cargo:rustc-link-lib=julia-debug");
+            } else {
+                println!("cargo:rustc-link-lib=julia");
+            }
 
-    if env::var("CARGO_FEATURE_DEBUG").is_ok() {
-        println!("cargo:rustc-link-lib=julia-debug");
-    } else {
-        println!("cargo:rustc-link-lib=julia");
+            if env::var("CARGO_FEATURE_UV").is_ok() {
+                #[cfg(target_os = "windows")]
+                {
+                    println!("cargo:rustc-link-lib=uv-2");
+                }
+
+                #[cfg(target_os = "linux")]
+                {
+                    println!("cargo:rustc-link-lib=uv");
+                }
+            }
+
+            jl_include_path
+        }
+        None => panic!("Unable to set compiler flags: JULIA_DIR is not set and no installed version of Julia can be found"),
     }
-
-    if env::var("CARGO_FEATURE_UV").is_ok() {
-        #[cfg(target_os = "windows")]
-        {
-            println!("cargo:rustc-link-lib=uv-2");
-        }
-
-        #[cfg(target_os = "linux")]
-        {
-            println!("cargo:rustc-link-lib=uv");
-        }
-    }
-
-    flags
 }
 
 fn main() {
@@ -70,170 +71,159 @@ fn main() {
         return;
     }
 
-    let mut out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
-    out_path.push("bindings.rs");
-
     println!("cargo:rerun-if-changed=src/jlrs_c.c");
     println!("cargo:rerun-if-changed=src/jlrs_c.h");
     println!("cargo:rerun-if-env-changed=JULIA_DIR");
 
-    let flags = flags();
+    let include_dir = flags();
 
     let mut c = cc::Build::new();
-    c.file("src/jlrs_c.c");
-
-    if flags.len() == 1 {
-        c.include(&flags[0][2..]);
-    }
-
-    c.compile("jlrs_c");
+    c.file("src/jlrs_c.c")
+        .flag_if_supported("-std=gnu99")
+        .include(&include_dir)
+        .compile("jlrs_c");
 
     #[cfg(feature = "use-bindgen")]
     {
-        let functions = vec![
-            "jl_alloc_array_1d",
-            "jl_alloc_array_2d",
-            "jl_alloc_array_3d",
-            "jl_alloc_svec",
-            "jl_alloc_svec_uninit",
-            "jl_apply_array_type",
-            "jl_apply_generic",
-            "jl_apply_tuple_type_v",
-            "jl_apply_type",
-            "jl_array_eltype",
-            "jl_array_typetagdata",
-            "jl_atexit_hook",
-            "jl_box_bool",
-            "jl_box_char",
-            "jl_box_float32",
-            "jl_box_float64",
-            "jl_box_int16",
-            "jl_box_int32",
-            "jl_box_int64",
-            "jl_box_int8",
-            "jl_box_uint16",
-            "jl_box_uint32",
-            "jl_box_uint64",
-            "jl_box_uint8",
-            "jl_box_voidpointer",
-            "jl_call",
-            "jl_call0",
-            "jl_call1",
-            "jl_call2",
-            "jl_call3",
-            "jl_compute_fieldtypes",
-            "jl_cpu_threads",
-            "jl_egal",
-            "jl_eval_string",
-            "jl_exception_occurred",
-            "jl_environ",
-            "jl_field_index",
-            "jl_gc_add_finalizer",
-            "jl_gc_add_ptr_finalizer",
-            "jl_gc_collect",
-            "jl_gc_enable",
-            "jl_gc_is_enabled",
-            "jl_gc_queue_root",
-            "jl_gc_safepoint",
-            "jl_getallocationgranularity",
-            "jl_get_global",
-            "jl_get_libllvm",
-            "jl_get_kwsorter",
-            "jl_get_nth_field",
-            "jl_get_nth_field_noalloc",
-            "jl_get_ptls_states",
-            "jl_get_ARCH",
-            "jl_get_UNAME",
-            "jl_getpagesize",
-            "jl_git_branch",
-            "jl_git_commit",
-            "jl_init",
-            "jl_init__threading",
-            "jl_init_with_image",
-            "jl_init_with_image__threading",
-            "jl_is_debugbuild",
-            "jl_is_imported",
-            "jl_is_initialized",
-            "jl_ver_is_release",
-            "jl_isa",
-            "jl_islayout_inline",
-            "jl_new_array",
-            "jl_new_struct_uninit",
-            "jl_new_structv",
-            "jl_new_typevar",
-            "jl_object_id",
-            "jl_pchar_to_array",
-            "jl_pchar_to_string",
-            "jl_process_events",
-            "jl_ptr_to_array",
-            "jl_ptr_to_array_1d",
-            "jl_set_const",
-            "jl_set_global",
-            "jl_set_nth_field",
-            "jl_stderr_obj",
-            "jl_stdout_obj",
-            "jl_subtype",
-            "jl_symbol",
-            "jl_symbol_n",
-            "jl_typename_str",
-            "jl_typeof_str",
-            "jl_type_union",
-            "jl_type_unionall",
-            "jl_unbox_float32",
-            "jl_unbox_float64",
-            "jl_unbox_int16",
-            "jl_unbox_int32",
-            "jl_unbox_int64",
-            "jl_unbox_int8",
-            "jl_unbox_uint16",
-            "jl_unbox_uint32",
-            "jl_unbox_uint64",
-            "jl_unbox_uint8",
-            "jl_unbox_voidpointer",
-            "jl_ver_is_released",
-            "jl_ver_major",
-            "jl_ver_minor",
-            "jl_ver_patch",
-            "jl_ver_string",
-            "jl_yield",
-            "uv_async_send",
-            "jlrs_alloc_array_1d",
-            "jlrs_alloc_array_2d",
-            "jlrs_alloc_array_3d",
-            "jlrs_apply_array_type",
-            "jlrs_apply_type",
-            "jlrs_get_nth_field",
-            "jlrs_new_array",
-            "jlrs_new_structv",
-            "jlrs_new_typevar",
-            "jlrs_set_const",
-            "jlrs_set_global",
-            "jlrs_set_nth_field",
-            "jlrs_type_union",
-            "jlrs_type_unionall",
-            "jlrs_reshape_array",
-            "jlrs_array_grow_end",
-            "jlrs_array_del_end",
-            "jlrs_array_grow_beg",
-            "jlrs_array_del_beg",
-            "jlrs_array_sizehint",
-            "jlrs_array_ptr_1d_push",
-            "jlrs_array_ptr_1d_append",
-            "jlrs_array_data_owner_offset",
-            "jlrs_print_stack",
-            "jlrs_current_task",
-        ];
+        let mut out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
+        out_path.push("bindings.rs");
 
-        let mut builder = bindgen::Builder::default()
-            .clang_args(&flags)
+        let include_dir_flag = format!("-I{}", include_dir);
+        let bindings = bindgen::Builder::default()
+            .clang_arg(include_dir_flag)
             .header("src/jlrs_c.h")
-            .size_t_is_usize(true);
-
-        for func in functions.iter().copied() {
-            builder = builder.allowlist_function(func);
-        }
-
-        let bindings = builder
+            .size_t_is_usize(true)
+            .allowlist_function("jl_alloc_array_1d")
+            .allowlist_function("jl_alloc_array_2d")
+            .allowlist_function("jl_alloc_array_3d")
+            .allowlist_function("jl_alloc_svec")
+            .allowlist_function("jl_alloc_svec_uninit")
+            .allowlist_function("jl_apply_array_type")
+            .allowlist_function("jl_apply_generic")
+            .allowlist_function("jl_apply_tuple_type_v")
+            .allowlist_function("jl_apply_type")
+            .allowlist_function("jl_array_eltype")
+            .allowlist_function("jl_array_typetagdata")
+            .allowlist_function("jl_atexit_hook")
+            .allowlist_function("jl_box_bool")
+            .allowlist_function("jl_box_char")
+            .allowlist_function("jl_box_float32")
+            .allowlist_function("jl_box_float64")
+            .allowlist_function("jl_box_int16")
+            .allowlist_function("jl_box_int32")
+            .allowlist_function("jl_box_int64")
+            .allowlist_function("jl_box_int8")
+            .allowlist_function("jl_box_uint16")
+            .allowlist_function("jl_box_uint32")
+            .allowlist_function("jl_box_uint64")
+            .allowlist_function("jl_box_uint8")
+            .allowlist_function("jl_box_voidpointer")
+            .allowlist_function("jl_call")
+            .allowlist_function("jl_call0")
+            .allowlist_function("jl_call1")
+            .allowlist_function("jl_call2")
+            .allowlist_function("jl_call3")
+            .allowlist_function("jl_compute_fieldtypes")
+            .allowlist_function("jl_cpu_threads")
+            .allowlist_function("jl_egal")
+            .allowlist_function("jl_eval_string")
+            .allowlist_function("jl_exception_occurred")
+            .allowlist_function("jl_environ")
+            .allowlist_function("jl_field_index")
+            .allowlist_function("jl_gc_add_finalizer")
+            .allowlist_function("jl_gc_add_ptr_finalizer")
+            .allowlist_function("jl_gc_collect")
+            .allowlist_function("jl_gc_enable")
+            .allowlist_function("jl_gc_is_enabled")
+            .allowlist_function("jl_gc_queue_root")
+            .allowlist_function("jl_gc_safepoint")
+            .allowlist_function("jl_getallocationgranularity")
+            .allowlist_function("jl_get_current_task")
+            .allowlist_function("jl_get_global")
+            .allowlist_function("jl_get_libllvm")
+            .allowlist_function("jl_get_kwsorter")
+            .allowlist_function("jl_get_nth_field")
+            .allowlist_function("jl_get_nth_field_noalloc")
+            .allowlist_function("jl_get_ptls_states")
+            .allowlist_function("jl_get_ARCH")
+            .allowlist_function("jl_get_UNAME")
+            .allowlist_function("jl_getpagesize")
+            .allowlist_function("jl_git_branch")
+            .allowlist_function("jl_git_commit")
+            .allowlist_function("jl_init")
+            .allowlist_function("jl_init__threading")
+            .allowlist_function("jl_init_with_image")
+            .allowlist_function("jl_init_with_image__threading")
+            .allowlist_function("jl_is_debugbuild")
+            .allowlist_function("jl_is_imported")
+            .allowlist_function("jl_is_initialized")
+            .allowlist_function("jl_ver_is_release")
+            .allowlist_function("jl_isa")
+            .allowlist_function("jl_islayout_inline")
+            .allowlist_function("jl_new_array")
+            .allowlist_function("jl_new_struct_uninit")
+            .allowlist_function("jl_new_structv")
+            .allowlist_function("jl_new_typevar")
+            .allowlist_function("jl_object_id")
+            .allowlist_function("jl_pchar_to_array")
+            .allowlist_function("jl_pchar_to_string")
+            .allowlist_function("jl_process_events")
+            .allowlist_function("jl_ptr_to_array")
+            .allowlist_function("jl_ptr_to_array_1d")
+            .allowlist_function("jl_set_const")
+            .allowlist_function("jl_set_global")
+            .allowlist_function("jl_set_nth_field")
+            .allowlist_function("jl_stderr_obj")
+            .allowlist_function("jl_stdout_obj")
+            .allowlist_function("jl_subtype")
+            .allowlist_function("jl_symbol")
+            .allowlist_function("jl_symbol_n")
+            .allowlist_function("jl_typename_str")
+            .allowlist_function("jl_typeof_str")
+            .allowlist_function("jl_type_union")
+            .allowlist_function("jl_type_unionall")
+            .allowlist_function("jl_unbox_float32")
+            .allowlist_function("jl_unbox_float64")
+            .allowlist_function("jl_unbox_int16")
+            .allowlist_function("jl_unbox_int32")
+            .allowlist_function("jl_unbox_int64")
+            .allowlist_function("jl_unbox_int8")
+            .allowlist_function("jl_unbox_uint16")
+            .allowlist_function("jl_unbox_uint32")
+            .allowlist_function("jl_unbox_uint64")
+            .allowlist_function("jl_unbox_uint8")
+            .allowlist_function("jl_unbox_voidpointer")
+            .allowlist_function("jl_ver_is_released")
+            .allowlist_function("jl_ver_major")
+            .allowlist_function("jl_ver_minor")
+            .allowlist_function("jl_ver_patch")
+            .allowlist_function("jl_ver_string")
+            .allowlist_function("jl_yield")
+            .allowlist_function("uv_async_send")
+            .allowlist_function("jlrs_alloc_array_1d")
+            .allowlist_function("jlrs_alloc_array_2d")
+            .allowlist_function("jlrs_alloc_array_3d")
+            .allowlist_function("jlrs_apply_array_type")
+            .allowlist_function("jlrs_apply_type")
+            .allowlist_function("jlrs_get_nth_field")
+            .allowlist_function("jlrs_new_array")
+            .allowlist_function("jlrs_new_structv")
+            .allowlist_function("jlrs_new_typevar")
+            .allowlist_function("jlrs_set_const")
+            .allowlist_function("jlrs_set_global")
+            .allowlist_function("jlrs_set_nth_field")
+            .allowlist_function("jlrs_type_union")
+            .allowlist_function("jlrs_type_unionall")
+            .allowlist_function("jlrs_reshape_array")
+            .allowlist_function("jlrs_array_grow_end")
+            .allowlist_function("jlrs_array_del_end")
+            .allowlist_function("jlrs_array_grow_beg")
+            .allowlist_function("jlrs_array_del_beg")
+            .allowlist_function("jlrs_array_sizehint")
+            .allowlist_function("jlrs_array_ptr_1d_push")
+            .allowlist_function("jlrs_array_ptr_1d_append")
+            .allowlist_function("jlrs_array_data_owner_offset")
+            .allowlist_function("jlrs_print_stack")
             .allowlist_type("jl_code_instance_t")
             .allowlist_type("jl_datatype_t")
             .allowlist_type("jl_expr_t")
@@ -381,7 +371,6 @@ fn main() {
             .generate()
             .expect("Unable to generate bindings");
 
-        // Write the bindings to the $OUT_DIR/bindings.rs file.
         bindings
             .write_to_file(&out_path)
             .expect("Couldn't write bindings!");

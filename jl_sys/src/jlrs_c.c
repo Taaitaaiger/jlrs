@@ -2,7 +2,7 @@
 
 void jlrs_print_stack(jl_gcframe_t *frame) {
     if (frame == NULL) return;
-    size_t n = frame->nroots / 2;
+    size_t n = frame->nroots >> 2;
 
     printf("gc_frame@%p -- %zu %p [", frame, n, frame->prev);
     if (n == 0) {
@@ -375,9 +375,4 @@ jlrs_result_t jlrs_array_del_beg(jl_array_t *a, size_t dec)
 
 uint_t jlrs_array_data_owner_offset(uint16_t n_dims) {
     return jl_array_data_owner_offset(n_dims);
-}
-
-jl_task_t *jlrs_current_task(void)
-{
-    return jl_current_task;
 }

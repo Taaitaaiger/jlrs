@@ -41,19 +41,17 @@
 //! executable.
 //!
 //! In order to ensure the `julia.h` header file can be found, either `/usr/include/julia/julia.h`
-//! or `/usr/local/include/julia/julia.h`
-//! must exist, or you have to set the `JULIA_DIR` environment variable to `/path/to/julia-x.y.z`.
-//! This environment variable can be used to override the default. Similarly, in order to load
-//! `libjulia.so` you must add `/path/to/julia-x.y.z/lib` to the `LD_LIBRARY_PATH` environment
-//! variable. When the `uv` feature is enabled, `/path/to/julia-x.y.z/lib/julia` must also be
-//! added to `LD_LIBRARY_PATH`.
+//! or `/usr/local/include/julia/julia.h` must exist, or you have to set the `JULIA_DIR`
+//! environment variable to `/path/to/julia-x.y.z`. This environment variable can be used to
+//! override the default. Similarly, in order to load `libjulia.so` you must add
+//! `/path/to/julia-x.y.z/lib` to the `LD_LIBRARY_PATH` environment variable. When the `uv`
+//! feature is enabled, `/path/to/julia-x.y.z/lib/julia` must also be added to `LD_LIBRARY_PATH`.
 //!
 //! #### Windows
 //!
 //! If you want to use jlrs on Windows you must use WSL. An installation guide to install WSL on
 //! Windows can be found [on Microsoft's website]. After installing a Linux distribution, follow
 //! the installation instructions for Linux.
-//!
 //!
 //! # Using this crate
 //!
@@ -272,7 +270,13 @@
 //! another thread and return a `Future`. While awaiting the result the runtime can handle another
 //! task.
 //!
-//! A `PersistentTask` can be called multiple times. In addition to `run` it also has an async `init` method. This method is called when the `PersistentTask` is created and can be used to prepare the initial state of the task. The frame provided to `init` is not dropped after this method returns, which means this initial state can contain Julia data. Whenever a `PersistentTask` is successfully created a `PersistentHandle` is returned. This handle can be used to call the `PersistentTask` which calls its `run` method once. A `PersistentHandle` can be cloned and shared across threads.
+//! A `PersistentTask` can be called multiple times. In addition to `run` it also has an async
+//! `init` method. This method is called when the `PersistentTask` is created and can be used to
+//! prepare the initial state of the task. The frame provided to `init` is not dropped after this
+//! method returns, which means this initial state can contain Julia data. Whenever a
+//! `PersistentTask` is successfully created a `PersistentHandle` is returned. This handle can be
+//! used to call the `PersistentTask` which calls its `run` method once. A `PersistentHandle` can
+//! be cloned and shared across threads.
 //!
 //! You can find basic examples that show how to implement these traits in
 //! [the examples directory of the GitHub repository].

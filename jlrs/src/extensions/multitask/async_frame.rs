@@ -206,7 +206,7 @@ impl<'frame> AsyncGcFrame<'frame> {
 
     /// Returns the number of values currently rooted in this frame.
     pub fn n_roots(&self) -> usize {
-        self.raw_frame[0].get() as usize >> 1
+        self.raw_frame[0].get() as usize >> 2
     }
 
     /// Returns the maximum number of slots this frame can use.
@@ -234,7 +234,7 @@ impl<'frame> AsyncGcFrame<'frame> {
     // Safety: capacity >= n_slots
     pub(crate) unsafe fn set_n_roots(&mut self, n_slots: usize) {
         debug_assert!(n_slots <= self.capacity());
-        self.raw_frame.get_unchecked_mut(0).set((n_slots << 1) as _);
+        self.raw_frame.get_unchecked_mut(0).set((n_slots << 2) as _);
     }
 
     // Safety: this frame must be dropped in the same scope it has been created.

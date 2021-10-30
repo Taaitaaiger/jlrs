@@ -1,7 +1,7 @@
 use jlrs::prelude::*;
 use std::time::Duration;
 
-// This struct contains the y-label of the plot. 
+// This struct contains the y-label of the plot.
 struct MyTask {
     ylabel: String,
 }
@@ -50,7 +50,11 @@ impl PersistentTask for MyTask {
             println!("Update");
             // Add a line with 100 points to the plot
             let n = Value::new(&mut *frame, 100usize)?;
-            let data = Module::base(global).function_ref("randn")?.wrapper_unchecked().call1(&mut *frame, n)?.into_jlrs_result()?;
+            let data = Module::base(global)
+                .function_ref("randn")?
+                .wrapper_unchecked()
+                .call1(&mut *frame, n)?
+                .into_jlrs_result()?;
 
             let plot_fn = Module::plots(global)
                 .function_ref("plot")?
@@ -60,6 +64,7 @@ impl PersistentTask for MyTask {
                 .0
                 .update_with_keywords(&mut *frame, plot_fn, &mut [data], state.1)?;
         }
+
         Ok(())
     }
 

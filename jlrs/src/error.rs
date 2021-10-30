@@ -139,6 +139,7 @@ pub enum JlrsError {
         value: String,
     },
     MoreThreadsRequired,
+    ThreadsVarRequired,
     UndefRef,
 }
 
@@ -374,6 +375,9 @@ impl Display for JlrsError {
             }
             JlrsError::UndefRef => {
                 write!(formatter, "An undefined reference cannot be rooted")
+            }
+            JlrsError::ThreadsVarRequired => {
+                write!(formatter, "On Windows the JULIA_NUM_THREADS environment variable must be explicitly set to 3 or higher, or auto.")
             }
             JlrsError::NumThreadsVar { value } => {
                 write!(formatter, "The `JULIA_NUM_THREADS` environment variable must be set to a value larger than 2 or auto, but its value is: {}", value)

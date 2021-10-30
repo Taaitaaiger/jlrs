@@ -90,8 +90,8 @@ use crate::{
     INIT,
 };
 use jl_sys::{
-    jl_atexit_hook, jl_init, jl_init_with_image, jl_is_initialized, jl_process_events, jl_yield,
-    jlrs_current_task,
+    jl_atexit_hook, jl_get_current_task, jl_init, jl_init_with_image, jl_is_initialized,
+    jl_process_events, jl_task_t, jl_yield,
 };
 use std::{
     collections::VecDeque,
@@ -1841,7 +1841,7 @@ impl AsyncStackPage {
 unsafe fn link_stacks(stacks: &mut [Option<Pin<Box<AsyncStackPage>>>]) {
     for stack in stacks.iter_mut() {
         let stack = stack.as_mut().unwrap();
-        let task = NonNull::new_unchecked(jlrs_current_task()).as_mut();
+        let task = NonNull::new_unchecked(jl_get_current_task().cast::<jl_task_t>()).as_mut();
 
         stack.top[1].set(task.gcstack.cast());
 
@@ -1936,7 +1936,7 @@ fn check_threads_var() -> JlrsResult<()> {
             }
         }
         Err(_) => {
-            env::set_var("JULIA_NUM_THREADS", "auto");
+            Err(JlrsError::ThreadsVarRequired)?;
         }
     };
 

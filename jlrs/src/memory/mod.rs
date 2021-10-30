@@ -54,11 +54,11 @@ pub(crate) mod root_pending;
 pub mod scope;
 pub(crate) mod stack_page;
 
+#[cfg(not(feature = "lts"))]
+use jl_sys::jl_get_current_task;
 #[cfg(feature = "lts")]
 use jl_sys::jl_get_ptls_states;
 use jl_sys::jl_tls_states_t;
-#[cfg(not(feature = "lts"))]
-use jl_sys::jlrs_current_task;
 #[cfg(not(feature = "lts"))]
 use std::ptr::NonNull;
 
@@ -69,5 +69,5 @@ pub(crate) unsafe fn get_tls() -> *mut jl_tls_states_t {
 
 #[cfg(not(feature = "lts"))]
 pub(crate) unsafe fn get_tls() -> *mut jl_tls_states_t {
-    NonNull::new_unchecked(jlrs_current_task()).as_ref().ptls
+    NonNull::new_unchecked(jl_get_current_task()).as_ref().ptls
 }

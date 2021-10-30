@@ -6712,6 +6712,9 @@ extern "C" {
 extern "C" {
     pub fn jl_git_commit() -> *const ::std::os::raw::c_char;
 }
+extern "C" {
+    pub fn jl_get_current_task() -> *mut jl_task_t;
+}
 pub const jlrs_result_tag_t_JLRS_RESULT_VOID: jlrs_result_tag_t = 0;
 pub const jlrs_result_tag_t_JLRS_RESULT_VALUE: jlrs_result_tag_t = 1;
 pub const jlrs_result_tag_t_JLRS_RESULT_ERR: jlrs_result_tag_t = 2;
@@ -6847,9 +6850,6 @@ extern "C" {
 }
 extern "C" {
     pub fn jlrs_array_data_owner_offset(n_dims: u16) -> uint_t;
-}
-extern "C" {
-    pub fn jlrs_current_task() -> *mut jl_task_t;
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]

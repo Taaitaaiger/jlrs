@@ -37,7 +37,7 @@ use crate::{
     private::Private,
     CCall,
 };
-use jl_sys::{jl_value_t, jlrs_current_task};
+use jl_sys::{jl_get_current_task, jl_task_t, jl_value_t};
 use std::{cell::Cell, ffi::c_void, marker::PhantomData, ptr::NonNull};
 
 pub(crate) const MIN_FRAME_CAPACITY: usize = 16;
@@ -56,11 +56,12 @@ pub struct GcFrame<'frame, M: Mode> {
 impl<'frame, M: Mode> GcFrame<'frame, M> {
     /// Returns the number of values currently rooted in this frame.
     pub fn n_roots(&self) -> usize {
-        self.raw_frame[0].get() as usize >> 1
+        self.raw_frame[0].get() as usize >> 2
     }
 
+    #[doc(hidden)]
     pub unsafe fn print_stack(&self) {
-        let last = jlrs_current_task();
+        let last = jl_get_current_task().cast::<jl_task_t>();
         jl_sys::jlrs_print_stack(NonNull::new_unchecked(last).as_ref().gcstack);
     }
 
@@ -105,7 +106,7 @@ impl<'frame, M: Mode> GcFrame<'frame, M> {
     // Safety: capacity >= n_slots
     pub(crate) unsafe fn set_n_roots(&mut self, n_roots: usize) {
         debug_assert!(self.capacity() >= n_roots);
-        self.raw_frame.get_unchecked_mut(0).set((n_roots << 1) as _);
+        self.raw_frame.get_unchecked_mut(0).set((n_roots << 2) as _);
     }
 
     // Safety: capacity > n_roots
