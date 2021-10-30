@@ -82,7 +82,6 @@ where
         }
     }
 }
-pub type jl_gcframe_t = _jl_gcframe_t;
 pub type __int8_t = ::std::os::raw::c_schar;
 pub type __uint8_t = ::std::os::raw::c_uchar;
 pub type __int16_t = ::std::os::raw::c_short;
@@ -2133,35 +2132,39 @@ fn bindgen_test_layout_small_arraylist_t() {
 }
 pub type sigjmp_buf = [__jmp_buf_tag; 1usize];
 pub type jl_taggedvalue_t = _jl_taggedvalue_t;
+pub type jl_tls_states_t = _jl_tls_states_t;
+pub type jl_ptls_t = *mut jl_tls_states_t;
+extern "C" {
+    pub fn jl_get_ptls_states() -> jl_ptls_t;
+}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct jl_stack_context_t {
+pub struct jl_ucontext_t {
     pub uc_mcontext: sigjmp_buf,
 }
 #[test]
-fn bindgen_test_layout_jl_stack_context_t() {
+fn bindgen_test_layout_jl_ucontext_t() {
     assert_eq!(
-        ::std::mem::size_of::<jl_stack_context_t>(),
+        ::std::mem::size_of::<jl_ucontext_t>(),
         200usize,
-        concat!("Size of: ", stringify!(jl_stack_context_t))
+        concat!("Size of: ", stringify!(jl_ucontext_t))
     );
     assert_eq!(
-        ::std::mem::align_of::<jl_stack_context_t>(),
+        ::std::mem::align_of::<jl_ucontext_t>(),
         8usize,
-        concat!("Alignment of ", stringify!(jl_stack_context_t))
+        concat!("Alignment of ", stringify!(jl_ucontext_t))
     );
     assert_eq!(
-        unsafe { &(*(::std::ptr::null::<jl_stack_context_t>())).uc_mcontext as *const _ as usize },
+        unsafe { &(*(::std::ptr::null::<jl_ucontext_t>())).uc_mcontext as *const _ as usize },
         0usize,
         concat!(
             "Offset of field: ",
-            stringify!(jl_stack_context_t),
+            stringify!(jl_ucontext_t),
             "::",
             stringify!(uc_mcontext)
         )
     );
 }
-pub type jl_ucontext_t = jl_stack_context_t;
 pub type jl_thread_t = pthread_t;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -2679,15 +2682,15 @@ pub struct _jl_bt_element_t {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct _jl_tls_states_t {
+    pub pgcstack: *mut _jl_gcframe_t,
+    pub world_age: usize,
     pub tid: i16,
     pub rngseed: u64,
     pub safepoint: *mut usize,
     pub sleep_check_state: i8,
     pub gc_state: i8,
-    pub in_pure_callback: i8,
     pub in_finalizer: i8,
     pub disable_gc: i8,
-    pub finalizers_inhibited: ::std::os::raw::c_int,
     pub heap: jl_thread_heap_t,
     pub gc_num: jl_thread_gc_num_t,
     pub sleep_lock: uv_mutex_t,
@@ -2695,12 +2698,12 @@ pub struct _jl_tls_states_t {
     pub defer_signal: sig_atomic_t,
     pub current_task: *mut _jl_task_t,
     pub next_task: *mut _jl_task_t,
-    pub previous_task: *mut _jl_task_t,
     pub root_task: *mut _jl_task_t,
     pub timing_stack: *mut _jl_timing_block_t,
     pub stackbase: *mut ::std::os::raw::c_void,
     pub stacksize: usize,
-    pub __bindgen_anon_1: _jl_tls_states_t__bindgen_ty_1,
+    pub base_ctx: jl_ucontext_t,
+    pub safe_restore: *mut sigjmp_buf,
     pub sig_exception: *mut _jl_value_t,
     pub bt_data: *mut _jl_bt_element_t,
     pub bt_size: usize,
@@ -2708,6 +2711,8 @@ pub struct _jl_tls_states_t {
     pub io_wait: sig_atomic_t,
     pub signal_stack: *mut ::std::os::raw::c_void,
     pub system_id: jl_thread_t,
+    pub in_pure_callback: ::std::os::raw::c_int,
+    pub finalizers_inhibited: ::std::os::raw::c_int,
     pub finalizers: arraylist_t,
     pub gc_cache: jl_gc_mark_cache_t,
     pub sweep_objs: arraylist_t,
@@ -2715,55 +2720,11 @@ pub struct _jl_tls_states_t {
     pub previous_exception: *mut _jl_value_t,
     pub locks: small_arraylist_t,
 }
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union _jl_tls_states_t__bindgen_ty_1 {
-    pub base_ctx: jl_ucontext_t,
-    pub copy_stack_ctx: jl_stack_context_t,
-}
-#[test]
-fn bindgen_test_layout__jl_tls_states_t__bindgen_ty_1() {
-    assert_eq!(
-        ::std::mem::size_of::<_jl_tls_states_t__bindgen_ty_1>(),
-        200usize,
-        concat!("Size of: ", stringify!(_jl_tls_states_t__bindgen_ty_1))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<_jl_tls_states_t__bindgen_ty_1>(),
-        8usize,
-        concat!("Alignment of ", stringify!(_jl_tls_states_t__bindgen_ty_1))
-    );
-    assert_eq!(
-        unsafe {
-            &(*(::std::ptr::null::<_jl_tls_states_t__bindgen_ty_1>())).base_ctx as *const _ as usize
-        },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(_jl_tls_states_t__bindgen_ty_1),
-            "::",
-            stringify!(base_ctx)
-        )
-    );
-    assert_eq!(
-        unsafe {
-            &(*(::std::ptr::null::<_jl_tls_states_t__bindgen_ty_1>())).copy_stack_ctx as *const _
-                as usize
-        },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(_jl_tls_states_t__bindgen_ty_1),
-            "::",
-            stringify!(copy_stack_ctx)
-        )
-    );
-}
 #[test]
 fn bindgen_test_layout__jl_tls_states_t() {
     assert_eq!(
         ::std::mem::size_of::<_jl_tls_states_t>(),
-        15776usize,
+        15792usize,
         concat!("Size of: ", stringify!(_jl_tls_states_t))
     );
     assert_eq!(
@@ -2772,8 +2733,28 @@ fn bindgen_test_layout__jl_tls_states_t() {
         concat!("Alignment of ", stringify!(_jl_tls_states_t))
     );
     assert_eq!(
-        unsafe { &(*(::std::ptr::null::<_jl_tls_states_t>())).tid as *const _ as usize },
+        unsafe { &(*(::std::ptr::null::<_jl_tls_states_t>())).pgcstack as *const _ as usize },
         0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_jl_tls_states_t),
+            "::",
+            stringify!(pgcstack)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<_jl_tls_states_t>())).world_age as *const _ as usize },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_jl_tls_states_t),
+            "::",
+            stringify!(world_age)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<_jl_tls_states_t>())).tid as *const _ as usize },
+        16usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_tls_states_t),
@@ -2783,7 +2764,7 @@ fn bindgen_test_layout__jl_tls_states_t() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_tls_states_t>())).rngseed as *const _ as usize },
-        8usize,
+        24usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_tls_states_t),
@@ -2793,7 +2774,7 @@ fn bindgen_test_layout__jl_tls_states_t() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_tls_states_t>())).safepoint as *const _ as usize },
-        16usize,
+        32usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_tls_states_t),
@@ -2805,7 +2786,7 @@ fn bindgen_test_layout__jl_tls_states_t() {
         unsafe {
             &(*(::std::ptr::null::<_jl_tls_states_t>())).sleep_check_state as *const _ as usize
         },
-        24usize,
+        40usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_tls_states_t),
@@ -2815,7 +2796,7 @@ fn bindgen_test_layout__jl_tls_states_t() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_tls_states_t>())).gc_state as *const _ as usize },
-        25usize,
+        41usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_tls_states_t),
@@ -2824,20 +2805,8 @@ fn bindgen_test_layout__jl_tls_states_t() {
         )
     );
     assert_eq!(
-        unsafe {
-            &(*(::std::ptr::null::<_jl_tls_states_t>())).in_pure_callback as *const _ as usize
-        },
-        26usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(_jl_tls_states_t),
-            "::",
-            stringify!(in_pure_callback)
-        )
-    );
-    assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_tls_states_t>())).in_finalizer as *const _ as usize },
-        27usize,
+        42usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_tls_states_t),
@@ -2847,7 +2816,7 @@ fn bindgen_test_layout__jl_tls_states_t() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_tls_states_t>())).disable_gc as *const _ as usize },
-        28usize,
+        43usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_tls_states_t),
@@ -2856,20 +2825,8 @@ fn bindgen_test_layout__jl_tls_states_t() {
         )
     );
     assert_eq!(
-        unsafe {
-            &(*(::std::ptr::null::<_jl_tls_states_t>())).finalizers_inhibited as *const _ as usize
-        },
-        32usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(_jl_tls_states_t),
-            "::",
-            stringify!(finalizers_inhibited)
-        )
-    );
-    assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_tls_states_t>())).heap as *const _ as usize },
-        40usize,
+        48usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_tls_states_t),
@@ -2879,7 +2836,7 @@ fn bindgen_test_layout__jl_tls_states_t() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_tls_states_t>())).gc_num as *const _ as usize },
-        6448usize,
+        6456usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_tls_states_t),
@@ -2889,7 +2846,7 @@ fn bindgen_test_layout__jl_tls_states_t() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_tls_states_t>())).sleep_lock as *const _ as usize },
-        6504usize,
+        6512usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_tls_states_t),
@@ -2899,7 +2856,7 @@ fn bindgen_test_layout__jl_tls_states_t() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_tls_states_t>())).wake_signal as *const _ as usize },
-        6544usize,
+        6552usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_tls_states_t),
@@ -2909,7 +2866,7 @@ fn bindgen_test_layout__jl_tls_states_t() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_tls_states_t>())).defer_signal as *const _ as usize },
-        6592usize,
+        6600usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_tls_states_t),
@@ -2919,7 +2876,7 @@ fn bindgen_test_layout__jl_tls_states_t() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_tls_states_t>())).current_task as *const _ as usize },
-        6600usize,
+        6608usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_tls_states_t),
@@ -2929,22 +2886,12 @@ fn bindgen_test_layout__jl_tls_states_t() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_tls_states_t>())).next_task as *const _ as usize },
-        6608usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(_jl_tls_states_t),
-            "::",
-            stringify!(next_task)
-        )
-    );
-    assert_eq!(
-        unsafe { &(*(::std::ptr::null::<_jl_tls_states_t>())).previous_task as *const _ as usize },
         6616usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_tls_states_t),
             "::",
-            stringify!(previous_task)
+            stringify!(next_task)
         )
     );
     assert_eq!(
@@ -2988,8 +2935,28 @@ fn bindgen_test_layout__jl_tls_states_t() {
         )
     );
     assert_eq!(
-        unsafe { &(*(::std::ptr::null::<_jl_tls_states_t>())).sig_exception as *const _ as usize },
+        unsafe { &(*(::std::ptr::null::<_jl_tls_states_t>())).base_ctx as *const _ as usize },
+        6656usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_jl_tls_states_t),
+            "::",
+            stringify!(base_ctx)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<_jl_tls_states_t>())).safe_restore as *const _ as usize },
         6856usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_jl_tls_states_t),
+            "::",
+            stringify!(safe_restore)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<_jl_tls_states_t>())).sig_exception as *const _ as usize },
+        6864usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_tls_states_t),
@@ -2999,7 +2966,7 @@ fn bindgen_test_layout__jl_tls_states_t() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_tls_states_t>())).bt_data as *const _ as usize },
-        6864usize,
+        6872usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_tls_states_t),
@@ -3009,7 +2976,7 @@ fn bindgen_test_layout__jl_tls_states_t() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_tls_states_t>())).bt_size as *const _ as usize },
-        6872usize,
+        6880usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_tls_states_t),
@@ -3019,7 +2986,7 @@ fn bindgen_test_layout__jl_tls_states_t() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_tls_states_t>())).signal_request as *const _ as usize },
-        6880usize,
+        6888usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_tls_states_t),
@@ -3029,7 +2996,7 @@ fn bindgen_test_layout__jl_tls_states_t() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_tls_states_t>())).io_wait as *const _ as usize },
-        6884usize,
+        6892usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_tls_states_t),
@@ -3039,7 +3006,7 @@ fn bindgen_test_layout__jl_tls_states_t() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_tls_states_t>())).signal_stack as *const _ as usize },
-        6888usize,
+        6896usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_tls_states_t),
@@ -3049,7 +3016,7 @@ fn bindgen_test_layout__jl_tls_states_t() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_tls_states_t>())).system_id as *const _ as usize },
-        6896usize,
+        6904usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_tls_states_t),
@@ -3058,8 +3025,32 @@ fn bindgen_test_layout__jl_tls_states_t() {
         )
     );
     assert_eq!(
+        unsafe {
+            &(*(::std::ptr::null::<_jl_tls_states_t>())).in_pure_callback as *const _ as usize
+        },
+        6912usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_jl_tls_states_t),
+            "::",
+            stringify!(in_pure_callback)
+        )
+    );
+    assert_eq!(
+        unsafe {
+            &(*(::std::ptr::null::<_jl_tls_states_t>())).finalizers_inhibited as *const _ as usize
+        },
+        6916usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_jl_tls_states_t),
+            "::",
+            stringify!(finalizers_inhibited)
+        )
+    );
+    assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_tls_states_t>())).finalizers as *const _ as usize },
-        6904usize,
+        6920usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_tls_states_t),
@@ -3069,7 +3060,7 @@ fn bindgen_test_layout__jl_tls_states_t() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_tls_states_t>())).gc_cache as *const _ as usize },
-        7160usize,
+        7176usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_tls_states_t),
@@ -3079,7 +3070,7 @@ fn bindgen_test_layout__jl_tls_states_t() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_tls_states_t>())).sweep_objs as *const _ as usize },
-        15416usize,
+        15432usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_tls_states_t),
@@ -3089,7 +3080,7 @@ fn bindgen_test_layout__jl_tls_states_t() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_tls_states_t>())).gc_mark_sp as *const _ as usize },
-        15672usize,
+        15688usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_tls_states_t),
@@ -3101,7 +3092,7 @@ fn bindgen_test_layout__jl_tls_states_t() {
         unsafe {
             &(*(::std::ptr::null::<_jl_tls_states_t>())).previous_exception as *const _ as usize
         },
-        15704usize,
+        15720usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_tls_states_t),
@@ -3111,7 +3102,7 @@ fn bindgen_test_layout__jl_tls_states_t() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_tls_states_t>())).locks as *const _ as usize },
-        15712usize,
+        15728usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_tls_states_t),
@@ -3120,8 +3111,6 @@ fn bindgen_test_layout__jl_tls_states_t() {
         )
     );
 }
-pub type jl_tls_states_t = _jl_tls_states_t;
-pub type jl_ptls_t = *mut jl_tls_states_t;
 extern "C" {
     pub fn jl_gc_safepoint();
 }
@@ -3690,29 +3679,25 @@ pub struct _jl_method_t {
     pub specializations: *mut jl_svec_t,
     pub speckeyset: *mut jl_array_t,
     pub slot_syms: *mut jl_value_t,
-    pub external_mt: *mut jl_value_t,
     pub source: *mut jl_value_t,
     pub unspecialized: *mut _jl_method_instance_t,
     pub generator: *mut jl_value_t,
     pub roots: *mut jl_array_t,
     pub ccallable: *mut jl_svec_t,
     pub invokes: *mut jl_typemap_t,
-    pub recursion_relation: *mut jl_value_t,
     pub nargs: i32,
     pub called: i32,
     pub nospecialize: i32,
     pub nkw: i32,
     pub isva: u8,
     pub pure_: u8,
-    pub is_for_opaque_closure: u8,
-    pub aggressive_constprop: u8,
     pub writelock: jl_mutex_t,
 }
 #[test]
 fn bindgen_test_layout__jl_method_t() {
     assert_eq!(
         ::std::mem::size_of::<_jl_method_t>(),
-        184usize,
+        168usize,
         concat!("Size of: ", stringify!(_jl_method_t))
     );
     assert_eq!(
@@ -3821,18 +3806,8 @@ fn bindgen_test_layout__jl_method_t() {
         )
     );
     assert_eq!(
-        unsafe { &(*(::std::ptr::null::<_jl_method_t>())).external_mt as *const _ as usize },
-        80usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(_jl_method_t),
-            "::",
-            stringify!(external_mt)
-        )
-    );
-    assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_method_t>())).source as *const _ as usize },
-        88usize,
+        80usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_method_t),
@@ -3842,7 +3817,7 @@ fn bindgen_test_layout__jl_method_t() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_method_t>())).unspecialized as *const _ as usize },
-        96usize,
+        88usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_method_t),
@@ -3852,7 +3827,7 @@ fn bindgen_test_layout__jl_method_t() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_method_t>())).generator as *const _ as usize },
-        104usize,
+        96usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_method_t),
@@ -3862,7 +3837,7 @@ fn bindgen_test_layout__jl_method_t() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_method_t>())).roots as *const _ as usize },
-        112usize,
+        104usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_method_t),
@@ -3872,7 +3847,7 @@ fn bindgen_test_layout__jl_method_t() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_method_t>())).ccallable as *const _ as usize },
-        120usize,
+        112usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_method_t),
@@ -3882,7 +3857,7 @@ fn bindgen_test_layout__jl_method_t() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_method_t>())).invokes as *const _ as usize },
-        128usize,
+        120usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_method_t),
@@ -3891,18 +3866,8 @@ fn bindgen_test_layout__jl_method_t() {
         )
     );
     assert_eq!(
-        unsafe { &(*(::std::ptr::null::<_jl_method_t>())).recursion_relation as *const _ as usize },
-        136usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(_jl_method_t),
-            "::",
-            stringify!(recursion_relation)
-        )
-    );
-    assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_method_t>())).nargs as *const _ as usize },
-        144usize,
+        128usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_method_t),
@@ -3912,7 +3877,7 @@ fn bindgen_test_layout__jl_method_t() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_method_t>())).called as *const _ as usize },
-        148usize,
+        132usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_method_t),
@@ -3922,7 +3887,7 @@ fn bindgen_test_layout__jl_method_t() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_method_t>())).nospecialize as *const _ as usize },
-        152usize,
+        136usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_method_t),
@@ -3932,7 +3897,7 @@ fn bindgen_test_layout__jl_method_t() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_method_t>())).nkw as *const _ as usize },
-        156usize,
+        140usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_method_t),
@@ -3942,7 +3907,7 @@ fn bindgen_test_layout__jl_method_t() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_method_t>())).isva as *const _ as usize },
-        160usize,
+        144usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_method_t),
@@ -3952,7 +3917,7 @@ fn bindgen_test_layout__jl_method_t() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_method_t>())).pure_ as *const _ as usize },
-        161usize,
+        145usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_method_t),
@@ -3961,32 +3926,8 @@ fn bindgen_test_layout__jl_method_t() {
         )
     );
     assert_eq!(
-        unsafe {
-            &(*(::std::ptr::null::<_jl_method_t>())).is_for_opaque_closure as *const _ as usize
-        },
-        162usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(_jl_method_t),
-            "::",
-            stringify!(is_for_opaque_closure)
-        )
-    );
-    assert_eq!(
-        unsafe {
-            &(*(::std::ptr::null::<_jl_method_t>())).aggressive_constprop as *const _ as usize
-        },
-        163usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(_jl_method_t),
-            "::",
-            stringify!(aggressive_constprop)
-        )
-    );
-    assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_method_t>())).writelock as *const _ as usize },
-        168usize,
+        152usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_method_t),
@@ -4166,89 +4107,6 @@ fn bindgen_test_layout__jl_method_instance_t() {
             stringify!(_jl_method_instance_t),
             "::",
             stringify!(inInference)
-        )
-    );
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct jl_opaque_closure_t {
-    pub captures: *mut jl_value_t,
-    pub isva: u8,
-    pub world: usize,
-    pub source: *mut jl_method_t,
-    pub invoke: jl_fptr_args_t,
-    pub specptr: *mut ::std::os::raw::c_void,
-}
-#[test]
-fn bindgen_test_layout_jl_opaque_closure_t() {
-    assert_eq!(
-        ::std::mem::size_of::<jl_opaque_closure_t>(),
-        48usize,
-        concat!("Size of: ", stringify!(jl_opaque_closure_t))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<jl_opaque_closure_t>(),
-        8usize,
-        concat!("Alignment of ", stringify!(jl_opaque_closure_t))
-    );
-    assert_eq!(
-        unsafe { &(*(::std::ptr::null::<jl_opaque_closure_t>())).captures as *const _ as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(jl_opaque_closure_t),
-            "::",
-            stringify!(captures)
-        )
-    );
-    assert_eq!(
-        unsafe { &(*(::std::ptr::null::<jl_opaque_closure_t>())).isva as *const _ as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(jl_opaque_closure_t),
-            "::",
-            stringify!(isva)
-        )
-    );
-    assert_eq!(
-        unsafe { &(*(::std::ptr::null::<jl_opaque_closure_t>())).world as *const _ as usize },
-        16usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(jl_opaque_closure_t),
-            "::",
-            stringify!(world)
-        )
-    );
-    assert_eq!(
-        unsafe { &(*(::std::ptr::null::<jl_opaque_closure_t>())).source as *const _ as usize },
-        24usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(jl_opaque_closure_t),
-            "::",
-            stringify!(source)
-        )
-    );
-    assert_eq!(
-        unsafe { &(*(::std::ptr::null::<jl_opaque_closure_t>())).invoke as *const _ as usize },
-        32usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(jl_opaque_closure_t),
-            "::",
-            stringify!(invoke)
-        )
-    );
-    assert_eq!(
-        unsafe { &(*(::std::ptr::null::<jl_opaque_closure_t>())).specptr as *const _ as usize },
-        40usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(jl_opaque_closure_t),
-            "::",
-            stringify!(specptr)
         )
     );
 }
@@ -4489,23 +4347,18 @@ pub struct jl_typename_t {
     pub name: *mut jl_sym_t,
     pub module: *mut _jl_module_t,
     pub names: *mut jl_svec_t,
-    pub atomicfields: *const u32,
     pub wrapper: *mut jl_value_t,
     pub cache: *mut jl_svec_t,
     pub linearcache: *mut jl_svec_t,
+    pub hash: isize,
     pub mt: *mut _jl_methtable_t,
     pub partial: *mut jl_array_t,
-    pub hash: isize,
-    pub n_uninitialized: i32,
-    pub _bitfield_align_1: [u8; 0],
-    pub _bitfield_1: __BindgenBitfieldUnit<[u8; 1usize]>,
-    pub __bindgen_padding_0: [u8; 3usize],
 }
 #[test]
 fn bindgen_test_layout_jl_typename_t() {
     assert_eq!(
         ::std::mem::size_of::<jl_typename_t>(),
-        88usize,
+        72usize,
         concat!("Size of: ", stringify!(jl_typename_t))
     );
     assert_eq!(
@@ -4544,18 +4397,8 @@ fn bindgen_test_layout_jl_typename_t() {
         )
     );
     assert_eq!(
-        unsafe { &(*(::std::ptr::null::<jl_typename_t>())).atomicfields as *const _ as usize },
-        24usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(jl_typename_t),
-            "::",
-            stringify!(atomicfields)
-        )
-    );
-    assert_eq!(
         unsafe { &(*(::std::ptr::null::<jl_typename_t>())).wrapper as *const _ as usize },
-        32usize,
+        24usize,
         concat!(
             "Offset of field: ",
             stringify!(jl_typename_t),
@@ -4565,7 +4408,7 @@ fn bindgen_test_layout_jl_typename_t() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<jl_typename_t>())).cache as *const _ as usize },
-        40usize,
+        32usize,
         concat!(
             "Offset of field: ",
             stringify!(jl_typename_t),
@@ -4575,12 +4418,22 @@ fn bindgen_test_layout_jl_typename_t() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<jl_typename_t>())).linearcache as *const _ as usize },
-        48usize,
+        40usize,
         concat!(
             "Offset of field: ",
             stringify!(jl_typename_t),
             "::",
             stringify!(linearcache)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_typename_t>())).hash as *const _ as usize },
+        48usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_typename_t),
+            "::",
+            stringify!(hash)
         )
     );
     assert_eq!(
@@ -4603,82 +4456,6 @@ fn bindgen_test_layout_jl_typename_t() {
             stringify!(partial)
         )
     );
-    assert_eq!(
-        unsafe { &(*(::std::ptr::null::<jl_typename_t>())).hash as *const _ as usize },
-        72usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(jl_typename_t),
-            "::",
-            stringify!(hash)
-        )
-    );
-    assert_eq!(
-        unsafe { &(*(::std::ptr::null::<jl_typename_t>())).n_uninitialized as *const _ as usize },
-        80usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(jl_typename_t),
-            "::",
-            stringify!(n_uninitialized)
-        )
-    );
-}
-impl jl_typename_t {
-    #[inline]
-    pub fn abstract_(&self) -> u8 {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(0usize, 1u8) as u8) }
-    }
-    #[inline]
-    pub fn set_abstract(&mut self, val: u8) {
-        unsafe {
-            let val: u8 = ::std::mem::transmute(val);
-            self._bitfield_1.set(0usize, 1u8, val as u64)
-        }
-    }
-    #[inline]
-    pub fn mutabl(&self) -> u8 {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(1usize, 1u8) as u8) }
-    }
-    #[inline]
-    pub fn set_mutabl(&mut self, val: u8) {
-        unsafe {
-            let val: u8 = ::std::mem::transmute(val);
-            self._bitfield_1.set(1usize, 1u8, val as u64)
-        }
-    }
-    #[inline]
-    pub fn mayinlinealloc(&self) -> u8 {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(2usize, 1u8) as u8) }
-    }
-    #[inline]
-    pub fn set_mayinlinealloc(&mut self, val: u8) {
-        unsafe {
-            let val: u8 = ::std::mem::transmute(val);
-            self._bitfield_1.set(2usize, 1u8, val as u64)
-        }
-    }
-    #[inline]
-    pub fn new_bitfield_1(
-        abstract_: u8,
-        mutabl: u8,
-        mayinlinealloc: u8,
-    ) -> __BindgenBitfieldUnit<[u8; 1usize]> {
-        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 1usize]> = Default::default();
-        __bindgen_bitfield_unit.set(0usize, 1u8, {
-            let abstract_: u8 = unsafe { ::std::mem::transmute(abstract_) };
-            abstract_ as u64
-        });
-        __bindgen_bitfield_unit.set(1usize, 1u8, {
-            let mutabl: u8 = unsafe { ::std::mem::transmute(mutabl) };
-            mutabl as u64
-        });
-        __bindgen_bitfield_unit.set(2usize, 1u8, {
-            let mayinlinealloc: u8 = unsafe { ::std::mem::transmute(mayinlinealloc) };
-            mayinlinealloc as u64
-        });
-        __bindgen_bitfield_unit
-    }
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -5031,19 +4808,28 @@ pub struct _jl_datatype_t {
     pub super_: *mut _jl_datatype_t,
     pub parameters: *mut jl_svec_t,
     pub types: *mut jl_svec_t,
+    pub names: *mut jl_svec_t,
     pub instance: *mut jl_value_t,
     pub layout: *const jl_datatype_layout_t,
     pub size: i32,
+    pub ninitialized: i32,
     pub hash: u32,
-    pub _bitfield_align_1: [u8; 0],
-    pub _bitfield_1: __BindgenBitfieldUnit<[u8; 1usize]>,
-    pub __bindgen_padding_0: [u8; 7usize],
+    pub abstract_: u8,
+    pub mutabl: u8,
+    pub hasfreetypevars: u8,
+    pub isconcretetype: u8,
+    pub isdispatchtuple: u8,
+    pub isbitstype: u8,
+    pub zeroinit: u8,
+    pub isinlinealloc: u8,
+    pub has_concrete_subtype: u8,
+    pub cached_by_hash: u8,
 }
 #[test]
 fn bindgen_test_layout__jl_datatype_t() {
     assert_eq!(
         ::std::mem::size_of::<_jl_datatype_t>(),
-        64usize,
+        80usize,
         concat!("Size of: ", stringify!(_jl_datatype_t))
     );
     assert_eq!(
@@ -5092,8 +4878,18 @@ fn bindgen_test_layout__jl_datatype_t() {
         )
     );
     assert_eq!(
-        unsafe { &(*(::std::ptr::null::<_jl_datatype_t>())).instance as *const _ as usize },
+        unsafe { &(*(::std::ptr::null::<_jl_datatype_t>())).names as *const _ as usize },
         32usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_jl_datatype_t),
+            "::",
+            stringify!(names)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<_jl_datatype_t>())).instance as *const _ as usize },
+        40usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_datatype_t),
@@ -5103,7 +4899,7 @@ fn bindgen_test_layout__jl_datatype_t() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_datatype_t>())).layout as *const _ as usize },
-        40usize,
+        48usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_datatype_t),
@@ -5113,7 +4909,7 @@ fn bindgen_test_layout__jl_datatype_t() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_datatype_t>())).size as *const _ as usize },
-        48usize,
+        56usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_datatype_t),
@@ -5122,8 +4918,18 @@ fn bindgen_test_layout__jl_datatype_t() {
         )
     );
     assert_eq!(
+        unsafe { &(*(::std::ptr::null::<_jl_datatype_t>())).ninitialized as *const _ as usize },
+        60usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_jl_datatype_t),
+            "::",
+            stringify!(ninitialized)
+        )
+    );
+    assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_datatype_t>())).hash as *const _ as usize },
-        52usize,
+        64usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_datatype_t),
@@ -5131,168 +4937,110 @@ fn bindgen_test_layout__jl_datatype_t() {
             stringify!(hash)
         )
     );
-}
-impl _jl_datatype_t {
-    #[inline]
-    pub fn hasfreetypevars(&self) -> u8 {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(0usize, 1u8) as u8) }
-    }
-    #[inline]
-    pub fn set_hasfreetypevars(&mut self, val: u8) {
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<_jl_datatype_t>())).abstract_ as *const _ as usize },
+        68usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_jl_datatype_t),
+            "::",
+            stringify!(abstract_)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<_jl_datatype_t>())).mutabl as *const _ as usize },
+        69usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_jl_datatype_t),
+            "::",
+            stringify!(mutabl)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<_jl_datatype_t>())).hasfreetypevars as *const _ as usize },
+        70usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_jl_datatype_t),
+            "::",
+            stringify!(hasfreetypevars)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<_jl_datatype_t>())).isconcretetype as *const _ as usize },
+        71usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_jl_datatype_t),
+            "::",
+            stringify!(isconcretetype)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<_jl_datatype_t>())).isdispatchtuple as *const _ as usize },
+        72usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_jl_datatype_t),
+            "::",
+            stringify!(isdispatchtuple)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<_jl_datatype_t>())).isbitstype as *const _ as usize },
+        73usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_jl_datatype_t),
+            "::",
+            stringify!(isbitstype)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<_jl_datatype_t>())).zeroinit as *const _ as usize },
+        74usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_jl_datatype_t),
+            "::",
+            stringify!(zeroinit)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<_jl_datatype_t>())).isinlinealloc as *const _ as usize },
+        75usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_jl_datatype_t),
+            "::",
+            stringify!(isinlinealloc)
+        )
+    );
+    assert_eq!(
         unsafe {
-            let val: u8 = ::std::mem::transmute(val);
-            self._bitfield_1.set(0usize, 1u8, val as u64)
-        }
-    }
-    #[inline]
-    pub fn isconcretetype(&self) -> u8 {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(1usize, 1u8) as u8) }
-    }
-    #[inline]
-    pub fn set_isconcretetype(&mut self, val: u8) {
-        unsafe {
-            let val: u8 = ::std::mem::transmute(val);
-            self._bitfield_1.set(1usize, 1u8, val as u64)
-        }
-    }
-    #[inline]
-    pub fn isdispatchtuple(&self) -> u8 {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(2usize, 1u8) as u8) }
-    }
-    #[inline]
-    pub fn set_isdispatchtuple(&mut self, val: u8) {
-        unsafe {
-            let val: u8 = ::std::mem::transmute(val);
-            self._bitfield_1.set(2usize, 1u8, val as u64)
-        }
-    }
-    #[inline]
-    pub fn isbitstype(&self) -> u8 {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(3usize, 1u8) as u8) }
-    }
-    #[inline]
-    pub fn set_isbitstype(&mut self, val: u8) {
-        unsafe {
-            let val: u8 = ::std::mem::transmute(val);
-            self._bitfield_1.set(3usize, 1u8, val as u64)
-        }
-    }
-    #[inline]
-    pub fn zeroinit(&self) -> u8 {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(4usize, 1u8) as u8) }
-    }
-    #[inline]
-    pub fn set_zeroinit(&mut self, val: u8) {
-        unsafe {
-            let val: u8 = ::std::mem::transmute(val);
-            self._bitfield_1.set(4usize, 1u8, val as u64)
-        }
-    }
-    #[inline]
-    pub fn has_concrete_subtype(&self) -> u8 {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(5usize, 1u8) as u8) }
-    }
-    #[inline]
-    pub fn set_has_concrete_subtype(&mut self, val: u8) {
-        unsafe {
-            let val: u8 = ::std::mem::transmute(val);
-            self._bitfield_1.set(5usize, 1u8, val as u64)
-        }
-    }
-    #[inline]
-    pub fn cached_by_hash(&self) -> u8 {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(6usize, 1u8) as u8) }
-    }
-    #[inline]
-    pub fn set_cached_by_hash(&mut self, val: u8) {
-        unsafe {
-            let val: u8 = ::std::mem::transmute(val);
-            self._bitfield_1.set(6usize, 1u8, val as u64)
-        }
-    }
-    #[inline]
-    pub fn new_bitfield_1(
-        hasfreetypevars: u8,
-        isconcretetype: u8,
-        isdispatchtuple: u8,
-        isbitstype: u8,
-        zeroinit: u8,
-        has_concrete_subtype: u8,
-        cached_by_hash: u8,
-    ) -> __BindgenBitfieldUnit<[u8; 1usize]> {
-        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 1usize]> = Default::default();
-        __bindgen_bitfield_unit.set(0usize, 1u8, {
-            let hasfreetypevars: u8 = unsafe { ::std::mem::transmute(hasfreetypevars) };
-            hasfreetypevars as u64
-        });
-        __bindgen_bitfield_unit.set(1usize, 1u8, {
-            let isconcretetype: u8 = unsafe { ::std::mem::transmute(isconcretetype) };
-            isconcretetype as u64
-        });
-        __bindgen_bitfield_unit.set(2usize, 1u8, {
-            let isdispatchtuple: u8 = unsafe { ::std::mem::transmute(isdispatchtuple) };
-            isdispatchtuple as u64
-        });
-        __bindgen_bitfield_unit.set(3usize, 1u8, {
-            let isbitstype: u8 = unsafe { ::std::mem::transmute(isbitstype) };
-            isbitstype as u64
-        });
-        __bindgen_bitfield_unit.set(4usize, 1u8, {
-            let zeroinit: u8 = unsafe { ::std::mem::transmute(zeroinit) };
-            zeroinit as u64
-        });
-        __bindgen_bitfield_unit.set(5usize, 1u8, {
-            let has_concrete_subtype: u8 = unsafe { ::std::mem::transmute(has_concrete_subtype) };
-            has_concrete_subtype as u64
-        });
-        __bindgen_bitfield_unit.set(6usize, 1u8, {
-            let cached_by_hash: u8 = unsafe { ::std::mem::transmute(cached_by_hash) };
-            cached_by_hash as u64
-        });
-        __bindgen_bitfield_unit
-    }
+            &(*(::std::ptr::null::<_jl_datatype_t>())).has_concrete_subtype as *const _ as usize
+        },
+        76usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_jl_datatype_t),
+            "::",
+            stringify!(has_concrete_subtype)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<_jl_datatype_t>())).cached_by_hash as *const _ as usize },
+        77usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_jl_datatype_t),
+            "::",
+            stringify!(cached_by_hash)
+        )
+    );
 }
 pub type jl_datatype_t = _jl_datatype_t;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct _jl_vararg_t {
-    pub T: *mut jl_value_t,
-    pub N: *mut jl_value_t,
-}
-#[test]
-fn bindgen_test_layout__jl_vararg_t() {
-    assert_eq!(
-        ::std::mem::size_of::<_jl_vararg_t>(),
-        16usize,
-        concat!("Size of: ", stringify!(_jl_vararg_t))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<_jl_vararg_t>(),
-        8usize,
-        concat!("Alignment of ", stringify!(_jl_vararg_t))
-    );
-    assert_eq!(
-        unsafe { &(*(::std::ptr::null::<_jl_vararg_t>())).T as *const _ as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(_jl_vararg_t),
-            "::",
-            stringify!(T)
-        )
-    );
-    assert_eq!(
-        unsafe { &(*(::std::ptr::null::<_jl_vararg_t>())).N as *const _ as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(_jl_vararg_t),
-            "::",
-            stringify!(N)
-        )
-    );
-}
-pub type jl_vararg_t = _jl_vararg_t;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct jl_weakref_t {
@@ -6116,19 +5864,16 @@ extern "C" {
     pub static mut jl_anytuple_type_type: *mut jl_unionall_t;
 }
 extern "C" {
-    pub static mut jl_vararg_type: *mut jl_datatype_t;
+    pub static mut jl_vararg_type: *mut jl_unionall_t;
+}
+extern "C" {
+    pub static mut jl_vararg_typename: *mut jl_typename_t;
 }
 extern "C" {
     pub static mut jl_function_type: *mut jl_datatype_t;
 }
 extern "C" {
     pub static mut jl_builtin_type: *mut jl_datatype_t;
-}
-extern "C" {
-    pub static mut jl_opaque_closure_type: *mut jl_unionall_t;
-}
-extern "C" {
-    pub static mut jl_opaque_closure_typename: *mut jl_typename_t;
 }
 extern "C" {
     pub static mut jl_bottom_type: *mut jl_value_t;
@@ -6189,9 +5934,6 @@ extern "C" {
 }
 extern "C" {
     pub static mut jl_undefvarerror_type: *mut jl_datatype_t;
-}
-extern "C" {
-    pub static mut jl_atomicerror_type: *mut jl_datatype_t;
 }
 extern "C" {
     pub static mut jl_lineinfonode_type: *mut jl_datatype_t;
@@ -6415,6 +6157,7 @@ fn bindgen_test_layout__jl_gcframe_t() {
         )
     );
 }
+pub type jl_gcframe_t = _jl_gcframe_t;
 extern "C" {
     pub fn jl_gc_enable(on: ::std::os::raw::c_int) -> ::std::os::raw::c_int;
 }
@@ -6439,7 +6182,7 @@ extern "C" {
     );
 }
 extern "C" {
-    pub fn jl_gc_queue_root(root: *const jl_value_t);
+    pub fn jl_gc_queue_root(root: *mut jl_value_t);
 }
 extern "C" {
     pub fn jl_array_typetagdata(a: *mut jl_array_t) -> *mut ::std::os::raw::c_char;
@@ -6454,7 +6197,7 @@ extern "C" {
     pub fn jl_subtype(a: *mut jl_value_t, b: *mut jl_value_t) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn jl_egal(a: *const jl_value_t, b: *const jl_value_t) -> ::std::os::raw::c_int;
+    pub fn jl_egal(a: *mut jl_value_t, b: *mut jl_value_t) -> ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn jl_object_id(v: *mut jl_value_t) -> usize;
@@ -6708,10 +6451,10 @@ extern "C" {
     pub fn jl_exception_occurred() -> *mut jl_value_t;
 }
 extern "C" {
-    pub fn jl_init();
+    pub fn jl_init__threading();
 }
 extern "C" {
-    pub fn jl_init_with_image(
+    pub fn jl_init_with_image__threading(
         julia_bindir: *const ::std::os::raw::c_char,
         image_relative_path: *const ::std::os::raw::c_char,
     );
@@ -6877,7 +6620,7 @@ fn bindgen_test_layout__jl_handler_t() {
 }
 pub type jl_handler_t = _jl_handler_t;
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct _jl_task_t {
     pub next: *mut jl_value_t,
     pub queue: *mut jl_value_t,
@@ -6886,73 +6629,25 @@ pub struct _jl_task_t {
     pub result: *mut jl_value_t,
     pub logstate: *mut jl_value_t,
     pub start: *mut jl_function_t,
-    pub rngState0: u64,
-    pub rngState1: u64,
-    pub rngState2: u64,
-    pub rngState3: u64,
     pub _state: u8,
     pub sticky: u8,
     pub _isexception: u8,
     pub tid: i16,
     pub prio: i16,
-    pub gcstack: *mut jl_gcframe_t,
-    pub world_age: usize,
-    pub ptls: *mut jl_tls_states_t,
     pub excstack: *mut jl_excstack_t,
     pub eh: *mut jl_handler_t,
-    pub __bindgen_anon_1: _jl_task_t__bindgen_ty_1,
+    pub ctx: jl_ucontext_t,
     pub stkbuf: *mut ::std::os::raw::c_void,
     pub bufsz: usize,
     pub _bitfield_align_1: [u32; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 4usize]>,
-    pub __bindgen_padding_0: u32,
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union _jl_task_t__bindgen_ty_1 {
-    pub ctx: jl_ucontext_t,
-    pub copy_stack_ctx: jl_stack_context_t,
-}
-#[test]
-fn bindgen_test_layout__jl_task_t__bindgen_ty_1() {
-    assert_eq!(
-        ::std::mem::size_of::<_jl_task_t__bindgen_ty_1>(),
-        200usize,
-        concat!("Size of: ", stringify!(_jl_task_t__bindgen_ty_1))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<_jl_task_t__bindgen_ty_1>(),
-        8usize,
-        concat!("Alignment of ", stringify!(_jl_task_t__bindgen_ty_1))
-    );
-    assert_eq!(
-        unsafe { &(*(::std::ptr::null::<_jl_task_t__bindgen_ty_1>())).ctx as *const _ as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(_jl_task_t__bindgen_ty_1),
-            "::",
-            stringify!(ctx)
-        )
-    );
-    assert_eq!(
-        unsafe {
-            &(*(::std::ptr::null::<_jl_task_t__bindgen_ty_1>())).copy_stack_ctx as *const _ as usize
-        },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(_jl_task_t__bindgen_ty_1),
-            "::",
-            stringify!(copy_stack_ctx)
-        )
-    );
+    pub gcstack: *mut jl_gcframe_t,
 }
 #[test]
 fn bindgen_test_layout__jl_task_t() {
     assert_eq!(
         ::std::mem::size_of::<_jl_task_t>(),
-        360usize,
+        312usize,
         concat!("Size of: ", stringify!(_jl_task_t))
     );
     assert_eq!(
@@ -7031,48 +6726,8 @@ fn bindgen_test_layout__jl_task_t() {
         )
     );
     assert_eq!(
-        unsafe { &(*(::std::ptr::null::<_jl_task_t>())).rngState0 as *const _ as usize },
-        56usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(_jl_task_t),
-            "::",
-            stringify!(rngState0)
-        )
-    );
-    assert_eq!(
-        unsafe { &(*(::std::ptr::null::<_jl_task_t>())).rngState1 as *const _ as usize },
-        64usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(_jl_task_t),
-            "::",
-            stringify!(rngState1)
-        )
-    );
-    assert_eq!(
-        unsafe { &(*(::std::ptr::null::<_jl_task_t>())).rngState2 as *const _ as usize },
-        72usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(_jl_task_t),
-            "::",
-            stringify!(rngState2)
-        )
-    );
-    assert_eq!(
-        unsafe { &(*(::std::ptr::null::<_jl_task_t>())).rngState3 as *const _ as usize },
-        80usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(_jl_task_t),
-            "::",
-            stringify!(rngState3)
-        )
-    );
-    assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_task_t>()))._state as *const _ as usize },
-        88usize,
+        56usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_task_t),
@@ -7082,7 +6737,7 @@ fn bindgen_test_layout__jl_task_t() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_task_t>())).sticky as *const _ as usize },
-        89usize,
+        57usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_task_t),
@@ -7092,7 +6747,7 @@ fn bindgen_test_layout__jl_task_t() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_task_t>()))._isexception as *const _ as usize },
-        90usize,
+        58usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_task_t),
@@ -7102,7 +6757,7 @@ fn bindgen_test_layout__jl_task_t() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_task_t>())).tid as *const _ as usize },
-        92usize,
+        60usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_task_t),
@@ -7112,7 +6767,7 @@ fn bindgen_test_layout__jl_task_t() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_task_t>())).prio as *const _ as usize },
-        94usize,
+        62usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_task_t),
@@ -7121,38 +6776,8 @@ fn bindgen_test_layout__jl_task_t() {
         )
     );
     assert_eq!(
-        unsafe { &(*(::std::ptr::null::<_jl_task_t>())).gcstack as *const _ as usize },
-        96usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(_jl_task_t),
-            "::",
-            stringify!(gcstack)
-        )
-    );
-    assert_eq!(
-        unsafe { &(*(::std::ptr::null::<_jl_task_t>())).world_age as *const _ as usize },
-        104usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(_jl_task_t),
-            "::",
-            stringify!(world_age)
-        )
-    );
-    assert_eq!(
-        unsafe { &(*(::std::ptr::null::<_jl_task_t>())).ptls as *const _ as usize },
-        112usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(_jl_task_t),
-            "::",
-            stringify!(ptls)
-        )
-    );
-    assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_task_t>())).excstack as *const _ as usize },
-        120usize,
+        64usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_task_t),
@@ -7162,7 +6787,7 @@ fn bindgen_test_layout__jl_task_t() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_task_t>())).eh as *const _ as usize },
-        128usize,
+        72usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_task_t),
@@ -7171,8 +6796,18 @@ fn bindgen_test_layout__jl_task_t() {
         )
     );
     assert_eq!(
+        unsafe { &(*(::std::ptr::null::<_jl_task_t>())).ctx as *const _ as usize },
+        80usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_jl_task_t),
+            "::",
+            stringify!(ctx)
+        )
+    );
+    assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_task_t>())).stkbuf as *const _ as usize },
-        336usize,
+        280usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_task_t),
@@ -7182,12 +6817,22 @@ fn bindgen_test_layout__jl_task_t() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<_jl_task_t>())).bufsz as *const _ as usize },
-        344usize,
+        288usize,
         concat!(
             "Offset of field: ",
             stringify!(_jl_task_t),
             "::",
             stringify!(bufsz)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<_jl_task_t>())).gcstack as *const _ as usize },
+        304usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_jl_task_t),
+            "::",
+            stringify!(gcstack)
         )
     );
 }
@@ -7261,6 +6906,9 @@ extern "C" {
 }
 extern "C" {
     pub fn jl_git_commit() -> *const ::std::os::raw::c_char;
+}
+extern "C" {
+    pub fn jl_get_current_task() -> *mut jl_value_t;
 }
 pub const jlrs_result_tag_t_JLRS_RESULT_VOID: jlrs_result_tag_t = 0;
 pub const jlrs_result_tag_t_JLRS_RESULT_VALUE: jlrs_result_tag_t = 1;
