@@ -72,7 +72,7 @@ async fn main() {
     // Include the custom code our task needs.
     julia.include("MyModule.jl").await.unwrap();
 
-    // Create channels for each of the tasks. 
+    // Create channels for each of the tasks.
     let (sender1, receiver1) = tokio::sync::oneshot::channel();
     let (sender2, receiver2) = tokio::sync::oneshot::channel();
     let (sender3, receiver3) = tokio::sync::oneshot::channel();
@@ -80,31 +80,43 @@ async fn main() {
 
     // Send four tasks to the runtime.
     julia
-        .task(MyTask {
-            dims: 4,
-            iters: 100_000_000,
-        }, sender1)
+        .task(
+            MyTask {
+                dims: 4,
+                iters: 100_000_000,
+            },
+            sender1,
+        )
         .await;
 
     julia
-        .task(MyTask {
-            dims: 4,
-            iters: 200_000_000,
-        }, sender2)
+        .task(
+            MyTask {
+                dims: 4,
+                iters: 200_000_000,
+            },
+            sender2,
+        )
         .await;
 
     julia
-        .task(MyTask {
-            dims: 4,
-            iters: 300_000_000,
-        }, sender3)
+        .task(
+            MyTask {
+                dims: 4,
+                iters: 300_000_000,
+            },
+            sender3,
+        )
         .await;
 
     julia
-        .task(MyTask {
-            dims: 4,
-            iters: 400_000_000,
-        }, sender4)
+        .task(
+            MyTask {
+                dims: 4,
+                iters: 400_000_000,
+            },
+            sender4,
+        )
         .await;
 
     // Receive the results of the tasks.
@@ -120,5 +132,8 @@ async fn main() {
     // Dropping `julia` causes the runtime to shut down Julia and itself if it was the final
     // handle to the runtime.
     std::mem::drop(julia);
-    handle.await.expect("Julia exited with an error").expect("The Julia thread panicked");
+    handle
+        .await
+        .expect("Julia exited with an error")
+        .expect("The Julia thread panicked");
 }

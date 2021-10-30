@@ -53,6 +53,7 @@
 //! Windows can be found [on Microsoft's website]. After installing a Linux distribution, follow
 //! the installation instructions for Linux.
 //!
+//!
 //! # Using this crate
 //!
 //! The first thing you should do is `use` the [`prelude`]-module with an asterisk, this will
@@ -519,8 +520,7 @@ impl Julia {
             crate::extensions::pyplot::init_jlrs_py_plot(&mut *frame);
 
             Ok(())
-        })
-        .expect("Could not load Jlrs module");
+        })?;
 
         Ok(jl)
     }

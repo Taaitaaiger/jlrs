@@ -11,7 +11,7 @@ repository = "https://github.com/Taaitaaiger/jlrs"
 readme = "README.md"
 keywords = ["Julia", "math", "mathematics", "bindings", "ffi"]
 license = "MIT"
-edition = "2018"
+edition = "2021"
 
 [lib]
 proc-macro = true
