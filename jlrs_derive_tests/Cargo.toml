@@ -2,7 +2,7 @@
 name = "jlrs-derive-tests"
 version = "0.1.0"
 authors = ["Thomas van Doornmalen <thomas.vandoornmalen@gmail.com>"]
-edition = "2021"
+edition = "2018"
 
 [features]
 default = ["jlrs/jlrs-derive"]

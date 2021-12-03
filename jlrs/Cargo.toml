@@ -12,13 +12,13 @@ readme = "../README.md"
 keywords = ["Julia", "math", "mathematics", "bindings", "ffi"]
 categories = ["api-bindings", "mathematics"]
 license = "MIT"
-edition = "2021"
-
-[lib]
-doctest = false
+edition = "2018"
 
 [features]
 default = []
+sync = []
+ccall = []
+sync-rt = []
 debug = ["jl-sys/debug"]
 uv = ["jl-sys/uv"]
 async = ["futures", "crossbeam-channel", "async-trait"]
@@ -27,7 +27,10 @@ tokio-rt = ["async", "tokio"]
 jlrs-ndarray = ["ndarray"]
 f16 = ["half"]
 pyplot = []
-docs-rs = ["jl-sys/docs-rs", "uv", "async-std-rt", "async", "tokio", "f16", "jlrs-ndarray", "jlrs-derive", "docs"]
+docs-rs = [
+    "jl-sys/docs-rs", "uv", "async-std-rt", "async", "tokio", "f16", "jlrs-ndarray", 
+    "jlrs-derive", "sync-rt", "ccall", "docs"
+]
 docs = []
 lts = ["jl-sys/lts"]
 use-bindgen = ["jl-sys/use-bindgen"]

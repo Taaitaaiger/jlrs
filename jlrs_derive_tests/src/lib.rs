@@ -1,6 +1,7 @@
 mod impls;
 mod util;
 
+#[cfg(feature = "sync-rt")]
 #[cfg(test)]
 mod tests {
     use super::impls::*;

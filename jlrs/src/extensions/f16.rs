@@ -23,6 +23,7 @@ unsafe impl IntoJulia for f16 {
 }
 
 #[cfg(test)]
+#[cfg(feature = "sync-rt")]
 mod tests {
     use crate::prelude::*;
     use crate::util::JULIA;

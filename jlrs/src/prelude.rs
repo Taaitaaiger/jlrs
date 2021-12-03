@@ -5,7 +5,7 @@ pub use crate::{
     error::JlrsResult,
     layout::typecheck::Nothing,
     memory::{
-        frame::{Frame, GcFrame, NullFrame},
+        frame::{Frame, GcFrame},
         global::Global,
         scope::{Scope, ScopeExt},
     },
@@ -23,18 +23,25 @@ pub use crate::{
             Wrapper,
         },
     },
-    CCall, Julia,
 };
+
+#[cfg(feature = "sync-rt")]
+pub use crate::julia::Julia;
+
+#[cfg(feature = "ccall")]
+pub use crate::{ccall::CCall, memory::frame::NullFrame};
 
 #[cfg(feature = "jlrs-derive")]
 pub use jlrs_derive::*;
 
+#[cfg(any(feature = "tokio-rt", feature = "async-std-rt"))]
+pub use crate::extensions::multitask::AsyncJulia;
 #[cfg(feature = "async")]
 pub use crate::extensions::multitask::{
     async_frame::AsyncGcFrame,
     async_task::{AsyncTask, PersistentTask},
     call_async::CallAsync,
-    yield_task, AsyncJulia,
+    yield_task,
 };
 #[cfg(feature = "async")]
 pub use async_trait::async_trait;

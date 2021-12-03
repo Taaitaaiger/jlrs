@@ -144,9 +144,11 @@ pub trait Wrapper<'scope, 'data>: private::Wrapper<'scope, 'data> {
 
     /// Convert the wrapper to its error string, i.e. the string that is shown when calling
     /// `Base.showerror`. This string can contain ANSI color codes if this is enabled by calling
-    /// [`Julia::error_color`].
+    /// [`Julia::error_color`], [`AsyncJulia::error_color`], or [`AsyncJulia::try_error_color`], .
     ///
-    /// [`Julia::error_color`]: crate::Julia::error_color
+    /// [`Julia::error_color`]: crate::julia::Julia::error_color
+    /// [`AsyncJulia::error_color`]: crate::extensions::multitask::AsyncJulia::error_color
+    /// [`AsyncJulia::try_error_color`]: crate::extensions::multitask::AsyncJulia::try_error_color
     fn error_string(self) -> JlrsResult<String> {
         unsafe {
             let global = Global::new();

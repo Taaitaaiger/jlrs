@@ -57,8 +57,8 @@
 //! which can trigger a garbage collection cycle. Because an unrooted value exists which is likely
 //! unreachable, such a cycle can free the value that has just been created.
 //!
-//! [`Julia::scope`]: crate::Julia::scope
-//! [`Julia::scope_with_slots`]: crate::Julia::scope_with_slots
+//! [`Julia::scope`]: crate::julia::Julia::scope
+//! [`Julia::scope_with_slots`]: crate::julia::Julia::scope_with_slots
 
 use crate::{
     error::{JlrsResult, JuliaResult},

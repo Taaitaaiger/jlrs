@@ -1,13 +1,13 @@
 //! Run Julia in a separate thread and execute tasks in parallel.
 //!
 //! While the Julia C API can only be used from a single thread, it is possible to schedule
-//! multiple [`Task`]s to run in parallel. This doesn't work nicely with the sync runtime provided
-//! by [`Julia`] because the garbage collector is unable to run and async events in Julia aren't
-//! handled. The async runtime initializes Julia in a new thread and returns a handle,
-//! [`AsyncJulia`], that can be cloned and shared across threads; async events in Julia are handled
-//! periodically, which also allows the garbage collector to run.
+//! multiple Julia `Task`s to run in parallel. This doesn't work nicely with the sync runtime
+//! because the garbage collector is unable to run and events aren't handled. The async runtimes
+//! initialize Julia on a new thread and return a handle, [`AsyncJulia`], that can be cloned and
+//! shared across threads; async events in Julia are handled periodically, which also allows the
+//! garbage collector to run.
 //!
-//! In order to use the async runtime, either the `async-std-rt` or `tokio-rt` feature must be
+//! In order to use an async runtime, either the `async-std-rt` or `tokio-rt` feature must be
 //! enabled. If the first is enabled async-std is used, while the latter makes use of tokio. Julia
 //! must be started with three or more threads by setting the `JULIA_NUM_THREADS` environment
 //! variable. If this environment variable is not set it's set to `auto`, which starts Julia with
@@ -54,17 +54,18 @@
 //! the task using its handle.
 //!
 //! Examples that show how to use the async runtime and implement tasks can be found in the
-//! [`examples`] directory of the repository.
+//! [crate-level docs] and [`examples`] directory of the repository.
 //!
 //! [`examples`]: https://github.com/Taaitaaiger/jlrs/tree/master/examples
-//! [`Julia`]: crate::Julia
-//! [`Julia::scope`]: crate::Julia::scope
+//! [`Julia`]: crate::julia::Julia
+//! [`Julia::scope`]: crate::julia::Julia::scope
 //! [`AsyncGcFrame`]: crate::extensions::multitask::async_frame::AsyncGcFrame
 //! [`CallAsync`]: crate::extensions::multitask::call_async::CallAsync
 //! [`PersistentTask`]: crate::extensions::multitask::async_task::PersistentTask
 //! [`AsyncTask`]: crate::extensions::multitask::async_task::AsyncTask
 //! [`AsyncTask::run`]: crate::extensions::multitask::async_task::AsyncTask::run
 //! [`Task`]: crate::wrappers::ptr::task::Task
+//! [crate-level docs]: crate
 
 pub mod async_frame;
 pub mod async_task;
@@ -86,7 +87,7 @@ use crate::{
     info::Info,
     init_jlrs,
     memory::{frame::GcFrame, global::Global, stack_page::StackPage},
-    wrappers::ptr::{call::Call, module::Module, string::JuliaString, value::Value, Wrapper},
+    wrappers::ptr::{call::Call, module::Module, string::JuliaString, value::Value},
     INIT,
 };
 use jl_sys::{

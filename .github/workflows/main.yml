@@ -27,7 +27,7 @@ jobs:
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v1
         with:
-          version: '1.7-nightly'
+          version: '1.7'
 
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v1
@@ -44,7 +44,50 @@ jobs:
         run: |
           export JULIA_DIR="$(dirname $(dirname $(which julia)))"
           export LD_LIBRARY_PATH="${JULIA_DIR}/lib:${LD_LIBRARY_PATH}"
-          cargo test --features tokio-rt,jlrs-ndarray,f16,jlrs-derive --verbose -- --test-threads=1
+          cargo test --features tokio-rt,jlrs-ndarray,f16,jlrs-derive,sync-rt,ccall --verbose -- --test-threads=1
+
+      - name: Run async-std async tests
+        run: |
+          export JULIA_DIR="$(dirname $(dirname $(which julia)))"
+          export LD_LIBRARY_PATH="${JULIA_DIR}/lib:${LD_LIBRARY_PATH}"
+          cargo test --package jlrs-async-tests --features jlrs/async-std-rt -- --test-threads=1
+
+  test-linux:
+    env:
+      JULIA_NUM_THREADS: 3
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.allow-fail }}
+    strategy:
+      matrix:
+        rust: [stable, beta]
+        allow-fail: [false]
+        include:
+          - rust: nightly
+            allow-fail: true
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup Julia environment
+        uses: julia-actions/setup-julia@v1
+        with:
+          version: '1.6'
+
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v1
+        with:
+          version: "12.0"
+          directory: ${{ runner.temp }}/llvm
+
+      - name: rust-toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.rust }}
+
+      - name: Run tests
+        run: |
+          export JULIA_DIR="$(dirname $(dirname $(which julia)))"
+          export LD_LIBRARY_PATH="${JULIA_DIR}/lib:${LD_LIBRARY_PATH}"
+          cargo test --features tokio-rt,jlrs-ndarray,f16,jlrs-derive,lts,sync-rt,ccall --verbose -- --test-threads=1
 
       - name: Run async-std async tests
         run: |

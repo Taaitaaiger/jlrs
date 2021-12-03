@@ -2,12 +2,16 @@
 // initialized once. Note that tests that involve calling Julia functions must always be
 // executed with `cargo test -- --test-threads=1`.
 
-use jlrs::{wrappers::ptr::value::Value, Julia};
+#[cfg(feature = "sync-rt")]
+use jlrs::{julia::Julia, wrappers::ptr::value::Value};
+#[cfg(feature = "sync-rt")]
 use std::cell::RefCell;
 
+#[cfg(feature = "sync-rt")]
 static JLRS_TESTS_JL: &'static str = include_str!("JlrsTests.jl");
+#[cfg(feature = "sync-rt")]
 thread_local! {
-    #[doc(hidden)]
+#[doc(hidden)]
     pub static JULIA: RefCell<Julia> = {
         let r = RefCell::new(unsafe { Julia::init().unwrap() });
         r.borrow_mut().scope_with_slots(1, |_, frame| unsafe {

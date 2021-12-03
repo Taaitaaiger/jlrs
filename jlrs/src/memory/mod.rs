@@ -31,8 +31,8 @@
 //!
 //! More informaton can be found in the [`frame`] and [`scope`] modules.
 //!
-//! [`Julia::scope`]: crate::Julia::scope
-//! [`Julia::scope_with_slots`]: crate::Julia::scope_with_slots
+//! [`Julia::scope`]: crate::julia::Julia::scope
+//! [`Julia::scope_with_slots`]: crate::julia::Julia::scope_with_slots
 //! [`Global`]: global::Global
 //! [`GcFrame`]: frame::GcFrame
 //! [`Scope`]: scope::Scope

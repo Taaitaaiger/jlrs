@@ -32,13 +32,17 @@
 //! [`ScopeExt::scope`]: crate::memory::scope::ScopeExt::scope
 
 use super::{mode::Mode, reusable_slot::ReusableSlot, stack_page::StackPage};
-use crate::{
-    error::{JlrsError, JlrsResult},
-    private::Private,
-    CCall,
-};
+#[cfg(feature = "ccall")]
+use crate::error::JlrsError;
+use crate::{error::JlrsResult, private::Private};
+
+#[cfg(feature = "ccall")]
+use crate::ccall::CCall;
+
 use jl_sys::{jl_get_current_task, jl_task_t, jl_value_t};
-use std::{cell::Cell, ffi::c_void, marker::PhantomData, ptr::NonNull};
+#[cfg(feature = "ccall")]
+use std::marker::PhantomData;
+use std::{cell::Cell, ffi::c_void, ptr::NonNull};
 
 pub(crate) const MIN_FRAME_CAPACITY: usize = 16;
 
@@ -131,8 +135,10 @@ impl<'frame, M: Mode> Drop for GcFrame<'frame, M> {
 /// A `NullFrame` can be used if you call Rust from Julia through `ccall` and want to borrow array
 /// data but not perform any allocations. It can't be used to created a nested scope or root a
 /// newly allocated value. If you try to do so a `JlrsError::NullFrame` is returned.
+#[cfg(feature = "ccall")]
 pub struct NullFrame<'frame>(PhantomData<&'frame ()>);
 
+#[cfg(feature = "ccall")]
 impl<'frame> NullFrame<'frame> {
     pub(crate) unsafe fn new(_: &'frame mut CCall) -> Self {
         NullFrame(PhantomData)
@@ -172,6 +178,7 @@ impl<'frame, M: Mode> Frame<'frame> for GcFrame<'frame, M> {
     }
 }
 
+#[cfg(feature = "ccall")]
 impl<'frame> Frame<'frame> for NullFrame<'frame> {
     fn reusable_slot(&mut self) -> JlrsResult<ReusableSlot<'frame>> {
         Err(JlrsError::NullFrame)?
@@ -193,8 +200,11 @@ pub(crate) mod private {
     };
 
     use crate::memory::frame::GcFrame;
+    #[cfg(feature = "ccall")]
     use crate::memory::frame::NullFrame;
-    use crate::memory::mode::{Mode, Sync};
+    use crate::memory::mode::Mode;
+    #[cfg(feature = "ccall")]
+    use crate::memory::mode::Sync;
     use crate::memory::root_pending::RootPending;
     use crate::wrappers::ptr::private::Wrapper;
     use crate::wrappers::ptr::value::Value;
@@ -422,6 +432,7 @@ pub(crate) mod private {
         }
     }
 
+    #[cfg(feature = "ccall")]
     impl<'frame> Frame<'frame> for NullFrame<'frame> {
         type Mode = Sync;
 
@@ -529,6 +540,7 @@ pub(crate) mod private {
 }
 
 #[cfg(test)]
+#[cfg(feature = "sync-rt")]
 mod tests {
     use crate::{
         memory::{frame::GcFrame, mode, stack_page::StackPage},

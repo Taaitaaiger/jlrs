@@ -4,12 +4,11 @@
 //! two categories: tasks that can be called once implement [`AsyncTask`], tasks that can be
 //! called multiple times implement [`PersistentTask`].
 //!
-//! Both of these traits require that you implement an async `run` method. This method essentially
-//! replaces the closures of the sync runtime. Rather than a mutable reference to a [`GcFrame`] it
-//! takes a mutable reference to an [`AsyncGcFrame`]. This frame type provides the same
-//! functionality as `GcFrame`, and can be used in combination with several async methods. Most
-//! importantly, the methods of the trait [`CallAsync`] which let you schedule a Julia function
-//! call as a new Julia task and await its completion.
+//! Both of these traits require that you implement one or more async methods. Rather than a
+//! mutable reference to a [`GcFrame`] they take a mutable reference to an [`AsyncGcFrame`].
+//! This frame type provides the same functionality as `GcFrame`, and can be used in combination
+//! with several async methods. Most importantly, the methods of the trait [`CallAsync`] which let
+//! you schedule a Julia function call as a new Julia task and await its completion.
 //!
 //! [`GcFrame`]: crate::memory::frame::GcFrame
 //! [`CallAsync`]: crate::extensions::multitask::call_async::CallAsync
@@ -154,7 +153,7 @@ pub trait PersistentTask: 'static + Send + Sync {
     }
 }
 
-pub struct PersistentMessage<GT>
+pub(crate) struct PersistentMessage<GT>
 where
     GT: PersistentTask,
 {

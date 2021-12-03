@@ -1,6 +1,5 @@
-#[cfg(not(feature = "lts"))]
 mod util;
-#[cfg(not(feature = "lts"))]
+#[cfg(all(not(feature = "lts"), feature = "sync-rt"))]
 mod not_lts {
     use super::util::JULIA;
     use jlrs::layout::valid_layout::ValidLayout;

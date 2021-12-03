@@ -1,4 +1,4 @@
-use crate::Julia;
+use crate::julia::Julia;
 use std::cell::RefCell;
 
 thread_local! {

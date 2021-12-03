@@ -31,8 +31,8 @@ use super::private::Wrapper;
 
 /// Functionality in Julia can be accessed through its module system. You can get a handle to the
 /// three standard modules, `Main`, `Base`, and `Core` and access their submodules through them.
-/// If you include your own Julia code with [`Julia::include`], its contents are made available
-/// relative to `Main`.
+/// If you include your own Julia code with [`Julia::include`], [`AsyncJulia::include`], or
+/// [`AsyncJulia::try_include`] its contents are made available relative to `Main`.
 ///
 /// The most important methods offered by this wrapper are those that let you access submodules,
 /// functions, and other global values defined in the module. These come in two variants: one that
@@ -40,7 +40,9 @@ use super::private::Wrapper;
 /// named functions, constants and submodules unrooted when you use them from Rust. The same holds
 /// true for other global values that are never redefined to point at another value.
 ///
-/// [`Julia::include`]: crate::Julia::include
+/// [`Julia::include`]: crate::julia::Julia::include
+/// [`AsyncJulia::include`]: crate::extensions::multitask::AsyncJulia::include
+/// [`AsyncJulia::try_include`]: crate::extensions::multitask::AsyncJulia::try_include
 #[derive(Copy, Clone)]
 #[repr(transparent)]
 pub struct Module<'scope>(NonNull<jl_module_t>, PhantomData<&'scope ()>);
@@ -79,11 +81,13 @@ impl<'scope> Module<'scope> {
         Module::wrap(self.unwrap(Private), Private)
     }
 
-    /// Returns a handle to Julia's `Main`-module. If you include your own Julia code by calling
-    /// [`Julia::include`], handles to functions, globals, and submodules defined in these
-    /// included files are available through this module.
+    /// Returns a handle to Julia's `Main`-module. If you include your own Julia code with
+    /// [`Julia::include`], [`AsyncJulia::include`], or [`AsyncJulia::try_include`] its contents
+    ///  are made available relative to `Main`.
     ///
-    /// [`Julia::include`]: crate::Julia::include
+    /// [`Julia::include`]: crate::julia::Julia::include
+    /// [`AsyncJulia::include`]: crate::extensions::multitask::AsyncJulia::include
+    /// [`AsyncJulia::try_include`]: crate::extensions::multitask::AsyncJulia::try_include
     pub fn main(_: Global<'scope>) -> Self {
         unsafe { Module::wrap(jl_main_module, Private) }
     }
