@@ -2,7 +2,7 @@ use crate::memory::output::OutputResult;
 use jl_sys::jl_value_t;
 use std::ptr::NonNull;
 
-pub(super) trait OutputResultExt {
+pub(crate) trait OutputResultExt {
     fn unwrap_non_null(self) -> NonNull<jl_value_t>;
 }
 

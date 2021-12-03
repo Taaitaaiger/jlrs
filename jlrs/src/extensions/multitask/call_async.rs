@@ -1,6 +1,6 @@
 //! Create, schedule and `await` Julia `Task`s.
 
-use super::{async_frame::AsyncGcFrame, julia_future::JuliaFuture};
+use super::{async_frame::AsyncGcFrame, julia_future::JuliaFuture, yield_task};
 use crate::{
     error::{JlrsResult, JuliaResult},
     memory::scope::Scope,
@@ -158,7 +158,7 @@ impl<'data> CallAsync<'data> for Value<'_, 'data> {
             .wrapper_unchecked()
             .call(&mut *frame, &mut vals)?;
 
-        crate::extensions::multitask::yield_task(frame);
+        yield_task(frame);
 
         match task {
             Ok(t) => Ok(Ok(t.cast_unchecked::<Task>())),
@@ -199,7 +199,7 @@ impl<'data> CallAsync<'data> for Value<'_, 'data> {
             .wrapper_unchecked()
             .call(&mut *frame, &mut vals)?;
 
-        crate::extensions::multitask::yield_task(frame);
+        yield_task(frame);
 
         match task {
             Ok(t) => Ok(Ok(t.cast_unchecked::<Task>())),
@@ -240,7 +240,7 @@ impl<'data> CallAsync<'data> for Value<'_, 'data> {
             .wrapper_unchecked()
             .call(&mut *frame, &mut vals)?;
 
-        crate::extensions::multitask::yield_task(frame);
+        yield_task(frame);
 
         match task {
             Ok(t) => Ok(Ok(t.cast_unchecked::<Task>())),
@@ -354,7 +354,7 @@ impl<'data> CallAsync<'data> for WithKeywords<'_, 'data> {
             .with_keywords(self.keywords())?
             .call(&mut *frame, &mut vals)?;
 
-        crate::extensions::multitask::yield_task(frame);
+        yield_task(frame);
 
         match task {
             Ok(t) => Ok(Ok(t.cast_unchecked::<Task>())),
@@ -396,7 +396,7 @@ impl<'data> CallAsync<'data> for WithKeywords<'_, 'data> {
             .with_keywords(self.keywords())?
             .call(&mut *frame, &mut vals)?;
 
-        crate::extensions::multitask::yield_task(frame);
+        yield_task(frame);
 
         match task {
             Ok(t) => Ok(Ok(t.cast_unchecked::<Task>())),
@@ -438,7 +438,7 @@ impl<'data> CallAsync<'data> for WithKeywords<'_, 'data> {
             .with_keywords(self.keywords())?
             .call(&mut *frame, &mut vals)?;
 
-        crate::extensions::multitask::yield_task(frame);
+        yield_task(frame);
 
         match task {
             Ok(t) => Ok(Ok(t.cast_unchecked::<Task>())),

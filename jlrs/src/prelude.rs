@@ -35,7 +35,7 @@ pub use crate::{ccall::CCall, memory::frame::NullFrame};
 pub use jlrs_derive::*;
 
 #[cfg(any(feature = "tokio-rt", feature = "async-std-rt"))]
-pub use crate::extensions::multitask::AsyncJulia;
+pub use crate::extensions::multitask::runtime::AsyncJulia;
 #[cfg(feature = "async")]
 pub use crate::extensions::multitask::{
     async_frame::AsyncGcFrame,

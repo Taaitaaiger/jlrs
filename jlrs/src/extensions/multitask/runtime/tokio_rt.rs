@@ -1,4 +1,4 @@
-use crate::extensions::multitask::async_task::PersistentMessage;
+use crate::extensions::multitask::async_task::internal::PersistentMessage;
 use crate::extensions::multitask::result_sender::ResultSender;
 use async_trait::async_trait;
 use futures::Future;

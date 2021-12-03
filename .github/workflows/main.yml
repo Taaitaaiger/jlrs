@@ -29,12 +29,6 @@ jobs:
         with:
           version: '1.7'
 
-      - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v1
-        with:
-          version: "12.0"
-          directory: ${{ runner.temp }}/llvm
-
       - name: rust-toolchain
         uses: actions-rs/toolchain@v1
         with:
@@ -72,12 +66,6 @@ jobs:
         with:
           version: '1.6'
 
-      - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v1
-        with:
-          version: "12.0"
-          directory: ${{ runner.temp }}/llvm
-
       - name: rust-toolchain
         uses: actions-rs/toolchain@v1
         with:
@@ -105,12 +93,6 @@ jobs:
         uses: julia-actions/setup-julia@v1
         with:
           version: '1.7-nightly'
-
-      - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v1
-        with:
-          version: "12.0"
-          directory: ${{ runner.temp }}/llvm
 
       - name: rust-toolchain
         uses: actions-rs/toolchain@v1

@@ -76,14 +76,17 @@
 //!   `Task`, which is returned as a `Future` that resolves when this task has completed.
 //!
 //! If you're writing a library, either one that will be called from Julia or one that will be
-//! used by an application that embeds Julia, no runtime is required. There is one exception,
-//! it's currently not possible to write a library that uses jlrs's async capabilities without
-//! picking a runtime.
+//! used by an application that embeds Julia, no runtime is required.
 //!
 //! In addition to these runtimes, the following utility features are available:
 //!
 //! - `lts`
 //!   Use the current LTS version of Julia (1.6) instead of the current stable version (1.7).
+//!
+//! - `async`
+//!   Enable the features of the async runtime which don't depend on the backing runtime. This
+//!   can be used in libraries which provide implementations of tasks that an async runtime can
+//!   execute.
 //!
 //! - `jlrs-derive`
 //!   This features should be used in combination with the JlrsReflect.jl package. This package

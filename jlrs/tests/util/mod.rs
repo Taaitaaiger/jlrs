@@ -8,10 +8,12 @@ use jlrs::{julia::Julia, wrappers::ptr::value::Value};
 use std::cell::RefCell;
 
 #[cfg(feature = "sync-rt")]
+#[allow(dead_code)]
 static JLRS_TESTS_JL: &'static str = include_str!("JlrsTests.jl");
-#[cfg(feature = "sync-rt")]
+
 thread_local! {
-#[doc(hidden)]
+    #[cfg(feature = "sync-rt")]
+    #[doc(hidden)]
     pub static JULIA: RefCell<Julia> = {
         let r = RefCell::new(unsafe { Julia::init().unwrap() });
         r.borrow_mut().scope_with_slots(1, |_, frame| unsafe {
