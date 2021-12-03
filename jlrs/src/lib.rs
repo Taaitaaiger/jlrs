@@ -530,8 +530,8 @@
 //! [`Julia::scope`]: crate::julia::Julia::scope
 //! [`Julia::scope_with_slots`]: crate::julia::Julia::scope_with_slots
 //! [`Julia::init`]: crate::julia::Julia::init
-//! [`AsyncJulia::init`]: crate::extensions::multitask::AsyncJulia::init
-//! [`AsyncJulia::init_async`]: crate::extensions::multitask::AsyncJulia::init_async
+//! [`AsyncJulia::init`]: crate::extensions::multitask::runtime::AsyncJulia::init
+//! [`AsyncJulia::init_async`]: crate::extensions::multitask::runtime::AsyncJulia::init_async
 //! [`Julia::init_with_image`]: crate::julia::Julia::init_with_image
 //! [`CCall`]: crate::ccall::CCall
 //! [`CCall::uv_async_send`]: crate::ccall::CCall::uv_async_send
@@ -550,8 +550,8 @@
 //! [`Module::function`]: crate::wrappers::ptr::module::Module::function
 //! [`Module::global`]: crate::wrappers::ptr::module::Module::global
 //! [`Module::submodule`]: crate::wrappers::ptr::module::Module::submodule
-//! [`AsyncJulia::init_with_image`]: crate::extensions::multitask::AsyncJulia::init_with_image
-//! [`AsyncJulia::init_with_image_async`]: crate::extensions::multitask::AsyncJulia::init_with_image_async
+//! [`AsyncJulia::init_with_image`]: crate::extensions::multitask::runtime::AsyncJulia::init_with_image
+//! [`AsyncJulia::init_with_image_async`]: crate::extensions::multitask::runtime::AsyncJulia::init_with_image_async
 //! [`IntoJulia`]: crate::convert::into_julia::IntoJulia
 //! [`Typecheck`]: crate::layout::typecheck::Typecheck
 //! [`ValidLayout`]: crate::layout::valid_layout::ValidLayout
@@ -562,7 +562,7 @@
 //! [`AsyncTask`]: crate::extensions::multitask::async_task::AsyncTask
 //! [`PersistentTask`]: crate::extensions::multitask::async_task::PersistentTask
 //! [`PersistentHandle`]: crate::extensions::multitask::async_task::PersistentHandle
-//! [`AsyncJulia`]: crate::extensions::multitask::AsyncJulia
+//! [`AsyncJulia`]: crate::extensions::multitask::runtime::AsyncJulia
 //! [`CallAsync`]: crate::extensions::multitask::call_async::CallAsync
 //! [`DataType`]: crate::wrappers::ptr::datatype::DataType
 //! [`TypedArray`]: crate::wrappers::ptr::array::TypedArray

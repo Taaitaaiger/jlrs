@@ -58,11 +58,17 @@
 //!
 //! [`examples`]: https://github.com/Taaitaaiger/jlrs/tree/master/examples
 //! [`Julia`]: crate::julia::Julia
+//! [`Global`]: crate::memory::global::Global
+//! [`GcFrame`]: crate::memory::frame::GcFrame
+//! [`JlrsResult`]: crate::error::JlrsResult
+//! [`Call`]: crate::wrappers::ptr::call::Call
+//! [`ResultSender`]: crate::extensions::multitask::result_sender::ResultSender
 //! [`Julia::scope`]: crate::julia::Julia::scope
 //! [`AsyncGcFrame`]: crate::extensions::multitask::async_frame::AsyncGcFrame
 //! [`CallAsync`]: crate::extensions::multitask::call_async::CallAsync
 //! [`PersistentTask`]: crate::extensions::multitask::async_task::PersistentTask
 //! [`AsyncTask`]: crate::extensions::multitask::async_task::AsyncTask
+//! [`AsyncJulia`]: crate::extensions::multitask::runtime::AsyncJulia
 //! [`AsyncTask::run`]: crate::extensions::multitask::async_task::AsyncTask::run
 //! [`Task`]: crate::wrappers::ptr::task::Task
 //! [crate-level docs]: crate

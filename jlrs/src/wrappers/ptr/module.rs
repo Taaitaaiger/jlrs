@@ -41,8 +41,8 @@ use super::private::Wrapper;
 /// true for other global values that are never redefined to point at another value.
 ///
 /// [`Julia::include`]: crate::julia::Julia::include
-/// [`AsyncJulia::include`]: crate::extensions::multitask::AsyncJulia::include
-/// [`AsyncJulia::try_include`]: crate::extensions::multitask::AsyncJulia::try_include
+/// [`AsyncJulia::include`]: crate::extensions::multitask::runtime::AsyncJulia::include
+/// [`AsyncJulia::try_include`]: crate::extensions::multitask::runtime::AsyncJulia::try_include
 #[derive(Copy, Clone)]
 #[repr(transparent)]
 pub struct Module<'scope>(NonNull<jl_module_t>, PhantomData<&'scope ()>);
@@ -86,8 +86,8 @@ impl<'scope> Module<'scope> {
     ///  are made available relative to `Main`.
     ///
     /// [`Julia::include`]: crate::julia::Julia::include
-    /// [`AsyncJulia::include`]: crate::extensions::multitask::AsyncJulia::include
-    /// [`AsyncJulia::try_include`]: crate::extensions::multitask::AsyncJulia::try_include
+    /// [`AsyncJulia::include`]: crate::extensions::multitask::runtime::AsyncJulia::include
+    /// [`AsyncJulia::try_include`]: crate::extensions::multitask::runtime::AsyncJulia::try_include
     pub fn main(_: Global<'scope>) -> Self {
         unsafe { Module::wrap(jl_main_module, Private) }
     }

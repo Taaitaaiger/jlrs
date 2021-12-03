@@ -20,6 +20,7 @@ pub(crate) struct Tokio {
 }
 
 impl Tokio {
+    #[allow(dead_code)]
     pub(crate) fn new() -> Self {
         let runtime = Builder::new_current_thread()
             .thread_name("jlrs-tokio-runtime")
@@ -33,6 +34,7 @@ impl Tokio {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn block_on<F, T>(&self, future: F) -> T
     where
         F: Future<Output = T>,
@@ -41,12 +43,14 @@ impl Tokio {
     }
 }
 
+#[allow(dead_code)]
 pub(crate) enum MaybeUnboundedSender<T> {
     Bounded(MpscSender<T>),
     Unbounded(UnboundedMpscSender<T>),
 }
 
 impl<T> MaybeUnboundedSender<T> {
+    #[allow(dead_code)]
     pub(crate) async fn send(&self, msg: T) -> Result<(), tokio::sync::mpsc::error::SendError<T>> {
         match self {
             MaybeUnboundedSender::Bounded(b) => match b.send(msg).await {
@@ -60,6 +64,7 @@ impl<T> MaybeUnboundedSender<T> {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn try_send(&self, msg: T) -> Result<(), tokio::sync::mpsc::error::TrySendError<T>> {
         match self {
             MaybeUnboundedSender::Bounded(b) => match b.try_send(msg) {
@@ -76,12 +81,14 @@ impl<T> MaybeUnboundedSender<T> {
     }
 }
 
+#[allow(dead_code)]
 pub(crate) enum MaybeUnboundedReceiver<T> {
     Bounded(MpscReceiver<T>),
     Unbounded(UnboundedMpscReceiver<T>),
 }
 
 impl<T> MaybeUnboundedReceiver<T> {
+    #[allow(dead_code)]
     pub(crate) async fn recv(&mut self) -> Option<T> {
         match self {
             MaybeUnboundedReceiver::Bounded(b) => b.recv().await,
@@ -139,6 +146,7 @@ impl<T: 'static + Send> ResultSender<T> for BroadcastSender<T> {
     }
 }
 
+#[allow(dead_code)]
 pub(crate) fn channel<T>(cap: usize) -> (MaybeUnboundedSender<T>, MaybeUnboundedReceiver<T>) {
     if cap == 0 {
         let (s, r) = unbounded_channel();
@@ -155,8 +163,10 @@ pub(crate) fn channel<T>(cap: usize) -> (MaybeUnboundedSender<T>, MaybeUnbounded
     }
 }
 
+#[allow(dead_code)]
 pub(crate) fn oneshot_channel<T>() -> (OneshotSender<T>, OneshotReceiver<T>) {
     tokio::sync::oneshot::channel()
 }
 
+#[allow(dead_code)]
 pub(crate) type HandleSender<GT> = Arc<MaybeUnboundedSender<PersistentMessage<GT>>>;

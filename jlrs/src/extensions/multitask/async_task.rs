@@ -23,8 +23,8 @@ use async_trait::async_trait;
 /// A task that returns once. In order to schedule the task you must use [`AsyncJulia::task`] or
 /// [`AsyncJulia::try_task`].
 ///
-/// [`AsyncJulia::task`]: crate::extensions::multitask::AsyncJulia::task
-/// [`AsyncJulia::try_task`]: crate::extensions::multitask::AsyncJulia::try_task
+/// [`AsyncJulia::task`]: crate::extensions::multitask::runtime::AsyncJulia::task
+/// [`AsyncJulia::try_task`]: crate::extensions::multitask::runtime::AsyncJulia::try_task
 #[async_trait(?Send)]
 pub trait AsyncTask: 'static + Send + Sync {
     /// The type of the result which is returned if `run` completes successfully.
@@ -41,8 +41,8 @@ pub trait AsyncTask: 'static + Send + Sync {
     /// can be implemented to take care of everything required to execute the task successfully,
     /// like loading packages.
     ///
-    /// [`AsyncJulia::register_task`]: crate::extensions::multitask::AsyncJulia::register_task
-    /// [`AsyncJulia::try_register_task`]: crate::extensions::multitask::AsyncJulia::try_register_task
+    /// [`AsyncJulia::register_task`]: crate::extensions::multitask::runtime::AsyncJulia::register_task
+    /// [`AsyncJulia::try_register_task`]: crate::extensions::multitask::runtime::AsyncJulia::try_register_task
     async fn register<'frame>(
         _global: Global<'frame>,
         _frame: &mut AsyncGcFrame<'frame>,
@@ -62,8 +62,8 @@ pub trait AsyncTask: 'static + Send + Sync {
 /// A task that can be called multiple times. In order to schedule the task you must use
 /// [`AsyncJulia::persistent`] or [`AsyncJulia::try_persistent`].
 ///
-/// [`AsyncJulia::persistent`]: crate::extensions::multitask::AsyncJulia::persistent
-/// [`AsyncJulia::try_persistent`]: crate::extensions::multitask::AsyncJulia::try_persistent
+/// [`AsyncJulia::persistent`]: crate::extensions::multitask::runtime::AsyncJulia::persistent
+/// [`AsyncJulia::try_persistent`]: crate::extensions::multitask::runtime::AsyncJulia::try_persistent
 #[async_trait(?Send)]
 pub trait PersistentTask: 'static + Send + Sync {
     /// The type of the result which is returned if `init` completes successfully. This data is
@@ -81,6 +81,8 @@ pub trait PersistentTask: 'static + Send + Sync {
     /// persistent.
     ///
     /// If it's set to 0, the channel is unbounded.
+    ///
+    /// [`PersistentHandle`]: crate::extensions::multitask::runtime::PersistentHandle
     const CHANNEL_CAPACITY: usize = 0;
 
     /// The number of slots preallocated for the `AsyncGcFrame` provided to `register`.
@@ -100,8 +102,8 @@ pub trait PersistentTask: 'static + Send + Sync {
     /// method can be implemented to take care of everything required to execute the task
     /// successfully, like loading packages.
     ///
-    /// [`AsyncJulia::register_persistent`]: crate::extensions::multitask::AsyncJulia::register_persistent
-    /// [`AsyncJulia::try_register_persistent`]: crate::extensions::multitask::AsyncJulia::try_register_persistent
+    /// [`AsyncJulia::register_persistent`]: crate::extensions::multitask::runtime::AsyncJulia::register_persistent
+    /// [`AsyncJulia::try_register_persistent`]: crate::extensions::multitask::runtime::AsyncJulia::try_register_persistent
     async fn register<'frame>(
         _global: Global<'frame>,
         _frame: &mut AsyncGcFrame<'frame>,

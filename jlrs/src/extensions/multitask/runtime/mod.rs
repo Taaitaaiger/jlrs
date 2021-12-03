@@ -1,5 +1,5 @@
-use std::error::Error;
 use std::fmt;
+use std::{error::Error, marker::PhantomData};
 
 #[cfg(feature = "async-std-rt")]
 pub mod async_std_rt;
@@ -43,6 +43,7 @@ use crate::{
     error::{JlrsError, JlrsResult},
     extensions::multitask::{
         async_task::internal::{GenericBlockingTask, GenericPendingTask},
+        async_task::PersistentTask,
         mode::Async,
         result_sender::ResultSender,
     },
@@ -82,8 +83,7 @@ mod impl_async_std {
     use super::*;
     use crate::error::JlrsResult;
     use crate::extensions::multitask::async_task::internal::{
-        BlockingTask, PendingTask, Persistent, PersistentHandle, RegisterPersistent, RegisterTask,
-        Task,
+        BlockingTask, PendingTask, Persistent, RegisterPersistent, RegisterTask, Task,
     };
     use crate::extensions::multitask::async_task::{AsyncTask, PersistentTask};
     use async_std::{
@@ -125,7 +125,7 @@ mod impl_async_std {
         /// Safety: this method can race with other crates that try to initialize Julia at the same
         /// time.
         ///
-        /// [struct-level]: crate::extensions::multitask::AsyncJulia
+        /// [struct-level]: crate::extensions::multitask::runtime::AsyncJulia
         pub unsafe fn init(
             max_n_tasks: usize,
             channel_capacity: usize,
@@ -152,7 +152,7 @@ mod impl_async_std {
         /// Safety: this method can race with other crates that try to initialize Julia at the same
         /// time.
         ///
-        /// [struct-level]: crate::extensions::multitask::AsyncJulia
+        /// [struct-level]: crate::extensions::multitask::runtime::AsyncJulia
         pub async unsafe fn init_async(
             max_n_tasks: usize,
             channel_capacity: usize,
@@ -969,8 +969,7 @@ pub mod impl_tokio {
         TrySendError,
     };
     use super::super::async_task::internal::{
-        BlockingTask, PendingTask, Persistent, PersistentHandle, RegisterPersistent, RegisterTask,
-        Task,
+        BlockingTask, PendingTask, Persistent, RegisterPersistent, RegisterTask, Task,
     };
     use super::super::async_task::{AsyncTask, PersistentTask};
     use super::*;
@@ -1013,7 +1012,7 @@ pub mod impl_tokio {
         /// Safety: this method can race with other crates that try to initialize Julia at the same
         /// time.
         ///
-        /// [struct-level]: crate::extensions::multitask::AsyncJulia
+        /// [struct-level]: crate::extensions::multitask::runtime::AsyncJulia
         pub unsafe fn init(
             max_n_tasks: usize,
             channel_capacity: usize,
@@ -1040,7 +1039,7 @@ pub mod impl_tokio {
         /// Safety: this method can race with other crates that try to initialize Julia at the same
         /// time.
         ///
-        /// [struct-level]: crate::extensions::multitask::AsyncJulia
+        /// [struct-level]: crate::extensions::multitask::runtime::AsyncJulia
         pub async unsafe fn init_async(
             max_n_tasks: usize,
             channel_capacity: usize,
@@ -1900,3 +1899,68 @@ fn check_threads_var() -> JlrsResult<()> {
 
     Ok(())
 }
+
+#[cfg(feature = "async-std-rt")]
+use async_std_rt::HandleSender;
+#[cfg(feature = "tokio-rt")]
+use tokio_rt::HandleSender;
+
+use super::async_task::internal::{CallPersistentMessage, PersistentMessage};
+
+/// A handle to a [`PersistentTask`]. This handle can be used to call the task and shared
+/// across threads. The `PersistentTask` is dropped when its final handle has been dropped and all
+/// remaining pending calls have completed.
+#[derive(Clone)]
+pub struct PersistentHandle<GT>
+where
+    GT: PersistentTask,
+{
+    sender: HandleSender<GT>,
+}
+
+impl<GT> PersistentHandle<GT>
+where
+    GT: PersistentTask,
+{
+    pub(crate) fn new(sender: HandleSender<GT>) -> Self {
+        PersistentHandle { sender }
+    }
+
+    /// Call the task, this method waits until there's room available in the channel.
+    pub async fn call<R>(&self, input: GT::Input, sender: R)
+    where
+        R: ResultSender<JlrsResult<GT::Output>>,
+    {
+        self.sender
+            .send(PersistentMessage {
+                msg: Box::new(CallPersistentMessage {
+                    input: Some(input),
+                    sender,
+                    _marker: PhantomData,
+                }),
+            })
+            .await
+            .expect("Channel was closed")
+    }
+
+    /// Call the task, this method returns an error immediately if there's NO room available
+    /// in the channel.
+    pub fn try_call<R>(&self, input: GT::Input, sender: R) -> JlrsResult<()>
+    where
+        R: ResultSender<JlrsResult<GT::Output>>,
+    {
+        match self.sender.try_send(PersistentMessage {
+            msg: Box::new(CallPersistentMessage {
+                input: Some(input),
+                sender,
+                _marker: PhantomData,
+            }),
+        }) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(JlrsError::other(e))?,
+        }
+    }
+}
+
+// Ensure the handle can be shared across threads
+impl<GT: PersistentTask> RequireSendSync for PersistentHandle<GT> {}

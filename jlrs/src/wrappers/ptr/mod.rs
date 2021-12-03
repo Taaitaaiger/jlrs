@@ -147,8 +147,8 @@ pub trait Wrapper<'scope, 'data>: private::Wrapper<'scope, 'data> {
     /// [`Julia::error_color`], [`AsyncJulia::error_color`], or [`AsyncJulia::try_error_color`], .
     ///
     /// [`Julia::error_color`]: crate::julia::Julia::error_color
-    /// [`AsyncJulia::error_color`]: crate::extensions::multitask::AsyncJulia::error_color
-    /// [`AsyncJulia::try_error_color`]: crate::extensions::multitask::AsyncJulia::try_error_color
+    /// [`AsyncJulia::error_color`]: crate::extensions::multitask::runtime::AsyncJulia::error_color
+    /// [`AsyncJulia::try_error_color`]: crate::extensions::multitask::runtime::AsyncJulia::try_error_color
     fn error_string(self) -> JlrsResult<String> {
         unsafe {
             let global = Global::new();

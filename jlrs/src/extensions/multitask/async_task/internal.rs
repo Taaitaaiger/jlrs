@@ -7,13 +7,10 @@ use super::super::mode::Async;
 use super::super::result_sender::ResultSender;
 use super::AsyncTask;
 use super::PersistentTask;
-use crate::memory::frame::GcFrame;
 use crate::memory::global::Global;
 use crate::memory::stack_page::StackPage;
-use crate::{
-    error::{JlrsError, JlrsResult},
-    extensions::multitask::runtime::{AsyncStackPage, RequireSendSync},
-};
+use crate::{error::JlrsResult, extensions::multitask::runtime::AsyncStackPage};
+use crate::{extensions::multitask::runtime::PersistentHandle, memory::frame::GcFrame};
 use async_trait::async_trait;
 
 #[cfg(feature = "async-std-rt")]
@@ -25,7 +22,7 @@ pub(crate) struct PersistentMessage<GT>
 where
     GT: PersistentTask,
 {
-    msg: InnerPersistentMessage<GT>,
+    pub(crate) msg: InnerPersistentMessage<GT>,
 }
 
 impl<GT> fmt::Debug for PersistentMessage<GT>
@@ -44,64 +41,6 @@ type InnerPersistentMessage<GT> = Box<
     >,
 >;
 
-/// A handle to a [`PersistentTask`]. This handle can be used to call the task and shared
-/// across threads. The `PersistentTask` is dropped when its final handle has been dropped and all
-/// remaining pending calls have completed.
-#[derive(Clone)]
-pub struct PersistentHandle<GT>
-where
-    GT: PersistentTask,
-{
-    sender: HandleSender<GT>,
-}
-
-impl<GT> PersistentHandle<GT>
-where
-    GT: PersistentTask,
-{
-    fn new(sender: HandleSender<GT>) -> Self {
-        PersistentHandle { sender }
-    }
-
-    /// Call the task, this method waits until there's room available in the channel.
-    pub async fn call<R>(&self, input: GT::Input, sender: R)
-    where
-        R: ResultSender<JlrsResult<GT::Output>>,
-    {
-        self.sender
-            .send(PersistentMessage {
-                msg: Box::new(CallPersistentMessage {
-                    input: Some(input),
-                    sender,
-                    _marker: PhantomData,
-                }),
-            })
-            .await
-            .expect("Channel was closed")
-    }
-
-    /// Call the task, this method returns an error immediately if there's NO room available
-    /// in the channel.
-    pub fn try_call<R>(&self, input: GT::Input, sender: R) -> JlrsResult<()>
-    where
-        R: ResultSender<JlrsResult<GT::Output>>,
-    {
-        match self.sender.try_send(PersistentMessage {
-            msg: Box::new(CallPersistentMessage {
-                input: Some(input),
-                sender,
-                _marker: PhantomData,
-            }),
-        }) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(JlrsError::other(e))?,
-        }
-    }
-}
-
-// Ensure the handle can be shared across threads
-impl<GT: PersistentTask> RequireSendSync for PersistentHandle<GT> {}
-
 // What follows is a significant amount of indirection to allow different tasks to have a
 // different Output, and allow users to provide an arbitrary sender that implements ReturnChannel
 // to return some result.
@@ -110,19 +49,21 @@ pub(crate) enum RegisterTask {}
 pub(crate) enum Persistent {}
 pub(crate) enum RegisterPersistent {}
 
-struct CallPersistentMessage<I, O, RC>
+pub(crate) struct CallPersistentMessage<I, O, RC>
 where
     I: Send + Sync,
     O: Send + Sync + 'static,
     RC: ResultSender<JlrsResult<O>>,
 {
-    sender: RC,
-    input: Option<I>,
-    _marker: PhantomData<O>,
+    pub(crate) sender: RC,
+
+    pub(crate) input: Option<I>,
+
+    pub(crate) _marker: PhantomData<O>,
 }
 
 #[async_trait(?Send)]
-trait GenericCallPersistentMessage: Send + Sync {
+pub(crate) trait GenericCallPersistentMessage: Send + Sync {
     type Input;
     type Output;
 
