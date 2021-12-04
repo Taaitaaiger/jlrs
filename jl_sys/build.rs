@@ -1,14 +1,20 @@
+#[cfg(target_os = "linux")]
+use std::ffi::OsStr;
+#[cfg(target_os = "linux")]
+use std::os::unix::prelude::OsStrExt;
+use std::path::PathBuf;
+use std::str::FromStr;
 use std::{env, process::Command};
-use std::{ffi::OsStr, os::unix::prelude::OsStrExt, path::PathBuf};
 
+#[cfg(target_os = "linux")]
 fn find_julia() -> Option<String> {
     if let Ok(path) = env::var("JULIA_DIR") {
         return Some(path);
     }
 
     let out = Command::new("which").arg("julia").output().ok()?.stdout;
-
     let mut julia_path = PathBuf::from(OsStr::from_bytes(out.as_ref()));
+
     if !julia_path.pop() {
         return None;
     }
@@ -20,27 +26,47 @@ fn find_julia() -> Option<String> {
     Some(julia_path.to_string_lossy().to_string())
 }
 
+#[cfg(target_os = "windows")]
+fn find_julia() -> Option<String> {
+    if let Ok(path) = env::var("JULIA_DIR") {
+        return Some(path);
+    }
+
+    let out = Command::new("cmd")
+        .args(["/C", "where", "julia"])
+        .output()
+        .ok()?;
+    let results = String::from_utf8(out.stdout).ok()?;
+
+    let mut lines = results.lines();
+    let first = lines.next()?;
+
+    let mut julia_path = PathBuf::from_str(first).unwrap();
+
+    if !julia_path.pop() {
+        return None;
+    }
+
+    if !julia_path.pop() {
+        return None;
+    }
+
+    Some(julia_path.to_string_lossy().to_string())
+}
+
+#[cfg(target_os = "linux")]
 fn flags() -> String {
     match find_julia() {
         Some(julia_dir) => {
             let jl_include_path = format!("{}/include/julia/", julia_dir);
+            let jl_lib_path = format!("-L{}/lib/", julia_dir);
+            println!("cargo:rustc-flags={}", &jl_lib_path);
 
-            #[cfg(target_os = "linux")]
-            {
-                let jl_lib_path = format!("-L{}/lib/", julia_dir);
-                println!("cargo:rustc-flags={}", &jl_lib_path);
-
-                if env::var("CARGO_FEATURE_UV").is_ok() {
-                    let jl_internal_lib_path = format!("-L{}/lib/julia", julia_dir);
-                    println!("cargo:rustc-flags={}", &jl_internal_lib_path);
-                }
+            if env::var("CARGO_FEATURE_UV").is_ok() {
+                let jl_internal_lib_path = format!("-L{}/lib/julia", julia_dir);
+                println!("cargo:rustc-flags={}", &jl_internal_lib_path);
             }
 
-            #[cfg(target_os = "windows")]
-            {
-                let jl_lib_path = format!("-L{}/bin/", julia_dir);
-                println!("cargo:rustc-flags={}", &jl_lib_path);
-            }
 
             if env::var("CARGO_FEATURE_DEBUG").is_ok() {
                 println!("cargo:rustc-link-lib=julia-debug");
@@ -49,15 +75,34 @@ fn flags() -> String {
             }
 
             if env::var("CARGO_FEATURE_UV").is_ok() {
-                #[cfg(target_os = "windows")]
-                {
-                    println!("cargo:rustc-link-lib=uv-2");
-                }
+                println!("cargo:rustc-link-lib=uv");
+            }
 
-                #[cfg(target_os = "linux")]
-                {
-                    println!("cargo:rustc-link-lib=uv");
-                }
+            jl_include_path
+        }
+        None => panic!("Unable to set compiler flags: JULIA_DIR is not set and no installed version of Julia can be found"),
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn flags() -> String {
+    match find_julia() {
+        Some(julia_dir) => {
+            let jl_include_path = format!("{}/include/julia/", julia_dir);
+            let jl_lib_path = format!("-L{}/bin/", julia_dir);
+            println!("cargo:rustc-flags={}", &jl_lib_path);
+
+            if env::var("CARGO_FEATURE_DEBUG").is_ok() {
+                println!("cargo:rustc-link-lib=julia-debug");
+            } else {
+                println!("cargo:rustc-link-lib=julia");
+            }
+
+            println!("cargo:rustc-link-lib=openlibm");
+            println!("cargo:rustc-link-arg=-Wl,--stack,8388608");
+
+            if env::var("CARGO_FEATURE_UV").is_ok() {
+                println!("cargo:rustc-link-lib=uv-2");
             }
 
             jl_include_path
