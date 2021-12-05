@@ -1,3 +1,4 @@
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
 mod example {
     use jlrs::prelude::*;
 
@@ -376,7 +377,7 @@ mod example {
     }
 
     #[async_trait(?Send)]
-    impl GeneratorTask for AccumulatorTask {
+    impl PersistentTask for AccumulatorTask {
         type State = Value<'static, 'static>;
         type Input = f64;
         type Output = f64;
@@ -542,20 +543,20 @@ mod example {
         }
 
         #[test]
-        fn test_generator() {
+        fn test_persistent() {
             JULIA.with(|j| {
                 let julia = j.borrow_mut();
 
                 let (is, ir) = crossbeam_channel::bounded(1);
                 julia
-                    .try_register_generator::<AccumulatorTask, _>(is)
+                    .try_register_persistent::<AccumulatorTask, _>(is)
                     .unwrap();
                 ir.recv().unwrap().unwrap();
 
                 let (sender, receiver) = crossbeam_channel::bounded(1);
 
                 let handle = julia
-                    .try_generator(AccumulatorTask { init_value: 5.0 })
+                    .try_persistent(AccumulatorTask { init_value: 5.0 })
                     .unwrap();
 
                 handle.try_call(7.0, sender.clone()).unwrap();

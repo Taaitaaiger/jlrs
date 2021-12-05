@@ -31,8 +31,8 @@
 //!
 //! More informaton can be found in the [`frame`] and [`scope`] modules.
 //!
-//! [`Julia::scope`]: crate::Julia::scope
-//! [`Julia::scope_with_slots`]: crate::Julia::scope_with_slots
+//! [`Julia::scope`]: crate::julia::Julia::scope
+//! [`Julia::scope_with_slots`]: crate::julia::Julia::scope_with_slots
 //! [`Global`]: global::Global
 //! [`GcFrame`]: frame::GcFrame
 //! [`Scope`]: scope::Scope
@@ -49,6 +49,25 @@ pub mod gc;
 pub mod global;
 pub mod mode;
 pub mod output;
+pub mod reusable_slot;
 pub(crate) mod root_pending;
 pub mod scope;
 pub(crate) mod stack_page;
+
+#[cfg(not(feature = "lts"))]
+use jl_sys::jl_get_current_task;
+#[cfg(feature = "lts")]
+use jl_sys::jl_get_ptls_states;
+use jl_sys::jl_tls_states_t;
+#[cfg(not(feature = "lts"))]
+use std::ptr::NonNull;
+
+#[cfg(feature = "lts")]
+pub(crate) unsafe fn get_tls() -> *mut jl_tls_states_t {
+    jl_get_ptls_states()
+}
+
+#[cfg(not(feature = "lts"))]
+pub(crate) unsafe fn get_tls() -> *mut jl_tls_states_t {
+    NonNull::new_unchecked(jl_get_current_task()).as_ref().ptls
+}

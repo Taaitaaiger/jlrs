@@ -14,8 +14,8 @@ pub type JuliaResult<'frame, 'data, V = Value<'frame, 'data>> = Result<V, Value<
 pub type JuliaResultRef<'frame, 'data, V = ValueRef<'frame, 'data>> =
     Result<V, ValueRef<'frame, 'data>>;
 
-pub static CANNOT_DISPLAY_TYPE: &'static str = "<Cannot display type>";
-pub static CANNOT_DISPLAY_VALUE: &'static str = "<Cannot display value>";
+pub(crate) static CANNOT_DISPLAY_TYPE: &'static str = "<Cannot display type>";
+pub(crate) static CANNOT_DISPLAY_VALUE: &'static str = "<Cannot display value>";
 
 /// All different errors.
 #[derive(Debug)]
@@ -139,6 +139,7 @@ pub enum JlrsError {
         value: String,
     },
     MoreThreadsRequired,
+    ThreadsVarRequired,
     UndefRef,
 }
 
@@ -375,6 +376,9 @@ impl Display for JlrsError {
             JlrsError::UndefRef => {
                 write!(formatter, "An undefined reference cannot be rooted")
             }
+            JlrsError::ThreadsVarRequired => {
+                write!(formatter, "On Windows the JULIA_NUM_THREADS environment variable must be explicitly set to 3 or higher, or auto.")
+            }
             JlrsError::NumThreadsVar { value } => {
                 write!(formatter, "The `JULIA_NUM_THREADS` environment variable must be set to a value larger than 2 or auto, but its value is: {}", value)
             }
@@ -390,8 +394,8 @@ impl Into<Box<JlrsError>> for Box<dyn Error + 'static + Send + Sync> {
     }
 }
 
-/// Frames and data they protect have a memory cost. If the memory set aside for containing frames
-/// or the frame itself is exhausted, this error is returned.
+/// Frames and data they protect have a memory cost. If the memory available to a frame is
+/// exhausted, this error is returned.
 #[derive(Copy, Clone, Debug)]
 pub enum AllocError {
     //            desired, cap

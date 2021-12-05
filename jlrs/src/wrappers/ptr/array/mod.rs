@@ -22,17 +22,12 @@
 
 use crate::{
     convert::into_julia::IntoJulia,
-    droparray,
-    error::{JlrsError, JlrsResult, JuliaResult, CANNOT_DISPLAY_TYPE},
+    error::{JlrsError, JlrsResult, CANNOT_DISPLAY_TYPE},
     impl_debug,
     layout::{typecheck::Typecheck, valid_layout::ValidLayout},
     memory::{
-        frame::private::Frame as _,
-        frame::Frame,
-        global::Global,
-        output::{OutputResult, OutputValue},
-        scope::private::Scope as _,
-        scope::Scope,
+        frame::private::Frame as _, frame::Frame, get_tls, global::Global,
+        scope::private::Scope as _, scope::Scope,
     },
     private::Private,
     wrappers::ptr::{
@@ -52,22 +47,37 @@ use crate::{
         Wrapper,
     },
 };
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use crate::{
+    error::JuliaResult,
+    memory::output::{OutputResult, OutputValue},
+};
 use jl_sys::{
     jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_apply_array_type,
-    jl_apply_tuple_type_v, jl_array_data, jl_array_eltype, jl_array_t, jl_datatype_t,
-    jl_gc_add_ptr_finalizer, jl_get_ptls_states, jl_is_array_type, jl_new_array,
-    jl_new_struct_uninit, jl_pchar_to_array, jl_ptr_to_array, jl_ptr_to_array_1d, jl_tparam0,
+    jl_apply_tuple_type_v, jl_array_data, jl_array_dims_ptr, jl_array_eltype, jl_array_ndims,
+    jl_array_t, jl_datatype_t, jl_gc_add_ptr_finalizer, jl_new_array, jl_new_struct_uninit,
+    jl_pchar_to_array, jl_ptr_to_array, jl_ptr_to_array_1d,
+};
+
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use jl_sys::{
     jlrs_alloc_array_1d, jlrs_alloc_array_2d, jlrs_alloc_array_3d, jlrs_array_del_beg,
     jlrs_array_del_end, jlrs_array_grow_beg, jlrs_array_grow_end, jlrs_new_array,
     jlrs_reshape_array, jlrs_result_tag_t_JLRS_RESULT_ERR,
 };
+
 use std::{
     cell::UnsafeCell,
     ffi::c_void,
     fmt::{Debug, Formatter, Result as FmtResult},
     marker::PhantomData,
-    ptr::NonNull,
+    mem,
+    mem::MaybeUninit,
+    ptr::{null_mut, NonNull},
+    slice,
 };
+
+use super::type_name::TypeName;
 
 pub mod data;
 pub mod dimensions;
@@ -76,6 +86,8 @@ pub mod dimensions;
 /// [`Value::is`], if the check returns `true` the [`Value`] can be cast to `Array`:
 ///
 /// ```
+/// # #[cfg(not(all(target_os = "windows", feature = "lts")))]
+/// # mod example {
 /// # use jlrs::prelude::*;
 /// # use jlrs::util::JULIA;
 /// # fn main() {
@@ -90,6 +102,7 @@ pub mod dimensions;
 ///     Ok(())
 /// }).unwrap();
 /// # });
+/// # }
 /// # }
 /// ```
 ///
@@ -124,6 +137,7 @@ impl<'data> Array<'_, 'data> {
     ///
     /// If the array size is too large, Julia will throw an error. This error is caught and
     /// returned.
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn new<'target, 'current, T, D, S, F>(scope: S, dims: D) -> JlrsResult<S::JuliaResult>
     where
         T: IntoJulia,
@@ -240,6 +254,7 @@ impl<'data> Array<'_, 'data> {
     /// `Union`, `UnionAll` or `DataType`, and dimensions `dims`. If `dims = (4, 2)` a
     /// two-dimensional array with 4 rows and 2 columns is created. If an exception is thrown due
     /// to either the type or dimensions being invalid it's caught and returned.
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn new_for<'target, 'current, D, S, F>(
         scope: S,
         dims: D,
@@ -464,11 +479,7 @@ impl<'data> Array<'_, 'data> {
                         )
                         .cast();
 
-                        jl_gc_add_ptr_finalizer(
-                            jl_get_ptls_states(),
-                            array,
-                            droparray as *mut c_void,
-                        );
+                        jl_gc_add_ptr_finalizer(get_tls(), array, droparray as *mut c_void);
 
                         output
                             .into_scope(frame)
@@ -484,11 +495,7 @@ impl<'data> Array<'_, 'data> {
                         )
                         .cast();
 
-                        jl_gc_add_ptr_finalizer(
-                            jl_get_ptls_states(),
-                            array,
-                            droparray as *mut c_void,
-                        );
+                        jl_gc_add_ptr_finalizer(get_tls(), array, droparray as *mut c_void);
 
                         output
                             .into_scope(frame)
@@ -504,11 +511,7 @@ impl<'data> Array<'_, 'data> {
                         )
                         .cast();
 
-                        jl_gc_add_ptr_finalizer(
-                            jl_get_ptls_states(),
-                            array,
-                            droparray as *mut c_void,
-                        );
+                        jl_gc_add_ptr_finalizer(get_tls(), array, droparray as *mut c_void);
 
                         output
                             .into_scope(frame)
@@ -931,6 +934,7 @@ impl<'scope> Array<'scope, 'static> {
     /// `self` share their data. This method returns an exception if the old and new array have a
     /// different number of elements or if the array contains data that has been borrowed or moved
     /// from Rust.
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn reshape<'target, 'current, D, S, F>(
         self,
         scope: S,
@@ -975,6 +979,7 @@ impl<'scope> Array<'scope, 'static> {
     /// left uninitialized, or their contents will be set to 0s. It's set to 0s if
     /// `DataType::zero_init` returns true, if the elements are stored as pointers to Julia data,
     /// or if the elements contain pointers to Julia data.
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn grow_end<'current, F>(
         self,
         frame: &mut F,
@@ -997,6 +1002,7 @@ impl<'scope> Array<'scope, 'static> {
 
     /// Removes the final `dec` elements from the array. The array must be 1D and contain no data
     /// borrowed or moved from Rust, otherwise an exception is returned.
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn del_end<'current, F>(
         self,
         frame: &mut F,
@@ -1023,6 +1029,7 @@ impl<'scope> Array<'scope, 'static> {
     /// left uninitialized, or their contents will be set to 0s. It's set to 0s if
     /// `DataType::zero_init` returns true, if the elements are stored as pointers to Julia data,
     /// or if the elements contain pointers to Julia data.
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn grow_begin<'current, F>(
         self,
         frame: &mut F,
@@ -1045,6 +1052,7 @@ impl<'scope> Array<'scope, 'static> {
 
     /// Removes the first `dec` elements from the array. The array must be 1D and contain no data
     /// borrowed or moved from Rust, otherwise an exception is returned.
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn del_begin<'current, F>(
         self,
         frame: &mut F,
@@ -1068,7 +1076,7 @@ impl<'scope> Array<'scope, 'static> {
 
 unsafe impl<'scope, 'data> Typecheck for Array<'scope, 'data> {
     fn typecheck(t: DataType) -> bool {
-        unsafe { jl_is_array_type(t.unwrap(Private).cast()) }
+        unsafe { t.type_name().wrapper_unchecked() == TypeName::of_array(Global::new()) }
     }
 }
 
@@ -1090,10 +1098,12 @@ impl<'scope, 'data> WrapperPriv<'scope, 'data> for Array<'scope, 'data> {
     type Wraps = jl_array_t;
     const NAME: &'static str = "Array";
 
+    #[inline(always)]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData, PhantomData)
     }
 
+    #[inline(always)]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
@@ -1323,6 +1333,7 @@ where
     /// `self` share their data. This method returns an exception if the old and new array have a
     /// different number of elements or if the array contains data that has been borrowed or moved
     /// from Rust.
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn reshape<'target, 'current, D, S, F>(
         self,
         scope: S,
@@ -1342,6 +1353,7 @@ where
     /// left uninitialized, or their contents will be set to 0s. It's set to 0s if
     /// `DataType::zero_init` returns true, if the elements are stored as pointers to Julia data,
     /// or if the elements contain pointers to Julia data.
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn grow_end<'current, F>(
         self,
         frame: &mut F,
@@ -1355,6 +1367,7 @@ where
 
     /// Removes the final `dec` elements from the array. The array must be 1D and contain no data
     /// borrowed or moved from Rust, otherwise an exception is returned.
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn del_end<'current, F>(
         self,
         frame: &mut F,
@@ -1372,6 +1385,7 @@ where
     /// left uninitialized, or their contents will be set to 0s. It's set to 0s if
     /// `DataType::zero_init` returns true, if the elements are stored as pointers to Julia data,
     /// or if the elements contain pointers to Julia data.
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn grow_begin<'current, F>(
         self,
         frame: &mut F,
@@ -1385,6 +1399,7 @@ where
 
     /// Removes the first `dec` elements from the array. The array must be 1D and contain no data
     /// borrowed or moved from Rust, otherwise an exception is returned.
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn del_begin<'current, F>(
         self,
         frame: &mut F,
@@ -1402,8 +1417,10 @@ unsafe impl<'scope, 'data, T: Clone + ValidLayout + Debug> Typecheck
 {
     fn typecheck(t: DataType) -> bool {
         unsafe {
-            jl_is_array_type(t.unwrap(Private).cast())
-                && T::valid_layout(Value::wrap(jl_tparam0(t.unwrap(Private)).cast(), Private))
+            t.is::<Array>()
+                && T::valid_layout(
+                    t.parameters().wrapper_unchecked().data_unchecked()[0].as_value(),
+                )
         }
     }
 }
@@ -1512,4 +1529,32 @@ where
     std::ptr::copy_nonoverlapping(dims.as_slice().as_ptr(), usize_ptr, n);
 
     Ok(v)
+}
+
+unsafe extern "C" fn droparray(a: Array) {
+    // The data of a moved array is allocated by Rust, this function is called by
+    // a finalizer in order to ensure it's also freed by Rust.
+    let mut arr_nn_ptr = a.unwrap_non_null(Private);
+    let arr_ref = arr_nn_ptr.as_mut();
+
+    if arr_ref.flags.how() != 2 {
+        return;
+    }
+
+    // Set data to null pointer
+    let data_ptr = arr_ref.data.cast::<MaybeUninit<u8>>();
+    arr_ref.data = null_mut();
+
+    // Set all dims to 0
+    let arr_ptr = arr_nn_ptr.as_ptr();
+    let dims_ptr = jl_array_dims_ptr(arr_ptr);
+    let n_dims = jl_array_ndims(arr_ptr);
+    for dim in slice::from_raw_parts_mut(dims_ptr, n_dims as _) {
+        *dim = 0;
+    }
+
+    // Drop the data
+    let n_els = arr_ref.elsize as usize * arr_ref.length;
+    let data = Vec::from_raw_parts(data_ptr, n_els, n_els);
+    mem::drop(data);
 }

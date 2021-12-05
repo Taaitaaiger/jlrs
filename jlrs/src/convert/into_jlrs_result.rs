@@ -7,7 +7,7 @@
 
 use crate::{
     error::{exception, JlrsResult, JuliaResult, CANNOT_DISPLAY_VALUE},
-    prelude::Wrapper,
+    wrappers::ptr::Wrapper,
 };
 
 /// Extension trait that lets you convert a `JuliaResult` to a `JlrsResult`. If an exception

@@ -6,7 +6,7 @@
 
 use crate::{
     convert::temporary_symbol::TemporarySymbol,
-    error::{JlrsError, JlrsResult, JuliaResult, JuliaResultRef, CANNOT_DISPLAY_VALUE},
+    error::{JlrsError, JlrsResult, CANNOT_DISPLAY_VALUE},
     impl_debug, impl_julia_typecheck, impl_valid_layout,
     memory::{frame::Frame, global::Global, scope::Scope},
     private::Private,
@@ -18,12 +18,17 @@ use crate::{
         FunctionRef, ModuleRef, ValueRef, Wrapper as _,
     },
 };
+
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use crate::error::{JuliaResult, JuliaResultRef};
+
 use jl_sys::{
     jl_base_module, jl_core_module, jl_get_global, jl_is_imported, jl_main_module, jl_module_t,
-    jl_module_type, jl_set_const, jl_set_global, jl_typeis, jlrs_result_tag_t_JLRS_RESULT_ERR,
-    jlrs_set_const, jlrs_set_global,
+    jl_module_type, jl_set_const, jl_set_global,
 };
 
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use jl_sys::{jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_set_const, jlrs_set_global};
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 
@@ -31,8 +36,8 @@ use super::private::Wrapper;
 
 /// Functionality in Julia can be accessed through its module system. You can get a handle to the
 /// three standard modules, `Main`, `Base`, and `Core` and access their submodules through them.
-/// If you include your own Julia code with [`Julia::include`], its contents are made available
-/// relative to `Main`.
+/// If you include your own Julia code with [`Julia::include`], [`AsyncJulia::include`], or
+/// [`AsyncJulia::try_include`] its contents are made available relative to `Main`.
 ///
 /// The most important methods offered by this wrapper are those that let you access submodules,
 /// functions, and other global values defined in the module. These come in two variants: one that
@@ -40,7 +45,9 @@ use super::private::Wrapper;
 /// named functions, constants and submodules unrooted when you use them from Rust. The same holds
 /// true for other global values that are never redefined to point at another value.
 ///
-/// [`Julia::include`]: crate::Julia::include
+/// [`Julia::include`]: crate::julia::Julia::include
+/// [`AsyncJulia::include`]: crate::extensions::multitask::runtime::AsyncJulia::include
+/// [`AsyncJulia::try_include`]: crate::extensions::multitask::runtime::AsyncJulia::try_include
 #[derive(Copy, Clone)]
 #[repr(transparent)]
 pub struct Module<'scope>(NonNull<jl_module_t>, PhantomData<&'scope ()>);
@@ -79,11 +86,13 @@ impl<'scope> Module<'scope> {
         Module::wrap(self.unwrap(Private), Private)
     }
 
-    /// Returns a handle to Julia's `Main`-module. If you include your own Julia code by calling
-    /// [`Julia::include`], handles to functions, globals, and submodules defined in these
-    /// included files are available through this module.
+    /// Returns a handle to Julia's `Main`-module. If you include your own Julia code with
+    /// [`Julia::include`], [`AsyncJulia::include`], or [`AsyncJulia::try_include`] its contents
+    ///  are made available relative to `Main`.
     ///
-    /// [`Julia::include`]: crate::Julia::include
+    /// [`Julia::include`]: crate::julia::Julia::include
+    /// [`AsyncJulia::include`]: crate::extensions::multitask::runtime::AsyncJulia::include
+    /// [`AsyncJulia::try_include`]: crate::extensions::multitask::runtime::AsyncJulia::try_include
     pub fn main(_: Global<'scope>) -> Self {
         unsafe { Module::wrap(jl_main_module, Private) }
     }
@@ -119,10 +128,18 @@ impl<'scope> Module<'scope> {
         unsafe {
             let symbol = name.temporary_symbol(Private);
             let submodule = jl_get_global(self.unwrap(Private), symbol.unwrap(Private));
+            if submodule.is_null() {
+                Err(JlrsError::GlobalNotFound {
+                    name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+                    module: self.name().as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+                })?
+            }
 
-            if !submodule.is_null() && jl_typeis(submodule, jl_module_type) {
+            let submodule = Value::wrap_non_null(NonNull::new_unchecked(submodule), Private);
+
+            if submodule.is::<Self>() {
                 frame
-                    .push_root(NonNull::new_unchecked(submodule), Private)
+                    .push_root(submodule.unwrap_non_null(Private), Private)
                     .map(|v| v.cast_unchecked())
                     .map_err(Into::into)
             } else {
@@ -145,9 +162,17 @@ impl<'scope> Module<'scope> {
         unsafe {
             let symbol = name.temporary_symbol(Private);
             let submodule = jl_get_global(self.unwrap(Private), symbol.unwrap(Private));
+            if submodule.is_null() {
+                Err(JlrsError::GlobalNotFound {
+                    name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+                    module: self.name().as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+                })?
+            }
 
-            if !submodule.is_null() && jl_typeis(submodule, jl_module_type) {
-                Ok(ModuleRef::wrap(submodule.cast()))
+            let submodule = Value::wrap_non_null(NonNull::new_unchecked(submodule), Private);
+
+            if let Ok(submodule) = submodule.cast::<Self>() {
+                Ok(submodule.as_ref())
             } else {
                 Err(JlrsError::NotAModule {
                     name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
@@ -159,6 +184,7 @@ impl<'scope> Module<'scope> {
     /// Set a global value in this module. Note that if this global already exists, this can
     /// make the old value unreachable. If an excection is thrown, it's caught, rooted and
     /// returned.
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn set_global<'frame, N, F>(
         self,
         frame: &mut F,
@@ -194,6 +220,7 @@ impl<'scope> Module<'scope> {
     /// Set a global value in this module. Note that if this global already exists, this can
     /// make the old value unreachable. If an exception is thrown it's caught but not rooted and
     /// returned.
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn set_global_unrooted<N>(
         self,
         name: N,
@@ -247,6 +274,7 @@ impl<'scope> Module<'scope> {
     /// Set a constant in this module. If Julia throws an exception it's caught and rooted in the
     /// current frame, if the exception can't be rooted a `JlrsError::AllocError` is returned. If
     /// no exception is thrown an unrooted reference to the constant is returned.
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn set_const<'frame, N, F>(
         self,
         frame: &mut F,
@@ -281,6 +309,7 @@ impl<'scope> Module<'scope> {
 
     /// Set a constant in this module. If Julia throws an exception it's caught. Otherwise an
     /// unrooted reference to the constant is returned.
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn set_const_unrooted<N>(
         self,
         name: N,
@@ -525,10 +554,12 @@ impl<'scope> Wrapper<'scope, '_> for Module<'scope> {
     type Wraps = jl_module_t;
     const NAME: &'static str = "Module";
 
+    #[inline(always)]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData)
     }
 
+    #[inline(always)]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }

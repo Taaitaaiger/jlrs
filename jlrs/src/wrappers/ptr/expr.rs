@@ -42,10 +42,12 @@ impl<'scope> Wrapper<'scope, '_> for Expr<'scope> {
     type Wraps = jl_expr_t;
     const NAME: &'static str = "Expr";
 
+    #[inline(always)]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData)
     }
 
+    #[inline(always)]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }

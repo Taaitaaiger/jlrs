@@ -29,6 +29,8 @@ pub mod method_instance;
 pub mod method_match;
 pub mod method_table;
 pub mod module;
+#[cfg(not(feature = "lts"))]
+pub mod opaque_closure;
 pub mod simple_vector;
 pub mod string;
 pub mod symbol;
@@ -40,7 +42,12 @@ pub mod typemap_level;
 pub mod union;
 pub mod union_all;
 pub mod value;
+#[cfg(not(feature = "lts"))]
+pub mod vararg;
 pub mod weak_ref;
+
+#[cfg(not(feature = "lts"))]
+use jl_sys::jl_value_t;
 
 use self::{
     array::{Array, TypedArray},
@@ -68,6 +75,9 @@ use self::{
     value::Value,
     weak_ref::WeakRef,
 };
+
+#[cfg(not(feature = "lts"))]
+use self::{opaque_closure::OpaqueClosure, vararg::Vararg};
 use crate::{
     error::{JlrsError, JlrsResult, CANNOT_DISPLAY_VALUE},
     layout::valid_layout::ValidLayout,
@@ -78,7 +88,11 @@ use std::{
     fmt::{Debug, Formatter, Result as FmtResult},
     marker::PhantomData,
     ptr::null_mut,
+    str::FromStr,
 };
+
+#[cfg(not(feature = "lts"))]
+use std::sync::atomic::AtomicPtr;
 
 macro_rules! impl_valid_layout {
     ($ref_type:ident, $type:ident) => {
@@ -126,8 +140,9 @@ pub trait Wrapper<'scope, 'data>: private::Wrapper<'scope, 'data> {
                 })?
                 .value_unchecked()
                 .cast::<JuliaString>()?
-                .as_str()?
-                .to_string();
+                .as_str()?;
+
+            let s = String::from_str(s).unwrap();
 
             Ok(s)
         }
@@ -135,9 +150,11 @@ pub trait Wrapper<'scope, 'data>: private::Wrapper<'scope, 'data> {
 
     /// Convert the wrapper to its error string, i.e. the string that is shown when calling
     /// `Base.showerror`. This string can contain ANSI color codes if this is enabled by calling
-    /// [`Julia::error_color`].
+    /// [`Julia::error_color`], [`AsyncJulia::error_color`], or [`AsyncJulia::try_error_color`], .
     ///
-    /// [`Julia::error_color`]: crate::Julia::error_color
+    /// [`Julia::error_color`]: crate::julia::Julia::error_color
+    /// [`AsyncJulia::error_color`]: crate::extensions::multitask::runtime::AsyncJulia::error_color
+    /// [`AsyncJulia::try_error_color`]: crate::extensions::multitask::runtime::AsyncJulia::try_error_color
     fn error_string(self) -> JlrsResult<String> {
         unsafe {
             let global = Global::new();
@@ -315,6 +332,12 @@ impl_valid_layout!(MethodMatchRef, MethodMatch);
 pub type MethodTableRef<'scope> = Ref<'scope, 'static, MethodTable<'scope>>;
 impl_valid_layout!(MethodTableRef, MethodTable);
 
+/// A reference to an [`OpaqueClosure`]
+#[cfg(not(feature = "lts"))]
+pub type OpaqueClosureRef<'scope> = Ref<'scope, 'static, OpaqueClosure<'scope>>;
+#[cfg(not(feature = "lts"))]
+impl_valid_layout!(OpaqueClosureRef, OpaqueClosure);
+
 /// A reference to a [`SimpleVector`]
 pub type SimpleVectorRef<'scope, T = Value<'scope, 'static>> =
     Ref<'scope, 'static, SimpleVector<'scope, T>>;
@@ -362,6 +385,12 @@ impl_valid_layout!(UnionRef, Union);
 /// A reference to a [`UnionAll`]
 pub type UnionAllRef<'scope> = Ref<'scope, 'static, UnionAll<'scope>>;
 impl_valid_layout!(UnionAllRef, UnionAll);
+
+/// A reference to a [`Vararg`]
+#[cfg(not(feature = "lts"))]
+pub type VarargRef<'scope> = Ref<'scope, 'static, Vararg<'scope>>;
+#[cfg(not(feature = "lts"))]
+impl_valid_layout!(VarargRef, Vararg);
 
 /// A reference to a [`WeakRef`]
 pub type WeakRefRef<'scope> = Ref<'scope, 'static, WeakRef<'scope>>;
@@ -453,6 +482,7 @@ pub(crate) mod private {
 
         unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self;
 
+        #[inline(always)]
         unsafe fn wrap(ptr: *mut Self::Wraps, _: Private) -> Self {
             debug_assert!(!ptr.is_null());
             Self::wrap_non_null(NonNull::new_unchecked(ptr), Private)
@@ -460,6 +490,7 @@ pub(crate) mod private {
 
         fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps>;
 
+        #[inline(always)]
         fn unwrap(self, _: Private) -> *mut Self::Wraps {
             self.unwrap_non_null(Private).as_ptr()
         }
@@ -512,4 +543,9 @@ pub(crate) mod private {
             Some(Value::wrap(ptr.cast(), Private))
         }
     }
+}
+
+#[cfg(not(feature = "lts"))]
+pub(crate) fn atomic_value(addr: u64) -> AtomicPtr<jl_value_t> {
+    AtomicPtr::new(addr as usize as *mut _)
 }

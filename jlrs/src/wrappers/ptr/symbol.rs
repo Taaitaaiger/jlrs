@@ -7,13 +7,18 @@ use crate::{
 };
 use crate::{impl_julia_typecheck, impl_valid_layout};
 use crate::{private::Private, wrappers::ptr::value::LeakedValue};
-use jl_sys::{jl_sym_t, jl_symbol_n, jl_symbol_name, jl_symbol_type};
+use jl_sys::{jl_sym_t, jl_symbol_n, jl_symbol_name_ as jl_symbol_name, jl_symbol_type};
 use std::ffi::CStr;
 
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 
 use super::private::Wrapper;
+
+#[cfg(not(feature = "lts"))]
+use super::atomic_value;
+#[cfg(not(feature = "lts"))]
+use std::sync::atomic::Ordering;
 
 /// `Symbol`s are used Julia to represent identifiers, `:x` represents the `Symbol` `x`. Things
 /// that can be accessed using a `Symbol` include submodules, functions, and globals. However,
@@ -54,29 +59,59 @@ impl<'scope> Symbol<'scope> {
     /// `Symbol`s are stored using an invasive binary tree, this returns the left branch of the
     /// current node. This method is unsafe because it's not accessible from Julia except through
     /// the C API.
+    #[cfg(feature = "lts")]
     pub unsafe fn left(self) -> Option<Symbol<'scope>> {
-        let nn_self = self.unwrap_non_null(Private);
-        let ref_self = nn_self.as_ref();
+        let left = self.unwrap_non_null(Private).as_ref().left;
 
-        if ref_self.left.is_null() {
+        if left.is_null() {
             return None;
         }
 
-        Some(Symbol::wrap(ref_self.left, Private))
+        Some(Symbol::wrap(left, Private))
+    }
+
+    /// `Symbol`s are stored using an invasive binary tree, this returns the left branch of the
+    /// current node. This method is unsafe because it's not accessible from Julia except through
+    /// the C API.
+    #[cfg(not(feature = "lts"))]
+    pub unsafe fn left(self) -> Option<Symbol<'scope>> {
+        let left = atomic_value(self.unwrap_non_null(Private).as_ref().left);
+        let ptr = left.load(Ordering::Relaxed);
+
+        if ptr.is_null() {
+            return None;
+        }
+
+        Some(Symbol::wrap(ptr.cast(), Private))
     }
 
     /// `Symbol`s are stored using an invasive binary tree, this returns the right branch of the
     /// current node. This method is unsafe because it's not accessible from Julia except through
     /// the C API.
+    #[cfg(feature = "lts")]
     pub unsafe fn right(self) -> Option<Symbol<'scope>> {
-        let nn_self = self.unwrap_non_null(Private);
-        let ref_self = nn_self.as_ref();
+        let right = self.unwrap_non_null(Private).as_ref().right;
 
-        if ref_self.right.is_null() {
+        if right.is_null() {
             return None;
         }
 
-        Some(Symbol::wrap(ref_self.right, Private))
+        Some(Symbol::wrap(right, Private))
+    }
+
+    /// `Symbol`s are stored using an invasive binary tree, this returns the right branch of the
+    /// current node. This method is unsafe because it's not accessible from Julia except through
+    /// the C API.
+    #[cfg(not(feature = "lts"))]
+    pub unsafe fn right(self) -> Option<Symbol<'scope>> {
+        let right = atomic_value(self.unwrap_non_null(Private).as_ref().right);
+        let ptr = right.load(Ordering::Relaxed);
+
+        if ptr.is_null() {
+            return None;
+        }
+
+        Some(Symbol::wrap(ptr.cast(), Private))
     }
 
     /// Convert `self` to a `LeakedValue`.
@@ -124,10 +159,12 @@ impl<'scope> Wrapper<'scope, '_> for Symbol<'scope> {
     type Wraps = jl_sym_t;
     const NAME: &'static str = "Symbol";
 
+    #[inline(always)]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData)
     }
 
+    #[inline(always)]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }

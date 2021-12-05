@@ -42,13 +42,13 @@ impl AsyncTask for MyTask {
                 .wrapper_unchecked()
                 .call_async(&mut *frame, &mut [dims, iters])
                 .await?
-                .unwrap()
+                .into_jlrs_result()?
                 .unbox::<f64>()
         }
     }
 }
 
-#[async_std::main]
+#[tokio::main]
 async fn main() {
     // The first thing we need to do is initialize Julia in a separate thread, to do so the method
     // AsyncJulia::init is used. This method takes three arguments: the maximum number of active
@@ -72,54 +72,68 @@ async fn main() {
     // Include the custom code our task needs.
     julia.include("MyModule.jl").await.unwrap();
 
-    // Create channels for each of the tasks (this is not required but helps distinguish which
-    // result belongs to which task).
-    let (sender1, receiver1) = async_std::channel::bounded(1);
-    let (sender2, receiver2) = async_std::channel::bounded(1);
-    let (sender3, receiver3) = async_std::channel::bounded(1);
-    let (sender4, receiver4) = async_std::channel::bounded(1);
+    // Create channels for each of the tasks.
+    let (sender1, receiver1) = tokio::sync::oneshot::channel();
+    let (sender2, receiver2) = tokio::sync::oneshot::channel();
+    let (sender3, receiver3) = tokio::sync::oneshot::channel();
+    let (sender4, receiver4) = tokio::sync::oneshot::channel();
 
     // Send four tasks to the runtime.
     julia
-        .task(MyTask {
-            dims: 4,
-            iters: 100_000_000,
-        }, sender1)
+        .task(
+            MyTask {
+                dims: 4,
+                iters: 100_000_000,
+            },
+            sender1,
+        )
         .await;
 
     julia
-        .task(MyTask {
-            dims: 4,
-            iters: 200_000_000,
-        }, sender2)
+        .task(
+            MyTask {
+                dims: 4,
+                iters: 200_000_000,
+            },
+            sender2,
+        )
         .await;
 
     julia
-        .task(MyTask {
-            dims: 4,
-            iters: 300_000_000,
-        }, sender3)
+        .task(
+            MyTask {
+                dims: 4,
+                iters: 300_000_000,
+            },
+            sender3,
+        )
         .await;
 
     julia
-        .task(MyTask {
-            dims: 4,
-            iters: 400_000_000,
-        }, sender4)
+        .task(
+            MyTask {
+                dims: 4,
+                iters: 400_000_000,
+            },
+            sender4,
+        )
         .await;
 
     // Receive the results of the tasks.
-    let res1 = receiver1.recv().await.unwrap().unwrap();
-    println!("Result of first task: {:?}", res1);
-    let res2 = receiver2.recv().await.unwrap().unwrap();
-    println!("Result of second task: {:?}", res2);
-    let res3 = receiver3.recv().await.unwrap().unwrap();
-    println!("Result of third task: {:?}", res3);
-    let res4 = receiver4.recv().await.unwrap().unwrap();
-    println!("Result of fourth task: {:?}", res4);
+    let res1 = receiver1.await.unwrap().unwrap();
+    println!("Result of first task: {}", res1);
+    let res2 = receiver2.await.unwrap().unwrap();
+    println!("Result of second task: {}", res2);
+    let res3 = receiver3.await.unwrap().unwrap();
+    println!("Result of third task: {}", res3);
+    let res4 = receiver4.await.unwrap().unwrap();
+    println!("Result of fourth task: {}", res4);
 
     // Dropping `julia` causes the runtime to shut down Julia and itself if it was the final
     // handle to the runtime.
     std::mem::drop(julia);
-    handle.await.expect("Julia exited with an error");
+    handle
+        .await
+        .expect("Julia exited with an error")
+        .expect("The Julia thread panicked");
 }

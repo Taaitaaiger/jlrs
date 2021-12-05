@@ -1,40 +1,50 @@
 //! Wrapper for `DataType`, which provides access to type properties.
 
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use super::array::Array;
 use super::{
-    array::Array, private::Wrapper as WrapperPriv, DataTypeRef, SimpleVectorRef, TypeNameRef,
+    private::Wrapper as WrapperPriv, value::Value, DataTypeRef, SimpleVectorRef, TypeNameRef,
     ValueRef, Wrapper,
 };
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use crate::error::JlrsError;
+use crate::error::JlrsResult;
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
 use crate::error::{JuliaResultRef, CANNOT_DISPLAY_TYPE};
-use crate::layout::typecheck::{Concrete, Typecheck};
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use crate::layout::typecheck::Concrete;
+use crate::layout::typecheck::Typecheck;
 use crate::memory::frame::Frame;
-use crate::wrappers::ptr::value::Value;
+use crate::memory::scope::Scope;
 use crate::wrappers::ptr::{simple_vector::SimpleVector, symbol::Symbol};
-use crate::{
-    error::{JlrsError, JlrsResult},
-    memory::scope::Scope,
-};
 use crate::{impl_debug, impl_valid_layout, memory::global::Global, private::Private};
 use jl_sys::{
     jl_abstractslot_type, jl_abstractstring_type, jl_any_type, jl_anytuple_type, jl_argument_type,
     jl_argumenterror_type, jl_bool_type, jl_boundserror_type, jl_builtin_type, jl_char_type,
-    jl_code_info_type, jl_code_instance_type, jl_const_type, jl_datatype_align, jl_datatype_nbits,
-    jl_datatype_nfields, jl_datatype_size, jl_datatype_t, jl_datatype_type, jl_emptytuple_type,
-    jl_errorexception_type, jl_expr_type, jl_field_isptr, jl_field_names, jl_field_offset,
-    jl_field_size, jl_float16_type, jl_float32_type, jl_float64_type, jl_floatingpoint_type,
-    jl_function_type, jl_get_fieldtypes, jl_globalref_type, jl_gotoifnot_type, jl_gotonode_type,
-    jl_initerror_type, jl_int16_type, jl_int32_type, jl_int64_type, jl_int8_type,
-    jl_intrinsic_type, jl_isbits, jl_lineinfonode_type, jl_linenumbernode_type, jl_loaderror_type,
-    jl_method_instance_type, jl_method_match_type, jl_method_type, jl_methoderror_type,
-    jl_methtable_type, jl_module_type, jl_new_structv, jl_newvarnode_type, jl_nothing_type,
-    jl_number_type, jl_partial_struct_type, jl_phicnode_type, jl_phinode_type, jl_pinode_type,
-    jl_quotenode_type, jl_returnnode_type, jl_signed_type, jl_simplevector_type,
+    jl_code_info_type, jl_code_instance_type, jl_const_type, jl_datatype_layout_t, jl_datatype_t,
+    jl_datatype_type, jl_emptytuple_type, jl_errorexception_type, jl_expr_type, jl_field_isptr,
+    jl_field_offset, jl_field_size, jl_float16_type, jl_float32_type, jl_float64_type,
+    jl_floatingpoint_type, jl_function_type, jl_get_fieldtypes, jl_globalref_type,
+    jl_gotoifnot_type, jl_gotonode_type, jl_initerror_type, jl_int16_type, jl_int32_type,
+    jl_int64_type, jl_int8_type, jl_intrinsic_type, jl_lineinfonode_type, jl_linenumbernode_type,
+    jl_loaderror_type, jl_method_instance_type, jl_method_match_type, jl_method_type,
+    jl_methoderror_type, jl_methtable_type, jl_module_type, jl_new_structv, jl_newvarnode_type,
+    jl_nothing_type, jl_number_type, jl_partial_struct_type, jl_phicnode_type, jl_phinode_type,
+    jl_pinode_type, jl_quotenode_type, jl_returnnode_type, jl_signed_type, jl_simplevector_type,
     jl_slotnumber_type, jl_ssavalue_type, jl_string_type, jl_symbol_type, jl_task_type,
     jl_tvar_type, jl_typedslot_type, jl_typeerror_type, jl_typemap_entry_type,
     jl_typemap_level_type, jl_typename_str, jl_typename_type, jl_typeofbottom_type, jl_uint16_type,
     jl_uint32_type, jl_uint64_type, jl_uint8_type, jl_undefvarerror_type, jl_unionall_type,
-    jl_uniontype_type, jl_upsilonnode_type, jl_voidpointer_type, jl_weakref_type, jlrs_new_structv,
-    jlrs_result_tag_t_JLRS_RESULT_ERR,
+    jl_uniontype_type, jl_upsilonnode_type, jl_voidpointer_type, jl_weakref_type,
 };
+#[cfg(not(feature = "lts"))]
+use jl_sys::{
+    jl_atomicerror_type, jl_interconditional_type, jl_partial_opaque_type, jl_vararg_type,
+};
+
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use jl_sys::{jlrs_new_structv, jlrs_result_tag_t_JLRS_RESULT_ERR};
+use std::ffi::c_void;
 use std::{ffi::CStr, marker::PhantomData, ptr::NonNull};
 
 /// Julia type information. You can acquire a [`Value`]'s datatype by by calling
@@ -129,7 +139,7 @@ impl<'scope> DataType<'scope> {
 
     /// Returns the field names of this type.
     pub fn field_names(self) -> SimpleVectorRef<'scope, Symbol<'scope>> {
-        unsafe { SimpleVectorRef::wrap(jl_field_names(self.unwrap(Private))) }
+        unsafe { self.type_name().wrapper_unchecked().names() }
     }
 
     /// Returns the name of the field at position `idx`.
@@ -158,9 +168,22 @@ impl<'scope> DataType<'scope> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().instance) }
     }
 
+    pub fn layout(self) -> Option<NonNull<c_void>> {
+        unsafe {
+            let ly = self.unwrap_non_null(Private).as_ref().layout;
+            if ly.is_null() {
+                None
+            } else {
+                Some(NonNull::new_unchecked(
+                    ly as *mut jl_datatype_layout_t as *mut c_void,
+                ))
+            }
+        }
+    }
+
     /// Returns the size of a value of this type in bytes.
     pub fn size(self) -> i32 {
-        unsafe { jl_datatype_size(self.unwrap(Private)) }
+        unsafe { self.unwrap_non_null(Private).as_ref().size }
     }
 
     /// Returns the hash of this type.
@@ -169,51 +192,131 @@ impl<'scope> DataType<'scope> {
     }
 
     /// Returns true if this is an abstract type.
+    #[cfg(not(feature = "lts"))]
+    pub fn is_abstract(self) -> bool {
+        unsafe { self.type_name().wrapper_unchecked().abstract_() }
+    }
+
+    /// Returns true if this is an abstract type.
+    #[cfg(feature = "lts")]
     pub fn is_abstract(self) -> bool {
         unsafe { self.unwrap_non_null(Private).as_ref().abstract_ != 0 }
     }
 
     /// Returns true if this is a mutable type.
+    #[cfg(not(feature = "lts"))]
+    pub fn mutable(self) -> bool {
+        unsafe { self.type_name().wrapper_unchecked().mutabl() }
+    }
+
+    /// Returns true if this is a mutable type.
+    #[cfg(feature = "lts")]
     pub fn mutable(self) -> bool {
         unsafe { self.unwrap_non_null(Private).as_ref().mutabl != 0 }
     }
 
     /// Returns true if one or more of the type parameters has not been set.
+    #[cfg(not(feature = "lts"))]
+    pub fn has_free_type_vars(self) -> bool {
+        unsafe { self.unwrap_non_null(Private).as_ref().hasfreetypevars() != 0 }
+    }
+
+    /// Returns true if one or more of the type parameters has not been set.
+    #[cfg(feature = "lts")]
     pub fn has_free_type_vars(self) -> bool {
         unsafe { self.unwrap_non_null(Private).as_ref().hasfreetypevars != 0 }
     }
 
     /// Returns true if this type can have instances
+    #[cfg(not(feature = "lts"))]
+    pub fn is_concrete_type(self) -> bool {
+        unsafe { self.unwrap_non_null(Private).as_ref().isconcretetype() != 0 }
+    }
+
+    /// Returns true if this type can have instances
+    #[cfg(feature = "lts")]
     pub fn is_concrete_type(self) -> bool {
         unsafe { self.unwrap_non_null(Private).as_ref().isconcretetype != 0 }
     }
 
     /// Returns true if this type is a dispatch, or leaf, tuple type.
+    #[cfg(not(feature = "lts"))]
+    pub fn is_dispatch_tuple(self) -> bool {
+        unsafe { self.unwrap_non_null(Private).as_ref().isdispatchtuple() != 0 }
+    }
+
+    /// Returns true if this type is a dispatch, or leaf, tuple type.
+    #[cfg(feature = "lts")]
     pub fn is_dispatch_tuple(self) -> bool {
         unsafe { self.unwrap_non_null(Private).as_ref().isdispatchtuple != 0 }
     }
 
     /// Returns true if this type is a bits-type.
+    #[cfg(not(feature = "lts"))]
     pub fn is_bits(self) -> bool {
-        unsafe { jl_isbits(self.unwrap(Private).cast()) }
+        unsafe { self.unwrap_non_null(Private).as_ref().isbitstype() != 0 }
+    }
+
+    /// Returns true if this type is a bits-type.
+    #[cfg(feature = "lts")]
+    pub fn is_bits(self) -> bool {
+        unsafe { self.unwrap_non_null(Private).as_ref().isbitstype != 0 }
     }
 
     /// Returns true if values of this type are zero-initialized.
+    #[cfg(not(feature = "lts"))]
+    pub fn zero_init(self) -> bool {
+        unsafe { self.unwrap_non_null(Private).as_ref().zeroinit() != 0 }
+    }
+
+    /// Returns true if values of this type are zero-initialized.
+    #[cfg(feature = "lts")]
     pub fn zero_init(self) -> bool {
         unsafe { self.unwrap_non_null(Private).as_ref().zeroinit != 0 }
     }
 
     /// Returns true if a value of this type stores its data inline.
+    #[cfg(not(feature = "lts"))]
     pub fn is_inline_alloc(self) -> bool {
         unsafe {
-            self.unwrap_non_null(Private).as_ref().isinlinealloc != 0
+            self.type_name().wrapper_unchecked().mayinlinealloc()
                 && !self.unwrap_non_null(Private).as_ref().layout.is_null()
         }
     }
 
+    /// Returns true if a value of this type stores its data inline.
+    #[cfg(feature = "lts")]
+    pub fn is_inline_alloc(self) -> bool {
+        unsafe { self.unwrap_non_null(Private).as_ref().isinlinealloc != 0 }
+    }
+
     /// If false, no value will have this type.
+    #[cfg(not(feature = "lts"))]
+    pub fn has_concrete_subtype(self) -> bool {
+        unsafe {
+            self.unwrap_non_null(Private)
+                .as_ref()
+                .has_concrete_subtype()
+                != 0
+        }
+    }
+
+    /// If false, no value will have this type.
+    #[cfg(feature = "lts")]
     pub fn has_concrete_subtype(self) -> bool {
         unsafe { self.unwrap_non_null(Private).as_ref().has_concrete_subtype != 0 }
+    }
+
+    /// If true, the type is stored in hash-based set cache (instead of linear cache).
+    #[cfg(not(feature = "lts"))]
+    pub fn cached_by_hash(self) -> bool {
+        unsafe { self.unwrap_non_null(Private).as_ref().cached_by_hash() != 0 }
+    }
+
+    /// If true, the type is stored in hash-based set cache (instead of linear cache).
+    #[cfg(feature = "lts")]
+    pub fn cached_by_hash(self) -> bool {
+        unsafe { self.unwrap_non_null(Private).as_ref().cached_by_hash != 0 }
     }
 }
 
@@ -225,17 +328,26 @@ impl<'scope> DataType<'scope> {
 
     /// Returns the alignment of a value of this type in bytes.
     pub fn align(self) -> u16 {
-        unsafe { jl_datatype_align(self.unwrap(Private)) }
+        unsafe {
+            self.layout()
+                .unwrap()
+                .cast::<jl_datatype_layout_t>()
+                .as_ref()
+                .alignment
+        }
     }
 
     /// Returns the size of a value of this type in bits.
     pub fn n_bits(self) -> i32 {
-        unsafe { jl_datatype_nbits(self.unwrap(Private)) }
+        self.size() * 8
     }
 
     /// Returns the number of fields of a value of this type.
     pub fn n_fields(self) -> u32 {
-        unsafe { jl_datatype_nfields(self.unwrap(Private)) }
+        unsafe {
+            let layout = self.layout().unwrap();
+            layout.cast::<jl_datatype_layout_t>().as_ref().nfields
+        }
     }
 
     /// Returns the name of this type.
@@ -266,6 +378,7 @@ impl<'scope> DataType<'scope> {
     /// arbitrary concrete `DataType`s, at the cost that each of its fields must have already been
     /// allocated as a `Value`. This functions returns an error if the given `DataType` isn't
     /// concrete or is an array type. For custom array types you must use [`Array::new_for`].
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn instantiate<'target, 'frame, 'value, 'borrow, V, S, F>(
         self,
         scope: S,
@@ -310,6 +423,7 @@ impl<'scope> DataType<'scope> {
     /// allocated as a `Value`. This functions returns an error if the given `DataType` is not
     /// concrete or an array type. Unlike [`DataType::instantiate`] this method doesn't root the
     /// allocated value.
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn instantiate_unrooted<'global, 'value, 'borrow, V>(
         self,
         _: Global<'global>,
@@ -476,6 +590,18 @@ impl<'base> DataType<'base> {
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_partial_struct_type), Private) }
     }
 
+    /// The type `Core.PartialOpaque`
+    #[cfg(not(feature = "lts"))]
+    pub fn partial_opaque_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_partial_opaque_type), Private) }
+    }
+
+    /// The type `Core.InterConditional`
+    #[cfg(not(feature = "lts"))]
+    pub fn interconditional_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_interconditional_type), Private) }
+    }
+
     /// The type `MethodMatch`
     pub fn method_match_type(_: Global<'base>) -> Self {
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_method_match_type), Private) }
@@ -499,6 +625,12 @@ impl<'base> DataType<'base> {
     /// The type `Tuple`.
     pub fn tuple_type(_: Global<'base>) -> Self {
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_anytuple_type), Private) }
+    }
+
+    /// The type `Vararg`.
+    #[cfg(not(feature = "lts"))]
+    pub fn vararg_type(_: Global<'base>) -> Self {
+        unsafe { DataType::wrap(jl_vararg_type, Private) }
     }
 
     /// The type `Function`.
@@ -584,6 +716,12 @@ impl<'base> DataType<'base> {
     /// The type `UndefVarError`.
     pub fn undefvarerror_type(_: Global<'base>) -> Self {
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_undefvarerror_type), Private) }
+    }
+
+    /// The type `Core.AtomicError`.
+    #[cfg(not(feature = "lts"))]
+    pub fn atomicerror_type(_: Global<'base>) -> Self {
+        unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_atomicerror_type), Private) }
     }
 
     /// The type `LineInfoNode`.
@@ -793,10 +931,12 @@ impl<'scope> WrapperPriv<'scope, '_> for DataType<'scope> {
     type Wraps = jl_datatype_t;
     const NAME: &'static str = "DataType";
 
+    #[inline(always)]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, ::std::marker::PhantomData)
     }
 
+    #[inline(always)]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }

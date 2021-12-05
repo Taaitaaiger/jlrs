@@ -2,7 +2,9 @@
 
 use super::mode::Async;
 use super::output_result_ext::OutputResultExt;
-use crate::memory::{frame::Frame, root_pending::RootPending, stack_page::StackPage};
+use crate::memory::{
+    frame::Frame, reusable_slot::ReusableSlot, root_pending::RootPending, stack_page::StackPage,
+};
 use crate::{
     error::{AllocError, JlrsError, JlrsResult, JuliaResult},
     memory::{
@@ -17,6 +19,7 @@ use crate::{memory::frame::private, wrappers::ptr::private::Wrapper as _};
 use futures::Future;
 use jl_sys::jl_value_t;
 use std::{
+    cell::Cell,
     ffi::c_void,
     ptr::{null_mut, NonNull},
 };
@@ -32,10 +35,9 @@ use std::{
 /// [`CallAsync`]: crate::extensions::multitask::call_async::CallAsync
 /// [`memory`]: crate::memory
 pub struct AsyncGcFrame<'frame> {
-    raw_frame: &'frame mut [*mut c_void],
-    n_roots: usize,
+    raw_frame: &'frame mut [Cell<*mut c_void>],
     page: Option<StackPage>,
-    output: Option<&'frame mut *mut c_void>,
+    output: Option<&'frame mut Cell<*mut c_void>>,
     mode: Async<'frame>,
 }
 
@@ -60,7 +62,7 @@ impl<'frame> AsyncGcFrame<'frame> {
             let ptr = func(output, r_nested).await?.unwrap_non_null();
 
             if let Some(output) = nested.output.take() {
-                *output = ptr.cast().as_ptr();
+                output.set(ptr.cast().as_ptr());
             }
 
             Ok(Value::wrap_non_null(ptr, Private))
@@ -88,7 +90,7 @@ impl<'frame> AsyncGcFrame<'frame> {
             let ptr = func(output, r_nested).await?.unwrap_non_null();
 
             if let Some(output) = nested.output.take() {
-                *output = ptr.cast().as_ptr();
+                output.set(ptr.cast().as_ptr());
             }
 
             Ok(Value::wrap_non_null(ptr, Private))
@@ -117,7 +119,7 @@ impl<'frame> AsyncGcFrame<'frame> {
             let ptr = res.unwrap_non_null();
 
             if let Some(output) = nested.output.take() {
-                *output = ptr.cast().as_ptr();
+                output.set(ptr.cast().as_ptr());
             }
 
             if is_exc {
@@ -151,7 +153,7 @@ impl<'frame> AsyncGcFrame<'frame> {
             let ptr = res.unwrap_non_null();
 
             if let Some(output) = nested.output.take() {
-                *output = ptr.cast().as_ptr();
+                output.set(ptr.cast().as_ptr());
             }
 
             if is_exc {
@@ -204,12 +206,7 @@ impl<'frame> AsyncGcFrame<'frame> {
 
     /// Returns the number of values currently rooted in this frame.
     pub fn n_roots(&self) -> usize {
-        self.n_roots
-    }
-
-    /// Returns the number of slots that are currently allocated to this frame.
-    pub fn n_slots(&self) -> usize {
-        self.raw_frame[0] as usize >> 1
+        self.raw_frame[0].get() as usize >> 2
     }
 
     /// Returns the maximum number of slots this frame can use.
@@ -217,38 +214,17 @@ impl<'frame> AsyncGcFrame<'frame> {
         self.raw_frame.len() - 2
     }
 
-    /// Try to allocate `additional` slots in the current frame. Returns `true` on success, or
-    /// `false` if `self.n_slots() + additional > self.capacity()`.
-    pub fn alloc_slots(&mut self, additional: usize) -> bool {
-        let slots = self.n_slots();
-        if additional + slots > self.capacity() {
-            return false;
-        }
-
-        for idx in slots + 2..slots + additional + 2 {
-            unsafe {
-                *self.raw_frame.get_unchecked_mut(idx) = null_mut();
-            }
-        }
-
-        // The new number of slots doesn't  exceed the capacity, and the new slots have been cleared
-        unsafe { self.set_n_slots(slots + additional) }
-        true
-    }
-
     // Safety: this frame must be dropped in the same scope it has been created and raw_frame must
     // have 2 + slots capacity available.
     pub(crate) unsafe fn new(
-        raw_frame: &'frame mut [*mut c_void],
-        capacity: usize,
+        raw_frame: &'frame mut [Cell<*mut c_void>],
         mode: Async<'frame>,
     ) -> Self {
         // Is popped when this frame is dropped
-        mode.push_frame(raw_frame, capacity, Private);
+        mode.push_frame(raw_frame, Private);
 
         AsyncGcFrame {
             raw_frame,
-            n_roots: 0,
             page: None,
             output: None,
             mode,
@@ -256,9 +232,9 @@ impl<'frame> AsyncGcFrame<'frame> {
     }
 
     // Safety: capacity >= n_slots
-    pub(crate) unsafe fn set_n_slots(&mut self, n_slots: usize) {
+    pub(crate) unsafe fn set_n_roots(&mut self, n_slots: usize) {
         debug_assert!(n_slots <= self.capacity());
-        *self.raw_frame.get_unchecked_mut(0) = (n_slots << 1) as _;
+        self.raw_frame.get_unchecked_mut(0).set((n_slots << 2) as _);
     }
 
     // Safety: this frame must be dropped in the same scope it has been created.
@@ -266,7 +242,7 @@ impl<'frame> AsyncGcFrame<'frame> {
         &'nested mut self,
         capacity: usize,
     ) -> GcFrame<'nested, Async<'frame>> {
-        let used = self.n_slots() + 2;
+        let used = self.n_roots() + 2;
         let new_frame_size = MIN_FRAME_CAPACITY.max(capacity) + 2;
         let raw_frame = if self.page.is_some() {
             if new_frame_size <= self.page.as_ref().unwrap().size() {
@@ -282,7 +258,7 @@ impl<'frame> AsyncGcFrame<'frame> {
             self.page.as_mut().unwrap().as_mut()
         };
 
-        GcFrame::new(raw_frame, capacity, self.mode)
+        GcFrame::new(raw_frame, self.mode)
     }
 
     // Safety: this frame must be dropped in the same scope it has been created.
@@ -290,7 +266,7 @@ impl<'frame> AsyncGcFrame<'frame> {
         &'nested mut self,
         capacity: usize,
     ) -> AsyncGcFrame<'nested> {
-        let used = self.n_slots() + 2;
+        let used = self.n_roots() + 2;
         let new_frame_size = MIN_FRAME_CAPACITY.max(capacity) + 2;
         let raw_frame = if self.page.is_some() {
             if new_frame_size <= self.page.as_ref().unwrap().size() {
@@ -306,7 +282,7 @@ impl<'frame> AsyncGcFrame<'frame> {
             self.page.as_mut().unwrap().as_mut()
         };
 
-        AsyncGcFrame::new(raw_frame, capacity, self.mode)
+        AsyncGcFrame::new(raw_frame, self.mode)
     }
 
     // Safety: n_roots < capacity
@@ -314,10 +290,10 @@ impl<'frame> AsyncGcFrame<'frame> {
         debug_assert!(self.n_roots() < self.capacity());
 
         let n_roots = self.n_roots();
-        *self.raw_frame.get_unchecked_mut(n_roots + 2) = value.cast().as_ptr();
-        if n_roots == self.n_slots() {
-            self.set_n_slots(n_roots + 1);
-        }
+        self.raw_frame
+            .get_unchecked_mut(n_roots + 2)
+            .set(value.cast().as_ptr());
+        self.set_n_roots(n_roots + 1);
     }
 
     // Safety: this frame must be dropped in the same scope it has been created.
@@ -325,7 +301,7 @@ impl<'frame> AsyncGcFrame<'frame> {
         &'nested mut self,
         capacity: usize,
     ) -> JlrsResult<AsyncGcFrame<'nested>> {
-        if self.capacity() == self.n_slots() {
+        if self.capacity() == self.n_roots() {
             Err(JlrsError::AllocError(AllocError::FrameOverflow(
                 1,
                 self.capacity(),
@@ -334,7 +310,7 @@ impl<'frame> AsyncGcFrame<'frame> {
 
         let new_frame_size = MIN_FRAME_CAPACITY.max(capacity) + 2;
         let (output, raw_frame) = if let Some(output) = self.output.take() {
-            let used = self.n_slots() + 2;
+            let used = self.n_roots() + 2;
 
             let new_frame_size = MIN_FRAME_CAPACITY.max(capacity) + 2;
             let raw_frame = if self.page.is_some() {
@@ -353,8 +329,7 @@ impl<'frame> AsyncGcFrame<'frame> {
 
             (output, raw_frame)
         } else {
-            let used = self.n_slots() + 3;
-
+            let used = self.n_roots() + 3;
             if self.page.is_some() {
                 if new_frame_size > self.page.as_ref().unwrap().size() {
                     self.page = Some(StackPage::new(new_frame_size));
@@ -375,7 +350,7 @@ impl<'frame> AsyncGcFrame<'frame> {
             }
         };
 
-        let mut frame = AsyncGcFrame::new(raw_frame, capacity, self.mode);
+        let mut frame = AsyncGcFrame::new(raw_frame, self.mode);
         frame.output = Some(output);
         Ok(frame)
     }
@@ -389,17 +364,12 @@ impl<'frame> Drop for AsyncGcFrame<'frame> {
 }
 
 impl<'frame> Frame<'frame> for AsyncGcFrame<'frame> {
-    #[must_use]
-    fn alloc_slots(&mut self, additional: usize) -> bool {
-        self.alloc_slots(additional)
+    fn reusable_slot(&mut self) -> JlrsResult<ReusableSlot<'frame>> {
+        ReusableSlot::new(self)
     }
 
     fn n_roots(&self) -> usize {
         self.n_roots()
-    }
-
-    fn n_slots(&self) -> usize {
-        self.n_slots()
     }
 
     fn capacity(&self) -> usize {
@@ -424,6 +394,21 @@ impl<'frame> private::Frame<'frame> for AsyncGcFrame<'frame> {
         Ok(Value::wrap_non_null(value, Private))
     }
 
+    unsafe fn reserve_slot(&mut self, _: Private) -> JlrsResult<*mut *mut c_void> {
+        let n_roots = self.n_roots();
+        if n_roots == self.capacity() {
+            Err(JlrsError::alloc_error(AllocError::FrameOverflow(
+                1, n_roots,
+            )))?;
+        }
+
+        self.raw_frame
+            .get_unchecked_mut(n_roots + 2)
+            .set(null_mut());
+        self.set_n_roots(n_roots + 1);
+
+        Ok(self.raw_frame.get_unchecked_mut(n_roots + 2).as_ptr())
+    }
     unsafe fn nest<'nested>(
         &'nested mut self,
         capacity: usize,

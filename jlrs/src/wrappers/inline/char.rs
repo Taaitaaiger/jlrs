@@ -17,16 +17,19 @@ use std::fmt::{Debug, Formatter, Result as FmtResult, Write};
 pub struct Char(u32);
 
 impl Char {
+    #[inline(always)]
     pub fn new(val: char) -> Self {
         Char(val as u32)
     }
 
     /// Returns the value of the `Char` as a `u32`.
+    #[inline(always)]
     pub fn as_u32(self) -> u32 {
         self.0
     }
 
     /// Returns the value of the `Char` as a `char` if it's valid, `None` if it isn't.
+    #[inline(always)]
     pub fn try_as_char(self) -> Option<char> {
         char::from_u32(self.0)
     }
@@ -34,6 +37,7 @@ impl Char {
     /// Returns the value of the `Char` as a `char`.
     ///
     /// Safety: the `Char` must be a valid `char`.
+    #[inline(always)]
     pub unsafe fn try_as_char_unchecked(self) -> char {
         char::from_u32_unchecked(self.0)
     }
@@ -54,6 +58,7 @@ impl_valid_layout!(Char);
 
 unsafe impl Unbox for Char {
     type Output = Self;
+    #[inline(always)]
     unsafe fn unbox(value: Value) -> Char {
         Char(jl_unbox_uint32(value.unwrap(Private).cast()))
     }
@@ -61,6 +66,7 @@ unsafe impl Unbox for Char {
 
 unsafe impl Unbox for char {
     type Output = Char;
+    #[inline(always)]
     unsafe fn unbox(value: Value) -> Char {
         Char(jl_unbox_uint32(value.unwrap(Private).cast()))
     }

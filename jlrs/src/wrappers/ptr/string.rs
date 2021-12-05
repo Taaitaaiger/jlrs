@@ -111,10 +111,12 @@ impl<'scope> WrapperPriv<'scope, '_> for JuliaString<'scope> {
     type Wraps = u8;
     const NAME: &'static str = "String";
 
+    #[inline(always)]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         JuliaString(inner.as_ptr(), PhantomData)
     }
 
+    #[inline(always)]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         unsafe { NonNull::new_unchecked(self.0 as *mut _) }
     }

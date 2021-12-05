@@ -1,15 +1,15 @@
-use std::{ffi::c_void, ptr::null_mut};
+use std::{cell::Cell, ffi::c_void, ptr::null_mut};
 
 const MIN_PAGE_SIZE: usize = 64;
 
 #[derive(Debug)]
 pub(crate) struct StackPage {
-    raw: Box<[*mut c_void]>,
+    raw: Box<[Cell<*mut c_void>]>,
 }
 
 impl StackPage {
     pub(crate) fn new(min_capacity: usize) -> Self {
-        let raw = vec![null_mut(); MIN_PAGE_SIZE.max(min_capacity)];
+        let raw = vec![Cell::new(null_mut()); MIN_PAGE_SIZE.max(min_capacity)];
         StackPage {
             raw: raw.into_boxed_slice(),
         }
@@ -26,8 +26,8 @@ impl Default for StackPage {
     }
 }
 
-impl AsMut<[*mut c_void]> for StackPage {
-    fn as_mut(&mut self) -> &mut [*mut c_void] {
+impl AsMut<[Cell<*mut c_void>]> for StackPage {
+    fn as_mut(&mut self) -> &mut [Cell<*mut c_void>] {
         self.raw.as_mut()
     }
 }

@@ -11,6 +11,11 @@ use crate::{private::Private, wrappers::ptr::ValueRef};
 use jl_sys::{jl_typemap_entry_t, jl_typemap_entry_type};
 use std::{marker::PhantomData, ptr::NonNull};
 
+#[cfg(not(feature = "lts"))]
+use super::atomic_value;
+#[cfg(not(feature = "lts"))]
+use std::sync::atomic::Ordering;
+
 /// One Type-to-Value entry
 #[derive(Copy, Clone)]
 #[repr(transparent)]
@@ -34,8 +39,19 @@ impl<'scope> TypeMapEntry<'scope> {
     */
 
     /// Invasive linked list
+    #[cfg(feature = "lts")]
     pub fn next(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().next.cast()) }
+    }
+
+    /// Invasive linked list
+    #[cfg(not(feature = "lts"))]
+    pub fn next(self) -> ValueRef<'scope, 'static> {
+        unsafe {
+            let next = atomic_value(self.unwrap_non_null(Private).as_ref().next);
+            let ptr = next.load(Ordering::Relaxed);
+            ValueRef::wrap(ptr.cast())
+        }
     }
 
     /// The type sig for this entry
@@ -92,10 +108,12 @@ impl<'scope> Wrapper<'scope, '_> for TypeMapEntry<'scope> {
     type Wraps = jl_typemap_entry_t;
     const NAME: &'static str = "TypeMapEntry";
 
+    #[inline(always)]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData)
     }
 
+    #[inline(always)]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }

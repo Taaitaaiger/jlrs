@@ -57,8 +57,8 @@
 //! which can trigger a garbage collection cycle. Because an unrooted value exists which is likely
 //! unreachable, such a cycle can free the value that has just been created.
 //!
-//! [`Julia::scope`]: crate::Julia::scope
-//! [`Julia::scope_with_slots`]: crate::Julia::scope_with_slots
+//! [`Julia::scope`]: crate::julia::Julia::scope
+//! [`Julia::scope_with_slots`]: crate::julia::Julia::scope_with_slots
 
 use crate::{
     error::{JlrsResult, JuliaResult},
@@ -116,8 +116,8 @@ pub trait ScopeExt<'target, 'current, 'data, F: Frame<'current>>:
     where
         for<'inner> G: FnOnce(&mut GcFrame<'inner, F::Mode>) -> JlrsResult<T>;
 
-    /// Create a [`GcFrame`] with `capacity` slots and call the given closure with it. Returns the
-    /// result of this closure.
+    /// Create a [`GcFrame`] with capacity for at least `capacity` roots and call the given
+    /// closure with it. Returns the result of this closure.
     ///
     /// Example:
     ///

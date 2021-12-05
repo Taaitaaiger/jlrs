@@ -74,6 +74,13 @@ impl<'scope, T: Wrapper<'scope, 'static>> SimpleVector<'scope, T> {
         std::slice::from_raw_parts(jl_svec_data(self.unwrap(Private)).cast(), self.len())
     }
 
+    /// Returns the data of this `SimpleVector`.
+    ///
+    /// Safety: the type `T` must be the type of all elements in the simple vector.
+    pub unsafe fn data_unchecked(self) -> &'scope [T] {
+        std::slice::from_raw_parts(jl_svec_data(self.unwrap(Private)).cast(), self.len())
+    }
+
     /// Set the element at `index` to `value`. This is only safe if the `SimpleVector` has just
     /// been allocated.
     pub unsafe fn set(self, index: usize, value: Option<T>) -> JlrsResult<Ref<'scope, 'static, T>> {
@@ -134,10 +141,12 @@ impl<'scope, T: Wrapper<'scope, 'static>> WrapperPriv<'scope, '_> for SimpleVect
     type Wraps = jl_svec_t;
     const NAME: &'static str = "SimpleVector";
 
+    #[inline(always)]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData, PhantomData)
     }
 
+    #[inline(always)]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }

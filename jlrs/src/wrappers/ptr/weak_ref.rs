@@ -33,10 +33,12 @@ impl<'scope> Wrapper<'scope, '_> for WeakRef<'scope> {
     type Wraps = jl_weakref_t;
     const NAME: &'static str = "WeakRef";
 
+    #[inline(always)]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData)
     }
 
+    #[inline(always)]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }

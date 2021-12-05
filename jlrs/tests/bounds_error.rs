@@ -1,36 +1,41 @@
-use jlrs::prelude::*;
-use jlrs::util::JULIA;
+mod util;
+#[cfg(feature = "sync-rt")]
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+mod tests {
+    use super::util::JULIA;
+    use jlrs::prelude::*;
 
-#[test]
-fn bounds_error() {
-    JULIA.with(|j| {
-        let mut jlrs = j.borrow_mut();
-        let oob_idx = jlrs
-            .scope_with_slots(0, |global, frame| {
-                frame.scope_with_slots(5, |frame| unsafe {
-                    let idx = Value::new(&mut *frame, 4usize)?;
-                    let data = vec![1.0f64, 2., 3.];
-                    let array = Array::from_vec(&mut *frame, data, 3)?;
-                    let func = Module::base(global)
-                        .function_ref("getindex")?
-                        .wrapper_unchecked();
-                    let out = func.call2(&mut *frame, array, idx)?.unwrap_err();
+    #[test]
+    fn bounds_error() {
+        JULIA.with(|j| {
+            let mut jlrs = j.borrow_mut();
+            let oob_idx = jlrs
+                .scope_with_slots(0, |global, frame| {
+                    frame.scope_with_slots(5, |frame| unsafe {
+                        let idx = Value::new(&mut *frame, 4usize)?;
+                        let data = vec![1.0f64, 2., 3.];
+                        let array = Array::from_vec(&mut *frame, data, 3)?;
+                        let func = Module::base(global)
+                            .function_ref("getindex")?
+                            .wrapper_unchecked();
+                        let out = func.call2(&mut *frame, array, idx)?.unwrap_err();
 
-                    assert_eq!(out.datatype_name().unwrap(), "BoundsError");
+                        assert_eq!(out.datatype_name().unwrap(), "BoundsError");
 
-                    let field_names = out.field_names();
-                    let f0: String = field_names[0].as_string().unwrap();
-                    assert_eq!(f0, "a");
-                    let f1 = field_names[1].as_str().unwrap();
-                    assert_eq!(f1, "i");
+                        let field_names = out.field_names();
+                        let f0: String = field_names[0].as_string().unwrap();
+                        assert_eq!(f0, "a");
+                        let f1 = field_names[1].as_str().unwrap();
+                        assert_eq!(f1, "i");
 
-                    out.get_field(&mut *frame, field_names[1])?
-                        .get_nth_field(&mut *frame, 0)?
-                        .unbox::<isize>()
+                        out.get_field(&mut *frame, field_names[1])?
+                            .get_nth_field(&mut *frame, 0)?
+                            .unbox::<isize>()
+                    })
                 })
-            })
-            .unwrap();
+                .unwrap();
 
-        assert_eq!(oob_idx, 4);
-    });
+            assert_eq!(oob_idx, 4);
+        });
+    }
 }

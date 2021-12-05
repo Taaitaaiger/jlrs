@@ -1,6 +1,27 @@
 #include "jlrs_c.h"
-#include <julia.h>
 
+void jlrs_print_stack(jl_gcframe_t *frame) {
+    if (frame == NULL) return;
+    size_t n = frame->nroots >> 2;
+
+    printf("gc_frame@%p -- %zu %p [", frame, n, frame->prev);
+    if (n == 0) {
+        printf("]\n");
+    } else {
+        if (n > 1) {
+            for (unsigned i = 1; i < n; ++i) {
+                printf("%p, ", *(((void**)frame) + 1 + i));
+            }
+        }
+        printf("%p]\n",  *(((void**)frame) + 1 + n));
+    }
+
+    if (frame->prev != NULL) {
+        jlrs_print_stack(frame->prev);
+    }
+}
+
+#if !defined(JLRS_WINDOWS_LTS)
 jlrs_result_t jlrs_alloc_array_1d(jl_value_t *atype, size_t nr)
 {
     jlrs_result_t out;
@@ -351,4 +372,9 @@ jlrs_result_t jlrs_array_del_beg(jl_array_t *a, size_t dec)
     jl_exception_clear();
 
     return out;
+}
+#endif
+
+uint_t jlrs_array_data_owner_offset(uint16_t n_dims) {
+    return jl_array_data_owner_offset(n_dims);
 }

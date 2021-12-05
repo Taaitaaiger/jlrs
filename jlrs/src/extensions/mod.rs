@@ -6,3 +6,5 @@ pub mod f16;
 pub mod multitask;
 #[cfg(feature = "jlrs-ndarray")]
 pub mod ndarray;
+#[cfg(feature = "pyplot")]
+pub mod pyplot;

@@ -21,9 +21,19 @@
 //! # }
 //! ```
 
-use crate::wrappers::ptr::datatype::DataType;
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use crate::convert::into_jlrs_result::IntoJlrsResult;
+use crate::wrappers::ptr::{
+    datatype::DataType,
+    value::{Value, MAX_SIZE},
+};
 use crate::wrappers::ptr::{private::Wrapper as _, Wrapper as _};
-use crate::{layout::typecheck::Typecheck, private::Private};
+use crate::{
+    error::JlrsResult,
+    layout::typecheck::Typecheck,
+    memory::{frame::Frame, scope::Scope},
+    private::Private,
+};
 use jl_sys::jl_tuple_typename;
 
 /// A typecheck that can be used in combination with `DataType::is`. This method returns true if
@@ -31,6 +41,66 @@ use jl_sys::jl_tuple_typename;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Tuple;
+
+impl Tuple {
+    /// Create a new tuple from the contents of `values`.
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    pub fn new<'target, 'current, 'value, 'borrow, V, S, F>(
+        scope: S,
+        mut values: V,
+    ) -> JlrsResult<S::JuliaResult>
+    where
+        V: AsMut<[Value<'value, 'borrow>]>,
+        S: Scope<'target, 'current, 'borrow, F>,
+        F: Frame<'current>,
+    {
+        scope.result_scope(|output, frame| {
+            let types: smallvec::SmallVec<[_; MAX_SIZE]> = values
+                .as_mut()
+                .iter()
+                .copied()
+                .map(|v| v.datatype().as_value())
+                .collect();
+
+            let tuple_ty = DataType::tuple_type(frame.global())
+                .as_value()
+                .apply_type(&mut *frame, types)?
+                .into_jlrs_result()?
+                .cast::<DataType>()?;
+
+            let output = output.into_scope(frame);
+            tuple_ty.instantiate(output, values)
+        })
+    }
+
+    /// Create a new tuple from the contents of `values`.
+    pub unsafe fn new_unchecked<'target, 'current, 'value, 'borrow, V, S, F>(
+        scope: S,
+        mut values: V,
+    ) -> JlrsResult<S::Value>
+    where
+        V: AsMut<[Value<'value, 'borrow>]>,
+        S: Scope<'target, 'current, 'borrow, F>,
+        F: Frame<'current>,
+    {
+        scope.value_scope(|output, frame| {
+            let types: smallvec::SmallVec<[_; MAX_SIZE]> = values
+                .as_mut()
+                .iter()
+                .copied()
+                .map(|v| v.datatype().as_value())
+                .collect();
+
+            let tuple_ty = DataType::tuple_type(frame.global())
+                .as_value()
+                .apply_type_unchecked(&mut *frame, types)?
+                .cast::<DataType>()?;
+
+            let output = output.into_scope(frame);
+            tuple_ty.instantiate_unchecked(output, values)
+        })
+    }
+}
 
 unsafe impl Typecheck for Tuple {
     fn typecheck(t: DataType) -> bool {

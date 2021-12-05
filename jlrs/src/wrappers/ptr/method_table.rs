@@ -14,6 +14,11 @@ use crate::{
 use jl_sys::{jl_methtable_t, jl_methtable_type};
 use std::{marker::PhantomData, ptr::NonNull};
 
+#[cfg(not(feature = "lts"))]
+use super::atomic_value;
+#[cfg(not(feature = "lts"))]
+use std::sync::atomic::Ordering;
+
 /// contains the TypeMap for one Type
 #[derive(Copy, Clone)]
 #[repr(transparent)]
@@ -44,18 +49,51 @@ impl<'scope> MethodTable<'scope> {
     }
 
     /// The `defs` field.
+    #[cfg(feature = "lts")]
     pub fn defs(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().defs) }
     }
 
+    /// The `defs` field.
+    #[cfg(not(feature = "lts"))]
+    pub fn defs(self) -> ValueRef<'scope, 'static> {
+        unsafe {
+            let defs = atomic_value(self.unwrap_non_null(Private).as_ref().cache);
+            let ptr = defs.load(Ordering::Relaxed);
+            ValueRef::wrap(ptr)
+        }
+    }
+
     /// The `leafcache` field.
-    pub fn leaf_cache(self) -> ValueRef<'scope, 'static> {
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().leafcache.cast()) }
+    #[cfg(feature = "lts")]
+    pub fn leafcache(self) -> ArrayRef<'scope, 'static> {
+        unsafe { ArrayRef::wrap(self.unwrap_non_null(Private).as_ref().leafcache) }
+    }
+
+    /// The `leafcache` field.
+    #[cfg(not(feature = "lts"))]
+    pub fn leafcache(self) -> ArrayRef<'scope, 'static> {
+        unsafe {
+            let leafcache = atomic_value(self.unwrap_non_null(Private).as_ref().cache);
+            let ptr = leafcache.load(Ordering::Relaxed);
+            ArrayRef::wrap(ptr.cast())
+        }
     }
 
     /// The `cache` field.
+    #[cfg(feature = "lts")]
     pub fn cache(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().cache) }
+    }
+
+    /// The `cache` field.
+    #[cfg(not(feature = "lts"))]
+    pub fn cache(self) -> ValueRef<'scope, 'static> {
+        unsafe {
+            let cache = atomic_value(self.unwrap_non_null(Private).as_ref().cache);
+            let ptr = cache.load(Ordering::Relaxed);
+            ValueRef::wrap(ptr)
+        }
     }
 
     /// Max # of non-vararg arguments in a signature
@@ -97,10 +135,12 @@ impl<'scope> Wrapper<'scope, '_> for MethodTable<'scope> {
     type Wraps = jl_methtable_t;
     const NAME: &'static str = "<MethodTable";
 
+    #[inline(always)]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData)
     }
 
+    #[inline(always)]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }

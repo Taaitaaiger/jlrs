@@ -146,6 +146,7 @@ impl<'frame: 'borrow, 'data: 'borrow, 'borrow, T: ValidLayout + Clone + Debug> N
 }
 
 #[cfg(test)]
+#[cfg(feature = "sync-rt")]
 mod tests {
     use super::NdArray;
     use crate::util::JULIA;

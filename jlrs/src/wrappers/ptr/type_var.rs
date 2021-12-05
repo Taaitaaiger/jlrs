@@ -3,6 +3,7 @@
 use super::TypeVarRef;
 use super::{datatype::DataType, value::Value};
 use super::{private::Wrapper, Wrapper as _};
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
 use crate::error::JuliaResultRef;
 use crate::memory::global::Global;
 use crate::memory::scope::Scope;
@@ -10,9 +11,11 @@ use crate::private::Private;
 use crate::wrappers::ptr::{SymbolRef, ValueRef};
 use crate::{convert::temporary_symbol::TemporarySymbol, error::JlrsResult, memory::frame::Frame};
 use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout};
-use jl_sys::{
-    jl_new_typevar, jl_tvar_t, jl_tvar_type, jlrs_new_typevar, jlrs_result_tag_t_JLRS_RESULT_ERR,
-};
+use jl_sys::{jl_new_typevar, jl_tvar_t, jl_tvar_type};
+
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use jl_sys::{jlrs_new_typevar, jlrs_result_tag_t_JLRS_RESULT_ERR};
+
 use std::{marker::PhantomData, ptr::NonNull};
 
 /// An unknown, but possibly restricted, type parameter. In `Array{T, N}`, `T` and `N` are
@@ -25,6 +28,7 @@ impl<'scope> TypeVar<'scope> {
     /// Create a new `TypeVar`, the optional lower and upper bounds must be subtypes of `Type`,
     /// their default values are `Union{}` and `Any` respectively. The returned value can be
     /// cast to a [`TypeVar`]. If Julia throws an exception, it's caught, rooted and returned.
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn new<'target, 'current, N, S, F>(
         scope: S,
         name: N,
@@ -78,6 +82,7 @@ impl<'scope> TypeVar<'scope> {
     }
 
     /// See [`TypeVar::new`], the only difference is that the result isn't rooted.
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn new_unrooted<'global, N>(
         global: Global<'global>,
         name: N,
@@ -154,10 +159,12 @@ impl<'scope> Wrapper<'scope, '_> for TypeVar<'scope> {
     type Wraps = jl_tvar_t;
     const NAME: &'static str = "TypeVar";
 
+    #[inline(always)]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData)
     }
 
+    #[inline(always)]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }

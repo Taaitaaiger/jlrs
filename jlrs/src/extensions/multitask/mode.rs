@@ -14,18 +14,13 @@ pub struct Async<'a>(pub(crate) &'a Cell<*mut c_void>);
 impl<'a> Mode for Async<'a> {}
 
 impl<'a> ModePriv for Async<'a> {
-    unsafe fn push_frame(&self, raw_frame: &mut [*mut c_void], capacity: usize, _: Private) {
-        raw_frame[0] = (capacity << 1) as _;
-        raw_frame[1] = self.0.get();
-
-        for i in 0..capacity {
-            raw_frame[2 + i] = null_mut();
-        }
-
-        self.0.set(raw_frame[..].as_mut_ptr().cast());
+    unsafe fn push_frame(&self, raw_frame: &mut [Cell<*mut c_void>], _: Private) {
+        raw_frame[0].set(null_mut());
+        raw_frame[1].set(self.0.get());
+        self.0.set(raw_frame.as_mut_ptr().cast());
     }
 
-    unsafe fn pop_frame(&self, raw_frame: &mut [*mut c_void], _: Private) {
-        self.0.set(raw_frame[1]);
+    unsafe fn pop_frame(&self, raw_frame: &mut [Cell<*mut c_void>], _: Private) {
+        self.0.set(raw_frame[1].get());
     }
 }

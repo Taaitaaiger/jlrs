@@ -1,11 +1,9 @@
 //! Control the garbage collector.
 
 use super::frame::Frame;
-use crate::Julia;
-use jl_sys::{
-    jl_flush_cstdio, jl_gc_collect, jl_gc_collection_t, jl_gc_enable, jl_gc_is_enabled,
-    jl_gc_safepoint,
-};
+#[cfg(feature = "sync-rt")]
+use crate::julia::Julia;
+use jl_sys::{jl_gc_collect, jl_gc_collection_t, jl_gc_enable, jl_gc_is_enabled, jl_gc_safepoint};
 
 /// The different collection modes.
 #[derive(Debug, Copy, Clone)]
@@ -36,19 +34,18 @@ pub trait Gc: private::Gc {
     unsafe fn gc_safepoint(&mut self) {
         jl_gc_safepoint();
     }
-
-    /// Flush C stdio.
-    fn flush_io(&mut self) {
-        unsafe { jl_flush_cstdio() }
-    }
 }
 
+#[cfg(feature = "sync-rt")]
 impl Gc for Julia {}
 impl<'frame, T: Frame<'frame>> Gc for T {}
 
 mod private {
-    use super::{Frame, Julia};
+    use super::Frame;
+    #[cfg(feature = "sync-rt")]
+    use crate::julia::Julia;
     pub trait Gc {}
     impl<'a, F: Frame<'a>> Gc for F {}
+    #[cfg(feature = "sync-rt")]
     impl Gc for Julia {}
 }

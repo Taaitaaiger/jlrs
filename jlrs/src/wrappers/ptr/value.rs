@@ -97,14 +97,13 @@ macro_rules! named_tuple {
 
 use crate::{
     convert::{into_julia::IntoJulia, temporary_symbol::TemporarySymbol, unbox::Unbox},
-    error::{JlrsError, JlrsResult, JuliaResult, JuliaResultRef, CANNOT_DISPLAY_TYPE},
+    error::{JlrsError, JlrsResult, JuliaResultRef, CANNOT_DISPLAY_TYPE},
     impl_debug,
     layout::{
         typecheck::{NamedTuple, Typecheck},
         valid_layout::ValidLayout,
     },
-    memory::{frame::Frame, global::Global, scope::Scope},
-    prelude::JuliaString,
+    memory::{frame::Frame, get_tls, global::Global, scope::Scope},
     private::Private,
     wrappers::ptr::{
         array::Array,
@@ -112,6 +111,7 @@ use crate::{
         datatype::DataType,
         module::Module,
         private::Wrapper as WrapperPriv,
+        string::JuliaString,
         symbol::Symbol,
         union::{nth_union_component, Union},
         union_all::UnionAll,
@@ -120,22 +120,27 @@ use crate::{
 };
 use jl_sys::{
     jl_an_empty_string, jl_an_empty_vec_any, jl_apply_type, jl_array_any_type, jl_array_int32_type,
-    jl_array_symbol_type, jl_array_uint8_type, jl_bottom_type, jl_call, jl_call0, jl_call1,
-    jl_call2, jl_call3, jl_diverror_exception, jl_egal, jl_emptytuple, jl_eval_string,
-    jl_exception_occurred, jl_false, jl_field_index, jl_field_isptr, jl_field_names,
-    jl_field_offset, jl_fieldref, jl_fieldref_noalloc, jl_finalize, jl_gc_add_finalizer,
-    jl_gc_add_ptr_finalizer, jl_get_ptls_states, jl_interrupt_exception, jl_is_kind, jl_isa,
-    jl_memory_exception, jl_nfields, jl_nothing, jl_object_id, jl_readonlymemory_exception,
-    jl_set_nth_field, jl_stackovf_exception, jl_stderr_obj, jl_stdout_obj, jl_subtype,
-    jl_svec_data, jl_svec_len, jl_true, jl_typeof, jl_typeof_str, jl_undefref_exception,
-    jl_value_t, jlrs_apply_type, jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_set_nth_field,
+    jl_array_symbol_type, jl_array_uint8_type, jl_astaggedvalue, jl_bottom_type, jl_call, jl_call0,
+    jl_call1, jl_call2, jl_call3, jl_diverror_exception, jl_egal, jl_emptytuple, jl_eval_string,
+    jl_exception_occurred, jl_false, jl_field_index, jl_field_isptr, jl_field_offset,
+    jl_gc_add_finalizer, jl_gc_add_ptr_finalizer, jl_get_nth_field, jl_get_nth_field_noalloc,
+    jl_interrupt_exception, jl_isa, jl_memory_exception, jl_nothing, jl_object_id,
+    jl_readonlymemory_exception, jl_set_nth_field, jl_stackovf_exception, jl_stderr_obj,
+    jl_stdout_obj, jl_subtype, jl_true, jl_typeof_str, jl_undefref_exception, jl_value_t,
 };
+
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use jl_sys::{jlrs_apply_type, jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_set_nth_field};
+
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use crate::error::JuliaResult;
+
 use std::{
     ffi::{c_void, CStr, CString},
     marker::PhantomData,
     path::Path,
     ptr::NonNull,
-    slice, usize,
+    usize,
 };
 
 /// In some cases it's necessary to place one or more arguments in front of the arguments a
@@ -265,6 +270,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// If the types can't be applied to `self` this methods catches and returns the exception.
     ///
     /// [`Union::new`]: crate::wrappers::ptr::union::Union::new
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn apply_type<'target, 'current, S, F, V>(
         self,
         scope: S,
@@ -325,7 +331,13 @@ impl<'scope, 'data> Value<'scope, 'data> {
 impl<'scope, 'data> Value<'scope, 'data> {
     /// Returns the `DataType` of this value.
     pub fn datatype(self) -> DataType<'scope> {
-        unsafe { DataType::wrap(jl_typeof(self.unwrap(Private)).cast(), Private) }
+        unsafe {
+            let ptr = ((*jl_astaggedvalue(self.unwrap(Private)))
+                .__bindgen_anon_1
+                .header as usize
+                & !15usize) as *mut jl_value_t;
+            DataType::wrap(ptr.cast(), Private)
+        }
     }
 
     /// Returns the name of this value's [`DataType`] as a string slice.
@@ -387,7 +399,14 @@ impl Value<'_, '_> {
     /// Returns true if `self` is the type of a `DataType`, `UnionAll`, `Union`, or `Union{}` (the
     /// bottom type).
     pub fn is_kind(self) -> bool {
-        unsafe { jl_is_kind(self.unwrap(Private)) }
+        unsafe {
+            let global = Global::new();
+            let ptr = self.unwrap(Private);
+            ptr == DataType::datatype_type(global).unwrap(Private).cast()
+                || ptr == DataType::unionall_type(global).unwrap(Private).cast()
+                || ptr == DataType::uniontype_type(global).unwrap(Private).cast()
+                || ptr == DataType::typeofbottom_type(global).unwrap(Private).cast()
+        }
     }
 
     /// Returns true if the value is a type, ie a `DataType`, `UnionAll`, `Union`, or `Union{}`
@@ -502,17 +521,16 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// Returns the field names of this value as a slice of `Symbol`s.
     pub fn field_names(self) -> &'scope [Symbol<'scope>] {
         unsafe {
-            let tp = jl_typeof(self.unwrap(Private));
-            let field_names = jl_field_names(tp.cast());
-            let len = jl_svec_len(field_names);
-            let items = jl_svec_data(field_names);
-            slice::from_raw_parts(items.cast(), len)
+            self.datatype()
+                .field_names()
+                .wrapper_unchecked()
+                .data_unchecked()
         }
     }
 
     /// Returns the number of fields the underlying Julia value has.
     pub fn n_fields(self) -> usize {
-        unsafe { jl_nfields(self.unwrap(Private)) as _ }
+        self.datatype().n_fields() as _
     }
 
     /// Access the contents of the field at index `idx`. If the field is a bits union, this method
@@ -626,7 +644,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
                 })?
             }
 
-            let fld_ptr = jl_fieldref(self.unwrap(Private), idx as _);
+            let fld_ptr = jl_get_nth_field(self.unwrap(Private), idx as _);
             if fld_ptr.is_null() {
                 Err(JlrsError::UndefRef)?;
             }
@@ -677,7 +695,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
                 })?
             }
 
-            Ok(ValueRef::wrap(jl_fieldref_noalloc(
+            Ok(ValueRef::wrap(jl_get_nth_field_noalloc(
                 self.unwrap(Private),
                 idx,
             )))
@@ -697,7 +715,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
             })?
         }
 
-        unsafe { Ok(ValueRef::wrap(jl_fieldref(self.unwrap(Private), idx))) }
+        unsafe { Ok(ValueRef::wrap(jl_get_nth_field(self.unwrap(Private), idx))) }
     }
 
     /// Roots the field with the name `field_name` if it exists and returns it, or
@@ -714,9 +732,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     {
         unsafe {
             let symbol = field_name.temporary_symbol(Private);
-
-            let jl_type = jl_typeof(self.unwrap(Private)).cast();
-            let idx = jl_field_index(jl_type, symbol.unwrap(Private), 0);
+            let idx = jl_field_index(self.datatype().unwrap(Private), symbol.unwrap(Private), 0);
 
             if idx < 0 {
                 Err(JlrsError::NoSuchField {
@@ -725,7 +741,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
                 })?
             }
 
-            let fld_ptr = jl_fieldref(self.unwrap(Private), idx as _);
+            let fld_ptr = jl_get_nth_field(self.unwrap(Private), idx as _);
             if fld_ptr.is_null() {
                 Err(JlrsError::UndefRef)?;
             }
@@ -745,13 +761,11 @@ impl<'scope, 'data> Value<'scope, 'data> {
         unsafe {
             let symbol = field_name.temporary_symbol(Private);
             let ty = self.datatype();
-
-            let jl_type = jl_typeof(self.unwrap(Private)).cast();
-            let idx = jl_field_index(jl_type, symbol.unwrap(Private), 0);
+            let idx = jl_field_index(ty.unwrap(Private), symbol.unwrap(Private), 0);
 
             if idx < 0 {
                 Err(JlrsError::NoSuchField {
-                    type_name: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
+                    type_name: ty.display_string_or(CANNOT_DISPLAY_TYPE),
                     field_name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
                 })?
             }
@@ -778,7 +792,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
                 })?
             }
 
-            Ok(ValueRef::wrap(jl_fieldref_noalloc(
+            Ok(ValueRef::wrap(jl_get_nth_field_noalloc(
                 self.unwrap(Private),
                 idx as _,
             )))
@@ -795,9 +809,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     {
         unsafe {
             let symbol = field_name.temporary_symbol(Private);
-
-            let jl_type = jl_typeof(self.unwrap(Private)).cast();
-            let idx = jl_field_index(jl_type, symbol.unwrap(Private), 0);
+            let idx = jl_field_index(self.datatype().unwrap(Private), symbol.unwrap(Private), 0);
 
             if idx < 0 {
                 Err(JlrsError::NoSuchField {
@@ -806,7 +818,10 @@ impl<'scope, 'data> Value<'scope, 'data> {
                 })?
             }
 
-            Ok(ValueRef::wrap(jl_fieldref(self.unwrap(Private), idx as _)))
+            Ok(ValueRef::wrap(jl_get_nth_field(
+                self.unwrap(Private),
+                idx as _,
+            )))
         }
     }
 
@@ -816,6 +831,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     ///
     /// Safety: Mutating things that should absolutely not be mutated, like the fields of a
     /// `DataType`, is not prevented.
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub unsafe fn set_nth_field<'frame, F>(
         self,
         frame: &mut F,
@@ -865,6 +881,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     ///
     /// Safety: Mutating things that should absolutely not be mutated, like the fields of a
     /// `DataType`, is not prevented.
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub unsafe fn set_nth_field_unrooted(
         self,
         idx: usize,
@@ -913,6 +930,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     ///
     /// Safety: Mutating things that should absolutely not be mutated, like the fields of a
     /// `DataType`, is not prevented.
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub unsafe fn set_field<'frame, F, N>(
         self,
         frame: &mut F,
@@ -924,8 +942,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
         N: TemporarySymbol,
     {
         let symbol = field_name.temporary_symbol(Private);
-        let jl_type = jl_typeof(self.unwrap(Private)).cast();
-        let idx = jl_field_index(jl_type, symbol.unwrap(Private), 0);
+        let idx = jl_field_index(self.datatype().unwrap(Private), symbol.unwrap(Private), 0);
 
         if idx < 0 {
             Err(JlrsError::NoSuchField {
@@ -965,6 +982,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     ///
     /// Safety: Mutating things that should absolutely not be mutated, like the fields of a
     /// `DataType`, is not prevented.
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub unsafe fn set_field_unrooted<N>(
         self,
         field_name: N,
@@ -974,8 +992,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
         N: TemporarySymbol,
     {
         let symbol = field_name.temporary_symbol(Private);
-        let jl_type = jl_typeof(self.unwrap(Private)).cast();
-        let idx = jl_field_index(jl_type, symbol.unwrap(Private), 0);
+        let idx = jl_field_index(self.datatype().unwrap(Private), symbol.unwrap(Private), 0);
 
         if idx < 0 {
             Err(JlrsError::NoSuchField {
@@ -1018,8 +1035,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
         N: TemporarySymbol,
     {
         let symbol = field_name.temporary_symbol(Private);
-        let jl_type = jl_typeof(self.unwrap(Private)).cast();
-        let idx = jl_field_index(jl_type, symbol.unwrap(Private), 0);
+        let idx = jl_field_index(self.datatype().unwrap(Private), symbol.unwrap(Private), 0);
 
         if idx < 0 {
             Err(JlrsError::NoSuchField {
@@ -1198,12 +1214,7 @@ impl Value<'_, '_> {
     /// Add a finalizer `f` to this value. The finalizer must be an `extern "C"` function that
     /// takes one argument, the value as a void pointer.
     pub unsafe fn add_ptr_finalizer(self, f: unsafe extern "C" fn(*mut c_void) -> ()) {
-        jl_gc_add_ptr_finalizer(jl_get_ptls_states(), self.unwrap(Private), f as *mut c_void)
-    }
-
-    /// Call all finalizers.
-    pub unsafe fn finalize(self) {
-        jl_finalize(self.unwrap(Private))
+        jl_gc_add_ptr_finalizer(get_tls(), self.unwrap(Private), f as *mut c_void)
     }
 }
 
@@ -1322,6 +1333,7 @@ unsafe impl<'scope, 'data> ValidLayout for Value<'scope, 'data> {
 }
 
 impl<'data> Call<'data> for Value<'_, 'data> {
+    #[inline(always)]
     unsafe fn call0<'target, 'current, S, F>(self, scope: S) -> JlrsResult<S::JuliaResult>
     where
         S: Scope<'target, 'current, 'data, F>,
@@ -1331,6 +1343,7 @@ impl<'data> Call<'data> for Value<'_, 'data> {
         scope.unrooted_call_result(res, Private)
     }
 
+    #[inline(always)]
     unsafe fn call1<'target, 'current, S, F>(
         self,
         scope: S,
@@ -1344,6 +1357,7 @@ impl<'data> Call<'data> for Value<'_, 'data> {
         scope.unrooted_call_result(res, Private)
     }
 
+    #[inline(always)]
     unsafe fn call2<'target, 'current, S, F>(
         self,
         scope: S,
@@ -1358,6 +1372,7 @@ impl<'data> Call<'data> for Value<'_, 'data> {
         scope.unrooted_call_result(res, Private)
     }
 
+    #[inline(always)]
     unsafe fn call3<'target, 'current, S, F>(
         self,
         scope: S,
@@ -1373,6 +1388,7 @@ impl<'data> Call<'data> for Value<'_, 'data> {
         scope.unrooted_call_result(res, Private)
     }
 
+    #[inline(always)]
     unsafe fn call<'target, 'current, 'value, V, S, F>(
         self,
         scope: S,
@@ -1387,6 +1403,7 @@ impl<'data> Call<'data> for Value<'_, 'data> {
         scope.unrooted_call_result(res, Private)
     }
 
+    #[inline(always)]
     unsafe fn call0_unrooted<'target>(self, _: Global<'target>) -> JuliaResultRef<'target, 'data> {
         let res = jl_call0(self.unwrap(Private));
         let exc = jl_exception_occurred();
@@ -1398,6 +1415,7 @@ impl<'data> Call<'data> for Value<'_, 'data> {
         }
     }
 
+    #[inline(always)]
     unsafe fn call1_unrooted<'target>(
         self,
         _: Global<'target>,
@@ -1413,6 +1431,7 @@ impl<'data> Call<'data> for Value<'_, 'data> {
         }
     }
 
+    #[inline(always)]
     unsafe fn call2_unrooted<'target>(
         self,
         _: Global<'target>,
@@ -1433,6 +1452,7 @@ impl<'data> Call<'data> for Value<'_, 'data> {
         }
     }
 
+    #[inline(always)]
     unsafe fn call3_unrooted<'target>(
         self,
         _: Global<'target>,
@@ -1455,6 +1475,7 @@ impl<'data> Call<'data> for Value<'_, 'data> {
         }
     }
 
+    #[inline(always)]
     unsafe fn call_unrooted<'target, 'value, V>(
         self,
         _: Global<'target>,
@@ -1498,10 +1519,12 @@ impl<'scope, 'data> WrapperPriv<'scope, 'data> for Value<'scope, 'data> {
     type Wraps = jl_value_t;
     const NAME: &'static str = "Value";
 
+    #[inline(always)]
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData, PhantomData)
     }
 
+    #[inline(always)]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
@@ -1513,10 +1536,12 @@ impl<'scope, 'data> WrapperPriv<'scope, 'data> for Value<'scope, 'data> {
 pub struct LeakedValue(Value<'static, 'static>);
 
 impl LeakedValue {
+    #[inline(always)]
     pub(crate) unsafe fn wrap(ptr: *mut jl_value_t) -> Self {
         LeakedValue(Value::wrap(ptr, Private))
     }
 
+    #[inline(always)]
     pub(crate) unsafe fn wrap_non_null(ptr: NonNull<jl_value_t>) -> Self {
         LeakedValue(Value::wrap_non_null(ptr, Private))
     }
@@ -1526,6 +1551,7 @@ impl LeakedValue {
     ///
     /// Safety: you must guarantee this value has not been freed by the garbage collector. While
     /// `Symbol`s are never garbage collected, modules and their contents can be redefined.
+    #[inline(always)]
     pub unsafe fn as_value<'scope>(self, _: Global<'scope>) -> Value<'scope, 'static> {
         self.0
     }
