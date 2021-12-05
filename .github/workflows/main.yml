@@ -80,6 +80,40 @@ jobs:
         run: |
           cargo test --package jlrs-async-tests --features jlrs/async-std-rt -- --test-threads=1
 
+  test-windows-lts:
+    env:
+      JULIA_NUM_THREADS: 3
+    runs-on: windows-latest
+    continue-on-error: ${{ matrix.allow-fail }}
+    strategy:
+      matrix:
+        rust: [stable-x86_64-pc-windows-gnu, beta-x86_64-pc-windows-gnu]
+        allow-fail: [false]
+        include:
+          - rust: nightly-x86_64-pc-windows-gnu
+            allow-fail: true
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup Julia environment
+        uses: julia-actions/setup-julia@v1
+        with:
+          version: '1.6'
+
+      - name: rust-toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.rust }}
+          override: true
+
+      - name: Run tests
+        run: |
+          cargo test --features tokio-rt,jlrs-ndarray,f16,jlrs-derive,sync-rt,ccall,lts --verbose -- --test-threads=1
+
+      - name: Run async-std async tests
+        run: |
+          cargo test --package jlrs-async-tests --features jlrs/async-std-rt,lts -- --test-threads=1
+
   test-linux-lts:
     env:
       JULIA_NUM_THREADS: 3
