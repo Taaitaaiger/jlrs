@@ -53,10 +53,10 @@ jobs:
     continue-on-error: ${{ matrix.allow-fail }}
     strategy:
       matrix:
-        rust: [stable, beta]
+        rust: [stable-x86_64-pc-windows-gnu, beta-x86_64-pc-windows-gnu]
         allow-fail: [false]
         include:
-          - rust: nightly
+          - rust: nightly-x86_64-pc-windows-gnu
             allow-fail: true
     steps:
       - uses: actions/checkout@v2
@@ -70,7 +70,6 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ matrix.rust }}
-          target: x86_64-pc-windows-gnu
 
       - name: Run tests
         run: |
