@@ -550,6 +550,7 @@
 //! [`Call`]: crate::wrappers::ptr::call::Call
 //! [`Value::eval_string`]: crate::wrappers::ptr::value::Value::eval_string
 //! [`Value::new`]: crate::wrappers::ptr::value::Value::new
+//! [`Array`]: crate::wrappers::ptr::array::Array
 //! [`JuliaString`]: crate::wrappers::ptr::string::JuliaString
 //! [`Module::main`]: crate::wrappers::ptr::module::Module::main
 //! [`Module::base`]: crate::wrappers::ptr::module::Module::base
