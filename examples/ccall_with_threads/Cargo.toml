@@ -9,4 +9,4 @@ edition = "2018"
 crate-type = ["cdylib"]
 
 [dependencies]
-jlrs = { path = "../../jlrs", features = ["uv"] }
+jlrs = { path = "../../jlrs", features = ["uv", "ccall"] }
