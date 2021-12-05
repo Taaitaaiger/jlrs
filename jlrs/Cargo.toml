@@ -16,7 +16,6 @@ edition = "2018"
 
 [features]
 default = []
-sync = []
 ccall = []
 sync-rt = []
 debug = ["jl-sys/debug"]

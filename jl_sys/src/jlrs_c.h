@@ -6,6 +6,7 @@
 //! without depending on undefined behaviour, this small C library provides a few functions that
 //! wrap the functions from the C API that jlrs uses and can throw exceptions in such blocks.
 
+#if !defined(JLRS_WINDOWS_LTS)
 /// Flag used by `jlrs_result_t` that indicates what the union field of that struct contains.
 typedef enum
 {
@@ -22,9 +23,11 @@ typedef struct
     jlrs_result_tag_t flag;
     jl_value_t *data;
 } jlrs_result_t;
+#endif
 
 void jlrs_print_stack(jl_gcframe_t *frame);
 
+#if !defined(JLRS_WINDOWS_LTS)
 jlrs_result_t jlrs_alloc_array_1d(jl_value_t *atype, size_t nr);
 jlrs_result_t jlrs_alloc_array_2d(jl_value_t *atype, size_t nr, size_t nc);
 jlrs_result_t jlrs_alloc_array_3d(jl_value_t *atype, size_t nr, size_t nc, size_t z);
@@ -43,4 +46,6 @@ jlrs_result_t jlrs_array_grow_end(jl_array_t *a, size_t inc);
 jlrs_result_t jlrs_array_del_end(jl_array_t *a, size_t dec);
 jlrs_result_t jlrs_array_grow_beg(jl_array_t *a, size_t inc);
 jlrs_result_t jlrs_array_del_beg(jl_array_t *a, size_t dec);
+#endif
+
 uint_t jlrs_array_data_owner_offset(uint16_t n_dims);

@@ -6,7 +6,7 @@
 
 use crate::{
     convert::temporary_symbol::TemporarySymbol,
-    error::{JlrsError, JlrsResult, JuliaResult, JuliaResultRef, CANNOT_DISPLAY_VALUE},
+    error::{JlrsError, JlrsResult, CANNOT_DISPLAY_VALUE},
     impl_debug, impl_julia_typecheck, impl_valid_layout,
     memory::{frame::Frame, global::Global, scope::Scope},
     private::Private,
@@ -18,12 +18,17 @@ use crate::{
         FunctionRef, ModuleRef, ValueRef, Wrapper as _,
     },
 };
+
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use crate::error::{JuliaResult, JuliaResultRef};
+
 use jl_sys::{
     jl_base_module, jl_core_module, jl_get_global, jl_is_imported, jl_main_module, jl_module_t,
-    jl_module_type, jl_set_const, jl_set_global, jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_set_const,
-    jlrs_set_global,
+    jl_module_type, jl_set_const, jl_set_global,
 };
 
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use jl_sys::{jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_set_const, jlrs_set_global};
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 
@@ -179,6 +184,7 @@ impl<'scope> Module<'scope> {
     /// Set a global value in this module. Note that if this global already exists, this can
     /// make the old value unreachable. If an excection is thrown, it's caught, rooted and
     /// returned.
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn set_global<'frame, N, F>(
         self,
         frame: &mut F,
@@ -214,6 +220,7 @@ impl<'scope> Module<'scope> {
     /// Set a global value in this module. Note that if this global already exists, this can
     /// make the old value unreachable. If an exception is thrown it's caught but not rooted and
     /// returned.
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn set_global_unrooted<N>(
         self,
         name: N,
@@ -267,6 +274,7 @@ impl<'scope> Module<'scope> {
     /// Set a constant in this module. If Julia throws an exception it's caught and rooted in the
     /// current frame, if the exception can't be rooted a `JlrsError::AllocError` is returned. If
     /// no exception is thrown an unrooted reference to the constant is returned.
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn set_const<'frame, N, F>(
         self,
         frame: &mut F,
@@ -301,6 +309,7 @@ impl<'scope> Module<'scope> {
 
     /// Set a constant in this module. If Julia throws an exception it's caught. Otherwise an
     /// unrooted reference to the constant is returned.
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn set_const_unrooted<N>(
         self,
         name: N,

@@ -39,6 +39,7 @@ mod tests {
     impl_valid_layout_test!(valid_layout_char, char, 'a');
 
     #[test]
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     fn valid_layout_array() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();

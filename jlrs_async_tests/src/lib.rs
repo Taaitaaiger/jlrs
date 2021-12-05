@@ -1,3 +1,4 @@
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
 mod example {
     use jlrs::prelude::*;
 

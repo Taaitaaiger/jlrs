@@ -97,7 +97,7 @@ macro_rules! named_tuple {
 
 use crate::{
     convert::{into_julia::IntoJulia, temporary_symbol::TemporarySymbol, unbox::Unbox},
-    error::{JlrsError, JlrsResult, JuliaResult, JuliaResultRef, CANNOT_DISPLAY_TYPE},
+    error::{JlrsError, JlrsResult, JuliaResultRef, CANNOT_DISPLAY_TYPE},
     impl_debug,
     layout::{
         typecheck::{NamedTuple, Typecheck},
@@ -127,8 +127,14 @@ use jl_sys::{
     jl_interrupt_exception, jl_isa, jl_memory_exception, jl_nothing, jl_object_id,
     jl_readonlymemory_exception, jl_set_nth_field, jl_stackovf_exception, jl_stderr_obj,
     jl_stdout_obj, jl_subtype, jl_true, jl_typeof_str, jl_undefref_exception, jl_value_t,
-    jlrs_apply_type, jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_set_nth_field,
 };
+
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use jl_sys::{jlrs_apply_type, jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_set_nth_field};
+
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use crate::error::JuliaResult;
+
 use std::{
     ffi::{c_void, CStr, CString},
     marker::PhantomData,
@@ -264,6 +270,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// If the types can't be applied to `self` this methods catches and returns the exception.
     ///
     /// [`Union::new`]: crate::wrappers::ptr::union::Union::new
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn apply_type<'target, 'current, S, F, V>(
         self,
         scope: S,
@@ -824,6 +831,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     ///
     /// Safety: Mutating things that should absolutely not be mutated, like the fields of a
     /// `DataType`, is not prevented.
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub unsafe fn set_nth_field<'frame, F>(
         self,
         frame: &mut F,
@@ -873,6 +881,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     ///
     /// Safety: Mutating things that should absolutely not be mutated, like the fields of a
     /// `DataType`, is not prevented.
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub unsafe fn set_nth_field_unrooted(
         self,
         idx: usize,
@@ -921,6 +930,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     ///
     /// Safety: Mutating things that should absolutely not be mutated, like the fields of a
     /// `DataType`, is not prevented.
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub unsafe fn set_field<'frame, F, N>(
         self,
         frame: &mut F,
@@ -972,6 +982,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     ///
     /// Safety: Mutating things that should absolutely not be mutated, like the fields of a
     /// `DataType`, is not prevented.
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub unsafe fn set_field_unrooted<N>(
         self,
         field_name: N,

@@ -2,7 +2,9 @@
 
 use super::type_var::TypeVar;
 use super::{private::Wrapper, value::Value};
-use crate::error::{JlrsResult, JuliaResultRef};
+use crate::error::JlrsResult;
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use crate::error::JuliaResultRef;
 use crate::impl_debug;
 use crate::memory::frame::Frame;
 use crate::memory::scope::Scope;
@@ -15,9 +17,11 @@ use crate::{memory::global::Global, private::Private};
 use jl_sys::{
     jl_abstractarray_type, jl_anytuple_type_type, jl_array_type, jl_densearray_type,
     jl_llvmpointer_type, jl_namedtuple_type, jl_pointer_type, jl_ref_type, jl_type_type,
-    jl_type_unionall, jl_unionall_t, jl_unionall_type, jlrs_result_tag_t_JLRS_RESULT_ERR,
-    jlrs_type_unionall,
+    jl_type_unionall, jl_unionall_t, jl_unionall_type,
 };
+
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use jl_sys::{jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_type_unionall};
 
 #[cfg(not(feature = "lts"))]
 use jl_sys::jl_opaque_closure_type;
@@ -34,6 +38,7 @@ pub struct UnionAll<'scope>(NonNull<jl_unionall_t>, PhantomData<&'scope ()>);
 
 impl<'scope> UnionAll<'scope> {
     /// Create a new `UnionAll`. If an exception is thrown, it's caught and returned.
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn new<'target, 'current, S, F>(
         scope: S,
         tvar: TypeVar,
@@ -71,6 +76,7 @@ impl<'scope> UnionAll<'scope> {
 
     /// Create a new `UnionAll`. Unlike [`UnionAll::new`] this method doesn't root the allocated
     /// value or exception.
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn new_unrooted<'global>(
         _: Global<'global>,
         tvar: TypeVar,

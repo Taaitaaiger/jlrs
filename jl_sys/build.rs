@@ -125,9 +125,12 @@ fn main() {
     let include_dir = flags();
 
     let mut c = cc::Build::new();
-    c.file("src/jlrs_c.c")
-        .include(&include_dir)
-        .compile("jlrs_c");
+    c.file("src/jlrs_c.c").include(&include_dir);
+
+    #[cfg(all(feature = "lts", target_os = "windows"))]
+    c.define("JLRS_WINDOWS_LTS", None);
+
+    c.compile("jlrs_c");
 
     #[cfg(feature = "use-bindgen")]
     {

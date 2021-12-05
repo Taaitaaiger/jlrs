@@ -32,7 +32,7 @@ Julia must be installed before jlrs can be used. Only version 1.6 and 1.7 are su
 
 #### Linux
 
-The recommended way to install Julia is to download the binaries from the official website, which is distributed in an archive containing a directory called `julia-x.y.z`. This directory contains several other directories, including a `bin` directory containing the `julia` executable.
+The recommended way to install Julia is to download the binaries from the official website, which is distributed in an archive containing a directory called `julia-x.y.z`. This directory contains several other directories including a `bin` directory containing the `julia` executable.
 
 During compilation, the paths to the header and library are normally detected automatically by executing the command `which julia`. The path to `julia.h` must be
 `$(which julia)/../include/julia/julia.h` and the path to the library `$(which julia)/../lib/libjulia.so`. If you want to override this default behaviour the
@@ -42,7 +42,11 @@ In order to be able to load `libjulia.so`, this file must be on the library sear
 
 #### Windows
 
-If you want to use jlrs on Windows you must use WSL. An installation guide to install WSL on Windows can be found [on Microsoft's website](https://docs.microsoft.com/en-us/windows/wsl/install). After installing a Linux distribution, follow the installation instructions for Linux.
+Julia can be installed using the installer or portable installation downloaded from the official website. After installation or extraction a folder called `Julia-x.y.z` exists, which contains several folders including a `bin` folder containing `julia.exe`. The path to the `bin` folder must be added to the `Path` environment variable.
+
+Julia is automatically detected by executing the command `where julia`. If this returns multiple locations the first one is used. The default can be overridden by setting the `JULIA_DIR` environment variable. 
+
+Note that while both Julia 1.6 and 1.7 are supported on Windows, several methods are currently unavailable when the LTS version is used.
 
 
 ## Features

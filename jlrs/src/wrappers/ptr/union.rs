@@ -1,16 +1,19 @@
 //! Wrapper for `Union`.
 
 use super::{private::Wrapper, value::Value, ValueRef, Wrapper as _};
+use crate::error::JlrsResult;
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use crate::error::JuliaResultRef;
 use crate::{
-    error::{JlrsResult, JuliaResultRef},
     impl_debug, impl_julia_typecheck, impl_valid_layout,
     memory::{frame::Frame, global::Global, scope::Scope},
     private::Private,
 };
-use jl_sys::{
-    jl_islayout_inline, jl_type_union, jl_uniontype_t, jl_uniontype_type,
-    jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_type_union,
-};
+use jl_sys::{jl_islayout_inline, jl_type_union, jl_uniontype_t, jl_uniontype_type};
+
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use jl_sys::{jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_type_union};
+
 use std::{marker::PhantomData, ptr::NonNull};
 
 /// A struct field can have a type that's a union of several types. In this case, the type of this
@@ -28,6 +31,7 @@ impl<'scope> Union<'scope> {
     ///
     /// [`Union`]: crate::wrappers::ptr::union::Union
     /// [`DataType`]: crate::wrappers::ptr::datatype::DataType
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn new<'target, 'current, V, S, F>(scope: S, mut types: V) -> JlrsResult<S::JuliaResult>
     where
         V: AsMut<[Value<'scope, 'static>]>,
@@ -73,6 +77,7 @@ impl<'scope> Union<'scope> {
     ///
     /// [`Union`]: crate::wrappers::ptr::union::Union
     /// [`DataType`]: crate::wrappers::ptr::datatype::DataType
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn new_unrooted<'global, V>(
         _: Global<'global>,
         mut types: V,

@@ -1,18 +1,22 @@
 //! Wrapper for `DataType`, which provides access to type properties.
 
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use super::array::Array;
 use super::{
-    array::Array, private::Wrapper as WrapperPriv, DataTypeRef, SimpleVectorRef, TypeNameRef,
+    private::Wrapper as WrapperPriv, value::Value, DataTypeRef, SimpleVectorRef, TypeNameRef,
     ValueRef, Wrapper,
 };
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use crate::error::JlrsError;
+use crate::error::JlrsResult;
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
 use crate::error::{JuliaResultRef, CANNOT_DISPLAY_TYPE};
-use crate::layout::typecheck::{Concrete, Typecheck};
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use crate::layout::typecheck::Concrete;
+use crate::layout::typecheck::Typecheck;
 use crate::memory::frame::Frame;
-use crate::wrappers::ptr::value::Value;
+use crate::memory::scope::Scope;
 use crate::wrappers::ptr::{simple_vector::SimpleVector, symbol::Symbol};
-use crate::{
-    error::{JlrsError, JlrsResult},
-    memory::scope::Scope,
-};
 use crate::{impl_debug, impl_valid_layout, memory::global::Global, private::Private};
 use jl_sys::{
     jl_abstractslot_type, jl_abstractstring_type, jl_any_type, jl_anytuple_type, jl_argument_type,
@@ -31,13 +35,15 @@ use jl_sys::{
     jl_tvar_type, jl_typedslot_type, jl_typeerror_type, jl_typemap_entry_type,
     jl_typemap_level_type, jl_typename_str, jl_typename_type, jl_typeofbottom_type, jl_uint16_type,
     jl_uint32_type, jl_uint64_type, jl_uint8_type, jl_undefvarerror_type, jl_unionall_type,
-    jl_uniontype_type, jl_upsilonnode_type, jl_voidpointer_type, jl_weakref_type, jlrs_new_structv,
-    jlrs_result_tag_t_JLRS_RESULT_ERR,
+    jl_uniontype_type, jl_upsilonnode_type, jl_voidpointer_type, jl_weakref_type,
 };
 #[cfg(not(feature = "lts"))]
 use jl_sys::{
     jl_atomicerror_type, jl_interconditional_type, jl_partial_opaque_type, jl_vararg_type,
 };
+
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use jl_sys::{jlrs_new_structv, jlrs_result_tag_t_JLRS_RESULT_ERR};
 use std::ffi::c_void;
 use std::{ffi::CStr, marker::PhantomData, ptr::NonNull};
 
@@ -372,6 +378,7 @@ impl<'scope> DataType<'scope> {
     /// arbitrary concrete `DataType`s, at the cost that each of its fields must have already been
     /// allocated as a `Value`. This functions returns an error if the given `DataType` isn't
     /// concrete or is an array type. For custom array types you must use [`Array::new_for`].
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn instantiate<'target, 'frame, 'value, 'borrow, V, S, F>(
         self,
         scope: S,
@@ -416,6 +423,7 @@ impl<'scope> DataType<'scope> {
     /// allocated as a `Value`. This functions returns an error if the given `DataType` is not
     /// concrete or an array type. Unlike [`DataType::instantiate`] this method doesn't root the
     /// allocated value.
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn instantiate_unrooted<'global, 'value, 'borrow, V>(
         self,
         _: Global<'global>,

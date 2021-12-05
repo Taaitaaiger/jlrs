@@ -1,7 +1,6 @@
 mod impls;
 mod util;
 
-#[cfg(feature = "sync-rt")]
 #[cfg(test)]
 mod tests {
     use super::impls::*;
@@ -488,6 +487,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     fn derive_double_variant() {
         JULIA.with(|j| {
             let mut julia = j.borrow_mut();
@@ -856,6 +856,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     fn derive_with_propagated_lifetimes() {
         JULIA.with(|j| {
             let mut julia = j.borrow_mut();

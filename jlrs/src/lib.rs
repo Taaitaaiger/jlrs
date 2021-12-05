@@ -51,9 +51,17 @@
 //!
 //! #### Windows
 //!
-//! If you want to use jlrs on Windows you must use WSL. An installation guide to install WSL on
-//! Windows can be found [on Microsoft's website]. After installing a Linux distribution, follow
-//! the installation instructions for Linux.
+//! Julia can be installed using the installer or portable installation downloaded from the
+//! official website. After installation or extraction a folder called `Julia-x.y.z` exists, which
+//! contains several folders including a `bin` folder containing `julia.exe`. The path to the
+//! `bin` folder must be added to the `Path` environment variable.
+//!
+//! Julia is automatically detected by executing the command `where julia`. If this returns
+//! multiple locations the first one is used. The default can be overridden by setting the
+//! `JULIA_DIR` environment variable.
+//!
+//! Note that while both Julia 1.6 and 1.7 are supported on Windows, several methods are currently
+//! unavailable when the LTS version is used.
 //!
 //!
 //! # Features

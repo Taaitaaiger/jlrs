@@ -1,5 +1,6 @@
 mod util;
 #[cfg(feature = "sync-rt")]
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
 mod tests {
     use super::util::JULIA;
     use jlrs::error::JuliaResult;

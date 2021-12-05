@@ -40,6 +40,10 @@ mod bindings_1_7_x86_64_pc_windows_gnu;
     target_os = "windows"
 ))]
 pub use bindings_1_7_x86_64_pc_windows_gnu::*;
+#[cfg(all(not(feature = "use-bindgen"), feature = "lts", target_os = "windows"))]
+mod bindings_1_6_x86_64_pc_windows_gnu;
+#[cfg(all(not(feature = "use-bindgen"), feature = "lts", target_os = "windows"))]
+pub use bindings_1_6_x86_64_pc_windows_gnu::*;
 
 #[cfg(feature = "use-bindgen")]
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));

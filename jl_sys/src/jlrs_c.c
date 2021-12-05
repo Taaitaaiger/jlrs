@@ -21,6 +21,7 @@ void jlrs_print_stack(jl_gcframe_t *frame) {
     }
 }
 
+#if !defined(JLRS_WINDOWS_LTS)
 jlrs_result_t jlrs_alloc_array_1d(jl_value_t *atype, size_t nr)
 {
     jlrs_result_t out;
@@ -372,6 +373,7 @@ jlrs_result_t jlrs_array_del_beg(jl_array_t *a, size_t dec)
 
     return out;
 }
+#endif
 
 uint_t jlrs_array_data_owner_offset(uint16_t n_dims) {
     return jl_array_data_owner_offset(n_dims);
