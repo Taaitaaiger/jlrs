@@ -14,6 +14,11 @@ use crate::{
 use jl_sys::{jl_code_instance_t, jl_code_instance_type};
 use std::{marker::PhantomData, ptr::NonNull};
 
+#[cfg(not(feature = "lts"))]
+use super::atomic_value;
+#[cfg(not(feature = "lts"))]
+use std::sync::atomic::Ordering;
+
 /// A `CodeInstance` represents an executable operation.
 #[derive(Copy, Clone)]
 #[repr(transparent)]
@@ -43,8 +48,19 @@ impl<'scope> CodeInstance<'scope> {
     }
 
     /// Next cache entry.
+    #[cfg(feature = "lts")]
     pub fn next(self) -> CodeInstanceRef<'scope> {
         unsafe { CodeInstanceRef::wrap(self.unwrap_non_null(Private).as_ref().next) }
+    }
+
+    /// Next cache entry.
+    #[cfg(not(feature = "lts"))]
+    pub fn next(self) -> CodeInstanceRef<'scope> {
+        unsafe {
+            let next = atomic_value(self.unwrap_non_null(Private).as_ref().next);
+            let ptr = next.load(Ordering::Relaxed);
+            CodeInstanceRef::wrap(ptr.cast())
+        }
     }
 
     /// Returns the minimum of the world range for which this object is valid to use.

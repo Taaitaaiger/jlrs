@@ -1,6 +1,6 @@
 [package]
 name = "jl-sys"
-version = "0.13.0"
+version = "0.14.0"
 authors = ["Thomas van Doornmalen <thomas.vandoornmalen@gmail.com>"]
 description = """
 jl-sys contains the generated bindings for the Julia C API used by jlrs.
@@ -27,7 +27,7 @@ use-bindgen = ["bindgen"]
 [dependencies]
 
 [build-dependencies]
-bindgen = { version = "0.59", optional = true }
+bindgen = { version = "0.59.2", optional = true }
 cc = "1"
 
 [package.metadata.docs.rs]

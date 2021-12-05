@@ -92,7 +92,7 @@ jobs:
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v1
         with:
-          version: '1.7-nightly'
+          version: '1.7'
 
       - name: rust-toolchain
         uses: actions-rs/toolchain@v1

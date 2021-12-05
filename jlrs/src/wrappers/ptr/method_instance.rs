@@ -13,6 +13,11 @@ use crate::{
 use jl_sys::{jl_method_instance_t, jl_method_instance_type};
 use std::{marker::PhantomData, ptr::NonNull};
 
+#[cfg(not(feature = "lts"))]
+use super::atomic_value;
+#[cfg(not(feature = "lts"))]
+use std::sync::atomic::Ordering;
+
 /// This type is a placeholder to cache data for a specType signature specialization of a `Method`
 /// can can be used as a unique dictionary key representation of a call to a particular `Method`
 /// with a particular set of argument types.
@@ -66,8 +71,19 @@ impl<'scope> MethodInstance<'scope> {
     }
 
     /// The `cache` field.
+    #[cfg(feature = "lts")]
     pub fn cache(self) -> CodeInstanceRef<'scope> {
         unsafe { CodeInstanceRef::wrap(self.unwrap_non_null(Private).as_ref().cache) }
+    }
+
+    /// The `cache` field.
+    #[cfg(not(feature = "lts"))]
+    pub fn cache(self) -> CodeInstanceRef<'scope> {
+        unsafe {
+            let cache = atomic_value(self.unwrap_non_null(Private).as_ref().cache);
+            let ptr = cache.load(Ordering::Relaxed);
+            CodeInstanceRef::wrap(ptr.cast())
+        }
     }
 
     /// Flags to tell if inference is running on this object

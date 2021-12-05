@@ -2,10 +2,10 @@ use std::fmt;
 use std::{error::Error, marker::PhantomData};
 
 #[cfg(feature = "async-std-rt")]
-pub mod async_std_rt;
+pub(crate) mod async_std_rt;
 
 #[cfg(any(feature = "tokio-rt", feature = "docs"))]
-pub mod tokio_rt;
+pub(crate) mod tokio_rt;
 
 #[derive(Debug)]
 pub struct SendError<T>(pub T);

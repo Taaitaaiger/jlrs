@@ -22,7 +22,6 @@
 
 use crate::{
     convert::into_julia::IntoJulia,
-    droparray,
     error::{JlrsError, JlrsResult, JuliaResult, CANNOT_DISPLAY_TYPE},
     impl_debug,
     layout::{typecheck::Typecheck, valid_layout::ValidLayout},
@@ -55,18 +54,22 @@ use crate::{
 };
 use jl_sys::{
     jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_apply_array_type,
-    jl_apply_tuple_type_v, jl_array_data, jl_array_eltype, jl_array_t, jl_datatype_t,
-    jl_gc_add_ptr_finalizer, jl_new_array, jl_new_struct_uninit, jl_pchar_to_array,
-    jl_ptr_to_array, jl_ptr_to_array_1d, jlrs_alloc_array_1d, jlrs_alloc_array_2d,
-    jlrs_alloc_array_3d, jlrs_array_del_beg, jlrs_array_del_end, jlrs_array_grow_beg,
-    jlrs_array_grow_end, jlrs_new_array, jlrs_reshape_array, jlrs_result_tag_t_JLRS_RESULT_ERR,
+    jl_apply_tuple_type_v, jl_array_data, jl_array_dims_ptr, jl_array_eltype, jl_array_ndims,
+    jl_array_t, jl_datatype_t, jl_gc_add_ptr_finalizer, jl_new_array, jl_new_struct_uninit,
+    jl_pchar_to_array, jl_ptr_to_array, jl_ptr_to_array_1d, jlrs_alloc_array_1d,
+    jlrs_alloc_array_2d, jlrs_alloc_array_3d, jlrs_array_del_beg, jlrs_array_del_end,
+    jlrs_array_grow_beg, jlrs_array_grow_end, jlrs_new_array, jlrs_reshape_array,
+    jlrs_result_tag_t_JLRS_RESULT_ERR,
 };
 use std::{
     cell::UnsafeCell,
     ffi::c_void,
     fmt::{Debug, Formatter, Result as FmtResult},
     marker::PhantomData,
-    ptr::NonNull,
+    mem,
+    mem::MaybeUninit,
+    ptr::{null_mut, NonNull},
+    slice,
 };
 
 use super::type_name::TypeName;
@@ -1506,4 +1509,32 @@ where
     std::ptr::copy_nonoverlapping(dims.as_slice().as_ptr(), usize_ptr, n);
 
     Ok(v)
+}
+
+unsafe extern "C" fn droparray(a: Array) {
+    // The data of a moved array is allocated by Rust, this function is called by
+    // a finalizer in order to ensure it's also freed by Rust.
+    let mut arr_nn_ptr = a.unwrap_non_null(Private);
+    let arr_ref = arr_nn_ptr.as_mut();
+
+    if arr_ref.flags.how() != 2 {
+        return;
+    }
+
+    // Set data to null pointer
+    let data_ptr = arr_ref.data.cast::<MaybeUninit<u8>>();
+    arr_ref.data = null_mut();
+
+    // Set all dims to 0
+    let arr_ptr = arr_nn_ptr.as_ptr();
+    let dims_ptr = jl_array_dims_ptr(arr_ptr);
+    let n_dims = jl_array_ndims(arr_ptr);
+    for dim in slice::from_raw_parts_mut(dims_ptr, n_dims as _) {
+        *dim = 0;
+    }
+
+    // Drop the data
+    let n_els = arr_ref.elsize as usize * arr_ref.length;
+    let data = Vec::from_raw_parts(data_ptr, n_els, n_els);
+    mem::drop(data);
 }

@@ -21,6 +21,11 @@ use jl_sys::jl_opaque_closure_typename;
 use jl_sys::jl_vararg_typename;
 use std::{marker::PhantomData, ptr::NonNull};
 
+#[cfg(not(feature = "lts"))]
+use super::atomic_value;
+#[cfg(not(feature = "lts"))]
+use std::sync::atomic::Ordering;
+
 /// Describes the syntactic structure of a type and stores all data common to different
 /// instantiations of the type.
 #[derive(Copy, Clone, PartialEq)]
@@ -74,13 +79,35 @@ impl<'scope> TypeName<'scope> {
     }
 
     /// Sorted array.
+    #[cfg(feature = "lts")]
     pub fn cache(self) -> SimpleVectorRef<'scope> {
         unsafe { SimpleVectorRef::wrap(self.unwrap_non_null(Private).as_ref().cache) }
     }
 
+    /// Sorted array.
+    #[cfg(not(feature = "lts"))]
+    pub fn cache(self) -> SimpleVectorRef<'scope> {
+        unsafe {
+            let cache = atomic_value(self.unwrap_non_null(Private).as_ref().cache);
+            let ptr = cache.load(Ordering::Relaxed);
+            SimpleVectorRef::wrap(ptr.cast())
+        }
+    }
+
     /// Unsorted array.
+    #[cfg(feature = "lts")]
     pub fn linear_cache(self) -> SimpleVectorRef<'scope> {
         unsafe { SimpleVectorRef::wrap(self.unwrap_non_null(Private).as_ref().linearcache) }
+    }
+
+    /// Unsorted array.
+    #[cfg(not(feature = "lts"))]
+    pub fn linear_cache(self) -> SimpleVectorRef<'scope> {
+        unsafe {
+            let linearcache = atomic_value(self.unwrap_non_null(Private).as_ref().linearcache);
+            let ptr = linearcache.load(Ordering::Relaxed);
+            SimpleVectorRef::wrap(ptr.cast())
+        }
     }
 
     /// The `mt` field.

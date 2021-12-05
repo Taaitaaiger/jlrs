@@ -3,6 +3,7 @@ use std::ffi::OsStr;
 #[cfg(target_os = "linux")]
 use std::os::unix::prelude::OsStrExt;
 use std::path::PathBuf;
+#[cfg(target_os = "windows")]
 use std::str::FromStr;
 use std::{env, process::Command};
 
@@ -67,6 +68,7 @@ fn flags() -> String {
                 println!("cargo:rustc-flags={}", &jl_internal_lib_path);
             }
 
+            println!("cargo:rustc-link-arg=-Wl,--export-dynamic");
 
             if env::var("CARGO_FEATURE_DEBUG").is_ok() {
                 println!("cargo:rustc-link-lib=julia-debug");
@@ -124,7 +126,6 @@ fn main() {
 
     let mut c = cc::Build::new();
     c.file("src/jlrs_c.c")
-        .flag_if_supported("-std=gnu99")
         .include(&include_dir)
         .compile("jlrs_c");
 
@@ -412,7 +413,6 @@ fn main() {
             .allowlist_var("jl_weakref_type")
             .allowlist_var("jl_weakref_typejl_abstractslot_type")
             .rustfmt_bindings(true)
-            .dynamic_link_require_all(true)
             .generate()
             .expect("Unable to generate bindings");
 

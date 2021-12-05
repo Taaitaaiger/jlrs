@@ -46,6 +46,9 @@ pub mod value;
 pub mod vararg;
 pub mod weak_ref;
 
+#[cfg(not(feature = "lts"))]
+use jl_sys::jl_value_t;
+
 use self::{
     array::{Array, TypedArray},
     call::Call,
@@ -87,6 +90,9 @@ use std::{
     ptr::null_mut,
     str::FromStr,
 };
+
+#[cfg(not(feature = "lts"))]
+use std::sync::atomic::AtomicPtr;
 
 macro_rules! impl_valid_layout {
     ($ref_type:ident, $type:ident) => {
@@ -537,4 +543,9 @@ pub(crate) mod private {
             Some(Value::wrap(ptr.cast(), Private))
         }
     }
+}
+
+#[cfg(not(feature = "lts"))]
+pub(crate) fn atomic_value(addr: u64) -> AtomicPtr<jl_value_t> {
+    AtomicPtr::new(addr as usize as *mut _)
 }

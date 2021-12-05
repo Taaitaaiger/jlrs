@@ -11,6 +11,11 @@ use crate::{private::Private, wrappers::ptr::ValueRef};
 use jl_sys::{jl_typemap_level_t, jl_typemap_level_type};
 use std::{marker::PhantomData, ptr::NonNull};
 
+#[cfg(not(feature = "lts"))]
+use super::atomic_value;
+#[cfg(not(feature = "lts"))]
+use std::sync::atomic::Ordering;
+
 /// One level in a TypeMap tree
 /// Indexed by key if it is a sublevel in an array
 #[derive(Copy, Clone)]
@@ -31,33 +36,99 @@ impl<'scope> TypeMapLevel<'scope> {
     */
 
     /// The `arg1` field.
+    #[cfg(feature = "lts")]
     pub fn arg1(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().arg1.cast()) }
     }
 
+    /// The `arg1` field.
+    #[cfg(not(feature = "lts"))]
+    pub fn arg1(self) -> ValueRef<'scope, 'static> {
+        unsafe {
+            let arg1 = atomic_value(self.unwrap_non_null(Private).as_ref().arg1);
+            let ptr = arg1.load(Ordering::Relaxed);
+            ValueRef::wrap(ptr.cast())
+        }
+    }
+
     /// The `targ` field.
+    #[cfg(feature = "lts")]
     pub fn targ(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().targ.cast()) }
     }
 
+    /// The `targ` field.
+    #[cfg(not(feature = "lts"))]
+    pub fn targ(self) -> ValueRef<'scope, 'static> {
+        unsafe {
+            let targ = atomic_value(self.unwrap_non_null(Private).as_ref().targ);
+            let ptr = targ.load(Ordering::Relaxed);
+            ValueRef::wrap(ptr.cast())
+        }
+    }
+
     /// The `name1` field.
+    #[cfg(feature = "lts")]
     pub fn name1(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().name1.cast()) }
     }
 
+    /// The `name1` field.
+    #[cfg(not(feature = "lts"))]
+    pub fn name1(self) -> ValueRef<'scope, 'static> {
+        unsafe {
+            let name1 = atomic_value(self.unwrap_non_null(Private).as_ref().name1);
+            let ptr = name1.load(Ordering::Relaxed);
+            ValueRef::wrap(ptr.cast())
+        }
+    }
+
     /// The `tname` field.
+    #[cfg(feature = "lts")]
     pub fn tname(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().tname.cast()) }
     }
 
+    /// The `tname` field.
+    #[cfg(not(feature = "lts"))]
+    pub fn tname(self) -> ValueRef<'scope, 'static> {
+        unsafe {
+            let tname = atomic_value(self.unwrap_non_null(Private).as_ref().tname);
+            let ptr = tname.load(Ordering::Relaxed);
+            ValueRef::wrap(ptr.cast())
+        }
+    }
+
     /// The `linear` field, which is called `list` in `Core.TypemapLevel`.
+    #[cfg(feature = "lts")]
     pub fn list(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().linear.cast()) }
     }
 
+    /// The `linear` field, which is called `list` in `Core.TypemapLevel`.
+    #[cfg(not(feature = "lts"))]
+    pub fn list(self) -> ValueRef<'scope, 'static> {
+        unsafe {
+            let linear = atomic_value(self.unwrap_non_null(Private).as_ref().linear);
+            let ptr = linear.load(Ordering::Relaxed);
+            ValueRef::wrap(ptr.cast())
+        }
+    }
+
     /// The `any` field.
+    #[cfg(feature = "lts")]
     pub fn any(self) -> ValueRef<'scope, 'static> {
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().any) }
+        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().any.cast()) }
+    }
+
+    /// The `any` field.
+    #[cfg(not(feature = "lts"))]
+    pub fn any(self) -> ValueRef<'scope, 'static> {
+        unsafe {
+            let any = atomic_value(self.unwrap_non_null(Private).as_ref().any);
+            let ptr = any.load(Ordering::Relaxed);
+            ValueRef::wrap(ptr.cast())
+        }
     }
 }
 

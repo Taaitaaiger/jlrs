@@ -115,9 +115,16 @@
 //!
 //! # Using this crate
 //!
-//! The first thing you should do is `use` the [`prelude`]-module with an asterisk, this will
-//! bring all the structs and traits you're likely to need into scope. When embedding Julia, it
-//! must be initialized before it can be used.
+//! If you want to embed Julia and call it from Rust, you must enable a runtime feature:
+//!
+//! `jlrs = {version = "0.13", features = ["sync-rt"]}`
+//!
+//! `jlrs = {version = "0.13", features = ["tokio-rt"]}`
+//!
+//! `jlrs = {version = "0.13", features = ["async-std-rt"]}`
+//!
+//! A `prelude` is available which provides access to most of the structs and traits you're likely
+//! to need. When embedding Julia, it must be initialized before it can be used.
 //!
 //! If you use the sync runtime, you can do this by calling [`Julia::init`] which returns an
 //! instance of [`Julia`]. Note that this method can only be called once while the application is
@@ -576,17 +583,6 @@
 
 #![forbid(rustdoc::broken_intra_doc_links)]
 
-use crate::{
-    private::Private,
-    wrappers::ptr::{array::Array, private::Wrapper as _},
-};
-use jl_sys::{jl_array_dims_ptr, jl_array_ndims};
-use std::{
-    mem::{self, MaybeUninit},
-    ptr::null_mut,
-    slice,
-};
-
 #[cfg(any(feature = "sync-rt", feature = "async"))]
 use std::sync::atomic::AtomicBool;
 
@@ -631,36 +627,8 @@ pub(crate) mod private;
 pub mod util;
 pub mod wrappers;
 
-#[cfg(any(feature = "sync-rt", feature = "async"))]
+#[cfg(any(feature = "sync-rt", feature = "tokio-rt", feature = "async-std-rt"))]
 pub(crate) static INIT: AtomicBool = AtomicBool::new(false);
 
-#[cfg(any(feature = "sync-rt", feature = "async"))]
+#[cfg(any(feature = "sync-rt", feature = "tokio-rt", feature = "async-std-rt"))]
 init_fn!(init_jlrs, JLRS_JL, "Jlrs.jl");
-
-unsafe extern "C" fn droparray(a: Array) {
-    // The data of a moved array is allocated by Rust, this function is called by
-    // a finalizer in order to ensure it's also freed by Rust.
-    let mut arr_nn_ptr = a.unwrap_non_null(Private);
-    let arr_ref = arr_nn_ptr.as_mut();
-
-    if arr_ref.flags.how() != 2 {
-        return;
-    }
-
-    // Set data to null pointer
-    let data_ptr = arr_ref.data.cast::<MaybeUninit<u8>>();
-    arr_ref.data = null_mut();
-
-    // Set all dims to 0
-    let arr_ptr = arr_nn_ptr.as_ptr();
-    let dims_ptr = jl_array_dims_ptr(arr_ptr);
-    let n_dims = jl_array_ndims(arr_ptr);
-    for dim in slice::from_raw_parts_mut(dims_ptr, n_dims as _) {
-        *dim = 0;
-    }
-
-    // Drop the data
-    let n_els = arr_ref.elsize as usize * arr_ref.length;
-    let data = Vec::from_raw_parts(data_ptr, n_els, n_els);
-    mem::drop(data);
-}

@@ -16,6 +16,11 @@ use crate::{
 use jl_sys::{jl_method_t, jl_method_type};
 use std::{marker::PhantomData, ptr::NonNull};
 
+#[cfg(not(feature = "lts"))]
+use super::atomic_value;
+#[cfg(not(feature = "lts"))]
+use std::sync::atomic::Ordering;
+
 /// This type describes a single method definition, and stores data shared by the specializations
 /// of a function.
 #[derive(Copy, Clone)]
@@ -87,13 +92,36 @@ impl<'scope> Method<'scope> {
     }
 
     /// Table of all `Method` specializations, allocated as [hashable, ..., NULL, linear, ....]
+    #[cfg(feature = "lts")]
     pub fn specializations(self) -> SimpleVectorRef<'scope> {
         unsafe { SimpleVectorRef::wrap(self.unwrap_non_null(Private).as_ref().specializations) }
     }
 
+    /// Table of all `Method` specializations, allocated as [hashable, ..., NULL, linear, ....]
+    #[cfg(not(feature = "lts"))]
+    pub fn specializations(self) -> SimpleVectorRef<'scope> {
+        unsafe {
+            let specializations =
+                atomic_value(self.unwrap_non_null(Private).as_ref().specializations);
+            let ptr = specializations.load(Ordering::Relaxed);
+            SimpleVectorRef::wrap(ptr.cast())
+        }
+    }
+
     /// Index lookup by hash into specializations
+    #[cfg(feature = "lts")]
     pub fn spec_key_set(self) -> ArrayRef<'scope, 'static> {
         unsafe { ArrayRef::wrap(self.unwrap_non_null(Private).as_ref().speckeyset) }
+    }
+
+    /// Index lookup by hash into specializations
+    #[cfg(not(feature = "lts"))]
+    pub fn spec_key_set(self) -> ArrayRef<'scope, 'static> {
+        unsafe {
+            let speckeyset = atomic_value(self.unwrap_non_null(Private).as_ref().speckeyset);
+            let ptr = speckeyset.load(Ordering::Relaxed);
+            ArrayRef::wrap(ptr.cast())
+        }
     }
 
     /// Compacted list of slot names (String)
@@ -107,8 +135,19 @@ impl<'scope> Method<'scope> {
     }
 
     /// Unspecialized executable method instance, or `None`
+    #[cfg(feature = "lts")]
     pub fn unspecialized(self) -> MethodInstanceRef<'scope> {
         unsafe { MethodInstanceRef::wrap(self.unwrap_non_null(Private).as_ref().unspecialized) }
+    }
+
+    /// Unspecialized executable method instance, or `None`
+    #[cfg(not(feature = "lts"))]
+    pub fn unspecialized(self) -> MethodInstanceRef<'scope> {
+        unsafe {
+            let unspecialized = atomic_value(self.unwrap_non_null(Private).as_ref().unspecialized);
+            let ptr = unspecialized.load(Ordering::Relaxed);
+            MethodInstanceRef::wrap(ptr.cast())
+        }
     }
 
     /// Executable code-generating function if available
@@ -129,8 +168,21 @@ impl<'scope> Method<'scope> {
     /// Cache of specializations of this method for invoke(), i.e.
     /// cases where this method was called even though it was not necessarily
     /// the most specific for the argument types.
+    #[cfg(feature = "lts")]
     pub fn invokes(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().invokes) }
+    }
+
+    /// Cache of specializations of this method for invoke(), i.e.
+    /// cases where this method was called even though it was not necessarily
+    /// the most specific for the argument types.
+    #[cfg(not(feature = "lts"))]
+    pub fn invokes(self) -> ValueRef<'scope, 'static> {
+        unsafe {
+            let invokes = atomic_value(self.unwrap_non_null(Private).as_ref().invokes);
+            let ptr = invokes.load(Ordering::Relaxed);
+            ValueRef::wrap(ptr.cast())
+        }
     }
 
     /// The `n_args` field.
