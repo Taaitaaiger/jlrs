@@ -7,7 +7,7 @@
 
 use super::{private::Wrapper, SymbolRef};
 use crate::wrappers::ptr::symbol::Symbol;
-use crate::wrappers::ptr::{MethodTableRef, ModuleRef, SimpleVectorRef, ValueRef};
+use crate::wrappers::ptr::{ModuleRef, SimpleVectorRef, ValueRef};
 use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout};
 use crate::{memory::global::Global, private::Private};
 use jl_sys::{
@@ -111,8 +111,8 @@ impl<'scope> TypeName<'scope> {
     }
 
     /// The `mt` field.
-    pub fn mt(self) -> MethodTableRef<'scope> {
-        unsafe { MethodTableRef::wrap(self.unwrap_non_null(Private).as_ref().mt) }
+    pub fn mt(self) -> ValueRef<'scope, 'static> {
+        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().mt.cast()) }
     }
 
     /// Incomplete instantiations of this type.

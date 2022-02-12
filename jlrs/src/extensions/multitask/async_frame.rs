@@ -425,6 +425,13 @@ impl<'frame> private::Frame<'frame> for AsyncGcFrame<'frame> {
         ) -> JlrsResult<OutputValue<'frame, 'data, 'inner>>,
     {
         unsafe {
+            if self.capacity() == self.n_roots() {
+                Err(JlrsError::alloc_error(AllocError::FrameOverflow(
+                    1,
+                    self.n_roots(),
+                )))?
+            }
+
             let v = {
                 let mut nested = self.nest(0);
                 let out = Output::new();
@@ -447,6 +454,13 @@ impl<'frame> private::Frame<'frame> for AsyncGcFrame<'frame> {
             &'inner mut GcFrame<'nested, Self::Mode>,
         ) -> JlrsResult<OutputValue<'frame, 'data, 'inner>>,
     {
+        if self.capacity() == self.n_roots() {
+            Err(JlrsError::alloc_error(AllocError::FrameOverflow(
+                1,
+                self.n_roots(),
+            )))?
+        }
+
         unsafe {
             let v = {
                 let mut nested = self.nest(capacity);
@@ -469,6 +483,13 @@ impl<'frame> private::Frame<'frame> for AsyncGcFrame<'frame> {
             &'inner mut GcFrame<'nested, Self::Mode>,
         ) -> JlrsResult<OutputResult<'frame, 'data, 'inner>>,
     {
+        if self.capacity() == self.n_roots() {
+            Err(JlrsError::alloc_error(AllocError::FrameOverflow(
+                1,
+                self.n_roots(),
+            )))?
+        }
+
         unsafe {
             let v = {
                 let mut nested = self.nest(0);
@@ -492,6 +513,13 @@ impl<'frame> private::Frame<'frame> for AsyncGcFrame<'frame> {
             &'inner mut GcFrame<'nested, Self::Mode>,
         ) -> JlrsResult<OutputResult<'frame, 'data, 'inner>>,
     {
+        if self.capacity() == self.n_roots() {
+            Err(JlrsError::alloc_error(AllocError::FrameOverflow(
+                1,
+                self.n_roots(),
+            )))?
+        }
+
         unsafe {
             let v = {
                 let mut nested = self.nest(capacity);

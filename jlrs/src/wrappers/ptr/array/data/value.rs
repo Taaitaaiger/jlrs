@@ -14,7 +14,7 @@ use crate::{
         Ref, ValueRef, Wrapper,
     },
 };
-use jl_sys::{jl_array_data, jl_array_ptr_set};
+use jl_sys::jl_array_ptr_set;
 use std::{marker::PhantomData, ops::Index, ptr::null_mut, slice};
 
 /// Immutably borrowed value array data from Julia. The data has a column-major order and can be
@@ -50,7 +50,8 @@ where
         unsafe {
             let dims = ArrayDimensions::new(self.array);
             let idx = dims.index_of(index).ok()?;
-            jl_array_data(self.array.unwrap(Private).cast())
+            self.array
+                .data_ptr()
                 .cast::<Ref<T>>()
                 .add(idx)
                 .as_ref()
@@ -61,7 +62,7 @@ where
     /// Returns the array's data as a slice, the data is in column-major order.
     pub fn as_slice(&self) -> &[Ref<'array, 'data, T>] {
         unsafe {
-            let arr_data = jl_array_data(self.array.unwrap(Private).cast()).cast::<Ref<T>>();
+            let arr_data = self.array.data_ptr().cast::<Ref<T>>();
 
             let dims = ArrayDimensions::new(self.array);
             let n_elems = dims.size();
@@ -85,7 +86,8 @@ where
         unsafe {
             let dims = ArrayDimensions::new(self.array);
             let idx = dims.index_of(index).unwrap();
-            jl_array_data(self.array.unwrap(Private).cast())
+            self.array
+                .data_ptr()
                 .cast::<Ref<T>>()
                 .add(idx)
                 .as_ref()
@@ -127,7 +129,8 @@ where
         unsafe {
             let dims = ArrayDimensions::new(self.array);
             let idx = dims.index_of(index).ok()?;
-            jl_array_data(self.array.unwrap(Private).cast())
+            self.array
+                .data_ptr()
                 .cast::<Ref<T>>()
                 .add(idx)
                 .as_ref()
@@ -175,7 +178,7 @@ where
     /// Returns the array's data as a slice, the data is in column-major order.
     pub fn as_slice(&self) -> &[Ref<'array, 'data, T>] {
         unsafe {
-            let arr_data = jl_array_data(self.array.unwrap(Private).cast()).cast::<Ref<T>>();
+            let arr_data = self.array.data_ptr().cast::<Ref<T>>();
             let dims = ArrayDimensions::new(self.array);
             let n_elems = dims.size();
             slice::from_raw_parts(arr_data, n_elems)
@@ -198,7 +201,8 @@ where
         unsafe {
             let dims = ArrayDimensions::new(self.array);
             let idx = dims.index_of(index).unwrap();
-            jl_array_data(self.array.unwrap(Private).cast())
+            self.array
+                .data_ptr()
                 .cast::<ValueRef>()
                 .add(idx)
                 .as_ref()
@@ -240,7 +244,8 @@ where
         unsafe {
             let dims = ArrayDimensions::new(self.array);
             let idx = dims.index_of(index).ok()?;
-            jl_array_data(self.array.unwrap(Private).cast())
+            self.array
+                .data_ptr()
                 .cast::<Ref<T>>()
                 .add(idx)
                 .as_ref()
@@ -288,7 +293,7 @@ where
     /// Returns the array's data as a slice, the data is in column-major order.
     pub fn as_slice(&self) -> &[Ref<'array, 'data, T>] {
         unsafe {
-            let arr_data = jl_array_data(self.array.unwrap(Private).cast()).cast::<Ref<T>>();
+            let arr_data = self.array.data_ptr().cast::<Ref<T>>();
             let dims = ArrayDimensions::new(self.array);
             let n_elems = dims.size();
             slice::from_raw_parts(arr_data, n_elems)
@@ -312,7 +317,8 @@ where
         unsafe {
             let dims = ArrayDimensions::new(self.array);
             let idx = dims.index_of(index).unwrap();
-            jl_array_data(self.array.unwrap(Private).cast())
+            self.array
+                .data_ptr()
                 .cast::<Ref<T>>()
                 .add(idx)
                 .as_ref()

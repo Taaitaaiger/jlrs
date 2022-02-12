@@ -475,7 +475,7 @@ impl<'data> Array<'_, 'data> {
                             array_type,
                             Box::into_raw(data.into_boxed_slice()).cast(),
                             dims.n_elements(0),
-                            0,
+                            1,
                         )
                         .cast();
 
@@ -491,7 +491,7 @@ impl<'data> Array<'_, 'data> {
                             array_type,
                             Box::into_raw(data.into_boxed_slice()).cast(),
                             tuple.unwrap(Private),
-                            0,
+                            1,
                         )
                         .cast();
 
@@ -507,7 +507,7 @@ impl<'data> Array<'_, 'data> {
                             array_type,
                             Box::into_raw(data.into_boxed_slice()).cast(),
                             tuple.unwrap(Private),
-                            0,
+                            1,
                         )
                         .cast();
 
@@ -539,6 +539,11 @@ impl<'data> Array<'_, 'data> {
             let arr = jl_pchar_to_array(ptr.cast(), nbytes);
             scope.value(NonNull::new_unchecked(arr.cast()), Private)
         }
+    }
+
+    #[inline(always)]
+    pub(crate) fn data_ptr(self) -> *mut c_void {
+        unsafe { self.unwrap_non_null(Private).as_ref().data }
     }
 }
 
@@ -633,9 +638,10 @@ impl<'scope, 'data> Array<'scope, 'data> {
 
     /// Copy the data of an inline array to Rust. Returns `JlrsError::NotInline` if the data is
     /// not stored inline or `JlrsError::WrongType` if the type of the elements is incorrect.
-    pub fn copy_inline_data<T>(self) -> JlrsResult<CopiedArray<T>>
+    pub fn copy_inline_data<'frame, T, F>(self, _: &F) -> JlrsResult<CopiedArray<T>>
     where
         T: ValidLayout,
+        F: Frame<'frame>,
     {
         if !self.contains::<T>() {
             Err(JlrsError::WrongType {
@@ -717,11 +723,13 @@ impl<'scope, 'data> Array<'scope, 'data> {
     }
 
     /// Mutably borrow inline array data without the restriction that only a single array can be
-    /// mutably borrowed. It's your responsibility to ensure you don't create multiple mutable
-    /// references to the same array data.
+    /// mutably borrowed.
     ///
     /// Returns `JlrsError::NotInline` if the data is not stored inline or `JlrsError::WrongType`
     /// if the type of the elements is incorrect.
+    ///
+    /// Safety: It's your responsibility to ensure you don't create multiple mutable
+    /// references to the same data.
     pub unsafe fn unrestricted_inline_data_mut<'borrow, 'frame, T, F>(
         self,
         frame: &'borrow F,
@@ -755,15 +763,13 @@ impl<'scope, 'data> Array<'scope, 'data> {
     where
         F: Frame<'frame>,
     {
-        unsafe {
-            if !self.is_value_array() {
-                Err(JlrsError::Inline {
-                    element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-                })?;
-            }
-
-            Ok(ValueArrayData::new(self, frame))
+        if !self.is_value_array() {
+            Err(JlrsError::Inline {
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
         }
+
+        unsafe { Ok(ValueArrayData::new(self, frame)) }
     }
 
     /// Immutably borrow the data of this array of wrappers, you can borrow data from multiple
@@ -778,15 +784,13 @@ impl<'scope, 'data> Array<'scope, 'data> {
         T: Wrapper<'scope, 'data>,
         T::Ref: ValidLayout,
     {
-        unsafe {
-            if !self.contains::<T::Ref>() {
-                Err(JlrsError::WrongType {
-                    value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-                })?;
-            }
-
-            Ok(ValueArrayData::new(self, frame))
+        if !self.contains::<T::Ref>() {
+            Err(JlrsError::WrongType {
+                value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
         }
+
+        unsafe { Ok(ValueArrayData::new(self, frame)) }
     }
 
     /// Mutably borrow the data of this array of values, you can mutably borrow a single array at
@@ -798,15 +802,13 @@ impl<'scope, 'data> Array<'scope, 'data> {
     where
         F: Frame<'frame>,
     {
-        unsafe {
-            if !self.is_value_array() {
-                Err(JlrsError::Inline {
-                    element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-                })?;
-            }
-
-            Ok(ValueArrayDataMut::new(self, frame))
+        if !self.is_value_array() {
+            Err(JlrsError::Inline {
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
         }
+
+        unsafe { Ok(ValueArrayDataMut::new(self, frame)) }
     }
 
     /// Mutably borrow the data of this array of wrappers, you can mutably borrow a single array
@@ -820,21 +822,22 @@ impl<'scope, 'data> Array<'scope, 'data> {
         T: Wrapper<'scope, 'data>,
         T::Ref: ValidLayout,
     {
-        unsafe {
-            if !self.contains::<T::Ref>() {
-                Err(JlrsError::WrongType {
-                    value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-                })?;
-            }
-
-            Ok(ValueArrayDataMut::new(self, frame))
+        if !self.contains::<T::Ref>() {
+            Err(JlrsError::WrongType {
+                value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
         }
+
+        unsafe { Ok(ValueArrayDataMut::new(self, frame)) }
     }
 
     /// Mutably borrow the data of this array of values without the restriction that only a single
-    /// array can be mutably borrowed. It's your responsibility to ensure you don't create
-    /// multiple mutable references to the same array data. Returns `JlrsError::Inline` if the
-    /// data is stored inline.
+    /// array can be mutably borrowed.
+    ///
+    /// Returns `JlrsError::Inline` if the data is stored inline.
+    ///
+    /// Safety: It's your responsibility to ensure you don't create multiple mutable
+    /// references to the same data.
     pub unsafe fn unrestricted_value_data_mut<'borrow, 'frame, F>(
         self,
         frame: &'borrow F,
@@ -852,9 +855,12 @@ impl<'scope, 'data> Array<'scope, 'data> {
     }
 
     /// Mutably borrow the data of this array of wrappers without the restriction that only a
-    /// single array can be mutably borrowed. It's your responsibility to ensure you don't create
-    /// multiple mutable references to the same array data. Returns `JlrsError::Inline` if the
-    /// data is stored inline.
+    /// single array can be mutably borrowed.
+    ///
+    /// Returns `JlrsError::WrongType` if the type doesn't match the type of the elements.
+    ///
+    /// Safety: It's your responsibility to ensure you don't create multiple mutable
+    /// references to the same data.
     pub unsafe fn unrestricted_wrapper_data_mut<'borrow, 'frame, T, F>(
         self,
         frame: &'borrow F,
@@ -883,7 +889,7 @@ impl<'scope> Array<'scope, 'static> {
         F: Frame<'frame>,
     {
         if self.is_union_array() {
-            Ok(UnionArrayData::new(self, frame))
+            unsafe { Ok(UnionArrayData::new(self, frame)) }
         } else {
             let elem_ty = self.element_type().display_string_or(CANNOT_DISPLAY_TYPE);
             let inline = !self.is_value_array();
@@ -901,7 +907,7 @@ impl<'scope> Array<'scope, 'static> {
         F: Frame<'frame>,
     {
         if self.is_union_array() {
-            Ok(UnionArrayDataMut::new(self, frame))
+            unsafe { Ok(UnionArrayDataMut::new(self, frame)) }
         } else {
             let elem_ty = self.element_type().display_string_or(CANNOT_DISPLAY_TYPE);
             let inline = !self.is_value_array();
@@ -910,8 +916,10 @@ impl<'scope> Array<'scope, 'static> {
     }
 
     /// Mutably borrow the data of this array of bits-unions without the restriction that only a
-    /// single array can be mutably borrowed. It's your responsibility to ensure you don't create
-    /// multiple mutable references to the same array data.
+    /// single array can be mutably borrowed.
+    ///
+    /// Safety: It's your responsibility to ensure you don't create multiple mutable references to
+    /// the same data. 
     pub unsafe fn unrestricted_union_data_mut<'borrow, 'frame, F>(
         self,
         frame: &'borrow F,
@@ -1154,8 +1162,11 @@ impl<'scope, 'data, T: Clone + ValidLayout + Debug> TypedArray<'scope, 'data, T>
     }
 
     /// Copy the data of an inline array to Rust. Returns `JlrsError::NotInline` if the data is
-    /// not stored inline or `JlrsError::WrongType` if the type of the elements is incorrect.
-    pub fn copy_inline_data(self) -> JlrsResult<CopiedArray<T>> {
+    /// not stored inline.
+    pub fn copy_inline_data<'frame, F>(self, _: &F) -> JlrsResult<CopiedArray<T>>
+    where
+        F: Frame<'frame>,
+    {
         if !self.is_inline_array() {
             Err(JlrsError::NotInline {
                 element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
@@ -1165,15 +1176,15 @@ impl<'scope, 'data, T: Clone + ValidLayout + Debug> TypedArray<'scope, 'data, T>
         unsafe {
             let jl_data = jl_array_data(self.unwrap(Private).cast()).cast();
             let dimensions = self.dimensions().into_dimensions();
-
-            let sz = dimensions.size();
-            let mut data = Vec::with_capacity(sz);
-            let ptr = data.as_mut_ptr();
-            std::ptr::copy_nonoverlapping(jl_data, ptr, sz);
-            data.set_len(sz);
-
-            Ok(CopiedArray::new(data, dimensions))
-        }
+            
+        let sz = dimensions.size();
+        let mut data = Vec::with_capacity(sz);
+        let ptr = data.as_mut_ptr();
+        std::ptr::copy_nonoverlapping(jl_data, ptr, sz);
+        data.set_len(sz);
+        
+        Ok(CopiedArray::new(data, dimensions))
+    }
     }
 
     /// Immutably borrow inline array data, you can borrow data from multiple arrays at the same
@@ -1216,11 +1227,12 @@ impl<'scope, 'data, T: Clone + ValidLayout + Debug> TypedArray<'scope, 'data, T>
     }
 
     /// Mutably borrow inline array data without the restriction that only a single array can be
-    /// mutably borrowed. It's your responsibility to ensure you don't create multiple mutable
-    /// references to the same array data.
+    /// mutably borrowed.
     ///
     /// Returns `JlrsError::NotInline` if the data is not stored inline or `JlrsError::WrongType`
     /// if the type of the elements is incorrect.
+    ///
+    /// Safety: No `Task` must be running in Julia that can mutate the array data.
     pub unsafe fn unrestricted_inline_data_mut<'borrow, 'frame, F>(
         self,
         frame: &'borrow F,
@@ -1293,8 +1305,9 @@ impl<'scope, 'data, T: Wrapper<'scope, 'data> + ValidLayout> TypedArray<'scope, 
     }
 
     /// Mutably borrow the data of this array as an array of values without the restriction that
-    /// only a single array can be mutably borrowed. It's your responsibility to ensure you don't
-    /// create multiple mutable references to the same array data.
+    /// only a single array can be mutably borrowed.
+    ///
+    /// Safety: No `Task` must be running in Julia that can mutate the array data.
     pub unsafe fn unrestricted_value_data_mut<'borrow, 'frame, F>(
         self,
         frame: &'borrow F,
@@ -1309,8 +1322,9 @@ impl<'scope, 'data, T: Wrapper<'scope, 'data> + ValidLayout> TypedArray<'scope, 
     }
 
     /// Mutably borrow the data of this array of wrappers without the restriction that only a
-    /// single array can be mutably borrowed. It's your responsibility to ensure you don't create
-    /// multiple mutable references to the same array data.
+    /// single array can be mutably borrowed.
+    ///
+    /// Safety: No `Task` must be running in Julia that can mutate the array data.
     pub unsafe fn unrestricted_wrapper_data_mut<'borrow, 'frame, F>(
         self,
         frame: &'borrow F,

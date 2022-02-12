@@ -9,7 +9,7 @@ use crate::memory::global::Global;
 use crate::memory::scope::Scope;
 use crate::private::Private;
 use crate::wrappers::ptr::{SymbolRef, ValueRef};
-use crate::{convert::temporary_symbol::TemporarySymbol, error::JlrsResult, memory::frame::Frame};
+use crate::{convert::to_symbol::ToSymbol, error::JlrsResult, memory::frame::Frame};
 use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_new_typevar, jl_tvar_t, jl_tvar_type};
 
@@ -38,11 +38,11 @@ impl<'scope> TypeVar<'scope> {
     where
         S: Scope<'target, 'current, 'static, F>,
         F: Frame<'current>,
-        N: TemporarySymbol,
+        N: ToSymbol,
     {
         unsafe {
             let global = scope.global();
-            let name = name.temporary_symbol(Private);
+            let name = name.to_symbol_priv(Private);
             let lb = lower_bound.unwrap_or_else(|| Value::bottom_type(global));
             let ub = upper_bound.unwrap_or_else(|| DataType::any_type(global).as_value());
             let tvar =
@@ -68,11 +68,11 @@ impl<'scope> TypeVar<'scope> {
     where
         S: Scope<'target, 'current, 'static, F>,
         F: Frame<'current>,
-        N: TemporarySymbol,
+        N: ToSymbol,
     {
         unsafe {
             let global = scope.global();
-            let name = name.temporary_symbol(Private);
+            let name = name.to_symbol_priv(Private);
             let lb = lower_bound.unwrap_or_else(|| Value::bottom_type(global));
             let ub = upper_bound.unwrap_or_else(|| DataType::any_type(global).as_value());
             let tvar = jl_new_typevar(name.unwrap(Private), lb.unwrap(Private), ub.unwrap(Private));
@@ -90,10 +90,10 @@ impl<'scope> TypeVar<'scope> {
         upper_bound: Option<Value>,
     ) -> JuliaResultRef<'global, 'static, TypeVarRef<'global>>
     where
-        N: TemporarySymbol,
+        N: ToSymbol,
     {
         unsafe {
-            let name = name.temporary_symbol(Private);
+            let name = name.to_symbol_priv(Private);
             let lb = lower_bound.unwrap_or_else(|| Value::bottom_type(global));
             let ub = upper_bound.unwrap_or_else(|| DataType::any_type(global).as_value());
             let tvar =
@@ -114,10 +114,10 @@ impl<'scope> TypeVar<'scope> {
         upper_bound: Option<Value>,
     ) -> TypeVarRef<'scope>
     where
-        N: TemporarySymbol,
+        N: ToSymbol,
     {
         unsafe {
-            let name = name.temporary_symbol(Private);
+            let name = name.to_symbol_priv(Private);
             let lb = lower_bound.unwrap_or_else(|| Value::bottom_type(global));
             let ub = upper_bound.unwrap_or_else(|| DataType::any_type(global).as_value());
             let tvar = jl_new_typevar(name.unwrap(Private), lb.unwrap(Private), ub.unwrap(Private));

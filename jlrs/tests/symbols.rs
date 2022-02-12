@@ -79,7 +79,7 @@ mod tests {
     }
 
     #[test]
-    fn jl_string_as_symbol() {
+    fn jl_string_to_symbol() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
             jlrs.scope_with_slots(1, |global, frame| {

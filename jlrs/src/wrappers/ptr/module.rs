@@ -5,7 +5,7 @@
 //! relative to the `Main` module, just like in Julia itself.
 
 use crate::{
-    convert::temporary_symbol::TemporarySymbol,
+    convert::to_symbol::ToSymbol,
     error::{JlrsError, JlrsResult, CANNOT_DISPLAY_VALUE},
     impl_debug, impl_julia_typecheck, impl_valid_layout,
     memory::{frame::Frame, global::Global, scope::Scope},
@@ -48,7 +48,7 @@ use super::private::Wrapper;
 /// [`Julia::include`]: crate::julia::Julia::include
 /// [`AsyncJulia::include`]: crate::extensions::multitask::runtime::AsyncJulia::include
 /// [`AsyncJulia::try_include`]: crate::extensions::multitask::runtime::AsyncJulia::try_include
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 #[repr(transparent)]
 pub struct Module<'scope>(NonNull<jl_module_t>, PhantomData<&'scope ()>);
 
@@ -108,9 +108,9 @@ impl<'scope> Module<'scope> {
     }
 
     /// Returns `true` if `self` has imported `sym`.
-    pub fn is_imported<N: TemporarySymbol>(self, sym: N) -> bool {
+    pub fn is_imported<N: ToSymbol>(self, sym: N) -> bool {
         unsafe {
-            let sym = sym.temporary_symbol(Private);
+            let sym = sym.to_symbol_priv(Private);
             jl_is_imported(self.unwrap(Private), sym.unwrap(Private)) != 0
         }
     }
@@ -122,11 +122,11 @@ impl<'scope> Module<'scope> {
     /// Returns an error if the submodule doesn't exist.
     pub fn submodule<'target, N, F>(self, frame: &mut F, name: N) -> JlrsResult<Module<'target>>
     where
-        N: TemporarySymbol,
+        N: ToSymbol,
         F: Frame<'target>,
     {
         unsafe {
-            let symbol = name.temporary_symbol(Private);
+            let symbol = name.to_symbol_priv(Private);
             let submodule = jl_get_global(self.unwrap(Private), symbol.unwrap(Private));
             if submodule.is_null() {
                 Err(JlrsError::GlobalNotFound {
@@ -157,10 +157,10 @@ impl<'scope> Module<'scope> {
     /// Returns an error if the submodule doesn't exist.
     pub fn submodule_ref<N>(self, name: N) -> JlrsResult<ModuleRef<'scope>>
     where
-        N: TemporarySymbol,
+        N: ToSymbol,
     {
         unsafe {
-            let symbol = name.temporary_symbol(Private);
+            let symbol = name.to_symbol_priv(Private);
             let submodule = jl_get_global(self.unwrap(Private), symbol.unwrap(Private));
             if submodule.is_null() {
                 Err(JlrsError::GlobalNotFound {
@@ -192,11 +192,11 @@ impl<'scope> Module<'scope> {
         value: Value<'_, 'static>,
     ) -> JlrsResult<JuliaResult<'frame, 'static, ValueRef<'scope, 'static>>>
     where
-        N: TemporarySymbol,
+        N: ToSymbol,
         F: Frame<'frame>,
     {
         unsafe {
-            let symbol = name.temporary_symbol(Private);
+            let symbol = name.to_symbol_priv(Private);
 
             let res = jlrs_set_global(
                 self.unwrap(Private),
@@ -227,10 +227,10 @@ impl<'scope> Module<'scope> {
         value: Value<'_, 'static>,
     ) -> JuliaResultRef<'scope, 'static>
     where
-        N: TemporarySymbol,
+        N: ToSymbol,
     {
         unsafe {
-            let symbol = name.temporary_symbol(Private);
+            let symbol = name.to_symbol_priv(Private);
 
             let res = jlrs_set_global(
                 self.unwrap(Private),
@@ -256,10 +256,10 @@ impl<'scope> Module<'scope> {
         value: Value<'_, 'static>,
     ) -> ValueRef<'scope, 'static>
     where
-        N: TemporarySymbol,
+        N: ToSymbol,
     {
         unsafe {
-            let symbol = name.temporary_symbol(Private);
+            let symbol = name.to_symbol_priv(Private);
 
             jl_set_global(
                 self.unwrap(Private),
@@ -282,11 +282,11 @@ impl<'scope> Module<'scope> {
         value: Value<'_, 'static>,
     ) -> JlrsResult<JuliaResult<'frame, 'static, ValueRef<'scope, 'static>>>
     where
-        N: TemporarySymbol,
+        N: ToSymbol,
         F: Frame<'frame>,
     {
         unsafe {
-            let symbol = name.temporary_symbol(Private);
+            let symbol = name.to_symbol_priv(Private);
 
             let res = jlrs_set_const(
                 self.unwrap(Private),
@@ -316,10 +316,10 @@ impl<'scope> Module<'scope> {
         value: Value<'_, 'static>,
     ) -> JuliaResultRef<'scope, 'static>
     where
-        N: TemporarySymbol,
+        N: ToSymbol,
     {
         unsafe {
-            let symbol = name.temporary_symbol(Private);
+            let symbol = name.to_symbol_priv(Private);
 
             let res = jlrs_set_const(
                 self.unwrap(Private),
@@ -345,10 +345,10 @@ impl<'scope> Module<'scope> {
         value: Value<'_, 'static>,
     ) -> ValueRef<'scope, 'static>
     where
-        N: TemporarySymbol,
+        N: ToSymbol,
     {
         unsafe {
-            let symbol = name.temporary_symbol(Private);
+            let symbol = name.to_symbol_priv(Private);
 
             jl_set_const(
                 self.unwrap(Private),
@@ -368,11 +368,11 @@ impl<'scope> Module<'scope> {
         name: N,
     ) -> JlrsResult<Value<'target, 'static>>
     where
-        N: TemporarySymbol,
+        N: ToSymbol,
         F: Frame<'target>,
     {
         unsafe {
-            let symbol = name.temporary_symbol(Private);
+            let symbol = name.to_symbol_priv(Private);
 
             let func = jl_get_global(self.unwrap(Private), symbol.unwrap(Private));
             if func.is_null() {
@@ -392,10 +392,10 @@ impl<'scope> Module<'scope> {
     /// Returns an error if the global doesn't exist.
     pub fn global_ref<N>(self, name: N) -> JlrsResult<ValueRef<'scope, 'static>>
     where
-        N: TemporarySymbol,
+        N: ToSymbol,
     {
         unsafe {
-            let symbol = name.temporary_symbol(Private);
+            let symbol = name.to_symbol_priv(Private);
 
             let global = jl_get_global(self.unwrap(Private), symbol.unwrap(Private));
             if global.is_null() {
@@ -413,10 +413,10 @@ impl<'scope> Module<'scope> {
     /// Returns an error if the global doesn't exist.
     pub fn leaked_global<N>(self, name: N) -> JlrsResult<LeakedValue>
     where
-        N: TemporarySymbol,
+        N: ToSymbol,
     {
         unsafe {
-            let symbol = name.temporary_symbol(Private);
+            let symbol = name.to_symbol_priv(Private);
 
             // there doesn't seem to be a way to check if this is actually a
             // function...
@@ -440,11 +440,11 @@ impl<'scope> Module<'scope> {
         name: N,
     ) -> JlrsResult<Function<'target, 'static>>
     where
-        N: TemporarySymbol,
+        N: ToSymbol,
         F: Frame<'target>,
     {
         unsafe {
-            let symbol = name.temporary_symbol(Private);
+            let symbol = name.to_symbol_priv(Private);
             let func = self.global(frame, symbol)?;
 
             if !func.is::<Function>() {
@@ -461,10 +461,10 @@ impl<'scope> Module<'scope> {
     /// Returns an error if the function doesn't exist or if it's not a subtype of `Function`.
     pub fn function_ref<N>(self, name: N) -> JlrsResult<FunctionRef<'scope, 'static>>
     where
-        N: TemporarySymbol,
+        N: ToSymbol,
     {
         unsafe {
-            let symbol = name.temporary_symbol(Private);
+            let symbol = name.to_symbol_priv(Private);
             let func = self.global_ref(symbol)?.wrapper_unchecked();
 
             if !func.is::<Function>() {
@@ -498,18 +498,14 @@ impl<'scope> Module<'scope> {
     where
         S: Scope<'target, 'current, 'static, F>,
         F: Frame<'current>,
-        N: TemporarySymbol,
+        N: ToSymbol,
     {
         unsafe {
             Module::wrap(jl_base_module, Private)
                 .function_ref("require")
                 .unwrap()
                 .wrapper_unchecked()
-                .call2(
-                    scope,
-                    self.as_value(),
-                    module.temporary_symbol(Private).as_value(),
-                )
+                .call2(scope, self.as_value(), module.to_symbol_priv(Private).as_value())
         }
     }
 
@@ -523,7 +519,7 @@ impl<'scope> Module<'scope> {
     /// evaluating the using-statement with [`Value::eval_string`].
     pub fn require_ref<S>(self, global: Global<'scope>, module: S) -> ModuleRef<'scope>
     where
-        S: TemporarySymbol,
+        S: ToSymbol,
     {
         unsafe {
             Module::base(global)
@@ -533,12 +529,9 @@ impl<'scope> Module<'scope> {
                 .call2_unrooted(
                     global,
                     self.as_value(),
-                    module.temporary_symbol(Private).as_value(),
+                    module.to_symbol_priv(Private).as_value(),
                 )
-                .expect(&format!(
-                    "Could not load ${:?}",
-                    module.temporary_symbol(Private)
-                ))
+                .expect(&format!("Could not load ${:?}", module.to_symbol_priv(Private)))
                 .wrapper_unchecked()
                 .cast_unchecked::<Module>()
                 .as_ref()

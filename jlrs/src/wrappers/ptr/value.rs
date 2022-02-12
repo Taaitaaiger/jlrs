@@ -96,7 +96,7 @@ macro_rules! named_tuple {
 }
 
 use crate::{
-    convert::{into_julia::IntoJulia, temporary_symbol::TemporarySymbol, unbox::Unbox},
+    convert::{to_symbol::ToSymbol, into_julia::IntoJulia, unbox::Unbox},
     error::{JlrsError, JlrsResult, JuliaResultRef, CANNOT_DISPLAY_TYPE},
     impl_debug,
     layout::{
@@ -210,7 +210,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
         S: Scope<'target, 'current, 'data, F>,
         F: Frame<'current>,
         N: AsMut<[T]>,
-        T: TemporarySymbol,
+        T: ToSymbol,
         V: AsMut<[Value<'scope, 'data>]>,
     {
         scope.value_scope_with_slots(4, |output, frame| unsafe {
@@ -230,7 +230,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
 
             let mut field_names_vec = field_names
                 .iter()
-                .map(|name| name.temporary_symbol(Private).as_value())
+                .map(|name| name.to_symbol_priv(Private).as_value())
                 .collect::<smallvec::SmallVec<[_; MAX_SIZE]>>();
 
             let names = DataType::anytuple_type(global)
@@ -332,10 +332,11 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// Returns the `DataType` of this value.
     pub fn datatype(self) -> DataType<'scope> {
         unsafe {
-            let ptr = ((*jl_astaggedvalue(self.unwrap(Private)))
+            let header = NonNull::new_unchecked(jl_astaggedvalue(self.unwrap(Private)))
+                .as_ref()
                 .__bindgen_anon_1
-                .header as usize
-                & !15usize) as *mut jl_value_t;
+                .header;
+            let ptr = (header & !15usize) as *mut jl_value_t;
             DataType::wrap(ptr.cast(), Private)
         }
     }
@@ -582,10 +583,10 @@ impl<'scope, 'data> Value<'scope, 'data> {
     pub fn get_raw_field<T, N>(self, field_name: N) -> JlrsResult<T>
     where
         T: ValidLayout,
-        N: TemporarySymbol,
+        N: ToSymbol,
     {
         unsafe {
-            let symbol = field_name.temporary_symbol(Private);
+            let symbol = field_name.to_symbol_priv(Private);
             let ty = self.datatype();
             let jl_type = ty.unwrap(Private);
             let idx = jl_field_index(jl_type, symbol.unwrap(Private), 0);
@@ -607,9 +608,9 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// Safety: the layout out `T` must be compatible with the layout of the field.
     pub unsafe fn get_raw_field_unchecked<T, N>(self, field_name: N) -> T
     where
-        N: TemporarySymbol,
+        N: ToSymbol,
     {
-        let symbol = field_name.temporary_symbol(Private);
+        let symbol = field_name.to_symbol_priv(Private);
         let ty = self.datatype();
         let jl_type = ty.unwrap(Private);
         let idx = jl_field_index(jl_type, symbol.unwrap(Private), 0);
@@ -726,12 +727,12 @@ impl<'scope, 'data> Value<'scope, 'data> {
         field_name: N,
     ) -> JlrsResult<S::Value>
     where
-        N: TemporarySymbol,
+        N: ToSymbol,
         S: Scope<'target, 'current, 'data, F>,
         F: Frame<'current>,
     {
         unsafe {
-            let symbol = field_name.temporary_symbol(Private);
+            let symbol = field_name.to_symbol_priv(Private);
             let idx = jl_field_index(self.datatype().unwrap(Private), symbol.unwrap(Private), 0);
 
             if idx < 0 {
@@ -756,10 +757,10 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// field, `JlrsError::NotAPointerField` is returned.
     pub fn get_field_ref<N>(self, field_name: N) -> JlrsResult<ValueRef<'scope, 'data>>
     where
-        N: TemporarySymbol,
+        N: ToSymbol,
     {
         unsafe {
-            let symbol = field_name.temporary_symbol(Private);
+            let symbol = field_name.to_symbol_priv(Private);
             let ty = self.datatype();
             let idx = jl_field_index(ty.unwrap(Private), symbol.unwrap(Private), 0);
 
@@ -805,10 +806,10 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// If the field doesn't  exist `JlrsError::NoSuchField` is returned.
     pub fn get_field_unrooted<N>(self, field_name: N) -> JlrsResult<ValueRef<'scope, 'data>>
     where
-        N: TemporarySymbol,
+        N: ToSymbol,
     {
         unsafe {
-            let symbol = field_name.temporary_symbol(Private);
+            let symbol = field_name.to_symbol_priv(Private);
             let idx = jl_field_index(self.datatype().unwrap(Private), symbol.unwrap(Private), 0);
 
             if idx < 0 {
@@ -939,9 +940,9 @@ impl<'scope, 'data> Value<'scope, 'data> {
     ) -> JlrsResult<JuliaResult<'frame, 'data, ()>>
     where
         F: Frame<'frame>,
-        N: TemporarySymbol,
+        N: ToSymbol,
     {
-        let symbol = field_name.temporary_symbol(Private);
+        let symbol = field_name.to_symbol_priv(Private);
         let idx = jl_field_index(self.datatype().unwrap(Private), symbol.unwrap(Private), 0);
 
         if idx < 0 {
@@ -989,9 +990,9 @@ impl<'scope, 'data> Value<'scope, 'data> {
         value: Value<'_, 'data>,
     ) -> JlrsResult<JuliaResultRef<'scope, 'data, ()>>
     where
-        N: TemporarySymbol,
+        N: ToSymbol,
     {
-        let symbol = field_name.temporary_symbol(Private);
+        let symbol = field_name.to_symbol_priv(Private);
         let idx = jl_field_index(self.datatype().unwrap(Private), symbol.unwrap(Private), 0);
 
         if idx < 0 {
@@ -1032,9 +1033,9 @@ impl<'scope, 'data> Value<'scope, 'data> {
         value: Value<'_, 'data>,
     ) -> JlrsResult<()>
     where
-        N: TemporarySymbol,
+        N: ToSymbol,
     {
-        let symbol = field_name.temporary_symbol(Private);
+        let symbol = field_name.to_symbol_priv(Private);
         let idx = jl_field_index(self.datatype().unwrap(Private), symbol.unwrap(Private), 0);
 
         if idx < 0 {

@@ -2,16 +2,11 @@
 
 use crate::{
     memory::frame::Frame,
-    private::Private,
-    wrappers::ptr::{
-        array::{
-            dimensions::{ArrayDimensions, Dims},
-            Array,
-        },
-        private::Wrapper,
+    wrappers::ptr::array::{
+        dimensions::{ArrayDimensions, Dims},
+        Array,
     },
 };
-use jl_sys::jl_array_data;
 use std::{
     marker::PhantomData,
     ops::{Index, IndexMut},
@@ -21,18 +16,10 @@ use std::{
 /// Immutably borrowed inline array data from Julia. The data has a column-major order and can be
 /// indexed with anything that implements [`Dims`].
 #[repr(transparent)]
+#[derive(Clone)]
 pub struct InlineArrayData<'borrow, 'array, 'data, T> {
     array: Array<'array, 'data>,
     _marker: PhantomData<&'borrow [T]>,
-}
-
-impl<'borrow, 'array, 'data, T> Clone for InlineArrayData<'borrow, 'array, 'data, T> {
-    fn clone(&self) -> Self {
-        InlineArrayData {
-            array: self.array,
-            _marker: PhantomData,
-        }
-    }
 }
 
 impl<'borrow, 'array, 'data, T> InlineArrayData<'borrow, 'array, 'data, T> {
@@ -54,10 +41,7 @@ impl<'borrow, 'array, 'data, T> InlineArrayData<'borrow, 'array, 'data, T> {
         unsafe {
             let dims = ArrayDimensions::new(self.array);
             let idx = dims.index_of(index).ok()?;
-            jl_array_data(self.array.unwrap(Private).cast())
-                .cast::<T>()
-                .add(idx)
-                .as_ref()
+            self.array.data_ptr().cast::<T>().add(idx).as_ref()
         }
     }
 
@@ -66,7 +50,7 @@ impl<'borrow, 'array, 'data, T> InlineArrayData<'borrow, 'array, 'data, T> {
         unsafe {
             let dims = ArrayDimensions::new(self.array);
             let len = dims.size();
-            let data = jl_array_data(self.array.unwrap(Private).cast()).cast::<T>();
+            let data = self.array.data_ptr().cast::<T>();
             slice::from_raw_parts(data, len)
         }
     }
@@ -76,7 +60,7 @@ impl<'borrow, 'array, 'data, T> InlineArrayData<'borrow, 'array, 'data, T> {
         unsafe {
             let dims = ArrayDimensions::new(self.array);
             let len = dims.size();
-            let data = jl_array_data(self.array.unwrap(Private).cast()).cast::<T>();
+            let data = self.array.data_ptr().cast::<T>();
             slice::from_raw_parts(data, len)
         }
     }
@@ -96,11 +80,7 @@ where
         unsafe {
             let dims = ArrayDimensions::new(self.array);
             let idx = dims.index_of(index).unwrap();
-            jl_array_data(self.array.unwrap(Private).cast())
-                .cast::<T>()
-                .add(idx)
-                .as_ref()
-                .unwrap()
+            self.array.data_ptr().cast::<T>().add(idx).as_ref().unwrap()
         }
     }
 }
@@ -132,10 +112,7 @@ impl<'borrow, 'array, 'data, T> InlineArrayDataMut<'borrow, 'array, 'data, T> {
         unsafe {
             let dims = ArrayDimensions::new(self.array);
             let idx = dims.index_of(index).ok()?;
-            jl_array_data(self.array.unwrap(Private).cast())
-                .cast::<T>()
-                .add(idx)
-                .as_ref()
+            self.array.data_ptr().cast::<T>().add(idx).as_ref()
         }
     }
 
@@ -147,10 +124,7 @@ impl<'borrow, 'array, 'data, T> InlineArrayDataMut<'borrow, 'array, 'data, T> {
         unsafe {
             let dims = ArrayDimensions::new(self.array);
             let idx = dims.index_of(index).ok()?;
-            jl_array_data(self.array.unwrap(Private).cast())
-                .cast::<T>()
-                .add(idx)
-                .as_mut()
+            self.array.data_ptr().cast::<T>().add(idx).as_mut()
         }
     }
 
@@ -159,7 +133,7 @@ impl<'borrow, 'array, 'data, T> InlineArrayDataMut<'borrow, 'array, 'data, T> {
         unsafe {
             let dims = ArrayDimensions::new(self.array);
             let len = dims.size();
-            let data = jl_array_data(self.array.unwrap(Private).cast()).cast::<T>();
+            let data = self.array.data_ptr().cast::<T>();
             slice::from_raw_parts(data, len)
         }
     }
@@ -169,7 +143,7 @@ impl<'borrow, 'array, 'data, T> InlineArrayDataMut<'borrow, 'array, 'data, T> {
         unsafe {
             let dims = ArrayDimensions::new(self.array);
             let len = dims.size();
-            let data = jl_array_data(self.array.unwrap(Private).cast()).cast::<T>();
+            let data = self.array.data_ptr().cast::<T>();
             slice::from_raw_parts(data, len)
         }
     }
@@ -179,7 +153,7 @@ impl<'borrow, 'array, 'data, T> InlineArrayDataMut<'borrow, 'array, 'data, T> {
         unsafe {
             let dims = ArrayDimensions::new(self.array);
             let len = dims.size();
-            let data = jl_array_data(self.array.unwrap(Private).cast()).cast::<T>();
+            let data = self.array.data_ptr().cast::<T>();
             slice::from_raw_parts_mut(data, len)
         }
     }
@@ -189,7 +163,7 @@ impl<'borrow, 'array, 'data, T> InlineArrayDataMut<'borrow, 'array, 'data, T> {
         unsafe {
             let dims = ArrayDimensions::new(self.array);
             let len = dims.size();
-            let data = jl_array_data(self.array.unwrap(Private).cast()).cast::<T>();
+            let data = self.array.data_ptr().cast::<T>();
             slice::from_raw_parts_mut(data, len)
         }
     }
@@ -211,11 +185,7 @@ where
         unsafe {
             let dims = ArrayDimensions::new(self.array);
             let idx = dims.index_of(index).unwrap();
-            jl_array_data(self.array.unwrap(Private).cast())
-                .cast::<T>()
-                .add(idx)
-                .as_ref()
-                .unwrap()
+            self.array.data_ptr().cast::<T>().add(idx).as_ref().unwrap()
         }
     }
 }
@@ -228,11 +198,7 @@ where
         unsafe {
             let dims = ArrayDimensions::new(self.array);
             let idx = dims.index_of(index).unwrap();
-            jl_array_data(self.array.unwrap(Private).cast())
-                .cast::<T>()
-                .add(idx)
-                .as_mut()
-                .unwrap()
+            self.array.data_ptr().cast::<T>().add(idx).as_mut().unwrap()
         }
     }
 }
@@ -264,10 +230,7 @@ impl<'borrow, 'array, 'data, T> UnrestrictedInlineArrayDataMut<'borrow, 'array, 
         unsafe {
             let dims = ArrayDimensions::new(self.array);
             let idx = dims.index_of(index).ok()?;
-            jl_array_data(self.array.unwrap(Private).cast())
-                .cast::<T>()
-                .add(idx)
-                .as_ref()
+            self.array.data_ptr().cast::<T>().add(idx).as_ref()
         }
     }
 
@@ -279,10 +242,7 @@ impl<'borrow, 'array, 'data, T> UnrestrictedInlineArrayDataMut<'borrow, 'array, 
         unsafe {
             let dims = ArrayDimensions::new(self.array);
             let idx = dims.index_of(index).ok()?;
-            jl_array_data(self.array.unwrap(Private).cast())
-                .cast::<T>()
-                .add(idx)
-                .as_mut()
+            self.array.data_ptr().cast::<T>().add(idx).as_mut()
         }
     }
 
@@ -291,7 +251,7 @@ impl<'borrow, 'array, 'data, T> UnrestrictedInlineArrayDataMut<'borrow, 'array, 
         unsafe {
             let dims = ArrayDimensions::new(self.array);
             let len = dims.size();
-            let data = jl_array_data(self.array.unwrap(Private).cast()).cast::<T>();
+            let data = self.array.data_ptr().cast::<T>();
             slice::from_raw_parts(data, len)
         }
     }
@@ -301,7 +261,7 @@ impl<'borrow, 'array, 'data, T> UnrestrictedInlineArrayDataMut<'borrow, 'array, 
         unsafe {
             let dims = ArrayDimensions::new(self.array);
             let len = dims.size();
-            let data = jl_array_data(self.array.unwrap(Private).cast()).cast::<T>();
+            let data = self.array.data_ptr().cast::<T>();
             slice::from_raw_parts(data, len)
         }
     }
@@ -311,7 +271,7 @@ impl<'borrow, 'array, 'data, T> UnrestrictedInlineArrayDataMut<'borrow, 'array, 
         unsafe {
             let dims = ArrayDimensions::new(self.array);
             let len = dims.size();
-            let data = jl_array_data(self.array.unwrap(Private).cast()).cast::<T>();
+            let data = self.array.data_ptr().cast::<T>();
             slice::from_raw_parts_mut(data, len)
         }
     }
@@ -321,7 +281,7 @@ impl<'borrow, 'array, 'data, T> UnrestrictedInlineArrayDataMut<'borrow, 'array, 
         unsafe {
             let dims = ArrayDimensions::new(self.array);
             let len = dims.size();
-            let data = jl_array_data(self.array.unwrap(Private).cast()).cast::<T>();
+            let data = self.array.data_ptr().cast::<T>();
             slice::from_raw_parts_mut(data, len)
         }
     }
@@ -342,11 +302,7 @@ where
         unsafe {
             let dims = ArrayDimensions::new(self.array);
             let idx = dims.index_of(index).unwrap();
-            jl_array_data(self.array.unwrap(Private).cast())
-                .cast::<T>()
-                .add(idx)
-                .as_ref()
-                .unwrap()
+            self.array.data_ptr().cast::<T>().add(idx).as_ref().unwrap()
         }
     }
 }
@@ -360,11 +316,7 @@ where
         unsafe {
             let dims = ArrayDimensions::new(self.array);
             let idx = dims.index_of(index).unwrap();
-            jl_array_data(self.array.unwrap(Private).cast())
-                .cast::<T>()
-                .add(idx)
-                .as_mut()
-                .unwrap()
+            self.array.data_ptr().cast::<T>().add(idx).as_mut().unwrap()
         }
     }
 }

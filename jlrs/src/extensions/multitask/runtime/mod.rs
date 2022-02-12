@@ -995,13 +995,13 @@ pub mod impl_tokio {
     ///  - `recv_timeout`: timeout used when receiving messages on the communication channel. If no
     ///    new message is received before the timeout and tasks are running, events are processed.
     #[derive(Clone)]
-    pub struct AsyncJulia {
+    pub struct AsyncJuliaTokio {
         pub(crate) sender: Arc<MaybeUnboundedSender<Message>>,
     }
 
-    impl RequireSendSync for AsyncJulia {}
+    impl RequireSendSync for AsyncJuliaTokio {}
 
-    impl AsyncJulia {
+    impl AsyncJuliaTokio {
         /// Initialize Julia in a new thread.
         ///
         /// This function returns an error if the `JULIA_NUM_THREADS` environment variable is set
@@ -1022,7 +1022,7 @@ pub mod impl_tokio {
 
             let (sender, receiver) = channel(channel_capacity);
             let sender = Arc::new(sender);
-            let julia = AsyncJulia { sender };
+            let julia = AsyncJuliaTokio { sender };
             let handle = thread::spawn(move || run_async(max_n_tasks, recv_timeout, receiver));
             julia.try_set_custom_fns()?;
 
@@ -1049,7 +1049,7 @@ pub mod impl_tokio {
 
             let (sender, receiver) = channel(channel_capacity);
             let sender = Arc::new(sender);
-            let julia = AsyncJulia { sender };
+            let julia = AsyncJuliaTokio { sender };
             let handle =
                 task::spawn_blocking(move || run_async(max_n_tasks, recv_timeout, receiver));
             julia.set_custom_fns().await?;
@@ -1092,7 +1092,7 @@ pub mod impl_tokio {
 
             let (sender, receiver) = channel(channel_capacity);
             let sender = Arc::new(sender);
-            let julia = AsyncJulia { sender };
+            let julia = AsyncJuliaTokio { sender };
             let handle = thread::spawn(move || {
                 run_async_with_image::<_, _>(
                     max_n_tasks,
@@ -1142,7 +1142,7 @@ pub mod impl_tokio {
 
             let (sender, receiver) = channel(channel_capacity);
             let sender = Arc::new(sender);
-            let julia = AsyncJulia { sender };
+            let julia = AsyncJuliaTokio { sender };
             let handle = task::spawn_blocking(move || {
                 run_async_with_image::<_, _>(
                     max_n_tasks,
@@ -1747,7 +1747,10 @@ pub mod impl_tokio {
 pub use impl_async_std::*;
 
 #[cfg(feature = "tokio-rt")]
-pub use impl_tokio::*;
+pub use impl_tokio::AsyncJuliaTokio as AsyncJulia;
+
+#[cfg(feature = "tokio-rt")]
+use impl_tokio::MessageInner;
 
 use super::julia_future::wake_task;
 

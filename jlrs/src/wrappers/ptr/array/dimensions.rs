@@ -95,6 +95,10 @@ impl<'scope> ArrayDimensions<'scope> {
             _marker: PhantomData,
         }
     }
+
+    pub unsafe fn as_slice<'a>(&'a self) -> &'a [usize] {
+        std::slice::from_raw_parts(self.ptr, self.n)
+    }
 }
 
 impl<'scope> Dims for ArrayDimensions<'scope> {

@@ -271,6 +271,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
             jlrs.error_color(true).unwrap();
+            jlrs.error_color(false).unwrap();
             let err = jlrs.scope_with_slots(2, |global, frame| {
                 let main = Module::main(global);
                 let value1 = Value::new(&mut *frame, 3usize)?;

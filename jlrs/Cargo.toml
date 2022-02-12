@@ -15,7 +15,7 @@ license = "MIT"
 edition = "2018"
 
 [features]
-default = []
+default = ["async-std"]
 ccall = []
 sync-rt = []
 debug = ["jl-sys/debug"]
@@ -26,6 +26,7 @@ tokio-rt = ["async", "tokio"]
 jlrs-ndarray = ["ndarray"]
 f16 = ["half"]
 pyplot = []
+internal-types = []
 docs-rs = [
     "jl-sys/docs-rs", "uv", "async-std-rt", "async", "tokio", "f16", "jlrs-ndarray", 
     "jlrs-derive", "sync-rt", "ccall", "docs"

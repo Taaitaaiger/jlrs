@@ -470,14 +470,14 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
 pub(crate) mod private {
     use crate::wrappers::ptr::{function::Function, value::Value};
 
-    #[cfg(not(feature = "lts"))]
-    use crate::wrappers::ptr::opaque_closure::OpaqueClosure;
+    #[cfg(all(not(feature = "lts"), feature = "internal-types"))]
+    use crate::wrappers::ptr::internal::opaque_closure::OpaqueClosure;
 
     use super::WithKeywords;
     pub trait Call {}
     impl Call for WithKeywords<'_, '_> {}
     impl Call for Function<'_, '_> {}
-    #[cfg(not(feature = "lts"))]
+    #[cfg(all(not(feature = "lts"), feature = "internal-types"))]
     impl Call for OpaqueClosure<'_> {}
     impl Call for Value<'_, '_> {}
 }

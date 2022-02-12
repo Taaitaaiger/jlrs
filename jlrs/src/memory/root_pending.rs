@@ -23,14 +23,8 @@ impl<'frame, 'data> RootPending<'frame, 'data> for JuliaResult<'frame, 'data> {
         val: Self::ClosureOutput,
     ) -> JlrsResult<Self> {
         match val {
-            Ok(v) => frame
-                .push_root(v.unwrap_non_null(), Private)
-                .map(|v| Ok(v))
-                .map_err(Into::into),
-            Err(e) => frame
-                .push_root(e.unwrap_non_null(), Private)
-                .map(|v| Err(v))
-                .map_err(Into::into),
+            Ok(v) => Ok(Ok(frame.push_root(v.unwrap_non_null(), Private).unwrap())),
+            Err(e) => Ok(Err(frame.push_root(e.unwrap_non_null(), Private).unwrap())),
         }
     }
 }
@@ -42,9 +36,6 @@ impl<'frame, 'data> RootPending<'frame, 'data> for Value<'frame, 'data> {
         frame: &mut F,
         val: Self::ClosureOutput,
     ) -> JlrsResult<Self> {
-        frame
-            .push_root(val.unwrap_non_null().cast(), Private)
-            .map(|v| unsafe { Value::cast_unchecked(v) })
-            .map_err(Into::into)
+        Ok(frame.push_root(val.unwrap_non_null(), Private).unwrap())
     }
 }

@@ -89,6 +89,9 @@ In addition to these runtimes, the following utility features are available:
 - `pyplot`
   This feature lets you plot data using the Pyplot package and Gtk 3 from Rust.
 
+- `internal-types`
+  This feature adds several wrappers for types that are definied by the C API that are mostly used internally.
+
 
 ## Using this crate
 

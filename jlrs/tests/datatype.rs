@@ -5,10 +5,14 @@ mod tests {
     use super::util::JULIA;
     use jlrs::layout::typecheck::*;
     use jlrs::prelude::*;
-    use jlrs::wrappers::ptr::code_instance::CodeInstance;
-    use jlrs::wrappers::ptr::expr::Expr;
-    use jlrs::wrappers::ptr::method::Method;
-    use jlrs::wrappers::ptr::method_instance::MethodInstance;
+    #[cfg(feature = "internal-types")]
+    use jlrs::wrappers::ptr::internal::code_instance::CodeInstance;
+    #[cfg(feature = "internal-types")]
+    use jlrs::wrappers::ptr::internal::expr::Expr;
+    #[cfg(feature = "internal-types")]
+    use jlrs::wrappers::ptr::internal::method::Method;
+    #[cfg(feature = "internal-types")]
+    use jlrs::wrappers::ptr::internal::method_instance::MethodInstance;
     use jlrs::wrappers::ptr::simple_vector::SimpleVector;
     use jlrs::wrappers::ptr::type_name::TypeName;
     use jlrs::wrappers::ptr::type_var::TypeVar;
@@ -49,9 +53,7 @@ mod tests {
                 assert!(!dt.is::<NamedTuple>());
                 assert!(!dt.is::<SimpleVector>());
                 assert!(!dt.is::<Mutable>());
-                assert!(!dt.is::<MutableDatatype>());
                 assert!(dt.is::<Immutable>());
-                assert!(!dt.is::<ImmutableDatatype>());
                 assert!(!dt.is::<Union>());
                 assert!(!dt.is::<TypeVar>());
                 assert!(!dt.is::<UnionAll>());
@@ -71,6 +73,7 @@ mod tests {
                 assert!(!dt.is::<Symbol>());
                 assert!(!dt.is::<Array>());
                 assert!(!dt.is::<Slot>());
+                #[cfg(feature = "internal-types")]
                 assert!(!dt.is::<Expr>());
                 assert!(!dt.is::<GlobalRef>());
                 assert!(!dt.is::<GotoNode>());
@@ -78,9 +81,13 @@ mod tests {
                 assert!(!dt.is::<PhiCNode>());
                 assert!(!dt.is::<UpsilonNode>());
                 assert!(!dt.is::<QuoteNode>());
+                #[cfg(feature = "internal-types")]
                 assert!(!dt.is::<LineNode>());
+                #[cfg(feature = "internal-types")]
                 assert!(!dt.is::<MethodInstance>());
+                #[cfg(feature = "internal-types")]
                 assert!(!dt.is::<CodeInstance>());
+                #[cfg(feature = "internal-types")]
                 assert!(!dt.is::<Method>());
                 assert!(!dt.is::<Module>());
                 assert!(!dt.is::<String>());

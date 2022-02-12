@@ -8,7 +8,6 @@ use super::{
 };
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
 use crate::error::JlrsError;
-use crate::error::JlrsResult;
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
 use crate::error::{JuliaResultRef, CANNOT_DISPLAY_TYPE};
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
@@ -17,6 +16,7 @@ use crate::layout::typecheck::Typecheck;
 use crate::memory::frame::Frame;
 use crate::memory::scope::Scope;
 use crate::wrappers::ptr::{simple_vector::SimpleVector, symbol::Symbol};
+use crate::{error::JlrsResult, impl_julia_typecheck};
 use crate::{impl_debug, impl_valid_layout, memory::global::Global, private::Private};
 use jl_sys::{
     jl_abstractslot_type, jl_abstractstring_type, jl_any_type, jl_anytuple_type, jl_argument_type,
@@ -924,7 +924,7 @@ impl<'scope, 'data> PartialEq<Value<'scope, 'data>> for DataType<'scope> {
 
 impl<'scope> Eq for DataType<'scope> {}
 impl_debug!(DataType<'_>);
-
+impl_julia_typecheck!(DataType<'frame>, jl_datatype_type, 'frame);
 impl_valid_layout!(DataType<'scope>, 'scope);
 
 impl<'scope> WrapperPriv<'scope, '_> for DataType<'scope> {

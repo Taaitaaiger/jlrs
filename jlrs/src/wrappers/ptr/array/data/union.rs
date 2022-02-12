@@ -29,7 +29,7 @@ pub struct UnionArrayData<'borrow, 'array> {
 }
 
 impl<'borrow, 'array> UnionArrayData<'borrow, 'array> {
-    pub(crate) fn new<'frame, F>(array: Array<'array, 'static>, _: &'borrow F) -> Self
+    pub(crate) unsafe fn new<'frame, F>(array: Array<'array, 'static>, _: &'borrow F) -> Self
     where
         F: Frame<'frame>,
     {
@@ -85,14 +85,7 @@ impl<'borrow, 'array> UnionArrayData<'borrow, 'array> {
             if let Some(ty) = nth_union_component(elty, &mut tag) {
                 if T::valid_layout(ty) {
                     let offset = idx * self.array.unwrap_non_null(Private).as_ref().elsize as usize;
-                    let ptr = self
-                        .array
-                        .unwrap_non_null(Private)
-                        .as_ref()
-                        .data
-                        .cast::<i8>()
-                        .add(offset)
-                        .cast::<T>();
+                    let ptr = self.array.data_ptr().cast::<i8>().add(offset).cast::<T>();
                     return Ok((&*ptr).clone());
                 }
 
@@ -118,7 +111,7 @@ pub struct UnionArrayDataMut<'borrow, 'array> {
 }
 
 impl<'borrow, 'array> UnionArrayDataMut<'borrow, 'array> {
-    pub(crate) fn new<'frame, F>(array: Array<'array, 'static>, _: &'borrow mut F) -> Self
+    pub(crate) unsafe fn new<'frame, F>(array: Array<'array, 'static>, _: &'borrow mut F) -> Self
     where
         F: Frame<'frame>,
     {
@@ -174,14 +167,7 @@ impl<'borrow, 'array> UnionArrayDataMut<'borrow, 'array> {
             if let Some(ty) = nth_union_component(elty, &mut tag) {
                 if T::valid_layout(ty) {
                     let offset = idx * self.array.unwrap_non_null(Private).as_ref().elsize as usize;
-                    let ptr = self
-                        .array
-                        .unwrap_non_null(Private)
-                        .as_ref()
-                        .data
-                        .cast::<i8>()
-                        .add(offset)
-                        .cast::<T>();
+                    let ptr = self.array.data_ptr().cast::<i8>().add(offset).cast::<T>();
                     return Ok((&*ptr).clone());
                 }
                 Err(JlrsError::WrongType {
@@ -227,9 +213,7 @@ impl<'borrow, 'array> UnionArrayDataMut<'borrow, 'array> {
             let idx = dims.index_of(index)?;
             let offset = idx * self.array.unwrap_non_null(Private).as_ref().elsize as usize;
             self.array
-                .unwrap_non_null(Private)
-                .as_ref()
-                .data
+                .data_ptr()
                 .cast::<i8>()
                 .add(offset)
                 .cast::<T>()
@@ -253,7 +237,7 @@ pub struct UnresistrictedUnionArrayDataMut<'borrow, 'array> {
 }
 
 impl<'borrow, 'array> UnresistrictedUnionArrayDataMut<'borrow, 'array> {
-    pub(crate) fn new<'frame, F>(array: Array<'array, 'static>, _: &'borrow F) -> Self
+    pub(crate) unsafe fn new<'frame, F>(array: Array<'array, 'static>, _: &'borrow F) -> Self
     where
         F: Frame<'frame>,
     {
@@ -309,14 +293,7 @@ impl<'borrow, 'array> UnresistrictedUnionArrayDataMut<'borrow, 'array> {
             if let Some(ty) = nth_union_component(elty, &mut tag) {
                 if T::valid_layout(ty) {
                     let offset = idx * self.array.unwrap_non_null(Private).as_ref().elsize as usize;
-                    let ptr = self
-                        .array
-                        .unwrap_non_null(Private)
-                        .as_ref()
-                        .data
-                        .cast::<i8>()
-                        .add(offset)
-                        .cast::<T>();
+                    let ptr = self.array.data_ptr().cast::<i8>().add(offset).cast::<T>();
                     return Ok((&*ptr).clone());
                 }
                 Err(JlrsError::WrongType {
@@ -362,9 +339,7 @@ impl<'borrow, 'array> UnresistrictedUnionArrayDataMut<'borrow, 'array> {
             let idx = dims.index_of(index)?;
             let offset = idx * self.array.unwrap_non_null(Private).as_ref().elsize as usize;
             self.array
-                .unwrap_non_null(Private)
-                .as_ref()
-                .data
+                .data_ptr()
                 .cast::<i8>()
                 .add(offset)
                 .cast::<T>()

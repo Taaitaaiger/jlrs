@@ -14,9 +14,7 @@ use std::marker::PhantomData;
 pub struct Global<'global>(PhantomData<&'global ()>);
 
 impl<'global> Global<'global> {
-    #[doc(hidden)]
-
-    pub unsafe fn new() -> Self {
+    pub(crate) unsafe fn new() -> Self {
         Global(PhantomData)
     }
 }

@@ -39,7 +39,8 @@ use crate::{error::JlrsResult, private::Private};
 #[cfg(feature = "ccall")]
 use crate::ccall::CCall;
 
-use jl_sys::{jl_get_current_task, jl_task_t, jl_value_t};
+use jl_sys::jl_value_t;
+// use jl_sys::{jl_get_current_task, jl_task_t, };
 #[cfg(feature = "ccall")]
 use std::marker::PhantomData;
 use std::{cell::Cell, ffi::c_void, ptr::NonNull};
@@ -58,21 +59,12 @@ pub struct GcFrame<'frame, M: Mode> {
 }
 
 impl<'frame, M: Mode> GcFrame<'frame, M> {
-    /// Returns the number of values currently rooted in this frame.
-    pub fn n_roots(&self) -> usize {
-        self.raw_frame[0].get() as usize >> 2
-    }
-
-    #[doc(hidden)]
+    /*
     pub unsafe fn print_stack(&self) {
         let last = jl_get_current_task().cast::<jl_task_t>();
         jl_sys::jlrs_print_stack(NonNull::new_unchecked(last).as_ref().gcstack);
     }
-
-    /// Returns the maximum number of slots this frame can use.
-    pub fn capacity(&self) -> usize {
-        self.raw_frame.len() - 2
-    }
+    */
 
     // Safety: this frame must be dropped in the same scope it has been created.
     pub(crate) unsafe fn nest<'nested>(&'nested mut self, capacity: usize) -> GcFrame<'nested, M> {
@@ -170,11 +162,11 @@ impl<'frame, M: Mode> Frame<'frame> for GcFrame<'frame, M> {
     }
 
     fn n_roots(&self) -> usize {
-        self.n_roots()
+        self.raw_frame[0].get() as usize >> 2
     }
 
     fn capacity(&self) -> usize {
-        self.capacity()
+        self.raw_frame.len() - 2
     }
 }
 
@@ -214,6 +206,8 @@ pub(crate) mod private {
         memory::output::{Output, OutputResult, OutputValue},
     };
     use jl_sys::jl_value_t;
+
+    use super::Frame as _;
 
     pub trait Frame<'frame> {
         type Mode: Mode;
@@ -300,8 +294,8 @@ pub(crate) mod private {
             value: NonNull<jl_value_t>,
             _: Private,
         ) -> Result<Value<'frame, 'data>, AllocError> {
-            let n_roots = self.n_roots();
-            if n_roots == self.capacity() {
+            let n_roots = self.raw_frame[0].get() as usize >> 2;
+            if n_roots == self.raw_frame.len() - 2 {
                 return Err(AllocError::FrameOverflow(1, n_roots));
             }
 
@@ -310,8 +304,8 @@ pub(crate) mod private {
         }
 
         unsafe fn reserve_slot(&mut self, _: Private) -> JlrsResult<*mut *mut c_void> {
-            let n_roots = self.n_roots();
-            if n_roots == self.capacity() {
+            let n_roots = self.raw_frame[0].get() as usize >> 2;
+            if n_roots == self.raw_frame.len() - 2 {
                 Err(JlrsError::alloc_error(AllocError::FrameOverflow(
                     1, n_roots,
                 )))?;
@@ -342,6 +336,12 @@ pub(crate) mod private {
                 -> JlrsResult<OutputValue<'frame, 'data, 'inner>>,
         {
             let v = {
+                if self.capacity() == self.n_roots() {
+                    Err(JlrsError::alloc_error(AllocError::FrameOverflow(
+                        1,
+                        self.n_roots(),
+                    )))?
+                }
                 let mut nested = unsafe { self.nest(0) };
                 let out = Output::new();
                 func(out, &mut nested)?.into_pending()
@@ -364,6 +364,12 @@ pub(crate) mod private {
                 -> JlrsResult<OutputValue<'frame, 'data, 'inner>>,
         {
             let v = {
+                if self.capacity() == self.n_roots() {
+                    Err(JlrsError::alloc_error(AllocError::FrameOverflow(
+                        1,
+                        self.n_roots(),
+                    )))?
+                }
                 let mut nested = unsafe { self.nest(capacity) };
                 let out = Output::new();
                 func(out, &mut nested)?.into_pending()
@@ -385,6 +391,12 @@ pub(crate) mod private {
                 -> JlrsResult<OutputResult<'frame, 'data, 'inner>>,
         {
             let v = {
+                if self.capacity() == self.n_roots() {
+                    Err(JlrsError::alloc_error(AllocError::FrameOverflow(
+                        1,
+                        self.n_roots(),
+                    )))?
+                }
                 let mut nested = unsafe { self.nest(0) };
                 let out = Output::new();
                 func(out, &mut nested)?.into_pending()
@@ -407,6 +419,12 @@ pub(crate) mod private {
                 -> JlrsResult<OutputResult<'frame, 'data, 'inner>>,
         {
             let v = {
+                if self.capacity() == self.n_roots() {
+                    Err(JlrsError::alloc_error(AllocError::FrameOverflow(
+                        1,
+                        self.n_roots(),
+                    )))?
+                }
                 let mut nested = unsafe { self.nest(capacity) };
                 let out = Output::new();
                 func(out, &mut nested)?.into_pending()
@@ -542,6 +560,7 @@ pub(crate) mod private {
 #[cfg(test)]
 #[cfg(feature = "sync-rt")]
 mod tests {
+    use crate::prelude::*;
     use crate::{
         memory::{frame::GcFrame, mode, stack_page::StackPage},
         util,

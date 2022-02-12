@@ -47,15 +47,11 @@ pub unsafe trait IntoJulia: Sized + 'static {
     unsafe fn into_julia<'scope>(self, global: Global<'scope>) -> ValueRef<'scope, 'static> {
         let ty = Self::julia_type(global)
             .wrapper()
-            .expect("DataTypeRef::wrapper returned None")
-            .unwrap_non_null(Private);
+            .expect("DataTypeRef::wrapper returned None");
 
-        #[cfg(not(feature = "lts"))]
-        debug_assert!(ty.as_ref().isbitstype() != 0);
-        #[cfg(feature = "lts")]
-        debug_assert!(ty.as_ref().isbitstype != 0);
+        debug_assert!(ty.is_bits());
 
-        let container = jl_new_struct_uninit(ty.as_ptr());
+        let container = jl_new_struct_uninit(ty.unwrap(Private));
         container.cast::<Self>().write(self);
 
         ValueRef::wrap(container)
@@ -118,16 +114,12 @@ unsafe impl<T: IntoJulia> IntoJulia for *mut T {
             // Not rooting the result should be fine. The result must be a concrete type, which
             // means `applied` can't have any free type parameters, so it should be cached.
             let applied = jl_apply_type(ptr_ua.unwrap(Private).cast(), param_ptr, 1);
+            debug_assert!(!applied.is_null());
 
-            if applied.is_null() {
-                return DataTypeRef::undefined_ref();
-            }
+            let val = Value::wrap_non_null(NonNull::new_unchecked(applied), Private);
+            debug_assert!(val.is::<DataType>());
 
-            match Value::wrap_non_null(NonNull::new_unchecked(applied), Private).cast::<DataType>()
-            {
-                Ok(dt) => dt.as_ref(),
-                Err(_e) => return DataTypeRef::undefined_ref(),
-            }
+            val.cast_unchecked::<DataType>().as_ref()
         }
     }
 }

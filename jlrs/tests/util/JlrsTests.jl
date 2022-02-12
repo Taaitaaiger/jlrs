@@ -38,6 +38,16 @@ function callrustwitharr(ptr::Ptr, arr::Array{Float64, 1})::Bool
     ccall(ptr, Bool, (Array,), arr)
 end
 
+function callrustwithasynccond(func::Ptr, destroyhandle::Ptr)::UInt32
+    condition = Base.AsyncCondition()
+    output::Ref{UInt32} = C_NULL
+    joinhandle = ccall(func, Ptr{Cvoid}, (Ref{UInt32}, Ptr{Cvoid}), output, condition.handle)
+    wait(condition)
+    ccall(destroyhandle, Cvoid, (Ptr{Cvoid},), joinhandle)
+
+    output[]
+end
+
 function vecofmodules()::Vector{Module}
     [Base; Core; Main]
 end

@@ -20,31 +20,22 @@
 
 pub mod array;
 pub mod call;
-pub mod code_instance;
 pub mod datatype;
-pub mod expr;
 pub mod function;
-pub mod method;
-pub mod method_instance;
-pub mod method_match;
-pub mod method_table;
+#[cfg(feature = "internal-types")]
+pub mod internal;
 pub mod module;
-#[cfg(not(feature = "lts"))]
-pub mod opaque_closure;
 pub mod simple_vector;
 pub mod string;
 pub mod symbol;
 pub mod task;
 pub mod type_name;
 pub mod type_var;
-pub mod typemap_entry;
-pub mod typemap_level;
 pub mod union;
 pub mod union_all;
 pub mod value;
 #[cfg(not(feature = "lts"))]
 pub mod vararg;
-pub mod weak_ref;
 
 #[cfg(not(feature = "lts"))]
 use jl_sys::jl_value_t;
@@ -52,14 +43,8 @@ use jl_sys::jl_value_t;
 use self::{
     array::{Array, TypedArray},
     call::Call,
-    code_instance::CodeInstance,
     datatype::DataType,
-    expr::Expr,
     function::Function,
-    method::Method,
-    method_instance::MethodInstance,
-    method_match::MethodMatch,
-    method_table::MethodTable,
     module::Module,
     private::Wrapper as _,
     simple_vector::SimpleVector,
@@ -68,16 +53,22 @@ use self::{
     task::Task,
     type_name::TypeName,
     type_var::TypeVar,
-    typemap_entry::TypeMapEntry,
-    typemap_level::TypeMapLevel,
     union::Union,
     union_all::UnionAll,
     value::Value,
-    weak_ref::WeakRef,
 };
 
+#[cfg(feature = "internal-types")]
+use self::internal::{
+    code_instance::CodeInstance, expr::Expr, method::Method, method_instance::MethodInstance,
+    method_match::MethodMatch, method_table::MethodTable, typemap_entry::TypeMapEntry,
+    typemap_level::TypeMapLevel, weak_ref::WeakRef,
+};
+
+#[cfg(all(not(feature = "lts"), feature = "internal-types"))]
+use self::internal::opaque_closure::OpaqueClosure;
 #[cfg(not(feature = "lts"))]
-use self::{opaque_closure::OpaqueClosure, vararg::Vararg};
+use self::vararg::Vararg;
 use crate::{
     error::{JlrsError, JlrsResult, CANNOT_DISPLAY_VALUE},
     layout::valid_layout::ValidLayout,
@@ -309,33 +300,45 @@ pub type StringRef<'scope> = Ref<'scope, 'static, JuliaString<'scope>>;
 impl_valid_layout!(StringRef, String);
 
 /// A reference to a [`CodeInstance`]
+#[cfg(feature = "internal-types")]
 pub type CodeInstanceRef<'scope> = Ref<'scope, 'static, CodeInstance<'scope>>;
+#[cfg(feature = "internal-types")]
 impl_valid_layout!(CodeInstanceRef, CodeInstance);
 
 /// A reference to an [`Expr`]
+#[cfg(feature = "internal-types")]
 pub type ExprRef<'scope> = Ref<'scope, 'static, Expr<'scope>>;
+#[cfg(feature = "internal-types")]
 impl_valid_layout!(ExprRef, Expr);
 
 /// A reference to a [`Method`]
+#[cfg(feature = "internal-types")]
 pub type MethodRef<'scope> = Ref<'scope, 'static, Method<'scope>>;
+#[cfg(feature = "internal-types")]
 impl_valid_layout!(MethodRef, Method);
 
 /// A reference to a [`MethodInstance`]
+#[cfg(feature = "internal-types")]
 pub type MethodInstanceRef<'scope> = Ref<'scope, 'static, MethodInstance<'scope>>;
+#[cfg(feature = "internal-types")]
 impl_valid_layout!(MethodInstanceRef, MethodInstance);
 
 /// A reference to a [`MethodMatch`]
+#[cfg(feature = "internal-types")]
 pub type MethodMatchRef<'scope> = Ref<'scope, 'static, MethodMatch<'scope>>;
+#[cfg(feature = "internal-types")]
 impl_valid_layout!(MethodMatchRef, MethodMatch);
 
 /// A reference to a [`MethodTable`]
+#[cfg(feature = "internal-types")]
 pub type MethodTableRef<'scope> = Ref<'scope, 'static, MethodTable<'scope>>;
+#[cfg(feature = "internal-types")]
 impl_valid_layout!(MethodTableRef, MethodTable);
 
 /// A reference to an [`OpaqueClosure`]
-#[cfg(not(feature = "lts"))]
+#[cfg(all(not(feature = "lts"), feature = "internal-types"))]
 pub type OpaqueClosureRef<'scope> = Ref<'scope, 'static, OpaqueClosure<'scope>>;
-#[cfg(not(feature = "lts"))]
+#[cfg(all(not(feature = "lts"), feature = "internal-types"))]
 impl_valid_layout!(OpaqueClosureRef, OpaqueClosure);
 
 /// A reference to a [`SimpleVector`]
@@ -371,11 +374,15 @@ pub type TypeVarRef<'scope> = Ref<'scope, 'static, TypeVar<'scope>>;
 impl_valid_layout!(TypeVarRef, TypeVar);
 
 /// A reference to a [`TypeMapEntry`]
+#[cfg(feature = "internal-types")]
 pub type TypeMapEntryRef<'scope> = Ref<'scope, 'static, TypeMapEntry<'scope>>;
+#[cfg(feature = "internal-types")]
 impl_valid_layout!(TypeMapEntryRef, TypeMapEntry);
 
 /// A reference to a [`TypeMapLevel`]
+#[cfg(feature = "internal-types")]
 pub type TypeMapLevelRef<'scope> = Ref<'scope, 'static, TypeMapLevel<'scope>>;
+#[cfg(feature = "internal-types")]
 impl_valid_layout!(TypeMapLevelRef, TypeMapLevel);
 
 /// A reference to a [`Union`]
@@ -393,7 +400,9 @@ pub type VarargRef<'scope> = Ref<'scope, 'static, Vararg<'scope>>;
 impl_valid_layout!(VarargRef, Vararg);
 
 /// A reference to a [`WeakRef`]
+#[cfg(feature = "internal-types")]
 pub type WeakRefRef<'scope> = Ref<'scope, 'static, WeakRef<'scope>>;
+#[cfg(feature = "internal-types")]
 impl_valid_layout!(WeakRefRef, WeakRef);
 
 impl<'scope, 'data, T: Wrapper<'scope, 'data>> Ref<'scope, 'data, T> {
