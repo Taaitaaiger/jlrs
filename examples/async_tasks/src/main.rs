@@ -66,7 +66,9 @@ fn main() {
         unsafe { AsyncJulia::init(4, 16, Duration::from_millis(1)).expect("Could not init Julia") };
 
     // Include the custom code MyTask needs.
-    julia.try_include("MyModule.jl").unwrap();
+    unsafe {
+        julia.try_include("MyModule.jl").unwrap();
+    }
 
     // Send two tasks to the runtime.
     let receiver1 = {

@@ -6,7 +6,7 @@ mod tests {
 
     #[test]
     fn error_include_nonexistent() {
-        JULIA.with(|j| {
+        JULIA.with(|j| unsafe {
             let mut jlrs = j.borrow_mut();
             assert!(jlrs.include("nonexistent/path/").is_err());
         });
@@ -21,7 +21,7 @@ mod tests {
 
     #[test]
     fn include_error() {
-        JULIA.with(|j| {
+        JULIA.with(|j| unsafe {
             let mut jlrs = j.borrow_mut();
             assert!(jlrs.include("Cargo.toml").is_err());
         });

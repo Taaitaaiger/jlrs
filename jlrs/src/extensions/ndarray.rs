@@ -42,7 +42,7 @@ pub trait NdArray<'borrow, T>: private::Sealed {
 
     /// Mutably borrow the data in the array as an `ArrayViewMut`. Returns an error if the wrong
     /// type is provided or the data is not stored inline.
-    fn array_view_mut<'frame: 'borrow, F>(
+    unsafe fn array_view_mut<'frame: 'borrow, F>(
         self,
         frame: &'borrow mut F,
     ) -> JlrsResult<ArrayViewMut<'borrow, T, Dim<IxDynImpl>>>
@@ -75,7 +75,7 @@ impl<'frame: 'borrow, 'data: 'borrow, 'borrow, T: ValidLayout + Clone> NdArray<'
         }
     }
 
-    fn array_view_mut<'fr: 'borrow, F>(
+    unsafe fn array_view_mut<'fr: 'borrow, F>(
         self,
         frame: &'borrow mut F,
     ) -> JlrsResult<ArrayViewMut<'borrow, T, Dim<IxDynImpl>>>
@@ -122,7 +122,7 @@ impl<'frame: 'borrow, 'data: 'borrow, 'borrow, T: ValidLayout + Clone + Debug> N
         }
     }
 
-    fn array_view_mut<'fr: 'borrow, F>(
+    unsafe fn array_view_mut<'fr: 'borrow, F>(
         self,
         frame: &'borrow mut F,
     ) -> JlrsResult<ArrayViewMut<'borrow, T, Dim<IxDynImpl>>>
@@ -202,7 +202,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .scope(|_global, frame| {
+                .scope(|_global, frame| unsafe {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
                     let borrowed = Array::from_slice(&mut *frame, slice, (3, 2))?;
@@ -231,7 +231,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .scope(|_global, frame| {
+                .scope(|_global, frame| unsafe {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
                     let borrowed = Array::from_slice(&mut *frame, slice, (3, 2))?;
@@ -275,7 +275,7 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .scope(|_global, frame| {
+                .scope(|_global, frame| unsafe {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
                     let borrowed = Array::from_slice(&mut *frame, slice, (3, 2))?;

@@ -23,6 +23,7 @@ pub struct InlineArrayData<'borrow, 'array, 'data, T> {
 }
 
 impl<'borrow, 'array, 'data, T> InlineArrayData<'borrow, 'array, 'data, T> {
+    // Safety: The representation of T and the element type must match
     pub(crate) unsafe fn new<'frame, F>(array: Array<'array, 'data>, _: &'borrow F) -> Self
     where
         F: Frame<'frame>,
@@ -67,7 +68,7 @@ impl<'borrow, 'array, 'data, T> InlineArrayData<'borrow, 'array, 'data, T> {
 
     /// Returns the array's dimensions.
     pub fn dimensions(&self) -> ArrayDimensions<'array> {
-        unsafe { ArrayDimensions::new(self.array) }
+        ArrayDimensions::new(self.array)
     }
 }
 
@@ -94,6 +95,7 @@ pub struct InlineArrayDataMut<'borrow, 'array, 'data, T> {
 }
 
 impl<'borrow, 'array, 'data, T> InlineArrayDataMut<'borrow, 'array, 'data, T> {
+    // Safety: The representation of T and the element type must match
     pub(crate) unsafe fn new<'frame, F>(array: Array<'array, 'data>, _: &'borrow mut F) -> Self
     where
         F: Frame<'frame>,
@@ -170,7 +172,7 @@ impl<'borrow, 'array, 'data, T> InlineArrayDataMut<'borrow, 'array, 'data, T> {
 
     /// Returns a reference to the array's dimensions.
     pub fn dimensions(&self) -> ArrayDimensions<'array> {
-        unsafe { ArrayDimensions::new(self.array) }
+        ArrayDimensions::new(self.array)
     }
 }
 
@@ -212,6 +214,7 @@ pub struct UnrestrictedInlineArrayDataMut<'borrow, 'array, 'data, T> {
 }
 
 impl<'borrow, 'array, 'data, T> UnrestrictedInlineArrayDataMut<'borrow, 'array, 'data, T> {
+    // Safety: The representation of T and the element type must match
     pub(crate) unsafe fn new<'frame, F>(array: Array<'array, 'data>, _: &'borrow F) -> Self
     where
         F: Frame<'frame>,
@@ -288,7 +291,7 @@ impl<'borrow, 'array, 'data, T> UnrestrictedInlineArrayDataMut<'borrow, 'array, 
 
     /// Returns a reference to the array's dimensions.
     pub fn dimensions(&self) -> ArrayDimensions<'array> {
-        unsafe { ArrayDimensions::new(self.array) }
+        ArrayDimensions::new(self.array)
     }
 }
 

@@ -377,7 +377,9 @@
 //!             // Array data can be directly accessed from Rust.
 //!             // TypedArray::inline_data_mut can be used if the type
 //!             // of the elements is concrete and immutable.
-//!             let mut data = state.array.inline_data_mut(frame)?;
+//!             // This is safe because this is the only active reference to
+//!             // the array.
+//!             let mut data = unsafe { state.array.inline_data_mut(frame)? };
 //!             data[state.offset] = input;
 //!
 //!             state.offset += 1;

@@ -29,6 +29,7 @@ pub struct UnionArrayData<'borrow, 'array> {
 }
 
 impl<'borrow, 'array> UnionArrayData<'borrow, 'array> {
+    // Safety: The array must contain bits unions
     pub(crate) unsafe fn new<'frame, F>(array: Array<'array, 'static>, _: &'borrow F) -> Self
     where
         F: Frame<'frame>,
@@ -41,7 +42,7 @@ impl<'borrow, 'array> UnionArrayData<'borrow, 'array> {
 
     /// Returns the dimensions of this array.
     pub fn dimensions(&self) -> ArrayDimensions<'array> {
-        unsafe { ArrayDimensions::new(self.array) }
+        ArrayDimensions::new(self.array)
     }
 
     /// Returns `true` if `ty` if a value of that type can be stored in this array.
@@ -111,6 +112,7 @@ pub struct UnionArrayDataMut<'borrow, 'array> {
 }
 
 impl<'borrow, 'array> UnionArrayDataMut<'borrow, 'array> {
+    // Safety: The array must contain bits unions
     pub(crate) unsafe fn new<'frame, F>(array: Array<'array, 'static>, _: &'borrow mut F) -> Self
     where
         F: Frame<'frame>,
@@ -123,7 +125,7 @@ impl<'borrow, 'array> UnionArrayDataMut<'borrow, 'array> {
 
     /// Returns the dimensions of this array.
     pub fn dimensions(&self) -> ArrayDimensions<'array> {
-        unsafe { ArrayDimensions::new(self.array) }
+        ArrayDimensions::new(self.array)
     }
 
     /// Returns `true` if `ty` if a value of that type can be stored in this array.
@@ -237,6 +239,7 @@ pub struct UnresistrictedUnionArrayDataMut<'borrow, 'array> {
 }
 
 impl<'borrow, 'array> UnresistrictedUnionArrayDataMut<'borrow, 'array> {
+    // Safety: The array must contain bits unions
     pub(crate) unsafe fn new<'frame, F>(array: Array<'array, 'static>, _: &'borrow F) -> Self
     where
         F: Frame<'frame>,
@@ -249,7 +252,7 @@ impl<'borrow, 'array> UnresistrictedUnionArrayDataMut<'borrow, 'array> {
 
     /// Returns the dimensions of this array.
     pub fn dimensions(&self) -> ArrayDimensions<'array> {
-        unsafe { ArrayDimensions::new(self.array) }
+        ArrayDimensions::new(self.array)
     }
 
     /// Returns `true` if `ty` if a value of that type can be stored in this array.

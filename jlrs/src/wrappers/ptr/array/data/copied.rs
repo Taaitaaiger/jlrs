@@ -10,17 +10,18 @@ use std::ops::{Index, IndexMut};
 /// [`Array::copy_inline_data`]: crate::wrappers::ptr::array::Array::copy_inline_data
 #[derive(Debug)]
 pub struct CopiedArray<T> {
-    data: Vec<T>,
+    data: Box<[T]>,
     dimensions: Dimensions,
 }
 
 impl<T> CopiedArray<T> {
-    pub(crate) fn new(data: Vec<T>, dimensions: Dimensions) -> Self {
+    // Safety: dimensions must be valid for the size of data
+    pub(crate) unsafe fn new(data: Box<[T]>, dimensions: Dimensions) -> Self {
         CopiedArray { data, dimensions }
     }
 
     /// Turn the array into a tuple containing its data in column-major order and its dimensions.
-    pub fn splat(self) -> (Vec<T>, Dimensions) {
+    pub fn splat(self) -> (Box<[T]>, Dimensions) {
         (self.data, self.dimensions)
     }
 

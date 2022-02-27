@@ -96,7 +96,7 @@ macro_rules! named_tuple {
 }
 
 use crate::{
-    convert::{to_symbol::ToSymbol, into_julia::IntoJulia, unbox::Unbox},
+    convert::{into_julia::IntoJulia, to_symbol::ToSymbol, unbox::Unbox},
     error::{JlrsError, JlrsResult, JuliaResultRef, CANNOT_DISPLAY_TYPE},
     impl_debug,
     layout::{
@@ -197,7 +197,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     where
         V: IntoJulia,
     {
-        unsafe { value.into_julia(global) }
+        value.into_julia(global)
     }
 
     /// Create a new named tuple, you should use the `named_tuple` macro rather than this method.

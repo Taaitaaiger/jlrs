@@ -13,7 +13,7 @@ mod tests {
                     .into_jlrs_result()?
                     .cast::<Array>()?;
 
-                unsafe {
+                {
                     let data = arr.value_data(frame)?;
                     assert_eq!(data.dimensions().as_slice(), &[4]);
                 }
@@ -28,7 +28,7 @@ mod tests {
                     assert_eq!(data.dimensions().as_slice(), &[4]);
                 }
 
-                unsafe {
+                {
                     let data = arr.wrapper_data::<Module, _>(frame)?;
                     assert_eq!(data.dimensions().as_slice(), &[4]);
                 }
@@ -141,7 +141,7 @@ mod tests {
                     assert!(data.set(0, Some(module)).is_err());
                 }
 
-                 {
+                {
                     let mut data = arr.unrestricted_value_data_mut(frame)?;
                     assert!(data.set(0, Some(module)).is_err());
                 }
@@ -151,7 +151,7 @@ mod tests {
                     assert!(data.set(0, Some(module)).is_err());
                 }
 
-                 {
+                {
                     let mut data = arr.unrestricted_wrapper_data_mut::<Module, _>(frame)?;
                     assert!(data.set(0, Some(module)).is_err());
                 }
@@ -184,7 +184,7 @@ mod tests {
                     assert_eq!(slice.len(), 4)
                 }
 
-                 {
+                {
                     let data = arr.unrestricted_value_data_mut(frame)?;
                     let slice = data.as_slice();
                     assert_eq!(slice.len(), 4)
@@ -202,7 +202,7 @@ mod tests {
                     assert_eq!(slice.len(), 4)
                 }
 
-                 {
+                {
                     let data = arr.unrestricted_wrapper_data_mut::<Module, _>(frame)?;
                     let slice = data.as_slice();
                     assert_eq!(slice.len(), 4)

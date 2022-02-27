@@ -27,7 +27,7 @@ use-bindgen = ["bindgen"]
 [dependencies]
 
 [build-dependencies]
-bindgen = { version = "0.59.2", optional = true }
+bindgen = { git = "https://github.com/emilio/rust-bindgen", branch = "atomic", optional = true, default-features = false, features = ["runtime"] }
 cc = "1"
 
 [package.metadata.docs.rs]

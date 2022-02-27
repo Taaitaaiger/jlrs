@@ -24,7 +24,7 @@ mod tests {
                     .into_jlrs_result()?
                     .cast::<Array>()?;
 
-                unsafe {
+                {
                     let data = arr.union_data(frame)?;
                     assert_eq!(data.dimensions().as_slice(), &[4]);
                 }

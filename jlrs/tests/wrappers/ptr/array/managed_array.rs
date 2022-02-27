@@ -10,7 +10,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope_with_slots(1, |_, frame| unsafe {
+                .scope_with_slots(1, |_, frame| {
                     let new_array =
                         Array::new::<f32, _, _, _>(&mut *frame, 3)?.into_jlrs_result()?;
                     new_array.cast::<Array>()?.copy_inline_data::<f32, _>(frame)
@@ -30,7 +30,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope_with_slots(1, |_, frame| unsafe {
+                .scope_with_slots(1, |_, frame| {
                     let array = frame
                         .result_scope_with_slots(0, |output, frame| {
                             let output = output.into_scope(frame);
@@ -55,7 +55,7 @@ mod tests {
 
             let unboxed = jlrs
                 .scope_with_slots(0, |_, frame| {
-                    frame.scope_with_slots(1, |frame| unsafe {
+                    frame.scope_with_slots(1, |frame| {
                         let new_array =
                             Array::new::<f64, _, _, _>(&mut *frame, 3)?.into_jlrs_result()?;
                         new_array.cast::<Array>()?.copy_inline_data::<f64, _>(frame)
@@ -77,7 +77,7 @@ mod tests {
 
             let unboxed = jlrs
                 .scope_with_slots(0, |_, frame| {
-                    frame.scope(|frame| unsafe {
+                    frame.scope(|frame| {
                         let new_array =
                             Array::new::<i8, _, _, _>(&mut *frame, 3)?.into_jlrs_result()?;
                         new_array.cast::<Array>()?.copy_inline_data::<i8, _>(frame)
@@ -98,7 +98,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope(|_, frame| unsafe {
+                .scope(|_, frame| {
                     let new_array =
                         Array::new::<i16, _, _, _>(&mut *frame, 3)?.into_jlrs_result()?;
                     new_array.cast::<Array>()?.copy_inline_data::<i16, _>(frame)
@@ -119,7 +119,7 @@ mod tests {
 
             let unboxed = jlrs
                 .scope(|_, frame| {
-                    frame.scope_with_slots(1, |frame| unsafe {
+                    frame.scope_with_slots(1, |frame| {
                         let new_array =
                             Array::new::<i32, _, _, _>(&mut *frame, 3)?.into_jlrs_result()?;
                         new_array.cast::<Array>()?.copy_inline_data::<i32, _>(frame)
@@ -141,7 +141,7 @@ mod tests {
 
             let unboxed = jlrs
                 .scope(|_, frame| {
-                    frame.scope(|frame| unsafe {
+                    frame.scope(|frame| {
                         let new_array =
                             Array::new::<i64, _, _, _>(&mut *frame, 3)?.into_jlrs_result()?;
                         new_array.cast::<Array>()?.copy_inline_data::<i64, _>(frame)
@@ -162,7 +162,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope_with_slots(1, |_, frame| unsafe {
+                .scope_with_slots(1, |_, frame| {
                     let new_array =
                         Array::new::<u8, _, _, _>(&mut *frame, (3, 4))?.into_jlrs_result()?;
                     new_array.cast::<Array>()?.copy_inline_data::<u8, _>(frame)
@@ -184,7 +184,7 @@ mod tests {
 
             let unboxed = jlrs
                 .scope_with_slots(0, |_, frame| {
-                    frame.scope_with_slots(1, |frame| unsafe {
+                    frame.scope_with_slots(1, |frame| {
                         let new_array =
                             Array::new::<u16, _, _, _>(&mut *frame, (3, 4))?.into_jlrs_result()?;
                         new_array.cast::<Array>()?.copy_inline_data::<u16, _>(frame)
@@ -207,7 +207,7 @@ mod tests {
 
             let unboxed = jlrs
                 .scope_with_slots(0, |_, frame| {
-                    frame.scope(|frame| unsafe {
+                    frame.scope(|frame| {
                         let new_array =
                             Array::new::<u32, _, _, _>(&mut *frame, (3, 4))?.into_jlrs_result()?;
                         new_array.cast::<Array>()?.copy_inline_data::<u32, _>(frame)
@@ -229,7 +229,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope(|_, frame| unsafe {
+                .scope(|_, frame| {
                     let new_array =
                         Array::new::<u64, _, _, _>(&mut *frame, (3, 4))?.into_jlrs_result()?;
                     new_array.cast::<Array>()?.copy_inline_data::<u64, _>(frame)
@@ -251,10 +251,12 @@ mod tests {
 
             let unboxed = jlrs
                 .scope(|_, frame| {
-                    frame.scope_with_slots(1, |frame| unsafe {
+                    frame.scope_with_slots(1, |frame| {
                         let new_array = Array::new::<usize, _, _, _>(&mut *frame, (3, 4))?
                             .into_jlrs_result()?;
-                        new_array.cast::<Array>()?.copy_inline_data::<usize, _>(frame)
+                        new_array
+                            .cast::<Array>()?
+                            .copy_inline_data::<usize, _>(frame)
                     })
                 })
                 .unwrap();
@@ -274,10 +276,12 @@ mod tests {
 
             let unboxed = jlrs
                 .scope(|_, frame| {
-                    frame.scope(|frame| unsafe {
+                    frame.scope(|frame| {
                         let new_array = Array::new::<isize, _, _, _>(&mut *frame, (3, 4))?
                             .into_jlrs_result()?;
-                        new_array.cast::<Array>()?.copy_inline_data::<isize, _>(frame)
+                        new_array
+                            .cast::<Array>()?
+                            .copy_inline_data::<isize, _>(frame)
                     })
                 })
                 .unwrap();
@@ -296,7 +300,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope_with_slots(1, |_, frame| unsafe {
+                .scope_with_slots(1, |_, frame| {
                     let new_array =
                         Array::new::<u8, _, _, _>(&mut *frame, (3, 4, 5))?.into_jlrs_result()?;
                     new_array.cast::<Array>()?.copy_inline_data::<u8, _>(frame)
@@ -319,7 +323,7 @@ mod tests {
 
             let unboxed = jlrs
                 .scope_with_slots(0, |_, frame| {
-                    frame.scope_with_slots(1, |frame| unsafe {
+                    frame.scope_with_slots(1, |frame| {
                         let new_array = Array::new::<u16, _, _, _>(&mut *frame, (3, 4, 5))?
                             .into_jlrs_result()?;
                         new_array.cast::<Array>()?.copy_inline_data::<u16, _>(frame)
@@ -343,7 +347,7 @@ mod tests {
 
             let unboxed = jlrs
                 .scope_with_slots(0, |_, frame| {
-                    frame.scope(|frame| unsafe {
+                    frame.scope(|frame| {
                         let new_array = Array::new::<u32, _, _, _>(&mut *frame, (3, 4, 5))?
                             .into_jlrs_result()?;
                         new_array.cast::<Array>()?.copy_inline_data::<u32, _>(frame)
@@ -366,7 +370,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope(|_, frame| unsafe {
+                .scope(|_, frame| {
                     let new_array =
                         Array::new::<u64, _, _, _>(&mut *frame, (3, 4, 5))?.into_jlrs_result()?;
                     new_array.cast::<Array>()?.copy_inline_data::<u64, _>(frame)
@@ -389,10 +393,12 @@ mod tests {
 
             let unboxed = jlrs
                 .scope(|_, frame| {
-                    frame.scope_with_slots(1, |frame| unsafe {
+                    frame.scope_with_slots(1, |frame| {
                         let new_array = Array::new::<usize, _, _, _>(&mut *frame, (3, 4, 5))?
                             .into_jlrs_result()?;
-                        new_array.cast::<Array>()?.copy_inline_data::<usize, _>(frame)
+                        new_array
+                            .cast::<Array>()?
+                            .copy_inline_data::<usize, _>(frame)
                     })
                 })
                 .unwrap();
@@ -413,10 +419,12 @@ mod tests {
 
             let unboxed = jlrs
                 .scope(|_, frame| {
-                    frame.scope(|frame| unsafe {
+                    frame.scope(|frame| {
                         let new_array = Array::new::<isize, _, _, _>(&mut *frame, (3, 4, 5))?
                             .into_jlrs_result()?;
-                        new_array.cast::<Array>()?.copy_inline_data::<isize, _>(frame)
+                        new_array
+                            .cast::<Array>()?
+                            .copy_inline_data::<isize, _>(frame)
                     })
                 })
                 .unwrap();
@@ -436,7 +444,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope_with_slots(1, |_, frame| unsafe {
+                .scope_with_slots(1, |_, frame| {
                     let new_array =
                         Array::new::<u8, _, _, _>(&mut *frame, (3, 4, 5, 6))?.into_jlrs_result()?;
                     new_array.cast::<Array>()?.copy_inline_data::<u8, _>(frame)
@@ -460,7 +468,7 @@ mod tests {
 
             let unboxed = jlrs
                 .scope_with_slots(0, |_, frame| {
-                    frame.scope_with_slots(1, |frame| unsafe {
+                    frame.scope_with_slots(1, |frame| {
                         let new_array = Array::new::<u16, _, _, _>(&mut *frame, (3, 4, 5, 6))?
                             .into_jlrs_result()?;
                         new_array.cast::<Array>()?.copy_inline_data::<u16, _>(frame)
@@ -485,7 +493,7 @@ mod tests {
 
             let unboxed = jlrs
                 .scope_with_slots(0, |_, frame| {
-                    frame.scope(|frame| unsafe {
+                    frame.scope(|frame| {
                         let new_array = Array::new::<u32, _, _, _>(&mut *frame, (3, 4, 5, 6))?
                             .into_jlrs_result()?;
                         new_array.cast::<Array>()?.copy_inline_data::<u32, _>(frame)
@@ -509,7 +517,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope(|_, frame| unsafe {
+                .scope(|_, frame| {
                     let new_array = Array::new::<u64, _, _, _>(&mut *frame, (3, 4, 5, 6))?
                         .into_jlrs_result()?;
                     new_array.cast::<Array>()?.copy_inline_data::<u64, _>(frame)
@@ -533,10 +541,12 @@ mod tests {
 
             let unboxed = jlrs
                 .scope(|_, frame| {
-                    frame.scope_with_slots(1, |frame| unsafe {
+                    frame.scope_with_slots(1, |frame| {
                         let new_array = Array::new::<usize, _, _, _>(&mut *frame, (3, 4, 5, 6))?
                             .into_jlrs_result()?;
-                        new_array.cast::<Array>()?.copy_inline_data::<usize, _>(frame)
+                        new_array
+                            .cast::<Array>()?
+                            .copy_inline_data::<usize, _>(frame)
                     })
                 })
                 .unwrap();
@@ -558,10 +568,12 @@ mod tests {
 
             let unboxed = jlrs
                 .scope(|_, frame| {
-                    frame.scope(|frame| unsafe {
+                    frame.scope(|frame| {
                         let new_array = Array::new::<isize, _, _, _>(&mut *frame, (3, 4, 5, 6))?
                             .into_jlrs_result()?;
-                        new_array.cast::<Array>()?.copy_inline_data::<isize, _>(frame)
+                        new_array
+                            .cast::<Array>()?
+                            .copy_inline_data::<isize, _>(frame)
                     })
                 })
                 .unwrap();
@@ -583,10 +595,12 @@ mod tests {
 
             let unboxed = jlrs
                 .scope(|_, frame| {
-                    frame.scope(|frame| unsafe {
+                    frame.scope(|frame| {
                         let new_array = Array::new::<bool, _, _, _>(&mut *frame, (3, 4, 5, 6))?
                             .into_jlrs_result()?;
-                        new_array.cast::<Array>()?.copy_inline_data::<bool, _>(frame)
+                        new_array
+                            .cast::<Array>()?
+                            .copy_inline_data::<bool, _>(frame)
                     })
                 })
                 .unwrap();
@@ -608,10 +622,12 @@ mod tests {
 
             let unboxed = jlrs
                 .scope(|_, frame| {
-                    frame.scope(|frame| unsafe {
+                    frame.scope(|frame| {
                         let new_array = Array::new::<char, _, _, _>(&mut *frame, (3, 4, 5, 6))?
                             .into_jlrs_result()?;
-                        new_array.cast::<Array>()?.copy_inline_data::<char, _>(frame)
+                        new_array
+                            .cast::<Array>()?
+                            .copy_inline_data::<char, _>(frame)
                     })
                 })
                 .unwrap();
@@ -632,7 +648,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope_with_slots(1, |_, frame| unsafe {
+                .scope_with_slots(1, |_, frame| {
                     let new_array = Array::new_unchecked::<f32, _, _, _>(&mut *frame, 3)?;
                     new_array.cast::<Array>()?.copy_inline_data::<f32, _>(frame)
                 })
@@ -651,7 +667,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope_with_slots(1, |_, frame| unsafe {
+                .scope_with_slots(1, |_, frame| {
                     let array = frame.value_scope_with_slots(0, |output, frame| {
                         let output = output.into_scope(frame);
                         Array::new_unchecked::<f32, _, _, _>(output, 3)
@@ -674,7 +690,7 @@ mod tests {
 
             let unboxed = jlrs
                 .scope_with_slots(0, |_, frame| {
-                    frame.scope_with_slots(1, |frame| unsafe {
+                    frame.scope_with_slots(1, |frame| {
                         let new_array = Array::new_unchecked::<f64, _, _, _>(&mut *frame, 3)?;
                         new_array.cast::<Array>()?.copy_inline_data::<f64, _>(frame)
                     })
@@ -695,7 +711,7 @@ mod tests {
 
             let unboxed = jlrs
                 .scope_with_slots(0, |_, frame| {
-                    frame.scope(|frame| unsafe {
+                    frame.scope(|frame| {
                         let new_array = Array::new_unchecked::<i8, _, _, _>(&mut *frame, 3)?;
                         new_array.cast::<Array>()?.copy_inline_data::<i8, _>(frame)
                     })
@@ -715,7 +731,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope(|_, frame| unsafe {
+                .scope(|_, frame| {
                     let new_array = Array::new_unchecked::<i16, _, _, _>(&mut *frame, 3)?;
                     new_array.cast::<Array>()?.copy_inline_data::<i16, _>(frame)
                 })
@@ -735,7 +751,7 @@ mod tests {
 
             let unboxed = jlrs
                 .scope(|_, frame| {
-                    frame.scope_with_slots(1, |frame| unsafe {
+                    frame.scope_with_slots(1, |frame| {
                         let new_array = Array::new_unchecked::<i32, _, _, _>(&mut *frame, 3)?;
                         new_array.cast::<Array>()?.copy_inline_data::<i32, _>(frame)
                     })
@@ -756,7 +772,7 @@ mod tests {
 
             let unboxed = jlrs
                 .scope(|_, frame| {
-                    frame.scope(|frame| unsafe {
+                    frame.scope(|frame| {
                         let new_array = Array::new_unchecked::<i64, _, _, _>(&mut *frame, 3)?;
                         new_array.cast::<Array>()?.copy_inline_data::<i64, _>(frame)
                     })
@@ -776,7 +792,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope_with_slots(1, |_, frame| unsafe {
+                .scope_with_slots(1, |_, frame| {
                     let new_array = Array::new_unchecked::<u8, _, _, _>(&mut *frame, (3, 4))?;
                     new_array.cast::<Array>()?.copy_inline_data::<u8, _>(frame)
                 })
@@ -797,7 +813,7 @@ mod tests {
 
             let unboxed = jlrs
                 .scope_with_slots(0, |_, frame| {
-                    frame.scope_with_slots(1, |frame| unsafe {
+                    frame.scope_with_slots(1, |frame| {
                         let new_array = Array::new_unchecked::<u16, _, _, _>(&mut *frame, (3, 4))?;
                         new_array.cast::<Array>()?.copy_inline_data::<u16, _>(frame)
                     })
@@ -819,7 +835,7 @@ mod tests {
 
             let unboxed = jlrs
                 .scope_with_slots(0, |_, frame| {
-                    frame.scope(|frame| unsafe {
+                    frame.scope(|frame| {
                         let new_array = Array::new_unchecked::<u32, _, _, _>(&mut *frame, (3, 4))?;
                         new_array.cast::<Array>()?.copy_inline_data::<u32, _>(frame)
                     })
@@ -840,7 +856,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope(|_, frame| unsafe {
+                .scope(|_, frame| {
                     let new_array = Array::new_unchecked::<u64, _, _, _>(&mut *frame, (3, 4))?;
                     new_array.cast::<Array>()?.copy_inline_data::<u64, _>(frame)
                 })
@@ -861,10 +877,12 @@ mod tests {
 
             let unboxed = jlrs
                 .scope(|_, frame| {
-                    frame.scope_with_slots(1, |frame| unsafe {
+                    frame.scope_with_slots(1, |frame| {
                         let new_array =
                             Array::new_unchecked::<usize, _, _, _>(&mut *frame, (3, 4))?;
-                        new_array.cast::<Array>()?.copy_inline_data::<usize, _>(frame)
+                        new_array
+                            .cast::<Array>()?
+                            .copy_inline_data::<usize, _>(frame)
                     })
                 })
                 .unwrap();
@@ -884,10 +902,12 @@ mod tests {
 
             let unboxed = jlrs
                 .scope(|_, frame| {
-                    frame.scope(|frame| unsafe {
+                    frame.scope(|frame| {
                         let new_array =
                             Array::new_unchecked::<isize, _, _, _>(&mut *frame, (3, 4))?;
-                        new_array.cast::<Array>()?.copy_inline_data::<isize, _>(frame)
+                        new_array
+                            .cast::<Array>()?
+                            .copy_inline_data::<isize, _>(frame)
                     })
                 })
                 .unwrap();
@@ -906,7 +926,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope_with_slots(1, |_, frame| unsafe {
+                .scope_with_slots(1, |_, frame| {
                     let new_array = Array::new_unchecked::<u8, _, _, _>(&mut *frame, (3, 4, 5))?;
                     new_array.cast::<Array>()?.copy_inline_data::<u8, _>(frame)
                 })
@@ -928,7 +948,7 @@ mod tests {
 
             let unboxed = jlrs
                 .scope_with_slots(0, |_, frame| {
-                    frame.scope_with_slots(1, |frame| unsafe {
+                    frame.scope_with_slots(1, |frame| {
                         let new_array =
                             Array::new_unchecked::<u16, _, _, _>(&mut *frame, (3, 4, 5))?;
                         new_array.cast::<Array>()?.copy_inline_data::<u16, _>(frame)
@@ -952,7 +972,7 @@ mod tests {
 
             let unboxed = jlrs
                 .scope_with_slots(0, |_, frame| {
-                    frame.scope(|frame| unsafe {
+                    frame.scope(|frame| {
                         let new_array =
                             Array::new_unchecked::<u32, _, _, _>(&mut *frame, (3, 4, 5))?;
                         new_array.cast::<Array>()?.copy_inline_data::<u32, _>(frame)
@@ -975,7 +995,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope(|_, frame| unsafe {
+                .scope(|_, frame| {
                     let new_array = Array::new_unchecked::<u64, _, _, _>(&mut *frame, (3, 4, 5))?;
                     new_array.cast::<Array>()?.copy_inline_data::<u64, _>(frame)
                 })
@@ -997,10 +1017,12 @@ mod tests {
 
             let unboxed = jlrs
                 .scope(|_, frame| {
-                    frame.scope_with_slots(1, |frame| unsafe {
+                    frame.scope_with_slots(1, |frame| {
                         let new_array =
                             Array::new_unchecked::<usize, _, _, _>(&mut *frame, (3, 4, 5))?;
-                        new_array.cast::<Array>()?.copy_inline_data::<usize, _>(frame)
+                        new_array
+                            .cast::<Array>()?
+                            .copy_inline_data::<usize, _>(frame)
                     })
                 })
                 .unwrap();
@@ -1021,10 +1043,12 @@ mod tests {
 
             let unboxed = jlrs
                 .scope(|_, frame| {
-                    frame.scope(|frame| unsafe {
+                    frame.scope(|frame| {
                         let new_array =
                             Array::new_unchecked::<isize, _, _, _>(&mut *frame, (3, 4, 5))?;
-                        new_array.cast::<Array>()?.copy_inline_data::<isize, _>(frame)
+                        new_array
+                            .cast::<Array>()?
+                            .copy_inline_data::<isize, _>(frame)
                     })
                 })
                 .unwrap();
@@ -1044,7 +1068,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope_with_slots(1, |_, frame| unsafe {
+                .scope_with_slots(1, |_, frame| {
                     let new_array = Array::new_unchecked::<u8, _, _, _>(&mut *frame, (3, 4, 5, 6))?;
                     new_array.cast::<Array>()?.copy_inline_data::<u8, _>(frame)
                 })
@@ -1067,7 +1091,7 @@ mod tests {
 
             let unboxed = jlrs
                 .scope_with_slots(0, |_, frame| {
-                    frame.scope_with_slots(1, |frame| unsafe {
+                    frame.scope_with_slots(1, |frame| {
                         let new_array =
                             Array::new_unchecked::<u16, _, _, _>(&mut *frame, (3, 4, 5, 6))?;
                         new_array.cast::<Array>()?.copy_inline_data::<u16, _>(frame)
@@ -1092,7 +1116,7 @@ mod tests {
 
             let unboxed = jlrs
                 .scope_with_slots(0, |_, frame| {
-                    frame.scope(|frame| unsafe {
+                    frame.scope(|frame| {
                         let new_array =
                             Array::new_unchecked::<u32, _, _, _>(&mut *frame, (3, 4, 5, 6))?;
                         new_array.cast::<Array>()?.copy_inline_data::<u32, _>(frame)
@@ -1116,7 +1140,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope(|_, frame| unsafe {
+                .scope(|_, frame| {
                     let new_array =
                         Array::new_unchecked::<u64, _, _, _>(&mut *frame, (3, 4, 5, 6))?;
                     new_array.cast::<Array>()?.copy_inline_data::<u64, _>(frame)
@@ -1140,10 +1164,12 @@ mod tests {
 
             let unboxed = jlrs
                 .scope(|_, frame| {
-                    frame.scope_with_slots(1, |frame| unsafe {
+                    frame.scope_with_slots(1, |frame| {
                         let new_array =
                             Array::new_unchecked::<usize, _, _, _>(&mut *frame, (3, 4, 5, 6))?;
-                        new_array.cast::<Array>()?.copy_inline_data::<usize, _>(frame)
+                        new_array
+                            .cast::<Array>()?
+                            .copy_inline_data::<usize, _>(frame)
                     })
                 })
                 .unwrap();
@@ -1165,10 +1191,12 @@ mod tests {
 
             let unboxed = jlrs
                 .scope(|_, frame| {
-                    frame.scope(|frame| unsafe {
+                    frame.scope(|frame| {
                         let new_array =
                             Array::new_unchecked::<isize, _, _, _>(&mut *frame, (3, 4, 5, 6))?;
-                        new_array.cast::<Array>()?.copy_inline_data::<isize, _>(frame)
+                        new_array
+                            .cast::<Array>()?
+                            .copy_inline_data::<isize, _>(frame)
                     })
                 })
                 .unwrap();
@@ -1190,10 +1218,12 @@ mod tests {
 
             let unboxed = jlrs
                 .scope(|_, frame| {
-                    frame.scope(|frame| unsafe {
+                    frame.scope(|frame| {
                         let new_array =
                             Array::new_unchecked::<bool, _, _, _>(&mut *frame, (3, 4, 5, 6))?;
-                        new_array.cast::<Array>()?.copy_inline_data::<bool, _>(frame)
+                        new_array
+                            .cast::<Array>()?
+                            .copy_inline_data::<bool, _>(frame)
                     })
                 })
                 .unwrap();
@@ -1214,11 +1244,13 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope(|_, frame| unsafe {
+                .scope(|_, frame| {
                     frame.scope(|frame| {
                         let new_array =
                             Array::new_unchecked::<char, _, _, _>(&mut *frame, (3, 4, 5, 6))?;
-                        new_array.cast::<Array>()?.copy_inline_data::<char, _>(frame)
+                        new_array
+                            .cast::<Array>()?
+                            .copy_inline_data::<char, _>(frame)
                     })
                 })
                 .unwrap();
@@ -1239,7 +1271,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope_with_slots(1, |global, frame| unsafe {
+                .scope_with_slots(1, |global, frame| {
                     let new_array =
                         Array::new_for(&mut *frame, 3, DataType::float32_type(global).as_value())?
                             .into_jlrs_result()?;
@@ -1260,7 +1292,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope_with_slots(1, |global, frame| unsafe {
+                .scope_with_slots(1, |global, frame| {
                     let array = frame
                         .result_scope_with_slots(0, |output, frame| {
                             let output = output.into_scope(frame);
@@ -1285,7 +1317,7 @@ mod tests {
 
             let unboxed = jlrs
                 .scope_with_slots(0, |global, frame| {
-                    frame.scope_with_slots(1, |frame| unsafe {
+                    frame.scope_with_slots(1, |frame| {
                         let new_array = Array::new_for(
                             &mut *frame,
                             3,
@@ -1311,7 +1343,7 @@ mod tests {
 
             let unboxed = jlrs
                 .scope_with_slots(0, |global, frame| {
-                    frame.scope(|frame| unsafe {
+                    frame.scope(|frame| {
                         let new_array =
                             Array::new_for(&mut *frame, 3, DataType::int8_type(global).as_value())?
                                 .into_jlrs_result()?;
@@ -1333,7 +1365,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope(|global, frame| unsafe {
+                .scope(|global, frame| {
                     let new_array =
                         Array::new_for(&mut *frame, 3, DataType::int16_type(global).as_value())?
                             .into_jlrs_result()?;
@@ -1355,7 +1387,7 @@ mod tests {
 
             let unboxed = jlrs
                 .scope(|global, frame| {
-                    frame.scope_with_slots(1, |frame| unsafe {
+                    frame.scope_with_slots(1, |frame| {
                         let new_array = Array::new_for(
                             &mut *frame,
                             3,
@@ -1381,7 +1413,7 @@ mod tests {
 
             let unboxed = jlrs
                 .scope(|global, frame| {
-                    frame.scope(|frame| unsafe {
+                    frame.scope(|frame| {
                         let new_array = Array::new_for(
                             &mut *frame,
                             3,
@@ -1406,7 +1438,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope_with_slots(1, |global, frame| unsafe {
+                .scope_with_slots(1, |global, frame| {
                     let new_array = Array::new_for(
                         &mut *frame,
                         (3, 4),
@@ -1432,7 +1464,7 @@ mod tests {
 
             let unboxed = jlrs
                 .scope_with_slots(0, |global, frame| {
-                    frame.scope_with_slots(1, |frame| unsafe {
+                    frame.scope_with_slots(1, |frame| {
                         let new_array = Array::new_for(
                             &mut *frame,
                             (3, 4),
@@ -1459,7 +1491,7 @@ mod tests {
 
             let unboxed = jlrs
                 .scope_with_slots(0, |global, frame| {
-                    frame.scope(|frame| unsafe {
+                    frame.scope(|frame| {
                         let new_array = Array::new_for(
                             &mut *frame,
                             (3, 4),
@@ -1485,7 +1517,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope(|global, frame| unsafe {
+                .scope(|global, frame| {
                     let new_array = Array::new_for(
                         &mut *frame,
                         (3, 4),
@@ -1511,14 +1543,16 @@ mod tests {
 
             let unboxed = jlrs
                 .scope(|global, frame| {
-                    frame.scope_with_slots(1, |frame| unsafe {
+                    frame.scope_with_slots(1, |frame| {
                         let new_array = Array::new_for(
                             &mut *frame,
                             (3, 4),
                             DataType::uint64_type(global).as_value(),
                         )?
                         .into_jlrs_result()?;
-                        new_array.cast::<Array>()?.copy_inline_data::<usize, _>(frame)
+                        new_array
+                            .cast::<Array>()?
+                            .copy_inline_data::<usize, _>(frame)
                     })
                 })
                 .unwrap();
@@ -1538,14 +1572,16 @@ mod tests {
 
             let unboxed = jlrs
                 .scope(|global, frame| {
-                    frame.scope(|frame| unsafe {
+                    frame.scope(|frame| {
                         let new_array = Array::new_for(
                             &mut *frame,
                             (3, 4),
                             DataType::int64_type(global).as_value(),
                         )?
                         .into_jlrs_result()?;
-                        new_array.cast::<Array>()?.copy_inline_data::<isize, _>(frame)
+                        new_array
+                            .cast::<Array>()?
+                            .copy_inline_data::<isize, _>(frame)
                     })
                 })
                 .unwrap();
@@ -1564,7 +1600,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope_with_slots(1, |global, frame| unsafe {
+                .scope_with_slots(1, |global, frame| {
                     let new_array = Array::new_for(
                         &mut *frame,
                         (3, 4, 5),
@@ -1591,7 +1627,7 @@ mod tests {
 
             let unboxed = jlrs
                 .scope_with_slots(0, |global, frame| {
-                    frame.scope_with_slots(1, |frame| unsafe {
+                    frame.scope_with_slots(1, |frame| {
                         let new_array = Array::new_for(
                             &mut *frame,
                             (3, 4, 5),
@@ -1619,7 +1655,7 @@ mod tests {
 
             let unboxed = jlrs
                 .scope_with_slots(0, |global, frame| {
-                    frame.scope(|frame| unsafe {
+                    frame.scope(|frame| {
                         let new_array = Array::new_for(
                             &mut *frame,
                             (3, 4, 5),
@@ -1646,7 +1682,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope(|global, frame| unsafe {
+                .scope(|global, frame| {
                     let new_array = Array::new_for(
                         &mut *frame,
                         (3, 4, 5),
@@ -1673,14 +1709,16 @@ mod tests {
 
             let unboxed = jlrs
                 .scope(|global, frame| {
-                    frame.scope_with_slots(1, |frame| unsafe {
+                    frame.scope_with_slots(1, |frame| {
                         let new_array = Array::new_for(
                             &mut *frame,
                             (3, 4, 5),
                             DataType::uint64_type(global).as_value(),
                         )?
                         .into_jlrs_result()?;
-                        new_array.cast::<Array>()?.copy_inline_data::<usize, _>(frame)
+                        new_array
+                            .cast::<Array>()?
+                            .copy_inline_data::<usize, _>(frame)
                     })
                 })
                 .unwrap();
@@ -1701,14 +1739,16 @@ mod tests {
 
             let unboxed = jlrs
                 .scope(|global, frame| {
-                    frame.scope(|frame| unsafe {
+                    frame.scope(|frame| {
                         let new_array = Array::new_for(
                             &mut *frame,
                             (3, 4, 5),
                             DataType::int64_type(global).as_value(),
                         )?
                         .into_jlrs_result()?;
-                        new_array.cast::<Array>()?.copy_inline_data::<isize, _>(frame)
+                        new_array
+                            .cast::<Array>()?
+                            .copy_inline_data::<isize, _>(frame)
                     })
                 })
                 .unwrap();
@@ -1728,7 +1768,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope_with_slots(1, |global, frame| unsafe {
+                .scope_with_slots(1, |global, frame| {
                     let new_array = Array::new_for(
                         &mut *frame,
                         (3, 4, 5, 6),
@@ -1756,7 +1796,7 @@ mod tests {
 
             let unboxed = jlrs
                 .scope_with_slots(0, |global, frame| {
-                    frame.scope_with_slots(1, |frame| unsafe {
+                    frame.scope_with_slots(1, |frame| {
                         let new_array = Array::new_for(
                             &mut *frame,
                             (3, 4, 5, 6),
@@ -1785,7 +1825,7 @@ mod tests {
 
             let unboxed = jlrs
                 .scope_with_slots(0, |global, frame| {
-                    frame.scope(|frame| unsafe {
+                    frame.scope(|frame| {
                         let new_array = Array::new_for(
                             &mut *frame,
                             (3, 4, 5, 6),
@@ -1813,7 +1853,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope(|global, frame| unsafe {
+                .scope(|global, frame| {
                     let new_array = Array::new_for(
                         &mut *frame,
                         (3, 4, 5, 6),
@@ -1841,14 +1881,16 @@ mod tests {
 
             let unboxed = jlrs
                 .scope(|global, frame| {
-                    frame.scope_with_slots(1, |frame| unsafe {
+                    frame.scope_with_slots(1, |frame| {
                         let new_array = Array::new_for(
                             &mut *frame,
                             (3, 4, 5, 6),
                             DataType::uint64_type(global).as_value(),
                         )?
                         .into_jlrs_result()?;
-                        new_array.cast::<Array>()?.copy_inline_data::<usize, _>(frame)
+                        new_array
+                            .cast::<Array>()?
+                            .copy_inline_data::<usize, _>(frame)
                     })
                 })
                 .unwrap();
@@ -1870,14 +1912,16 @@ mod tests {
 
             let unboxed = jlrs
                 .scope(|global, frame| {
-                    frame.scope(|frame| unsafe {
+                    frame.scope(|frame| {
                         let new_array = Array::new_for(
                             &mut *frame,
                             (3, 4, 5, 6),
                             DataType::int64_type(global).as_value(),
                         )?
                         .into_jlrs_result()?;
-                        new_array.cast::<Array>()?.copy_inline_data::<isize, _>(frame)
+                        new_array
+                            .cast::<Array>()?
+                            .copy_inline_data::<isize, _>(frame)
                     })
                 })
                 .unwrap();
@@ -1899,14 +1943,16 @@ mod tests {
 
             let unboxed = jlrs
                 .scope(|global, frame| {
-                    frame.scope(|frame| unsafe {
+                    frame.scope(|frame| {
                         let new_array = Array::new_for(
                             &mut *frame,
                             (3, 4, 5, 6),
                             DataType::bool_type(global).as_value(),
                         )?
                         .into_jlrs_result()?;
-                        new_array.cast::<Array>()?.copy_inline_data::<bool, _>(frame)
+                        new_array
+                            .cast::<Array>()?
+                            .copy_inline_data::<bool, _>(frame)
                     })
                 })
                 .unwrap();
@@ -1928,14 +1974,16 @@ mod tests {
 
             let unboxed = jlrs
                 .scope(|global, frame| {
-                    frame.scope(|frame| unsafe {
+                    frame.scope(|frame| {
                         let new_array = Array::new_for(
                             &mut *frame,
                             (3, 4, 5, 6),
                             DataType::char_type(global).as_value(),
                         )?
                         .into_jlrs_result()?;
-                        new_array.cast::<Array>()?.copy_inline_data::<char, _>(frame)
+                        new_array
+                            .cast::<Array>()?
+                            .copy_inline_data::<char, _>(frame)
                     })
                 })
                 .unwrap();
@@ -1956,7 +2004,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope_with_slots(1, |global, frame| unsafe {
+                .scope_with_slots(1, |global, frame| {
                     let new_array = Array::new_for_unchecked(
                         &mut *frame,
                         3,
@@ -1979,7 +2027,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope_with_slots(1, |global, frame| unsafe {
+                .scope_with_slots(1, |global, frame| {
                     let array = frame.value_scope_with_slots(0, |output, frame| {
                         let output = output.into_scope(frame);
                         Array::new_for_unchecked(
@@ -2006,7 +2054,7 @@ mod tests {
 
             let unboxed = jlrs
                 .scope_with_slots(0, |global, frame| {
-                    frame.scope_with_slots(1, |frame| unsafe {
+                    frame.scope_with_slots(1, |frame| {
                         let new_array = Array::new_for_unchecked(
                             &mut *frame,
                             3,
@@ -2031,7 +2079,7 @@ mod tests {
 
             let unboxed = jlrs
                 .scope_with_slots(0, |global, frame| {
-                    frame.scope(|frame| unsafe {
+                    frame.scope(|frame| {
                         let new_array = Array::new_for_unchecked(
                             &mut *frame,
                             3,
@@ -2055,7 +2103,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope(|global, frame| unsafe {
+                .scope(|global, frame| {
                     let new_array = Array::new_for_unchecked(
                         &mut *frame,
                         3,
@@ -2079,7 +2127,7 @@ mod tests {
 
             let unboxed = jlrs
                 .scope(|global, frame| {
-                    frame.scope_with_slots(1, |frame| unsafe {
+                    frame.scope_with_slots(1, |frame| {
                         let new_array = Array::new_for_unchecked(
                             &mut *frame,
                             3,
@@ -2104,7 +2152,7 @@ mod tests {
 
             let unboxed = jlrs
                 .scope(|global, frame| {
-                    frame.scope(|frame| unsafe {
+                    frame.scope(|frame| {
                         let new_array = Array::new_for_unchecked(
                             &mut *frame,
                             3,
@@ -2128,7 +2176,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope_with_slots(1, |global, frame| unsafe {
+                .scope_with_slots(1, |global, frame| {
                     let new_array = Array::new_for_unchecked(
                         &mut *frame,
                         (3, 4),
@@ -2153,7 +2201,7 @@ mod tests {
 
             let unboxed = jlrs
                 .scope_with_slots(0, |global, frame| {
-                    frame.scope_with_slots(1, |frame| unsafe {
+                    frame.scope_with_slots(1, |frame| {
                         let new_array = Array::new_for_unchecked(
                             &mut *frame,
                             (3, 4),
@@ -2179,7 +2227,7 @@ mod tests {
 
             let unboxed = jlrs
                 .scope_with_slots(0, |global, frame| {
-                    frame.scope(|frame| unsafe {
+                    frame.scope(|frame| {
                         let new_array = Array::new_for_unchecked(
                             &mut *frame,
                             (3, 4),
@@ -2204,7 +2252,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope(|global, frame| unsafe {
+                .scope(|global, frame| {
                     let new_array = Array::new_for_unchecked(
                         &mut *frame,
                         (3, 4),
@@ -2229,13 +2277,15 @@ mod tests {
 
             let unboxed = jlrs
                 .scope(|global, frame| {
-                    frame.scope_with_slots(1, |frame| unsafe {
+                    frame.scope_with_slots(1, |frame| {
                         let new_array = Array::new_for_unchecked(
                             &mut *frame,
                             (3, 4),
                             DataType::uint64_type(global).as_value(),
                         )?;
-                        new_array.cast::<Array>()?.copy_inline_data::<usize, _>(frame)
+                        new_array
+                            .cast::<Array>()?
+                            .copy_inline_data::<usize, _>(frame)
                     })
                 })
                 .unwrap();
@@ -2255,13 +2305,15 @@ mod tests {
 
             let unboxed = jlrs
                 .scope(|global, frame| {
-                    frame.scope(|frame| unsafe {
+                    frame.scope(|frame| {
                         let new_array = Array::new_for_unchecked(
                             &mut *frame,
                             (3, 4),
                             DataType::int64_type(global).as_value(),
                         )?;
-                        new_array.cast::<Array>()?.copy_inline_data::<isize, _>(frame)
+                        new_array
+                            .cast::<Array>()?
+                            .copy_inline_data::<isize, _>(frame)
                     })
                 })
                 .unwrap();
@@ -2280,7 +2332,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope_with_slots(1, |global, frame| unsafe {
+                .scope_with_slots(1, |global, frame| {
                     let new_array = Array::new_for_unchecked(
                         &mut *frame,
                         (3, 4, 5),
@@ -2306,7 +2358,7 @@ mod tests {
 
             let unboxed = jlrs
                 .scope_with_slots(0, |global, frame| {
-                    frame.scope_with_slots(1, |frame| unsafe {
+                    frame.scope_with_slots(1, |frame| {
                         let new_array = Array::new_for_unchecked(
                             &mut *frame,
                             (3, 4, 5),
@@ -2333,7 +2385,7 @@ mod tests {
 
             let unboxed = jlrs
                 .scope_with_slots(0, |global, frame| {
-                    frame.scope(|frame| unsafe {
+                    frame.scope(|frame| {
                         let new_array = Array::new_for_unchecked(
                             &mut *frame,
                             (3, 4, 5),
@@ -2359,7 +2411,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope(|global, frame| unsafe {
+                .scope(|global, frame| {
                     let new_array = Array::new_for_unchecked(
                         &mut *frame,
                         (3, 4, 5),
@@ -2385,13 +2437,15 @@ mod tests {
 
             let unboxed = jlrs
                 .scope(|global, frame| {
-                    frame.scope_with_slots(1, |frame| unsafe {
+                    frame.scope_with_slots(1, |frame| {
                         let new_array = Array::new_for_unchecked(
                             &mut *frame,
                             (3, 4, 5),
                             DataType::uint64_type(global).as_value(),
                         )?;
-                        new_array.cast::<Array>()?.copy_inline_data::<usize, _>(frame)
+                        new_array
+                            .cast::<Array>()?
+                            .copy_inline_data::<usize, _>(frame)
                     })
                 })
                 .unwrap();
@@ -2412,13 +2466,15 @@ mod tests {
 
             let unboxed = jlrs
                 .scope(|global, frame| {
-                    frame.scope(|frame| unsafe {
+                    frame.scope(|frame| {
                         let new_array = Array::new_for_unchecked(
                             &mut *frame,
                             (3, 4, 5),
                             DataType::int64_type(global).as_value(),
                         )?;
-                        new_array.cast::<Array>()?.copy_inline_data::<isize, _>(frame)
+                        new_array
+                            .cast::<Array>()?
+                            .copy_inline_data::<isize, _>(frame)
                     })
                 })
                 .unwrap();
@@ -2438,7 +2494,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope_with_slots(1, |global, frame| unsafe {
+                .scope_with_slots(1, |global, frame| {
                     let new_array = Array::new_for_unchecked(
                         &mut *frame,
                         (3, 4, 5, 6),
@@ -2465,7 +2521,7 @@ mod tests {
 
             let unboxed = jlrs
                 .scope_with_slots(0, |global, frame| {
-                    frame.scope_with_slots(1, |frame| unsafe {
+                    frame.scope_with_slots(1, |frame| {
                         let new_array = Array::new_for_unchecked(
                             &mut *frame,
                             (3, 4, 5, 6),
@@ -2493,7 +2549,7 @@ mod tests {
 
             let unboxed = jlrs
                 .scope_with_slots(0, |global, frame| {
-                    frame.scope(|frame| unsafe {
+                    frame.scope(|frame| {
                         let new_array = Array::new_for_unchecked(
                             &mut *frame,
                             (3, 4, 5, 6),
@@ -2520,7 +2576,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope(|global, frame| unsafe {
+                .scope(|global, frame| {
                     let new_array = Array::new_for_unchecked(
                         &mut *frame,
                         (3, 4, 5, 6),
@@ -2547,13 +2603,15 @@ mod tests {
 
             let unboxed = jlrs
                 .scope(|global, frame| {
-                    frame.scope_with_slots(1, |frame| unsafe {
+                    frame.scope_with_slots(1, |frame| {
                         let new_array = Array::new_for_unchecked(
                             &mut *frame,
                             (3, 4, 5, 6),
                             DataType::uint64_type(global).as_value(),
                         )?;
-                        new_array.cast::<Array>()?.copy_inline_data::<usize, _>(frame)
+                        new_array
+                            .cast::<Array>()?
+                            .copy_inline_data::<usize, _>(frame)
                     })
                 })
                 .unwrap();
@@ -2575,13 +2633,15 @@ mod tests {
 
             let unboxed = jlrs
                 .scope(|global, frame| {
-                    frame.scope(|frame| unsafe {
+                    frame.scope(|frame| {
                         let new_array = Array::new_for_unchecked(
                             &mut *frame,
                             (3, 4, 5, 6),
                             DataType::int64_type(global).as_value(),
                         )?;
-                        new_array.cast::<Array>()?.copy_inline_data::<isize, _>(frame)
+                        new_array
+                            .cast::<Array>()?
+                            .copy_inline_data::<isize, _>(frame)
                     })
                 })
                 .unwrap();
@@ -2603,13 +2663,15 @@ mod tests {
 
             let unboxed = jlrs
                 .scope(|global, frame| {
-                    frame.scope(|frame| unsafe {
+                    frame.scope(|frame| {
                         let new_array = Array::new_for_unchecked(
                             &mut *frame,
                             (3, 4, 5, 6),
                             DataType::bool_type(global).as_value(),
                         )?;
-                        new_array.cast::<Array>()?.copy_inline_data::<bool, _>(frame)
+                        new_array
+                            .cast::<Array>()?
+                            .copy_inline_data::<bool, _>(frame)
                     })
                 })
                 .unwrap();
@@ -2631,13 +2693,15 @@ mod tests {
 
             let unboxed = jlrs
                 .scope(|global, frame| {
-                    frame.scope(|frame| unsafe {
+                    frame.scope(|frame| {
                         let new_array = Array::new_for_unchecked(
                             &mut *frame,
                             (3, 4, 5, 6),
                             DataType::char_type(global).as_value(),
                         )?;
-                        new_array.cast::<Array>()?.copy_inline_data::<char, _>(frame)
+                        new_array
+                            .cast::<Array>()?
+                            .copy_inline_data::<char, _>(frame)
                     })
                 })
                 .unwrap();

@@ -211,7 +211,7 @@ macro_rules! impl_tuple {
                 $crate::wrappers::ptr::datatype::DataType::emptytuple_type(global).as_ref()
             }
 
-            unsafe fn into_julia<'scope>(
+            fn into_julia<'scope>(
                 self,
                 global: $crate::memory::global::Global<'scope>
             ) -> $crate::wrappers::ptr::ValueRef<'scope, 'static> {

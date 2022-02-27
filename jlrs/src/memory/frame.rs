@@ -66,8 +66,7 @@ impl<'frame, M: Mode> GcFrame<'frame, M> {
     }
     */
 
-    // Safety: this frame must be dropped in the same scope it has been created.
-    pub(crate) unsafe fn nest<'nested>(&'nested mut self, capacity: usize) -> GcFrame<'nested, M> {
+    pub(crate) fn nest<'nested>(&'nested mut self, capacity: usize) -> GcFrame<'nested, M> {
         let used = self.n_roots() + 2;
         let new_frame_size = MIN_FRAME_CAPACITY.max(capacity) + 2;
         let raw_frame = if self.page.is_some() {
@@ -84,7 +83,7 @@ impl<'frame, M: Mode> GcFrame<'frame, M> {
             self.page.as_mut().unwrap().as_mut()
         };
 
-        GcFrame::new(raw_frame, self.mode)
+        unsafe { GcFrame::new(raw_frame, self.mode) }
     }
 
     // Safety: this frame must be dropped in the same scope it has been created and raw_frame must
@@ -219,9 +218,9 @@ pub(crate) mod private {
             _: Private,
         ) -> Result<Value<'frame, 'data>, AllocError>;
 
-        unsafe fn reserve_slot(&mut self, _: Private) -> JlrsResult<*mut *mut c_void>;
+        fn reserve_slot(&mut self, _: Private) -> JlrsResult<*mut *mut c_void>;
 
-        unsafe fn nest<'nested>(
+        fn nest<'nested>(
             &'nested mut self,
             capacity: usize,
             _: Private,
@@ -303,7 +302,7 @@ pub(crate) mod private {
             Ok(Value::wrap_non_null(value, Private))
         }
 
-        unsafe fn reserve_slot(&mut self, _: Private) -> JlrsResult<*mut *mut c_void> {
+        fn reserve_slot(&mut self, _: Private) -> JlrsResult<*mut *mut c_void> {
             let n_roots = self.raw_frame[0].get() as usize >> 2;
             if n_roots == self.raw_frame.len() - 2 {
                 Err(JlrsError::alloc_error(AllocError::FrameOverflow(
@@ -311,15 +310,17 @@ pub(crate) mod private {
                 )))?;
             }
 
-            self.raw_frame
-                .get_unchecked_mut(n_roots + 2)
-                .set(null_mut());
-            self.set_n_roots(n_roots + 1);
+            unsafe {
+                self.raw_frame
+                    .get_unchecked_mut(n_roots + 2)
+                    .set(null_mut());
+                self.set_n_roots(n_roots + 1);
 
-            Ok(self.raw_frame.get_unchecked_mut(n_roots + 2).as_ptr())
+                Ok(self.raw_frame.get_unchecked_mut(n_roots + 2).as_ptr())
+            }
         }
 
-        unsafe fn nest<'nested>(
+        fn nest<'nested>(
             &'nested mut self,
             capacity: usize,
             _: Private,
@@ -342,7 +343,7 @@ pub(crate) mod private {
                         self.n_roots(),
                     )))?
                 }
-                let mut nested = unsafe { self.nest(0) };
+                let mut nested = self.nest(0);
                 let out = Output::new();
                 func(out, &mut nested)?.into_pending()
             };
@@ -370,7 +371,7 @@ pub(crate) mod private {
                         self.n_roots(),
                     )))?
                 }
-                let mut nested = unsafe { self.nest(capacity) };
+                let mut nested = self.nest(capacity);
                 let out = Output::new();
                 func(out, &mut nested)?.into_pending()
             };
@@ -397,7 +398,7 @@ pub(crate) mod private {
                         self.n_roots(),
                     )))?
                 }
-                let mut nested = unsafe { self.nest(0) };
+                let mut nested = self.nest(0);
                 let out = Output::new();
                 func(out, &mut nested)?.into_pending()
             };
@@ -425,7 +426,7 @@ pub(crate) mod private {
                         self.n_roots(),
                     )))?
                 }
-                let mut nested = unsafe { self.nest(capacity) };
+                let mut nested = self.nest(capacity);
                 let out = Output::new();
                 func(out, &mut nested)?.into_pending()
             };
@@ -437,7 +438,7 @@ pub(crate) mod private {
         where
             for<'inner> F: FnOnce(&mut GcFrame<'inner, Self::Mode>) -> JlrsResult<T>,
         {
-            let mut nested = unsafe { self.nest(0) };
+            let mut nested = self.nest(0);
             func(&mut nested)
         }
 
@@ -445,7 +446,7 @@ pub(crate) mod private {
         where
             for<'inner> F: FnOnce(&mut GcFrame<'inner, Self::Mode>) -> JlrsResult<T>,
         {
-            let mut nested = unsafe { self.nest(capacity) };
+            let mut nested = self.nest(capacity);
             func(&mut nested)
         }
     }

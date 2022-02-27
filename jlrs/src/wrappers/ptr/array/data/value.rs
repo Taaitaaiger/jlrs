@@ -32,6 +32,7 @@ impl<'borrow, 'array, 'data, T> ValueArrayData<'borrow, 'array, 'data, T>
 where
     T: Wrapper<'array, 'data>,
 {
+    // Safety: The representation of T and the element type must match
     pub(crate) unsafe fn new<'frame, F>(array: Array<'array, 'data>, _: &'borrow F) -> Self
     where
         F: Frame<'frame>,
@@ -72,7 +73,7 @@ where
 
     /// Returns the array's dimensions.
     pub fn dimensions(&self) -> ArrayDimensions<'array> {
-        unsafe { ArrayDimensions::new(self.array) }
+        ArrayDimensions::new(self.array)
     }
 }
 
@@ -111,6 +112,7 @@ impl<'borrow, 'array, 'data, T> ValueArrayDataMut<'borrow, 'array, 'data, T>
 where
     T: Wrapper<'array, 'data>,
 {
+    // Safety: The representation of T and the element type must match
     pub(crate) unsafe fn new<'frame, F>(array: Array<'array, 'data>, _: &'borrow mut F) -> Self
     where
         F: Frame<'frame>,
@@ -187,7 +189,7 @@ where
 
     /// Returns the array's dimensions.
     pub fn dimensions(&self) -> ArrayDimensions<'array> {
-        unsafe { ArrayDimensions::new(self.array) }
+        ArrayDimensions::new(self.array)
     }
 }
 
@@ -226,6 +228,7 @@ impl<'borrow, 'array, 'data, T> UnrestrictedValueArrayDataMut<'borrow, 'array, '
 where
     T: Wrapper<'array, 'data>,
 {
+    // Safety: The representation of T and the element type must match
     pub(crate) unsafe fn new<'frame, F>(array: Array<'array, 'data>, _: &'borrow F) -> Self
     where
         F: Frame<'frame>,
@@ -302,7 +305,7 @@ where
 
     /// Returns the array's dimensions.
     pub fn dimensions(&self) -> ArrayDimensions<'array> {
-        unsafe { ArrayDimensions::new(self.array) }
+        ArrayDimensions::new(self.array)
     }
 }
 

@@ -64,9 +64,7 @@ mod tests {
                     })
                     .unwrap();
 
-                    unsafe {
-                        jlrs.gc_collect(GcCollection::Full);
-                    }
+                    jlrs.gc_collect(GcCollection::Full);
                 });
             }
 
@@ -128,7 +126,7 @@ mod tests {
                 JULIA.with(|j| {
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope_with_slots(1, |_, frame| unsafe {
+                    jlrs.scope_with_slots(1, |_, frame| {
                         let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
                         let array = Array::from_vec(&mut *frame, data.clone(), (2, 3, 4))?;
@@ -305,7 +303,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |_, frame| unsafe {
+            jlrs.scope_with_slots(1, |_, frame| {
                 let arr_val =
                     Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?.into_jlrs_result()?;
                 let arr = arr_val.cast::<Array>()?;

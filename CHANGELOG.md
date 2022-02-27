@@ -1,6 +1,16 @@
 #### v0.14
  - `TemporarySymbol` has been renamed to `ToSymbol`. The method `ToSymbol::to_symbol` has been added to this trait.
 
- - The wrappers for `CodeInstance`, `Expr`, `MethodInstance`, `MethodMatch`, `MethodTable`, `Method`, `OpaqueClosure`, `TypemapEntry`, `TypemapLevel` and `WeakRef` are now considered internal types, they are only available when the `internal-types` feature is enabled.
+ - The wrappers for `CodeInstance`, `Expr`, `MethodInstance`, `MethodMatch`, `MethodTable`, `Method`, `OpaqueClosure`, `SSAValue`, `TypemapEntry`, `TypemapLevel` and `WeakRef` are considered internal types, they are only available when the `internal-types` feature is enabled.
 
- - `Array::copy_inline_data` and `TypedArray::copy_inline_data` are now unsafe and require a reference to a `Frame`. `Array::dimensions`, `Array::inline_data`, `Array::inline_data_mut`, `Array::value_data`, `Array::value_data_mut`, `Array::wrapper_data`, and `Array::wrapper_data_mut` are now unsafe, the same holds true for `TypedArray`. The reason these methods are now unsafe is that it can't be guaranteed that no `Task` running in Julia is currently mutating this data.
+ - `Array::copy_inline_data` and `TypedArray::copy_inline_data` require a reference to a `Frame`.
+
+ - `CopiedArray::splat` returns a boxed slice instead of a `Vec`.
+
+ - `IntoJulia::into_julia` is now a safe method.
+
+ - `Align`, `BitsUnionContainer`, and `Flag` are now sealed traits.
+
+ - All methods of the `Gc` trait are now safe.
+
+ - Mutating Julia data is considered unsafe, as a result `Module::set_global` and related methods are now unsafe. So are all methods that provide mutable access to array data. 

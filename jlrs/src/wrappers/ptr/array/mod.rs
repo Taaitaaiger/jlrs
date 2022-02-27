@@ -72,7 +72,6 @@ use std::{
     fmt::{Debug, Formatter, Result as FmtResult},
     marker::PhantomData,
     mem,
-    mem::MaybeUninit,
     ptr::{null_mut, NonNull},
     slice,
 };
@@ -443,7 +442,7 @@ impl<'data> Array<'_, 'data> {
     /// `dims = (4, 2)` a two-dimensional array with 4 rows and 2 columns is created.
     pub fn from_vec<'target, 'current, T, D, S, F>(
         scope: S,
-        data: Vec<T>,
+        mut data: Vec<T>,
         dims: D,
     ) -> JlrsResult<S::Value>
     where
@@ -457,6 +456,10 @@ impl<'data> Array<'_, 'data> {
                 vec_size: data.len(),
                 dim_size: dims.size(),
             })?;
+        }
+
+        if data.len() != data.capacity() {
+            data.shrink_to_fit();
         }
 
         unsafe {
@@ -479,7 +482,7 @@ impl<'data> Array<'_, 'data> {
                         )
                         .cast();
 
-                        jl_gc_add_ptr_finalizer(get_tls(), array, droparray as *mut c_void);
+                        jl_gc_add_ptr_finalizer(get_tls(), array, droparray::<T> as *mut c_void);
 
                         output
                             .into_scope(frame)
@@ -495,7 +498,7 @@ impl<'data> Array<'_, 'data> {
                         )
                         .cast();
 
-                        jl_gc_add_ptr_finalizer(get_tls(), array, droparray as *mut c_void);
+                        jl_gc_add_ptr_finalizer(get_tls(), array, droparray::<T> as *mut c_void);
 
                         output
                             .into_scope(frame)
@@ -511,7 +514,7 @@ impl<'data> Array<'_, 'data> {
                         )
                         .cast();
 
-                        jl_gc_add_ptr_finalizer(get_tls(), array, droparray as *mut c_void);
+                        jl_gc_add_ptr_finalizer(get_tls(), array, droparray::<T> as *mut c_void);
 
                         output
                             .into_scope(frame)
@@ -550,7 +553,7 @@ impl<'data> Array<'_, 'data> {
 impl<'scope, 'data> Array<'scope, 'data> {
     /// Returns the array's dimensions.
     pub fn dimensions(self) -> ArrayDimensions<'scope> {
-        unsafe { ArrayDimensions::new(self) }
+        ArrayDimensions::new(self)
     }
 
     /// Returns the type of this array's elements.
@@ -665,7 +668,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
             std::ptr::copy_nonoverlapping(jl_data, ptr, sz);
             data.set_len(sz);
 
-            Ok(CopiedArray::new(data, dimensions))
+            Ok(CopiedArray::new(data.into_boxed_slice(), dimensions))
         }
     }
 
@@ -698,7 +701,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     /// Mutably borrow inline array data, you can mutably borrow a single array at a time. Returns
     /// `JlrsError::NotInline` if the data is not stored inline or `JlrsError::WrongType` if the
     /// type of the elements is incorrect.
-    pub fn inline_data_mut<'borrow, 'frame, T, F>(
+    pub unsafe fn inline_data_mut<'borrow, 'frame, T, F>(
         self,
         frame: &'borrow mut F,
     ) -> JlrsResult<InlineArrayDataMut<'borrow, 'scope, 'data, T>>
@@ -719,7 +722,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
             })?;
         }
 
-        unsafe { Ok(InlineArrayDataMut::new(self, frame)) }
+        Ok(InlineArrayDataMut::new(self, frame))
     }
 
     /// Mutably borrow inline array data without the restriction that only a single array can be
@@ -795,7 +798,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
 
     /// Mutably borrow the data of this array of values, you can mutably borrow a single array at
     /// the same time. Returns `JlrsError::Inline` if the data is stored inline.
-    pub fn value_data_mut<'borrow, 'frame, F>(
+    pub unsafe fn value_data_mut<'borrow, 'frame, F>(
         self,
         frame: &'borrow mut F,
     ) -> JlrsResult<ValueArrayDataMut<'borrow, 'scope, 'data>>
@@ -808,12 +811,12 @@ impl<'scope, 'data> Array<'scope, 'data> {
             })?;
         }
 
-        unsafe { Ok(ValueArrayDataMut::new(self, frame)) }
+        Ok(ValueArrayDataMut::new(self, frame))
     }
 
     /// Mutably borrow the data of this array of wrappers, you can mutably borrow a single array
     /// at the same time. Returns `JlrsError::Inline` if the data is stored inline.
-    pub fn wrapper_data_mut<'borrow, 'frame, T, F>(
+    pub unsafe fn wrapper_data_mut<'borrow, 'frame, T, F>(
         self,
         frame: &'borrow mut F,
     ) -> JlrsResult<ValueArrayDataMut<'borrow, 'scope, 'data, T>>
@@ -828,7 +831,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
             })?;
         }
 
-        unsafe { Ok(ValueArrayDataMut::new(self, frame)) }
+        Ok(ValueArrayDataMut::new(self, frame))
     }
 
     /// Mutably borrow the data of this array of values without the restriction that only a single
@@ -899,7 +902,7 @@ impl<'scope> Array<'scope, 'static> {
 
     /// Mutably borrow the data of this array of bits-unions, you can mutably borrow a single
     /// array at a time.
-    pub fn union_data_mut<'borrow, 'frame, F>(
+    pub unsafe fn union_data_mut<'borrow, 'frame, F>(
         self,
         frame: &'borrow mut F,
     ) -> JlrsResult<UnionArrayDataMut<'borrow, 'scope>>
@@ -907,7 +910,7 @@ impl<'scope> Array<'scope, 'static> {
         F: Frame<'frame>,
     {
         if self.is_union_array() {
-            unsafe { Ok(UnionArrayDataMut::new(self, frame)) }
+            Ok(UnionArrayDataMut::new(self, frame))
         } else {
             let elem_ty = self.element_type().display_string_or(CANNOT_DISPLAY_TYPE);
             let inline = !self.is_value_array();
@@ -919,7 +922,7 @@ impl<'scope> Array<'scope, 'static> {
     /// single array can be mutably borrowed.
     ///
     /// Safety: It's your responsibility to ensure you don't create multiple mutable references to
-    /// the same data. 
+    /// the same data.
     pub unsafe fn unrestricted_union_data_mut<'borrow, 'frame, F>(
         self,
         frame: &'borrow F,
@@ -1134,7 +1137,7 @@ impl<'scope, 'data, T> Copy for TypedArray<'scope, 'data, T> where T: Clone + Va
 impl<'scope, 'data, T: Clone + ValidLayout + Debug> TypedArray<'scope, 'data, T> {
     /// Returns the array's dimensions.
     pub fn dimensions(&self) -> ArrayDimensions<'scope> {
-        unsafe { ArrayDimensions::new(self.as_array()) }
+        ArrayDimensions::new(self.as_array())
     }
 
     /// Returns the type of this array's elements.
@@ -1176,15 +1179,15 @@ impl<'scope, 'data, T: Clone + ValidLayout + Debug> TypedArray<'scope, 'data, T>
         unsafe {
             let jl_data = jl_array_data(self.unwrap(Private).cast()).cast();
             let dimensions = self.dimensions().into_dimensions();
-            
-        let sz = dimensions.size();
-        let mut data = Vec::with_capacity(sz);
-        let ptr = data.as_mut_ptr();
-        std::ptr::copy_nonoverlapping(jl_data, ptr, sz);
-        data.set_len(sz);
-        
-        Ok(CopiedArray::new(data, dimensions))
-    }
+
+            let sz = dimensions.size();
+            let mut data = Vec::with_capacity(sz);
+            let ptr = data.as_mut_ptr();
+            std::ptr::copy_nonoverlapping(jl_data, ptr, sz);
+            data.set_len(sz);
+
+            Ok(CopiedArray::new(data.into_boxed_slice(), dimensions))
+        }
     }
 
     /// Immutably borrow inline array data, you can borrow data from multiple arrays at the same
@@ -1209,7 +1212,7 @@ impl<'scope, 'data, T: Clone + ValidLayout + Debug> TypedArray<'scope, 'data, T>
     /// Mutably borrow inline array data, you can mutably borrow a single array at the same time.
     /// Returns `JlrsError::NotInline` if the data is not stored inline or `JlrsError::WrongType`
     /// if the type of the elements is incorrect.
-    pub fn inline_data_mut<'borrow, 'frame, F>(
+    pub unsafe fn inline_data_mut<'borrow, 'frame, F>(
         self,
         frame: &'borrow mut F,
     ) -> JlrsResult<InlineArrayDataMut<'borrow, 'scope, 'data, T>>
@@ -1223,7 +1226,7 @@ impl<'scope, 'data, T: Clone + ValidLayout + Debug> TypedArray<'scope, 'data, T>
             })?;
         }
 
-        unsafe { Ok(InlineArrayDataMut::new(self.as_array(), frame)) }
+        Ok(InlineArrayDataMut::new(self.as_array(), frame))
     }
 
     /// Mutably borrow inline array data without the restriction that only a single array can be
@@ -1232,7 +1235,8 @@ impl<'scope, 'data, T: Clone + ValidLayout + Debug> TypedArray<'scope, 'data, T>
     /// Returns `JlrsError::NotInline` if the data is not stored inline or `JlrsError::WrongType`
     /// if the type of the elements is incorrect.
     ///
-    /// Safety: No `Task` must be running in Julia that can mutate the array data.
+    /// Safety: It's your responsibility to ensure you don't create multiple mutable
+    /// references to the same data.
     pub unsafe fn unrestricted_inline_data_mut<'borrow, 'frame, F>(
         self,
         frame: &'borrow F,
@@ -1282,32 +1286,33 @@ impl<'scope, 'data, T: Wrapper<'scope, 'data> + ValidLayout> TypedArray<'scope, 
 
     /// Mutably borrow the data of this array as an array of values, you can mutably borrow a
     /// single array at the same time.
-    pub fn value_data_mut<'borrow, 'frame, F>(
+    pub unsafe fn value_data_mut<'borrow, 'frame, F>(
         self,
         frame: &'borrow mut F,
     ) -> ValueArrayDataMut<'borrow, 'scope, 'data>
     where
         F: Frame<'frame>,
     {
-        unsafe { ValueArrayDataMut::new(self.as_array(), frame) }
+        ValueArrayDataMut::new(self.as_array(), frame)
     }
 
     /// Mutably borrow the data of this array of wrappers, you can mutably borrow a single array
     /// at the same time.
-    pub fn wrapper_data_mut<'borrow, 'frame, F>(
+    pub unsafe fn wrapper_data_mut<'borrow, 'frame, F>(
         self,
         frame: &'borrow mut F,
     ) -> ValueArrayDataMut<'borrow, 'scope, 'data, T>
     where
         F: Frame<'frame>,
     {
-        unsafe { ValueArrayDataMut::new(self.as_array(), frame) }
+        ValueArrayDataMut::new(self.as_array(), frame)
     }
 
     /// Mutably borrow the data of this array as an array of values without the restriction that
     /// only a single array can be mutably borrowed.
     ///
-    /// Safety: No `Task` must be running in Julia that can mutate the array data.
+    /// Safety: It's your responsibility to ensure you don't create multiple mutable
+    /// references to the same data.
     pub unsafe fn unrestricted_value_data_mut<'borrow, 'frame, F>(
         self,
         frame: &'borrow F,
@@ -1324,7 +1329,8 @@ impl<'scope, 'data, T: Wrapper<'scope, 'data> + ValidLayout> TypedArray<'scope, 
     /// Mutably borrow the data of this array of wrappers without the restriction that only a
     /// single array can be mutably borrowed.
     ///
-    /// Safety: No `Task` must be running in Julia that can mutate the array data.
+    /// Safety: It's your responsibility to ensure you don't create multiple mutable
+    /// references to the same data.
     pub unsafe fn unrestricted_wrapper_data_mut<'borrow, 'frame, F>(
         self,
         frame: &'borrow F,
@@ -1545,7 +1551,7 @@ where
     Ok(v)
 }
 
-unsafe extern "C" fn droparray(a: Array) {
+unsafe extern "C" fn droparray<T>(a: Array) {
     // The data of a moved array is allocated by Rust, this function is called by
     // a finalizer in order to ensure it's also freed by Rust.
     let mut arr_nn_ptr = a.unwrap_non_null(Private);
@@ -1556,7 +1562,7 @@ unsafe extern "C" fn droparray(a: Array) {
     }
 
     // Set data to null pointer
-    let data_ptr = arr_ref.data.cast::<MaybeUninit<u8>>();
+    let data_ptr = arr_ref.data.cast::<T>();
     arr_ref.data = null_mut();
 
     // Set all dims to 0
@@ -1568,7 +1574,6 @@ unsafe extern "C" fn droparray(a: Array) {
     }
 
     // Drop the data
-    let n_els = arr_ref.elsize as usize * arr_ref.length;
-    let data = Vec::from_raw_parts(data_ptr, n_els, n_els);
+    let data = Vec::from_raw_parts(data_ptr, arr_ref.length, arr_ref.length);
     mem::drop(data);
 }

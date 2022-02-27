@@ -185,7 +185,7 @@ impl<'scope> Module<'scope> {
     /// make the old value unreachable. If an excection is thrown, it's caught, rooted and
     /// returned.
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub fn set_global<'frame, N, F>(
+    pub unsafe fn set_global<'frame, N, F>(
         self,
         frame: &mut F,
         name: N,
@@ -195,25 +195,23 @@ impl<'scope> Module<'scope> {
         N: ToSymbol,
         F: Frame<'frame>,
     {
-        unsafe {
-            let symbol = name.to_symbol_priv(Private);
+        let symbol = name.to_symbol_priv(Private);
 
-            let res = jlrs_set_global(
-                self.unwrap(Private),
-                symbol.unwrap(Private),
-                value.unwrap(Private),
-            );
+        let res = jlrs_set_global(
+            self.unwrap(Private),
+            symbol.unwrap(Private),
+            value.unwrap(Private),
+        );
 
-            let data = res.data;
+        let data = res.data;
 
-            if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
-                let v = frame
-                    .push_root(NonNull::new_unchecked(data), Private)
-                    .map_err(|e| JlrsError::AllocError(e))?;
-                Ok(Err(v))
-            } else {
-                Ok(Ok(ValueRef::wrap(data)))
-            }
+        if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
+            let v = frame
+                .push_root(NonNull::new_unchecked(data), Private)
+                .map_err(|e| JlrsError::AllocError(e))?;
+            Ok(Err(v))
+        } else {
+            Ok(Ok(ValueRef::wrap(data)))
         }
     }
 
@@ -221,7 +219,7 @@ impl<'scope> Module<'scope> {
     /// make the old value unreachable. If an exception is thrown it's caught but not rooted and
     /// returned.
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub fn set_global_unrooted<N>(
+    pub unsafe fn set_global_unrooted<N>(
         self,
         name: N,
         value: Value<'_, 'static>,
@@ -229,28 +227,26 @@ impl<'scope> Module<'scope> {
     where
         N: ToSymbol,
     {
-        unsafe {
-            let symbol = name.to_symbol_priv(Private);
+        let symbol = name.to_symbol_priv(Private);
 
-            let res = jlrs_set_global(
-                self.unwrap(Private),
-                symbol.unwrap(Private),
-                value.unwrap(Private),
-            );
+        let res = jlrs_set_global(
+            self.unwrap(Private),
+            symbol.unwrap(Private),
+            value.unwrap(Private),
+        );
 
-            let data = res.data;
+        let data = res.data;
 
-            if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
-                Err(ValueRef::wrap(data))
-            } else {
-                Ok(ValueRef::wrap(data))
-            }
+        if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
+            Err(ValueRef::wrap(data))
+        } else {
+            Ok(ValueRef::wrap(data))
         }
     }
 
     /// Set a global value in this module. Note that if this global already exists, this can
     /// make the old value unreachable. If an exception is thrown the process aborts.
-    pub fn set_global_unchecked<N>(
+    pub unsafe fn set_global_unchecked<N>(
         self,
         name: N,
         value: Value<'_, 'static>,
@@ -258,17 +254,15 @@ impl<'scope> Module<'scope> {
     where
         N: ToSymbol,
     {
-        unsafe {
-            let symbol = name.to_symbol_priv(Private);
+        let symbol = name.to_symbol_priv(Private);
 
-            jl_set_global(
-                self.unwrap(Private),
-                symbol.unwrap(Private),
-                value.unwrap(Private),
-            );
+        jl_set_global(
+            self.unwrap(Private),
+            symbol.unwrap(Private),
+            value.unwrap(Private),
+        );
 
-            ValueRef::wrap(value.unwrap(Private))
-        }
+        ValueRef::wrap(value.unwrap(Private))
     }
 
     /// Set a constant in this module. If Julia throws an exception it's caught and rooted in the
@@ -505,7 +499,11 @@ impl<'scope> Module<'scope> {
                 .function_ref("require")
                 .unwrap()
                 .wrapper_unchecked()
-                .call2(scope, self.as_value(), module.to_symbol_priv(Private).as_value())
+                .call2(
+                    scope,
+                    self.as_value(),
+                    module.to_symbol_priv(Private).as_value(),
+                )
         }
     }
 
@@ -517,7 +515,7 @@ impl<'scope> Module<'scope> {
     ///
     /// Note that when you want to call `using Submodule` in the `Main` module, you can do so by
     /// evaluating the using-statement with [`Value::eval_string`].
-    pub fn require_ref<S>(self, global: Global<'scope>, module: S) -> ModuleRef<'scope>
+    pub fn require_unrooted<S>(self, global: Global<'scope>, module: S) -> ModuleRef<'scope>
     where
         S: ToSymbol,
     {
@@ -531,7 +529,10 @@ impl<'scope> Module<'scope> {
                     self.as_value(),
                     module.to_symbol_priv(Private).as_value(),
                 )
-                .expect(&format!("Could not load ${:?}", module.to_symbol_priv(Private)))
+                .expect(&format!(
+                    "Could not load ${:?}",
+                    module.to_symbol_priv(Private)
+                ))
                 .wrapper_unchecked()
                 .cast_unchecked::<Module>()
                 .as_ref()

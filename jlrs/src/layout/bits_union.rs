@@ -15,22 +15,38 @@
 //! field, which contains the data of the bits-union, is aligned correctly. `BitsUnionContainer`
 //! and `Flag` are essentially marker traits that are used by jlrs-derive to implement
 //! `ValidLayout` correctly.
-use std::fmt::Debug;
 
 /// Trait implemented by the aligning structs, which ensure bits unions are properly aligned.
 /// Used in combination with `BitsUnionContainer` and `Flag` to ensure bits unions are inserted
 /// correctly.
-pub unsafe trait Align: Copy + Debug {
+pub unsafe trait Align: private::Align {
     /// The alignment in bytes
     const ALIGNMENT: usize;
 }
 
 /// Trait implemented by structs that can contain the data of a bits union. Used in combination
 /// with `Align` and `Flag` to ensure bits unions are inserted correctly.
-pub unsafe trait BitsUnionContainer: Copy + Debug {}
+pub unsafe trait BitsUnionContainer: private::BitsUnionContainer {}
 
 /// Trait implemented by structs that can contain the flag of a bits union. Used in combination
 /// with `Align` and `BitsUnionContainer` to ensure bits unions are inserted correctly.
-pub unsafe trait Flag: Copy + Debug {}
-
+pub unsafe trait Flag: private::Flag {}
 unsafe impl Flag for u8 {}
+
+mod private {
+    use crate::wrappers::inline::union::{Align1, Align16, Align2, Align4, Align8, BitsUnion};
+    use std::fmt::Debug;
+
+    pub trait Align: Copy + Debug {}
+    impl Align for Align1 {}
+    impl Align for Align2 {}
+    impl Align for Align4 {}
+    impl Align for Align8 {}
+    impl Align for Align16 {}
+
+    pub trait BitsUnionContainer: Copy + Debug {}
+    impl<const N: usize> BitsUnionContainer for BitsUnion<N> {}
+
+    pub trait Flag: Copy + Debug {}
+    impl Flag for u8 {}
+}

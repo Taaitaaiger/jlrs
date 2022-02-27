@@ -555,7 +555,7 @@ mod impl_async_std {
         /// Include a Julia file. This method waits until the call to `Main.include` in Julia has been
         /// completed. It returns an error if the path doesn't exist or the call to `Main.include`
         /// throws an exception.
-        pub async fn include<P: AsRef<Path>>(&self, path: P) -> JlrsResult<()> {
+        pub async unsafe fn include<P: AsRef<Path>>(&self, path: P) -> JlrsResult<()> {
             if !path.as_ref().exists() {
                 Err(JlrsError::IncludeNotFound {
                     path: path.as_ref().to_string_lossy().into(),
@@ -574,7 +574,7 @@ mod impl_async_std {
         /// Include a Julia file. This method waits until the call `Main.include` in Julia has been
         /// completed. It returns an error if the path doesn't  exist, the channel is full, or the
         /// call to `Main.include` throws an exception.
-        pub fn try_include<P: AsRef<Path>>(&self, path: P) -> JlrsResult<()> {
+        pub unsafe fn try_include<P: AsRef<Path>>(&self, path: P) -> JlrsResult<()> {
             if !path.as_ref().exists() {
                 Err(JlrsError::IncludeNotFound {
                     path: path.as_ref().to_string_lossy().into(),
@@ -1442,7 +1442,7 @@ pub mod impl_tokio {
         /// Include a Julia file. This method waits until the call to `Main.include` in Julia has been
         /// completed. It returns an error if the path doesn't exist or the call to `Main.include`
         /// throws an exception.
-        pub async fn include<P: AsRef<Path>>(&self, path: P) -> JlrsResult<()> {
+        pub async unsafe fn include<P: AsRef<Path>>(&self, path: P) -> JlrsResult<()> {
             if !path.as_ref().exists() {
                 Err(JlrsError::IncludeNotFound {
                     path: path.as_ref().to_string_lossy().into(),
@@ -1461,7 +1461,7 @@ pub mod impl_tokio {
         /// Include a Julia file. This method waits until the call `Main.include` in Julia has been
         /// completed. It returns an error if the path doesn't  exist, the channel is full, or the
         /// call to `Main.include` throws an exception.
-        pub fn try_include<P: AsRef<Path>>(&self, path: P) -> JlrsResult<()> {
+        pub unsafe fn try_include<P: AsRef<Path>>(&self, path: P) -> JlrsResult<()> {
             if !path.as_ref().exists() {
                 Err(JlrsError::IncludeNotFound {
                     path: path.as_ref().to_string_lossy().into(),

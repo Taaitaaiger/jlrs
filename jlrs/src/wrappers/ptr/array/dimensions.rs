@@ -85,19 +85,22 @@ pub struct ArrayDimensions<'scope> {
 }
 
 impl<'scope> ArrayDimensions<'scope> {
-    pub(crate) unsafe fn new(array: Array<'scope, '_>) -> Self {
-        let array_ptr = array.unwrap(Private);
-        let ptr = jl_array_dims_ptr(array_ptr);
-        let n = jl_array_ndims(array_ptr) as usize;
-        ArrayDimensions {
-            ptr,
-            n,
-            _marker: PhantomData,
+    pub(crate) fn new(array: Array<'scope, '_>) -> Self {
+        unsafe {
+            let array_ptr = array.unwrap(Private);
+            let ptr = jl_array_dims_ptr(array_ptr);
+            let n = jl_array_ndims(array_ptr) as usize;
+
+            ArrayDimensions {
+                ptr,
+                n,
+                _marker: PhantomData,
+            }
         }
     }
 
-    pub unsafe fn as_slice<'a>(&'a self) -> &'a [usize] {
-        std::slice::from_raw_parts(self.ptr, self.n)
+    pub fn as_slice<'a>(&'a self) -> &'a [usize] {
+        unsafe { std::slice::from_raw_parts(self.ptr, self.n) }
     }
 }
 

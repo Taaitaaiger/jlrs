@@ -13,10 +13,8 @@ mod tests {
                 let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?;
                 let arr = arr_val.cast::<Array>()?;
 
-                let data = unsafe { arr.inline_data::<f32, _>(frame)? };
-                unsafe {
-                    assert_eq!(data.dimensions().as_slice(), &[1, 2]);
-                }
+                let data = arr.inline_data::<f32, _>(frame)?;
+                assert_eq!(data.dimensions().as_slice(), &[1, 2]);
 
                 Ok(())
             })
@@ -34,7 +32,7 @@ mod tests {
                 let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?;
                 let arr = arr_val.cast::<Array>()?;
 
-                let data = unsafe { arr.inline_data::<f32, _>(frame)? };
+                let data = arr.inline_data::<f32, _>(frame)?;
                 let cloned_data = data.clone();
                 assert_eq!(data[(0, 0)], cloned_data[(0, 0)]);
                 assert_eq!(data[(0, 1)], cloned_data[(0, 1)]);
@@ -55,7 +53,7 @@ mod tests {
                 let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?;
                 let arr = arr_val.cast::<Array>()?;
 
-                let data = unsafe { arr.inline_data::<f32, _>(frame)? };
+                let data = arr.inline_data::<f32, _>(frame)?;
                 assert_eq!(data[(0, 1)], *data.get((0, 1)).unwrap());
 
                 Ok(())
@@ -74,7 +72,7 @@ mod tests {
                 let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?;
                 let arr = arr_val.cast::<Array>()?;
 
-                let data = unsafe { arr.inline_data::<f32, _>(frame)? };
+                let data = arr.inline_data::<f32, _>(frame)?;
                 let slice = data.as_slice();
                 assert_eq!(slice, &[1.0f32, 2.0f32]);
 
@@ -94,7 +92,7 @@ mod tests {
                 let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?;
                 let arr = arr_val.cast::<Array>()?;
 
-                let data = unsafe { arr.inline_data::<f32, _>(frame)? };
+                let data = arr.inline_data::<f32, _>(frame)?;
                 let slice = data.into_slice();
                 assert_eq!(slice, &[1.0f32, 2.0f32]);
 
@@ -109,16 +107,13 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |_, frame| {
+            jlrs.scope_with_slots(1, |_, frame| unsafe {
                 let data = vec![1.0f32, 2.0f32];
                 let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?;
                 let arr = arr_val.cast::<Array>()?;
 
-                let data = unsafe { arr.inline_data_mut::<f32, _>(frame)? };
-                unsafe {
-                    assert_eq!(data.dimensions().as_slice(), &[1, 2]);
-                }
-
+                let data = arr.inline_data_mut::<f32, _>(frame)?;
+                assert_eq!(data.dimensions().as_slice(), &[1, 2]);
                 Ok(())
             })
             .unwrap();
@@ -130,12 +125,12 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |_, frame| {
+            jlrs.scope_with_slots(1, |_, frame| unsafe {
                 let data = vec![1.0f32, 2.0f32];
                 let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?;
                 let arr = arr_val.cast::<Array>()?;
 
-                let mut data = unsafe { arr.inline_data_mut::<f32, _>(frame)? };
+                let mut data = arr.inline_data_mut::<f32, _>(frame)?;
                 data[(0, 0)] = 3.0;
                 assert_eq!(data[(0, 0)], 3.0f32);
                 assert_eq!(data[(0, 0)], *data.get((0, 0)).unwrap());
@@ -155,12 +150,12 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |_, frame| {
+            jlrs.scope_with_slots(1, |_, frame| unsafe {
                 let data = vec![1.0f32, 2.0f32];
                 let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?;
                 let arr = arr_val.cast::<Array>()?;
 
-                let data = unsafe { arr.inline_data_mut::<f32, _>(frame)? };
+                let data = arr.inline_data_mut::<f32, _>(frame)?;
                 let slice = data.as_slice();
                 assert_eq!(slice, &[1.0f32, 2.0f32]);
 
@@ -175,12 +170,12 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |_, frame| {
+            jlrs.scope_with_slots(1, |_, frame| unsafe {
                 let data = vec![1.0f32, 2.0f32];
                 let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?;
                 let arr = arr_val.cast::<Array>()?;
 
-                let mut data = unsafe { arr.inline_data_mut::<f32, _>(frame)? };
+                let mut data = arr.inline_data_mut::<f32, _>(frame)?;
                 let slice = data.as_mut_slice();
                 slice[0] = 3.0;
                 assert_eq!(slice, &[3.0f32, 2.0f32]);
@@ -195,12 +190,12 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |_, frame| {
+            jlrs.scope_with_slots(1, |_, frame| unsafe {
                 let data = vec![1.0f32, 2.0f32];
                 let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?;
                 let arr = arr_val.cast::<Array>()?;
 
-                let data = unsafe { arr.inline_data_mut::<f32, _>(frame)? };
+                let data = arr.inline_data_mut::<f32, _>(frame)?;
                 let slice = data.into_slice();
                 assert_eq!(slice, &[1.0f32, 2.0f32]);
 
@@ -215,12 +210,12 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |_, frame| {
+            jlrs.scope_with_slots(1, |_, frame| unsafe {
                 let data = vec![1.0f32, 2.0f32];
                 let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?;
                 let arr = arr_val.cast::<Array>()?;
 
-                let data = unsafe { arr.inline_data_mut::<f32, _>(frame)? };
+                let data = arr.inline_data_mut::<f32, _>(frame)?;
                 let slice = data.into_mut_slice();
                 slice[0] = 3.0;
                 assert_eq!(slice, &[3.0f32, 2.0f32]);

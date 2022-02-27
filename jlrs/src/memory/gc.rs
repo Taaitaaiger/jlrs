@@ -16,8 +16,8 @@ pub enum GcCollection {
 /// This trait is used to enable and disable the garbage collector and to force a collection.
 pub trait Gc: private::Gc {
     /// Enable or disable the GC.
-    unsafe fn enable_gc(&mut self, on: bool) -> bool {
-        jl_gc_enable(on as i32) == 1
+    fn enable_gc(&mut self, on: bool) -> bool {
+        unsafe { jl_gc_enable(on as i32) == 1 }
     }
 
     /// Returns `true` if the GC is enabled.
@@ -26,13 +26,15 @@ pub trait Gc: private::Gc {
     }
 
     /// Force a collection.
-    unsafe fn gc_collect(&mut self, mode: GcCollection) {
-        jl_gc_collect(mode as jl_gc_collection_t)
+    fn gc_collect(&mut self, mode: GcCollection) {
+        unsafe { jl_gc_collect(mode as jl_gc_collection_t) }
     }
 
     /// Insert a safepoint, a point where the garbage collector may run.
-    unsafe fn gc_safepoint(&mut self) {
-        jl_gc_safepoint();
+    fn gc_safepoint(&mut self) {
+        unsafe {
+            jl_gc_safepoint();
+        }
     }
 }
 

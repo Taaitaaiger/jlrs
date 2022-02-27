@@ -44,17 +44,19 @@ pub unsafe trait IntoJulia: Sized + 'static {
 
     #[doc(hidden)]
     #[inline(always)]
-    unsafe fn into_julia<'scope>(self, global: Global<'scope>) -> ValueRef<'scope, 'static> {
-        let ty = Self::julia_type(global)
-            .wrapper()
-            .expect("DataTypeRef::wrapper returned None");
+    fn into_julia<'scope>(self, global: Global<'scope>) -> ValueRef<'scope, 'static> {
+        unsafe {
+            let ty = Self::julia_type(global)
+                .wrapper()
+                .expect("DataTypeRef::wrapper returned None");
 
-        debug_assert!(ty.is_bits());
+            debug_assert!(ty.is_bits());
 
-        let container = jl_new_struct_uninit(ty.unwrap(Private));
-        container.cast::<Self>().write(self);
+            let container = jl_new_struct_uninit(ty.unwrap(Private));
+            container.cast::<Self>().write(self);
 
-        ValueRef::wrap(container)
+            ValueRef::wrap(container)
+        }
     }
 }
 
@@ -67,11 +69,11 @@ macro_rules! impl_into_julia {
             }
 
             #[inline(always)]
-            unsafe fn into_julia<'scope>(
+            fn into_julia<'scope>(
                 self,
                 _: Global<'scope>,
             ) -> $crate::wrappers::ptr::ValueRef<'scope, 'static> {
-                $crate::wrappers::ptr::ValueRef::wrap($boxer(self as _))
+                unsafe { $crate::wrappers::ptr::ValueRef::wrap($boxer(self as _)) }
             }
         }
     };

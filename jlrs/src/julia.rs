@@ -137,18 +137,20 @@ impl Julia {
     /// Calls `include` in the `Main` module in Julia, which executes the file's contents in that
     /// module. This has the same effect as calling `include` in the Julia REPL.
     ///
+    /// This is unsafe because the contents of the file are evaluated.
+    ///
     /// Example:
     ///
     /// ```no_run
     /// # use jlrs::prelude::*;
     /// # fn main() {
     /// # let mut julia = unsafe { Julia::init().unwrap() };
-    /// julia.include("Path/To/MyJuliaCode.jl").unwrap();
+    /// unsafe { julia.include("Path/To/MyJuliaCode.jl").unwrap(); }
     /// # }
     /// ```
-    pub fn include<P: AsRef<Path>>(&mut self, path: P) -> JlrsResult<()> {
+    pub unsafe fn include<P: AsRef<Path>>(&mut self, path: P) -> JlrsResult<()> {
         if path.as_ref().exists() {
-            return self.scope(|global, frame| unsafe {
+            return self.scope(|global, frame| {
                 let path_jl_str = JuliaString::new(&mut *frame, path.as_ref().to_string_lossy())?;
                 let include_func = Module::main(global)
                     .function_ref("include")?

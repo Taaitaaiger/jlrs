@@ -15,10 +15,8 @@ pub struct ReusableSlot<'scope>(*mut *mut c_void, PhantomData<&'scope ()>);
 
 impl<'scope> ReusableSlot<'scope> {
     pub(crate) fn new<F: Frame<'scope>>(frame: &mut F) -> JlrsResult<Self> {
-        unsafe {
-            let slot = frame.reserve_slot(Private)?;
-            Ok(ReusableSlot(slot, PhantomData))
-        }
+        let slot = frame.reserve_slot(Private)?;
+        Ok(ReusableSlot(slot, PhantomData))
     }
 
     /// Root the given value in this slot.

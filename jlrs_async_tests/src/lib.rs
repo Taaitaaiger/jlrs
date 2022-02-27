@@ -818,7 +818,7 @@ mod example {
         thread_local! {
             pub static JULIA: RefCell<AsyncJulia> = {
                 let r = RefCell::new(unsafe {  AsyncJulia::init(4, 16, Duration::from_millis(1)).expect("Could not init Julia").0 });
-                r.borrow_mut().try_include("MyModule.jl").unwrap();
+                unsafe {r.borrow_mut().try_include("MyModule.jl").unwrap();}
                 r
             };
         }

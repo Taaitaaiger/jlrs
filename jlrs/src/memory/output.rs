@@ -59,7 +59,7 @@ impl<'scope, 'frame, 'borrow, F: Frame<'frame>> OutputScope<'scope, 'frame, 'bor
             &'inner mut GcFrame<'nested, F::Mode>,
         ) -> JlrsResult<OutputValue<'scope, 'data, 'inner>>,
     {
-        let mut frame = unsafe { self.0.nest(0, Private) };
+        let mut frame = self.0.nest(0, Private);
         let out = Output::new();
         func(out, &mut frame).map(|pv| OutputValue::wrap_non_null(pv.unwrap_non_null()))
     }
@@ -75,7 +75,7 @@ impl<'scope, 'frame, 'borrow, F: Frame<'frame>> OutputScope<'scope, 'frame, 'bor
             &'inner mut GcFrame<'nested, F::Mode>,
         ) -> JlrsResult<OutputValue<'scope, 'data, 'inner>>,
     {
-        let mut frame = unsafe { self.0.nest(capacity, Private) };
+        let mut frame = self.0.nest(capacity, Private);
         let out = Output::new();
         func(out, &mut frame).map(|pv| OutputValue::wrap_non_null(pv.unwrap_non_null()))
     }
@@ -90,7 +90,7 @@ impl<'scope, 'frame, 'borrow, F: Frame<'frame>> OutputScope<'scope, 'frame, 'bor
             &'inner mut GcFrame<'nested, F::Mode>,
         ) -> JlrsResult<OutputResult<'scope, 'data, 'inner>>,
     {
-        let mut frame = unsafe { self.0.nest(0, Private) };
+        let mut frame = self.0.nest(0, Private);
         let out = Output::new();
         func(out, &mut frame).map(|pv| match pv {
             OutputResult::Ok(pv) => {
@@ -113,7 +113,7 @@ impl<'scope, 'frame, 'borrow, F: Frame<'frame>> OutputScope<'scope, 'frame, 'bor
             &'inner mut GcFrame<'nested, F::Mode>,
         ) -> JlrsResult<OutputResult<'scope, 'data, 'inner>>,
     {
-        let mut frame = unsafe { self.0.nest(capacity, Private) };
+        let mut frame = self.0.nest(capacity, Private);
         let out = Output::new();
         func(out, &mut frame).map(|pv| match pv {
             OutputResult::Ok(pv) => {

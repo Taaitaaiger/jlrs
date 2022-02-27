@@ -61,7 +61,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |_, frame| unsafe {
+            jlrs.scope_with_slots(1, |_, frame| {
                 let arr_val =
                     Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?.into_jlrs_result()?;
                 let arr = arr_val.cast::<Array>()?;
@@ -119,7 +119,7 @@ mod tests {
 
             let out = jlrs.scope_with_slots(1, |_, frame| {
                 let array = Array::new::<f32, _, _, _>(&mut *frame, (3, 1))?.into_jlrs_result()?;
-                unsafe { array.cast::<Array>()?.copy_inline_data::<u8, _>(frame) }
+                array.cast::<Array>()?.copy_inline_data::<u8, _>(frame)
             });
 
             assert!(out.is_err());
@@ -184,12 +184,12 @@ mod tests {
 
             jlrs.scope_with_slots(0, |global, frame| {
                 let arr_val = Value::an_empty_vec_any(global);
-                unsafe {
-                    assert!(arr_val
-                        .cast::<Array>()?
-                        .copy_inline_data::<Value, _>(frame)
-                        .is_err());
-                }
+
+                assert!(arr_val
+                    .cast::<Array>()?
+                    .copy_inline_data::<Value, _>(frame)
+                    .is_err());
+
                 Ok(())
             })
             .unwrap();
@@ -201,7 +201,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(0, |global, frame| unsafe {
+            jlrs.scope_with_slots(0, |global, frame| {
                 let arr_val = Value::an_empty_vec_any(global);
                 assert!(arr_val
                     .cast::<Array>()?
@@ -269,7 +269,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |_, frame| unsafe {
+            jlrs.scope_with_slots(1, |_, frame| {
                 let arr_val =
                     Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?.into_jlrs_result()?;
                 assert!(arr_val.cast::<Array>()?.value_data(&mut *frame).is_err());
