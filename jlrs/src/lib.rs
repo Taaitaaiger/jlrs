@@ -633,8 +633,6 @@ pub mod layout;
 pub mod memory;
 pub mod prelude;
 pub(crate) mod private;
-#[cfg(feature = "docs")]
-pub mod safety;
 #[doc(hidden)]
 #[cfg(feature = "sync-rt")]
 pub mod util;
