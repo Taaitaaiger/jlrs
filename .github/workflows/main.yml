@@ -107,8 +107,9 @@ jobs:
           override: true
 
       - name: Run tests
+        shell: bash
         run: |
-          julia_dir=$(where julia)
+          julia_dir=$(which julia)
           current_dir=$(pwd)
           
           cp ${current_dir}\jl_sys\def\lts\* ${julia_dir}\bin
