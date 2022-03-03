@@ -1,6 +1,6 @@
 [package]
 name = "jlrs"
-version = "0.13.0"
+version = "0.13.1"
 authors = ["Thomas van Doornmalen <thomas.vandoornmalen@gmail.com>"]
 description = """
 jlrs provides bindings to the Julia C API that enables Julia code to be called from Rust and more.
@@ -35,7 +35,7 @@ lts = ["jl-sys/lts"]
 use-bindgen = ["jl-sys/use-bindgen"]
 
 [dependencies]
-jl-sys = {version = "0.14", path = "../jl_sys" }
+jl-sys = {version = "0.15", path = "../jl_sys" }
 smallvec = "1"
 jlrs-derive = { version = "0.3", optional = true, path = "../jlrs_derive" }
 futures = { version = "0.3", optional = true }
