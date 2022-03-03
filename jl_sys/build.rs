@@ -86,13 +86,37 @@ fn flags() -> String {
     }
 }
 
-#[cfg(target_os = "windows")]
+#[cfg(all(target_os = "windows", target_env = "msvc"))]
+fn flags() -> String {
+    match find_julia() {
+        Some(julia_dir) => {
+            let jl_include_path = format!("{}/include/julia/", &julia_dir);
+            println!("cargo:rustc-link-search={}/bin", &julia_dir);
+
+            if env::var("CARGO_FEATURE_DEBUG").is_ok() {
+                println!("cargo:rustc-link-lib=julia-debug");
+            } else {
+                println!("cargo:rustc-link-lib=libjulia");
+            }
+
+            println!("cargo:rustc-link-lib=libopenlibm");
+
+            if env::var("CARGO_FEATURE_UV").is_ok() {
+                println!("cargo:rustc-link-lib=libuv-2");
+            }
+
+            jl_include_path
+        }
+        None => panic!("Unable to set compiler flags: JULIA_DIR is not set and no installed version of Julia can be found"),
+    }
+}
+
+#[cfg(all(target_os = "windows", target_env = "gnu"))]
 fn flags() -> String {
     match find_julia() {
         Some(julia_dir) => {
             let jl_include_path = format!("{}/include/julia/", julia_dir);
-            let jl_lib_path = format!("-L{}/bin/", julia_dir);
-            println!("cargo:rustc-flags={}", &jl_lib_path);
+            println!("cargo:rustc-link-search={}/bin", &julia_dir);
 
             if env::var("CARGO_FEATURE_DEBUG").is_ok() {
                 println!("cargo:rustc-link-lib=julia-debug");
@@ -118,19 +142,19 @@ fn main() {
         return;
     }
 
-    println!("cargo:rerun-if-changed=src/jlrs_c.c");
-    println!("cargo:rerun-if-changed=src/jlrs_c.h");
+    println!("cargo:rerun-if-changed=src/jlrs_cc.cc");
+    println!("cargo:rerun-if-changed=src/jlrs_cc.h");
     println!("cargo:rerun-if-env-changed=JULIA_DIR");
 
     let include_dir = flags();
 
     let mut c = cc::Build::new();
-    c.file("src/jlrs_c.c").include(&include_dir);
+    c.file("src/jlrs_cc.cc").include(&include_dir).cpp(true);
 
     #[cfg(all(feature = "lts", target_os = "windows"))]
     c.define("JLRS_WINDOWS_LTS", None);
 
-    c.compile("jlrs_c");
+    c.compile("jlrs_cc");
 
     #[cfg(feature = "use-bindgen")]
     {
