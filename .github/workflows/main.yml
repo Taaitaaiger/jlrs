@@ -95,11 +95,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Setup Julia environment
-        uses: julia-actions/setup-julia@v1
-        with:
-          version: '1.7'
-
       - name: rust-toolchain
         uses: actions-rs/toolchain@v1
         with:
@@ -109,16 +104,15 @@ jobs:
       - name: Run tests
         shell: bash
         run: |
-          julia_dir=$(which julia)
-          current_dir=$(pwd)
-          
-          cp ${current_dir}\jl_sys\def\lts\* ${julia_dir}\bin
-          cd ${julia_dir}\bin
+          wget https://julialang-s3.julialang.org/bin/winnt/x64/1.7/julia-1.7.2-win64.zip
+          unzip julia-1.7.2-win64.zip
+          cp ./jl_sys/def/stable/* ./Julia-1.7.2/bin
+          cd ./Julia-1.7.2/bin
           lib /def:libjulia.def /out:libjulia.lib /machine:x64
           lib /def:libopenlibm.def /out:libopenlibm.lib /machine:x64
           lib /def:libuv-2.def /out:libuv-2.lib /machine:x64
-          cd $current_dir
-          
+          cd ../..
+          echo "./Julia-1.7.2/bin" >> $GITHUB_PATH
           cargo test --features tokio-rt,jlrs-ndarray,f16,jlrs-derive,sync-rt,ccall --verbose -- --test-threads=1
 
       - name: Run async-std async tests
