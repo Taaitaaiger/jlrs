@@ -9,7 +9,7 @@ mod tests {
     fn eval_string(string: &str, with_result: impl for<'f> FnOnce(JuliaResult<'f, 'static>)) {
         JULIA.with(|j| unsafe {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(1, |_global, frame| {
+            jlrs.scope_with_capacity(1, |_global, frame| {
                 with_result(Value::eval_string(&mut *frame, string)?);
                 Ok(())
             })
@@ -51,7 +51,7 @@ mod tests {
         });
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(4, |global, frame| unsafe {
+            jlrs.scope_with_capacity(4, |global, frame| unsafe {
                 let func = Module::main(global)
                     .function_ref("increase")?
                     .wrapper_unchecked();

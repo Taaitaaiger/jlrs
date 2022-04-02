@@ -11,11 +11,9 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |_, frame| {
-                let arr_val =
-                    Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?.into_jlrs_result()?;
-                let arr = arr_val.cast::<Array>();
-                assert!(arr.is_ok());
+            jlrs.scope_with_capacity(1, |_, frame| {
+                let arr_val = Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?.into_jlrs_result();
+                assert!(arr_val.is_ok());
                 Ok(())
             })
             .unwrap();
@@ -27,7 +25,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |_global, frame| unsafe {
+            jlrs.scope_with_capacity(1, |_global, frame| unsafe {
                 let arr_val = Value::eval_string(
                     &mut *frame,
                     "a = Vector{Union{Int32, Float32, Bool}}()
@@ -61,10 +59,10 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |_, frame| {
+            jlrs.scope_with_capacity(1, |_, frame| {
                 let arr_val =
                     Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?.into_jlrs_result()?;
-                let arr = arr_val.cast::<Array>()?;
+                let arr = arr_val;
                 let dims = arr.dimensions().into_dimensions();
                 assert_eq!(dims.as_slice(), &[1, 2]);
                 Ok(())
@@ -78,14 +76,14 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |_, frame| {
+            jlrs.scope_with_capacity(1, |_, frame| {
                 let arr_val =
                     Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?.into_jlrs_result()?;
-                let arr = arr_val.cast::<Array>()?;
+                let arr = arr_val;
                 assert!(arr.contains::<f32>());
                 assert!(arr.contains_inline::<f32>());
-                assert!(arr.as_typed_array::<f32>().is_ok());
-                assert!(arr.as_typed_array::<f64>().is_err());
+                assert!(arr.try_as_typed::<f32>().is_ok());
+                assert!(arr.try_as_typed::<f64>().is_err());
                 assert!(!arr.has_inlined_pointers());
                 assert!(arr.is_inline_array());
                 assert!(!arr.is_value_array());
@@ -102,7 +100,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.scope_with_slots(1, |_, frame| {
+            let out = jlrs.scope_with_capacity(1, |_, frame| {
                 let p = Value::new(&mut *frame, 1u8)?;
                 p.cast::<Array>()?;
                 Ok(())
@@ -117,9 +115,9 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.scope_with_slots(1, |_, frame| {
+            let out = jlrs.scope_with_capacity(1, |_, frame| {
                 let array = Array::new::<f32, _, _, _>(&mut *frame, (3, 1))?.into_jlrs_result()?;
-                array.cast::<Array>()?.copy_inline_data::<u8, _>(frame)
+                array.copy_inline_data::<u8, _>(frame)
             });
 
             assert!(out.is_err());
@@ -131,10 +129,10 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |_, frame| {
+            jlrs.scope_with_capacity(1, |_, frame| {
                 let arr_val =
                     Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?.into_jlrs_result()?;
-                let arr = arr_val.cast::<TypedArray<f32>>();
+                let arr = arr_val.as_value().cast::<TypedArray<f32>>();
                 assert!(arr.is_ok());
                 Ok(())
             })
@@ -147,10 +145,10 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |_, frame| {
+            jlrs.scope_with_capacity(1, |_, frame| {
                 let arr_val =
                     Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?.into_jlrs_result()?;
-                let arr = arr_val.cast::<TypedArray<f32>>()?;
+                let arr = arr_val.as_value().cast::<TypedArray<f32>>()?;
                 let dims = arr.dimensions().into_dimensions();
                 assert_eq!(dims.as_slice(), &[1, 2]);
                 Ok(())
@@ -164,10 +162,10 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |_, frame| {
+            jlrs.scope_with_capacity(1, |_, frame| {
                 let arr_val =
                     Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?.into_jlrs_result()?;
-                let arr = arr_val.cast::<TypedArray<f32>>()?;
+                let arr = arr_val.as_value().cast::<TypedArray<f32>>()?;
                 assert!(!arr.has_inlined_pointers());
                 assert!(arr.is_inline_array());
                 assert!(!arr.is_value_array());
@@ -182,7 +180,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(0, |global, frame| {
+            jlrs.scope_with_capacity(0, |global, frame| {
                 let arr_val = Value::an_empty_vec_any(global);
 
                 assert!(arr_val
@@ -201,7 +199,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(0, |global, frame| {
+            jlrs.scope_with_capacity(0, |global, frame| {
                 let arr_val = Value::an_empty_vec_any(global);
                 assert!(arr_val
                     .cast::<Array>()?
@@ -218,7 +216,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(0, |global, frame| unsafe {
+            jlrs.scope_with_capacity(0, |global, frame| unsafe {
                 let arr_val = Value::an_empty_vec_any(global);
                 assert!(arr_val
                     .cast::<Array>()?
@@ -235,7 +233,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(0, |global, frame| unsafe {
+            jlrs.scope_with_capacity(0, |global, frame| unsafe {
                 let arr_val = Value::an_empty_vec_any(global);
                 assert!(arr_val
                     .cast::<Array>()?
@@ -252,7 +250,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(0, |global, frame| unsafe {
+            jlrs.scope_with_capacity(0, |global, frame| unsafe {
                 let arr_val = Value::an_empty_vec_any(global);
                 assert!(arr_val
                     .cast::<Array>()?
@@ -269,10 +267,10 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |_, frame| {
+            jlrs.scope_with_capacity(1, |_, frame| {
                 let arr_val =
                     Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?.into_jlrs_result()?;
-                assert!(arr_val.cast::<Array>()?.value_data(&mut *frame).is_err());
+                assert!(arr_val.value_data(&mut *frame).is_err());
                 Ok(())
             })
             .unwrap();
@@ -284,13 +282,10 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |_, frame| unsafe {
+            jlrs.scope_with_capacity(1, |_, frame| unsafe {
                 let arr_val =
                     Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?.into_jlrs_result()?;
-                assert!(arr_val
-                    .cast::<Array>()?
-                    .value_data_mut(&mut *frame)
-                    .is_err());
+                assert!(arr_val.value_data_mut(&mut *frame).is_err());
                 Ok(())
             })
             .unwrap();
@@ -302,13 +297,10 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |_, frame| unsafe {
+            jlrs.scope_with_capacity(1, |_, frame| unsafe {
                 let arr_val =
                     Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?.into_jlrs_result()?;
-                assert!(arr_val
-                    .cast::<Array>()?
-                    .unrestricted_value_data_mut(&mut *frame)
-                    .is_err());
+                assert!(arr_val.unrestricted_value_data_mut(&mut *frame).is_err());
                 Ok(())
             })
             .unwrap();
@@ -320,7 +312,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(0, |global, _| {
+            jlrs.scope_with_capacity(0, |global, _| {
                 let arr_val = Value::an_empty_vec_any(global);
                 arr_val.cast::<Array>()?.as_value().is::<Array>();
                 Ok(())
@@ -334,7 +326,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |_, frame| {
+            jlrs.scope_with_capacity(1, |_, frame| {
                 let not_arr_val = Value::new(&mut *frame, 1usize)?;
                 assert!(!Array::valid_layout(not_arr_val));
                 Ok(())

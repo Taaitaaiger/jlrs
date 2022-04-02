@@ -9,7 +9,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |global, frame| {
+            jlrs.scope_with_capacity(1, |global, frame| unsafe {
                 Module::main(global)
                     .require(&mut *frame, "LinearAlgebra")?
                     .expect("Cannot load LinearAlgebra");
@@ -24,7 +24,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |global, frame| {
+            jlrs.scope_with_capacity(1, |global, frame| unsafe {
                 Module::main(global)
                     .require(&mut *frame, "LnearAlgebra")?
                     .expect_err("Can load LnearAlgebra");
@@ -39,7 +39,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(4, |global, frame| unsafe {
+            jlrs.scope_with_capacity(4, |global, frame| unsafe {
                 let func = Module::base(global)
                     .require(&mut *frame, "LinearAlgebra")?
                     .expect("Cannot load LinearAlgebra")
@@ -54,7 +54,7 @@ mod tests {
                 let arr2_v = Array::from_slice(&mut *frame, &mut arr2, 2)?;
 
                 let res = func
-                    .call2(&mut *frame, arr1_v, arr2_v)?
+                    .call2(&mut *frame, arr1_v.as_value(), arr2_v.as_value())?
                     .expect("Cannot call LinearAlgebra.dot")
                     .unbox::<f64>()?;
 

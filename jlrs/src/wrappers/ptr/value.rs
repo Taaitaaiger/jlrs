@@ -51,7 +51,7 @@ macro_rules! count {
 /// # JULIA.with(|j| {
 /// # let mut julia = j.borrow_mut();
 /// // Three slots; two for the inputs and one for the output.
-/// julia.scope_with_slots(3, |global, frame| {
+/// julia.scope_with_capacity(3, |global, frame| {
 ///     // Create the two arguments, each value requires one slot
 ///     let i = Value::new(&mut *frame, 2u64)?;
 ///     let j = Value::new(&mut *frame, 1u32)?;
@@ -103,7 +103,13 @@ use crate::{
         typecheck::{NamedTuple, Typecheck},
         valid_layout::ValidLayout,
     },
-    memory::{frame::Frame, get_tls, global::Global, scope::Scope},
+    memory::{
+        frame::Frame,
+        get_tls,
+        global::Global,
+        output::Output,
+        scope::{PartialScope, Scope},
+    },
     private::Private,
     wrappers::ptr::{
         array::Array,
@@ -127,12 +133,13 @@ use jl_sys::{
     jl_interrupt_exception, jl_isa, jl_memory_exception, jl_nothing, jl_object_id,
     jl_readonlymemory_exception, jl_set_nth_field, jl_stackovf_exception, jl_stderr_obj,
     jl_stdout_obj, jl_subtype, jl_true, jl_typeof_str, jl_undefref_exception, jl_value_t,
+    jlrs_lock, jlrs_unlock,
 };
 
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
 use jl_sys::{jlrs_apply_type, jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_set_nth_field};
 
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
+// // #[cfg(not(all(target_os = "windows", feature = "lts")))]
 use crate::error::JuliaResult;
 
 use std::{
@@ -140,6 +147,7 @@ use std::{
     marker::PhantomData,
     path::Path,
     ptr::NonNull,
+    sync::atomic::{AtomicPtr, AtomicU16, AtomicU32, AtomicU64, AtomicU8, Ordering},
     usize,
 };
 
@@ -159,12 +167,18 @@ pub const MAX_SIZE: usize = 8;
 /// argument the result will inherit the second lifetime of the borrowed data to ensure that
 /// such a `Value` can only be used while the borrow is active.
 #[repr(transparent)]
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, Eq)]
 pub struct Value<'scope, 'data>(
     NonNull<jl_value_t>,
     PhantomData<&'scope ()>,
     PhantomData<&'data ()>,
 );
+
+impl PartialEq for Value<'_, '_> {
+    fn eq(&self, other: &Value<'_, '_>) -> bool {
+        self.egal(*other)
+    }
+}
 
 /// # Create new `Value`s
 ///
@@ -177,11 +191,10 @@ pub struct Value<'scope, 'data>(
 impl<'scope, 'data> Value<'scope, 'data> {
     /// Create a new Julia value, any type that implements [`IntoJulia`] can be converted using
     /// this function.
-    pub fn new<'target, 'current, V, S, F>(scope: S, value: V) -> JlrsResult<S::Value>
+    pub fn new<'target, V, S>(scope: S, value: V) -> JlrsResult<Value<'target, 'static>>
     where
         V: IntoJulia,
-        S: Scope<'target, 'current, 'static, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
     {
         unsafe {
             let global = scope.global();
@@ -201,20 +214,21 @@ impl<'scope, 'data> Value<'scope, 'data> {
     }
 
     /// Create a new named tuple, you should use the `named_tuple` macro rather than this method.
-    pub fn new_named_tuple<'target, 'current, S, F, N, T, V>(
+    pub fn new_named_tuple<'target: 'current, 'current, S, F, N, T, V>(
         scope: S,
         mut field_names: N,
         mut values: V,
-    ) -> JlrsResult<S::Value>
+    ) -> JlrsResult<Value<'target, 'data>>
     where
-        S: Scope<'target, 'current, 'data, F>,
+        S: Scope<'target, 'current, F>,
         F: Frame<'current>,
         N: AsMut<[T]>,
         T: ToSymbol,
         V: AsMut<[Value<'scope, 'data>]>,
     {
-        scope.value_scope_with_slots(4, |output, frame| unsafe {
-            let global = frame.global();
+        let global = scope.global();
+        let (output, scope) = scope.split()?;
+        scope.scope_with_capacity(4, |frame| unsafe {
             let field_names = field_names.as_mut();
             let values_m = values.as_mut();
 
@@ -271,14 +285,13 @@ impl<'scope, 'data> Value<'scope, 'data> {
     ///
     /// [`Union::new`]: crate::wrappers::ptr::union::Union::new
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub fn apply_type<'target, 'current, S, F, V>(
+    pub fn apply_type<'target, V, S>(
         self,
         scope: S,
         mut types: V,
-    ) -> JlrsResult<S::JuliaResult>
+    ) -> JlrsResult<JuliaResult<'target, 'data>>
     where
-        S: Scope<'target, 'current, 'data, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
         V: AsMut<[Value<'scope, 'data>]>,
     {
         unsafe {
@@ -305,22 +318,18 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// If the types can't be applied to `self` the program will abort.
     ///
     /// [`Union::new`]: crate::wrappers::ptr::union::Union::new
-    pub fn apply_type_unchecked<'target, 'current, S, F, V>(
+    pub unsafe fn apply_type_unchecked<'target, S, V>(
         self,
         scope: S,
         mut types: V,
-    ) -> JlrsResult<S::Value>
+    ) -> JlrsResult<Value<'target, 'data>>
     where
-        S: Scope<'target, 'current, 'data, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
         V: AsMut<[Value<'scope, 'data>]>,
     {
-        unsafe {
-            let types = types.as_mut();
-            let applied =
-                jl_apply_type(self.unwrap(Private), types.as_mut_ptr().cast(), types.len());
-            scope.value(NonNull::new_unchecked(applied), Private)
-        }
+        let types = types.as_mut();
+        let applied = jl_apply_type(self.unwrap(Private), types.as_mut_ptr().cast(), types.len());
+        scope.value(NonNull::new_unchecked(applied), Private)
     }
 }
 
@@ -437,6 +446,15 @@ impl<'scope, 'data> Value<'scope, 'data> {
     pub unsafe fn assume_owned(self) -> Value<'scope, 'static> {
         Value::wrap_non_null(self.unwrap_non_null(Private), Private)
     }
+
+    /// Use the `Output` to extend the lifetime of this data.
+    pub fn root<'target>(self, output: Output<'target>) -> Value<'target, 'data> {
+        unsafe {
+            let ptr = self.unwrap_non_null(Private);
+            output.set_root::<Value>(ptr);
+            Value::wrap_non_null(ptr, Private)
+        }
+    }
 }
 
 /// # Conversions
@@ -491,8 +509,8 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// Safety:
     ///
     /// You must guarantee `self.is::<T>()` would have returned `true`.
-    pub fn unbox_unchecked<T: Unbox>(self) -> T::Output {
-        unsafe { T::unbox(self) }
+    pub unsafe fn unbox_unchecked<T: Unbox>(self) -> T::Output {
+        T::unbox(self)
     }
 
     /// Returns a pointer to the data, this is useful when the output type of `Unbox` is different
@@ -577,7 +595,9 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// Access the contents of the field with the name `field_name`. If the field is a bits union,
     /// this method will try to unbox the active variant. Pointer fields can also be accessed by
     /// using the approriate [`Ref`]. Returns an error if there's no field with the given name or
-    /// if the layout of `T` is incompatible with the layout of that field in Julia.
+    /// if the layout of `T` is incompatible with the layout of that field in Julia. If the field
+    /// is atomic relaxed ordering is used if it's a pointer field, and sequentially consistent
+    /// ordering if it isn't.
     ///
     /// [`Ref`]: crate::wrappers::ptr::Ref
     pub fn get_raw_field<T, N>(self, field_name: N) -> JlrsResult<T>
@@ -605,7 +625,8 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// Access the contents of the field with the name `field_name` without checking if the layouts
     /// of the types are compatible. Panics if the field doesn't exist.
     ///
-    /// Safety: the layout out `T` must be compatible with the layout of the field.
+    /// Safety: the layout of `T` must be compatible with the layout of the field, the field must
+    /// not be an atomic field.
     pub unsafe fn get_raw_field_unchecked<T, N>(self, field_name: N) -> T
     where
         N: ToSymbol,
@@ -615,7 +636,9 @@ impl<'scope, 'data> Value<'scope, 'data> {
         let jl_type = ty.unwrap(Private);
         let idx = jl_field_index(jl_type, symbol.unwrap(Private), 0);
 
-        assert!(idx >= 0, "Field {:?} doesn't exist", symbol);
+        debug_assert!(idx >= 0, "Field {:?} doesn't exist", symbol);
+        #[cfg(not(feature = "lts"))]
+        debug_assert!(!ty.is_atomic_field_unchecked(idx as usize));
 
         let field_offset = jl_field_offset(jl_type, idx as _);
         self.unwrap(Private)
@@ -627,14 +650,13 @@ impl<'scope, 'data> Value<'scope, 'data> {
 
     /// Roots the field at index `idx` if it exists and returns it, or
     /// `JlrsError::OutOfBounds` if the index is out of bounds.
-    pub fn get_nth_field<'target, 'current, S, F>(
+    pub fn get_nth_field<'target, S>(
         self,
         scope: S,
         idx: usize,
-    ) -> JlrsResult<S::Value>
+    ) -> JlrsResult<Value<'target, 'data>>
     where
-        S: Scope<'target, 'current, 'data, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
     {
         unsafe {
             if idx >= self.n_fields() {
@@ -721,15 +743,14 @@ impl<'scope, 'data> Value<'scope, 'data> {
 
     /// Roots the field with the name `field_name` if it exists and returns it, or
     /// `JlrsError::NoSuchField` if there's no field with that name.
-    pub fn get_field<'target, 'current, N, S, F>(
+    pub fn get_field<'target, N, S>(
         self,
         scope: S,
         field_name: N,
-    ) -> JlrsResult<S::Value>
+    ) -> JlrsResult<Value<'target, 'data>>
     where
         N: ToSymbol,
-        S: Scope<'target, 'current, 'data, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
     {
         unsafe {
             let symbol = field_name.to_symbol_priv(Private);
@@ -865,7 +886,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
         let res = jlrs_set_nth_field(self.unwrap(Private), idx, value.unwrap(Private));
         if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
             let ptr = res.data;
-            let err = crate::memory::scope::private::Scope::value(
+            let err = crate::memory::scope::private::PartialScope::value(
                 frame,
                 NonNull::new_unchecked(ptr),
                 Private,
@@ -927,7 +948,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
 
     /// Set the value of the field with the name `field_name`. If Julia throws an exception it's
     /// caught, rooted in the frame, and returned. If there's no field with the given name or the
-    /// value is not a subtype of the field an error is returned,
+    /// value is not a subtype of the field an error is returned.
     ///
     /// Safety: Mutating things that should absolutely not be mutated, like the fields of a
     /// `DataType`, is not prevented.
@@ -966,7 +987,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
         let res = jlrs_set_nth_field(self.unwrap(Private), idx as usize, value.unwrap(Private));
         if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
             let ptr = res.data;
-            let err = crate::memory::scope::private::Scope::value(
+            let err = crate::memory::scope::private::PartialScope::value(
                 frame,
                 NonNull::new_unchecked(ptr),
                 Private,
@@ -979,7 +1000,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
 
     /// Set the value of the field with the name `field_name`. If Julia throws an exception it's
     /// caught, and returned but not rooted. If there's no field with the given name or the value
-    /// is not a subtype of the field an error is returned,
+    /// is not a subtype of the field an error is returned.
     ///
     /// Safety: Mutating things that should absolutely not be mutated, like the fields of a
     /// `DataType`, is not prevented.
@@ -1061,8 +1082,14 @@ impl<'scope, 'data> Value<'scope, 'data> {
         let mut field_type =
             ty.field_types().wrapper_unchecked().data()[idx as usize].value_unchecked();
 
+        #[cfg(not(feature = "lts"))]
+        let isatomic = ty.is_atomic_field_unchecked(idx as _);
+        #[cfg(feature = "lts")]
+        let isatomic = false;
+
         if let Ok(u) = field_type.cast::<Union>() {
             // If the field is a bits union, we want to access its current variant
+            debug_assert!(!isatomic);
             let mut size = 0;
 
             if u.isbits_size_align(&mut size, &mut 0) {
@@ -1077,7 +1104,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
                 }
             }
         } else if let Ok(_) = field_type.cast::<UnionAll>() {
-            // If the field is a unionall, we want to take the concrete type into account
+            // If the field is a unionall, we need to take the concrete type into account
             field_type = self
                 .unwrap(Private)
                 .cast::<u8>()
@@ -1089,12 +1116,62 @@ impl<'scope, 'data> Value<'scope, 'data> {
         }
 
         if T::valid_layout(field_type) {
-            Ok(self
-                .unwrap(Private)
-                .cast::<u8>()
-                .add(field_offset as usize)
-                .cast::<T>()
-                .read())
+            if isatomic {
+                if ty.is_pointer_field_unchecked(idx as usize) {
+                    // https://github.com/JuliaLang/julia/blob/9b2169181d341cba5b3358f9e11b96975f563491/src/datatype.c#L1415
+                    let ptr = &*self
+                        .unwrap(Private)
+                        .cast::<u8>()
+                        .add(field_offset as usize)
+                        .cast::<AtomicPtr<jl_value_t>>();
+
+                    let v = ptr.load(Ordering::Relaxed);
+                    // T must be a pointer wrapper
+                    Ok(std::mem::transmute_copy(&v))
+                } else {
+                    // https://github.com/JuliaLang/julia/blob/b91dd0268a9fad8208284ae394c0dcc863f68048/src/datatype.c#L849
+                    let field_size = field_type.cast_unchecked::<DataType>().size();
+                    debug_assert!(std::mem::size_of::<T>() == field_size as usize);
+                    let ptr = self.unwrap(Private).cast::<u8>().add(field_offset as usize);
+
+                    match field_size {
+                        0 => Ok(std::mem::transmute_copy(&())),
+                        1 => {
+                            let atomic = &*ptr.cast::<AtomicU8>();
+                            let v = atomic.load(Ordering::SeqCst);
+                            Ok(std::mem::transmute_copy(&v))
+                        }
+                        2 => {
+                            let atomic = &*ptr.cast::<AtomicU16>();
+                            let v = atomic.load(Ordering::SeqCst);
+                            Ok(std::mem::transmute_copy(&v))
+                        }
+                        sz if sz <= 4 => {
+                            let atomic = &*ptr.cast::<AtomicU32>();
+                            let v = atomic.load(Ordering::SeqCst);
+                            Ok(std::mem::transmute_copy(&v))
+                        }
+                        sz if sz <= 8 => {
+                            let atomic = &*ptr.cast::<AtomicU64>();
+                            let v = atomic.load(Ordering::SeqCst);
+                            Ok(std::mem::transmute_copy(&v))
+                        }
+                        _ => {
+                            jlrs_lock(self.unwrap(Private));
+                            let v = ptr.cast::<T>().read();
+                            jlrs_unlock(self.unwrap(Private));
+                            Ok(v)
+                        }
+                    }
+                }
+            } else {
+                Ok(self
+                    .unwrap(Private)
+                    .cast::<u8>()
+                    .add(field_offset as usize)
+                    .cast::<T>()
+                    .read())
+            }
         } else {
             let value_type_str = field_type.display_string_or(CANNOT_DISPLAY_TYPE).into();
             Err(JlrsError::InvalidLayout { value_type_str })?
@@ -1113,14 +1190,13 @@ impl Value<'_, '_> {
     ///
     /// Safety: The command can't be checked for correctness, nothing prevents you from causing a
     /// segmentation fault with a command like `unsafe_load(Ptr{Float64}(C_NULL))`.
-    pub unsafe fn eval_string<'target, 'current, C, S, F>(
+    pub unsafe fn eval_string<'target, C, S>(
         scope: S,
         cmd: C,
-    ) -> JlrsResult<S::JuliaResult>
+    ) -> JlrsResult<JuliaResult<'target, 'static>>
     where
         C: AsRef<str>,
-        S: Scope<'target, 'current, 'static, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
     {
         let cmd = cmd.as_ref();
         let cmd_cstring = CString::new(cmd).map_err(JlrsError::other)?;
@@ -1140,14 +1216,13 @@ impl Value<'_, '_> {
     ///
     /// Safety: The command can't be checked for correctness, nothing prevents you from causing a
     /// segmentation fault with a command like `unsafe_load(Ptr{Float64}(C_NULL))`.
-    pub unsafe fn eval_cstring<'target, 'current, C, S, F>(
+    pub unsafe fn eval_cstring<'target, C, S>(
         scope: S,
         cmd: C,
-    ) -> JlrsResult<S::JuliaResult>
+    ) -> JlrsResult<JuliaResult<'target, 'static>>
     where
         C: AsRef<CStr>,
-        S: Scope<'target, 'current, 'static, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
     {
         let cmd = cmd.as_ref();
         let cmd_ptr = cmd.as_ptr();
@@ -1163,25 +1238,26 @@ impl Value<'_, '_> {
 
     /// Calls `include` in the `Main` module in Julia, which evaluates the file's contents in that
     /// module. This has the same effect as calling `include` in the Julia REPL.
-    pub unsafe fn include<'target, 'current, P, S, F>(
+    pub unsafe fn include<'target: 'current, 'current, P, S, F>(
         scope: S,
         path: P,
-    ) -> JlrsResult<S::JuliaResult>
+    ) -> JlrsResult<JuliaResult<'target, 'static>>
     where
         P: AsRef<Path>,
-        S: Scope<'target, 'current, 'static, F>,
+        S: Scope<'target, 'current, F>,
         F: Frame<'current>,
     {
         if path.as_ref().exists() {
-            return scope.result_scope(|output, frame| {
-                let global = frame.global();
+            let global = scope.global();
+            let (output, scope) = scope.split()?;
+            return scope.scope(|frame| {
                 let path_jl_str = JuliaString::new(&mut *frame, path.as_ref().to_string_lossy())?;
                 let include_func = Module::main(global)
                     .function_ref("include")?
                     .wrapper_unchecked();
 
                 let scope = output.into_scope(frame);
-                include_func.call1(scope, path_jl_str)
+                include_func.call1(scope, path_jl_str.as_value())
             });
         }
 
@@ -1335,73 +1411,83 @@ unsafe impl<'scope, 'data> ValidLayout for Value<'scope, 'data> {
 
 impl<'data> Call<'data> for Value<'_, 'data> {
     #[inline(always)]
-    unsafe fn call0<'target, 'current, S, F>(self, scope: S) -> JlrsResult<S::JuliaResult>
+    unsafe fn call0<'target, S>(self, scope: S) -> JlrsResult<JuliaResult<'target, 'data>>
     where
-        S: Scope<'target, 'current, 'data, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
     {
-        let res = self.call0_unrooted(scope.global());
-        scope.unrooted_call_result(res, Private)
+        let res = match self.call0_unrooted(Global::new()) {
+            Ok(v) => Ok(NonNull::new_unchecked(v.ptr())),
+            Err(e) => Err(NonNull::new_unchecked(e.ptr())),
+        };
+        scope.call_result(res, Private)
     }
 
     #[inline(always)]
-    unsafe fn call1<'target, 'current, S, F>(
+    unsafe fn call1<'target, S>(
         self,
         scope: S,
         arg0: Value<'_, 'data>,
-    ) -> JlrsResult<S::JuliaResult>
+    ) -> JlrsResult<JuliaResult<'target, 'data>>
     where
-        S: Scope<'target, 'current, 'data, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
     {
-        let res = self.call1_unrooted(scope.global(), arg0);
-        scope.unrooted_call_result(res, Private)
+        let res = match self.call1_unrooted(Global::new(), arg0) {
+            Ok(v) => Ok(NonNull::new_unchecked(v.ptr())),
+            Err(e) => Err(NonNull::new_unchecked(e.ptr())),
+        };
+        scope.call_result(res, Private)
     }
 
     #[inline(always)]
-    unsafe fn call2<'target, 'current, S, F>(
+    unsafe fn call2<'target, S>(
         self,
         scope: S,
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
-    ) -> JlrsResult<S::JuliaResult>
+    ) -> JlrsResult<JuliaResult<'target, 'data>>
     where
-        S: Scope<'target, 'current, 'data, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
     {
-        let res = self.call2_unrooted(scope.global(), arg0, arg1);
-        scope.unrooted_call_result(res, Private)
+        let res = match self.call2_unrooted(Global::new(), arg0, arg1) {
+            Ok(v) => Ok(NonNull::new_unchecked(v.ptr())),
+            Err(e) => Err(NonNull::new_unchecked(e.ptr())),
+        };
+        scope.call_result(res, Private)
     }
 
     #[inline(always)]
-    unsafe fn call3<'target, 'current, S, F>(
+    unsafe fn call3<'target, S>(
         self,
         scope: S,
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
         arg2: Value<'_, 'data>,
-    ) -> JlrsResult<S::JuliaResult>
+    ) -> JlrsResult<JuliaResult<'target, 'data>>
     where
-        S: Scope<'target, 'current, 'data, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
     {
-        let res = self.call3_unrooted(scope.global(), arg0, arg1, arg2);
-        scope.unrooted_call_result(res, Private)
+        let res = match self.call3_unrooted(Global::new(), arg0, arg1, arg2) {
+            Ok(v) => Ok(NonNull::new_unchecked(v.ptr())),
+            Err(e) => Err(NonNull::new_unchecked(e.ptr())),
+        };
+        scope.call_result(res, Private)
     }
 
     #[inline(always)]
-    unsafe fn call<'target, 'current, 'value, V, S, F>(
+    unsafe fn call<'target, 'value, V, S>(
         self,
         scope: S,
         args: V,
-    ) -> JlrsResult<S::JuliaResult>
+    ) -> JlrsResult<JuliaResult<'target, 'data>>
     where
         V: AsMut<[Value<'value, 'data>]>,
-        S: Scope<'target, 'current, 'data, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
     {
-        let res = self.call_unrooted(scope.global(), args);
-        scope.unrooted_call_result(res, Private)
+        let res = match self.call_unrooted(Global::new(), args) {
+            Ok(v) => Ok(NonNull::new_unchecked(v.ptr())),
+            Err(e) => Err(NonNull::new_unchecked(e.ptr())),
+        };
+        scope.call_result(res, Private)
     }
 
     #[inline(always)]
@@ -1502,9 +1588,7 @@ impl<'data> Call<'data> for Value<'_, 'data> {
     }
 }
 
-impl<'target, 'current, 'value, 'data> CallExt<'target, 'current, 'value, 'data>
-    for Value<'value, 'data>
-{
+impl<'value, 'data> CallExt<'value, 'data> for Value<'value, 'data> {
     fn with_keywords(self, kws: Value<'value, 'data>) -> JlrsResult<WithKeywords<'value, 'data>> {
         if !kws.is::<NamedTuple>() {
             let type_str = kws.datatype().display_string_or(CANNOT_DISPLAY_TYPE);
@@ -1557,3 +1641,5 @@ impl LeakedValue {
         self.0
     }
 }
+
+impl_root!(Value, 2);

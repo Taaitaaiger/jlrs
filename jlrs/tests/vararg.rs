@@ -11,7 +11,7 @@ mod not_lts {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |global, frame| unsafe {
+            jlrs.scope_with_capacity(1, |global, frame| unsafe {
                 let vararg =
                     Value::eval_string(&mut *frame, "Vararg{Int32}")?.into_jlrs_result()?;
 
@@ -37,7 +37,7 @@ mod not_lts {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |global, frame| {
+            jlrs.scope_with_capacity(1, |global, frame| {
                 let vararg_type = DataType::vararg_type(global);
                 let instance = vararg_type
                     .instantiate(&mut *frame, [])?
@@ -59,7 +59,7 @@ mod not_lts {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |global, frame| unsafe {
+            jlrs.scope_with_capacity(1, |global, frame| unsafe {
                 let vararg_type = DataType::vararg_type(global);
                 let instance = vararg_type
                     .instantiate(&mut *frame, [DataType::int32_type(global).as_value()])?
@@ -84,7 +84,7 @@ mod not_lts {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(2, |global, frame| unsafe {
+            jlrs.scope_with_capacity(2, |global, frame| unsafe {
                 let vararg_type = DataType::vararg_type(global);
                 let n = Value::new(&mut *frame, 3isize)?;
                 let instance = vararg_type

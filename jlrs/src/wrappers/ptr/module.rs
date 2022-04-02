@@ -8,7 +8,7 @@ use crate::{
     convert::to_symbol::ToSymbol,
     error::{JlrsError, JlrsResult, CANNOT_DISPLAY_VALUE},
     impl_debug, impl_julia_typecheck, impl_valid_layout,
-    memory::{frame::Frame, global::Global, scope::Scope},
+    memory::{global::Global, output::Output, scope::PartialScope},
     private::Private,
     wrappers::ptr::{
         call::Call,
@@ -19,8 +19,9 @@ use crate::{
     },
 };
 
+use crate::error::JuliaResult;
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
-use crate::error::{JuliaResult, JuliaResultRef};
+use crate::error::JuliaResultRef;
 
 use jl_sys::{
     jl_base_module, jl_core_module, jl_get_global, jl_is_imported, jl_main_module, jl_module_t,
@@ -46,8 +47,8 @@ use super::private::Wrapper;
 /// true for other global values that are never redefined to point at another value.
 ///
 /// [`Julia::include`]: crate::julia::Julia::include
-/// [`AsyncJulia::include`]: crate::extensions::multitask::runtime::AsyncJulia::include
-/// [`AsyncJulia::try_include`]: crate::extensions::multitask::runtime::AsyncJulia::try_include
+/// [`AsyncJulia::include`]: crate::multitask::runtime::AsyncJulia::include
+/// [`AsyncJulia::try_include`]: crate::multitask::runtime::AsyncJulia::try_include
 #[derive(Copy, Clone, PartialEq)]
 #[repr(transparent)]
 pub struct Module<'scope>(NonNull<jl_module_t>, PhantomData<&'scope ()>);
@@ -62,17 +63,13 @@ impl<'scope> Module<'scope> {
     }
 
     /// Returns the parent of this module.
-    pub fn parent<'target, F>(self, frame: &mut F) -> JlrsResult<Module<'target>>
+    pub fn parent<'target, S>(self, scope: S) -> JlrsResult<Module<'target>>
     where
-        F: Frame<'target>,
+        S: PartialScope<'target>,
     {
         unsafe {
             let parent = self.unwrap_non_null(Private).as_ref().parent;
-            debug_assert!(!parent.is_null());
-            frame
-                .push_root(NonNull::new_unchecked(parent.cast()), Private)
-                .map(|v| v.cast_unchecked::<Module>())
-                .map_err(Into::into)
+            scope.value(NonNull::new_unchecked(parent), Private)
         }
     }
 
@@ -91,8 +88,8 @@ impl<'scope> Module<'scope> {
     ///  are made available relative to `Main`.
     ///
     /// [`Julia::include`]: crate::julia::Julia::include
-    /// [`AsyncJulia::include`]: crate::extensions::multitask::runtime::AsyncJulia::include
-    /// [`AsyncJulia::try_include`]: crate::extensions::multitask::runtime::AsyncJulia::try_include
+    /// [`AsyncJulia::include`]: crate::multitask::runtime::AsyncJulia::include
+    /// [`AsyncJulia::try_include`]: crate::multitask::runtime::AsyncJulia::try_include
     pub fn main(_: Global<'scope>) -> Self {
         unsafe { Module::wrap(jl_main_module, Private) }
     }
@@ -120,13 +117,13 @@ impl<'scope> Module<'scope> {
     /// access `A` first and then `B`.
     ///
     /// Returns an error if the submodule doesn't exist.
-    pub fn submodule<'target, N, F>(self, frame: &mut F, name: N) -> JlrsResult<Module<'target>>
+    pub fn submodule<'target, N, S>(self, scope: S, name: N) -> JlrsResult<Module<'target>>
     where
         N: ToSymbol,
-        F: Frame<'target>,
+        S: PartialScope<'target>,
     {
         unsafe {
-            let symbol = name.to_symbol_priv(Private);
+            let symbol = name.to_symbol(scope.global());
             let submodule = jl_get_global(self.unwrap(Private), symbol.unwrap(Private));
             if submodule.is_null() {
                 Err(JlrsError::GlobalNotFound {
@@ -138,10 +135,7 @@ impl<'scope> Module<'scope> {
             let submodule = Value::wrap_non_null(NonNull::new_unchecked(submodule), Private);
 
             if submodule.is::<Self>() {
-                frame
-                    .push_root(submodule.unwrap_non_null(Private), Private)
-                    .map(|v| v.cast_unchecked())
-                    .map_err(Into::into)
+                scope.value(submodule.unwrap_non_null(Private).cast(), Private)
             } else {
                 Err(JlrsError::NotAModule {
                     name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
@@ -185,15 +179,15 @@ impl<'scope> Module<'scope> {
     /// make the old value unreachable. If an excection is thrown, it's caught, rooted and
     /// returned.
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub unsafe fn set_global<'frame, N, F>(
+    pub unsafe fn set_global<'frame, N, S>(
         self,
-        frame: &mut F,
+        scope: S,
         name: N,
         value: Value<'_, 'static>,
     ) -> JlrsResult<JuliaResult<'frame, 'static, ValueRef<'scope, 'static>>>
     where
         N: ToSymbol,
-        F: Frame<'frame>,
+        S: PartialScope<'frame>,
     {
         let symbol = name.to_symbol_priv(Private);
 
@@ -204,12 +198,8 @@ impl<'scope> Module<'scope> {
         );
 
         let data = res.data;
-
         if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
-            let v = frame
-                .push_root(NonNull::new_unchecked(data), Private)
-                .map_err(|e| JlrsError::AllocError(e))?;
-            Ok(Err(v))
+            Ok(Err(scope.value(NonNull::new_unchecked(data), Private)?))
         } else {
             Ok(Ok(ValueRef::wrap(data)))
         }
@@ -236,7 +226,6 @@ impl<'scope> Module<'scope> {
         );
 
         let data = res.data;
-
         if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
             Err(ValueRef::wrap(data))
         } else {
@@ -269,15 +258,15 @@ impl<'scope> Module<'scope> {
     /// current frame, if the exception can't be rooted a `JlrsError::AllocError` is returned. If
     /// no exception is thrown an unrooted reference to the constant is returned.
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub fn set_const<'frame, N, F>(
+    pub fn set_const<'frame, N, S>(
         self,
-        frame: &mut F,
+        scope: S,
         name: N,
         value: Value<'_, 'static>,
     ) -> JlrsResult<JuliaResult<'frame, 'static, ValueRef<'scope, 'static>>>
     where
         N: ToSymbol,
-        F: Frame<'frame>,
+        S: PartialScope<'frame>,
     {
         unsafe {
             let symbol = name.to_symbol_priv(Private);
@@ -289,12 +278,8 @@ impl<'scope> Module<'scope> {
             );
 
             let data = res.data;
-
             if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
-                let v = frame
-                    .push_root(NonNull::new_unchecked(data), Private)
-                    .map_err(|e| JlrsError::AllocError(e))?;
-                Ok(Err(v))
+                Ok(Err(scope.value(NonNull::new_unchecked(data), Private)?))
             } else {
                 Ok(Ok(ValueRef::wrap(data)))
             }
@@ -322,7 +307,6 @@ impl<'scope> Module<'scope> {
             );
 
             let data = res.data;
-
             if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
                 Err(ValueRef::wrap(data))
             } else {
@@ -333,7 +317,7 @@ impl<'scope> Module<'scope> {
 
     /// Set a constant in this module. If the constant already exists the process aborts,
     /// otherwise an unrooted reference to the constant is returned.
-    pub fn set_const_unchecked<N>(
+    pub unsafe fn set_const_unchecked<N>(
         self,
         name: N,
         value: Value<'_, 'static>,
@@ -341,44 +325,36 @@ impl<'scope> Module<'scope> {
     where
         N: ToSymbol,
     {
-        unsafe {
-            let symbol = name.to_symbol_priv(Private);
+        let symbol = name.to_symbol_priv(Private);
 
-            jl_set_const(
-                self.unwrap(Private),
-                symbol.unwrap(Private),
-                value.unwrap(Private),
-            );
+        jl_set_const(
+            self.unwrap(Private),
+            symbol.unwrap(Private),
+            value.unwrap(Private),
+        );
 
-            ValueRef::wrap(value.unwrap(Private))
-        }
+        ValueRef::wrap(value.unwrap(Private))
     }
 
     /// Returns the global named `name` in this module.
     /// Returns an error if the global doesn't exist.
-    pub fn global<'target, N, F>(
-        self,
-        frame: &mut F,
-        name: N,
-    ) -> JlrsResult<Value<'target, 'static>>
+    pub fn global<'target, N, S>(self, scope: S, name: N) -> JlrsResult<Value<'target, 'static>>
     where
         N: ToSymbol,
-        F: Frame<'target>,
+        S: PartialScope<'target>,
     {
         unsafe {
             let symbol = name.to_symbol_priv(Private);
 
-            let func = jl_get_global(self.unwrap(Private), symbol.unwrap(Private));
-            if func.is_null() {
+            let global = jl_get_global(self.unwrap(Private), symbol.unwrap(Private));
+            if global.is_null() {
                 Err(JlrsError::GlobalNotFound {
                     name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
                     module: self.name().as_str().unwrap_or("<Non-UTF8 symbol>").into(),
                 })?;
             }
 
-            frame
-                .push_root(NonNull::new_unchecked(func), Private)
-                .map_err(Into::into)
+            scope.value(NonNull::new_unchecked(global), Private)
         }
     }
 
@@ -414,32 +390,32 @@ impl<'scope> Module<'scope> {
 
             // there doesn't seem to be a way to check if this is actually a
             // function...
-            let func = jl_get_global(self.unwrap(Private), symbol.unwrap(Private));
-            if func.is_null() {
+            let global = jl_get_global(self.unwrap(Private), symbol.unwrap(Private));
+            if global.is_null() {
                 Err(JlrsError::GlobalNotFound {
                     name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
                     module: self.name().as_str().unwrap_or("<Non-UTF8 symbol>").into(),
                 })?;
             }
 
-            Ok(LeakedValue::wrap(func))
+            Ok(LeakedValue::wrap(global))
         }
     }
 
     /// Returns the function named `name` in this module.
     /// Returns an error if the function doesn't exist or if it's not a subtype of `Function`.
-    pub fn function<'target, N, F>(
+    pub fn function<'target, N, S>(
         self,
-        frame: &mut F,
+        scope: S,
         name: N,
     ) -> JlrsResult<Function<'target, 'static>>
     where
         N: ToSymbol,
-        F: Frame<'target>,
+        S: PartialScope<'target>,
     {
         unsafe {
             let symbol = name.to_symbol_priv(Private);
-            let func = self.global(frame, symbol)?;
+            let func = self.global(scope, symbol)?;
 
             if !func.is::<Function>() {
                 let name = symbol.as_str().unwrap_or("<Non-UTF8 string>").into();
@@ -484,27 +460,24 @@ impl<'scope> Module<'scope> {
     ///
     /// Note that when you want to call `using Submodule` in the `Main` module, you can do so by
     /// evaluating the using-statement with [`Value::eval_string`].
-    pub fn require<'target, 'current, S, F, N>(
+    pub unsafe fn require<'target, S, N>(
         self,
         scope: S,
         module: N,
-    ) -> JlrsResult<S::JuliaResult>
+    ) -> JlrsResult<JuliaResult<'target, 'static>>
     where
-        S: Scope<'target, 'current, 'static, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
         N: ToSymbol,
     {
-        unsafe {
-            Module::wrap(jl_base_module, Private)
-                .function_ref("require")
-                .unwrap()
-                .wrapper_unchecked()
-                .call2(
-                    scope,
-                    self.as_value(),
-                    module.to_symbol_priv(Private).as_value(),
-                )
-        }
+        Module::wrap(jl_base_module, Private)
+            .function_ref("require")
+            .unwrap()
+            .wrapper_unchecked()
+            .call2(
+                scope,
+                self.as_value(),
+                module.to_symbol_priv(Private).as_value(),
+            )
     }
 
     /// Load a module by calling `Base.require` and return this module if it has been loaded
@@ -515,27 +488,34 @@ impl<'scope> Module<'scope> {
     ///
     /// Note that when you want to call `using Submodule` in the `Main` module, you can do so by
     /// evaluating the using-statement with [`Value::eval_string`].
-    pub fn require_unrooted<S>(self, global: Global<'scope>, module: S) -> ModuleRef<'scope>
+    pub unsafe fn require_unrooted<S>(self, global: Global<'scope>, module: S) -> ModuleRef<'scope>
     where
         S: ToSymbol,
     {
+        Module::base(global)
+            .function_ref("require")
+            .unwrap()
+            .wrapper_unchecked()
+            .call2_unrooted(
+                global,
+                self.as_value(),
+                module.to_symbol_priv(Private).as_value(),
+            )
+            .expect(&format!(
+                "Could not load ${:?}",
+                module.to_symbol_priv(Private)
+            ))
+            .wrapper_unchecked()
+            .cast_unchecked::<Module>()
+            .as_ref()
+    }
+
+    /// Use the `Output` to extend the lifetime of this data.
+    pub fn root<'target>(self, output: Output<'target>) -> Module<'target> {
         unsafe {
-            Module::base(global)
-                .function_ref("require")
-                .unwrap()
-                .wrapper_unchecked()
-                .call2_unrooted(
-                    global,
-                    self.as_value(),
-                    module.to_symbol_priv(Private).as_value(),
-                )
-                .expect(&format!(
-                    "Could not load ${:?}",
-                    module.to_symbol_priv(Private)
-                ))
-                .wrapper_unchecked()
-                .cast_unchecked::<Module>()
-                .as_ref()
+            let ptr = self.unwrap_non_null(Private);
+            output.set_root::<Module>(ptr);
+            Module::wrap_non_null(ptr, Private)
         }
     }
 }
@@ -558,3 +538,5 @@ impl<'scope> Wrapper<'scope, '_> for Module<'scope> {
         self.0
     }
 }
+
+impl_root!(Module, 1);

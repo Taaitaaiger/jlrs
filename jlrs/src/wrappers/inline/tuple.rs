@@ -20,9 +20,15 @@
 //! # });
 //! # }
 //! ```
+//!
+//! Additionally, [`Tuple` ] can be used to create a tuple from an arbitrary number of `Value`s.
 
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
 use crate::convert::into_jlrs_result::IntoJlrsResult;
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use crate::error::JuliaResult;
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use crate::memory::scope::PartialScope;
 use crate::wrappers::ptr::{
     datatype::DataType,
     value::{Value, MAX_SIZE},
@@ -36,25 +42,26 @@ use crate::{
 };
 use jl_sys::jl_tuple_typename;
 
-/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
-/// a value of this type is a tuple.
-
+/// A tuple that has an arbitrary number of fields. This type can be used as a typecheck to check
+/// if the data is a tuple type, and to create tuples of arbitrary sizes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Tuple;
 
 impl Tuple {
     /// Create a new tuple from the contents of `values`.
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub fn new<'target, 'current, 'value, 'borrow, V, S, F>(
+    pub fn new<'target: 'current, 'current, 'value, 'borrow, V, S, F>(
         scope: S,
         mut values: V,
-    ) -> JlrsResult<S::JuliaResult>
+    ) -> JlrsResult<JuliaResult<'target, 'borrow>>
     where
         V: AsMut<[Value<'value, 'borrow>]>,
-        S: Scope<'target, 'current, 'borrow, F>,
+        S: Scope<'target, 'current, F>,
         F: Frame<'current>,
     {
-        scope.result_scope(|output, frame| {
+        let (output, frame) = scope.split()?;
+        frame.scope(|frame| {
+            let global = frame.global();
             let types: smallvec::SmallVec<[_; MAX_SIZE]> = values
                 .as_mut()
                 .iter()
@@ -62,28 +69,30 @@ impl Tuple {
                 .map(|v| v.datatype().as_value())
                 .collect();
 
-            let tuple_ty = DataType::tuple_type(frame.global())
+            let tuple_ty = DataType::tuple_type(global)
                 .as_value()
                 .apply_type(&mut *frame, types)?
                 .into_jlrs_result()?
                 .cast::<DataType>()?;
 
-            let output = output.into_scope(frame);
             tuple_ty.instantiate(output, values)
         })
     }
 
     /// Create a new tuple from the contents of `values`.
-    pub unsafe fn new_unchecked<'target, 'current, 'value, 'borrow, V, S, F>(
+    pub unsafe fn new_unchecked<'target: 'current, 'current, 'value, 'borrow, V, S, F>(
         scope: S,
         mut values: V,
-    ) -> JlrsResult<S::Value>
+    ) -> JlrsResult<Value<'target, 'borrow>>
     where
         V: AsMut<[Value<'value, 'borrow>]>,
-        S: Scope<'target, 'current, 'borrow, F>,
+        S: Scope<'target, 'current, F>,
         F: Frame<'current>,
     {
-        scope.value_scope(|output, frame| {
+        let global = scope.global();
+        let (output, frame) = scope.split()?;
+
+        frame.scope(|frame| {
             let types: smallvec::SmallVec<[_; MAX_SIZE]> = values
                 .as_mut()
                 .iter()
@@ -91,12 +100,14 @@ impl Tuple {
                 .map(|v| v.datatype().as_value())
                 .collect();
 
-            let tuple_ty = DataType::tuple_type(frame.global())
+            // The tuple type is constructed with the types of the values as its type
+            // parameters, since only concrete types can have instances, all types are
+            // concrete so the tuple type is concrete, too.
+            let tuple_ty = DataType::tuple_type(global)
                 .as_value()
                 .apply_type_unchecked(&mut *frame, types)?
                 .cast::<DataType>()?;
 
-            let output = output.into_scope(frame);
             tuple_ty.instantiate_unchecked(output, values)
         })
     }

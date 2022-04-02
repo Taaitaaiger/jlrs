@@ -9,7 +9,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(2, |global, frame| unsafe {
+            jlrs.scope_with_capacity(2, |global, frame| unsafe {
                 let a_value = Value::new(&mut *frame, 1isize)?;
                 let func = Module::main(global)
                     .submodule_ref("JlrsTests")?
@@ -34,7 +34,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(4, |global, frame| unsafe {
+            jlrs.scope_with_capacity(4, |global, frame| unsafe {
                 let a_value = Value::new(&mut *frame, 1isize)?;
                 let b_value = Value::new(&mut *frame, 10isize)?;
                 let func = Module::main(global)
@@ -62,7 +62,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(5, |global, frame| unsafe {
+            jlrs.scope_with_capacity(5, |global, frame| unsafe {
                 let a_value = Value::new(&mut *frame, 1isize)?;
                 let b_value = Value::new(&mut *frame, 10isize)?;
                 let c_value = Value::new(&mut *frame, 5isize)?;
@@ -91,7 +91,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(6, |global, frame| unsafe {
+            jlrs.scope_with_capacity(6, |global, frame| unsafe {
                 let a_value = Value::new(&mut *frame, 1isize)?;
                 let b_value = Value::new(&mut *frame, 10isize)?;
                 let c_value = Value::new(&mut *frame, 5isize)?;
@@ -120,7 +120,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(7, |global, frame| unsafe {
+            jlrs.scope_with_capacity(7, |global, frame| unsafe {
                 let a_value = Value::new(&mut *frame, 1isize)?;
                 let b_value = Value::new(&mut *frame, 10isize)?;
                 let c_value = Value::new(&mut *frame, 5isize)?;
@@ -150,7 +150,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(8, |global, frame| unsafe {
+            jlrs.scope_with_capacity(8, |global, frame| unsafe {
                 let a_value = Value::new(&mut *frame, 1isize)?;
                 let b_value = Value::new(&mut *frame, 10isize)?;
                 let c_value = Value::new(&mut *frame, 5isize)?;
@@ -181,7 +181,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(4, |global, frame| unsafe {
+            jlrs.scope_with_capacity(4, |global, frame| unsafe {
                 let a_value = Value::new(&mut *frame, 1f32)?;
                 let b_value = Value::new(&mut *frame, 10f32)?;
                 let func = Module::main(global)
@@ -209,7 +209,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(4, |global, frame| unsafe {
+            jlrs.scope_with_capacity(4, |global, frame| unsafe {
                 let a_value = Value::new(&mut *frame, 1f32)?;
                 let b_value = Value::new(&mut *frame, 10f64)?;
                 let func = Module::main(global)

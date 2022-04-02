@@ -872,7 +872,7 @@ mod tests {
                         .global_ref("WithGenericT")?
                         .wrapper_unchecked();
 
-                    let wgt = wgt_constr.call1(&mut *frame, arr)?.unwrap();
+                    let wgt = wgt_constr.call1(&mut *frame, arr.as_value())?.unwrap();
 
                     let constr = Module::base(global)
                         .function_ref("tuple")?

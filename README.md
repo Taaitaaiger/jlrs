@@ -48,6 +48,16 @@ Julia is automatically detected by executing the command `where julia`. If this 
 
 Note that while both Julia 1.6 and 1.7 are supported on Windows, several methods are currently unavailable when the LTS version is used.
 
+If you use the MSVC target, you must create two or three lib files using `lib.exe`. The def files required for this can be found in the `defs` folder in the jl-sys crate. To create the lib files, copy the three files from either the `lts` or `stable` folder to the `bin` folder where Julia is installed. Afterwards, open a Developer Command Prompt for VS19 and execute the following commands:
+
+```
+cd C:\Path\To\Julia-x.y.z\bin
+lib /def:libjulia.def /out:libjulia.lib /machine:x64
+lib /def:libopenlibm.def /out:libopenlibm.lib /machine:x64
+lib /def:libuv-2.def /out:libuv-2.lib /machine:x64
+```
+
+If you use the GNU target these lib files must not exist.
 
 ## Features
 

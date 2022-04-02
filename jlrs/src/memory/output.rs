@@ -1,193 +1,72 @@
-//! Root a value in the frame of an earlier scope.
+//! Root data in parent scope.
 //!
-//! In order to prevent temporary values from remaining rooted, it's often desirable to call some
-//! function or create a new value in a new scope but root the final result in the frame of the
-//! current scope. This can be done with the methods like [`Scope::result_scope`] and
-//! [`Scope::value_scope`] respectively. These methods take a closure that provides an `Output`
-//! and a mutable reference to a frame. The frame can be used to root temporary values, the
-//! [`Output`] can be converted to an [`OutputScope`]. An [`OutputScope`] is a [`Scope`] that
-//! roots the result in an earlier frame and can only be used once.
+//! In order to allow temporary data to be freed by the GC when it's no longer in use, these
+//! temporaries should be allocated in a new scope. Because the data returned from a scope must
+//! outlive that scope, data rooted in it can't be returned from it.
 //!
-//! [`Scope`]: crate::memory::scope::Scope
-//! [`Scope::result_scope`]: crate::memory::scope::Scope::result_scope
-//! [`Scope::value_scope`]: crate::memory::scope::Scope::value_scope
+//! Instead, Julia data that you want to return from a scope must be rooted in a parent scope. For
+//! this purpose [`Output`] and [`OutputScope`] can be used. An `Output` can be reserved in a
+//! frame by calling [`Frame::reserve_output`], an `Output` can be turned into an `OutputScope` by
+//! calling [`Output::into_scope`].
 
-use jl_sys::jl_value_t;
+use crate::{
+    prelude::{Frame, Wrapper},
+    private::Private,
+};
+use std::{cell::Cell, ffi::c_void, marker::PhantomData, ptr::NonNull};
 
-use super::{frame::Frame, frame::GcFrame};
-use crate::{error::JlrsResult, private::Private};
-use std::{marker::PhantomData, ptr::NonNull};
+/// A reserved slot in a frame. A new output can be created by calling [`Frame::reserve_output`].
+/// While an `Output` doesn't implement [`Scope`], it does implement [`PartialScope`].
+///
+/// [`Scope`]: crate::memory::scope::Scope
+/// [`PartialScope`]: crate::memory::scope::PartialScope
+pub struct Output<'target> {
+    output: *const Cell<*mut c_void>,
+    _marker: PhantomData<fn(&'target mut ()) -> ()>,
+}
 
-/// An output that can be converted into an [`OutputScope`] to root a value in an earlier frame.
-pub struct Output<'scope>(PhantomData<&'scope ()>);
-
-impl<'scope> Output<'scope> {
-    pub(crate) fn new() -> Self {
-        Output(PhantomData)
-    }
-
-    /// Convert the output to an [`OutputScope`].
+impl<'target> Output<'target> {
+    /// Convert the `Output` and a frame to an `OutputScope`.
     pub fn into_scope<'frame, 'borrow, F: Frame<'frame>>(
         self,
         frame: &'borrow mut F,
-    ) -> OutputScope<'scope, 'frame, 'borrow, F> {
-        OutputScope::new(self, frame)
+    ) -> OutputScope<'target, 'frame, 'borrow, F> {
+        OutputScope {
+            output: self,
+            frame,
+            _marker: PhantomData,
+        }
+    }
+
+    pub(crate) fn new<F: Frame<'target>>(_frame: &F, output: *const Cell<*mut c_void>) -> Self {
+        Output {
+            output,
+            _marker: PhantomData,
+        }
+    }
+
+    pub(crate) fn set_root<'data, X: Wrapper<'target, 'data>>(self, value: NonNull<X::Wraps>) {
+        unsafe {
+            let cell = &*self.output;
+            cell.set(value.as_ptr().cast());
+        }
     }
 }
 
-/// A [`Scope`] that can be used once to root a value in an earlier frame.
+/// A [`Scope`] that roots a result using an [`Output`].
 ///
 /// [`Scope`]: crate::memory::scope::Scope
-pub struct OutputScope<'scope, 'frame, 'borrow, F: Frame<'frame>>(
-    pub(crate) &'borrow mut F,
-    Output<'scope>,
-    PhantomData<&'frame ()>,
-);
-
-impl<'scope, 'frame, 'borrow, F: Frame<'frame>> OutputScope<'scope, 'frame, 'borrow, F> {
-    fn new(output: Output<'scope>, frame: &'borrow mut F) -> Self {
-        OutputScope(frame, output, PhantomData)
-    }
-
-    pub(crate) fn value_scope<'data, G>(
-        self,
-        func: G,
-    ) -> JlrsResult<OutputValue<'scope, 'data, 'borrow>>
-    where
-        G: for<'nested, 'inner> FnOnce(
-            Output<'scope>,
-            &'inner mut GcFrame<'nested, F::Mode>,
-        ) -> JlrsResult<OutputValue<'scope, 'data, 'inner>>,
-    {
-        let mut frame = self.0.nest(0, Private);
-        let out = Output::new();
-        func(out, &mut frame).map(|pv| OutputValue::wrap_non_null(pv.unwrap_non_null()))
-    }
-
-    pub(crate) fn value_scope_with_slots<'data, G>(
-        self,
-        capacity: usize,
-        func: G,
-    ) -> JlrsResult<OutputValue<'scope, 'data, 'borrow>>
-    where
-        G: for<'nested, 'inner> FnOnce(
-            Output<'scope>,
-            &'inner mut GcFrame<'nested, F::Mode>,
-        ) -> JlrsResult<OutputValue<'scope, 'data, 'inner>>,
-    {
-        let mut frame = self.0.nest(capacity, Private);
-        let out = Output::new();
-        func(out, &mut frame).map(|pv| OutputValue::wrap_non_null(pv.unwrap_non_null()))
-    }
-
-    pub(crate) fn result_scope<'data, G>(
-        self,
-        func: G,
-    ) -> JlrsResult<OutputResult<'scope, 'data, 'borrow>>
-    where
-        G: for<'nested, 'inner> FnOnce(
-            Output<'scope>,
-            &'inner mut GcFrame<'nested, F::Mode>,
-        ) -> JlrsResult<OutputResult<'scope, 'data, 'inner>>,
-    {
-        let mut frame = self.0.nest(0, Private);
-        let out = Output::new();
-        func(out, &mut frame).map(|pv| match pv {
-            OutputResult::Ok(pv) => {
-                OutputResult::Ok(OutputValue::wrap_non_null(pv.unwrap_non_null()))
-            }
-            OutputResult::Err(pv) => {
-                OutputResult::Err(OutputValue::wrap_non_null(pv.unwrap_non_null()))
-            }
-        })
-    }
-
-    pub(crate) fn result_scope_with_slots<'data, G>(
-        self,
-        capacity: usize,
-        func: G,
-    ) -> JlrsResult<OutputResult<'scope, 'data, 'borrow>>
-    where
-        G: for<'nested, 'inner> FnOnce(
-            Output<'scope>,
-            &'inner mut GcFrame<'nested, F::Mode>,
-        ) -> JlrsResult<OutputResult<'scope, 'data, 'inner>>,
-    {
-        let mut frame = self.0.nest(capacity, Private);
-        let out = Output::new();
-        func(out, &mut frame).map(|pv| match pv {
-            OutputResult::Ok(pv) => {
-                OutputResult::Ok(OutputValue::wrap_non_null(pv.unwrap_non_null()))
-            }
-            OutputResult::Err(pv) => {
-                OutputResult::Err(OutputValue::wrap_non_null(pv.unwrap_non_null()))
-            }
-        })
-    }
+pub struct OutputScope<'target, 'current, 'borrow, F: Frame<'current>> {
+    pub(crate) output: Output<'target>,
+    pub(crate) frame: &'borrow mut F,
+    _marker: PhantomData<&'current ()>,
 }
 
-/// A `Value` that has not yet been rooted.
-#[repr(transparent)]
-pub struct OutputValue<'frame, 'data, 'borrow>(
-    NonNull<jl_value_t>,
-    PhantomData<&'frame ()>,
-    PhantomData<&'data ()>,
-    PhantomData<&'borrow ()>,
-);
-
-impl<'frame, 'data, 'borrow> OutputValue<'frame, 'data, 'borrow> {
-    pub(crate) fn into_pending(self) -> PendingValue<'frame, 'data> {
-        PendingValue::wrap_non_null(self.0)
-    }
-
-    pub(crate) fn unwrap_non_null(self) -> NonNull<jl_value_t> {
-        self.0
-    }
-
-    pub(crate) fn wrap_non_null(contents: NonNull<jl_value_t>) -> Self {
-        OutputValue(contents, PhantomData, PhantomData, PhantomData)
-    }
-}
-
-/// A `JuliaResult` that has not yet been rooted.
-pub enum OutputResult<'frame, 'data, 'inner> {
-    Ok(OutputValue<'frame, 'data, 'inner>),
-    Err(OutputValue<'frame, 'data, 'inner>),
-}
-
-impl<'frame, 'data, 'inner> OutputResult<'frame, 'data, 'inner> {
-    pub(crate) fn into_pending(self) -> PendingResult<'frame, 'data> {
-        match self {
-            Self::Ok(pov) => Ok(pov.into_pending()),
-            Self::Err(pov) => Err(pov.into_pending()),
-        }
-    }
-
-    /// Returns true if the result is an exception.
-    pub fn is_exception(&self) -> bool {
-        match self {
-            Self::Ok(_) => false,
-            Self::Err(_) => true,
+impl<'target, 'current, 'borrow, F: Frame<'current>> OutputScope<'target, 'current, 'borrow, F> {
+    pub(crate) fn set_root<'data, X: Wrapper<'target, 'data>>(self, value: NonNull<X::Wraps>) -> X {
+        unsafe {
+            self.output.set_root::<X>(value);
+            X::wrap_non_null(value, Private)
         }
     }
 }
-
-#[repr(transparent)]
-pub(crate) struct PendingValue<'frame, 'data>(
-    NonNull<jl_value_t>,
-    PhantomData<&'frame ()>,
-    PhantomData<&'data ()>,
-);
-
-impl<'frame, 'data> PendingValue<'frame, 'data> {
-    pub(crate) fn unwrap_non_null(self) -> NonNull<jl_value_t> {
-        self.0
-    }
-
-    pub(crate) fn wrap_non_null(contents: NonNull<jl_value_t>) -> Self {
-        PendingValue(contents, PhantomData, PhantomData)
-    }
-}
-
-pub(crate) type PendingResult<'frame, 'data> =
-    Result<PendingValue<'frame, 'data>, PendingValue<'frame, 'data>>;

@@ -8,7 +8,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |global, frame| {
+            jlrs.scope_with_capacity(1, |global, frame| {
                 let union_ty = DataType::uniontype_type(global)
                     .as_value()
                     .apply_type(
@@ -20,9 +20,7 @@ mod tests {
                     )?
                     .into_jlrs_result()?;
 
-                let arr = Array::new_for(&mut *frame, 4, union_ty)?
-                    .into_jlrs_result()?
-                    .cast::<Array>()?;
+                let arr = Array::new_for(&mut *frame, 4, union_ty)?.into_jlrs_result()?;
 
                 {
                     let data = arr.union_data(frame)?;
@@ -50,7 +48,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |global, frame| unsafe {
+            jlrs.scope_with_capacity(1, |global, frame| unsafe {
                 let union_ty = DataType::uniontype_type(global)
                     .as_value()
                     .apply_type(
@@ -62,9 +60,7 @@ mod tests {
                     )?
                     .into_jlrs_result()?;
 
-                let arr = Array::new_for(&mut *frame, 4, union_ty)?
-                    .into_jlrs_result()?
-                    .cast::<Array>()?;
+                let arr = Array::new_for(&mut *frame, 4, union_ty)?.into_jlrs_result()?;
 
                 {
                     let mut data = arr.union_data_mut(frame)?;
@@ -109,7 +105,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |global, frame| unsafe {
+            jlrs.scope_with_capacity(1, |global, frame| unsafe {
                 let union_ty = DataType::uniontype_type(global)
                     .as_value()
                     .apply_type(
@@ -121,9 +117,7 @@ mod tests {
                     )?
                     .into_jlrs_result()?;
 
-                let arr = Array::new_for(&mut *frame, 4, union_ty)?
-                    .into_jlrs_result()?
-                    .cast::<Array>()?;
+                let arr = Array::new_for(&mut *frame, 4, union_ty)?.into_jlrs_result()?;
 
                 {
                     let mut data = arr.union_data_mut(frame)?;
@@ -155,7 +149,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |global, frame| {
+            jlrs.scope_with_capacity(1, |global, frame| {
                 let union_ty = DataType::uniontype_type(global)
                     .as_value()
                     .apply_type(
@@ -167,9 +161,7 @@ mod tests {
                     )?
                     .into_jlrs_result()?;
 
-                let arr = Array::new_for(&mut *frame, 4, union_ty)?
-                    .into_jlrs_result()?
-                    .cast::<Array>()?;
+                let arr = Array::new_for(&mut *frame, 4, union_ty)?.into_jlrs_result()?;
 
                 unsafe {
                     let mut data = arr.union_data_mut(frame)?;

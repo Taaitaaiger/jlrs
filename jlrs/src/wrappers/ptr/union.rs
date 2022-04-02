@@ -1,13 +1,14 @@
 //! Wrapper for `Union`.
 
 use super::{private::Wrapper, value::Value, ValueRef, Wrapper as _};
-use crate::error::JlrsResult;
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
-use crate::error::JuliaResultRef;
+use crate::error::{JuliaResult, JuliaResultRef};
 use crate::{
-    impl_debug, impl_julia_typecheck, impl_valid_layout,
-    memory::{frame::Frame, global::Global, scope::Scope},
-    private::Private,
+    error::JlrsResult,
+    memory::{output::Output, scope::PartialScope},
+};
+use crate::{
+    impl_debug, impl_julia_typecheck, impl_valid_layout, memory::global::Global, private::Private,
 };
 use jl_sys::{jl_islayout_inline, jl_type_union, jl_uniontype_t, jl_uniontype_type};
 
@@ -32,11 +33,10 @@ impl<'scope> Union<'scope> {
     /// [`Union`]: crate::wrappers::ptr::union::Union
     /// [`DataType`]: crate::wrappers::ptr::datatype::DataType
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub fn new<'target, 'current, V, S, F>(scope: S, mut types: V) -> JlrsResult<S::JuliaResult>
+    pub fn new<'target, V, S>(scope: S, mut types: V) -> JlrsResult<JuliaResult<'target, 'static>>
     where
         V: AsMut<[Value<'scope, 'static>]>,
-        S: Scope<'target, 'current, 'static, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
     {
         unsafe {
             let types = types.as_mut();
@@ -57,17 +57,17 @@ impl<'scope> Union<'scope> {
     ///
     /// [`Union`]: crate::wrappers::ptr::union::Union
     /// [`DataType`]: crate::wrappers::ptr::datatype::DataType
-    pub fn new_unchecked<'target, 'current, V, S, F>(scope: S, mut types: V) -> JlrsResult<S::Value>
+    pub unsafe fn new_unchecked<'target, V, S>(
+        scope: S,
+        mut types: V,
+    ) -> JlrsResult<Value<'target, 'static>>
     where
         V: AsMut<[Value<'scope, 'static>]>,
-        S: Scope<'target, 'current, 'static, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
     {
-        unsafe {
-            let types = types.as_mut();
-            let un = jl_type_union(types.as_mut_ptr().cast(), types.len());
-            scope.value(NonNull::new_unchecked(un), Private)
-        }
+        let types = types.as_mut();
+        let un = jl_type_union(types.as_mut_ptr().cast(), types.len());
+        scope.value(NonNull::new_unchecked(un), Private)
     }
 
     /// Returns the union of all types in `types`. For each of these types, [`Value::is_kind`]
@@ -105,18 +105,16 @@ impl<'scope> Union<'scope> {
     ///
     /// [`Union`]: crate::wrappers::ptr::union::Union
     /// [`DataType`]: crate::wrappers::ptr::datatype::DataType
-    pub fn new_unrooted_unchecked<'global, V>(
+    pub unsafe fn new_unrooted_unchecked<'global, V>(
         _: Global<'global>,
         mut types: V,
     ) -> ValueRef<'global, 'static>
     where
         V: AsMut<[Value<'scope, 'static>]>,
     {
-        unsafe {
-            let types = types.as_mut();
-            let un = jl_type_union(types.as_mut_ptr().cast(), types.len());
-            ValueRef::wrap(un)
-        }
+        let types = types.as_mut();
+        let un = jl_type_union(types.as_mut_ptr().cast(), types.len());
+        ValueRef::wrap(un)
     }
 
     /// Returns true if the bits-union optimization applies to this union type.
@@ -173,6 +171,15 @@ impl<'scope> Union<'scope> {
     /// returns one of its branches.
     pub fn b(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().b) }
+    }
+
+    /// Use the `Output` to extend the lifetime of this data.
+    pub fn root<'target>(self, output: Output<'target>) -> Union<'target> {
+        unsafe {
+            let ptr = self.unwrap_non_null(Private);
+            output.set_root::<Union>(ptr);
+            Union::wrap_non_null(ptr, Private)
+        }
     }
 }
 
@@ -258,3 +265,5 @@ pub(crate) fn find_union_component(haystack: Value, needle: Value, nth: &mut u32
         }
     }
 }
+
+impl_root!(Union, 1);

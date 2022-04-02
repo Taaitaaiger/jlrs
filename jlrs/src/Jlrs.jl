@@ -10,7 +10,7 @@ end
 
 function errorstring(@nospecialize(value::Any))::String
     io = IOBuffer()
-    showerror(IOContext(io, :color => color[], :compact => true), value)
+    showerror(IOContext(io, :color => color[], :compact => true, :limit => true), value)
     String(take!(io))
 end
 end

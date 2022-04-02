@@ -2,15 +2,16 @@
 
 use super::type_var::TypeVar;
 use super::{private::Wrapper, value::Value};
-use crate::error::JlrsResult;
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
-use crate::error::JuliaResultRef;
+use crate::error::{JuliaResult, JuliaResultRef};
 use crate::impl_debug;
-use crate::memory::frame::Frame;
-use crate::memory::scope::Scope;
 use crate::wrappers::ptr::datatype::DataType;
 use crate::wrappers::ptr::DataTypeRef;
 use crate::wrappers::ptr::{TypeVarRef, ValueRef};
+use crate::{
+    error::JlrsResult,
+    memory::{output::Output, scope::PartialScope},
+};
 use crate::{impl_julia_typecheck, impl_valid_layout};
 use crate::{memory::global::Global, private::Private};
 
@@ -39,14 +40,13 @@ pub struct UnionAll<'scope>(NonNull<jl_unionall_t>, PhantomData<&'scope ()>);
 impl<'scope> UnionAll<'scope> {
     /// Create a new `UnionAll`. If an exception is thrown, it's caught and returned.
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub fn new<'target, 'current, S, F>(
+    pub fn new<'target, S>(
         scope: S,
         tvar: TypeVar,
         body: Value<'_, 'static>,
-    ) -> JlrsResult<S::JuliaResult>
+    ) -> JlrsResult<JuliaResult<'target, 'static>>
     where
-        S: Scope<'target, 'current, 'static, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
     {
         unsafe {
             let ua = jlrs_type_unionall(tvar.unwrap(Private), body.unwrap(Private));
@@ -59,19 +59,16 @@ impl<'scope> UnionAll<'scope> {
     }
 
     /// Create a new `UnionAll`. If an exception is thrown the process aborts.
-    pub fn new_unchecked<'target, 'current, S, F>(
+    pub unsafe fn new_unchecked<'target, S>(
         scope: S,
         tvar: TypeVar,
         body: Value<'_, 'static>,
-    ) -> JlrsResult<S::Value>
+    ) -> JlrsResult<Value<'target, 'static>>
     where
-        S: Scope<'target, 'current, 'static, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
     {
-        unsafe {
-            let ua = jl_type_unionall(tvar.unwrap(Private), body.unwrap(Private));
-            scope.value(NonNull::new_unchecked(ua), Private)
-        }
+        let ua = jl_type_unionall(tvar.unwrap(Private), body.unwrap(Private));
+        scope.value(NonNull::new_unchecked(ua), Private)
     }
 
     /// Create a new `UnionAll`. Unlike [`UnionAll::new`] this method doesn't root the allocated
@@ -94,15 +91,13 @@ impl<'scope> UnionAll<'scope> {
 
     /// Create a new `UnionAll`. Unlike [`UnionAll::new_unchecked`] this method doesn't root the
     /// allocated value. If an exception is thrown the process aborts.
-    pub fn new_unrooted_unchecked<'global>(
+    pub unsafe fn new_unrooted_unchecked<'global>(
         _: Global<'global>,
         tvar: TypeVar,
         body: Value<'_, 'static>,
     ) -> ValueRef<'global, 'static> {
-        unsafe {
-            let ua = jl_type_unionall(tvar.unwrap(Private), body.unwrap(Private));
-            ValueRef::wrap(ua)
-        }
+        let ua = jl_type_unionall(tvar.unwrap(Private), body.unwrap(Private));
+        ValueRef::wrap(ua)
     }
 
     /// The type at the bottom of this `UnionAll`.
@@ -141,6 +136,15 @@ impl<'scope> UnionAll<'scope> {
     /// The type variable associated with this "layer" of the `UnionAll`.
     pub fn var(self) -> TypeVarRef<'scope> {
         unsafe { TypeVarRef::wrap(self.unwrap_non_null(Private).as_ref().var) }
+    }
+
+    /// Use the `Output` to extend the lifetime of this data.
+    pub fn root<'target>(self, output: Output<'target>) -> UnionAll<'target> {
+        unsafe {
+            let ptr = self.unwrap_non_null(Private);
+            output.set_root::<UnionAll>(ptr);
+            UnionAll::wrap_non_null(ptr, Private)
+        }
     }
 }
 
@@ -221,3 +225,5 @@ impl<'scope> Wrapper<'scope, '_> for UnionAll<'scope> {
         self.0
     }
 }
+
+impl_root!(UnionAll, 1);

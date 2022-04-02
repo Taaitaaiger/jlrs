@@ -1,6 +1,6 @@
 [package]
 name = "jlrs"
-version = "0.13.0"
+version = "0.14.0"
 authors = ["Thomas van Doornmalen <thomas.vandoornmalen@gmail.com>"]
 description = """
 jlrs provides bindings to the Julia C API that enables Julia code to be called from Rust and more.
@@ -15,11 +15,11 @@ license = "MIT"
 edition = "2018"
 
 [features]
-default = ["async-std"]
+default = []
 ccall = []
 sync-rt = []
 debug = ["jl-sys/debug"]
-uv = ["jl-sys/uv"]
+uv = ["jl-sys/uv", "ccall"]
 async = ["futures", "crossbeam-channel", "async-trait"]
 async-std-rt = ["async", "async-std"]
 tokio-rt = ["async", "tokio"]
@@ -27,22 +27,21 @@ jlrs-ndarray = ["ndarray"]
 f16 = ["half"]
 pyplot = []
 internal-types = []
-docs-rs = [
-    "jl-sys/docs-rs", "uv", "async-std-rt", "async", "tokio", "f16", "jlrs-ndarray", 
-    "jlrs-derive", "sync-rt", "ccall", "docs"
+docs = [
+    "jl-sys/docs", "uv", "async-std-rt", "async", "tokio", "f16", "jlrs-ndarray", 
+    "jlrs-derive", "sync-rt", "ccall", "internal-types", "pyplot"
 ]
-docs = []
 lts = ["jl-sys/lts"]
 use-bindgen = ["jl-sys/use-bindgen"]
 
 [dependencies]
-jl-sys = {version = "0.14", path = "../jl_sys" }
+jl-sys = {version = "0.16", path = "../jl_sys" }
 smallvec = "1"
 jlrs-derive = { version = "0.3", optional = true, path = "../jlrs_derive" }
 futures = { version = "0.3", optional = true }
 crossbeam-channel = { version = "0.5", optional = true }
 async-trait = { version = "0.1", optional = true }
-async-std = { version = "1.10", features = ["unstable"], optional = true }
+async-std = { version = "1", features = ["unstable"], optional = true }
 ndarray = { version = "0.15", optional = true }
 half = { version = "1", optional = true }
 tokio = { version = "1", optional = true, features = ["rt", "time", "sync"]}

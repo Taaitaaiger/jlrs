@@ -65,7 +65,7 @@ impl CCall {
 
     /// Creates a [`GcFrame`] with  capacity for at least `slots` roots, calls the given closure,
     /// and returns its result.
-    pub fn scope_with_slots<T, F>(&mut self, slots: usize, func: F) -> JlrsResult<T>
+    pub fn scope_with_capacity<T, F>(&mut self, slots: usize, func: F) -> JlrsResult<T>
     where
         for<'base> F: FnOnce(Global<'base>, &mut GcFrame<'base, Sync>) -> JlrsResult<T>,
     {

@@ -6,7 +6,7 @@
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#525
 
 use super::super::private::Wrapper;
-use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout};
+use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout, memory::output::Output};
 use crate::{private::Private, wrappers::ptr::ValueRef};
 use jl_sys::{jl_typemap_level_t, jl_typemap_level_type};
 use std::{marker::PhantomData, ptr::NonNull};
@@ -130,6 +130,15 @@ impl<'scope> TypeMapLevel<'scope> {
             ValueRef::wrap(ptr.cast())
         }
     }
+
+    /// Use the `Output` to extend the lifetime of this data.
+    pub fn root<'target>(self, output: Output<'target>) -> TypeMapLevel<'target> {
+        unsafe {
+            let ptr = self.unwrap_non_null(Private);
+            output.set_root::<TypeMapLevel>(ptr);
+            TypeMapLevel::wrap_non_null(ptr, Private)
+        }
+    }
 }
 
 impl_julia_typecheck!(TypeMapLevel<'scope>, jl_typemap_level_type, 'scope);
@@ -150,3 +159,5 @@ impl<'scope> Wrapper<'scope, '_> for TypeMapLevel<'scope> {
         self.0
     }
 }
+
+impl_root!(TypeMapLevel, 1);

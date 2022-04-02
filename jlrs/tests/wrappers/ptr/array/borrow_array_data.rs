@@ -15,13 +15,11 @@ mod tests {
                 JULIA.with(|j| {
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope_with_slots(5, |global, frame| unsafe {
+                    jlrs.scope_with_capacity(5, |global, frame| unsafe {
                         let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
                         let array = Array::from_vec(&mut *frame, data, (2, 3, 4))?;
-                        let d = array
-                            .cast::<Array>()?
-                            .inline_data::<$value_type, _>(&mut *frame)?;
+                        let d = array.inline_data::<$value_type, _>(&mut *frame)?;
 
                         let mut out = 1 as $value_type;
                         for third in &[0, 1, 2, 3] {
@@ -45,11 +43,11 @@ mod tests {
                         for third in &[one, two, three, four] {
                             for second in &[one, two, three] {
                                 for first in &[one, two] {
-                                    frame.scope_with_slots(1, |frame| {
+                                    frame.scope_with_capacity(1, |frame| {
                                         let v = gi
                                             .call(
                                                 &mut *frame,
-                                                &mut [array, *first, *second, *third],
+                                                &mut [array.as_value(), *first, *second, *third],
                                             )?
                                             .unwrap();
                                         assert_eq!(v.unbox::<$value_type>()?, out);
@@ -73,13 +71,11 @@ mod tests {
                 JULIA.with(|j| {
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope_with_slots(5, |global, frame| unsafe {
+                    jlrs.scope_with_capacity(5, |global, frame| unsafe {
                         let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
                         let array = Array::from_vec(&mut *frame, data, (2, 3, 4))?;
-                        let mut d = array
-                            .cast::<Array>()?
-                            .inline_data_mut::<$value_type, _>(&mut *frame)?;
+                        let mut d = array.inline_data_mut::<$value_type, _>(&mut *frame)?;
 
                         for third in &[0, 1, 2, 3] {
                             for second in &[0, 1, 2] {
@@ -100,11 +96,11 @@ mod tests {
                         for third in &[one, two, three, four] {
                             for second in &[one, two, three] {
                                 for first in &[one, two] {
-                                    frame.scope_with_slots(1, |frame| {
+                                    frame.scope_with_capacity(1, |frame| {
                                         let v = gi
                                             .call(
                                                 &mut *frame,
-                                                &mut [array, *first, *second, *third],
+                                                &mut [array.as_value(), *first, *second, *third],
                                             )?
                                             .unwrap();
                                         assert_eq!(v.unbox::<$value_type>()?, out);
@@ -126,13 +122,11 @@ mod tests {
                 JULIA.with(|j| {
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope_with_slots(1, |_, frame| {
+                    jlrs.scope_with_capacity(1, |_, frame| {
                         let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
                         let array = Array::from_vec(&mut *frame, data.clone(), (2, 3, 4))?;
-                        let d = array
-                            .cast::<Array>()?
-                            .inline_data::<$value_type, _>(&mut *frame)?;
+                        let d = array.inline_data::<$value_type, _>(&mut *frame)?;
 
                         for (a, b) in data.iter().zip(d.as_slice()) {
                             assert_eq!(a, b)
@@ -149,13 +143,11 @@ mod tests {
                 JULIA.with(|j| {
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope_with_slots(1, |_, frame| unsafe {
+                    jlrs.scope_with_capacity(1, |_, frame| unsafe {
                         let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
                         let array = Array::from_vec(&mut *frame, data.clone(), (2, 3, 4))?;
-                        let mut d = array
-                            .cast::<Array>()?
-                            .inline_data_mut::<$value_type, _>(&mut *frame)?;
+                        let mut d = array.inline_data_mut::<$value_type, _>(&mut *frame)?;
 
                         for (a, b) in data.iter().zip(d.as_mut_slice()) {
                             assert_eq!(a, b)
@@ -245,17 +237,13 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |global, frame| unsafe {
+            jlrs.scope_with_capacity(1, |global, frame| unsafe {
                 let data: Vec<u8> = (1..=24).map(|x| x as u8).collect();
 
                 let array = Array::from_vec(&mut *frame, data, (2, 3, 4))?;
 
-                frame.scope_with_slots(4, |frame| {
-                    let d = {
-                        array
-                            .cast_unchecked::<Array>()
-                            .inline_data::<u8, _>(&mut *frame)?
-                    };
+                frame.scope_with_capacity(4, |frame| {
+                    let d = { array.inline_data::<u8, _>(&mut *frame)? };
 
                     let mut out = 1 as u8;
                     for third in &[0, 1, 2, 3] {
@@ -279,9 +267,12 @@ mod tests {
                     for third in &[one, two, three, four] {
                         for second in &[one, two, three] {
                             for first in &[one, two] {
-                                frame.scope_with_slots(1, |frame| {
+                                frame.scope_with_capacity(1, |frame| {
                                     let v = gi
-                                        .call(&mut *frame, &mut [array, *first, *second, *third])?
+                                        .call(
+                                            &mut *frame,
+                                            &mut [array.as_value(), *first, *second, *third],
+                                        )?
                                         .unwrap();
                                     assert_eq!(v.unbox::<u8>()?, out);
                                     out += 1 as u8;
@@ -303,10 +294,10 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |_, frame| {
+            jlrs.scope_with_capacity(1, |_, frame| {
                 let arr_val =
                     Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?.into_jlrs_result()?;
-                let arr = arr_val.cast::<Array>()?;
+                let arr = arr_val;
 
                 let data = arr.inline_data::<f32, _>(&mut *frame)?;
                 assert_eq!(data.dimensions().into_dimensions().as_slice(), &[1, 2]);
@@ -322,10 +313,10 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |_, frame| unsafe {
+            jlrs.scope_with_capacity(1, |_, frame| unsafe {
                 let arr_val =
                     Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?.into_jlrs_result()?;
-                let arr = arr_val.cast::<Array>()?;
+                let arr = arr_val;
 
                 let data = arr.inline_data_mut::<f32, _>(&mut *frame)?;
                 assert_eq!(data.dimensions().into_dimensions().as_slice(), &[1, 2]);
@@ -341,14 +332,14 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(2, |_, frame| {
+            jlrs.scope_with_capacity(2, |_, frame| {
                 unsafe {
                     let arr_val =
                         Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?.into_jlrs_result()?;
                     let arr_val2 =
                         Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?.into_jlrs_result()?;
-                    let arr = arr_val.cast::<Array>()?;
-                    let arr2 = arr_val2.cast::<Array>()?;
+                    let arr = arr_val;
+                    let arr2 = arr_val2;
 
                     let data = arr.unrestricted_inline_data_mut::<f32, _>(&*frame)?;
                     let data2 = arr2.unrestricted_inline_data_mut::<f32, _>(&*frame)?;
@@ -369,14 +360,14 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(2, |_, frame| {
+            jlrs.scope_with_capacity(2, |_, frame| {
                 unsafe {
                     let arr_val =
                         Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?.into_jlrs_result()?;
                     let arr_val2 =
                         Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?.into_jlrs_result()?;
-                    let arr = arr_val.cast::<TypedArray<f32>>()?;
-                    let arr2 = arr_val2.cast::<TypedArray<f32>>()?;
+                    let arr = arr_val.as_value().cast::<TypedArray<f32>>()?;
+                    let arr2 = arr_val2.as_value().cast::<TypedArray<f32>>()?;
 
                     let data = arr.unrestricted_inline_data_mut(&*frame)?;
                     let data2 = arr2.unrestricted_inline_data_mut(&*frame)?;
@@ -397,7 +388,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(2, |global, frame| {
+            jlrs.scope_with_capacity(2, |global, frame| {
                 unsafe {
                     let arr = Module::main(global)
                         .submodule_ref("JlrsTests")?
@@ -422,7 +413,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(3, |global, frame| {
+            jlrs.scope_with_capacity(3, |global, frame| {
                 unsafe {
                     let submod = Module::main(global)
                         .submodule_ref("JlrsTests")?
@@ -458,7 +449,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(6, |global, frame| {
+            jlrs.scope_with_capacity(6, |global, frame| {
                 unsafe {
                     let submod = Module::main(global)
                         .submodule_ref("JlrsTests")?
@@ -509,7 +500,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(2, |global, frame| {
+            jlrs.scope_with_capacity(2, |global, frame| {
                 unsafe {
                     let arr = Module::main(global)
                         .submodule_ref("JlrsTests")?
@@ -534,7 +525,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(3, |global, frame| {
+            jlrs.scope_with_capacity(3, |global, frame| {
                 unsafe {
                     let submod = Module::main(global)
                         .submodule_ref("JlrsTests")?
@@ -570,7 +561,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(6, |global, frame| {
+            jlrs.scope_with_capacity(6, |global, frame| {
                 unsafe {
                     let submod = Module::main(global)
                         .submodule_ref("JlrsTests")?

@@ -22,7 +22,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.scope(|global, frame| {
-                let plus = JuliaString::new(&mut *frame, "+")?.cast::<JuliaString>()?;
+                let plus = JuliaString::new(&mut *frame, "+")?;
                 assert!(Module::base(global).function(&mut *frame, plus).is_ok());
                 Ok(())
             })

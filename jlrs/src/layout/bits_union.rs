@@ -7,14 +7,14 @@
 //! fields, the size doesn't  have to be a multiple of the alignment. This is unlike structs in
 //! Rust, whose size is a multiple of their alignment.
 //!
-//! In order represent such a union in Rust, JlrsReflect.jl generates three separate fields: an
+//! In order represent such a union in Rust, JlrsReflect.jl generates three separate fields: a
 //! zero-sized alignment field which enforces the alignment, a container to store the raw bytes,
 //! and a flag to indicate the active variant.
 //!
 //! This module provides three traits, one for each of the fields. [`Align`] ensures the next
-//! field, which contains the data of the bits-union, is aligned correctly. `BitsUnionContainer`
-//! and `Flag` are essentially marker traits that are used by jlrs-derive to implement
-//! `ValidLayout` correctly.
+//! field, which contains the data of the bits-union, is aligned correctly. [`BitsUnionContainer`]
+//! and [`Flag`] are marker traits that are used by jlrs-derive to implement `ValidLayout`
+//! correctly.
 
 /// Trait implemented by the aligning structs, which ensure bits unions are properly aligned.
 /// Used in combination with `BitsUnionContainer` and `Flag` to ensure bits unions are inserted

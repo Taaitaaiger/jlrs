@@ -7,7 +7,7 @@ mod tests {
     fn frame_starts_with_no_roots() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(0, |_global, frame| {
+            jlrs.scope_with_capacity(0, |_global, frame| {
                 assert_eq!(frame.n_roots(), 0);
                 Ok(())
             })
@@ -19,7 +19,7 @@ mod tests {
     fn allocation_creates_root() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(0, |_global, frame| {
+            jlrs.scope_with_capacity(0, |_global, frame| {
                 Value::new(&mut *frame, 0usize)?;
                 assert_eq!(frame.n_roots(), 1);
                 Ok(())
@@ -32,7 +32,7 @@ mod tests {
     fn allocation_fails_if_capacity_exceeded() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(0, |_global, frame| {
+            jlrs.scope_with_capacity(0, |_global, frame| {
                 for _ in 0..frame.capacity() {
                     Value::new(&mut *frame, 0usize)?;
                 }
@@ -50,7 +50,7 @@ mod tests {
     fn frames_can_be_nested() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(0, |_global, frame| {
+            jlrs.scope_with_capacity(0, |_global, frame| {
                 let cap = frame.capacity();
                 frame
                     .scope(|frame| {
@@ -72,7 +72,7 @@ mod tests {
     fn new_page_is_allocated_if_necessary() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(0, |_global, frame| {
+            jlrs.scope_with_capacity(0, |_global, frame| {
                 let cap = frame.capacity();
 
                 for _ in 0..frame.capacity() {
@@ -98,7 +98,7 @@ mod tests {
     fn new_page_is_reused() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(0, |_global, frame| {
+            jlrs.scope_with_capacity(0, |_global, frame| {
                 let cap = frame.capacity();
 
                 for _ in 0..frame.capacity() {
@@ -106,7 +106,7 @@ mod tests {
                 }
 
                 frame
-                    .scope_with_slots(128, |frame| {
+                    .scope_with_capacity(128, |frame| {
                         let inner_cap = frame.capacity();
                         assert_eq!(inner_cap, 128);
                         Ok(())
@@ -114,7 +114,7 @@ mod tests {
                     .unwrap();
 
                 frame
-                    .scope_with_slots(64, |frame| {
+                    .scope_with_capacity(64, |frame| {
                         let inner_cap = frame.capacity();
                         assert_eq!(inner_cap, 128);
                         Ok(())
@@ -132,7 +132,7 @@ mod tests {
     fn new_page_realloacated_if_necessary() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(0, |_global, frame| {
+            jlrs.scope_with_capacity(0, |_global, frame| {
                 let cap = frame.capacity();
 
                 for _ in 0..frame.capacity() {
@@ -140,7 +140,7 @@ mod tests {
                 }
 
                 frame
-                    .scope_with_slots(128, |frame| {
+                    .scope_with_capacity(128, |frame| {
                         let inner_cap = frame.capacity();
                         assert_eq!(inner_cap, 128);
                         Ok(())
@@ -148,7 +148,7 @@ mod tests {
                     .unwrap();
 
                 frame
-                    .scope_with_slots(129, |frame| {
+                    .scope_with_capacity(129, |frame| {
                         let inner_cap = frame.capacity();
                         assert_eq!(inner_cap, 129);
                         Ok(())
@@ -162,6 +162,7 @@ mod tests {
         })
     }
 
+    /*
     #[test]
     #[cfg(feature = "ccall")]
     fn create_null_frame() {
@@ -198,7 +199,7 @@ mod tests {
 
         ccall
             .null_scope(|frame| {
-                assert!(frame.scope_with_slots(0, |_| { Ok(()) }).is_err());
+                assert!(frame.scope_with_capacity(0, |_| { Ok(()) }).is_err());
                 Ok(())
             })
             .unwrap();
@@ -235,4 +236,5 @@ mod tests {
             })
             .unwrap();
     }
+     */
 }

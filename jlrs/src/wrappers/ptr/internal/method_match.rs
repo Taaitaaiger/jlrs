@@ -5,7 +5,7 @@
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/f9720dc2ebd6cd9e3086365f281e62506444ef37/src/julia.h#L585
 use super::super::private::Wrapper;
-use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout};
+use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout, memory::output::Output};
 use crate::{
     private::Private,
     wrappers::ptr::{MethodRef, SimpleVectorRef, ValueRef},
@@ -49,6 +49,15 @@ impl<'scope> MethodMatch<'scope> {
     pub fn fully_covers(self) -> u8 {
         unsafe { self.unwrap_non_null(Private).as_ref().fully_covers }
     }
+
+    /// Use the `Output` to extend the lifetime of this data.
+    pub fn root<'target>(self, output: Output<'target>) -> MethodMatch<'target> {
+        unsafe {
+            let ptr = self.unwrap_non_null(Private);
+            output.set_root::<MethodMatch>(ptr);
+            MethodMatch::wrap_non_null(ptr, Private)
+        }
+    }
 }
 
 impl_julia_typecheck!(MethodMatch<'scope>, jl_method_match_type, 'scope);
@@ -69,3 +78,5 @@ impl<'scope> Wrapper<'scope, '_> for MethodMatch<'scope> {
         self.0
     }
 }
+
+impl_root!(MethodMatch, 1);

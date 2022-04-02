@@ -1,7 +1,7 @@
 //! Wrapper for `WeakRef`.
 
 use super::super::private::Wrapper;
-use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout};
+use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout, memory::output::Output};
 use crate::{private::Private, wrappers::ptr::ValueRef};
 use jl_sys::{jl_weakref_t, jl_weakref_type};
 use std::{marker::PhantomData, ptr::NonNull};
@@ -23,6 +23,15 @@ impl<'scope> WeakRef<'scope> {
     pub fn value(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().value) }
     }
+
+    /// Use the `Output` to extend the lifetime of this data.
+    pub fn root<'target>(self, output: Output<'target>) -> WeakRef<'target> {
+        unsafe {
+            let ptr = self.unwrap_non_null(Private);
+            output.set_root::<WeakRef>(ptr);
+            WeakRef::wrap_non_null(ptr, Private)
+        }
+    }
 }
 
 impl_julia_typecheck!(WeakRef<'scope>, jl_weakref_type, 'scope);
@@ -43,3 +52,5 @@ impl<'scope> Wrapper<'scope, '_> for WeakRef<'scope> {
         self.0
     }
 }
+
+impl_root!(WeakRef, 1);

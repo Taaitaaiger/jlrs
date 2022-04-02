@@ -12,7 +12,7 @@ mod tests {
             fn $name() {
                 JULIA.with(|j| {
                     let mut jlrs = j.borrow_mut();
-                    jlrs.scope_with_slots(1, |_global, frame| {
+                    jlrs.scope_with_capacity(1, |_global, frame| {
                         let val: $t = $val;
                         let v = Value::new(frame, val)?;
                         assert!(<$t as Typecheck>::typecheck(v.datatype()));
@@ -26,7 +26,7 @@ mod tests {
             fn $invalid_name() {
                 JULIA.with(|j| {
                     let mut jlrs = j.borrow_mut();
-                    jlrs.scope_with_slots(1, |_global, frame| {
+                    jlrs.scope_with_capacity(1, |_global, frame| {
                         let val: $t = $val;
                         let v = Value::new(frame, val)?;
                         assert!(!<*mut $t as Typecheck>::typecheck(v.datatype()));
@@ -149,7 +149,7 @@ mod tests {
     fn type_typecheck() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(1, |global, _frame| {
+            jlrs.scope_with_capacity(1, |global, _frame| {
                 assert!(Type::typecheck(DataType::datatype_type(global)));
                 assert!(Type::typecheck(DataType::unionall_type(global)));
                 assert!(Type::typecheck(DataType::uniontype_type(global)));
@@ -165,7 +165,7 @@ mod tests {
     fn bits_typecheck() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(1, |global, _frame| {
+            jlrs.scope_with_capacity(1, |global, _frame| {
                 assert!(Bits::typecheck(DataType::bool_type(global)));
                 assert!(!Bits::typecheck(DataType::datatype_type(global)));
                 Ok(())
@@ -178,7 +178,7 @@ mod tests {
     fn abstract_typecheck() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(1, |global, _frame| {
+            jlrs.scope_with_capacity(1, |global, _frame| {
                 assert!(Abstract::typecheck(DataType::floatingpoint_type(global)));
                 assert!(!Abstract::typecheck(DataType::datatype_type(global)));
                 Ok(())
@@ -191,7 +191,7 @@ mod tests {
     fn abstract_ref_typecheck() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(1, |global, frame| {
+            jlrs.scope_with_capacity(1, |global, frame| {
                 let v = UnionAll::ref_type(global)
                     .as_value()
                     .apply_type(&mut *frame, &mut [DataType::uint8_type(global).as_value()])?
@@ -210,7 +210,7 @@ mod tests {
     fn vec_element_typecheck() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(1, |global, frame| {
+            jlrs.scope_with_capacity(1, |global, frame| {
                 let value = Value::new(&mut *frame, 0u8)?;
                 let vec_elem_ty = Module::base(global)
                     .global(&mut *frame, "VecElement")?
@@ -234,7 +234,7 @@ mod tests {
     fn type_type_typecheck() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(1, |global, frame| {
+            jlrs.scope_with_capacity(1, |global, frame| {
                 let ty = UnionAll::type_type(global)
                     .as_value()
                     .apply_type(&mut *frame, &mut [DataType::uint8_type(global).as_value()])?
@@ -253,7 +253,7 @@ mod tests {
     fn named_tuple_typecheck() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(1, |global, frame| {
+            jlrs.scope_with_capacity(1, |global, frame| {
                 let a = Value::new(&mut *frame, 1usize)?;
                 let named_tuple = named_tuple!(&mut *frame, "a" => a)?;
 
@@ -269,7 +269,7 @@ mod tests {
     fn mutable_typecheck() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(1, |global, _frame| {
+            jlrs.scope_with_capacity(1, |global, _frame| {
                 assert!(Mutable::typecheck(DataType::datatype_type(global)));
                 assert!(!Mutable::typecheck(DataType::bool_type(global)));
                 Ok(())
@@ -282,7 +282,7 @@ mod tests {
     fn nothing_typecheck() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(1, |global, _frame| {
+            jlrs.scope_with_capacity(1, |global, _frame| {
                 let nothing = Value::nothing(global);
                 assert!(Nothing::typecheck(nothing.datatype()));
                 assert!(!Nothing::typecheck(DataType::bool_type(global)));
@@ -296,7 +296,7 @@ mod tests {
     fn immutable_typecheck() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(1, |global, _frame| {
+            jlrs.scope_with_capacity(1, |global, _frame| {
                 assert!(Immutable::typecheck(DataType::bool_type(global)));
                 assert!(!Immutable::typecheck(DataType::datatype_type(global)));
                 Ok(())
@@ -309,7 +309,7 @@ mod tests {
     fn primitive_type_typecheck() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(1, |global, _frame| {
+            jlrs.scope_with_capacity(1, |global, _frame| {
                 assert!(PrimitiveType::typecheck(DataType::bool_type(global)));
                 assert!(!PrimitiveType::typecheck(DataType::datatype_type(global)));
                 assert!(!PrimitiveType::typecheck(DataType::floatingpoint_type(
@@ -325,7 +325,7 @@ mod tests {
     fn struct_type_typecheck() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(1, |global, _frame| {
+            jlrs.scope_with_capacity(1, |global, _frame| {
                 assert!(StructType::typecheck(DataType::datatype_type(global)));
                 assert!(!StructType::typecheck(DataType::bool_type(global)));
                 assert!(!StructType::typecheck(DataType::floatingpoint_type(global)));
@@ -339,7 +339,7 @@ mod tests {
     fn singleton_typecheck() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(1, |global, _frame| {
+            jlrs.scope_with_capacity(1, |global, _frame| {
                 assert!(Singleton::typecheck(DataType::nothing_type(global)));
                 assert!(!Singleton::typecheck(DataType::bool_type(global)));
                 Ok(())
@@ -352,7 +352,7 @@ mod tests {
     fn slot_typecheck() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(1, |global, _frame| {
+            jlrs.scope_with_capacity(1, |global, _frame| {
                 assert!(Slot::typecheck(DataType::slotnumber_type(global)));
                 assert!(Slot::typecheck(DataType::typedslot_type(global)));
                 assert!(!Slot::typecheck(DataType::bool_type(global)));
@@ -366,7 +366,7 @@ mod tests {
     fn global_ref_typecheck() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(1, |global, _frame| {
+            jlrs.scope_with_capacity(1, |global, _frame| {
                 assert!(GlobalRef::typecheck(DataType::globalref_type(global)));
                 assert!(!GlobalRef::typecheck(DataType::bool_type(global)));
                 Ok(())
@@ -379,7 +379,7 @@ mod tests {
     fn goto_node_typecheck() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(1, |global, _frame| {
+            jlrs.scope_with_capacity(1, |global, _frame| {
                 assert!(GotoNode::typecheck(DataType::gotonode_type(global)));
                 assert!(!GotoNode::typecheck(DataType::bool_type(global)));
                 Ok(())
@@ -392,7 +392,7 @@ mod tests {
     fn pi_node_typecheck() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(1, |global, _frame| {
+            jlrs.scope_with_capacity(1, |global, _frame| {
                 assert!(PiNode::typecheck(DataType::pinode_type(global)));
                 assert!(!PiNode::typecheck(DataType::bool_type(global)));
                 Ok(())
@@ -405,7 +405,7 @@ mod tests {
     fn phi_node_typecheck() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(1, |global, _frame| {
+            jlrs.scope_with_capacity(1, |global, _frame| {
                 assert!(PhiNode::typecheck(DataType::phinode_type(global)));
                 assert!(!PhiNode::typecheck(DataType::bool_type(global)));
                 Ok(())
@@ -418,7 +418,7 @@ mod tests {
     fn phic_node_typecheck() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(1, |global, _frame| {
+            jlrs.scope_with_capacity(1, |global, _frame| {
                 assert!(PhiCNode::typecheck(DataType::phicnode_type(global)));
                 assert!(!PhiCNode::typecheck(DataType::bool_type(global)));
                 Ok(())
@@ -431,7 +431,7 @@ mod tests {
     fn upsilon_node_typecheck() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(1, |global, _frame| {
+            jlrs.scope_with_capacity(1, |global, _frame| {
                 assert!(UpsilonNode::typecheck(DataType::upsilonnode_type(global)));
                 assert!(!UpsilonNode::typecheck(DataType::bool_type(global)));
                 Ok(())
@@ -444,7 +444,7 @@ mod tests {
     fn quote_node_typecheck() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(1, |global, _frame| {
+            jlrs.scope_with_capacity(1, |global, _frame| {
                 assert!(QuoteNode::typecheck(DataType::quotenode_type(global)));
                 assert!(!QuoteNode::typecheck(DataType::bool_type(global)));
                 Ok(())
@@ -457,7 +457,7 @@ mod tests {
     fn new_var_node_typecheck() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(1, |global, _frame| {
+            jlrs.scope_with_capacity(1, |global, _frame| {
                 assert!(NewVarNode::typecheck(DataType::newvarnode_type(global)));
                 assert!(!NewVarNode::typecheck(DataType::bool_type(global)));
                 Ok(())
@@ -470,7 +470,7 @@ mod tests {
     fn line_node_typecheck() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(1, |global, _frame| {
+            jlrs.scope_with_capacity(1, |global, _frame| {
                 assert!(LineNode::typecheck(DataType::linenumbernode_type(global)));
                 assert!(!LineNode::typecheck(DataType::bool_type(global)));
                 Ok(())
@@ -483,7 +483,7 @@ mod tests {
     fn code_info_typecheck() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(1, |global, _frame| {
+            jlrs.scope_with_capacity(1, |global, _frame| {
                 assert!(CodeInfo::typecheck(DataType::code_info_type(global)));
                 assert!(!CodeInfo::typecheck(DataType::bool_type(global)));
                 Ok(())
@@ -496,7 +496,7 @@ mod tests {
     fn string_typecheck() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(1, |global, _frame| {
+            jlrs.scope_with_capacity(1, |global, _frame| {
                 assert!(String::typecheck(DataType::string_type(global)));
                 assert!(!String::typecheck(DataType::bool_type(global)));
                 Ok(())
@@ -509,7 +509,7 @@ mod tests {
     fn pointer_typecheck() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(1, |global, frame| {
+            jlrs.scope_with_capacity(1, |global, frame| {
                 let v: *mut u8 = null_mut();
                 let value = Value::new(&mut *frame, v)?;
                 assert!(Pointer::typecheck(value.datatype()));
@@ -524,7 +524,7 @@ mod tests {
     fn llvm_pointer_typecheck() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(1, |global, frame| unsafe {
+            jlrs.scope_with_capacity(1, |global, frame| unsafe {
                 let cmd = "reinterpret(Core.LLVMPtr{UInt8,1}, 0)";
                 let value = Value::eval_string(&mut *frame, cmd)?.into_jlrs_result()?;
                 assert!(LLVMPointer::typecheck(value.datatype()));
@@ -539,7 +539,7 @@ mod tests {
     fn intrinsic_typecheck() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(1, |global, _frame| {
+            jlrs.scope_with_capacity(1, |global, _frame| {
                 assert!(Intrinsic::typecheck(DataType::intrinsic_type(global)));
                 assert!(!Intrinsic::typecheck(DataType::bool_type(global)));
                 Ok(())
@@ -552,7 +552,7 @@ mod tests {
     fn concrete_typecheck() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(1, |global, _frame| {
+            jlrs.scope_with_capacity(1, |global, _frame| {
                 assert!(Concrete::typecheck(DataType::bool_type(global)));
                 assert!(!Concrete::typecheck(DataType::floatingpoint_type(global)));
                 Ok(())
@@ -565,7 +565,7 @@ mod tests {
     fn dispatch_tuple_typecheck() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(1, |global, frame| {
+            jlrs.scope_with_capacity(1, |global, frame| {
                 let tt = DataType::anytuple_type(global)
                     .as_value()
                     .apply_type(

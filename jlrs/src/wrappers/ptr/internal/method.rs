@@ -5,7 +5,7 @@
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L273
 
-use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout};
+use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout, memory::output::Output};
 use crate::{
     private::Private,
     wrappers::ptr::{
@@ -186,23 +186,23 @@ impl<'scope> Method<'scope> {
     }
 
     /// The `n_args` field.
-    pub fn n_args(self) -> i32 {
+    pub fn n_args(self) -> u32 {
         unsafe { self.unwrap_non_null(Private).as_ref().nargs }
     }
 
     /// Bit flags: whether each of the first 8 arguments is called
-    pub fn called(self) -> i32 {
+    pub fn called(self) -> u32 {
         unsafe { self.unwrap_non_null(Private).as_ref().called }
     }
 
     /// Bit flags: which arguments should not be specialized
-    pub fn no_specialize(self) -> i32 {
+    pub fn no_specialize(self) -> u32 {
         unsafe { self.unwrap_non_null(Private).as_ref().nospecialize }
     }
 
     /// Number of leading arguments that are actually keyword arguments
     /// of another method.
-    pub fn nkw(self) -> i32 {
+    pub fn nkw(self) -> u32 {
         unsafe { self.unwrap_non_null(Private).as_ref().nkw }
     }
 
@@ -214,6 +214,15 @@ impl<'scope> Method<'scope> {
     /// The `pure` field.
     pub fn pure(self) -> bool {
         unsafe { self.unwrap_non_null(Private).as_ref().pure_ != 0 }
+    }
+
+    /// Use the `Output` to extend the lifetime of this data.
+    pub fn root<'target>(self, output: Output<'target>) -> Method<'target> {
+        unsafe {
+            let ptr = self.unwrap_non_null(Private);
+            output.set_root::<Method>(ptr);
+            Method::wrap_non_null(ptr, Private)
+        }
     }
 }
 
@@ -235,3 +244,5 @@ impl<'scope> Wrapper<'scope, '_> for Method<'scope> {
         self.0
     }
 }
+
+impl_root!(Method, 1);

@@ -1,7 +1,7 @@
 //! Wrapper for `Expr`.
 
 use super::super::private::Wrapper;
-use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout};
+use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout, memory::output::Output};
 use crate::{
     private::Private,
     wrappers::ptr::{ArrayRef, SymbolRef},
@@ -32,6 +32,15 @@ impl<'scope> Expr<'scope> {
     pub fn args(self) -> ArrayRef<'scope, 'static> {
         unsafe { ArrayRef::wrap(self.unwrap_non_null(Private).as_ref().args) }
     }
+
+    /// Use the `Output` to extend the lifetime of this data.
+    pub fn root<'target>(self, output: Output<'target>) -> Expr<'target> {
+        unsafe {
+            let ptr = self.unwrap_non_null(Private);
+            output.set_root::<Expr>(ptr);
+            Expr::wrap_non_null(ptr, Private)
+        }
+    }
 }
 
 impl_julia_typecheck!(Expr<'scope>, jl_expr_type, 'scope);
@@ -52,3 +61,5 @@ impl<'scope> Wrapper<'scope, '_> for Expr<'scope> {
         self.0
     }
 }
+
+impl_root!(Expr, 1);

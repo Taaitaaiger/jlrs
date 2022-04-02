@@ -30,7 +30,7 @@ impl PersistentTask for MyTask {
                 .wrapper_unchecked();
 
             let ylabel_str = JuliaString::new(&mut *frame, &self.ylabel)?;
-            let ylabel = Tuple::new(&mut *frame, &mut [ylabel_str])?.into_jlrs_result()?;
+            let ylabel = Tuple::new(&mut *frame, &mut [ylabel_str.as_value()])?.into_jlrs_result()?;
             let kws = named_tuple!(&mut *frame, "yaxis" => ylabel)?;
 
             let plot = PyPlot::new_with_keywords(frame, plot_fn, &mut [], kws)?;

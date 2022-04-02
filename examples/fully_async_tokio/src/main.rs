@@ -70,7 +70,9 @@ async fn main() {
     };
 
     // Include the custom code our task needs.
-    julia.include("MyModule.jl").await.unwrap();
+    unsafe {
+        julia.include("MyModule.jl").await.unwrap();
+    }
 
     // Create channels for each of the tasks.
     let (sender1, receiver1) = tokio::sync::oneshot::channel();

@@ -11,7 +11,7 @@ mod tests {
             let mut data = vec![1u64, 2, 3, 4];
 
             let unboxed = jlrs
-                .scope_with_slots(1, |_, frame| {
+                .scope_with_capacity(1, |_, frame| {
                     let array = Array::from_slice(frame, &mut data, 4)?;
                     assert!(array.is_array_of::<u64>());
                     array.cast::<Array>()?.copy_inline_data::<u64>()
@@ -39,7 +39,7 @@ mod tests {
             };
 
             let unboxed = jlrs
-                .scope_with_slots(1, |_, frame| {
+                .scope_with_capacity(1, |_, frame| {
                     let x = false;
 
                     let array = match x {
@@ -70,7 +70,7 @@ mod tests {
             let mut data = vec![1u64, 2, 3, 4];
 
             let unboxed = jlrs
-                .scope_with_slots(1, |_, frame| {
+                .scope_with_capacity(1, |_, frame| {
                     let array = frame.value_scope_with_slots(0, |output, frame| {
                         let output = output.into_scope(frame);
                         Array::from_slice(output, &mut data, 4)
@@ -114,7 +114,7 @@ mod tests {
             let mut data = vec![1u64, 2, 3, 4];
 
             let unboxed = jlrs
-                .scope_with_slots(1, |_, frame| {
+                .scope_with_capacity(1, |_, frame| {
                     let array = Array::from_slice(frame, &mut data, (2, 2))?;
                     array.cast::<Array>()?.copy_inline_data::<u64>()
                 })
@@ -155,7 +155,7 @@ mod tests {
             let mut data = vec![1u64, 2, 3, 4];
 
             let unboxed = jlrs
-                .scope_with_slots(2, |global, frame| unsafe {
+                .scope_with_capacity(2, |global, frame| unsafe {
                     let array = Array::from_slice(&mut *frame, &mut data, 4)?;
                     Module::base(global)
                         .function_ref("sum")?

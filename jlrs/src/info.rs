@@ -14,7 +14,7 @@ pub struct Info {
 }
 
 impl Info {
-    pub(crate) fn new() -> Self {
+    pub(crate) unsafe fn new() -> Self {
         Info { _priv: PhantomData }
     }
 

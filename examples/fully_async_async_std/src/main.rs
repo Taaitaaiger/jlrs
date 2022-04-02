@@ -70,7 +70,9 @@ async fn main() {
     };
 
     // Include the custom code our task needs.
-    julia.include("MyModule.jl").await.unwrap();
+    unsafe {
+        julia.include("MyModule.jl").await.unwrap();
+    }
 
     // Create channels for each of the tasks (this is not required but helps distinguish which
     // result belongs to which task).

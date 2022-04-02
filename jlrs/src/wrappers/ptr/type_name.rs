@@ -6,10 +6,10 @@
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L380
 
 use super::{private::Wrapper, SymbolRef};
-use crate::wrappers::ptr::symbol::Symbol;
 use crate::wrappers::ptr::{ModuleRef, SimpleVectorRef, ValueRef};
 use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout};
 use crate::{memory::global::Global, private::Private};
+use crate::{memory::output::Output, wrappers::ptr::symbol::Symbol};
 use jl_sys::{
     jl_array_typename, jl_llvmpointer_typename, jl_namedtuple_typename, jl_pointer_typename,
     jl_tuple_typename, jl_type_typename, jl_typename_t, jl_typename_type, jl_vecelement_typename,
@@ -70,6 +70,12 @@ impl<'scope> TypeName<'scope> {
     #[cfg(not(feature = "lts"))]
     pub fn atomicfields(self) -> *const u32 {
         unsafe { self.unwrap_non_null(Private).as_ref().atomicfields }
+    }
+
+    /// The `atomicfields` field.
+    #[cfg(not(feature = "lts"))]
+    pub fn constfields(self) -> *const u32 {
+        unsafe { self.unwrap_non_null(Private).as_ref().constfields }
     }
 
     /// Either the only instantiation of the type (if no parameters) or a `UnionAll` accepting
@@ -148,6 +154,15 @@ impl<'scope> TypeName<'scope> {
     pub fn mayinlinealloc(self) -> bool {
         unsafe { self.unwrap_non_null(Private).as_ref().mayinlinealloc() != 0 }
     }
+
+    /// Use the `Output` to extend the lifetime of this data.
+    pub fn root<'target>(self, output: Output<'target>) -> TypeName<'target> {
+        unsafe {
+            let ptr = self.unwrap_non_null(Private);
+            output.set_root::<TypeName>(ptr);
+            TypeName::wrap_non_null(ptr, Private)
+        }
+    }
 }
 
 impl<'base> TypeName<'base> {
@@ -217,3 +232,5 @@ impl<'scope> Wrapper<'scope, '_> for TypeName<'scope> {
         self.0
     }
 }
+
+impl_root!(TypeName, 1);

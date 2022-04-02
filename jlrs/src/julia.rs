@@ -4,7 +4,6 @@
 
 use crate::{
     error::{JlrsError, JlrsResult, CANNOT_DISPLAY_VALUE},
-    info::Info,
     init_jlrs,
     memory::{frame::GcFrame, global::Global, mode::Sync, stack_page::StackPage},
     wrappers::ptr::{call::Call, module::Module, string::JuliaString, value::Value, Wrapper},
@@ -46,7 +45,7 @@ impl Julia {
             init_jlrs(&mut *frame);
 
             #[cfg(feature = "pyplot")]
-            crate::extensions::pyplot::init_jlrs_py_plot(&mut *frame);
+            crate::pyplot::init_jlrs_py_plot(&mut *frame);
 
             Ok(())
         })
@@ -104,7 +103,7 @@ impl Julia {
             init_jlrs(&mut *frame);
 
             #[cfg(feature = "pyplot")]
-            crate::extensions::pyplot::init_jlrs_py_plot(&mut *frame);
+            crate::pyplot::init_jlrs_py_plot(&mut *frame);
 
             Ok(())
         })?;
@@ -156,7 +155,7 @@ impl Julia {
                     .function_ref("include")?
                     .wrapper_unchecked();
 
-                let res = include_func.call1(frame, path_jl_str)?;
+                let res = include_func.call1(frame, path_jl_str.as_value())?;
 
                 return match res {
                     Ok(_) => Ok(()),
@@ -205,7 +204,7 @@ impl Julia {
 
     /// This method is a main entrypoint to interact with Julia. It takes a closure with two
     /// arguments, a `Global` and a mutable reference to a `GcFrame`, and can return arbitrary
-    /// results. The frame will have capacity for at least `slots` roots.
+    /// results. The frame will have capacity for at least `capacity` roots.
     ///
     /// Example:
     ///
@@ -215,30 +214,25 @@ impl Julia {
     /// # fn main() {
     /// # JULIA.with(|j| {
     /// # let mut julia = j.borrow_mut();
-    ///   julia.scope_with_slots(1, |_global, frame| {
+    ///   julia.scope_with_capacity(1, |_global, frame| {
     ///       let _i = Value::new(&mut *frame, 1u64)?;
     ///       Ok(())
     ///   }).unwrap();
     /// # });
     /// # }
     /// ```
-    pub fn scope_with_slots<T, F>(&mut self, slots: usize, func: F) -> JlrsResult<T>
+    pub fn scope_with_capacity<T, F>(&mut self, capacity: usize, func: F) -> JlrsResult<T>
     where
         for<'base> F: FnOnce(Global<'base>, &mut GcFrame<'base, Sync>) -> JlrsResult<T>,
     {
         unsafe {
             let global = Global::new();
-            if slots + 2 > self.page.size() {
-                self.page = StackPage::new(slots + 2);
+            if capacity + 2 > self.page.size() {
+                self.page = StackPage::new(capacity + 2);
             }
             let mut frame = GcFrame::new(self.page.as_mut(), Sync);
             func(global, &mut frame)
         }
-    }
-
-    /// Provides access to global information.
-    pub fn info(&self) -> Info {
-        Info::new()
     }
 
     #[cfg(test)]

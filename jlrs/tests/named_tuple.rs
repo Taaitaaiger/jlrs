@@ -10,7 +10,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(4, |_, frame| {
+            jlrs.scope_with_capacity(4, |_, frame| {
                 let name = "foo";
                 let value = Value::new(&mut *frame, 1u32)?;
                 let nt = Value::new_named_tuple(&mut *frame, &mut [name], &mut [value])?;
@@ -27,7 +27,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(5, |_, frame| {
+            jlrs.scope_with_capacity(5, |_, frame| {
                 let a_name = "a";
                 let a_value = Value::new(&mut *frame, 1u32)?;
                 let b_value = Value::new(&mut *frame, 2u64)?;

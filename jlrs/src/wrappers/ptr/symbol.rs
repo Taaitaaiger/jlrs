@@ -3,7 +3,7 @@
 use crate::{
     error::{JlrsError, JlrsResult},
     impl_debug,
-    memory::global::Global,
+    memory::{global::Global, output::Output},
 };
 use crate::{impl_julia_typecheck, impl_valid_layout};
 use crate::{private::Private, wrappers::ptr::value::LeakedValue};
@@ -149,6 +149,15 @@ impl<'scope> Symbol<'scope> {
             symbol.to_bytes()
         }
     }
+
+    /// Use the `Output` to extend the lifetime of this data.
+    pub fn root<'target>(self, output: Output<'target>) -> Symbol<'target> {
+        unsafe {
+            let ptr = self.unwrap_non_null(Private);
+            output.set_root::<Symbol>(ptr);
+            Symbol::wrap_non_null(ptr, Private)
+        }
+    }
 }
 
 impl_julia_typecheck!(Symbol<'scope>, jl_symbol_type, 'scope);
@@ -169,3 +178,5 @@ impl<'scope> Wrapper<'scope, '_> for Symbol<'scope> {
         self.0
     }
 }
+
+impl_root!(Symbol, 1);

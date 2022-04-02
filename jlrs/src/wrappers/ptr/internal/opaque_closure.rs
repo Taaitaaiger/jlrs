@@ -4,11 +4,14 @@ use super::super::type_name::TypeName;
 use super::super::union_all::UnionAll;
 use super::super::MethodRef;
 use super::super::{call::Call, datatype::DataType, private::Wrapper, value::Value, Wrapper as _};
-use crate::error::{JlrsResult, JuliaResultRef};
 use crate::impl_debug;
 use crate::layout::typecheck::Typecheck;
 use crate::layout::valid_layout::ValidLayout;
-use crate::memory::{frame::Frame, global::Global, scope::Scope};
+use crate::memory::global::Global;
+use crate::{
+    error::{JlrsResult, JuliaResult, JuliaResultRef},
+    memory::{output::Output, scope::PartialScope},
+};
 use crate::{private::Private, wrappers::ptr::ValueRef};
 use jl_sys::jl_opaque_closure_t;
 use std::ffi::c_void;
@@ -40,11 +43,6 @@ impl<'scope> OpaqueClosure<'scope> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().captures) }
     }
 
-    /// Returns `true` is this `OpaqueClosure` takes an arbitrary number of arguments.
-    pub fn is_vararg(self) -> bool {
-        unsafe { self.unwrap_non_null(Private).as_ref().isva != 0 }
-    }
-
     /// Returns the world age of this `OpaqueClosure`.
     pub fn world(self) -> usize {
         unsafe { self.unwrap_non_null(Private).as_ref().world }
@@ -70,6 +68,15 @@ impl<'scope> OpaqueClosure<'scope> {
     /// Returns the `specptr` field of this `OpaqueClosure`.
     pub fn specptr(self) -> *mut c_void {
         unsafe { self.unwrap_non_null(Private).as_ref().specptr }
+    }
+
+    /// Use the `Output` to extend the lifetime of this data.
+    pub fn root<'target>(self, output: Output<'target>) -> OpaqueClosure<'target> {
+        unsafe {
+            let ptr = self.unwrap_non_null(Private);
+            output.set_root::<OpaqueClosure>(ptr);
+            OpaqueClosure::wrap_non_null(ptr, Private)
+        }
     }
 }
 
@@ -115,62 +122,57 @@ impl<'scope> Wrapper<'scope, 'static> for OpaqueClosure<'scope> {
 }
 
 impl<'data> Call<'data> for OpaqueClosure<'_> {
-    unsafe fn call0<'target, 'current, S, F>(self, scope: S) -> JlrsResult<S::JuliaResult>
+    unsafe fn call0<'target, S>(self, scope: S) -> JlrsResult<JuliaResult<'target, 'data>>
     where
-        S: Scope<'target, 'current, 'data, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
     {
         self.as_value().call0(scope)
     }
 
-    unsafe fn call1<'target, 'current, S, F>(
+    unsafe fn call1<'target, S>(
         self,
         scope: S,
         arg0: Value<'_, 'data>,
-    ) -> JlrsResult<S::JuliaResult>
+    ) -> JlrsResult<JuliaResult<'target, 'data>>
     where
-        S: Scope<'target, 'current, 'data, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
     {
         self.as_value().call1(scope, arg0)
     }
 
-    unsafe fn call2<'target, 'current, S, F>(
+    unsafe fn call2<'target, S>(
         self,
         scope: S,
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
-    ) -> JlrsResult<S::JuliaResult>
+    ) -> JlrsResult<JuliaResult<'target, 'data>>
     where
-        S: Scope<'target, 'current, 'data, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
     {
         self.as_value().call2(scope, arg0, arg1)
     }
 
-    unsafe fn call3<'target, 'current, S, F>(
+    unsafe fn call3<'target, S>(
         self,
         scope: S,
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
         arg2: Value<'_, 'data>,
-    ) -> JlrsResult<S::JuliaResult>
+    ) -> JlrsResult<JuliaResult<'target, 'data>>
     where
-        S: Scope<'target, 'current, 'data, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
     {
         self.as_value().call3(scope, arg0, arg1, arg2)
     }
 
-    unsafe fn call<'target, 'current, 'value, V, S, F>(
+    unsafe fn call<'target, 'value, V, S>(
         self,
         scope: S,
         args: V,
-    ) -> JlrsResult<S::JuliaResult>
+    ) -> JlrsResult<JuliaResult<'target, 'data>>
     where
         V: AsMut<[Value<'value, 'data>]>,
-        S: Scope<'target, 'current, 'data, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
     {
         self.as_value().call(scope, args)
     }
@@ -220,3 +222,5 @@ impl<'data> Call<'data> for OpaqueClosure<'_> {
         self.as_value().call_unrooted(global, args)
     }
 }
+
+impl_root!(OpaqueClosure, 1);

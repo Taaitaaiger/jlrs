@@ -1,11 +1,12 @@
 //! Wrapper for `String`.
 
-use crate::error::{JlrsError, JlrsResult};
-use crate::memory::frame::Frame;
 use crate::memory::global::Global;
-use crate::memory::scope::Scope;
 use crate::wrappers::ptr::{private::Wrapper as WrapperPriv, value::Value, StringRef};
 use crate::{convert::unbox::Unbox, private::Private};
+use crate::{
+    error::{JlrsError, JlrsResult},
+    memory::{output::Output, scope::PartialScope},
+};
 use crate::{impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_pchar_to_string, jl_string_type};
 use std::{ffi::CStr, ptr::NonNull};
@@ -22,11 +23,10 @@ pub struct JuliaString<'scope>(*const u8, PhantomData<&'scope ()>);
 
 impl<'scope> JuliaString<'scope> {
     /// Create a new Julia string.
-    pub fn new<'target, 'current, V, S, F>(scope: S, string: V) -> JlrsResult<S::Value>
+    pub fn new<'target, V, S>(scope: S, string: V) -> JlrsResult<JuliaString<'target>>
     where
         V: AsRef<str>,
-        S: Scope<'target, 'current, 'static, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
     {
         unsafe {
             let global = scope.global();
@@ -78,6 +78,15 @@ impl<'scope> JuliaString<'scope> {
     pub unsafe fn as_str_unchecked(self) -> &'scope str {
         str::from_utf8_unchecked(self.as_slice())
     }
+
+    /// Use the `Output` to extend the lifetime of this data.
+    pub fn root<'target>(self, output: Output<'target>) -> JuliaString<'target> {
+        unsafe {
+            let ptr = self.unwrap_non_null(Private);
+            output.set_root::<JuliaString>(ptr);
+            JuliaString::wrap_non_null(ptr, Private)
+        }
+    }
 }
 
 impl_julia_typecheck!(JuliaString<'scope>, jl_string_type, 'scope);
@@ -121,3 +130,5 @@ impl<'scope> WrapperPriv<'scope, '_> for JuliaString<'scope> {
         unsafe { NonNull::new_unchecked(self.0 as *mut _) }
     }
 }
+
+impl_root!(JuliaString, 1);

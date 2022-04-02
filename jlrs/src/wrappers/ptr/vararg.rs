@@ -1,7 +1,7 @@
 //! Wrapper for `Vararg`.
 
 use super::private::Wrapper;
-use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout};
+use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout, memory::output::Output};
 use crate::{private::Private, wrappers::ptr::ValueRef};
 use jl_sys::{jl_vararg_t, jl_vararg_type};
 use std::{marker::PhantomData, ptr::NonNull};
@@ -20,6 +20,15 @@ impl<'scope> Vararg<'scope> {
     /// The number of arguments, i.e. the `N` in `Vararg{T, N}`.
     pub fn n(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().N) }
+    }
+
+    /// Use the `Output` to extend the lifetime of this data.
+    pub fn root<'target>(self, output: Output<'target>) -> Vararg<'target> {
+        unsafe {
+            let ptr = self.unwrap_non_null(Private);
+            output.set_root::<Vararg>(ptr);
+            Vararg::wrap_non_null(ptr, Private)
+        }
     }
 }
 
@@ -41,3 +50,5 @@ impl<'scope> Wrapper<'scope, 'static> for Vararg<'scope> {
         self.0
     }
 }
+
+impl_root!(Vararg, 1);

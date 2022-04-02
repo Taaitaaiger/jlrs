@@ -9,7 +9,7 @@ mod tests {
     fn create_symbol() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(0, |global, _frame| {
+            jlrs.scope_with_capacity(0, |global, _frame| {
                 let smb = Symbol::new(global, "a");
                 smb.extend(global);
 
@@ -23,7 +23,7 @@ mod tests {
     fn function_returns_symbol() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(1, |global, frame| unsafe {
+            jlrs.scope_with_capacity(1, |global, frame| unsafe {
                 let smb = Module::main(global)
                     .submodule_ref("JlrsTests")?
                     .wrapper_unchecked()
@@ -47,7 +47,7 @@ mod tests {
     fn symbols_are_reused() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(0, |global, _frame| {
+            jlrs.scope_with_capacity(0, |global, _frame| {
                 let s1 = Symbol::new(global, "foo");
                 let s2 = Symbol::new(global, "foo");
 
@@ -63,7 +63,7 @@ mod tests {
     fn symbols_are_not_collected() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(0, |global, frame| {
+            jlrs.scope_with_capacity(0, |global, frame| {
                 let s1 = Symbol::new(global, "foo");
 
                 {
@@ -82,8 +82,8 @@ mod tests {
     fn jl_string_to_symbol() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(1, |global, frame| {
-                let string = JuliaString::new(&mut *frame, "+")?.cast::<JuliaString>()?;
+            jlrs.scope_with_capacity(1, |global, frame| {
+                let string = JuliaString::new(&mut *frame, "+")?;
                 assert!(Module::base(global).function_ref(string).is_ok());
 
                 Ok(())

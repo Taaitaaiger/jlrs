@@ -29,16 +29,16 @@ end
 function datatype()::DataType
     Bool
 end
-
-function callrust(ptr::Ptr)::Bool
+ 
+function callrust(ptr::Ptr{Cvoid})::Bool
     ccall(ptr, Bool, ())
 end
 
-function callrustwitharr(ptr::Ptr, arr::Array{Float64, 1})::Bool
-    ccall(ptr, Bool, (Array,), arr)
+function callrustwitharr(ptr::Ptr{Cvoid}, arr::Array{Float64, 1})::Bool
+    ccall(ptr, Bool, (Array{Float64, 1},), arr)
 end
 
-function callrustwithasynccond(func::Ptr, destroyhandle::Ptr)::UInt32
+function callrustwithasynccond(func::Ptr{Cvoid}, destroyhandle::Ptr{Cvoid})::UInt32
     condition = Base.AsyncCondition()
     output::Ref{UInt32} = C_NULL
     joinhandle = ccall(func, Ptr{Cvoid}, (Ref{UInt32}, Ptr{Cvoid}), output, condition.handle)
@@ -117,5 +117,9 @@ struct WithEmpty{T}
     b::T
     c::UInt
     WithEmpty{T}() where T = new()
+end
+
+struct WithAbstract 
+    a::Real
 end
 end

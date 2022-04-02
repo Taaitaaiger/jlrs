@@ -6,7 +6,7 @@
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L273
 
 use super::super::private::Wrapper;
-use crate::{impl_debug, impl_julia_typecheck};
+use crate::{impl_debug, impl_julia_typecheck, memory::output::Output};
 use crate::{
     private::Private,
     wrappers::ptr::{CodeInstanceRef, MethodInstanceRef, ValueRef},
@@ -97,6 +97,15 @@ impl<'scope> CodeInstance<'scope> {
     pub fn precompile(self) -> bool {
         unsafe { self.unwrap_non_null(Private).as_ref().precompile != 0 }
     }
+
+    /// Use the `Output` to extend the lifetime of this data.
+    pub fn root<'target>(self, output: Output<'target>) -> CodeInstance<'target> {
+        unsafe {
+            let ptr = self.unwrap_non_null(Private);
+            output.set_root::<CodeInstance>(ptr);
+            CodeInstance::wrap_non_null(ptr, Private)
+        }
+    }
 }
 
 impl_julia_typecheck!(CodeInstance<'scope>, jl_code_instance_type, 'scope);
@@ -116,3 +125,5 @@ impl<'scope> Wrapper<'scope, '_> for CodeInstance<'scope> {
         self.0
     }
 }
+
+impl_root!(CodeInstance, 1);

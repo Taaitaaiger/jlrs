@@ -13,13 +13,12 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unwrapped_string = jlrs
-                .scope_with_slots(1, |_, frame| {
-                    frame.scope_with_slots(1, |frame| {
+                .scope_with_capacity(1, |_, frame| {
+                    frame.scope_with_capacity(1, |frame| {
                         let string = JuliaString::new(frame, "Hellõ world!")?;
-                        string.unbox::<String>()
+                        Ok(string.as_str()?.to_string())
                     })
                 })
-                .unwrap()
                 .unwrap();
 
             assert_eq!(unwrapped_string, "Hellõ world!");
@@ -32,13 +31,12 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unwrapped_string = jlrs
-                .scope_with_slots(1, |_, frame| {
-                    frame.scope_with_slots(1, |frame| {
+                .scope_with_capacity(1, |_, frame| {
+                    frame.scope_with_capacity(1, |frame| {
                         let string = JuliaString::new(frame, String::from("Hellõ world!"))?;
-                        string.unbox::<String>()
+                        Ok(string.as_str()?.to_string())
                     })
                 })
-                .unwrap()
                 .unwrap();
 
             assert_eq!(unwrapped_string, "Hellõ world!");
@@ -51,13 +49,12 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unwrapped_string = jlrs
-                .scope_with_slots(1, |_, frame| {
-                    frame.scope_with_slots(1, |frame| {
+                .scope_with_capacity(1, |_, frame| {
+                    frame.scope_with_capacity(1, |frame| {
                         let string = JuliaString::new(frame, Cow::from("Hellõ world!"))?;
-                        string.unbox::<String>()
+                        Ok(string.as_str()?.to_string())
                     })
                 })
-                .unwrap()
                 .unwrap();
 
             assert_eq!(unwrapped_string, "Hellõ world!");
@@ -69,11 +66,13 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |_global, frame| {
+            jlrs.scope_with_capacity(1, |_global, frame| {
                 let v = JuliaString::new(frame, "Foo bar")?;
-                assert!(v.is::<JuliaString>());
-                let string = v.cast::<JuliaString>()?;
-                assert!(JuliaString::valid_layout(v.datatype().as_value()));
+                assert!(v.as_value().is::<JuliaString>());
+                let string = v.as_value().cast::<JuliaString>()?;
+                assert!(JuliaString::valid_layout(
+                    v.as_value().datatype().as_value()
+                ));
                 assert_eq!(string.len(), 7);
                 assert_eq!(string.as_c_str().to_str().unwrap(), "Foo bar");
                 assert_eq!(string.as_str().unwrap(), "Foo bar");

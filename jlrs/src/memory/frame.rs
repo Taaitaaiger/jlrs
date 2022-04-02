@@ -1,72 +1,79 @@
-//! Frames protect values from garbage collection.
+//! Data rooted in a frame is valid until the frame is dropped.
 //!
-//! The garbage collector owns of all Julia data and is not automatically aware of references to
-//! this data existing outside of Julia. In order to prevent data from being freed by the garbage
-//! collector while it's used from Rust, this data must be rooted in a frame (or at least
-//! reachable from such a root). Frames and scopes are strongly connected, each scope creates a
-//! single frame. All frames implement the [`Frame`] trait, all mutable references to them
-//! implement [`Scope`] and [`ScopeExt`]. The [`scope`] module contains much information about
-//! how frames can be used.
+//! The garbage collector owns all Julia data and is not automatically aware of references to this
+//! data existing outside of Julia. In order to prevent data from being freed by the garbage
+//! collector while it's used from Rust, this data must be rooted, or stored, in a frame (or at
+//! least reachable from such a root). A new frame is created whenever a new scope is created, and
+//! dropped when its scope ends.
 //!
-//! Several kinds of frame exist in jlrs. The simplest one is [`NullFrame`], which is only used
-//! when writing `ccall`able functions. It doesn't let you root any values or create a nested
-//! scope, but can be used to (mutably) borrow array data. If you neither use the async runtime
-//! nor write Rust functions that Julia will call, the only frame type you will use is
-//! [`GcFrame`]; this frame can be used to root a relatively arbitrary number of values.
+//! Several frame types exist in jlrs. They all implement the [`Frame`] trait, mutable references
+//! implement [`Scope`] and [`PartialScope`]. Methods that allocate and return Julia data take
+//! either a `Scope` or `PartialScope` to root the returned data in that scope. The `Frame` trait
+//! provides methods that return info about that frame, like its capacity and current number of
+//! roots, and methods to reserve a new output and create a nested scope with its own frame.
 //!
-//! A [`GcFrame`] can be created with a number of preallocated slots by using one of the
-//! `Scope[Ext]::*scope_with_slots` methods or without them by using the
-//! `Scope[Ext]::*scope` methods, each slot can root one value. By preallocating the slots less
-//! work has to be done to root a value, more slots are allocated if this is necessary. The
-//! maximum number of slots that can be allocated is the frame's capacity, which is at least 16.
-//! When a new frame is created, the current frame's remaining capacity can be used to store this
-//! new frame if it can hold the requested number of slots and provide capacity for 16 slots.  If
-//! the remaining capacity is insufficient more stack space is allocated, this doesn't  affect the
-//! existing frames.
+//! Which frame types are available depends on what features have been enabled. By default, only
+//! [`GcFrame`] is available. When `ccall` is enabled, [`NullFrame`] can also be used. This frame
+//! type can't store any roots or be used to create a new scope, but is useful for borrowing array
+//! data. Finally, when `async` is enabled, trait methods of [`AsyncTask`] and [`PersistentTask`]
+//! take an [`AsyncGcFrame`] which can be used to call async functions.
 //!
 //! [`scope`]: crate::memory::scope
 //! [`Scope`]: crate::memory::scope::Scope
-//! [`ScopeExt`]: crate::memory::scope::ScopeExt
-//! [`Scope::value_scope`]: crate::memory::scope::Scope::value_scope
-//! [`Scope::result_scope`]: crate::memory::scope::Scope::result_scope
-//! [`ScopeExt::scope`]: crate::memory::scope::ScopeExt::scope
+//! [`PartialScope`]: crate::memory::scope::PartialScope
+//! [`AsyncGcFrame`]: crate::multitask::async_frame::AsyncGcFrame
+//! [`AsyncTask`]: crate::multitask::async_task::AsyncTask
+//! [`PersistentTask`]: crate::multitask::async_task::PersistentTask
 
-use super::{mode::Mode, reusable_slot::ReusableSlot, stack_page::StackPage};
-#[cfg(feature = "ccall")]
-use crate::error::JlrsError;
-use crate::{error::JlrsResult, private::Private};
-
+use super::{mode::Mode, output::Output, reusable_slot::ReusableSlot, stack_page::StackPage};
 #[cfg(feature = "ccall")]
 use crate::ccall::CCall;
-
+use crate::{
+    error::{AllocError, JlrsError, JlrsResult},
+    private::Private,
+};
 use jl_sys::jl_value_t;
-// use jl_sys::{jl_get_current_task, jl_task_t, };
 #[cfg(feature = "ccall")]
 use std::marker::PhantomData;
-use std::{cell::Cell, ffi::c_void, ptr::NonNull};
+use std::{
+    cell::Cell,
+    ffi::c_void,
+    ptr::{null_mut, NonNull},
+};
 
 pub(crate) const MIN_FRAME_CAPACITY: usize = 16;
 
 /// A frame that can be used to root values.
 ///
-/// Roots are stored in slots, each slot can contain one root. Frames created with slots will
-/// preallocate that number of slots. Frames created without slots will dynamically create new
-/// slots as needed. A frame's capacity is at least 16.
+/// Frames created with a capacity can store at least that number of roots. A frame's capacity is
+/// at least 16.
 pub struct GcFrame<'frame, M: Mode> {
-    pub(crate) raw_frame: &'frame mut [Cell<*mut c_void>],
-    pub(crate) page: Option<StackPage>,
-    pub(crate) mode: M,
+    raw_frame: &'frame mut [Cell<*mut c_void>],
+    page: Option<StackPage>,
+    mode: M,
 }
 
 impl<'frame, M: Mode> GcFrame<'frame, M> {
+    /// Returns the number of values currently rooted in this frame.
+    pub fn n_roots(&self) -> usize {
+        self.raw_frame[0].get() as usize >> 2
+    }
+
     /*
+    #[doc(hidden)]
     pub unsafe fn print_stack(&self) {
         let last = jl_get_current_task().cast::<jl_task_t>();
         jl_sys::jlrs_print_stack(NonNull::new_unchecked(last).as_ref().gcstack);
     }
     */
 
-    pub(crate) fn nest<'nested>(&'nested mut self, capacity: usize) -> GcFrame<'nested, M> {
+    /// Returns the maximum number of values that can be rooted in this frame.
+    pub fn capacity(&self) -> usize {
+        self.raw_frame.len() - 2
+    }
+
+    // Safety: this frame must be dropped in the same scope it has been created.
+    pub(crate) unsafe fn nest<'nested>(&'nested mut self, capacity: usize) -> GcFrame<'nested, M> {
         let used = self.n_roots() + 2;
         let new_frame_size = MIN_FRAME_CAPACITY.max(capacity) + 2;
         let raw_frame = if self.page.is_some() {
@@ -83,11 +90,10 @@ impl<'frame, M: Mode> GcFrame<'frame, M> {
             self.page.as_mut().unwrap().as_mut()
         };
 
-        unsafe { GcFrame::new(raw_frame, self.mode) }
+        GcFrame::new(raw_frame, self.mode)
     }
 
-    // Safety: this frame must be dropped in the same scope it has been created and raw_frame must
-    // have 2 + slots capacity available.
+    // Safety: this frame must be dropped in the same scope it has been created.
     pub(crate) unsafe fn new(raw_frame: &'frame mut [Cell<*mut c_void>], mode: M) -> Self {
         mode.push_frame(raw_frame, Private);
 
@@ -98,13 +104,14 @@ impl<'frame, M: Mode> GcFrame<'frame, M> {
         }
     }
 
-    // Safety: capacity >= n_slots
+    // Safety: capacity >= n_slots, the n_roots pointers the garbage collector
+    // can see must all be null or point to valid Julia data.
     pub(crate) unsafe fn set_n_roots(&mut self, n_roots: usize) {
         debug_assert!(self.capacity() >= n_roots);
         self.raw_frame.get_unchecked_mut(0).set((n_roots << 2) as _);
     }
 
-    // Safety: capacity > n_roots
+    // Safety: capacity > n_roots, and the pointer must point to valid Julia data
     pub(crate) unsafe fn root(&mut self, value: NonNull<jl_value_t>) {
         debug_assert!(self.n_roots() < self.capacity());
 
@@ -124,8 +131,8 @@ impl<'frame, M: Mode> Drop for GcFrame<'frame, M> {
 }
 
 /// A `NullFrame` can be used if you call Rust from Julia through `ccall` and want to borrow array
-/// data but not perform any allocations. It can't be used to created a nested scope or root a
-/// newly allocated value. If you try to do so a `JlrsError::NullFrame` is returned.
+/// data but not perform any allocations. It can't be used to created a new scope or root Julia
+/// data. If you try to do so `JlrsError::NullFrame` is returned.
 #[cfg(feature = "ccall")]
 pub struct NullFrame<'frame>(PhantomData<&'frame ()>);
 
@@ -136,23 +143,53 @@ impl<'frame> NullFrame<'frame> {
     }
 }
 
-/// This trait provides the functionality shared by the different frame types.
+/// Functionality shared by the different frame types.
 pub trait Frame<'frame>: private::Frame<'frame> {
     /// This method takes a mutable reference to a frame and returns it; this method can be used
-    /// as an alternative to reborrowing a frame with `&mut *frame` when a [`Scope`] is needed.
+    /// as an alternative to reborrowing a frame with `&mut *frame` when a [`Scope`] or
+    /// [`PartialScope`] is needed.
     ///
     /// [`Scope`]: crate::memory::scope::Scope
+    /// [`PartialScope`]: crate::memory::scope::PartialScope
     fn as_scope(&mut self) -> &mut Self {
         self
     }
 
+    /// Reserve a new output in the current frame. Returns an error if the frame is full.
+    fn reserve_output(&mut self) -> JlrsResult<Output<'frame>>;
+
+    /// Create a new reusable slot in the current frame. Returns an error if the frame is full.
     fn reusable_slot(&mut self) -> JlrsResult<ReusableSlot<'frame>>;
 
     /// Returns the number of values currently rooted in this frame.
     fn n_roots(&self) -> usize;
 
-    /// Returns the maximum number of slots this frame can use.
+    /// Returns the maximum number of values that can be rooted in this frame.
     fn capacity(&self) -> usize;
+
+    /// Creates a new `GcFrame` and calls `func` with it. The new frame is popped from the GC stack
+    /// stack after `func` returns.
+    fn scope<T, F>(&mut self, func: F) -> JlrsResult<T>
+    where
+        for<'inner> F: FnOnce(&mut GcFrame<'inner, Self::Mode>) -> JlrsResult<T>,
+    {
+        unsafe {
+            let mut nested = self.nest(0, Private);
+            func(&mut nested)
+        }
+    }
+
+    /// Creates a frame that can store at least `capacity` roots and calls `func` with this new
+    /// frame. The new frame is popped from the GC stack after `func` returns.
+    fn scope_with_capacity<T, F>(&mut self, capacity: usize, func: F) -> JlrsResult<T>
+    where
+        for<'inner> F: FnOnce(&mut GcFrame<'inner, Self::Mode>) -> JlrsResult<T>,
+    {
+        unsafe {
+            let mut nested = self.nest(capacity, Private);
+            func(&mut nested)
+        }
+    }
 }
 
 impl<'frame, M: Mode> Frame<'frame> for GcFrame<'frame, M> {
@@ -161,11 +198,29 @@ impl<'frame, M: Mode> Frame<'frame> for GcFrame<'frame, M> {
     }
 
     fn n_roots(&self) -> usize {
-        self.raw_frame[0].get() as usize >> 2
+        self.n_roots()
     }
 
     fn capacity(&self) -> usize {
-        self.raw_frame.len() - 2
+        self.capacity()
+    }
+
+    fn reserve_output(&mut self) -> JlrsResult<Output<'frame>> {
+        unsafe {
+            let n_roots = self.n_roots();
+            if n_roots == self.capacity() {
+                Err(JlrsError::alloc_error(AllocError::FrameOverflow(
+                    1, n_roots,
+                )))?;
+            }
+
+            let mut_slot = self.raw_frame.get_unchecked_mut(n_roots + 2);
+            mut_slot.set(null_mut());
+            let mut_slot = mut_slot as *mut _;
+            self.set_n_roots(n_roots + 1);
+
+            Ok(Output::new(self, mut_slot))
+        }
     }
 }
 
@@ -182,272 +237,103 @@ impl<'frame> Frame<'frame> for NullFrame<'frame> {
     fn capacity(&self) -> usize {
         0
     }
+
+    fn scope<T, F>(&mut self, _func: F) -> JlrsResult<T>
+    where
+        for<'inner> F: FnOnce(&mut GcFrame<'inner, Self::Mode>) -> JlrsResult<T>,
+    {
+        Err(JlrsError::NullFrame)?
+    }
+
+    fn scope_with_capacity<T, F>(&mut self, _capacity: usize, _func: F) -> JlrsResult<T>
+    where
+        for<'inner> F: FnOnce(&mut GcFrame<'inner, Self::Mode>) -> JlrsResult<T>,
+    {
+        Err(JlrsError::NullFrame)?
+    }
+
+    fn reserve_output(&mut self) -> JlrsResult<Output<'frame>> {
+        Err(JlrsError::NullFrame)?
+    }
 }
 
 pub(crate) mod private {
     use std::{
+        cell::Cell,
         ffi::c_void,
         ptr::{null_mut, NonNull},
     };
 
+    use crate::error::{JlrsError, JlrsResult};
     use crate::memory::frame::GcFrame;
     #[cfg(feature = "ccall")]
     use crate::memory::frame::NullFrame;
     use crate::memory::mode::Mode;
     #[cfg(feature = "ccall")]
     use crate::memory::mode::Sync;
-    use crate::memory::root_pending::RootPending;
     use crate::wrappers::ptr::private::Wrapper;
-    use crate::wrappers::ptr::value::Value;
     use crate::{error::AllocError, private::Private};
-    use crate::{
-        error::{JlrsError, JlrsResult, JuliaResult},
-        memory::output::{Output, OutputResult, OutputValue},
-    };
-    use jl_sys::jl_value_t;
-
-    use super::Frame as _;
 
     pub trait Frame<'frame> {
         type Mode: Mode;
         // protect the value from being garbage collected while this frame is active.
         // safety: the value must be a valid pointer to a Julia value.
-        unsafe fn push_root<'data>(
+        unsafe fn push_root<'data, X: Wrapper<'frame, 'data>>(
             &mut self,
-            value: NonNull<jl_value_t>,
+            value: NonNull<X::Wraps>,
             _: Private,
-        ) -> Result<Value<'frame, 'data>, AllocError>;
+        ) -> Result<X, AllocError>;
 
-        fn reserve_slot(&mut self, _: Private) -> JlrsResult<*mut *mut c_void>;
+        // safety: this pointer must only be used while the frame exists.
+        unsafe fn reserve_slot(&mut self, _: Private) -> JlrsResult<*const Cell<*mut c_void>>;
 
-        fn nest<'nested>(
+        // safety: the nested frame must be dropped in the same scope as it has been created in.
+        unsafe fn nest<'nested>(
             &'nested mut self,
             capacity: usize,
             _: Private,
         ) -> GcFrame<'nested, Self::Mode>;
-
-        fn value_scope<'data, F>(
-            &mut self,
-            func: F,
-            _: Private,
-        ) -> JlrsResult<Value<'frame, 'data>>
-        where
-            for<'nested, 'inner> F: FnOnce(
-                Output<'frame>,
-                &'inner mut GcFrame<'nested, Self::Mode>,
-            )
-                -> JlrsResult<OutputValue<'frame, 'data, 'inner>>;
-
-        fn value_scope_with_slots<'data, F>(
-            &mut self,
-            capacity: usize,
-            func: F,
-            _: Private,
-        ) -> JlrsResult<Value<'frame, 'data>>
-        where
-            for<'nested, 'inner> F: FnOnce(
-                Output<'frame>,
-                &'inner mut GcFrame<'nested, Self::Mode>,
-            )
-                -> JlrsResult<OutputValue<'frame, 'data, 'inner>>;
-
-        fn result_scope<'data, F>(
-            &mut self,
-            func: F,
-            _: Private,
-        ) -> JlrsResult<JuliaResult<'frame, 'data>>
-        where
-            for<'nested, 'inner> F: FnOnce(
-                Output<'frame>,
-                &'inner mut GcFrame<'nested, Self::Mode>,
-            )
-                -> JlrsResult<OutputResult<'frame, 'data, 'inner>>;
-
-        fn result_scope_with_slots<'data, F>(
-            &mut self,
-            capacity: usize,
-            func: F,
-            _: Private,
-        ) -> JlrsResult<JuliaResult<'frame, 'data>>
-        where
-            for<'nested, 'inner> F: FnOnce(
-                Output<'frame>,
-                &'inner mut GcFrame<'nested, Self::Mode>,
-            )
-                -> JlrsResult<OutputResult<'frame, 'data, 'inner>>;
-
-        fn scope<T, F>(&mut self, func: F, _: Private) -> JlrsResult<T>
-        where
-            for<'inner> F: FnOnce(&mut GcFrame<'inner, Self::Mode>) -> JlrsResult<T>;
-
-        fn scope_with_slots<T, F>(&mut self, capacity: usize, func: F, _: Private) -> JlrsResult<T>
-        where
-            for<'inner> F: FnOnce(&mut GcFrame<'inner, Self::Mode>) -> JlrsResult<T>;
     }
 
     impl<'frame, M: Mode> Frame<'frame> for GcFrame<'frame, M> {
         type Mode = M;
 
-        unsafe fn push_root<'data>(
+        unsafe fn push_root<'data, X: Wrapper<'frame, 'data>>(
             &mut self,
-            value: NonNull<jl_value_t>,
+            value: NonNull<X::Wraps>,
             _: Private,
-        ) -> Result<Value<'frame, 'data>, AllocError> {
-            let n_roots = self.raw_frame[0].get() as usize >> 2;
-            if n_roots == self.raw_frame.len() - 2 {
+        ) -> Result<X, AllocError> {
+            let n_roots = self.n_roots();
+            if n_roots == self.capacity() {
                 return Err(AllocError::FrameOverflow(1, n_roots));
             }
 
-            self.root(value);
-            Ok(Value::wrap_non_null(value, Private))
+            self.root(value.cast());
+            Ok(X::wrap_non_null(value, Private))
         }
 
-        fn reserve_slot(&mut self, _: Private) -> JlrsResult<*mut *mut c_void> {
-            let n_roots = self.raw_frame[0].get() as usize >> 2;
-            if n_roots == self.raw_frame.len() - 2 {
+        unsafe fn reserve_slot(&mut self, _: Private) -> JlrsResult<*const Cell<*mut c_void>> {
+            let n_roots = self.n_roots();
+            if n_roots == self.capacity() {
                 Err(JlrsError::alloc_error(AllocError::FrameOverflow(
                     1, n_roots,
                 )))?;
             }
 
-            unsafe {
-                self.raw_frame
-                    .get_unchecked_mut(n_roots + 2)
-                    .set(null_mut());
-                self.set_n_roots(n_roots + 1);
+            self.raw_frame
+                .get_unchecked_mut(n_roots + 2)
+                .set(null_mut());
+            self.set_n_roots(n_roots + 1);
 
-                Ok(self.raw_frame.get_unchecked_mut(n_roots + 2).as_ptr())
-            }
+            Ok(self.raw_frame.get_unchecked_mut(n_roots + 2))
         }
 
-        fn nest<'nested>(
+        unsafe fn nest<'nested>(
             &'nested mut self,
             capacity: usize,
             _: Private,
         ) -> GcFrame<'nested, Self::Mode> {
             self.nest(capacity)
-        }
-
-        fn value_scope<'data, F>(&mut self, func: F, _: Private) -> JlrsResult<Value<'frame, 'data>>
-        where
-            for<'nested, 'inner> F: FnOnce(
-                Output<'frame>,
-                &'inner mut GcFrame<'nested, Self::Mode>,
-            )
-                -> JlrsResult<OutputValue<'frame, 'data, 'inner>>,
-        {
-            let v = {
-                if self.capacity() == self.n_roots() {
-                    Err(JlrsError::alloc_error(AllocError::FrameOverflow(
-                        1,
-                        self.n_roots(),
-                    )))?
-                }
-                let mut nested = self.nest(0);
-                let out = Output::new();
-                func(out, &mut nested)?.into_pending()
-            };
-
-            unsafe { Value::root_pending(self, v) }
-        }
-
-        fn value_scope_with_slots<'data, F>(
-            &mut self,
-            capacity: usize,
-            func: F,
-            _: Private,
-        ) -> JlrsResult<Value<'frame, 'data>>
-        where
-            for<'nested, 'inner> F: FnOnce(
-                Output<'frame>,
-                &'inner mut GcFrame<'nested, Self::Mode>,
-            )
-                -> JlrsResult<OutputValue<'frame, 'data, 'inner>>,
-        {
-            let v = {
-                if self.capacity() == self.n_roots() {
-                    Err(JlrsError::alloc_error(AllocError::FrameOverflow(
-                        1,
-                        self.n_roots(),
-                    )))?
-                }
-                let mut nested = self.nest(capacity);
-                let out = Output::new();
-                func(out, &mut nested)?.into_pending()
-            };
-
-            unsafe { Value::root_pending(self, v) }
-        }
-
-        fn result_scope<'data, F>(
-            &mut self,
-            func: F,
-            _: Private,
-        ) -> JlrsResult<JuliaResult<'frame, 'data>>
-        where
-            for<'nested, 'inner> F: FnOnce(
-                Output<'frame>,
-                &'inner mut GcFrame<'nested, Self::Mode>,
-            )
-                -> JlrsResult<OutputResult<'frame, 'data, 'inner>>,
-        {
-            let v = {
-                if self.capacity() == self.n_roots() {
-                    Err(JlrsError::alloc_error(AllocError::FrameOverflow(
-                        1,
-                        self.n_roots(),
-                    )))?
-                }
-                let mut nested = self.nest(0);
-                let out = Output::new();
-                func(out, &mut nested)?.into_pending()
-            };
-
-            unsafe { JuliaResult::root_pending(self, v) }
-        }
-
-        fn result_scope_with_slots<'data, F>(
-            &mut self,
-            capacity: usize,
-            func: F,
-            _: Private,
-        ) -> JlrsResult<JuliaResult<'frame, 'data>>
-        where
-            for<'nested, 'inner> F: FnOnce(
-                Output<'frame>,
-                &'inner mut GcFrame<'nested, Self::Mode>,
-            )
-                -> JlrsResult<OutputResult<'frame, 'data, 'inner>>,
-        {
-            let v = {
-                if self.capacity() == self.n_roots() {
-                    Err(JlrsError::alloc_error(AllocError::FrameOverflow(
-                        1,
-                        self.n_roots(),
-                    )))?
-                }
-                let mut nested = self.nest(capacity);
-                let out = Output::new();
-                func(out, &mut nested)?.into_pending()
-            };
-
-            unsafe { JuliaResult::root_pending(self, v) }
-        }
-
-        fn scope<T, F>(&mut self, func: F, _: Private) -> JlrsResult<T>
-        where
-            for<'inner> F: FnOnce(&mut GcFrame<'inner, Self::Mode>) -> JlrsResult<T>,
-        {
-            let mut nested = self.nest(0);
-            func(&mut nested)
-        }
-
-        fn scope_with_slots<T, F>(&mut self, capacity: usize, func: F, _: Private) -> JlrsResult<T>
-        where
-            for<'inner> F: FnOnce(&mut GcFrame<'inner, Self::Mode>) -> JlrsResult<T>,
-        {
-            let mut nested = self.nest(capacity);
-            func(&mut nested)
         }
     }
 
@@ -455,15 +341,15 @@ pub(crate) mod private {
     impl<'frame> Frame<'frame> for NullFrame<'frame> {
         type Mode = Sync;
 
-        unsafe fn push_root<'data>(
+        unsafe fn push_root<'data, X: Wrapper<'frame, 'data>>(
             &mut self,
-            _value: NonNull<jl_value_t>,
+            _value: NonNull<X::Wraps>,
             _: Private,
-        ) -> Result<Value<'frame, 'data>, AllocError> {
+        ) -> Result<X, AllocError> {
             Err(AllocError::FrameOverflow(1, 0))
         }
 
-        unsafe fn reserve_slot(&mut self, _: Private) -> JlrsResult<*mut *mut c_void> {
+        unsafe fn reserve_slot(&mut self, _: Private) -> JlrsResult<*const Cell<*mut c_void>> {
             Err(JlrsError::NullFrame)?
         }
 
@@ -474,94 +360,12 @@ pub(crate) mod private {
         ) -> GcFrame<'nested, Self::Mode> {
             unreachable!()
         }
-
-        fn value_scope<'data, F>(
-            &mut self,
-            _func: F,
-            _: Private,
-        ) -> JlrsResult<Value<'frame, 'data>>
-        where
-            for<'nested, 'inner> F: FnOnce(
-                Output<'frame>,
-                &'inner mut GcFrame<'nested, Self::Mode>,
-            )
-                -> JlrsResult<OutputValue<'frame, 'data, 'inner>>,
-        {
-            Err(JlrsError::NullFrame)?
-        }
-
-        fn value_scope_with_slots<'data, F>(
-            &mut self,
-            _capacity: usize,
-            _func: F,
-            _: Private,
-        ) -> JlrsResult<Value<'frame, 'data>>
-        where
-            for<'nested, 'inner> F: FnOnce(
-                Output<'frame>,
-                &'inner mut GcFrame<'nested, Self::Mode>,
-            )
-                -> JlrsResult<OutputValue<'frame, 'data, 'inner>>,
-        {
-            Err(JlrsError::NullFrame)?
-        }
-
-        fn result_scope<'data, F>(
-            &mut self,
-            _func: F,
-            _: Private,
-        ) -> JlrsResult<JuliaResult<'frame, 'data>>
-        where
-            for<'nested, 'inner> F: FnOnce(
-                Output<'frame>,
-                &'inner mut GcFrame<'nested, Self::Mode>,
-            )
-                -> JlrsResult<OutputResult<'frame, 'data, 'inner>>,
-        {
-            Err(JlrsError::NullFrame)?
-        }
-
-        fn result_scope_with_slots<'data, F>(
-            &mut self,
-            _capacity: usize,
-            _func: F,
-            _: Private,
-        ) -> JlrsResult<JuliaResult<'frame, 'data>>
-        where
-            for<'nested, 'inner> F: FnOnce(
-                Output<'frame>,
-                &'inner mut GcFrame<'nested, Self::Mode>,
-            )
-                -> JlrsResult<OutputResult<'frame, 'data, 'inner>>,
-        {
-            Err(JlrsError::NullFrame)?
-        }
-
-        fn scope<T, F>(&mut self, _func: F, _: Private) -> JlrsResult<T>
-        where
-            for<'inner> F: FnOnce(&mut GcFrame<'inner, Self::Mode>) -> JlrsResult<T>,
-        {
-            Err(JlrsError::NullFrame)?
-        }
-
-        fn scope_with_slots<T, F>(
-            &mut self,
-            _capacity: usize,
-            _func: F,
-            _: Private,
-        ) -> JlrsResult<T>
-        where
-            for<'inner> F: FnOnce(&mut GcFrame<'inner, Self::Mode>) -> JlrsResult<T>,
-        {
-            Err(JlrsError::NullFrame)?
-        }
     }
 }
 
 #[cfg(test)]
 #[cfg(feature = "sync-rt")]
 mod tests {
-    use crate::prelude::*;
     use crate::{
         memory::{frame::GcFrame, mode, stack_page::StackPage},
         util,

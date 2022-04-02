@@ -10,7 +10,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |global, frame| unsafe {
+            jlrs.scope_with_capacity(1, |global, frame| unsafe {
                 let func = Module::main(global)
                     .submodule_ref("JlrsTests")?
                     .wrapper_unchecked()
@@ -41,7 +41,7 @@ mod tests {
         });
     }
 
-    #[test]
+    /*#[test]
     fn call0_nested_as_unrooted() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
@@ -65,14 +65,14 @@ mod tests {
             })
             .unwrap();
         });
-    }
+    }*/
 
     #[test]
     fn call1() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(2, |global, frame| unsafe {
+            jlrs.scope_with_capacity(2, |global, frame| unsafe {
                 let angle = Value::new(&mut *frame, std::f32::consts::PI)?;
                 let func = Module::main(global)
                     .submodule_ref("JlrsTests")?
@@ -110,7 +110,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(3, |global, frame| unsafe {
+            jlrs.scope_with_capacity(3, |global, frame| unsafe {
                 let angle = Value::new(&mut *frame, std::f32::consts::PI)?;
                 let func = Module::main(global)
                     .submodule_ref("JlrsTests")?
@@ -148,7 +148,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(4, |global, frame| unsafe {
+            jlrs.scope_with_capacity(4, |global, frame| unsafe {
                 let angle = Value::new(&mut *frame, std::f32::consts::PI)?;
                 let func = Module::main(global)
                     .submodule_ref("JlrsTests")?
@@ -188,7 +188,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(5, |global, frame| unsafe {
+            jlrs.scope_with_capacity(5, |global, frame| unsafe {
                 let angle = Value::new(&mut *frame, std::f32::consts::PI)?;
                 let func = Module::main(global)
                     .submodule_ref("JlrsTests")?
@@ -208,9 +208,10 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.scope_with_slots(5, |global, frame| {
+            let out = jlrs.scope_with_capacity(5, |global, frame| {
+                let (output, frame) = frame.split()?;
                 frame
-                    .result_scope_with_slots(24, |output, frame| unsafe {
+                    .scope_with_capacity(24, |frame| unsafe {
                         let func = Module::base(global).function_ref("+")?.wrapper_unchecked();
                         let arg0 = Value::new(&mut *frame, 1u32)?;
                         let arg1 = Value::new(&mut *frame, 2u32)?;
@@ -253,8 +254,9 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let out = jlrs.scope(|global, frame| {
+                let (output, frame) = frame.split()?;
                 frame
-                    .result_scope_with_slots(24, |output, frame| unsafe {
+                    .scope_with_capacity(24, |frame| unsafe {
                         let func = Module::base(global).function_ref("+")?.wrapper_unchecked();
                         let arg0 = Value::new(&mut *frame, 1u32)?;
                         let arg1 = Value::new(&mut *frame, 2u32)?;

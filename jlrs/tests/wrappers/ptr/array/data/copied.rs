@@ -8,10 +8,10 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |_, frame| {
+            jlrs.scope_with_capacity(1, |_, frame| {
                 let arr_val =
                     Array::new::<f32, _, _, _>(&mut *frame, (1, 2))?.into_jlrs_result()?;
-                let arr = arr_val.cast::<Array>()?;
+                let arr = arr_val;
 
                 let data = arr.copy_inline_data::<f32, _>(frame)?;
                 assert_eq!(data.dimensions().as_slice(), &[1, 2]);

@@ -11,7 +11,7 @@ mod not_lts {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |_, frame| unsafe {
+            jlrs.scope_with_capacity(1, |_, frame| unsafe {
                 let closure =
                     Value::eval_string(&mut *frame, "Base.Experimental.@opaque (x::Int64) -> 2x")?
                         .into_jlrs_result()?;
@@ -31,7 +31,7 @@ mod not_lts {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(3, |_, frame| unsafe {
+            jlrs.scope_with_capacity(3, |_, frame| unsafe {
                 let closure =
                     Value::eval_string(&mut *frame, "Base.Experimental.@opaque (x::Int64) -> 2x")?
                         .into_jlrs_result()?
@@ -55,7 +55,7 @@ mod not_lts {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(3, |_, frame| unsafe {
+            jlrs.scope_with_capacity(3, |_, frame| unsafe {
                 let closure =
                     Value::eval_string(&mut *frame, "Base.Experimental.@opaque (x::Int64) -> 2x")?
                         .into_jlrs_result()?
@@ -76,7 +76,7 @@ mod not_lts {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(3, |_, frame| unsafe {
+            jlrs.scope_with_capacity(3, |_, frame| unsafe {
                 let closure =
                     Value::eval_string(&mut *frame, "Base.Experimental.@opaque (x::Int64) -> 2x")?
                         .into_jlrs_result()?
@@ -97,7 +97,7 @@ mod not_lts {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(3, |_, frame| unsafe {
+            jlrs.scope_with_capacity(3, |_, frame| unsafe {
                 let closure = Value::eval_string(
                     &mut *frame,
                     "Base.Experimental.@opaque (x::Int64, y::Int64...) -> 2x + sum(y)",

@@ -1,11 +1,11 @@
 //! Wrapper for `SimpleVector`.
 
-use crate::layout::typecheck::Typecheck;
 use crate::wrappers::ptr::value::Value;
 use crate::{
     error::{JlrsError, JlrsResult},
     memory::{frame::Frame, global::Global},
 };
+use crate::{layout::typecheck::Typecheck, memory::output::Output};
 use crate::{layout::valid_layout::ValidLayout, private::Private};
 use jl_sys::{
     jl_alloc_svec, jl_alloc_svec_uninit, jl_emptysvec, jl_gc_wb, jl_simplevector_type,
@@ -39,11 +39,10 @@ impl<'scope, T: Wrapper<'scope, 'static>> SimpleVector<'scope, T> {
     {
         unsafe {
             let svec = NonNull::new_unchecked(jl_alloc_svec(n));
-            if let Err(err) = frame.push_root(svec.cast(), Private) {
-                Err(JlrsError::AllocError(err))?
-            };
-
-            Ok(SimpleVector::wrap_non_null(svec, Private))
+            let v = frame
+                .push_root(svec, Private)
+                .map_err(JlrsError::alloc_error)?;
+            Ok(v)
         }
     }
 
@@ -55,11 +54,10 @@ impl<'scope, T: Wrapper<'scope, 'static>> SimpleVector<'scope, T> {
         F: Frame<'scope>,
     {
         let svec = NonNull::new_unchecked(jl_alloc_svec_uninit(n));
-        if let Err(err) = frame.push_root(svec.cast(), Private) {
-            Err(JlrsError::AllocError(err))?
-        };
-
-        Ok(SimpleVector::wrap_non_null(svec, Private))
+        let v = frame
+            .push_root(svec, Private)
+            .map_err(JlrsError::alloc_error)?;
+        Ok(v)
     }
 
     /// Returns the length of this `SimpleVector`.
@@ -102,6 +100,17 @@ impl<'scope, T: Wrapper<'scope, 'static>> SimpleVector<'scope, T> {
 
         let ptr = value.map(|v| v.unwrap(Private)).unwrap_or(null_mut());
         Ok(Ref::wrap(ptr))
+    }
+}
+
+impl<'scope> SimpleVector<'scope, Value<'scope, 'static>> {
+    /// Use the `Output` to extend the lifetime of this data.
+    pub fn root<'target>(self, output: Output<'target>) -> SimpleVector<'target> {
+        unsafe {
+            let ptr = self.unwrap_non_null(Private);
+            output.set_root::<SimpleVector>(ptr);
+            SimpleVector::wrap_non_null(ptr, Private)
+        }
     }
 }
 
@@ -151,3 +160,6 @@ impl<'scope, T: Wrapper<'scope, 'static>> WrapperPriv<'scope, '_> for SimpleVect
         self.0
     }
 }
+
+// TODO: T
+impl_root!(SimpleVector, 1);

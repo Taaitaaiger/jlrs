@@ -1,742 +1,285 @@
-//! Scopes provide a nestable context in which Julia can be called.
+//! Traits for rooting Julia data in a specific scope's frame
 //!
-//! All interactions with Julia happen inside a scope. A base scope can be created with
-//! [`Julia::scope`] and [`Julia::scope_with_slots`], these methods take a closure which is
-//! called inside these methods after creating the arguments it requires: a [`Global`] and a
-//! mutable reference to a [`GcFrame`]. Each scope has exactly one [`GcFrame`] which is dropped
-//! when you leave the scope. Any value which is rooted in a frame or can be reached from a root
-//! isn't freed by the garbage collector until it becomes unreachable.
+//! When you take a look at the signatures of methods that return newly allocated Julia data, such
+//! as [`Value::new`] and [`Array::new`], you'll notice that these methods don't take a mutable
+//! reference to a frame, but a [`PartialScope`] and [`Scope`] respectively. Because you can't
+//! access a parent frame from a nested scope, it's not possible to call methods that allocate
+//! data with a parent frame. Instead, you need to reserve a slot in that frame by creating an
+//! `Output` in advance.
 //!
-//! Holding on to many roots will slow down the garbage collector. Scanning will be slower because
-//! more values can be reached, and because this data is not freed memory pressure increases
-//! causing the garbage collector to run more often. In order to manage the number of roots, it's
-//! possible to create nested scopes with their own `GcFrame`. The frames form a stack, when a
-//! nested scope is created the new frame is constructed at the top of this stack. This kind of
-//! functionality is provided by the two traits in this module, [`Scope`] and [`ScopeExt`].
+//! Both [`Output`] and mutable references to frames implement `PartialScope`. Methods that take a
+//! `PartialScope` allocate a single value and use the provided implementation to root that value.
+//! Methods that need to allocate and root temporary values take a `Scope`, while mutable
+//! references to frames do implement this trait, `Output` does not because it can only be used to
+//! root a single value once. An `Output` can be converted to an `OutputScope` by calling
+//! [`Output::into_scope`] and providing it with a mutable reference to the current frame.
 //!
-//! There are several ways to create a nested scope. The easiest is [`ScopeExt::scope`], which
-//! behaves the same way as [`Julia::scope`]. This method is relatively limited in the sense that
-//! it cannot be used to create a new value inside this new scope and root it in the frame of
-//! parent scope. Several methods are available to handle that case, which is particularly useful
-//! if you want to create a new value or call a function with some temporary values. These methods
-//! are [`Scope::value_scope`], used to allocate a value in a nested scope and root it in the
-//! frame of a parent scope; [`Scope::result_scope`], used to call a function in a nested scope
-//! and root the result in the frame of a parent scope; [`ScopeExt::wrapper_scope`] and
-//! [`ScopeExt::wrapper_result_scope`] are also available, they do the same thing as the previous
-//! two methods but they will cast the result to the given wrapper type before returning it.
+//! The `Scope` trait provides a single method, [`Scope::split`]. This method splits the
+//! implementation to an `Output` and a mutable reference to a frame. When a frame is used as a
+//! `Scope`, the `Output` is reserved in that frame and the frame is the frame itself. If an
+//! `OutputScope` is used, the existing `Output` and frame are returned.
+//!  
+//! A few examples:
 //!
-//! Two traits exist because there are two implementors of [`Scope`] and they behave differently.
-//! The first implementor is all mutable references to types that implement the [`Frame`] trait,
-//! [`ScopeExt`] is also implemented. Methods that create new values that must be rooted usually
-//! take an argument that implements `Scope`, when a mutable reference to a frame is used the
-//! value is rooted in that frame. Because the scope is taken by value and mutable references
-//! don't implement `Copy`, it's necessary to mutably reborrow the frame when calling these
-//! methods to prevent the frame from moving. These methods only care about the fact that it's a
-//! mutable reference to a frame, not the duration of that borrow.
+//! ```
+//! # use jlrs::prelude::*;
+//! # use jlrs::util::JULIA;
+//! # fn main() {
+//! # JULIA.with(|j| {
+//! # let mut julia = j.borrow_mut();
+//! julia.scope(|global, frame| {
+//!     // Value::new takes a partial scope, here a frame is used, so the
+//!     // value is rooted in the current frame.
+//!     let _i = Value::new(&mut *frame, 2u64)?;
+//!     
+//!     // We can also reserve an output in the current frame and use
+//!     // that output. This has the same effect as the previous example.
+//!     let output = frame.reserve_output()?;
+//!     let _j = Value::new(output, 1u32)?;
+//!     
+//!     // Simarly, we can use an OutputScope because everything that
+//!     // implements Scope implements PartialScope.
+//!     let output = frame.reserve_output()?;
+//!     let output_scope = output.into_scope(frame);
+//!     let _k = Value::new(output_scope, 1u32)?;
 //!
-//! The other implementor, [`OutputScope`], is used in nested scopes that root a value in the
-//! frame of a parent scope. It doesn't implement [`ScopeExt`]. As mentioned before, frames form a
-//! stack and the frame of a nested scope is constructed on top of its parent but can't access it,
-//! or any other ancestral frame. Due to this design, it's not possible to directly root a value
-//! in some ancestral frame. Rather, rooting has to be postponed until the target frame is the
-//! current frame again.
+//!     // Using an output this way isn't particularly useful, because in all
+//!     // the above examples the result is rooted in the current frame.
+//!     // Outputs are more useful in combination with a nested scope.
+//!     let output_a = frame.reserve_output()?;
+//!     let output_b = frame.reserve_output()?;
+//!     let (_array, _value) = frame.scope(|frame| {
+//!         // By using the output from a nested scope, the data is rooted in
+//!         // the parent frame and both these values can be returned from
+//!         // this scope
+//!         let output_scope = output_a.into_scope(frame);
+//!         let array = Array::new::<f32, _, _, _>(output_scope, (3, 3))?
+//!             .into_jlrs_result()?;
 //!
-//! Scopes that root a value in an ancestral frame take a closure with two arguments, an
-//! [`Output`] and a mutable reference to a [`GcFrame`]. The frame can be used to root temporary
-//! values, once all temporary values have been created and there's nothing else that needs to be
-//! rooted in the current frame, the `Output` can be converted to an `OutputScope`. Unlike frames,
-//! the [`Scope`] trait is not implemented for a mutable reference but for `OutputScope` itself.
-//! Because it implements this trait it can be nested. In this case the output is propagated to
-//! the new scope, ie the the result still targets the same scope. An `OutputScope` can be used
-//! a single time to create a new value, this value is left unrooted until the target scope is
-//! reached.
+//!         let value = Value::new(output_b, 3usize)?;
 //!
-//! You should always immediately return such an unrooted value from the closure without calling
-//! any function in jlrs, even those that don't take a frame or a scope as an argument. Functions
-//! that call the C API but don't take a scope or frame can still allocate new values internally,
-//! which can trigger a garbage collection cycle. Because an unrooted value exists which is likely
-//! unreachable, such a cycle can free the value that has just been created.
+//!         Ok((array, value))
+//!     })?;
 //!
-//! [`Julia::scope`]: crate::julia::Julia::scope
-//! [`Julia::scope_with_slots`]: crate::julia::Julia::scope_with_slots
+//!     Ok(())
+//! })
+//! # .unwrap();
+//! # });
+//! # }
+//! ```
+//
+//! [`Value::new`]: crate::wrappers::ptr::value::Value::new
+//! [`Array::new`]: crate::wrappers::ptr::array::Array::new
+//! [`Output::into_scope`]: crate::memory::output::Output::into_scope
 
 use crate::{
-    error::{JlrsResult, JuliaResult},
-    info::Info,
-    layout::typecheck::Typecheck,
+    error::JlrsResult,
     memory::{
         frame::Frame,
-        frame::GcFrame,
         global::Global,
-        output::{Output, OutputResult, OutputScope, OutputValue},
+        output::{Output, OutputScope},
     },
-    private::Private,
-    wrappers::ptr::Wrapper,
 };
 
-/// Extension for [`Scope`] implemented by mutable references to frames. It offers methods like
-/// [`ScopeExt::scope`], [`ScopeExt::wrapper_scope`], and [`ScopeExt::wrapper_result_scope`] that
-/// can be used to create a nested scope that returns arbitrary data, and to automatically call
-/// cast before returning a Julia value or result respectively.
-pub trait ScopeExt<'target, 'current, 'data, F: Frame<'current>>:
-    Scope<'target, 'current, 'data, F>
-{
-    /// Create a [`GcFrame`] and call the given closure with it. Returns the result of this
-    /// closure.
-    ///
-    /// Example:
-    ///
-    /// ```
-    /// # use jlrs::prelude::*;
-    /// # use jlrs::util::JULIA;
-    /// # fn main() {
-    /// # JULIA.with(|j| {
-    /// # let mut julia = j.borrow_mut();
-    ///   julia.scope(|global, frame| {
-    ///       let sum = frame.scope(|frame| {
-    ///           let v1 = Value::new(&mut *frame, 1usize)?;
-    ///           let v2 = Value::new(&mut *frame, 2usize)?;
-    ///
-    ///           unsafe {
-    ///               Module::base(global)
-    ///                   .function(&mut *frame, "+")?
-    ///                   .call2(&mut *frame, v1, v2)?
-    ///                   .unwrap()
-    ///                   .unbox::<usize>()
-    ///           }
-    ///       })?;
-    ///
-    ///       assert_eq!(sum, 3);
-    ///       Ok(())
-    ///   }).unwrap();
-    /// # });
-    /// # }
-    /// ```
-    fn scope<T, G>(self, func: G) -> JlrsResult<T>
-    where
-        for<'inner> G: FnOnce(&mut GcFrame<'inner, F::Mode>) -> JlrsResult<T>;
-
-    /// Create a [`GcFrame`] with capacity for at least `capacity` roots and call the given
-    /// closure with it. Returns the result of this closure.
-    ///
-    /// Example:
-    ///
-    /// ```
-    /// # use jlrs::prelude::*;
-    /// # use jlrs::util::JULIA;
-    /// # fn main() {
-    /// # JULIA.with(|j| {
-    /// # let mut julia = j.borrow_mut();
-    ///   julia.scope(|global, frame| {
-    ///       let sum = frame.scope_with_slots(3, |frame| {
-    ///           let v1 = Value::new(&mut *frame, 1usize)?;
-    ///           let v2 = Value::new(&mut *frame, 2usize)?;
-    ///
-    ///           unsafe {
-    ///               Module::base(global)
-    ///                   .function(&mut *frame, "+")?
-    ///                   .call2(&mut *frame, v1, v2)?
-    ///                   .unwrap()
-    ///                   .unbox::<usize>()
-    ///           }
-    ///       })?;
-    ///
-    ///       assert_eq!(sum, 3);
-    ///       Ok(())
-    ///   }).unwrap();
-    /// # });
-    /// # }
-    /// ```
-    fn scope_with_slots<T, G>(self, capacity: usize, func: G) -> JlrsResult<T>
-    where
-        for<'inner> G: FnOnce(&mut GcFrame<'inner, F::Mode>) -> JlrsResult<T>;
-
-    /// The same as [`Scope::value_scope`], but the value is cast to `T` before returning it.
-    fn wrapper_scope<T, G>(self, func: G) -> JlrsResult<T>
-    where
-        T: Wrapper<'current, 'data> + Typecheck,
-        for<'nested, 'inner> G: FnOnce(
-            Output<'current>,
-            &'inner mut GcFrame<'nested, F::Mode>,
-        ) -> JlrsResult<OutputValue<'current, 'data, 'inner>>;
-
-    /// The same as [`Scope::value_scope_with_slots`], but the value is cast to `T` before
-    /// returning it.
-    fn wrapper_scope_with_slots<T, G>(self, capacity: usize, func: G) -> JlrsResult<T>
-    where
-        T: Wrapper<'current, 'data> + Typecheck,
-        for<'nested, 'inner> G: FnOnce(
-            Output<'current>,
-            &'inner mut GcFrame<'nested, F::Mode>,
-        ) -> JlrsResult<OutputValue<'current, 'data, 'inner>>;
-
-    /// The same as [`Scope::result_scope`], on success the result is cast to `T` before returning
-    /// it.
-    fn wrapper_result_scope<T, G>(self, func: G) -> JlrsResult<JuliaResult<'current, 'data, T>>
-    where
-        T: Wrapper<'current, 'data> + Typecheck,
-        for<'nested, 'inner> G: FnOnce(
-            Output<'current>,
-            &'inner mut GcFrame<'nested, F::Mode>,
-        )
-            -> JlrsResult<OutputResult<'current, 'data, 'inner>>;
-
-    /// The same as [`Scope::result_scope_with_slots`], on success the result is cast to `T`
-    /// before returning it.
-    fn wrapper_result_scope_with_slots<T, G>(
-        self,
-        capacity: usize,
-        func: G,
-    ) -> JlrsResult<JuliaResult<'current, 'data, T>>
-    where
-        T: Wrapper<'current, 'data> + Typecheck,
-        for<'nested, 'inner> G: FnOnce(
-            Output<'current>,
-            &'inner mut GcFrame<'nested, F::Mode>,
-        )
-            -> JlrsResult<OutputResult<'current, 'data, 'inner>>;
-}
-
-impl<'current, 'data, F: Frame<'current>> ScopeExt<'current, 'current, 'data, F> for &mut F {
-    fn scope<T, G>(self, func: G) -> JlrsResult<T>
-    where
-        for<'inner> G: FnOnce(&mut GcFrame<'inner, F::Mode>) -> JlrsResult<T>,
-    {
-        F::scope(self, func, Private)
-    }
-
-    fn scope_with_slots<T, G>(self, capacity: usize, func: G) -> JlrsResult<T>
-    where
-        for<'inner> G: FnOnce(&mut GcFrame<'inner, F::Mode>) -> JlrsResult<T>,
-    {
-        F::scope_with_slots(self, capacity, func, Private)
-    }
-
-    fn wrapper_scope<T, G>(self, func: G) -> JlrsResult<T>
-    where
-        T: Wrapper<'current, 'data> + Typecheck,
-        for<'nested, 'inner> G: FnOnce(
-            Output<'current>,
-            &'inner mut GcFrame<'nested, F::Mode>,
-        ) -> JlrsResult<OutputValue<'current, 'data, 'inner>>,
-    {
-        F::value_scope(self, func, Private)?.cast::<T>()
-    }
-
-    fn wrapper_scope_with_slots<T, G>(self, capacity: usize, func: G) -> JlrsResult<T>
-    where
-        T: Wrapper<'current, 'data> + Typecheck,
-        for<'nested, 'inner> G: FnOnce(
-            Output<'current>,
-            &'inner mut GcFrame<'nested, F::Mode>,
-        ) -> JlrsResult<OutputValue<'current, 'data, 'inner>>,
-    {
-        F::value_scope_with_slots(self, capacity, func, Private)?.cast::<T>()
-    }
-
-    fn wrapper_result_scope<T, G>(self, func: G) -> JlrsResult<JuliaResult<'current, 'data, T>>
-    where
-        T: Wrapper<'current, 'data> + Typecheck,
-        for<'nested, 'inner> G: FnOnce(
-            Output<'current>,
-            &'inner mut GcFrame<'nested, F::Mode>,
-        )
-            -> JlrsResult<OutputResult<'current, 'data, 'inner>>,
-    {
-        match F::result_scope(self, func, Private)? {
-            Ok(v) => Ok(Ok(v.cast::<T>()?)),
-            Err(e) => Ok(Err(e)),
-        }
-    }
-
-    fn wrapper_result_scope_with_slots<T, G>(
-        self,
-        capacity: usize,
-        func: G,
-    ) -> JlrsResult<JuliaResult<'current, 'data, T>>
-    where
-        T: Wrapper<'current, 'data> + Typecheck,
-        for<'nested, 'inner> G: FnOnce(
-            Output<'current>,
-            &'inner mut GcFrame<'nested, F::Mode>,
-        )
-            -> JlrsResult<OutputResult<'current, 'data, 'inner>>,
-    {
-        match F::result_scope_with_slots(self, capacity, func, Private)? {
-            Ok(v) => Ok(Ok(v.cast::<T>()?)),
-            Err(e) => Ok(Err(e)),
-        }
-    }
-}
-
-/// Trait that provides methods to create nested scopes which eventually root a value in the frame
-/// of a target scope. It's implemented for [`OutputScope`] and mutable references to implementors
-/// of [`Frame`]. In addition to nesting, many methods that allocate a new value take an
-/// implementation of this trait as their first argument. If a mutable reference to a frame is
-/// used this way, the value is rooted in that frame. If it's an [`OutputScope`], it's rooted in
-/// the frame for which the [`Output`] was originally created.
-pub trait Scope<'target, 'current, 'data, F>:
-    Sized + private::Scope<'target, 'current, 'data, F>
+/// This trait is used with functions that return Julia data rooted in some scope which need to
+/// allocate and root temporary data. It's implemented by mutable references to implementations of
+/// [`Frame`] and [`OutputScope`]. This trait provides a single method, `Scope::split` which
+/// splits it into an output and the current frame. If this method is used with a mutable
+/// reference to a frame, the output is reserved in that frame. If it's used with an `OutputScope`
+/// the existing output is returned. In both cases the frame is the current frame, it's
+/// recommended to create a nested scope to root temporary Julia data.
+pub trait Scope<'target, 'current, F>:
+    private::Scope<'target, 'current, F> + PartialScope<'target>
 where
     F: Frame<'current>,
 {
-    /// Create a new `Global`.
+    /// Split the scope into an output and a frame. If the scope is a frame, the output is
+    /// allocated in the current frame. If it's an [`OutputScope`], the existing output is
+    /// returned.
+    fn split<'own>(self) -> JlrsResult<(Output<'target>, &'own mut F)>
+    where
+        Self: 'own;
+}
+
+impl<'current, F> Scope<'current, 'current, F> for &mut F
+where
+    F: Frame<'current>,
+{
+    fn split<'own>(self) -> JlrsResult<(Output<'current>, &'own mut F)>
+    where
+        Self: 'own,
+    {
+        let output = self.reserve_output()?;
+        Ok((output, self))
+    }
+}
+
+impl<'target, 'current, 'borrow, F> Scope<'target, 'current, F>
+    for OutputScope<'target, 'current, 'borrow, F>
+where
+    F: Frame<'current>,
+{
+    fn split<'own>(self) -> JlrsResult<(Output<'target>, &'own mut F)>
+    where
+        Self: 'own,
+    {
+        Ok((self.output, self.frame))
+    }
+}
+
+/// This trait is used with functions that return Julia data rooted in some scope which don't need
+/// to allocate and root temporary data. It's implemented by mutable references to implementations
+/// of [`Frame`], [`OutputScope`], and [`Output`]. In the first case the data rooted in that
+/// frame, in the other two cases the provided `Output` is used.
+pub trait PartialScope<'target>: private::PartialScope<'target> {
+    /// Returns a new `Global`.
     fn global(&self) -> Global<'target> {
         unsafe { Global::new() }
     }
-
-    /// Provides access to global information.
-    fn info(&self) -> Info {
-        Info::new()
-    }
-
-    /// Create a new `GcFrame` that can be used to root `capacity` values, an `Output` for the
-    /// current scope, and use them to call the inner closure. The final result is not rooted in
-    /// this newly created frame, but the current frame. The final result must not be the result
-    /// of a function call, use [`Scope::result_scope`] for that purpose instead. If the current
-    /// scope is a mutable reference to a frame, calling this method will require one slot of the
-    /// current frame.
-    ///
-    /// Example:
-    ///
-    /// ```
-    /// # use jlrs::prelude::*;
-    /// # use jlrs::util::JULIA;
-    /// # fn main() {
-    /// # JULIA.with(|j| {
-    /// # let mut julia = j.borrow_mut();
-    ///   julia.scope(|global, frame| {
-    ///       let _nt = frame.value_scope(|output, frame| {
-    ///           let v1 = Value::new(&mut *frame, 1usize)?;
-    ///           let v2 = Value::new(&mut *frame, 2usize)?;
-    ///
-    ///           let output = output.into_scope(frame);
-    ///           named_tuple!(output, "a" => v1, "b" => v2)
-    ///       })?;
-    ///
-    ///       Ok(())
-    ///   }).unwrap();
-    /// # });
-    /// # }
-    /// ```
-    fn value_scope<G>(self, func: G) -> JlrsResult<Self::Value>
-    where
-        G: for<'nested, 'inner> FnOnce(
-            Output<'target>,
-            &'inner mut GcFrame<'nested, F::Mode>,
-        ) -> JlrsResult<OutputValue<'target, 'data, 'inner>>;
-
-    /// Create a new `GcFrame` that can be used to root `capacity` values, an `Output` for the
-    /// current scope, and use them to call the inner closure. The final result is not rooted in
-    /// this newly created frame, but the current frame. The final result must be the result of a
-    /// function call, if you want to create a new value use [`Scope::value_scope`] instead. If
-    /// the current scope is a mutable reference to a frame, calling this method will require one
-    /// slot of the current frame.
-    ///
-    /// Example:
-    ///
-    /// ```
-    /// # use jlrs::prelude::*;
-    /// # use jlrs::util::JULIA;
-    /// # fn main() {
-    /// # JULIA.with(|j| {
-    /// # let mut julia = j.borrow_mut();
-    ///   julia.scope(|global, frame| {
-    ///       let sum = frame.result_scope(|output, frame| {
-    ///           let v1 = Value::new(&mut *frame, 1usize)?;
-    ///           let v2 = Value::new(&mut *frame, 2usize)?;
-    ///
-    ///           let add = Module::base(global).function(&mut *frame, "+")?;
-    ///
-    ///           let output = output.into_scope(frame);
-    ///           unsafe { add.call2(output, v1, v2) }
-    ///       })?.unwrap().unbox::<usize>()?;
-    ///
-    ///       assert_eq!(sum, 3);
-    ///       Ok(())
-    ///   }).unwrap();
-    /// # });
-    /// # }
-    /// ```
-    fn result_scope<G>(self, func: G) -> JlrsResult<Self::JuliaResult>
-    where
-        G: for<'nested, 'inner> FnOnce(
-            Output<'target>,
-            &'inner mut GcFrame<'nested, F::Mode>,
-        ) -> JlrsResult<OutputResult<'target, 'data, 'inner>>;
-
-    /// Create a new `GcFrame` that can be used to root `capacity` values, an `Output` for the
-    /// current scope, and use them to call the inner closure. The final result is not rooted in
-    /// this newly created frame, but the current frame. The final result must not be the result
-    /// of a function call, use [`Scope::result_scope`] for that purpose instead. If the current
-    /// scope is a mutable reference to a frame, calling this method will require one slot of the
-    /// current frame.
-    ///
-    /// Example:
-    ///
-    /// ```
-    /// # use jlrs::prelude::*;
-    /// # use jlrs::util::JULIA;
-    /// # fn main() {
-    /// # JULIA.with(|j| {
-    /// # let mut julia = j.borrow_mut();
-    ///   julia.scope(|global, frame| {
-    ///       let _nt = frame.value_scope(|output, frame| {
-    ///           let v1 = Value::new(&mut *frame, 1usize)?;
-    ///           let v2 = Value::new(&mut *frame, 2usize)?;
-    ///
-    ///           let output = output.into_scope(frame);
-    ///           named_tuple!(output, "a" => v1, "b" => v2)
-    ///       })?;
-    ///
-    ///       Ok(())
-    ///   }).unwrap();
-    /// # });
-    /// # }
-    /// ```
-    fn value_scope_with_slots<G>(self, capacity: usize, func: G) -> JlrsResult<Self::Value>
-    where
-        G: for<'nested, 'inner> FnOnce(
-            Output<'target>,
-            &'inner mut GcFrame<'nested, F::Mode>,
-        ) -> JlrsResult<OutputValue<'target, 'data, 'inner>>;
-
-    /// Create a new `GcFrame` that can be used to root `capacity` values, an `Output` for the
-    /// current scope, and use them to call the inner closure. The final result is not rooted in
-    /// this newly created frame, but the current frame. The final result must be the result of a
-    /// function call, if you want to create a new value use [`Scope::value_scope`] instead. If
-    /// the current scope is a mutable reference to a frame, calling this method will require one
-    /// slot of the current frame.
-    ///
-    /// Example:
-    ///
-    /// ```
-    /// # use jlrs::prelude::*;
-    /// # use jlrs::util::JULIA;
-    /// # fn main() {
-    /// # JULIA.with(|j| {
-    /// # let mut julia = j.borrow_mut();
-    ///   julia.scope(|global, frame| {
-    ///       let sum = frame.result_scope(|output, frame| {
-    ///           let v1 = Value::new(&mut *frame, 1usize)?;
-    ///           let v2 = Value::new(&mut *frame, 2usize)?;
-    ///
-    ///           let add = Module::base(global).function(&mut *frame, "+")?;
-    ///
-    ///           let output = output.into_scope(frame);
-    ///           unsafe { add.call2(output, v1, v2) }
-    ///       })?.unwrap().unbox::<usize>()?;
-    ///
-    ///       assert_eq!(sum, 3);
-    ///       Ok(())
-    ///   }).unwrap();
-    /// # });
-    /// # }
-    /// ```
-    fn result_scope_with_slots<G>(self, capacity: usize, func: G) -> JlrsResult<Self::JuliaResult>
-    where
-        G: for<'nested, 'inner> FnOnce(
-            Output<'target>,
-            &'inner mut GcFrame<'nested, F::Mode>,
-        ) -> JlrsResult<OutputResult<'target, 'data, 'inner>>;
 }
 
-impl<'current, 'data, F: Frame<'current>> Scope<'current, 'current, 'data, F> for &mut F {
-    /// Creates a [`GcFrame`] and calls the given closure with it. Returns the result of this
-    /// closure.
-    ///
-    /// Example:
-    ///
-    /// ```
-    /// # use jlrs::prelude::*;
-    /// # use jlrs::util::JULIA;
-    /// # fn main() {
-    /// # JULIA.with(|j| {
-    /// # let mut julia = j.borrow_mut();
-    /// julia.scope(|_global, frame| {
-    ///     let _nt = frame.value_scope(|output, frame| {
-    ///         let i = Value::new(&mut *frame, 2u64)?;
-    ///         let j = Value::new(&mut *frame, 1u32)?;
-    ///
-    ///         let output = output.into_scope(frame);
-    ///         named_tuple!(output, "i" => i, "j" => j)
-    ///     })?;
-    ///
-    ///     Ok(())
-    /// }).unwrap();
-    /// # });
-    /// # }
-    /// ```
-    fn value_scope<G>(self, func: G) -> JlrsResult<Self::Value>
-    where
-        G: for<'nested, 'inner> FnOnce(
-            Output<'current>,
-            &'inner mut GcFrame<'nested, F::Mode>,
-        ) -> JlrsResult<OutputValue<'current, 'data, 'inner>>,
-    {
-        F::value_scope(self, func, Private)
-    }
+impl<'target, F> PartialScope<'target> for &mut F where F: Frame<'target> {}
 
-    /// Creates a [`GcFrame`] and calls the given closure with it. Returns the result of this
-    /// closure.
-    ///
-    /// Example:
-    ///
-    /// ```
-    /// # use jlrs::prelude::*;
-    /// # use jlrs::util::JULIA;
-    /// # fn main() {
-    /// # JULIA.with(|j| {
-    /// # let mut julia = j.borrow_mut();
-    ///   julia.scope(|global, frame| {
-    ///       let sum = frame.result_scope(|output, frame| {
-    ///           let v1 = Value::new(&mut *frame, 1usize)?;
-    ///           let v2 = Value::new(&mut *frame, 2usize)?;
-    ///
-    ///           let func = Module::base(global)
-    ///               .function(&mut *frame, "+")?;
-    ///
-    ///           let output = output.into_scope(frame);
-    ///           unsafe { func.call2(output, v1, v2) }
-    ///       })?.unwrap()
-    ///           .unbox::<usize>()?;
-    ///
-    ///       assert_eq!(sum, 3);
-    ///       Ok(())
-    ///   }).unwrap();
-    /// # });
-    /// # }
-    /// ```
-    fn result_scope<G>(self, func: G) -> JlrsResult<Self::JuliaResult>
-    where
-        G: for<'nested, 'inner> FnOnce(
-            Output<'current>,
-            &'inner mut GcFrame<'nested, F::Mode>,
-        )
-            -> JlrsResult<OutputResult<'current, 'data, 'inner>>,
-    {
-        F::result_scope(self, func, Private)
-    }
+impl<'target> PartialScope<'target> for Output<'target> {}
 
-    /// Creates a [`GcFrame`] and calls the given closure with it. Returns the result of this
-    /// closure.
-    ///
-    /// Example:
-    ///
-    /// ```
-    /// # use jlrs::prelude::*;
-    /// # use jlrs::util::JULIA;
-    /// # fn main() {
-    /// # JULIA.with(|j| {
-    /// # let mut julia = j.borrow_mut();
-    /// julia.scope(|_global, frame| {
-    ///     let _nt = frame.value_scope_with_slots(2, |output, frame| {
-    ///         let i = Value::new(&mut *frame, 2u64)?;
-    ///         let j = Value::new(&mut *frame, 1u32)?;
-    ///
-    ///         let output = output.into_scope(frame);
-    ///         named_tuple!(output, "i" => i, "j" => j)
-    ///     })?;
-    ///
-    ///     Ok(())
-    /// }).unwrap();
-    /// # });
-    /// # }
-    /// ```
-    fn value_scope_with_slots<G>(self, capacity: usize, func: G) -> JlrsResult<Self::Value>
-    where
-        G: for<'nested, 'inner> FnOnce(
-            Output<'current>,
-            &'inner mut GcFrame<'nested, F::Mode>,
-        ) -> JlrsResult<OutputValue<'current, 'data, 'inner>>,
-    {
-        F::value_scope_with_slots(self, capacity, func, Private)
-    }
-
-    /// Creates a [`GcFrame`] with `capacity` preallocated slots and calls the given closure with
-    /// it. Returns the result of this closure.
-    ///
-    /// Example:
-    ///
-    /// ```
-    /// # use jlrs::prelude::*;
-    /// # use jlrs::util::JULIA;
-    /// # fn main() {
-    /// # JULIA.with(|j| {
-    /// # let mut julia = j.borrow_mut();
-    ///   julia.scope(|global, frame| {
-    ///       let sum = frame.result_scope_with_slots(2, |output, frame| {
-    ///           let v1 = Value::new(&mut *frame, 1usize)?;
-    ///           let v2 = Value::new(&mut *frame, 2usize)?;
-    ///
-    ///
-    ///           let func = Module::base(global)
-    ///               .function(&mut *frame, "+")?;
-    ///
-    ///           let output = output.into_scope(frame);
-    ///           unsafe { func.call2(output, v1, v2) }
-    ///       })?.unwrap()
-    ///           .unbox::<usize>()?;
-    ///
-    ///       assert_eq!(sum, 3);
-    ///       Ok(())
-    ///   }).unwrap();
-    /// # });
-    /// # }
-    /// ```
-    fn result_scope_with_slots<G>(self, capacity: usize, func: G) -> JlrsResult<Self::JuliaResult>
-    where
-        G: for<'nested, 'inner> FnOnce(
-            Output<'current>,
-            &'inner mut GcFrame<'nested, F::Mode>,
-        )
-            -> JlrsResult<OutputResult<'current, 'data, 'inner>>,
-    {
-        F::result_scope_with_slots(self, capacity, func, Private)
-    }
-}
-
-impl<'target, 'current, 'data, 'borrow, F: Frame<'current>> Scope<'target, 'current, 'data, F>
-    for OutputScope<'target, 'current, 'borrow, F>
+impl<'target, 'current, 'inner, F> PartialScope<'target>
+    for OutputScope<'target, 'current, 'inner, F>
+where
+    F: Frame<'current>,
 {
-    fn value_scope<G>(self, func: G) -> JlrsResult<Self::Value>
-    where
-        G: for<'nested, 'inner> FnOnce(
-            Output<'target>,
-            &'inner mut GcFrame<'nested, F::Mode>,
-        ) -> JlrsResult<OutputValue<'target, 'data, 'inner>>,
-    {
-        self.value_scope(func)
-            .map(|ppv| OutputValue::wrap_non_null(ppv.unwrap_non_null()))
-    }
-
-    fn result_scope<G>(self, func: G) -> JlrsResult<Self::JuliaResult>
-    where
-        G: for<'nested, 'inner> FnOnce(
-            Output<'target>,
-            &'inner mut GcFrame<'nested, F::Mode>,
-        ) -> JlrsResult<OutputResult<'target, 'data, 'inner>>,
-    {
-        self.result_scope(func)
-    }
-
-    fn value_scope_with_slots<G>(self, capacity: usize, func: G) -> JlrsResult<Self::Value>
-    where
-        G: for<'nested, 'inner> FnOnce(
-            Output<'target>,
-            &'inner mut GcFrame<'nested, F::Mode>,
-        ) -> JlrsResult<OutputValue<'target, 'data, 'inner>>,
-    {
-        self.value_scope_with_slots(capacity, func)
-            .map(|ppv| OutputValue::wrap_non_null(ppv.unwrap_non_null()))
-    }
-
-    fn result_scope_with_slots<G>(self, capacity: usize, func: G) -> JlrsResult<Self::JuliaResult>
-    where
-        G: for<'nested, 'inner> FnOnce(
-            Output<'target>,
-            &'inner mut GcFrame<'nested, F::Mode>,
-        ) -> JlrsResult<OutputResult<'target, 'data, 'inner>>,
-    {
-        self.result_scope_with_slots(capacity, func)
-    }
 }
 
 pub(crate) mod private {
     use std::ptr::NonNull;
 
-    use crate::wrappers::ptr::private::Wrapper;
-    use crate::wrappers::ptr::value::Value;
-    use crate::wrappers::ptr::ValueRef;
     use crate::{
-        error::{JlrsResult, JuliaResult},
-        memory::{
-            frame::Frame,
-            output::{OutputResult, OutputScope, OutputValue},
-        },
+        error::{JlrsError, JlrsResult, JuliaResult},
+        memory::{frame::Frame, output::Output},
+        prelude::Value,
         private::Private,
     };
+    use crate::{memory::output::OutputScope, wrappers::ptr::private::Wrapper};
     use jl_sys::jl_value_t;
 
-    pub trait Scope<'target, 'current, 'data, F: Frame<'current>>: Sized {
-        type Value: Sized;
-        type JuliaResult: Sized;
+    pub trait Scope<'target, 'current, F>: Sized + PartialScope<'target>
+    where
+        F: Frame<'current>,
+    {
+    }
+
+    impl<'current, F> Scope<'current, 'current, F> for &mut F where F: Frame<'current> {}
+
+    impl<'target, 'current, 'borrow, F> Scope<'target, 'current, F>
+        for OutputScope<'target, 'current, 'borrow, F>
+    where
+        F: Frame<'current>,
+    {
+    }
+
+    pub trait PartialScope<'target>: Sized {
+        // safety: the value must be a valid pointer to a Julia value.
+        unsafe fn value<'data, X: Wrapper<'target, 'data>>(
+            self,
+            value: NonNull<X::Wraps>,
+            _: Private,
+        ) -> JlrsResult<X>;
 
         // safety: the value must be a valid pointer to a Julia value.
-        unsafe fn value(self, value: NonNull<jl_value_t>, _: Private) -> JlrsResult<Self::Value>;
-
-        // safety: the value must be a valid pointer to a Julia value.
-        unsafe fn call_result(
+        unsafe fn call_result<'data, X: Wrapper<'target, 'data>>(
             self,
-            value: Result<NonNull<jl_value_t>, NonNull<jl_value_t>>,
+            result: Result<NonNull<X::Wraps>, NonNull<jl_value_t>>,
             _: Private,
-        ) -> JlrsResult<Self::JuliaResult>;
+        ) -> JlrsResult<JuliaResult<'target, 'data, X>>;
+    }
 
-        unsafe fn unrooted_call_result(
+    impl<'current, F> PartialScope<'current> for &mut F
+    where
+        F: Frame<'current>,
+    {
+        unsafe fn value<'data, X: Wrapper<'current, 'data>>(
             self,
-            value: Result<ValueRef, ValueRef>,
+            value: NonNull<X::Wraps>,
             _: Private,
-        ) -> JlrsResult<Self::JuliaResult> {
-            let value = match value {
-                Ok(v) => Ok(v
-                    .value()
-                    .expect("Expected non-null pointer")
-                    .unwrap_non_null(Private)),
-                Err(e) => Err(e
-                    .value()
-                    .expect("Expected non-null pointer")
-                    .unwrap_non_null(Private)),
+        ) -> JlrsResult<X> {
+            let v = self
+                .push_root(value, Private)
+                .map_err(JlrsError::alloc_error)?;
+
+            Ok(v)
+        }
+
+        unsafe fn call_result<'data, X: Wrapper<'current, 'data>>(
+            self,
+            result: Result<NonNull<X::Wraps>, NonNull<jl_value_t>>,
+            _: Private,
+        ) -> JlrsResult<JuliaResult<'current, 'data, X>> {
+            match result {
+                Ok(v) => {
+                    let v = self.push_root(v, Private).map_err(JlrsError::alloc_error)?;
+                    Ok(Ok(v))
+                }
+                Err(e) => {
+                    let e = self.push_root(e, Private).map_err(JlrsError::alloc_error)?;
+                    Ok(Err(e))
+                }
+            }
+        }
+    }
+
+    impl<'target, 'current, 'borrow, F> PartialScope<'target>
+        for OutputScope<'target, 'current, 'borrow, F>
+    where
+        F: Frame<'current>,
+    {
+        unsafe fn value<'data, X: Wrapper<'target, 'data>>(
+            self,
+            value: NonNull<X::Wraps>,
+            _: Private,
+        ) -> JlrsResult<X> {
+            Ok(self.set_root(value))
+        }
+
+        unsafe fn call_result<'data, X: Wrapper<'target, 'data>>(
+            self,
+            result: Result<NonNull<X::Wraps>, NonNull<jl_value_t>>,
+            _: Private,
+        ) -> JlrsResult<JuliaResult<'target, 'data, X>> {
+            let rooted = match result {
+                Ok(v) => Ok(self.set_root(v)),
+                Err(e) => Err(self.set_root(e)),
             };
 
-            self.call_result(value, Private)
+            Ok(rooted)
         }
     }
 
-    impl<'current, 'data, F: Frame<'current>> Scope<'current, 'current, 'data, F> for &mut F {
-        type Value = Value<'current, 'data>;
-        type JuliaResult = JuliaResult<'current, 'data>;
-
-        unsafe fn value(self, value: NonNull<jl_value_t>, _: Private) -> JlrsResult<Self::Value> {
-            self.push_root(value.cast(), Private).map_err(Into::into)
-        }
-
-        unsafe fn call_result(
+    impl<'target> PartialScope<'target> for Output<'target> {
+        unsafe fn value<'data, X: Wrapper<'target, 'data>>(
             self,
-            value: Result<NonNull<jl_value_t>, NonNull<jl_value_t>>,
+            value: NonNull<X::Wraps>,
             _: Private,
-        ) -> JlrsResult<Self::JuliaResult> {
-            match value {
-                Ok(v) => self
-                    .push_root(v, Private)
-                    .map(|v| Ok(v))
-                    .map_err(Into::into),
-                Err(e) => self
-                    .push_root(e, Private)
-                    .map(|v| Err(v))
-                    .map_err(Into::into),
-            }
-        }
-    }
-
-    impl<'target, 'current, 'data, 'inner, F: Frame<'current>> Scope<'target, 'current, 'data, F>
-        for OutputScope<'target, 'current, 'inner, F>
-    {
-        type Value = OutputValue<'target, 'data, 'inner>;
-        type JuliaResult = OutputResult<'target, 'data, 'inner>;
-
-        unsafe fn value(self, value: NonNull<jl_value_t>, _: Private) -> JlrsResult<Self::Value> {
-            Ok(OutputValue::wrap_non_null(value))
+        ) -> JlrsResult<X> {
+            self.set_root::<X>(value);
+            Ok(X::wrap_non_null(value, Private))
         }
 
-        unsafe fn call_result(
+        unsafe fn call_result<'data, X: Wrapper<'target, 'data>>(
             self,
-            value: Result<NonNull<jl_value_t>, NonNull<jl_value_t>>,
+            result: Result<NonNull<X::Wraps>, NonNull<jl_value_t>>,
             _: Private,
-        ) -> JlrsResult<Self::JuliaResult> {
-            match value {
-                Ok(v) => Ok(OutputResult::Ok(OutputValue::wrap_non_null(v))),
-                Err(e) => Ok(OutputResult::Err(OutputValue::wrap_non_null(e))),
-            }
+        ) -> JlrsResult<JuliaResult<'target, 'data, X>> {
+            let rooted = match result {
+                Ok(v) => {
+                    self.set_root::<X>(v);
+                    Ok(X::wrap_non_null(v, Private))
+                }
+                Err(e) => {
+                    self.set_root::<Value>(e);
+                    Err(Value::wrap_non_null(e, Private))
+                }
+            };
+
+            Ok(rooted)
         }
     }
 }

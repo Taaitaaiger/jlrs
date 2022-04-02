@@ -1,4 +1,4 @@
-//! Wrapper for `Function`, the super type of all Julia functions.
+//! Wrapper for `Function`, the supertype of all Julia functions.
 //!
 //! All Julia functions are subtypes of `Function`, a function can be called with the methods
 //! of the [`Call`] trait. Note that you don't need to cast a [`Value`] to a [`Function`] in order
@@ -17,13 +17,13 @@ use super::{
     Wrapper,
 };
 use crate::{
-    error::{JlrsError, JlrsResult, JuliaResultRef, CANNOT_DISPLAY_TYPE},
+    error::{JlrsError, JlrsResult, JuliaResult, JuliaResultRef, CANNOT_DISPLAY_TYPE},
     impl_debug,
     layout::{
         typecheck::{NamedTuple, Typecheck},
         valid_layout::ValidLayout,
     },
-    memory::{frame::Frame, global::Global, scope::Scope},
+    memory::{global::Global, output::Output, scope::PartialScope},
     private::Private,
 };
 
@@ -41,6 +41,15 @@ impl<'scope, 'data> Function<'scope, 'data> {
     pub fn datatype(self) -> DataType<'scope> {
         self.as_value().datatype()
     }
+
+    /// Use the `Output` to extend the lifetime of this data.
+    pub fn root<'target>(self, output: Output<'target>) -> Function<'target, 'data> {
+        unsafe {
+            let ptr = self.unwrap_non_null(Private);
+            output.set_root::<Function>(ptr);
+            Function::wrap_non_null(ptr, Private)
+        }
+    }
 }
 
 unsafe impl ValidLayout for Function<'_, '_> {
@@ -52,8 +61,8 @@ unsafe impl ValidLayout for Function<'_, '_> {
 }
 
 unsafe impl Typecheck for Function<'_, '_> {
-    fn typecheck(t: DataType) -> bool {
-        <Self as ValidLayout>::valid_layout(t.as_value())
+    fn typecheck(ty: DataType) -> bool {
+        <Self as ValidLayout>::valid_layout(ty.as_value())
     }
 }
 
@@ -79,62 +88,57 @@ impl<'scope, 'data> WrapperPriv<'scope, 'data> for Function<'scope, 'data> {
 }
 
 impl<'data> Call<'data> for Function<'_, 'data> {
-    unsafe fn call0<'target, 'current, S, F>(self, scope: S) -> JlrsResult<S::JuliaResult>
+    unsafe fn call0<'target, S>(self, scope: S) -> JlrsResult<JuliaResult<'target, 'data>>
     where
-        S: Scope<'target, 'current, 'data, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
     {
         self.as_value().call0(scope)
     }
 
-    unsafe fn call1<'target, 'current, S, F>(
+    unsafe fn call1<'target, S>(
         self,
         scope: S,
         arg0: Value<'_, 'data>,
-    ) -> JlrsResult<S::JuliaResult>
+    ) -> JlrsResult<JuliaResult<'target, 'data>>
     where
-        S: Scope<'target, 'current, 'data, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
     {
         self.as_value().call1(scope, arg0)
     }
 
-    unsafe fn call2<'target, 'current, S, F>(
+    unsafe fn call2<'target, S>(
         self,
         scope: S,
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
-    ) -> JlrsResult<S::JuliaResult>
+    ) -> JlrsResult<JuliaResult<'target, 'data>>
     where
-        S: Scope<'target, 'current, 'data, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
     {
         self.as_value().call2(scope, arg0, arg1)
     }
 
-    unsafe fn call3<'target, 'current, S, F>(
+    unsafe fn call3<'target, S>(
         self,
         scope: S,
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
         arg2: Value<'_, 'data>,
-    ) -> JlrsResult<S::JuliaResult>
+    ) -> JlrsResult<JuliaResult<'target, 'data>>
     where
-        S: Scope<'target, 'current, 'data, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
     {
         self.as_value().call3(scope, arg0, arg1, arg2)
     }
 
-    unsafe fn call<'target, 'current, 'value, V, S, F>(
+    unsafe fn call<'target, 'value, V, S>(
         self,
         scope: S,
         args: V,
-    ) -> JlrsResult<S::JuliaResult>
+    ) -> JlrsResult<JuliaResult<'target, 'data>>
     where
         V: AsMut<[Value<'value, 'data>]>,
-        S: Scope<'target, 'current, 'data, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
     {
         self.as_value().call(scope, args)
     }
@@ -185,9 +189,7 @@ impl<'data> Call<'data> for Function<'_, 'data> {
     }
 }
 
-impl<'target, 'current, 'value, 'data> CallExt<'target, 'current, 'value, 'data>
-    for Function<'value, 'data>
-{
+impl<'value, 'data> CallExt<'value, 'data> for Function<'value, 'data> {
     fn with_keywords(self, kws: Value<'value, 'data>) -> JlrsResult<WithKeywords<'value, 'data>> {
         if !kws.is::<NamedTuple>() {
             let type_str = kws.datatype().display_string_or(CANNOT_DISPLAY_TYPE);
@@ -196,3 +198,5 @@ impl<'target, 'current, 'value, 'data> CallExt<'target, 'current, 'value, 'data>
         Ok(WithKeywords::new(self.as_value(), kws))
     }
 }
+
+impl_root!(Function, 2);

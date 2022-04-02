@@ -1,6 +1,6 @@
 [package]
 name = "jl-sys"
-version = "0.14.0"
+version = "0.16.0"
 authors = ["Thomas van Doornmalen <thomas.vandoornmalen@gmail.com>"]
 description = """
 jl-sys contains the generated bindings for the Julia C API used by jlrs.
@@ -15,10 +15,8 @@ license = "MIT"
 edition = "2018"
 links = "julia"
 
-
-
 [features]
-docs-rs = []
+docs = []
 uv = []
 debug = []
 lts = []
@@ -31,4 +29,4 @@ bindgen = { git = "https://github.com/emilio/rust-bindgen", branch = "atomic", o
 cc = "1"
 
 [package.metadata.docs.rs]
-features = ["docs-rs"]
+features = ["docs"]

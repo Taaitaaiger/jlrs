@@ -43,7 +43,7 @@
 //! directory; in this case `$JULIA_DIR/include/julia/julia.h` and
 //! `$JULIA_DIR/lib/libjulia.so` are used instead.
 //!
-//! In order to be able to load `libjulia.so`, this file must be on the library search path. If
+//! In order to be able to load `libjulia.so` this file must be on the library search path. If
 //! this is not the case you must add `/path/to/julia-x.y.z/lib` to the `LD_LIBRARY_PATH`
 //! environment variable. When the `uv` feature is enabled, `/path/to/julia-x.y.z/lib/julia` must
 //! also be added to `LD_LIBRARY_PATH`. The latter path should not be added to the default path
@@ -63,10 +63,24 @@
 //! Note that while both Julia 1.6 and 1.7 are supported on Windows, several methods are currently
 //! unavailable when the LTS version is used.
 //!
+//! If you use the MSVC target, you must create two or three lib files using `lib.exe`. The def
+//! files required for this can be found in the `defs` folder in the jl-sys crate. To create the
+//! lib files, copy the three files from either the `lts` or `stable` folder to the `bin` folder
+//! where Julia is installed. Afterwards, open a Developer Command Prompt for VS19 and execute the
+//! following commands:
+//!
+//! ```cmd
+//! cd C:\Path\To\Julia-x.y.z\bin
+//! lib /def:libjulia.def /out:libjulia.lib /machine:x64
+//! lib /def:libopenlibm.def /out:libopenlibm.lib /machine:x64
+//! lib /def:libuv-2.def /out:libuv-2.lib /machine:x64
+//! ```
+//!
+//! If you use the GNU target these lib files must not exist.
 //!
 //! # Features
 //!
-//! Much functionality of jlrs is unavailable unless the proper features are enabled. These
+//! Most functionality of jlrs is only available if the proper features are enabled. These
 //! features generally belong to one of two categories: runtimes and utilities.
 //!
 //! A runtime lets you call Julia from Rust, you must enable one of them if you want to embed
@@ -114,8 +128,9 @@
 //!   the sync runtime without initializing Julia.
 //!
 //! - `uv`
-//!   When `ccall` has been enabled, this feature enables the method `CCall::uv_async_send`, which
-//!   can be used to wake a Julia `AsyncCondition` from Rust.
+//!   This feature enables the method `CCall::uv_async_send`, which can be used to wake a Julia
+//!   `AsyncCondition` from Rust. The `ccall` features is automically enabled when this features
+//!   is used.
 //!
 //! - `pyplot`
 //!   This feature lets you plot data using the Pyplot package and Gtk 3 from Rust.
@@ -132,11 +147,12 @@
 //! `jlrs = {version = "0.13", features = ["async-std-rt"]}`
 //!
 //! A `prelude` is available which provides access to most of the structs and traits you're likely
-//! to need. When embedding Julia, it must be initialized before it can be used.
+//! to need. When Julia is embedded in an application, it must be initialized before it can be
+//! used.
 //!
-//! If you use the sync runtime, you can do this by calling [`Julia::init`] which returns an
-//! instance of [`Julia`]. Note that this method can only be called once while the application is
-//! running, if you drop it you won't be able to create a new instance but have to restart the
+//! If you use the sync runtime, you can initialize Julia by calling [`Julia::init`] which returns
+//! an instance of [`Julia`]. Note that this method can only be called once while the application
+//! is running, if you drop it you won't be able to create a new instance but have to restart the
 //! application. If you want to use a custom system image you must call [`Julia::init_with_image`]
 //! instead of `Julia::init`.
 //!
@@ -158,34 +174,34 @@
 //! create Julia data and call Julia functions, a scope must be created.
 //!
 //! When the sync runtime is used this can be done by calling the methods [`Julia::scope`] and
-//! [`Julia::scope_with_slots`]. These methods take a closure with two arguments, a [`Global`] and
-//! a mutable reference to a [`GcFrame`] (frame). The first is an access token for global Julia
-//! data, the second is used to root non-global data. While non-global data is rooted, it won't be
-//! freed by Julia's garbage collector (GC). The frame is created when `Julia::scope(_with_slots)`
-//! is called and dropped when it returns. This means that any data rooted in the frame associated
-//! with a scope won't be freed by the GC until leaving that scope.
+//! [`Julia::scope_with_capacity`]. These methods take a closure with two arguments, a [`Global`]
+//! and a mutable reference to a [`GcFrame`] (frame). The first is an access token for global
+//! Julia data, the second is used to root non-global data. While non-global data is rooted, it
+//! won't be freed by Julia's garbage collector (GC). The frame is created when
+//! `Julia::scope(_with_capacity)` is called and dropped when it returns. This means that any data
+//! rooted in the frame associated with a scope won't be freed by the GC until leaving that scope.
 //!
 //! Because `AsyncJulia` is a handle to the async runtime which runs on another thread it's not
 //! possible to directly create a scope. Rather, the async runtime deals with tasks. The simplest
 //! of these is a blocking task, which can be executed by calling
-//! `AsyncJulia::(try_)blocking_task(_with_slots)`. This method accepts any closure
-//! `Julia::scope(_with_slots)` can handle with the additional requirement that they're `Send` and
-//! `Sync`. It's called a blocking task because the runtime is blocked while executing this task.
-//! The other kinds of tasks that the async runtime can handle will be introduced later.
+//! `AsyncJulia::(try_)blocking_task`. This method accepts any closure `Julia::scope` can handle
+//! with the additional requirement that they must be `Send` and `Sync`. It's called a blocking
+//! task because the runtime is blocked while executing this task. The other kinds of tasks that
+//! the async runtime can handle will be introduced later.
 //!
-//! Inside the closure provided to `Julia::scope(_with_slots)` or
-//! `AsyncJulia::(try_)blocking_task(_with_slots)` it's possible to interact with Julia. Global
-//! Julia data can be accessed through its module system, the methods [`Module::main`],
-//! [`Module::base`], and [`Module::core`] can be used to access the `Main`, `Base`, and `Core`
-//! modules respectively. The contents of these modules can then be accessed by calling
-//! [`Module::function`] which returns a [`Function`], [`Module::global`] which returns a
-//! [`Value`], and [`Module::submodule`] which returns another `Module`.
+//! Inside the closure provided to `Julia::scope` or `AsyncJulia::(try_)blocking_task` it's
+//! possible to interact with Julia. Global Julia data can be accessed through its module
+//! system, the methods [`Module::main`], [`Module::base`], and [`Module::core`] can be used to
+//! access the `Main`, `Base`, and `Core` modules respectively. The contents of these modules
+//! can then be accessed by calling [`Module::function`] which returns a [`Function`],
+//! [`Module::global`] which returns a [`Value`], and [`Module::submodule`] which returns another
+//! `Module`.
 //!
 //! `Value`, `Module`, and `Function` are all examples of pointer wrapper types. Pointer wrapper
-//! types wrap a pointer to some data "owned" by the GC. Other important examples of pointer
+//! types wrap a pointer to some data owned by the GC. Other important examples of pointer
 //! wrapper types are [`Array`], [`JuliaString`] and [`DataType`]. `Value` wraps arbitrary Julia
 //! data, all other pointer wrapper types can always be converted to a `Value`. All pointer
-//! wrapper types wrap a type defined by the Julia C API.
+//! wrapper types wrap a mutable type defined by the Julia C API.
 //!
 //! In addition to pointer wrapper types there are inline wrapper types. The most important
 //! difference between the two kinds of wrapper types is that a pointer wrapper type wraps a
@@ -206,7 +222,7 @@
 //! like `i8` and `char`. Any type that implements [`IntoJulia`] also implements [`Unbox`] which
 //!  is used to extract the contents of a `Value`. Because `sqrt(2)` returns a `Float64`, it can
 //! be unboxed as an `f64`. Pointer wrapper types don't implement [`IntoJulia`] or [`Unbox`], if
-//! they can be created from Rust the provide methods to do so.
+//! they can be created from Rust they provide methods to do so.
 //!
 //! It's possible to call anything that implements [`Call`] as a Julia function. In addition to
 //! `Function`, this trait is implemented by `Value` because any Julia value is potentially
@@ -215,7 +231,7 @@
 //! be created with the [`named_tuple`] macro.
 //!
 //! Evaluating raw code and calling Julia functions is always unsafe. Nothing prevents you from
-//! calling a function like `nasaldemons() = unsafe_load(Ptr{Float64}(C_NULL))`.
+//! calling a function like `nasaldemons() = unsafe_load(Ptr{Float64}(0x05391A445))`.
 //!
 //! As a simple example, let's convert two numbers to Julia values and add them:
 //!
@@ -226,10 +242,11 @@
 //! // Initializing Julia is unsafe because it can race with another crate that does
 //! // the same.
 //! let mut julia = unsafe { Julia::init().unwrap() };
+//!
 //! let res = julia.scope(|global, frame| {
-//!     // Create the two arguments. Note that the first argument, something that
-//!     // implements Scope, is taken by value and mutable references don't implement
-//!     // Copy, so it's necessary to mutably reborrow the frame.
+//!     // Create the two arguments. The first argument, something that implements
+//!     // PartialScope, is taken by value and mutable references don't
+//!     // implement Copy, so it's necessary to mutably reborrow the frame.
 //!     let i = Value::new(&mut *frame, 2u64)?;
 //!     let j = Value::new(&mut *frame, 1u32)?;
 //!
@@ -355,7 +372,7 @@
 //!         // `TypedArray`.
 //!         let data = vec![0usize; self.n_values];
 //!         let array = Array::from_vec(&mut *frame, data, self.n_values)?
-//!             .cast::<TypedArray<usize>>()?;
+//!             .try_as_typed::<usize>()?;
 //!     
 //!         Ok(AccumulatorTaskState {
 //!             array,
@@ -379,6 +396,10 @@
 //!             // of the elements is concrete and immutable.
 //!             // This is safe because this is the only active reference to
 //!             // the array.
+//!             //
+//!             // Methods that mutate Julia data are all unsafe because it
+//!             // can't be guaranteed at compile time that no other task is
+//!             // using that data.
 //!             let mut data = unsafe { state.array.inline_data_mut(frame)? };
 //!             data[state.offset] = input;
 //!
@@ -463,7 +484,7 @@
 //!
 //! respectively to your crate's `Cargo.toml`. Use a `dylib` if you want to use the crate in other
 //! Rust crates, but if it's only intended to be called through `ccall` a `cdylib` is the better
-//! choice. On Linux, compiling such a crate will be compiled to `lib<crate_name>.so`.
+//! choice. On Linux, such a crate will be compiled to `lib<crate_name>.so`.
 //!
 //! The functions you want to use with `ccall` must be both `extern "C"` functions to ensure the C
 //! ABI is used, and annotated with `#[no_mangle]` to prevent name mangling. Julia can find
@@ -490,7 +511,8 @@
 //! can be used to wake an `Base.AsyncCondition`. In particular, it can be used to write a
 //! `ccall`able function that does its actual work on another thread, returns early and then
 //! `wait`ing on the async condition from Julia. The advantage of this is that the long-running
-//! function will not block the Julia runtime.
+//! function won't block Julia. In this case you will need to use `GC.@preserve` to ensure Julia
+//! is aware that the use of this data is still in use after the `ccall` has returned.
 //!
 //!
 //! # Testing
@@ -504,25 +526,43 @@
 //! thread_local! {
 //!     pub static JULIA: RefCell<Julia> = {
 //!         let julia = RefCell::new(unsafe { Julia::init().unwrap() });
-//!         julia.borrow_mut().scope(|_global, _frame| {
-//!             /* include everything you need to use */
-//!             Ok(())
-//!         }).unwrap();
+//!
+//!         /* include everything you need to use */
+
 //!         julia
 //!     };
 //! }
 //! ```
 //!
-//! Tests that use this construct can only use one thread for testing, so you must use
-//! `cargo test -- --test-threads=1`, otherwise the code above will panic when a test
-//! tries to call `Julia::init` a second time from another thread.
+//! A similar approach works for the async runtimes:
 //!
-//! If these tests also involve the async runtime, the `JULIA_NUM_THREADS` environment
-//! variable must be set to a value larger than 2.
+//! ```no_run
+//! use jlrs::prelude::*;
+//! use std::{cell::RefCell, time::Duration};
+//! thread_local! {
+//!     pub static JULIA: RefCell<AsyncJulia> = {
+//!         let julia = RefCell::new(unsafe {
+//!             AsyncJulia::init(4, 16, Duration::from_millis(1))
+//!                 .expect("Could not init Julia")
+//!                 .0
+//!         });
 //!
-//! If you want to run jlrs's tests, both these requirements must be taken into account, for
-//! example:
-//! `JULIA_NUM_THREADS=3 cargo test --features jlrs-ndarray,f16,ccall,uv,jlrs-derive,tokio-rt -- --test-threads=1`
+//!         /* include everything you need to use */
+//!
+//!         julia
+//!     };
+//! }
+//! ```
+//!
+//! Tests that use these constructs can only use one thread for testing, so you must use
+//! `cargo test -- --test-threads=1`, otherwise the code above will panic when a test tries to
+//! call `Julia::init` a second time from another thread.
+//!
+//! Tests that involve the async runtime, the `JULIA_NUM_THREADS` environment variable must be set
+//! to a value larger than 2.
+//!
+//! If you want to run all of jlrs's tests, all these requirements must be taken into account:
+//! `JULIA_NUM_THREADS=3 cargo test --features sync-rt,jlrs-ndarray,f16,uv,jlrs-derive,tokio-rt -- --test-threads=1`
 //!
 //!
 //! # Custom types
@@ -531,8 +571,8 @@
 //! and [`Typecheck`]. If the struct in Julia has no type parameters and is a bits type you can
 //! also derive [`IntoJulia`], which lets you use the type in combination with [`Value::new`].
 //!
-//! You should normally not need to implement these structs or traits manually. The JlrsReflect.jl
-//! package can generate the correct Rust struct and automatically derive the supported traits for
+//! You normally shouldn't need to implement these structs or traits manually. The JlrsReflect.jl
+//! package can generate correct Rust struct and automatically derive the supported traits for
 //! types that have no tuple or union fields with type parameters. The reason for this restriction
 //! is that the layout of tuple and union fields can be very different depending on these
 //! parameters in a way that can't be represented by a single Rust struct.
@@ -545,10 +585,10 @@
 //! [the examples directory of the repo]: https://github.com/Taaitaaiger/jlrs/tree/master/examples
 //! [`Julia`]: crate::julia::Julia
 //! [`Julia::scope`]: crate::julia::Julia::scope
-//! [`Julia::scope_with_slots`]: crate::julia::Julia::scope_with_slots
+//! [`Julia::scope_with_capacity`]: crate::julia::Julia::scope_with_capacity
 //! [`Julia::init`]: crate::julia::Julia::init
-//! [`AsyncJulia::init`]: crate::extensions::multitask::runtime::AsyncJulia::init
-//! [`AsyncJulia::init_async`]: crate::extensions::multitask::runtime::AsyncJulia::init_async
+//! [`AsyncJulia::init`]: crate::multitask::runtime::AsyncJulia::init
+//! [`AsyncJulia::init_async`]: crate::multitask::runtime::AsyncJulia::init_async
 //! [`Julia::init_with_image`]: crate::julia::Julia::init_with_image
 //! [`CCall`]: crate::ccall::CCall
 //! [`CCall::uv_async_send`]: crate::ccall::CCall::uv_async_send
@@ -568,30 +608,27 @@
 //! [`Module::function`]: crate::wrappers::ptr::module::Module::function
 //! [`Module::global`]: crate::wrappers::ptr::module::Module::global
 //! [`Module::submodule`]: crate::wrappers::ptr::module::Module::submodule
-//! [`AsyncJulia::init_with_image`]: crate::extensions::multitask::runtime::AsyncJulia::init_with_image
-//! [`AsyncJulia::init_with_image_async`]: crate::extensions::multitask::runtime::AsyncJulia::init_with_image_async
+//! [`AsyncJulia::init_with_image`]: crate::multitask::runtime::AsyncJulia::init_with_image
+//! [`AsyncJulia::init_with_image_async`]: crate::multitask::runtime::AsyncJulia::init_with_image_async
 //! [`IntoJulia`]: crate::convert::into_julia::IntoJulia
 //! [`Typecheck`]: crate::layout::typecheck::Typecheck
 //! [`ValidLayout`]: crate::layout::valid_layout::ValidLayout
 //! [`Unbox`]: crate::convert::unbox::Unbox
-//! [`CallAsync::call_async`]: crate::extensions::multitask::call_async::CallAsync
-//! [`AsyncGcFrame`]: crate::extensions::multitask::async_frame::AsyncGcFrame
+//! [`CallAsync::call_async`]: crate::multitask::call_async::CallAsync
+//! [`AsyncGcFrame`]: crate::multitask::async_frame::AsyncGcFrame
 //! [`Frame`]: crate::memory::frame::Frame
-//! [`AsyncTask`]: crate::extensions::multitask::async_task::AsyncTask
-//! [`PersistentTask`]: crate::extensions::multitask::async_task::PersistentTask
-//! [`PersistentHandle`]: crate::extensions::multitask::async_task::PersistentHandle
-//! [`AsyncJulia`]: crate::extensions::multitask::runtime::AsyncJulia
-//! [`CallAsync`]: crate::extensions::multitask::call_async::CallAsync
+//! [`AsyncTask`]: crate::multitask::async_task::AsyncTask
+//! [`PersistentTask`]: crate::multitask::async_task::PersistentTask
+//! [`PersistentHandle`]: crate::multitask::async_task::PersistentHandle
+//! [`AsyncJulia`]: crate::multitask::runtime::AsyncJulia
+//! [`CallAsync`]: crate::multitask::call_async::CallAsync
 //! [`DataType`]: crate::wrappers::ptr::datatype::DataType
 //! [`TypedArray`]: crate::wrappers::ptr::array::TypedArray
 //! [`Output`]: crate::memory::output::Output
 //! [`OutputScope`]: crate::memory::output::OutputScope
-//! [`ScopeExt`]: crate::memory::scope::ScopeExt
-//! [`ScopeExt::scope`]: crate::memory::scope::ScopeExt::scope
 //! [`Scope`]: crate::memory::scope::Scope
 //! [`Scope::value_scope`]: crate::memory::scope::Scope::value_scope
 //! [`Scope::result_scope`]: crate::memory::scope::Scope::result_scope
-
 #![forbid(rustdoc::broken_intra_doc_links)]
 
 #[cfg(any(feature = "sync-rt", feature = "async"))]
@@ -625,14 +662,20 @@ macro_rules! init_fn {
 pub mod ccall;
 pub mod convert;
 pub mod error;
-pub mod extensions;
 pub mod info;
 #[cfg(feature = "sync-rt")]
 pub mod julia;
 pub mod layout;
 pub mod memory;
+#[cfg(feature = "async")]
+pub mod multitask;
+#[cfg(feature = "jlrs-ndarray")]
+pub mod ndarray;
 pub mod prelude;
 pub(crate) mod private;
+#[cfg(feature = "pyplot")]
+pub mod pyplot;
+pub mod safety;
 #[doc(hidden)]
 #[cfg(feature = "sync-rt")]
 pub mod util;

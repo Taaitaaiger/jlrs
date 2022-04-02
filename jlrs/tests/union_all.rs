@@ -10,7 +10,7 @@ mod tests {
     fn create_new_unionall() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(3, |global, frame| unsafe {
+            jlrs.scope_with_capacity(3, |global, frame| unsafe {
                 let atype = UnionAll::array_type(global);
                 let body = atype.body().wrapper_unchecked();
                 let tvar = TypeVar::new(
@@ -19,8 +19,8 @@ mod tests {
                     None,
                     Some(DataType::number_type(global).as_value()),
                 )?
-                .into_jlrs_result()?
-                .cast()?;
+                .into_jlrs_result()?;
+
                 let ua = UnionAll::new(&mut *frame, tvar, body)?
                     .into_jlrs_result()?
                     .cast::<UnionAll>()?;
@@ -44,7 +44,7 @@ mod tests {
     fn instantiate_unionall() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(4, |global, frame| unsafe {
+            jlrs.scope_with_capacity(4, |global, frame| unsafe {
                 let v = Value::new(&mut *frame, 3i8)?;
                 let out = Module::main(global)
                     .submodule_ref("JlrsTests")?
@@ -70,7 +70,7 @@ mod tests {
     fn apply_value_type() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(8, |global, frame| unsafe {
+            jlrs.scope_with_capacity(8, |global, frame| unsafe {
                 let ty1 = Value::new(&mut *frame, 1isize)?;
                 let ty2 = Value::new(&mut *frame, 2isize)?;
 

@@ -20,14 +20,22 @@
 //! `[usize; N]` and `&[usize; N]` implement it for all `N`, `&[usize]` can be used if `N` is not
 //! a constant at compile time.
 
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use crate::error::JuliaResult;
+// // #[cfg(not(all(target_os = "windows", feature = "lts")))]
+use crate::memory::scope::PartialScope;
 use crate::{
     convert::into_julia::IntoJulia,
     error::{JlrsError, JlrsResult, CANNOT_DISPLAY_TYPE},
     impl_debug,
     layout::{typecheck::Typecheck, valid_layout::ValidLayout},
     memory::{
-        frame::private::Frame as _, frame::Frame, get_tls, global::Global,
-        scope::private::Scope as _, scope::Scope,
+        frame::private::Frame as _,
+        frame::Frame,
+        get_tls,
+        global::Global,
+        output::Output,
+        scope::{private::PartialScope as _, Scope},
     },
     private::Private,
     wrappers::ptr::{
@@ -46,11 +54,6 @@ use crate::{
         value::Value,
         Wrapper,
     },
-};
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
-use crate::{
-    error::JuliaResult,
-    memory::output::{OutputResult, OutputValue},
 };
 use jl_sys::{
     jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_apply_array_type,
@@ -93,11 +96,9 @@ pub mod dimensions;
 /// # JULIA.with(|j| {
 /// # let mut julia = j.borrow_mut();
 /// julia.scope(|_global, frame| {
-///     let arr = Array::new::<f64, _, _, _>(&mut *frame, (3, 3))?
+///     let _arr = Array::new::<f64, _, _, _>(&mut *frame, (3, 3))?
 ///         .into_jlrs_result()?;
 ///
-///     assert!(arr.is::<Array>());
-///     assert!(arr.cast::<Array>().is_ok());
 ///     Ok(())
 /// }).unwrap();
 /// # });
@@ -137,19 +138,23 @@ impl<'data> Array<'_, 'data> {
     /// If the array size is too large, Julia will throw an error. This error is caught and
     /// returned.
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub fn new<'target, 'current, T, D, S, F>(scope: S, dims: D) -> JlrsResult<S::JuliaResult>
+    pub fn new<'target: 'current, 'current, T, D, S, F>(
+        scope: S,
+        dims: D,
+    ) -> JlrsResult<JuliaResult<'target, 'static, Array<'target, 'static>>>
     where
         T: IntoJulia,
         D: Dims,
-        S: Scope<'target, 'current, 'static, F>,
+        S: Scope<'target, 'current, F>,
         F: Frame<'current>,
     {
         unsafe {
-            scope.result_scope_with_slots(2, |_, frame| {
+            let (output, frame) = scope.split()?;
+            frame.scope(|frame| {
                 let global = frame.global();
                 let elty_ptr = T::julia_type(global).ptr();
                 let array_type = jl_apply_array_type(elty_ptr.cast(), dims.n_dimensions());
-                (&mut *frame).value(NonNull::new_unchecked(array_type), Private)?;
+                let _: Value = (&mut *frame).value(NonNull::new_unchecked(array_type), Private)?;
 
                 let array = match dims.n_dimensions() {
                     1 => jlrs_alloc_array_1d(array_type, dims.n_elements(0)),
@@ -170,15 +175,14 @@ impl<'data> Array<'_, 'data> {
                     }
                 };
 
-                if array.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
-                    Ok(OutputResult::Err(OutputValue::wrap_non_null(
-                        NonNull::new_unchecked(array.data),
-                    )))
+                let res = if array.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
+                    Err(NonNull::new_unchecked(array.data))
                 } else {
-                    Ok(OutputResult::Ok(OutputValue::wrap_non_null(
-                        NonNull::new_unchecked(array.data),
-                    )))
-                }
+                    Ok(NonNull::new_unchecked(array.data.cast::<jl_array_t>()))
+                };
+
+                let output = output.into_scope(frame);
+                output.call_result(res, Private)
             })
         }
     }
@@ -189,62 +193,61 @@ impl<'data> Array<'_, 'data> {
     /// type that doesn't implement this trait you must use [`Array::new_for`].
     ///
     /// If the array size is too large, the process will abort.
-    pub fn new_unchecked<'target, 'current, T, D, S, F>(scope: S, dims: D) -> JlrsResult<S::Value>
+    pub unsafe fn new_unchecked<'target: 'current, 'current, T, D, S, F>(
+        scope: S,
+        dims: D,
+    ) -> JlrsResult<Array<'target, 'static>>
     where
         T: IntoJulia,
         D: Dims,
-        S: Scope<'target, 'current, 'static, F>,
+        S: Scope<'target, 'current, F>,
         F: Frame<'current>,
     {
-        unsafe {
-            let global = scope.global();
-            let elty_ptr = T::julia_type(global).ptr();
-            let array_type = jl_apply_array_type(elty_ptr.cast(), dims.n_dimensions());
+        let global = scope.global();
+        let elty_ptr = T::julia_type(global).ptr();
+        let array_type = jl_apply_array_type(elty_ptr.cast(), dims.n_dimensions());
 
-            match dims.n_dimensions() {
-                1 => scope.value(
-                    NonNull::new_unchecked(
-                        jl_alloc_array_1d(array_type, dims.n_elements(0)).cast(),
-                    ),
-                    Private,
-                ),
-                2 => scope.value(
-                    NonNull::new_unchecked(
-                        jl_alloc_array_2d(array_type, dims.n_elements(0), dims.n_elements(1))
-                            .cast(),
-                    ),
-                    Private,
-                ),
-                3 => scope.value(
-                    NonNull::new_unchecked(
-                        jl_alloc_array_3d(
-                            array_type,
-                            dims.n_elements(0),
-                            dims.n_elements(1),
-                            dims.n_elements(2),
-                        )
-                        .cast(),
-                    ),
-                    Private,
-                ),
-                n if n <= 8 => scope.value_scope_with_slots(1, |output, frame| {
+        match dims.n_dimensions() {
+            1 => scope.value(
+                NonNull::new_unchecked(jl_alloc_array_1d(array_type, dims.n_elements(0))),
+                Private,
+            ),
+            2 => scope.value(
+                NonNull::new_unchecked(jl_alloc_array_2d(
+                    array_type,
+                    dims.n_elements(0),
+                    dims.n_elements(1),
+                )),
+                Private,
+            ),
+            3 => scope.value(
+                NonNull::new_unchecked(jl_alloc_array_3d(
+                    array_type,
+                    dims.n_elements(0),
+                    dims.n_elements(1),
+                    dims.n_elements(2),
+                )),
+                Private,
+            ),
+            n if n <= 8 => {
+                let (output, scope) = scope.split()?;
+                scope.scope_with_capacity(1, |frame| {
                     let tuple = small_dim_tuple(frame, dims)?;
                     output.into_scope(frame).value(
-                        NonNull::new_unchecked(
-                            jl_new_array(array_type, tuple.unwrap(Private)).cast(),
-                        ),
+                        NonNull::new_unchecked(jl_new_array(array_type, tuple.unwrap(Private))),
                         Private,
                     )
-                }),
-                _ => scope.value_scope_with_slots(1, |output, frame| {
+                })
+            }
+            _ => {
+                let (output, scope) = scope.split()?;
+                scope.scope_with_capacity(1, |frame| {
                     let tuple = large_dim_tuple(frame, dims)?;
                     output.into_scope(frame).value(
-                        NonNull::new_unchecked(
-                            jl_new_array(array_type, tuple.unwrap(Private)).cast(),
-                        ),
+                        NonNull::new_unchecked(jl_new_array(array_type, tuple.unwrap(Private))),
                         Private,
                     )
-                }),
+                })
             }
         }
     }
@@ -254,20 +257,21 @@ impl<'data> Array<'_, 'data> {
     /// two-dimensional array with 4 rows and 2 columns is created. If an exception is thrown due
     /// to either the type or dimensions being invalid it's caught and returned.
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub fn new_for<'target, 'current, D, S, F>(
+    pub fn new_for<'target: 'current, 'current, D, S, F>(
         scope: S,
         dims: D,
         ty: Value,
-    ) -> JlrsResult<S::JuliaResult>
+    ) -> JlrsResult<JuliaResult<'target, 'static, Array<'target, 'static>>>
     where
         D: Dims,
-        S: Scope<'target, 'current, 'static, F>,
+        S: Scope<'target, 'current, F>,
         F: Frame<'current>,
     {
         unsafe {
-            scope.result_scope_with_slots(2, |_, frame| {
+            let (output, frame) = scope.split()?;
+            frame.scope(|frame| {
                 let array_type = jl_apply_array_type(ty.unwrap(Private), dims.n_dimensions());
-                (&mut *frame).value(NonNull::new_unchecked(array_type), Private)?;
+                let _: Value = (&mut *frame).value(NonNull::new_unchecked(array_type), Private)?;
 
                 let array = match dims.n_dimensions() {
                     1 => jlrs_alloc_array_1d(array_type, dims.n_elements(0)),
@@ -288,15 +292,14 @@ impl<'data> Array<'_, 'data> {
                     }
                 };
 
-                if array.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
-                    Ok(OutputResult::Err(OutputValue::wrap_non_null(
-                        NonNull::new_unchecked(array.data),
-                    )))
+                let res = if array.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
+                    Err(NonNull::new_unchecked(array.data))
                 } else {
-                    Ok(OutputResult::Ok(OutputValue::wrap_non_null(
-                        NonNull::new_unchecked(array.data),
-                    )))
-                }
+                    Ok(NonNull::new_unchecked(array.data.cast::<jl_array_t>()))
+                };
+
+                let output = output.into_scope(frame);
+                output.call_result(res, Private)
             })
         }
     }
@@ -305,78 +308,74 @@ impl<'data> Array<'_, 'data> {
     /// `Union`, `UnionAll` or `DataType`, and dimensions `dims`. If `dims = (4, 2)` a
     /// two-dimensional array with 4 rows and 2 columns is created. If an exception is thrown due
     /// to either the type or dimensions being invalid the process aborts.
-    pub fn new_for_unchecked<'target, 'current, D, S, F>(
+    pub unsafe fn new_for_unchecked<'target: 'current, 'current, D, S, F>(
         scope: S,
         dims: D,
         ty: Value,
-    ) -> JlrsResult<S::Value>
+    ) -> JlrsResult<Array<'target, 'static>>
     where
         D: Dims,
-        S: Scope<'target, 'current, 'static, F>,
+        S: Scope<'target, 'current, F>,
         F: Frame<'current>,
     {
-        unsafe {
-            let array_type = jl_apply_array_type(ty.unwrap(Private), dims.n_dimensions());
+        let array_type = jl_apply_array_type(ty.unwrap(Private), dims.n_dimensions());
 
-            match dims.n_dimensions() {
-                1 => scope.value(
-                    NonNull::new_unchecked(
-                        jl_alloc_array_1d(array_type, dims.n_elements(0)).cast(),
-                    ),
-                    Private,
-                ),
-                2 => scope.value(
-                    NonNull::new_unchecked(
-                        jl_alloc_array_2d(array_type, dims.n_elements(0), dims.n_elements(1))
-                            .cast(),
-                    ),
-                    Private,
-                ),
-                3 => scope.value(
-                    NonNull::new_unchecked(
-                        jl_alloc_array_3d(
-                            array_type,
-                            dims.n_elements(0),
-                            dims.n_elements(1),
-                            dims.n_elements(2),
-                        )
-                        .cast(),
-                    ),
-                    Private,
-                ),
-                n if n <= 8 => scope.value_scope_with_slots(1, |output, frame| {
+        match dims.n_dimensions() {
+            1 => scope.value(
+                NonNull::new_unchecked(jl_alloc_array_1d(array_type, dims.n_elements(0))),
+                Private,
+            ),
+            2 => scope.value(
+                NonNull::new_unchecked(jl_alloc_array_2d(
+                    array_type,
+                    dims.n_elements(0),
+                    dims.n_elements(1),
+                )),
+                Private,
+            ),
+            3 => scope.value(
+                NonNull::new_unchecked(jl_alloc_array_3d(
+                    array_type,
+                    dims.n_elements(0),
+                    dims.n_elements(1),
+                    dims.n_elements(2),
+                )),
+                Private,
+            ),
+            n if n <= 8 => {
+                let (output, scope) = scope.split()?;
+                scope.scope_with_capacity(1, |frame| {
                     let tuple = small_dim_tuple(frame, dims)?;
                     output.into_scope(frame).value(
-                        NonNull::new_unchecked(
-                            jl_new_array(array_type, tuple.unwrap(Private)).cast(),
-                        ),
+                        NonNull::new_unchecked(jl_new_array(array_type, tuple.unwrap(Private))),
                         Private,
                     )
-                }),
-                _ => scope.value_scope_with_slots(1, |output, frame| {
+                })
+            }
+            _ => {
+                let (output, scope) = scope.split()?;
+                scope.scope_with_capacity(1, |frame| {
                     let tuple = large_dim_tuple(frame, dims)?;
                     output.into_scope(frame).value(
-                        NonNull::new_unchecked(
-                            jl_new_array(array_type, tuple.unwrap(Private)).cast(),
-                        ),
+                        NonNull::new_unchecked(jl_new_array(array_type, tuple.unwrap(Private))),
                         Private,
                     )
-                }),
+                })
             }
         }
     }
 
     /// Borrows an n-dimensional array from Rust for use in Julia with dimensions `dims`. If
     /// `dims` = (4, 2)` a two-dimensional array with 4 rows and 2 columns is created.
-    pub fn from_slice<'target, 'current, T, D, S, F>(
+    pub fn from_slice<'target: 'current, 'current, T, D, S, F>(
         scope: S,
         data: &'data mut [T],
         dims: D,
-    ) -> JlrsResult<S::Value>
+    ) -> JlrsResult<Array<'target, 'data>>
     where
         T: IntoJulia,
         D: Dims,
-        S: Scope<'target, 'current, 'data, F>,
+        S: Scope<'target, 'current, F>,
         F: Frame<'current>,
     {
         if dims.size() != data.len() {
@@ -404,51 +403,57 @@ impl<'data> Array<'_, 'data> {
                     ),
                     Private,
                 ),
-                n if n <= 8 => scope.value_scope_with_slots(1, |output, frame| {
-                    let tuple = small_dim_tuple(frame, dims)?;
-                    output.into_scope(frame).value(
-                        NonNull::new_unchecked(
-                            jl_ptr_to_array(
-                                array_type,
-                                data.as_mut_ptr().cast(),
-                                tuple.unwrap(Private),
-                                0,
-                            )
-                            .cast(),
-                        ),
-                        Private,
-                    )
-                }),
-                _ => scope.value_scope_with_slots(1, |output, frame| {
-                    let tuple = large_dim_tuple(frame, dims)?;
-                    output.into_scope(frame).value(
-                        NonNull::new_unchecked(
-                            jl_ptr_to_array(
-                                array_type,
-                                data.as_mut_ptr().cast(),
-                                tuple.unwrap(Private),
-                                0,
-                            )
-                            .cast(),
-                        ),
-                        Private,
-                    )
-                }),
+                n if n <= 8 => {
+                    let (output, scope) = scope.split()?;
+                    scope.scope_with_capacity(1, |frame| {
+                        let tuple = small_dim_tuple(frame, dims)?;
+                        output.into_scope(frame).value(
+                            NonNull::new_unchecked(
+                                jl_ptr_to_array(
+                                    array_type,
+                                    data.as_mut_ptr().cast(),
+                                    tuple.unwrap(Private),
+                                    0,
+                                )
+                                .cast(),
+                            ),
+                            Private,
+                        )
+                    })
+                }
+                _ => {
+                    let (output, scope) = scope.split()?;
+                    scope.scope_with_capacity(1, |frame| {
+                        let tuple = large_dim_tuple(frame, dims)?;
+                        output.into_scope(frame).value(
+                            NonNull::new_unchecked(
+                                jl_ptr_to_array(
+                                    array_type,
+                                    data.as_mut_ptr().cast(),
+                                    tuple.unwrap(Private),
+                                    0,
+                                )
+                                .cast(),
+                            ),
+                            Private,
+                        )
+                    })
+                }
             }
         }
     }
 
     /// Moves an n-dimensional array from Rust for use in Julia with dimensions `dims`. If
     /// `dims = (4, 2)` a two-dimensional array with 4 rows and 2 columns is created.
-    pub fn from_vec<'target, 'current, T, D, S, F>(
+    pub fn from_vec<'target: 'current, 'current, T, D, S, F>(
         scope: S,
-        mut data: Vec<T>,
+        data: Vec<T>,
         dims: D,
-    ) -> JlrsResult<S::Value>
+    ) -> JlrsResult<Array<'target, 'static>>
     where
         T: IntoJulia,
         D: Dims,
-        S: Scope<'target, 'current, 'static, F>,
+        S: Scope<'target, 'current, F>,
         F: Frame<'current>,
     {
         if dims.size() != data.len() {
@@ -458,17 +463,14 @@ impl<'data> Array<'_, 'data> {
             })?;
         }
 
-        if data.len() != data.capacity() {
-            data.shrink_to_fit();
-        }
-
         unsafe {
             let global = scope.global();
 
-            scope.value_scope_with_slots(1, |output, frame| {
+            let (output, scope) = scope.split()?;
+            scope.scope_with_capacity(1, |frame| {
                 let array_type =
                     jl_apply_array_type(T::julia_type(global).ptr().cast(), dims.n_dimensions());
-                let _ = frame
+                let _: Value = frame
                     .push_root(NonNull::new_unchecked(array_type), Private)
                     .map_err(JlrsError::alloc_error)?;
 
@@ -478,11 +480,14 @@ impl<'data> Array<'_, 'data> {
                             array_type,
                             Box::into_raw(data.into_boxed_slice()).cast(),
                             dims.n_elements(0),
-                            1,
-                        )
-                        .cast();
+                            0,
+                        );
 
-                        jl_gc_add_ptr_finalizer(get_tls(), array, droparray::<T> as *mut c_void);
+                        jl_gc_add_ptr_finalizer(
+                            get_tls(),
+                            array.cast(),
+                            droparray::<T> as *mut c_void,
+                        );
 
                         output
                             .into_scope(frame)
@@ -494,11 +499,14 @@ impl<'data> Array<'_, 'data> {
                             array_type,
                             Box::into_raw(data.into_boxed_slice()).cast(),
                             tuple.unwrap(Private),
-                            1,
-                        )
-                        .cast();
+                            0,
+                        );
 
-                        jl_gc_add_ptr_finalizer(get_tls(), array, droparray::<T> as *mut c_void);
+                        jl_gc_add_ptr_finalizer(
+                            get_tls(),
+                            array.cast(),
+                            droparray::<T> as *mut c_void,
+                        );
 
                         output
                             .into_scope(frame)
@@ -510,11 +518,14 @@ impl<'data> Array<'_, 'data> {
                             array_type,
                             Box::into_raw(data.into_boxed_slice()).cast(),
                             tuple.unwrap(Private),
-                            1,
-                        )
-                        .cast();
+                            0,
+                        );
 
-                        jl_gc_add_ptr_finalizer(get_tls(), array, droparray::<T> as *mut c_void);
+                        jl_gc_add_ptr_finalizer(
+                            get_tls(),
+                            array.cast(),
+                            droparray::<T> as *mut c_void,
+                        );
 
                         output
                             .into_scope(frame)
@@ -526,21 +537,29 @@ impl<'data> Array<'_, 'data> {
     }
 
     /// Convert a string to an array.
-    pub fn from_string<'target, 'current, A: AsRef<str>, S, F>(
+    pub fn from_string<'target, A: AsRef<str>, S>(
         scope: S,
         data: A,
-    ) -> JlrsResult<S::Value>
+    ) -> JlrsResult<Array<'target, 'static>>
     where
         A: IntoJulia,
-        S: Scope<'target, 'current, 'static, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
     {
         let string = data.as_ref();
         let nbytes = string.bytes().len();
         let ptr = string.as_ptr();
         unsafe {
             let arr = jl_pchar_to_array(ptr.cast(), nbytes);
-            scope.value(NonNull::new_unchecked(arr.cast()), Private)
+            scope.value(NonNull::new_unchecked(arr), Private)
+        }
+    }
+
+    /// Use the `Output` to extend the lifetime of this data.
+    pub fn root<'target>(self, output: Output<'target>) -> Array<'target, 'data> {
+        unsafe {
+            let ptr = self.unwrap_non_null(Private);
+            output.set_root::<Array>(ptr);
+            Array::wrap_non_null(ptr, Private)
         }
     }
 
@@ -621,7 +640,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     }
 
     /// Convert this untyped array to a [`TypedArray`].
-    pub fn as_typed_array<T>(self) -> JlrsResult<TypedArray<'scope, 'data, T>>
+    pub fn try_as_typed<T>(self) -> JlrsResult<TypedArray<'scope, 'data, T>>
     where
         T: Clone + ValidLayout + Debug,
     {
@@ -637,6 +656,17 @@ impl<'scope, 'data> Array<'scope, 'data> {
                 value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
             })?
         }
+    }
+
+    /// Convert this untyped array to a [`TypedArray`] without checking if this conversion is
+    /// valid.
+    ///
+    /// Safety: `T` must be a valid representation of the data stored in the array.
+    pub unsafe fn as_typed_unchecked<T>(self) -> TypedArray<'scope, 'data, T>
+    where
+        T: Clone + ValidLayout + Debug,
+    {
+        TypedArray::wrap_non_null(self.unwrap_non_null(Private), Private)
     }
 
     /// Copy the data of an inline array to Rust. Returns `JlrsError::NotInline` if the data is
@@ -946,21 +976,24 @@ impl<'scope> Array<'scope, 'static> {
     /// different number of elements or if the array contains data that has been borrowed or moved
     /// from Rust.
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub fn reshape<'target, 'current, D, S, F>(
+    pub fn reshape<'target: 'current, 'current, 'borrow, D, S, F>(
         self,
         scope: S,
         dims: D,
-    ) -> JlrsResult<S::JuliaResult>
+    ) -> JlrsResult<JuliaResult<'target, 'static>>
     where
         D: Dims,
-        S: Scope<'target, 'current, 'static, F>,
+        S: Scope<'target, 'current, F>,
         F: Frame<'current>,
     {
         unsafe {
-            scope.result_scope_with_slots(2, |_, frame| {
+            let (output, scope) = scope.split()?;
+            scope.scope_with_capacity(2, |frame| {
                 let elty_ptr = self.element_type().unwrap(Private);
                 let array_type = jl_apply_array_type(elty_ptr.cast(), dims.n_dimensions());
-                (&mut *frame).value(NonNull::new_unchecked(array_type), Private)?;
+                let _: Value = frame
+                    .push_root(NonNull::new_unchecked(array_type), Private)
+                    .map_err(|x| JlrsError::alloc_error(x))?;
 
                 let tuple = if dims.n_dimensions() <= 8 {
                     small_dim_tuple(frame, dims)?
@@ -971,15 +1004,14 @@ impl<'scope> Array<'scope, 'static> {
                 let res =
                     jlrs_reshape_array(array_type, self.unwrap(Private), tuple.unwrap(Private));
 
-                if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
-                    Ok(OutputResult::Err(OutputValue::wrap_non_null(
-                        NonNull::new_unchecked(res.data),
-                    )))
+                let output = output.into_scope(frame);
+                let result = if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
+                    Err(NonNull::new_unchecked(res.data))
                 } else {
-                    Ok(OutputResult::Ok(OutputValue::wrap_non_null(
-                        NonNull::new_unchecked(res.data),
-                    )))
-                }
+                    Ok(NonNull::new_unchecked(res.data).cast())
+                };
+
+                output.call_result(result, Private)
             })
         }
     }
@@ -1354,14 +1386,14 @@ where
     /// different number of elements or if the array contains data that has been borrowed or moved
     /// from Rust.
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub fn reshape<'target, 'current, D, S, F>(
+    pub fn reshape<'target: 'current, 'current, 'borrow, D, S, F>(
         self,
         scope: S,
         dims: D,
-    ) -> JlrsResult<S::JuliaResult>
+    ) -> JlrsResult<JuliaResult<'target, 'static>>
     where
         D: Dims,
-        S: Scope<'target, 'current, 'static, F>,
+        S: Scope<'target, 'current, F>,
         F: Frame<'current>,
     {
         self.as_array().reshape(scope, dims)
@@ -1517,7 +1549,7 @@ where
     let tuple_type = jl_apply_tuple_type_v(elem_types.cast(), n);
     let tuple = jl_new_struct_uninit(tuple_type);
     let dims = dims.into_dimensions();
-    let v = frame
+    let v: Value = frame
         .push_root(NonNull::new_unchecked(tuple), Private)
         .map_err(JlrsError::alloc_error)?;
 
@@ -1536,11 +1568,11 @@ where
     F: Frame<'scope>,
 {
     let n = dims.n_dimensions();
-    let global = frame.global();
+    let global = Global::new();
     let mut elem_types = vec![usize::julia_type(global); n];
     let tuple_type = jl_apply_tuple_type_v(elem_types.as_mut_ptr().cast(), n);
     let tuple = jl_new_struct_uninit(tuple_type);
-    let v = frame
+    let v: Value = frame
         .push_root(NonNull::new_unchecked(tuple), Private)
         .map_err(JlrsError::alloc_error)?;
 
@@ -1576,4 +1608,27 @@ unsafe extern "C" fn droparray<T>(a: Array) {
     // Drop the data
     let data = Vec::from_raw_parts(data_ptr, arr_ref.length, arr_ref.length);
     mem::drop(data);
+}
+
+impl_root!(Array, 2);
+impl<'target, 'value, 'data, T> crate::wrappers::ptr::Root<'target, 'value, 'data>
+    for TypedArray<'value, 'data, T>
+where
+    T: Clone + Debug + ValidLayout,
+{
+    type Output = TypedArray<'target, 'data, T>;
+    unsafe fn root<S>(
+        scope: S,
+        value: crate::wrappers::ptr::Ref<'value, 'data, Self>,
+    ) -> crate::error::JlrsResult<Self::Output>
+    where
+        S: crate::memory::scope::PartialScope<'target>,
+    {
+        if let Some(v) = Self::wrapper(value, Private) {
+            let ptr = v.unwrap_non_null(Private);
+            scope.value(ptr, Private)
+        } else {
+            Err(crate::error::JlrsError::UndefRef)?
+        }
+    }
 }

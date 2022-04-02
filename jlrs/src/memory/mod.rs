@@ -1,46 +1,66 @@
-//! Structs and traits to protect data from being garbage collected.
+//! Julia memory management.
 //!
-//! Julia is a garbage-collected programming language, whenever Julia is called through its C API
-//! the user is responsible for ensuring the garbage collector can reach all values that are in
-//! use. The garbage collector uses a set of values called roots as a starting point when
-//! determining what values can still be reached, any value that is reachable is not freed.
-//! Whenever a newly allocated value is returned by the C API, it's not reachable from one of the
-//! existing roots so it must be added to this set. Structurally, this set is a stack of GC
-//! frames. A frame is essentially a dynamically-sized array of roots. The C API provides several
-//! macros to create such a frame and push it to the stack, which can only be used once in a scope
-//! and must be matched by a call to the macro that pops the frame from the stack before leaving
-//! the scope.
+//! This module contains most of the structs and traits that are used to deal with memory
+//! management and enforcing some degree of compile-time memory safety by applying reasonable
+//! lifetime bounds to Julia data. The rest of the documentation in this module provides
+//! information about how the design of this module has been influenced by the Julia C API
+//! (C API).
 //!
-//! These macros can be neither directly translated to Rust, nor wrapped in another C function,
-//! because these macros allocate the frame on the stack with `alloca`, which is not possible in
-//! Rust. Instead, the structs and traits in this module provide a reimplementation of this
-//! mechanism.
+//! Julia is a garbage-collected programming language. The garbage collector (GC) is a tracing GC,
+//! it has a mark and a sweep phase; during the mark phase the GC uses a set of root pointers
+//! (roots) to mark all data that can be reached from these roots, unreachable data is freed
+//! during the sweep phase. Internally, this set of pointers is a stack, or a linked list, of
+//! dynamically sized GC frames (frames). Two imporant invariants that must be maintained are that
+//! each scope must only create one frame, and that a frame must be popped before returning from
+//! the scope that created it.
 //!
-//! In particular, when you use jlrs all interactions with Julia happen inside a scope. A base
-//! scope can be created with the methods [`Julia::scope`] and [`Julia::scope_with_slots`]. These
-//! methods take a closure which is called inside this scope. This closure is provided with its
-//! two arguments, a [`Global`] and a mutable reference to a [`GcFrame`]. The first of these is an
-//! access token that can be used to access Julia modules and their contents, the second is a new
-//! frame that is used to store roots. The frame is popped from the stack when leaving the scope,
-//! so any value rooted in that frame can be used until you leave the scope.
+//! Whenever a function from the C API returns data owned by the GC, it's likely that this data is
+//! unreachable. In order to root the data a frame must be created first. While the C API provides
+//! several macros to create a frame, these macros can't be converted to Rust because they
+//! allocate a dynamically-sized array on the stack.
 //!
-//! Whenever a new value is created, it's usually rooted automatically by jlrs. Methods that
-//! create new values either require an argument that implements the [`Scope`] trait, or a mutable
-//! reference to something that implements the [`Frame`] trait. All mutable references to an
-//! implementation of [`Frame`] implement [`Scope`].
+//! In order to work around the issue that frames are dynamically sized, jlrs allocates some
+//! memory on the heap to store one or more frames and manipulates the contents to ensure the
+//! GC sees a consistent stack. Several methods to create a new scope are available, these methods
+//! often take a closure which takes a mutable reference to a [`GcFrame`]. After creating a frame,
+//! the closure is called with a mutable reference to that frame. When the closure returns the
+//! frame is popped from the stack.
 //!
-//! More informaton can be found in the [`frame`] and [`scope`] modules.
+//! The C API requires you to manually root data in a frame, methods in jlrs that return Julia
+//! data ensure this data is automatically rooted in some frame. All frame types provided by jlrs
+//! have a lifetime because they borrow a slice from the memory allocated to store the frame
+//! stack. Types that wrap a pointer to rooted Julia data, pointer wrappers, have at least one
+//! lifetime. This lifetime is determined by the lifetime of the frame used to root the data. As a
+//! result of this lifetime, this data can't be returned from the scope whose frame roots it.
 //!
-//! [`Julia::scope`]: crate::julia::Julia::scope
-//! [`Julia::scope_with_slots`]: crate::julia::Julia::scope_with_slots
+//! Two other features provided by frames in jlrs is the ability to reserve outputs and create
+//! nested scopes. The main use case of nested scopes is ensuring temporary data isn't rooted
+//! longer than necessary. In order to return rooted data from this nested scope, it must have
+//! been rooted in a parent frame. Inside the nested scope only the current frame can be accessed,
+//! in order to be able to root data in a parent frame an [`Output`] must first be reserved in
+//! that frame.
+//!
+//! Methods provided by jlrs that return rooted Julia data take either a [`PartialScope`] or
+//! [`Scope`]. The main difference is that methods that take a `PartialScope` only need to
+//! allocate a single value, while methods that take a `Scope` need to root one or more temporary
+//! values in addition to the result. The `Scope` trait is implemented for all mutable references
+//! to a frame and for [`OutputScope`], which contains an `Output` and a mutable reference to a
+//! frame. All these types implement `PartialScope`, `Output` does too. Because a wrapper inherits
+//! its lifetime from the frame that roots it, data rooted in a parent scope can be returned from
+//! a nested scope.
+//!
+//! // TODO:
+//! // mode
+//! // gc
+//! // global
+//!
+//! Examples and more information can be found in the [`frame`] and [`scope`] modules.
+//!
 //! [`Global`]: global::Global
 //! [`GcFrame`]: frame::GcFrame
+//! [`PartialScope`]: scope::PartialScope
 //! [`Scope`]: scope::Scope
 //! [`Frame`]: frame::Frame
-//! [`ScopeExt::scope`]: scope::Scope::scope
-//! [`ScopeExt`]: scope::ScopeExt
-//! [`Scope::value_scope`]: scope::Scope::value_scope
-//! [`Scope::result_scope`]: scope::Scope::result_scope
 //! [`Output`]: output::Output
 //! [`OutputScope`]: output::OutputScope
 //! [`Output::into_scope`]: output::Output::into_scope
@@ -50,7 +70,6 @@ pub mod global;
 pub mod mode;
 pub mod output;
 pub mod reusable_slot;
-pub(crate) mod root_pending;
 pub mod scope;
 pub(crate) mod stack_page;
 

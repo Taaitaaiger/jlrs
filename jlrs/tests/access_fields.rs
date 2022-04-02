@@ -34,7 +34,7 @@ mod tests {
     fn access_tuple_fields() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(4, |global, frame| unsafe {
+            jlrs.scope_with_capacity(4, |global, frame| unsafe {
                 // Returns (1, 2, 3) as Tuple{UInt32, UInt16, Int64}
                 let func = Module::main(global)
                     .submodule_ref("JlrsTests")?
@@ -47,7 +47,8 @@ mod tests {
                 assert_eq!(tup.n_fields(), 3);
                 let v1 = tup.get_nth_field(&mut *frame, 0)?;
                 let v2 = tup.get_nth_field(&mut *frame, 1)?;
-                let v3 = frame.value_scope_with_slots(0, |output, frame| {
+                let (output, frame) = frame.split()?;
+                let v3 = frame.scope_with_capacity(0, |frame| {
                     let output = output.into_scope(frame);
                     tup.get_nth_field(output, 2)
                 })?;
@@ -66,7 +67,7 @@ mod tests {
     fn cannot_access_oob_tuple_field() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(4, |global, frame| unsafe {
+            jlrs.scope_with_capacity(4, |global, frame| unsafe {
                 // Returns (1, 2, 3) as Tuple{UInt32, UInt16, Int64}
                 let func = Module::main(global)
                     .submodule_ref("JlrsTests")?
@@ -86,7 +87,7 @@ mod tests {
     fn access_non_pointer_tuple_field_must_alloc() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(4, |global, frame| unsafe {
+            jlrs.scope_with_capacity(4, |global, frame| unsafe {
                 // Returns (1, 2, 3) as Tuple{UInt32, UInt16, Int64}
                 let func = Module::main(global)
                     .submodule_ref("JlrsTests")?
@@ -106,7 +107,7 @@ mod tests {
     fn access_mutable_struct_fields() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(5, |global, frame| unsafe {
+            jlrs.scope_with_capacity(5, |global, frame| unsafe {
                 //mutable struct MutableStruct
                 //  x
                 //  y::UInt64
@@ -132,7 +133,8 @@ mod tests {
                 {
                     assert!(x_val.unwrap().wrapper().unwrap().is::<f32>());
                 }
-                let _ = frame.value_scope_with_slots(0, |output, frame| {
+                let (output, frame) = frame.split()?;
+                let _ = frame.scope_with_capacity(0, |frame| {
                     let output = output.into_scope(frame);
                     mut_struct.get_field(output, "y")
                 })?;
@@ -148,7 +150,7 @@ mod tests {
     fn cannot_access_unknown_mutable_struct_field() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_slots(5, |global, frame| unsafe {
+            jlrs.scope_with_capacity(5, |global, frame| unsafe {
                 //mutable struct MutableStruct
                 //  x
                 //  y::UInt64
@@ -181,14 +183,14 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let oob_idx = jlrs
-                .scope_with_slots(5, |global, frame| unsafe {
+                .scope_with_capacity(5, |global, frame| unsafe {
                     let idx = Value::new(&mut *frame, 4usize)?;
                     let data = vec![1.0f64, 2., 3.];
                     let array = Array::from_vec(&mut *frame, data, 3)?;
                     let func = Module::base(global)
                         .function_ref("getindex")?
                         .wrapper_unchecked();
-                    let out = func.call2(&mut *frame, array, idx)?.unwrap_err();
+                    let out = func.call2(&mut *frame, array.as_value(), idx)?.unwrap_err();
 
                     assert_eq!(out.datatype_name().unwrap(), "BoundsError");
 
@@ -215,14 +217,14 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(5, |global, frame| unsafe {
+            jlrs.scope_with_capacity(5, |global, frame| unsafe {
                 let idx = Value::new(&mut *frame, 4usize)?;
                 let data = vec![1.0f64, 2., 3.];
                 let array = Array::from_vec(&mut *frame, data, 3)?;
                 let func = Module::base(global)
                     .function_ref("getindex")?
                     .wrapper_unchecked();
-                let out = func.call2(&mut *frame, array, idx)?.unwrap_err();
+                let out = func.call2(&mut *frame, array.as_value(), idx)?.unwrap_err();
 
                 let field_names = out.field_names();
                 assert!(out
@@ -240,17 +242,18 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(5, |global, frame| unsafe {
+            jlrs.scope_with_capacity(5, |global, frame| unsafe {
                 let idx = Value::new(&mut *frame, 4usize)?;
                 let data = vec![1.0f64, 2., 3.];
                 let array = Array::from_vec(&mut *frame, data, 3)?;
                 let func = Module::base(global)
                     .function_ref("getindex")?
                     .wrapper_unchecked();
-                let out = func.call2(&mut *frame, array, idx)?.unwrap_err();
+                let out = func.call2(&mut *frame, array.as_value(), idx)?.unwrap_err();
 
                 let field_names = out.field_names();
-                let _ = frame.value_scope_with_slots(1, |output, frame| {
+                let (output, frame) = frame.split()?;
+                let _ = frame.scope_with_capacity(1, |frame| {
                     let field = out.get_field(&mut *frame, field_names[1])?;
                     let output = output.into_scope(frame);
                     field.get_nth_field(output, 0)
@@ -267,18 +270,19 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(5, |global, frame| unsafe {
+            jlrs.scope_with_capacity(5, |global, frame| unsafe {
                 let idx = Value::new(&mut *frame, 4usize)?;
                 let data = vec![1.0f64, 2., 3.];
                 let array = Array::from_vec(&mut *frame, data, 3)?;
                 let func = Module::base(global)
                     .function_ref("getindex")?
                     .wrapper_unchecked();
-                let out = func.call2(&mut *frame, array, idx)?.unwrap_err();
+                let out = func.call2(&mut *frame, array.as_value(), idx)?.unwrap_err();
 
                 let field_names = out.field_names();
+                let (output, frame) = frame.split()?;
                 let _ = frame
-                    .value_scope_with_slots(1, |output, frame| {
+                    .scope_with_capacity(1, |frame| {
                         let field = out.get_field(&mut *frame, field_names[1])?;
                         let output = output.into_scope(frame);
                         field.get_nth_field(output, 123)

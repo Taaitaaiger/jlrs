@@ -56,81 +56,88 @@ fn find_julia() -> Option<String> {
 }
 
 #[cfg(target_os = "linux")]
-fn flags() -> String {
-    match find_julia() {
-        Some(julia_dir) => {
-            let jl_include_path = format!("{}/include/julia/", julia_dir);
-            let jl_lib_path = format!("-L{}/lib/", julia_dir);
-            println!("cargo:rustc-flags={}", &jl_lib_path);
+fn set_flags(julia_dir: &str) {
+    println!("cargo:rustc-link-search={}/lib", &julia_dir);
 
-            if env::var("CARGO_FEATURE_UV").is_ok() {
-                let jl_internal_lib_path = format!("-L{}/lib/julia", julia_dir);
-                println!("cargo:rustc-flags={}", &jl_internal_lib_path);
-            }
+    if env::var("CARGO_FEATURE_UV").is_ok() {
+        println!("cargo:rustc-link-search={}/lib/julia", &julia_dir);
+    }
 
-            println!("cargo:rustc-link-arg=-Wl,--export-dynamic");
+    println!("cargo:rustc-link-arg=-Wl,--export-dynamic");
 
-            if env::var("CARGO_FEATURE_DEBUG").is_ok() {
-                println!("cargo:rustc-link-lib=julia-debug");
-            } else {
-                println!("cargo:rustc-link-lib=julia");
-            }
+    if env::var("CARGO_FEATURE_DEBUG").is_ok() {
+        println!("cargo:rustc-link-lib=julia-debug");
+    } else {
+        println!("cargo:rustc-link-lib=julia");
+    }
 
-            if env::var("CARGO_FEATURE_UV").is_ok() {
-                println!("cargo:rustc-link-lib=uv");
-            }
-
-            jl_include_path
-        }
-        None => panic!("Unable to set compiler flags: JULIA_DIR is not set and no installed version of Julia can be found"),
+    if env::var("CARGO_FEATURE_UV").is_ok() {
+        println!("cargo:rustc-link-lib=uv");
     }
 }
 
-#[cfg(target_os = "windows")]
-fn flags() -> String {
-    match find_julia() {
-        Some(julia_dir) => {
-            let jl_include_path = format!("{}/include/julia/", julia_dir);
-            let jl_lib_path = format!("-L{}/bin/", julia_dir);
-            println!("cargo:rustc-flags={}", &jl_lib_path);
+#[cfg(all(target_os = "windows", target_env = "msvc"))]
+fn set_flags(julia_dir: &str) {
+    println!("cargo:rustc-link-search={}/bin", &julia_dir);
 
-            if env::var("CARGO_FEATURE_DEBUG").is_ok() {
-                println!("cargo:rustc-link-lib=julia-debug");
-            } else {
-                println!("cargo:rustc-link-lib=julia");
-            }
+    if env::var("CARGO_FEATURE_DEBUG").is_ok() {
+        println!("cargo:rustc-link-lib=libjulia-debug");
+    } else {
+        println!("cargo:rustc-link-lib=libjulia");
+    }
 
-            println!("cargo:rustc-link-lib=openlibm");
-            println!("cargo:rustc-link-arg=-Wl,--stack,8388608");
+    println!("cargo:rustc-link-lib=libopenlibm");
 
-            if env::var("CARGO_FEATURE_UV").is_ok() {
-                println!("cargo:rustc-link-lib=uv-2");
-            }
+    if env::var("CARGO_FEATURE_UV").is_ok() {
+        println!("cargo:rustc-link-lib=libuv-2");
+    }
+}
 
-            jl_include_path
-        }
-        None => panic!("Unable to set compiler flags: JULIA_DIR is not set and no installed version of Julia can be found"),
+#[cfg(all(target_os = "windows", target_env = "gnu"))]
+fn set_flags(julia_dir: &str) {
+    println!("cargo:rustc-link-search={}/bin", &julia_dir);
+
+    if env::var("CARGO_FEATURE_DEBUG").is_ok() {
+        println!("cargo:rustc-link-lib=julia-debug");
+    } else {
+        println!("cargo:rustc-link-lib=julia");
+    }
+
+    println!("cargo:rustc-link-lib=openlibm");
+    println!("cargo:rustc-link-arg=-Wl,--stack,8388608");
+
+    if env::var("CARGO_FEATURE_UV").is_ok() {
+        println!("cargo:rustc-link-lib=uv-2");
     }
 }
 
 fn main() {
+    println!("cargo:rerun-if-changed=src/jlrs_cc.cc");
+    println!("cargo:rerun-if-changed=src/jlrs_cc.h");
+    println!("cargo:rerun-if-env-changed=JULIA_DIR");
+
     if env::var("DOCS_RS").is_ok() {
         return;
     }
 
-    println!("cargo:rerun-if-changed=src/jlrs_c.c");
-    println!("cargo:rerun-if-changed=src/jlrs_c.h");
-    println!("cargo:rerun-if-env-changed=JULIA_DIR");
+    let include_dir = match find_julia() {
+        Some(julia_dir) => {
+            set_flags(&julia_dir);
+            format!("{}/include/julia/", &julia_dir)
+        }
+        None => panic!("JULIA_DIR is not set and no installed version of Julia can be found"),
+    };
 
-    let include_dir = flags();
-
+    // Compile a small C++ library which provides a few additional functions that wrap functions
+    // from the Julia C API that can throw exceptions with the JL_TRY and JL_CATCH macros.
+    // This has to be a C++ library because MSVC doesn't support _Atomic.
     let mut c = cc::Build::new();
-    c.file("src/jlrs_c.c").include(&include_dir);
+    c.file("src/jlrs_cc.cc").include(&include_dir).cpp(true);
 
     #[cfg(all(feature = "lts", target_os = "windows"))]
     c.define("JLRS_WINDOWS_LTS", None);
 
-    c.compile("jlrs_c");
+    c.compile("jlrs_cc");
 
     #[cfg(feature = "use-bindgen")]
     {
@@ -140,7 +147,7 @@ fn main() {
         let include_dir_flag = format!("-I{}", include_dir);
         let bindings = bindgen::Builder::default()
             .clang_arg(include_dir_flag)
-            .header("src/jlrs_c.h")
+            .header("src/jlrs_cc.h")
             .size_t_is_usize(true)
             .allowlist_function("jl_alloc_array_1d")
             .allowlist_function("jl_alloc_array_2d")
@@ -255,6 +262,8 @@ fn main() {
             .allowlist_function("jlrs_apply_array_type")
             .allowlist_function("jlrs_apply_type")
             .allowlist_function("jlrs_get_nth_field")
+            .allowlist_function("jlrs_lock")
+            .allowlist_function("jlrs_unlock")
             .allowlist_function("jlrs_new_array")
             .allowlist_function("jlrs_new_structv")
             .allowlist_function("jlrs_new_typevar")
@@ -272,7 +281,6 @@ fn main() {
             .allowlist_function("jlrs_array_ptr_1d_push")
             .allowlist_function("jlrs_array_ptr_1d_append")
             .allowlist_function("jlrs_array_data_owner_offset")
-            .allowlist_function("jlrs_print_stack")
             .allowlist_type("jl_code_instance_t")
             .allowlist_type("jl_datatype_t")
             .allowlist_type("jl_expr_t")

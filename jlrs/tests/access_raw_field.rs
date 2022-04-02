@@ -211,7 +211,7 @@ mod tests {
                 let arg1 = Array::from_vec(&mut *frame, data, (2, 2))?;
                 let instance = ty
                     .cast::<DataType>()?
-                    .instantiate(&mut *frame, &mut [arg1])?
+                    .instantiate(&mut *frame, &mut [arg1.as_value()])?
                     .into_jlrs_result()?;
 
                 assert!(instance.get_raw_field::<ArrayRef, _>("a").is_ok());
@@ -242,7 +242,7 @@ mod tests {
                 let arg1 = Array::from_vec(&mut *frame, data, (2, 2))?;
                 let instance = ty
                     .cast::<DataType>()?
-                    .instantiate(&mut *frame, &mut [arg1])?
+                    .instantiate(&mut *frame, &mut [arg1.as_value()])?
                     .into_jlrs_result()?;
 
                 assert!(instance.get_raw_field::<ArrayRef, _>("a").is_ok());
@@ -454,7 +454,7 @@ mod tests {
                 let arg1 = Array::from_vec(&mut *frame, data, (2, 2))?;
                 let instance = ty
                     .cast::<DataType>()?
-                    .instantiate(&mut *frame, &mut [arg1])?
+                    .instantiate(&mut *frame, &mut [arg1.as_value()])?
                     .into_jlrs_result()?;
 
                 assert!(instance.get_nth_raw_field::<ArrayRef>(0).is_ok());
@@ -483,7 +483,7 @@ mod tests {
                 let arg1 = Array::from_vec(&mut *frame, data, (2, 2))?;
                 let instance = ty
                     .cast::<DataType>()?
-                    .instantiate(&mut *frame, &mut [arg1])?
+                    .instantiate(&mut *frame, &mut [arg1.as_value()])?
                     .into_jlrs_result()?;
 
                 assert!(instance.get_nth_raw_field::<ArrayRef>(0).is_ok());

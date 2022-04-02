@@ -1,10 +1,10 @@
 //! Convert simple data from Rust to Julia.
 //!
-//! In order to use data from Rust in Julia, it must first be converted to a [`Value`]. The
-//! easiest way to do this is by using [`Value::new`], which is compatible with types that
-//! implement the [`IntoJulia`] trait defined in this module. This trait only supports bits-types
-//! with no type parameters, and should not be implemented manually. Rather, you should use
-//! JlrsReflect.jl to automatically derive it for compatible types.
+//! In order to use data from Rust in Julia it must first be converted to a [`Value`]. The
+//! easiest way to do this is by calling [`Value::new`], which is compatible with types that
+//! implement the [`IntoJulia`] trait defined in this module. This trait only supports
+//! isbits-types, and should not be implemented manually. Rather, you should use JlrsReflect.jl to
+//! automatically derive it for compatible types.
 //!
 //! [`Value::new`]: crate::wrappers::ptr::value::Value::new
 //! [`Value`]: crate::wrappers::ptr::value::Value
@@ -33,13 +33,14 @@ use std::{ffi::c_void, ptr::NonNull};
 ///
 /// If you do choose to implement it manually, you only need to implement the `julia_type` method
 /// which must return the `DataType` of the type this data will have in Julia. The layout of this
-/// type and the type in Rust must match exactly. Incompatible layouts will lead to UB. Note that
-/// the type in Rust must always be `#[repr(C)]`.
+/// type and the type in Rust must match exactly. Incompatible layouts will cause undefined
+/// behavior. The type in Rust must always be `#[repr(C)]`. The `DataType` must be an isbits-type.
 ///
 /// [`Value::new`]: crate::wrappers::ptr::value::Value::new
 pub unsafe trait IntoJulia: Sized + 'static {
     /// Returns the associated Julia type of the implementor. The layout of that type and the
-    /// Rust type must match exactly, otherwise the trait is implemented incorrectly.
+    /// Rust type must match exactly, and it must be an `isbits` type, otherwise this trait has
+    /// been implemented incorrectly.
     fn julia_type<'scope>(_: Global<'scope>) -> DataTypeRef<'scope>;
 
     #[doc(hidden)]
@@ -113,8 +114,8 @@ unsafe impl<T: IntoJulia> IntoJulia for *mut T {
         let param_ptr = params.as_mut_ptr().cast();
 
         unsafe {
-            // Not rooting the result should be fine. The result must be a concrete type, which
-            // means `applied` can't have any free type parameters, so it should be cached.
+            // Not rooting the result should be fine. The result must be a concrete type, which is
+            // cached.
             let applied = jl_apply_type(ptr_ua.unwrap(Private).cast(), param_ptr, 1);
             debug_assert!(!applied.is_null());
 

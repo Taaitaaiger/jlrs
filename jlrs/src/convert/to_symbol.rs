@@ -1,8 +1,7 @@
-//! Automatically convert strings to symbols.
+//! Convert strings to symbols.
 //!
 //! Many things in Julia are accessed with [`Symbol`]s, the [`ToSymbol`] trait allows for
-//! strings to be used instead. This trait can only be used by jlrs internally, the method that
-//! performs the conversion is not public.
+//! strings to be used instead.
 
 use crate::wrappers::ptr::symbol::Symbol;
 use crate::{memory::global::Global, private::Private, wrappers::ptr::string::JuliaString};
@@ -11,6 +10,7 @@ use crate::{memory::global::Global, private::Private, wrappers::ptr::string::Jul
 pub trait ToSymbol: private::ToSymbol {
     /// Convert `self` to a `Symbol`.
     fn to_symbol<'global>(&self, _: Global<'global>) -> Symbol<'global> {
+        // Requiring a Global guarantees Julia has been initialized
         unsafe { self.to_symbol_priv(Private) }
     }
 }

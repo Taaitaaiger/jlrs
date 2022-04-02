@@ -6,18 +6,17 @@ use super::{
     private::Wrapper as WrapperPriv, value::Value, DataTypeRef, SimpleVectorRef, TypeNameRef,
     ValueRef, Wrapper,
 };
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
 use crate::error::JlrsError;
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
-use crate::error::{JuliaResultRef, CANNOT_DISPLAY_TYPE};
+use crate::error::{JuliaResult, JuliaResultRef};
+use crate::error::CANNOT_DISPLAY_TYPE;
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
 use crate::layout::typecheck::Concrete;
-use crate::layout::typecheck::Typecheck;
-use crate::memory::frame::Frame;
-use crate::memory::scope::Scope;
+use crate::memory::scope::PartialScope;
 use crate::wrappers::ptr::{simple_vector::SimpleVector, symbol::Symbol};
 use crate::{error::JlrsResult, impl_julia_typecheck};
 use crate::{impl_debug, impl_valid_layout, memory::global::Global, private::Private};
+use crate::{layout::typecheck::Typecheck, memory::output::Output};
 use jl_sys::{
     jl_abstractslot_type, jl_abstractstring_type, jl_any_type, jl_anytuple_type, jl_argument_type,
     jl_argumenterror_type, jl_bool_type, jl_boundserror_type, jl_builtin_type, jl_char_type,
@@ -90,20 +89,14 @@ impl<'scope> DataType<'scope> {
 
     /// Returns the number of type parameters.
     pub fn n_parameters(self) -> usize {
-        unsafe {
-            let params = self.unwrap_non_null(Private).as_ref().parameters;
-            SimpleVector::<Value>::wrap(params, Private).len()
-        }
+        unsafe { self.parameters().wrapper_unchecked().len() }
     }
 
     /// Returns the type parameter at position `idx`, or `None` if the index is out of bounds.
     pub fn parameter(self, idx: usize) -> Option<ValueRef<'scope, 'static>> {
         unsafe {
             let params = self.unwrap_non_null(Private).as_ref().parameters;
-            SimpleVector::<Value>::wrap(params, Private)
-                .data()
-                .get(idx)
-                .copied()
+            SimpleVector::wrap(params, Private).data().get(idx).copied()
         }
     }
 
@@ -168,6 +161,7 @@ impl<'scope> DataType<'scope> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().instance) }
     }
 
+    // TODO
     pub fn layout(self) -> Option<NonNull<c_void>> {
         unsafe {
             let ly = self.unwrap_non_null(Private).as_ref().layout;
@@ -359,18 +353,129 @@ impl<'scope> DataType<'scope> {
     }
 
     /// Returns the size of the field at position `idx` in this type.
-    pub fn field_size(self, idx: usize) -> u32 {
-        unsafe { jl_field_size(self.unwrap(Private), idx as _) }
+    pub fn field_size(self, idx: usize) -> JlrsResult<u32> {
+        if idx >= self.n_fields() as usize {
+            Err(JlrsError::OutOfBounds {
+                idx,
+                n_fields: self.n_fields() as usize,
+                value_type: self.display_string_or(CANNOT_DISPLAY_TYPE),
+            })?
+        }
+
+        unsafe { Ok(jl_field_size(self.unwrap(Private), idx as _)) }
     }
 
     /// Returns the offset where the field at position `idx` is stored.
-    pub fn field_offset(self, idx: usize) -> u32 {
-        unsafe { jl_field_offset(self.unwrap(Private), idx as _) }
+    pub fn field_offset(self, idx: usize) -> JlrsResult<u32> {
+        if idx >= self.n_fields() as usize {
+            Err(JlrsError::OutOfBounds {
+                idx,
+                n_fields: self.n_fields() as usize,
+                value_type: self.display_string_or(CANNOT_DISPLAY_TYPE),
+            })?
+        }
+
+        unsafe { Ok(jl_field_offset(self.unwrap(Private), idx as _)) }
     }
 
-    /// Returns true if the field at position `idx` is a pointer.
-    pub fn is_pointer_field(self, idx: usize) -> bool {
-        unsafe { jl_field_isptr(self.unwrap(Private), idx as _) }
+    /// Returns true if the field at position `idx` is stored as a pointer.
+    pub fn is_pointer_field(self, idx: usize) -> JlrsResult<bool> {
+        if idx >= self.n_fields() as usize {
+            Err(JlrsError::OutOfBounds {
+                idx,
+                n_fields: self.n_fields() as usize,
+                value_type: self.display_string_or(CANNOT_DISPLAY_TYPE),
+            })?
+        }
+
+        unsafe { Ok(jl_field_isptr(self.unwrap(Private), idx as _)) }
+    }
+
+    #[cfg(not(feature = "lts"))]
+    pub fn is_atomic_field(self, idx: usize) -> JlrsResult<bool> {
+        if idx >= self.n_fields() as usize {
+            Err(JlrsError::OutOfBounds {
+                idx,
+                n_fields: self.n_fields() as usize,
+                value_type: self.display_string_or(CANNOT_DISPLAY_TYPE),
+            })?
+        }
+
+        unsafe { Ok(self.is_atomic_field_unchecked(idx)) }
+    }
+
+    #[cfg(not(feature = "lts"))]
+    pub fn is_const_field(self, idx: usize) -> JlrsResult<bool> {
+        if idx >= self.n_fields() as usize {
+            Err(JlrsError::OutOfBounds {
+                idx,
+                n_fields: self.n_fields() as usize,
+                value_type: self.display_string_or(CANNOT_DISPLAY_TYPE),
+            })?
+        }
+
+        unsafe { Ok(self.is_const_field_unchecked(idx)) }
+    }
+
+    /// Returns the size of the field at position `idx` in this type.
+    pub unsafe fn field_size_unchecked(self, idx: usize) -> u32 {
+        jl_field_size(self.unwrap(Private), idx as _)
+    }
+
+    /// Returns the offset where the field at position `idx` is stored.
+    pub unsafe fn field_offset_unchecked(self, idx: usize) -> u32 {
+        jl_field_offset(self.unwrap(Private), idx as _)
+    }
+
+    /// Returns true if the field at position `idx` is stored as a pointer.
+    pub unsafe fn is_pointer_field_unchecked(self, idx: usize) -> bool {
+        jl_field_isptr(self.unwrap(Private), idx as _)
+    }
+
+    #[cfg(not(feature = "lts"))]
+    pub unsafe fn is_atomic_field_unchecked(self, idx: usize) -> bool {
+        /*
+            const uint32_t *atomicfields = st->name->atomicfields;
+            if (atomicfields != NULL) {
+                if (atomicfields[i / 32] & (1 << (i % 32)))
+                    return 1;
+            }
+            return 0;
+        */
+        let atomicfields = self.type_name().wrapper_unchecked().atomicfields();
+        if atomicfields.is_null() {
+            return false;
+        }
+
+        let isatomic = (*atomicfields.add(idx / 32)) & (1 << (idx % 32));
+        isatomic != 0
+    }
+
+    #[cfg(not(feature = "lts"))]
+    pub unsafe fn is_const_field_unchecked(self, idx: usize) -> bool {
+        /*
+        jl_typename_t *tn = st->name;
+        if (!tn->mutabl)
+            return 1;
+        const uint32_t *constfields = tn->constfields;
+        if (constfields != NULL) {
+            if (constfields[i / 32] & (1 << (i % 32)))
+                return 1;
+        }
+        return 0;
+        */
+        let tn = self.type_name().wrapper_unchecked();
+        if !tn.mutabl() {
+            return true;
+        }
+
+        let constfields = tn.constfields();
+        if constfields.is_null() {
+            return false;
+        }
+
+        let isconst = (*constfields.add(idx / 32)) & (1 << (idx % 32));
+        isconst != 0
     }
 
     /// Create a new instance of this `DataType`, using `values` to set the fields.
@@ -379,17 +484,17 @@ impl<'scope> DataType<'scope> {
     /// allocated as a `Value`. This functions returns an error if the given `DataType` isn't
     /// concrete or is an array type. For custom array types you must use [`Array::new_for`].
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub fn instantiate<'target, 'frame, 'value, 'borrow, V, S, F>(
+    pub fn instantiate<'target, 'value, 'data, V, S>(
         self,
         scope: S,
         mut values: V,
-    ) -> JlrsResult<S::JuliaResult>
+    ) -> JlrsResult<JuliaResult<'target, 'data>>
     where
-        S: Scope<'target, 'frame, 'borrow, F>,
-        F: Frame<'frame>,
-        V: AsMut<[Value<'value, 'borrow>]>,
+        S: PartialScope<'target>,
+        V: AsMut<[Value<'value, 'data>]>,
     {
         unsafe {
+            // TODO: Check if Julia crashes or throws an error when these checks fail
             if !self.is::<Concrete>() {
                 Err(JlrsError::NotConcrete {
                     value_type: self.display_string_or(CANNOT_DISPLAY_TYPE),
@@ -424,13 +529,13 @@ impl<'scope> DataType<'scope> {
     /// concrete or an array type. Unlike [`DataType::instantiate`] this method doesn't root the
     /// allocated value.
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub fn instantiate_unrooted<'global, 'value, 'borrow, V>(
+    pub fn instantiate_unrooted<'global, 'value, 'data, V>(
         self,
         _: Global<'global>,
         mut values: V,
-    ) -> JlrsResult<JuliaResultRef<'global, 'borrow>>
+    ) -> JlrsResult<JuliaResultRef<'global, 'data>>
     where
-        V: AsMut<[Value<'value, 'borrow>]>,
+        V: AsMut<[Value<'value, 'data>]>,
     {
         unsafe {
             if !self.is::<Concrete>() {
@@ -465,25 +570,22 @@ impl<'scope> DataType<'scope> {
     ///
     /// This method performs no checks whether or not the value can be constructed with these
     /// values. If Julia throws an exception the process aborts.
-    pub fn instantiate_unchecked<'target, 'frame, 'value, 'borrow, V, S, F>(
+    pub unsafe fn instantiate_unchecked<'target, 'value, 'data, V, S>(
         self,
         scope: S,
         mut values: V,
-    ) -> JlrsResult<S::Value>
+    ) -> JlrsResult<Value<'target, 'data>>
     where
-        S: Scope<'target, 'frame, 'borrow, F>,
-        F: Frame<'frame>,
-        V: AsMut<[Value<'value, 'borrow>]>,
+        S: PartialScope<'target>,
+        V: AsMut<[Value<'value, 'data>]>,
     {
-        unsafe {
-            let values = values.as_mut();
-            let value = jl_new_structv(
-                self.unwrap(Private),
-                values.as_mut_ptr().cast(),
-                values.len() as _,
-            );
-            scope.value(NonNull::new_unchecked(value), Private)
-        }
+        let values = values.as_mut();
+        let value = jl_new_structv(
+            self.unwrap(Private),
+            values.as_mut_ptr().cast(),
+            values.len() as _,
+        );
+        scope.value(NonNull::new_unchecked(value), Private)
     }
 
     /// Create a new instance of this `DataType`, using `values` to set the fields.
@@ -493,7 +595,7 @@ impl<'scope> DataType<'scope> {
     ///
     /// This method performs no checks whether or not the value can be constructed with these
     /// values. If Julia throws an exception the process aborts.
-    pub fn instantiate_unrooted_unchecked<'global, 'value, 'borrow, V>(
+    pub unsafe fn instantiate_unrooted_unchecked<'global, 'value, 'borrow, V>(
         self,
         _: Global<'global>,
         mut values: V,
@@ -501,15 +603,22 @@ impl<'scope> DataType<'scope> {
     where
         V: AsMut<[Value<'value, 'borrow>]>,
     {
-        unsafe {
-            let values = values.as_mut();
-            let value = jl_new_structv(
-                self.unwrap(Private),
-                values.as_mut_ptr().cast(),
-                values.len() as _,
-            );
+        let values = values.as_mut();
+        let value = jl_new_structv(
+            self.unwrap(Private),
+            values.as_mut_ptr().cast(),
+            values.len() as _,
+        );
 
-            ValueRef::wrap(value)
+        ValueRef::wrap(value)
+    }
+
+    /// Use the `Output` to extend the lifetime of this data.
+    pub fn root<'target>(self, output: Output<'target>) -> DataType<'target> {
+        unsafe {
+            let ptr = self.unwrap_non_null(Private);
+            output.set_root::<DataType>(ptr);
+            DataType::wrap_non_null(ptr, Private)
         }
     }
 }
@@ -912,13 +1021,13 @@ impl<'base> DataType<'base> {
 
 impl<'scope> PartialEq for DataType<'scope> {
     fn eq(&self, other: &Self) -> bool {
-        self.as_value().egal(other.as_value())
+        self.as_value() == other.as_value()
     }
 }
 
 impl<'scope, 'data> PartialEq<Value<'scope, 'data>> for DataType<'scope> {
     fn eq(&self, other: &Value<'scope, 'data>) -> bool {
-        self.as_value().egal(*other)
+        self.as_value() == *other
     }
 }
 
@@ -941,3 +1050,5 @@ impl<'scope> WrapperPriv<'scope, '_> for DataType<'scope> {
         self.0
     }
 }
+
+impl_root!(DataType, 1);

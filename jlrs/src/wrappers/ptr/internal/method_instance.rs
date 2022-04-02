@@ -5,7 +5,7 @@
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L321
 use super::super::private::Wrapper;
-use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout};
+use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout, memory::output::Output};
 use crate::{
     private::Private,
     wrappers::ptr::{CodeInstanceRef, SimpleVectorRef, ValueRef},
@@ -90,6 +90,15 @@ impl<'scope> MethodInstance<'scope> {
     pub fn in_inference(self) -> bool {
         unsafe { self.unwrap_non_null(Private).as_ref().inInference != 0 }
     }
+
+    /// Use the `Output` to extend the lifetime of this data.
+    pub fn root<'target>(self, output: Output<'target>) -> MethodInstance<'target> {
+        unsafe {
+            let ptr = self.unwrap_non_null(Private);
+            output.set_root::<MethodInstance>(ptr);
+            MethodInstance::wrap_non_null(ptr, Private)
+        }
+    }
 }
 
 impl_julia_typecheck!(MethodInstance<'scope>, jl_method_instance_type, 'scope);
@@ -110,3 +119,5 @@ impl<'scope> Wrapper<'scope, '_> for MethodInstance<'scope> {
         self.0
     }
 }
+
+impl_root!(MethodInstance, 1);

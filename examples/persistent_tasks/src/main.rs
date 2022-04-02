@@ -59,8 +59,9 @@ impl PersistentTask for AccumulatorTask {
         frame: &'inner mut AsyncGcFrame<'static>,
     ) -> JlrsResult<Self::State> {
         unsafe {
+            let output = frame.reserve_output()?;
             frame
-                .result_scope(|output, frame| {
+                .scope(|frame| {
                     // A nested scope is used to only root a single value in the frame provided to
                     // init, rather than two.
                     let func = Module::main(global)
@@ -68,9 +69,7 @@ impl PersistentTask for AccumulatorTask {
                         .value_unchecked();
                     let init_v = Value::new(&mut *frame, self.init_value)?;
 
-                    let os = output.into_scope(frame);
-
-                    func.call1(os, init_v)
+                    func.call1(output, init_v)
                 })?
                 .into_jlrs_result()
         }
@@ -148,5 +147,5 @@ fn main() {
     thread_handle
         .join()
         .expect("Cannot join")
-        .expect("Unable to init Julia");
+        .expect("Unable to exit Julia");
 }

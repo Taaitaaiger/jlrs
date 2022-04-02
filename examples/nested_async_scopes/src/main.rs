@@ -26,8 +26,9 @@ impl AsyncTask for MyTask {
     ) -> JlrsResult<Self::Output> {
         // Nesting async frames works like nesting on ordinary frame. The main differences are the `async`
         // block in the closure, and frame is provided by value rather than by mutable reference.
+        let output = frame.reserve_output()?;
         frame
-            .async_value_scope(|output, frame| async move {
+            .async_scope(|frame| async move {
                 // Convert the two arguments to values Julia can work with.
                 let dims = Value::new(&mut *frame, self.dims)?;
                 let iters = Value::new(&mut *frame, self.iters)?;
@@ -46,11 +47,10 @@ impl AsyncTask for MyTask {
                         .wrapper_unchecked()
                         .call_async(&mut *frame, &mut [dims, iters])
                         .await?
-                        .unwrap()
+                        .into_jlrs_result()?
                 };
 
-                let output = output.into_scope(frame);
-                Ok(out.as_unrooted(output))
+                Ok(out.root(output))
             })
             .await?
             .unbox::<f64>()
@@ -82,7 +82,9 @@ async fn main() {
     };
 
     // Include the custom code our task needs.
-    julia.include("MyModule.jl").await.unwrap();
+    unsafe {
+        julia.include("MyModule.jl").await.unwrap();
+    }
 
     // Create channels for each of the tasks (this is not required but helps distinguish which
     // result belongs to which task).

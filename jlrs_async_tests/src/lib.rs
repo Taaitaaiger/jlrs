@@ -105,6 +105,7 @@ mod example {
             Ok(v)
         }
     }
+
     struct ThrowingTask;
 
     #[async_trait(?Send)]
@@ -150,7 +151,7 @@ mod example {
             let iters = Value::new(&mut *frame, self.iters)?;
 
             let v = frame
-                .async_scope_with_slots(1, |frame| async move {
+                .async_scope_with_capacity(1, |frame| async move {
                     unsafe {
                         Module::main(global)
                             .submodule_ref("MyModule")?
@@ -184,8 +185,9 @@ mod example {
             global: Global<'base>,
             frame: &mut AsyncGcFrame<'base>,
         ) -> JlrsResult<Self::Output> {
+            let (output, frame) = frame.split()?;
             let v = frame
-                .async_value_scope_with_slots(3, |output, frame| async move {
+                .async_scope_with_capacity(3, |frame| async move {
                     let iters = Value::new(&mut *frame, self.iters)?;
                     let dims = Value::new(&mut *frame, self.dims)?;
 
@@ -201,8 +203,7 @@ mod example {
                             .unwrap()
                     };
 
-                    let output = output.into_scope(frame);
-                    Ok(out.as_unrooted(output))
+                    Ok(out.root(output))
                 })
                 .await?
                 .unbox::<f64>()?;
@@ -225,8 +226,9 @@ mod example {
             global: Global<'base>,
             frame: &mut AsyncGcFrame<'base>,
         ) -> JlrsResult<Self::Output> {
+            let (output, frame) = frame.split()?;
             let v = frame
-                .async_result_scope_with_slots(3, |output, frame| async move {
+                .async_scope_with_capacity(3, |frame| async move {
                     let iters = Value::new(&mut *frame, self.iters)?;
                     let dims = Value::new(&mut *frame, self.dims)?;
 
@@ -242,7 +244,14 @@ mod example {
                     };
 
                     let output = output.into_scope(frame);
-                    Ok(out.as_unrooted(output))
+                    let out = unsafe {
+                        match out {
+                            Ok(v) => Ok(v.as_ref().root(output)?),
+                            Err(e) => Err(e.as_ref().root(output)?),
+                        }
+                    };
+
+                    Ok(out)
                 })
                 .await?
                 .unwrap()
@@ -304,8 +313,9 @@ mod example {
             global: Global<'base>,
             frame: &mut AsyncGcFrame<'base>,
         ) -> JlrsResult<Self::Output> {
+            let (output, frame) = frame.split()?;
             let v = frame
-                .async_value_scope(|output, frame| async move {
+                .async_scope(|frame| async move {
                     let iters = Value::new(&mut *frame, self.iters)?;
                     let dims = Value::new(&mut *frame, self.dims)?;
 
@@ -321,8 +331,7 @@ mod example {
                             .unwrap()
                     };
 
-                    let output = output.into_scope(frame);
-                    Ok(out.as_unrooted(output))
+                    Ok(out.root(output))
                 })
                 .await?
                 .unbox::<f64>()?;
@@ -345,8 +354,9 @@ mod example {
             global: Global<'base>,
             frame: &mut AsyncGcFrame<'base>,
         ) -> JlrsResult<Self::Output> {
+            let (output, frame) = frame.split()?;
             let v = frame
-                .async_result_scope(|output, frame| async move {
+                .async_scope(|frame| async move {
                     let iters = Value::new(&mut *frame, self.iters)?;
                     let dims = Value::new(&mut *frame, self.dims)?;
 
@@ -362,7 +372,14 @@ mod example {
                     };
 
                     let output = output.into_scope(frame);
-                    Ok(out.as_unrooted(output))
+                    let out = unsafe {
+                        match out {
+                            Ok(v) => Ok(v.as_ref().root(output)?),
+                            Err(e) => Err(e.as_ref().root(output)?),
+                        }
+                    };
+
+                    Ok(out)
                 })
                 .await?
                 .unwrap()
@@ -404,8 +421,9 @@ mod example {
             frame: &'inner mut AsyncGcFrame<'static>,
         ) -> JlrsResult<Value<'static, 'static>> {
             unsafe {
+                let (output, frame) = frame.split()?;
                 frame
-                    .result_scope_with_slots(1, |output, frame| {
+                    .async_scope(|frame| async move {
                         // A nested scope is used to only root a single value in the frame provided to
                         // init, rather than two.
                         let func = Module::main(global)
@@ -416,7 +434,8 @@ mod example {
                         let os = output.into_scope(frame);
 
                         func.call1(os, init_v)
-                    })?
+                    })
+                    .await?
                     .into_jlrs_result()
             }
         }
@@ -578,6 +597,7 @@ mod example {
             Ok(v)
         }
     }
+
     struct SchedulingTask {
         dims: isize,
         iters: isize,
@@ -845,31 +865,6 @@ mod example {
         }
 
         #[test]
-        fn test_persistent() {
-            JULIA.with(|j| {
-                let julia = j.borrow_mut();
-
-                let (is, ir) = crossbeam_channel::bounded(1);
-                julia
-                    .try_register_persistent::<AccumulatorTask, _>(is)
-                    .unwrap();
-                ir.recv().unwrap().unwrap();
-
-                let (sender, receiver) = crossbeam_channel::bounded(1);
-
-                let handle = julia
-                    .try_persistent(AccumulatorTask { init_value: 5.0 })
-                    .unwrap();
-
-                handle.try_call(7.0, sender.clone()).unwrap();
-                assert_eq!(receiver.recv().unwrap().unwrap(), 12.0);
-
-                handle.try_call(12.0, sender).unwrap();
-                assert_eq!(receiver.recv().unwrap().unwrap(), 24.0);
-            });
-        }
-
-        #[test]
         fn test_other_ret_type_task() {
             JULIA.with(|j| {
                 let julia = j.borrow_mut();
@@ -887,182 +882,6 @@ mod example {
                     .unwrap();
 
                 assert_eq!(receiver.recv().unwrap().unwrap(), 20_000_004.0);
-            });
-        }
-
-        #[test]
-        fn test_local_task() {
-            JULIA.with(|j| {
-                let julia = j.borrow_mut();
-                julia.try_error_color(true).unwrap();
-
-                let (sender, receiver) = crossbeam_channel::bounded(1);
-
-                julia
-                    .try_task(
-                        LocalTask {
-                            dims: 4,
-                            iters: 5_000,
-                        },
-                        sender,
-                    )
-                    .unwrap();
-
-                assert_eq!(receiver.recv().unwrap().unwrap(), 20_004.0);
-            });
-        }
-
-        #[test]
-        fn test_main_task() {
-            JULIA.with(|j| {
-                let julia = j.borrow_mut();
-                julia.try_error_color(true).unwrap();
-
-                let (sender, receiver) = crossbeam_channel::bounded(1);
-
-                julia
-                    .try_task(
-                        MainTask {
-                            dims: 4,
-                            iters: 5_000,
-                        },
-                        sender,
-                    )
-                    .unwrap();
-
-                assert_eq!(receiver.recv().unwrap().unwrap(), 20_004.0);
-            });
-        }
-
-        #[test]
-        fn test_scheduling_local_task() {
-            JULIA.with(|j| {
-                let julia = j.borrow_mut();
-                julia.try_error_color(true).unwrap();
-
-                let (sender, receiver) = crossbeam_channel::bounded(1);
-
-                julia
-                    .try_task(
-                        LocalSchedulingTask {
-                            dims: 4,
-                            iters: 5_000,
-                        },
-                        sender,
-                    )
-                    .unwrap();
-
-                assert_eq!(receiver.recv().unwrap().unwrap(), 20_004.0);
-            });
-        }
-
-        #[test]
-        fn test_scheduling_main_task() {
-            JULIA.with(|j| {
-                let julia = j.borrow_mut();
-                julia.try_error_color(true).unwrap();
-
-                let (sender, receiver) = crossbeam_channel::bounded(1);
-
-                julia
-                    .try_task(
-                        MainSchedulingTask {
-                            dims: 4,
-                            iters: 5_000,
-                        },
-                        sender,
-                    )
-                    .unwrap();
-
-                assert_eq!(receiver.recv().unwrap().unwrap(), 20_004.0);
-            });
-        }
-
-        #[test]
-        fn test_scheduling_task() {
-            JULIA.with(|j| {
-                let julia = j.borrow_mut();
-                julia.try_error_color(true).unwrap();
-
-                let (sender, receiver) = crossbeam_channel::bounded(1);
-
-                julia
-                    .try_task(
-                        SchedulingTask {
-                            dims: 4,
-                            iters: 5_000,
-                        },
-                        sender,
-                    )
-                    .unwrap();
-
-                assert_eq!(receiver.recv().unwrap().unwrap(), 20_004.0);
-            });
-        }
-
-        #[test]
-        fn test_scheduling_kw_task() {
-            JULIA.with(|j| {
-                let julia = j.borrow_mut();
-                julia.try_error_color(true).unwrap();
-
-                let (sender, receiver) = crossbeam_channel::bounded(1);
-
-                julia
-                    .try_task(
-                        KwSchedulingTask {
-                            dims: 4,
-                            iters: 5_000,
-                        },
-                        sender,
-                    )
-                    .unwrap();
-
-                assert_eq!(receiver.recv().unwrap().unwrap(), 20_009.0);
-            });
-        }
-
-        #[test]
-        fn test_scheduling_kw_local_task() {
-            JULIA.with(|j| {
-                let julia = j.borrow_mut();
-                julia.try_error_color(true).unwrap();
-
-                let (sender, receiver) = crossbeam_channel::bounded(1);
-
-                julia
-                    .try_task(
-                        LocalKwSchedulingTask {
-                            dims: 4,
-                            iters: 5_000,
-                        },
-                        sender,
-                    )
-                    .unwrap();
-
-                assert_eq!(receiver.recv().unwrap().unwrap(), 20_009.0);
-            });
-        }
-
-        #[test]
-        fn test_scheduling_kw_main_task() {
-            JULIA.with(|j| {
-                let julia = j.borrow_mut();
-                julia.try_error_color(true).unwrap();
-
-                let (sender, receiver) = crossbeam_channel::bounded(1);
-
-                julia
-                    .try_task(
-                        MainKwSchedulingTask {
-                            dims: 4,
-                            iters: 5_000,
-                        },
-                        sender,
-                    )
-                    .unwrap();
-
-                assert_eq!(receiver.recv().unwrap().unwrap(), 20_009.0);
             });
         }
 
@@ -1097,48 +916,6 @@ mod example {
                 julia.try_task(ThrowingTask, sender).unwrap();
 
                 assert!(receiver.recv().unwrap().is_err());
-            });
-        }
-
-        #[test]
-        fn test_local_kw_task() {
-            JULIA.with(|j| {
-                let julia = j.borrow_mut();
-
-                let (sender, receiver) = crossbeam_channel::bounded(1);
-
-                julia
-                    .try_task(
-                        LocalKwTask {
-                            dims: 4,
-                            iters: 5_000,
-                        },
-                        sender,
-                    )
-                    .unwrap();
-
-                assert_eq!(receiver.recv().unwrap().unwrap(), 20_009.0);
-            });
-        }
-
-        #[test]
-        fn test_main_kw_task() {
-            JULIA.with(|j| {
-                let julia = j.borrow_mut();
-
-                let (sender, receiver) = crossbeam_channel::bounded(1);
-
-                julia
-                    .try_task(
-                        MainKwTask {
-                            dims: 4,
-                            iters: 5_000,
-                        },
-                        sender,
-                    )
-                    .unwrap();
-
-                assert_eq!(receiver.recv().unwrap().unwrap(), 20_009.0);
             });
         }
 
@@ -1265,6 +1042,249 @@ mod example {
                     .unwrap();
 
                 assert_eq!(receiver.recv().unwrap().unwrap(), 30_000_006.0);
+            });
+        }
+
+        #[test]
+        fn test_persistent() {
+            JULIA.with(|j| {
+                let julia = j.borrow_mut();
+
+                let (is, ir) = crossbeam_channel::bounded(1);
+                julia
+                    .try_register_persistent::<AccumulatorTask, _>(is)
+                    .unwrap();
+                ir.recv().unwrap().unwrap();
+
+                let (sender, receiver) = crossbeam_channel::bounded(1);
+
+                let handle = julia
+                    .try_persistent(AccumulatorTask { init_value: 5.0 })
+                    .unwrap();
+
+                handle.try_call(7.0, sender.clone()).unwrap();
+                assert_eq!(receiver.recv().unwrap().unwrap(), 12.0);
+
+                handle.try_call(12.0, sender).unwrap();
+                assert_eq!(receiver.recv().unwrap().unwrap(), 24.0);
+            });
+        }
+
+        #[test]
+        fn test_local_task() {
+            JULIA.with(|j| {
+                let julia = j.borrow_mut();
+                julia.try_error_color(true).unwrap();
+
+                let (sender, receiver) = crossbeam_channel::bounded(1);
+
+                julia
+                    .try_task(
+                        LocalTask {
+                            dims: 4,
+                            iters: 5_000,
+                        },
+                        sender,
+                    )
+                    .unwrap();
+
+                assert_eq!(receiver.recv().unwrap().unwrap(), 20_004.0);
+            });
+        }
+
+        #[test]
+        fn test_scheduling_local_task() {
+            JULIA.with(|j| {
+                let julia = j.borrow_mut();
+                julia.try_error_color(true).unwrap();
+
+                let (sender, receiver) = crossbeam_channel::bounded(1);
+
+                julia
+                    .try_task(
+                        LocalSchedulingTask {
+                            dims: 4,
+                            iters: 5_000,
+                        },
+                        sender,
+                    )
+                    .unwrap();
+
+                assert_eq!(receiver.recv().unwrap().unwrap(), 20_004.0);
+            });
+        }
+
+        #[test]
+        fn test_main_task() {
+            JULIA.with(|j| {
+                let julia = j.borrow_mut();
+                julia.try_error_color(true).unwrap();
+
+                let (sender, receiver) = crossbeam_channel::bounded(1);
+
+                julia
+                    .try_task(
+                        MainTask {
+                            dims: 4,
+                            iters: 5_000,
+                        },
+                        sender,
+                    )
+                    .unwrap();
+
+                assert_eq!(receiver.recv().unwrap().unwrap(), 20_004.0);
+            });
+        }
+
+        #[test]
+        fn test_scheduling_main_task() {
+            JULIA.with(|j| {
+                let julia = j.borrow_mut();
+                julia.try_error_color(true).unwrap();
+
+                let (sender, receiver) = crossbeam_channel::bounded(1);
+
+                julia
+                    .try_task(
+                        MainSchedulingTask {
+                            dims: 4,
+                            iters: 5_000,
+                        },
+                        sender,
+                    )
+                    .unwrap();
+
+                assert_eq!(receiver.recv().unwrap().unwrap(), 20_004.0);
+            });
+        }
+
+        #[test]
+        fn test_scheduling_task() {
+            JULIA.with(|j| {
+                let julia = j.borrow_mut();
+                julia.try_error_color(true).unwrap();
+
+                let (sender, receiver) = crossbeam_channel::bounded(1);
+
+                julia
+                    .try_task(
+                        SchedulingTask {
+                            dims: 4,
+                            iters: 5_000,
+                        },
+                        sender,
+                    )
+                    .unwrap();
+
+                assert_eq!(receiver.recv().unwrap().unwrap(), 20_004.0);
+            });
+        }
+
+        #[test]
+        fn test_scheduling_kw_local_task() {
+            JULIA.with(|j| {
+                let julia = j.borrow_mut();
+                julia.try_error_color(true).unwrap();
+
+                let (sender, receiver) = crossbeam_channel::bounded(1);
+
+                julia
+                    .try_task(
+                        LocalKwSchedulingTask {
+                            dims: 4,
+                            iters: 5_000,
+                        },
+                        sender,
+                    )
+                    .unwrap();
+
+                assert_eq!(receiver.recv().unwrap().unwrap(), 20_009.0);
+            });
+        }
+
+        #[test]
+        fn test_scheduling_kw_task() {
+            JULIA.with(|j| {
+                let julia = j.borrow_mut();
+                julia.try_error_color(true).unwrap();
+
+                let (sender, receiver) = crossbeam_channel::bounded(1);
+
+                julia
+                    .try_task(
+                        KwSchedulingTask {
+                            dims: 4,
+                            iters: 5_000,
+                        },
+                        sender,
+                    )
+                    .unwrap();
+
+                assert_eq!(receiver.recv().unwrap().unwrap(), 20_009.0);
+            });
+        }
+
+        #[test]
+        fn test_scheduling_kw_main_task() {
+            JULIA.with(|j| {
+                let julia = j.borrow_mut();
+                julia.try_error_color(true).unwrap();
+
+                let (sender, receiver) = crossbeam_channel::bounded(1);
+
+                julia
+                    .try_task(
+                        MainKwSchedulingTask {
+                            dims: 4,
+                            iters: 5_000,
+                        },
+                        sender,
+                    )
+                    .unwrap();
+
+                assert_eq!(receiver.recv().unwrap().unwrap(), 20_009.0);
+            });
+        }
+
+        #[test]
+        fn test_local_kw_task() {
+            JULIA.with(|j| {
+                let julia = j.borrow_mut();
+
+                let (sender, receiver) = crossbeam_channel::bounded(1);
+
+                julia
+                    .try_task(
+                        LocalKwTask {
+                            dims: 4,
+                            iters: 5_000,
+                        },
+                        sender,
+                    )
+                    .unwrap();
+
+                assert_eq!(receiver.recv().unwrap().unwrap(), 20_009.0);
+            });
+        }
+
+        #[test]
+        fn test_main_kw_task() {
+            JULIA.with(|j| {
+                let julia = j.borrow_mut();
+
+                let (sender, receiver) = crossbeam_channel::bounded(1);
+
+                julia
+                    .try_task(
+                        MainKwTask {
+                            dims: 4,
+                            iters: 5_000,
+                        },
+                        sender,
+                    )
+                    .unwrap();
+
+                assert_eq!(receiver.recv().unwrap().unwrap(), 20_009.0);
             });
         }
     }

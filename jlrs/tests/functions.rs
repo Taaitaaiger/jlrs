@@ -9,7 +9,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(3, |_global, frame| unsafe {
+            jlrs.scope_with_capacity(3, |_global, frame| unsafe {
                 let func = Value::eval_string(
                     &mut *frame,
                     "function x(a)::Nothing
@@ -31,7 +31,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(3, |_global, frame| unsafe {
+            jlrs.scope_with_capacity(3, |_global, frame| unsafe {
                 let func = Value::eval_string(
                     &mut *frame,
                     "function y()::Nothing
@@ -52,7 +52,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |global, frame| unsafe {
+            jlrs.scope_with_capacity(1, |global, frame| unsafe {
                 let func = Module::base(global)
                     .function_ref("vect")?
                     .wrapper_unchecked();
@@ -68,9 +68,10 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |global, frame| {
+            jlrs.scope_with_capacity(1, |global, frame| {
+                let (output, frame) = frame.split()?;
                 frame
-                    .result_scope_with_slots(24, |output, frame| unsafe {
+                    .scope_with_capacity(24, |frame| unsafe {
                         let func = Module::base(global)
                             .function_ref("vect")?
                             .wrapper_unchecked();
@@ -107,8 +108,9 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.scope(|global, frame| {
+                let (output, frame) = frame.split()?;
                 frame
-                    .result_scope_with_slots(24, |output, frame| unsafe {
+                    .scope_with_capacity(24, |frame| unsafe {
                         let func = Module::base(global)
                             .function_ref("vect")?
                             .wrapper_unchecked();
@@ -127,7 +129,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.scope_with_slots(2, |global, frame| unsafe {
+            let out = jlrs.scope_with_capacity(2, |global, frame| unsafe {
                 let func = Module::base(global)
                     .function_ref("cos")?
                     .wrapper_unchecked();
@@ -145,9 +147,10 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(2, |global, frame| unsafe {
+            jlrs.scope_with_capacity(2, |global, frame| unsafe {
+                let (output, frame) = frame.split()?;
                 let out = frame
-                    .result_scope_with_slots(24, |output, frame| {
+                    .scope_with_capacity(24, |frame| {
                         let func = Module::base(global)
                             .function_ref("cos")?
                             .wrapper_unchecked();
@@ -170,8 +173,9 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.scope(|global, frame| {
+                let (output, frame) = frame.split()?;
                 let out = frame
-                    .result_scope_with_slots(24, |output, frame| unsafe {
+                    .scope_with_capacity(24, |frame| unsafe {
                         let func = Module::base(global)
                             .function_ref("cos")?
                             .wrapper_unchecked();
@@ -194,8 +198,9 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.scope(|global, frame| {
+                let (output, frame) = frame.split()?;
                 let out = frame
-                    .result_scope_with_slots(24, |output, frame| unsafe {
+                    .scope_with_capacity(24, |frame| unsafe {
                         let func = Module::base(global)
                             .function_ref("cos")?
                             .wrapper_unchecked();
@@ -217,7 +222,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.scope_with_slots(3, |global, frame| unsafe {
+            let out = jlrs.scope_with_capacity(3, |global, frame| unsafe {
                 let func = Module::base(global).function_ref("+")?.wrapper_unchecked();
                 let arg0 = Value::new(&mut *frame, 1u32)?;
                 let arg1 = Value::new(&mut *frame, 2u32)?;
@@ -234,9 +239,10 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.scope_with_slots(3, |global, frame| {
+            let out = jlrs.scope_with_capacity(3, |global, frame| {
+                let (output, frame) = frame.split()?;
                 frame
-                    .result_scope_with_slots(24, |output, frame| unsafe {
+                    .scope_with_capacity(24, |frame| unsafe {
                         let func = Module::base(global).function_ref("+")?.wrapper_unchecked();
                         let arg0 = Value::new(&mut *frame, 1u32)?;
                         let arg1 = Value::new(&mut *frame, 2u32)?;
@@ -274,8 +280,9 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let out = jlrs.scope(|global, frame| {
+                let (output, frame) = frame.split()?;
                 frame
-                    .result_scope_with_slots(24, |output, frame| unsafe {
+                    .scope_with_capacity(24, |frame| unsafe {
                         let func = Module::base(global).function_ref("+")?.wrapper_unchecked();
                         let arg0 = Value::new(&mut *frame, 1u32)?;
                         let arg1 = Value::new(&mut *frame, 2u32)?;
@@ -295,7 +302,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.scope_with_slots(4, |global, frame| unsafe {
+            let out = jlrs.scope_with_capacity(4, |global, frame| unsafe {
                 let func = Module::base(global).function_ref("+")?.wrapper_unchecked();
                 let arg0 = Value::new(&mut *frame, 1u32)?;
                 let arg1 = Value::new(&mut *frame, 2u32)?;
@@ -313,9 +320,10 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.scope_with_slots(4, |global, frame| {
+            let out = jlrs.scope_with_capacity(4, |global, frame| {
+                let (output, frame) = frame.split()?;
                 frame
-                    .result_scope_with_slots(24, |output, frame| unsafe {
+                    .scope_with_capacity(24, |frame| unsafe {
                         let func = Module::base(global).function_ref("+")?.wrapper_unchecked();
                         let arg0 = Value::new(&mut *frame, 1u32)?;
                         let arg1 = Value::new(&mut *frame, 2u32)?;
@@ -355,8 +363,9 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let out = jlrs.scope(|global, frame| {
+                let (output, frame) = frame.split()?;
                 frame
-                    .result_scope_with_slots(24, |output, frame| unsafe {
+                    .scope_with_capacity(24, |frame| unsafe {
                         let func = Module::base(global).function_ref("+")?.wrapper_unchecked();
                         let arg0 = Value::new(&mut *frame, 1u32)?;
                         let arg1 = Value::new(&mut *frame, 2u32)?;
@@ -377,7 +386,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.scope_with_slots(5, |global, frame| unsafe {
+            let out = jlrs.scope_with_capacity(5, |global, frame| unsafe {
                 let func = Module::base(global).function_ref("+")?.wrapper_unchecked();
                 let arg0 = Value::new(&mut *frame, 1u32)?;
                 let arg1 = Value::new(&mut *frame, 2u32)?;
@@ -398,9 +407,10 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.scope_with_slots(5, |global, frame| {
+            let out = jlrs.scope_with_capacity(5, |global, frame| {
+                let (output, frame) = frame.split()?;
                 frame
-                    .result_scope_with_slots(24, |output, frame| unsafe {
+                    .scope_with_capacity(24, |frame| unsafe {
                         let func = Module::base(global).function_ref("+")?.wrapper_unchecked();
                         let arg0 = Value::new(&mut *frame, 1u32)?;
                         let arg1 = Value::new(&mut *frame, 2u32)?;
@@ -423,8 +433,9 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let out = jlrs.scope(|global, frame| {
+                let (output, frame) = frame.split()?;
                 frame
-                    .result_scope_with_slots(24, |output, frame| unsafe {
+                    .scope_with_capacity(24, |frame| unsafe {
                         let func = Module::base(global).function_ref("+")?.wrapper_unchecked();
                         let arg0 = Value::new(&mut *frame, 1u32)?;
                         let arg1 = Value::new(&mut *frame, 2u32)?;
@@ -447,8 +458,9 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let out = jlrs.scope(|global, frame| {
+                let (output, frame) = frame.split()?;
                 frame
-                    .result_scope_with_slots(24, |output, frame| unsafe {
+                    .scope_with_capacity(24, |frame| unsafe {
                         let func = Module::base(global).function_ref("+")?.wrapper_unchecked();
                         let arg0 = Value::new(&mut *frame, 1u32)?;
                         let arg1 = Value::new(&mut *frame, 2u32)?;

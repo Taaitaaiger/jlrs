@@ -149,6 +149,7 @@ pub fn exception<T>(exc: String) -> JlrsResult<T> {
 }
 
 impl JlrsError {
+    /// An aritrary error.
     pub fn other<E: Error + 'static + Send + Sync>(reason: E) -> Self {
         JlrsError::Other(Box::new(reason))
     }

@@ -40,7 +40,6 @@ use std::ffi::c_void;
 /// method `typecheck` must only return `true` if it's guaranteed that `Unbox::unbox` can safely
 /// be called for values whose type is that method's argument.
 ///
-///
 /// [`Value::is`]: crate::wrappers::ptr::value::Value::is
 /// [`DataType::cast`]: crate::wrappers::ptr::datatype::DataType::cast
 /// [`Unbox`]: crate::convert::unbox::Unbox

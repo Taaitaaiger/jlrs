@@ -14,32 +14,31 @@ use ::std::os::raw::c_char;
 mod bindings_1_6_x86_64_unknown_linux_gnu;
 #[cfg(all(not(feature = "use-bindgen"), feature = "lts", target_os = "linux"))]
 pub use bindings_1_6_x86_64_unknown_linux_gnu::*;
-
 #[cfg(all(
     not(feature = "use-bindgen"),
     not(feature = "lts"),
     target_os = "linux"
 ))]
-mod bindings_1_7_x86_64_unknown_linux_gnu;
+mod bindings_1_8_x86_64_unknown_linux_gnu;
 #[cfg(all(
     not(feature = "use-bindgen"),
     not(feature = "lts"),
     target_os = "linux"
 ))]
-pub use bindings_1_7_x86_64_unknown_linux_gnu::*;
+pub use bindings_1_8_x86_64_unknown_linux_gnu::*;
 
 #[cfg(all(
     not(feature = "use-bindgen"),
     not(feature = "lts"),
     target_os = "windows"
 ))]
-mod bindings_1_7_x86_64_pc_windows_gnu;
+mod bindings_1_8_x86_64_pc_windows_gnu;
 #[cfg(all(
     not(feature = "use-bindgen"),
     not(feature = "lts"),
     target_os = "windows"
 ))]
-pub use bindings_1_7_x86_64_pc_windows_gnu::*;
+pub use bindings_1_8_x86_64_pc_windows_gnu::*;
 #[cfg(all(not(feature = "use-bindgen"), feature = "lts", target_os = "windows"))]
 mod bindings_1_6_x86_64_pc_windows_gnu;
 #[cfg(all(not(feature = "use-bindgen"), feature = "lts", target_os = "windows"))]

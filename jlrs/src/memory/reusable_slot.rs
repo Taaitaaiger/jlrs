@@ -1,29 +1,37 @@
-//! A reusable slot in a GC frame.
+//! A reusable slot in a frame.
+
 use super::frame::Frame;
 use crate::{
     error::JlrsResult,
     private::Private,
     wrappers::ptr::{private::Wrapper, value::Value, ValueRef},
 };
-use std::{ffi::c_void, marker::PhantomData};
+use std::{cell::Cell, ffi::c_void, marker::PhantomData};
 
-/// A reusable slot in a GC frame. Unlike an `Output`, a `ReusableSlot` can be used multiple
-/// times. It's the user's responsibility to ensure a value that is rooted using a `ReusableSlot`
-/// is not used after the slot has been reused.
+/// A reusable slot in a frame. Unlike an `Output`, a `ReusableSlot` can be used multiple times.
+/// It's your responsibility to ensure a value that is rooted using a `ReusableSlot` is never
+/// used after the slot has been reset.
 #[derive(Clone, Copy)]
-pub struct ReusableSlot<'scope>(*mut *mut c_void, PhantomData<&'scope ()>);
+pub struct ReusableSlot<'target> {
+    slot: *const Cell<*mut c_void>,
+    _marker: PhantomData<fn(&'target mut ()) -> ()>,
+}
 
-impl<'scope> ReusableSlot<'scope> {
-    pub(crate) fn new<F: Frame<'scope>>(frame: &mut F) -> JlrsResult<Self> {
-        let slot = frame.reserve_slot(Private)?;
-        Ok(ReusableSlot(slot, PhantomData))
+impl<'target> ReusableSlot<'target> {
+    pub(crate) fn new<F: Frame<'target>>(frame: &mut F) -> JlrsResult<Self> {
+        let slot = unsafe { frame.reserve_slot(Private)? };
+        Ok(ReusableSlot {
+            slot,
+            _marker: PhantomData,
+        })
     }
 
-    /// Root the given value in this slot.
-    pub fn reset<'data: 'scope>(self, new: Value<'_, 'data>) -> ValueRef<'scope, 'data> {
+    /// Root the given value in this slot, any data currently rooted in this slot is potentially
+    /// unreachable after calling this method.
+    pub fn reset<'data>(self, new: Value<'_, 'data>) -> ValueRef<'target, 'data> {
         unsafe {
             let ptr = new.unwrap_non_null(Private).as_ptr();
-            self.0.write(ptr.cast());
+            (&*self.slot).set(ptr.cast());
             ValueRef::wrap(ptr)
         }
     }

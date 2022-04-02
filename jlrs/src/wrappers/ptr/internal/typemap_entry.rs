@@ -6,7 +6,7 @@
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#505
 
 use super::super::private::Wrapper;
-use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout};
+use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout, memory::output::Output};
 use crate::{private::Private, wrappers::ptr::ValueRef};
 use jl_sys::{jl_typemap_entry_t, jl_typemap_entry_type};
 use std::{marker::PhantomData, ptr::NonNull};
@@ -98,6 +98,15 @@ impl<'scope> TypeMapEntry<'scope> {
     pub fn is_vararg(self) -> bool {
         unsafe { self.unwrap_non_null(Private).as_ref().va != 0 }
     }
+
+    /// Use the `Output` to extend the lifetime of this data.
+    pub fn root<'target>(self, output: Output<'target>) -> TypeMapEntry<'target> {
+        unsafe {
+            let ptr = self.unwrap_non_null(Private);
+            output.set_root::<TypeMapEntry>(ptr);
+            TypeMapEntry::wrap_non_null(ptr, Private)
+        }
+    }
 }
 
 impl_julia_typecheck!(TypeMapEntry<'scope>, jl_typemap_entry_type, 'scope);
@@ -118,3 +127,5 @@ impl<'scope> Wrapper<'scope, '_> for TypeMapEntry<'scope> {
         self.0
     }
 }
+
+impl_root!(TypeMapEntry, 1);

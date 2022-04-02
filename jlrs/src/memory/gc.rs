@@ -1,4 +1,4 @@
-//! Control the garbage collector.
+//! Manage the garbage collector.
 
 use super::frame::Frame;
 #[cfg(feature = "sync-rt")]

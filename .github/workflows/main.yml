@@ -27,7 +27,7 @@ jobs:
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v1
         with:
-          version: '1.7'
+          version: '~1.8.0-0'
 
       - name: rust-toolchain
         uses: actions-rs/toolchain@v1
@@ -64,7 +64,7 @@ jobs:
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v1
         with:
-          version: '1.7'
+          version: '~1.8.0-0'
 
       - name: rust-toolchain
         uses: actions-rs/toolchain@v1
@@ -160,7 +160,7 @@ jobs:
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v1
         with:
-          version: '1.7'
+          version: '~1.8.0-0'
 
       - name: rust-toolchain
         uses: actions-rs/toolchain@v1
@@ -174,4 +174,4 @@ jobs:
           echo "JULIA_DIR=${JULIA_DIR}" >> $GITHUB_ENV
 
       - name: Build Docs
-        run: cargo doc --features docs-rs
+        run: cargo doc --features docs

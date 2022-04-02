@@ -8,10 +8,9 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |global, frame| {
+            jlrs.scope_with_capacity(1, |global, frame| {
                 let arr = Array::new_for(&mut *frame, 4, DataType::module_type(global).as_value())?
-                    .into_jlrs_result()?
-                    .cast::<Array>()?;
+                    .into_jlrs_result()?;
 
                 {
                     let data = arr.value_data(frame)?;
@@ -54,10 +53,9 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |global, frame| {
+            jlrs.scope_with_capacity(1, |global, frame| {
                 let arr = Array::new_for(&mut *frame, 4, DataType::module_type(global).as_value())?
-                    .into_jlrs_result()?
-                    .cast::<Array>()?;
+                    .into_jlrs_result()?;
 
                 let module = Module::core(global).as_value();
 
@@ -129,10 +127,9 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |global, frame| unsafe {
+            jlrs.scope_with_capacity(1, |global, frame| unsafe {
                 let arr = Array::new_for(&mut *frame, 4, DataType::module_type(global).as_value())?
-                    .into_jlrs_result()?
-                    .cast::<Array>()?;
+                    .into_jlrs_result()?;
 
                 let module = Value::nothing(global);
 
@@ -167,10 +164,9 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |global, frame| unsafe {
+            jlrs.scope_with_capacity(1, |global, frame| unsafe {
                 let arr = Array::new_for(&mut *frame, 4, DataType::module_type(global).as_value())?
-                    .into_jlrs_result()?
-                    .cast::<Array>()?;
+                    .into_jlrs_result()?;
 
                 {
                     let data = arr.value_data_mut(frame)?;
