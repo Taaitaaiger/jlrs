@@ -24,6 +24,9 @@
 //! ```
 //! # use jlrs::prelude::*;
 //! # use jlrs::util::JULIA;
+//! # #[cfg(feature = "lts")]
+//! # fn main() {}
+//! # #[cfg(not(feature = "lts"))]
 //! # fn main() {
 //! # JULIA.with(|j| {
 //! # let mut julia = j.borrow_mut();
