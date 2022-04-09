@@ -26,7 +26,7 @@
 //!
 //! # Prerequisites
 //!
-//! Julia must be installed before jlrs can be used. Only version 1.6 and 1.8 are supported,
+//! Julia must be installed before jlrs can be used. Only version 1.6 and 1.8 are supported.
 //!
 //! #### Linux
 //!
@@ -107,7 +107,7 @@
 //! In addition to these runtimes, the following utility features are available:
 //!
 //! - `lts`
-//!   Use the current LTS version of Julia (1.6) instead of the current stable version (1.7).
+//!   Use the current LTS version of Julia (1.6) instead of the current stable version (1.8).
 //!
 //! - `async`
 //!   Enable the features of the async runtime which don't depend on the backing runtime. This
