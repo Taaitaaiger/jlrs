@@ -24,15 +24,15 @@ pub struct TypeMapLevel<'scope>(NonNull<jl_typemap_level_t>, PhantomData<&'scope
 
 impl<'scope> TypeMapLevel<'scope> {
     /*
-    for (a,b) in zip(fieldnames(Core.TypeMapEntry), fieldtypes(Core.TypeMapEntry))
+    for (a,b) in zip(fieldnames(Core.TypeMapLevel), fieldtypes(Core.TypeMapLevel))
          println(a,": ", b)
     end
-    arg1: Any
-    targ: Any
-    name1: Any
-    tname: Any
-    list: Any
-    any: Any
+    arg1: Any _Atomic
+    targ: Any _Atomic
+    name1: Any _Atomic
+    tname: Any _Atomic
+    list: Any _Atomic
+    any: Any _Atomic
     */
 
     /// The `arg1` field.

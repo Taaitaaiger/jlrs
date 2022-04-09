@@ -25,13 +25,13 @@ pub struct OpaqueClosure<'scope>(NonNull<jl_opaque_closure_t>, PhantomData<&'sco
 
 impl<'scope> OpaqueClosure<'scope> {
     /*
-    oq = Base.Experiment.@opaque (x) -> 2x
+    using Base.Experimental
+    oq = Base.Experimental.@opaque (x) -> 2x
     ty = typeof(oq)
     for (a, b) in zip(fieldnames(ty), fieldtypes(ty))
         println(a, ": ", b)
     end
     captures: Any
-    isva: Bool
     world: Int64
     source: Any
     invoke: Ptr{Nothing}

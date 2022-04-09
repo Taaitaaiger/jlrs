@@ -32,9 +32,10 @@ pub struct CCall {
 }
 
 impl CCall {
-    /// Create a new `CCall`. This function must never be called outside a function called through
-    /// `ccall` from Julia and must only be called once during that call. The stack is not
-    /// allocated until a [`GcFrame`] is created.
+    /// Create a new `CCall`. The stack is not allocated until a [`GcFrame`] is created.
+    ///
+    /// Safety: This function must never be called outside a function called through `ccall` from
+    /// Julia and must only be called once during that call.
     pub unsafe fn new() -> Self {
         CCall { page: None }
     }
@@ -45,6 +46,8 @@ impl CCall {
     /// there's an example available in the repository: ccall_with_threads.
     ///
     /// This method is only available if the `uv` feature is enabled.
+    ///
+    /// Safety: the handle must be acquired from an `AsyncCondition`.
     #[cfg(feature = "uv")]
     pub unsafe fn uv_async_send(handle: *mut std::ffi::c_void) -> bool {
         uv_async_send(handle.cast()) == 0

@@ -5,7 +5,10 @@
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L273
 
-use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout, memory::output::Output};
+use crate::{
+    impl_debug, impl_julia_typecheck, impl_valid_layout, memory::output::Output,
+    wrappers::ptr::TypedArrayRef,
+};
 use crate::{
     private::Private,
     wrappers::ptr::{
@@ -39,21 +42,28 @@ impl<'scope> Method<'scope> {
     primary_world: UInt64
     deleted_world: UInt64
     sig: Type
-    specializations: Core.SimpleVector
-    speckeyset: Array
+    specializations: Core.SimpleVector _Atomic
+    speckeyset: Array _Atomic
     slot_syms: String
+    external_mt: Any
     source: Any
-    unspecialized: Core.MethodInstance
+    unspecialized: Core.MethodInstance _Atomic
     generator: Any
     roots: Vector{Any}
+    root_blocks: Vector{UInt64}
+    nroots_sysimg: Int32
     ccallable: Core.SimpleVector
-    invokes: Any
+    invokes: Any _Atomic
+    recursion_relation: Any
     nargs: Int32
     called: Int32
     nospecialize: Int32
     nkw: Int32
     isva: Bool
     pure: Bool
+    is_for_opaque_closure: Bool
+    constprop: UInt8
+    purity: UInt8
     */
 
     /// Method name for error reporting
@@ -129,6 +139,12 @@ impl<'scope> Method<'scope> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().slot_syms) }
     }
 
+    /// reference to the method table this method is part of, null if part of the internal table
+    #[cfg(not(feature = "lts"))]
+    pub fn external_mt(self) -> ValueRef<'scope, 'static> {
+        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().external_mt) }
+    }
+
     // Original code template (`Core.CodeInfo`, but may be compressed), `None` for builtins.
     pub fn source(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().source) }
@@ -158,6 +174,18 @@ impl<'scope> Method<'scope> {
     /// Pointers in generated code (shared to reduce memory), or `None`
     pub fn roots(self) -> ArrayRef<'scope, 'static> {
         unsafe { ArrayRef::wrap(self.unwrap_non_null(Private).as_ref().roots) }
+    }
+
+    /// RLE (build_id, offset) pairs (even/odd indexing)
+    #[cfg(not(feature = "lts"))]
+    pub fn root_blocks(self) -> TypedArrayRef<'scope, 'static, u64> {
+        unsafe { TypedArrayRef::wrap(self.unwrap_non_null(Private).as_ref().root_blocks) }
+    }
+
+    /// # of roots stored in the system image
+    #[cfg(not(feature = "lts"))]
+    pub fn nroots_sysimg(self) -> i32 {
+        unsafe { self.unwrap_non_null(Private).as_ref().nroots_sysimg }
     }
 
     /// `SimpleVector(rettype, sig)` if a ccallable entry point is requested for this
@@ -214,6 +242,25 @@ impl<'scope> Method<'scope> {
     /// The `pure` field.
     pub fn pure(self) -> bool {
         unsafe { self.unwrap_non_null(Private).as_ref().pure_ != 0 }
+    }
+
+    /// The `is_for_opaque_closure` field of this `Method`
+    #[cfg(not(feature = "lts"))]
+    pub fn is_for_opaque_closure(self) -> bool {
+        unsafe { self.unwrap_non_null(Private).as_ref().is_for_opaque_closure != 0 }
+    }
+
+    /// 0x00 = use heuristic; 0x01 = aggressive; 0x02 = none
+    #[cfg(not(feature = "lts"))]
+    pub fn constprop(self) -> u8 {
+        unsafe { self.unwrap_non_null(Private).as_ref().constprop }
+    }
+
+    /// Override the conclusions of inter-procedural effect analysis,
+    /// forcing the conclusion to always true.
+    #[cfg(not(feature = "lts"))]
+    pub fn purity(self) -> u8 {
+        unsafe { self.unwrap_non_null(Private).as_ref().purity.bits }
     }
 
     /// Use the `Output` to extend the lifetime of this data.

@@ -2,7 +2,7 @@
 //!
 //! In Julia, each module introduces a separate global scope. There are three important "root"
 //! modules, `Main`, `Base` and `Core`. Any Julia code that you include in jlrs is made available
-//! relative to the `Main` module, just like in Julia itself.
+//! relative to the `Main` module.
 
 use crate::{
     convert::to_symbol::ToSymbol,
@@ -178,6 +178,9 @@ impl<'scope> Module<'scope> {
     /// Set a global value in this module. Note that if this global already exists, this can
     /// make the old value unreachable. If an excection is thrown, it's caught, rooted and
     /// returned.
+    ///
+    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
+    /// this value is allowed.
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub unsafe fn set_global<'frame, N, S>(
         self,
@@ -208,6 +211,9 @@ impl<'scope> Module<'scope> {
     /// Set a global value in this module. Note that if this global already exists, this can
     /// make the old value unreachable. If an exception is thrown it's caught but not rooted and
     /// returned.
+    ///
+    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
+    /// this value is allowed.
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub unsafe fn set_global_unrooted<N>(
         self,
@@ -234,7 +240,10 @@ impl<'scope> Module<'scope> {
     }
 
     /// Set a global value in this module. Note that if this global already exists, this can
-    /// make the old value unreachable. If an exception is thrown the process aborts.
+    /// make the old value unreachable.
+    ///
+    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
+    /// this value is allowed.
     pub unsafe fn set_global_unchecked<N>(
         self,
         name: N,
@@ -317,6 +326,8 @@ impl<'scope> Module<'scope> {
 
     /// Set a constant in this module. If the constant already exists the process aborts,
     /// otherwise an unrooted reference to the constant is returned.
+    ///
+    /// Safety: This method must not throw an error if called from a `ccall`ed function.
     pub unsafe fn set_const_unchecked<N>(
         self,
         name: N,
@@ -460,6 +471,9 @@ impl<'scope> Module<'scope> {
     ///
     /// Note that when you want to call `using Submodule` in the `Main` module, you can do so by
     /// evaluating the using-statement with [`Value::eval_string`].
+    ///
+    /// Safety: This method can execute arbitrary Julia code depending on the module that is
+    /// loaded.
     pub unsafe fn require<'target, S, N>(
         self,
         scope: S,
@@ -488,6 +502,9 @@ impl<'scope> Module<'scope> {
     ///
     /// Note that when you want to call `using Submodule` in the `Main` module, you can do so by
     /// evaluating the using-statement with [`Value::eval_string`].
+    ///
+    /// Safety: This method can execute arbitrary Julia code depending on the module that is
+    /// loaded.
     pub unsafe fn require_unrooted<S>(self, global: Global<'scope>, module: S) -> ModuleRef<'scope>
     where
         S: ToSymbol,

@@ -13,6 +13,9 @@ use crate::{
 use jl_sys::{jl_task_t, jl_task_type};
 use std::{marker::PhantomData, ptr::NonNull};
 
+#[cfg(not(feature = "lts"))]
+use std::sync::atomic::{AtomicU8, Ordering};
+
 /// A Julia `Task` (coroutine).
 #[derive(Copy, Clone)]
 #[repr(transparent)]
@@ -30,9 +33,13 @@ impl<'scope> Task<'scope> {
     result: Any
     logstate: Any
     code: Any
-    _state: UInt8
+    rngState0: UInt64
+    rngState1: UInt64
+    rngState2: UInt64
+    rngState3: UInt64
+    _state: UInt8 _Atomic
     sticky: Bool
-    _isexception: Bool
+    _isexception: Bool _Atomic
     */
 
     /// Invasive linked list for scheduler
@@ -70,9 +77,21 @@ impl<'scope> Task<'scope> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().start) }
     }
 
-    /// The `state` field.
+    /// The `_state` field.
+    #[cfg(feature = "lts")]
     pub fn state(self) -> u8 {
         unsafe { self.unwrap_non_null(Private).as_ref()._state }
+    }
+
+    /// The `_state` field.
+    #[cfg(not(feature = "lts"))]
+    pub fn state(self) -> u8 {
+        unsafe {
+            let ptr =
+                &self.unwrap_non_null(Private).as_ref()._state as *const u8 as *const AtomicU8;
+            let field_ref = &*ptr;
+            field_ref.load(Ordering::SeqCst)
+        }
     }
 
     /// Record whether this Task can be migrated to a new thread
@@ -81,8 +100,20 @@ impl<'scope> Task<'scope> {
     }
 
     /// set if `result` is an exception to throw or that we exited with
+    #[cfg(feature = "lts")]
     pub fn is_exception(self) -> bool {
         unsafe { self.unwrap_non_null(Private).as_ref()._isexception != 0 }
+    }
+
+    /// set if `result` is an exception to throw or that we exited with
+    #[cfg(not(feature = "lts"))]
+    pub fn is_exception(self) -> bool {
+        unsafe {
+            let ptr = &self.unwrap_non_null(Private).as_ref()._isexception as *const u8
+                as *const AtomicU8;
+            let field_ref = &*ptr;
+            field_ref.load(Ordering::SeqCst) != 0
+        }
     }
 
     /// Use the `Output` to extend the lifetime of this data.

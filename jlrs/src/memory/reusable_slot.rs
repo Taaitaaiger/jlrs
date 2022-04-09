@@ -2,7 +2,6 @@
 
 use super::frame::Frame;
 use crate::{
-    error::JlrsResult,
     private::Private,
     wrappers::ptr::{private::Wrapper, value::Value, ValueRef},
 };
@@ -14,16 +13,15 @@ use std::{cell::Cell, ffi::c_void, marker::PhantomData};
 #[derive(Clone, Copy)]
 pub struct ReusableSlot<'target> {
     slot: *const Cell<*mut c_void>,
-    _marker: PhantomData<fn(&'target mut ()) -> ()>,
+    _marker: PhantomData<fn(&'target mut ())>,
 }
 
 impl<'target> ReusableSlot<'target> {
-    pub(crate) fn new<F: Frame<'target>>(frame: &mut F) -> JlrsResult<Self> {
-        let slot = unsafe { frame.reserve_slot(Private)? };
-        Ok(ReusableSlot {
+    pub(crate) fn new<F: Frame<'target>>(_frame: &F, slot: *const Cell<*mut c_void>) -> Self {
+        ReusableSlot {
             slot,
             _marker: PhantomData,
-        })
+        }
     }
 
     /// Root the given value in this slot, any data currently rooted in this slot is potentially

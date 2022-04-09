@@ -47,8 +47,9 @@ impl<'scope, T: Wrapper<'scope, 'static>> SimpleVector<'scope, T> {
     }
 
     /// Create a new `SimpleVector` that can hold `n` values without initializing its contents.
-    /// The contents must be set before calling Julia again, the contents must never be accessed
-    /// before all elements are set.
+    ///
+    /// Safety: The contents must be set before calling Julia again, the contents must never be
+    /// accessed before all elements are set.
     pub unsafe fn with_capacity_uninit<F>(frame: &mut F, n: usize) -> JlrsResult<Self>
     where
         F: Frame<'scope>,
@@ -81,6 +82,9 @@ impl<'scope, T: Wrapper<'scope, 'static>> SimpleVector<'scope, T> {
 
     /// Set the element at `index` to `value`. This is only safe if the `SimpleVector` has just
     /// been allocated.
+    ///
+    /// Safety: you may only mutate a `SimpleVector` after creating it, they should generally be
+    /// considered immutable.
     pub unsafe fn set(self, index: usize, value: Option<T>) -> JlrsResult<Ref<'scope, 'static, T>> {
         if index >= self.len() {
             Err(JlrsError::OutOfBoundsSVec {

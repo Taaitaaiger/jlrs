@@ -7,9 +7,9 @@ use super::{
     ValueRef, Wrapper,
 };
 use crate::error::JlrsError;
+use crate::error::CANNOT_DISPLAY_TYPE;
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
 use crate::error::{JuliaResult, JuliaResultRef};
-use crate::error::CANNOT_DISPLAY_TYPE;
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
 use crate::layout::typecheck::Concrete;
 use crate::memory::scope::PartialScope;
@@ -161,18 +161,10 @@ impl<'scope> DataType<'scope> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().instance) }
     }
 
-    // TODO
-    pub fn layout(self) -> Option<NonNull<c_void>> {
-        unsafe {
-            let ly = self.unwrap_non_null(Private).as_ref().layout;
-            if ly.is_null() {
-                None
-            } else {
-                Some(NonNull::new_unchecked(
-                    ly as *mut jl_datatype_layout_t as *mut c_void,
-                ))
-            }
-        }
+    // TODO: Allow using this information
+    /// Returns a pointe to the layout of this `DataType`.
+    pub fn layout(self) -> *const c_void {
+        unsafe { self.unwrap_non_null(Private).as_ref().layout as _ }
     }
 
     /// Returns the size of a value of this type in bytes.
@@ -324,9 +316,9 @@ impl<'scope> DataType<'scope> {
     pub fn align(self) -> u16 {
         unsafe {
             self.layout()
-                .unwrap()
                 .cast::<jl_datatype_layout_t>()
                 .as_ref()
+                .unwrap()
                 .alignment
         }
     }
@@ -339,8 +331,11 @@ impl<'scope> DataType<'scope> {
     /// Returns the number of fields of a value of this type.
     pub fn n_fields(self) -> u32 {
         unsafe {
-            let layout = self.layout().unwrap();
-            layout.cast::<jl_datatype_layout_t>().as_ref().nfields
+            self.layout()
+                .cast::<jl_datatype_layout_t>()
+                .as_ref()
+                .unwrap()
+                .nfields
         }
     }
 
@@ -418,16 +413,25 @@ impl<'scope> DataType<'scope> {
     }
 
     /// Returns the size of the field at position `idx` in this type.
+    ///
+    /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
+    /// function.
     pub unsafe fn field_size_unchecked(self, idx: usize) -> u32 {
         jl_field_size(self.unwrap(Private), idx as _)
     }
 
     /// Returns the offset where the field at position `idx` is stored.
+    ///
+    /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
+    /// function.
     pub unsafe fn field_offset_unchecked(self, idx: usize) -> u32 {
         jl_field_offset(self.unwrap(Private), idx as _)
     }
 
     /// Returns true if the field at position `idx` is stored as a pointer.
+    ///
+    /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
+    /// function.
     pub unsafe fn is_pointer_field_unchecked(self, idx: usize) -> bool {
         jl_field_isptr(self.unwrap(Private), idx as _)
     }
@@ -569,7 +573,10 @@ impl<'scope> DataType<'scope> {
     /// allocated as a `Value`.
     ///
     /// This method performs no checks whether or not the value can be constructed with these
-    /// values. If Julia throws an exception the process aborts.
+    /// values.
+    ///
+    /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
+    /// function.
     pub unsafe fn instantiate_unchecked<'target, 'value, 'data, V, S>(
         self,
         scope: S,
@@ -594,7 +601,10 @@ impl<'scope> DataType<'scope> {
     /// allocated as a `Value`.
     ///
     /// This method performs no checks whether or not the value can be constructed with these
-    /// values. If Julia throws an exception the process aborts.
+    /// values.
+    ///
+    /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
+    /// function.
     pub unsafe fn instantiate_unrooted_unchecked<'global, 'value, 'borrow, V>(
         self,
         _: Global<'global>,

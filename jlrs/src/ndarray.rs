@@ -30,6 +30,9 @@ pub trait NdArray<'borrow, T>: private::NdArray {
 
     /// Mutably borrow the data in the array as an `ArrayViewMut`. Returns an error if the wrong
     /// type is provided or the data is not stored inline.
+    ///
+    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
+    /// this value is allowed.
     unsafe fn array_view_mut<'frame, F>(
         self,
         frame: &'borrow mut F,

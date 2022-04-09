@@ -3,7 +3,7 @@
 //! While the Julia C API can only be used from a single thread, it is possible to schedule
 //! multiple Julia `Task`s to run in parallel. This doesn't work nicely with the sync runtime
 //! because this runtime is not aware of any potential tasks running in the background. Two
-//! async runtimes are available, one backed by tokio and the other on async-std. 
+//! async runtimes are available, one backed by tokio and the other on async-std.
 //!
 //! In order to use an async runtime, either the `async-std-rt` or `tokio-rt` feature must be
 //! enabled. If the first is enabled async-std is used, while the latter makes use of tokio. Julia

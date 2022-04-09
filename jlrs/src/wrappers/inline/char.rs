@@ -1,4 +1,4 @@
-//! Wrapper for `Core.Char`.
+//! Wrapper for `Char`.
 //!
 //! In Rust it's unsafe to create an invalid `char`, while a `Char` in Julia can be an arbitrary
 //! `u32` in some rare cases. Rather than treating all `Char`s as `u32` or `char`s, jlrs provides

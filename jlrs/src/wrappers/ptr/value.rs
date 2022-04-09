@@ -139,7 +139,6 @@ use jl_sys::{
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
 use jl_sys::{jlrs_apply_type, jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_set_nth_field};
 
-// // #[cfg(not(all(target_os = "windows", feature = "lts")))]
 use crate::error::JuliaResult;
 
 use std::{
@@ -315,7 +314,10 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// the value is a `UnionAll`, the given types will be applied and the resulting type is
     /// returned.
     ///
-    /// If the types can't be applied to `self` the program will abort.
+    /// If an exception is thrown it isn't caught
+    ///
+    /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
+    /// function.
     ///
     /// [`Union::new`]: crate::wrappers::ptr::union::Union::new
     pub unsafe fn apply_type_unchecked<'target, S, V>(
@@ -484,9 +486,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
 
     /// Cast the value to a pointer wrapper type `T` without checking if this conversion is valid.
     ///
-    /// Safety:
-    ///
-    /// You must guarantee `self.is::<T>()` would have returned `true`.
+    /// Safety: You must guarantee `self.is::<T>()` would have returned `true`.
     pub unsafe fn cast_unchecked<T: Wrapper<'scope, 'data>>(self) -> T {
         T::cast(self, Private)
     }
@@ -506,9 +506,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// Unbox the contents of the value as the output type associated with `T` without checking
     /// if the layout of `T::Output` is compatible with the layout of the type in Julia.
     ///
-    /// Safety:
-    ///
-    /// You must guarantee `self.is::<T>()` would have returned `true`.
+    /// Safety: You must guarantee `self.is::<T>()` would have returned `true`.
     pub unsafe fn unbox_unchecked<T: Unbox>(self) -> T::Output {
         T::unbox(self)
     }
@@ -1238,6 +1236,9 @@ impl Value<'_, '_> {
 
     /// Calls `include` in the `Main` module in Julia, which evaluates the file's contents in that
     /// module. This has the same effect as calling `include` in the Julia REPL.
+    ///
+    /// Safety: The content of the file can't be checked for correctness, nothing prevents you
+    /// from causing a segmentation fault with code like `unsafe_load(Ptr{Float64}(C_NULL))`.
     pub unsafe fn include<'target: 'current, 'current, P, S, F>(
         scope: S,
         path: P,
@@ -1284,12 +1285,16 @@ impl Value<'_, '_> {
 impl Value<'_, '_> {
     /// Add a finalizer `f` to this value. The finalizer must be a Julia function, it will be
     /// called when this value is about to be freed by the garbage collector.
+    ///
+    /// Safety: the finalizer must be compatible with the data.
     pub unsafe fn add_finalizer(self, f: Value<'_, 'static>) {
         jl_gc_add_finalizer(self.unwrap(Private), f.unwrap(Private))
     }
 
     /// Add a finalizer `f` to this value. The finalizer must be an `extern "C"` function that
     /// takes one argument, the value as a void pointer.
+    ///
+    /// Safety: the finalizer must be compatible with the data.
     pub unsafe fn add_ptr_finalizer(self, f: unsafe extern "C" fn(*mut c_void) -> ()) {
         jl_gc_add_ptr_finalizer(get_tls(), self.unwrap(Private), f as *mut c_void)
     }

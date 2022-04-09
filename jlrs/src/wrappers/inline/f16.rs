@@ -1,4 +1,4 @@
-//! Wrapper for half-precision floating point numbers.
+//! Wrapper for `Float16`.
 
 use crate::{
     convert::{into_julia::IntoJulia, unbox::Unbox},

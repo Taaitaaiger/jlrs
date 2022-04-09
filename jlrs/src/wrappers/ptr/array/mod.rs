@@ -13,7 +13,7 @@
 //!
 //! How the contents of the array must be accessed from Rust depends on the type of the elements.
 //! [`Array`] provides methods to (mutably) access their contents for all three possible
-//! "layouts" of the elements: inline, pointer, and bits union.
+//! layouts of the elements: inline, pointer, and bits union.
 //!
 //! Accessing the contents of an array requires an n-dimensional index. The [`Dims`] trait is
 //! available for this purpose. This trait is implemented for tuples of four or fewer `usize`s;
@@ -192,7 +192,10 @@ impl<'data> Array<'_, 'data> {
     /// in combination with types that implement `IntoJulia`. If you want to create an array for a
     /// type that doesn't implement this trait you must use [`Array::new_for`].
     ///
-    /// If the array size is too large, the process will abort.
+    /// If the array size is too large, Julia throws an exception which isn't caught.
+    ///
+    /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
+    /// function.
     pub unsafe fn new_unchecked<'target: 'current, 'current, T, D, S, F>(
         scope: S,
         dims: D,
@@ -307,7 +310,10 @@ impl<'data> Array<'_, 'data> {
     /// Allocates a new n-dimensional array in Julia for elements of type `ty`, which must be a
     /// `Union`, `UnionAll` or `DataType`, and dimensions `dims`. If `dims = (4, 2)` a
     /// two-dimensional array with 4 rows and 2 columns is created. If an exception is thrown due
-    /// to either the type or dimensions being invalid the process aborts.
+    /// to either the type or dimensions being invalid which isn't caught.
+    ///
+    /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
+    /// function.
     pub unsafe fn new_for_unchecked<'target: 'current, 'current, D, S, F>(
         scope: S,
         dims: D,
@@ -731,6 +737,9 @@ impl<'scope, 'data> Array<'scope, 'data> {
     /// Mutably borrow inline array data, you can mutably borrow a single array at a time. Returns
     /// `JlrsError::NotInline` if the data is not stored inline or `JlrsError::WrongType` if the
     /// type of the elements is incorrect.
+    ///
+    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
+    /// this value is allowed.
     pub unsafe fn inline_data_mut<'borrow, 'frame, T, F>(
         self,
         frame: &'borrow mut F,
@@ -762,7 +771,8 @@ impl<'scope, 'data> Array<'scope, 'data> {
     /// if the type of the elements is incorrect.
     ///
     /// Safety: It's your responsibility to ensure you don't create multiple mutable
-    /// references to the same data.
+    /// references to the same data. Mutating Julia data is generally unsafe because it can't be
+    /// guaranteed mutating this value is allowed.
     pub unsafe fn unrestricted_inline_data_mut<'borrow, 'frame, T, F>(
         self,
         frame: &'borrow F,
@@ -828,6 +838,9 @@ impl<'scope, 'data> Array<'scope, 'data> {
 
     /// Mutably borrow the data of this array of values, you can mutably borrow a single array at
     /// the same time. Returns `JlrsError::Inline` if the data is stored inline.
+    ///
+    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
+    /// this value is allowed.
     pub unsafe fn value_data_mut<'borrow, 'frame, F>(
         self,
         frame: &'borrow mut F,
@@ -846,6 +859,9 @@ impl<'scope, 'data> Array<'scope, 'data> {
 
     /// Mutably borrow the data of this array of wrappers, you can mutably borrow a single array
     /// at the same time. Returns `JlrsError::Inline` if the data is stored inline.
+    ///
+    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
+    /// this value is allowed.
     pub unsafe fn wrapper_data_mut<'borrow, 'frame, T, F>(
         self,
         frame: &'borrow mut F,
@@ -870,7 +886,8 @@ impl<'scope, 'data> Array<'scope, 'data> {
     /// Returns `JlrsError::Inline` if the data is stored inline.
     ///
     /// Safety: It's your responsibility to ensure you don't create multiple mutable
-    /// references to the same data.
+    /// references to the same data. Mutating Julia data is generally unsafe because it can't be
+    /// guaranteed mutating this value is allowed.
     pub unsafe fn unrestricted_value_data_mut<'borrow, 'frame, F>(
         self,
         frame: &'borrow F,
@@ -893,7 +910,8 @@ impl<'scope, 'data> Array<'scope, 'data> {
     /// Returns `JlrsError::WrongType` if the type doesn't match the type of the elements.
     ///
     /// Safety: It's your responsibility to ensure you don't create multiple mutable
-    /// references to the same data.
+    /// references to the same data. Mutating Julia data is generally unsafe because it can't be
+    /// guaranteed mutating this value is allowed.
     pub unsafe fn unrestricted_wrapper_data_mut<'borrow, 'frame, T, F>(
         self,
         frame: &'borrow F,
@@ -932,6 +950,9 @@ impl<'scope> Array<'scope, 'static> {
 
     /// Mutably borrow the data of this array of bits-unions, you can mutably borrow a single
     /// array at a time.
+    ///
+    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
+    /// this value is allowed.
     pub unsafe fn union_data_mut<'borrow, 'frame, F>(
         self,
         frame: &'borrow mut F,
@@ -952,7 +973,8 @@ impl<'scope> Array<'scope, 'static> {
     /// single array can be mutably borrowed.
     ///
     /// Safety: It's your responsibility to ensure you don't create multiple mutable references to
-    /// the same data.
+    /// the same data. Mutating Julia data is generally unsafe because it can't be guaranteed
+    /// mutating this value is allowed.
     pub unsafe fn unrestricted_union_data_mut<'borrow, 'frame, F>(
         self,
         frame: &'borrow F,
@@ -1244,6 +1266,9 @@ impl<'scope, 'data, T: Clone + ValidLayout + Debug> TypedArray<'scope, 'data, T>
     /// Mutably borrow inline array data, you can mutably borrow a single array at the same time.
     /// Returns `JlrsError::NotInline` if the data is not stored inline or `JlrsError::WrongType`
     /// if the type of the elements is incorrect.
+    ///
+    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
+    /// this value is allowed.
     pub unsafe fn inline_data_mut<'borrow, 'frame, F>(
         self,
         frame: &'borrow mut F,
@@ -1267,8 +1292,9 @@ impl<'scope, 'data, T: Clone + ValidLayout + Debug> TypedArray<'scope, 'data, T>
     /// Returns `JlrsError::NotInline` if the data is not stored inline or `JlrsError::WrongType`
     /// if the type of the elements is incorrect.
     ///
-    /// Safety: It's your responsibility to ensure you don't create multiple mutable
-    /// references to the same data.
+    /// Safety: It's your responsibility to ensure you don't create multiple mutable references to
+    /// the same data. Mutating Julia data is generally unsafe because it can't be guaranteed
+    /// mutating this value is allowed.
     pub unsafe fn unrestricted_inline_data_mut<'borrow, 'frame, F>(
         self,
         frame: &'borrow F,
@@ -1318,6 +1344,9 @@ impl<'scope, 'data, T: Wrapper<'scope, 'data> + ValidLayout> TypedArray<'scope, 
 
     /// Mutably borrow the data of this array as an array of values, you can mutably borrow a
     /// single array at the same time.
+    ///
+    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
+    /// this value is allowed.
     pub unsafe fn value_data_mut<'borrow, 'frame, F>(
         self,
         frame: &'borrow mut F,
@@ -1330,6 +1359,9 @@ impl<'scope, 'data, T: Wrapper<'scope, 'data> + ValidLayout> TypedArray<'scope, 
 
     /// Mutably borrow the data of this array of wrappers, you can mutably borrow a single array
     /// at the same time.
+    ///
+    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
+    /// this value is allowed.
     pub unsafe fn wrapper_data_mut<'borrow, 'frame, F>(
         self,
         frame: &'borrow mut F,
@@ -1343,8 +1375,9 @@ impl<'scope, 'data, T: Wrapper<'scope, 'data> + ValidLayout> TypedArray<'scope, 
     /// Mutably borrow the data of this array as an array of values without the restriction that
     /// only a single array can be mutably borrowed.
     ///
-    /// Safety: It's your responsibility to ensure you don't create multiple mutable
-    /// references to the same data.
+    /// Safety: It's your responsibility to ensure you don't create multiple mutable references to
+    /// the same data. Mutating Julia data is generally unsafe because it can't be guaranteed
+    /// mutating this value is allowed.
     pub unsafe fn unrestricted_value_data_mut<'borrow, 'frame, F>(
         self,
         frame: &'borrow F,
@@ -1361,8 +1394,9 @@ impl<'scope, 'data, T: Wrapper<'scope, 'data> + ValidLayout> TypedArray<'scope, 
     /// Mutably borrow the data of this array of wrappers without the restriction that only a
     /// single array can be mutably borrowed.
     ///
-    /// Safety: It's your responsibility to ensure you don't create multiple mutable
-    /// references to the same data.
+    /// Safety: It's your responsibility to ensure you don't create multiple mutable references to
+    /// the same data. Mutating Julia data is generally unsafe because it can't be guaranteed
+    /// mutating this value is allowed.
     pub unsafe fn unrestricted_wrapper_data_mut<'borrow, 'frame, F>(
         self,
         frame: &'borrow F,

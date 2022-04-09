@@ -53,7 +53,10 @@ impl<'scope> Union<'scope> {
     /// must return `true`. Note that the result is not necessarily a [`Union`], for example the
     /// union of a single [`DataType`] is that type, not a `Union` with a single variant.
     ///
-    /// If an exception is thrown the process aborts.
+    /// If an exception is thrown it isn't caught.
+    ///
+    /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
+    /// function.
     ///
     /// [`Union`]: crate::wrappers::ptr::union::Union
     /// [`DataType`]: crate::wrappers::ptr::datatype::DataType
@@ -101,7 +104,10 @@ impl<'scope> Union<'scope> {
     /// union of a single [`DataType`] is that type, not a `Union` with a single variant. Unlike
     /// [`Union::new`] this method doesn't root the allocated value.
     ///
-    /// If an exception is thrown the process aborts.
+    /// If an exception is thrown it isn't caught.
+    ///
+    /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
+    /// function.
     ///
     /// [`Union`]: crate::wrappers::ptr::union::Union
     /// [`DataType`]: crate::wrappers::ptr::datatype::DataType

@@ -75,6 +75,8 @@ impl<'scope> JuliaString<'scope> {
     }
 
     /// Returns the string as a string slice without checking if the string is properly encoded.
+    ///
+    /// Safety: the string must be properly encoded.
     pub unsafe fn as_str_unchecked(self) -> &'scope str {
         str::from_utf8_unchecked(self.as_slice())
     }

@@ -21,8 +21,8 @@ use std::{cell::Cell, ffi::c_void, marker::PhantomData, ptr::NonNull};
 /// [`Scope`]: crate::memory::scope::Scope
 /// [`PartialScope`]: crate::memory::scope::PartialScope
 pub struct Output<'target> {
-    output: *const Cell<*mut c_void>,
-    _marker: PhantomData<fn(&'target mut ()) -> ()>,
+    slot: *const Cell<*mut c_void>,
+    _marker: PhantomData<fn(&'target mut ())>,
 }
 
 impl<'target> Output<'target> {
@@ -38,16 +38,16 @@ impl<'target> Output<'target> {
         }
     }
 
-    pub(crate) fn new<F: Frame<'target>>(_frame: &F, output: *const Cell<*mut c_void>) -> Self {
+    pub(crate) fn new<F: Frame<'target>>(_frame: &F, slot: *const Cell<*mut c_void>) -> Self {
         Output {
-            output,
+            slot,
             _marker: PhantomData,
         }
     }
 
-    pub(crate) fn set_root<'data, X: Wrapper<'target, 'data>>(self, value: NonNull<X::Wraps>) {
+    pub(crate) fn set_root<'data, T: Wrapper<'target, 'data>>(self, value: NonNull<T::Wraps>) {
         unsafe {
-            let cell = &*self.output;
+            let cell = &*self.slot;
             cell.set(value.as_ptr().cast());
         }
     }
@@ -63,10 +63,10 @@ pub struct OutputScope<'target, 'current, 'borrow, F: Frame<'current>> {
 }
 
 impl<'target, 'current, 'borrow, F: Frame<'current>> OutputScope<'target, 'current, 'borrow, F> {
-    pub(crate) fn set_root<'data, X: Wrapper<'target, 'data>>(self, value: NonNull<X::Wraps>) -> X {
+    pub(crate) fn set_root<'data, T: Wrapper<'target, 'data>>(self, value: NonNull<T::Wraps>) -> T {
         unsafe {
-            self.output.set_root::<X>(value);
-            X::wrap_non_null(value, Private)
+            self.output.set_root::<T>(value);
+            T::wrap_non_null(value, Private)
         }
     }
 }

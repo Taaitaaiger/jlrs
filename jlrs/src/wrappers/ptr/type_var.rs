@@ -52,7 +52,10 @@ impl<'scope> TypeVar<'scope> {
 
     /// Create a new `TypeVar`, the optional lower and upper bounds must be subtypes of `Type`,
     /// their default values are `Union{}` and `Any` respectively. The returned value can be
-    /// cast to a [`TypeVar`]. If Julia throws an exception the process aborts.
+    /// cast to a [`TypeVar`]. If Julia throws an exception it isn't caught.
+    ///
+    /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
+    /// function.
     pub unsafe fn new_unchecked<'target, N, S>(
         scope: S,
         name: N,
@@ -93,6 +96,9 @@ impl<'scope> TypeVar<'scope> {
     }
 
     /// See [`TypeVar::new_unchecked`], the only difference is that the result isn't rooted.
+    ///
+    /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
+    /// function.
     pub unsafe fn new_unrooted_unchecked<'global, N>(
         global: Global<'global>,
         name: N,

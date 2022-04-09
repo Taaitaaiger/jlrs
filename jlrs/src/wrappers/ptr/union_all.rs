@@ -58,7 +58,10 @@ impl<'scope> UnionAll<'scope> {
         }
     }
 
-    /// Create a new `UnionAll`. If an exception is thrown the process aborts.
+    /// Create a new `UnionAll`. If an exception is thrown it isn't caught
+    ///
+    /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
+    /// function.
     pub unsafe fn new_unchecked<'target, S>(
         scope: S,
         tvar: TypeVar,
@@ -90,7 +93,10 @@ impl<'scope> UnionAll<'scope> {
     }
 
     /// Create a new `UnionAll`. Unlike [`UnionAll::new_unchecked`] this method doesn't root the
-    /// allocated value. If an exception is thrown the process aborts.
+    /// allocated value. If an exception is thrown it isn't caught
+    ///
+    /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
+    /// function.
     pub unsafe fn new_unrooted_unchecked<'global>(
         _: Global<'global>,
         tvar: TypeVar,

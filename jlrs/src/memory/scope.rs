@@ -178,29 +178,29 @@ pub(crate) mod private {
 
     pub trait PartialScope<'target>: Sized {
         // safety: the value must be a valid pointer to a Julia value.
-        unsafe fn value<'data, X: Wrapper<'target, 'data>>(
+        unsafe fn value<'data, T: Wrapper<'target, 'data>>(
             self,
-            value: NonNull<X::Wraps>,
+            value: NonNull<T::Wraps>,
             _: Private,
-        ) -> JlrsResult<X>;
+        ) -> JlrsResult<T>;
 
         // safety: the value must be a valid pointer to a Julia value.
-        unsafe fn call_result<'data, X: Wrapper<'target, 'data>>(
+        unsafe fn call_result<'data, T: Wrapper<'target, 'data>>(
             self,
-            result: Result<NonNull<X::Wraps>, NonNull<jl_value_t>>,
+            result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
             _: Private,
-        ) -> JlrsResult<JuliaResult<'target, 'data, X>>;
+        ) -> JlrsResult<JuliaResult<'target, 'data, T>>;
     }
 
     impl<'current, F> PartialScope<'current> for &mut F
     where
         F: Frame<'current>,
     {
-        unsafe fn value<'data, X: Wrapper<'current, 'data>>(
+        unsafe fn value<'data, T: Wrapper<'current, 'data>>(
             self,
-            value: NonNull<X::Wraps>,
+            value: NonNull<T::Wraps>,
             _: Private,
-        ) -> JlrsResult<X> {
+        ) -> JlrsResult<T> {
             let v = self
                 .push_root(value, Private)
                 .map_err(JlrsError::alloc_error)?;
@@ -208,11 +208,11 @@ pub(crate) mod private {
             Ok(v)
         }
 
-        unsafe fn call_result<'data, X: Wrapper<'current, 'data>>(
+        unsafe fn call_result<'data, T: Wrapper<'current, 'data>>(
             self,
-            result: Result<NonNull<X::Wraps>, NonNull<jl_value_t>>,
+            result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
             _: Private,
-        ) -> JlrsResult<JuliaResult<'current, 'data, X>> {
+        ) -> JlrsResult<JuliaResult<'current, 'data, T>> {
             match result {
                 Ok(v) => {
                     let v = self.push_root(v, Private).map_err(JlrsError::alloc_error)?;
@@ -231,19 +231,19 @@ pub(crate) mod private {
     where
         F: Frame<'current>,
     {
-        unsafe fn value<'data, X: Wrapper<'target, 'data>>(
+        unsafe fn value<'data, T: Wrapper<'target, 'data>>(
             self,
-            value: NonNull<X::Wraps>,
+            value: NonNull<T::Wraps>,
             _: Private,
-        ) -> JlrsResult<X> {
+        ) -> JlrsResult<T> {
             Ok(self.set_root(value))
         }
 
-        unsafe fn call_result<'data, X: Wrapper<'target, 'data>>(
+        unsafe fn call_result<'data, T: Wrapper<'target, 'data>>(
             self,
-            result: Result<NonNull<X::Wraps>, NonNull<jl_value_t>>,
+            result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
             _: Private,
-        ) -> JlrsResult<JuliaResult<'target, 'data, X>> {
+        ) -> JlrsResult<JuliaResult<'target, 'data, T>> {
             let rooted = match result {
                 Ok(v) => Ok(self.set_root(v)),
                 Err(e) => Err(self.set_root(e)),
@@ -254,24 +254,24 @@ pub(crate) mod private {
     }
 
     impl<'target> PartialScope<'target> for Output<'target> {
-        unsafe fn value<'data, X: Wrapper<'target, 'data>>(
+        unsafe fn value<'data, T: Wrapper<'target, 'data>>(
             self,
-            value: NonNull<X::Wraps>,
+            value: NonNull<T::Wraps>,
             _: Private,
-        ) -> JlrsResult<X> {
-            self.set_root::<X>(value);
-            Ok(X::wrap_non_null(value, Private))
+        ) -> JlrsResult<T> {
+            self.set_root::<T>(value);
+            Ok(T::wrap_non_null(value, Private))
         }
 
-        unsafe fn call_result<'data, X: Wrapper<'target, 'data>>(
+        unsafe fn call_result<'data, T: Wrapper<'target, 'data>>(
             self,
-            result: Result<NonNull<X::Wraps>, NonNull<jl_value_t>>,
+            result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
             _: Private,
-        ) -> JlrsResult<JuliaResult<'target, 'data, X>> {
+        ) -> JlrsResult<JuliaResult<'target, 'data, T>> {
             let rooted = match result {
                 Ok(v) => {
-                    self.set_root::<X>(v);
-                    Ok(X::wrap_non_null(v, Private))
+                    self.set_root::<T>(v);
+                    Ok(T::wrap_non_null(v, Private))
                 }
                 Err(e) => {
                     self.set_root::<Value>(e);

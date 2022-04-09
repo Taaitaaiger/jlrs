@@ -10,7 +10,7 @@ use std::{ffi::CStr, marker::PhantomData};
 
 /// Global Julia information.
 pub struct Info {
-    _priv: PhantomData<*mut ()>,
+    _priv: PhantomData<()>,
 }
 
 impl Info {

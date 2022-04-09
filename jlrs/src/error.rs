@@ -320,15 +320,15 @@ impl Display for JlrsError {
                 write!(formatter, "Expected a type, got: {}", type_str)
             }
             JlrsError::NotAModule { name } => write!(formatter, "{} is not a module", name),
-            JlrsError::AllocError(AllocError::FrameOverflow(n, cap)) => write!(
+            JlrsError::AllocError(AllocError::FrameOverflow(cap)) => write!(
                 formatter,
-                "The frame cannot handle more data. Tried to allocate: {}; capacity: {}",
-                n, cap,
+                "The frame cannot handle more data. Current capacity: {}",
+                cap,
             ),
-            JlrsError::AllocError(AllocError::StackOverflow(n, cap)) => write!(
+            JlrsError::AllocError(AllocError::StackOverflow(cap)) => write!(
                 formatter,
-                "The stack cannot handle more data. Tried to allocate: {}; capacity: {}",
-                n, cap,
+                "The stack cannot handle more data. Current capacity: {}",
+                cap,
             ),
             JlrsError::WrongType { value_type } => {
                 write!(
@@ -399,9 +399,9 @@ impl Into<Box<JlrsError>> for Box<dyn Error + 'static + Send + Sync> {
 /// exhausted, this error is returned.
 #[derive(Copy, Clone, Debug)]
 pub enum AllocError {
-    //            desired, cap
-    StackOverflow(usize, usize),
-    FrameOverflow(usize, usize),
+    //            cap
+    StackOverflow(usize),
+    FrameOverflow(usize),
 }
 
 impl Into<JlrsError> for AllocError {

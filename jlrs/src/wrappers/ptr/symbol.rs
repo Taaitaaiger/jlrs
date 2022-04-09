@@ -41,10 +41,8 @@ impl<'scope> Symbol<'scope> {
         }
     }
 
-    /// Extend the `Symbol`'s lifetime. `Symbol`s are never freed by the garbage collector, but a
-    /// `Symbol` returned as a [`Value`] from a Julia function inherits the frame's lifetime when
-    /// it's cast to a `Symbol`. Its lifetime can be safely extended from `'scope` to `'global`
-    /// using this method.
+    /// Extend the `Symbol`'s lifetime. A `Symbol` is never freed by the garbage collector, its
+    /// lifetime can be safely extended.
     ///
     /// [`Value`]: crate::wrappers::ptr::value::Value
     pub fn extend<'global>(self, _: Global<'global>) -> Symbol<'global> {
@@ -57,61 +55,65 @@ impl<'scope> Symbol<'scope> {
     }
 
     /// `Symbol`s are stored using an invasive binary tree, this returns the left branch of the
-    /// current node. This method is unsafe because it's not accessible from Julia except through
-    /// the C API.
+    /// current node.
     #[cfg(feature = "lts")]
-    pub unsafe fn left(self) -> Option<Symbol<'scope>> {
-        let left = self.unwrap_non_null(Private).as_ref().left;
+    pub fn left(self) -> Option<Symbol<'scope>> {
+        unsafe {
+            let left = self.unwrap_non_null(Private).as_ref().left;
 
-        if left.is_null() {
-            return None;
+            if left.is_null() {
+                return None;
+            }
+
+            Some(Symbol::wrap(left, Private))
         }
-
-        Some(Symbol::wrap(left, Private))
     }
 
     /// `Symbol`s are stored using an invasive binary tree, this returns the left branch of the
-    /// current node. This method is unsafe because it's not accessible from Julia except through
-    /// the C API.
+    /// current node.
     #[cfg(not(feature = "lts"))]
-    pub unsafe fn left(self) -> Option<Symbol<'scope>> {
-        let left = atomic_value(self.unwrap_non_null(Private).as_ref().left);
-        let ptr = left.load(Ordering::Relaxed);
+    pub fn left(self) -> Option<Symbol<'scope>> {
+        unsafe {
+            let left = atomic_value(self.unwrap_non_null(Private).as_ref().left);
+            let ptr = left.load(Ordering::Relaxed);
 
-        if ptr.is_null() {
-            return None;
+            if ptr.is_null() {
+                return None;
+            }
+
+            Some(Symbol::wrap(ptr.cast(), Private))
         }
-
-        Some(Symbol::wrap(ptr.cast(), Private))
     }
 
     /// `Symbol`s are stored using an invasive binary tree, this returns the right branch of the
-    /// current node. This method is unsafe because it's not accessible from Julia except through
-    /// the C API.
+    /// current node.
     #[cfg(feature = "lts")]
-    pub unsafe fn right(self) -> Option<Symbol<'scope>> {
-        let right = self.unwrap_non_null(Private).as_ref().right;
+    pub fn right(self) -> Option<Symbol<'scope>> {
+        unsafe {
+            let right = self.unwrap_non_null(Private).as_ref().right;
 
-        if right.is_null() {
-            return None;
+            if right.is_null() {
+                return None;
+            }
+
+            Some(Symbol::wrap(right, Private))
         }
-
-        Some(Symbol::wrap(right, Private))
     }
 
     /// `Symbol`s are stored using an invasive binary tree, this returns the right branch of the
-    /// current node. This method is unsafe because it's not accessible from Julia except through
-    /// the C API.
+    /// current node.
     #[cfg(not(feature = "lts"))]
-    pub unsafe fn right(self) -> Option<Symbol<'scope>> {
-        let right = atomic_value(self.unwrap_non_null(Private).as_ref().right);
-        let ptr = right.load(Ordering::Relaxed);
+    pub fn right(self) -> Option<Symbol<'scope>> {
+        unsafe {
+            let right = atomic_value(self.unwrap_non_null(Private).as_ref().right);
+            let ptr = right.load(Ordering::Relaxed);
 
-        if ptr.is_null() {
-            return None;
+            if ptr.is_null() {
+                return None;
+            }
+
+            Some(Symbol::wrap(ptr.cast(), Private))
         }
-
-        Some(Symbol::wrap(ptr.cast(), Private))
     }
 
     /// Convert `self` to a `LeakedValue`.
@@ -150,7 +152,8 @@ impl<'scope> Symbol<'scope> {
         }
     }
 
-    /// Use the `Output` to extend the lifetime of this data.
+    /// Use the `Output` to extend the lifetime of this data. This is never nevessary
+    /// because a `Symbol` is never freed by the garbage collector.
     pub fn root<'target>(self, output: Output<'target>) -> Symbol<'target> {
         unsafe {
             let ptr = self.unwrap_non_null(Private);

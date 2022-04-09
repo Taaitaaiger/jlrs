@@ -26,7 +26,7 @@ impl<'scope> TypeMapEntry<'scope> {
     for (a,b) in zip(fieldnames(Core.TypeMapEntry), fieldtypes(Core.TypeMapEntry))
          println(a,": ", b)
     end
-    next: Any
+    next: Any _Atomic
     sig: Type
     simplesig: Any
     guardsigs: Any

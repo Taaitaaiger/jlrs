@@ -12,7 +12,8 @@ use crate::{
     wrappers::ptr::{CodeInstanceRef, MethodInstanceRef, ValueRef},
 };
 use jl_sys::{jl_code_instance_t, jl_code_instance_type};
-use std::{marker::PhantomData, ptr::NonNull};
+use std::{ffi::c_void, sync::atomic::AtomicPtr};
+use std::{marker::PhantomData, ptr::NonNull, sync::atomic::AtomicU8};
 
 #[cfg(not(feature = "lts"))]
 use super::super::atomic_value;
@@ -36,10 +37,14 @@ impl<'scope> CodeInstance<'scope> {
     rettype: Any
     rettype_const: Any
     inferred: Any
+    ipo_purity_bits: UInt32
+    purity_bits: UInt32
+    argescapes: Any
     isspecsig: Bool
-    precompile: Bool
-    invoke: Ptr{Nothing}
-    specptr: Ptr{Nothing}
+    precompile: Bool _Atomic
+    invoke: Ptr{Nothing} _Atomic
+    specptr: Ptr{Nothing} _Atomic
+    relocatability: UInt8
     */
 
     /// Method this instance is specialized from.
@@ -88,14 +93,211 @@ impl<'scope> CodeInstance<'scope> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().inferred) }
     }
 
+    /// The `ipo_purity_bits` field of this `CodeInstance`.
+    #[cfg(not(feature = "lts"))]
+    pub fn ipo_purity_bits(self) -> u32 {
+        unsafe {
+            self.unwrap_non_null(Private)
+                .as_ref()
+                .__bindgen_anon_1
+                .ipo_purity_bits
+        }
+    }
+
+    /// The `ipo_consistent` flag of this `CodeInstance`.
+    #[cfg(not(feature = "lts"))]
+    pub fn ipo_consistent(self) -> u8 {
+        unsafe {
+            self.unwrap_non_null(Private)
+                .as_ref()
+                .__bindgen_anon_1
+                .ipo_purity_flags
+                .ipo_consistent()
+        }
+    }
+
+    /// The `ipo_effect_free` flag of this `CodeInstance`.
+    #[cfg(not(feature = "lts"))]
+    pub fn ipo_effect_free(self) -> u8 {
+        unsafe {
+            self.unwrap_non_null(Private)
+                .as_ref()
+                .__bindgen_anon_1
+                .ipo_purity_flags
+                .ipo_effect_free()
+        }
+    }
+
+    /// The `ipo_nothrow` flag of this `CodeInstance`.
+    #[cfg(not(feature = "lts"))]
+    pub fn ipo_nothrow(self) -> u8 {
+        unsafe {
+            self.unwrap_non_null(Private)
+                .as_ref()
+                .__bindgen_anon_1
+                .ipo_purity_flags
+                .ipo_nothrow()
+        }
+    }
+
+    /// The `ipo_terminates` flag of this `CodeInstance`.
+    #[cfg(not(feature = "lts"))]
+    pub fn ipo_terminates(self) -> u8 {
+        unsafe {
+            self.unwrap_non_null(Private)
+                .as_ref()
+                .__bindgen_anon_1
+                .ipo_purity_flags
+                .ipo_terminates()
+        }
+    }
+
+    /// The `ipo_overlayed` flag of this `CodeInstance`.
+    #[cfg(not(feature = "lts"))]
+    pub fn ipo_overlayed(self) -> u8 {
+        unsafe {
+            self.unwrap_non_null(Private)
+                .as_ref()
+                .__bindgen_anon_1
+                .ipo_purity_flags
+                .ipo_overlayed()
+        }
+    }
+
+    /// The `purity_bits` field of this `CodeInstance`.
+    #[cfg(not(feature = "lts"))]
+    pub fn purity_bits(self) -> u32 {
+        unsafe {
+            self.unwrap_non_null(Private)
+                .as_ref()
+                .__bindgen_anon_2
+                .purity_bits
+        }
+    }
+
+    /// The `consistent` flag of this `CodeInstance`.
+    #[cfg(not(feature = "lts"))]
+    pub fn consistent(self) -> u8 {
+        unsafe {
+            self.unwrap_non_null(Private)
+                .as_ref()
+                .__bindgen_anon_2
+                .purity_flags
+                .consistent()
+        }
+    }
+
+    /// The `effect_free` flag of this `CodeInstance`.
+    #[cfg(not(feature = "lts"))]
+    pub fn effect_free(self) -> u8 {
+        unsafe {
+            self.unwrap_non_null(Private)
+                .as_ref()
+                .__bindgen_anon_2
+                .purity_flags
+                .effect_free()
+        }
+    }
+
+    /// The `nothrow` flag of this `CodeInstance`.
+    #[cfg(not(feature = "lts"))]
+    pub fn nothrow(self) -> u8 {
+        unsafe {
+            self.unwrap_non_null(Private)
+                .as_ref()
+                .__bindgen_anon_2
+                .purity_flags
+                .nothrow()
+        }
+    }
+
+    /// The `terminates` flag of this `CodeInstance`.
+    #[cfg(not(feature = "lts"))]
+    pub fn terminates(self) -> u8 {
+        unsafe {
+            self.unwrap_non_null(Private)
+                .as_ref()
+                .__bindgen_anon_2
+                .purity_flags
+                .terminates()
+        }
+    }
+
+    /// The `overlayed` flag of this `CodeInstance`.
+    #[cfg(not(feature = "lts"))]
+    pub fn overlayed(self) -> u8 {
+        unsafe {
+            self.unwrap_non_null(Private)
+                .as_ref()
+                .__bindgen_anon_2
+                .purity_flags
+                .overlayed()
+        }
+    }
+
+    /// Method this instance is specialized from.
+    pub fn argescapes(self) -> ValueRef<'scope, 'static> {
+        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().argescapes) }
+    }
+
     /// If `specptr` is a specialized function signature for specTypes->rettype
     pub fn is_specsig(self) -> bool {
         unsafe { self.unwrap_non_null(Private).as_ref().isspecsig != 0 }
     }
 
     /// If `specptr` is a specialized function signature for specTypes->rettype
+    #[cfg(not(feature = "lts"))]
+    pub fn precompile(self) -> bool {
+        unsafe {
+            let ptr =
+                &self.unwrap_non_null(Private).as_ref().precompile as *const u8 as *const AtomicU8;
+            let field_ref = &*ptr;
+            field_ref.load(Ordering::SeqCst) != 0
+        }
+    }
+
+    /// If `specptr` is a specialized function signature for specTypes->rettype
+    #[cfg(feature = "lts")]
     pub fn precompile(self) -> bool {
         unsafe { self.unwrap_non_null(Private).as_ref().precompile != 0 }
+    }
+
+    /// jlcall entry point
+    #[cfg(not(feature = "lts"))]
+    pub fn invoke(self) -> *mut c_void {
+        unsafe {
+            let ptr = &self.unwrap_non_null(Private).as_ref().invoke as *const _
+                as *const AtomicPtr<c_void>;
+            (&*ptr).load(Ordering::Relaxed)
+        }
+    }
+
+    /// jlcall entry point
+    #[cfg(feature = "lts")]
+    pub fn invoke(self) -> *mut c_void {
+        unsafe { &self.unwrap_non_null(Private).as_ref().invoke as *mut c_void }
+    }
+
+    /// private data for `jlcall entry point
+    #[cfg(not(feature = "lts"))]
+    pub fn specptr(self) -> *mut c_void {
+        unsafe {
+            let ptr = &self.unwrap_non_null(Private).as_ref().specptr as *const _
+                as *const AtomicPtr<c_void>;
+            (&*ptr).load(Ordering::Relaxed)
+        }
+    }
+
+    /// private data for `jlcall entry point
+    #[cfg(feature = "lts")]
+    pub fn specptr(self) -> *mut c_void {
+        unsafe { &self.unwrap_non_null(Private).as_ref().specptr as *mut c_void }
+    }
+
+    /// nonzero if all roots are built into sysimg or tagged by module key
+    #[cfg(not(feature = "lts"))]
+    pub fn relocatability(self) -> u8 {
+        unsafe { self.unwrap_non_null(Private).as_ref().relocatability }
     }
 
     /// Use the `Output` to extend the lifetime of this data.

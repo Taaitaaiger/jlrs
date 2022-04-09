@@ -42,8 +42,8 @@ impl<'scope> TypeName<'scope> {
     names: Core.SimpleVector
     atomicfields: Ptr{Nothing}
     wrapper: Type
-    cache: Core.SimpleVector
-    linearcache: Core.SimpleVector
+    cache: Core.SimpleVector _Atomic
+    linearcache: Core.SimpleVector _Atomic
     mt: Core.MethodTable
     partial: Any
     hash: Int64

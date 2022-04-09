@@ -30,9 +30,9 @@ impl<'scope> MethodTable<'scope> {
         println(a, ": ", b)
     end
     name: Symbol
-    defs: Any
-    leafcache: Any
-    cache: Any
+    defs: Any _Atomic
+    leafcache: Any _Atomic
+    cache: Any _Atomic
     max_args: Int64
     kwsorter: Any
     module: Module

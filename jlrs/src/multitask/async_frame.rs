@@ -176,7 +176,10 @@ impl<'frame> Drop for AsyncGcFrame<'frame> {
 
 impl<'frame> Frame<'frame> for AsyncGcFrame<'frame> {
     fn reusable_slot(&mut self) -> JlrsResult<ReusableSlot<'frame>> {
-        ReusableSlot::new(self)
+        unsafe {
+            let slot = <Self as private::Frame>::reserve_slot(self, Private)?;
+            Ok(ReusableSlot::new(self, slot))
+        }
     }
 
     fn n_roots(&self) -> usize {
@@ -189,19 +192,8 @@ impl<'frame> Frame<'frame> for AsyncGcFrame<'frame> {
 
     fn reserve_output(&mut self) -> JlrsResult<Output<'frame>> {
         unsafe {
-            let n_roots = self.n_roots();
-            if n_roots == self.capacity() {
-                Err(JlrsError::alloc_error(AllocError::FrameOverflow(
-                    1, n_roots,
-                )))?;
-            }
-
-            let mut_slot = self.raw_frame.get_unchecked_mut(n_roots + 2);
-            mut_slot.set(null_mut());
-            let mut_slot = mut_slot as *mut _;
-            self.set_n_roots(n_roots + 1);
-
-            Ok(Output::new(self, mut_slot))
+            let slot = <Self as private::Frame>::reserve_slot(self, Private)?;
+            Ok(Output::new(self, slot))
         }
     }
 }
@@ -209,26 +201,24 @@ impl<'frame> Frame<'frame> for AsyncGcFrame<'frame> {
 impl<'frame> private::Frame<'frame> for AsyncGcFrame<'frame> {
     type Mode = Async<'frame>;
 
-    unsafe fn push_root<'data, X: Wrapper<'frame, 'data>>(
+    unsafe fn push_root<'data, T: Wrapper<'frame, 'data>>(
         &mut self,
-        value: NonNull<X::Wraps>,
+        value: NonNull<T::Wraps>,
         _: Private,
-    ) -> Result<X, AllocError> {
+    ) -> Result<T, AllocError> {
         let n_roots = self.n_roots();
         if n_roots == self.capacity() {
-            return Err(AllocError::FrameOverflow(1, n_roots));
+            return Err(AllocError::FrameOverflow(n_roots));
         }
 
         self.root(value.cast());
-        Ok(X::wrap_non_null(value, Private))
+        Ok(T::wrap_non_null(value, Private))
     }
 
     unsafe fn reserve_slot(&mut self, _: Private) -> JlrsResult<*const Cell<*mut c_void>> {
         let n_roots = self.n_roots();
         if n_roots == self.capacity() {
-            Err(JlrsError::alloc_error(AllocError::FrameOverflow(
-                1, n_roots,
-            )))?;
+            Err(JlrsError::alloc_error(AllocError::FrameOverflow(n_roots)))?;
         }
 
         self.raw_frame

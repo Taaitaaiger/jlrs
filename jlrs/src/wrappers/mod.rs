@@ -1,22 +1,25 @@
 //! Wrapper types for Julia data
 //!
-//! There are two major "classes" of Julia types, pointer and inline types. This distinction is due
-//! to how data of these types is stored when they're used as field types in Julia structs. The
-//! fields of inline types are stored inline, while a pointer type is stored as a pointer.
+//! Whenever the C API returns data owned by the garbage collector it's returned as a pointer. In
+//! order to avoid dealing with these raw pointers, jlrs provides several pointer wrapper types.
+//! Examples include [`Value`], [`Array`], and [`Module`]. A pointer wrapper can always be
+//! converted to a `Value`. All pointer wrappers have a lifetime which ensures the data can't
+//! escape the scope it has been rooted in.
 //!
-//! While most kinds of data in Julia are defined purely in Julia, some are defined in C. This
-//! includes types like `Module`, `DataType`, and `Array`. They're mostly pointer types. Rather
-//! than dealing with the raw pointers, jlrs provides wrappers for these builtin types, you can
-//! find them, and more information about them in general, in the [`ptr`] module. The most
-//! important of these wrappers is [`Value`], which is essentially the `Any` of Julia.
+//! Methods in jlrs that return Julia data usually come in two flavors: the result is rooted, in
+//! this case a pointer wrapper is returned, or it's left unrooted. In the latter case a [`Ref`]
+//! is returned instead. It's always unsafe to convert a `Ref` to a pointer wrapper because jlrs
+//! can't guarantee that the data hasn't been freed yet.
 //!
-//! In addition to these pointer wrappers, jlrs also provides a many inline wrappers. Examples
-//! include the primitive types like `UInt8` and `Float64`, most of them are simply the
-//! appropriate primitive type in Rust; `u8` and `f64` will work for these two types, but `Bool`
-//! and `Char` have custom wrappers: [`Bool`] and [`Char`]. Tuples of up to 32 elements are
-//! available in the [`tuple`] module.
+//! In addition to pointer wrappers there are inline wrappers which provide a layout for several
+//! Julia types. This includes primitive types like `u8`, custom [`Bool`] and [`Char`] types, and
+//! generic tuples that can have up to 32 elements are available in the [`tuple`] module. Inline
+//! wrappers for other types can be generated with the JlrsReflect package.
 //!
 //! [`Value`]: crate::wrappers::ptr::value::Value
+//! [`Array`]: crate::wrappers::ptr::array::Array
+//! [`Module`]: crate::wrappers::ptr::module::Module
+//! [`Ref`]: crate::wrappers::ptr::Ref
 //! [`Char`]: crate::wrappers::inline::char::Char
 //! [`Bool`]: crate::wrappers::inline::bool::Bool
 //! [`tuple`]: crate::wrappers::inline::tuple

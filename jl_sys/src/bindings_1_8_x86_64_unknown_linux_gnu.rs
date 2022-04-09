@@ -3853,6 +3853,7 @@ pub struct _jl_method_instance_t {
     pub callbacks: *mut jl_array_t,
     pub cache: u64,
     pub inInference: u8,
+    pub precompiled: u8,
 }
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -4014,6 +4015,18 @@ fn bindgen_test_layout__jl_method_instance_t() {
             stringify!(inInference)
         )
     );
+    assert_eq!(
+        unsafe {
+            &(*(::std::ptr::null::<_jl_method_instance_t>())).precompiled as *const _ as usize
+        },
+        57usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(_jl_method_instance_t),
+            "::",
+            stringify!(precompiled)
+        )
+    );
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -4109,20 +4122,20 @@ pub struct _jl_code_instance_t {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union _jl_code_instance_t__bindgen_ty_1 {
-    pub ipo_purity_bits: u8,
+    pub ipo_purity_bits: u32,
     pub ipo_purity_flags: _jl_code_instance_t__bindgen_ty_1__bindgen_ty_1,
 }
 #[repr(C, packed)]
 #[derive(Debug, Copy, Clone)]
 pub struct _jl_code_instance_t__bindgen_ty_1__bindgen_ty_1 {
     pub _bitfield_align_1: [u8; 0],
-    pub _bitfield_1: __BindgenBitfieldUnit<[u8; 1usize]>,
+    pub _bitfield_1: __BindgenBitfieldUnit<[u8; 2usize]>,
 }
 #[test]
 fn bindgen_test_layout__jl_code_instance_t__bindgen_ty_1__bindgen_ty_1() {
     assert_eq!(
         ::std::mem::size_of::<_jl_code_instance_t__bindgen_ty_1__bindgen_ty_1>(),
-        1usize,
+        2usize,
         concat!(
             "Size of: ",
             stringify!(_jl_code_instance_t__bindgen_ty_1__bindgen_ty_1)
@@ -4183,13 +4196,25 @@ impl _jl_code_instance_t__bindgen_ty_1__bindgen_ty_1 {
         }
     }
     #[inline]
+    pub fn ipo_overlayed(&self) -> u8 {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(8usize, 1u8) as u8) }
+    }
+    #[inline]
+    pub fn set_ipo_overlayed(&mut self, val: u8) {
+        unsafe {
+            let val: u8 = ::std::mem::transmute(val);
+            self._bitfield_1.set(8usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
     pub fn new_bitfield_1(
         ipo_consistent: u8,
         ipo_effect_free: u8,
         ipo_nothrow: u8,
         ipo_terminates: u8,
-    ) -> __BindgenBitfieldUnit<[u8; 1usize]> {
-        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 1usize]> = Default::default();
+        ipo_overlayed: u8,
+    ) -> __BindgenBitfieldUnit<[u8; 2usize]> {
+        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 2usize]> = Default::default();
         __bindgen_bitfield_unit.set(0usize, 2u8, {
             let ipo_consistent: u8 = unsafe { ::std::mem::transmute(ipo_consistent) };
             ipo_consistent as u64
@@ -4206,6 +4231,10 @@ impl _jl_code_instance_t__bindgen_ty_1__bindgen_ty_1 {
             let ipo_terminates: u8 = unsafe { ::std::mem::transmute(ipo_terminates) };
             ipo_terminates as u64
         });
+        __bindgen_bitfield_unit.set(8usize, 1u8, {
+            let ipo_overlayed: u8 = unsafe { ::std::mem::transmute(ipo_overlayed) };
+            ipo_overlayed as u64
+        });
         __bindgen_bitfield_unit
     }
 }
@@ -4213,12 +4242,12 @@ impl _jl_code_instance_t__bindgen_ty_1__bindgen_ty_1 {
 fn bindgen_test_layout__jl_code_instance_t__bindgen_ty_1() {
     assert_eq!(
         ::std::mem::size_of::<_jl_code_instance_t__bindgen_ty_1>(),
-        1usize,
+        4usize,
         concat!("Size of: ", stringify!(_jl_code_instance_t__bindgen_ty_1))
     );
     assert_eq!(
         ::std::mem::align_of::<_jl_code_instance_t__bindgen_ty_1>(),
-        1usize,
+        4usize,
         concat!(
             "Alignment of ",
             stringify!(_jl_code_instance_t__bindgen_ty_1)
@@ -4254,20 +4283,20 @@ fn bindgen_test_layout__jl_code_instance_t__bindgen_ty_1() {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union _jl_code_instance_t__bindgen_ty_2 {
-    pub purity_bits: u8,
+    pub purity_bits: u32,
     pub purity_flags: _jl_code_instance_t__bindgen_ty_2__bindgen_ty_1,
 }
 #[repr(C, packed)]
 #[derive(Debug, Copy, Clone)]
 pub struct _jl_code_instance_t__bindgen_ty_2__bindgen_ty_1 {
     pub _bitfield_align_1: [u8; 0],
-    pub _bitfield_1: __BindgenBitfieldUnit<[u8; 1usize]>,
+    pub _bitfield_1: __BindgenBitfieldUnit<[u8; 2usize]>,
 }
 #[test]
 fn bindgen_test_layout__jl_code_instance_t__bindgen_ty_2__bindgen_ty_1() {
     assert_eq!(
         ::std::mem::size_of::<_jl_code_instance_t__bindgen_ty_2__bindgen_ty_1>(),
-        1usize,
+        2usize,
         concat!(
             "Size of: ",
             stringify!(_jl_code_instance_t__bindgen_ty_2__bindgen_ty_1)
@@ -4328,13 +4357,25 @@ impl _jl_code_instance_t__bindgen_ty_2__bindgen_ty_1 {
         }
     }
     #[inline]
+    pub fn overlayed(&self) -> u8 {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(8usize, 1u8) as u8) }
+    }
+    #[inline]
+    pub fn set_overlayed(&mut self, val: u8) {
+        unsafe {
+            let val: u8 = ::std::mem::transmute(val);
+            self._bitfield_1.set(8usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
     pub fn new_bitfield_1(
         consistent: u8,
         effect_free: u8,
         nothrow: u8,
         terminates: u8,
-    ) -> __BindgenBitfieldUnit<[u8; 1usize]> {
-        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 1usize]> = Default::default();
+        overlayed: u8,
+    ) -> __BindgenBitfieldUnit<[u8; 2usize]> {
+        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 2usize]> = Default::default();
         __bindgen_bitfield_unit.set(0usize, 2u8, {
             let consistent: u8 = unsafe { ::std::mem::transmute(consistent) };
             consistent as u64
@@ -4351,6 +4392,10 @@ impl _jl_code_instance_t__bindgen_ty_2__bindgen_ty_1 {
             let terminates: u8 = unsafe { ::std::mem::transmute(terminates) };
             terminates as u64
         });
+        __bindgen_bitfield_unit.set(8usize, 1u8, {
+            let overlayed: u8 = unsafe { ::std::mem::transmute(overlayed) };
+            overlayed as u64
+        });
         __bindgen_bitfield_unit
     }
 }
@@ -4358,12 +4403,12 @@ impl _jl_code_instance_t__bindgen_ty_2__bindgen_ty_1 {
 fn bindgen_test_layout__jl_code_instance_t__bindgen_ty_2() {
     assert_eq!(
         ::std::mem::size_of::<_jl_code_instance_t__bindgen_ty_2>(),
-        1usize,
+        4usize,
         concat!("Size of: ", stringify!(_jl_code_instance_t__bindgen_ty_2))
     );
     assert_eq!(
         ::std::mem::align_of::<_jl_code_instance_t__bindgen_ty_2>(),
-        1usize,
+        4usize,
         concat!(
             "Alignment of ",
             stringify!(_jl_code_instance_t__bindgen_ty_2)

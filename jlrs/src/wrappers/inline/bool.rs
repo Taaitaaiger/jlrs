@@ -1,4 +1,4 @@
-//! Wrapper for `Core.Bool`.
+//! Wrapper for `Bool`.
 //!
 //! In Rust it's unsound to create an invalid `bool`, while a `Bool` in Julia can be an arbitrary
 //! `i8` in some rare cases. Rather than treating all `Bool`s as `i8` or `bool`s jlrs provides
