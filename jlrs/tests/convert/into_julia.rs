@@ -51,8 +51,7 @@ mod tests {
 
                         let applied = UnionAll::pointer_type(global)
                             .as_value()
-                            .apply_type(&mut *frame, &mut [DataType::$assoc_ty(global).as_value()])?
-                            .into_jlrs_result()?;
+                            .apply_type_unchecked(&mut *frame, &mut [DataType::$assoc_ty(global).as_value()])?;
 
                         assert_eq!(ty, applied);
                         assert!(applied.cast::<DataType>()?.is::<*mut $type>());
