@@ -7,7 +7,7 @@
 use crate::{
     convert::to_symbol::ToSymbol,
     error::{JlrsError, JlrsResult, CANNOT_DISPLAY_VALUE},
-    impl_debug, impl_julia_typecheck, impl_valid_layout,
+    impl_debug, impl_julia_typecheck,
     memory::{global::Global, output::Output, scope::PartialScope},
     private::Private,
     wrappers::ptr::{
@@ -539,7 +539,6 @@ impl<'scope> Module<'scope> {
 
 impl_julia_typecheck!(Module<'target>, jl_module_type, 'target);
 impl_debug!(Module<'_>);
-impl_valid_layout!(Module<'target>, 'target);
 
 impl<'scope> Wrapper<'scope, '_> for Module<'scope> {
     type Wraps = jl_module_t;

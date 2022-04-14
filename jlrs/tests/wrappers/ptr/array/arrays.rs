@@ -2,9 +2,12 @@
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
 mod tests {
     use crate::util::JULIA;
-    use jlrs::layout::valid_layout::ValidLayout;
     use jlrs::prelude::*;
     use jlrs::wrappers::ptr::array::dimensions::Dims;
+    use jlrs::{
+        layout::valid_layout::ValidLayout,
+        wrappers::ptr::{ArrayRef, ValueRef},
+    };
 
     #[test]
     fn array_can_be_cast() {
@@ -185,7 +188,7 @@ mod tests {
 
                 assert!(arr_val
                     .cast::<Array>()?
-                    .copy_inline_data::<Value, _>(frame)
+                    .copy_inline_data::<ValueRef, _>(frame)
                     .is_err());
 
                 Ok(())
@@ -203,7 +206,7 @@ mod tests {
                 let arr_val = Value::an_empty_vec_any(global);
                 assert!(arr_val
                     .cast::<Array>()?
-                    .inline_data::<Value, _>(&mut *frame)
+                    .inline_data::<ValueRef, _>(&mut *frame)
                     .is_err());
                 Ok(())
             })
@@ -220,7 +223,7 @@ mod tests {
                 let arr_val = Value::an_empty_vec_any(global);
                 assert!(arr_val
                     .cast::<Array>()?
-                    .inline_data_mut::<Value, _>(&mut *frame)
+                    .inline_data_mut::<ValueRef, _>(&mut *frame)
                     .is_err());
                 Ok(())
             })
@@ -237,7 +240,7 @@ mod tests {
                 let arr_val = Value::an_empty_vec_any(global);
                 assert!(arr_val
                     .cast::<Array>()?
-                    .unrestricted_inline_data_mut::<Value, _>(&mut *frame)
+                    .unrestricted_inline_data_mut::<ValueRef, _>(&mut *frame)
                     .is_err());
                 Ok(())
             })
@@ -328,7 +331,7 @@ mod tests {
 
             jlrs.scope_with_capacity(1, |_, frame| {
                 let not_arr_val = Value::new(&mut *frame, 1usize)?;
-                assert!(!Array::valid_layout(not_arr_val));
+                assert!(!ArrayRef::valid_layout(not_arr_val));
                 Ok(())
             })
             .unwrap();

@@ -14,7 +14,7 @@ use super::{
     datatype::DataType,
     private::Wrapper as WrapperPriv,
     value::Value,
-    Wrapper,
+    FunctionRef, Wrapper,
 };
 use crate::{
     error::{JlrsError, JlrsResult, JuliaResult, JuliaResultRef, CANNOT_DISPLAY_TYPE},
@@ -52,17 +52,10 @@ impl<'scope, 'data> Function<'scope, 'data> {
     }
 }
 
-unsafe impl ValidLayout for Function<'_, '_> {
-    fn valid_layout(ty: Value) -> bool {
-        let global = unsafe { Global::new() };
-        let function_type = DataType::function_type(global);
-        ty.subtype(function_type.as_value())
-    }
-}
-
+// XXX: TODO
 unsafe impl Typecheck for Function<'_, '_> {
     fn typecheck(ty: DataType) -> bool {
-        <Self as ValidLayout>::valid_layout(ty.as_value())
+        <FunctionRef as ValidLayout>::valid_layout(ty.as_value())
     }
 }
 

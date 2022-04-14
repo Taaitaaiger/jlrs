@@ -1,11 +1,11 @@
 //! Wrapper for `Symbol`. Symbols represent identifiers like module and function names.
 
+use crate::impl_julia_typecheck;
 use crate::{
     error::{JlrsError, JlrsResult},
     impl_debug,
     memory::{global::Global, output::Output},
 };
-use crate::{impl_julia_typecheck, impl_valid_layout};
 use crate::{private::Private, wrappers::ptr::value::LeakedValue};
 use jl_sys::{jl_sym_t, jl_symbol_n, jl_symbol_name_ as jl_symbol_name, jl_symbol_type};
 use std::ffi::CStr;
@@ -165,7 +165,6 @@ impl<'scope> Symbol<'scope> {
 
 impl_julia_typecheck!(Symbol<'scope>, jl_symbol_type, 'scope);
 impl_debug!(Symbol<'_>);
-impl_valid_layout!(Symbol<'scope>, 'scope);
 
 impl<'scope> Wrapper<'scope, '_> for Symbol<'scope> {
     type Wraps = jl_sym_t;

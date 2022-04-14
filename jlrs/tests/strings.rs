@@ -2,9 +2,9 @@ mod util;
 #[cfg(feature = "sync-rt")]
 mod tests {
     use super::util::JULIA;
-    use jlrs::layout::valid_layout::ValidLayout;
     use jlrs::prelude::*;
     use jlrs::wrappers::ptr::string::JuliaString;
+    use jlrs::{layout::valid_layout::ValidLayout, wrappers::ptr::StringRef};
     use std::borrow::Cow;
 
     #[test]
@@ -70,9 +70,7 @@ mod tests {
                 let v = JuliaString::new(frame, "Foo bar")?;
                 assert!(v.as_value().is::<JuliaString>());
                 let string = v.as_value().cast::<JuliaString>()?;
-                assert!(JuliaString::valid_layout(
-                    v.as_value().datatype().as_value()
-                ));
+                assert!(StringRef::valid_layout(v.as_value().datatype().as_value()));
                 assert_eq!(string.len(), 7);
                 assert_eq!(string.as_c_str().to_str().unwrap(), "Foo bar");
                 assert_eq!(string.as_str().unwrap(), "Foo bar");

@@ -1077,8 +1077,15 @@ impl<'scope, 'data> Value<'scope, 'data> {
         let ty = self.datatype();
         let jl_type = ty.unwrap(Private);
         let field_offset = jl_field_offset(jl_type, idx as _);
+        let is_ptr_field = ty.is_pointer_field_unchecked(idx as _);
+
         let mut field_type =
             ty.field_types().wrapper_unchecked().data()[idx as usize].value_unchecked();
+
+        if is_ptr_field && !T::is_ref() {
+            let value_type_str = field_type.display_string_or(CANNOT_DISPLAY_TYPE).into();
+            Err(JlrsError::InvalidLayout { value_type_str })?;
+        }
 
         #[cfg(not(feature = "lts"))]
         let isatomic = ty.is_atomic_field_unchecked(idx as _);
@@ -1114,8 +1121,15 @@ impl<'scope, 'data> Value<'scope, 'data> {
         }
 
         if T::valid_layout(field_type) {
-            if isatomic {
-                if ty.is_pointer_field_unchecked(idx as usize) {
+            if !isatomic {
+                Ok(self
+                    .unwrap(Private)
+                    .cast::<u8>()
+                    .add(field_offset as usize)
+                    .cast::<T>()
+                    .read())
+            } else {
+                if T::is_ref() {
                     // https://github.com/JuliaLang/julia/blob/9b2169181d341cba5b3358f9e11b96975f563491/src/datatype.c#L1415
                     let ptr = &*self
                         .unwrap(Private)
@@ -1124,7 +1138,6 @@ impl<'scope, 'data> Value<'scope, 'data> {
                         .cast::<AtomicPtr<jl_value_t>>();
 
                     let v = ptr.load(Ordering::Relaxed);
-                    // T must be a pointer wrapper
                     Ok(std::mem::transmute_copy(&v))
                 } else {
                     // https://github.com/JuliaLang/julia/blob/b91dd0268a9fad8208284ae394c0dcc863f68048/src/datatype.c#L849
@@ -1162,13 +1175,6 @@ impl<'scope, 'data> Value<'scope, 'data> {
                         }
                     }
                 }
-            } else {
-                Ok(self
-                    .unwrap(Private)
-                    .cast::<u8>()
-                    .add(field_offset as usize)
-                    .cast::<T>()
-                    .read())
             }
         } else {
             let value_type_str = field_type.display_string_or(CANNOT_DISPLAY_TYPE).into();
@@ -1397,20 +1403,6 @@ impl<'scope> Value<'scope, 'static> {
     /// The handle to `stderr` as a Julia value.
     pub fn stderr(_: Global<'scope>) -> Self {
         unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_stderr_obj()), Private) }
-    }
-}
-
-unsafe impl<'scope, 'data> ValidLayout for Value<'scope, 'data> {
-    fn valid_layout(v: Value) -> bool {
-        if let Ok(dt) = v.cast::<DataType>() {
-            !dt.is_inline_alloc()
-        } else if v.cast::<UnionAll>().is_ok() {
-            true
-        } else if let Ok(u) = v.cast::<Union>() {
-            !u.is_bits_union()
-        } else {
-            false
-        }
     }
 }
 

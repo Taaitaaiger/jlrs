@@ -2,9 +2,9 @@ mod util;
 #[cfg(all(not(feature = "lts"), feature = "sync-rt", feature = "internal-types"))]
 mod not_lts {
     use super::util::JULIA;
-    use jlrs::layout::valid_layout::ValidLayout;
     use jlrs::prelude::*;
     use jlrs::wrappers::ptr::internal::opaque_closure::OpaqueClosure;
+    use jlrs::{layout::valid_layout::ValidLayout, wrappers::ptr::OpaqueClosureRef};
 
     #[test]
     fn create_opaque_closure() {
@@ -17,7 +17,7 @@ mod not_lts {
                         .into_jlrs_result()?;
 
                 assert!(closure.is::<OpaqueClosure>());
-                assert!(OpaqueClosure::valid_layout(
+                assert!(OpaqueClosureRef::valid_layout(
                     closure.as_value().datatype().as_value()
                 ));
                 Ok(())

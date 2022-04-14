@@ -6,7 +6,7 @@
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L535
 
 use super::super::private::Wrapper;
-use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout, memory::output::Output};
+use crate::{impl_debug, impl_julia_typecheck, memory::output::Output};
 use crate::{
     private::Private,
     wrappers::ptr::{ArrayRef, ModuleRef, SymbolRef, ValueRef},
@@ -138,7 +138,6 @@ impl<'scope> MethodTable<'scope> {
 
 impl_julia_typecheck!(MethodTable<'scope>, jl_methtable_type, 'scope);
 impl_debug!(MethodTable<'_>);
-impl_valid_layout!(MethodTable<'scope>, 'scope);
 
 impl<'scope> Wrapper<'scope, '_> for MethodTable<'scope> {
     type Wraps = jl_methtable_t;

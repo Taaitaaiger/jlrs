@@ -6,6 +6,7 @@ mod tests {
     use super::impls::*;
     use super::util::JULIA;
     use jlrs::prelude::*;
+    use jlrs::wrappers::ptr::ModuleRef;
 
     #[test]
     fn derive_bits_type_bool() {
@@ -844,7 +845,7 @@ mod tests {
                         .is::<WithPropagatedLifetime>());
 
                     let first = jl_val.get_nth_field(&mut *frame, 0).unwrap();
-                    assert!(first.unbox::<WithGenericT<Module>>().is_ok());
+                    assert!(first.unbox::<WithGenericT<ModuleRef>>().is_ok());
 
                     assert!(jl_val.is::<WithPropagatedLifetime>());
                     assert!(jl_val.unbox::<WithPropagatedLifetime>().is_ok());
@@ -858,6 +859,8 @@ mod tests {
     #[test]
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     fn derive_with_propagated_lifetimes() {
+        use jlrs::wrappers::ptr::ArrayRef;
+
         JULIA.with(|j| {
             let mut julia = j.borrow_mut();
 
@@ -899,7 +902,7 @@ mod tests {
 
                     let first = jl_val.get_nth_field(&mut *frame, 0).unwrap();
                     assert!(first
-                        .unbox::<WithGenericT<Tuple2<i32, WithGenericT<Array>>>>()
+                        .unbox::<WithGenericT<Tuple2<i32, WithGenericT<ArrayRef>>>>()
                         .is_ok());
 
                     assert!(jl_val.is::<WithPropagatedLifetimes>());

@@ -15,7 +15,7 @@ use crate::layout::typecheck::Concrete;
 use crate::memory::scope::PartialScope;
 use crate::wrappers::ptr::{simple_vector::SimpleVector, symbol::Symbol};
 use crate::{error::JlrsResult, impl_julia_typecheck};
-use crate::{impl_debug, impl_valid_layout, memory::global::Global, private::Private};
+use crate::{impl_debug, memory::global::Global, private::Private};
 use crate::{layout::typecheck::Typecheck, memory::output::Output};
 use jl_sys::{
     jl_abstractslot_type, jl_abstractstring_type, jl_any_type, jl_anytuple_type, jl_argument_type,
@@ -1044,7 +1044,6 @@ impl<'scope, 'data> PartialEq<Value<'scope, 'data>> for DataType<'scope> {
 impl<'scope> Eq for DataType<'scope> {}
 impl_debug!(DataType<'_>);
 impl_julia_typecheck!(DataType<'frame>, jl_datatype_type, 'frame);
-impl_valid_layout!(DataType<'scope>, 'scope);
 
 impl<'scope> WrapperPriv<'scope, '_> for DataType<'scope> {
     type Wraps = jl_datatype_t;

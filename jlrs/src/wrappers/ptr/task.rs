@@ -5,7 +5,7 @@
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L1727
 use super::private::Wrapper;
-use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout, memory::output::Output};
+use crate::{impl_debug, impl_julia_typecheck, memory::output::Output};
 use crate::{
     private::Private,
     wrappers::ptr::{TaskRef, ValueRef},
@@ -128,7 +128,6 @@ impl<'scope> Task<'scope> {
 
 impl_julia_typecheck!(Task<'scope>, jl_task_type, 'scope);
 impl_debug!(Task<'_>);
-impl_valid_layout!(Task<'scope>, 'scope);
 
 impl<'scope> Wrapper<'scope, '_> for Task<'scope> {
     type Wraps = jl_task_t;

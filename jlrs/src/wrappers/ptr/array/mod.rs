@@ -79,7 +79,7 @@ use std::{
     slice,
 };
 
-use super::type_name::TypeName;
+use super::{type_name::TypeName, WrapperRef};
 
 pub mod data;
 pub mod dimensions;
@@ -824,10 +824,9 @@ impl<'scope, 'data> Array<'scope, 'data> {
     ) -> JlrsResult<ValueArrayData<'borrow, 'scope, 'data, T>>
     where
         F: Frame<'frame>,
-        T: Wrapper<'scope, 'data>,
-        T::Ref: ValidLayout,
+        T: WrapperRef<'scope, 'data> + ValidLayout,
     {
-        if !self.contains::<T::Ref>() {
+        if !self.contains::<T>() {
             Err(JlrsError::WrongType {
                 value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
@@ -868,10 +867,9 @@ impl<'scope, 'data> Array<'scope, 'data> {
     ) -> JlrsResult<ValueArrayDataMut<'borrow, 'scope, 'data, T>>
     where
         F: Frame<'frame>,
-        T: Wrapper<'scope, 'data>,
-        T::Ref: ValidLayout,
+        T: WrapperRef<'scope, 'data> + ValidLayout,
     {
-        if !self.contains::<T::Ref>() {
+        if !self.contains::<T>() {
             Err(JlrsError::WrongType {
                 value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
@@ -918,7 +916,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     ) -> JlrsResult<UnrestrictedValueArrayDataMut<'borrow, 'scope, 'data, T>>
     where
         F: Frame<'frame>,
-        T: Wrapper<'scope, 'data>,
+        T: WrapperRef<'scope, 'data> + ValidLayout,
     {
         if !self.is_value_array() {
             Err(JlrsError::WrongType {
@@ -1145,18 +1143,6 @@ unsafe impl<'scope, 'data> Typecheck for Array<'scope, 'data> {
     }
 }
 
-unsafe impl<'scope, 'data> ValidLayout for Array<'scope, 'data> {
-    fn valid_layout(v: Value) -> bool {
-        if let Ok(dt) = v.cast::<DataType>() {
-            dt.is::<Array>()
-        } else if let Ok(ua) = v.cast::<super::union_all::UnionAll>() {
-            unsafe { ua.base_type().wrapper_unchecked().is::<Array>() }
-        } else {
-            false
-        }
-    }
-}
-
 impl_debug!(Array<'_, '_>);
 
 impl<'scope, 'data> WrapperPriv<'scope, 'data> for Array<'scope, 'data> {
@@ -1317,7 +1303,7 @@ impl<'scope, 'data, T: Clone + ValidLayout + Debug> TypedArray<'scope, 'data, T>
     }
 }
 
-impl<'scope, 'data, T: Wrapper<'scope, 'data> + ValidLayout> TypedArray<'scope, 'data, T> {
+impl<'scope, 'data, T: WrapperRef<'scope, 'data> + ValidLayout> TypedArray<'scope, 'data, T> {
     /// Immutably borrow the data of this array as an array of values, you can borrow data
     /// from multiple arrays at the same time.
     pub fn value_data<'borrow, 'frame, F>(
@@ -1507,20 +1493,6 @@ unsafe impl<'scope, 'data, T: Clone + ValidLayout + Debug> Typecheck
                 && T::valid_layout(
                     t.parameters().wrapper_unchecked().data_unchecked()[0].as_value(),
                 )
-        }
-    }
-}
-
-unsafe impl<'scope, 'data, T: Clone + ValidLayout + Debug> ValidLayout
-    for TypedArray<'scope, 'data, T>
-{
-    fn valid_layout(v: Value) -> bool {
-        if let Ok(dt) = v.cast::<DataType>() {
-            dt.is::<TypedArray<T>>()
-        } else if let Ok(ua) = v.cast::<super::union_all::UnionAll>() {
-            unsafe { ua.base_type().wrapper_unchecked().is::<TypedArray<T>>() }
-        } else {
-            false
         }
     }
 }

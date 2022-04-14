@@ -155,4 +155,8 @@ unsafe impl ValidLayout for EmptyUnion {
     fn valid_layout(ty: Value) -> bool {
         unsafe { ty.unwrap(Private) == jl_bottom_type }
     }
+
+    fn is_ref() -> bool {
+        true
+    }
 }

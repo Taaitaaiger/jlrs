@@ -1,12 +1,10 @@
 //! Wrapper for `OpaqueClosure`.
 
 use super::super::type_name::TypeName;
-use super::super::union_all::UnionAll;
 use super::super::MethodRef;
 use super::super::{call::Call, datatype::DataType, private::Wrapper, value::Value, Wrapper as _};
 use crate::impl_debug;
 use crate::layout::typecheck::Typecheck;
-use crate::layout::valid_layout::ValidLayout;
 use crate::memory::global::Global;
 use crate::{
     error::{JlrsResult, JuliaResult, JuliaResultRef},
@@ -83,24 +81,6 @@ impl<'scope> OpaqueClosure<'scope> {
 unsafe impl Typecheck for OpaqueClosure<'_> {
     fn typecheck(t: DataType) -> bool {
         unsafe { t.type_name().wrapper_unchecked() == TypeName::of_opaque_closure(Global::new()) }
-    }
-}
-
-unsafe impl ValidLayout for OpaqueClosure<'_> {
-    fn valid_layout(ty: Value) -> bool {
-        unsafe {
-            if let Ok(dt) = ty.cast::<DataType>() {
-                dt.type_name().wrapper_unchecked() == TypeName::of_opaque_closure(Global::new())
-            } else if let Ok(ua) = ty.cast::<UnionAll>() {
-                ua.base_type()
-                    .wrapper_unchecked()
-                    .type_name()
-                    .wrapper_unchecked()
-                    == TypeName::of_opaque_closure(Global::new())
-            } else {
-                false
-            }
-        }
     }
 }
 

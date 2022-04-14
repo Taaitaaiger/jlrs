@@ -6,8 +6,7 @@
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L273
 
 use crate::{
-    impl_debug, impl_julia_typecheck, impl_valid_layout, memory::output::Output,
-    wrappers::ptr::TypedArrayRef,
+    impl_debug, impl_julia_typecheck, memory::output::Output, wrappers::ptr::TypedArrayRef,
 };
 use crate::{
     private::Private,
@@ -274,7 +273,6 @@ impl<'scope> Method<'scope> {
 }
 
 impl_julia_typecheck!(Method<'scope>, jl_method_type, 'scope);
-impl_valid_layout!(Method<'scope>, 'scope);
 impl_debug!(Method<'_>);
 
 impl<'scope> Wrapper<'scope, '_> for Method<'scope> {
