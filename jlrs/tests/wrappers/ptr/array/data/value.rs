@@ -3,6 +3,7 @@
 mod tests {
     use crate::util::JULIA;
     use jlrs::prelude::*;
+    use jlrs::wrappers::ptr::ModuleRef;
 
     #[test]
     fn access_value_array_dimensions() {
@@ -29,17 +30,17 @@ mod tests {
                 }
 
                 {
-                    let data = arr.wrapper_data::<Module, _>(frame)?;
+                    let data = arr.wrapper_data::<ModuleRef, _>(frame)?;
                     assert_eq!(data.dimensions().as_slice(), &[4]);
                 }
 
                 unsafe {
-                    let data = arr.wrapper_data_mut::<Module, _>(frame)?;
+                    let data = arr.wrapper_data_mut::<ModuleRef, _>(frame)?;
                     assert_eq!(data.dimensions().as_slice(), &[4]);
                 }
 
                 unsafe {
-                    let data = arr.unrestricted_wrapper_data_mut::<Module, _>(frame)?;
+                    let data = arr.unrestricted_wrapper_data_mut::<ModuleRef, _>(frame)?;
                     assert_eq!(data.dimensions().as_slice(), &[4]);
                 }
 
@@ -85,7 +86,7 @@ mod tests {
                 }
 
                 unsafe {
-                    let data = arr.wrapper_data::<Module, _>(frame)?;
+                    let data = arr.wrapper_data::<ModuleRef, _>(frame)?;
                     assert_eq!(data[1].value_unchecked(), module);
                     assert_eq!(
                         data.get(1).unwrap().wrapper_unchecked(),
@@ -94,7 +95,7 @@ mod tests {
                 }
 
                 unsafe {
-                    let mut data = arr.wrapper_data_mut::<Module, _>(frame)?;
+                    let mut data = arr.wrapper_data_mut::<ModuleRef, _>(frame)?;
                     assert!(data[2].is_undefined());
                     assert!(data.set(2, Some(module)).is_ok());
                     assert!(!data[2].is_undefined());
@@ -106,7 +107,7 @@ mod tests {
                 }
 
                 unsafe {
-                    let mut data = arr.unrestricted_wrapper_data_mut::<Module, _>(frame)?;
+                    let mut data = arr.unrestricted_wrapper_data_mut::<ModuleRef, _>(frame)?;
                     assert!(data[3].is_undefined());
                     assert!(data.set(3, Some(module)).is_ok());
                     assert!(!data[3].is_undefined());
@@ -145,12 +146,12 @@ mod tests {
                 }
 
                 {
-                    let mut data = arr.wrapper_data_mut::<Module, _>(frame)?;
+                    let mut data = arr.wrapper_data_mut::<ModuleRef, _>(frame)?;
                     assert!(data.set(0, Some(module)).is_err());
                 }
 
                 {
-                    let mut data = arr.unrestricted_wrapper_data_mut::<Module, _>(frame)?;
+                    let mut data = arr.unrestricted_wrapper_data_mut::<ModuleRef, _>(frame)?;
                     assert!(data.set(0, Some(module)).is_err());
                 }
 
@@ -188,19 +189,19 @@ mod tests {
                 }
 
                 {
-                    let data = arr.wrapper_data::<Module, _>(frame)?;
+                    let data = arr.wrapper_data::<ModuleRef, _>(frame)?;
                     let slice = data.as_slice();
                     assert_eq!(slice.len(), 4)
                 }
 
                 {
-                    let data = arr.wrapper_data_mut::<Module, _>(frame)?;
+                    let data = arr.wrapper_data_mut::<ModuleRef, _>(frame)?;
                     let slice = data.as_slice();
                     assert_eq!(slice.len(), 4)
                 }
 
                 {
-                    let data = arr.unrestricted_wrapper_data_mut::<Module, _>(frame)?;
+                    let data = arr.unrestricted_wrapper_data_mut::<ModuleRef, _>(frame)?;
                     let slice = data.as_slice();
                     assert_eq!(slice.len(), 4)
                 }

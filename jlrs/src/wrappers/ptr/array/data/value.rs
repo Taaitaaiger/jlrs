@@ -11,7 +11,7 @@ use crate::{
         },
         private::Wrapper as _,
         value::Value,
-        Ref, ValueRef, Wrapper,
+        ValueRef, Wrapper, WrapperRef,
     },
 };
 use jl_sys::jl_array_ptr_set;
@@ -20,17 +20,17 @@ use std::{marker::PhantomData, ops::Index, ptr::null_mut, slice};
 /// Immutably borrowed value array data from Julia. The data has a column-major order and can be
 /// indexed with anything that implements [`Dims`].
 #[repr(transparent)]
-pub struct ValueArrayData<'borrow, 'array, 'data, T = Value<'array, 'data>>
+pub struct ValueArrayData<'borrow, 'array, 'data, T = ValueRef<'array, 'data>>
 where
-    T: Wrapper<'array, 'data>,
+    T: WrapperRef<'array, 'data>,
 {
     array: Array<'array, 'data>,
-    _marker: PhantomData<&'borrow [Ref<'array, 'data, T>]>,
+    _marker: PhantomData<&'borrow [T]>,
 }
 
 impl<'borrow, 'array, 'data, T> ValueArrayData<'borrow, 'array, 'data, T>
 where
-    T: Wrapper<'array, 'data>,
+    T: WrapperRef<'array, 'data>,
 {
     // Safety: The representation of T and the element type must match
     pub(crate) unsafe fn new<'frame, F>(array: Array<'array, 'data>, _: &'borrow F) -> Self
@@ -44,26 +44,21 @@ where
     }
 
     /// Get a reference to the value at `index`, or `None` if the index is out of bounds.
-    pub fn get<D>(&self, index: D) -> Option<Ref<'array, 'data, T>>
+    pub fn get<D>(&self, index: D) -> Option<T>
     where
         D: Dims,
     {
         unsafe {
             let dims = ArrayDimensions::new(self.array);
-            let idx = dims.index_of(index).ok()?;
-            self.array
-                .data_ptr()
-                .cast::<Ref<T>>()
-                .add(idx)
-                .as_ref()
-                .cloned()
+            let idx = dims.index_of(&index).ok()?;
+            self.array.data_ptr().cast::<T>().add(idx).as_ref().cloned()
         }
     }
 
     /// Returns the array's data as a slice, the data is in column-major order.
-    pub fn as_slice(&self) -> &[Ref<'array, 'data, T>] {
+    pub fn as_slice(&self) -> &[T] {
         unsafe {
-            let arr_data = self.array.data_ptr().cast::<Ref<T>>();
+            let arr_data = self.array.data_ptr().cast::<T>();
 
             let dims = ArrayDimensions::new(self.array);
             let n_elems = dims.size();
@@ -80,19 +75,14 @@ where
 impl<'borrow, 'array, 'data, D, T> Index<D> for ValueArrayData<'borrow, 'array, 'data, T>
 where
     D: Dims,
-    T: Wrapper<'array, 'data>,
+    T: WrapperRef<'array, 'data>,
 {
-    type Output = Ref<'array, 'data, T>;
+    type Output = T;
     fn index(&self, index: D) -> &Self::Output {
         unsafe {
             let dims = ArrayDimensions::new(self.array);
-            let idx = dims.index_of(index).unwrap();
-            self.array
-                .data_ptr()
-                .cast::<Ref<T>>()
-                .add(idx)
-                .as_ref()
-                .unwrap()
+            let idx = dims.index_of(&index).unwrap();
+            self.array.data_ptr().cast::<T>().add(idx).as_ref().unwrap()
         }
     }
 }
@@ -100,17 +90,17 @@ where
 /// Mutably borrowed value array data from Julia. The data has a column-major order and can be
 /// indexed with anything that implements [`Dims`].
 #[repr(transparent)]
-pub struct ValueArrayDataMut<'borrow, 'array, 'data, T = Value<'array, 'data>>
+pub struct ValueArrayDataMut<'borrow, 'array, 'data, T = ValueRef<'array, 'data>>
 where
-    T: Wrapper<'array, 'data>,
+    T: WrapperRef<'array, 'data>,
 {
     array: Array<'array, 'data>,
-    _marker: PhantomData<&'borrow mut [Ref<'array, 'data, T>]>,
+    _marker: PhantomData<&'borrow mut [T]>,
 }
 
 impl<'borrow, 'array, 'data, T> ValueArrayDataMut<'borrow, 'array, 'data, T>
 where
-    T: Wrapper<'array, 'data>,
+    T: WrapperRef<'array, 'data>,
 {
     // Safety: The representation of T and the element type must match
     pub(crate) unsafe fn new<'frame, F>(array: Array<'array, 'data>, _: &'borrow mut F) -> Self
@@ -124,19 +114,14 @@ where
     }
 
     /// Get a reference to the value at `index`, or `None` if the index is out of bounds.
-    pub fn get<D>(&self, index: D) -> Option<Ref<'array, 'data, T>>
+    pub fn get<D>(&self, index: D) -> Option<T>
     where
         D: Dims,
     {
         unsafe {
             let dims = ArrayDimensions::new(self.array);
-            let idx = dims.index_of(index).ok()?;
-            self.array
-                .data_ptr()
-                .cast::<Ref<T>>()
-                .add(idx)
-                .as_ref()
-                .cloned()
+            let idx = dims.index_of(&index).ok()?;
+            self.array.data_ptr().cast::<T>().add(idx).as_ref().cloned()
         }
     }
 
@@ -148,7 +133,7 @@ where
         unsafe {
             let ptr = self.array.unwrap(Private);
             let dims = ArrayDimensions::new(self.array);
-            let idx = dims.index_of(index)?;
+            let idx = dims.index_of(&index)?;
 
             let data_ptr = if let Some(value) = value {
                 if !self
@@ -178,9 +163,9 @@ where
     }
 
     /// Returns the array's data as a slice, the data is in column-major order.
-    pub fn as_slice(&self) -> &[Ref<'array, 'data, T>] {
+    pub fn as_slice(&self) -> &[T] {
         unsafe {
-            let arr_data = self.array.data_ptr().cast::<Ref<T>>();
+            let arr_data = self.array.data_ptr().cast::<T>();
             let dims = ArrayDimensions::new(self.array);
             let n_elems = dims.size();
             slice::from_raw_parts(arr_data, n_elems)
@@ -196,19 +181,14 @@ where
 impl<'borrow, 'array, 'data, D, T> Index<D> for ValueArrayDataMut<'borrow, 'array, 'data, T>
 where
     D: Dims,
-    T: Wrapper<'array, 'data>,
+    T: WrapperRef<'array, 'data>,
 {
-    type Output = ValueRef<'array, 'data>;
+    type Output = T;
     fn index(&self, index: D) -> &Self::Output {
         unsafe {
             let dims = ArrayDimensions::new(self.array);
-            let idx = dims.index_of(index).unwrap();
-            self.array
-                .data_ptr()
-                .cast::<ValueRef>()
-                .add(idx)
-                .as_ref()
-                .unwrap()
+            let idx = dims.index_of(&index).unwrap();
+            self.array.data_ptr().cast::<T>().add(idx).as_ref().unwrap()
         }
     }
 }
@@ -216,17 +196,17 @@ where
 /// Mutably borrowed value array data from Julia. The data has a column-major order and can be
 /// indexed with anything that implements [`Dims`].
 #[repr(transparent)]
-pub struct UnrestrictedValueArrayDataMut<'borrow, 'array, 'data, T = Value<'array, 'data>>
+pub struct UnrestrictedValueArrayDataMut<'borrow, 'array, 'data, T = ValueRef<'array, 'data>>
 where
-    T: Wrapper<'array, 'data>,
+    T: WrapperRef<'array, 'data>,
 {
     array: Array<'array, 'data>,
-    _marker: PhantomData<&'borrow mut [Ref<'array, 'data, T>]>,
+    _marker: PhantomData<&'borrow mut [T]>,
 }
 
 impl<'borrow, 'array, 'data, T> UnrestrictedValueArrayDataMut<'borrow, 'array, 'data, T>
 where
-    T: Wrapper<'array, 'data>,
+    T: WrapperRef<'array, 'data>,
 {
     // Safety: The representation of T and the element type must match
     pub(crate) unsafe fn new<'frame, F>(array: Array<'array, 'data>, _: &'borrow F) -> Self
@@ -240,19 +220,14 @@ where
     }
 
     /// Get a reference to the value at `index`, or `None` if the index is out of bounds.
-    pub fn get<D>(&self, index: D) -> Option<Ref<'array, 'data, T>>
+    pub fn get<D>(&self, index: D) -> Option<T>
     where
         D: Dims,
     {
         unsafe {
             let dims = ArrayDimensions::new(self.array);
-            let idx = dims.index_of(index).ok()?;
-            self.array
-                .data_ptr()
-                .cast::<Ref<T>>()
-                .add(idx)
-                .as_ref()
-                .cloned()
+            let idx = dims.index_of(&index).ok()?;
+            self.array.data_ptr().cast::<T>().add(idx).as_ref().cloned()
         }
     }
 
@@ -264,7 +239,7 @@ where
         unsafe {
             let ptr = self.array.unwrap(Private);
             let dims = ArrayDimensions::new(self.array);
-            let idx = dims.index_of(index)?;
+            let idx = dims.index_of(&index)?;
 
             let data_ptr = if let Some(value) = value {
                 if !self
@@ -294,9 +269,9 @@ where
     }
 
     /// Returns the array's data as a slice, the data is in column-major order.
-    pub fn as_slice(&self) -> &[Ref<'array, 'data, T>] {
+    pub fn as_slice(&self) -> &[T] {
         unsafe {
-            let arr_data = self.array.data_ptr().cast::<Ref<T>>();
+            let arr_data = self.array.data_ptr().cast::<T>();
             let dims = ArrayDimensions::new(self.array);
             let n_elems = dims.size();
             slice::from_raw_parts(arr_data, n_elems)
@@ -313,19 +288,14 @@ impl<'borrow, 'array, 'data, D, T> Index<D>
     for UnrestrictedValueArrayDataMut<'borrow, 'array, 'data, T>
 where
     D: Dims,
-    T: Wrapper<'array, 'data>,
+    T: WrapperRef<'array, 'data>,
 {
-    type Output = Ref<'array, 'data, T>;
+    type Output = T;
     fn index(&self, index: D) -> &Self::Output {
         unsafe {
             let dims = ArrayDimensions::new(self.array);
-            let idx = dims.index_of(index).unwrap();
-            self.array
-                .data_ptr()
-                .cast::<Ref<T>>()
-                .add(idx)
-                .as_ref()
-                .unwrap()
+            let idx = dims.index_of(&index).unwrap();
+            self.array.data_ptr().cast::<T>().add(idx).as_ref().unwrap()
         }
     }
 }

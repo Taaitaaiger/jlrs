@@ -10,7 +10,7 @@ use crate::memory::{global::Global, output::Output};
 use crate::private::Private;
 use crate::wrappers::ptr::{SymbolRef, ValueRef};
 use crate::{convert::to_symbol::ToSymbol, error::JlrsResult};
-use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout};
+use crate::{impl_debug, impl_julia_typecheck};
 use jl_sys::{jl_new_typevar, jl_tvar_t, jl_tvar_type};
 
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
@@ -152,7 +152,6 @@ impl<'scope> TypeVar<'scope> {
 
 impl_julia_typecheck!(TypeVar<'scope>, jl_tvar_type, 'scope);
 impl_debug!(TypeVar<'_>);
-impl_valid_layout!(TypeVar<'scope>, 'scope);
 
 impl<'scope> Wrapper<'scope, '_> for TypeVar<'scope> {
     type Wraps = jl_tvar_t;

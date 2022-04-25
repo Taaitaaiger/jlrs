@@ -142,6 +142,10 @@ macro_rules! impl_valid_layout {
                     false
                 }
             }
+
+            fn is_ref() -> bool {
+                true
+            }
         }
     };
 }
@@ -169,11 +173,19 @@ macro_rules! impl_ref_root {
     };
 }
 
-pub trait Root<'target, 'value, 'data>: Wrapper<'value, 'data> {
+pub(crate) trait Root<'target, 'value, 'data>: Wrapper<'value, 'data> {
     type Output;
     unsafe fn root<S>(scope: S, value: Ref<'value, 'data, Self>) -> JlrsResult<Self::Output>
     where
         S: PartialScope<'target>;
+}
+
+/// Marker trait implemented by `Ref`.
+pub trait WrapperRef<'scope, 'data>: private::WrapperRef<'scope, 'data> + Copy + Debug {}
+
+impl<'scope, 'data, T> WrapperRef<'scope, 'data> for Ref<'scope, 'data, T> where
+    T: Wrapper<'scope, 'data>
+{
 }
 
 /// Methods shared by all builtin pointer wrappers.
@@ -321,6 +333,10 @@ unsafe impl ValidLayout for ValueRef<'_, '_> {
             false
         }
     }
+
+    fn is_ref() -> bool {
+        true
+    }
 }
 
 impl_ref_root!(Value, ValueRef, 2);
@@ -333,6 +349,10 @@ unsafe impl ValidLayout for FunctionRef<'_, '_> {
         let global = unsafe { Global::new() };
         let function_type = DataType::function_type(global);
         ty.subtype(function_type.as_value())
+    }
+
+    fn is_ref() -> bool {
+        true
     }
 }
 
@@ -351,6 +371,10 @@ unsafe impl ValidLayout for ArrayRef<'_, '_> {
             false
         }
     }
+
+    fn is_ref() -> bool {
+        true
+    }
 }
 
 impl_ref_root!(Array, ArrayRef, 2);
@@ -367,6 +391,10 @@ unsafe impl<T: Clone + ValidLayout + Debug> ValidLayout for TypedArrayRef<'_, '_
         } else {
             false
         }
+    }
+
+    fn is_ref() -> bool {
+        true
     }
 }
 
@@ -466,6 +494,10 @@ unsafe impl<'scope, T: Wrapper<'scope, 'static>> ValidLayout for SimpleVectorRef
         } else {
             false
         }
+    }
+
+    fn is_ref() -> bool {
+        true
     }
 }
 
@@ -669,6 +701,13 @@ pub(crate) mod private {
 
             Some(Value::wrap(ptr.cast(), Private))
         }
+    }
+
+    pub trait WrapperRef<'scope, 'data> {}
+
+    impl<'scope, 'data, T> WrapperRef<'scope, 'data> for Ref<'scope, 'data, T> where
+        T: Wrapper<'scope, 'data>
+    {
     }
 }
 

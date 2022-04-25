@@ -32,3 +32,17 @@
  - The `AsUnrooted` trait has been removed.
  
  - Most of the extensions defined in the extensions module have moved: `jlrs::extensions::f16` to `jlrs::wrappers::inline::f16`. `jlrs::extensions::ndarray` to `jlrs::ndarray`, `jlrs::extensions::multitask` to `jlrs::multitask`, and `jlrs::extensions::pyplot` to `jlrs::pyplot`.
+
+ - Pointer wrapper types don't implement `ValidLayout`, only `Ref` and inline wrappers do. 
+
+ - Raw fields can be accessed with `FieldAccessor`, the `raw_field` methods have been removed.
+
+ - Add a `FieldIndex` trait which is used in combination with a `FieldAccessor` to access arbitrary fields.
+
+ - A wrapper for `Nothing`/`nothing` has been added.
+
+ - `Dims::index_of` now takes `dim_index` by reference.
+
+ - `Array::element_size` and `TypedArray::element_size` have been added.
+
+ - `DataType::field_type_unchecked` and `DataType::field_index` have been added.

@@ -5,6 +5,7 @@ use super::{private::Wrapper, value::Value};
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
 use crate::error::{JuliaResult, JuliaResultRef};
 use crate::impl_debug;
+use crate::impl_julia_typecheck;
 use crate::wrappers::ptr::datatype::DataType;
 use crate::wrappers::ptr::DataTypeRef;
 use crate::wrappers::ptr::{TypeVarRef, ValueRef};
@@ -12,7 +13,6 @@ use crate::{
     error::JlrsResult,
     memory::{output::Output, scope::PartialScope},
 };
-use crate::{impl_julia_typecheck, impl_valid_layout};
 use crate::{memory::global::Global, private::Private};
 
 use jl_sys::{
@@ -215,7 +215,6 @@ impl<'base> UnionAll<'base> {
 
 impl_julia_typecheck!(UnionAll<'scope>, jl_unionall_type, 'scope);
 impl_debug!(UnionAll<'_>);
-impl_valid_layout!(UnionAll<'scope>, 'scope);
 
 impl<'scope> Wrapper<'scope, '_> for UnionAll<'scope> {
     type Wraps = jl_unionall_t;

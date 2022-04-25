@@ -158,8 +158,8 @@ pub(crate) mod private {
     use crate::{
         error::{JlrsError, JlrsResult, JuliaResult},
         memory::{frame::Frame, output::Output},
-        prelude::Value,
         private::Private,
+        wrappers::ptr::value::Value,
     };
     use crate::{memory::output::OutputScope, wrappers::ptr::private::Wrapper};
     use jl_sys::jl_value_t;

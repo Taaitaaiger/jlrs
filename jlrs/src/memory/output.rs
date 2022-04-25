@@ -9,10 +9,7 @@
 //! frame by calling [`Frame::reserve_output`], an `Output` can be turned into an `OutputScope` by
 //! calling [`Output::into_scope`].
 
-use crate::{
-    prelude::{Frame, Wrapper},
-    private::Private,
-};
+use crate::{memory::frame::Frame, private::Private, wrappers::ptr::Wrapper};
 use std::{cell::Cell, ffi::c_void, marker::PhantomData, ptr::NonNull};
 
 /// A reserved slot in a frame. A new output can be created by calling [`Frame::reserve_output`].

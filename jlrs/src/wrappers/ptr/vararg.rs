@@ -1,7 +1,7 @@
 //! Wrapper for `Vararg`.
 
 use super::private::Wrapper;
-use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout, memory::output::Output};
+use crate::{impl_debug, impl_julia_typecheck, memory::output::Output};
 use crate::{private::Private, wrappers::ptr::ValueRef};
 use jl_sys::{jl_vararg_t, jl_vararg_type};
 use std::{marker::PhantomData, ptr::NonNull};
@@ -34,7 +34,6 @@ impl<'scope> Vararg<'scope> {
 
 impl_julia_typecheck!(Vararg<'scope>, jl_vararg_type, 'scope);
 impl_debug!(Vararg<'_>);
-impl_valid_layout!(Vararg<'scope>, 'scope);
 
 impl<'scope> Wrapper<'scope, 'static> for Vararg<'scope> {
     type Wraps = jl_vararg_t;

@@ -39,7 +39,7 @@ pub trait Dims: Sized + Debug {
 
     /// Calculates the linear index for `dim_index` in an array with dimensions `self`. The
     /// default implementation is generally correct and should not be overridden.
-    fn index_of<D: Dims>(&self, dim_index: D) -> JlrsResult<usize> {
+    fn index_of<D: Dims>(&self, dim_index: &D) -> JlrsResult<usize> {
         if self.n_dimensions() != dim_index.n_dimensions() {
             Err(JlrsError::InvalidIndex {
                 idx: dim_index.into_dimensions(),

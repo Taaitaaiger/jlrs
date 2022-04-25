@@ -5,7 +5,7 @@
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L321
 use super::super::private::Wrapper;
-use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout, memory::output::Output};
+use crate::{impl_debug, impl_julia_typecheck, memory::output::Output};
 use crate::{
     private::Private,
     wrappers::ptr::{CodeInstanceRef, SimpleVectorRef, ValueRef},
@@ -109,7 +109,6 @@ impl<'scope> MethodInstance<'scope> {
 }
 
 impl_julia_typecheck!(MethodInstance<'scope>, jl_method_instance_type, 'scope);
-impl_valid_layout!(MethodInstance<'scope>, 'scope);
 impl_debug!(MethodInstance<'_>);
 
 impl<'scope> Wrapper<'scope, '_> for MethodInstance<'scope> {

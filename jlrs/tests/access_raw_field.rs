@@ -7,7 +7,6 @@ mod tests {
     use jlrs::wrappers::ptr::ArrayRef;
     use jlrs::wrappers::ptr::DataTypeRef;
     use jlrs::wrappers::ptr::TypedArrayRef;
-    use jlrs::wrappers::ptr::ValueRef;
 
     #[test]
     fn access_raw_fields_bits() {
@@ -28,10 +27,10 @@ mod tests {
                     .instantiate(&mut *frame, &mut [arg1, arg2])?
                     .into_jlrs_result()?;
 
-                let a = instance.get_raw_field::<i16, _>("a")?;
+                let a = instance.field_accessor(frame).field("a")?.access::<i16>()?;
                 assert_eq!(a, 3);
 
-                let b = instance.get_raw_field::<i32, _>("b")?;
+                let b = instance.field_accessor(frame).field("b")?.access::<i32>()?;
                 assert_eq!(b, -3);
 
                 Ok(())
@@ -59,10 +58,13 @@ mod tests {
                     .instantiate(&mut *frame, &mut [arg1, arg2.as_value()])?
                     .into_jlrs_result()?;
 
-                let a = instance.get_raw_field::<i16, _>("a")?;
+                let a = instance.field_accessor(frame).field("a")?.access::<i16>()?;
                 assert_eq!(a, 3);
 
-                let b = instance.get_raw_field::<DataTypeRef, _>("b")?;
+                let b = instance
+                    .field_accessor(frame)
+                    .field("b")?
+                    .access::<DataTypeRef>()?;
                 assert_eq!(unsafe { b.wrapper_unchecked() }, arg2);
 
                 Ok(())
@@ -90,10 +92,10 @@ mod tests {
                     .instantiate(&mut *frame, &mut [arg1, arg2])?
                     .into_jlrs_result()?;
 
-                let a = instance.get_raw_field::<i16, _>("a")?;
+                let a = instance.field_accessor(frame).field("a")?.access::<i16>()?;
                 assert_eq!(a, 3);
 
-                let b = instance.get_raw_field::<i32, _>("b")?;
+                let b = instance.field_accessor(frame).field("b")?.access::<i32>()?;
                 assert_eq!(b, -3);
 
                 Ok(())
@@ -121,10 +123,13 @@ mod tests {
                     .instantiate(&mut *frame, &mut [arg1.as_value(), arg2])?
                     .into_jlrs_result()?;
 
-                let a = instance.get_raw_field::<DataTypeRef, _>("a")?;
+                let a = instance
+                    .field_accessor(frame)
+                    .field("a")?
+                    .access::<DataTypeRef>()?;
                 assert_eq!(unsafe { a.wrapper_unchecked() }, arg1);
 
-                let b = instance.get_raw_field::<i32, _>("b")?;
+                let b = instance.field_accessor(frame).field("b")?.access::<i32>()?;
                 assert_eq!(b, -3);
 
                 Ok(())
@@ -152,12 +157,14 @@ mod tests {
                     .instantiate(&mut *frame, &mut [arg1.as_value(), arg2])?
                     .into_jlrs_result()?;
 
-                let a = instance.get_raw_field::<DataTypeRef, _>("a")?;
+                let a = instance
+                    .field_accessor(frame)
+                    .field("a")?
+                    .access::<DataTypeRef>()?;
                 assert_eq!(unsafe { a.wrapper_unchecked() }, arg1);
 
-                let b = instance.get_raw_field::<ValueRef, _>("b")?;
-                let v = unsafe { b.value_unchecked().unbox::<i32>() }?;
-                assert_eq!(v, -3);
+                let b = instance.field_accessor(frame).field("b")?.access::<i32>()?;
+                assert_eq!(b, -3);
 
                 Ok(())
             })
@@ -184,10 +191,14 @@ mod tests {
                     .instantiate(&mut *frame, &mut [arg1.as_value(), arg2])?
                     .into_jlrs_result()?;
 
-                assert!(instance.get_raw_field::<ArrayRef, _>("a").is_err());
+                assert!(instance
+                    .field_accessor(frame)
+                    .field("a")?
+                    .access::<ArrayRef>()
+                    .is_err());
 
-                let b = instance.get_raw_field::<ValueRef, _>("b")?;
-                assert!(unsafe { b.value_unchecked().unbox::<i16>() }.is_err());
+                let b = instance.field_accessor(frame).field("b")?.access::<i16>();
+                assert!(b.is_err());
 
                 Ok(())
             })
@@ -214,10 +225,20 @@ mod tests {
                     .instantiate(&mut *frame, &mut [arg1.as_value()])?
                     .into_jlrs_result()?;
 
-                assert!(instance.get_raw_field::<ArrayRef, _>("a").is_ok());
-                assert!(instance.get_raw_field::<TypedArrayRef<f64>, _>("a").is_ok());
                 assert!(instance
-                    .get_raw_field::<TypedArrayRef<f32>, _>("a")
+                    .field_accessor(frame)
+                    .field("a")?
+                    .access::<ArrayRef>()
+                    .is_ok());
+                assert!(instance
+                    .field_accessor(frame)
+                    .field("a")?
+                    .access::<TypedArrayRef<f64>>()
+                    .is_ok());
+                assert!(instance
+                    .field_accessor(frame)
+                    .field("a")?
+                    .access::<TypedArrayRef<f32>>()
                     .is_err());
 
                 Ok(())
@@ -245,10 +266,20 @@ mod tests {
                     .instantiate(&mut *frame, &mut [arg1.as_value()])?
                     .into_jlrs_result()?;
 
-                assert!(instance.get_raw_field::<ArrayRef, _>("a").is_ok());
-                assert!(instance.get_raw_field::<TypedArrayRef<f64>, _>("a").is_ok());
                 assert!(instance
-                    .get_raw_field::<TypedArrayRef<f32>, _>("a")
+                    .field_accessor(frame)
+                    .field("a")?
+                    .access::<ArrayRef>()
+                    .is_ok());
+                assert!(instance
+                    .field_accessor(frame)
+                    .field("a")?
+                    .access::<TypedArrayRef<f64>>()
+                    .is_ok());
+                assert!(instance
+                    .field_accessor(frame)
+                    .field("a")?
+                    .access::<TypedArrayRef<f32>>()
                     .is_err());
 
                 Ok(())
@@ -276,7 +307,7 @@ mod tests {
                     .instantiate(&mut *frame, &mut [arg1.as_value(), arg2])?
                     .into_jlrs_result()?;
 
-                assert!(instance.get_raw_field::<DataTypeRef, _>("c").is_err());
+                assert!(instance.field_accessor(frame).field("c").is_err());
                 Ok(())
             })
             .unwrap();
@@ -302,10 +333,10 @@ mod tests {
                     .instantiate(&mut *frame, &mut [arg1, arg2])?
                     .into_jlrs_result()?;
 
-                let a = instance.get_nth_raw_field::<i16>(0)?;
+                let a = instance.field_accessor(frame).field(0)?.access::<i16>()?;
                 assert_eq!(a, 3);
 
-                let b = instance.get_nth_raw_field::<i32>(1)?;
+                let b = instance.field_accessor(frame).field(1)?.access::<i32>()?;
                 assert_eq!(b, -3);
 
                 Ok(())
@@ -333,10 +364,13 @@ mod tests {
                     .instantiate(&mut *frame, &mut [arg1, arg2.as_value()])?
                     .into_jlrs_result()?;
 
-                let a = instance.get_nth_raw_field::<i16>(0)?;
+                let a = instance.field_accessor(frame).field(0)?.access::<i16>()?;
                 assert_eq!(a, 3);
 
-                let b = instance.get_nth_raw_field::<DataTypeRef>(1)?;
+                let b = instance
+                    .field_accessor(frame)
+                    .field(1)?
+                    .access::<DataTypeRef>()?;
                 assert_eq!(unsafe { b.wrapper_unchecked() }, arg2);
 
                 Ok(())
@@ -364,10 +398,10 @@ mod tests {
                     .instantiate(&mut *frame, &mut [arg1, arg2])?
                     .into_jlrs_result()?;
 
-                let a = instance.get_nth_raw_field::<i16>(0)?;
+                let a = instance.field_accessor(frame).field(0)?.access::<i16>()?;
                 assert_eq!(a, 3);
 
-                let b = instance.get_nth_raw_field::<i32>(1)?;
+                let b = instance.field_accessor(frame).field(1)?.access::<i32>()?;
                 assert_eq!(b, -3);
 
                 Ok(())
@@ -395,12 +429,14 @@ mod tests {
                     .instantiate(&mut *frame, &mut [arg1.as_value(), arg2])?
                     .into_jlrs_result()?;
 
-                let a = instance.get_nth_raw_field::<DataTypeRef>(0)?;
+                let a = instance
+                    .field_accessor(frame)
+                    .field(0)?
+                    .access::<DataTypeRef>()?;
                 assert_eq!(unsafe { a.wrapper_unchecked() }, arg1);
 
-                let b = instance.get_nth_raw_field::<ValueRef>(1)?;
-                let v = unsafe { b.value_unchecked().unbox::<i32>() }?;
-                assert_eq!(v, -3);
+                let b = instance.field_accessor(frame).field(1)?.access::<i32>()?;
+                assert_eq!(b, -3);
 
                 Ok(())
             })
@@ -427,10 +463,14 @@ mod tests {
                     .instantiate(&mut *frame, &mut [arg1.as_value(), arg2])?
                     .into_jlrs_result()?;
 
-                assert!(instance.get_nth_raw_field::<ArrayRef>(0).is_err());
+                assert!(instance
+                    .field_accessor(frame)
+                    .field(0)?
+                    .access::<ArrayRef>()
+                    .is_err());
 
-                let b = instance.get_nth_raw_field::<ValueRef>(1)?;
-                assert!(unsafe { b.value_unchecked().unbox::<i16>() }.is_err());
+                let b = instance.field_accessor(frame).field(1)?.access::<i16>();
+                assert!(b.is_err());
 
                 Ok(())
             })
@@ -457,9 +497,21 @@ mod tests {
                     .instantiate(&mut *frame, &mut [arg1.as_value()])?
                     .into_jlrs_result()?;
 
-                assert!(instance.get_nth_raw_field::<ArrayRef>(0).is_ok());
-                assert!(instance.get_nth_raw_field::<TypedArrayRef<f64>>(0).is_ok());
-                assert!(instance.get_nth_raw_field::<TypedArrayRef<f32>>(0).is_err());
+                assert!(instance
+                    .field_accessor(frame)
+                    .field(0)?
+                    .access::<ArrayRef>()
+                    .is_ok());
+                assert!(instance
+                    .field_accessor(frame)
+                    .field(0)?
+                    .access::<TypedArrayRef<f64>>()
+                    .is_ok());
+                assert!(instance
+                    .field_accessor(frame)
+                    .field(0)?
+                    .access::<TypedArrayRef<f32>>()
+                    .is_err());
 
                 Ok(())
             })
@@ -486,9 +538,21 @@ mod tests {
                     .instantiate(&mut *frame, &mut [arg1.as_value()])?
                     .into_jlrs_result()?;
 
-                assert!(instance.get_nth_raw_field::<ArrayRef>(0).is_ok());
-                assert!(instance.get_nth_raw_field::<TypedArrayRef<f64>>(0).is_ok());
-                assert!(instance.get_nth_raw_field::<TypedArrayRef<f32>>(0).is_err());
+                assert!(instance
+                    .field_accessor(frame)
+                    .field(0)?
+                    .access::<ArrayRef>()
+                    .is_ok());
+                assert!(instance
+                    .field_accessor(frame)
+                    .field(0)?
+                    .access::<TypedArrayRef<f64>>()
+                    .is_ok());
+                assert!(instance
+                    .field_accessor(frame)
+                    .field(0)?
+                    .access::<TypedArrayRef<f32>>()
+                    .is_err());
 
                 Ok(())
             })
@@ -515,7 +579,7 @@ mod tests {
                     .instantiate(&mut *frame, &mut [arg1.as_value(), arg2])?
                     .into_jlrs_result()?;
 
-                assert!(instance.get_nth_raw_field::<DataTypeRef>(2).is_err());
+                assert!(instance.field_accessor(frame).field(2).is_err());
                 Ok(())
             })
             .unwrap();

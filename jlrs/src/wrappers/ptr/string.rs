@@ -1,5 +1,6 @@
 //! Wrapper for `String`.
 
+use crate::impl_julia_typecheck;
 use crate::memory::global::Global;
 use crate::wrappers::ptr::{private::Wrapper as WrapperPriv, value::Value, StringRef};
 use crate::{convert::unbox::Unbox, private::Private};
@@ -7,7 +8,6 @@ use crate::{
     error::{JlrsError, JlrsResult},
     memory::{output::Output, scope::PartialScope},
 };
-use crate::{impl_julia_typecheck, impl_valid_layout};
 use jl_sys::{jl_pchar_to_string, jl_string_type};
 use std::{ffi::CStr, ptr::NonNull};
 use std::{
@@ -92,8 +92,6 @@ impl<'scope> JuliaString<'scope> {
 }
 
 impl_julia_typecheck!(JuliaString<'scope>, jl_string_type, 'scope);
-
-impl_valid_layout!(JuliaString<'scope>, 'scope);
 
 unsafe impl<'scope> Unbox for JuliaString<'scope> {
     type Output = Result<String, Vec<u8>>;

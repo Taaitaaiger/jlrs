@@ -7,7 +7,7 @@
 
 use super::{private::Wrapper, SymbolRef};
 use crate::wrappers::ptr::{ModuleRef, SimpleVectorRef, ValueRef};
-use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout};
+use crate::{impl_debug, impl_julia_typecheck};
 use crate::{memory::global::Global, private::Private};
 use crate::{memory::output::Output, wrappers::ptr::symbol::Symbol};
 use jl_sys::{
@@ -216,7 +216,6 @@ impl<'base> TypeName<'base> {
 
 impl_julia_typecheck!(TypeName<'scope>, jl_typename_type, 'scope);
 impl_debug!(TypeName<'_>);
-impl_valid_layout!(TypeName<'scope>, 'scope);
 
 impl<'scope> Wrapper<'scope, '_> for TypeName<'scope> {
     type Wraps = jl_typename_t;

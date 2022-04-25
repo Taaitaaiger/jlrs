@@ -3,7 +3,7 @@
 use super::{async_frame::AsyncGcFrame, julia_future::JuliaFuture, yield_task};
 use crate::{
     error::{JlrsResult, JuliaResult},
-    prelude::Global,
+    memory::global::Global,
     wrappers::ptr::call::CallExt,
     wrappers::ptr::{
         call::{Call, WithKeywords},

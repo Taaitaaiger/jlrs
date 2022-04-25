@@ -6,7 +6,7 @@
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#505
 
 use super::super::private::Wrapper;
-use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout, memory::output::Output};
+use crate::{impl_debug, impl_julia_typecheck, memory::output::Output};
 use crate::{private::Private, wrappers::ptr::ValueRef};
 use jl_sys::{jl_typemap_entry_t, jl_typemap_entry_type};
 use std::{marker::PhantomData, ptr::NonNull};
@@ -111,7 +111,6 @@ impl<'scope> TypeMapEntry<'scope> {
 
 impl_julia_typecheck!(TypeMapEntry<'scope>, jl_typemap_entry_type, 'scope);
 impl_debug!(TypeMapEntry<'_>);
-impl_valid_layout!(TypeMapEntry<'scope>, 'scope);
 
 impl<'scope> Wrapper<'scope, '_> for TypeMapEntry<'scope> {
     type Wraps = jl_typemap_entry_t;

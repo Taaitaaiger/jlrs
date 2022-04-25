@@ -7,9 +7,7 @@ use crate::{
     error::JlrsResult,
     memory::{output::Output, scope::PartialScope},
 };
-use crate::{
-    impl_debug, impl_julia_typecheck, impl_valid_layout, memory::global::Global, private::Private,
-};
+use crate::{impl_debug, impl_julia_typecheck, memory::global::Global, private::Private};
 use jl_sys::{jl_islayout_inline, jl_type_union, jl_uniontype_t, jl_uniontype_type};
 
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
@@ -191,7 +189,6 @@ impl<'scope> Union<'scope> {
 
 impl_julia_typecheck!(Union<'scope>, jl_uniontype_type, 'scope);
 impl_debug!(Union<'_>);
-impl_valid_layout!(Union<'scope>, 'scope);
 
 impl<'scope> Wrapper<'scope, '_> for Union<'scope> {
     type Wraps = jl_uniontype_t;

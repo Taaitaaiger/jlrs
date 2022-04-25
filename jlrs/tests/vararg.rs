@@ -2,9 +2,9 @@ mod util;
 #[cfg(all(not(feature = "lts"), feature = "sync-rt"))]
 mod not_lts {
     use super::util::JULIA;
-    use jlrs::layout::valid_layout::ValidLayout;
     use jlrs::prelude::*;
     use jlrs::wrappers::ptr::vararg::Vararg;
+    use jlrs::{layout::valid_layout::ValidLayout, wrappers::ptr::VarargRef};
 
     #[test]
     fn access_vararg() {
@@ -16,7 +16,7 @@ mod not_lts {
                     Value::eval_string(&mut *frame, "Vararg{Int32}")?.into_jlrs_result()?;
 
                 assert!(vararg.is::<Vararg>());
-                assert!(Vararg::valid_layout(
+                assert!(VarargRef::valid_layout(
                     vararg.as_value().datatype().as_value()
                 ));
 

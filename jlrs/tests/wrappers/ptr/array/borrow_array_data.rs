@@ -5,7 +5,7 @@ mod tests {
     use jlrs::prelude::*;
     use jlrs::{
         memory::gc::{Gc, GcCollection},
-        wrappers::ptr::array::dimensions::Dims,
+        wrappers::ptr::{array::dimensions::Dims, ModuleRef},
     };
 
     macro_rules! impl_test {
@@ -509,7 +509,7 @@ mod tests {
                         .wrapper_unchecked()
                         .call0(&mut *frame)?
                         .unwrap()
-                        .cast::<TypedArray<Module>>()?;
+                        .cast::<TypedArray<ModuleRef>>()?;
                     let data = arr.value_data(&mut *frame);
 
                     assert!(data[0].wrapper_unchecked().is::<Module>());
@@ -535,7 +535,7 @@ mod tests {
                         .wrapper_unchecked()
                         .call0(&mut *frame)?
                         .unwrap()
-                        .cast::<TypedArray<Module>>()?;
+                        .cast::<TypedArray<ModuleRef>>()?;
                     let mut data = arr.value_data_mut(&mut *frame);
                     data.set(0, Some(submod.as_value()))?;
 
@@ -571,14 +571,14 @@ mod tests {
                         .wrapper_unchecked()
                         .call0(&mut *frame)?
                         .unwrap()
-                        .cast::<TypedArray<Module>>()?;
+                        .cast::<TypedArray<ModuleRef>>()?;
 
                     let arr2 = submod
                         .function_ref("anothervecofmodules")?
                         .wrapper_unchecked()
                         .call0(&mut *frame)?
                         .unwrap()
-                        .cast::<TypedArray<Module>>()?;
+                        .cast::<TypedArray<ModuleRef>>()?;
 
                     let mut data1 = arr1.unrestricted_value_data_mut(&*frame);
                     let mut data2 = arr2.unrestricted_value_data_mut(&*frame);

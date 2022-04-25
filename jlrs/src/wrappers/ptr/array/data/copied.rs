@@ -28,13 +28,13 @@ impl<T> CopiedArray<T> {
     /// Returns a reference to the element at the given n-dimensional index if the index is valid,
     /// `None` otherwise.
     pub fn get<D: Dims>(&self, idx: D) -> Option<&T> {
-        Some(&self.data[self.dimensions.index_of(idx).ok()?])
+        Some(&self.data[self.dimensions.index_of(&idx).ok()?])
     }
 
     /// Returns a mutable reference to the element at the given n-dimensional index if the index
     /// is valid, `None` otherwise.
     pub fn get_mut<D: Dims>(&mut self, idx: D) -> Option<&mut T> {
-        Some(&mut self.data[self.dimensions.index_of(idx).ok()?])
+        Some(&mut self.data[self.dimensions.index_of(&idx).ok()?])
     }
 
     /// Returns the array's data as a slice, the data is in column-major order.
@@ -56,12 +56,12 @@ impl<T> CopiedArray<T> {
 impl<T, D: Dims> Index<D> for CopiedArray<T> {
     type Output = T;
     fn index(&self, idx: D) -> &T {
-        &self.data[self.dimensions.index_of(idx).unwrap()]
+        &self.data[self.dimensions.index_of(&idx).unwrap()]
     }
 }
 
 impl<T, D: Dims> IndexMut<D> for CopiedArray<T> {
     fn index_mut(&mut self, idx: D) -> &mut T {
-        &mut self.data[self.dimensions.index_of(idx).unwrap()]
+        &mut self.data[self.dimensions.index_of(&idx).unwrap()]
     }
 }

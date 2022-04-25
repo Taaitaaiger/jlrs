@@ -447,7 +447,7 @@ mod example {
             state: &'inner mut Self::State,
             input: Self::Input,
         ) -> JlrsResult<Self::Output> {
-            let value = state.get_raw_field::<f64, _>("v")? + input;
+            let value = state.field_accessor(frame).field("v")?.access::<f64>()? + input;
             let new_value = Value::new(&mut *frame, value)?;
 
             unsafe {

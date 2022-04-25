@@ -5,7 +5,7 @@
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/f9720dc2ebd6cd9e3086365f281e62506444ef37/src/julia.h#L585
 use super::super::private::Wrapper;
-use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout, memory::output::Output};
+use crate::{impl_debug, impl_julia_typecheck, memory::output::Output};
 use crate::{
     private::Private,
     wrappers::ptr::{MethodRef, SimpleVectorRef, ValueRef},
@@ -62,7 +62,6 @@ impl<'scope> MethodMatch<'scope> {
 
 impl_julia_typecheck!(MethodMatch<'scope>, jl_method_match_type, 'scope);
 impl_debug!(MethodMatch<'_>);
-impl_valid_layout!(MethodMatch<'scope>, 'scope);
 
 impl<'scope> Wrapper<'scope, '_> for MethodMatch<'scope> {
     type Wraps = jl_method_match_t;

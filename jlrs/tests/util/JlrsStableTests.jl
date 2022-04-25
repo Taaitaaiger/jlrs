@@ -10,4 +10,8 @@ end
 mutable struct WithOddlySizedAtomic
     @atomic a::Tuple{UInt32, UInt16}
 end
+
+mutable struct WithAtomicUnion
+    @atomic a::Union{UInt32, UInt16}
+end
 end

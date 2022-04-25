@@ -23,6 +23,11 @@ pub unsafe trait ValidLayout {
     /// argument is a `Value` to account for the fact that a field type can be a `Union`,
     /// `UnionAll` or `Union{}`.
     fn valid_layout(ty: Value) -> bool;
+
+    /// Returns `true` if the Rust type is a pointer wrapper type.
+    fn is_ref() -> bool {
+        false
+    }
 }
 
 #[doc(hidden)]
@@ -37,6 +42,10 @@ macro_rules! impl_valid_layout {
                     false
                 }
             }
+
+            fn is_ref() -> bool {
+                true
+            }
         }
     };
     ($t:ty) => {
@@ -47,6 +56,10 @@ macro_rules! impl_valid_layout {
                 } else {
                     false
                 }
+            }
+
+            fn is_ref() -> bool {
+                false
             }
         }
     }

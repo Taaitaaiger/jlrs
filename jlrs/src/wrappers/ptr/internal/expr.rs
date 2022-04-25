@@ -1,7 +1,7 @@
 //! Wrapper for `Expr`.
 
 use super::super::private::Wrapper;
-use crate::{impl_debug, impl_julia_typecheck, impl_valid_layout, memory::output::Output};
+use crate::{impl_debug, impl_julia_typecheck, memory::output::Output};
 use crate::{
     private::Private,
     wrappers::ptr::{ArrayRef, SymbolRef},
@@ -44,7 +44,6 @@ impl<'scope> Expr<'scope> {
 }
 
 impl_julia_typecheck!(Expr<'scope>, jl_expr_type, 'scope);
-impl_valid_layout!(Expr<'scope>, 'scope);
 impl_debug!(Expr<'_>);
 
 impl<'scope> Wrapper<'scope, '_> for Expr<'scope> {

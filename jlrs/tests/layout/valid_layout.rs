@@ -152,6 +152,8 @@ mod tests {
     #[test]
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     fn valid_layout_array() {
+        use jlrs::wrappers::ptr::ArrayRef;
+
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
             jlrs.scope(|global, frame| {
@@ -159,13 +161,13 @@ mod tests {
                     let v = Array::new::<i32, _, _, _>(frame, (2, 2))?
                         .into_jlrs_result()?
                         .as_value();
-                    assert!(Array::valid_layout(v.datatype().as_value()));
+                    assert!(ArrayRef::valid_layout(v.datatype().as_value()));
 
                     let ua = Module::base(global)
                         .global_ref("Array")?
                         .wrapper_unchecked();
 
-                    assert!(Array::valid_layout(ua));
+                    assert!(ArrayRef::valid_layout(ua));
                 }
                 Ok(())
             })

@@ -1,12 +1,12 @@
 //! Wrapper for `SimpleVector`.
 
+use crate::private::Private;
 use crate::wrappers::ptr::value::Value;
 use crate::{
     error::{JlrsError, JlrsResult},
     memory::{frame::Frame, global::Global},
 };
 use crate::{layout::typecheck::Typecheck, memory::output::Output};
-use crate::{layout::valid_layout::ValidLayout, private::Private};
 use jl_sys::{
     jl_alloc_svec, jl_alloc_svec_uninit, jl_emptysvec, jl_gc_wb, jl_simplevector_type,
     jl_svec_data, jl_svec_t,
@@ -128,16 +128,6 @@ impl<'base, T: Wrapper<'base, 'static>> SimpleVector<'base, T> {
 unsafe impl<'scope, T: Wrapper<'scope, 'static>> Typecheck for SimpleVector<'scope, T> {
     fn typecheck(t: DataType) -> bool {
         unsafe { t.unwrap(Private) == jl_simplevector_type }
-    }
-}
-
-unsafe impl<'scope, T: Wrapper<'scope, 'static>> ValidLayout for SimpleVector<'scope, T> {
-    fn valid_layout(v: Value) -> bool {
-        if let Ok(dt) = v.cast::<DataType>() {
-            dt.is::<SimpleVector>()
-        } else {
-            false
-        }
     }
 }
 

@@ -24,8 +24,8 @@ mod tests {
                     .instantiate(&mut *frame, &mut [arg1])?
                     .into_jlrs_result()?;
 
-                let a = instance.get_raw_field::<Value, _>("a")?;
-                assert_eq!(a.unbox::<u32>()?, 3);
+                let field = instance.field_accessor(frame).field("a")?.access::<u32>()?;
+                assert_eq!(field, 3);
 
                 Ok(())
             })

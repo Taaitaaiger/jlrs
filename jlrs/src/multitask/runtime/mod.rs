@@ -57,7 +57,7 @@ use crate::{
         mode::Async,
         result_sender::ResultSender,
     },
-    prelude::Wrapper,
+    wrappers::ptr::Wrapper,
     wrappers::ptr::{call::Call, module::Module, string::JuliaString, value::Value},
     INIT,
 };

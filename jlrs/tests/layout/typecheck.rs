@@ -194,7 +194,10 @@ mod tests {
             jlrs.scope_with_capacity(1, |global, frame| unsafe {
                 let v = UnionAll::ref_type(global)
                     .as_value()
-                    .apply_type_unchecked(&mut *frame, &mut [DataType::uint8_type(global).as_value()])?
+                    .apply_type_unchecked(
+                        &mut *frame,
+                        &mut [DataType::uint8_type(global).as_value()],
+                    )?
                     .cast::<DataType>()?;
 
                 assert!(AbstractRef::typecheck(v));
@@ -215,7 +218,10 @@ mod tests {
                 let vec_elem_ty = Module::base(global)
                     .global(&mut *frame, "VecElement")?
                     .as_value()
-                    .apply_type_unchecked(&mut *frame, &mut [DataType::uint8_type(global).as_value()])?
+                    .apply_type_unchecked(
+                        &mut *frame,
+                        &mut [DataType::uint8_type(global).as_value()],
+                    )?
                     .cast::<DataType>()?
                     .instantiate(&mut *frame, &mut [value])?
                     .into_jlrs_result()?
@@ -236,7 +242,10 @@ mod tests {
             jlrs.scope_with_capacity(1, |global, frame| unsafe {
                 let ty = UnionAll::type_type(global)
                     .as_value()
-                    .apply_type_unchecked(&mut *frame, &mut [DataType::uint8_type(global).as_value()])?
+                    .apply_type_unchecked(
+                        &mut *frame,
+                        &mut [DataType::uint8_type(global).as_value()],
+                    )?
                     .cast::<DataType>()?;
 
                 assert!(TypeType::typecheck(ty));
