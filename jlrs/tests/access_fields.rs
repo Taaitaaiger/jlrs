@@ -1,8 +1,10 @@
 mod util;
 #[cfg(feature = "sync-rt")]
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
 mod tests {
-    use super::util::JULIA;
+    #[cfg(not(feature = "lts"))]
+    use std::sync::atomic::Ordering;
+
+    use super::util::{JULIA, MIXED_BAG_JL};
     use jlrs::prelude::*;
     use jlrs::{layout::typecheck::Mutable, wrappers::inline::union::EmptyUnion};
 
@@ -23,7 +25,11 @@ mod tests {
                     .instantiate(&mut *frame, &mut [])?
                     .into_jlrs_result()?;
 
-                assert!(res.get_nth_raw_field::<EmptyUnion>(1).is_ok());
+                assert!(res
+                    .field_accessor(frame)
+                    .field(1)?
+                    .access::<EmptyUnion>()
+                    .is_err());
                 Ok(())
             })
             .unwrap()
@@ -292,5 +298,478 @@ mod tests {
             })
             .unwrap();
         });
+    }
+
+    #[test]
+    fn access_nested_field() {
+        JULIA.with(|j| {
+            let mut jlrs = j.borrow_mut();
+            jlrs.scope_with_capacity(0, |global, frame| unsafe {
+                let value = Value::eval_string(&mut *frame, MIXED_BAG_JL)?
+                    .into_jlrs_result()?
+                    .cast::<Module>()?
+                    .global_ref("mixedbag")?
+                    .wrapper_unchecked();
+
+                {
+                    let field = value
+                        .field_accessor(frame)
+                        .field("mutabl")?
+                        .field("mutable_unions")?
+                        .field("bits_union")?
+                        .access::<i32>()?;
+
+                    assert_eq!(field, 3);
+                }
+
+                #[cfg(not(feature = "lts"))]
+                {
+                    let field = value
+                        .field_accessor(frame)
+                        .field("mutabl")?
+                        .field("mutable_unions")?
+                        .atomic_field("atomic_union", Ordering::Relaxed)?
+                        .access::<i64>()?;
+
+                    assert_eq!(field, 5);
+                }
+
+                {
+                    let field = value
+                        .field_accessor(frame)
+                        .field("mutabl")?
+                        .field("mutable_unions")?
+                        .field("normal_union")?
+                        .access::<Nothing>()?;
+
+                    assert_eq!(field, Nothing);
+                }
+
+                {
+                    let field = value
+                        .field_accessor(frame)
+                        .field("mutabl")?
+                        .field("immutable_unions")?
+                        .field("bits_union")?
+                        .access::<i64>()?;
+
+                    assert_eq!(field, 7);
+                }
+
+                {
+                    let field = value
+                        .field_accessor(frame)
+                        .field("mutabl")?
+                        .field("immutable_unions")?
+                        .field("normal_union")?
+                        .access::<ModuleRef>()?;
+
+                    assert_eq!(field.wrapper_unchecked(), Module::main(global));
+                }
+
+                #[cfg(not(feature = "lts"))]
+                {
+                    {
+                        let field = value
+                            .field_accessor(frame)
+                            .field("mutabl")?
+                            .field("atomics")?
+                            .field("i8")?
+                            .access::<i8>()?;
+
+                        assert_eq!(field, 1);
+                    }
+
+                    {
+                        let field = value
+                            .field_accessor(frame)
+                            .field("mutabl")?
+                            .field("atomics")?
+                            .atomic_field("i16", Ordering::Acquire)?
+                            .access::<i16>()?;
+
+                        assert_eq!(field, 2);
+                    }
+
+                    {
+                        let field = value
+                            .field_accessor(frame)
+                            .field("mutabl")?
+                            .field("atomics")?
+                            .field("i24")?
+                            .field(0)?
+                            .access::<i8>()?;
+
+                        assert_eq!(field, 3);
+                    }
+
+                    {
+                        let field = value
+                            .field_accessor(frame)
+                            .field("mutabl")?
+                            .field("atomics")?
+                            .field("i48")?
+                            .field(2)?
+                            .access::<i8>()?;
+
+                        assert_eq!(field, 8);
+                    }
+
+                    {
+                        let field = value
+                            .field_accessor(frame)
+                            .field("mutabl")?
+                            .field("atomics")?
+                            .field("i72")?
+                            .field(1)?
+                            .access::<i8>()?;
+
+                        assert_eq!(field, 13);
+                    }
+
+                    {
+                        let field = value
+                            .field_accessor(frame)
+                            .field("mutabl")?
+                            .field("atomics")?
+                            .field("ptr")?
+                            .access::<ModuleRef>()?;
+
+                        assert_eq!(field.wrapper_unchecked(), Module::main(global));
+                    }
+
+                    {
+                        let field = value
+                            .field_accessor(frame)
+                            .field("mutabl")?
+                            .field("atomics")?
+                            .field("wrapped_ptr")?
+                            .field((0,))?
+                            .access::<ModuleRef>()?;
+
+                        assert_eq!(field.wrapper_unchecked(), Module::base(global));
+                    }
+                }
+
+                {
+                    let field = value
+                        .field_accessor(frame)
+                        .field("mutabl")?
+                        .field("number")?
+                        .access::<f64>()?;
+
+                    assert_eq!(field, 3.0);
+                }
+
+                {
+                    let field = value
+                        .field_accessor(frame)
+                        .field("immutabl")?
+                        .field("mutable_unions")?
+                        .field("bits_union")?
+                        .access::<i32>()?;
+
+                    assert_eq!(field, -3);
+                }
+
+                #[cfg(not(feature = "lts"))]
+                {
+                    let field = value
+                        .field_accessor(frame)
+                        .field("immutabl")?
+                        .field("mutable_unions")?
+                        .atomic_field("atomic_union", Ordering::Relaxed)?
+                        .access::<i64>()?;
+
+                    assert_eq!(field, -5);
+                }
+
+                {
+                    let field = value
+                        .field_accessor(frame)
+                        .field("immutabl")?
+                        .field("mutable_unions")?
+                        .field("normal_union")?
+                        .access::<ModuleRef>()?;
+
+                    assert_eq!(field.wrapper_unchecked(), Module::main(global));
+                }
+
+                {
+                    let field = value
+                        .field_accessor(frame)
+                        .field("immutabl")?
+                        .field("immutable_unions")?
+                        .field("bits_union")?
+                        .access::<i64>()?;
+
+                    assert_eq!(field, -7);
+                }
+
+                {
+                    let field = value
+                        .field_accessor(frame)
+                        .field("immutabl")?
+                        .field("immutable_unions")?
+                        .field("normal_union")?
+                        .access::<Nothing>()?;
+
+                    assert_eq!(field, Nothing);
+                }
+
+                #[cfg(not(feature = "lts"))]
+                {
+                    {
+                        let field = value
+                            .field_accessor(frame)
+                            .field("immutabl")?
+                            .field("atomics")?
+                            .field("i8")?
+                            .access::<i8>()?;
+
+                        assert_eq!(field, -1);
+                    }
+
+                    {
+                        let field = value
+                            .field_accessor(frame)
+                            .field("immutabl")?
+                            .field("atomics")?
+                            .atomic_field("i16", Ordering::Acquire)?
+                            .access::<i16>()?;
+
+                        assert_eq!(field, -2);
+                    }
+
+                    {
+                        let field = value
+                            .field_accessor(frame)
+                            .field("immutabl")?
+                            .field("atomics")?
+                            .field("i24")?
+                            .field(0)?
+                            .access::<i8>()?;
+
+                        assert_eq!(field, -3);
+                    }
+
+                    {
+                        let field = value
+                            .field_accessor(frame)
+                            .field("immutabl")?
+                            .field("atomics")?
+                            .field("i48")?
+                            .field(2)?
+                            .access::<i8>()?;
+
+                        assert_eq!(field, -8);
+                    }
+
+                    {
+                        let field = value
+                            .field_accessor(frame)
+                            .field("immutabl")?
+                            .field("atomics")?
+                            .field("i72")?
+                            .field(1)?
+                            .access::<i8>()?;
+
+                        assert_eq!(field, -13);
+                    }
+
+                    {
+                        let field = value
+                            .field_accessor(frame)
+                            .field("immutabl")?
+                            .field("atomics")?
+                            .field("ptr")?
+                            .access::<ModuleRef>()?;
+
+                        assert_eq!(field.wrapper_unchecked(), Module::main(global));
+                    }
+
+                    {
+                        let field = value
+                            .field_accessor(frame)
+                            .field("immutabl")?
+                            .field("atomics")?
+                            .field("wrapped_ptr")?
+                            .field((0,))?
+                            .access::<ModuleRef>()?;
+
+                        assert_eq!(field.wrapper_unchecked(), Module::base(global));
+                    }
+                }
+                {
+                    let field = value
+                        .field_accessor(frame)
+                        .field("immutabl")?
+                        .field("number")?
+                        .access::<i16>()?;
+
+                    assert_eq!(field, -3);
+                }
+
+                {
+                    let field = value
+                        .field_accessor(frame)
+                        .field("tuples")?
+                        .field("empty")?
+                        .access::<Tuple0>()?;
+
+                    assert_eq!(field, Tuple0());
+                }
+
+                {
+                    let field = value
+                        .field_accessor(frame)
+                        .field("tuples")?
+                        .field("single")?
+                        .field(0)?
+                        .access::<i32>()?;
+
+                    assert_eq!(field, 1);
+                }
+
+                {
+                    let field = value
+                        .field_accessor(frame)
+                        .field("tuples")?
+                        .field("double")?
+                        .field(1)?
+                        .access::<i64>()?;
+
+                    assert_eq!(field, -4);
+                }
+
+                {
+                    let field = value
+                        .field_accessor(frame)
+                        .field("tuples")?
+                        .field("abstract")?
+                        .field(1)?
+                        .access::<f64>()?;
+
+                    assert_eq!(field, 4.0);
+                }
+
+                {
+                    let field = value
+                        .field_accessor(frame)
+                        .field("arrays")?
+                        .field("u8vec")?
+                        .field(1)?
+                        .access::<u8>()?;
+
+                    assert_eq!(field, 2);
+                }
+
+                {
+                    let field = value
+                        .field_accessor(frame)
+                        .field("arrays")?
+                        .field("unionvec")?
+                        .field(0)?
+                        .access::<u8>()?;
+
+                    assert_eq!(field, 1);
+                }
+
+                {
+                    let field = value
+                        .field_accessor(frame)
+                        .field("arrays")?
+                        .field("unionvec")?
+                        .field(1)?
+                        .access::<u16>()?;
+
+                    assert_eq!(field, 2);
+                }
+
+                {
+                    let field = value
+                        .field_accessor(frame)
+                        .field("arrays")?
+                        .field("wrappervec")?
+                        .field(1)?
+                        .access::<ModuleRef>()?;
+
+                    assert_eq!(field.wrapper_unchecked(), Module::base(global));
+                }
+
+                {
+                    let field = value
+                        .field_accessor(frame)
+                        .field("arrays")?
+                        .field("ptrvec")?
+                        .field(1)?
+                        .field(0)?
+                        .access::<f32>()?;
+
+                    assert_eq!(field, 2.0);
+                }
+
+                {
+                    let field = value
+                        .field_accessor(frame)
+                        .field("arrays")?
+                        .field("inlinedptrvec")?
+                        .field(2)?
+                        .field(0)?
+                        .access::<u16>()?;
+
+                    assert_eq!(field, 5);
+                }
+
+                {
+                    let field = value
+                        .field_accessor(frame)
+                        .field("arrays")?
+                        .field("inlinedptrvec")?
+                        .field(1)?
+                        .field("mut_f32")?
+                        .field("a")?
+                        .access::<f32>()?;
+
+                    assert_eq!(field, 4.0);
+                }
+
+                {
+                    let field = value
+                        .field_accessor(frame)
+                        .field("arrays")?
+                        .field("u8array")?
+                        .field((1, 1))?
+                        .access::<u8>()?;
+
+                    assert_eq!(field, 4);
+                }
+
+                {
+                    let field = value
+                        .field_accessor(frame)
+                        .field("arrays")?
+                        .field("inlinedptrarray")?
+                        .field((1, 0))?
+                        .field(1)?
+                        .field(0)?
+                        .access::<f32>()?;
+
+                    assert_eq!(field, 6.0);
+                }
+
+                {
+                    let field = value
+                        .field_accessor(frame)
+                        .field("nonexistent")?
+                        .access::<ValueRef>()?;
+
+                    assert!(field.is_undefined());
+                }
+
+                Ok(())
+            })
+            .unwrap();
+        })
     }
 }

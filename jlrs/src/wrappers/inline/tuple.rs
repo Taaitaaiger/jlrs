@@ -211,7 +211,7 @@ macro_rules! impl_tuple {
     };
     ($name:ident) => {
         #[repr(C)]
-        #[derive(Copy, Clone, Debug)]
+        #[derive(Copy, Clone, Debug, PartialEq, Eq)]
         pub struct $name();
 
         unsafe impl $crate::convert::into_julia::IntoJulia for $name

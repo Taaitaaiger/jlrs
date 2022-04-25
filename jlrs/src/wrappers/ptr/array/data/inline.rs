@@ -41,7 +41,7 @@ impl<'borrow, 'array, 'data, T> InlineArrayData<'borrow, 'array, 'data, T> {
     {
         unsafe {
             let dims = ArrayDimensions::new(self.array);
-            let idx = dims.index_of(index).ok()?;
+            let idx = dims.index_of(&index).ok()?;
             self.array.data_ptr().cast::<T>().add(idx).as_ref()
         }
     }
@@ -80,7 +80,7 @@ where
     fn index(&self, index: D) -> &Self::Output {
         unsafe {
             let dims = ArrayDimensions::new(self.array);
-            let idx = dims.index_of(index).unwrap();
+            let idx = dims.index_of(&index).unwrap();
             self.array.data_ptr().cast::<T>().add(idx).as_ref().unwrap()
         }
     }
@@ -113,7 +113,7 @@ impl<'borrow, 'array, 'data, T> InlineArrayDataMut<'borrow, 'array, 'data, T> {
     {
         unsafe {
             let dims = ArrayDimensions::new(self.array);
-            let idx = dims.index_of(index).ok()?;
+            let idx = dims.index_of(&index).ok()?;
             self.array.data_ptr().cast::<T>().add(idx).as_ref()
         }
     }
@@ -125,7 +125,7 @@ impl<'borrow, 'array, 'data, T> InlineArrayDataMut<'borrow, 'array, 'data, T> {
     {
         unsafe {
             let dims = ArrayDimensions::new(self.array);
-            let idx = dims.index_of(index).ok()?;
+            let idx = dims.index_of(&index).ok()?;
             self.array.data_ptr().cast::<T>().add(idx).as_mut()
         }
     }
@@ -186,7 +186,7 @@ where
     fn index(&self, index: D) -> &Self::Output {
         unsafe {
             let dims = ArrayDimensions::new(self.array);
-            let idx = dims.index_of(index).unwrap();
+            let idx = dims.index_of(&index).unwrap();
             self.array.data_ptr().cast::<T>().add(idx).as_ref().unwrap()
         }
     }
@@ -199,7 +199,7 @@ where
     fn index_mut(&mut self, index: D) -> &mut Self::Output {
         unsafe {
             let dims = ArrayDimensions::new(self.array);
-            let idx = dims.index_of(index).unwrap();
+            let idx = dims.index_of(&index).unwrap();
             self.array.data_ptr().cast::<T>().add(idx).as_mut().unwrap()
         }
     }
@@ -232,7 +232,7 @@ impl<'borrow, 'array, 'data, T> UnrestrictedInlineArrayDataMut<'borrow, 'array, 
     {
         unsafe {
             let dims = ArrayDimensions::new(self.array);
-            let idx = dims.index_of(index).ok()?;
+            let idx = dims.index_of(&index).ok()?;
             self.array.data_ptr().cast::<T>().add(idx).as_ref()
         }
     }
@@ -244,7 +244,7 @@ impl<'borrow, 'array, 'data, T> UnrestrictedInlineArrayDataMut<'borrow, 'array, 
     {
         unsafe {
             let dims = ArrayDimensions::new(self.array);
-            let idx = dims.index_of(index).ok()?;
+            let idx = dims.index_of(&index).ok()?;
             self.array.data_ptr().cast::<T>().add(idx).as_mut()
         }
     }
@@ -304,7 +304,7 @@ where
     fn index(&self, index: D) -> &Self::Output {
         unsafe {
             let dims = ArrayDimensions::new(self.array);
-            let idx = dims.index_of(index).unwrap();
+            let idx = dims.index_of(&index).unwrap();
             self.array.data_ptr().cast::<T>().add(idx).as_ref().unwrap()
         }
     }
@@ -318,7 +318,7 @@ where
     fn index_mut(&mut self, index: D) -> &mut Self::Output {
         unsafe {
             let dims = ArrayDimensions::new(self.array);
-            let idx = dims.index_of(index).unwrap();
+            let idx = dims.index_of(&index).unwrap();
             self.array.data_ptr().cast::<T>().add(idx).as_mut().unwrap()
         }
     }

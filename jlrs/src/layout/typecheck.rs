@@ -17,9 +17,9 @@
 //! [`Unbox`]: crate::convert::unbox::Unbox
 use jl_sys::{
     jl_code_info_type, jl_globalref_type, jl_gotonode_type, jl_intrinsic_type,
-    jl_linenumbernode_type, jl_namedtuple_typename, jl_newvarnode_type, jl_nothing_type,
-    jl_phicnode_type, jl_phinode_type, jl_pinode_type, jl_quotenode_type, jl_slotnumber_type,
-    jl_string_type, jl_typedslot_type, jl_upsilonnode_type,
+    jl_linenumbernode_type, jl_namedtuple_typename, jl_newvarnode_type, jl_phicnode_type,
+    jl_phinode_type, jl_pinode_type, jl_quotenode_type, jl_slotnumber_type, jl_string_type,
+    jl_typedslot_type, jl_upsilonnode_type,
 };
 
 use crate::{
@@ -217,11 +217,6 @@ unsafe impl Typecheck for Mutable {
         t.mutable()
     }
 }
-
-/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
-/// the datatype is `Nothing`.
-pub struct Nothing;
-impl_julia_typecheck!(Nothing, jl_nothing_type);
 
 /// A typecheck that can be used in combination with `DataType::is`. This method returns true if
 /// the fields of a value of this type cannot be modified.

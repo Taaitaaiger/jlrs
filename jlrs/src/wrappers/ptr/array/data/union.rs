@@ -59,7 +59,7 @@ impl<'borrow, 'array> UnionArrayData<'borrow, 'array> {
         unsafe {
             let elty = self.array.element_type();
             let dims = ArrayDimensions::new(self.array);
-            let idx = dims.index_of(index)?;
+            let idx = dims.index_of(&index)?;
 
             let tags = jl_array_typetagdata(self.array.unwrap(Private));
             let mut tag = *tags.add(idx) as _;
@@ -78,7 +78,7 @@ impl<'borrow, 'array> UnionArrayData<'borrow, 'array> {
         unsafe {
             let elty = self.array.element_type();
             let dims = ArrayDimensions::new(self.array);
-            let idx = dims.index_of(index)?;
+            let idx = dims.index_of(&index)?;
 
             let tags = jl_array_typetagdata(self.array.unwrap(Private));
             let mut tag = *tags.add(idx) as _;
@@ -142,7 +142,7 @@ impl<'borrow, 'array> UnionArrayDataMut<'borrow, 'array> {
         unsafe {
             let elty = self.array.element_type();
             let dims = ArrayDimensions::new(self.array);
-            let idx = dims.index_of(index)?;
+            let idx = dims.index_of(&index)?;
 
             let tags = jl_array_typetagdata(self.array.unwrap(Private));
             let mut tag = *tags.add(idx) as _;
@@ -161,7 +161,7 @@ impl<'borrow, 'array> UnionArrayDataMut<'borrow, 'array> {
         unsafe {
             let elty = self.array.element_type();
             let dims = ArrayDimensions::new(self.array);
-            let idx = dims.index_of(index)?;
+            let idx = dims.index_of(&index)?;
 
             let tags = jl_array_typetagdata(self.array.unwrap(Private));
             let mut tag = *tags.add(idx) as _;
@@ -212,7 +212,7 @@ impl<'borrow, 'array> UnionArrayDataMut<'borrow, 'array> {
             }
 
             let dims = ArrayDimensions::new(self.array);
-            let idx = dims.index_of(index)?;
+            let idx = dims.index_of(&index)?;
             let offset = idx * self.array.unwrap_non_null(Private).as_ref().elsize as usize;
             self.array
                 .data_ptr()
@@ -269,7 +269,7 @@ impl<'borrow, 'array> UnresistrictedUnionArrayDataMut<'borrow, 'array> {
         unsafe {
             let elty = self.array.element_type();
             let dims = ArrayDimensions::new(self.array);
-            let idx = dims.index_of(index)?;
+            let idx = dims.index_of(&index)?;
 
             let tags = jl_array_typetagdata(self.array.unwrap(Private));
             let mut tag = *tags.add(idx) as _;
@@ -288,7 +288,7 @@ impl<'borrow, 'array> UnresistrictedUnionArrayDataMut<'borrow, 'array> {
         unsafe {
             let elty = self.array.element_type();
             let dims = ArrayDimensions::new(self.array);
-            let idx = dims.index_of(index)?;
+            let idx = dims.index_of(&index)?;
 
             let tags = jl_array_typetagdata(self.array.unwrap(Private));
             let mut tag = *tags.add(idx) as _;
@@ -339,7 +339,7 @@ impl<'borrow, 'array> UnresistrictedUnionArrayDataMut<'borrow, 'array> {
             }
 
             let dims = ArrayDimensions::new(self.array);
-            let idx = dims.index_of(index)?;
+            let idx = dims.index_of(&index)?;
             let offset = idx * self.array.unwrap_non_null(Private).as_ref().elsize as usize;
             self.array
                 .data_ptr()

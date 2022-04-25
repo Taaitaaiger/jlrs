@@ -18,7 +18,6 @@ pub use crate::{ccall::CCall, memory::frame::NullFrame};
 pub use crate::{
     convert::into_jlrs_result::IntoJlrsResult,
     error::JlrsResult,
-    layout::typecheck::Nothing,
     memory::{
         frame::{Frame, GcFrame},
         global::Global,
@@ -26,7 +25,7 @@ pub use crate::{
     },
     named_tuple,
     wrappers::{
-        inline::{bool::Bool, char::Char, tuple::*},
+        inline::{bool::Bool, char::Char, nothing::Nothing, tuple::*},
         ptr::{
             array::{dimensions::Dims, Array, TypedArray},
             call::{Call, CallExt},
@@ -35,7 +34,7 @@ pub use crate::{
             string::JuliaString,
             symbol::Symbol,
             value::Value,
-            Wrapper,
+            ArrayRef, DataTypeRef, ModuleRef, Ref, StringRef, TypedArrayRef, ValueRef, Wrapper,
         },
     },
 };

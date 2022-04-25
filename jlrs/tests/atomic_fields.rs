@@ -24,7 +24,7 @@ mod tests {
                     .instantiate(&mut *frame, &mut [arg1])?
                     .into_jlrs_result()?;
 
-                let a = instance.get_raw_field::<u32, _>("a")?;
+                let a = instance.field_accessor(frame).field("a")?.access::<u32>()?;
                 assert_eq!(a, 3);
 
                 Ok(())
@@ -53,7 +53,11 @@ mod tests {
                     .instantiate(&mut *frame, &mut [tup])?
                     .into_jlrs_result()?;
 
-                let a = instance.get_raw_field::<Tuple4<usize, usize, usize, usize>, _>("a")?;
+                let a =
+                    instance
+                        .field_accessor(frame)
+                        .field("a")?
+                        .access::<Tuple4<usize, usize, usize, usize>>()?;
                 assert_eq!(a, Tuple4(1, 2, 3, 4));
 
                 Ok(())
@@ -82,8 +86,33 @@ mod tests {
                     .instantiate(&mut *frame, &mut [tup])?
                     .into_jlrs_result()?;
 
-                let a = instance.get_raw_field::<Tuple2<u32, u16>, _>("a")?;
+                let a = instance
+                    .field_accessor(frame)
+                    .field("a")?
+                    .access::<Tuple2<u32, u16>>()?;
                 assert_eq!(a, Tuple2(1, 2));
+
+                Ok(())
+            })
+            .unwrap();
+        })
+    }
+
+    #[test]
+    fn atomic_union_is_pointer_field() {
+        JULIA.with(|j| {
+            let mut jlrs = j.borrow_mut();
+            jlrs.scope(|global, _frame| {
+                let ty = unsafe {
+                    Module::main(global)
+                        .submodule_ref("JlrsStableTests")?
+                        .wrapper_unchecked()
+                        .global_ref("WithAtomicUnion")?
+                        .value_unchecked()
+                };
+
+                assert!(ty.cast::<DataType>()?.is_pointer_field(0)?);
+                assert!(ty.cast::<DataType>()?.is_atomic_field(0)?);
 
                 Ok(())
             })

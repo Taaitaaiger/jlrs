@@ -59,7 +59,7 @@ macro_rules! impl_valid_layout {
             }
 
             fn is_ref() -> bool {
-                true
+                false
             }
         }
     }

@@ -100,6 +100,7 @@ use crate::{
     error::{JlrsError, JlrsResult, JuliaResultRef, CANNOT_DISPLAY_TYPE},
     impl_debug,
     layout::{
+        field_index::FieldIndex,
         typecheck::{NamedTuple, Typecheck},
         valid_layout::ValidLayout,
     },
@@ -126,14 +127,14 @@ use crate::{
 };
 use jl_sys::{
     jl_an_empty_string, jl_an_empty_vec_any, jl_apply_type, jl_array_any_type, jl_array_int32_type,
-    jl_array_symbol_type, jl_array_uint8_type, jl_astaggedvalue, jl_bottom_type, jl_call, jl_call0,
-    jl_call1, jl_call2, jl_call3, jl_diverror_exception, jl_egal, jl_emptytuple, jl_eval_string,
-    jl_exception_occurred, jl_false, jl_field_index, jl_field_isptr, jl_field_offset,
-    jl_gc_add_finalizer, jl_gc_add_ptr_finalizer, jl_get_nth_field, jl_get_nth_field_noalloc,
-    jl_interrupt_exception, jl_isa, jl_memory_exception, jl_nothing, jl_object_id,
-    jl_readonlymemory_exception, jl_set_nth_field, jl_stackovf_exception, jl_stderr_obj,
-    jl_stdout_obj, jl_subtype, jl_true, jl_typeof_str, jl_undefref_exception, jl_value_t,
-    jlrs_lock, jlrs_unlock,
+    jl_array_symbol_type, jl_array_typetagdata, jl_array_uint8_type, jl_astaggedvalue,
+    jl_bottom_type, jl_call, jl_call0, jl_call1, jl_call2, jl_call3, jl_diverror_exception,
+    jl_egal, jl_emptytuple, jl_eval_string, jl_exception_occurred, jl_false, jl_field_index,
+    jl_field_isptr, jl_gc_add_finalizer, jl_gc_add_ptr_finalizer, jl_get_nth_field,
+    jl_get_nth_field_noalloc, jl_interrupt_exception, jl_isa, jl_memory_exception, jl_nothing,
+    jl_object_id, jl_readonlymemory_exception, jl_set_nth_field, jl_stackovf_exception,
+    jl_stderr_obj, jl_stdout_obj, jl_subtype, jl_true, jl_typeof_str, jl_undefref_exception,
+    jl_value_t,
 };
 
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
@@ -144,11 +145,23 @@ use crate::error::JuliaResult;
 use std::{
     ffi::{c_void, CStr, CString},
     marker::PhantomData,
+    mem::MaybeUninit,
     path::Path,
     ptr::NonNull,
-    sync::atomic::{AtomicPtr, AtomicU16, AtomicU32, AtomicU64, AtomicU8, Ordering},
+    sync::atomic::Ordering,
     usize,
 };
+
+#[cfg(not(feature = "lts"))]
+use jl_sys::{jlrs_lock, jlrs_unlock};
+
+#[cfg(not(feature = "lts"))]
+use std::{
+    ptr::null_mut,
+    sync::atomic::{AtomicPtr, AtomicU16, AtomicU32, AtomicU64, AtomicU8},
+};
+
+use super::DataTypeRef;
 
 /// In some cases it's necessary to place one or more arguments in front of the arguments a
 /// function is called with. Examples include the `named_tuple` macro and `Value::call_async`.
@@ -532,8 +545,8 @@ impl<'scope, 'data> Value<'scope, 'data> {
 ///
 /// it will have two fields, `fielda` and `fieldb`. The first field is a pointer field, the second
 /// is stored inline as a `u32`. It's possible to safely access the raw contents of these fields
-/// with the methods [`Value::get_raw_field`] and [`Value::get_nth_raw_field`]. The first field can be
-/// accessed as a [`ValueRef`], the second as a `u32`.
+/// with the method [`Value::field_accessor`]. The first field can be accessed as a [`ValueRef`],
+/// the second as a `u32`.
 impl<'scope, 'data> Value<'scope, 'data> {
     /// Returns the field names of this value as a slice of `Symbol`s.
     pub fn field_names(self) -> &'scope [Symbol<'scope>] {
@@ -550,100 +563,20 @@ impl<'scope, 'data> Value<'scope, 'data> {
         self.datatype().n_fields() as _
     }
 
-    /// Access the contents of the field at index `idx`. If the field is a bits union, this method
-    /// will try to unbox the active variant. Pointer fields can also be accessed by using the
-    /// approriate [`Ref`]. Returns an error if the index is out of bounds or if the layout of `T`
-    /// is incompatible with the layout of that field in Julia.
-    ///
-    /// [`Ref`]: crate::wrappers::ptr::Ref
-    pub fn get_nth_raw_field<T>(self, idx: usize) -> JlrsResult<T>
-    where
-        T: ValidLayout,
-    {
-        unsafe {
-            if idx >= self.n_fields() as usize {
-                Err(JlrsError::OutOfBounds {
-                    idx,
-                    n_fields: self.n_fields(),
-                    value_type: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
-                })?
-            }
-
-            self.read_field(idx as _)
+    /// Returns an accessor to access the contents of this value without allocating temporary Julia data.
+    pub fn field_accessor<'current, 'borrow, F: Frame<'current>>(
+        self,
+        _frame: &'borrow F,
+    ) -> FieldAccessor<'scope, 'data, 'borrow> {
+        FieldAccessor {
+            value: self.as_ref(),
+            current_field_type: self.datatype().as_ref(),
+            offset: 0,
+            #[cfg(not(feature = "lts"))]
+            buffer: AtomicBuffer::new(),
+            state: ViewState::Unlocked,
+            _frame: PhantomData,
         }
-    }
-
-    /// Access the contents of the field at index `idx` without checking bounds or if the layouts
-    /// of the types are compatible.
-    ///
-    /// Safety: the layout out `T` must be compatible with the layout of the field and `idx` must
-    /// not be out of bounds.
-    pub unsafe fn get_nth_raw_field_unchecked<T>(self, idx: usize) -> T {
-        let ty = self.datatype();
-        let jl_type = ty.unwrap(Private);
-        let field_offset = jl_field_offset(jl_type, idx as _);
-
-        self.unwrap(Private)
-            .cast::<u8>()
-            .add(field_offset as usize)
-            .cast::<T>()
-            .read()
-    }
-
-    /// Access the contents of the field with the name `field_name`. If the field is a bits union,
-    /// this method will try to unbox the active variant. Pointer fields can also be accessed by
-    /// using the approriate [`Ref`]. Returns an error if there's no field with the given name or
-    /// if the layout of `T` is incompatible with the layout of that field in Julia. If the field
-    /// is atomic relaxed ordering is used if it's a pointer field, and sequentially consistent
-    /// ordering if it isn't.
-    ///
-    /// [`Ref`]: crate::wrappers::ptr::Ref
-    pub fn get_raw_field<T, N>(self, field_name: N) -> JlrsResult<T>
-    where
-        T: ValidLayout,
-        N: ToSymbol,
-    {
-        unsafe {
-            let symbol = field_name.to_symbol_priv(Private);
-            let ty = self.datatype();
-            let jl_type = ty.unwrap(Private);
-            let idx = jl_field_index(jl_type, symbol.unwrap(Private), 0);
-
-            if idx < 0 {
-                Err(JlrsError::NoSuchField {
-                    type_name: ty.display_string_or(CANNOT_DISPLAY_TYPE),
-                    field_name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
-                })?
-            }
-
-            self.read_field(idx)
-        }
-    }
-
-    /// Access the contents of the field with the name `field_name` without checking if the layouts
-    /// of the types are compatible. Panics if the field doesn't exist.
-    ///
-    /// Safety: the layout of `T` must be compatible with the layout of the field, the field must
-    /// not be an atomic field.
-    pub unsafe fn get_raw_field_unchecked<T, N>(self, field_name: N) -> T
-    where
-        N: ToSymbol,
-    {
-        let symbol = field_name.to_symbol_priv(Private);
-        let ty = self.datatype();
-        let jl_type = ty.unwrap(Private);
-        let idx = jl_field_index(jl_type, symbol.unwrap(Private), 0);
-
-        debug_assert!(idx >= 0, "Field {:?} doesn't exist", symbol);
-        #[cfg(not(feature = "lts"))]
-        debug_assert!(!ty.is_atomic_field_unchecked(idx as usize));
-
-        let field_offset = jl_field_offset(jl_type, idx as _);
-        self.unwrap(Private)
-            .cast::<u8>()
-            .add(field_offset as usize)
-            .cast::<T>()
-            .read()
     }
 
     /// Roots the field at index `idx` if it exists and returns it, or
@@ -1068,118 +1001,6 @@ impl<'scope, 'data> Value<'scope, 'data> {
             idx as usize,
             value.unwrap(Private),
         ))
-    }
-
-    unsafe fn read_field<T>(self, idx: i32) -> JlrsResult<T>
-    where
-        T: ValidLayout,
-    {
-        let ty = self.datatype();
-        let jl_type = ty.unwrap(Private);
-        let field_offset = jl_field_offset(jl_type, idx as _);
-        let is_ptr_field = ty.is_pointer_field_unchecked(idx as _);
-
-        let mut field_type =
-            ty.field_types().wrapper_unchecked().data()[idx as usize].value_unchecked();
-
-        if is_ptr_field && !T::is_ref() {
-            let value_type_str = field_type.display_string_or(CANNOT_DISPLAY_TYPE).into();
-            Err(JlrsError::InvalidLayout { value_type_str })?;
-        }
-
-        #[cfg(not(feature = "lts"))]
-        let isatomic = ty.is_atomic_field_unchecked(idx as _);
-        #[cfg(feature = "lts")]
-        let isatomic = false;
-
-        if let Ok(u) = field_type.cast::<Union>() {
-            // If the field is a bits union, we want to access its current variant
-            debug_assert!(!isatomic);
-            let mut size = 0;
-
-            if u.isbits_size_align(&mut size, &mut 0) {
-                let flag_offset = field_offset as usize + size;
-                let mut flag = self.unwrap(Private).cast::<u8>().add(flag_offset).read() as i32;
-
-                match nth_union_component(u.as_value(), &mut flag) {
-                    Some(active_ty) => {
-                        field_type = active_ty;
-                    }
-                    _ => (),
-                }
-            }
-        } else if let Ok(_) = field_type.cast::<UnionAll>() {
-            // If the field is a unionall, we need to take the concrete type into account
-            field_type = self
-                .unwrap(Private)
-                .cast::<u8>()
-                .add(field_offset as usize)
-                .cast::<Value>()
-                .read()
-                .datatype()
-                .as_value();
-        }
-
-        if T::valid_layout(field_type) {
-            if !isatomic {
-                Ok(self
-                    .unwrap(Private)
-                    .cast::<u8>()
-                    .add(field_offset as usize)
-                    .cast::<T>()
-                    .read())
-            } else {
-                if T::is_ref() {
-                    // https://github.com/JuliaLang/julia/blob/9b2169181d341cba5b3358f9e11b96975f563491/src/datatype.c#L1415
-                    let ptr = &*self
-                        .unwrap(Private)
-                        .cast::<u8>()
-                        .add(field_offset as usize)
-                        .cast::<AtomicPtr<jl_value_t>>();
-
-                    let v = ptr.load(Ordering::Relaxed);
-                    Ok(std::mem::transmute_copy(&v))
-                } else {
-                    // https://github.com/JuliaLang/julia/blob/b91dd0268a9fad8208284ae394c0dcc863f68048/src/datatype.c#L849
-                    let field_size = field_type.cast_unchecked::<DataType>().size();
-                    debug_assert!(std::mem::size_of::<T>() == field_size as usize);
-                    let ptr = self.unwrap(Private).cast::<u8>().add(field_offset as usize);
-
-                    match field_size {
-                        0 => Ok(std::mem::transmute_copy(&())),
-                        1 => {
-                            let atomic = &*ptr.cast::<AtomicU8>();
-                            let v = atomic.load(Ordering::SeqCst);
-                            Ok(std::mem::transmute_copy(&v))
-                        }
-                        2 => {
-                            let atomic = &*ptr.cast::<AtomicU16>();
-                            let v = atomic.load(Ordering::SeqCst);
-                            Ok(std::mem::transmute_copy(&v))
-                        }
-                        sz if sz <= 4 => {
-                            let atomic = &*ptr.cast::<AtomicU32>();
-                            let v = atomic.load(Ordering::SeqCst);
-                            Ok(std::mem::transmute_copy(&v))
-                        }
-                        sz if sz <= 8 => {
-                            let atomic = &*ptr.cast::<AtomicU64>();
-                            let v = atomic.load(Ordering::SeqCst);
-                            Ok(std::mem::transmute_copy(&v))
-                        }
-                        _ => {
-                            jlrs_lock(self.unwrap(Private));
-                            let v = ptr.cast::<T>().read();
-                            jlrs_unlock(self.unwrap(Private));
-                            Ok(v)
-                        }
-                    }
-                }
-            }
-        } else {
-            let value_type_str = field_type.display_string_or(CANNOT_DISPLAY_TYPE).into();
-            Err(JlrsError::InvalidLayout { value_type_str })?
-        }
     }
 }
 
@@ -1615,6 +1436,7 @@ impl<'scope, 'data> WrapperPriv<'scope, 'data> for Value<'scope, 'data> {
 /// While jlrs generally enforces that Julia data can only exist and be used while a frame is
 /// active, it's possible to leak global values: [`Symbol`]s, [`Module`]s, and globals defined in
 /// those modules.
+#[derive(Copy, Clone)]
 pub struct LeakedValue(Value<'static, 'static>);
 
 impl LeakedValue {
@@ -1636,6 +1458,614 @@ impl LeakedValue {
     #[inline(always)]
     pub unsafe fn as_value<'scope>(self, _: Global<'scope>) -> Value<'scope, 'static> {
         self.0
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+#[cfg(not(feature = "lts"))]
+union AtomicBuffer {
+    bytes: [MaybeUninit<u8>; 8],
+    ptr: *mut jl_value_t,
+}
+
+#[cfg(not(feature = "lts"))]
+impl AtomicBuffer {
+    fn new() -> Self {
+        AtomicBuffer { ptr: null_mut() }
+    }
+}
+
+#[derive(Copy, Clone, PartialEq)]
+enum ViewState {
+    #[cfg(not(feature = "lts"))]
+    Locked,
+    Unlocked,
+    #[cfg(not(feature = "lts"))]
+    AtomicBuffer,
+    Array,
+}
+
+/// Access the contents of a Julia value.
+///
+/// A `FieldAccessor` for a value can be created with [`Value::field_accessor`]. By chaining calls
+/// to the `field` and `atomic_field` methods you can access deeply nested fields without
+/// allocating temporary Julia data. These two methods support three kinds of field identifiers:
+/// field names, numerical field indices, and n-dimensional array indices. The first two can be
+/// used with types that have named fields, the second must be used with tuples, and the last one
+/// with arrays.
+pub struct FieldAccessor<'scope, 'data, 'borrow> {
+    value: ValueRef<'scope, 'data>,
+    current_field_type: DataTypeRef<'scope>,
+    #[cfg(not(feature = "lts"))]
+    buffer: AtomicBuffer,
+    offset: u32,
+    state: ViewState,
+    _frame: PhantomData<&'borrow ()>,
+}
+
+impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
+    /// Access the field the accessor is currenty pointing to as a value of type `T`.
+    ///
+    /// If the field is stored inline `T` must be a valid layout for that field. If the field is
+    /// stored as a pointer `T` can either be a `ValueRef`, another compatible pointer wrapper
+    /// type, or a valid layout for that field.
+    pub fn access<T: ValidLayout>(self) -> JlrsResult<T> {
+        if self.current_field_type.is_undefined() {
+            Err(JlrsError::UndefRef)?;
+        }
+
+        unsafe {
+            let ty = self.current_field_type.value_unchecked();
+            if !T::valid_layout(ty) {
+                let value_type_str = ty.display_string_or(CANNOT_DISPLAY_TYPE).into();
+                Err(JlrsError::InvalidLayout { value_type_str })?;
+            }
+
+            #[cfg(not(feature = "lts"))]
+            if self.state == ViewState::AtomicBuffer {
+                debug_assert!(!T::is_ref());
+                debug_assert!(std::mem::size_of::<T>() <= 8);
+                return Ok(std::ptr::read(
+                    self.buffer.bytes[self.offset as usize..].as_ptr() as *const T,
+                ));
+            }
+
+            if T::is_ref() {
+                Ok(std::mem::transmute_copy(&self.value))
+            } else if self.state == ViewState::Array {
+                Ok(self
+                    .value
+                    .value_unchecked()
+                    .cast_unchecked::<Array>()
+                    .data_ptr()
+                    .cast::<u8>()
+                    .add(self.offset as usize)
+                    .cast::<T>()
+                    .read())
+            } else {
+                Ok(self
+                    .value
+                    .ptr()
+                    .cast::<u8>()
+                    .add(self.offset as usize)
+                    .cast::<T>()
+                    .read())
+            }
+        }
+    }
+
+    /// Try to clone this accessor and its state.
+    ///
+    /// If the current value this accessor is accessing is locked an error is returned.
+    pub fn try_clone(&self) -> JlrsResult<Self> {
+        #[cfg(not(feature = "lts"))]
+        if self.state == ViewState::Locked {
+            Err(JlrsError::Locked)?;
+        }
+
+        Ok(FieldAccessor {
+            value: self.value,
+            current_field_type: self.current_field_type,
+            offset: self.offset,
+            #[cfg(not(feature = "lts"))]
+            buffer: self.buffer.clone(),
+            state: self.state,
+            _frame: PhantomData,
+        })
+    }
+
+    /// Returns true is the current value the accessor is accessing is locked.
+    #[cfg(not(feature = "lts"))]
+    pub fn is_locked(&self) -> bool {
+        self.state == ViewState::Locked
+    }
+
+    /// Returns true is the current value the accessor is accessing is locked.
+    #[cfg(feature = "lts")]
+    pub fn is_locked(&self) -> bool {
+        false
+    }
+
+    /// Update the accessor to point to `field`.
+    ///
+    /// Three kinds of field identifiers: field names, numerical field indices, and n-dimensional
+    /// array indices. The first two can be used with types that have named fields, the second
+    /// must be used with tuples, and the last one with arrays.
+    ///
+    /// If `field` is an invalid identifier an error is returned. Calls to `field` can be chained
+    /// to access nested fields.
+    ///
+    /// If the field is an atomic field the same ordering is used as Julia uses by default:
+    /// `Relaxed` for pointer fields, `SeqCst` for small inline fields, and a lock for large
+    /// inline fields.
+    pub fn field<F: FieldIndex>(mut self, field: F) -> JlrsResult<Self> {
+        if self.value.is_undefined() {
+            Err(JlrsError::UndefRef)?
+        }
+
+        if self.current_field_type.is_undefined() {
+            Err(JlrsError::UndefRef)?
+        }
+
+        unsafe {
+            let current_field_type = self.current_field_type.wrapper_unchecked();
+            if self.state == ViewState::Array && current_field_type.is::<Array>() {
+                // accessing an array, find the offset of the requested element
+                self.get_array_field(field)?;
+                return Ok(self);
+            }
+
+            let index = field.field_index(current_field_type, Private)?;
+
+            let next_field_type = current_field_type.field_type_unchecked(index);
+            if next_field_type.is_undefined() {
+                Err(JlrsError::UndefRef)?
+            }
+
+            let next_field_type = next_field_type.wrapper_unchecked();
+            let is_pointer_field = current_field_type.is_pointer_field_unchecked(index);
+            let field_offset = current_field_type.field_offset_unchecked(index);
+            self.offset += field_offset;
+
+            match self.state {
+                ViewState::Array => {
+                    self.get_inline_array_field(is_pointer_field, next_field_type)?
+                }
+                ViewState::Unlocked => self.get_unlocked_inline_field(
+                    is_pointer_field,
+                    current_field_type,
+                    next_field_type,
+                    index,
+                    Ordering::Relaxed,
+                    Ordering::SeqCst,
+                ),
+                #[cfg(not(feature = "lts"))]
+                ViewState::Locked => {
+                    self.get_locked_inline_field(is_pointer_field, next_field_type)
+                }
+                #[cfg(not(feature = "lts"))]
+                ViewState::AtomicBuffer => {
+                    self.get_atomic_buffer_field(is_pointer_field, next_field_type)?
+                }
+            }
+        }
+
+        Ok(self)
+    }
+
+    /// Update the accessor to point to `field`.
+    ///
+    /// If the field is a small atomic field `ordering` is used to read it. The ordering is
+    /// ignored for non-atomic fields and fields that require a lock to access. See
+    /// [`FieldAccessor::field`] for more information.
+    #[cfg(not(feature = "lts"))]
+    pub fn atomic_field<F: FieldIndex>(mut self, field: F, ordering: Ordering) -> JlrsResult<Self> {
+        if self.value.is_undefined() {
+            Err(JlrsError::UndefRef)?
+        }
+
+        if self.current_field_type.is_undefined() {
+            Err(JlrsError::UndefRef)?
+        }
+
+        unsafe {
+            let current_field_type = self.current_field_type.wrapper_unchecked();
+            if self.state == ViewState::Array && current_field_type.is::<Array>() {
+                self.get_array_field(field)?;
+                return Ok(self);
+            }
+
+            let index = field.field_index(current_field_type, Private)?;
+
+            let next_field_type = current_field_type.field_type_unchecked(index);
+            if next_field_type.is_undefined() {
+                Err(JlrsError::UndefRef)?
+            }
+
+            let next_field_type = next_field_type.wrapper_unchecked();
+            let is_pointer_field = current_field_type.is_pointer_field_unchecked(index);
+            let field_offset = current_field_type.field_offset_unchecked(index);
+            self.offset += field_offset;
+
+            match self.state {
+                ViewState::Array => {
+                    self.get_inline_array_field(is_pointer_field, next_field_type)?
+                }
+                ViewState::Unlocked => self.get_unlocked_inline_field(
+                    is_pointer_field,
+                    current_field_type,
+                    next_field_type,
+                    index,
+                    ordering,
+                    ordering,
+                ),
+                ViewState::Locked => {
+                    self.get_locked_inline_field(is_pointer_field, next_field_type)
+                }
+                ViewState::AtomicBuffer => {
+                    self.get_atomic_buffer_field(is_pointer_field, next_field_type)?
+                }
+            }
+        }
+
+        Ok(self)
+    }
+
+    #[cfg(not(feature = "lts"))]
+    unsafe fn get_atomic_buffer_field(
+        &mut self,
+        is_pointer_field: bool,
+        next_field_type: Value<'scope, 'data>,
+    ) -> JlrsResult<()> {
+        if is_pointer_field {
+            debug_assert_eq!(self.offset, 0);
+            self.value = ValueRef::wrap(self.buffer.ptr);
+            self.state = ViewState::Unlocked;
+            if self.value.is_undefined() {
+                if let Ok(ty) = next_field_type.cast::<DataType>() {
+                    self.current_field_type = ty.as_ref();
+                } else {
+                    self.current_field_type = DataTypeRef::undefined_ref();
+                }
+            } else {
+                self.current_field_type = self.value.wrapper_unchecked().datatype().as_ref();
+            }
+        } else {
+            self.current_field_type = next_field_type.cast::<DataType>()?.as_ref();
+        }
+
+        Ok(())
+    }
+
+    #[cfg(not(feature = "lts"))]
+    unsafe fn get_unlocked_inline_field(
+        &mut self,
+        is_pointer_field: bool,
+        current_field_type: DataType<'scope>,
+        next_field_type: Value<'scope, 'data>,
+        index: usize,
+        pointer_ordering: Ordering,
+        inline_ordering: Ordering,
+    ) {
+        let is_atomic_field = current_field_type.is_atomic_field_unchecked(index);
+        if is_pointer_field {
+            if is_atomic_field {
+                self.get_atomic_pointer_field(next_field_type, pointer_ordering);
+            } else {
+                self.get_pointer_field(false, next_field_type);
+            }
+        } else if let Ok(un) = next_field_type.cast::<Union>() {
+            self.get_bits_union_field(un);
+        } else {
+            debug_assert!(next_field_type.is::<DataType>());
+            self.current_field_type = next_field_type.cast_unchecked::<DataType>().as_ref();
+
+            if is_atomic_field {
+                self.lock_or_copy_atomic(inline_ordering);
+            }
+        }
+    }
+
+    #[cfg(feature = "lts")]
+    unsafe fn get_unlocked_inline_field(
+        &mut self,
+        is_pointer_field: bool,
+        _current_field_type: DataType<'scope>,
+        next_field_type: Value<'scope, 'data>,
+        _index: usize,
+        _pointer_ordering: Ordering,
+        _inline_ordering: Ordering,
+    ) {
+        if is_pointer_field {
+            self.get_pointer_field(false, next_field_type);
+        } else if let Ok(un) = next_field_type.cast::<Union>() {
+            self.get_bits_union_field(un);
+        } else {
+            debug_assert!(next_field_type.is::<DataType>());
+            self.current_field_type = next_field_type.cast_unchecked::<DataType>().as_ref();
+        }
+    }
+
+    #[cfg(not(feature = "lts"))]
+    unsafe fn get_locked_inline_field(
+        &mut self,
+        is_pointer_field: bool,
+        next_field_type: Value<'scope, 'data>,
+    ) {
+        if is_pointer_field {
+            self.get_pointer_field(true, next_field_type);
+        } else if let Ok(un) = next_field_type.cast::<Union>() {
+            self.get_bits_union_field(un);
+        } else {
+            debug_assert!(next_field_type.is::<DataType>());
+            self.current_field_type = next_field_type.cast_unchecked::<DataType>().as_ref();
+        }
+    }
+
+    unsafe fn get_inline_array_field(
+        &mut self,
+        is_pointer_field: bool,
+        next_field_type: Value<'scope, 'data>,
+    ) -> JlrsResult<()> {
+        // Inline field of the current array
+        if is_pointer_field {
+            self.value = self
+                .value
+                .value_unchecked()
+                .cast::<Array>()?
+                .data_ptr()
+                .cast::<MaybeUninit<u8>>()
+                .add(self.offset as usize)
+                .cast::<ValueRef>()
+                .read();
+
+            self.offset = 0;
+            self.state = ViewState::Unlocked;
+
+            if self.value.is_undefined() {
+                if let Ok(ty) = next_field_type.cast::<DataType>() {
+                    self.current_field_type = ty.as_ref();
+                } else {
+                    self.current_field_type = DataTypeRef::undefined_ref();
+                }
+            } else {
+                self.current_field_type = self.value.value_unchecked().datatype().as_ref();
+            }
+        } else {
+            self.current_field_type = next_field_type.cast::<DataType>()?.as_ref();
+        }
+
+        Ok(())
+    }
+
+    #[cfg(not(feature = "lts"))]
+    unsafe fn lock_or_copy_atomic(&mut self, ordering: Ordering) {
+        let ptr = self
+            .value
+            .ptr()
+            .cast::<MaybeUninit<u8>>()
+            .add(self.offset as usize);
+
+        match self.current_field_type.wrapper_unchecked().size() {
+            0 => (),
+            1 => {
+                let atomic = &*ptr.cast::<AtomicU8>();
+                let v = atomic.load(ordering);
+                let dst_ptr = self.buffer.bytes.as_mut_ptr();
+                std::ptr::copy_nonoverlapping(&v as *const _ as *const u8, dst_ptr as _, 1);
+                self.state = ViewState::AtomicBuffer;
+                self.offset = 0;
+            }
+            2 => {
+                let atomic = &*ptr.cast::<AtomicU16>();
+                let v = atomic.load(ordering);
+                let dst_ptr = self.buffer.bytes.as_mut_ptr();
+                std::ptr::copy_nonoverlapping(&v as *const _ as *const u8, dst_ptr as _, 2);
+                self.state = ViewState::AtomicBuffer;
+                self.offset = 0;
+            }
+            sz if sz <= 4 => {
+                let atomic = &*ptr.cast::<AtomicU32>();
+                let v = atomic.load(ordering);
+                let dst_ptr = self.buffer.bytes.as_mut_ptr();
+                std::ptr::copy_nonoverlapping(
+                    &v as *const _ as *const u8,
+                    dst_ptr as _,
+                    sz as usize,
+                );
+                self.state = ViewState::AtomicBuffer;
+                self.offset = 0;
+            }
+            sz if sz <= 8 => {
+                let atomic = &*ptr.cast::<AtomicU64>();
+                let v = atomic.load(ordering);
+                let dst_ptr = self.buffer.bytes.as_mut_ptr();
+                std::ptr::copy_nonoverlapping(
+                    &v as *const _ as *const u8,
+                    dst_ptr as _,
+                    sz as usize,
+                );
+                self.state = ViewState::AtomicBuffer;
+                self.offset = 0;
+            }
+            _ => {
+                jlrs_lock(self.value.ptr());
+                self.state = ViewState::Locked;
+            }
+        }
+    }
+
+    unsafe fn get_array_field<F: FieldIndex>(&mut self, field: F) -> JlrsResult<()> {
+        // TODO: Atomics?
+
+        let arr = self.value.wrapper_unchecked().cast_unchecked::<Array>();
+        let index = field.array_index(arr, Private)?;
+        if arr.is_value_array() {
+            self.value = arr.data_ptr().cast::<ValueRef>().add(index).read();
+            self.offset = 0;
+            if self.value.is_undefined() {
+                if let Ok(ty) = arr.element_type().cast::<DataType>() {
+                    self.current_field_type = ty.as_ref();
+                    if !ty.is::<Array>() {
+                        self.state = ViewState::Unlocked;
+                    }
+                } else {
+                    self.current_field_type = DataTypeRef::undefined_ref();
+                    self.state = ViewState::Unlocked;
+                }
+            } else {
+                let ty = self.value.value_unchecked().datatype();
+                self.current_field_type = ty.as_ref();
+                if !ty.is::<Array>() {
+                    self.state = ViewState::Unlocked;
+                }
+            }
+        } else if arr.is_union_array() {
+            let el_size = arr.element_size();
+            self.offset = (index * el_size) as u32;
+            let mut tag = *jl_array_typetagdata(arr.unwrap(Private)).add(index) as i32;
+            if let Some(ty) = nth_union_component(arr.element_type(), &mut tag) {
+                if let Ok(ty) = ty.cast::<DataType>() {
+                    self.current_field_type = ty.as_ref();
+                } else {
+                    self.current_field_type = DataTypeRef::undefined_ref();
+                }
+            } else {
+                unreachable!()
+            }
+        } else {
+            let el_size = arr.element_size();
+            self.offset = (index * el_size) as u32;
+            self.current_field_type = arr.element_type().cast::<DataType>()?.as_ref();
+        }
+
+        Ok(())
+    }
+
+    #[cfg(not(feature = "lts"))]
+    unsafe fn get_pointer_field(&mut self, locked: bool, next_field_type: Value<'scope, 'data>) {
+        let value = self
+            .value
+            .ptr()
+            .cast::<u8>()
+            .add(self.offset as usize)
+            .cast::<ValueRef>()
+            .read();
+
+        if locked {
+            jlrs_unlock(self.value.ptr());
+            self.state = ViewState::Unlocked;
+        }
+
+        self.value = value;
+        self.offset = 0;
+
+        if self.value.is_undefined() {
+            if let Ok(ty) = next_field_type.cast::<DataType>() {
+                self.current_field_type = ty.as_ref();
+            } else {
+                self.current_field_type = DataTypeRef::undefined_ref();
+            }
+        } else {
+            let value = self.value.value_unchecked();
+            self.current_field_type = value.datatype().as_ref();
+            if value.is::<Array>() {
+                self.state = ViewState::Array;
+            }
+        }
+    }
+
+    #[cfg(feature = "lts")]
+    unsafe fn get_pointer_field(&mut self, _locked: bool, next_field_type: Value<'scope, 'data>) {
+        let value = self
+            .value
+            .ptr()
+            .cast::<u8>()
+            .add(self.offset as usize)
+            .cast::<ValueRef>()
+            .read();
+
+        self.value = value;
+        self.offset = 0;
+
+        if self.value.is_undefined() {
+            if let Ok(ty) = next_field_type.cast::<DataType>() {
+                self.current_field_type = ty.as_ref();
+            } else {
+                self.current_field_type = DataTypeRef::undefined_ref();
+            }
+        } else {
+            let value = self.value.value_unchecked();
+            self.current_field_type = value.datatype().as_ref();
+            if value.is::<Array>() {
+                self.state = ViewState::Array;
+            }
+        }
+    }
+
+    #[cfg(not(feature = "lts"))]
+    unsafe fn get_atomic_pointer_field(
+        &mut self,
+        next_field_type: Value<'scope, 'data>,
+        ordering: Ordering,
+    ) {
+        let v = self
+            .value
+            .ptr()
+            .cast::<u8>()
+            .add(self.offset as usize)
+            .cast::<AtomicPtr<jl_value_t>>()
+            .read();
+
+        let ptr = v.load(ordering);
+        self.value = ValueRef::wrap(ptr);
+        self.offset = 0;
+
+        if self.value.is_undefined() {
+            if let Ok(ty) = next_field_type.cast::<DataType>() {
+                self.current_field_type = ty.as_ref();
+            } else {
+                self.current_field_type = DataTypeRef::undefined_ref();
+            }
+        } else {
+            let value = self.value.value_unchecked();
+            self.current_field_type = value.datatype().as_ref();
+            if value.is::<Array>() {
+                self.state = ViewState::Array;
+            }
+        }
+    }
+
+    unsafe fn get_bits_union_field(&mut self, union: Union<'scope>) {
+        let mut size = 0;
+        if union.isbits_size_align(&mut size, &mut 0) {
+            let flag_offset = self.offset as usize + size;
+            let mut flag = self.value.ptr().cast::<u8>().add(flag_offset).read() as i32;
+
+            match nth_union_component(union.as_value(), &mut flag) {
+                Some(active_ty) => {
+                    if let Ok(ty) = active_ty.cast::<DataType>() {
+                        self.current_field_type = ty.as_ref();
+                    } else {
+                        self.current_field_type = DataTypeRef::undefined_ref();
+                    }
+                }
+                _ => unreachable!(),
+            }
+        } else {
+            unreachable!();
+        }
+    }
+}
+
+impl Drop for FieldAccessor<'_, '_, '_> {
+    fn drop(&mut self) {
+        #[cfg(not(feature = "lts"))]
+        if self.state == ViewState::Locked {
+            debug_assert!(!self.value.is_undefined());
+            unsafe { jlrs_unlock(self.value.ptr()) }
+        }
     }
 }
 

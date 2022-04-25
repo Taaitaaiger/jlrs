@@ -12,7 +12,7 @@ use crate::{
 };
 use crate::{
     memory::{frame::Frame, output::Output, reusable_slot::ReusableSlot, stack_page::StackPage},
-    prelude::Wrapper,
+    wrappers::ptr::Wrapper,
 };
 use futures::Future;
 use jl_sys::jl_value_t;

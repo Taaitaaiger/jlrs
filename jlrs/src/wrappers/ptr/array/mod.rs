@@ -586,6 +586,11 @@ impl<'scope, 'data> Array<'scope, 'data> {
         unsafe { Value::wrap(jl_array_eltype(self.unwrap(Private).cast()).cast(), Private) }
     }
 
+    /// Returns the size of this array's elements.
+    pub fn element_size(self) -> usize {
+        unsafe { self.unwrap_non_null(Private).as_ref().elsize as usize }
+    }
+
     /// Returns `true` if the layout of the elements is compatible with `T`.
     pub fn contains<T: ValidLayout>(self) -> bool {
         unsafe {
@@ -1183,6 +1188,11 @@ impl<'scope, 'data, T: Clone + ValidLayout + Debug> TypedArray<'scope, 'data, T>
     /// Returns the type of this array's elements.
     pub fn element_type(self) -> Value<'scope, 'static> {
         unsafe { Value::wrap(jl_array_eltype(self.unwrap(Private).cast()).cast(), Private) }
+    }
+
+    /// Returns the size of this array's elements.
+    pub fn element_size(self) -> usize {
+        unsafe { self.unwrap_non_null(Private).as_ref().elsize as usize }
     }
 
     /// Returns true if the elements of the array are stored inline.

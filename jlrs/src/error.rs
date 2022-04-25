@@ -24,6 +24,7 @@ pub enum JlrsError {
     Exception {
         msg: String,
     },
+    Locked,
     AlreadyInitialized,
     ConstAlreadyExists {
         name: String,
@@ -127,6 +128,8 @@ pub enum JlrsError {
         value_type: String,
     },
     ArrayNotSupported,
+    ArrayNeedsNumericalIndex,
+    ArrayNeedsSimpleIndex,
     NamedTupleSizeMismatch {
         n_names: usize,
         n_values: usize,
@@ -169,6 +172,10 @@ impl Display for JlrsError {
                     dim_size, vec_size
                 )
             }
+            JlrsError::Locked => write!(
+                formatter,
+                "A FieldAccessor can only be cloned when no data has been locked"
+            ),
             JlrsError::Other(other) => write!(formatter, "An error occurred: {}", other),
             JlrsError::AlreadyInitialized => {
                 write!(formatter, "The runtime was already initialized, it can only be initialized once in a process")
@@ -372,6 +379,18 @@ impl Display for JlrsError {
                     formatter,
                     "Array types cannot be instantiated with `DataType::instantiate`, but must \
                     be created with one of the methods provided by `Array` and `TypedArray`",
+                )
+            }
+            JlrsError::ArrayNeedsNumericalIndex => {
+                write!(
+                    formatter,
+                    "Array types can only be accessed with n-dimensional indices.",
+                )
+            }
+            JlrsError::ArrayNeedsSimpleIndex => {
+                write!(
+                    formatter,
+                    "Non-array types can only be accessed with field names and indices.",
                 )
             }
             JlrsError::UndefRef => {

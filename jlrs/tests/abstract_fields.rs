@@ -4,7 +4,6 @@ mod util;
 mod tests {
     use super::util::JULIA;
     use jlrs::prelude::*;
-    use jlrs::wrappers::ptr::ValueRef;
 
     #[test]
     fn read_abstract_field() {
@@ -25,8 +24,8 @@ mod tests {
                     .instantiate(&mut *frame, &mut [arg1])?
                     .into_jlrs_result()?;
 
-                let a = unsafe { instance.get_raw_field::<ValueRef, _>("a")?.value().unwrap() };
-                assert_eq!(a.unbox::<u32>()?, 3);
+                let field = instance.field_accessor(frame).field("a")?.access::<u32>()?;
+                assert_eq!(field, 3);
 
                 Ok(())
             })

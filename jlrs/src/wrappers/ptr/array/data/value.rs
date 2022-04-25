@@ -50,7 +50,7 @@ where
     {
         unsafe {
             let dims = ArrayDimensions::new(self.array);
-            let idx = dims.index_of(index).ok()?;
+            let idx = dims.index_of(&index).ok()?;
             self.array.data_ptr().cast::<T>().add(idx).as_ref().cloned()
         }
     }
@@ -81,7 +81,7 @@ where
     fn index(&self, index: D) -> &Self::Output {
         unsafe {
             let dims = ArrayDimensions::new(self.array);
-            let idx = dims.index_of(index).unwrap();
+            let idx = dims.index_of(&index).unwrap();
             self.array.data_ptr().cast::<T>().add(idx).as_ref().unwrap()
         }
     }
@@ -120,7 +120,7 @@ where
     {
         unsafe {
             let dims = ArrayDimensions::new(self.array);
-            let idx = dims.index_of(index).ok()?;
+            let idx = dims.index_of(&index).ok()?;
             self.array.data_ptr().cast::<T>().add(idx).as_ref().cloned()
         }
     }
@@ -133,7 +133,7 @@ where
         unsafe {
             let ptr = self.array.unwrap(Private);
             let dims = ArrayDimensions::new(self.array);
-            let idx = dims.index_of(index)?;
+            let idx = dims.index_of(&index)?;
 
             let data_ptr = if let Some(value) = value {
                 if !self
@@ -187,7 +187,7 @@ where
     fn index(&self, index: D) -> &Self::Output {
         unsafe {
             let dims = ArrayDimensions::new(self.array);
-            let idx = dims.index_of(index).unwrap();
+            let idx = dims.index_of(&index).unwrap();
             self.array.data_ptr().cast::<T>().add(idx).as_ref().unwrap()
         }
     }
@@ -226,7 +226,7 @@ where
     {
         unsafe {
             let dims = ArrayDimensions::new(self.array);
-            let idx = dims.index_of(index).ok()?;
+            let idx = dims.index_of(&index).ok()?;
             self.array.data_ptr().cast::<T>().add(idx).as_ref().cloned()
         }
     }
@@ -239,7 +239,7 @@ where
         unsafe {
             let ptr = self.array.unwrap(Private);
             let dims = ArrayDimensions::new(self.array);
-            let idx = dims.index_of(index)?;
+            let idx = dims.index_of(&index)?;
 
             let data_ptr = if let Some(value) = value {
                 if !self
@@ -294,7 +294,7 @@ where
     fn index(&self, index: D) -> &Self::Output {
         unsafe {
             let dims = ArrayDimensions::new(self.array);
-            let idx = dims.index_of(index).unwrap();
+            let idx = dims.index_of(&index).unwrap();
             self.array.data_ptr().cast::<T>().add(idx).as_ref().unwrap()
         }
     }

@@ -1,7 +1,3 @@
-// This module exists for testing purposes, the thread-local instance ensures Julia is only
-// initialized once. Note that tests that involve calling Julia functions must always be
-// executed with `cargo test -- --test-threads=1`.
-
 #[cfg(feature = "sync-rt")]
 use jlrs::{julia::Julia, wrappers::ptr::value::Value};
 #[cfg(feature = "sync-rt")]
@@ -14,6 +10,14 @@ static JLRS_TESTS_JL: &'static str = include_str!("JlrsTests.jl");
 #[cfg(all(feature = "sync-rt", not(feature = "lts")))]
 #[allow(dead_code)]
 static JLRS_STABLE_TESTS_JL: &'static str = include_str!("JlrsStableTests.jl");
+
+// This module is expensive, don't include it by default.
+#[cfg(all(feature = "sync-rt", not(feature = "lts")))]
+#[allow(dead_code)]
+pub static MIXED_BAG_JL: &'static str = include_str!("MixedBagStable.jl");
+#[cfg(all(feature = "sync-rt", feature = "lts"))]
+#[allow(dead_code)]
+pub static MIXED_BAG_JL: &'static str = include_str!("MixedBagLTS.jl");
 
 thread_local! {
     #[cfg(feature = "sync-rt")]

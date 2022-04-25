@@ -6,7 +6,6 @@ use super::{
     private::Wrapper as WrapperPriv, value::Value, DataTypeRef, SimpleVectorRef, TypeNameRef,
     ValueRef, Wrapper,
 };
-use crate::error::JlrsError;
 use crate::error::CANNOT_DISPLAY_TYPE;
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
 use crate::error::{JuliaResult, JuliaResultRef};
@@ -14,6 +13,7 @@ use crate::error::{JuliaResult, JuliaResultRef};
 use crate::layout::typecheck::Concrete;
 use crate::memory::scope::PartialScope;
 use crate::wrappers::ptr::{simple_vector::SimpleVector, symbol::Symbol};
+use crate::{convert::to_symbol::ToSymbol, error::JlrsError};
 use crate::{error::JlrsResult, impl_julia_typecheck};
 use crate::{impl_debug, memory::global::Global, private::Private};
 use crate::{layout::typecheck::Typecheck, memory::output::Output};
@@ -21,9 +21,9 @@ use jl_sys::{
     jl_abstractslot_type, jl_abstractstring_type, jl_any_type, jl_anytuple_type, jl_argument_type,
     jl_argumenterror_type, jl_bool_type, jl_boundserror_type, jl_builtin_type, jl_char_type,
     jl_code_info_type, jl_code_instance_type, jl_const_type, jl_datatype_layout_t, jl_datatype_t,
-    jl_datatype_type, jl_emptytuple_type, jl_errorexception_type, jl_expr_type, jl_field_isptr,
-    jl_field_offset, jl_field_size, jl_float16_type, jl_float32_type, jl_float64_type,
-    jl_floatingpoint_type, jl_function_type, jl_get_fieldtypes, jl_globalref_type,
+    jl_datatype_type, jl_emptytuple_type, jl_errorexception_type, jl_expr_type, jl_field_index,
+    jl_field_isptr, jl_field_offset, jl_field_size, jl_float16_type, jl_float32_type,
+    jl_float64_type, jl_floatingpoint_type, jl_function_type, jl_get_fieldtypes, jl_globalref_type,
     jl_gotoifnot_type, jl_gotonode_type, jl_initerror_type, jl_int16_type, jl_int32_type,
     jl_int64_type, jl_int8_type, jl_intrinsic_type, jl_lineinfonode_type, jl_linenumbernode_type,
     jl_loaderror_type, jl_method_instance_type, jl_method_match_type, jl_method_type,
@@ -116,6 +116,15 @@ impl<'scope> DataType<'scope> {
         }
     }
 
+    /// Returns the field type of the field at position `idx` without performing a bounds check.
+    pub unsafe fn field_type_unchecked(self, idx: usize) -> ValueRef<'scope, 'static> {
+        *self
+            .field_types()
+            .wrapper_unchecked()
+            .data()
+            .get_unchecked(idx)
+    }
+
     /// Returns the field type of the field at position `idx` if `self` is a concrete datatype.
     pub fn field_type_concrete(self, idx: usize) -> Option<ValueRef<'scope, 'static>> {
         unsafe {
@@ -144,6 +153,22 @@ impl<'scope> DataType<'scope> {
                 .get(idx)
                 .copied()
                 .map(|s| s.wrapper_unchecked())
+        }
+    }
+
+    pub fn field_index<N: ToSymbol>(self, field_name: N) -> JlrsResult<usize> {
+        unsafe {
+            let sym = field_name.to_symbol_priv(Private);
+            let idx = jl_field_index(self.unwrap(Private), sym.unwrap(Private), 0);
+
+            if idx < 0 {
+                Err(JlrsError::NoSuchField {
+                    type_name: self.display_string_or(CANNOT_DISPLAY_TYPE),
+                    field_name: sym.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+                })?;
+            }
+
+            Ok(idx as usize)
         }
     }
 

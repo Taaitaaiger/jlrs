@@ -173,14 +173,15 @@ macro_rules! impl_ref_root {
     };
 }
 
-pub trait Root<'target, 'value, 'data>: Wrapper<'value, 'data> {
+pub(crate) trait Root<'target, 'value, 'data>: Wrapper<'value, 'data> {
     type Output;
     unsafe fn root<S>(scope: S, value: Ref<'value, 'data, Self>) -> JlrsResult<Self::Output>
     where
         S: PartialScope<'target>;
 }
 
-pub trait WrapperRef<'scope, 'data>: private::WrapperRef<'scope, 'data> + Clone + Debug {}
+/// Marker trait implemented by `Ref`.
+pub trait WrapperRef<'scope, 'data>: private::WrapperRef<'scope, 'data> + Copy + Debug {}
 
 impl<'scope, 'data, T> WrapperRef<'scope, 'data> for Ref<'scope, 'data, T> where
     T: Wrapper<'scope, 'data>
