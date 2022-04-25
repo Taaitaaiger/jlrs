@@ -9,6 +9,7 @@ mod tests {
     use jlrs::{layout::typecheck::Mutable, wrappers::inline::union::EmptyUnion};
 
     #[test]
+    #[cfg(not(target_os = "windows"))]
     fn empty_union_field() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
@@ -110,6 +111,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(target_os = "windows"))]
     fn access_mutable_struct_fields() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
@@ -153,6 +155,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(target_os = "windows"))]
     fn cannot_access_unknown_mutable_struct_field() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();

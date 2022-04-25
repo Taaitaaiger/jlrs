@@ -14,6 +14,7 @@
 //!
 //! [`Value::is`]: crate::wrappers::ptr::value::Value::is
 //! [`Wrapper`]: crate::wrappers::ptr::Wrapper
+//! [`Nothing`]: crate::wrappers::inline::nothing::Nothing
 //! [`Unbox`]: crate::convert::unbox::Unbox
 use jl_sys::{
     jl_code_info_type, jl_globalref_type, jl_gotonode_type, jl_intrinsic_type,
