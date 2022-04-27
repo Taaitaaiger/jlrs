@@ -665,8 +665,6 @@ pub mod layout;
 pub mod memory;
 #[cfg(feature = "async")]
 pub mod multitask;
-#[cfg(feature = "jlrs-ndarray")]
-pub mod ndarray;
 pub mod prelude;
 pub(crate) mod private;
 #[cfg(feature = "pyplot")]

@@ -31,7 +31,7 @@
 
  - The `AsUnrooted` trait has been removed.
  
- - Most of the extensions defined in the extensions module have moved: `jlrs::extensions::f16` to `jlrs::wrappers::inline::f16`. `jlrs::extensions::ndarray` to `jlrs::ndarray`, `jlrs::extensions::multitask` to `jlrs::multitask`, and `jlrs::extensions::pyplot` to `jlrs::pyplot`.
+ - Most of the extensions defined in the extensions module have moved: `jlrs::extensions::f16` to `jlrs::wrappers::inline::f16`. `jlrs::extensions::ndarray` to `jlrs::convert::ndarray`, `jlrs::extensions::multitask` to `jlrs::multitask`, and `jlrs::extensions::pyplot` to `jlrs::pyplot`.
 
  - Pointer wrapper types don't implement `ValidLayout`, only `Ref` and inline wrappers do. 
 
@@ -46,3 +46,5 @@
  - `Array::element_size` and `TypedArray::element_size` have been added.
 
  - `DataType::field_type_unchecked` and `DataType::field_index` have been added.
+
+ - `GC::enable_logging` has been added.

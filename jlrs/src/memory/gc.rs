@@ -20,6 +20,31 @@ pub trait Gc: private::Gc {
         unsafe { jl_gc_enable(on as i32) == 1 }
     }
 
+    /// Enable or disable GC logging.
+    #[cfg(not(feature = "lts"))]
+    fn enable_logging(&mut self, on: bool) {
+        use crate::prelude::{Module, Global, Value, Call};
+
+        unsafe {
+            let global = Global::new();
+            let func = Module::base(global)
+                .submodule_ref("GC")
+                .expect("No GC module in Base")
+                .wrapper_unchecked()
+                .function_ref("enable_logging")
+                .expect("No enable_logging function in GC")
+                .wrapper_unchecked();
+
+            let arg = if on {
+                Value::true_v(global)
+            } else {
+                Value::false_v(global)
+            };
+
+            func.call1_unrooted(global, arg).expect("GC.enable_logging threw an exception");
+        }
+    }
+
     /// Returns `true` if the GC is enabled.
     fn gc_is_enabled(&mut self) -> bool {
         unsafe { jl_gc_is_enabled() == 1 }
