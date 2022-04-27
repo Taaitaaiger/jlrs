@@ -32,6 +32,7 @@ pub(crate) mod private {
     }
 
     impl<T: AsRef<str>> ToSymbol for T {
+        #[inline]
         unsafe fn to_symbol_priv<'symbol>(&self, _: Private) -> Symbol<'symbol> {
             let symbol_ptr = self.as_ref().as_ptr().cast();
             let symbol = jl_symbol_n(symbol_ptr, self.as_ref().len());
@@ -40,6 +41,7 @@ pub(crate) mod private {
     }
 
     impl ToSymbol for JuliaString<'_> {
+        #[inline]
         unsafe fn to_symbol_priv<'symbol>(&self, _: Private) -> Symbol<'symbol> {
             let symbol_ptr = self.as_c_str();
             let symbol = jl_symbol(symbol_ptr.as_ptr());
@@ -48,6 +50,7 @@ pub(crate) mod private {
     }
 
     impl ToSymbol for Symbol<'_> {
+        #[inline]
         unsafe fn to_symbol_priv<'symbol>(&self, _: Private) -> Symbol<'symbol> {
             Symbol::wrap_non_null(self.unwrap_non_null(Private), Private)
         }

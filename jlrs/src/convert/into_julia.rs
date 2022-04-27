@@ -44,13 +44,11 @@ pub unsafe trait IntoJulia: Sized + 'static {
     fn julia_type<'scope>(_: Global<'scope>) -> DataTypeRef<'scope>;
 
     #[doc(hidden)]
-    #[inline(always)]
     fn into_julia<'scope>(self, global: Global<'scope>) -> ValueRef<'scope, 'static> {
         unsafe {
-            let ty = Self::julia_type(global)
-                .wrapper()
-                .expect("DataTypeRef::wrapper returned None");
-
+            let ty = Self::julia_type(global).wrapper();
+            debug_assert!(ty.is_some());
+            let ty = ty.unwrap_unchecked();
             debug_assert!(ty.is_bits());
 
             let container = jl_new_struct_uninit(ty.unwrap(Private));
@@ -107,6 +105,7 @@ impl_into_julia!(isize, jl_box_int32, jl_int32_type);
 impl_into_julia!(isize, jl_box_int64, jl_int64_type);
 
 unsafe impl<T: IntoJulia> IntoJulia for *mut T {
+    #[inline]
     fn julia_type<'scope>(global: Global<'scope>) -> DataTypeRef<'scope> {
         let ptr_ua = UnionAll::pointer_type(global);
         let inner_ty = T::julia_type(global);
@@ -118,11 +117,11 @@ unsafe impl<T: IntoJulia> IntoJulia for *mut T {
             // cached.
             let applied = jl_apply_type(ptr_ua.unwrap(Private).cast(), param_ptr, 1);
             debug_assert!(!applied.is_null());
-
             let val = Value::wrap_non_null(NonNull::new_unchecked(applied), Private);
             debug_assert!(val.is::<DataType>());
-
-            val.cast_unchecked::<DataType>().as_ref()
+            let ty = val.cast_unchecked::<DataType>();
+            debug_assert!(ty.is_concrete_type());
+            ty.as_ref()
         }
     }
 }

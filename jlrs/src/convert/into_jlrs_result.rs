@@ -20,6 +20,7 @@ pub trait IntoJlrsResult<T>: private::IntoJlrsResult {
 }
 
 impl<T> IntoJlrsResult<T> for JuliaResult<'_, '_, T> {
+    #[inline(always)]
     fn into_jlrs_result(self) -> JlrsResult<T> {
         match self {
             Ok(v) => Ok(v),

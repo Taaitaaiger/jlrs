@@ -156,6 +156,7 @@ impl<'scope> DataType<'scope> {
         }
     }
 
+    /// Returns the index of the field with the name `field_name`.
     pub fn field_index<N: ToSymbol>(self, field_name: N) -> JlrsResult<usize> {
         unsafe {
             let sym = field_name.to_symbol_priv(Private);
@@ -169,6 +170,15 @@ impl<'scope> DataType<'scope> {
             }
 
             Ok(idx as usize)
+        }
+    }
+
+    /// Returns the index of the field with the name `field_name`, if the field doesn't exist the
+    /// result is `-1`.
+    pub fn field_index_unchecked<N: ToSymbol>(self, field_name: N) -> i32 {
+        unsafe {
+            let sym = field_name.to_symbol_priv(Private);
+            jl_field_index(self.unwrap(Private), sym.unwrap(Private), 0)
         }
     }
 
@@ -187,7 +197,7 @@ impl<'scope> DataType<'scope> {
     }
 
     // TODO: Allow using this information
-    /// Returns a pointe to the layout of this `DataType`.
+    /// Returns a pointer to the layout of this `DataType`.
     pub fn layout(self) -> *const c_void {
         unsafe { self.unwrap_non_null(Private).as_ref().layout as _ }
     }

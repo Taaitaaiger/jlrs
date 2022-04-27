@@ -35,6 +35,7 @@ pub unsafe trait ValidLayout {
 macro_rules! impl_valid_layout {
     ($type:ty, $($lt:lifetime),+) => {
         unsafe impl<$($lt),+> $crate::layout::valid_layout::ValidLayout for $type {
+            #[inline(always)]
             fn valid_layout(v: $crate::wrappers::ptr::value::Value) -> bool {
                 if let Ok(dt) = v.cast::<$crate::wrappers::ptr::datatype::DataType>() {
                     dt.is::<$type>()
@@ -43,6 +44,7 @@ macro_rules! impl_valid_layout {
                 }
             }
 
+            #[inline(always)]
             fn is_ref() -> bool {
                 true
             }
@@ -50,6 +52,7 @@ macro_rules! impl_valid_layout {
     };
     ($t:ty) => {
         unsafe impl $crate::layout::valid_layout::ValidLayout for $t {
+            #[inline(always)]
             fn valid_layout(v: $crate::wrappers::ptr::value::Value) -> bool {
                 if let Ok(dt) =  v.cast::<$crate::wrappers::ptr::datatype::DataType>() {
                     dt.is::<$t>()
@@ -58,6 +61,7 @@ macro_rules! impl_valid_layout {
                 }
             }
 
+            #[inline(always)]
             fn is_ref() -> bool {
                 false
             }
@@ -82,6 +86,7 @@ impl_valid_layout!(f64);
 impl_valid_layout!(*mut c_void);
 
 unsafe impl<T: IntoJulia> ValidLayout for *mut T {
+    #[inline(always)]
     fn valid_layout(v: Value) -> bool {
         if let Ok(dt) = v.cast::<DataType>() {
             dt.is::<*mut T>()
