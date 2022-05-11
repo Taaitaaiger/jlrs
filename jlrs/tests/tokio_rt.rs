@@ -13,7 +13,11 @@ mod tests {
             unsafe {
                 let r = RefCell::new(builder
                     .async_runtime::<Tokio, UnboundedChannel<_>>()
-                .start().expect("Could not init Julia").0);
+                    .n_threads(3)
+                    .n_tasks(3)
+                    .start()
+                    .expect("Could not init Julia")
+                    .0);
                 let (sender, recv) = tokio::sync::oneshot::channel();
                 r.borrow_mut().try_blocking_task(|_global, frame| {
                     Value::eval_string(frame, ASYNC_TESTS_JL)?.into_jlrs_result()?;
