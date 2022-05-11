@@ -1,16 +1,15 @@
-mod impls;
 mod util;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "jlrs-derive", feature = "sync-rt"))]
 mod tests {
-    use super::impls::*;
-    use super::util::JULIA;
+    use super::util::derive_impls::*;
+    use super::util::JULIA_DERIVE;
     use jlrs::prelude::*;
     use jlrs::wrappers::ptr::ModuleRef;
 
     #[test]
     fn derive_bits_type_bool() {
-        JULIA.with(|j| {
+        JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
@@ -31,7 +30,7 @@ mod tests {
 
     #[test]
     fn derive_bits_type_char() {
-        JULIA.with(|j| {
+        JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
@@ -52,7 +51,7 @@ mod tests {
 
     #[test]
     fn derive_bits_type_uint8() {
-        JULIA.with(|j| {
+        JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
@@ -73,7 +72,7 @@ mod tests {
 
     #[test]
     fn derive_bits_type_uint16() {
-        JULIA.with(|j| {
+        JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
@@ -94,7 +93,7 @@ mod tests {
 
     #[test]
     fn derive_bits_type_uint32() {
-        JULIA.with(|j| {
+        JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
@@ -115,7 +114,7 @@ mod tests {
 
     #[test]
     fn derive_bits_type_uint64() {
-        JULIA.with(|j| {
+        JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
@@ -136,7 +135,7 @@ mod tests {
 
     #[test]
     fn derive_bits_type_uint() {
-        JULIA.with(|j| {
+        JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
@@ -157,7 +156,7 @@ mod tests {
 
     #[test]
     fn derive_bits_type_int8() {
-        JULIA.with(|j| {
+        JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
@@ -178,7 +177,7 @@ mod tests {
 
     #[test]
     fn derive_bits_type_int16() {
-        JULIA.with(|j| {
+        JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
@@ -199,7 +198,7 @@ mod tests {
 
     #[test]
     fn derive_bits_type_int32() {
-        JULIA.with(|j| {
+        JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
@@ -220,7 +219,7 @@ mod tests {
 
     #[test]
     fn derive_bits_type_int64() {
-        JULIA.with(|j| {
+        JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
@@ -241,7 +240,7 @@ mod tests {
 
     #[test]
     fn derive_bits_type_int() {
-        JULIA.with(|j| {
+        JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
@@ -262,7 +261,7 @@ mod tests {
 
     #[test]
     fn derive_bits_type_float32() {
-        JULIA.with(|j| {
+        JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
@@ -283,7 +282,7 @@ mod tests {
 
     #[test]
     fn derive_bits_type_float64() {
-        JULIA.with(|j| {
+        JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
@@ -304,7 +303,7 @@ mod tests {
 
     #[test]
     fn derive_bits_char_float32_float64() {
-        JULIA.with(|j| {
+        JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
@@ -329,7 +328,7 @@ mod tests {
 
     #[test]
     fn derive_bits_int_bool() {
-        JULIA.with(|j| {
+        JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
@@ -353,7 +352,7 @@ mod tests {
 
     #[test]
     fn derive_bits_char_bits_int_char() {
-        JULIA.with(|j| {
+        JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
@@ -379,7 +378,7 @@ mod tests {
 
     #[test]
     fn derive_bits_uint8_tuple_int32_int64() {
-        JULIA.with(|j| {
+        JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
@@ -406,7 +405,7 @@ mod tests {
 
     #[test]
     fn derive_bits_uint8_tuple_int32_tuple_int16_uint16() {
-        JULIA.with(|j| {
+        JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
@@ -449,7 +448,7 @@ mod tests {
 
     #[test]
     fn derive_single_variant() {
-        JULIA.with(|j| {
+        JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
@@ -490,7 +489,7 @@ mod tests {
     #[test]
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     fn derive_double_variant() {
-        JULIA.with(|j| {
+        JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
@@ -537,7 +536,7 @@ mod tests {
 
     #[test]
     fn derive_size_align_mismatch() {
-        JULIA.with(|j| {
+        JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
@@ -581,7 +580,7 @@ mod tests {
 
     #[test]
     fn derive_union_in_tuple() {
-        JULIA.with(|j| {
+        JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
@@ -618,7 +617,7 @@ mod tests {
 
     #[test]
     fn derive_non_bits_union() {
-        JULIA.with(|j| {
+        JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
@@ -655,7 +654,7 @@ mod tests {
     /*
     #[test]
     fn derive_string() {
-        JULIA.with(|j| {
+        JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
@@ -689,7 +688,7 @@ mod tests {
 
     #[test]
     fn derive_with_generic_t_i32() {
-        JULIA.with(|j| {
+        JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
@@ -725,7 +724,7 @@ mod tests {
 
     #[test]
     fn derive_with_unionall() {
-        JULIA.with(|j| {
+        JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
@@ -769,7 +768,7 @@ mod tests {
 
     #[test]
     fn derive_with_nested_generic() {
-        JULIA.with(|j| {
+        JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
@@ -813,7 +812,7 @@ mod tests {
 
     #[test]
     fn derive_with_propagated_lifetime() {
-        JULIA.with(|j| {
+        JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
@@ -861,7 +860,7 @@ mod tests {
     fn derive_with_propagated_lifetimes() {
         use jlrs::wrappers::ptr::ArrayRef;
 
-        JULIA.with(|j| {
+        JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
@@ -916,7 +915,7 @@ mod tests {
 
     #[test]
     fn derive_with_set_generic() {
-        JULIA.with(|j| {
+        JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
@@ -960,7 +959,7 @@ mod tests {
 
     #[test]
     fn derive_with_set_generic_tuple() {
-        JULIA.with(|j| {
+        JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
@@ -1009,7 +1008,7 @@ mod tests {
 
     #[test]
     fn derive_with_value_type() {
-        JULIA.with(|j| {
+        JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia
@@ -1044,7 +1043,7 @@ mod tests {
     }
     #[test]
     fn derive_zero_sized() {
-        JULIA.with(|j| {
+        JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
 
             julia

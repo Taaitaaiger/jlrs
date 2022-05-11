@@ -14,9 +14,7 @@ mod tests {
 
     #[test]
     fn cannot_init_again() {
-        JULIA.with(|_j| unsafe {
-            assert!(Julia::init().is_err());
-        });
+        JULIA.with(|_j| unsafe { assert!(RuntimeBuilder::new().start().is_err()) });
     }
 
     #[test]

@@ -1,5 +1,4 @@
 use jlrs::prelude::*;
-use std::time::Duration;
 
 // This struct contains the data our task will need. This struct must be `Send`, `Sync`, and
 // contain no borrowed data.
@@ -15,6 +14,17 @@ struct MyTask {
 impl AsyncTask for MyTask {
     // Different tasks can return different results. If successful, this task returns an `f64`.
     type Output = f64;
+
+    // Include the custom code MyTask needs.
+    async fn register<'base>(
+        _global: Global<'base>,
+        frame: &mut AsyncGcFrame<'base>,
+    ) -> JlrsResult<()> {
+        unsafe {
+            Value::include(frame, "MyModule.jl")?.into_jlrs_result()?;
+        }
+        Ok(())
+    }
 
     // This is the async variation of the closure you provide `Julia::scope` when using the sync
     // runtime. The `Global` can be used to access `Module`s and other static data, while the
@@ -49,25 +59,24 @@ impl AsyncTask for MyTask {
 }
 
 fn main() {
-    // The first thing we need to do is initialize Julia in a separate thread, to do so the method
-    // AsyncJulia::init is used. This method takes three arguments: the maximum number of active
-    // tasks, the capacity of the channel used to communicate with the async runtime, and the
-    // timeout in ms that is used when trying to receive a new message. If the timeout happens
-    // while there are active tasks, control of the thread is yielded to Julia, this allows the
-    // garbage collector and scheduler to run.
+    // The first thing we need to do is initialize Julia on a separate thread. In this example
+    // tokio is used.
     //
-    // Here we allow four tasks to be running concurrently, a backlog of sixteen messages before
-    // the channel is full, and yield control of the thread to Julia after one ms.
-    //
-    // After calling this method we have an instance of `AsyncJulia` that can be used to send
+    // Afterwards we have an instance of `AsyncJulia` that can be used to send
     // tasks and requests to include a file to the runtime, and a handle to the thread where the
     // runtime is running.
-    let (julia, handle) =
-        unsafe { AsyncJulia::init(4, 16, Duration::from_millis(1)).expect("Could not init Julia") };
+    let (julia, handle) = unsafe {
+        RuntimeBuilder::new()
+            .async_runtime::<Tokio, UnboundedChannel<_>>()
+            .start()
+            .expect("Could not init Julia")
+    };
 
-    // Include the custom code MyTask needs.
-    unsafe {
-        julia.try_include("MyModule.jl").unwrap();
+    {
+        // Include the custom code MyTask needs by registering it.
+        let (sender, receiver) = crossbeam_channel::bounded(1);
+        julia.try_register_task::<MyTask, _>(sender).unwrap();
+        receiver.recv().unwrap().unwrap();
     }
 
     // Send two tasks to the runtime.

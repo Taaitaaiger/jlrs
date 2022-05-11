@@ -27,7 +27,7 @@
 
  - Methods that return rooted data return the appropriate type, eg `Array::new` returns an `Array`.
 
- - All pointer wrapper types now have a `root` method that can be used to safely extend their lifetime using an `Output`.
+ - All pointer wrapper types have a `root` method that can be used to safely extend their lifetime using an `Output`.
 
  - The `AsUnrooted` trait has been removed.
  
@@ -35,16 +35,26 @@
 
  - Pointer wrapper types don't implement `ValidLayout`, only `Ref` and inline wrappers do. 
 
- - Raw fields can be accessed with `FieldAccessor`, the `raw_field` methods have been removed.
+ - Raw fields can be accessed with a `FieldAccessor`, the `raw_field` methods have been removed.
 
  - Add a `FieldIndex` trait which is used in combination with a `FieldAccessor` to access arbitrary fields.
 
  - A wrapper for `Nothing`/`nothing` has been added.
 
- - `Dims::index_of` now takes `dim_index` by reference.
+ - `Dims::index_of` takes `dim_index` by reference.
 
  - `Array::element_size` and `TypedArray::element_size` have been added.
 
  - `DataType::field_type_unchecked` and `DataType::field_index` have been added.
 
  - `GC::enable_logging` has been added.
+
+ - The `call` module has been moved from `jlrs::wrappers::ptr::call` to `jlrs::call`.
+
+ - The `prelude` module can be disabled by opting out of the default features.
+
+ - The different runtimes have been moved to the `runtime` crate. Both the sync and async runtime can no longer be initialized directly, but require using a `RuntimeBuilder` or `AsyncRuntimeBuilder`. To create an async runtime an implementation of `AsyncRuntime` and a backing channel that implements `Channel` must be provided.
+
+ - All methods that send a new task to the async runtime take a `OneshotSender` and return an error rather than panicking if they fail. 
+
+ - Like the async runtime, creating new `PersistentTask`s requires providing a backing channel.

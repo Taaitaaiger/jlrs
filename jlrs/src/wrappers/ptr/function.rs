@@ -4,19 +4,16 @@
 //! of the [`Call`] trait. Note that you don't need to cast a [`Value`] to a [`Function`] in order
 //! to call it because [`Value`] also implements [`Call`].
 //!
-//! [`Call`]: crate::wrappers::ptr::call::Call
+//! [`Call`]: crate::call::Call
 
 use jl_sys::jl_value_t;
 use std::{marker::PhantomData, ptr::NonNull};
 
 use super::{
-    call::{Call, CallExt, WithKeywords},
-    datatype::DataType,
-    private::Wrapper as WrapperPriv,
-    value::Value,
-    FunctionRef, Wrapper,
+    datatype::DataType, private::Wrapper as WrapperPriv, value::Value, FunctionRef, Wrapper,
 };
 use crate::{
+    call::{Call, CallExt, WithKeywords},
     error::{JlrsError, JlrsResult, JuliaResult, JuliaResultRef, CANNOT_DISPLAY_TYPE},
     impl_debug,
     layout::{

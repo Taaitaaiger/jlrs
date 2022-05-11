@@ -1,6 +1,6 @@
+use crate::call::{Call, CallExt, WithKeywords};
 use crate::error::CANNOT_DISPLAY_VALUE;
-use crate::memory::global::Global;
-use crate::wrappers::ptr::call::{Call, CallExt, WithKeywords};
+use crate::memory::{frame::AsyncGcFrame, global::Global};
 use crate::wrappers::ptr::module::Module;
 use crate::wrappers::ptr::task::Task;
 use crate::wrappers::ptr::value::{Value, MAX_SIZE};
@@ -19,7 +19,7 @@ use std::marker::PhantomData;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 
-use super::{async_frame::AsyncGcFrame, yield_task};
+use super::task::yield_task;
 
 pub(crate) struct TaskState<'frame, 'data> {
     completed: bool,
@@ -402,7 +402,7 @@ impl<'frame, 'data> Future for JuliaFuture<'frame, 'data> {
 
 // This function is set as a constant in `Main.Jlrs` and called using `ccall` to indicate a task has
 // completed.
-#[cfg(any(feature = "async-std-rt", feature = "tokio-rt"))]
+#[cfg(feature = "async-rt")]
 pub(crate) unsafe extern "C" fn wake_task(state: *const Mutex<TaskState>) {
     let state = Arc::from_raw(state);
     let shared_state = state.lock();

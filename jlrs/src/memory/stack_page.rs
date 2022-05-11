@@ -31,3 +31,56 @@ impl AsMut<[Cell<*mut c_void>]> for StackPage {
         self.raw.as_mut()
     }
 }
+
+cfg_if::cfg_if! {
+    if #[cfg(feature = "async")] {
+        use std::pin::Pin;
+        #[cfg(not(feature = "lts"))]
+        use std::ptr::NonNull;
+        #[cfg(not(feature = "lts"))]
+        use jl_sys::{jl_get_current_task, jl_task_t};
+
+        #[derive(Debug)]
+        pub(crate) struct AsyncStackPage {
+            pub(crate) top: Pin<Box<[Cell<*mut c_void>; 2]>>,
+            pub(crate) page: StackPage,
+        }
+
+        // Not actually true, but we need to be able to send a page back after completing a task. The page
+        // is never (and must never be) shared across threads.
+        unsafe impl Send for AsyncStackPage {}
+        unsafe impl Sync for AsyncStackPage {}
+
+        impl AsyncStackPage {
+            pub(crate) unsafe fn new() -> Pin<Box<Self>> {
+                let stack = AsyncStackPage {
+                    top: Box::pin([Cell::new(null_mut()), Cell::new(null_mut())]),
+                    page: StackPage::default(),
+                };
+
+                Box::pin(stack)
+            }
+
+            #[cfg(not(feature = "lts"))]
+            pub(crate) unsafe fn link_stacks(stacks: &mut [Option<Pin<Box<Self>>>]) {
+                for stack in stacks.iter_mut() {
+                    let stack = stack.as_mut().unwrap();
+                    let task = NonNull::new_unchecked(jl_get_current_task().cast::<jl_task_t>()).as_mut();
+
+                    stack.top[1].set(task.gcstack.cast());
+                    task.gcstack = stack.top[0..].as_mut_ptr().cast();
+                }
+            }
+
+            #[cfg(feature = "lts")]
+            pub(crate) unsafe fn link_stacks(stacks: &mut [Option<Pin<Box<Self>>>]) {
+                for stack in stacks.iter_mut() {
+                    let stack = stack.as_mut().unwrap();
+                    let rtls = NonNull::new_unchecked(jl_sys::jl_get_ptls_states()).as_mut();
+                    stack.top[1].set(rtls.pgcstack.cast());
+                    rtls.pgcstack = stack.top[0..].as_mut_ptr().cast();
+                }
+            }
+        }
+    }
+}

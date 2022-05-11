@@ -8,5 +8,5 @@ edition = "2018"
 
 [dependencies]
 # You can use tokio instead of async-std by enabling the feature tokio-rt rather than async-std-rt
-jlrs = { path = "../../jlrs", features = ["async-std-rt"] }
+jlrs = { path = "../../jlrs", features = ["tokio-rt"] }
 crossbeam-channel = "0.5"

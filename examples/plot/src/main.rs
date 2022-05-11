@@ -30,7 +30,8 @@ impl PersistentTask for MyTask {
                 .wrapper_unchecked();
 
             let ylabel_str = JuliaString::new(&mut *frame, &self.ylabel)?;
-            let ylabel = Tuple::new(&mut *frame, &mut [ylabel_str.as_value()])?.into_jlrs_result()?;
+            let ylabel =
+                Tuple::new(&mut *frame, &mut [ylabel_str.as_value()])?.into_jlrs_result()?;
             let kws = named_tuple!(&mut *frame, "yaxis" => ylabel)?;
 
             let plot = PyPlot::new_with_keywords(frame, plot_fn, &mut [], kws)?;
@@ -84,13 +85,15 @@ impl PersistentTask for MyTask {
 #[tokio::main]
 async fn main() {
     let (julia, handle) = unsafe {
-        AsyncJulia::init_async(4, 16, Duration::from_millis(1))
+        RuntimeBuilder::new()
+            .async_runtime::<Tokio, UnboundedChannel<_>>()
+            .start_async()
             .await
             .expect("Could not init Julia")
     };
 
     let persistent_handle = julia
-        .persistent(MyTask {
+        .persistent::<UnboundedChannel<_>, _>(MyTask {
             ylabel: String::from("Random data"),
         })
         .await
@@ -99,7 +102,7 @@ async fn main() {
     // Call the task ten times, waiting a second between each call.
     for _ in 0..10 {
         let (s, r) = tokio::sync::oneshot::channel();
-        persistent_handle.call((), s).await;
+        persistent_handle.call((), s).await.unwrap();
         let res = r.await.unwrap();
         if res.is_err() {
             println!("Error: {}", res.unwrap_err());

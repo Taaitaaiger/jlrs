@@ -1,5 +1,4 @@
 use jlrs::prelude::*;
-use std::time::Duration;
 
 // This struct contains the data our task will need. This struct must be `Send`, `Sync`, and
 // contain no borrowed data.
@@ -15,6 +14,17 @@ struct MyTask {
 impl AsyncTask for MyTask {
     // Different tasks can return different results. If successful, this task returns an `f64`.
     type Output = f64;
+
+    // Include the custom code MyTask needs.
+    async fn register<'base>(
+        _global: Global<'base>,
+        frame: &mut AsyncGcFrame<'base>,
+    ) -> JlrsResult<()> {
+        unsafe {
+            Value::include(frame, "MyModule.jl")?.into_jlrs_result()?;
+        }
+        Ok(())
+    }
 
     // This is the async variation of the closure you provide `Julia::scope` when using the sync
     // runtime. The `Global` can be used to access `Module`s and other static data, while the
@@ -64,14 +74,18 @@ async fn main() {
     // tasks and requests to include a file to the runtime, and a handle to the thread where the
     // runtime is running.
     let (julia, handle) = unsafe {
-        AsyncJulia::init_async(4, 16, Duration::from_millis(1))
+        RuntimeBuilder::new()
+            .async_runtime::<AsyncStd, AsyncStdChannel<_>>()
+            .start_async()
             .await
             .expect("Could not init Julia")
     };
 
-    // Include the custom code our task needs.
-    unsafe {
-        julia.include("MyModule.jl").await.unwrap();
+    {
+        // Include the custom code MyTask needs by registering it.
+        let (sender, receiver) = async_std::channel::bounded(1);
+        julia.register_task::<MyTask, _>(sender).await.unwrap();
+        receiver.recv().await.unwrap().unwrap();
     }
 
     // Create channels for each of the tasks (this is not required but helps distinguish which
@@ -86,41 +100,45 @@ async fn main() {
         .task(
             MyTask {
                 dims: 4,
-                iters: 100_000_000,
+                iters: 10_000_000,
             },
             sender1,
         )
-        .await;
+        .await
+        .expect("Cannot send task");
 
     julia
         .task(
             MyTask {
                 dims: 4,
-                iters: 200_000_000,
+                iters: 20_000_000,
             },
             sender2,
         )
-        .await;
+        .await
+        .expect("Cannot send task");
 
     julia
         .task(
             MyTask {
                 dims: 4,
-                iters: 300_000_000,
+                iters: 30_000_000,
             },
             sender3,
         )
-        .await;
+        .await
+        .expect("Cannot send task");
 
     julia
         .task(
             MyTask {
                 dims: 4,
-                iters: 400_000_000,
+                iters: 40_000_000,
             },
             sender4,
         )
-        .await;
+        .await
+        .expect("Cannot send task");
 
     // Receive the results of the tasks.
     let res1 = receiver1.recv().await.unwrap().unwrap();

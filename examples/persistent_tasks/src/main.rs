@@ -1,5 +1,4 @@
 use jlrs::prelude::*;
-use std::time::Duration;
 
 // This struct contains the data our task will need. This struct must implement `Send`, `Sync`,
 // and contain no borrowed data.
@@ -87,7 +86,7 @@ impl PersistentTask for AccumulatorTask {
     ) -> JlrsResult<Self::Output> {
         // Add call_cata to the accumulator and return its new value. The accumulator is mutable
         // Julia data so its contents can be changed.
-        let value = state.get_raw_field::<f64, _>("v")? + input;
+        let value = state.field_accessor(frame).field("v")?.access::<f64>()? + input;
         let new_value = Value::new(&mut *frame, value)?;
 
         unsafe {
@@ -108,8 +107,12 @@ fn main() {
     //
     // Here we allow four tasks to be running concurrently, a backlog of sixteen messages before
     // the channel is full, and yield control of the thread to Julia after one ms.
-    let (julia, thread_handle) =
-        unsafe { AsyncJulia::init(4, 16, Duration::from_millis(1)).expect("Could not init Julia") };
+    let (julia, handle) = unsafe {
+        RuntimeBuilder::new()
+            .async_runtime::<Tokio, UnboundedChannel<_>>()
+            .start()
+            .expect("Could not init Julia")
+    };
 
     {
         // Register AccumulatorTask, otherwise AccumulatorTask::init returns an error.
@@ -123,7 +126,7 @@ fn main() {
     // Create a new AccumulatorTask, if AccumulatorTask::init completes successfully a handle to
     // the task is returned.
     let persistent = julia
-        .try_persistent(AccumulatorTask { init_value: 5.0 })
+        .try_persistent::<UnboundedChannel<_>, _>(AccumulatorTask { init_value: 5.0 })
         .expect("AccumulatorTask::init failed");
 
     // Call the task twice. Because AccumulatorTask::Input is f64, that data must be
@@ -144,7 +147,7 @@ fn main() {
     // the handle to wait for everything to shut down cleanly.
     std::mem::drop(persistent);
     std::mem::drop(julia);
-    thread_handle
+    handle
         .join()
         .expect("Cannot join")
         .expect("Unable to exit Julia");

@@ -7499,6 +7499,562 @@ extern "C" {
 extern "C" {
     pub fn jl_stderr_obj() -> *mut jl_value_t;
 }
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct jl_options_t {
+    pub quiet: i8,
+    pub banner: i8,
+    pub julia_bindir: *const ::std::os::raw::c_char,
+    pub julia_bin: *const ::std::os::raw::c_char,
+    pub cmds: *mut *const ::std::os::raw::c_char,
+    pub image_file: *const ::std::os::raw::c_char,
+    pub cpu_target: *const ::std::os::raw::c_char,
+    pub nthreads: i32,
+    pub nprocs: i32,
+    pub machine_file: *const ::std::os::raw::c_char,
+    pub project: *const ::std::os::raw::c_char,
+    pub isinteractive: i8,
+    pub color: i8,
+    pub historyfile: i8,
+    pub startupfile: i8,
+    pub compile_enabled: i8,
+    pub code_coverage: i8,
+    pub malloc_log: i8,
+    pub tracked_path: *const ::std::os::raw::c_char,
+    pub opt_level: i8,
+    pub opt_level_min: i8,
+    pub debug_level: i8,
+    pub check_bounds: i8,
+    pub depwarn: i8,
+    pub warn_overwrite: i8,
+    pub can_inline: i8,
+    pub polly: i8,
+    pub trace_compile: *const ::std::os::raw::c_char,
+    pub fast_math: i8,
+    pub worker: i8,
+    pub cookie: *const ::std::os::raw::c_char,
+    pub handle_signals: i8,
+    pub use_sysimage_native_code: i8,
+    pub use_compiled_modules: i8,
+    pub bindto: *const ::std::os::raw::c_char,
+    pub outputbc: *const ::std::os::raw::c_char,
+    pub outputunoptbc: *const ::std::os::raw::c_char,
+    pub outputo: *const ::std::os::raw::c_char,
+    pub outputasm: *const ::std::os::raw::c_char,
+    pub outputji: *const ::std::os::raw::c_char,
+    pub output_code_coverage: *const ::std::os::raw::c_char,
+    pub incremental: i8,
+    pub image_file_specified: i8,
+    pub warn_scope: i8,
+    pub image_codegen: i8,
+    pub rr_detach: i8,
+    pub strip_metadata: i8,
+    pub strip_ir: i8,
+}
+#[test]
+fn bindgen_test_layout_jl_options_t() {
+    assert_eq!(
+        ::std::mem::size_of::<jl_options_t>(),
+        192usize,
+        concat!("Size of: ", stringify!(jl_options_t))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<jl_options_t>(),
+        8usize,
+        concat!("Alignment of ", stringify!(jl_options_t))
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).quiet as *const _ as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(quiet)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).banner as *const _ as usize },
+        1usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(banner)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).julia_bindir as *const _ as usize },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(julia_bindir)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).julia_bin as *const _ as usize },
+        16usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(julia_bin)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).cmds as *const _ as usize },
+        24usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(cmds)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).image_file as *const _ as usize },
+        32usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(image_file)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).cpu_target as *const _ as usize },
+        40usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(cpu_target)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).nthreads as *const _ as usize },
+        48usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(nthreads)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).nprocs as *const _ as usize },
+        52usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(nprocs)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).machine_file as *const _ as usize },
+        56usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(machine_file)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).project as *const _ as usize },
+        64usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(project)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).isinteractive as *const _ as usize },
+        72usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(isinteractive)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).color as *const _ as usize },
+        73usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(color)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).historyfile as *const _ as usize },
+        74usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(historyfile)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).startupfile as *const _ as usize },
+        75usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(startupfile)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).compile_enabled as *const _ as usize },
+        76usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(compile_enabled)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).code_coverage as *const _ as usize },
+        77usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(code_coverage)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).malloc_log as *const _ as usize },
+        78usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(malloc_log)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).tracked_path as *const _ as usize },
+        80usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(tracked_path)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).opt_level as *const _ as usize },
+        88usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(opt_level)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).opt_level_min as *const _ as usize },
+        89usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(opt_level_min)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).debug_level as *const _ as usize },
+        90usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(debug_level)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).check_bounds as *const _ as usize },
+        91usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(check_bounds)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).depwarn as *const _ as usize },
+        92usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(depwarn)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).warn_overwrite as *const _ as usize },
+        93usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(warn_overwrite)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).can_inline as *const _ as usize },
+        94usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(can_inline)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).polly as *const _ as usize },
+        95usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(polly)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).trace_compile as *const _ as usize },
+        96usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(trace_compile)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).fast_math as *const _ as usize },
+        104usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(fast_math)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).worker as *const _ as usize },
+        105usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(worker)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).cookie as *const _ as usize },
+        112usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(cookie)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).handle_signals as *const _ as usize },
+        120usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(handle_signals)
+        )
+    );
+    assert_eq!(
+        unsafe {
+            &(*(::std::ptr::null::<jl_options_t>())).use_sysimage_native_code as *const _ as usize
+        },
+        121usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(use_sysimage_native_code)
+        )
+    );
+    assert_eq!(
+        unsafe {
+            &(*(::std::ptr::null::<jl_options_t>())).use_compiled_modules as *const _ as usize
+        },
+        122usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(use_compiled_modules)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).bindto as *const _ as usize },
+        128usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(bindto)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).outputbc as *const _ as usize },
+        136usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(outputbc)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).outputunoptbc as *const _ as usize },
+        144usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(outputunoptbc)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).outputo as *const _ as usize },
+        152usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(outputo)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).outputasm as *const _ as usize },
+        160usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(outputasm)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).outputji as *const _ as usize },
+        168usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(outputji)
+        )
+    );
+    assert_eq!(
+        unsafe {
+            &(*(::std::ptr::null::<jl_options_t>())).output_code_coverage as *const _ as usize
+        },
+        176usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(output_code_coverage)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).incremental as *const _ as usize },
+        184usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(incremental)
+        )
+    );
+    assert_eq!(
+        unsafe {
+            &(*(::std::ptr::null::<jl_options_t>())).image_file_specified as *const _ as usize
+        },
+        185usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(image_file_specified)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).warn_scope as *const _ as usize },
+        186usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(warn_scope)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).image_codegen as *const _ as usize },
+        187usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(image_codegen)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).rr_detach as *const _ as usize },
+        188usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(rr_detach)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).strip_metadata as *const _ as usize },
+        189usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(strip_metadata)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<jl_options_t>())).strip_ir as *const _ as usize },
+        190usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(jl_options_t),
+            "::",
+            stringify!(strip_ir)
+        )
+    );
+}
+extern "C" {
+    pub static mut jl_options: jl_options_t;
+}
 extern "C" {
     pub fn jl_ver_major() -> ::std::os::raw::c_int;
 }
