@@ -38,13 +38,7 @@ jobs:
         run: |
           export JULIA_DIR="$(dirname $(dirname $(which julia)))"
           export LD_LIBRARY_PATH="${JULIA_DIR}/lib:${LD_LIBRARY_PATH}"
-          cargo test --features tokio-rt,jlrs-ndarray,f16,jlrs-derive,sync-rt,ccall --verbose -- --test-threads=1
-
-      - name: Run async-std async tests
-        run: |
-          export JULIA_DIR="$(dirname $(dirname $(which julia)))"
-          export LD_LIBRARY_PATH="${JULIA_DIR}/lib:${LD_LIBRARY_PATH}"
-          cargo test --package jlrs-async-tests --features jlrs/async-std-rt -- --test-threads=1
+          cargo test --features tokio-rt,async-std-rt,jlrs-ndarray,f16,jlrs-derive,sync-rt,ccall --verbose -- --test-threads=1
 
   test-windows:
     env:
@@ -74,11 +68,7 @@ jobs:
 
       - name: Run tests
         run: |
-          cargo test --features tokio-rt,jlrs-ndarray,f16,jlrs-derive,sync-rt,ccall --verbose -- --test-threads=1
-
-      - name: Run async-std async tests
-        run: |
-          cargo test --package jlrs-async-tests --features jlrs/async-std-rt -- --test-threads=1
+          cargo test --features tokio-rt,async-std-rt,jlrs-ndarray,f16,jlrs-derive,sync-rt,ccall --verbose -- --test-threads=1
 
   test-windows-lts:
     env:
@@ -108,11 +98,7 @@ jobs:
 
       - name: Run tests
         run: |
-          cargo test --features tokio-rt,jlrs-ndarray,f16,jlrs-derive,sync-rt,ccall,lts --verbose -- --test-threads=1
-
-      - name: Run async-std async tests
-        run: |
-          cargo test --package jlrs-async-tests --features jlrs/async-std-rt,lts -- --test-threads=1
+          cargo test --features tokio-rt,async-std-rt,jlrs-ndarray,f16,jlrs-derive,sync-rt,ccall,lts --verbose -- --test-threads=1
 
   test-linux-lts:
     env:
@@ -143,13 +129,7 @@ jobs:
         run: |
           export JULIA_DIR="$(dirname $(dirname $(which julia)))"
           export LD_LIBRARY_PATH="${JULIA_DIR}/lib:${LD_LIBRARY_PATH}"
-          cargo test --features tokio-rt,jlrs-ndarray,f16,jlrs-derive,lts,sync-rt,ccall --verbose -- --test-threads=1
-
-      - name: Run async-std async tests
-        run: |
-          export JULIA_DIR="$(dirname $(dirname $(which julia)))"
-          export LD_LIBRARY_PATH="${JULIA_DIR}/lib:${LD_LIBRARY_PATH}"
-          cargo test --package jlrs-async-tests --features jlrs/async-std-rt,jlrs/lts -- --test-threads=1
+          cargo test --features tokio-rt,async-std-rt,jlrs-ndarray,f16,jlrs-derive,lts,sync-rt,ccall --verbose -- --test-threads=1
 
   docs:
     runs-on: ubuntu-latest
