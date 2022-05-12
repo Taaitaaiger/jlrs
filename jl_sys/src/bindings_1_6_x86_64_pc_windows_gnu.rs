@@ -957,7 +957,7 @@ fn bindgen_test_layout_uv_async_s() {
         )
     );
 }
-#[link(name = "libuv")]
+#[link(name = "libjulia")]
 extern "C" {
     pub fn uv_async_send(async_: *mut uv_async_t) -> ::std::os::raw::c_int;
 }

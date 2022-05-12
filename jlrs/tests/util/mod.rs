@@ -15,6 +15,8 @@ static JLRS_STABLE_TESTS_JL: &'static str = include_str!("JlrsStableTests.jl");
 
 #[cfg(all(feature = "sync-rt", not(feature = "lts")))]
 pub static MIXED_BAG_JL: &'static str = include_str!("MixedBagStable.jl");
+#[cfg(all(feature = "sync-rt", feature = "lts"))]
+pub static MIXED_BAG_JL: &'static str = include_str!("MixedBagLTS.jl");
 
 #[cfg(all(feature = "async-rt", not(all(target_os = "windows", feature = "lts"))))]
 pub static ASYNC_TESTS_JL: &'static str = include_str!("AsyncTests.jl");
