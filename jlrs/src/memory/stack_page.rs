@@ -35,7 +35,6 @@ impl AsMut<[Cell<*mut c_void>]> for StackPage {
 cfg_if::cfg_if! {
     if #[cfg(feature = "async")] {
         use std::pin::Pin;
-        #[cfg(not(feature = "lts"))]
         use std::ptr::NonNull;
         #[cfg(not(feature = "lts"))]
         use jl_sys::{jl_get_current_task, jl_task_t};
