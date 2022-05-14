@@ -10,8 +10,6 @@ on:
 
 jobs:
   test-linux:
-    env:
-      JULIA_NUM_THREADS: 3
     runs-on: ubuntu-latest
     continue-on-error: ${{ matrix.allow-fail }}
     strategy:
@@ -41,8 +39,6 @@ jobs:
           cargo test --features tokio-rt,async-std-rt,jlrs-ndarray,f16,jlrs-derive,sync-rt,ccall --verbose -- --test-threads=1
 
   test-windows:
-    env:
-      JULIA_NUM_THREADS: 3
     runs-on: windows-latest
     continue-on-error: ${{ matrix.allow-fail }}
     strategy:

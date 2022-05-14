@@ -41,9 +41,11 @@ use crate::{
 };
 use async_trait::async_trait;
 use futures::Future;
-use jl_sys::{
-    jl_atexit_hook, jl_init, jl_init_with_image, jl_is_initialized, jl_options, jl_process_events,
-};
+use jl_sys::{jl_atexit_hook, jl_init, jl_init_with_image, jl_is_initialized, jl_process_events};
+
+#[cfg(not(feature = "lts"))]
+use jl_sys::jl_options;
+
 use std::{
     collections::VecDeque,
     ffi::c_void,
@@ -599,11 +601,14 @@ where
                     return Err(JlrsError::AlreadyInitialized.into());
                 }
 
-                if builder.n_threads == 0 {
-                    let n = num_cpus::get();
-                    jl_options.nthreads = n as _;
-                } else {
-                    jl_options.nthreads = builder.n_threads as _;
+                #[cfg(not(feature = "lts"))]
+                {
+                    if builder.n_threads == 0 {
+                        let n = num_cpus::get();
+                        jl_options.nthreads = n as _;
+                    } else {
+                        jl_options.nthreads = builder.n_threads as _;
+                    }
                 }
 
                 if let Some((ref julia_bindir, ref image_path)) = builder.builder.image {

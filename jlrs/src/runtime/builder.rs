@@ -37,6 +37,7 @@ cfg_if::cfg_if! {
             C: Channel<Message>,
         {
             pub(crate) builder: RuntimeBuilder,
+            #[cfg(not(feature = "lts"))]
             pub(crate) n_threads: usize,
             pub(crate) n_tasks: usize,
             pub(crate) channel_capacity: usize,
@@ -53,6 +54,11 @@ cfg_if::cfg_if! {
             /// Set the number of threads Julia can use.
             ///
             /// If it's set to 0, the default value, the number of threads is the number of CPU cores.
+            ///
+            /// This method is not available for the LTS version, instead you must set the number
+            /// of threads using the `JULIA_NUM_THREADS` environment variable. At least three
+            /// threads are required.
+            #[cfg(not(feature = "lts"))]
             pub fn n_threads(mut self, n: usize) -> Self {
                 self.n_threads = n;
                 self
@@ -171,6 +177,7 @@ impl RuntimeBuilder {
     {
         AsyncRuntimeBuilder {
             builder: self,
+            #[cfg(not(feature = "lts"))]
             n_threads: 0,
             n_tasks: 0,
             channel_capacity: 0,

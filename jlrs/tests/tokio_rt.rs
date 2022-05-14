@@ -9,15 +9,21 @@ mod tests {
 
     thread_local! {
         pub static JULIA: RefCell<AsyncJulia<Tokio>> = {
-            let builder = RuntimeBuilder::new();
             unsafe {
-                let r = RefCell::new(builder
+                #[allow(unused_mut)]
+                let mut builder = RuntimeBuilder::new()
                     .async_runtime::<Tokio, UnboundedChannel<_>>()
-                    .n_threads(3)
-                    .n_tasks(3)
-                    .start()
-                    .expect("Could not init Julia")
-                    .0);
+                    .n_tasks(3);
+
+                #[cfg(not(feature = "lts"))]
+                {
+                    builder = builder.n_threads(3);
+                }
+
+                let r = RefCell::new(
+                    builder.start().expect("Could not init Julia").0
+                );
+
                 let (sender, recv) = tokio::sync::oneshot::channel();
                 r.borrow_mut().try_blocking_task(|_global, frame| {
                     Value::eval_string(frame, ASYNC_TESTS_JL)?.into_jlrs_result()?;
