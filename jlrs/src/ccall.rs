@@ -26,7 +26,7 @@ use jl_sys::uv_async_send;
 /// GC until a `GcFrame` is created. In the case of a null scope, this stack isn't allocated at
 /// all.
 ///
-/// [`Julia`]: crate::julia::Julia
+/// [`Julia`]: crate::runtime::sync_rt::Julia
 pub struct CCall {
     page: Option<StackPage>,
 }

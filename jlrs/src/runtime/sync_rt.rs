@@ -3,40 +3,58 @@
 //! This module is only available if the `sync-rt` feature is enabled.
 
 use crate::{
+    call::Call,
     error::{JlrsError, JlrsResult, CANNOT_DISPLAY_VALUE},
-    init_jlrs,
     memory::{frame::GcFrame, global::Global, mode::Sync, stack_page::StackPage},
-    wrappers::ptr::{call::Call, module::Module, string::JuliaString, value::Value, Wrapper},
-    INIT,
+    runtime::{builder::RuntimeBuilder, init_jlrs, INIT},
+    wrappers::ptr::{module::Module, string::JuliaString, value::Value, Wrapper},
 };
 use jl_sys::{jl_atexit_hook, jl_init, jl_init_with_image, jl_is_initialized};
 use std::{
-    ffi::CString,
     io::{Error as IOError, ErrorKind},
     path::Path,
     sync::atomic::Ordering,
 };
 
-/// A Julia instance. You must create it with [`Julia::init`] or [`Julia::init_with_image`]
-/// before you can do anything related to Julia. While this struct exists Julia is active,
-/// dropping it causes the shutdown code to be called but this doesn't leave Julia in a state from
-/// which it can be reinitialized.
+/// A Julia instance. You must create it with [`RuntimeBuilder::start`] before you can start using
+/// Julia from Rust. While this struct exists Julia is active, dropping it causes the shutdown
+/// code to be called but this doesn't leave Julia in a state from which it can be reinitialized.
+///
+/// [`RuntimeBuilder::start`]: crate::runtime::builder::RuntimeBuilder::start
 pub struct Julia {
     page: StackPage,
 }
 
 impl Julia {
-    /// Initialize Julia, this method can only be called once. If it's called a second time it
-    /// will return an error. If this struct is dropped, you will need to restart your program to
-    /// be able to call Julia code again.
-    ///
-    /// This method is unsafe because it can race with another crate initializing Julia.
-    pub unsafe fn init() -> JlrsResult<Self> {
+    pub(crate) unsafe fn init(builder: RuntimeBuilder) -> JlrsResult<Self> {
         if jl_is_initialized() != 0 || INIT.swap(true, Ordering::SeqCst) {
             return Err(JlrsError::AlreadyInitialized.into());
         }
 
-        jl_init();
+        if let Some((ref julia_bindir, ref image_path)) = builder.image {
+            let julia_bindir_str = julia_bindir.to_string_lossy().to_string();
+            let image_path_str = image_path.to_string_lossy().to_string();
+
+            if !julia_bindir.exists() {
+                let io_err = IOError::new(ErrorKind::NotFound, julia_bindir_str);
+                return Err(JlrsError::other(io_err))?;
+            }
+
+            if !image_path.exists() {
+                let io_err = IOError::new(ErrorKind::NotFound, image_path_str);
+                return Err(JlrsError::other(io_err))?;
+            }
+
+            let bindir = std::ffi::CString::new(julia_bindir_str).unwrap();
+            let im_rel_path = std::ffi::CString::new(image_path_str).unwrap();
+
+            jl_init_with_image(bindir.as_ptr(), im_rel_path.as_ptr());
+        } else {
+            jl_init();
+        }
+
+        assert!(jl_is_initialized() != 0);
+
         let mut jl = Julia {
             page: StackPage::default(),
         };
@@ -50,63 +68,6 @@ impl Julia {
             Ok(())
         })
         .expect("Could not load Jlrs module");
-
-        Ok(jl)
-    }
-
-    /// This method is similar to [`Julia::init`] except that it loads a custom system image. A
-    /// custom image can be generated with the [`PackageCompiler`] package for Julia. The main
-    /// advantage of using a custom image over the default one is that it allows you to avoid much
-    /// of the compilation overhead often associated with Julia.
-    ///
-    /// Two arguments are required to call this method compared to [`Julia::init`];
-    /// `julia_bindir` and `image_relative_path`. The first must be the absolute path to a
-    /// directory that contains a compatible Julia binary (eg `${JULIA_DIR}/bin`), the second must
-    /// be either an absolute or a relative path to a system image.
-    ///
-    /// This method will return an error if either of the two paths doesn't  exist or if Julia
-    /// has already been initialized. It is unsafe because it can race with another crate
-    /// initializing Julia.
-    ///
-    /// [`PackageCompiler`]: https://julialang.github.io/PackageCompiler.jl/dev/
-    pub unsafe fn init_with_image<P: AsRef<Path>, Q: AsRef<Path>>(
-        julia_bindir: P,
-        image_path: Q,
-    ) -> JlrsResult<Self> {
-        if INIT.swap(true, Ordering::SeqCst) {
-            Err(JlrsError::AlreadyInitialized)?;
-        }
-
-        let julia_bindir_str = julia_bindir.as_ref().to_string_lossy().to_string();
-        let image_path_str = image_path.as_ref().to_string_lossy().to_string();
-
-        if !julia_bindir.as_ref().exists() {
-            let io_err = IOError::new(ErrorKind::NotFound, julia_bindir_str);
-            return Err(JlrsError::other(io_err))?;
-        }
-
-        if !image_path.as_ref().exists() {
-            let io_err = IOError::new(ErrorKind::NotFound, image_path_str);
-            return Err(JlrsError::other(io_err))?;
-        }
-
-        let bindir = CString::new(julia_bindir_str).unwrap();
-        let im_rel_path = CString::new(image_path_str).unwrap();
-
-        jl_init_with_image(bindir.as_ptr(), im_rel_path.as_ptr());
-
-        let mut jl = Julia {
-            page: StackPage::default(),
-        };
-
-        jl.scope(|_, frame| {
-            init_jlrs(&mut *frame);
-
-            #[cfg(feature = "pyplot")]
-            crate::pyplot::init_jlrs_py_plot(&mut *frame);
-
-            Ok(())
-        })?;
 
         Ok(jl)
     }
@@ -143,7 +104,7 @@ impl Julia {
     /// ```no_run
     /// # use jlrs::prelude::*;
     /// # fn main() {
-    /// # let mut julia = unsafe { Julia::init().unwrap() };
+    /// # let mut julia = unsafe { RuntimeBuilder::new().start().unwrap() };
     /// unsafe { julia.include("Path/To/MyJuliaCode.jl").unwrap(); }
     /// # }
     /// ```

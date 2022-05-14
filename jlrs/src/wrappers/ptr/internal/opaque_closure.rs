@@ -2,11 +2,12 @@
 
 use super::super::type_name::TypeName;
 use super::super::MethodRef;
-use super::super::{call::Call, datatype::DataType, private::Wrapper, value::Value, Wrapper as _};
+use super::super::{datatype::DataType, private::Wrapper, value::Value, Wrapper as _};
 use crate::impl_debug;
 use crate::layout::typecheck::Typecheck;
 use crate::memory::global::Global;
 use crate::{
+    call::Call,
     error::{JlrsResult, JuliaResult, JuliaResultRef},
     memory::{output::Output, scope::PartialScope},
 };

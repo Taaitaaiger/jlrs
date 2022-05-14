@@ -26,6 +26,8 @@ pub enum JlrsError {
     },
     Locked,
     AlreadyInitialized,
+    ChannelClosed,
+    ChannelFull,
     ConstAlreadyExists {
         name: String,
         module: String,
@@ -172,6 +174,8 @@ impl Display for JlrsError {
                     dim_size, vec_size
                 )
             }
+            JlrsError::ChannelClosed => write!(formatter, "The channel has been closed"),
+            JlrsError::ChannelFull => write!(formatter, "The channel is full"),
             JlrsError::Locked => write!(
                 formatter,
                 "A FieldAccessor can only be cloned when no data has been locked"

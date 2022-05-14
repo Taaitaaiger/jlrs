@@ -4,21 +4,22 @@
 //! GTK3. GTK3 is currently the only supported GUI. Note that when multiple figures are open, only
 //! the most recently opened one is updated automatically.
 
-#[cfg(feature = "async")]
-use crate::multitask::{async_frame::AsyncGcFrame, call_async::CallAsync};
 use crate::{
+    call::{Call, CallExt},
     convert::into_jlrs_result::IntoJlrsResult,
     error::JlrsResult,
     memory::{frame::Frame, global::Global, scope::PartialScope},
-    wrappers::ptr::call::Call,
     wrappers::ptr::{
-        call::CallExt,
         function::Function,
         module::Module,
         value::{Value, MAX_SIZE},
         Wrapper,
     },
 };
+
+#[cfg(feature = "async-rt")]
+use crate::{call::CallAsync, memory::frame::AsyncGcFrame};
+
 use smallvec::SmallVec;
 
 init_fn!(init_jlrs_py_plot, JLRS_PY_PLOT_JL, "JlrsPyPlot.jl");
@@ -222,7 +223,7 @@ impl<'scope> PyPlot<'scope> {
 
     /// Wait until the window associated with `self` has been closed in a new task scheduled
     /// on the main thread.
-    #[cfg(feature = "async")]
+    #[cfg(feature = "async-rt")]
     pub async fn wait_async_main<'frame>(self, frame: &mut AsyncGcFrame<'frame>) -> JlrsResult<()> {
         unsafe {
             let global = frame.global();
@@ -240,7 +241,7 @@ impl<'scope> PyPlot<'scope> {
 
     /// Wait until the window associated with `self` has been closed in a new task scheduled
     /// on another thread.
-    #[cfg(feature = "async")]
+    #[cfg(feature = "async-rt")]
     pub async fn wait_async_local<'frame>(
         self,
         frame: &mut AsyncGcFrame<'frame>,
@@ -261,7 +262,7 @@ impl<'scope> PyPlot<'scope> {
 
     /// Wait until the window associated with `self` has been closed in a new task scheduled
     /// on another thread.
-    #[cfg(feature = "async")]
+    #[cfg(feature = "async-rt")]
     pub async fn wait_async<'frame>(self, frame: &mut AsyncGcFrame<'frame>) -> JlrsResult<()> {
         unsafe {
             let global = frame.global();

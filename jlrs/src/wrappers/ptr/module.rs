@@ -5,13 +5,13 @@
 //! relative to the `Main` module.
 
 use crate::{
+    call::Call,
     convert::to_symbol::ToSymbol,
     error::{JlrsError, JlrsResult, CANNOT_DISPLAY_VALUE},
     impl_debug, impl_julia_typecheck,
     memory::{global::Global, output::Output, scope::PartialScope},
     private::Private,
     wrappers::ptr::{
-        call::Call,
         function::Function,
         symbol::Symbol,
         value::{LeakedValue, Value},
@@ -46,9 +46,9 @@ use super::private::Wrapper;
 /// named functions, constants and submodules unrooted when you use them from Rust. The same holds
 /// true for other global values that are never redefined to point at another value.
 ///
-/// [`Julia::include`]: crate::julia::Julia::include
-/// [`AsyncJulia::include`]: crate::multitask::runtime::AsyncJulia::include
-/// [`AsyncJulia::try_include`]: crate::multitask::runtime::AsyncJulia::try_include
+/// [`Julia::include`]: crate::runtime::sync_rt::Julia::include
+/// [`AsyncJulia::include`]: crate::runtime::async_rt::AsyncJulia::include
+/// [`AsyncJulia::try_include`]: crate::runtime::async_rt::AsyncJulia::try_include
 #[derive(Copy, Clone, PartialEq)]
 #[repr(transparent)]
 pub struct Module<'scope>(NonNull<jl_module_t>, PhantomData<&'scope ()>);
@@ -87,9 +87,9 @@ impl<'scope> Module<'scope> {
     /// [`Julia::include`], [`AsyncJulia::include`], or [`AsyncJulia::try_include`] its contents
     ///  are made available relative to `Main`.
     ///
-    /// [`Julia::include`]: crate::julia::Julia::include
-    /// [`AsyncJulia::include`]: crate::multitask::runtime::AsyncJulia::include
-    /// [`AsyncJulia::try_include`]: crate::multitask::runtime::AsyncJulia::try_include
+    /// [`Julia::include`]: crate::runtime::sync_rt::Julia::include
+    /// [`AsyncJulia::include`]: crate::runtime::async_rt::AsyncJulia::include
+    /// [`AsyncJulia::try_include`]: crate::runtime::async_rt::AsyncJulia::try_include
     pub fn main(_: Global<'scope>) -> Self {
         unsafe { Module::wrap(jl_main_module, Private) }
     }

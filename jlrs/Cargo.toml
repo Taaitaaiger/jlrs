@@ -15,20 +15,22 @@ license = "MIT"
 edition = "2018"
 
 [features]
-default = []
-ccall = []
+default = ["prelude"]
 sync-rt = []
-debug = ["jl-sys/debug"]
-uv = ["jl-sys/uv", "ccall"]
 async = ["futures", "crossbeam-channel", "async-trait"]
-async-std-rt = ["async", "async-std"]
-tokio-rt = ["async", "tokio"]
+async-rt = ["async"]
+async-std-rt = ["async-rt", "async-std", "num_cpus"]
+tokio-rt = ["async-rt", "num_cpus", "tokio"]
 jlrs-ndarray = ["ndarray"]
 f16 = ["half"]
+prelude = []
 pyplot = []
 internal-types = []
+ccall = []
+uv = ["jl-sys/uv", "ccall"]
+debug = ["jl-sys/debug"]
 docs = [
-    "jl-sys/docs", "uv", "async-std-rt", "async", "tokio", "f16", "jlrs-ndarray", 
+    "jl-sys/docs", "uv", "async-std-rt", "tokio-rt", "f16", "jlrs-ndarray", 
     "jlrs-derive", "sync-rt", "ccall", "internal-types", "pyplot"
 ]
 lts = ["jl-sys/lts"]
@@ -45,6 +47,11 @@ async-std = { version = "1", features = ["unstable"], optional = true }
 ndarray = { version = "0.15", optional = true }
 half = { version = "1", optional = true }
 tokio = { version = "1", optional = true, features = ["rt", "time", "sync"]}
+cfg-if = "1"
+num_cpus = { version = "1", optional = true }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "rt", "time", "sync"]}
 
 [package.metadata.docs.rs]
-features = ["docs-rs"]
+features = ["docs"]

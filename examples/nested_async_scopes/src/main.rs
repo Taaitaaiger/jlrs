@@ -1,5 +1,4 @@
 use jlrs::prelude::*;
-use std::time::Duration;
 
 // This struct contains the data our task will need. This struct must be `Send`, `Sync`, and
 // contain no borrowed data.
@@ -16,6 +15,17 @@ impl AsyncTask for MyTask {
     // Different tasks can return different results. If successful, this task returns an `f64`.
     type Output = f64;
 
+    // Include the custom code MyTask needs.
+    async fn register<'base>(
+        _global: Global<'base>,
+        frame: &mut AsyncGcFrame<'base>,
+    ) -> JlrsResult<()> {
+        unsafe {
+            Value::include(frame, "MyModule.jl")?.into_jlrs_result()?;
+        }
+        Ok(())
+    }
+
     // This is the async variation of the closure you provide `Julia::scope` when using the sync
     // runtime. The `Global` can be used to access `Module`s and other static data, while the
     // `AsyncGcFrame` lets you create new Julia values, call functions, and create nested scopes.
@@ -24,8 +34,8 @@ impl AsyncTask for MyTask {
         global: Global<'base>,
         frame: &mut AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
-        // Nesting async frames works like nesting on ordinary frame. The main differences are the `async`
-        // block in the closure, and frame is provided by value rather than by mutable reference.
+        // Nesting async frames works like nesting on ordinary scope. The main differences are the `async`
+        // block in the closure.
         let output = frame.reserve_output()?;
         frame
             .async_scope(|frame| async move {
@@ -57,7 +67,7 @@ impl AsyncTask for MyTask {
     }
 }
 
-#[async_std::main]
+#[tokio::main]
 async fn main() {
     // Initialize the async runtime. The `JULIA_NUM_THREADS` environment variable must be set to a
     // value larger than 1, or an error is returned.
@@ -76,76 +86,86 @@ async fn main() {
     // tasks and requests to include a file to the runtime, and a handle to the thread where the
     // runtime is running.
     let (julia, handle) = unsafe {
-        AsyncJulia::init_async(4, 16, Duration::from_millis(1))
+        RuntimeBuilder::new()
+            .async_runtime::<Tokio, UnboundedChannel<_>>()
+            .start_async()
             .await
             .expect("Could not init Julia")
     };
 
-    // Include the custom code our task needs.
-    unsafe {
-        julia.include("MyModule.jl").await.unwrap();
+    {
+        // Include the custom code MyTask needs by registering it.
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        julia.register_task::<MyTask, _>(sender).await.unwrap();
+        receiver.await.unwrap().unwrap();
     }
 
     // Create channels for each of the tasks (this is not required but helps distinguish which
     // result belongs to which task).
-    let (sender1, receiver1) = async_std::channel::bounded(1);
-    let (sender2, receiver2) = async_std::channel::bounded(1);
-    let (sender3, receiver3) = async_std::channel::bounded(1);
-    let (sender4, receiver4) = async_std::channel::bounded(1);
-
+    let (sender1, receiver1) = tokio::sync::oneshot::channel();
+    let (sender2, receiver2) = tokio::sync::oneshot::channel();
+    let (sender3, receiver3) = tokio::sync::oneshot::channel();
+    let (sender4, receiver4) = tokio::sync::oneshot::channel();
     // Send four tasks to the runtime.
     julia
         .task(
             MyTask {
                 dims: 4,
-                iters: 100_000_000,
+                iters: 10_000_000,
             },
             sender1,
         )
-        .await;
+        .await
+        .expect("Cannot send task");
 
     julia
         .task(
             MyTask {
                 dims: 4,
-                iters: 200_000_000,
+                iters: 20_000_000,
             },
             sender2,
         )
-        .await;
+        .await
+        .expect("Cannot send task");
 
     julia
         .task(
             MyTask {
                 dims: 4,
-                iters: 300_000_000,
+                iters: 30_000_000,
             },
             sender3,
         )
-        .await;
+        .await
+        .expect("Cannot send task");
 
     julia
         .task(
             MyTask {
                 dims: 4,
-                iters: 400_000_000,
+                iters: 40_000_000,
             },
             sender4,
         )
-        .await;
+        .await
+        .expect("Cannot send task");
 
     // Receive the results of the tasks.
-    let res1 = receiver1.recv().await.unwrap().unwrap();
+    let res1 = receiver1.await.unwrap().unwrap();
     println!("Result of first task: {:?}", res1);
-    let res2 = receiver2.recv().await.unwrap().unwrap();
+    let res2 = receiver2.await.unwrap().unwrap();
     println!("Result of second task: {:?}", res2);
-    let res3 = receiver3.recv().await.unwrap().unwrap();
+    let res3 = receiver3.await.unwrap().unwrap();
     println!("Result of third task: {:?}", res3);
-    let res4 = receiver4.recv().await.unwrap().unwrap();
+    let res4 = receiver4.await.unwrap().unwrap();
     println!("Result of fourth task: {:?}", res4);
 
     // Dropping `julia` causes the runtime to shut down Julia and itself if it was the final
     // handle to the runtime.
     std::mem::drop(julia);
-    handle.await.expect("Julia exited with an error");
+    handle
+        .await
+        .expect("Could not await the task")
+        .expect("Julia exited with an error");
 }

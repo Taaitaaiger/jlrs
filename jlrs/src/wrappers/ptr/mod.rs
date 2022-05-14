@@ -66,7 +66,6 @@ macro_rules! impl_root {
 }
 
 pub mod array;
-pub mod call;
 pub mod datatype;
 pub mod function;
 #[cfg(feature = "internal-types")]
@@ -89,7 +88,6 @@ use jl_sys::jl_value_t;
 
 use self::{
     array::{Array, TypedArray},
-    call::Call,
     datatype::DataType,
     function::Function,
     module::Module,
@@ -117,6 +115,7 @@ use self::internal::opaque_closure::OpaqueClosure;
 #[cfg(not(feature = "lts"))]
 use self::vararg::Vararg;
 use crate::{
+    call::Call,
     error::{JlrsError, JlrsResult, CANNOT_DISPLAY_VALUE},
     layout::valid_layout::ValidLayout,
     memory::{global::Global, scope::PartialScope},
@@ -232,9 +231,9 @@ pub trait Wrapper<'scope, 'data>: private::Wrapper<'scope, 'data> {
     /// `Base.showerror`. This string can contain ANSI color codes if this is enabled by calling
     /// [`Julia::error_color`], [`AsyncJulia::error_color`], or [`AsyncJulia::try_error_color`], .
     ///
-    /// [`Julia::error_color`]: crate::julia::Julia::error_color
-    /// [`AsyncJulia::error_color`]: crate::multitask::runtime::AsyncJulia::error_color
-    /// [`AsyncJulia::try_error_color`]: crate::multitask::runtime::AsyncJulia::try_error_color
+    /// [`Julia::error_color`]: crate::runtime::sync_rt::Julia::error_color
+    /// [`AsyncJulia::error_color`]: crate::runtime::async_rt::AsyncJulia::error_color
+    /// [`AsyncJulia::try_error_color`]: crate::runtime::async_rt::AsyncJulia::try_error_color
     fn error_string(self) -> JlrsResult<String> {
         unsafe {
             let global = Global::new();

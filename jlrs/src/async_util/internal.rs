@@ -1,40 +1,18 @@
-use std::fmt;
-use std::marker::PhantomData;
-use std::sync::Arc;
-
-use super::super::async_frame::AsyncGcFrame;
-use super::super::mode::Async;
-use super::super::result_sender::ResultSender;
-use super::AsyncTask;
-use super::PersistentTask;
-use crate::memory::global::Global;
+use super::task::PersistentTask;
+use crate::memory::frame::GcFrame;
+use crate::memory::mode::Async;
 use crate::memory::stack_page::StackPage;
-use crate::{error::JlrsResult, multitask::runtime::AsyncStackPage};
-use crate::{memory::frame::GcFrame, multitask::runtime::PersistentHandle};
+use crate::{async_util::channel::ChannelReceiver, memory::global::Global};
+use crate::{async_util::channel::OneshotSender, memory::frame::AsyncGcFrame};
+use crate::{
+    async_util::task::AsyncTask,
+    runtime::async_rt::{AsyncRuntime, PersistentMessage},
+};
+use crate::{error::JlrsResult, memory::stack_page::AsyncStackPage};
 use async_trait::async_trait;
+use std::marker::PhantomData;
 
-#[cfg(feature = "async-std-rt")]
-use crate::multitask::runtime::async_std_rt::{channel, HandleSender};
-#[cfg(feature = "tokio-rt")]
-use crate::multitask::runtime::tokio_rt::{channel, HandleSender};
-
-pub(crate) struct PersistentMessage<GT>
-where
-    GT: PersistentTask,
-{
-    pub(crate) msg: InnerPersistentMessage<GT>,
-}
-
-impl<GT> fmt::Debug for PersistentMessage<GT>
-where
-    GT: PersistentTask,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("PersistentMessage")
-    }
-}
-
-type InnerPersistentMessage<GT> = Box<
+pub(crate) type InnerPersistentMessage<GT> = Box<
     dyn GenericCallPersistentMessage<
         Input = <GT as PersistentTask>::Input,
         Output = <GT as PersistentTask>::Output,
@@ -53,7 +31,7 @@ pub(crate) struct CallPersistentMessage<I, O, RC>
 where
     I: Send + Sync,
     O: Send + Sync + 'static,
-    RC: ResultSender<JlrsResult<O>>,
+    RC: OneshotSender<JlrsResult<O>>,
 {
     pub(crate) sender: RC,
 
@@ -76,7 +54,7 @@ impl<I, O, RC> GenericCallPersistentMessage for CallPersistentMessage<I, O, RC>
 where
     I: Send + Sync,
     O: Send + Sync,
-    RC: ResultSender<JlrsResult<O>>,
+    RC: OneshotSender<JlrsResult<O>>,
 {
     type Input = I;
     type Output = O;
@@ -138,8 +116,6 @@ trait GenericPersistentTask: Send + Sync {
         state: &'inner mut <Self::GT as PersistentTask>::State,
         input: <Self::GT as PersistentTask>::Input,
     ) -> JlrsResult<<Self::GT as PersistentTask>::Output>;
-
-    fn create_handle(&self, sender: HandleSender<Self::GT>) -> PersistentHandle<Self::GT>;
 }
 
 #[async_trait(?Send)]
@@ -175,10 +151,6 @@ where
             output
         }
     }
-
-    fn create_handle(&self, sender: HandleSender<Self>) -> PersistentHandle<Self> {
-        PersistentHandle::new(sender)
-    }
 }
 
 trait GenericRegisterPersistentTask: Send + Sync {
@@ -197,7 +169,8 @@ pub(crate) struct PendingTask<RC, T, Kind> {
 
 impl<RC, AT> PendingTask<RC, AT, Task>
 where
-    RC: ResultSender<JlrsResult<AT::Output>>,
+    RC: OneshotSender<JlrsResult<AT::Output>>,
+
     AT: AsyncTask,
 {
     pub(crate) fn new(task: AT, sender: RC) -> Self {
@@ -215,7 +188,9 @@ where
 
 impl<IRC, GT> PendingTask<IRC, GT, Persistent>
 where
-    IRC: ResultSender<JlrsResult<PersistentHandle<GT>>>,
+    // IRC: OneshotSender<JlrsResult<PersistentHandle<GT>>>,
+    IRC: ChannelReceiver<PersistentMessage<GT>>,
+
     GT: PersistentTask,
 {
     pub(crate) fn new(task: GT, sender: IRC) -> Self {
@@ -233,7 +208,8 @@ where
 
 impl<RC, AT> PendingTask<RC, AT, RegisterTask>
 where
-    RC: ResultSender<JlrsResult<()>>,
+    RC: OneshotSender<JlrsResult<()>>,
+
     AT: AsyncTask,
 {
     pub(crate) fn new(sender: RC) -> Self {
@@ -251,7 +227,8 @@ where
 
 impl<RC, GT> PendingTask<RC, GT, RegisterPersistent>
 where
-    RC: ResultSender<JlrsResult<()>>,
+    RC: OneshotSender<JlrsResult<()>>,
+
     GT: PersistentTask,
 {
     pub(crate) fn new(sender: RC) -> Self {
@@ -275,7 +252,8 @@ pub(crate) trait GenericPendingTask: Send + Sync {
 #[async_trait(?Send)]
 impl<RC, AT> GenericPendingTask for PendingTask<RC, AT, Task>
 where
-    RC: ResultSender<JlrsResult<AT::Output>>,
+    RC: OneshotSender<JlrsResult<AT::Output>>,
+
     AT: AsyncTask,
 {
     async fn call(mut self: Box<Self>, mut stack: &mut AsyncStackPage) {
@@ -301,7 +279,8 @@ where
 #[async_trait(?Send)]
 impl<RC, AT> GenericPendingTask for PendingTask<RC, AT, RegisterTask>
 where
-    RC: ResultSender<JlrsResult<()>>,
+    RC: OneshotSender<JlrsResult<()>>,
+
     AT: AsyncTask,
 {
     async fn call(mut self: Box<Self>, mut stack: &mut AsyncStackPage) {
@@ -326,7 +305,8 @@ where
 #[async_trait(?Send)]
 impl<RC, GT> GenericPendingTask for PendingTask<RC, GT, RegisterPersistent>
 where
-    RC: ResultSender<JlrsResult<()>>,
+    RC: OneshotSender<JlrsResult<()>>,
+
     GT: PersistentTask,
 {
     async fn call(mut self: Box<Self>, mut stack: &mut AsyncStackPage) {
@@ -351,15 +331,14 @@ where
 #[async_trait(?Send)]
 impl<IRC, GT> GenericPendingTask for PendingTask<IRC, GT, Persistent>
 where
-    IRC: ResultSender<JlrsResult<PersistentHandle<GT>>>,
+    IRC: ChannelReceiver<PersistentMessage<GT>>,
+
     GT: PersistentTask,
 {
     async fn call(mut self: Box<Self>, mut stack: &mut AsyncStackPage) {
         unsafe {
             {
-                let (mut persistent, handle_sender) = self.split();
-                let handle_sender = Box::new(handle_sender);
-
+                let (mut persistent, mut receiver) = self.split();
                 // Transmute to get static lifetimes. Should be okay because tasks can't leak
                 // Julia data and the frame is not dropped until the task is dropped.
                 let mode = Async(std::mem::transmute(&stack.top[1]));
@@ -373,23 +352,10 @@ where
 
                 match persistent.call_init(global, &mut frame).await {
                     Ok(mut state) => {
-                        #[allow(unused_mut)]
-                        let (sender, mut receiver) = channel(GT::CHANNEL_CAPACITY);
-
-                        let handle = persistent.create_handle(Arc::new(sender));
-                        handle_sender.send(Ok(handle)).await;
-
                         loop {
-                            #[cfg(feature = "async-std-rt")]
                             let mut msg = match receiver.recv().await {
                                 Ok(msg) => msg.msg,
                                 Err(_) => break,
-                            };
-
-                            #[cfg(feature = "tokio-rt")]
-                            let mut msg = match receiver.recv().await {
-                                Some(msg) => msg.msg,
-                                None => break,
                             };
 
                             let res = persistent
@@ -401,27 +367,28 @@ where
 
                         persistent.exit(global, &mut frame, &mut state).await;
                     }
-                    Err(e) => {
-                        handle_sender.send(Err(e)).await;
-                    }
+                    _ => (),
                 }
             }
         }
     }
 }
 
-pub(crate) struct BlockingTask<F, RC, T> {
+pub(crate) struct BlockingTask<F, RC, R, T> {
     func: F,
     sender: RC,
     slots: usize,
+    _runtime: PhantomData<R>,
     _res: PhantomData<T>,
 }
 
-impl<F, RC, T> BlockingTask<F, RC, T>
+impl<F, RC, R, T> BlockingTask<F, RC, R, T>
 where
     for<'base> F:
         Send + Sync + FnOnce(Global<'base>, &mut GcFrame<'base, Async<'base>>) -> JlrsResult<T>,
-    RC: ResultSender<JlrsResult<T>>,
+
+    RC: OneshotSender<JlrsResult<T>>,
+    R: AsyncRuntime,
     T: Send + Sync + 'static,
 {
     pub(crate) fn new(func: F, sender: RC, slots: usize) -> Self {
@@ -429,6 +396,7 @@ where
             func,
             sender,
             slots,
+            _runtime: PhantomData,
             _res: PhantomData,
         }
     }
@@ -448,11 +416,12 @@ pub(crate) trait GenericBlockingTask: Send + Sync {
     fn call(self: Box<Self>, stack: &mut AsyncStackPage);
 }
 
-impl<F, RC, T> GenericBlockingTask for BlockingTask<F, RC, T>
+impl<F, RC, R, T> GenericBlockingTask for BlockingTask<F, RC, R, T>
 where
     for<'base> F:
         Send + Sync + FnOnce(Global<'base>, &mut GcFrame<'base, Async<'base>>) -> JlrsResult<T>,
-    RC: ResultSender<JlrsResult<T>>,
+    RC: OneshotSender<JlrsResult<T>>,
+    R: AsyncRuntime,
     T: Send + Sync + 'static,
 {
     fn call(self: Box<Self>, stack: &mut AsyncStackPage) {
@@ -464,18 +433,8 @@ where
         let mut frame = unsafe { GcFrame::new(raw, mode) };
         let (res, ch) = self.call(&mut frame);
 
-        #[cfg(feature = "tokio-rt")]
-        {
-            tokio::task::spawn_local(async {
-                Box::new(ch).send(res).await;
-            });
-        }
-
-        #[cfg(feature = "async-std-rt")]
-        {
-            async_std::task::spawn_local(async {
-                Box::new(ch).send(res).await;
-            });
-        }
+        R::spawn_local(async {
+            OneshotSender::send(Box::new(ch), res).await;
+        });
     }
 }

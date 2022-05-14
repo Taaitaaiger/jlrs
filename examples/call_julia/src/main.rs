@@ -4,7 +4,7 @@ fn main() {
     // Julia must be initialized before it can be used.
     // This is safe because this we're not initializing Julia from another
     // thread and crate at the same time.
-    let mut julia = unsafe { Julia::init().expect("Could not init Julia") };
+    let mut julia = unsafe { RuntimeBuilder::new().start().expect("Could not init Julia") };
 
     // Include some custom code defined in MyModule.jl.
     // This is safe because the included code doesn't do any strange things.
@@ -13,7 +13,7 @@ fn main() {
             .include("MyModule.jl")
             .expect("Could not include file");
     }
-        
+
     let result = julia
         .scope(|global, frame| {
             let dim = Value::new(&mut *frame, 4isize)?;

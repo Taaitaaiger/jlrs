@@ -96,6 +96,7 @@ macro_rules! named_tuple {
 }
 
 use crate::{
+    call::{Call, CallExt, WithKeywords},
     convert::{into_julia::IntoJulia, to_symbol::ToSymbol, unbox::Unbox},
     error::{JlrsError, JlrsResult, JuliaResultRef, CANNOT_DISPLAY_TYPE},
     impl_debug,
@@ -114,7 +115,6 @@ use crate::{
     private::Private,
     wrappers::ptr::{
         array::Array,
-        call::{Call, CallExt, WithKeywords},
         datatype::DataType,
         module::Module,
         private::Wrapper as WrapperPriv,

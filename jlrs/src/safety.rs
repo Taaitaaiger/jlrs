@@ -25,8 +25,8 @@
 //! careful when using tasks. Any data that might be mutated by a task must not be accessed from
 //! Rust. In general, you must not call any Julia function that schedules and returns a task, but
 //! use the trait methods of `CallAsync` to schedule function calls as new tasks instead. Working
-//! tasks is only supported when one of the async runtimes is used, it's not supported by the sync
-//! runtime or when calling Rust from Julia.
+//! tasks is only supported when an async runtime is used, it's not supported by the sync runtime
+//! or when calling Rust from Julia.
 //!
 //! # Memory-safety
 //!
