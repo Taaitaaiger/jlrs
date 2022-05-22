@@ -45,6 +45,7 @@ Base.Threads.@spawn begin
 end
 
 function scheduleasynclocal(func::Function, wakeptr::Ptr{Cvoid}, args...; kwargs...)::Task
+    @nospecialize func wakeptr args kwargs
     task = LocalTask(func, args, kwargs, wakeptr)
     put!(inchannel, task)
     take!(outchannel)

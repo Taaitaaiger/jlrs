@@ -159,9 +159,7 @@ unsafe impl ValidLayout for EmptyUnion {
         unsafe { ty.unwrap(Private) == jl_bottom_type }
     }
 
-    fn is_ref() -> bool {
-        true
-    }
+    const IS_REF: bool = true;
 }
 
 unsafe impl Typecheck for EmptyUnion {

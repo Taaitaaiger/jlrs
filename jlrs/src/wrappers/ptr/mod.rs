@@ -13,7 +13,7 @@
 //! One useful guarantee provided by wrappers is that they point to an existing value and are
 //! rooted. If a wrapper is returned that isn't rooted, jlrs will return a [`Ref`]. Unlike a
 //! wrapper a ref can be undefined, and since it's not rooted it's not guaranteed to remain valid
-//! while it can be used. For more information about rooting please see the documentation of the
+//! while it can be used. For more information about rooting see the documentation of the
 //! [`memory`] module.
 //!
 //! [`memory`]: crate::memory
@@ -142,9 +142,7 @@ macro_rules! impl_valid_layout {
                 }
             }
 
-            fn is_ref() -> bool {
-                true
-            }
+            const IS_REF: bool = true;
         }
     };
 }
@@ -180,11 +178,18 @@ pub(crate) trait Root<'target, 'value, 'data>: Wrapper<'value, 'data> {
 }
 
 /// Marker trait implemented by `Ref`.
-pub trait WrapperRef<'scope, 'data>: private::WrapperRef<'scope, 'data> + Copy + Debug {}
-
-impl<'scope, 'data, T> WrapperRef<'scope, 'data> for Ref<'scope, 'data, T> where
-    T: Wrapper<'scope, 'data>
+pub trait WrapperRef<'scope, 'data>:
+    private::WrapperRef<'scope, 'data> + Copy + Debug + ValidLayout
 {
+    type Wrapper: Wrapper<'scope, 'data>;
+}
+
+impl<'scope, 'data, T> WrapperRef<'scope, 'data> for Ref<'scope, 'data, T>
+where
+    T: Wrapper<'scope, 'data>,
+    Self: ValidLayout,
+{
+    type Wrapper = T;
 }
 
 /// Methods shared by all builtin pointer wrappers.
@@ -333,9 +338,7 @@ unsafe impl ValidLayout for ValueRef<'_, '_> {
         }
     }
 
-    fn is_ref() -> bool {
-        true
-    }
+    const IS_REF: bool = true;
 }
 
 impl_ref_root!(Value, ValueRef, 2);
@@ -350,9 +353,7 @@ unsafe impl ValidLayout for FunctionRef<'_, '_> {
         ty.subtype(function_type.as_value())
     }
 
-    fn is_ref() -> bool {
-        true
-    }
+    const IS_REF: bool = true;
 }
 
 impl_ref_root!(Function, FunctionRef, 2);
@@ -371,9 +372,7 @@ unsafe impl ValidLayout for ArrayRef<'_, '_> {
         }
     }
 
-    fn is_ref() -> bool {
-        true
-    }
+    const IS_REF: bool = true;
 }
 
 impl_ref_root!(Array, ArrayRef, 2);
@@ -392,9 +391,7 @@ unsafe impl<T: Clone + ValidLayout + Debug> ValidLayout for TypedArrayRef<'_, '_
         }
     }
 
-    fn is_ref() -> bool {
-        true
-    }
+    const IS_REF: bool = true;
 }
 
 impl<'scope, 'data, T> TypedArrayRef<'scope, 'data, T>
@@ -481,26 +478,21 @@ impl_valid_layout!(OpaqueClosureRef, OpaqueClosure);
 impl_ref_root!(OpaqueClosure, OpaqueClosureRef, 1);
 
 /// A reference to a [`SimpleVector`]
-pub type SimpleVectorRef<'scope, T = Value<'scope, 'static>> =
-    Ref<'scope, 'static, SimpleVector<'scope, T>>;
+pub type SimpleVectorRef<'scope> = Ref<'scope, 'static, SimpleVector<'scope>>;
 
-unsafe impl<'scope, T: Wrapper<'scope, 'static>> ValidLayout for SimpleVectorRef<'scope, T> {
+unsafe impl<'scope> ValidLayout for SimpleVectorRef<'scope> {
     fn valid_layout(v: Value) -> bool {
         if let Ok(dt) = v.cast::<DataType>() {
             dt.is::<SimpleVector>()
-
-            // FIXME: Check if all elements are T
         } else {
             false
         }
     }
 
-    fn is_ref() -> bool {
-        true
-    }
+    const IS_REF: bool = true;
 }
 
-impl<'scope> SimpleVectorRef<'scope, Value<'scope, 'static>> {
+impl<'scope> SimpleVectorRef<'scope> {
     pub unsafe fn root<'target, S>(self, scope: S) -> JlrsResult<SimpleVector<'target>>
     where
         S: PartialScope<'target>,
@@ -653,6 +645,7 @@ pub(crate) mod private {
             self.unwrap_non_null(Private).as_ptr()
         }
 
+        #[inline(always)]
         unsafe fn wrapper_unchecked(value_ref: Ref<'scope, 'data, Self>, _: Private) -> Self
         where
             Self: Sized + super::Wrapper<'scope, 'data>,
@@ -660,10 +653,12 @@ pub(crate) mod private {
             Self::wrap(value_ref.ptr(), Private)
         }
 
+        #[inline(always)]
         unsafe fn cast(value: Value<'scope, 'data>, _: Private) -> Self {
             Self::wrap_non_null(value.unwrap_non_null(Private).cast(), Private)
         }
 
+        #[inline(always)]
         unsafe fn wrapper(value_ref: Ref<'scope, 'data, Self>, _: Private) -> Option<Self>
         where
             Self: Sized + super::Wrapper<'scope, 'data>,
@@ -676,6 +671,7 @@ pub(crate) mod private {
             Some(Self::wrap(ptr, Private))
         }
 
+        #[inline(always)]
         unsafe fn value_unchecked(
             value_ref: Ref<'scope, 'data, Self>,
             _: Private,
@@ -686,6 +682,7 @@ pub(crate) mod private {
             Value::wrap(value_ref.ptr().cast(), Private)
         }
 
+        #[inline(always)]
         unsafe fn value(
             value_ref: Ref<'scope, 'data, Self>,
             _: Private,

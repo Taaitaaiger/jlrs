@@ -13,11 +13,11 @@ mod tests {
     use jlrs::wrappers::ptr::internal::method::Method;
     #[cfg(feature = "internal-types")]
     use jlrs::wrappers::ptr::internal::method_instance::MethodInstance;
-    use jlrs::wrappers::ptr::simple_vector::SimpleVector;
     use jlrs::wrappers::ptr::type_name::TypeName;
     use jlrs::wrappers::ptr::type_var::TypeVar;
     use jlrs::wrappers::ptr::union::Union;
     use jlrs::wrappers::ptr::union_all::UnionAll;
+    use jlrs::wrappers::ptr::{simple_vector::SimpleVector, SymbolRef};
 
     #[test]
     fn datatype_methods() {
@@ -142,13 +142,20 @@ mod tests {
     fn datatype_has_fieldnames() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |global, _| unsafe {
+            jlrs.scope_with_capacity(0, |global, frame| unsafe {
                 let dt = DataType::tvar_type(global);
-                let tn = dt.field_names().wrapper_unchecked().data();
+                {
+                    let frame = &mut *frame;
+                    let tn = dt
+                        .field_names()
+                        .wrapper_unchecked()
+                        .typed_data::<SymbolRef, _>(frame)?
+                        .as_slice();
 
-                assert_eq!(tn[0].wrapper().unwrap().as_string().unwrap(), "name");
-                assert_eq!(tn[1].wrapper().unwrap().as_string().unwrap(), "lb");
-                assert_eq!(tn[2].wrapper().unwrap().as_string().unwrap(), "ub");
+                    assert_eq!(tn[0].wrapper().unwrap().as_string().unwrap(), "name");
+                    assert_eq!(tn[1].wrapper().unwrap().as_string().unwrap(), "lb");
+                    assert_eq!(tn[2].wrapper().unwrap().as_string().unwrap(), "ub");
+                }
 
                 Ok(())
             })

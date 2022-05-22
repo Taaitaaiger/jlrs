@@ -26,8 +26,8 @@ pub trait Dims: Sized + Debug {
     /// Returns the number of elements of the nth dimension. Indexing starts at 0.
     fn n_elements(&self, dimension: usize) -> usize;
 
-    /// The total number of elements in the arry, ie the product of the number of elements of each
-    /// dimension.
+    /// The total number of elements in the arry, i.e. the product of the number of elements of
+    /// each dimension.
     fn size(&self) -> usize {
         let mut acc = 1;
         for i in 0..self.n_dimensions() {
@@ -37,8 +37,9 @@ pub trait Dims: Sized + Debug {
         acc
     }
 
-    /// Calculates the linear index for `dim_index` in an array with dimensions `self`. The
-    /// default implementation is generally correct and should not be overridden.
+    /// Calculate the linear index for `dim_index` in an array with dimensions `self`.
+    ///
+    /// The default implementation must not be overridden.
     fn index_of<D: Dims>(&self, dim_index: &D) -> JlrsResult<usize> {
         if self.n_dimensions() != dim_index.n_dimensions() {
             Err(JlrsError::InvalidIndex {
@@ -69,8 +70,9 @@ pub trait Dims: Sized + Debug {
         Ok(idx)
     }
 
-    /// Convert the dimensions into a generic `Dimensions` struct. The default implementation
-    /// should not be overridden.
+    /// Convert `Self` to `Dimensions`.
+    ///
+    /// The default implementation must not be overridden.
     fn into_dimensions(&self) -> Dimensions {
         Dimensions::from_dims(self)
     }
@@ -99,7 +101,8 @@ impl<'scope> ArrayDimensions<'scope> {
         }
     }
 
-    pub fn as_slice<'a>(&'a self) -> &'a [usize] {
+    /// Returns the dimensions as a slice.
+    pub fn as_slice<'borrow>(&'borrow self) -> &'borrow [usize] {
         unsafe { std::slice::from_raw_parts(self.ptr, self.n) }
     }
 }
@@ -253,6 +256,7 @@ pub enum Dimensions {
 }
 
 impl Dimensions {
+    /// Convert an implementation of `Dims` to `Dimensions`.
     pub fn from_dims<D: Dims>(dims: &D) -> Self {
         match dims.n_dimensions() {
             0 => Dimensions::Few([0, 0, 0, 0]),
@@ -276,7 +280,7 @@ impl Dimensions {
         }
     }
 
-    /// Returns the raw dimensions as a slice.
+    /// Returns the dimensions as a slice.
     pub fn as_slice(&self) -> &[usize] {
         match self {
             Dimensions::Few(ref v) => &v[1..v[0] as usize + 1],

@@ -37,14 +37,14 @@ impl<'scope> PyPlot<'scope> {
     pub unsafe fn new<'value, V, F>(
         frame: &mut F,
         plot_fn: Function<'_, 'static>,
-        mut args: V,
+        args: V,
     ) -> JlrsResult<Self>
     where
-        V: AsMut<[Value<'value, 'static>]>,
+        V: AsRef<[Value<'value, 'static>]>,
         F: Frame<'scope>,
     {
         let global = frame.global();
-        let args = args.as_mut();
+        let args = args.as_ref();
         let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(1 + args.len());
         vals.push(plot_fn.as_value());
 
@@ -73,15 +73,15 @@ impl<'scope> PyPlot<'scope> {
     pub unsafe fn new_with_keywords<'value, V, F>(
         frame: &mut F,
         plot_fn: Function<'_, 'static>,
-        mut args: V,
+        args: V,
         keywords: Value<'_, 'static>,
     ) -> JlrsResult<Self>
     where
-        V: AsMut<[Value<'value, 'static>]>,
+        V: AsRef<[Value<'value, 'static>]>,
         F: Frame<'scope>,
     {
         let global = frame.global();
-        let args = args.as_mut();
+        let args = args.as_ref();
         let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(1 + args.len());
         vals.push(plot_fn.as_value());
 
@@ -111,15 +111,15 @@ impl<'scope> PyPlot<'scope> {
         self,
         frame: &mut F,
         plot_fn: Function<'_, 'static>,
-        mut args: V,
+        args: V,
     ) -> JlrsResult<isize>
     where
-        V: AsMut<[Value<'value, 'static>]>,
+        V: AsRef<[Value<'value, 'static>]>,
         F: Frame<'frame>,
     {
         let global = frame.global();
 
-        let args = args.as_mut();
+        let args = args.as_ref();
         let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + args.len());
         vals.push(self.0);
         vals.push(plot_fn.as_value());
@@ -148,16 +148,16 @@ impl<'scope> PyPlot<'scope> {
         self,
         frame: &mut F,
         plot_fn: Function<'_, 'static>,
-        mut args: V,
+        args: V,
         keywords: Value<'_, 'static>,
     ) -> JlrsResult<isize>
     where
-        V: AsMut<[Value<'value, 'static>]>,
+        V: AsRef<[Value<'value, 'static>]>,
         F: Frame<'frame>,
     {
         let global = frame.global();
 
-        let args = args.as_mut();
+        let args = args.as_ref();
         let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + args.len());
         vals.push(self.0);
         vals.push(plot_fn.as_value());

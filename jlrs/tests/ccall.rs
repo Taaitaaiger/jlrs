@@ -82,7 +82,7 @@ mod tests {
             jlrs.scope(|global, frame| unsafe {
                 let fn_ptr = Value::new(&mut *frame, uses_null_scope as *mut std::ffi::c_void)?;
                 let mut arr_data = vec![0.0f64, 1.0f64];
-                let arr = Array::from_slice(&mut *frame, &mut arr_data, 2)?;
+                let arr = Array::from_slice_unchecked(&mut *frame, &mut arr_data, 2)?;
                 let func = Module::main(global)
                     .submodule_ref("JlrsTests")?
                     .wrapper_unchecked()
@@ -106,7 +106,7 @@ mod tests {
             jlrs.scope(|global, frame| unsafe {
                 let fn_ptr = Value::new(&mut *frame, uses_scope as *mut std::ffi::c_void)?;
                 let mut arr_data = vec![0.0f64, 1.0f64];
-                let arr = Array::from_slice(&mut *frame, &mut arr_data, 2)?;
+                let arr = Array::from_slice_unchecked(&mut *frame, &mut arr_data, 2)?;
                 let func = Module::main(global)
                     .submodule_ref("JlrsTests")?
                     .wrapper_unchecked()
@@ -131,7 +131,7 @@ mod tests {
                 let fn_ptr =
                     Value::new(&mut *frame, uses_scope_with_slots as *mut std::ffi::c_void)?;
                 let mut arr_data = vec![0.0f64, 1.0f64];
-                let arr = Array::from_slice(&mut *frame, &mut arr_data, 2)?;
+                let arr = Array::from_slice_unchecked(&mut *frame, &mut arr_data, 2)?;
                 let func = Module::main(global)
                     .submodule_ref("JlrsTests")?
                     .wrapper_unchecked()
@@ -158,7 +158,7 @@ mod tests {
                     uses_scope_with_realloced_slots as *mut std::ffi::c_void,
                 )?;
                 let mut arr_data = vec![0.0f64, 1.0f64];
-                let arr = Array::from_slice(&mut *frame, &mut arr_data, 2)?;
+                let arr = Array::from_slice_unchecked(&mut *frame, &mut arr_data, 2)?;
                 let func = Module::main(global)
                     .submodule_ref("JlrsTests")?
                     .wrapper_unchecked()

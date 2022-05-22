@@ -112,6 +112,7 @@ use crate::{
         output::Output,
         scope::{PartialScope, Scope},
     },
+    prelude::Symbol,
     private::Private,
     wrappers::ptr::{
         array::Array,
@@ -119,7 +120,6 @@ use crate::{
         module::Module,
         private::Wrapper as WrapperPriv,
         string::JuliaString,
-        symbol::Symbol,
         union::{nth_union_component, Union},
         union_all::UnionAll,
         ValueRef, Wrapper,
@@ -228,21 +228,21 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// Create a new named tuple, you should use the `named_tuple` macro rather than this method.
     pub fn new_named_tuple<'target: 'current, 'current, S, F, N, T, V>(
         scope: S,
-        mut field_names: N,
-        mut values: V,
+        field_names: N,
+        values: V,
     ) -> JlrsResult<Value<'target, 'data>>
     where
         S: Scope<'target, 'current, F>,
         F: Frame<'current>,
-        N: AsMut<[T]>,
+        N: AsRef<[T]>,
         T: ToSymbol,
-        V: AsMut<[Value<'scope, 'data>]>,
+        V: AsRef<[Value<'scope, 'data>]>,
     {
         let global = scope.global();
         let (output, scope) = scope.split()?;
         scope.scope_with_capacity(4, |frame| unsafe {
-            let field_names = field_names.as_mut();
-            let values_m = values.as_mut();
+            let field_names = field_names.as_ref();
+            let values_m = values.as_ref();
 
             let n_names = field_names.len();
             let n_values = values_m.len();
@@ -300,16 +300,16 @@ impl<'scope, 'data> Value<'scope, 'data> {
     pub fn apply_type<'target, V, S>(
         self,
         scope: S,
-        mut types: V,
+        types: V,
     ) -> JlrsResult<JuliaResult<'target, 'data>>
     where
         S: PartialScope<'target>,
-        V: AsMut<[Value<'scope, 'data>]>,
+        V: AsRef<[Value<'scope, 'data>]>,
     {
         unsafe {
-            let types = types.as_mut();
+            let types = types.as_ref();
             let applied =
-                jlrs_apply_type(self.unwrap(Private), types.as_mut_ptr().cast(), types.len());
+                jlrs_apply_type(self.unwrap(Private), types.as_ptr() as *mut _, types.len());
 
             if applied.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
                 scope.call_result(Err(NonNull::new_unchecked(applied.data)), Private)
@@ -336,14 +336,14 @@ impl<'scope, 'data> Value<'scope, 'data> {
     pub unsafe fn apply_type_unchecked<'target, S, V>(
         self,
         scope: S,
-        mut types: V,
+        types: V,
     ) -> JlrsResult<Value<'target, 'data>>
     where
         S: PartialScope<'target>,
-        V: AsMut<[Value<'scope, 'data>]>,
+        V: AsRef<[Value<'scope, 'data>]>,
     {
-        let types = types.as_mut();
-        let applied = jl_apply_type(self.unwrap(Private), types.as_mut_ptr().cast(), types.len());
+        let types = types.as_ref();
+        let applied = jl_apply_type(self.unwrap(Private), types.as_ptr() as *mut _, types.len());
         scope.value(NonNull::new_unchecked(applied), Private)
     }
 }
@@ -551,10 +551,14 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// Returns the field names of this value as a slice of `Symbol`s.
     pub fn field_names(self) -> &'scope [Symbol<'scope>] {
         unsafe {
-            self.datatype()
-                .field_names()
-                .wrapper_unchecked()
-                .data_unchecked()
+            // Symbol and SymbolRef have the same layout, and this data is non-null
+            std::mem::transmute(
+                self.datatype()
+                    .field_names()
+                    .wrapper_unchecked()
+                    .unrestricted_data()
+                    .as_slice(),
+            )
         }
     }
 
@@ -625,11 +629,8 @@ impl<'scope, 'data> Value<'scope, 'data> {
             if !jl_field_isptr(ty.unwrap(Private), idx as _) {
                 let value_type_str = ty.display_string_or(CANNOT_DISPLAY_TYPE);
 
-                let field_name = if let Some(field_name) =
-                    ty.field_names().wrapper_unchecked().data().get(idx)
-                {
+                let field_name = if let Some(field_name) = self.field_names().get(idx) {
                     field_name
-                        .wrapper_unchecked()
                         .as_str()
                         .unwrap_or("<Cannot display field name>")
                         .to_string()
@@ -637,7 +638,11 @@ impl<'scope, 'data> Value<'scope, 'data> {
                     format!("{}", idx)
                 };
 
-                let field_type = ty.field_types().wrapper_unchecked().data()[idx]
+                let field_type = ty
+                    .field_types()
+                    .wrapper_unchecked()
+                    .unrestricted_data()
+                    .as_slice()[idx]
                     .value_unchecked()
                     .display_string_or(CANNOT_DISPLAY_TYPE);
 
@@ -727,13 +732,16 @@ impl<'scope, 'data> Value<'scope, 'data> {
                 let idx = idx as usize;
                 let value_type_str = ty.display_string_or(CANNOT_DISPLAY_TYPE);
 
-                let field_name = ty.field_names().wrapper_unchecked().data()[idx]
-                    .wrapper_unchecked()
+                let field_name = self.field_names()[idx]
                     .as_str()
                     .unwrap_or("<Cannot display field name>")
                     .to_string();
 
-                let field_type = ty.field_types().wrapper_unchecked().data()[idx]
+                let field_type = ty
+                    .field_types()
+                    .wrapper_unchecked()
+                    .unrestricted_data()
+                    .as_slice()[idx]
                     .value_unchecked()
                     .display_string_or(CANNOT_DISPLAY_TYPE);
 
@@ -803,7 +811,12 @@ impl<'scope, 'data> Value<'scope, 'data> {
             })?;
         }
 
-        let field_type = self.datatype().field_types().wrapper_unchecked().data()[idx as usize]
+        let field_type = self
+            .datatype()
+            .field_types()
+            .wrapper_unchecked()
+            .unrestricted_data()
+            .as_slice()[idx as usize]
             .value_unchecked();
         let dt = value.datatype();
 
@@ -849,7 +862,12 @@ impl<'scope, 'data> Value<'scope, 'data> {
             })?;
         }
 
-        let field_type = self.datatype().field_types().wrapper_unchecked().data()[idx as usize]
+        let field_type = self
+            .datatype()
+            .field_types()
+            .wrapper_unchecked()
+            .unrestricted_data()
+            .as_slice()[idx as usize]
             .value_unchecked();
         let dt = value.datatype();
 
@@ -904,7 +922,12 @@ impl<'scope, 'data> Value<'scope, 'data> {
             })?
         }
 
-        let field_type = self.datatype().field_types().wrapper_unchecked().data()[idx as usize]
+        let field_type = self
+            .datatype()
+            .field_types()
+            .wrapper_unchecked()
+            .unrestricted_data()
+            .as_slice()[idx as usize]
             .value_unchecked();
         let dt = value.datatype();
 
@@ -954,7 +977,12 @@ impl<'scope, 'data> Value<'scope, 'data> {
             })?
         }
 
-        let field_type = self.datatype().field_types().wrapper_unchecked().data()[idx as usize]
+        let field_type = self
+            .datatype()
+            .field_types()
+            .wrapper_unchecked()
+            .unrestricted_data()
+            .as_slice()[idx as usize]
             .value_unchecked();
         let dt = value.datatype();
 
@@ -1298,7 +1326,7 @@ impl<'data> Call<'data> for Value<'_, 'data> {
         args: V,
     ) -> JlrsResult<JuliaResult<'target, 'data>>
     where
-        V: AsMut<[Value<'value, 'data>]>,
+        V: AsRef<[Value<'value, 'data>]>,
         S: PartialScope<'target>,
     {
         let res = match self.call_unrooted(Global::new(), args) {
@@ -1384,18 +1412,14 @@ impl<'data> Call<'data> for Value<'_, 'data> {
     unsafe fn call_unrooted<'target, 'value, V>(
         self,
         _: Global<'target>,
-        mut args: V,
+        args: V,
     ) -> JuliaResultRef<'target, 'data>
     where
-        V: AsMut<[Value<'value, 'data>]>,
+        V: AsRef<[Value<'value, 'data>]>,
     {
-        let args = args.as_mut();
+        let args = args.as_ref();
         let n = args.len();
-        let res = jl_call(
-            self.unwrap(Private).cast(),
-            args.as_mut_ptr().cast(),
-            n as _,
-        );
+        let res = jl_call(self.unwrap(Private).cast(), args.as_ptr() as *mut _, n as _);
         let exc = jl_exception_occurred();
 
         if exc.is_null() {
@@ -1526,14 +1550,14 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
 
             #[cfg(not(feature = "lts"))]
             if self.state == ViewState::AtomicBuffer {
-                debug_assert!(!T::is_ref());
+                debug_assert!(!T::IS_REF);
                 debug_assert!(std::mem::size_of::<T>() <= 8);
                 return Ok(std::ptr::read(
                     self.buffer.bytes[self.offset as usize..].as_ptr() as *const T,
                 ));
             }
 
-            if T::is_ref() {
+            if T::IS_REF {
                 Ok(std::mem::transmute_copy(&self.value))
             } else if self.state == ViewState::Array {
                 Ok(self
@@ -1937,7 +1961,6 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
     }
 
     unsafe fn get_array_field(&mut self, arr: Array<'scope, 'data>, index: usize) {
-        // TODO: Atomics?
         debug_assert!(self.state == ViewState::Array);
         let el_size = arr.element_size();
         self.offset = (index * el_size) as u32;

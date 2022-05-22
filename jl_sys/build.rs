@@ -134,7 +134,7 @@ fn main() {
     let mut c = cc::Build::new();
     c.file("src/jlrs_cc.cc").include(&include_dir).cpp(true);
 
-    #[cfg(all(feature = "lts", target_os = "windows"))]
+    #[cfg(any(feature = "windows-lts", all(feature = "lts", windows)))]
     c.define("JLRS_WINDOWS_LTS", None);
 
     c.compile("jlrs_cc");
@@ -145,7 +145,8 @@ fn main() {
         out_path.push("bindings.rs");
 
         let include_dir_flag = format!("-I{}", include_dir);
-        let bindings = bindgen::Builder::default()
+        #[allow(unused_mut)]
+        let mut builder = bindgen::Builder::default()
             .clang_arg(include_dir_flag)
             .header("src/jlrs_cc.h")
             .size_t_is_usize(true)
@@ -158,7 +159,11 @@ fn main() {
             .allowlist_function("jl_apply_generic")
             .allowlist_function("jl_apply_tuple_type_v")
             .allowlist_function("jl_apply_type")
+            .allowlist_function("jl_array_del_beg")
+            .allowlist_function("jl_array_del_end")
             .allowlist_function("jl_array_eltype")
+            .allowlist_function("jl_array_grow_beg")
+            .allowlist_function("jl_array_grow_end")
             .allowlist_function("jl_array_typetagdata")
             .allowlist_function("jl_atexit_hook")
             .allowlist_function("jl_box_bool")
@@ -182,9 +187,9 @@ fn main() {
             .allowlist_function("jl_compute_fieldtypes")
             .allowlist_function("jl_cpu_threads")
             .allowlist_function("jl_egal")
+            .allowlist_function("jl_environ")
             .allowlist_function("jl_eval_string")
             .allowlist_function("jl_exception_occurred")
-            .allowlist_function("jl_environ")
             .allowlist_function("jl_field_index")
             .allowlist_function("jl_gc_add_finalizer")
             .allowlist_function("jl_gc_add_ptr_finalizer")
@@ -226,6 +231,7 @@ fn main() {
             .allowlist_function("jl_process_events")
             .allowlist_function("jl_ptr_to_array")
             .allowlist_function("jl_ptr_to_array_1d")
+            .allowlist_function("jl_reshape_array")
             .allowlist_function("jl_set_const")
             .allowlist_function("jl_set_global")
             .allowlist_function("jl_set_nth_field")
@@ -256,30 +262,8 @@ fn main() {
             .allowlist_function("jl_ver_string")
             .allowlist_function("jl_yield")
             .allowlist_function("uv_async_send")
-            .allowlist_function("jlrs_alloc_array_1d")
-            .allowlist_function("jlrs_alloc_array_2d")
-            .allowlist_function("jlrs_alloc_array_3d")
-            .allowlist_function("jlrs_apply_array_type")
-            .allowlist_function("jlrs_apply_type")
-            .allowlist_function("jlrs_get_nth_field")
             .allowlist_function("jlrs_lock")
             .allowlist_function("jlrs_unlock")
-            .allowlist_function("jlrs_new_array")
-            .allowlist_function("jlrs_new_structv")
-            .allowlist_function("jlrs_new_typevar")
-            .allowlist_function("jlrs_set_const")
-            .allowlist_function("jlrs_set_global")
-            .allowlist_function("jlrs_set_nth_field")
-            .allowlist_function("jlrs_type_union")
-            .allowlist_function("jlrs_type_unionall")
-            .allowlist_function("jlrs_reshape_array")
-            .allowlist_function("jlrs_array_grow_end")
-            .allowlist_function("jlrs_array_del_end")
-            .allowlist_function("jlrs_array_grow_beg")
-            .allowlist_function("jlrs_array_del_beg")
-            .allowlist_function("jlrs_array_sizehint")
-            .allowlist_function("jlrs_array_ptr_1d_push")
-            .allowlist_function("jlrs_array_ptr_1d_append")
             .allowlist_function("jlrs_array_data_owner_offset")
             .allowlist_type("jl_code_instance_t")
             .allowlist_type("jl_datatype_t")
@@ -424,12 +408,41 @@ fn main() {
             .allowlist_var("jl_vecelement_typename")
             .allowlist_var("jl_voidpointer_type")
             .allowlist_var("jl_weakref_type")
-            .allowlist_var("jl_weakref_typejl_abstractslot_type")
+            .allowlist_var("jl_weakref_typejl_abstractslot_type");
+
+        #[cfg(not(any(feature = "windows-lts", all(feature = "lts", windows))))]
+        {
+            builder = builder
+                .allowlist_function("jlrs_alloc_array_1d")
+                .allowlist_function("jlrs_alloc_array_2d")
+                .allowlist_function("jlrs_alloc_array_3d")
+                .allowlist_function("jlrs_apply_array_type")
+                .allowlist_function("jlrs_ptr_to_array_1d")
+                .allowlist_function("jlrs_ptr_to_array")
+                .allowlist_function("jlrs_apply_type")
+                .allowlist_function("jlrs_get_nth_field")
+                .allowlist_function("jlrs_new_array")
+                .allowlist_function("jlrs_new_structv")
+                .allowlist_function("jlrs_new_typevar")
+                .allowlist_function("jlrs_set_const")
+                .allowlist_function("jlrs_set_global")
+                .allowlist_function("jlrs_set_nth_field")
+                .allowlist_function("jlrs_type_union")
+                .allowlist_function("jlrs_type_unionall")
+                .allowlist_function("jlrs_reshape_array")
+                .allowlist_function("jlrs_array_grow_end")
+                .allowlist_function("jlrs_array_del_end")
+                .allowlist_function("jlrs_array_grow_beg")
+                .allowlist_function("jlrs_array_del_beg")
+                .allowlist_function("jlrs_array_sizehint")
+                .allowlist_function("jlrs_array_ptr_1d_push")
+                .allowlist_function("jlrs_array_ptr_1d_append");
+        }
+
+        builder
             .rustfmt_bindings(true)
             .generate()
-            .expect("Unable to generate bindings");
-
-        bindings
+            .expect("Unable to generate bindings")
             .write_to_file(&out_path)
             .expect("Couldn't write bindings!");
     }

@@ -152,7 +152,7 @@ impl<'data> Call<'data> for OpaqueClosure<'_> {
         args: V,
     ) -> JlrsResult<JuliaResult<'target, 'data>>
     where
-        V: AsMut<[Value<'value, 'data>]>,
+        V: AsRef<[Value<'value, 'data>]>,
         S: PartialScope<'target>,
     {
         self.as_value().call(scope, args)
@@ -198,7 +198,7 @@ impl<'data> Call<'data> for OpaqueClosure<'_> {
         args: V,
     ) -> JuliaResultRef<'target, 'data>
     where
-        V: AsMut<[Value<'value, 'data>]>,
+        V: AsRef<[Value<'value, 'data>]>,
     {
         self.as_value().call_unrooted(global, args)
     }

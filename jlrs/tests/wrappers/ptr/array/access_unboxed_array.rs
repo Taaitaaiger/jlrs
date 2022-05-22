@@ -14,7 +14,8 @@ mod tests {
                     jlrs.scope_with_capacity(1, |_, frame| {
                         let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
-                        let array = Array::from_vec(&mut *frame, data, (2, 3, 4))?;
+                        let array =
+                            Array::from_vec(&mut *frame, data, (2, 3, 4))?.into_jlrs_result()?;
                         let d = array.copy_inline_data::<$value_type, _>(frame)?;
 
                         let mut out = 1 as $value_type;
@@ -44,7 +45,8 @@ mod tests {
                     jlrs.scope_with_capacity(1, |_, frame| {
                         let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
-                        let array = Array::from_vec(&mut *frame, data, (2, 3, 4))?;
+                        let array =
+                            Array::from_vec(&mut *frame, data, (2, 3, 4))?.into_jlrs_result()?;
                         let mut d = array.copy_inline_data::<$value_type, _>(frame)?;
 
                         let mut out = 2 as $value_type;
@@ -80,7 +82,8 @@ mod tests {
                     jlrs.scope_with_capacity(1, |_, frame| {
                         let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
-                        let array = Array::from_vec(&mut *frame, data.clone(), (2, 3, 4))?;
+                        let array = Array::from_vec(&mut *frame, data.clone(), (2, 3, 4))?
+                            .into_jlrs_result()?;
                         let d = array.copy_inline_data::<$value_type, _>(frame)?;
 
                         for (a, b) in data.iter().zip(d.as_slice()) {
@@ -101,7 +104,8 @@ mod tests {
                     jlrs.scope_with_capacity(1, |_, frame| {
                         let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
-                        let array = Array::from_vec(&mut *frame, data.clone(), (2, 3, 4))?;
+                        let array = Array::from_vec(&mut *frame, data.clone(), (2, 3, 4))?
+                            .into_jlrs_result()?;
                         let mut d = array.copy_inline_data::<$value_type, _>(frame)?;
 
                         for (a, b) in data.iter().zip(d.as_mut_slice()) {

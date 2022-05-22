@@ -195,7 +195,7 @@ mod tests {
                 .scope_with_capacity(5, |global, frame| unsafe {
                     let idx = Value::new(&mut *frame, 4usize)?;
                     let data = vec![1.0f64, 2., 3.];
-                    let array = Array::from_vec(&mut *frame, data, 3)?;
+                    let array = Array::from_vec_unchecked(&mut *frame, data, 3)?;
                     let func = Module::base(global)
                         .function_ref("getindex")?
                         .wrapper_unchecked();
@@ -229,7 +229,7 @@ mod tests {
             jlrs.scope_with_capacity(5, |global, frame| unsafe {
                 let idx = Value::new(&mut *frame, 4usize)?;
                 let data = vec![1.0f64, 2., 3.];
-                let array = Array::from_vec(&mut *frame, data, 3)?;
+                let array = Array::from_vec_unchecked(&mut *frame, data, 3)?;
                 let func = Module::base(global)
                     .function_ref("getindex")?
                     .wrapper_unchecked();
@@ -254,7 +254,7 @@ mod tests {
             jlrs.scope_with_capacity(5, |global, frame| unsafe {
                 let idx = Value::new(&mut *frame, 4usize)?;
                 let data = vec![1.0f64, 2., 3.];
-                let array = Array::from_vec(&mut *frame, data, 3)?;
+                let array = Array::from_vec_unchecked(&mut *frame, data, 3)?;
                 let func = Module::base(global)
                     .function_ref("getindex")?
                     .wrapper_unchecked();
@@ -282,7 +282,7 @@ mod tests {
             jlrs.scope_with_capacity(5, |global, frame| unsafe {
                 let idx = Value::new(&mut *frame, 4usize)?;
                 let data = vec![1.0f64, 2., 3.];
-                let array = Array::from_vec(&mut *frame, data, 3)?;
+                let array = Array::from_vec_unchecked(&mut *frame, data, 3)?;
                 let func = Module::base(global)
                     .function_ref("getindex")?
                     .wrapper_unchecked();

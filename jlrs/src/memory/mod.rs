@@ -49,11 +49,6 @@
 //! its lifetime from the frame that roots it, data rooted in a parent scope can be returned from
 //! a nested scope.
 //!
-//! // TODO:
-//! // mode
-//! // gc
-//! // global
-//!
 //! Examples and more information can be found in the [`frame`] and [`scope`] modules.
 //!
 //! [`Global`]: global::Global

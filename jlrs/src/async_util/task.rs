@@ -175,6 +175,7 @@ pub trait PersistentTask: 'static + Send + Sync {
     ///         // implements `IntoJulia`.
     ///         let data = vec![0usize; self.n_values];
     ///         let array = Array::from_vec(&mut *frame, data, self.n_values)?
+    ///             .into_jlrs_result()?
     ///             .try_as_typed::<usize>()?;
     ///     
     ///         Ok(AccumulatorTaskState {
@@ -262,7 +263,7 @@ pub trait PersistentTask: 'static + Send + Sync {
     }
 }
 
-/// Yield the current task.
+/// Yield the root task.
 pub fn yield_task(_: &mut AsyncGcFrame) {
     unsafe {
         jl_process_events();

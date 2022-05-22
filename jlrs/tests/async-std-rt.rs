@@ -1,10 +1,15 @@
+#[cfg(all(
+    feature = "async-std-rt",
+    not(all(target_os = "windows", feature = "lts")),
+    test
+))]
 mod util;
 
 #[cfg(all(
     feature = "async-std-rt",
-    not(all(target_os = "windows", feature = "lts"))
+    not(all(target_os = "windows", feature = "lts")),
+    test
 ))]
-#[cfg(test)]
 mod tests {
     use super::util::{async_tasks::*, ASYNC_TESTS_JL};
     use jlrs::prelude::*;
@@ -13,18 +18,12 @@ mod tests {
     thread_local! {
         pub static JULIA: RefCell<AsyncJulia<AsyncStd>> = {
             unsafe {
-                #[allow(unused_mut)]
-                let mut builder = RuntimeBuilder::new()
-                    .async_runtime::<AsyncStd, AsyncStdChannel<_>>()
-                    .n_tasks(3);
-
-                #[cfg(not(feature = "lts"))]
-                {
-                    builder = builder.n_threads(3);
-                }
-
                 let r = RefCell::new(
-                    builder.start().expect("Could not init Julia").0
+                    RuntimeBuilder::new()
+                        .async_runtime::<AsyncStd, AsyncStdChannel<_>>()
+                        .start()
+                        .expect("Could not init Julia")
+                        .0
                 );
 
                 let (sender, recv) = tokio::sync::oneshot::channel();

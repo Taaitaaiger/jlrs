@@ -6,10 +6,10 @@
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L380
 
 use super::{private::Wrapper, SymbolRef};
+use crate::memory::output::Output;
 use crate::wrappers::ptr::{ModuleRef, SimpleVectorRef, ValueRef};
 use crate::{impl_debug, impl_julia_typecheck};
 use crate::{memory::global::Global, private::Private};
-use crate::{memory::output::Output, wrappers::ptr::symbol::Symbol};
 use jl_sys::{
     jl_array_typename, jl_llvmpointer_typename, jl_namedtuple_typename, jl_pointer_typename,
     jl_tuple_typename, jl_type_typename, jl_typename_t, jl_typename_type, jl_vecelement_typename,
@@ -62,7 +62,7 @@ impl<'scope> TypeName<'scope> {
     }
 
     /// Field names.
-    pub fn names(self) -> SimpleVectorRef<'scope, Symbol<'scope>> {
+    pub fn names(self) -> SimpleVectorRef<'scope> {
         unsafe { SimpleVectorRef::wrap(self.unwrap_non_null(Private).as_ref().names) }
     }
 

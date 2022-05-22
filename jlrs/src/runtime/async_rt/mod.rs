@@ -34,14 +34,16 @@ use crate::{
     },
     call::Call,
     error::{JlrsError, JlrsResult},
-    info::Info,
     memory::{frame::GcFrame, global::Global, mode::Async, stack_page::AsyncStackPage},
     runtime::{builder::AsyncRuntimeBuilder, init_jlrs, INIT},
     wrappers::ptr::{module::Module, string::JuliaString, value::Value, Wrapper},
 };
 use async_trait::async_trait;
 use futures::Future;
-use jl_sys::{jl_atexit_hook, jl_init, jl_init_with_image, jl_is_initialized, jl_process_events};
+use jl_sys::{
+    jl_atexit_hook, jl_cpu_threads, jl_init, jl_init_with_image, jl_is_initialized,
+    jl_process_events,
+};
 
 #[cfg(not(feature = "lts"))]
 use jl_sys::jl_options;
@@ -604,8 +606,7 @@ where
                 #[cfg(not(feature = "lts"))]
                 {
                     if builder.n_threads == 0 {
-                        let n = num_cpus::get();
-                        jl_options.nthreads = n as _;
+                        jl_options.nthreads = -1;
                     } else {
                         jl_options.nthreads = builder.n_threads as _;
                     }
@@ -647,25 +648,21 @@ where
     where
         C: Channel<Message>,
     {
-        if Info::new().n_threads() < 3 {
-            Err(JlrsError::MoreThreadsRequired)?;
-        }
-
         let max_n_tasks = if builder.n_tasks == 0 {
-            num_cpus::get() as _
+            jl_cpu_threads() as usize
         } else {
             builder.n_tasks
         };
         let recv_timeout = builder.recv_timeout;
 
         let mut free_stacks = VecDeque::with_capacity(max_n_tasks);
-        for i in 1..max_n_tasks {
+        for i in 1..=max_n_tasks {
             free_stacks.push_back(i);
         }
 
         let mut stacks = {
-            let mut stacks = Vec::with_capacity(max_n_tasks);
-            for _ in 0..max_n_tasks {
+            let mut stacks = Vec::with_capacity(max_n_tasks + 1);
+            for _ in 0..=max_n_tasks {
                 stacks.push(Some(AsyncStackPage::new()));
             }
             AsyncStackPage::link_stacks(&mut stacks);
@@ -710,7 +707,7 @@ where
                                     .ok();
                             });
                             n_running += 1;
-                            running_tasks[idx] = Some(task);
+                            running_tasks[idx - 1] = Some(task);
                         } else {
                             pending_tasks.push_back((task, sender));
                         }
@@ -724,12 +721,12 @@ where
                                     .await
                                     .ok();
                             });
-                            running_tasks[idx] = Some(task);
+                            running_tasks[idx - 1] = Some(task);
                         } else {
                             stacks[idx] = Some(stack);
                             n_running -= 1;
                             free_stacks.push_front(idx);
-                            running_tasks[idx] = None;
+                            running_tasks[idx - 1] = None;
                         }
                     }
                     MessageInner::BlockingTask(task) => {
@@ -742,7 +739,7 @@ where
                         sender.send(res).await;
                     }
                     MessageInner::ErrorColor(enable, sender) => {
-                        let res = call_error_color(enable);
+                        let res = set_error_color(enable);
                         sender.send(res).await;
                     }
                 },
@@ -809,7 +806,7 @@ unsafe fn call_include(stack: &mut AsyncStackPage, path: PathBuf) -> JlrsResult<
     Ok(())
 }
 
-fn call_error_color(enable: bool) -> JlrsResult<()> {
+fn set_error_color(enable: bool) -> JlrsResult<()> {
     unsafe {
         let global = Global::new();
 

@@ -3,8 +3,8 @@
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
 use super::array::Array;
 use super::{
-    private::Wrapper as WrapperPriv, value::Value, DataTypeRef, SimpleVectorRef, TypeNameRef,
-    ValueRef, Wrapper,
+    private::Wrapper as WrapperPriv, value::Value, DataTypeRef, SimpleVectorRef, SymbolRef,
+    TypeNameRef, ValueRef, Wrapper,
 };
 use crate::error::CANNOT_DISPLAY_TYPE;
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
@@ -96,7 +96,11 @@ impl<'scope> DataType<'scope> {
     pub fn parameter(self, idx: usize) -> Option<ValueRef<'scope, 'static>> {
         unsafe {
             let params = self.unwrap_non_null(Private).as_ref().parameters;
-            SimpleVector::wrap(params, Private).data().get(idx).copied()
+            SimpleVector::wrap(params, Private)
+                .unrestricted_data()
+                .as_slice()
+                .get(idx)
+                .copied()
         }
     }
 
@@ -105,12 +109,14 @@ impl<'scope> DataType<'scope> {
         unsafe { SimpleVectorRef::wrap(jl_get_fieldtypes(self.unwrap(Private))) }
     }
 
-    /// Returns the field type of the field at position `idx`.
+    /// Returns the field type of the field at position `idx`, or `None` if the index is out of
+    /// bounds.
     pub fn field_type(self, idx: usize) -> Option<ValueRef<'scope, 'static>> {
         unsafe {
             self.field_types()
                 .wrapper_unchecked()
-                .data()
+                .unrestricted_data()
+                .as_slice()
                 .get(idx)
                 .copied()
         }
@@ -121,7 +127,8 @@ impl<'scope> DataType<'scope> {
         *self
             .field_types()
             .wrapper_unchecked()
-            .data()
+            .unrestricted_data()
+            .as_slice()
             .get_unchecked(idx)
     }
 
@@ -132,15 +139,16 @@ impl<'scope> DataType<'scope> {
                 return None;
             }
 
-            SimpleVector::<Value>::wrap(self.unwrap_non_null(Private).as_ref().types, Private)
-                .data()
+            SimpleVector::wrap(self.unwrap_non_null(Private).as_ref().types, Private)
+                .unrestricted_data()
+                .as_slice()
                 .get(idx)
                 .copied()
         }
     }
 
     /// Returns the field names of this type.
-    pub fn field_names(self) -> SimpleVectorRef<'scope, Symbol<'scope>> {
+    pub fn field_names(self) -> SimpleVectorRef<'scope> {
         unsafe { self.type_name().wrapper_unchecked().names() }
     }
 
@@ -149,7 +157,8 @@ impl<'scope> DataType<'scope> {
         unsafe {
             self.field_names()
                 .wrapper_unchecked()
-                .data()
+                .unrestricted_typed_data_unchecked::<SymbolRef>()
+                .as_slice()
                 .get(idx)
                 .copied()
                 .map(|s| s.wrapper_unchecked())
@@ -422,6 +431,7 @@ impl<'scope> DataType<'scope> {
     }
 
     #[cfg(not(feature = "lts"))]
+    /// Returns true if the field at position `idx` is an atomic field.
     pub fn is_atomic_field(self, idx: usize) -> JlrsResult<bool> {
         if idx >= self.n_fields() as usize {
             Err(JlrsError::OutOfBounds {
@@ -435,6 +445,7 @@ impl<'scope> DataType<'scope> {
     }
 
     #[cfg(not(feature = "lts"))]
+    /// Returns true if the field at position `idx` is a constant field.
     pub fn is_const_field(self, idx: usize) -> JlrsResult<bool> {
         if idx >= self.n_fields() as usize {
             Err(JlrsError::OutOfBounds {
@@ -472,6 +483,10 @@ impl<'scope> DataType<'scope> {
     }
 
     #[cfg(not(feature = "lts"))]
+    /// Returns true if the field at position `idx` is an atomic field.
+    ///
+    /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
+    /// function.
     pub unsafe fn is_atomic_field_unchecked(self, idx: usize) -> bool {
         /*
             const uint32_t *atomicfields = st->name->atomicfields;
@@ -491,6 +506,10 @@ impl<'scope> DataType<'scope> {
     }
 
     #[cfg(not(feature = "lts"))]
+    /// Returns true if the field at position `idx` is a constant field.
+    ///
+    /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
+    /// function.
     pub unsafe fn is_const_field_unchecked(self, idx: usize) -> bool {
         /*
         jl_typename_t *tn = st->name;
@@ -526,11 +545,11 @@ impl<'scope> DataType<'scope> {
     pub fn instantiate<'target, 'value, 'data, V, S>(
         self,
         scope: S,
-        mut values: V,
+        values: V,
     ) -> JlrsResult<JuliaResult<'target, 'data>>
     where
         S: PartialScope<'target>,
-        V: AsMut<[Value<'value, 'data>]>,
+        V: AsRef<[Value<'value, 'data>]>,
     {
         unsafe {
             // TODO: Check if Julia crashes or throws an error when these checks fail
@@ -544,10 +563,10 @@ impl<'scope> DataType<'scope> {
                 Err(JlrsError::ArrayNotSupported)?;
             }
 
-            let values = values.as_mut();
+            let values = values.as_ref();
             let res = jlrs_new_structv(
                 self.unwrap(Private),
-                values.as_mut_ptr().cast(),
+                values.as_ptr() as *mut _,
                 values.len() as _,
             );
 
@@ -571,10 +590,10 @@ impl<'scope> DataType<'scope> {
     pub fn instantiate_unrooted<'global, 'value, 'data, V>(
         self,
         _: Global<'global>,
-        mut values: V,
+        values: V,
     ) -> JlrsResult<JuliaResultRef<'global, 'data>>
     where
-        V: AsMut<[Value<'value, 'data>]>,
+        V: AsRef<[Value<'value, 'data>]>,
     {
         unsafe {
             if !self.is::<Concrete>() {
@@ -587,10 +606,10 @@ impl<'scope> DataType<'scope> {
                 Err(JlrsError::ArrayNotSupported)?;
             }
 
-            let values = values.as_mut();
+            let values = values.as_ref();
             let res = jlrs_new_structv(
                 self.unwrap(Private),
-                values.as_mut_ptr().cast(),
+                values.as_ptr() as *mut _,
                 values.len() as _,
             );
 
@@ -615,16 +634,16 @@ impl<'scope> DataType<'scope> {
     pub unsafe fn instantiate_unchecked<'target, 'value, 'data, V, S>(
         self,
         scope: S,
-        mut values: V,
+        values: V,
     ) -> JlrsResult<Value<'target, 'data>>
     where
         S: PartialScope<'target>,
-        V: AsMut<[Value<'value, 'data>]>,
+        V: AsRef<[Value<'value, 'data>]>,
     {
-        let values = values.as_mut();
+        let values = values.as_ref();
         let value = jl_new_structv(
             self.unwrap(Private),
-            values.as_mut_ptr().cast(),
+            values.as_ptr() as *mut _,
             values.len() as _,
         );
         scope.value(NonNull::new_unchecked(value), Private)
@@ -643,15 +662,15 @@ impl<'scope> DataType<'scope> {
     pub unsafe fn instantiate_unrooted_unchecked<'global, 'value, 'borrow, V>(
         self,
         _: Global<'global>,
-        mut values: V,
+        values: V,
     ) -> ValueRef<'global, 'borrow>
     where
-        V: AsMut<[Value<'value, 'borrow>]>,
+        V: AsRef<[Value<'value, 'borrow>]>,
     {
-        let values = values.as_mut();
+        let values = values.as_ref();
         let value = jl_new_structv(
             self.unwrap(Private),
-            values.as_mut_ptr().cast(),
+            values.as_ptr() as *mut _,
             values.len() as _,
         );
 

@@ -40,7 +40,10 @@ mod tests {
 
             jlrs.scope_with_capacity(1, |_, frame| {
                 let mut data = vec![1u32];
-                let array = Array::from_slice(frame, &mut data, &[1, 1, 1, 1, 1, 1, 1, 1, 1][..]);
+                let array = {
+                    Array::from_slice(frame, &mut data, &[1, 1, 1, 1, 1, 1, 1, 1, 1][..])?
+                        .into_jlrs_result()
+                };
                 assert!(array.is_ok());
                 Ok(())
             })

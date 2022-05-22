@@ -6904,6 +6904,13 @@ extern "C" {
     pub fn jl_new_array(atype: *mut jl_value_t, dims: *mut jl_value_t) -> *mut jl_array_t;
 }
 extern "C" {
+    pub fn jl_reshape_array(
+        atype: *mut jl_value_t,
+        data: *mut jl_array_t,
+        dims: *mut jl_value_t,
+    ) -> *mut jl_array_t;
+}
+extern "C" {
     pub fn jl_ptr_to_array_1d(
         atype: *mut jl_value_t,
         data: *mut ::std::os::raw::c_void,
@@ -6938,6 +6945,18 @@ extern "C" {
 }
 extern "C" {
     pub fn jl_pchar_to_string(str_: *const ::std::os::raw::c_char, len: usize) -> *mut jl_value_t;
+}
+extern "C" {
+    pub fn jl_array_grow_end(a: *mut jl_array_t, inc: usize);
+}
+extern "C" {
+    pub fn jl_array_del_end(a: *mut jl_array_t, dec: usize);
+}
+extern "C" {
+    pub fn jl_array_grow_beg(a: *mut jl_array_t, inc: usize);
+}
+extern "C" {
+    pub fn jl_array_del_beg(a: *mut jl_array_t, dec: usize);
 }
 extern "C" {
     pub fn jl_apply_array_type(type_: *mut jl_value_t, dim: usize) -> *mut jl_value_t;
@@ -8138,6 +8157,22 @@ extern "C" {
         nr: usize,
         nc: usize,
         z: usize,
+    ) -> jlrs_result_t;
+}
+extern "C" {
+    pub fn jlrs_ptr_to_array_1d(
+        atype: *mut jl_value_t,
+        data: *mut ::std::os::raw::c_void,
+        nel: usize,
+        own_buffer: ::std::os::raw::c_int,
+    ) -> jlrs_result_t;
+}
+extern "C" {
+    pub fn jlrs_ptr_to_array(
+        atype: *mut jl_value_t,
+        data: *mut ::std::os::raw::c_void,
+        _dims: *mut jl_value_t,
+        own_buffer: ::std::os::raw::c_int,
     ) -> jlrs_result_t;
 }
 extern "C" {

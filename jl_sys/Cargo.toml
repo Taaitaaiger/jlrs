@@ -20,6 +20,7 @@ docs = []
 uv = []
 debug = []
 lts = []
+windows-lts = ["lts"]
 use-bindgen = ["bindgen"]
 
 [dependencies]

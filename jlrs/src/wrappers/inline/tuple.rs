@@ -52,10 +52,10 @@ impl Tuple {
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn new<'target: 'current, 'current, 'value, 'borrow, V, S, F>(
         scope: S,
-        mut values: V,
+        values: V,
     ) -> JlrsResult<JuliaResult<'target, 'borrow>>
     where
-        V: AsMut<[Value<'value, 'borrow>]>,
+        V: AsRef<[Value<'value, 'borrow>]>,
         S: Scope<'target, 'current, F>,
         F: Frame<'current>,
     {
@@ -63,7 +63,7 @@ impl Tuple {
         frame.scope(|frame| {
             let global = frame.global();
             let types: smallvec::SmallVec<[_; MAX_SIZE]> = values
-                .as_mut()
+                .as_ref()
                 .iter()
                 .copied()
                 .map(|v| v.datatype().as_value())
@@ -82,10 +82,10 @@ impl Tuple {
     /// Create a new tuple from the contents of `values`.
     pub unsafe fn new_unchecked<'target: 'current, 'current, 'value, 'borrow, V, S, F>(
         scope: S,
-        mut values: V,
+        values: V,
     ) -> JlrsResult<Value<'target, 'borrow>>
     where
-        V: AsMut<[Value<'value, 'borrow>]>,
+        V: AsRef<[Value<'value, 'borrow>]>,
         S: Scope<'target, 'current, F>,
         F: Frame<'current>,
     {
@@ -94,7 +94,7 @@ impl Tuple {
 
         frame.scope(|frame| {
             let types: smallvec::SmallVec<[_; MAX_SIZE]> = values
-                .as_mut()
+                .as_ref()
                 .iter()
                 .copied()
                 .map(|v| v.datatype().as_value())
@@ -180,7 +180,7 @@ macro_rules! impl_tuple {
                             return false;
                         }
 
-                        let types = fieldtypes.wrapper_unchecked().data();
+                        let types = fieldtypes.wrapper_unchecked().unrestricted_data().as_slice();
                         if !check!(types, n, $($types),+) {
                             return false
                         }
@@ -191,6 +191,8 @@ macro_rules! impl_tuple {
                     false
                 }
             }
+
+            const IS_REF: bool = false;
         }
 
         unsafe impl<$($types),+> $crate::convert::unbox::Unbox for $name<$($types),+>
@@ -239,6 +241,8 @@ macro_rules! impl_tuple {
 
                 false
             }
+
+            const IS_REF: bool = false;
         }
 
         unsafe impl $crate::convert::unbox::Unbox for $name {

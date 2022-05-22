@@ -219,7 +219,7 @@ mod tests {
                         .value_unchecked()
                 };
                 let data = vec![1.0, 2.0, 3.0, 4.0];
-                let arg1 = Array::from_vec(&mut *frame, data, (2, 2))?;
+                let arg1 = Array::from_vec(&mut *frame, data, (2, 2))?.into_jlrs_result()?;
                 let instance = ty
                     .cast::<DataType>()?
                     .instantiate(&mut *frame, &mut [arg1.as_value()])?
@@ -260,7 +260,7 @@ mod tests {
                         .value_unchecked()
                 };
                 let data = vec![1.0, 2.0, 3.0, 4.0];
-                let arg1 = Array::from_vec(&mut *frame, data, (2, 2))?;
+                let arg1 = Array::from_vec(&mut *frame, data, (2, 2))?.into_jlrs_result()?;
                 let instance = ty
                     .cast::<DataType>()?
                     .instantiate(&mut *frame, &mut [arg1.as_value()])?
@@ -491,7 +491,7 @@ mod tests {
                         .value_unchecked()
                 };
                 let data = vec![1.0, 2.0, 3.0, 4.0];
-                let arg1 = Array::from_vec(&mut *frame, data, (2, 2))?;
+                let arg1 = Array::from_vec(&mut *frame, data, (2, 2))?.into_jlrs_result()?;
                 let instance = ty
                     .cast::<DataType>()?
                     .instantiate(&mut *frame, &mut [arg1.as_value()])?
@@ -532,7 +532,7 @@ mod tests {
                         .value_unchecked()
                 };
                 let data = vec![1.0, 2.0, 3.0, 4.0];
-                let arg1 = Array::from_vec(&mut *frame, data, (2, 2))?;
+                let arg1 = Array::from_vec(&mut *frame, data, (2, 2))?.into_jlrs_result()?;
                 let instance = ty
                     .cast::<DataType>()?
                     .instantiate(&mut *frame, &mut [arg1.as_value()])?

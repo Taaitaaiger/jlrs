@@ -62,6 +62,44 @@ extern "C"
         return out;
     }
 
+    jlrs_result_t jlrs_ptr_to_array_1d(jl_value_t *atype, void *data, size_t nel, int own_buffer)
+    {
+        jlrs_result_t out;
+
+        JL_TRY
+        {
+            out.data = (jl_value_t *)jl_ptr_to_array_1d(atype, data, nel, own_buffer);
+            out.flag = JLRS_RESULT_VALUE;
+        }
+        JL_CATCH
+        {
+            out.data = jl_current_exception();
+            out.flag = JLRS_RESULT_ERR;
+        }
+        jl_exception_clear();
+
+        return out;
+    }
+
+    jlrs_result_t jlrs_ptr_to_array(jl_value_t *atype, void *data, jl_value_t *_dims, int own_buffer)
+    {
+        jlrs_result_t out;
+
+        JL_TRY
+        {
+            out.data = (jl_value_t *)jl_ptr_to_array(atype, data, _dims, own_buffer);
+            out.flag = JLRS_RESULT_VALUE;
+        }
+        JL_CATCH
+        {
+            out.data = jl_current_exception();
+            out.flag = JLRS_RESULT_ERR;
+        }
+        jl_exception_clear();
+
+        return out;
+    }
+
     jlrs_result_t jlrs_apply_array_type(jl_value_t *ty, size_t dim)
 
     {

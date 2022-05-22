@@ -13,8 +13,9 @@ use std::{
     slice,
 };
 
-/// Immutably borrowed inline array data from Julia. The data has a column-major order and can be
-/// indexed with anything that implements [`Dims`].
+/// Immutably borrowed inline array data from Julia.
+///
+/// The data has a column-major order and can be indexed with anything that implements [`Dims`].
 #[repr(transparent)]
 #[derive(Clone)]
 pub struct InlineArrayData<'borrow, 'array, 'data, T> {
@@ -86,8 +87,9 @@ where
     }
 }
 
-/// Mutably borrowed inline array data from Julia. The data has a column-major order and can be
-/// indexed with anything that implements [`Dims`].
+/// Mutably borrowed inline array data from Julia.
+///
+/// The data has a column-major order and can be indexed with anything that implements [`Dims`].
 #[repr(transparent)]
 pub struct InlineArrayDataMut<'borrow, 'array, 'data, T> {
     array: Array<'array, 'data>,
@@ -176,8 +178,6 @@ impl<'borrow, 'array, 'data, T> InlineArrayDataMut<'borrow, 'array, 'data, T> {
     }
 }
 
-/// Mutably borrowed inline array data from Julia. The data has a column-major order and can be
-/// indexed with anything that implements [`Dims`].
 impl<'borrow, 'array, 'data, T, D> Index<D> for InlineArrayDataMut<'borrow, 'array, 'data, T>
 where
     D: Dims,
@@ -205,8 +205,9 @@ where
     }
 }
 
-/// Mutably borrowed inline array data from Julia. The data has a column-major order and can be
-/// indexed with anything that implements [`Dims`].
+/// Mutably borrowed inline array data from Julia.
+///
+/// The data has a column-major order and can be indexed with anything that implements [`Dims`].
 #[repr(transparent)]
 pub struct UnrestrictedInlineArrayDataMut<'borrow, 'array, 'data, T> {
     array: Array<'array, 'data>,

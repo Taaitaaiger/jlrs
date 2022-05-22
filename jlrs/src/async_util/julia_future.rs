@@ -36,10 +36,10 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
     pub(crate) fn new<'value, V>(
         frame: &mut AsyncGcFrame<'frame>,
         func: Value,
-        mut values: V,
+        values: V,
     ) -> JlrsResult<Self>
     where
-        V: AsMut<[Value<'value, 'data>]>,
+        V: AsRef<[Value<'value, 'data>]>,
     {
         let shared_state = Arc::new(Mutex::new(TaskState {
             completed: false,
@@ -49,7 +49,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         }));
 
         unsafe {
-            let values = values.as_mut();
+            let values = values.as_ref();
             let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
             let state_ptr_boxed = Value::new(&mut *frame, state_ptr)?;
 
@@ -90,10 +90,10 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
     pub(crate) fn new_local<'value, V>(
         frame: &mut AsyncGcFrame<'frame>,
         func: Value,
-        mut values: V,
+        values: V,
     ) -> JlrsResult<Self>
     where
-        V: AsMut<[Value<'value, 'data>]>,
+        V: AsRef<[Value<'value, 'data>]>,
     {
         let shared_state = Arc::new(Mutex::new(TaskState {
             completed: false,
@@ -103,7 +103,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         }));
 
         unsafe {
-            let values = values.as_mut();
+            let values = values.as_ref();
             let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
             let state_ptr_boxed = Value::new(&mut *frame, state_ptr)?;
 
@@ -144,10 +144,10 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
     pub(crate) fn new_main<'value, V>(
         frame: &mut AsyncGcFrame<'frame>,
         func: Value,
-        mut values: V,
+        values: V,
     ) -> JlrsResult<Self>
     where
-        V: AsMut<[Value<'value, 'data>]>,
+        V: AsRef<[Value<'value, 'data>]>,
     {
         let shared_state = Arc::new(Mutex::new(TaskState {
             completed: false,
@@ -157,7 +157,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         }));
 
         unsafe {
-            let values = values.as_mut();
+            let values = values.as_ref();
             let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
             let state_ptr_boxed = Value::new(&mut *frame, state_ptr)?;
 
@@ -198,10 +198,10 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
     pub(crate) fn new_with_keywords<'value, V>(
         frame: &mut AsyncGcFrame<'frame>,
         func: WithKeywords,
-        mut values: V,
+        values: V,
     ) -> JlrsResult<Self>
     where
-        V: AsMut<[Value<'value, 'data>]>,
+        V: AsRef<[Value<'value, 'data>]>,
     {
         let shared_state = Arc::new(Mutex::new(TaskState {
             completed: false,
@@ -211,7 +211,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         }));
 
         unsafe {
-            let values = values.as_mut();
+            let values = values.as_ref();
             let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
             let state_ptr_boxed = Value::new(&mut *frame, state_ptr)?;
 
@@ -254,10 +254,10 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
     pub(crate) fn new_local_with_keywords<'value, V>(
         frame: &mut AsyncGcFrame<'frame>,
         func: WithKeywords,
-        mut values: V,
+        values: V,
     ) -> JlrsResult<Self>
     where
-        V: AsMut<[Value<'value, 'data>]>,
+        V: AsRef<[Value<'value, 'data>]>,
     {
         let shared_state = Arc::new(Mutex::new(TaskState {
             completed: false,
@@ -267,7 +267,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         }));
 
         unsafe {
-            let values = values.as_mut();
+            let values = values.as_ref();
             let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
             let state_ptr_boxed = Value::new(&mut *frame, state_ptr)?;
 
@@ -310,10 +310,10 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
     pub(crate) fn new_main_with_keywords<'value, V>(
         frame: &mut AsyncGcFrame<'frame>,
         func: WithKeywords,
-        mut values: V,
+        values: V,
     ) -> JlrsResult<Self>
     where
-        V: AsMut<[Value<'value, 'data>]>,
+        V: AsRef<[Value<'value, 'data>]>,
     {
         let shared_state = Arc::new(Mutex::new(TaskState {
             completed: false,
@@ -323,7 +323,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         }));
 
         unsafe {
-            let values = values.as_mut();
+            let values = values.as_ref();
             let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
             let state_ptr_boxed = Value::new(&mut *frame, state_ptr)?;
 

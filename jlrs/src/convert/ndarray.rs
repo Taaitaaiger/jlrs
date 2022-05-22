@@ -165,7 +165,8 @@ mod tests {
                 .scope(|_global, frame| {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
-                    let borrowed = Array::from_slice(&mut *frame, slice, (3, 2))?;
+                    let borrowed =
+                        unsafe { Array::from_slice_unchecked(&mut *frame, slice, (3, 2))? };
                     let x = borrowed.inline_data::<usize, _>(&mut *frame)?[(1, 0)];
 
                     let array: ArrayView<usize, _> = borrowed.array_view(&mut *frame)?;
@@ -186,7 +187,8 @@ mod tests {
                 .scope(|_global, frame| {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
-                    let borrowed = Array::from_slice(&mut *frame, slice, (3, 2))?;
+                    let borrowed =
+                        unsafe { Array::from_slice_unchecked(&mut *frame, slice, (3, 2))? };
 
                     let view: Result<ArrayView<isize, _>, _> = borrowed.array_view(&mut *frame);
                     assert!(view.is_err());
@@ -205,7 +207,7 @@ mod tests {
                 .scope(|_global, frame| unsafe {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
-                    let borrowed = Array::from_slice(&mut *frame, slice, (3, 2))?;
+                    let borrowed = Array::from_slice_unchecked(&mut *frame, slice, (3, 2))?;
                     let mut inline = borrowed.inline_data_mut::<usize, _>(&mut *frame)?;
                     let x = inline[(1, 0)];
 
@@ -232,7 +234,7 @@ mod tests {
                 .scope(|_global, frame| unsafe {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
-                    let borrowed = Array::from_slice(&mut *frame, slice, (3, 2))?;
+                    let borrowed = Array::from_slice_unchecked(&mut *frame, slice, (3, 2))?;
 
                     let view: Result<ArrayViewMut<isize, _>, _> =
                         borrowed.array_view_mut(&mut *frame);
@@ -252,7 +254,8 @@ mod tests {
                 .scope(|_global, frame| {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
-                    let borrowed = Array::from_slice(&mut *frame, slice, (3, 2))?;
+                    let borrowed =
+                        unsafe { Array::from_slice_unchecked(&mut *frame, slice, (3, 2))? };
 
                     let x = borrowed.inline_data(&mut *frame)?[(1, 0)];
 
@@ -274,7 +277,7 @@ mod tests {
                 .scope(|_global, frame| unsafe {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
-                    let borrowed = Array::from_slice(&mut *frame, slice, (3, 2))?;
+                    let borrowed = Array::from_slice_unchecked(&mut *frame, slice, (3, 2))?;
 
                     let mut inline = borrowed.inline_data_mut::<usize, _>(&mut *frame)?;
                     let x = inline[(1, 0)];
@@ -302,7 +305,8 @@ mod tests {
                 .scope(|_global, frame| {
                     let mut data = vec![1u64, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
-                    let borrowed = Array::from_slice(&mut *frame, slice, (3, 2))?;
+                    let borrowed =
+                        unsafe { Array::from_slice_unchecked(&mut *frame, slice, (3, 2))? };
 
                     let _array = borrowed.try_as_typed::<u64>()?.array_view(&mut *frame)?;
 

@@ -113,7 +113,11 @@ unsafe impl<T: IntoJulia> Typecheck for *mut T {
                 return false;
             }
 
-            let params = t.parameters().wrapper_unchecked().data();
+            let params = t
+                .parameters()
+                .wrapper_unchecked()
+                .unrestricted_data()
+                .as_slice();
             let inner_ty = T::julia_type(global);
             if params[0].value_unchecked() != inner_ty.value_unchecked() {
                 return false;

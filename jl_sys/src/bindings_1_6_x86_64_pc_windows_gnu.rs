@@ -5967,6 +5967,14 @@ extern "C" {
 }
 #[link(name = "libjulia")]
 extern "C" {
+    pub fn jl_reshape_array(
+        atype: *mut jl_value_t,
+        data: *mut jl_array_t,
+        dims: *mut jl_value_t,
+    ) -> *mut jl_array_t;
+}
+#[link(name = "libjulia")]
+extern "C" {
     pub fn jl_ptr_to_array_1d(
         atype: *mut jl_value_t,
         data: *mut ::std::os::raw::c_void,
@@ -6007,6 +6015,22 @@ extern "C" {
 #[link(name = "libjulia")]
 extern "C" {
     pub fn jl_pchar_to_string(str_: *const ::std::os::raw::c_char, len: usize) -> *mut jl_value_t;
+}
+#[link(name = "libjulia")]
+extern "C" {
+    pub fn jl_array_grow_end(a: *mut jl_array_t, inc: usize);
+}
+#[link(name = "libjulia")]
+extern "C" {
+    pub fn jl_array_del_end(a: *mut jl_array_t, dec: usize);
+}
+#[link(name = "libjulia")]
+extern "C" {
+    pub fn jl_array_grow_beg(a: *mut jl_array_t, inc: usize);
+}
+#[link(name = "libjulia")]
+extern "C" {
+    pub fn jl_array_del_beg(a: *mut jl_array_t, dec: usize);
 }
 #[link(name = "libjulia")]
 extern "C" {
@@ -7081,136 +7105,6 @@ extern "C" {
 #[link(name = "libjulia")]
 extern "C" {
     pub fn jl_get_current_task() -> *mut jl_value_t;
-}
-pub const jlrs_result_tag_t_JLRS_RESULT_VOID: jlrs_result_tag_t = 0;
-pub const jlrs_result_tag_t_JLRS_RESULT_VALUE: jlrs_result_tag_t = 1;
-pub const jlrs_result_tag_t_JLRS_RESULT_ERR: jlrs_result_tag_t = 2;
-#[doc = " Flag used by `jlrs_result_t` that indicates what the union field of that struct contains."]
-pub type jlrs_result_tag_t = ::std::os::raw::c_uint;
-#[doc = " Container for the result of some function called in a JULIA_TRY block. The flag indicates what"]
-#[doc = " the union field contains. If the flag is `JLRS_RESULT_VOID` `data` is set to a null"]
-#[doc = " pointer, if it's `JLRS_RESULT_ERR` `data` is set to the pointer to the exception."]
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct jlrs_result_t {
-    pub flag: jlrs_result_tag_t,
-    pub data: *mut jl_value_t,
-}
-#[test]
-fn bindgen_test_layout_jlrs_result_t() {
-    assert_eq!(
-        ::std::mem::size_of::<jlrs_result_t>(),
-        16usize,
-        concat!("Size of: ", stringify!(jlrs_result_t))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<jlrs_result_t>(),
-        8usize,
-        concat!("Alignment of ", stringify!(jlrs_result_t))
-    );
-    assert_eq!(
-        unsafe { &(*(::std::ptr::null::<jlrs_result_t>())).flag as *const _ as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(jlrs_result_t),
-            "::",
-            stringify!(flag)
-        )
-    );
-    assert_eq!(
-        unsafe { &(*(::std::ptr::null::<jlrs_result_t>())).data as *const _ as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(jlrs_result_t),
-            "::",
-            stringify!(data)
-        )
-    );
-}
-extern "C" {
-    pub fn jlrs_alloc_array_1d(atype: *mut jl_value_t, nr: usize) -> jlrs_result_t;
-}
-extern "C" {
-    pub fn jlrs_alloc_array_2d(atype: *mut jl_value_t, nr: usize, nc: usize) -> jlrs_result_t;
-}
-extern "C" {
-    pub fn jlrs_alloc_array_3d(
-        atype: *mut jl_value_t,
-        nr: usize,
-        nc: usize,
-        z: usize,
-    ) -> jlrs_result_t;
-}
-extern "C" {
-    pub fn jlrs_apply_array_type(ty: *mut jl_value_t, dim: usize) -> jlrs_result_t;
-}
-extern "C" {
-    pub fn jlrs_apply_type(
-        tc: *mut jl_value_t,
-        params: *mut *mut jl_value_t,
-        n: usize,
-    ) -> jlrs_result_t;
-}
-extern "C" {
-    pub fn jlrs_new_array(atype: *mut jl_value_t, dims: *mut jl_value_t) -> jlrs_result_t;
-}
-extern "C" {
-    pub fn jlrs_new_structv(
-        type_: *mut jl_datatype_t,
-        args: *mut *mut jl_value_t,
-        na: u32,
-    ) -> jlrs_result_t;
-}
-extern "C" {
-    pub fn jlrs_new_typevar(
-        name: *mut jl_sym_t,
-        lb: *mut jl_value_t,
-        ub: *mut jl_value_t,
-    ) -> jlrs_result_t;
-}
-extern "C" {
-    pub fn jlrs_set_const(
-        m: *mut jl_module_t,
-        var: *mut jl_sym_t,
-        val: *mut jl_value_t,
-    ) -> jlrs_result_t;
-}
-extern "C" {
-    pub fn jlrs_set_global(
-        m: *mut jl_module_t,
-        var: *mut jl_sym_t,
-        val: *mut jl_value_t,
-    ) -> jlrs_result_t;
-}
-extern "C" {
-    pub fn jlrs_set_nth_field(v: *mut jl_value_t, i: usize, rhs: *mut jl_value_t) -> jlrs_result_t;
-}
-extern "C" {
-    pub fn jlrs_type_union(ts: *mut *mut jl_value_t, n: usize) -> jlrs_result_t;
-}
-extern "C" {
-    pub fn jlrs_type_unionall(v: *mut jl_tvar_t, body: *mut jl_value_t) -> jlrs_result_t;
-}
-extern "C" {
-    pub fn jlrs_reshape_array(
-        atype: *mut jl_value_t,
-        data: *mut jl_array_t,
-        _dims: *mut jl_value_t,
-    ) -> jlrs_result_t;
-}
-extern "C" {
-    pub fn jlrs_array_grow_end(a: *mut jl_array_t, inc: usize) -> jlrs_result_t;
-}
-extern "C" {
-    pub fn jlrs_array_del_end(a: *mut jl_array_t, dec: usize) -> jlrs_result_t;
-}
-extern "C" {
-    pub fn jlrs_array_grow_beg(a: *mut jl_array_t, inc: usize) -> jlrs_result_t;
-}
-extern "C" {
-    pub fn jlrs_array_del_beg(a: *mut jl_array_t, dec: usize) -> jlrs_result_t;
 }
 extern "C" {
     pub fn jlrs_array_data_owner_offset(n_dims: u16) -> uint_t;

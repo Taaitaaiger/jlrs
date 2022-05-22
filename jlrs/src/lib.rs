@@ -405,6 +405,7 @@
 //!         // implements `IntoJulia`.
 //!         let data = vec![0usize; self.n_values];
 //!         let array = Array::from_vec(&mut *frame, data, self.n_values)?
+//!             .into_jlrs_result()?
 //!             .try_as_typed::<usize>()?;
 //!     
 //!         Ok(AccumulatorTaskState {

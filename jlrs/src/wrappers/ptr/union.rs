@@ -31,14 +31,14 @@ impl<'scope> Union<'scope> {
     /// [`Union`]: crate::wrappers::ptr::union::Union
     /// [`DataType`]: crate::wrappers::ptr::datatype::DataType
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub fn new<'target, V, S>(scope: S, mut types: V) -> JlrsResult<JuliaResult<'target, 'static>>
+    pub fn new<'target, V, S>(scope: S, types: V) -> JlrsResult<JuliaResult<'target, 'static>>
     where
-        V: AsMut<[Value<'scope, 'static>]>,
+        V: AsRef<[Value<'scope, 'static>]>,
         S: PartialScope<'target>,
     {
         unsafe {
-            let types = types.as_mut();
-            let un = jlrs_type_union(types.as_mut_ptr().cast(), types.len());
+            let types = types.as_ref();
+            let un = jlrs_type_union(types.as_ptr() as *mut _, types.len());
             if un.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
                 scope.call_result(Err(NonNull::new_unchecked(un.data)), Private)
             } else {
@@ -60,14 +60,14 @@ impl<'scope> Union<'scope> {
     /// [`DataType`]: crate::wrappers::ptr::datatype::DataType
     pub unsafe fn new_unchecked<'target, V, S>(
         scope: S,
-        mut types: V,
+        types: V,
     ) -> JlrsResult<Value<'target, 'static>>
     where
-        V: AsMut<[Value<'scope, 'static>]>,
+        V: AsRef<[Value<'scope, 'static>]>,
         S: PartialScope<'target>,
     {
-        let types = types.as_mut();
-        let un = jl_type_union(types.as_mut_ptr().cast(), types.len());
+        let types = types.as_ref();
+        let un = jl_type_union(types.as_ptr() as *mut _, types.len());
         scope.value(NonNull::new_unchecked(un), Private)
     }
 
@@ -81,14 +81,14 @@ impl<'scope> Union<'scope> {
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn new_unrooted<'global, V>(
         _: Global<'global>,
-        mut types: V,
+        types: V,
     ) -> JuliaResultRef<'global, 'static>
     where
-        V: AsMut<[Value<'scope, 'static>]>,
+        V: AsRef<[Value<'scope, 'static>]>,
     {
         unsafe {
-            let types = types.as_mut();
-            let un = jlrs_type_union(types.as_mut_ptr().cast(), types.len());
+            let types = types.as_ref();
+            let un = jlrs_type_union(types.as_ptr() as *mut _, types.len());
             if un.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
                 Err(ValueRef::wrap(un.data))
             } else {
@@ -111,13 +111,13 @@ impl<'scope> Union<'scope> {
     /// [`DataType`]: crate::wrappers::ptr::datatype::DataType
     pub unsafe fn new_unrooted_unchecked<'global, V>(
         _: Global<'global>,
-        mut types: V,
+        types: V,
     ) -> ValueRef<'global, 'static>
     where
-        V: AsMut<[Value<'scope, 'static>]>,
+        V: AsRef<[Value<'scope, 'static>]>,
     {
-        let types = types.as_mut();
-        let un = jl_type_union(types.as_mut_ptr().cast(), types.len());
+        let types = types.as_ref();
+        let un = jl_type_union(types.as_ptr() as *mut _, types.len());
         ValueRef::wrap(un)
     }
 

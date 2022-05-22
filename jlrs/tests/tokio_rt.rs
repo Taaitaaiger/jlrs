@@ -1,3 +1,5 @@
+#[cfg(all(feature = "tokio-rt", not(all(target_os = "windows", feature = "lts"))))]
+#[cfg(test)]
 mod util;
 
 #[cfg(all(feature = "tokio-rt", not(all(target_os = "windows", feature = "lts"))))]
@@ -10,18 +12,12 @@ mod tests {
     thread_local! {
         pub static JULIA: RefCell<AsyncJulia<Tokio>> = {
             unsafe {
-                #[allow(unused_mut)]
-                let mut builder = RuntimeBuilder::new()
-                    .async_runtime::<Tokio, UnboundedChannel<_>>()
-                    .n_tasks(3);
-
-                #[cfg(not(feature = "lts"))]
-                {
-                    builder = builder.n_threads(3);
-                }
-
                 let r = RefCell::new(
-                    builder.start().expect("Could not init Julia").0
+                    RuntimeBuilder::new()
+                     .async_runtime::<Tokio, UnboundedChannel<_>>()
+                        .start()
+                        .expect("Could not init Julia")
+                        .0
                 );
 
                 let (sender, recv) = tokio::sync::oneshot::channel();

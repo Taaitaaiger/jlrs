@@ -49,7 +49,6 @@ impl<'scope, 'data> Function<'scope, 'data> {
     }
 }
 
-// XXX: TODO
 unsafe impl Typecheck for Function<'_, '_> {
     fn typecheck(ty: DataType) -> bool {
         <FunctionRef as ValidLayout>::valid_layout(ty.as_value())
@@ -127,7 +126,7 @@ impl<'data> Call<'data> for Function<'_, 'data> {
         args: V,
     ) -> JlrsResult<JuliaResult<'target, 'data>>
     where
-        V: AsMut<[Value<'value, 'data>]>,
+        V: AsRef<[Value<'value, 'data>]>,
         S: PartialScope<'target>,
     {
         self.as_value().call(scope, args)
@@ -173,7 +172,7 @@ impl<'data> Call<'data> for Function<'_, 'data> {
         args: V,
     ) -> JuliaResultRef<'target, 'data>
     where
-        V: AsMut<[Value<'value, 'data>]>,
+        V: AsRef<[Value<'value, 'data>]>,
     {
         self.as_value().call_unrooted(global, args)
     }

@@ -18,7 +18,8 @@ mod tests {
                     jlrs.scope_with_capacity(5, |global, frame| unsafe {
                         let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
-                        let array = Array::from_vec(&mut *frame, data, (2, 3, 4))?;
+                        let array =
+                            Array::from_vec(&mut *frame, data, (2, 3, 4))?.into_jlrs_result()?;
                         let d = array.inline_data::<$value_type, _>(&mut *frame)?;
 
                         let mut out = 1 as $value_type;
@@ -74,7 +75,8 @@ mod tests {
                     jlrs.scope_with_capacity(5, |global, frame| unsafe {
                         let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
-                        let array = Array::from_vec(&mut *frame, data, (2, 3, 4))?;
+                        let array =
+                            Array::from_vec(&mut *frame, data, (2, 3, 4))?.into_jlrs_result()?;
                         let mut d = array.inline_data_mut::<$value_type, _>(&mut *frame)?;
 
                         for third in &[0, 1, 2, 3] {
@@ -125,7 +127,8 @@ mod tests {
                     jlrs.scope_with_capacity(1, |_, frame| {
                         let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
-                        let array = Array::from_vec(&mut *frame, data.clone(), (2, 3, 4))?;
+                        let array = Array::from_vec(&mut *frame, data.clone(), (2, 3, 4))?
+                            .into_jlrs_result()?;
                         let d = array.inline_data::<$value_type, _>(&mut *frame)?;
 
                         for (a, b) in data.iter().zip(d.as_slice()) {
@@ -146,7 +149,8 @@ mod tests {
                     jlrs.scope_with_capacity(1, |_, frame| unsafe {
                         let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
-                        let array = Array::from_vec(&mut *frame, data.clone(), (2, 3, 4))?;
+                        let array = Array::from_vec(&mut *frame, data.clone(), (2, 3, 4))?
+                            .into_jlrs_result()?;
                         let mut d = array.inline_data_mut::<$value_type, _>(&mut *frame)?;
 
                         for (a, b) in data.iter().zip(d.as_mut_slice()) {
@@ -240,7 +244,7 @@ mod tests {
             jlrs.scope_with_capacity(1, |global, frame| unsafe {
                 let data: Vec<u8> = (1..=24).map(|x| x as u8).collect();
 
-                let array = Array::from_vec(&mut *frame, data, (2, 3, 4))?;
+                let array = Array::from_vec(&mut *frame, data, (2, 3, 4))?.into_jlrs_result()?;
 
                 frame.scope_with_capacity(4, |frame| {
                     let d = { array.inline_data::<u8, _>(&mut *frame)? };

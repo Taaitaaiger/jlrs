@@ -10,7 +10,7 @@ mod tests {
 
             jlrs.scope_with_capacity(1, |_, frame| {
                 let data = vec![1.0f32, 2.0f32];
-                let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?;
+                let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?.into_jlrs_result()?;
                 let arr = arr_val;
 
                 let data = arr.inline_data::<f32, _>(frame)?;
@@ -29,7 +29,7 @@ mod tests {
 
             jlrs.scope_with_capacity(1, |_, frame| {
                 let data = vec![1.0f32, 2.0f32];
-                let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?;
+                let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?.into_jlrs_result()?;
                 let arr = arr_val;
 
                 let data = arr.inline_data::<f32, _>(frame)?;
@@ -50,7 +50,7 @@ mod tests {
 
             jlrs.scope_with_capacity(1, |_, frame| {
                 let data = vec![1.0f32, 2.0f32];
-                let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?;
+                let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?.into_jlrs_result()?;
                 let arr = arr_val;
 
                 let data = arr.inline_data::<f32, _>(frame)?;
@@ -69,7 +69,7 @@ mod tests {
 
             jlrs.scope_with_capacity(1, |_, frame| {
                 let data = vec![1.0f32, 2.0f32];
-                let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?;
+                let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?.into_jlrs_result()?;
                 let arr = arr_val;
 
                 let data = arr.inline_data::<f32, _>(frame)?;
@@ -89,7 +89,7 @@ mod tests {
 
             jlrs.scope_with_capacity(1, |_, frame| {
                 let data = vec![1.0f32, 2.0f32];
-                let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?;
+                let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?.into_jlrs_result()?;
                 let arr = arr_val;
 
                 let data = arr.inline_data::<f32, _>(frame)?;
@@ -109,7 +109,7 @@ mod tests {
 
             jlrs.scope_with_capacity(1, |_, frame| unsafe {
                 let data = vec![1.0f32, 2.0f32];
-                let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?;
+                let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?.into_jlrs_result()?;
                 let arr = arr_val;
 
                 let data = arr.inline_data_mut::<f32, _>(frame)?;
@@ -127,7 +127,7 @@ mod tests {
 
             jlrs.scope_with_capacity(1, |_, frame| unsafe {
                 let data = vec![1.0f32, 2.0f32];
-                let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?;
+                let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?.into_jlrs_result()?;
                 let arr = arr_val;
 
                 let mut data = arr.inline_data_mut::<f32, _>(frame)?;
@@ -152,7 +152,7 @@ mod tests {
 
             jlrs.scope_with_capacity(1, |_, frame| unsafe {
                 let data = vec![1.0f32, 2.0f32];
-                let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?;
+                let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?.into_jlrs_result()?;
                 let arr = arr_val;
 
                 let data = arr.inline_data_mut::<f32, _>(frame)?;
@@ -172,7 +172,7 @@ mod tests {
 
             jlrs.scope_with_capacity(1, |_, frame| unsafe {
                 let data = vec![1.0f32, 2.0f32];
-                let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?;
+                let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?.into_jlrs_result()?;
                 let arr = arr_val;
 
                 let mut data = arr.inline_data_mut::<f32, _>(frame)?;
@@ -192,7 +192,7 @@ mod tests {
 
             jlrs.scope_with_capacity(1, |_, frame| unsafe {
                 let data = vec![1.0f32, 2.0f32];
-                let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?;
+                let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?.into_jlrs_result()?;
                 let arr = arr_val;
 
                 let data = arr.inline_data_mut::<f32, _>(frame)?;
@@ -212,7 +212,7 @@ mod tests {
 
             jlrs.scope_with_capacity(1, |_, frame| unsafe {
                 let data = vec![1.0f32, 2.0f32];
-                let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?;
+                let arr_val = Array::from_vec_unchecked(&mut *frame, data, (1, 2))?;
                 let arr = arr_val;
 
                 let data = arr.inline_data_mut::<f32, _>(frame)?;
@@ -233,7 +233,7 @@ mod tests {
 
             jlrs.scope_with_capacity(1, |_, frame| {
                 let data = vec![1.0f32, 2.0f32];
-                let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?;
+                let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?.into_jlrs_result()?;
                 let arr = arr_val;
 
                 unsafe {
@@ -254,7 +254,7 @@ mod tests {
 
             jlrs.scope_with_capacity(1, |_, frame| unsafe {
                 let data = vec![1.0f32, 2.0f32];
-                let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?;
+                let arr_val = Array::from_vec_unchecked(&mut *frame, data, (1, 2))?;
                 let arr = arr_val;
 
                 let mut data = arr.unrestricted_inline_data_mut::<f32, _>(frame)?;
@@ -279,7 +279,7 @@ mod tests {
 
             jlrs.scope_with_capacity(1, |_, frame| unsafe {
                 let data = vec![1.0f32, 2.0f32];
-                let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?;
+                let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?.into_jlrs_result()?;
                 let arr = arr_val;
 
                 let data = arr.unrestricted_inline_data_mut::<f32, _>(frame)?;
@@ -299,7 +299,7 @@ mod tests {
 
             jlrs.scope_with_capacity(1, |_, frame| unsafe {
                 let data = vec![1.0f32, 2.0f32];
-                let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?;
+                let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?.into_jlrs_result()?;
                 let arr = arr_val;
 
                 let mut data = arr.unrestricted_inline_data_mut::<f32, _>(frame)?;
@@ -319,7 +319,7 @@ mod tests {
 
             jlrs.scope_with_capacity(1, |_, frame| unsafe {
                 let data = vec![1.0f32, 2.0f32];
-                let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?;
+                let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?.into_jlrs_result()?;
                 let arr = arr_val;
 
                 let data = arr.unrestricted_inline_data_mut::<f32, _>(frame)?;
@@ -339,7 +339,7 @@ mod tests {
 
             jlrs.scope_with_capacity(1, |_, frame| unsafe {
                 let data = vec![1.0f32, 2.0f32];
-                let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?;
+                let arr_val = Array::from_vec(&mut *frame, data, (1, 2))?.into_jlrs_result()?;
                 let arr = arr_val;
 
                 let data = arr.unrestricted_inline_data_mut::<f32, _>(frame)?;

@@ -91,12 +91,12 @@ cfg_if::cfg_if! {
                 self
             }
 
-            /// Set a custom system image.
+            /// Use a custom system image.
             ///
-            /// You provide two arguments to use a custom system image, `julia_bindir` and
+            /// You must provide two arguments to use a custom system image, `julia_bindir` and
             /// `image_path`. The first is the absolute path to a directory that contains a
-            /// compatible Julia binary (eg `${JULIA_DIR}/bin`), the second must be either an
-            /// absolute or a relative path to a system image.
+            /// compatible Julia binary (eg `${JULIA_DIR}/bin`), the second is the path to a
+            /// system image.
             ///
             /// A custom system image can be created with [`PackageCompiler`].
             ///
@@ -140,9 +140,9 @@ impl RuntimeBuilder {
 
     /// Upgrade this builder to an [`AsyncRuntimeBuilder`].
     ///
-    /// In order to upgrade this builder to an `AsyncRuntimeBuilder`, you must provide a backing
-    /// runtime `R` and a backing channel `C`. By default, jlrs supports using tokio and async-std
-    /// as backing runtimes if the `tokio-rt` and `async-std-rt` features are enabled.
+    /// You must provide a backing runtime `R` and a backing channel `C`. By default, jlrs
+    /// supports using tokio and async-std as backing runtimes if the `tokio-rt` and
+    /// `async-std-rt` features are enabled.
     ///
     /// For example, if you want to use tokio as the backing runtime and use an unbounded channel:
     ///
@@ -150,10 +150,10 @@ impl RuntimeBuilder {
     /// use jlrs::prelude::*;
     ///
     /// # fn main() {
-    ///     let (_julia, _thread_handle) = unsafe { RuntimeBuilder::new()
-    ///         .async_runtime::<Tokio, UnboundedChannel<_>>()
-    ///         .start()
-    ///         .expect("Could not start Julia") };
+    /// let (_julia, _thread_handle) = unsafe { RuntimeBuilder::new()
+    ///     .async_runtime::<Tokio, UnboundedChannel<_>>()
+    ///     .start()
+    ///     .expect("Could not start Julia") };
     /// # }
     /// ```
     ///
@@ -163,10 +163,10 @@ impl RuntimeBuilder {
     /// use jlrs::prelude::{AsyncStd, AsyncStdChannel, RuntimeBuilder};
     ///
     /// # fn main() {
-    ///     let (_julia, _thread_handle) = unsafe { RuntimeBuilder::new()
-    ///         .async_runtime::<AsyncStd, AsyncStdChannel<_>>()
-    ///         .start()
-    ///         .expect("Could not start Julia") };
+    /// let (_julia, _thread_handle) = unsafe { RuntimeBuilder::new()
+    ///     .async_runtime::<AsyncStd, AsyncStdChannel<_>>()
+    ///     .start()
+    ///     .expect("Could not start Julia") };
     /// # }
     /// ```
     #[cfg(feature = "async-rt")]
@@ -189,10 +189,9 @@ impl RuntimeBuilder {
 
     /// Use a custom system image.
     ///
-    /// You provide two arguments to use a custom system image, `julia_bindir` and `image_path`.
-    /// The first is the absolute path to a directory that contains a compatible Julia binary (eg
-    /// `${JULIA_DIR}/bin`), the second must be either an absolute or a relative path to a system
-    /// image.
+    /// You must provide two arguments to use a custom system image, `julia_bindir` and
+    /// `image_path`. The first is the absolute path to a directory that contains a compatible
+    /// Julia binary (eg `${JULIA_DIR}/bin`), the second is the path to a system image.
     ///
     /// A custom system image can be created with [`PackageCompiler`].
     ///

@@ -13,7 +13,7 @@
 //! by using some other crate unrelated to jlrs.
 //!
 //! More importantly, mutating Julia data is considered unsafe. The main reason for this is that
-//! a lot of things in Julia are mutable that must absolutely not be mutated. A major example is
+//! a lot of things in Julia are mutable that must absolutely not be mutated. A obvious example is
 //! the `Core` module, you must never mutate its contents, but there's nothing preventing you from
 //! doing so either.
 //!
@@ -31,11 +31,11 @@
 //! # Memory-safety
 //!
 //! All Julia data is owned by its garbage collector. In order to ensure this data is not freed
-//! while you're still using it, it must normally be rooted in a frame. All data that can be
-//! reached from these roots won't be freed. Frames form a stack, every time you enter a new scope
-//! a new frame is pushed to the stack, and it's popped when you leave that scope. Methods that
-//! return new data usually take an argument that implements `Scope` or a `PartialScope`, the data
-//! is automatically rooted in the frame associated with that scope before it is returned. Rooted
+//! while you're still using it, it must be rooted in a frame. All data that can be reached from
+//!  these roots won't be freed. Frames form a stack, every time you enter a new scope a new frame
+//! is pushed to the stack, and it's popped when you leave that scope. Methods that return new
+//! data usually take an argument that implements `Scope` or a `PartialScope`, the result is
+//! automatically rooted in the frame associated with that scope before it is returned. Rooted
 //! Julia data is always returned as a pointer wrapper type like `Value` or `Array`, these types
 //! have at least one lifetime which ensures they can't be returned from the scope whose frame
 //! roots them.
