@@ -27,10 +27,11 @@ An incomplete list of features that are currently supported by jlrs:
  - An async runtime is available which can be used from multiple threads and supports
    scheduling Julia `Task`s and `await`ing the result without blocking the runtime thread.
 
+NB: Active development happens on the `dev` branch, the `master` branch points to the most recently released version.
 
 ## Prerequisites
 
-Julia must be installed before jlrs can be used. Only version 1.6 and 1.8 are supported.
+Julia must be installed before jlrs can be used. Only version 1.6 and 1.8 are supported. Using version 1.6 requires enabling the `lts` feature.
 
 ##### Linux
 

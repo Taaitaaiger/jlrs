@@ -139,6 +139,8 @@ pub trait PersistentTask: 'static + Send + Sync {
     /// Example:
     ///
     /// ```
+    /// # {
+    /// use jlrs::prelude::*;
     /// use jlrs::prelude::*;
     ///
     /// struct AccumulatorTask {
@@ -219,6 +221,7 @@ pub trait PersistentTask: 'static + Send + Sync {
     ///         }
     ///     }
     /// }
+    /// # }
     /// ```
     ///
     /// [`AsyncJulia::register_persistent`]: crate::runtime::async_rt::AsyncJulia::register_persistent
