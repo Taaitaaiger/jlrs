@@ -56,8 +56,7 @@ cfg_if::cfg_if! {
             /// If it's set to 0, the default value, the number of threads is the number of CPU cores.
             ///
             /// This method is not available for the LTS version, instead you must set the number
-            /// of threads using the `JULIA_NUM_THREADS` environment variable. At least three
-            /// threads are required.
+            /// of threads using the `JULIA_NUM_THREADS` environment variable.
             #[cfg(not(feature = "lts"))]
             pub fn n_threads(mut self, n: usize) -> Self {
                 self.n_threads = n;

@@ -69,8 +69,7 @@ impl AsyncTask for MyTask {
 
 #[tokio::main]
 async fn main() {
-    // Initialize the async runtime. The `JULIA_NUM_THREADS` environment variable must be set to a
-    // value larger than 1, or an error is returned.
+    // Initialize the async runtime.
     //
     // The runtime runs in a separate thread. It receives messages through a channel, a backlog
     // can build up if a task which does a significant amount of work on the main thread is

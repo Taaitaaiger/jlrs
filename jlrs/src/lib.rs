@@ -22,7 +22,7 @@
 //!  - An async runtime is available which can be used from multiple threads and supports
 //!    scheduling Julia `Task`s and `await`ing the result without blocking the runtime thread.
 //!
-//! NB: Active development happens on the `dev` branch, the `master` branch points to the most 
+//! NB: Active development happens on the `dev` branch, the `master` branch points to the most
 //! recently released version.
 //!
 //! # Prerequisites

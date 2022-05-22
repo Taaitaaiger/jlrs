@@ -139,6 +139,7 @@ pub trait PersistentTask: 'static + Send + Sync {
     /// Example:
     ///
     /// ```
+    /// # #[cfg(not(all(target_os = "windows", feature = "lts")))]
     /// # {
     /// use jlrs::prelude::*;
     /// use jlrs::prelude::*;
