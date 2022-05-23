@@ -5,6 +5,13 @@ use super::frame::Frame;
 use crate::runtime::sync_rt::Julia;
 use jl_sys::{jl_gc_collect, jl_gc_collection_t, jl_gc_enable, jl_gc_is_enabled, jl_gc_safepoint};
 
+#[cfg(not(feature = "lts"))]
+use crate::{
+    call::Call,
+    memory::global::Global,
+    wrappers::ptr::{module::Module, value::Value},
+};
+
 /// The different collection modes.
 #[derive(Debug, Copy, Clone)]
 pub enum GcCollection {
@@ -21,10 +28,10 @@ pub trait Gc: private::Gc {
     }
 
     /// Enable or disable GC logging.
+    ///
+    /// This method is not available when the `lts` feature is enabled.
     #[cfg(not(feature = "lts"))]
     fn enable_logging(&mut self, on: bool) {
-        use crate::prelude::{Call, Global, Module, Value};
-
         unsafe {
             let global = Global::new();
             let func = Module::base(global)

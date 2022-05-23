@@ -1,10 +1,10 @@
 //! Wrapper for `Expr`.
 
-use super::super::private::Wrapper;
-use crate::{impl_debug, impl_julia_typecheck, memory::output::Output};
 use crate::{
+    impl_debug, impl_julia_typecheck,
+    memory::output::Output,
     private::Private,
-    wrappers::ptr::{ArrayRef, SymbolRef},
+    wrappers::ptr::{private::Wrapper as WrapperPriv, ArrayRef, SymbolRef},
 };
 use jl_sys::{jl_expr_t, jl_expr_type};
 use std::{marker::PhantomData, ptr::NonNull};
@@ -46,7 +46,7 @@ impl<'scope> Expr<'scope> {
 impl_julia_typecheck!(Expr<'scope>, jl_expr_type, 'scope);
 impl_debug!(Expr<'_>);
 
-impl<'scope> Wrapper<'scope, '_> for Expr<'scope> {
+impl<'scope> WrapperPriv<'scope, '_> for Expr<'scope> {
     type Wraps = jl_expr_t;
     const NAME: &'static str = "Expr";
 

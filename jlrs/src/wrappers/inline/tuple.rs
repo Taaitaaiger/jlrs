@@ -50,7 +50,7 @@ pub struct Tuple;
 impl Tuple {
     /// Create a new tuple from the contents of `values`.
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub fn new<'target: 'current, 'current, 'value, 'borrow, V, S, F>(
+    pub fn new<'target, 'current, 'value, 'borrow, V, S, F>(
         scope: S,
         values: V,
     ) -> JlrsResult<JuliaResult<'target, 'borrow>>
@@ -80,7 +80,7 @@ impl Tuple {
     }
 
     /// Create a new tuple from the contents of `values`.
-    pub unsafe fn new_unchecked<'target: 'current, 'current, 'value, 'borrow, V, S, F>(
+    pub unsafe fn new_unchecked<'target, 'current, 'value, 'borrow, V, S, F>(
         scope: S,
         values: V,
     ) -> JlrsResult<Value<'target, 'borrow>>

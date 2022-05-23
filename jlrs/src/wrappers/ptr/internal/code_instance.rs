@@ -5,20 +5,25 @@
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L273
 
-use super::super::private::Wrapper;
-use crate::{impl_debug, impl_julia_typecheck, memory::output::Output};
 use crate::{
+    impl_debug, impl_julia_typecheck,
+    memory::output::Output,
     private::Private,
-    wrappers::ptr::{CodeInstanceRef, MethodInstanceRef, ValueRef},
+    wrappers::ptr::{
+        private::Wrapper as WrapperPriv, CodeInstanceRef, MethodInstanceRef, ValueRef,
+    },
 };
+use cfg_if::cfg_if;
 use jl_sys::{jl_code_instance_t, jl_code_instance_type};
 use std::{ffi::c_void, sync::atomic::AtomicPtr};
 use std::{marker::PhantomData, ptr::NonNull, sync::atomic::AtomicU8};
 
-#[cfg(not(feature = "lts"))]
-use super::super::atomic_value;
-#[cfg(not(feature = "lts"))]
-use std::sync::atomic::Ordering;
+cfg_if! {
+    if #[cfg(not(feature = "lts"))] {
+        use crate::wrappers::ptr::atomic_value;
+        use std::sync::atomic::Ordering;
+    }
+}
 
 /// A `CodeInstance` represents an executable operation.
 #[derive(Copy, Clone)]
@@ -62,7 +67,7 @@ impl<'scope> CodeInstance<'scope> {
     #[cfg(not(feature = "lts"))]
     pub fn next(self) -> CodeInstanceRef<'scope> {
         unsafe {
-            let next = atomic_value(self.unwrap_non_null(Private).as_ref().next);
+            let next = atomic_value(&mut self.unwrap_non_null(Private).as_mut().next as *mut _);
             let ptr = next.load(Ordering::Relaxed);
             CodeInstanceRef::wrap(ptr.cast())
         }
@@ -313,7 +318,7 @@ impl<'scope> CodeInstance<'scope> {
 impl_julia_typecheck!(CodeInstance<'scope>, jl_code_instance_type, 'scope);
 impl_debug!(CodeInstance<'_>);
 
-impl<'scope> Wrapper<'scope, '_> for CodeInstance<'scope> {
+impl<'scope> WrapperPriv<'scope, '_> for CodeInstance<'scope> {
     type Wraps = jl_code_instance_t;
     const NAME: &'static str = "CodeInstance";
 

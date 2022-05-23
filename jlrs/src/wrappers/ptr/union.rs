@@ -1,19 +1,22 @@
 //! Wrapper for `Union`.
 
-use super::{private::Wrapper, value::Value, ValueRef, Wrapper as _};
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
-use crate::error::{JuliaResult, JuliaResultRef};
 use crate::{
     error::JlrsResult,
-    memory::{output::Output, scope::PartialScope},
+    impl_debug, impl_julia_typecheck,
+    memory::{global::Global, output::Output, scope::PartialScope},
+    private::Private,
+    wrappers::ptr::{private::Wrapper as WrapperPriv, value::Value, ValueRef, Wrapper},
 };
-use crate::{impl_debug, impl_julia_typecheck, memory::global::Global, private::Private};
+use cfg_if::cfg_if;
 use jl_sys::{jl_islayout_inline, jl_type_union, jl_uniontype_t, jl_uniontype_type};
-
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
-use jl_sys::{jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_type_union};
-
 use std::{marker::PhantomData, ptr::NonNull};
+
+cfg_if! {
+    if #[cfg(not(all(target_os = "windows", feature = "lts")))] {
+        use crate::error::{JuliaResult, JuliaResultRef};
+        use jl_sys::{jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_type_union};
+    }
+}
 
 /// A struct field can have a type that's a union of several types. In this case, the type of this
 /// field is an instance of `Union`.
@@ -190,7 +193,7 @@ impl<'scope> Union<'scope> {
 impl_julia_typecheck!(Union<'scope>, jl_uniontype_type, 'scope);
 impl_debug!(Union<'_>);
 
-impl<'scope> Wrapper<'scope, '_> for Union<'scope> {
+impl<'scope> WrapperPriv<'scope, '_> for Union<'scope> {
     type Wraps = jl_uniontype_t;
     const NAME: &'static str = "Union";
 

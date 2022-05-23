@@ -10,7 +10,7 @@
 use crate::{
     error::{JlrsError, JlrsResult},
     private::Private,
-    wrappers::ptr::{array::Array, private::Wrapper},
+    wrappers::ptr::{array::Array, private::Wrapper as _},
 };
 use jl_sys::{jl_array_dims_ptr, jl_array_ndims};
 use std::{

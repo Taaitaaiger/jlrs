@@ -1,24 +1,22 @@
 //! Wrapper for `Symbol`. Symbols represent identifiers like module and function names.
 
-use crate::impl_julia_typecheck;
 use crate::{
     error::{JlrsError, JlrsResult},
-    impl_debug,
+    impl_debug, impl_julia_typecheck,
     memory::{global::Global, output::Output},
+    private::Private,
+    wrappers::ptr::{private::Wrapper as WrapperPriv, value::LeakedValue},
 };
-use crate::{private::Private, wrappers::ptr::value::LeakedValue};
+use cfg_if::cfg_if;
 use jl_sys::{jl_sym_t, jl_symbol_n, jl_symbol_name_ as jl_symbol_name, jl_symbol_type};
-use std::ffi::CStr;
+use std::{ffi::CStr, marker::PhantomData, ptr::NonNull};
 
-use std::marker::PhantomData;
-use std::ptr::NonNull;
-
-use super::private::Wrapper;
-
-#[cfg(not(feature = "lts"))]
-use super::atomic_value;
-#[cfg(not(feature = "lts"))]
-use std::sync::atomic::Ordering;
+cfg_if! {
+    if #[cfg(not(feature = "lts"))] {
+        use crate::wrappers::ptr::atomic_value;
+        use std::sync::atomic::Ordering;
+    }
+}
 
 /// `Symbol`s are used Julia to represent identifiers, `:x` represents the `Symbol` `x`. Things
 /// that can be accessed using a `Symbol` include submodules, functions, and globals. However,
@@ -74,7 +72,7 @@ impl<'scope> Symbol<'scope> {
     #[cfg(not(feature = "lts"))]
     pub fn left(self) -> Option<Symbol<'scope>> {
         unsafe {
-            let left = atomic_value(self.unwrap_non_null(Private).as_ref().left);
+            let left = atomic_value(&mut self.unwrap_non_null(Private).as_mut().left as *mut _);
             let ptr = left.load(Ordering::Relaxed);
 
             if ptr.is_null() {
@@ -105,7 +103,7 @@ impl<'scope> Symbol<'scope> {
     #[cfg(not(feature = "lts"))]
     pub fn right(self) -> Option<Symbol<'scope>> {
         unsafe {
-            let right = atomic_value(self.unwrap_non_null(Private).as_ref().right);
+            let right = atomic_value(&mut self.unwrap_non_null(Private).as_mut().right as *mut _);
             let ptr = right.load(Ordering::Relaxed);
 
             if ptr.is_null() {
@@ -166,7 +164,7 @@ impl<'scope> Symbol<'scope> {
 impl_julia_typecheck!(Symbol<'scope>, jl_symbol_type, 'scope);
 impl_debug!(Symbol<'_>);
 
-impl<'scope> Wrapper<'scope, '_> for Symbol<'scope> {
+impl<'scope> WrapperPriv<'scope, '_> for Symbol<'scope> {
     type Wraps = jl_sym_t;
     const NAME: &'static str = "Symbol";
 

@@ -4,11 +4,11 @@
 //! in [`julia.h`]
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/f9720dc2ebd6cd9e3086365f281e62506444ef37/src/julia.h#L585
-use super::super::private::Wrapper;
-use crate::{impl_debug, impl_julia_typecheck, memory::output::Output};
 use crate::{
+    impl_debug, impl_julia_typecheck,
+    memory::output::Output,
     private::Private,
-    wrappers::ptr::{MethodRef, SimpleVectorRef, ValueRef},
+    wrappers::ptr::{private::Wrapper as WrapperPriv, MethodRef, SimpleVectorRef, ValueRef},
 };
 use jl_sys::{jl_method_match_t, jl_method_match_type};
 use std::{marker::PhantomData, ptr::NonNull};
@@ -63,7 +63,7 @@ impl<'scope> MethodMatch<'scope> {
 impl_julia_typecheck!(MethodMatch<'scope>, jl_method_match_type, 'scope);
 impl_debug!(MethodMatch<'_>);
 
-impl<'scope> Wrapper<'scope, '_> for MethodMatch<'scope> {
+impl<'scope> WrapperPriv<'scope, '_> for MethodMatch<'scope> {
     type Wraps = jl_method_match_t;
     const NAME: &'static str = "MethodMatch";
 

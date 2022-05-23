@@ -83,12 +83,13 @@ impl CCall {
         }
     }
 
-    /// Create a [`NullFrame`] and call the given closure. A [`NullFrame`] cannot be nested and
-    /// can only be used to (mutably) borrow array data. Unlike other scope-methods, no `Global`
-    /// is provided to the closure.
-    pub fn null_scope<'base, 'julia: 'base, T, F>(&'julia mut self, func: F) -> JlrsResult<T>
+    /// Create a [`NullFrame`] and call the given closure.
+    ///
+    /// A [`NullFrame`] cannot be nested and can only be used to (mutably) borrow array data.
+    /// Unlike other base-level scope-methods, no `Global` is provided to the closure.
+    pub fn null_scope<T, F>(&mut self, func: F) -> JlrsResult<T>
     where
-        F: FnOnce(&mut NullFrame<'base>) -> JlrsResult<T>,
+        for<'base> F: FnOnce(&mut NullFrame<'base>) -> JlrsResult<T>,
     {
         unsafe {
             let mut frame = NullFrame::new(self);

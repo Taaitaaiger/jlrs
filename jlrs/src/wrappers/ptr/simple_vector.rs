@@ -2,11 +2,10 @@
 
 use crate::{
     error::{JlrsError, JlrsResult},
-    layout::valid_layout::ValidLayout,
-    memory::{frame::Frame, global::Global},
+    layout::{typecheck::Typecheck, valid_layout::ValidLayout},
+    memory::{frame::Frame, global::Global, output::Output, scope::private::PartialScope},
+    private::Private,
 };
-use crate::{layout::typecheck::Typecheck, memory::output::Output};
-use crate::{memory::scope::private::PartialScope, private::Private};
 use jl_sys::{
     jl_alloc_svec, jl_alloc_svec_uninit, jl_emptysvec, jl_gc_wb, jl_simplevector_type,
     jl_svec_data, jl_svec_t,

@@ -1,8 +1,11 @@
 //! Wrapper for `WeakRef`.
 
-use super::super::private::Wrapper;
-use crate::{impl_debug, impl_julia_typecheck, memory::output::Output};
-use crate::{private::Private, wrappers::ptr::ValueRef};
+use crate::{
+    impl_debug, impl_julia_typecheck,
+    memory::output::Output,
+    private::Private,
+    wrappers::ptr::{private::Wrapper as WrapperPriv, ValueRef},
+};
 use jl_sys::{jl_weakref_t, jl_weakref_type};
 use std::{marker::PhantomData, ptr::NonNull};
 
@@ -37,7 +40,7 @@ impl<'scope> WeakRef<'scope> {
 impl_julia_typecheck!(WeakRef<'scope>, jl_weakref_type, 'scope);
 impl_debug!(WeakRef<'_>);
 
-impl<'scope> Wrapper<'scope, '_> for WeakRef<'scope> {
+impl<'scope> WrapperPriv<'scope, '_> for WeakRef<'scope> {
     type Wraps = jl_weakref_t;
     const NAME: &'static str = "WeakRef";
 

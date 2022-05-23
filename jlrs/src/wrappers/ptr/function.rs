@@ -6,12 +6,6 @@
 //!
 //! [`Call`]: crate::call::Call
 
-use jl_sys::jl_value_t;
-use std::{marker::PhantomData, ptr::NonNull};
-
-use super::{
-    datatype::DataType, private::Wrapper as WrapperPriv, value::Value, FunctionRef, Wrapper,
-};
 use crate::{
     call::{Call, CallExt, WithKeywords},
     error::{JlrsError, JlrsResult, JuliaResult, JuliaResultRef, CANNOT_DISPLAY_TYPE},
@@ -22,7 +16,12 @@ use crate::{
     },
     memory::{global::Global, output::Output, scope::PartialScope},
     private::Private,
+    wrappers::ptr::{
+        datatype::DataType, private::Wrapper as WrapperPriv, value::Value, FunctionRef, Wrapper,
+    },
 };
+use jl_sys::jl_value_t;
+use std::{marker::PhantomData, ptr::NonNull};
 
 /// A Julia function.
 #[derive(Clone, Copy)]

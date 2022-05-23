@@ -1,19 +1,26 @@
-//! Root data in parent scope.
+//! Root data in a parent scope.
 //!
-//! In order to allow temporary data to be freed by the GC when it's no longer in use, these
-//! temporaries should be allocated in a new scope. Because the data returned from a scope must
-//! outlive that scope, data rooted in it can't be returned from it.
+//! In order to allow temporary data to be freed by the GC when it's no longer in use, this
+//! data should be allocated in a new scope. Because the data returned from a scope must outlive
+//! that scope, data rooted in it can't be returned from it.
 //!
-//! Instead, Julia data that you want to return from a scope must be rooted in a parent scope. For
-//! this purpose [`Output`] and [`OutputScope`] can be used. An `Output` can be reserved in a
-//! frame by calling [`Frame::reserve_output`], an `Output` can be turned into an `OutputScope` by
-//! calling [`Output::into_scope`].
+//! Instead, Julia data that you want to return from a scope must be rooted in a parent scope.
+//! Thiscan be done by using an [`Output`] or [`OutputScope`]. An `Output` can be reserved in a
+//! frame by calling [`Frame::reserve_output`], it can be turned into an `OutputScope` by calling
+//! [`Output::into_scope`]. `Output` only implements [`PartialScope`], while `OutputScope`
+//! implements both [`Scope`] and [`OutputScope`]
+//!
+//! [`PartialScope`]: crate::memory::scope::PartialScope
+//! [`Scope`]: crate::memory::scope::Scope
 
 use crate::{memory::frame::Frame, private::Private, wrappers::ptr::Wrapper};
 use std::{cell::Cell, ffi::c_void, marker::PhantomData, ptr::NonNull};
 
-/// A reserved slot in a frame. A new output can be created by calling [`Frame::reserve_output`].
-/// While an `Output` doesn't implement [`Scope`], it does implement [`PartialScope`].
+/// A reserved slot in a frame.
+///
+/// A new `Output` can be created by calling [`Frame::reserve_output`]. `Output` implements
+/// [`PartialScope`], not [`Scope`]. It can be upgraded to an [`OutputScope`], which does
+/// implement `Scope`, by calling [`Output::into_scope`].
 ///
 /// [`Scope`]: crate::memory::scope::Scope
 /// [`PartialScope`]: crate::memory::scope::PartialScope

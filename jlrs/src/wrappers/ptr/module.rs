@@ -7,33 +7,31 @@
 use crate::{
     call::Call,
     convert::to_symbol::ToSymbol,
-    error::{JlrsError, JlrsResult, CANNOT_DISPLAY_VALUE},
+    error::{JlrsError, JlrsResult, JuliaResult, CANNOT_DISPLAY_VALUE},
     impl_debug, impl_julia_typecheck,
     memory::{global::Global, output::Output, scope::PartialScope},
     private::Private,
     wrappers::ptr::{
         function::Function,
+        private::Wrapper as WrapperPriv,
         symbol::Symbol,
         value::{LeakedValue, Value},
         FunctionRef, ModuleRef, ValueRef, Wrapper as _,
     },
 };
-
-use crate::error::JuliaResult;
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
-use crate::error::JuliaResultRef;
-
+use cfg_if::cfg_if;
 use jl_sys::{
     jl_base_module, jl_core_module, jl_get_global, jl_is_imported, jl_main_module, jl_module_t,
     jl_module_type, jl_set_const, jl_set_global,
 };
+use std::{marker::PhantomData, ptr::NonNull};
 
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
-use jl_sys::{jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_set_const, jlrs_set_global};
-use std::marker::PhantomData;
-use std::ptr::NonNull;
-
-use super::private::Wrapper;
+cfg_if! {
+    if #[cfg(not(all(target_os = "windows", feature = "lts")))] {
+        use crate::error::JuliaResultRef;
+        use jl_sys::{jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_set_const, jlrs_set_global};
+    }
+}
 
 /// Functionality in Julia can be accessed through its module system. You can get a handle to the
 /// three standard modules, `Main`, `Base`, and `Core` and access their submodules through them.
@@ -540,7 +538,7 @@ impl<'scope> Module<'scope> {
 impl_julia_typecheck!(Module<'target>, jl_module_type, 'target);
 impl_debug!(Module<'_>);
 
-impl<'scope> Wrapper<'scope, '_> for Module<'scope> {
+impl<'scope> WrapperPriv<'scope, '_> for Module<'scope> {
     type Wraps = jl_module_t;
     const NAME: &'static str = "Module";
 

@@ -5,26 +5,31 @@
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L380
 
-use super::{private::Wrapper, SymbolRef};
-use crate::memory::output::Output;
-use crate::wrappers::ptr::{ModuleRef, SimpleVectorRef, ValueRef};
-use crate::{impl_debug, impl_julia_typecheck};
-use crate::{memory::global::Global, private::Private};
+use crate::{
+    impl_debug, impl_julia_typecheck,
+    memory::{global::Global, output::Output},
+    private::Private,
+    wrappers::ptr::{
+        private::Wrapper as WrapperPriv, ModuleRef, SimpleVectorRef, SymbolRef, ValueRef,
+    },
+};
+use cfg_if::cfg_if;
 use jl_sys::{
     jl_array_typename, jl_llvmpointer_typename, jl_namedtuple_typename, jl_pointer_typename,
     jl_tuple_typename, jl_type_typename, jl_typename_t, jl_typename_type, jl_vecelement_typename,
 };
-
-#[cfg(not(feature = "lts"))]
-use jl_sys::jl_opaque_closure_typename;
-#[cfg(feature = "lts")]
-use jl_sys::jl_vararg_typename;
 use std::{marker::PhantomData, ptr::NonNull};
 
-#[cfg(not(feature = "lts"))]
-use super::atomic_value;
-#[cfg(not(feature = "lts"))]
-use std::sync::atomic::Ordering;
+cfg_if! {
+    if #[cfg(feature = "lts")] {
+        use jl_sys::jl_vararg_typename;
+
+    } else {
+        use jl_sys::jl_opaque_closure_typename;
+        use super::atomic_value;
+        use std::sync::atomic::Ordering;
+    }
+}
 
 /// Describes the syntactic structure of a type and stores all data common to different
 /// instantiations of the type.
@@ -94,7 +99,7 @@ impl<'scope> TypeName<'scope> {
     #[cfg(not(feature = "lts"))]
     pub fn cache(self) -> SimpleVectorRef<'scope> {
         unsafe {
-            let cache = atomic_value(self.unwrap_non_null(Private).as_ref().cache);
+            let cache = atomic_value(&mut self.unwrap_non_null(Private).as_mut().cache as *mut _);
             let ptr = cache.load(Ordering::Relaxed);
             SimpleVectorRef::wrap(ptr.cast())
         }
@@ -110,7 +115,8 @@ impl<'scope> TypeName<'scope> {
     #[cfg(not(feature = "lts"))]
     pub fn linear_cache(self) -> SimpleVectorRef<'scope> {
         unsafe {
-            let linearcache = atomic_value(self.unwrap_non_null(Private).as_ref().linearcache);
+            let linearcache =
+                atomic_value(&mut self.unwrap_non_null(Private).as_mut().linearcache as *mut _);
             let ptr = linearcache.load(Ordering::Relaxed);
             SimpleVectorRef::wrap(ptr.cast())
         }
@@ -217,7 +223,7 @@ impl<'base> TypeName<'base> {
 impl_julia_typecheck!(TypeName<'scope>, jl_typename_type, 'scope);
 impl_debug!(TypeName<'_>);
 
-impl<'scope> Wrapper<'scope, '_> for TypeName<'scope> {
+impl<'scope> WrapperPriv<'scope, '_> for TypeName<'scope> {
     type Wraps = jl_typename_t;
     const NAME: &'static str = "TypeName";
 

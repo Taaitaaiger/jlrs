@@ -20,8 +20,6 @@
 //! `[usize; N]` and `&[usize; N]` implement it for all `N`, `&[usize]` can be used if `N` is not
 //! a constant at compile time.
 
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
-use crate::error::JuliaResult;
 use crate::{
     convert::into_julia::IntoJulia,
     error::{JlrsError, JlrsResult, CANNOT_DISPLAY_TYPE},
@@ -53,6 +51,7 @@ use crate::{
         Wrapper, WrapperRef,
     },
 };
+use cfg_if::cfg_if;
 use jl_sys::{
     jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_apply_array_type,
     jl_apply_tuple_type_v, jl_array_data, jl_array_del_beg, jl_array_del_end, jl_array_dims_ptr,
@@ -60,15 +59,6 @@ use jl_sys::{
     jl_datatype_t, jl_gc_add_ptr_finalizer, jl_new_array, jl_new_struct_uninit, jl_pchar_to_array,
     jl_ptr_to_array, jl_ptr_to_array_1d, jl_reshape_array,
 };
-
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
-use jl_sys::{
-    jlrs_alloc_array_1d, jlrs_alloc_array_2d, jlrs_alloc_array_3d, jlrs_apply_array_type,
-    jlrs_array_del_beg, jlrs_array_del_end, jlrs_array_grow_beg, jlrs_array_grow_end,
-    jlrs_new_array, jlrs_ptr_to_array, jlrs_ptr_to_array_1d, jlrs_reshape_array,
-    jlrs_result_tag_t_JLRS_RESULT_ERR,
-};
-
 use std::{
     cell::UnsafeCell,
     ffi::c_void,
@@ -78,6 +68,18 @@ use std::{
     ptr::{null_mut, NonNull},
     slice,
 };
+
+cfg_if! {
+    if #[cfg(not(all(target_os = "windows", feature = "lts")))] {
+        use jl_sys::{
+            jlrs_alloc_array_1d, jlrs_alloc_array_2d, jlrs_alloc_array_3d, jlrs_apply_array_type,
+            jlrs_array_del_beg, jlrs_array_del_end, jlrs_array_grow_beg, jlrs_array_grow_end,
+            jlrs_new_array, jlrs_ptr_to_array, jlrs_ptr_to_array_1d, jlrs_reshape_array,
+            jlrs_result_tag_t_JLRS_RESULT_ERR,
+        };
+        use crate::error::JuliaResult;
+    }
+}
 
 pub mod data;
 pub mod dimensions;
@@ -805,7 +807,6 @@ impl<'scope, 'data> Array<'scope, 'data> {
         frame: &'borrow mut F,
     ) -> JlrsResult<InlineArrayDataMut<'borrow, 'scope, 'data, T>>
     where
-        'borrow: 'data,
         T: ValidLayout,
         F: Frame<'frame>,
     {
@@ -1675,7 +1676,6 @@ where
         frame: &'borrow mut F,
     ) -> JlrsResult<InlineArrayDataMut<'borrow, 'scope, 'data, T>>
     where
-        'borrow: 'data,
         F: Frame<'frame>,
     {
         if !self.is_inline_array() {

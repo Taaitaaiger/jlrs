@@ -177,9 +177,8 @@ pub trait PersistentTask: 'static + Send + Sync {
     ///         // A `Vec` can be moved from Rust to Julia if the element type
     ///         // implements `IntoJulia`.
     ///         let data = vec![0usize; self.n_values];
-    ///         let array = Array::from_vec(&mut *frame, data, self.n_values)?
-    ///             .into_jlrs_result()?
-    ///             .try_as_typed::<usize>()?;
+    ///         let array = TypedArray::from_vec(&mut *frame, data, self.n_values)?
+    ///             .into_jlrs_result()?;
     ///     
     ///         Ok(AccumulatorTaskState {
     ///             array,

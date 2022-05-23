@@ -5,16 +5,22 @@
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#525
 
-use super::super::private::Wrapper;
-use crate::{impl_debug, impl_julia_typecheck, memory::output::Output};
-use crate::{private::Private, wrappers::ptr::ValueRef};
+use crate::{
+    impl_debug, impl_julia_typecheck,
+    memory::output::Output,
+    private::Private,
+    wrappers::ptr::{private::Wrapper as WrapperPriv, ValueRef},
+};
+use cfg_if::cfg_if;
 use jl_sys::{jl_typemap_level_t, jl_typemap_level_type};
 use std::{marker::PhantomData, ptr::NonNull};
 
-#[cfg(not(feature = "lts"))]
-use super::super::atomic_value;
-#[cfg(not(feature = "lts"))]
-use std::sync::atomic::Ordering;
+cfg_if! {
+    if #[cfg(not(feature = "lts"))] {
+        use crate::wrappers::ptr::atomic_value;
+        use std::sync::atomic::Ordering;
+    }
+}
 
 /// One level in a TypeMap tree
 /// Indexed by key if it is a sublevel in an array
@@ -45,7 +51,7 @@ impl<'scope> TypeMapLevel<'scope> {
     #[cfg(not(feature = "lts"))]
     pub fn arg1(self) -> ValueRef<'scope, 'static> {
         unsafe {
-            let arg1 = atomic_value(self.unwrap_non_null(Private).as_ref().arg1);
+            let arg1 = atomic_value(&mut self.unwrap_non_null(Private).as_mut().arg1 as *mut _);
             let ptr = arg1.load(Ordering::Relaxed);
             ValueRef::wrap(ptr.cast())
         }
@@ -61,7 +67,7 @@ impl<'scope> TypeMapLevel<'scope> {
     #[cfg(not(feature = "lts"))]
     pub fn targ(self) -> ValueRef<'scope, 'static> {
         unsafe {
-            let targ = atomic_value(self.unwrap_non_null(Private).as_ref().targ);
+            let targ = atomic_value(&mut self.unwrap_non_null(Private).as_mut().targ as *mut _);
             let ptr = targ.load(Ordering::Relaxed);
             ValueRef::wrap(ptr.cast())
         }
@@ -77,7 +83,7 @@ impl<'scope> TypeMapLevel<'scope> {
     #[cfg(not(feature = "lts"))]
     pub fn name1(self) -> ValueRef<'scope, 'static> {
         unsafe {
-            let name1 = atomic_value(self.unwrap_non_null(Private).as_ref().name1);
+            let name1 = atomic_value(&mut self.unwrap_non_null(Private).as_mut().name1 as *mut _);
             let ptr = name1.load(Ordering::Relaxed);
             ValueRef::wrap(ptr.cast())
         }
@@ -93,7 +99,7 @@ impl<'scope> TypeMapLevel<'scope> {
     #[cfg(not(feature = "lts"))]
     pub fn tname(self) -> ValueRef<'scope, 'static> {
         unsafe {
-            let tname = atomic_value(self.unwrap_non_null(Private).as_ref().tname);
+            let tname = atomic_value(&mut self.unwrap_non_null(Private).as_mut().tname as *mut _);
             let ptr = tname.load(Ordering::Relaxed);
             ValueRef::wrap(ptr.cast())
         }
@@ -109,7 +115,7 @@ impl<'scope> TypeMapLevel<'scope> {
     #[cfg(not(feature = "lts"))]
     pub fn list(self) -> ValueRef<'scope, 'static> {
         unsafe {
-            let linear = atomic_value(self.unwrap_non_null(Private).as_ref().linear);
+            let linear = atomic_value(&mut self.unwrap_non_null(Private).as_mut().linear as *mut _);
             let ptr = linear.load(Ordering::Relaxed);
             ValueRef::wrap(ptr.cast())
         }
@@ -125,7 +131,7 @@ impl<'scope> TypeMapLevel<'scope> {
     #[cfg(not(feature = "lts"))]
     pub fn any(self) -> ValueRef<'scope, 'static> {
         unsafe {
-            let any = atomic_value(self.unwrap_non_null(Private).as_ref().any);
+            let any = atomic_value(&mut self.unwrap_non_null(Private).as_mut().any as *mut _);
             let ptr = any.load(Ordering::Relaxed);
             ValueRef::wrap(ptr.cast())
         }
@@ -144,7 +150,7 @@ impl<'scope> TypeMapLevel<'scope> {
 impl_julia_typecheck!(TypeMapLevel<'scope>, jl_typemap_level_type, 'scope);
 impl_debug!(TypeMapLevel<'_>);
 
-impl<'scope> Wrapper<'scope, '_> for TypeMapLevel<'scope> {
+impl<'scope> WrapperPriv<'scope, '_> for TypeMapLevel<'scope> {
     type Wraps = jl_typemap_level_t;
     const NAME: &'static str = "TypeMapLevel";
 

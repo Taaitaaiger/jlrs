@@ -98,7 +98,7 @@ macro_rules! named_tuple {
 use crate::{
     call::{Call, CallExt, WithKeywords},
     convert::{into_julia::IntoJulia, to_symbol::ToSymbol, unbox::Unbox},
-    error::{JlrsError, JlrsResult, JuliaResultRef, CANNOT_DISPLAY_TYPE},
+    error::{JlrsError, JlrsResult, JuliaResult, JuliaResultRef, CANNOT_DISPLAY_TYPE},
     impl_debug,
     layout::{
         field_index::FieldIndex,
@@ -112,7 +112,6 @@ use crate::{
         output::Output,
         scope::{PartialScope, Scope},
     },
-    prelude::Symbol,
     private::Private,
     wrappers::ptr::{
         array::Array,
@@ -120,11 +119,13 @@ use crate::{
         module::Module,
         private::Wrapper as WrapperPriv,
         string::JuliaString,
+        symbol::Symbol,
         union::{nth_union_component, Union},
         union_all::UnionAll,
-        ValueRef, Wrapper,
+        DataTypeRef, ValueRef, Wrapper,
     },
 };
+use cfg_if::cfg_if;
 use jl_sys::{
     jl_an_empty_string, jl_an_empty_vec_any, jl_apply_type, jl_array_any_type, jl_array_int32_type,
     jl_array_symbol_type, jl_array_typetagdata, jl_array_uint8_type, jl_astaggedvalue,
@@ -136,12 +137,6 @@ use jl_sys::{
     jl_stderr_obj, jl_stdout_obj, jl_subtype, jl_true, jl_typeof_str, jl_undefref_exception,
     jl_value_t,
 };
-
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
-use jl_sys::{jlrs_apply_type, jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_set_nth_field};
-
-use crate::error::JuliaResult;
-
 use std::{
     ffi::{c_void, CStr, CString},
     marker::PhantomData,
@@ -152,16 +147,19 @@ use std::{
     usize,
 };
 
-#[cfg(not(feature = "lts"))]
-use jl_sys::{jlrs_lock, jlrs_unlock};
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use jl_sys::{jlrs_apply_type, jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_set_nth_field};
 
-#[cfg(not(feature = "lts"))]
-use std::{
-    ptr::null_mut,
-    sync::atomic::{AtomicPtr, AtomicU16, AtomicU32, AtomicU64, AtomicU8},
-};
+cfg_if! {
+    if #[cfg(not(feature = "lts"))] {
+        use jl_sys::{jlrs_lock, jlrs_unlock};
 
-use super::DataTypeRef;
+        use std::{
+            ptr::null_mut,
+            sync::atomic::{AtomicPtr, AtomicU16, AtomicU32, AtomicU64, AtomicU8},
+        };
+    }
+}
 
 /// In some cases it's necessary to place one or more arguments in front of the arguments a
 /// function is called with. Examples include the `named_tuple` macro and `Value::call_async`.
@@ -200,7 +198,7 @@ impl PartialEq for Value<'_, '_> {
 /// primitive number types. This trait is also automatically derived by JlrsReflect.jl for types
 /// that are trivially guaranteed to be bits-types: the type must have no type parameters, no
 /// unions, and all fields must be immutable bits-types themselves.
-impl<'scope, 'data> Value<'scope, 'data> {
+impl Value<'_, '_> {
     /// Create a new Julia value, any type that implements [`IntoJulia`] can be converted using
     /// this function.
     pub fn new<'target, V, S>(scope: S, value: V) -> JlrsResult<Value<'target, 'static>>
@@ -208,12 +206,10 @@ impl<'scope, 'data> Value<'scope, 'data> {
         V: IntoJulia,
         S: PartialScope<'target>,
     {
-        unsafe {
-            let global = scope.global();
-            let v = value.into_julia(global).ptr();
-            debug_assert!(!v.is_null());
-            scope.value(NonNull::new_unchecked(v), Private)
-        }
+        let global = scope.global();
+        let v = value.into_julia(global).ptr();
+        debug_assert!(!v.is_null());
+        unsafe { scope.value(NonNull::new_unchecked(v), Private) }
     }
 
     /// Create a new Julia value, any type that implements [`IntoJulia`] can be converted using
@@ -226,7 +222,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     }
 
     /// Create a new named tuple, you should use the `named_tuple` macro rather than this method.
-    pub fn new_named_tuple<'target: 'current, 'current, S, F, N, T, V>(
+    pub fn new_named_tuple<'target, 'current, 'value, 'data, S, F, N, T, V>(
         scope: S,
         field_names: N,
         values: V,
@@ -236,7 +232,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
         F: Frame<'current>,
         N: AsRef<[T]>,
         T: ToSymbol,
-        V: AsRef<[Value<'scope, 'data>]>,
+        V: AsRef<[Value<'value, 'data>]>,
     {
         let global = scope.global();
         let (output, scope) = scope.split()?;
@@ -280,7 +276,6 @@ impl<'scope, 'data> Value<'scope, 'data> {
                 .apply_type_unchecked(&mut *frame, &mut [names, field_type_tup])?
                 .cast::<DataType>()?;
 
-            let output = output.into_scope(frame);
             ty.instantiate_unchecked(output, values)
         })
     }
@@ -297,14 +292,14 @@ impl<'scope, 'data> Value<'scope, 'data> {
     ///
     /// [`Union::new`]: crate::wrappers::ptr::union::Union::new
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub fn apply_type<'target, V, S>(
+    pub fn apply_type<'target, 'value, 'data, V, S>(
         self,
         scope: S,
         types: V,
     ) -> JlrsResult<JuliaResult<'target, 'data>>
     where
         S: PartialScope<'target>,
-        V: AsRef<[Value<'scope, 'data>]>,
+        V: AsRef<[Value<'value, 'data>]>,
     {
         unsafe {
             let types = types.as_ref();
@@ -333,14 +328,14 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// function.
     ///
     /// [`Union::new`]: crate::wrappers::ptr::union::Union::new
-    pub unsafe fn apply_type_unchecked<'target, S, V>(
+    pub unsafe fn apply_type_unchecked<'target, 'value, 'data, S, V>(
         self,
         scope: S,
         types: V,
     ) -> JlrsResult<Value<'target, 'data>>
     where
         S: PartialScope<'target>,
-        V: AsRef<[Value<'scope, 'data>]>,
+        V: AsRef<[Value<'value, 'data>]>,
     {
         let types = types.as_ref();
         let applied = jl_apply_type(self.unwrap(Private), types.as_ptr() as *mut _, types.len());
@@ -1094,7 +1089,7 @@ impl Value<'_, '_> {
     ///
     /// Safety: The content of the file can't be checked for correctness, nothing prevents you
     /// from causing a segmentation fault with code like `unsafe_load(Ptr{Float64}(C_NULL))`.
-    pub unsafe fn include<'target: 'current, 'current, P, S, F>(
+    pub unsafe fn include<'target, 'current, P, S, F>(
         scope: S,
         path: P,
     ) -> JlrsResult<JuliaResult<'target, 'static>>

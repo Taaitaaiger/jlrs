@@ -80,8 +80,6 @@ pub mod type_var;
 pub mod union;
 pub mod union_all;
 pub mod value;
-#[cfg(not(feature = "lts"))]
-pub mod vararg;
 
 #[cfg(not(feature = "lts"))]
 use jl_sys::jl_value_t;
@@ -112,8 +110,8 @@ use self::internal::{
 
 #[cfg(all(not(feature = "lts"), feature = "internal-types"))]
 use self::internal::opaque_closure::OpaqueClosure;
-#[cfg(not(feature = "lts"))]
-use self::vararg::Vararg;
+#[cfg(all(not(feature = "lts"), feature = "internal-types"))]
+use self::internal::vararg::Vararg;
 use crate::{
     call::Call,
     error::{JlrsError, JlrsResult, CANNOT_DISPLAY_VALUE},
@@ -170,6 +168,20 @@ macro_rules! impl_ref_root {
     };
 }
 
+#[macro_export]
+macro_rules! impl_debug {
+    ($type:ty) => {
+        impl ::std::fmt::Debug for $type {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+                match <Self as $crate::wrappers::ptr::Wrapper>::display_string(*self) {
+                    Ok(s) => f.write_str(&s),
+                    Err(e) => f.write_fmt(format_args!("<Cannot display value: {}>", e)),
+                }
+            }
+        }
+    };
+}
+
 pub(crate) trait Root<'target, 'value, 'data>: Wrapper<'value, 'data> {
     type Output;
     unsafe fn root<S>(scope: S, value: Ref<'value, 'data, Self>) -> JlrsResult<Self::Output>
@@ -177,7 +189,7 @@ pub(crate) trait Root<'target, 'value, 'data>: Wrapper<'value, 'data> {
         S: PartialScope<'target>;
 }
 
-/// Marker trait implemented by `Ref`.
+/// Trait implemented by `Ref`.
 pub trait WrapperRef<'scope, 'data>:
     private::WrapperRef<'scope, 'data> + Copy + Debug + ValidLayout
 {
@@ -192,13 +204,12 @@ where
     type Wrapper = T;
 }
 
-/// Methods shared by all builtin pointer wrappers.
+/// Trait implemented by all pointer wrapper types.
 pub trait Wrapper<'scope, 'data>: private::Wrapper<'scope, 'data> {
-    /// The reference type associated with this wrapper.
-    type Ref;
-
     /// Convert the wrapper to a `Ref`.
-    fn as_ref(self) -> Self::Ref;
+    fn as_ref(self) -> Ref<'scope, 'data, Self> {
+        unsafe { Ref::wrap(self.unwrap(Private)) }
+    }
 
     /// Convert the wrapper to a `Value`.
     fn as_value(self) -> Value<'scope, 'data> {
@@ -276,30 +287,7 @@ pub trait Wrapper<'scope, 'data>: private::Wrapper<'scope, 'data> {
     }
 }
 
-impl<'scope, 'data, W> Wrapper<'scope, 'data> for W
-where
-    W: private::Wrapper<'scope, 'data>,
-{
-    type Ref = Ref<'scope, 'data, Self>;
-
-    fn as_ref(self) -> Self::Ref {
-        unsafe { Self::Ref::wrap(self.unwrap(Private)) }
-    }
-}
-
-#[macro_export]
-macro_rules! impl_debug {
-    ($type:ty) => {
-        impl ::std::fmt::Debug for $type {
-            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-                match <Self as $crate::wrappers::ptr::Wrapper>::display_string(*self) {
-                    Ok(s) => f.write_str(&s),
-                    Err(e) => f.write_fmt(format_args!("<Cannot display value: {}>", e)),
-                }
-            }
-        }
-    };
-}
+impl<'scope, 'data, W> Wrapper<'scope, 'data> for W where W: private::Wrapper<'scope, 'data> {}
 
 /// An unrooted reference to Julia data.
 ///
@@ -548,11 +536,11 @@ impl_valid_layout!(UnionAllRef, UnionAll);
 impl_ref_root!(UnionAll, UnionAllRef, 1);
 
 /// A reference to a [`Vararg`]
-#[cfg(not(feature = "lts"))]
+#[cfg(all(not(feature = "lts"), feature = "internal-types"))]
 pub type VarargRef<'scope> = Ref<'scope, 'static, Vararg<'scope>>;
-#[cfg(not(feature = "lts"))]
+#[cfg(all(not(feature = "lts"), feature = "internal-types"))]
 impl_valid_layout!(VarargRef, Vararg);
-#[cfg(not(feature = "lts"))]
+#[cfg(all(not(feature = "lts"), feature = "internal-types"))]
 impl_ref_root!(Vararg, VarargRef, 1);
 
 /// A reference to a [`WeakRef`]
@@ -708,6 +696,7 @@ pub(crate) mod private {
 }
 
 #[cfg(not(feature = "lts"))]
-pub(crate) fn atomic_value(addr: u64) -> AtomicPtr<jl_value_t> {
-    AtomicPtr::new(addr as usize as *mut _)
+#[inline(always)]
+pub(crate) unsafe fn atomic_value(addr: *mut u64) -> AtomicPtr<jl_value_t> {
+    AtomicPtr::new(addr as *mut jl_value_t)
 }

@@ -4,19 +4,22 @@
 //! in [`julia.h`]
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L321
-use super::super::private::Wrapper;
-use crate::{impl_debug, impl_julia_typecheck, memory::output::Output};
 use crate::{
+    impl_debug, impl_julia_typecheck,
+    memory::output::Output,
     private::Private,
-    wrappers::ptr::{CodeInstanceRef, SimpleVectorRef, ValueRef},
+    wrappers::ptr::{private::Wrapper as WrapperPriv, CodeInstanceRef, SimpleVectorRef, ValueRef},
 };
+use cfg_if::cfg_if;
 use jl_sys::{jl_method_instance_t, jl_method_instance_type};
 use std::{marker::PhantomData, ptr::NonNull};
 
-#[cfg(not(feature = "lts"))]
-use super::super::atomic_value;
-#[cfg(not(feature = "lts"))]
-use std::sync::atomic::Ordering;
+cfg_if! {
+    if #[cfg(not(feature = "lts"))] {
+        use crate::wrappers::ptr::atomic_value;
+        use std::sync::atomic::Ordering;
+    }
+}
 
 /// This type is a placeholder to cache data for a specType signature specialization of a `Method`
 /// can can be used as a unique dictionary key representation of a call to a particular `Method`
@@ -81,7 +84,7 @@ impl<'scope> MethodInstance<'scope> {
     #[cfg(not(feature = "lts"))]
     pub fn cache(self) -> CodeInstanceRef<'scope> {
         unsafe {
-            let cache = atomic_value(self.unwrap_non_null(Private).as_ref().cache);
+            let cache = atomic_value(&mut self.unwrap_non_null(Private).as_mut().cache as *mut _);
             let ptr = cache.load(Ordering::Relaxed);
             CodeInstanceRef::wrap(ptr.cast())
         }
@@ -111,7 +114,7 @@ impl<'scope> MethodInstance<'scope> {
 impl_julia_typecheck!(MethodInstance<'scope>, jl_method_instance_type, 'scope);
 impl_debug!(MethodInstance<'_>);
 
-impl<'scope> Wrapper<'scope, '_> for MethodInstance<'scope> {
+impl<'scope> WrapperPriv<'scope, '_> for MethodInstance<'scope> {
     type Wraps = jl_method_instance_t;
     const NAME: &'static str = "MethodInstance";
 

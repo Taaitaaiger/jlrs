@@ -1,22 +1,18 @@
 //! Wrapper for `DataType`, which provides access to type properties.
 
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
-use super::array::Array;
-use super::{
-    private::Wrapper as WrapperPriv, value::Value, DataTypeRef, SimpleVectorRef, SymbolRef,
-    TypeNameRef, ValueRef, Wrapper,
+use crate::{
+    convert::to_symbol::ToSymbol,
+    error::{JlrsError, JlrsResult, CANNOT_DISPLAY_TYPE},
+    impl_debug, impl_julia_typecheck,
+    layout::typecheck::{Concrete, Typecheck},
+    memory::{global::Global, output::Output, scope::PartialScope},
+    private::Private,
+    wrappers::ptr::{
+        private::Wrapper as WrapperPriv, simple_vector::SimpleVector, symbol::Symbol, value::Value,
+        DataTypeRef, SimpleVectorRef, SymbolRef, TypeNameRef, ValueRef, Wrapper,
+    },
 };
-use crate::error::CANNOT_DISPLAY_TYPE;
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
-use crate::error::{JuliaResult, JuliaResultRef};
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
-use crate::layout::typecheck::Concrete;
-use crate::memory::scope::PartialScope;
-use crate::wrappers::ptr::{simple_vector::SimpleVector, symbol::Symbol};
-use crate::{convert::to_symbol::ToSymbol, error::JlrsError};
-use crate::{error::JlrsResult, impl_julia_typecheck};
-use crate::{impl_debug, memory::global::Global, private::Private};
-use crate::{layout::typecheck::Typecheck, memory::output::Output};
+use cfg_if::cfg_if;
 use jl_sys::{
     jl_abstractslot_type, jl_abstractstring_type, jl_any_type, jl_anytuple_type, jl_argument_type,
     jl_argumenterror_type, jl_bool_type, jl_boundserror_type, jl_builtin_type, jl_char_type,
@@ -40,11 +36,19 @@ use jl_sys::{
 use jl_sys::{
     jl_atomicerror_type, jl_interconditional_type, jl_partial_opaque_type, jl_vararg_type,
 };
+use std::{
+    ffi::{c_void, CStr},
+    marker::PhantomData,
+    ptr::NonNull,
+};
 
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
-use jl_sys::{jlrs_new_structv, jlrs_result_tag_t_JLRS_RESULT_ERR};
-use std::ffi::c_void;
-use std::{ffi::CStr, marker::PhantomData, ptr::NonNull};
+cfg_if! {
+    if #[cfg(not(all(target_os = "windows", feature = "lts")))] {
+        use super::array::Array;
+        use crate::error::{JuliaResult, JuliaResultRef};
+        use jl_sys::{jlrs_new_structv, jlrs_result_tag_t_JLRS_RESULT_ERR};
+    }
+}
 
 /// Julia type information. You can acquire a [`Value`]'s datatype by by calling
 /// [`Value::datatype`]. If a `DataType` is concrete and not a subtype of `Array` a new instance

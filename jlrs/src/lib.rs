@@ -113,7 +113,7 @@
 //! In addition to these runtimes, the following utility features are available:
 //!
 //! - `prelude`
-//!   Provides a prelude module. This feature is enabled by default.
+//!   Provide a prelude module, [`jlrs::prelude`]. This feature is enabled by default.
 //!
 //! - `lts`
 //!   Use the current LTS version of Julia (1.6) instead of the current stable version (1.8).
@@ -409,9 +409,8 @@
 //!         // A `Vec` can be moved from Rust to Julia if the element type
 //!         // implements `IntoJulia`.
 //!         let data = vec![0usize; self.n_values];
-//!         let array = Array::from_vec(&mut *frame, data, self.n_values)?
-//!             .into_jlrs_result()?
-//!             .try_as_typed::<usize>()?;
+//!         let array = TypedArray::from_vec(&mut *frame, data, self.n_values)?
+//!             .into_jlrs_result()?;
 //!     
 //!         Ok(AccumulatorTaskState {
 //!             array,
@@ -664,6 +663,7 @@
 //! [`Scope::result_scope`]: crate::memory::scope::Scope::result_scope
 //! [`RuntimeBuilder`]: crate::runtime::builder::RuntimeBuilder
 //! [`AsyncRuntimeBuilder`]: crate::runtime::builder::AsyncRuntimeBuilder
+//! [`jlrs::prelude`]: crate::prelude
 #![forbid(rustdoc::broken_intra_doc_links)]
 
 #[cfg(any(feature = "sync-rt", feature = "async-rt", feature = "pyplot"))]

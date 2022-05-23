@@ -6,22 +6,25 @@
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L273
 
 use crate::{
-    impl_debug, impl_julia_typecheck, memory::output::Output, wrappers::ptr::TypedArrayRef,
-};
-use crate::{
+    impl_debug, impl_julia_typecheck,
+    memory::output::Output,
     private::Private,
+    wrappers::ptr::TypedArrayRef,
     wrappers::ptr::{
-        private::Wrapper, ArrayRef, MethodInstanceRef, ModuleRef, SimpleVectorRef, SymbolRef,
-        ValueRef,
+        private::Wrapper as WrapperPriv, ArrayRef, MethodInstanceRef, ModuleRef, SimpleVectorRef,
+        SymbolRef, ValueRef,
     },
 };
+use cfg_if::cfg_if;
 use jl_sys::{jl_method_t, jl_method_type};
 use std::{marker::PhantomData, ptr::NonNull};
 
-#[cfg(not(feature = "lts"))]
-use super::super::atomic_value;
-#[cfg(not(feature = "lts"))]
-use std::sync::atomic::Ordering;
+cfg_if! {
+    if #[cfg(not(feature = "lts"))] {
+        use crate::wrappers::ptr::atomic_value;
+        use std::sync::atomic::Ordering;
+    }
+}
 
 /// This type describes a single method definition, and stores data shared by the specializations
 /// of a function.
@@ -111,7 +114,7 @@ impl<'scope> Method<'scope> {
     pub fn specializations(self) -> SimpleVectorRef<'scope> {
         unsafe {
             let specializations =
-                atomic_value(self.unwrap_non_null(Private).as_ref().specializations);
+                atomic_value(&mut self.unwrap_non_null(Private).as_mut().specializations as *mut _);
             let ptr = specializations.load(Ordering::Relaxed);
             SimpleVectorRef::wrap(ptr.cast())
         }
@@ -127,7 +130,8 @@ impl<'scope> Method<'scope> {
     #[cfg(not(feature = "lts"))]
     pub fn spec_key_set(self) -> ArrayRef<'scope, 'static> {
         unsafe {
-            let speckeyset = atomic_value(self.unwrap_non_null(Private).as_ref().speckeyset);
+            let speckeyset =
+                atomic_value(&mut self.unwrap_non_null(Private).as_mut().speckeyset as *mut _);
             let ptr = speckeyset.load(Ordering::Relaxed);
             ArrayRef::wrap(ptr.cast())
         }
@@ -159,7 +163,8 @@ impl<'scope> Method<'scope> {
     #[cfg(not(feature = "lts"))]
     pub fn unspecialized(self) -> MethodInstanceRef<'scope> {
         unsafe {
-            let unspecialized = atomic_value(self.unwrap_non_null(Private).as_ref().unspecialized);
+            let unspecialized =
+                atomic_value(&mut self.unwrap_non_null(Private).as_mut().unspecialized as *mut _);
             let ptr = unspecialized.load(Ordering::Relaxed);
             MethodInstanceRef::wrap(ptr.cast())
         }
@@ -206,7 +211,8 @@ impl<'scope> Method<'scope> {
     #[cfg(not(feature = "lts"))]
     pub fn invokes(self) -> ValueRef<'scope, 'static> {
         unsafe {
-            let invokes = atomic_value(self.unwrap_non_null(Private).as_ref().invokes);
+            let invokes =
+                atomic_value(&mut self.unwrap_non_null(Private).as_mut().invokes as *mut _);
             let ptr = invokes.load(Ordering::Relaxed);
             ValueRef::wrap(ptr.cast())
         }
@@ -275,7 +281,7 @@ impl<'scope> Method<'scope> {
 impl_julia_typecheck!(Method<'scope>, jl_method_type, 'scope);
 impl_debug!(Method<'_>);
 
-impl<'scope> Wrapper<'scope, '_> for Method<'scope> {
+impl<'scope> WrapperPriv<'scope, '_> for Method<'scope> {
     type Wraps = jl_method_t;
     const NAME: &'static str = "Method";
 

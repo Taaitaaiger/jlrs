@@ -1,33 +1,36 @@
 //! Wrapper for `UnionAll`, A union of types over all values of a type parameter.
 
-use super::type_var::TypeVar;
-use super::{private::Wrapper, value::Value};
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
-use crate::error::{JuliaResult, JuliaResultRef};
-use crate::impl_debug;
-use crate::impl_julia_typecheck;
-use crate::wrappers::ptr::datatype::DataType;
-use crate::wrappers::ptr::DataTypeRef;
-use crate::wrappers::ptr::{TypeVarRef, ValueRef};
 use crate::{
     error::JlrsResult,
-    memory::{output::Output, scope::PartialScope},
+    impl_debug, impl_julia_typecheck,
+    memory::{global::Global, output::Output, scope::PartialScope},
+    private::Private,
+    wrappers::ptr::{
+        datatype::DataType, private::Wrapper as WrapperPriv, type_var::TypeVar, value::Value,
+        DataTypeRef, TypeVarRef, ValueRef,
+    },
 };
-use crate::{memory::global::Global, private::Private};
-
+use cfg_if::cfg_if;
 use jl_sys::{
     jl_abstractarray_type, jl_anytuple_type_type, jl_array_type, jl_densearray_type,
     jl_llvmpointer_type, jl_namedtuple_type, jl_pointer_type, jl_ref_type, jl_type_type,
     jl_type_unionall, jl_unionall_t, jl_unionall_type,
 };
 
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
-use jl_sys::{jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_type_unionall};
+cfg_if! {
+    if #[cfg(not(all(target_os = "windows", feature = "lts")))] {
+        use jl_sys::{jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_type_unionall};
+        use crate::error::{JuliaResult, JuliaResultRef};
+    }
+}
 
-#[cfg(not(feature = "lts"))]
-use jl_sys::jl_opaque_closure_type;
-#[cfg(feature = "lts")]
-use jl_sys::jl_vararg_type;
+cfg_if! {
+    if #[cfg(feature = "lts")] {
+        use jl_sys::jl_vararg_type;
+    }else {
+        use jl_sys::jl_opaque_closure_type;
+    }
+}
 
 use std::{marker::PhantomData, ptr::NonNull};
 
@@ -216,7 +219,7 @@ impl<'base> UnionAll<'base> {
 impl_julia_typecheck!(UnionAll<'scope>, jl_unionall_type, 'scope);
 impl_debug!(UnionAll<'_>);
 
-impl<'scope> Wrapper<'scope, '_> for UnionAll<'scope> {
+impl<'scope> WrapperPriv<'scope, '_> for UnionAll<'scope> {
     type Wraps = jl_unionall_t;
     const NAME: &'static str = "UnionAll";
 

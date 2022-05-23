@@ -235,6 +235,29 @@ mod tests {
     }
 
     #[test]
+    fn call_multiple_scopes() {
+        JULIA.with(|j| {
+            let mut jlrs = j.borrow_mut();
+
+            let out = jlrs.scope_with_capacity(3, |global, frame| unsafe {
+                let arg0 = Value::new(&mut *frame, 1u32)?;
+
+                let output = frame.reserve_output()?;
+                frame
+                    .scope(|frame| {
+                        let func = Module::base(global).function_ref("+")?.wrapper_unchecked();
+                        let arg1 = Value::new(&mut *frame, 2u32)?;
+                        func.call(output, [arg0, arg1])
+                    })?
+                    .into_jlrs_result()?
+                    .unbox::<u32>()
+            });
+
+            assert_eq!(out.unwrap(), 3);
+        });
+    }
+
+    #[test]
     fn call2_output() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();

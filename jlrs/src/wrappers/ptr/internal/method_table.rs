@@ -5,19 +5,22 @@
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L535
 
-use super::super::private::Wrapper;
-use crate::{impl_debug, impl_julia_typecheck, memory::output::Output};
 use crate::{
+    impl_debug, impl_julia_typecheck,
+    memory::output::Output,
     private::Private,
-    wrappers::ptr::{ArrayRef, ModuleRef, SymbolRef, ValueRef},
+    wrappers::ptr::{private::Wrapper as WrapperPriv, ArrayRef, ModuleRef, SymbolRef, ValueRef},
 };
+use cfg_if::cfg_if;
 use jl_sys::{jl_methtable_t, jl_methtable_type};
 use std::{marker::PhantomData, ptr::NonNull};
 
-#[cfg(not(feature = "lts"))]
-use super::super::atomic_value;
-#[cfg(not(feature = "lts"))]
-use std::sync::atomic::Ordering;
+cfg_if! {
+    if #[cfg(not(feature = "lts"))] {
+        use crate::wrappers::ptr::atomic_value;
+        use std::sync::atomic::Ordering;
+    }
+}
 
 /// contains the TypeMap for one Type
 #[derive(Copy, Clone)]
@@ -58,7 +61,7 @@ impl<'scope> MethodTable<'scope> {
     #[cfg(not(feature = "lts"))]
     pub fn defs(self) -> ValueRef<'scope, 'static> {
         unsafe {
-            let defs = atomic_value(self.unwrap_non_null(Private).as_ref().cache);
+            let defs = atomic_value(&mut self.unwrap_non_null(Private).as_mut().defs as *mut _);
             let ptr = defs.load(Ordering::Relaxed);
             ValueRef::wrap(ptr)
         }
@@ -74,7 +77,8 @@ impl<'scope> MethodTable<'scope> {
     #[cfg(not(feature = "lts"))]
     pub fn leafcache(self) -> ArrayRef<'scope, 'static> {
         unsafe {
-            let leafcache = atomic_value(self.unwrap_non_null(Private).as_ref().cache);
+            let leafcache =
+                atomic_value(&mut self.unwrap_non_null(Private).as_mut().leafcache as *mut _);
             let ptr = leafcache.load(Ordering::Relaxed);
             ArrayRef::wrap(ptr.cast())
         }
@@ -90,7 +94,7 @@ impl<'scope> MethodTable<'scope> {
     #[cfg(not(feature = "lts"))]
     pub fn cache(self) -> ValueRef<'scope, 'static> {
         unsafe {
-            let cache = atomic_value(self.unwrap_non_null(Private).as_ref().cache);
+            let cache = atomic_value(&mut self.unwrap_non_null(Private).as_mut().cache as *mut _);
             let ptr = cache.load(Ordering::Relaxed);
             ValueRef::wrap(ptr)
         }
@@ -139,7 +143,7 @@ impl<'scope> MethodTable<'scope> {
 impl_julia_typecheck!(MethodTable<'scope>, jl_methtable_type, 'scope);
 impl_debug!(MethodTable<'_>);
 
-impl<'scope> Wrapper<'scope, '_> for MethodTable<'scope> {
+impl<'scope> WrapperPriv<'scope, '_> for MethodTable<'scope> {
     type Wraps = jl_methtable_t;
     const NAME: &'static str = "<MethodTable";
 

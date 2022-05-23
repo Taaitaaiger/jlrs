@@ -1,22 +1,26 @@
 //! Wrapper for `TypeVar`.
 
-use super::TypeVarRef;
-use super::{datatype::DataType, value::Value};
-use super::{private::Wrapper, Wrapper as _};
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
-use crate::error::{JuliaResult, JuliaResultRef};
-use crate::memory::scope::PartialScope;
-use crate::memory::{global::Global, output::Output};
-use crate::private::Private;
-use crate::wrappers::ptr::{SymbolRef, ValueRef};
-use crate::{convert::to_symbol::ToSymbol, error::JlrsResult};
-use crate::{impl_debug, impl_julia_typecheck};
+use crate::{
+    convert::to_symbol::ToSymbol,
+    error::JlrsResult,
+    impl_debug, impl_julia_typecheck,
+    memory::{global::Global, output::Output, scope::PartialScope},
+    private::Private,
+    wrappers::ptr::{
+        datatype::DataType, private::Wrapper as WrapperPriv, value::Value, SymbolRef, TypeVarRef,
+        ValueRef, Wrapper,
+    },
+};
+use cfg_if::cfg_if;
 use jl_sys::{jl_new_typevar, jl_tvar_t, jl_tvar_type};
-
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
-use jl_sys::{jlrs_new_typevar, jlrs_result_tag_t_JLRS_RESULT_ERR};
-
 use std::{marker::PhantomData, ptr::NonNull};
+
+cfg_if! {
+    if #[cfg(not(all(target_os = "windows", feature = "lts")))] {
+        use crate::error::{JuliaResult, JuliaResultRef};
+        use jl_sys::{jlrs_new_typevar, jlrs_result_tag_t_JLRS_RESULT_ERR};
+    }
+}
 
 /// An unknown, but possibly restricted, type parameter. In `Array{T, N}`, `T` and `N` are
 /// `TypeVar`s.
@@ -153,7 +157,7 @@ impl<'scope> TypeVar<'scope> {
 impl_julia_typecheck!(TypeVar<'scope>, jl_tvar_type, 'scope);
 impl_debug!(TypeVar<'_>);
 
-impl<'scope> Wrapper<'scope, '_> for TypeVar<'scope> {
+impl<'scope> WrapperPriv<'scope, '_> for TypeVar<'scope> {
     type Wraps = jl_tvar_t;
     const NAME: &'static str = "TypeVar";
 

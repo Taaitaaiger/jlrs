@@ -4,11 +4,11 @@
 //! in [`julia.h`]
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L1727
-use super::private::Wrapper;
-use crate::{impl_debug, impl_julia_typecheck, memory::output::Output};
 use crate::{
+    impl_debug, impl_julia_typecheck,
+    memory::output::Output,
     private::Private,
-    wrappers::ptr::{TaskRef, ValueRef},
+    wrappers::ptr::{private::Wrapper as WrapperPriv, TaskRef, ValueRef},
 };
 use jl_sys::{jl_task_t, jl_task_type};
 use std::{marker::PhantomData, ptr::NonNull};
@@ -129,7 +129,7 @@ impl<'scope> Task<'scope> {
 impl_julia_typecheck!(Task<'scope>, jl_task_type, 'scope);
 impl_debug!(Task<'_>);
 
-impl<'scope> Wrapper<'scope, '_> for Task<'scope> {
+impl<'scope> WrapperPriv<'scope, '_> for Task<'scope> {
     type Wraps = jl_task_t;
     const NAME: &'static str = "Task";
 

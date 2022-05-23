@@ -42,9 +42,7 @@ pub trait NdArray<'borrow, T>: private::NdArray {
         T: ValidLayout + Clone;
 }
 
-impl<'frame, 'data: 'borrow, 'borrow, T: ValidLayout + Clone> NdArray<'borrow, T>
-    for Array<'frame, 'data>
-{
+impl<'frame, 'data, 'borrow, T: ValidLayout + Clone> NdArray<'borrow, T> for Array<'frame, 'data> {
     fn array_view<'fr, F>(
         self,
         frame: &'borrow F,
@@ -89,7 +87,7 @@ impl<'frame, 'data: 'borrow, 'borrow, T: ValidLayout + Clone> NdArray<'borrow, T
     }
 }
 
-impl<'frame: 'borrow, 'data: 'borrow, 'borrow, T: ValidLayout + Clone + Debug> NdArray<'borrow, T>
+impl<'frame, 'data, 'borrow, T: ValidLayout + Clone + Debug> NdArray<'borrow, T>
     for TypedArray<'frame, 'data, T>
 {
     fn array_view<'fr, F>(

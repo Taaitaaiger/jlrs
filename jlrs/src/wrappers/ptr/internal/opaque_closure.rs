@@ -1,21 +1,23 @@
 //! Wrapper for `OpaqueClosure`.
 
-use super::super::type_name::TypeName;
-use super::super::MethodRef;
-use super::super::{datatype::DataType, private::Wrapper, value::Value, Wrapper as _};
-use crate::impl_debug;
-use crate::layout::typecheck::Typecheck;
-use crate::memory::global::Global;
 use crate::{
     call::Call,
     error::{JlrsResult, JuliaResult, JuliaResultRef},
-    memory::{output::Output, scope::PartialScope},
+    impl_debug,
+    layout::typecheck::Typecheck,
+    memory::{global::Global, output::Output, scope::PartialScope},
+    private::Private,
+    wrappers::ptr::{
+        datatype::DataType, private::Wrapper as WrapperPriv, type_name::TypeName, value::Value,
+        MethodRef, ValueRef, Wrapper as _,
+    },
 };
-use crate::{private::Private, wrappers::ptr::ValueRef};
 use jl_sys::jl_opaque_closure_t;
-use std::ffi::c_void;
-use std::ptr::null_mut;
-use std::{marker::PhantomData, ptr::NonNull};
+use std::{
+    ffi::c_void,
+    marker::PhantomData,
+    ptr::{null_mut, NonNull},
+};
 
 /// An opaque closure. Note that opaque closures are currently an experimental feature in Julia.
 #[derive(Copy, Clone)]
@@ -87,7 +89,7 @@ unsafe impl Typecheck for OpaqueClosure<'_> {
 
 impl_debug!(OpaqueClosure<'_>);
 
-impl<'scope> Wrapper<'scope, 'static> for OpaqueClosure<'scope> {
+impl<'scope> WrapperPriv<'scope, 'static> for OpaqueClosure<'scope> {
     type Wraps = jl_opaque_closure_t;
     const NAME: &'static str = "OpaqueClosure";
 

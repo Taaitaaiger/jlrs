@@ -8,4 +8,6 @@ pub mod method_table;
 pub mod opaque_closure;
 pub mod typemap_entry;
 pub mod typemap_level;
+#[cfg(not(feature = "lts"))]
+pub mod vararg;
 pub mod weak_ref;

@@ -1,19 +1,21 @@
 //! Wrapper for `String`.
 
-use crate::impl_julia_typecheck;
-use crate::memory::global::Global;
-use crate::wrappers::ptr::{private::Wrapper as WrapperPriv, value::Value, StringRef};
-use crate::{convert::unbox::Unbox, private::Private};
 use crate::{
+    convert::unbox::Unbox,
     error::{JlrsError, JlrsResult},
-    memory::{output::Output, scope::PartialScope},
+    impl_julia_typecheck,
+    memory::{global::Global, output::Output, scope::PartialScope},
+    private::Private,
+    wrappers::ptr::{private::Wrapper as WrapperPriv, value::Value, StringRef},
 };
 use jl_sys::{jl_pchar_to_string, jl_string_type};
-use std::{ffi::CStr, ptr::NonNull};
 use std::{
+    ffi::CStr,
     fmt::{Debug, Formatter, Result as FmtResult},
     marker::PhantomData,
-    mem, str,
+    mem,
+    ptr::NonNull,
+    str,
 };
 
 /// A Julia string.

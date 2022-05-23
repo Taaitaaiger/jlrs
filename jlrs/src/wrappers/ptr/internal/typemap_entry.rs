@@ -5,16 +5,22 @@
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#505
 
-use super::super::private::Wrapper;
-use crate::{impl_debug, impl_julia_typecheck, memory::output::Output};
-use crate::{private::Private, wrappers::ptr::ValueRef};
+use crate::{
+    impl_debug, impl_julia_typecheck,
+    memory::output::Output,
+    private::Private,
+    wrappers::ptr::{private::Wrapper as WrapperPriv, ValueRef},
+};
+use cfg_if::cfg_if;
 use jl_sys::{jl_typemap_entry_t, jl_typemap_entry_type};
 use std::{marker::PhantomData, ptr::NonNull};
 
-#[cfg(not(feature = "lts"))]
-use super::super::atomic_value;
-#[cfg(not(feature = "lts"))]
-use std::sync::atomic::Ordering;
+cfg_if! {
+    if #[cfg(not(feature = "lts"))] {
+        use crate::wrappers::ptr::atomic_value;
+        use std::sync::atomic::Ordering;
+    }
+}
 
 /// One Type-to-Value entry
 #[derive(Copy, Clone)]
@@ -48,7 +54,7 @@ impl<'scope> TypeMapEntry<'scope> {
     #[cfg(not(feature = "lts"))]
     pub fn next(self) -> ValueRef<'scope, 'static> {
         unsafe {
-            let next = atomic_value(self.unwrap_non_null(Private).as_ref().next);
+            let next = atomic_value(&mut self.unwrap_non_null(Private).as_mut().next as *mut _);
             let ptr = next.load(Ordering::Relaxed);
             ValueRef::wrap(ptr.cast())
         }
@@ -112,7 +118,7 @@ impl<'scope> TypeMapEntry<'scope> {
 impl_julia_typecheck!(TypeMapEntry<'scope>, jl_typemap_entry_type, 'scope);
 impl_debug!(TypeMapEntry<'_>);
 
-impl<'scope> Wrapper<'scope, '_> for TypeMapEntry<'scope> {
+impl<'scope> WrapperPriv<'scope, '_> for TypeMapEntry<'scope> {
     type Wraps = jl_typemap_entry_t;
     const NAME: &'static str = "TypeMapEntry";
 

@@ -1,29 +1,22 @@
-//! Data rooted in a frame is valid until the frame is dropped.
+//! Different frame types that prevent data from being freed by the garbage collector while it's
+//! in use.
 //!
 //! The garbage collector owns all Julia data and is not automatically aware of references to this
 //! data existing outside of Julia. In order to prevent data from being freed by the garbage
-//! collector while it's used from Rust, this data must be rooted, or stored, in a frame (or at
-//! least reachable from such a root). A new frame is created whenever a new scope is created, and
-//! dropped when its scope ends.
+//! collector while it's used from Rust this data must be rooted, or stored, in a frame (or at
+//! least be reachable from such a root). A new frame is created whenever a new scope is created
+//! and dropped when its scope ends.
 //!
 //! Several frame types exist in jlrs. They all implement the [`Frame`] trait, mutable references
-//! implement [`Scope`] and [`PartialScope`]. Methods that allocate and return Julia data take
-//! either a `Scope` or `PartialScope` to root the returned data in that scope. The `Frame` trait
-//! provides methods that return info about that frame, like its capacity and current number of
-//! roots, and methods to reserve a new output and create a nested scope with its own frame.
+//! to them implement [`Scope`] and [`PartialScope`]. The `Frame` trait provides methods that
+//! return info about that frame, like its capacity and current number of roots, and methods to
+//! reserve a new [`Output`] or [`ReusableSlot`], and create a nested scope with its own frame.
+//! Only [`AsyncGcFrame`] provides additional public methods, these methods create a nested async
+//! scope with its own async frame.
 //!
-//! Which frame types are available depends on what features have been enabled. By default, only
-//! [`GcFrame`] is available. When `ccall` is enabled, [`NullFrame`] can also be used. This frame
-//! type can't store any roots or be used to create a new scope, but is useful for borrowing array
-//! data. Finally, when `async` is enabled, trait methods of [`AsyncTask`] and [`PersistentTask`]
-//! take an [`AsyncGcFrame`] which can be used to call async functions.
-//!
-//! [`scope`]: crate::memory::scope
 //! [`Scope`]: crate::memory::scope::Scope
 //! [`PartialScope`]: crate::memory::scope::PartialScope
-//! [`AsyncGcFrame`]: crate::memory::frame::AsyncGcFrame
-//! [`AsyncTask`]: crate::async_util::task::AsyncTask
-//! [`PersistentTask`]: crate::async_util::task::PersistentTask
+//! [`CallAsync`]: crate::call::CallAsync
 
 use super::{mode::Mode, output::Output, reusable_slot::ReusableSlot, stack_page::StackPage};
 use crate::{error::JlrsResult, private::Private};
@@ -32,7 +25,7 @@ use std::{cell::Cell, ffi::c_void, ptr::NonNull};
 
 pub(crate) const MIN_FRAME_CAPACITY: usize = 16;
 
-/// A frame that can be used to root values.
+/// A frame that can be used to root Julia data.
 ///
 /// Frames created with a capacity can store at least that number of roots. A frame's capacity is
 /// at least 16.
@@ -43,13 +36,13 @@ pub struct GcFrame<'frame, M: Mode> {
 }
 
 impl<'frame, M: Mode> GcFrame<'frame, M> {
-    /// Returns the number of values currently rooted in this frame.
-    pub fn n_roots(&self) -> usize {
+    #[inline]
+    pub(crate) fn n_roots(&self) -> usize {
         self.raw_frame[0].get() as usize >> 2
     }
 
-    /// Returns the maximum number of values that can be rooted in this frame.
-    pub fn capacity(&self) -> usize {
+    #[inline]
+    pub(crate) fn capacity(&self) -> usize {
         self.raw_frame.len() - 2
     }
 
@@ -154,6 +147,7 @@ cfg_if::cfg_if! {
         impl<'frame> AsyncGcFrame<'frame> {
             /// An async version of [`Frame::scope`]. Rather than a closure, it takes an async closure
             /// that provides a new `AsyncGcFrame`.
+            #[inline(never)]
             pub async fn async_scope<'nested, T, F, G>(&'nested mut self, func: F) -> JlrsResult<T>
             where
                 T: 'frame,
@@ -170,6 +164,7 @@ cfg_if::cfg_if! {
 
             /// An async version of [`Frame::scope_with_capacity`]. Rather than a closure, it takes an
             /// async closure that provides a new `AsyncGcFrame`.
+            #[inline(never)]
             pub async fn async_scope_with_capacity<'nested, T, F, G>(
                 &'nested mut self,
                 capacity: usize,
@@ -189,12 +184,14 @@ cfg_if::cfg_if! {
             }
 
             /// Returns the number of values currently rooted in this frame.
-            pub fn n_roots(&self) -> usize {
+            #[inline]
+            pub(crate) fn n_roots(&self) -> usize {
                 self.raw_frame[0].get() as usize >> 2
             }
 
             /// Returns the maximum number of slots this frame can use.
-            pub fn capacity(&self) -> usize {
+            #[inline]
+            pub(crate) fn capacity(&self) -> usize {
                 self.raw_frame.len() - 2
             }
 
@@ -339,6 +336,7 @@ pub trait Frame<'frame>: private::Frame<'frame> {
 
     /// Creates a new `GcFrame` and calls `func` with it. The new frame is popped from the GC stack
     /// stack after `func` returns.
+    #[inline(never)]
     fn scope<T, F>(&mut self, func: F) -> JlrsResult<T>
     where
         for<'inner> F: FnOnce(&mut GcFrame<'inner, Self::Mode>) -> JlrsResult<T>,
@@ -351,6 +349,7 @@ pub trait Frame<'frame>: private::Frame<'frame> {
 
     /// Creates a frame that can store at least `capacity` roots and calls `func` with this new
     /// frame. The new frame is popped from the GC stack after `func` returns.
+    #[inline(never)]
     fn scope_with_capacity<T, F>(&mut self, capacity: usize, func: F) -> JlrsResult<T>
     where
         for<'inner> F: FnOnce(&mut GcFrame<'inner, Self::Mode>) -> JlrsResult<T>,
@@ -400,6 +399,7 @@ impl<'frame> Frame<'frame> for NullFrame<'frame> {
         0
     }
 
+    #[inline(never)]
     fn scope<T, F>(&mut self, _func: F) -> JlrsResult<T>
     where
         for<'inner> F: FnOnce(&mut GcFrame<'inner, Self::Mode>) -> JlrsResult<T>,
@@ -407,6 +407,7 @@ impl<'frame> Frame<'frame> for NullFrame<'frame> {
         Err(JlrsError::NullFrame)?
     }
 
+    #[inline(never)]
     fn scope_with_capacity<T, F>(&mut self, _capacity: usize, _func: F) -> JlrsResult<T>
     where
         for<'inner> F: FnOnce(&mut GcFrame<'inner, Self::Mode>) -> JlrsResult<T>,
