@@ -12,7 +12,7 @@ JULIA_DIR=~/julia-1.6.6-win LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$JULIA_DIR/lib:$JU
 updated=$(sed \
     -e '1h;2,$H;$!d;g' \
     -r -E \
-    -e 's/(extern "C" \{\n\s+pub (static|fn uv|fn jl[^r]))/#[link(name = "libjulia")]\n\1/g' \
+    -e 's/(extern "C" \{\n\s+pub static)/#[link(name = "libjulia")]\n\1/g' \
     ../target/x86_64-pc-windows-gnu/debug/build/jl-sys*/out/bindings.rs)
 
 echo "#![allow(deref_nullptr)]" > ./src/bindings_1_6_x86_64_pc_windows_gnu.rs
@@ -30,7 +30,7 @@ JULIA_DIR=~/julia-1.8.0-beta3-win/ LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$JULIA_DIR/
 updated=$(sed \
     -e '1h;2,$H;$!d;g' \
     -r -E \
-    -e 's/(extern "C" \{\n\s+pub (static|fn uv|fn jl[^r]))/#[link(name = "libjulia")]\n\1/g' \
+    -e 's/(extern "C" \{\n\s+pub static)/#[link(name = "libjulia")]\n\1/g' \
     ../target/x86_64-pc-windows-gnu/debug/build/jl-sys*/out/bindings.rs)
 
 echo "#![allow(deref_nullptr)]" > ./src/bindings_1_8_x86_64_pc_windows_gnu.rs
