@@ -472,7 +472,10 @@ pub type OpaqueClosureRef<'scope> = Ref<'scope, 'static, OpaqueClosure<'scope>>;
     feature = "internal-types"
 ))]
 impl_valid_layout!(OpaqueClosureRef, OpaqueClosure);
-#[cfg(feature = "internal-types")]
+#[cfg(all(
+    any(not(feature = "lts"), feature = "all-features-override"),
+    feature = "internal-types"
+))]
 impl_ref_root!(OpaqueClosure, OpaqueClosureRef, 1);
 
 /// A reference to a [`SimpleVector`]

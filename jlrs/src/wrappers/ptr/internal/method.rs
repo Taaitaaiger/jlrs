@@ -9,7 +9,6 @@ use crate::{
     impl_debug, impl_julia_typecheck,
     memory::output::Output,
     private::Private,
-    wrappers::ptr::TypedArrayRef,
     wrappers::ptr::{
         private::WrapperPriv, ArrayRef, MethodInstanceRef, ModuleRef, SimpleVectorRef, SymbolRef,
         ValueRef,
@@ -22,7 +21,7 @@ use std::{marker::PhantomData, ptr::NonNull};
 cfg_if! {
     if #[cfg(any(not(feature = "lts"), feature = "all-features-override"))] {
         use jl_sys::jl_value_t;
-        use crate::wrappers::ptr::atomic_value;
+        use crate::wrappers::ptr::{atomic_value, TypedArrayRef};
         use std::sync::atomic::Ordering;
     }
 }
@@ -215,23 +214,23 @@ impl<'scope> Method<'scope> {
 
     /// The `n_args` field.
     pub fn n_args(self) -> u32 {
-        unsafe { self.unwrap_non_null(Private).as_ref().nargs }
+        unsafe { self.unwrap_non_null(Private).as_ref().nargs as u32 }
     }
 
     /// Bit flags: whether each of the first 8 arguments is called
     pub fn called(self) -> u32 {
-        unsafe { self.unwrap_non_null(Private).as_ref().called }
+        unsafe { self.unwrap_non_null(Private).as_ref().called as u32 }
     }
 
     /// Bit flags: which arguments should not be specialized
     pub fn no_specialize(self) -> u32 {
-        unsafe { self.unwrap_non_null(Private).as_ref().nospecialize }
+        unsafe { self.unwrap_non_null(Private).as_ref().nospecialize as u32 }
     }
 
     /// Number of leading arguments that are actually keyword arguments
     /// of another method.
     pub fn nkw(self) -> u32 {
-        unsafe { self.unwrap_non_null(Private).as_ref().nkw }
+        unsafe { self.unwrap_non_null(Private).as_ref().nkw as u32 }
     }
 
     /// The `isva` field.

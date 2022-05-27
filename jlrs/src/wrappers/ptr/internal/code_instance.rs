@@ -13,14 +13,13 @@ use crate::{
 };
 use cfg_if::cfg_if;
 use jl_sys::{jl_code_instance_t, jl_code_instance_type};
-use std::{ffi::c_void, sync::atomic::AtomicPtr};
-use std::{marker::PhantomData, ptr::NonNull, sync::atomic::AtomicU8};
+use std::{ffi::c_void, marker::PhantomData, ptr::null_mut, ptr::NonNull};
 
 cfg_if! {
     if #[cfg(any(not(feature = "lts"), feature = "all-features-override"))] {
         use jl_sys::jl_value_t;
         use crate::wrappers::ptr::atomic_value;
-        use std::sync::atomic::Ordering;
+        use std::sync::atomic::{Ordering, AtomicPtr, AtomicU8};
     }
 }
 
@@ -239,6 +238,7 @@ impl<'scope> CodeInstance<'scope> {
     }
 
     /// Method this instance is specialized from.
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn argescapes(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().argescapes) }
     }
@@ -268,7 +268,7 @@ impl<'scope> CodeInstance<'scope> {
     pub fn invoke(self) -> *mut c_void {
         cfg_if! {
             if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
-                unsafe { &self.unwrap_non_null(Private).as_ref().invoke as *mut c_void }
+                unsafe { self.unwrap_non_null(Private).as_ref().invoke.map(|x| x as *mut c_void).unwrap_or(null_mut()) }
             } else {
                 unsafe {
                     let ptr = atomic_value::<c_void>(&self.unwrap_non_null(Private).as_ref().invoke as *const _);
@@ -282,7 +282,7 @@ impl<'scope> CodeInstance<'scope> {
     pub fn specptr(self) -> *mut c_void {
         cfg_if! {
             if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
-                unsafe { &self.unwrap_non_null(Private).as_ref().specptr as *mut c_void }
+                unsafe { self.unwrap_non_null(Private).as_ref().specptr.fptr }
             } else {
                 unsafe {
                     let ptr = &self.unwrap_non_null(Private).as_ref().specptr as *const _

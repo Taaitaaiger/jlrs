@@ -35,7 +35,7 @@ jobs:
       - name: Run tests
         run: |
           export JULIA_DIR="$(dirname $(dirname $(which julia)))"
-          export LD_LIBRARY_PATH="${JULIA_DIR}/lib:${JULIA_DIR}/lib:${LD_LIBRARY_PATH}"
+          export LD_LIBRARY_PATH="${JULIA_DIR}/lib:${JULIA_DIR}/lib/julia:${LD_LIBRARY_PATH}"
           cargo test --features tokio-rt,async-std-rt,jlrs-ndarray,f16,jlrs-derive,sync-rt,ccall --verbose -- --test-threads=1
 
   test-windows:
@@ -120,7 +120,7 @@ jobs:
       - name: Run tests
         run: |
           export JULIA_DIR="$(dirname $(dirname $(which julia)))"
-          export LD_LIBRARY_PATH="${JULIA_DIR}/lib:${JULIA_DIR}/lib:${LD_LIBRARY_PATH}"
+          export LD_LIBRARY_PATH="${JULIA_DIR}/lib:${JULIA_DIR}/lib/julia:${LD_LIBRARY_PATH}"
           cargo test --features tokio-rt,async-std-rt,jlrs-ndarray,f16,jlrs-derive,lts,sync-rt,ccall --verbose -- --test-threads=1
 
   docs:
