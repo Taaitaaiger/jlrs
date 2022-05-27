@@ -77,7 +77,6 @@ async fn main() {
         RuntimeBuilder::new()
             .async_runtime::<AsyncStd, AsyncStdChannel<_>>()
             .start_async()
-            .await
             .expect("Could not init Julia")
     };
 

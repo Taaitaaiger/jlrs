@@ -67,10 +67,12 @@ macro_rules! impl_unboxer {
             type Output = Self;
             #[inline(always)]
             unsafe fn unbox(value: Value) -> $type {
-                $unboxer(<Value as crate::wrappers::ptr::private::Wrapper>::unwrap(
-                    value,
-                    $crate::private::Private,
-                )) as _
+                $unboxer(
+                    <Value as crate::wrappers::ptr::private::WrapperPriv>::unwrap(
+                        value,
+                        $crate::private::Private,
+                    ),
+                ) as _
             }
         }
     };

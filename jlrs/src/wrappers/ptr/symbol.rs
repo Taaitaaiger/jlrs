@@ -5,14 +5,15 @@ use crate::{
     impl_debug, impl_julia_typecheck,
     memory::{global::Global, output::Output},
     private::Private,
-    wrappers::ptr::{private::Wrapper as WrapperPriv, value::LeakedValue},
+    wrappers::ptr::{private::WrapperPriv, value::LeakedValue},
 };
 use cfg_if::cfg_if;
 use jl_sys::{jl_sym_t, jl_symbol_n, jl_symbol_name_ as jl_symbol_name, jl_symbol_type};
 use std::{ffi::CStr, marker::PhantomData, ptr::NonNull};
 
 cfg_if! {
-    if #[cfg(not(feature = "lts"))] {
+    if #[cfg(any(not(feature = "lts"), feature = "all-features-override"))] {
+        use jl_sys::jl_value_t;
         use crate::wrappers::ptr::atomic_value;
         use std::sync::atomic::Ordering;
     }
@@ -54,63 +55,59 @@ impl<'scope> Symbol<'scope> {
 
     /// `Symbol`s are stored using an invasive binary tree, this returns the left branch of the
     /// current node.
-    #[cfg(feature = "lts")]
     pub fn left(self) -> Option<Symbol<'scope>> {
-        unsafe {
-            let left = self.unwrap_non_null(Private).as_ref().left;
+        cfg_if! {
+            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                unsafe {
+                    let right = self.unwrap_non_null(Private).as_ref().left;
 
-            if left.is_null() {
-                return None;
+                    if right.is_null() {
+                        return None;
+                    }
+
+                    Some(Symbol::wrap(right, Private))
+                }
+            } else {
+                unsafe {
+                    let left = atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().left as *const _);
+                    let ptr = left.load(Ordering::Relaxed);
+
+                    if ptr.is_null() {
+                        return None;
+                    }
+
+                    Some(Symbol::wrap(ptr.cast(), Private))
+                }
             }
-
-            Some(Symbol::wrap(left, Private))
-        }
-    }
-
-    /// `Symbol`s are stored using an invasive binary tree, this returns the left branch of the
-    /// current node.
-    #[cfg(not(feature = "lts"))]
-    pub fn left(self) -> Option<Symbol<'scope>> {
-        unsafe {
-            let left = atomic_value(&mut self.unwrap_non_null(Private).as_mut().left as *mut _);
-            let ptr = left.load(Ordering::Relaxed);
-
-            if ptr.is_null() {
-                return None;
-            }
-
-            Some(Symbol::wrap(ptr.cast(), Private))
         }
     }
 
     /// `Symbol`s are stored using an invasive binary tree, this returns the right branch of the
     /// current node.
-    #[cfg(feature = "lts")]
     pub fn right(self) -> Option<Symbol<'scope>> {
-        unsafe {
-            let right = self.unwrap_non_null(Private).as_ref().right;
+        cfg_if! {
+            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                unsafe {
+                    let right = self.unwrap_non_null(Private).as_ref().right;
 
-            if right.is_null() {
-                return None;
+                    if right.is_null() {
+                        return None;
+                    }
+
+                    Some(Symbol::wrap(right, Private))
+                }
+            } else {
+                unsafe {
+                    let left = atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().right as *const _);
+                    let ptr = left.load(Ordering::Relaxed);
+
+                    if ptr.is_null() {
+                        return None;
+                    }
+
+                    Some(Symbol::wrap(ptr.cast(), Private))
+                }
             }
-
-            Some(Symbol::wrap(right, Private))
-        }
-    }
-
-    /// `Symbol`s are stored using an invasive binary tree, this returns the right branch of the
-    /// current node.
-    #[cfg(not(feature = "lts"))]
-    pub fn right(self) -> Option<Symbol<'scope>> {
-        unsafe {
-            let right = atomic_value(&mut self.unwrap_non_null(Private).as_mut().right as *mut _);
-            let ptr = right.load(Ordering::Relaxed);
-
-            if ptr.is_null() {
-                return None;
-            }
-
-            Some(Symbol::wrap(ptr.cast(), Private))
         }
     }
 

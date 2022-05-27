@@ -9,9 +9,7 @@ use crate::{
     impl_debug, impl_julia_typecheck,
     memory::{global::Global, output::Output},
     private::Private,
-    wrappers::ptr::{
-        private::Wrapper as WrapperPriv, ModuleRef, SimpleVectorRef, SymbolRef, ValueRef,
-    },
+    wrappers::ptr::{private::WrapperPriv, ModuleRef, SimpleVectorRef, SymbolRef, ValueRef},
 };
 use cfg_if::cfg_if;
 use jl_sys::{
@@ -21,11 +19,11 @@ use jl_sys::{
 use std::{marker::PhantomData, ptr::NonNull};
 
 cfg_if! {
-    if #[cfg(feature = "lts")] {
+    if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
         use jl_sys::jl_vararg_typename;
 
     } else {
-        use jl_sys::jl_opaque_closure_typename;
+        use jl_sys::{jl_opaque_closure_typename, jl_value_t};
         use super::atomic_value;
         use std::sync::atomic::Ordering;
     }
@@ -72,13 +70,13 @@ impl<'scope> TypeName<'scope> {
     }
 
     /// The `atomicfields` field.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn atomicfields(self) -> *const u32 {
         unsafe { self.unwrap_non_null(Private).as_ref().atomicfields }
     }
 
     /// The `atomicfields` field.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn constfields(self) -> *const u32 {
         unsafe { self.unwrap_non_null(Private).as_ref().constfields }
     }
@@ -90,35 +88,33 @@ impl<'scope> TypeName<'scope> {
     }
 
     /// Sorted array.
-    #[cfg(feature = "lts")]
     pub fn cache(self) -> SimpleVectorRef<'scope> {
-        unsafe { SimpleVectorRef::wrap(self.unwrap_non_null(Private).as_ref().cache) }
-    }
-
-    /// Sorted array.
-    #[cfg(not(feature = "lts"))]
-    pub fn cache(self) -> SimpleVectorRef<'scope> {
-        unsafe {
-            let cache = atomic_value(&mut self.unwrap_non_null(Private).as_mut().cache as *mut _);
-            let ptr = cache.load(Ordering::Relaxed);
-            SimpleVectorRef::wrap(ptr.cast())
+        cfg_if! {
+            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                unsafe { SimpleVectorRef::wrap(self.unwrap_non_null(Private).as_ref().cache) }
+            } else {
+                unsafe {
+                    let cache = atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().cache as *const _);
+                    let ptr = cache.load(Ordering::Relaxed);
+                    SimpleVectorRef::wrap(ptr.cast())
+                }
+            }
         }
     }
 
     /// Unsorted array.
-    #[cfg(feature = "lts")]
     pub fn linear_cache(self) -> SimpleVectorRef<'scope> {
-        unsafe { SimpleVectorRef::wrap(self.unwrap_non_null(Private).as_ref().linearcache) }
-    }
-
-    /// Unsorted array.
-    #[cfg(not(feature = "lts"))]
-    pub fn linear_cache(self) -> SimpleVectorRef<'scope> {
-        unsafe {
-            let linearcache =
-                atomic_value(&mut self.unwrap_non_null(Private).as_mut().linearcache as *mut _);
-            let ptr = linearcache.load(Ordering::Relaxed);
-            SimpleVectorRef::wrap(ptr.cast())
+        cfg_if! {
+            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                unsafe { SimpleVectorRef::wrap(self.unwrap_non_null(Private).as_ref().linearcache) }
+            } else {
+                unsafe {
+                    let linearcache =
+                        atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().linearcache as *const _);
+                    let ptr = linearcache.load(Ordering::Relaxed);
+                    SimpleVectorRef::wrap(ptr.cast())
+                }
+            }
         }
     }
 
@@ -138,25 +134,25 @@ impl<'scope> TypeName<'scope> {
     }
 
     /// The `n_uninitialized` field.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn n_uninitialized(self) -> i32 {
         unsafe { self.unwrap_non_null(Private).as_ref().n_uninitialized }
     }
 
     /// The `abstract` field.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn abstract_(self) -> bool {
         unsafe { self.unwrap_non_null(Private).as_ref().abstract_() != 0 }
     }
 
     /// The `mutabl` field.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn mutabl(self) -> bool {
         unsafe { self.unwrap_non_null(Private).as_ref().mutabl() != 0 }
     }
 
     /// The `mayinlinealloc` field.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn mayinlinealloc(self) -> bool {
         unsafe { self.unwrap_non_null(Private).as_ref().mayinlinealloc() != 0 }
     }
@@ -188,7 +184,7 @@ impl<'base> TypeName<'base> {
     }
 
     /// The typename of the `UnionAll` `Vararg`.
-    #[cfg(feature = "lts")]
+    #[cfg(all(feature = "lts", not(feature = "all-features-override")))]
     pub fn of_vararg(_: Global<'base>) -> Self {
         unsafe { Self::wrap(jl_vararg_typename, Private) }
     }
@@ -199,7 +195,7 @@ impl<'base> TypeName<'base> {
     }
 
     /// The typename of the `UnionAll` `Ptr`.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn of_opaque_closure(_: Global<'base>) -> Self {
         unsafe { Self::wrap(jl_opaque_closure_typename, Private) }
     }

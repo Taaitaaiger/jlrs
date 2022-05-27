@@ -16,9 +16,7 @@ use crate::{
     },
     memory::{global::Global, output::Output, scope::PartialScope},
     private::Private,
-    wrappers::ptr::{
-        datatype::DataType, private::Wrapper as WrapperPriv, value::Value, FunctionRef, Wrapper,
-    },
+    wrappers::ptr::{datatype::DataType, private::WrapperPriv, value::Value, FunctionRef, Wrapper},
 };
 use jl_sys::jl_value_t;
 use std::{marker::PhantomData, ptr::NonNull};

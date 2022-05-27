@@ -7,107 +7,118 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::{env, process::Command};
 
-#[cfg(target_os = "linux")]
+use cfg_if::cfg_if;
+
 fn find_julia() -> Option<String> {
-    if let Ok(path) = env::var("JULIA_DIR") {
-        return Some(path);
+    cfg_if! {
+        if #[cfg(target_os = "linux")] {
+            if let Ok(path) = env::var("JULIA_DIR") {
+                return Some(path);
+            }
+
+            let out = Command::new("which").arg("julia").output().ok()?.stdout;
+            let mut julia_path = PathBuf::from(OsStr::from_bytes(out.as_ref()));
+
+            if !julia_path.pop() {
+                return None;
+            }
+
+            if !julia_path.pop() {
+                return None;
+            }
+
+            Some(julia_path.to_string_lossy().to_string())
+        } else if #[cfg(target_os = "windows")] {
+            if let Ok(path) = env::var("JULIA_DIR") {
+                return Some(path);
+            }
+
+            let out = Command::new("cmd")
+                .args(["/C", "where", "julia"])
+                .output()
+                .ok()?;
+            let results = String::from_utf8(out.stdout).ok()?;
+
+            let mut lines = results.lines();
+            let first = lines.next()?;
+
+            let mut julia_path = PathBuf::from_str(first).unwrap();
+
+            if !julia_path.pop() {
+                return None;
+            }
+
+            if !julia_path.pop() {
+                return None;
+            }
+
+            Some(julia_path.to_string_lossy().to_string())
+        } else {
+            unimplemented!("Only Linux and Windows are supported")
+        }
     }
-
-    let out = Command::new("which").arg("julia").output().ok()?.stdout;
-    let mut julia_path = PathBuf::from(OsStr::from_bytes(out.as_ref()));
-
-    if !julia_path.pop() {
-        return None;
-    }
-
-    if !julia_path.pop() {
-        return None;
-    }
-
-    Some(julia_path.to_string_lossy().to_string())
 }
 
-#[cfg(target_os = "windows")]
-fn find_julia() -> Option<String> {
-    if let Ok(path) = env::var("JULIA_DIR") {
-        return Some(path);
-    }
-
-    let out = Command::new("cmd")
-        .args(["/C", "where", "julia"])
-        .output()
-        .ok()?;
-    let results = String::from_utf8(out.stdout).ok()?;
-
-    let mut lines = results.lines();
-    let first = lines.next()?;
-
-    let mut julia_path = PathBuf::from_str(first).unwrap();
-
-    if !julia_path.pop() {
-        return None;
-    }
-
-    if !julia_path.pop() {
-        return None;
-    }
-
-    Some(julia_path.to_string_lossy().to_string())
-}
-
-#[cfg(target_os = "linux")]
 fn set_flags(julia_dir: &str) {
-    println!("cargo:rustc-link-search={}/lib", &julia_dir);
+    cfg_if! {
+        if #[cfg(target_os = "linux")] {
+            println!("cargo:rustc-link-search={}/lib", &julia_dir);
+            println!("cargo:rustc-link-arg=-Wl,--export-dynamic");
 
-    if env::var("CARGO_FEATURE_UV").is_ok() {
-        println!("cargo:rustc-link-search={}/lib/julia", &julia_dir);
-    }
+            cfg_if! {
+                if #[cfg(all(feature = "debug", not(feature = "all-features-override")))] {
+                    println!("cargo:rustc-link-lib=julia-debug");
+                } else {
+                    println!("cargo:rustc-link-lib=julia");
+                }
+            }
 
-    println!("cargo:rustc-link-arg=-Wl,--export-dynamic");
+            cfg_if! {
+                if #[cfg(feature = "uv")] {
+                    println!("cargo:rustc-link-search={}/lib/julia", &julia_dir);
+                    println!("cargo:rustc-link-lib=uv");
+                }
+            }
+        } else if #[cfg(all(target_os = "windows", target_env = "msvc"))] {
+            println!("cargo:rustc-link-search={}/bin", &julia_dir);
 
-    if env::var("CARGO_FEATURE_DEBUG").is_ok() {
-        println!("cargo:rustc-link-lib=julia-debug");
-    } else {
-        println!("cargo:rustc-link-lib=julia");
-    }
+            cfg_if! {
+                if #[cfg(all(feature = "debug", not(feature = "all-features-override")))] {
+                    println!("cargo:rustc-link-lib=libjulia-debug");
+                } else {
+                    println!("cargo:rustc-link-lib=libjulia");
+                }
+            }
 
-    if env::var("CARGO_FEATURE_UV").is_ok() {
-        println!("cargo:rustc-link-lib=uv");
-    }
-}
+            println!("cargo:rustc-link-lib=libopenlibm");
 
-#[cfg(all(target_os = "windows", target_env = "msvc"))]
-fn set_flags(julia_dir: &str) {
-    println!("cargo:rustc-link-search={}/bin", &julia_dir);
+            cfg_if! {
+                if #[cfg(feature = "uv")] {
+                    println!("cargo:rustc-link-lib=libuv-2");
+                }
+            }
+        } else if #[cfg(all(target_os = "windows", target_env = "gnu"))] {
+            println!("cargo:rustc-link-search={}/bin", &julia_dir);
 
-    if env::var("CARGO_FEATURE_DEBUG").is_ok() {
-        println!("cargo:rustc-link-lib=libjulia-debug");
-    } else {
-        println!("cargo:rustc-link-lib=libjulia");
-    }
+            cfg_if! {
+                if #[cfg(all(feature = "debug", not(feature = "all-features-override")))] {
+                    println!("cargo:rustc-link-lib=julia-debug");
+                } else {
+                    println!("cargo:rustc-link-lib=julia");
+                }
+            }
 
-    println!("cargo:rustc-link-lib=libopenlibm");
+            println!("cargo:rustc-link-lib=openlibm");
+            println!("cargo:rustc-link-arg=-Wl,--stack,8388608");
 
-    if env::var("CARGO_FEATURE_UV").is_ok() {
-        println!("cargo:rustc-link-lib=libuv-2");
-    }
-}
-
-#[cfg(all(target_os = "windows", target_env = "gnu"))]
-fn set_flags(julia_dir: &str) {
-    println!("cargo:rustc-link-search={}/bin", &julia_dir);
-
-    if env::var("CARGO_FEATURE_DEBUG").is_ok() {
-        println!("cargo:rustc-link-lib=julia-debug");
-    } else {
-        println!("cargo:rustc-link-lib=julia");
-    }
-
-    println!("cargo:rustc-link-lib=openlibm");
-    println!("cargo:rustc-link-arg=-Wl,--stack,8388608");
-
-    if env::var("CARGO_FEATURE_UV").is_ok() {
-        println!("cargo:rustc-link-lib=uv-2");
+            cfg_if! {
+                if #[cfg(feature = "uv")] {
+                    println!("cargo:rustc-link-lib=uv-2");
+                }
+            }
+        } else {
+            unreachable!()
+        }
     }
 }
 
@@ -134,12 +145,15 @@ fn main() {
     let mut c = cc::Build::new();
     c.file("src/jlrs_cc.cc").include(&include_dir).cpp(true);
 
-    #[cfg(any(feature = "windows-lts", all(feature = "lts", windows)))]
+    #[cfg(all(
+        any(feature = "windows-lts", all(feature = "lts", windows)),
+        not(feature = "all-features-override")
+    ))]
     c.define("JLRS_WINDOWS_LTS", None);
 
     c.compile("jlrs_cc");
 
-    #[cfg(feature = "use-bindgen")]
+    #[cfg(all(feature = "use-bindgen", not(feature = "all-features-override")))]
     {
         let mut out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
         out_path.push("bindings.rs");

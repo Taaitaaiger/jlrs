@@ -11,8 +11,8 @@ use crate::{
     private::Private,
     wrappers::ptr::TypedArrayRef,
     wrappers::ptr::{
-        private::Wrapper as WrapperPriv, ArrayRef, MethodInstanceRef, ModuleRef, SimpleVectorRef,
-        SymbolRef, ValueRef,
+        private::WrapperPriv, ArrayRef, MethodInstanceRef, ModuleRef, SimpleVectorRef, SymbolRef,
+        ValueRef,
     },
 };
 use cfg_if::cfg_if;
@@ -20,7 +20,8 @@ use jl_sys::{jl_method_t, jl_method_type};
 use std::{marker::PhantomData, ptr::NonNull};
 
 cfg_if! {
-    if #[cfg(not(feature = "lts"))] {
+    if #[cfg(any(not(feature = "lts"), feature = "all-features-override"))] {
+        use jl_sys::jl_value_t;
         use crate::wrappers::ptr::atomic_value;
         use std::sync::atomic::Ordering;
     }
@@ -104,36 +105,34 @@ impl<'scope> Method<'scope> {
     }
 
     /// Table of all `Method` specializations, allocated as [hashable, ..., NULL, linear, ....]
-    #[cfg(feature = "lts")]
     pub fn specializations(self) -> SimpleVectorRef<'scope> {
-        unsafe { SimpleVectorRef::wrap(self.unwrap_non_null(Private).as_ref().specializations) }
-    }
-
-    /// Table of all `Method` specializations, allocated as [hashable, ..., NULL, linear, ....]
-    #[cfg(not(feature = "lts"))]
-    pub fn specializations(self) -> SimpleVectorRef<'scope> {
-        unsafe {
-            let specializations =
-                atomic_value(&mut self.unwrap_non_null(Private).as_mut().specializations as *mut _);
-            let ptr = specializations.load(Ordering::Relaxed);
-            SimpleVectorRef::wrap(ptr.cast())
+        cfg_if! {
+            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                unsafe { SimpleVectorRef::wrap(self.unwrap_non_null(Private).as_ref().specializations) }
+            } else {
+                unsafe {
+                    let specializations =
+                        atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().specializations as *const _);
+                    let ptr = specializations.load(Ordering::Relaxed);
+                    SimpleVectorRef::wrap(ptr.cast())
+                }
+            }
         }
     }
 
     /// Index lookup by hash into specializations
-    #[cfg(feature = "lts")]
     pub fn spec_key_set(self) -> ArrayRef<'scope, 'static> {
-        unsafe { ArrayRef::wrap(self.unwrap_non_null(Private).as_ref().speckeyset) }
-    }
-
-    /// Index lookup by hash into specializations
-    #[cfg(not(feature = "lts"))]
-    pub fn spec_key_set(self) -> ArrayRef<'scope, 'static> {
-        unsafe {
-            let speckeyset =
-                atomic_value(&mut self.unwrap_non_null(Private).as_mut().speckeyset as *mut _);
-            let ptr = speckeyset.load(Ordering::Relaxed);
-            ArrayRef::wrap(ptr.cast())
+        cfg_if! {
+            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                unsafe { ArrayRef::wrap(self.unwrap_non_null(Private).as_ref().speckeyset) }
+            } else {
+                unsafe {
+                    let speckeyset =
+                        atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().speckeyset as *const _);
+                    let ptr = speckeyset.load(Ordering::Relaxed);
+                    ArrayRef::wrap(ptr.cast())
+                }
+            }
         }
     }
 
@@ -143,7 +142,7 @@ impl<'scope> Method<'scope> {
     }
 
     /// reference to the method table this method is part of, null if part of the internal table
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn external_mt(self) -> ValueRef<'scope, 'static> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().external_mt) }
     }
@@ -154,19 +153,18 @@ impl<'scope> Method<'scope> {
     }
 
     /// Unspecialized executable method instance, or `None`
-    #[cfg(feature = "lts")]
     pub fn unspecialized(self) -> MethodInstanceRef<'scope> {
-        unsafe { MethodInstanceRef::wrap(self.unwrap_non_null(Private).as_ref().unspecialized) }
-    }
-
-    /// Unspecialized executable method instance, or `None`
-    #[cfg(not(feature = "lts"))]
-    pub fn unspecialized(self) -> MethodInstanceRef<'scope> {
-        unsafe {
-            let unspecialized =
-                atomic_value(&mut self.unwrap_non_null(Private).as_mut().unspecialized as *mut _);
-            let ptr = unspecialized.load(Ordering::Relaxed);
-            MethodInstanceRef::wrap(ptr.cast())
+        cfg_if! {
+            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                unsafe { MethodInstanceRef::wrap(self.unwrap_non_null(Private).as_ref().unspecialized) }
+            } else {
+                unsafe {
+                    let unspecialized =
+                        atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().unspecialized as *const _);
+                    let ptr = unspecialized.load(Ordering::Relaxed);
+                    MethodInstanceRef::wrap(ptr.cast())
+                }
+            }
         }
     }
 
@@ -181,13 +179,13 @@ impl<'scope> Method<'scope> {
     }
 
     /// RLE (build_id, offset) pairs (even/odd indexing)
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn root_blocks(self) -> TypedArrayRef<'scope, 'static, u64> {
         unsafe { TypedArrayRef::wrap(self.unwrap_non_null(Private).as_ref().root_blocks) }
     }
 
     /// # of roots stored in the system image
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn nroots_sysimg(self) -> i32 {
         unsafe { self.unwrap_non_null(Private).as_ref().nroots_sysimg }
     }
@@ -200,21 +198,18 @@ impl<'scope> Method<'scope> {
     /// Cache of specializations of this method for invoke(), i.e.
     /// cases where this method was called even though it was not necessarily
     /// the most specific for the argument types.
-    #[cfg(feature = "lts")]
     pub fn invokes(self) -> ValueRef<'scope, 'static> {
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().invokes) }
-    }
-
-    /// Cache of specializations of this method for invoke(), i.e.
-    /// cases where this method was called even though it was not necessarily
-    /// the most specific for the argument types.
-    #[cfg(not(feature = "lts"))]
-    pub fn invokes(self) -> ValueRef<'scope, 'static> {
-        unsafe {
-            let invokes =
-                atomic_value(&mut self.unwrap_non_null(Private).as_mut().invokes as *mut _);
-            let ptr = invokes.load(Ordering::Relaxed);
-            ValueRef::wrap(ptr.cast())
+        cfg_if! {
+            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().invokes) }
+            } else {
+                unsafe {
+                    let invokes =
+                        atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().invokes as *const _);
+                    let ptr = invokes.load(Ordering::Relaxed);
+                    ValueRef::wrap(ptr.cast())
+                }
+            }
         }
     }
 
@@ -250,20 +245,20 @@ impl<'scope> Method<'scope> {
     }
 
     /// The `is_for_opaque_closure` field of this `Method`
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn is_for_opaque_closure(self) -> bool {
         unsafe { self.unwrap_non_null(Private).as_ref().is_for_opaque_closure != 0 }
     }
 
     /// 0x00 = use heuristic; 0x01 = aggressive; 0x02 = none
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn constprop(self) -> u8 {
         unsafe { self.unwrap_non_null(Private).as_ref().constprop }
     }
 
     /// Override the conclusions of inter-procedural effect analysis,
     /// forcing the conclusion to always true.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn purity(self) -> u8 {
         unsafe { self.unwrap_non_null(Private).as_ref().purity.bits }
     }

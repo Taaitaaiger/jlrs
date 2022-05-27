@@ -18,6 +18,14 @@ impl PersistentTask for MyTask {
     type Output = ();
     type State = (PyPlot<'static>, Value<'static, 'static>);
 
+    async fn register<'frame>(
+        _global: Global<'frame>,
+        frame: &mut AsyncGcFrame<'frame>,
+    ) -> JlrsResult<()> {
+        PyPlot::init(frame);
+        Ok(())
+    }
+
     async fn init<'inner>(
         &'inner mut self,
         global: Global<'static>,
@@ -88,9 +96,14 @@ async fn main() {
         RuntimeBuilder::new()
             .async_runtime::<Tokio, UnboundedChannel<_>>()
             .start_async()
-            .await
             .expect("Could not init Julia")
     };
+
+    {
+        let (s, r) = tokio::sync::oneshot::channel();
+        julia.register_persistent::<MyTask, _>(s).await.unwrap();
+        r.await.unwrap().unwrap();
+    }
 
     let persistent_handle = julia
         .persistent::<UnboundedChannel<_>, _>(MyTask {

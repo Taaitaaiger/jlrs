@@ -77,7 +77,6 @@ async fn main() {
         RuntimeBuilder::new()
             .async_runtime::<Tokio, UnboundedChannel<_>>()
             .start_async()
-            .await
             .expect("Could not init Julia")
     };
 

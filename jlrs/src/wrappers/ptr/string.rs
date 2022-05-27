@@ -6,7 +6,7 @@ use crate::{
     impl_julia_typecheck,
     memory::{global::Global, output::Output, scope::PartialScope},
     private::Private,
-    wrappers::ptr::{private::Wrapper as WrapperPriv, value::Value, StringRef},
+    wrappers::ptr::{private::WrapperPriv, value::Value, StringRef},
 };
 use jl_sys::{jl_pchar_to_string, jl_string_type};
 use std::{

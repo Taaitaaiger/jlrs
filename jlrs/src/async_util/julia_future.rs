@@ -8,7 +8,7 @@ use crate::wrappers::ptr::Wrapper;
 use crate::{
     error::{exception, JlrsError, JlrsResult, JuliaResult},
     private::Private,
-    wrappers::ptr::private::Wrapper as _,
+    wrappers::ptr::private::WrapperPriv,
 };
 use futures::task::{Context, Poll, Waker};
 use futures::Future;

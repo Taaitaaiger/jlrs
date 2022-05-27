@@ -11,7 +11,7 @@ use crate::{
             Array,
         },
         datatype::DataType,
-        private::Wrapper,
+        private::WrapperPriv,
         union::{find_union_component, nth_union_component},
         value::Value,
         Wrapper as _,

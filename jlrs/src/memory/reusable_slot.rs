@@ -3,7 +3,7 @@
 use super::frame::Frame;
 use crate::{
     private::Private,
-    wrappers::ptr::{private::Wrapper, value::Value, ValueRef},
+    wrappers::ptr::{private::WrapperPriv, value::Value, ValueRef},
 };
 use std::{cell::Cell, ffi::c_void, marker::PhantomData};
 

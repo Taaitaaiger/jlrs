@@ -61,10 +61,6 @@ impl Julia {
 
         jl.scope(|_, frame| {
             init_jlrs(&mut *frame);
-
-            #[cfg(feature = "pyplot")]
-            crate::pyplot::init_jlrs_py_plot(&mut *frame);
-
             Ok(())
         })
         .expect("Could not load Jlrs module");
@@ -159,7 +155,10 @@ impl Julia {
         unsafe {
             let global = Global::new();
             let mut frame = GcFrame::new(self.page.as_mut(), Sync);
-            func(global, &mut frame)
+
+            let ret = func(global, &mut frame);
+            std::mem::drop(frame);
+            ret
         }
     }
 
@@ -192,7 +191,10 @@ impl Julia {
                 self.page = StackPage::new(capacity + 2);
             }
             let mut frame = GcFrame::new(self.page.as_mut(), Sync);
-            func(global, &mut frame)
+
+            let ret = func(global, &mut frame);
+            std::mem::drop(frame);
+            ret
         }
     }
 

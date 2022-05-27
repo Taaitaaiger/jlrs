@@ -30,7 +30,7 @@ use crate::{
         get_tls,
         global::Global,
         output::Output,
-        scope::{private::PartialScope as _, PartialScope, Scope},
+        scope::{private::PartialScopePriv, PartialScope, Scope},
     },
     private::Private,
     wrappers::ptr::{
@@ -44,7 +44,7 @@ use crate::{
             dimensions::{ArrayDimensions, Dims},
         },
         datatype::DataType,
-        private::Wrapper as WrapperPriv,
+        private::WrapperPriv,
         type_name::TypeName,
         union::Union,
         value::Value,

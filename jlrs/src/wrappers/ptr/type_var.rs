@@ -7,8 +7,8 @@ use crate::{
     memory::{global::Global, output::Output, scope::PartialScope},
     private::Private,
     wrappers::ptr::{
-        datatype::DataType, private::Wrapper as WrapperPriv, value::Value, SymbolRef, TypeVarRef,
-        ValueRef, Wrapper,
+        datatype::DataType, private::WrapperPriv, value::Value, SymbolRef, TypeVarRef, ValueRef,
+        Wrapper,
     },
 };
 use cfg_if::cfg_if;

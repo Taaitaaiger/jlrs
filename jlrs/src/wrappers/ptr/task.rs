@@ -8,12 +8,13 @@ use crate::{
     impl_debug, impl_julia_typecheck,
     memory::output::Output,
     private::Private,
-    wrappers::ptr::{private::Wrapper as WrapperPriv, TaskRef, ValueRef},
+    wrappers::ptr::{private::WrapperPriv, TaskRef, ValueRef},
 };
 use jl_sys::{jl_task_t, jl_task_type};
 use std::{marker::PhantomData, ptr::NonNull};
 
-#[cfg(not(feature = "lts"))]
+use cfg_if::cfg_if;
+#[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
 use std::sync::atomic::{AtomicU8, Ordering};
 
 /// A Julia `Task` (coroutine).
@@ -78,19 +79,18 @@ impl<'scope> Task<'scope> {
     }
 
     /// The `_state` field.
-    #[cfg(feature = "lts")]
     pub fn state(self) -> u8 {
-        unsafe { self.unwrap_non_null(Private).as_ref()._state }
-    }
-
-    /// The `_state` field.
-    #[cfg(not(feature = "lts"))]
-    pub fn state(self) -> u8 {
-        unsafe {
-            let ptr =
-                &self.unwrap_non_null(Private).as_ref()._state as *const u8 as *const AtomicU8;
-            let field_ref = &*ptr;
-            field_ref.load(Ordering::SeqCst)
+        cfg_if! {
+            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                unsafe { self.unwrap_non_null(Private).as_ref()._state }
+            } else {
+                unsafe {
+                    let ptr =
+                        &self.unwrap_non_null(Private).as_ref()._state as *const u8 as *const AtomicU8;
+                    let field_ref = &*ptr;
+                    field_ref.load(Ordering::SeqCst)
+                }
+            }
         }
     }
 
@@ -100,19 +100,18 @@ impl<'scope> Task<'scope> {
     }
 
     /// set if `result` is an exception to throw or that we exited with
-    #[cfg(feature = "lts")]
     pub fn is_exception(self) -> bool {
-        unsafe { self.unwrap_non_null(Private).as_ref()._isexception != 0 }
-    }
-
-    /// set if `result` is an exception to throw or that we exited with
-    #[cfg(not(feature = "lts"))]
-    pub fn is_exception(self) -> bool {
-        unsafe {
-            let ptr = &self.unwrap_non_null(Private).as_ref()._isexception as *const u8
-                as *const AtomicU8;
-            let field_ref = &*ptr;
-            field_ref.load(Ordering::SeqCst) != 0
+        cfg_if! {
+            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                unsafe { self.unwrap_non_null(Private).as_ref()._isexception != 0 }
+            } else {
+                unsafe {
+                    let ptr = &self.unwrap_non_null(Private).as_ref()._isexception as *const u8
+                        as *const AtomicU8;
+                    let field_ref = &*ptr;
+                    field_ref.load(Ordering::SeqCst) != 0
+                }
+            }
         }
     }
 

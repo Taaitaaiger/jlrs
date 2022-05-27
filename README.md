@@ -152,6 +152,10 @@ In addition to these runtimes, the following utility features are available:
 - `pyplot`
   This feature lets you plot data using the Pyplot package and Gtk 3 from Rust.
 
+- `debug`
+  Link with a debug build of Julia. 
+
+You can enable all features except `lts` and `debug` by enabling the `full` feature.
 
 ## Using this crate
 
@@ -206,7 +210,6 @@ async fn main() {
           RuntimeBuilder::new()
               .async_runtime::<Tokio, UnboundedChannel<_>>()
               .start_async()
-              .await
               .unwrap()
       };
 }
@@ -596,8 +599,9 @@ Tests that use these constructs can only use one thread for testing, so you must
 `cargo test -- --test-threads=1`, otherwise the code above will panic when a test tries to
 initialize Julia a second time from another thread.
 
-If you want to run all of jlrs's tests, all these requirements must be taken into account:
-cargo test --features sync-rt,jlrs-ndarray,f16,uv,jlrs-derive,tokio-rt,async-std-rt -- --test-threads=1`
+If you want to run all of jlrs's tests, this requirement must be taken into account:
+`cargo test --all-features -- --test-threads=1`. Testing with the `--all-features` flag only works
+with Julia 1.8 because this overrides the `lts` and `debug` features.
 
 
 ## Custom types

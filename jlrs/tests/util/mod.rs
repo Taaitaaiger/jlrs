@@ -10,12 +10,21 @@ use std::cell::RefCell;
 
 static JLRS_TESTS_JL: &'static str = include_str!("JlrsTests.jl");
 
-#[cfg(all(feature = "sync-rt", not(feature = "lts")))]
+#[cfg(all(
+    feature = "sync-rt",
+    any(not(feature = "lts"), feature = "all-features-override")
+))]
 static JLRS_STABLE_TESTS_JL: &'static str = include_str!("JlrsStableTests.jl");
 
-#[cfg(all(feature = "sync-rt", not(feature = "lts")))]
+#[cfg(all(
+    feature = "sync-rt",
+    any(not(feature = "lts"), feature = "all-features-override")
+))]
 pub static MIXED_BAG_JL: &'static str = include_str!("MixedBagStable.jl");
-#[cfg(all(feature = "sync-rt", feature = "lts"))]
+#[cfg(all(
+    feature = "sync-rt",
+    all(feature = "lts", not(feature = "all-features-override"))
+))]
 pub static MIXED_BAG_JL: &'static str = include_str!("MixedBagLTS.jl");
 
 #[cfg(all(feature = "async-rt", not(all(target_os = "windows", feature = "lts"))))]
@@ -37,7 +46,7 @@ thread_local! {
         let r = RefCell::new(unsafe {RuntimeBuilder::new().start().unwrap() });
         r.borrow_mut().scope_with_capacity(1, |_, frame| unsafe {
             Value::eval_string(&mut *frame, JLRS_TESTS_JL)?.expect("failed to evaluate contents of JlrsTests.jl");
-            #[cfg(all(feature = "sync-rt", not(feature = "lts")))]
+            #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
             Value::eval_string(&mut *frame, JLRS_STABLE_TESTS_JL)?.expect("failed to evaluate contents of JlrsTests.jl");
             Ok(())
         }).unwrap();

@@ -9,7 +9,7 @@ use crate::{
             dimensions::{ArrayDimensions, Dims},
             Array,
         },
-        private::Wrapper as _,
+        private::WrapperPriv as _,
         value::Value,
         ValueRef, Wrapper, WrapperRef,
     },

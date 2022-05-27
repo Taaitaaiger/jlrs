@@ -5,7 +5,7 @@
 //! this pushing and popping works, which is handled by the `Mode` trait provided by this module.
 
 /// Handle memory management differences between the sync and async runtime.
-pub trait Mode: Copy + private::Mode {}
+pub trait Mode: Copy + private::ModePriv {}
 
 /// Mode used by the sync runtime.
 #[derive(Clone, Copy)]
@@ -30,14 +30,14 @@ pub(crate) mod private {
     use std::ptr::{null_mut, NonNull};
     use std::{cell::Cell, ffi::c_void};
 
-    pub trait Mode {
+    pub trait ModePriv {
         unsafe fn push_frame(&self, raw_frame: &mut [Cell<*mut c_void>], _: Private);
         unsafe fn pop_frame(&self, raw_frame: &mut [Cell<*mut c_void>], _: Private);
     }
 
     cfg_if::cfg_if! {
-        if #[cfg(feature = "lts")] {
-            impl Mode for Sync {
+        if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+            impl ModePriv for Sync {
                 unsafe fn push_frame(&self, raw_frame: &mut [Cell<*mut c_void>], _: Private) {
                     let rtls = NonNull::new_unchecked(jl_sys::jl_get_ptls_states()).as_mut();
                     raw_frame[0].set(null_mut());
@@ -52,7 +52,7 @@ pub(crate) mod private {
             }
         } else {
             use jl_sys::{jl_get_current_task, jl_task_t};
-            impl Mode for Sync {
+            impl ModePriv for Sync {
                 unsafe fn push_frame(&self, raw_frame: &mut [Cell<*mut c_void>], _: Private) {
                     let task = NonNull::new_unchecked(jl_get_current_task().cast::<jl_task_t>()).as_mut();
                     raw_frame[0].set(null_mut());
@@ -71,7 +71,7 @@ pub(crate) mod private {
     cfg_if::cfg_if! {
         if #[cfg(feature = "async")] {
             use super::Async;
-            impl<'a> Mode for Async<'a> {
+            impl<'a> ModePriv for Async<'a> {
                 unsafe fn push_frame(&self, raw_frame: &mut [Cell<*mut c_void>], _: Private) {
                     raw_frame[0].set(null_mut());
                     raw_frame[1].set(self.0.get());

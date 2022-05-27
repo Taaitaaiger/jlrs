@@ -68,20 +68,18 @@ pub mod reusable_slot;
 pub mod scope;
 pub(crate) mod stack_page;
 
-#[cfg(not(feature = "lts"))]
-use jl_sys::jl_get_current_task;
-#[cfg(feature = "lts")]
-use jl_sys::jl_get_ptls_states;
+use cfg_if::cfg_if;
 use jl_sys::jl_tls_states_t;
-#[cfg(not(feature = "lts"))]
-use std::ptr::NonNull;
 
-#[cfg(feature = "lts")]
 pub(crate) unsafe fn get_tls() -> *mut jl_tls_states_t {
-    jl_get_ptls_states()
-}
-
-#[cfg(not(feature = "lts"))]
-pub(crate) unsafe fn get_tls() -> *mut jl_tls_states_t {
-    NonNull::new_unchecked(jl_get_current_task()).as_ref().ptls
+    cfg_if! {
+        if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+            use jl_sys::jl_get_ptls_states;
+            jl_get_ptls_states()
+        } else {
+            use jl_sys::jl_get_current_task;
+            use std::ptr::NonNull;
+            NonNull::new_unchecked(jl_get_current_task()).as_ref().ptls
+        }
+    }
 }

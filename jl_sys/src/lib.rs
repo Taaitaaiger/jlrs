@@ -7,44 +7,78 @@ use std::mem::size_of;
 use std::ptr::{null_mut, NonNull};
 use std::sync::atomic::{AtomicPtr, Ordering};
 
-#[cfg(feature = "lts")]
+#[cfg(all(feature = "lts", not(feature = "all-features-override")))]
 use ::std::os::raw::c_char;
 
-#[cfg(all(not(feature = "use-bindgen"), feature = "lts", target_os = "linux"))]
-mod bindings_1_6_x86_64_unknown_linux_gnu;
-#[cfg(all(not(feature = "use-bindgen"), feature = "lts", target_os = "linux"))]
-pub use bindings_1_6_x86_64_unknown_linux_gnu::*;
 #[cfg(all(
     not(feature = "use-bindgen"),
-    not(feature = "lts"),
-    target_os = "linux"
+    feature = "lts",
+    target_os = "linux",
+    not(feature = "all-features-override")
+))]
+mod bindings_1_6_x86_64_unknown_linux_gnu;
+#[cfg(all(
+    not(feature = "use-bindgen"),
+    feature = "lts",
+    target_os = "linux",
+    not(feature = "all-features-override")
+))]
+pub use bindings_1_6_x86_64_unknown_linux_gnu::*;
+
+#[cfg(any(
+    all(
+        not(feature = "use-bindgen"),
+        not(feature = "lts"),
+        target_os = "linux"
+    ),
+    all(feature = "all-features-override", target_os = "linux")
 ))]
 mod bindings_1_8_x86_64_unknown_linux_gnu;
-#[cfg(all(
-    not(feature = "use-bindgen"),
-    not(feature = "lts"),
-    target_os = "linux"
+#[cfg(any(
+    all(
+        not(feature = "use-bindgen"),
+        not(feature = "lts"),
+        target_os = "linux"
+    ),
+    all(feature = "all-features-override", target_os = "linux")
 ))]
 pub use bindings_1_8_x86_64_unknown_linux_gnu::*;
 
 #[cfg(all(
     not(feature = "use-bindgen"),
-    not(feature = "lts"),
-    target_os = "windows"
+    feature = "lts",
+    target_os = "windows",
+    not(feature = "all-features-override")
 ))]
-mod bindings_1_8_x86_64_pc_windows_gnu;
+mod bindings_1_6_x86_64_pc_windows_gnu;
 #[cfg(all(
     not(feature = "use-bindgen"),
-    not(feature = "lts"),
-    target_os = "windows"
+    feature = "lts",
+    target_os = "windows",
+    not(feature = "all-features-override")
 ))]
-pub use bindings_1_8_x86_64_pc_windows_gnu::*;
-#[cfg(all(not(feature = "use-bindgen"), feature = "lts", target_os = "windows"))]
-mod bindings_1_6_x86_64_pc_windows_gnu;
-#[cfg(all(not(feature = "use-bindgen"), feature = "lts", target_os = "windows"))]
 pub use bindings_1_6_x86_64_pc_windows_gnu::*;
 
-#[cfg(feature = "use-bindgen")]
+#[cfg(any(
+    all(
+        not(feature = "use-bindgen"),
+        not(feature = "lts"),
+        target_os = "windows"
+    ),
+    all(feature = "all-features-override", target_os = "windows")
+))]
+mod bindings_1_8_x86_64_pc_windows_gnu;
+#[cfg(any(
+    all(
+        not(feature = "use-bindgen"),
+        not(feature = "lts"),
+        target_os = "windows"
+    ),
+    all(feature = "all-features-override", target_os = "windows")
+))]
+pub use bindings_1_8_x86_64_pc_windows_gnu::*;
+
+#[cfg(all(not(feature = "all-features-override"), feature = "use-bindgen"))]
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 #[inline(always)]
@@ -227,10 +261,10 @@ pub unsafe fn jl_array_ptr_set(a: *mut jl_array_t, i: usize, x: *mut c_void) -> 
     x.cast()
 }
 
-#[cfg(feature = "lts")]
+#[cfg(all(not(feature = "all-features-override"), feature = "lts"))]
 pub const jl_init: unsafe extern "C" fn() = jl_init__threading;
 
-#[cfg(feature = "lts")]
+#[cfg(all(not(feature = "all-features-override"), feature = "lts"))]
 pub const jl_init_with_image: unsafe extern "C" fn(*const c_char, *const c_char) =
     jl_init_with_image__threading;
 

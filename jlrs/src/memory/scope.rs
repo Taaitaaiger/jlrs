@@ -24,9 +24,9 @@
 //! ```
 //! # use jlrs::prelude::*;
 //! # use jlrs::util::JULIA;
-//! # #[cfg(feature = "lts")]
+//! # #[cfg(all(feature = "lts", not(feature = "all-features-override")))]
 //! # fn main() {}
-//! # #[cfg(not(feature = "lts"))]
+//! # #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
 //! # fn main() {
 //! # JULIA.with(|j| {
 //! # let mut julia = j.borrow_mut();
@@ -37,20 +37,20 @@
 //!     
 //!     // We can also reserve an output in the current frame and use
 //!     // that output. This has the same effect as the previous example.
-//!     let output = frame.reserve_output()?;
+//!     let output = frame.output()?;
 //!     let _j = Value::new(output, 1u32)?;
 //!     
 //!     // Simarly, we can use an OutputScope because everything that
 //!     // implements Scope implements PartialScope.
-//!     let output = frame.reserve_output()?;
+//!     let output = frame.output()?;
 //!     let output_scope = output.into_scope(frame);
 //!     let _k = Value::new(output_scope, 1u32)?;
 //!
 //!     // Using an output this way isn't particularly useful, because in all
 //!     // the above examples the result is rooted in the current frame.
 //!     // Outputs are more useful in combination with a nested scope.
-//!     let output_a = frame.reserve_output()?;
-//!     let output_b = frame.reserve_output()?;
+//!     let output_a = frame.output()?;
+//!     let output_b = frame.output()?;
 //!     let (_array, _value) = frame.scope(|frame| {
 //!         // By using the output from a nested scope, the data is rooted in
 //!         // the parent frame and both these values can be returned from
@@ -92,7 +92,7 @@ use crate::{
 /// the existing output is returned. In both cases the frame is the current frame, it's
 /// recommended to create a nested scope to root temporary Julia data.
 pub trait Scope<'target, 'current, F>:
-    private::Scope<'target, 'current, F> + PartialScope<'target>
+    private::ScopePriv<'target, 'current, F> + PartialScope<'target>
 where
     F: Frame<'current>,
 {
@@ -112,7 +112,7 @@ where
     where
         Self: 'own,
     {
-        let output = self.reserve_output()?;
+        let output = self.output()?;
         Ok((output, self))
     }
 }
@@ -134,7 +134,7 @@ where
 /// to allocate and root temporary data. It's implemented by mutable references to implementations
 /// of [`Frame`], [`OutputScope`], and [`Output`]. In the first case the data rooted in that
 /// frame, in the other two cases the provided `Output` is used.
-pub trait PartialScope<'target>: private::PartialScope<'target> {
+pub trait PartialScope<'target>: private::PartialScopePriv<'target> {
     /// Returns a new `Global`.
     fn global(&self) -> Global<'target> {
         unsafe { Global::new() }
@@ -161,45 +161,45 @@ pub(crate) mod private {
         private::Private,
         wrappers::ptr::value::Value,
     };
-    use crate::{memory::output::OutputScope, wrappers::ptr::private::Wrapper};
+    use crate::{memory::output::OutputScope, wrappers::ptr::private::WrapperPriv};
     use jl_sys::jl_value_t;
 
-    pub trait Scope<'target, 'current, F>: Sized + PartialScope<'target>
+    pub trait ScopePriv<'target, 'current, F>: Sized + PartialScopePriv<'target>
     where
         F: Frame<'current>,
     {
     }
 
-    impl<'current, F> Scope<'current, 'current, F> for &mut F where F: Frame<'current> {}
+    impl<'current, F> ScopePriv<'current, 'current, F> for &mut F where F: Frame<'current> {}
 
-    impl<'target, 'current, 'borrow, F> Scope<'target, 'current, F>
+    impl<'target, 'current, 'borrow, F> ScopePriv<'target, 'current, F>
         for OutputScope<'target, 'current, 'borrow, F>
     where
         F: Frame<'current>,
     {
     }
 
-    pub trait PartialScope<'target>: Sized {
+    pub trait PartialScopePriv<'target>: Sized {
         // safety: the value must be a valid pointer to a Julia value.
-        unsafe fn value<'data, T: Wrapper<'target, 'data>>(
+        unsafe fn value<'data, T: WrapperPriv<'target, 'data>>(
             self,
             value: NonNull<T::Wraps>,
             _: Private,
         ) -> JlrsResult<T>;
 
         // safety: the value must be a valid pointer to a Julia value.
-        unsafe fn call_result<'data, T: Wrapper<'target, 'data>>(
+        unsafe fn call_result<'data, T: WrapperPriv<'target, 'data>>(
             self,
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
             _: Private,
         ) -> JlrsResult<JuliaResult<'target, 'data, T>>;
     }
 
-    impl<'current, F> PartialScope<'current> for &mut F
+    impl<'current, F> PartialScopePriv<'current> for &mut F
     where
         F: Frame<'current>,
     {
-        unsafe fn value<'data, T: Wrapper<'current, 'data>>(
+        unsafe fn value<'data, T: WrapperPriv<'current, 'data>>(
             self,
             value: NonNull<T::Wraps>,
             _: Private,
@@ -211,7 +211,7 @@ pub(crate) mod private {
             Ok(v)
         }
 
-        unsafe fn call_result<'data, T: Wrapper<'current, 'data>>(
+        unsafe fn call_result<'data, T: WrapperPriv<'current, 'data>>(
             self,
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
             _: Private,
@@ -229,12 +229,12 @@ pub(crate) mod private {
         }
     }
 
-    impl<'target, 'current, 'borrow, F> PartialScope<'target>
+    impl<'target, 'current, 'borrow, F> PartialScopePriv<'target>
         for OutputScope<'target, 'current, 'borrow, F>
     where
         F: Frame<'current>,
     {
-        unsafe fn value<'data, T: Wrapper<'target, 'data>>(
+        unsafe fn value<'data, T: WrapperPriv<'target, 'data>>(
             self,
             value: NonNull<T::Wraps>,
             _: Private,
@@ -242,7 +242,7 @@ pub(crate) mod private {
             Ok(self.set_root(value))
         }
 
-        unsafe fn call_result<'data, T: Wrapper<'target, 'data>>(
+        unsafe fn call_result<'data, T: WrapperPriv<'target, 'data>>(
             self,
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
             _: Private,
@@ -256,8 +256,8 @@ pub(crate) mod private {
         }
     }
 
-    impl<'target> PartialScope<'target> for Output<'target> {
-        unsafe fn value<'data, T: Wrapper<'target, 'data>>(
+    impl<'target> PartialScopePriv<'target> for Output<'target> {
+        unsafe fn value<'data, T: WrapperPriv<'target, 'data>>(
             self,
             value: NonNull<T::Wraps>,
             _: Private,
@@ -266,7 +266,7 @@ pub(crate) mod private {
             Ok(T::wrap_non_null(value, Private))
         }
 
-        unsafe fn call_result<'data, T: Wrapper<'target, 'data>>(
+        unsafe fn call_result<'data, T: WrapperPriv<'target, 'data>>(
             self,
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
             _: Private,

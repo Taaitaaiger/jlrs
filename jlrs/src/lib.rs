@@ -148,6 +148,11 @@
 //! - `pyplot`
 //!   This feature lets you plot data using the Pyplot package and Gtk 3 from Rust.
 //!
+//! - `debug`
+//!   Link with a debug build of Julia.
+//!
+//! You can enable all features except `lts` and `debug` by enabling the `full` feature.
+//!
 //!
 //! # Using this crate
 //!
@@ -206,7 +211,6 @@
 //!           RuntimeBuilder::new()
 //!               .async_runtime::<Tokio, UnboundedChannel<_>>()
 //!               .start_async()
-//!               .await
 //!               .unwrap()
 //!       };
 //! }
@@ -593,8 +597,9 @@
 //! `cargo test -- --test-threads=1`, otherwise the code above will panic when a test tries to
 //! initialize Julia a second time from another thread.
 //!
-//! If you want to run all of jlrs's tests, all these requirements must be taken into account:
-//! cargo test --features sync-rt,jlrs-ndarray,f16,uv,jlrs-derive,tokio-rt,async-std-rt -- --test-threads=1`
+//! If you want to run all of jlrs's tests, this requirement must be taken into account:
+//! `cargo test --all-features -- --test-threads=1`. Testing with the `--all-features` flag only
+//! works with Julia 1.8 because this overrides the `lts` and `debug` features.
 //!
 //!
 //! # Custom types
@@ -670,21 +675,21 @@
 macro_rules! init_fn {
     ($name:ident, $include:ident, $file:expr) => {
         pub(crate) static $include: &'static str = include_str!($file);
-        pub(crate) fn $name<'frame, F: $crate::memory::frame::Frame<'frame>>(frame: &mut F) -> () {
-            unsafe {
-                match $crate::wrappers::ptr::value::Value::eval_string(frame, $include) {
-                    Ok(Ok(_)) => (),
-                    Ok(Err(e)) => {
-                        panic!(
-                            "{}",
-                            $crate::wrappers::ptr::Wrapper::error_string_or(
-                                e,
-                                $crate::error::CANNOT_DISPLAY_VALUE
-                            )
+        pub(crate) unsafe fn $name<'frame, F: $crate::memory::frame::Frame<'frame>>(
+            frame: &mut F,
+        ) -> () {
+            match $crate::wrappers::ptr::value::Value::eval_string(frame, $include) {
+                Ok(Ok(_)) => (),
+                Ok(Err(e)) => {
+                    panic!(
+                        "{}",
+                        $crate::wrappers::ptr::Wrapper::error_string_or(
+                            e,
+                            $crate::error::CANNOT_DISPLAY_VALUE
                         )
-                    }
-                    Err(_) => panic!("AllocError during initialization of {}", $file),
+                    )
                 }
+                Err(_) => panic!("AllocError during initialization of {}", $file),
             }
         }
     };

@@ -3,7 +3,7 @@
 use crate::{
     error::{JlrsError, JlrsResult},
     layout::{typecheck::Typecheck, valid_layout::ValidLayout},
-    memory::{frame::Frame, global::Global, output::Output, scope::private::PartialScope},
+    memory::{frame::Frame, global::Global, output::Output, scope::private::PartialScopePriv},
     private::Private,
 };
 use jl_sys::{
@@ -16,7 +16,7 @@ use std::{
     ptr::NonNull,
 };
 
-use super::{datatype::DataType, private::Wrapper as WrapperPriv, ValueRef, Wrapper, WrapperRef};
+use super::{datatype::DataType, private::WrapperPriv, ValueRef, Wrapper, WrapperRef};
 
 /// Access and mutate the contents of a `SimpleVector`.
 #[repr(transparent)]

@@ -13,8 +13,8 @@ use crate::{
     memory::global::Global,
     private::Private,
     wrappers::ptr::{
-        datatype::DataType, private::Wrapper as WrapperPriv, union_all::UnionAll, value::Value,
-        DataTypeRef, ValueRef, Wrapper,
+        datatype::DataType, private::WrapperPriv, union_all::UnionAll, value::Value, DataTypeRef,
+        ValueRef, Wrapper,
     },
 };
 use jl_sys::{

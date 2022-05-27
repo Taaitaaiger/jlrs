@@ -209,7 +209,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     fn vec_element_typecheck() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();

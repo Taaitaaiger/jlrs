@@ -53,7 +53,7 @@
 
  - The `prelude` module can be disabled by opting out of the default features.
 
- - The different runtimes have been moved to the `runtime` crate. Both the sync and async runtime can no longer be initialized directly, but require using a `RuntimeBuilder` or `AsyncRuntimeBuilder`. To create an async runtime an implementation of `AsyncRuntime` and a backing channel that implements `Channel` must be provided.
+ - The different runtimes have been moved to the `runtime` crate. Both the sync and async runtime can no longer be initialized directly, but require using a `RuntimeBuilder` or `AsyncRuntimeBuilder`. To create an async runtime an implementation of `AsyncRuntime` and a backing channel that implements `Channel` must be provided. `AsyncRuntimeBuilder::start_async` is a sync function. 
 
  - All methods that send a new task to the async runtime take a `OneshotSender` and return an error rather than panicking if they fail.
 
@@ -70,3 +70,7 @@
  - `SimpleVector` no longer has a type to indicate the type of its contents because this property can't be checked with `ValidLayout` or `Typecheck`. Instead, a type can now be provided when accessing the contents which is checked for compatibility at runtime.
 
  - The `ValidLayout` trait has an associated constant `IS_REF` to indicate whether the implementor is an inline or pointer wrapper type.
+
+ - Add `all-features-override` feature that disables the `lts` and `debug` features when `all-features` is `true`.
+
+ - The contents `JlrsPyPlot.jl` are no longer evaluated automatically when the `pyplot` feature has been enabled, `PyPlot::init` must be called.

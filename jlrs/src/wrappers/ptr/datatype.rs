@@ -8,7 +8,7 @@ use crate::{
     memory::{global::Global, output::Output, scope::PartialScope},
     private::Private,
     wrappers::ptr::{
-        private::Wrapper as WrapperPriv, simple_vector::SimpleVector, symbol::Symbol, value::Value,
+        private::WrapperPriv, simple_vector::SimpleVector, symbol::Symbol, value::Value,
         DataTypeRef, SimpleVectorRef, SymbolRef, TypeNameRef, ValueRef, Wrapper,
     },
 };
@@ -32,7 +32,7 @@ use jl_sys::{
     jl_uint32_type, jl_uint64_type, jl_uint8_type, jl_undefvarerror_type, jl_unionall_type,
     jl_uniontype_type, jl_upsilonnode_type, jl_voidpointer_type, jl_weakref_type,
 };
-#[cfg(not(feature = "lts"))]
+#[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
 use jl_sys::{
     jl_atomicerror_type, jl_interconditional_type, jl_partial_opaque_type, jl_vararg_type,
 };
@@ -226,131 +226,116 @@ impl<'scope> DataType<'scope> {
     }
 
     /// Returns true if this is an abstract type.
-    #[cfg(not(feature = "lts"))]
     pub fn is_abstract(self) -> bool {
-        unsafe { self.type_name().wrapper_unchecked().abstract_() }
-    }
-
-    /// Returns true if this is an abstract type.
-    #[cfg(feature = "lts")]
-    pub fn is_abstract(self) -> bool {
-        unsafe { self.unwrap_non_null(Private).as_ref().abstract_ != 0 }
+        cfg_if! {
+            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                unsafe { self.unwrap_non_null(Private).as_ref().abstract_ != 0 }
+            } else {
+                unsafe { self.type_name().wrapper_unchecked().abstract_() }
+            }
+        }
     }
 
     /// Returns true if this is a mutable type.
-    #[cfg(not(feature = "lts"))]
     pub fn mutable(self) -> bool {
-        unsafe { self.type_name().wrapper_unchecked().mutabl() }
-    }
-
-    /// Returns true if this is a mutable type.
-    #[cfg(feature = "lts")]
-    pub fn mutable(self) -> bool {
-        unsafe { self.unwrap_non_null(Private).as_ref().mutabl != 0 }
+        cfg_if! {
+            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                unsafe { self.unwrap_non_null(Private).as_ref().mutabl != 0 }
+            } else {
+                unsafe { self.type_name().wrapper_unchecked().mutabl() }
+            }
+        }
     }
 
     /// Returns true if one or more of the type parameters has not been set.
-    #[cfg(not(feature = "lts"))]
     pub fn has_free_type_vars(self) -> bool {
-        unsafe { self.unwrap_non_null(Private).as_ref().hasfreetypevars() != 0 }
-    }
-
-    /// Returns true if one or more of the type parameters has not been set.
-    #[cfg(feature = "lts")]
-    pub fn has_free_type_vars(self) -> bool {
-        unsafe { self.unwrap_non_null(Private).as_ref().hasfreetypevars != 0 }
+        cfg_if! {
+            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                unsafe { self.unwrap_non_null(Private).as_ref().hasfreetypevars != 0 }
+            } else {
+                unsafe { self.unwrap_non_null(Private).as_ref().hasfreetypevars() != 0 }
+            }
+        }
     }
 
     /// Returns true if this type can have instances
-    #[cfg(not(feature = "lts"))]
     pub fn is_concrete_type(self) -> bool {
-        unsafe { self.unwrap_non_null(Private).as_ref().isconcretetype() != 0 }
-    }
-
-    /// Returns true if this type can have instances
-    #[cfg(feature = "lts")]
-    pub fn is_concrete_type(self) -> bool {
-        unsafe { self.unwrap_non_null(Private).as_ref().isconcretetype != 0 }
+        cfg_if! {
+            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                unsafe { self.unwrap_non_null(Private).as_ref().isconcretetype != 0 }
+            } else {
+                unsafe { self.unwrap_non_null(Private).as_ref().isconcretetype() != 0 }
+            }
+        }
     }
 
     /// Returns true if this type is a dispatch, or leaf, tuple type.
-    #[cfg(not(feature = "lts"))]
     pub fn is_dispatch_tuple(self) -> bool {
-        unsafe { self.unwrap_non_null(Private).as_ref().isdispatchtuple() != 0 }
-    }
-
-    /// Returns true if this type is a dispatch, or leaf, tuple type.
-    #[cfg(feature = "lts")]
-    pub fn is_dispatch_tuple(self) -> bool {
-        unsafe { self.unwrap_non_null(Private).as_ref().isdispatchtuple != 0 }
+        cfg_if! {
+            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                unsafe { self.unwrap_non_null(Private).as_ref().isdispatchtuple != 0 }
+            } else {
+                unsafe { self.unwrap_non_null(Private).as_ref().isdispatchtuple() != 0 }
+            }
+        }
     }
 
     /// Returns true if this type is a bits-type.
-    #[cfg(not(feature = "lts"))]
     pub fn is_bits(self) -> bool {
-        unsafe { self.unwrap_non_null(Private).as_ref().isbitstype() != 0 }
-    }
-
-    /// Returns true if this type is a bits-type.
-    #[cfg(feature = "lts")]
-    pub fn is_bits(self) -> bool {
-        unsafe { self.unwrap_non_null(Private).as_ref().isbitstype != 0 }
+        cfg_if! {
+            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                unsafe { self.unwrap_non_null(Private).as_ref().isbitstype != 0 }
+            } else {
+                unsafe { self.unwrap_non_null(Private).as_ref().isbitstype() != 0 }
+            }
+        }
     }
 
     /// Returns true if values of this type are zero-initialized.
-    #[cfg(not(feature = "lts"))]
     pub fn zero_init(self) -> bool {
-        unsafe { self.unwrap_non_null(Private).as_ref().zeroinit() != 0 }
-    }
-
-    /// Returns true if values of this type are zero-initialized.
-    #[cfg(feature = "lts")]
-    pub fn zero_init(self) -> bool {
-        unsafe { self.unwrap_non_null(Private).as_ref().zeroinit != 0 }
-    }
-
-    /// Returns true if a value of this type stores its data inline.
-    #[cfg(not(feature = "lts"))]
-    pub fn is_inline_alloc(self) -> bool {
-        unsafe {
-            self.type_name().wrapper_unchecked().mayinlinealloc()
-                && !self.unwrap_non_null(Private).as_ref().layout.is_null()
+        cfg_if! {
+            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                unsafe { self.unwrap_non_null(Private).as_ref().zeroinit != 0 }
+            } else {
+                unsafe { self.unwrap_non_null(Private).as_ref().zeroinit() != 0 }
+            }
         }
     }
 
     /// Returns true if a value of this type stores its data inline.
-    #[cfg(feature = "lts")]
     pub fn is_inline_alloc(self) -> bool {
-        unsafe { self.unwrap_non_null(Private).as_ref().isinlinealloc != 0 }
-    }
-
-    /// If false, no value will have this type.
-    #[cfg(not(feature = "lts"))]
-    pub fn has_concrete_subtype(self) -> bool {
-        unsafe {
-            self.unwrap_non_null(Private)
-                .as_ref()
-                .has_concrete_subtype()
-                != 0
+        cfg_if! {
+            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                unsafe { self.unwrap_non_null(Private).as_ref().isinlinealloc != 0 }
+            } else {
+                unsafe {
+                    self.type_name().wrapper_unchecked().mayinlinealloc()
+                        && !self.unwrap_non_null(Private).as_ref().layout.is_null()
+                }
+            }
         }
     }
 
     /// If false, no value will have this type.
-    #[cfg(feature = "lts")]
     pub fn has_concrete_subtype(self) -> bool {
-        unsafe { self.unwrap_non_null(Private).as_ref().has_concrete_subtype != 0 }
+        cfg_if! {
+            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                unsafe { self.unwrap_non_null(Private).as_ref().has_concrete_subtype != 0 }
+            } else {
+                unsafe { self.unwrap_non_null(Private).as_ref().has_concrete_subtype() != 0 }
+            }
+        }
     }
 
     /// If true, the type is stored in hash-based set cache (instead of linear cache).
-    #[cfg(not(feature = "lts"))]
     pub fn cached_by_hash(self) -> bool {
-        unsafe { self.unwrap_non_null(Private).as_ref().cached_by_hash() != 0 }
-    }
-
-    /// If true, the type is stored in hash-based set cache (instead of linear cache).
-    #[cfg(feature = "lts")]
-    pub fn cached_by_hash(self) -> bool {
-        unsafe { self.unwrap_non_null(Private).as_ref().cached_by_hash != 0 }
+        cfg_if! {
+            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                unsafe { self.unwrap_non_null(Private).as_ref().cached_by_hash != 0 }
+            } else {
+                unsafe { self.unwrap_non_null(Private).as_ref().cached_by_hash() != 0 }
+            }
+        }
     }
 }
 
@@ -434,7 +419,7 @@ impl<'scope> DataType<'scope> {
         unsafe { Ok(jl_field_isptr(self.unwrap(Private), idx as _)) }
     }
 
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     /// Returns true if the field at position `idx` is an atomic field.
     pub fn is_atomic_field(self, idx: usize) -> JlrsResult<bool> {
         if idx >= self.n_fields() as usize {
@@ -448,7 +433,7 @@ impl<'scope> DataType<'scope> {
         unsafe { Ok(self.is_atomic_field_unchecked(idx)) }
     }
 
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     /// Returns true if the field at position `idx` is a constant field.
     pub fn is_const_field(self, idx: usize) -> JlrsResult<bool> {
         if idx >= self.n_fields() as usize {
@@ -486,7 +471,7 @@ impl<'scope> DataType<'scope> {
         jl_field_isptr(self.unwrap(Private), idx as _)
     }
 
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     /// Returns true if the field at position `idx` is an atomic field.
     ///
     /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
@@ -509,7 +494,7 @@ impl<'scope> DataType<'scope> {
         isatomic != 0
     }
 
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     /// Returns true if the field at position `idx` is a constant field.
     ///
     /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
@@ -768,13 +753,13 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Core.PartialOpaque`
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn partial_opaque_type(_: Global<'base>) -> Self {
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_partial_opaque_type), Private) }
     }
 
     /// The type `Core.InterConditional`
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn interconditional_type(_: Global<'base>) -> Self {
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_interconditional_type), Private) }
     }
@@ -805,7 +790,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Vararg`.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn vararg_type(_: Global<'base>) -> Self {
         unsafe { DataType::wrap(jl_vararg_type, Private) }
     }
@@ -896,7 +881,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Core.AtomicError`.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn atomicerror_type(_: Global<'base>) -> Self {
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_atomicerror_type), Private) }
     }

@@ -5,7 +5,7 @@ use crate::{
     impl_debug, impl_julia_typecheck,
     memory::{global::Global, output::Output, scope::PartialScope},
     private::Private,
-    wrappers::ptr::{private::Wrapper as WrapperPriv, value::Value, ValueRef, Wrapper},
+    wrappers::ptr::{private::WrapperPriv, value::Value, ValueRef, Wrapper},
 };
 use cfg_if::cfg_if;
 use jl_sys::{jl_islayout_inline, jl_type_union, jl_uniontype_t, jl_uniontype_type};

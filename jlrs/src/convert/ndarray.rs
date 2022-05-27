@@ -17,7 +17,7 @@ use ndarray::{ArrayView, ArrayViewMut, Dim, IntoDimension, IxDynImpl, ShapeBuild
 use std::fmt::Debug;
 
 /// Trait to borrow Julia arrays with inline data as `ndarray`'s `ArrayView` and `ArrayViewMut`.
-pub trait NdArray<'borrow, T>: private::NdArray {
+pub trait NdArray<'borrow, T>: private::NdArrayPriv {
     /// Borrow the data in the array as an `ArrayView`. Returns an error if the wrong type is
     /// provided or the data is not stored inline.
     fn array_view<'frame, F>(
@@ -141,9 +141,12 @@ mod private {
     };
     use std::fmt::Debug;
 
-    pub trait NdArray {}
-    impl<'frame, 'data> NdArray for Array<'frame, 'data> {}
-    impl<'frame, 'data, T> NdArray for TypedArray<'frame, 'data, T> where T: Clone + ValidLayout + Debug {}
+    pub trait NdArrayPriv {}
+    impl<'frame, 'data> NdArrayPriv for Array<'frame, 'data> {}
+    impl<'frame, 'data, T> NdArrayPriv for TypedArray<'frame, 'data, T> where
+        T: Clone + ValidLayout + Debug
+    {
+    }
 }
 
 #[cfg(test)]

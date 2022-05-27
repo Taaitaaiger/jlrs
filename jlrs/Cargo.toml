@@ -34,6 +34,8 @@ docs = [
     "jlrs-derive", "sync-rt", "ccall", "internal-types", "pyplot"
 ]
 lts = ["jl-sys/lts"]
+all-features-override = ["jl-sys/all-features-override"]
+full = ["prelude", "sync-rt", "tokio-rt", "async-std-rt", "jlrs-ndarray", "f16", "pyplot", "internal-types", "uv", "jlrs-derive"] 
 
 [dependencies]
 jl-sys = {version = "0.16", path = "../jl_sys" }

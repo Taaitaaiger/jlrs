@@ -36,7 +36,7 @@ impl AsyncTask for MyTask {
     ) -> JlrsResult<Self::Output> {
         // Nesting async frames works like nesting on ordinary scope. The main differences are the `async`
         // block in the closure.
-        let output = frame.reserve_output()?;
+        let output = frame.output()?;
         frame
             .async_scope(|frame| async move {
                 // Convert the two arguments to values Julia can work with.
@@ -88,7 +88,6 @@ async fn main() {
         RuntimeBuilder::new()
             .async_runtime::<Tokio, UnboundedChannel<_>>()
             .start_async()
-            .await
             .expect("Could not init Julia")
     };
 

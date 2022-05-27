@@ -58,7 +58,7 @@ impl PersistentTask for AccumulatorTask {
         frame: &'inner mut AsyncGcFrame<'static>,
     ) -> JlrsResult<Self::State> {
         unsafe {
-            let output = frame.reserve_output()?;
+            let output = frame.output()?;
             frame
                 .scope(|frame| {
                     // A nested scope is used to only root a single value in the frame provided to

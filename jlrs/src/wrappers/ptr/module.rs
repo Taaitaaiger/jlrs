@@ -13,7 +13,7 @@ use crate::{
     private::Private,
     wrappers::ptr::{
         function::Function,
-        private::Wrapper as WrapperPriv,
+        private::WrapperPriv,
         symbol::Symbol,
         value::{LeakedValue, Value},
         FunctionRef, ModuleRef, ValueRef, Wrapper as _,

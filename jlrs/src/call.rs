@@ -14,7 +14,7 @@ use crate::{
     memory::{global::Global, scope::PartialScope},
     private::Private,
     wrappers::ptr::{
-        private::Wrapper as _,
+        private::WrapperPriv as _,
         value::{Value, MAX_SIZE},
         ValueRef,
     },
@@ -895,17 +895,23 @@ cfg_if::cfg_if! {
     }
 }
 
-pub(crate) mod private {
+mod private {
     use crate::wrappers::ptr::{function::Function, value::Value};
 
-    #[cfg(all(not(feature = "lts"), feature = "internal-types"))]
+    #[cfg(all(
+        any(not(feature = "lts"), feature = "all-features-override"),
+        feature = "internal-types"
+    ))]
     use crate::wrappers::ptr::internal::opaque_closure::OpaqueClosure;
 
     use super::WithKeywords;
     pub trait Call {}
     impl Call for WithKeywords<'_, '_> {}
     impl Call for Function<'_, '_> {}
-    #[cfg(all(not(feature = "lts"), feature = "internal-types"))]
+    #[cfg(all(
+        any(not(feature = "lts"), feature = "all-features-override"),
+        feature = "internal-types"
+    ))]
     impl Call for OpaqueClosure<'_> {}
     impl Call for Value<'_, '_> {}
 }

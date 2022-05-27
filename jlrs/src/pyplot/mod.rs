@@ -30,6 +30,15 @@ init_fn!(init_jlrs_py_plot, JLRS_PY_PLOT_JL, "JlrsPyPlot.jl");
 pub struct PyPlot<'scope>(Value<'scope, 'static>);
 
 impl<'scope> PyPlot<'scope> {
+    /// This metod must be called exactly once before this module can be used.
+    pub fn init<'frame, F: Frame<'frame>>(frame: &mut F) {
+        let global = frame.global();
+        if Module::main(global).submodule_ref("JlrsPyPlot").is_ok() {
+            return;
+        }
+        unsafe { init_jlrs_py_plot(frame) };
+    }
+
     /// Create a new plotting window by calling `plotfn(args...)`. The window stays open until it
     /// has been closed, even if all handles have been dropped. `plot_fn` must be a plotting
     /// function from the Plots.jl package, such as `plot` or `hexbin`. The resources associated
@@ -281,7 +290,7 @@ impl<'scope> PyPlot<'scope> {
 
 /// This trait is, and can only be, implemented by [`Module`]. It adds the method `Module::plots`
 /// that provides access to the contents of the `Plots` package.
-pub trait AccessPlotsModule: private::AccessPlotsModule {
+pub trait AccessPlotsModule: private::AccessPlotsModulePriv {
     /// Returns the `Plots` module.
     fn plots<'global>(global: Global<'global>) -> Module<'global> {
         unsafe {
@@ -301,7 +310,7 @@ impl<'scope> AccessPlotsModule for Module<'scope> {}
 mod private {
     use crate::wrappers::ptr::module::Module;
 
-    pub trait AccessPlotsModule {}
+    pub trait AccessPlotsModulePriv {}
 
-    impl<'scope> AccessPlotsModule for Module<'scope> {}
+    impl<'scope> AccessPlotsModulePriv for Module<'scope> {}
 }

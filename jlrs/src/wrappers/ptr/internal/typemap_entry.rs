@@ -9,14 +9,15 @@ use crate::{
     impl_debug, impl_julia_typecheck,
     memory::output::Output,
     private::Private,
-    wrappers::ptr::{private::Wrapper as WrapperPriv, ValueRef},
+    wrappers::ptr::{private::WrapperPriv, ValueRef},
 };
 use cfg_if::cfg_if;
 use jl_sys::{jl_typemap_entry_t, jl_typemap_entry_type};
 use std::{marker::PhantomData, ptr::NonNull};
 
 cfg_if! {
-    if #[cfg(not(feature = "lts"))] {
+    if #[cfg(any(not(feature = "lts"), feature = "all-features-override"))] {
+        use jl_sys::jl_value_t;
         use crate::wrappers::ptr::atomic_value;
         use std::sync::atomic::Ordering;
     }
@@ -45,18 +46,17 @@ impl<'scope> TypeMapEntry<'scope> {
     */
 
     /// Invasive linked list
-    #[cfg(feature = "lts")]
     pub fn next(self) -> ValueRef<'scope, 'static> {
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().next.cast()) }
-    }
-
-    /// Invasive linked list
-    #[cfg(not(feature = "lts"))]
-    pub fn next(self) -> ValueRef<'scope, 'static> {
-        unsafe {
-            let next = atomic_value(&mut self.unwrap_non_null(Private).as_mut().next as *mut _);
-            let ptr = next.load(Ordering::Relaxed);
-            ValueRef::wrap(ptr.cast())
+        cfg_if! {
+            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().next.cast()) }
+            } else {
+                unsafe {
+                    let next = atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().next as *const _);
+                    let ptr = next.load(Ordering::Relaxed);
+                    ValueRef::wrap(ptr.cast())
+                }
+            }
         }
     }
 

@@ -9,14 +9,15 @@ use crate::{
     impl_debug, impl_julia_typecheck,
     memory::output::Output,
     private::Private,
-    wrappers::ptr::{private::Wrapper as WrapperPriv, ArrayRef, ModuleRef, SymbolRef, ValueRef},
+    wrappers::ptr::{private::WrapperPriv, ArrayRef, ModuleRef, SymbolRef, ValueRef},
 };
 use cfg_if::cfg_if;
 use jl_sys::{jl_methtable_t, jl_methtable_type};
 use std::{marker::PhantomData, ptr::NonNull};
 
 cfg_if! {
-    if #[cfg(not(feature = "lts"))] {
+    if #[cfg(any(not(feature = "lts"), feature = "all-features-override"))] {
+        use jl_sys::jl_value_t;
         use crate::wrappers::ptr::atomic_value;
         use std::sync::atomic::Ordering;
     }
@@ -52,51 +53,48 @@ impl<'scope> MethodTable<'scope> {
     }
 
     /// The `defs` field.
-    #[cfg(feature = "lts")]
     pub fn defs(self) -> ValueRef<'scope, 'static> {
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().defs) }
-    }
-
-    /// The `defs` field.
-    #[cfg(not(feature = "lts"))]
-    pub fn defs(self) -> ValueRef<'scope, 'static> {
-        unsafe {
-            let defs = atomic_value(&mut self.unwrap_non_null(Private).as_mut().defs as *mut _);
-            let ptr = defs.load(Ordering::Relaxed);
-            ValueRef::wrap(ptr)
+        cfg_if! {
+            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().defs) }
+            } else {
+                unsafe {
+                    let defs = atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().defs as *const _);
+                    let ptr = defs.load(Ordering::Relaxed);
+                    ValueRef::wrap(ptr)
+                }
+            }
         }
     }
 
     /// The `leafcache` field.
-    #[cfg(feature = "lts")]
     pub fn leafcache(self) -> ArrayRef<'scope, 'static> {
-        unsafe { ArrayRef::wrap(self.unwrap_non_null(Private).as_ref().leafcache) }
-    }
-
-    /// The `leafcache` field.
-    #[cfg(not(feature = "lts"))]
-    pub fn leafcache(self) -> ArrayRef<'scope, 'static> {
-        unsafe {
-            let leafcache =
-                atomic_value(&mut self.unwrap_non_null(Private).as_mut().leafcache as *mut _);
-            let ptr = leafcache.load(Ordering::Relaxed);
-            ArrayRef::wrap(ptr.cast())
+        cfg_if! {
+            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                unsafe { ArrayRef::wrap(self.unwrap_non_null(Private).as_ref().leafcache) }
+            } else {
+                unsafe {
+                    let leafcache =
+                        atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().leafcache as *const _);
+                    let ptr = leafcache.load(Ordering::Relaxed);
+                    ArrayRef::wrap(ptr.cast())
+                }
+            }
         }
     }
 
     /// The `cache` field.
-    #[cfg(feature = "lts")]
     pub fn cache(self) -> ValueRef<'scope, 'static> {
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().cache) }
-    }
-
-    /// The `cache` field.
-    #[cfg(not(feature = "lts"))]
-    pub fn cache(self) -> ValueRef<'scope, 'static> {
-        unsafe {
-            let cache = atomic_value(&mut self.unwrap_non_null(Private).as_mut().cache as *mut _);
-            let ptr = cache.load(Ordering::Relaxed);
-            ValueRef::wrap(ptr)
+        cfg_if! {
+            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().cache) }
+            } else {
+                unsafe {
+                    let cache = atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().cache as *const _);
+                    let ptr = cache.load(Ordering::Relaxed);
+                    ValueRef::wrap(ptr)
+                }
+            }
         }
     }
 

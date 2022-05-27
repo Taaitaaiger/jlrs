@@ -1,6 +1,6 @@
 mod util;
 #[cfg(feature = "sync-rt")]
-#[cfg(not(feature = "lts"))]
+#[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
 mod tests {
     use super::util::JULIA;
     use jlrs::prelude::*;
@@ -113,6 +113,29 @@ mod tests {
 
                 assert!(ty.cast::<DataType>()?.is_pointer_field(0)?);
                 assert!(ty.cast::<DataType>()?.is_atomic_field(0)?);
+
+                Ok(())
+            })
+            .unwrap();
+        })
+    }
+
+    #[test]
+    fn read_atomic_field_of_ptr_wrapper() {
+        JULIA.with(|j| {
+            let mut jlrs = j.borrow_mut();
+            jlrs.scope(|global, _frame| {
+                unsafe {
+                    assert_eq!(
+                        DataType::datatype_type(global)
+                            .type_name()
+                            .wrapper_unchecked()
+                            .cache()
+                            .wrapper_unchecked()
+                            .len(),
+                        0
+                    )
+                }
 
                 Ok(())
             })

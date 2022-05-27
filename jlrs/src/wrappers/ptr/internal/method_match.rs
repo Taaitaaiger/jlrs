@@ -8,7 +8,7 @@ use crate::{
     impl_debug, impl_julia_typecheck,
     memory::output::Output,
     private::Private,
-    wrappers::ptr::{private::Wrapper as WrapperPriv, MethodRef, SimpleVectorRef, ValueRef},
+    wrappers::ptr::{private::WrapperPriv, MethodRef, SimpleVectorRef, ValueRef},
 };
 use jl_sys::{jl_method_match_t, jl_method_match_type};
 use std::{marker::PhantomData, ptr::NonNull};

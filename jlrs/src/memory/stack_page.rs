@@ -36,8 +36,7 @@ cfg_if::cfg_if! {
     if #[cfg(feature = "async")] {
         use std::pin::Pin;
         use std::ptr::NonNull;
-        #[cfg(not(feature = "lts"))]
-        use jl_sys::{jl_get_current_task, jl_task_t};
+        use cfg_if::cfg_if;
 
         #[derive(Debug)]
         pub(crate) struct AsyncStackPage {
@@ -60,24 +59,26 @@ cfg_if::cfg_if! {
                 Box::pin(stack)
             }
 
-            #[cfg(not(feature = "lts"))]
             pub(crate) unsafe fn link_stacks(stacks: &mut [Option<Pin<Box<Self>>>]) {
-                for stack in stacks.iter_mut() {
-                    let stack = stack.as_mut().unwrap();
-                    let task = NonNull::new_unchecked(jl_get_current_task().cast::<jl_task_t>()).as_mut();
+                cfg_if! {
+                    if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                        for stack in stacks.iter_mut() {
+                            let stack = stack.as_mut().unwrap();
+                            let rtls = NonNull::new_unchecked(jl_sys::jl_get_ptls_states()).as_mut();
+                            stack.top[1].set(rtls.pgcstack.cast());
+                            rtls.pgcstack = stack.top[0..].as_mut_ptr().cast();
+                        }
+                    } else {
+                        use jl_sys::{jl_get_current_task, jl_task_t};
 
-                    stack.top[1].set(task.gcstack.cast());
-                    task.gcstack = stack.top[0..].as_mut_ptr().cast();
-                }
-            }
+                        for stack in stacks.iter_mut() {
+                            let stack = stack.as_mut().unwrap();
+                            let task = NonNull::new_unchecked(jl_get_current_task().cast::<jl_task_t>()).as_mut();
 
-            #[cfg(feature = "lts")]
-            pub(crate) unsafe fn link_stacks(stacks: &mut [Option<Pin<Box<Self>>>]) {
-                for stack in stacks.iter_mut() {
-                    let stack = stack.as_mut().unwrap();
-                    let rtls = NonNull::new_unchecked(jl_sys::jl_get_ptls_states()).as_mut();
-                    stack.top[1].set(rtls.pgcstack.cast());
-                    rtls.pgcstack = stack.top[0..].as_mut_ptr().cast();
+                            stack.top[1].set(task.gcstack.cast());
+                            task.gcstack = stack.top[0..].as_mut_ptr().cast();
+                        }
+                    }
                 }
             }
         }

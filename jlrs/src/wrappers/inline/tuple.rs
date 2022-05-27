@@ -33,7 +33,7 @@ use crate::wrappers::ptr::{
     datatype::DataType,
     value::{Value, MAX_SIZE},
 };
-use crate::wrappers::ptr::{private::Wrapper as _, Wrapper as _};
+use crate::wrappers::ptr::{private::WrapperPriv as _, Wrapper as _};
 use crate::{
     error::JlrsResult,
     layout::typecheck::Typecheck,

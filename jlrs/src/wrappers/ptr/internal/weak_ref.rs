@@ -4,7 +4,7 @@ use crate::{
     impl_debug, impl_julia_typecheck,
     memory::output::Output,
     private::Private,
-    wrappers::ptr::{private::Wrapper as WrapperPriv, ValueRef},
+    wrappers::ptr::{private::WrapperPriv, ValueRef},
 };
 use jl_sys::{jl_weakref_t, jl_weakref_type};
 use std::{marker::PhantomData, ptr::NonNull};

@@ -45,7 +45,7 @@ use jl_sys::{
     jl_process_events,
 };
 
-#[cfg(not(feature = "lts"))]
+#[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
 use jl_sys::jl_options;
 
 use std::{
@@ -114,7 +114,8 @@ pub trait AsyncRuntime: Send + Sync + 'static {
     /// The handle type of the runtime task spawned by `AsyncRuntime::spawn_local`.
     type RuntimeHandle: Future<Output = Self::RuntimeOutput>;
 
-    /// Spawn a new thread, this method called if `AsyncBuilder::start` is called.
+    /// Spawn the async runtime a new thread, this method called if `AsyncBuilder::start` is
+    /// called.
     fn spawn_thread<F>(rt_fn: F) -> std::thread::JoinHandle<JlrsResult<()>>
     where
         F: FnOnce() -> JlrsResult<()> + Send + Sync + 'static,
@@ -122,18 +123,19 @@ pub trait AsyncRuntime: Send + Sync + 'static {
         std::thread::spawn(rt_fn)
     }
 
-    /// Spawn a blocking task, this method called if `AsyncBuilder::start_async` is called.
+    /// Spawn the async runtime a blocking task, this method called if `AsyncBuilder::start_async`
+    /// is called.
     fn spawn_blocking<F>(rt_fn: F) -> Self::RuntimeHandle
     where
         F: FnOnce() -> JlrsResult<()> + Send + Sync + 'static;
 
-    /// Block on a future, this method is called from the runtime task or thread.
+    /// Block on a future, this method is called to start the runtime loop.
     fn block_on<F>(loop_fn: F) -> JlrsResult<()>
     where
         F: Future<Output = JlrsResult<()>>;
 
-    /// Spawn a local task, this method is called from the loop task when an [`AsyncTask`] or
-    /// [`PersistentTask`] starts.
+    /// Spawn a local task, this method is called from the loop task to spawn an [`AsyncTask`] or
+    /// [`PersistentTask`].
     fn spawn_local<F>(future: F) -> Self::JoinHandle
     where
         F: Future<Output = ()> + 'static;
@@ -573,7 +575,7 @@ where
         Ok((julia, handle))
     }
 
-    pub(crate) async unsafe fn init_async<C>(
+    pub(crate) unsafe fn init_async<C>(
         builder: AsyncRuntimeBuilder<R, C>,
     ) -> JlrsResult<(Self, R::RuntimeHandle)>
     where
@@ -603,7 +605,7 @@ where
                     return Err(JlrsError::AlreadyInitialized.into());
                 }
 
-                #[cfg(not(feature = "lts"))]
+                #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
                 {
                     if builder.n_threads == 0 {
                         jl_options.nthreads = -1;
@@ -846,9 +848,6 @@ fn set_custom_fns(stack: &mut AsyncStackPage) -> JlrsResult<()> {
             .global_ref("wakerust")?
             .wrapper_unchecked()
             .set_nth_field_unchecked(0, wake_rust);
-
-        #[cfg(feature = "pyplot")]
-        crate::pyplot::init_jlrs_py_plot(&mut frame);
 
         Ok(())
     }

@@ -9,9 +9,7 @@ use crate::{
     impl_debug, impl_julia_typecheck,
     memory::output::Output,
     private::Private,
-    wrappers::ptr::{
-        private::Wrapper as WrapperPriv, CodeInstanceRef, MethodInstanceRef, ValueRef,
-    },
+    wrappers::ptr::{private::WrapperPriv, CodeInstanceRef, MethodInstanceRef, ValueRef},
 };
 use cfg_if::cfg_if;
 use jl_sys::{jl_code_instance_t, jl_code_instance_type};
@@ -19,7 +17,8 @@ use std::{ffi::c_void, sync::atomic::AtomicPtr};
 use std::{marker::PhantomData, ptr::NonNull, sync::atomic::AtomicU8};
 
 cfg_if! {
-    if #[cfg(not(feature = "lts"))] {
+    if #[cfg(any(not(feature = "lts"), feature = "all-features-override"))] {
+        use jl_sys::jl_value_t;
         use crate::wrappers::ptr::atomic_value;
         use std::sync::atomic::Ordering;
     }
@@ -58,18 +57,17 @@ impl<'scope> CodeInstance<'scope> {
     }
 
     /// Next cache entry.
-    #[cfg(feature = "lts")]
     pub fn next(self) -> CodeInstanceRef<'scope> {
-        unsafe { CodeInstanceRef::wrap(self.unwrap_non_null(Private).as_ref().next) }
-    }
-
-    /// Next cache entry.
-    #[cfg(not(feature = "lts"))]
-    pub fn next(self) -> CodeInstanceRef<'scope> {
-        unsafe {
-            let next = atomic_value(&mut self.unwrap_non_null(Private).as_mut().next as *mut _);
-            let ptr = next.load(Ordering::Relaxed);
-            CodeInstanceRef::wrap(ptr.cast())
+        cfg_if! {
+            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                unsafe { CodeInstanceRef::wrap(self.unwrap_non_null(Private).as_ref().next) }
+            } else {
+                unsafe {
+                    let next = atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().next as *const _);
+                    let ptr = next.load(Ordering::Relaxed);
+                    CodeInstanceRef::wrap(ptr.cast())
+                }
+            }
         }
     }
 
@@ -99,7 +97,7 @@ impl<'scope> CodeInstance<'scope> {
     }
 
     /// The `ipo_purity_bits` field of this `CodeInstance`.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn ipo_purity_bits(self) -> u32 {
         unsafe {
             self.unwrap_non_null(Private)
@@ -110,7 +108,7 @@ impl<'scope> CodeInstance<'scope> {
     }
 
     /// The `ipo_consistent` flag of this `CodeInstance`.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn ipo_consistent(self) -> u8 {
         unsafe {
             self.unwrap_non_null(Private)
@@ -122,7 +120,7 @@ impl<'scope> CodeInstance<'scope> {
     }
 
     /// The `ipo_effect_free` flag of this `CodeInstance`.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn ipo_effect_free(self) -> u8 {
         unsafe {
             self.unwrap_non_null(Private)
@@ -134,7 +132,7 @@ impl<'scope> CodeInstance<'scope> {
     }
 
     /// The `ipo_nothrow` flag of this `CodeInstance`.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn ipo_nothrow(self) -> u8 {
         unsafe {
             self.unwrap_non_null(Private)
@@ -146,7 +144,7 @@ impl<'scope> CodeInstance<'scope> {
     }
 
     /// The `ipo_terminates` flag of this `CodeInstance`.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn ipo_terminates(self) -> u8 {
         unsafe {
             self.unwrap_non_null(Private)
@@ -158,7 +156,7 @@ impl<'scope> CodeInstance<'scope> {
     }
 
     /// The `ipo_overlayed` flag of this `CodeInstance`.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn ipo_overlayed(self) -> u8 {
         unsafe {
             self.unwrap_non_null(Private)
@@ -170,7 +168,7 @@ impl<'scope> CodeInstance<'scope> {
     }
 
     /// The `purity_bits` field of this `CodeInstance`.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn purity_bits(self) -> u32 {
         unsafe {
             self.unwrap_non_null(Private)
@@ -181,7 +179,7 @@ impl<'scope> CodeInstance<'scope> {
     }
 
     /// The `consistent` flag of this `CodeInstance`.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn consistent(self) -> u8 {
         unsafe {
             self.unwrap_non_null(Private)
@@ -193,7 +191,7 @@ impl<'scope> CodeInstance<'scope> {
     }
 
     /// The `effect_free` flag of this `CodeInstance`.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn effect_free(self) -> u8 {
         unsafe {
             self.unwrap_non_null(Private)
@@ -205,7 +203,7 @@ impl<'scope> CodeInstance<'scope> {
     }
 
     /// The `nothrow` flag of this `CodeInstance`.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn nothrow(self) -> u8 {
         unsafe {
             self.unwrap_non_null(Private)
@@ -217,7 +215,7 @@ impl<'scope> CodeInstance<'scope> {
     }
 
     /// The `terminates` flag of this `CodeInstance`.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn terminates(self) -> u8 {
         unsafe {
             self.unwrap_non_null(Private)
@@ -229,7 +227,7 @@ impl<'scope> CodeInstance<'scope> {
     }
 
     /// The `overlayed` flag of this `CodeInstance`.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn overlayed(self) -> u8 {
         unsafe {
             self.unwrap_non_null(Private)
@@ -251,56 +249,52 @@ impl<'scope> CodeInstance<'scope> {
     }
 
     /// If `specptr` is a specialized function signature for specTypes->rettype
-    #[cfg(not(feature = "lts"))]
     pub fn precompile(self) -> bool {
-        unsafe {
-            let ptr =
-                &self.unwrap_non_null(Private).as_ref().precompile as *const u8 as *const AtomicU8;
-            let field_ref = &*ptr;
-            field_ref.load(Ordering::SeqCst) != 0
-        }
-    }
-
-    /// If `specptr` is a specialized function signature for specTypes->rettype
-    #[cfg(feature = "lts")]
-    pub fn precompile(self) -> bool {
-        unsafe { self.unwrap_non_null(Private).as_ref().precompile != 0 }
-    }
-
-    /// jlcall entry point
-    #[cfg(not(feature = "lts"))]
-    pub fn invoke(self) -> *mut c_void {
-        unsafe {
-            let ptr = &self.unwrap_non_null(Private).as_ref().invoke as *const _
-                as *const AtomicPtr<c_void>;
-            (&*ptr).load(Ordering::Relaxed)
+        cfg_if! {
+            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                unsafe { self.unwrap_non_null(Private).as_ref().precompile != 0 }
+            } else {
+                unsafe {
+                    let ptr =
+                        &self.unwrap_non_null(Private).as_ref().precompile as *const u8 as *const AtomicU8;
+                    let field_ref = &*ptr;
+                    field_ref.load(Ordering::SeqCst) != 0
+                }
+            }
         }
     }
 
     /// jlcall entry point
-    #[cfg(feature = "lts")]
     pub fn invoke(self) -> *mut c_void {
-        unsafe { &self.unwrap_non_null(Private).as_ref().invoke as *mut c_void }
-    }
-
-    /// private data for `jlcall entry point
-    #[cfg(not(feature = "lts"))]
-    pub fn specptr(self) -> *mut c_void {
-        unsafe {
-            let ptr = &self.unwrap_non_null(Private).as_ref().specptr as *const _
-                as *const AtomicPtr<c_void>;
-            (&*ptr).load(Ordering::Relaxed)
+        cfg_if! {
+            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                unsafe { &self.unwrap_non_null(Private).as_ref().invoke as *mut c_void }
+            } else {
+                unsafe {
+                    let ptr = atomic_value::<c_void>(&self.unwrap_non_null(Private).as_ref().invoke as *const _);
+                    ptr.load(Ordering::Relaxed)
+                }
+            }
         }
     }
 
     /// private data for `jlcall entry point
-    #[cfg(feature = "lts")]
     pub fn specptr(self) -> *mut c_void {
-        unsafe { &self.unwrap_non_null(Private).as_ref().specptr as *mut c_void }
+        cfg_if! {
+            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                unsafe { &self.unwrap_non_null(Private).as_ref().specptr as *mut c_void }
+            } else {
+                unsafe {
+                    let ptr = &self.unwrap_non_null(Private).as_ref().specptr as *const _
+                        as *const AtomicPtr<c_void>;
+                    (&*ptr).load(Ordering::Relaxed)
+                }
+            }
+        }
     }
 
     /// nonzero if all roots are built into sysimg or tagged by module key
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn relocatability(self) -> u8 {
         unsafe { self.unwrap_non_null(Private).as_ref().relocatability }
     }

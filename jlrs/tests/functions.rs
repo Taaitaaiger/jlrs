@@ -242,7 +242,7 @@ mod tests {
             let out = jlrs.scope_with_capacity(3, |global, frame| unsafe {
                 let arg0 = Value::new(&mut *frame, 1u32)?;
 
-                let output = frame.reserve_output()?;
+                let output = frame.output()?;
                 frame
                     .scope(|frame| {
                         let func = Module::base(global).function_ref("+")?.wrapper_unchecked();

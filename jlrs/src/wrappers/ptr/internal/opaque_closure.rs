@@ -8,8 +8,8 @@ use crate::{
     memory::{global::Global, output::Output, scope::PartialScope},
     private::Private,
     wrappers::ptr::{
-        datatype::DataType, private::Wrapper as WrapperPriv, type_name::TypeName, value::Value,
-        MethodRef, ValueRef, Wrapper as _,
+        datatype::DataType, private::WrapperPriv, type_name::TypeName, value::Value, MethodRef,
+        ValueRef, Wrapper as _,
     },
 };
 use jl_sys::jl_opaque_closure_t;

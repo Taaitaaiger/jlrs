@@ -62,7 +62,9 @@ impl CCall {
             let page = self.get_init_page();
             let global = Global::new();
             let mut frame = GcFrame::new(page.as_mut(), Sync);
-            func(global, &mut frame)
+            let ret = func(global, &mut frame);
+            std::mem::drop(frame);
+            ret
         }
     }
 
@@ -79,7 +81,9 @@ impl CCall {
                 *page = StackPage::new(slots + 2);
             }
             let mut frame = GcFrame::new(page.as_mut(), Sync);
-            func(global, &mut frame)
+            let ret = func(global, &mut frame);
+            std::mem::drop(frame);
+            ret
         }
     }
 

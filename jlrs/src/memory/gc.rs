@@ -5,7 +5,7 @@ use super::frame::Frame;
 use crate::runtime::sync_rt::Julia;
 use jl_sys::{jl_gc_collect, jl_gc_collection_t, jl_gc_enable, jl_gc_is_enabled, jl_gc_safepoint};
 
-#[cfg(not(feature = "lts"))]
+#[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
 use crate::{
     call::Call,
     memory::global::Global,
@@ -21,7 +21,7 @@ pub enum GcCollection {
 }
 
 /// This trait is used to enable and disable the garbage collector and to force a collection.
-pub trait Gc: private::Gc {
+pub trait Gc: private::GcPriv {
     /// Enable or disable the GC.
     fn enable_gc(&mut self, on: bool) -> bool {
         unsafe { jl_gc_enable(on as i32) == 1 }
@@ -30,7 +30,7 @@ pub trait Gc: private::Gc {
     /// Enable or disable GC logging.
     ///
     /// This method is not available when the `lts` feature is enabled.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     fn enable_logging(&mut self, on: bool) {
         unsafe {
             let global = Global::new();
@@ -79,8 +79,8 @@ mod private {
     use super::Frame;
     #[cfg(feature = "sync-rt")]
     use crate::runtime::sync_rt::Julia;
-    pub trait Gc {}
-    impl<'a, F: Frame<'a>> Gc for F {}
+    pub trait GcPriv {}
+    impl<'a, F: Frame<'a>> GcPriv for F {}
     #[cfg(feature = "sync-rt")]
-    impl Gc for Julia {}
+    impl GcPriv for Julia {}
 }

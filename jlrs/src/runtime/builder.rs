@@ -1,4 +1,4 @@
-//! Build a Julia runtime.
+//! Build a runtime.
 //!
 //! Before Julia can be used it must be initialized. The builders provided by this module must be
 //! used to initialize Julia and set custom parameters. The [`RuntimeBuilder`] only lets you
@@ -37,7 +37,7 @@ cfg_if::cfg_if! {
             C: Channel<Message>,
         {
             pub(crate) builder: RuntimeBuilder,
-            #[cfg(not(feature = "lts"))]
+            #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
             pub(crate) n_threads: usize,
             pub(crate) n_tasks: usize,
             pub(crate) channel_capacity: usize,
@@ -53,11 +53,12 @@ cfg_if::cfg_if! {
         {
             /// Set the number of threads Julia can use.
             ///
-            /// If it's set to 0, the default value, the number of threads is the number of CPU cores.
+            /// If it's set to 0, the default value, the number of threads is the number of CPU
+            /// cores.
             ///
             /// This method is not available for the LTS version, instead you must set the number
             /// of threads using the `JULIA_NUM_THREADS` environment variable.
-            #[cfg(not(feature = "lts"))]
+            #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
             pub fn n_threads(mut self, n: usize) -> Self {
                 self.n_threads = n;
                 self
@@ -118,8 +119,8 @@ cfg_if::cfg_if! {
             }
 
             /// Initialize Julia as a blocking task.
-            pub async unsafe fn start_async(self) -> JlrsResult<(AsyncJulia<R>, R::RuntimeHandle)> {
-                AsyncJulia::init_async(self).await
+            pub unsafe fn start_async(self) -> JlrsResult<(AsyncJulia<R>, R::RuntimeHandle)> {
+                AsyncJulia::init_async(self)
             }
         }
     }
@@ -176,7 +177,7 @@ impl RuntimeBuilder {
     {
         AsyncRuntimeBuilder {
             builder: self,
-            #[cfg(not(feature = "lts"))]
+            #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
             n_threads: 0,
             n_tasks: 0,
             channel_capacity: 0,

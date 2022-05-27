@@ -6,8 +6,8 @@ use crate::{
     memory::{global::Global, output::Output, scope::PartialScope},
     private::Private,
     wrappers::ptr::{
-        datatype::DataType, private::Wrapper as WrapperPriv, type_var::TypeVar, value::Value,
-        DataTypeRef, TypeVarRef, ValueRef,
+        datatype::DataType, private::WrapperPriv, type_var::TypeVar, value::Value, DataTypeRef,
+        TypeVarRef, ValueRef,
     },
 };
 use cfg_if::cfg_if;
@@ -25,7 +25,7 @@ cfg_if! {
 }
 
 cfg_if! {
-    if #[cfg(feature = "lts")] {
+    if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
         use jl_sys::jl_vararg_type;
     }else {
         use jl_sys::jl_opaque_closure_type;
@@ -169,7 +169,7 @@ impl<'base> UnionAll<'base> {
     }
 
     /// The `UnionAll` `Vararg`.
-    #[cfg(feature = "lts")]
+    #[cfg(all(feature = "lts", not(feature = "all-features-override")))]
     pub fn vararg_type(_: Global<'base>) -> Self {
         unsafe { UnionAll::wrap(jl_vararg_type, Private) }
     }
@@ -180,7 +180,7 @@ impl<'base> UnionAll<'base> {
     }
 
     /// The `UnionAll` `OpaqueClosure`.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn opaque_closure_type(_: Global<'base>) -> Self {
         unsafe { UnionAll::wrap(jl_opaque_closure_type, Private) }
     }

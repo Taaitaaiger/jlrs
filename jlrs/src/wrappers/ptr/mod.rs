@@ -53,7 +53,7 @@ macro_rules! impl_root {
                 S: $crate::memory::scope::PartialScope<'target>,
             {
                 if let Some(v) =
-                    <Self as $crate::wrappers::ptr::private::Wrapper>::wrapper(value, Private)
+                    <Self as $crate::wrappers::ptr::private::WrapperPriv>::wrapper(value, Private)
                 {
                     let ptr = v.unwrap_non_null(Private);
                     scope.value(ptr, Private)
@@ -81,15 +81,12 @@ pub mod union;
 pub mod union_all;
 pub mod value;
 
-#[cfg(not(feature = "lts"))]
-use jl_sys::jl_value_t;
-
 use self::{
     array::{Array, TypedArray},
     datatype::DataType,
     function::Function,
     module::Module,
-    private::Wrapper as _,
+    private::WrapperPriv as _,
     simple_vector::SimpleVector,
     string::JuliaString,
     symbol::Symbol,
@@ -108,9 +105,15 @@ use self::internal::{
     typemap_level::TypeMapLevel, weak_ref::WeakRef,
 };
 
-#[cfg(all(not(feature = "lts"), feature = "internal-types"))]
+#[cfg(all(
+    any(not(feature = "lts"), feature = "all-features-override"),
+    feature = "internal-types"
+))]
 use self::internal::opaque_closure::OpaqueClosure;
-#[cfg(all(not(feature = "lts"), feature = "internal-types"))]
+#[cfg(all(
+    any(not(feature = "lts"), feature = "all-features-override"),
+    feature = "internal-types"
+))]
 use self::internal::vararg::Vararg;
 use crate::{
     call::Call,
@@ -126,7 +129,7 @@ use std::{
     str::FromStr,
 };
 
-#[cfg(not(feature = "lts"))]
+#[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
 use std::sync::atomic::AtomicPtr;
 
 macro_rules! impl_valid_layout {
@@ -193,6 +196,7 @@ pub(crate) trait Root<'target, 'value, 'data>: Wrapper<'value, 'data> {
 pub trait WrapperRef<'scope, 'data>:
     private::WrapperRef<'scope, 'data> + Copy + Debug + ValidLayout
 {
+    /// The pointer wrapper type associated with this `Ref`.
     type Wrapper: Wrapper<'scope, 'data>;
 }
 
@@ -205,7 +209,7 @@ where
 }
 
 /// Trait implemented by all pointer wrapper types.
-pub trait Wrapper<'scope, 'data>: private::Wrapper<'scope, 'data> {
+pub trait Wrapper<'scope, 'data>: private::WrapperPriv<'scope, 'data> {
     /// Convert the wrapper to a `Ref`.
     fn as_ref(self) -> Ref<'scope, 'data, Self> {
         unsafe { Ref::wrap(self.unwrap(Private)) }
@@ -287,7 +291,7 @@ pub trait Wrapper<'scope, 'data>: private::Wrapper<'scope, 'data> {
     }
 }
 
-impl<'scope, 'data, W> Wrapper<'scope, 'data> for W where W: private::Wrapper<'scope, 'data> {}
+impl<'scope, 'data, W> Wrapper<'scope, 'data> for W where W: private::WrapperPriv<'scope, 'data> {}
 
 /// An unrooted reference to Julia data.
 ///
@@ -458,9 +462,15 @@ impl_valid_layout!(MethodTableRef, MethodTable);
 impl_ref_root!(MethodTable, MethodTableRef, 1);
 
 /// A reference to an [`OpaqueClosure`]
-#[cfg(all(not(feature = "lts"), feature = "internal-types"))]
+#[cfg(all(
+    any(not(feature = "lts"), feature = "all-features-override"),
+    feature = "internal-types"
+))]
 pub type OpaqueClosureRef<'scope> = Ref<'scope, 'static, OpaqueClosure<'scope>>;
-#[cfg(all(not(feature = "lts"), feature = "internal-types"))]
+#[cfg(all(
+    any(not(feature = "lts"), feature = "all-features-override"),
+    feature = "internal-types"
+))]
 impl_valid_layout!(OpaqueClosureRef, OpaqueClosure);
 #[cfg(feature = "internal-types")]
 impl_ref_root!(OpaqueClosure, OpaqueClosureRef, 1);
@@ -536,11 +546,20 @@ impl_valid_layout!(UnionAllRef, UnionAll);
 impl_ref_root!(UnionAll, UnionAllRef, 1);
 
 /// A reference to a [`Vararg`]
-#[cfg(all(not(feature = "lts"), feature = "internal-types"))]
+#[cfg(all(
+    any(not(feature = "lts"), feature = "all-features-override"),
+    feature = "internal-types"
+))]
 pub type VarargRef<'scope> = Ref<'scope, 'static, Vararg<'scope>>;
-#[cfg(all(not(feature = "lts"), feature = "internal-types"))]
+#[cfg(all(
+    any(not(feature = "lts"), feature = "all-features-override"),
+    feature = "internal-types"
+))]
 impl_valid_layout!(VarargRef, Vararg);
-#[cfg(all(not(feature = "lts"), feature = "internal-types"))]
+#[cfg(all(
+    any(not(feature = "lts"), feature = "all-features-override"),
+    feature = "internal-types"
+))]
 impl_ref_root!(Vararg, VarargRef, 1);
 
 /// A reference to a [`WeakRef`]
@@ -614,7 +633,7 @@ pub(crate) mod private {
     use crate::wrappers::ptr::{value::Value, Ref};
     use std::{fmt::Debug, ptr::NonNull};
 
-    pub trait Wrapper<'scope, 'data>: Sized + Copy + Debug {
+    pub trait WrapperPriv<'scope, 'data>: Sized + Copy + Debug {
         type Wraps: Copy;
         const NAME: &'static str;
 
@@ -690,13 +709,13 @@ pub(crate) mod private {
     pub trait WrapperRef<'scope, 'data> {}
 
     impl<'scope, 'data, T> WrapperRef<'scope, 'data> for Ref<'scope, 'data, T> where
-        T: Wrapper<'scope, 'data>
+        T: WrapperPriv<'scope, 'data>
     {
     }
 }
 
-#[cfg(not(feature = "lts"))]
+#[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
 #[inline(always)]
-pub(crate) unsafe fn atomic_value(addr: *mut u64) -> AtomicPtr<jl_value_t> {
-    AtomicPtr::new(addr as *mut jl_value_t)
+pub(crate) unsafe fn atomic_value<'a, T>(addr: *const u64) -> &'a AtomicPtr<T> {
+    &*(addr as *const AtomicPtr<T>)
 }

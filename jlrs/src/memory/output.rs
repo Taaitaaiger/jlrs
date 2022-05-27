@@ -6,7 +6,7 @@
 //!
 //! Instead, Julia data that you want to return from a scope must be rooted in a parent scope.
 //! Thiscan be done by using an [`Output`] or [`OutputScope`]. An `Output` can be reserved in a
-//! frame by calling [`Frame::reserve_output`], it can be turned into an `OutputScope` by calling
+//! frame by calling [`Frame::output`], it can be turned into an `OutputScope` by calling
 //! [`Output::into_scope`]. `Output` only implements [`PartialScope`], while `OutputScope`
 //! implements both [`Scope`] and [`OutputScope`]
 //!
@@ -18,7 +18,7 @@ use std::{cell::Cell, ffi::c_void, marker::PhantomData, ptr::NonNull};
 
 /// A reserved slot in a frame.
 ///
-/// A new `Output` can be created by calling [`Frame::reserve_output`]. `Output` implements
+/// A new `Output` can be created by calling [`Frame::output`]. `Output` implements
 /// [`PartialScope`], not [`Scope`]. It can be upgraded to an [`OutputScope`], which does
 /// implement `Scope`, by calling [`Output::into_scope`].
 ///

@@ -29,7 +29,7 @@ use crate::{
     private::Private,
     wrappers::ptr::Wrapper,
     wrappers::ptr::{
-        datatype::DataType, private::Wrapper as _, type_name::TypeName, union_all::UnionAll,
+        datatype::DataType, private::WrapperPriv, type_name::TypeName, union_all::UnionAll,
     },
 };
 use std::ffi::c_void;
@@ -59,7 +59,7 @@ macro_rules! impl_julia_typecheck {
             #[inline(always)]
             fn typecheck(t: $crate::wrappers::ptr::datatype::DataType) -> bool {
                 unsafe {
-                    <$crate::wrappers::ptr::datatype::DataType as $crate::wrappers::ptr::private::Wrapper>::unwrap(t, crate::private::Private) == $jl_type
+                    <$crate::wrappers::ptr::datatype::DataType as $crate::wrappers::ptr::private::WrapperPriv>::unwrap(t, crate::private::Private) == $jl_type
                 }
             }
         }
@@ -69,7 +69,7 @@ macro_rules! impl_julia_typecheck {
             #[inline(always)]
             fn typecheck(t: $crate::wrappers::ptr::datatype::DataType) -> bool {
                 unsafe {
-                    <$crate::wrappers::ptr::datatype::DataType as $crate::wrappers::ptr::private::Wrapper>::unwrap(t, crate::private::Private) == $jl_type
+                    <$crate::wrappers::ptr::datatype::DataType as $crate::wrappers::ptr::private::WrapperPriv>::unwrap(t, crate::private::Private) == $jl_type
                 }
             }
         }
@@ -80,7 +80,7 @@ macro_rules! impl_julia_typecheck {
             fn typecheck(t: crate::wrappers::ptr::datatype::DataType) -> bool {
                 unsafe {
                     let global = $crate::memory::global::Global::new();
-                    <$crate::wrappers::ptr::datatype::DataType as $crate::wrappers::ptr::private::Wrapper>::unwrap(t, crate::private::Private) == <$type as $crate::convert::into_julia::IntoJulia>::julia_type(global).ptr()
+                    <$crate::wrappers::ptr::datatype::DataType as $crate::wrappers::ptr::private::WrapperPriv>::unwrap(t, crate::private::Private) == <$type as $crate::convert::into_julia::IntoJulia>::julia_type(global).ptr()
                 }
             }
         }

@@ -4,12 +4,12 @@
 /// [`FieldAccessor`].
 ///
 /// [`FieldAccessor`]: crate::wrappers::ptr::value::FieldAccessor
-pub trait FieldIndex: private::FieldIndex {}
-impl<FI: private::FieldIndex> FieldIndex for FI {}
+pub trait FieldIndex: private::FieldIndexFramePriv {}
+impl<I: private::FieldIndexFramePriv> FieldIndex for I {}
 
 mod private {
     use crate::{
-        convert::to_symbol::private::ToSymbol,
+        convert::to_symbol::private::ToSymbolPriv,
         error::{JlrsError, JlrsResult, CANNOT_DISPLAY_TYPE},
         private::Private,
         wrappers::ptr::{
@@ -21,7 +21,7 @@ mod private {
         },
     };
 
-    pub trait FieldIndex {
+    pub trait FieldIndexFramePriv {
         fn field_index(&self, ty: DataType, _: Private) -> JlrsResult<usize>;
 
         #[inline]
@@ -30,28 +30,28 @@ mod private {
         }
     }
 
-    impl FieldIndex for &str {
+    impl FieldIndexFramePriv for &str {
         #[inline]
         fn field_index(&self, ty: DataType, _: Private) -> JlrsResult<usize> {
             unsafe { ty.field_index(self.to_symbol_priv(Private)) }
         }
     }
 
-    impl FieldIndex for Symbol<'_> {
+    impl FieldIndexFramePriv for Symbol<'_> {
         #[inline]
         fn field_index(&self, ty: DataType, _: Private) -> JlrsResult<usize> {
             ty.field_index(*self)
         }
     }
 
-    impl FieldIndex for JuliaString<'_> {
+    impl FieldIndexFramePriv for JuliaString<'_> {
         #[inline]
         fn field_index(&self, ty: DataType, _: Private) -> JlrsResult<usize> {
             unsafe { ty.field_index(self.to_symbol_priv(Private)) }
         }
     }
 
-    impl<D: Dims> FieldIndex for D {
+    impl<D: Dims> FieldIndexFramePriv for D {
         fn field_index(&self, ty: DataType, _: Private) -> JlrsResult<usize> {
             debug_assert!(!ty.is::<Array>());
 
