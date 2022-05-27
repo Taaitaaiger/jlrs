@@ -13,7 +13,7 @@ use crate::{
 };
 use cfg_if::cfg_if;
 use jl_sys::{jl_code_instance_t, jl_code_instance_type};
-use std::{ffi::c_void, marker::PhantomData, ptr::null_mut, ptr::NonNull};
+use std::{ffi::c_void, marker::PhantomData, ptr::NonNull};
 
 cfg_if! {
     if #[cfg(any(not(feature = "lts"), feature = "all-features-override"))] {
@@ -268,6 +268,7 @@ impl<'scope> CodeInstance<'scope> {
     pub fn invoke(self) -> *mut c_void {
         cfg_if! {
             if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                use std::ptr::null_mut;
                 unsafe { self.unwrap_non_null(Private).as_ref().invoke.map(|x| x as *mut c_void).unwrap_or(null_mut()) }
             } else {
                 unsafe {
