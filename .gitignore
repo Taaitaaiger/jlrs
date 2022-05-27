@@ -14,3 +14,5 @@ tarpaulin-report.html
 
 **/*.profraw
 **/*.o
+**/coverage_report.dat
+**/coverage_summary.dat

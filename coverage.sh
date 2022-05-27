@@ -1,29 +1,4 @@
 #!/usr/bin/env bash
 
-set -euxo pipefail
-
-cargo clean
-
-LLVM_PROFILE_FILE="jlrs-%m-%p.profraw" \
-RUSTFLAGS="-C instrument-coverage" \
-cargo test --features sync-rt,tokio-rt,async-std-rt,jlrs-derive,f16,jlrs-ndarray,uv --tests -- --test-threads=1
-
-rust-profdata merge *.profraw -o jlrs.profdata
-
-rust-cov report \
-    $( \
-      for file in \
-        $( \
-          RUSTFLAGS="-C instrument-coverage" \
-            cargo test  --features sync-rt,tokio-rt,async-std-rt,jlrs-derive,f16,jlrs-ndarray,uv --tests --no-run --message-format=json -- --test-threads=1 \
-              | jq -r "select(.profile.test == true) | .filenames[]" \
-              | grep -v dSYM - \
-        ); \
-      do \
-        printf "%s %s " -object $file; \
-      done \
-    ) \
-  --instr-profile=jlrs.profdata --summary-only
-
-find . -name "*.profraw" -print0 | xargs -0 rm
-rm ./*.profdata
+cargo llvm-cov clean --workspace; 
+cargo llvm-cov --all-features --workspace --open --ignore-filename-regex "(ptr/internal|jl_sys)" -- --test-threads=1
