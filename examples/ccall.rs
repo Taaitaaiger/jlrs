@@ -81,7 +81,7 @@ mod tests {
                 )?.into_jlrs_result()?;
 
                 let data  = vec![1.0f64, 2.0, 3.0];
-                let array = TypedArray::from_vec(&mut *frame, data, 3)?.into_jlrs_result()?;
+                let array = TypedArray::from_vec_unchecked(&mut *frame, data, 3)?;
 
                 // Call the function and unbox the result.
                 let output = func.call2_unrooted(global, incr_array_ptr, array.as_value());
