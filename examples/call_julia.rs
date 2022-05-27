@@ -1,4 +1,5 @@
 use jlrs::prelude::*;
+use std::path::PathBuf;
 
 fn main() {
     // Julia must be initialized before it can be used.
@@ -9,9 +10,14 @@ fn main() {
     // Include some custom code defined in MyModule.jl.
     // This is safe because the included code doesn't do any strange things.
     unsafe {
-        julia
-            .include("MyModule.jl")
-            .expect("Could not include file");
+        let path = PathBuf::from("MyModule.jl");
+        if path.exists() {
+            julia.include(path).expect("Could not include file");
+        } else {
+            julia
+                .include("examples/MyModule.jl")
+                .expect("Could not include file");
+        }
     }
 
     let result = julia

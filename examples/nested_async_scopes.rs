@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use jlrs::prelude::*;
 
 // This struct contains the data our task will need. This struct must be `Send`, `Sync`, and
@@ -21,7 +23,12 @@ impl AsyncTask for MyTask {
         frame: &mut AsyncGcFrame<'base>,
     ) -> JlrsResult<()> {
         unsafe {
-            Value::include(frame, "MyModule.jl")?.into_jlrs_result()?;
+            let path = PathBuf::from("MyModule.jl");
+            if path.exists() {
+                Value::include(frame, "MyModule.jl")?.into_jlrs_result()?;
+            } else {
+                Value::include(frame, "examples/MyModule.jl")?.into_jlrs_result()?;
+            }
         }
         Ok(())
     }
@@ -109,7 +116,7 @@ async fn main() {
         .task(
             MyTask {
                 dims: 4,
-                iters: 10_000_000,
+                iters: 1_000_000,
             },
             sender1,
         )
@@ -120,7 +127,7 @@ async fn main() {
         .task(
             MyTask {
                 dims: 4,
-                iters: 20_000_000,
+                iters: 1_000_000,
             },
             sender2,
         )
@@ -131,7 +138,7 @@ async fn main() {
         .task(
             MyTask {
                 dims: 4,
-                iters: 30_000_000,
+                iters: 1_000_000,
             },
             sender3,
         )
@@ -142,7 +149,7 @@ async fn main() {
         .task(
             MyTask {
                 dims: 4,
-                iters: 40_000_000,
+                iters: 1_000_000,
             },
             sender4,
         )

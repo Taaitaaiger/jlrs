@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use jlrs::prelude::*;
 
 // This struct contains the data our task will need. This struct must be `Send`, `Sync`, and
@@ -21,7 +23,12 @@ impl AsyncTask for MyTask {
         frame: &mut AsyncGcFrame<'base>,
     ) -> JlrsResult<()> {
         unsafe {
-            Value::include(frame, "MyModule.jl")?.into_jlrs_result()?;
+            let path = PathBuf::from("MyModule.jl");
+            if path.exists() {
+                Value::include(frame, "MyModule.jl")?.into_jlrs_result()?;
+            } else {
+                Value::include(frame, "examples/MyModule.jl")?.into_jlrs_result()?;
+            }
         }
         Ok(())
     }
@@ -83,7 +90,7 @@ fn main() {
     let receiver1 = {
         let task = MyTask {
             dims: 4,
-            iters: 5_000_000,
+            iters: 1_000_000,
         };
         let (sender, receiver) = crossbeam_channel::bounded(1);
         julia.try_task(task, sender).unwrap();
@@ -93,7 +100,7 @@ fn main() {
     let receiver2 = {
         let task = MyTask {
             dims: 6,
-            iters: 5_000_000,
+            iters: 1_000_000,
         };
         let (sender, receiver) = crossbeam_channel::bounded(1);
         julia.try_task(task, sender).unwrap();
