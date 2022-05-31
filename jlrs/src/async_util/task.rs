@@ -142,7 +142,6 @@ pub trait PersistentTask: 'static + Send + Sync {
     /// # #[cfg(not(all(target_os = "windows", feature = "lts")))]
     /// # {
     /// use jlrs::prelude::*;
-    /// use jlrs::prelude::*;
     ///
     /// struct AccumulatorTask {
     ///     n_values: usize
@@ -198,11 +197,11 @@ pub trait PersistentTask: 'static + Send + Sync {
     ///     ) -> JlrsResult<Self::Output> {
     ///         {
     ///             // Array data can be directly accessed from Rust.
-    ///             // TypedArray::inline_data_mut can be used if the type
+    ///             // TypedArray::bits_data_mut can be used if the type
     ///             // of the elements is concrete and immutable.
     ///             // This is safe because this is the only active reference to
     ///             // the array.
-    ///             let mut data = unsafe { state.array.inline_data_mut(frame)? };
+    ///             let mut data = unsafe { state.array.bits_data_mut(frame)? };
     ///             data[state.offset] = input;
     ///
     ///             state.offset += 1;

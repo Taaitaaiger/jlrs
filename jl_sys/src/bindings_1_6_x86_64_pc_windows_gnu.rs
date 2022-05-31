@@ -5950,6 +5950,12 @@ extern "C" {
     pub fn jl_pchar_to_string(str_: *const ::std::os::raw::c_char, len: usize) -> *mut jl_value_t;
 }
 extern "C" {
+    pub fn jl_arrayref(a: *mut jl_array_t, i: usize) -> *mut jl_value_t;
+}
+extern "C" {
+    pub fn jl_arrayset(a: *mut jl_array_t, v: *mut jl_value_t, i: usize);
+}
+extern "C" {
     pub fn jl_array_grow_end(a: *mut jl_array_t, inc: usize);
 }
 extern "C" {

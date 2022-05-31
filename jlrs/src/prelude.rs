@@ -1,5 +1,7 @@
 //! Reexports structs and traits you're likely to need.
 
+#[cfg(feature = "ccall")]
+pub use crate::ccall::CCall;
 #[cfg(feature = "pyplot")]
 pub use crate::pyplot::{AccessPlotsModule, PyPlot};
 #[cfg(feature = "async-std-rt")]
@@ -23,7 +25,7 @@ pub use crate::{
     convert::into_jlrs_result::IntoJlrsResult,
     error::JlrsResult,
     memory::{
-        frame::{Frame, GcFrame},
+        frame::Frame,
         global::Global,
         scope::{PartialScope, Scope},
     },
@@ -31,7 +33,7 @@ pub use crate::{
     wrappers::{
         inline::{bool::Bool, char::Char, nothing::Nothing, tuple::*},
         ptr::{
-            array::{dimensions::Dims, Array, TypedArray},
+            array::{Array, TypedArray},
             datatype::DataType,
             module::Module,
             string::JuliaString,
@@ -41,8 +43,6 @@ pub use crate::{
         },
     },
 };
-#[cfg(feature = "ccall")]
-pub use crate::{ccall::CCall, memory::frame::NullFrame};
 #[cfg(feature = "async")]
 pub use async_trait::async_trait;
 #[cfg(feature = "jlrs-derive")]

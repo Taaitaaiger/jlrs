@@ -51,6 +51,10 @@ impl<'scope, 'data> WithKeywords<'scope, 'data> {
 /// [`WithKeywords`], and [`OpaqueClosure`] if the `internal-types` feature is enabled. Because
 /// `Value` implements this trait it's not necessary to cast it before calling it.
 ///
+/// Constructors can be called with the methods defined by this trait, both the inner and outer
+/// constructors of a `DataType` can be called by converting the `DataType` to a `Value` and
+/// calling it.
+///
 /// Note that all of these methods are unsafe. There are several reasons for this. First and
 /// foremost these methods let you call arbitrary Julia functions which can't be checked for
 /// correctness. If the second lifetime of an argument is not `'static`, it must never be assigned
@@ -59,7 +63,7 @@ impl<'scope, 'data> WithKeywords<'scope, 'data> {
 /// [`Function`]: crate::wrappers::ptr::function::Function
 /// [`OpaqueClosure`]: crate::wrappers::ptr::internal::opaque_closure::OpaqueClosure
 /// [`safety`]: crate::safety
-pub trait Call<'data>: private::Call {
+pub trait Call<'data>: private::CallPriv {
     /// Call a function with no arguments and root the result in `scope`.
     ///
     /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
@@ -905,13 +909,13 @@ mod private {
     use crate::wrappers::ptr::internal::opaque_closure::OpaqueClosure;
 
     use super::WithKeywords;
-    pub trait Call {}
-    impl Call for WithKeywords<'_, '_> {}
-    impl Call for Function<'_, '_> {}
+    pub trait CallPriv {}
+    impl CallPriv for WithKeywords<'_, '_> {}
+    impl CallPriv for Function<'_, '_> {}
     #[cfg(all(
         any(not(feature = "lts"), feature = "all-features-override"),
         feature = "internal-types"
     ))]
-    impl Call for OpaqueClosure<'_> {}
-    impl Call for Value<'_, '_> {}
+    impl CallPriv for OpaqueClosure<'_> {}
+    impl CallPriv for Value<'_, '_> {}
 }

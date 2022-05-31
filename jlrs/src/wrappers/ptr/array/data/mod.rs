@@ -4,7 +4,5 @@
 //! union. Structs that provide access to their contents can be found in the this module's
 //! submodules.
 
+pub mod accessor;
 pub mod copied;
-pub mod inline;
-pub mod union;
-pub mod value;

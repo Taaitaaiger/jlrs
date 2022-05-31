@@ -60,6 +60,8 @@ extern "C"
     jlrs_result_t jlrs_array_del_end(jl_array_t *a, size_t dec);
     jlrs_result_t jlrs_array_grow_beg(jl_array_t *a, size_t inc);
     jlrs_result_t jlrs_array_del_beg(jl_array_t *a, size_t dec);
+    jlrs_result_t jlrs_arrayset(jl_array_t *a JL_ROOTING_ARGUMENT, jl_value_t *rhs JL_ROOTED_ARGUMENT JL_MAYBE_UNROOTED, size_t i);
+    jlrs_result_t jlrs_arrayref(jl_array_t *a JL_PROPAGATES_ROOT, size_t i);
 #endif
 
     uint_t jlrs_array_data_owner_offset(uint16_t n_dims);

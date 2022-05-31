@@ -16,14 +16,12 @@ pub unsafe extern "C" fn add(a: i32, b: i32) -> i32 {
 // `ccall((:incr_array, "libccall"), Cvoid, (Array{Float64},), arr)`  where `arr` is an
 // `Array{Float64}`.
 #[no_mangle]
-pub unsafe extern "C" fn incr_array(a: TypedArray<f64>) {
+pub unsafe extern "C" fn incr_array(arr: TypedArray<f64>) {
     // We want to mutably borrow the array data but don't need to protect any new values, so we
     // can use `CCall::null_frame` to avoid allocations.
     CCall::new()
         .null_scope(|frame| {
-            let mut data = a.inline_data_mut(frame)?;
-
-            for x in data.as_mut_slice() {
+            for x in arr.bits_data_mut(frame)?.as_mut_slice() {
                 *x += 1.0;
             }
 

@@ -4,8 +4,8 @@
 /// [`FieldAccessor`].
 ///
 /// [`FieldAccessor`]: crate::wrappers::ptr::value::FieldAccessor
-pub trait FieldIndex: private::FieldIndexFramePriv {}
-impl<I: private::FieldIndexFramePriv> FieldIndex for I {}
+pub trait FieldIndex: private::FieldIndexPriv {}
+impl<I: private::FieldIndexPriv> FieldIndex for I {}
 
 mod private {
     use crate::{
@@ -21,7 +21,7 @@ mod private {
         },
     };
 
-    pub trait FieldIndexFramePriv {
+    pub trait FieldIndexPriv {
         fn field_index(&self, ty: DataType, _: Private) -> JlrsResult<usize>;
 
         #[inline]
@@ -30,33 +30,33 @@ mod private {
         }
     }
 
-    impl FieldIndexFramePriv for &str {
+    impl FieldIndexPriv for &str {
         #[inline]
         fn field_index(&self, ty: DataType, _: Private) -> JlrsResult<usize> {
             unsafe { ty.field_index(self.to_symbol_priv(Private)) }
         }
     }
 
-    impl FieldIndexFramePriv for Symbol<'_> {
+    impl FieldIndexPriv for Symbol<'_> {
         #[inline]
         fn field_index(&self, ty: DataType, _: Private) -> JlrsResult<usize> {
             ty.field_index(*self)
         }
     }
 
-    impl FieldIndexFramePriv for JuliaString<'_> {
+    impl FieldIndexPriv for JuliaString<'_> {
         #[inline]
         fn field_index(&self, ty: DataType, _: Private) -> JlrsResult<usize> {
             unsafe { ty.field_index(self.to_symbol_priv(Private)) }
         }
     }
 
-    impl<D: Dims> FieldIndexFramePriv for D {
+    impl<D: Dims> FieldIndexPriv for D {
         fn field_index(&self, ty: DataType, _: Private) -> JlrsResult<usize> {
             debug_assert!(!ty.is::<Array>());
 
             if self.n_dimensions() != 1 {
-                Err(JlrsError::ArrayNeedsSimpleIndex)?
+                Err(JlrsError::FieldNeedsSimpleIndex)?
             }
 
             let n = self.size();

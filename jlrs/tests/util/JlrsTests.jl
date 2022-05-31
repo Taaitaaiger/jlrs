@@ -122,4 +122,14 @@ end
 struct WithAbstract 
     a::Real
 end
+
+struct HasConstructors
+    a::DataType
+    b::Union{Int16, Int32}
+    HasConstructors(i::Int16) = new(Int16, i)
+    HasConstructors(i::Int32) = new(Int32, i)
+    HasConstructors(i::Bool) = new(Bool, i ? one(Int32) : zero(Int32))
+end
+
+HasConstructors() = HasConstructors(false)
 end

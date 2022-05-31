@@ -136,7 +136,8 @@ cfg_if::cfg_if! {
 
         impl<'frame> AsyncGcFrame<'frame> {
             /// An async version of [`Frame::scope`]. The closure `func` must return an async
-            /// block.
+            /// block. Note that the returned value is required to live at least as long the
+            /// current frame.
             #[inline(never)]
             pub async fn async_scope<'nested, T, F, G>(&'nested mut self, func: F) -> JlrsResult<T>
             where
@@ -156,7 +157,8 @@ cfg_if::cfg_if! {
             }
 
             /// An async version of [`Frame::scope_with_capacity`]. The closure `func` must return
-            /// an async block.
+            /// an async block. Note that the returned value is required to live at least as long
+            /// the current frame.
             #[inline(never)]
             pub async fn async_scope_with_capacity<'nested, T, F, G>(
                 &'nested mut self,

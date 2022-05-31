@@ -35,12 +35,7 @@ use crate::{
     private::Private,
     wrappers::ptr::{
         array::{
-            data::{
-                copied::CopiedArray,
-                inline::{InlineArrayData, InlineArrayDataMut, UnrestrictedInlineArrayDataMut},
-                union::{UnionArrayData, UnionArrayDataMut, UnresistrictedUnionArrayDataMut},
-                value::{UnrestrictedValueArrayDataMut, ValueArrayData, ValueArrayDataMut},
-            },
+            data::copied::CopiedArray,
             dimensions::{ArrayDimensions, Dims},
         },
         datatype::DataType,
@@ -68,6 +63,13 @@ use std::{
     ptr::{null_mut, NonNull},
     slice,
 };
+
+use self::data::accessor::{
+    ArrayAccessor, BitsArrayAccessor, Immutable, IndeterminateArrayAccessor,
+    InlinePtrArrayAccessor, Mutable, PtrArrayAccessor, UnionArrayAccessor,
+};
+
+use super::ValueRef;
 
 cfg_if! {
     if #[cfg(not(all(target_os = "windows", feature = "lts")))] {
@@ -767,233 +769,376 @@ impl<'scope, 'data> Array<'scope, 'data> {
         }
     }
 
-    /// Immutably borrow inline array data.
+    /// Immutably the contents of this array. The elements must have an `isbits` type.
     ///
-    /// You can borrow data from multiple arrays at the same time. Returns `JlrsError::NotInline`
-    /// if the data is not stored inline or `JlrsError::WrongType` if the type of the elements is
-    /// incorrect.
-    pub fn inline_data<'borrow, 'frame, T, F>(
+    /// You can borrow data from multiple arrays at the same time.
+    ///
+    /// Returns `JlrsError::NotInline` if the data is not stored inline, `JlrsError::HasPointers`
+    /// if the type is not an `isbits` type, or `JlrsError::WrongType` if `T` is not a valid
+    /// layout for the array elements.
+    pub fn bits_data<'borrow, 'frame, T, F>(
         self,
         frame: &'borrow F,
-    ) -> JlrsResult<InlineArrayData<'borrow, 'scope, 'data, T>>
+    ) -> JlrsResult<BitsArrayAccessor<'borrow, 'scope, 'data, T, Immutable<'borrow, T>>>
     where
         T: ValidLayout,
         F: Frame<'frame>,
     {
-        if !self.contains::<T>() {
-            Err(JlrsError::WrongType {
-                value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
-
-        if !self.is_inline_array() {
-            Err(JlrsError::NotInline {
-                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
-
-        unsafe { Ok(InlineArrayData::new(self, frame)) }
+        self.ensure_bits_containing::<T>()?;
+        unsafe { Ok(ArrayAccessor::unrestricted_new(self, frame)) }
     }
 
-    /// Mutably borrow inline array data, you can mutably borrow a single array at a time.
+    /// Mutably access the contents of this array. The elements must have an `isbits` type.
     ///
-    /// Returns `JlrsError::NotInline` if the data is not stored inline or `JlrsError::WrongType`
-    /// if the type of the elements is incorrect.
+    /// This method can be used to gain mutable access to the contents of a single array.
+    ///
+    /// Returns `JlrsError::NotInline` if the data is not stored inline, `JlrsError::HasPointers`
+    /// if the type is not an `isbits` type, or `JlrsError::WrongType` if `T` is not a valid
+    /// layout for the array elements.
+    ///
+    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
+    /// this value is allowed.
+    pub unsafe fn bits_data_mut<'borrow, 'frame, T, F>(
+        self,
+        frame: &'borrow mut F,
+    ) -> JlrsResult<BitsArrayAccessor<'borrow, 'scope, 'data, T, Mutable<'borrow, T>>>
+    where
+        T: ValidLayout,
+        F: Frame<'frame>,
+    {
+        self.ensure_bits_containing::<T>()?;
+        Ok(ArrayAccessor::new(self, frame))
+    }
+
+    /// Mutably access the contents of this array. The elements must have an `isbits` type.
+    ///
+    /// Unlike [`Array::bits_data_mut`], this method can be used to gain mutable access to the
+    /// contents of multiple arrays simultaneously.
+    ///
+    /// Returns `JlrsError::NotInline` if the data is not stored inline, `JlrsError::HasPointers`
+    /// if the type is not an `isbits` type, or `JlrsError::WrongType` if `T` is not a valid
+    /// layout for the array elements.
+    ///
+    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
+    /// this value is allowed. This method can create multiple mutable references to the same
+    /// data.
+    pub unsafe fn unrestricted_bits_data_mut<'borrow, 'frame, T, F>(
+        self,
+        frame: &'borrow F,
+    ) -> JlrsResult<BitsArrayAccessor<'borrow, 'scope, 'data, T, Mutable<'borrow, T>>>
+    where
+        T: ValidLayout,
+        F: Frame<'frame>,
+    {
+        self.ensure_bits_containing::<T>()?;
+        Ok(ArrayAccessor::unrestricted_new(self, frame))
+    }
+
+    /// Immutably the contents of this array. The elements must be stored inline.
+    ///
+    /// You can borrow data from multiple arrays at the same time.
+    ///
+    /// Returns `JlrsError::NotInline` if the data is not stored inline or
+    /// `JlrsError::WrongType` if `T` is not a valid layout for the array elements.
+    pub fn inline_data<'borrow, 'frame, T, F>(
+        self,
+        frame: &'borrow F,
+    ) -> JlrsResult<InlinePtrArrayAccessor<'borrow, 'scope, 'data, T, Immutable<'borrow, T>>>
+    where
+        T: ValidLayout,
+        F: Frame<'frame>,
+    {
+        self.ensure_inline_containing::<T>()?;
+        unsafe { Ok(ArrayAccessor::unrestricted_new(self, frame)) }
+    }
+
+    /// Mutably access the contents of this array. The elements must be stored inline.
+    ///
+    /// This method can be used to gain mutable access to the contents of a single array.
+    ///
+    /// Returns `JlrsError::NotInline` if the data is not stored inline or
+    /// `JlrsError::WrongType` if `T` is not a valid layout for the array elements.
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
     /// this value is allowed.
     pub unsafe fn inline_data_mut<'borrow, 'frame, T, F>(
         self,
         frame: &'borrow mut F,
-    ) -> JlrsResult<InlineArrayDataMut<'borrow, 'scope, 'data, T>>
+    ) -> JlrsResult<InlinePtrArrayAccessor<'borrow, 'scope, 'data, T, Mutable<'borrow, T>>>
     where
         T: ValidLayout,
         F: Frame<'frame>,
     {
-        if !self.contains::<T>() {
-            Err(JlrsError::WrongType {
-                value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
-
-        if !self.is_inline_array() {
-            Err(JlrsError::NotInline {
-                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
-
-        Ok(InlineArrayDataMut::new(self, frame))
+        self.ensure_inline_containing::<T>()?;
+        Ok(ArrayAccessor::new(self, frame))
     }
 
-    /// Mutably borrow inline array data without the restriction that only a single array can be
-    /// mutably borrowed.
+    /// Mutably access the contents of this array. The elements must be stored inline.
     ///
-    /// Returns `JlrsError::NotInline` if the data is not stored inline or `JlrsError::WrongType`
-    /// if the type of the elements is incorrect.
+    /// Unlike [`Array::inline_data_mut`], this method can be used to gain mutable access to the
+    /// contents of multiple arrays simultaneously.
     ///
-    /// Safety: It's your responsibility to ensure you don't create multiple mutable
-    /// references to the same data. Mutating Julia data is generally unsafe because it can't be
-    /// guaranteed mutating this value is allowed.
+    /// Returns `JlrsError::NotInline` if the data is not stored inline or
+    /// `JlrsError::WrongType` if `T` is not a valid layout for the array elements.
+    ///
+    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
+    /// this value is allowed. This method can create multiple mutable references to the same
+    /// data.
     pub unsafe fn unrestricted_inline_data_mut<'borrow, 'frame, T, F>(
         self,
         frame: &'borrow F,
-    ) -> JlrsResult<UnrestrictedInlineArrayDataMut<'borrow, 'scope, 'data, T>>
+    ) -> JlrsResult<InlinePtrArrayAccessor<'borrow, 'scope, 'data, T, Mutable<'borrow, T>>>
     where
         T: ValidLayout,
         F: Frame<'frame>,
     {
-        if !self.contains::<T>() {
-            Err(JlrsError::WrongType {
-                value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
-
-        if !self.is_inline_array() {
-            Err(JlrsError::NotInline {
-                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
-
-        Ok(UnrestrictedInlineArrayDataMut::new(self, frame))
+        self.ensure_inline_containing::<T>()?;
+        Ok(ArrayAccessor::unrestricted_new(self, frame))
     }
 
-    /// Immutably borrow the data of this array of values.
+    /// Immutably the contents of this array. The elements must not be stored inline.
     ///
-    /// You can borrow data from multiple arrays at the same time. The values themselves can be
-    /// mutable, but you can't replace an element with another value. Returns `JlrsError::Inline`
-    /// if the data is stored inline.
-    pub fn value_data<'borrow, 'frame, F>(
-        self,
-        frame: &'borrow F,
-    ) -> JlrsResult<ValueArrayData<'borrow, 'scope, 'data>>
-    where
-        F: Frame<'frame>,
-    {
-        if !self.is_value_array() {
-            Err(JlrsError::Inline {
-                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
-
-        unsafe { Ok(ValueArrayData::new(self, frame)) }
-    }
-
-    /// Immutably borrow the data of this array of pointer wrappers.
+    /// You can borrow data from multiple arrays at the same time.
     ///
-    /// You can borrow data from multiple arrays at the same time. The values themselves can be
-    /// mutable, but you can't replace an element with another value. Returns
-    /// `JlrsError::WrongType` if the type of the elements is incorrect.
+    /// Returns `JlrsError::Inline` if the data is stored inline or `JlrsError::WrongType` if `T`
+    /// is not a valid layout for the array elements.
     pub fn wrapper_data<'borrow, 'frame, T, F>(
         self,
         frame: &'borrow F,
-    ) -> JlrsResult<ValueArrayData<'borrow, 'scope, 'data, T>>
+    ) -> JlrsResult<PtrArrayAccessor<'borrow, 'scope, 'data, T, Immutable<'borrow, T>>>
     where
-        F: Frame<'frame>,
-        T: WrapperRef<'scope, 'data> + ValidLayout,
-    {
-        if !self.contains::<T>() {
-            Err(JlrsError::WrongType {
-                value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
-
-        unsafe { Ok(ValueArrayData::new(self, frame)) }
-    }
-
-    /// Mutably borrow the data of this array of values.
-    ///
-    /// You can mutably borrow a single array at the same time. Returns `JlrsError::Inline` if the
-    /// data is stored inline.
-    ///
-    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
-    /// this value is allowed.
-    pub unsafe fn value_data_mut<'borrow, 'frame, F>(
-        self,
-        frame: &'borrow mut F,
-    ) -> JlrsResult<ValueArrayDataMut<'borrow, 'scope, 'data>>
-    where
+        T: WrapperRef<'scope, 'data>,
         F: Frame<'frame>,
     {
-        if !self.is_value_array() {
-            Err(JlrsError::Inline {
-                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
-
-        Ok(ValueArrayDataMut::new(self, frame))
+        self.ensure_ptr_containing::<T>()?;
+        unsafe { Ok(ArrayAccessor::unrestricted_new(self, frame)) }
     }
 
-    /// Mutably borrow the data of this array of wrappers.
+    /// Mutably access the contents of this array. The elements must not be stored inline.
     ///
-    /// You can mutably borrow a single array at the same time. Returns `JlrsError::WrongType` if
-    /// the type of the elements is incorrect.
+    /// This method can be used to gain mutable access to the contents of a single array.
+    ///
+    /// Returns `JlrsError::Inline` if the data is stored inline or `JlrsError::WrongType` if `T`
+    /// is not a valid layout for the array elements.
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
     /// this value is allowed.
     pub unsafe fn wrapper_data_mut<'borrow, 'frame, T, F>(
         self,
         frame: &'borrow mut F,
-    ) -> JlrsResult<ValueArrayDataMut<'borrow, 'scope, 'data, T>>
+    ) -> JlrsResult<PtrArrayAccessor<'borrow, 'scope, 'data, T, Mutable<'borrow, T>>>
     where
-        F: Frame<'frame>,
-        T: WrapperRef<'scope, 'data> + ValidLayout,
-    {
-        if !self.contains::<T>() {
-            Err(JlrsError::WrongType {
-                value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
-
-        Ok(ValueArrayDataMut::new(self, frame))
-    }
-
-    /// Mutably borrow the data of this array of values without the restriction that only a single
-    /// array can be mutably borrowed.
-    ///
-    /// Returns `JlrsError::Inline` if the data is stored inline.
-    ///
-    /// Safety: It's your responsibility to ensure you don't create multiple mutable
-    /// references to the same data. Mutating Julia data is generally unsafe because it can't be
-    /// guaranteed mutating this value is allowed.
-    pub unsafe fn unrestricted_value_data_mut<'borrow, 'frame, F>(
-        self,
-        frame: &'borrow F,
-    ) -> JlrsResult<UnrestrictedValueArrayDataMut<'borrow, 'scope, 'data>>
-    where
+        T: WrapperRef<'frame, 'data>,
         F: Frame<'frame>,
     {
-        if !self.is_value_array() {
-            Err(JlrsError::Inline {
-                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
-
-        Ok(UnrestrictedValueArrayDataMut::new(self, frame))
+        self.ensure_ptr_containing::<T>()?;
+        Ok(ArrayAccessor::new(self, frame))
     }
 
-    /// Mutably borrow the data of this array of wrappers without the restriction that only a
-    /// single array can be mutably borrowed.
+    /// Mutably access the contents of this array. The elements must not be stored inline.
     ///
-    /// Returns `JlrsError::WrongType` if the type doesn't match the type of the elements.
+    /// Unlike [`Array::wrapper_data_mut`], this method can be used to gain mutable access to the
+    /// contents of multiple arrays simultaneously.
     ///
-    /// Safety: It's your responsibility to ensure you don't create multiple mutable
-    /// references to the same data. Mutating Julia data is generally unsafe because it can't be
-    /// guaranteed mutating this value is allowed.
+    /// Returns `JlrsError::Inline` if the data is stored inline or `JlrsError::WrongType` if `T`
+    /// is not a valid layout for the array elements.
+    ///
+    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
+    /// this value is allowed. This method can create multiple mutable references to the same
+    /// data.
     pub unsafe fn unrestricted_wrapper_data_mut<'borrow, 'frame, T, F>(
         self,
         frame: &'borrow F,
-    ) -> JlrsResult<UnrestrictedValueArrayDataMut<'borrow, 'scope, 'data, T>>
+    ) -> JlrsResult<PtrArrayAccessor<'borrow, 'scope, 'data, T, Mutable<'borrow, T>>>
+    where
+        T: WrapperRef<'frame, 'data>,
+        F: Frame<'frame>,
+    {
+        self.ensure_ptr_containing::<T>()?;
+        Ok(ArrayAccessor::unrestricted_new(self, frame))
+    }
+
+    /// Immutably the contents of this array. The elements must not be stored inline.
+    ///
+    /// You can borrow data from multiple arrays at the same time.
+    ///
+    /// Returns `JlrsError::Inline` if the data is stored inline.
+    pub fn value_data<'borrow, 'frame, F>(
+        self,
+        frame: &'borrow F,
+    ) -> JlrsResult<
+        PtrArrayAccessor<
+            'borrow,
+            'scope,
+            'data,
+            ValueRef<'frame, 'data>,
+            Immutable<'borrow, ValueRef<'frame, 'data>>,
+        >,
+    >
     where
         F: Frame<'frame>,
-        T: WrapperRef<'scope, 'data> + ValidLayout,
     {
-        if !self.is_value_array() {
-            Err(JlrsError::WrongType {
-                value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
+        self.ensure_ptr_containing::<ValueRef>()?;
+        unsafe { Ok(ArrayAccessor::unrestricted_new(self, frame)) }
+    }
 
-        Ok(UnrestrictedValueArrayDataMut::new(self, frame))
+    /// Mutably access the contents of this array. The elements must not be stored inline.
+    ///
+    /// This method can be used to gain mutable access to the contents of a single array.
+    ///
+    /// Returns `JlrsError::Inline` if the data is stored inline.
+    ///
+    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
+    /// this value is allowed.
+    pub unsafe fn value_data_mut<'borrow, 'frame, F>(
+        self,
+        frame: &'borrow mut F,
+    ) -> JlrsResult<
+        PtrArrayAccessor<
+            'borrow,
+            'scope,
+            'data,
+            ValueRef<'frame, 'data>,
+            Mutable<'borrow, ValueRef<'frame, 'data>>,
+        >,
+    >
+    where
+        F: Frame<'frame>,
+    {
+        self.ensure_ptr_containing::<ValueRef>()?;
+        Ok(ArrayAccessor::new(self, frame))
+    }
+
+    /// Mutably access the contents of this array. The elements must not be stored inline.
+    ///
+    /// Unlike [`Array::value_data_mut`], this method can be used to gain mutable access to the
+    /// contents of multiple arrays simultaneously.
+    ///
+    /// Returns `JlrsError::Inline` if the data is stored inline.
+    ///
+    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
+    /// this value is allowed. This method can create multiple mutable references to the same
+    /// data.
+    pub unsafe fn unrestricted_value_data_mut<'borrow, 'frame, F>(
+        self,
+        frame: &'borrow F,
+    ) -> JlrsResult<
+        PtrArrayAccessor<
+            'borrow,
+            'scope,
+            'data,
+            ValueRef<'frame, 'data>,
+            Mutable<'borrow, ValueRef<'frame, 'data>>,
+        >,
+    >
+    where
+        F: Frame<'frame>,
+    {
+        self.ensure_ptr_containing::<ValueRef>()?;
+        Ok(ArrayAccessor::unrestricted_new(self, frame))
+    }
+
+    /// Immutably access the contents of this array. The element type must be a bits union type.
+    ///
+    /// You can borrow data from multiple arrays at the same time.
+    ///
+    /// Returns `JlrsError::NotAUnionArray` if the data is not stored as a bits union.
+    pub fn union_data<'borrow, 'frame, F>(
+        self,
+        frame: &'borrow F,
+    ) -> JlrsResult<UnionArrayAccessor<'borrow, 'scope, 'data, Immutable<'borrow, u8>>>
+    where
+        F: Frame<'frame>,
+    {
+        self.ensure_union()?;
+        unsafe { Ok(ArrayAccessor::unrestricted_new(self, frame)) }
+    }
+
+    /// Mutably access the contents of this array. The element type must be a bits union.
+    ///
+    /// This method can be used to gain mutable access to the contents of a single array.
+    ///
+    /// Returns `JlrsError::NotAUnionArray` if the data is not stored as a bits union.
+    ///
+    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
+    /// this value is allowed.
+    pub unsafe fn union_data_mut<'borrow, 'frame, F>(
+        self,
+        frame: &'borrow mut F,
+    ) -> JlrsResult<UnionArrayAccessor<'borrow, 'scope, 'data, Mutable<'borrow, u8>>>
+    where
+        F: Frame<'frame>,
+    {
+        self.ensure_union()?;
+        Ok(ArrayAccessor::new(self, frame))
+    }
+
+    /// Mutably access the contents of this array. The element type must be a bits union.
+    ///
+    /// Unlike [`Array::union_data_mut`], this method can be used to gain mutable access to the
+    /// contents of multiple arrays simultaneously.
+    ///
+    /// Returns `JlrsError::NotAUnionArray` if the data is not stored as a bits union.
+    ///
+    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
+    /// this value is allowed. This method can create multiple mutable references to the same
+    /// data.
+    pub unsafe fn unrestricted_union_data_mut<'borrow, 'frame, F>(
+        self,
+        frame: &'borrow F,
+    ) -> JlrsResult<UnionArrayAccessor<'borrow, 'scope, 'data, Mutable<'borrow, u8>>>
+    where
+        F: Frame<'frame>,
+    {
+        self.ensure_union()?;
+        Ok(ArrayAccessor::unrestricted_new(self, frame))
+    }
+
+    /// Immutably access the contents of this array.
+    ///
+    /// You can borrow data from multiple arrays at the same time.
+    pub fn indeterminate_data<'borrow, 'frame, F>(
+        self,
+        frame: &'borrow F,
+    ) -> IndeterminateArrayAccessor<'borrow, 'scope, 'data, Immutable<'borrow, u8>>
+    where
+        F: Frame<'frame>,
+    {
+        unsafe { ArrayAccessor::unrestricted_new(self, frame) }
+    }
+
+    /// Mutably access the contents of this array.
+    ///
+    /// This method can be used to gain mutable access to the contents of a single array.
+    ///
+    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
+    /// this value is allowed.
+    pub unsafe fn indeterminate_data_mut<'borrow, 'frame, F>(
+        self,
+        frame: &'borrow mut F,
+    ) -> IndeterminateArrayAccessor<'borrow, 'scope, 'data, Mutable<'borrow, u8>>
+    where
+        F: Frame<'frame>,
+    {
+        ArrayAccessor::new(self, frame)
+    }
+
+    /// Mutably access the contents of this array.
+    ///
+    /// Unlike [`Array::indeterminate_data_mut`], this method can be used to gain mutable access
+    /// to the contents of multiple arrays simultaneously.
+    ///
+    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
+    /// this value is allowed. This method can create multiple mutable references to the same
+    /// data.
+    pub unsafe fn unrestricted_indeterminate_data_mut<'borrow, 'frame, F>(
+        self,
+        frame: &'borrow F,
+    ) -> IndeterminateArrayAccessor<'borrow, 'scope, 'data, Mutable<'borrow, u8>>
+    where
+        F: Frame<'frame>,
+    {
+        ArrayAccessor::unrestricted_new(self, frame)
     }
 
     /// Reshape the array, a new array is returned that has dimensions `dims`. The new array and
@@ -1071,73 +1216,82 @@ impl<'scope, 'data> Array<'scope, 'data> {
             output.value(NonNull::new_unchecked(res), Private)
         })
     }
-}
 
-impl<'scope> Array<'scope, 'static> {
-    /// Immutably borrow the data of this array of bits-unions.
-    ///
-    /// Retuns `JlrsError::NotAUnionArray` if the array doesn't contain bits unions.
-    pub fn union_data<'borrow, 'frame, F>(
-        self,
-        frame: &'borrow F,
-    ) -> JlrsResult<UnionArrayData<'borrow, 'scope>>
+    fn ensure_bits_containing<T>(self) -> JlrsResult<()>
     where
-        F: Frame<'frame>,
+        T: ValidLayout,
     {
-        if !self.is_union_array() {
-            let elem_ty = self.element_type().display_string_or(CANNOT_DISPLAY_TYPE);
-            let inline = !self.is_value_array();
-            Err(JlrsError::NotAUnionArray { elem_ty, inline })?
+        if !self.is_inline_array() {
+            Err(JlrsError::NotInline {
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
         }
 
-        unsafe { Ok(UnionArrayData::new(self, frame)) }
+        if unsafe {
+            self.element_type()
+                .cast_unchecked::<DataType>()
+                .has_pointer_fields()?
+        } {
+            Err(JlrsError::HasPointers {
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
+        }
+
+        if !self.contains::<T>() {
+            Err(JlrsError::WrongType {
+                value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
+        }
+
+        Ok(())
     }
 
-    /// Mutably borrow the data of this array of bits-unions, you can mutably borrow a single
-    /// array at a time.
-    ///
-    /// Retuns `JlrsError::NotAUnionArray` if the array doesn't contain bits unions.
-    ///
-    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
-    /// this value is allowed.
-    pub unsafe fn union_data_mut<'borrow, 'frame, F>(
-        self,
-        frame: &'borrow mut F,
-    ) -> JlrsResult<UnionArrayDataMut<'borrow, 'scope>>
+    fn ensure_inline_containing<T>(self) -> JlrsResult<()>
     where
-        F: Frame<'frame>,
+        T: ValidLayout,
     {
-        if !self.is_union_array() {
-            let elem_ty = self.element_type().display_string_or(CANNOT_DISPLAY_TYPE);
-            let inline = !self.is_value_array();
-            Err(JlrsError::NotAUnionArray { elem_ty, inline })?
+        if !self.is_inline_array() {
+            Err(JlrsError::NotInline {
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
         }
 
-        Ok(UnionArrayDataMut::new(self, frame))
+        if !self.contains::<T>() {
+            Err(JlrsError::WrongType {
+                value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
+        }
+
+        Ok(())
     }
 
-    /// Mutably borrow the data of this array of bits-unions without the restriction that only a
-    /// single array can be mutably borrowed.
-    ///
-    /// Retuns `JlrsError::NotAUnionArray` if the array doesn't contain bits unions.
-    ///
-    /// Safety: It's your responsibility to ensure you don't create multiple mutable references to
-    /// the same data. Mutating Julia data is generally unsafe because it can't be guaranteed
-    /// mutating this value is allowed.
-    pub unsafe fn unrestricted_union_data_mut<'borrow, 'frame, F>(
-        self,
-        frame: &'borrow F,
-    ) -> JlrsResult<UnresistrictedUnionArrayDataMut<'borrow, 'scope>>
+    fn ensure_ptr_containing<'fr, 'da, T>(self) -> JlrsResult<()>
     where
-        F: Frame<'frame>,
+        T: WrapperRef<'fr, 'da>,
     {
+        if !self.is_value_array() {
+            Err(JlrsError::Inline {
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
+        }
+
+        if !self.contains::<T>() {
+            Err(JlrsError::WrongType {
+                value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
+        }
+
+        Ok(())
+    }
+
+    fn ensure_union(self) -> JlrsResult<()> {
         if !self.is_union_array() {
             let elem_ty = self.element_type().display_string_or(CANNOT_DISPLAY_TYPE);
             let inline = !self.is_value_array();
             Err(JlrsError::NotAUnionArray { elem_ty, inline })?
         }
 
-        Ok(UnresistrictedUnionArrayDataMut::new(self, frame))
+        Ok(())
     }
 }
 
@@ -1643,73 +1797,161 @@ where
         }
     }
 
-    /// Immutably borrow inline array data.
-    ///
-    /// You can borrow data from multiple arrays at the same time. Returns `JlrsError::NotInline`
-    /// if the data is not stored inline or `JlrsError::WrongType` if the type of the elements is
-    /// incorrect.
-    pub fn inline_data<'borrow, 'frame, F>(
-        self,
-        frame: &'borrow F,
-    ) -> JlrsResult<InlineArrayData<'borrow, 'scope, 'data, T>>
-    where
-        F: Frame<'frame>,
-    {
+    fn ensure_bits(self) -> JlrsResult<()> {
         if !self.is_inline_array() {
             Err(JlrsError::NotInline {
                 element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
 
-        unsafe { Ok(InlineArrayData::new(self.as_array(), frame)) }
+        if unsafe {
+            self.element_type()
+                .cast_unchecked::<DataType>()
+                .has_pointer_fields()?
+        } {
+            Err(JlrsError::HasPointers {
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
+        }
+
+        Ok(())
     }
 
-    /// Mutably borrow inline array data, you can mutably borrow a single array at a time.
+    fn ensure_inline(self) -> JlrsResult<()> {
+        if !self.is_inline_array() {
+            Err(JlrsError::NotInline {
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
+        }
+
+        Ok(())
+    }
+
+    /// Immutably the contents of this array. The elements must have an `isbits` type.
     ///
-    /// Returns `JlrsError::NotInline` if the data is not stored inline or `JlrsError::WrongType`
-    /// if the type of the elements is incorrect.
+    /// You can borrow data from multiple arrays at the same time.
+    ///
+    /// Returns `JlrsError::NotInline` if the data is not stored inline, `JlrsError::HasPointers`
+    /// if the type is not an `isbits` type, or `JlrsError::WrongType` if `T` is not a valid
+    /// layout for the array elements.
+    pub fn bits_data<'borrow, 'frame, F>(
+        self,
+        frame: &'borrow F,
+    ) -> JlrsResult<BitsArrayAccessor<'borrow, 'scope, 'data, T, Immutable<'borrow, T>>>
+    where
+        T: ValidLayout,
+        F: Frame<'frame>,
+    {
+        self.ensure_bits()?;
+        unsafe { Ok(ArrayAccessor::unrestricted_new(self.as_array(), frame)) }
+    }
+
+    /// Mutably access the contents of this array. The elements must have an `isbits` type.
+    ///
+    /// This method can be used to gain mutable access to the contents of a single array.
+    ///
+    /// Returns `JlrsError::NotInline` if the data is not stored inline, `JlrsError::HasPointers`
+    /// if the type is not an `isbits` type, or `JlrsError::WrongType` if `T` is not a valid
+    /// layout for the array elements.
+    ///
+    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
+    /// this value is allowed.
+    pub unsafe fn bits_data_mut<'borrow, 'frame, F>(
+        self,
+        frame: &'borrow mut F,
+    ) -> JlrsResult<BitsArrayAccessor<'borrow, 'scope, 'data, T, Mutable<'borrow, T>>>
+    where
+        T: ValidLayout,
+        F: Frame<'frame>,
+    {
+        self.ensure_bits()?;
+        Ok(ArrayAccessor::new(self.as_array(), frame))
+    }
+
+    /// Mutably access the contents of this array. The elements must have an `isbits` type.
+    ///
+    /// Unlike [`Array::bits_data_mut`], this method can be used to gain mutable access to the
+    /// contents of multiple arrays simultaneously.
+    ///
+    /// Returns `JlrsError::NotInline` if the data is not stored inline, `JlrsError::HasPointers`
+    /// if the type is not an `isbits` type, or `JlrsError::WrongType` if `T` is not a valid
+    /// layout for the array elements.
+    ///
+    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
+    /// this value is allowed. This method can create multiple mutable references to the same
+    /// data.
+    pub unsafe fn unrestricted_bits_data_mut<'borrow, 'frame, F>(
+        self,
+        frame: &'borrow F,
+    ) -> JlrsResult<BitsArrayAccessor<'borrow, 'scope, 'data, T, Mutable<'borrow, T>>>
+    where
+        T: ValidLayout,
+        F: Frame<'frame>,
+    {
+        self.ensure_bits()?;
+        Ok(ArrayAccessor::unrestricted_new(self.as_array(), frame))
+    }
+
+    /// Immutably the contents of this array. The elements must be stored inline.
+    ///
+    /// You can borrow data from multiple arrays at the same time.
+    ///
+    /// Returns `JlrsError::NotInline` if the data is not stored inline or
+    /// `JlrsError::WrongType` if `T` is not a valid layout for the array elements.
+    pub fn inline_data<'borrow, 'frame, F>(
+        self,
+        frame: &'borrow F,
+    ) -> JlrsResult<InlinePtrArrayAccessor<'borrow, 'scope, 'data, T, Immutable<'borrow, T>>>
+    where
+        T: ValidLayout,
+        F: Frame<'frame>,
+    {
+        self.ensure_inline()?;
+        unsafe { Ok(ArrayAccessor::unrestricted_new(self.as_array(), frame)) }
+    }
+
+    /// Mutably access the contents of this array. The elements must be stored inline.
+    ///
+    /// This method can be used to gain mutable access to the contents of a single array.
+    ///
+    /// Returns `JlrsError::NotInline` if the data is not stored inline or
+    /// `JlrsError::WrongType` if `T` is not a valid layout for the array elements.
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
     /// this value is allowed.
     pub unsafe fn inline_data_mut<'borrow, 'frame, F>(
         self,
         frame: &'borrow mut F,
-    ) -> JlrsResult<InlineArrayDataMut<'borrow, 'scope, 'data, T>>
+    ) -> JlrsResult<InlinePtrArrayAccessor<'borrow, 'scope, 'data, T, Mutable<'borrow, T>>>
     where
+        T: ValidLayout,
         F: Frame<'frame>,
     {
-        if !self.is_inline_array() {
-            Err(JlrsError::NotInline {
-                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
-
-        Ok(InlineArrayDataMut::new(self.as_array(), frame))
+        self.ensure_inline()?;
+        Ok(ArrayAccessor::new(self.as_array(), frame))
     }
 
-    /// Mutably borrow inline array data without the restriction that only a single array can be
-    /// mutably borrowed.
+    /// Mutably access the contents of this array. The elements must be stored inline.
     ///
-    /// Returns `JlrsError::NotInline` if the data is not stored inline or `JlrsError::WrongType`
-    /// if the type of the elements is incorrect.
+    /// Unlike [`Array::inline_data_mut`], this method can be used to gain mutable access to the
+    /// contents of multiple arrays simultaneously.
     ///
-    /// Safety: It's your responsibility to ensure you don't create multiple mutable
-    /// references to the same data. Mutating Julia data is generally unsafe because it can't be
-    /// guaranteed mutating this value is allowed.
+    /// Returns `JlrsError::NotInline` if the data is not stored inline or
+    /// `JlrsError::WrongType` if `T` is not a valid layout for the array elements.
+    ///
+    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
+    /// this value is allowed. This method can create multiple mutable references to the same
+    /// data.
     pub unsafe fn unrestricted_inline_data_mut<'borrow, 'frame, F>(
         self,
         frame: &'borrow F,
-    ) -> JlrsResult<UnrestrictedInlineArrayDataMut<'borrow, 'scope, 'data, T>>
+    ) -> JlrsResult<InlinePtrArrayAccessor<'borrow, 'scope, 'data, T, Mutable<'borrow, T>>>
     where
+        T: ValidLayout,
         F: Frame<'frame>,
     {
-        if !self.is_inline_array() {
-            Err(JlrsError::NotInline {
-                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
-
-        Ok(UnrestrictedInlineArrayDataMut::new(self.as_array(), frame))
+        self.ensure_inline()?;
+        Ok(ArrayAccessor::unrestricted_new(self.as_array(), frame))
     }
 
     /// Convert `self` to `Array`.
@@ -1719,104 +1961,153 @@ where
 }
 
 impl<'scope, 'data, T: WrapperRef<'scope, 'data> + ValidLayout> TypedArray<'scope, 'data, T> {
-    /// Immutably borrow the data of this array of values.
-    ///
-    /// You can borrow data from multiple arrays at the same time. The values themselves can be
-    /// mutable, but you can't replace an element with another value. Returns `JlrsError::Inline`
-    /// if the data is stored inline.
-    pub fn value_data<'borrow, 'frame, F>(
-        self,
-        frame: &'borrow F,
-    ) -> ValueArrayData<'borrow, 'scope, 'data>
-    where
-        F: Frame<'frame>,
-    {
-        unsafe { ValueArrayData::new(self.as_array(), frame) }
+    fn ensure_ptr(self) -> JlrsResult<()> {
+        if !self.as_array().is_value_array() {
+            Err(JlrsError::Inline {
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
+        }
+
+        Ok(())
     }
 
-    /// Immutably borrow the data of this array of pointer wrappers.
+    /// Immutably the contents of this array. The elements must not be stored inline.
     ///
-    /// You can borrow data from multiple arrays at the same time. The values themselves can be
-    /// mutable, but you can't replace an element with another value. Returns
-    /// `JlrsError::WrongType` if the type of the elements is incorrect.
+    /// You can borrow data from multiple arrays at the same time.
+    ///
+    /// Returns `JlrsError::Inline` if the data is stored inline or `JlrsError::WrongType` if `T`
+    /// is not a valid layout for the array elements.
     pub fn wrapper_data<'borrow, 'frame, F>(
         self,
         frame: &'borrow F,
-    ) -> ValueArrayData<'borrow, 'scope, 'data, T>
+    ) -> JlrsResult<PtrArrayAccessor<'borrow, 'scope, 'data, T, Immutable<'borrow, T>>>
     where
         F: Frame<'frame>,
     {
-        unsafe { ValueArrayData::new(self.as_array(), frame) }
+        self.ensure_ptr()?;
+        unsafe { Ok(ArrayAccessor::unrestricted_new(self.as_array(), frame)) }
     }
 
-    /// Mutably borrow the data of this array of values.
+    /// Mutably access the contents of this array. The elements must not be stored inline.
     ///
-    /// You can mutably borrow a single array at the same time. Returns `JlrsError::Inline` if the
-    /// data is stored inline.
+    /// This method can be used to gain mutable access to the contents of a single array.
     ///
-    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
-    /// this value is allowed.
-    pub unsafe fn value_data_mut<'borrow, 'frame, F>(
-        self,
-        frame: &'borrow mut F,
-    ) -> ValueArrayDataMut<'borrow, 'scope, 'data>
-    where
-        F: Frame<'frame>,
-    {
-        ValueArrayDataMut::new(self.as_array(), frame)
-    }
-
-    /// Mutably borrow the data of this array of wrappers.
-    ///
-    /// You can mutably borrow a single array at the same time. Returns `JlrsError::WrongType` if
-    /// the type of the elements is incorrect.
+    /// Returns `JlrsError::Inline` if the data is stored inline or `JlrsError::WrongType` if `T`
+    /// is not a valid layout for the array elements.
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
     /// this value is allowed.
     pub unsafe fn wrapper_data_mut<'borrow, 'frame, F>(
         self,
         frame: &'borrow mut F,
-    ) -> ValueArrayDataMut<'borrow, 'scope, 'data, T>
+    ) -> JlrsResult<PtrArrayAccessor<'borrow, 'scope, 'data, T, Mutable<'borrow, T>>>
     where
         F: Frame<'frame>,
     {
-        ValueArrayDataMut::new(self.as_array(), frame)
+        self.ensure_ptr()?;
+        Ok(ArrayAccessor::new(self.as_array(), frame))
     }
 
-    /// Mutably borrow the data of this array of values without the restriction that only a single
-    /// array can be mutably borrowed.
+    /// Mutably access the contents of this array. The elements must not be stored inline.
     ///
-    /// Returns `JlrsError::Inline` if the data is stored inline.
+    /// Unlike [`Array::wrapper_data_mut`], this method can be used to gain mutable access to the
+    /// contents of multiple arrays simultaneously.
     ///
-    /// Safety: It's your responsibility to ensure you don't create multiple mutable
-    /// references to the same data. Mutating Julia data is generally unsafe because it can't be
-    /// guaranteed mutating this value is allowed.
-    pub unsafe fn unrestricted_value_data_mut<'borrow, 'frame, F>(
-        self,
-        frame: &'borrow F,
-    ) -> UnrestrictedValueArrayDataMut<'borrow, 'scope, 'data>
-    where
-        F: Frame<'frame>,
-    {
-        UnrestrictedValueArrayDataMut::new(self.as_array(), frame)
-    }
-
-    /// Mutably borrow the data of this array of wrappers without the restriction that only a
-    /// single array can be mutably borrowed.
+    /// Returns `JlrsError::Inline` if the data is stored inline or `JlrsError::WrongType` if `T`
+    /// is not a valid layout for the array elements.
     ///
-    /// Returns `JlrsError::WrongType` if the type doesn't match the type of the elements.
-    ///
-    /// Safety: It's your responsibility to ensure you don't create multiple mutable
-    /// references to the same data. Mutating Julia data is generally unsafe because it can't be
-    /// guaranteed mutating this value is allowed.
+    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
+    /// this value is allowed. This method can create multiple mutable references to the same
+    /// data.
     pub unsafe fn unrestricted_wrapper_data_mut<'borrow, 'frame, F>(
         self,
         frame: &'borrow F,
-    ) -> UnrestrictedValueArrayDataMut<'borrow, 'scope, 'data, T>
+    ) -> JlrsResult<PtrArrayAccessor<'borrow, 'scope, 'data, T, Mutable<'borrow, T>>>
     where
         F: Frame<'frame>,
     {
-        UnrestrictedValueArrayDataMut::new(self.as_array(), frame)
+        self.ensure_ptr()?;
+        Ok(ArrayAccessor::unrestricted_new(self.as_array(), frame))
+    }
+
+    /// Immutably the contents of this array. The elements must not be stored inline.
+    ///
+    /// You can borrow data from multiple arrays at the same time.
+    ///
+    /// Returns `JlrsError::Inline` if the data is stored inline.
+    pub fn value_data<'borrow, 'frame, F>(
+        self,
+        frame: &'borrow F,
+    ) -> JlrsResult<
+        PtrArrayAccessor<
+            'borrow,
+            'scope,
+            'data,
+            ValueRef<'frame, 'data>,
+            Immutable<'borrow, ValueRef<'frame, 'data>>,
+        >,
+    >
+    where
+        F: Frame<'frame>,
+    {
+        self.ensure_ptr()?;
+        unsafe { Ok(ArrayAccessor::unrestricted_new(self.as_array(), frame)) }
+    }
+
+    /// Mutably access the contents of this array. The elements must not be stored inline.
+    ///
+    /// This method can be used to gain mutable access to the contents of a single array.
+    ///
+    /// Returns `JlrsError::Inline` if the data is stored inline.
+    ///
+    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
+    /// this value is allowed.
+    pub unsafe fn value_data_mut<'borrow, 'frame, F>(
+        self,
+        frame: &'borrow mut F,
+    ) -> JlrsResult<
+        PtrArrayAccessor<
+            'borrow,
+            'scope,
+            'data,
+            ValueRef<'frame, 'data>,
+            Mutable<'borrow, ValueRef<'frame, 'data>>,
+        >,
+    >
+    where
+        F: Frame<'frame>,
+    {
+        self.ensure_ptr()?;
+        Ok(ArrayAccessor::new(self.as_array(), frame))
+    }
+
+    /// Mutably access the contents of this array. The elements must not be stored inline.
+    ///
+    /// Unlike [`Array::value_data_mut`], this method can be used to gain mutable access to the
+    /// contents of multiple arrays simultaneously.
+    ///
+    /// Returns `JlrsError::Inline` if the data is stored inline.
+    ///
+    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
+    /// this value is allowed. This method can create multiple mutable references to the same
+    /// data.
+    pub unsafe fn unrestricted_value_data_mut<'borrow, 'frame, F>(
+        self,
+        frame: &'borrow F,
+    ) -> JlrsResult<
+        PtrArrayAccessor<
+            'borrow,
+            'scope,
+            'data,
+            ValueRef<'frame, 'data>,
+            Mutable<'borrow, ValueRef<'frame, 'data>>,
+        >,
+    >
+    where
+        F: Frame<'frame>,
+    {
+        self.ensure_ptr()?;
+        Ok(ArrayAccessor::unrestricted_new(self.as_array(), frame))
     }
 
     /// Reshape the array, a new array is returned that has dimensions `dims`. The new array and
@@ -1860,6 +2151,53 @@ impl<'scope, 'data, T: WrapperRef<'scope, 'data> + ValidLayout> TypedArray<'scop
             .as_array()
             .reshape_unchecked(scope, dims)?
             .as_typed_unchecked())
+    }
+
+    /// Immutably access the contents of this array.
+    ///
+    /// You can borrow data from multiple arrays at the same time.
+    pub fn indeterminate_data<'borrow, 'frame, F>(
+        self,
+        frame: &'borrow F,
+    ) -> IndeterminateArrayAccessor<'borrow, 'scope, 'data, Immutable<'borrow, u8>>
+    where
+        F: Frame<'frame>,
+    {
+        unsafe { ArrayAccessor::unrestricted_new(self.as_array(), frame) }
+    }
+
+    /// Mutably access the contents of this array.
+    ///
+    /// This method can be used to gain mutable access to the contents of a single array.
+    ///
+    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
+    /// this value is allowed.
+    pub unsafe fn indeterminate_data_mut<'borrow, 'frame, F>(
+        self,
+        frame: &'borrow mut F,
+    ) -> IndeterminateArrayAccessor<'borrow, 'scope, 'data, Mutable<'borrow, u8>>
+    where
+        F: Frame<'frame>,
+    {
+        ArrayAccessor::new(self.as_array(), frame)
+    }
+
+    /// Mutably access the contents of this array.
+    ///
+    /// Unlike [`Array::indeterminate_data_mut`], this method can be used to gain mutable access
+    /// to the contents of multiple arrays simultaneously.
+    ///
+    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
+    /// this value is allowed. This method can create multiple mutable references to the same
+    /// data.
+    pub unsafe fn unrestricted_indeterminate_data_mut<'borrow, 'frame, F>(
+        self,
+        frame: &'borrow F,
+    ) -> IndeterminateArrayAccessor<'borrow, 'scope, 'data, Mutable<'borrow, u8>>
+    where
+        F: Frame<'frame>,
+    {
+        ArrayAccessor::unrestricted_new(self.as_array(), frame)
     }
 }
 

@@ -74,3 +74,9 @@
  - Add `all-features-override` feature that disables the `lts` and `debug` features when `all-features` is `true`.
 
  - The contents `JlrsPyPlot.jl` are no longer evaluated automatically when the `pyplot` feature has been enabled, `PyPlot::init` must be called.
+
+ - The `Dims` trait and `Frame` types are no longer included in the prelude.
+
+ - There's a single type that provides possibly mutable access to the contents of an array, `ArrayAccessor`, which replaces the large number of types that previously provided this access. A distinction is made between element types that are stored inline which have no and those that have some pointer fields. 
+
+ - `NdArray` has been split into `NdArrayView` and `NdArrayViewMut`. Rather than a typed array, their trait methods take a (mutable) reference to an `ArrayAccessor` or `CopiedArray` instead.

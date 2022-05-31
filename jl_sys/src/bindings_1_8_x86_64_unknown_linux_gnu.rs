@@ -6947,6 +6947,12 @@ extern "C" {
     pub fn jl_pchar_to_string(str_: *const ::std::os::raw::c_char, len: usize) -> *mut jl_value_t;
 }
 extern "C" {
+    pub fn jl_arrayref(a: *mut jl_array_t, i: usize) -> *mut jl_value_t;
+}
+extern "C" {
+    pub fn jl_arrayset(a: *mut jl_array_t, v: *mut jl_value_t, i: usize);
+}
+extern "C" {
     pub fn jl_array_grow_end(a: *mut jl_array_t, inc: usize);
 }
 extern "C" {
@@ -8243,6 +8249,12 @@ extern "C" {
 }
 extern "C" {
     pub fn jlrs_array_del_beg(a: *mut jl_array_t, dec: usize) -> jlrs_result_t;
+}
+extern "C" {
+    pub fn jlrs_arrayset(a: *mut jl_array_t, rhs: *mut jl_value_t, i: usize) -> jlrs_result_t;
+}
+extern "C" {
+    pub fn jlrs_arrayref(a: *mut jl_array_t, i: usize) -> jlrs_result_t;
 }
 extern "C" {
     pub fn jlrs_array_data_owner_offset(n_dims: u16) -> uint_t;

@@ -36,7 +36,7 @@ jobs:
         run: |
           export JULIA_DIR="$(dirname $(dirname $(which julia)))"
           export LD_LIBRARY_PATH="${JULIA_DIR}/lib:${JULIA_DIR}/lib/julia:${LD_LIBRARY_PATH}"
-          cargo test --features tokio-rt,async-std-rt,jlrs-ndarray,f16,jlrs-derive,sync-rt,ccall --verbose -- --test-threads=1
+          cargo test --features full --verbose -- --test-threads=1
 
   test-windows:
     runs-on: windows-latest
@@ -64,7 +64,7 @@ jobs:
 
       - name: Run tests
         run: |
-          cargo test --features tokio-rt,async-std-rt,jlrs-ndarray,f16,jlrs-derive,sync-rt,ccall --verbose -- --test-threads=1
+          cargo test --features full --verbose -- --test-threads=1
 
   test-windows-lts:
     runs-on: windows-latest
@@ -92,7 +92,7 @@ jobs:
 
       - name: Run tests
         run: |
-          cargo test --features tokio-rt,async-std-rt,jlrs-ndarray,f16,jlrs-derive,sync-rt,ccall,lts --verbose -- --test-threads=1
+          cargo test --features full,lts --verbose -- --test-threads=1
 
   test-linux-lts:
     runs-on: ubuntu-latest
@@ -121,7 +121,7 @@ jobs:
         run: |
           export JULIA_DIR="$(dirname $(dirname $(which julia)))"
           export LD_LIBRARY_PATH="${JULIA_DIR}/lib:${JULIA_DIR}/lib/julia:${LD_LIBRARY_PATH}"
-          cargo test --features tokio-rt,async-std-rt,jlrs-ndarray,f16,jlrs-derive,lts,sync-rt,ccall --verbose -- --test-threads=1
+          cargo test --features full,lts --verbose -- --test-threads=1
 
   docs:
     runs-on: ubuntu-latest

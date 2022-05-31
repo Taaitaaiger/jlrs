@@ -5,6 +5,7 @@ mod tests {
     use std::sync::atomic::Ordering;
 
     use super::util::{JULIA, MIXED_BAG_JL};
+    use jlrs::convert::to_symbol::ToSymbol;
     use jlrs::prelude::*;
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     use jlrs::{layout::typecheck::Mutable, wrappers::inline::union::EmptyUnion};
@@ -636,14 +637,36 @@ mod tests {
                 }
 
                 {
+                    let s = JuliaString::new(&mut *frame, "double")?;
                     let field = value
                         .field_accessor(frame)
                         .field("tuples")?
-                        .field("double")?
+                        .field(s)?
                         .field(1)?
                         .access::<i64>()?;
 
                     assert_eq!(field, -4);
+                }
+
+                {
+                    let s = "double".to_symbol(global);
+                    let field = value
+                        .field_accessor(frame)
+                        .field("tuples")?
+                        .field(s)?
+                        .field(1)?
+                        .access::<i64>()?;
+
+                    assert_eq!(field, -4);
+                }
+
+                {
+                    assert!(value
+                        .field_accessor(frame)
+                        .field("tuples")?
+                        .field("double")?
+                        .field((1, 1))
+                        .is_err());
                 }
 
                 {
@@ -747,6 +770,25 @@ mod tests {
                         .access::<u8>()?;
 
                     assert_eq!(field, 4);
+                }
+
+                {
+                    assert!(value
+                        .field_accessor(frame)
+                        .field("arrays")?
+                        .field("u8array")?
+                        .field("wrongkind")
+                        .is_err());
+                }
+
+                {
+                    let sym = "wrongkind".to_symbol(global);
+                    assert!(value
+                        .field_accessor(frame)
+                        .field("arrays")?
+                        .field("u8array")?
+                        .field(sym)
+                        .is_err());
                 }
 
                 {

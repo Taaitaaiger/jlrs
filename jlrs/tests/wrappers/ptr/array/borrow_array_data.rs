@@ -77,7 +77,7 @@ mod tests {
 
                         let array =
                             Array::from_vec(&mut *frame, data, (2, 3, 4))?.into_jlrs_result()?;
-                        let mut d = array.inline_data_mut::<$value_type, _>(&mut *frame)?;
+                        let mut d = array.bits_data_mut::<$value_type, _>(&mut *frame)?;
 
                         for third in &[0, 1, 2, 3] {
                             for second in &[0, 1, 2] {
@@ -151,7 +151,7 @@ mod tests {
 
                         let array = Array::from_vec(&mut *frame, data.clone(), (2, 3, 4))?
                             .into_jlrs_result()?;
-                        let mut d = array.inline_data_mut::<$value_type, _>(&mut *frame)?;
+                        let mut d = array.bits_data_mut::<$value_type, _>(&mut *frame)?;
 
                         for (a, b) in data.iter().zip(d.as_mut_slice()) {
                             assert_eq!(a, b)
@@ -514,7 +514,7 @@ mod tests {
                         .call0(&mut *frame)?
                         .unwrap()
                         .cast::<TypedArray<ModuleRef>>()?;
-                    let data = arr.value_data(&mut *frame);
+                    let data = arr.value_data(&mut *frame)?;
 
                     assert!(data[0].wrapper_unchecked().is::<Module>());
                 }
@@ -540,7 +540,7 @@ mod tests {
                         .call0(&mut *frame)?
                         .unwrap()
                         .cast::<TypedArray<ModuleRef>>()?;
-                    let mut data = arr.value_data_mut(&mut *frame);
+                    let mut data = arr.value_data_mut(&mut *frame)?;
                     data.set(0, Some(submod.as_value()))?;
 
                     let getindex = Module::base(global)
@@ -584,8 +584,8 @@ mod tests {
                         .unwrap()
                         .cast::<TypedArray<ModuleRef>>()?;
 
-                    let mut data1 = arr1.unrestricted_value_data_mut(&*frame);
-                    let mut data2 = arr2.unrestricted_value_data_mut(&*frame);
+                    let mut data1 = arr1.unrestricted_value_data_mut(&*frame)?;
+                    let mut data2 = arr2.unrestricted_value_data_mut(&*frame)?;
                     data1.set(0, Some(submod.as_value()))?;
                     data2.set(1, Some(submod.as_value()))?;
 

@@ -179,6 +179,8 @@ fn main() {
             .allowlist_function("jl_array_grow_beg")
             .allowlist_function("jl_array_grow_end")
             .allowlist_function("jl_array_typetagdata")
+            .allowlist_function("jl_arrayset")
+            .allowlist_function("jl_arrayref")
             .allowlist_function("jl_atexit_hook")
             .allowlist_function("jl_box_bool")
             .allowlist_function("jl_box_char")
@@ -212,7 +214,6 @@ fn main() {
             .allowlist_function("jl_gc_is_enabled")
             .allowlist_function("jl_gc_queue_root")
             .allowlist_function("jl_gc_safepoint")
-            .allowlist_function("jl_getallocationgranularity")
             .allowlist_function("jl_get_current_task")
             .allowlist_function("jl_get_global")
             .allowlist_function("jl_get_libllvm")
@@ -222,6 +223,7 @@ fn main() {
             .allowlist_function("jl_get_ptls_states")
             .allowlist_function("jl_get_ARCH")
             .allowlist_function("jl_get_UNAME")
+            .allowlist_function("jl_getallocationgranularity")
             .allowlist_function("jl_getpagesize")
             .allowlist_function("jl_git_branch")
             .allowlist_function("jl_git_commit")
@@ -450,7 +452,9 @@ fn main() {
                 .allowlist_function("jlrs_array_del_beg")
                 .allowlist_function("jlrs_array_sizehint")
                 .allowlist_function("jlrs_array_ptr_1d_push")
-                .allowlist_function("jlrs_array_ptr_1d_append");
+                .allowlist_function("jlrs_array_ptr_1d_append")
+                .allowlist_function("jlrs_arrayset")
+                .allowlist_function("jlrs_arrayref");
         }
 
         builder

@@ -2,7 +2,7 @@
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
 mod tests {
     use crate::util::JULIA;
-    use jlrs::prelude::*;
+    use jlrs::{prelude::*, wrappers::ptr::array::dimensions::Dims};
 
     #[test]
     fn array_1d() {

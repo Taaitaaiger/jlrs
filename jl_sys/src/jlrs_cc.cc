@@ -394,6 +394,45 @@ extern "C"
 
         return out;
     }
+
+    jlrs_result_t jlrs_arrayset(jl_array_t *a JL_ROOTING_ARGUMENT, jl_value_t *rhs JL_ROOTED_ARGUMENT JL_MAYBE_UNROOTED, size_t i)
+    {
+        jlrs_result_t out;
+
+        JL_TRY
+        {
+            jl_arrayset(a, rhs, i);
+            out.data = NULL;
+            out.flag = JLRS_RESULT_VOID;
+        }
+        JL_CATCH
+        {
+            out.data = jl_current_exception();
+            out.flag = JLRS_RESULT_ERR;
+        }
+        jl_exception_clear();
+
+        return out;
+    }
+
+    jlrs_result_t jlrs_arrayref(jl_array_t *a JL_PROPAGATES_ROOT, size_t i)
+    {
+        jlrs_result_t out;
+
+        JL_TRY
+        {
+            out.data = jl_arrayref(a, i);
+            out.flag = JLRS_RESULT_VOID;
+        }
+        JL_CATCH
+        {
+            out.data = jl_current_exception();
+            out.flag = JLRS_RESULT_ERR;
+        }
+        jl_exception_clear();
+
+        return out;
+    }
 #endif
 
     uint_t jlrs_array_data_owner_offset(uint16_t n_dims)
@@ -401,12 +440,14 @@ extern "C"
         return jl_array_data_owner_offset(n_dims);
     }
 
-    void jlrs_lock(jl_value_t *v) {
-        JL_LOCK_NOGC((jl_mutex_t*)v);
+    void jlrs_lock(jl_value_t *v)
+    {
+        JL_LOCK_NOGC((jl_mutex_t *)v);
     }
 
-    void jlrs_unlock(jl_value_t *v) {
-        JL_UNLOCK_NOGC((jl_mutex_t*)v);
+    void jlrs_unlock(jl_value_t *v)
+    {
+        JL_UNLOCK_NOGC((jl_mutex_t *)v);
     }
 #ifdef __cplusplus
 }

@@ -90,7 +90,7 @@ impl PersistentTask for AccumulatorTask {
         let new_value = Value::new(&mut *frame, value)?;
 
         unsafe {
-            state.set_field_unchecked( "v", new_value)?;
+            state.set_field_unchecked("v", new_value)?;
         }
 
         Ok(value)

@@ -136,14 +136,12 @@ impl<'scope> DataType<'scope> {
             .get_unchecked(idx)
     }
 
-    /// Returns the field type of the field at position `idx` if `self` is a concrete datatype.
+    /// Returns the field type of the field at position `idx` if `self`.
     pub fn field_type_concrete(self, idx: usize) -> Option<ValueRef<'scope, 'static>> {
         unsafe {
-            if !self.is_concrete_type() {
-                return None;
-            }
-
-            SimpleVector::wrap(self.unwrap_non_null(Private).as_ref().types, Private)
+            let ptr = self.unwrap_non_null(Private).as_ref().types;
+            assert!(!ptr.is_null());
+            SimpleVector::wrap(ptr, Private)
                 .unrestricted_data()
                 .as_slice()
                 .get(idx)
@@ -530,7 +528,10 @@ impl<'scope> DataType<'scope> {
     /// arbitrary concrete `DataType`s, at the cost that each of its fields must have already been
     /// allocated as a `Value`. This functions returns an error if the given `DataType` isn't
     /// concrete or is an array type. For custom array types you must use [`Array::new_for`].
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(
+        target_os = "windows",
+        all(feature = "lts", not(feature = "all-features-override"))
+    )))]
     pub fn instantiate<'target, 'value, 'data, V, S>(
         self,
         scope: S,
@@ -575,7 +576,10 @@ impl<'scope> DataType<'scope> {
     /// allocated as a `Value`. This functions returns an error if the given `DataType` is not
     /// concrete or an array type. Unlike [`DataType::instantiate`] this method doesn't root the
     /// allocated value.
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(
+        target_os = "windows",
+        all(feature = "lts", not(feature = "all-features-override"))
+    )))]
     pub fn instantiate_unrooted<'global, 'value, 'data, V>(
         self,
         _: Global<'global>,
@@ -664,6 +668,24 @@ impl<'scope> DataType<'scope> {
         );
 
         ValueRef::wrap(value)
+    }
+
+    pub fn has_pointer_fields(self) -> JlrsResult<bool> {
+        if !self.is::<Concrete>() {
+            Err(JlrsError::NotConcrete {
+                value_type: self.display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
+        }
+
+        unsafe {
+            Ok(self
+                .layout()
+                .cast::<jl_datatype_layout_t>()
+                .as_ref()
+                .unwrap()
+                .first_ptr
+                != -1)
+        }
     }
 
     /// Use the `Output` to extend the lifetime of this data.

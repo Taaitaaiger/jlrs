@@ -27,7 +27,7 @@ use jl_sys::{
 use std::{marker::PhantomData, ptr::NonNull};
 
 cfg_if! {
-    if #[cfg(not(all(target_os = "windows", feature = "lts")))] {
+    if #[cfg(not(all(target_os = "windows", all(feature = "lts", not(feature = "all-features-override")))))] {
         use crate::error::JuliaResultRef;
         use jl_sys::{jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_set_const, jlrs_set_global};
     }
@@ -179,7 +179,10 @@ impl<'scope> Module<'scope> {
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
     /// this value is allowed.
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(
+        target_os = "windows",
+        all(feature = "lts", not(feature = "all-features-override"))
+    )))]
     pub unsafe fn set_global<'frame, N, S>(
         self,
         scope: S,
@@ -212,7 +215,10 @@ impl<'scope> Module<'scope> {
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
     /// this value is allowed.
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(
+        target_os = "windows",
+        all(feature = "lts", not(feature = "all-features-override"))
+    )))]
     pub unsafe fn set_global_unrooted<N>(
         self,
         name: N,
@@ -264,7 +270,10 @@ impl<'scope> Module<'scope> {
     /// Set a constant in this module. If Julia throws an exception it's caught and rooted in the
     /// current frame, if the exception can't be rooted a `JlrsError::AllocError` is returned. If
     /// no exception is thrown an unrooted reference to the constant is returned.
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(
+        target_os = "windows",
+        all(feature = "lts", not(feature = "all-features-override"))
+    )))]
     pub fn set_const<'frame, N, S>(
         self,
         scope: S,
@@ -295,7 +304,10 @@ impl<'scope> Module<'scope> {
 
     /// Set a constant in this module. If Julia throws an exception it's caught. Otherwise an
     /// unrooted reference to the constant is returned.
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(
+        target_os = "windows",
+        all(feature = "lts", not(feature = "all-features-override"))
+    )))]
     pub fn set_const_unrooted<N>(
         self,
         name: N,

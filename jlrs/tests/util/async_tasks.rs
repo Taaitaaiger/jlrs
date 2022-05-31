@@ -184,7 +184,7 @@ impl AsyncTask for NestingTaskAsyncValueFrame {
         frame: &mut AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
         let (output, frame) = frame.split()?;
-        let v = frame
+        let v = (&mut *frame)
             .async_scope(|frame| async move {
                 let iters = Value::new(&mut *frame, self.iters)?;
                 let dims = Value::new(&mut *frame, self.dims)?;

@@ -97,6 +97,9 @@ pub enum JlrsError {
         element_type: String,
     },
     NullFrame,
+    HasPointers {
+        element_type: String,
+    },
     Inline {
         element_type: String,
     },
@@ -131,7 +134,7 @@ pub enum JlrsError {
     },
     ArrayNotSupported,
     ArrayNeedsNumericalIndex,
-    ArrayNeedsSimpleIndex,
+    FieldNeedsSimpleIndex,
     NamedTupleSizeMismatch {
         n_names: usize,
         n_values: usize,
@@ -255,6 +258,13 @@ impl Display for JlrsError {
                     formatter,
                     "The field {} of type {} (index: {}) has type {} which is stored inline",
                     field_name, value_type, field_idx, field_type
+                )
+            }
+            JlrsError::HasPointers { element_type } => {
+                write!(
+                    formatter,
+                    "The elements of this array have the type {} which contains inline pointer fields",
+                    element_type
                 )
             }
             JlrsError::NotInline { element_type } => {
@@ -382,7 +392,7 @@ impl Display for JlrsError {
                     "Array types can only be accessed with n-dimensional indices.",
                 )
             }
-            JlrsError::ArrayNeedsSimpleIndex => {
+            JlrsError::FieldNeedsSimpleIndex => {
                 write!(
                     formatter,
                     "Non-array types can only be accessed with field names and indices.",
