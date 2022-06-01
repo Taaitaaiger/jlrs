@@ -27,13 +27,15 @@ An incomplete list of features that are currently supported by jlrs:
  - An async runtime is available which can be used from multiple threads and supports
    scheduling Julia `Task`s and `await`ing the result without blocking the runtime thread.
 
-NB: Active development happens on the `dev` branch, the `master` branch points to the most recently released version.
+NB: Active development happens on the `dev` branch, the `master` branch points to the most
+recently released version.
 
 ## Prerequisites
 
-Julia must be installed before jlrs can be used. Only version 1.6 and 1.8 are supported. Using version 1.6 requires enabling the `lts` feature.
+Julia must be installed before jlrs can be used. Only version 1.6 and 1.8 are supported. Using
+version 1.6 requires enabling the `lts` feature.
 
-##### Linux
+### Linux
 
 The recommended way to install Julia is to download the binaries from the official website,
 which is distributed in an archive containing a directory called `julia-x.y.z`. This directory
@@ -54,7 +56,7 @@ environment variable. When the `uv` feature is enabled, `/path/to/julia-x.y.z/li
 also be added to `LD_LIBRARY_PATH`. The latter path should not be added to the default path
 because this can break tools currently installed on your system.
 
-##### Windows
+### Windows
 
 Julia can be installed using juliaup, or with the installer or portable installation
 downloaded from the official website. In the first case, Julia has been likely placed in
@@ -72,11 +74,10 @@ Note that while both Julia 1.6 and 1.8 are supported on Windows, several methods
 unavailable when the LTS version is used.
 
 If you use the MSVC target, you must create two or three lib files using `lib.exe`. The def
-files required for this can be found in the 
-[`def` folder](https://github.com/Taaitaaiger/jlrs/tree/master/jl_sys/def) in the jl-sys crate. 
-To create the lib files, copy the three files from either the `lts` or `stable` folder to the 
-`bin` folder where Julia is installed. Afterwards, open a Developer Command Prompt for VS19 and
-execute the following commands:
+files required for this can be found in the [`def` folder](https://github.com/Taaitaaiger/jlrs/tree/master/jl_sys/def) in the jl-sys crate. To create the
+lib files, copy the three files from either the `lts` or `stable` folder to the `bin` folder
+where Julia is installed. Afterwards, open a Developer Command Prompt for VS19 and execute the
+following commands:
 
 ```cmd
 cd C:\Path\To\Julia-x.y.z\bin
@@ -117,7 +118,7 @@ used by a Rust application that embeds Julia, no runtime is required.
 In addition to these runtimes, the following utility features are available:
 
 - `prelude`
-  Provides a prelude module. This feature is enabled by default.
+  Provide a prelude module, `jlrs::prelude`. This feature is enabled by default.
 
 - `lts`
   Use the current LTS version of Julia (1.6) instead of the current stable version (1.8).
@@ -153,9 +154,10 @@ In addition to these runtimes, the following utility features are available:
   This feature lets you plot data using the Pyplot package and Gtk 3 from Rust.
 
 - `debug`
-  Link with a debug build of Julia. 
+  Link with a debug build of Julia.
 
 You can enable all features except `lts` and `debug` by enabling the `full` feature.
+
 
 ## Using this crate
 
@@ -173,11 +175,11 @@ following snippet initializes the sync runtime:
 ```rust
 use jlrs::prelude::*;
 
-      // Initializing Julia is unsafe because this can load arbitrary
-      // Julia code, and because it can race with other crates unrelated
-      // to jlrs. It returns an error if Julia has already been
-      // initialized.
-      let _julia = unsafe { RuntimeBuilder::new().start().unwrap() };
+// Initializing Julia is unsafe because this can load arbitrary
+// Julia code, and because it can race with other crates unrelated
+// to jlrs. It returns an error if Julia has already been
+// initialized.
+let _julia = unsafe { RuntimeBuilder::new().start().unwrap() };
 ```
 
 To use the async runtime you must upgrade the `RuntimeBuilder` to an
@@ -189,13 +191,13 @@ feature is enabled:
 ```rust
 use jlrs::prelude::*;
 
-      // Initializing Julia is unsafe for the same reasons as the sync runtime.
-      let (_julia, _task_handle) = unsafe {
-          RuntimeBuilder::new()
-              .async_runtime::<Tokio, UnboundedChannel<_>>()
-              .start()
-              .unwrap()
-      };
+// Initializing Julia is unsafe for the same reasons as the sync runtime.
+let (_julia, _task_handle) = unsafe {
+    RuntimeBuilder::new()
+        .async_runtime::<Tokio, UnboundedChannel<_>>()
+        .start()
+        .unwrap()
+};
 ```
 
 The async runtime can also be started asynchronously:
@@ -205,13 +207,13 @@ use jlrs::prelude::*;
 
 #[tokio::main]
 async fn main() {
-      // Initializing Julia is unsafe for the same reasons as the sync runtime.
-      let (_julia, _task_handle) = unsafe {
-          RuntimeBuilder::new()
-              .async_runtime::<Tokio, UnboundedChannel<_>>()
-              .start_async()
-              .unwrap()
-      };
+    // Initializing Julia is unsafe for the same reasons as the sync runtime.
+    let (_julia, _task_handle) = unsafe {
+        RuntimeBuilder::new()
+            .async_runtime::<Tokio, UnboundedChannel<_>>()
+            .start_async()
+            .unwrap()
+    };
 }
 ```
 
@@ -250,16 +252,6 @@ interact with Julia. Global Julia data can be accessed through its module system
 calling `Module::function` which returns a `Function`, `Module::global` which returns a
 `Value`, and `Module::submodule` which returns another `Module`.
 
-`Value`, `Module`, and `Function` are all examples of pointer wrapper types. Pointer wrapper
-types wrap a pointer to some data owned by the GC. Other important examples of pointer
-wrapper types are `Array`, `JuliaString` and `DataType`. A `Value` wraps arbitrary Julia
-data, all other pointer wrapper types can always be converted to a `Value`. All pointer
-wrapper types wrap instances of mutable types defined by the Julia C API.
-
-In addition to pointer wrapper types there are inline wrapper types, these types provide
-matching layouts for Julia data. Examples are primitive types like `Float32` and `UInt`, the
-inline wrapper types associated with these types are their counterparts, `f32` and `usize`.
-
 `Value` provides several methods to allocate new Julia data. The simplest one is
 `Value::eval_string`, which evaluates the contents of the string passed to it and returns
 the result as a `Value`. For example, you can evaluate `2` to convert it to  `Value`. In
@@ -275,10 +267,10 @@ of a `Value`. Because `sqrt(2)` returns a `Float64`, it can be unboxed as an `f6
 wrapper types don't implement `IntoJulia` or `Unbox`, if they can be created from Rust
 they provide methods to do so.
 
-It's possible to call anything that implements `Call` as a Julia function. In addition to
-`Function`, this trait is implemented by `Value` itself. Functions can be called with any
-number of positional arguments and can be provided with keyword arguments. Keywords must be
-provided as a `NamedTuple`, which can be created with the `named_tuple` macro.
+It's possible to call anything that implements `Call` as a Julia function. Functions can be
+called with any number of positional arguments and can be provided with keyword arguments.
+Keywords must be provided as a `NamedTuple`, which can be created with the `named_tuple`
+macro.
 
 Evaluating raw code and calling Julia functions is always unsafe. Nothing prevents you from
 calling a function like `nasaldemons() = unsafe_load(Ptr{Float64}(0x05391A445))`. Similarly,
@@ -418,8 +410,8 @@ impl PersistentTask for AccumulatorTask {
         // A `Vec` can be moved from Rust to Julia if the element type
         // implements `IntoJulia`.
         let data = vec![0usize; self.n_values];
-        let array = Array::from_vec(&mut *frame, data, self.n_values)?
-            .try_as_typed::<usize>()?;
+        let array = TypedArray::from_vec(&mut *frame, data, self.n_values)?
+            .into_jlrs_result()?;
 
         Ok(AccumulatorTaskState {
             array,
@@ -440,7 +432,7 @@ impl PersistentTask for AccumulatorTask {
         {
             // Array data can be directly accessed from Rust.
             // TypedArray::bits_data_mut can be used if the type
-            // of the elements is concrete, pointer-free and immutable.
+            // of the elements is concrete and immutable.
             // This is safe because this is the only active reference to
             // the array.
             let mut data = unsafe { state.array.bits_data_mut(frame)? };
@@ -573,7 +565,7 @@ thread_local! {
 }
 ```
 
-A similar approach works for the async runtimes:
+A similar approach works for the async runtime:
 
 ```rust
 use jlrs::prelude::*;
@@ -600,8 +592,8 @@ Tests that use these constructs can only use one thread for testing, so you must
 initialize Julia a second time from another thread.
 
 If you want to run all of jlrs's tests, this requirement must be taken into account:
-`cargo test --all-features -- --test-threads=1`. Testing with the `--all-features` flag only works
-with Julia 1.8 because this overrides the `lts` and `debug` features.
+`cargo test --all-features -- --test-threads=1`. Testing with the `--all-features` flag only
+works with Julia 1.8 because this overrides the `lts` and `debug` features.
 
 
 ## Custom types

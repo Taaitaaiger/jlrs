@@ -171,11 +171,11 @@
 //! use jlrs::prelude::*;
 //!
 //! # fn main() {
-//!       // Initializing Julia is unsafe because this can load arbitrary
-//!       // Julia code, and because it can race with other crates unrelated
-//!       // to jlrs. It returns an error if Julia has already been
-//!       // initialized.
-//!       let _julia = unsafe { RuntimeBuilder::new().start().unwrap() };
+//! // Initializing Julia is unsafe because this can load arbitrary
+//! // Julia code, and because it can race with other crates unrelated
+//! // to jlrs. It returns an error if Julia has already been
+//! // initialized.
+//! let _julia = unsafe { RuntimeBuilder::new().start().unwrap() };
 //! # }
 //! ```
 //!
@@ -189,13 +189,13 @@
 //! use jlrs::prelude::*;
 //!
 //! # fn main() {
-//!       // Initializing Julia is unsafe for the same reasons as the sync runtime.
-//!       let (_julia, _task_handle) = unsafe {
-//!           RuntimeBuilder::new()
-//!               .async_runtime::<Tokio, UnboundedChannel<_>>()
-//!               .start()
-//!               .unwrap()
-//!       };
+//! // Initializing Julia is unsafe for the same reasons as the sync runtime.
+//! let (_julia, _task_handle) = unsafe {
+//!     RuntimeBuilder::new()
+//!         .async_runtime::<Tokio, UnboundedChannel<_>>()
+//!         .start()
+//!         .unwrap()
+//! };
 //! # }
 //! ```
 //!
@@ -206,13 +206,13 @@
 //!
 //! #[tokio::main]
 //! async fn main() {
-//!       // Initializing Julia is unsafe for the same reasons as the sync runtime.
-//!       let (_julia, _task_handle) = unsafe {
-//!           RuntimeBuilder::new()
-//!               .async_runtime::<Tokio, UnboundedChannel<_>>()
-//!               .start_async()
-//!               .unwrap()
-//!       };
+//!     // Initializing Julia is unsafe for the same reasons as the sync runtime.
+//!     let (_julia, _task_handle) = unsafe {
+//!         RuntimeBuilder::new()
+//!             .async_runtime::<Tokio, UnboundedChannel<_>>()
+//!             .start_async()
+//!             .unwrap()
+//!     };
 //! }
 //! ```
 //!
