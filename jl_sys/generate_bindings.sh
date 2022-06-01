@@ -9,7 +9,7 @@ if [ "$(pwd)" != "$(readlink -f $(dirname $0))" ]; then
 fi
 
 if [ -z "$JULIA_STABLE_DIR" ]; then
-    JULIA_STABLE_DIR=~/julia-1.8.0-beta3
+    JULIA_STABLE_DIR=~/julia-1.8.0-rc1
 fi
 if [ -z "$JULIA_STABLE_DIR_WIN" ]; then
     JULIA_STABLE_DIR_WIN=$JULIA_STABLE_DIR-win
@@ -58,11 +58,11 @@ cargo clean
 JULIA_DIR=$JULIA_STABLE_DIR_WIN LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$JULIA_DIR/lib:$JULIA_DIR/lib/julia" cargo build --features use-bindgen --target x86_64-pc-windows-gnu
 updated=$(sed -e '1h;2,$H;$!d;g' -r -E -e 's/(extern "C" \{\n\s+pub static)/#[link(name = \"libjulia\")]\n\1/g' ../target/x86_64-pc-windows-gnu/debug/build/jl-sys*/out/bindings.rs)
 echo "#![allow(deref_nullptr)]" > ./src/bindings_1_8_x86_64_pc_windows_gnu.rs
-echo "/* generated from Julia version 1.8.0-beta3 */" >> ./src/bindings_1_8_x86_64_pc_windows_gnu.rs
+echo "/* generated from Julia version 1.8.0-rc1 */" >> ./src/bindings_1_8_x86_64_pc_windows_gnu.rs
 echo -e "$updated" >> ./src/bindings_1_8_x86_64_pc_windows_gnu.rs
 
 cargo clean
 JULIA_DIR=$JULIA_STABLE_DIR LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$JULIA_DIR/lib:$JULIA_DIR/lib/julia" cargo build --features use-bindgen
 echo "#![allow(deref_nullptr)]" > ./src/bindings_1_8_x86_64_unknown_linux_gnu.rs
-echo "/* generated from Julia version 1.8.0-beta3 */" >> ./src/bindings_1_8_x86_64_unknown_linux_gnu.rs
+echo "/* generated from Julia version 1.8.0-rc1 */" >> ./src/bindings_1_8_x86_64_unknown_linux_gnu.rs
 cat ../target/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings_1_8_x86_64_unknown_linux_gnu.rs
