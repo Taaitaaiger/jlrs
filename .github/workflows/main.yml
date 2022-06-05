@@ -188,7 +188,7 @@ jobs:
 
       - name: Create lib files
         run: |
-          copy ./jl_sys/def/stable/*.def ${{ steps.setup-julia.outputs.julia-bindir }}
+          copy ./jl_sys/def/lts/*.def ${{ steps.setup-julia.outputs.julia-bindir }}
           cd ${{ steps.setup-julia.outputs.julia-bindir }}
           lib /def:libjulia.def /out:libjulia.lib /machine:x64
           lib /def:libopenlibm.def /out:libopenlibm.lib /machine:x64
