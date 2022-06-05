@@ -195,7 +195,7 @@ jobs:
           lib /def:libuv-2.def /out:libuv-2.lib /machine:x64
 
       - name: Run tests
-        run:  cargo test --features full,lts --verbose -- --test-threads=1
+        run: cargo test --features full,lts --verbose -- --test-threads=1
 
  docs:
    runs-on: ubuntu-latest
