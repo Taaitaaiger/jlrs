@@ -5,11 +5,9 @@
 //!
 //!   - [`BoundedChannel`]
 //!   - [`UnboundedChannel`]
-//!   - [`MaybeUnboundedChannel`]
 //!
 //! The first of these is backed by the mpsc `Sender` and `Receiver` from tokio, the second by the
-//! `UnboundedSender` and `UnboundedReceiver` from the same module. The last one is backed by the
-//! `MaybeUnboundedSender` and `MaybeUnboundedReceiver` defined in this module.
+//! `UnboundedSender` and `UnboundedReceiver` from the same module.
 //!
 //! All sending halves of channels provided by tokio, that is the oneshot, mpsc, broadcast, and
 //! watch `Sender`s, implement the [`OneshotSender`] trait.
