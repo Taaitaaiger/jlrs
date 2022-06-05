@@ -44,12 +44,13 @@ use super::into_julia::IntoJulia;
 /// If you do choose to implement it manually, you only need to provide the associated `Output`
 /// type if the type matches the layout of the data in Julia. The default implementation of
 /// `unbox` dereferences the value as `&Self::Output` and clones it. If this implementation is
-/// incorrect it can be overridden.
+/// incorrect it must be overridden.
 ///
 /// [`Value::unbox`]: crate::wrappers::ptr::value::Value::unbox
 /// [`Value::unbox_unchecked`]: crate::wrappers::ptr::value::Value::unbox_unchecked
 /// [`ValidLayout`]: crate::layout::valid_layout::ValidLayout
 pub unsafe trait Unbox {
+    /// The type of the unboxed data. Must be `#[repr(C)]`.
     type Output: Sized + Clone;
 
     /// Unbox the value as `Self::Output`.

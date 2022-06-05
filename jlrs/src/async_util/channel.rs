@@ -4,7 +4,7 @@
 //! defined in this module. Async runtimes and persistent tasks need a backing channel whose
 //! sending half implements [`ChannelSender`], whose receiving half implements
 //! [`ChannelReceiver`], and the pair must implement [`Channel`]. Async tasks, blocking tasks and
-//! calling persistent tasks need an implementation of z[`OneshotChannel`] to send their result.
+//! calling persistent tasks need an implementation of [`OneshotSender`] to send their result.
 //!
 //! Several implementations of this trait are provided by jlrs if the `async-std-rt` or `tokio-rt`
 //! feature is enabled.
