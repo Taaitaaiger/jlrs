@@ -397,9 +397,9 @@ impl PersistentTask for AccumulatorTask {
     type Input = f64;
     type Output = f64;
 
-    const REGISTER_SLOTS: usize = 1;
-    const INIT_SLOTS: usize = 1;
-    const RUN_SLOTS: usize = 1;
+    const REGISTER_CAPACITY: usize = 1;
+    const INIT_CAPACITY: usize = 1;
+    const RUN_CAPACITY: usize = 1;
     const CHANNEL_CAPACITY: usize = 2;
 
     async fn register<'frame>(
@@ -413,10 +413,10 @@ impl PersistentTask for AccumulatorTask {
         Ok(())
     }
 
-    async fn init<'inner>(
-        &'inner mut self,
+    async fn init(
+        &mut self,
         global: Global<'static>,
-        frame: &'inner mut AsyncGcFrame<'static>,
+        frame: &mut AsyncGcFrame<'static>,
     ) -> JlrsResult<Value<'static, 'static>> {
         unsafe {
             let (output, frame) = frame.split()?;
@@ -438,11 +438,11 @@ impl PersistentTask for AccumulatorTask {
         }
     }
 
-    async fn run<'inner, 'frame>(
-        &'inner mut self,
+    async fn run<'frame>(
+        &mut self,
         _global: Global<'frame>,
-        frame: &'inner mut AsyncGcFrame<'frame>,
-        state: &'inner mut Self::State,
+        frame: &mut AsyncGcFrame<'frame>,
+        state: &mut Self::State,
         input: Self::Input,
     ) -> JlrsResult<Self::Output> {
         let value = state.field_accessor(frame).field("v")?.access::<f64>()? + input;

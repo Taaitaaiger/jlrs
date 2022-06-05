@@ -10,8 +10,9 @@ use crate::{
     wrappers::ptr::Wrapper,
 };
 
-/// Extension trait that lets you convert a `JuliaResult` to a `JlrsResult`. If an exception
-/// is thrown, this method converts the exception to an error message by calling
+/// Extension trait that lets you convert a `JuliaResult` to a `JlrsResult`. 
+/// 
+/// If an exception is thrown, this method converts the exception to an error message by calling
 /// `Base.showerror`.
 pub trait IntoJlrsResult<T>: private::IntoJlrsResultPriv {
     /// Convert `self` to `JlrsResult` by calling `Base.showerror` if an exception has been
@@ -20,7 +21,7 @@ pub trait IntoJlrsResult<T>: private::IntoJlrsResultPriv {
 }
 
 impl<T> IntoJlrsResult<T> for JuliaResult<'_, '_, T> {
-    #[inline(always)]
+    #[inline]
     fn into_jlrs_result(self) -> JlrsResult<T> {
         match self {
             Ok(v) => Ok(v),

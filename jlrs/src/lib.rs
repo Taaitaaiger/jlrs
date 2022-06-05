@@ -405,10 +405,10 @@
 //!     // lifetime of the frame is `'static`: the frame is not dropped until
 //!     // the task has completed, so the task's internal state can contain
 //!     // Julia data rooted in this frame.
-//!     async fn init<'inner>(
-//!         &'inner mut self,
+//!     async fn init(
+//!         &mut self,
 //!         _global: Global<'static>,
-//!         frame: &'inner mut AsyncGcFrame<'static>,
+//!         frame: &mut AsyncGcFrame<'static>,
 //!     ) -> JlrsResult<Self::State> {
 //!         // A `Vec` can be moved from Rust to Julia if the element type
 //!         // implements `IntoJulia`.
@@ -425,11 +425,11 @@
 //!     // Whenever the task is called through its handle this method
 //!     // is called. Unlike `init`, the frame that this method can use
 //!     // is dropped after `run` returns.
-//!     async fn run<'inner, 'frame>(
-//!         &'inner mut self,
+//!     async fn run<'frame>(
+//!         &mut self,
 //!         global: Global<'frame>,
-//!         frame: &'inner mut AsyncGcFrame<'frame>,
-//!         state: &'inner mut Self::State,
+//!         frame: &mut AsyncGcFrame<'frame>,
+//!         state: &mut Self::State,
 //!         input: Self::Input,
 //!     ) -> JlrsResult<Self::Output> {
 //!         {

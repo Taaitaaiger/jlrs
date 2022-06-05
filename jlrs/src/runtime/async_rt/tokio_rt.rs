@@ -78,40 +78,6 @@ impl AsyncRuntime for Tokio {
     }
 }
 
-/// Either [`tokio::sync::mpsc::Sender`] or [`tokio::sync::mpsc::UnboundedSender`].
-pub enum MaybeUnboundedSender<M> {
-    Bounded(tokio::sync::mpsc::Sender<M>),
-    Unbounded(tokio::sync::mpsc::UnboundedSender<M>),
-}
-
-/// Either [`tokio::sync::mpsc::Receiver`] or [`tokio::sync::mpsc::UnboundedReceiver`].
-pub enum MaybeUnboundedReceiver<M> {
-    Bounded(tokio::sync::mpsc::Receiver<M>),
-    Unbounded(tokio::sync::mpsc::UnboundedReceiver<M>),
-}
-
-/// Create a new channel that is unbounded if the capacity is `None` and bounded otherwise.
-pub fn maybe_unbounded_channel<M: Send + Sync + 'static>(
-    capacity: Option<NonZeroUsize>,
-) -> (MaybeUnboundedSender<M>, MaybeUnboundedReceiver<M>) {
-    match capacity {
-        Some(n) => {
-            let (s, r) = tokio::sync::mpsc::channel(n.get());
-            (
-                MaybeUnboundedSender::Bounded(s),
-                MaybeUnboundedReceiver::Bounded(r),
-            )
-        }
-        None => {
-            let (s, r) = tokio::sync::mpsc::unbounded_channel();
-            (
-                MaybeUnboundedSender::Unbounded(s),
-                MaybeUnboundedReceiver::Unbounded(r),
-            )
-        }
-    }
-}
-
 impl<M: Send + Sync + 'static> Channel<M> for BoundedChannel<M> {
     type Sender = tokio::sync::mpsc::Sender<M>;
     type Receiver = tokio::sync::mpsc::Receiver<M>;
@@ -127,15 +93,6 @@ impl<M: Send + Sync + 'static> Channel<M> for UnboundedChannel<M> {
 
     fn channel(_: Option<NonZeroUsize>) -> (Self::Sender, Self::Receiver) {
         tokio::sync::mpsc::unbounded_channel()
-    }
-}
-
-impl<M: Send + Sync + 'static> Channel<M> for MaybeUnboundedChannel<M> {
-    type Sender = MaybeUnboundedSender<M>;
-    type Receiver = MaybeUnboundedReceiver<M>;
-
-    fn channel(capacity: Option<NonZeroUsize>) -> (Self::Sender, Self::Receiver) {
-        maybe_unbounded_channel(capacity)
     }
 }
 
@@ -189,33 +146,6 @@ impl<M: Send + Sync + 'static> ChannelReceiver<M> for tokio::sync::mpsc::Unbound
 }
 
 #[async_trait]
-impl<M: Send + Sync + 'static> ChannelSender<M> for MaybeUnboundedSender<M> {
-    async fn send(&self, msg: M) -> Result<(), SendError<M>> {
-        match self {
-            MaybeUnboundedSender::Bounded(ref s) => ChannelSender::send(s, msg).await,
-            MaybeUnboundedSender::Unbounded(ref s) => ChannelSender::send(s, msg).await,
-        }
-    }
-
-    fn try_send(&self, msg: M) -> Result<(), TrySendError<M>> {
-        match self {
-            MaybeUnboundedSender::Bounded(ref s) => ChannelSender::try_send(s, msg),
-            MaybeUnboundedSender::Unbounded(ref s) => ChannelSender::try_send(s, msg),
-        }
-    }
-}
-
-#[async_trait]
-impl<M: Send + Sync + 'static> ChannelReceiver<M> for MaybeUnboundedReceiver<M> {
-    async fn recv(&mut self) -> JlrsResult<M> {
-        match self {
-            MaybeUnboundedReceiver::Bounded(ref mut r) => ChannelReceiver::recv(r).await,
-            MaybeUnboundedReceiver::Unbounded(ref mut r) => ChannelReceiver::recv(r).await,
-        }
-    }
-}
-
-#[async_trait]
 impl<M: Send + Sync + 'static> OneshotSender<M> for tokio::sync::oneshot::Sender<M> {
     async fn send(self: Box<Self>, msg: M) {
         (*self).send(msg).ok();
@@ -247,5 +177,3 @@ impl<M: Send + Sync + 'static> OneshotSender<M> for tokio::sync::watch::Sender<M
 pub type BoundedChannel<M> = (BoundedSender<M>, BoundedReceiver<M>);
 /// An unbounded channel.
 pub type UnboundedChannel<M> = (UnboundedSender<M>, UnboundedReceiver<M>);
-/// A channel that is either bounded or unbounded.
-pub type MaybeUnboundedChannel<M> = (MaybeUnboundedSender<M>, MaybeUnboundedReceiver<M>);

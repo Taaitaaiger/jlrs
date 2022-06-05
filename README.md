@@ -422,11 +422,11 @@ impl PersistentTask for AccumulatorTask {
     // Whenever the task is called through its handle this method
     // is called. Unlike `init`, the frame that this method can use
     // is dropped after `run` returns.
-    async fn run<'inner, 'frame>(
-        &'inner mut self,
+    async fn run<'frame>(
+        &mut self,
         global: Global<'frame>,
-        frame: &'inner mut AsyncGcFrame<'frame>,
-        state: &'inner mut Self::State,
+        frame: &mut AsyncGcFrame<'frame>,
+        state: &mut Self::State,
         input: Self::Input,
     ) -> JlrsResult<Self::Output> {
         {

@@ -1,10 +1,10 @@
-//! Async channels.
+//! Channel traits used to communicate with the async runtime
 //!
-//! In order to communicate with an async runtime you must use channels that implement the traits
+//! In order to communicate with the async runtime you must use channels that implement the traits
 //! defined in this module. Async runtimes and persistent tasks need a backing channel whose
 //! sending half implements [`ChannelSender`], whose receiving half implements
 //! [`ChannelReceiver`], and the pair must implement [`Channel`]. Async tasks, blocking tasks and
-//! calling persistent tasks need an implementation of `OneshotChannel` to send their result.
+//! calling persistent tasks need an implementation of z[`OneshotChannel`] to send their result.
 //!
 //! Several implementations of this trait are provided by jlrs if the `async-std-rt` or `tokio-rt`
 //! feature is enabled.

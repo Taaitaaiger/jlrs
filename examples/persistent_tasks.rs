@@ -30,9 +30,9 @@ impl PersistentTask for AccumulatorTask {
     // and PersistentTask::run respectively. By default they're 0 and no slots are preallocated.
     // The last sets the capacity of the channel that's used by the task and its handle to
     // communicate, by default it's 0, in which case an unbounded channel is used.
-    const REGISTER_SLOTS: usize = 1;
-    const INIT_SLOTS: usize = 1;
-    const RUN_SLOTS: usize = 1;
+    const REGISTER_CAPACITY: usize = 1;
+    const INIT_CAPACITY: usize = 1;
+    const RUN_CAPACITY: usize = 1;
     const CHANNEL_CAPACITY: usize = 2;
 
     // Register this task. This method can take care of custom initialization work, in this case
@@ -52,10 +52,10 @@ impl PersistentTask for AccumulatorTask {
     // have been dropped and every pending call has completed, Julia data rooted in this frame
     // can be returned as State. Here, the value we'll use as an accumulator is created and
     // returned.
-    async fn init<'inner>(
-        &'inner mut self,
+    async fn init(
+        &mut self,
         global: Global<'static>,
-        frame: &'inner mut AsyncGcFrame<'static>,
+        frame: &mut AsyncGcFrame<'static>,
     ) -> JlrsResult<Self::State> {
         unsafe {
             let output = frame.output()?;
@@ -77,11 +77,11 @@ impl PersistentTask for AccumulatorTask {
     // Call the task once. Note that while the state can be mutated, you can't replace any
     // Julia data that it contains with newly allocated data because it's called in a nested
     // scope.
-    async fn run<'inner, 'frame>(
-        &'inner mut self,
+    async fn run<'frame>(
+        &mut self,
         _global: Global<'frame>,
-        frame: &'inner mut AsyncGcFrame<'frame>,
-        state: &'inner mut Self::State,
+        frame: &mut AsyncGcFrame<'frame>,
+        state: &mut Self::State,
         input: Self::Input,
     ) -> JlrsResult<Self::Output> {
         // Add call_cata to the accumulator and return its new value. The accumulator is mutable

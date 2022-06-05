@@ -26,10 +26,10 @@ impl PersistentTask for MyTask {
         Ok(())
     }
 
-    async fn init<'inner>(
-        &'inner mut self,
+    async fn init(
+        &mut self,
         global: Global<'static>,
-        frame: &'inner mut AsyncGcFrame<'static>,
+        frame: &mut AsyncGcFrame<'static>,
     ) -> JlrsResult<Self::State> {
         unsafe {
             // Create the first plot with no data, but with a custom label for the y-axis.
@@ -47,11 +47,11 @@ impl PersistentTask for MyTask {
         }
     }
 
-    async fn run<'inner, 'frame>(
-        &'inner mut self,
+    async fn run<'frame>(
+        &mut self,
         global: Global<'frame>,
-        frame: &'inner mut AsyncGcFrame<'frame>,
-        state: &'inner mut Self::State,
+        frame: &mut AsyncGcFrame<'frame>,
+        state: &mut Self::State,
         _input: Self::Input,
     ) -> JlrsResult<Self::Output> {
         unsafe {
@@ -76,11 +76,11 @@ impl PersistentTask for MyTask {
         Ok(())
     }
 
-    async fn exit<'inner>(
-        &'inner mut self,
+    async fn exit(
+        &mut self,
         _: Global<'static>,
-        frame: &'inner mut AsyncGcFrame<'static>,
-        state: &'inner mut Self::State,
+        frame: &mut AsyncGcFrame<'static>,
+        state: &mut Self::State,
     ) {
         // Wait until the plot window is closed.
         println!("Exit");

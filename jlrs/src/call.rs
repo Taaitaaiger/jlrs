@@ -463,7 +463,7 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
 cfg_if::cfg_if! {
     if #[cfg(feature = "async")] {
         use async_trait::async_trait;
-        use crate::{memory::frame::AsyncGcFrame, wrappers::ptr::{Wrapper, task::Task, module::Module, function::Function}, async_util::{julia_future::JuliaFuture, task::yield_task}};
+        use crate::{memory::frame::AsyncGcFrame, wrappers::ptr::{Wrapper, task::Task, module::Module, function::Function}, async_util::{future::JuliaFuture, task::yield_task}};
         /// This trait provides async methods to create and schedule `Task`s that resolve when the
         /// `Task` has completed. Sync methods are also provided which only schedule the `Task`,
         /// those methods should only be used from [`PersistentTask::init`].

@@ -112,7 +112,6 @@ mod tests {
     use super::{NdArrayView, NdArrayViewMut};
     use crate::wrappers::ptr::array::Array;
     use crate::{prelude::TypedArray, util::JULIA};
-    use ndarray::{ArrayView, ArrayViewMut, IxDyn};
 
     #[test]
     fn bits_array_view() {
@@ -127,10 +126,10 @@ mod tests {
                         unsafe { Array::from_slice_unchecked(&mut *frame, slice, (3, 2))? };
 
                     let data = borrowed.bits_data::<usize, _>(&mut *frame)?;
-                    let x = data[(1, 0)];
+                    let x = data[(2, 1)];
 
-                    let array: ArrayView<usize, _> = data.array_view();
-                    assert_eq!(array[IxDyn(&[1, 0])], x);
+                    let array = data.array_view();
+                    assert_eq!(array[[2, 1]], x);
 
                     Ok(())
                 })
@@ -149,16 +148,16 @@ mod tests {
                     let slice = &mut data.as_mut_slice();
                     let borrowed = Array::from_slice_unchecked(&mut *frame, slice, (3, 2))?;
                     let mut inline = borrowed.bits_data_mut::<usize, _>(&mut *frame)?;
-                    let x = inline[(1, 0)];
+                    let x = inline[(2, 1)];
 
-                    inline[(1, 0)] = x + 1;
+                    inline[(2, 1)] = x + 1;
 
-                    let mut array: ArrayViewMut<usize, _> = inline.array_view_mut();
-                    assert_eq!(array[IxDyn(&[1, 0])], x + 1);
-                    array[IxDyn(&[1, 0])] -= 1;
+                    let mut array = inline.array_view_mut();
+                    assert_eq!(array[[2, 1]], x + 1);
+                    array[[2, 1]] -= 1;
 
                     let inline = borrowed.bits_data_mut::<usize, _>(&mut *frame)?;
-                    assert_eq!(inline[(1, 0)], x);
+                    assert_eq!(inline[(2, 1)], x);
                     Ok(())
                 })
                 .unwrap();
@@ -178,10 +177,10 @@ mod tests {
                         unsafe { Array::from_slice_unchecked(&mut *frame, slice, (3, 2))? };
 
                     let data = borrowed.inline_data::<usize, _>(&mut *frame)?;
-                    let x = data[(1, 0)];
+                    let x = data[(2, 1)];
 
-                    let array: ArrayView<usize, _> = data.array_view();
-                    assert_eq!(array[IxDyn(&[1, 0])], x);
+                    let array = data.array_view();
+                    assert_eq!(array[[2, 1]], x);
 
                     Ok(())
                 })
@@ -202,10 +201,10 @@ mod tests {
                         unsafe { TypedArray::from_slice_unchecked(&mut *frame, slice, (3, 2))? };
                     let copied = borrowed.copy_inline_data(frame)?;
 
-                    let x = copied[(1, 0)];
+                    let x = copied[(2, 1)];
 
-                    let array: ArrayView<usize, _> = copied.array_view();
-                    assert_eq!(array[IxDyn(&[1, 0])], x);
+                    let array = copied.array_view();
+                    assert_eq!(array[[2, 1]], x);
 
                     Ok(())
                 })
@@ -224,16 +223,16 @@ mod tests {
                     let slice = &mut data.as_mut_slice();
                     let borrowed = Array::from_slice_unchecked(&mut *frame, slice, (3, 2))?;
                     let mut copied = borrowed.copy_inline_data(frame)?;
-                    let x = copied[(1, 0)];
+                    let x = copied[(2, 1)];
 
-                    copied[(1, 0)] = x + 1;
+                    copied[(2, 1)] = x + 1;
 
-                    let mut array: ArrayViewMut<usize, _> = copied.array_view_mut();
-                    assert_eq!(array[IxDyn(&[1, 0])], x + 1);
-                    array[IxDyn(&[1, 0])] -= 1;
+                    let mut array = copied.array_view_mut();
+                    assert_eq!(array[[2, 1]], x + 1);
+                    array[[2, 1]] -= 1;
 
                     let inline = borrowed.bits_data_mut::<usize, _>(&mut *frame)?;
-                    assert_eq!(inline[(1, 0)], x);
+                    assert_eq!(inline[(2, 1)], x);
                     Ok(())
                 })
                 .unwrap();
