@@ -266,8 +266,8 @@ pub trait PersistentTask: 'static + Send + Sync {
         input: Self::Input,
     ) -> JlrsResult<Self::Output>;
 
-    /// Method that is called when all handles to the task have been dropped. 
-    /// 
+    /// Method that is called when all handles to the task have been dropped.
+    ///
     /// This method is called with the same frame as `init`.
     async fn exit(
         &mut self,

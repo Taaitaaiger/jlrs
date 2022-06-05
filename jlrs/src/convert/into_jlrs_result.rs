@@ -10,8 +10,8 @@ use crate::{
     wrappers::ptr::Wrapper,
 };
 
-/// Extension trait that lets you convert a `JuliaResult` to a `JlrsResult`. 
-/// 
+/// Extension trait that lets you convert a `JuliaResult` to a `JlrsResult`.
+///
 /// If an exception is thrown, this method converts the exception to an error message by calling
 /// `Base.showerror`.
 pub trait IntoJlrsResult<T>: private::IntoJlrsResultPriv {

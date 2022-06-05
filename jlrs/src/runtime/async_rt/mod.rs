@@ -24,12 +24,11 @@ pub mod tokio_rt;
 use crate::{
     async_util::{
         channel::{Channel, ChannelReceiver, ChannelSender, OneshotSender, TrySendError},
-        internal::{
-            BlockingTask, CallPersistentMessage, BlockingTaskEnvelope, PendingTaskEnvelope,
-            InnerPersistentMessage, PendingTask, Persistent, RegisterPersistent, RegisterTask,
-            Task,
-        },
         future::wake_task,
+        internal::{
+            BlockingTask, BlockingTaskEnvelope, CallPersistentMessage, InnerPersistentMessage,
+            PendingTask, PendingTaskEnvelope, Persistent, RegisterPersistent, RegisterTask, Task,
+        },
         task::{AsyncTask, PersistentTask},
     },
     call::Call,
@@ -766,7 +765,10 @@ pub struct Message {
 }
 
 pub(crate) enum MessageInner {
-    Task(Box<dyn PendingTaskEnvelope>, Arc<dyn ChannelSender<Message>>),
+    Task(
+        Box<dyn PendingTaskEnvelope>,
+        Arc<dyn ChannelSender<Message>>,
+    ),
     BlockingTask(Box<dyn BlockingTaskEnvelope>),
     Include(PathBuf, Box<dyn OneshotSender<JlrsResult<()>>>),
     ErrorColor(bool, Box<dyn OneshotSender<JlrsResult<()>>>),

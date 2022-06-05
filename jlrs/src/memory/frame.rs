@@ -113,7 +113,7 @@ cfg_if::cfg_if! {
 }
 
 cfg_if::cfg_if! {
-    
+
     if #[cfg(feature = "async")] {
         use super::mode::Async;
         use super::mode::private::ModePriv as _;

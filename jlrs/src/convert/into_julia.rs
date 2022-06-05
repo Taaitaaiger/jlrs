@@ -39,8 +39,8 @@ use std::{ffi::c_void, ptr::NonNull};
 /// [`Value::new`]: crate::wrappers::ptr::value::Value::new
 pub unsafe trait IntoJulia: Sized + 'static {
     /// Returns the associated Julia type of the implementor.
-    /// 
-    /// The layout of that type and the Rust type must match exactly, and it must be an `isbits` 
+    ///
+    /// The layout of that type and the Rust type must match exactly, and it must be an `isbits`
     /// type, otherwise this trait has been implemented incorrectly.
     fn julia_type<'scope>(_: Global<'scope>) -> DataTypeRef<'scope>;
 
