@@ -98,7 +98,10 @@ macro_rules! named_tuple {
 use crate::{
     call::{Call, CallExt, WithKeywords},
     convert::{into_julia::IntoJulia, to_symbol::ToSymbol, unbox::Unbox},
-    error::{JlrsError, JlrsResult, JuliaResult, JuliaResultRef, CANNOT_DISPLAY_TYPE},
+    error::{
+        AccessError, IOError, InstantiationError, JlrsError, JlrsResult, JuliaResult,
+        JuliaResultRef, TypeError, CANNOT_DISPLAY_TYPE,
+    },
     impl_debug,
     layout::{
         field_index::FieldIndex,
@@ -244,7 +247,7 @@ impl Value<'_, '_> {
             let n_values = values_m.len();
 
             if n_names != n_values {
-                Err(JlrsError::NamedTupleSizeMismatch { n_names, n_values })?;
+                Err(InstantiationError::NamedTupleSizeMismatch { n_names, n_values })?;
             }
 
             let symbol_ty = DataType::symbol_type(global).as_value();
@@ -365,7 +368,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
         unsafe {
             let type_name = jl_typeof_str(self.unwrap(Private));
             let type_name_ref = CStr::from_ptr(type_name);
-            Ok(type_name_ref.to_str().map_err(|_| JlrsError::NotUTF8)?)
+            Ok(type_name_ref.to_str().map_err(JlrsError::other)?)
         }
     }
 }
@@ -486,8 +489,8 @@ impl<'scope, 'data> Value<'scope, 'data> {
         if self.is::<T>() {
             unsafe { Ok(T::cast(self, Private)) }
         } else {
-            Err(JlrsError::WrongType {
-                value_type: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
+            Err(AccessError::InvalidLayout {
+                value_type_str: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
             })?
         }
     }
@@ -503,8 +506,8 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// if the layout of `T::Output` is incompatible with the layout of the type in Julia.
     pub fn unbox<T: Unbox + Typecheck>(self) -> JlrsResult<T::Output> {
         if !self.is::<T>() {
-            Err(JlrsError::WrongType {
-                value_type: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
+            Err(AccessError::InvalidLayout {
+                value_type_str: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
 
@@ -578,8 +581,8 @@ impl<'scope, 'data> Value<'scope, 'data> {
         }
     }
 
-    /// Roots the field at index `idx` if it exists and returns it, or
-    /// `JlrsError::OutOfBounds` if the index is out of bounds.
+    /// Roots the field at index `idx` if it exists and returns it, or a
+    /// `JlrsError::AccessError` if the index is out of bounds.
     pub fn get_nth_field<'target, S>(
         self,
         scope: S,
@@ -590,7 +593,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     {
         unsafe {
             if idx >= self.n_fields() {
-                Err(JlrsError::OutOfBounds {
+                Err(AccessError::OutOfBoundsField {
                     idx,
                     n_fields: self.n_fields(),
                     value_type: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
@@ -599,7 +602,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
 
             let fld_ptr = jl_get_nth_field(self.unwrap(Private), idx as _);
             if fld_ptr.is_null() {
-                Err(JlrsError::UndefRef)?;
+                Err(AccessError::UndefRef)?;
             }
 
             scope.value(NonNull::new_unchecked(fld_ptr), Private)
@@ -608,12 +611,12 @@ impl<'scope, 'data> Value<'scope, 'data> {
 
     /// Returns the field at index `idx` if it's a pointer field.
     ///
-    /// If the field doesn't exist `JlrsError::OutOfBounds` is returned. If the field can't be
-    /// referenced because its data is stored inline, `JlrsError::NotAPointerField` is returned.
+    /// If the field doesn't exist or if the field can't be referenced because its data is stored
+    /// inline, a `JlrsError::AccessError` is returned.
     pub fn get_nth_field_ref(self, idx: usize) -> JlrsResult<ValueRef<'scope, 'data>> {
         let ty = self.datatype();
         if idx >= ty.n_fields() as _ {
-            Err(JlrsError::OutOfBounds {
+            Err(AccessError::OutOfBoundsField {
                 idx,
                 n_fields: self.n_fields(),
                 value_type: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
@@ -633,19 +636,9 @@ impl<'scope, 'data> Value<'scope, 'data> {
                     format!("{}", idx)
                 };
 
-                let field_type = ty
-                    .field_types()
-                    .wrapper_unchecked()
-                    .unrestricted_data()
-                    .as_slice()[idx]
-                    .value_unchecked()
-                    .display_string_or(CANNOT_DISPLAY_TYPE);
-
-                Err(JlrsError::NotAPointerField {
+                Err(AccessError::NotAPointerField {
                     value_type: value_type_str,
-                    field_idx: idx,
                     field_name,
-                    field_type,
                 })?
             }
 
@@ -659,10 +652,10 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// Returns the field at index `idx` if it exists as a `ValueRef`. If the field is an inline
     /// field a new value is allocated which is left unrooted.
     ///
-    /// If the field doesn't exist `JlrsError::OutOfBounds` is returned.
+    /// If the field doesn't exist `JlrsError::OutOfBoundsField` is returned.
     pub fn get_nth_field_unrooted(self, idx: usize) -> JlrsResult<ValueRef<'scope, 'data>> {
         if idx >= self.n_fields() {
-            Err(JlrsError::OutOfBounds {
+            Err(AccessError::OutOfBoundsField {
                 idx,
                 n_fields: self.n_fields(),
                 value_type: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
@@ -672,8 +665,8 @@ impl<'scope, 'data> Value<'scope, 'data> {
         unsafe { Ok(ValueRef::wrap(jl_get_nth_field(self.unwrap(Private), idx))) }
     }
 
-    /// Roots the field with the name `field_name` if it exists and returns it, or
-    /// `JlrsError::NoSuchField` if there's no field with that name.
+    /// Roots the field with the name `field_name` if it exists and returns it, or a
+    /// `JlrsError::AccessError` if there's no field with that name.
     pub fn get_field<'target, N, S>(
         self,
         scope: S,
@@ -688,7 +681,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
             let idx = jl_field_index(self.datatype().unwrap(Private), symbol.unwrap(Private), 0);
 
             if idx < 0 {
-                Err(JlrsError::NoSuchField {
+                Err(AccessError::NoSuchField {
                     type_name: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
                     field_name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
                 })?
@@ -696,7 +689,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
 
             let fld_ptr = jl_get_nth_field(self.unwrap(Private), idx as _);
             if fld_ptr.is_null() {
-                Err(JlrsError::UndefRef)?;
+                Err(AccessError::UndefRef)?;
             }
 
             scope.value(NonNull::new_unchecked(fld_ptr), Private)
@@ -705,8 +698,8 @@ impl<'scope, 'data> Value<'scope, 'data> {
 
     /// Returns the field with the name `field_name` if it's a pointer field.
     ///
-    /// If the field doesn't exist `JlrsError::NoSuchField` is returned. If it isn't a pointer
-    /// field, `JlrsError::NotAPointerField` is returned.
+    /// If the field doesn't exist or if the field can't be referenced because its data is stored
+    /// inline, a `JlrsError::AccessError` is returned.
     pub fn get_field_ref<N>(self, field_name: N) -> JlrsResult<ValueRef<'scope, 'data>>
     where
         N: ToSymbol,
@@ -717,7 +710,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
             let idx = jl_field_index(ty.unwrap(Private), symbol.unwrap(Private), 0);
 
             if idx < 0 {
-                Err(JlrsError::NoSuchField {
+                Err(AccessError::NoSuchField {
                     type_name: ty.display_string_or(CANNOT_DISPLAY_TYPE),
                     field_name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
                 })?
@@ -732,19 +725,9 @@ impl<'scope, 'data> Value<'scope, 'data> {
                     .unwrap_or("<Cannot display field name>")
                     .to_string();
 
-                let field_type = ty
-                    .field_types()
-                    .wrapper_unchecked()
-                    .unrestricted_data()
-                    .as_slice()[idx]
-                    .value_unchecked()
-                    .display_string_or(CANNOT_DISPLAY_TYPE);
-
-                Err(JlrsError::NotAPointerField {
+                Err(AccessError::NotAPointerField {
                     value_type: value_type_str,
-                    field_idx: idx,
                     field_name,
-                    field_type,
                 })?
             }
 
@@ -758,7 +741,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// Returns the field with the name `field_name` if it exists. If the field is an inline field
     /// a new value is allocated which is left unrooted.
     ///
-    /// If the field doesn't  exist `JlrsError::NoSuchField` is returned.
+    /// If the field doesn't exist a `JlrsError::AccessError` is returned.
     pub fn get_field_unrooted<N>(self, field_name: N) -> JlrsResult<ValueRef<'scope, 'data>>
     where
         N: ToSymbol,
@@ -768,7 +751,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
             let idx = jl_field_index(self.datatype().unwrap(Private), symbol.unwrap(Private), 0);
 
             if idx < 0 {
-                Err(JlrsError::NoSuchField {
+                Err(AccessError::NoSuchField {
                     type_name: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
                     field_name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
                 })?
@@ -799,7 +782,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     {
         let n_fields = self.n_fields();
         if n_fields <= idx {
-            Err(JlrsError::OutOfBounds {
+            Err(AccessError::OutOfBoundsField {
                 idx,
                 n_fields,
                 value_type: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
@@ -816,7 +799,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
         let dt = value.datatype();
 
         if !Value::subtype(dt.as_value(), field_type) {
-            Err(JlrsError::NotSubtype {
+            Err(TypeError::NotASubtype {
                 field_type: field_type.display_string_or(CANNOT_DISPLAY_TYPE),
                 value_type: value.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
             })?
@@ -850,7 +833,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     ) -> JlrsResult<JuliaResultRef<'scope, 'data, ()>> {
         let n_fields = self.n_fields();
         if n_fields <= idx {
-            Err(JlrsError::OutOfBounds {
+            Err(AccessError::OutOfBoundsField {
                 idx,
                 n_fields,
                 value_type: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
@@ -867,7 +850,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
         let dt = value.datatype();
 
         if !Value::subtype(dt.as_value(), field_type) {
-            Err(JlrsError::NotSubtype {
+            Err(TypeError::NotASubtype {
                 field_type: field_type.display_string_or(CANNOT_DISPLAY_TYPE),
                 value_type: value.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
             })?
@@ -911,7 +894,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
         let idx = jl_field_index(self.datatype().unwrap(Private), symbol.unwrap(Private), 0);
 
         if idx < 0 {
-            Err(JlrsError::NoSuchField {
+            Err(AccessError::NoSuchField {
                 type_name: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
                 field_name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
             })?
@@ -927,7 +910,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
         let dt = value.datatype();
 
         if !Value::subtype(dt.as_value(), field_type) {
-            Err(JlrsError::NotSubtype {
+            Err(TypeError::NotASubtype {
                 field_type: field_type.display_string_or(CANNOT_DISPLAY_TYPE),
                 value_type: value.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
             })?
@@ -966,7 +949,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
         let idx = jl_field_index(self.datatype().unwrap(Private), symbol.unwrap(Private), 0);
 
         if idx < 0 {
-            Err(JlrsError::NoSuchField {
+            Err(AccessError::NoSuchField {
                 type_name: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
                 field_name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
             })?
@@ -982,7 +965,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
         let dt = value.datatype();
 
         if !Value::subtype(dt.as_value(), field_type) {
-            Err(JlrsError::NotSubtype {
+            Err(TypeError::NotASubtype {
                 field_type: field_type.display_string_or(CANNOT_DISPLAY_TYPE),
                 value_type: value.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
             })?
@@ -1014,7 +997,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
         let idx = jl_field_index(self.datatype().unwrap(Private), symbol.unwrap(Private), 0);
 
         if idx < 0 {
-            Err(JlrsError::NoSuchField {
+            Err(AccessError::NoSuchField {
                 type_name: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
                 field_name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
             })?
@@ -1112,7 +1095,7 @@ impl Value<'_, '_> {
             });
         }
 
-        Err(JlrsError::IncludeNotFound {
+        Err(IOError::NotFound {
             path: path.as_ref().to_string_lossy().into(),
         })?
     }
@@ -1429,7 +1412,7 @@ impl<'value, 'data> CallExt<'value, 'data> for Value<'value, 'data> {
     fn with_keywords(self, kws: Value<'value, 'data>) -> JlrsResult<WithKeywords<'value, 'data>> {
         if !kws.is::<NamedTuple>() {
             let type_str = kws.datatype().display_string_or(CANNOT_DISPLAY_TYPE);
-            Err(JlrsError::NotANamedTuple { type_str })?
+            Err(TypeError::NotANamedTuple { type_str })?
         }
         Ok(WithKeywords::new(self, kws))
     }
@@ -1533,14 +1516,14 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
     /// untyped field that currently holds a `Float64` must be accessed as `f64`.
     pub fn access<T: ValidLayout>(self) -> JlrsResult<T> {
         if self.current_field_type.is_undefined() {
-            Err(JlrsError::UndefRef)?;
+            Err(AccessError::UndefRef)?;
         }
 
         unsafe {
             let ty = self.current_field_type.value_unchecked();
             if !T::valid_layout(ty) {
                 let value_type_str = ty.display_string_or(CANNOT_DISPLAY_TYPE).into();
-                Err(JlrsError::InvalidLayout { value_type_str })?;
+                Err(AccessError::InvalidLayout { value_type_str })?;
             }
 
             #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
@@ -1606,11 +1589,11 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
     /// inline fields.
     pub fn field<F: FieldIndex>(mut self, field: F) -> JlrsResult<Self> {
         if self.value.is_undefined() {
-            Err(JlrsError::UndefRef)?
+            Err(AccessError::UndefRef)?
         }
 
         if self.current_field_type.is_undefined() {
-            Err(JlrsError::UndefRef)?
+            Err(AccessError::UndefRef)?
         }
 
         unsafe {
@@ -1627,7 +1610,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
 
             let next_field_type = current_field_type.field_type_unchecked(index);
             if next_field_type.is_undefined() {
-                Err(JlrsError::UndefRef)?
+                Err(AccessError::UndefRef)?
             }
 
             let next_field_type = next_field_type.wrapper_unchecked();
@@ -1669,11 +1652,11 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
     #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn atomic_field<F: FieldIndex>(mut self, field: F, ordering: Ordering) -> JlrsResult<Self> {
         if self.value.is_undefined() {
-            Err(JlrsError::UndefRef)?
+            Err(AccessError::UndefRef)?
         }
 
         if self.current_field_type.is_undefined() {
-            Err(JlrsError::UndefRef)?
+            Err(AccessError::UndefRef)?
         }
 
         unsafe {
@@ -1690,7 +1673,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
 
             let next_field_type = current_field_type.field_type_unchecked(index);
             if next_field_type.is_undefined() {
-                Err(JlrsError::UndefRef)?
+                Err(AccessError::UndefRef)?
             }
 
             let next_field_type = next_field_type.wrapper_unchecked();
@@ -1728,7 +1711,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
     pub fn try_clone(&self) -> JlrsResult<Self> {
         #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
         if self.state == ViewState::Locked {
-            Err(JlrsError::Locked)?;
+            Err(AccessError::Locked)?;
         }
 
         Ok(FieldAccessor {

@@ -7,7 +7,7 @@
 use crate::{
     call::Call,
     convert::to_symbol::ToSymbol,
-    error::{JlrsError, JlrsResult, JuliaResult, CANNOT_DISPLAY_VALUE},
+    error::{AccessError, JlrsResult, JuliaResult, TypeError, CANNOT_DISPLAY_VALUE},
     impl_debug, impl_julia_typecheck,
     memory::{global::Global, output::Output, scope::PartialScope},
     private::Private,
@@ -124,7 +124,7 @@ impl<'scope> Module<'scope> {
             let symbol = name.to_symbol(scope.global());
             let submodule = jl_get_global(self.unwrap(Private), symbol.unwrap(Private));
             if submodule.is_null() {
-                Err(JlrsError::GlobalNotFound {
+                Err(AccessError::GlobalNotFound {
                     name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
                     module: self.name().as_str().unwrap_or("<Non-UTF8 symbol>").into(),
                 })?
@@ -135,8 +135,9 @@ impl<'scope> Module<'scope> {
             if submodule.is::<Self>() {
                 scope.value(submodule.unwrap_non_null(Private).cast(), Private)
             } else {
-                Err(JlrsError::NotAModule {
+                Err(TypeError::NotAModule {
                     name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+                    type_str: submodule.datatype().name().into(),
                 })?
             }
         }
@@ -155,7 +156,7 @@ impl<'scope> Module<'scope> {
             let symbol = name.to_symbol_priv(Private);
             let submodule = jl_get_global(self.unwrap(Private), symbol.unwrap(Private));
             if submodule.is_null() {
-                Err(JlrsError::GlobalNotFound {
+                Err(AccessError::GlobalNotFound {
                     name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
                     module: self.name().as_str().unwrap_or("<Non-UTF8 symbol>").into(),
                 })?
@@ -166,8 +167,9 @@ impl<'scope> Module<'scope> {
             if let Ok(submodule) = submodule.cast::<Self>() {
                 Ok(submodule.as_ref())
             } else {
-                Err(JlrsError::NotAModule {
+                Err(TypeError::NotAModule {
                     name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+                    type_str: submodule.datatype().name().into(),
                 })?
             }
         }
@@ -369,7 +371,7 @@ impl<'scope> Module<'scope> {
 
             let global = jl_get_global(self.unwrap(Private), symbol.unwrap(Private));
             if global.is_null() {
-                Err(JlrsError::GlobalNotFound {
+                Err(AccessError::GlobalNotFound {
                     name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
                     module: self.name().as_str().unwrap_or("<Non-UTF8 symbol>").into(),
                 })?;
@@ -390,7 +392,7 @@ impl<'scope> Module<'scope> {
 
             let global = jl_get_global(self.unwrap(Private), symbol.unwrap(Private));
             if global.is_null() {
-                Err(JlrsError::GlobalNotFound {
+                Err(AccessError::GlobalNotFound {
                     name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
                     module: self.name().as_str().unwrap_or("<Non-UTF8 symbol>").into(),
                 })?;
@@ -413,7 +415,7 @@ impl<'scope> Module<'scope> {
             // function...
             let global = jl_get_global(self.unwrap(Private), symbol.unwrap(Private));
             if global.is_null() {
-                Err(JlrsError::GlobalNotFound {
+                Err(AccessError::GlobalNotFound {
                     name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
                     module: self.name().as_str().unwrap_or("<Non-UTF8 symbol>").into(),
                 })?;
@@ -441,7 +443,7 @@ impl<'scope> Module<'scope> {
             if !func.is::<Function>() {
                 let name = symbol.as_str().unwrap_or("<Non-UTF8 string>").into();
                 let ty = func.datatype().display_string_or(CANNOT_DISPLAY_VALUE);
-                Err(JlrsError::NotAFunction { name, ty })?;
+                Err(TypeError::NotAFunction { name, type_str: ty })?;
             }
 
             Ok(func.cast_unchecked::<Function>())
@@ -461,7 +463,7 @@ impl<'scope> Module<'scope> {
             if !func.is::<Function>() {
                 let name = symbol.as_str().unwrap_or("<Non-UTF8 string>").into();
                 let ty = func.datatype_name().unwrap_or("<Non-UTF8 string>").into();
-                Err(JlrsError::NotAFunction { name, ty })?;
+                Err(TypeError::NotAFunction { name, type_str: ty })?;
             }
 
             Ok(FunctionRef::wrap(func.unwrap(Private)))

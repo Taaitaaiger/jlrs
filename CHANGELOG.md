@@ -80,3 +80,9 @@
  - There's a single type that provides possibly mutable access to the contents of an array, `ArrayAccessor`, which replaces the large number of types that previously provided this access. A distinction is made between element types that are stored inline which have no and those that have some pointer fields. 
 
  - `NdArray` has been split into `NdArrayView` and `NdArrayViewMut`. Rather than a typed array, their trait methods take a (mutable) reference to an `ArrayAccessor` or `CopiedArray` instead.
+
+ - `JlrsError` has been split into several error types and unused variants have been removed.
+
+ - `JuliaString::as_slice` has been renamed to `JuliaString::to_bytes`, `Symbol::as_slice` has been renamed to `Symbol::to_bytes`.
+
+ - `Symbol::new_bytes_unchecked` has been added, `Symbol::to_bytes` has been renamed to `Symbol::as_bytes`.

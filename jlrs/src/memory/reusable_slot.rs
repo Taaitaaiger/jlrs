@@ -13,7 +13,7 @@ use std::{cell::Cell, ffi::c_void, marker::PhantomData};
 #[derive(Clone, Copy)]
 pub struct ReusableSlot<'target> {
     slot: *const Cell<*mut c_void>,
-    _marker: PhantomData<fn(&'target mut ())>,
+    _marker: PhantomData<fn(&'target ())>,
 }
 
 impl<'target> ReusableSlot<'target> {

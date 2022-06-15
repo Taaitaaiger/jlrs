@@ -1,13 +1,13 @@
 //! Call Julia functions.
 //!
 //! This module provides the [`Call`], [`CallAsync`] and [`CallExt`] traits, their methods can be
-//! used to call Julia functions.
+//! used to call Julia functions, including inner and outer constructors.
 //!
 //! The methods provided by `Call` and `CallAsync` call the implementor as a Julia function with
 //! some number of positional arguments. These methods have two variants, either the returned data
 //! is rooted or it isn't. It's fine to leave the return value unrooted if you never use it or if
 //! you can guarantee that it's reachable from some GC root while you do. Keyword arguments can be
-//! provided by  calling [`CallExt::with_keywords`].
+//! provided by calling [`CallExt::with_keywords`].
 
 use crate::{
     error::{JlrsResult, JuliaResult, JuliaResultRef},

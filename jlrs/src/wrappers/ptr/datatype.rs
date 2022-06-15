@@ -2,9 +2,9 @@
 
 use crate::{
     convert::to_symbol::ToSymbol,
-    error::{JlrsError, JlrsResult, CANNOT_DISPLAY_TYPE},
+    error::{AccessError, JlrsResult, CANNOT_DISPLAY_TYPE},
     impl_debug, impl_julia_typecheck,
-    layout::typecheck::{Concrete, Typecheck},
+    layout::typecheck::Typecheck,
     memory::{global::Global, output::Output, scope::PartialScope},
     private::Private,
     wrappers::ptr::{
@@ -174,7 +174,7 @@ impl<'scope> DataType<'scope> {
             let idx = jl_field_index(self.unwrap(Private), sym.unwrap(Private), 0);
 
             if idx < 0 {
-                Err(JlrsError::NoSuchField {
+                Err(AccessError::NoSuchField {
                     type_name: self.display_string_or(CANNOT_DISPLAY_TYPE),
                     field_name: sym.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
                 })?;
@@ -381,7 +381,7 @@ impl<'scope> DataType<'scope> {
     /// Returns the size of the field at position `idx` in this type.
     pub fn field_size(self, idx: usize) -> JlrsResult<u32> {
         if idx >= self.n_fields() as usize {
-            Err(JlrsError::OutOfBounds {
+            Err(AccessError::OutOfBoundsField {
                 idx,
                 n_fields: self.n_fields() as usize,
                 value_type: self.display_string_or(CANNOT_DISPLAY_TYPE),
@@ -394,7 +394,7 @@ impl<'scope> DataType<'scope> {
     /// Returns the offset where the field at position `idx` is stored.
     pub fn field_offset(self, idx: usize) -> JlrsResult<u32> {
         if idx >= self.n_fields() as usize {
-            Err(JlrsError::OutOfBounds {
+            Err(AccessError::OutOfBoundsField {
                 idx,
                 n_fields: self.n_fields() as usize,
                 value_type: self.display_string_or(CANNOT_DISPLAY_TYPE),
@@ -407,7 +407,7 @@ impl<'scope> DataType<'scope> {
     /// Returns true if the field at position `idx` is stored as a pointer.
     pub fn is_pointer_field(self, idx: usize) -> JlrsResult<bool> {
         if idx >= self.n_fields() as usize {
-            Err(JlrsError::OutOfBounds {
+            Err(AccessError::OutOfBoundsField {
                 idx,
                 n_fields: self.n_fields() as usize,
                 value_type: self.display_string_or(CANNOT_DISPLAY_TYPE),
@@ -421,7 +421,7 @@ impl<'scope> DataType<'scope> {
     /// Returns true if the field at position `idx` is an atomic field.
     pub fn is_atomic_field(self, idx: usize) -> JlrsResult<bool> {
         if idx >= self.n_fields() as usize {
-            Err(JlrsError::OutOfBounds {
+            Err(AccessError::OutOfBoundsField {
                 idx,
                 n_fields: self.n_fields() as usize,
                 value_type: self.display_string_or(CANNOT_DISPLAY_TYPE),
@@ -435,7 +435,7 @@ impl<'scope> DataType<'scope> {
     /// Returns true if the field at position `idx` is a constant field.
     pub fn is_const_field(self, idx: usize) -> JlrsResult<bool> {
         if idx >= self.n_fields() as usize {
-            Err(JlrsError::OutOfBounds {
+            Err(AccessError::OutOfBoundsField {
                 idx,
                 n_fields: self.n_fields() as usize,
                 value_type: self.display_string_or(CANNOT_DISPLAY_TYPE),
@@ -541,16 +541,11 @@ impl<'scope> DataType<'scope> {
         S: PartialScope<'target>,
         V: AsRef<[Value<'value, 'data>]>,
     {
-        unsafe {
-            // TODO: Check if Julia crashes or throws an error when these checks fail
-            if !self.is::<Concrete>() {
-                Err(JlrsError::NotConcrete {
-                    value_type: self.display_string_or(CANNOT_DISPLAY_TYPE),
-                })?;
-            }
+        use crate::error::InstantiationError;
 
+        unsafe {
             if self.is::<Array>() {
-                Err(JlrsError::ArrayNotSupported)?;
+                Err(InstantiationError::ArrayNotSupported)?;
             }
 
             let values = values.as_ref();
@@ -588,15 +583,11 @@ impl<'scope> DataType<'scope> {
     where
         V: AsRef<[Value<'value, 'data>]>,
     {
-        unsafe {
-            if !self.is::<Concrete>() {
-                Err(JlrsError::NotConcrete {
-                    value_type: self.display_string_or(CANNOT_DISPLAY_TYPE),
-                })?;
-            }
+        use crate::error::InstantiationError;
 
+        unsafe {
             if self.is::<Array>() {
-                Err(JlrsError::ArrayNotSupported)?;
+                Err(InstantiationError::ArrayNotSupported)?;
             }
 
             let values = values.as_ref();
@@ -671,12 +662,6 @@ impl<'scope> DataType<'scope> {
     }
 
     pub fn has_pointer_fields(self) -> JlrsResult<bool> {
-        if !self.is::<Concrete>() {
-            Err(JlrsError::NotConcrete {
-                value_type: self.display_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
-
         unsafe {
             Ok(self
                 .layout()

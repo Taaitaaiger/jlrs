@@ -420,18 +420,21 @@ impl PersistentTask for AccumulatorTask {
     ) -> JlrsResult<Value<'static, 'static>> {
         unsafe {
             let (output, frame) = frame.split()?;
+            let init_value = self.init_value;
             frame
-                .async_scope(|frame| async move {
-                    // A nested scope is used to only root a single value in the frame provided to
-                    // init, rather than two.
-                    let func = Module::main(global)
-                        .global_ref("MutFloat64")?
-                        .value_unchecked();
-                    let init_v = Value::new(&mut *frame, self.init_value)?;
+                .async_scope(|frame| {
+                    async move {
+                        // A nested scope is used to only root a single value in the frame provided to
+                        // init, rather than two.
+                        let func = Module::main(global)
+                            .global_ref("MutFloat64")?
+                            .value_unchecked();
+                        let init_v = Value::new(&mut *frame, init_value)?;
 
-                    let os = output.into_scope(frame);
+                        let os = output.into_scope(frame);
 
-                    func.call1(os, init_v)
+                        func.call1(os, init_v)
+                    }
                 })
                 .await?
                 .into_jlrs_result()

@@ -22,7 +22,7 @@
 
 use crate::{
     convert::into_julia::IntoJulia,
-    error::{JlrsError, JlrsResult, CANNOT_DISPLAY_TYPE},
+    error::{AccessError, ArrayLayoutError, InstantiationError, JlrsResult, CANNOT_DISPLAY_TYPE},
     impl_debug,
     layout::{typecheck::Typecheck, valid_layout::ValidLayout},
     memory::{
@@ -108,7 +108,7 @@ pub mod dimensions;
 pub struct Array<'scope, 'data>(
     NonNull<jl_array_t>,
     PhantomData<&'scope ()>,
-    PhantomData<&'data ()>,
+    PhantomData<fn(&'data mut ())>,
 );
 
 impl<'data> Array<'_, 'data> {
@@ -341,7 +341,7 @@ impl<'data> Array<'_, 'data> {
         F: Frame<'current>,
     {
         if dims.size() != data.len() {
-            Err(JlrsError::ArraySizeMismatch {
+            Err(InstantiationError::ArraySizeMismatch {
                 vec_size: data.len(),
                 dim_size: dims.size(),
             })?;
@@ -397,6 +397,66 @@ impl<'data> Array<'_, 'data> {
     /// the data is borrowed from Rust, operations that can change the size of the array (e.g.
     /// `push!`) will fail.
     ///
+    /// If the array size is too large, Julia will throw an error. This error is caught and
+    /// returned.
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    pub fn from_pinned_slice<'target, 'current, 'pin, T, D, S, F>(
+        scope: S,
+        mut data: std::pin::Pin<&'data mut [T]>,
+        dims: D,
+    ) -> JlrsResult<JuliaResult<'target, 'pin, Array<'target, 'pin>>>
+    where
+        T: IntoJulia + Unpin,
+        D: Dims,
+        S: Scope<'target, 'current, F>,
+        F: Frame<'current>,
+    {
+        use std::ops::DerefMut;
+
+        if dims.size() != data.len() {
+            Err(InstantiationError::ArraySizeMismatch {
+                vec_size: data.len(),
+                dim_size: dims.size(),
+            })?;
+        }
+
+        let data = (&mut data).deref_mut().as_mut_ptr();
+
+        let (output, frame) = scope.split()?;
+        frame.scope(|frame| unsafe {
+            let global = frame.global();
+            let array_type =
+                jl_apply_array_type(T::julia_type(global).ptr().cast(), dims.n_dimensions());
+            let _: Value = (&mut *frame).value(NonNull::new_unchecked(array_type), Private)?;
+
+            let array = match dims.n_dimensions() {
+                1 => jlrs_ptr_to_array_1d(array_type, data.cast(), dims.n_elements(0), 0),
+                n if n <= 8 => {
+                    let tuple = small_dim_tuple(frame, dims)?;
+                    jlrs_ptr_to_array(array_type, data.cast(), tuple.unwrap(Private), 0)
+                }
+                _ => {
+                    let tuple = large_dim_tuple(frame, dims)?;
+                    jlrs_ptr_to_array(array_type, data.cast(), tuple.unwrap(Private), 0)
+                }
+            };
+
+            let res = if array.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
+                Err(NonNull::new_unchecked(array.data))
+            } else {
+                Ok(NonNull::new_unchecked(array.data.cast::<jl_array_t>()))
+            };
+
+            output.call_result(res, Private)
+        })
+    }
+
+    /// Create a new n-dimensional Julia array of dimensions `dims` that borrows data from Rust.
+    ///
+    /// This method can only be used in combination with types that implement `IntoJulia`. Because
+    /// the data is borrowed from Rust, operations that can change the size of the array (e.g.
+    /// `push!`) will fail.
+    ///
     /// Safety: If the array size is too large, Julia will throw an error. This error is not
     /// caught, which is UB from a `ccall`ed function.
     pub unsafe fn from_slice_unchecked<'target, 'current, T, D, S, F>(
@@ -411,7 +471,7 @@ impl<'data> Array<'_, 'data> {
         F: Frame<'current>,
     {
         if dims.size() != data.len() {
-            Err(JlrsError::ArraySizeMismatch {
+            Err(InstantiationError::ArraySizeMismatch {
                 vec_size: data.len(),
                 dim_size: dims.size(),
             })?;
@@ -474,7 +534,7 @@ impl<'data> Array<'_, 'data> {
         F: Frame<'current>,
     {
         if dims.size() != data.len() {
-            Err(JlrsError::ArraySizeMismatch {
+            Err(InstantiationError::ArraySizeMismatch {
                 vec_size: data.len(),
                 dim_size: dims.size(),
             })?;
@@ -552,7 +612,7 @@ impl<'data> Array<'_, 'data> {
         F: Frame<'current>,
     {
         if dims.size() != data.len() {
-            Err(JlrsError::ArraySizeMismatch {
+            Err(InstantiationError::ArraySizeMismatch {
                 vec_size: data.len(),
                 dim_size: dims.size(),
             })?;
@@ -717,8 +777,8 @@ impl<'scope, 'data> Array<'scope, 'data> {
                 ))
             }
         } else {
-            Err(JlrsError::WrongType {
-                value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            Err(AccessError::InvalidLayout {
+                value_type_str: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
             })?
         }
     }
@@ -736,7 +796,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
 
     /// Copy the data of an inline array to Rust.
     ///
-    /// Returns `JlrsError::NotInline` if the data is not stored inline or `JlrsError::WrongType`
+    /// Returns `ArrayLayoutError::NotInline` if the data is not stored inline or `AccessError::InvalidLayout`
     /// if the type of the elements is incorrect.
     pub fn copy_inline_data<'frame, T, F>(self, _: &F) -> JlrsResult<CopiedArray<T>>
     where
@@ -744,13 +804,13 @@ impl<'scope, 'data> Array<'scope, 'data> {
         F: Frame<'frame>,
     {
         if !self.contains::<T>() {
-            Err(JlrsError::WrongType {
-                value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            Err(AccessError::InvalidLayout {
+                value_type_str: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
 
         if !self.is_inline_array() {
-            Err(JlrsError::NotInline {
+            Err(ArrayLayoutError::NotInline {
                 element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
@@ -773,8 +833,8 @@ impl<'scope, 'data> Array<'scope, 'data> {
     ///
     /// You can borrow data from multiple arrays at the same time.
     ///
-    /// Returns `JlrsError::NotInline` if the data is not stored inline, `JlrsError::HasPointers`
-    /// if the type is not an `isbits` type, or `JlrsError::WrongType` if `T` is not a valid
+    /// Returns `ArrayLayoutError::NotInline` if the data is not stored inline, `ArrayLayoutError::NotBits`
+    /// if the type is not an `isbits` type, or `AccessError::InvalidLayout` if `T` is not a valid
     /// layout for the array elements.
     pub fn bits_data<'borrow, 'frame, T, F>(
         self,
@@ -792,8 +852,8 @@ impl<'scope, 'data> Array<'scope, 'data> {
     ///
     /// This method can be used to gain mutable access to the contents of a single array.
     ///
-    /// Returns `JlrsError::NotInline` if the data is not stored inline, `JlrsError::HasPointers`
-    /// if the type is not an `isbits` type, or `JlrsError::WrongType` if `T` is not a valid
+    /// Returns `ArrayLayoutError::NotInline` if the data is not stored inline, `ArrayLayoutError::NotBits`
+    /// if the type is not an `isbits` type, or `AccessError::InvalidLayout` if `T` is not a valid
     /// layout for the array elements.
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
@@ -815,8 +875,8 @@ impl<'scope, 'data> Array<'scope, 'data> {
     /// Unlike [`Array::bits_data_mut`], this method can be used to gain mutable access to the
     /// contents of multiple arrays simultaneously.
     ///
-    /// Returns `JlrsError::NotInline` if the data is not stored inline, `JlrsError::HasPointers`
-    /// if the type is not an `isbits` type, or `JlrsError::WrongType` if `T` is not a valid
+    /// Returns `ArrayLayoutError::NotInline` if the data is not stored inline, `ArrayLayoutError::NotBits`
+    /// if the type is not an `isbits` type, or `AccessError::InvalidLayout` if `T` is not a valid
     /// layout for the array elements.
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
@@ -838,8 +898,8 @@ impl<'scope, 'data> Array<'scope, 'data> {
     ///
     /// You can borrow data from multiple arrays at the same time.
     ///
-    /// Returns `JlrsError::NotInline` if the data is not stored inline or
-    /// `JlrsError::WrongType` if `T` is not a valid layout for the array elements.
+    /// Returns `ArrayLayoutError::NotInline` if the data is not stored inline or
+    /// `AccessError::InvalidLayout` if `T` is not a valid layout for the array elements.
     pub fn inline_data<'borrow, 'frame, T, F>(
         self,
         frame: &'borrow F,
@@ -856,8 +916,8 @@ impl<'scope, 'data> Array<'scope, 'data> {
     ///
     /// This method can be used to gain mutable access to the contents of a single array.
     ///
-    /// Returns `JlrsError::NotInline` if the data is not stored inline or
-    /// `JlrsError::WrongType` if `T` is not a valid layout for the array elements.
+    /// Returns `ArrayLayoutError::NotInline` if the data is not stored inline or
+    /// `AccessError::InvalidLayout` if `T` is not a valid layout for the array elements.
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
     /// this value is allowed.
@@ -878,8 +938,8 @@ impl<'scope, 'data> Array<'scope, 'data> {
     /// Unlike [`Array::inline_data_mut`], this method can be used to gain mutable access to the
     /// contents of multiple arrays simultaneously.
     ///
-    /// Returns `JlrsError::NotInline` if the data is not stored inline or
-    /// `JlrsError::WrongType` if `T` is not a valid layout for the array elements.
+    /// Returns `ArrayLayoutError::NotInline` if the data is not stored inline or
+    /// `AccessError::InvalidLayout` if `T` is not a valid layout for the array elements.
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
     /// this value is allowed. This method can create multiple mutable references to the same
@@ -900,7 +960,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     ///
     /// You can borrow data from multiple arrays at the same time.
     ///
-    /// Returns `JlrsError::Inline` if the data is stored inline or `JlrsError::WrongType` if `T`
+    /// Returns `ArrayLayoutError::NotPointer` if the data is stored inline or `AccessError::InvalidLayout` if `T`
     /// is not a valid layout for the array elements.
     pub fn wrapper_data<'borrow, 'frame, T, F>(
         self,
@@ -918,7 +978,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     ///
     /// This method can be used to gain mutable access to the contents of a single array.
     ///
-    /// Returns `JlrsError::Inline` if the data is stored inline or `JlrsError::WrongType` if `T`
+    /// Returns `ArrayLayoutError::NotPointer` if the data is stored inline or `AccessError::InvalidLayout` if `T`
     /// is not a valid layout for the array elements.
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
@@ -940,7 +1000,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     /// Unlike [`Array::wrapper_data_mut`], this method can be used to gain mutable access to the
     /// contents of multiple arrays simultaneously.
     ///
-    /// Returns `JlrsError::Inline` if the data is stored inline or `JlrsError::WrongType` if `T`
+    /// Returns `ArrayLayoutError::NotPointer` if the data is stored inline or `AccessError::InvalidLayout` if `T`
     /// is not a valid layout for the array elements.
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
@@ -962,7 +1022,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     ///
     /// You can borrow data from multiple arrays at the same time.
     ///
-    /// Returns `JlrsError::Inline` if the data is stored inline.
+    /// Returns `ArrayLayoutError::NotPointer` if the data is stored inline.
     pub fn value_data<'borrow, 'frame, F>(
         self,
         frame: &'borrow F,
@@ -986,7 +1046,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     ///
     /// This method can be used to gain mutable access to the contents of a single array.
     ///
-    /// Returns `JlrsError::Inline` if the data is stored inline.
+    /// Returns `ArrayLayoutError::NotPointer` if the data is stored inline.
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
     /// this value is allowed.
@@ -1014,7 +1074,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     /// Unlike [`Array::value_data_mut`], this method can be used to gain mutable access to the
     /// contents of multiple arrays simultaneously.
     ///
-    /// Returns `JlrsError::Inline` if the data is stored inline.
+    /// Returns `ArrayLayoutError::NotPointer` if the data is stored inline.
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
     /// this value is allowed. This method can create multiple mutable references to the same
@@ -1042,7 +1102,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     ///
     /// You can borrow data from multiple arrays at the same time.
     ///
-    /// Returns `JlrsError::NotAUnionArray` if the data is not stored as a bits union.
+    /// Returns `ArrayLayoutError::NotUnion` if the data is not stored as a bits union.
     pub fn union_data<'borrow, 'frame, F>(
         self,
         frame: &'borrow F,
@@ -1058,7 +1118,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     ///
     /// This method can be used to gain mutable access to the contents of a single array.
     ///
-    /// Returns `JlrsError::NotAUnionArray` if the data is not stored as a bits union.
+    /// Returns `ArrayLayoutError::NotUnion` if the data is not stored as a bits union.
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
     /// this value is allowed.
@@ -1078,7 +1138,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     /// Unlike [`Array::union_data_mut`], this method can be used to gain mutable access to the
     /// contents of multiple arrays simultaneously.
     ///
-    /// Returns `JlrsError::NotAUnionArray` if the data is not stored as a bits union.
+    /// Returns `ArrayLayoutError::NotUnion` if the data is not stored as a bits union.
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
     /// this value is allowed. This method can create multiple mutable references to the same
@@ -1222,7 +1282,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
         T: ValidLayout,
     {
         if !self.is_inline_array() {
-            Err(JlrsError::NotInline {
+            Err(ArrayLayoutError::NotInline {
                 element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
@@ -1232,14 +1292,14 @@ impl<'scope, 'data> Array<'scope, 'data> {
                 .cast_unchecked::<DataType>()
                 .has_pointer_fields()?
         } {
-            Err(JlrsError::HasPointers {
+            Err(ArrayLayoutError::NotBits {
                 element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
 
         if !self.contains::<T>() {
-            Err(JlrsError::WrongType {
-                value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            Err(AccessError::InvalidLayout {
+                value_type_str: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
 
@@ -1251,14 +1311,14 @@ impl<'scope, 'data> Array<'scope, 'data> {
         T: ValidLayout,
     {
         if !self.is_inline_array() {
-            Err(JlrsError::NotInline {
+            Err(ArrayLayoutError::NotInline {
                 element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
 
         if !self.contains::<T>() {
-            Err(JlrsError::WrongType {
-                value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            Err(AccessError::InvalidLayout {
+                value_type_str: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
 
@@ -1270,14 +1330,14 @@ impl<'scope, 'data> Array<'scope, 'data> {
         T: WrapperRef<'fr, 'da>,
     {
         if !self.is_value_array() {
-            Err(JlrsError::Inline {
+            Err(ArrayLayoutError::NotPointer {
                 element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
 
         if !self.contains::<T>() {
-            Err(JlrsError::WrongType {
-                value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            Err(AccessError::InvalidLayout {
+                value_type_str: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
 
@@ -1286,9 +1346,8 @@ impl<'scope, 'data> Array<'scope, 'data> {
 
     fn ensure_union(self) -> JlrsResult<()> {
         if !self.is_union_array() {
-            let elem_ty = self.element_type().display_string_or(CANNOT_DISPLAY_TYPE);
-            let inline = !self.is_value_array();
-            Err(JlrsError::NotAUnionArray { elem_ty, inline })?
+            let element_type = self.element_type().display_string_or(CANNOT_DISPLAY_TYPE);
+            Err(ArrayLayoutError::NotUnion { element_type })?
         }
 
         Ok(())
@@ -1650,7 +1709,7 @@ where
     {
         if !T::valid_layout(ty) {
             let value_type_str = ty.display_string_or(CANNOT_DISPLAY_TYPE).into();
-            Err(JlrsError::InvalidLayout { value_type_str })?;
+            Err(AccessError::InvalidLayout { value_type_str })?;
         }
 
         match Array::new_for(scope, dims, ty)? {
@@ -1678,7 +1737,7 @@ where
     {
         if !T::valid_layout(ty) {
             let value_type_str = ty.display_string_or(CANNOT_DISPLAY_TYPE).into();
-            Err(JlrsError::InvalidLayout { value_type_str })?;
+            Err(AccessError::InvalidLayout { value_type_str })?;
         }
 
         Ok(Array::new_for_unchecked(scope, dims, ty)?.as_typed_unchecked())
@@ -1771,14 +1830,14 @@ where
 
     /// Copy the data of an inline array to Rust.
     ///
-    /// Returns `JlrsError::NotInline` if the data is not stored inline or `JlrsError::WrongType`
+    /// Returns `ArrayLayoutError::NotInline` if the data is not stored inline or `AccessError::InvalidLayout`
     /// if the type of the elements is incorrect.
     pub fn copy_inline_data<'frame, F>(self, _: &F) -> JlrsResult<CopiedArray<T>>
     where
         F: Frame<'frame>,
     {
         if !self.is_inline_array() {
-            Err(JlrsError::NotInline {
+            Err(ArrayLayoutError::NotInline {
                 element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
@@ -1799,7 +1858,7 @@ where
 
     fn ensure_bits(self) -> JlrsResult<()> {
         if !self.is_inline_array() {
-            Err(JlrsError::NotInline {
+            Err(ArrayLayoutError::NotInline {
                 element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
@@ -1809,7 +1868,7 @@ where
                 .cast_unchecked::<DataType>()
                 .has_pointer_fields()?
         } {
-            Err(JlrsError::HasPointers {
+            Err(ArrayLayoutError::NotBits {
                 element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
@@ -1819,7 +1878,7 @@ where
 
     fn ensure_inline(self) -> JlrsResult<()> {
         if !self.is_inline_array() {
-            Err(JlrsError::NotInline {
+            Err(ArrayLayoutError::NotInline {
                 element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
@@ -1831,8 +1890,8 @@ where
     ///
     /// You can borrow data from multiple arrays at the same time.
     ///
-    /// Returns `JlrsError::NotInline` if the data is not stored inline, `JlrsError::HasPointers`
-    /// if the type is not an `isbits` type, or `JlrsError::WrongType` if `T` is not a valid
+    /// Returns `ArrayLayoutError::NotInline` if the data is not stored inline, `ArrayLayoutError::NotBits`
+    /// if the type is not an `isbits` type, or `AccessError::InvalidLayout` if `T` is not a valid
     /// layout for the array elements.
     pub fn bits_data<'borrow, 'frame, F>(
         self,
@@ -1850,8 +1909,8 @@ where
     ///
     /// This method can be used to gain mutable access to the contents of a single array.
     ///
-    /// Returns `JlrsError::NotInline` if the data is not stored inline, `JlrsError::HasPointers`
-    /// if the type is not an `isbits` type, or `JlrsError::WrongType` if `T` is not a valid
+    /// Returns `ArrayLayoutError::NotInline` if the data is not stored inline, `ArrayLayoutError::NotBits`
+    /// if the type is not an `isbits` type, or `AccessError::InvalidLayout` if `T` is not a valid
     /// layout for the array elements.
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
@@ -1873,8 +1932,8 @@ where
     /// Unlike [`Array::bits_data_mut`], this method can be used to gain mutable access to the
     /// contents of multiple arrays simultaneously.
     ///
-    /// Returns `JlrsError::NotInline` if the data is not stored inline, `JlrsError::HasPointers`
-    /// if the type is not an `isbits` type, or `JlrsError::WrongType` if `T` is not a valid
+    /// Returns `ArrayLayoutError::NotInline` if the data is not stored inline, `ArrayLayoutError::NotBits`
+    /// if the type is not an `isbits` type, or `AccessError::InvalidLayout` if `T` is not a valid
     /// layout for the array elements.
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
@@ -1896,8 +1955,8 @@ where
     ///
     /// You can borrow data from multiple arrays at the same time.
     ///
-    /// Returns `JlrsError::NotInline` if the data is not stored inline or
-    /// `JlrsError::WrongType` if `T` is not a valid layout for the array elements.
+    /// Returns `ArrayLayoutError::NotInline` if the data is not stored inline or
+    /// `AccessError::InvalidLayout` if `T` is not a valid layout for the array elements.
     pub fn inline_data<'borrow, 'frame, F>(
         self,
         frame: &'borrow F,
@@ -1914,8 +1973,8 @@ where
     ///
     /// This method can be used to gain mutable access to the contents of a single array.
     ///
-    /// Returns `JlrsError::NotInline` if the data is not stored inline or
-    /// `JlrsError::WrongType` if `T` is not a valid layout for the array elements.
+    /// Returns `ArrayLayoutError::NotInline` if the data is not stored inline or
+    /// `AccessError::InvalidLayout` if `T` is not a valid layout for the array elements.
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
     /// this value is allowed.
@@ -1936,8 +1995,8 @@ where
     /// Unlike [`Array::inline_data_mut`], this method can be used to gain mutable access to the
     /// contents of multiple arrays simultaneously.
     ///
-    /// Returns `JlrsError::NotInline` if the data is not stored inline or
-    /// `JlrsError::WrongType` if `T` is not a valid layout for the array elements.
+    /// Returns `ArrayLayoutError::NotInline` if the data is not stored inline or
+    /// `AccessError::InvalidLayout` if `T` is not a valid layout for the array elements.
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
     /// this value is allowed. This method can create multiple mutable references to the same
@@ -1963,7 +2022,7 @@ where
 impl<'scope, 'data, T: WrapperRef<'scope, 'data> + ValidLayout> TypedArray<'scope, 'data, T> {
     fn ensure_ptr(self) -> JlrsResult<()> {
         if !self.as_array().is_value_array() {
-            Err(JlrsError::Inline {
+            Err(ArrayLayoutError::NotPointer {
                 element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
@@ -1975,7 +2034,7 @@ impl<'scope, 'data, T: WrapperRef<'scope, 'data> + ValidLayout> TypedArray<'scop
     ///
     /// You can borrow data from multiple arrays at the same time.
     ///
-    /// Returns `JlrsError::Inline` if the data is stored inline or `JlrsError::WrongType` if `T`
+    /// Returns `ArrayLayoutError::NotPointer` if the data is stored inline or `AccessError::InvalidLayout` if `T`
     /// is not a valid layout for the array elements.
     pub fn wrapper_data<'borrow, 'frame, F>(
         self,
@@ -1992,7 +2051,7 @@ impl<'scope, 'data, T: WrapperRef<'scope, 'data> + ValidLayout> TypedArray<'scop
     ///
     /// This method can be used to gain mutable access to the contents of a single array.
     ///
-    /// Returns `JlrsError::Inline` if the data is stored inline or `JlrsError::WrongType` if `T`
+    /// Returns `ArrayLayoutError::NotPointer` if the data is stored inline or `AccessError::InvalidLayout` if `T`
     /// is not a valid layout for the array elements.
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
@@ -2013,7 +2072,7 @@ impl<'scope, 'data, T: WrapperRef<'scope, 'data> + ValidLayout> TypedArray<'scop
     /// Unlike [`Array::wrapper_data_mut`], this method can be used to gain mutable access to the
     /// contents of multiple arrays simultaneously.
     ///
-    /// Returns `JlrsError::Inline` if the data is stored inline or `JlrsError::WrongType` if `T`
+    /// Returns `ArrayLayoutError::NotPointer` if the data is stored inline or `AccessError::InvalidLayout` if `T`
     /// is not a valid layout for the array elements.
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
@@ -2034,7 +2093,7 @@ impl<'scope, 'data, T: WrapperRef<'scope, 'data> + ValidLayout> TypedArray<'scop
     ///
     /// You can borrow data from multiple arrays at the same time.
     ///
-    /// Returns `JlrsError::Inline` if the data is stored inline.
+    /// Returns `ArrayLayoutError::NotPointer` if the data is stored inline.
     pub fn value_data<'borrow, 'frame, F>(
         self,
         frame: &'borrow F,
@@ -2058,7 +2117,7 @@ impl<'scope, 'data, T: WrapperRef<'scope, 'data> + ValidLayout> TypedArray<'scop
     ///
     /// This method can be used to gain mutable access to the contents of a single array.
     ///
-    /// Returns `JlrsError::Inline` if the data is stored inline.
+    /// Returns `ArrayLayoutError::NotPointer` if the data is stored inline.
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
     /// this value is allowed.
@@ -2086,7 +2145,7 @@ impl<'scope, 'data, T: WrapperRef<'scope, 'data> + ValidLayout> TypedArray<'scop
     /// Unlike [`Array::value_data_mut`], this method can be used to gain mutable access to the
     /// contents of multiple arrays simultaneously.
     ///
-    /// Returns `JlrsError::Inline` if the data is stored inline.
+    /// Returns `ArrayLayoutError::NotPointer` if the data is stored inline.
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
     /// this value is allowed. This method can create multiple mutable references to the same
@@ -2393,9 +2452,7 @@ where
     let tuple_type = jl_apply_tuple_type_v(elem_types.cast(), n);
     let tuple = jl_new_struct_uninit(tuple_type);
     let dims = dims.into_dimensions();
-    let v: Value = frame
-        .push_root(NonNull::new_unchecked(tuple), Private)
-        .map_err(JlrsError::alloc_error)?;
+    let v: Value = frame.push_root(NonNull::new_unchecked(tuple), Private)?;
 
     let usize_ptr: *mut usize = v.unwrap(Private).cast();
     std::ptr::copy_nonoverlapping(dims.as_slice().as_ptr(), usize_ptr, n);
@@ -2416,9 +2473,7 @@ where
     let mut elem_types = vec![usize::julia_type(global); n];
     let tuple_type = jl_apply_tuple_type_v(elem_types.as_mut_ptr().cast(), n);
     let tuple = jl_new_struct_uninit(tuple_type);
-    let v: Value = frame
-        .push_root(NonNull::new_unchecked(tuple), Private)
-        .map_err(JlrsError::alloc_error)?;
+    let v: Value = frame.push_root(NonNull::new_unchecked(tuple), Private)?;
 
     let usize_ptr: *mut usize = v.unwrap(Private).cast();
     let dims = dims.into_dimensions();
@@ -2472,7 +2527,7 @@ where
             let ptr = v.unwrap_non_null(Private);
             scope.value(ptr, Private)
         } else {
-            Err(crate::error::JlrsError::UndefRef)?
+            Err(crate::error::AccessError::UndefRef)?
         }
     }
 }

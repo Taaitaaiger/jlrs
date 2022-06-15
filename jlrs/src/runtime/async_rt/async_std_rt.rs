@@ -90,17 +90,15 @@ impl<M: Send + Sync + 'static> ChannelReceiver<M> for Receiver<M> {
     async fn recv(&mut self) -> JlrsResult<M> {
         match (&*self).recv().await {
             Ok(m) => Ok(m),
-            Err(_) => Err(JlrsError::Exception {
-                msg: String::from("Channel was closed"),
-            })?,
+            Err(_) => JlrsError::exception_error("Channel was closed".into())?,
         }
     }
 }
 
 #[async_trait]
 impl<M: Send + Sync + 'static> OneshotSender<M> for Sender<M> {
-    async fn send(self: Box<Self>, msg: M) {
-        (&*self).send(msg).await.ok();
+    async fn send(self, msg: M) {
+        (&self).send(msg).await.ok();
     }
 }
 

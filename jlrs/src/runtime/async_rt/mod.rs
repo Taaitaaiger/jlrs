@@ -32,7 +32,7 @@ use crate::{
         task::{AsyncTask, PersistentTask},
     },
     call::Call,
-    error::{JlrsError, JlrsResult},
+    error::{IOError, JlrsError, JlrsResult, RuntimeError},
     memory::{frame::GcFrame, global::Global, mode::Async, stack_page::AsyncStackPage},
     runtime::{builder::AsyncRuntimeBuilder, init_jlrs, INIT},
     wrappers::ptr::{module::Module, string::JuliaString, value::Value, Wrapper},
@@ -51,7 +51,6 @@ use std::{
     collections::VecDeque,
     ffi::c_void,
     fmt,
-    io::{Error as IOError, ErrorKind},
     marker::PhantomData,
     num::NonZeroUsize,
     path::{Path, PathBuf},
@@ -178,7 +177,7 @@ where
         self.sender
             .send(MessageInner::Task(boxed, sender).wrap())
             .await
-            .map_err(|_| JlrsError::ChannelClosed)?;
+            .map_err(|_| RuntimeError::ChannelClosed)?;
 
         Ok(())
     }
@@ -199,8 +198,8 @@ where
         self.sender
             .try_send(MessageInner::Task(boxed, sender).wrap())
             .map_err(|e| match e {
-                TrySendError::Full(_) => JlrsError::ChannelFull,
-                TrySendError::Closed(_) => JlrsError::ChannelClosed,
+                TrySendError::Full(_) => RuntimeError::ChannelFull,
+                TrySendError::Closed(_) => RuntimeError::ChannelClosed,
             })?;
 
         Ok(())
@@ -222,7 +221,7 @@ where
         self.sender
             .send(MessageInner::Task(boxed, sender).wrap())
             .await
-            .map_err(|_| JlrsError::ChannelClosed)?;
+            .map_err(|_| RuntimeError::ChannelClosed)?;
 
         Ok(())
     }
@@ -243,8 +242,8 @@ where
         self.sender
             .try_send(MessageInner::Task(boxed, sender).wrap())
             .map_err(|e| match e {
-                TrySendError::Full(_) => JlrsError::ChannelFull,
-                TrySendError::Closed(_) => JlrsError::ChannelClosed,
+                TrySendError::Full(_) => RuntimeError::ChannelFull,
+                TrySendError::Closed(_) => RuntimeError::ChannelClosed,
             })?;
 
         Ok(())
@@ -272,7 +271,7 @@ where
         self.sender
             .send(MessageInner::BlockingTask(boxed).wrap())
             .await
-            .map_err(|_| JlrsError::ChannelClosed)?;
+            .map_err(|_| RuntimeError::ChannelClosed)?;
 
         Ok(())
     }
@@ -299,8 +298,8 @@ where
         self.sender
             .try_send(MessageInner::BlockingTask(boxed).wrap())
             .map_err(|e| match e {
-                TrySendError::Full(_) => JlrsError::ChannelFull,
-                TrySendError::Closed(_) => JlrsError::ChannelClosed,
+                TrySendError::Full(_) => RuntimeError::ChannelFull,
+                TrySendError::Closed(_) => RuntimeError::ChannelClosed,
             })?;
 
         Ok(())
@@ -330,7 +329,7 @@ where
         self.sender
             .send(MessageInner::BlockingTask(boxed).wrap())
             .await
-            .map_err(|_| JlrsError::ChannelClosed)?;
+            .map_err(|_| RuntimeError::ChannelClosed)?;
 
         Ok(())
     }
@@ -359,8 +358,8 @@ where
         self.sender
             .try_send(MessageInner::BlockingTask(boxed).wrap())
             .map_err(|e| match e {
-                TrySendError::Full(_) => JlrsError::ChannelFull,
-                TrySendError::Closed(_) => JlrsError::ChannelClosed,
+                TrySendError::Full(_) => RuntimeError::ChannelFull,
+                TrySendError::Closed(_) => RuntimeError::ChannelClosed,
             })?;
 
         Ok(())
@@ -384,7 +383,7 @@ where
         self.sender
             .send(MessageInner::Task(boxed, rt_sender).wrap())
             .await
-            .map_err(|_| JlrsError::ChannelClosed)?;
+            .map_err(|_| RuntimeError::ChannelClosed)?;
 
         Ok(PersistentHandle::new(Arc::new(sender)))
     }
@@ -408,8 +407,8 @@ where
         self.sender
             .try_send(MessageInner::Task(boxed, rt_sender).wrap())
             .map_err(|e| match e {
-                TrySendError::Full(_) => JlrsError::ChannelFull,
-                TrySendError::Closed(_) => JlrsError::ChannelClosed,
+                TrySendError::Full(_) => RuntimeError::ChannelFull,
+                TrySendError::Closed(_) => RuntimeError::ChannelClosed,
             })?;
 
         Ok(PersistentHandle::new(Arc::new(sender)))
@@ -431,7 +430,7 @@ where
         self.sender
             .send(MessageInner::Task(boxed, sender).wrap())
             .await
-            .map_err(|_| JlrsError::ChannelClosed)?;
+            .map_err(|_| RuntimeError::ChannelClosed)?;
 
         Ok(())
     }
@@ -452,8 +451,8 @@ where
         self.sender
             .try_send(MessageInner::Task(boxed, sender).wrap())
             .map_err(|e| match e {
-                TrySendError::Full(_) => JlrsError::ChannelFull,
-                TrySendError::Closed(_) => JlrsError::ChannelClosed,
+                TrySendError::Full(_) => RuntimeError::ChannelFull,
+                TrySendError::Closed(_) => RuntimeError::ChannelClosed,
             })?;
 
         Ok(())
@@ -473,7 +472,7 @@ where
         O: OneshotSender<JlrsResult<()>>,
     {
         if !path.as_ref().exists() {
-            Err(JlrsError::IncludeNotFound {
+            Err(IOError::NotFound {
                 path: path.as_ref().to_string_lossy().into(),
             })?
         }
@@ -481,7 +480,7 @@ where
         self.sender
             .send(MessageInner::Include(path.as_ref().to_path_buf(), Box::new(res_sender)).wrap())
             .await
-            .map_err(|_| JlrsError::ChannelClosed)?;
+            .map_err(|_| RuntimeError::ChannelClosed)?;
 
         Ok(())
     }
@@ -500,7 +499,7 @@ where
         O: OneshotSender<JlrsResult<()>>,
     {
         if !path.as_ref().exists() {
-            Err(JlrsError::IncludeNotFound {
+            Err(IOError::NotFound {
                 path: path.as_ref().to_string_lossy().into(),
             })?
         }
@@ -510,8 +509,8 @@ where
                 MessageInner::Include(path.as_ref().to_path_buf(), Box::new(res_sender)).wrap(),
             )
             .map_err(|e| match e {
-                TrySendError::Full(_) => JlrsError::ChannelFull,
-                TrySendError::Closed(_) => JlrsError::ChannelClosed,
+                TrySendError::Full(_) => RuntimeError::ChannelFull,
+                TrySendError::Closed(_) => RuntimeError::ChannelClosed,
             })?;
 
         Ok(())
@@ -531,7 +530,7 @@ where
         self.sender
             .send(MessageInner::ErrorColor(enable, Box::new(res_sender)).wrap())
             .await
-            .map_err(|_| JlrsError::ChannelClosed)?;
+            .map_err(|_| RuntimeError::ChannelClosed)?;
 
         Ok(())
     }
@@ -550,8 +549,8 @@ where
         self.sender
             .try_send(MessageInner::ErrorColor(enable, Box::new(res_sender)).wrap())
             .map_err(|e| match e {
-                TrySendError::Full(_) => JlrsError::ChannelFull,
-                TrySendError::Closed(_) => JlrsError::ChannelClosed,
+                TrySendError::Full(_) => RuntimeError::ChannelFull,
+                TrySendError::Closed(_) => RuntimeError::ChannelClosed,
             })?;
 
         Ok(())
@@ -601,7 +600,7 @@ where
         R::block_on(async {
             unsafe {
                 if jl_is_initialized() != 0 || INIT.swap(true, Ordering::SeqCst) {
-                    return Err(JlrsError::AlreadyInitialized.into());
+                    Err(RuntimeError::AlreadyInitialized)?;
                 }
 
                 #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
@@ -618,13 +617,17 @@ where
                     let image_path_str = image_path.to_string_lossy().to_string();
 
                     if !julia_bindir.exists() {
-                        let io_err = IOError::new(ErrorKind::NotFound, julia_bindir_str);
-                        return Err(JlrsError::other(io_err))?;
+                        Err(IOError::NotFound {
+                            path: julia_bindir_str,
+                        })?;
+                        unreachable!()
                     }
 
                     if !image_path.exists() {
-                        let io_err = IOError::new(ErrorKind::NotFound, image_path_str);
-                        return Err(JlrsError::other(io_err))?;
+                        Err(IOError::NotFound {
+                            path: image_path_str,
+                        })?;
+                        unreachable!()
                     }
 
                     let bindir = std::ffi::CString::new(julia_bindir_str).unwrap();
@@ -666,7 +669,7 @@ where
             for _ in 0..=max_n_tasks {
                 stacks.push(Some(AsyncStackPage::new()));
             }
-            AsyncStackPage::link_stacks(&mut stacks);
+            AsyncStackPage::link_stacks(&stacks);
             stacks.into_boxed_slice()
         };
 
@@ -787,10 +790,10 @@ impl MessageInner {
     }
 }
 
-unsafe fn call_include(stack: &mut AsyncStackPage, path: PathBuf) -> JlrsResult<()> {
+unsafe fn call_include(stack: &AsyncStackPage, path: PathBuf) -> JlrsResult<()> {
     let global = Global::new();
     let mode = Async(&stack.top[1]);
-    let raw = stack.page.as_mut();
+    let raw = stack.page.as_ref();
     let mut frame = GcFrame::new(raw, mode);
 
     match path.to_str() {
@@ -800,8 +803,8 @@ unsafe fn call_include(stack: &mut AsyncStackPage, path: PathBuf) -> JlrsResult<
                 .function_ref("include")?
                 .wrapper_unchecked()
                 .call1_unrooted(global, path.as_value())
-                .map_err(|e| JlrsError::Exception {
-                    msg: format!("Include error: {:?}", e.value_unchecked()),
+                .map_err(|e| {
+                    JlrsError::exception(format!("Include error: {:?}", e.value_unchecked()))
                 })?;
         }
         None => {}
@@ -831,11 +834,11 @@ fn set_error_color(enable: bool) -> JlrsResult<()> {
     }
 }
 
-fn set_custom_fns(stack: &mut AsyncStackPage) -> JlrsResult<()> {
+fn set_custom_fns(stack: &AsyncStackPage) -> JlrsResult<()> {
     unsafe {
         let global = Global::new();
         let mode = Async(&stack.top[1]);
-        let raw = stack.page.as_mut();
+        let raw = stack.page.as_ref();
         let mut frame = GcFrame::new(raw, mode);
 
         init_jlrs(&mut frame);
@@ -910,7 +913,7 @@ where
                 }),
             })
             .await
-            .map_err(|_| JlrsError::ChannelClosed)?;
+            .map_err(|_| RuntimeError::ChannelClosed)?;
 
         Ok(())
     }
@@ -933,8 +936,8 @@ where
                 }),
             })
             .map_err(|e| match e {
-                TrySendError::Full(_) => JlrsError::ChannelFull,
-                TrySendError::Closed(_) => JlrsError::ChannelClosed,
+                TrySendError::Full(_) => RuntimeError::ChannelFull,
+                TrySendError::Closed(_) => RuntimeError::ChannelClosed,
             })?;
 
         Ok(())

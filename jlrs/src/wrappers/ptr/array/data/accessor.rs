@@ -7,7 +7,7 @@
 use crate::error::{JuliaResult, JuliaResultRef};
 
 use crate::{
-    error::{JlrsError, JlrsResult, CANNOT_DISPLAY_TYPE},
+    error::{AccessError, JlrsResult, TypeError, CANNOT_DISPLAY_TYPE},
     layout::valid_layout::ValidLayout,
     memory::{
         frame::Frame,
@@ -370,7 +370,7 @@ impl<'borrow, 'array, 'data, T: WrapperRef<'array, 'data>>
                     .element_type()
                     .display_string_or(CANNOT_DISPLAY_TYPE);
                 let value_type_str = value.datatype().display_string_or(CANNOT_DISPLAY_TYPE);
-                Err(JlrsError::ElementTypeError {
+                Err(TypeError::IncompatibleType {
                     element_type_str,
                     value_type_str,
                 })?;
@@ -616,12 +616,12 @@ impl<'borrow, 'array, 'data, M: Mutability> UnionArrayAccessor<'borrow, 'array, 
                     let ptr = self.array.data_ptr().cast::<i8>().add(offset).cast::<T>();
                     return Ok((&*ptr).clone());
                 }
-                Err(JlrsError::WrongType {
-                    value_type: ty.display_string_or(CANNOT_DISPLAY_TYPE),
+                Err(AccessError::InvalidLayout {
+                    value_type_str: ty.display_string_or(CANNOT_DISPLAY_TYPE),
                 })?
             }
 
-            Err(JlrsError::IllegalUnionTag {
+            Err(AccessError::IllegalUnionTag {
                 union_type: elty.display_string_or(CANNOT_DISPLAY_TYPE),
                 tag: tag as usize,
             })?
@@ -644,7 +644,7 @@ impl<'borrow, 'array, 'data> UnionArrayAccessor<'borrow, 'array, 'data, Mutable<
     {
         if !T::valid_layout(ty.as_value()) {
             let value_type_str = ty.display_string_or(CANNOT_DISPLAY_TYPE).into();
-            Err(JlrsError::InvalidLayout { value_type_str })?;
+            Err(AccessError::InvalidLayout { value_type_str })?;
         }
 
         let mut tag = 0;
@@ -654,7 +654,7 @@ impl<'borrow, 'array, 'data> UnionArrayAccessor<'borrow, 'array, 'data, Mutable<
                 .element_type()
                 .display_string_or(CANNOT_DISPLAY_TYPE);
             let value_type_str = ty.display_string_or(CANNOT_DISPLAY_TYPE);
-            Err(JlrsError::ElementTypeError {
+            Err(TypeError::IncompatibleType {
                 element_type_str,
                 value_type_str,
             })?;

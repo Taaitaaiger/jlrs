@@ -26,9 +26,9 @@ impl Default for StackPage {
     }
 }
 
-impl AsMut<[Cell<*mut c_void>]> for StackPage {
-    fn as_mut(&mut self) -> &mut [Cell<*mut c_void>] {
-        self.raw.as_mut()
+impl AsRef<[Cell<*mut c_void>]> for StackPage {
+    fn as_ref(&self) -> &[Cell<*mut c_void>] {
+        self.raw.as_ref()
     }
 }
 
@@ -59,24 +59,24 @@ cfg_if::cfg_if! {
                 Box::pin(stack)
             }
 
-            pub(crate) unsafe fn link_stacks(stacks: &mut [Option<Pin<Box<Self>>>]) {
+            pub(crate) unsafe fn link_stacks(stacks: &[Option<Pin<Box<Self>>>]) {
                 cfg_if! {
                     if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
-                        for stack in stacks.iter_mut() {
-                            let stack = stack.as_mut().unwrap();
+                        for stack in stacks.iter() {
+                            let stack = stack.as_ref().unwrap_unchecked();
                             let rtls = NonNull::new_unchecked(jl_sys::jl_get_ptls_states()).as_mut();
                             stack.top[1].set(rtls.pgcstack.cast());
-                            rtls.pgcstack = stack.top[0..].as_mut_ptr().cast();
+                            rtls.pgcstack = stack.top[0..].as_ptr() as *const _ as *mut _;
                         }
                     } else {
                         use jl_sys::{jl_get_current_task, jl_task_t};
 
-                        for stack in stacks.iter_mut() {
-                            let stack = stack.as_mut().unwrap();
+                        for stack in stacks.iter() {
+                            let stack = stack.as_ref().unwrap_unchecked();
                             let task = NonNull::new_unchecked(jl_get_current_task().cast::<jl_task_t>()).as_mut();
 
                             stack.top[1].set(task.gcstack.cast());
-                            task.gcstack = stack.top[0..].as_mut_ptr().cast();
+                            task.gcstack = stack.top[0..].as_ptr() as *const _ as *mut _;
                         }
                     }
                 }

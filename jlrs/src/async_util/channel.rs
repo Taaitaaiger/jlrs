@@ -108,12 +108,19 @@ pub trait ChannelReceiver<M: Send + Sync + 'static>: 'static + Send + Sync {
 /// done the result is sent to the receiving half.
 #[async_trait]
 pub trait OneshotSender<M: Send + Sync + 'static>: 'static + Send + Sync {
-    async fn send(self: Box<Self>, msg: M);
+    async fn send(self, msg: M);
+}
+
+#[async_trait::async_trait]
+impl<M: Send + Sync + 'static> OneshotSender<M> for Box<dyn OneshotSender<M>> {
+    async fn send(self, msg: M) {
+        self.send(msg).await;
+    }
 }
 
 #[async_trait::async_trait]
 impl<M: Send + Sync + 'static> OneshotSender<M> for crossbeam_channel::Sender<M> {
-    async fn send(self: Box<Self>, msg: M) {
-        (*self).send(msg).ok();
+    async fn send(self, msg: M) {
+        (&self).send(msg).ok();
     }
 }

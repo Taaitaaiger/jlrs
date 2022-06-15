@@ -73,6 +73,7 @@ docs = ["jl-sys/docs", "full"]
 cfg-if = "1"
 jl-sys = {version = "0.16", path = "../jl_sys" }
 smallvec = "1"
+thiserror = "1"
 
 async-std = { version = "1.6.1", features = ["unstable"], optional = true }
 async-trait = { version = "0.1", optional = true }

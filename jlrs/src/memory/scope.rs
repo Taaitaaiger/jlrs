@@ -75,14 +75,32 @@
 //! [`Array::new`]: crate::wrappers::ptr::array::Array::new
 //! [`Output::into_scope`]: crate::memory::output::Output::into_scope
 
+use std::{marker::PhantomData, ptr::NonNull};
+
 use crate::{
     error::JlrsResult,
-    memory::{
-        frame::Frame,
-        global::Global,
-        output::{Output, OutputScope},
-    },
+    memory::{frame::Frame, global::Global, output::Output},
+    private::Private,
+    wrappers::ptr::Wrapper,
 };
+
+/// A [`Scope`] that roots a result using an [`Output`].
+///
+/// [`Scope`]: crate::memory::scope::Scope
+pub struct OutputScope<'target, 'current, 'borrow, F: Frame<'current>> {
+    pub(crate) output: Output<'target>,
+    pub(crate) frame: &'borrow mut F,
+    pub(crate) _marker: PhantomData<&'current ()>,
+}
+
+impl<'target, 'current, 'borrow, F: Frame<'current>> OutputScope<'target, 'current, 'borrow, F> {
+    pub(crate) fn set_root<'data, T: Wrapper<'target, 'data>>(self, value: NonNull<T::Wraps>) -> T {
+        unsafe {
+            self.output.set_root::<T>(value);
+            T::wrap_non_null(value, Private)
+        }
+    }
+}
 
 /// This trait is used with functions that return Julia data rooted in some scope which need to
 /// allocate and root temporary data. It's implemented by mutable references to implementations of
@@ -155,14 +173,16 @@ where
 pub(crate) mod private {
     use std::ptr::NonNull;
 
+    use crate::wrappers::ptr::private::WrapperPriv;
     use crate::{
-        error::{JlrsError, JlrsResult, JuliaResult},
+        error::{JlrsResult, JuliaResult},
         memory::{frame::Frame, output::Output},
         private::Private,
         wrappers::ptr::value::Value,
     };
-    use crate::{memory::output::OutputScope, wrappers::ptr::private::WrapperPriv};
     use jl_sys::jl_value_t;
+
+    use super::OutputScope;
 
     pub trait ScopePriv<'target, 'current, F>: Sized + PartialScopePriv<'target>
     where
@@ -180,14 +200,14 @@ pub(crate) mod private {
     }
 
     pub trait PartialScopePriv<'target>: Sized {
-        // safety: the value must be a valid pointer to a Julia value.
+        // Safety: the pointer must point to existing and valid data.
         unsafe fn value<'data, T: WrapperPriv<'target, 'data>>(
             self,
             value: NonNull<T::Wraps>,
             _: Private,
         ) -> JlrsResult<T>;
 
-        // safety: the value must be a valid pointer to a Julia value.
+        // Safety: the pointer must point to existing and valid data.
         unsafe fn call_result<'data, T: WrapperPriv<'target, 'data>>(
             self,
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
@@ -199,18 +219,18 @@ pub(crate) mod private {
     where
         F: Frame<'current>,
     {
+        // Safety: the pointer must point to existing and valid data.
         unsafe fn value<'data, T: WrapperPriv<'current, 'data>>(
             self,
             value: NonNull<T::Wraps>,
             _: Private,
         ) -> JlrsResult<T> {
-            let v = self
-                .push_root(value, Private)
-                .map_err(JlrsError::alloc_error)?;
+            let v = self.push_root(value, Private)?;
 
             Ok(v)
         }
 
+        // Safety: the pointer must point to existing and valid data.
         unsafe fn call_result<'data, T: WrapperPriv<'current, 'data>>(
             self,
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
@@ -218,11 +238,11 @@ pub(crate) mod private {
         ) -> JlrsResult<JuliaResult<'current, 'data, T>> {
             match result {
                 Ok(v) => {
-                    let v = self.push_root(v, Private).map_err(JlrsError::alloc_error)?;
+                    let v = self.push_root(v, Private)?;
                     Ok(Ok(v))
                 }
                 Err(e) => {
-                    let e = self.push_root(e, Private).map_err(JlrsError::alloc_error)?;
+                    let e = self.push_root(e, Private)?;
                     Ok(Err(e))
                 }
             }
@@ -234,6 +254,7 @@ pub(crate) mod private {
     where
         F: Frame<'current>,
     {
+        // Safety: the pointer must point to existing and valid data.
         unsafe fn value<'data, T: WrapperPriv<'target, 'data>>(
             self,
             value: NonNull<T::Wraps>,
@@ -242,6 +263,7 @@ pub(crate) mod private {
             Ok(self.set_root(value))
         }
 
+        // Safety: the pointer must point to existing and valid data.
         unsafe fn call_result<'data, T: WrapperPriv<'target, 'data>>(
             self,
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
@@ -257,6 +279,7 @@ pub(crate) mod private {
     }
 
     impl<'target> PartialScopePriv<'target> for Output<'target> {
+        // Safety: the pointer must point to existing and valid data.
         unsafe fn value<'data, T: WrapperPriv<'target, 'data>>(
             self,
             value: NonNull<T::Wraps>,
@@ -266,6 +289,7 @@ pub(crate) mod private {
             Ok(T::wrap_non_null(value, Private))
         }
 
+        // Safety: the pointer must point to existing and valid data.
         unsafe fn call_result<'data, T: WrapperPriv<'target, 'data>>(
             self,
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
