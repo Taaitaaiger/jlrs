@@ -6,12 +6,3 @@ members = [
     "jl_sys",
     "examples"
 ]
-
-[profile.coverage]
-panic = "abort"
-opt-level = 0
-debug = 2
-overflow-checks = false
-incremental = false
-codegen-units = 1
-inherits = "test"

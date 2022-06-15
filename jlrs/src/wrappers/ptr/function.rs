@@ -8,7 +8,7 @@
 
 use crate::{
     call::{Call, CallExt, WithKeywords},
-    error::{JlrsError, JlrsResult, JuliaResult, JuliaResultRef, CANNOT_DISPLAY_TYPE},
+    error::{JlrsResult, JuliaResult, JuliaResultRef, TypeError, CANNOT_DISPLAY_TYPE},
     impl_debug,
     layout::{
         typecheck::{NamedTuple, Typecheck},
@@ -179,7 +179,7 @@ impl<'value, 'data> CallExt<'value, 'data> for Function<'value, 'data> {
     fn with_keywords(self, kws: Value<'value, 'data>) -> JlrsResult<WithKeywords<'value, 'data>> {
         if !kws.is::<NamedTuple>() {
             let type_str = kws.datatype().display_string_or(CANNOT_DISPLAY_TYPE);
-            Err(JlrsError::NotANamedTuple { type_str })?
+            Err(TypeError::NotANamedTuple { type_str })?
         }
         Ok(WithKeywords::new(self.as_value(), kws))
     }

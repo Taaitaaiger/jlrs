@@ -35,7 +35,7 @@ macro_rules! impl_root {
                     let ptr = v.unwrap_non_null(Private);
                     scope.value(ptr, Private)
                 } else {
-                    Err($crate::error::JlrsError::UndefRef)?
+                    Err($crate::error::AccessError::UndefRef)?
                 }
             }
         }
@@ -58,7 +58,7 @@ macro_rules! impl_root {
                     let ptr = v.unwrap_non_null(Private);
                     scope.value(ptr, Private)
                 } else {
-                    Err($crate::error::JlrsError::UndefRef)?
+                    Err($crate::error::AccessError::UndefRef)?
                 }
             }
         }
@@ -231,11 +231,11 @@ pub trait Wrapper<'scope, 'data>: private::WrapperPriv<'scope, 'data> {
                 .function_ref("valuestring")?
                 .wrapper_unchecked()
                 .call1_unrooted(global, self.as_value())
-                .map_err(|e| JlrsError::Exception {
-                    msg: format!(
+                .map_err(|e| {
+                    JlrsError::exception(format!(
                         "Jlrs.valuestring failed: {}",
                         e.value_unchecked().error_string_or(CANNOT_DISPLAY_VALUE)
-                    ),
+                    ))
                 })?
                 .value_unchecked()
                 .cast::<JuliaString>()?
@@ -263,11 +263,11 @@ pub trait Wrapper<'scope, 'data>: private::WrapperPriv<'scope, 'data> {
                 .function_ref("errorstring")?
                 .wrapper_unchecked()
                 .call1_unrooted(global, self.as_value())
-                .map_err(|e| JlrsError::Exception {
-                    msg: format!(
-                        "Jlrs.errorstring failed: {}",
+                .map_err(|e| {
+                    JlrsError::exception(format!(
+                        "Jlrs.valuestring failed: {}",
                         e.value_unchecked().error_string_or(CANNOT_DISPLAY_VALUE)
-                    ),
+                    ))
                 })?
                 .value_unchecked()
                 .cast::<JuliaString>()?
@@ -591,18 +591,19 @@ impl<'scope, 'data, T: Wrapper<'scope, 'data>> Ref<'scope, 'data, T> {
     /// Assume the reference still points to valid Julia data and convert it to its wrapper type.
     /// Returns `None` if the reference is undefined.
     ///
-    /// Safety: a reference is only valid as long as it's reachable through some rooted value.
-    /// It's the caller's responsibility to ensure the result is never used after it becomes
-    /// unreachable.
+    /// Safety: a reference is only guaranteed to be valid as long as it's reachable from some
+    /// GC root. If the reference is unreachable, the GC can free it. The GC can run whenever a
+    /// safepoint is reached, this is generally the case when new Julia data is allocated.
     pub unsafe fn wrapper(self) -> Option<T> {
         T::wrapper(self, Private)
     }
 
     /// Assume the reference still points to valid Julia data and convert it to its wrapper type.
     ///
-    /// Safety: this method doesn't  check if the reference is undefined, a reference is only
-    /// valid as long as it's reachable through some rooted value.  It's the caller's
-    /// responsibility to ensure the result is never used after it becomes unreachable.
+    /// Safety: this method doesn't check if the reference is undefined. A reference is only
+    /// guaranteed to be valid as long as it's reachable from some GC root. If the reference is
+    /// unreachable, the GC can free it. The GC can run whenever a safepoint is reached, this is
+    /// generally the case when new Julia data is allocated.
     pub unsafe fn wrapper_unchecked(self) -> T {
         T::wrapper_unchecked(self, Private)
     }
@@ -610,18 +611,19 @@ impl<'scope, 'data, T: Wrapper<'scope, 'data>> Ref<'scope, 'data, T> {
     /// Assume the reference still points to valid Julia data and convert it to a `Value`. Returns
     /// `None` if the reference is undefined.
     ///
-    /// Safety: a reference is only valid as long as it's reachable through some rooted value.
-    /// It's the caller's responsibility to ensure the result is never used after it becomes
-    /// unreachable.
+    /// Safety: a reference is only guaranteed to be valid as long as it's reachable from some
+    /// GC root. If the reference is unreachable, the GC can free it. The GC can run whenever a
+    /// safepoint is reached, this is generally the case when new Julia data is allocated.
     pub unsafe fn value(self) -> Option<Value<'scope, 'data>> {
         T::value(self, Private)
     }
 
-    /// Assume the reference still points to valid Julia data and convert it to a `Value`.
+    /// Assume the reference still points to valid Julia data and convert it to its wrapper type.
     ///
-    /// Safety: this method doesn't  check if the reference is undefined, a reference is only
-    /// valid as long as it's reachable through some rooted value. It's the caller's
-    /// responsibility to ensure the result is never used after it becomes unreachable.
+    /// Safety: this method doesn't check if the reference is undefined. A reference is only
+    /// guaranteed to be valid as long as it's reachable from some GC root. If the reference is
+    /// unreachable, the GC can free it. The GC can run whenever a safepoint is reached, this is
+    /// generally the case when new Julia data is allocated.
     pub unsafe fn value_unchecked(self) -> Value<'scope, 'data> {
         T::value_unchecked(self, Private)
     }

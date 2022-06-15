@@ -261,7 +261,7 @@ where
             if stack.page.size() < A::RUN_CAPACITY + 2 {
                 stack.page = StackPage::new(A::RUN_CAPACITY + 2);
             }
-            let raw = std::mem::transmute(stack.page.as_mut());
+            let raw = std::mem::transmute(stack.page.as_ref());
             let mut frame = AsyncGcFrame::new(raw, mode);
             let global = Global::new();
 
@@ -288,7 +288,7 @@ where
                 stack.page = StackPage::new(A::REGISTER_CAPACITY + 2);
             }
 
-            let raw = stack.page.as_mut();
+            let raw = stack.page.as_ref();
             let mut frame = AsyncGcFrame::new(raw, mode);
             let global = Global::new();
 
@@ -315,7 +315,7 @@ where
                 stack.page = StackPage::new(P::REGISTER_CAPACITY + 2);
             }
 
-            let raw = stack.page.as_mut();
+            let raw = stack.page.as_ref();
             let mut frame = AsyncGcFrame::new(raw, mode);
             let global = Global::new();
 
@@ -343,7 +343,7 @@ where
                     stack.page = StackPage::new(P::INIT_CAPACITY + 2);
                 }
 
-                let raw = std::mem::transmute(stack.page.as_mut());
+                let raw = std::mem::transmute(stack.page.as_ref());
                 let mut frame = AsyncGcFrame::new(raw, mode);
                 let global = Global::new();
 
@@ -427,12 +427,12 @@ where
         if stack.page.size() < self.slots + 2 {
             stack.page = StackPage::new(self.slots + 2);
         }
-        let raw = stack.page.as_mut();
+        let raw = stack.page.as_ref();
         let mut frame = unsafe { GcFrame::new(raw, mode) };
         let (res, ch) = self.call(&mut frame);
 
         R::spawn_local(async {
-            OneshotSender::send(Box::new(ch), res).await;
+            OneshotSender::send(ch, res).await;
         });
 
         std::mem::drop(frame);

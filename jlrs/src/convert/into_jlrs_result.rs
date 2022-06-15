@@ -6,7 +6,7 @@
 //! error.
 
 use crate::{
-    error::{exception, JlrsResult, JuliaResult, CANNOT_DISPLAY_VALUE},
+    error::{JlrsError, JlrsResult, JuliaResult, CANNOT_DISPLAY_VALUE},
     wrappers::ptr::Wrapper,
 };
 
@@ -25,7 +25,7 @@ impl<T> IntoJlrsResult<T> for JuliaResult<'_, '_, T> {
     fn into_jlrs_result(self) -> JlrsResult<T> {
         match self {
             Ok(v) => Ok(v),
-            Err(e) => exception(e.error_string_or(CANNOT_DISPLAY_VALUE)),
+            Err(e) => JlrsError::exception_error(e.error_string_or(CANNOT_DISPLAY_VALUE))?,
         }
     }
 }

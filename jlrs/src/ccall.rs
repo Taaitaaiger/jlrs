@@ -18,15 +18,13 @@ use jl_sys::uv_async_send;
 /// When you call Rust from Julia through `ccall`, Julia has already been initialized and trying to
 /// initialize it again would cause a crash. In order to still be able to call Julia from Rust
 /// and to borrow arrays (if you pass them as `Array` rather than `Ptr{Array}`), you'll need to
-/// create a frame first. You can use this struct to do so. It must never be used outside
+/// create a scope first. You can use this struct to do so. It must never be used outside
 /// functions called through `ccall`, and only once for each `ccall`ed function.
 ///
 /// If you only need to use a frame to borrow array data, you can use [`CCall::null_scope`].
-/// Unlike [`Julia`], `CCall` postpones the allocation of the stack that is used for managing the
-/// GC until a `GcFrame` is created. In the case of a null scope, this stack isn't allocated at
+/// Unlike the runtimes, `CCall` postpones the allocation of the stack that is used for managing
+/// the GC until a `GcFrame` is created. If a null scope is created, this stack isn't allocated at
 /// all.
-///
-/// [`Julia`]: crate::runtime::sync_rt::Julia
 pub struct CCall {
     page: Option<StackPage>,
 }
@@ -61,26 +59,26 @@ impl CCall {
         unsafe {
             let page = self.get_init_page();
             let global = Global::new();
-            let mut frame = GcFrame::new(page.as_mut(), Sync);
+            let mut frame = GcFrame::new(page.as_ref(), Sync);
             let ret = func(global, &mut frame);
             std::mem::drop(frame);
             ret
         }
     }
 
-    /// Creates a [`GcFrame`] with  capacity for at least `slots` roots, calls the given closure,
-    /// and returns its result.
-    pub fn scope_with_capacity<T, F>(&mut self, slots: usize, func: F) -> JlrsResult<T>
+    /// Creates a [`GcFrame`] with capacity for at least `capacity` roots, calls the given
+    /// closure, and returns its result.
+    pub fn scope_with_capacity<T, F>(&mut self, capacity: usize, func: F) -> JlrsResult<T>
     where
         for<'base> F: FnOnce(Global<'base>, &mut GcFrame<'base, Sync>) -> JlrsResult<T>,
     {
         unsafe {
             let page = self.get_init_page();
             let global = Global::new();
-            if slots + 2 > page.size() {
-                *page = StackPage::new(slots + 2);
+            if capacity + 2 > page.size() {
+                *page = StackPage::new(capacity + 2);
             }
-            let mut frame = GcFrame::new(page.as_mut(), Sync);
+            let mut frame = GcFrame::new(page.as_ref(), Sync);
             let ret = func(global, &mut frame);
             std::mem::drop(frame);
             ret
@@ -89,8 +87,7 @@ impl CCall {
 
     /// Create a [`NullFrame`] and call the given closure.
     ///
-    /// A [`NullFrame`] cannot be nested and can only be used to (mutably) borrow array data.
-    /// Unlike other base-level scope-methods, no `Global` is provided to the closure.
+    /// A [`NullFrame`] cannot be nested and cannot store any roots.
     pub fn null_scope<T, F>(&mut self, func: F) -> JlrsResult<T>
     where
         for<'base> F: FnOnce(&mut NullFrame<'base>) -> JlrsResult<T>,

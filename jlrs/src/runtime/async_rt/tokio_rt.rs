@@ -113,9 +113,7 @@ impl<M: Send + Sync + 'static> ChannelReceiver<M> for tokio::sync::mpsc::Receive
     async fn recv(&mut self) -> JlrsResult<M> {
         match self.recv().await {
             Some(m) => Ok(m),
-            None => Err(JlrsError::Exception {
-                msg: String::from("Channel was closed"),
-            })?,
+            None => JlrsError::exception_error("Channel was closed".into())?,
         }
     }
 }
@@ -136,38 +134,36 @@ impl<M: Send + Sync + 'static> ChannelReceiver<M> for tokio::sync::mpsc::Unbound
     async fn recv(&mut self) -> JlrsResult<M> {
         match self.recv().await {
             Some(m) => Ok(m),
-            None => Err(JlrsError::Exception {
-                msg: String::from("Channel was closed"),
-            })?,
+            None => JlrsError::exception_error("Channel was closed".into())?,
         }
     }
 }
 
 #[async_trait]
 impl<M: Send + Sync + 'static> OneshotSender<M> for tokio::sync::oneshot::Sender<M> {
-    async fn send(self: Box<Self>, msg: M) {
-        (*self).send(msg).ok();
+    async fn send(self, msg: M) {
+        self.send(msg).ok();
     }
 }
 
 #[async_trait]
 impl<M: Send + Sync + 'static> OneshotSender<M> for tokio::sync::mpsc::Sender<M> {
-    async fn send(self: Box<Self>, msg: M) {
-        (&*self).send(msg).await.ok();
+    async fn send(self, msg: M) {
+        (&self).send(msg).await.ok();
     }
 }
 
 #[async_trait]
 impl<M: Send + Sync + 'static> OneshotSender<M> for tokio::sync::broadcast::Sender<M> {
-    async fn send(self: Box<Self>, msg: M) {
-        (&*self).send(msg).ok();
+    async fn send(self, msg: M) {
+        (&self).send(msg).ok();
     }
 }
 
 #[async_trait]
 impl<M: Send + Sync + 'static> OneshotSender<M> for tokio::sync::watch::Sender<M> {
-    async fn send(self: Box<Self>, msg: M) {
-        (&*self).send(msg).ok();
+    async fn send(self, msg: M) {
+        (&self).send(msg).ok();
     }
 }
 

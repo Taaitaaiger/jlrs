@@ -5,16 +5,15 @@
 //! that scope, data rooted in it can't be returned from it.
 //!
 //! Instead, Julia data that you want to return from a scope must be rooted in a parent scope.
-//! Thiscan be done by using an [`Output`] or [`OutputScope`]. An `Output` can be reserved in a
-//! frame by calling [`Frame::output`], it can be turned into an `OutputScope` by calling
-//! [`Output::into_scope`]. `Output` only implements [`PartialScope`], while `OutputScope`
-//! implements both [`Scope`] and [`OutputScope`]
+//! This can be done by using an [`Output`]. An `Output` can be reserved in a frame by calling
+//! [`Frame::output`].
 //!
 //! [`PartialScope`]: crate::memory::scope::PartialScope
-//! [`Scope`]: crate::memory::scope::Scope
 
-use crate::{memory::frame::Frame, private::Private, wrappers::ptr::Wrapper};
+use crate::{memory::frame::Frame, wrappers::ptr::Wrapper};
 use std::{cell::Cell, ffi::c_void, marker::PhantomData, ptr::NonNull};
+
+use super::scope::OutputScope;
 
 /// A reserved slot in a frame.
 ///
@@ -24,9 +23,10 @@ use std::{cell::Cell, ffi::c_void, marker::PhantomData, ptr::NonNull};
 ///
 /// [`Scope`]: crate::memory::scope::Scope
 /// [`PartialScope`]: crate::memory::scope::PartialScope
+/// [`OutputScope`]: crate::memory::scope::OutputScope
 pub struct Output<'target> {
     slot: *const Cell<*mut c_void>,
-    _marker: PhantomData<fn(&'target mut ())>,
+    _marker: PhantomData<fn(&'target ())>,
 }
 
 impl<'target> Output<'target> {
@@ -53,24 +53,6 @@ impl<'target> Output<'target> {
         unsafe {
             let cell = &*self.slot;
             cell.set(value.as_ptr().cast());
-        }
-    }
-}
-
-/// A [`Scope`] that roots a result using an [`Output`].
-///
-/// [`Scope`]: crate::memory::scope::Scope
-pub struct OutputScope<'target, 'current, 'borrow, F: Frame<'current>> {
-    pub(crate) output: Output<'target>,
-    pub(crate) frame: &'borrow mut F,
-    _marker: PhantomData<&'current ()>,
-}
-
-impl<'target, 'current, 'borrow, F: Frame<'current>> OutputScope<'target, 'current, 'borrow, F> {
-    pub(crate) fn set_root<'data, T: Wrapper<'target, 'data>>(self, value: NonNull<T::Wraps>) -> T {
-        unsafe {
-            self.output.set_root::<T>(value);
-            T::wrap_non_null(value, Private)
         }
     }
 }

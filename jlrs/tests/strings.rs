@@ -75,7 +75,7 @@ mod tests {
                 assert_eq!(string.as_c_str().to_str().unwrap(), "Foo bar");
                 assert_eq!(string.as_str().unwrap(), "Foo bar");
                 assert_eq!(unsafe { string.as_str_unchecked() }, "Foo bar");
-                assert_eq!(string.as_slice(), b"Foo bar".as_ref());
+                assert_eq!(string.to_bytes(), b"Foo bar".as_ref());
 
                 Ok(())
             })

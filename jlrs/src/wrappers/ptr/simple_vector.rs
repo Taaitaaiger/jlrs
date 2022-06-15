@@ -1,7 +1,7 @@
 //! Wrapper for `SimpleVector`.
 
 use crate::{
-    error::{JlrsError, JlrsResult},
+    error::{AccessError, JlrsResult},
     layout::{typecheck::Typecheck, valid_layout::ValidLayout},
     memory::{frame::Frame, global::Global, output::Output, scope::private::PartialScopePriv},
     private::Private,
@@ -46,9 +46,9 @@ impl<'scope, 'borrow, T: WrapperRef<'scope, 'static>> SimpleVectorData<'scope, '
     /// considered immutable.
     pub unsafe fn set(&mut self, index: usize, value: Option<T::Wrapper>) -> JlrsResult<()> {
         if index >= self.len() {
-            Err(JlrsError::OutOfBoundsSVec {
+            Err(AccessError::OutOfBoundsSVec {
                 idx: index,
-                n_fields: self.len(),
+                len: self.len(),
             })?
         }
 
@@ -107,7 +107,7 @@ impl<'scope> SimpleVector<'scope> {
 
     /// Access the contents of this `SimpleVector` as `U`.
     ///
-    /// This method returns `JlrsError::InvalidLayout` if `U` isn't correct for all elements.
+    /// This method returns a `JlrsError::AccessError` if `U` isn't correct for all elements.
     pub fn typed_data<'borrow, 'current, U, F>(
         self,
         _: &'borrow mut F,
@@ -117,7 +117,7 @@ impl<'scope> SimpleVector<'scope> {
         U: WrapperRef<'scope, 'static>,
     {
         if !self.is_typed::<U>() {
-            Err(JlrsError::InvalidLayout {
+            Err(AccessError::InvalidLayout {
                 value_type_str: String::from("this SimpleVector"),
             })?;
         }
@@ -154,7 +154,7 @@ impl<'scope> SimpleVector<'scope> {
 
     /// Access the contents of this `SimpleVector` as `U`.
     ///
-    /// This method returns `JlrsError::InvalidLayout` if `U` isn't correct for all elements.
+    /// This method returns `JlrsError::AccessError` if `U` isn't correct for all elements.
     ///
     /// Safety: the lifetime borrow is not restricted by a frame.
     pub unsafe fn unrestricted_typed_data<U>(
@@ -164,7 +164,7 @@ impl<'scope> SimpleVector<'scope> {
         U: WrapperRef<'scope, 'static>,
     {
         if !self.is_typed::<U>() {
-            Err(JlrsError::InvalidLayout {
+            Err(AccessError::InvalidLayout {
                 value_type_str: String::from("this SimpleVector"),
             })?;
         }
@@ -178,7 +178,7 @@ impl<'scope> SimpleVector<'scope> {
 
     /// Access the contents of this `SimpleVector` as `U`.
     ///
-    /// This method returns `JlrsError::InvalidLayout` if `U` isn't correct for all elements.
+    /// This method returns `JlrsError::AccessError` if `U` isn't correct for all elements.
     ///
     /// Safety: this method doesn't check if `U` is correct for all elements, the lifetime borrow
     /// is not restricted by a frame.

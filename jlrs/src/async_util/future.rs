@@ -6,7 +6,7 @@ use crate::wrappers::ptr::task::Task;
 use crate::wrappers::ptr::value::{Value, MAX_SIZE};
 use crate::wrappers::ptr::Wrapper;
 use crate::{
-    error::{exception, JlrsError, JlrsResult, JuliaResult},
+    error::{JlrsError, JlrsResult, JuliaResult},
     private::Private,
     wrappers::ptr::private::WrapperPriv,
 };
@@ -68,9 +68,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                 .call(&mut *frame, &mut vals)?
                 .map_err(|e| {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
-                    JlrsError::Exception {
-                        msg: format!("asynccall threw an exception: {}", msg),
-                    }
+                    JlrsError::exception(format!("asynccall threw an exception: {}", msg))
                 })?
                 .cast_unchecked::<Task>();
 
@@ -78,7 +76,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                 let locked = shared_state.lock();
                 match locked {
                     Ok(mut data) => data.task = Some(task),
-                    _ => exception("Cannot set task".into())?,
+                    _ => JlrsError::exception_error("Cannot set task".into())?,
                 }
             }
 
@@ -122,9 +120,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                 .call(&mut *frame, &mut vals)?
                 .map_err(|e| {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
-                    JlrsError::Exception {
-                        msg: format!("scheduleasynclocal threw an exception: {}", msg),
-                    }
+                    JlrsError::exception(format!("scheduleasynclocal threw an exception: {}", msg))
                 })?
                 .cast_unchecked::<Task>();
 
@@ -132,7 +128,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                 let locked = shared_state.lock();
                 match locked {
                     Ok(mut data) => data.task = Some(task),
-                    _ => exception("Cannot set task".into())?,
+                    _ => JlrsError::exception_error("Cannot set task".into())?,
                 }
             }
 
@@ -176,9 +172,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                 .call(&mut *frame, &mut vals)?
                 .map_err(|e| {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
-                    JlrsError::Exception {
-                        msg: format!("scheduleasync threw an exception: {}", msg),
-                    }
+                    JlrsError::exception(format!("scheduleasync threw an exception: {}", msg))
                 })?
                 .cast_unchecked::<Task>();
 
@@ -186,7 +180,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                 let locked = shared_state.lock();
                 match locked {
                     Ok(mut data) => data.task = Some(task),
-                    _ => exception("Cannot set task".into())?,
+                    _ => JlrsError::exception_error("Cannot set task".into())?,
                 }
             }
 
@@ -231,9 +225,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                 .call(&mut *frame, &mut vals)?
                 .map_err(|e| {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
-                    JlrsError::Exception {
-                        msg: format!("asynccall threw an exception: {}", msg),
-                    }
+                    JlrsError::exception(format!("asynccall threw an exception: {}", msg))
                 })?
                 .cast_unchecked::<Task>();
 
@@ -241,7 +233,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                 let locked = shared_state.lock();
                 match locked {
                     Ok(mut data) => data.task = Some(task),
-                    _ => exception("Cannot set task".into())?,
+                    _ => JlrsError::exception_error("Cannot set task".into())?,
                 }
             }
 
@@ -287,9 +279,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                 .call(&mut *frame, &mut vals)?
                 .map_err(|e| {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
-                    JlrsError::Exception {
-                        msg: format!("scheduleasynclocal threw an exception: {}", msg),
-                    }
+                    JlrsError::exception(format!("scheduleasynclocal threw an exception: {}", msg))
                 })?
                 .cast_unchecked::<Task>();
 
@@ -297,7 +287,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                 let locked = shared_state.lock();
                 match locked {
                     Ok(mut data) => data.task = Some(task),
-                    _ => exception("Cannot set task".into())?,
+                    _ => JlrsError::exception_error("Cannot set task".into())?,
                 }
             }
 
@@ -343,9 +333,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                 .call(&mut *frame, &mut vals)?
                 .map_err(|e| {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
-                    JlrsError::Exception {
-                        msg: format!("scheduleasync threw an exception: {}", msg),
-                    }
+                    JlrsError::exception(format!("scheduleasync threw an exception: {}", msg))
                 })?
                 .cast_unchecked::<Task>();
 
@@ -353,7 +341,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                 let locked = shared_state.lock();
                 match locked {
                     Ok(mut data) => data.task = Some(task),
-                    _ => exception("Cannot set task".into())?,
+                    _ => JlrsError::exception_error("Cannot set task".into())?,
                 }
             }
 

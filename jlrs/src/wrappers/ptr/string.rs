@@ -44,10 +44,36 @@ impl<'scope> JuliaString<'scope> {
     {
         unsafe {
             let str_ref = string.as_ref();
-            let ptr = str_ref.as_ptr().cast();
             let len = str_ref.len();
+            let ptr = str_ref.as_ptr().cast();
             let s = jl_pchar_to_string(ptr, len);
-            debug_assert!(!s.is_null());
+            StringRef::wrap(s.cast())
+        }
+    }
+
+    /// Create a new Julia string.
+    pub fn new_bytes<'target, V, S>(scope: S, bytes: V) -> JlrsResult<JuliaString<'target>>
+    where
+        V: AsRef<[u8]>,
+        S: PartialScope<'target>,
+    {
+        unsafe {
+            let global = scope.global();
+            JuliaString::new_bytes_unrooted(global, bytes).root(scope)
+        }
+    }
+
+    /// Create a new Julia string. Unlike [`JuliaString::new_bytes`] this method doesn't root the
+    /// allocated value.
+    pub fn new_bytes_unrooted<'global, V>(_: Global<'global>, bytes: V) -> StringRef<'global>
+    where
+        V: AsRef<[u8]>,
+    {
+        unsafe {
+            let str_ref = bytes.as_ref();
+            let len = str_ref.len();
+            let ptr = str_ref.as_ptr().cast();
+            let s = jl_pchar_to_string(ptr, len);
             StringRef::wrap(s.cast())
         }
     }
@@ -66,21 +92,21 @@ impl<'scope> JuliaString<'scope> {
     }
 
     /// Returns the string as a slice of bytes without the terminating `\0`.
-    pub fn as_slice(self) -> &'scope [u8] {
+    pub fn to_bytes(self) -> &'scope [u8] {
         self.as_c_str().to_bytes()
     }
 
     /// Returns the string as a string slice, or an error if it the string contains
     /// invalid characters
     pub fn as_str(self) -> JlrsResult<&'scope str> {
-        Ok(str::from_utf8(self.as_slice()).or(Err(JlrsError::NotUTF8))?)
+        Ok(str::from_utf8(self.to_bytes()).map_err(JlrsError::other)?)
     }
 
     /// Returns the string as a string slice without checking if the string is properly encoded.
     ///
     /// Safety: the string must be properly encoded.
     pub unsafe fn as_str_unchecked(self) -> &'scope str {
-        str::from_utf8_unchecked(self.as_slice())
+        str::from_utf8_unchecked(self.to_bytes())
     }
 
     /// Use the `Output` to extend the lifetime of this data.
@@ -95,20 +121,13 @@ impl<'scope> JuliaString<'scope> {
 
 impl_julia_typecheck!(JuliaString<'scope>, jl_string_type, 'scope);
 
-unsafe impl<'scope> Unbox for JuliaString<'scope> {
-    type Output = Result<String, Vec<u8>>;
-    unsafe fn unbox(value: Value) -> Self::Output {
-        let slice = value.cast_unchecked::<JuliaString>().as_slice();
-        str::from_utf8(slice)
-            .map(String::from)
-            .map_err(|_| slice.into())
-    }
-}
-
 unsafe impl Unbox for String {
     type Output = Result<String, Vec<u8>>;
     unsafe fn unbox(value: Value) -> Self::Output {
-        JuliaString::unbox(value)
+        let slice = value.cast_unchecked::<JuliaString>().to_bytes();
+        str::from_utf8(slice)
+            .map(String::from)
+            .map_err(|_| slice.into())
     }
 }
 

@@ -8,7 +8,7 @@
 //! `[1, 2]` or `(1, 2)`. Note that unlike Julia, array indexing starts at 0.
 
 use crate::{
-    error::{JlrsError, JlrsResult},
+    error::{AccessError, JlrsResult},
     private::Private,
     wrappers::ptr::{array::Array, private::WrapperPriv as _},
 };
@@ -42,7 +42,7 @@ pub trait Dims: Sized + Debug {
     /// The default implementation must not be overridden.
     fn index_of<D: Dims>(&self, dim_index: &D) -> JlrsResult<usize> {
         if self.n_dimensions() != dim_index.n_dimensions() {
-            Err(JlrsError::InvalidIndex {
+            Err(AccessError::InvalidIndex {
                 idx: dim_index.into_dimensions(),
                 sz: self.into_dimensions(),
             })?;
@@ -55,7 +55,7 @@ pub trait Dims: Sized + Debug {
 
         for dim in 0..n_dims {
             if self.n_elements(dim) <= dim_index.n_elements(dim) {
-                Err(JlrsError::InvalidIndex {
+                Err(AccessError::InvalidIndex {
                     idx: dim_index.into_dimensions(),
                     sz: self.into_dimensions(),
                 })?;
@@ -335,7 +335,13 @@ impl Debug for Dimensions {
 
 impl Display for Dimensions {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        <Self as Debug>::fmt(self, f)
+        let mut f = f.debug_tuple("");
+
+        for d in self.as_slice() {
+            f.field(&d);
+        }
+
+        f.finish()
     }
 }
 

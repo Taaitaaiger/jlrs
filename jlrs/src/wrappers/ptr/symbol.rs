@@ -7,17 +7,13 @@ use crate::{
     private::Private,
     wrappers::ptr::{private::WrapperPriv, value::LeakedValue},
 };
-use cfg_if::cfg_if;
 use jl_sys::{jl_sym_t, jl_symbol_n, jl_symbol_name_ as jl_symbol_name, jl_symbol_type};
-use std::{ffi::CStr, marker::PhantomData, ptr::NonNull};
-
-cfg_if! {
-    if #[cfg(any(not(feature = "lts"), feature = "all-features-override"))] {
-        use jl_sys::jl_value_t;
-        use crate::wrappers::ptr::atomic_value;
-        use std::sync::atomic::Ordering;
-    }
-}
+use std::{
+    ffi::CStr,
+    hash::{Hash, Hasher},
+    marker::PhantomData,
+    ptr::NonNull,
+};
 
 /// `Symbol`s are used Julia to represent identifiers, `:x` represents the `Symbol` `x`. Things
 /// that can be accessed using a `Symbol` include submodules, functions, and globals. However,
@@ -27,7 +23,7 @@ cfg_if! {
 /// One special property of `Symbol`s is that they're never freed by the garbage collector after
 /// they've been created.
 #[repr(transparent)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub struct Symbol<'scope>(NonNull<jl_sym_t>, PhantomData<&'scope ()>);
 
 impl<'scope> Symbol<'scope> {
@@ -38,6 +34,15 @@ impl<'scope> Symbol<'scope> {
             let sym = jl_symbol_n(sym_b.as_ptr().cast(), sym_b.len());
             Symbol::wrap(sym, Private)
         }
+    }
+
+    /// Convert the given byte slice to a `Symbol`.
+    ///
+    /// Safety: if `symbol` contains `0`, an error is throws which is not caught.
+    pub unsafe fn new_bytes_unchecked<S: AsRef<[u8]>>(_: Global<'scope>, symbol: S) -> Self {
+        let sym_b = symbol.as_ref();
+        let sym = jl_symbol_n(sym_b.as_ptr().cast(), sym_b.len());
+        Symbol::wrap(sym, Private)
     }
 
     /// Extend the `Symbol`'s lifetime. A `Symbol` is never freed by the garbage collector, its
@@ -51,64 +56,6 @@ impl<'scope> Symbol<'scope> {
     /// The hash of this `Symbol`.
     pub fn hash(self) -> usize {
         unsafe { self.unwrap_non_null(Private).as_ref().hash }
-    }
-
-    /// `Symbol`s are stored using an invasive binary tree, this returns the left branch of the
-    /// current node.
-    pub fn left(self) -> Option<Symbol<'scope>> {
-        cfg_if! {
-            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
-                unsafe {
-                    let right = self.unwrap_non_null(Private).as_ref().left;
-
-                    if right.is_null() {
-                        return None;
-                    }
-
-                    Some(Symbol::wrap(right, Private))
-                }
-            } else {
-                unsafe {
-                    let left = atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().left as *const _);
-                    let ptr = left.load(Ordering::Relaxed);
-
-                    if ptr.is_null() {
-                        return None;
-                    }
-
-                    Some(Symbol::wrap(ptr.cast(), Private))
-                }
-            }
-        }
-    }
-
-    /// `Symbol`s are stored using an invasive binary tree, this returns the right branch of the
-    /// current node.
-    pub fn right(self) -> Option<Symbol<'scope>> {
-        cfg_if! {
-            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
-                unsafe {
-                    let right = self.unwrap_non_null(Private).as_ref().right;
-
-                    if right.is_null() {
-                        return None;
-                    }
-
-                    Some(Symbol::wrap(right, Private))
-                }
-            } else {
-                unsafe {
-                    let left = atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().right as *const _);
-                    let ptr = left.load(Ordering::Relaxed);
-
-                    if ptr.is_null() {
-                        return None;
-                    }
-
-                    Some(Symbol::wrap(ptr.cast(), Private))
-                }
-            }
-        }
     }
 
     /// Convert `self` to a `LeakedValue`.
@@ -126,20 +73,20 @@ impl<'scope> Symbol<'scope> {
         unsafe {
             let ptr = jl_symbol_name(self.unwrap(Private)).cast();
             let symbol = CStr::from_ptr(ptr);
-            symbol.to_str().map_err(|_| Box::new(JlrsError::NotUTF8))
+            Ok(symbol.to_str().map_err(JlrsError::other)?)
         }
     }
 
     /// View `self` as a `Cstr`.
     pub fn as_cstr(self) -> &'scope CStr {
         unsafe {
-            let ptr = jl_symbol_name(self.unwrap(Private)).cast();
-            &CStr::from_ptr(ptr)
+            let ptr = jl_symbol_name(self.unwrap(Private));
+            &CStr::from_ptr(ptr.cast())
         }
     }
 
     /// View `self` as an slice of bytes without the trailing null.
-    pub fn as_slice(self) -> &'scope [u8] {
+    pub fn as_bytes(self) -> &'scope [u8] {
         unsafe {
             let ptr = jl_symbol_name(self.unwrap(Private)).cast();
             let symbol = CStr::from_ptr(ptr);
@@ -155,6 +102,12 @@ impl<'scope> Symbol<'scope> {
             output.set_root::<Symbol>(ptr);
             Symbol::wrap_non_null(ptr, Private)
         }
+    }
+}
+
+impl Hash for Symbol<'_> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write_usize((*self).hash())
     }
 }
 

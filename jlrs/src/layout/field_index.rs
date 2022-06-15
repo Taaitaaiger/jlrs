@@ -10,7 +10,7 @@ impl<I: private::FieldIndexPriv> FieldIndex for I {}
 mod private {
     use crate::{
         convert::to_symbol::private::ToSymbolPriv,
-        error::{JlrsError, JlrsResult, CANNOT_DISPLAY_TYPE},
+        error::{AccessError, JlrsResult, CANNOT_DISPLAY_TYPE},
         private::Private,
         wrappers::ptr::{
             array::{dimensions::Dims, Array},
@@ -26,7 +26,7 @@ mod private {
 
         #[inline]
         fn array_index(&self, _data: Array, _: Private) -> JlrsResult<usize> {
-            Err(JlrsError::ArrayNeedsNumericalIndex)?
+            Err(AccessError::ArrayNeedsNumericalIndex)?
         }
     }
 
@@ -56,12 +56,12 @@ mod private {
             debug_assert!(!ty.is::<Array>());
 
             if self.n_dimensions() != 1 {
-                Err(JlrsError::FieldNeedsSimpleIndex)?
+                Err(AccessError::FieldNeedsSimpleIndex)?
             }
 
             let n = self.size();
             if ty.n_fields() as usize <= n {
-                Err(JlrsError::OutOfBounds {
+                Err(AccessError::OutOfBoundsField {
                     idx: n,
                     n_fields: ty.n_fields() as usize,
                     value_type: ty.display_string_or(CANNOT_DISPLAY_TYPE),

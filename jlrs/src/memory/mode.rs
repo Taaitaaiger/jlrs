@@ -19,9 +19,9 @@ cfg_if::cfg_if! {
 
         /// Mode used by the async runtime.
         #[derive(Clone, Copy)]
-        pub struct Async<'a>(pub(crate) &'a Cell<*mut c_void>);
+        pub struct Async<'frame>(pub(crate) &'frame Cell<*mut c_void>);
 
-        impl<'a> Mode for Async<'a> {}
+        impl<'frame> Mode for Async<'frame> {}
     }
 }
 
@@ -31,36 +31,36 @@ pub(crate) mod private {
     use std::{cell::Cell, ffi::c_void};
 
     pub trait ModePriv {
-        unsafe fn push_frame(&self, raw_frame: &mut [Cell<*mut c_void>], _: Private);
-        unsafe fn pop_frame(&self, raw_frame: &mut [Cell<*mut c_void>], _: Private);
+        unsafe fn push_frame(&self, raw_frame: &[Cell<*mut c_void>], _: Private);
+        unsafe fn pop_frame(&self, raw_frame: &[Cell<*mut c_void>], _: Private);
     }
 
     cfg_if::cfg_if! {
         if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
             impl ModePriv for Sync {
-                unsafe fn push_frame(&self, raw_frame: &mut [Cell<*mut c_void>], _: Private) {
+                unsafe fn push_frame(&self, raw_frame: &[Cell<*mut c_void>], _: Private) {
                     let rtls = NonNull::new_unchecked(jl_sys::jl_get_ptls_states()).as_mut();
                     raw_frame[0].set(null_mut());
                     raw_frame[1].set(rtls.pgcstack.cast());
-                    rtls.pgcstack = raw_frame[..].as_mut_ptr().cast();
+                    rtls.pgcstack = raw_frame[..].as_ptr() as *const _ as *mut _;
                 }
 
-                unsafe fn pop_frame(&self, _raw_frame: &mut [Cell<*mut c_void>], _: Private) {
+                unsafe fn pop_frame(&self, _raw_frame: &[Cell<*mut c_void>], _: Private) {
                     let rtls = NonNull::new_unchecked(jl_sys::jl_get_ptls_states()).as_mut();
-                    rtls.pgcstack = (&*rtls.pgcstack).prev;
+                    rtls.pgcstack = NonNull::new_unchecked(rtls.pgcstack).as_ref().prev;
                 }
             }
         } else {
             use jl_sys::{jl_get_current_task, jl_task_t};
             impl ModePriv for Sync {
-                unsafe fn push_frame(&self, raw_frame: &mut [Cell<*mut c_void>], _: Private) {
+                unsafe fn push_frame(&self, raw_frame: &[Cell<*mut c_void>], _: Private) {
                     let task = NonNull::new_unchecked(jl_get_current_task().cast::<jl_task_t>()).as_mut();
                     raw_frame[0].set(null_mut());
                     raw_frame[1].set(task.gcstack.cast());
-                    task.gcstack = raw_frame[..].as_mut_ptr().cast();
+                    task.gcstack = raw_frame[..].as_ptr() as *const _ as *mut _;
                 }
 
-                unsafe fn pop_frame(&self, _raw_frame: &mut [Cell<*mut c_void>], _: Private) {
+                unsafe fn pop_frame(&self, _raw_frame: &[Cell<*mut c_void>], _: Private) {
                     let task = NonNull::new_unchecked(jl_get_current_task().cast::<jl_task_t>()).as_mut();
                     task.gcstack = NonNull::new_unchecked(task.gcstack).as_ref().prev;
                 }
@@ -71,14 +71,14 @@ pub(crate) mod private {
     cfg_if::cfg_if! {
         if #[cfg(feature = "async")] {
             use super::Async;
-            impl<'a> ModePriv for Async<'a> {
-                unsafe fn push_frame(&self, raw_frame: &mut [Cell<*mut c_void>], _: Private) {
+            impl<'frame> ModePriv for Async<'frame> {
+                unsafe fn push_frame(&self, raw_frame: &[Cell<*mut c_void>], _: Private) {
                     raw_frame[0].set(null_mut());
                     raw_frame[1].set(self.0.get());
-                    self.0.set(raw_frame.as_mut_ptr().cast());
+                    self.0.set(raw_frame.as_ptr() as *const _ as *mut _);
                 }
 
-                unsafe fn pop_frame(&self, raw_frame: &mut [Cell<*mut c_void>], _: Private) {
+                unsafe fn pop_frame(&self, raw_frame: &[Cell<*mut c_void>], _: Private) {
                     self.0.set(raw_frame[1].get());
                 }
             }
