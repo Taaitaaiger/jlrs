@@ -46,13 +46,13 @@ mod tests {
                 JULIA.with(|j| {
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope(|global, frame| unsafe {
+                    jlrs.scope(|global, mut frame| unsafe {
                         let ty = <*mut $type as IntoJulia>::julia_type(global).value_unchecked();
 
                         let applied = UnionAll::pointer_type(global)
                             .as_value()
                             .apply_type_unchecked(
-                                &mut *frame,
+                                &mut frame,
                                 &mut [DataType::$assoc_ty(global).as_value()],
                             )?;
 

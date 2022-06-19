@@ -54,14 +54,14 @@ impl CCall {
     /// Creates a [`GcFrame`], calls the given closure, and returns its result.
     pub fn scope<T, F>(&mut self, func: F) -> JlrsResult<T>
     where
-        for<'base> F: FnOnce(Global<'base>, &mut GcFrame<'base, Sync>) -> JlrsResult<T>,
+        for<'base> F: FnOnce(Global<'base>, GcFrame<'base, Sync>) -> JlrsResult<T>,
     {
         unsafe {
             let page = self.get_init_page();
             let global = Global::new();
-            let mut frame = GcFrame::new(page.as_ref(), Sync);
-            let ret = func(global, &mut frame);
-            std::mem::drop(frame);
+            let (frame, owner) = GcFrame::new(page.as_ref(), Sync);
+            let ret = func(global, frame);
+            std::mem::drop(owner);
             ret
         }
     }
@@ -70,7 +70,7 @@ impl CCall {
     /// closure, and returns its result.
     pub fn scope_with_capacity<T, F>(&mut self, capacity: usize, func: F) -> JlrsResult<T>
     where
-        for<'base> F: FnOnce(Global<'base>, &mut GcFrame<'base, Sync>) -> JlrsResult<T>,
+        for<'base> F: FnOnce(Global<'base>, GcFrame<'base, Sync>) -> JlrsResult<T>,
     {
         unsafe {
             let page = self.get_init_page();
@@ -78,9 +78,9 @@ impl CCall {
             if capacity + 2 > page.size() {
                 *page = StackPage::new(capacity + 2);
             }
-            let mut frame = GcFrame::new(page.as_ref(), Sync);
-            let ret = func(global, &mut frame);
-            std::mem::drop(frame);
+            let (frame, owner) = GcFrame::new(page.as_ref(), Sync);
+            let ret = func(global, frame);
+            std::mem::drop(owner);
             ret
         }
     }
@@ -90,11 +90,11 @@ impl CCall {
     /// A [`NullFrame`] cannot be nested and cannot store any roots.
     pub fn null_scope<T, F>(&mut self, func: F) -> JlrsResult<T>
     where
-        for<'base> F: FnOnce(&mut NullFrame<'base>) -> JlrsResult<T>,
+        for<'base> F: FnOnce(NullFrame<'base>) -> JlrsResult<T>,
     {
         unsafe {
-            let mut frame = NullFrame::new(self);
-            func(&mut frame)
+            let frame = NullFrame::new(self);
+            func(frame)
         }
     }
 

@@ -231,11 +231,11 @@ create Julia data and call Julia functions, a scope must be created.
 
 When the sync runtime is used this can be done by calling the methods `Julia::scope` and
 `Julia::scope_with_capacity`. These methods take a closure with two arguments, a `Global`
-and a mutable reference to a `GcFrame` (frame). The first is an access token for global
-Julia data, the second is used to root non-global data. While non-global data is rooted, it
-won't be freed by Julia's garbage collector (GC). The frame is created when
-`Julia::scope(_with_capacity)` is called and dropped when it returns, so any data rooted in
-the frame associated with a scope won't be freed by the GC until leaving that scope.
+and a `GcFrame` (frame). The first is an access token for global Julia data, the second is
+used to root non-global data. While non-global data is rooted, it won't be freed by Julia's 
+garbage collector (GC). The frame is created when `Julia::scope(_with_capacity)` is called 
+and dropped when it returns, so any data rooted in the frame associated with a scope won't 
+be freed by the GC until leaving that scope.
 
 Because `AsyncJulia` is a handle to the async runtime which runs on another thread it's not
 possible to directly create a scope. Rather, the async runtime deals with tasks. The simplest
@@ -287,22 +287,20 @@ use jlrs::prelude::*;
 // the same.
 let mut julia = unsafe { RuntimeBuilder::new().start().unwrap() };
 
-let res = julia.scope(|global, frame| {
-    // Create the two arguments. The first argument, something that implements
-    // PartialScope, is taken by value and mutable references don't
-    // implement Copy, so it's necessary to mutably reborrow the frame.
-    let i = Value::new(&mut *frame, 2u64)?;
-    let j = Value::new(&mut *frame, 1u32)?;
+let res = julia.scope(|global, mut frame| {
+    // Create the two arguments.
+    let i = Value::new(&mut frame, 2u64)?;
+    let j = Value::new(&mut frame, 1u32)?;
 
     // The `+` function can be found in the base module.
-    let func = Module::base(global).function(&mut *frame, "+")?;
+    let func = Module::base(global).function(&mut frame, "+")?;
 
     // Call the function and unbox the result as a `u64`. The result of the function
     // call is a nested `Result`; the outer error doesn't contain to any Julia
     // data, while the inner error contains the exception if one is thrown. Here the
     // exception is converted to the outer error type by calling `into_jlrs_result`, this new
     // error contains the error message Julia would have shown.
-    unsafe { func.call2(&mut *frame, i, j)? }
+    unsafe { func.call2(&mut frame, i, j)? }
         .into_jlrs_result()?
         .unbox::<u64>()
 }).unwrap();
@@ -317,12 +315,12 @@ the `AsyncTask` trait, and persistent tasks which implement `PersistentTask`. Bo
 these traits are async traits.
 
 An async task is similar to a blocking task, except that you must implement the async `run`
-method instead of providing a closure. This method takes a `Global` and a mutable reference to
-an `AsyncGcFrame`. This new frame type not only provides access to the same features as
-`GcFrame`, it can also be used to call async methods provided by the `CallAsync` trait.
-These methods schedule a function call as a new Julia `Task` and can be `await`ed until
-this task has completed. The async runtime can switch to another task while the result is
-pending, allowing multiple tasks to progress.
+method instead of providing a closure. This method takes a `Global` and an `AsyncGcFrame`. 
+This new frame type not only provides access to the same features as `GcFrame`, it can also
+be used to call async methods provided by the `CallAsync` trait. These methods schedule a 
+function call as a new Julia `Task` and can be `await`ed until this task has completed. The
+async runtime can switch to another task while the result is pending, allowing multiple 
+tasks to progress.
 
 The previous example can be rewritten as an async task:
 
@@ -345,20 +343,20 @@ impl AsyncTask for AdditionTask {
     // This async method replaces the closure from the previous examples,
     // an `AsyncGcFrame` can be used the same way as a `GcFrame` but also
     // can be used in combination with methods from the `CallAsync` trait.
-    async fn run<'base>(
+    async fn run<'frame>(
         &mut self,
-        global: Global<'base>,
-        frame: &mut AsyncGcFrame<'base>,
+        global: Global<'frame>,
+        mut frame: AsyncGcFrame<'frame>,
     ) -> JlrsResult<Self::Output> {
-        let a = Value::new(&mut *frame, self.a)?;
-        let b = Value::new(&mut *frame, self.b)?;
+        let a = Value::new(&mut frame, self.a)?;
+        let b = Value::new(&mut frame, self.b)?;
 
-        let func = Module::base(global).function(&mut *frame, "+")?;
+        let func = Module::base(global).function(&mut frame, "+")?;
 
         // CallAsync::call_async schedules the function call on another
         // thread and returns a Future that resolves when the scheduled
         // function has returned or thrown an error.
-        unsafe { func.call_async(&mut *frame, &mut [a, b]) }
+        unsafe { func.call_async(&mut frame, &mut [a, b]) }
             .await?
             .into_jlrs_result()?
             .unbox::<u64>()
@@ -402,15 +400,15 @@ impl PersistentTask for AccumulatorTask {
     // lifetime of the frame is `'static`: the frame is not dropped until
     // the task has completed, so the task's internal state can contain
     // Julia data rooted in this frame.
-    async fn init<'inner>(
-        &'inner mut self,
+    async fn init(
+        &mut self,
         _global: Global<'static>,
-        frame: &'inner mut AsyncGcFrame<'static>,
+        mut frame: AsyncGcFrame<'static>,
     ) -> JlrsResult<Self::State> {
         // A `Vec` can be moved from Rust to Julia if the element type
         // implements `IntoJulia`.
         let data = vec![0usize; self.n_values];
-        let array = TypedArray::from_vec(&mut *frame, data, self.n_values)?
+        let array = TypedArray::from_vec(&mut frame, data, self.n_values)?
             .into_jlrs_result()?;
 
         Ok(AccumulatorTaskState {
@@ -425,7 +423,7 @@ impl PersistentTask for AccumulatorTask {
     async fn run<'frame>(
         &mut self,
         global: Global<'frame>,
-        frame: &mut AsyncGcFrame<'frame>,
+        mut frame: AsyncGcFrame<'frame>,
         state: &mut Self::State,
         input: Self::Input,
     ) -> JlrsResult<Self::Output> {
@@ -435,7 +433,7 @@ impl PersistentTask for AccumulatorTask {
             // of the elements is concrete and immutable.
             // This is safe because this is the only active reference to
             // the array.
-            let mut data = unsafe { state.array.bits_data_mut(frame)? };
+            let mut data = unsafe { state.array.bits_data_mut(&mut frame)? };
             data[state.offset] = input;
 
             state.offset += 1;
@@ -448,7 +446,7 @@ impl PersistentTask for AccumulatorTask {
         unsafe {
             Module::base(global)
                 .function(&mut *frame, "sum")?
-                .call1(&mut *frame, state.array.as_value())?
+                .call1(&mut frame, state.array.as_value())?
                 .into_jlrs_result()?
                 .unbox::<usize>()
         }
@@ -477,18 +475,18 @@ unsafe extern "C" fn call_me(arg: bool) -> isize {
 }
 
 let mut julia = unsafe { RuntimeBuilder::new().start().unwrap() };
-julia.scope(|global, frame| unsafe {
+julia.scope(|global, mut frame| unsafe {
     // Cast the function to a void pointer
-    let call_me_val = Value::new(&mut *frame, call_me as *mut std::ffi::c_void)?;
+    let call_me_val = Value::new(&mut frame, call_me as *mut std::ffi::c_void)?;
 
     // Value::eval_string can be used to create new functions.
     let func = Value::eval_string(
-        &mut *frame,
+        &mut frame,
         "myfunc(callme::Ptr{Cvoid})::Int = ccall(callme, Int, (Bool,), true)"
     )?.into_jlrs_result()?;
 
     // Call the function and unbox the result.
-    let output = func.call1(&mut *frame, call_me_val)?
+    let output = func.call1(&mut frame, call_me_val)?
         .into_jlrs_result()?
         .unbox::<isize>()?;
 

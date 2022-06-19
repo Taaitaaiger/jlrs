@@ -10,10 +10,11 @@
 //!
 //! [`PartialScope`]: crate::memory::scope::PartialScope
 
-use crate::{memory::frame::Frame, wrappers::ptr::Wrapper};
-use std::{cell::Cell, ffi::c_void, marker::PhantomData, ptr::NonNull};
-
-use super::scope::OutputScope;
+use crate::{
+    memory::{frame::Frame, scope::OutputScope, stack_page::Slot},
+    wrappers::ptr::Wrapper,
+};
+use std::{marker::PhantomData, ptr::NonNull};
 
 /// A reserved slot in a frame.
 ///
@@ -25,7 +26,7 @@ use super::scope::OutputScope;
 /// [`PartialScope`]: crate::memory::scope::PartialScope
 /// [`OutputScope`]: crate::memory::scope::OutputScope
 pub struct Output<'target> {
-    slot: *const Cell<*mut c_void>,
+    slot: *const Slot,
     _marker: PhantomData<fn(&'target ())>,
 }
 
@@ -43,10 +44,7 @@ impl<'target> Output<'target> {
     }
 
     // Safety: slot must have been reserved in _frame
-    pub(crate) unsafe fn new<F: Frame<'target>>(
-        _frame: &F,
-        slot: *const Cell<*mut c_void>,
-    ) -> Self {
+    pub(crate) unsafe fn new(slot: &'target Slot) -> Self {
         Output {
             slot,
             _marker: PhantomData,

@@ -24,8 +24,8 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_capacity(1, |_global, frame| {
-                let val = Value::new(frame, 3.0f32)?;
+            jlrs.scope_with_capacity(1, |_global, mut frame| {
+                let val = Value::new(&mut frame, 3.0f32)?;
                 let dt = val.datatype();
 
                 assert_eq!(dt.size(), 4);
@@ -45,8 +45,8 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_capacity(1, |_global, frame| {
-                let val = Value::new(frame, 3.0f32)?;
+            jlrs.scope_with_capacity(1, |_global, mut frame| {
+                let val = Value::new(&mut frame, 3.0f32)?;
                 let dt = val.datatype();
 
                 assert!(!dt.is::<Tuple>());
@@ -104,13 +104,13 @@ mod tests {
     fn function_returns_datatype() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(1, |global, frame| unsafe {
+            jlrs.scope_with_capacity(1, |global, mut frame| unsafe {
                 let dt = Module::main(global)
                     .submodule_ref("JlrsTests")?
                     .wrapper_unchecked()
                     .function_ref("datatype")?
                     .wrapper_unchecked();
-                let dt_val = dt.call0(frame)?.unwrap();
+                let dt_val = dt.call0(&mut frame)?.unwrap();
 
                 assert!(dt_val.is::<DataType>());
                 assert!(dt_val.cast::<DataType>().is_ok());
@@ -142,10 +142,10 @@ mod tests {
     fn datatype_has_fieldnames() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |global, frame| unsafe {
+            jlrs.scope_with_capacity(0, |global, mut frame| unsafe {
                 let dt = DataType::tvar_type(global);
                 {
-                    let frame = &mut *frame;
+                    let frame = &mut frame;
                     let tn = dt
                         .field_names()
                         .wrapper_unchecked()

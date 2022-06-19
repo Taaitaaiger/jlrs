@@ -51,12 +51,12 @@ macro_rules! count {
 /// # JULIA.with(|j| {
 /// # let mut julia = j.borrow_mut();
 /// // Three slots; two for the inputs and one for the output.
-/// julia.scope_with_capacity(3, |global, frame| {
+/// julia.scope_with_capacity(3, |global, mut frame| {
 ///     // Create the two arguments, each value requires one slot
-///     let i = Value::new(&mut *frame, 2u64)?;
-///     let j = Value::new(&mut *frame, 1u32)?;
+///     let i = Value::new(&mut frame, 2u64)?;
+///     let j = Value::new(&mut frame, 1u32)?;
 ///
-///     let _nt = named_tuple!(&mut *frame, "i" => i, "j" => j)?;
+///     let _nt = named_tuple!(&mut frame, "i" => i, "j" => j)?;
 ///
 ///     Ok(())
 /// }).unwrap();
@@ -239,7 +239,7 @@ impl Value<'_, '_> {
     {
         let global = scope.global();
         let (output, scope) = scope.split()?;
-        scope.scope_with_capacity(4, |frame| unsafe {
+        scope.scope_with_capacity(4, |mut frame| unsafe {
             let field_names = field_names.as_ref();
             let values_m = values.as_ref();
 
@@ -260,9 +260,9 @@ impl Value<'_, '_> {
 
             let names = DataType::anytuple_type(global)
                 .as_value()
-                .apply_type_unchecked(&mut *frame, &mut symbol_type_vec)?
+                .apply_type_unchecked(&mut frame, &mut symbol_type_vec)?
                 .cast::<DataType>()?
-                .instantiate_unchecked(&mut *frame, &mut field_names_vec)?;
+                .instantiate_unchecked(&mut frame, &mut field_names_vec)?;
 
             let mut field_types_vec = values_m
                 .iter()
@@ -272,11 +272,11 @@ impl Value<'_, '_> {
 
             let field_type_tup = DataType::anytuple_type(global)
                 .as_value()
-                .apply_type_unchecked(&mut *frame, &mut field_types_vec)?;
+                .apply_type_unchecked(&mut frame, &mut field_types_vec)?;
 
             let ty = UnionAll::namedtuple_type(global)
                 .as_value()
-                .apply_type_unchecked(&mut *frame, &mut [names, field_type_tup])?
+                .apply_type_unchecked(&mut frame, &mut [names, field_type_tup])?
                 .cast::<DataType>()?;
 
             ty.instantiate_unchecked(output, values)
@@ -389,8 +389,8 @@ impl Value<'_, '_> {
     /// # fn main() {
     /// # JULIA.with(|j| {
     /// # let mut julia = j.borrow_mut();
-    /// julia.scope(|_global, frame| {
-    ///     let i = Value::new(frame, 2u64)?;
+    /// julia.scope(|_global, mut frame| {
+    ///     let i = Value::new(&mut frame, 2u64)?;
     ///     assert!(i.is::<u64>());
     ///     Ok(())
     /// }).unwrap();
@@ -1084,13 +1084,13 @@ impl Value<'_, '_> {
         if path.as_ref().exists() {
             let global = scope.global();
             let (output, scope) = scope.split()?;
-            return scope.scope(|frame| {
-                let path_jl_str = JuliaString::new(&mut *frame, path.as_ref().to_string_lossy())?;
+            return scope.scope(|mut frame| {
+                let path_jl_str = JuliaString::new(&mut frame, path.as_ref().to_string_lossy())?;
                 let include_func = Module::main(global)
                     .function_ref("include")?
                     .wrapper_unchecked();
 
-                let scope = output.into_scope(frame);
+                let scope = output.into_scope(&mut frame);
                 include_func.call1(scope, path_jl_str.as_value())
             });
         }

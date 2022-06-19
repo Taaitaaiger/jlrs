@@ -5,10 +5,10 @@
 //! [`PersistentTask`].
 //!
 //! Both of these traits require that you implement one or more async methods. These methods take
-//! a mutable reference to an [`AsyncGcFrame`]. This frame type provides the same functionality as
-//! `GcFrame`, and can be used in combination with several async methods. Most importantly, the
-//! methods of the trait [`CallAsync`] which let you schedule a Julia function call as a new Julia
-//! task and await its completion.
+//! an [`AsyncGcFrame`]. This frame type provides the same functionality as `GcFrame`, and can be
+//! used in combination with several async methods. Most importantly, the methods of the trait
+//! [`CallAsync`] which let you schedule a Julia function call as a new Julia task and await its
+//! completion.
 //!
 //! [`GcFrame`]: crate::memory::frame::GcFrame
 //! [`CallAsync`]: crate::call::CallAsync
@@ -44,13 +44,13 @@ use jl_sys::{jl_process_events, jl_yield};
 ///     async fn run<'base>(
 ///         &mut self,
 ///         global: Global<'base>,
-///         frame: &mut AsyncGcFrame<'base>,
+///         mut frame: AsyncGcFrame<'base>,
 ///     ) -> JlrsResult<Self::Output> {
-///         let a = Value::new(&mut *frame, self.a)?;
-///         let b = Value::new(&mut *frame, self.b)?;
+///         let a = Value::new(&mut frame, self.a)?;
+///         let b = Value::new(&mut frame, self.b)?;
 ///             
-///         let func = Module::base(global).function(&mut *frame, "+")?;
-///         unsafe { func.call_async(&mut *frame, &mut [a, b]) }
+///         let func = Module::base(global).function(&mut frame, "+")?;
+///         unsafe { func.call_async(&mut frame, &mut [a, b]) }
 ///             .await?
 ///             .into_jlrs_result()?
 ///             .unbox::<u64>()
@@ -82,19 +82,18 @@ pub trait AsyncTask: 'static + Send + Sync {
     /// [`AsyncJulia::try_register_task`]: crate::runtime::async_rt::AsyncJulia::try_register_task
     async fn register<'frame>(
         _global: Global<'frame>,
-        _frame: &mut AsyncGcFrame<'frame>,
+        _frame: AsyncGcFrame<'frame>,
     ) -> JlrsResult<()> {
         Ok(())
     }
 
     /// Run this task.
     ///
-    /// This method takes a `Global` and a mutable reference to an `AsyncGcFrame`, which lets you
-    /// interact with Julia.
+    /// This method takes a `Global` and an `AsyncGcFrame`, which lets you interact with Julia.
     async fn run<'frame>(
         &mut self,
         global: Global<'frame>,
-        frame: &mut AsyncGcFrame<'frame>,
+        frame: AsyncGcFrame<'frame>,
     ) -> JlrsResult<Self::Output>;
 }
 
@@ -138,12 +137,12 @@ pub trait AsyncTask: 'static + Send + Sync {
 ///     async fn init(
 ///         &mut self,
 ///         _global: Global<'static>,
-///         frame: &mut AsyncGcFrame<'static>,
+///         mut frame: AsyncGcFrame<'static>,
 ///     ) -> JlrsResult<Self::State> {
 ///         // A `Vec` can be moved from Rust to Julia if the element type
 ///         // implements `IntoJulia`.
 ///         let data = vec![0usize; self.n_values];
-///         let array = TypedArray::from_vec(&mut *frame, data, self.n_values)?
+///         let array = TypedArray::from_vec(&mut frame, data, self.n_values)?
 ///             .into_jlrs_result()?;
 ///     
 ///         Ok(AccumulatorTaskState {
@@ -158,7 +157,7 @@ pub trait AsyncTask: 'static + Send + Sync {
 ///     async fn run<'frame>(
 ///         &mut self,
 ///         global: Global<'frame>,
-///         frame: &mut AsyncGcFrame<'frame>,
+///         mut frame: AsyncGcFrame<'frame>,
 ///         state: &mut Self::State,
 ///         input: Self::Input,
 ///     ) -> JlrsResult<Self::Output> {
@@ -168,7 +167,7 @@ pub trait AsyncTask: 'static + Send + Sync {
 ///             // of the elements is concrete and immutable.
 ///             // This is safe because this is the only active reference to
 ///             // the array.
-///             let mut data = unsafe { state.array.bits_data_mut(frame)? };
+///             let mut data = unsafe { state.array.bits_data_mut(&mut frame)? };
 ///             data[state.offset] = input;
 ///
 ///             state.offset += 1;
@@ -180,8 +179,8 @@ pub trait AsyncTask: 'static + Send + Sync {
 ///         // Return the sum of the contents of `state.array`.
 ///         unsafe {
 ///             Module::base(global)
-///                 .function(&mut *frame, "sum")?
-///                 .call1(&mut *frame, state.array.as_value())?
+///                 .function(&mut frame, "sum")?
+///                 .call1(&mut frame, state.array.as_value())?
 ///                 .into_jlrs_result()?
 ///                 .unbox::<usize>()
 ///         }
@@ -235,7 +234,7 @@ pub trait PersistentTask: 'static + Send + Sync {
     /// [`AsyncJulia::try_register_persistent`]: crate::runtime::async_rt::AsyncJulia::try_register_persistent
     async fn register<'frame>(
         _global: Global<'frame>,
-        _frame: &mut AsyncGcFrame<'frame>,
+        _frame: AsyncGcFrame<'frame>,
     ) -> JlrsResult<()> {
         Ok(())
     }
@@ -248,20 +247,19 @@ pub trait PersistentTask: 'static + Send + Sync {
     async fn init(
         &mut self,
         global: Global<'static>,
-        frame: &mut AsyncGcFrame<'static>,
+        frame: AsyncGcFrame<'static>,
     ) -> JlrsResult<Self::State>;
 
     /// Run the task.
     ///
-    /// This method takes a `Global` and a mutable reference to an `AsyncGcFrame`, which lets you
-    /// interact with Julia. It's also provided with a mutable reference to its `state` and the
-    /// `input` provided by the caller. While the state is mutable, it's not possible to allocate
-    /// a new Julia value in `run` and assign it to the state because the frame doesn't live long
-    /// enough.
+    /// This method takes a `Global` and an `AsyncGcFrame`, which lets you interact with Julia.
+    /// It's also provided with a mutable reference to its `state` and the `input` provided by the
+    /// caller. While the state is mutable, it's not possible to allocate a new Julia value in
+    /// `run` and assign it to the state because the frame doesn't live long enough.
     async fn run<'frame>(
         &mut self,
         global: Global<'frame>,
-        frame: &mut AsyncGcFrame<'frame>,
+        frame: AsyncGcFrame<'frame>,
         state: &mut Self::State,
         input: Self::Input,
     ) -> JlrsResult<Self::Output>;
@@ -272,7 +270,7 @@ pub trait PersistentTask: 'static + Send + Sync {
     async fn exit(
         &mut self,
         _global: Global<'static>,
-        _frame: &mut AsyncGcFrame<'static>,
+        _frame: AsyncGcFrame<'static>,
         _state: &mut Self::State,
     ) {
     }

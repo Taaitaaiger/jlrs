@@ -208,22 +208,22 @@ pub trait CallExt<'value, 'data>: Call<'data> {
     /// # fn main() {
     /// # JULIA.with(|j| {
     /// # let mut julia = j.borrow_mut();
-    /// julia.scope(|global, frame| unsafe {
+    /// julia.scope(|global, mut frame| unsafe {
     ///     // The code we evaluate is a simple function definition, which is safe.
     ///     let func = unsafe {
-    ///         Value::eval_string(&mut *frame, "func(; a=3, b=4, c=5) = a + b + c")?
+    ///         Value::eval_string(&mut frame, "func(; a=3, b=4, c=5) = a + b + c")?
     ///         .into_jlrs_result()?
     ///     };
     ///
-    ///     let a = Value::new(&mut *frame, 1isize)?;
-    ///     let b = Value::new(&mut *frame, 2isize)?;
-    ///     let nt = named_tuple!(&mut *frame, "a" => a, "b" => b)?;
+    ///     let a = Value::new(&mut frame, 1isize)?;
+    ///     let b = Value::new(&mut frame, 2isize)?;
+    ///     let nt = named_tuple!(&mut frame, "a" => a, "b" => b)?;
     ///
     ///     // Call the previously defined function. This function simply sums its three
     ///     // keyword arguments and has no side effects, so it's safe to call.
     ///     let res = unsafe {
     ///         func.with_keywords(nt)?
-    ///             .call0(&mut *frame)?
+    ///             .call0(&mut frame)?
     ///             .into_jlrs_result()?
     ///             .unbox::<isize>()?
     ///     };

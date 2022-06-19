@@ -11,9 +11,9 @@ mod tests {
             fn $name() {
                 JULIA.with(|j| {
                     let mut jlrs = j.borrow_mut();
-                    jlrs.scope_with_capacity(1, |_global, frame| {
+                    jlrs.scope_with_capacity(1, |_global, mut frame| {
                         let val: $t = $val;
-                        let v = Value::new(frame, val)?;
+                        let v = Value::new(&mut frame, val)?;
                         assert!(<$t>::valid_layout(v.datatype().as_value()));
                         Ok(())
                     })
@@ -25,8 +25,8 @@ mod tests {
             fn $invalid_name() {
                 JULIA.with(|j| {
                     let mut jlrs = j.borrow_mut();
-                    jlrs.scope_with_capacity(1, |_global, frame| {
-                        let v = Value::new(frame, null_mut::<$t>())?;
+                    jlrs.scope_with_capacity(1, |_global, mut frame| {
+                        let v = Value::new(&mut frame, null_mut::<$t>())?;
                         assert!(!<$t>::valid_layout(v.datatype().as_value()));
                         Ok(())
                     })
@@ -140,8 +140,8 @@ mod tests {
     fn invalid_ptr_layout() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(1, |_global, frame| {
-                let v = Value::new(frame, null_mut::<u8>())?;
+            jlrs.scope_with_capacity(1, |_global, mut frame| {
+                let v = Value::new(&mut frame, null_mut::<u8>())?;
                 assert!(!<u8>::valid_layout(v.datatype().as_value()));
                 Ok(())
             })
@@ -156,9 +156,9 @@ mod tests {
 
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope(|global, frame| {
+            jlrs.scope(|global, mut frame| {
                 unsafe {
-                    let v = Array::new::<i32, _, _, _>(frame, (2, 2))?
+                    let v = Array::new::<i32, _, _, _>(&mut frame, (2, 2))?
                         .into_jlrs_result()?
                         .as_value();
                     assert!(ArrayRef::valid_layout(v.datatype().as_value()));
@@ -180,8 +180,8 @@ mod tests {
     fn invalid_layout_array() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope(|_global, frame| {
-                let v = Array::new::<i32, _, _, _>(frame, (2, 2))?
+            jlrs.scope(|_global, mut frame| {
+                let v = Array::new::<i32, _, _, _>(&mut frame, (2, 2))?
                     .into_jlrs_result()?
                     .as_value();
                 assert!(!bool::valid_layout(v));

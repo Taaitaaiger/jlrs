@@ -21,8 +21,8 @@ mod tests {
                 );
 
                 let (sender, recv) = tokio::sync::oneshot::channel();
-                r.borrow_mut().try_blocking_task(|_global, frame| {
-                    Value::eval_string(frame, ASYNC_TESTS_JL)?.into_jlrs_result()?;
+                r.borrow_mut().try_blocking_task(|_global, mut frame| {
+                    Value::eval_string(&mut frame, ASYNC_TESTS_JL)?.into_jlrs_result()?;
                     Ok(())
                 }, sender).expect("Could not send blocking task");
 

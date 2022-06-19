@@ -1,27 +1,24 @@
 //! A reusable slot in a frame.
 
-use super::frame::Frame;
 use crate::{
+    memory::stack_page::Slot,
     private::Private,
     wrappers::ptr::{private::WrapperPriv, value::Value, ValueRef},
 };
-use std::{cell::Cell, ffi::c_void, marker::PhantomData};
+use std::marker::PhantomData;
 
 /// A reusable slot in a frame. Unlike an `Output`, a `ReusableSlot` can be used multiple times.
 /// It's your responsibility to ensure a value that is rooted using a `ReusableSlot` is never
 /// used after the slot has been reset.
 #[derive(Clone, Copy)]
 pub struct ReusableSlot<'target> {
-    slot: *const Cell<*mut c_void>,
+    slot: *const Slot,
     _marker: PhantomData<fn(&'target ())>,
 }
 
 impl<'target> ReusableSlot<'target> {
     // Safety: slot must have been reserved in _frame
-    pub(crate) unsafe fn new<F: Frame<'target>>(
-        _frame: &F,
-        slot: *const Cell<*mut c_void>,
-    ) -> Self {
+    pub(crate) unsafe fn new(slot: &'target Slot) -> Self {
         ReusableSlot {
             slot,
             _marker: PhantomData,

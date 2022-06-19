@@ -11,9 +11,9 @@ mod not_lts {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_capacity(1, |_, frame| unsafe {
+            jlrs.scope_with_capacity(1, |_, mut frame| unsafe {
                 let closure =
-                    Value::eval_string(&mut *frame, "Base.Experimental.@opaque (x::Int64) -> 2x")?
+                    Value::eval_string(&mut frame, "Base.Experimental.@opaque (x::Int64) -> 2x")?
                         .into_jlrs_result()?;
 
                 assert!(closure.is::<OpaqueClosure>());
@@ -31,15 +31,15 @@ mod not_lts {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_capacity(3, |_, frame| unsafe {
+            jlrs.scope_with_capacity(3, |_, mut frame| unsafe {
                 let closure =
-                    Value::eval_string(&mut *frame, "Base.Experimental.@opaque (x::Int64) -> 2x")?
+                    Value::eval_string(&mut frame, "Base.Experimental.@opaque (x::Int64) -> 2x")?
                         .into_jlrs_result()?
                         .cast::<OpaqueClosure>()?;
 
-                let arg = Value::new(&mut *frame, 3isize)?;
+                let arg = Value::new(&mut frame, 3isize)?;
                 let res = closure
-                    .call1(&mut *frame, arg)?
+                    .call1(&mut frame, arg)?
                     .into_jlrs_result()?
                     .unbox::<isize>()?;
 
@@ -55,14 +55,14 @@ mod not_lts {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_capacity(3, |_, frame| unsafe {
+            jlrs.scope_with_capacity(3, |_, mut frame| unsafe {
                 let closure =
-                    Value::eval_string(&mut *frame, "Base.Experimental.@opaque (x::Int64) -> 2x")?
+                    Value::eval_string(&mut frame, "Base.Experimental.@opaque (x::Int64) -> 2x")?
                         .into_jlrs_result()?
                         .cast::<OpaqueClosure>()?;
 
-                let arg = Value::new(&mut *frame, 3usize)?;
-                let res = closure.call1(&mut *frame, arg)?;
+                let arg = Value::new(&mut frame, 3usize)?;
+                let res = closure.call1(&mut frame, arg)?;
 
                 assert!(res.is_err());
                 Ok(())
@@ -76,14 +76,14 @@ mod not_lts {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_capacity(3, |_, frame| unsafe {
+            jlrs.scope_with_capacity(3, |_, mut frame| unsafe {
                 let closure =
-                    Value::eval_string(&mut *frame, "Base.Experimental.@opaque (x::Int64) -> 2x")?
+                    Value::eval_string(&mut frame, "Base.Experimental.@opaque (x::Int64) -> 2x")?
                         .into_jlrs_result()?
                         .cast::<OpaqueClosure>()?;
 
-                let arg = Value::new(&mut *frame, 3isize)?;
-                let res = closure.call2(&mut *frame, arg, arg)?;
+                let arg = Value::new(&mut frame, 3isize)?;
+                let res = closure.call2(&mut frame, arg, arg)?;
 
                 assert!(res.is_err());
                 Ok(())
@@ -97,17 +97,17 @@ mod not_lts {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_capacity(3, |_, frame| unsafe {
+            jlrs.scope_with_capacity(3, |_, mut frame| unsafe {
                 let closure = Value::eval_string(
-                    &mut *frame,
+                    &mut frame,
                     "Base.Experimental.@opaque (x::Int64, y::Int64...) -> 2x + sum(y)",
                 )?
                 .into_jlrs_result()?
                 .cast::<OpaqueClosure>()?;
 
-                let arg = Value::new(&mut *frame, 3isize)?;
+                let arg = Value::new(&mut frame, 3isize)?;
                 let res = closure
-                    .call2(&mut *frame, arg, arg)?
+                    .call2(&mut frame, arg, arg)?
                     .into_jlrs_result()?
                     .unbox::<isize>()?;
 

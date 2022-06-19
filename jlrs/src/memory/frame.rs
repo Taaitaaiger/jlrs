@@ -12,10 +12,19 @@
 //! [`CallAsync`]: crate::call::CallAsync
 //! [`memory`]: crate::memory
 
-use super::{mode::Mode, output::Output, reusable_slot::ReusableSlot, stack_page::StackPage};
-use crate::{error::JlrsResult, private::Private};
+use self::private::FrameOwner;
+use crate::{
+    error::JlrsResult,
+    memory::{
+        mode::Mode,
+        output::Output,
+        reusable_slot::ReusableSlot,
+        stack_page::{Slot, StackPage},
+    },
+    private::Private,
+};
 use jl_sys::jl_value_t;
-use std::{cell::Cell, ffi::c_void, ptr::NonNull};
+use std::ptr::NonNull;
 
 pub(crate) const MIN_FRAME_CAPACITY: usize = 16;
 
@@ -24,7 +33,7 @@ pub(crate) const MIN_FRAME_CAPACITY: usize = 16;
 /// Frames created with a capacity can store at least that number of roots. A frame's capacity is
 /// at least 16.
 pub struct GcFrame<'frame, M: Mode> {
-    raw_frame: &'frame [Cell<*mut c_void>],
+    raw_frame: &'frame [Slot],
     page: Option<StackPage>,
     mode: M,
 }
@@ -32,14 +41,17 @@ pub struct GcFrame<'frame, M: Mode> {
 impl<'frame, M: Mode> GcFrame<'frame, M> {
     // Safety: frames must form a single nested hierarchy. A new frame must only be created when
     // entering a new scope.
-    pub(crate) unsafe fn new(raw_frame: &'frame [Cell<*mut c_void>], mode: M) -> Self {
+    pub(crate) unsafe fn new(raw_frame: &'frame [Slot], mode: M) -> (Self, FrameOwner<'frame, M>) {
         mode.push_frame(raw_frame, Private);
 
-        GcFrame {
+        let owner = FrameOwner::new(raw_frame, mode);
+        let frame = GcFrame {
             raw_frame,
             page: None,
             mode,
-        }
+        };
+
+        (frame, owner)
     }
 
     // Safety: capacity >= n_slots, the n_roots pointers the garbage collector
@@ -58,13 +70,6 @@ impl<'frame, M: Mode> GcFrame<'frame, M> {
             .get_unchecked(n_roots + 2)
             .set(value.cast().as_ptr());
         self.set_n_roots(n_roots + 1);
-    }
-}
-
-impl<'frame, M: Mode> Drop for GcFrame<'frame, M> {
-    fn drop(&mut self) {
-        // The frame was pushed when the frame was created.
-        unsafe { self.mode.pop_frame(self.raw_frame, Private) }
     }
 }
 
@@ -99,7 +104,7 @@ cfg_if::cfg_if! {
         /// Frames created with a capacity can store at least that number of roots. A frame's
         /// capacity is at least 16.
         pub struct AsyncGcFrame<'frame> {
-            raw_frame: &'frame [Cell<*mut c_void>],
+            raw_frame: &'frame [Slot],
             page: Option<StackPage>,
             mode: Async<'frame>,
         }
@@ -114,36 +119,15 @@ cfg_if::cfg_if! {
             where
                 T: 'frame,
                 G: Future<Output = JlrsResult<T>>,
-                F: FnOnce(&'nested mut AsyncGcFrame<'nested>) -> G,
+                F: FnOnce(AsyncGcFrame<'nested>) -> G,
             {
                 // Safety: the lifetime of the borrow is extended, but it's valid during the call
                 // to func and data returned from func must live longer.
-                unsafe {
-                    let mut nested = self.nest_async(0);
-                    let p_nested = &mut nested as *mut _;
-                    let r_nested = &mut *p_nested;
-
-                    let ret =  func(r_nested).await;
-                    std::mem::drop(nested);
-                    ret
-                }
+                let (nested, owner) = self.nest_async(0);
+                let ret =  func(nested).await;
+                std::mem::drop(owner);
+                ret
             }
-
-            /*
-            pub fn new_async_scope<'nested, T, G, F>(&'nested mut self, func: F) -> Pin<Box<dyn Future<Output = JlrsResult<T>> + 'nested>>
-            where
-                T: 'nested,
-                G: Future<Output = JlrsResult<T>>,
-                for<'b> F: 'nested + FnOnce(&mut AsyncGcFrame<'b>) -> G,
-            {
-                Box::pin(async move {
-                    let mut nested = self.nest_async(0);
-                    let ret =  func(&mut nested).await;
-                    std::mem::drop(nested);
-                    ret
-                })
-            }
-            */
 
             /// An async version of [`Frame::scope_with_capacity`].
             ///
@@ -158,42 +142,39 @@ cfg_if::cfg_if! {
             where
                 T: 'frame,
                 G: Future<Output = JlrsResult<T>>,
-                F: FnOnce(&'nested mut AsyncGcFrame<'nested>) -> G,
+                F: FnOnce(AsyncGcFrame<'nested>) -> G,
             {
                 // Safety: the lifetime of the borrow is extended, but it's valid during the call
                 // to func and data returned from func must live longer.
-                unsafe {
-                    let mut nested = self.nest_async(capacity);
-                    let p_nested = &mut nested as *mut _;
-                    let r_nested = &mut *p_nested;
-
-                    let ret =  func(r_nested).await;
-                    std::mem::drop(nested);
-                    ret
-                }
+                let (nested, owner) = self.nest_async(capacity);
+                let ret =  func(nested).await;
+                std::mem::drop(owner);
+                ret
             }
-
 
             // Safety: frames must form a single nested hierarchy. A new frame must only be
             // created when entering a new scope.
             pub(crate) unsafe fn new(
-                raw_frame: &'frame [Cell<*mut c_void>],
+                raw_frame: &'frame [Slot],
                 mode: Async<'frame>,
-            ) -> Self {
+            ) -> (Self, FrameOwner<'frame, Async<'frame>>) {
                 // Is popped when this frame is dropped
                 mode.push_frame(raw_frame, Private);
 
-                AsyncGcFrame {
+                let owner = FrameOwner::new(raw_frame, mode);
+                let frame = AsyncGcFrame {
                     raw_frame,
                     page: None,
                     mode,
-                }
+                };
+
+                (frame, owner)
             }
 
             pub(crate) fn nest_async<'nested>(
                 &'nested mut self,
                 capacity: usize,
-            ) -> AsyncGcFrame<'nested> {
+            ) -> (AsyncGcFrame<'nested>, FrameOwner<'nested, Async<'nested>>) {
                 let used = self.n_roots() + 2;
                 let new_frame_size = MIN_FRAME_CAPACITY.max(capacity) + 2;
                 let raw_frame = if self.page.is_some() {
@@ -237,19 +218,12 @@ cfg_if::cfg_if! {
             }
         }
 
-        impl<'frame> Drop for AsyncGcFrame<'frame> {
-            fn drop(&mut self) {
-                // Safety: The frame was pushed when the frame was created.
-                unsafe { self.mode.pop_frame(self.raw_frame, Private) }
-            }
-        }
-
         impl<'frame> Frame<'frame> for AsyncGcFrame<'frame> {
             fn reusable_slot(&mut self) -> JlrsResult<ReusableSlot<'frame>> {
                 // Safety: the slot can only be used while the frame exists.
                 unsafe {
                     let slot = <Self as private::FramePriv>::reserve_slot(self, Private)?;
-                    Ok(ReusableSlot::new(self, slot))
+                    Ok(ReusableSlot::new(slot))
                 }
             }
 
@@ -265,7 +239,7 @@ cfg_if::cfg_if! {
                 // Safety: the slot can only be used while the frame exists.
                 unsafe {
                     let slot = <Self as private::FramePriv>::reserve_slot(self, Private)?;
-                    Ok(Output::new(self, slot))
+                    Ok(Output::new(slot))
                 }
             }
         }
@@ -274,11 +248,10 @@ cfg_if::cfg_if! {
 
 /// Functionality shared by the different frame types.
 pub trait Frame<'frame>: private::FramePriv<'frame> {
-    /// Reborrow the frame.
+    /// Convert the frame to a scope.
     ///
     /// This method takes a mutable reference to a frame and returns it, it can be used as an
-    /// alternative to reborrowing a frame with `&mut *frame` when a [`Scope`] or
-    /// [`PartialScope`] is needed.
+    /// alternative to borrowing a frame with when a [`Scope`] or [`PartialScope`] is needed.
     ///
     /// [`Scope`]: crate::memory::scope::Scope
     /// [`PartialScope`]: crate::memory::scope::PartialScope
@@ -308,11 +281,11 @@ pub trait Frame<'frame>: private::FramePriv<'frame> {
     #[inline(never)]
     fn scope<T, F>(&mut self, func: F) -> JlrsResult<T>
     where
-        for<'inner> F: FnOnce(&mut GcFrame<'inner, Self::Mode>) -> JlrsResult<T>,
+        for<'inner> F: FnOnce(GcFrame<'inner, Self::Mode>) -> JlrsResult<T>,
     {
-        let mut nested = self.nest(0, Private);
-        let ret = func(&mut nested);
-        std::mem::drop(nested);
+        let (nested, owner) = self.nest(0, Private);
+        let ret = func(nested);
+        std::mem::drop(owner);
         ret
     }
 
@@ -322,11 +295,11 @@ pub trait Frame<'frame>: private::FramePriv<'frame> {
     #[inline(never)]
     fn scope_with_capacity<T, F>(&mut self, capacity: usize, func: F) -> JlrsResult<T>
     where
-        for<'inner> F: FnOnce(&mut GcFrame<'inner, Self::Mode>) -> JlrsResult<T>,
+        for<'inner> F: FnOnce(GcFrame<'inner, Self::Mode>) -> JlrsResult<T>,
     {
-        let mut nested = self.nest(capacity, Private);
-        let ret = func(&mut nested);
-        std::mem::drop(nested);
+        let (nested, owner) = self.nest(capacity, Private);
+        let ret = func(nested);
+        std::mem::drop(owner);
         ret
     }
 }
@@ -336,7 +309,7 @@ impl<'frame, M: Mode> Frame<'frame> for GcFrame<'frame, M> {
         // Safety: the slot can only be used while the frame exists.
         unsafe {
             let slot = <Self as private::FramePriv>::reserve_slot(self, Private)?;
-            Ok(ReusableSlot::new(self, slot))
+            Ok(ReusableSlot::new(slot))
         }
     }
 
@@ -352,7 +325,7 @@ impl<'frame, M: Mode> Frame<'frame> for GcFrame<'frame, M> {
         // Safety: the slot can only be used while the frame exists.
         unsafe {
             let slot = <Self as private::FramePriv>::reserve_slot(self, Private)?;
-            Ok(Output::new(self, slot))
+            Ok(Output::new(slot))
         }
     }
 }
@@ -373,14 +346,14 @@ impl<'frame> Frame<'frame> for NullFrame<'frame> {
 
     fn scope<T, F>(&mut self, _func: F) -> JlrsResult<T>
     where
-        for<'inner> F: FnOnce(&mut GcFrame<'inner, Self::Mode>) -> JlrsResult<T>,
+        for<'inner> F: FnOnce(GcFrame<'inner, Self::Mode>) -> JlrsResult<T>,
     {
         Err(AllocError::NullFrame)?
     }
 
     fn scope_with_capacity<T, F>(&mut self, _capacity: usize, _func: F) -> JlrsResult<T>
     where
-        for<'inner> F: FnOnce(&mut GcFrame<'inner, Self::Mode>) -> JlrsResult<T>,
+        for<'inner> F: FnOnce(GcFrame<'inner, Self::Mode>) -> JlrsResult<T>,
     {
         Err(AllocError::NullFrame)?
     }
@@ -391,19 +364,45 @@ impl<'frame> Frame<'frame> for NullFrame<'frame> {
 }
 
 mod private {
-    use std::{
-        cell::Cell,
-        ffi::c_void,
-        ptr::{null_mut, NonNull},
-    };
+    use std::ptr::{null_mut, NonNull};
 
     use super::{Frame as _, MIN_FRAME_CAPACITY};
     use crate::error::JlrsResult;
     use crate::memory::frame::GcFrame;
     use crate::memory::mode::Mode;
+    use crate::memory::stack_page::Slot;
     use crate::memory::stack_page::StackPage;
     use crate::wrappers::ptr::private::WrapperPriv;
     use crate::{error::AllocError, private::Private};
+
+    pub struct FrameOwner<'frame, M: Mode> {
+        mode: M,
+        raw_frame: &'frame [Slot],
+    }
+
+    impl<'frame, M: Mode> FrameOwner<'frame, M> {
+        // Only one owner must be created for a frame.
+        pub(crate) unsafe fn new(raw_frame: &'frame [Slot], mode: M) -> Self {
+            FrameOwner { mode, raw_frame }
+        }
+    }
+
+    #[cfg(feature = "async")]
+    impl<'frame> FrameOwner<'frame, Async<'frame>> {
+        pub(crate) unsafe fn reconstruct(&self) -> AsyncGcFrame<'frame> {
+            AsyncGcFrame {
+                raw_frame: self.raw_frame,
+                page: None,
+                mode: self.mode,
+            }
+        }
+    }
+
+    impl<M: Mode> Drop for FrameOwner<'_, M> {
+        fn drop(&mut self) {
+            unsafe { self.mode.pop_frame(self.raw_frame, Private) }
+        }
+    }
 
     pub trait FramePriv<'frame> {
         type Mode: Mode;
@@ -416,13 +415,16 @@ mod private {
         ) -> Result<T, AllocError>;
 
         // safety: this slot must only be used while the frame exists.
-        unsafe fn reserve_slot(&mut self, _: Private) -> JlrsResult<&'frame Cell<*mut c_void>>;
+        unsafe fn reserve_slot(&mut self, _: Private) -> JlrsResult<&'frame Slot>;
 
         fn nest<'nested>(
             &'nested mut self,
             capacity: usize,
             _: Private,
-        ) -> GcFrame<'nested, Self::Mode>;
+        ) -> (
+            GcFrame<'nested, Self::Mode>,
+            FrameOwner<'nested, Self::Mode>,
+        );
     }
 
     impl<'frame, M: Mode> FramePriv<'frame> for GcFrame<'frame, M> {
@@ -442,7 +444,7 @@ mod private {
             Ok(T::wrap_non_null(value, Private))
         }
 
-        unsafe fn reserve_slot(&mut self, _: Private) -> JlrsResult<&'frame Cell<*mut c_void>> {
+        unsafe fn reserve_slot(&mut self, _: Private) -> JlrsResult<&'frame Slot> {
             let n_roots = self.n_roots();
             if n_roots == self.capacity() {
                 Err(AllocError::Full { cap: n_roots })?
@@ -458,7 +460,10 @@ mod private {
             &'nested mut self,
             capacity: usize,
             _: Private,
-        ) -> GcFrame<'nested, Self::Mode> {
+        ) -> (
+            GcFrame<'nested, Self::Mode>,
+            FrameOwner<'nested, Self::Mode>,
+        ) {
             let used = self.n_roots() + 2;
             let new_frame_size = MIN_FRAME_CAPACITY.max(capacity) + 2;
             let raw_frame = if self.page.is_some() {
@@ -500,7 +505,7 @@ mod private {
                     Err(AllocError::NullFrame)?
                 }
 
-                unsafe fn reserve_slot(&mut self, _: Private) -> JlrsResult<&'frame Cell<*mut c_void>> {
+                unsafe fn reserve_slot(&mut self, _: Private) -> JlrsResult<&'frame Slot> {
                     Err(AllocError::NullFrame)?
                 }
 
@@ -508,7 +513,7 @@ mod private {
                     &'nested mut self,
                     _capacity: usize,
                     _: Private,
-                ) -> GcFrame<'nested, Self::Mode> {
+                ) -> (GcFrame<'nested, Self::Mode>, FrameOwner<'nested, Self::Mode>) {
                     unreachable!()
                 }
             }
@@ -537,7 +542,7 @@ mod private {
                     Ok(T::wrap_non_null(value, Private))
                 }
 
-                unsafe fn reserve_slot(&mut self, _: Private) -> JlrsResult<&'frame Cell<*mut c_void>> {
+                unsafe fn reserve_slot(&mut self, _: Private) -> JlrsResult<&'frame Slot> {
                     let n_roots = self.n_roots();
                     if n_roots == self.capacity() {
                         Err(AllocError::Full { cap: n_roots })?
@@ -556,7 +561,7 @@ mod private {
                     &'nested mut self,
                     capacity: usize,
                     _: Private,
-                ) -> GcFrame<'nested, Self::Mode> {
+                ) -> (GcFrame<'nested, Self::Mode>, FrameOwner<'nested, Self::Mode>) {
                     let used = self.n_roots() + 2;
                     let new_frame_size = MIN_FRAME_CAPACITY.max(capacity) + 2;
                     let raw_frame = if self.page.is_some() {
@@ -614,8 +619,8 @@ mod tests {
             let page_size = page.size();
 
             let frame = GcFrame::new(page.as_ref(), mode::Sync);
-            assert_eq!(frame.capacity(), page_size - 2);
-            assert_eq!(frame.n_roots(), 0);
+            assert_eq!(frame.0.capacity(), page_size - 2);
+            assert_eq!(frame.0.n_roots(), 0);
         })
     }
 
@@ -626,10 +631,10 @@ mod tests {
             let page = julia.get_page();
             let page_size = page.size();
             let mut frame = GcFrame::new(page.as_ref(), mode::Sync);
-            let _value = Value::new(&mut frame, 1usize).unwrap();
+            let _value = Value::new(&mut frame.0, 1usize).unwrap();
 
-            assert_eq!(frame.capacity(), page_size - 2);
-            assert_eq!(frame.n_roots(), 1);
+            assert_eq!(frame.0.capacity(), page_size - 2);
+            assert_eq!(frame.0.n_roots(), 1);
         })
     }
 
@@ -642,13 +647,13 @@ mod tests {
             let mut frame = GcFrame::new(page.as_ref(), mode::Sync);
 
             for _ in 0..page_size - 2 {
-                let _value = Value::new(&mut frame, 1usize).unwrap();
+                let _value = Value::new(&mut frame.0, 1usize).unwrap();
             }
 
-            assert_eq!(frame.capacity(), page_size - 2);
-            assert_eq!(frame.n_roots(), page_size - 2);
+            assert_eq!(frame.0.capacity(), page_size - 2);
+            assert_eq!(frame.0.n_roots(), page_size - 2);
 
-            assert!(Value::new(&mut frame, 1usize).is_err());
+            assert!(Value::new(&mut frame.0, 1usize).is_err());
         })
     }
 
@@ -661,8 +666,8 @@ mod tests {
             let mut frame = GcFrame::new(page.as_ref(), mode::Sync);
 
             {
-                let nested = frame.nest(0, Private);
-                let capacity = nested.capacity();
+                let nested = frame.0.nest(0, Private);
+                let capacity = nested.0.capacity();
                 assert_eq!(capacity, page_size - 4);
             }
         })
@@ -677,9 +682,9 @@ mod tests {
             let mut frame = GcFrame::new(page.as_ref(), mode::Sync);
 
             {
-                let nested = frame.nest(2 * page_size, Private);
-                let capacity = nested.capacity();
-                let n_roots = nested.n_roots();
+                let nested = frame.0.nest(2 * page_size, Private);
+                let capacity = nested.0.capacity();
+                let n_roots = nested.0.n_roots();
                 assert_eq!(capacity, 2 * page_size);
                 assert_eq!(n_roots, 0);
             }
@@ -695,13 +700,13 @@ mod tests {
             let mut frame = GcFrame::new(page.as_ref(), mode::Sync);
 
             {
-                frame.nest(2 * page_size, Private);
+                frame.0.nest(2 * page_size, Private);
             }
 
             {
-                let nested = frame.nest(0, Private);
-                let capacity = nested.capacity();
-                let n_roots = nested.n_roots();
+                let nested = frame.0.nest(0, Private);
+                let capacity = nested.0.capacity();
+                let n_roots = nested.0.n_roots();
                 assert_eq!(capacity, 2 * page_size);
                 assert_eq!(n_roots, 0);
             }

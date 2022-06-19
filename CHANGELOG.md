@@ -86,3 +86,5 @@
  - `JuliaString::as_slice` has been renamed to `JuliaString::to_bytes`, `Symbol::as_slice` has been renamed to `Symbol::to_bytes`.
 
  - `Symbol::new_bytes_unchecked` has been added, `Symbol::to_bytes` has been renamed to `Symbol::as_bytes`.
+
+ - Closures and async trait methods that are called in a scope take a frame by value instead of by mutable reference. This gets rid of the need to reborrow the frame. 

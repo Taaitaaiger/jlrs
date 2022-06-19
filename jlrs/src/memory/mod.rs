@@ -10,9 +10,9 @@
 //!
 //! A scope must be created before data can be rooted, the sync runtime lets you create a scope
 //! directly with [`Julia::scope`]. This method takes a closure which takes two arguments, the
-//! second is a mutable reference to a [`GcFrame`]. A `GcFrame` is used to store roots, each scope
-//! has its own `GcFrame`, any Julia data rooted in this frame is guaranteed to be protected from
-//! being freed by the GC until you leave the scope.
+//! second is a [`GcFrame`]. A `GcFrame` is used to store roots, each scope has its own `GcFrame`,
+//! any Julia data rooted in this frame is guaranteed to be protected from being freed by the GC
+//! until you leave the scope.
 //!
 //! There are two other frame types, [`AsyncGcFrame`] and [`NullFrame`], the first is used by the
 //! async runtime and is used with several async functions, while the latter is only available

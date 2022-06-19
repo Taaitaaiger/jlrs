@@ -20,14 +20,14 @@ impl AsyncTask for MyTask {
     // Include the custom code MyTask needs.
     async fn register<'base>(
         _global: Global<'base>,
-        frame: &mut AsyncGcFrame<'base>,
+        mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<()> {
         unsafe {
             let path = PathBuf::from("MyModule.jl");
             if path.exists() {
-                Value::include(frame, "MyModule.jl")?.into_jlrs_result()?;
+                Value::include(&mut frame, "MyModule.jl")?.into_jlrs_result()?;
             } else {
-                Value::include(frame, "examples/MyModule.jl")?.into_jlrs_result()?;
+                Value::include(&mut frame, "examples/MyModule.jl")?.into_jlrs_result()?;
             }
         }
         Ok(())
@@ -39,11 +39,11 @@ impl AsyncTask for MyTask {
     async fn run<'base>(
         &mut self,
         global: Global<'base>,
-        frame: &mut AsyncGcFrame<'base>,
+        mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
         // Convert the two arguments to values Julia can work with.
-        let dims = Value::new(&mut *frame, self.dims)?;
-        let iters = Value::new(&mut *frame, self.iters)?;
+        let dims = Value::new(&mut frame, self.dims)?;
+        let iters = Value::new(&mut frame, self.iters)?;
 
         // Get `complexfunc` in `MyModule`, call it on another thread with `call_async`, and await
         // the result before casting it to an `f64` (which that function returns). A function that
@@ -57,7 +57,7 @@ impl AsyncTask for MyTask {
                 .wrapper_unchecked()
                 .function_ref("complexfunc")?
                 .wrapper_unchecked()
-                .call_async(&mut *frame, &mut [dims, iters])
+                .call_async(&mut frame, &mut [dims, iters])
                 .await?
                 .unwrap()
                 .unbox::<f64>()

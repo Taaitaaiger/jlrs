@@ -53,12 +53,12 @@ mod tests {
     fn call_multithreaded() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope(|global, frame| unsafe {
-                let multithreaded_ptr = Value::new(&mut *frame, multithreaded as *mut std::ffi::c_void)?;
-                let drop_handle_ptr = Value::new(&mut *frame, drop_handle as *mut std::ffi::c_void)?;
+            jlrs.scope(|global, mut frame| unsafe {
+                let multithreaded_ptr = Value::new(&mut frame, multithreaded as *mut std::ffi::c_void)?;
+                let drop_handle_ptr = Value::new(&mut frame, drop_handle as *mut std::ffi::c_void)?;
 
                 let func = Value::eval_string(
-                    &mut *frame,
+                    &mut frame,
                     "function run(multithreaded_ptr::Ptr{Cvoid}, drop_handle_ptr::Ptr{Cvoid})
                         task = @async begin
                             condition = Base.AsyncCondition()

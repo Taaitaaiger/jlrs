@@ -12,9 +12,9 @@ mod tests {
             fn $name() {
                 JULIA.with(|j| {
                     let mut jlrs = j.borrow_mut();
-                    jlrs.scope_with_capacity(1, |_global, frame| {
+                    jlrs.scope_with_capacity(1, |_global, mut frame| {
                         let val: $t = $val;
-                        let v = Value::new(frame, val)?;
+                        let v = Value::new(&mut frame, val)?;
                         assert!(<$t as Typecheck>::typecheck(v.datatype()));
                         Ok(())
                     })
@@ -26,9 +26,9 @@ mod tests {
             fn $invalid_name() {
                 JULIA.with(|j| {
                     let mut jlrs = j.borrow_mut();
-                    jlrs.scope_with_capacity(1, |_global, frame| {
+                    jlrs.scope_with_capacity(1, |_global, mut frame| {
                         let val: $t = $val;
-                        let v = Value::new(frame, val)?;
+                        let v = Value::new(&mut frame, val)?;
                         assert!(!<*mut $t as Typecheck>::typecheck(v.datatype()));
                         Ok(())
                     })
@@ -191,11 +191,11 @@ mod tests {
     fn abstract_ref_typecheck() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(1, |global, frame| unsafe {
+            jlrs.scope_with_capacity(1, |global, mut frame| unsafe {
                 let v = UnionAll::ref_type(global)
                     .as_value()
                     .apply_type_unchecked(
-                        &mut *frame,
+                        &mut frame,
                         &mut [DataType::uint8_type(global).as_value()],
                     )?
                     .cast::<DataType>()?;
@@ -213,17 +213,17 @@ mod tests {
     fn vec_element_typecheck() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(1, |global, frame| unsafe {
-                let value = Value::new(&mut *frame, 0u8)?;
+            jlrs.scope_with_capacity(1, |global, mut frame| unsafe {
+                let value = Value::new(&mut frame, 0u8)?;
                 let vec_elem_ty = Module::base(global)
-                    .global(&mut *frame, "VecElement")?
+                    .global(&mut frame, "VecElement")?
                     .as_value()
                     .apply_type_unchecked(
-                        &mut *frame,
+                        &mut frame,
                         &mut [DataType::uint8_type(global).as_value()],
                     )?
                     .cast::<DataType>()?
-                    .instantiate(&mut *frame, &mut [value])?
+                    .instantiate(&mut frame, &mut [value])?
                     .into_jlrs_result()?
                     .datatype();
 
@@ -239,11 +239,11 @@ mod tests {
     fn type_type_typecheck() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(1, |global, frame| unsafe {
+            jlrs.scope_with_capacity(1, |global, mut frame| unsafe {
                 let ty = UnionAll::type_type(global)
                     .as_value()
                     .apply_type_unchecked(
-                        &mut *frame,
+                        &mut frame,
                         &mut [DataType::uint8_type(global).as_value()],
                     )?
                     .cast::<DataType>()?;
@@ -260,9 +260,9 @@ mod tests {
     fn named_tuple_typecheck() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(1, |global, frame| {
-                let a = Value::new(&mut *frame, 1usize)?;
-                let named_tuple = named_tuple!(&mut *frame, "a" => a)?;
+            jlrs.scope_with_capacity(1, |global, mut frame| {
+                let a = Value::new(&mut frame, 1usize)?;
+                let named_tuple = named_tuple!(&mut frame, "a" => a)?;
 
                 assert!(NamedTuple::typecheck(named_tuple.datatype()));
                 assert!(!NamedTuple::typecheck(DataType::bool_type(global)));
@@ -516,9 +516,9 @@ mod tests {
     fn pointer_typecheck() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(1, |global, frame| {
+            jlrs.scope_with_capacity(1, |global, mut frame| {
                 let v: *mut u8 = null_mut();
-                let value = Value::new(&mut *frame, v)?;
+                let value = Value::new(&mut frame, v)?;
                 assert!(Pointer::typecheck(value.datatype()));
                 assert!(!Pointer::typecheck(DataType::bool_type(global)));
                 Ok(())
@@ -531,9 +531,9 @@ mod tests {
     fn llvm_pointer_typecheck() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(1, |global, frame| unsafe {
+            jlrs.scope_with_capacity(1, |global, mut frame| unsafe {
                 let cmd = "reinterpret(Core.LLVMPtr{UInt8,1}, 0)";
-                let value = Value::eval_string(&mut *frame, cmd)?.into_jlrs_result()?;
+                let value = Value::eval_string(&mut frame, cmd)?.into_jlrs_result()?;
                 assert!(LLVMPointer::typecheck(value.datatype()));
                 assert!(!LLVMPointer::typecheck(DataType::bool_type(global)));
                 Ok(())
@@ -572,11 +572,11 @@ mod tests {
     fn dispatch_tuple_typecheck() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(1, |global, frame| unsafe {
+            jlrs.scope_with_capacity(1, |global, mut frame| unsafe {
                 let tt = DataType::anytuple_type(global)
                     .as_value()
                     .apply_type_unchecked(
-                        &mut *frame,
+                        &mut frame,
                         &mut [
                             DataType::bool_type(global).as_value(),
                             DataType::int32_type(global).as_value(),

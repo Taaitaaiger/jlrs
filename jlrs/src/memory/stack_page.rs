@@ -2,17 +2,39 @@ use std::{cell::Cell, ffi::c_void, ptr::null_mut};
 
 const MIN_PAGE_SIZE: usize = 64;
 
+#[repr(transparent)]
+#[derive(Clone, Debug)]
+pub struct Slot {
+    cell: Cell<*mut c_void>,
+}
+
+impl Slot {
+    // Safety: Whenever a slot is updated the stack must remain valid.
+    pub(crate) unsafe fn set(&self, val: *mut c_void) {
+        self.cell.set(val)
+    }
+
+    pub(crate) fn get(&self) -> *mut c_void {
+        self.cell.get()
+    }
+}
+
+impl Default for Slot {
+    fn default() -> Self {
+        let cell = Cell::new(null_mut());
+        Slot { cell }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct StackPage {
-    raw: Box<[Cell<*mut c_void>]>,
+    raw: Box<[Slot]>,
 }
 
 impl StackPage {
     pub(crate) fn new(min_capacity: usize) -> Self {
-        let raw = vec![Cell::new(null_mut()); MIN_PAGE_SIZE.max(min_capacity)];
-        StackPage {
-            raw: raw.into_boxed_slice(),
-        }
+        let raw = vec![Slot::default(); MIN_PAGE_SIZE.max(min_capacity)].into_boxed_slice();
+        StackPage { raw }
     }
 
     pub(crate) fn size(&self) -> usize {
@@ -21,7 +43,7 @@ impl StackPage {
 
     // Safety: invariants required by the GC must be maintained when changing the contents of a
     // stack page.
-    pub(crate) unsafe fn as_ref(&self) -> &[Cell<*mut c_void>] {
+    pub(crate) unsafe fn as_ref(&self) -> &[Slot] {
         self.raw.as_ref()
     }
 }
@@ -34,13 +56,12 @@ impl Default for StackPage {
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "async")] {
-        use std::pin::Pin;
         use std::ptr::NonNull;
         use cfg_if::cfg_if;
 
         #[derive(Debug)]
         pub(crate) struct AsyncStackPage {
-            top: Pin<Box<[Cell<*mut c_void>; 2]>>,
+            top: Box<[Slot; 2]>,
             page: StackPage,
         }
 
@@ -52,17 +73,17 @@ cfg_if::cfg_if! {
         impl AsyncStackPage {
             // Safety: the page must be linked into the stack with AsyncStackpages::link_stacks
             // before it can be used.
-            pub(crate) unsafe fn new() -> Pin<Box<Self>> {
+            pub(crate) unsafe fn new() -> Box<Self> {
                 let stack = AsyncStackPage {
-                    top: Box::pin([Cell::new(null_mut()), Cell::new(null_mut())]),
+                    top: Box::new([Slot::default(), Slot::default()]),
                     page: StackPage::default(),
                 };
 
-                Box::pin(stack)
+                Box::new(stack)
             }
 
             // Safety: Must only be called when the async runtime is initialized.
-            pub(crate) unsafe fn link_stacks(stacks: &[Option<Pin<Box<Self>>>]) {
+            pub(crate) unsafe fn link_stacks(stacks: &[Option<Box<Self>>]) {
                 cfg_if! {
                     if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
                         for stack in stacks.iter() {
@@ -87,7 +108,7 @@ cfg_if::cfg_if! {
 
             // Safety: invariants required by the GC must be maintained when changing the contents of a
             // stack page.
-            pub(crate) unsafe fn page(&self) -> &[Cell<*mut c_void>] {
+            pub(crate) unsafe fn slots(&self) -> &[Slot] {
                 self.page.as_ref()
             }
 
@@ -104,7 +125,7 @@ cfg_if::cfg_if! {
             // Safety: whenever a new frame is pushed to this stack, this pointer has to be used
             // as if it's pointer to the top of the GC stack to ensure a single nested hierarchy
             // of scopes is maintained.
-            pub(crate) unsafe fn top(&self) -> &Cell<*mut c_void> {
+            pub(crate) unsafe fn top(&self) -> &Slot {
                 &self.top[1]
             }
         }

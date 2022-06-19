@@ -1,16 +1,15 @@
 //! Manage the garbage collector.
 
-use super::frame::Frame;
+use crate::memory::frame::Frame;
 #[cfg(feature = "sync-rt")]
 use crate::runtime::sync_rt::Julia;
-use jl_sys::{jl_gc_collect, jl_gc_collection_t, jl_gc_enable, jl_gc_is_enabled, jl_gc_safepoint};
-
 #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
 use crate::{
     call::Call,
     memory::global::Global,
     wrappers::ptr::{module::Module, value::Value},
 };
+use jl_sys::{jl_gc_collect, jl_gc_collection_t, jl_gc_enable, jl_gc_is_enabled, jl_gc_safepoint};
 
 /// The different collection modes.
 #[derive(Debug, Copy, Clone)]
@@ -24,7 +23,7 @@ pub enum GcCollection {
 ///
 /// This trait provides several methods that can be used to enable or disable the GC, force a
 /// collection, insert a safepoint, and to enable and disable GC logging. It's implemented for
-/// all mutable reference to implementations of [`Frame`], and [`Julia`].
+/// all mutable references to implementations of [`Frame`], and [`Julia`].
 pub trait Gc: private::GcPriv {
     /// Enable or disable the GC.
     fn enable_gc(&mut self, on: bool) -> bool {

@@ -10,37 +10,37 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_capacity(1, |global, frame| {
-                let arr = Array::new_for(&mut *frame, 4, DataType::module_type(global).as_value())?
+            jlrs.scope_with_capacity(1, |global, mut frame| {
+                let arr = Array::new_for(&mut frame, 4, DataType::module_type(global).as_value())?
                     .into_jlrs_result()?;
 
                 {
-                    let data = arr.value_data(frame)?;
+                    let data = arr.value_data(&frame)?;
                     assert_eq!(data.dimensions().as_slice(), &[4]);
                 }
 
                 unsafe {
-                    let data = arr.value_data_mut(frame)?;
+                    let data = arr.value_data_mut(&mut frame)?;
                     assert_eq!(data.dimensions().as_slice(), &[4]);
                 }
 
                 unsafe {
-                    let data = arr.unrestricted_value_data_mut(frame)?;
+                    let data = arr.unrestricted_value_data_mut(&frame)?;
                     assert_eq!(data.dimensions().as_slice(), &[4]);
                 }
 
                 {
-                    let data = arr.wrapper_data::<ModuleRef, _>(frame)?;
+                    let data = arr.wrapper_data::<ModuleRef, _>(&frame)?;
                     assert_eq!(data.dimensions().as_slice(), &[4]);
                 }
 
                 unsafe {
-                    let data = arr.wrapper_data_mut::<ModuleRef, _>(frame)?;
+                    let data = arr.wrapper_data_mut::<ModuleRef, _>(&mut frame)?;
                     assert_eq!(data.dimensions().as_slice(), &[4]);
                 }
 
                 unsafe {
-                    let data = arr.unrestricted_wrapper_data_mut::<ModuleRef, _>(frame)?;
+                    let data = arr.unrestricted_wrapper_data_mut::<ModuleRef, _>(&frame)?;
                     assert_eq!(data.dimensions().as_slice(), &[4]);
                 }
 
@@ -55,14 +55,14 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_capacity(1, |global, frame| {
-                let arr = Array::new_for(&mut *frame, 4, DataType::module_type(global).as_value())?
+            jlrs.scope_with_capacity(1, |global, mut frame| {
+                let arr = Array::new_for(&mut frame, 4, DataType::module_type(global).as_value())?
                     .into_jlrs_result()?;
 
                 let module = Module::core(global).as_value();
 
                 unsafe {
-                    let mut data = arr.value_data_mut(frame)?;
+                    let mut data = arr.value_data_mut(&mut frame)?;
                     assert!(data[0].is_undefined());
                     assert!(data.set(0, Some(module)).is_ok());
                     assert!(!data[0].is_undefined());
@@ -71,13 +71,13 @@ mod tests {
                 }
 
                 unsafe {
-                    let data = arr.value_data(frame)?;
+                    let data = arr.value_data(&frame)?;
                     assert_eq!(data[0].value_unchecked(), module);
                     assert_eq!(data.get(0).unwrap().value_unchecked(), module);
                 }
 
                 unsafe {
-                    let mut data = arr.unrestricted_value_data_mut(frame)?;
+                    let mut data = arr.unrestricted_value_data_mut(&frame)?;
                     assert!(data[1].is_undefined());
                     assert!(data.set(1, Some(module)).is_ok());
                     assert!(!data[1].is_undefined());
@@ -86,7 +86,7 @@ mod tests {
                 }
 
                 unsafe {
-                    let data = arr.wrapper_data::<ModuleRef, _>(frame)?;
+                    let data = arr.wrapper_data::<ModuleRef, _>(&frame)?;
                     assert_eq!(data[1].value_unchecked(), module);
                     assert_eq!(
                         data.get(1).unwrap().wrapper_unchecked(),
@@ -95,7 +95,7 @@ mod tests {
                 }
 
                 unsafe {
-                    let mut data = arr.wrapper_data_mut::<ModuleRef, _>(frame)?;
+                    let mut data = arr.wrapper_data_mut::<ModuleRef, _>(&mut frame)?;
                     assert!(data[2].is_undefined());
                     assert!(data.set(2, Some(module)).is_ok());
                     assert!(!data[2].is_undefined());
@@ -107,7 +107,7 @@ mod tests {
                 }
 
                 unsafe {
-                    let mut data = arr.unrestricted_wrapper_data_mut::<ModuleRef, _>(frame)?;
+                    let mut data = arr.unrestricted_wrapper_data_mut::<ModuleRef, _>(&frame)?;
                     assert!(data[3].is_undefined());
                     assert!(data.set(3, Some(module)).is_ok());
                     assert!(!data[3].is_undefined());
@@ -129,29 +129,29 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_capacity(1, |global, frame| unsafe {
-                let arr = Array::new_for(&mut *frame, 4, DataType::module_type(global).as_value())?
+            jlrs.scope_with_capacity(1, |global, mut frame| unsafe {
+                let arr = Array::new_for(&mut frame, 4, DataType::module_type(global).as_value())?
                     .into_jlrs_result()?;
 
                 let module = Value::nothing(global);
 
                 {
-                    let mut data = arr.value_data_mut(frame)?;
+                    let mut data = arr.value_data_mut(&mut frame)?;
                     assert!(data.set(0, Some(module)).is_err());
                 }
 
                 {
-                    let mut data = arr.unrestricted_value_data_mut(frame)?;
+                    let mut data = arr.unrestricted_value_data_mut(&frame)?;
                     assert!(data.set(0, Some(module)).is_err());
                 }
 
                 {
-                    let mut data = arr.wrapper_data_mut::<ModuleRef, _>(frame)?;
+                    let mut data = arr.wrapper_data_mut::<ModuleRef, _>(&mut frame)?;
                     assert!(data.set(0, Some(module)).is_err());
                 }
 
                 {
-                    let mut data = arr.unrestricted_wrapper_data_mut::<ModuleRef, _>(frame)?;
+                    let mut data = arr.unrestricted_wrapper_data_mut::<ModuleRef, _>(&frame)?;
                     assert!(data.set(0, Some(module)).is_err());
                 }
 
@@ -166,42 +166,42 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_capacity(1, |global, frame| unsafe {
-                let arr = Array::new_for(&mut *frame, 4, DataType::module_type(global).as_value())?
+            jlrs.scope_with_capacity(1, |global, mut frame| unsafe {
+                let arr = Array::new_for(&mut frame, 4, DataType::module_type(global).as_value())?
                     .into_jlrs_result()?;
 
                 {
-                    let data = arr.value_data_mut(frame)?;
+                    let data = arr.value_data_mut(&mut frame)?;
                     let slice = data.as_slice();
                     assert_eq!(slice.len(), 4)
                 }
 
                 {
-                    let data = arr.value_data(frame)?;
+                    let data = arr.value_data(&frame)?;
                     let slice = data.as_slice();
                     assert_eq!(slice.len(), 4)
                 }
 
                 {
-                    let data = arr.unrestricted_value_data_mut(frame)?;
+                    let data = arr.unrestricted_value_data_mut(&frame)?;
                     let slice = data.as_slice();
                     assert_eq!(slice.len(), 4)
                 }
 
                 {
-                    let data = arr.wrapper_data::<ModuleRef, _>(frame)?;
+                    let data = arr.wrapper_data::<ModuleRef, _>(&frame)?;
                     let slice = data.as_slice();
                     assert_eq!(slice.len(), 4)
                 }
 
                 {
-                    let data = arr.wrapper_data_mut::<ModuleRef, _>(frame)?;
+                    let data = arr.wrapper_data_mut::<ModuleRef, _>(&mut frame)?;
                     let slice = data.as_slice();
                     assert_eq!(slice.len(), 4)
                 }
 
                 {
-                    let data = arr.unrestricted_wrapper_data_mut::<ModuleRef, _>(frame)?;
+                    let data = arr.unrestricted_wrapper_data_mut::<ModuleRef, _>(&frame)?;
                     let slice = data.as_slice();
                     assert_eq!(slice.len(), 4)
                 }

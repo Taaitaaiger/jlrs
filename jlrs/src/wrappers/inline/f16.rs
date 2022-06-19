@@ -35,11 +35,11 @@ mod tests {
             let mut julia = j.borrow_mut();
 
             julia
-                .scope(|global, frame| unsafe {
-                    let one = Value::new(&mut *frame, f16::ONE)?;
-                    let func = Module::base(global).function(&mut *frame, "-")?;
+                .scope(|global, mut frame| unsafe {
+                    let one = Value::new(&mut frame, f16::ONE)?;
+                    let func = Module::base(global).function(&mut frame, "-")?;
                     let res = func
-                        .call2(&mut *frame, one, one)?
+                        .call2(&mut frame, one, one)?
                         .into_jlrs_result()?
                         .unbox::<f16>()?;
 

@@ -9,9 +9,9 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_capacity(1, |global, frame| unsafe {
+            jlrs.scope_with_capacity(1, |global, mut frame| unsafe {
                 Module::main(global)
-                    .require(&mut *frame, "LinearAlgebra")?
+                    .require(&mut frame, "LinearAlgebra")?
                     .expect("Cannot load LinearAlgebra");
                 Ok(())
             })
@@ -24,9 +24,9 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_capacity(1, |global, frame| unsafe {
+            jlrs.scope_with_capacity(1, |global, mut frame| unsafe {
                 Module::main(global)
-                    .require(&mut *frame, "LnearAlgebra")?
+                    .require(&mut frame, "LnearAlgebra")?
                     .expect_err("Can load LnearAlgebra");
                 Ok(())
             })
@@ -39,9 +39,9 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_capacity(4, |global, frame| unsafe {
+            jlrs.scope_with_capacity(4, |global, mut frame| unsafe {
                 let func = Module::base(global)
-                    .require(&mut *frame, "LinearAlgebra")?
+                    .require(&mut frame, "LinearAlgebra")?
                     .expect("Cannot load LinearAlgebra")
                     .cast::<Module>()?
                     .function_ref("dot")?
@@ -50,11 +50,11 @@ mod tests {
                 let mut arr1 = vec![1.0f64, 2.0f64];
                 let mut arr2 = vec![2.0f64, 3.0f64];
 
-                let arr1_v = Array::from_slice_unchecked(&mut *frame, &mut arr1, 2)?;
-                let arr2_v = Array::from_slice_unchecked(&mut *frame, &mut arr2, 2)?;
+                let arr1_v = Array::from_slice_unchecked(&mut frame, &mut arr1, 2)?;
+                let arr2_v = Array::from_slice_unchecked(&mut frame, &mut arr2, 2)?;
 
                 let res = func
-                    .call2(&mut *frame, arr1_v.as_value(), arr2_v.as_value())?
+                    .call2(&mut frame, arr1_v.as_value(), arr2_v.as_value())?
                     .expect("Cannot call LinearAlgebra.dot")
                     .unbox::<f64>()?;
 

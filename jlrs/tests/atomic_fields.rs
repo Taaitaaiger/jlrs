@@ -9,7 +9,7 @@ mod tests {
     fn read_atomic_field() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope(|global, frame| {
+            jlrs.scope(|global, mut frame| {
                 let ty = unsafe {
                     Module::main(global)
                         .submodule_ref("JlrsStableTests")?
@@ -18,13 +18,16 @@ mod tests {
                         .value_unchecked()
                 };
 
-                let arg1 = Value::new(&mut *frame, 3u32)?;
+                let arg1 = Value::new(&mut frame, 3u32)?;
                 let instance = ty
                     .cast::<DataType>()?
-                    .instantiate(&mut *frame, &mut [arg1])?
+                    .instantiate(&mut frame, &mut [arg1])?
                     .into_jlrs_result()?;
 
-                let a = instance.field_accessor(frame).field("a")?.access::<u32>()?;
+                let a = instance
+                    .field_accessor(&mut frame)
+                    .field("a")?
+                    .access::<u32>()?;
                 assert_eq!(a, 3);
 
                 Ok(())
@@ -37,7 +40,7 @@ mod tests {
     fn read_large_atomic_field() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope(|global, frame| {
+            jlrs.scope(|global, mut frame| {
                 let ty = unsafe {
                     Module::main(global)
                         .submodule_ref("JlrsStableTests")?
@@ -46,18 +49,17 @@ mod tests {
                         .value_unchecked()
                 };
 
-                let tup = Value::new(&mut *frame, Tuple4(1usize, 2usize, 3usize, 4usize))?;
+                let tup = Value::new(&mut frame, Tuple4(1usize, 2usize, 3usize, 4usize))?;
 
                 let instance = ty
                     .cast::<DataType>()?
-                    .instantiate(&mut *frame, &mut [tup])?
+                    .instantiate(&mut frame, &mut [tup])?
                     .into_jlrs_result()?;
 
-                let a =
-                    instance
-                        .field_accessor(frame)
-                        .field("a")?
-                        .access::<Tuple4<usize, usize, usize, usize>>()?;
+                let a = instance
+                    .field_accessor(&mut frame)
+                    .field("a")?
+                    .access::<Tuple4<usize, usize, usize, usize>>()?;
                 assert_eq!(a, Tuple4(1, 2, 3, 4));
 
                 Ok(())
@@ -70,7 +72,7 @@ mod tests {
     fn read_oddly_sized_atomic_field() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope(|global, frame| {
+            jlrs.scope(|global, mut frame| {
                 let ty = unsafe {
                     Module::main(global)
                         .submodule_ref("JlrsStableTests")?
@@ -79,15 +81,15 @@ mod tests {
                         .value_unchecked()
                 };
 
-                let tup = Value::new(&mut *frame, Tuple2(1u32, 2u16))?;
+                let tup = Value::new(&mut frame, Tuple2(1u32, 2u16))?;
 
                 let instance = ty
                     .cast::<DataType>()?
-                    .instantiate(&mut *frame, &mut [tup])?
+                    .instantiate(&mut frame, &mut [tup])?
                     .into_jlrs_result()?;
 
                 let a = instance
-                    .field_accessor(frame)
+                    .field_accessor(&mut frame)
                     .field("a")?
                     .access::<Tuple2<u32, u16>>()?;
                 assert_eq!(a, Tuple2(1, 2));

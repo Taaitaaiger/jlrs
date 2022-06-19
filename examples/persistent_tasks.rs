@@ -39,10 +39,10 @@ impl PersistentTask for AccumulatorTask {
     // creating the mutable MutFloat64 type in the Main module.
     async fn register<'frame>(
         _global: Global<'frame>,
-        frame: &mut AsyncGcFrame<'frame>,
+        mut frame: AsyncGcFrame<'frame>,
     ) -> JlrsResult<()> {
         unsafe {
-            Value::eval_string(&mut *frame, "mutable struct MutFloat64 v::Float64 end")?
+            Value::eval_string(&mut frame, "mutable struct MutFloat64 v::Float64 end")?
                 .into_jlrs_result()?;
         }
         Ok(())
@@ -55,18 +55,18 @@ impl PersistentTask for AccumulatorTask {
     async fn init(
         &mut self,
         global: Global<'static>,
-        frame: &mut AsyncGcFrame<'static>,
+        mut frame: AsyncGcFrame<'static>,
     ) -> JlrsResult<Self::State> {
         unsafe {
             let output = frame.output()?;
             frame
-                .scope(|frame| {
+                .scope(|mut frame| {
                     // A nested scope is used to only root a single value in the frame provided to
                     // init, rather than two.
                     let func = Module::main(global)
                         .global_ref("MutFloat64")?
                         .value_unchecked();
-                    let init_v = Value::new(&mut *frame, self.init_value)?;
+                    let init_v = Value::new(&mut frame, self.init_value)?;
 
                     func.call1(output, init_v)
                 })?
@@ -80,14 +80,18 @@ impl PersistentTask for AccumulatorTask {
     async fn run<'frame>(
         &mut self,
         _global: Global<'frame>,
-        frame: &mut AsyncGcFrame<'frame>,
+        mut frame: AsyncGcFrame<'frame>,
         state: &mut Self::State,
         input: Self::Input,
     ) -> JlrsResult<Self::Output> {
         // Add call_cata to the accumulator and return its new value. The accumulator is mutable
         // Julia data so its contents can be changed.
-        let value = state.field_accessor(frame).field("v")?.access::<f64>()? + input;
-        let new_value = Value::new(&mut *frame, value)?;
+        let value = state
+            .field_accessor(&mut frame)
+            .field("v")?
+            .access::<f64>()?
+            + input;
+        let new_value = Value::new(&mut frame, value)?;
 
         unsafe {
             state.set_field_unchecked("v", new_value)?;

@@ -10,9 +10,9 @@
 //! # fn main() {
 //! # JULIA.with(|j| {
 //! # let mut julia = j.borrow_mut();
-//! julia.scope(|global, frame| {
+//! julia.scope(|global, mut frame| {
 //!     let tup = Tuple2(2i32, true);
-//!     let val = Value::new(frame, tup)?;
+//!     let val = Value::new(&mut frame, tup)?;
 //!     assert!(val.is::<Tuple2<i32, bool>>());
 //!     assert!(val.unbox::<Tuple2<i32, bool>>().is_ok());
 //!     Ok(())
@@ -60,8 +60,8 @@ impl Tuple {
         F: Frame<'current>,
     {
         let (output, frame) = scope.split()?;
-        frame.scope(|frame| {
-            let global = frame.global();
+        frame.scope(|mut frame| {
+            let global = frame.as_scope().global();
             let types: smallvec::SmallVec<[_; MAX_SIZE]> = values
                 .as_ref()
                 .iter()
@@ -71,7 +71,7 @@ impl Tuple {
 
             let tuple_ty = DataType::tuple_type(global)
                 .as_value()
-                .apply_type(&mut *frame, types)?
+                .apply_type(&mut frame, types)?
                 .into_jlrs_result()?
                 .cast::<DataType>()?;
 
@@ -92,7 +92,7 @@ impl Tuple {
         let global = scope.global();
         let (output, frame) = scope.split()?;
 
-        frame.scope(|frame| {
+        frame.scope(|mut frame| {
             let types: smallvec::SmallVec<[_; MAX_SIZE]> = values
                 .as_ref()
                 .iter()
@@ -105,7 +105,7 @@ impl Tuple {
             // concrete so the tuple type is concrete, too.
             let tuple_ty = DataType::tuple_type(global)
                 .as_value()
-                .apply_type_unchecked(&mut *frame, types)?
+                .apply_type_unchecked(&mut frame, types)?
                 .cast::<DataType>()?;
 
             tuple_ty.instantiate_unchecked(output, values)

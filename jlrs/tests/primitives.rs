@@ -8,12 +8,12 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_capacity(5, |_, frame| {
-                let p1 = Value::new(&mut *frame, 1u8)?;
-                let p2 = Value::new(&mut *frame, 2u16)?;
-                let p3 = Value::new(&mut *frame, 3u32)?;
-                let p4 = Value::new(&mut *frame, 4u64)?;
-                let p5 = Value::new(&mut *frame, 5usize)?;
+            jlrs.scope_with_capacity(5, |_, mut frame| {
+                let p1 = Value::new(&mut frame, 1u8)?;
+                let p2 = Value::new(&mut frame, 2u16)?;
+                let p3 = Value::new(&mut frame, 3u32)?;
+                let p4 = Value::new(&mut frame, 4u64)?;
+                let p5 = Value::new(&mut frame, 5usize)?;
 
                 let u1 = p1.unbox::<u8>()?;
                 let u2 = p2.unbox::<u16>()?;
@@ -38,12 +38,12 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|_, frame| {
-                let p1 = Value::new(&mut *frame, 1u8)?;
-                let p2 = Value::new(&mut *frame, 2u16)?;
-                let p3 = Value::new(&mut *frame, 3u32)?;
-                let p4 = Value::new(&mut *frame, 4u64)?;
-                let p5 = Value::new(&mut *frame, 5usize)?;
+            jlrs.scope(|_, mut frame| {
+                let p1 = Value::new(&mut frame, 1u8)?;
+                let p2 = Value::new(&mut frame, 2u16)?;
+                let p3 = Value::new(&mut frame, 3u32)?;
+                let p4 = Value::new(&mut frame, 4u64)?;
+                let p5 = Value::new(&mut frame, 5usize)?;
 
                 let u1 = p1.unbox::<u8>()?;
                 let u2 = p2.unbox::<u16>()?;
@@ -68,12 +68,12 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_capacity(5, |_, frame| {
-                let p1 = Value::new(&mut *frame, 1i8)?;
-                let p2 = Value::new(&mut *frame, 2i16)?;
-                let p3 = Value::new(&mut *frame, 3i32)?;
-                let p4 = Value::new(&mut *frame, 4i64)?;
-                let p5 = Value::new(&mut *frame, 5isize)?;
+            jlrs.scope_with_capacity(5, |_, mut frame| {
+                let p1 = Value::new(&mut frame, 1i8)?;
+                let p2 = Value::new(&mut frame, 2i16)?;
+                let p3 = Value::new(&mut frame, 3i32)?;
+                let p4 = Value::new(&mut frame, 4i64)?;
+                let p5 = Value::new(&mut frame, 5isize)?;
 
                 let u1 = p1.unbox::<i8>()?;
                 let u2 = p2.unbox::<i16>()?;
@@ -98,12 +98,12 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|_, frame| {
-                let p1 = Value::new(&mut *frame, 1i8)?;
-                let p2 = Value::new(&mut *frame, 2i16)?;
-                let p3 = Value::new(&mut *frame, 3i32)?;
-                let p4 = Value::new(&mut *frame, 4i64)?;
-                let p5 = Value::new(&mut *frame, 5isize)?;
+            jlrs.scope(|_, mut frame| {
+                let p1 = Value::new(&mut frame, 1i8)?;
+                let p2 = Value::new(&mut frame, 2i16)?;
+                let p3 = Value::new(&mut frame, 3i32)?;
+                let p4 = Value::new(&mut frame, 4i64)?;
+                let p5 = Value::new(&mut frame, 5isize)?;
 
                 let u1 = p1.unbox::<i8>()?;
                 let u2 = p2.unbox::<i16>()?;
@@ -128,9 +128,9 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_capacity(5, |_, frame| {
-                let p1 = Value::new(&mut *frame, 1f32)?;
-                let p2 = Value::new(&mut *frame, 2f64)?;
+            jlrs.scope_with_capacity(5, |_, mut frame| {
+                let p1 = Value::new(&mut frame, 1f32)?;
+                let p2 = Value::new(&mut frame, 2f64)?;
 
                 let u1 = p1.unbox::<f32>()?;
                 let u2 = p2.unbox::<f64>()?;
@@ -149,9 +149,9 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|_, frame| {
-                let p1 = Value::new(&mut *frame, 1f32)?;
-                let p2 = Value::new(&mut *frame, 2f64)?;
+            jlrs.scope(|_, mut frame| {
+                let p1 = Value::new(&mut frame, 1f32)?;
+                let p2 = Value::new(&mut frame, 2f64)?;
 
                 let u1 = p1.unbox::<f32>()?;
                 let u2 = p2.unbox::<f64>()?;
@@ -170,8 +170,8 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_capacity(5, |_, frame| {
-                let p1 = Value::new(&mut *frame, true)?;
+            jlrs.scope_with_capacity(5, |_, mut frame| {
+                let p1 = Value::new(&mut frame, true)?;
                 let u1 = p1.unbox::<bool>()?.as_bool();
                 assert_eq!(u1, true);
                 Ok(())
@@ -185,8 +185,8 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|_, frame| {
-                let p1 = Value::new(&mut *frame, false)?;
+            jlrs.scope(|_, mut frame| {
+                let p1 = Value::new(&mut frame, false)?;
                 let u1 = p1.unbox::<bool>()?.as_bool();
                 assert_eq!(u1, false);
                 Ok(())
@@ -200,8 +200,8 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_capacity(5, |_, frame| {
-                let p1 = Value::new(&mut *frame, 'a')?;
+            jlrs.scope_with_capacity(5, |_, mut frame| {
+                let p1 = Value::new(&mut frame, 'a')?;
                 let u1 = p1.unbox::<char>()?.try_as_char();
                 assert_eq!(u1, Some('a'));
                 Ok(())
@@ -215,8 +215,8 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|_, frame| {
-                let p1 = Value::new(&mut *frame, 'a')?;
+            jlrs.scope(|_, mut frame| {
+                let p1 = Value::new(&mut frame, 'a')?;
                 let u1 = p1.unbox::<char>()?.try_as_char();
                 assert_eq!(u1, Some('a'));
                 Ok(())
@@ -253,8 +253,8 @@ mod tests {
                 JULIA.with(|j| {
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope_with_capacity(1, |_global, frame| {
-                        let val = Value::new(&mut *frame, $val)?;
+                    jlrs.scope_with_capacity(1, |_global, mut frame| {
+                        let val = Value::new(&mut frame, $val)?;
                         assert!(val.is::<$from>());
                         assert!(val.unbox::<$to>().is_err());
                         Ok(())
@@ -287,8 +287,8 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_capacity(2, |global, frame| {
-                let val = Value::new(&mut *frame, func as *mut std::ffi::c_void)?;
+            jlrs.scope_with_capacity(2, |global, mut frame| {
+                let val = Value::new(&mut frame, func as *mut std::ffi::c_void)?;
                 assert!(val.is::<*mut std::ffi::c_void>());
 
                 let res = unsafe {
@@ -297,7 +297,7 @@ mod tests {
                         .wrapper_unchecked()
                         .function_ref("callrust")?
                         .wrapper_unchecked()
-                        .call1(&mut *frame, val)?
+                        .call1(&mut frame, val)?
                         .unwrap()
                         .unbox::<bool>()?
                         .as_bool()

@@ -10,10 +10,10 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope_with_capacity(1, |_, frame| {
+                .scope_with_capacity(1, |_, mut frame| {
                     let data = vec![1.0f32, 2., 3.];
-                    let array = Array::from_vec(&mut *frame, data, 3)?.into_jlrs_result()?;
-                    array.copy_inline_data::<f32, _>(frame)
+                    let array = Array::from_vec(&mut frame, data, 3)?.into_jlrs_result()?;
+                    array.copy_inline_data::<f32, _>(&frame)
                 })
                 .unwrap();
 
@@ -30,12 +30,12 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope_with_capacity(1, |_, frame| {
+                .scope_with_capacity(1, |_, mut frame| {
                     let (output, frame) = frame.split()?;
                     let data = vec![1.0f32, 2., 3.];
                     let array = frame
-                        .scope_with_capacity(0, |frame| {
-                            let output = output.into_scope(frame);
+                        .scope_with_capacity(0, |mut frame| {
+                            let output = output.into_scope(&mut frame);
                             Array::from_vec(output, data, 3)
                         })?
                         .into_jlrs_result()?;
@@ -56,11 +56,11 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope_with_capacity(0, |_, frame| {
-                    frame.scope_with_capacity(1, |frame| {
+                .scope_with_capacity(0, |_, mut frame| {
+                    frame.scope_with_capacity(1, |mut frame| {
                         let data = vec![1.0f64, 2., 3.];
-                        let array = Array::from_vec(&mut *frame, data, 3)?.into_jlrs_result()?;
-                        array.copy_inline_data::<f64, _>(frame)
+                        let array = Array::from_vec(&mut frame, data, 3)?.into_jlrs_result()?;
+                        array.copy_inline_data::<f64, _>(&frame)
                     })
                 })
                 .unwrap();
@@ -78,11 +78,11 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope_with_capacity(0, |_, frame| {
-                    frame.scope(|frame| {
+                .scope_with_capacity(0, |_, mut frame| {
+                    frame.scope(|mut frame| {
                         let data = vec![1i8, 2, 3];
-                        let array = Array::from_vec(&mut *frame, data, 3)?.into_jlrs_result()?;
-                        array.copy_inline_data::<i8, _>(frame)
+                        let array = Array::from_vec(&mut frame, data, 3)?.into_jlrs_result()?;
+                        array.copy_inline_data::<i8, _>(&frame)
                     })
                 })
                 .unwrap();
@@ -100,10 +100,10 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope(|_, frame| {
+                .scope(|_, mut frame| {
                     let data = vec![1i16, 2, 3];
-                    let array = Array::from_vec(&mut *frame, data, 3)?.into_jlrs_result()?;
-                    array.copy_inline_data::<i16, _>(frame)
+                    let array = Array::from_vec(&mut frame, data, 3)?.into_jlrs_result()?;
+                    array.copy_inline_data::<i16, _>(&frame)
                 })
                 .unwrap();
 
@@ -120,11 +120,11 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope(|_, frame| {
-                    frame.scope_with_capacity(1, |frame| {
+                .scope(|_, mut frame| {
+                    frame.scope_with_capacity(1, |mut frame| {
                         let data = vec![1i32, 2, 3];
-                        let array = Array::from_vec(&mut *frame, data, 3)?.into_jlrs_result()?;
-                        array.copy_inline_data::<i32, _>(frame)
+                        let array = Array::from_vec(&mut frame, data, 3)?.into_jlrs_result()?;
+                        array.copy_inline_data::<i32, _>(&frame)
                     })
                 })
                 .unwrap();
@@ -142,11 +142,11 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope(|_, frame| {
-                    frame.scope(|frame| {
+                .scope(|_, mut frame| {
+                    frame.scope(|mut frame| {
                         let data = vec![1i64, 2, 3];
-                        let array = Array::from_vec(&mut *frame, data, 3)?.into_jlrs_result()?;
-                        array.copy_inline_data::<i64, _>(frame)
+                        let array = Array::from_vec(&mut frame, data, 3)?.into_jlrs_result()?;
+                        array.copy_inline_data::<i64, _>(&frame)
                     })
                 })
                 .unwrap();
@@ -164,10 +164,10 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope_with_capacity(1, |_, frame| {
+                .scope_with_capacity(1, |_, mut frame| {
                     let data = vec![1u8, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4];
-                    let array = Array::from_vec(&mut *frame, data, (3, 4))?.into_jlrs_result()?;
-                    array.copy_inline_data::<u8, _>(frame)
+                    let array = Array::from_vec(&mut frame, data, (3, 4))?.into_jlrs_result()?;
+                    array.copy_inline_data::<u8, _>(&frame)
                 })
                 .unwrap();
 
@@ -185,12 +185,12 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope_with_capacity(0, |_, frame| {
-                    frame.scope_with_capacity(1, |frame| {
+                .scope_with_capacity(0, |_, mut frame| {
+                    frame.scope_with_capacity(1, |mut frame| {
                         let data = vec![1u16, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4];
                         let array =
-                            Array::from_vec(&mut *frame, data, (3, 4))?.into_jlrs_result()?;
-                        array.copy_inline_data::<u16, _>(frame)
+                            Array::from_vec(&mut frame, data, (3, 4))?.into_jlrs_result()?;
+                        array.copy_inline_data::<u16, _>(&frame)
                     })
                 })
                 .unwrap();
@@ -209,12 +209,12 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope_with_capacity(0, |_, frame| {
-                    frame.scope(|frame| {
+                .scope_with_capacity(0, |_, mut frame| {
+                    frame.scope(|mut frame| {
                         let data = vec![1u32, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4];
                         let array =
-                            Array::from_vec(&mut *frame, data, (3, 4))?.into_jlrs_result()?;
-                        array.copy_inline_data::<u32, _>(frame)
+                            Array::from_vec(&mut frame, data, (3, 4))?.into_jlrs_result()?;
+                        array.copy_inline_data::<u32, _>(&frame)
                     })
                 })
                 .unwrap();
@@ -233,10 +233,10 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope(|_, frame| {
+                .scope(|_, mut frame| {
                     let data = vec![1u64, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4];
-                    let array = Array::from_vec(&mut *frame, data, (3, 4))?.into_jlrs_result()?;
-                    array.copy_inline_data::<u64, _>(frame)
+                    let array = Array::from_vec(&mut frame, data, (3, 4))?.into_jlrs_result()?;
+                    array.copy_inline_data::<u64, _>(&frame)
                 })
                 .unwrap();
 
@@ -254,12 +254,12 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope(|_, frame| {
-                    frame.scope_with_capacity(1, |frame| {
+                .scope(|_, mut frame| {
+                    frame.scope_with_capacity(1, |mut frame| {
                         let data = vec![1usize, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4];
                         let array =
-                            Array::from_vec(&mut *frame, data, (3, 4))?.into_jlrs_result()?;
-                        array.copy_inline_data::<usize, _>(frame)
+                            Array::from_vec(&mut frame, data, (3, 4))?.into_jlrs_result()?;
+                        array.copy_inline_data::<usize, _>(&frame)
                     })
                 })
                 .unwrap();
@@ -278,12 +278,12 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope(|_, frame| {
-                    frame.scope(|frame| {
+                .scope(|_, mut frame| {
+                    frame.scope(|mut frame| {
                         let data = vec![1isize, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4];
                         let array =
-                            Array::from_vec(&mut *frame, data, (3, 4))?.into_jlrs_result()?;
-                        array.copy_inline_data::<isize, _>(frame)
+                            Array::from_vec(&mut frame, data, (3, 4))?.into_jlrs_result()?;
+                        array.copy_inline_data::<isize, _>(&frame)
                     })
                 })
                 .unwrap();

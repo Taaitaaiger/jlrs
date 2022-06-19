@@ -9,8 +9,8 @@ mod tests {
     fn eval_string(string: &str, with_result: impl for<'f> FnOnce(JuliaResult<'f, 'static>)) {
         JULIA.with(|j| unsafe {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(1, |_global, frame| {
-                with_result(Value::eval_string(&mut *frame, string)?);
+            jlrs.scope_with_capacity(1, |_global, mut frame| {
+                with_result(Value::eval_string(&mut frame, string)?);
                 Ok(())
             })
             .unwrap();
@@ -51,12 +51,12 @@ mod tests {
         });
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(4, |global, frame| unsafe {
+            jlrs.scope_with_capacity(4, |global, mut frame| unsafe {
                 let func = Module::main(global)
                     .function_ref("increase")?
                     .wrapper_unchecked();
-                let twelve = Value::new(&mut *frame, 12i32).unwrap();
-                let result = func.call1(&mut *frame, twelve)?;
+                let twelve = Value::new(&mut frame, 12i32).unwrap();
+                let result = func.call1(&mut frame, twelve)?;
                 assert_eq!(result.unwrap().unbox::<i32>().unwrap(), 13i32);
                 Ok(())
             })

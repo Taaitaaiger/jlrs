@@ -212,9 +212,9 @@ impl<'scope> PyPlot<'scope> {
         frame: &mut F,
         version: isize,
     ) -> JlrsResult<()> {
-        frame.scope(|frame| unsafe {
-            let global = frame.global();
-            let version = Value::new(&mut *frame, version)?;
+        frame.scope(|mut frame| unsafe {
+            let global = frame.as_scope().global();
+            let version = Value::new(&mut frame, version)?;
 
             Module::main(global)
                 .submodule_ref("JlrsPyPlot")
@@ -223,7 +223,7 @@ impl<'scope> PyPlot<'scope> {
                 .function_ref("setversion")
                 .unwrap()
                 .wrapper_unchecked()
-                .call1(&mut *frame, version)?
+                .call1(&mut frame, version)?
                 .into_jlrs_result()?;
 
             Ok(())

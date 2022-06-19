@@ -15,21 +15,21 @@ mod tests {
     fn empty_union_field() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope(|global, frame| unsafe {
-                let mut tys = [Value::new(&mut *frame, 0usize)?];
+            jlrs.scope(|global, mut frame| unsafe {
+                let mut tys = [Value::new(&mut frame, 0usize)?];
                 let res = Module::main(global)
                     .submodule_ref("JlrsTests")?
                     .wrapper_unchecked()
                     .global_ref("WithEmpty")?
                     .wrapper_unchecked()
-                    .apply_type(&mut *frame, &mut tys)?
+                    .apply_type(&mut frame, &mut tys)?
                     .into_jlrs_result()?
                     .cast::<DataType>()?
-                    .instantiate(&mut *frame, &mut [])?
+                    .instantiate(&mut frame, &mut [])?
                     .into_jlrs_result()?;
 
                 assert!(res
-                    .field_accessor(frame)
+                    .field_accessor(&mut frame)
                     .field(1)?
                     .access::<EmptyUnion>()
                     .is_err());
@@ -43,22 +43,22 @@ mod tests {
     fn access_tuple_fields() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(4, |global, frame| unsafe {
+            jlrs.scope_with_capacity(4, |global, mut frame| unsafe {
                 // Returns (1, 2, 3) as Tuple{UInt32, UInt16, Int64}
                 let func = Module::main(global)
                     .submodule_ref("JlrsTests")?
                     .wrapper_unchecked()
                     .function_ref("inlinetuple")?
                     .wrapper_unchecked();
-                let tup = func.call0(&mut *frame)?.unwrap();
+                let tup = func.call0(&mut frame)?.unwrap();
 
                 assert!(tup.is::<Tuple>());
                 assert_eq!(tup.n_fields(), 3);
-                let v1 = tup.get_nth_field(&mut *frame, 0)?;
-                let v2 = tup.get_nth_field(&mut *frame, 1)?;
+                let v1 = tup.get_nth_field(&mut frame, 0)?;
+                let v2 = tup.get_nth_field(&mut frame, 1)?;
                 let (output, frame) = frame.split()?;
-                let v3 = frame.scope_with_capacity(0, |frame| {
-                    let output = output.into_scope(frame);
+                let v3 = frame.scope_with_capacity(0, |mut frame| {
+                    let output = output.into_scope(&mut frame);
                     tup.get_nth_field(output, 2)
                 })?;
 
@@ -76,15 +76,15 @@ mod tests {
     fn cannot_access_oob_tuple_field() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(4, |global, frame| unsafe {
+            jlrs.scope_with_capacity(4, |global, mut frame| unsafe {
                 // Returns (1, 2, 3) as Tuple{UInt32, UInt16, Int64}
                 let func = Module::main(global)
                     .submodule_ref("JlrsTests")?
                     .wrapper_unchecked()
                     .function_ref("inlinetuple")?
                     .wrapper_unchecked();
-                let tup = func.call0(&mut *frame)?.unwrap();
-                assert!(tup.get_nth_field(&mut *frame, 3).is_err());
+                let tup = func.call0(&mut frame)?.unwrap();
+                assert!(tup.get_nth_field(&mut frame, 3).is_err());
 
                 Ok(())
             })
@@ -96,14 +96,14 @@ mod tests {
     fn access_non_pointer_tuple_field_must_alloc() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(4, |global, frame| unsafe {
+            jlrs.scope_with_capacity(4, |global, mut frame| unsafe {
                 // Returns (1, 2, 3) as Tuple{UInt32, UInt16, Int64}
                 let func = Module::main(global)
                     .submodule_ref("JlrsTests")?
                     .wrapper_unchecked()
                     .function_ref("inlinetuple")?
                     .wrapper_unchecked();
-                let tup = func.call0(&mut *frame)?.unwrap();
+                let tup = func.call0(&mut frame)?.unwrap();
                 assert!(tup.get_nth_field_ref(2).is_err());
 
                 Ok(())
@@ -117,7 +117,7 @@ mod tests {
     fn access_mutable_struct_fields() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(5, |global, frame| unsafe {
+            jlrs.scope_with_capacity(5, |global, mut frame| unsafe {
                 //mutable struct MutableStruct
                 //  x
                 //  y::UInt64
@@ -129,23 +129,23 @@ mod tests {
                     .wrapper_unchecked()
                     .cast::<DataType>()?;
 
-                let x = Value::new(&mut *frame, 2.0f32)?;
-                let y = Value::new(&mut *frame, 3u64)?;
+                let x = Value::new(&mut frame, 2.0f32)?;
+                let y = Value::new(&mut frame, 3u64)?;
 
                 let mut_struct = func
-                    .instantiate(&mut *frame, &mut [x, y])?
+                    .instantiate(&mut frame, &mut [x, y])?
                     .into_jlrs_result()?;
                 assert!(mut_struct.is::<Mutable>());
 
-                assert!(mut_struct.get_field(&mut *frame, "x").is_ok());
+                assert!(mut_struct.get_field(&mut frame, "x").is_ok());
                 let x_val = mut_struct.get_field_ref("x");
                 assert!(x_val.is_ok());
                 {
                     assert!(x_val.unwrap().wrapper().unwrap().is::<f32>());
                 }
                 let (output, frame) = frame.split()?;
-                let _ = frame.scope_with_capacity(0, |frame| {
-                    let output = output.into_scope(frame);
+                let _ = frame.scope_with_capacity(0, |mut frame| {
+                    let output = output.into_scope(&mut frame);
                     mut_struct.get_field(output, "y")
                 })?;
                 assert!(mut_struct.get_field_ref("y").is_err());
@@ -161,7 +161,7 @@ mod tests {
     fn cannot_access_unknown_mutable_struct_field() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(5, |global, frame| unsafe {
+            jlrs.scope_with_capacity(5, |global, mut frame| unsafe {
                 //mutable struct MutableStruct
                 //  x
                 //  y::UInt64
@@ -173,15 +173,15 @@ mod tests {
                     .wrapper_unchecked()
                     .cast::<DataType>()?;
 
-                let x = Value::new(&mut *frame, 2.0f32)?;
-                let y = Value::new(&mut *frame, 3u64)?;
+                let x = Value::new(&mut frame, 2.0f32)?;
+                let y = Value::new(&mut frame, 3u64)?;
 
                 let mut_struct = func
-                    .instantiate(&mut *frame, &mut [x, y])?
+                    .instantiate(&mut frame, &mut [x, y])?
                     .into_jlrs_result()?;
                 assert!(mut_struct.is::<Mutable>());
 
-                assert!(mut_struct.get_field(&mut *frame, "z").is_err());
+                assert!(mut_struct.get_field(&mut frame, "z").is_err());
                 Ok(())
             })
             .unwrap();
@@ -194,14 +194,14 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let oob_idx = jlrs
-                .scope_with_capacity(5, |global, frame| unsafe {
-                    let idx = Value::new(&mut *frame, 4usize)?;
+                .scope_with_capacity(5, |global, mut frame| unsafe {
+                    let idx = Value::new(&mut frame, 4usize)?;
                     let data = vec![1.0f64, 2., 3.];
-                    let array = Array::from_vec_unchecked(&mut *frame, data, 3)?;
+                    let array = Array::from_vec_unchecked(&mut frame, data, 3)?;
                     let func = Module::base(global)
                         .function_ref("getindex")?
                         .wrapper_unchecked();
-                    let out = func.call2(&mut *frame, array.as_value(), idx)?.unwrap_err();
+                    let out = func.call2(&mut frame, array.as_value(), idx)?.unwrap_err();
 
                     assert_eq!(out.datatype_name().unwrap(), "BoundsError");
 
@@ -213,8 +213,8 @@ mod tests {
 
                     out.get_field_ref("a")?;
 
-                    out.get_field(&mut *frame, field_names[1])?
-                        .get_nth_field(&mut *frame, 0)?
+                    out.get_field(&mut frame, field_names[1])?
+                        .get_nth_field(&mut frame, 0)?
                         .unbox::<isize>()
                 })
                 .unwrap();
@@ -228,19 +228,19 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_capacity(5, |global, frame| unsafe {
-                let idx = Value::new(&mut *frame, 4usize)?;
+            jlrs.scope_with_capacity(5, |global, mut frame| unsafe {
+                let idx = Value::new(&mut frame, 4usize)?;
                 let data = vec![1.0f64, 2., 3.];
-                let array = Array::from_vec_unchecked(&mut *frame, data, 3)?;
+                let array = Array::from_vec_unchecked(&mut frame, data, 3)?;
                 let func = Module::base(global)
                     .function_ref("getindex")?
                     .wrapper_unchecked();
-                let out = func.call2(&mut *frame, array.as_value(), idx)?.unwrap_err();
+                let out = func.call2(&mut frame, array.as_value(), idx)?.unwrap_err();
 
                 let field_names = out.field_names();
                 assert!(out
-                    .get_field(&mut *frame, field_names[1])?
-                    .get_nth_field(&mut *frame, 123)
+                    .get_field(&mut frame, field_names[1])?
+                    .get_nth_field(&mut frame, 123)
                     .is_err());
                 Ok(())
             })
@@ -253,20 +253,20 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_capacity(5, |global, frame| unsafe {
-                let idx = Value::new(&mut *frame, 4usize)?;
+            jlrs.scope_with_capacity(5, |global, mut frame| unsafe {
+                let idx = Value::new(&mut frame, 4usize)?;
                 let data = vec![1.0f64, 2., 3.];
-                let array = Array::from_vec_unchecked(&mut *frame, data, 3)?;
+                let array = Array::from_vec_unchecked(&mut frame, data, 3)?;
                 let func = Module::base(global)
                     .function_ref("getindex")?
                     .wrapper_unchecked();
-                let out = func.call2(&mut *frame, array.as_value(), idx)?.unwrap_err();
+                let out = func.call2(&mut frame, array.as_value(), idx)?.unwrap_err();
 
                 let field_names = out.field_names();
                 let (output, frame) = frame.split()?;
-                let _ = frame.scope_with_capacity(1, |frame| {
-                    let field = out.get_field(&mut *frame, field_names[1])?;
-                    let output = output.into_scope(frame);
+                let _ = frame.scope_with_capacity(1, |mut frame| {
+                    let field = out.get_field(&mut frame, field_names[1])?;
+                    let output = output.into_scope(&mut frame);
                     field.get_nth_field(output, 0)
                 })?;
 
@@ -281,21 +281,21 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_capacity(5, |global, frame| unsafe {
-                let idx = Value::new(&mut *frame, 4usize)?;
+            jlrs.scope_with_capacity(5, |global, mut frame| unsafe {
+                let idx = Value::new(&mut frame, 4usize)?;
                 let data = vec![1.0f64, 2., 3.];
-                let array = Array::from_vec_unchecked(&mut *frame, data, 3)?;
+                let array = Array::from_vec_unchecked(&mut frame, data, 3)?;
                 let func = Module::base(global)
                     .function_ref("getindex")?
                     .wrapper_unchecked();
-                let out = func.call2(&mut *frame, array.as_value(), idx)?.unwrap_err();
+                let out = func.call2(&mut frame, array.as_value(), idx)?.unwrap_err();
 
                 let field_names = out.field_names();
                 let (output, frame) = frame.split()?;
                 let _ = frame
-                    .scope_with_capacity(1, |frame| {
-                        let field = out.get_field(&mut *frame, field_names[1])?;
-                        let output = output.into_scope(frame);
+                    .scope_with_capacity(1, |mut frame| {
+                        let field = out.get_field(&mut frame, field_names[1])?;
+                        let output = output.into_scope(&mut frame);
                         field.get_nth_field(output, 123)
                     })
                     .unwrap_err();
@@ -309,8 +309,8 @@ mod tests {
     fn access_nested_field() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |global, frame| unsafe {
-                let value = Value::eval_string(&mut *frame, MIXED_BAG_JL)?
+            jlrs.scope_with_capacity(0, |global, mut frame| unsafe {
+                let value = Value::eval_string(&mut frame, MIXED_BAG_JL)?
                     .into_jlrs_result()?
                     .cast::<Module>()?
                     .global_ref("mixedbag")?
@@ -318,7 +318,7 @@ mod tests {
 
                 {
                     let field = value
-                        .field_accessor(frame)
+                        .field_accessor(&mut frame)
                         .field("mutabl")?
                         .field("mutable_unions")?
                         .field("bits_union")?
@@ -330,7 +330,7 @@ mod tests {
                 #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
                 {
                     let field = value
-                        .field_accessor(frame)
+                        .field_accessor(&mut frame)
                         .field("mutabl")?
                         .field("mutable_unions")?
                         .atomic_field("atomic_union", Ordering::Relaxed)?
@@ -341,7 +341,7 @@ mod tests {
 
                 {
                     let field = value
-                        .field_accessor(frame)
+                        .field_accessor(&mut frame)
                         .field("mutabl")?
                         .field("mutable_unions")?
                         .field("normal_union")?
@@ -352,7 +352,7 @@ mod tests {
 
                 {
                     let field = value
-                        .field_accessor(frame)
+                        .field_accessor(&mut frame)
                         .field("mutabl")?
                         .field("immutable_unions")?
                         .field("bits_union")?
@@ -363,7 +363,7 @@ mod tests {
 
                 {
                     let field = value
-                        .field_accessor(frame)
+                        .field_accessor(&mut frame)
                         .field("mutabl")?
                         .field("immutable_unions")?
                         .field("normal_union")?
@@ -376,7 +376,7 @@ mod tests {
                 {
                     {
                         let field = value
-                            .field_accessor(frame)
+                            .field_accessor(&mut frame)
                             .field("mutabl")?
                             .field("atomics")?
                             .field("i8")?
@@ -387,7 +387,7 @@ mod tests {
 
                     {
                         let field = value
-                            .field_accessor(frame)
+                            .field_accessor(&mut frame)
                             .field("mutabl")?
                             .field("atomics")?
                             .atomic_field("i16", Ordering::Acquire)?
@@ -398,7 +398,7 @@ mod tests {
 
                     {
                         let field = value
-                            .field_accessor(frame)
+                            .field_accessor(&mut frame)
                             .field("mutabl")?
                             .field("atomics")?
                             .field("i24")?
@@ -410,7 +410,7 @@ mod tests {
 
                     {
                         let field = value
-                            .field_accessor(frame)
+                            .field_accessor(&mut frame)
                             .field("mutabl")?
                             .field("atomics")?
                             .field("i48")?
@@ -422,7 +422,7 @@ mod tests {
 
                     {
                         let field = value
-                            .field_accessor(frame)
+                            .field_accessor(&mut frame)
                             .field("mutabl")?
                             .field("atomics")?
                             .field("i72")?
@@ -434,7 +434,7 @@ mod tests {
 
                     {
                         let field = value
-                            .field_accessor(frame)
+                            .field_accessor(&mut frame)
                             .field("mutabl")?
                             .field("atomics")?
                             .field("ptr")?
@@ -445,7 +445,7 @@ mod tests {
 
                     {
                         let field = value
-                            .field_accessor(frame)
+                            .field_accessor(&mut frame)
                             .field("mutabl")?
                             .field("atomics")?
                             .field("wrapped_ptr")?
@@ -458,7 +458,7 @@ mod tests {
 
                 {
                     let field = value
-                        .field_accessor(frame)
+                        .field_accessor(&mut frame)
                         .field("mutabl")?
                         .field("number")?
                         .access::<f64>()?;
@@ -468,7 +468,7 @@ mod tests {
 
                 {
                     let field = value
-                        .field_accessor(frame)
+                        .field_accessor(&mut frame)
                         .field("immutabl")?
                         .field("mutable_unions")?
                         .field("bits_union")?
@@ -480,7 +480,7 @@ mod tests {
                 #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
                 {
                     let field = value
-                        .field_accessor(frame)
+                        .field_accessor(&mut frame)
                         .field("immutabl")?
                         .field("mutable_unions")?
                         .atomic_field("atomic_union", Ordering::Relaxed)?
@@ -491,7 +491,7 @@ mod tests {
 
                 {
                     let field = value
-                        .field_accessor(frame)
+                        .field_accessor(&mut frame)
                         .field("immutabl")?
                         .field("mutable_unions")?
                         .field("normal_union")?
@@ -502,7 +502,7 @@ mod tests {
 
                 {
                     let field = value
-                        .field_accessor(frame)
+                        .field_accessor(&mut frame)
                         .field("immutabl")?
                         .field("immutable_unions")?
                         .field("bits_union")?
@@ -513,7 +513,7 @@ mod tests {
 
                 {
                     let field = value
-                        .field_accessor(frame)
+                        .field_accessor(&mut frame)
                         .field("immutabl")?
                         .field("immutable_unions")?
                         .field("normal_union")?
@@ -526,7 +526,7 @@ mod tests {
                 {
                     {
                         let field = value
-                            .field_accessor(frame)
+                            .field_accessor(&mut frame)
                             .field("immutabl")?
                             .field("atomics")?
                             .field("i8")?
@@ -537,7 +537,7 @@ mod tests {
 
                     {
                         let field = value
-                            .field_accessor(frame)
+                            .field_accessor(&mut frame)
                             .field("immutabl")?
                             .field("atomics")?
                             .atomic_field("i16", Ordering::Acquire)?
@@ -548,7 +548,7 @@ mod tests {
 
                     {
                         let field = value
-                            .field_accessor(frame)
+                            .field_accessor(&mut frame)
                             .field("immutabl")?
                             .field("atomics")?
                             .field("i24")?
@@ -560,7 +560,7 @@ mod tests {
 
                     {
                         let field = value
-                            .field_accessor(frame)
+                            .field_accessor(&mut frame)
                             .field("immutabl")?
                             .field("atomics")?
                             .field("i48")?
@@ -572,7 +572,7 @@ mod tests {
 
                     {
                         let field = value
-                            .field_accessor(frame)
+                            .field_accessor(&mut frame)
                             .field("immutabl")?
                             .field("atomics")?
                             .field("i72")?
@@ -584,7 +584,7 @@ mod tests {
 
                     {
                         let field = value
-                            .field_accessor(frame)
+                            .field_accessor(&mut frame)
                             .field("immutabl")?
                             .field("atomics")?
                             .field("ptr")?
@@ -595,7 +595,7 @@ mod tests {
 
                     {
                         let field = value
-                            .field_accessor(frame)
+                            .field_accessor(&mut frame)
                             .field("immutabl")?
                             .field("atomics")?
                             .field("wrapped_ptr")?
@@ -607,7 +607,7 @@ mod tests {
                 }
                 {
                     let field = value
-                        .field_accessor(frame)
+                        .field_accessor(&mut frame)
                         .field("immutabl")?
                         .field("number")?
                         .access::<i16>()?;
@@ -617,7 +617,7 @@ mod tests {
 
                 {
                     let field = value
-                        .field_accessor(frame)
+                        .field_accessor(&mut frame)
                         .field("tuples")?
                         .field("empty")?
                         .access::<Tuple0>()?;
@@ -627,7 +627,7 @@ mod tests {
 
                 {
                     let field = value
-                        .field_accessor(frame)
+                        .field_accessor(&mut frame)
                         .field("tuples")?
                         .field("single")?
                         .field(0)?
@@ -637,9 +637,9 @@ mod tests {
                 }
 
                 {
-                    let s = JuliaString::new(&mut *frame, "double")?;
+                    let s = JuliaString::new(&mut frame, "double")?;
                     let field = value
-                        .field_accessor(frame)
+                        .field_accessor(&mut frame)
                         .field("tuples")?
                         .field(s)?
                         .field(1)?
@@ -651,7 +651,7 @@ mod tests {
                 {
                     let s = "double".to_symbol(global);
                     let field = value
-                        .field_accessor(frame)
+                        .field_accessor(&mut frame)
                         .field("tuples")?
                         .field(s)?
                         .field(1)?
@@ -662,7 +662,7 @@ mod tests {
 
                 {
                     assert!(value
-                        .field_accessor(frame)
+                        .field_accessor(&mut frame)
                         .field("tuples")?
                         .field("double")?
                         .field((1, 1))
@@ -671,7 +671,7 @@ mod tests {
 
                 {
                     let field = value
-                        .field_accessor(frame)
+                        .field_accessor(&mut frame)
                         .field("tuples")?
                         .field("abstract")?
                         .field(1)?
@@ -682,7 +682,7 @@ mod tests {
 
                 {
                     let field = value
-                        .field_accessor(frame)
+                        .field_accessor(&mut frame)
                         .field("arrays")?
                         .field("u8vec")?
                         .field(1)?
@@ -693,7 +693,7 @@ mod tests {
 
                 {
                     let field = value
-                        .field_accessor(frame)
+                        .field_accessor(&mut frame)
                         .field("arrays")?
                         .field("unionvec")?
                         .field(0)?
@@ -704,7 +704,7 @@ mod tests {
 
                 {
                     let field = value
-                        .field_accessor(frame)
+                        .field_accessor(&mut frame)
                         .field("arrays")?
                         .field("unionvec")?
                         .field(1)?
@@ -715,7 +715,7 @@ mod tests {
 
                 {
                     let field = value
-                        .field_accessor(frame)
+                        .field_accessor(&mut frame)
                         .field("arrays")?
                         .field("wrappervec")?
                         .field(1)?
@@ -726,7 +726,7 @@ mod tests {
 
                 {
                     let field = value
-                        .field_accessor(frame)
+                        .field_accessor(&mut frame)
                         .field("arrays")?
                         .field("ptrvec")?
                         .field(1)?
@@ -738,7 +738,7 @@ mod tests {
 
                 {
                     let field = value
-                        .field_accessor(frame)
+                        .field_accessor(&mut frame)
                         .field("arrays")?
                         .field("inlinedptrvec")?
                         .field(2)?
@@ -750,7 +750,7 @@ mod tests {
 
                 {
                     let field = value
-                        .field_accessor(frame)
+                        .field_accessor(&mut frame)
                         .field("arrays")?
                         .field("inlinedptrvec")?
                         .field(1)?
@@ -763,7 +763,7 @@ mod tests {
 
                 {
                     let field = value
-                        .field_accessor(frame)
+                        .field_accessor(&mut frame)
                         .field("arrays")?
                         .field("u8array")?
                         .field((1, 1))?
@@ -774,7 +774,7 @@ mod tests {
 
                 {
                     assert!(value
-                        .field_accessor(frame)
+                        .field_accessor(&mut frame)
                         .field("arrays")?
                         .field("u8array")?
                         .field("wrongkind")
@@ -784,7 +784,7 @@ mod tests {
                 {
                     let sym = "wrongkind".to_symbol(global);
                     assert!(value
-                        .field_accessor(frame)
+                        .field_accessor(&mut frame)
                         .field("arrays")?
                         .field("u8array")?
                         .field(sym)
@@ -793,7 +793,7 @@ mod tests {
 
                 {
                     let field = value
-                        .field_accessor(frame)
+                        .field_accessor(&mut frame)
                         .field("arrays")?
                         .field("inlinedptrarray")?
                         .field((1, 0))?
@@ -806,7 +806,7 @@ mod tests {
 
                 {
                     let field = value
-                        .field_accessor(frame)
+                        .field_accessor(&mut frame)
                         .field("nonexistent")?
                         .access::<ValueRef>()?;
 

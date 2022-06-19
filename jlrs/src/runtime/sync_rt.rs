@@ -60,8 +60,8 @@ impl Julia {
             page: StackPage::default(),
         };
 
-        jl.scope(|_, frame| {
-            init_jlrs(&mut *frame);
+        jl.scope(|_, mut frame| {
+            init_jlrs(&mut frame);
             Ok(())
         })
         .expect("Could not load Jlrs module");
@@ -109,12 +109,12 @@ impl Julia {
     /// ```
     pub unsafe fn include<P: AsRef<Path>>(&mut self, path: P) -> JlrsResult<()> {
         if path.as_ref().exists() {
-            return self.scope(|global, frame| {
-                let path_jl_str = JuliaString::new(&mut *frame, path.as_ref().to_string_lossy())?;
+            return self.scope(|global, mut frame| {
+                let path_jl_str = JuliaString::new(&mut frame, path.as_ref().to_string_lossy())?;
                 Module::main(global)
                     .function_ref("include")?
                     .wrapper_unchecked()
-                    .call1(frame, path_jl_str.as_value())?
+                    .call1(&mut frame, path_jl_str.as_value())?
                     .into_jlrs_result()
                     .map(|_| ())
             });
@@ -126,8 +126,7 @@ impl Julia {
     }
 
     /// This method is a main entrypoint to interact with Julia. It takes a closure with two
-    /// arguments, a `Global` and a mutable reference to a `GcFrame`, and can return arbitrary
-    /// results.
+    /// arguments, a `Global` and a `GcFrame`, and can return arbitrary results.
     ///
     /// Example:
     ///
@@ -137,8 +136,8 @@ impl Julia {
     /// # fn main() {
     /// # JULIA.with(|j| {
     /// # let mut julia = j.borrow_mut();
-    ///   julia.scope(|_global, frame| {
-    ///       let _i = Value::new(&mut *frame, 1u64)?;
+    ///   julia.scope(|_global, mut frame| {
+    ///       let _i = Value::new(&mut frame, 1u64)?;
     ///       Ok(())
     ///   }).unwrap();
     /// # });
@@ -146,21 +145,21 @@ impl Julia {
     /// ```
     pub fn scope<T, F>(&mut self, func: F) -> JlrsResult<T>
     where
-        for<'base> F: FnOnce(Global<'base>, &mut GcFrame<'base, Sync>) -> JlrsResult<T>,
+        for<'base> F: FnOnce(Global<'base>, GcFrame<'base, Sync>) -> JlrsResult<T>,
     {
         unsafe {
             let global = Global::new();
-            let mut frame = GcFrame::new(self.page.as_ref(), Sync);
+            let (frame, owner) = GcFrame::new(self.page.as_ref(), Sync);
 
-            let ret = func(global, &mut frame);
-            std::mem::drop(frame);
+            let ret = func(global, frame);
+            std::mem::drop(owner);
             ret
         }
     }
 
     /// This method is a main entrypoint to interact with Julia. It takes a closure with two
-    /// arguments, a `Global` and a mutable reference to a `GcFrame`, and can return arbitrary
-    /// results. The frame will have capacity for at least `capacity` roots.
+    /// arguments, a `Global` and a `GcFrame`, and can return arbitrary results. The frame will
+    /// have capacity for at least `capacity` roots.
     ///
     /// Example:
     ///
@@ -170,8 +169,8 @@ impl Julia {
     /// # fn main() {
     /// # JULIA.with(|j| {
     /// # let mut julia = j.borrow_mut();
-    ///   julia.scope_with_capacity(1, |_global, frame| {
-    ///       let _i = Value::new(&mut *frame, 1u64)?;
+    ///   julia.scope_with_capacity(1, |_global, mut frame| {
+    ///       let _i = Value::new(&mut frame, 1u64)?;
     ///       Ok(())
     ///   }).unwrap();
     /// # });
@@ -179,17 +178,17 @@ impl Julia {
     /// ```
     pub fn scope_with_capacity<T, F>(&mut self, capacity: usize, func: F) -> JlrsResult<T>
     where
-        for<'base> F: FnOnce(Global<'base>, &mut GcFrame<'base, Sync>) -> JlrsResult<T>,
+        for<'base> F: FnOnce(Global<'base>, GcFrame<'base, Sync>) -> JlrsResult<T>,
     {
         unsafe {
             let global = Global::new();
             if capacity + 2 > self.page.size() {
                 self.page = StackPage::new(capacity + 2);
             }
-            let mut frame = GcFrame::new(self.page.as_ref(), Sync);
+            let (frame, owner) = GcFrame::new(self.page.as_ref(), Sync);
 
-            let ret = func(global, &mut frame);
-            std::mem::drop(frame);
+            let ret = func(global, frame);
+            std::mem::drop(owner);
             ret
         }
     }

@@ -8,8 +8,8 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|global, frame| {
-                assert!(Module::base(global).function(&mut *frame, "+").is_ok());
+            jlrs.scope(|global, mut frame| {
+                assert!(Module::base(global).function(&mut frame, "+").is_ok());
                 Ok(())
             })
             .unwrap();
@@ -21,9 +21,9 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|global, frame| {
-                let plus = JuliaString::new(&mut *frame, "+")?;
-                assert!(Module::base(global).function(&mut *frame, plus).is_ok());
+            jlrs.scope(|global, mut frame| {
+                let plus = JuliaString::new(&mut frame, "+")?;
+                assert!(Module::base(global).function(&mut frame, plus).is_ok());
                 Ok(())
             })
             .unwrap();
@@ -35,9 +35,9 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|global, frame| {
+            jlrs.scope(|global, mut frame| {
                 let plus = Symbol::new(global, "+");
-                assert!(Module::base(global).function(&mut *frame, plus).is_ok());
+                assert!(Module::base(global).function(&mut frame, plus).is_ok());
                 Ok(())
             })
             .unwrap();

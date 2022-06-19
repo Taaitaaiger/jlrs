@@ -12,10 +12,10 @@ impl AsyncTask for MyTask {
     async fn run<'base>(
         &mut self,
         global: Global<'base>,
-        frame: &mut AsyncGcFrame<'base>,
+        mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
-        let dims = Value::new(&mut *frame, self.dims)?;
-        let iters = Value::new(&mut *frame, self.iters)?;
+        let dims = Value::new(&mut frame, self.dims)?;
+        let iters = Value::new(&mut frame, self.iters)?;
 
         let v = unsafe {
             Module::main(global)
@@ -24,7 +24,7 @@ impl AsyncTask for MyTask {
                 .function_ref("complexfunc")?
                 .wrapper_unchecked()
                 .as_value()
-                .call_async(&mut *frame, &mut [dims, iters])
+                .call_async(&mut frame, &mut [dims, iters])
                 .await?
                 .unwrap()
                 .unbox::<f64>()?
@@ -46,10 +46,10 @@ impl AsyncTask for OtherRetTypeTask {
     async fn run<'base>(
         &mut self,
         global: Global<'base>,
-        frame: &mut AsyncGcFrame<'base>,
+        mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
-        let dims = Value::new(&mut *frame, self.dims)?;
-        let iters = Value::new(&mut *frame, self.iters)?;
+        let dims = Value::new(&mut frame, self.dims)?;
+        let iters = Value::new(&mut frame, self.iters)?;
 
         let v = unsafe {
             Module::main(global)
@@ -58,7 +58,7 @@ impl AsyncTask for OtherRetTypeTask {
                 .function_ref("complexfunc")?
                 .wrapper_unchecked()
                 .as_value()
-                .call_async(&mut *frame, &mut [dims, iters])
+                .call_async(&mut frame, &mut [dims, iters])
                 .await?
                 .unwrap()
                 .unbox::<f64>()? as f32
@@ -80,12 +80,12 @@ impl AsyncTask for KwTask {
     async fn run<'base>(
         &mut self,
         global: Global<'base>,
-        frame: &mut AsyncGcFrame<'base>,
+        mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
-        let dims = Value::new(&mut *frame, self.dims)?;
-        let iters = Value::new(&mut *frame, self.iters)?;
-        let kw = Value::new(&mut *frame, 5.0f64)?;
-        let nt = named_tuple!(&mut *frame, "kw" => kw)?;
+        let dims = Value::new(&mut frame, self.dims)?;
+        let iters = Value::new(&mut frame, self.iters)?;
+        let kw = Value::new(&mut frame, 5.0f64)?;
+        let nt = named_tuple!(&mut frame, "kw" => kw)?;
 
         let v = unsafe {
             Module::main(global)
@@ -94,7 +94,7 @@ impl AsyncTask for KwTask {
                 .function_ref("kwfunc")?
                 .wrapper_unchecked()
                 .with_keywords(nt)?
-                .call_async(&mut *frame, &mut [dims, iters])
+                .call_async(&mut frame, &mut [dims, iters])
                 .await?
                 .unwrap()
                 .unbox::<f64>()? as f32
@@ -113,7 +113,7 @@ impl AsyncTask for ThrowingTask {
     async fn run<'base>(
         &mut self,
         global: Global<'base>,
-        frame: &mut AsyncGcFrame<'base>,
+        mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
         let v = unsafe {
             Module::main(global)
@@ -121,7 +121,7 @@ impl AsyncTask for ThrowingTask {
                 .wrapper_unchecked()
                 .function_ref("throwingfunc")?
                 .wrapper_unchecked()
-                .call_async(&mut *frame, [])
+                .call_async(&mut frame, [])
                 .await?
                 .into_jlrs_result()?
                 .unbox::<f64>()? as f32
@@ -143,13 +143,13 @@ impl AsyncTask for NestingTaskAsyncFrame {
     async fn run<'base>(
         &mut self,
         global: Global<'base>,
-        frame: &mut AsyncGcFrame<'base>,
+        mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
-        let dims = Value::new(&mut *frame, self.dims)?;
-        let iters = Value::new(&mut *frame, self.iters)?;
+        let dims = Value::new(&mut frame, self.dims)?;
+        let iters = Value::new(&mut frame, self.iters)?;
 
         let v = frame
-            .async_scope_with_capacity(1, |frame| async move {
+            .async_scope_with_capacity(1, |mut frame| async move {
                 unsafe {
                     Module::main(global)
                         .submodule_ref("AsyncTests")?
@@ -157,7 +157,7 @@ impl AsyncTask for NestingTaskAsyncFrame {
                         .function_ref("complexfunc")?
                         .wrapper_unchecked()
                         .as_value()
-                        .call_async(&mut *frame, &mut [dims, iters])
+                        .call_async(&mut frame, &mut [dims, iters])
                         .await?
                         .unwrap()
                         .unbox::<f64>()
@@ -181,13 +181,13 @@ impl AsyncTask for NestingTaskAsyncValueFrame {
     async fn run<'base>(
         &mut self,
         global: Global<'base>,
-        frame: &mut AsyncGcFrame<'base>,
+        mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
-        let (output, frame) = frame.split()?;
-        let v = (&mut *frame)
-            .async_scope(|frame| async move {
-                let iters = Value::new(&mut *frame, self.iters)?;
-                let dims = Value::new(&mut *frame, self.dims)?;
+        let (output, mut frame) = frame.split()?;
+        let v = (&mut frame)
+            .async_scope(|mut frame| async move {
+                let iters = Value::new(&mut frame, self.iters)?;
+                let dims = Value::new(&mut frame, self.dims)?;
 
                 let out = unsafe {
                     Module::main(global)
@@ -196,7 +196,7 @@ impl AsyncTask for NestingTaskAsyncValueFrame {
                         .function_ref("complexfunc")?
                         .wrapper_unchecked()
                         .as_value()
-                        .call_async(&mut *frame, &mut [dims, iters])
+                        .call_async(&mut frame, &mut [dims, iters])
                         .await?
                         .unwrap()
                 };
@@ -222,13 +222,13 @@ impl AsyncTask for NestingTaskAsyncCallFrame {
     async fn run<'base>(
         &mut self,
         global: Global<'base>,
-        frame: &mut AsyncGcFrame<'base>,
+        mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
         let (output, frame) = frame.split()?;
         let v = frame
-            .async_scope_with_capacity(3, |frame| async move {
-                let iters = Value::new(&mut *frame, self.iters)?;
-                let dims = Value::new(&mut *frame, self.dims)?;
+            .async_scope_with_capacity(3, |mut frame| async move {
+                let iters = Value::new(&mut frame, self.iters)?;
+                let dims = Value::new(&mut frame, self.dims)?;
 
                 let out = unsafe {
                     Module::main(global)
@@ -237,11 +237,10 @@ impl AsyncTask for NestingTaskAsyncCallFrame {
                         .function_ref("complexfunc")?
                         .wrapper_unchecked()
                         .as_value()
-                        .call_async(&mut *frame, &mut [dims, iters])
+                        .call_async(&mut frame, &mut [dims, iters])
                         .await?
                 };
 
-                let output = output.into_scope(frame);
                 let out = unsafe {
                     match out {
                         Ok(v) => Ok(v.as_ref().root(output)?),
@@ -271,13 +270,13 @@ impl AsyncTask for NestingTaskAsyncGcFrame {
     async fn run<'base>(
         &mut self,
         global: Global<'base>,
-        frame: &mut AsyncGcFrame<'base>,
+        mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
-        let dims = Value::new(&mut *frame, self.dims)?;
-        let iters = Value::new(&mut *frame, self.iters)?;
+        let dims = Value::new(&mut frame, self.dims)?;
+        let iters = Value::new(&mut frame, self.iters)?;
 
         let v = frame
-            .async_scope(|frame| async move {
+            .async_scope(|mut frame| async move {
                 unsafe {
                     Module::main(global)
                         .submodule_ref("AsyncTests")?
@@ -285,7 +284,7 @@ impl AsyncTask for NestingTaskAsyncGcFrame {
                         .function_ref("complexfunc")?
                         .wrapper_unchecked()
                         .as_value()
-                        .call_async(&mut *frame, &mut [dims, iters])
+                        .call_async(&mut frame, &mut [dims, iters])
                         .await?
                         .unwrap()
                         .unbox::<f64>()
@@ -309,13 +308,13 @@ impl AsyncTask for NestingTaskAsyncDynamicValueFrame {
     async fn run<'base>(
         &mut self,
         global: Global<'base>,
-        frame: &mut AsyncGcFrame<'base>,
+        mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
         let (output, frame) = frame.split()?;
         let v = frame
-            .async_scope(|frame| async move {
-                let iters = Value::new(&mut *frame, self.iters)?;
-                let dims = Value::new(&mut *frame, self.dims)?;
+            .async_scope(|mut frame| async move {
+                let iters = Value::new(&mut frame, self.iters)?;
+                let dims = Value::new(&mut frame, self.dims)?;
 
                 let out = unsafe {
                     Module::main(global)
@@ -324,7 +323,7 @@ impl AsyncTask for NestingTaskAsyncDynamicValueFrame {
                         .function_ref("complexfunc")?
                         .wrapper_unchecked()
                         .as_value()
-                        .call_async(&mut *frame, &mut [dims, iters])
+                        .call_async(&mut frame, &mut [dims, iters])
                         .await?
                         .unwrap()
                 };
@@ -350,13 +349,13 @@ impl AsyncTask for NestingTaskAsyncDynamicCallFrame {
     async fn run<'base>(
         &mut self,
         global: Global<'base>,
-        frame: &mut AsyncGcFrame<'base>,
+        mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
         let (output, frame) = frame.split()?;
         let v = frame
-            .async_scope(|frame| async move {
-                let iters = Value::new(&mut *frame, self.iters)?;
-                let dims = Value::new(&mut *frame, self.dims)?;
+            .async_scope(|mut frame| async move {
+                let iters = Value::new(&mut frame, self.iters)?;
+                let dims = Value::new(&mut frame, self.dims)?;
 
                 let out = unsafe {
                     Module::main(global)
@@ -365,11 +364,11 @@ impl AsyncTask for NestingTaskAsyncDynamicCallFrame {
                         .function_ref("complexfunc")?
                         .wrapper_unchecked()
                         .as_value()
-                        .call_async(&mut *frame, &mut [dims, iters])
+                        .call_async(&mut frame, &mut [dims, iters])
                         .await?
                 };
 
-                let output = output.into_scope(frame);
+                let output = output.into_scope(&mut frame);
                 let out = unsafe {
                     match out {
                         Ok(v) => Ok(v.as_ref().root(output)?),
@@ -404,10 +403,10 @@ impl PersistentTask for AccumulatorTask {
 
     async fn register<'frame>(
         _global: Global<'frame>,
-        frame: &mut AsyncGcFrame<'frame>,
+        mut frame: AsyncGcFrame<'frame>,
     ) -> JlrsResult<()> {
         unsafe {
-            Value::eval_string(&mut *frame, "mutable struct MutFloat64 v::Float64 end")?
+            Value::eval_string(&mut frame, "mutable struct MutFloat64 v::Float64 end")?
                 .into_jlrs_result()?;
         }
         Ok(())
@@ -416,22 +415,22 @@ impl PersistentTask for AccumulatorTask {
     async fn init(
         &mut self,
         global: Global<'static>,
-        frame: &mut AsyncGcFrame<'static>,
+        mut frame: AsyncGcFrame<'static>,
     ) -> JlrsResult<Value<'static, 'static>> {
         unsafe {
             let (output, frame) = frame.split()?;
             let init_value = self.init_value;
             frame
-                .async_scope(|frame| {
+                .async_scope(|mut frame| {
                     async move {
                         // A nested scope is used to only root a single value in the frame provided to
                         // init, rather than two.
                         let func = Module::main(global)
                             .global_ref("MutFloat64")?
                             .value_unchecked();
-                        let init_v = Value::new(&mut *frame, init_value)?;
+                        let init_v = Value::new(&mut frame, init_value)?;
 
-                        let os = output.into_scope(frame);
+                        let os = output.into_scope(&mut frame);
 
                         func.call1(os, init_v)
                     }
@@ -444,15 +443,17 @@ impl PersistentTask for AccumulatorTask {
     async fn run<'frame>(
         &mut self,
         _global: Global<'frame>,
-        frame: &mut AsyncGcFrame<'frame>,
+        mut frame: AsyncGcFrame<'frame>,
         state: &mut Self::State,
         input: Self::Input,
     ) -> JlrsResult<Self::Output> {
-        let value = state.field_accessor(frame).field("v")?.access::<f64>()? + input;
-        let new_value = Value::new(&mut *frame, value)?;
+        let value = state.field_accessor(&frame).field("v")?.access::<f64>()? + input;
+        let new_value = Value::new(&mut frame, value)?;
 
         unsafe {
-            state.set_field(frame, "v", new_value)?.into_jlrs_result()?;
+            state
+                .set_field(&mut frame, "v", new_value)?
+                .into_jlrs_result()?;
         }
 
         Ok(value)
@@ -471,10 +472,10 @@ impl AsyncTask for LocalTask {
     async fn run<'base>(
         &mut self,
         global: Global<'base>,
-        frame: &mut AsyncGcFrame<'base>,
+        mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
-        let dims = Value::new(&mut *frame, self.dims)?;
-        let iters = Value::new(&mut *frame, self.iters)?;
+        let dims = Value::new(&mut frame, self.dims)?;
+        let iters = Value::new(&mut frame, self.iters)?;
 
         let v = unsafe {
             Module::main(global)
@@ -482,7 +483,7 @@ impl AsyncTask for LocalTask {
                 .wrapper_unchecked()
                 .function_ref("complexfunc")?
                 .wrapper_unchecked()
-                .call_async_local(&mut *frame, &mut [dims, iters])
+                .call_async_local(&mut frame, &mut [dims, iters])
                 .await?
                 .unwrap()
                 .unbox::<f64>()? as f32
@@ -504,10 +505,10 @@ impl AsyncTask for LocalSchedulingTask {
     async fn run<'base>(
         &mut self,
         global: Global<'base>,
-        frame: &mut AsyncGcFrame<'base>,
+        mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
-        let dims = Value::new(&mut *frame, self.dims)?;
-        let iters = Value::new(&mut *frame, self.iters)?;
+        let dims = Value::new(&mut frame, self.dims)?;
+        let iters = Value::new(&mut frame, self.iters)?;
 
         let v = unsafe {
             let task = Module::main(global)
@@ -515,12 +516,12 @@ impl AsyncTask for LocalSchedulingTask {
                 .wrapper_unchecked()
                 .function_ref("complexfunc")?
                 .wrapper_unchecked()
-                .schedule_async_local(&mut *frame, &mut [dims, iters])?
+                .schedule_async_local(&mut frame, &mut [dims, iters])?
                 .unwrap();
 
             Module::base(global)
-                .function(&mut *frame, "fetch")?
-                .call1(&mut *frame, task.as_value())?
+                .function(&mut frame, "fetch")?
+                .call1(&mut frame, task.as_value())?
                 .into_jlrs_result()?
                 .unbox::<f64>()? as f32
         };
@@ -541,10 +542,10 @@ impl AsyncTask for MainTask {
     async fn run<'base>(
         &mut self,
         global: Global<'base>,
-        frame: &mut AsyncGcFrame<'base>,
+        mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
-        let dims = Value::new(&mut *frame, self.dims)?;
-        let iters = Value::new(&mut *frame, self.iters)?;
+        let dims = Value::new(&mut frame, self.dims)?;
+        let iters = Value::new(&mut frame, self.iters)?;
 
         let v = unsafe {
             Module::main(global)
@@ -552,7 +553,7 @@ impl AsyncTask for MainTask {
                 .wrapper_unchecked()
                 .function_ref("complexfunc")?
                 .wrapper_unchecked()
-                .call_async_main(&mut *frame, &mut [dims, iters])
+                .call_async_main(&mut frame, &mut [dims, iters])
                 .await?
                 .unwrap()
                 .unbox::<f64>()? as f32
@@ -574,10 +575,10 @@ impl AsyncTask for MainSchedulingTask {
     async fn run<'base>(
         &mut self,
         global: Global<'base>,
-        frame: &mut AsyncGcFrame<'base>,
+        mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
-        let dims = Value::new(&mut *frame, self.dims)?;
-        let iters = Value::new(&mut *frame, self.iters)?;
+        let dims = Value::new(&mut frame, self.dims)?;
+        let iters = Value::new(&mut frame, self.iters)?;
 
         let v = unsafe {
             let task = Module::main(global)
@@ -585,12 +586,12 @@ impl AsyncTask for MainSchedulingTask {
                 .wrapper_unchecked()
                 .function_ref("complexfunc")?
                 .wrapper_unchecked()
-                .schedule_async_main(&mut *frame, &mut [dims, iters])?
+                .schedule_async_main(&mut frame, &mut [dims, iters])?
                 .unwrap();
 
             Module::base(global)
-                .function(&mut *frame, "fetch")?
-                .call1(&mut *frame, task.as_value())?
+                .function(&mut frame, "fetch")?
+                .call1(&mut frame, task.as_value())?
                 .into_jlrs_result()?
                 .unbox::<f64>()? as f32
         };
@@ -611,10 +612,10 @@ impl AsyncTask for SchedulingTask {
     async fn run<'base>(
         &mut self,
         global: Global<'base>,
-        frame: &mut AsyncGcFrame<'base>,
+        mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
-        let dims = Value::new(&mut *frame, self.dims)?;
-        let iters = Value::new(&mut *frame, self.iters)?;
+        let dims = Value::new(&mut frame, self.dims)?;
+        let iters = Value::new(&mut frame, self.iters)?;
 
         let v = unsafe {
             let task = Module::main(global)
@@ -622,12 +623,12 @@ impl AsyncTask for SchedulingTask {
                 .wrapper_unchecked()
                 .function_ref("complexfunc")?
                 .wrapper_unchecked()
-                .schedule_async(&mut *frame, &mut [dims, iters])?
+                .schedule_async(&mut frame, &mut [dims, iters])?
                 .unwrap();
 
             Module::base(global)
-                .function(&mut *frame, "fetch")?
-                .call1(&mut *frame, task.as_value())?
+                .function(&mut frame, "fetch")?
+                .call1(&mut frame, task.as_value())?
                 .into_jlrs_result()?
                 .unbox::<f64>()? as f32
         };
@@ -648,14 +649,14 @@ impl AsyncTask for LocalKwSchedulingTask {
     async fn run<'base>(
         &mut self,
         global: Global<'base>,
-        frame: &mut AsyncGcFrame<'base>,
+        mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
-        let dims = Value::new(&mut *frame, self.dims)?;
-        let iters = Value::new(&mut *frame, self.iters)?;
+        let dims = Value::new(&mut frame, self.dims)?;
+        let iters = Value::new(&mut frame, self.iters)?;
 
         let v = unsafe {
-            let kw = Value::new(&mut *frame, 5.0f64)?;
-            let nt = named_tuple!(&mut *frame, "kw" => kw)?;
+            let kw = Value::new(&mut frame, 5.0f64)?;
+            let nt = named_tuple!(&mut frame, "kw" => kw)?;
 
             let task = Module::main(global)
                 .submodule_ref("AsyncTests")?
@@ -663,12 +664,12 @@ impl AsyncTask for LocalKwSchedulingTask {
                 .function_ref("kwfunc")?
                 .wrapper_unchecked()
                 .with_keywords(nt)?
-                .schedule_async_local(&mut *frame, &mut [dims, iters])?
+                .schedule_async_local(&mut frame, &mut [dims, iters])?
                 .unwrap();
 
             Module::base(global)
-                .function(&mut *frame, "fetch")?
-                .call1(&mut *frame, task.as_value())?
+                .function(&mut frame, "fetch")?
+                .call1(&mut frame, task.as_value())?
                 .into_jlrs_result()?
                 .unbox::<f64>()? as f32
         };
@@ -689,14 +690,14 @@ impl AsyncTask for KwSchedulingTask {
     async fn run<'base>(
         &mut self,
         global: Global<'base>,
-        frame: &mut AsyncGcFrame<'base>,
+        mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
-        let dims = Value::new(&mut *frame, self.dims)?;
-        let iters = Value::new(&mut *frame, self.iters)?;
+        let dims = Value::new(&mut frame, self.dims)?;
+        let iters = Value::new(&mut frame, self.iters)?;
 
         let v = unsafe {
-            let kw = Value::new(&mut *frame, 5.0f64)?;
-            let nt = named_tuple!(&mut *frame, "kw" => kw)?;
+            let kw = Value::new(&mut frame, 5.0f64)?;
+            let nt = named_tuple!(&mut frame, "kw" => kw)?;
 
             let task = Module::main(global)
                 .submodule_ref("AsyncTests")?
@@ -704,12 +705,12 @@ impl AsyncTask for KwSchedulingTask {
                 .function_ref("kwfunc")?
                 .wrapper_unchecked()
                 .with_keywords(nt)?
-                .schedule_async(&mut *frame, &mut [dims, iters])?
+                .schedule_async(&mut frame, &mut [dims, iters])?
                 .unwrap();
 
             Module::base(global)
-                .function(&mut *frame, "fetch")?
-                .call1(&mut *frame, task.as_value())?
+                .function(&mut frame, "fetch")?
+                .call1(&mut frame, task.as_value())?
                 .into_jlrs_result()?
                 .unbox::<f64>()? as f32
         };
@@ -730,14 +731,14 @@ impl AsyncTask for MainKwSchedulingTask {
     async fn run<'base>(
         &mut self,
         global: Global<'base>,
-        frame: &mut AsyncGcFrame<'base>,
+        mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
-        let dims = Value::new(&mut *frame, self.dims)?;
-        let iters = Value::new(&mut *frame, self.iters)?;
+        let dims = Value::new(&mut frame, self.dims)?;
+        let iters = Value::new(&mut frame, self.iters)?;
 
         let v = unsafe {
-            let kw = Value::new(&mut *frame, 5.0f64)?;
-            let nt = named_tuple!(&mut *frame, "kw" => kw)?;
+            let kw = Value::new(&mut frame, 5.0f64)?;
+            let nt = named_tuple!(&mut frame, "kw" => kw)?;
 
             let task = Module::main(global)
                 .submodule_ref("AsyncTests")?
@@ -745,12 +746,12 @@ impl AsyncTask for MainKwSchedulingTask {
                 .function_ref("kwfunc")?
                 .wrapper_unchecked()
                 .with_keywords(nt)?
-                .schedule_async_main(&mut *frame, &mut [dims, iters])?
+                .schedule_async_main(&mut frame, &mut [dims, iters])?
                 .unwrap();
 
             Module::base(global)
-                .function(&mut *frame, "fetch")?
-                .call1(&mut *frame, task.as_value())?
+                .function(&mut frame, "fetch")?
+                .call1(&mut frame, task.as_value())?
                 .into_jlrs_result()?
                 .unbox::<f64>()? as f32
         };
@@ -771,12 +772,12 @@ impl AsyncTask for LocalKwTask {
     async fn run<'base>(
         &mut self,
         global: Global<'base>,
-        frame: &mut AsyncGcFrame<'base>,
+        mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
-        let dims = Value::new(&mut *frame, self.dims)?;
-        let iters = Value::new(&mut *frame, self.iters)?;
-        let kw = Value::new(&mut *frame, 5.0f64)?;
-        let nt = named_tuple!(&mut *frame, "kw" => kw)?;
+        let dims = Value::new(&mut frame, self.dims)?;
+        let iters = Value::new(&mut frame, self.iters)?;
+        let kw = Value::new(&mut frame, 5.0f64)?;
+        let nt = named_tuple!(&mut frame, "kw" => kw)?;
 
         let v = unsafe {
             Module::main(global)
@@ -785,7 +786,7 @@ impl AsyncTask for LocalKwTask {
                 .function_ref("kwfunc")?
                 .wrapper_unchecked()
                 .with_keywords(nt)?
-                .call_async_local(&mut *frame, &mut [dims, iters])
+                .call_async_local(&mut frame, &mut [dims, iters])
                 .await?
                 .unwrap()
                 .unbox::<f64>()? as f32
@@ -807,12 +808,12 @@ impl AsyncTask for MainKwTask {
     async fn run<'base>(
         &mut self,
         global: Global<'base>,
-        frame: &mut AsyncGcFrame<'base>,
+        mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
-        let dims = Value::new(&mut *frame, self.dims)?;
-        let iters = Value::new(&mut *frame, self.iters)?;
-        let kw = Value::new(&mut *frame, 5.0f64)?;
-        let nt = named_tuple!(&mut *frame, "kw" => kw)?;
+        let dims = Value::new(&mut frame, self.dims)?;
+        let iters = Value::new(&mut frame, self.iters)?;
+        let kw = Value::new(&mut frame, 5.0f64)?;
+        let nt = named_tuple!(&mut frame, "kw" => kw)?;
 
         let v = unsafe {
             Module::main(global)
@@ -821,7 +822,7 @@ impl AsyncTask for MainKwTask {
                 .function_ref("kwfunc")?
                 .wrapper_unchecked()
                 .with_keywords(nt)?
-                .call_async_main(&mut *frame, &mut [dims, iters])
+                .call_async_main(&mut frame, &mut [dims, iters])
                 .await?
                 .unwrap()
                 .unbox::<f64>()? as f32
@@ -830,34 +831,3 @@ impl AsyncTask for MainKwTask {
         Ok(v)
     }
 }
-
-/*
-pub struct FooTask {}
-
-#[async_trait(?Send)]
-impl AsyncTask for FooTask {
-    type Output = f32;
-
-    async fn run<'base>(
-        &mut self,
-        global: Global<'base>,
-        frame: &mut AsyncGcFrame<'base>,
-    ) -> JlrsResult<Self::Output> {
-        let output = frame.output()?;
-        let mut data = vec![3.0f32];
-        let borrowed = data;
-
-        let arr = (&mut *frame)
-        .new_async_scope(|frame| async move {
-                let scope = output.into_scope(frame);
-                // unsafe { Array::from_vec_unchecked(scope, borrowed, 1) }
-                Value::new(scope, 0)
-            })
-            .await?;
-
-        // let mut accessor = unsafe {arr.bits_data_mut::<f32, _>(frame)?};
-        let v = &mut 3.0f32; //&mut f32 = accessor.get_mut(0).unwrap();
-        Ok(*v)
-    }
-}
-*/

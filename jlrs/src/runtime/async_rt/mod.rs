@@ -54,7 +54,6 @@ use std::{
     marker::PhantomData,
     num::NonZeroUsize,
     path::{Path, PathBuf},
-    pin::Pin,
     sync::{atomic::Ordering, Arc},
     time::Duration,
 };
@@ -252,17 +251,16 @@ where
     /// Send a new blocking task to the runtime.
     ///
     /// This method waits if there's no room in the channel. It takes two arguments, the first is
-    /// a closure that takes two arguments, a `Global` and mutable reference to a `GcFrame`, and
-    /// must return a `JlrsResult` whose inner type is both `Send` and `Sync`. The second is the
-    /// sending half of a channel which is used to send the result back after the task has
-    /// completed. This task is executed as soon as possible and can't call async methods, so it
-    /// blocks the runtime.
+    /// a closure that takes two arguments, a `Global` and a `GcFrame`, and must return a
+    /// `JlrsResult` whose inner type is both `Send` and `Sync`. The second is the sending half of
+    /// a channel which is used to send the result back after the task has completed. This task is
+    /// executed as soon as possible and can't call async methods, so it blocks the runtime.
     pub async fn blocking_task<T, O, F>(&self, task: F, res_sender: O) -> JlrsResult<()>
     where
         for<'base> F: 'static
             + Send
             + Sync
-            + FnOnce(Global<'base>, &mut GcFrame<'base, Async<'base>>) -> JlrsResult<T>,
+            + FnOnce(Global<'base>, GcFrame<'base, Async<'base>>) -> JlrsResult<T>,
         O: OneshotSender<JlrsResult<T>>,
         T: Send + Sync + 'static,
     {
@@ -280,16 +278,16 @@ where
     ///
     /// If there's no room in the backing channel an error is returned immediately. This method
     /// takes two arguments, the first is a closure that takes two arguments, a `Global` and
-    /// mutable reference to a `GcFrame`, and must return a `JlrsResult` whose inner type is both
-    /// `Send` and `Sync`. The second is the sending half of a channel which is used to send the
-    /// result back after the task has completed. This task is executed as soon as possible and
-    /// can't call async methods, so it blocks the runtime.
+    /// a `GcFrame`, and must return a `JlrsResult` whose inner type is both `Send` and `Sync`.
+    /// The second is the sending half of a channel which is used to send the  result back after
+    /// the task has completed. This task is executed as soon as possible and can't call async
+    /// methods, so it blocks the runtime.
     pub fn try_blocking_task<T, O, F>(&self, task: F, res_sender: O) -> JlrsResult<()>
     where
         for<'base> F: 'static
             + Send
             + Sync
-            + FnOnce(Global<'base>, &mut GcFrame<'base, Async<'base>>) -> JlrsResult<T>,
+            + FnOnce(Global<'base>, GcFrame<'base, Async<'base>>) -> JlrsResult<T>,
         O: OneshotSender<JlrsResult<T>>,
         T: Send + Sync + 'static,
     {
@@ -320,7 +318,7 @@ where
         for<'base> F: 'static
             + Send
             + Sync
-            + FnOnce(Global<'base>, &mut GcFrame<'base, Async<'base>>) -> JlrsResult<T>,
+            + FnOnce(Global<'base>, GcFrame<'base, Async<'base>>) -> JlrsResult<T>,
         O: OneshotSender<JlrsResult<T>>,
         T: Send + Sync + 'static,
     {
@@ -349,7 +347,7 @@ where
         for<'base> F: 'static
             + Send
             + Sync
-            + FnOnce(Global<'base>, &mut GcFrame<'base, Async<'base>>) -> JlrsResult<T>,
+            + FnOnce(Global<'base>, GcFrame<'base, Async<'base>>) -> JlrsResult<T>,
         O: OneshotSender<JlrsResult<T>>,
         T: Send + Sync + 'static,
     {
@@ -778,7 +776,7 @@ pub(crate) enum MessageInner {
     BlockingTask(Box<dyn BlockingTaskEnvelope>),
     Include(PathBuf, Box<dyn OneshotSender<JlrsResult<()>>>),
     ErrorColor(bool, Box<dyn OneshotSender<JlrsResult<()>>>),
-    Complete(usize, Pin<Box<AsyncStackPage>>),
+    Complete(usize, Box<AsyncStackPage>),
 }
 
 impl fmt::Debug for Message {
@@ -796,8 +794,8 @@ impl MessageInner {
 unsafe fn call_include(stack: &AsyncStackPage, path: PathBuf) -> JlrsResult<()> {
     let global = Global::new();
     let mode = Async::new(stack.top());
-    let raw = stack.page();
-    let mut frame = GcFrame::new(raw, mode);
+    let raw = stack.slots();
+    let (mut frame, owner) = GcFrame::new(raw, mode);
 
     match path.to_str() {
         Some(path) => {
@@ -813,6 +811,7 @@ unsafe fn call_include(stack: &AsyncStackPage, path: PathBuf) -> JlrsResult<()> 
         None => {}
     }
 
+    std::mem::drop(owner);
     Ok(())
 }
 
@@ -841,8 +840,8 @@ fn set_custom_fns(stack: &AsyncStackPage) -> JlrsResult<()> {
     unsafe {
         let global = Global::new();
         let mode = Async::new(stack.top());
-        let raw = stack.page();
-        let mut frame = GcFrame::new(raw, mode);
+        let raw = stack.slots();
+        let (mut frame, owner) = GcFrame::new(raw, mode);
 
         init_jlrs(&mut frame);
         init_multitask(&mut frame);
@@ -857,6 +856,7 @@ fn set_custom_fns(stack: &AsyncStackPage) -> JlrsResult<()> {
             .wrapper_unchecked()
             .set_nth_field_unchecked(0, wake_rust);
 
+        std::mem::drop(owner);
         Ok(())
     }
 }

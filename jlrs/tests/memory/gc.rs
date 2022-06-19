@@ -12,7 +12,7 @@ mod tests {
             jlrs.enable_gc(true);
             assert!(jlrs.gc_is_enabled());
 
-            jlrs.scope(|_global, frame| {
+            jlrs.scope(|_global, mut frame| {
                 frame.enable_gc(false);
                 assert!(!frame.gc_is_enabled());
                 frame.enable_gc(true);
@@ -32,7 +32,7 @@ mod tests {
             jlrs.gc_collect(GcCollection::Incremental);
             jlrs.gc_collect(GcCollection::Full);
 
-            jlrs.scope(|_global, frame| {
+            jlrs.scope(|_global, mut frame| {
                 frame.gc_collect(GcCollection::Auto);
                 frame.gc_collect(GcCollection::Incremental);
                 frame.gc_collect(GcCollection::Full);
@@ -49,7 +49,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
             jlrs.gc_safepoint();
 
-            jlrs.scope(|_global, frame| {
+            jlrs.scope(|_global, mut frame| {
                 frame.gc_safepoint();
                 Ok(())
             })

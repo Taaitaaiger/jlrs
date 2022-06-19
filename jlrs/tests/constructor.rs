@@ -22,7 +22,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|global, frame| {
+            jlrs.scope(|global, mut frame| {
                 unsafe {
                     let ty = Module::main(global)
                         .submodule_ref("JlrsTests")?
@@ -32,11 +32,11 @@ mod tests {
 
                     assert!(ty.is::<DataType>());
 
-                    let res = ty.call0(&mut *frame)?;
+                    let res = ty.call0(&mut frame)?;
                     assert!(res.is_ok());
                     let value = res.unwrap();
                     let is_bool = value
-                        .field_accessor(frame)
+                        .field_accessor(&frame)
                         .field("a")?
                         .access::<DataTypeRef>()?
                         .wrapper_unchecked()
@@ -44,7 +44,7 @@ mod tests {
 
                     assert!(is_bool);
 
-                    let field_b = value.field_accessor(frame).field("b")?.access::<i32>()?;
+                    let field_b = value.field_accessor(&frame).field("b")?.access::<i32>()?;
 
                     assert_eq!(field_b, 0);
                 };
@@ -60,7 +60,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|global, frame| {
+            jlrs.scope(|global, mut frame| {
                 unsafe {
                     let ty = Module::main(global)
                         .submodule_ref("JlrsTests")?
@@ -68,13 +68,13 @@ mod tests {
                         .global_ref("HasConstructors")?
                         .value_unchecked();
 
-                    let arg = Value::new(&mut *frame, 1i16)?;
+                    let arg = Value::new(&mut frame, 1i16)?;
 
-                    let res = ty.call1(&mut *frame, arg)?;
+                    let res = ty.call1(&mut frame, arg)?;
                     assert!(res.is_ok());
                     let value = res.unwrap();
                     let is_i16 = value
-                        .field_accessor(frame)
+                        .field_accessor(&frame)
                         .field("a")?
                         .access::<DataTypeRef>()?
                         .wrapper_unchecked()
@@ -82,7 +82,7 @@ mod tests {
 
                     assert!(is_i16);
 
-                    let field_b = value.field_accessor(frame).field("b")?.access::<i16>()?;
+                    let field_b = value.field_accessor(&frame).field("b")?.access::<i16>()?;
 
                     assert_eq!(field_b, 1);
                 };
@@ -98,7 +98,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|global, frame| {
+            jlrs.scope(|global, mut frame| {
                 unsafe {
                     let ty = Module::main(global)
                         .submodule_ref("JlrsTests")?
@@ -106,15 +106,15 @@ mod tests {
                         .global_ref("HasConstructors")?
                         .value_unchecked();
 
-                    let arg = Value::new(&mut *frame, 1i16)?;
+                    let arg = Value::new(&mut frame, 1i16)?;
 
                     let value = ty.cast::<DataType>()?.instantiate_unchecked(
-                        &mut *frame,
+                        &mut frame,
                         [DataType::int64_type(global).as_value(), arg],
                     )?;
 
                     let is_i64 = value
-                        .field_accessor(frame)
+                        .field_accessor(&frame)
                         .field("a")?
                         .access::<DataTypeRef>()?
                         .wrapper_unchecked()
@@ -122,7 +122,7 @@ mod tests {
 
                     assert!(is_i64);
 
-                    let field_b = value.field_accessor(frame).field("b")?.access::<i16>()?;
+                    let field_b = value.field_accessor(&frame).field("b")?.access::<i16>()?;
 
                     assert_eq!(field_b, 1);
                 };

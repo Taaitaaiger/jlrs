@@ -21,9 +21,9 @@ fn main() {
     }
 
     let result = julia
-        .scope(|global, frame| {
-            let dim = Value::new(&mut *frame, 4isize)?;
-            let iters = Value::new(&mut *frame, 1_000_000isize)?;
+        .scope(|global, mut frame| {
+            let dim = Value::new(&mut frame, 4isize)?;
+            let iters = Value::new(&mut frame, 1_000_000isize)?;
 
             unsafe {
                 Module::main(global)
@@ -35,7 +35,7 @@ fn main() {
                     .function_ref("complexfunc")?
                     .wrapper_unchecked()
                     // Call the function with the two arguments it takes
-                    .call2(&mut *frame, dim, iters)?
+                    .call2(&mut frame, dim, iters)?
                     // If you don't want to use the exception, it can be converted to a `JlrsError`
                     // In this case the error message will contain the message that calling
                     // `display` in Julia would show

@@ -30,10 +30,10 @@
 //! # fn main() {
 //! # JULIA.with(|j| {
 //! # let mut julia = j.borrow_mut();
-//! julia.scope(|global, frame| {
+//! julia.scope(|global, mut frame| {
 //!     // Value::new takes a partial scope, here a frame is used, so the
 //!     // value is rooted in the current frame.
-//!     let _i = Value::new(&mut *frame, 2u64)?;
+//!     let _i = Value::new(&mut frame, 2u64)?;
 //!     
 //!     // We can also reserve an output in the current frame and use
 //!     // that output. This has the same effect as the previous example.
@@ -43,7 +43,7 @@
 //!     // Simarly, we can use an OutputScope because everything that
 //!     // implements Scope implements PartialScope.
 //!     let output = frame.output()?;
-//!     let output_scope = output.into_scope(frame);
+//!     let output_scope = output.into_scope(&mut frame);
 //!     let _k = Value::new(output_scope, 1u32)?;
 //!
 //!     // Using an output this way isn't particularly useful, because in all
@@ -51,11 +51,11 @@
 //!     // Outputs are more useful in combination with a nested scope.
 //!     let output_a = frame.output()?;
 //!     let output_b = frame.output()?;
-//!     let (_array, _value) = frame.scope(|frame| {
+//!     let (_array, _value) = frame.scope(|mut frame| {
 //!         // By using the output from a nested scope, the data is rooted in
 //!         // the parent frame and both these values can be returned from
 //!         // this scope
-//!         let output_scope = output_a.into_scope(frame);
+//!         let output_scope = output_a.into_scope(&mut frame);
 //!         let array = Array::new::<f32, _, _, _>(output_scope, (3, 3))?
 //!             .into_jlrs_result()?;
 //!
@@ -75,14 +75,13 @@
 //! [`Array::new`]: crate::wrappers::ptr::array::Array::new
 //! [`Output::into_scope`]: crate::memory::output::Output::into_scope
 
-use std::{marker::PhantomData, ptr::NonNull};
-
 use crate::{
     error::JlrsResult,
     memory::{frame::Frame, global::Global, output::Output},
     private::Private,
     wrappers::ptr::Wrapper,
 };
+use std::{marker::PhantomData, ptr::NonNull};
 
 /// A [`Scope`] that roots a result using an [`Output`].
 ///

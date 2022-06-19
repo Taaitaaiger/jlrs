@@ -44,10 +44,10 @@ thread_local! {
     #[doc(hidden)]
     pub static JULIA: RefCell<Julia> = {
         let r = RefCell::new(unsafe {RuntimeBuilder::new().start().unwrap() });
-        r.borrow_mut().scope_with_capacity(1, |_, frame| unsafe {
-            Value::eval_string(&mut *frame, JLRS_TESTS_JL)?.expect("failed to evaluate contents of JlrsTests.jl");
+        r.borrow_mut().scope_with_capacity(1, |_, mut frame| unsafe {
+            Value::eval_string(&mut frame, JLRS_TESTS_JL)?.expect("failed to evaluate contents of JlrsTests.jl");
             #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
-            Value::eval_string(&mut *frame, JLRS_STABLE_TESTS_JL)?.expect("failed to evaluate contents of JlrsTests.jl");
+            Value::eval_string(&mut frame, JLRS_STABLE_TESTS_JL)?.expect("failed to evaluate contents of JlrsTests.jl");
             Ok(())
         }).unwrap();
         r
@@ -57,8 +57,8 @@ thread_local! {
     #[doc(hidden)]
     pub static JULIA_DERIVE: RefCell<Julia> = {
         let r = RefCell::new(unsafe {RuntimeBuilder::new().start().unwrap() });
-        r.borrow_mut().scope_with_capacity(1, |_, frame| unsafe {
-            Value::eval_string(&mut *frame, JLRS_DERIVE_TESTS_JL)?.expect("failed to evaluate contents of JlrsTests.jl");
+        r.borrow_mut().scope_with_capacity(1, |_, mut frame| unsafe {
+            Value::eval_string(&mut frame, JLRS_DERIVE_TESTS_JL)?.expect("failed to evaluate contents of JlrsTests.jl");
             Ok(())
         }).unwrap();
         r
