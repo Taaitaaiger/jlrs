@@ -274,14 +274,11 @@ impl<'borrow, 'array, 'data, T, L: ArrayLayout>
     /// Set the element at `index` to `value`.
     ///
     /// If an error is thrown by Julia it's caught and returned.
-    ///
-    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
-    /// this value is allowed.
     #[cfg(not(all(
         target_os = "windows",
         all(feature = "lts", not(feature = "all-features-override"))
     )))]
-    pub unsafe fn set_value<'frame, D: Dims, F: Frame<'frame>>(
+    pub fn set_value<'frame, D: Dims, F: Frame<'frame>>(
         &mut self,
         frame: &mut F,
         index: D,
@@ -291,19 +288,21 @@ impl<'borrow, 'array, 'data, T, L: ArrayLayout>
 
         let idx = self.array.dimensions().index_of(&index)?;
         let ptr = value.map(|v| v.unwrap(Private)).unwrap_or(null_mut());
-        let res = jlrs_arrayset(self.array.unwrap(Private), ptr, idx);
-        if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
-            let e = (&mut *frame).value(NonNull::new_unchecked(res.data), Private)?;
-            Ok(Err(e))
-        } else {
-            Ok(Ok(()))
+        unsafe {
+            let res = jlrs_arrayset(self.array.unwrap(Private), ptr, idx);
+
+            if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
+                let e = (&mut *frame).value(NonNull::new_unchecked(res.data), Private)?;
+                Ok(Err(e))
+            } else {
+                Ok(Ok(()))
+            }
         }
     }
 
     /// Set the element at `index` to `value`.
     ///
-    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
-    /// this value is allowed. If an error is thrown by Julia it's not caught.
+    /// Safety: If an error is thrown by Julia it's not caught.
     pub unsafe fn set_value_unchecked<D: Dims>(
         &mut self,
         index: D,
@@ -353,10 +352,7 @@ impl<'borrow, 'array, 'data, T: WrapperRef<'array, 'data>>
     PtrArrayAccessor<'borrow, 'array, 'data, T, Mutable<'borrow, T>>
 {
     /// Set the value at `index` to `value` if `value` has a type that's compatible with this array.
-    ///
-    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
-    /// this value is allowed.
-    pub unsafe fn set<D>(&mut self, index: D, value: Option<Value<'_, 'data>>) -> JlrsResult<()>
+    pub fn set<D>(&mut self, index: D, value: Option<Value<'_, 'data>>) -> JlrsResult<()>
     where
         D: Dims,
     {
@@ -381,7 +377,9 @@ impl<'borrow, 'array, 'data, T: WrapperRef<'array, 'data>>
             null_mut()
         };
 
-        jl_array_ptr_set(ptr.cast(), idx, data_ptr.cast());
+        unsafe {
+            jl_array_ptr_set(ptr.cast(), idx, data_ptr.cast());
+        }
 
         Ok(())
     }
@@ -435,49 +433,39 @@ impl<'borrow, 'array, 'data, T, M: Mutability> BitsArrayAccessor<'borrow, 'array
 
 impl<'borrow, 'array, 'data, T> BitsArrayAccessor<'borrow, 'array, 'data, T, Mutable<'borrow, T>> {
     /// Set the value at `index` to `value` if `value` has a type that's compatible with this array.
-    ///
-    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
-    /// this value is allowed.
-    pub unsafe fn set<D>(&mut self, index: D, value: T) -> JlrsResult<()>
+    pub fn set<D>(&mut self, index: D, value: T) -> JlrsResult<()>
     where
         D: Dims,
     {
         let idx = self.dimensions().index_of(&index)?;
-        self.array.data_ptr().cast::<T>().add(idx).write(value);
+        unsafe {
+            self.array.data_ptr().cast::<T>().add(idx).write(value);
+        }
 
         Ok(())
     }
 
     /// Set the value at `index` to `value` if `value` has a type that's compatible with this array.
-    ///
-    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
-    /// this value is allowed.
-    pub unsafe fn get_mut<D>(&mut self, index: D) -> Option<&mut T>
+    pub fn get_mut<D>(&mut self, index: D) -> Option<&mut T>
     where
         D: Dims,
     {
         let idx = self.dimensions().index_of(&index).ok()?;
-        self.array.data_ptr().cast::<T>().add(idx).as_mut()
+        unsafe { self.array.data_ptr().cast::<T>().add(idx).as_mut() }
     }
 
     /// Returns the array's data as a mutable slice, the data is in column-major order.
-    ///
-    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
-    /// this value is allowed.
-    pub unsafe fn as_mut_slice(&mut self) -> &mut [T] {
+    pub fn as_mut_slice(&mut self) -> &mut [T] {
         let len = self.dimensions().size();
         let data = self.array.data_ptr().cast::<T>();
-        slice::from_raw_parts_mut(data, len)
+        unsafe { slice::from_raw_parts_mut(data, len) }
     }
 
     /// Returns the array's data as a mutable slice, the data is in column-major order.
-    ///
-    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
-    /// this value is allowed.
-    pub unsafe fn into_mut_slice(self) -> &'borrow mut [T] {
+    pub fn into_mut_slice(self) -> &'borrow mut [T] {
         let len = self.dimensions().size();
         let data = self.array.data_ptr().cast::<T>();
-        slice::from_raw_parts_mut(data, len)
+        unsafe { slice::from_raw_parts_mut(data, len) }
     }
 }
 
@@ -634,10 +622,7 @@ impl<'borrow, 'array, 'data> UnionArrayAccessor<'borrow, 'array, 'data, Mutable<
     ///
     /// The type `T` must be a valid layout for the value, and `ty` must be a member of the union
     /// of all possible element types.
-    ///
-    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
-    /// this value is allowed.
-    pub unsafe fn set<T, D>(&mut self, index: D, ty: DataType, value: T) -> JlrsResult<()>
+    pub fn set<T, D>(&mut self, index: D, ty: DataType, value: T) -> JlrsResult<()>
     where
         T: ValidLayout + Clone,
         D: Dims,
@@ -662,17 +647,19 @@ impl<'borrow, 'array, 'data> UnionArrayAccessor<'borrow, 'array, 'data, Mutable<
 
         let dims = ArrayDimensions::new(self.array);
         let idx = dims.index_of(&index)?;
-        let offset = idx * self.array.unwrap_non_null(Private).as_ref().elsize as usize;
-        self.array
-            .data_ptr()
-            .cast::<i8>()
-            .add(offset)
-            .cast::<T>()
-            .write(value);
+        unsafe {
+            let offset = idx * self.array.unwrap_non_null(Private).as_ref().elsize as usize;
+            self.array
+                .data_ptr()
+                .cast::<i8>()
+                .add(offset)
+                .cast::<T>()
+                .write(value);
 
-        jl_array_typetagdata(self.array.unwrap(Private))
-            .add(idx)
-            .write(tag as _);
+            jl_array_typetagdata(self.array.unwrap(Private))
+                .add(idx)
+                .write(tag as _);
+        }
 
         Ok(())
     }

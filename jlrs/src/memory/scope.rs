@@ -94,11 +94,13 @@ pub struct OutputScope<'target, 'current, 'borrow, F: Frame<'current>> {
 }
 
 impl<'target, 'current, 'borrow, F: Frame<'current>> OutputScope<'target, 'current, 'borrow, F> {
-    pub(crate) fn set_root<'data, T: Wrapper<'target, 'data>>(self, value: NonNull<T::Wraps>) -> T {
-        unsafe {
-            self.output.set_root::<T>(value);
-            T::wrap_non_null(value, Private)
-        }
+    // Safety: value must point to valid Jula data
+    pub(crate) unsafe fn set_root<'data, T: Wrapper<'target, 'data>>(
+        self,
+        value: NonNull<T::Wraps>,
+    ) -> T {
+        self.output.set_root::<T>(value);
+        T::wrap_non_null(value, Private)
     }
 }
 
@@ -155,6 +157,8 @@ where
 pub trait PartialScope<'target>: private::PartialScopePriv<'target> {
     /// Returns a new `Global`.
     fn global(&self) -> Global<'target> {
+        // Safety: this function must only be called from a thread known to Julia and the liftime
+        // is limited.
         unsafe { Global::new() }
     }
 }
@@ -200,14 +204,14 @@ pub(crate) mod private {
     }
 
     pub trait PartialScopePriv<'target>: Sized {
-        // Safety: the pointer must point to existing and valid data.
+        // Safety: the pointer must point to valid data.
         unsafe fn value<'data, T: WrapperPriv<'target, 'data>>(
             self,
             value: NonNull<T::Wraps>,
             _: Private,
         ) -> JlrsResult<T>;
 
-        // Safety: the pointer must point to existing and valid data.
+        // Safety: the pointer must point to valid data.
         unsafe fn call_result<'data, T: WrapperPriv<'target, 'data>>(
             self,
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
@@ -219,7 +223,6 @@ pub(crate) mod private {
     where
         F: Frame<'current>,
     {
-        // Safety: the pointer must point to existing and valid data.
         unsafe fn value<'data, T: WrapperPriv<'current, 'data>>(
             self,
             value: NonNull<T::Wraps>,
@@ -230,7 +233,6 @@ pub(crate) mod private {
             Ok(v)
         }
 
-        // Safety: the pointer must point to existing and valid data.
         unsafe fn call_result<'data, T: WrapperPriv<'current, 'data>>(
             self,
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
@@ -254,7 +256,6 @@ pub(crate) mod private {
     where
         F: Frame<'current>,
     {
-        // Safety: the pointer must point to existing and valid data.
         unsafe fn value<'data, T: WrapperPriv<'target, 'data>>(
             self,
             value: NonNull<T::Wraps>,
@@ -263,7 +264,6 @@ pub(crate) mod private {
             Ok(self.set_root(value))
         }
 
-        // Safety: the pointer must point to existing and valid data.
         unsafe fn call_result<'data, T: WrapperPriv<'target, 'data>>(
             self,
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
@@ -279,7 +279,6 @@ pub(crate) mod private {
     }
 
     impl<'target> PartialScopePriv<'target> for Output<'target> {
-        // Safety: the pointer must point to existing and valid data.
         unsafe fn value<'data, T: WrapperPriv<'target, 'data>>(
             self,
             value: NonNull<T::Wraps>,
@@ -289,7 +288,6 @@ pub(crate) mod private {
             Ok(T::wrap_non_null(value, Private))
         }
 
-        // Safety: the pointer must point to existing and valid data.
         unsafe fn call_result<'data, T: WrapperPriv<'target, 'data>>(
             self,
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,

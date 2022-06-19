@@ -4,12 +4,10 @@ use crate::memory::mode::Async;
 use crate::memory::stack_page::StackPage;
 use crate::{async_util::channel::ChannelReceiver, memory::global::Global};
 use crate::{async_util::channel::OneshotSender, memory::frame::AsyncGcFrame};
-use crate::{
-    async_util::task::AsyncTask,
-    runtime::async_rt::{AsyncRuntime, PersistentMessage},
-};
+use crate::{async_util::task::AsyncTask, runtime::async_rt::PersistentMessage};
 use crate::{error::JlrsResult, memory::stack_page::AsyncStackPage};
 use async_trait::async_trait;
+use futures::{future::LocalBoxFuture, FutureExt};
 use std::marker::PhantomData;
 
 pub(crate) type InnerPersistentMessage<P> = Box<
@@ -103,13 +101,13 @@ impl<A: AsyncTask> RegisterAsyncTaskEnvelope for A {
 trait PersistentTaskEnvelope: Send + Sync {
     type P: PersistentTask + Send + Sync;
 
-    async unsafe fn call_init<'inner>(
+    async fn call_init<'inner>(
         &'inner mut self,
         global: Global<'static>,
         frame: &'inner mut AsyncGcFrame<'static>,
     ) -> JlrsResult<<Self::P as PersistentTask>::State>;
 
-    async unsafe fn call_run<'inner>(
+    async fn call_run<'inner>(
         &'inner mut self,
         global: Global<'static>,
         frame: &'inner mut AsyncGcFrame<'static>,
@@ -125,7 +123,7 @@ where
 {
     type P = Self;
 
-    async unsafe fn call_init<'inner>(
+    async fn call_init<'inner>(
         &'inner mut self,
         global: Global<'static>,
         frame: &'inner mut AsyncGcFrame<'static>,
@@ -135,7 +133,7 @@ where
         }
     }
 
-    async unsafe fn call_run<'inner>(
+    async fn call_run<'inner>(
         &'inner mut self,
         global: Global<'static>,
         frame: &'inner mut AsyncGcFrame<'static>,
@@ -145,7 +143,9 @@ where
         {
             let output = {
                 let mut nested = frame.nest_async(Self::RUN_CAPACITY);
-                self.run(global, &mut nested, state, input).await
+                let res = self.run(global, &mut nested, state, input).await;
+                std::mem::drop(nested);
+                res
             };
 
             output
@@ -251,24 +251,30 @@ where
     O: OneshotSender<JlrsResult<A::Output>>,
     A: AsyncTask,
 {
-    async fn call(mut self: Box<Self>, mut stack: &mut AsyncStackPage) {
-        unsafe {
-            let (mut task, result_sender) = self.split();
+    async fn call(mut self: Box<Self>, stack: &mut AsyncStackPage) {
+        let (mut task, result_sender) = self.split();
+
+        // Safety: the stack page can be reallocated because it doesn't contain any frames
+        // yet. The frame is dropped at the end of the scope, the nested hierarchy of scopes is
+        // maintained.
+        let res = unsafe {
+            if stack.size() < A::RUN_CAPACITY + 2 {
+                *stack.page_mut() = StackPage::new(A::RUN_CAPACITY + 2);
+            }
 
             // Transmute to get static lifetimes. Should be okay because tasks can't leak
             // Julia data and the frame is not dropped until the task has completed.
-            let mode = Async(std::mem::transmute(&stack.top[1]));
-            if stack.page.size() < A::RUN_CAPACITY + 2 {
-                stack.page = StackPage::new(A::RUN_CAPACITY + 2);
-            }
-            let raw = std::mem::transmute(stack.page.as_ref());
+            let mode = Async::new(std::mem::transmute(stack.top()));
+            let raw = std::mem::transmute(stack.page());
             let mut frame = AsyncGcFrame::new(raw, mode);
             let global = Global::new();
 
             let res = task.call_run(global, &mut frame).await;
-            Box::new(result_sender).send(res).await;
             std::mem::drop(frame);
-        }
+            res
+        };
+
+        Box::new(result_sender).send(res).await;
     }
 }
 
@@ -279,23 +285,28 @@ where
 
     A: AsyncTask,
 {
-    async fn call(mut self: Box<Self>, mut stack: &mut AsyncStackPage) {
-        unsafe {
-            let sender = self.sender();
+    async fn call(mut self: Box<Self>, stack: &mut AsyncStackPage) {
+        let sender = self.sender();
 
-            let mode = Async(&stack.top[1]);
-            if stack.page.size() < A::REGISTER_CAPACITY + 2 {
-                stack.page = StackPage::new(A::REGISTER_CAPACITY + 2);
+        // Safety: the stack page can be reallocated because it doesn't contain any frames
+        // yet. The frame is dropped at the end of the scope, the nested hierarchy of scopes is
+        // maintained.
+        let res = unsafe {
+            if stack.size() < A::REGISTER_CAPACITY + 2 {
+                *stack.page_mut() = StackPage::new(A::REGISTER_CAPACITY + 2);
             }
 
-            let raw = stack.page.as_ref();
+            let mode = Async::new(stack.top());
+            let raw = stack.page();
             let mut frame = AsyncGcFrame::new(raw, mode);
             let global = Global::new();
 
             let res = A::register(global, &mut frame).await;
-            Box::new(sender).send(res).await;
             std::mem::drop(frame);
-        }
+            res
+        };
+
+        Box::new(sender).send(res).await;
     }
 }
 
@@ -306,23 +317,28 @@ where
 
     P: PersistentTask,
 {
-    async fn call(mut self: Box<Self>, mut stack: &mut AsyncStackPage) {
-        unsafe {
-            let sender = self.sender();
+    async fn call(mut self: Box<Self>, stack: &mut AsyncStackPage) {
+        let sender = self.sender();
 
-            let mode = Async(&stack.top[1]);
-            if stack.page.size() < P::REGISTER_CAPACITY + 2 {
-                stack.page = StackPage::new(P::REGISTER_CAPACITY + 2);
+        // Safety: the stack page can be reallocated because it doesn't contain any frames
+        // yet. The frame is dropped at the end of the scope, the nested hierarchy of scopes is
+        // maintained.
+        let res = unsafe {
+            if stack.size() < P::REGISTER_CAPACITY + 2 {
+                *stack.page_mut() = StackPage::new(P::REGISTER_CAPACITY + 2);
             }
 
-            let raw = stack.page.as_ref();
+            let mode = Async::new(stack.top());
+            let raw = stack.page();
             let mut frame = AsyncGcFrame::new(raw, mode);
             let global = Global::new();
 
             let res = P::register(global, &mut frame).await;
-            Box::new(sender).send(res).await;
             std::mem::drop(frame);
-        }
+            res
+        };
+
+        Box::new(sender).send(res).await;
     }
 }
 
@@ -332,61 +348,61 @@ where
     C: ChannelReceiver<PersistentMessage<P>>,
     P: PersistentTask,
 {
-    async fn call(mut self: Box<Self>, mut stack: &mut AsyncStackPage) {
+    async fn call(mut self: Box<Self>, stack: &mut AsyncStackPage) {
+        let (mut persistent, mut receiver) = self.split();
+
+        // Safety: the stack page can be reallocated because it doesn't contain any frames
+        // yet. The frame is dropped at the end of the scope, the nested hierarchy of scopes is
+        // maintained.
         unsafe {
-            {
-                let (mut persistent, mut receiver) = self.split();
-                // Transmute to get static lifetimes. Should be okay because tasks can't leak
-                // Julia data and the frame is not dropped until the task is dropped.
-                let mode = Async(std::mem::transmute(&stack.top[1]));
-                if stack.page.size() < P::INIT_CAPACITY + 2 {
-                    stack.page = StackPage::new(P::INIT_CAPACITY + 2);
-                }
-
-                let raw = std::mem::transmute(stack.page.as_ref());
-                let mut frame = AsyncGcFrame::new(raw, mode);
-                let global = Global::new();
-
-                match persistent.call_init(global, &mut frame).await {
-                    Ok(mut state) => {
-                        loop {
-                            let mut msg = match receiver.recv().await {
-                                Ok(msg) => msg.msg,
-                                Err(_) => break,
-                            };
-
-                            let res = persistent
-                                .call_run(global, &mut frame, &mut state, msg.input())
-                                .await;
-
-                            msg.respond(res).await;
-                        }
-
-                        persistent.exit(global, &mut frame, &mut state).await;
-                    }
-                    _ => (), // TODO: don't just drop it.
-                }
-
-                std::mem::drop(frame);
+            if stack.size() < P::INIT_CAPACITY + 2 {
+                *stack.page_mut() = StackPage::new(P::INIT_CAPACITY + 2);
             }
+
+            // Transmute to get static lifetimes. Should be okay because tasks can't leak
+            // Julia data and the frame is not dropped until the task is dropped.
+            let mode = Async::new(std::mem::transmute(stack.top()));
+            let raw = std::mem::transmute(stack.page());
+            let mut frame = AsyncGcFrame::new(raw, mode);
+            let global = Global::new();
+
+            match persistent.call_init(global, &mut frame).await {
+                Ok(mut state) => {
+                    loop {
+                        let mut msg = match receiver.recv().await {
+                            Ok(msg) => msg.msg,
+                            Err(_) => break,
+                        };
+
+                        let res = persistent
+                            .call_run(global, &mut frame, &mut state, msg.input())
+                            .await;
+
+                        msg.respond(res).await;
+                    }
+
+                    persistent.exit(global, &mut frame, &mut state).await;
+                }
+                _ => (), // TODO: don't just drop it.
+            }
+
+            std::mem::drop(frame);
         }
     }
 }
 
-pub(crate) struct BlockingTask<F, O, R, T> {
+pub(crate) struct BlockingTask<F, O, T> {
     func: F,
     sender: O,
     slots: usize,
-    _runtime: PhantomData<R>,
     _res: PhantomData<T>,
 }
 
-impl<F, O, R, T> BlockingTask<F, O, R, T>
+impl<F, O, T> BlockingTask<F, O, T>
 where
     for<'base> F:
         Send + Sync + FnOnce(Global<'base>, &mut GcFrame<'base, Async<'base>>) -> JlrsResult<T>,
     O: OneshotSender<JlrsResult<T>>,
-    R: AsyncRuntime,
     T: Send + Sync + 'static,
 {
     pub(crate) fn new(func: F, sender: O, slots: usize) -> Self {
@@ -394,7 +410,6 @@ where
             func,
             sender,
             slots,
-            _runtime: PhantomData,
             _res: PhantomData,
         }
     }
@@ -403,6 +418,8 @@ where
         self: Box<Self>,
         frame: &mut GcFrame<'scope, Async<'scope>>,
     ) -> (JlrsResult<T>, O) {
+        // Safety: this method is called from a thread known to Julia, the lifetime is limited to
+        // 'scope.
         let global = unsafe { Global::new() };
         let func = self.func;
         let res = func(global, frame);
@@ -411,30 +428,36 @@ where
 }
 
 pub(crate) trait BlockingTaskEnvelope: Send + Sync {
-    fn call(self: Box<Self>, stack: &mut AsyncStackPage);
+    fn call(self: Box<Self>, stack: &mut AsyncStackPage) -> LocalBoxFuture<()>;
 }
 
-impl<F, O, R, T> BlockingTaskEnvelope for BlockingTask<F, O, R, T>
+impl<F, O, T> BlockingTaskEnvelope for BlockingTask<F, O, T>
 where
     for<'base> F:
         Send + Sync + FnOnce(Global<'base>, &mut GcFrame<'base, Async<'base>>) -> JlrsResult<T>,
     O: OneshotSender<JlrsResult<T>>,
-    R: AsyncRuntime,
     T: Send + Sync + 'static,
 {
-    fn call(self: Box<Self>, stack: &mut AsyncStackPage) {
-        let mode = Async(&stack.top[1]);
-        if stack.page.size() < self.slots + 2 {
-            stack.page = StackPage::new(self.slots + 2);
-        }
-        let raw = stack.page.as_ref();
-        let mut frame = unsafe { GcFrame::new(raw, mode) };
-        let (res, ch) = self.call(&mut frame);
+    fn call(self: Box<Self>, stack: &mut AsyncStackPage) -> LocalBoxFuture<'static, ()> {
+        // Safety: the stack page can be reallocated because it doesn't contain any frames
+        // yet. The frame is dropped at the end of the scope, the nested hierarchy of scopes is
+        // maintained.
+        let (res, ch) = unsafe {
+            if stack.size() < self.slots + 2 {
+                *stack.page_mut() = StackPage::new(self.slots + 2);
+            }
 
-        R::spawn_local(async {
+            let mode = Async::new(stack.top());
+            let raw = stack.page();
+            let mut frame = GcFrame::new(raw, mode);
+            let res = self.call(&mut frame);
+            std::mem::drop(frame);
+            res
+        };
+
+        async {
             OneshotSender::send(ch, res).await;
-        });
-
-        std::mem::drop(frame);
+        }
+        .boxed_local()
     }
 }

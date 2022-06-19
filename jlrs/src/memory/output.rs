@@ -1,4 +1,4 @@
-//! Root data in a parent scope.
+//! Outputs to root data in a parent scope.
 //!
 //! In order to allow temporary data to be freed by the GC when it's no longer in use, this
 //! data should be allocated in a new scope. Because the data returned from a scope must outlive
@@ -42,17 +42,23 @@ impl<'target> Output<'target> {
         }
     }
 
-    pub(crate) fn new<F: Frame<'target>>(_frame: &F, slot: *const Cell<*mut c_void>) -> Self {
+    // Safety: slot must have been reserved in _frame
+    pub(crate) unsafe fn new<F: Frame<'target>>(
+        _frame: &F,
+        slot: *const Cell<*mut c_void>,
+    ) -> Self {
         Output {
             slot,
             _marker: PhantomData,
         }
     }
 
-    pub(crate) fn set_root<'data, T: Wrapper<'target, 'data>>(self, value: NonNull<T::Wraps>) {
-        unsafe {
-            let cell = &*self.slot;
-            cell.set(value.as_ptr().cast());
-        }
+    // Safety: value must point to valid Jula data
+    pub(crate) unsafe fn set_root<'data, T: Wrapper<'target, 'data>>(
+        self,
+        value: NonNull<T::Wraps>,
+    ) {
+        let cell = &*self.slot;
+        cell.set(value.as_ptr().cast());
     }
 }

@@ -830,3 +830,34 @@ impl AsyncTask for MainKwTask {
         Ok(v)
     }
 }
+
+/*
+pub struct FooTask {}
+
+#[async_trait(?Send)]
+impl AsyncTask for FooTask {
+    type Output = f32;
+
+    async fn run<'base>(
+        &mut self,
+        global: Global<'base>,
+        frame: &mut AsyncGcFrame<'base>,
+    ) -> JlrsResult<Self::Output> {
+        let output = frame.output()?;
+        let mut data = vec![3.0f32];
+        let borrowed = data;
+
+        let arr = (&mut *frame)
+        .new_async_scope(|frame| async move {
+                let scope = output.into_scope(frame);
+                // unsafe { Array::from_vec_unchecked(scope, borrowed, 1) }
+                Value::new(scope, 0)
+            })
+            .await?;
+
+        // let mut accessor = unsafe {arr.bits_data_mut::<f32, _>(frame)?};
+        let v = &mut 3.0f32; //&mut f32 = accessor.get_mut(0).unwrap();
+        Ok(*v)
+    }
+}
+*/

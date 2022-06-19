@@ -54,7 +54,7 @@ where
 {
     fn array_view_mut<'frame>(&'borrow mut self) -> ArrayViewMut<'borrow, T, Dim<IxDynImpl>> {
         let shape = self.dimensions().as_slice().into_dimension().f();
-        ArrayViewMut::from_shape(shape, unsafe { self.as_mut_slice() }).unwrap()
+        ArrayViewMut::from_shape(shape, self.as_mut_slice()).unwrap()
     }
 }
 

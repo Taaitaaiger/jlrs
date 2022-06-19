@@ -280,6 +280,7 @@ pub trait PersistentTask: 'static + Send + Sync {
 
 /// Yield the root task.
 pub fn yield_task(_: &mut AsyncGcFrame) {
+    // Safety: this function can only be called from a thread known to Julia.
     unsafe {
         jl_process_events();
         jl_yield();

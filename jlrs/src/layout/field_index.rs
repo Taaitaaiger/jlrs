@@ -33,7 +33,8 @@ mod private {
     impl FieldIndexPriv for &str {
         #[inline]
         fn field_index(&self, ty: DataType, _: Private) -> JlrsResult<usize> {
-            unsafe { ty.field_index(self.to_symbol_priv(Private)) }
+            // Safety: This method can only be called from a thread known to Julia
+            ty.field_index(unsafe { self.to_symbol_priv(Private) })
         }
     }
 
@@ -47,7 +48,8 @@ mod private {
     impl FieldIndexPriv for JuliaString<'_> {
         #[inline]
         fn field_index(&self, ty: DataType, _: Private) -> JlrsResult<usize> {
-            unsafe { ty.field_index(self.to_symbol_priv(Private)) }
+            // Safety: This method can only be called from a thread known to Julia
+            ty.field_index(unsafe { self.to_symbol_priv(Private) })
         }
     }
 

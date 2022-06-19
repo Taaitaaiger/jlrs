@@ -17,7 +17,11 @@ pub struct ReusableSlot<'target> {
 }
 
 impl<'target> ReusableSlot<'target> {
-    pub(crate) fn new<F: Frame<'target>>(_frame: &F, slot: *const Cell<*mut c_void>) -> Self {
+    // Safety: slot must have been reserved in _frame
+    pub(crate) unsafe fn new<F: Frame<'target>>(
+        _frame: &F,
+        slot: *const Cell<*mut c_void>,
+    ) -> Self {
         ReusableSlot {
             slot,
             _marker: PhantomData,
@@ -27,8 +31,10 @@ impl<'target> ReusableSlot<'target> {
     /// Root the given value in this slot, any data currently rooted in this slot is potentially
     /// unreachable after calling this method.
     pub fn reset<'data>(self, new: Value<'_, 'data>) -> ValueRef<'target, 'data> {
+        let ptr = new.unwrap(Private);
+
+        // the slot is valid as long as the ReusableSlot is.
         unsafe {
-            let ptr = new.unwrap_non_null(Private).as_ptr();
             (&*self.slot).set(ptr.cast());
             ValueRef::wrap(ptr)
         }

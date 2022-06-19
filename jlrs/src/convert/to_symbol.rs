@@ -10,7 +10,8 @@ use crate::{memory::global::Global, private::Private, wrappers::ptr::string::Jul
 pub trait ToSymbol: private::ToSymbolPriv {
     /// Convert `self` to a `Symbol`.
     fn to_symbol<'global>(&self, _: Global<'global>) -> Symbol<'global> {
-        // Requiring a Global guarantees Julia has been initialized
+        // Safety: Requiring a Global guarantees this method can only be called from a thread
+        // known to Julia
         unsafe { self.to_symbol_priv(Private) }
     }
 }
@@ -27,7 +28,7 @@ pub(crate) mod private {
     use std::ptr::NonNull;
 
     pub trait ToSymbolPriv {
-        // Safety: don't call this method before Julia has been initialized.
+        // Safety: this method must only be called from a thread known to Julia
         unsafe fn to_symbol_priv<'symbol>(&self, _: Private) -> Symbol<'symbol>;
     }
 

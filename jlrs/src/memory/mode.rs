@@ -19,9 +19,29 @@ cfg_if::cfg_if! {
 
         /// Mode used by the async runtime.
         #[derive(Clone, Copy)]
-        pub struct Async<'frame>(pub(crate) &'frame Cell<*mut c_void>);
+        pub struct Async<'frame>{
+            top: &'frame Cell<*mut c_void>
+        }
 
-        impl<'frame> Mode for Async<'frame> {}
+        impl<'frame> Async<'frame> {
+            // Safety: top must be a reference to the slot that stores the top pointer of the
+            // backing AsyncStackPage. The AsyncStackPage must have been linked into the gc stack
+            pub(crate) unsafe fn new(top: &'frame Cell<*mut c_void>) -> Self {
+                Async { top }
+            }
+
+            // Safety: top must only be changed when pushing or popping frames from the stack, the
+            // linked AsyncStackPages and the frames they store must form a single, nested
+            // hierarchy. The top pointer must point to the frame at the top of the stack, to
+            // the top pointer of another AsyncStackPage, or be a null pointer if no more pages
+            // exist.
+            pub(crate) unsafe fn top(&self) -> &Cell<*mut c_void> {
+                self.top
+            }
+        }
+
+        impl<'frame> Mode for Async<'frame> {
+        }
     }
 }
 
@@ -31,7 +51,10 @@ pub(crate) mod private {
     use std::{cell::Cell, ffi::c_void};
 
     pub trait ModePriv {
+        // Safety: must only be called when a new scope is entered, pop_frame
+        // must be called when leaving the scope with the same raw_frame
         unsafe fn push_frame(&self, raw_frame: &[Cell<*mut c_void>], _: Private);
+        // Safety: see push_frame
         unsafe fn pop_frame(&self, raw_frame: &[Cell<*mut c_void>], _: Private);
     }
 
@@ -74,12 +97,12 @@ pub(crate) mod private {
             impl<'frame> ModePriv for Async<'frame> {
                 unsafe fn push_frame(&self, raw_frame: &[Cell<*mut c_void>], _: Private) {
                     raw_frame[0].set(null_mut());
-                    raw_frame[1].set(self.0.get());
-                    self.0.set(raw_frame.as_ptr() as *const _ as *mut _);
+                    raw_frame[1].set(self.top().get());
+                    self.top().set(raw_frame.as_ptr() as *const _ as *mut _);
                 }
 
                 unsafe fn pop_frame(&self, raw_frame: &[Cell<*mut c_void>], _: Private) {
-                    self.0.set(raw_frame[1].get());
+                    self.top().set(raw_frame[1].get());
                 }
             }
         }

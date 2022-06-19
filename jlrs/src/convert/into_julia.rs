@@ -46,6 +46,7 @@ pub unsafe trait IntoJulia: Sized + 'static {
 
     #[doc(hidden)]
     fn into_julia<'scope>(self, global: Global<'scope>) -> ValueRef<'scope, 'static> {
+        // Safety: trait is implemented incorrectly if this is incorrect.
         unsafe {
             let ty = Self::julia_type(global).wrapper();
             debug_assert!(ty.is_some());
@@ -62,6 +63,7 @@ pub unsafe trait IntoJulia: Sized + 'static {
 
 macro_rules! impl_into_julia {
     ($type:ty, $boxer:ident, $julia_type:expr) => {
+        // Safety: These implemetations use a boxing function provided by Julia
         unsafe impl IntoJulia for $type {
             #[inline(always)]
             fn julia_type<'scope>(_: Global<'scope>) -> $crate::wrappers::ptr::DataTypeRef<'scope> {
@@ -105,6 +107,7 @@ impl_into_julia!(isize, jl_box_int32, jl_int32_type);
 #[cfg(target_pointer_width = "64")]
 impl_into_julia!(isize, jl_box_int64, jl_int64_type);
 
+// Safety: *mut T and Ptr{T} have the same layout
 unsafe impl<T: IntoJulia> IntoJulia for *mut T {
     #[inline]
     fn julia_type<'scope>(global: Global<'scope>) -> DataTypeRef<'scope> {
@@ -113,9 +116,9 @@ unsafe impl<T: IntoJulia> IntoJulia for *mut T {
         let params = &mut [inner_ty];
         let param_ptr = params.as_mut_ptr().cast();
 
+        // Safety: Not rooting the result should be fine. The result must be a concrete type,
+        // which is globally rooted.
         unsafe {
-            // Not rooting the result should be fine. The result must be a concrete type, which is
-            // cached.
             let applied = jl_apply_type(ptr_ua.unwrap(Private).cast(), param_ptr, 1);
             debug_assert!(!applied.is_null());
             let val = Value::wrap_non_null(NonNull::new_unchecked(applied), Private);

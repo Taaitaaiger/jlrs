@@ -1,22 +1,16 @@
-//! Different frame types that prevent data from being freed by the garbage collector while it's
-//! in use.
+//! Frames store GC roots.
 //!
-//! The garbage collector owns all Julia data and is not automatically aware of references to this
-//! data existing outside of Julia. In order to prevent data from being freed by the garbage
-//! collector while it's used from Rust this data must be rooted, or stored, in a frame (or at
-//! least be reachable from such a root). A new frame is created whenever a new scope is created
-//! and dropped when its scope ends.
+//! Several frame types exist in jlrs. They all implement the [`Frame`] trait, which provides
+//! methods that return info about that frame, like its capacity and current number of roots,
+//! methods to reserve a new [`Output`] or [`ReusableSlot`], and methods to create a nested
+//! scope with its own frame. Only [`AsyncGcFrame`] provides additional public methods.
 //!
-//! Several frame types exist in jlrs. They all implement the [`Frame`] trait, mutable references
-//! to them implement [`Scope`] and [`PartialScope`]. The `Frame` trait provides methods that
-//! return info about that frame, like its capacity and current number of roots, and methods to
-//! reserve a new [`Output`] or [`ReusableSlot`], and create a nested scope with its own frame.
-//! Only [`AsyncGcFrame`] provides additional public methods, these methods create a nested async
-//! scope with its own async frame.
+//! See the [`memory`] module for more information.
 //!
 //! [`Scope`]: crate::memory::scope::Scope
 //! [`PartialScope`]: crate::memory::scope::PartialScope
 //! [`CallAsync`]: crate::call::CallAsync
+//! [`memory`]: crate::memory
 
 use super::{mode::Mode, output::Output, reusable_slot::ReusableSlot, stack_page::StackPage};
 use crate::{error::JlrsResult, private::Private};
@@ -36,28 +30,8 @@ pub struct GcFrame<'frame, M: Mode> {
 }
 
 impl<'frame, M: Mode> GcFrame<'frame, M> {
-    // Safety: this frame must be dropped in the same scope it has been created.
-    pub(crate) unsafe fn nest<'nested>(&'nested mut self, capacity: usize) -> GcFrame<'nested, M> {
-        let used = self.n_roots() + 2;
-        let new_frame_size = MIN_FRAME_CAPACITY.max(capacity) + 2;
-        let raw_frame = if self.page.is_some() {
-            if new_frame_size <= self.page.as_ref().unwrap_unchecked().size() {
-                self.page.as_ref().unwrap_unchecked().as_ref()
-            } else {
-                self.page = Some(StackPage::new(new_frame_size));
-                self.page.as_ref().unwrap_unchecked().as_ref()
-            }
-        } else if used + new_frame_size <= self.raw_frame.len() {
-            &self.raw_frame[used..]
-        } else {
-            self.page = Some(StackPage::new(new_frame_size));
-            self.page.as_ref().unwrap_unchecked().as_ref()
-        };
-
-        GcFrame::new(raw_frame, self.mode)
-    }
-
-    // Safety: this frame must be dropped in the same scope it has been created.
+    // Safety: frames must form a single nested hierarchy. A new frame must only be created when
+    // entering a new scope.
     pub(crate) unsafe fn new(raw_frame: &'frame [Cell<*mut c_void>], mode: M) -> Self {
         mode.push_frame(raw_frame, Private);
 
@@ -69,13 +43,13 @@ impl<'frame, M: Mode> GcFrame<'frame, M> {
     }
 
     // Safety: capacity >= n_slots, the n_roots pointers the garbage collector
-    // can see must all be null or point to valid Julia data.
+    // can see must point to valid Julia data or be null pointers.
     pub(crate) unsafe fn set_n_roots(&self, n_roots: usize) {
         debug_assert!(self.capacity() >= n_roots);
         self.raw_frame.get_unchecked(0).set((n_roots << 2) as _);
     }
 
-    // Safety: capacity > n_roots, and the pointer must point to valid Julia data
+    // Safety: capacity > n_roots, value must point to valid Julia data
     pub(crate) unsafe fn root(&self, value: NonNull<jl_value_t>) {
         debug_assert!(self.n_roots() < self.capacity());
 
@@ -99,12 +73,14 @@ cfg_if::cfg_if! {
         use crate::{ccall::CCall, error::AllocError};
         use std::marker::PhantomData;
 
-        /// A `NullFrame` can be used if you call Rust from Julia through `ccall` and want to borrow array
-        /// data but not perform any allocations. It can't be used to created a new scope or root Julia
-        /// data. If you try to do so `JlrsError::AllocError` is returned.
+        /// A frame that can't store any roots or be nested.
+        ///
+        /// A `NullFrame` can be used if you call Rust from Julia through `ccall` and want to
+        /// borrow array data but not perform any allocations.
         pub struct NullFrame<'frame>(PhantomData<&'frame ()>);
 
         impl<'frame> NullFrame<'frame> {
+            // Safety: frames must form a single nested hierarchy.
             pub(crate) unsafe fn new(_: &'frame CCall) -> Self {
                 NullFrame(PhantomData)
             }
@@ -118,17 +94,10 @@ cfg_if::cfg_if! {
         use super::mode::private::ModePriv as _;
         use std::future::Future;
 
-
-        /// A frame is used to root Julia data, which guarantees the garbage collector doesn't free the
-        /// data while the frame has not been dropped. More information about this topic can be found in
-        /// the [`memory`] module.
+        /// A frame that can be used to root Julia data and call async methods.
         ///
-        /// An `AsyncGcFrame` offers the same functionality as a [`GcFrame`], and some additional async
-        /// methods that can be used to create nested async scopes. It can also be used to call the trait
-        /// methods of [`CallAsync`].
-        ///
-        /// [`CallAsync`]: crate::call::CallAsync
-        /// [`memory`]: crate::memory
+        /// Frames created with a capacity can store at least that number of roots. A frame's
+        /// capacity is at least 16.
         pub struct AsyncGcFrame<'frame> {
             raw_frame: &'frame [Cell<*mut c_void>],
             page: Option<StackPage>,
@@ -136,9 +105,10 @@ cfg_if::cfg_if! {
         }
 
         impl<'frame> AsyncGcFrame<'frame> {
-            /// An async version of [`Frame::scope`]. The closure `func` must return an async
-            /// block. Note that the returned value is required to live at least as long the
-            /// current frame.
+            /// An async version of [`Frame::scope`].
+            ///
+            /// The closure `func` must return an async block. Note that the returned value is
+            /// required to live at least as long the current frame.
             #[inline(never)]
             pub async fn async_scope<'nested, T, F, G>(&'nested mut self, func: F) -> JlrsResult<T>
             where
@@ -146,6 +116,8 @@ cfg_if::cfg_if! {
                 G: Future<Output = JlrsResult<T>>,
                 F: FnOnce(&'nested mut AsyncGcFrame<'nested>) -> G,
             {
+                // Safety: the lifetime of the borrow is extended, but it's valid during the call
+                // to func and data returned from func must live longer.
                 unsafe {
                     let mut nested = self.nest_async(0);
                     let p_nested = &mut nested as *mut _;
@@ -157,9 +129,26 @@ cfg_if::cfg_if! {
                 }
             }
 
-            /// An async version of [`Frame::scope_with_capacity`]. The closure `func` must return
-            /// an async block. Note that the returned value is required to live at least as long
-            /// the current frame.
+            /*
+            pub fn new_async_scope<'nested, T, G, F>(&'nested mut self, func: F) -> Pin<Box<dyn Future<Output = JlrsResult<T>> + 'nested>>
+            where
+                T: 'nested,
+                G: Future<Output = JlrsResult<T>>,
+                for<'b> F: 'nested + FnOnce(&mut AsyncGcFrame<'b>) -> G,
+            {
+                Box::pin(async move {
+                    let mut nested = self.nest_async(0);
+                    let ret =  func(&mut nested).await;
+                    std::mem::drop(nested);
+                    ret
+                })
+            }
+            */
+
+            /// An async version of [`Frame::scope_with_capacity`].
+            ///
+            /// The closure `func` must return an async block. Note that the returned value is
+            /// required to live at least as long the current frame.
             #[inline(never)]
             pub async fn async_scope_with_capacity<'nested, T, F, G>(
                 &'nested mut self,
@@ -171,6 +160,8 @@ cfg_if::cfg_if! {
                 G: Future<Output = JlrsResult<T>>,
                 F: FnOnce(&'nested mut AsyncGcFrame<'nested>) -> G,
             {
+                // Safety: the lifetime of the borrow is extended, but it's valid during the call
+                // to func and data returned from func must live longer.
                 unsafe {
                     let mut nested = self.nest_async(capacity);
                     let p_nested = &mut nested as *mut _;
@@ -182,8 +173,9 @@ cfg_if::cfg_if! {
                 }
             }
 
-            // Safety: this frame must be dropped in the same scope it has been created and raw_frame must
-            // have 2 + slots capacity available.
+
+            // Safety: frames must form a single nested hierarchy. A new frame must only be
+            // created when entering a new scope.
             pub(crate) unsafe fn new(
                 raw_frame: &'frame [Cell<*mut c_void>],
                 mode: Async<'frame>,
@@ -198,61 +190,42 @@ cfg_if::cfg_if! {
                 }
             }
 
-            // Safety: capacity >= n_slots
-            pub(crate) unsafe fn set_n_roots(&self, n_slots: usize) {
-                debug_assert!(n_slots <= self.capacity());
-                self.raw_frame.get_unchecked(0).set((n_slots << 2) as _);
-            }
-
-            // Safety: this frame must be dropped in the same scope it has been created.
-            pub(crate) unsafe fn nest<'nested>(
-                &'nested mut self,
-                capacity: usize,
-            ) -> GcFrame<'nested, Async<'frame>> {
-                let used = self.n_roots() + 2;
-                let new_frame_size = MIN_FRAME_CAPACITY.max(capacity) + 2;
-                let raw_frame = if self.page.is_some() {
-                    if new_frame_size <= self.page.as_ref().unwrap_unchecked().size() {
-                        self.page.as_ref().unwrap_unchecked().as_ref()
-                    } else {
-                        self.page = Some(StackPage::new(new_frame_size));
-                        self.page.as_ref().unwrap_unchecked().as_ref()
-                    }
-                } else if used + new_frame_size <= self.raw_frame.len() {
-                    &self.raw_frame[used..]
-                } else {
-                    self.page = Some(StackPage::new(new_frame_size));
-                    self.page.as_ref().unwrap_unchecked().as_ref()
-                };
-
-                GcFrame::new(raw_frame, self.mode)
-            }
-
-            // Safety: this frame must be dropped in the same scope it has been created.
-            pub(crate) unsafe fn nest_async<'nested>(
+            pub(crate) fn nest_async<'nested>(
                 &'nested mut self,
                 capacity: usize,
             ) -> AsyncGcFrame<'nested> {
                 let used = self.n_roots() + 2;
                 let new_frame_size = MIN_FRAME_CAPACITY.max(capacity) + 2;
                 let raw_frame = if self.page.is_some() {
-                    if new_frame_size <= self.page.as_ref().unwrap_unchecked().size() {
-                        self.page.as_ref().unwrap_unchecked().as_ref()
-                    } else {
-                        self.page = Some(StackPage::new(new_frame_size));
-                        self.page.as_ref().unwrap_unchecked().as_ref()
+                    // Safety: page is some
+                    unsafe {
+                        if new_frame_size <= self.page.as_ref().unwrap_unchecked().size() {
+                            self.page.as_ref().unwrap_unchecked().as_ref()
+                        } else {
+                            self.page = Some(StackPage::new(new_frame_size));
+                            self.page.as_ref().unwrap_unchecked().as_ref()
+                        }
                     }
                 } else if used + new_frame_size <= self.raw_frame.len() {
                     &self.raw_frame[used..]
                 } else {
                     self.page = Some(StackPage::new(new_frame_size));
-                    self.page.as_ref().unwrap_unchecked().as_ref()
+                    // Safety: page is some
+                    unsafe { self.page.as_ref().unwrap_unchecked().as_ref() }
                 };
 
-                AsyncGcFrame::new(raw_frame, self.mode)
+                // Safety: nested hierarchy is maintained
+                unsafe { AsyncGcFrame::new(raw_frame, self.mode) }
             }
 
-            // Safety: n_roots < capacity
+            // Safety: capacity >= n_slots, the n_roots pointers the garbage collector
+            // can see must point to valid Julia data or be null pointers.
+            pub(crate) unsafe fn set_n_roots(&self, n_slots: usize) {
+                debug_assert!(n_slots <= self.capacity());
+                self.raw_frame.get_unchecked(0).set((n_slots << 2) as _);
+            }
+
+            // Safety: capacity > n_roots, value must point to valid Julia data
             pub(crate) unsafe fn root(&self, value: NonNull<jl_value_t>) {
                 debug_assert!(self.n_roots() < self.capacity());
 
@@ -266,13 +239,14 @@ cfg_if::cfg_if! {
 
         impl<'frame> Drop for AsyncGcFrame<'frame> {
             fn drop(&mut self) {
-                // The frame was pushed when the frame was created.
+                // Safety: The frame was pushed when the frame was created.
                 unsafe { self.mode.pop_frame(self.raw_frame, Private) }
             }
         }
 
         impl<'frame> Frame<'frame> for AsyncGcFrame<'frame> {
             fn reusable_slot(&mut self) -> JlrsResult<ReusableSlot<'frame>> {
+                // Safety: the slot can only be used while the frame exists.
                 unsafe {
                     let slot = <Self as private::FramePriv>::reserve_slot(self, Private)?;
                     Ok(ReusableSlot::new(self, slot))
@@ -288,6 +262,7 @@ cfg_if::cfg_if! {
             }
 
             fn output(&mut self) -> JlrsResult<Output<'frame>> {
+                // Safety: the slot can only be used while the frame exists.
                 unsafe {
                     let slot = <Self as private::FramePriv>::reserve_slot(self, Private)?;
                     Ok(Output::new(self, slot))
@@ -299,8 +274,10 @@ cfg_if::cfg_if! {
 
 /// Functionality shared by the different frame types.
 pub trait Frame<'frame>: private::FramePriv<'frame> {
-    /// This method takes a mutable reference to a frame and returns it; this method can be used
-    /// as an alternative to reborrowing a frame with `&mut *frame` when a [`Scope`] or
+    /// Reborrow the frame.
+    ///
+    /// This method takes a mutable reference to a frame and returns it, it can be used as an
+    /// alternative to reborrowing a frame with `&mut *frame` when a [`Scope`] or
     /// [`PartialScope`] is needed.
     ///
     /// [`Scope`]: crate::memory::scope::Scope
@@ -309,10 +286,14 @@ pub trait Frame<'frame>: private::FramePriv<'frame> {
         self
     }
 
-    /// Reserve a new output in the current frame. Returns an error if the frame is full.
+    /// Reserve a new output in the current frame.
+    ///
+    /// Returns an error if the frame is full.
     fn output(&mut self) -> JlrsResult<Output<'frame>>;
 
-    /// Create a new reusable slot in the current frame. Returns an error if the frame is full.
+    /// Reserve a new reusable slot in the current frame.
+    ///
+    /// Returns an error if the frame is full.
     fn reusable_slot(&mut self) -> JlrsResult<ReusableSlot<'frame>>;
 
     /// Returns the number of values currently rooted in this frame.
@@ -321,39 +302,38 @@ pub trait Frame<'frame>: private::FramePriv<'frame> {
     /// Returns the maximum number of values that can be rooted in this frame.
     fn capacity(&self) -> usize;
 
-    /// Creates a new `GcFrame` and calls `func` with it. The new frame is popped from the GC stack
-    /// stack after `func` returns.
+    /// Create a new scope and call func with that scope's frame.
+    ///
+    /// The frame can store at least 16 roots.
     #[inline(never)]
     fn scope<T, F>(&mut self, func: F) -> JlrsResult<T>
     where
         for<'inner> F: FnOnce(&mut GcFrame<'inner, Self::Mode>) -> JlrsResult<T>,
     {
-        unsafe {
-            let mut nested = self.nest(0, Private);
-            let ret = func(&mut nested);
-            std::mem::drop(nested);
-            ret
-        }
+        let mut nested = self.nest(0, Private);
+        let ret = func(&mut nested);
+        std::mem::drop(nested);
+        ret
     }
 
-    /// Creates a frame that can store at least `capacity` roots and calls `func` with this new
-    /// frame. The new frame is popped from the GC stack after `func` returns.
+    /// Create a new scope and call func with that scope's frame.
+    ///
+    /// The frame can store at least `capacity` roots.
     #[inline(never)]
     fn scope_with_capacity<T, F>(&mut self, capacity: usize, func: F) -> JlrsResult<T>
     where
         for<'inner> F: FnOnce(&mut GcFrame<'inner, Self::Mode>) -> JlrsResult<T>,
     {
-        unsafe {
-            let mut nested = self.nest(capacity, Private);
-            let ret = func(&mut nested);
-            std::mem::drop(nested);
-            ret
-        }
+        let mut nested = self.nest(capacity, Private);
+        let ret = func(&mut nested);
+        std::mem::drop(nested);
+        ret
     }
 }
 
 impl<'frame, M: Mode> Frame<'frame> for GcFrame<'frame, M> {
     fn reusable_slot(&mut self) -> JlrsResult<ReusableSlot<'frame>> {
+        // Safety: the slot can only be used while the frame exists.
         unsafe {
             let slot = <Self as private::FramePriv>::reserve_slot(self, Private)?;
             Ok(ReusableSlot::new(self, slot))
@@ -369,6 +349,7 @@ impl<'frame, M: Mode> Frame<'frame> for GcFrame<'frame, M> {
     }
 
     fn output(&mut self) -> JlrsResult<Output<'frame>> {
+        // Safety: the slot can only be used while the frame exists.
         unsafe {
             let slot = <Self as private::FramePriv>::reserve_slot(self, Private)?;
             Ok(Output::new(self, slot))
@@ -416,14 +397,11 @@ mod private {
         ptr::{null_mut, NonNull},
     };
 
-    use super::Frame as _;
+    use super::{Frame as _, MIN_FRAME_CAPACITY};
     use crate::error::JlrsResult;
     use crate::memory::frame::GcFrame;
-    #[cfg(feature = "ccall")]
-    use crate::memory::frame::NullFrame;
     use crate::memory::mode::Mode;
-    #[cfg(feature = "ccall")]
-    use crate::memory::mode::Sync;
+    use crate::memory::stack_page::StackPage;
     use crate::wrappers::ptr::private::WrapperPriv;
     use crate::{error::AllocError, private::Private};
 
@@ -437,11 +415,10 @@ mod private {
             _: Private,
         ) -> Result<T, AllocError>;
 
-        // safety: this pointer must only be used while the frame exists.
+        // safety: this slot must only be used while the frame exists.
         unsafe fn reserve_slot(&mut self, _: Private) -> JlrsResult<&'frame Cell<*mut c_void>>;
 
-        // safety: the nested frame must be dropped in the same scope as it has been created in.
-        unsafe fn nest<'nested>(
+        fn nest<'nested>(
             &'nested mut self,
             capacity: usize,
             _: Private,
@@ -477,37 +454,64 @@ mod private {
             Ok(self.raw_frame.get_unchecked(n_roots + 2))
         }
 
-        unsafe fn nest<'nested>(
+        fn nest<'nested>(
             &'nested mut self,
             capacity: usize,
             _: Private,
         ) -> GcFrame<'nested, Self::Mode> {
-            self.nest(capacity)
+            let used = self.n_roots() + 2;
+            let new_frame_size = MIN_FRAME_CAPACITY.max(capacity) + 2;
+            let raw_frame = if self.page.is_some() {
+                // Safety: page is some
+                unsafe {
+                    if new_frame_size <= self.page.as_ref().unwrap_unchecked().size() {
+                        self.page.as_ref().unwrap_unchecked().as_ref()
+                    } else {
+                        self.page = Some(StackPage::new(new_frame_size));
+                        self.page.as_ref().unwrap_unchecked().as_ref()
+                    }
+                }
+            } else if used + new_frame_size <= self.raw_frame.len() {
+                &self.raw_frame[used..]
+            } else {
+                self.page = Some(StackPage::new(new_frame_size));
+                // Safety: page is some
+                unsafe { self.page.as_ref().unwrap_unchecked().as_ref() }
+            };
+
+            // Safety: nested hierarchy is maintained
+            unsafe { GcFrame::new(raw_frame, self.mode) }
         }
     }
 
-    #[cfg(feature = "ccall")]
-    impl<'frame> FramePriv<'frame> for NullFrame<'frame> {
-        type Mode = Sync;
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "ccall")] {
+            use crate::memory::frame::NullFrame;
+            use crate::memory::mode::Sync;
 
-        unsafe fn push_root<'data, T: WrapperPriv<'frame, 'data>>(
-            &mut self,
-            _value: NonNull<T::Wraps>,
-            _: Private,
-        ) -> Result<T, AllocError> {
-            Err(AllocError::NullFrame)?
-        }
+            impl<'frame> FramePriv<'frame> for NullFrame<'frame> {
+                type Mode = Sync;
 
-        unsafe fn reserve_slot(&mut self, _: Private) -> JlrsResult<&'frame Cell<*mut c_void>> {
-            Err(AllocError::NullFrame)?
-        }
+                unsafe fn push_root<'data, T: WrapperPriv<'frame, 'data>>(
+                    &mut self,
+                    _value: NonNull<T::Wraps>,
+                    _: Private,
+                ) -> Result<T, AllocError> {
+                    Err(AllocError::NullFrame)?
+                }
 
-        unsafe fn nest<'nested>(
-            &'nested mut self,
-            _capacity: usize,
-            _: Private,
-        ) -> GcFrame<'nested, Self::Mode> {
-            unreachable!()
+                unsafe fn reserve_slot(&mut self, _: Private) -> JlrsResult<&'frame Cell<*mut c_void>> {
+                    Err(AllocError::NullFrame)?
+                }
+
+                fn nest<'nested>(
+                    &'nested mut self,
+                    _capacity: usize,
+                    _: Private,
+                ) -> GcFrame<'nested, Self::Mode> {
+                    unreachable!()
+                }
+            }
         }
     }
 
@@ -548,12 +552,33 @@ mod private {
                     Ok(self.raw_frame.get_unchecked(n_roots + 2))
                 }
 
-                unsafe fn nest<'nested>(
+                fn nest<'nested>(
                     &'nested mut self,
                     capacity: usize,
                     _: Private,
                 ) -> GcFrame<'nested, Self::Mode> {
-                    self.nest(capacity)
+                    let used = self.n_roots() + 2;
+                    let new_frame_size = MIN_FRAME_CAPACITY.max(capacity) + 2;
+                    let raw_frame = if self.page.is_some() {
+                        // Safety: page is some
+                        unsafe {
+                            if new_frame_size <= self.page.as_ref().unwrap_unchecked().size() {
+                                self.page.as_ref().unwrap_unchecked().as_ref()
+                            } else {
+                                self.page = Some(StackPage::new(new_frame_size));
+                                self.page.as_ref().unwrap_unchecked().as_ref()
+                            }
+                        }
+                    } else if used + new_frame_size <= self.raw_frame.len() {
+                        &self.raw_frame[used..]
+                    } else {
+                        self.page = Some(StackPage::new(new_frame_size));
+                        // Safety: page is some
+                        unsafe { self.page.as_ref().unwrap_unchecked().as_ref() }
+                    };
+
+                    // Safety: nested hierarchy is maintained
+                    unsafe { GcFrame::new(raw_frame, self.mode) }
                 }
             }
         }
@@ -563,12 +588,14 @@ mod private {
 #[cfg(test)]
 #[cfg(feature = "sync-rt")]
 mod tests {
+    use super::private::FramePriv;
     use crate::{
         memory::{
             frame::{Frame as _, GcFrame},
             mode,
             stack_page::StackPage,
         },
+        private::Private,
         util,
         wrappers::ptr::value::Value,
     };
@@ -576,7 +603,7 @@ mod tests {
     #[test]
     fn min_stack_pack_size() {
         let page = StackPage::new(0);
-        assert_eq!(page.as_ref().len(), 64);
+        assert_eq!(page.size(), 64);
     }
 
     #[test]
@@ -634,7 +661,7 @@ mod tests {
             let mut frame = GcFrame::new(page.as_ref(), mode::Sync);
 
             {
-                let nested = frame.nest(0);
+                let nested = frame.nest(0, Private);
                 let capacity = nested.capacity();
                 assert_eq!(capacity, page_size - 4);
             }
@@ -650,7 +677,7 @@ mod tests {
             let mut frame = GcFrame::new(page.as_ref(), mode::Sync);
 
             {
-                let nested = frame.nest(2 * page_size);
+                let nested = frame.nest(2 * page_size, Private);
                 let capacity = nested.capacity();
                 let n_roots = nested.n_roots();
                 assert_eq!(capacity, 2 * page_size);
@@ -668,11 +695,11 @@ mod tests {
             let mut frame = GcFrame::new(page.as_ref(), mode::Sync);
 
             {
-                frame.nest(2 * page_size);
+                frame.nest(2 * page_size, Private);
             }
 
             {
-                let nested = frame.nest(0);
+                let nested = frame.nest(0, Private);
                 let capacity = nested.capacity();
                 let n_roots = nested.n_roots();
                 assert_eq!(capacity, 2 * page_size);

@@ -266,7 +266,7 @@ where
         O: OneshotSender<JlrsResult<T>>,
         T: Send + Sync + 'static,
     {
-        let msg = BlockingTask::<_, _, R, _>::new(task, res_sender, 0);
+        let msg = BlockingTask::new(task, res_sender, 0);
         let boxed = Box::new(msg);
         self.sender
             .send(MessageInner::BlockingTask(boxed).wrap())
@@ -293,7 +293,7 @@ where
         O: OneshotSender<JlrsResult<T>>,
         T: Send + Sync + 'static,
     {
-        let msg = BlockingTask::<_, _, R, _>::new(task, res_sender, 0);
+        let msg = BlockingTask::new(task, res_sender, 0);
         let boxed = Box::new(msg);
         self.sender
             .try_send(MessageInner::BlockingTask(boxed).wrap())
@@ -324,7 +324,7 @@ where
         O: OneshotSender<JlrsResult<T>>,
         T: Send + Sync + 'static,
     {
-        let msg = BlockingTask::<_, _, R, _>::new(task, res_sender, capacity);
+        let msg = BlockingTask::new(task, res_sender, capacity);
         let boxed = Box::new(msg);
         self.sender
             .send(MessageInner::BlockingTask(boxed).wrap())
@@ -353,7 +353,7 @@ where
         O: OneshotSender<JlrsResult<T>>,
         T: Send + Sync + 'static,
     {
-        let msg = BlockingTask::<_, _, R, _>::new(task, res_sender, capacity);
+        let msg = BlockingTask::new(task, res_sender, capacity);
         let boxed = Box::new(msg);
         self.sender
             .try_send(MessageInner::BlockingTask(boxed).wrap())
@@ -734,8 +734,11 @@ where
                         }
                     }
                     MessageInner::BlockingTask(task) => {
-                        let stack = stacks[0].as_mut().expect("Async stack corrupted");
-                        task.call(stack)
+                        let res = {
+                            let stack = stacks[0].as_mut().expect("Async stack corrupted");
+                            task.call(stack)
+                        };
+                        res.await;
                     }
                     MessageInner::Include(path, sender) => {
                         let stack = stacks[0].as_mut().expect("Async stack corrupted");
@@ -792,8 +795,8 @@ impl MessageInner {
 
 unsafe fn call_include(stack: &AsyncStackPage, path: PathBuf) -> JlrsResult<()> {
     let global = Global::new();
-    let mode = Async(&stack.top[1]);
-    let raw = stack.page.as_ref();
+    let mode = Async::new(stack.top());
+    let raw = stack.page();
     let mut frame = GcFrame::new(raw, mode);
 
     match path.to_str() {
@@ -837,8 +840,8 @@ fn set_error_color(enable: bool) -> JlrsResult<()> {
 fn set_custom_fns(stack: &AsyncStackPage) -> JlrsResult<()> {
     unsafe {
         let global = Global::new();
-        let mode = Async(&stack.top[1]);
-        let raw = stack.page.as_ref();
+        let mode = Async::new(stack.top());
+        let raw = stack.page();
         let mut frame = GcFrame::new(raw, mode);
 
         init_jlrs(&mut frame);

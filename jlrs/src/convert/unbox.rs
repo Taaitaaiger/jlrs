@@ -104,6 +104,7 @@ impl_unboxer!(usize, jl_unbox_uint64);
 #[cfg(target_pointer_width = "64")]
 impl_unboxer!(isize, jl_unbox_int64);
 
+// Safety: *mut T and Ptr{T} have the same layout
 unsafe impl<T: IntoJulia> Unbox for *mut T {
     type Output = Self;
 }

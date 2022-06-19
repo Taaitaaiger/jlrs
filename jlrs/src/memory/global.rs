@@ -18,7 +18,7 @@ use crate::info::Info;
 pub struct Global<'global>(PhantomData<&'global ()>);
 
 impl<'global> Global<'global> {
-    // Safety: Julia must have been initialized
+    // Safety: this function must only be called from a thread known to Julia.
     pub(crate) unsafe fn new() -> Self {
         Global(PhantomData)
     }

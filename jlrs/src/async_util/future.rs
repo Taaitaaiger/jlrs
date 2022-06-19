@@ -48,19 +48,21 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             _marker: PhantomData,
         }));
 
-        unsafe {
-            let values = values.as_ref();
-            let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
-            let state_ptr_boxed = Value::new(&mut *frame, state_ptr)?;
+        let values = values.as_ref();
+        let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
+        let state_ptr_boxed = Value::new(&mut *frame, state_ptr)?;
 
-            let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + values.len());
+        let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + values.len());
 
-            vals.push(func);
-            vals.push(state_ptr_boxed);
-            vals.extend_from_slice(values);
+        vals.push(func);
+        vals.push(state_ptr_boxed);
+        vals.extend_from_slice(values);
 
+        // Safety: module contents are globally rooted, and the function is guaranteed to be safe
+        // by the caller.
+        let task = unsafe {
             let global = Global::new();
-            let task = Module::main(global)
+            Module::main(global)
                 .submodule_ref("JlrsMultitask")?
                 .wrapper_unchecked()
                 .function_ref("asynccall")?
@@ -70,19 +72,19 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
                     JlrsError::exception(format!("asynccall threw an exception: {}", msg))
                 })?
-                .cast_unchecked::<Task>();
+                .cast_unchecked::<Task>()
+        };
 
-            {
-                let locked = shared_state.lock();
-                match locked {
-                    Ok(mut data) => data.task = Some(task),
-                    _ => JlrsError::exception_error("Cannot set task".into())?,
-                }
+        {
+            let locked = shared_state.lock();
+            match locked {
+                Ok(mut data) => data.task = Some(task),
+                _ => JlrsError::exception_error("Cannot set task".into())?,
             }
-
-            yield_task(frame);
-            Ok(JuliaFuture { shared_state })
         }
+
+        yield_task(frame);
+        Ok(JuliaFuture { shared_state })
     }
 
     pub(crate) fn new_local<'value, V>(
@@ -100,19 +102,21 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             _marker: PhantomData,
         }));
 
-        unsafe {
-            let values = values.as_ref();
-            let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
-            let state_ptr_boxed = Value::new(&mut *frame, state_ptr)?;
+        let values = values.as_ref();
+        let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
+        let state_ptr_boxed = Value::new(&mut *frame, state_ptr)?;
 
-            let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + values.len());
+        let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + values.len());
 
-            vals.push(func);
-            vals.push(state_ptr_boxed);
-            vals.extend_from_slice(values);
+        vals.push(func);
+        vals.push(state_ptr_boxed);
+        vals.extend_from_slice(values);
 
+        // Safety: module contents are globally rooted, and the function is guaranteed to be safe
+        // by the caller.
+        let task = unsafe {
             let global = Global::new();
-            let task = Module::main(global)
+            Module::main(global)
                 .submodule_ref("JlrsMultitask")?
                 .wrapper_unchecked()
                 .function_ref("scheduleasynclocal")?
@@ -122,19 +126,19 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
                     JlrsError::exception(format!("scheduleasynclocal threw an exception: {}", msg))
                 })?
-                .cast_unchecked::<Task>();
+                .cast_unchecked::<Task>()
+        };
 
-            {
-                let locked = shared_state.lock();
-                match locked {
-                    Ok(mut data) => data.task = Some(task),
-                    _ => JlrsError::exception_error("Cannot set task".into())?,
-                }
+        {
+            let locked = shared_state.lock();
+            match locked {
+                Ok(mut data) => data.task = Some(task),
+                _ => JlrsError::exception_error("Cannot set task".into())?,
             }
-
-            yield_task(frame);
-            Ok(JuliaFuture { shared_state })
         }
+
+        yield_task(frame);
+        Ok(JuliaFuture { shared_state })
     }
 
     pub(crate) fn new_main<'value, V>(
@@ -152,19 +156,21 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             _marker: PhantomData,
         }));
 
-        unsafe {
-            let values = values.as_ref();
-            let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
-            let state_ptr_boxed = Value::new(&mut *frame, state_ptr)?;
+        let values = values.as_ref();
+        let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
+        let state_ptr_boxed = Value::new(&mut *frame, state_ptr)?;
 
-            let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + values.len());
+        let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + values.len());
 
-            vals.push(func);
-            vals.push(state_ptr_boxed);
-            vals.extend_from_slice(values);
+        vals.push(func);
+        vals.push(state_ptr_boxed);
+        vals.extend_from_slice(values);
 
+        // Safety: module contents are globally rooted, and the function is guaranteed to be safe
+        // by the caller.
+        let task = unsafe {
             let global = Global::new();
-            let task = Module::main(global)
+            Module::main(global)
                 .submodule_ref("JlrsMultitask")?
                 .wrapper_unchecked()
                 .function_ref("scheduleasync")?
@@ -174,19 +180,19 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
                     JlrsError::exception(format!("scheduleasync threw an exception: {}", msg))
                 })?
-                .cast_unchecked::<Task>();
+                .cast_unchecked::<Task>()
+        };
 
-            {
-                let locked = shared_state.lock();
-                match locked {
-                    Ok(mut data) => data.task = Some(task),
-                    _ => JlrsError::exception_error("Cannot set task".into())?,
-                }
+        {
+            let locked = shared_state.lock();
+            match locked {
+                Ok(mut data) => data.task = Some(task),
+                _ => JlrsError::exception_error("Cannot set task".into())?,
             }
-
-            yield_task(frame);
-            Ok(JuliaFuture { shared_state })
         }
+
+        yield_task(frame);
+        Ok(JuliaFuture { shared_state })
     }
 
     pub(crate) fn new_with_keywords<'value, V>(
@@ -204,19 +210,20 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             _marker: PhantomData,
         }));
 
-        unsafe {
-            let values = values.as_ref();
-            let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
-            let state_ptr_boxed = Value::new(&mut *frame, state_ptr)?;
+        let values = values.as_ref();
+        let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
+        let state_ptr_boxed = Value::new(&mut *frame, state_ptr)?;
 
-            let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + values.len());
+        let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + values.len());
+        vals.push(func.function());
+        vals.push(state_ptr_boxed);
+        vals.extend_from_slice(values);
 
-            vals.push(func.function());
-            vals.push(state_ptr_boxed);
-            vals.extend_from_slice(values);
-
+        // Safety: module contents are globally rooted, and the function is guaranteed to be safe
+        // by the caller.
+        let task = unsafe {
             let global = Global::new();
-            let task = Module::main(global)
+            Module::main(global)
                 .submodule_ref("JlrsMultitask")?
                 .wrapper_unchecked()
                 .function_ref("asynccall")?
@@ -227,20 +234,20 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
                     JlrsError::exception(format!("asynccall threw an exception: {}", msg))
                 })?
-                .cast_unchecked::<Task>();
+                .cast_unchecked::<Task>()
+        };
 
-            {
-                let locked = shared_state.lock();
-                match locked {
-                    Ok(mut data) => data.task = Some(task),
-                    _ => JlrsError::exception_error("Cannot set task".into())?,
-                }
+        {
+            let locked = shared_state.lock();
+            match locked {
+                Ok(mut data) => data.task = Some(task),
+                _ => JlrsError::exception_error("Cannot set task".into())?,
             }
-
-            yield_task(frame);
-
-            Ok(JuliaFuture { shared_state })
         }
+
+        yield_task(frame);
+
+        Ok(JuliaFuture { shared_state })
     }
 
     pub(crate) fn new_local_with_keywords<'value, V>(
@@ -258,17 +265,19 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             _marker: PhantomData,
         }));
 
+        let values = values.as_ref();
+        let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
+        let state_ptr_boxed = Value::new(&mut *frame, state_ptr)?;
+
+        let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + values.len());
+
+        vals.push(func.function());
+        vals.push(state_ptr_boxed);
+        vals.extend_from_slice(values);
+
+        // Safety: module contents are globally rooted, and the function is guaranteed to be safe
+        // by the caller.
         unsafe {
-            let values = values.as_ref();
-            let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
-            let state_ptr_boxed = Value::new(&mut *frame, state_ptr)?;
-
-            let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + values.len());
-
-            vals.push(func.function());
-            vals.push(state_ptr_boxed);
-            vals.extend_from_slice(values);
-
             let global = Global::new();
             let task = Module::main(global)
                 .submodule_ref("JlrsMultitask")?
@@ -312,19 +321,21 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             _marker: PhantomData,
         }));
 
-        unsafe {
-            let values = values.as_ref();
-            let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
-            let state_ptr_boxed = Value::new(&mut *frame, state_ptr)?;
+        let values = values.as_ref();
+        let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
+        let state_ptr_boxed = Value::new(&mut *frame, state_ptr)?;
 
-            let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + values.len());
+        let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + values.len());
 
-            vals.push(func.function());
-            vals.push(state_ptr_boxed);
-            vals.extend_from_slice(values);
+        vals.push(func.function());
+        vals.push(state_ptr_boxed);
+        vals.extend_from_slice(values);
 
+        // Safety: module contents are globally rooted, and the function is guaranteed to be safe
+        // by the caller.
+        let task = unsafe {
             let global = Global::new();
-            let task = Module::main(global)
+            Module::main(global)
                 .submodule_ref("JlrsMultitask")?
                 .wrapper_unchecked()
                 .function_ref("scheduleasync")?
@@ -335,20 +346,19 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
                     JlrsError::exception(format!("scheduleasync threw an exception: {}", msg))
                 })?
-                .cast_unchecked::<Task>();
+                .cast_unchecked::<Task>()
+        };
 
-            {
-                let locked = shared_state.lock();
-                match locked {
-                    Ok(mut data) => data.task = Some(task),
-                    _ => JlrsError::exception_error("Cannot set task".into())?,
-                }
+        {
+            let locked = shared_state.lock();
+            match locked {
+                Ok(mut data) => data.task = Some(task),
+                _ => JlrsError::exception_error("Cannot set task".into())?,
             }
-
-            yield_task(frame);
-
-            Ok(JuliaFuture { shared_state })
         }
+
+        yield_task(frame);
+        Ok(JuliaFuture { shared_state })
     }
 }
 
@@ -358,7 +368,8 @@ impl<'frame, 'data> Future for JuliaFuture<'frame, 'data> {
         let mut shared_state = self.shared_state.lock().unwrap();
         if shared_state.completed {
             if let Some(task) = shared_state.task {
-                // Ensure the result of the task is set
+                // Safety: module contents are globally rooted, and fetch is safe to call. The
+                // result is reachable through the task which must be rooted at ths point.
                 unsafe {
                     let global = Global::new();
                     let f = Module::base(global)
