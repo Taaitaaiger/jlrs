@@ -101,18 +101,15 @@ jobs:
           lib /def:libuv-2.def /out:libuv-2.lib /machine:x64
 
       - name: Run tests
-        run: cargo test --features full,rc1 --verbose -- --test-threads=1
+        run: cargo test --features full --verbose -- --test-threads=1
 
   test-linux-rc1:
     runs-on: ubuntu-latest
     continue-on-error: ${{ matrix.allow-fail }}
     strategy:
       matrix:
-        rust: [stable, beta]
+        rust: [stable]
         allow-fail: [false]
-        include:
-          - rust: nightly
-            allow-fail: true
     steps:
       - uses: actions/checkout@v2
 
@@ -137,11 +134,8 @@ jobs:
     continue-on-error: ${{ matrix.allow-fail }}
     strategy:
       matrix:
-        rust: [stable-x86_64-pc-windows-gnu, beta-x86_64-pc-windows-gnu]
+        rust: [stable-x86_64-pc-windows-gnu]
         allow-fail: [false]
-        include:
-          - rust: nightly-x86_64-pc-windows-gnu
-            allow-fail: true
     steps:
       - uses: actions/checkout@v2
 
@@ -164,11 +158,8 @@ jobs:
     continue-on-error: ${{ matrix.allow-fail }}
     strategy:
       matrix:
-        rust: [stable-x86_64-pc-windows-msvc, beta-x86_64-pc-windows-msvc]
+        rust: [stable-x86_64-pc-windows-msvc]
         allow-fail: [false]
-        include:
-          - rust: nightly-x86_64-pc-windows-msvc
-            allow-fail: true
     steps:
       - uses: actions/checkout@v2
 
@@ -202,11 +193,8 @@ jobs:
     continue-on-error: ${{ matrix.allow-fail }}
     strategy:
       matrix:
-        rust: [stable, beta]
+        rust: [stable]
         allow-fail: [false]
-        include:
-          - rust: nightly
-            allow-fail: true
     steps:
       - uses: actions/checkout@v2
 
@@ -231,11 +219,8 @@ jobs:
     continue-on-error: ${{ matrix.allow-fail }}
     strategy:
       matrix:
-        rust: [stable-x86_64-pc-windows-gnu, beta-x86_64-pc-windows-gnu]
+        rust: [stable-x86_64-pc-windows-gnu]
         allow-fail: [false]
-        include:
-          - rust: nightly-x86_64-pc-windows-gnu
-            allow-fail: true
     steps:
       - uses: actions/checkout@v2
 
@@ -258,11 +243,8 @@ jobs:
     continue-on-error: ${{ matrix.allow-fail }}
     strategy:
       matrix:
-        rust: [stable-x86_64-pc-windows-msvc, beta-x86_64-pc-windows-msvc]
+        rust: [stable-x86_64-pc-windows-msvc]
         allow-fail: [false]
-        include:
-          - rust: nightly-x86_64-pc-windows-msvc
-            allow-fail: true
     steps:
       - uses: actions/checkout@v2
 
