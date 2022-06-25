@@ -17,6 +17,8 @@
 //! [`memory`] module.
 //!
 //! [`memory`]: crate::memory
+//! [`DataType`]: crate::wrappers::ptr::datatype::DataType
+//! [`Array`]: crate::wrappers::ptr::array::Array
 
 macro_rules! impl_root {
     ($type:tt, 2) => {
