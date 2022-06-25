@@ -29,7 +29,7 @@ impl PersistentTask for MyTask {
     async fn init(
         &mut self,
         global: Global<'static>,
-        mut frame: AsyncGcFrame<'static>,
+        frame: &mut AsyncGcFrame<'static>,
     ) -> JlrsResult<Self::State> {
         unsafe {
             // Create the first plot with no data, but with a custom label for the y-axis.
@@ -37,11 +37,11 @@ impl PersistentTask for MyTask {
                 .function_ref("plot")?
                 .wrapper_unchecked();
 
-            let ylabel_str = JuliaString::new(&mut frame, &self.ylabel)?;
-            let ylabel = Tuple::new_unchecked(&mut frame, &mut [ylabel_str.as_value()])?;
-            let kws = named_tuple!(&mut frame, "yaxis" => ylabel)?;
+            let ylabel_str = JuliaString::new(&mut *frame, &self.ylabel)?;
+            let ylabel = Tuple::new_unchecked(&mut *frame, &mut [ylabel_str.as_value()])?;
+            let kws = named_tuple!(&mut *frame, "yaxis" => ylabel)?;
 
-            let plot = PyPlot::new_with_keywords(&mut frame, plot_fn, &mut [], kws)?;
+            let plot = PyPlot::new_with_keywords(&mut *frame, plot_fn, &mut [], kws)?;
 
             Ok((plot, kws))
         }
@@ -104,12 +104,23 @@ async fn main() {
         r.await.unwrap().unwrap();
     }
 
-    let persistent_handle = julia
-        .persistent::<UnboundedChannel<_>, _>(MyTask {
-            ylabel: String::from("Random data"),
-        })
-        .await
-        .unwrap();
+    let persistent_handle = {
+        let (handle_sender, handle_receiver) = tokio::sync::oneshot::channel();
+        julia
+            .persistent::<UnboundedChannel<_>, _, _>(
+                MyTask {
+                    ylabel: String::from("Random data"),
+                },
+                handle_sender,
+            )
+            .await
+            .expect("Cannot send task");
+
+        handle_receiver
+            .await
+            .expect("Channel was closed")
+            .expect("Cannot init task")
+    };
 
     // Call the task ten times, waiting a second between each call.
     for _ in 0..10 {

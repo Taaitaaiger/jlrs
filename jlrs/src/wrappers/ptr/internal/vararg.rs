@@ -4,7 +4,7 @@ use crate::{
     impl_debug, impl_julia_typecheck,
     memory::output::Output,
     private::Private,
-    wrappers::ptr::{private::WrapperPriv, ValueRef},
+    wrappers::ptr::{private::WrapperPriv, value::ValueRef, Ref},
 };
 use jl_sys::{jl_vararg_t, jl_vararg_type};
 use std::{marker::PhantomData, ptr::NonNull};
@@ -42,15 +42,20 @@ impl<'scope> WrapperPriv<'scope, 'static> for Vararg<'scope> {
     type Wraps = jl_vararg_t;
     const NAME: &'static str = "Vararg";
 
-    #[inline(always)]
+    // Safety: `inner` must not have been freed yet, the result must never be
+    // used after the GC might have freed it.
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData)
     }
 
-    #[inline(always)]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
 }
 
 impl_root!(Vararg, 1);
+
+/// A reference to a [`Vararg`] that has not been explicitly rooted.
+pub type VarargRef<'scope> = Ref<'scope, 'static, Vararg<'scope>>;
+impl_valid_layout!(VarargRef, Vararg);
+impl_ref_root!(Vararg, VarargRef, 1);

@@ -93,7 +93,7 @@ impl AsyncTask for KwTask {
                 .wrapper_unchecked()
                 .function_ref("kwfunc")?
                 .wrapper_unchecked()
-                .with_keywords(nt)?
+                .provide_keywords(nt)?
                 .call_async(&mut frame, &mut [dims, iters])
                 .await?
                 .unwrap()
@@ -415,7 +415,7 @@ impl PersistentTask for AccumulatorTask {
     async fn init(
         &mut self,
         global: Global<'static>,
-        mut frame: AsyncGcFrame<'static>,
+        frame: &mut AsyncGcFrame<'static>,
     ) -> JlrsResult<Value<'static, 'static>> {
         unsafe {
             let (output, frame) = frame.split()?;
@@ -663,7 +663,7 @@ impl AsyncTask for LocalKwSchedulingTask {
                 .wrapper_unchecked()
                 .function_ref("kwfunc")?
                 .wrapper_unchecked()
-                .with_keywords(nt)?
+                .provide_keywords(nt)?
                 .schedule_async_local(&mut frame, &mut [dims, iters])?
                 .unwrap();
 
@@ -704,7 +704,7 @@ impl AsyncTask for KwSchedulingTask {
                 .wrapper_unchecked()
                 .function_ref("kwfunc")?
                 .wrapper_unchecked()
-                .with_keywords(nt)?
+                .provide_keywords(nt)?
                 .schedule_async(&mut frame, &mut [dims, iters])?
                 .unwrap();
 
@@ -745,7 +745,7 @@ impl AsyncTask for MainKwSchedulingTask {
                 .wrapper_unchecked()
                 .function_ref("kwfunc")?
                 .wrapper_unchecked()
-                .with_keywords(nt)?
+                .provide_keywords(nt)?
                 .schedule_async_main(&mut frame, &mut [dims, iters])?
                 .unwrap();
 
@@ -785,7 +785,7 @@ impl AsyncTask for LocalKwTask {
                 .wrapper_unchecked()
                 .function_ref("kwfunc")?
                 .wrapper_unchecked()
-                .with_keywords(nt)?
+                .provide_keywords(nt)?
                 .call_async_local(&mut frame, &mut [dims, iters])
                 .await?
                 .unwrap()
@@ -821,7 +821,7 @@ impl AsyncTask for MainKwTask {
                 .wrapper_unchecked()
                 .function_ref("kwfunc")?
                 .wrapper_unchecked()
-                .with_keywords(nt)?
+                .provide_keywords(nt)?
                 .call_async_main(&mut frame, &mut [dims, iters])
                 .await?
                 .unwrap()

@@ -192,7 +192,7 @@ pub struct SizeAlignMismatch {
 #[jlrs(julia_type = "Main.WithBitsUnion.UnionInTuple")]
 pub struct UnionInTuple<'frame, 'data> {
     pub a: i8,
-    pub b: ::jlrs::wrappers::ptr::ValueRef<'frame, 'data>,
+    pub b: ::jlrs::wrappers::ptr::value::ValueRef<'frame, 'data>,
     pub c: i8,
 }
 
@@ -210,7 +210,7 @@ where
 #[derive(Clone, Debug, Unbox, ValidLayout, Typecheck)]
 #[jlrs(julia_type = "Main.WithGeneric.WithGenericUnionAll")]
 pub struct WithGenericUnionAll<'frame, 'data> {
-    pub a: ::jlrs::wrappers::ptr::ValueRef<'frame, 'data>,
+    pub a: ::jlrs::wrappers::ptr::value::ValueRef<'frame, 'data>,
 }
 
 #[repr(C)]
@@ -227,7 +227,7 @@ where
 #[derive(Clone, Debug, Unbox, ValidLayout, Typecheck)]
 #[jlrs(julia_type = "Main.WithGeneric.WithPropagatedLifetime")]
 pub struct WithPropagatedLifetime<'frame> {
-    pub a: WithGenericT<::jlrs::wrappers::ptr::ModuleRef<'frame>>,
+    pub a: WithGenericT<::jlrs::wrappers::ptr::module::ModuleRef<'frame>>,
 }
 
 #[repr(C)]
@@ -237,7 +237,7 @@ pub struct WithPropagatedLifetimes<'frame, 'data> {
     pub a: WithGenericT<
         ::jlrs::wrappers::inline::tuple::Tuple2<
             i32,
-            WithGenericT<::jlrs::wrappers::ptr::ArrayRef<'frame, 'data>>,
+            WithGenericT<::jlrs::wrappers::ptr::array::ArrayRef<'frame, 'data>>,
         >,
     >,
 }
@@ -267,7 +267,7 @@ pub struct WithValueType {
 #[derive(Clone, Debug, Unbox, ValidLayout, Typecheck)]
 #[jlrs(julia_type = "Main.WithNonBitsUnion.NonBitsUnion")]
 pub struct NonBitsUnion<'frame, 'data> {
-    pub a: ::jlrs::wrappers::ptr::ValueRef<'frame, 'data>,
+    pub a: ::jlrs::wrappers::ptr::value::ValueRef<'frame, 'data>,
 }
 
 #[repr(C)]

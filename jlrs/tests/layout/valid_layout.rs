@@ -152,8 +152,6 @@ mod tests {
     #[test]
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     fn valid_layout_array() {
-        use jlrs::wrappers::ptr::ArrayRef;
-
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
             jlrs.scope(|global, mut frame| {

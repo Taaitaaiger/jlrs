@@ -15,7 +15,7 @@ mod tests {
                 let arr = arr_val;
 
                 let data = arr.inline_data::<f32, _>(&frame)?;
-                assert_eq!(data.dimensions().as_slice(), &[1, 2]);
+                assert_eq!(unsafe { data.dimensions().as_slice() }, &[1, 2]);
 
                 Ok(())
             })

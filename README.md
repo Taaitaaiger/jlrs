@@ -567,7 +567,7 @@ A similar approach works for the async runtime:
 
 ```rust
 use jlrs::prelude::*;
-use std::{cell::RefCell, time::Duration};
+use std::cell::RefCell;
 thread_local! {
     pub static JULIA: RefCell<AsyncJulia<Tokio>> = {
         let julia = RefCell::new(unsafe {

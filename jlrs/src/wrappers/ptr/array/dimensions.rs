@@ -88,8 +88,9 @@ pub struct ArrayDimensions<'scope> {
 
 impl<'scope> ArrayDimensions<'scope> {
     pub(crate) fn new(array: Array<'scope, '_>) -> Self {
+        let array_ptr = array.unwrap(Private);
+        // Safety: The array's dimensions exists as long as the array does.
         unsafe {
-            let array_ptr = array.unwrap(Private);
             let ptr = jl_array_dims_ptr(array_ptr);
             let n = jl_array_ndims(array_ptr) as usize;
 
@@ -102,8 +103,11 @@ impl<'scope> ArrayDimensions<'scope> {
     }
 
     /// Returns the dimensions as a slice.
-    pub fn as_slice<'borrow>(&'borrow self) -> &'borrow [usize] {
-        unsafe { std::slice::from_raw_parts(self.ptr, self.n) }
+    ///
+    /// Safety: don't push new elements to a 1-dimensional array while borrowing its dimensions
+    /// as a slice.
+    pub unsafe fn as_slice<'borrow>(&'borrow self) -> &'borrow [usize] {
+        std::slice::from_raw_parts(self.ptr, self.n)
     }
 }
 
@@ -117,6 +121,7 @@ impl<'scope> Dims for ArrayDimensions<'scope> {
             return 0;
         }
 
+        // Safety: the dimension is in bounds
         unsafe { self.ptr.add(dimension).read() }
     }
 }

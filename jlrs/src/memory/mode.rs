@@ -2,7 +2,7 @@
 //!
 //! Whenever a new frame is created it's pushed to the GC frame stack and popped from this stack
 //! when it's dropped. There are some minor differences between the sync and async runtime how
-//! this pushing and popping works, which is handled by the `Mode` trait provided by this module.
+//! this pushing and popping works, which is handled by the [`Mode`] trait.
 
 /// Handle memory management differences between the sync and async runtime.
 pub trait Mode: Copy + private::ModePriv {}

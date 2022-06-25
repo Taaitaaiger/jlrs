@@ -65,78 +65,11 @@ macro_rules! impl_root {
     };
 }
 
-pub mod array;
-pub mod datatype;
-pub mod function;
-#[cfg(feature = "internal-types")]
-pub mod internal;
-pub mod module;
-pub mod simple_vector;
-pub mod string;
-pub mod symbol;
-pub mod task;
-pub mod type_name;
-pub mod type_var;
-pub mod union;
-pub mod union_all;
-pub mod value;
-
-use self::{
-    array::{Array, TypedArray},
-    datatype::DataType,
-    function::Function,
-    module::Module,
-    private::WrapperPriv as _,
-    simple_vector::SimpleVector,
-    string::JuliaString,
-    symbol::Symbol,
-    task::Task,
-    type_name::TypeName,
-    type_var::TypeVar,
-    union::Union,
-    union_all::UnionAll,
-    value::Value,
-};
-
-#[cfg(feature = "internal-types")]
-use self::internal::{
-    code_instance::CodeInstance, expr::Expr, method::Method, method_instance::MethodInstance,
-    method_match::MethodMatch, method_table::MethodTable, typemap_entry::TypeMapEntry,
-    typemap_level::TypeMapLevel, weak_ref::WeakRef,
-};
-
-#[cfg(all(
-    any(not(feature = "lts"), feature = "all-features-override"),
-    feature = "internal-types"
-))]
-use self::internal::opaque_closure::OpaqueClosure;
-#[cfg(all(
-    any(not(feature = "lts"), feature = "all-features-override"),
-    feature = "internal-types"
-))]
-use self::internal::vararg::Vararg;
-use crate::{
-    call::Call,
-    error::{JlrsError, JlrsResult, CANNOT_DISPLAY_VALUE},
-    layout::valid_layout::ValidLayout,
-    memory::{global::Global, scope::PartialScope},
-    private::Private,
-};
-use std::{
-    fmt::{Debug, Formatter, Result as FmtResult},
-    marker::PhantomData,
-    ptr::null_mut,
-    str::FromStr,
-};
-
-#[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
-use std::sync::atomic::AtomicPtr;
-
 macro_rules! impl_valid_layout {
     ($ref_type:ident, $type:ident) => {
         unsafe impl $crate::layout::valid_layout::ValidLayout for $ref_type<'_> {
-            fn valid_layout(v: $crate::wrappers::ptr::value::Value) -> bool {
-                if let Ok(dt) = v.cast::<$crate::wrappers::ptr::datatype::DataType>() {
+            fn valid_layout(ty: $crate::wrappers::ptr::value::Value) -> bool {
+                if let Ok(dt) = ty.cast::<$crate::wrappers::ptr::datatype::DataType>() {
                     dt.is::<$type>()
                 } else {
                     false
@@ -151,21 +84,33 @@ macro_rules! impl_valid_layout {
 macro_rules! impl_ref_root {
     ($type:tt, $reftype:tt, 2) => {
         impl<'scope, 'data> $reftype<'scope, 'data> {
-            pub unsafe fn root<'target, S>(self, scope: S) -> JlrsResult<$type<'target, 'data>>
+            /// Root this data in `scope`.
+            ///
+            /// Safety: The data pointed to by `self` must not have been freed by the GC yet.
+            pub unsafe fn root<'target, S>(
+                self,
+                scope: S,
+            ) -> $crate::error::JlrsResult<$type<'target, 'data>>
             where
-                S: PartialScope<'target>,
+                S: $crate::memory::scope::PartialScope<'target>,
             {
-                <$type as Root>::root(scope, self)
+                <$type as $crate::wrappers::ptr::Root>::root(scope, self)
             }
         }
     };
     ($type:tt, $reftype:tt, 1) => {
         impl<'scope> $reftype<'scope> {
-            pub unsafe fn root<'target, S>(self, scope: S) -> JlrsResult<$type<'target>>
+            /// Root this data in `scope`.
+            ///
+            /// Safety: The data pointed to by `self` must not have been freed by the GC yet.
+            pub unsafe fn root<'target, S>(
+                self,
+                scope: S,
+            ) -> $crate::error::JlrsResult<$type<'target>>
             where
-                S: PartialScope<'target>,
+                S: $crate::memory::scope::PartialScope<'target>,
             {
-                <$type as Root>::root(scope, self)
+                <$type as $crate::wrappers::ptr::Root>::root(scope, self)
             }
         }
     };
@@ -185,8 +130,42 @@ macro_rules! impl_debug {
     };
 }
 
+pub mod array;
+pub mod datatype;
+pub mod function;
+#[cfg(feature = "internal-types")]
+pub mod internal;
+pub mod module;
+pub mod simple_vector;
+pub mod string;
+pub mod symbol;
+pub mod task;
+pub mod type_name;
+pub mod type_var;
+pub mod union;
+pub mod union_all;
+pub mod value;
+
+use crate::{
+    call::Call,
+    error::{JlrsError, JlrsResult, CANNOT_DISPLAY_VALUE},
+    layout::valid_layout::ValidLayout,
+    memory::{global::Global, scope::PartialScope},
+    private::Private,
+    wrappers::ptr::{module::Module, private::WrapperPriv as _, string::JuliaString, value::Value},
+};
+use std::{
+    fmt::{Debug, Formatter, Result as FmtResult},
+    marker::PhantomData,
+    ptr::null_mut,
+};
+
+#[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+use std::sync::atomic::AtomicPtr;
+
 pub(crate) trait Root<'target, 'value, 'data>: Wrapper<'value, 'data> {
     type Output;
+    // Safety: `value` must point to valid Julia data.
     unsafe fn root<S>(scope: S, value: Ref<'value, 'data, Self>) -> JlrsResult<Self::Output>
     where
         S: PartialScope<'target>;
@@ -212,39 +191,37 @@ where
 pub trait Wrapper<'scope, 'data>: private::WrapperPriv<'scope, 'data> {
     /// Convert the wrapper to a `Ref`.
     fn as_ref(self) -> Ref<'scope, 'data, Self> {
-        unsafe { Ref::wrap(self.unwrap(Private)) }
+        Ref::wrap(self.unwrap(Private))
     }
 
     /// Convert the wrapper to a `Value`.
     fn as_value(self) -> Value<'scope, 'data> {
+        // Safety: Pointer wrappers can always be converted to a Value
         unsafe { Value::wrap_non_null(self.unwrap_non_null(Private).cast(), Private) }
     }
 
     /// Convert the wrapper to its display string, i.e. the string that is shown when calling
     /// `Base.show`.
     fn display_string(self) -> JlrsResult<String> {
-        unsafe {
+        // Safety: all Julia data that is accessed is globally rooted, the result is converted
+        // to a String before the GC can free it.
+        let s = unsafe {
             let global = Global::new();
-            let s = Module::main(global)
+            Module::main(global)
                 .submodule_ref("Jlrs")?
                 .wrapper_unchecked()
                 .function_ref("valuestring")?
                 .wrapper_unchecked()
                 .call1_unrooted(global, self.as_value())
-                .map_err(|e| {
-                    JlrsError::exception(format!(
-                        "Jlrs.valuestring failed: {}",
-                        e.value_unchecked().error_string_or(CANNOT_DISPLAY_VALUE)
-                    ))
-                })?
+                .map_err(|e| e.value_unchecked().error_string_or(CANNOT_DISPLAY_VALUE))
+                .map_err(|e| JlrsError::exception(format!("Jlrs.valuestring failed: {}", e)))?
                 .value_unchecked()
                 .cast::<JuliaString>()?
-                .as_str()?;
+                .as_str()?
+                .to_string()
+        };
 
-            let s = String::from_str(s).unwrap();
-
-            Ok(s)
-        }
+        Ok(s)
     }
 
     /// Convert the wrapper to its error string, i.e. the string that is shown when calling
@@ -255,27 +232,25 @@ pub trait Wrapper<'scope, 'data>: private::WrapperPriv<'scope, 'data> {
     /// [`AsyncJulia::error_color`]: crate::runtime::async_rt::AsyncJulia::error_color
     /// [`AsyncJulia::try_error_color`]: crate::runtime::async_rt::AsyncJulia::try_error_color
     fn error_string(self) -> JlrsResult<String> {
-        unsafe {
+        // Safety: all Julia data that is accessed is globally rooted, the result is converted
+        // to a String before the GC can free it.
+        let s = unsafe {
             let global = Global::new();
-            let s = Module::main(global)
+            Module::main(global)
                 .submodule_ref("Jlrs")?
                 .wrapper_unchecked()
                 .function_ref("errorstring")?
                 .wrapper_unchecked()
                 .call1_unrooted(global, self.as_value())
-                .map_err(|e| {
-                    JlrsError::exception(format!(
-                        "Jlrs.valuestring failed: {}",
-                        e.value_unchecked().error_string_or(CANNOT_DISPLAY_VALUE)
-                    ))
-                })?
+                .map_err(|e| e.value_unchecked().error_string_or(CANNOT_DISPLAY_VALUE))
+                .map_err(|e| JlrsError::exception(format!("Jlrs.errorstring failed: {}", e)))?
                 .value_unchecked()
                 .cast::<JuliaString>()?
                 .as_str()?
-                .to_string();
+                .to_string()
+        };
 
-            Ok(s)
-        }
+        Ok(s)
     }
 
     /// Convert the wrapper to its display string, i.e. the string that is shown by calling
@@ -293,7 +268,7 @@ pub trait Wrapper<'scope, 'data>: private::WrapperPriv<'scope, 'data> {
 
 impl<'scope, 'data, W> Wrapper<'scope, 'data> for W where W: private::WrapperPriv<'scope, 'data> {}
 
-/// An unrooted reference to Julia data.
+/// An reference to Julia data that is not guaranteed to be rooted.
 ///
 /// Pointer wrappers are generally guaranteed to wrap valid, rooted data. In some cases this
 /// guarantee is too strong. The garbage collector uses the roots as a starting point to
@@ -314,267 +289,8 @@ impl<'scope, 'data, T: Wrapper<'scope, 'data>> Debug for Ref<'scope, 'data, T> {
     }
 }
 
-/// A reference to a [`Value`]
-pub type ValueRef<'scope, 'data> = Ref<'scope, 'data, Value<'scope, 'data>>;
-
-unsafe impl ValidLayout for ValueRef<'_, '_> {
-    fn valid_layout(v: Value) -> bool {
-        if let Ok(dt) = v.cast::<DataType>() {
-            !dt.is_inline_alloc()
-        } else if v.cast::<UnionAll>().is_ok() {
-            true
-        } else if let Ok(u) = v.cast::<Union>() {
-            !u.is_bits_union()
-        } else {
-            false
-        }
-    }
-
-    const IS_REF: bool = true;
-}
-
-impl_ref_root!(Value, ValueRef, 2);
-
-/// A reference to an [`Function`]
-pub type FunctionRef<'scope, 'data> = Ref<'scope, 'data, Function<'scope, 'data>>;
-
-unsafe impl ValidLayout for FunctionRef<'_, '_> {
-    fn valid_layout(ty: Value) -> bool {
-        let global = unsafe { Global::new() };
-        let function_type = DataType::function_type(global);
-        ty.subtype(function_type.as_value())
-    }
-
-    const IS_REF: bool = true;
-}
-
-impl_ref_root!(Function, FunctionRef, 2);
-
-/// A reference to an [`Array`]
-pub type ArrayRef<'scope, 'data> = Ref<'scope, 'data, Array<'scope, 'data>>;
-
-unsafe impl ValidLayout for ArrayRef<'_, '_> {
-    fn valid_layout(v: Value) -> bool {
-        if let Ok(dt) = v.cast::<DataType>() {
-            dt.is::<Array>()
-        } else if let Ok(ua) = v.cast::<UnionAll>() {
-            unsafe { ua.base_type().wrapper_unchecked().is::<Array>() }
-        } else {
-            false
-        }
-    }
-
-    const IS_REF: bool = true;
-}
-
-impl_ref_root!(Array, ArrayRef, 2);
-
-/// A reference to an [`TypedArray`]
-pub type TypedArrayRef<'scope, 'data, T> = Ref<'scope, 'data, TypedArray<'scope, 'data, T>>;
-
-unsafe impl<T: Clone + ValidLayout + Debug> ValidLayout for TypedArrayRef<'_, '_, T> {
-    fn valid_layout(v: Value) -> bool {
-        if let Ok(dt) = v.cast::<DataType>() {
-            dt.is::<TypedArray<T>>()
-        } else if let Ok(ua) = v.cast::<UnionAll>() {
-            unsafe { ua.base_type().wrapper_unchecked().is::<TypedArray<T>>() }
-        } else {
-            false
-        }
-    }
-
-    const IS_REF: bool = true;
-}
-
-impl<'scope, 'data, T> TypedArrayRef<'scope, 'data, T>
-where
-    T: Clone + ValidLayout + Debug,
-{
-    pub unsafe fn root<'target, S>(self, scope: S) -> JlrsResult<TypedArray<'target, 'data, T>>
-    where
-        S: PartialScope<'target>,
-    {
-        <TypedArray<T> as Root>::root(scope, self)
-    }
-}
-
-/// A reference to a [`Module`]
-pub type ModuleRef<'scope> = Ref<'scope, 'static, Module<'scope>>;
-impl_valid_layout!(ModuleRef, Module);
-impl_ref_root!(Module, ModuleRef, 1);
-
-/// A reference to a [`DataType`]
-pub type DataTypeRef<'scope> = Ref<'scope, 'static, DataType<'scope>>;
-impl_valid_layout!(DataTypeRef, DataType);
-impl_ref_root!(DataType, DataTypeRef, 1);
-
-/// A reference to a [`JuliaString`]
-pub type StringRef<'scope> = Ref<'scope, 'static, JuliaString<'scope>>;
-impl_valid_layout!(StringRef, String);
-impl_ref_root!(JuliaString, StringRef, 1);
-
-/// A reference to a [`CodeInstance`]
-#[cfg(feature = "internal-types")]
-pub type CodeInstanceRef<'scope> = Ref<'scope, 'static, CodeInstance<'scope>>;
-#[cfg(feature = "internal-types")]
-impl_valid_layout!(CodeInstanceRef, CodeInstance);
-#[cfg(feature = "internal-types")]
-impl_ref_root!(CodeInstance, CodeInstanceRef, 1);
-
-/// A reference to an [`Expr`]
-#[cfg(feature = "internal-types")]
-pub type ExprRef<'scope> = Ref<'scope, 'static, Expr<'scope>>;
-#[cfg(feature = "internal-types")]
-impl_valid_layout!(ExprRef, Expr);
-#[cfg(feature = "internal-types")]
-impl_ref_root!(Expr, ExprRef, 1);
-
-/// A reference to a [`Method`]
-#[cfg(feature = "internal-types")]
-pub type MethodRef<'scope> = Ref<'scope, 'static, Method<'scope>>;
-#[cfg(feature = "internal-types")]
-impl_valid_layout!(MethodRef, Method);
-#[cfg(feature = "internal-types")]
-impl_ref_root!(Method, MethodRef, 1);
-
-/// A reference to a [`MethodInstance`]
-#[cfg(feature = "internal-types")]
-pub type MethodInstanceRef<'scope> = Ref<'scope, 'static, MethodInstance<'scope>>;
-#[cfg(feature = "internal-types")]
-impl_valid_layout!(MethodInstanceRef, MethodInstance);
-#[cfg(feature = "internal-types")]
-impl_ref_root!(MethodInstance, MethodInstanceRef, 1);
-
-/// A reference to a [`MethodMatch`]
-#[cfg(feature = "internal-types")]
-pub type MethodMatchRef<'scope> = Ref<'scope, 'static, MethodMatch<'scope>>;
-#[cfg(feature = "internal-types")]
-impl_valid_layout!(MethodMatchRef, MethodMatch);
-#[cfg(feature = "internal-types")]
-impl_ref_root!(MethodMatch, MethodMatchRef, 1);
-
-/// A reference to a [`MethodTable`]
-#[cfg(feature = "internal-types")]
-pub type MethodTableRef<'scope> = Ref<'scope, 'static, MethodTable<'scope>>;
-#[cfg(feature = "internal-types")]
-impl_valid_layout!(MethodTableRef, MethodTable);
-#[cfg(feature = "internal-types")]
-impl_ref_root!(MethodTable, MethodTableRef, 1);
-
-/// A reference to an [`OpaqueClosure`]
-#[cfg(all(
-    any(not(feature = "lts"), feature = "all-features-override"),
-    feature = "internal-types"
-))]
-pub type OpaqueClosureRef<'scope> = Ref<'scope, 'static, OpaqueClosure<'scope>>;
-#[cfg(all(
-    any(not(feature = "lts"), feature = "all-features-override"),
-    feature = "internal-types"
-))]
-impl_valid_layout!(OpaqueClosureRef, OpaqueClosure);
-#[cfg(all(
-    any(not(feature = "lts"), feature = "all-features-override"),
-    feature = "internal-types"
-))]
-impl_ref_root!(OpaqueClosure, OpaqueClosureRef, 1);
-
-/// A reference to a [`SimpleVector`]
-pub type SimpleVectorRef<'scope> = Ref<'scope, 'static, SimpleVector<'scope>>;
-
-unsafe impl<'scope> ValidLayout for SimpleVectorRef<'scope> {
-    fn valid_layout(v: Value) -> bool {
-        if let Ok(dt) = v.cast::<DataType>() {
-            dt.is::<SimpleVector>()
-        } else {
-            false
-        }
-    }
-
-    const IS_REF: bool = true;
-}
-
-impl<'scope> SimpleVectorRef<'scope> {
-    pub unsafe fn root<'target, S>(self, scope: S) -> JlrsResult<SimpleVector<'target>>
-    where
-        S: PartialScope<'target>,
-    {
-        <SimpleVector as Root>::root(scope, self)
-    }
-}
-
-/// A reference to a [`Symbol`]
-pub type SymbolRef<'scope> = Ref<'scope, 'static, Symbol<'scope>>;
-impl_valid_layout!(SymbolRef, Symbol);
-impl_ref_root!(Symbol, SymbolRef, 1);
-
-/// A reference to a [`Task`]
-pub type TaskRef<'scope> = Ref<'scope, 'static, Task<'scope>>;
-impl_valid_layout!(TaskRef, Task);
-impl_ref_root!(Task, TaskRef, 1);
-
-/// A reference to a [`TypeName`]
-pub type TypeNameRef<'scope> = Ref<'scope, 'static, TypeName<'scope>>;
-impl_valid_layout!(TypeNameRef, TypeName);
-impl_ref_root!(TypeName, TypeNameRef, 1);
-
-/// A reference to a [`TypeVar`]
-pub type TypeVarRef<'scope> = Ref<'scope, 'static, TypeVar<'scope>>;
-impl_valid_layout!(TypeVarRef, TypeVar);
-impl_ref_root!(TypeVar, TypeVarRef, 1);
-
-/// A reference to a [`TypeMapEntry`]
-#[cfg(feature = "internal-types")]
-pub type TypeMapEntryRef<'scope> = Ref<'scope, 'static, TypeMapEntry<'scope>>;
-#[cfg(feature = "internal-types")]
-impl_valid_layout!(TypeMapEntryRef, TypeMapEntry);
-#[cfg(feature = "internal-types")]
-impl_ref_root!(TypeMapEntry, TypeMapEntryRef, 1);
-
-/// A reference to a [`TypeMapLevel`]
-#[cfg(feature = "internal-types")]
-pub type TypeMapLevelRef<'scope> = Ref<'scope, 'static, TypeMapLevel<'scope>>;
-#[cfg(feature = "internal-types")]
-impl_valid_layout!(TypeMapLevelRef, TypeMapLevel);
-#[cfg(feature = "internal-types")]
-impl_ref_root!(TypeMapLevel, TypeMapLevelRef, 1);
-
-/// A reference to a [`Union`]
-pub type UnionRef<'scope> = Ref<'scope, 'static, Union<'scope>>;
-impl_valid_layout!(UnionRef, Union);
-impl_ref_root!(Union, UnionRef, 1);
-
-/// A reference to a [`UnionAll`]
-pub type UnionAllRef<'scope> = Ref<'scope, 'static, UnionAll<'scope>>;
-impl_valid_layout!(UnionAllRef, UnionAll);
-impl_ref_root!(UnionAll, UnionAllRef, 1);
-
-/// A reference to a [`Vararg`]
-#[cfg(all(
-    any(not(feature = "lts"), feature = "all-features-override"),
-    feature = "internal-types"
-))]
-pub type VarargRef<'scope> = Ref<'scope, 'static, Vararg<'scope>>;
-#[cfg(all(
-    any(not(feature = "lts"), feature = "all-features-override"),
-    feature = "internal-types"
-))]
-impl_valid_layout!(VarargRef, Vararg);
-#[cfg(all(
-    any(not(feature = "lts"), feature = "all-features-override"),
-    feature = "internal-types"
-))]
-impl_ref_root!(Vararg, VarargRef, 1);
-
-/// A reference to a [`WeakRef`]
-#[cfg(feature = "internal-types")]
-pub type WeakRefRef<'scope> = Ref<'scope, 'static, WeakRef<'scope>>;
-#[cfg(feature = "internal-types")]
-impl_valid_layout!(WeakRefRef, WeakRef);
-#[cfg(feature = "internal-types")]
-impl_ref_root!(WeakRef, WeakRefRef, 1);
-
 impl<'scope, 'data, T: Wrapper<'scope, 'data>> Ref<'scope, 'data, T> {
-    pub(crate) unsafe fn wrap(ptr: *mut T::Wraps) -> Self {
+    pub(crate) fn wrap(ptr: *mut T::Wraps) -> Self {
         Ref(ptr, PhantomData, PhantomData)
     }
 
@@ -638,13 +354,16 @@ pub(crate) mod private {
     use crate::wrappers::ptr::{value::Value, Ref};
     use std::{fmt::Debug, ptr::NonNull};
 
-    pub trait WrapperPriv<'scope, 'data>: Sized + Copy + Debug {
+    pub trait WrapperPriv<'scope, 'data>: Copy + Debug {
         type Wraps: Copy;
         const NAME: &'static str;
 
+        // Safety: `inner` must point to valid data. If it is not
+        // rooted, it must never be used after becoming unreachable.
         unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self;
 
-        #[inline(always)]
+        // Safety: `ptr` must point to valid data. If it is not
+        // rooted, it must never be used after becoming unreachable.
         unsafe fn wrap(ptr: *mut Self::Wraps, _: Private) -> Self {
             debug_assert!(!ptr.is_null());
             Self::wrap_non_null(NonNull::new_unchecked(ptr), Private)
@@ -658,6 +377,8 @@ pub(crate) mod private {
         }
 
         #[inline(always)]
+        // Safety: value_ref must not have been freed yet and not be undefined, the wrapper can't
+        // be used after the data becomes unreachable.
         unsafe fn wrapper_unchecked(value_ref: Ref<'scope, 'data, Self>, _: Private) -> Self
         where
             Self: Sized + super::Wrapper<'scope, 'data>,
@@ -666,11 +387,14 @@ pub(crate) mod private {
         }
 
         #[inline(always)]
+        // Safety: `Self` must be the correct type for `value`, and must not be undefined.
         unsafe fn cast(value: Value<'scope, 'data>, _: Private) -> Self {
             Self::wrap_non_null(value.unwrap_non_null(Private).cast(), Private)
         }
 
         #[inline(always)]
+        // Safety: value_ref must not have been freed yet, the wrapper can't
+        // be used after the data becomes unreachable.
         unsafe fn wrapper(value_ref: Ref<'scope, 'data, Self>, _: Private) -> Option<Self>
         where
             Self: Sized + super::Wrapper<'scope, 'data>,
@@ -684,6 +408,8 @@ pub(crate) mod private {
         }
 
         #[inline(always)]
+        // Safety: value_ref must not have been freed yet and not be undefined, the wrapper can't
+        // be used after the data becomes unreachable.
         unsafe fn value_unchecked(
             value_ref: Ref<'scope, 'data, Self>,
             _: Private,
@@ -695,6 +421,8 @@ pub(crate) mod private {
         }
 
         #[inline(always)]
+        // Safety: value_ref must not have been freed yet, the wrapper can't
+        // be used after the data becomes unreachable.
         unsafe fn value(
             value_ref: Ref<'scope, 'data, Self>,
             _: Private,
@@ -721,6 +449,8 @@ pub(crate) mod private {
 
 #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
 #[inline(always)]
+// Safety: this is a workaround for a bug in bindgen that turns all atomic fields into `u64`s.
+// It must only be used to access such fields.
 pub(crate) unsafe fn atomic_value<'a, T>(addr: *const u64) -> &'a AtomicPtr<T> {
     &*(addr as *const AtomicPtr<T>)
 }

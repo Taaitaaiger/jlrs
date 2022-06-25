@@ -1,23 +1,23 @@
-//! Traits for rooting Julia data in a specific scope's frame
+//! Root Julia data in a specific scope's frame
 //!
 //! When you take a look at the signatures of methods that return newly allocated Julia data, such
 //! as [`Value::new`] and [`Array::new`], you'll notice that these methods don't take a mutable
 //! reference to a frame, but a [`PartialScope`] and [`Scope`] respectively. Because you can't
-//! access a parent frame from a nested scope, it's not possible to call methods that allocate
-//! data with a parent frame. Instead, you need to reserve a slot in that frame by creating an
-//! `Output` in advance.
+//! access the frame of an parent scope from a nested scope, it's not possible to call methods
+//! that allocate data with a parent frame. Instead, you need to reserve a slot in that frame by
+//! creating an [`Output`] in advance.
 //!
-//! Both [`Output`] and mutable references to frames implement `PartialScope`. Methods that take a
+//! Both `Output` and mutable references to frames implement `PartialScope`. Methods that take a
 //! `PartialScope` allocate a single value and use the provided implementation to root that value.
-//! Methods that need to allocate and root temporary values take a `Scope`, while mutable
-//! references to frames do implement this trait, `Output` does not because it can only be used to
-//! root a single value once. An `Output` can be converted to an `OutputScope` by calling
+//! Methods that need to allocate and root temporary values take a `Scope`. While mutable
+//! references to frames implement this trait, `Output` doesn't because it can only be used to
+//! root a single value once. An `Output` can be converted to an [`OutputScope`] by calling
 //! [`Output::into_scope`] and providing it with a mutable reference to the current frame.
 //!
 //! The `Scope` trait provides a single method, [`Scope::split`]. This method splits the
 //! implementation to an `Output` and a mutable reference to a frame. When a frame is used as a
 //! `Scope`, the `Output` is reserved in that frame and the frame is the frame itself. If an
-//! `OutputScope` is used, the existing `Output` and frame are returned.
+//! `OutputScope` is used, the provided `Output` and frame are returned.
 //!  
 //! A few examples:
 //!
@@ -83,7 +83,7 @@ use crate::{
 };
 use std::{marker::PhantomData, ptr::NonNull};
 
-/// A [`Scope`] that roots a result using an [`Output`].
+/// A [`Scope`] that roots a result using a provided [`Output`].
 ///
 /// [`Scope`]: crate::memory::scope::Scope
 pub struct OutputScope<'target, 'current, 'borrow, F: Frame<'current>> {
@@ -103,6 +103,9 @@ impl<'target, 'current, 'borrow, F: Frame<'current>> OutputScope<'target, 'curre
     }
 }
 
+/// Trait used to root a single value in a target scope, methods called with this trait can access
+/// the current frame as well.
+///
 /// This trait is used with functions that return Julia data rooted in some scope which need to
 /// allocate and root temporary data. It's implemented by mutable references to implementations of
 /// [`Frame`] and [`OutputScope`]. This trait provides a single method, `Scope::split` which
@@ -115,9 +118,10 @@ pub trait Scope<'target, 'current, F>:
 where
     F: Frame<'current>,
 {
-    /// Split the scope into an output and a frame. If the scope is a frame, the output is
-    /// allocated in the current frame. If it's an [`OutputScope`], the existing output is
-    /// returned.
+    /// Split the scope into an output and a frame.
+    ///
+    /// If the scope is a frame, the output is allocated in the current frame. If it's an
+    /// [`OutputScope`], the existing output is returned.
     fn split<'own>(self) -> JlrsResult<(Output<'target>, &'own mut F)>
     where
         Self: 'own;
@@ -149,6 +153,8 @@ where
     }
 }
 
+/// Trait used to root a single value in a target scope.
+///
 /// This trait is used with functions that return Julia data rooted in some scope which don't need
 /// to allocate and root temporary data. It's implemented by mutable references to implementations
 /// of [`Frame`], [`OutputScope`], and [`Output`]. In the first case the data rooted in that

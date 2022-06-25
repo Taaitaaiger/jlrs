@@ -39,11 +39,9 @@ pub struct GcFrame<'frame, M: Mode> {
 }
 
 impl<'frame, M: Mode> GcFrame<'frame, M> {
-    // Safety: frames must form a single nested hierarchy. A new frame must only be created when
-    // entering a new scope.
+    // Safety: frames must form a single nested hierarchy. A new frame owner must only be created
+    // when entering a new scope.
     pub(crate) unsafe fn new(raw_frame: &'frame [Slot], mode: M) -> (Self, FrameOwner<'frame, M>) {
-        mode.push_frame(raw_frame, Private);
-
         let owner = FrameOwner::new(raw_frame, mode);
         let frame = GcFrame {
             raw_frame,
@@ -96,7 +94,6 @@ cfg_if::cfg_if! {
 cfg_if::cfg_if! {
     if #[cfg(feature = "async")] {
         use super::mode::Async;
-        use super::mode::private::ModePriv as _;
         use std::future::Future;
 
         /// A frame that can be used to root Julia data and call async methods.
@@ -152,15 +149,13 @@ cfg_if::cfg_if! {
                 ret
             }
 
-            // Safety: frames must form a single nested hierarchy. A new frame must only be
+            // Safety: frames must form a single nested hierarchy. A new frame owner must only be
             // created when entering a new scope.
             pub(crate) unsafe fn new(
                 raw_frame: &'frame [Slot],
                 mode: Async<'frame>,
             ) -> (Self, FrameOwner<'frame, Async<'frame>>) {
                 // Is popped when this frame is dropped
-                mode.push_frame(raw_frame, Private);
-
                 let owner = FrameOwner::new(raw_frame, mode);
                 let frame = AsyncGcFrame {
                     raw_frame,
@@ -364,16 +359,17 @@ impl<'frame> Frame<'frame> for NullFrame<'frame> {
 }
 
 mod private {
+    use crate::{
+        error::{AllocError, JlrsResult},
+        memory::{
+            frame::{Frame, GcFrame, MIN_FRAME_CAPACITY},
+            mode::Mode,
+            stack_page::{Slot, StackPage},
+        },
+        private::Private,
+        wrappers::ptr::private::WrapperPriv,
+    };
     use std::ptr::{null_mut, NonNull};
-
-    use super::{Frame as _, MIN_FRAME_CAPACITY};
-    use crate::error::JlrsResult;
-    use crate::memory::frame::GcFrame;
-    use crate::memory::mode::Mode;
-    use crate::memory::stack_page::Slot;
-    use crate::memory::stack_page::StackPage;
-    use crate::wrappers::ptr::private::WrapperPriv;
-    use crate::{error::AllocError, private::Private};
 
     pub struct FrameOwner<'frame, M: Mode> {
         mode: M,
@@ -383,12 +379,14 @@ mod private {
     impl<'frame, M: Mode> FrameOwner<'frame, M> {
         // Only one owner must be created for a frame.
         pub(crate) unsafe fn new(raw_frame: &'frame [Slot], mode: M) -> Self {
+            mode.push_frame(raw_frame, Private);
             FrameOwner { mode, raw_frame }
         }
     }
 
     #[cfg(feature = "async")]
     impl<'frame> FrameOwner<'frame, Async<'frame>> {
+        // Safety: only one `AsyncGcFrame` must exist at a time
         pub(crate) unsafe fn reconstruct(&self) -> AsyncGcFrame<'frame> {
             AsyncGcFrame {
                 raw_frame: self.raw_frame,
@@ -553,7 +551,6 @@ mod private {
                         .set(null_mut());
 
                     self.set_n_roots(n_roots + 1);
-
                     Ok(self.raw_frame.get_unchecked(n_roots + 2))
                 }
 
@@ -652,7 +649,6 @@ mod tests {
 
             assert_eq!(frame.0.capacity(), page_size - 2);
             assert_eq!(frame.0.n_roots(), page_size - 2);
-
             assert!(Value::new(&mut frame.0, 1usize).is_err());
         })
     }

@@ -5,7 +5,7 @@
 //! the most recently opened one is updated automatically.
 
 use crate::{
-    call::{Call, CallExt},
+    call::{Call, ProvideKeywords},
     convert::into_jlrs_result::IntoJlrsResult,
     error::JlrsResult,
     memory::{frame::Frame, global::Global, scope::PartialScope},
@@ -105,7 +105,7 @@ impl<'scope> PyPlot<'scope> {
             .function_ref("jlrsplot")
             .unwrap()
             .wrapper_unchecked()
-            .with_keywords(keywords)?
+            .provide_keywords(keywords)?
             .call(frame, vals)?
             .into_jlrs_result()?;
 
@@ -182,7 +182,7 @@ impl<'scope> PyPlot<'scope> {
             .function_ref("updateplot!")
             .unwrap()
             .wrapper_unchecked()
-            .with_keywords(keywords)?
+            .provide_keywords(keywords)?
             .call(frame, vals)?
             .into_jlrs_result()?
             .unbox::<isize>()

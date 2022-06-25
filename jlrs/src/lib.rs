@@ -9,7 +9,7 @@
 //!
 //!  - Access arbitrary Julia modules and their contents.
 //!  - Call Julia functions, including functions that take keyword arguments.
-//!  - Exceptions can be handled or converted to their error message, optionally with color.
+//!  - Handle exceptions or convert them to an error message, optionally with color.
 //!  - Include and call your own Julia code.
 //!  - Use a custom system image.
 //!  - Create values that Julia can use, and convert them back to Rust, from Rust.
@@ -232,13 +232,13 @@
 //! [`Julia::scope_with_capacity`]. These methods take a closure with two arguments, a [`Global`]
 //! and a [`GcFrame`] (frame). The first is an access token for global Julia data, the second is
 //! used to root non-global data. While non-global data is rooted, it won't be freed by Julia's
-//! garbage collector (GC). The frame is created when `Julia::scope(_with_capacity)` is called and
+//! garbage collector. The frame is created when `Julia::scope(_with_capacity)` is called and
 //! dropped when it returns, so any data rooted in the frame associated with a scope won't be
-//! freed by the GC until leaving that scope.
+//! freed by the garbage collector until leaving that scope.
 //!
-//! Because `AsyncJulia` is a handle to the async runtime which runs on another thread it's not
-//! possible to directly create a scope. Rather, the async runtime deals with tasks. The simplest
-//! of these is a blocking task, which can be executed by calling
+//! The async runtime can't create a new scope directly, `AsyncJulia` is a handle to the async
+//! runtime which runs on another thread. Instead, the async runtime deals with tasks. The
+//! simplest of these is a blocking task, which can be executed by calling
 //! `AsyncJulia::(try_)blocking_task(_with_capacity)`. These methods accept any closure
 //! `Julia::scope` can handle with the additional requirement that it must be `Send` and `Sync`.
 //! It's called a blocking task because the runtime is blocked while executing this task. The
@@ -406,12 +406,12 @@
 //!     async fn init(
 //!         &mut self,
 //!         _global: Global<'static>,
-//!         mut frame: AsyncGcFrame<'static>,
+//!         frame: &mut AsyncGcFrame<'static>,
 //!     ) -> JlrsResult<Self::State> {
 //!         // A `Vec` can be moved from Rust to Julia if the element type
 //!         // implements `IntoJulia`.
 //!         let data = vec![0usize; self.n_values];
-//!         let array = TypedArray::from_vec(&mut frame, data, self.n_values)?
+//!         let array = TypedArray::from_vec(&mut *frame, data, self.n_values)?
 //!             .into_jlrs_result()?;
 //!     
 //!         Ok(AccumulatorTaskState {
@@ -573,7 +573,7 @@
 //!
 //! ```no_run
 //! use jlrs::prelude::*;
-//! use std::{cell::RefCell, time::Duration};
+//! use std::cell::RefCell;
 //! thread_local! {
 //!     pub static JULIA: RefCell<AsyncJulia<Tokio>> = {
 //!         let julia = RefCell::new(unsafe {

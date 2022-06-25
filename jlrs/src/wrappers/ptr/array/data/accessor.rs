@@ -23,7 +23,8 @@ use crate::{
         private::WrapperPriv,
         union::{find_union_component, nth_union_component},
         value::Value,
-        ValueRef, Wrapper, WrapperRef,
+        value::ValueRef,
+        Wrapper, WrapperRef,
     },
 };
 use jl_sys::{jl_array_ptr_set, jl_array_typetagdata, jl_arrayref, jl_arrayset};
@@ -184,7 +185,7 @@ impl<'borrow, 'array, 'data, T, L: ArrayLayout, M: Mutability>
         }
     }
 
-    /// Access the element at `index`, convert it to a `Value` and root it in `scope`.
+    /// Access the element at `index` and convert it to a `Value` rooted in `scope`.
     ///
     /// If an error is thrown by Julia it's caught and returned.
     #[cfg(not(all(
@@ -199,6 +200,7 @@ impl<'borrow, 'array, 'data, T, L: ArrayLayout, M: Mutability>
         use jl_sys::{jlrs_arrayref, jlrs_result_tag_t_JLRS_RESULT_ERR};
 
         let idx = self.array.dimensions().index_of(&index)?;
+        // Safety: exceptions are caught, the result is immediately rooted
         unsafe {
             let res = jlrs_arrayref(self.array.unwrap(Private), idx);
             let v = scope.value(NonNull::new_unchecked(res.data), Private)?;
@@ -211,7 +213,7 @@ impl<'borrow, 'array, 'data, T, L: ArrayLayout, M: Mutability>
         }
     }
 
-    /// Access the element at `index`, convert it to a `Value` and root it in `scope`.
+    /// Access the element at `index` and convert it to a `Value` rooted in `scope`.
     ///
     /// Safety: If an error is thrown by Julia it's not caught.
     pub unsafe fn get_value_unchecked<'frame, D: Dims, P: PartialScope<'frame>>(
@@ -238,6 +240,7 @@ impl<'borrow, 'array, 'data, T, L: ArrayLayout, M: Mutability>
         use jl_sys::{jlrs_arrayref, jlrs_result_tag_t_JLRS_RESULT_ERR};
 
         let idx = self.array.dimensions().index_of(&index)?;
+        // Safety: exceptions are caught
         unsafe {
             let res = jlrs_arrayref(self.array.unwrap(Private), idx);
             let v = res.data;
@@ -288,6 +291,8 @@ impl<'borrow, 'array, 'data, T, L: ArrayLayout>
 
         let idx = self.array.dimensions().index_of(&index)?;
         let ptr = value.map(|v| v.unwrap(Private)).unwrap_or(null_mut());
+
+        // Safety: exceptions are caught, if one is thrown it's immediately rooted
         unsafe {
             let res = jlrs_arrayset(self.array.unwrap(Private), ptr, idx);
 
@@ -323,28 +328,25 @@ impl<'borrow, 'array, 'data, T: WrapperRef<'array, 'data>, M: Mutability>
     where
         D: Dims,
     {
-        unsafe {
-            let idx = self.dimensions().index_of(&index).ok()?;
-            self.array.data_ptr().cast::<T>().add(idx).as_ref().cloned()
-        }
+        let idx = self.dimensions().index_of(&index).ok()?;
+        // The index is in-bounds, the type has been checked in advance
+        unsafe { self.array.data_ptr().cast::<T>().add(idx).as_ref().cloned() }
     }
 
     /// Returns the array's data as a slice, the data is in column-major order.
     pub fn as_slice(&self) -> &[T] {
-        unsafe {
-            let arr_data = self.array.data_ptr().cast::<T>();
-            let n_elems = self.dimensions().size();
-            slice::from_raw_parts(arr_data, n_elems)
-        }
+        let n_elems = self.dimensions().size();
+        let arr_data = self.array.data_ptr().cast::<T>();
+        // Safety: the layout is compatible and the lifetime is limited.
+        unsafe { slice::from_raw_parts(arr_data, n_elems) }
     }
 
     /// Returns the array's data as a slice, the data is in column-major order.
     pub fn into_slice(self) -> &'borrow [T] {
-        unsafe {
-            let arr_data = self.array.data_ptr().cast::<T>();
-            let n_elems = self.dimensions().size();
-            slice::from_raw_parts(arr_data, n_elems)
-        }
+        let n_elems = self.dimensions().size();
+        let arr_data = self.array.data_ptr().cast::<T>();
+        // Safety: the layout is compatible and the lifetime is limited.
+        unsafe { slice::from_raw_parts(arr_data, n_elems) }
     }
 }
 
@@ -377,9 +379,8 @@ impl<'borrow, 'array, 'data, T: WrapperRef<'array, 'data>>
             null_mut()
         };
 
-        unsafe {
-            jl_array_ptr_set(ptr.cast(), idx, data_ptr.cast());
-        }
+        // Safety: the index is in bounds, the value can be stored in this array
+        unsafe { jl_array_ptr_set(ptr.cast(), idx, data_ptr.cast()) };
 
         Ok(())
     }
@@ -393,10 +394,9 @@ where
 {
     type Output = T;
     fn index(&self, index: D) -> &Self::Output {
-        unsafe {
-            let idx = self.dimensions().index_of(&index).unwrap();
-            self.array.data_ptr().cast::<T>().add(idx).as_ref().unwrap()
-        }
+        let idx = self.dimensions().index_of(&index).unwrap();
+        // Safety: the index is in bounds
+        unsafe { self.array.data_ptr().cast::<T>().add(idx).as_ref().unwrap() }
     }
 }
 
@@ -406,28 +406,25 @@ impl<'borrow, 'array, 'data, T, M: Mutability> BitsArrayAccessor<'borrow, 'array
     where
         D: Dims,
     {
-        unsafe {
-            let idx = self.dimensions().index_of(&index).ok()?;
-            self.array.data_ptr().cast::<T>().add(idx).as_ref()
-        }
+        let idx = self.dimensions().index_of(&index).ok()?;
+        // Safety: the index is in bounds
+        unsafe { self.array.data_ptr().cast::<T>().add(idx).as_ref() }
     }
 
     /// Returns the array's data as a slice, the data is in column-major order.
     pub fn as_slice(&self) -> &[T] {
-        unsafe {
-            let len = self.dimensions().size();
-            let data = self.array.data_ptr().cast::<T>();
-            slice::from_raw_parts(data, len)
-        }
+        let len = self.dimensions().size();
+        let data = self.array.data_ptr().cast::<T>();
+        // Safety: the layout is compatible and the lifetime is limited.
+        unsafe { slice::from_raw_parts(data, len) }
     }
 
     /// Returns the array's data as a slice, the data is in column-major order.
     pub fn into_slice(self) -> &'borrow [T] {
-        unsafe {
-            let len = self.dimensions().size();
-            let data = self.array.data_ptr().cast::<T>();
-            slice::from_raw_parts(data, len)
-        }
+        let len = self.dimensions().size();
+        let data = self.array.data_ptr().cast::<T>();
+        // Safety: the layout is compatible and the lifetime is limited.
+        unsafe { slice::from_raw_parts(data, len) }
     }
 }
 
@@ -438,19 +435,19 @@ impl<'borrow, 'array, 'data, T> BitsArrayAccessor<'borrow, 'array, 'data, T, Mut
         D: Dims,
     {
         let idx = self.dimensions().index_of(&index)?;
-        unsafe {
-            self.array.data_ptr().cast::<T>().add(idx).write(value);
-        }
+        // Safety: the index is in bounds and layout is compatible.
+        unsafe { self.array.data_ptr().cast::<T>().add(idx).write(value) };
 
         Ok(())
     }
 
-    /// Set the value at `index` to `value` if `value` has a type that's compatible with this array.
+    /// Get a mutable reference to the element stored at `index`.
     pub fn get_mut<D>(&mut self, index: D) -> Option<&mut T>
     where
         D: Dims,
     {
         let idx = self.dimensions().index_of(&index).ok()?;
+        // Safety: the index is in bounds and layout is compatible.
         unsafe { self.array.data_ptr().cast::<T>().add(idx).as_mut() }
     }
 
@@ -458,6 +455,7 @@ impl<'borrow, 'array, 'data, T> BitsArrayAccessor<'borrow, 'array, 'data, T, Mut
     pub fn as_mut_slice(&mut self) -> &mut [T] {
         let len = self.dimensions().size();
         let data = self.array.data_ptr().cast::<T>();
+        // Safety: the layout is compatible and the lifetime is limited.
         unsafe { slice::from_raw_parts_mut(data, len) }
     }
 
@@ -465,6 +463,7 @@ impl<'borrow, 'array, 'data, T> BitsArrayAccessor<'borrow, 'array, 'data, T, Mut
     pub fn into_mut_slice(self) -> &'borrow mut [T] {
         let len = self.dimensions().size();
         let data = self.array.data_ptr().cast::<T>();
+        // Safety: the layout is compatible and the lifetime is limited.
         unsafe { slice::from_raw_parts_mut(data, len) }
     }
 }
@@ -476,8 +475,9 @@ where
 {
     type Output = T;
     fn index(&self, index: D) -> &Self::Output {
+        let idx = self.dimensions().index_of(&index).unwrap();
+        // Safety: the layout is compatible and the index is in bounds.
         unsafe {
-            let idx = self.dimensions().index_of(&index).unwrap();
             self.array
                 .data_ptr()
                 .cast::<T>()
@@ -494,8 +494,9 @@ where
     D: Dims,
 {
     fn index_mut(&mut self, index: D) -> &mut Self::Output {
+        let idx = self.dimensions().index_of(&index).unwrap();
+        // Safety: the layout is compatible and the index is in bounds.
         unsafe {
-            let idx = self.dimensions().index_of(&index).unwrap();
             self.array
                 .data_ptr()
                 .cast::<T>()
@@ -514,28 +515,25 @@ impl<'borrow, 'array, 'data, T, M: Mutability>
     where
         D: Dims,
     {
-        unsafe {
-            let idx = self.dimensions().index_of(&index).ok()?;
-            self.array.data_ptr().cast::<T>().add(idx).as_ref()
-        }
+        let idx = self.dimensions().index_of(&index).ok()?;
+        // Safety: the layout is compatible and the index is in bounds.
+        unsafe { self.array.data_ptr().cast::<T>().add(idx).as_ref() }
     }
 
     /// Returns the array's data as a slice, the data is in column-major order.
     pub fn as_slice(&self) -> &[T] {
-        unsafe {
-            let len = self.dimensions().size();
-            let data = self.array.data_ptr().cast::<T>();
-            slice::from_raw_parts(data, len)
-        }
+        let len = self.dimensions().size();
+        let data = self.array.data_ptr().cast::<T>();
+        // Safety: the layout is compatible and the lifetime is limited.
+        unsafe { slice::from_raw_parts(data, len) }
     }
 
     /// Returns the array's data as a slice, the data is in column-major order.
     pub fn into_slice(self) -> &'borrow [T] {
-        unsafe {
-            let len = self.dimensions().size();
-            let data = self.array.data_ptr().cast::<T>();
-            slice::from_raw_parts(data, len)
-        }
+        let len = self.dimensions().size();
+        let data = self.array.data_ptr().cast::<T>();
+        // Safety: the layout is compatible and the lifetime is limited.
+        unsafe { slice::from_raw_parts(data, len) }
     }
 }
 
@@ -547,8 +545,9 @@ where
 {
     type Output = T;
     fn index(&self, index: D) -> &Self::Output {
+        let idx = self.dimensions().index_of(&index).unwrap();
+        // Safety: the layout is compatible and the index is in bounds.
         unsafe {
-            let idx = self.dimensions().index_of(&index).unwrap();
             self.array
                 .data_ptr()
                 .cast::<T>()
@@ -571,11 +570,11 @@ impl<'borrow, 'array, 'data, M: Mutability> UnionArrayAccessor<'borrow, 'array, 
     where
         D: Dims,
     {
-        unsafe {
-            let elty = self.array.element_type();
-            let dims = ArrayDimensions::new(self.array);
-            let idx = dims.index_of(&index)?;
+        let elty = self.array.element_type();
+        let idx = self.array.dimensions().index_of(&index)?;
 
+        // Safety: the index is in bounds.
+        unsafe {
             let tags = jl_array_typetagdata(self.array.unwrap(Private));
             let mut tag = *tags.add(idx) as _;
 
@@ -590,11 +589,11 @@ impl<'borrow, 'array, 'data, M: Mutability> UnionArrayAccessor<'borrow, 'array, 
         T: ValidLayout + Clone,
         D: Dims,
     {
-        unsafe {
-            let elty = self.array.element_type();
-            let dims = ArrayDimensions::new(self.array);
-            let idx = dims.index_of(&index)?;
+        let elty = self.array.element_type();
+        let idx = self.array.dimensions().index_of(&index)?;
 
+        // Safety: The index is in bounds and layout compatibility is checked.
+        unsafe {
             let tags = jl_array_typetagdata(self.array.unwrap(Private));
             let mut tag = *tags.add(idx) as _;
 
@@ -645,8 +644,8 @@ impl<'borrow, 'array, 'data> UnionArrayAccessor<'borrow, 'array, 'data, Mutable<
             })?;
         }
 
-        let dims = ArrayDimensions::new(self.array);
-        let idx = dims.index_of(&index)?;
+        let idx = self.array.dimensions().index_of(&index)?;
+        // Safety: The data can be stored in this array, the tag is updated accordingly.
         unsafe {
             let offset = idx * self.array.unwrap_non_null(Private).as_ref().elsize as usize;
             self.array

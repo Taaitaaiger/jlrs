@@ -1,13 +1,14 @@
 //! Call Julia functions.
 //!
-//! This module provides the [`Call`], [`CallAsync`] and [`CallExt`] traits, their methods can be
-//! used to call Julia functions, including inner and outer constructors.
+//! This module provides the [`Call`], [`CallAsync`] and [`ProvideKeywords`] traits. Their methods
+//! can be used to call Julia functions, including inner and outer constructors, schedule and
+//! await tasks, and provide keyword argumentes respectively
 //!
 //! The methods provided by `Call` and `CallAsync` call the implementor as a Julia function with
 //! some number of positional arguments. These methods have two variants, either the returned data
 //! is rooted or it isn't. It's fine to leave the return value unrooted if you never use it or if
 //! you can guarantee that it's reachable from some GC root while you do. Keyword arguments can be
-//! provided by calling [`CallExt::with_keywords`].
+//! provided by calling [`ProvideKeywords::provide_keywords`].
 
 use crate::{
     error::{JlrsResult, JuliaResult, JuliaResultRef},
@@ -15,8 +16,8 @@ use crate::{
     private::Private,
     wrappers::ptr::{
         private::WrapperPriv as _,
+        value::ValueRef,
         value::{Value, MAX_SIZE},
-        ValueRef,
     },
 };
 use jl_sys::{jl_call, jl_exception_occurred, jl_get_kwsorter};
@@ -197,7 +198,7 @@ pub trait Call<'data>: private::CallPriv {
 }
 
 /// Provide keyword arguments to a Julia function.
-pub trait CallExt<'value, 'data>: Call<'data> {
+pub trait ProvideKeywords<'value, 'data>: Call<'data> {
     /// Provide keyword arguments to the function. The keyword arguments must be a `NamedTuple`.
     ///
     /// Example:
@@ -222,7 +223,7 @@ pub trait CallExt<'value, 'data>: Call<'data> {
     ///     // Call the previously defined function. This function simply sums its three
     ///     // keyword arguments and has no side effects, so it's safe to call.
     ///     let res = unsafe {
-    ///         func.with_keywords(nt)?
+    ///         func.provide_keywords(nt)?
     ///             .call0(&mut frame)?
     ///             .into_jlrs_result()?
     ///             .unbox::<isize>()?
@@ -235,7 +236,7 @@ pub trait CallExt<'value, 'data>: Call<'data> {
     /// # .unwrap();
     /// # });
     /// # }
-    fn with_keywords(
+    fn provide_keywords(
         self,
         keywords: Value<'value, 'data>,
     ) -> JlrsResult<WithKeywords<'value, 'data>>;
@@ -801,7 +802,7 @@ cfg_if::cfg_if! {
                     .wrapper_unchecked()
                     .function_ref("asynccall")?
                     .wrapper_unchecked()
-                    .with_keywords(self.keywords())?
+                    .provide_keywords(self.keywords())?
                     .call(&mut *frame, &mut vals)?;
 
                 yield_task(frame);
@@ -843,7 +844,7 @@ cfg_if::cfg_if! {
                     .wrapper_unchecked()
                     .function_ref("scheduleasynclocal")?
                     .wrapper_unchecked()
-                    .with_keywords(self.keywords())?
+                    .provide_keywords(self.keywords())?
                     .call(&mut *frame, &mut vals)?;
 
                 yield_task(frame);
@@ -885,7 +886,7 @@ cfg_if::cfg_if! {
                     .wrapper_unchecked()
                     .function_ref("scheduleasync")?
                     .wrapper_unchecked()
-                    .with_keywords(self.keywords())?
+                    .provide_keywords(self.keywords())?
                     .call(&mut *frame, &mut vals)?;
 
                 yield_task(frame);

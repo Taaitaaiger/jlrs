@@ -25,7 +25,7 @@ mod tests {
 
                 {
                     let data = arr.union_data(&frame)?;
-                    assert_eq!(data.dimensions().as_slice(), &[4]);
+                    assert_eq!(unsafe { data.dimensions().as_slice() }, &[4]);
                 }
 
                 unsafe {

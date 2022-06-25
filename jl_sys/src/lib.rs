@@ -248,7 +248,7 @@ pub unsafe fn jl_array_ptr_set(a: *mut jl_array_t, i: usize, x: *mut c_void) -> 
 
     NonNull::new_unchecked(a_data.add(i))
         .as_ref()
-        .store(x.cast(), Ordering::Relaxed);
+        .store(x.cast(), Ordering::Release);
 
     if !x.is_null() {
         if NonNull::new_unchecked(a).as_ref().flags.how() == 3 {

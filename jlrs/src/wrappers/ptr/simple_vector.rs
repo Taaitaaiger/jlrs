@@ -4,11 +4,11 @@ use crate::{
     error::{AccessError, JlrsResult},
     layout::{typecheck::Typecheck, valid_layout::ValidLayout},
     memory::{frame::Frame, global::Global, output::Output, scope::private::PartialScopePriv},
+    prelude::{PartialScope, Value},
     private::Private,
 };
 use jl_sys::{
-    jl_alloc_svec, jl_alloc_svec_uninit, jl_emptysvec, jl_gc_wb, jl_simplevector_type,
-    jl_svec_data, jl_svec_t,
+    jl_alloc_svec, jl_alloc_svec_uninit, jl_emptysvec, jl_gc_wb, jl_svec_data, jl_svec_t,
 };
 use std::{
     fmt::{Debug, Formatter, Result as FmtResult},
@@ -16,7 +16,9 @@ use std::{
     ptr::NonNull,
 };
 
-use super::{datatype::DataType, private::WrapperPriv, ValueRef, Wrapper, WrapperRef};
+use super::{
+    datatype::DataType, private::WrapperPriv, value::ValueRef, Ref, Root, Wrapper, WrapperRef,
+};
 
 /// Access and mutate the contents of a `SimpleVector`.
 #[repr(transparent)]
@@ -31,11 +33,13 @@ where
 impl<'scope, 'borrow, T: WrapperRef<'scope, 'static>> SimpleVectorData<'scope, 'borrow, T> {
     /// Returns the length of this `SimpleVector`.
     pub fn len(&self) -> usize {
+        // Safety: the pointer points to valid data
         unsafe { self.0.as_ref().length }
     }
 
     /// Returns the contents of this `SimpleVector` as a slice.
     pub fn as_slice(&self) -> &'borrow [T] {
+        // Safety: the C API function is called with valid data
         unsafe { std::slice::from_raw_parts(jl_svec_data(self.0.as_ptr()).cast(), self.len()) }
     }
 
@@ -76,6 +80,7 @@ impl<'scope> SimpleVector<'scope> {
     where
         F: Frame<'scope>,
     {
+        // Safety: the allocated data is immediately rooted
         unsafe {
             let svec = NonNull::new_unchecked(jl_alloc_svec(n));
             frame.value(svec, Private)
@@ -190,6 +195,7 @@ impl<'scope> SimpleVector<'scope> {
     }
 
     fn is_typed<U: ValidLayout>(self) -> bool {
+        // Safety: the pointer points to valid data
         unsafe {
             let len = self.unwrap_non_null(Private).as_ref().length;
             let ptr = self.unwrap_non_null(Private).as_ptr();
@@ -212,6 +218,7 @@ impl<'scope> SimpleVector<'scope> {
 
     /// Returns the length of this `SimpleVector`.
     pub fn len(&self) -> usize {
+        // Safety: the pointer points to valid data
         unsafe { self.0.as_ref().length }
     }
 }
@@ -219,6 +226,7 @@ impl<'scope> SimpleVector<'scope> {
 impl<'scope> SimpleVector<'scope> {
     /// Use the `Output` to extend the lifetime of this data.
     pub fn root<'target>(self, output: Output<'target>) -> SimpleVector<'target> {
+        // Safety: the pointer points to valid data
         unsafe {
             let ptr = self.unwrap_non_null(Private);
             output.set_root::<SimpleVector>(ptr);
@@ -230,13 +238,16 @@ impl<'scope> SimpleVector<'scope> {
 impl<'base> SimpleVector<'base> {
     /// The empty `SimpleVector`.
     pub fn emptysvec(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap(jl_emptysvec, Private) }
     }
 }
 
+// Safety: if the type is jl_simplevector_type the data is an SimpleVector
 unsafe impl<'scope> Typecheck for SimpleVector<'scope> {
     fn typecheck(t: DataType) -> bool {
-        unsafe { t.unwrap(Private) == jl_simplevector_type }
+        // Safety: can only be called from a thread known to Julia
+        t == DataType::simplevector_type(unsafe { Global::new() })
     }
 }
 
@@ -253,15 +264,42 @@ impl<'scope> WrapperPriv<'scope, '_> for SimpleVector<'scope> {
     type Wraps = jl_svec_t;
     const NAME: &'static str = "SimpleVector";
 
-    #[inline(always)]
+    // Safety: `inner` must not have been freed yet, the result must never be
+    // used after the GC might have freed it.
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData)
     }
 
-    #[inline(always)]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
 }
 
 impl_root!(SimpleVector, 1);
+
+/// A reference to a [`SimpleVector`] that has not been explicitly rooted.
+pub type SimpleVectorRef<'scope> = Ref<'scope, 'static, SimpleVector<'scope>>;
+
+unsafe impl<'scope> ValidLayout for SimpleVectorRef<'scope> {
+    fn valid_layout(v: Value) -> bool {
+        if let Ok(dt) = v.cast::<DataType>() {
+            dt.is::<SimpleVector>()
+        } else {
+            false
+        }
+    }
+
+    const IS_REF: bool = true;
+}
+
+impl<'scope> SimpleVectorRef<'scope> {
+    /// Root this reference to a SimpleVector in `scope`.
+    ///
+    /// Safety: self must point to valid data.
+    pub unsafe fn root<'target, S>(self, scope: S) -> JlrsResult<SimpleVector<'target>>
+    where
+        S: PartialScope<'target>,
+    {
+        <SimpleVector as Root>::root(scope, self)
+    }
+}

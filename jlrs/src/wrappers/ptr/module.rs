@@ -13,10 +13,12 @@ use crate::{
     private::Private,
     wrappers::ptr::{
         function::Function,
+        function::FunctionRef,
         private::WrapperPriv,
         symbol::Symbol,
+        value::ValueRef,
         value::{LeakedValue, Value},
-        FunctionRef, ModuleRef, ValueRef, Wrapper as _,
+        Wrapper as _,
     },
 };
 use cfg_if::cfg_if;
@@ -25,6 +27,8 @@ use jl_sys::{
     jl_module_type, jl_set_const, jl_set_global,
 };
 use std::{marker::PhantomData, ptr::NonNull};
+
+use super::Ref;
 
 cfg_if! {
     if #[cfg(not(all(target_os = "windows", all(feature = "lts", not(feature = "all-features-override")))))] {
@@ -54,6 +58,7 @@ pub struct Module<'scope>(NonNull<jl_module_t>, PhantomData<&'scope ()>);
 impl<'scope> Module<'scope> {
     /// Returns the name of this module.
     pub fn name(self) -> Symbol<'scope> {
+        // Safety: the pointer points to valid data, the name is never null
         unsafe {
             let sym = NonNull::new_unchecked(self.unwrap_non_null(Private).as_ref().name);
             Symbol::wrap_non_null(sym, Private)
@@ -65,6 +70,7 @@ impl<'scope> Module<'scope> {
     where
         S: PartialScope<'target>,
     {
+        // Safety: the pointer points to valid data, the parent is never null
         unsafe {
             let parent = self.unwrap_non_null(Private).as_ref().parent;
             scope.value(NonNull::new_unchecked(parent), Private)
@@ -73,6 +79,7 @@ impl<'scope> Module<'scope> {
 
     /// Returns the parent of this module without rooting it.
     pub fn parent_ref(self) -> ModuleRef<'scope> {
+        // Safety: the pointer points to valid data, the parent is never null
         unsafe { ModuleRef::wrap(self.unwrap_non_null(Private).as_ref().parent) }
     }
 
@@ -89,21 +96,26 @@ impl<'scope> Module<'scope> {
     /// [`AsyncJulia::include`]: crate::runtime::async_rt::AsyncJulia::include
     /// [`AsyncJulia::try_include`]: crate::runtime::async_rt::AsyncJulia::try_include
     pub fn main(_: Global<'scope>) -> Self {
+        // Safety: the Main module is globally rooted
         unsafe { Module::wrap(jl_main_module, Private) }
     }
 
     /// Returns a handle to Julia's `Core`-module.
     pub fn core(_: Global<'scope>) -> Self {
+        // Safety: the Core module is globally rooted
         unsafe { Module::wrap(jl_core_module, Private) }
     }
 
     /// Returns a handle to Julia's `Base`-module.
     pub fn base(_: Global<'scope>) -> Self {
+        // Safety: the Base module is globally rooted
         unsafe { Module::wrap(jl_base_module, Private) }
     }
 
     /// Returns `true` if `self` has imported `sym`.
     pub fn is_imported<N: ToSymbol>(self, sym: N) -> bool {
+        // Safety: the pointer points to valid data, the C API function is called with
+        // valid arguments.
         unsafe {
             let sym = sym.to_symbol_priv(Private);
             jl_is_imported(self.unwrap(Private), sym.unwrap(Private)) != 0
@@ -120,8 +132,11 @@ impl<'scope> Module<'scope> {
         N: ToSymbol,
         S: PartialScope<'target>,
     {
+        let symbol = name.to_symbol(scope.global());
+
+        // Safety: the pointer points to valid data, the C API function is called with
+        // valid arguments and its result is checked.
         unsafe {
-            let symbol = name.to_symbol(scope.global());
             let submodule = jl_get_global(self.unwrap(Private), symbol.unwrap(Private));
             if submodule.is_null() {
                 Err(AccessError::GlobalNotFound {
@@ -152,6 +167,8 @@ impl<'scope> Module<'scope> {
     where
         N: ToSymbol,
     {
+        // Safety: the pointer points to valid data, the C API function is called with
+        // valid arguments and its result is checked.
         unsafe {
             let symbol = name.to_symbol_priv(Private);
             let submodule = jl_get_global(self.unwrap(Private), symbol.unwrap(Private));
@@ -286,6 +303,9 @@ impl<'scope> Module<'scope> {
         N: ToSymbol,
         S: PartialScope<'frame>,
     {
+        // Safety: the pointer points to valid data, the C API function is called with
+        // valid arguments and its result is checked. if an exception is thrown it's caught
+        // and returned
         unsafe {
             let symbol = name.to_symbol_priv(Private);
 
@@ -318,6 +338,9 @@ impl<'scope> Module<'scope> {
     where
         N: ToSymbol,
     {
+        // Safety: the pointer points to valid data, the C API function is called with
+        // valid arguments and its result is checked. if an exception is thrown it's caught
+        // and returned
         unsafe {
             let symbol = name.to_symbol_priv(Private);
 
@@ -366,6 +389,8 @@ impl<'scope> Module<'scope> {
         N: ToSymbol,
         S: PartialScope<'target>,
     {
+        // Safety: the pointer points to valid data, the C API function is called with
+        // valid arguments and its result is checked.
         unsafe {
             let symbol = name.to_symbol_priv(Private);
 
@@ -387,6 +412,8 @@ impl<'scope> Module<'scope> {
     where
         N: ToSymbol,
     {
+        // Safety: the pointer points to valid data, the C API function is called with
+        // valid arguments and its result is checked.
         unsafe {
             let symbol = name.to_symbol_priv(Private);
 
@@ -408,11 +435,11 @@ impl<'scope> Module<'scope> {
     where
         N: ToSymbol,
     {
+        // Safety: the pointer points to valid data, the C API function is called with
+        // valid arguments and its result is checked.
         unsafe {
             let symbol = name.to_symbol_priv(Private);
 
-            // there doesn't seem to be a way to check if this is actually a
-            // function...
             let global = jl_get_global(self.unwrap(Private), symbol.unwrap(Private));
             if global.is_null() {
                 Err(AccessError::GlobalNotFound {
@@ -436,6 +463,7 @@ impl<'scope> Module<'scope> {
         N: ToSymbol,
         S: PartialScope<'target>,
     {
+        // Safety: the pointer points to valid data, the result is checked.
         unsafe {
             let symbol = name.to_symbol_priv(Private);
             let func = self.global(scope, symbol)?;
@@ -456,6 +484,7 @@ impl<'scope> Module<'scope> {
     where
         N: ToSymbol,
     {
+        // Safety: the pointer points to valid data, the result is checked.
         unsafe {
             let symbol = name.to_symbol_priv(Private);
             let func = self.global_ref(symbol)?.wrapper_unchecked();
@@ -472,6 +501,7 @@ impl<'scope> Module<'scope> {
 
     /// Convert `self` to a `LeakedValue`.
     pub fn as_leaked(self) -> LeakedValue {
+        // Safety: the pointer points to valid data
         unsafe { LeakedValue::wrap_non_null(self.unwrap_non_null(Private).cast()) }
     }
 
@@ -541,6 +571,7 @@ impl<'scope> Module<'scope> {
 
     /// Use the `Output` to extend the lifetime of this data.
     pub fn root<'target>(self, output: Output<'target>) -> Module<'target> {
+        // safety: the pointer points to valid data
         unsafe {
             let ptr = self.unwrap_non_null(Private);
             output.set_root::<Module>(ptr);
@@ -556,15 +587,20 @@ impl<'scope> WrapperPriv<'scope, '_> for Module<'scope> {
     type Wraps = jl_module_t;
     const NAME: &'static str = "Module";
 
-    #[inline(always)]
+    // Safety: `inner` must not have been freed yet, the result must never be
+    // used after the GC might have freed it.
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData)
     }
 
-    #[inline(always)]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
 }
 
 impl_root!(Module, 1);
+
+/// A reference to a [`Module`] that has not been explicitly rooted.
+pub type ModuleRef<'scope> = Ref<'scope, 'static, Module<'scope>>;
+impl_valid_layout!(ModuleRef, Module);
+impl_ref_root!(Module, ModuleRef, 1);

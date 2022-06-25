@@ -1,6 +1,9 @@
 //! Everything related to errors.
 
-use crate::wrappers::ptr::{array::dimensions::Dimensions, value::Value, ValueRef};
+use crate::wrappers::ptr::{
+    array::dimensions::Dimensions,
+    value::{Value, ValueRef},
+};
 use std::error::Error as StdErr;
 use thiserror::Error;
 

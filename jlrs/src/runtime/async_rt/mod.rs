@@ -1,5 +1,7 @@
 //! Use Julia with support for multitasking.
 //!
+//! This module is only available if the `async-rt` feature is enabled.
+//!
 //! While access to the Julia C API is not thread-safe, it is possible to create and schedule new
 //! tasks from the thread that has intialized Julia. To do so from Rust you must use an async
 //! runtime rather than the sync runtime.
@@ -26,8 +28,9 @@ use crate::{
         channel::{Channel, ChannelReceiver, ChannelSender, OneshotSender, TrySendError},
         future::wake_task,
         internal::{
-            BlockingTask, BlockingTaskEnvelope, CallPersistentMessage, InnerPersistentMessage,
-            PendingTask, PendingTaskEnvelope, Persistent, RegisterPersistent, RegisterTask, Task,
+            BlockingTask, BlockingTaskEnvelope, CallPersistentTask, InnerPersistentMessage,
+            PendingTask, PendingTaskEnvelope, Persistent, PersistentComms, RegisterPersistent,
+            RegisterTask, Task,
         },
         task::{AsyncTask, PersistentTask},
     },
@@ -170,11 +173,10 @@ where
         A: AsyncTask,
         O: OneshotSender<JlrsResult<A::Output>>,
     {
-        let sender = self.sender.clone();
         let msg = PendingTask::<_, _, Task>::new(task, res_sender);
         let boxed = Box::new(msg);
         self.sender
-            .send(MessageInner::Task(boxed, sender).wrap())
+            .send(MessageInner::Task(boxed, self.sender.clone()).wrap())
             .await
             .map_err(|_| RuntimeError::ChannelClosed)?;
 
@@ -191,11 +193,10 @@ where
         A: AsyncTask,
         O: OneshotSender<JlrsResult<A::Output>>,
     {
-        let sender = self.sender.clone();
         let msg = PendingTask::<_, _, Task>::new(task, res_sender);
         let boxed = Box::new(msg);
         self.sender
-            .try_send(MessageInner::Task(boxed, sender).wrap())
+            .try_send(MessageInner::Task(boxed, self.sender.clone()).wrap())
             .map_err(|e| match e {
                 TrySendError::Full(_) => RuntimeError::ChannelFull,
                 TrySendError::Closed(_) => RuntimeError::ChannelClosed,
@@ -214,11 +215,10 @@ where
         A: AsyncTask,
         O: OneshotSender<JlrsResult<()>>,
     {
-        let sender = self.sender.clone();
         let msg = PendingTask::<_, A, RegisterTask>::new(res_sender);
         let boxed = Box::new(msg);
         self.sender
-            .send(MessageInner::Task(boxed, sender).wrap())
+            .send(MessageInner::Task(boxed, self.sender.clone()).wrap())
             .await
             .map_err(|_| RuntimeError::ChannelClosed)?;
 
@@ -235,11 +235,10 @@ where
         A: AsyncTask,
         O: OneshotSender<JlrsResult<()>>,
     {
-        let sender = self.sender.clone();
         let msg = PendingTask::<_, A, RegisterTask>::new(res_sender);
         let boxed = Box::new(msg);
         self.sender
-            .try_send(MessageInner::Task(boxed, sender).wrap())
+            .try_send(MessageInner::Task(boxed, self.sender.clone()).wrap())
             .map_err(|e| match e {
                 TrySendError::Full(_) => RuntimeError::ChannelFull,
                 TrySendError::Closed(_) => RuntimeError::ChannelClosed,
@@ -365,51 +364,56 @@ where
 
     /// Send a new persistent task to the runtime.
     ///
-    /// This method waits if there's no room in the channel. It takes a single argument, the task,
-    /// you must also provide an implementation of [`Channel`] as a type parameter. This channel
-    /// is used by the returned [`PersistentHandle`] to communicate with the persistent task.
-    pub async fn persistent<C, P>(&self, task: P) -> JlrsResult<PersistentHandle<P>>
+    /// This method waits if there's no room in the channel. It takes a two arguments, the task
+    /// and a `OneshotSender` to send a [`PersistentHandle`] after the task's `init` method has
+    /// completed. You must also provide an implementation of [`Channel`] as a type parameter.
+    /// This channel is used by the handle to communicate with the persistent task.
+    pub async fn persistent<C, P, O>(&self, task: P, handle_sender: O) -> JlrsResult<()>
     where
         C: Channel<PersistentMessage<P>>,
         P: PersistentTask,
+        O: OneshotSender<JlrsResult<PersistentHandle<P>>>,
     {
-        let (sender, receiver) = C::channel(NonZeroUsize::new(P::CHANNEL_CAPACITY));
-        let rt_sender = self.sender.clone();
-        let msg = PendingTask::<_, _, Persistent>::new(task, receiver);
+        let msg = PendingTask::<_, _, Persistent>::new(
+            task,
+            PersistentComms::<C, _, _>::new(handle_sender),
+        );
         let boxed = Box::new(msg);
 
         self.sender
-            .send(MessageInner::Task(boxed, rt_sender).wrap())
+            .send(MessageInner::Task(boxed, self.sender.clone()).wrap())
             .await
             .map_err(|_| RuntimeError::ChannelClosed)?;
 
-        Ok(PersistentHandle::new(Arc::new(sender)))
+        Ok(())
     }
 
     /// Try to send a new persistent task to the runtime.
     ///
     /// If there's no room in the backing channel an error is returned immediately. This method
-    /// takes a single argument, the task, you must also provide an implementation of [`Channel`]
-    /// as a type parameter. This channel is used by the returned [`PersistentHandle`] to
-    /// communicate with the persistent task.
-    pub fn try_persistent<C, P>(&self, task: P) -> JlrsResult<PersistentHandle<P>>
+    /// takes a two arguments, the task  and a `OneshotSender` to send a [`PersistentHandle`]
+    /// after the task's `init` method has completed. You must also provide an implementation of
+    /// [`Channel`] as a type parameter. This channel is used by the handle to communicate with
+    /// the persistent task.
+    pub fn try_persistent<C, P, O>(&self, task: P, handle_sender: O) -> JlrsResult<()>
     where
         C: Channel<PersistentMessage<P>>,
         P: PersistentTask,
+        O: OneshotSender<JlrsResult<PersistentHandle<P>>>,
     {
-        let (sender, recv) = C::channel(NonZeroUsize::new(P::CHANNEL_CAPACITY));
-
-        let rt_sender = self.sender.clone();
-        let msg = PendingTask::<_, _, Persistent>::new(task, recv);
+        let msg = PendingTask::<_, _, Persistent>::new(
+            task,
+            PersistentComms::<C, _, _>::new(handle_sender),
+        );
         let boxed = Box::new(msg);
         self.sender
-            .try_send(MessageInner::Task(boxed, rt_sender).wrap())
+            .try_send(MessageInner::Task(boxed, self.sender.clone()).wrap())
             .map_err(|e| match e {
                 TrySendError::Full(_) => RuntimeError::ChannelFull,
                 TrySendError::Closed(_) => RuntimeError::ChannelClosed,
             })?;
 
-        Ok(PersistentHandle::new(Arc::new(sender)))
+        Ok(())
     }
 
     /// Register a persistent task.
@@ -422,11 +426,10 @@ where
         P: PersistentTask,
         O: OneshotSender<JlrsResult<()>>,
     {
-        let sender = self.sender.clone();
         let msg = PendingTask::<_, P, RegisterPersistent>::new(res_sender);
         let boxed = Box::new(msg);
         self.sender
-            .send(MessageInner::Task(boxed, sender).wrap())
+            .send(MessageInner::Task(boxed, self.sender.clone()).wrap())
             .await
             .map_err(|_| RuntimeError::ChannelClosed)?;
 
@@ -732,11 +735,8 @@ where
                         }
                     }
                     MessageInner::BlockingTask(task) => {
-                        let res = {
-                            let stack = stacks[0].as_mut().expect("Async stack corrupted");
-                            task.call(stack)
-                        };
-                        res.await;
+                        let stack = stacks[0].as_mut().expect("Async stack corrupted");
+                        task.call(stack).await;
                     }
                     MessageInner::Include(path, sender) => {
                         let stack = stacks[0].as_mut().expect("Async stack corrupted");
@@ -909,7 +909,7 @@ where
     {
         self.sender
             .send(PersistentMessage {
-                msg: Box::new(CallPersistentMessage {
+                msg: Box::new(CallPersistentTask {
                     input: Some(input),
                     sender,
                     _marker: PhantomData,
@@ -932,7 +932,7 @@ where
     {
         self.sender
             .try_send(PersistentMessage {
-                msg: Box::new(CallPersistentMessage {
+                msg: Box::new(CallPersistentTask {
                     input: Some(input),
                     sender,
                     _marker: PhantomData,

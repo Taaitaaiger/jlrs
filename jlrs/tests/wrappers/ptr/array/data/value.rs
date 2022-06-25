@@ -3,7 +3,6 @@
 mod tests {
     use crate::util::JULIA;
     use jlrs::prelude::*;
-    use jlrs::wrappers::ptr::ModuleRef;
 
     #[test]
     fn access_value_array_dimensions() {
@@ -16,7 +15,7 @@ mod tests {
 
                 {
                     let data = arr.value_data(&frame)?;
-                    assert_eq!(data.dimensions().as_slice(), &[4]);
+                    assert_eq!(unsafe { data.dimensions().as_slice() }, &[4]);
                 }
 
                 unsafe {
@@ -31,7 +30,7 @@ mod tests {
 
                 {
                     let data = arr.wrapper_data::<ModuleRef, _>(&frame)?;
-                    assert_eq!(data.dimensions().as_slice(), &[4]);
+                    assert_eq!(unsafe { data.dimensions().as_slice() }, &[4]);
                 }
 
                 unsafe {

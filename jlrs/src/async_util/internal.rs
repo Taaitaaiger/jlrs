@@ -1,17 +1,17 @@
-use super::task::PersistentTask;
-use crate::memory::frame::GcFrame;
+use super::{channel::Channel, task::PersistentTask};
 use crate::memory::mode::Async;
 use crate::memory::stack_page::StackPage;
 use crate::{async_util::channel::ChannelReceiver, memory::global::Global};
 use crate::{async_util::channel::OneshotSender, memory::frame::AsyncGcFrame};
 use crate::{async_util::task::AsyncTask, runtime::async_rt::PersistentMessage};
 use crate::{error::JlrsResult, memory::stack_page::AsyncStackPage};
+use crate::{memory::frame::GcFrame, runtime::async_rt::PersistentHandle};
 use async_trait::async_trait;
 use futures::{future::LocalBoxFuture, FutureExt};
-use std::marker::PhantomData;
+use std::{marker::PhantomData, num::NonZeroUsize, sync::Arc};
 
 pub(crate) type InnerPersistentMessage<P> = Box<
-    dyn CallPersistentMessageEnvelope<
+    dyn CallPersistentTaskEnvelope<
         Input = <P as PersistentTask>::Input,
         Output = <P as PersistentTask>::Output,
     >,
@@ -25,7 +25,7 @@ pub(crate) enum RegisterTask {}
 pub(crate) enum Persistent {}
 pub(crate) enum RegisterPersistent {}
 
-pub(crate) struct CallPersistentMessage<I, O, S>
+pub(crate) struct CallPersistentTask<I, O, S>
 where
     I: Send + Sync,
     O: Send + Sync + 'static,
@@ -36,34 +36,6 @@ where
     pub(crate) input: Option<I>,
 
     pub(crate) _marker: PhantomData<O>,
-}
-
-#[async_trait(?Send)]
-pub(crate) trait CallPersistentMessageEnvelope: Send + Sync {
-    type Input;
-    type Output;
-
-    async fn respond(self: Box<Self>, result: JlrsResult<Self::Output>);
-    fn input(&mut self) -> Self::Input;
-}
-
-#[async_trait(?Send)]
-impl<I, O, S> CallPersistentMessageEnvelope for CallPersistentMessage<I, O, S>
-where
-    I: Send + Sync,
-    O: Send + Sync,
-    S: OneshotSender<JlrsResult<O>>,
-{
-    type Input = I;
-    type Output = O;
-
-    async fn respond(self: Box<Self>, result: JlrsResult<Self::Output>) {
-        Box::new(self.sender).send(result).await
-    }
-
-    fn input(&mut self) -> Self::Input {
-        self.input.take().unwrap()
-    }
 }
 
 #[async_trait(?Send)]
@@ -87,14 +59,6 @@ impl<A: AsyncTask> AsyncTaskEnvelope for A {
     ) -> JlrsResult<<Self::A as AsyncTask>::Output> {
         self.run(global, frame).await
     }
-}
-
-trait RegisterAsyncTaskEnvelope: Send + Sync {
-    type A: AsyncTask + Send + Sync;
-}
-
-impl<A: AsyncTask> RegisterAsyncTaskEnvelope for A {
-    type A = Self;
 }
 
 #[async_trait(?Send)]
@@ -126,10 +90,10 @@ where
     async fn call_init<'inner>(
         &'inner mut self,
         global: Global<'static>,
-        frame: AsyncGcFrame<'static>,
+        mut frame: AsyncGcFrame<'static>,
     ) -> JlrsResult<<Self::P as PersistentTask>::State> {
         {
-            self.init(global, frame).await
+            self.init(global, &mut frame).await
         }
     }
 
@@ -153,12 +117,72 @@ where
     }
 }
 
-trait RegisterPersistentTaskEnvelope: Send + Sync {
-    type P: PersistentTask + Send + Sync;
+#[async_trait(?Send)]
+pub(crate) trait CallPersistentTaskEnvelope: Send + Sync {
+    type Input;
+    type Output;
+
+    async fn respond(self: Box<Self>, result: JlrsResult<Self::Output>);
+    fn input(&mut self) -> Self::Input;
 }
 
-impl<P: PersistentTask> RegisterPersistentTaskEnvelope for P {
-    type P = Self;
+#[async_trait(?Send)]
+impl<I, O, S> CallPersistentTaskEnvelope for CallPersistentTask<I, O, S>
+where
+    I: Send + Sync,
+    O: Send + Sync,
+    S: OneshotSender<JlrsResult<O>>,
+{
+    type Input = I;
+    type Output = O;
+
+    async fn respond(self: Box<Self>, result: JlrsResult<Self::Output>) {
+        Box::new(self.sender).send(result).await
+    }
+
+    fn input(&mut self) -> Self::Input {
+        self.input.take().unwrap()
+    }
+}
+
+pub(crate) struct PersistentComms<C, P, O> {
+    sender: O,
+    _task: PhantomData<P>,
+    _channel: PhantomData<C>,
+}
+
+impl<C, P, O> PersistentComms<C, P, O>
+where
+    C: Channel<PersistentMessage<P>>,
+    P: PersistentTask,
+    O: OneshotSender<JlrsResult<PersistentHandle<P>>>,
+{
+    pub(crate) fn new(sender: O) -> Self {
+        PersistentComms {
+            sender,
+            _task: PhantomData,
+            _channel: PhantomData,
+        }
+    }
+}
+
+impl<C, P, O> PendingTask<PersistentComms<C, P, O>, P, Persistent>
+where
+    C: Channel<PersistentMessage<P>>,
+    P: PersistentTask,
+    O: OneshotSender<JlrsResult<PersistentHandle<P>>>,
+{
+    pub(crate) fn new(task: P, sender: PersistentComms<C, P, O>) -> Self {
+        PendingTask {
+            task: Some(task),
+            sender,
+            _kind: PhantomData,
+        }
+    }
+
+    fn split(self) -> (P, PersistentComms<C, P, O>) {
+        (self.task.unwrap(), self.sender)
+    }
 }
 
 pub(crate) struct PendingTask<O, T, Kind> {
@@ -185,24 +209,6 @@ where
     }
 }
 
-impl<C, P> PendingTask<C, P, Persistent>
-where
-    C: ChannelReceiver<PersistentMessage<P>>,
-    P: PersistentTask,
-{
-    pub(crate) fn new(task: P, sender: C) -> Self {
-        PendingTask {
-            task: Some(task),
-            sender,
-            _kind: PhantomData,
-        }
-    }
-
-    fn split(self) -> (P, C) {
-        (self.task.unwrap(), self.sender)
-    }
-}
-
 impl<O, A> PendingTask<O, A, RegisterTask>
 where
     O: OneshotSender<JlrsResult<()>>,
@@ -224,7 +230,6 @@ where
 impl<O, P> PendingTask<O, P, RegisterPersistent>
 where
     O: OneshotSender<JlrsResult<()>>,
-
     P: PersistentTask,
 {
     pub(crate) fn new(sender: O) -> Self {
@@ -282,7 +287,6 @@ where
 impl<O, A> PendingTaskEnvelope for PendingTask<O, A, RegisterTask>
 where
     O: OneshotSender<JlrsResult<()>>,
-
     A: AsyncTask,
 {
     async fn call(mut self: Box<Self>, stack: &mut AsyncStackPage) {
@@ -314,7 +318,6 @@ where
 impl<O, P> PendingTaskEnvelope for PendingTask<O, P, RegisterPersistent>
 where
     O: OneshotSender<JlrsResult<()>>,
-
     P: PersistentTask,
 {
     async fn call(mut self: Box<Self>, stack: &mut AsyncStackPage) {
@@ -343,14 +346,16 @@ where
 }
 
 #[async_trait(?Send)]
-impl<C, P> PendingTaskEnvelope for PendingTask<C, P, Persistent>
+impl<C, P, O> PendingTaskEnvelope for PendingTask<PersistentComms<C, P, O>, P, Persistent>
 where
-    C: ChannelReceiver<PersistentMessage<P>>,
+    C: Channel<PersistentMessage<P>>,
+    O: OneshotSender<JlrsResult<PersistentHandle<P>>>,
     P: PersistentTask,
 {
     async fn call(mut self: Box<Self>, stack: &mut AsyncStackPage) {
-        let (mut persistent, mut receiver) = self.split();
-
+        let (mut persistent, handle_sender) = self.split();
+        let handle_sender = handle_sender.sender;
+        let (sender, mut receiver) = C::channel(NonZeroUsize::new(P::CHANNEL_CAPACITY));
         // Safety: the stack slots can be reallocated because it doesn't contain any frames
         // yet. The frame is dropped at the end of the scope, the nested hierarchy of scopes is
         // maintained.
@@ -368,6 +373,10 @@ where
 
             match persistent.call_init(global, frame).await {
                 Ok(mut state) => {
+                    handle_sender
+                        .send(Ok(PersistentHandle::new(Arc::new(sender))))
+                        .await;
+
                     loop {
                         let mut msg = match receiver.recv().await {
                             Ok(msg) => msg.msg,
@@ -385,7 +394,7 @@ where
                     let frame = owner.reconstruct();
                     persistent.exit(global, frame, &mut state).await;
                 }
-                _ => (), // TODO: don't just drop it.
+                Err(e) => handle_sender.send(Err(e)).await,
             }
 
             std::mem::drop(owner);

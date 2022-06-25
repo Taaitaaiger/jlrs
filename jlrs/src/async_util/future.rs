@@ -1,4 +1,4 @@
-use crate::call::{Call, CallExt, WithKeywords};
+use crate::call::{Call, ProvideKeywords, WithKeywords};
 use crate::error::CANNOT_DISPLAY_VALUE;
 use crate::memory::{frame::AsyncGcFrame, global::Global};
 use crate::wrappers::ptr::module::Module;
@@ -228,7 +228,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                 .wrapper_unchecked()
                 .function_ref("asynccall")?
                 .wrapper_unchecked()
-                .with_keywords(func.keywords())?
+                .provide_keywords(func.keywords())?
                 .call(&mut *frame, &mut vals)?
                 .map_err(|e| {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
@@ -284,7 +284,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                 .wrapper_unchecked()
                 .function_ref("scheduleasynclocal")?
                 .wrapper_unchecked()
-                .with_keywords(func.keywords())?
+                .provide_keywords(func.keywords())?
                 .call(&mut *frame, &mut vals)?
                 .map_err(|e| {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
@@ -340,7 +340,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                 .wrapper_unchecked()
                 .function_ref("scheduleasync")?
                 .wrapper_unchecked()
-                .with_keywords(func.keywords())?
+                .provide_keywords(func.keywords())?
                 .call(&mut *frame, &mut vals)?
                 .map_err(|e| {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);

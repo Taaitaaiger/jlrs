@@ -4,7 +4,10 @@ mod not_lts {
     use super::util::JULIA;
     use jlrs::prelude::*;
     use jlrs::wrappers::ptr::internal::opaque_closure::OpaqueClosure;
-    use jlrs::{layout::valid_layout::ValidLayout, wrappers::ptr::OpaqueClosureRef};
+    use jlrs::{
+        layout::valid_layout::ValidLayout,
+        wrappers::ptr::internal::opaque_closure::OpaqueClosureRef,
+    };
 
     #[test]
     fn create_opaque_closure() {

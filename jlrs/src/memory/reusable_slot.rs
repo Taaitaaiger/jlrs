@@ -3,7 +3,10 @@
 use crate::{
     memory::stack_page::Slot,
     private::Private,
-    wrappers::ptr::{private::WrapperPriv, value::Value, ValueRef},
+    wrappers::ptr::{
+        private::WrapperPriv,
+        value::{Value, ValueRef},
+    },
 };
 use std::marker::PhantomData;
 

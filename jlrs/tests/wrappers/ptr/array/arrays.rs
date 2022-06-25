@@ -2,12 +2,9 @@
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
 mod tests {
     use crate::util::JULIA;
+    use jlrs::layout::valid_layout::ValidLayout;
     use jlrs::prelude::*;
     use jlrs::wrappers::ptr::array::dimensions::Dims;
-    use jlrs::{
-        layout::valid_layout::ValidLayout,
-        wrappers::ptr::{ArrayRef, ValueRef},
-    };
 
     #[test]
     fn array_can_be_cast() {

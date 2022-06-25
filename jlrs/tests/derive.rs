@@ -5,7 +5,6 @@ mod tests {
     use super::util::derive_impls::*;
     use super::util::JULIA_DERIVE;
     use jlrs::prelude::*;
-    use jlrs::wrappers::ptr::ModuleRef;
 
     #[test]
     fn derive_bits_type_bool() {
@@ -858,8 +857,6 @@ mod tests {
     #[test]
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     fn derive_with_propagated_lifetimes() {
-        use jlrs::wrappers::ptr::ArrayRef;
-
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
 

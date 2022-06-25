@@ -4,9 +4,6 @@ mod util;
 mod tests {
     use super::util::JULIA;
     use jlrs::prelude::*;
-    use jlrs::wrappers::ptr::ArrayRef;
-    use jlrs::wrappers::ptr::DataTypeRef;
-    use jlrs::wrappers::ptr::TypedArrayRef;
 
     #[test]
     fn access_raw_fields_bits() {

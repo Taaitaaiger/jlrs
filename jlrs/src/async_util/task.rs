@@ -137,12 +137,12 @@ pub trait AsyncTask: 'static + Send + Sync {
 ///     async fn init(
 ///         &mut self,
 ///         _global: Global<'static>,
-///         mut frame: AsyncGcFrame<'static>,
+///         frame: &mut AsyncGcFrame<'static>,
 ///     ) -> JlrsResult<Self::State> {
 ///         // A `Vec` can be moved from Rust to Julia if the element type
 ///         // implements `IntoJulia`.
 ///         let data = vec![0usize; self.n_values];
-///         let array = TypedArray::from_vec(&mut frame, data, self.n_values)?
+///         let array = TypedArray::from_vec(&mut *frame, data, self.n_values)?
 ///             .into_jlrs_result()?;
 ///     
 ///         Ok(AccumulatorTaskState {
@@ -247,7 +247,7 @@ pub trait PersistentTask: 'static + Send + Sync {
     async fn init(
         &mut self,
         global: Global<'static>,
-        frame: AsyncGcFrame<'static>,
+        frame: &mut AsyncGcFrame<'static>,
     ) -> JlrsResult<Self::State>;
 
     /// Run the task.

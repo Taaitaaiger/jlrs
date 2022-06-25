@@ -17,7 +17,7 @@ mod tests {
     use jlrs::wrappers::ptr::type_var::TypeVar;
     use jlrs::wrappers::ptr::union::Union;
     use jlrs::wrappers::ptr::union_all::UnionAll;
-    use jlrs::wrappers::ptr::{simple_vector::SimpleVector, SymbolRef};
+    use jlrs::wrappers::ptr::{simple_vector::SimpleVector, symbol::SymbolRef};
 
     #[test]
     fn datatype_methods() {

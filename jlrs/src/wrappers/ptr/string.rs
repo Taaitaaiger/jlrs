@@ -6,7 +6,7 @@ use crate::{
     impl_julia_typecheck,
     memory::{global::Global, output::Output, scope::PartialScope},
     private::Private,
-    wrappers::ptr::{private::WrapperPriv, value::Value, StringRef},
+    wrappers::ptr::{private::WrapperPriv, value::Value},
 };
 use jl_sys::{jl_pchar_to_string, jl_string_type};
 use std::{
@@ -17,6 +17,8 @@ use std::{
     ptr::NonNull,
     str,
 };
+
+use super::Ref;
 
 /// A Julia string.
 #[derive(Copy, Clone)]
@@ -30,10 +32,9 @@ impl<'scope> JuliaString<'scope> {
         V: AsRef<str>,
         S: PartialScope<'target>,
     {
-        unsafe {
-            let global = scope.global();
-            JuliaString::new_unrooted(global, string).root(scope)
-        }
+        let global = scope.global();
+        // Safety: the result is immediately rooted
+        unsafe { JuliaString::new_unrooted(global, string).root(scope) }
     }
 
     /// Create a new Julia string. Unlike [`JuliaString::new`] this method doesn't root the
@@ -42,6 +43,7 @@ impl<'scope> JuliaString<'scope> {
     where
         V: AsRef<str>,
     {
+        // Safety: the C API function is called with valid arguments
         unsafe {
             let str_ref = string.as_ref();
             let len = str_ref.len();
@@ -57,10 +59,9 @@ impl<'scope> JuliaString<'scope> {
         V: AsRef<[u8]>,
         S: PartialScope<'target>,
     {
-        unsafe {
-            let global = scope.global();
-            JuliaString::new_bytes_unrooted(global, bytes).root(scope)
-        }
+        let global = scope.global();
+        // Safety: the result is immediately rooted
+        unsafe { JuliaString::new_bytes_unrooted(global, bytes).root(scope) }
     }
 
     /// Create a new Julia string. Unlike [`JuliaString::new_bytes`] this method doesn't root the
@@ -69,6 +70,7 @@ impl<'scope> JuliaString<'scope> {
     where
         V: AsRef<[u8]>,
     {
+        // Safety: the C API function is called with valid arguments
         unsafe {
             let str_ref = bytes.as_ref();
             let len = str_ref.len();
@@ -80,11 +82,14 @@ impl<'scope> JuliaString<'scope> {
 
     /// Returns the length of the string.
     pub fn len(self) -> usize {
+        // Safety: the pointer points to valid data, the length of the array is stored at the
+        // beginning
         unsafe { *self.0.cast() }
     }
 
     /// Returns the string as a `CStr`.
     pub fn as_c_str(self) -> &'scope CStr {
+        // Safety: The string is terminated with a null character.
         unsafe {
             let str_begin = self.0.add(mem::size_of::<usize>());
             CStr::from_ptr(str_begin.cast())
@@ -141,15 +146,20 @@ impl<'scope> WrapperPriv<'scope, '_> for JuliaString<'scope> {
     type Wraps = u8;
     const NAME: &'static str = "String";
 
-    #[inline(always)]
+    // Safety: `inner` must not have been freed yet, the result must never be
+    // used after the GC might have freed it.
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         JuliaString(inner.as_ptr(), PhantomData)
     }
 
-    #[inline(always)]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         unsafe { NonNull::new_unchecked(self.0 as *mut _) }
     }
 }
 
 impl_root!(JuliaString, 1);
+
+/// A reference to a [`JuliaString`] that has not been explicitly rooted.
+pub type StringRef<'scope> = Ref<'scope, 'static, JuliaString<'scope>>;
+impl_valid_layout!(StringRef, String);
+impl_ref_root!(JuliaString, StringRef, 1);

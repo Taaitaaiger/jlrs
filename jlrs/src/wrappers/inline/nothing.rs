@@ -4,7 +4,7 @@ use crate::{
     convert::{into_julia::IntoJulia, unbox::Unbox},
     impl_julia_typecheck, impl_valid_layout,
     memory::global::Global,
-    wrappers::ptr::{datatype::DataType, DataTypeRef, Wrapper},
+    wrappers::ptr::{datatype::DataType, datatype::DataTypeRef, Wrapper},
 };
 use jl_sys::jl_nothing_type;
 

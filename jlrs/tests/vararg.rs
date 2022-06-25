@@ -4,7 +4,7 @@ mod not_lts {
     use super::util::JULIA;
     use jlrs::prelude::*;
     use jlrs::wrappers::ptr::internal::vararg::Vararg;
-    use jlrs::{layout::valid_layout::ValidLayout, wrappers::ptr::VarargRef};
+    use jlrs::{layout::valid_layout::ValidLayout, wrappers::ptr::internal::vararg::VarargRef};
 
     #[test]
     fn access_vararg() {

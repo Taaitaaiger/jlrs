@@ -13,8 +13,8 @@ use crate::{
     memory::global::Global,
     private::Private,
     wrappers::ptr::{
-        datatype::DataType, private::WrapperPriv, union_all::UnionAll, value::Value, DataTypeRef,
-        ValueRef, Wrapper,
+        datatype::DataType, datatype::DataTypeRef, private::WrapperPriv, union_all::UnionAll,
+        value::Value, value::ValueRef, Wrapper,
     },
 };
 use jl_sys::{
@@ -66,16 +66,18 @@ macro_rules! impl_into_julia {
         // Safety: These implemetations use a boxing function provided by Julia
         unsafe impl IntoJulia for $type {
             #[inline(always)]
-            fn julia_type<'scope>(_: Global<'scope>) -> $crate::wrappers::ptr::DataTypeRef<'scope> {
-                unsafe { $crate::wrappers::ptr::DataTypeRef::wrap($julia_type) }
+            fn julia_type<'scope>(
+                _: Global<'scope>,
+            ) -> $crate::wrappers::ptr::datatype::DataTypeRef<'scope> {
+                unsafe { $crate::wrappers::ptr::datatype::DataTypeRef::wrap($julia_type) }
             }
 
             #[inline(always)]
             fn into_julia<'scope>(
                 self,
                 _: Global<'scope>,
-            ) -> $crate::wrappers::ptr::ValueRef<'scope, 'static> {
-                unsafe { $crate::wrappers::ptr::ValueRef::wrap($boxer(self as _)) }
+            ) -> $crate::wrappers::ptr::value::ValueRef<'scope, 'static> {
+                unsafe { $crate::wrappers::ptr::value::ValueRef::wrap($boxer(self as _)) }
             }
         }
     };

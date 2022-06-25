@@ -1,4 +1,4 @@
-//! The sync runtime.
+//! Use Julia without support for multitasking.
 //!
 //! This module is only available if the `sync-rt` feature is enabled.
 
@@ -13,7 +13,9 @@ use crate::{
 use jl_sys::{jl_atexit_hook, jl_init, jl_init_with_image, jl_is_initialized};
 use std::{path::Path, sync::atomic::Ordering};
 
-/// A Julia instance. You must create it with [`RuntimeBuilder::start`] before you can start using
+/// A Julia instance.
+///
+/// You must create this instance with [`RuntimeBuilder::start`] before you can start using
 /// Julia from Rust. While this struct exists Julia is active, dropping it causes the shutdown
 /// code to be called but this doesn't leave Julia in a state from which it can be reinitialized.
 ///
@@ -28,7 +30,7 @@ impl Julia {
             Err(RuntimeError::AlreadyInitialized)?;
         }
 
-        if let Some((ref julia_bindir, ref image_path)) = builder.image {
+        if let Some((julia_bindir, image_path)) = builder.image {
             let julia_bindir_str = julia_bindir.to_string_lossy().to_string();
             let image_path_str = image_path.to_string_lossy().to_string();
 
@@ -64,7 +66,7 @@ impl Julia {
             init_jlrs(&mut frame);
             Ok(())
         })
-        .expect("Could not load Jlrs module");
+        .ok();
 
         Ok(jl)
     }

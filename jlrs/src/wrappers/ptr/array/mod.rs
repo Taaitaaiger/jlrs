@@ -69,7 +69,7 @@ use self::data::accessor::{
     InlinePtrArrayAccessor, Mutable, PtrArrayAccessor, UnionArrayAccessor,
 };
 
-use super::ValueRef;
+use super::{union_all::UnionAll, value::ValueRef, Ref, Root};
 
 cfg_if! {
     if #[cfg(not(all(target_os = "windows", feature = "lts")))] {
@@ -131,11 +131,14 @@ impl<'data> Array<'_, 'data> {
         S: Scope<'target, 'current, F>,
         F: Frame<'current>,
     {
-        unsafe {
-            let (output, frame) = scope.split()?;
-            frame.scope(|mut frame| {
-                let global = frame.as_scope().global();
-                let elty_ptr = T::julia_type(global).ptr();
+        let (output, frame) = scope.split()?;
+        frame.scope(|mut frame| {
+            let global = frame.as_scope().global();
+            let elty_ptr = T::julia_type(global).ptr();
+
+            // Safety: The array type is rooted until the array has been constructed, all C API
+            // functions are called with valid data.
+            unsafe {
                 let array_type = jl_apply_array_type(elty_ptr.cast(), dims.n_dimensions());
                 let _: Value = (&mut frame).value(NonNull::new_unchecked(array_type), Private)?;
 
@@ -165,8 +168,8 @@ impl<'data> Array<'_, 'data> {
                 };
 
                 output.call_result(res, Private)
-            })
-        }
+            }
+        })
     }
 
     /// Allocate a new n-dimensional Julia array of dimensions `dims` for data of type `T`.
@@ -232,19 +235,25 @@ impl<'data> Array<'_, 'data> {
         S: Scope<'target, 'current, F>,
         F: Frame<'current>,
     {
-        unsafe {
-            let (output, frame) = scope.split()?;
-            frame.scope(|mut frame| {
+        let (output, frame) = scope.split()?;
+        frame.scope(|mut frame| {
+            // Safety: if this C API function throws an exception, it's caught, rooted and
+            // returned. If successful, the array type is rooted.
+            let array_type = unsafe {
                 let array_type_res = jlrs_apply_array_type(ty.unwrap(Private), dims.n_dimensions());
-                let array_type = if array_type_res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
+                if array_type_res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
                     let exc = Err(NonNull::new_unchecked(array_type_res.data));
                     return output.call_result(exc, Private);
                 } else {
+                    let _: Value =
+                        (&mut frame).value(NonNull::new_unchecked(array_type_res.data), Private)?;
                     array_type_res.data
-                };
+                }
+            };
 
-                let _: Value = (&mut frame).value(NonNull::new_unchecked(array_type), Private)?;
-
+            // Safety: The array type is rooted until the array has been constructed, all C API
+            // functions are called with valid data.
+            unsafe {
                 let array = match dims.n_dimensions() {
                     1 => jlrs_alloc_array_1d(array_type, dims.n_elements(0)),
                     2 => jlrs_alloc_array_2d(array_type, dims.n_elements(0), dims.n_elements(1)),
@@ -271,8 +280,8 @@ impl<'data> Array<'_, 'data> {
                 };
 
                 output.call_result(res, Private)
-            })
-        }
+            }
+        })
     }
 
     /// Allocate a new n-dimensional Julia array of dimensions `dims` for data of type `T`.
@@ -348,46 +357,52 @@ impl<'data> Array<'_, 'data> {
         }
 
         let (output, frame) = scope.split()?;
-        frame.scope(|mut frame| unsafe {
+        frame.scope(|mut frame| {
             let global = frame.as_scope().global();
-            let array_type =
-                jl_apply_array_type(T::julia_type(global).ptr().cast(), dims.n_dimensions());
-            let _: Value = (&mut frame).value(NonNull::new_unchecked(array_type), Private)?;
+            let elty_ptr = T::julia_type(global).ptr().cast();
 
-            let array = match dims.n_dimensions() {
-                1 => jlrs_ptr_to_array_1d(
-                    array_type,
-                    data.as_mut_ptr().cast(),
-                    dims.n_elements(0),
-                    0,
-                ),
-                n if n <= 8 => {
-                    let tuple = small_dim_tuple(&mut frame, dims)?;
-                    jlrs_ptr_to_array(
+            // Safety: The array type is rooted until the array has been constructed, all C API
+            // functions are called with valid data. The data-lifetime ensures the data can't be
+            // used from Rust after the borrow ends.
+            unsafe {
+                let array_type = jl_apply_array_type(elty_ptr, dims.n_dimensions());
+                let _: Value = (&mut frame).value(NonNull::new_unchecked(array_type), Private)?;
+
+                let array = match dims.n_dimensions() {
+                    1 => jlrs_ptr_to_array_1d(
                         array_type,
                         data.as_mut_ptr().cast(),
-                        tuple.unwrap(Private),
+                        dims.n_elements(0),
                         0,
-                    )
-                }
-                _ => {
-                    let tuple = large_dim_tuple(&mut frame, dims)?;
-                    jlrs_ptr_to_array(
-                        array_type,
-                        data.as_mut_ptr().cast(),
-                        tuple.unwrap(Private),
-                        0,
-                    )
-                }
-            };
+                    ),
+                    n if n <= 8 => {
+                        let tuple = small_dim_tuple(&mut frame, dims)?;
+                        jlrs_ptr_to_array(
+                            array_type,
+                            data.as_mut_ptr().cast(),
+                            tuple.unwrap(Private),
+                            0,
+                        )
+                    }
+                    _ => {
+                        let tuple = large_dim_tuple(&mut frame, dims)?;
+                        jlrs_ptr_to_array(
+                            array_type,
+                            data.as_mut_ptr().cast(),
+                            tuple.unwrap(Private),
+                            0,
+                        )
+                    }
+                };
 
-            let res = if array.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
-                Err(NonNull::new_unchecked(array.data))
-            } else {
-                Ok(NonNull::new_unchecked(array.data.cast::<jl_array_t>()))
-            };
+                let res = if array.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
+                    Err(NonNull::new_unchecked(array.data))
+                } else {
+                    Ok(NonNull::new_unchecked(array.data.cast::<jl_array_t>()))
+                };
 
-            output.call_result(res, Private)
+                output.call_result(res, Private)
+            }
         })
     }
 
@@ -480,12 +495,16 @@ impl<'data> Array<'_, 'data> {
             })?;
         }
 
-        unsafe {
-            let (output, scope) = scope.split()?;
-            scope.scope_with_capacity(1, |mut frame| {
-                let global = frame.as_scope().global();
-                let array_type =
-                    jl_apply_array_type(T::julia_type(global).ptr().cast(), dims.n_dimensions());
+        let (output, scope) = scope.split()?;
+        scope.scope_with_capacity(1, |mut frame| {
+            let global = frame.as_scope().global();
+            let elty_ptr = T::julia_type(global).ptr().cast();
+
+            // Safety: The array type is rooted until the array has been constructed, all C API
+            // functions are called with valid data. The data-lifetime ensures the data can't be
+            // used from Rust after the borrow ends.
+            unsafe {
+                let array_type = jl_apply_array_type(elty_ptr, dims.n_dimensions());
                 let _: Value = (&mut frame).value(NonNull::new_unchecked(array_type), Private)?;
 
                 let array = match dims.n_dimensions() {
@@ -527,8 +546,8 @@ impl<'data> Array<'_, 'data> {
                 };
 
                 output.call_result(res, Private)
-            })
-        }
+            }
+        })
     }
 
     /// Create a new n-dimensional Julia array of dimensions `dims` that takes ownership of Rust
@@ -598,17 +617,15 @@ impl<'data> Array<'_, 'data> {
     }
 
     /// Convert a string to a Julia array.
-    pub fn from_string<'target, A: AsRef<str>, S>(
-        scope: S,
-        data: A,
-    ) -> JlrsResult<Array<'target, 'static>>
+    pub fn from_string<'target, A, S>(scope: S, data: A) -> JlrsResult<Array<'target, 'static>>
     where
-        A: IntoJulia,
+        A: AsRef<str>,
         S: PartialScope<'target>,
     {
         let string = data.as_ref();
         let nbytes = string.bytes().len();
         let ptr = string.as_ptr();
+        // Safety: a string can be converted to an array of bytes.
         unsafe {
             let arr = jl_pchar_to_array(ptr.cast(), nbytes);
             scope.value(NonNull::new_unchecked(arr), Private)
@@ -617,8 +634,9 @@ impl<'data> Array<'_, 'data> {
 
     /// Use the `Output` to extend the lifetime of this data.
     pub fn root<'target>(self, output: Output<'target>) -> Array<'target, 'data> {
+        let ptr = self.unwrap_non_null(Private);
+        // Safety: the data is valid.
         unsafe {
-            let ptr = self.unwrap_non_null(Private);
             output.set_root::<Array>(ptr);
             Array::wrap_non_null(ptr, Private)
         }
@@ -626,6 +644,7 @@ impl<'data> Array<'_, 'data> {
 
     #[inline(always)]
     pub(crate) fn data_ptr(self) -> *mut c_void {
+        // Safety: the pointer points to valid data.
         unsafe { self.unwrap_non_null(Private).as_ref().data }
     }
 }
@@ -638,16 +657,19 @@ impl<'scope, 'data> Array<'scope, 'data> {
 
     /// Returns the type of this array's elements.
     pub fn element_type(self) -> Value<'scope, 'static> {
+        // Safety: C API function is called valid arguments.
         unsafe { Value::wrap(jl_array_eltype(self.unwrap(Private).cast()).cast(), Private) }
     }
 
     /// Returns the size of this array's elements.
     pub fn element_size(self) -> usize {
+        // Safety: the pointer points to valid data.
         unsafe { self.unwrap_non_null(Private).as_ref().elsize as usize }
     }
 
     /// Returns `true` if the layout of the elements is compatible with `T`.
     pub fn contains<T: ValidLayout>(self) -> bool {
+        // Safety: C API function is called valid arguments.
         unsafe {
             T::valid_layout(Value::wrap(
                 jl_array_eltype(self.unwrap(Private).cast()).cast(),
@@ -664,6 +686,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
 
     /// Returns `true` if the elements of the array are stored inline.
     pub fn is_inline_array(self) -> bool {
+        // Safety: the pointer points to valid data.
         unsafe { self.unwrap_non_null(Private).as_ref().flags.ptrarray() == 0 }
     }
 
@@ -676,6 +699,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     /// Returns true if the elements of the array are stored inline and at least one of the fields
     /// of the inlined type is a pointer.
     pub fn has_inlined_pointers(self) -> bool {
+        // Safety: the pointer points to valid data.
         unsafe {
             let flags = self.unwrap_non_null(Private).as_ref().flags;
             self.is_inline_array() && flags.hasptr() != 0
@@ -684,6 +708,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
 
     /// Returns `true` if elements of this array are zero-initialized.
     pub fn zero_init(self) -> bool {
+        // Safety: the pointer points to valid data.
         unsafe {
             let flags = self.unwrap_non_null(Private).as_ref().flags;
             if flags.ptrarray() == 1 || flags.hasptr() == 1 {
@@ -710,16 +735,12 @@ impl<'scope, 'data> Array<'scope, 'data> {
         T: Clone + ValidLayout + Debug,
     {
         if self.contains::<T>() {
-            unsafe {
-                Ok(TypedArray::wrap_non_null(
-                    self.unwrap_non_null(Private),
-                    Private,
-                ))
-            }
+            let ptr = self.unwrap_non_null(Private);
+            // Safety: the type is correct
+            unsafe { Ok(TypedArray::wrap_non_null(ptr, Private)) }
         } else {
-            Err(AccessError::InvalidLayout {
-                value_type_str: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?
+            let value_type_str = self.element_type().display_string_or(CANNOT_DISPLAY_TYPE);
+            Err(AccessError::InvalidLayout { value_type_str })?
         }
     }
 
@@ -740,7 +761,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     /// if the type of the elements is incorrect.
     pub fn copy_inline_data<'frame, T, F>(self, _: &F) -> JlrsResult<CopiedArray<T>>
     where
-        T: ValidLayout,
+        T: 'static + ValidLayout,
         F: Frame<'frame>,
     {
         if !self.contains::<T>() {
@@ -755,12 +776,14 @@ impl<'scope, 'data> Array<'scope, 'data> {
             })?;
         }
 
+        let dimensions = self.dimensions().into_dimensions();
+        let sz = dimensions.size();
+        let mut data = Vec::with_capacity(sz);
+
+        // Safety: layouts are compatible and is guaranteed to be a bits type due to the
+        // 'static constraint on T.
         unsafe {
             let jl_data = jl_array_data(self.unwrap(Private).cast()).cast();
-            let dimensions = self.dimensions().into_dimensions();
-
-            let sz = dimensions.size();
-            let mut data = Vec::with_capacity(sz);
             let ptr = data.as_mut_ptr();
             std::ptr::copy_nonoverlapping(jl_data, ptr, sz);
             data.set_len(sz);
@@ -785,6 +808,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
         F: Frame<'frame>,
     {
         self.ensure_bits_containing::<T>()?;
+        // Safety: layouts are compatible, access is immutable.
         unsafe { Ok(ArrayAccessor::unrestricted_new(self, frame)) }
     }
 
@@ -849,6 +873,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
         F: Frame<'frame>,
     {
         self.ensure_inline_containing::<T>()?;
+        // Safety: layouts are compatible, access is immutable.
         unsafe { Ok(ArrayAccessor::unrestricted_new(self, frame)) }
     }
 
@@ -911,6 +936,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
         F: Frame<'frame>,
     {
         self.ensure_ptr_containing::<T>()?;
+        // Safety: layouts are compatible, access is immutable.
         unsafe { Ok(ArrayAccessor::unrestricted_new(self, frame)) }
     }
 
@@ -979,6 +1005,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
         F: Frame<'frame>,
     {
         self.ensure_ptr_containing::<ValueRef>()?;
+        // Safety: layouts are compatible, access is immutable.
         unsafe { Ok(ArrayAccessor::unrestricted_new(self, frame)) }
     }
 
@@ -1051,6 +1078,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
         F: Frame<'frame>,
     {
         self.ensure_union()?;
+        // Safety: layouts are compatible, access is immutable.
         unsafe { Ok(ArrayAccessor::unrestricted_new(self, frame)) }
     }
 
@@ -1104,6 +1132,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     where
         F: Frame<'frame>,
     {
+        // Safety: no assumptions about the data are made, access is immutable
         unsafe { ArrayAccessor::unrestricted_new(self, frame) }
     }
 
@@ -1157,11 +1186,14 @@ impl<'scope, 'data> Array<'scope, 'data> {
         S: Scope<'target, 'current, F>,
         F: Frame<'current>,
     {
-        unsafe {
-            let (output, scope) = scope.split()?;
-            scope.scope_with_capacity(2, |mut frame| {
-                let elty_ptr = self.element_type().unwrap(Private);
-                let array_type = jl_apply_array_type(elty_ptr.cast(), dims.n_dimensions());
+        let (output, scope) = scope.split()?;
+        scope.scope_with_capacity(2, |mut frame| {
+            let elty_ptr = self.element_type().unwrap(Private).cast();
+
+            // Safety: The array type is rooted until the array has been constructed, all C API
+            // functions are called with valid data. If an exception is thrown it's caught.
+            unsafe {
+                let array_type = jl_apply_array_type(elty_ptr, dims.n_dimensions());
                 let _: Value = (&mut frame).value(NonNull::new_unchecked(array_type), Private)?;
 
                 let tuple = if dims.n_dimensions() <= 8 {
@@ -1181,8 +1213,8 @@ impl<'scope, 'data> Array<'scope, 'data> {
                 };
 
                 output.call_result(result, Private)
-            })
-        }
+            }
+        })
     }
 
     /// Reshape the array, a new array is returned that has dimensions `dims`. The new array and
@@ -1227,6 +1259,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
             })?;
         }
 
+        // Safety: Inline array must have a DataType as element type
         if unsafe {
             self.element_type()
                 .cast_unchecked::<DataType>()
@@ -1308,6 +1341,7 @@ impl<'scope> Array<'scope, 'static> {
     where
         F: Frame<'current>,
     {
+        // Safety: the C API function is called with valid data. If an exception is thrown it's caught.
         unsafe {
             let res = jlrs_array_grow_end(self.unwrap(Private), inc);
 
@@ -1345,6 +1379,7 @@ impl<'scope> Array<'scope, 'static> {
     where
         F: Frame<'current>,
     {
+        // Safety: the C API function is called with valid data. If an exception is thrown it's caught.
         unsafe {
             let res = jlrs_array_del_end(self.unwrap(Private), dec);
 
@@ -1382,6 +1417,7 @@ impl<'scope> Array<'scope, 'static> {
     where
         F: Frame<'current>,
     {
+        // Safety: the C API function is called with valid data. If an exception is thrown it's caught.
         unsafe {
             let res = jlrs_array_grow_beg(self.unwrap(Private), inc);
 
@@ -1419,6 +1455,7 @@ impl<'scope> Array<'scope, 'static> {
     where
         F: Frame<'current>,
     {
+        // Safety: the C API function is called with valid data. If an exception is thrown it's caught.
         unsafe {
             let res = jlrs_array_del_beg(self.unwrap(Private), dec);
 
@@ -1446,6 +1483,7 @@ impl<'scope> Array<'scope, 'static> {
 
 unsafe impl<'scope, 'data> Typecheck for Array<'scope, 'data> {
     fn typecheck(t: DataType) -> bool {
+        // Safety: Array is a UnionAll. so check if the typenames match
         unsafe { t.type_name().wrapper_unchecked() == TypeName::of_array(Global::new()) }
     }
 }
@@ -1456,7 +1494,8 @@ impl<'scope, 'data> WrapperPriv<'scope, 'data> for Array<'scope, 'data> {
     type Wraps = jl_array_t;
     const NAME: &'static str = "Array";
 
-    #[inline(always)]
+    // Safety: `inner` must not have been freed yet, the result must never be
+    // used after the GC might have freed it.
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData, PhantomData)
     }
@@ -1504,6 +1543,7 @@ where
         F: Frame<'current>,
     {
         match Array::new::<T, _, _, _>(scope, dims)? {
+            // Safety: the type is correct.
             Ok(arr) => Ok(Ok(unsafe { arr.as_typed_unchecked() })),
             Err(err) => Ok(Err(err)),
         }
@@ -1524,6 +1564,7 @@ where
         S: Scope<'target, 'current, F>,
         F: Frame<'current>,
     {
+        // Safety: the type is correct.
         Ok(Array::new_unchecked::<T, _, _, _>(scope, dims)?.as_typed_unchecked())
     }
 
@@ -1548,6 +1589,7 @@ where
         F: Frame<'current>,
     {
         match Array::from_slice(scope, data, dims)? {
+            // Safety: the type is correct.
             Ok(arr) => Ok(Ok(unsafe { arr.as_typed_unchecked() })),
             Err(err) => Ok(Err(err)),
         }
@@ -1597,6 +1639,7 @@ where
         F: Frame<'current>,
     {
         match Array::from_vec(scope, data, dims)? {
+            // Safety: the type is correct.
             Ok(arr) => Ok(Ok(unsafe { arr.as_typed_unchecked() })),
             Err(err) => Ok(Err(err)),
         }
@@ -1653,6 +1696,7 @@ where
         }
 
         match Array::new_for(scope, dims, ty)? {
+            // Safety: the type is correct.
             Ok(arr) => Ok(Ok(unsafe { arr.as_typed_unchecked() })),
             Err(err) => Ok(Err(err)),
         }
@@ -1685,8 +1729,9 @@ where
 
     /// Use the `Output` to extend the lifetime of this data.
     pub fn root<'target>(self, output: Output<'target>) -> TypedArray<'target, 'data, T> {
+        let ptr = self.unwrap_non_null(Private);
+        // Safety: the data is valid.
         unsafe {
-            let ptr = self.unwrap_non_null(Private);
             output.set_root::<Array>(ptr);
             TypedArray::wrap_non_null(ptr, Private)
         }
@@ -1706,6 +1751,8 @@ impl<'data> TypedArray<'_, 'data, u8> {
         let string = data.as_ref();
         let nbytes = string.bytes().len();
         let ptr = string.as_ptr();
+
+        // Safety: a string can be converted to an array of bytes.
         unsafe {
             let arr = jl_pchar_to_array(ptr.cast(), nbytes);
             scope.value(NonNull::new_unchecked(arr), Private)
@@ -1719,81 +1766,38 @@ where
 {
     /// Returns the array's dimensions.
     pub fn dimensions(self) -> ArrayDimensions<'scope> {
-        ArrayDimensions::new(self.as_array())
+        self.as_array().dimensions()
     }
 
     /// Returns the type of this array's elements.
     pub fn element_type(self) -> Value<'scope, 'static> {
-        unsafe { Value::wrap(jl_array_eltype(self.unwrap(Private).cast()).cast(), Private) }
+        self.as_array().element_type()
     }
 
     /// Returns the size of this array's elements.
     pub fn element_size(self) -> usize {
-        unsafe { self.unwrap_non_null(Private).as_ref().elsize as usize }
+        self.as_array().element_size()
     }
 
     /// Returns `true` if the elements of the array are stored inline.
     pub fn is_inline_array(self) -> bool {
-        unsafe { self.unwrap_non_null(Private).as_ref().flags.ptrarray() == 0 }
+        self.as_array().is_inline_array()
     }
 
     /// Returns true if the elements of the array are stored inline and at least one of the fields
     /// of the inlined type is a pointer.
     pub fn has_inlined_pointers(self) -> bool {
-        unsafe {
-            let flags = self.unwrap_non_null(Private).as_ref().flags;
-            self.is_inline_array() && flags.hasptr() != 0
-        }
+        self.as_array().has_inlined_pointers()
     }
 
     /// Returns `true` if elements of this array are zero-initialized.
     pub fn zero_init(self) -> bool {
-        unsafe {
-            let flags = self.unwrap_non_null(Private).as_ref().flags;
-            if flags.ptrarray() == 1 || flags.hasptr() == 1 {
-                return true;
-            }
-
-            let elty = self.element_type();
-            if let Ok(dt) = elty.cast::<DataType>() {
-                return dt.zero_init();
-            } else {
-                false
-            }
-        }
+        self.as_array().zero_init()
     }
 
     /// Returns true if the elements of the array are stored as [`Value`]s.
     pub fn is_value_array(self) -> bool {
         !self.is_inline_array()
-    }
-
-    /// Copy the data of an inline array to Rust.
-    ///
-    /// Returns `ArrayLayoutError::NotInline` if the data is not stored inline or `AccessError::InvalidLayout`
-    /// if the type of the elements is incorrect.
-    pub fn copy_inline_data<'frame, F>(self, _: &F) -> JlrsResult<CopiedArray<T>>
-    where
-        F: Frame<'frame>,
-    {
-        if !self.is_inline_array() {
-            Err(ArrayLayoutError::NotInline {
-                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
-            })?;
-        }
-
-        unsafe {
-            let jl_data = jl_array_data(self.unwrap(Private).cast()).cast();
-            let dimensions = self.dimensions().into_dimensions();
-
-            let sz = dimensions.size();
-            let mut data = Vec::with_capacity(sz);
-            let ptr = data.as_mut_ptr();
-            std::ptr::copy_nonoverlapping(jl_data, ptr, sz);
-            data.set_len(sz);
-
-            Ok(CopiedArray::new(data.into_boxed_slice(), dimensions))
-        }
     }
 
     fn ensure_bits(self) -> JlrsResult<()> {
@@ -1803,6 +1807,7 @@ where
             })?;
         }
 
+        // Safety: Inline array must have a DataType as element type
         if unsafe {
             self.element_type()
                 .cast_unchecked::<DataType>()
@@ -1842,6 +1847,7 @@ where
         F: Frame<'frame>,
     {
         self.ensure_bits()?;
+        // Safety: layouts are compatible, access is immutable.
         unsafe { Ok(ArrayAccessor::unrestricted_new(self.as_array(), frame)) }
     }
 
@@ -1906,6 +1912,7 @@ where
         F: Frame<'frame>,
     {
         self.ensure_inline()?;
+        // Safety: layouts are compatible, access is immutable.
         unsafe { Ok(ArrayAccessor::unrestricted_new(self.as_array(), frame)) }
     }
 
@@ -1984,6 +1991,7 @@ impl<'scope, 'data, T: WrapperRef<'scope, 'data> + ValidLayout> TypedArray<'scop
         F: Frame<'frame>,
     {
         self.ensure_ptr()?;
+        // Safety: layouts are compatible, access is immutable.
         unsafe { Ok(ArrayAccessor::unrestricted_new(self.as_array(), frame)) }
     }
 
@@ -2050,6 +2058,7 @@ impl<'scope, 'data, T: WrapperRef<'scope, 'data> + ValidLayout> TypedArray<'scop
         F: Frame<'frame>,
     {
         self.ensure_ptr()?;
+        // Safety: layouts are compatible, access is immutable.
         unsafe { Ok(ArrayAccessor::unrestricted_new(self.as_array(), frame)) }
     }
 
@@ -2126,6 +2135,7 @@ impl<'scope, 'data, T: WrapperRef<'scope, 'data> + ValidLayout> TypedArray<'scop
         F: Frame<'current>,
     {
         match self.as_array().reshape(scope, dims)? {
+            // Safety: the type is correct.
             Ok(arr) => Ok(Ok(unsafe { arr.as_typed_unchecked() })),
             Err(err) => Ok(Err(err)),
         }
@@ -2162,6 +2172,7 @@ impl<'scope, 'data, T: WrapperRef<'scope, 'data> + ValidLayout> TypedArray<'scop
     where
         F: Frame<'frame>,
     {
+        // Safety: no assumptions about the data are made, access is immutable
         unsafe { ArrayAccessor::unrestricted_new(self.as_array(), frame) }
     }
 
@@ -2197,6 +2208,41 @@ impl<'scope, 'data, T: WrapperRef<'scope, 'data> + ValidLayout> TypedArray<'scop
         F: Frame<'frame>,
     {
         ArrayAccessor::unrestricted_new(self.as_array(), frame)
+    }
+}
+
+impl<'scope, 'data, T> TypedArray<'scope, 'data, T>
+where
+    T: 'static + Clone + ValidLayout,
+{
+    /// Copy the data of an inline array to Rust.
+    ///
+    /// Returns `ArrayLayoutError::NotInline` if the data is not stored inline or `AccessError::InvalidLayout`
+    /// if the type of the elements is incorrect.
+    pub fn copy_inline_data<'frame, F>(self, _: &F) -> JlrsResult<CopiedArray<T>>
+    where
+        F: Frame<'frame>,
+    {
+        if !self.is_inline_array() {
+            Err(ArrayLayoutError::NotInline {
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
+        }
+
+        // Safety: layouts are compatible and is guaranteed to be a bits type due to the
+        // 'static constraint on T.
+        unsafe {
+            let jl_data = jl_array_data(self.unwrap(Private).cast()).cast();
+            let dimensions = self.dimensions().into_dimensions();
+
+            let sz = dimensions.size();
+            let mut data = Vec::with_capacity(sz);
+            let ptr = data.as_mut_ptr();
+            std::ptr::copy_nonoverlapping(jl_data, ptr, sz);
+            data.set_len(sz);
+
+            Ok(CopiedArray::new(data.into_boxed_slice(), dimensions))
+        }
     }
 }
 
@@ -2319,6 +2365,7 @@ where
 
 unsafe impl<'scope, 'data, T: Clone + ValidLayout> Typecheck for TypedArray<'scope, 'data, T> {
     fn typecheck(t: DataType) -> bool {
+        // Safety: borrow is only temporary
         unsafe {
             t.is::<Array>()
                 && T::valid_layout(
@@ -2347,12 +2394,12 @@ impl<'scope, 'data, T: Clone + ValidLayout> WrapperPriv<'scope, 'data>
     type Wraps = jl_array_t;
     const NAME: &'static str = "Array";
 
-    #[inline(always)]
+    // Safety: `inner` must not have been freed yet, the result must never be
+    // used after the GC might have freed it. T must be correct
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData, PhantomData, PhantomData)
     }
 
-    #[inline(always)]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
@@ -2378,6 +2425,7 @@ thread_local! {
     };
 }
 
+// Safety: dims.m_dimensions() <= 8
 unsafe fn small_dim_tuple<'scope, D, F>(
     frame: &mut F,
     dims: D,
@@ -2400,28 +2448,29 @@ where
     Ok(v)
 }
 
-unsafe fn large_dim_tuple<'scope, D, F>(
-    frame: &mut F,
-    dims: D,
-) -> JlrsResult<Value<'scope, 'static>>
+fn large_dim_tuple<'scope, D, F>(frame: &mut F, dims: D) -> JlrsResult<Value<'scope, 'static>>
 where
     D: Dims,
     F: Frame<'scope>,
 {
-    let n = dims.n_dimensions();
-    let global = Global::new();
-    let mut elem_types = vec![usize::julia_type(global); n];
-    let tuple_type = jl_apply_tuple_type_v(elem_types.as_mut_ptr().cast(), n);
-    let tuple = jl_new_struct_uninit(tuple_type);
-    let v: Value = frame.push_root(NonNull::new_unchecked(tuple), Private)?;
+    // Safety: all C API functions are called with valid arguments.
+    unsafe {
+        let n = dims.n_dimensions();
+        let global = Global::new();
+        let mut elem_types = vec![usize::julia_type(global); n];
+        let tuple_type = jl_apply_tuple_type_v(elem_types.as_mut_ptr().cast(), n);
+        let tuple = jl_new_struct_uninit(tuple_type);
+        let v: Value = frame.push_root(NonNull::new_unchecked(tuple), Private)?;
 
-    let usize_ptr: *mut usize = v.unwrap(Private).cast();
-    let dims = dims.into_dimensions();
-    std::ptr::copy_nonoverlapping(dims.as_slice().as_ptr(), usize_ptr, n);
-
-    Ok(v)
+        let usize_ptr: *mut usize = v.unwrap(Private).cast();
+        let dims = dims.into_dimensions();
+        std::ptr::copy_nonoverlapping(dims.as_slice().as_ptr(), usize_ptr, n);
+        Ok(v)
+    }
 }
 
+// Safety: must be used as a finalizer when moving array data from Rust to Julia
+// to ensure it's freed correctly.
 unsafe extern "C" fn droparray<T>(a: Array) {
     // The data of a moved array is allocated by Rust, this function is called by
     // a finalizer in order to ensure it's also freed by Rust.
@@ -2469,5 +2518,53 @@ where
         } else {
             Err(crate::error::AccessError::UndefRef)?
         }
+    }
+}
+
+/// A reference to an [`Array`] that has not been explicitly rooted.
+pub type ArrayRef<'scope, 'data> = Ref<'scope, 'data, Array<'scope, 'data>>;
+
+unsafe impl ValidLayout for ArrayRef<'_, '_> {
+    fn valid_layout(v: Value) -> bool {
+        if let Ok(dt) = v.cast::<DataType>() {
+            dt.is::<Array>()
+        } else if let Ok(ua) = v.cast::<UnionAll>() {
+            unsafe { ua.base_type().wrapper_unchecked().is::<Array>() }
+        } else {
+            false
+        }
+    }
+
+    const IS_REF: bool = true;
+}
+
+impl_ref_root!(Array, ArrayRef, 2);
+
+/// A reference to an [`TypedArray`] that has not been explicitly rooted.
+pub type TypedArrayRef<'scope, 'data, T> = Ref<'scope, 'data, TypedArray<'scope, 'data, T>>;
+
+unsafe impl<T: Clone + ValidLayout + Debug> ValidLayout for TypedArrayRef<'_, '_, T> {
+    fn valid_layout(v: Value) -> bool {
+        if let Ok(dt) = v.cast::<DataType>() {
+            dt.is::<TypedArray<T>>()
+        } else if let Ok(ua) = v.cast::<UnionAll>() {
+            unsafe { ua.base_type().wrapper_unchecked().is::<TypedArray<T>>() }
+        } else {
+            false
+        }
+    }
+
+    const IS_REF: bool = true;
+}
+
+impl<'scope, 'data, T> TypedArrayRef<'scope, 'data, T>
+where
+    T: Clone + ValidLayout + Debug,
+{
+    pub unsafe fn root<'target, S>(self, scope: S) -> JlrsResult<TypedArray<'target, 'data, T>>
+    where
+        S: PartialScope<'target>,
+    {
+        <TypedArray<T> as Root>::root(scope, self)
     }
 }

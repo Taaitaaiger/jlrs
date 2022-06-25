@@ -253,9 +253,20 @@ mod tests {
 
             let (sender, receiver) = crossbeam_channel::bounded(1);
 
-            let handle = julia
-                .try_persistent::<AsyncStdChannel<_>, _>(AccumulatorTask { init_value: 5.0 })
-                .unwrap();
+            let handle = {
+                let (handle_sender, handle_receiver) = crossbeam_channel::bounded(1);
+                julia
+                    .try_persistent::<AsyncStdChannel<_>, _, _>(
+                        AccumulatorTask { init_value: 5.0 },
+                        handle_sender,
+                    )
+                    .expect("Cannot send task");
+
+                handle_receiver
+                    .recv()
+                    .expect("Channel was closed")
+                    .expect("Cannot init task")
+            };
 
             handle.try_call(7.0, sender.clone()).unwrap();
             assert_eq!(receiver.recv().unwrap().unwrap(), 12.0);

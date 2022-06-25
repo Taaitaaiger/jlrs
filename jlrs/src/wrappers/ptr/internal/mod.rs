@@ -1,4 +1,4 @@
-//! Types you probably won't need.
+//! Wrappers for internal types.
 //!
 //! To use these types you must enable the `internal-types` feature.
 

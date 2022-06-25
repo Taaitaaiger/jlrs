@@ -1,7 +1,7 @@
 //! An implementation of `AsyncRuntime` for async-std.
 //!
 //! When async-std is used as a backing runtime, the [`AsyncStdChannel`] type provides an
-//! implementation of the [`Channel`]. This channel is backed by the `Sender` and
+//! implementation of the [`Channel`] trait. This channel is backed by the `Sender` and
 //! `Receiver` from async-std. The sending half of this channel also implements
 //! [`OneshotSender`].
 

@@ -9,7 +9,7 @@ use crate::{
     impl_debug, impl_julia_typecheck,
     memory::output::Output,
     private::Private,
-    wrappers::ptr::{private::WrapperPriv, ValueRef},
+    wrappers::ptr::{private::WrapperPriv, value::ValueRef, Ref},
 };
 use cfg_if::cfg_if;
 use jl_sys::{jl_typemap_level_t, jl_typemap_level_type};
@@ -46,8 +46,10 @@ impl<'scope> TypeMapLevel<'scope> {
     pub fn arg1(self) -> ValueRef<'scope, 'static> {
         cfg_if! {
             if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                // Safety: the pointer points to valid data
                 unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().arg1.cast()) }
             } else {
+                // Safety: the pointer points to valid data
                 unsafe {
                     let arg1 = atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().arg1 as *const _);
                     let ptr = arg1.load(Ordering::Relaxed);
@@ -61,9 +63,11 @@ impl<'scope> TypeMapLevel<'scope> {
     pub fn targ(self) -> ValueRef<'scope, 'static> {
         cfg_if! {
             if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                // Safety: the pointer points to valid data
                 unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().targ.cast()) }
             } else {
                 unsafe {
+                    // Safety: the pointer points to valid data
                     let arg1 = atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().targ as *const _);
                     let ptr = arg1.load(Ordering::Relaxed);
                     ValueRef::wrap(ptr.cast())
@@ -76,9 +80,11 @@ impl<'scope> TypeMapLevel<'scope> {
     pub fn name1(self) -> ValueRef<'scope, 'static> {
         cfg_if! {
             if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                // Safety: the pointer points to valid data
                 unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().name1.cast()) }
             } else {
                 unsafe {
+                    // Safety: the pointer points to valid data
                     let arg1 = atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().name1 as *const _);
                     let ptr = arg1.load(Ordering::Relaxed);
                     ValueRef::wrap(ptr.cast())
@@ -91,9 +97,11 @@ impl<'scope> TypeMapLevel<'scope> {
     pub fn tname(self) -> ValueRef<'scope, 'static> {
         cfg_if! {
             if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                // Safety: the pointer points to valid data
                 unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().tname.cast()) }
             } else {
                 unsafe {
+                    // Safety: the pointer points to valid data
                     let arg1 = atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().tname as *const _);
                     let ptr = arg1.load(Ordering::Relaxed);
                     ValueRef::wrap(ptr.cast())
@@ -106,8 +114,10 @@ impl<'scope> TypeMapLevel<'scope> {
     pub fn list(self) -> ValueRef<'scope, 'static> {
         cfg_if! {
             if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                // Safety: the pointer points to valid data
                 unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().linear.cast()) }
             } else {
+                // Safety: the pointer points to valid data
                 unsafe {
                     let arg1 = atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().linear as *const _);
                     let ptr = arg1.load(Ordering::Relaxed);
@@ -121,8 +131,10 @@ impl<'scope> TypeMapLevel<'scope> {
     pub fn any(self) -> ValueRef<'scope, 'static> {
         cfg_if! {
             if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                // Safety: the pointer points to valid data
                 unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().any.cast()) }
             } else {
+                // Safety: the pointer points to valid data
                 unsafe {
                     let arg1 = atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().any as *const _);
                     let ptr = arg1.load(Ordering::Relaxed);
@@ -134,6 +146,7 @@ impl<'scope> TypeMapLevel<'scope> {
 
     /// Use the `Output` to extend the lifetime of this data.
     pub fn root<'target>(self, output: Output<'target>) -> TypeMapLevel<'target> {
+        // Safety: the pointer points to valid data
         unsafe {
             let ptr = self.unwrap_non_null(Private);
             output.set_root::<TypeMapLevel>(ptr);
@@ -149,15 +162,20 @@ impl<'scope> WrapperPriv<'scope, '_> for TypeMapLevel<'scope> {
     type Wraps = jl_typemap_level_t;
     const NAME: &'static str = "TypeMapLevel";
 
-    #[inline(always)]
+    // Safety: `inner` must not have been freed yet, the result must never be
+    // used after the GC might have freed it.
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData)
     }
 
-    #[inline(always)]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
 }
 
 impl_root!(TypeMapLevel, 1);
+
+/// A reference to a [`TypeMapLevel`] that has not been explicitly rooted.
+pub type TypeMapLevelRef<'scope> = Ref<'scope, 'static, TypeMapLevel<'scope>>;
+impl_valid_layout!(TypeMapLevelRef, TypeMapLevel);
+impl_ref_root!(TypeMapLevel, TypeMapLevelRef, 1);

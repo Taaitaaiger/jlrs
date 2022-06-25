@@ -5,7 +5,7 @@ mod tests {
     use jlrs::prelude::*;
     use jlrs::{
         memory::gc::{Gc, GcCollection},
-        wrappers::ptr::{array::dimensions::Dims, ModuleRef},
+        wrappers::ptr::array::dimensions::Dims,
     };
 
     macro_rules! impl_test {

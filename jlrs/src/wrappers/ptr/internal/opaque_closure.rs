@@ -8,8 +8,8 @@ use crate::{
     memory::{global::Global, output::Output, scope::PartialScope},
     private::Private,
     wrappers::ptr::{
-        datatype::DataType, private::WrapperPriv, type_name::TypeName, value::Value, MethodRef,
-        ValueRef, Wrapper as _,
+        datatype::DataType, internal::method::MethodRef, private::WrapperPriv, type_name::TypeName,
+        value::Value, value::ValueRef, Ref, Wrapper as _,
     },
 };
 use jl_sys::jl_opaque_closure_t;
@@ -41,22 +41,26 @@ impl<'scope> OpaqueClosure<'scope> {
 
     /// The data captured by this `OpaqueClosure`.
     pub fn captures(self) -> ValueRef<'scope, 'static> {
+        // Safety: the pointer points to valid data
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().captures) }
     }
 
     /// Returns the world age of this `OpaqueClosure`.
     pub fn world(self) -> usize {
+        // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().world }
     }
 
     /// Returns the `source` field of this `OpaqueClosure`.
     pub fn source(self) -> MethodRef<'scope> {
+        // Safety: the pointer points to valid data
         unsafe { MethodRef::wrap(self.unwrap_non_null(Private).as_ref().source) }
     }
 
     /// Returns a function pointer that can be used to call this `OpaqueClosure`. Using this is
     /// not necessary, you can use the methods of the Call trait instead.
     pub fn invoke(self) -> *mut c_void {
+        // Safety: the pointer points to valid data
         unsafe {
             self.unwrap_non_null(Private)
                 .as_ref()
@@ -68,11 +72,13 @@ impl<'scope> OpaqueClosure<'scope> {
 
     /// Returns the `specptr` field of this `OpaqueClosure`.
     pub fn specptr(self) -> *mut c_void {
+        // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().specptr }
     }
 
     /// Use the `Output` to extend the lifetime of this data.
     pub fn root<'target>(self, output: Output<'target>) -> OpaqueClosure<'target> {
+        // Safety: the pointer points to valid data
         unsafe {
             let ptr = self.unwrap_non_null(Private);
             output.set_root::<OpaqueClosure>(ptr);
@@ -93,12 +99,12 @@ impl<'scope> WrapperPriv<'scope, 'static> for OpaqueClosure<'scope> {
     type Wraps = jl_opaque_closure_t;
     const NAME: &'static str = "OpaqueClosure";
 
-    #[inline(always)]
+    // Safety: `inner` must not have been freed yet, the result must never be
+    // used after the GC might have freed it.
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData)
     }
 
-    #[inline(always)]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
@@ -207,3 +213,8 @@ impl<'data> Call<'data> for OpaqueClosure<'_> {
 }
 
 impl_root!(OpaqueClosure, 1);
+
+/// A reference to an [`OpaqueClosure`] that has not been explicitly rooted.
+pub type OpaqueClosureRef<'scope> = Ref<'scope, 'static, OpaqueClosure<'scope>>;
+impl_valid_layout!(OpaqueClosureRef, OpaqueClosure);
+impl_ref_root!(OpaqueClosure, OpaqueClosureRef, 1);

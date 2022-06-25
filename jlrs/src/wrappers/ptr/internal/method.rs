@@ -10,8 +10,9 @@ use crate::{
     memory::output::Output,
     private::Private,
     wrappers::ptr::{
-        private::WrapperPriv, ArrayRef, MethodInstanceRef, ModuleRef, SimpleVectorRef, SymbolRef,
-        ValueRef,
+        array::ArrayRef, internal::method_instance::MethodInstanceRef, module::ModuleRef,
+        private::WrapperPriv, simple_vector::SimpleVectorRef, symbol::SymbolRef, value::ValueRef,
+        Ref,
     },
 };
 use cfg_if::cfg_if;
@@ -21,7 +22,7 @@ use std::{marker::PhantomData, ptr::NonNull};
 cfg_if! {
     if #[cfg(any(not(feature = "lts"), feature = "all-features-override"))] {
         use jl_sys::jl_value_t;
-        use crate::wrappers::ptr::{atomic_value, TypedArrayRef};
+        use crate::wrappers::ptr::{atomic_value, array::TypedArrayRef};
         use std::sync::atomic::Ordering;
     }
 }
@@ -70,36 +71,43 @@ impl<'scope> Method<'scope> {
 
     /// Method name for error reporting
     pub fn name(self) -> SymbolRef<'scope> {
+        // Safety: the pointer points to valid data
         unsafe { SymbolRef::wrap(self.unwrap_non_null(Private).as_ref().name) }
     }
 
     /// Method module
     pub fn module(self) -> ModuleRef<'scope> {
+        // Safety: the pointer points to valid data
         unsafe { ModuleRef::wrap(self.unwrap_non_null(Private).as_ref().module) }
     }
 
     /// Method file
     pub fn file(self) -> SymbolRef<'scope> {
+        // Safety: the pointer points to valid data
         unsafe { SymbolRef::wrap(self.unwrap_non_null(Private).as_ref().file) }
     }
 
     /// Method line in file
     pub fn line(self) -> i32 {
+        // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().line }
     }
 
     /// The `primary_world` field.
     pub fn primary_world(self) -> usize {
+        // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().primary_world }
     }
 
     /// The `deleted_world` field.
     pub fn deleted_world(self) -> usize {
+        // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().deleted_world }
     }
 
     /// Method's type signature.
     pub fn signature(self) -> ValueRef<'scope, 'static> {
+        // Safety: the pointer points to valid data
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().sig) }
     }
 
@@ -107,8 +115,10 @@ impl<'scope> Method<'scope> {
     pub fn specializations(self) -> SimpleVectorRef<'scope> {
         cfg_if! {
             if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                // Safety: the pointer points to valid data
                 unsafe { SimpleVectorRef::wrap(self.unwrap_non_null(Private).as_ref().specializations) }
             } else {
+                // Safety: the pointer points to valid data
                 unsafe {
                     let specializations =
                         atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().specializations as *const _);
@@ -123,8 +133,10 @@ impl<'scope> Method<'scope> {
     pub fn spec_key_set(self) -> ArrayRef<'scope, 'static> {
         cfg_if! {
             if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                // Safety: the pointer points to valid data
                 unsafe { ArrayRef::wrap(self.unwrap_non_null(Private).as_ref().speckeyset) }
             } else {
+                // Safety: the pointer points to valid data
                 unsafe {
                     let speckeyset =
                         atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().speckeyset as *const _);
@@ -137,17 +149,20 @@ impl<'scope> Method<'scope> {
 
     /// Compacted list of slot names (String)
     pub fn slot_syms(self) -> ValueRef<'scope, 'static> {
+        // Safety: the pointer points to valid data
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().slot_syms) }
     }
 
     /// reference to the method table this method is part of, null if part of the internal table
     #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn external_mt(self) -> ValueRef<'scope, 'static> {
+        // Safety: the pointer points to valid data
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().external_mt) }
     }
 
     // Original code template (`Core.CodeInfo`, but may be compressed), `None` for builtins.
     pub fn source(self) -> ValueRef<'scope, 'static> {
+        // Safety: the pointer points to valid data
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().source) }
     }
 
@@ -155,8 +170,10 @@ impl<'scope> Method<'scope> {
     pub fn unspecialized(self) -> MethodInstanceRef<'scope> {
         cfg_if! {
             if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                // Safety: the pointer points to valid data
                 unsafe { MethodInstanceRef::wrap(self.unwrap_non_null(Private).as_ref().unspecialized) }
             } else {
+                // Safety: the pointer points to valid data
                 unsafe {
                     let unspecialized =
                         atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().unspecialized as *const _);
@@ -169,28 +186,33 @@ impl<'scope> Method<'scope> {
 
     /// Executable code-generating function if available
     pub fn generator(self) -> ValueRef<'scope, 'static> {
+        // Safety: the pointer points to valid data
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().generator) }
     }
 
     /// Pointers in generated code (shared to reduce memory), or `None`
     pub fn roots(self) -> ArrayRef<'scope, 'static> {
+        // Safety: the pointer points to valid data
         unsafe { ArrayRef::wrap(self.unwrap_non_null(Private).as_ref().roots) }
     }
 
     /// RLE (build_id, offset) pairs (even/odd indexing)
     #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn root_blocks(self) -> TypedArrayRef<'scope, 'static, u64> {
+        // Safety: the pointer points to valid data
         unsafe { TypedArrayRef::wrap(self.unwrap_non_null(Private).as_ref().root_blocks) }
     }
 
     /// # of roots stored in the system image
     #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn nroots_sysimg(self) -> i32 {
+        // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().nroots_sysimg }
     }
 
     /// `SimpleVector(rettype, sig)` if a ccallable entry point is requested for this
     pub fn ccallable(self) -> SimpleVectorRef<'scope> {
+        // Safety: the pointer points to valid data
         unsafe { SimpleVectorRef::wrap(self.unwrap_non_null(Private).as_ref().ccallable) }
     }
 
@@ -200,8 +222,10 @@ impl<'scope> Method<'scope> {
     pub fn invokes(self) -> ValueRef<'scope, 'static> {
         cfg_if! {
             if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                // Safety: the pointer points to valid data
                 unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().invokes) }
             } else {
+                // Safety: the pointer points to valid data
                 unsafe {
                     let invokes =
                         atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().invokes as *const _);
@@ -214,44 +238,52 @@ impl<'scope> Method<'scope> {
 
     /// The `n_args` field.
     pub fn n_args(self) -> u32 {
+        // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().nargs as u32 }
     }
 
     /// Bit flags: whether each of the first 8 arguments is called
     pub fn called(self) -> u32 {
+        // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().called as u32 }
     }
 
     /// Bit flags: which arguments should not be specialized
     pub fn no_specialize(self) -> u32 {
+        // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().nospecialize as u32 }
     }
 
     /// Number of leading arguments that are actually keyword arguments
     /// of another method.
     pub fn nkw(self) -> u32 {
+        // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().nkw as u32 }
     }
 
     /// The `isva` field.
     pub fn is_varargs(self) -> bool {
+        // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().isva != 0 }
     }
 
     /// The `pure` field.
     pub fn pure(self) -> bool {
+        // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().pure_ != 0 }
     }
 
     /// The `is_for_opaque_closure` field of this `Method`
     #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn is_for_opaque_closure(self) -> bool {
+        // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().is_for_opaque_closure != 0 }
     }
 
     /// 0x00 = use heuristic; 0x01 = aggressive; 0x02 = none
     #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn constprop(self) -> u8 {
+        // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().constprop }
     }
 
@@ -259,11 +291,13 @@ impl<'scope> Method<'scope> {
     /// forcing the conclusion to always true.
     #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn purity(self) -> u8 {
+        // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().purity.bits }
     }
 
     /// Use the `Output` to extend the lifetime of this data.
     pub fn root<'target>(self, output: Output<'target>) -> Method<'target> {
+        // Safety: the pointer points to valid data
         unsafe {
             let ptr = self.unwrap_non_null(Private);
             output.set_root::<Method>(ptr);
@@ -279,15 +313,20 @@ impl<'scope> WrapperPriv<'scope, '_> for Method<'scope> {
     type Wraps = jl_method_t;
     const NAME: &'static str = "Method";
 
-    #[inline(always)]
+    // Safety: `inner` must not have been freed yet, the result must never be
+    // used after the GC might have freed it.
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, ::std::marker::PhantomData)
     }
 
-    #[inline(always)]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
 }
 
 impl_root!(Method, 1);
+
+/// A reference to a [`Method`] that has not been explicitly rooted.
+pub type MethodRef<'scope> = Ref<'scope, 'static, Method<'scope>>;
+impl_valid_layout!(MethodRef, Method);
+impl_ref_root!(Method, MethodRef, 1);

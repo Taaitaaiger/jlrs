@@ -2,9 +2,9 @@ mod util;
 #[cfg(feature = "sync-rt")]
 mod tests {
     use super::util::JULIA;
+    use jlrs::layout::valid_layout::ValidLayout;
     use jlrs::prelude::*;
     use jlrs::wrappers::ptr::string::JuliaString;
-    use jlrs::{layout::valid_layout::ValidLayout, wrappers::ptr::StringRef};
     use std::borrow::Cow;
 
     #[test]

@@ -28,8 +28,8 @@ where
     T: ValidLayout + Clone,
 {
     fn array_view<'frame>(&'borrow self) -> ArrayView<'borrow, T, Dim<IxDynImpl>> {
-        let shape = self.dimensions().as_slice().into_dimension().f();
-
+        // Safety: while the array is borrowed nothing can be pushed or popped from it.
+        let shape = unsafe { self.dimensions().as_slice().into_dimension().f() };
         ArrayView::from_shape(shape, self.as_slice()).unwrap()
     }
 }
@@ -41,8 +41,8 @@ where
     T: ValidLayout + Clone,
 {
     fn array_view<'frame>(&'borrow self) -> ArrayView<'borrow, T, Dim<IxDynImpl>> {
-        let shape = self.dimensions().as_slice().into_dimension().f();
-
+        // Safety: while the array is borrowed nothing can be pushed or popped from it.
+        let shape = unsafe { self.dimensions().as_slice().into_dimension().f() };
         ArrayView::from_shape(shape, self.as_slice()).unwrap()
     }
 }
@@ -53,7 +53,8 @@ where
     T: ValidLayout + Clone,
 {
     fn array_view_mut<'frame>(&'borrow mut self) -> ArrayViewMut<'borrow, T, Dim<IxDynImpl>> {
-        let shape = self.dimensions().as_slice().into_dimension().f();
+        // Safety: while the array is borrowed nothing can be pushed or popped from it.
+        let shape = unsafe { self.dimensions().as_slice().into_dimension().f() };
         ArrayViewMut::from_shape(shape, self.as_mut_slice()).unwrap()
     }
 }

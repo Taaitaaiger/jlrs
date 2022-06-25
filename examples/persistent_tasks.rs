@@ -55,7 +55,7 @@ impl PersistentTask for AccumulatorTask {
     async fn init(
         &mut self,
         global: Global<'static>,
-        mut frame: AsyncGcFrame<'static>,
+        frame: &mut AsyncGcFrame<'static>,
     ) -> JlrsResult<Self::State> {
         unsafe {
             let output = frame.output()?;
@@ -129,9 +129,20 @@ fn main() {
 
     // Create a new AccumulatorTask, if AccumulatorTask::init completes successfully a handle to
     // the task is returned.
-    let persistent = julia
-        .try_persistent::<UnboundedChannel<_>, _>(AccumulatorTask { init_value: 5.0 })
-        .expect("AccumulatorTask::init failed");
+    let persistent = {
+        let (handle_sender, handle_receiver) = crossbeam_channel::bounded(1);
+        julia
+            .try_persistent::<UnboundedChannel<_>, _, _>(
+                AccumulatorTask { init_value: 5.0 },
+                handle_sender,
+            )
+            .expect("Cannot send task");
+
+        handle_receiver
+            .recv()
+            .expect("Channel was closed")
+            .expect("Cannot init task")
+    };
 
     // Call the task twice. Because AccumulatorTask::Input is f64, that data must be
     // provided here.

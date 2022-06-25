@@ -21,7 +21,7 @@ pub use crate::{
     memory::frame::AsyncGcFrame,
 };
 pub use crate::{
-    call::{Call, CallExt},
+    call::{Call, ProvideKeywords},
     convert::into_jlrs_result::IntoJlrsResult,
     error::JlrsResult,
     memory::{
@@ -33,13 +33,19 @@ pub use crate::{
     wrappers::{
         inline::{bool::Bool, char::Char, nothing::Nothing, tuple::*},
         ptr::{
+            array::ArrayRef,
+            array::TypedArrayRef,
             array::{Array, TypedArray},
             datatype::DataType,
+            datatype::DataTypeRef,
             module::Module,
+            module::ModuleRef,
             string::JuliaString,
+            string::StringRef,
             symbol::Symbol,
             value::Value,
-            ArrayRef, DataTypeRef, ModuleRef, Ref, StringRef, TypedArrayRef, ValueRef, Wrapper,
+            value::ValueRef,
+            /*Ref,*/ Wrapper,
         },
     },
 };

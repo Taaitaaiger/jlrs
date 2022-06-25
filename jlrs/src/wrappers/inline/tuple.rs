@@ -154,13 +154,13 @@ macro_rules! impl_tuple {
         {
             fn julia_type<'scope>(
                 global: $crate::memory::global::Global<'scope>
-            ) -> $crate::wrappers::ptr::DataTypeRef<'scope> {
+            ) -> $crate::wrappers::ptr::datatype::DataTypeRef<'scope> {
                 let types = &mut [
                     $(<$types as $crate::convert::into_julia::IntoJulia>::julia_type(global)),+
                 ];
 
                 unsafe {
-                    $crate::wrappers::ptr::DataTypeRef::wrap(
+                    $crate::wrappers::ptr::datatype::DataTypeRef::wrap(
                         ::jl_sys::jl_apply_tuple_type_v(types.as_mut_ptr().cast(), types.len())
                     )
                 }
@@ -220,14 +220,14 @@ macro_rules! impl_tuple {
         {
             fn julia_type<'scope>(
                 global: $crate::memory::global::Global<'scope>
-            ) -> $crate::wrappers::ptr::DataTypeRef<'scope> {
+            ) -> $crate::wrappers::ptr::datatype::DataTypeRef<'scope> {
                 $crate::wrappers::ptr::datatype::DataType::emptytuple_type(global).as_ref()
             }
 
             fn into_julia<'scope>(
                 self,
                 global: $crate::memory::global::Global<'scope>
-            ) -> $crate::wrappers::ptr::ValueRef<'scope, 'static> {
+            ) -> $crate::wrappers::ptr::value::ValueRef<'scope, 'static> {
                 $crate::wrappers::ptr::value::Value::emptytuple(global).as_ref()
             }
         }

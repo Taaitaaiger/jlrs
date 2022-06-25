@@ -182,7 +182,7 @@ fn impl_into_julia(ast: &syn::DeriveInput) -> TokenStream {
 
     let into_julia_impl = quote! {
         unsafe impl ::jlrs::convert::into_julia::IntoJulia for #name {
-            fn julia_type<'target>(global: ::jlrs::memory::global::Global<'target>) -> ::jlrs::wrappers::ptr::DataTypeRef<'target> {
+            fn julia_type<'target>(global: ::jlrs::memory::global::Global<'target>) -> ::jlrs::wrappers::ptr::datatype::DataTypeRef<'target> {
                 unsafe {
                     ::jlrs::wrappers::ptr::module::Module::#func(global)
                         #(

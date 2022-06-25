@@ -3,7 +3,6 @@ mod util;
 mod tests {
     use super::util::JULIA;
     use jlrs::prelude::*;
-    use jlrs::wrappers::ptr::ValueRef;
 
     #[test]
     fn ptr_union_fields_access_something() {

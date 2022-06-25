@@ -15,6 +15,8 @@ use crate::{
 #[cfg(feature = "uv")]
 use jl_sys::uv_async_send;
 
+/// Use Julia from a Rust function called through `ccall`.
+///
 /// When you call Rust from Julia through `ccall`, Julia has already been initialized and trying to
 /// initialize it again would cause a crash. In order to still be able to call Julia from Rust
 /// and to borrow arrays (if you pass them as `Array` rather than `Ptr{Array}`), you'll need to
@@ -38,10 +40,12 @@ impl CCall {
         CCall { page: None }
     }
 
-    /// Wake the task associated with `handle`. The handle must be the `handle` field of a
-    /// `Base.AsyncCondition` in Julia. This can be used to call a long-running Rust function from
-    /// Julia with ccall in another thread and wait for it to complete in Julia without blocking,
-    /// there's an example available in the repository: ccall_with_threads.
+    /// Wake the task associated with `handle`.
+    ///
+    /// The handle must be the `handle` field of a `Base.AsyncCondition` in Julia. This can be
+    /// used to call a long-running Rust function from Julia with `ccall` in another thread and
+    /// wait for it to complete in Julia without blocking, an example is available in the
+    /// repository: `ccall_with_threads`.
     ///
     /// This method is only available if the `uv` feature is enabled.
     ///
@@ -51,7 +55,7 @@ impl CCall {
         uv_async_send(handle.cast()) == 0
     }
 
-    /// Creates a [`GcFrame`], calls the given closure, and returns its result.
+    /// Create a [`GcFrame`], call the given closure, and return its result.
     pub fn scope<T, F>(&mut self, func: F) -> JlrsResult<T>
     where
         for<'base> F: FnOnce(Global<'base>, GcFrame<'base, Sync>) -> JlrsResult<T>,
@@ -66,8 +70,8 @@ impl CCall {
         }
     }
 
-    /// Creates a [`GcFrame`] with capacity for at least `capacity` roots, calls the given
-    /// closure, and returns its result.
+    /// Create a [`GcFrame`] with capacity for at least `capacity` roots, call the given closure
+    /// and return its result.
     pub fn scope_with_capacity<T, F>(&mut self, capacity: usize, func: F) -> JlrsResult<T>
     where
         for<'base> F: FnOnce(Global<'base>, GcFrame<'base, Sync>) -> JlrsResult<T>,
