@@ -1,6 +1,6 @@
 [package]
 name = "jlrs"
-version = "0.13.1"
+version = "0.14.0"
 authors = ["Thomas van Doornmalen <thomas.vandoornmalen@gmail.com>"]
 description = """
 jlrs provides bindings to the Julia C API that enables Julia code to be called from Rust and more.
@@ -15,36 +15,79 @@ license = "MIT"
 edition = "2018"
 
 [features]
-default = []
-ccall = []
+# The only default feature is the prelude module
+default = ["prelude"]
+
+# Enable all features except `lts` and `debug`
+full = ["prelude", "sync-rt", "tokio-rt", "async-std-rt", "jlrs-ndarray", "f16", "pyplot", "internal-types", "uv", "jlrs-derive"] 
+
+
+# Runtimes
+
+# Enable sync runtime
 sync-rt = []
-debug = ["jl-sys/debug"]
-uv = ["jl-sys/uv"]
+# Enable async runtime
+async-rt = ["async"]
+# Enable async-std as backing runtime
+async-std-rt = ["async-rt", "async-std"]
+# Enable tokio as backing runtime
+tokio-rt = ["async-rt", "tokio"]
+
+
+# Utilities
+
+# Enable task and channel traits used by the async runtime
 async = ["futures", "crossbeam-channel", "async-trait"]
-async-std-rt = ["async", "async-std"]
-tokio-rt = ["async", "tokio"]
-jlrs-ndarray = ["ndarray"]
+# Enable `ccall` module for use from `ccall`ed Rust functions
+ccall = []
+# Enable using `f16` as an inline wrapper for `Float16` data
 f16 = ["half"]
+# Enable all internal types
+internal-types = []
+# Enable converting a Julia array to an `ArrayView(Mut)` from ndarray
+jlrs-ndarray = ["ndarray"]
+# Enable the `prelude` module
+prelude = []
+# Enable the `pyplot` module
 pyplot = []
-docs-rs = [
-    "jl-sys/docs-rs", "uv", "async-std-rt", "async", "tokio", "f16", "jlrs-ndarray", 
-    "jlrs-derive", "sync-rt", "ccall", "docs"
-]
-docs = []
+# Enable `ccall` feature, link `libuv`, and enable `CCall::us_async_send`
+uv = ["jl-sys/uv", "ccall"]
+
+
+# Julia version
+
+# Link debug build of Julia
+debug = ["jl-sys/debug"]
+# Link LTS version of Julia
 lts = ["jl-sys/lts"]
-use-bindgen = ["jl-sys/use-bindgen"]
+# Link the RC1 version of Julia 1.8
+rc1 = ["jl-sys/rc1"]
+
+
+# Internal
+
+# Ignore `lts` and `debug` when --all-features is enabled
+all-features-override = ["jl-sys/all-features-override"]
+# Used to generate docs for docs.rs
+docs = ["jl-sys/docs", "full"]
 
 [dependencies]
-jl-sys = {version = "0.15", path = "../jl_sys" }
+cfg-if = "1"
+jl-sys = {version = "0.16", path = "../jl_sys" }
 smallvec = "1"
-jlrs-derive = { version = "0.3", optional = true, path = "../jlrs_derive" }
-futures = { version = "0.3", optional = true }
-crossbeam-channel = { version = "0.5", optional = true }
+thiserror = "1"
+
+async-std = { version = "1.6.1", features = ["unstable"], optional = true }
 async-trait = { version = "0.1", optional = true }
-async-std = { version = "1.10", features = ["unstable"], optional = true }
-ndarray = { version = "0.15", optional = true }
+crossbeam-channel = { version = "0.5", optional = true }
+futures = { version = "0.3", optional = true }
 half = { version = "1", optional = true }
+jlrs-derive = { version = "0.4", optional = true, path = "../jlrs_derive" }
+ndarray = { version = "0.15", optional = true }
 tokio = { version = "1", optional = true, features = ["rt", "time", "sync"]}
 
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "rt", "time", "sync"]}
+
 [package.metadata.docs.rs]
-features = ["docs-rs"]
+features = ["docs"]

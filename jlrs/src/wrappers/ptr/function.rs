@@ -1,31 +1,27 @@
-//! Wrapper for `Function`, the super type of all Julia functions.
+//! Wrapper for `Function`, the supertype of all Julia functions.
 //!
 //! All Julia functions are subtypes of `Function`, a function can be called with the methods
 //! of the [`Call`] trait. Note that you don't need to cast a [`Value`] to a [`Function`] in order
 //! to call it because [`Value`] also implements [`Call`].
 //!
-//! [`Call`]: crate::wrappers::ptr::call::Call
+//! [`Call`]: crate::call::Call
 
-use jl_sys::jl_value_t;
-use std::{marker::PhantomData, ptr::NonNull};
-
-use super::{
-    call::{Call, CallExt, WithKeywords},
-    datatype::DataType,
-    private::Wrapper as WrapperPriv,
-    value::Value,
-    Wrapper,
-};
 use crate::{
-    error::{JlrsError, JlrsResult, JuliaResultRef, CANNOT_DISPLAY_TYPE},
+    call::{Call, ProvideKeywords, WithKeywords},
+    error::{JlrsResult, JuliaResult, JuliaResultRef, TypeError, CANNOT_DISPLAY_TYPE},
     impl_debug,
     layout::{
         typecheck::{NamedTuple, Typecheck},
         valid_layout::ValidLayout,
     },
-    memory::{frame::Frame, global::Global, scope::Scope},
+    memory::{global::Global, output::Output, scope::PartialScope},
     private::Private,
+    wrappers::ptr::{datatype::DataType, private::WrapperPriv, value::Value, Wrapper},
 };
+use jl_sys::jl_value_t;
+use std::{marker::PhantomData, ptr::NonNull};
+
+use super::Ref;
 
 /// A Julia function.
 #[derive(Clone, Copy)]
@@ -41,19 +37,23 @@ impl<'scope, 'data> Function<'scope, 'data> {
     pub fn datatype(self) -> DataType<'scope> {
         self.as_value().datatype()
     }
-}
 
-unsafe impl ValidLayout for Function<'_, '_> {
-    fn valid_layout(ty: Value) -> bool {
-        let global = unsafe { Global::new() };
-        let function_type = DataType::function_type(global);
-        ty.subtype(function_type.as_value())
+    /// Use the `Output` to extend the lifetime of this data.
+    pub fn root<'target>(self, output: Output<'target>) -> Function<'target, 'data> {
+        // The pointer points to valid data
+        unsafe {
+            let ptr = self.unwrap_non_null(Private);
+            output.set_root::<Function>(ptr);
+            Function::wrap_non_null(ptr, Private)
+        }
     }
 }
 
+// Safety: The trait is implemented correctly by using the implementation
+// of ValidLayout for FunctionRef
 unsafe impl Typecheck for Function<'_, '_> {
-    fn typecheck(t: DataType) -> bool {
-        <Self as ValidLayout>::valid_layout(t.as_value())
+    fn typecheck(ty: DataType) -> bool {
+        <FunctionRef as ValidLayout>::valid_layout(ty.as_value())
     }
 }
 
@@ -63,7 +63,8 @@ impl<'scope, 'data> WrapperPriv<'scope, 'data> for Function<'scope, 'data> {
     type Wraps = jl_value_t;
     const NAME: &'static str = "Function";
 
-    #[inline(always)]
+    // Safety: `inner` must not have been freed yet, the result must never be
+    // used after the GC might have freed it.
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self {
             inner,
@@ -72,69 +73,63 @@ impl<'scope, 'data> WrapperPriv<'scope, 'data> for Function<'scope, 'data> {
         }
     }
 
-    #[inline(always)]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.inner
     }
 }
 
 impl<'data> Call<'data> for Function<'_, 'data> {
-    unsafe fn call0<'target, 'current, S, F>(self, scope: S) -> JlrsResult<S::JuliaResult>
+    unsafe fn call0<'target, S>(self, scope: S) -> JlrsResult<JuliaResult<'target, 'data>>
     where
-        S: Scope<'target, 'current, 'data, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
     {
         self.as_value().call0(scope)
     }
 
-    unsafe fn call1<'target, 'current, S, F>(
+    unsafe fn call1<'target, S>(
         self,
         scope: S,
         arg0: Value<'_, 'data>,
-    ) -> JlrsResult<S::JuliaResult>
+    ) -> JlrsResult<JuliaResult<'target, 'data>>
     where
-        S: Scope<'target, 'current, 'data, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
     {
         self.as_value().call1(scope, arg0)
     }
 
-    unsafe fn call2<'target, 'current, S, F>(
+    unsafe fn call2<'target, S>(
         self,
         scope: S,
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
-    ) -> JlrsResult<S::JuliaResult>
+    ) -> JlrsResult<JuliaResult<'target, 'data>>
     where
-        S: Scope<'target, 'current, 'data, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
     {
         self.as_value().call2(scope, arg0, arg1)
     }
 
-    unsafe fn call3<'target, 'current, S, F>(
+    unsafe fn call3<'target, S>(
         self,
         scope: S,
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
         arg2: Value<'_, 'data>,
-    ) -> JlrsResult<S::JuliaResult>
+    ) -> JlrsResult<JuliaResult<'target, 'data>>
     where
-        S: Scope<'target, 'current, 'data, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
     {
         self.as_value().call3(scope, arg0, arg1, arg2)
     }
 
-    unsafe fn call<'target, 'current, 'value, V, S, F>(
+    unsafe fn call<'target, 'value, V, S>(
         self,
         scope: S,
         args: V,
-    ) -> JlrsResult<S::JuliaResult>
+    ) -> JlrsResult<JuliaResult<'target, 'data>>
     where
-        V: AsMut<[Value<'value, 'data>]>,
-        S: Scope<'target, 'current, 'data, F>,
-        F: Frame<'current>,
+        V: AsRef<[Value<'value, 'data>]>,
+        S: PartialScope<'target>,
     {
         self.as_value().call(scope, args)
     }
@@ -179,20 +174,39 @@ impl<'data> Call<'data> for Function<'_, 'data> {
         args: V,
     ) -> JuliaResultRef<'target, 'data>
     where
-        V: AsMut<[Value<'value, 'data>]>,
+        V: AsRef<[Value<'value, 'data>]>,
     {
         self.as_value().call_unrooted(global, args)
     }
 }
 
-impl<'target, 'current, 'value, 'data> CallExt<'target, 'current, 'value, 'data>
-    for Function<'value, 'data>
-{
-    fn with_keywords(self, kws: Value<'value, 'data>) -> JlrsResult<WithKeywords<'value, 'data>> {
+impl<'value, 'data> ProvideKeywords<'value, 'data> for Function<'value, 'data> {
+    fn provide_keywords(
+        self,
+        kws: Value<'value, 'data>,
+    ) -> JlrsResult<WithKeywords<'value, 'data>> {
         if !kws.is::<NamedTuple>() {
             let type_str = kws.datatype().display_string_or(CANNOT_DISPLAY_TYPE);
-            Err(JlrsError::NotANamedTuple { type_str })?
+            Err(TypeError::NotANamedTuple { type_str })?
         }
         Ok(WithKeywords::new(self.as_value(), kws))
     }
 }
+
+impl_root!(Function, 2);
+
+/// A reference to an [`Function`] that has not been explicitly rooted.
+pub type FunctionRef<'scope, 'data> = Ref<'scope, 'data, Function<'scope, 'data>>;
+
+// Safety: FunctionRef is valid for ty if ty is a subtype of Function
+unsafe impl ValidLayout for FunctionRef<'_, '_> {
+    fn valid_layout(ty: Value) -> bool {
+        let global = unsafe { Global::new() };
+        let function_type = DataType::function_type(global);
+        ty.subtype(function_type.as_value())
+    }
+
+    const IS_REF: bool = true;
+}
+
+impl_ref_root!(Function, FunctionRef, 2);

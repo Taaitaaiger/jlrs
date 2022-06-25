@@ -9,15 +9,15 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.scope_with_slots(1, |_global, frame| {
+            let out = jlrs.scope_with_capacity(1, |_global, mut frame| {
+                let (output, frame) = frame.split()?;
+
                 frame
-                    .value_scope_with_slots(0, |output, frame| {
-                        output
-                            .into_scope(frame)
-                            .value_scope_with_slots(0, |output, frame| {
-                                let output = output.into_scope(frame);
-                                Value::new(output, 1usize)
-                            })
+                    .scope_with_capacity(0, |mut frame| {
+                        frame.scope_with_capacity(0, |mut frame| {
+                            let output = output.into_scope(&mut frame);
+                            Value::new(output, 1usize)
+                        })
                     })?
                     .unbox::<usize>()
             });
@@ -31,20 +31,18 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.scope_with_slots(1, |global, frame| {
+            let out = jlrs.scope_with_capacity(1, |global, mut frame| {
+                let (output, frame) = frame.split()?;
+
                 frame
-                    .result_scope_with_slots(0, |output, frame| {
-                        output.into_scope(frame).result_scope_with_slots(
-                            2,
-                            |output, frame| unsafe {
-                                let func =
-                                    Module::base(global).function_ref("+")?.wrapper_unchecked();
-                                let v1 = Value::new(frame.as_scope(), 1usize)?;
-                                let v2 = Value::new(frame.as_scope(), 2usize)?;
-                                let output = output.into_scope(frame);
-                                func.call2(output, v1, v2)
-                            },
-                        )
+                    .scope_with_capacity(0, |mut frame| {
+                        frame.scope_with_capacity(2, |mut frame| unsafe {
+                            let func = Module::base(global).function_ref("+")?.wrapper_unchecked();
+                            let v1 = Value::new(frame.as_scope(), 1usize)?;
+                            let v2 = Value::new(frame.as_scope(), 2usize)?;
+                            let output = output.into_scope(&mut frame);
+                            func.call2(output, v1, v2)
+                        })
                     })?
                     .unwrap()
                     .unbox::<usize>()

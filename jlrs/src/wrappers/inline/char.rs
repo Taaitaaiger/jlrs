@@ -1,4 +1,4 @@
-//! Wrapper for `Core.Char`.
+//! Wrapper for `Char`.
 //!
 //! In Rust it's unsafe to create an invalid `char`, while a `Char` in Julia can be an arbitrary
 //! `u32` in some rare cases. Rather than treating all `Char`s as `u32` or `char`s, jlrs provides
@@ -6,7 +6,7 @@
 use crate::{convert::unbox::Unbox, impl_julia_typecheck, impl_valid_layout};
 use crate::{
     private::Private,
-    wrappers::ptr::{private::Wrapper, value::Value},
+    wrappers::ptr::{private::WrapperPriv, value::Value},
 };
 use jl_sys::{jl_char_type, jl_unbox_uint32};
 use std::fmt::{Debug, Formatter, Result as FmtResult, Write};

@@ -4,35 +4,6 @@
 extern "C"
 {
 #endif
-    void jlrs_print_stack(jl_gcframe_t *frame)
-    {
-        if (frame == NULL)
-            return;
-        size_t n = frame->nroots >> 2;
-
-        printf("gc_frame@%p -- %zu %p [", frame, n, frame->prev);
-        if (n == 0)
-        {
-            printf("]\n");
-        }
-        else
-        {
-            if (n > 1)
-            {
-                for (unsigned i = 1; i < n; ++i)
-                {
-                    printf("%p, ", *(((void **)frame) + 1 + i));
-                }
-            }
-            printf("%p]\n", *(((void **)frame) + 1 + n));
-        }
-
-        if (frame->prev != NULL)
-        {
-            jlrs_print_stack(frame->prev);
-        }
-    }
-
 #if !defined(JLRS_WINDOWS_LTS)
     jlrs_result_t jlrs_alloc_array_1d(jl_value_t *atype, size_t nr)
     {
@@ -79,6 +50,44 @@ extern "C"
         JL_TRY
         {
             out.data = (jl_value_t *)jl_alloc_array_3d(atype, nr, nc, z);
+            out.flag = JLRS_RESULT_VALUE;
+        }
+        JL_CATCH
+        {
+            out.data = jl_current_exception();
+            out.flag = JLRS_RESULT_ERR;
+        }
+        jl_exception_clear();
+
+        return out;
+    }
+
+    jlrs_result_t jlrs_ptr_to_array_1d(jl_value_t *atype, void *data, size_t nel, int own_buffer)
+    {
+        jlrs_result_t out;
+
+        JL_TRY
+        {
+            out.data = (jl_value_t *)jl_ptr_to_array_1d(atype, data, nel, own_buffer);
+            out.flag = JLRS_RESULT_VALUE;
+        }
+        JL_CATCH
+        {
+            out.data = jl_current_exception();
+            out.flag = JLRS_RESULT_ERR;
+        }
+        jl_exception_clear();
+
+        return out;
+    }
+
+    jlrs_result_t jlrs_ptr_to_array(jl_value_t *atype, void *data, jl_value_t *_dims, int own_buffer)
+    {
+        jlrs_result_t out;
+
+        JL_TRY
+        {
+            out.data = (jl_value_t *)jl_ptr_to_array(atype, data, _dims, own_buffer);
             out.flag = JLRS_RESULT_VALUE;
         }
         JL_CATCH
@@ -385,11 +394,60 @@ extern "C"
 
         return out;
     }
+
+    jlrs_result_t jlrs_arrayset(jl_array_t *a JL_ROOTING_ARGUMENT, jl_value_t *rhs JL_ROOTED_ARGUMENT JL_MAYBE_UNROOTED, size_t i)
+    {
+        jlrs_result_t out;
+
+        JL_TRY
+        {
+            jl_arrayset(a, rhs, i);
+            out.data = NULL;
+            out.flag = JLRS_RESULT_VOID;
+        }
+        JL_CATCH
+        {
+            out.data = jl_current_exception();
+            out.flag = JLRS_RESULT_ERR;
+        }
+        jl_exception_clear();
+
+        return out;
+    }
+
+    jlrs_result_t jlrs_arrayref(jl_array_t *a JL_PROPAGATES_ROOT, size_t i)
+    {
+        jlrs_result_t out;
+
+        JL_TRY
+        {
+            out.data = jl_arrayref(a, i);
+            out.flag = JLRS_RESULT_VOID;
+        }
+        JL_CATCH
+        {
+            out.data = jl_current_exception();
+            out.flag = JLRS_RESULT_ERR;
+        }
+        jl_exception_clear();
+
+        return out;
+    }
 #endif
 
     uint_t jlrs_array_data_owner_offset(uint16_t n_dims)
     {
         return jl_array_data_owner_offset(n_dims);
+    }
+
+    void jlrs_lock(jl_value_t *v)
+    {
+        JL_LOCK_NOGC((jl_mutex_t *)v);
+    }
+
+    void jlrs_unlock(jl_value_t *v)
+    {
+        JL_UNLOCK_NOGC((jl_mutex_t *)v);
     }
 #ifdef __cplusplus
 }

@@ -9,8 +9,8 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(2, |global, frame| unsafe {
-                let a_value = Value::new(&mut *frame, 1isize)?;
+            jlrs.scope_with_capacity(2, |global, mut frame| unsafe {
+                let a_value = Value::new(&mut frame, 1isize)?;
                 let func = Module::main(global)
                     .submodule_ref("JlrsTests")?
                     .wrapper_unchecked()
@@ -18,7 +18,7 @@ mod tests {
                     .wrapper_unchecked();
 
                 let v = func
-                    .call(&mut *frame, &mut [a_value])?
+                    .call(&mut frame, &mut [a_value])?
                     .unwrap()
                     .unbox::<isize>()?;
 
@@ -34,19 +34,19 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(4, |global, frame| unsafe {
-                let a_value = Value::new(&mut *frame, 1isize)?;
-                let b_value = Value::new(&mut *frame, 10isize)?;
+            jlrs.scope_with_capacity(4, |global, mut frame| unsafe {
+                let a_value = Value::new(&mut frame, 1isize)?;
+                let b_value = Value::new(&mut frame, 10isize)?;
                 let func = Module::main(global)
                     .submodule_ref("JlrsTests")?
                     .wrapper_unchecked()
                     .function_ref("funcwithkw")?
                     .wrapper_unchecked();
 
-                let kw = named_tuple!(&mut *frame, "b" => b_value)?;
+                let kw = named_tuple!(&mut frame, "b" => b_value)?;
                 let v = func
-                    .with_keywords(kw)?
-                    .call1(&mut *frame, a_value)?
+                    .provide_keywords(kw)?
+                    .call1(&mut frame, a_value)?
                     .unwrap()
                     .unbox::<isize>()?;
 
@@ -62,20 +62,20 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(5, |global, frame| unsafe {
-                let a_value = Value::new(&mut *frame, 1isize)?;
-                let b_value = Value::new(&mut *frame, 10isize)?;
-                let c_value = Value::new(&mut *frame, 5isize)?;
+            jlrs.scope_with_capacity(5, |global, mut frame| unsafe {
+                let a_value = Value::new(&mut frame, 1isize)?;
+                let b_value = Value::new(&mut frame, 10isize)?;
+                let c_value = Value::new(&mut frame, 5isize)?;
                 let func = Module::main(global)
                     .submodule_ref("JlrsTests")?
                     .wrapper_unchecked()
                     .function_ref("funcwithkw")?
                     .wrapper_unchecked();
 
-                let kw = named_tuple!(&mut *frame, "b" => b_value)?;
+                let kw = named_tuple!(&mut frame, "b" => b_value)?;
                 let v = func
-                    .with_keywords(kw)?
-                    .call2(&mut *frame, a_value, c_value)?
+                    .provide_keywords(kw)?
+                    .call2(&mut frame, a_value, c_value)?
                     .unwrap()
                     .unbox::<isize>()?;
 
@@ -91,20 +91,20 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(6, |global, frame| unsafe {
-                let a_value = Value::new(&mut *frame, 1isize)?;
-                let b_value = Value::new(&mut *frame, 10isize)?;
-                let c_value = Value::new(&mut *frame, 5isize)?;
+            jlrs.scope_with_capacity(6, |global, mut frame| unsafe {
+                let a_value = Value::new(&mut frame, 1isize)?;
+                let b_value = Value::new(&mut frame, 10isize)?;
+                let c_value = Value::new(&mut frame, 5isize)?;
                 let func = Module::main(global)
                     .submodule_ref("JlrsTests")?
                     .wrapper_unchecked()
                     .function_ref("funcwithkw")?
                     .wrapper_unchecked();
 
-                let kw = named_tuple!(&mut *frame, "b" => b_value)?;
+                let kw = named_tuple!(&mut frame, "b" => b_value)?;
                 let v = func
-                    .with_keywords(kw)?
-                    .call2(&mut *frame, a_value, c_value)?
+                    .provide_keywords(kw)?
+                    .call2(&mut frame, a_value, c_value)?
                     .unwrap()
                     .unbox::<isize>()?;
 
@@ -120,21 +120,21 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(7, |global, frame| unsafe {
-                let a_value = Value::new(&mut *frame, 1isize)?;
-                let b_value = Value::new(&mut *frame, 10isize)?;
-                let c_value = Value::new(&mut *frame, 5isize)?;
-                let d_value = Value::new(&mut *frame, 4isize)?;
+            jlrs.scope_with_capacity(7, |global, mut frame| unsafe {
+                let a_value = Value::new(&mut frame, 1isize)?;
+                let b_value = Value::new(&mut frame, 10isize)?;
+                let c_value = Value::new(&mut frame, 5isize)?;
+                let d_value = Value::new(&mut frame, 4isize)?;
                 let func = Module::main(global)
                     .submodule_ref("JlrsTests")?
                     .wrapper_unchecked()
                     .function_ref("funcwithkw")?
                     .wrapper_unchecked();
 
-                let kw = named_tuple!(&mut *frame, "b" => b_value)?;
+                let kw = named_tuple!(&mut frame, "b" => b_value)?;
                 let v = func
-                    .with_keywords(kw)?
-                    .call3(&mut *frame, a_value, c_value, d_value)?
+                    .provide_keywords(kw)?
+                    .call3(&mut frame, a_value, c_value, d_value)?
                     .unwrap()
                     .unbox::<isize>()?;
 
@@ -150,22 +150,22 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(8, |global, frame| unsafe {
-                let a_value = Value::new(&mut *frame, 1isize)?;
-                let b_value = Value::new(&mut *frame, 10isize)?;
-                let c_value = Value::new(&mut *frame, 5isize)?;
-                let d_value = Value::new(&mut *frame, 4isize)?;
-                let e_value = Value::new(&mut *frame, 2isize)?;
+            jlrs.scope_with_capacity(8, |global, mut frame| unsafe {
+                let a_value = Value::new(&mut frame, 1isize)?;
+                let b_value = Value::new(&mut frame, 10isize)?;
+                let c_value = Value::new(&mut frame, 5isize)?;
+                let d_value = Value::new(&mut frame, 4isize)?;
+                let e_value = Value::new(&mut frame, 2isize)?;
                 let func = Module::main(global)
                     .submodule_ref("JlrsTests")?
                     .wrapper_unchecked()
                     .function_ref("funcwithkw")?
                     .wrapper_unchecked();
 
-                let kw = named_tuple!(&mut *frame, "b" => b_value)?;
+                let kw = named_tuple!(&mut frame, "b" => b_value)?;
                 let v = func
-                    .with_keywords(kw)?
-                    .call(&mut *frame, &mut [a_value, c_value, d_value, e_value])?
+                    .provide_keywords(kw)?
+                    .call(&mut frame, &mut [a_value, c_value, d_value, e_value])?
                     .unwrap()
                     .unbox::<isize>()?;
 
@@ -181,19 +181,19 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(4, |global, frame| unsafe {
-                let a_value = Value::new(&mut *frame, 1f32)?;
-                let b_value = Value::new(&mut *frame, 10f32)?;
+            jlrs.scope_with_capacity(4, |global, mut frame| unsafe {
+                let a_value = Value::new(&mut frame, 1f32)?;
+                let b_value = Value::new(&mut frame, 10f32)?;
                 let func = Module::main(global)
                     .submodule_ref("JlrsTests")?
                     .wrapper_unchecked()
                     .function_ref("funcwithabstractkw")?
                     .wrapper_unchecked();
 
-                let kw = named_tuple!(&mut *frame, "b" => b_value)?;
+                let kw = named_tuple!(&mut frame, "b" => b_value)?;
                 let v = func
-                    .with_keywords(kw)?
-                    .call1(&mut *frame, a_value)?
+                    .provide_keywords(kw)?
+                    .call1(&mut frame, a_value)?
                     .unwrap()
                     .unbox::<f32>()?;
 
@@ -209,19 +209,19 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(4, |global, frame| unsafe {
-                let a_value = Value::new(&mut *frame, 1f32)?;
-                let b_value = Value::new(&mut *frame, 10f64)?;
+            jlrs.scope_with_capacity(4, |global, mut frame| unsafe {
+                let a_value = Value::new(&mut frame, 1f32)?;
+                let b_value = Value::new(&mut frame, 10f64)?;
                 let func = Module::main(global)
                     .submodule_ref("JlrsTests")?
                     .wrapper_unchecked()
                     .function_ref("funcwithabstractkw")?
                     .wrapper_unchecked();
 
-                let kw = named_tuple!(&mut *frame, "b" => b_value)?;
+                let kw = named_tuple!(&mut frame, "b" => b_value)?;
                 let v = func
-                    .with_keywords(kw)?
-                    .call1(&mut *frame, a_value)?
+                    .provide_keywords(kw)?
+                    .call1(&mut frame, a_value)?
                     .unwrap()
                     .unbox::<f64>()?;
 

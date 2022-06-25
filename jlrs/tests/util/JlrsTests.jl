@@ -29,13 +29,23 @@ end
 function datatype()::DataType
     Bool
 end
-
-function callrust(ptr::Ptr)::Bool
+ 
+function callrust(ptr::Ptr{Cvoid})::Bool
     ccall(ptr, Bool, ())
 end
 
-function callrustwitharr(ptr::Ptr, arr::Array{Float64, 1})::Bool
-    ccall(ptr, Bool, (Array,), arr)
+function callrustwitharr(ptr::Ptr{Cvoid}, arr::Array{Float64, 1})::Bool
+    ccall(ptr, Bool, (Array{Float64, 1},), arr)
+end
+
+function callrustwithasynccond(func::Ptr{Cvoid}, destroyhandle::Ptr{Cvoid})::UInt32
+    condition = Base.AsyncCondition()
+    output::Ref{UInt32} = C_NULL
+    joinhandle = ccall(func, Ptr{Cvoid}, (Ref{UInt32}, Ptr{Cvoid}), output, condition.handle)
+    wait(condition)
+    ccall(destroyhandle, Cvoid, (Ptr{Cvoid},), joinhandle)
+
+    output[]
 end
 
 function vecofmodules()::Vector{Module}
@@ -108,4 +118,18 @@ struct WithEmpty{T}
     c::UInt
     WithEmpty{T}() where T = new()
 end
+
+struct WithAbstract 
+    a::Real
+end
+
+struct HasConstructors
+    a::DataType
+    b::Union{Int16, Int32}
+    HasConstructors(i::Int16) = new(Int16, i)
+    HasConstructors(i::Int32) = new(Int32, i)
+    HasConstructors(i::Bool) = new(Bool, i ? one(Int32) : zero(Int32))
+end
+
+HasConstructors() = HasConstructors(false)
 end

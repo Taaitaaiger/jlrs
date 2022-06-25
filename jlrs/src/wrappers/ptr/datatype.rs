@@ -1,30 +1,26 @@
 //! Wrapper for `DataType`, which provides access to type properties.
 
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
-use super::array::Array;
-use super::{
-    private::Wrapper as WrapperPriv, value::Value, DataTypeRef, SimpleVectorRef, TypeNameRef,
-    ValueRef, Wrapper,
+use crate::{
+    convert::to_symbol::ToSymbol,
+    error::{AccessError, JlrsResult, CANNOT_DISPLAY_TYPE},
+    impl_debug, impl_julia_typecheck,
+    layout::typecheck::Typecheck,
+    memory::{global::Global, output::Output, scope::PartialScope},
+    private::Private,
+    wrappers::ptr::{
+        private::WrapperPriv, simple_vector::SimpleVector, simple_vector::SimpleVectorRef,
+        symbol::Symbol, symbol::SymbolRef, type_name::TypeNameRef, value::Value, value::ValueRef,
+        Wrapper,
+    },
 };
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
-use crate::error::JlrsError;
-use crate::error::JlrsResult;
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
-use crate::error::{JuliaResultRef, CANNOT_DISPLAY_TYPE};
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
-use crate::layout::typecheck::Concrete;
-use crate::layout::typecheck::Typecheck;
-use crate::memory::frame::Frame;
-use crate::memory::scope::Scope;
-use crate::wrappers::ptr::{simple_vector::SimpleVector, symbol::Symbol};
-use crate::{impl_debug, impl_valid_layout, memory::global::Global, private::Private};
+use cfg_if::cfg_if;
 use jl_sys::{
     jl_abstractslot_type, jl_abstractstring_type, jl_any_type, jl_anytuple_type, jl_argument_type,
     jl_argumenterror_type, jl_bool_type, jl_boundserror_type, jl_builtin_type, jl_char_type,
     jl_code_info_type, jl_code_instance_type, jl_const_type, jl_datatype_layout_t, jl_datatype_t,
-    jl_datatype_type, jl_emptytuple_type, jl_errorexception_type, jl_expr_type, jl_field_isptr,
-    jl_field_offset, jl_field_size, jl_float16_type, jl_float32_type, jl_float64_type,
-    jl_floatingpoint_type, jl_function_type, jl_get_fieldtypes, jl_globalref_type,
+    jl_datatype_type, jl_emptytuple_type, jl_errorexception_type, jl_expr_type, jl_field_index,
+    jl_field_isptr, jl_field_offset, jl_field_size, jl_float16_type, jl_float32_type,
+    jl_float64_type, jl_floatingpoint_type, jl_function_type, jl_get_fieldtypes, jl_globalref_type,
     jl_gotoifnot_type, jl_gotonode_type, jl_initerror_type, jl_int16_type, jl_int32_type,
     jl_int64_type, jl_int8_type, jl_intrinsic_type, jl_lineinfonode_type, jl_linenumbernode_type,
     jl_loaderror_type, jl_method_instance_type, jl_method_match_type, jl_method_type,
@@ -37,15 +33,25 @@ use jl_sys::{
     jl_uint32_type, jl_uint64_type, jl_uint8_type, jl_undefvarerror_type, jl_unionall_type,
     jl_uniontype_type, jl_upsilonnode_type, jl_voidpointer_type, jl_weakref_type,
 };
-#[cfg(not(feature = "lts"))]
+#[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
 use jl_sys::{
     jl_atomicerror_type, jl_interconditional_type, jl_partial_opaque_type, jl_vararg_type,
 };
+use std::{
+    ffi::{c_void, CStr},
+    marker::PhantomData,
+    ptr::NonNull,
+};
 
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
-use jl_sys::{jlrs_new_structv, jlrs_result_tag_t_JLRS_RESULT_ERR};
-use std::ffi::c_void;
-use std::{ffi::CStr, marker::PhantomData, ptr::NonNull};
+use super::Ref;
+
+cfg_if! {
+    if #[cfg(not(all(target_os = "windows", feature = "lts")))] {
+        use super::array::Array;
+        use crate::error::{JuliaResult, JuliaResultRef};
+        use jl_sys::{jlrs_new_structv, jlrs_result_tag_t_JLRS_RESULT_ERR};
+    }
+}
 
 /// Julia type information. You can acquire a [`Value`]'s datatype by by calling
 /// [`Value::datatype`]. If a `DataType` is concrete and not a subtype of `Array` a new instance
@@ -72,36 +78,36 @@ impl<'scope> DataType<'scope> {
 
     /// Returns the `TypeName` of this type.
     pub fn type_name(self) -> TypeNameRef<'scope> {
+        // Safety: the pointer points to valid data
         unsafe { TypeNameRef::wrap(self.unwrap_non_null(Private).as_ref().name) }
     }
 
     /// Returns the super type of this type.
     pub fn super_type(self) -> DataTypeRef<'scope> {
-        unsafe {
-            let sup = self.unwrap_non_null(Private).as_ref().super_;
-            DataTypeRef::wrap(sup)
-        }
+        // Safety: the pointer points to valid data
+        unsafe { DataTypeRef::wrap(self.unwrap_non_null(Private).as_ref().super_) }
     }
 
     /// Returns the type parameters of this type.
     pub fn parameters(self) -> SimpleVectorRef<'scope> {
+        // Safety: the pointer points to valid data
         unsafe { SimpleVectorRef::wrap(self.unwrap_non_null(Private).as_ref().parameters) }
     }
 
     /// Returns the number of type parameters.
     pub fn n_parameters(self) -> usize {
-        unsafe {
-            let params = self.unwrap_non_null(Private).as_ref().parameters;
-            SimpleVector::<Value>::wrap(params, Private).len()
-        }
+        // Safety: the pointer points to valid data, the parameters field is never null
+        unsafe { self.parameters().wrapper_unchecked().len() }
     }
 
     /// Returns the type parameter at position `idx`, or `None` if the index is out of bounds.
     pub fn parameter(self, idx: usize) -> Option<ValueRef<'scope, 'static>> {
+        // Safety: the pointer points to valid data, the parameters field is never null
         unsafe {
             let params = self.unwrap_non_null(Private).as_ref().parameters;
-            SimpleVector::<Value>::wrap(params, Private)
-                .data()
+            SimpleVector::wrap(params, Private)
+                .unrestricted_data()
+                .as_slice()
                 .get(idx)
                 .copied()
         }
@@ -109,48 +115,97 @@ impl<'scope> DataType<'scope> {
 
     /// Returns the field types of this type.
     pub fn field_types(self) -> SimpleVectorRef<'scope> {
+        // Safety: the pointer points to valid data, the C API function is called with a valid argument
         unsafe { SimpleVectorRef::wrap(jl_get_fieldtypes(self.unwrap(Private))) }
     }
 
-    /// Returns the field type of the field at position `idx`.
+    /// Returns the field type of the field at position `idx`, or `None` if the index is out of
+    /// bounds.
     pub fn field_type(self, idx: usize) -> Option<ValueRef<'scope, 'static>> {
+        // Safety: the pointer points to valid data, the field_types field is never null
         unsafe {
             self.field_types()
                 .wrapper_unchecked()
-                .data()
+                .unrestricted_data()
+                .as_slice()
                 .get(idx)
                 .copied()
         }
     }
 
-    /// Returns the field type of the field at position `idx` if `self` is a concrete datatype.
-    pub fn field_type_concrete(self, idx: usize) -> Option<ValueRef<'scope, 'static>> {
-        unsafe {
-            if !self.is_concrete_type() {
-                return None;
-            }
+    /// Returns the field type of the field at position `idx` without performing a bounds check.
+    ///
+    /// Safety: `idx` must be in-bounds.
+    pub unsafe fn field_type_unchecked(self, idx: usize) -> ValueRef<'scope, 'static> {
+        *self
+            .field_types()
+            .wrapper_unchecked()
+            .unrestricted_data()
+            .as_slice()
+            .get_unchecked(idx)
+    }
 
-            SimpleVector::<Value>::wrap(self.unwrap_non_null(Private).as_ref().types, Private)
-                .data()
+    /// Returns the field type of the field at position `idx`.
+    pub fn field_type_concrete(self, idx: usize) -> Option<ValueRef<'scope, 'static>> {
+        // Safety: the pointer points to valid data, an assert checks that the types field
+        // isn't null.
+        unsafe {
+            let ptr = self.unwrap_non_null(Private).as_ref().types;
+            assert!(!ptr.is_null());
+            SimpleVector::wrap(ptr, Private)
+                .unrestricted_data()
+                .as_slice()
                 .get(idx)
                 .copied()
         }
     }
 
     /// Returns the field names of this type.
-    pub fn field_names(self) -> SimpleVectorRef<'scope, Symbol<'scope>> {
+    pub fn field_names(self) -> SimpleVectorRef<'scope> {
+        // Safety: the pointer points to valid data, so it must have a TypeName.
         unsafe { self.type_name().wrapper_unchecked().names() }
     }
 
     /// Returns the name of the field at position `idx`.
     pub fn field_name(self, idx: usize) -> Option<Symbol<'scope>> {
+        // Safety: the pointer points to valid data, so it must have a TypeName.
         unsafe {
             self.field_names()
                 .wrapper_unchecked()
-                .data()
+                .unrestricted_typed_data_unchecked::<SymbolRef>()
+                .as_slice()
                 .get(idx)
                 .copied()
                 .map(|s| s.wrapper_unchecked())
+        }
+    }
+
+    /// Returns the index of the field with the name `field_name`.
+    pub fn field_index<N: ToSymbol>(self, field_name: N) -> JlrsResult<usize> {
+        // Safety: the pointer points to valid data, the C API function is called with valid data
+        let (sym, idx) = unsafe {
+            let sym = field_name.to_symbol_priv(Private);
+            let idx = jl_field_index(self.unwrap(Private), sym.unwrap(Private), 0);
+            (sym, idx)
+        };
+
+        if idx < 0 {
+            Err(AccessError::NoSuchField {
+                type_name: self.display_string_or(CANNOT_DISPLAY_TYPE),
+                field_name: sym.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
+            })?;
+        }
+
+        Ok(idx as usize)
+    }
+
+    /// Returns the index of the field with the name `field_name`, if the field doesn't exist the
+    /// result is `-1`.
+    pub fn field_index_unchecked<N: ToSymbol>(self, field_name: N) -> i32 {
+        // Safety: the pointer points to valid data, the C API function is called with valid data
+        unsafe {
+            let sym = field_name.to_symbol_priv(Private);
+            jl_field_index(self.unwrap(Private), sym.unwrap(Private), 0)
         }
     }
 
@@ -165,158 +220,160 @@ impl<'scope> DataType<'scope> {
 
     /// Returns the instance if this type is a singleton.
     pub fn instance(self) -> ValueRef<'scope, 'static> {
+        // Safety: the pointer points to valid data
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().instance) }
     }
 
-    pub fn layout(self) -> Option<NonNull<c_void>> {
-        unsafe {
-            let ly = self.unwrap_non_null(Private).as_ref().layout;
-            if ly.is_null() {
-                None
-            } else {
-                Some(NonNull::new_unchecked(
-                    ly as *mut jl_datatype_layout_t as *mut c_void,
-                ))
-            }
-        }
+    // TODO: Allow using this information
+    /// Returns a pointer to the layout of this `DataType`.
+    pub fn layout(self) -> *const c_void {
+        // Safety: the pointer points to valid data
+        unsafe { self.unwrap_non_null(Private).as_ref().layout as _ }
     }
 
     /// Returns the size of a value of this type in bytes.
     pub fn size(self) -> i32 {
+        // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().size }
     }
 
     /// Returns the hash of this type.
     pub fn hash(self) -> u32 {
+        // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().hash }
     }
 
     /// Returns true if this is an abstract type.
-    #[cfg(not(feature = "lts"))]
     pub fn is_abstract(self) -> bool {
-        unsafe { self.type_name().wrapper_unchecked().abstract_() }
-    }
-
-    /// Returns true if this is an abstract type.
-    #[cfg(feature = "lts")]
-    pub fn is_abstract(self) -> bool {
-        unsafe { self.unwrap_non_null(Private).as_ref().abstract_ != 0 }
+        cfg_if! {
+            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                // Safety: the pointer points to valid data
+                unsafe { self.unwrap_non_null(Private).as_ref().abstract_ != 0 }
+            } else {
+                // Safety: the pointer points to valid data, so it must have a TypeName.
+                unsafe { self.type_name().wrapper_unchecked().abstract_() }
+            }
+        }
     }
 
     /// Returns true if this is a mutable type.
-    #[cfg(not(feature = "lts"))]
     pub fn mutable(self) -> bool {
-        unsafe { self.type_name().wrapper_unchecked().mutabl() }
-    }
-
-    /// Returns true if this is a mutable type.
-    #[cfg(feature = "lts")]
-    pub fn mutable(self) -> bool {
-        unsafe { self.unwrap_non_null(Private).as_ref().mutabl != 0 }
+        cfg_if! {
+            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                // Safety: the pointer points to valid data
+                unsafe { self.unwrap_non_null(Private).as_ref().mutabl != 0 }
+            } else {
+                // Safety: the pointer points to valid data, so it must have a TypeName.
+                unsafe { self.type_name().wrapper_unchecked().mutabl() }
+            }
+        }
     }
 
     /// Returns true if one or more of the type parameters has not been set.
-    #[cfg(not(feature = "lts"))]
     pub fn has_free_type_vars(self) -> bool {
-        unsafe { self.unwrap_non_null(Private).as_ref().hasfreetypevars() != 0 }
-    }
-
-    /// Returns true if one or more of the type parameters has not been set.
-    #[cfg(feature = "lts")]
-    pub fn has_free_type_vars(self) -> bool {
-        unsafe { self.unwrap_non_null(Private).as_ref().hasfreetypevars != 0 }
+        cfg_if! {
+            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                // Safety: the pointer points to valid data
+                unsafe { self.unwrap_non_null(Private).as_ref().hasfreetypevars != 0 }
+            } else {
+                // Safety: the pointer points to valid data
+                unsafe { self.unwrap_non_null(Private).as_ref().hasfreetypevars() != 0 }
+            }
+        }
     }
 
     /// Returns true if this type can have instances
-    #[cfg(not(feature = "lts"))]
     pub fn is_concrete_type(self) -> bool {
-        unsafe { self.unwrap_non_null(Private).as_ref().isconcretetype() != 0 }
-    }
-
-    /// Returns true if this type can have instances
-    #[cfg(feature = "lts")]
-    pub fn is_concrete_type(self) -> bool {
-        unsafe { self.unwrap_non_null(Private).as_ref().isconcretetype != 0 }
+        cfg_if! {
+            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                // Safety: the pointer points to valid data
+                unsafe { self.unwrap_non_null(Private).as_ref().isconcretetype != 0 }
+            } else {
+                // Safety: the pointer points to valid data
+                unsafe { self.unwrap_non_null(Private).as_ref().isconcretetype() != 0 }
+            }
+        }
     }
 
     /// Returns true if this type is a dispatch, or leaf, tuple type.
-    #[cfg(not(feature = "lts"))]
     pub fn is_dispatch_tuple(self) -> bool {
-        unsafe { self.unwrap_non_null(Private).as_ref().isdispatchtuple() != 0 }
-    }
-
-    /// Returns true if this type is a dispatch, or leaf, tuple type.
-    #[cfg(feature = "lts")]
-    pub fn is_dispatch_tuple(self) -> bool {
-        unsafe { self.unwrap_non_null(Private).as_ref().isdispatchtuple != 0 }
+        cfg_if! {
+            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                // Safety: the pointer points to valid data
+                unsafe { self.unwrap_non_null(Private).as_ref().isdispatchtuple != 0 }
+            } else {
+                // Safety: the pointer points to valid data
+                unsafe { self.unwrap_non_null(Private).as_ref().isdispatchtuple() != 0 }
+            }
+        }
     }
 
     /// Returns true if this type is a bits-type.
-    #[cfg(not(feature = "lts"))]
     pub fn is_bits(self) -> bool {
-        unsafe { self.unwrap_non_null(Private).as_ref().isbitstype() != 0 }
-    }
-
-    /// Returns true if this type is a bits-type.
-    #[cfg(feature = "lts")]
-    pub fn is_bits(self) -> bool {
-        unsafe { self.unwrap_non_null(Private).as_ref().isbitstype != 0 }
+        cfg_if! {
+            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                // Safety: the pointer points to valid data
+                unsafe { self.unwrap_non_null(Private).as_ref().isbitstype != 0 }
+            } else {
+                // Safety: the pointer points to valid data
+                unsafe { self.unwrap_non_null(Private).as_ref().isbitstype() != 0 }
+            }
+        }
     }
 
     /// Returns true if values of this type are zero-initialized.
-    #[cfg(not(feature = "lts"))]
     pub fn zero_init(self) -> bool {
-        unsafe { self.unwrap_non_null(Private).as_ref().zeroinit() != 0 }
-    }
-
-    /// Returns true if values of this type are zero-initialized.
-    #[cfg(feature = "lts")]
-    pub fn zero_init(self) -> bool {
-        unsafe { self.unwrap_non_null(Private).as_ref().zeroinit != 0 }
-    }
-
-    /// Returns true if a value of this type stores its data inline.
-    #[cfg(not(feature = "lts"))]
-    pub fn is_inline_alloc(self) -> bool {
-        unsafe {
-            self.type_name().wrapper_unchecked().mayinlinealloc()
-                && !self.unwrap_non_null(Private).as_ref().layout.is_null()
+        cfg_if! {
+            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                // Safety: the pointer points to valid data
+                unsafe { self.unwrap_non_null(Private).as_ref().zeroinit != 0 }
+            } else {
+                // Safety: the pointer points to valid data
+                unsafe { self.unwrap_non_null(Private).as_ref().zeroinit() != 0 }
+            }
         }
     }
 
     /// Returns true if a value of this type stores its data inline.
-    #[cfg(feature = "lts")]
     pub fn is_inline_alloc(self) -> bool {
-        unsafe { self.unwrap_non_null(Private).as_ref().isinlinealloc != 0 }
-    }
-
-    /// If false, no value will have this type.
-    #[cfg(not(feature = "lts"))]
-    pub fn has_concrete_subtype(self) -> bool {
-        unsafe {
-            self.unwrap_non_null(Private)
-                .as_ref()
-                .has_concrete_subtype()
-                != 0
+        cfg_if! {
+            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                // Safety: the pointer points to valid data
+                unsafe { self.unwrap_non_null(Private).as_ref().isinlinealloc != 0 }
+            } else {
+                // Safety: the pointer points to valid data, so it must have a TypeName.
+                unsafe {
+                    self.type_name().wrapper_unchecked().mayinlinealloc()
+                        && !self.unwrap_non_null(Private).as_ref().layout.is_null()
+                }
+            }
         }
     }
 
     /// If false, no value will have this type.
-    #[cfg(feature = "lts")]
     pub fn has_concrete_subtype(self) -> bool {
-        unsafe { self.unwrap_non_null(Private).as_ref().has_concrete_subtype != 0 }
+        cfg_if! {
+            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                // Safety: the pointer points to valid data
+                unsafe { self.unwrap_non_null(Private).as_ref().has_concrete_subtype != 0 }
+            } else {
+                // Safety: the pointer points to valid data
+                unsafe { self.unwrap_non_null(Private).as_ref().has_concrete_subtype() != 0 }
+            }
+        }
     }
 
     /// If true, the type is stored in hash-based set cache (instead of linear cache).
-    #[cfg(not(feature = "lts"))]
     pub fn cached_by_hash(self) -> bool {
-        unsafe { self.unwrap_non_null(Private).as_ref().cached_by_hash() != 0 }
-    }
-
-    /// If true, the type is stored in hash-based set cache (instead of linear cache).
-    #[cfg(feature = "lts")]
-    pub fn cached_by_hash(self) -> bool {
-        unsafe { self.unwrap_non_null(Private).as_ref().cached_by_hash != 0 }
+        cfg_if! {
+            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                // Safety: the pointer points to valid data
+                unsafe { self.unwrap_non_null(Private).as_ref().cached_by_hash != 0 }
+            } else {
+                // Safety: the pointer points to valid data
+                unsafe { self.unwrap_non_null(Private).as_ref().cached_by_hash() != 0 }
+            }
+        }
     }
 }
 
@@ -328,11 +385,13 @@ impl<'scope> DataType<'scope> {
 
     /// Returns the alignment of a value of this type in bytes.
     pub fn align(self) -> u16 {
+        // Safety: the pointer points to valid data, if the layout is null the code
+        // panics.
         unsafe {
             self.layout()
-                .unwrap()
                 .cast::<jl_datatype_layout_t>()
                 .as_ref()
+                .unwrap()
                 .alignment
         }
     }
@@ -344,14 +403,21 @@ impl<'scope> DataType<'scope> {
 
     /// Returns the number of fields of a value of this type.
     pub fn n_fields(self) -> u32 {
+        // Safety: the pointer points to valid data, if the layout is null the code
+        // panics.
         unsafe {
-            let layout = self.layout().unwrap();
-            layout.cast::<jl_datatype_layout_t>().as_ref().nfields
+            self.layout()
+                .cast::<jl_datatype_layout_t>()
+                .as_ref()
+                .unwrap()
+                .nfields
         }
     }
 
     /// Returns the name of this type.
     pub fn name(self) -> &'scope str {
+        // Safety: the pointer points to valid data, so it must have a name. If it's not
+        // a valid UTF-8 encoded string the code panics.
         unsafe {
             let name = jl_typename_str(self.unwrap(Private).cast());
             CStr::from_ptr(name).to_str().unwrap()
@@ -359,18 +425,153 @@ impl<'scope> DataType<'scope> {
     }
 
     /// Returns the size of the field at position `idx` in this type.
-    pub fn field_size(self, idx: usize) -> u32 {
-        unsafe { jl_field_size(self.unwrap(Private), idx as _) }
+    pub fn field_size(self, idx: usize) -> JlrsResult<u32> {
+        if idx >= self.n_fields() as usize {
+            Err(AccessError::OutOfBoundsField {
+                idx,
+                n_fields: self.n_fields() as usize,
+                value_type: self.display_string_or(CANNOT_DISPLAY_TYPE),
+            })?
+        }
+
+        // Safety: the pointer points to valid data, and the field exists
+        unsafe { Ok(jl_field_size(self.unwrap(Private), idx as _)) }
     }
 
     /// Returns the offset where the field at position `idx` is stored.
-    pub fn field_offset(self, idx: usize) -> u32 {
-        unsafe { jl_field_offset(self.unwrap(Private), idx as _) }
+    pub fn field_offset(self, idx: usize) -> JlrsResult<u32> {
+        if idx >= self.n_fields() as usize {
+            Err(AccessError::OutOfBoundsField {
+                idx,
+                n_fields: self.n_fields() as usize,
+                value_type: self.display_string_or(CANNOT_DISPLAY_TYPE),
+            })?
+        }
+
+        // Safety: the pointer points to valid data, and the field exists
+        unsafe { Ok(jl_field_offset(self.unwrap(Private), idx as _)) }
     }
 
-    /// Returns true if the field at position `idx` is a pointer.
-    pub fn is_pointer_field(self, idx: usize) -> bool {
-        unsafe { jl_field_isptr(self.unwrap(Private), idx as _) }
+    /// Returns true if the field at position `idx` is stored as a pointer.
+    pub fn is_pointer_field(self, idx: usize) -> JlrsResult<bool> {
+        if idx >= self.n_fields() as usize {
+            Err(AccessError::OutOfBoundsField {
+                idx,
+                n_fields: self.n_fields() as usize,
+                value_type: self.display_string_or(CANNOT_DISPLAY_TYPE),
+            })?
+        }
+
+        // Safety: the pointer points to valid data, and the field exists
+        unsafe { Ok(jl_field_isptr(self.unwrap(Private), idx as _)) }
+    }
+
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    /// Returns true if the field at position `idx` is an atomic field.
+    pub fn is_atomic_field(self, idx: usize) -> JlrsResult<bool> {
+        if idx >= self.n_fields() as usize {
+            Err(AccessError::OutOfBoundsField {
+                idx,
+                n_fields: self.n_fields() as usize,
+                value_type: self.display_string_or(CANNOT_DISPLAY_TYPE),
+            })?
+        }
+
+        // Safety: the pointer points to valid data, and the field exists
+        unsafe { Ok(self.is_atomic_field_unchecked(idx)) }
+    }
+
+    #[cfg(all(feature = "rc1", not(feature = "all-features-override")))]
+    /// Returns true if the field at position `idx` is a constant field.
+    pub fn is_const_field(self, idx: usize) -> JlrsResult<bool> {
+        if idx >= self.n_fields() as usize {
+            Err(AccessError::OutOfBoundsField {
+                idx,
+                n_fields: self.n_fields() as usize,
+                value_type: self.display_string_or(CANNOT_DISPLAY_TYPE),
+            })?
+        }
+
+        // Safety: the pointer points to valid data, and the field exists
+        unsafe { Ok(self.is_const_field_unchecked(idx)) }
+    }
+
+    /// Returns the size of the field at position `idx` in this type.
+    ///
+    /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
+    /// function.
+    pub unsafe fn field_size_unchecked(self, idx: usize) -> u32 {
+        jl_field_size(self.unwrap(Private), idx as _)
+    }
+
+    /// Returns the offset where the field at position `idx` is stored.
+    ///
+    /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
+    /// function.
+    pub unsafe fn field_offset_unchecked(self, idx: usize) -> u32 {
+        jl_field_offset(self.unwrap(Private), idx as _)
+    }
+
+    /// Returns true if the field at position `idx` is stored as a pointer.
+    ///
+    /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
+    /// function.
+    pub unsafe fn is_pointer_field_unchecked(self, idx: usize) -> bool {
+        jl_field_isptr(self.unwrap(Private), idx as _)
+    }
+
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    /// Returns true if the field at position `idx` is an atomic field.
+    ///
+    /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
+    /// function.
+    pub unsafe fn is_atomic_field_unchecked(self, idx: usize) -> bool {
+        /*
+            const uint32_t *atomicfields = st->name->atomicfields;
+            if (atomicfields != NULL) {
+                if (atomicfields[i / 32] & (1 << (i % 32)))
+                    return 1;
+            }
+            return 0;
+        */
+        let atomicfields = self.type_name().wrapper_unchecked().atomicfields();
+        if atomicfields.is_null() {
+            return false;
+        }
+
+        let isatomic = (*atomicfields.add(idx / 32)) & (1 << (idx % 32));
+        isatomic != 0
+    }
+
+    #[cfg(all(feature = "rc1", not(feature = "all-features-override")))]
+    /// Returns true if the field at position `idx` is a constant field.
+    ///
+    /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
+    /// function.
+    pub unsafe fn is_const_field_unchecked(self, idx: usize) -> bool {
+        /*
+        jl_typename_t *tn = st->name;
+        if (!tn->mutabl)
+            return 1;
+        const uint32_t *constfields = tn->constfields;
+        if (constfields != NULL) {
+            if (constfields[i / 32] & (1 << (i % 32)))
+                return 1;
+        }
+        return 0;
+        */
+        let tn = self.type_name().wrapper_unchecked();
+        if !tn.mutabl() {
+            return true;
+        }
+
+        let constfields = tn.constfields();
+        if constfields.is_null() {
+            return false;
+        }
+
+        let isconst = (*constfields.add(idx / 32)) & (1 << (idx % 32));
+        isconst != 0
     }
 
     /// Create a new instance of this `DataType`, using `values` to set the fields.
@@ -378,32 +579,31 @@ impl<'scope> DataType<'scope> {
     /// arbitrary concrete `DataType`s, at the cost that each of its fields must have already been
     /// allocated as a `Value`. This functions returns an error if the given `DataType` isn't
     /// concrete or is an array type. For custom array types you must use [`Array::new_for`].
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub fn instantiate<'target, 'frame, 'value, 'borrow, V, S, F>(
+    #[cfg(not(all(
+        target_os = "windows",
+        all(feature = "lts", not(feature = "all-features-override"))
+    )))]
+    pub fn instantiate<'target, 'value, 'data, V, S>(
         self,
         scope: S,
-        mut values: V,
-    ) -> JlrsResult<S::JuliaResult>
+        values: V,
+    ) -> JlrsResult<JuliaResult<'target, 'data>>
     where
-        S: Scope<'target, 'frame, 'borrow, F>,
-        F: Frame<'frame>,
-        V: AsMut<[Value<'value, 'borrow>]>,
+        S: PartialScope<'target>,
+        V: AsRef<[Value<'value, 'data>]>,
     {
+        use crate::error::InstantiationError;
+
+        // Safety: the pointer points to valid data, if an exception is thrown it's caught
         unsafe {
-            if !self.is::<Concrete>() {
-                Err(JlrsError::NotConcrete {
-                    value_type: self.display_string_or(CANNOT_DISPLAY_TYPE),
-                })?;
-            }
-
             if self.is::<Array>() {
-                Err(JlrsError::ArrayNotSupported)?;
+                Err(InstantiationError::ArrayNotSupported)?;
             }
 
-            let values = values.as_mut();
+            let values = values.as_ref();
             let res = jlrs_new_structv(
                 self.unwrap(Private),
-                values.as_mut_ptr().cast(),
+                values.as_ptr() as *mut _,
                 values.len() as _,
             );
 
@@ -423,30 +623,30 @@ impl<'scope> DataType<'scope> {
     /// allocated as a `Value`. This functions returns an error if the given `DataType` is not
     /// concrete or an array type. Unlike [`DataType::instantiate`] this method doesn't root the
     /// allocated value.
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub fn instantiate_unrooted<'global, 'value, 'borrow, V>(
+    #[cfg(not(all(
+        target_os = "windows",
+        all(feature = "lts", not(feature = "all-features-override"))
+    )))]
+    pub fn instantiate_unrooted<'global, 'value, 'data, V>(
         self,
         _: Global<'global>,
-        mut values: V,
-    ) -> JlrsResult<JuliaResultRef<'global, 'borrow>>
+        values: V,
+    ) -> JlrsResult<JuliaResultRef<'global, 'data>>
     where
-        V: AsMut<[Value<'value, 'borrow>]>,
+        V: AsRef<[Value<'value, 'data>]>,
     {
+        use crate::error::InstantiationError;
+
+        // Safety: the pointer points to valid data, if an exception is thrown it's caught
         unsafe {
-            if !self.is::<Concrete>() {
-                Err(JlrsError::NotConcrete {
-                    value_type: self.display_string_or(CANNOT_DISPLAY_TYPE),
-                })?;
-            }
-
             if self.is::<Array>() {
-                Err(JlrsError::ArrayNotSupported)?;
+                Err(InstantiationError::ArrayNotSupported)?;
             }
 
-            let values = values.as_mut();
+            let values = values.as_ref();
             let res = jlrs_new_structv(
                 self.unwrap(Private),
-                values.as_mut_ptr().cast(),
+                values.as_ptr() as *mut _,
                 values.len() as _,
             );
 
@@ -464,26 +664,26 @@ impl<'scope> DataType<'scope> {
     /// allocated as a `Value`.
     ///
     /// This method performs no checks whether or not the value can be constructed with these
-    /// values. If Julia throws an exception the process aborts.
-    pub fn instantiate_unchecked<'target, 'frame, 'value, 'borrow, V, S, F>(
+    /// values.
+    ///
+    /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
+    /// function.
+    pub unsafe fn instantiate_unchecked<'target, 'value, 'data, V, S>(
         self,
         scope: S,
-        mut values: V,
-    ) -> JlrsResult<S::Value>
+        values: V,
+    ) -> JlrsResult<Value<'target, 'data>>
     where
-        S: Scope<'target, 'frame, 'borrow, F>,
-        F: Frame<'frame>,
-        V: AsMut<[Value<'value, 'borrow>]>,
+        S: PartialScope<'target>,
+        V: AsRef<[Value<'value, 'data>]>,
     {
-        unsafe {
-            let values = values.as_mut();
-            let value = jl_new_structv(
-                self.unwrap(Private),
-                values.as_mut_ptr().cast(),
-                values.len() as _,
-            );
-            scope.value(NonNull::new_unchecked(value), Private)
-        }
+        let values = values.as_ref();
+        let value = jl_new_structv(
+            self.unwrap(Private),
+            values.as_ptr() as *mut _,
+            values.len() as _,
+        );
+        scope.value(NonNull::new_unchecked(value), Private)
     }
 
     /// Create a new instance of this `DataType`, using `values` to set the fields.
@@ -492,24 +692,49 @@ impl<'scope> DataType<'scope> {
     /// allocated as a `Value`.
     ///
     /// This method performs no checks whether or not the value can be constructed with these
-    /// values. If Julia throws an exception the process aborts.
-    pub fn instantiate_unrooted_unchecked<'global, 'value, 'borrow, V>(
+    /// values.
+    ///
+    /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
+    /// function.
+    pub unsafe fn instantiate_unrooted_unchecked<'global, 'value, 'borrow, V>(
         self,
         _: Global<'global>,
-        mut values: V,
+        values: V,
     ) -> ValueRef<'global, 'borrow>
     where
-        V: AsMut<[Value<'value, 'borrow>]>,
+        V: AsRef<[Value<'value, 'borrow>]>,
     {
-        unsafe {
-            let values = values.as_mut();
-            let value = jl_new_structv(
-                self.unwrap(Private),
-                values.as_mut_ptr().cast(),
-                values.len() as _,
-            );
+        let values = values.as_ref();
+        let value = jl_new_structv(
+            self.unwrap(Private),
+            values.as_ptr() as *mut _,
+            values.len() as _,
+        );
 
-            ValueRef::wrap(value)
+        ValueRef::wrap(value)
+    }
+
+    pub fn has_pointer_fields(self) -> JlrsResult<bool> {
+        // Safety: the pointer points to valid data, if the layout is null the code
+        // panics.
+        unsafe {
+            Ok(self
+                .layout()
+                .cast::<jl_datatype_layout_t>()
+                .as_ref()
+                .unwrap()
+                .first_ptr
+                != -1)
+        }
+    }
+
+    /// Use the `Output` to extend the lifetime of this data.
+    pub fn root<'target>(self, output: Output<'target>) -> DataType<'target> {
+        // Safety: the pointer points to valid data
+        unsafe {
+            let ptr = self.unwrap_non_null(Private);
+            output.set_root::<DataType>(ptr);
+            DataType::wrap_non_null(ptr, Private)
         }
     }
 }
@@ -517,427 +742,511 @@ impl<'scope> DataType<'scope> {
 impl<'base> DataType<'base> {
     /// The type of the bottom type, `Union{}`.
     pub fn typeofbottom_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_typeofbottom_type), Private) }
     }
 
     /// The type `DataType`.
     pub fn datatype_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_datatype_type), Private) }
     }
 
     /// The type `Union`.
     pub fn uniontype_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_uniontype_type), Private) }
     }
 
     /// The type `UnionAll`.
     pub fn unionall_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_unionall_type), Private) }
     }
 
     /// The type `TypeVar`.
     pub fn tvar_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_tvar_type), Private) }
     }
 
     /// The type `Any`.
     pub fn any_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_any_type), Private) }
     }
 
     /// The type `TypeName`.
     pub fn typename_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_typename_type), Private) }
     }
 
     /// The type `Symbol`.
     pub fn symbol_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_symbol_type), Private) }
     }
 
     /// The type `SSAValue`.
     pub fn ssavalue_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_ssavalue_type), Private) }
     }
 
     /// The type `Slot`.
     pub fn abstractslot_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_abstractslot_type), Private) }
     }
 
     /// The type `SlotNumber`.
     pub fn slotnumber_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_slotnumber_type), Private) }
     }
 
     /// The type `TypedSlot`.
     pub fn typedslot_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_typedslot_type), Private) }
     }
 
     /// The type `Core.Argument`
     pub fn argument_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_argument_type), Private) }
     }
 
     /// The type `Core.Const`
     pub fn const_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_const_type), Private) }
     }
 
     /// The type `Core.PartialStruct`
     pub fn partial_struct_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_partial_struct_type), Private) }
     }
 
     /// The type `Core.PartialOpaque`
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn partial_opaque_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_partial_opaque_type), Private) }
     }
 
     /// The type `Core.InterConditional`
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn interconditional_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_interconditional_type), Private) }
     }
 
     /// The type `MethodMatch`
     pub fn method_match_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_method_match_type), Private) }
     }
 
     /// The type `SimpleVector`.
     pub fn simplevector_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_simplevector_type), Private) }
     }
 
     /// The type `Tuple`.
     pub fn anytuple_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_anytuple_type), Private) }
     }
 
     /// The type of an empty tuple.
     pub fn emptytuple_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_emptytuple_type), Private) }
     }
 
     /// The type `Tuple`.
     pub fn tuple_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_anytuple_type), Private) }
     }
 
     /// The type `Vararg`.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn vararg_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { DataType::wrap(jl_vararg_type, Private) }
     }
 
     /// The type `Function`.
     pub fn function_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_function_type), Private) }
     }
 
     /// The type `Builtin`.
     pub fn builtin_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_builtin_type), Private) }
     }
 
     /// The type `MethodInstance`.
     pub fn method_instance_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_method_instance_type), Private) }
     }
 
     /// The type `CodeInstance`.
     pub fn code_instance_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_code_instance_type), Private) }
     }
 
     /// The type `CodeInfo`.
     pub fn code_info_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_code_info_type), Private) }
     }
 
     /// The type `Method`.
     pub fn method_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_method_type), Private) }
     }
 
     /// The type `Module`.
     pub fn module_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_module_type), Private) }
     }
 
     /// The type `WeakRef`.
     pub fn weakref_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_weakref_type), Private) }
     }
 
     /// The type `AbstractString`.
     pub fn abstractstring_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_abstractstring_type), Private) }
     }
 
     /// The type `String`.
     pub fn string_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_string_type), Private) }
     }
 
     /// The type `ErrorException`.
     pub fn errorexception_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_errorexception_type), Private) }
     }
 
     /// The type `ArgumentError`.
     pub fn argumenterror_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_argumenterror_type), Private) }
     }
 
     /// The type `LoadError`.
     pub fn loaderror_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_loaderror_type), Private) }
     }
 
     /// The type `InitError`.
     pub fn initerror_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_initerror_type), Private) }
     }
 
     /// The type `TypeError`.
     pub fn typeerror_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_typeerror_type), Private) }
     }
 
     /// The type `MethodError`.
     pub fn methoderror_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_methoderror_type), Private) }
     }
 
     /// The type `UndefVarError`.
     pub fn undefvarerror_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_undefvarerror_type), Private) }
     }
 
     /// The type `Core.AtomicError`.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn atomicerror_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_atomicerror_type), Private) }
     }
 
     /// The type `LineInfoNode`.
     pub fn lineinfonode_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_lineinfonode_type), Private) }
     }
 
     /// The type `BoundsError`.
     pub fn boundserror_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_boundserror_type), Private) }
     }
 
     /// The type `Bool`.
     pub fn bool_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_bool_type), Private) }
     }
 
     /// The type `Char`.
     pub fn char_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_char_type), Private) }
     }
 
     /// The type `Int8`.
     pub fn int8_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_int8_type), Private) }
     }
 
     /// The type `UInt8`.
     pub fn uint8_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_uint8_type), Private) }
     }
 
     /// The type `Int16`.
     pub fn int16_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_int16_type), Private) }
     }
 
     /// The type `UInt16`.
     pub fn uint16_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_uint16_type), Private) }
     }
 
     /// The type `Int32`.
     pub fn int32_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_int32_type), Private) }
     }
 
     /// The type `UInt32`.
     pub fn uint32_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_uint32_type), Private) }
     }
 
     /// The type `Int64`.
     pub fn int64_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_int64_type), Private) }
     }
 
     /// The type `UInt64`.
     pub fn uint64_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_uint64_type), Private) }
     }
 
     /// The type `Float16`.
     pub fn float16_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_float16_type), Private) }
     }
 
     /// The type `Float32`.
     pub fn float32_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_float32_type), Private) }
     }
 
     /// The type `Float64`.
     pub fn float64_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_float64_type), Private) }
     }
 
     /// The type `AbstractFloat`.
     pub fn floatingpoint_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_floatingpoint_type), Private) }
     }
 
     /// The type `Number`.
     pub fn number_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_number_type), Private) }
     }
 
     /// The type `Nothing`.
     pub fn nothing_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_nothing_type), Private) }
     }
 
     /// The type `Signed`.
     pub fn signed_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_signed_type), Private) }
     }
 
     /// The type `Ptr{Nothing}`.
     pub fn voidpointer_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_voidpointer_type), Private) }
     }
 
     /// The type `Task`.
     pub fn task_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_task_type), Private) }
     }
 
     /// The type `Expr`.
     pub fn expr_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_expr_type), Private) }
     }
 
     /// The type `GlobalRef`.
     pub fn globalref_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_globalref_type), Private) }
     }
 
     /// The type `LineNumberNode`.
     pub fn linenumbernode_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_linenumbernode_type), Private) }
     }
 
     /// The type `GotoNode`.
     pub fn gotonode_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_gotonode_type), Private) }
     }
 
     /// The type `GotoIfNot`.
     pub fn gotoifnot_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_gotoifnot_type), Private) }
     }
 
     /// The type `ReturnNode`.
     pub fn returnnode_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_returnnode_type), Private) }
     }
 
     /// The type `PhiNode`.
     pub fn phinode_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_phinode_type), Private) }
     }
 
     /// The type `PiNode`.
     pub fn pinode_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_pinode_type), Private) }
     }
 
     /// The type `PhiCNode`.
     pub fn phicnode_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_phicnode_type), Private) }
     }
 
     /// The type `UpsilonNode`.
     pub fn upsilonnode_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_upsilonnode_type), Private) }
     }
 
     /// The type `QuoteNode`.
     pub fn quotenode_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_quotenode_type), Private) }
     }
 
     /// The type `NewVarNode`.
     pub fn newvarnode_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_newvarnode_type), Private) }
     }
 
     /// The type `Intrinsic`.
     pub fn intrinsic_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_intrinsic_type), Private) }
     }
 
     /// The type `MethodTable`.
     pub fn methtable_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_methtable_type), Private) }
     }
 
     /// The type `TypeMapLevel`.
     pub fn typemap_level_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_typemap_level_type), Private) }
     }
 
     /// The type `TypeMapEntry`.
     pub fn typemap_entry_type(_: Global<'base>) -> Self {
+        // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_typemap_entry_type), Private) }
     }
 }
 
 impl<'scope> PartialEq for DataType<'scope> {
     fn eq(&self, other: &Self) -> bool {
-        self.as_value().egal(other.as_value())
+        self.as_value() == other.as_value()
     }
 }
 
 impl<'scope, 'data> PartialEq<Value<'scope, 'data>> for DataType<'scope> {
     fn eq(&self, other: &Value<'scope, 'data>) -> bool {
-        self.as_value().egal(*other)
+        self.as_value() == *other
     }
 }
 
 impl<'scope> Eq for DataType<'scope> {}
 impl_debug!(DataType<'_>);
-
-impl_valid_layout!(DataType<'scope>, 'scope);
+impl_julia_typecheck!(DataType<'frame>, jl_datatype_type, 'frame);
 
 impl<'scope> WrapperPriv<'scope, '_> for DataType<'scope> {
     type Wraps = jl_datatype_t;
     const NAME: &'static str = "DataType";
 
-    #[inline(always)]
+    // Safety: `inner` must not have been freed yet, the result must never be
+    // used after the GC might have freed it.
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, ::std::marker::PhantomData)
     }
 
-    #[inline(always)]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
 }
+
+impl_root!(DataType, 1);
+
+/// A reference to a [`DataType`] that has not been explicitly rooted.
+pub type DataTypeRef<'scope> = Ref<'scope, 'static, DataType<'scope>>;
+impl_valid_layout!(DataTypeRef, DataType);
+impl_ref_root!(DataType, DataTypeRef, 1);

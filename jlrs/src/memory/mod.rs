@@ -1,73 +1,90 @@
-//! Structs and traits to protect data from being garbage collected.
+//! Julia memory management.
 //!
-//! Julia is a garbage-collected programming language, whenever Julia is called through its C API
-//! the user is responsible for ensuring the garbage collector can reach all values that are in
-//! use. The garbage collector uses a set of values called roots as a starting point when
-//! determining what values can still be reached, any value that is reachable is not freed.
-//! Whenever a newly allocated value is returned by the C API, it's not reachable from one of the
-//! existing roots so it must be added to this set. Structurally, this set is a stack of GC
-//! frames. A frame is essentially a dynamically-sized array of roots. The C API provides several
-//! macros to create such a frame and push it to the stack, which can only be used once in a scope
-//! and must be matched by a call to the macro that pops the frame from the stack before leaving
-//! the scope.
+//! This module contains all structs and traits that are used to deal with memory management and
+//! enforcing a degree of compile-time memory safety by applying reasonable lifetime bounds to
+//! Julia data.
 //!
-//! These macros can be neither directly translated to Rust, nor wrapped in another C function,
-//! because these macros allocate the frame on the stack with `alloca`, which is not possible in
-//! Rust. Instead, the structs and traits in this module provide a reimplementation of this
-//! mechanism.
+//! The Julia GC is unaware of any references to Julia data existing outside of Julia itself. To
+//! make these references known to the GC, data that is used must be rooted. This ensures the GC
+//! doesn't accidentally identify the data as unused and free it.
 //!
-//! In particular, when you use jlrs all interactions with Julia happen inside a scope. A base
-//! scope can be created with the methods [`Julia::scope`] and [`Julia::scope_with_slots`]. These
-//! methods take a closure which is called inside this scope. This closure is provided with its
-//! two arguments, a [`Global`] and a mutable reference to a [`GcFrame`]. The first of these is an
-//! access token that can be used to access Julia modules and their contents, the second is a new
-//! frame that is used to store roots. The frame is popped from the stack when leaving the scope,
-//! so any value rooted in that frame can be used until you leave the scope.
+//! A scope must be created before data can be rooted, the sync runtime lets you create a scope
+//! directly with [`Julia::scope`]. This method takes a closure which takes two arguments, the
+//! second is a [`GcFrame`]. A `GcFrame` is used to store roots, each scope has its own `GcFrame`,
+//! any Julia data rooted in this frame is guaranteed to be protected from being freed by the GC
+//! until you leave the scope.
 //!
-//! Whenever a new value is created, it's usually rooted automatically by jlrs. Methods that
-//! create new values either require an argument that implements the [`Scope`] trait, or a mutable
-//! reference to something that implements the [`Frame`] trait. All mutable references to an
-//! implementation of [`Frame`] implement [`Scope`].
+//! There are two other frame types, [`AsyncGcFrame`] and [`NullFrame`], the first is used by the
+//! async runtime and is used with several async functions, while the latter is only available
+//! when calling Rust from Julia with its `ccall` interface. All these frame types implement the
+//! [`Frame`] trait.
 //!
-//! More informaton can be found in the [`frame`] and [`scope`] modules.
+//! It's important to avoid rooting data longer than necessary. As more data is rooted, more
+//! memory remains in use, which causes the GC to run more often and require more time to run.
+//! Scopes can be nested by calling [`Frame::scope`], they form a single nested hierarchy. Any
+//! data rooted in the frame provided to this new scope is rooted until that new scope ends.
+//! Lifetimes ensure no data that is rooted in the child scope can be returned to the parent
+//! scope.
 //!
-//! [`Julia::scope`]: crate::julia::Julia::scope
-//! [`Julia::scope_with_slots`]: crate::julia::Julia::scope_with_slots
+//! To return rooted data from a child scope, it must be rooted in an ancestral scope. The method
+//! [`Frame::output`] can be used to reserve an [`Output`] in a frame. Methods that return rooted
+//! data generally take an implementation of [`PartialScope`] or [`Scope`]. Methods that take a
+//! `PartialScope` only need to root a single value, both `Output` and mutable references to an
+//! implementation of `Frame` implement this trait. In the first case the data is rooted in the
+//! frame targeted by the output, in the second it's rooted in the current frame. Methods that
+//! take a `Scope` need to root temporary data. While mutable references to an implementation of
+//! `Frame` implement this trait, `Output` doesn't. An `Output` must first be upgraded to an
+//! [`OutputScope`] by calling [`Output::into_scope`].
+//!
+//! Not all data needs to be rooted, roots form the starting point for the GC to trace the entire
+//! graph of reachable data. As long as data is reachable from a root, it won't be freed. Julia
+//! modules provide global scopes, their contents are rooted unless the module is reloaded or the
+//! data is overwritten some other way (e.g. by mutating a global value). If you never use the
+//! result of a Julia function call the result doesn't need to be rooted either. Most methods that
+//! return rooted Julia data have a corresponding method that leaves the result unrooted. These
+//! methods often only require a [`Global`], which ensures that this data can't be accessed before
+//! Julia has been initialized and that reasonable lifetime bounds are applied.
+//!
+//! The final tool that is available to manage the rootedness of Julia data is the
+//! [`ReusableSlot`], it can be created with [`Frame::reusable_slot`] and provides a slot in that
+//! frame that can be overwritten.
+//!
 //! [`Global`]: global::Global
+//! [`ReusableSlot`]: reusable_slot::ReusableSlot
 //! [`GcFrame`]: frame::GcFrame
+//! [`AsyncGcFrame`]: frame::AsyncGcFrame
+//! [`NullFrame`]: frame::NullFrame
+//! [`PartialScope`]: scope::PartialScope
 //! [`Scope`]: scope::Scope
 //! [`Frame`]: frame::Frame
-//! [`ScopeExt::scope`]: scope::Scope::scope
-//! [`ScopeExt`]: scope::ScopeExt
-//! [`Scope::value_scope`]: scope::Scope::value_scope
-//! [`Scope::result_scope`]: scope::Scope::result_scope
+//! [`Frame::scope`]: frame::Frame::scope
+//! [`Frame::output`]: frame::Frame::output
+//! [`Frame::reusable_slot`]: frame::Frame::reusable_slot
 //! [`Output`]: output::Output
-//! [`OutputScope`]: output::OutputScope
+//! [`OutputScope`]: scope::OutputScope
 //! [`Output::into_scope`]: output::Output::into_scope
+//! [`Julia::scope`]: crate::runtime::sync_rt::Julia::scope
 pub mod frame;
 pub mod gc;
 pub mod global;
 pub mod mode;
 pub mod output;
 pub mod reusable_slot;
-pub(crate) mod root_pending;
 pub mod scope;
 pub(crate) mod stack_page;
 
-#[cfg(not(feature = "lts"))]
-use jl_sys::jl_get_current_task;
-#[cfg(feature = "lts")]
-use jl_sys::jl_get_ptls_states;
+use cfg_if::cfg_if;
 use jl_sys::jl_tls_states_t;
-#[cfg(not(feature = "lts"))]
-use std::ptr::NonNull;
 
-#[cfg(feature = "lts")]
 pub(crate) unsafe fn get_tls() -> *mut jl_tls_states_t {
-    jl_get_ptls_states()
-}
-
-#[cfg(not(feature = "lts"))]
-pub(crate) unsafe fn get_tls() -> *mut jl_tls_states_t {
-    NonNull::new_unchecked(jl_get_current_task()).as_ref().ptls
+    cfg_if! {
+        if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+            use jl_sys::jl_get_ptls_states;
+            jl_get_ptls_states()
+        } else {
+            use jl_sys::jl_get_current_task;
+            use std::ptr::NonNull;
+            NonNull::new_unchecked(jl_get_current_task()).as_ref().ptls
+        }
+    }
 }

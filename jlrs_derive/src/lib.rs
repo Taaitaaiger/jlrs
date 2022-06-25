@@ -182,7 +182,7 @@ fn impl_into_julia(ast: &syn::DeriveInput) -> TokenStream {
 
     let into_julia_impl = quote! {
         unsafe impl ::jlrs::convert::into_julia::IntoJulia for #name {
-            fn julia_type<'target>(global: ::jlrs::memory::global::Global<'target>) -> ::jlrs::wrappers::ptr::DataTypeRef<'target> {
+            fn julia_type<'target>(global: ::jlrs::memory::global::Global<'target>) -> ::jlrs::wrappers::ptr::datatype::DataTypeRef<'target> {
                 unsafe {
                     ::jlrs::wrappers::ptr::module::Module::#func(global)
                         #(
@@ -302,7 +302,7 @@ fn impl_valid_layout(ast: &syn::DeriveInput) -> TokenStream {
                             return false;
                         }
 
-                        let field_types = dt.field_types().wrapper_unchecked().data();
+                        let field_types = dt.field_types().wrapper_unchecked().unrestricted_data().as_slice();
 
                         #(
                             if !<#rs_non_union_fields as ::jlrs::layout::valid_layout::ValidLayout>::valid_layout(field_types[#jl_non_union_field_idxs].wrapper_unchecked()) {
@@ -327,6 +327,8 @@ fn impl_valid_layout(ast: &syn::DeriveInput) -> TokenStream {
 
                 false
             }
+
+            const IS_REF: bool = false;
         }
     };
 

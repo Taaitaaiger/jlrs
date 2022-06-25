@@ -1,5 +1,6 @@
-#ifdef _MSC_VER
 #include <uv.h>
+
+#ifdef _MSC_VER
 #include <windows.h>
 
 template <typename T>
@@ -38,14 +39,12 @@ extern "C"
         jlrs_result_tag_t flag;
         jl_value_t *data;
     } jlrs_result_t;
-#endif
 
-    void jlrs_print_stack(jl_gcframe_t *frame);
-
-#if !defined(JLRS_WINDOWS_LTS)
     jlrs_result_t jlrs_alloc_array_1d(jl_value_t *atype, size_t nr);
     jlrs_result_t jlrs_alloc_array_2d(jl_value_t *atype, size_t nr, size_t nc);
     jlrs_result_t jlrs_alloc_array_3d(jl_value_t *atype, size_t nr, size_t nc, size_t z);
+    jlrs_result_t jlrs_ptr_to_array_1d(jl_value_t *atype, void *data, size_t nel, int own_buffer);
+    jlrs_result_t jlrs_ptr_to_array(jl_value_t *atype, void *data, jl_value_t *_dims, int own_buffer);
     jlrs_result_t jlrs_apply_array_type(jl_value_t *ty, size_t dim);
     jlrs_result_t jlrs_apply_type(jl_value_t *tc, jl_value_t **params, size_t n);
     jlrs_result_t jlrs_new_array(jl_value_t *atype, jl_value_t *dims);
@@ -61,10 +60,13 @@ extern "C"
     jlrs_result_t jlrs_array_del_end(jl_array_t *a, size_t dec);
     jlrs_result_t jlrs_array_grow_beg(jl_array_t *a, size_t inc);
     jlrs_result_t jlrs_array_del_beg(jl_array_t *a, size_t dec);
+    jlrs_result_t jlrs_arrayset(jl_array_t *a JL_ROOTING_ARGUMENT, jl_value_t *rhs JL_ROOTED_ARGUMENT JL_MAYBE_UNROOTED, size_t i);
+    jlrs_result_t jlrs_arrayref(jl_array_t *a JL_PROPAGATES_ROOT, size_t i);
 #endif
 
     uint_t jlrs_array_data_owner_offset(uint16_t n_dims);
-
+    void jlrs_lock(jl_value_t *v);
+    void jlrs_unlock(jl_value_t *v);
 #ifdef __cplusplus
 }
 #endif

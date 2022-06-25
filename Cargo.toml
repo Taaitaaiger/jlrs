@@ -3,11 +3,6 @@
 members = [
     "jlrs",
     "jlrs_derive",
-    "jlrs_derive_tests",
-    "jlrs_async_tests",
-    "jl_sys"
-]
-
-exclude = [
+    "jl_sys",
     "examples"
 ]

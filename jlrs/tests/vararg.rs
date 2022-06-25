@@ -1,22 +1,21 @@
 mod util;
-#[cfg(all(not(feature = "lts"), feature = "sync-rt"))]
+#[cfg(all(not(feature = "lts"), feature = "sync-rt", feature = "internal-types"))]
 mod not_lts {
     use super::util::JULIA;
-    use jlrs::layout::valid_layout::ValidLayout;
     use jlrs::prelude::*;
-    use jlrs::wrappers::ptr::vararg::Vararg;
+    use jlrs::wrappers::ptr::internal::vararg::Vararg;
+    use jlrs::{layout::valid_layout::ValidLayout, wrappers::ptr::internal::vararg::VarargRef};
 
     #[test]
     fn access_vararg() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |global, frame| unsafe {
-                let vararg =
-                    Value::eval_string(&mut *frame, "Vararg{Int32}")?.into_jlrs_result()?;
+            jlrs.scope_with_capacity(1, |global, mut frame| unsafe {
+                let vararg = Value::eval_string(&mut frame, "Vararg{Int32}")?.into_jlrs_result()?;
 
                 assert!(vararg.is::<Vararg>());
-                assert!(Vararg::valid_layout(
+                assert!(VarargRef::valid_layout(
                     vararg.as_value().datatype().as_value()
                 ));
 
@@ -37,10 +36,10 @@ mod not_lts {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |global, frame| {
+            jlrs.scope_with_capacity(1, |global, mut frame| {
                 let vararg_type = DataType::vararg_type(global);
                 let instance = vararg_type
-                    .instantiate(&mut *frame, [])?
+                    .instantiate(&mut frame, [])?
                     .into_jlrs_result()?;
 
                 assert!(instance.is::<Vararg>());
@@ -59,10 +58,10 @@ mod not_lts {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(1, |global, frame| unsafe {
+            jlrs.scope_with_capacity(1, |global, mut frame| unsafe {
                 let vararg_type = DataType::vararg_type(global);
                 let instance = vararg_type
-                    .instantiate(&mut *frame, [DataType::int32_type(global).as_value()])?
+                    .instantiate(&mut frame, [DataType::int32_type(global).as_value()])?
                     .into_jlrs_result()?;
 
                 assert!(instance.is::<Vararg>());
@@ -84,11 +83,11 @@ mod not_lts {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_slots(2, |global, frame| unsafe {
+            jlrs.scope_with_capacity(2, |global, mut frame| unsafe {
                 let vararg_type = DataType::vararg_type(global);
-                let n = Value::new(&mut *frame, 3isize)?;
+                let n = Value::new(&mut frame, 3isize)?;
                 let instance = vararg_type
-                    .instantiate(&mut *frame, [DataType::int32_type(global).as_value(), n])?
+                    .instantiate(&mut frame, [DataType::int32_type(global).as_value(), n])?
                     .into_jlrs_result()?;
 
                 assert!(instance.is::<Vararg>());

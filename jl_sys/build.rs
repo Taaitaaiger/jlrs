@@ -7,165 +7,164 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::{env, process::Command};
 
-#[cfg(target_os = "linux")]
+use cfg_if::cfg_if;
+
 fn find_julia() -> Option<String> {
-    if let Ok(path) = env::var("JULIA_DIR") {
-        return Some(path);
-    }
-
-    let out = Command::new("which").arg("julia").output().ok()?.stdout;
-    let mut julia_path = PathBuf::from(OsStr::from_bytes(out.as_ref()));
-
-    if !julia_path.pop() {
-        return None;
-    }
-
-    if !julia_path.pop() {
-        return None;
-    }
-
-    Some(julia_path.to_string_lossy().to_string())
-}
-
-#[cfg(target_os = "windows")]
-fn find_julia() -> Option<String> {
-    if let Ok(path) = env::var("JULIA_DIR") {
-        return Some(path);
-    }
-
-    let out = Command::new("cmd")
-        .args(["/C", "where", "julia"])
-        .output()
-        .ok()?;
-    let results = String::from_utf8(out.stdout).ok()?;
-
-    let mut lines = results.lines();
-    let first = lines.next()?;
-
-    let mut julia_path = PathBuf::from_str(first).unwrap();
-
-    if !julia_path.pop() {
-        return None;
-    }
-
-    if !julia_path.pop() {
-        return None;
-    }
-
-    Some(julia_path.to_string_lossy().to_string())
-}
-
-#[cfg(target_os = "linux")]
-fn flags() -> String {
-    match find_julia() {
-        Some(julia_dir) => {
-            let jl_include_path = format!("{}/include/julia/", julia_dir);
-            let jl_lib_path = format!("-L{}/lib/", julia_dir);
-            println!("cargo:rustc-flags={}", &jl_lib_path);
-
-            if env::var("CARGO_FEATURE_UV").is_ok() {
-                let jl_internal_lib_path = format!("-L{}/lib/julia", julia_dir);
-                println!("cargo:rustc-flags={}", &jl_internal_lib_path);
+    cfg_if! {
+        if #[cfg(target_os = "linux")] {
+            if let Ok(path) = env::var("JULIA_DIR") {
+                return Some(path);
             }
 
+            let out = Command::new("which").arg("julia").output().ok()?.stdout;
+            let mut julia_path = PathBuf::from(OsStr::from_bytes(out.as_ref()));
+
+            if !julia_path.pop() {
+                return None;
+            }
+
+            if !julia_path.pop() {
+                return None;
+            }
+
+            Some(julia_path.to_string_lossy().to_string())
+        } else if #[cfg(target_os = "windows")] {
+            if let Ok(path) = env::var("JULIA_DIR") {
+                return Some(path);
+            }
+
+            let out = Command::new("cmd")
+                .args(["/C", "where", "julia"])
+                .output()
+                .ok()?;
+            let results = String::from_utf8(out.stdout).ok()?;
+
+            let mut lines = results.lines();
+            let first = lines.next()?;
+
+            let mut julia_path = PathBuf::from_str(first).unwrap();
+
+            if !julia_path.pop() {
+                return None;
+            }
+
+            if !julia_path.pop() {
+                return None;
+            }
+
+            Some(julia_path.to_string_lossy().to_string())
+        } else {
+            unimplemented!("Only Linux and Windows are supported")
+        }
+    }
+}
+
+fn set_flags(julia_dir: &str) {
+    cfg_if! {
+        if #[cfg(target_os = "linux")] {
+            println!("cargo:rustc-link-search={}/lib", &julia_dir);
             println!("cargo:rustc-link-arg=-Wl,--export-dynamic");
 
-            if env::var("CARGO_FEATURE_DEBUG").is_ok() {
-                println!("cargo:rustc-link-lib=julia-debug");
-            } else {
-                println!("cargo:rustc-link-lib=julia");
+            cfg_if! {
+                if #[cfg(all(feature = "debug", not(feature = "all-features-override")))] {
+                    println!("cargo:rustc-link-lib=julia-debug");
+                } else {
+                    println!("cargo:rustc-link-lib=julia");
+                }
             }
 
-            if env::var("CARGO_FEATURE_UV").is_ok() {
-                println!("cargo:rustc-link-lib=uv");
+            cfg_if! {
+                if #[cfg(feature = "uv")] {
+                    println!("cargo:rustc-link-search={}/lib/julia", &julia_dir);
+                    println!("cargo:rustc-link-lib=uv");
+                }
             }
-
-            jl_include_path
-        }
-        None => panic!("Unable to set compiler flags: JULIA_DIR is not set and no installed version of Julia can be found"),
-    }
-}
-
-#[cfg(all(target_os = "windows", target_env = "msvc"))]
-fn flags() -> String {
-    match find_julia() {
-        Some(julia_dir) => {
-            let jl_include_path = format!("{}/include/julia/", &julia_dir);
+        } else if #[cfg(all(target_os = "windows", target_env = "msvc"))] {
             println!("cargo:rustc-link-search={}/bin", &julia_dir);
 
-            if env::var("CARGO_FEATURE_DEBUG").is_ok() {
-                println!("cargo:rustc-link-lib=julia-debug");
-            } else {
-                println!("cargo:rustc-link-lib=libjulia");
+            cfg_if! {
+                if #[cfg(all(feature = "debug", not(feature = "all-features-override")))] {
+                    println!("cargo:rustc-link-lib=libjulia-debug");
+                } else {
+                    println!("cargo:rustc-link-lib=libjulia");
+                }
             }
 
             println!("cargo:rustc-link-lib=libopenlibm");
 
-            if env::var("CARGO_FEATURE_UV").is_ok() {
-                println!("cargo:rustc-link-lib=libuv-2");
+            cfg_if! {
+                if #[cfg(feature = "uv")] {
+                    println!("cargo:rustc-link-lib=libuv-2");
+                }
             }
-
-            jl_include_path
-        }
-        None => panic!("Unable to set compiler flags: JULIA_DIR is not set and no installed version of Julia can be found"),
-    }
-}
-
-#[cfg(all(target_os = "windows", target_env = "gnu"))]
-fn flags() -> String {
-    match find_julia() {
-        Some(julia_dir) => {
-            let jl_include_path = format!("{}/include/julia/", julia_dir);
+        } else if #[cfg(all(target_os = "windows", target_env = "gnu"))] {
             println!("cargo:rustc-link-search={}/bin", &julia_dir);
 
-            if env::var("CARGO_FEATURE_DEBUG").is_ok() {
-                println!("cargo:rustc-link-lib=julia-debug");
-            } else {
-                println!("cargo:rustc-link-lib=julia");
+            cfg_if! {
+                if #[cfg(all(feature = "debug", not(feature = "all-features-override")))] {
+                    println!("cargo:rustc-link-lib=julia-debug");
+                } else {
+                    println!("cargo:rustc-link-lib=julia");
+                }
             }
 
             println!("cargo:rustc-link-lib=openlibm");
             println!("cargo:rustc-link-arg=-Wl,--stack,8388608");
 
-            if env::var("CARGO_FEATURE_UV").is_ok() {
-                println!("cargo:rustc-link-lib=uv-2");
+            cfg_if! {
+                if #[cfg(feature = "uv")] {
+                    println!("cargo:rustc-link-lib=uv-2");
+                }
             }
-
-            jl_include_path
+        } else {
+            unreachable!()
         }
-        None => panic!("Unable to set compiler flags: JULIA_DIR is not set and no installed version of Julia can be found"),
     }
 }
 
 fn main() {
-    if env::var("DOCS_RS").is_ok() {
-        return;
-    }
-
     println!("cargo:rerun-if-changed=src/jlrs_cc.cc");
     println!("cargo:rerun-if-changed=src/jlrs_cc.h");
     println!("cargo:rerun-if-env-changed=JULIA_DIR");
 
-    let include_dir = flags();
+    if env::var("DOCS_RS").is_ok() {
+        return;
+    }
 
+    let include_dir = match find_julia() {
+        Some(julia_dir) => {
+            set_flags(&julia_dir);
+            format!("{}/include/julia/", &julia_dir)
+        }
+        None => panic!("JULIA_DIR is not set and no installed version of Julia can be found"),
+    };
+
+    // Compile a small C++ library which provides a few additional functions that wrap functions
+    // from the Julia C API that can throw exceptions with the JL_TRY and JL_CATCH macros.
+    // This has to be a C++ library because MSVC doesn't support _Atomic.
     let mut c = cc::Build::new();
     c.file("src/jlrs_cc.cc").include(&include_dir).cpp(true);
 
-    #[cfg(all(feature = "lts", target_os = "windows"))]
+    #[cfg(all(
+        any(feature = "windows-lts", all(feature = "lts", windows)),
+        not(feature = "all-features-override")
+    ))]
     c.define("JLRS_WINDOWS_LTS", None);
 
     c.compile("jlrs_cc");
 
-    #[cfg(feature = "use-bindgen")]
+    #[cfg(all(feature = "use-bindgen", not(feature = "all-features-override")))]
     {
         let mut out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
         out_path.push("bindings.rs");
 
         let include_dir_flag = format!("-I{}", include_dir);
-        let bindings = bindgen::Builder::default()
+        #[allow(unused_mut)]
+        let mut builder = bindgen::Builder::default()
             .clang_arg(include_dir_flag)
-            .header("src/jlrs_c.h")
+            .header("src/jlrs_cc.h")
             .size_t_is_usize(true)
+            .layout_tests(false)
             .allowlist_function("jl_alloc_array_1d")
             .allowlist_function("jl_alloc_array_2d")
             .allowlist_function("jl_alloc_array_3d")
@@ -175,8 +174,14 @@ fn main() {
             .allowlist_function("jl_apply_generic")
             .allowlist_function("jl_apply_tuple_type_v")
             .allowlist_function("jl_apply_type")
+            .allowlist_function("jl_array_del_beg")
+            .allowlist_function("jl_array_del_end")
             .allowlist_function("jl_array_eltype")
+            .allowlist_function("jl_array_grow_beg")
+            .allowlist_function("jl_array_grow_end")
             .allowlist_function("jl_array_typetagdata")
+            .allowlist_function("jl_arrayset")
+            .allowlist_function("jl_arrayref")
             .allowlist_function("jl_atexit_hook")
             .allowlist_function("jl_box_bool")
             .allowlist_function("jl_box_char")
@@ -199,9 +204,9 @@ fn main() {
             .allowlist_function("jl_compute_fieldtypes")
             .allowlist_function("jl_cpu_threads")
             .allowlist_function("jl_egal")
+            .allowlist_function("jl_environ")
             .allowlist_function("jl_eval_string")
             .allowlist_function("jl_exception_occurred")
-            .allowlist_function("jl_environ")
             .allowlist_function("jl_field_index")
             .allowlist_function("jl_gc_add_finalizer")
             .allowlist_function("jl_gc_add_ptr_finalizer")
@@ -210,7 +215,6 @@ fn main() {
             .allowlist_function("jl_gc_is_enabled")
             .allowlist_function("jl_gc_queue_root")
             .allowlist_function("jl_gc_safepoint")
-            .allowlist_function("jl_getallocationgranularity")
             .allowlist_function("jl_get_current_task")
             .allowlist_function("jl_get_global")
             .allowlist_function("jl_get_libllvm")
@@ -220,6 +224,7 @@ fn main() {
             .allowlist_function("jl_get_ptls_states")
             .allowlist_function("jl_get_ARCH")
             .allowlist_function("jl_get_UNAME")
+            .allowlist_function("jl_getallocationgranularity")
             .allowlist_function("jl_getpagesize")
             .allowlist_function("jl_git_branch")
             .allowlist_function("jl_git_commit")
@@ -243,6 +248,7 @@ fn main() {
             .allowlist_function("jl_process_events")
             .allowlist_function("jl_ptr_to_array")
             .allowlist_function("jl_ptr_to_array_1d")
+            .allowlist_function("jl_reshape_array")
             .allowlist_function("jl_set_const")
             .allowlist_function("jl_set_global")
             .allowlist_function("jl_set_nth_field")
@@ -272,31 +278,10 @@ fn main() {
             .allowlist_function("jl_ver_patch")
             .allowlist_function("jl_ver_string")
             .allowlist_function("jl_yield")
-            .allowlist_function("uv_async_send")
-            .allowlist_function("jlrs_alloc_array_1d")
-            .allowlist_function("jlrs_alloc_array_2d")
-            .allowlist_function("jlrs_alloc_array_3d")
-            .allowlist_function("jlrs_apply_array_type")
-            .allowlist_function("jlrs_apply_type")
-            .allowlist_function("jlrs_get_nth_field")
-            .allowlist_function("jlrs_new_array")
-            .allowlist_function("jlrs_new_structv")
-            .allowlist_function("jlrs_new_typevar")
-            .allowlist_function("jlrs_set_const")
-            .allowlist_function("jlrs_set_global")
-            .allowlist_function("jlrs_set_nth_field")
-            .allowlist_function("jlrs_type_union")
-            .allowlist_function("jlrs_type_unionall")
-            .allowlist_function("jlrs_reshape_array")
-            .allowlist_function("jlrs_array_grow_end")
-            .allowlist_function("jlrs_array_del_end")
-            .allowlist_function("jlrs_array_grow_beg")
-            .allowlist_function("jlrs_array_del_beg")
-            .allowlist_function("jlrs_array_sizehint")
-            .allowlist_function("jlrs_array_ptr_1d_push")
-            .allowlist_function("jlrs_array_ptr_1d_append")
+            // .allowlist_function("uv_async_send")
+            .allowlist_function("jlrs_lock")
+            .allowlist_function("jlrs_unlock")
             .allowlist_function("jlrs_array_data_owner_offset")
-            .allowlist_function("jlrs_print_stack")
             .allowlist_type("jl_code_instance_t")
             .allowlist_type("jl_datatype_t")
             .allowlist_type("jl_expr_t")
@@ -306,6 +291,7 @@ fn main() {
             .allowlist_type("jl_method_match_t")
             .allowlist_type("jl_methtable_t")
             .allowlist_type("jl_opaque_closure_t")
+            .allowlist_type("jl_options_t")
             .allowlist_type("jl_taggedvalue_t")
             .allowlist_type("jl_task_t")
             .allowlist_type("jl_typemap_entry_t")
@@ -395,6 +381,7 @@ fn main() {
             .allowlist_var("jl_number_type")
             .allowlist_var("jl_opaque_closure_type")
             .allowlist_var("jl_opaque_closure_typename")
+            .allowlist_var("jl_options")
             .allowlist_var("jl_phicnode_type")
             .allowlist_var("jl_phinode_type")
             .allowlist_var("jl_pinode_type")
@@ -438,12 +425,43 @@ fn main() {
             .allowlist_var("jl_vecelement_typename")
             .allowlist_var("jl_voidpointer_type")
             .allowlist_var("jl_weakref_type")
-            .allowlist_var("jl_weakref_typejl_abstractslot_type")
+            .allowlist_var("jl_weakref_typejl_abstractslot_type");
+
+        #[cfg(not(any(feature = "windows-lts", all(feature = "lts", windows))))]
+        {
+            builder = builder
+                .allowlist_function("jlrs_alloc_array_1d")
+                .allowlist_function("jlrs_alloc_array_2d")
+                .allowlist_function("jlrs_alloc_array_3d")
+                .allowlist_function("jlrs_apply_array_type")
+                .allowlist_function("jlrs_ptr_to_array_1d")
+                .allowlist_function("jlrs_ptr_to_array")
+                .allowlist_function("jlrs_apply_type")
+                .allowlist_function("jlrs_get_nth_field")
+                .allowlist_function("jlrs_new_array")
+                .allowlist_function("jlrs_new_structv")
+                .allowlist_function("jlrs_new_typevar")
+                .allowlist_function("jlrs_set_const")
+                .allowlist_function("jlrs_set_global")
+                .allowlist_function("jlrs_set_nth_field")
+                .allowlist_function("jlrs_type_union")
+                .allowlist_function("jlrs_type_unionall")
+                .allowlist_function("jlrs_reshape_array")
+                .allowlist_function("jlrs_array_grow_end")
+                .allowlist_function("jlrs_array_del_end")
+                .allowlist_function("jlrs_array_grow_beg")
+                .allowlist_function("jlrs_array_del_beg")
+                .allowlist_function("jlrs_array_sizehint")
+                .allowlist_function("jlrs_array_ptr_1d_push")
+                .allowlist_function("jlrs_array_ptr_1d_append")
+                .allowlist_function("jlrs_arrayset")
+                .allowlist_function("jlrs_arrayref");
+        }
+
+        builder
             .rustfmt_bindings(true)
             .generate()
-            .expect("Unable to generate bindings");
-
-        bindings
+            .expect("Unable to generate bindings")
             .write_to_file(&out_path)
             .expect("Couldn't write bindings!");
     }

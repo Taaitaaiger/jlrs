@@ -1,6 +1,6 @@
 //! System and Julia version information.
 
-use crate::{private::Private, wrappers::ptr::private::Wrapper, wrappers::ptr::symbol::Symbol};
+use crate::{private::Private, wrappers::ptr::private::WrapperPriv, wrappers::ptr::symbol::Symbol};
 use jl_sys::{
     jl_cpu_threads, jl_get_ARCH, jl_get_UNAME, jl_getallocationgranularity, jl_getpagesize,
     jl_git_branch, jl_git_commit, jl_is_debugbuild, jl_n_threads, jl_ver_is_release, jl_ver_major,
@@ -10,11 +10,11 @@ use std::{ffi::CStr, marker::PhantomData};
 
 /// Global Julia information.
 pub struct Info {
-    _priv: PhantomData<*mut ()>,
+    _priv: PhantomData<()>,
 }
 
 impl Info {
-    pub(crate) fn new() -> Self {
+    pub(crate) unsafe fn new() -> Self {
         Info { _priv: PhantomData }
     }
 

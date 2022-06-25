@@ -51,12 +51,12 @@ macro_rules! count {
 /// # JULIA.with(|j| {
 /// # let mut julia = j.borrow_mut();
 /// // Three slots; two for the inputs and one for the output.
-/// julia.scope_with_slots(3, |global, frame| {
+/// julia.scope_with_capacity(3, |global, mut frame| {
 ///     // Create the two arguments, each value requires one slot
-///     let i = Value::new(&mut *frame, 2u64)?;
-///     let j = Value::new(&mut *frame, 1u32)?;
+///     let i = Value::new(&mut frame, 2u64)?;
+///     let j = Value::new(&mut frame, 1u32)?;
 ///
-///     let _nt = named_tuple!(&mut *frame, "i" => i, "j" => j)?;
+///     let _nt = named_tuple!(&mut frame, "i" => i, "j" => j)?;
 ///
 ///     Ok(())
 /// }).unwrap();
@@ -96,52 +96,76 @@ macro_rules! named_tuple {
 }
 
 use crate::{
-    convert::{into_julia::IntoJulia, temporary_symbol::TemporarySymbol, unbox::Unbox},
-    error::{JlrsError, JlrsResult, JuliaResultRef, CANNOT_DISPLAY_TYPE},
+    call::{Call, ProvideKeywords, WithKeywords},
+    convert::{into_julia::IntoJulia, to_symbol::ToSymbol, unbox::Unbox},
+    error::{
+        AccessError, IOError, InstantiationError, JlrsError, JlrsResult, JuliaResult,
+        JuliaResultRef, TypeError, CANNOT_DISPLAY_TYPE,
+    },
     impl_debug,
     layout::{
+        field_index::FieldIndex,
         typecheck::{NamedTuple, Typecheck},
         valid_layout::ValidLayout,
     },
-    memory::{frame::Frame, get_tls, global::Global, scope::Scope},
+    memory::{
+        frame::Frame,
+        get_tls,
+        global::Global,
+        output::Output,
+        scope::{PartialScope, Scope},
+    },
     private::Private,
     wrappers::ptr::{
         array::Array,
-        call::{Call, CallExt, WithKeywords},
         datatype::DataType,
+        datatype::DataTypeRef,
         module::Module,
-        private::Wrapper as WrapperPriv,
+        private::WrapperPriv,
         string::JuliaString,
         symbol::Symbol,
         union::{nth_union_component, Union},
         union_all::UnionAll,
-        ValueRef, Wrapper,
+        Wrapper,
     },
 };
+use cfg_if::cfg_if;
 use jl_sys::{
     jl_an_empty_string, jl_an_empty_vec_any, jl_apply_type, jl_array_any_type, jl_array_int32_type,
-    jl_array_symbol_type, jl_array_uint8_type, jl_astaggedvalue, jl_bottom_type, jl_call, jl_call0,
-    jl_call1, jl_call2, jl_call3, jl_diverror_exception, jl_egal, jl_emptytuple, jl_eval_string,
-    jl_exception_occurred, jl_false, jl_field_index, jl_field_isptr, jl_field_offset,
-    jl_gc_add_finalizer, jl_gc_add_ptr_finalizer, jl_get_nth_field, jl_get_nth_field_noalloc,
-    jl_interrupt_exception, jl_isa, jl_memory_exception, jl_nothing, jl_object_id,
-    jl_readonlymemory_exception, jl_set_nth_field, jl_stackovf_exception, jl_stderr_obj,
-    jl_stdout_obj, jl_subtype, jl_true, jl_typeof_str, jl_undefref_exception, jl_value_t,
+    jl_array_symbol_type, jl_array_typetagdata, jl_array_uint8_type, jl_astaggedvalue,
+    jl_bottom_type, jl_call, jl_call0, jl_call1, jl_call2, jl_call3, jl_diverror_exception,
+    jl_egal, jl_emptytuple, jl_eval_string, jl_exception_occurred, jl_false, jl_field_index,
+    jl_field_isptr, jl_gc_add_finalizer, jl_gc_add_ptr_finalizer, jl_get_nth_field,
+    jl_get_nth_field_noalloc, jl_interrupt_exception, jl_isa, jl_memory_exception, jl_nothing,
+    jl_object_id, jl_readonlymemory_exception, jl_set_nth_field, jl_stackovf_exception,
+    jl_stderr_obj, jl_stdout_obj, jl_subtype, jl_true, jl_typeof_str, jl_undefref_exception,
+    jl_value_t,
+};
+use std::{
+    ffi::{c_void, CStr, CString},
+    marker::PhantomData,
+    mem::MaybeUninit,
+    path::Path,
+    ptr::NonNull,
+    sync::atomic::Ordering,
+    usize,
 };
 
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
 use jl_sys::{jlrs_apply_type, jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_set_nth_field};
 
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
-use crate::error::JuliaResult;
+use super::Ref;
 
-use std::{
-    ffi::{c_void, CStr, CString},
-    marker::PhantomData,
-    path::Path,
-    ptr::NonNull,
-    usize,
-};
+cfg_if! {
+    if #[cfg(any(not(feature = "lts"), feature = "all-features-override"))] {
+        use jl_sys::{jlrs_lock, jlrs_unlock};
+
+        use std::{
+            ptr::null_mut,
+            sync::atomic::{AtomicPtr, AtomicU16, AtomicU32, AtomicU64, AtomicU8},
+        };
+    }
+}
 
 /// In some cases it's necessary to place one or more arguments in front of the arguments a
 /// function is called with. Examples include the `named_tuple` macro and `Value::call_async`.
@@ -159,12 +183,18 @@ pub const MAX_SIZE: usize = 8;
 /// argument the result will inherit the second lifetime of the borrowed data to ensure that
 /// such a `Value` can only be used while the borrow is active.
 #[repr(transparent)]
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, Eq)]
 pub struct Value<'scope, 'data>(
     NonNull<jl_value_t>,
     PhantomData<&'scope ()>,
     PhantomData<&'data ()>,
 );
+
+impl PartialEq for Value<'_, '_> {
+    fn eq(&self, other: &Value<'_, '_>) -> bool {
+        self.egal(*other)
+    }
+}
 
 /// # Create new `Value`s
 ///
@@ -174,21 +204,19 @@ pub struct Value<'scope, 'data>(
 /// primitive number types. This trait is also automatically derived by JlrsReflect.jl for types
 /// that are trivially guaranteed to be bits-types: the type must have no type parameters, no
 /// unions, and all fields must be immutable bits-types themselves.
-impl<'scope, 'data> Value<'scope, 'data> {
+impl Value<'_, '_> {
     /// Create a new Julia value, any type that implements [`IntoJulia`] can be converted using
     /// this function.
-    pub fn new<'target, 'current, V, S, F>(scope: S, value: V) -> JlrsResult<S::Value>
+    pub fn new<'target, V, S>(scope: S, value: V) -> JlrsResult<Value<'target, 'static>>
     where
         V: IntoJulia,
-        S: Scope<'target, 'current, 'static, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
     {
-        unsafe {
-            let global = scope.global();
-            let v = value.into_julia(global).ptr();
-            debug_assert!(!v.is_null());
-            scope.value(NonNull::new_unchecked(v), Private)
-        }
+        let global = scope.global();
+        let v = value.into_julia(global).ptr();
+        debug_assert!(!v.is_null());
+        // Safety: value was just allocated so it can't have been freed yet
+        unsafe { scope.value(NonNull::new_unchecked(v), Private) }
     }
 
     /// Create a new Julia value, any type that implements [`IntoJulia`] can be converted using
@@ -197,65 +225,70 @@ impl<'scope, 'data> Value<'scope, 'data> {
     where
         V: IntoJulia,
     {
-        unsafe { value.into_julia(global) }
+        value.into_julia(global)
     }
 
     /// Create a new named tuple, you should use the `named_tuple` macro rather than this method.
-    pub fn new_named_tuple<'target, 'current, S, F, N, T, V>(
+    pub fn new_named_tuple<'target, 'current, 'value, 'data, S, F, N, T, V>(
         scope: S,
-        mut field_names: N,
-        mut values: V,
-    ) -> JlrsResult<S::Value>
+        field_names: N,
+        values: V,
+    ) -> JlrsResult<Value<'target, 'data>>
     where
-        S: Scope<'target, 'current, 'data, F>,
+        S: Scope<'target, 'current, F>,
         F: Frame<'current>,
-        N: AsMut<[T]>,
-        T: TemporarySymbol,
-        V: AsMut<[Value<'scope, 'data>]>,
+        N: AsRef<[T]>,
+        T: ToSymbol,
+        V: AsRef<[Value<'value, 'data>]>,
     {
-        scope.value_scope_with_slots(4, |output, frame| unsafe {
-            let global = frame.global();
-            let field_names = field_names.as_mut();
-            let values_m = values.as_mut();
+        let global = scope.global();
+        let (output, scope) = scope.split()?;
+        scope.scope_with_capacity(4, |mut frame| {
+            let field_names = field_names.as_ref();
+            let values_m = values.as_ref();
 
             let n_names = field_names.len();
             let n_values = values_m.len();
 
             if n_names != n_values {
-                Err(JlrsError::NamedTupleSizeMismatch { n_names, n_values })?;
+                Err(InstantiationError::NamedTupleSizeMismatch { n_names, n_values })?;
             }
 
             let symbol_ty = DataType::symbol_type(global).as_value();
             let mut symbol_type_vec = vec![symbol_ty; n_names];
 
-            let mut field_names_vec = field_names
-                .iter()
-                .map(|name| name.temporary_symbol(Private).as_value())
-                .collect::<smallvec::SmallVec<[_; MAX_SIZE]>>();
+            // Safety: this method can only be called from a thread known to Julia. The
+            // unchecked methods are used because it can be guaranteed they won't throw
+            // an exception for the given arguments.
+            unsafe {
+                let mut field_names_vec = field_names
+                    .iter()
+                    .map(|name| name.to_symbol_priv(Private).as_value())
+                    .collect::<smallvec::SmallVec<[_; MAX_SIZE]>>();
 
-            let names = DataType::anytuple_type(global)
-                .as_value()
-                .apply_type_unchecked(&mut *frame, &mut symbol_type_vec)?
-                .cast::<DataType>()?
-                .instantiate_unchecked(&mut *frame, &mut field_names_vec)?;
+                let names = DataType::anytuple_type(global)
+                    .as_value()
+                    .apply_type_unchecked(&mut frame, &mut symbol_type_vec)?
+                    .cast::<DataType>()?
+                    .instantiate_unchecked(&mut frame, &mut field_names_vec)?;
 
-            let mut field_types_vec = values_m
-                .iter()
-                .copied()
-                .map(|val| val.datatype().as_value())
-                .collect::<smallvec::SmallVec<[_; MAX_SIZE]>>();
+                let mut field_types_vec = values_m
+                    .iter()
+                    .copied()
+                    .map(|val| val.datatype().as_value())
+                    .collect::<smallvec::SmallVec<[_; MAX_SIZE]>>();
 
-            let field_type_tup = DataType::anytuple_type(global)
-                .as_value()
-                .apply_type_unchecked(&mut *frame, &mut field_types_vec)?;
+                let field_type_tup = DataType::anytuple_type(global)
+                    .as_value()
+                    .apply_type_unchecked(&mut frame, &mut field_types_vec)?;
 
-            let ty = UnionAll::namedtuple_type(global)
-                .as_value()
-                .apply_type_unchecked(&mut *frame, &mut [names, field_type_tup])?
-                .cast::<DataType>()?;
+                let ty = UnionAll::namedtuple_type(global)
+                    .as_value()
+                    .apply_type_unchecked(&mut frame, &mut [names, field_type_tup])?
+                    .cast::<DataType>()?;
 
-            let output = output.into_scope(frame);
-            ty.instantiate_unchecked(output, values)
+                ty.instantiate_unchecked(output, values)
+            }
         })
     }
 
@@ -271,20 +304,21 @@ impl<'scope, 'data> Value<'scope, 'data> {
     ///
     /// [`Union::new`]: crate::wrappers::ptr::union::Union::new
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub fn apply_type<'target, 'current, S, F, V>(
+    pub fn apply_type<'target, 'value, 'data, V, S>(
         self,
         scope: S,
-        mut types: V,
-    ) -> JlrsResult<S::JuliaResult>
+        types: V,
+    ) -> JlrsResult<JuliaResult<'target, 'data>>
     where
-        S: Scope<'target, 'current, 'data, F>,
-        F: Frame<'current>,
-        V: AsMut<[Value<'scope, 'data>]>,
+        S: PartialScope<'target>,
+        V: AsRef<[Value<'value, 'data>]>,
     {
+        let types = types.as_ref();
+
+        // Safety: if an exception is thrown it's caught, the result is immediately rooted.
         unsafe {
-            let types = types.as_mut();
             let applied =
-                jlrs_apply_type(self.unwrap(Private), types.as_mut_ptr().cast(), types.len());
+                jlrs_apply_type(self.unwrap(Private), types.as_ptr() as *mut _, types.len());
 
             if applied.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
                 scope.call_result(Err(NonNull::new_unchecked(applied.data)), Private)
@@ -302,25 +336,24 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// the value is a `UnionAll`, the given types will be applied and the resulting type is
     /// returned.
     ///
-    /// If the types can't be applied to `self` the program will abort.
+    /// If an exception is thrown it isn't caught
+    ///
+    /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
+    /// function.
     ///
     /// [`Union::new`]: crate::wrappers::ptr::union::Union::new
-    pub fn apply_type_unchecked<'target, 'current, S, F, V>(
+    pub unsafe fn apply_type_unchecked<'target, 'value, 'data, S, V>(
         self,
         scope: S,
-        mut types: V,
-    ) -> JlrsResult<S::Value>
+        types: V,
+    ) -> JlrsResult<Value<'target, 'data>>
     where
-        S: Scope<'target, 'current, 'data, F>,
-        F: Frame<'current>,
-        V: AsMut<[Value<'scope, 'data>]>,
+        S: PartialScope<'target>,
+        V: AsRef<[Value<'value, 'data>]>,
     {
-        unsafe {
-            let types = types.as_mut();
-            let applied =
-                jl_apply_type(self.unwrap(Private), types.as_mut_ptr().cast(), types.len());
-            scope.value(NonNull::new_unchecked(applied), Private)
-        }
+        let types = types.as_ref();
+        let applied = jl_apply_type(self.unwrap(Private), types.as_ptr() as *mut _, types.len());
+        scope.value(NonNull::new_unchecked(applied), Private)
     }
 }
 
@@ -331,21 +364,26 @@ impl<'scope, 'data> Value<'scope, 'data> {
 impl<'scope, 'data> Value<'scope, 'data> {
     /// Returns the `DataType` of this value.
     pub fn datatype(self) -> DataType<'scope> {
+        // Safety: the pointer points to valid data, every value can be converted to a tagged
+        // value.
         unsafe {
-            let ptr = ((*jl_astaggedvalue(self.unwrap(Private)))
+            let header = NonNull::new_unchecked(jl_astaggedvalue(self.unwrap(Private)))
+                .as_ref()
                 .__bindgen_anon_1
-                .header as usize
-                & !15usize) as *mut jl_value_t;
+                .header;
+            let ptr = (header & !15usize) as *mut jl_value_t;
             DataType::wrap(ptr.cast(), Private)
         }
     }
 
     /// Returns the name of this value's [`DataType`] as a string slice.
     pub fn datatype_name(self) -> JlrsResult<&'scope str> {
+        // Safety: the pointer points to valid data, the C API function
+        // is called with a valid argument.
         unsafe {
             let type_name = jl_typeof_str(self.unwrap(Private));
             let type_name_ref = CStr::from_ptr(type_name);
-            Ok(type_name_ref.to_str().map_err(|_| JlrsError::NotUTF8)?)
+            Ok(type_name_ref.to_str().map_err(JlrsError::other)?)
         }
     }
 }
@@ -366,8 +404,8 @@ impl Value<'_, '_> {
     /// # fn main() {
     /// # JULIA.with(|j| {
     /// # let mut julia = j.borrow_mut();
-    /// julia.scope(|_global, frame| {
-    ///     let i = Value::new(frame, 2u64)?;
+    /// julia.scope(|_global, mut frame| {
+    ///     let i = Value::new(&mut frame, 2u64)?;
     ///     assert!(i.is::<u64>());
     ///     Ok(())
     /// }).unwrap();
@@ -393,20 +431,23 @@ impl Value<'_, '_> {
 
     /// Returns true if `self` is a subtype of `sup`.
     pub fn subtype(self, sup: Value) -> bool {
+        // Safety: the pointers point to valid data, the C API function
+        // is called with valid arguments.
         unsafe { jl_subtype(self.unwrap(Private), sup.unwrap(Private)) != 0 }
     }
 
     /// Returns true if `self` is the type of a `DataType`, `UnionAll`, `Union`, or `Union{}` (the
     /// bottom type).
     pub fn is_kind(self) -> bool {
-        unsafe {
-            let global = Global::new();
-            let ptr = self.unwrap(Private);
-            ptr == DataType::datatype_type(global).unwrap(Private).cast()
-                || ptr == DataType::unionall_type(global).unwrap(Private).cast()
-                || ptr == DataType::uniontype_type(global).unwrap(Private).cast()
-                || ptr == DataType::typeofbottom_type(global).unwrap(Private).cast()
-        }
+        // Safety: this method can only be called from a thread known to Julia, its lifetime is
+        // never used
+        let global = unsafe { Global::new() };
+
+        let ptr = self.unwrap(Private);
+        ptr == DataType::datatype_type(global).unwrap(Private).cast()
+            || ptr == DataType::unionall_type(global).unwrap(Private).cast()
+            || ptr == DataType::uniontype_type(global).unwrap(Private).cast()
+            || ptr == DataType::typeofbottom_type(global).unwrap(Private).cast()
     }
 
     /// Returns true if the value is a type, ie a `DataType`, `UnionAll`, `Union`, or `Union{}`
@@ -417,6 +458,8 @@ impl Value<'_, '_> {
 
     /// Returns true if `self` is of type `ty`.
     pub fn isa(self, ty: Value) -> bool {
+        // Safety: the pointers point to valid data, the C API function
+        // is called with valid arguments.
         unsafe { jl_isa(self.unwrap(Private), ty.unwrap(Private)) != 0 }
     }
 }
@@ -435,6 +478,16 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// Safety: The value must not contain any data borrowed from Rust.
     pub unsafe fn assume_owned(self) -> Value<'scope, 'static> {
         Value::wrap_non_null(self.unwrap_non_null(Private), Private)
+    }
+
+    /// Use the `Output` to extend the lifetime of this data.
+    pub fn root<'target>(self, output: Output<'target>) -> Value<'target, 'data> {
+        // Safety: the pointer points to valid data
+        unsafe {
+            let ptr = self.unwrap_non_null(Private);
+            output.set_root::<Value>(ptr);
+            Value::wrap_non_null(ptr, Private)
+        }
     }
 }
 
@@ -455,19 +508,18 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// invalid.
     pub fn cast<T: Wrapper<'scope, 'data> + Typecheck>(self) -> JlrsResult<T> {
         if self.is::<T>() {
+            // Safety: self.is::<T>() returning true guarantees this is safe
             unsafe { Ok(T::cast(self, Private)) }
         } else {
-            Err(JlrsError::WrongType {
-                value_type: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
+            Err(AccessError::InvalidLayout {
+                value_type_str: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
             })?
         }
     }
 
     /// Cast the value to a pointer wrapper type `T` without checking if this conversion is valid.
     ///
-    /// Safety:
-    ///
-    /// You must guarantee `self.is::<T>()` would have returned `true`.
+    /// Safety: You must guarantee `self.is::<T>()` would have returned `true`.
     pub unsafe fn cast_unchecked<T: Wrapper<'scope, 'data>>(self) -> T {
         T::cast(self, Private)
     }
@@ -476,22 +528,21 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// if the layout of `T::Output` is incompatible with the layout of the type in Julia.
     pub fn unbox<T: Unbox + Typecheck>(self) -> JlrsResult<T::Output> {
         if !self.is::<T>() {
-            Err(JlrsError::WrongType {
-                value_type: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
+            Err(AccessError::InvalidLayout {
+                value_type_str: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
 
+        // Safety: self.is::<T>() returning true guarantees this is safe
         unsafe { Ok(T::unbox(self)) }
     }
 
     /// Unbox the contents of the value as the output type associated with `T` without checking
     /// if the layout of `T::Output` is compatible with the layout of the type in Julia.
     ///
-    /// Safety:
-    ///
-    /// You must guarantee `self.is::<T>()` would have returned `true`.
-    pub fn unbox_unchecked<T: Unbox>(self) -> T::Output {
-        unsafe { T::unbox(self) }
+    /// Safety: You must guarantee `self.is::<T>()` would have returned `true`.
+    pub unsafe fn unbox_unchecked<T: Unbox>(self) -> T::Output {
+        T::unbox(self)
     }
 
     /// Returns a pointer to the data, this is useful when the output type of `Unbox` is different
@@ -515,16 +566,21 @@ impl<'scope, 'data> Value<'scope, 'data> {
 ///
 /// it will have two fields, `fielda` and `fieldb`. The first field is a pointer field, the second
 /// is stored inline as a `u32`. It's possible to safely access the raw contents of these fields
-/// with the methods [`Value::get_raw_field`] and [`Value::get_nth_raw_field`]. The first field can be
-/// accessed as a [`ValueRef`], the second as a `u32`.
+/// with the method [`Value::field_accessor`]. The first field can be accessed as a [`ValueRef`],
+/// the second as a `u32`.
 impl<'scope, 'data> Value<'scope, 'data> {
     /// Returns the field names of this value as a slice of `Symbol`s.
     pub fn field_names(self) -> &'scope [Symbol<'scope>] {
+        // Symbol and SymbolRef have the same layout, and this data is non-null. Symbols are
+        // globally rooted.
         unsafe {
-            self.datatype()
-                .field_names()
-                .wrapper_unchecked()
-                .data_unchecked()
+            std::mem::transmute(
+                self.datatype()
+                    .field_names()
+                    .wrapper_unchecked()
+                    .unrestricted_data()
+                    .as_slice(),
+            )
         }
     }
 
@@ -533,120 +589,46 @@ impl<'scope, 'data> Value<'scope, 'data> {
         self.datatype().n_fields() as _
     }
 
-    /// Access the contents of the field at index `idx`. If the field is a bits union, this method
-    /// will try to unbox the active variant. Pointer fields can also be accessed by using the
-    /// approriate [`Ref`]. Returns an error if the index is out of bounds or if the layout of `T`
-    /// is incompatible with the layout of that field in Julia.
-    ///
-    /// [`Ref`]: crate::wrappers::ptr::Ref
-    pub fn get_nth_raw_field<T>(self, idx: usize) -> JlrsResult<T>
-    where
-        T: ValidLayout,
-    {
-        unsafe {
-            if idx >= self.n_fields() as usize {
-                Err(JlrsError::OutOfBounds {
-                    idx,
-                    n_fields: self.n_fields(),
-                    value_type: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
-                })?
-            }
-
-            self.read_field(idx as _)
+    /// Returns an accessor to access the contents of this value without allocating temporary Julia data.
+    pub fn field_accessor<'current, 'borrow, F: Frame<'current>>(
+        self,
+        _frame: &'borrow F,
+    ) -> FieldAccessor<'scope, 'data, 'borrow> {
+        FieldAccessor {
+            value: self.as_ref(),
+            current_field_type: self.datatype().as_ref(),
+            offset: 0,
+            #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+            buffer: AtomicBuffer::new(),
+            state: ViewState::Unlocked,
+            _frame: PhantomData,
         }
     }
 
-    /// Access the contents of the field at index `idx` without checking bounds or if the layouts
-    /// of the types are compatible.
-    ///
-    /// Safety: the layout out `T` must be compatible with the layout of the field and `idx` must
-    /// not be out of bounds.
-    pub unsafe fn get_nth_raw_field_unchecked<T>(self, idx: usize) -> T {
-        let ty = self.datatype();
-        let jl_type = ty.unwrap(Private);
-        let field_offset = jl_field_offset(jl_type, idx as _);
-
-        self.unwrap(Private)
-            .cast::<u8>()
-            .add(field_offset as usize)
-            .cast::<T>()
-            .read()
-    }
-
-    /// Access the contents of the field with the name `field_name`. If the field is a bits union,
-    /// this method will try to unbox the active variant. Pointer fields can also be accessed by
-    /// using the approriate [`Ref`]. Returns an error if there's no field with the given name or
-    /// if the layout of `T` is incompatible with the layout of that field in Julia.
-    ///
-    /// [`Ref`]: crate::wrappers::ptr::Ref
-    pub fn get_raw_field<T, N>(self, field_name: N) -> JlrsResult<T>
-    where
-        T: ValidLayout,
-        N: TemporarySymbol,
-    {
-        unsafe {
-            let symbol = field_name.temporary_symbol(Private);
-            let ty = self.datatype();
-            let jl_type = ty.unwrap(Private);
-            let idx = jl_field_index(jl_type, symbol.unwrap(Private), 0);
-
-            if idx < 0 {
-                Err(JlrsError::NoSuchField {
-                    type_name: ty.display_string_or(CANNOT_DISPLAY_TYPE),
-                    field_name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
-                })?
-            }
-
-            self.read_field(idx)
-        }
-    }
-
-    /// Access the contents of the field with the name `field_name` without checking if the layouts
-    /// of the types are compatible. Panics if the field doesn't exist.
-    ///
-    /// Safety: the layout out `T` must be compatible with the layout of the field.
-    pub unsafe fn get_raw_field_unchecked<T, N>(self, field_name: N) -> T
-    where
-        N: TemporarySymbol,
-    {
-        let symbol = field_name.temporary_symbol(Private);
-        let ty = self.datatype();
-        let jl_type = ty.unwrap(Private);
-        let idx = jl_field_index(jl_type, symbol.unwrap(Private), 0);
-
-        assert!(idx >= 0, "Field {:?} doesn't exist", symbol);
-
-        let field_offset = jl_field_offset(jl_type, idx as _);
-        self.unwrap(Private)
-            .cast::<u8>()
-            .add(field_offset as usize)
-            .cast::<T>()
-            .read()
-    }
-
-    /// Roots the field at index `idx` if it exists and returns it, or
-    /// `JlrsError::OutOfBounds` if the index is out of bounds.
-    pub fn get_nth_field<'target, 'current, S, F>(
+    /// Roots the field at index `idx` if it exists and returns it, or a
+    /// `JlrsError::AccessError` if the index is out of bounds.
+    pub fn get_nth_field<'target, S>(
         self,
         scope: S,
         idx: usize,
-    ) -> JlrsResult<S::Value>
+    ) -> JlrsResult<Value<'target, 'data>>
     where
-        S: Scope<'target, 'current, 'data, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
     {
-        unsafe {
-            if idx >= self.n_fields() {
-                Err(JlrsError::OutOfBounds {
-                    idx,
-                    n_fields: self.n_fields(),
-                    value_type: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
-                })?
-            }
+        if idx >= self.n_fields() {
+            Err(AccessError::OutOfBoundsField {
+                idx,
+                n_fields: self.n_fields(),
+                value_type: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
+            })?
+        }
 
+        // Safety: the bounds check succeeded, the pointer points to valid data. The result is
+        // rooted immediately.
+        unsafe {
             let fld_ptr = jl_get_nth_field(self.unwrap(Private), idx as _);
             if fld_ptr.is_null() {
-                Err(JlrsError::UndefRef)?;
+                Err(AccessError::UndefRef)?;
             }
 
             scope.value(NonNull::new_unchecked(fld_ptr), Private)
@@ -655,27 +637,26 @@ impl<'scope, 'data> Value<'scope, 'data> {
 
     /// Returns the field at index `idx` if it's a pointer field.
     ///
-    /// If the field doesn't exist `JlrsError::OutOfBounds` is returned. If the field can't be
-    /// referenced because its data is stored inline, `JlrsError::NotAPointerField` is returned.
+    /// If the field doesn't exist or if the field can't be referenced because its data is stored
+    /// inline, a `JlrsError::AccessError` is returned.
     pub fn get_nth_field_ref(self, idx: usize) -> JlrsResult<ValueRef<'scope, 'data>> {
         let ty = self.datatype();
         if idx >= ty.n_fields() as _ {
-            Err(JlrsError::OutOfBounds {
+            Err(AccessError::OutOfBoundsField {
                 idx,
                 n_fields: self.n_fields(),
                 value_type: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
             })?
         }
 
+        // Safety: the bounds check succeeded, the pointer points to valid data. All C API
+        // functions are called with valid arguments. The result is rooted immediately.
         unsafe {
             if !jl_field_isptr(ty.unwrap(Private), idx as _) {
                 let value_type_str = ty.display_string_or(CANNOT_DISPLAY_TYPE);
 
-                let field_name = if let Some(field_name) =
-                    ty.field_names().wrapper_unchecked().data().get(idx)
-                {
+                let field_name = if let Some(field_name) = self.field_names().get(idx) {
                     field_name
-                        .wrapper_unchecked()
                         .as_str()
                         .unwrap_or("<Cannot display field name>")
                         .to_string()
@@ -683,15 +664,9 @@ impl<'scope, 'data> Value<'scope, 'data> {
                     format!("{}", idx)
                 };
 
-                let field_type = ty.field_types().wrapper_unchecked().data()[idx]
-                    .value_unchecked()
-                    .display_string_or(CANNOT_DISPLAY_TYPE);
-
-                Err(JlrsError::NotAPointerField {
+                Err(AccessError::NotAPointerField {
                     value_type: value_type_str,
-                    field_idx: idx,
                     field_name,
-                    field_type,
                 })?
             }
 
@@ -705,37 +680,39 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// Returns the field at index `idx` if it exists as a `ValueRef`. If the field is an inline
     /// field a new value is allocated which is left unrooted.
     ///
-    /// If the field doesn't exist `JlrsError::OutOfBounds` is returned.
+    /// If the field doesn't exist `JlrsError::OutOfBoundsField` is returned.
     pub fn get_nth_field_unrooted(self, idx: usize) -> JlrsResult<ValueRef<'scope, 'data>> {
         if idx >= self.n_fields() {
-            Err(JlrsError::OutOfBounds {
+            Err(AccessError::OutOfBoundsField {
                 idx,
                 n_fields: self.n_fields(),
                 value_type: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
             })?
         }
 
+        // Safety: the bounds check succeeded, the pointer points to valid data.
         unsafe { Ok(ValueRef::wrap(jl_get_nth_field(self.unwrap(Private), idx))) }
     }
 
-    /// Roots the field with the name `field_name` if it exists and returns it, or
-    /// `JlrsError::NoSuchField` if there's no field with that name.
-    pub fn get_field<'target, 'current, N, S, F>(
+    /// Roots the field with the name `field_name` if it exists and returns it, or a
+    /// `JlrsError::AccessError` if there's no field with that name.
+    pub fn get_field<'target, N, S>(
         self,
         scope: S,
         field_name: N,
-    ) -> JlrsResult<S::Value>
+    ) -> JlrsResult<Value<'target, 'data>>
     where
-        N: TemporarySymbol,
-        S: Scope<'target, 'current, 'data, F>,
-        F: Frame<'current>,
+        N: ToSymbol,
+        S: PartialScope<'target>,
     {
+        // Safety: the pointer points to valid data, the C API function is called with valid
+        // arguments, the result is rooted immediately.
         unsafe {
-            let symbol = field_name.temporary_symbol(Private);
+            let symbol = field_name.to_symbol_priv(Private);
             let idx = jl_field_index(self.datatype().unwrap(Private), symbol.unwrap(Private), 0);
 
             if idx < 0 {
-                Err(JlrsError::NoSuchField {
+                Err(AccessError::NoSuchField {
                     type_name: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
                     field_name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
                 })?
@@ -743,7 +720,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
 
             let fld_ptr = jl_get_nth_field(self.unwrap(Private), idx as _);
             if fld_ptr.is_null() {
-                Err(JlrsError::UndefRef)?;
+                Err(AccessError::UndefRef)?;
             }
 
             scope.value(NonNull::new_unchecked(fld_ptr), Private)
@@ -752,19 +729,21 @@ impl<'scope, 'data> Value<'scope, 'data> {
 
     /// Returns the field with the name `field_name` if it's a pointer field.
     ///
-    /// If the field doesn't exist `JlrsError::NoSuchField` is returned. If it isn't a pointer
-    /// field, `JlrsError::NotAPointerField` is returned.
+    /// If the field doesn't exist or if the field can't be referenced because its data is stored
+    /// inline, a `JlrsError::AccessError` is returned.
     pub fn get_field_ref<N>(self, field_name: N) -> JlrsResult<ValueRef<'scope, 'data>>
     where
-        N: TemporarySymbol,
+        N: ToSymbol,
     {
+        // Safety: the pointer points to valid data. All C API functions are called with valid
+        // arguments.
         unsafe {
-            let symbol = field_name.temporary_symbol(Private);
+            let symbol = field_name.to_symbol_priv(Private);
             let ty = self.datatype();
             let idx = jl_field_index(ty.unwrap(Private), symbol.unwrap(Private), 0);
 
             if idx < 0 {
-                Err(JlrsError::NoSuchField {
+                Err(AccessError::NoSuchField {
                     type_name: ty.display_string_or(CANNOT_DISPLAY_TYPE),
                     field_name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
                 })?
@@ -774,21 +753,14 @@ impl<'scope, 'data> Value<'scope, 'data> {
                 let idx = idx as usize;
                 let value_type_str = ty.display_string_or(CANNOT_DISPLAY_TYPE);
 
-                let field_name = ty.field_names().wrapper_unchecked().data()[idx]
-                    .wrapper_unchecked()
+                let field_name = self.field_names()[idx]
                     .as_str()
                     .unwrap_or("<Cannot display field name>")
                     .to_string();
 
-                let field_type = ty.field_types().wrapper_unchecked().data()[idx]
-                    .value_unchecked()
-                    .display_string_or(CANNOT_DISPLAY_TYPE);
-
-                Err(JlrsError::NotAPointerField {
+                Err(AccessError::NotAPointerField {
                     value_type: value_type_str,
-                    field_idx: idx,
                     field_name,
-                    field_type,
                 })?
             }
 
@@ -802,17 +774,19 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// Returns the field with the name `field_name` if it exists. If the field is an inline field
     /// a new value is allocated which is left unrooted.
     ///
-    /// If the field doesn't  exist `JlrsError::NoSuchField` is returned.
+    /// If the field doesn't exist a `JlrsError::AccessError` is returned.
     pub fn get_field_unrooted<N>(self, field_name: N) -> JlrsResult<ValueRef<'scope, 'data>>
     where
-        N: TemporarySymbol,
+        N: ToSymbol,
     {
+        // Safety: the pointer points to valid data. All C API functions are called with valid
+        // arguments.
         unsafe {
-            let symbol = field_name.temporary_symbol(Private);
+            let symbol = field_name.to_symbol_priv(Private);
             let idx = jl_field_index(self.datatype().unwrap(Private), symbol.unwrap(Private), 0);
 
             if idx < 0 {
-                Err(JlrsError::NoSuchField {
+                Err(AccessError::NoSuchField {
                     type_name: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
                     field_name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
                 })?
@@ -843,19 +817,24 @@ impl<'scope, 'data> Value<'scope, 'data> {
     {
         let n_fields = self.n_fields();
         if n_fields <= idx {
-            Err(JlrsError::OutOfBounds {
+            Err(AccessError::OutOfBoundsField {
                 idx,
                 n_fields,
                 value_type: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
 
-        let field_type = self.datatype().field_types().wrapper_unchecked().data()[idx as usize]
+        let field_type = self
+            .datatype()
+            .field_types()
+            .wrapper_unchecked()
+            .unrestricted_data()
+            .as_slice()[idx as usize]
             .value_unchecked();
         let dt = value.datatype();
 
         if !Value::subtype(dt.as_value(), field_type) {
-            Err(JlrsError::NotSubtype {
+            Err(TypeError::NotASubtype {
                 field_type: field_type.display_string_or(CANNOT_DISPLAY_TYPE),
                 value_type: value.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
             })?
@@ -864,7 +843,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
         let res = jlrs_set_nth_field(self.unwrap(Private), idx, value.unwrap(Private));
         if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
             let ptr = res.data;
-            let err = crate::memory::scope::private::Scope::value(
+            let err = crate::memory::scope::private::PartialScopePriv::value(
                 frame,
                 NonNull::new_unchecked(ptr),
                 Private,
@@ -889,19 +868,24 @@ impl<'scope, 'data> Value<'scope, 'data> {
     ) -> JlrsResult<JuliaResultRef<'scope, 'data, ()>> {
         let n_fields = self.n_fields();
         if n_fields <= idx {
-            Err(JlrsError::OutOfBounds {
+            Err(AccessError::OutOfBoundsField {
                 idx,
                 n_fields,
                 value_type: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
 
-        let field_type = self.datatype().field_types().wrapper_unchecked().data()[idx as usize]
+        let field_type = self
+            .datatype()
+            .field_types()
+            .wrapper_unchecked()
+            .unrestricted_data()
+            .as_slice()[idx as usize]
             .value_unchecked();
         let dt = value.datatype();
 
         if !Value::subtype(dt.as_value(), field_type) {
-            Err(JlrsError::NotSubtype {
+            Err(TypeError::NotASubtype {
                 field_type: field_type.display_string_or(CANNOT_DISPLAY_TYPE),
                 value_type: value.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
             })?
@@ -926,7 +910,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
 
     /// Set the value of the field with the name `field_name`. If Julia throws an exception it's
     /// caught, rooted in the frame, and returned. If there's no field with the given name or the
-    /// value is not a subtype of the field an error is returned,
+    /// value is not a subtype of the field an error is returned.
     ///
     /// Safety: Mutating things that should absolutely not be mutated, like the fields of a
     /// `DataType`, is not prevented.
@@ -939,24 +923,29 @@ impl<'scope, 'data> Value<'scope, 'data> {
     ) -> JlrsResult<JuliaResult<'frame, 'data, ()>>
     where
         F: Frame<'frame>,
-        N: TemporarySymbol,
+        N: ToSymbol,
     {
-        let symbol = field_name.temporary_symbol(Private);
+        let symbol = field_name.to_symbol_priv(Private);
         let idx = jl_field_index(self.datatype().unwrap(Private), symbol.unwrap(Private), 0);
 
         if idx < 0 {
-            Err(JlrsError::NoSuchField {
+            Err(AccessError::NoSuchField {
                 type_name: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
                 field_name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
             })?
         }
 
-        let field_type = self.datatype().field_types().wrapper_unchecked().data()[idx as usize]
+        let field_type = self
+            .datatype()
+            .field_types()
+            .wrapper_unchecked()
+            .unrestricted_data()
+            .as_slice()[idx as usize]
             .value_unchecked();
         let dt = value.datatype();
 
         if !Value::subtype(dt.as_value(), field_type) {
-            Err(JlrsError::NotSubtype {
+            Err(TypeError::NotASubtype {
                 field_type: field_type.display_string_or(CANNOT_DISPLAY_TYPE),
                 value_type: value.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
             })?
@@ -965,7 +954,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
         let res = jlrs_set_nth_field(self.unwrap(Private), idx as usize, value.unwrap(Private));
         if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
             let ptr = res.data;
-            let err = crate::memory::scope::private::Scope::value(
+            let err = crate::memory::scope::private::PartialScopePriv::value(
                 frame,
                 NonNull::new_unchecked(ptr),
                 Private,
@@ -978,7 +967,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
 
     /// Set the value of the field with the name `field_name`. If Julia throws an exception it's
     /// caught, and returned but not rooted. If there's no field with the given name or the value
-    /// is not a subtype of the field an error is returned,
+    /// is not a subtype of the field an error is returned.
     ///
     /// Safety: Mutating things that should absolutely not be mutated, like the fields of a
     /// `DataType`, is not prevented.
@@ -989,24 +978,29 @@ impl<'scope, 'data> Value<'scope, 'data> {
         value: Value<'_, 'data>,
     ) -> JlrsResult<JuliaResultRef<'scope, 'data, ()>>
     where
-        N: TemporarySymbol,
+        N: ToSymbol,
     {
-        let symbol = field_name.temporary_symbol(Private);
+        let symbol = field_name.to_symbol_priv(Private);
         let idx = jl_field_index(self.datatype().unwrap(Private), symbol.unwrap(Private), 0);
 
         if idx < 0 {
-            Err(JlrsError::NoSuchField {
+            Err(AccessError::NoSuchField {
                 type_name: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
                 field_name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
             })?
         }
 
-        let field_type = self.datatype().field_types().wrapper_unchecked().data()[idx as usize]
+        let field_type = self
+            .datatype()
+            .field_types()
+            .wrapper_unchecked()
+            .unrestricted_data()
+            .as_slice()[idx as usize]
             .value_unchecked();
         let dt = value.datatype();
 
         if !Value::subtype(dt.as_value(), field_type) {
-            Err(JlrsError::NotSubtype {
+            Err(TypeError::NotASubtype {
                 field_type: field_type.display_string_or(CANNOT_DISPLAY_TYPE),
                 value_type: value.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
             })?
@@ -1032,13 +1026,13 @@ impl<'scope, 'data> Value<'scope, 'data> {
         value: Value<'_, 'data>,
     ) -> JlrsResult<()>
     where
-        N: TemporarySymbol,
+        N: ToSymbol,
     {
-        let symbol = field_name.temporary_symbol(Private);
+        let symbol = field_name.to_symbol_priv(Private);
         let idx = jl_field_index(self.datatype().unwrap(Private), symbol.unwrap(Private), 0);
 
         if idx < 0 {
-            Err(JlrsError::NoSuchField {
+            Err(AccessError::NoSuchField {
                 type_name: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
                 field_name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
             })?
@@ -1048,56 +1042,6 @@ impl<'scope, 'data> Value<'scope, 'data> {
             idx as usize,
             value.unwrap(Private),
         ))
-    }
-
-    unsafe fn read_field<T>(self, idx: i32) -> JlrsResult<T>
-    where
-        T: ValidLayout,
-    {
-        let ty = self.datatype();
-        let jl_type = ty.unwrap(Private);
-        let field_offset = jl_field_offset(jl_type, idx as _);
-        let mut field_type =
-            ty.field_types().wrapper_unchecked().data()[idx as usize].value_unchecked();
-
-        if let Ok(u) = field_type.cast::<Union>() {
-            // If the field is a bits union, we want to access its current variant
-            let mut size = 0;
-
-            if u.isbits_size_align(&mut size, &mut 0) {
-                let flag_offset = field_offset as usize + size;
-                let mut flag = self.unwrap(Private).cast::<u8>().add(flag_offset).read() as i32;
-
-                match nth_union_component(u.as_value(), &mut flag) {
-                    Some(active_ty) => {
-                        field_type = active_ty;
-                    }
-                    _ => (),
-                }
-            }
-        } else if let Ok(_) = field_type.cast::<UnionAll>() {
-            // If the field is a unionall, we want to take the concrete type into account
-            field_type = self
-                .unwrap(Private)
-                .cast::<u8>()
-                .add(field_offset as usize)
-                .cast::<Value>()
-                .read()
-                .datatype()
-                .as_value();
-        }
-
-        if T::valid_layout(field_type) {
-            Ok(self
-                .unwrap(Private)
-                .cast::<u8>()
-                .add(field_offset as usize)
-                .cast::<T>()
-                .read())
-        } else {
-            let value_type_str = field_type.display_string_or(CANNOT_DISPLAY_TYPE).into();
-            Err(JlrsError::InvalidLayout { value_type_str })?
-        }
     }
 }
 
@@ -1112,14 +1056,13 @@ impl Value<'_, '_> {
     ///
     /// Safety: The command can't be checked for correctness, nothing prevents you from causing a
     /// segmentation fault with a command like `unsafe_load(Ptr{Float64}(C_NULL))`.
-    pub unsafe fn eval_string<'target, 'current, C, S, F>(
+    pub unsafe fn eval_string<'target, C, S>(
         scope: S,
         cmd: C,
-    ) -> JlrsResult<S::JuliaResult>
+    ) -> JlrsResult<JuliaResult<'target, 'static>>
     where
         C: AsRef<str>,
-        S: Scope<'target, 'current, 'static, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
     {
         let cmd = cmd.as_ref();
         let cmd_cstring = CString::new(cmd).map_err(JlrsError::other)?;
@@ -1139,14 +1082,13 @@ impl Value<'_, '_> {
     ///
     /// Safety: The command can't be checked for correctness, nothing prevents you from causing a
     /// segmentation fault with a command like `unsafe_load(Ptr{Float64}(C_NULL))`.
-    pub unsafe fn eval_cstring<'target, 'current, C, S, F>(
+    pub unsafe fn eval_cstring<'target, C, S>(
         scope: S,
         cmd: C,
-    ) -> JlrsResult<S::JuliaResult>
+    ) -> JlrsResult<JuliaResult<'target, 'static>>
     where
         C: AsRef<CStr>,
-        S: Scope<'target, 'current, 'static, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
     {
         let cmd = cmd.as_ref();
         let cmd_ptr = cmd.as_ptr();
@@ -1162,29 +1104,33 @@ impl Value<'_, '_> {
 
     /// Calls `include` in the `Main` module in Julia, which evaluates the file's contents in that
     /// module. This has the same effect as calling `include` in the Julia REPL.
+    ///
+    /// Safety: The content of the file can't be checked for correctness, nothing prevents you
+    /// from causing a segmentation fault with code like `unsafe_load(Ptr{Float64}(C_NULL))`.
     pub unsafe fn include<'target, 'current, P, S, F>(
         scope: S,
         path: P,
-    ) -> JlrsResult<S::JuliaResult>
+    ) -> JlrsResult<JuliaResult<'target, 'static>>
     where
         P: AsRef<Path>,
-        S: Scope<'target, 'current, 'static, F>,
+        S: Scope<'target, 'current, F>,
         F: Frame<'current>,
     {
         if path.as_ref().exists() {
-            return scope.result_scope(|output, frame| {
-                let global = frame.global();
-                let path_jl_str = JuliaString::new(&mut *frame, path.as_ref().to_string_lossy())?;
+            let global = scope.global();
+            let (output, scope) = scope.split()?;
+            return scope.scope(|mut frame| {
+                let path_jl_str = JuliaString::new(&mut frame, path.as_ref().to_string_lossy())?;
                 let include_func = Module::main(global)
                     .function_ref("include")?
                     .wrapper_unchecked();
 
-                let scope = output.into_scope(frame);
-                include_func.call1(scope, path_jl_str)
+                let scope = output.into_scope(&mut frame);
+                include_func.call1(scope, path_jl_str.as_value())
             });
         }
 
-        Err(JlrsError::IncludeNotFound {
+        Err(IOError::NotFound {
             path: path.as_ref().to_string_lossy().into(),
         })?
     }
@@ -1194,11 +1140,15 @@ impl Value<'_, '_> {
 impl Value<'_, '_> {
     /// Returns the object id of this value.
     pub fn object_id(self) -> usize {
+        // Safety: the pointer points to valid data, the C API
+        // functions is called with a valid argument.
         unsafe { jl_object_id(self.unwrap(Private)) }
     }
 
     /// Returns true if `self` and `other` are equal.
     pub fn egal(self, other: Value) -> bool {
+        // Safety: the pointer points to valid data, the C API
+        // functions is called with a valid argument.
         unsafe { jl_egal(self.unwrap(Private), other.unwrap(Private)) != 0 }
     }
 }
@@ -1207,12 +1157,16 @@ impl Value<'_, '_> {
 impl Value<'_, '_> {
     /// Add a finalizer `f` to this value. The finalizer must be a Julia function, it will be
     /// called when this value is about to be freed by the garbage collector.
+    ///
+    /// Safety: the finalizer must be compatible with the data.
     pub unsafe fn add_finalizer(self, f: Value<'_, 'static>) {
         jl_gc_add_finalizer(self.unwrap(Private), f.unwrap(Private))
     }
 
     /// Add a finalizer `f` to this value. The finalizer must be an `extern "C"` function that
     /// takes one argument, the value as a void pointer.
+    ///
+    /// Safety: the finalizer must be compatible with the data.
     pub unsafe fn add_ptr_finalizer(self, f: unsafe extern "C" fn(*mut c_void) -> ()) {
         jl_gc_add_ptr_finalizer(get_tls(), self.unwrap(Private), f as *mut c_void)
     }
@@ -1222,21 +1176,25 @@ impl Value<'_, '_> {
 impl<'scope> Value<'scope, 'static> {
     /// `Union{}`.
     pub fn bottom_type(_: Global<'scope>) -> Self {
+        // Safety: global constant
         unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_bottom_type), Private) }
     }
 
     /// `StackOverflowError`.
     pub fn stackovf_exception(_: Global<'scope>) -> Self {
+        // Safety: global constant
         unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_stackovf_exception), Private) }
     }
 
     /// `OutOfMemoryError`.
     pub fn memory_exception(_: Global<'scope>) -> Self {
+        // Safety: global constant
         unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_memory_exception), Private) }
     }
 
     /// `ReadOnlyMemoryError`.
     pub fn readonlymemory_exception(_: Global<'scope>) -> Self {
+        // Safety: global constant
         unsafe {
             Value::wrap_non_null(NonNull::new_unchecked(jl_readonlymemory_exception), Private)
         }
@@ -1244,163 +1202,174 @@ impl<'scope> Value<'scope, 'static> {
 
     /// `DivideError`.
     pub fn diverror_exception(_: Global<'scope>) -> Self {
+        // Safety: global constant
         unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_diverror_exception), Private) }
     }
 
     /// `UndefRefError`.
     pub fn undefref_exception(_: Global<'scope>) -> Self {
+        // Safety: global constant
         unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_undefref_exception), Private) }
     }
 
     /// `InterruptException`.
     pub fn interrupt_exception(_: Global<'scope>) -> Self {
+        // Safety: global constant
         unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_interrupt_exception), Private) }
     }
 
     /// An empty `Array{Any, 1}.
     pub fn an_empty_vec_any(_: Global<'scope>) -> Self {
+        // Safety: global constant
         unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_an_empty_vec_any), Private) }
     }
 
     /// An empty immutable String, "".
     pub fn an_empty_string(_: Global<'scope>) -> Self {
+        // Safety: global constant
         unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_an_empty_string), Private) }
     }
 
     /// `Array{UInt8, 1}`
     pub fn array_uint8_type(_: Global<'scope>) -> Self {
+        // Safety: global constant
         unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_array_uint8_type), Private) }
     }
 
     /// `Array{Any, 1}`
     pub fn array_any_type(_: Global<'scope>) -> Self {
+        // Safety: global constant
         unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_array_any_type), Private) }
     }
 
     /// `Array{Symbol, 1}`
     pub fn array_symbol_type(_: Global<'scope>) -> Self {
+        // Safety: global constant
         unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_array_symbol_type), Private) }
     }
 
     /// `Array{Int32, 1}`
     pub fn array_int32_type(_: Global<'scope>) -> Self {
+        // Safety: global constant
         unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_array_int32_type), Private) }
     }
 
     /// The empty tuple, `()`.
     pub fn emptytuple(_: Global<'scope>) -> Self {
+        // Safety: global constant
         unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_emptytuple), Private) }
     }
 
     /// The instance of `true`.
     pub fn true_v(_: Global<'scope>) -> Self {
+        // Safety: global constant
         unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_true), Private) }
     }
 
     /// The instance of `false`.
     pub fn false_v(_: Global<'scope>) -> Self {
+        // Safety: global constant
         unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_false), Private) }
     }
 
     /// The instance of `Nothing`, `nothing`.
     pub fn nothing(_: Global<'scope>) -> Self {
+        // Safety: global constant
         unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_nothing), Private) }
     }
 
     /// The handle to `stdout` as a Julia value.
     pub fn stdout(_: Global<'scope>) -> Self {
+        // Safety: global constant
         unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_stdout_obj()), Private) }
     }
 
     /// The handle to `stderr` as a Julia value.
     pub fn stderr(_: Global<'scope>) -> Self {
+        // Safety: global constant
         unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_stderr_obj()), Private) }
-    }
-}
-
-unsafe impl<'scope, 'data> ValidLayout for Value<'scope, 'data> {
-    fn valid_layout(v: Value) -> bool {
-        if let Ok(dt) = v.cast::<DataType>() {
-            !dt.is_inline_alloc()
-        } else if v.cast::<UnionAll>().is_ok() {
-            true
-        } else if let Ok(u) = v.cast::<Union>() {
-            !u.is_bits_union()
-        } else {
-            false
-        }
     }
 }
 
 impl<'data> Call<'data> for Value<'_, 'data> {
     #[inline(always)]
-    unsafe fn call0<'target, 'current, S, F>(self, scope: S) -> JlrsResult<S::JuliaResult>
+    unsafe fn call0<'target, S>(self, scope: S) -> JlrsResult<JuliaResult<'target, 'data>>
     where
-        S: Scope<'target, 'current, 'data, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
     {
-        let res = self.call0_unrooted(scope.global());
-        scope.unrooted_call_result(res, Private)
+        let res = match self.call0_unrooted(Global::new()) {
+            Ok(v) => Ok(NonNull::new_unchecked(v.ptr())),
+            Err(e) => Err(NonNull::new_unchecked(e.ptr())),
+        };
+        scope.call_result(res, Private)
     }
 
     #[inline(always)]
-    unsafe fn call1<'target, 'current, S, F>(
+    unsafe fn call1<'target, S>(
         self,
         scope: S,
         arg0: Value<'_, 'data>,
-    ) -> JlrsResult<S::JuliaResult>
+    ) -> JlrsResult<JuliaResult<'target, 'data>>
     where
-        S: Scope<'target, 'current, 'data, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
     {
-        let res = self.call1_unrooted(scope.global(), arg0);
-        scope.unrooted_call_result(res, Private)
+        let res = match self.call1_unrooted(Global::new(), arg0) {
+            Ok(v) => Ok(NonNull::new_unchecked(v.ptr())),
+            Err(e) => Err(NonNull::new_unchecked(e.ptr())),
+        };
+        scope.call_result(res, Private)
     }
 
     #[inline(always)]
-    unsafe fn call2<'target, 'current, S, F>(
+    unsafe fn call2<'target, S>(
         self,
         scope: S,
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
-    ) -> JlrsResult<S::JuliaResult>
+    ) -> JlrsResult<JuliaResult<'target, 'data>>
     where
-        S: Scope<'target, 'current, 'data, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
     {
-        let res = self.call2_unrooted(scope.global(), arg0, arg1);
-        scope.unrooted_call_result(res, Private)
+        let res = match self.call2_unrooted(Global::new(), arg0, arg1) {
+            Ok(v) => Ok(NonNull::new_unchecked(v.ptr())),
+            Err(e) => Err(NonNull::new_unchecked(e.ptr())),
+        };
+        scope.call_result(res, Private)
     }
 
     #[inline(always)]
-    unsafe fn call3<'target, 'current, S, F>(
+    unsafe fn call3<'target, S>(
         self,
         scope: S,
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
         arg2: Value<'_, 'data>,
-    ) -> JlrsResult<S::JuliaResult>
+    ) -> JlrsResult<JuliaResult<'target, 'data>>
     where
-        S: Scope<'target, 'current, 'data, F>,
-        F: Frame<'current>,
+        S: PartialScope<'target>,
     {
-        let res = self.call3_unrooted(scope.global(), arg0, arg1, arg2);
-        scope.unrooted_call_result(res, Private)
+        let res = match self.call3_unrooted(Global::new(), arg0, arg1, arg2) {
+            Ok(v) => Ok(NonNull::new_unchecked(v.ptr())),
+            Err(e) => Err(NonNull::new_unchecked(e.ptr())),
+        };
+        scope.call_result(res, Private)
     }
 
     #[inline(always)]
-    unsafe fn call<'target, 'current, 'value, V, S, F>(
+    unsafe fn call<'target, 'value, V, S>(
         self,
         scope: S,
         args: V,
-    ) -> JlrsResult<S::JuliaResult>
+    ) -> JlrsResult<JuliaResult<'target, 'data>>
     where
-        V: AsMut<[Value<'value, 'data>]>,
-        S: Scope<'target, 'current, 'data, F>,
-        F: Frame<'current>,
+        V: AsRef<[Value<'value, 'data>]>,
+        S: PartialScope<'target>,
     {
-        let res = self.call_unrooted(scope.global(), args);
-        scope.unrooted_call_result(res, Private)
+        let res = match self.call_unrooted(Global::new(), args) {
+            Ok(v) => Ok(NonNull::new_unchecked(v.ptr())),
+            Err(e) => Err(NonNull::new_unchecked(e.ptr())),
+        };
+        scope.call_result(res, Private)
     }
 
     #[inline(always)]
@@ -1479,18 +1448,14 @@ impl<'data> Call<'data> for Value<'_, 'data> {
     unsafe fn call_unrooted<'target, 'value, V>(
         self,
         _: Global<'target>,
-        mut args: V,
+        args: V,
     ) -> JuliaResultRef<'target, 'data>
     where
-        V: AsMut<[Value<'value, 'data>]>,
+        V: AsRef<[Value<'value, 'data>]>,
     {
-        let args = args.as_mut();
+        let args = args.as_ref();
         let n = args.len();
-        let res = jl_call(
-            self.unwrap(Private).cast(),
-            args.as_mut_ptr().cast(),
-            n as _,
-        );
+        let res = jl_call(self.unwrap(Private).cast(), args.as_ptr() as *mut _, n as _);
         let exc = jl_exception_occurred();
 
         if exc.is_null() {
@@ -1501,13 +1466,14 @@ impl<'data> Call<'data> for Value<'_, 'data> {
     }
 }
 
-impl<'target, 'current, 'value, 'data> CallExt<'target, 'current, 'value, 'data>
-    for Value<'value, 'data>
-{
-    fn with_keywords(self, kws: Value<'value, 'data>) -> JlrsResult<WithKeywords<'value, 'data>> {
+impl<'value, 'data> ProvideKeywords<'value, 'data> for Value<'value, 'data> {
+    fn provide_keywords(
+        self,
+        kws: Value<'value, 'data>,
+    ) -> JlrsResult<WithKeywords<'value, 'data>> {
         if !kws.is::<NamedTuple>() {
             let type_str = kws.datatype().display_string_or(CANNOT_DISPLAY_TYPE);
-            Err(JlrsError::NotANamedTuple { type_str })?
+            Err(TypeError::NotANamedTuple { type_str })?
         }
         Ok(WithKeywords::new(self, kws))
     }
@@ -1519,12 +1485,12 @@ impl<'scope, 'data> WrapperPriv<'scope, 'data> for Value<'scope, 'data> {
     type Wraps = jl_value_t;
     const NAME: &'static str = "Value";
 
-    #[inline(always)]
+    // Safety: `inner` must not have been freed yet, the result must never be
+    // used after the GC might have freed it.
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData, PhantomData)
     }
 
-    #[inline(always)]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
@@ -1533,15 +1499,16 @@ impl<'scope, 'data> WrapperPriv<'scope, 'data> for Value<'scope, 'data> {
 /// While jlrs generally enforces that Julia data can only exist and be used while a frame is
 /// active, it's possible to leak global values: [`Symbol`]s, [`Module`]s, and globals defined in
 /// those modules.
+#[derive(Copy, Clone)]
 pub struct LeakedValue(Value<'static, 'static>);
 
 impl LeakedValue {
-    #[inline(always)]
+    // Safety: ptr must point to valid Julia data
     pub(crate) unsafe fn wrap(ptr: *mut jl_value_t) -> Self {
         LeakedValue(Value::wrap(ptr, Private))
     }
 
-    #[inline(always)]
+    // Safety: ptr must point to valid Julia data
     pub(crate) unsafe fn wrap_non_null(ptr: NonNull<jl_value_t>) -> Self {
         LeakedValue(Value::wrap_non_null(ptr, Private))
     }
@@ -1556,3 +1523,707 @@ impl LeakedValue {
         self.0
     }
 }
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+#[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+union AtomicBuffer {
+    bytes: [MaybeUninit<u8>; 8],
+    ptr: *mut jl_value_t,
+}
+
+#[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+impl AtomicBuffer {
+    fn new() -> Self {
+        AtomicBuffer { ptr: null_mut() }
+    }
+}
+
+#[derive(Copy, Clone, PartialEq)]
+enum ViewState {
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    Locked,
+    Unlocked,
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    AtomicBuffer,
+    Array,
+}
+
+/// Access the raw contents of a Julia value.
+///
+/// A `FieldAccessor` for a value can be created with [`Value::field_accessor`]. By chaining calls
+/// to the `field` and `atomic_field` methods you can access deeply nested fields without
+/// allocating temporary Julia data. These two methods support three kinds of field identifiers:
+/// field names, numerical field indices, and n-dimensional array indices. The first two can be
+/// used with types that have named fields, the second must be used with tuples, and the last one
+/// with arrays.
+pub struct FieldAccessor<'scope, 'data, 'borrow> {
+    value: ValueRef<'scope, 'data>,
+    current_field_type: DataTypeRef<'scope>,
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    buffer: AtomicBuffer,
+    offset: u32,
+    state: ViewState,
+    _frame: PhantomData<&'borrow ()>,
+}
+
+impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
+    /// Access the field the accessor is currenty pointing to as a value of type `T`.
+    ///
+    /// This method accesses the field using its concrete type. If the concrete type of the field
+    /// has a matching pointer wrapper type it can be accessed as a `ValueRef` or a `Ref` of to
+    /// that pointer wrapper type. For example, a field that contains a `Module` can be accessed
+    /// as a `ModuleRef`. In all other cases an inline wrapper type must be used. For example, an
+    /// untyped field that currently holds a `Float64` must be accessed as `f64`.
+    pub fn access<T: ValidLayout>(self) -> JlrsResult<T> {
+        if self.current_field_type.is_undefined() {
+            Err(AccessError::UndefRef)?;
+        }
+
+        // Safety: in this block, the first check ensures that T is correct
+        // for the data that is accessed. If the data is in the atomic buffer
+        // it's read from there. If T is as Ref, the pointer is converted. If
+        // it's an array, the element at the desired position is read.
+        // Otherwise, the field is read at the offset where it has been determined
+        // to be stored.
+        unsafe {
+            let ty = self.current_field_type.value_unchecked();
+            if !T::valid_layout(ty) {
+                let value_type_str = ty.display_string_or(CANNOT_DISPLAY_TYPE).into();
+                Err(AccessError::InvalidLayout { value_type_str })?;
+            }
+
+            #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+            if self.state == ViewState::AtomicBuffer {
+                debug_assert!(!T::IS_REF);
+                debug_assert!(std::mem::size_of::<T>() <= 8);
+                return Ok(std::ptr::read(
+                    self.buffer.bytes[self.offset as usize..].as_ptr() as *const T,
+                ));
+            }
+
+            if T::IS_REF {
+                Ok(std::mem::transmute_copy(&self.value))
+            } else if self.state == ViewState::Array {
+                Ok(self
+                    .value
+                    .value_unchecked()
+                    .cast_unchecked::<Array>()
+                    .data_ptr()
+                    .cast::<u8>()
+                    .add(self.offset as usize)
+                    .cast::<T>()
+                    .read())
+            } else {
+                Ok(self
+                    .value
+                    .ptr()
+                    .cast::<u8>()
+                    .add(self.offset as usize)
+                    .cast::<T>()
+                    .read())
+            }
+        }
+    }
+
+    /// Returns `true` if `self.access::<T>()` will succeed, `false` if it will fail.
+    pub fn can_access_as<T: ValidLayout>(&self) -> bool {
+        if self.current_field_type.is_undefined() {
+            return false;
+        }
+
+        // Safety: the current_field_type field is not undefined.
+        let ty = unsafe { self.current_field_type.value_unchecked() };
+        if !T::valid_layout(ty) {
+            return false;
+        }
+
+        true
+    }
+
+    /// Update the accessor to point to `field`.
+    ///
+    /// Three kinds of field indices exist: field names, numerical field indices, and
+    /// n-dimensional array indices. The first two can be used with types that have named fields,
+    /// the second must be used with tuples, and the last one with arrays.
+    ///
+    /// If `field` is an invalid identifier an error is returned. Calls to `field` can be chained
+    /// to access nested fields.
+    ///
+    /// If the field is an atomic field the same ordering is used as Julia uses by default:
+    /// `Relaxed` for pointer fields, `SeqCst` for small inline fields, and a lock for large
+    /// inline fields.
+    pub fn field<F: FieldIndex>(mut self, field: F) -> JlrsResult<Self> {
+        if self.value.is_undefined() {
+            Err(AccessError::UndefRef)?
+        }
+
+        if self.current_field_type.is_undefined() {
+            Err(AccessError::UndefRef)?
+        }
+
+        // Safety: how to access the next field depends on the current view. If an array
+        // is accessed the view is updated to the requested element. Otherwise, the offset
+        // is adjusted to target the requested field. Because the starting point is assumed
+        // to be rooted, all pointer fields are either reachablle or undefined. If a field is
+        // atomic, atomic accesses (or locks for large atomic fields) are used.
+        unsafe {
+            let current_field_type = self.current_field_type.wrapper_unchecked();
+            if self.state == ViewState::Array && current_field_type.is::<Array>() {
+                let arr = self.value.value_unchecked().cast_unchecked::<Array>();
+                // accessing an array, find the offset of the requested element
+                let index = field.array_index(arr, Private)?;
+                self.get_array_field(arr, index);
+                return Ok(self);
+            }
+
+            let index = field.field_index(current_field_type, Private)?;
+
+            let next_field_type = current_field_type.field_type_unchecked(index);
+            if next_field_type.is_undefined() {
+                Err(AccessError::UndefRef)?
+            }
+
+            let next_field_type = next_field_type.wrapper_unchecked();
+            let is_pointer_field = current_field_type.is_pointer_field_unchecked(index);
+            let field_offset = current_field_type.field_offset_unchecked(index);
+            self.offset += field_offset;
+
+            match self.state {
+                ViewState::Array => {
+                    self.get_inline_array_field(is_pointer_field, next_field_type)?
+                }
+                ViewState::Unlocked => self.get_unlocked_inline_field(
+                    is_pointer_field,
+                    current_field_type,
+                    next_field_type,
+                    index,
+                    Ordering::Relaxed,
+                    Ordering::SeqCst,
+                ),
+                #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+                ViewState::Locked => {
+                    self.get_locked_inline_field(is_pointer_field, next_field_type)
+                }
+                #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+                ViewState::AtomicBuffer => {
+                    self.get_atomic_buffer_field(is_pointer_field, next_field_type)
+                }
+            }
+        }
+
+        Ok(self)
+    }
+
+    /// Update the accessor to point to `field`.
+    ///
+    /// If the field is a small atomic field `ordering` is used to read it. The ordering is
+    /// ignored for non-atomic fields and fields that require a lock to access. See
+    /// [`FieldAccessor::field`] for more information.
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    pub fn atomic_field<F: FieldIndex>(mut self, field: F, ordering: Ordering) -> JlrsResult<Self> {
+        if self.value.is_undefined() {
+            Err(AccessError::UndefRef)?
+        }
+
+        if self.current_field_type.is_undefined() {
+            Err(AccessError::UndefRef)?
+        }
+
+        // Safety: how to access the next field depends on the current view. If an array
+        // is accessed the view is updated to the requested element. Otherwise, the offset
+        // is adjusted to target the requested field. Because the starting point is assumed
+        // to be rooted, all pointer fields are either reachablle or undefined. If a field is
+        // atomic, atomic accesses (or locks for large atomic fields) are used.
+        unsafe {
+            let current_field_type = self.current_field_type.wrapper_unchecked();
+            if self.state == ViewState::Array && current_field_type.is::<Array>() {
+                let arr = self.value.value_unchecked().cast_unchecked::<Array>();
+                // accessing an array, find the offset of the requested element
+                let index = field.array_index(arr, Private)?;
+                self.get_array_field(arr, index);
+                return Ok(self);
+            }
+
+            let index = field.field_index(current_field_type, Private)?;
+
+            let next_field_type = current_field_type.field_type_unchecked(index);
+            if next_field_type.is_undefined() {
+                Err(AccessError::UndefRef)?
+            }
+
+            let next_field_type = next_field_type.wrapper_unchecked();
+            let is_pointer_field = current_field_type.is_pointer_field_unchecked(index);
+            let field_offset = current_field_type.field_offset_unchecked(index);
+            self.offset += field_offset;
+
+            match self.state {
+                ViewState::Array => {
+                    self.get_inline_array_field(is_pointer_field, next_field_type)?
+                }
+                ViewState::Unlocked => self.get_unlocked_inline_field(
+                    is_pointer_field,
+                    current_field_type,
+                    next_field_type,
+                    index,
+                    ordering,
+                    ordering,
+                ),
+                ViewState::Locked => {
+                    self.get_locked_inline_field(is_pointer_field, next_field_type)
+                }
+                ViewState::AtomicBuffer => {
+                    self.get_atomic_buffer_field(is_pointer_field, next_field_type)
+                }
+            }
+        }
+
+        Ok(self)
+    }
+
+    /// Try to clone this accessor and its state.
+    ///
+    /// If the current value this accessor is accessing is locked an error is returned.
+    pub fn try_clone(&self) -> JlrsResult<Self> {
+        #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+        if self.state == ViewState::Locked {
+            Err(AccessError::Locked)?;
+        }
+
+        Ok(FieldAccessor {
+            value: self.value,
+            current_field_type: self.current_field_type,
+            offset: self.offset,
+            #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+            buffer: self.buffer.clone(),
+            state: self.state,
+            _frame: PhantomData,
+        })
+    }
+
+    /// Returns `true` if the current value the accessor is accessing is locked.
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    pub fn is_locked(&self) -> bool {
+        self.state == ViewState::Locked
+    }
+
+    /// Returns `true` if the current value the accessor is accessing is locked.
+    #[cfg(all(feature = "lts", not(feature = "all-features-override")))]
+    pub fn is_locked(&self) -> bool {
+        false
+    }
+
+    /// Returns the type of the field the accessor is currently pointing at.
+    pub fn current_field_type(&self) -> DataTypeRef<'scope> {
+        self.current_field_type
+    }
+
+    /// Returns the value the accessor is currently inspecting.
+    pub fn value(&self) -> ValueRef<'scope, 'data> {
+        self.value
+    }
+
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    // Safety: the view state must be ViewState::AtomicBuffer
+    unsafe fn get_atomic_buffer_field(
+        &mut self,
+        is_pointer_field: bool,
+        next_field_type: Value<'scope, 'data>,
+    ) {
+        if is_pointer_field {
+            debug_assert_eq!(self.offset, 0);
+            self.value = ValueRef::wrap(self.buffer.ptr);
+            self.state = ViewState::Unlocked;
+            if self.value.is_undefined() {
+                if let Ok(ty) = next_field_type.cast::<DataType>() {
+                    if ty.is_concrete_type() {
+                        self.current_field_type = ty.as_ref();
+                    } else {
+                        self.current_field_type = DataTypeRef::undefined_ref();
+                    }
+                } else {
+                    self.current_field_type = DataTypeRef::undefined_ref();
+                }
+            } else {
+                self.current_field_type = self.value.wrapper_unchecked().datatype().as_ref();
+            }
+        } else {
+            debug_assert!(next_field_type.is::<DataType>());
+            self.current_field_type = next_field_type.cast_unchecked::<DataType>().as_ref();
+        }
+    }
+
+    // Safety: the view state must be ViewState::Unlocked
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    unsafe fn get_unlocked_inline_field(
+        &mut self,
+        is_pointer_field: bool,
+        current_field_type: DataType<'scope>,
+        next_field_type: Value<'scope, 'data>,
+        index: usize,
+        pointer_ordering: Ordering,
+        inline_ordering: Ordering,
+    ) {
+        let is_atomic_field = current_field_type.is_atomic_field_unchecked(index);
+        if is_pointer_field {
+            if is_atomic_field {
+                self.get_atomic_pointer_field(next_field_type, pointer_ordering);
+            } else {
+                self.get_pointer_field(false, next_field_type);
+            }
+        } else if let Ok(un) = next_field_type.cast::<Union>() {
+            self.get_bits_union_field(un);
+        } else {
+            debug_assert!(next_field_type.is::<DataType>());
+            self.current_field_type = next_field_type.cast_unchecked::<DataType>().as_ref();
+
+            if is_atomic_field {
+                self.lock_or_copy_atomic(inline_ordering);
+            }
+        }
+    }
+
+    // Safety: the view state must be ViewState::Unlocked
+    #[cfg(all(feature = "lts", not(feature = "all-features-override")))]
+    unsafe fn get_unlocked_inline_field(
+        &mut self,
+        is_pointer_field: bool,
+        _current_field_type: DataType<'scope>,
+        next_field_type: Value<'scope, 'data>,
+        _index: usize,
+        _pointer_ordering: Ordering,
+        _inline_ordering: Ordering,
+    ) {
+        if is_pointer_field {
+            self.get_pointer_field(false, next_field_type);
+        } else if let Ok(un) = next_field_type.cast::<Union>() {
+            self.get_bits_union_field(un);
+        } else {
+            debug_assert!(next_field_type.is::<DataType>());
+            self.current_field_type = next_field_type.cast_unchecked::<DataType>().as_ref();
+        }
+    }
+
+    // Safety: the view state must be ViewState::Locked
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    unsafe fn get_locked_inline_field(
+        &mut self,
+        is_pointer_field: bool,
+        next_field_type: Value<'scope, 'data>,
+    ) {
+        if is_pointer_field {
+            self.get_pointer_field(true, next_field_type);
+        } else if let Ok(un) = next_field_type.cast::<Union>() {
+            self.get_bits_union_field(un);
+        } else {
+            debug_assert!(next_field_type.is::<DataType>());
+            self.current_field_type = next_field_type.cast_unchecked::<DataType>().as_ref();
+        }
+    }
+
+    // Safety: the view state must be ViewState::Array
+    unsafe fn get_inline_array_field(
+        &mut self,
+        is_pointer_field: bool,
+        next_field_type: Value<'scope, 'data>,
+    ) -> JlrsResult<()> {
+        // Inline field of the current array
+        if is_pointer_field {
+            self.value = self
+                .value
+                .value_unchecked()
+                .cast::<Array>()?
+                .data_ptr()
+                .cast::<MaybeUninit<u8>>()
+                .add(self.offset as usize)
+                .cast::<ValueRef>()
+                .read();
+
+            self.offset = 0;
+            self.state = ViewState::Unlocked;
+
+            if self.value.is_undefined() {
+                if let Ok(ty) = next_field_type.cast::<DataType>() {
+                    if ty.is_concrete_type() {
+                        self.current_field_type = ty.as_ref();
+                    } else {
+                        self.current_field_type = DataTypeRef::undefined_ref();
+                    }
+                } else {
+                    self.current_field_type = DataTypeRef::undefined_ref();
+                }
+            } else {
+                self.current_field_type = self.value.value_unchecked().datatype().as_ref();
+            }
+        } else {
+            self.current_field_type = next_field_type.cast::<DataType>()?.as_ref();
+        }
+
+        Ok(())
+    }
+
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    // Safety: must only be used to read an atomic field
+    unsafe fn lock_or_copy_atomic(&mut self, ordering: Ordering) {
+        let ptr = self
+            .value
+            .ptr()
+            .cast::<MaybeUninit<u8>>()
+            .add(self.offset as usize);
+
+        match self.current_field_type.wrapper_unchecked().size() {
+            0 => (),
+            1 => {
+                let atomic = &*ptr.cast::<AtomicU8>();
+                let v = atomic.load(ordering);
+                let dst_ptr = self.buffer.bytes.as_mut_ptr();
+                std::ptr::copy_nonoverlapping(&v as *const _ as *const u8, dst_ptr as _, 1);
+                self.state = ViewState::AtomicBuffer;
+                self.offset = 0;
+            }
+            2 => {
+                let atomic = &*ptr.cast::<AtomicU16>();
+                let v = atomic.load(ordering);
+                let dst_ptr = self.buffer.bytes.as_mut_ptr();
+                std::ptr::copy_nonoverlapping(&v as *const _ as *const u8, dst_ptr as _, 2);
+                self.state = ViewState::AtomicBuffer;
+                self.offset = 0;
+            }
+            sz if sz <= 4 => {
+                let atomic = &*ptr.cast::<AtomicU32>();
+                let v = atomic.load(ordering);
+                let dst_ptr = self.buffer.bytes.as_mut_ptr();
+                std::ptr::copy_nonoverlapping(
+                    &v as *const _ as *const u8,
+                    dst_ptr as _,
+                    sz as usize,
+                );
+                self.state = ViewState::AtomicBuffer;
+                self.offset = 0;
+            }
+            sz if sz <= 8 => {
+                let atomic = &*ptr.cast::<AtomicU64>();
+                let v = atomic.load(ordering);
+                let dst_ptr = self.buffer.bytes.as_mut_ptr();
+                std::ptr::copy_nonoverlapping(
+                    &v as *const _ as *const u8,
+                    dst_ptr as _,
+                    sz as usize,
+                );
+                self.state = ViewState::AtomicBuffer;
+                self.offset = 0;
+            }
+            _ => {
+                jlrs_lock(self.value.ptr());
+                self.state = ViewState::Locked;
+            }
+        }
+    }
+
+    // Safety: must only be used to read an array element
+    unsafe fn get_array_field(&mut self, arr: Array<'scope, 'data>, index: usize) {
+        debug_assert!(self.state == ViewState::Array);
+        let el_size = arr.element_size();
+        self.offset = (index * el_size) as u32;
+
+        if arr.is_value_array() {
+            self.value = arr.data_ptr().cast::<ValueRef>().add(index).read();
+            self.offset = 0;
+            if self.value.is_undefined() {
+                if let Ok(ty) = arr.element_type().cast::<DataType>() {
+                    if ty.is_concrete_type() {
+                        self.current_field_type = ty.as_ref();
+                    } else {
+                        self.current_field_type = DataTypeRef::undefined_ref();
+                    }
+
+                    if !ty.is::<Array>() {
+                        self.state = ViewState::Unlocked;
+                    }
+                } else {
+                    self.current_field_type = DataTypeRef::undefined_ref();
+                    self.state = ViewState::Unlocked;
+                }
+            } else {
+                let ty = self.value.value_unchecked().datatype();
+                self.current_field_type = ty.as_ref();
+                if !ty.is::<Array>() {
+                    self.state = ViewState::Unlocked;
+                }
+            }
+        } else if arr.is_union_array() {
+            let mut tag = *jl_array_typetagdata(arr.unwrap(Private)).add(index) as i32;
+            let component = nth_union_component(arr.element_type(), &mut tag);
+            debug_assert!(component.is_some());
+            let ty = component.unwrap_unchecked();
+            debug_assert!(ty.is::<DataType>());
+            let ty = ty.cast_unchecked::<DataType>();
+            debug_assert!(ty.is_concrete_type());
+            self.current_field_type = ty.as_ref();
+        } else {
+            let ty = arr.element_type();
+            debug_assert!(ty.is::<DataType>());
+            self.current_field_type = ty.cast_unchecked::<DataType>().as_ref();
+        }
+    }
+
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    // Safety: must only be used to read an pointer field
+    unsafe fn get_pointer_field(&mut self, locked: bool, next_field_type: Value<'scope, 'data>) {
+        let value = self
+            .value
+            .ptr()
+            .cast::<u8>()
+            .add(self.offset as usize)
+            .cast::<ValueRef>()
+            .read();
+
+        if locked {
+            jlrs_unlock(self.value.ptr());
+            self.state = ViewState::Unlocked;
+        }
+
+        self.value = value;
+        self.offset = 0;
+
+        if self.value.is_undefined() {
+            if let Ok(ty) = next_field_type.cast::<DataType>() {
+                if ty.is_concrete_type() {
+                    self.current_field_type = ty.as_ref();
+                } else {
+                    self.current_field_type = DataTypeRef::undefined_ref();
+                }
+            } else {
+                self.current_field_type = DataTypeRef::undefined_ref();
+            }
+        } else {
+            let value = self.value.value_unchecked();
+            self.current_field_type = value.datatype().as_ref();
+            if value.is::<Array>() {
+                self.state = ViewState::Array;
+            }
+        }
+    }
+
+    #[cfg(all(feature = "lts", not(feature = "all-features-override")))]
+    // Safety: must only be used to read an pointer field
+    unsafe fn get_pointer_field(&mut self, _locked: bool, next_field_type: Value<'scope, 'data>) {
+        let value = self
+            .value
+            .ptr()
+            .cast::<u8>()
+            .add(self.offset as usize)
+            .cast::<ValueRef>()
+            .read();
+
+        self.value = value;
+        self.offset = 0;
+
+        if self.value.is_undefined() {
+            if let Ok(ty) = next_field_type.cast::<DataType>() {
+                if ty.is_concrete_type() {
+                    self.current_field_type = ty.as_ref();
+                } else {
+                    self.current_field_type = DataTypeRef::undefined_ref();
+                }
+            } else {
+                self.current_field_type = DataTypeRef::undefined_ref();
+            }
+        } else {
+            let value = self.value.value_unchecked();
+            self.current_field_type = value.datatype().as_ref();
+            if value.is::<Array>() {
+                self.state = ViewState::Array;
+            }
+        }
+    }
+
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    // Safety: must only be used to read an atomic pointer field
+    unsafe fn get_atomic_pointer_field(
+        &mut self,
+        next_field_type: Value<'scope, 'data>,
+        ordering: Ordering,
+    ) {
+        let v = &*self
+            .value
+            .ptr()
+            .cast::<u8>()
+            .add(self.offset as usize)
+            .cast::<AtomicPtr<jl_value_t>>();
+
+        let ptr = v.load(ordering);
+        self.value = ValueRef::wrap(ptr);
+        self.offset = 0;
+
+        if self.value.is_undefined() {
+            if let Ok(ty) = next_field_type.cast::<DataType>() {
+                if ty.is_concrete_type() {
+                    self.current_field_type = ty.as_ref();
+                } else {
+                    self.current_field_type = DataTypeRef::undefined_ref();
+                }
+            } else {
+                self.current_field_type = DataTypeRef::undefined_ref();
+            }
+        } else {
+            let value = self.value.value_unchecked();
+            self.current_field_type = value.datatype().as_ref();
+            if value.is::<Array>() {
+                self.state = ViewState::Array;
+            }
+        }
+    }
+
+    // Safety: must only be used to read a bits union field
+    unsafe fn get_bits_union_field(&mut self, union: Union<'scope>) {
+        let mut size = 0;
+        let isbits = union.isbits_size_align(&mut size, &mut 0);
+        debug_assert!(isbits);
+        let flag_offset = self.offset as usize + size;
+        let mut flag = self.value.ptr().cast::<u8>().add(flag_offset).read() as i32;
+
+        let active_ty = nth_union_component(union.as_value(), &mut flag);
+        debug_assert!(active_ty.is_some());
+        let active_ty = active_ty.unwrap_unchecked();
+        debug_assert!(active_ty.is::<DataType>());
+
+        let ty = active_ty.cast_unchecked::<DataType>();
+        debug_assert!(ty.is_concrete_type());
+        self.current_field_type = ty.as_ref();
+    }
+}
+
+impl Drop for FieldAccessor<'_, '_, '_> {
+    fn drop(&mut self) {
+        #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+        if self.state == ViewState::Locked {
+            debug_assert!(!self.value.is_undefined());
+            // Safety: the value is currently locked.
+            unsafe { jlrs_unlock(self.value.ptr()) }
+        }
+    }
+}
+
+impl_root!(Value, 2);
+
+/// A reference to a [`Value`] that has not been explicitly rooted.
+pub type ValueRef<'scope, 'data> = Ref<'scope, 'data, Value<'scope, 'data>>;
+
+unsafe impl ValidLayout for ValueRef<'_, '_> {
+    fn valid_layout(v: Value) -> bool {
+        if let Ok(dt) = v.cast::<DataType>() {
+            !dt.is_inline_alloc()
+        } else if v.cast::<UnionAll>().is_ok() {
+            true
+        } else if let Ok(u) = v.cast::<Union>() {
+            !u.is_bits_union()
+        } else {
+            false
+        }
+    }
+
+    const IS_REF: bool = true;
+}
+
+impl_ref_root!(Value, ValueRef, 2);

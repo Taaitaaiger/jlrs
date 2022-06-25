@@ -1,4 +1,4 @@
-//! Wrapper for `Core.SSAVAlue`.
+//! Wrapper for `SSAVAlue`.
 
 use crate::{convert::unbox::Unbox, impl_julia_typecheck, impl_valid_layout};
 use jl_sys::jl_ssavalue_type;

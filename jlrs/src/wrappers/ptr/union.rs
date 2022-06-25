@@ -1,20 +1,28 @@
 //! Wrapper for `Union`.
 
-use super::{private::Wrapper, value::Value, ValueRef, Wrapper as _};
-use crate::error::JlrsResult;
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
-use crate::error::JuliaResultRef;
 use crate::{
-    impl_debug, impl_julia_typecheck, impl_valid_layout,
-    memory::{frame::Frame, global::Global, scope::Scope},
+    error::JlrsResult,
+    impl_debug, impl_julia_typecheck,
+    memory::{global::Global, output::Output, scope::PartialScope},
     private::Private,
+    wrappers::ptr::{
+        private::WrapperPriv,
+        value::{Value, ValueRef},
+        Wrapper,
+    },
 };
+use cfg_if::cfg_if;
 use jl_sys::{jl_islayout_inline, jl_type_union, jl_uniontype_t, jl_uniontype_type};
-
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
-use jl_sys::{jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_type_union};
-
 use std::{marker::PhantomData, ptr::NonNull};
+
+use super::Ref;
+
+cfg_if! {
+    if #[cfg(not(all(target_os = "windows", feature = "lts")))] {
+        use crate::error::{JuliaResult, JuliaResultRef};
+        use jl_sys::{jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_type_union};
+    }
+}
 
 /// A struct field can have a type that's a union of several types. In this case, the type of this
 /// field is an instance of `Union`.
@@ -32,15 +40,15 @@ impl<'scope> Union<'scope> {
     /// [`Union`]: crate::wrappers::ptr::union::Union
     /// [`DataType`]: crate::wrappers::ptr::datatype::DataType
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub fn new<'target, 'current, V, S, F>(scope: S, mut types: V) -> JlrsResult<S::JuliaResult>
+    pub fn new<'target, V, S>(scope: S, types: V) -> JlrsResult<JuliaResult<'target, 'static>>
     where
-        V: AsMut<[Value<'scope, 'static>]>,
-        S: Scope<'target, 'current, 'static, F>,
-        F: Frame<'current>,
+        V: AsRef<[Value<'scope, 'static>]>,
+        S: PartialScope<'target>,
     {
+        // Safety: if an exception is thrown it's caught, the result is rooted immediately
         unsafe {
-            let types = types.as_mut();
-            let un = jlrs_type_union(types.as_mut_ptr().cast(), types.len());
+            let types = types.as_ref();
+            let un = jlrs_type_union(types.as_ptr() as *mut _, types.len());
             if un.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
                 scope.call_result(Err(NonNull::new_unchecked(un.data)), Private)
             } else {
@@ -53,21 +61,24 @@ impl<'scope> Union<'scope> {
     /// must return `true`. Note that the result is not necessarily a [`Union`], for example the
     /// union of a single [`DataType`] is that type, not a `Union` with a single variant.
     ///
-    /// If an exception is thrown the process aborts.
+    /// If an exception is thrown it isn't caught.
+    ///
+    /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
+    /// function.
     ///
     /// [`Union`]: crate::wrappers::ptr::union::Union
     /// [`DataType`]: crate::wrappers::ptr::datatype::DataType
-    pub fn new_unchecked<'target, 'current, V, S, F>(scope: S, mut types: V) -> JlrsResult<S::Value>
+    pub unsafe fn new_unchecked<'target, V, S>(
+        scope: S,
+        types: V,
+    ) -> JlrsResult<Value<'target, 'static>>
     where
-        V: AsMut<[Value<'scope, 'static>]>,
-        S: Scope<'target, 'current, 'static, F>,
-        F: Frame<'current>,
+        V: AsRef<[Value<'scope, 'static>]>,
+        S: PartialScope<'target>,
     {
-        unsafe {
-            let types = types.as_mut();
-            let un = jl_type_union(types.as_mut_ptr().cast(), types.len());
-            scope.value(NonNull::new_unchecked(un), Private)
-        }
+        let types = types.as_ref();
+        let un = jl_type_union(types.as_ptr() as *mut _, types.len());
+        scope.value(NonNull::new_unchecked(un), Private)
     }
 
     /// Returns the union of all types in `types`. For each of these types, [`Value::is_kind`]
@@ -80,14 +91,15 @@ impl<'scope> Union<'scope> {
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn new_unrooted<'global, V>(
         _: Global<'global>,
-        mut types: V,
+        types: V,
     ) -> JuliaResultRef<'global, 'static>
     where
-        V: AsMut<[Value<'scope, 'static>]>,
+        V: AsRef<[Value<'scope, 'static>]>,
     {
+        // Safety: if an exception is thrown it's caught
         unsafe {
-            let types = types.as_mut();
-            let un = jlrs_type_union(types.as_mut_ptr().cast(), types.len());
+            let types = types.as_ref();
+            let un = jlrs_type_union(types.as_ptr() as *mut _, types.len());
             if un.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
                 Err(ValueRef::wrap(un.data))
             } else {
@@ -101,40 +113,39 @@ impl<'scope> Union<'scope> {
     /// union of a single [`DataType`] is that type, not a `Union` with a single variant. Unlike
     /// [`Union::new`] this method doesn't root the allocated value.
     ///
-    /// If an exception is thrown the process aborts.
+    /// If an exception is thrown it isn't caught.
+    ///
+    /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
+    /// function.
     ///
     /// [`Union`]: crate::wrappers::ptr::union::Union
     /// [`DataType`]: crate::wrappers::ptr::datatype::DataType
-    pub fn new_unrooted_unchecked<'global, V>(
+    pub unsafe fn new_unrooted_unchecked<'global, V>(
         _: Global<'global>,
-        mut types: V,
+        types: V,
     ) -> ValueRef<'global, 'static>
     where
-        V: AsMut<[Value<'scope, 'static>]>,
+        V: AsRef<[Value<'scope, 'static>]>,
     {
-        unsafe {
-            let types = types.as_mut();
-            let un = jl_type_union(types.as_mut_ptr().cast(), types.len());
-            ValueRef::wrap(un)
-        }
+        let types = types.as_ref();
+        let un = jl_type_union(types.as_ptr() as *mut _, types.len());
+        ValueRef::wrap(un)
     }
 
     /// Returns true if the bits-union optimization applies to this union type.
     pub fn is_bits_union(self) -> bool {
-        unsafe {
-            let v: Value = self.as_value();
-            jl_islayout_inline(v.unwrap(Private), &mut 0, &mut 0) != 0
-        }
+        let v: Value = self.as_value();
+        // Safety: The C API function is called with valid arguments
+        unsafe { jl_islayout_inline(v.unwrap(Private), &mut 0, &mut 0) != 0 }
     }
 
     /// Returns true if the bits-union optimization applies to this union type and calculates
     /// the size and aligment if it does. If this method returns false, the calculated size and
     /// alignment are invalid.
     pub fn isbits_size_align(self, size: &mut usize, align: &mut usize) -> bool {
-        unsafe {
-            let v: Value = self.as_value();
-            jl_islayout_inline(v.unwrap(Private), size, align) != 0
-        }
+        let v: Value = self.as_value();
+        // Safety: The C API function is called with valid arguments
+        unsafe { jl_islayout_inline(v.unwrap(Private), size, align) != 0 }
     }
 
     /// Returns the size of a field that is of this `Union` type excluding the flag that is used
@@ -166,30 +177,41 @@ impl<'scope> Union<'scope> {
     /// Unions are stored as binary trees, the arguments are stored as its leaves. This method
     /// returns one of its branches.
     pub fn a(self) -> ValueRef<'scope, 'static> {
+        // Safety: the pointer points to valid data
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().a) }
     }
 
     /// Unions are stored as binary trees, the arguments are stored as its leaves. This method
     /// returns one of its branches.
     pub fn b(self) -> ValueRef<'scope, 'static> {
+        // Safety: the pointer points to valid data
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().b) }
+    }
+
+    /// Use the `Output` to extend the lifetime of this data.
+    pub fn root<'target>(self, output: Output<'target>) -> Union<'target> {
+        // Safety: the pointer points to valid data
+        unsafe {
+            let ptr = self.unwrap_non_null(Private);
+            output.set_root::<Union>(ptr);
+            Union::wrap_non_null(ptr, Private)
+        }
     }
 }
 
 impl_julia_typecheck!(Union<'scope>, jl_uniontype_type, 'scope);
 impl_debug!(Union<'_>);
-impl_valid_layout!(Union<'scope>, 'scope);
 
-impl<'scope> Wrapper<'scope, '_> for Union<'scope> {
+impl<'scope> WrapperPriv<'scope, '_> for Union<'scope> {
     type Wraps = jl_uniontype_t;
     const NAME: &'static str = "Union";
 
-    #[inline(always)]
+    // Safety: `inner` must not have been freed yet, the result must never be
+    // used after the GC might have freed it.
     unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
         Self(inner, PhantomData)
     }
 
-    #[inline(always)]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
     }
@@ -199,6 +221,7 @@ pub(crate) fn nth_union_component<'scope, 'data>(
     v: Value<'scope, 'data>,
     pi: &mut i32,
 ) -> Option<Value<'scope, 'data>> {
+    // Safety: both a and b are never null
     unsafe {
         match v.cast::<Union>() {
             Ok(un) => {
@@ -222,6 +245,7 @@ pub(crate) fn nth_union_component<'scope, 'data>(
 }
 
 fn collect<'scope>(value: Value<'scope, 'static>, comps: &mut Vec<ValueRef<'scope, 'static>>) {
+    // Safety: both a and b are never null
     unsafe {
         match value.cast::<Union>() {
             Ok(u) => {
@@ -236,6 +260,7 @@ fn collect<'scope>(value: Value<'scope, 'static>, comps: &mut Vec<ValueRef<'scop
 }
 
 pub(crate) fn find_union_component(haystack: Value, needle: Value, nth: &mut u32) -> bool {
+    // Safety: both a and b are never null
     unsafe {
         match haystack.cast::<Union>() {
             Ok(hs) => {
@@ -258,3 +283,10 @@ pub(crate) fn find_union_component(haystack: Value, needle: Value, nth: &mut u32
         }
     }
 }
+
+impl_root!(Union, 1);
+
+/// A reference to a [`Union`] that has not been explicitly rooted.
+pub type UnionRef<'scope> = Ref<'scope, 'static, Union<'scope>>;
+impl_valid_layout!(UnionRef, Union);
+impl_ref_root!(Union, UnionRef, 1);

@@ -10,15 +10,15 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
             let oob_idx = jlrs
-                .scope_with_slots(0, |global, frame| {
-                    frame.scope_with_slots(5, |frame| unsafe {
-                        let idx = Value::new(&mut *frame, 4usize)?;
+                .scope_with_capacity(0, |global, mut frame| {
+                    frame.scope_with_capacity(5, |mut frame| unsafe {
+                        let idx = Value::new(&mut frame, 4usize)?;
                         let data = vec![1.0f64, 2., 3.];
-                        let array = Array::from_vec(&mut *frame, data, 3)?;
+                        let array = Array::from_vec(&mut frame, data, 3)?.into_jlrs_result()?;
                         let func = Module::base(global)
                             .function_ref("getindex")?
                             .wrapper_unchecked();
-                        let out = func.call2(&mut *frame, array, idx)?.unwrap_err();
+                        let out = func.call2(&mut frame, array.as_value(), idx)?.unwrap_err();
 
                         assert_eq!(out.datatype_name().unwrap(), "BoundsError");
 
@@ -28,8 +28,8 @@ mod tests {
                         let f1 = field_names[1].as_str().unwrap();
                         assert_eq!(f1, "i");
 
-                        out.get_field(&mut *frame, field_names[1])?
-                            .get_nth_field(&mut *frame, 0)?
+                        out.get_field(&mut frame, field_names[1])?
+                            .get_nth_field(&mut frame, 0)?
                             .unbox::<isize>()
                     })
                 })

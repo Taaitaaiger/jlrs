@@ -8,9 +8,9 @@
 //! `[1, 2]` or `(1, 2)`. Note that unlike Julia, array indexing starts at 0.
 
 use crate::{
-    error::{JlrsError, JlrsResult},
+    error::{AccessError, JlrsResult},
     private::Private,
-    wrappers::ptr::{array::Array, private::Wrapper},
+    wrappers::ptr::{array::Array, private::WrapperPriv as _},
 };
 use jl_sys::{jl_array_dims_ptr, jl_array_ndims};
 use std::{
@@ -26,8 +26,8 @@ pub trait Dims: Sized + Debug {
     /// Returns the number of elements of the nth dimension. Indexing starts at 0.
     fn n_elements(&self, dimension: usize) -> usize;
 
-    /// The total number of elements in the arry, ie the product of the number of elements of each
-    /// dimension.
+    /// The total number of elements in the arry, i.e. the product of the number of elements of
+    /// each dimension.
     fn size(&self) -> usize {
         let mut acc = 1;
         for i in 0..self.n_dimensions() {
@@ -37,11 +37,12 @@ pub trait Dims: Sized + Debug {
         acc
     }
 
-    /// Calculates the linear index for `dim_index` in an array with dimensions `self`. The
-    /// default implementation is generally correct and should not be overridden.
-    fn index_of<D: Dims>(&self, dim_index: D) -> JlrsResult<usize> {
+    /// Calculate the linear index for `dim_index` in an array with dimensions `self`.
+    ///
+    /// The default implementation must not be overridden.
+    fn index_of<D: Dims>(&self, dim_index: &D) -> JlrsResult<usize> {
         if self.n_dimensions() != dim_index.n_dimensions() {
-            Err(JlrsError::InvalidIndex {
+            Err(AccessError::InvalidIndex {
                 idx: dim_index.into_dimensions(),
                 sz: self.into_dimensions(),
             })?;
@@ -54,7 +55,7 @@ pub trait Dims: Sized + Debug {
 
         for dim in 0..n_dims {
             if self.n_elements(dim) <= dim_index.n_elements(dim) {
-                Err(JlrsError::InvalidIndex {
+                Err(AccessError::InvalidIndex {
                     idx: dim_index.into_dimensions(),
                     sz: self.into_dimensions(),
                 })?;
@@ -69,8 +70,9 @@ pub trait Dims: Sized + Debug {
         Ok(idx)
     }
 
-    /// Convert the dimensions into a generic `Dimensions` struct. The default implementation
-    /// should not be overridden.
+    /// Convert `Self` to `Dimensions`.
+    ///
+    /// The default implementation must not be overridden.
     fn into_dimensions(&self) -> Dimensions {
         Dimensions::from_dims(self)
     }
@@ -85,15 +87,27 @@ pub struct ArrayDimensions<'scope> {
 }
 
 impl<'scope> ArrayDimensions<'scope> {
-    pub(crate) unsafe fn new(array: Array<'scope, '_>) -> Self {
+    pub(crate) fn new(array: Array<'scope, '_>) -> Self {
         let array_ptr = array.unwrap(Private);
-        let ptr = jl_array_dims_ptr(array_ptr);
-        let n = jl_array_ndims(array_ptr) as usize;
-        ArrayDimensions {
-            ptr,
-            n,
-            _marker: PhantomData,
+        // Safety: The array's dimensions exists as long as the array does.
+        unsafe {
+            let ptr = jl_array_dims_ptr(array_ptr);
+            let n = jl_array_ndims(array_ptr) as usize;
+
+            ArrayDimensions {
+                ptr,
+                n,
+                _marker: PhantomData,
+            }
         }
+    }
+
+    /// Returns the dimensions as a slice.
+    ///
+    /// Safety: don't push new elements to a 1-dimensional array while borrowing its dimensions
+    /// as a slice.
+    pub unsafe fn as_slice<'borrow>(&'borrow self) -> &'borrow [usize] {
+        std::slice::from_raw_parts(self.ptr, self.n)
     }
 }
 
@@ -107,6 +121,7 @@ impl<'scope> Dims for ArrayDimensions<'scope> {
             return 0;
         }
 
+        // Safety: the dimension is in bounds
         unsafe { self.ptr.add(dimension).read() }
     }
 }
@@ -246,6 +261,7 @@ pub enum Dimensions {
 }
 
 impl Dimensions {
+    /// Convert an implementation of `Dims` to `Dimensions`.
     pub fn from_dims<D: Dims>(dims: &D) -> Self {
         match dims.n_dimensions() {
             0 => Dimensions::Few([0, 0, 0, 0]),
@@ -269,7 +285,7 @@ impl Dimensions {
         }
     }
 
-    /// Returns the raw dimensions as a slice.
+    /// Returns the dimensions as a slice.
     pub fn as_slice(&self) -> &[usize] {
         match self {
             Dimensions::Few(ref v) => &v[1..v[0] as usize + 1],
@@ -324,7 +340,13 @@ impl Debug for Dimensions {
 
 impl Display for Dimensions {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        <Self as Debug>::fmt(self, f)
+        let mut f = f.debug_tuple("");
+
+        for d in self.as_slice() {
+            f.field(&d);
+        }
+
+        f.finish()
     }
 }
 

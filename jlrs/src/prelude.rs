@@ -1,50 +1,55 @@
 //! Reexports structs and traits you're likely to need.
 
+#[cfg(feature = "ccall")]
+pub use crate::ccall::CCall;
+#[cfg(feature = "pyplot")]
+pub use crate::pyplot::{AccessPlotsModule, PyPlot};
+#[cfg(feature = "async-std-rt")]
+pub use crate::runtime::async_rt::async_std_rt::*;
+#[cfg(feature = "tokio-rt")]
+pub use crate::runtime::async_rt::tokio_rt::*;
+#[cfg(any(feature = "async-rt", feature = "sync-rt"))]
+pub use crate::runtime::builder::RuntimeBuilder;
+#[cfg(feature = "sync-rt")]
+pub use crate::runtime::sync_rt::Julia;
+#[cfg(feature = "async-rt")]
+pub use crate::runtime::{async_rt::AsyncJulia, builder::AsyncRuntimeBuilder};
+#[cfg(feature = "async")]
 pub use crate::{
-    convert::{as_unrooted::AsUnrooted, into_jlrs_result::IntoJlrsResult},
+    async_util::task::{yield_task, AsyncTask, PersistentTask},
+    call::CallAsync,
+    memory::frame::AsyncGcFrame,
+};
+pub use crate::{
+    call::{Call, ProvideKeywords},
+    convert::into_jlrs_result::IntoJlrsResult,
     error::JlrsResult,
-    layout::typecheck::Nothing,
     memory::{
-        frame::{Frame, GcFrame},
+        frame::Frame,
         global::Global,
-        scope::{Scope, ScopeExt},
+        scope::{PartialScope, Scope},
     },
     named_tuple,
     wrappers::{
-        inline::{bool::Bool, char::Char, tuple::*},
+        inline::{bool::Bool, char::Char, nothing::Nothing, tuple::*},
         ptr::{
-            array::{dimensions::Dims, Array, TypedArray},
-            call::{Call, CallExt},
+            array::ArrayRef,
+            array::TypedArrayRef,
+            array::{Array, TypedArray},
             datatype::DataType,
+            datatype::DataTypeRef,
             module::Module,
+            module::ModuleRef,
             string::JuliaString,
+            string::StringRef,
             symbol::Symbol,
             value::Value,
-            Wrapper,
+            value::ValueRef,
+            /*Ref,*/ Wrapper,
         },
     },
 };
-
-#[cfg(feature = "sync-rt")]
-pub use crate::julia::Julia;
-
-#[cfg(feature = "ccall")]
-pub use crate::{ccall::CCall, memory::frame::NullFrame};
-
-#[cfg(feature = "jlrs-derive")]
-pub use jlrs_derive::*;
-
-#[cfg(any(feature = "tokio-rt", feature = "async-std-rt"))]
-pub use crate::extensions::multitask::runtime::AsyncJulia;
-#[cfg(feature = "async")]
-pub use crate::extensions::multitask::{
-    async_frame::AsyncGcFrame,
-    async_task::{AsyncTask, PersistentTask},
-    call_async::CallAsync,
-    yield_task,
-};
 #[cfg(feature = "async")]
 pub use async_trait::async_trait;
-
-#[cfg(feature = "pyplot")]
-pub use crate::extensions::pyplot::{AccessPlotsModule, PyPlot};
+#[cfg(feature = "jlrs-derive")]
+pub use jlrs_derive::*;

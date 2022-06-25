@@ -10,9 +10,9 @@
 //! # fn main() {
 //! # JULIA.with(|j| {
 //! # let mut julia = j.borrow_mut();
-//! julia.scope(|global, frame| {
+//! julia.scope(|global, mut frame| {
 //!     let tup = Tuple2(2i32, true);
-//!     let val = Value::new(frame, tup)?;
+//!     let val = Value::new(&mut frame, tup)?;
 //!     assert!(val.is::<Tuple2<i32, bool>>());
 //!     assert!(val.unbox::<Tuple2<i32, bool>>().is_ok());
 //!     Ok(())
@@ -20,14 +20,20 @@
 //! # });
 //! # }
 //! ```
+//!
+//! Additionally, [`Tuple` ] can be used to create a tuple from an arbitrary number of `Value`s.
 
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
 use crate::convert::into_jlrs_result::IntoJlrsResult;
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use crate::error::JuliaResult;
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use crate::memory::scope::PartialScope;
 use crate::wrappers::ptr::{
     datatype::DataType,
     value::{Value, MAX_SIZE},
 };
-use crate::wrappers::ptr::{private::Wrapper as _, Wrapper as _};
+use crate::wrappers::ptr::{private::WrapperPriv as _, Wrapper as _};
 use crate::{
     error::JlrsResult,
     layout::typecheck::Typecheck,
@@ -36,9 +42,8 @@ use crate::{
 };
 use jl_sys::jl_tuple_typename;
 
-/// A typecheck that can be used in combination with `DataType::is`. This method returns true if
-/// a value of this type is a tuple.
-
+/// A tuple that has an arbitrary number of fields. This type can be used as a typecheck to check
+/// if the data is a tuple type, and to create tuples of arbitrary sizes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Tuple;
 
@@ -47,28 +52,29 @@ impl Tuple {
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn new<'target, 'current, 'value, 'borrow, V, S, F>(
         scope: S,
-        mut values: V,
-    ) -> JlrsResult<S::JuliaResult>
+        values: V,
+    ) -> JlrsResult<JuliaResult<'target, 'borrow>>
     where
-        V: AsMut<[Value<'value, 'borrow>]>,
-        S: Scope<'target, 'current, 'borrow, F>,
+        V: AsRef<[Value<'value, 'borrow>]>,
+        S: Scope<'target, 'current, F>,
         F: Frame<'current>,
     {
-        scope.result_scope(|output, frame| {
+        let (output, frame) = scope.split()?;
+        frame.scope(|mut frame| {
+            let global = frame.as_scope().global();
             let types: smallvec::SmallVec<[_; MAX_SIZE]> = values
-                .as_mut()
+                .as_ref()
                 .iter()
                 .copied()
                 .map(|v| v.datatype().as_value())
                 .collect();
 
-            let tuple_ty = DataType::tuple_type(frame.global())
+            let tuple_ty = DataType::tuple_type(global)
                 .as_value()
-                .apply_type(&mut *frame, types)?
+                .apply_type(&mut frame, types)?
                 .into_jlrs_result()?
                 .cast::<DataType>()?;
 
-            let output = output.into_scope(frame);
             tuple_ty.instantiate(output, values)
         })
     }
@@ -76,27 +82,32 @@ impl Tuple {
     /// Create a new tuple from the contents of `values`.
     pub unsafe fn new_unchecked<'target, 'current, 'value, 'borrow, V, S, F>(
         scope: S,
-        mut values: V,
-    ) -> JlrsResult<S::Value>
+        values: V,
+    ) -> JlrsResult<Value<'target, 'borrow>>
     where
-        V: AsMut<[Value<'value, 'borrow>]>,
-        S: Scope<'target, 'current, 'borrow, F>,
+        V: AsRef<[Value<'value, 'borrow>]>,
+        S: Scope<'target, 'current, F>,
         F: Frame<'current>,
     {
-        scope.value_scope(|output, frame| {
+        let global = scope.global();
+        let (output, frame) = scope.split()?;
+
+        frame.scope(|mut frame| {
             let types: smallvec::SmallVec<[_; MAX_SIZE]> = values
-                .as_mut()
+                .as_ref()
                 .iter()
                 .copied()
                 .map(|v| v.datatype().as_value())
                 .collect();
 
-            let tuple_ty = DataType::tuple_type(frame.global())
+            // The tuple type is constructed with the types of the values as its type
+            // parameters, since only concrete types can have instances, all types are
+            // concrete so the tuple type is concrete, too.
+            let tuple_ty = DataType::tuple_type(global)
                 .as_value()
-                .apply_type_unchecked(&mut *frame, types)?
+                .apply_type_unchecked(&mut frame, types)?
                 .cast::<DataType>()?;
 
-            let output = output.into_scope(frame);
             tuple_ty.instantiate_unchecked(output, values)
         })
     }
@@ -143,13 +154,13 @@ macro_rules! impl_tuple {
         {
             fn julia_type<'scope>(
                 global: $crate::memory::global::Global<'scope>
-            ) -> $crate::wrappers::ptr::DataTypeRef<'scope> {
+            ) -> $crate::wrappers::ptr::datatype::DataTypeRef<'scope> {
                 let types = &mut [
                     $(<$types as $crate::convert::into_julia::IntoJulia>::julia_type(global)),+
                 ];
 
                 unsafe {
-                    $crate::wrappers::ptr::DataTypeRef::wrap(
+                    $crate::wrappers::ptr::datatype::DataTypeRef::wrap(
                         ::jl_sys::jl_apply_tuple_type_v(types.as_mut_ptr().cast(), types.len())
                     )
                 }
@@ -169,7 +180,7 @@ macro_rules! impl_tuple {
                             return false;
                         }
 
-                        let types = fieldtypes.wrapper_unchecked().data();
+                        let types = fieldtypes.wrapper_unchecked().unrestricted_data().as_slice();
                         if !check!(types, n, $($types),+) {
                             return false
                         }
@@ -180,6 +191,8 @@ macro_rules! impl_tuple {
                     false
                 }
             }
+
+            const IS_REF: bool = false;
         }
 
         unsafe impl<$($types),+> $crate::convert::unbox::Unbox for $name<$($types),+>
@@ -200,21 +213,21 @@ macro_rules! impl_tuple {
     };
     ($name:ident) => {
         #[repr(C)]
-        #[derive(Copy, Clone, Debug)]
+        #[derive(Copy, Clone, Debug, PartialEq, Eq)]
         pub struct $name();
 
         unsafe impl $crate::convert::into_julia::IntoJulia for $name
         {
             fn julia_type<'scope>(
                 global: $crate::memory::global::Global<'scope>
-            ) -> $crate::wrappers::ptr::DataTypeRef<'scope> {
+            ) -> $crate::wrappers::ptr::datatype::DataTypeRef<'scope> {
                 $crate::wrappers::ptr::datatype::DataType::emptytuple_type(global).as_ref()
             }
 
-            unsafe fn into_julia<'scope>(
+            fn into_julia<'scope>(
                 self,
                 global: $crate::memory::global::Global<'scope>
-            ) -> $crate::wrappers::ptr::ValueRef<'scope, 'static> {
+            ) -> $crate::wrappers::ptr::value::ValueRef<'scope, 'static> {
                 $crate::wrappers::ptr::value::Value::emptytuple(global).as_ref()
             }
         }
@@ -228,6 +241,8 @@ macro_rules! impl_tuple {
 
                 false
             }
+
+            const IS_REF: bool = false;
         }
 
         unsafe impl $crate::convert::unbox::Unbox for $name {

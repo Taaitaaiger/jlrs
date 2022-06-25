@@ -13,14 +13,14 @@ mod tests {
                 JULIA.with(|j| {
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope_with_slots(0, |global, _| {
+                    jlrs.scope_with_capacity(0, |global, _| {
                         let v1 = Value::$func(global);
                         let v2 = unsafe {
                             Module::core(global)
                                 .global_ref($tyname)?
                                 .wrapper_unchecked()
                         };
-                        assert!(v1.datatype().as_value().egal(v2));
+                        assert!(v1.datatype().as_value() == v2);
                         Ok(())
                     })
                     .unwrap();
@@ -36,7 +36,7 @@ mod tests {
                 JULIA.with(|j| {
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope_with_slots(0, |global, _| {
+                    jlrs.scope_with_capacity(0, |global, _| {
                         #[allow(unused_unsafe)]
                         unsafe {
                             let v1 = Value::$func(global);
@@ -62,7 +62,7 @@ mod tests {
                 JULIA.with(|j| {
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope_with_slots(0, |global, _| {
+                    jlrs.scope_with_capacity(0, |global, _| {
                         #[allow(unused_unsafe)]
                         unsafe {
                             let v1 = Value::$func(global);
@@ -88,14 +88,14 @@ mod tests {
                 JULIA.with(|j| {
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope_with_slots(0, |global, _| {
+                    jlrs.scope_with_capacity(0, |global, _| {
                         let v1 = UnionAll::$func(global);
                         let v2 = unsafe {
                             Module::core(global)
                                 .global_ref($tyname)?
                                 .wrapper_unchecked()
                         };
-                        assert!(v1.as_value().egal(v2));
+                        assert!(v1.as_value() == v2);
                         Ok(())
                     })
                     .unwrap();
@@ -111,7 +111,7 @@ mod tests {
                 JULIA.with(|j| {
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope_with_slots(0, |global, _| {
+                    jlrs.scope_with_capacity(0, |global, _| {
                         let v1 = UnionAll::$func(global);
                         let v2 = unsafe {
                             Module::core(global)
@@ -134,7 +134,7 @@ mod tests {
                 JULIA.with(|j| {
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope_with_slots(0, |global, _| {
+                    jlrs.scope_with_capacity(0, |global, _| {
                         let v1 = DataType::$func(global);
                         let v2 = unsafe {
                             Module::core(global)

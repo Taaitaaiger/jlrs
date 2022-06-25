@@ -1,0 +1,51 @@
+[package]
+name = "examples"
+version = "0.0.0"
+publish = false
+edition = "2018"
+
+[dev-dependencies]
+jlrs = { version = "0.14", path = "../jlrs", features = ["full"] }
+crossbeam-channel = "0.5"
+async-std = { version = "1", features = ["unstable", "attributes"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"]}
+
+[[example]]
+name = "async_tasks"
+path = "async_tasks.rs"
+
+[[example]]
+name = "call_julia"
+path = "call_julia.rs"
+
+[[example]]
+name = "fully_async_async_std"
+path = "fully_async_async_std.rs"
+
+[[example]]
+name = "fully_async_tokio"
+path = "fully_async_tokio.rs"
+
+[[example]]
+name = "persistent_tasks"
+path = "persistent_tasks.rs"
+
+[[example]]
+name = "nested_async_scopes"
+path = "nested_async_scopes.rs"
+
+[[example]]
+name = "plot"
+path = "plot.rs"
+
+[[example]]
+name = "ccall"
+path = "ccall.rs"
+crate-type = ["cdylib"]
+test = true
+
+[[example]]
+name = "ccall_with_threads"
+path = "ccall_with_threads.rs"
+crate-type = ["cdylib"]
+test = true

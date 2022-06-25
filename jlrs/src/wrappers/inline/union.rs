@@ -11,10 +11,13 @@ use jl_sys::jl_bottom_type;
 use crate::{
     layout::{
         bits_union::{Align, BitsUnionContainer, Flag},
+        typecheck::Typecheck,
         valid_layout::ValidLayout,
     },
     private::Private,
-    wrappers::ptr::{private::Wrapper, union::Union, value::Value},
+    wrappers::ptr::{
+        datatype::DataType, private::WrapperPriv as _, union::Union, value::Value, Wrapper,
+    },
 };
 
 /// Ensures the next field is aligned to 1 byte.
@@ -154,5 +157,13 @@ impl Debug for EmptyUnion {
 unsafe impl ValidLayout for EmptyUnion {
     fn valid_layout(ty: Value) -> bool {
         unsafe { ty.unwrap(Private) == jl_bottom_type }
+    }
+
+    const IS_REF: bool = true;
+}
+
+unsafe impl Typecheck for EmptyUnion {
+    fn typecheck(t: DataType) -> bool {
+        <Self as ValidLayout>::valid_layout(t.as_value())
     }
 }

@@ -1,31 +1,41 @@
-//! A reusable slot in a GC frame.
-use super::frame::Frame;
+//! A reusable slot in a frame.
+
 use crate::{
-    error::JlrsResult,
+    memory::stack_page::Slot,
     private::Private,
-    wrappers::ptr::{private::Wrapper, value::Value, ValueRef},
+    wrappers::ptr::{
+        private::WrapperPriv,
+        value::{Value, ValueRef},
+    },
 };
-use std::{ffi::c_void, marker::PhantomData};
+use std::marker::PhantomData;
 
-/// A reusable slot in a GC frame. Unlike an `Output`, a `ReusableSlot` can be used multiple
-/// times. It's the user's responsibility to ensure a value that is rooted using a `ReusableSlot`
-/// is not used after the slot has been reused.
+/// A reusable slot in a frame. Unlike an `Output`, a `ReusableSlot` can be used multiple times.
+/// It's your responsibility to ensure a value that is rooted using a `ReusableSlot` is never
+/// used after the slot has been reset.
 #[derive(Clone, Copy)]
-pub struct ReusableSlot<'scope>(*mut *mut c_void, PhantomData<&'scope ()>);
+pub struct ReusableSlot<'target> {
+    slot: *const Slot,
+    _marker: PhantomData<fn(&'target ())>,
+}
 
-impl<'scope> ReusableSlot<'scope> {
-    pub(crate) fn new<F: Frame<'scope>>(frame: &mut F) -> JlrsResult<Self> {
-        unsafe {
-            let slot = frame.reserve_slot(Private)?;
-            Ok(ReusableSlot(slot, PhantomData))
+impl<'target> ReusableSlot<'target> {
+    // Safety: slot must have been reserved in _frame
+    pub(crate) unsafe fn new(slot: &'target Slot) -> Self {
+        ReusableSlot {
+            slot,
+            _marker: PhantomData,
         }
     }
 
-    /// Root the given value in this slot.
-    pub fn reset<'data: 'scope>(self, new: Value<'_, 'data>) -> ValueRef<'scope, 'data> {
+    /// Root the given value in this slot, any data currently rooted in this slot is potentially
+    /// unreachable after calling this method.
+    pub fn reset<'data>(self, new: Value<'_, 'data>) -> ValueRef<'target, 'data> {
+        let ptr = new.unwrap(Private);
+
+        // the slot is valid as long as the ReusableSlot is.
         unsafe {
-            let ptr = new.unwrap_non_null(Private).as_ptr();
-            self.0.write(ptr.cast());
+            (&*self.slot).set(ptr.cast());
             ValueRef::wrap(ptr)
         }
     }
