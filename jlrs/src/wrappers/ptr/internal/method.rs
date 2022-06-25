@@ -20,12 +20,15 @@ use jl_sys::{jl_method_t, jl_method_type};
 use std::{marker::PhantomData, ptr::NonNull};
 
 cfg_if! {
-    if #[cfg(any(not(feature = "lts"), feature = "all-features-override"))] {
+    if #[cfg(all(not(feature = "lts"), not(feature = "all-features-override")))] {
         use jl_sys::jl_value_t;
-        use crate::wrappers::ptr::{atomic_value, array::TypedArrayRef};
+        use crate::wrappers::ptr::atomic_value;
         use std::sync::atomic::Ordering;
     }
 }
+
+#[cfg(all(feature = "rc1", not(feature = "all-features-override")))]
+use crate::wrappers::ptr::array::TypedArrayRef;
 
 /// This type describes a single method definition, and stores data shared by the specializations
 /// of a function.
@@ -114,10 +117,7 @@ impl<'scope> Method<'scope> {
     /// Table of all `Method` specializations, allocated as [hashable, ..., NULL, linear, ....]
     pub fn specializations(self) -> SimpleVectorRef<'scope> {
         cfg_if! {
-            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
-                // Safety: the pointer points to valid data
-                unsafe { SimpleVectorRef::wrap(self.unwrap_non_null(Private).as_ref().specializations) }
-            } else {
+            if #[cfg(all(not(feature = "lts"), not(feature = "all-features-override")))] {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let specializations =
@@ -125,6 +125,9 @@ impl<'scope> Method<'scope> {
                     let ptr = specializations.load(Ordering::Relaxed);
                     SimpleVectorRef::wrap(ptr.cast())
                 }
+            } else {
+                // Safety: the pointer points to valid data
+                unsafe { SimpleVectorRef::wrap(self.unwrap_non_null(Private).as_ref().specializations) }
             }
         }
     }
@@ -197,14 +200,14 @@ impl<'scope> Method<'scope> {
     }
 
     /// RLE (build_id, offset) pairs (even/odd indexing)
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(all(feature = "rc1", not(feature = "all-features-override")))]
     pub fn root_blocks(self) -> TypedArrayRef<'scope, 'static, u64> {
         // Safety: the pointer points to valid data
         unsafe { TypedArrayRef::wrap(self.unwrap_non_null(Private).as_ref().root_blocks) }
     }
 
     /// # of roots stored in the system image
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(all(feature = "rc1", not(feature = "all-features-override")))]
     pub fn nroots_sysimg(self) -> i32 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().nroots_sysimg }
@@ -281,7 +284,7 @@ impl<'scope> Method<'scope> {
     }
 
     /// 0x00 = use heuristic; 0x01 = aggressive; 0x02 = none
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(all(feature = "rc1", not(feature = "all-features-override")))]
     pub fn constprop(self) -> u8 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().constprop }
@@ -289,7 +292,7 @@ impl<'scope> Method<'scope> {
 
     /// Override the conclusions of inter-procedural effect analysis,
     /// forcing the conclusion to always true.
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(all(feature = "rc1", not(feature = "all-features-override")))]
     pub fn purity(self) -> u8 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().purity.bits }

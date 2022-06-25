@@ -60,6 +60,8 @@ uv = ["jl-sys/uv", "ccall"]
 debug = ["jl-sys/debug"]
 # Link LTS version of Julia
 lts = ["jl-sys/lts"]
+# Link the RC1 version of Julia 1.8
+rc1 = ["jl-sys/rc1"]
 
 
 # Internal

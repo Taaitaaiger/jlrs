@@ -85,7 +85,7 @@ impl<'scope> TypeName<'scope> {
     }
 
     /// The `atomicfields` field.
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(all(feature = "rc1", not(feature = "all-features-override")))]
     pub fn constfields(self) -> *const u32 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().constfields }

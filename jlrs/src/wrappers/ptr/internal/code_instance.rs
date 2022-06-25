@@ -106,21 +106,21 @@ impl<'scope> CodeInstance<'scope> {
     }
 
     /// The `ipo_purity_bits` field of this `CodeInstance`.
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(all(feature = "rc1", not(feature = "all-features-override")))]
     pub fn ipo_purity_bits(self) -> u32 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().ipo_purity_bits }
     }
 
     /// The `purity_bits` field of this `CodeInstance`.
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(all(feature = "rc1", not(feature = "all-features-override")))]
     pub fn purity_bits(self) -> u32 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().purity_bits }
     }
 
     /// Method this instance is specialized from.
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(all(feature = "rc1", not(feature = "all-features-override")))]
     pub fn argescapes(self) -> ValueRef<'scope, 'static> {
         // Safety: the pointer points to valid data
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().argescapes) }
@@ -185,7 +185,7 @@ impl<'scope> CodeInstance<'scope> {
     }
 
     /// nonzero if all roots are built into sysimg or tagged by module key
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(all(feature = "rc1", not(feature = "all-features-override")))]
     pub fn relocatability(self) -> u8 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().relocatability }

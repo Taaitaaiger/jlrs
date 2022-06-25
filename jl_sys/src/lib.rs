@@ -29,18 +29,35 @@ pub use bindings_1_6_x86_64_unknown_linux_gnu::*;
     all(
         not(feature = "use-bindgen"),
         not(feature = "lts"),
+        not(feature = "rc1"),
         target_os = "linux"
     ),
     all(feature = "all-features-override", target_os = "linux")
 ))]
-mod bindings_1_8_x86_64_unknown_linux_gnu;
+mod bindings_1_7_x86_64_unknown_linux_gnu;
 #[cfg(any(
     all(
         not(feature = "use-bindgen"),
         not(feature = "lts"),
+        not(feature = "rc1"),
         target_os = "linux"
     ),
     all(feature = "all-features-override", target_os = "linux")
+))]
+pub use bindings_1_7_x86_64_unknown_linux_gnu::*;
+
+#[cfg(all(
+    not(feature = "use-bindgen"),
+    feature = "rc1",
+    target_os = "linux",
+    not(feature = "all-features-override")
+))]
+mod bindings_1_8_x86_64_unknown_linux_gnu;
+#[cfg(all(
+    not(feature = "use-bindgen"),
+    feature = "rc1",
+    target_os = "linux",
+    not(feature = "all-features-override")
 ))]
 pub use bindings_1_8_x86_64_unknown_linux_gnu::*;
 
@@ -63,18 +80,35 @@ pub use bindings_1_6_x86_64_pc_windows_gnu::*;
     all(
         not(feature = "use-bindgen"),
         not(feature = "lts"),
+        not(feature = "rc1"),
         target_os = "windows"
     ),
     all(feature = "all-features-override", target_os = "windows")
 ))]
-mod bindings_1_8_x86_64_pc_windows_gnu;
+mod bindings_1_7_x86_64_pc_windows_gnu;
 #[cfg(any(
     all(
         not(feature = "use-bindgen"),
         not(feature = "lts"),
+        not(feature = "rc1"),
         target_os = "windows"
     ),
     all(feature = "all-features-override", target_os = "windows")
+))]
+pub use bindings_1_7_x86_64_pc_windows_gnu::*;
+
+#[cfg(all(
+    not(feature = "use-bindgen"),
+    feature = "rc1",
+    target_os = "windows",
+    not(feature = "all-features-override")
+))]
+mod bindings_1_8_x86_64_pc_windows_gnu;
+#[cfg(all(
+    not(feature = "use-bindgen"),
+    feature = "rc1",
+    target_os = "windows",
+    not(feature = "all-features-override")
 ))]
 pub use bindings_1_8_x86_64_pc_windows_gnu::*;
 
