@@ -145,16 +145,16 @@ fn main() {
     let mut c = cc::Build::new();
     c.file("src/jlrs_cc.cc").include(&include_dir).cpp(true);
 
+    #[cfg(all(feature = "i686", not(feature = "all-features-override")))]
+    c.flag("-march=pentium4");
+
     #[cfg(all(
         any(feature = "windows-lts", all(feature = "lts", windows)),
         not(feature = "all-features-override")
     ))]
     c.define("JLRS_WINDOWS_LTS", None);
 
-    #[cfg(target_pointer_width = "32")]
-    let arch_flag = "-march=pentium4";
-    #[cfg(target_pointer_width = "64")]
-    let arch_flag = "";
+    c.compile("jlrs_cc");
 
     #[cfg(all(feature = "use-bindgen", not(feature = "all-features-override")))]
     {
@@ -165,6 +165,11 @@ fn main() {
 
         #[allow(unused_mut)]
         let mut builder = bindgen::Builder::default();
+
+        #[cfg(all(feature = "i686", not(feature = "all-features-override")))]
+        let arch_flag = "-march=pentium4";
+        #[cfg(not(all(feature = "i686", not(feature = "all-features-override"))))]
+        let arch_flag = "";
 
         builder = builder
             .clang_arg(include_dir_flag)

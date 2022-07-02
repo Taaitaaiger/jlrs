@@ -62,7 +62,8 @@ debug = ["jl-sys/debug"]
 lts = ["jl-sys/lts"]
 # Link the RC1 version of Julia 1.8
 rc1 = ["jl-sys/rc1"]
-
+# Link with a 32-bits version of Julia
+i686 = ["jl-sys/i686"]
 
 # Internal
 

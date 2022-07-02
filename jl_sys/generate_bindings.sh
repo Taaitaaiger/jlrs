@@ -11,6 +11,9 @@ fi
 if [ -z "$JULIA_STABLE_DIR" ]; then
     JULIA_STABLE_DIR=~/julia-1.7.3
 fi
+if [ -z "$JULIA_STABLE_DIR_32" ]; then
+    JULIA_STABLE_DIR_32=$JULIA_STABLE_DIR-32
+fi
 if [ -z "$JULIA_STABLE_DIR_WIN" ]; then
     JULIA_STABLE_DIR_WIN=$JULIA_STABLE_DIR-win
 fi
@@ -23,6 +26,10 @@ fi
 
 if [ ! -d "$JULIA_STABLE_DIR" ]; then
     echo "Error: $JULIA_STABLE_DIR does not exist" >&2
+    exit 1
+fi
+if [ ! -d "$JULIA_STABLE_DIR_32" ]; then
+    echo "Error: $JULIA_STABLE_DIR_32 does not exist" >&2
     exit 1
 fi
 if [ ! -d "$JULIA_STABLE_DIR_WIN" ]; then
@@ -62,3 +69,8 @@ cargo clean
 JULIA_DIR=$JULIA_STABLE_DIR LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$JULIA_DIR/lib" cargo build --features use-bindgen
 echo "/* generated from Julia version 1.7.3 */" > ./src/bindings_1_7_x86_64_unknown_linux_gnu.rs
 cat ../target/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings_1_7_x86_64_unknown_linux_gnu.rs
+
+cargo clean
+JULIA_DIR=$JULIA_STABLE_DIR_32 LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$JULIA_DIR/lib" cargo build --features use-bindgen,i686 --target i686-unknown-linux-gnu
+echo "/* generated from Julia version 1.7.3 */" > ./src/bindings_1_7_i686_unknown_linux_gnu.rs
+cat ../target/i686-unknown-linux-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings_1_7_x86_64_unknown_linux_gnu.rs
