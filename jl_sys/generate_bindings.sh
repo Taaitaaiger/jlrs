@@ -73,4 +73,4 @@ cat ../target/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings_1_7_x86_64_u
 cargo clean
 JULIA_DIR=$JULIA_STABLE_DIR_32 LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$JULIA_DIR/lib" cargo build --features use-bindgen,i686 --target i686-unknown-linux-gnu
 echo "/* generated from Julia version 1.7.3 */" > ./src/bindings_1_7_i686_unknown_linux_gnu.rs
-cat ../target/i686-unknown-linux-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings_1_7_x86_64_unknown_linux_gnu.rs
+cat ../target/i686-unknown-linux-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings_1_7_i686_unknown_linux_gnu.rs
