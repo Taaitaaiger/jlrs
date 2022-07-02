@@ -30,6 +30,7 @@ pub use bindings_1_6_x86_64_unknown_linux_gnu::*;
         not(feature = "use-bindgen"),
         not(feature = "lts"),
         not(feature = "rc1"),
+        target_pointer_width = "64",
         target_os = "linux"
     ),
     all(feature = "all-features-override", target_os = "linux")
@@ -40,11 +41,35 @@ mod bindings_1_7_x86_64_unknown_linux_gnu;
         not(feature = "use-bindgen"),
         not(feature = "lts"),
         not(feature = "rc1"),
+        target_pointer_width = "64",
         target_os = "linux"
     ),
     all(feature = "all-features-override", target_os = "linux")
 ))]
 pub use bindings_1_7_x86_64_unknown_linux_gnu::*;
+
+#[cfg(any(
+    all(
+        not(feature = "use-bindgen"),
+        not(feature = "lts"),
+        not(feature = "rc1"),
+        target_pointer_width = "32",
+        target_os = "linux"
+    ),
+    all(feature = "all-features-override", target_os = "linux")
+))]
+mod bindings_1_7_i686_unknown_linux_gnu;
+#[cfg(any(
+    all(
+        not(feature = "use-bindgen"),
+        not(feature = "lts"),
+        not(feature = "rc1"),
+        target_pointer_width = "32",
+        target_os = "linux"
+    ),
+    all(feature = "all-features-override", target_os = "linux")
+))]
+pub use bindings_1_7_i686_unknown_linux_gnu::*;
 
 #[cfg(all(
     not(feature = "use-bindgen"),

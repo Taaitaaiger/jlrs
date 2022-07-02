@@ -8,11 +8,21 @@ pub struct BitsCharBitsIntChar {
     pub b: BitsIntChar,
 }
 
+#[cfg(target_pointer_width = "64")]
 #[repr(C)]
 #[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, IntoJulia)]
 #[jlrs(julia_type = "Main.BitsWithCustom.BitsIntChar")]
 pub struct BitsIntChar {
     pub a: i64,
+    pub b: ::jlrs::wrappers::inline::char::Char,
+}
+
+#[cfg(target_pointer_width = "32")]
+#[repr(C)]
+#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, IntoJulia)]
+#[jlrs(julia_type = "Main.BitsWithCustom.BitsIntChar")]
+pub struct BitsIntChar {
+    pub a: i32,
     pub b: ::jlrs::wrappers::inline::char::Char,
 }
 
@@ -44,11 +54,21 @@ pub struct BitsCharFloat32Float64 {
     pub c: f64,
 }
 
+#[cfg(target_pointer_width = "64")]
 #[repr(C)]
 #[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, IntoJulia)]
 #[jlrs(julia_type = "Main.MultiFieldBits.BitsIntBool")]
 pub struct BitsIntBool {
     pub a: i64,
+    pub b: ::jlrs::wrappers::inline::bool::Bool,
+}
+
+#[cfg(target_pointer_width = "32")]
+#[repr(C)]
+#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, IntoJulia)]
+#[jlrs(julia_type = "Main.MultiFieldBits.BitsIntBool")]
+pub struct BitsIntBool {
+    pub a: i32,
     pub b: ::jlrs::wrappers::inline::bool::Bool,
 }
 
@@ -80,11 +100,20 @@ pub struct BitsTypeFloat64 {
     pub a: f64,
 }
 
+#[cfg(target_pointer_width = "64")]
 #[repr(C)]
 #[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, IntoJulia)]
 #[jlrs(julia_type = "Main.SingleFieldBits.BitsTypeInt")]
 pub struct BitsTypeInt {
     pub a: i64,
+}
+
+#[cfg(target_pointer_width = "32")]
+#[repr(C)]
+#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, IntoJulia)]
+#[jlrs(julia_type = "Main.SingleFieldBits.BitsTypeInt")]
+pub struct BitsTypeInt {
+    pub a: i32,
 }
 
 #[repr(C)]
@@ -115,6 +144,7 @@ pub struct BitsTypeInt8 {
     pub a: i8,
 }
 
+#[cfg(target_pointer_width = "64")]
 #[repr(C)]
 #[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, IntoJulia)]
 #[jlrs(julia_type = "Main.SingleFieldBits.BitsTypeUInt")]
@@ -122,6 +152,13 @@ pub struct BitsTypeUInt {
     pub a: u64,
 }
 
+#[cfg(target_pointer_width = "32")]
+#[repr(C)]
+#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, IntoJulia)]
+#[jlrs(julia_type = "Main.SingleFieldBits.BitsTypeUInt")]
+pub struct BitsTypeUInt {
+    pub a: u32,
+}
 #[repr(C)]
 #[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, IntoJulia)]
 #[jlrs(julia_type = "Main.SingleFieldBits.BitsTypeUInt16")]

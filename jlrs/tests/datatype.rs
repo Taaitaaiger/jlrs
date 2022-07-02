@@ -170,7 +170,10 @@ mod tests {
             jlrs.scope_with_capacity(0, |global, _| {
                 let dt = DataType::tvar_type(global);
                 let sz = dt.field_size(1)?;
+                #[cfg(target_pointer_width = "64")]
                 assert_eq!(sz, 8);
+                #[cfg(target_pointer_width = "32")]
+                assert_eq!(sz, 4);
 
                 Ok(())
             })
@@ -185,7 +188,10 @@ mod tests {
             jlrs.scope_with_capacity(0, |global, _| {
                 let dt = DataType::tvar_type(global);
                 let sz = dt.field_offset(1)?;
+                #[cfg(target_pointer_width = "64")]
                 assert_eq!(sz, 8);
+                #[cfg(target_pointer_width = "32")]
+                assert_eq!(sz, 4);
 
                 Ok(())
             })

@@ -151,7 +151,10 @@ fn main() {
     ))]
     c.define("JLRS_WINDOWS_LTS", None);
 
-    c.compile("jlrs_cc");
+    #[cfg(target_pointer_width = "32")]
+    let arch_flag = "-march=pentium4";
+    #[cfg(target_pointer_width = "64")]
+    let arch_flag = "";
 
     #[cfg(all(feature = "use-bindgen", not(feature = "all-features-override")))]
     {
@@ -159,9 +162,13 @@ fn main() {
         out_path.push("bindings.rs");
 
         let include_dir_flag = format!("-I{}", include_dir);
+
         #[allow(unused_mut)]
-        let mut builder = bindgen::Builder::default()
+        let mut builder = bindgen::Builder::default();
+
+        builder = builder
             .clang_arg(include_dir_flag)
+            .clang_arg(arch_flag)
             .header("src/jlrs_cc.h")
             .size_t_is_usize(true)
             .layout_tests(false)

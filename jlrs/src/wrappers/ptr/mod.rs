@@ -453,6 +453,12 @@ pub(crate) mod private {
 #[inline(always)]
 // Safety: this is a workaround for a bug in bindgen that turns all atomic fields into `u64`s.
 // It must only be used to access such fields.
+#[cfg(target_pointer_width = "64")]
 pub(crate) unsafe fn atomic_value<'a, T>(addr: *const u64) -> &'a AtomicPtr<T> {
+    &*(addr as *const AtomicPtr<T>)
+}
+
+#[cfg(target_pointer_width = "32")]
+pub(crate) unsafe fn atomic_value<'a, T>(addr: *const u32) -> &'a AtomicPtr<T> {
     &*(addr as *const AtomicPtr<T>)
 }

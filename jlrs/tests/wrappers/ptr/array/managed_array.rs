@@ -1519,7 +1519,7 @@ mod tests {
                             DataType::uint64_type(global).as_value(),
                         )?
                         .into_jlrs_result()?;
-                        new_array.copy_inline_data::<usize, _>(&frame)
+                        new_array.copy_inline_data::<u64, _>(&frame)
                     })
                 })
                 .unwrap();
@@ -1546,7 +1546,7 @@ mod tests {
                             DataType::int64_type(global).as_value(),
                         )?
                         .into_jlrs_result()?;
-                        new_array.copy_inline_data::<isize, _>(&frame)
+                        new_array.copy_inline_data::<i64, _>(&frame)
                     })
                 })
                 .unwrap();
@@ -1681,7 +1681,7 @@ mod tests {
                             DataType::uint64_type(global).as_value(),
                         )?
                         .into_jlrs_result()?;
-                        new_array.copy_inline_data::<usize, _>(&frame)
+                        new_array.copy_inline_data::<u64, _>(&frame)
                     })
                 })
                 .unwrap();
@@ -1709,7 +1709,7 @@ mod tests {
                             DataType::int64_type(global).as_value(),
                         )?
                         .into_jlrs_result()?;
-                        new_array.copy_inline_data::<isize, _>(&frame)
+                        new_array.copy_inline_data::<i64, _>(&frame)
                     })
                 })
                 .unwrap();
@@ -1849,7 +1849,7 @@ mod tests {
                             DataType::uint64_type(global).as_value(),
                         )?
                         .into_jlrs_result()?;
-                        new_array.copy_inline_data::<usize, _>(&frame)
+                        new_array.copy_inline_data::<u64, _>(&frame)
                     })
                 })
                 .unwrap();
@@ -1878,7 +1878,7 @@ mod tests {
                             DataType::int64_type(global).as_value(),
                         )?
                         .into_jlrs_result()?;
-                        new_array.copy_inline_data::<isize, _>(&frame)
+                        new_array.copy_inline_data::<i64, _>(&frame)
                     })
                 })
                 .unwrap();
@@ -2237,7 +2237,7 @@ mod tests {
                             (3, 4),
                             DataType::uint64_type(global).as_value(),
                         )?;
-                        new_array.copy_inline_data::<usize, _>(&frame)
+                        new_array.copy_inline_data::<u64, _>(&frame)
                     })
                 })
                 .unwrap();
@@ -2263,7 +2263,7 @@ mod tests {
                             (3, 4),
                             DataType::int64_type(global).as_value(),
                         )?;
-                        new_array.copy_inline_data::<isize, _>(&frame)
+                        new_array.copy_inline_data::<i64, _>(&frame)
                     })
                 })
                 .unwrap();
@@ -2393,7 +2393,7 @@ mod tests {
                             (3, 4, 5),
                             DataType::uint64_type(global).as_value(),
                         )?;
-                        new_array.copy_inline_data::<usize, _>(&frame)
+                        new_array.copy_inline_data::<u64, _>(&frame)
                     })
                 })
                 .unwrap();
@@ -2420,7 +2420,7 @@ mod tests {
                             (3, 4, 5),
                             DataType::int64_type(global).as_value(),
                         )?;
-                        new_array.copy_inline_data::<isize, _>(&frame)
+                        new_array.copy_inline_data::<i64, _>(&frame)
                     })
                 })
                 .unwrap();
@@ -2555,7 +2555,7 @@ mod tests {
                             (3, 4, 5, 6),
                             DataType::uint64_type(global).as_value(),
                         )?;
-                        new_array.copy_inline_data::<usize, _>(&frame)
+                        new_array.copy_inline_data::<u64, _>(&frame)
                     })
                 })
                 .unwrap();
@@ -2583,7 +2583,7 @@ mod tests {
                             (3, 4, 5, 6),
                             DataType::int64_type(global).as_value(),
                         )?;
-                        new_array.copy_inline_data::<isize, _>(&frame)
+                        new_array.copy_inline_data::<i64, _>(&frame)
                     })
                 })
                 .unwrap();
