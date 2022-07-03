@@ -1,6 +1,6 @@
-use crate::{error::JuliaResultRef, wrappers::ptr::value::ValueRef};
-use jl_sys::{jlrs_catch_wrapper, jlrs_result_tag_t_JLRS_RESULT_ERR};
 use std::{ffi::c_void, mem::MaybeUninit};
+use jl_sys::{jlrs_catch_wrapper, jlrs_result_tag_t_JLRS_RESULT_ERR};
+use crate::{error::JuliaResultRef, wrappers::ptr::value::ValueRef};
 
 unsafe extern "C" fn trampoline<F: FnMut(&mut MaybeUninit<T>) -> (), T>(
     func: &mut F,

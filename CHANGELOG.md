@@ -1,3 +1,7 @@
+#### v0.15
+ - jlrs can be used with 32-bits versions of Julia on Linux by enabling the `i686` feature.
+
+
 #### v0.14
  - `TemporarySymbol` has been renamed to `ToSymbol`. The method `ToSymbol::to_symbol` has been added to this trait.
 

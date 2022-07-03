@@ -435,7 +435,7 @@ extern "C"
     }
 
     jlrs_result_tag_t jlrs_catch_wrapper(void *callback, jlrs_callback_caller_t caller, void *result, jl_value_t **error) {     
-        jlrs_result_tag_t tag = JLRS_RESULT_OK;   
+        jlrs_result_tag_t tag = JLRS_RESULT_OK;
         JL_TRY
         {
             caller(callback, result);

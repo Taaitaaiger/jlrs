@@ -2147,10 +2147,7 @@ extern "C" {
     pub fn jlrs_arrayref(a: *mut jl_array_t, i: usize) -> jlrs_result_t;
 }
 pub type jlrs_callback_caller_t = ::std::option::Option<
-    unsafe extern "C" fn(
-        arg1: *mut ::std::os::raw::c_void,
-        arg2: *mut ::std::os::raw::c_void,
-    ) -> (),
+    unsafe extern "C" fn(arg1: *mut ::std::os::raw::c_void, arg2: *mut ::std::os::raw::c_void),
 >;
 extern "C" {
     pub fn jlrs_catch_wrapper(
