@@ -107,7 +107,7 @@ pub mod dimensions;
 #[repr(transparent)]
 pub struct Array<'scope, 'data>(
     NonNull<jl_array_t>,
-    PhantomData<&'scope ()>,
+    PhantomData<&'scope mut ()>,
     PhantomData<&'data mut ()>,
 );
 

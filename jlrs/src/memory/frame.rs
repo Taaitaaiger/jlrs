@@ -24,7 +24,7 @@ use crate::{
     private::Private,
 };
 use jl_sys::jl_value_t;
-use std::ptr::NonNull;
+use std::{marker::PhantomData, ptr::NonNull};
 
 pub(crate) const MIN_FRAME_CAPACITY: usize = 16;
 
@@ -36,6 +36,7 @@ pub struct GcFrame<'frame, M: Mode> {
     raw_frame: &'frame [Slot],
     page: Option<StackPage>,
     mode: M,
+    _marker: PhantomData<&'frame mut &'frame ()>,
 }
 
 impl<'frame, M: Mode> GcFrame<'frame, M> {
@@ -47,6 +48,7 @@ impl<'frame, M: Mode> GcFrame<'frame, M> {
             raw_frame,
             page: None,
             mode,
+            _marker: PhantomData,
         };
 
         (frame, owner)
@@ -74,13 +76,12 @@ impl<'frame, M: Mode> GcFrame<'frame, M> {
 cfg_if::cfg_if! {
     if #[cfg(feature = "ccall")] {
         use crate::{ccall::CCall, error::AllocError};
-        use std::marker::PhantomData;
 
         /// A frame that can't store any roots or be nested.
         ///
         /// A `NullFrame` can be used if you call Rust from Julia through `ccall` and want to
         /// borrow array data but not perform any allocations.
-        pub struct NullFrame<'frame>(PhantomData<&'frame ()>);
+        pub struct NullFrame<'frame>(PhantomData<&'frame mut &'frame ()>);
 
         impl<'frame> NullFrame<'frame> {
             // Safety: frames must form a single nested hierarchy.
@@ -104,6 +105,7 @@ cfg_if::cfg_if! {
             raw_frame: &'frame [Slot],
             page: Option<StackPage>,
             mode: Async<'frame>,
+            _marker: PhantomData<&'frame mut &'frame ()>
         }
 
         impl<'frame> AsyncGcFrame<'frame> {
@@ -161,6 +163,7 @@ cfg_if::cfg_if! {
                     raw_frame,
                     page: None,
                     mode,
+                    _marker: PhantomData
                 };
 
                 (frame, owner)
@@ -369,18 +372,26 @@ mod private {
         private::Private,
         wrappers::ptr::private::WrapperPriv,
     };
-    use std::ptr::{null_mut, NonNull};
+    use std::{
+        marker::PhantomData,
+        ptr::{null_mut, NonNull},
+    };
 
     pub struct FrameOwner<'frame, M: Mode> {
         mode: M,
         raw_frame: &'frame [Slot],
+        _marker: PhantomData<&'frame mut &'frame ()>,
     }
 
     impl<'frame, M: Mode> FrameOwner<'frame, M> {
         // Only one owner must be created for a frame.
         pub(crate) unsafe fn new(raw_frame: &'frame [Slot], mode: M) -> Self {
             mode.push_frame(raw_frame, Private);
-            FrameOwner { mode, raw_frame }
+            FrameOwner {
+                mode,
+                raw_frame,
+                _marker: PhantomData,
+            }
         }
     }
 
@@ -392,6 +403,7 @@ mod private {
                 raw_frame: self.raw_frame,
                 page: None,
                 mode: self.mode,
+                _marker: PhantomData,
             }
         }
     }

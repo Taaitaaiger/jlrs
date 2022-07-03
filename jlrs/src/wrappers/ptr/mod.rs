@@ -458,6 +458,7 @@ pub(crate) unsafe fn atomic_value<'a, T>(addr: *const u64) -> &'a AtomicPtr<T> {
     &*(addr as *const AtomicPtr<T>)
 }
 
+#[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
 #[cfg(target_pointer_width = "32")]
 pub(crate) unsafe fn atomic_value<'a, T>(addr: *const u32) -> &'a AtomicPtr<T> {
     &*(addr as *const AtomicPtr<T>)

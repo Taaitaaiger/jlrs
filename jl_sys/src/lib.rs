@@ -14,6 +14,7 @@ use ::std::os::raw::c_char;
     not(feature = "use-bindgen"),
     feature = "lts",
     target_os = "linux",
+    target_pointer_width = "64",
     not(feature = "all-features-override")
 ))]
 mod bindings_1_6_x86_64_unknown_linux_gnu;
@@ -21,9 +22,27 @@ mod bindings_1_6_x86_64_unknown_linux_gnu;
     not(feature = "use-bindgen"),
     feature = "lts",
     target_os = "linux",
+    target_pointer_width = "64",
     not(feature = "all-features-override")
 ))]
 pub use bindings_1_6_x86_64_unknown_linux_gnu::*;
+
+#[cfg(all(
+    not(feature = "use-bindgen"),
+    feature = "lts",
+    target_os = "linux",
+    target_pointer_width = "32",
+    not(feature = "all-features-override")
+))]
+mod bindings_1_6_i686_unknown_linux_gnu;
+#[cfg(all(
+    not(feature = "use-bindgen"),
+    feature = "lts",
+    target_os = "linux",
+    target_pointer_width = "32",
+    not(feature = "all-features-override")
+))]
+pub use bindings_1_6_i686_unknown_linux_gnu::*;
 
 #[cfg(any(
     all(

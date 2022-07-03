@@ -2037,6 +2037,7 @@ extern "C" {
 pub const jlrs_result_tag_t_JLRS_RESULT_VOID: jlrs_result_tag_t = 0;
 pub const jlrs_result_tag_t_JLRS_RESULT_VALUE: jlrs_result_tag_t = 1;
 pub const jlrs_result_tag_t_JLRS_RESULT_ERR: jlrs_result_tag_t = 2;
+pub const jlrs_result_tag_t_JLRS_RESULT_OK: jlrs_result_tag_t = 3;
 #[doc = " Flag used by `jlrs_result_t` that indicates what the union field of that struct contains."]
 pub type jlrs_result_tag_t = ::std::os::raw::c_uint;
 #[doc = " Container for the result of some function called in a JULIA_TRY block. The flag indicates what"]
@@ -2152,6 +2153,20 @@ extern "C" {
 }
 extern "C" {
     pub fn jlrs_arrayref(a: *mut jl_array_t, i: usize) -> jlrs_result_t;
+}
+pub type jlrs_callback_caller_t = ::std::option::Option<
+    unsafe extern "C" fn(
+        arg1: *mut ::std::os::raw::c_void,
+        arg2: *mut ::std::os::raw::c_void,
+    ) -> (),
+>;
+extern "C" {
+    pub fn jlrs_catch_wrapper(
+        callback: *mut ::std::os::raw::c_void,
+        caller: jlrs_callback_caller_t,
+        result: *mut ::std::os::raw::c_void,
+        error: *mut *mut jl_value_t,
+    ) -> jlrs_result_tag_t;
 }
 extern "C" {
     pub fn jlrs_array_data_owner_offset(n_dims: u16) -> uint_t;

@@ -2336,6 +2336,20 @@ extern "C" {
 extern "C" {
     pub fn jlrs_unlock(v: *mut jl_value_t);
 }
+pub type jlrs_callback_caller_t = ::std::option::Option<
+    unsafe extern "C" fn(
+        arg1: *mut ::std::os::raw::c_void,
+        arg2: *mut ::std::os::raw::c_void,
+    ) -> (),
+>;
+extern "C" {
+    pub fn jlrs_catch_wrapper(
+        callback: *mut ::std::os::raw::c_void,
+        caller: jlrs_callback_caller_t,
+        result: *mut ::std::os::raw::c_void,
+        error: *mut *mut jl_value_t,
+    ) -> jlrs_result_tag_t;
+}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct _mallocarray_t {

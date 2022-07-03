@@ -150,6 +150,9 @@
 //! - `pyplot`
 //!   This feature lets you plot data using the Pyplot package and Gtk 3 from Rust.
 //!
+//! - `i686`
+//!   Link with a 32-bit build of Julia.
+//!
 //! - `debug`
 //!   Link with a debug build of Julia.
 //!
@@ -698,6 +701,8 @@ macro_rules! init_fn {
 #[cfg(feature = "async")]
 pub mod async_util;
 pub mod call;
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+pub mod catch;
 #[cfg(feature = "ccall")]
 pub mod ccall;
 pub mod convert;

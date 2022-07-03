@@ -29,6 +29,7 @@ extern "C"
         JLRS_RESULT_VOID = 0,
         JLRS_RESULT_VALUE = 1,
         JLRS_RESULT_ERR = 2,
+        JLRS_RESULT_OK = 3,
     } jlrs_result_tag_t;
 
     /// Container for the result of some function called in a JULIA_TRY block. The flag indicates what
@@ -62,6 +63,9 @@ extern "C"
     jlrs_result_t jlrs_array_del_beg(jl_array_t *a, size_t dec);
     jlrs_result_t jlrs_arrayset(jl_array_t *a JL_ROOTING_ARGUMENT, jl_value_t *rhs JL_ROOTED_ARGUMENT JL_MAYBE_UNROOTED, size_t i);
     jlrs_result_t jlrs_arrayref(jl_array_t *a JL_PROPAGATES_ROOT, size_t i);
+
+    typedef void (*jlrs_callback_caller_t)(void *, void*);
+    jlrs_result_tag_t jlrs_catch_wrapper(void *callback, jlrs_callback_caller_t caller, void *result, jl_value_t **error);
 #endif
 
     uint_t jlrs_array_data_owner_offset(uint16_t n_dims);

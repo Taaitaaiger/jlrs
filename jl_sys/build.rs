@@ -467,7 +467,8 @@ fn main() {
                 .allowlist_function("jlrs_array_ptr_1d_push")
                 .allowlist_function("jlrs_array_ptr_1d_append")
                 .allowlist_function("jlrs_arrayset")
-                .allowlist_function("jlrs_arrayref");
+                .allowlist_function("jlrs_arrayref")
+                .allowlist_function("jlrs_catch_wrapper");
         }
 
         builder

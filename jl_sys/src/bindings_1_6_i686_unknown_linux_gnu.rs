@@ -87,13 +87,13 @@ pub type __int16_t = ::std::os::raw::c_short;
 pub type __uint16_t = ::std::os::raw::c_ushort;
 pub type __int32_t = ::std::os::raw::c_int;
 pub type __uint32_t = ::std::os::raw::c_uint;
-pub type __int64_t = ::std::os::raw::c_long;
-pub type __uint64_t = ::std::os::raw::c_ulong;
+pub type __int64_t = ::std::os::raw::c_longlong;
+pub type __uint64_t = ::std::os::raw::c_ulonglong;
 pub type __sig_atomic_t = ::std::os::raw::c_int;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct __sigset_t {
-    pub __val: [::std::os::raw::c_ulong; 16usize],
+    pub __val: [::std::os::raw::c_ulong; 32usize],
 }
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -109,22 +109,31 @@ pub struct __atomic_wide_counter__bindgen_ty_1 {
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct __pthread_internal_list {
-    pub __prev: *mut __pthread_internal_list,
-    pub __next: *mut __pthread_internal_list,
+pub struct __pthread_internal_slist {
+    pub __next: *mut __pthread_internal_slist,
 }
-pub type __pthread_list_t = __pthread_internal_list;
+pub type __pthread_slist_t = __pthread_internal_slist;
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Copy, Clone)]
 pub struct __pthread_mutex_s {
     pub __lock: ::std::os::raw::c_int,
     pub __count: ::std::os::raw::c_uint,
     pub __owner: ::std::os::raw::c_int,
-    pub __nusers: ::std::os::raw::c_uint,
     pub __kind: ::std::os::raw::c_int,
-    pub __spins: ::std::os::raw::c_short,
-    pub __elision: ::std::os::raw::c_short,
-    pub __list: __pthread_list_t,
+    pub __nusers: ::std::os::raw::c_uint,
+    pub __bindgen_anon_1: __pthread_mutex_s__bindgen_ty_1,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union __pthread_mutex_s__bindgen_ty_1 {
+    pub __elision_data: __pthread_mutex_s__bindgen_ty_1__bindgen_ty_1,
+    pub __list: __pthread_slist_t,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct __pthread_mutex_s__bindgen_ty_1__bindgen_ty_1 {
+    pub __espins: ::std::os::raw::c_short,
+    pub __eelision: ::std::os::raw::c_short,
 }
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -142,7 +151,7 @@ pub type pthread_t = ::std::os::raw::c_ulong;
 #[derive(Copy, Clone)]
 pub union pthread_mutex_t {
     pub __data: __pthread_mutex_s,
-    pub __size: [::std::os::raw::c_char; 40usize],
+    pub __size: [::std::os::raw::c_char; 24usize],
     pub __align: ::std::os::raw::c_long,
 }
 #[repr(C)]
@@ -153,7 +162,7 @@ pub union pthread_cond_t {
     pub __align: ::std::os::raw::c_longlong,
 }
 pub type sig_atomic_t = __sig_atomic_t;
-pub type __jmp_buf = [::std::os::raw::c_long; 8usize];
+pub type __jmp_buf = [::std::os::raw::c_int; 6usize];
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct __jmp_buf_tag {
@@ -163,8 +172,7 @@ pub struct __jmp_buf_tag {
 }
 pub type uv_mutex_t = pthread_mutex_t;
 pub type uv_cond_t = pthread_cond_t;
-pub type jl_gcframe_t = _jl_gcframe_t;
-pub type uint_t = u64;
+pub type uint_t = u32;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct htable_t {
@@ -190,17 +198,21 @@ pub struct small_arraylist_t {
 }
 pub type sigjmp_buf = [__jmp_buf_tag; 1usize];
 pub type jl_taggedvalue_t = _jl_taggedvalue_t;
+pub type jl_tls_states_t = _jl_tls_states_t;
+pub type jl_ptls_t = *mut jl_tls_states_t;
+extern "C" {
+    pub fn jl_get_ptls_states() -> jl_ptls_t;
+}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct jl_stack_context_t {
+pub struct jl_ucontext_t {
     pub uc_mcontext: sigjmp_buf,
 }
-pub type jl_ucontext_t = jl_stack_context_t;
 pub type jl_thread_t = pthread_t;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct jl_mutex_t {
-    pub owner: u64,
+    pub owner: jl_thread_t,
     pub count: u32,
 }
 #[repr(C)]
@@ -213,8 +225,8 @@ pub struct jl_gc_pool_t {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct jl_thread_gc_num_t {
-    pub allocd: u64,
-    pub freed: u64,
+    pub allocd: i64,
+    pub freed: i64,
     pub malloc: u64,
     pub realloc: u64,
     pub poolalloc: u64,
@@ -234,7 +246,7 @@ pub struct jl_thread_heap_t {
     pub remset_nptr: ::std::os::raw::c_int,
     pub remset: *mut arraylist_t,
     pub last_remset: *mut arraylist_t,
-    pub norm_pools: [jl_gc_pool_t; 41usize],
+    pub norm_pools: [jl_gc_pool_t; 43usize],
     pub free_stacks: [arraylist_t; 16usize],
 }
 #[repr(C)]
@@ -271,35 +283,37 @@ pub struct _jl_bt_element_t {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct _jl_tls_states_t {
+    pub pgcstack: *mut _jl_gcframe_t,
+    pub world_age: usize,
     pub tid: i16,
     pub rngseed: u64,
     pub safepoint: *mut usize,
-    pub sleep_check_state: u8,
-    pub gc_state: u8,
-    pub in_pure_callback: i8,
+    pub sleep_check_state: i8,
+    pub gc_state: i8,
     pub in_finalizer: i8,
     pub disable_gc: i8,
-    pub finalizers_inhibited: ::std::os::raw::c_int,
     pub heap: jl_thread_heap_t,
     pub gc_num: jl_thread_gc_num_t,
     pub sleep_lock: uv_mutex_t,
     pub wake_signal: uv_cond_t,
     pub defer_signal: sig_atomic_t,
-    pub current_task: u64,
+    pub current_task: *mut _jl_task_t,
     pub next_task: *mut _jl_task_t,
-    pub previous_task: *mut _jl_task_t,
     pub root_task: *mut _jl_task_t,
     pub timing_stack: *mut _jl_timing_block_t,
     pub stackbase: *mut ::std::os::raw::c_void,
     pub stacksize: usize,
-    pub __bindgen_anon_1: _jl_tls_states_t__bindgen_ty_1,
+    pub base_ctx: jl_ucontext_t,
+    pub safe_restore: *mut sigjmp_buf,
     pub sig_exception: *mut _jl_value_t,
     pub bt_data: *mut _jl_bt_element_t,
     pub bt_size: usize,
-    pub signal_request: u32,
+    pub signal_request: sig_atomic_t,
     pub io_wait: sig_atomic_t,
     pub signal_stack: *mut ::std::os::raw::c_void,
     pub system_id: jl_thread_t,
+    pub in_pure_callback: ::std::os::raw::c_int,
+    pub finalizers_inhibited: ::std::os::raw::c_int,
     pub finalizers: arraylist_t,
     pub gc_cache: jl_gc_mark_cache_t,
     pub sweep_objs: arraylist_t,
@@ -307,35 +321,27 @@ pub struct _jl_tls_states_t {
     pub previous_exception: *mut _jl_value_t,
     pub locks: small_arraylist_t,
 }
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union _jl_tls_states_t__bindgen_ty_1 {
-    pub base_ctx: jl_ucontext_t,
-    pub copy_stack_ctx: jl_stack_context_t,
-}
-pub type jl_tls_states_t = _jl_tls_states_t;
-pub type jl_ptls_t = *mut jl_tls_states_t;
 extern "C" {
     pub fn jl_gc_safepoint();
 }
 pub type jl_value_t = _jl_value_t;
 #[repr(C)]
-#[repr(align(8))]
+#[repr(align(4))]
 #[derive(Debug, Copy, Clone)]
 pub struct _jl_taggedvalue_bits {
     pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 1usize]>,
-    pub __bindgen_padding_0: [u8; 7usize],
+    pub __bindgen_padding_0: [u8; 3usize],
 }
 impl _jl_taggedvalue_bits {
     #[inline]
     pub fn gc(&self) -> usize {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(0usize, 2u8) as u64) }
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(0usize, 2u8) as u32) }
     }
     #[inline]
     pub fn set_gc(&mut self, val: usize) {
         unsafe {
-            let val: u64 = ::std::mem::transmute(val);
+            let val: u32 = ::std::mem::transmute(val);
             self._bitfield_1.set(0usize, 2u8, val as u64)
         }
     }
@@ -343,7 +349,7 @@ impl _jl_taggedvalue_bits {
     pub fn new_bitfield_1(gc: usize) -> __BindgenBitfieldUnit<[u8; 1usize]> {
         let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 1usize]> = Default::default();
         __bindgen_bitfield_unit.set(0usize, 2u8, {
-            let gc: u64 = unsafe { ::std::mem::transmute(gc) };
+            let gc: u32 = unsafe { ::std::mem::transmute(gc) };
             gc as u64
         });
         __bindgen_bitfield_unit
@@ -365,8 +371,8 @@ pub union _jl_taggedvalue_t__bindgen_ty_1 {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct _jl_sym_t {
-    pub left: u64,
-    pub right: u64,
+    pub left: *mut _jl_sym_t,
+    pub right: *mut _jl_sym_t,
     pub hash: usize,
 }
 pub type jl_sym_t = _jl_sym_t;
@@ -520,6 +526,16 @@ pub union jl_array_t__bindgen_ty_1 {
     pub ncols: usize,
 }
 pub type jl_tupletype_t = _jl_datatype_t;
+pub type jl_typemap_t = jl_value_t;
+pub type jl_call_t = ::std::option::Option<
+    unsafe extern "C" fn(
+        arg1: *mut jl_value_t,
+        arg2: *mut *mut jl_value_t,
+        arg3: u32,
+        arg4: *mut _jl_code_instance_t,
+    ) -> *mut jl_value_t,
+>;
+pub type jl_callptr_t = jl_call_t;
 pub type jl_fptr_args_t = ::std::option::Option<
     unsafe extern "C" fn(
         arg1: *mut jl_value_t,
@@ -527,6 +543,21 @@ pub type jl_fptr_args_t = ::std::option::Option<
         arg3: u32,
     ) -> *mut jl_value_t,
 >;
+pub type jl_fptr_sparam_t = ::std::option::Option<
+    unsafe extern "C" fn(
+        arg1: *mut jl_value_t,
+        arg2: *mut *mut jl_value_t,
+        arg3: u32,
+        arg4: *mut jl_svec_t,
+    ) -> *mut jl_value_t,
+>;
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union jl_generic_specptr_t {
+    pub fptr: *mut ::std::os::raw::c_void,
+    pub fptr1: jl_fptr_args_t,
+    pub fptr3: jl_fptr_sparam_t,
+}
 pub type jl_method_instance_t = _jl_method_instance_t;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -538,25 +569,21 @@ pub struct _jl_method_t {
     pub primary_world: usize,
     pub deleted_world: usize,
     pub sig: *mut jl_value_t,
-    pub specializations: u64,
-    pub speckeyset: u64,
+    pub specializations: *mut jl_svec_t,
+    pub speckeyset: *mut jl_array_t,
     pub slot_syms: *mut jl_value_t,
-    pub external_mt: *mut jl_value_t,
     pub source: *mut jl_value_t,
-    pub unspecialized: u64,
+    pub unspecialized: *mut _jl_method_instance_t,
     pub generator: *mut jl_value_t,
     pub roots: *mut jl_array_t,
     pub ccallable: *mut jl_svec_t,
-    pub invokes: u64,
-    pub recursion_relation: *mut jl_value_t,
+    pub invokes: *mut jl_typemap_t,
     pub nargs: i32,
     pub called: i32,
     pub nospecialize: i32,
     pub nkw: i32,
     pub isva: u8,
     pub pure_: u8,
-    pub is_for_opaque_closure: u8,
-    pub aggressive_constprop: u8,
     pub writelock: jl_mutex_t,
 }
 pub type jl_method_t = _jl_method_t;
@@ -569,7 +596,7 @@ pub struct _jl_method_instance_t {
     pub uninferred: *mut jl_value_t,
     pub backedges: *mut jl_array_t,
     pub callbacks: *mut jl_array_t,
-    pub cache: u64,
+    pub cache: *mut _jl_code_instance_t,
     pub inInference: u8,
 }
 #[repr(C)]
@@ -580,20 +607,10 @@ pub union _jl_method_instance_t__bindgen_ty_1 {
     pub method: *mut jl_method_t,
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct jl_opaque_closure_t {
-    pub captures: *mut jl_value_t,
-    pub isva: u8,
-    pub world: usize,
-    pub source: *mut jl_method_t,
-    pub invoke: jl_fptr_args_t,
-    pub specptr: *mut ::std::os::raw::c_void,
-}
-#[repr(C)]
 #[derive(Copy, Clone)]
 pub struct _jl_code_instance_t {
     pub def: *mut jl_method_instance_t,
-    pub next: u64,
+    pub next: *mut _jl_code_instance_t,
     pub min_world: usize,
     pub max_world: usize,
     pub rettype: *mut jl_value_t,
@@ -601,15 +618,8 @@ pub struct _jl_code_instance_t {
     pub inferred: *mut jl_value_t,
     pub isspecsig: u8,
     pub precompile: u8,
-    pub invoke: u64,
-    pub specptr: _jl_code_instance_t__jl_generic_specptr_t,
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union _jl_code_instance_t__jl_generic_specptr_t {
-    pub fptr: u64,
-    pub fptr1: u64,
-    pub fptr3: u64,
+    pub invoke: jl_callptr_t,
+    pub specptr: jl_generic_specptr_t,
 }
 pub type jl_code_instance_t = _jl_code_instance_t;
 pub type jl_function_t = jl_value_t;
@@ -632,73 +642,12 @@ pub struct jl_typename_t {
     pub name: *mut jl_sym_t,
     pub module: *mut _jl_module_t,
     pub names: *mut jl_svec_t,
-    pub atomicfields: *const u32,
     pub wrapper: *mut jl_value_t,
-    pub cache: u64,
-    pub linearcache: u64,
+    pub cache: *mut jl_svec_t,
+    pub linearcache: *mut jl_svec_t,
+    pub hash: isize,
     pub mt: *mut _jl_methtable_t,
     pub partial: *mut jl_array_t,
-    pub hash: isize,
-    pub n_uninitialized: i32,
-    pub _bitfield_align_1: [u8; 0],
-    pub _bitfield_1: __BindgenBitfieldUnit<[u8; 1usize]>,
-    pub __bindgen_padding_0: [u8; 3usize],
-}
-impl jl_typename_t {
-    #[inline]
-    pub fn abstract_(&self) -> u8 {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(0usize, 1u8) as u8) }
-    }
-    #[inline]
-    pub fn set_abstract(&mut self, val: u8) {
-        unsafe {
-            let val: u8 = ::std::mem::transmute(val);
-            self._bitfield_1.set(0usize, 1u8, val as u64)
-        }
-    }
-    #[inline]
-    pub fn mutabl(&self) -> u8 {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(1usize, 1u8) as u8) }
-    }
-    #[inline]
-    pub fn set_mutabl(&mut self, val: u8) {
-        unsafe {
-            let val: u8 = ::std::mem::transmute(val);
-            self._bitfield_1.set(1usize, 1u8, val as u64)
-        }
-    }
-    #[inline]
-    pub fn mayinlinealloc(&self) -> u8 {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(2usize, 1u8) as u8) }
-    }
-    #[inline]
-    pub fn set_mayinlinealloc(&mut self, val: u8) {
-        unsafe {
-            let val: u8 = ::std::mem::transmute(val);
-            self._bitfield_1.set(2usize, 1u8, val as u64)
-        }
-    }
-    #[inline]
-    pub fn new_bitfield_1(
-        abstract_: u8,
-        mutabl: u8,
-        mayinlinealloc: u8,
-    ) -> __BindgenBitfieldUnit<[u8; 1usize]> {
-        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 1usize]> = Default::default();
-        __bindgen_bitfield_unit.set(0usize, 1u8, {
-            let abstract_: u8 = unsafe { ::std::mem::transmute(abstract_) };
-            abstract_ as u64
-        });
-        __bindgen_bitfield_unit.set(1usize, 1u8, {
-            let mutabl: u8 = unsafe { ::std::mem::transmute(mutabl) };
-            mutabl as u64
-        });
-        __bindgen_bitfield_unit.set(2usize, 1u8, {
-            let mayinlinealloc: u8 = unsafe { ::std::mem::transmute(mayinlinealloc) };
-            mayinlinealloc as u64
-        });
-        __bindgen_bitfield_unit
-    }
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -896,142 +845,24 @@ pub struct _jl_datatype_t {
     pub super_: *mut _jl_datatype_t,
     pub parameters: *mut jl_svec_t,
     pub types: *mut jl_svec_t,
+    pub names: *mut jl_svec_t,
     pub instance: *mut jl_value_t,
     pub layout: *const jl_datatype_layout_t,
     pub size: i32,
+    pub ninitialized: i32,
     pub hash: u32,
-    pub _bitfield_align_1: [u8; 0],
-    pub _bitfield_1: __BindgenBitfieldUnit<[u8; 1usize]>,
-    pub __bindgen_padding_0: [u8; 7usize],
-}
-impl _jl_datatype_t {
-    #[inline]
-    pub fn hasfreetypevars(&self) -> u8 {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(0usize, 1u8) as u8) }
-    }
-    #[inline]
-    pub fn set_hasfreetypevars(&mut self, val: u8) {
-        unsafe {
-            let val: u8 = ::std::mem::transmute(val);
-            self._bitfield_1.set(0usize, 1u8, val as u64)
-        }
-    }
-    #[inline]
-    pub fn isconcretetype(&self) -> u8 {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(1usize, 1u8) as u8) }
-    }
-    #[inline]
-    pub fn set_isconcretetype(&mut self, val: u8) {
-        unsafe {
-            let val: u8 = ::std::mem::transmute(val);
-            self._bitfield_1.set(1usize, 1u8, val as u64)
-        }
-    }
-    #[inline]
-    pub fn isdispatchtuple(&self) -> u8 {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(2usize, 1u8) as u8) }
-    }
-    #[inline]
-    pub fn set_isdispatchtuple(&mut self, val: u8) {
-        unsafe {
-            let val: u8 = ::std::mem::transmute(val);
-            self._bitfield_1.set(2usize, 1u8, val as u64)
-        }
-    }
-    #[inline]
-    pub fn isbitstype(&self) -> u8 {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(3usize, 1u8) as u8) }
-    }
-    #[inline]
-    pub fn set_isbitstype(&mut self, val: u8) {
-        unsafe {
-            let val: u8 = ::std::mem::transmute(val);
-            self._bitfield_1.set(3usize, 1u8, val as u64)
-        }
-    }
-    #[inline]
-    pub fn zeroinit(&self) -> u8 {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(4usize, 1u8) as u8) }
-    }
-    #[inline]
-    pub fn set_zeroinit(&mut self, val: u8) {
-        unsafe {
-            let val: u8 = ::std::mem::transmute(val);
-            self._bitfield_1.set(4usize, 1u8, val as u64)
-        }
-    }
-    #[inline]
-    pub fn has_concrete_subtype(&self) -> u8 {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(5usize, 1u8) as u8) }
-    }
-    #[inline]
-    pub fn set_has_concrete_subtype(&mut self, val: u8) {
-        unsafe {
-            let val: u8 = ::std::mem::transmute(val);
-            self._bitfield_1.set(5usize, 1u8, val as u64)
-        }
-    }
-    #[inline]
-    pub fn cached_by_hash(&self) -> u8 {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(6usize, 1u8) as u8) }
-    }
-    #[inline]
-    pub fn set_cached_by_hash(&mut self, val: u8) {
-        unsafe {
-            let val: u8 = ::std::mem::transmute(val);
-            self._bitfield_1.set(6usize, 1u8, val as u64)
-        }
-    }
-    #[inline]
-    pub fn new_bitfield_1(
-        hasfreetypevars: u8,
-        isconcretetype: u8,
-        isdispatchtuple: u8,
-        isbitstype: u8,
-        zeroinit: u8,
-        has_concrete_subtype: u8,
-        cached_by_hash: u8,
-    ) -> __BindgenBitfieldUnit<[u8; 1usize]> {
-        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 1usize]> = Default::default();
-        __bindgen_bitfield_unit.set(0usize, 1u8, {
-            let hasfreetypevars: u8 = unsafe { ::std::mem::transmute(hasfreetypevars) };
-            hasfreetypevars as u64
-        });
-        __bindgen_bitfield_unit.set(1usize, 1u8, {
-            let isconcretetype: u8 = unsafe { ::std::mem::transmute(isconcretetype) };
-            isconcretetype as u64
-        });
-        __bindgen_bitfield_unit.set(2usize, 1u8, {
-            let isdispatchtuple: u8 = unsafe { ::std::mem::transmute(isdispatchtuple) };
-            isdispatchtuple as u64
-        });
-        __bindgen_bitfield_unit.set(3usize, 1u8, {
-            let isbitstype: u8 = unsafe { ::std::mem::transmute(isbitstype) };
-            isbitstype as u64
-        });
-        __bindgen_bitfield_unit.set(4usize, 1u8, {
-            let zeroinit: u8 = unsafe { ::std::mem::transmute(zeroinit) };
-            zeroinit as u64
-        });
-        __bindgen_bitfield_unit.set(5usize, 1u8, {
-            let has_concrete_subtype: u8 = unsafe { ::std::mem::transmute(has_concrete_subtype) };
-            has_concrete_subtype as u64
-        });
-        __bindgen_bitfield_unit.set(6usize, 1u8, {
-            let cached_by_hash: u8 = unsafe { ::std::mem::transmute(cached_by_hash) };
-            cached_by_hash as u64
-        });
-        __bindgen_bitfield_unit
-    }
+    pub abstract_: u8,
+    pub mutabl: u8,
+    pub hasfreetypevars: u8,
+    pub isconcretetype: u8,
+    pub isdispatchtuple: u8,
+    pub isbitstype: u8,
+    pub zeroinit: u8,
+    pub isinlinealloc: u8,
+    pub has_concrete_subtype: u8,
+    pub cached_by_hash: u8,
 }
 pub type jl_datatype_t = _jl_datatype_t;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct _jl_vararg_t {
-    pub T: *mut jl_value_t,
-    pub N: *mut jl_value_t,
-}
-pub type jl_vararg_t = _jl_vararg_t;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct jl_weakref_t {
@@ -1065,7 +896,7 @@ pub type jl_module_t = _jl_module_t;
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct _jl_typemap_entry_t {
-    pub next: u64,
+    pub next: *mut _jl_typemap_entry_t,
     pub sig: *mut jl_tupletype_t,
     pub simplesig: *mut jl_tupletype_t,
     pub guardsigs: *mut jl_svec_t,
@@ -1087,21 +918,21 @@ pub type jl_typemap_entry_t = _jl_typemap_entry_t;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct _jl_typemap_level_t {
-    pub arg1: u64,
-    pub targ: u64,
-    pub name1: u64,
-    pub tname: u64,
-    pub linear: u64,
-    pub any: u64,
+    pub arg1: *mut jl_array_t,
+    pub targ: *mut jl_array_t,
+    pub name1: *mut jl_array_t,
+    pub tname: *mut jl_array_t,
+    pub linear: *mut jl_typemap_entry_t,
+    pub any: *mut jl_typemap_t,
 }
 pub type jl_typemap_level_t = _jl_typemap_level_t;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct _jl_methtable_t {
     pub name: *mut jl_sym_t,
-    pub defs: u64,
-    pub leafcache: u64,
-    pub cache: u64,
+    pub defs: *mut jl_typemap_t,
+    pub leafcache: *mut jl_array_t,
+    pub cache: *mut jl_typemap_t,
     pub max_args: isize,
     pub kwsorter: *mut jl_value_t,
     pub module: *mut jl_module_t,
@@ -1177,12 +1008,6 @@ extern "C" {
     pub static mut jl_partial_struct_type: *mut jl_datatype_t;
 }
 extern "C" {
-    pub static mut jl_partial_opaque_type: *mut jl_datatype_t;
-}
-extern "C" {
-    pub static mut jl_interconditional_type: *mut jl_datatype_t;
-}
-extern "C" {
     pub static mut jl_method_match_type: *mut jl_datatype_t;
 }
 extern "C" {
@@ -1204,19 +1029,16 @@ extern "C" {
     pub static mut jl_anytuple_type_type: *mut jl_unionall_t;
 }
 extern "C" {
-    pub static mut jl_vararg_type: *mut jl_datatype_t;
+    pub static mut jl_vararg_type: *mut jl_unionall_t;
+}
+extern "C" {
+    pub static mut jl_vararg_typename: *mut jl_typename_t;
 }
 extern "C" {
     pub static mut jl_function_type: *mut jl_datatype_t;
 }
 extern "C" {
     pub static mut jl_builtin_type: *mut jl_datatype_t;
-}
-extern "C" {
-    pub static mut jl_opaque_closure_type: *mut jl_unionall_t;
-}
-extern "C" {
-    pub static mut jl_opaque_closure_typename: *mut jl_typename_t;
 }
 extern "C" {
     pub static mut jl_bottom_type: *mut jl_value_t;
@@ -1277,9 +1099,6 @@ extern "C" {
 }
 extern "C" {
     pub static mut jl_undefvarerror_type: *mut jl_datatype_t;
-}
-extern "C" {
-    pub static mut jl_atomicerror_type: *mut jl_datatype_t;
 }
 extern "C" {
     pub static mut jl_lineinfonode_type: *mut jl_datatype_t;
@@ -1470,6 +1289,7 @@ pub struct _jl_gcframe_t {
     pub nroots: usize,
     pub prev: *mut _jl_gcframe_t,
 }
+pub type jl_gcframe_t = _jl_gcframe_t;
 extern "C" {
     pub fn jl_gc_enable(on: ::std::os::raw::c_int) -> ::std::os::raw::c_int;
 }
@@ -1494,7 +1314,7 @@ extern "C" {
     );
 }
 extern "C" {
-    pub fn jl_gc_queue_root(root: *const jl_value_t);
+    pub fn jl_gc_queue_root(root: *mut jl_value_t);
 }
 extern "C" {
     pub fn jl_array_typetagdata(a: *mut jl_array_t) -> *mut ::std::os::raw::c_char;
@@ -1509,7 +1329,7 @@ extern "C" {
     pub fn jl_subtype(a: *mut jl_value_t, b: *mut jl_value_t) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn jl_egal(a: *const jl_value_t, b: *const jl_value_t) -> ::std::os::raw::c_int;
+    pub fn jl_egal(a: *mut jl_value_t, b: *mut jl_value_t) -> ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn jl_object_id(v: *mut jl_value_t) -> usize;
@@ -1788,10 +1608,10 @@ extern "C" {
     pub fn jl_exception_occurred() -> *mut jl_value_t;
 }
 extern "C" {
-    pub fn jl_init();
+    pub fn jl_init__threading();
 }
 extern "C" {
-    pub fn jl_init_with_image(
+    pub fn jl_init_with_image__threading(
         julia_bindir: *const ::std::os::raw::c_char,
         image_relative_path: *const ::std::os::raw::c_char,
     );
@@ -1864,7 +1684,7 @@ pub struct _jl_handler_t {
 }
 pub type jl_handler_t = _jl_handler_t;
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct _jl_task_t {
     pub next: *mut jl_value_t,
     pub queue: *mut jl_value_t,
@@ -1873,32 +1693,19 @@ pub struct _jl_task_t {
     pub result: *mut jl_value_t,
     pub logstate: *mut jl_value_t,
     pub start: *mut jl_function_t,
-    pub rngState0: u64,
-    pub rngState1: u64,
-    pub rngState2: u64,
-    pub rngState3: u64,
     pub _state: u8,
     pub sticky: u8,
     pub _isexception: u8,
-    pub tid: u16,
+    pub tid: i16,
     pub prio: i16,
-    pub gcstack: *mut jl_gcframe_t,
-    pub world_age: usize,
-    pub ptls: *mut jl_tls_states_t,
     pub excstack: *mut jl_excstack_t,
     pub eh: *mut jl_handler_t,
-    pub __bindgen_anon_1: _jl_task_t__bindgen_ty_1,
+    pub ctx: jl_ucontext_t,
     pub stkbuf: *mut ::std::os::raw::c_void,
     pub bufsz: usize,
     pub _bitfield_align_1: [u32; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 4usize]>,
-    pub __bindgen_padding_0: u32,
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union _jl_task_t__bindgen_ty_1 {
-    pub ctx: jl_ucontext_t,
-    pub copy_stack_ctx: jl_stack_context_t,
+    pub gcstack: *mut jl_gcframe_t,
 }
 impl _jl_task_t {
     #[inline]
@@ -1972,7 +1779,6 @@ pub struct jl_options_t {
     pub code_coverage: i8,
     pub malloc_log: i8,
     pub opt_level: i8,
-    pub opt_level_min: i8,
     pub debug_level: i8,
     pub check_bounds: i8,
     pub depwarn: i8,
@@ -2024,7 +1830,7 @@ extern "C" {
     pub fn jl_git_commit() -> *const ::std::os::raw::c_char;
 }
 extern "C" {
-    pub fn jl_get_current_task() -> *mut jl_task_t;
+    pub fn jl_get_current_task() -> *mut jl_value_t;
 }
 pub const jlrs_result_tag_t_JLRS_RESULT_VOID: jlrs_result_tag_t = 0;
 pub const jlrs_result_tag_t_JLRS_RESULT_VALUE: jlrs_result_tag_t = 1;

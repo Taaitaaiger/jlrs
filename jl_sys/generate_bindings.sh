@@ -20,6 +20,9 @@ fi
 if [ -z "$JULIA_LTS_DIR" ]; then
     JULIA_LTS_DIR=~/julia-1.6.6
 fi
+if [ -z "$JULIA_LTS_DIR_32" ]; then
+    JULIA_LTS_DIR_32=$JULIA_LTS_DIR-32
+fi
 if [ -z "$JULIA_LTS_DIR_WIN" ]; then
     JULIA_LTS_DIR_WIN=$JULIA_LTS_DIR-win
 fi
@@ -40,6 +43,10 @@ if [ ! -d "$JULIA_LTS_DIR" ]; then
     echo "Error: $JULIA_LTS_DIR does not exist" >&2
     exit 1
 fi
+if [ ! -d "$JULIA_LTS_DIR_32" ]; then
+    echo "Error: $JULIA_LTS_DIR_32 does not exist" >&2
+    exit 1
+fi
 if [ ! -d "$JULIA_LTS_DIR_WIN" ]; then
     echo "Error: $JULIA_LTS_DIR_WIN does not exist" >&2
     exit 1
@@ -58,6 +65,11 @@ cargo clean
 JULIA_DIR=$JULIA_LTS_DIR LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$JULIA_DIR/lib" cargo build --features use-bindgen,lts
 echo "/* generated from Julia version 1.6.6 */" > ./src/bindings_1_6_x86_64_unknown_linux_gnu.rs
 cat ../target/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings_1_6_x86_64_unknown_linux_gnu.rs
+
+cargo clean
+JULIA_DIR=$JULIA_LTS_DIR_32 LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$JULIA_DIR/lib" cargo build --features use-bindgen,lts,i686 --target i686-unknown-linux-gnu
+echo "/* generated from Julia version 1.7.3 */" > ./src/bindings_1_6_i686_unknown_linux_gnu.rs
+cat ../target/i686-unknown-linux-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings_1_6_i686_unknown_linux_gnu.rs
 
 cargo clean
 JULIA_DIR=$JULIA_STABLE_DIR_WIN LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$JULIA_DIR/lib" cargo build --features use-bindgen --target x86_64-pc-windows-gnu
