@@ -33,7 +33,6 @@ use super::Ref;
 cfg_if! {
     if #[cfg(not(all(target_os = "windows", all(feature = "lts", not(feature = "all-features-override")))))] {
         use crate::error::JuliaResultRef;
-        use jl_sys::{jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_set_const, jlrs_set_global};
     }
 }
 
@@ -207,24 +206,28 @@ impl<'scope> Module<'scope> {
         scope: S,
         name: N,
         value: Value<'_, 'static>,
-    ) -> JlrsResult<JuliaResult<'frame, 'static, ValueRef<'scope, 'static>>>
+    ) -> JlrsResult<JuliaResult<'frame, 'static, ()>>
     where
         N: ToSymbol,
         S: PartialScope<'frame>,
     {
+        use crate::catch::catch_exceptions;
+        use std::mem::MaybeUninit;
         let symbol = name.to_symbol_priv(Private);
 
-        let res = jlrs_set_global(
-            self.unwrap(Private),
-            symbol.unwrap(Private),
-            value.unwrap(Private),
-        );
+        let mut callback = |_: &mut MaybeUninit<()>| {
+            jl_set_global(
+                self.unwrap(Private),
+                symbol.unwrap(Private),
+                value.unwrap(Private),
+            );
 
-        let data = res.data;
-        if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
-            Ok(Err(scope.value(NonNull::new_unchecked(data), Private)?))
-        } else {
-            Ok(Ok(ValueRef::wrap(data)))
+            Ok(())
+        };
+
+        match catch_exceptions(&mut callback)? {
+            Ok(_) => Ok(Ok(())),
+            Err(e) => Ok(Err(e.root(scope)?)),
         }
     }
 
@@ -242,23 +245,27 @@ impl<'scope> Module<'scope> {
         self,
         name: N,
         value: Value<'_, 'static>,
-    ) -> JuliaResultRef<'scope, 'static>
+    ) -> JlrsResult<JuliaResultRef<'scope, 'static, ()>>
     where
         N: ToSymbol,
     {
+        use crate::catch::catch_exceptions;
+        use std::mem::MaybeUninit;
         let symbol = name.to_symbol_priv(Private);
 
-        let res = jlrs_set_global(
-            self.unwrap(Private),
-            symbol.unwrap(Private),
-            value.unwrap(Private),
-        );
+        let mut callback = |_: &mut MaybeUninit<()>| {
+            jl_set_global(
+                self.unwrap(Private),
+                symbol.unwrap(Private),
+                value.unwrap(Private),
+            );
 
-        let data = res.data;
-        if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
-            Err(ValueRef::wrap(data))
-        } else {
-            Ok(ValueRef::wrap(data))
+            Ok(())
+        };
+
+        match catch_exceptions(&mut callback)? {
+            Ok(_) => Ok(Ok(())),
+            Err(e) => Ok(Err(e)),
         }
     }
 
@@ -267,11 +274,7 @@ impl<'scope> Module<'scope> {
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
     /// this value is allowed.
-    pub unsafe fn set_global_unchecked<N>(
-        self,
-        name: N,
-        value: Value<'_, 'static>,
-    ) -> ValueRef<'scope, 'static>
+    pub unsafe fn set_global_unchecked<N>(self, name: N, value: Value<'_, 'static>)
     where
         N: ToSymbol,
     {
@@ -282,8 +285,6 @@ impl<'scope> Module<'scope> {
             symbol.unwrap(Private),
             value.unwrap(Private),
         );
-
-        ValueRef::wrap(value.unwrap(Private))
     }
 
     /// Set a constant in this module. If Julia throws an exception it's caught and rooted in the
@@ -298,7 +299,7 @@ impl<'scope> Module<'scope> {
         scope: S,
         name: N,
         value: Value<'_, 'static>,
-    ) -> JlrsResult<JuliaResult<'frame, 'static, ValueRef<'scope, 'static>>>
+    ) -> JlrsResult<JuliaResult<'frame, 'static, ()>>
     where
         N: ToSymbol,
         S: PartialScope<'frame>,
@@ -307,19 +308,23 @@ impl<'scope> Module<'scope> {
         // valid arguments and its result is checked. if an exception is thrown it's caught
         // and returned
         unsafe {
+            use crate::catch::catch_exceptions;
+            use std::mem::MaybeUninit;
             let symbol = name.to_symbol_priv(Private);
 
-            let res = jlrs_set_const(
-                self.unwrap(Private),
-                symbol.unwrap(Private),
-                value.unwrap(Private),
-            );
+            let mut callback = |_: &mut MaybeUninit<()>| {
+                jl_set_const(
+                    self.unwrap(Private),
+                    symbol.unwrap(Private),
+                    value.unwrap(Private),
+                );
 
-            let data = res.data;
-            if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
-                Ok(Err(scope.value(NonNull::new_unchecked(data), Private)?))
-            } else {
-                Ok(Ok(ValueRef::wrap(data)))
+                Ok(())
+            };
+
+            match catch_exceptions(&mut callback)? {
+                Ok(_) => Ok(Ok(())),
+                Err(e) => Ok(Err(e.root(scope)?)),
             }
         }
     }
@@ -334,7 +339,7 @@ impl<'scope> Module<'scope> {
         self,
         name: N,
         value: Value<'_, 'static>,
-    ) -> JuliaResultRef<'scope, 'static>
+    ) -> JlrsResult<JuliaResultRef<'scope, 'static, ()>>
     where
         N: ToSymbol,
     {
@@ -342,19 +347,23 @@ impl<'scope> Module<'scope> {
         // valid arguments and its result is checked. if an exception is thrown it's caught
         // and returned
         unsafe {
+            use crate::catch::catch_exceptions;
+            use std::mem::MaybeUninit;
             let symbol = name.to_symbol_priv(Private);
 
-            let res = jlrs_set_const(
-                self.unwrap(Private),
-                symbol.unwrap(Private),
-                value.unwrap(Private),
-            );
+            let mut callback = |_: &mut MaybeUninit<()>| {
+                jl_set_const(
+                    self.unwrap(Private),
+                    symbol.unwrap(Private),
+                    value.unwrap(Private),
+                );
 
-            let data = res.data;
-            if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
-                Err(ValueRef::wrap(data))
-            } else {
-                Ok(ValueRef::wrap(data))
+                Ok(())
+            };
+
+            match catch_exceptions(&mut callback)? {
+                Ok(_) => Ok(Ok(())),
+                Err(e) => Ok(Err(e)),
             }
         }
     }

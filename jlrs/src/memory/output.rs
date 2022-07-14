@@ -12,6 +12,7 @@
 
 use crate::{
     memory::{frame::Frame, scope::OutputScope, stack_page::Slot},
+    private::Private,
     wrappers::ptr::Wrapper,
 };
 use std::{marker::PhantomData, ptr::NonNull};
@@ -55,8 +56,9 @@ impl<'target> Output<'target> {
     pub(crate) unsafe fn set_root<'data, T: Wrapper<'target, 'data>>(
         self,
         value: NonNull<T::Wraps>,
-    ) {
+    ) -> T {
         let cell = &*self.slot;
         cell.set(value.as_ptr().cast());
+        T::wrap_non_null(value, Private)
     }
 }

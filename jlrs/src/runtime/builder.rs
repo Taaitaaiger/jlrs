@@ -160,7 +160,7 @@ impl RuntimeBuilder {
     /// Smilarly for async-std:
     ///
     /// ```
-    /// use jlrs::prelude::{AsyncStd, AsyncStdChannel, RuntimeBuilder};
+    /// use jlrs::prelude::*;
     ///
     /// # fn main() {
     /// let (_julia, _thread_handle) = unsafe { RuntimeBuilder::new()

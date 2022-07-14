@@ -19,7 +19,6 @@ use jl_sys::{
 
 cfg_if! {
     if #[cfg(not(all(target_os = "windows", feature = "lts")))] {
-        use jl_sys::{jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_type_unionall};
         use crate::error::{JuliaResult, JuliaResultRef};
     }
 }
@@ -53,13 +52,21 @@ impl<'scope> UnionAll<'scope> {
     where
         S: PartialScope<'target>,
     {
+        use crate::catch::catch_exceptions;
+        use jl_sys::jl_value_t;
+        use std::mem::MaybeUninit;
+
         // Safety: if an exception is thrown it's caught, the result is immediately rooted
         unsafe {
-            let ua = jlrs_type_unionall(tvar.unwrap(Private), body.unwrap(Private));
-            if ua.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
-                scope.call_result(Err(NonNull::new_unchecked(ua.data)), Private)
-            } else {
-                scope.call_result(Ok(NonNull::new_unchecked(ua.data)), Private)
+            let mut callback = |result: &mut MaybeUninit<*mut jl_value_t>| {
+                let res = jl_type_unionall(tvar.unwrap(Private), body.unwrap(Private));
+                result.write(res);
+                Ok(())
+            };
+
+            match catch_exceptions(&mut callback)? {
+                Ok(ptr) => Ok(Ok(scope.value(NonNull::new_unchecked(ptr), Private)?)),
+                Err(e) => Ok(Err(e.root(scope)?)),
             }
         }
     }
@@ -87,14 +94,22 @@ impl<'scope> UnionAll<'scope> {
         _: Global<'global>,
         tvar: TypeVar,
         body: Value<'_, 'static>,
-    ) -> JuliaResultRef<'global, 'static> {
-        // If an exception is thrown it's caught and returned
+    ) -> JlrsResult<JuliaResultRef<'global, 'static>> {
+        use crate::catch::catch_exceptions;
+        use jl_sys::jl_value_t;
+        use std::mem::MaybeUninit;
+
+        // Safety: if an exception is thrown it's caught
         unsafe {
-            let ua = jlrs_type_unionall(tvar.unwrap(Private), body.unwrap(Private));
-            if ua.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
-                Err(ValueRef::wrap(ua.data))
-            } else {
-                Ok(ValueRef::wrap(ua.data))
+            let mut callback = |result: &mut MaybeUninit<*mut jl_value_t>| {
+                let res = jl_type_unionall(tvar.unwrap(Private), body.unwrap(Private));
+                result.write(res);
+                Ok(())
+            };
+
+            match catch_exceptions(&mut callback)? {
+                Ok(ptr) => Ok(Ok(ValueRef::wrap(ptr))),
+                Err(e) => Ok(Err(e)),
             }
         }
     }

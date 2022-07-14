@@ -42,7 +42,7 @@ impl AsyncRuntime for Tokio {
 
     fn spawn_blocking<F>(rt_fn: F) -> Self::RuntimeHandle
     where
-        F: FnOnce() -> JlrsResult<()> + Send + Sync + 'static,
+        F: FnOnce() -> JlrsResult<()> + Send + 'static,
     {
         tokio::task::spawn_blocking(rt_fn)
     }
@@ -140,21 +140,21 @@ impl<M: Send + Sync + 'static> ChannelReceiver<M> for tokio::sync::mpsc::Unbound
 }
 
 #[async_trait]
-impl<M: Send + Sync + 'static> OneshotSender<M> for tokio::sync::oneshot::Sender<M> {
+impl<M: Send + 'static> OneshotSender<M> for tokio::sync::oneshot::Sender<M> {
     async fn send(self, msg: M) {
         self.send(msg).ok();
     }
 }
 
 #[async_trait]
-impl<M: Send + Sync + 'static> OneshotSender<M> for tokio::sync::mpsc::Sender<M> {
+impl<M: Send + 'static> OneshotSender<M> for tokio::sync::mpsc::Sender<M> {
     async fn send(self, msg: M) {
         (&self).send(msg).await.ok();
     }
 }
 
 #[async_trait]
-impl<M: Send + Sync + 'static> OneshotSender<M> for tokio::sync::broadcast::Sender<M> {
+impl<M: Send + 'static> OneshotSender<M> for tokio::sync::broadcast::Sender<M> {
     async fn send(self, msg: M) {
         (&self).send(msg).ok();
     }

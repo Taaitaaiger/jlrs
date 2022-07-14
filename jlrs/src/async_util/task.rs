@@ -63,7 +63,7 @@ use jl_sys::{jl_process_events, jl_yield};
 #[async_trait(?Send)]
 pub trait AsyncTask: 'static + Send + Sync {
     /// The type of the result which is returned if `run` completes successfully.
-    type Output: 'static + Send + Sync;
+    type Output: 'static + Send;
 
     /// The minimum capacity of the `AsyncGcFrame` provided to `run`.
     const RUN_CAPACITY: usize = 0;

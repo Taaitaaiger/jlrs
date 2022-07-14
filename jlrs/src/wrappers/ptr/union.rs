@@ -20,7 +20,6 @@ use super::Ref;
 cfg_if! {
     if #[cfg(not(all(target_os = "windows", feature = "lts")))] {
         use crate::error::{JuliaResult, JuliaResultRef};
-        use jl_sys::{jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_type_union};
     }
 }
 
@@ -45,14 +44,23 @@ impl<'scope> Union<'scope> {
         V: AsRef<[Value<'scope, 'static>]>,
         S: PartialScope<'target>,
     {
-        // Safety: if an exception is thrown it's caught, the result is rooted immediately
+        use crate::catch::catch_exceptions;
+        use jl_sys::jl_value_t;
+        use std::mem::MaybeUninit;
+
+        // Safety: if an exception is thrown it's caught, the result is immediately rooted
         unsafe {
             let types = types.as_ref();
-            let un = jlrs_type_union(types.as_ptr() as *mut _, types.len());
-            if un.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
-                scope.call_result(Err(NonNull::new_unchecked(un.data)), Private)
-            } else {
-                scope.call_result(Ok(NonNull::new_unchecked(un.data)), Private)
+
+            let mut callback = |result: &mut MaybeUninit<*mut jl_value_t>| {
+                let res = jl_type_union(types.as_ptr() as *mut _, types.len());
+                result.write(res);
+                Ok(())
+            };
+
+            match catch_exceptions(&mut callback)? {
+                Ok(ptr) => Ok(Ok(scope.value(NonNull::new_unchecked(ptr), Private)?)),
+                Err(e) => Ok(Err(e.root(scope)?)),
             }
         }
     }
@@ -92,18 +100,27 @@ impl<'scope> Union<'scope> {
     pub fn new_unrooted<'global, V>(
         _: Global<'global>,
         types: V,
-    ) -> JuliaResultRef<'global, 'static>
+    ) -> JlrsResult<JuliaResultRef<'global, 'static>>
     where
         V: AsRef<[Value<'scope, 'static>]>,
     {
-        // Safety: if an exception is thrown it's caught
+        use crate::catch::catch_exceptions;
+        use jl_sys::jl_value_t;
+        use std::mem::MaybeUninit;
+
+        // Safety: if an exception is thrown it's caught, the result is immediately rooted
         unsafe {
             let types = types.as_ref();
-            let un = jlrs_type_union(types.as_ptr() as *mut _, types.len());
-            if un.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
-                Err(ValueRef::wrap(un.data))
-            } else {
-                Ok(ValueRef::wrap(un.data))
+
+            let mut callback = |result: &mut MaybeUninit<*mut jl_value_t>| {
+                let res = jl_type_union(types.as_ptr() as *mut _, types.len());
+                result.write(res);
+                Ok(())
+            };
+
+            match catch_exceptions(&mut callback)? {
+                Ok(ptr) => Ok(Ok(ValueRef::wrap(ptr))),
+                Err(e) => Ok(Err(e)),
             }
         }
     }

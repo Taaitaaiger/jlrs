@@ -278,7 +278,7 @@ mod tests {
                 let main = Module::main(global);
                 let value1 = Value::new(&mut frame, 3usize)?;
                 let value2 = Value::new(&mut frame, 4usize)?;
-                main.set_const_unrooted("TWICE", value1)
+                main.set_const_unrooted("TWICE", value1)?
                     .map_err(|v| unsafe { v.value_unchecked() })
                     .into_jlrs_result()?;
                 main.set_const(&mut frame, "TWICE", value2)?

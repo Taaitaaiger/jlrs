@@ -39,8 +39,8 @@ where
 }
 
 #[async_trait(?Send)]
-trait AsyncTaskEnvelope: Send + Sync {
-    type A: AsyncTask + Send + Sync;
+trait AsyncTaskEnvelope: Send {
+    type A: AsyncTask + Send;
 
     async fn call_run<'inner>(
         &'inner mut self,
@@ -62,8 +62,8 @@ impl<A: AsyncTask> AsyncTaskEnvelope for A {
 }
 
 #[async_trait(?Send)]
-trait PersistentTaskEnvelope: Send + Sync {
-    type P: PersistentTask + Send + Sync;
+trait PersistentTaskEnvelope: Send {
+    type P: PersistentTask + Send;
 
     async fn call_init<'inner>(
         &'inner mut self,

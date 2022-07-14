@@ -3,9 +3,14 @@
 use crate::{
     error::{AccessError, JlrsResult},
     layout::{typecheck::Typecheck, valid_layout::ValidLayout},
-    memory::{frame::Frame, global::Global, output::Output, scope::private::PartialScopePriv},
-    prelude::{PartialScope, Value},
+    memory::{
+        frame::Frame,
+        global::Global,
+        output::Output,
+        scope::{private::PartialScopePriv, PartialScope},
+    },
     private::Private,
+    wrappers::ptr::value::Value,
 };
 use jl_sys::{
     jl_alloc_svec, jl_alloc_svec_uninit, jl_emptysvec, jl_gc_wb, jl_svec_data, jl_svec_t,

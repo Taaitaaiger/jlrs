@@ -442,7 +442,7 @@ fn main() {
         #[cfg(not(any(feature = "windows-lts", all(feature = "lts", windows))))]
         {
             builder = builder
-                .allowlist_function("jlrs_alloc_array_1d")
+                /*.allowlist_function("jlrs_alloc_array_1d")
                 .allowlist_function("jlrs_alloc_array_2d")
                 .allowlist_function("jlrs_alloc_array_3d")
                 .allowlist_function("jlrs_apply_array_type")
@@ -467,7 +467,7 @@ fn main() {
                 .allowlist_function("jlrs_array_ptr_1d_push")
                 .allowlist_function("jlrs_array_ptr_1d_append")
                 .allowlist_function("jlrs_arrayset")
-                .allowlist_function("jlrs_arrayref")
+                .allowlist_function("jlrs_arrayref") */
                 .allowlist_function("jlrs_catch_wrapper");
         }
 

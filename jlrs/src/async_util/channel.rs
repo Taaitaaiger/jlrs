@@ -107,19 +107,19 @@ pub trait ChannelReceiver<M: Send + Sync + 'static>: 'static + Send + Sync {
 /// you must provide the sending half of a channel that implements this trait. When the task is
 /// done the result is sent to the receiving half.
 #[async_trait]
-pub trait OneshotSender<M: Send + Sync + 'static>: 'static + Send + Sync {
+pub trait OneshotSender<M: Send + 'static>: 'static + Send + Sync {
     async fn send(self, msg: M);
 }
 
 #[async_trait::async_trait]
-impl<M: Send + Sync + 'static> OneshotSender<M> for Box<dyn OneshotSender<M>> {
+impl<M: Send + 'static> OneshotSender<M> for Box<dyn OneshotSender<M>> {
     async fn send(self, msg: M) {
         self.send(msg).await;
     }
 }
 
 #[async_trait::async_trait]
-impl<M: Send + Sync + 'static> OneshotSender<M> for crossbeam_channel::Sender<M> {
+impl<M: Send + 'static> OneshotSender<M> for crossbeam_channel::Sender<M> {
     async fn send(self, msg: M) {
         (&self).send(msg).ok();
     }
