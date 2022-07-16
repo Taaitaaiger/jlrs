@@ -89,7 +89,7 @@ use std::{marker::PhantomData, ptr::NonNull};
 pub struct OutputScope<'target, 'current, 'borrow, F: Frame<'current>> {
     pub(crate) output: Output<'target>,
     pub(crate) frame: &'borrow mut F,
-    pub(crate) _marker: PhantomData<&'current ()>,
+    pub(crate) _marker: PhantomData<&'current mut &'current ()>,
 }
 
 impl<'target, 'current, 'borrow, F: Frame<'current>> OutputScope<'target, 'current, 'borrow, F> {

@@ -156,7 +156,7 @@ pub trait AsyncTask: 'static + Send + Sync {
 ///     // is dropped after `run` returns.
 ///     async fn run<'frame>(
 ///         &mut self,
-///         global: Global<'frame>,
+///         global: Global<'static>,
 ///         mut frame: AsyncGcFrame<'frame>,
 ///         state: &mut Self::State,
 ///         input: Self::Input,
@@ -258,7 +258,7 @@ pub trait PersistentTask: 'static + Send + Sync {
     /// `run` and assign it to the state because the frame doesn't live long enough.
     async fn run<'frame>(
         &mut self,
-        global: Global<'frame>,
+        global: Global<'static>,
         frame: AsyncGcFrame<'frame>,
         state: &mut Self::State,
         input: Self::Input,

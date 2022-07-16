@@ -442,7 +442,7 @@ impl PersistentTask for AccumulatorTask {
 
     async fn run<'frame>(
         &mut self,
-        _global: Global<'frame>,
+        _global: Global<'static>,
         mut frame: AsyncGcFrame<'frame>,
         state: &mut Self::State,
         input: Self::Input,
@@ -828,6 +828,38 @@ impl AsyncTask for MainKwTask {
                 .unbox::<f64>()? as f32
         };
 
+        Ok(v)
+    }
+}
+
+pub struct BorrowArrayData;
+
+#[async_trait(?Send)]
+impl AsyncTask for BorrowArrayData {
+    type Output = f64;
+
+    async fn run<'base>(
+        &mut self,
+        _global: Global<'base>,
+        mut frame: AsyncGcFrame<'base>,
+    ) -> JlrsResult<Self::Output> {
+        let mut data = vec![2.0f64];
+        let borrowed = &mut data;
+        let (output, frame) = frame.split()?;
+        let v = unsafe {
+            frame
+                .relaxed_async_scope(|mut frame| async move {
+                    let output_scope = output.into_scope(&mut frame);
+                    Array::from_slice(output_scope, borrowed, 1)
+                })
+                .await?
+                .into_jlrs_result()?
+        };
+
+        let data2 = v.inline_data::<f64, _>(frame)?;
+        // Uncommenting next line must be compile error
+        // let _ = data[0];
+        let v = data2[0];
         Ok(v)
     }
 }

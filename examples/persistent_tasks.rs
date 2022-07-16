@@ -79,7 +79,7 @@ impl PersistentTask for AccumulatorTask {
     // scope.
     async fn run<'frame>(
         &mut self,
-        _global: Global<'frame>,
+        _global: Global<'static>,
         mut frame: AsyncGcFrame<'frame>,
         state: &mut Self::State,
         input: Self::Input,

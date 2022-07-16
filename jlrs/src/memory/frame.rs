@@ -24,7 +24,7 @@ use crate::{
     private::Private,
 };
 use jl_sys::jl_value_t;
-use std::{marker::PhantomData, ptr::NonNull};
+use std::ptr::NonNull;
 
 pub(crate) const MIN_FRAME_CAPACITY: usize = 16;
 
@@ -52,7 +52,6 @@ pub struct GcFrame<'frame, M: Mode> {
     raw_frame: &'frame [Slot],
     page: Option<StackPage>,
     mode: M,
-    _marker: PhantomData<&'frame mut &'frame ()>,
 }
 
 impl<'frame, M: Mode> GcFrame<'frame, M> {
@@ -64,7 +63,6 @@ impl<'frame, M: Mode> GcFrame<'frame, M> {
             raw_frame,
             page: None,
             mode,
-            _marker: PhantomData,
         };
 
         (frame, owner)
@@ -92,12 +90,13 @@ impl<'frame, M: Mode> GcFrame<'frame, M> {
 cfg_if::cfg_if! {
     if #[cfg(feature = "ccall")] {
         use crate::{ccall::CCall, error::AllocError};
+        use std::marker::PhantomData;
 
         /// A frame that can't store any roots or be nested.
         ///
         /// A `NullFrame` can be used if you call Rust from Julia through `ccall` and want to
         /// borrow array data but not perform any allocations.
-        pub struct NullFrame<'frame>(PhantomData<&'frame mut &'frame ()>);
+        pub struct NullFrame<'frame>(PhantomData<&'frame ()>);
 
         impl<'frame> NullFrame<'frame> {
             // Safety: frames must form a single nested hierarchy.
@@ -134,7 +133,7 @@ cfg_if::cfg_if! {
             where
                 T: 'frame,
                 G: Future<Output = JlrsResult<T>>,
-                F: FnOnce(AsyncGcFrame<'nested>) -> G,
+                F:  FnOnce(AsyncGcFrame<'nested>) -> G,
             {
                 // Safety: the lifetime of the borrow is extended, but it's valid during the call
                 // to func and data returned from func must live longer.
@@ -161,6 +160,45 @@ cfg_if::cfg_if! {
             {
                 // Safety: the lifetime of the borrow is extended, but it's valid during the call
                 // to func and data returned from func must live longer.
+                let (nested, owner) = self.nest_async(capacity);
+                let ret =  func(nested).await;
+                std::mem::drop(owner);
+                ret
+            }
+
+            /// `AsyncFrame::async_scope` with less strict lifeitme bounds on the return value.
+            ///
+            /// Safety: because this method only requires that the returned data lives at least as
+            /// long as the borow of `self`, it's possible to return data rooted in that scope.
+            #[inline(never)]
+            pub async unsafe fn relaxed_async_scope<'nested, T, F, G>(&'nested mut self, func: F) -> JlrsResult<T>
+            where
+                T: 'nested,
+                G: Future<Output = JlrsResult<T>>,
+                F:  FnOnce(AsyncGcFrame<'nested>) -> G,
+            {
+                let (nested, owner) = self.nest_async(0);
+                let ret =  func(nested).await;
+                std::mem::drop(owner);
+                ret
+            }
+
+            /// `AsyncFrame::async_scope_wit_capacity` with less strict lifeitme bounds on the
+            /// return value.
+            ///
+            /// Safety: because this method only requires that the returned data lives at least as
+            /// long as the borow of `self`, it's possible to return data rooted in that scope.
+            #[inline(never)]
+            pub async unsafe fn relaxed_async_scope_with_capacity<'nested, T, F, G>(
+                &'nested mut self,
+                capacity: usize,
+                func: F,
+            ) -> JlrsResult<T>
+            where
+                T: 'nested,
+                G: Future<Output = JlrsResult<T>>,
+                F: FnOnce(AsyncGcFrame<'nested>) -> G,
+            {
                 let (nested, owner) = self.nest_async(capacity);
                 let ret =  func(nested).await;
                 std::mem::drop(owner);
@@ -406,28 +444,22 @@ pub(crate) mod private {
         private::Private,
         wrappers::ptr::private::WrapperPriv,
     };
-    use std::{
-        marker::PhantomData,
-        ptr::{null_mut, NonNull},
-    };
+    #[cfg(feature = "async")]
+    use std::marker::PhantomData;
+    use std::ptr::{null_mut, NonNull};
 
     use super::FrameSlice;
 
     pub struct FrameOwner<'frame, M: Mode> {
         mode: M,
         raw_frame: &'frame [Slot],
-        _marker: PhantomData<&'frame mut &'frame ()>,
     }
 
     impl<'frame, M: Mode> FrameOwner<'frame, M> {
         // Only one owner must be created for a frame.
         pub(crate) unsafe fn new(raw_frame: &'frame [Slot], mode: M) -> Self {
             mode.push_frame(raw_frame, Private);
-            FrameOwner {
-                mode,
-                raw_frame,
-                _marker: PhantomData,
-            }
+            FrameOwner { mode, raw_frame }
         }
     }
 

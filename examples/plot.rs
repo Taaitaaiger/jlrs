@@ -49,7 +49,7 @@ impl PersistentTask for MyTask {
 
     async fn run<'frame>(
         &mut self,
-        global: Global<'frame>,
+        global: Global<'static>,
         mut frame: AsyncGcFrame<'frame>,
         state: &mut Self::State,
         _input: Self::Input,

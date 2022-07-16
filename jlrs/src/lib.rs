@@ -443,7 +443,7 @@
 //!     // is dropped after `run` returns.
 //!     async fn run<'frame>(
 //!         &mut self,
-//!         global: Global<'frame>,
+//!         global: Global<'static>,
 //!         mut frame: AsyncGcFrame<'frame>,
 //!         state: &mut Self::State,
 //!         input: Self::Input,
