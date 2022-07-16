@@ -101,7 +101,7 @@ pub mod dimensions;
 #[repr(transparent)]
 pub struct Array<'scope, 'data>(
     NonNull<jl_array_t>,
-    PhantomData<&'scope mut ()>,
+    PhantomData<&'scope ()>,
     PhantomData<&'data mut ()>,
 );
 
@@ -342,11 +342,11 @@ impl<'data> Array<'_, 'data> {
     /// If the array size is too large, Julia will throw an error. This error is caught and
     /// returned.
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub fn from_slice<'target, 'current, 'da, T, D, S, F>(
+    pub fn from_slice<'target, 'current, T, D, S, F>(
         scope: S,
-        data: &'da mut [T],
+        data: &'data mut [T],
         dims: D,
-    ) -> JlrsResult<JuliaResult<Array<'target, 'da>>>
+    ) -> JlrsResult<JuliaResult<'target, 'data, Array<'target, 'data>>>
     where
         T: IntoJulia,
         D: Dims,
@@ -1634,7 +1634,7 @@ where
         scope: S,
         data: &'data mut [T],
         dims: D,
-    ) -> JlrsResult<JuliaResult<TypedArray<'target, 'data, T>>>
+    ) -> JlrsResult<JuliaResult<'target, 'data, TypedArray<'target, 'data, T>>>
     where
         T: IntoJulia,
         D: Dims,

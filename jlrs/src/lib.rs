@@ -1,7 +1,7 @@
 //! jlrs is a crate that provides access to most of the Julia C API, it can be used to embed Julia
 //! in Rust applications and to use functionality from the Julia C API when writing `ccall`able
 //! functions in Rust. Currently this crate is only tested on Linux and Windows in combination
-//! with Julia 1.6, 1.7, and 1.8.0-rc1 and is not compatible with other versions of Julia.
+//! with Julia 1.6, 1.7, and 1.8.0-rc3 and is not compatible with other versions of Julia.
 //!
 //! The documentation assumes you're already familiar with the Julia programming language.
 //!
@@ -27,9 +27,9 @@
 //!
 //! # Prerequisites
 //!
-//! Julia must be installed before jlrs can be used. Only version  1.6, 1.7, and 1.8.0-rc1 are
-//! supported. Using version 1.6 requires enabling the `lts` feature, 1.8.0-rc1 requires enabling
-//! the `rc1` feature.
+//! Julia must be installed before jlrs can be used. Only version  1.6, 1.7, and 1.8.0-rc3 are
+//! supported. Using version 1.6 requires enabling the `lts` feature, 1.8.0-rc3 requires enabling
+//! the `rc3` feature.
 //!
 //! ## Linux
 //!
@@ -71,7 +71,7 @@
 //!
 //! If you use the MSVC target, you must create two or three lib files using `lib.exe`. The def
 //! files required for this can be found in the [`def` folder] in the jl-sys crate. To create the
-//! lib files, copy the three files from either the `lts`, `stable`, or `rc1` folder to the `bin`
+//! lib files, copy the three files from either the `lts`, `stable`, or `rc3` folder to the `bin`
 //! folder where Julia is installed. Afterwards, open a Developer Command Prompt for VS19 and
 //! execute the following commands:
 //!
@@ -117,43 +117,56 @@
 //!   Provide a prelude module, [`jlrs::prelude`]. This feature is enabled by default.
 //!
 //! - `lts`
+//!
 //!   Use the current LTS version of Julia (1.6) instead of the current stable version (1.7).
-//! - `rc`
-//!   Use the current 1.8.0-rc1 version of Julia instead of the current stable version (1.7).
+//!
+//! - `rc3`
+//!
+//!   Use the current 1.8.0-rc3 version of Julia instead of the current stable version (1.7).
+//!
 //! - `async`
+//!
 //!   Enable the features of the async runtime which don't depend on the backing runtime. This
 //!   can be used in libraries which provide implementations of tasks that the async runtime can
 //!   handle.
 //!
 //! - `jlrs-derive`
+//!
 //!   This features should be used in combination with the JlrsReflect.jl package. This package
 //!   generates Rust bindings for Julia structs, these bindings use the custom derive macros to
 //!   enable the safe conversion of data from Julia to Rust, and from Rust to Julia in some cases.
 //!
 //! - `jlrs-ndarray`
+//!
 //!   Access the contents of a Julia array as an `ArrayView` or `ArrayViewMut` from ndarray.
 //!
 //! - `f16`
+//!
 //!   Adds support for working with Julia's `Float16` type from Rust using half's `f16` type.
 //!
 //! - `ccall`
+//!
 //!   Julia's `ccall` interface can be used to call functions written in Rust from Julia. No
 //!   runtime can be used in this case because Julia has already been initialized, when this
 //!   feature is enabled the `CCall` struct is available which offers the same functionality as
 //!   the sync runtime without initializing Julia.
 //!
 //! - `uv`
+//!
 //!   This feature enables the method `CCall::uv_async_send`, which can be used to wake a Julia
 //!   `AsyncCondition` from Rust. The `ccall` feature is automically enabled when this feature
 //!   is used.
 //!
 //! - `pyplot`
+//!
 //!   This feature lets you plot data using the Pyplot package and Gtk 3 from Rust.
 //!
 //! - `i686`
+//!
 //!   Link with a 32-bit build of Julia.
 //!
 //! - `debug`
+//!
 //!   Link with a debug build of Julia.
 //!
 //! You can enable all features except `lts` and `debug` by enabling the `full` feature.

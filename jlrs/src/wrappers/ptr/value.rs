@@ -184,7 +184,7 @@ pub const MAX_SIZE: usize = 8;
 pub struct Value<'scope, 'data>(
     NonNull<jl_value_t>,
     PhantomData<&'scope ()>,
-    PhantomData<&'data ()>,
+    PhantomData<&'data mut ()>,
 );
 
 impl PartialEq for Value<'_, '_> {

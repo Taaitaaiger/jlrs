@@ -28,7 +28,10 @@ if [ -z "$JULIA_LTS_DIR_WIN" ]; then
 fi
 
 if [ -z "$JULIA_RC_DIR" ]; then
-    JULIA_RC_DIR=~/julia-1.8.0-rc1
+    JULIA_RC_DIR=~/julia-1.8.0-rc3
+fi
+if [ -z "$JULIA_RC_DIR_32" ]; then
+    JULIA_RC_DIR_32=$JULIA_RC_DIR-32
 fi
 if [ -z "$JULIA_RC_DIR_WIN" ]; then
     JULIA_RC_DIR_WIN=$JULIA_RC_DIR-win
@@ -60,6 +63,10 @@ if [ ! -d "$JULIA_LTS_DIR_WIN" ]; then
 fi
 if [ ! -d "$JULIA_RC_DIR" ]; then
     echo "Error: $JULIA_RC_DIR does not exist" >&2
+    exit 1
+fi
+if [ ! -d "$JULIA_RC_DIR_32" ]; then
+    echo "Error: $JULIA_RC_DIR_32 does not exist" >&2
     exit 1
 fi
 if [ ! -d "$JULIA_RC_DIR_WIN" ]; then
@@ -105,10 +112,15 @@ cat ../target/i686-unknown-linux-gnu/debug/build/jl-sys*/out/bindings.rs >> ./sr
 cargo clean
 JULIA_DIR=$JULIA_RC_DIR_WIN LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$JULIA_DIR/lib" cargo build --features use-bindgen --target x86_64-pc-windows-gnu
 updated=$(sed -e '1h;2,$H;$!d;g' -r -E -e 's/(extern "C" \{\n\s+pub static)/#[link(name = \"libjulia\")]\n\1/g' ../target/x86_64-pc-windows-gnu/debug/build/jl-sys*/out/bindings.rs)
-echo "/* generated from Julia version 1.8.0-rc1 */" > ./src/bindings_1_8_x86_64_pc_windows_gnu.rs
+echo "/* generated from Julia version 1.8.0-rc3 */" > ./src/bindings_1_8_x86_64_pc_windows_gnu.rs
 echo -e "$updated" >> ./src/bindings_1_8_x86_64_pc_windows_gnu.rs
 
 cargo clean
 JULIA_DIR=$JULIA_RC_DIR LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$JULIA_DIR/lib" cargo build --features use-bindgen
-echo "/* generated from Julia version 1.8.0-rc1 */" > ./src/bindings_1_8_x86_64_unknown_linux_gnu.rs
+echo "/* generated from Julia version 1.8.0-rc3 */" > ./src/bindings_1_8_x86_64_unknown_linux_gnu.rs
 cat ../target/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings_1_8_x86_64_unknown_linux_gnu.rs
+
+cargo clean
+JULIA_DIR=$JULIA_RC_DIR_32 LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$JULIA_DIR/lib" cargo build --features use-bindgen,i686 --target i686-unknown-linux-gnu
+echo "/* generated from Julia version 1.8.0-rc3 */" > ./src/bindings_1_8_i686_unknown_linux_gnu.rs
+cat ../target/i686-unknown-linux-gnu/build/jl-sys*/out/bindings.rs >> ./src/bindings_1_8_i686_unknown_linux_gnu.rs

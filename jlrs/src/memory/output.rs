@@ -15,7 +15,7 @@ use crate::{
     private::Private,
     wrappers::ptr::Wrapper,
 };
-use std::{marker::PhantomData, ptr::NonNull};
+use std::ptr::NonNull;
 
 /// A reserved slot in a frame.
 ///
@@ -27,8 +27,7 @@ use std::{marker::PhantomData, ptr::NonNull};
 /// [`PartialScope`]: crate::memory::scope::PartialScope
 /// [`OutputScope`]: crate::memory::scope::OutputScope
 pub struct Output<'target> {
-    slot: *const Slot,
-    _marker: PhantomData<fn(&'target ())>,
+    slot: &'target Slot,
 }
 
 impl<'target> Output<'target> {
@@ -37,19 +36,12 @@ impl<'target> Output<'target> {
         self,
         frame: &'borrow mut F,
     ) -> OutputScope<'target, 'frame, 'borrow, F> {
-        OutputScope {
-            output: self,
-            frame,
-            _marker: PhantomData,
-        }
+        OutputScope::new(self, frame)
     }
 
     // Safety: slot must have been reserved in _frame
     pub(crate) unsafe fn new(slot: &'target Slot) -> Self {
-        Output {
-            slot,
-            _marker: PhantomData,
-        }
+        Output { slot }
     }
 
     // Safety: value must point to valid Jula data

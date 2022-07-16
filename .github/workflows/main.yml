@@ -103,7 +103,7 @@ jobs:
       - name: Run tests
         run: cargo test --features full --verbose -- --test-threads=1
 
-  test-linux-rc1:
+  test-linux-rc3:
     runs-on: ubuntu-latest
     continue-on-error: ${{ matrix.allow-fail }}
     strategy:
@@ -127,9 +127,9 @@ jobs:
         run: |
           export JULIA_DIR="$(dirname $(dirname $(which julia)))"
           export LD_LIBRARY_PATH="${JULIA_DIR}/lib:${JULIA_DIR}/lib/julia:${LD_LIBRARY_PATH}"
-          cargo test --features full,rc1 --verbose -- --test-threads=1
+          cargo test --features full,rc3 --verbose -- --test-threads=1
 
-  test-windows-gnu-rc1:
+  test-windows-gnu-rc3:
     runs-on: windows-latest
     continue-on-error: ${{ matrix.allow-fail }}
     strategy:
@@ -151,9 +151,9 @@ jobs:
           override: true
 
       - name: Run tests
-        run: cargo test --features full,rc1 --verbose -- --test-threads=1
+        run: cargo test --features full,rc3 --verbose -- --test-threads=1
 
-  test-windows-msvc-rc1:
+  test-windows-msvc-rc3:
     runs-on: windows-latest
     continue-on-error: ${{ matrix.allow-fail }}
     strategy:
@@ -179,14 +179,14 @@ jobs:
 
       - name: Create lib files
         run: |
-          copy ./jl_sys/def/rc1/*.def ${{ steps.setup-julia.outputs.julia-bindir }}
+          copy ./jl_sys/def/rc3/*.def ${{ steps.setup-julia.outputs.julia-bindir }}
           cd ${{ steps.setup-julia.outputs.julia-bindir }}
           lib /def:libjulia.def /out:libjulia.lib /machine:x64
           lib /def:libopenlibm.def /out:libopenlibm.lib /machine:x64
           lib /def:libuv-2.def /out:libuv-2.lib /machine:x64
 
       - name: Run tests
-        run: cargo test --features full,rc1 --verbose -- --test-threads=1
+        run: cargo test --features full,rc3 --verbose -- --test-threads=1
 
   test-linux-lts:
     runs-on: ubuntu-latest

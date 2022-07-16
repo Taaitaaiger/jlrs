@@ -480,7 +480,7 @@ impl<'scope> DataType<'scope> {
         unsafe { Ok(self.is_atomic_field_unchecked(idx)) }
     }
 
-    #[cfg(all(feature = "rc1", not(feature = "all-features-override")))]
+    #[cfg(all(feature = "rc3", not(feature = "all-features-override")))]
     /// Returns true if the field at position `idx` is a constant field.
     pub fn is_const_field(self, idx: usize) -> JlrsResult<bool> {
         if idx >= self.n_fields() as usize {
@@ -542,7 +542,7 @@ impl<'scope> DataType<'scope> {
         isatomic != 0
     }
 
-    #[cfg(all(feature = "rc1", not(feature = "all-features-override")))]
+    #[cfg(all(feature = "rc3", not(feature = "all-features-override")))]
     /// Returns true if the field at position `idx` is a constant field.
     ///
     /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
