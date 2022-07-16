@@ -148,6 +148,9 @@ fn main() {
     #[cfg(all(feature = "i686", not(feature = "all-features-override")))]
     c.flag("-march=pentium4");
 
+    #[cfg(target_env = "msvc")]
+    c.flag("/std:c++20");
+
     #[cfg(all(
         any(feature = "windows-lts", all(feature = "lts", windows)),
         not(feature = "all-features-override")
