@@ -23,7 +23,6 @@
 use crate::{
     convert::into_julia::IntoJulia,
     error::{AccessError, ArrayLayoutError, InstantiationError, JlrsResult, CANNOT_DISPLAY_TYPE},
-    impl_debug,
     layout::{typecheck::Typecheck, valid_layout::ValidLayout},
     memory::{
         frame::{private::FramePriv, Frame},
@@ -346,7 +345,7 @@ impl<'data> Array<'_, 'data> {
         scope: S,
         data: &'data mut [T],
         dims: D,
-    ) -> JlrsResult<JuliaResult<'target, 'data, Array<'target, 'data>>>
+    ) -> JlrsResult<JuliaResult<'target, 'static, Array<'target, 'data>>>
     where
         T: IntoJulia,
         D: Dims,
@@ -1634,7 +1633,7 @@ where
         scope: S,
         data: &'data mut [T],
         dims: D,
-    ) -> JlrsResult<JuliaResult<'target, 'data, TypedArray<'target, 'data, T>>>
+    ) -> JlrsResult<JuliaResult<'target, 'static, TypedArray<'target, 'data, T>>>
     where
         T: IntoJulia,
         D: Dims,

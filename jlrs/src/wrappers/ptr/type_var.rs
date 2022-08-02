@@ -3,7 +3,7 @@
 use crate::{
     convert::to_symbol::ToSymbol,
     error::JlrsResult,
-    impl_debug, impl_julia_typecheck,
+    impl_julia_typecheck,
     memory::{global::Global, output::Output, scope::PartialScope},
     private::Private,
     wrappers::ptr::{

@@ -3,7 +3,6 @@
 use crate::{
     call::Call,
     error::{JlrsResult, JuliaResult, JuliaResultRef},
-    impl_debug,
     layout::typecheck::Typecheck,
     memory::{global::Global, output::Output, scope::PartialScope},
     private::Private,

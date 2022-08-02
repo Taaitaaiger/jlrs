@@ -118,7 +118,6 @@ macro_rules! impl_ref_root {
     };
 }
 
-#[macro_export]
 macro_rules! impl_debug {
     ($type:ty) => {
         impl ::std::fmt::Debug for $type {

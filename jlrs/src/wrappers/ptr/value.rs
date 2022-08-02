@@ -102,7 +102,6 @@ use crate::{
         AccessError, IOError, InstantiationError, JlrsError, JlrsResult, JuliaResult,
         JuliaResultRef, TypeError, CANNOT_DISPLAY_TYPE,
     },
-    impl_debug,
     layout::{
         field_index::FieldIndex,
         typecheck::{NamedTuple, Typecheck},
@@ -844,8 +843,9 @@ impl<'scope, 'data> Value<'scope, 'data> {
             })?
         }
 
-        let mut callback = |_: &mut MaybeUninit<()>| {
+        let mut callback = |result: &mut MaybeUninit<()>| {
             jl_set_nth_field(self.unwrap(Private), idx, value.unwrap(Private));
+            result.write(());
             Ok(())
         };
 
@@ -894,8 +894,9 @@ impl<'scope, 'data> Value<'scope, 'data> {
             })?
         }
 
-        let mut callback = |_: &mut MaybeUninit<()>| {
+        let mut callback = |result: &mut MaybeUninit<()>| {
             jl_set_nth_field(self.unwrap(Private), idx, value.unwrap(Private));
+            result.write(());
             Ok(())
         };
 
@@ -959,8 +960,9 @@ impl<'scope, 'data> Value<'scope, 'data> {
             })?
         }
 
-        let mut callback = |_: &mut MaybeUninit<()>| {
+        let mut callback = |result: &mut MaybeUninit<()>| {
             jl_set_nth_field(self.unwrap(Private), idx as usize, value.unwrap(Private));
+            result.write(());
             Ok(())
         };
 
@@ -1013,8 +1015,9 @@ impl<'scope, 'data> Value<'scope, 'data> {
             })?
         }
 
-        let mut callback = |_: &mut MaybeUninit<()>| {
+        let mut callback = |result: &mut MaybeUninit<()>| {
             jl_set_nth_field(self.unwrap(Private), idx as usize, value.unwrap(Private));
+            result.write(());
             Ok(())
         };
 

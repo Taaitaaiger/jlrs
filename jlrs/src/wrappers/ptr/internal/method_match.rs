@@ -5,7 +5,7 @@
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/f9720dc2ebd6cd9e3086365f281e62506444ef37/src/julia.h#L585
 use crate::{
-    impl_debug, impl_julia_typecheck,
+    impl_julia_typecheck,
     memory::output::Output,
     private::Private,
     wrappers::ptr::{

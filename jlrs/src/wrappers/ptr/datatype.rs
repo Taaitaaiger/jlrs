@@ -3,7 +3,7 @@
 use crate::{
     convert::to_symbol::ToSymbol,
     error::{AccessError, JlrsResult, CANNOT_DISPLAY_TYPE},
-    impl_debug, impl_julia_typecheck,
+    impl_julia_typecheck,
     layout::typecheck::Typecheck,
     memory::{global::Global, output::Output, scope::PartialScope},
     private::Private,
@@ -641,11 +641,9 @@ impl<'scope> DataType<'scope> {
     where
         V: AsRef<[Value<'value, 'data>]>,
     {
-        use std::mem::MaybeUninit;
-
-        use jl_sys::jl_value_t;
-
         use crate::{catch::catch_exceptions, error::InstantiationError};
+        use jl_sys::jl_value_t;
+        use std::mem::MaybeUninit;
 
         // Safety: the pointer points to valid data, if an exception is thrown it's caught
         unsafe {

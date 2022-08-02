@@ -715,7 +715,7 @@ macro_rules! init_fn {
 pub mod async_util;
 pub mod call;
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
-pub mod catch;
+pub(crate) mod catch;
 #[cfg(feature = "ccall")]
 pub mod ccall;
 pub mod convert;

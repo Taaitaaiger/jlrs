@@ -8,7 +8,7 @@ use crate::{
     call::Call,
     convert::to_symbol::ToSymbol,
     error::{AccessError, JlrsResult, JuliaResult, TypeError, CANNOT_DISPLAY_VALUE},
-    impl_debug, impl_julia_typecheck,
+    impl_julia_typecheck,
     memory::{global::Global, output::Output, scope::PartialScope},
     private::Private,
     wrappers::ptr::{
@@ -215,13 +215,14 @@ impl<'scope> Module<'scope> {
         use std::mem::MaybeUninit;
         let symbol = name.to_symbol_priv(Private);
 
-        let mut callback = |_: &mut MaybeUninit<()>| {
+        let mut callback = |result: &mut MaybeUninit<()>| {
             jl_set_global(
                 self.unwrap(Private),
                 symbol.unwrap(Private),
                 value.unwrap(Private),
             );
 
+            result.write(());
             Ok(())
         };
 
@@ -253,13 +254,14 @@ impl<'scope> Module<'scope> {
         use std::mem::MaybeUninit;
         let symbol = name.to_symbol_priv(Private);
 
-        let mut callback = |_: &mut MaybeUninit<()>| {
+        let mut callback = |result: &mut MaybeUninit<()>| {
             jl_set_global(
                 self.unwrap(Private),
                 symbol.unwrap(Private),
                 value.unwrap(Private),
             );
 
+            result.write(());
             Ok(())
         };
 
@@ -312,13 +314,14 @@ impl<'scope> Module<'scope> {
             use std::mem::MaybeUninit;
             let symbol = name.to_symbol_priv(Private);
 
-            let mut callback = |_: &mut MaybeUninit<()>| {
+            let mut callback = |result: &mut MaybeUninit<()>| {
                 jl_set_const(
                     self.unwrap(Private),
                     symbol.unwrap(Private),
                     value.unwrap(Private),
                 );
 
+                result.write(());
                 Ok(())
             };
 
@@ -351,13 +354,14 @@ impl<'scope> Module<'scope> {
             use std::mem::MaybeUninit;
             let symbol = name.to_symbol_priv(Private);
 
-            let mut callback = |_: &mut MaybeUninit<()>| {
+            let mut callback = |result: &mut MaybeUninit<()>| {
                 jl_set_const(
                     self.unwrap(Private),
                     symbol.unwrap(Private),
                     value.unwrap(Private),
                 );
 
+                result.write(());
                 Ok(())
             };
 

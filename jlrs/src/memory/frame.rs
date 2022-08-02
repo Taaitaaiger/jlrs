@@ -175,7 +175,7 @@ cfg_if::cfg_if! {
             where
                 T: 'nested,
                 G: Future<Output = JlrsResult<T>>,
-                F:  FnOnce(AsyncGcFrame<'nested>) -> G,
+                F: FnOnce(AsyncGcFrame<'nested>) -> G,
             {
                 let (nested, owner) = self.nest_async(0);
                 let ret =  func(nested).await;
@@ -197,7 +197,7 @@ cfg_if::cfg_if! {
             where
                 T: 'nested,
                 G: Future<Output = JlrsResult<T>>,
-                F: FnOnce(AsyncGcFrame<'nested>) -> G,
+                F: for<'n> FnOnce(AsyncGcFrame<'n>) -> G,
             {
                 let (nested, owner) = self.nest_async(capacity);
                 let ret =  func(nested).await;
