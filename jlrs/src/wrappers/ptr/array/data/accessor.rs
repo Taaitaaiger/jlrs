@@ -9,10 +9,7 @@ use crate::error::{JuliaResult, JuliaResultRef};
 use crate::{
     error::{AccessError, JlrsResult, TypeError, CANNOT_DISPLAY_TYPE},
     layout::valid_layout::ValidLayout,
-    memory::{
-        frame::Frame,
-        scope::{private::PartialScopePriv, PartialScope},
-    },
+    memory::{frame::Frame, scope::PartialScope},
     private::Private,
     wrappers::ptr::{
         array::{
@@ -197,18 +194,23 @@ impl<'borrow, 'array, 'data, T, L: ArrayLayout, M: Mutability>
         scope: P,
         index: D,
     ) -> JlrsResult<JuliaResult<'frame, 'data>> {
-        use jl_sys::{jlrs_arrayref, jlrs_result_tag_t_JLRS_RESULT_ERR};
+        use crate::catch::catch_exceptions;
+        use jl_sys::jl_value_t;
+        use std::mem::MaybeUninit;
 
         let idx = self.array.dimensions().index_of(&index)?;
+
         // Safety: exceptions are caught, the result is immediately rooted
         unsafe {
-            let res = jlrs_arrayref(self.array.unwrap(Private), idx);
-            let v = scope.value(NonNull::new_unchecked(res.data), Private)?;
+            let mut callback = |result: &mut MaybeUninit<*mut jl_value_t>| {
+                let res = jl_arrayref(self.array.unwrap(Private), idx);
+                result.write(res);
+                Ok(())
+            };
 
-            if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
-                Ok(Err(v))
-            } else {
-                Ok(Ok(v))
+            match catch_exceptions(&mut callback)? {
+                Ok(ptr) => Ok(Ok(scope.value(NonNull::new_unchecked(ptr), Private)?)),
+                Err(e) => Ok(Err(e.root(scope)?)),
             }
         }
     }
@@ -237,18 +239,24 @@ impl<'borrow, 'array, 'data, T, L: ArrayLayout, M: Mutability>
         &mut self,
         index: D,
     ) -> JlrsResult<JuliaResultRef<'array, 'data>> {
-        use jl_sys::{jlrs_arrayref, jlrs_result_tag_t_JLRS_RESULT_ERR};
+        use jl_sys::jl_value_t;
+
+        use crate::catch::catch_exceptions;
+        use std::mem::MaybeUninit;
 
         let idx = self.array.dimensions().index_of(&index)?;
+
         // Safety: exceptions are caught
         unsafe {
-            let res = jlrs_arrayref(self.array.unwrap(Private), idx);
-            let v = res.data;
+            let mut callback = |result: &mut MaybeUninit<*mut jl_value_t>| {
+                let res = jl_arrayref(self.array.unwrap(Private), idx);
+                result.write(res);
+                Ok(())
+            };
 
-            if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
-                Ok(Ok(ValueRef::wrap(v)))
-            } else {
-                Ok(Err(ValueRef::wrap(v)))
+            match catch_exceptions(&mut callback)? {
+                Ok(ptr) => Ok(Ok(ValueRef::wrap(ptr))),
+                Err(e) => Ok(Err(e)),
             }
         }
     }
@@ -287,20 +295,23 @@ impl<'borrow, 'array, 'data, T, L: ArrayLayout>
         index: D,
         value: Option<Value<'_, 'data>>,
     ) -> JlrsResult<JuliaResult<'frame, 'static, ()>> {
-        use jl_sys::{jlrs_arrayset, jlrs_result_tag_t_JLRS_RESULT_ERR};
+        use crate::catch::catch_exceptions;
+        use std::mem::MaybeUninit;
 
         let idx = self.array.dimensions().index_of(&index)?;
         let ptr = value.map(|v| v.unwrap(Private)).unwrap_or(null_mut());
 
         // Safety: exceptions are caught, if one is thrown it's immediately rooted
         unsafe {
-            let res = jlrs_arrayset(self.array.unwrap(Private), ptr, idx);
+            let mut callback = |result: &mut MaybeUninit<()>| {
+                jl_arrayset(self.array.unwrap(Private), ptr, idx);
+                result.write(());
+                Ok(())
+            };
 
-            if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
-                let e = (&mut *frame).value(NonNull::new_unchecked(res.data), Private)?;
-                Ok(Err(e))
-            } else {
-                Ok(Ok(()))
+            match catch_exceptions(&mut callback)? {
+                Ok(()) => Ok(Ok(())),
+                Err(e) => Ok(Err(e.root(&mut *frame)?)),
             }
         }
     }

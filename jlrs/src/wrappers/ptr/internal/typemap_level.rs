@@ -6,7 +6,7 @@
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#525
 
 use crate::{
-    impl_debug, impl_julia_typecheck,
+    impl_julia_typecheck,
     memory::output::Output,
     private::Private,
     wrappers::ptr::{private::WrapperPriv, value::ValueRef, Ref},

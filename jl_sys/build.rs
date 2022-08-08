@@ -145,6 +145,18 @@ fn main() {
     let mut c = cc::Build::new();
     c.file("src/jlrs_cc.cc").include(&include_dir).cpp(true);
 
+    #[cfg(all(feature = "i686", not(feature = "all-features-override")))]
+    c.flag("-march=pentium4");
+
+    #[cfg(all(
+        target_env = "msvc",
+        any(
+            not(any(feature = "windows-lts", all(feature = "lts", windows))),
+            feature = "all-features-override"
+        )
+    ))]
+    c.flag("/std:c++20");
+
     #[cfg(all(
         any(feature = "windows-lts", all(feature = "lts", windows)),
         not(feature = "all-features-override")
@@ -159,9 +171,18 @@ fn main() {
         out_path.push("bindings.rs");
 
         let include_dir_flag = format!("-I{}", include_dir);
+
         #[allow(unused_mut)]
-        let mut builder = bindgen::Builder::default()
+        let mut builder = bindgen::Builder::default();
+
+        #[cfg(all(feature = "i686", not(feature = "all-features-override")))]
+        let arch_flag = "-march=pentium4";
+        #[cfg(not(all(feature = "i686", not(feature = "all-features-override"))))]
+        let arch_flag = "";
+
+        builder = builder
             .clang_arg(include_dir_flag)
+            .clang_arg(arch_flag)
             .header("src/jlrs_cc.h")
             .size_t_is_usize(true)
             .layout_tests(false)
@@ -430,7 +451,7 @@ fn main() {
         #[cfg(not(any(feature = "windows-lts", all(feature = "lts", windows))))]
         {
             builder = builder
-                .allowlist_function("jlrs_alloc_array_1d")
+                /*.allowlist_function("jlrs_alloc_array_1d")
                 .allowlist_function("jlrs_alloc_array_2d")
                 .allowlist_function("jlrs_alloc_array_3d")
                 .allowlist_function("jlrs_apply_array_type")
@@ -455,7 +476,8 @@ fn main() {
                 .allowlist_function("jlrs_array_ptr_1d_push")
                 .allowlist_function("jlrs_array_ptr_1d_append")
                 .allowlist_function("jlrs_arrayset")
-                .allowlist_function("jlrs_arrayref");
+                .allowlist_function("jlrs_arrayref") */
+                .allowlist_function("jlrs_catch_wrapper");
         }
 
         builder

@@ -49,7 +49,7 @@ mod tests {
                         .value_unchecked()
                 };
 
-                let tup = Value::new(&mut frame, Tuple4(1usize, 2usize, 3usize, 4usize))?;
+                let tup = Value::new(&mut frame, Tuple4(1u64, 2u64, 3u64, 4u64))?;
 
                 let instance = ty
                     .cast::<DataType>()?
@@ -59,7 +59,7 @@ mod tests {
                 let a = instance
                     .field_accessor(&mut frame)
                     .field("a")?
-                    .access::<Tuple4<usize, usize, usize, usize>>()?;
+                    .access::<Tuple4<u64, u64, u64, u64>>()?;
                 assert_eq!(a, Tuple4(1, 2, 3, 4));
 
                 Ok(())

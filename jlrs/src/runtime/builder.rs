@@ -37,7 +37,6 @@ cfg_if::cfg_if! {
             C: Channel<Message>,
         {
             pub(crate) builder: RuntimeBuilder,
-            #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
             pub(crate) n_threads: usize,
             pub(crate) n_tasks: usize,
             pub(crate) channel_capacity: usize,
@@ -58,7 +57,6 @@ cfg_if::cfg_if! {
             ///
             /// This method is not available for the LTS version, instead you must set the number
             /// of threads using the `JULIA_NUM_THREADS` environment variable.
-            #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
             pub fn n_threads(mut self, n: usize) -> Self {
                 self.n_threads = n;
                 self
@@ -160,7 +158,7 @@ impl RuntimeBuilder {
     /// Smilarly for async-std:
     ///
     /// ```
-    /// use jlrs::prelude::{AsyncStd, AsyncStdChannel, RuntimeBuilder};
+    /// use jlrs::prelude::*;
     ///
     /// # fn main() {
     /// let (_julia, _thread_handle) = unsafe { RuntimeBuilder::new()
@@ -177,7 +175,6 @@ impl RuntimeBuilder {
     {
         AsyncRuntimeBuilder {
             builder: self,
-            #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
             n_threads: 0,
             n_tasks: 0,
             channel_capacity: 0,

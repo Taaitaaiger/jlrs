@@ -3,7 +3,7 @@
 use crate::{
     convert::to_symbol::ToSymbol,
     error::JlrsResult,
-    impl_debug, impl_julia_typecheck,
+    impl_julia_typecheck,
     memory::{global::Global, output::Output, scope::PartialScope},
     private::Private,
     wrappers::ptr::{
@@ -20,7 +20,6 @@ use super::Ref;
 cfg_if! {
     if #[cfg(not(all(target_os = "windows", feature = "lts")))] {
         use crate::error::{JuliaResult, JuliaResultRef};
-        use jl_sys::{jlrs_new_typevar, jlrs_result_tag_t_JLRS_RESULT_ERR};
     }
 }
 
@@ -49,7 +48,7 @@ impl<'scope> TypeVar<'scope> {
 
         // Safety: the result is rooted immediately. If an exception is thrown it's caught and returned.
         unsafe {
-            let v = match Self::new_unrooted(global, name, lower_bound, upper_bound) {
+            let v = match Self::new_unrooted(global, name, lower_bound, upper_bound)? {
                 Ok(v) => Ok(v.root(scope)?),
                 Err(e) => Err(e.root(scope)?),
             };
@@ -85,21 +84,30 @@ impl<'scope> TypeVar<'scope> {
         name: N,
         lower_bound: Option<Value>,
         upper_bound: Option<Value>,
-    ) -> JuliaResultRef<'global, 'static, TypeVarRef<'global>>
+    ) -> JlrsResult<JuliaResultRef<'global, 'static, TypeVarRef<'global>>>
     where
         N: ToSymbol,
     {
+        use crate::catch::catch_exceptions;
+        use std::mem::MaybeUninit;
+
         // Safety: if an exception is thrown it's caught and returned
         unsafe {
             let name = name.to_symbol_priv(Private);
             let lb = lower_bound.unwrap_or_else(|| Value::bottom_type(global));
             let ub = upper_bound.unwrap_or_else(|| DataType::any_type(global).as_value());
-            let tvar =
-                jlrs_new_typevar(name.unwrap(Private), lb.unwrap(Private), ub.unwrap(Private));
-            if tvar.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
-                Err(ValueRef::wrap(tvar.data))
-            } else {
-                Ok(TypeVarRef::wrap(tvar.data.cast()))
+
+            let mut callback = |result: &mut MaybeUninit<*mut jl_tvar_t>| {
+                let res =
+                    jl_new_typevar(name.unwrap(Private), lb.unwrap(Private), ub.unwrap(Private));
+                result.write(res);
+
+                Ok(())
+            };
+
+            match catch_exceptions(&mut callback)? {
+                Ok(tvar) => Ok(Ok(TypeVarRef::wrap(tvar))),
+                Err(e) => Ok(Err(e)),
             }
         }
     }

@@ -2,7 +2,7 @@
 
 use crate::{
     error::{JlrsError, JlrsResult},
-    impl_debug, impl_julia_typecheck,
+    impl_julia_typecheck,
     memory::{global::Global, output::Output},
     private::Private,
     wrappers::ptr::{private::WrapperPriv, value::LeakedValue},

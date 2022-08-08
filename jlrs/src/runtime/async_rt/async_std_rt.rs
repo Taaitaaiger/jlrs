@@ -32,7 +32,7 @@ impl AsyncRuntime for AsyncStd {
 
     fn spawn_blocking<F>(rt_fn: F) -> Self::RuntimeHandle
     where
-        F: FnOnce() -> JlrsResult<()> + Send + Sync + 'static,
+        F: FnOnce() -> JlrsResult<()> + Send + 'static,
     {
         async_std::task::spawn_blocking(rt_fn)
     }

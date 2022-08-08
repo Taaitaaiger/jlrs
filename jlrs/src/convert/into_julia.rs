@@ -97,13 +97,13 @@ impl_into_julia!(f32, jl_box_float32, jl_float32_type);
 impl_into_julia!(f64, jl_box_float64, jl_float64_type);
 impl_into_julia!(*mut c_void, jl_box_voidpointer, jl_voidpointer_type);
 
-#[cfg(not(target_pointer_width = "64"))]
+#[cfg(target_pointer_width = "32")]
 impl_into_julia!(usize, jl_box_uint32, jl_uint32_type);
 
 #[cfg(target_pointer_width = "64")]
 impl_into_julia!(usize, jl_box_uint64, jl_uint64_type);
 
-#[cfg(not(target_pointer_width = "64"))]
+#[cfg(target_pointer_width = "32")]
 impl_into_julia!(isize, jl_box_int32, jl_int32_type);
 
 #[cfg(target_pointer_width = "64")]

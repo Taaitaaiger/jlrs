@@ -61,7 +61,12 @@ mod tests {
         null_mut()
     );
     #[cfg(target_pointer_width = "32")]
-    impl_test!(*mut usize, unbox_usize_ptr, null_mut());
+    impl_test!(
+        *mut usize,
+        unbox_usize_ptr,
+        unbox_usize_ptr_as_bool,
+        null_mut()
+    );
 
     impl_test!(*mut i8, unbox_i8_ptr, unbox_i8_ptr_as_bool, null_mut());
     impl_test!(*mut i16, unbox_i16_ptr, unbox_i16_ptr_as_bool, null_mut());

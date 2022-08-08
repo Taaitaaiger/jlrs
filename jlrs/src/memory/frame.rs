@@ -28,6 +28,22 @@ use std::ptr::NonNull;
 
 pub(crate) const MIN_FRAME_CAPACITY: usize = 16;
 
+pub(crate) struct FrameSlice<'frame> {
+    raw_frame: &'frame [Slot],
+    size: usize,
+}
+
+impl<'frame> FrameSlice<'frame> {
+    // Safety: The slots must have been reserved in an existing frame and must have been set to
+    // null.
+    pub(crate) unsafe fn new(slots: &'frame [Slot]) -> Self {
+        FrameSlice {
+            raw_frame: slots,
+            size: 0,
+        }
+    }
+}
+
 /// A frame that can be used to root Julia data.
 ///
 /// Frames created with a capacity can store at least that number of roots. A frame's capacity is
@@ -104,6 +120,7 @@ cfg_if::cfg_if! {
             raw_frame: &'frame [Slot],
             page: Option<StackPage>,
             mode: Async<'frame>,
+            _marker: PhantomData<&'frame mut &'frame ()>
         }
 
         impl<'frame> AsyncGcFrame<'frame> {
@@ -116,7 +133,7 @@ cfg_if::cfg_if! {
             where
                 T: 'frame,
                 G: Future<Output = JlrsResult<T>>,
-                F: FnOnce(AsyncGcFrame<'nested>) -> G,
+                F:  FnOnce(AsyncGcFrame<'nested>) -> G,
             {
                 // Safety: the lifetime of the borrow is extended, but it's valid during the call
                 // to func and data returned from func must live longer.
@@ -149,6 +166,45 @@ cfg_if::cfg_if! {
                 ret
             }
 
+            /// `AsyncFrame::async_scope` with less strict lifeitme bounds on the return value.
+            ///
+            /// Safety: because this method only requires that the returned data lives at least as
+            /// long as the borow of `self`, it's possible to return data rooted in that scope.
+            #[inline(never)]
+            pub async unsafe fn relaxed_async_scope<'nested, T, F, G>(&'nested mut self, func: F) -> JlrsResult<T>
+            where
+                T: 'nested,
+                G: Future<Output = JlrsResult<T>>,
+                F: FnOnce(AsyncGcFrame<'nested>) -> G,
+            {
+                let (nested, owner) = self.nest_async(0);
+                let ret =  func(nested).await;
+                std::mem::drop(owner);
+                ret
+            }
+
+            /// `AsyncFrame::async_scope_wit_capacity` with less strict lifeitme bounds on the
+            /// return value.
+            ///
+            /// Safety: because this method only requires that the returned data lives at least as
+            /// long as the borow of `self`, it's possible to return data rooted in that scope.
+            #[inline(never)]
+            pub async unsafe fn relaxed_async_scope_with_capacity<'nested, T, F, G>(
+                &'nested mut self,
+                capacity: usize,
+                func: F,
+            ) -> JlrsResult<T>
+            where
+                T: 'nested,
+                G: Future<Output = JlrsResult<T>>,
+                F: for<'n> FnOnce(AsyncGcFrame<'n>) -> G,
+            {
+                let (nested, owner) = self.nest_async(capacity);
+                let ret =  func(nested).await;
+                std::mem::drop(owner);
+                ret
+            }
+
             // Safety: frames must form a single nested hierarchy. A new frame owner must only be
             // created when entering a new scope.
             pub(crate) unsafe fn new(
@@ -161,6 +217,7 @@ cfg_if::cfg_if! {
                     raw_frame,
                     page: None,
                     mode,
+                    _marker: PhantomData
                 };
 
                 (frame, owner)
@@ -325,6 +382,24 @@ impl<'frame, M: Mode> Frame<'frame> for GcFrame<'frame, M> {
     }
 }
 
+impl<'frame> Frame<'frame> for FrameSlice<'frame> {
+    fn reusable_slot(&mut self) -> JlrsResult<ReusableSlot<'frame>> {
+        unimplemented!()
+    }
+
+    fn n_roots(&self) -> usize {
+        self.size
+    }
+
+    fn capacity(&self) -> usize {
+        self.raw_frame.len()
+    }
+
+    fn output(&mut self) -> JlrsResult<Output<'frame>> {
+        unimplemented!()
+    }
+}
+
 #[cfg(feature = "ccall")]
 impl<'frame> Frame<'frame> for NullFrame<'frame> {
     fn reusable_slot(&mut self) -> JlrsResult<ReusableSlot<'frame>> {
@@ -358,7 +433,7 @@ impl<'frame> Frame<'frame> for NullFrame<'frame> {
     }
 }
 
-mod private {
+pub(crate) mod private {
     use crate::{
         error::{AllocError, JlrsResult},
         memory::{
@@ -369,7 +444,11 @@ mod private {
         private::Private,
         wrappers::ptr::private::WrapperPriv,
     };
+    #[cfg(feature = "async")]
+    use std::marker::PhantomData;
     use std::ptr::{null_mut, NonNull};
+
+    use super::FrameSlice;
 
     pub struct FrameOwner<'frame, M: Mode> {
         mode: M,
@@ -392,6 +471,7 @@ mod private {
                 raw_frame: self.raw_frame,
                 page: None,
                 mode: self.mode,
+                _marker: PhantomData,
             }
         }
     }
@@ -414,6 +494,12 @@ mod private {
 
         // safety: this slot must only be used while the frame exists.
         unsafe fn reserve_slot(&mut self, _: Private) -> JlrsResult<&'frame Slot>;
+
+        unsafe fn reserve_slots<'borrow>(
+            &'borrow mut self,
+            slots: usize,
+            _: Private,
+        ) -> JlrsResult<&'frame [Slot]>;
 
         fn nest<'nested>(
             &'nested mut self,
@@ -454,6 +540,26 @@ mod private {
             Ok(self.raw_frame.get_unchecked(n_roots + 2))
         }
 
+        unsafe fn reserve_slots<'borrow>(
+            &'borrow mut self,
+            slots: usize,
+            _: Private,
+        ) -> JlrsResult<&'frame [Slot]> {
+            let n_roots = self.n_roots();
+            if n_roots + slots >= self.capacity() {
+                Err(AllocError::Full { cap: n_roots })?
+            }
+
+            for i in 0..slots {
+                self.raw_frame
+                    .get_unchecked(n_roots + i + 2)
+                    .set(null_mut());
+            }
+
+            self.set_n_roots(n_roots + slots);
+            Ok(self.raw_frame[n_roots + 2..n_roots + slots + 2].as_ref())
+        }
+
         fn nest<'nested>(
             &'nested mut self,
             capacity: usize,
@@ -487,6 +593,50 @@ mod private {
         }
     }
 
+    impl<'frame> FramePriv<'frame> for FrameSlice<'frame> {
+        type Mode = crate::memory::mode::Sync;
+
+        unsafe fn push_root<'data, T: WrapperPriv<'frame, 'data>>(
+            &mut self,
+            value: NonNull<T::Wraps>,
+            _: Private,
+        ) -> Result<T, AllocError> {
+            let n_roots = self.size;
+            if n_roots == self.raw_frame.len() {
+                Err(AllocError::Full { cap: n_roots })?
+            }
+
+            self.raw_frame
+                .get_unchecked(self.size)
+                .set(value.as_ptr().cast());
+            self.size += 1;
+            Ok(T::wrap_non_null(value, Private))
+        }
+
+        unsafe fn reserve_slot(&mut self, _: Private) -> JlrsResult<&'frame Slot> {
+            unimplemented!()
+        }
+
+        unsafe fn reserve_slots<'borrow>(
+            &'borrow mut self,
+            _: usize,
+            _: Private,
+        ) -> JlrsResult<&'frame [Slot]> {
+            unimplemented!()
+        }
+
+        fn nest<'nested>(
+            &'nested mut self,
+            _: usize,
+            _: Private,
+        ) -> (
+            GcFrame<'nested, Self::Mode>,
+            FrameOwner<'nested, Self::Mode>,
+        ) {
+            unimplemented!()
+        }
+    }
+
     cfg_if::cfg_if! {
         if #[cfg(feature = "ccall")] {
             use crate::memory::frame::NullFrame;
@@ -504,6 +654,10 @@ mod private {
                 }
 
                 unsafe fn reserve_slot(&mut self, _: Private) -> JlrsResult<&'frame Slot> {
+                    Err(AllocError::NullFrame)?
+                }
+
+                unsafe fn reserve_slots<'borrow>(&'borrow mut self, _: usize, _: Private) -> JlrsResult<&'frame [Slot]> {
                     Err(AllocError::NullFrame)?
                 }
 
@@ -553,6 +707,22 @@ mod private {
                     self.set_n_roots(n_roots + 1);
                     Ok(self.raw_frame.get_unchecked(n_roots + 2))
                 }
+
+                unsafe fn reserve_slots<'borrow>(&'borrow mut self, slots: usize, _: Private) -> JlrsResult<&'frame [Slot]> {
+                    let n_roots = self.n_roots();
+                    if n_roots + slots >= self.capacity() {
+                        Err(AllocError::Full { cap: n_roots })?
+                    }
+
+                    for i in 0..slots {
+                        self.raw_frame.get_unchecked(n_roots + i + 2).set(null_mut());
+                    }
+
+                    self.set_n_roots(n_roots + slots);
+                    Ok(self.raw_frame[n_roots + 2..n_roots + slots + 2].as_ref())
+                }
+
+
 
                 fn nest<'nested>(
                     &'nested mut self,

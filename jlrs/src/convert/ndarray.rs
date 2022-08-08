@@ -111,8 +111,8 @@ mod private {
 #[cfg(feature = "sync-rt")]
 mod tests {
     use super::{NdArrayView, NdArrayViewMut};
-    use crate::wrappers::ptr::array::Array;
-    use crate::{prelude::TypedArray, util::JULIA};
+    use crate::util::JULIA;
+    use crate::wrappers::ptr::array::{Array, TypedArray};
 
     #[test]
     fn bits_array_view() {

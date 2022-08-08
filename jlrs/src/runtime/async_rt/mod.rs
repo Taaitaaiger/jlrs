@@ -47,7 +47,6 @@ use jl_sys::{
     jl_process_events,
 };
 
-#[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
 use jl_sys::jl_options;
 
 use std::{
@@ -98,7 +97,7 @@ impl<E> IntoResult<JlrsResult<()>, E> for Result<JlrsResult<()>, E> {
 /// If you want to use async-std or tokio, you can use one of the implementations provided by
 /// jlrs. If you want to use another crate you can implement this trait.
 #[async_trait(?Send)]
-pub trait AsyncRuntime: Send + Sync + 'static {
+pub trait AsyncRuntime: Send + 'static {
     /// Error that is returned when a task can't be joined because it has panicked.
     type JoinError;
 
@@ -118,7 +117,7 @@ pub trait AsyncRuntime: Send + Sync + 'static {
     /// called.
     fn spawn_thread<F>(rt_fn: F) -> std::thread::JoinHandle<JlrsResult<()>>
     where
-        F: FnOnce() -> JlrsResult<()> + Send + Sync + 'static,
+        F: FnOnce() -> JlrsResult<()> + Send + 'static,
     {
         std::thread::spawn(rt_fn)
     }
@@ -127,7 +126,7 @@ pub trait AsyncRuntime: Send + Sync + 'static {
     /// is called.
     fn spawn_blocking<F>(rt_fn: F) -> Self::RuntimeHandle
     where
-        F: FnOnce() -> JlrsResult<()> + Send + Sync + 'static;
+        F: FnOnce() -> JlrsResult<()> + Send + 'static;
 
     /// Block on a future, this method is called to start the runtime loop.
     fn block_on<F>(loop_fn: F) -> JlrsResult<()>
@@ -604,7 +603,6 @@ where
                     Err(RuntimeError::AlreadyInitialized)?;
                 }
 
-                #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
                 {
                     if builder.n_threads == 0 {
                         jl_options.nthreads = -1;
@@ -947,7 +945,7 @@ where
     }
 }
 
-pub trait RequireSendSync: 'static + Send + Sync {}
+pub trait RequireSendSync: 'static + Send {}
 
 // Ensure the handle can be shared across threads
 impl<P: PersistentTask> RequireSendSync for PersistentHandle<P> {}

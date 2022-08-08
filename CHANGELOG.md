@@ -1,3 +1,17 @@
+#### v0.15
+ - jlrs can be used with 32-bits versions of Julia on Linux by enabling the `i686` feature.
+
+ - Methods that can catch exceptions thrown by Julia, eg `Module::set_const`, return a `JlrsResult<JuliaResult<T>>`.
+
+ - The `Global` provided to `PersistentTask::run` now has the `'static` lifetime.
+
+ - The methods `AsyncFrame::relaxed_async_scope_(with_capacity)` have been added to work around the limitation that `AsyncFrame::relaxed_async_scope` can't return return data that lives shorter than the frame that created it.
+
+ - Elided lifetimes have been added to methods that create arrays with data borrowed from Rust, eg `Array::from_slice`. Such arrays can now be returned from async scopes when `AsyncFrame::relaxed_async_scope_(with_capacity)` is used.
+
+ - The number of threads can be set with `AsyncRuntimeBuilder::n_threads` when the `lts` feature is enabled.
+
+
 #### v0.14
  - `TemporarySymbol` has been renamed to `ToSymbol`. The method `ToSymbol::to_symbol` has been added to this trait.
 

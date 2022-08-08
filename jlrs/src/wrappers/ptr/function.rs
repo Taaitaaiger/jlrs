@@ -9,7 +9,6 @@
 use crate::{
     call::{Call, ProvideKeywords, WithKeywords},
     error::{JlrsResult, JuliaResult, JuliaResultRef, TypeError, CANNOT_DISPLAY_TYPE},
-    impl_debug,
     layout::{
         typecheck::{NamedTuple, Typecheck},
         valid_layout::ValidLayout,

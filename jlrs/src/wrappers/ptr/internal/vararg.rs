@@ -1,7 +1,7 @@
 //! Wrapper for `Vararg`.
 
 use crate::{
-    impl_debug, impl_julia_typecheck,
+    impl_julia_typecheck,
     memory::output::Output,
     private::Private,
     wrappers::ptr::{private::WrapperPriv, value::ValueRef, Ref},

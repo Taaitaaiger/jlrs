@@ -1,7 +1,7 @@
 //! Wrapper for `Expr`.
 
 use crate::{
-    impl_debug, impl_julia_typecheck,
+    impl_julia_typecheck,
     memory::output::Output,
     private::Private,
     wrappers::ptr::{array::ArrayRef, private::WrapperPriv, symbol::SymbolRef, Ref},

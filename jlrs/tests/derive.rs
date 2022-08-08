@@ -143,7 +143,7 @@ mod tests {
                     let v = Value::new(&mut frame, s).unwrap();
                     let first = v.get_nth_field(&mut frame, 0).unwrap();
 
-                    assert_eq!(first.unbox::<u64>().unwrap(), 5);
+                    assert_eq!(first.unbox::<usize>().unwrap(), 5);
                     assert!(v.is::<BitsTypeUInt>());
                     assert!(v.unbox::<BitsTypeUInt>().is_ok());
 
@@ -248,7 +248,7 @@ mod tests {
                     let v = Value::new(&mut frame, s).unwrap();
                     let first = v.get_nth_field(&mut frame, 0).unwrap();
 
-                    assert_eq!(first.unbox::<i64>().unwrap(), -5);
+                    assert_eq!(first.unbox::<isize>().unwrap(), -5);
                     assert!(v.is::<BitsTypeInt>());
                     assert!(v.unbox::<BitsTypeInt>().is_ok());
 
@@ -339,7 +339,7 @@ mod tests {
                     let v = Value::new(&mut frame, s).unwrap();
                     let first = v.get_nth_field(&mut frame, 0).unwrap();
 
-                    assert_eq!(first.unbox::<i64>().unwrap(), 1);
+                    assert_eq!(first.unbox::<isize>().unwrap(), 1);
                     assert!(v.is::<BitsIntBool>());
                     assert!(v.unbox::<BitsIntBool>().is_ok());
 

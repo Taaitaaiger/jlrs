@@ -485,4 +485,17 @@ mod tests {
             assert_eq!(receiver.recv().unwrap().unwrap(), 20_009.0);
         });
     }
+
+    #[test]
+    fn test_borrow_array_data() {
+        JULIA.with(|j| {
+            let julia = j.borrow_mut();
+
+            let (sender, receiver) = crossbeam_channel::bounded(1);
+
+            julia.try_task(BorrowArrayData, sender).unwrap();
+
+            assert_eq!(receiver.recv().unwrap().unwrap(), 2.0);
+        });
+    }
 }

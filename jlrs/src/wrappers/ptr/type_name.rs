@@ -6,7 +6,7 @@
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L380
 
 use crate::{
-    impl_debug, impl_julia_typecheck,
+    impl_julia_typecheck,
     memory::{global::Global, output::Output},
     private::Private,
     wrappers::ptr::{
@@ -85,7 +85,7 @@ impl<'scope> TypeName<'scope> {
     }
 
     /// The `atomicfields` field.
-    #[cfg(all(feature = "rc1", not(feature = "all-features-override")))]
+    #[cfg(all(feature = "rc3", not(feature = "all-features-override")))]
     pub fn constfields(self) -> *const u32 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().constfields }

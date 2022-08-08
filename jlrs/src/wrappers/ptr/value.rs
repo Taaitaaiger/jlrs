@@ -102,7 +102,6 @@ use crate::{
         AccessError, IOError, InstantiationError, JlrsError, JlrsResult, JuliaResult,
         JuliaResultRef, TypeError, CANNOT_DISPLAY_TYPE,
     },
-    impl_debug,
     layout::{
         field_index::FieldIndex,
         typecheck::{NamedTuple, Typecheck},
@@ -151,9 +150,6 @@ use std::{
     usize,
 };
 
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
-use jl_sys::{jlrs_apply_type, jlrs_result_tag_t_JLRS_RESULT_ERR, jlrs_set_nth_field};
-
 use super::Ref;
 
 cfg_if! {
@@ -187,7 +183,7 @@ pub const MAX_SIZE: usize = 8;
 pub struct Value<'scope, 'data>(
     NonNull<jl_value_t>,
     PhantomData<&'scope ()>,
-    PhantomData<&'data ()>,
+    PhantomData<&'data mut ()>,
 );
 
 impl PartialEq for Value<'_, '_> {
@@ -313,17 +309,22 @@ impl Value<'_, '_> {
         S: PartialScope<'target>,
         V: AsRef<[Value<'value, 'data>]>,
     {
-        let types = types.as_ref();
+        use crate::catch::catch_exceptions;
 
-        // Safety: if an exception is thrown it's caught, the result is immediately rooted.
+        // Safety: if an exception is thrown it's caught, the result is immediately rooted
         unsafe {
-            let applied =
-                jlrs_apply_type(self.unwrap(Private), types.as_ptr() as *mut _, types.len());
+            let types = types.as_ref();
 
-            if applied.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
-                scope.call_result(Err(NonNull::new_unchecked(applied.data)), Private)
-            } else {
-                scope.call_result(Ok(NonNull::new_unchecked(applied.data)), Private)
+            let mut callback = |result: &mut MaybeUninit<*mut jl_value_t>| {
+                let res =
+                    jl_apply_type(self.unwrap(Private), types.as_ptr() as *mut _, types.len());
+                result.write(res);
+                Ok(())
+            };
+
+            match catch_exceptions(&mut callback)? {
+                Ok(ptr) => Ok(Ok(scope.value(NonNull::new_unchecked(ptr), Private)?)),
+                Err(e) => Ok(Err(e.root(scope)?)),
             }
         }
     }
@@ -815,6 +816,8 @@ impl<'scope, 'data> Value<'scope, 'data> {
     where
         F: Frame<'frame>,
     {
+        use crate::catch::catch_exceptions;
+
         let n_fields = self.n_fields();
         if n_fields <= idx {
             Err(AccessError::OutOfBoundsField {
@@ -840,17 +843,15 @@ impl<'scope, 'data> Value<'scope, 'data> {
             })?
         }
 
-        let res = jlrs_set_nth_field(self.unwrap(Private), idx, value.unwrap(Private));
-        if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
-            let ptr = res.data;
-            let err = crate::memory::scope::private::PartialScopePriv::value(
-                frame,
-                NonNull::new_unchecked(ptr),
-                Private,
-            )?;
-            Ok(Err(err))
-        } else {
-            Ok(Ok(()))
+        let mut callback = |result: &mut MaybeUninit<()>| {
+            jl_set_nth_field(self.unwrap(Private), idx, value.unwrap(Private));
+            result.write(());
+            Ok(())
+        };
+
+        match catch_exceptions(&mut callback)? {
+            Ok(_) => Ok(Ok(())),
+            Err(e) => Ok(Err(e.root(frame)?)),
         }
     }
 
@@ -866,6 +867,8 @@ impl<'scope, 'data> Value<'scope, 'data> {
         idx: usize,
         value: Value<'_, 'data>,
     ) -> JlrsResult<JuliaResultRef<'scope, 'data, ()>> {
+        use crate::catch::catch_exceptions;
+
         let n_fields = self.n_fields();
         if n_fields <= idx {
             Err(AccessError::OutOfBoundsField {
@@ -891,11 +894,15 @@ impl<'scope, 'data> Value<'scope, 'data> {
             })?
         }
 
-        let res = jlrs_set_nth_field(self.unwrap(Private), idx, value.unwrap(Private));
-        if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
-            Ok(Err(ValueRef::wrap(res.data)))
-        } else {
-            Ok(Ok(()))
+        let mut callback = |result: &mut MaybeUninit<()>| {
+            jl_set_nth_field(self.unwrap(Private), idx, value.unwrap(Private));
+            result.write(());
+            Ok(())
+        };
+
+        match catch_exceptions(&mut callback)? {
+            Ok(_) => Ok(Ok(())),
+            Err(e) => Ok(Err(e)),
         }
     }
 
@@ -925,6 +932,8 @@ impl<'scope, 'data> Value<'scope, 'data> {
         F: Frame<'frame>,
         N: ToSymbol,
     {
+        use crate::catch::catch_exceptions;
+
         let symbol = field_name.to_symbol_priv(Private);
         let idx = jl_field_index(self.datatype().unwrap(Private), symbol.unwrap(Private), 0);
 
@@ -951,17 +960,15 @@ impl<'scope, 'data> Value<'scope, 'data> {
             })?
         }
 
-        let res = jlrs_set_nth_field(self.unwrap(Private), idx as usize, value.unwrap(Private));
-        if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
-            let ptr = res.data;
-            let err = crate::memory::scope::private::PartialScopePriv::value(
-                frame,
-                NonNull::new_unchecked(ptr),
-                Private,
-            )?;
-            Ok(Err(err))
-        } else {
-            Ok(Ok(()))
+        let mut callback = |result: &mut MaybeUninit<()>| {
+            jl_set_nth_field(self.unwrap(Private), idx as usize, value.unwrap(Private));
+            result.write(());
+            Ok(())
+        };
+
+        match catch_exceptions(&mut callback)? {
+            Ok(_) => Ok(Ok(())),
+            Err(e) => Ok(Err(e.root(frame)?)),
         }
     }
 
@@ -980,6 +987,8 @@ impl<'scope, 'data> Value<'scope, 'data> {
     where
         N: ToSymbol,
     {
+        use crate::catch::catch_exceptions;
+
         let symbol = field_name.to_symbol_priv(Private);
         let idx = jl_field_index(self.datatype().unwrap(Private), symbol.unwrap(Private), 0);
 
@@ -1006,11 +1015,15 @@ impl<'scope, 'data> Value<'scope, 'data> {
             })?
         }
 
-        let res = jlrs_set_nth_field(self.unwrap(Private), idx as usize, value.unwrap(Private));
-        if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
-            Ok(Err(ValueRef::wrap(res.data)))
-        } else {
-            Ok(Ok(()))
+        let mut callback = |result: &mut MaybeUninit<()>| {
+            jl_set_nth_field(self.unwrap(Private), idx as usize, value.unwrap(Private));
+            result.write(());
+            Ok(())
+        };
+
+        match catch_exceptions(&mut callback)? {
+            Ok(_) => Ok(Ok(())),
+            Err(e) => Ok(Err(e)),
         }
     }
 

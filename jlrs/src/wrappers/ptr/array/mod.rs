@@ -23,10 +23,9 @@
 use crate::{
     convert::into_julia::IntoJulia,
     error::{AccessError, ArrayLayoutError, InstantiationError, JlrsResult, CANNOT_DISPLAY_TYPE},
-    impl_debug,
     layout::{typecheck::Typecheck, valid_layout::ValidLayout},
     memory::{
-        frame::Frame,
+        frame::{private::FramePriv, Frame},
         get_tls,
         global::Global,
         output::Output,
@@ -73,12 +72,6 @@ use super::{union_all::UnionAll, value::ValueRef, Ref, Root};
 
 cfg_if! {
     if #[cfg(not(all(target_os = "windows", feature = "lts")))] {
-        use jl_sys::{
-            jlrs_alloc_array_1d, jlrs_alloc_array_2d, jlrs_alloc_array_3d, jlrs_apply_array_type,
-            jlrs_array_del_beg, jlrs_array_del_end, jlrs_array_grow_beg, jlrs_array_grow_end,
-            jlrs_new_array, jlrs_ptr_to_array, jlrs_ptr_to_array_1d, jlrs_reshape_array,
-            jlrs_result_tag_t_JLRS_RESULT_ERR,
-        };
         use crate::error::JuliaResult;
     }
 }
@@ -131,6 +124,9 @@ impl<'data> Array<'_, 'data> {
         S: Scope<'target, 'current, F>,
         F: Frame<'current>,
     {
+        use crate::{catch::catch_exceptions_with_slots, memory::frame::FrameSlice};
+        use std::mem::MaybeUninit;
+
         let (output, frame) = scope.split()?;
         frame.scope(|mut frame| {
             let global = frame.as_scope().global();
@@ -139,35 +135,42 @@ impl<'data> Array<'_, 'data> {
             // Safety: The array type is rooted until the array has been constructed, all C API
             // functions are called with valid data.
             unsafe {
-                let array_type = jl_apply_array_type(elty_ptr.cast(), dims.n_dimensions());
-                let _: Value = (&mut frame).value(NonNull::new_unchecked(array_type), Private)?;
+                let mut callback =
+                    |frame: &mut FrameSlice, result: &mut MaybeUninit<*mut jl_array_t>| {
+                        let array_type = jl_apply_array_type(elty_ptr.cast(), dims.n_dimensions());
+                        frame.push_root::<Value>(NonNull::new_unchecked(array_type), Private)?;
 
-                let array = match dims.n_dimensions() {
-                    1 => jlrs_alloc_array_1d(array_type, dims.n_elements(0)),
-                    2 => jlrs_alloc_array_2d(array_type, dims.n_elements(0), dims.n_elements(1)),
-                    3 => jlrs_alloc_array_3d(
-                        array_type,
-                        dims.n_elements(0),
-                        dims.n_elements(1),
-                        dims.n_elements(2),
-                    ),
-                    n if n <= 8 => {
-                        let tuple = small_dim_tuple(&mut frame, dims)?;
-                        jlrs_new_array(array_type, tuple.unwrap(Private))
-                    }
-                    _ => {
-                        let tuple = large_dim_tuple(&mut frame, dims)?;
-                        jlrs_new_array(array_type, tuple.unwrap(Private))
-                    }
-                };
+                        let array = match dims.n_dimensions() {
+                            1 => jl_alloc_array_1d(array_type, dims.n_elements(0)),
+                            2 => jl_alloc_array_2d(
+                                array_type,
+                                dims.n_elements(0),
+                                dims.n_elements(1),
+                            ),
+                            3 => jl_alloc_array_3d(
+                                array_type,
+                                dims.n_elements(0),
+                                dims.n_elements(1),
+                                dims.n_elements(2),
+                            ),
+                            n if n <= 8 => {
+                                let tuple = small_dim_tuple(frame, &dims)?;
+                                jl_new_array(array_type, tuple.unwrap(Private))
+                            }
+                            _ => {
+                                let tuple = large_dim_tuple(frame, &dims)?;
+                                jl_new_array(array_type, tuple.unwrap(Private))
+                            }
+                        };
 
-                let res = if array.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
-                    Err(NonNull::new_unchecked(array.data))
-                } else {
-                    Ok(NonNull::new_unchecked(array.data.cast::<jl_array_t>()))
-                };
+                        result.write(array);
+                        Ok(())
+                    };
 
-                output.call_result(res, Private)
+                match catch_exceptions_with_slots(&mut frame, 2, &mut callback)? {
+                    Ok(array_ptr) => Ok(Ok(output.set_root(NonNull::new_unchecked(array_ptr)))),
+                    Err(e) => Ok(Err(e.root(output)?)),
+                }
             }
         })
     }
@@ -205,11 +208,11 @@ impl<'data> Array<'_, 'data> {
                     dims.n_elements(2),
                 ),
                 n if n <= 8 => {
-                    let tuple = small_dim_tuple(&mut frame, dims)?;
+                    let tuple = small_dim_tuple(&mut frame, &dims)?;
                     jl_new_array(array_type, tuple.unwrap(Private))
                 }
                 _ => {
-                    let tuple = large_dim_tuple(&mut frame, dims)?;
+                    let tuple = large_dim_tuple(&mut frame, &dims)?;
                     jl_new_array(array_type, tuple.unwrap(Private))
                 }
             };
@@ -235,51 +238,51 @@ impl<'data> Array<'_, 'data> {
         S: Scope<'target, 'current, F>,
         F: Frame<'current>,
     {
+        use crate::{catch::catch_exceptions_with_slots, memory::frame::FrameSlice};
+        use std::mem::MaybeUninit;
+
         let (output, frame) = scope.split()?;
         frame.scope(|mut frame| {
-            // Safety: if this C API function throws an exception, it's caught, rooted and
-            // returned. If successful, the array type is rooted.
-            let array_type = unsafe {
-                let array_type_res = jlrs_apply_array_type(ty.unwrap(Private), dims.n_dimensions());
-                if array_type_res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
-                    let exc = Err(NonNull::new_unchecked(array_type_res.data));
-                    return output.call_result(exc, Private);
-                } else {
-                    let _: Value =
-                        (&mut frame).value(NonNull::new_unchecked(array_type_res.data), Private)?;
-                    array_type_res.data
-                }
-            };
-
+            let elty_ptr = ty.unwrap(Private);
             // Safety: The array type is rooted until the array has been constructed, all C API
             // functions are called with valid data.
             unsafe {
-                let array = match dims.n_dimensions() {
-                    1 => jlrs_alloc_array_1d(array_type, dims.n_elements(0)),
-                    2 => jlrs_alloc_array_2d(array_type, dims.n_elements(0), dims.n_elements(1)),
-                    3 => jlrs_alloc_array_3d(
-                        array_type,
-                        dims.n_elements(0),
-                        dims.n_elements(1),
-                        dims.n_elements(2),
-                    ),
-                    n if n <= 8 => {
-                        let tuple = small_dim_tuple(&mut frame, dims)?;
-                        jlrs_new_array(array_type, tuple.unwrap(Private))
-                    }
-                    _ => {
-                        let tuple = large_dim_tuple(&mut frame, dims)?;
-                        jlrs_new_array(array_type, tuple.unwrap(Private))
-                    }
-                };
+                let mut callback =
+                    |frame: &mut FrameSlice, result: &mut MaybeUninit<*mut jl_array_t>| {
+                        let array_type = jl_apply_array_type(elty_ptr.cast(), dims.n_dimensions());
+                        frame.push_root::<Value>(NonNull::new_unchecked(array_type), Private)?;
 
-                let res = if array.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
-                    Err(NonNull::new_unchecked(array.data))
-                } else {
-                    Ok(NonNull::new_unchecked(array.data.cast::<jl_array_t>()))
-                };
+                        let array = match dims.n_dimensions() {
+                            1 => jl_alloc_array_1d(array_type, dims.n_elements(0)),
+                            2 => jl_alloc_array_2d(
+                                array_type,
+                                dims.n_elements(0),
+                                dims.n_elements(1),
+                            ),
+                            3 => jl_alloc_array_3d(
+                                array_type,
+                                dims.n_elements(0),
+                                dims.n_elements(1),
+                                dims.n_elements(2),
+                            ),
+                            n if n <= 8 => {
+                                let tuple = small_dim_tuple(frame, &dims)?;
+                                jl_new_array(array_type, tuple.unwrap(Private))
+                            }
+                            _ => {
+                                let tuple = large_dim_tuple(frame, &dims)?;
+                                jl_new_array(array_type, tuple.unwrap(Private))
+                            }
+                        };
 
-                output.call_result(res, Private)
+                        result.write(array);
+                        Ok(())
+                    };
+
+                match catch_exceptions_with_slots(&mut frame, 2, &mut callback)? {
+                    Ok(array_ptr) => Ok(Ok(output.set_root(NonNull::new_unchecked(array_ptr)))),
+                    Err(e) => Ok(Err(e.root(output)?)),
+                }
             }
         })
     }
@@ -316,11 +319,11 @@ impl<'data> Array<'_, 'data> {
                     dims.n_elements(2),
                 ),
                 n if n <= 8 => {
-                    let tuple = small_dim_tuple(&mut frame, dims)?;
+                    let tuple = small_dim_tuple(&mut frame, &dims)?;
                     jl_new_array(array_type, tuple.unwrap(Private))
                 }
                 _ => {
-                    let tuple = large_dim_tuple(&mut frame, dims)?;
+                    let tuple = large_dim_tuple(&mut frame, &dims)?;
                     jl_new_array(array_type, tuple.unwrap(Private))
                 }
             };
@@ -342,13 +345,17 @@ impl<'data> Array<'_, 'data> {
         scope: S,
         data: &'data mut [T],
         dims: D,
-    ) -> JlrsResult<JuliaResult<Array<'target, 'data>>>
+    ) -> JlrsResult<JuliaResult<'target, 'static, Array<'target, 'data>>>
     where
         T: IntoJulia,
         D: Dims,
         S: Scope<'target, 'current, F>,
         F: Frame<'current>,
     {
+        use std::mem::MaybeUninit;
+
+        use crate::{catch::catch_exceptions_with_slots, memory::frame::FrameSlice};
+
         if dims.size() != data.len() {
             Err(InstantiationError::ArraySizeMismatch {
                 vec_size: data.len(),
@@ -365,43 +372,48 @@ impl<'data> Array<'_, 'data> {
             // functions are called with valid data. The data-lifetime ensures the data can't be
             // used from Rust after the borrow ends.
             unsafe {
-                let array_type = jl_apply_array_type(elty_ptr, dims.n_dimensions());
-                let _: Value = (&mut frame).value(NonNull::new_unchecked(array_type), Private)?;
+                let mut callback =
+                    |frame: &mut FrameSlice, result: &mut MaybeUninit<*mut jl_array_t>| {
+                        let array_type = jl_apply_array_type(elty_ptr, dims.n_dimensions());
+                        frame.push_root::<Value>(NonNull::new_unchecked(array_type), Private)?;
 
-                let array = match dims.n_dimensions() {
-                    1 => jlrs_ptr_to_array_1d(
-                        array_type,
-                        data.as_mut_ptr().cast(),
-                        dims.n_elements(0),
-                        0,
-                    ),
-                    n if n <= 8 => {
-                        let tuple = small_dim_tuple(&mut frame, dims)?;
-                        jlrs_ptr_to_array(
-                            array_type,
-                            data.as_mut_ptr().cast(),
-                            tuple.unwrap(Private),
-                            0,
-                        )
+                        let array = match dims.n_dimensions() {
+                            1 => jl_ptr_to_array_1d(
+                                array_type,
+                                data.as_mut_ptr().cast(),
+                                dims.n_elements(0),
+                                0,
+                            ),
+                            n if n <= 8 => {
+                                let tuple = small_dim_tuple(frame, &dims)?;
+                                jl_ptr_to_array(
+                                    array_type,
+                                    data.as_mut_ptr().cast(),
+                                    tuple.unwrap(Private),
+                                    0,
+                                )
+                            }
+                            _ => {
+                                let tuple = large_dim_tuple(frame, &dims)?;
+                                jl_ptr_to_array(
+                                    array_type,
+                                    data.as_mut_ptr().cast(),
+                                    tuple.unwrap(Private),
+                                    0,
+                                )
+                            }
+                        };
+
+                        result.write(array);
+                        Ok(())
+                    };
+
+                match catch_exceptions_with_slots(&mut frame, 2, &mut callback)? {
+                    Ok(array_ptr) => {
+                        Ok(Ok(output.value(NonNull::new_unchecked(array_ptr), Private)?))
                     }
-                    _ => {
-                        let tuple = large_dim_tuple(&mut frame, dims)?;
-                        jlrs_ptr_to_array(
-                            array_type,
-                            data.as_mut_ptr().cast(),
-                            tuple.unwrap(Private),
-                            0,
-                        )
-                    }
-                };
-
-                let res = if array.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
-                    Err(NonNull::new_unchecked(array.data))
-                } else {
-                    Ok(NonNull::new_unchecked(array.data.cast::<jl_array_t>()))
-                };
-
-                output.call_result(res, Private)
+                    Err(e) => Ok(Err(e.root(output)?)),
+                }
             }
         })
     }
@@ -437,14 +449,14 @@ impl<'data> Array<'_, 'data> {
             let global = frame.as_scope().global();
             let array_type =
                 jl_apply_array_type(T::julia_type(global).ptr().cast(), dims.n_dimensions());
-            let _: Value = (&mut frame).value(NonNull::new_unchecked(array_type), Private)?;
+            frame.push_root::<Value>(NonNull::new_unchecked(array_type), Private)?;
 
             let array = match dims.n_dimensions() {
                 1 => {
                     jl_ptr_to_array_1d(array_type, data.as_mut_ptr().cast(), dims.n_elements(0), 0)
                 }
                 n if n <= 8 => {
-                    let tuple = small_dim_tuple(&mut frame, dims)?;
+                    let tuple = small_dim_tuple(&mut frame, &dims)?;
                     jl_ptr_to_array(
                         array_type,
                         data.as_mut_ptr().cast(),
@@ -453,7 +465,7 @@ impl<'data> Array<'_, 'data> {
                     )
                 }
                 _ => {
-                    let tuple = large_dim_tuple(&mut frame, dims)?;
+                    let tuple = large_dim_tuple(&mut frame, &dims)?;
                     jl_ptr_to_array(
                         array_type,
                         data.as_mut_ptr().cast(),
@@ -488,6 +500,10 @@ impl<'data> Array<'_, 'data> {
         S: Scope<'target, 'current, F>,
         F: Frame<'current>,
     {
+        use std::mem::MaybeUninit;
+
+        use crate::{catch::catch_exceptions_with_slots, memory::frame::FrameSlice};
+
         if dims.size() != data.len() {
             Err(InstantiationError::ArraySizeMismatch {
                 vec_size: data.len(),
@@ -499,53 +515,60 @@ impl<'data> Array<'_, 'data> {
         scope.scope_with_capacity(1, |mut frame| {
             let global = frame.as_scope().global();
             let elty_ptr = T::julia_type(global).ptr().cast();
+            let data = Box::leak(data.into_boxed_slice());
 
             // Safety: The array type is rooted until the array has been constructed, all C API
             // functions are called with valid data. The data-lifetime ensures the data can't be
             // used from Rust after the borrow ends.
             unsafe {
-                let array_type = jl_apply_array_type(elty_ptr, dims.n_dimensions());
-                let _: Value = (&mut frame).value(NonNull::new_unchecked(array_type), Private)?;
+                let mut callback =
+                    |frame: &mut FrameSlice, result: &mut MaybeUninit<*mut jl_array_t>| {
+                        let array_type = jl_apply_array_type(elty_ptr, dims.n_dimensions());
+                        frame.push_root::<Value>(NonNull::new_unchecked(array_type), Private)?;
 
-                let array = match dims.n_dimensions() {
-                    1 => jlrs_ptr_to_array_1d(
-                        array_type,
-                        Box::into_raw(data.into_boxed_slice()).cast(),
-                        dims.n_elements(0),
-                        1,
-                    ),
-                    n if n <= 8 => {
-                        let tuple = small_dim_tuple(&mut frame, dims)?;
-                        jlrs_ptr_to_array(
-                            array_type,
-                            Box::into_raw(data.into_boxed_slice()).cast(),
-                            tuple.unwrap(Private),
-                            1,
-                        )
+                        let array = match dims.n_dimensions() {
+                            1 => jl_ptr_to_array_1d(
+                                array_type,
+                                data.as_mut_ptr().cast(),
+                                dims.n_elements(0),
+                                1,
+                            ),
+                            n if n <= 8 => {
+                                let tuple = small_dim_tuple(frame, &dims)?;
+                                jl_ptr_to_array(
+                                    array_type,
+                                    data.as_mut_ptr().cast(),
+                                    tuple.unwrap(Private),
+                                    1,
+                                )
+                            }
+                            _ => {
+                                let tuple = large_dim_tuple(frame, &dims)?;
+                                jl_ptr_to_array(
+                                    array_type,
+                                    data.as_mut_ptr().cast(),
+                                    tuple.unwrap(Private),
+                                    1,
+                                )
+                            }
+                        };
+
+                        jl_gc_add_ptr_finalizer(
+                            get_tls(),
+                            array.cast(),
+                            droparray::<T> as *mut c_void,
+                        );
+
+                        result.write(array);
+                        Ok(())
+                    };
+
+                match catch_exceptions_with_slots(&mut frame, 2, &mut callback)? {
+                    Ok(array_ptr) => {
+                        Ok(Ok(output.value(NonNull::new_unchecked(array_ptr), Private)?))
                     }
-                    _ => {
-                        let tuple = large_dim_tuple(&mut frame, dims)?;
-                        jlrs_ptr_to_array(
-                            array_type,
-                            Box::into_raw(data.into_boxed_slice()).cast(),
-                            tuple.unwrap(Private),
-                            1,
-                        )
-                    }
-                };
-
-                let res = if array.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
-                    Err(NonNull::new_unchecked(array.data))
-                } else {
-                    jl_gc_add_ptr_finalizer(
-                        get_tls(),
-                        array.data.cast(),
-                        droparray::<T> as *mut c_void,
-                    );
-                    Ok(NonNull::new_unchecked(array.data.cast::<jl_array_t>()))
-                };
-
-                output.call_result(res, Private)
+                    Err(e) => Ok(Err(e.root(output)?)),
+                }
             }
         })
     }
@@ -592,7 +615,7 @@ impl<'data> Array<'_, 'data> {
                     1,
                 ),
                 n if n <= 8 => {
-                    let tuple = small_dim_tuple(&mut frame, dims)?;
+                    let tuple = small_dim_tuple(&mut frame, &dims)?;
                     jl_ptr_to_array(
                         array_type,
                         Box::into_raw(data.into_boxed_slice()).cast(),
@@ -601,7 +624,7 @@ impl<'data> Array<'_, 'data> {
                     )
                 }
                 _ => {
-                    let tuple = large_dim_tuple(&mut frame, dims)?;
+                    let tuple = large_dim_tuple(&mut frame, &dims)?;
                     jl_ptr_to_array(
                         array_type,
                         Box::into_raw(data.into_boxed_slice()).cast(),
@@ -1186,33 +1209,42 @@ impl<'scope, 'data> Array<'scope, 'data> {
         S: Scope<'target, 'current, F>,
         F: Frame<'current>,
     {
+        use std::mem::MaybeUninit;
+
+        use crate::{catch::catch_exceptions_with_slots, memory::frame::FrameSlice};
+
         let (output, scope) = scope.split()?;
         scope.scope_with_capacity(2, |mut frame| {
-            let elty_ptr = self.element_type().unwrap(Private).cast();
+            let elty_ptr = self.element_type().unwrap(Private);
 
             // Safety: The array type is rooted until the array has been constructed, all C API
             // functions are called with valid data. If an exception is thrown it's caught.
             unsafe {
-                let array_type = jl_apply_array_type(elty_ptr, dims.n_dimensions());
-                let _: Value = (&mut frame).value(NonNull::new_unchecked(array_type), Private)?;
+                let mut callback =
+                    |frame: &mut FrameSlice, result: &mut MaybeUninit<*mut jl_array_t>| {
+                        let array_type = jl_apply_array_type(elty_ptr, dims.n_dimensions());
+                        frame.push_root::<Value>(NonNull::new_unchecked(array_type), Private)?;
 
-                let tuple = if dims.n_dimensions() <= 8 {
-                    small_dim_tuple(&mut frame, dims)?
-                } else {
-                    large_dim_tuple(&mut frame, dims)?
-                };
+                        let tuple = if dims.n_dimensions() <= 8 {
+                            small_dim_tuple(frame, &dims)?
+                        } else {
+                            large_dim_tuple(frame, &dims)?
+                        };
 
-                let res =
-                    jlrs_reshape_array(array_type, self.unwrap(Private), tuple.unwrap(Private));
+                        let array = jl_reshape_array(
+                            array_type,
+                            self.unwrap(Private),
+                            tuple.unwrap(Private),
+                        );
 
-                let output = output.into_scope(&mut frame);
-                let result = if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
-                    Err(NonNull::new_unchecked(res.data))
-                } else {
-                    Ok(NonNull::new_unchecked(res.data).cast())
-                };
+                        result.write(array);
+                        Ok(())
+                    };
 
-                output.call_result(result, Private)
+                match catch_exceptions_with_slots(&mut frame, 2, &mut callback)? {
+                    Ok(array_ptr) => Ok(Ok(output.set_root(NonNull::new_unchecked(array_ptr)))),
+                    Err(e) => Ok(Err(e.root(output)?)),
+                }
             }
         })
     }
@@ -1239,9 +1271,9 @@ impl<'scope, 'data> Array<'scope, 'data> {
             let _: Value = (&mut frame).value(NonNull::new_unchecked(array_type), Private)?;
 
             let tuple = if dims.n_dimensions() <= 8 {
-                small_dim_tuple(&mut frame, dims)?
+                small_dim_tuple(&mut frame, &dims)?
             } else {
-                large_dim_tuple(&mut frame, dims)?
+                large_dim_tuple(&mut frame, &dims)?
             };
 
             let res = jl_reshape_array(array_type, self.unwrap(Private), tuple.unwrap(Private));
@@ -1341,15 +1373,20 @@ impl<'scope> Array<'scope, 'static> {
     where
         F: Frame<'current>,
     {
+        use crate::catch::catch_exceptions;
+        use std::mem::MaybeUninit;
+
         // Safety: the C API function is called with valid data. If an exception is thrown it's caught.
         unsafe {
-            let res = jlrs_array_grow_end(self.unwrap(Private), inc);
+            let mut callback = |result: &mut MaybeUninit<()>| {
+                jl_array_grow_end(self.unwrap(Private), inc);
+                result.write(());
+                Ok(())
+            };
 
-            if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
-                let e = frame.value(NonNull::new_unchecked(res.data), Private)?;
-                Ok(Err(e))
-            } else {
-                Ok(Ok(()))
+            match catch_exceptions(&mut callback)? {
+                Ok(_) => Ok(Ok(())),
+                Err(e) => Ok(Err(e.root(frame)?)),
             }
         }
     }
@@ -1379,15 +1416,20 @@ impl<'scope> Array<'scope, 'static> {
     where
         F: Frame<'current>,
     {
+        use crate::catch::catch_exceptions;
+        use std::mem::MaybeUninit;
+
         // Safety: the C API function is called with valid data. If an exception is thrown it's caught.
         unsafe {
-            let res = jlrs_array_del_end(self.unwrap(Private), dec);
+            let mut callback = |result: &mut MaybeUninit<()>| {
+                jl_array_del_end(self.unwrap(Private), dec);
+                result.write(());
+                Ok(())
+            };
 
-            if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
-                let e = frame.value(NonNull::new_unchecked(res.data), Private)?;
-                Ok(Err(e))
-            } else {
-                Ok(Ok(()))
+            match catch_exceptions(&mut callback)? {
+                Ok(_) => Ok(Ok(())),
+                Err(e) => Ok(Err(e.root(frame)?)),
             }
         }
     }
@@ -1417,15 +1459,20 @@ impl<'scope> Array<'scope, 'static> {
     where
         F: Frame<'current>,
     {
+        use crate::catch::catch_exceptions;
+        use std::mem::MaybeUninit;
+
         // Safety: the C API function is called with valid data. If an exception is thrown it's caught.
         unsafe {
-            let res = jlrs_array_grow_beg(self.unwrap(Private), inc);
+            let mut callback = |result: &mut MaybeUninit<()>| {
+                jl_array_grow_beg(self.unwrap(Private), inc);
+                result.write(());
+                Ok(())
+            };
 
-            if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
-                let e = frame.value(NonNull::new_unchecked(res.data), Private)?;
-                Ok(Err(e))
-            } else {
-                Ok(Ok(()))
+            match catch_exceptions(&mut callback)? {
+                Ok(_) => Ok(Ok(())),
+                Err(e) => Ok(Err(e.root(frame)?)),
             }
         }
     }
@@ -1455,15 +1502,20 @@ impl<'scope> Array<'scope, 'static> {
     where
         F: Frame<'current>,
     {
+        use crate::catch::catch_exceptions;
+        use std::mem::MaybeUninit;
+
         // Safety: the C API function is called with valid data. If an exception is thrown it's caught.
         unsafe {
-            let res = jlrs_array_del_beg(self.unwrap(Private), dec);
+            let mut callback = |result: &mut MaybeUninit<()>| {
+                jl_array_del_end(self.unwrap(Private), dec);
+                result.write(());
+                Ok(())
+            };
 
-            if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
-                let e = frame.value(NonNull::new_unchecked(res.data), Private)?;
-                Ok(Err(e))
-            } else {
-                Ok(Ok(()))
+            match catch_exceptions(&mut callback)? {
+                Ok(_) => Ok(Ok(())),
+                Err(e) => Ok(Err(e.root(frame)?)),
             }
         }
     }
@@ -1581,7 +1633,7 @@ where
         scope: S,
         data: &'data mut [T],
         dims: D,
-    ) -> JlrsResult<JuliaResult<TypedArray<'target, 'data, T>>>
+    ) -> JlrsResult<JuliaResult<'target, 'static, TypedArray<'target, 'data, T>>>
     where
         T: IntoJulia,
         D: Dims,
@@ -2428,7 +2480,7 @@ thread_local! {
 // Safety: dims.m_dimensions() <= 8
 unsafe fn small_dim_tuple<'scope, D, F>(
     frame: &mut F,
-    dims: D,
+    dims: &D,
 ) -> JlrsResult<Value<'scope, 'static>>
 where
     D: Dims,
@@ -2448,7 +2500,7 @@ where
     Ok(v)
 }
 
-fn large_dim_tuple<'scope, D, F>(frame: &mut F, dims: D) -> JlrsResult<Value<'scope, 'static>>
+fn large_dim_tuple<'scope, D, F>(frame: &mut F, dims: &D) -> JlrsResult<Value<'scope, 'static>>
 where
     D: Dims,
     F: Frame<'scope>,

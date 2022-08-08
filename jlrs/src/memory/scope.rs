@@ -89,10 +89,18 @@ use std::{marker::PhantomData, ptr::NonNull};
 pub struct OutputScope<'target, 'current, 'borrow, F: Frame<'current>> {
     pub(crate) output: Output<'target>,
     pub(crate) frame: &'borrow mut F,
-    pub(crate) _marker: PhantomData<&'current ()>,
+    pub(crate) _marker: PhantomData<&'current mut &'current ()>,
 }
 
 impl<'target, 'current, 'borrow, F: Frame<'current>> OutputScope<'target, 'current, 'borrow, F> {
+    pub(crate) fn new(output: Output<'target>, frame: &'borrow mut F) -> Self {
+        OutputScope {
+            output,
+            frame,
+            _marker: PhantomData,
+        }
+    }
+
     // Safety: value must point to valid Jula data
     pub(crate) unsafe fn set_root<'data, T: Wrapper<'target, 'data>>(
         self,

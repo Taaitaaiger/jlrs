@@ -40,11 +40,11 @@ mod not_lts {
                         .into_jlrs_result()?
                         .cast::<OpaqueClosure>()?;
 
-                let arg = Value::new(&mut frame, 3isize)?;
+                let arg = Value::new(&mut frame, 3i64)?;
                 let res = closure
                     .call1(&mut frame, arg)?
                     .into_jlrs_result()?
-                    .unbox::<isize>()?;
+                    .unbox::<i64>()?;
 
                 assert_eq!(res, 6);
                 Ok(())
@@ -85,7 +85,7 @@ mod not_lts {
                         .into_jlrs_result()?
                         .cast::<OpaqueClosure>()?;
 
-                let arg = Value::new(&mut frame, 3isize)?;
+                let arg = Value::new(&mut frame, 3i64)?;
                 let res = closure.call2(&mut frame, arg, arg)?;
 
                 assert!(res.is_err());
@@ -108,11 +108,11 @@ mod not_lts {
                 .into_jlrs_result()?
                 .cast::<OpaqueClosure>()?;
 
-                let arg = Value::new(&mut frame, 3isize)?;
+                let arg = Value::new(&mut frame, 3i64)?;
                 let res = closure
                     .call2(&mut frame, arg, arg)?
                     .into_jlrs_result()?
-                    .unbox::<isize>()?;
+                    .unbox::<i64>()?;
 
                 assert_eq!(res, 9);
                 Ok(())

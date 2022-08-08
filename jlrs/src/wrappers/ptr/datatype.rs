@@ -3,7 +3,7 @@
 use crate::{
     convert::to_symbol::ToSymbol,
     error::{AccessError, JlrsResult, CANNOT_DISPLAY_TYPE},
-    impl_debug, impl_julia_typecheck,
+    impl_julia_typecheck,
     layout::typecheck::Typecheck,
     memory::{global::Global, output::Output, scope::PartialScope},
     private::Private,
@@ -49,7 +49,6 @@ cfg_if! {
     if #[cfg(not(all(target_os = "windows", feature = "lts")))] {
         use super::array::Array;
         use crate::error::{JuliaResult, JuliaResultRef};
-        use jl_sys::{jlrs_new_structv, jlrs_result_tag_t_JLRS_RESULT_ERR};
     }
 }
 
@@ -481,7 +480,7 @@ impl<'scope> DataType<'scope> {
         unsafe { Ok(self.is_atomic_field_unchecked(idx)) }
     }
 
-    #[cfg(all(feature = "rc1", not(feature = "all-features-override")))]
+    #[cfg(all(feature = "rc3", not(feature = "all-features-override")))]
     /// Returns true if the field at position `idx` is a constant field.
     pub fn is_const_field(self, idx: usize) -> JlrsResult<bool> {
         if idx >= self.n_fields() as usize {
@@ -543,7 +542,7 @@ impl<'scope> DataType<'scope> {
         isatomic != 0
     }
 
-    #[cfg(all(feature = "rc1", not(feature = "all-features-override")))]
+    #[cfg(all(feature = "rc3", not(feature = "all-features-override")))]
     /// Returns true if the field at position `idx` is a constant field.
     ///
     /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
@@ -592,7 +591,9 @@ impl<'scope> DataType<'scope> {
         S: PartialScope<'target>,
         V: AsRef<[Value<'value, 'data>]>,
     {
-        use crate::error::InstantiationError;
+        use crate::{catch::catch_exceptions, error::InstantiationError};
+        use jl_sys::jl_value_t;
+        use std::mem::MaybeUninit;
 
         // Safety: the pointer points to valid data, if an exception is thrown it's caught
         unsafe {
@@ -601,19 +602,24 @@ impl<'scope> DataType<'scope> {
             }
 
             let values = values.as_ref();
-            let res = jlrs_new_structv(
-                self.unwrap(Private),
-                values.as_ptr() as *mut _,
-                values.len() as _,
-            );
+            let mut callback = |result: &mut MaybeUninit<*mut jl_value_t>| {
+                let v = jl_new_structv(
+                    self.unwrap(Private),
+                    values.as_ptr() as *mut _,
+                    values.len() as _,
+                );
 
-            let out = if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
-                Err(NonNull::new_unchecked(res.data))
-            } else {
-                Ok(NonNull::new_unchecked(res.data))
+                result.write(v);
+                Ok(())
             };
 
-            scope.call_result(out, Private)
+            match catch_exceptions(&mut callback)? {
+                Ok(ptr) => {
+                    debug_assert!(!ptr.is_null());
+                    Ok(Ok(scope.value(NonNull::new_unchecked(ptr), Private)?))
+                }
+                Err(e) => Ok(Err(e.root(scope)?)),
+            }
         }
     }
 
@@ -635,7 +641,9 @@ impl<'scope> DataType<'scope> {
     where
         V: AsRef<[Value<'value, 'data>]>,
     {
-        use crate::error::InstantiationError;
+        use crate::{catch::catch_exceptions, error::InstantiationError};
+        use jl_sys::jl_value_t;
+        use std::mem::MaybeUninit;
 
         // Safety: the pointer points to valid data, if an exception is thrown it's caught
         unsafe {
@@ -644,16 +652,20 @@ impl<'scope> DataType<'scope> {
             }
 
             let values = values.as_ref();
-            let res = jlrs_new_structv(
-                self.unwrap(Private),
-                values.as_ptr() as *mut _,
-                values.len() as _,
-            );
+            let mut callback = |result: &mut MaybeUninit<*mut jl_value_t>| {
+                let v = jl_new_structv(
+                    self.unwrap(Private),
+                    values.as_ptr() as *mut _,
+                    values.len() as _,
+                );
 
-            if res.flag == jlrs_result_tag_t_JLRS_RESULT_ERR {
-                Ok(Err(ValueRef::wrap(res.data)))
-            } else {
-                Ok(Ok(ValueRef::wrap(res.data)))
+                result.write(v);
+                Ok(())
+            };
+
+            match catch_exceptions(&mut callback)? {
+                Ok(ptr) => Ok(Ok(ValueRef::wrap(ptr))),
+                Err(e) => Ok(Err(e)),
             }
         }
     }

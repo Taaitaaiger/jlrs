@@ -6,7 +6,7 @@
 jlrs is a crate that provides access to most of the Julia C API, it can be used to embed Julia
 in Rust applications and to use functionality from the Julia C API when writing `ccall`able
 functions in Rust. Currently this crate is only tested on Linux and Windows in combination
-with Julia 1.6, 1.7, and 1.8.0-rc1 and is not compatible with other versions of Julia.
+with Julia 1.6, 1.7, and 1.8.0-rc3 and is not compatible with other versions of Julia.
 
 The documentation assumes you're already familiar with the Julia programming language.
 
@@ -32,9 +32,9 @@ recently released version.
 
 ## Prerequisites
 
-Julia must be installed before jlrs can be used. Only version  1.6, 1.7, and 1.8.0-rc1 are 
-supported. Using version 1.6 requires enabling the `lts` feature, 1.8.0-rc1 requires enabling
-the `rc1` feature.
+Julia must be installed before jlrs can be used. Only version  1.6, 1.7, and 1.8.0-rc3 are 
+supported. Using version 1.6 requires enabling the `lts` feature, 1.8.0-rc3 requires enabling
+the `rc3` feature.
 
 ### Linux
 
@@ -76,7 +76,7 @@ when this version is used.
 
 If you use the MSVC target, you must create two or three lib files using `lib.exe`. The def
 files required for this can be found in the [`def` folder](https://github.com/Taaitaaiger/jlrs/tree/master/jl_sys/def) in the jl-sys crate. To create the
-lib files, copy the three files from either the `lts`, `stable`, or `rc1` folder to the `bin` 
+lib files, copy the three files from either the `lts`, `stable`, or `rc3` folder to the `bin` 
 folder where Julia is installed. Afterwards, open a Developer Command Prompt for VS19 and 
 execute the following commands:
 
@@ -124,8 +124,8 @@ In addition to these runtimes, the following utility features are available:
 - `lts`
   Use the current LTS version of Julia (1.6) instead of the current stable version (1.7).
 
-- `rc`
-  Use the current 1.8.0-rc1 version of Julia instead of the current stable version (1.7).
+- `rc3`
+  Use the current 1.8.0-rc3 version of Julia instead of the current stable version (1.7).
 
 - `async`
   Enable the features of the async runtime which don't depend on the backing runtime. This
@@ -157,6 +157,9 @@ In addition to these runtimes, the following utility features are available:
 - `pyplot`
   This feature lets you plot data using the Pyplot package and Gtk 3 from Rust.
 
+- `i686`
+  Link with a 32-bit build of Julia on Linux.
+
 - `debug`
   Link with a debug build of Julia.
 
@@ -167,11 +170,11 @@ You can enable all features except `lts` and `debug` by enabling the `full` feat
 
 If you want to embed Julia and call it from Rust, you must enable a runtime feature:
 
-`jlrs = {version = "0.14", features = ["sync-rt"]}`
+`jlrs = {version = "0.15", features = ["sync-rt"]}`
 
-`jlrs = {version = "0.14", features = ["tokio-rt"]}`
+`jlrs = {version = "0.15", features = ["tokio-rt"]}`
 
-`jlrs = {version = "0.14", features = ["async-std-rt"]}`
+`jlrs = {version = "0.15", features = ["async-std-rt"]}`
 
 When Julia is embedded in an application, it must be initialized before it can be used. The
 following snippet initializes the sync runtime:
@@ -426,7 +429,7 @@ impl PersistentTask for AccumulatorTask {
     // is dropped after `run` returns.
     async fn run<'frame>(
         &mut self,
-        global: Global<'frame>,
+        global: Global<'static>,
         mut frame: AsyncGcFrame<'frame>,
         state: &mut Self::State,
         input: Self::Input,
