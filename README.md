@@ -158,7 +158,7 @@ In addition to these runtimes, the following utility features are available:
   This feature lets you plot data using the Pyplot package and Gtk 3 from Rust.
 
 - `i686`
-  Link with a 32-bit build of Julia.
+  Link with a 32-bit build of Julia on Linux.
 
 - `debug`
   Link with a debug build of Julia.

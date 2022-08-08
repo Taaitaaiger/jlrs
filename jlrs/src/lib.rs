@@ -167,7 +167,7 @@
 //!
 //! - `debug`
 //!
-//!   Link with a debug build of Julia.
+//!   Link with a debug build of Julia on Linux.
 //!
 //! You can enable all features except `lts` and `debug` by enabling the `full` feature.
 //!
