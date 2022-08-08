@@ -572,6 +572,7 @@ jl_object_id_
 jl_obvious_subtype
 jl_op_suffix_char
 jl_operator_precedence
+jl_options
 jl_or_int
 jl_parse
 jl_parse_all
