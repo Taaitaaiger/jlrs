@@ -9,6 +9,8 @@
 
  - Elided lifetimes have been added to methods that create arrays with data borrowed from Rust, eg `Array::from_slice`. Such arrays can now be returned from async scopes when `AsyncFrame::relaxed_async_scope_(with_capacity)` is used.
 
+ - The number of threads can be set with `AsyncRuntimeBuilder::n_threads` when the `lts` feature is enabled.
+
 
 #### v0.14
  - `TemporarySymbol` has been renamed to `ToSymbol`. The method `ToSymbol::to_symbol` has been added to this trait.
