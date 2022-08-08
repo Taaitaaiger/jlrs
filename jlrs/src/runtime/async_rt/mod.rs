@@ -47,7 +47,6 @@ use jl_sys::{
     jl_process_events,
 };
 
-#[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
 use jl_sys::jl_options;
 
 use std::{
@@ -604,7 +603,6 @@ where
                     Err(RuntimeError::AlreadyInitialized)?;
                 }
 
-                #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
                 {
                     if builder.n_threads == 0 {
                         jl_options.nthreads = -1;
