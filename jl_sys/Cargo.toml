@@ -1,6 +1,6 @@
 [package]
 name = "jl-sys"
-version = "0.17.0"
+version = "0.18.0"
 authors = ["Thomas van Doornmalen <thomas.vandoornmalen@gmail.com>"]
 description = """
 jl-sys contains the generated bindings for the Julia C API used by jlrs.
@@ -20,7 +20,6 @@ docs = []
 uv = []
 debug = []
 lts = []
-rc3 = []
 i686 = []
 windows-lts = ["lts"]
 use-bindgen = ["bindgen"]

@@ -27,7 +27,7 @@ cfg_if! {
     }
 }
 
-#[cfg(all(feature = "rc3", not(feature = "all-features-override")))]
+#[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
 use crate::wrappers::ptr::array::TypedArrayRef;
 
 /// This type describes a single method definition, and stores data shared by the specializations
@@ -200,14 +200,14 @@ impl<'scope> Method<'scope> {
     }
 
     /// RLE (build_id, offset) pairs (even/odd indexing)
-    #[cfg(all(feature = "rc3", not(feature = "all-features-override")))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn root_blocks(self) -> TypedArrayRef<'scope, 'static, u64> {
         // Safety: the pointer points to valid data
         unsafe { TypedArrayRef::wrap(self.unwrap_non_null(Private).as_ref().root_blocks) }
     }
 
     /// # of roots stored in the system image
-    #[cfg(all(feature = "rc3", not(feature = "all-features-override")))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn nroots_sysimg(self) -> i32 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().nroots_sysimg }
@@ -284,7 +284,7 @@ impl<'scope> Method<'scope> {
     }
 
     /// 0x00 = use heuristic; 0x01 = aggressive; 0x02 = none
-    #[cfg(all(feature = "rc3", not(feature = "all-features-override")))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn constprop(self) -> u8 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().constprop }
@@ -292,7 +292,7 @@ impl<'scope> Method<'scope> {
 
     /// Override the conclusions of inter-procedural effect analysis,
     /// forcing the conclusion to always true.
-    #[cfg(all(feature = "rc3", not(feature = "all-features-override")))]
+    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn purity(self) -> u8 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().purity.bits }

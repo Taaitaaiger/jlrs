@@ -25,7 +25,7 @@ jobs:
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v1
         with:
-          version: '1.7'
+          version: '1.8'
 
       - name: rust-toolchain
         uses: actions-rs/toolchain@v1
@@ -54,7 +54,7 @@ jobs:
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v1
         with:
-          version: '1.7'
+          version: '1.8'
 
       - name: rust-toolchain
         uses: actions-rs/toolchain@v1
@@ -82,7 +82,7 @@ jobs:
         id: setup-julia
         uses: julia-actions/setup-julia@v1
         with:
-          version: '1.7'
+          version: '1.8'
 
       - uses: ilammy/msvc-dev-cmd@v1
 
@@ -102,91 +102,6 @@ jobs:
 
       - name: Run tests
         run: cargo test --features full --verbose -- --test-threads=1
-
-  test-linux-rc3:
-    runs-on: ubuntu-latest
-    continue-on-error: ${{ matrix.allow-fail }}
-    strategy:
-      matrix:
-        rust: [stable]
-        allow-fail: [false]
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: Setup Julia environment
-        uses: julia-actions/setup-julia@v1
-        with:
-          version: '~1.8.0-0'
-
-      - name: rust-toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: ${{ matrix.rust }}
-
-      - name: Run tests
-        run: |
-          export JULIA_DIR="$(dirname $(dirname $(which julia)))"
-          export LD_LIBRARY_PATH="${JULIA_DIR}/lib:${JULIA_DIR}/lib/julia:${LD_LIBRARY_PATH}"
-          cargo test --features full,rc3 --verbose -- --test-threads=1
-
-  test-windows-gnu-rc3:
-    runs-on: windows-latest
-    continue-on-error: ${{ matrix.allow-fail }}
-    strategy:
-      matrix:
-        rust: [stable-x86_64-pc-windows-gnu]
-        allow-fail: [false]
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: Setup Julia environment
-        uses: julia-actions/setup-julia@v1
-        with:
-          version: '~1.8.0-0'
-
-      - name: rust-toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: ${{ matrix.rust }}
-          override: true
-
-      - name: Run tests
-        run: cargo test --features full,rc3 --verbose -- --test-threads=1
-
-  test-windows-msvc-rc3:
-    runs-on: windows-latest
-    continue-on-error: ${{ matrix.allow-fail }}
-    strategy:
-      matrix:
-        rust: [stable-x86_64-pc-windows-msvc]
-        allow-fail: [false]
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: Setup Julia environment
-        id: setup-julia
-        uses: julia-actions/setup-julia@v1
-        with:
-          version: '~1.8.0-0'
-
-      - uses: ilammy/msvc-dev-cmd@v1
-
-      - name: rust-toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: ${{ matrix.rust }}
-          override: true
-
-      - name: Create lib files
-        run: |
-          copy ./jl_sys/def/rc3/*.def ${{ steps.setup-julia.outputs.julia-bindir }}
-          cd ${{ steps.setup-julia.outputs.julia-bindir }}
-          lib /def:libjulia.def /out:libjulia.lib /machine:x64
-          lib /def:libopenlibm.def /out:libopenlibm.lib /machine:x64
-          lib /def:libuv-2.def /out:libuv-2.lib /machine:x64
-
-      - name: Run tests
-        run: cargo test --features full,rc3 --verbose -- --test-threads=1
 
   test-linux-lts:
     runs-on: ubuntu-latest
