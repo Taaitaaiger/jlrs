@@ -166,11 +166,11 @@ You can enable all features except `lts` and `debug` by enabling the `full` feat
 
 If you want to embed Julia and call it from Rust, you must enable a runtime feature:
 
-`jlrs = {version = "0.15", features = ["sync-rt"]}`
+`jlrs = {version = "0.16", features = ["sync-rt"]}`
 
-`jlrs = {version = "0.15", features = ["tokio-rt"]}`
+`jlrs = {version = "0.16", features = ["tokio-rt"]}`
 
-`jlrs = {version = "0.15", features = ["async-std-rt"]}`
+`jlrs = {version = "0.16", features = ["async-std-rt"]}`
 
 When Julia is embedded in an application, it must be initialized before it can be used. The
 following snippet initializes the sync runtime:
