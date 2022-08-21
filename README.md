@@ -6,7 +6,7 @@
 jlrs is a crate that provides access to most of the Julia C API, it can be used to embed Julia
 in Rust applications and to use functionality from the Julia C API when writing `ccall`able
 functions in Rust. Currently this crate is only tested on Linux and Windows in combination
-with Julia 1.6, 1.7, and 1.8.0-rc3 and is not compatible with other versions of Julia.
+with Julia 1.6 and 1.8.0 and is not compatible with other versions of Julia.
 
 The documentation assumes you're already familiar with the Julia programming language.
 
@@ -32,9 +32,8 @@ recently released version.
 
 ## Prerequisites
 
-Julia must be installed before jlrs can be used. Only version  1.6, 1.7, and 1.8.0-rc3 are 
-supported. Using version 1.6 requires enabling the `lts` feature, 1.8.0-rc3 requires enabling
-the `rc3` feature.
+Julia must be installed before jlrs can be used. Only version  1.6 and 1.8.0 are 
+supported. Using version 1.6 requires enabling the `lts`.
 
 ### Linux
 
@@ -76,7 +75,7 @@ when this version is used.
 
 If you use the MSVC target, you must create two or three lib files using `lib.exe`. The def
 files required for this can be found in the [`def` folder](https://github.com/Taaitaaiger/jlrs/tree/master/jl_sys/def) in the jl-sys crate. To create the
-lib files, copy the three files from either the `lts`, `stable`, or `rc3` folder to the `bin` 
+lib files, copy the three files from either the `lts` or `stable` folder to the `bin` 
 folder where Julia is installed. Afterwards, open a Developer Command Prompt for VS19 and 
 execute the following commands:
 
@@ -122,10 +121,7 @@ In addition to these runtimes, the following utility features are available:
   Provide a prelude module, `jlrs::prelude`. This feature is enabled by default.
 
 - `lts`
-  Use the current LTS version of Julia (1.6) instead of the current stable version (1.7).
-
-- `rc3`
-  Use the current 1.8.0-rc3 version of Julia instead of the current stable version (1.7).
+  Use the current LTS version of Julia (1.6) instead of the current stable version (1.8).
 
 - `async`
   Enable the features of the async runtime which don't depend on the backing runtime. This

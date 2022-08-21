@@ -21,6 +21,7 @@
 //! module which provides an easy way to create values of this type.
 //!
 //! [`TypedArray<isize>`]: crate::wrappers::ptr::array::TypedArray
+//! [`named_tuple`]: crate::named_tuple!
 
 #[doc(hidden)]
 #[macro_export]

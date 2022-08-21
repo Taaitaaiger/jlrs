@@ -60,8 +60,6 @@ uv = ["jl-sys/uv", "ccall"]
 debug = ["jl-sys/debug"]
 # Link LTS version of Julia
 lts = ["jl-sys/lts"]
-# Link the rc3 version of Julia 1.8
-rc3 = ["jl-sys/rc3"]
 # Link 32-bits version of Julia on Linux
 i686 = ["jl-sys/i686"]
 
