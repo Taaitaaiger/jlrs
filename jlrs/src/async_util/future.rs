@@ -87,6 +87,61 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         Ok(JuliaFuture { shared_state })
     }
 
+    #[cfg(all(feature = "nightly", not(feature = "all-features-override")))]
+    pub(crate) fn new_interactive<'value, V>(
+        frame: &mut AsyncGcFrame<'frame>,
+        func: Value,
+        values: V,
+    ) -> JlrsResult<Self>
+    where
+        V: AsRef<[Value<'value, 'data>]>,
+    {
+        let shared_state = Arc::new(Mutex::new(TaskState {
+            completed: false,
+            waker: None,
+            task: None,
+            _marker: PhantomData,
+        }));
+
+        let values = values.as_ref();
+        let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
+        let state_ptr_boxed = Value::new(&mut *frame, state_ptr)?;
+
+        let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + values.len());
+
+        vals.push(func);
+        vals.push(state_ptr_boxed);
+        vals.extend_from_slice(values);
+
+        // Safety: module contents are globally rooted, and the function is guaranteed to be safe
+        // by the caller.
+        let task = unsafe {
+            let global = Global::new();
+            Module::main(global)
+                .submodule_ref("JlrsMultitask")?
+                .wrapper_unchecked()
+                .function_ref("interactivecall")?
+                .wrapper_unchecked()
+                .call(&mut *frame, &mut vals)?
+                .map_err(|e| {
+                    let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
+                    JlrsError::exception(format!("interactivecall threw an exception: {}", msg))
+                })?
+                .cast_unchecked::<Task>()
+        };
+
+        {
+            let locked = shared_state.lock();
+            match locked {
+                Ok(mut data) => data.task = Some(task),
+                _ => JlrsError::exception_error("Cannot set task".into())?,
+            }
+        }
+
+        yield_task(frame);
+        Ok(JuliaFuture { shared_state })
+    }
+
     pub(crate) fn new_local<'value, V>(
         frame: &mut AsyncGcFrame<'frame>,
         func: Value,
@@ -233,6 +288,62 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                 .map_err(|e| {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
                     JlrsError::exception(format!("asynccall threw an exception: {}", msg))
+                })?
+                .cast_unchecked::<Task>()
+        };
+
+        {
+            let locked = shared_state.lock();
+            match locked {
+                Ok(mut data) => data.task = Some(task),
+                _ => JlrsError::exception_error("Cannot set task".into())?,
+            }
+        }
+
+        yield_task(frame);
+
+        Ok(JuliaFuture { shared_state })
+    }
+
+    #[cfg(all(feature = "nightly", not(feature = "all-features-override")))]
+    pub(crate) fn new_interactive_with_keywords<'value, V>(
+        frame: &mut AsyncGcFrame<'frame>,
+        func: WithKeywords,
+        values: V,
+    ) -> JlrsResult<Self>
+    where
+        V: AsRef<[Value<'value, 'data>]>,
+    {
+        let shared_state = Arc::new(Mutex::new(TaskState {
+            completed: false,
+            waker: None,
+            task: None,
+            _marker: PhantomData,
+        }));
+
+        let values = values.as_ref();
+        let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
+        let state_ptr_boxed = Value::new(&mut *frame, state_ptr)?;
+
+        let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + values.len());
+        vals.push(func.function());
+        vals.push(state_ptr_boxed);
+        vals.extend_from_slice(values);
+
+        // Safety: module contents are globally rooted, and the function is guaranteed to be safe
+        // by the caller.
+        let task = unsafe {
+            let global = Global::new();
+            Module::main(global)
+                .submodule_ref("JlrsMultitask")?
+                .wrapper_unchecked()
+                .function_ref("interactivecall")?
+                .wrapper_unchecked()
+                .provide_keywords(func.keywords())?
+                .call(&mut *frame, &mut vals)?
+                .map_err(|e| {
+                    let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
+                    JlrsError::exception(format!("interactivecall threw an exception: {}", msg))
                 })?
                 .cast_unchecked::<Task>()
         };

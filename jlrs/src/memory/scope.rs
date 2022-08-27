@@ -18,7 +18,7 @@
 //! implementation to an `Output` and a mutable reference to a frame. When a frame is used as a
 //! `Scope`, the `Output` is reserved in that frame and the frame is the frame itself. If an
 //! `OutputScope` is used, the provided `Output` and frame are returned.
-//!  
+//!
 //! A few examples:
 //!
 //! ```
@@ -34,12 +34,12 @@
 //!     // Value::new takes a partial scope, here a frame is used, so the
 //!     // value is rooted in the current frame.
 //!     let _i = Value::new(&mut frame, 2u64)?;
-//!     
+//!
 //!     // We can also reserve an output in the current frame and use
 //!     // that output. This has the same effect as the previous example.
 //!     let output = frame.output()?;
 //!     let _j = Value::new(output, 1u32)?;
-//!     
+//!
 //!     // Simarly, we can use an OutputScope because everything that
 //!     // implements Scope implements PartialScope.
 //!     let output = frame.output()?;

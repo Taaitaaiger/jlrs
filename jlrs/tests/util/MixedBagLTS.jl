@@ -41,7 +41,7 @@ struct HasPointer
     mut_f32::MutableF32
 end
 
-struct Arrays 
+struct Arrays
     u8vec::Vector{UInt8}
     unionvec::Vector{Union{UInt8, UInt16}}
     wrappervec::Vector{Module}

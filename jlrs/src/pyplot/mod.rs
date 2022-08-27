@@ -1,8 +1,10 @@
 //! Plot data with Plots.jl and PyPlot.jl
 //!
-//! In order to use this module, both PyPlot.jl and PyCall.jl must have been installed, as well as
-//! GTK3. GTK3 is currently the only supported GUI. Note that when multiple figures are open, only
-//! the most recently opened one is updated automatically.
+//! In order to use this module PyPlot.jl must have been installed, as well as GTK3. GTK3 is
+//! currently the only supported GUI. You must use a `matplotlibrc` file that sets the backend
+//! to `Gtk3Agg`.
+//!
+//! When multiple figures are open, only the most recently opened one is updated automatically.
 
 use crate::{
     call::{Call, ProvideKeywords},

@@ -2463,7 +2463,7 @@ thread_local! {
     // requires a mutable pointer to this array so an `UnsafeCell` is used to store it.
     static JL_LONG_TYPE: UnsafeCell<[*mut jl_datatype_t; 8]> = unsafe {
         let global = Global::new();
-        let t = usize::julia_type(global).ptr();
+        let t = isize::julia_type(global).ptr();
         UnsafeCell::new([
             t,
             t,
@@ -2509,7 +2509,7 @@ where
     unsafe {
         let n = dims.n_dimensions();
         let global = Global::new();
-        let mut elem_types = vec![usize::julia_type(global); n];
+        let mut elem_types = vec![isize::julia_type(global); n];
         let tuple_type = jl_apply_tuple_type_v(elem_types.as_mut_ptr().cast(), n);
         let tuple = jl_new_struct_uninit(tuple_type);
         let v: Value = frame.push_root(NonNull::new_unchecked(tuple), Private)?;

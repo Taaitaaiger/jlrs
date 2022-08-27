@@ -29,7 +29,7 @@ end
 function datatype()::DataType
     Bool
 end
- 
+
 function callrust(ptr::Ptr{Cvoid})::Bool
     ccall(ptr, Bool, ())
 end
@@ -119,7 +119,7 @@ struct WithEmpty{T}
     WithEmpty{T}() where T = new()
 end
 
-struct WithAbstract 
+struct WithAbstract
     a::Real
 end
 
