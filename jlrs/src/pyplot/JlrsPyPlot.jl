@@ -1,6 +1,4 @@
 module JlrsPyPlot
-using PyCall
-pygui(:gtk3)
 using Plots
 pyplot()
 
@@ -31,9 +29,9 @@ function jlrsplot(plotfn::Function, args...; kwargs...)::PlotHandle
     global id
     plotid = id += 1
     handle = PlotHandle(plotid)
-    
+
     onclose = function (obj)
-        lock(() -> begin 
+        lock(() -> begin
             plt = activeplots[handle]
             notify(plt.event)
         end, plotlock)
@@ -41,14 +39,14 @@ function jlrsplot(plotfn::Function, args...; kwargs...)::PlotHandle
 
     plt = plotfn(args...; kwargs...)
     plt.o.canvas.mpl_connect("close_event", onclose)
-    
+
     closed = Event()
     ap = ActivePlot([plt], 1, closed)
-    lock(() -> begin 
+    lock(() -> begin
         activeplots[handle] = ap
     end, plotlock)
 
-    handle    
+    handle
 end
 
 function updateplot!(handle::PlotHandle, plotfn::Function, args...; kwargs...)::Int

@@ -364,7 +364,7 @@
 //!     ) -> JlrsResult<Self::Output> {
 //!         let a = Value::new(&mut frame, self.a)?;
 //!         let b = Value::new(&mut frame, self.b)?;
-//!             
+//!
 //!         let func = Module::base(global).function(&mut frame, "+")?;
 //!
 //!         // CallAsync::call_async schedules the function call on another
@@ -426,13 +426,13 @@
 //!         let data = vec![0usize; self.n_values];
 //!         let array = TypedArray::from_vec(&mut *frame, data, self.n_values)?
 //!             .into_jlrs_result()?;
-//!     
+//!
 //!         Ok(AccumulatorTaskState {
 //!             array,
 //!             offset: 0
 //!         })
 //!     }
-//!     
+//!
 //!     // Whenever the task is called through its handle this method
 //!     // is called. Unlike `init`, the frame that this method can use
 //!     // is dropped after `run` returns.

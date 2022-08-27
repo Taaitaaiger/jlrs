@@ -20,6 +20,7 @@ docs = []
 uv = []
 debug = []
 lts = []
+nightly = []
 i686 = []
 windows-lts = ["lts"]
 use-bindgen = ["bindgen"]
@@ -28,8 +29,8 @@ all-features-override = []
 [dependencies]
 
 [build-dependencies]
-# bindgen = { git = "https://github.com/emilio/rust-bindgen", branch = "atomic", optional = true, default-features = false, features = ["runtime"] }
-bindgen = { version = "0.60", optional = true, default-features = false, features = ["runtime"] }
+bindgen = { git = "https://github.com/emilio/rust-bindgen", branch = "atomic", optional = true, default-features = false, features = ["runtime"] }
+# bindgen = { version = "0.60", optional = true, default-features = false, features = ["runtime"] }
 cc = "1"
 cfg-if = "1"
 

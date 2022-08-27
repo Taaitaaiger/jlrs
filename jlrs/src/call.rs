@@ -489,6 +489,42 @@ cfg_if::cfg_if! {
             where
                 V: AsRef<[Value<'value, 'data>]>;
 
+            /// Call a function on another thread with the given arguments. This method uses
+            /// `Base.Threads.@spawn` to call the given function on another thread but return immediately.
+            /// While `await`ing the result the async runtime can work on other tasks, the current task
+            /// resumes after the function call on the other thread completes.
+            ///
+            /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
+            /// correctness. More information can be found in the [`safety`] module.
+            ///
+            /// [`safety`]: crate::safety
+            #[cfg(all(feature = "nightly", not(feature = "all-features-override")))]
+            async unsafe fn call_interactive<'frame, 'value, V>(
+                self,
+                frame: &mut AsyncGcFrame<'frame>,
+                args: V,
+            ) -> JlrsResult<JuliaResult<'frame, 'data>>
+            where
+                V: AsRef<[Value<'value, 'data>]>;
+
+            /// Does the same thing as [`CallAsync::call_async`], but the task is returned rather than an
+            /// awaitable `Future`. This method should only be called in [`PersistentTask::init`],
+            /// otherwise it's not guaranteed this task can make progress.
+            ///
+            /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
+            /// correctness. More information can be found in the [`safety`] module.
+            ///
+            /// [`safety`]: crate::safety
+            /// [`PersistentTask::init`]: crate::async_util::task::PersistentTask::init
+            #[cfg(all(feature = "nightly", not(feature = "all-features-override")))]
+            unsafe fn schedule_interactive<'frame, 'value, V>(
+                self,
+                frame: &mut AsyncGcFrame<'frame>,
+                args: V,
+            ) -> JlrsResult<JuliaResult<Task<'frame>, 'frame, 'data>>
+            where
+                V: AsRef<[Value<'value, 'data>]>;
+
             /// Does the same thing as [`CallAsync::call_async`], but the task is returned rather than an
             /// awaitable `Future`. This method should only be called in [`PersistentTask::init`],
             /// otherwise it's not guaranteed this task can make progress.
@@ -505,6 +541,7 @@ cfg_if::cfg_if! {
             ) -> JlrsResult<JuliaResult<Task<'frame>, 'frame, 'data>>
             where
                 V: AsRef<[Value<'value, 'data>]>;
+
 
             /// Call a function with the given arguments in an `@async` block. Like `call_async`, the
             /// function is not called on the main thread, but on a separate thread that handles all
@@ -585,6 +622,49 @@ cfg_if::cfg_if! {
                 V: AsRef<[Value<'value, 'data>]>,
             {
                 Ok(JuliaFuture::new(frame, self, args)?.await)
+            }
+
+            #[cfg(all(feature = "nightly", not(feature = "all-features-override")))]
+            async unsafe fn call_interactive<'frame, 'value, V>(
+                self,
+                frame: &mut AsyncGcFrame<'frame>,
+                args: V,
+            ) -> JlrsResult<JuliaResult<'frame, 'data>>
+            where
+                V: AsRef<[Value<'value, 'data>]>
+            {
+                Ok(JuliaFuture::new_interactive(frame, self, args)?.await)
+            }
+
+            #[cfg(all(feature = "nightly", not(feature = "all-features-override")))]
+            unsafe fn schedule_interactive<'frame, 'value, V>(
+                self,
+                frame: &mut AsyncGcFrame<'frame>,
+                args: V,
+            ) -> JlrsResult<JuliaResult<Task<'frame>, 'frame, 'data>>
+            where
+                V: AsRef<[Value<'value, 'data>]>,
+            {
+                let values = args.as_ref();
+                let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(1 + values.len());
+
+                vals.push(self);
+                vals.extend_from_slice(values);
+
+                let global = Global::new();
+                let task = Module::main(global)
+                    .submodule_ref("JlrsMultitask")?
+                    .wrapper_unchecked()
+                    .function_ref("interactivecall")?
+                    .wrapper_unchecked()
+                    .call(&mut *frame, &mut vals)?;
+
+                yield_task(frame);
+
+                match task {
+                    Ok(t) => Ok(Ok(t.cast_unchecked::<Task>())),
+                    Err(e) => Ok(Err(e)),
+                }
             }
 
             unsafe fn schedule_async<'frame, 'value, V>(
@@ -713,6 +793,30 @@ cfg_if::cfg_if! {
                 Ok(JuliaFuture::new(frame, self.as_value(), args)?.await)
             }
 
+            #[cfg(all(feature = "nightly", not(feature = "all-features-override")))]
+            async unsafe fn call_interactive<'frame, 'value, V>(
+                self,
+                frame: &mut AsyncGcFrame<'frame>,
+                args: V,
+            ) -> JlrsResult<JuliaResult<'frame, 'data>>
+            where
+                V: AsRef<[Value<'value, 'data>]>,
+            {
+                Ok(JuliaFuture::new_interactive(frame, self.as_value(), args)?.await)
+            }
+
+            #[cfg(all(feature = "nightly", not(feature = "all-features-override")))]
+            unsafe fn schedule_interactive<'frame, 'value, V>(
+                self,
+                frame: &mut AsyncGcFrame<'frame>,
+                args: V,
+            ) -> JlrsResult<JuliaResult<Task<'frame>, 'frame, 'data>>
+            where
+                V: AsRef<[Value<'value, 'data>]>,
+            {
+                self.as_value().schedule_interactive(frame, args)
+            }
+
             unsafe fn schedule_async<'frame, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'frame>,
@@ -780,6 +884,50 @@ cfg_if::cfg_if! {
                 V: AsRef<[Value<'value, 'data>]>,
             {
                 Ok(JuliaFuture::new_with_keywords(frame, self, args)?.await)
+            }
+
+            #[cfg(all(feature = "nightly", not(feature = "all-features-override")))]
+            async unsafe fn call_interactive<'frame, 'value, V>(
+                self,
+                frame: &mut AsyncGcFrame<'frame>,
+                args: V,
+            ) -> JlrsResult<JuliaResult<'frame, 'data>>
+            where
+                V: AsRef<[Value<'value, 'data>]>,
+            {
+                Ok(JuliaFuture::new_interactive_with_keywords(frame, self, args)?.await)
+            }
+
+            #[cfg(all(feature = "nightly", not(feature = "all-features-override")))]
+            unsafe fn schedule_interactive<'frame, 'value, V>(
+                self,
+                frame: &mut AsyncGcFrame<'frame>,
+                args: V,
+            ) -> JlrsResult<JuliaResult<Task<'frame>, 'frame, 'data>>
+            where
+                V: AsRef<[Value<'value, 'data>]>,
+            {
+                let values = args.as_ref();
+                let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(1 + values.len());
+
+                vals.push(self.function());
+                vals.extend_from_slice(values);
+
+                let global = Global::new();
+                let task = Module::main(global)
+                    .submodule_ref("JlrsMultitask")?
+                    .wrapper_unchecked()
+                    .function_ref("interactivecall")?
+                    .wrapper_unchecked()
+                    .provide_keywords(self.keywords())?
+                    .call(&mut *frame, &mut vals)?;
+
+                yield_task(frame);
+
+                match task {
+                    Ok(t) => Ok(Ok(t.cast_unchecked::<Task>())),
+                    Err(e) => Ok(Err(e)),
+                }
             }
 
             unsafe fn schedule_async<'frame, 'value, V>(

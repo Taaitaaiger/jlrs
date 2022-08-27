@@ -60,6 +60,10 @@ use std::{
     time::Duration,
 };
 
+#[cfg(all(feature = "nightly", not(feature = "all-features-override")))]
+init_fn!(init_multitask, JLRS_MULTITASK_JL, "JlrsMultitaskNightly.jl");
+
+#[cfg(any(not(feature = "nightly"), feature = "all-features-override"))]
 init_fn!(init_multitask, JLRS_MULTITASK_JL, "JlrsMultitask.jl");
 
 /// Convert `Self` to a `Result`.
@@ -603,11 +607,40 @@ where
                     Err(RuntimeError::AlreadyInitialized)?;
                 }
 
+                #[cfg(any(not(feature = "nightly"), feature = "all-features-override"))]
                 {
                     if builder.n_threads == 0 {
                         jl_options.nthreads = -1;
                     } else {
                         jl_options.nthreads = builder.n_threads as _;
+                    }
+                }
+
+                #[cfg(all(feature = "nightly", not(feature = "all-features-override")))]
+                {
+                    if builder.n_threadsi != 0 {
+                        if builder.n_threads == 0 {
+                            jl_options.nthreads = -1;
+                            jl_options.nthreadpools = 2;
+                            let perthread = Box::new([-1i16, builder.n_threadsi as _]);
+                            jl_options.nthreads_per_pool = Box::leak(perthread) as *const _;
+                        } else {
+                            jl_options.nthreads = builder.n_threads as _;
+                            jl_options.nthreadpools = 2;
+                            let perthread =
+                                Box::new([builder.n_threads as i16, builder.n_threadsi as i16]);
+                            jl_options.nthreads_per_pool = Box::leak(perthread) as *const _;
+                        }
+                    } else if builder.n_threads == 0 {
+                        jl_options.nthreads = -1;
+                        jl_options.nthreadpools = 1;
+                        let perthread = Box::new(-1i16);
+                        jl_options.nthreads_per_pool = Box::leak(perthread) as *const _;
+                    } else {
+                        jl_options.nthreads = builder.n_threads as _;
+                        jl_options.nthreadpools = 1;
+                        let perthread = Box::new(builder.n_threads as i16);
+                        jl_options.nthreads_per_pool = Box::leak(perthread) as *const _;
                     }
                 }
 

@@ -32,7 +32,7 @@ recently released version.
 
 ## Prerequisites
 
-Julia must be installed before jlrs can be used. Only version  1.6 and 1.8.0 are 
+Julia must be installed before jlrs can be used. Only version  1.6 and 1.8.0 are
 supported. Using version 1.6 requires enabling the `lts`.
 
 ### Linux
@@ -75,8 +75,8 @@ when this version is used.
 
 If you use the MSVC target, you must create two or three lib files using `lib.exe`. The def
 files required for this can be found in the [`def` folder](https://github.com/Taaitaaiger/jlrs/tree/master/jl_sys/def) in the jl-sys crate. To create the
-lib files, copy the three files from either the `lts` or `stable` folder to the `bin` 
-folder where Julia is installed. Afterwards, open a Developer Command Prompt for VS19 and 
+lib files, copy the three files from either the `lts` or `stable` folder to the `bin`
+folder where Julia is installed. Afterwards, open a Developer Command Prompt for VS19 and
 execute the following commands:
 
 ```cmd
@@ -235,9 +235,9 @@ create Julia data and call Julia functions, a scope must be created.
 When the sync runtime is used this can be done by calling the methods `Julia::scope` and
 `Julia::scope_with_capacity`. These methods take a closure with two arguments, a `Global`
 and a `GcFrame` (frame). The first is an access token for global Julia data, the second is
-used to root non-global data. While non-global data is rooted, it won't be freed by Julia's 
-garbage collector (GC). The frame is created when `Julia::scope(_with_capacity)` is called 
-and dropped when it returns, so any data rooted in the frame associated with a scope won't 
+used to root non-global data. While non-global data is rooted, it won't be freed by Julia's
+garbage collector (GC). The frame is created when `Julia::scope(_with_capacity)` is called
+and dropped when it returns, so any data rooted in the frame associated with a scope won't
 be freed by the GC until leaving that scope.
 
 Because `AsyncJulia` is a handle to the async runtime which runs on another thread it's not
@@ -318,11 +318,11 @@ the `AsyncTask` trait, and persistent tasks which implement `PersistentTask`. Bo
 these traits are async traits.
 
 An async task is similar to a blocking task, except that you must implement the async `run`
-method instead of providing a closure. This method takes a `Global` and an `AsyncGcFrame`. 
+method instead of providing a closure. This method takes a `Global` and an `AsyncGcFrame`.
 This new frame type not only provides access to the same features as `GcFrame`, it can also
-be used to call async methods provided by the `CallAsync` trait. These methods schedule a 
+be used to call async methods provided by the `CallAsync` trait. These methods schedule a
 function call as a new Julia `Task` and can be `await`ed until this task has completed. The
-async runtime can switch to another task while the result is pending, allowing multiple 
+async runtime can switch to another task while the result is pending, allowing multiple
 tasks to progress.
 
 The previous example can be rewritten as an async task:

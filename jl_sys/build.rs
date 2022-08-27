@@ -163,6 +163,9 @@ fn main() {
     ))]
     c.define("JLRS_WINDOWS_LTS", None);
 
+    #[cfg(all(feature = "lts", not(feature = "all-features-override")))]
+    c.define("JLRS_LTS", None);
+
     c.compile("jlrs_cc");
 
     #[cfg(all(feature = "use-bindgen", not(feature = "all-features-override")))]

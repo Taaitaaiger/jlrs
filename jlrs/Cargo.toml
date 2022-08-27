@@ -19,7 +19,7 @@ edition = "2018"
 default = ["prelude"]
 
 # Enable all features except `lts` and `debug`
-full = ["prelude", "sync-rt", "tokio-rt", "async-std-rt", "jlrs-ndarray", "f16", "pyplot", "internal-types", "uv", "jlrs-derive"] 
+full = ["prelude", "sync-rt", "tokio-rt", "async-std-rt", "jlrs-ndarray", "f16", "pyplot", "internal-types", "uv", "jlrs-derive"]
 
 
 # Runtimes
@@ -53,13 +53,14 @@ pyplot = []
 # Enable `ccall` feature, link `libuv`, and enable `CCall::us_async_send`
 uv = ["jl-sys/uv", "ccall"]
 
-
 # Julia version
 
 # Link debug build of Julia
 debug = ["jl-sys/debug"]
 # Link LTS version of Julia
 lts = ["jl-sys/lts"]
+# link nightly version of Julia
+nightly = ["jl-sys/nightly"]
 # Link 32-bits version of Julia on Linux
 i686 = ["jl-sys/i686"]
 

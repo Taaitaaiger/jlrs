@@ -99,11 +99,13 @@ impl<'scope> CodeInstance<'scope> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().rettype_const) }
     }
 
+    /*
     /// Inferred `CodeInfo`, `Nothing`, or `None`.
     pub fn inferred(self) -> ValueRef<'scope, 'static> {
         // Safety: the pointer points to valid data
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().inferred) }
     }
+    */
 
     /// The `ipo_purity_bits` field of this `CodeInstance`.
     #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]

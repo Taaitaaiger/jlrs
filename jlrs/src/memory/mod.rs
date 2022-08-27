@@ -74,9 +74,17 @@ pub mod scope;
 pub(crate) mod stack_page;
 
 use cfg_if::cfg_if;
+#[cfg(all(feature = "nightly", not(feature = "all-features-override")))]
+use jl_sys::jl_ptls_t;
+#[cfg(any(not(feature = "nightly"), feature = "all-features-override"))]
 use jl_sys::jl_tls_states_t;
+#[cfg(all(feature = "nightly", not(feature = "all-features-override")))]
+pub type PTls = jl_ptls_t;
 
-pub(crate) unsafe fn get_tls() -> *mut jl_tls_states_t {
+#[cfg(any(not(feature = "nightly"), feature = "all-features-override"))]
+pub type PTls = *mut jl_tls_states_t;
+
+pub(crate) unsafe fn get_tls() -> PTls {
     cfg_if! {
         if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
             use jl_sys::jl_get_ptls_states;
