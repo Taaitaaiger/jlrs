@@ -15,7 +15,7 @@ use std::{marker::PhantomData, ptr::NonNull};
 
 use cfg_if::cfg_if;
 #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::atomic::Ordering;
 
 use super::Ref;
 
@@ -96,10 +96,7 @@ impl<'scope> Task<'scope> {
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
-                    let ptr =
-                        &self.unwrap_non_null(Private).as_ref()._state as *const u8 as *const AtomicU8;
-                    let field_ref = &*ptr;
-                    field_ref.load(Ordering::SeqCst)
+                    self.unwrap_non_null(Private).as_ref()._state.load(Ordering::SeqCst)
                 }
             }
         }
@@ -120,10 +117,7 @@ impl<'scope> Task<'scope> {
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
-                    let ptr = &self.unwrap_non_null(Private).as_ref()._isexception as *const u8
-                        as *const AtomicU8;
-                    let field_ref = &*ptr;
-                    field_ref.load(Ordering::SeqCst) != 0
+                    self.unwrap_non_null(Private).as_ref()._isexception.load(Ordering::SeqCst) != 0
                 }
             }
         }

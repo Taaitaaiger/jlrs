@@ -19,8 +19,6 @@ use std::{marker::PhantomData, ptr::NonNull};
 
 cfg_if! {
     if #[cfg(any(not(feature = "lts"), feature = "all-features-override"))] {
-        use jl_sys::jl_value_t;
-        use crate::wrappers::ptr::atomic_value;
         use std::sync::atomic::Ordering;
     }
 }
@@ -93,9 +91,8 @@ impl<'scope> MethodInstance<'scope> {
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
-                    let cache = atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().cache as *const _);
-                    let ptr = cache.load(Ordering::Relaxed);
-                    CodeInstanceRef::wrap(ptr.cast())
+                    let cache = self.unwrap_non_null(Private).as_ref().cache.load(Ordering::Relaxed);
+                    CodeInstanceRef::wrap(cache)
                 }
             }
         }

@@ -21,8 +21,6 @@ use std::{marker::PhantomData, ptr::NonNull};
 
 cfg_if! {
     if #[cfg(all(not(feature = "lts"), not(feature = "all-features-override")))] {
-        use jl_sys::jl_value_t;
-        use crate::wrappers::ptr::atomic_value;
         use std::sync::atomic::Ordering;
     }
 }
@@ -120,10 +118,8 @@ impl<'scope> Method<'scope> {
             if #[cfg(all(not(feature = "lts"), not(feature = "all-features-override")))] {
                 // Safety: the pointer points to valid data
                 unsafe {
-                    let specializations =
-                        atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().specializations as *const _);
-                    let ptr = specializations.load(Ordering::Relaxed);
-                    SimpleVectorRef::wrap(ptr.cast())
+                    let specializations = self.unwrap_non_null(Private).as_ref().specializations.load(Ordering::Relaxed);
+                    SimpleVectorRef::wrap(specializations)
                 }
             } else {
                 // Safety: the pointer points to valid data
@@ -142,9 +138,8 @@ impl<'scope> Method<'scope> {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let speckeyset =
-                        atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().speckeyset as *const _);
-                    let ptr = speckeyset.load(Ordering::Relaxed);
-                    ArrayRef::wrap(ptr.cast())
+                        self.unwrap_non_null(Private).as_ref().speckeyset.load(Ordering::Relaxed);
+                    ArrayRef::wrap(speckeyset)
                 }
             }
         }
@@ -179,9 +174,8 @@ impl<'scope> Method<'scope> {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let unspecialized =
-                        atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().unspecialized as *const _);
-                    let ptr = unspecialized.load(Ordering::Relaxed);
-                    MethodInstanceRef::wrap(ptr.cast())
+                        self.unwrap_non_null(Private).as_ref().unspecialized.load(Ordering::Relaxed);
+                    MethodInstanceRef::wrap(unspecialized)
                 }
             }
         }
@@ -231,9 +225,8 @@ impl<'scope> Method<'scope> {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let invokes =
-                        atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().invokes as *const _);
-                    let ptr = invokes.load(Ordering::Relaxed);
-                    ValueRef::wrap(ptr.cast())
+                        self.unwrap_non_null(Private).as_ref().invokes.load(Ordering::Relaxed);
+                    ValueRef::wrap(invokes)
                 }
             }
         }

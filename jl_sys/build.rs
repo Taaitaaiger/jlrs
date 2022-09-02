@@ -7,6 +7,12 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::{env, process::Command};
 
+#[cfg(all(feature = "use-bindgen", not(feature = "all-features-override")))]
+#[path = "build/fix_bindings.rs"]
+mod fix_bindings;
+#[cfg(all(feature = "use-bindgen", not(feature = "all-features-override")))]
+use fix_bindings::fix_bindings;
+
 use cfg_if::cfg_if;
 
 fn find_julia() -> Option<String> {
@@ -306,18 +312,21 @@ fn main() {
             .allowlist_function("jlrs_lock")
             .allowlist_function("jlrs_unlock")
             .allowlist_function("jlrs_array_data_owner_offset")
+            .allowlist_type("jl_callptr_t")
             .allowlist_type("jl_code_instance_t")
             .allowlist_type("jl_datatype_t")
             .allowlist_type("jl_expr_t")
             .allowlist_type("jl_fielddesc16_t")
             .allowlist_type("jl_fielddesc32_t")
             .allowlist_type("jl_fielddesc8_t")
+            .allowlist_type("jl_fptr_sparam_t")
             .allowlist_type("jl_method_match_t")
             .allowlist_type("jl_methtable_t")
             .allowlist_type("jl_opaque_closure_t")
             .allowlist_type("jl_options_t")
             .allowlist_type("jl_taggedvalue_t")
             .allowlist_type("jl_task_t")
+            .allowlist_type("jl_typemap_t")
             .allowlist_type("jl_typemap_entry_t")
             .allowlist_type("jl_typemap_level_t")
             .allowlist_type("jl_uniontype_t")
@@ -483,11 +492,20 @@ fn main() {
                 .allowlist_function("jlrs_catch_wrapper");
         }
 
-        builder
+        let bindings = builder
             .rustfmt_bindings(true)
             .generate()
-            .expect("Unable to generate bindings")
-            .write_to_file(&out_path)
-            .expect("Couldn't write bindings!");
+            .expect("Unable to generate bindings");
+
+        let mut vec = Vec::new();
+        bindings
+            .write(Box::new(&mut vec))
+            .expect("Couldn't write to vec");
+        let s = String::from_utf8(vec).unwrap();
+        fix_bindings(&include_dir, &s, &out_path);
+
+        //bindings
+        //    .write_to_file(&out_path)
+        //    .expect("Couldn't write bindings!");
     }
 }

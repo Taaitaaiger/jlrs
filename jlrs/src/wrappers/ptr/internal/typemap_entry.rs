@@ -17,8 +17,6 @@ use std::{marker::PhantomData, ptr::NonNull};
 
 cfg_if! {
     if #[cfg(any(not(feature = "lts"), feature = "all-features-override"))] {
-        use jl_sys::jl_value_t;
-        use crate::wrappers::ptr::atomic_value;
         use std::sync::atomic::Ordering;
     }
 }
@@ -46,6 +44,7 @@ impl<'scope> TypeMapEntry<'scope> {
     */
 
     /// Invasive linked list
+    /// TODO: check types
     pub fn next(self) -> ValueRef<'scope, 'static> {
         cfg_if! {
             if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
@@ -54,9 +53,8 @@ impl<'scope> TypeMapEntry<'scope> {
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
-                    let next = atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().next as *const _);
-                    let ptr = next.load(Ordering::Relaxed);
-                    ValueRef::wrap(ptr.cast())
+                    let next = self.unwrap_non_null(Private).as_ref().next.load(Ordering::Relaxed);
+                    ValueRef::wrap(next.cast())
                 }
             }
         }

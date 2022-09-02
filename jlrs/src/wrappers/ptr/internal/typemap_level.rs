@@ -17,8 +17,6 @@ use std::{marker::PhantomData, ptr::NonNull};
 
 cfg_if! {
     if #[cfg(any(not(feature = "lts"), feature = "all-features-override"))] {
-        use jl_sys::jl_value_t;
-        use crate::wrappers::ptr::atomic_value;
         use std::sync::atomic::Ordering;
     }
 }
@@ -51,9 +49,8 @@ impl<'scope> TypeMapLevel<'scope> {
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
-                    let arg1 = atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().arg1 as *const _);
-                    let ptr = arg1.load(Ordering::Relaxed);
-                    ValueRef::wrap(ptr.cast())
+                    let arg1 = self.unwrap_non_null(Private).as_ref().arg1.load(Ordering::Relaxed);
+                    ValueRef::wrap(arg1.cast())
                 }
             }
         }
@@ -68,9 +65,8 @@ impl<'scope> TypeMapLevel<'scope> {
             } else {
                 unsafe {
                     // Safety: the pointer points to valid data
-                    let arg1 = atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().targ as *const _);
-                    let ptr = arg1.load(Ordering::Relaxed);
-                    ValueRef::wrap(ptr.cast())
+                    let targ = self.unwrap_non_null(Private).as_ref().targ.load(Ordering::Relaxed);
+                    ValueRef::wrap(targ.cast())
                 }
             }
         }
@@ -85,9 +81,8 @@ impl<'scope> TypeMapLevel<'scope> {
             } else {
                 unsafe {
                     // Safety: the pointer points to valid data
-                    let arg1 = atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().name1 as *const _);
-                    let ptr = arg1.load(Ordering::Relaxed);
-                    ValueRef::wrap(ptr.cast())
+                    let name1 = self.unwrap_non_null(Private).as_ref().name1.load(Ordering::Relaxed);
+                    ValueRef::wrap(name1.cast())
                 }
             }
         }
@@ -102,9 +97,8 @@ impl<'scope> TypeMapLevel<'scope> {
             } else {
                 unsafe {
                     // Safety: the pointer points to valid data
-                    let arg1 = atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().tname as *const _);
-                    let ptr = arg1.load(Ordering::Relaxed);
-                    ValueRef::wrap(ptr.cast())
+                    let tname = self.unwrap_non_null(Private).as_ref().tname.load(Ordering::Relaxed);
+                    ValueRef::wrap(tname.cast())
                 }
             }
         }
@@ -119,9 +113,8 @@ impl<'scope> TypeMapLevel<'scope> {
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
-                    let arg1 = atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().linear as *const _);
-                    let ptr = arg1.load(Ordering::Relaxed);
-                    ValueRef::wrap(ptr.cast())
+                    let linear = self.unwrap_non_null(Private).as_ref().linear.load(Ordering::Relaxed);
+                    ValueRef::wrap(linear.cast())
                 }
             }
         }
@@ -136,9 +129,8 @@ impl<'scope> TypeMapLevel<'scope> {
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
-                    let arg1 = atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().any as *const _);
-                    let ptr = arg1.load(Ordering::Relaxed);
-                    ValueRef::wrap(ptr.cast())
+                    let any = self.unwrap_non_null(Private).as_ref().any.load(Ordering::Relaxed);
+                    ValueRef::wrap(any.cast())
                 }
             }
         }

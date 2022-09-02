@@ -19,9 +19,7 @@ use std::{ffi::c_void, marker::PhantomData, ptr::NonNull};
 
 cfg_if! {
     if #[cfg(any(not(feature = "lts"), feature = "all-features-override"))] {
-        use jl_sys::jl_value_t;
-        use crate::wrappers::ptr::atomic_value;
-        use std::sync::atomic::{Ordering, AtomicPtr, AtomicU8};
+        use std::{sync::atomic::Ordering, ptr::null_mut};
     }
 }
 
@@ -67,9 +65,8 @@ impl<'scope> CodeInstance<'scope> {
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
-                    let next = atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().next as *const _);
-                    let ptr = next.load(Ordering::Relaxed);
-                    CodeInstanceRef::wrap(ptr.cast())
+                    let next = self.unwrap_non_null(Private).as_ref().next.load(Ordering::Relaxed);
+                    CodeInstanceRef::wrap(next)
                 }
             }
         }
@@ -99,13 +96,21 @@ impl<'scope> CodeInstance<'scope> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().rettype_const) }
     }
 
-    /*
     /// Inferred `CodeInfo`, `Nothing`, or `None`.
     pub fn inferred(self) -> ValueRef<'scope, 'static> {
         // Safety: the pointer points to valid data
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().inferred) }
+        cfg_if! {
+            if #[cfg(any(not(feature = "nightly"), feature = "all-features-override"))] {
+                unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().inferred) }
+            } else {
+                // Safety: the pointer points to valid data
+                unsafe {
+                    let inferred = self.unwrap_non_null(Private).as_ref().inferred.load(Ordering::Relaxed);
+                    ValueRef::wrap(inferred)
+                }
+            }
+        }
     }
-    */
 
     /// The `ipo_purity_bits` field of this `CodeInstance`.
     #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
@@ -118,7 +123,17 @@ impl<'scope> CodeInstance<'scope> {
     #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
     pub fn purity_bits(self) -> u32 {
         // Safety: the pointer points to valid data
-        unsafe { self.unwrap_non_null(Private).as_ref().purity_bits }
+        #[cfg(feature = "nightly")]
+        unsafe {
+            self.unwrap_non_null(Private)
+                .as_ref()
+                .purity_bits
+                .load(Ordering::Relaxed)
+        }
+        #[cfg(not(feature = "nightly"))]
+        unsafe {
+            self.unwrap_non_null(Private).as_ref().purity_bits
+        }
     }
 
     /// Method this instance is specialized from.
@@ -143,10 +158,7 @@ impl<'scope> CodeInstance<'scope> {
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
-                    let ptr =
-                        &self.unwrap_non_null(Private).as_ref().precompile as *const u8 as *const AtomicU8;
-                    let field_ref = &*ptr;
-                    field_ref.load(Ordering::SeqCst) != 0
+                    self.unwrap_non_null(Private).as_ref().precompile.load(Ordering::SeqCst) != 0
                 }
             }
         }
@@ -162,8 +174,7 @@ impl<'scope> CodeInstance<'scope> {
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
-                    let ptr = atomic_value::<c_void>(&self.unwrap_non_null(Private).as_ref().invoke as *const _);
-                    ptr.load(Ordering::Relaxed)
+                    self.unwrap_non_null(Private).as_ref().invoke.load(Ordering::Relaxed).map(|x| x as *mut c_void).unwrap_or(null_mut())
                 }
             }
         }
@@ -178,9 +189,7 @@ impl<'scope> CodeInstance<'scope> {
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
-                    let ptr = &self.unwrap_non_null(Private).as_ref().specptr as *const _
-                        as *const AtomicPtr<c_void>;
-                    (&*ptr).load(Ordering::Relaxed)
+                    self.unwrap_non_null(Private).as_ref().specptr.fptr.load(Ordering::Relaxed)
                 }
             }
         }

@@ -20,8 +20,6 @@ use std::{marker::PhantomData, ptr::NonNull};
 
 cfg_if! {
     if #[cfg(any(not(feature = "lts"), feature = "all-features-override"))] {
-        use jl_sys::jl_value_t;
-        use crate::wrappers::ptr::atomic_value;
         use std::sync::atomic::Ordering;
     }
 }
@@ -65,9 +63,8 @@ impl<'scope> MethodTable<'scope> {
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
-                    let defs = atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().defs as *const _);
-                    let ptr = defs.load(Ordering::Relaxed);
-                    ValueRef::wrap(ptr)
+                    let defs = self.unwrap_non_null(Private).as_ref().defs.load(Ordering::Relaxed);
+                    ValueRef::wrap(defs)
                 }
             }
         }
@@ -83,9 +80,8 @@ impl<'scope> MethodTable<'scope> {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let leafcache =
-                        atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().leafcache as *const _);
-                    let ptr = leafcache.load(Ordering::Relaxed);
-                    ArrayRef::wrap(ptr.cast())
+                        self.unwrap_non_null(Private).as_ref().leafcache.load(Ordering::Relaxed);
+                    ArrayRef::wrap(leafcache)
                 }
             }
         }
@@ -100,9 +96,8 @@ impl<'scope> MethodTable<'scope> {
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
-                    let cache = atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().cache as *const _);
-                    let ptr = cache.load(Ordering::Relaxed);
-                    ValueRef::wrap(ptr)
+                    let cache = self.unwrap_non_null(Private).as_ref().cache.load(Ordering::Relaxed);
+                    ValueRef::wrap(cache)
                 }
             }
         }
