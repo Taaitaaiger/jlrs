@@ -28,8 +28,7 @@ cfg_if! {
         use jl_sys::jl_vararg_typename;
 
     } else {
-        use jl_sys::{jl_opaque_closure_typename, jl_value_t};
-        use super::atomic_value;
+        use jl_sys::{jl_opaque_closure_typename};
         use std::sync::atomic::Ordering;
     }
 }
@@ -107,9 +106,8 @@ impl<'scope> TypeName<'scope> {
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
-                    let cache = atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().cache as *const _);
-                    let ptr = cache.load(Ordering::Relaxed);
-                    SimpleVectorRef::wrap(ptr.cast())
+                    let cache = self.unwrap_non_null(Private).as_ref().cache.load(Ordering::Relaxed);
+                    SimpleVectorRef::wrap(cache)
                 }
             }
         }
@@ -124,10 +122,8 @@ impl<'scope> TypeName<'scope> {
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
-                    let linearcache =
-                        atomic_value::<jl_value_t>(&self.unwrap_non_null(Private).as_mut().linearcache as *const _);
-                    let ptr = linearcache.load(Ordering::Relaxed);
-                    SimpleVectorRef::wrap(ptr.cast())
+                    let cache = self.unwrap_non_null(Private).as_ref().linearcache.load(Ordering::Relaxed);
+                    SimpleVectorRef::wrap(cache)
                 }
             }
         }

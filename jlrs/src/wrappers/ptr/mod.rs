@@ -161,9 +161,6 @@ use std::{
     ptr::null_mut,
 };
 
-#[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
-use std::sync::atomic::AtomicPtr;
-
 pub(crate) trait Root<'target, 'value, 'data>: Wrapper<'value, 'data> {
     type Output;
     // Safety: `value` must point to valid Julia data.
@@ -183,7 +180,7 @@ pub trait WrapperRef<'scope, 'data>:
 impl<'scope, 'data, T> WrapperRef<'scope, 'data> for Ref<'scope, 'data, T>
 where
     T: Wrapper<'scope, 'data>,
-    Self: ValidLayout,
+    Self: ValidLayout + Copy,
 {
     type Wrapper = T;
 }
@@ -276,13 +273,23 @@ impl<'scope, 'data, W> Wrapper<'scope, 'data> for W where W: private::WrapperPri
 /// determine what values can be reached, as long as you can guarantee a value is reachable it's
 /// safe to use. Whenever data is not rooted jlrs returns a `Ref`. Because it's not rooted it's
 /// unsafe to use.
-#[derive(Copy, Clone)]
 #[repr(transparent)]
 pub struct Ref<'scope, 'data, T: Wrapper<'scope, 'data>>(
     *mut T::Wraps,
     PhantomData<&'scope ()>,
     PhantomData<&'data ()>,
 );
+
+impl<'scope, 'data, T> Clone for Ref<'scope, 'data, T>
+where
+    T: Wrapper<'scope, 'data>,
+{
+    fn clone(&self) -> Self {
+        Ref(self.0, PhantomData, PhantomData)
+    }
+}
+
+impl<'scope, 'data, T> Copy for Ref<'scope, 'data, T> where T: Wrapper<'scope, 'data> {}
 
 impl<'scope, 'data, T: Wrapper<'scope, 'data>> Debug for Ref<'scope, 'data, T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
@@ -356,7 +363,7 @@ pub(crate) mod private {
     use std::{fmt::Debug, ptr::NonNull};
 
     pub trait WrapperPriv<'scope, 'data>: Copy + Debug {
-        type Wraps: Copy;
+        type Wraps;
         const NAME: &'static str;
 
         // Safety: `inner` must point to valid data. If it is not
@@ -446,19 +453,4 @@ pub(crate) mod private {
         T: WrapperPriv<'scope, 'data>
     {
     }
-}
-
-#[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
-#[inline(always)]
-// Safety: this is a workaround for a bug in bindgen that turns all atomic fields into `u64`s.
-// It must only be used to access such fields.
-#[cfg(target_pointer_width = "64")]
-pub(crate) unsafe fn atomic_value<'a, T>(addr: *const u64) -> &'a AtomicPtr<T> {
-    &*(addr as *const AtomicPtr<T>)
-}
-
-#[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
-#[cfg(target_pointer_width = "32")]
-pub(crate) unsafe fn atomic_value<'a, T>(addr: *const u32) -> &'a AtomicPtr<T> {
-    &*(addr as *const AtomicPtr<T>)
 }

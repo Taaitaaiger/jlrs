@@ -26,7 +26,7 @@ function print_help() {
     echo -e "\033[1m      Version                   Default path            Override\033[0m"
     echo "    Linux 64 bit nightly:     ~/Projects/C/julia/usr  JULIA_NIGHTLY_DIR"
     echo ""
-    echo "All dependencies have been installed before running this script:"
+    echo "All dependencies must have been installed before running this script:"
     echo ""
     echo "    apt install llvm-dev libclang-dev clang \\"
     echo "                g++-multilib-i686-linux-gnu \\"
@@ -63,6 +63,8 @@ while [ -n "$1" ]; do
             JULIA_DIR=$JULIA_NIGHTLY_DIR cargo build --features use-bindgen
             echo "/* generated from Julia version 1.9.0-dev */" > ./src/bindings_nightly_x86_64_unknown_linux_gnu.rs
             cat ../target/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings_nightly_x86_64_unknown_linux_gnu.rs
+
+            cargo fmt
 
             exit
             ;;
@@ -127,9 +129,8 @@ fi
 # https://unix.stackexchange.com/a/235016
 cargo clean
 JULIA_DIR=$JULIA_LTS_DIR_WIN cargo build --features use-bindgen,windows-lts --target x86_64-pc-windows-gnu
-updated=$(sed -e '1h;2,$H;$!d;g' -r -E -e 's/(extern "C" \{\n\s+pub static)/#[link(name = \"libjulia\")]\n\1/g' ../target/x86_64-pc-windows-gnu/debug/build/jl-sys*/out/bindings.rs)
 echo "/* generated from Julia version 1.6.7 */" > ./src/bindings_1_6_x86_64_pc_windows_gnu.rs
-echo -e "$updated" >> ./src/bindings_1_6_x86_64_pc_windows_gnu.rs
+cat ../target/x86_64-pc-windows-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings_1_6_x86_64_pc_windows_gnu.rs
 
 cargo clean
 JULIA_DIR=$JULIA_LTS_DIR cargo build --features use-bindgen,lts
@@ -142,10 +143,9 @@ echo "/* generated from Julia version 1.6.7 */" > ./src/bindings_1_6_i686_unknow
 cat ../target/i686-unknown-linux-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings_1_6_i686_unknown_linux_gnu.rs
 
 cargo clean
-JULIA_DIR=$JULIA_STABLE_DIR_WIN cargo build --features use-bindgen --target x86_64-pc-windows-gnu
-updated=$(sed -e '1h;2,$H;$!d;g' -r -E -e 's/(extern "C" \{\n\s+pub static)/#[link(name = \"libjulia\")]\n\1/g' ../target/x86_64-pc-windows-gnu/debug/build/jl-sys*/out/bindings.rs)
+JULIA_DIR=$JULIA_STABLE_DIR_WIN cargo build --features use-bindgen,windows --target x86_64-pc-windows-gnu
 echo "/* generated from Julia version 1.8.0 */" > ./src/bindings_1_8_x86_64_pc_windows_gnu.rs
-echo -e "$updated" >> ./src/bindings_1_8_x86_64_pc_windows_gnu.rs
+cat ../target/x86_64-pc-windows-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings_1_8_x86_64_pc_windows_gnu.rs
 
 cargo clean
 JULIA_DIR=$JULIA_STABLE_DIR cargo build --features use-bindgen
@@ -156,3 +156,5 @@ cargo clean
 JULIA_DIR=$JULIA_STABLE_DIR_32 cargo build --features use-bindgen,i686 --target i686-unknown-linux-gnu
 echo "/* generated from Julia version 1.8.0 */" > ./src/bindings_1_8_i686_unknown_linux_gnu.rs
 cat ../target/i686-unknown-linux-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings_1_8_i686_unknown_linux_gnu.rs
+
+cargo fmt
