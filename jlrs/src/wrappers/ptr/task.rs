@@ -5,16 +5,19 @@
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L1727
 use crate::{
-    impl_julia_typecheck,
-    memory::output::Output,
-    private::Private,
-    wrappers::ptr::{private::WrapperPriv, value::ValueRef},
+    impl_julia_typecheck, memory::output::Output, private::Private,
+    wrappers::ptr::private::WrapperPriv,
 };
+
+#[cfg(feature = "extra-fields")]
+use crate::wrappers::ptr::value::ValueRef;
 use jl_sys::{jl_task_t, jl_task_type};
 use std::{marker::PhantomData, ptr::NonNull};
 
+#[cfg(feature = "extra-fields")]
 use cfg_if::cfg_if;
-#[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+#[cfg(feature = "extra-fields")]
+#[cfg(not(feature = "lts"))]
 use std::sync::atomic::Ordering;
 
 use super::Ref;
@@ -46,51 +49,59 @@ impl<'scope> Task<'scope> {
     */
 
     /// Invasive linked list for scheduler
+    #[cfg(feature = "extra-fields")]
     pub fn next(self) -> TaskRef<'scope> {
         // Safety: the pointer points to valid data
         unsafe { TaskRef::wrap(self.unwrap_non_null(Private).as_ref().next.cast()) }
     }
 
     /// Invasive linked list for scheduler
+    #[cfg(feature = "extra-fields")]
     pub fn queue(self) -> ValueRef<'scope, 'static> {
         // Safety: the pointer points to valid data
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().queue) }
     }
 
     /// The `tls` field, called `Task.storage` in Julia.
+    #[cfg(feature = "extra-fields")]
     pub fn storage(self) -> ValueRef<'scope, 'static> {
         // Safety: the pointer points to valid data
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().tls) }
     }
 
     /// The `donenotify` field.
+    #[cfg(feature = "extra-fields")]
     pub fn done_notify(self) -> ValueRef<'scope, 'static> {
         // Safety: the pointer points to valid data
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().donenotify) }
     }
 
     /// The `result` field.
+    #[cfg(feature = "extra-fields")]
     pub fn result(self) -> ValueRef<'scope, 'static> {
         // Safety: the pointer points to valid data
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().result) }
     }
 
     /// The `logstate` field.
+    #[cfg(feature = "extra-fields")]
     pub fn log_state(self) -> ValueRef<'scope, 'static> {
         // Safety: the pointer points to valid data
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().logstate) }
     }
 
     /// The `start` field.
+    #[cfg(feature = "extra-fields")]
     pub fn start(self) -> ValueRef<'scope, 'static> {
         // Safety: the pointer points to valid data
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().start) }
     }
 
     /// The `_state` field.
+    #[cfg(feature = "extra-fields")]
     pub fn state(self) -> u8 {
         cfg_if! {
-            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+            if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe { self.unwrap_non_null(Private).as_ref()._state }
             } else {
@@ -103,15 +114,17 @@ impl<'scope> Task<'scope> {
     }
 
     /// Record whether this Task can be migrated to a new thread
+    #[cfg(feature = "extra-fields")]
     pub fn sticky(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().sticky != 0 }
     }
 
     /// set if `result` is an exception to throw or that we exited with
+    #[cfg(feature = "extra-fields")]
     pub fn is_exception(self) -> bool {
         cfg_if! {
-            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+            if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe { self.unwrap_non_null(Private).as_ref()._isexception != 0 }
             } else {

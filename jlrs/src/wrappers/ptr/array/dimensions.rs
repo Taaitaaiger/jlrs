@@ -20,6 +20,8 @@ use std::{
 
 /// Trait implemented by types that can be used as n-dimensional indices.
 pub trait Dims: Sized + Debug {
+    const SIZE: isize;
+
     /// Returns the number of dimensions.
     fn n_dimensions(&self) -> usize;
 
@@ -112,6 +114,8 @@ impl<'scope> ArrayDimensions<'scope> {
 }
 
 impl<'scope> Dims for ArrayDimensions<'scope> {
+    const SIZE: isize = -1;
+
     fn n_dimensions(&self) -> usize {
         self.n
     }
@@ -127,6 +131,8 @@ impl<'scope> Dims for ArrayDimensions<'scope> {
 }
 
 impl Dims for () {
+    const SIZE: isize = 0;
+
     fn n_dimensions(&self) -> usize {
         0
     }
@@ -137,6 +143,8 @@ impl Dims for () {
 }
 
 impl Dims for usize {
+    const SIZE: isize = 1;
+
     fn n_dimensions(&self) -> usize {
         1
     }
@@ -151,6 +159,8 @@ impl Dims for usize {
 }
 
 impl Dims for (usize,) {
+    const SIZE: isize = 1;
+
     fn n_dimensions(&self) -> usize {
         1
     }
@@ -165,6 +175,8 @@ impl Dims for (usize,) {
 }
 
 impl Dims for (usize, usize) {
+    const SIZE: isize = 2;
+
     fn n_dimensions(&self) -> usize {
         2
     }
@@ -179,6 +191,8 @@ impl Dims for (usize, usize) {
 }
 
 impl Dims for (usize, usize, usize) {
+    const SIZE: isize = 3;
+
     fn n_dimensions(&self) -> usize {
         3
     }
@@ -194,6 +208,8 @@ impl Dims for (usize, usize, usize) {
 }
 
 impl Dims for (usize, usize, usize, usize) {
+    const SIZE: isize = 4;
+
     fn n_dimensions(&self) -> usize {
         4
     }
@@ -210,6 +226,8 @@ impl Dims for (usize, usize, usize, usize) {
 }
 
 impl<const N: usize> Dims for &[usize; N] {
+    const SIZE: isize = N as isize;
+
     fn n_dimensions(&self) -> usize {
         N
     }
@@ -224,6 +242,8 @@ impl<const N: usize> Dims for &[usize; N] {
 }
 
 impl<const N: usize> Dims for [usize; N] {
+    const SIZE: isize = N as isize;
+
     fn n_dimensions(&self) -> usize {
         N
     }
@@ -238,6 +258,8 @@ impl<const N: usize> Dims for [usize; N] {
 }
 
 impl Dims for &[usize] {
+    const SIZE: isize = -1;
+
     fn n_dimensions(&self) -> usize {
         self.len()
     }
@@ -295,6 +317,8 @@ impl Dimensions {
 }
 
 impl Dims for Dimensions {
+    const SIZE: isize = -1;
+
     fn n_dimensions(&self) -> usize {
         match self {
             Dimensions::Few([n, _, _, _]) => *n,

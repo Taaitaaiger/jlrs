@@ -64,6 +64,10 @@ function funcwithkw(a::Int, rest...; b::Int=1)
     a + sum(rest) + b
 end
 
+function funcwithkw(; b::Int=1, c::Int=2)
+    b + c
+end
+
 function funcwithabstractkw(a::Float32; b::Real=1.0f0)
     a + b
 end

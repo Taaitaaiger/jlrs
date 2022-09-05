@@ -58,6 +58,61 @@ mod tests {
     }
 
     #[test]
+    fn call_with_kw_and_no_arg() {
+        JULIA.with(|j| {
+            let mut jlrs = j.borrow_mut();
+
+            jlrs.scope_with_capacity(5, |global, mut frame| unsafe {
+                let b_value = Value::new(&mut frame, 10isize)?;
+                let func = Module::main(global)
+                    .submodule_ref("JlrsTests")?
+                    .wrapper_unchecked()
+                    .function_ref("funcwithkw")?
+                    .wrapper_unchecked();
+
+                let kw = named_tuple!(&mut frame, "b" => b_value)?;
+                let v = func
+                    .provide_keywords(kw)?
+                    .call0(&mut frame)?
+                    .unwrap()
+                    .unbox::<isize>()?;
+
+                assert_eq!(v, 12);
+                Ok(())
+            })
+            .unwrap();
+        });
+    }
+
+    #[test]
+    fn call_with_kw_and_1_arg() {
+        JULIA.with(|j| {
+            let mut jlrs = j.borrow_mut();
+
+            jlrs.scope_with_capacity(5, |global, mut frame| unsafe {
+                let a_value = Value::new(&mut frame, 1isize)?;
+                let b_value = Value::new(&mut frame, 10isize)?;
+                let func = Module::main(global)
+                    .submodule_ref("JlrsTests")?
+                    .wrapper_unchecked()
+                    .function_ref("funcwithkw")?
+                    .wrapper_unchecked();
+
+                let kw = named_tuple!(&mut frame, "b" => b_value)?;
+                let v = func
+                    .provide_keywords(kw)?
+                    .call1(&mut frame, a_value)?
+                    .unwrap()
+                    .unbox::<isize>()?;
+
+                assert_eq!(v, 11);
+                Ok(())
+            })
+            .unwrap();
+        });
+    }
+
+    #[test]
     fn call_with_kw_and_1_vararg() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();

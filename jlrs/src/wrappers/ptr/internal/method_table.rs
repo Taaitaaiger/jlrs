@@ -19,7 +19,7 @@ use jl_sys::{jl_methtable_t, jl_methtable_type};
 use std::{marker::PhantomData, ptr::NonNull};
 
 cfg_if! {
-    if #[cfg(any(not(feature = "lts"), feature = "all-features-override"))] {
+    if #[cfg(not(feature = "lts"))] {
         use std::sync::atomic::Ordering;
     }
 }
@@ -57,7 +57,7 @@ impl<'scope> MethodTable<'scope> {
     /// The `defs` field.
     pub fn defs(self) -> ValueRef<'scope, 'static> {
         cfg_if! {
-            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+            if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().defs) }
             } else {
@@ -73,7 +73,7 @@ impl<'scope> MethodTable<'scope> {
     /// The `leafcache` field.
     pub fn leafcache(self) -> ArrayRef<'scope, 'static> {
         cfg_if! {
-            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+            if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe { ArrayRef::wrap(self.unwrap_non_null(Private).as_ref().leafcache) }
             } else {
@@ -90,7 +90,7 @@ impl<'scope> MethodTable<'scope> {
     /// The `cache` field.
     pub fn cache(self) -> ValueRef<'scope, 'static> {
         cfg_if! {
-            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+            if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().cache) }
             } else {

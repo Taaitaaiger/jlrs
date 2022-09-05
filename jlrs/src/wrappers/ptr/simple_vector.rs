@@ -258,10 +258,10 @@ unsafe impl<'scope> Typecheck for SimpleVector<'scope> {
 
 impl<'scope> Debug for SimpleVector<'scope> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        match self.display_string() {
-            Ok(s) => write!(f, "{}", s),
-            Err(e) => write!(f, "<Cannot display value: {}>", e),
-        }
+        let s = self
+            .display_string()
+            .unwrap_or(String::from("<Cannot display value>"));
+        write!(f, "{}", s)
     }
 }
 

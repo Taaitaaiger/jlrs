@@ -1,8 +1,7 @@
-mod util;
 #[cfg(feature = "sync-rt")]
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
 mod tests {
-    use super::util::JULIA;
+    use crate::util::JULIA;
     use jlrs::layout::typecheck::*;
     use jlrs::prelude::*;
     #[cfg(feature = "internal-types")]
@@ -175,6 +174,11 @@ mod tests {
                 #[cfg(target_pointer_width = "32")]
                 assert_eq!(sz, 4);
 
+                let sz_unchecked = unsafe { dt.field_size_unchecked(1) };
+                assert_eq!(sz, sz_unchecked);
+
+                assert!(dt.field_size(20).is_err());
+
                 Ok(())
             })
             .unwrap();
@@ -193,6 +197,8 @@ mod tests {
                 #[cfg(target_pointer_width = "32")]
                 assert_eq!(sz, 4);
 
+                assert!(dt.field_offset(20).is_err());
+
                 Ok(())
             })
             .unwrap();
@@ -206,6 +212,7 @@ mod tests {
             jlrs.scope_with_capacity(0, |global, _| {
                 let dt = DataType::tvar_type(global);
                 assert!(dt.is_pointer_field(1)?);
+                assert!(dt.is_pointer_field(25).is_err());
 
                 Ok(())
             })
@@ -396,6 +403,290 @@ mod tests {
             jlrs.scope_with_capacity(0, |global, _| {
                 let dt = DataType::tvar_type(global);
                 assert!(dt.has_concrete_subtype());
+
+                Ok(())
+            })
+            .unwrap();
+        })
+    }
+
+    #[test]
+    fn datatype_params() {
+        JULIA.with(|j| {
+            let mut jlrs = j.borrow_mut();
+            jlrs.scope_with_capacity(0, |global, _| {
+                let dt = unsafe { UnionAll::array_type(global).base_type().wrapper_unchecked() };
+                assert_eq!(dt.n_parameters(), 2);
+                let param = unsafe { dt.parameter(0).unwrap().value_unchecked() };
+                assert!(param.is::<TypeVar>());
+
+                Ok(())
+            })
+            .unwrap();
+        })
+    }
+
+    #[test]
+    fn datatype_field_type() {
+        JULIA.with(|j| {
+            let mut jlrs = j.borrow_mut();
+            jlrs.scope_with_capacity(0, |global, _| {
+                let val = unsafe {
+                    DataType::unionall_type(global)
+                        .field_type(0)
+                        .unwrap()
+                        .wrapper_unchecked()
+                };
+
+                assert!(val.is::<DataType>());
+                Ok(())
+            })
+            .unwrap();
+        })
+    }
+
+    #[test]
+    fn datatype_concrete_field_type() {
+        JULIA.with(|j| {
+            let mut jlrs = j.borrow_mut();
+            jlrs.scope_with_capacity(0, |global, _| {
+                let val = unsafe {
+                    DataType::unionall_type(global)
+                        .field_type_concrete(0)
+                        .unwrap()
+                        .wrapper_unchecked()
+                };
+
+                assert!(val.is::<DataType>());
+                Ok(())
+            })
+            .unwrap();
+        })
+    }
+
+    #[test]
+    fn datatype_field_name() {
+        JULIA.with(|j| {
+            let mut jlrs = j.borrow_mut();
+            jlrs.scope_with_capacity(0, |global, _| {
+                let name = DataType::uniontype_type(global)
+                    .field_name(0)
+                    .unwrap()
+                    .as_str()?;
+
+                assert_eq!(name, "a");
+                Ok(())
+            })
+            .unwrap();
+        })
+    }
+
+    #[test]
+    fn datatype_field_name_str() {
+        JULIA.with(|j| {
+            let mut jlrs = j.borrow_mut();
+            jlrs.scope_with_capacity(0, |global, _| {
+                let name = DataType::uniontype_type(global).field_name_str(0).unwrap();
+
+                assert_eq!(name, "a");
+                let nonexistent = DataType::uniontype_type(global).field_name_str(12);
+                assert!(nonexistent.is_none());
+                Ok(())
+            })
+            .unwrap();
+        })
+    }
+
+    #[test]
+    fn datatype_field_index_unchecked() {
+        JULIA.with(|j| {
+            let mut jlrs = j.borrow_mut();
+            jlrs.scope_with_capacity(0, |global, _| {
+                let idx = DataType::uniontype_type(global).field_index_unchecked("a");
+
+                assert_eq!(idx, 0);
+
+                let idx = DataType::uniontype_type(global).field_index_unchecked("c");
+
+                assert_eq!(idx, -1);
+                Ok(())
+            })
+            .unwrap();
+        })
+    }
+
+    #[test]
+    #[cfg(not(feature = "lts"))]
+    fn datatype_is_const_field() {
+        JULIA.with(|j| {
+            let mut jlrs = j.borrow_mut();
+            jlrs.scope_with_capacity(0, |global, _| {
+                let ty = unsafe {
+                    Module::main(global)
+                        .submodule_ref("JlrsStableTests")?
+                        .wrapper_unchecked()
+                        .global_ref("WithConst")?
+                        .value_unchecked()
+                        .cast::<DataType>()?
+                };
+
+                assert!(ty.is_const_field(0)?);
+                assert!(DataType::uniontype_type(global).is_const_field(0)?);
+                assert!(!DataType::tvar_type(global).is_const_field(0)?);
+                assert!(!ty.clone().is_const_field(1)?);
+                assert!(ty.is_const_field(2).is_err());
+
+                Ok(())
+            })
+            .unwrap();
+        })
+    }
+
+    #[test]
+    fn cannot_instantiate_array() {
+        JULIA.with(|j| {
+            let mut jlrs = j.borrow_mut();
+            jlrs.scope_with_capacity(0, |_, mut frame| {
+                let ty = TypedArray::<usize>::new(&mut frame, 1)?
+                    .into_jlrs_result()?
+                    .as_value()
+                    .datatype();
+
+                let instance = ty.instantiate(&mut frame, []);
+                assert!(instance.is_err());
+
+                Ok(())
+            })
+            .unwrap();
+        })
+    }
+
+    #[test]
+    fn cannot_instantiate_with_incorrect_params() {
+        JULIA.with(|j| {
+            let mut jlrs = j.borrow_mut();
+            jlrs.scope_with_capacity(0, |global, mut frame| {
+                let ty = unsafe {
+                    Module::main(global)
+                        .submodule_ref("JlrsTests")?
+                        .wrapper_unchecked()
+                        .global_ref("WithAbstract")?
+                        .value_unchecked()
+                        .cast::<DataType>()?
+                };
+
+                let instance = ty.instantiate(&mut frame, [])?;
+                assert!(instance.is_err());
+
+                Ok(())
+            })
+            .unwrap();
+        })
+    }
+
+    #[test]
+    fn compare_with_value() {
+        JULIA.with(|j| {
+            let mut jlrs = j.borrow_mut();
+            jlrs.scope_with_capacity(0, |global, _| {
+                let ty = DataType::bool_type(global);
+                assert!(ty == ty.as_value());
+
+                let ty2 = DataType::int32_type(global);
+                assert!(ty != ty2.as_value());
+
+                Ok(())
+            })
+            .unwrap();
+        })
+    }
+
+    #[test]
+    fn datatype_cached_by_hash() {
+        JULIA.with(|j| {
+            let mut jlrs = j.borrow_mut();
+            jlrs.scope_with_capacity(0, |global, _| {
+                let ty = DataType::bool_type(global);
+                assert!(ty.cached_by_hash());
+                Ok(())
+            })
+            .unwrap();
+        })
+    }
+
+    #[test]
+    fn extend_lifetime() {
+        JULIA.with(|j| {
+            let mut jlrs = j.borrow_mut();
+            jlrs.scope(|_, mut frame| {
+                let output = frame.output()?;
+
+                frame
+                    .scope(|mut frame| {
+                        let global = frame.as_scope().global();
+                        let ty = DataType::bool_type(global);
+                        Ok(ty.root(output))
+                    })
+                    .unwrap();
+
+                Ok(())
+            })
+            .unwrap();
+        })
+    }
+
+    #[test]
+    fn check_names() {
+        JULIA.with(|j| {
+            let mut jlrs = j.borrow_mut();
+            jlrs.scope(|global, _| {
+                {
+                    let ty = DataType::returnnode_type(global);
+                    assert_eq!(ty.name(), "ReturnNode");
+                }
+
+                {
+                    let ty = DataType::gotoifnot_type(global);
+                    assert_eq!(ty.name(), "GotoIfNot");
+                }
+
+                #[cfg(not(feature = "lts"))]
+                {
+                    let ty = DataType::atomicerror_type(global);
+                    assert_eq!(ty.name(), "ConcurrencyViolationError");
+                }
+
+                {
+                    let ty = DataType::method_match_type(global);
+                    assert_eq!(ty.name(), "MethodMatch");
+                }
+
+                #[cfg(not(feature = "lts"))]
+                {
+                    let ty = DataType::interconditional_type(global);
+                    assert_eq!(ty.name(), "InterConditional");
+                }
+
+                #[cfg(not(feature = "lts"))]
+                {
+                    let ty = DataType::partial_opaque_type(global);
+                    assert_eq!(ty.name(), "PartialOpaque");
+                }
+
+                {
+                    let ty = DataType::partial_struct_type(global);
+                    assert_eq!(ty.name(), "PartialStruct");
+                }
+
+                {
+                    let ty = DataType::const_type(global);
+                    assert_eq!(ty.name(), "Const");
+                }
+
+                {
+                    let ty = DataType::argument_type(global);
+                    assert_eq!(ty.name(), "Argument");
+                }
 
                 Ok(())
             })

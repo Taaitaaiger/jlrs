@@ -41,7 +41,7 @@ cfg_if::cfg_if! {
             pub(crate) n_tasks: usize,
             pub(crate) channel_capacity: usize,
             pub(crate) recv_timeout: Duration,
-            #[cfg(all(feature = "nightly", not(feature = "all-features-override")))]
+            #[cfg(feature = "nightly")]
             pub(crate) n_threadsi: usize,
             _runtime: PhantomData<R>,
             _channel: PhantomData<C>,
@@ -64,7 +64,7 @@ cfg_if::cfg_if! {
                 self
             }
 
-            #[cfg(all(feature = "nightly", not(feature = "all-features-override")))]
+            #[cfg(feature = "nightly")]
             pub fn n_interactive_threads(mut self, n: usize) -> Self {
                 self.n_threadsi = n;
                 self
@@ -187,7 +187,7 @@ impl RuntimeBuilder {
             n_tasks: 0,
             channel_capacity: 0,
             recv_timeout: Duration::from_millis(1),
-            #[cfg(all(feature = "nightly", not(feature = "all-features-override")))]
+            #[cfg(feature = "nightly")]
             n_threadsi: 0,
             _runtime: PhantomData,
             _channel: PhantomData,

@@ -3,7 +3,7 @@
 use crate::memory::frame::Frame;
 #[cfg(feature = "sync-rt")]
 use crate::runtime::sync_rt::Julia;
-#[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+#[cfg(not(feature = "lts"))]
 use crate::{
     call::Call,
     memory::global::Global,
@@ -35,7 +35,7 @@ pub trait Gc: private::GcPriv {
     /// Enable or disable GC logging.
     ///
     /// This method is not available when the `lts` feature is enabled.
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(not(feature = "lts"))]
     fn enable_gc_logging(&mut self, on: bool) {
         // Safety: Julia is active, this method is called from a thread known to Julia, and no
         // Julia data is returned by this method.

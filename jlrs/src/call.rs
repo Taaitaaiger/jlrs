@@ -22,7 +22,6 @@ use crate::{
 };
 use jl_sys::{jl_call, jl_exception_occurred, jl_get_kwsorter};
 use smallvec::SmallVec;
-use std::ptr::NonNull;
 
 /// A function and its keyword arguments.
 pub struct WithKeywords<'scope, 'data> {
@@ -247,18 +246,8 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
     where
         S: PartialScope<'target>,
     {
-        let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
-        let args = &mut [self.keywords, self.func];
-        let n = args.len();
-
-        let res = jl_call(func, args.as_mut_ptr().cast(), n as _);
-        let exc = jl_exception_occurred();
-
-        if exc.is_null() {
-            scope.call_result(Ok(NonNull::new_unchecked(res)), Private)
-        } else {
-            scope.call_result(Err(NonNull::new_unchecked(exc)), Private)
-        }
+        let res = self.call0_unrooted(scope.global());
+        scope.call_result_ref(res, Private)
     }
 
     unsafe fn call1<'target, S>(
@@ -269,18 +258,8 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
     where
         S: PartialScope<'target>,
     {
-        let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
-        let args = &mut [self.keywords, self.func, arg0];
-        let n = args.len();
-
-        let res = jl_call(func, args.as_mut_ptr().cast(), n as _);
-        let exc = jl_exception_occurred();
-
-        if exc.is_null() {
-            scope.call_result(Ok(NonNull::new_unchecked(res)), Private)
-        } else {
-            scope.call_result(Err(NonNull::new_unchecked(exc)), Private)
-        }
+        let res = self.call1_unrooted(scope.global(), arg0);
+        scope.call_result_ref(res, Private)
     }
 
     unsafe fn call2<'target, S>(
@@ -292,18 +271,8 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
     where
         S: PartialScope<'target>,
     {
-        let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
-        let args = &mut [self.keywords, self.func, arg0, arg1];
-        let n = args.len();
-
-        let res = jl_call(func, args.as_mut_ptr().cast(), n as _);
-        let exc = jl_exception_occurred();
-
-        if exc.is_null() {
-            scope.call_result(Ok(NonNull::new_unchecked(res)), Private)
-        } else {
-            scope.call_result(Err(NonNull::new_unchecked(exc)), Private)
-        }
+        let res = self.call2_unrooted(scope.global(), arg0, arg1);
+        scope.call_result_ref(res, Private)
     }
 
     unsafe fn call3<'target, S>(
@@ -316,18 +285,8 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
     where
         S: PartialScope<'target>,
     {
-        let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
-        let args = &mut [self.keywords, self.func, arg0, arg1, arg2];
-        let n = args.len();
-
-        let res = jl_call(func, args.as_mut_ptr().cast(), n as _);
-        let exc = jl_exception_occurred();
-
-        if exc.is_null() {
-            scope.call_result(Ok(NonNull::new_unchecked(res)), Private)
-        } else {
-            scope.call_result(Err(NonNull::new_unchecked(exc)), Private)
-        }
+        let res = self.call3_unrooted(scope.global(), arg0, arg1, arg2);
+        scope.call_result_ref(res, Private)
     }
 
     unsafe fn call<'target, 'value, V, S>(
@@ -339,25 +298,8 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
         V: AsRef<[Value<'value, 'data>]>,
         S: PartialScope<'target>,
     {
-        let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
-        let args = args.as_ref();
-        let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + args.len());
-        vals.push(self.keywords);
-        vals.push(self.func);
-
-        for arg in args.iter().copied() {
-            vals.push(arg);
-        }
-
-        let n = vals.len();
-        let res = jl_call(func, vals.as_mut_ptr().cast(), n as _);
-        let exc = jl_exception_occurred();
-
-        if exc.is_null() {
-            scope.call_result(Ok(NonNull::new_unchecked(res)), Private)
-        } else {
-            scope.call_result(Err(NonNull::new_unchecked(exc)), Private)
-        }
+        let res = self.call_unrooted(scope.global(), args);
+        scope.call_result_ref(res, Private)
     }
 
     unsafe fn call0_unrooted<'target>(self, _: Global<'target>) -> JuliaResultRef<'target, 'data> {
@@ -498,7 +440,7 @@ cfg_if::cfg_if! {
             /// correctness. More information can be found in the [`safety`] module.
             ///
             /// [`safety`]: crate::safety
-            #[cfg(all(feature = "nightly", not(feature = "all-features-override")))]
+            #[cfg(feature = "nightly")]
             async unsafe fn call_interactive<'frame, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'frame>,
@@ -516,7 +458,7 @@ cfg_if::cfg_if! {
             ///
             /// [`safety`]: crate::safety
             /// [`PersistentTask::init`]: crate::async_util::task::PersistentTask::init
-            #[cfg(all(feature = "nightly", not(feature = "all-features-override")))]
+            #[cfg(feature = "nightly")]
             unsafe fn schedule_interactive<'frame, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'frame>,
@@ -624,7 +566,7 @@ cfg_if::cfg_if! {
                 Ok(JuliaFuture::new(frame, self, args)?.await)
             }
 
-            #[cfg(all(feature = "nightly", not(feature = "all-features-override")))]
+            #[cfg(feature = "nightly")]
             async unsafe fn call_interactive<'frame, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'frame>,
@@ -636,7 +578,7 @@ cfg_if::cfg_if! {
                 Ok(JuliaFuture::new_interactive(frame, self, args)?.await)
             }
 
-            #[cfg(all(feature = "nightly", not(feature = "all-features-override")))]
+            #[cfg(feature = "nightly")]
             unsafe fn schedule_interactive<'frame, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'frame>,
@@ -793,7 +735,7 @@ cfg_if::cfg_if! {
                 Ok(JuliaFuture::new(frame, self.as_value(), args)?.await)
             }
 
-            #[cfg(all(feature = "nightly", not(feature = "all-features-override")))]
+            #[cfg(feature = "nightly")]
             async unsafe fn call_interactive<'frame, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'frame>,
@@ -805,7 +747,7 @@ cfg_if::cfg_if! {
                 Ok(JuliaFuture::new_interactive(frame, self.as_value(), args)?.await)
             }
 
-            #[cfg(all(feature = "nightly", not(feature = "all-features-override")))]
+            #[cfg(feature = "nightly")]
             unsafe fn schedule_interactive<'frame, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'frame>,
@@ -886,7 +828,7 @@ cfg_if::cfg_if! {
                 Ok(JuliaFuture::new_with_keywords(frame, self, args)?.await)
             }
 
-            #[cfg(all(feature = "nightly", not(feature = "all-features-override")))]
+            #[cfg(feature = "nightly")]
             async unsafe fn call_interactive<'frame, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'frame>,
@@ -898,7 +840,7 @@ cfg_if::cfg_if! {
                 Ok(JuliaFuture::new_interactive_with_keywords(frame, self, args)?.await)
             }
 
-            #[cfg(all(feature = "nightly", not(feature = "all-features-override")))]
+            #[cfg(feature = "nightly")]
             unsafe fn schedule_interactive<'frame, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'frame>,
@@ -1051,20 +993,14 @@ cfg_if::cfg_if! {
 mod private {
     use crate::wrappers::ptr::{function::Function, value::Value};
 
-    #[cfg(all(
-        any(not(feature = "lts"), feature = "all-features-override"),
-        feature = "internal-types"
-    ))]
+    #[cfg(all(not(feature = "lts"), feature = "internal-types"))]
     use crate::wrappers::ptr::internal::opaque_closure::OpaqueClosure;
 
     use super::WithKeywords;
     pub trait CallPriv {}
     impl CallPriv for WithKeywords<'_, '_> {}
     impl CallPriv for Function<'_, '_> {}
-    #[cfg(all(
-        any(not(feature = "lts"), feature = "all-features-override"),
-        feature = "internal-types"
-    ))]
+    #[cfg(all(not(feature = "lts"), feature = "internal-types"))]
     impl CallPriv for OpaqueClosure<'_> {}
     impl CallPriv for Value<'_, '_> {}
 }

@@ -33,7 +33,7 @@ use jl_sys::{
     jl_uint32_type, jl_uint64_type, jl_uint8_type, jl_undefvarerror_type, jl_unionall_type,
     jl_uniontype_type, jl_upsilonnode_type, jl_voidpointer_type, jl_weakref_type,
 };
-#[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+#[cfg(not(feature = "lts"))]
 use jl_sys::{
     jl_atomicerror_type, jl_interconditional_type, jl_partial_opaque_type, jl_vararg_type,
 };
@@ -245,7 +245,7 @@ impl<'scope> DataType<'scope> {
     /// Returns true if this is an abstract type.
     pub fn is_abstract(self) -> bool {
         cfg_if! {
-            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+            if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe { self.unwrap_non_null(Private).as_ref().abstract_ != 0 }
             } else {
@@ -258,7 +258,7 @@ impl<'scope> DataType<'scope> {
     /// Returns true if this is a mutable type.
     pub fn mutable(self) -> bool {
         cfg_if! {
-            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+            if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe { self.unwrap_non_null(Private).as_ref().mutabl != 0 }
             } else {
@@ -271,7 +271,7 @@ impl<'scope> DataType<'scope> {
     /// Returns true if one or more of the type parameters has not been set.
     pub fn has_free_type_vars(self) -> bool {
         cfg_if! {
-            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+            if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe { self.unwrap_non_null(Private).as_ref().hasfreetypevars != 0 }
             } else {
@@ -284,7 +284,7 @@ impl<'scope> DataType<'scope> {
     /// Returns true if this type can have instances
     pub fn is_concrete_type(self) -> bool {
         cfg_if! {
-            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+            if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe { self.unwrap_non_null(Private).as_ref().isconcretetype != 0 }
             } else {
@@ -297,7 +297,7 @@ impl<'scope> DataType<'scope> {
     /// Returns true if this type is a dispatch, or leaf, tuple type.
     pub fn is_dispatch_tuple(self) -> bool {
         cfg_if! {
-            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+            if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe { self.unwrap_non_null(Private).as_ref().isdispatchtuple != 0 }
             } else {
@@ -310,7 +310,7 @@ impl<'scope> DataType<'scope> {
     /// Returns true if this type is a bits-type.
     pub fn is_bits(self) -> bool {
         cfg_if! {
-            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+            if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe { self.unwrap_non_null(Private).as_ref().isbitstype != 0 }
             } else {
@@ -323,7 +323,7 @@ impl<'scope> DataType<'scope> {
     /// Returns true if values of this type are zero-initialized.
     pub fn zero_init(self) -> bool {
         cfg_if! {
-            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+            if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe { self.unwrap_non_null(Private).as_ref().zeroinit != 0 }
             } else {
@@ -336,7 +336,7 @@ impl<'scope> DataType<'scope> {
     /// Returns true if a value of this type stores its data inline.
     pub fn is_inline_alloc(self) -> bool {
         cfg_if! {
-            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+            if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe { self.unwrap_non_null(Private).as_ref().isinlinealloc != 0 }
             } else {
@@ -352,7 +352,7 @@ impl<'scope> DataType<'scope> {
     /// If false, no value will have this type.
     pub fn has_concrete_subtype(self) -> bool {
         cfg_if! {
-            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+            if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe { self.unwrap_non_null(Private).as_ref().has_concrete_subtype != 0 }
             } else {
@@ -365,7 +365,7 @@ impl<'scope> DataType<'scope> {
     /// If true, the type is stored in hash-based set cache (instead of linear cache).
     pub fn cached_by_hash(self) -> bool {
         cfg_if! {
-            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+            if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe { self.unwrap_non_null(Private).as_ref().cached_by_hash != 0 }
             } else {
@@ -465,7 +465,7 @@ impl<'scope> DataType<'scope> {
         unsafe { Ok(jl_field_isptr(self.unwrap(Private), idx as _)) }
     }
 
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(not(feature = "lts"))]
     /// Returns true if the field at position `idx` is an atomic field.
     pub fn is_atomic_field(self, idx: usize) -> JlrsResult<bool> {
         if idx >= self.n_fields() as usize {
@@ -480,7 +480,7 @@ impl<'scope> DataType<'scope> {
         unsafe { Ok(self.is_atomic_field_unchecked(idx)) }
     }
 
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(not(feature = "lts"))]
     /// Returns true if the field at position `idx` is a constant field.
     pub fn is_const_field(self, idx: usize) -> JlrsResult<bool> {
         if idx >= self.n_fields() as usize {
@@ -519,7 +519,7 @@ impl<'scope> DataType<'scope> {
         jl_field_isptr(self.unwrap(Private), idx as _)
     }
 
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(not(feature = "lts"))]
     /// Returns true if the field at position `idx` is an atomic field.
     ///
     /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
@@ -542,7 +542,7 @@ impl<'scope> DataType<'scope> {
         isatomic != 0
     }
 
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(not(feature = "lts"))]
     /// Returns true if the field at position `idx` is a constant field.
     ///
     /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
@@ -578,10 +578,7 @@ impl<'scope> DataType<'scope> {
     /// arbitrary concrete `DataType`s, at the cost that each of its fields must have already been
     /// allocated as a `Value`. This functions returns an error if the given `DataType` isn't
     /// concrete or is an array type. For custom array types you must use [`Array::new_for`].
-    #[cfg(not(all(
-        target_os = "windows",
-        all(feature = "lts", not(feature = "all-features-override"))
-    )))]
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn instantiate<'target, 'value, 'data, V, S>(
         self,
         scope: S,
@@ -591,36 +588,8 @@ impl<'scope> DataType<'scope> {
         S: PartialScope<'target>,
         V: AsRef<[Value<'value, 'data>]>,
     {
-        use crate::{catch::catch_exceptions, error::InstantiationError};
-        use jl_sys::jl_value_t;
-        use std::mem::MaybeUninit;
-
-        // Safety: the pointer points to valid data, if an exception is thrown it's caught
-        unsafe {
-            if self.is::<Array>() {
-                Err(InstantiationError::ArrayNotSupported)?;
-            }
-
-            let values = values.as_ref();
-            let mut callback = |result: &mut MaybeUninit<*mut jl_value_t>| {
-                let v = jl_new_structv(
-                    self.unwrap(Private),
-                    values.as_ptr() as *mut _,
-                    values.len() as _,
-                );
-
-                result.write(v);
-                Ok(())
-            };
-
-            match catch_exceptions(&mut callback)? {
-                Ok(ptr) => {
-                    debug_assert!(!ptr.is_null());
-                    Ok(Ok(scope.value(NonNull::new_unchecked(ptr), Private)?))
-                }
-                Err(e) => Ok(Err(e.root(scope)?)),
-            }
-        }
+        let res = self.instantiate_unrooted(scope.global(), values)?;
+        unsafe { scope.call_result_ref(res, Private) }
     }
 
     /// Create a new instance of this `DataType`, using `values` to set the fields.
@@ -629,10 +598,7 @@ impl<'scope> DataType<'scope> {
     /// allocated as a `Value`. This functions returns an error if the given `DataType` is not
     /// concrete or an array type. Unlike [`DataType::instantiate`] this method doesn't root the
     /// allocated value.
-    #[cfg(not(all(
-        target_os = "windows",
-        all(feature = "lts", not(feature = "all-features-override"))
-    )))]
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn instantiate_unrooted<'global, 'value, 'data, V>(
         self,
         _: Global<'global>,
@@ -663,7 +629,7 @@ impl<'scope> DataType<'scope> {
                 Ok(())
             };
 
-            match catch_exceptions(&mut callback)? {
+            match catch_exceptions(&mut callback).unwrap() {
                 Ok(ptr) => Ok(Ok(ValueRef::wrap(ptr))),
                 Err(e) => Ok(Err(e)),
             }
@@ -689,13 +655,8 @@ impl<'scope> DataType<'scope> {
         S: PartialScope<'target>,
         V: AsRef<[Value<'value, 'data>]>,
     {
-        let values = values.as_ref();
-        let value = jl_new_structv(
-            self.unwrap(Private),
-            values.as_ptr() as *mut _,
-            values.len() as _,
-        );
-        scope.value(NonNull::new_unchecked(value), Private)
+        self.instantiate_unrooted_unchecked(scope.global(), values)
+            .root(scope)
     }
 
     /// Create a new instance of this `DataType`, using `values` to set the fields.
@@ -843,14 +804,14 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Core.PartialOpaque`
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(not(feature = "lts"))]
     pub fn partial_opaque_type(_: Global<'base>) -> Self {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_partial_opaque_type), Private) }
     }
 
     /// The type `Core.InterConditional`
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(not(feature = "lts"))]
     pub fn interconditional_type(_: Global<'base>) -> Self {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_interconditional_type), Private) }
@@ -887,7 +848,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Vararg`.
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(not(feature = "lts"))]
     pub fn vararg_type(_: Global<'base>) -> Self {
         // Safety: global constant
         unsafe { DataType::wrap(jl_vararg_type, Private) }
@@ -996,7 +957,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Core.AtomicError`.
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(not(feature = "lts"))]
     pub fn atomicerror_type(_: Global<'base>) -> Self {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_atomicerror_type), Private) }

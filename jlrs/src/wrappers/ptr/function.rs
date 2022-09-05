@@ -8,11 +8,8 @@
 
 use crate::{
     call::{Call, ProvideKeywords, WithKeywords},
-    error::{JlrsResult, JuliaResult, JuliaResultRef, TypeError, CANNOT_DISPLAY_TYPE},
-    layout::{
-        typecheck::{NamedTuple, Typecheck},
-        valid_layout::ValidLayout,
-    },
+    error::{JlrsResult, JuliaResult, JuliaResultRef},
+    layout::{typecheck::Typecheck, valid_layout::ValidLayout},
     memory::{global::Global, output::Output, scope::PartialScope},
     private::Private,
     wrappers::ptr::{datatype::DataType, private::WrapperPriv, value::Value, Wrapper},
@@ -184,11 +181,7 @@ impl<'value, 'data> ProvideKeywords<'value, 'data> for Function<'value, 'data> {
         self,
         kws: Value<'value, 'data>,
     ) -> JlrsResult<WithKeywords<'value, 'data>> {
-        if !kws.is::<NamedTuple>() {
-            let type_str = kws.datatype().display_string_or(CANNOT_DISPLAY_TYPE);
-            Err(TypeError::NotANamedTuple { type_str })?
-        }
-        Ok(WithKeywords::new(self.as_value(), kws))
+        self.as_value().provide_keywords(kws)
     }
 }
 

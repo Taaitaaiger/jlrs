@@ -14,4 +14,9 @@ end
 mutable struct WithAtomicUnion
     @atomic a::Union{UInt32, UInt16}
 end
+
+mutable struct WithConst
+    const i::Int
+    j::Int
+end
 end

@@ -60,10 +60,10 @@ use std::{
     time::Duration,
 };
 
-#[cfg(all(feature = "nightly", not(feature = "all-features-override")))]
+#[cfg(feature = "nightly")]
 init_fn!(init_multitask, JLRS_MULTITASK_JL, "JlrsMultitaskNightly.jl");
 
-#[cfg(any(not(feature = "nightly"), feature = "all-features-override"))]
+#[cfg(not(feature = "nightly"))]
 init_fn!(init_multitask, JLRS_MULTITASK_JL, "JlrsMultitask.jl");
 
 /// Convert `Self` to a `Result`.
@@ -607,7 +607,7 @@ where
                     Err(RuntimeError::AlreadyInitialized)?;
                 }
 
-                #[cfg(any(not(feature = "nightly"), feature = "all-features-override"))]
+                #[cfg(not(feature = "nightly"))]
                 {
                     if builder.n_threads == 0 {
                         jl_options.nthreads = -1;
@@ -616,7 +616,7 @@ where
                     }
                 }
 
-                #[cfg(all(feature = "nightly", not(feature = "all-features-override")))]
+                #[cfg(feature = "nightly")]
                 {
                     if builder.n_threadsi != 0 {
                         if builder.n_threads == 0 {

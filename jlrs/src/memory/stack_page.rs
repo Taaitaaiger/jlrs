@@ -85,7 +85,7 @@ cfg_if::cfg_if! {
             // Safety: Must only be called when the async runtime is initialized.
             pub(crate) unsafe fn link_stacks(stacks: &[Option<Box<Self>>]) {
                 cfg_if! {
-                    if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+                    if #[cfg(feature = "lts")] {
                         for stack in stacks.iter() {
                             let stack = stack.as_ref().unwrap_unchecked();
                             let rtls = NonNull::new_unchecked(jl_sys::jl_get_ptls_states()).as_mut();

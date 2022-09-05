@@ -7,10 +7,10 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::{env, process::Command};
 
-#[cfg(all(feature = "use-bindgen", not(feature = "all-features-override")))]
+#[cfg(feature = "use-bindgen")]
 #[path = "build/fix_bindings.rs"]
 mod fix_bindings;
-#[cfg(all(feature = "use-bindgen", not(feature = "all-features-override")))]
+#[cfg(feature = "use-bindgen")]
 use fix_bindings::fix_bindings;
 
 use cfg_if::cfg_if;
@@ -72,7 +72,7 @@ fn set_flags(julia_dir: &str) {
             println!("cargo:rustc-link-arg=-Wl,--export-dynamic");
 
             cfg_if! {
-                if #[cfg(all(feature = "debug", not(feature = "all-features-override")))] {
+                if #[cfg(feature = "debug")] {
                     println!("cargo:rustc-link-lib=julia-debug");
                 } else {
                     println!("cargo:rustc-link-lib=julia");
@@ -89,7 +89,7 @@ fn set_flags(julia_dir: &str) {
             println!("cargo:rustc-link-search={}/bin", &julia_dir);
 
             cfg_if! {
-                if #[cfg(all(feature = "debug", not(feature = "all-features-override")))] {
+                if #[cfg(feature = "debug")] {
                     println!("cargo:rustc-link-lib=libjulia-debug");
                 } else {
                     println!("cargo:rustc-link-lib=libjulia");
@@ -107,7 +107,7 @@ fn set_flags(julia_dir: &str) {
             println!("cargo:rustc-link-search={}/bin", &julia_dir);
 
             cfg_if! {
-                if #[cfg(all(feature = "debug", not(feature = "all-features-override")))] {
+                if #[cfg(feature = "debug")] {
                     println!("cargo:rustc-link-lib=julia-debug");
                 } else {
                     println!("cargo:rustc-link-lib=julia");
@@ -137,44 +137,37 @@ fn main() {
         return;
     }
 
-    let include_dir = match find_julia() {
-        Some(julia_dir) => {
-            set_flags(&julia_dir);
-            format!("{}/include/julia/", &julia_dir)
-        }
+    let julia_dir = match find_julia() {
+        Some(julia_dir) => julia_dir,
         None => panic!("JULIA_DIR is not set and no installed version of Julia can be found"),
     };
 
+    set_flags(&julia_dir);
+    let include_dir = format!("{}/include/julia/", &julia_dir);
     // Compile a small C++ library which provides a few additional functions that wrap functions
     // from the Julia C API that can throw exceptions with the JL_TRY and JL_CATCH macros.
     // This has to be a C++ library because MSVC doesn't support _Atomic.
     let mut c = cc::Build::new();
     c.file("src/jlrs_cc.cc").include(&include_dir).cpp(true);
 
-    #[cfg(all(feature = "i686", not(feature = "all-features-override")))]
+    #[cfg(feature = "i686")]
     c.flag("-march=pentium4");
 
     #[cfg(all(
         target_env = "msvc",
-        any(
-            not(any(feature = "windows-lts", all(feature = "lts", windows))),
-            feature = "all-features-override"
-        )
+        not(all(feature = "lts", any(windows, feature = "windows")))
     ))]
     c.flag("/std:c++20");
 
-    #[cfg(all(
-        any(feature = "windows-lts", all(feature = "lts", windows)),
-        not(feature = "all-features-override")
-    ))]
+    #[cfg(all(feature = "lts", any(windows, feature = "windows")))]
     c.define("JLRS_WINDOWS_LTS", None);
 
-    #[cfg(all(feature = "lts", not(feature = "all-features-override")))]
+    #[cfg(feature = "lts")]
     c.define("JLRS_LTS", None);
 
     c.compile("jlrs_cc");
 
-    #[cfg(all(feature = "use-bindgen", not(feature = "all-features-override")))]
+    #[cfg(feature = "use-bindgen")]
     {
         let mut out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
         out_path.push("bindings.rs");
@@ -184,9 +177,9 @@ fn main() {
         #[allow(unused_mut)]
         let mut builder = bindgen::Builder::default();
 
-        #[cfg(all(feature = "i686", not(feature = "all-features-override")))]
+        #[cfg(feature = "i686")]
         let arch_flag = "-march=pentium4";
-        #[cfg(not(all(feature = "i686", not(feature = "all-features-override"))))]
+        #[cfg(not(feature = "i686"))]
         let arch_flag = "";
 
         builder = builder
@@ -308,7 +301,6 @@ fn main() {
             .allowlist_function("jl_ver_patch")
             .allowlist_function("jl_ver_string")
             .allowlist_function("jl_yield")
-            // .allowlist_function("uv_async_send")
             .allowlist_function("jlrs_lock")
             .allowlist_function("jlrs_unlock")
             .allowlist_function("jlrs_array_data_owner_offset")
@@ -460,36 +452,9 @@ fn main() {
             .allowlist_var("jl_weakref_type")
             .allowlist_var("jl_weakref_typejl_abstractslot_type");
 
-        #[cfg(not(any(feature = "windows-lts", all(feature = "lts", windows))))]
+        #[cfg(not(all(feature = "lts", any(windows, feature = "windows"))))]
         {
-            builder = builder
-                /*.allowlist_function("jlrs_alloc_array_1d")
-                .allowlist_function("jlrs_alloc_array_2d")
-                .allowlist_function("jlrs_alloc_array_3d")
-                .allowlist_function("jlrs_apply_array_type")
-                .allowlist_function("jlrs_ptr_to_array_1d")
-                .allowlist_function("jlrs_ptr_to_array")
-                .allowlist_function("jlrs_apply_type")
-                .allowlist_function("jlrs_get_nth_field")
-                .allowlist_function("jlrs_new_array")
-                .allowlist_function("jlrs_new_structv")
-                .allowlist_function("jlrs_new_typevar")
-                .allowlist_function("jlrs_set_const")
-                .allowlist_function("jlrs_set_global")
-                .allowlist_function("jlrs_set_nth_field")
-                .allowlist_function("jlrs_type_union")
-                .allowlist_function("jlrs_type_unionall")
-                .allowlist_function("jlrs_reshape_array")
-                .allowlist_function("jlrs_array_grow_end")
-                .allowlist_function("jlrs_array_del_end")
-                .allowlist_function("jlrs_array_grow_beg")
-                .allowlist_function("jlrs_array_del_beg")
-                .allowlist_function("jlrs_array_sizehint")
-                .allowlist_function("jlrs_array_ptr_1d_push")
-                .allowlist_function("jlrs_array_ptr_1d_append")
-                .allowlist_function("jlrs_arrayset")
-                .allowlist_function("jlrs_arrayref") */
-                .allowlist_function("jlrs_catch_wrapper");
+            builder = builder.allowlist_function("jlrs_catch_wrapper");
         }
 
         let bindings = builder
@@ -497,15 +462,11 @@ fn main() {
             .generate()
             .expect("Unable to generate bindings");
 
-        let mut vec = Vec::new();
+        let mut bindings_bytes = Vec::new();
         bindings
-            .write(Box::new(&mut vec))
+            .write(Box::new(&mut bindings_bytes))
             .expect("Couldn't write to vec");
-        let s = String::from_utf8(vec).unwrap();
-        fix_bindings(&include_dir, &s, &out_path);
-
-        //bindings
-        //    .write_to_file(&out_path)
-        //    .expect("Couldn't write bindings!");
+        let bindigs_str = String::from_utf8(bindings_bytes).unwrap();
+        fix_bindings(&include_dir, &bindigs_str, &out_path);
     }
 }

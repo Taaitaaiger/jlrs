@@ -1,7 +1,7 @@
 mod util;
 #[cfg(feature = "sync-rt")]
 mod tests {
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(not(feature = "lts"))]
     use std::sync::atomic::Ordering;
 
     use super::util::{JULIA, MIXED_BAG_JL};
@@ -327,7 +327,7 @@ mod tests {
                     assert_eq!(field, 3);
                 }
 
-                #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+                #[cfg(not(feature = "lts"))]
                 {
                     let field = value
                         .field_accessor(&mut frame)
@@ -372,7 +372,7 @@ mod tests {
                     assert_eq!(field.wrapper_unchecked(), Module::main(global));
                 }
 
-                #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+                #[cfg(not(feature = "lts"))]
                 {
                     {
                         let field = value
@@ -477,7 +477,7 @@ mod tests {
                     assert_eq!(field, -3);
                 }
 
-                #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+                #[cfg(not(feature = "lts"))]
                 {
                     let field = value
                         .field_accessor(&mut frame)
@@ -522,7 +522,7 @@ mod tests {
                     assert_eq!(field, Nothing);
                 }
 
-                #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+                #[cfg(not(feature = "lts"))]
                 {
                     {
                         let field = value

@@ -154,7 +154,7 @@ use std::{
 use super::Ref;
 
 cfg_if! {
-    if #[cfg(any(not(feature = "lts"), feature = "all-features-override"))] {
+    if #[cfg(not(feature = "lts"))] {
         use jl_sys::{jlrs_lock, jlrs_unlock};
 
         use std::{
@@ -187,9 +187,9 @@ pub struct Value<'scope, 'data>(
     PhantomData<&'data mut ()>,
 );
 
-impl PartialEq for Value<'_, '_> {
-    fn eq(&self, other: &Value<'_, '_>) -> bool {
-        self.egal(*other)
+impl<'scope, 'data, T: Wrapper<'scope, 'data>> PartialEq<T> for Value<'_, '_> {
+    fn eq(&self, other: &T) -> bool {
+        self.egal(other.as_value())
     }
 }
 
@@ -600,7 +600,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
             value: self.as_ref(),
             current_field_type: self.datatype().as_ref(),
             offset: 0,
-            #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+            #[cfg(not(feature = "lts"))]
             buffer: AtomicBuffer::new(),
             state: ViewState::Unlocked,
             _frame: PhantomData,
@@ -1311,11 +1311,8 @@ impl<'data> Call<'data> for Value<'_, 'data> {
     where
         S: PartialScope<'target>,
     {
-        let res = match self.call0_unrooted(Global::new()) {
-            Ok(v) => Ok(NonNull::new_unchecked(v.ptr())),
-            Err(e) => Err(NonNull::new_unchecked(e.ptr())),
-        };
-        scope.call_result(res, Private)
+        let res = self.call0_unrooted(scope.global());
+        scope.call_result_ref(res, Private)
     }
 
     #[inline(always)]
@@ -1327,11 +1324,8 @@ impl<'data> Call<'data> for Value<'_, 'data> {
     where
         S: PartialScope<'target>,
     {
-        let res = match self.call1_unrooted(Global::new(), arg0) {
-            Ok(v) => Ok(NonNull::new_unchecked(v.ptr())),
-            Err(e) => Err(NonNull::new_unchecked(e.ptr())),
-        };
-        scope.call_result(res, Private)
+        let res = self.call1_unrooted(scope.global(), arg0);
+        scope.call_result_ref(res, Private)
     }
 
     #[inline(always)]
@@ -1344,11 +1338,8 @@ impl<'data> Call<'data> for Value<'_, 'data> {
     where
         S: PartialScope<'target>,
     {
-        let res = match self.call2_unrooted(Global::new(), arg0, arg1) {
-            Ok(v) => Ok(NonNull::new_unchecked(v.ptr())),
-            Err(e) => Err(NonNull::new_unchecked(e.ptr())),
-        };
-        scope.call_result(res, Private)
+        let res = self.call2_unrooted(scope.global(), arg0, arg1);
+        scope.call_result_ref(res, Private)
     }
 
     #[inline(always)]
@@ -1362,11 +1353,8 @@ impl<'data> Call<'data> for Value<'_, 'data> {
     where
         S: PartialScope<'target>,
     {
-        let res = match self.call3_unrooted(Global::new(), arg0, arg1, arg2) {
-            Ok(v) => Ok(NonNull::new_unchecked(v.ptr())),
-            Err(e) => Err(NonNull::new_unchecked(e.ptr())),
-        };
-        scope.call_result(res, Private)
+        let res = self.call3_unrooted(scope.global(), arg0, arg1, arg2);
+        scope.call_result_ref(res, Private)
     }
 
     #[inline(always)]
@@ -1379,11 +1367,8 @@ impl<'data> Call<'data> for Value<'_, 'data> {
         V: AsRef<[Value<'value, 'data>]>,
         S: PartialScope<'target>,
     {
-        let res = match self.call_unrooted(Global::new(), args) {
-            Ok(v) => Ok(NonNull::new_unchecked(v.ptr())),
-            Err(e) => Err(NonNull::new_unchecked(e.ptr())),
-        };
-        scope.call_result(res, Private)
+        let res = self.call_unrooted(scope.global(), args);
+        scope.call_result_ref(res, Private)
     }
 
     #[inline(always)]
@@ -1540,13 +1525,13 @@ impl LeakedValue {
 
 #[repr(C)]
 #[derive(Clone, Copy)]
-#[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+#[cfg(not(feature = "lts"))]
 union AtomicBuffer {
     bytes: [MaybeUninit<u8>; 8],
     ptr: *mut jl_value_t,
 }
 
-#[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+#[cfg(not(feature = "lts"))]
 impl AtomicBuffer {
     fn new() -> Self {
         AtomicBuffer { ptr: null_mut() }
@@ -1555,10 +1540,10 @@ impl AtomicBuffer {
 
 #[derive(Copy, Clone, PartialEq)]
 enum ViewState {
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(not(feature = "lts"))]
     Locked,
     Unlocked,
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(not(feature = "lts"))]
     AtomicBuffer,
     Array,
 }
@@ -1574,7 +1559,7 @@ enum ViewState {
 pub struct FieldAccessor<'scope, 'data, 'borrow> {
     value: ValueRef<'scope, 'data>,
     current_field_type: DataTypeRef<'scope>,
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(not(feature = "lts"))]
     buffer: AtomicBuffer,
     offset: u32,
     state: ViewState,
@@ -1607,7 +1592,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
                 Err(AccessError::InvalidLayout { value_type_str })?;
             }
 
-            #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+            #[cfg(not(feature = "lts"))]
             if self.state == ViewState::AtomicBuffer {
                 debug_assert!(!T::IS_REF);
                 debug_assert!(std::mem::size_of::<T>() <= 8);
@@ -1715,11 +1700,11 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
                     Ordering::Relaxed,
                     Ordering::SeqCst,
                 ),
-                #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+                #[cfg(not(feature = "lts"))]
                 ViewState::Locked => {
                     self.get_locked_inline_field(is_pointer_field, next_field_type)
                 }
-                #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+                #[cfg(not(feature = "lts"))]
                 ViewState::AtomicBuffer => {
                     self.get_atomic_buffer_field(is_pointer_field, next_field_type)
                 }
@@ -1734,7 +1719,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
     /// If the field is a small atomic field `ordering` is used to read it. The ordering is
     /// ignored for non-atomic fields and fields that require a lock to access. See
     /// [`FieldAccessor::field`] for more information.
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(not(feature = "lts"))]
     pub fn atomic_field<F: FieldIndex>(mut self, field: F, ordering: Ordering) -> JlrsResult<Self> {
         if self.value.is_undefined() {
             Err(AccessError::UndefRef)?
@@ -1799,7 +1784,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
     ///
     /// If the current value this accessor is accessing is locked an error is returned.
     pub fn try_clone(&self) -> JlrsResult<Self> {
-        #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+        #[cfg(not(feature = "lts"))]
         if self.state == ViewState::Locked {
             Err(AccessError::Locked)?;
         }
@@ -1808,7 +1793,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
             value: self.value,
             current_field_type: self.current_field_type,
             offset: self.offset,
-            #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+            #[cfg(not(feature = "lts"))]
             buffer: self.buffer.clone(),
             state: self.state,
             _frame: PhantomData,
@@ -1816,13 +1801,13 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
     }
 
     /// Returns `true` if the current value the accessor is accessing is locked.
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(not(feature = "lts"))]
     pub fn is_locked(&self) -> bool {
         self.state == ViewState::Locked
     }
 
     /// Returns `true` if the current value the accessor is accessing is locked.
-    #[cfg(all(feature = "lts", not(feature = "all-features-override")))]
+    #[cfg(feature = "lts")]
     pub fn is_locked(&self) -> bool {
         false
     }
@@ -1837,7 +1822,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
         self.value
     }
 
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(not(feature = "lts"))]
     // Safety: the view state must be ViewState::AtomicBuffer
     unsafe fn get_atomic_buffer_field(
         &mut self,
@@ -1868,7 +1853,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
     }
 
     // Safety: the view state must be ViewState::Unlocked
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(not(feature = "lts"))]
     unsafe fn get_unlocked_inline_field(
         &mut self,
         is_pointer_field: bool,
@@ -1898,7 +1883,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
     }
 
     // Safety: the view state must be ViewState::Unlocked
-    #[cfg(all(feature = "lts", not(feature = "all-features-override")))]
+    #[cfg(feature = "lts")]
     unsafe fn get_unlocked_inline_field(
         &mut self,
         is_pointer_field: bool,
@@ -1919,7 +1904,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
     }
 
     // Safety: the view state must be ViewState::Locked
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(not(feature = "lts"))]
     unsafe fn get_locked_inline_field(
         &mut self,
         is_pointer_field: bool,
@@ -1976,7 +1961,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
         Ok(())
     }
 
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(not(feature = "lts"))]
     // Safety: must only be used to read an atomic field
     unsafe fn lock_or_copy_atomic(&mut self, ordering: Ordering) {
         let ptr = self
@@ -2081,7 +2066,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
         }
     }
 
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(not(feature = "lts"))]
     // Safety: must only be used to read an pointer field
     unsafe fn get_pointer_field(&mut self, locked: bool, next_field_type: Value<'scope, 'data>) {
         let value = self
@@ -2119,7 +2104,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
         }
     }
 
-    #[cfg(all(feature = "lts", not(feature = "all-features-override")))]
+    #[cfg(feature = "lts")]
     // Safety: must only be used to read an pointer field
     unsafe fn get_pointer_field(&mut self, _locked: bool, next_field_type: Value<'scope, 'data>) {
         let value = self
@@ -2152,7 +2137,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
         }
     }
 
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(not(feature = "lts"))]
     // Safety: must only be used to read an atomic pointer field
     unsafe fn get_atomic_pointer_field(
         &mut self,
@@ -2210,7 +2195,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
 
 impl Drop for FieldAccessor<'_, '_, '_> {
     fn drop(&mut self) {
-        #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+        #[cfg(not(feature = "lts"))]
         if self.state == ViewState::Locked {
             debug_assert!(!self.value.is_undefined());
             // Safety: the value is currently locked.
