@@ -24,7 +24,7 @@ use std::{marker::PhantomData, ptr::NonNull};
 use super::Ref;
 
 cfg_if! {
-    if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+    if #[cfg(feature = "lts")] {
         use jl_sys::jl_vararg_typename;
 
     } else {
@@ -77,14 +77,14 @@ impl<'scope> TypeName<'scope> {
     }
 
     /// The `atomicfields` field.
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(not(feature = "lts"))]
     pub fn atomicfields(self) -> *const u32 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().atomicfields }
     }
 
     /// The `atomicfields` field.
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(not(feature = "lts"))]
     pub fn constfields(self) -> *const u32 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().constfields }
@@ -92,15 +92,17 @@ impl<'scope> TypeName<'scope> {
 
     /// Either the only instantiation of the type (if no parameters) or a `UnionAll` accepting
     /// parameters to make an instantiation.
+    #[cfg(feature = "extra-fields")]
     pub fn wrapper(self) -> ValueRef<'scope, 'static> {
         // Safety: the pointer points to valid data
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().wrapper) }
     }
 
     /// Sorted array.
+    #[cfg(feature = "extra-fields")]
     pub fn cache(self) -> SimpleVectorRef<'scope> {
         cfg_if! {
-            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+            if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe { SimpleVectorRef::wrap(self.unwrap_non_null(Private).as_ref().cache) }
             } else {
@@ -114,9 +116,10 @@ impl<'scope> TypeName<'scope> {
     }
 
     /// Unsorted array.
+    #[cfg(feature = "extra-fields")]
     pub fn linear_cache(self) -> SimpleVectorRef<'scope> {
         cfg_if! {
-            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+            if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe { SimpleVectorRef::wrap(self.unwrap_non_null(Private).as_ref().linearcache) }
             } else {
@@ -130,12 +133,14 @@ impl<'scope> TypeName<'scope> {
     }
 
     /// The `mt` field.
+    #[cfg(feature = "extra-fields")]
     pub fn mt(self) -> ValueRef<'scope, 'static> {
         // Safety: the pointer points to valid data
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().mt.cast()) }
     }
 
     /// Incomplete instantiations of this type.
+    #[cfg(feature = "extra-fields")]
     pub fn partial(self) -> ValueRef<'scope, 'static> {
         // Safety: the pointer points to valid data
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().partial.cast()) }
@@ -148,28 +153,28 @@ impl<'scope> TypeName<'scope> {
     }
 
     /// The `n_uninitialized` field.
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(not(feature = "lts"))]
     pub fn n_uninitialized(self) -> i32 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().n_uninitialized }
     }
 
     /// The `abstract` field.
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(not(feature = "lts"))]
     pub fn abstract_(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().abstract_() != 0 }
     }
 
     /// The `mutabl` field.
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(not(feature = "lts"))]
     pub fn mutabl(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().mutabl() != 0 }
     }
 
     /// The `mayinlinealloc` field.
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(not(feature = "lts"))]
     pub fn mayinlinealloc(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().mayinlinealloc() != 0 }
@@ -206,7 +211,7 @@ impl<'base> TypeName<'base> {
     }
 
     /// The typename of the `UnionAll` `Vararg`.
-    #[cfg(all(feature = "lts", not(feature = "all-features-override")))]
+    #[cfg(feature = "lts")]
     pub fn of_vararg(_: Global<'base>) -> Self {
         // Safety: global constant
         unsafe { Self::wrap(jl_vararg_typename, Private) }
@@ -219,7 +224,7 @@ impl<'base> TypeName<'base> {
     }
 
     /// The typename of the `UnionAll` `Ptr`.
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(not(feature = "lts"))]
     pub fn of_opaque_closure(_: Global<'base>) -> Self {
         // Safety: global constant
         unsafe { Self::wrap(jl_opaque_closure_typename, Private) }

@@ -46,6 +46,9 @@ f16 = ["half"]
 internal-types = []
 # Enable converting a Julia array to an `ArrayView(Mut)` from ndarray
 jlrs-ndarray = ["ndarray"]
+
+extra-fields = []
+
 # Enable the `prelude` module
 prelude = []
 # Enable the `pyplot` module
@@ -66,8 +69,6 @@ i686 = ["jl-sys/i686"]
 
 # Internal
 
-# Ignore `lts` and `debug` when --all-features is enabled
-all-features-override = ["jl-sys/all-features-override"]
 # Used to generate docs for docs.rs
 docs = ["jl-sys/docs", "full"]
 

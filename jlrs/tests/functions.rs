@@ -64,6 +64,24 @@ mod tests {
     }
 
     #[test]
+    fn call0_unrooted() {
+        JULIA.with(|j| {
+            let mut jlrs = j.borrow_mut();
+
+            jlrs.scope_with_capacity(1, |global, _| unsafe {
+                Module::base(global)
+                    .function_ref("vect")?
+                    .wrapper_unchecked()
+                    .call0_unrooted(global)
+                    .unwrap();
+
+                Ok(())
+            })
+            .unwrap();
+        });
+    }
+
+    #[test]
     fn call0_output() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
@@ -136,6 +154,24 @@ mod tests {
                 let angle = Value::new(&mut frame, std::f32::consts::PI)?;
                 let out = func.call1(&mut frame, angle)?.unwrap();
                 out.unbox::<f32>()
+            });
+
+            assert_eq!(out.unwrap(), -1.);
+        });
+    }
+
+    #[test]
+    fn call1_unrooted() {
+        JULIA.with(|j| {
+            let mut jlrs = j.borrow_mut();
+
+            let out = jlrs.scope_with_capacity(2, |global, mut frame| unsafe {
+                let func = Module::base(global)
+                    .function_ref("cos")?
+                    .wrapper_unchecked();
+                let angle = Value::new(&mut frame, std::f32::consts::PI)?;
+                let out = func.call1_unrooted(global, angle).unwrap();
+                out.wrapper_unchecked().unbox::<f32>()
             });
 
             assert_eq!(out.unwrap(), -1.);
@@ -228,6 +264,23 @@ mod tests {
                 let arg1 = Value::new(&mut frame, 2u32)?;
                 let out = func.call2(&mut frame, arg0, arg1)?.unwrap();
                 out.unbox::<u32>()
+            });
+
+            assert_eq!(out.unwrap(), 3);
+        });
+    }
+
+    #[test]
+    fn call2_unrooted() {
+        JULIA.with(|j| {
+            let mut jlrs = j.borrow_mut();
+
+            let out = jlrs.scope_with_capacity(3, |global, mut frame| unsafe {
+                let func = Module::base(global).function_ref("+")?.wrapper_unchecked();
+                let arg0 = Value::new(&mut frame, 1u32)?;
+                let arg1 = Value::new(&mut frame, 2u32)?;
+                let out = func.call2_unrooted(global, arg0, arg1).unwrap();
+                out.wrapper_unchecked().unbox::<u32>()
             });
 
             assert_eq!(out.unwrap(), 3);
@@ -339,6 +392,24 @@ mod tests {
     }
 
     #[test]
+    fn call3_unrooted() {
+        JULIA.with(|j| {
+            let mut jlrs = j.borrow_mut();
+
+            let out = jlrs.scope_with_capacity(4, |global, mut frame| unsafe {
+                let func = Module::base(global).function_ref("+")?.wrapper_unchecked();
+                let arg0 = Value::new(&mut frame, 1u32)?;
+                let arg1 = Value::new(&mut frame, 2u32)?;
+                let arg2 = Value::new(&mut frame, 3u32)?;
+                let out = func.call3_unrooted(global, arg0, arg1, arg2).unwrap();
+                out.wrapper_unchecked().unbox::<u32>()
+            });
+
+            assert_eq!(out.unwrap(), 6);
+        });
+    }
+
+    #[test]
     fn call3_output() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
@@ -426,6 +497,27 @@ mod tests {
     }
 
     #[test]
+    fn call_unrooted() {
+        JULIA.with(|j| {
+            let mut jlrs = j.borrow_mut();
+
+            let out = jlrs.scope_with_capacity(5, |global, mut frame| unsafe {
+                let func = Module::base(global).function_ref("+")?.wrapper_unchecked();
+                let arg0 = Value::new(&mut frame, 1u32)?;
+                let arg1 = Value::new(&mut frame, 2u32)?;
+                let arg2 = Value::new(&mut frame, 3u32)?;
+                let arg3 = Value::new(&mut frame, 4u32)?;
+                let out = func
+                    .call_unrooted(global, &mut [arg0, arg1, arg2, arg3])
+                    .unwrap();
+                out.wrapper_unchecked().unbox::<u32>()
+            });
+
+            assert_eq!(out.unwrap(), 10);
+        });
+    }
+
+    #[test]
     fn call_output() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
@@ -490,7 +582,7 @@ mod tests {
                         let arg2 = Value::new(&mut frame, 3u32)?;
                         let arg3 = Value::new(&mut frame, 4u32)?;
                         let output = output.into_scope(&mut frame);
-                        func.call(output, &mut [arg0, arg1, arg2, arg3])
+                        func.clone().call(output, &mut [arg0, arg1, arg2, arg3])
                     })?
                     .unwrap()
                     .unbox::<u32>()

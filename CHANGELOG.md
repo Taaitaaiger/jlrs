@@ -1,3 +1,19 @@
+#### v0.17
+ - `Module::require_unrooted` returns a `JuliaResultRef`.
+
+ - `Module::set_global_unrooted` and `Module::set_const_unrooted` now take a `Global` as their first argument.
+
+ - Atomic struct fields are now atomic in the generated bindings.
+
+ - `Value` implements `PartialEq` for all wrapper types, allowing a value to be compared with any other wrapper type directly.
+
+ - `JuliaString::to_bytes` has been renamed to `JuliaString::as_bytes`, and returns all data. 
+
+ - If a `JuliaString` is unboxed and contains non-utf8 data, all data is returned as a `Vec<u8>` rather than stopping at the first null character.
+
+#### v0.16
+ - Support for Julia 1.7 has been dropped, by default Julia 1.8 is targeted.
+
 #### v0.15
  - jlrs can be used with 32-bits versions of Julia on Linux by enabling the `i686` feature.
 

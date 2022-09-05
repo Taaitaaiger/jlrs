@@ -20,12 +20,12 @@ use jl_sys::{jl_method_t, jl_method_type};
 use std::{marker::PhantomData, ptr::NonNull};
 
 cfg_if! {
-    if #[cfg(all(not(feature = "lts"), not(feature = "all-features-override")))] {
+    if #[cfg(not(feature = "lts"))] {
         use std::sync::atomic::Ordering;
     }
 }
 
-#[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+#[cfg(not(feature = "lts"))]
 use crate::wrappers::ptr::array::TypedArrayRef;
 
 /// This type describes a single method definition, and stores data shared by the specializations
@@ -115,7 +115,7 @@ impl<'scope> Method<'scope> {
     /// Table of all `Method` specializations, allocated as [hashable, ..., NULL, linear, ....]
     pub fn specializations(self) -> SimpleVectorRef<'scope> {
         cfg_if! {
-            if #[cfg(all(not(feature = "lts"), not(feature = "all-features-override")))] {
+            if #[cfg(not(feature = "lts"))] {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let specializations = self.unwrap_non_null(Private).as_ref().specializations.load(Ordering::Relaxed);
@@ -131,7 +131,7 @@ impl<'scope> Method<'scope> {
     /// Index lookup by hash into specializations
     pub fn spec_key_set(self) -> ArrayRef<'scope, 'static> {
         cfg_if! {
-            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+            if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe { ArrayRef::wrap(self.unwrap_non_null(Private).as_ref().speckeyset) }
             } else {
@@ -152,7 +152,7 @@ impl<'scope> Method<'scope> {
     }
 
     /// reference to the method table this method is part of, null if part of the internal table
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(not(feature = "lts"))]
     pub fn external_mt(self) -> ValueRef<'scope, 'static> {
         // Safety: the pointer points to valid data
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().external_mt) }
@@ -167,7 +167,7 @@ impl<'scope> Method<'scope> {
     /// Unspecialized executable method instance, or `None`
     pub fn unspecialized(self) -> MethodInstanceRef<'scope> {
         cfg_if! {
-            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+            if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe { MethodInstanceRef::wrap(self.unwrap_non_null(Private).as_ref().unspecialized) }
             } else {
@@ -194,14 +194,14 @@ impl<'scope> Method<'scope> {
     }
 
     /// RLE (build_id, offset) pairs (even/odd indexing)
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(not(feature = "lts"))]
     pub fn root_blocks(self) -> TypedArrayRef<'scope, 'static, u64> {
         // Safety: the pointer points to valid data
         unsafe { TypedArrayRef::wrap(self.unwrap_non_null(Private).as_ref().root_blocks) }
     }
 
     /// # of roots stored in the system image
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(not(feature = "lts"))]
     pub fn nroots_sysimg(self) -> i32 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().nroots_sysimg }
@@ -218,7 +218,7 @@ impl<'scope> Method<'scope> {
     /// the most specific for the argument types.
     pub fn invokes(self) -> ValueRef<'scope, 'static> {
         cfg_if! {
-            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+            if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().invokes) }
             } else {
@@ -270,14 +270,14 @@ impl<'scope> Method<'scope> {
     }
 
     /// The `is_for_opaque_closure` field of this `Method`
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(not(feature = "lts"))]
     pub fn is_for_opaque_closure(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().is_for_opaque_closure != 0 }
     }
 
     /// 0x00 = use heuristic; 0x01 = aggressive; 0x02 = none
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(not(feature = "lts"))]
     pub fn constprop(self) -> u8 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().constprop }
@@ -285,7 +285,7 @@ impl<'scope> Method<'scope> {
 
     /// Override the conclusions of inter-procedural effect analysis,
     /// forcing the conclusion to always true.
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(not(feature = "lts"))]
     pub fn purity(self) -> u8 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().purity.bits }

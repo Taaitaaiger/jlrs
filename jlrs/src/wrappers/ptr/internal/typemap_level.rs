@@ -16,7 +16,7 @@ use jl_sys::{jl_typemap_level_t, jl_typemap_level_type};
 use std::{marker::PhantomData, ptr::NonNull};
 
 cfg_if! {
-    if #[cfg(any(not(feature = "lts"), feature = "all-features-override"))] {
+    if #[cfg(not(feature = "lts"))] {
         use std::sync::atomic::Ordering;
     }
 }
@@ -43,7 +43,7 @@ impl<'scope> TypeMapLevel<'scope> {
     /// The `arg1` field.
     pub fn arg1(self) -> ValueRef<'scope, 'static> {
         cfg_if! {
-            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+            if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().arg1.cast()) }
             } else {
@@ -59,7 +59,7 @@ impl<'scope> TypeMapLevel<'scope> {
     /// The `targ` field.
     pub fn targ(self) -> ValueRef<'scope, 'static> {
         cfg_if! {
-            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+            if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().targ.cast()) }
             } else {
@@ -75,7 +75,7 @@ impl<'scope> TypeMapLevel<'scope> {
     /// The `name1` field.
     pub fn name1(self) -> ValueRef<'scope, 'static> {
         cfg_if! {
-            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+            if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().name1.cast()) }
             } else {
@@ -91,7 +91,7 @@ impl<'scope> TypeMapLevel<'scope> {
     /// The `tname` field.
     pub fn tname(self) -> ValueRef<'scope, 'static> {
         cfg_if! {
-            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+            if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().tname.cast()) }
             } else {
@@ -107,7 +107,7 @@ impl<'scope> TypeMapLevel<'scope> {
     /// The `linear` field, which is called `list` in `Core.TypemapLevel`.
     pub fn list(self) -> ValueRef<'scope, 'static> {
         cfg_if! {
-            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+            if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().linear.cast()) }
             } else {
@@ -123,7 +123,7 @@ impl<'scope> TypeMapLevel<'scope> {
     /// The `any` field.
     pub fn any(self) -> ValueRef<'scope, 'static> {
         cfg_if! {
-            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+            if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().any.cast()) }
             } else {

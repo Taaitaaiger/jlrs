@@ -59,7 +59,7 @@ pub(crate) mod private {
     }
 
     cfg_if::cfg_if! {
-        if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+        if #[cfg(feature = "lts")] {
             impl ModePriv for Sync {
                 unsafe fn push_frame(&self, raw_frame: &[Slot], _: Private) {
                     let rtls = NonNull::new_unchecked(jl_sys::jl_get_ptls_states()).as_mut();

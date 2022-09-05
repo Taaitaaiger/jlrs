@@ -1,5 +1,5 @@
 #[cfg(feature = "sync-rt")]
-#[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+#[cfg(not(feature = "lts"))]
 mod tests {
     use crate::util::JULIA;
     use jlrs::prelude::*;

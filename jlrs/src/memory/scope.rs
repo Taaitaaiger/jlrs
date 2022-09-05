@@ -24,9 +24,9 @@
 //! ```
 //! # use jlrs::prelude::*;
 //! # use jlrs::util::JULIA;
-//! # #[cfg(all(feature = "lts", not(feature = "all-features-override")))]
+//! # #[cfg(feature = "lts")]
 //! # fn main() {}
-//! # #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+//! # #[cfg(not(feature = "lts"))]
 //! # fn main() {
 //! # JULIA.with(|j| {
 //! # let mut julia = j.borrow_mut();
@@ -190,7 +190,9 @@ where
 pub(crate) mod private {
     use std::ptr::NonNull;
 
+    use crate::prelude::ValueRef;
     use crate::wrappers::ptr::private::WrapperPriv;
+    use crate::wrappers::ptr::Ref;
     use crate::{
         error::{JlrsResult, JuliaResult},
         memory::{frame::Frame, output::Output},
@@ -230,6 +232,32 @@ pub(crate) mod private {
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
             _: Private,
         ) -> JlrsResult<JuliaResult<'target, 'data, T>>;
+
+        // Safety: the pointer must point to valid data.
+        unsafe fn call_result_ref<'data, T: WrapperPriv<'target, 'data>>(
+            self,
+            result: Result<Ref<'target, 'data, T>, ValueRef<'target, 'data>>,
+            _: Private,
+        ) -> JlrsResult<JuliaResult<'target, 'data, T>> {
+            self.call_result(
+                result
+                    .map(|p| NonNull::new_unchecked(p.ptr()))
+                    .map_err(|p| NonNull::new_unchecked(p.ptr())),
+                Private,
+            )
+        }
+
+        // Safety: the pointer must point to valid data.
+        unsafe fn exception<'data, T>(
+            self,
+            result: Result<T, ValueRef<'target, 'data>>,
+            _: Private,
+        ) -> JlrsResult<JuliaResult<'target, 'data, T>> {
+            match result {
+                Ok(v) => Ok(Ok(v)),
+                Err(e) => Ok(Err(self.value(NonNull::new_unchecked(e.ptr()), Private)?)),
+            }
+        }
     }
 
     impl<'current, F> PartialScopePriv<'current> for &mut F

@@ -24,7 +24,7 @@ cfg_if! {
 }
 
 cfg_if! {
-    if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+    if #[cfg(feature = "lts")] {
         use jl_sys::jl_vararg_type;
     }else {
         use jl_sys::jl_opaque_closure_type;
@@ -196,7 +196,7 @@ impl<'base> UnionAll<'base> {
     }
 
     /// The `UnionAll` `Vararg`.
-    #[cfg(all(feature = "lts", not(feature = "all-features-override")))]
+    #[cfg(feature = "lts")]
     pub fn vararg_type(_: Global<'base>) -> Self {
         // Safety: global constant
         unsafe { UnionAll::wrap(jl_vararg_type, Private) }
@@ -209,7 +209,7 @@ impl<'base> UnionAll<'base> {
     }
 
     /// The `UnionAll` `OpaqueClosure`.
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(not(feature = "lts"))]
     pub fn opaque_closure_type(_: Global<'base>) -> Self {
         // Safety: global constant
         unsafe { UnionAll::wrap(jl_opaque_closure_type, Private) }

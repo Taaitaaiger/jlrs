@@ -1,9 +1,8 @@
-mod util;
 #[cfg(feature = "sync-rt")]
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
 mod tests {
-    use super::util::JULIA;
-    use jlrs::prelude::*;
+    use crate::util::JULIA;
+    use jlrs::{memory::gc::Gc, prelude::*};
     use std::borrow::Cow;
 
     #[test]
@@ -278,7 +277,7 @@ mod tests {
                 let main = Module::main(global);
                 let value1 = Value::new(&mut frame, 3usize)?;
                 let value2 = Value::new(&mut frame, 4usize)?;
-                main.set_const_unrooted("TWICE", value1)?
+                main.set_const_unrooted(global, "TWICE", value1)?
                     .map_err(|v| unsafe { v.value_unchecked() })
                     .into_jlrs_result()?;
                 main.set_const(&mut frame, "TWICE", value2)?
@@ -301,6 +300,231 @@ mod tests {
                 Value::eval_string(&mut frame, "using LinearAlgebra: Hermitian")?.unwrap();
                 assert!(Module::main(global).global(&mut frame, "Hermitian").is_ok());
 
+                Ok(())
+            });
+
+            assert!(res.is_ok());
+        })
+    }
+
+    #[test]
+    fn module_parent() {
+        JULIA.with(|j| {
+            let mut jlrs = j.borrow_mut();
+            let res = jlrs.scope(|global, mut frame| {
+                let main = Module::main(global);
+                assert_eq!(main, main.parent(&mut frame)?);
+
+                Ok(())
+            });
+
+            assert!(res.is_ok());
+        })
+    }
+
+    #[test]
+    fn extend_lifetime() {
+        JULIA.with(|j| {
+            let mut jlrs = j.borrow_mut();
+            let res = jlrs.scope(|global, mut frame| {
+                frame
+                    .scope(|mut frame| {
+                        let inner_global = frame.as_scope().global();
+                        let main = Module::main(inner_global);
+                        unsafe { Ok(main.extend(global)) }
+                    })
+                    .unwrap();
+
+                Ok(())
+            });
+
+            assert!(res.is_ok());
+        })
+    }
+
+    #[test]
+    fn extend_lifetime_with_root() {
+        JULIA.with(|j| {
+            let mut jlrs = j.borrow_mut();
+            let res = jlrs.scope(|_, mut frame| {
+                let output = frame.output()?;
+
+                frame
+                    .scope(|mut frame| {
+                        let inner_global = frame.as_scope().global();
+                        Ok(Module::main(inner_global).root(output))
+                    })
+                    .unwrap();
+
+                Ok(())
+            });
+
+            assert!(res.is_ok());
+        })
+    }
+
+    #[test]
+    fn is_imported() {
+        JULIA.with(|j| {
+            let mut jlrs = j.borrow_mut();
+            let res = jlrs.scope(|global, mut frame| {
+                let main = Module::main(global);
+                assert!(!main.is_imported("+"));
+                unsafe {
+                    Value::eval_string(&mut frame, "import Base: +")?.into_jlrs_result()?;
+                }
+                assert!(main.is_imported("+"));
+
+                Ok(())
+            });
+
+            assert!(res.is_ok());
+        })
+    }
+
+    #[test]
+    fn submodule_must_be_module() {
+        JULIA.with(|j| {
+            let mut jlrs = j.borrow_mut();
+            let res = jlrs.scope(|global, mut frame| {
+                let submod = Module::main(global).submodule(&mut frame, "+");
+                assert!(submod.is_err());
+
+                Ok(())
+            });
+
+            assert!(res.is_ok());
+        })
+    }
+
+    #[test]
+    #[cfg(not(all(feature = "lts", any(windows, feature = "windows"))))]
+    fn cant_redefine_const() {
+        JULIA.with(|j| {
+            let mut jlrs = j.borrow_mut();
+            let res = jlrs.scope(|global, mut frame| {
+                let value = Value::new(&mut frame, 1usize)?;
+                let main = Module::base(global);
+
+                assert!(main.set_const(&mut frame, "pi", value)?.is_err());
+
+                unsafe { assert!(main.set_global(&mut frame, "pi", value)?.is_err()) }
+
+                Ok(())
+            });
+
+            assert!(res.is_ok());
+        })
+    }
+
+    #[test]
+    fn set_global_unchecked() {
+        JULIA.with(|j| {
+            let mut jlrs = j.borrow_mut();
+            let res = jlrs.scope(|global, mut frame| {
+                let main = Module::base(global);
+                assert!(main.global(&mut frame, "FOO").is_err());
+
+                let value = Value::new(&mut frame, 1usize)?;
+                unsafe { main.set_global_unchecked("FOO", value) }
+
+                assert_eq!(value, main.global(&mut frame, "FOO")?);
+
+                Ok(())
+            });
+
+            assert!(res.is_ok());
+        })
+    }
+
+    #[test]
+    fn set_const_unchecked() {
+        JULIA.with(|j| {
+            let mut jlrs = j.borrow_mut();
+            let res = jlrs.scope(|global, mut frame| {
+                let main = Module::base(global);
+                assert!(main.global(&mut frame, "BAR").is_err());
+
+                let value = Value::new(&mut frame, 1usize)?;
+                unsafe { main.set_const_unchecked("BAR", value) };
+
+                assert_eq!(value, main.global(&mut frame, "BAR")?);
+
+                Ok(())
+            });
+
+            assert!(res.is_ok());
+        })
+    }
+
+    #[test]
+    fn function_must_be_function() {
+        JULIA.with(|j| {
+            let mut jlrs = j.borrow_mut();
+            let res = jlrs.scope(|global, mut frame| {
+                let main = Module::base(global);
+
+                let value = Value::new(&mut frame, 1usize)?;
+                unsafe { main.set_const_unchecked("BAZ", value) };
+
+                assert!(main.function(&mut frame, "BAZ").is_err());
+                Ok(())
+            });
+
+            assert!(res.is_ok());
+        })
+    }
+
+    #[test]
+    fn global_can_be_leaked() {
+        JULIA.with(|j| {
+            let mut jlrs = j.borrow_mut();
+            let leaked = jlrs
+                .scope(|global, mut frame| {
+                    let main = Module::base(global);
+
+                    let value = Value::new(&mut frame, 1usize)?;
+                    unsafe { main.set_const_unchecked("QUX", value) };
+                    main.leaked_global("QUX")
+                })
+                .unwrap();
+
+            jlrs.gc_collect(jlrs::memory::gc::GcCollection::Full);
+
+            let res = jlrs.scope(|global, _| {
+                let value = unsafe { leaked.as_value(global) };
+                assert_eq!(value.unbox::<usize>()?, 1);
+                Ok(())
+            });
+
+            assert!(res.is_ok());
+        })
+    }
+
+    #[test]
+    fn leaked_global_must_exist() {
+        JULIA.with(|j| {
+            let mut jlrs = j.borrow_mut();
+            let res = jlrs.scope(|global, _| {
+                let main = Module::base(global);
+                main.leaked_global("QUx")
+            });
+
+            assert!(res.is_err());
+        })
+    }
+
+    #[test]
+    fn module_can_be_leaked() {
+        JULIA.with(|j| {
+            let mut jlrs = j.borrow_mut();
+            let leaked = jlrs
+                .scope(|global, _| Ok(Module::base(global).as_leaked()))
+                .unwrap();
+
+            let res = jlrs.scope(|global, _| {
+                let value = unsafe { leaked.as_value(global) };
+                assert_eq!(value, Module::base(global).clone());
                 Ok(())
             });
 

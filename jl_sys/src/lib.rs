@@ -9,67 +9,58 @@ use std::sync::atomic::{AtomicPtr, Ordering};
 
 pub mod atomic_c_fn_ptr;
 
-#[cfg(all(feature = "lts", not(feature = "all-features-override")))]
+#[cfg(feature = "lts")]
 use ::std::os::raw::c_char;
 
+// LTS
+
+// Linux 64-bit LTS bindings
 #[cfg(all(
     not(feature = "use-bindgen"),
     feature = "lts",
     target_os = "linux",
-    target_pointer_width = "64",
-    not(feature = "all-features-override")
+    target_pointer_width = "64"
 ))]
 mod bindings_1_6_x86_64_unknown_linux_gnu;
 #[cfg(all(
     not(feature = "use-bindgen"),
     feature = "lts",
     target_os = "linux",
-    target_pointer_width = "64",
-    not(feature = "all-features-override")
+    target_pointer_width = "64"
 ))]
 pub use bindings_1_6_x86_64_unknown_linux_gnu::*;
 
+// Linux 32-bit LTS bindings
 #[cfg(all(
     not(feature = "use-bindgen"),
     feature = "lts",
     target_os = "linux",
-    target_pointer_width = "32",
-    not(feature = "all-features-override")
+    target_pointer_width = "32"
 ))]
 mod bindings_1_6_i686_unknown_linux_gnu;
 #[cfg(all(
     not(feature = "use-bindgen"),
     feature = "lts",
     target_os = "linux",
-    target_pointer_width = "32",
-    not(feature = "all-features-override")
+    target_pointer_width = "32"
 ))]
 pub use bindings_1_6_i686_unknown_linux_gnu::*;
 
-#[cfg(all(
-    not(feature = "use-bindgen"),
-    not(feature = "lts"),
-    target_os = "linux",
-    target_pointer_width = "32",
-    not(feature = "all-features-override")
-))]
-mod bindings_1_8_i686_unknown_linux_gnu;
-#[cfg(all(
-    not(feature = "use-bindgen"),
-    not(feature = "lts"),
-    target_os = "linux",
-    target_pointer_width = "32",
-    not(feature = "all-features-override")
-))]
-pub use bindings_1_8_i686_unknown_linux_gnu::*;
+// Windows 64-bit LTS bindings
+#[cfg(all(not(feature = "use-bindgen"), feature = "lts", target_os = "windows"))]
+mod bindings_1_6_x86_64_pc_windows_gnu;
+#[cfg(all(not(feature = "use-bindgen"), feature = "lts", target_os = "windows"))]
+pub use bindings_1_6_x86_64_pc_windows_gnu::*;
 
+// Stable
+
+// Linux 64-bit stable bindings
 #[cfg(all(
     not(feature = "use-bindgen"),
     not(feature = "lts"),
     not(feature = "nightly"),
     target_os = "linux",
-    target_pointer_width = "64",
-    not(feature = "all-features-override")
+    target_pointer_width = "64"
 ))]
 mod bindings_1_8_x86_64_unknown_linux_gnu;
 #[cfg(all(
@@ -77,61 +68,59 @@ mod bindings_1_8_x86_64_unknown_linux_gnu;
     not(feature = "lts"),
     not(feature = "nightly"),
     target_os = "linux",
-    target_pointer_width = "64",
-    not(feature = "all-features-override")
+    target_pointer_width = "64"
 ))]
 pub use bindings_1_8_x86_64_unknown_linux_gnu::*;
 
+// Linux 32-bit stable bindings
 #[cfg(all(
     not(feature = "use-bindgen"),
     not(feature = "lts"),
     target_os = "linux",
-    feature = "nightly",
-    target_pointer_width = "64",
-    not(feature = "all-features-override")
+    target_pointer_width = "32"
 ))]
-mod bindings_nightly_x86_64_unknown_linux_gnu;
+mod bindings_1_8_i686_unknown_linux_gnu;
 #[cfg(all(
     not(feature = "use-bindgen"),
     not(feature = "lts"),
     target_os = "linux",
-    feature = "nightly",
-    target_pointer_width = "64",
-    not(feature = "all-features-override")
+    target_pointer_width = "32"
 ))]
-pub use bindings_nightly_x86_64_unknown_linux_gnu::*;
+pub use bindings_1_8_i686_unknown_linux_gnu::*;
 
-#[cfg(all(
-    not(feature = "use-bindgen"),
-    feature = "lts",
-    target_os = "windows",
-    not(feature = "all-features-override")
-))]
-mod bindings_1_6_x86_64_pc_windows_gnu;
-#[cfg(all(
-    not(feature = "use-bindgen"),
-    feature = "lts",
-    target_os = "windows",
-    not(feature = "all-features-override")
-))]
-pub use bindings_1_6_x86_64_pc_windows_gnu::*;
-
+// Windows 64-bit stable bindings
 #[cfg(all(
     not(feature = "use-bindgen"),
     not(feature = "lts"),
-    target_os = "windows",
-    not(feature = "all-features-override")
+    target_os = "windows"
 ))]
 mod bindings_1_8_x86_64_pc_windows_gnu;
 #[cfg(all(
     not(feature = "use-bindgen"),
     not(feature = "lts"),
-    target_os = "windows",
-    not(feature = "all-features-override")
+    target_os = "windows"
 ))]
 pub use bindings_1_8_x86_64_pc_windows_gnu::*;
 
-#[cfg(all(not(feature = "all-features-override"), feature = "use-bindgen"))]
+// Nightly
+
+// Linux 64-bit nightly bindings
+#[cfg(all(
+    not(feature = "use-bindgen"),
+    target_os = "linux",
+    feature = "nightly",
+    target_pointer_width = "64"
+))]
+mod bindings_nightly_x86_64_unknown_linux_gnu;
+#[cfg(all(
+    not(feature = "use-bindgen"),
+    target_os = "linux",
+    feature = "nightly",
+    target_pointer_width = "64"
+))]
+pub use bindings_nightly_x86_64_unknown_linux_gnu::*;
+
+#[cfg(feature = "use-bindgen")]
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 #[inline(always)]
@@ -314,10 +303,10 @@ pub unsafe fn jl_array_ptr_set(a: *mut jl_array_t, i: usize, x: *mut c_void) -> 
     x.cast()
 }
 
-#[cfg(all(not(feature = "all-features-override"), feature = "lts"))]
+#[cfg(feature = "lts")]
 pub const jl_init: unsafe extern "C" fn() = jl_init__threading;
 
-#[cfg(all(not(feature = "all-features-override"), feature = "lts"))]
+#[cfg(feature = "lts")]
 pub const jl_init_with_image: unsafe extern "C" fn(*const c_char, *const c_char) =
     jl_init_with_image__threading;
 

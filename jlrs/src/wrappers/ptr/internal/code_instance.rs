@@ -18,7 +18,7 @@ use jl_sys::{jl_code_instance_t, jl_code_instance_type};
 use std::{ffi::c_void, marker::PhantomData, ptr::NonNull};
 
 cfg_if! {
-    if #[cfg(any(not(feature = "lts"), feature = "all-features-override"))] {
+    if #[cfg(not(feature = "lts"))] {
         use std::{sync::atomic::Ordering, ptr::null_mut};
     }
 }
@@ -59,7 +59,7 @@ impl<'scope> CodeInstance<'scope> {
     /// Next cache entry.
     pub fn next(self) -> CodeInstanceRef<'scope> {
         cfg_if! {
-            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+            if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe { CodeInstanceRef::wrap(self.unwrap_non_null(Private).as_ref().next) }
             } else {
@@ -100,7 +100,7 @@ impl<'scope> CodeInstance<'scope> {
     pub fn inferred(self) -> ValueRef<'scope, 'static> {
         // Safety: the pointer points to valid data
         cfg_if! {
-            if #[cfg(any(not(feature = "nightly"), feature = "all-features-override"))] {
+            if #[cfg(not(feature = "nightly"))] {
                 unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().inferred) }
             } else {
                 // Safety: the pointer points to valid data
@@ -113,14 +113,14 @@ impl<'scope> CodeInstance<'scope> {
     }
 
     /// The `ipo_purity_bits` field of this `CodeInstance`.
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(not(feature = "lts"))]
     pub fn ipo_purity_bits(self) -> u32 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().ipo_purity_bits }
     }
 
     /// The `purity_bits` field of this `CodeInstance`.
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(not(feature = "lts"))]
     pub fn purity_bits(self) -> u32 {
         // Safety: the pointer points to valid data
         #[cfg(feature = "nightly")]
@@ -137,7 +137,7 @@ impl<'scope> CodeInstance<'scope> {
     }
 
     /// Method this instance is specialized from.
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(not(feature = "lts"))]
     pub fn argescapes(self) -> ValueRef<'scope, 'static> {
         // Safety: the pointer points to valid data
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().argescapes) }
@@ -152,7 +152,7 @@ impl<'scope> CodeInstance<'scope> {
     /// If `specptr` is a specialized function signature for specTypes->rettype
     pub fn precompile(self) -> bool {
         cfg_if! {
-            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+            if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe { self.unwrap_non_null(Private).as_ref().precompile != 0 }
             } else {
@@ -167,7 +167,7 @@ impl<'scope> CodeInstance<'scope> {
     /// jlcall entry point
     pub fn invoke(self) -> *mut c_void {
         cfg_if! {
-            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+            if #[cfg(feature = "lts")] {
                 use std::ptr::null_mut;
                 // Safety: the pointer points to valid data
                 unsafe { self.unwrap_non_null(Private).as_ref().invoke.map(|x| x as *mut c_void).unwrap_or(null_mut()) }
@@ -183,7 +183,7 @@ impl<'scope> CodeInstance<'scope> {
     /// private data for `jlcall entry point
     pub fn specptr(self) -> *mut c_void {
         cfg_if! {
-            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+            if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe { self.unwrap_non_null(Private).as_ref().specptr.fptr }
             } else {
@@ -196,7 +196,7 @@ impl<'scope> CodeInstance<'scope> {
     }
 
     /// nonzero if all roots are built into sysimg or tagged by module key
-    #[cfg(any(not(feature = "lts"), feature = "all-features-override"))]
+    #[cfg(not(feature = "lts"))]
     pub fn relocatability(self) -> u8 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().relocatability }

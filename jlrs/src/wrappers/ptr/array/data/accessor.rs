@@ -1,9 +1,6 @@
 //! Access and modify the contents of Julia arrays.
 
-#[cfg(not(all(
-    target_os = "windows",
-    all(feature = "lts", not(feature = "all-features-override"))
-)))]
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
 use crate::error::{JuliaResult, JuliaResultRef};
 
 use crate::{
@@ -185,10 +182,7 @@ impl<'borrow, 'array, 'data, T, L: ArrayLayout, M: Mutability>
     /// Access the element at `index` and convert it to a `Value` rooted in `scope`.
     ///
     /// If an error is thrown by Julia it's caught and returned.
-    #[cfg(not(all(
-        target_os = "windows",
-        all(feature = "lts", not(feature = "all-features-override"))
-    )))]
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn get_value<'frame, D: Dims, P: PartialScope<'frame>>(
         &mut self,
         scope: P,
@@ -231,10 +225,7 @@ impl<'borrow, 'array, 'data, T, L: ArrayLayout, M: Mutability>
     /// Access the element at `index` and convert it to a `ValueRef`.
     ///
     /// If an error is thrown by Julia it's caught and returned.
-    #[cfg(not(all(
-        target_os = "windows",
-        all(feature = "lts", not(feature = "all-features-override"))
-    )))]
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn get_value_unrooted<D: Dims>(
         &mut self,
         index: D,
@@ -285,10 +276,7 @@ impl<'borrow, 'array, 'data, T, L: ArrayLayout>
     /// Set the element at `index` to `value`.
     ///
     /// If an error is thrown by Julia it's caught and returned.
-    #[cfg(not(all(
-        target_os = "windows",
-        all(feature = "lts", not(feature = "all-features-override"))
-    )))]
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn set_value<'frame, D: Dims, F: Frame<'frame>>(
         &mut self,
         frame: &mut F,

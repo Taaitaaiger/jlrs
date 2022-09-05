@@ -16,7 +16,7 @@ use jl_sys::{jl_typemap_entry_t, jl_typemap_entry_type};
 use std::{marker::PhantomData, ptr::NonNull};
 
 cfg_if! {
-    if #[cfg(any(not(feature = "lts"), feature = "all-features-override"))] {
+    if #[cfg(not(feature = "lts"))] {
         use std::sync::atomic::Ordering;
     }
 }
@@ -47,7 +47,7 @@ impl<'scope> TypeMapEntry<'scope> {
     /// TODO: check types
     pub fn next(self) -> ValueRef<'scope, 'static> {
         cfg_if! {
-            if #[cfg(all(feature = "lts", not(feature = "all-features-override")))] {
+            if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().next.cast()) }
             } else {

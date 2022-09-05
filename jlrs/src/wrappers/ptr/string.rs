@@ -96,22 +96,26 @@ impl<'scope> JuliaString<'scope> {
         }
     }
 
-    /// Returns the string as a slice of bytes without the terminating `\0`.
-    pub fn to_bytes(self) -> &'scope [u8] {
-        self.as_c_str().to_bytes()
+    /// Returns the string as a slice of bytes, including all null characters..
+    pub fn as_bytes(self) -> &'scope [u8] {
+        unsafe {
+            let len = self.len();
+            let str_begin = self.0.add(mem::size_of::<usize>());
+            std::slice::from_raw_parts(str_begin, len)
+        }
     }
 
     /// Returns the string as a string slice, or an error if it the string contains
     /// invalid characters
     pub fn as_str(self) -> JlrsResult<&'scope str> {
-        Ok(str::from_utf8(self.to_bytes()).map_err(JlrsError::other)?)
+        Ok(str::from_utf8(self.as_c_str().to_bytes()).map_err(JlrsError::other)?)
     }
 
     /// Returns the string as a string slice without checking if the string is properly encoded.
     ///
     /// Safety: the string must be properly encoded.
     pub unsafe fn as_str_unchecked(self) -> &'scope str {
-        str::from_utf8_unchecked(self.to_bytes())
+        str::from_utf8_unchecked(self.as_c_str().to_bytes())
     }
 
     /// Use the `Output` to extend the lifetime of this data.
@@ -129,10 +133,11 @@ impl_julia_typecheck!(JuliaString<'scope>, jl_string_type, 'scope);
 unsafe impl Unbox for String {
     type Output = Result<String, Vec<u8>>;
     unsafe fn unbox(value: Value) -> Self::Output {
-        let slice = value.cast_unchecked::<JuliaString>().to_bytes();
-        str::from_utf8(slice)
-            .map(String::from)
-            .map_err(|_| slice.into())
+        let s = value.cast_unchecked::<JuliaString>();
+        match s.as_str() {
+            Ok(s) => Ok(s.into()),
+            Err(_) => Err(s.as_bytes().into()),
+        }
     }
 }
 

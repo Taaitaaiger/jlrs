@@ -87,7 +87,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         Ok(JuliaFuture { shared_state })
     }
 
-    #[cfg(all(feature = "nightly", not(feature = "all-features-override")))]
+    #[cfg(feature = "nightly")]
     pub(crate) fn new_interactive<'value, V>(
         frame: &mut AsyncGcFrame<'frame>,
         func: Value,
@@ -305,7 +305,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         Ok(JuliaFuture { shared_state })
     }
 
-    #[cfg(all(feature = "nightly", not(feature = "all-features-override")))]
+    #[cfg(feature = "nightly")]
     pub(crate) fn new_interactive_with_keywords<'value, V>(
         frame: &mut AsyncGcFrame<'frame>,
         func: WithKeywords,

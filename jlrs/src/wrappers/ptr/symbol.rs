@@ -1,9 +1,10 @@
 //! Wrapper for `Symbol`. Symbols represent identifiers like module and function names.
 
 use crate::{
-    error::{JlrsError, JlrsResult},
+    error::{JlrsError, JlrsResult, JuliaResult},
     impl_julia_typecheck,
     memory::{global::Global, output::Output},
+    prelude::PartialScope,
     private::Private,
     wrappers::ptr::{private::WrapperPriv, value::LeakedValue},
 };
@@ -36,6 +37,31 @@ impl<'scope> Symbol<'scope> {
         unsafe {
             let sym = jl_symbol_n(bytes.as_ptr().cast(), bytes.len());
             Symbol::wrap(sym, Private)
+        }
+    }
+
+    /// Convert the given byte slice to a `Symbol`.
+    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    pub fn new_bytes<N: AsRef<[u8]>, S: PartialScope<'scope>>(
+        scope: S,
+        symbol: N,
+    ) -> JlrsResult<JuliaResult<'scope, 'static, Self>> {
+        use crate::catch::catch_exceptions;
+        use std::mem::MaybeUninit;
+
+        unsafe {
+            let symbol = symbol.as_ref();
+
+            let mut callback = |result: &mut MaybeUninit<*mut jl_sym_t>| {
+                let sym = jl_symbol_n(symbol.as_ptr().cast(), symbol.len());
+                result.write(sym);
+                Ok(())
+            };
+
+            match catch_exceptions(&mut callback).unwrap() {
+                Ok(sym) => Ok(Ok(Symbol::wrap(sym, Private))),
+                Err(e) => Ok(Err(e.root(scope)?)),
+            }
         }
     }
 
