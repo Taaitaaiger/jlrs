@@ -7,7 +7,7 @@ mod tests {
     fn frame_starts_with_no_roots() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |_global, frame| {
+            jlrs.scope(|_global, frame| {
                 assert_eq!(frame.n_roots(), 0);
                 Ok(())
             })
@@ -19,8 +19,8 @@ mod tests {
     fn allocation_creates_root() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |_global, mut frame| {
-                Value::new(&mut frame, 0usize)?;
+            jlrs.scope(|_global, mut frame| {
+                Value::new(&mut frame, 0usize);
                 assert_eq!(frame.n_roots(), 1);
                 Ok(())
             })
@@ -28,139 +28,6 @@ mod tests {
         })
     }
 
-    #[test]
-    fn allocation_fails_if_capacity_exceeded() {
-        JULIA.with(|j| {
-            let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |_global, mut frame| {
-                for _ in 0..frame.capacity() {
-                    Value::new(&mut frame, 0usize)?;
-                }
-
-                assert_eq!(frame.n_roots(), frame.capacity());
-                assert!(Value::new(&mut frame, 0usize).is_err());
-
-                Ok(())
-            })
-            .unwrap();
-        })
-    }
-
-    #[test]
-    fn frames_can_be_nested() {
-        JULIA.with(|j| {
-            let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |_global, mut frame| {
-                let cap = frame.capacity();
-                frame
-                    .scope(|frame| {
-                        let inner_cap = frame.capacity();
-                        assert_eq!(inner_cap, cap - 2);
-                        assert_eq!(frame.n_roots(), 0);
-                        Ok(())
-                    })
-                    .unwrap();
-
-                assert_eq!(frame.capacity(), cap);
-                Ok(())
-            })
-            .unwrap();
-        })
-    }
-
-    #[test]
-    fn new_page_is_allocated_if_necessary() {
-        JULIA.with(|j| {
-            let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |_global, mut frame| {
-                let cap = frame.capacity();
-
-                for _ in 0..frame.capacity() {
-                    Value::new(&mut frame, 0usize)?;
-                }
-
-                frame
-                    .scope(|frame| {
-                        let inner_cap = frame.capacity();
-                        assert_eq!(inner_cap, cap);
-                        Ok(())
-                    })
-                    .unwrap();
-
-                assert_eq!(frame.capacity(), cap);
-                Ok(())
-            })
-            .unwrap();
-        })
-    }
-
-    #[test]
-    fn new_page_is_reused() {
-        JULIA.with(|j| {
-            let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |_global, mut frame| {
-                let cap = frame.capacity();
-
-                for _ in 0..frame.capacity() {
-                    Value::new(&mut frame, 0usize)?;
-                }
-
-                frame
-                    .scope_with_capacity(128, |frame| {
-                        let inner_cap = frame.capacity();
-                        assert_eq!(inner_cap, 128);
-                        Ok(())
-                    })
-                    .unwrap();
-
-                frame
-                    .scope_with_capacity(64, |frame| {
-                        let inner_cap = frame.capacity();
-                        assert_eq!(inner_cap, 128);
-                        Ok(())
-                    })
-                    .unwrap();
-
-                assert_eq!(frame.capacity(), cap);
-                Ok(())
-            })
-            .unwrap();
-        })
-    }
-
-    #[test]
-    fn new_page_realloacated_if_necessary() {
-        JULIA.with(|j| {
-            let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |_global, mut frame| {
-                let cap = frame.capacity();
-
-                for _ in 0..frame.capacity() {
-                    Value::new(&mut frame, 0usize)?;
-                }
-
-                frame
-                    .scope_with_capacity(128, |frame| {
-                        let inner_cap = frame.capacity();
-                        assert_eq!(inner_cap, 128);
-                        Ok(())
-                    })
-                    .unwrap();
-
-                frame
-                    .scope_with_capacity(129, |frame| {
-                        let inner_cap = frame.capacity();
-                        assert_eq!(inner_cap, 129);
-                        Ok(())
-                    })
-                    .unwrap();
-
-                assert_eq!(frame.capacity(), cap);
-                Ok(())
-            })
-            .unwrap();
-        })
-    }
 
     /*
     #[test]
@@ -199,7 +66,7 @@ mod tests {
 
         ccall
             .null_scope(|mut frame| {
-                assert!(frame.scope_with_capacity(0, |_| { Ok(()) }).is_err());
+                assert!(frame.scope(|_| { Ok(()) }).is_err());
                 Ok(())
             })
             .unwrap();

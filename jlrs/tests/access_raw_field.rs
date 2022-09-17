@@ -17,8 +17,8 @@ mod tests {
                         .global_ref("NoUnionsBits")?
                         .value_unchecked()
                 };
-                let arg1 = Value::new(&mut frame, 3i16)?;
-                let arg2 = Value::new(&mut frame, -3i32)?;
+                let arg1 = Value::new(&mut frame, 3i16);
+                let arg2 = Value::new(&mut frame, -3i32);
                 let instance = ty
                     .cast::<DataType>()?
                     .instantiate(&mut frame, &mut [arg1, arg2])?
@@ -54,7 +54,7 @@ mod tests {
                         .global_ref("NoUnionsBitsPtr")?
                         .value_unchecked()
                 };
-                let arg1 = Value::new(&mut frame, 3i16)?;
+                let arg1 = Value::new(&mut frame, 3i16);
                 let arg2 = DataType::bool_type(global);
                 let instance = ty
                     .cast::<DataType>()?
@@ -91,8 +91,8 @@ mod tests {
                         .global_ref("BitsBitsUnion")?
                         .value_unchecked()
                 };
-                let arg1 = Value::new(&mut frame, 3i16)?;
-                let arg2 = Value::new(&mut frame, -3i32)?;
+                let arg1 = Value::new(&mut frame, 3i16);
+                let arg2 = Value::new(&mut frame, -3i32);
                 let instance = ty
                     .cast::<DataType>()?
                     .instantiate(&mut frame, &mut [arg1, arg2])?
@@ -129,7 +129,7 @@ mod tests {
                         .value_unchecked()
                 };
                 let arg1 = DataType::bool_type(global);
-                let arg2 = Value::new(&mut frame, -3i32)?;
+                let arg2 = Value::new(&mut frame, -3i32);
                 let instance = ty
                     .cast::<DataType>()?
                     .instantiate(&mut frame, &mut [arg1.as_value(), arg2])?
@@ -166,7 +166,7 @@ mod tests {
                         .value_unchecked()
                 };
                 let arg1 = DataType::bool_type(global);
-                let arg2 = Value::new(&mut frame, -3i32)?;
+                let arg2 = Value::new(&mut frame, -3i32);
                 let instance = ty
                     .cast::<DataType>()?
                     .instantiate(&mut frame, &mut [arg1.as_value(), arg2])?
@@ -203,7 +203,7 @@ mod tests {
                         .value_unchecked()
                 };
                 let arg1 = DataType::bool_type(global);
-                let arg2 = Value::new(&mut frame, -3i32)?;
+                let arg2 = Value::new(&mut frame, -3i32);
                 let instance = ty
                     .cast::<DataType>()?
                     .instantiate(&mut frame, &mut [arg1.as_value(), arg2])?
@@ -322,7 +322,7 @@ mod tests {
                         .value_unchecked()
                 };
                 let arg1 = DataType::bool_type(global);
-                let arg2 = Value::new(&mut frame, -3i32)?;
+                let arg2 = Value::new(&mut frame, -3i32);
                 let instance = ty
                     .cast::<DataType>()?
                     .instantiate(&mut frame, &mut [arg1.as_value(), arg2])?
@@ -347,8 +347,8 @@ mod tests {
                         .global_ref("NoUnionsBits")?
                         .value_unchecked()
                 };
-                let arg1 = Value::new(&mut frame, 3i16)?;
-                let arg2 = Value::new(&mut frame, -3i32)?;
+                let arg1 = Value::new(&mut frame, 3i16);
+                let arg2 = Value::new(&mut frame, -3i32);
                 let instance = ty
                     .cast::<DataType>()?
                     .instantiate(&mut frame, &mut [arg1, arg2])?
@@ -384,7 +384,7 @@ mod tests {
                         .global_ref("NoUnionsBitsPtr")?
                         .value_unchecked()
                 };
-                let arg1 = Value::new(&mut frame, 3i16)?;
+                let arg1 = Value::new(&mut frame, 3i16);
                 let arg2 = DataType::bool_type(global);
                 let instance = ty
                     .cast::<DataType>()?
@@ -421,8 +421,8 @@ mod tests {
                         .global_ref("BitsBitsUnion")?
                         .value_unchecked()
                 };
-                let arg1 = Value::new(&mut frame, 3i16)?;
-                let arg2 = Value::new(&mut frame, -3i32)?;
+                let arg1 = Value::new(&mut frame, 3i16);
+                let arg2 = Value::new(&mut frame, -3i32);
                 let instance = ty
                     .cast::<DataType>()?
                     .instantiate(&mut frame, &mut [arg1, arg2])?
@@ -459,7 +459,7 @@ mod tests {
                         .value_unchecked()
                 };
                 let arg1 = DataType::bool_type(global);
-                let arg2 = Value::new(&mut frame, -3i32)?;
+                let arg2 = Value::new(&mut frame, -3i32);
                 let instance = ty
                     .cast::<DataType>()?
                     .instantiate(&mut frame, &mut [arg1.as_value(), arg2])?
@@ -496,7 +496,7 @@ mod tests {
                         .value_unchecked()
                 };
                 let arg1 = DataType::bool_type(global);
-                let arg2 = Value::new(&mut frame, -3i32)?;
+                let arg2 = Value::new(&mut frame, -3i32);
                 let instance = ty
                     .cast::<DataType>()?
                     .instantiate(&mut frame, &mut [arg1.as_value(), arg2])?
@@ -615,7 +615,7 @@ mod tests {
                         .value_unchecked()
                 };
                 let arg1 = DataType::bool_type(global);
-                let arg2 = Value::new(&mut frame, -3i32)?;
+                let arg2 = Value::new(&mut frame, -3i32);
                 let instance = ty
                     .cast::<DataType>()?
                     .instantiate(&mut frame, &mut [arg1.as_value(), arg2])?

@@ -23,7 +23,7 @@
 //!
 //! ```
 //! # use jlrs::prelude::*;
-//! # use jlrs::util::JULIA;
+//! # use jlrs::util::test::JULIA;
 //! # #[cfg(feature = "lts")]
 //! # fn main() {}
 //! # #[cfg(not(feature = "lts"))]
@@ -33,33 +33,33 @@
 //! julia.scope(|global, mut frame| {
 //!     // Value::new takes a partial scope, here a frame is used, so the
 //!     // value is rooted in the current frame.
-//!     let _i = Value::new(&mut frame, 2u64)?;
+//!     let _i = Value::new(&mut frame, 2u64);
 //!
 //!     // We can also reserve an output in the current frame and use
 //!     // that output. This has the same effect as the previous example.
-//!     let output = frame.output()?;
-//!     let _j = Value::new(output, 1u32)?;
+//!     let output = frame.output();
+//!     let _j = Value::new(output, 1u32);
 //!
 //!     // Simarly, we can use an OutputScope because everything that
 //!     // implements Scope implements PartialScope.
-//!     let output = frame.output()?;
+//!     let output = frame.output();
 //!     let output_scope = output.into_scope(&mut frame);
-//!     let _k = Value::new(output_scope, 1u32)?;
+//!     let _k = Value::new(output_scope, 1u32);
 //!
 //!     // Using an output this way isn't particularly useful, because in all
 //!     // the above examples the result is rooted in the current frame.
 //!     // Outputs are more useful in combination with a nested scope.
-//!     let output_a = frame.output()?;
-//!     let output_b = frame.output()?;
+//!     let output_a = frame.output();
+//!     let output_b = frame.output();
 //!     let (_array, _value) = frame.scope(|mut frame| {
 //!         // By using the output from a nested scope, the data is rooted in
 //!         // the parent frame and both these values can be returned from
 //!         // this scope
 //!         let output_scope = output_a.into_scope(&mut frame);
-//!         let array = Array::new::<f32, _, _, _>(output_scope, (3, 3))?
+//!         let array = Array::new::<f32, _, _, _>(output_scope, (3, 3))
 //!             .into_jlrs_result()?;
 //!
-//!         let value = Value::new(output_b, 3usize)?;
+//!         let value = Value::new(output_b, 3usize);
 //!
 //!         Ok((array, value))
 //!     })?;
@@ -76,12 +76,24 @@
 //! [`Output::into_scope`]: crate::memory::output::Output::into_scope
 
 use crate::{
-    error::JlrsResult,
     memory::{frame::Frame, global::Global, output::Output},
     private::Private,
     wrappers::ptr::Wrapper,
 };
 use std::{marker::PhantomData, ptr::NonNull};
+
+// use super::{frame::{Frame, GcFrame}, output::Output};
+
+/*
+/// A [`Scope`] that roots a result using a provided [`Output`].
+///
+/// [`Scope`]: crate::memory::scope::Scope
+pub struct OutputScope<'target, 'current, 'borrow, F: Frame<'current>> {
+    pub(crate) output: Output<'target>,
+    pub(crate) frame: &'borrow mut F,
+    pub(crate) _marker: PhantomData<&'current mut &'current ()>,
+}
+ */
 
 /// A [`Scope`] that roots a result using a provided [`Output`].
 ///
@@ -91,7 +103,26 @@ pub struct OutputScope<'target, 'current, 'borrow, F: Frame<'current>> {
     pub(crate) frame: &'borrow mut F,
     pub(crate) _marker: PhantomData<&'current mut &'current ()>,
 }
+/*
+impl<'target, 'current, 'borrow, F: Frame<'current>> OutputScope<'target, 'current, 'borrow, F> {
+    pub(crate) fn new(output: Output<'target>, frame: &'borrow mut F) -> Self {
+        OutputScope {
+            output,
+            frame,
+            _marker: PhantomData,
+        }
+    }
 
+    // Safety: value must point to valid Jula data
+    pub(crate) unsafe fn set_root<'data, T: Wrapper<'target, 'data>>(
+        self,
+        value: NonNull<T::Wraps>,
+    ) -> T {
+        self.output.set_root::<T>(value);
+        T::wrap_non_null(value, Private)
+    }
+}
+ */
 impl<'target, 'current, 'borrow, F: Frame<'current>> OutputScope<'target, 'current, 'borrow, F> {
     pub(crate) fn new(output: Output<'target>, frame: &'borrow mut F) -> Self {
         OutputScope {
@@ -111,6 +142,7 @@ impl<'target, 'current, 'borrow, F: Frame<'current>> OutputScope<'target, 'curre
     }
 }
 
+/*
 /// Trait used to root a single value in a target scope, methods called with this trait can access
 /// the current frame as well.
 ///
@@ -160,7 +192,80 @@ where
         Ok((self.output, self.frame))
     }
 }
+ */
 
+/// Trait used to root a single value in a target scope, methods called with this trait can access
+/// the current frame as well.
+///
+/// This trait is used with functions that return Julia data rooted in some scope which need to
+/// allocate and root temporary data. It's implemented by mutable references to implementations of
+/// [`Frame`] and [`OutputScope`]. This trait provides a single method, `Scope::split` which
+/// splits it into an output and the current frame. If this method is used with a mutable
+/// reference to a frame, the output is reserved in that frame. If it's used with an `OutputScope`
+/// the existing output is returned. In both cases the frame is the current frame, it's
+/// recommended to create a nested scope to root temporary Julia data.
+pub trait Scope<'target, 'current, F>:
+    private::ScopePriv<'target, 'current, F> + PartialScope<'target>
+where
+    F: Frame<'current>,
+{
+    /// Split the scope into an output and a frame.
+    ///
+    /// If the scope is a frame, the output is allocated in the current frame. If it's an
+    /// [`OutputScope`], the existing output is returned.
+    fn split<'own>(self) -> (Output<'target>, &'own mut F)
+    where
+        Self: 'own;
+}
+
+impl<'current> Scope<'current, 'current, GcFrame<'current>> for &mut GcFrame<'current> {
+    fn split<'own>(self) -> (Output<'current>, &'own mut GcFrame<'current>)
+    where
+        Self: 'own,
+    {
+        let output = self.output();
+        (output, self)
+    }
+}
+
+impl<'target, 'current, 'borrow> Scope<'target, 'current, GcFrame<'current>>
+    for OutputScope<'target, 'current, 'borrow, GcFrame<'current>>
+{
+    fn split<'own>(self) -> (Output<'target>, &'own mut GcFrame<'current>)
+    where
+        Self: 'own,
+    {
+        (self.output, self.frame)
+    }
+}
+
+#[cfg(feature = "async")]
+use crate::memory::frame::AsyncGcFrame;
+
+#[cfg(feature = "async")]
+impl<'current> Scope<'current, 'current, AsyncGcFrame<'current>> for &mut AsyncGcFrame<'current> {
+    fn split<'own>(self) -> (Output<'current>, &'own mut AsyncGcFrame<'current>)
+    where
+        Self: 'own,
+    {
+        let output = self.output();
+        (output, self)
+    }
+}
+
+#[cfg(feature = "async")]
+impl<'target, 'current, 'borrow> Scope<'target, 'current, AsyncGcFrame<'current>>
+    for OutputScope<'target, 'current, 'borrow, AsyncGcFrame<'current>>
+{
+    fn split<'own>(self) -> (Output<'target>, &'own mut AsyncGcFrame<'current>)
+    where
+        Self: 'own,
+    {
+        (self.output, self.frame)
+    }
+}
+
+/*
 /// Trait used to root a single value in a target scope.
 ///
 /// This trait is used with functions that return Julia data rooted in some scope which don't need
@@ -175,7 +280,22 @@ pub trait PartialScope<'target>: private::PartialScopePriv<'target> {
         unsafe { Global::new() }
     }
 }
-
+ */
+/// Trait used to root a single value in a target scope.
+///
+/// This trait is used with functions that return Julia data rooted in some scope which don't need
+/// to allocate and root temporary data. It's implemented by mutable references to implementations
+/// of [`Frame`], [`OutputScope`], and [`Output`]. In the first case the data rooted in that
+/// frame, in the other two cases the provided `Output` is used.
+pub trait PartialScope<'target>: private::PartialScopePriv<'target> {
+    /// Returns a new `Global`.
+    fn global(&self) -> Global<'target> {
+        // Safety: this function must only be called from a thread known to Julia and the liftime
+        // is limited.
+        unsafe { Global::new() }
+    }
+}
+/*
 impl<'target, F> PartialScope<'target> for &mut F where F: Frame<'target> {}
 
 impl<'target> PartialScope<'target> for Output<'target> {}
@@ -186,23 +306,44 @@ where
     F: Frame<'current>,
 {
 }
+ */
+
+impl<'target> PartialScope<'target> for &mut GcFrame<'target> {}
+
+use super::frame::GcFrame;
+
+#[cfg(feature = "async")]
+impl<'target> PartialScope<'target> for &mut AsyncGcFrame<'target> {}
+
+impl<'target> PartialScope<'target> for Output<'target> {}
+
+impl<'target, 'current, 'inner> PartialScope<'target>
+    for OutputScope<'target, 'current, 'inner, GcFrame<'current>>
+{
+}
+
+#[cfg(feature = "async")]
+impl<'target, 'current, 'inner> PartialScope<'target>
+    for OutputScope<'target, 'current, 'inner, AsyncGcFrame<'current>>
+{
+}
 
 pub(crate) mod private {
+    use std::cell::RefCell;
     use std::ptr::NonNull;
 
+    use crate::memory::frame::{Frame, GcFrame};
+    use crate::memory::ledger::Ledger;
+    use crate::memory::output::Output;
     use crate::prelude::ValueRef;
     use crate::wrappers::ptr::private::WrapperPriv;
     use crate::wrappers::ptr::Ref;
-    use crate::{
-        error::{JlrsResult, JuliaResult},
-        memory::{frame::Frame, output::Output},
-        private::Private,
-        wrappers::ptr::value::Value,
-    };
+    use crate::{error::JuliaResult, private::Private, wrappers::ptr::value::Value};
     use jl_sys::jl_value_t;
 
     use super::OutputScope;
 
+    /*
     pub trait ScopePriv<'target, 'current, F>: Sized + PartialScopePriv<'target>
     where
         F: Frame<'current>,
@@ -217,28 +358,99 @@ pub(crate) mod private {
         F: Frame<'current>,
     {
     }
+     */
 
+    pub trait ScopePriv<'target, 'current, F>: Sized + PartialScopePriv<'target>
+    where
+        F: Frame<'current>,
+    {
+    }
+
+    impl<'current> ScopePriv<'current, 'current, GcFrame<'current>> for &mut GcFrame<'current> {}
+
+    #[cfg(feature = "async")]
+    impl<'current> ScopePriv<'current, 'current, AsyncGcFrame<'current>>
+        for &mut AsyncGcFrame<'current>
+    {
+    }
+
+    impl<'target, 'current, 'borrow> ScopePriv<'target, 'current, GcFrame<'current>>
+        for OutputScope<'target, 'current, 'borrow, GcFrame<'current>>
+    {
+    }
+
+    #[cfg(feature = "async")]
+    impl<'target, 'current, 'borrow> ScopePriv<'target, 'current, AsyncGcFrame<'current>>
+        for OutputScope<'target, 'current, 'borrow, AsyncGcFrame<'current>>
+    {
+    }
+
+    /*
+       pub trait PartialScopePriv<'target>: Sized {
+           // Safety: the pointer must point to valid data.
+           unsafe fn value<'data, T: WrapperPriv<'target, 'data>>(
+               self,
+               value: NonNull<T::Wraps>,
+               _: Private,
+           ) -> JlrsResult<T>;
+
+           // Safety: the pointer must point to valid data.
+           unsafe fn call_result<'data, T: WrapperPriv<'target, 'data>>(
+               self,
+               result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
+               _: Private,
+           ) -> JlrsResult<JuliaResult<'target, 'data, T>>;
+
+           // Safety: the pointer must point to valid data.
+           unsafe fn call_result_ref<'data, T: WrapperPriv<'target, 'data>>(
+               self,
+               result: Result<Ref<'target, 'data, T>, ValueRef<'target, 'data>>,
+               _: Private,
+           ) -> JlrsResult<JuliaResult<'target, 'data, T>> {
+               self.call_result(
+                   result
+                       .map(|p| NonNull::new_unchecked(p.ptr()))
+                       .map_err(|p| NonNull::new_unchecked(p.ptr())),
+                   Private,
+               )
+           }
+
+           // Safety: the pointer must point to valid data.
+           unsafe fn exception<'data, T>(
+               self,
+               result: Result<T, ValueRef<'target, 'data>>,
+               _: Private,
+           ) -> JlrsResult<JuliaResult<'target, 'data, T>> {
+               match result {
+                   Ok(v) => Ok(Ok(v)),
+                   Err(e) => Ok(Err(self.value(NonNull::new_unchecked(e.ptr()), Private)?)),
+               }
+           }
+       }
+    */
     pub trait PartialScopePriv<'target>: Sized {
+        fn ledger(&self) -> &'target RefCell<Ledger>;
+
         // Safety: the pointer must point to valid data.
         unsafe fn value<'data, T: WrapperPriv<'target, 'data>>(
             self,
             value: NonNull<T::Wraps>,
             _: Private,
-        ) -> JlrsResult<T>;
+        ) -> T;
 
         // Safety: the pointer must point to valid data.
         unsafe fn call_result<'data, T: WrapperPriv<'target, 'data>>(
             self,
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
             _: Private,
-        ) -> JlrsResult<JuliaResult<'target, 'data, T>>;
+        ) -> JuliaResult<'target, 'data, T>;
 
         // Safety: the pointer must point to valid data.
         unsafe fn call_result_ref<'data, T: WrapperPriv<'target, 'data>>(
             self,
             result: Result<Ref<'target, 'data, T>, ValueRef<'target, 'data>>,
             _: Private,
-        ) -> JlrsResult<JuliaResult<'target, 'data, T>> {
+        ) -> JuliaResult<'target, 'data, T> {
             self.call_result(
                 result
                     .map(|p| NonNull::new_unchecked(p.ptr()))
@@ -252,14 +464,14 @@ pub(crate) mod private {
             self,
             result: Result<T, ValueRef<'target, 'data>>,
             _: Private,
-        ) -> JlrsResult<JuliaResult<'target, 'data, T>> {
+        ) -> JuliaResult<'target, 'data, T> {
             match result {
-                Ok(v) => Ok(Ok(v)),
-                Err(e) => Ok(Err(self.value(NonNull::new_unchecked(e.ptr()), Private)?)),
+                Ok(v) => Ok(v),
+                Err(e) => Err(self.value(NonNull::new_unchecked(e.ptr()), Private)),
             }
         }
     }
-
+    /*
     impl<'current, F> PartialScopePriv<'current> for &mut F
     where
         F: Frame<'current>,
@@ -290,8 +502,75 @@ pub(crate) mod private {
                 }
             }
         }
+    } */
+
+    impl<'current> PartialScopePriv<'current> for &mut GcFrame<'current> {
+        fn ledger(&self) -> &'current RefCell<Ledger> {
+            self.ledger
+        }
+        unsafe fn value<'data, T: WrapperPriv<'current, 'data>>(
+            self,
+            value: NonNull<T::Wraps>,
+            _: Private,
+        ) -> T {
+            self.push_root(value.cast());
+            T::wrap_non_null(value, Private)
+        }
+
+        unsafe fn call_result<'data, T: WrapperPriv<'current, 'data>>(
+            self,
+            result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
+            _: Private,
+        ) -> JuliaResult<'current, 'data, T> {
+            match result {
+                Ok(v) => {
+                    self.push_root(v.cast());
+                    Ok(T::wrap_non_null(v, Private))
+                }
+                Err(e) => {
+                    self.push_root(e);
+                    Err(Value::wrap_non_null(e, Private))
+                }
+            }
+        }
     }
 
+    #[cfg(feature = "async")]
+    use crate::memory::frame::AsyncGcFrame;
+
+    #[cfg(feature = "async")]
+    impl<'current> PartialScopePriv<'current> for &mut AsyncGcFrame<'current> {
+        fn ledger(&self) -> &'current RefCell<Ledger> {
+            self.frame.ledger
+        }
+        unsafe fn value<'data, T: WrapperPriv<'current, 'data>>(
+            self,
+            value: NonNull<T::Wraps>,
+            _: Private,
+        ) -> T {
+            self.push_root(value.cast());
+            T::wrap_non_null(value, Private)
+        }
+
+        unsafe fn call_result<'data, T: WrapperPriv<'current, 'data>>(
+            self,
+            result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
+            _: Private,
+        ) -> JuliaResult<'current, 'data, T> {
+            match result {
+                Ok(v) => {
+                    self.push_root(v.cast());
+                    Ok(T::wrap_non_null(v, Private))
+                }
+                Err(e) => {
+                    self.push_root(e);
+                    Err(Value::wrap_non_null(e, Private))
+                }
+            }
+        }
+    }
+
+    /*
     impl<'target, 'current, 'borrow, F> PartialScopePriv<'target>
         for OutputScope<'target, 'current, 'borrow, F>
     where
@@ -318,7 +597,38 @@ pub(crate) mod private {
             Ok(rooted)
         }
     }
+     */
 
+    impl<'target, 'current, 'borrow, F> PartialScopePriv<'target>
+        for OutputScope<'target, 'current, 'borrow, F>
+    where
+        F: Frame<'current>,
+    {
+        fn ledger(&self) -> &'target RefCell<Ledger> {
+            self.output.ledger
+        }
+
+        unsafe fn value<'data, T: WrapperPriv<'target, 'data>>(
+            self,
+            value: NonNull<T::Wraps>,
+            _: Private,
+        ) -> T {
+            self.set_root(value)
+        }
+
+        unsafe fn call_result<'data, T: WrapperPriv<'target, 'data>>(
+            self,
+            result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
+            _: Private,
+        ) -> JuliaResult<'target, 'data, T> {
+            match result {
+                Ok(v) => Ok(self.set_root(v)),
+                Err(e) => Err(self.set_root(e)),
+            }
+        }
+    }
+
+    /*
     impl<'target> PartialScopePriv<'target> for Output<'target> {
         unsafe fn value<'data, T: WrapperPriv<'target, 'data>>(
             self,
@@ -346,6 +656,32 @@ pub(crate) mod private {
             };
 
             Ok(rooted)
+        }
+    }
+     */
+
+    impl<'target> PartialScopePriv<'target> for Output<'target> {
+        fn ledger(&self) -> &'target RefCell<Ledger> {
+            self.ledger
+        }
+
+        unsafe fn value<'data, T: WrapperPriv<'target, 'data>>(
+            self,
+            value: NonNull<T::Wraps>,
+            _: Private,
+        ) -> T {
+            self.set_root::<T>(value)
+        }
+
+        unsafe fn call_result<'data, T: WrapperPriv<'target, 'data>>(
+            self,
+            result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
+            _: Private,
+        ) -> JuliaResult<'target, 'data, T> {
+            match result {
+                Ok(v) => Ok(self.set_root::<T>(v)),
+                Err(e) => Err(self.set_root::<Value>(e)),
+            }
         }
     }
 }

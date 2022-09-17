@@ -1,5 +1,5 @@
 #![cfg(feature = "sync-rt")]
-use jlrs::runtime::builder::RuntimeBuilder;
+use jlrs::{runtime::builder::RuntimeBuilder, memory::context::ContextFrame};
 
 #[test]
 fn init_with_image() {
@@ -9,11 +9,12 @@ fn init_with_image() {
         let image_path = format!("{}/lib/julia/sys.dll", julia_dir);
         #[cfg(target_os = "linux")]
         let image_path = format!("{}/lib/julia/sys.so", julia_dir);
+        let base = ContextFrame::new();
 
         unsafe {
             assert!(RuntimeBuilder::new()
                 .image(bindir, image_path)
-                .start()
+                .start(&base)
                 .is_ok())
         }
     } else {

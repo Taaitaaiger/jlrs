@@ -188,7 +188,8 @@
 //! // Julia code, and because it can race with other crates unrelated
 //! // to jlrs. It returns an error if Julia has already been
 //! // initialized.
-//! let _julia = unsafe { RuntimeBuilder::new().start().unwrap() };
+//! let ctx_frame = ContextFrame::new();
+//! let _julia = unsafe { RuntimeBuilder::new().start(&ctx_frame).unwrap() };
 //! # }
 //! ```
 //!
@@ -206,7 +207,7 @@
 //! let (_julia, _task_handle) = unsafe {
 //!     RuntimeBuilder::new()
 //!         .async_runtime::<Tokio, UnboundedChannel<_>>()
-//!         .start()
+//!         .start::<1>()
 //!         .unwrap()
 //! };
 //! # }
@@ -223,7 +224,7 @@
 //!     let (_julia, _task_handle) = unsafe {
 //!         RuntimeBuilder::new()
 //!             .async_runtime::<Tokio, UnboundedChannel<_>>()
-//!             .start_async()
+//!             .start_async::<1>()
 //!             .unwrap()
 //!     };
 //! }
@@ -298,12 +299,13 @@
 //! # fn main() {
 //! // Initializing Julia is unsafe because it can race with another crate that does
 //! // the same.
-//! let mut julia = unsafe { RuntimeBuilder::new().start().unwrap() };
+//! let context_frame = ContextFrame::new();
+//! let mut julia = unsafe { RuntimeBuilder::new().start(&context_frame).unwrap() };
 //!
 //! let res = julia.scope(|global, mut frame| {
 //!     // Create the two arguments.
-//!     let i = Value::new(&mut frame, 2u64)?;
-//!     let j = Value::new(&mut frame, 1u32)?;
+//!     let i = Value::new(&mut frame, 2u64);
+//!     let j = Value::new(&mut frame, 1u32);
 //!
 //!     // The `+` function can be found in the base module.
 //!     let func = Module::base(global).function(&mut frame, "+")?;
@@ -313,7 +315,7 @@
 //!     // data, while the inner error contains the exception if one is thrown. Here the
 //!     // exception is converted to the outer error type by calling `into_jlrs_result`, this new
 //!     // error contains the error message Julia would have shown.
-//!     unsafe { func.call2(&mut frame, i, j)? }
+//!     unsafe { func.call2(&mut frame, i, j) }
 //!         .into_jlrs_result()?
 //!         .unbox::<u64>()
 //! }).unwrap();
@@ -362,8 +364,8 @@
 //!         global: Global<'frame>,
 //!         mut frame: AsyncGcFrame<'frame>,
 //!     ) -> JlrsResult<Self::Output> {
-//!         let a = Value::new(&mut frame, self.a)?;
-//!         let b = Value::new(&mut frame, self.b)?;
+//!         let a = Value::new(&mut frame, self.a);
+//!         let b = Value::new(&mut frame, self.b);
 //!
 //!         let func = Module::base(global).function(&mut frame, "+")?;
 //!
@@ -462,7 +464,7 @@
 //!         unsafe {
 //!             Module::base(global)
 //!                 .function(&mut frame, "sum")?
-//!                 .call1(&mut frame, state.array.as_value())?
+//!                 .call1(&mut frame, state.array.as_value())
 //!                 .into_jlrs_result()?
 //!                 .unbox::<usize>()
 //!         }
@@ -492,19 +494,20 @@
 //! }
 //!
 //! # fn main() {
-//! let mut julia = unsafe { RuntimeBuilder::new().start().unwrap() };
+//! let context_frame = ContextFrame::new();
+//! let mut julia = unsafe { RuntimeBuilder::new().start(&context_frame).unwrap() };
 //! julia.scope(|global, mut frame| unsafe {
 //!     // Cast the function to a void pointer
-//!     let call_me_val = Value::new(&mut frame, call_me as *mut std::ffi::c_void)?;
+//!     let call_me_val = Value::new(&mut frame, call_me as *mut std::ffi::c_void);
 //!
 //!     // Value::eval_string can be used to create new functions.
 //!     let func = Value::eval_string(
 //!         &mut frame,
 //!         "myfunc(callme::Ptr{Cvoid})::Int = ccall(callme, Int, (Bool,), true)"
-//!     )?.into_jlrs_result()?;
+//!     ).into_jlrs_result()?;
 //!
 //!     // Call the function and unbox the result.
-//!     let output = func.call1(&mut frame, call_me_val)?
+//!     let output = func.call1(&mut frame, call_me_val)
 //!         .into_jlrs_result()?
 //!         .unbox::<isize>()?;
 //!
@@ -572,8 +575,9 @@
 //! use jlrs::prelude::*;
 //! use std::cell::RefCell;
 //! thread_local! {
-//!     pub static JULIA: RefCell<Julia> = {
-//!         let julia = RefCell::new(unsafe { RuntimeBuilder::new().start().unwrap() });
+//!     pub static JULIA: RefCell<Julia<'static>> = {
+//!         let context_frame = jlrs::util::test::static_context_frame();
+//!         let julia = RefCell::new(unsafe { RuntimeBuilder::new().start(context_frame).unwrap() });
 //!
 //!         /* include everything you need to use */
 //!
@@ -592,7 +596,7 @@
 //!         let julia = RefCell::new(unsafe {
 //!             RuntimeBuilder::new()
 //!                 .async_runtime::<Tokio, UnboundedChannel<_>>()
-//!                 .start()
+//!                 .start::<1>()
 //!                 .unwrap()
 //!                 .0
 //!         });
@@ -686,12 +690,12 @@
 macro_rules! init_fn {
     ($name:ident, $include:ident, $file:expr) => {
         pub(crate) static $include: &'static str = include_str!($file);
-        pub(crate) unsafe fn $name<'frame, F: $crate::memory::frame::Frame<'frame>>(
-            frame: &mut F,
+        pub(crate) unsafe fn $name<'frame>(
+            frame: &mut $crate::memory::frame::GcFrame<'frame>,
         ) -> () {
             match $crate::wrappers::ptr::value::Value::eval_string(frame, $include) {
-                Ok(Ok(_)) => (),
-                Ok(Err(e)) => {
+                Ok(_) => (),
+                Err(e) => {
                     panic!(
                         "{}",
                         $crate::wrappers::ptr::Wrapper::error_string_or(
@@ -700,7 +704,6 @@ macro_rules! init_fn {
                         )
                     )
                 }
-                Err(_) => panic!("AllocError during initialization of {}", $file),
             }
         }
     };

@@ -8,7 +8,7 @@ mod tests {
     fn ptr_union_fields_access_something() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(4, |global, mut frame| unsafe {
+            jlrs.scope(|global, mut frame| unsafe {
                 let field = Module::main(global)
                     .submodule_ref("JlrsTests")?
                     .wrapper_unchecked()
@@ -31,7 +31,7 @@ mod tests {
     fn ptr_union_fields_nothing_is_not_null() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(4, |global, mut frame| unsafe {
+            jlrs.scope(|global, mut frame| unsafe {
                 let _field = Module::main(global)
                     .submodule_ref("JlrsTests")?
                     .wrapper_unchecked()

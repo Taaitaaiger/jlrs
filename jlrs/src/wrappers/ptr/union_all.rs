@@ -1,7 +1,6 @@
 //! Wrapper for `UnionAll`, A union of types over all values of a type parameter.
 
 use crate::{
-    error::JlrsResult,
     impl_julia_typecheck,
     memory::{global::Global, output::Output, scope::PartialScope},
     private::Private,
@@ -48,7 +47,7 @@ impl<'scope> UnionAll<'scope> {
         scope: S,
         tvar: TypeVar,
         body: Value<'_, 'static>,
-    ) -> JlrsResult<JuliaResult<'target, 'static>>
+    ) -> JuliaResult<'target, 'static>
     where
         S: PartialScope<'target>,
     {
@@ -64,9 +63,9 @@ impl<'scope> UnionAll<'scope> {
                 Ok(())
             };
 
-            match catch_exceptions(&mut callback)? {
-                Ok(ptr) => Ok(Ok(scope.value(NonNull::new_unchecked(ptr), Private)?)),
-                Err(e) => Ok(Err(e.root(scope)?)),
+            match catch_exceptions(&mut callback).unwrap() {
+                Ok(ptr) => Ok(scope.value(NonNull::new_unchecked(ptr), Private)),
+                Err(e) => Err(scope.value(NonNull::new_unchecked(e.ptr()), Private)),
             }
         }
     }
@@ -79,7 +78,7 @@ impl<'scope> UnionAll<'scope> {
         scope: S,
         tvar: TypeVar,
         body: Value<'_, 'static>,
-    ) -> JlrsResult<Value<'target, 'static>>
+    ) -> Value<'target, 'static>
     where
         S: PartialScope<'target>,
     {
@@ -94,7 +93,7 @@ impl<'scope> UnionAll<'scope> {
         _: Global<'global>,
         tvar: TypeVar,
         body: Value<'_, 'static>,
-    ) -> JlrsResult<JuliaResultRef<'global, 'static>> {
+    ) -> JuliaResultRef<'global, 'static> {
         use crate::catch::catch_exceptions;
         use jl_sys::jl_value_t;
         use std::mem::MaybeUninit;
@@ -107,9 +106,9 @@ impl<'scope> UnionAll<'scope> {
                 Ok(())
             };
 
-            match catch_exceptions(&mut callback)? {
-                Ok(ptr) => Ok(Ok(ValueRef::wrap(ptr))),
-                Err(e) => Ok(Err(e)),
+            match catch_exceptions(&mut callback).unwrap() {
+                Ok(ptr) => Ok(ValueRef::wrap(ptr)),
+                Err(e) => Err(e),
             }
         }
     }

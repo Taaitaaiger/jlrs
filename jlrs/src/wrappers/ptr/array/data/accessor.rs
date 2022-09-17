@@ -6,7 +6,8 @@ use crate::error::{JuliaResult, JuliaResultRef};
 use crate::{
     error::{AccessError, JlrsResult, TypeError, CANNOT_DISPLAY_TYPE},
     layout::valid_layout::ValidLayout,
-    memory::{frame::Frame, scope::PartialScope},
+    memory::frame::GcFrame,
+    memory::{frame::Frame, ledger::Ledger, scope::PartialScope},
     private::Private,
     wrappers::ptr::{
         array::{
@@ -23,8 +24,9 @@ use crate::{
 };
 use jl_sys::{jl_array_ptr_set, jl_array_typetagdata, jl_arrayref, jl_arrayset};
 use std::{
+    cell::RefCell,
     marker::PhantomData,
-    ops::{Index, IndexMut},
+    ops::{Deref, DerefMut, Index, IndexMut},
     ptr::{null_mut, NonNull},
     slice,
 };
@@ -102,7 +104,7 @@ impl<'borrow, T> Mutability for Mutable<'borrow, T> {}
 /// [`ArrayAccessor::get_value`] and mutate them with [`ArrayAccessor::set_value`].
 #[repr(transparent)]
 pub struct ArrayAccessor<'borrow, 'array, 'data, T, L: ArrayLayout, M: Mutability> {
-    array: Array<'array, 'data>,
+    pub(crate) array: Array<'array, 'data>,
     _lt_marker: PhantomData<&'borrow ()>,
     _ty_marker: PhantomData<*mut T>,
     _layout_marker: PhantomData<L>,
@@ -113,21 +115,62 @@ pub struct ArrayAccessor<'borrow, 'array, 'data, T, L: ArrayLayout, M: Mutabilit
 pub type BitsArrayAccessor<'borrow, 'array, 'data, T, M> =
     ArrayAccessor<'borrow, 'array, 'data, T, BitsLayout, M>;
 
+/// A type alias for an ArrayAcccessor for the `BitsLayout`.
+pub type BitsArrayAccessorI<'borrow, 'array, 'data, T> =
+    ArrayAccessor<'borrow, 'array, 'data, T, BitsLayout, Immutable<'borrow, T>>;
+
+
+/// A type alias for an ArrayAcccessor for the `BitsLayout`.
+pub type BitsArrayAccessorMut<'borrow, 'array, 'data, T> =
+    ArrayAccessor<'borrow, 'array, 'data, T, BitsLayout, Mutable<'borrow, T>>;
+
 /// A type alias for an ArrayAcccessor for the `InlinePtrLayout`.
 pub type InlinePtrArrayAccessor<'borrow, 'array, 'data, T, M> =
     ArrayAccessor<'borrow, 'array, 'data, T, InlinePtrLayout, M>;
+
+/// A type alias for an ArrayAcccessor for the `InlinePtrLayout`.
+pub type InlinePtrArrayAccessorI<'borrow, 'array, 'data, T> =
+    ArrayAccessor<'borrow, 'array, 'data, T, InlinePtrLayout, Immutable<'borrow, T>>;
+
+/// A type alias for an ArrayAcccessor for the `InlinePtrLayout`.
+pub type InlinePtrArrayAccessorMut<'borrow, 'array, 'data, T> =
+    ArrayAccessor<'borrow, 'array, 'data, T, InlinePtrLayout, Mutable<'borrow, T>>;
 
 /// A type alias for an ArrayAcccessor for the `UnionLayout`.
 pub type UnionArrayAccessor<'borrow, 'array, 'data, M> =
     ArrayAccessor<'borrow, 'array, 'data, u8, UnionLayout, M>;
 
+/// A type alias for an ArrayAcccessor for the `UnionLayout`.
+pub type UnionArrayAccessorI<'borrow, 'array, 'data,> =
+    ArrayAccessor<'borrow, 'array, 'data, u8, UnionLayout, Immutable<'borrow, u8>>;
+
+/// A type alias for an ArrayAcccessor for the `UnionLayout`.
+pub type UnionArrayAccessorMut<'borrow, 'array, 'data,> =
+    ArrayAccessor<'borrow, 'array, 'data, u8, UnionLayout, Mutable<'borrow, u8>>;
+
 /// A type alias for an ArrayAcccessor for the `PtrLayout`.
 pub type PtrArrayAccessor<'borrow, 'array, 'data, T, M> =
     ArrayAccessor<'borrow, 'array, 'data, T, PtrLayout, M>;
 
+/// A type alias for an ArrayAcccessor for the `PtrLayout`.
+pub type PtrArrayAccessorI<'borrow, 'array, 'data, T> =
+    ArrayAccessor<'borrow, 'array, 'data, T, PtrLayout, Immutable<'borrow, T>>;
+
+/// A type alias for an ArrayAcccessor for the `PtrLayout`.
+pub type PtrArrayAccessorMut<'borrow, 'array, 'data, T> =
+    ArrayAccessor<'borrow, 'array, 'data, T, PtrLayout, Mutable<'borrow, T>>;
+
 /// A type alias for an ArrayAcccessor for the `UnknownLayout`.
 pub type IndeterminateArrayAccessor<'borrow, 'array, 'data, M> =
     ArrayAccessor<'borrow, 'array, 'data, u8, UnknownLayout, M>;
+
+/// A type alias for an ArrayAcccessor for the `UnknownLayout`.
+pub type IndeterminateArrayAccessorI<'borrow, 'array, 'data> =
+    ArrayAccessor<'borrow, 'array, 'data, u8, UnknownLayout, Immutable<'borrow, u8>>;
+
+/// A type alias for an ArrayAcccessor for the `UnknownLayout`.
+pub type IndeterminateArrayAccessorMut<'borrow, 'array, 'data> =
+    ArrayAccessor<'borrow, 'array, 'data, u8, UnknownLayout, Mutable<'borrow, u8>>;
 
 impl<'borrow, 'array, 'data, T, L: ArrayLayout> Clone
     for ArrayAccessor<'borrow, 'array, 'data, T, L, Immutable<'borrow, T>>
@@ -154,6 +197,16 @@ impl<'borrow, 'array, 'data, T, L: ArrayLayout, M: Mutability>
     {
         ArrayAccessor {
             array,
+            _lt_marker: PhantomData,
+            _ty_marker: PhantomData,
+            _layout_marker: PhantomData,
+            _mut_marker: PhantomData,
+        }
+    }
+
+    pub(crate) unsafe fn new2(array: &'borrow Array<'array, 'data>) -> Self {
+        ArrayAccessor {
+            array: *array,
             _lt_marker: PhantomData,
             _ty_marker: PhantomData,
             _layout_marker: PhantomData,
@@ -192,7 +245,7 @@ impl<'borrow, 'array, 'data, T, L: ArrayLayout, M: Mutability>
         use jl_sys::jl_value_t;
         use std::mem::MaybeUninit;
 
-        let idx = self.array.dimensions().index_of(&index)?;
+        let idx = unsafe { self.dimensions().index_of(&index)? };
 
         // Safety: exceptions are caught, the result is immediately rooted
         unsafe {
@@ -203,8 +256,8 @@ impl<'borrow, 'array, 'data, T, L: ArrayLayout, M: Mutability>
             };
 
             match catch_exceptions(&mut callback)? {
-                Ok(ptr) => Ok(Ok(scope.value(NonNull::new_unchecked(ptr), Private)?)),
-                Err(e) => Ok(Err(e.root(scope)?)),
+                Ok(ptr) => Ok(Ok(scope.value(NonNull::new_unchecked(ptr), Private))),
+                Err(e) => Ok(Err(scope.value(NonNull::new_unchecked(e.ptr()), Private))),
             }
         }
     }
@@ -217,9 +270,9 @@ impl<'borrow, 'array, 'data, T, L: ArrayLayout, M: Mutability>
         scope: P,
         index: D,
     ) -> JlrsResult<Value<'frame, 'data>> {
-        let idx = self.array.dimensions().index_of(&index)?;
+        let idx = self.dimensions().index_of(&index)?;
         let res = jl_arrayref(self.array.unwrap(Private), idx);
-        scope.value(NonNull::new_unchecked(res), Private)
+        Ok(scope.value(NonNull::new_unchecked(res), Private))
     }
 
     /// Access the element at `index` and convert it to a `ValueRef`.
@@ -235,7 +288,7 @@ impl<'borrow, 'array, 'data, T, L: ArrayLayout, M: Mutability>
         use crate::catch::catch_exceptions;
         use std::mem::MaybeUninit;
 
-        let idx = self.array.dimensions().index_of(&index)?;
+        let idx = unsafe { self.dimensions().index_of(&index)? };
 
         // Safety: exceptions are caught
         unsafe {
@@ -259,7 +312,7 @@ impl<'borrow, 'array, 'data, T, L: ArrayLayout, M: Mutability>
         &mut self,
         index: D,
     ) -> JlrsResult<ValueRef<'array, 'data>> {
-        let idx = self.array.dimensions().index_of(&index)?;
+        let idx = self.dimensions().index_of(&index)?;
         let res = jl_arrayref(self.array.unwrap(Private), idx);
         Ok(ValueRef::wrap(res))
     }
@@ -277,16 +330,16 @@ impl<'borrow, 'array, 'data, T, L: ArrayLayout>
     ///
     /// If an error is thrown by Julia it's caught and returned.
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub fn set_value<'frame, D: Dims, F: Frame<'frame>>(
+    pub fn set_value<'frame, D: Dims>(
         &mut self,
-        frame: &mut F,
+        frame: &mut GcFrame<'frame>,
         index: D,
         value: Option<Value<'_, 'data>>,
     ) -> JlrsResult<JuliaResult<'frame, 'static, ()>> {
-        use crate::catch::catch_exceptions;
+        use crate::{catch::catch_exceptions, memory::scope::private::PartialScopePriv};
         use std::mem::MaybeUninit;
 
-        let idx = self.array.dimensions().index_of(&index)?;
+        let idx = unsafe { self.dimensions().index_of(&index)? };
         let ptr = value.map(|v| v.unwrap(Private)).unwrap_or(null_mut());
 
         // Safety: exceptions are caught, if one is thrown it's immediately rooted
@@ -297,9 +350,11 @@ impl<'borrow, 'array, 'data, T, L: ArrayLayout>
                 Ok(())
             };
 
-            match catch_exceptions(&mut callback)? {
+            match catch_exceptions(&mut callback).unwrap() {
                 Ok(()) => Ok(Ok(())),
-                Err(e) => Ok(Err(e.root(&mut *frame)?)),
+                Err(e) => Ok(Err(frame
+                    .as_scope()
+                    .value(NonNull::new_unchecked(e.ptr()), Private))),
             }
         }
     }
@@ -312,7 +367,7 @@ impl<'borrow, 'array, 'data, T, L: ArrayLayout>
         index: D,
         value: Option<Value<'_, 'data>>,
     ) -> JlrsResult<()> {
-        let idx = self.array.dimensions().index_of(&index)?;
+        let idx = self.dimensions().index_of(&index)?;
         let ptr = value.map(|v| v.unwrap(Private)).unwrap_or(null_mut());
         jl_arrayset(self.array.unwrap(Private), ptr, idx);
         Ok(())
@@ -361,11 +416,9 @@ impl<'borrow, 'array, 'data, T: WrapperRef<'array, 'data>>
         let idx = self.dimensions().index_of(&index)?;
 
         let data_ptr = if let Some(value) = value {
-            if !value.isa(self.array.element_type()) {
-                let element_type_str = self
-                    .array
-                    .element_type()
-                    .display_string_or(CANNOT_DISPLAY_TYPE);
+            let ty = unsafe { self.array.element_type().value_unchecked() };
+            if !value.isa(ty) {
+                let element_type_str = ty.display_string_or(CANNOT_DISPLAY_TYPE);
                 let value_type_str = value.datatype().display_string_or(CANNOT_DISPLAY_TYPE);
                 Err(TypeError::IncompatibleType {
                     element_type_str,
@@ -561,7 +614,7 @@ impl<'borrow, 'array, 'data, M: Mutability> UnionArrayAccessor<'borrow, 'array, 
     /// Returns `true` if `ty` if a value of that type can be stored in this array.
     pub fn contains(&self, ty: DataType) -> bool {
         let mut tag = 0;
-        find_union_component(self.array.element_type(), ty.as_value(), &mut tag)
+        find_union_component(unsafe {self.array.element_type().value_unchecked()}, ty.as_value(), &mut tag)
     }
 
     /// Returns the type of the element at index `idx`.
@@ -569,8 +622,8 @@ impl<'borrow, 'array, 'data, M: Mutability> UnionArrayAccessor<'borrow, 'array, 
     where
         D: Dims,
     {
-        let elty = self.array.element_type();
-        let idx = self.array.dimensions().index_of(&index)?;
+        let elty = unsafe {self.array.element_type().value_unchecked()};
+        let idx = unsafe { self.dimensions().index_of(&index)? };
 
         // Safety: the index is in bounds.
         unsafe {
@@ -588,8 +641,8 @@ impl<'borrow, 'array, 'data, M: Mutability> UnionArrayAccessor<'borrow, 'array, 
         T: ValidLayout + Clone,
         D: Dims,
     {
-        let elty = self.array.element_type();
-        let idx = self.array.dimensions().index_of(&index)?;
+        let elty = unsafe {self.array.element_type().value_unchecked()};
+        let idx = unsafe { self.dimensions().index_of(&index)? };
 
         // Safety: The index is in bounds and layout compatibility is checked.
         unsafe {
@@ -631,10 +684,9 @@ impl<'borrow, 'array, 'data> UnionArrayAccessor<'borrow, 'array, 'data, Mutable<
         }
 
         let mut tag = 0;
-        if !find_union_component(self.array.element_type(), ty.as_value(), &mut tag) {
-            let element_type_str = self
-                .array
-                .element_type()
+        let elty = unsafe { self.array.element_type().value_unchecked() } ;
+        if !find_union_component(elty, ty.as_value(), &mut tag) {
+            let element_type_str = elty
                 .display_string_or(CANNOT_DISPLAY_TYPE);
             let value_type_str = ty.display_string_or(CANNOT_DISPLAY_TYPE);
             Err(TypeError::IncompatibleType {
@@ -643,7 +695,7 @@ impl<'borrow, 'array, 'data> UnionArrayAccessor<'borrow, 'array, 'data, Mutable<
             })?;
         }
 
-        let idx = self.array.dimensions().index_of(&index)?;
+        let idx = unsafe { self.dimensions().index_of(&index)? };
         // Safety: The data can be stored in this array, the tag is updated accordingly.
         unsafe {
             let offset = idx * self.array.unwrap_non_null(Private).as_ref().elsize as usize;

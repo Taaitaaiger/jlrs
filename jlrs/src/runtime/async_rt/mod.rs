@@ -36,14 +36,18 @@ use crate::{
     },
     call::Call,
     error::{IOError, JlrsError, JlrsResult, RuntimeError},
-    memory::{frame::GcFrame, global::Global, mode::Async, stack_page::AsyncStackPage},
+    memory::{
+        context::{AsyncContextFrame, Stack, WrappedContext},
+        frame::GcFrame,
+        global::Global, ledger::Ledger,
+    },
     runtime::{builder::AsyncRuntimeBuilder, init_jlrs, INIT},
     wrappers::ptr::{module::Module, string::JuliaString, value::Value, Wrapper},
 };
 use async_trait::async_trait;
 use futures::Future;
 use jl_sys::{
-    jl_atexit_hook, jl_cpu_threads, jl_init, jl_init_with_image, jl_is_initialized,
+    jl_atexit_hook, jl_init, jl_init_with_image, jl_is_initialized,
     jl_process_events,
 };
 
@@ -57,7 +61,7 @@ use std::{
     num::NonZeroUsize,
     path::{Path, PathBuf},
     sync::{atomic::Ordering, Arc},
-    time::Duration,
+    time::Duration, ptr::NonNull, cell::RefCell,
 };
 
 #[cfg(feature = "nightly")]
@@ -259,14 +263,12 @@ where
     /// executed as soon as possible and can't call async methods, so it blocks the runtime.
     pub async fn blocking_task<T, O, F>(&self, task: F, res_sender: O) -> JlrsResult<()>
     where
-        for<'base> F: 'static
-            + Send
-            + Sync
-            + FnOnce(Global<'base>, GcFrame<'base, Async<'base>>) -> JlrsResult<T>,
+        for<'base> F:
+            'static + Send + Sync + FnOnce(Global<'base>, GcFrame<'base>) -> JlrsResult<T>,
         O: OneshotSender<JlrsResult<T>>,
         T: Send + Sync + 'static,
     {
-        let msg = BlockingTask::new(task, res_sender, 0);
+        let msg = BlockingTask::new(task, res_sender);
         let boxed = Box::new(msg);
         self.sender
             .send(MessageInner::BlockingTask(boxed).wrap())
@@ -286,74 +288,12 @@ where
     /// methods, so it blocks the runtime.
     pub fn try_blocking_task<T, O, F>(&self, task: F, res_sender: O) -> JlrsResult<()>
     where
-        for<'base> F: 'static
-            + Send
-            + Sync
-            + FnOnce(Global<'base>, GcFrame<'base, Async<'base>>) -> JlrsResult<T>,
+        for<'base> F:
+            'static + Send + Sync + FnOnce(Global<'base>, GcFrame<'base>) -> JlrsResult<T>,
         O: OneshotSender<JlrsResult<T>>,
         T: Send + Sync + 'static,
     {
-        let msg = BlockingTask::new(task, res_sender, 0);
-        let boxed = Box::new(msg);
-        self.sender
-            .try_send(MessageInner::BlockingTask(boxed).wrap())
-            .map_err(|e| match e {
-                TrySendError::Full(_) => RuntimeError::ChannelFull,
-                TrySendError::Closed(_) => RuntimeError::ChannelClosed,
-            })?;
-
-        Ok(())
-    }
-
-    /// Send a new blocking task to the runtime, the frame the task can use can root A least
-    /// `capacity` values.
-    ///
-    /// This method is equivalent to `AsyncJulia::blocking_task` but takes an additional
-    /// argument, the capacity of the task's frame.
-    pub async fn blocking_task_with_capacity<T, O, F>(
-        &self,
-        task: F,
-        res_sender: O,
-        capacity: usize,
-    ) -> JlrsResult<()>
-    where
-        for<'base> F: 'static
-            + Send
-            + Sync
-            + FnOnce(Global<'base>, GcFrame<'base, Async<'base>>) -> JlrsResult<T>,
-        O: OneshotSender<JlrsResult<T>>,
-        T: Send + Sync + 'static,
-    {
-        let msg = BlockingTask::new(task, res_sender, capacity);
-        let boxed = Box::new(msg);
-        self.sender
-            .send(MessageInner::BlockingTask(boxed).wrap())
-            .await
-            .map_err(|_| RuntimeError::ChannelClosed)?;
-
-        Ok(())
-    }
-
-    /// Try to send a new blocking task to the runtime, the frame the task can use can root A
-    /// least `capacity` values.
-    ///
-    /// This method is equivalent to `AsyncJulia::try_blocking_task` but takes an additional
-    /// argument, the capacity of the task's frame.
-    pub fn try_blocking_task_with_capacity<T, O, F>(
-        &self,
-        task: F,
-        res_sender: O,
-        capacity: usize,
-    ) -> JlrsResult<()>
-    where
-        for<'base> F: 'static
-            + Send
-            + Sync
-            + FnOnce(Global<'base>, GcFrame<'base, Async<'base>>) -> JlrsResult<T>,
-        O: OneshotSender<JlrsResult<T>>,
-        T: Send + Sync + 'static,
-    {
-        let msg = BlockingTask::new(task, res_sender, capacity);
+        let msg = BlockingTask::new(task, res_sender);
         let boxed = Box::new(msg);
         self.sender
             .try_send(MessageInner::BlockingTask(boxed).wrap())
@@ -560,14 +500,14 @@ where
         Ok(())
     }
 
-    pub(crate) unsafe fn init<C>(
+    pub(crate) unsafe fn init<C, const N: usize>(
         builder: AsyncRuntimeBuilder<R, C>,
     ) -> JlrsResult<(Self, std::thread::JoinHandle<JlrsResult<()>>)>
     where
         C: Channel<Message>,
     {
         let (sender, receiver) = C::channel(NonZeroUsize::new(builder.channel_capacity));
-        let handle = R::spawn_thread(move || Self::run_async(builder, Box::new(receiver)));
+        let handle = R::spawn_thread(move || Self::run_async::<_, N>(builder, Box::new(receiver)));
 
         let julia = AsyncJulia {
             sender: Arc::new(sender),
@@ -577,14 +517,15 @@ where
         Ok((julia, handle))
     }
 
-    pub(crate) unsafe fn init_async<C>(
+    pub(crate) unsafe fn init_async<C, const N: usize>(
         builder: AsyncRuntimeBuilder<R, C>,
     ) -> JlrsResult<(Self, R::RuntimeHandle)>
     where
         C: Channel<Message>,
     {
         let (sender, receiver) = C::channel(NonZeroUsize::new(builder.channel_capacity));
-        let handle = R::spawn_blocking(move || Self::run_async(builder, Box::new(receiver)));
+        let handle =
+            R::spawn_blocking(move || Self::run_async::<_, N>(builder, Box::new(receiver)));
 
         let julia = AsyncJulia {
             sender: Arc::new(sender),
@@ -594,7 +535,7 @@ where
         Ok((julia, handle))
     }
 
-    fn run_async<C>(
+    fn run_async<C, const N: usize>(
         builder: AsyncRuntimeBuilder<R, C>,
         receiver: Box<dyn ChannelReceiver<Message>>,
     ) -> JlrsResult<()>
@@ -670,43 +611,62 @@ where
                     jl_init();
                 }
 
-                Self::run_inner(builder, receiver).await?;
+                let base_frame = AsyncContextFrame::<N>::new();
+                Self::run_inner::<_, N>(builder, receiver, std::mem::transmute(&base_frame))
+                    .await?;
             }
 
             Ok(())
         })
     }
 
-    async unsafe fn run_inner<C>(
+    async unsafe fn run_inner<C, const N: usize>(
         builder: AsyncRuntimeBuilder<R, C>,
         mut receiver: Box<dyn ChannelReceiver<Message>>,
+        base_frame: &'static AsyncContextFrame<N>,
     ) -> Result<(), Box<JlrsError>>
     where
         C: Channel<Message>,
     {
-        let max_n_tasks = if builder.n_tasks == 0 {
-            jl_cpu_threads() as usize
-        } else {
-            builder.n_tasks
-        };
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "lts")] {
+                let rtls = NonNull::new_unchecked(jl_sys::jl_get_ptls_states()).as_mut();
+                rtls.pgcstack = base_frame as *const _ as *mut _;
+            } else {
+                use jl_sys::{jl_get_current_task, jl_task_t};
+                let task = NonNull::new_unchecked(jl_get_current_task().cast::<jl_task_t>()).as_mut();
+                task.gcstack = base_frame as *const _ as *mut _;
+            }
+        }
+
+        let ledger = RefCell::new(Ledger::default());
+        let ledger_ref: &'static RefCell<Ledger> = std::mem::transmute(&ledger);
+
         let recv_timeout = builder.recv_timeout;
 
-        let mut free_stacks = VecDeque::with_capacity(max_n_tasks);
-        for i in 1..=max_n_tasks {
+        let mut free_stacks = VecDeque::with_capacity(N);
+        for i in 1..=N {
             free_stacks.push_back(i);
         }
 
         let mut stacks = {
-            let mut stacks = Vec::with_capacity(max_n_tasks + 1);
-            for _ in 0..=max_n_tasks {
-                stacks.push(Some(AsyncStackPage::new()));
+            let mut stacks = Vec::with_capacity(N + 1);
+            let ctx_ty = Stack::init();
+            let ctx = Stack::new(ctx_ty);
+            let context = base_frame.set_sync(ctx);
+            stacks.push(Some(context));
+
+            for i in 0..N {
+                let ctx = Stack::new(ctx_ty);
+                let context = base_frame.set(i, ctx);
+                stacks.push(Some(context));
             }
-            AsyncStackPage::link_stacks(&stacks);
+
             stacks.into_boxed_slice()
         };
 
-        let mut running_tasks = Vec::with_capacity(max_n_tasks);
-        for _ in 0..max_n_tasks {
+        let mut running_tasks = Vec::with_capacity(N);
+        for _ in 0..N {
             running_tasks.push(None);
         }
 
@@ -715,9 +675,10 @@ where
         let mut n_running = 0usize;
 
         {
-            let stack = stacks[0].as_mut().expect("Async stack corrupted");
-            set_custom_fns(stack)?;
+            let stack = stacks[0].as_ref().expect("Async stack corrupted");
+            set_custom_fns(stack, ledger_ref)?;
         }
+
 
         loop {
             let wait_time = if n_running > 0 {
@@ -736,9 +697,10 @@ where
                         if let Some(idx) = free_stacks.pop_front() {
                             let mut stack = stacks[idx].take().expect("Async stack corrupted");
                             let task = R::spawn_local(async move {
-                                task.call(&mut stack).await;
+                                task.call(&mut stack, ledger_ref).await;
+                                let wrapped = WrappedContext::wrap(stack);
                                 sender
-                                    .send(MessageInner::Complete(idx, stack).wrap())
+                                    .send(MessageInner::Complete(idx, wrapped).wrap())
                                     .await
                                     .ok();
                             });
@@ -748,12 +710,14 @@ where
                             pending_tasks.push_back((task, sender));
                         }
                     }
-                    MessageInner::Complete(idx, mut stack) => {
+                    MessageInner::Complete(idx, stack) => {
+                        let stack = stack.unwrap();
                         if let Some((jl_task, sender)) = pending_tasks.pop_front() {
                             let task = R::spawn_local(async move {
-                                jl_task.call(&mut stack).await;
+                                jl_task.call(stack, ledger_ref).await;
+                                let wrapped = WrappedContext::wrap(stack);
                                 sender
-                                    .send(MessageInner::Complete(idx, stack).wrap())
+                                    .send(MessageInner::Complete(idx, wrapped).wrap())
                                     .await
                                     .ok();
                             });
@@ -766,12 +730,12 @@ where
                         }
                     }
                     MessageInner::BlockingTask(task) => {
-                        let stack = stacks[0].as_mut().expect("Async stack corrupted");
-                        task.call(stack).await;
+                        let stack = stacks[0].expect("Async stack corrupted");
+                        task.call(stack, ledger_ref).await; 
                     }
                     MessageInner::Include(path, sender) => {
-                        let stack = stacks[0].as_mut().expect("Async stack corrupted");
-                        let res = call_include(stack, path);
+                        let stack = stacks[0].expect("Async stack corrupted");
+                        let res = call_include(stack, ledger_ref, path);
                         sender.send(res).await;
                     }
                     MessageInner::ErrorColor(enable, sender) => {
@@ -807,7 +771,7 @@ pub(crate) enum MessageInner {
     BlockingTask(Box<dyn BlockingTaskEnvelope>),
     Include(PathBuf, Box<dyn OneshotSender<JlrsResult<()>>>),
     ErrorColor(bool, Box<dyn OneshotSender<JlrsResult<()>>>),
-    Complete(usize, Box<AsyncStackPage>),
+    Complete(usize, WrappedContext),
 }
 
 impl fmt::Debug for Message {
@@ -822,11 +786,10 @@ impl MessageInner {
     }
 }
 
-unsafe fn call_include(stack: &AsyncStackPage, path: PathBuf) -> JlrsResult<()> {
+unsafe fn call_include(stack: &Stack, ledger: &'static RefCell<Ledger>, path: PathBuf) -> JlrsResult<()> {
     let global = Global::new();
-    let mode = Async::new(stack.top());
-    let raw = stack.slots();
-    let (mut frame, owner) = GcFrame::new(raw, mode);
+
+    let (mut frame, owner) = GcFrame::base(stack, ledger);
 
     match path.to_str() {
         Some(path) => {
@@ -867,12 +830,10 @@ fn set_error_color(enable: bool) -> JlrsResult<()> {
     }
 }
 
-fn set_custom_fns(stack: &AsyncStackPage) -> JlrsResult<()> {
+fn set_custom_fns(stack: &Stack, ledger: &'static RefCell<Ledger>) -> JlrsResult<()> {
     unsafe {
         let global = Global::new();
-        let mode = Async::new(stack.top());
-        let raw = stack.slots();
-        let (mut frame, owner) = GcFrame::new(raw, mode);
+        let (mut frame, owner) = GcFrame::base(stack, ledger);
 
         init_jlrs(&mut frame);
         init_multitask(&mut frame);
@@ -881,7 +842,7 @@ fn set_custom_fns(stack: &AsyncStackPage) -> JlrsResult<()> {
             .submodule_ref("JlrsMultitask")?
             .wrapper_unchecked();
 
-        let wake_rust = Value::new(&mut frame, wake_task as *mut c_void)?;
+        let wake_rust = Value::new(&mut frame, wake_task as *mut c_void);
         jlrs_mod
             .global_ref("wakerust")?
             .wrapper_unchecked()

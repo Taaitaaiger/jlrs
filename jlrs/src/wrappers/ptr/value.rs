@@ -47,17 +47,17 @@ macro_rules! count {
 ///
 /// ```
 /// # use jlrs::prelude::*;
-/// # use jlrs::util::JULIA;
+/// # use jlrs::util::test::JULIA;
 /// # fn main() {
 /// # JULIA.with(|j| {
 /// # let mut julia = j.borrow_mut();
 /// // Three slots; two for the inputs and one for the output.
-/// julia.scope_with_capacity(3, |global, mut frame| {
+/// julia.scope(|global, mut frame| {
 ///     // Create the two arguments, each value requires one slot
-///     let i = Value::new(&mut frame, 2u64)?;
-///     let j = Value::new(&mut frame, 1u32)?;
+///     let i = Value::new(&mut frame, 2u64);
+///     let j = Value::new(&mut frame, 1u32);
 ///
-///     let _nt = named_tuple!(&mut frame, "i" => i, "j" => j)?;
+///     let _nt = named_tuple!(&mut frame, "i" => i, "j" => j);
 ///
 ///     Ok(())
 /// }).unwrap();
@@ -67,7 +67,7 @@ macro_rules! count {
 #[macro_export]
 macro_rules! named_tuple {
     ($frame:expr, $name:expr => $value:expr) => {
-        $crate::wrappers::ptr::value::Value::new_named_tuple($frame, &mut [$name], &mut [$value])
+        $crate::wrappers::ptr::value::Value::new_named_tuple($frame, &mut [$name], &mut [$value]).expect("Invalid use of named_tuple!")
     };
     ($frame:expr, $name:expr => $value:expr, $($rest:tt)+) => {
         {
@@ -91,7 +91,7 @@ macro_rules! named_tuple {
         {
             $names.push($name);
             $values.push($value);
-            $crate::wrappers::ptr::value::Value::new_named_tuple($frame, $names, $values)
+            $crate::wrappers::ptr::value::Value::new_named_tuple($frame, $names, $values).expect("Invalid use of named_tuple!")
         }
     };
 }
@@ -151,6 +151,9 @@ use std::{
     usize,
 };
 
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use crate::memory::frame::GcFrame;
+
 use super::Ref;
 
 cfg_if! {
@@ -204,7 +207,7 @@ impl<'scope, 'data, T: Wrapper<'scope, 'data>> PartialEq<T> for Value<'_, '_> {
 impl Value<'_, '_> {
     /// Create a new Julia value, any type that implements [`IntoJulia`] can be converted using
     /// this function.
-    pub fn new<'target, V, S>(scope: S, value: V) -> JlrsResult<Value<'target, 'static>>
+    pub fn new<'target, V, S>(scope: S, value: V) -> Value<'target, 'static>
     where
         V: IntoJulia,
         S: PartialScope<'target>,
@@ -238,19 +241,20 @@ impl Value<'_, '_> {
         T: ToSymbol,
         V: AsRef<[Value<'value, 'data>]>,
     {
-        let global = scope.global();
-        let (output, scope) = scope.split()?;
-        scope.scope_with_capacity(4, |mut frame| {
-            let field_names = field_names.as_ref();
-            let values_m = values.as_ref();
+        let field_names = field_names.as_ref();
+        let values_m = values.as_ref();
 
-            let n_names = field_names.len();
-            let n_values = values_m.len();
+        let n_names = field_names.len();
+        let n_values = values_m.len();
 
-            if n_names != n_values {
-                Err(InstantiationError::NamedTupleSizeMismatch { n_names, n_values })?;
-            }
+        if n_names != n_values {
+            Err(InstantiationError::NamedTupleSizeMismatch { n_names, n_values })?;
+        }
 
+        let (output, scope) = scope.split();
+
+        scope.scope(|mut frame| {
+            let global = frame.as_scope().global();
             let symbol_ty = DataType::symbol_type(global).as_value();
             let mut symbol_type_vec = vec![symbol_ty; n_names];
 
@@ -265,7 +269,7 @@ impl Value<'_, '_> {
 
                 let names = DataType::anytuple_type(global)
                     .as_value()
-                    .apply_type_unchecked(&mut frame, &mut symbol_type_vec)?
+                    .apply_type_unchecked(&mut frame, &mut symbol_type_vec)
                     .cast::<DataType>()?
                     .instantiate_unchecked(&mut frame, &mut field_names_vec)?;
 
@@ -277,14 +281,14 @@ impl Value<'_, '_> {
 
                 let field_type_tup = DataType::anytuple_type(global)
                     .as_value()
-                    .apply_type_unchecked(&mut frame, &mut field_types_vec)?;
+                    .apply_type_unchecked(&mut frame, &mut field_types_vec);
 
                 let ty = UnionAll::namedtuple_type(global)
                     .as_value()
-                    .apply_type_unchecked(&mut frame, &mut [names, field_type_tup])?
+                    .apply_type_unchecked(&mut frame, &mut [names, field_type_tup])
                     .cast::<DataType>()?;
 
-                ty.instantiate_unchecked(output, values)
+                ty.instantiate_unchecked(output, values_m)
             }
         })
     }
@@ -305,7 +309,7 @@ impl Value<'_, '_> {
         self,
         scope: S,
         types: V,
-    ) -> JlrsResult<JuliaResult<'target, 'data>>
+    ) -> JuliaResult<'target, 'data>
     where
         S: PartialScope<'target>,
         V: AsRef<[Value<'value, 'data>]>,
@@ -323,9 +327,9 @@ impl Value<'_, '_> {
                 Ok(())
             };
 
-            match catch_exceptions(&mut callback)? {
-                Ok(ptr) => Ok(Ok(scope.value(NonNull::new_unchecked(ptr), Private)?)),
-                Err(e) => Ok(Err(e.root(scope)?)),
+            match catch_exceptions(&mut callback).unwrap() {
+                Ok(ptr) => Ok(scope.value(NonNull::new_unchecked(ptr), Private)),
+                Err(e) => Err(scope.value(NonNull::new_unchecked(e.ptr()), Private)),
             }
         }
     }
@@ -348,7 +352,7 @@ impl Value<'_, '_> {
         self,
         scope: S,
         types: V,
-    ) -> JlrsResult<Value<'target, 'data>>
+    ) -> Value<'target, 'data>
     where
         S: PartialScope<'target>,
         V: AsRef<[Value<'value, 'data>]>,
@@ -402,12 +406,12 @@ impl Value<'_, '_> {
     ///
     /// ```
     /// # use jlrs::prelude::*;
-    /// # use jlrs::util::JULIA;
+    /// # use jlrs::util::test::JULIA;
     /// # fn main() {
     /// # JULIA.with(|j| {
     /// # let mut julia = j.borrow_mut();
     /// julia.scope(|_global, mut frame| {
-    ///     let i = Value::new(&mut frame, 2u64)?;
+    ///     let i = Value::new(&mut frame, 2u64);
     ///     assert!(i.is::<u64>());
     ///     Ok(())
     /// }).unwrap();
@@ -633,7 +637,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
                 Err(AccessError::UndefRef)?;
             }
 
-            scope.value(NonNull::new_unchecked(fld_ptr), Private)
+            Ok(scope.value(NonNull::new_unchecked(fld_ptr), Private))
         }
     }
 
@@ -725,7 +729,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
                 Err(AccessError::UndefRef)?;
             }
 
-            scope.value(NonNull::new_unchecked(fld_ptr), Private)
+            Ok(scope.value(NonNull::new_unchecked(fld_ptr), Private))
         }
     }
 
@@ -807,16 +811,14 @@ impl<'scope, 'data> Value<'scope, 'data> {
     ///
     /// Safety: Mutating things that should absolutely not be mutated, like the fields of a
     /// `DataType`, is not prevented.
+
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub unsafe fn set_nth_field<'frame, F>(
+    pub unsafe fn set_nth_field<'frame>(
         self,
-        frame: &mut F,
+        frame: &mut GcFrame<'frame>,
         idx: usize,
         value: Value<'_, 'data>,
-    ) -> JlrsResult<JuliaResult<'frame, 'data, ()>>
-    where
-        F: Frame<'frame>,
-    {
+    ) -> JlrsResult<JuliaResult<'frame, 'data, ()>> {
         use crate::catch::catch_exceptions;
 
         let n_fields = self.n_fields();
@@ -852,7 +854,10 @@ impl<'scope, 'data> Value<'scope, 'data> {
 
         match catch_exceptions(&mut callback)? {
             Ok(_) => Ok(Ok(())),
-            Err(e) => Ok(Err(e.root(frame)?)),
+            Err(e) => {
+                frame.push_root(NonNull::new_unchecked(e.ptr()));
+                Ok(Err(e.wrapper_unchecked()))
+            }
         }
     }
 
@@ -923,14 +928,13 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// Safety: Mutating things that should absolutely not be mutated, like the fields of a
     /// `DataType`, is not prevented.
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub unsafe fn set_field<'frame, F, N>(
+    pub unsafe fn set_field<'frame, N>(
         self,
-        frame: &mut F,
+        frame: &mut GcFrame<'frame>,
         field_name: N,
         value: Value<'_, 'data>,
     ) -> JlrsResult<JuliaResult<'frame, 'data, ()>>
     where
-        F: Frame<'frame>,
         N: ToSymbol,
     {
         use crate::catch::catch_exceptions;
@@ -969,7 +973,10 @@ impl<'scope, 'data> Value<'scope, 'data> {
 
         match catch_exceptions(&mut callback)? {
             Ok(_) => Ok(Ok(())),
-            Err(e) => Ok(Err(e.root(frame)?)),
+            Err(e) => {
+                frame.push_root(NonNull::new_unchecked(e.ptr()));
+                Ok(Err(e.wrapper_unchecked()))
+            }
         }
     }
 
@@ -1070,16 +1077,13 @@ impl Value<'_, '_> {
     ///
     /// Safety: The command can't be checked for correctness, nothing prevents you from causing a
     /// segmentation fault with a command like `unsafe_load(Ptr{Float64}(C_NULL))`.
-    pub unsafe fn eval_string<'target, C, S>(
-        scope: S,
-        cmd: C,
-    ) -> JlrsResult<JuliaResult<'target, 'static>>
+    pub unsafe fn eval_string<'target, C, S>(scope: S, cmd: C) -> JuliaResult<'target, 'static>
     where
         C: AsRef<str>,
         S: PartialScope<'target>,
     {
         let cmd = cmd.as_ref();
-        let cmd_cstring = CString::new(cmd).map_err(JlrsError::other)?;
+        let cmd_cstring = CString::new(cmd).map_err(JlrsError::other).unwrap();
         let cmd_ptr = cmd_cstring.as_ptr();
         let res = jl_eval_string(cmd_ptr);
         let exc = jl_exception_occurred();
@@ -1096,10 +1100,7 @@ impl Value<'_, '_> {
     ///
     /// Safety: The command can't be checked for correctness, nothing prevents you from causing a
     /// segmentation fault with a command like `unsafe_load(Ptr{Float64}(C_NULL))`.
-    pub unsafe fn eval_cstring<'target, C, S>(
-        scope: S,
-        cmd: C,
-    ) -> JlrsResult<JuliaResult<'target, 'static>>
+    pub unsafe fn eval_cstring<'target, C, S>(scope: S, cmd: C) -> JuliaResult<'target, 'static>
     where
         C: AsRef<CStr>,
         S: PartialScope<'target>,
@@ -1132,7 +1133,7 @@ impl Value<'_, '_> {
     {
         if path.as_ref().exists() {
             let global = scope.global();
-            let (output, scope) = scope.split()?;
+            let (output, scope) = scope.split();
             return scope.scope(|mut frame| {
                 let path_jl_str = JuliaString::new(&mut frame, path.as_ref().to_string_lossy())?;
                 let include_func = Module::main(global)
@@ -1140,7 +1141,7 @@ impl Value<'_, '_> {
                     .wrapper_unchecked();
 
                 let scope = output.into_scope(&mut frame);
-                include_func.call1(scope, path_jl_str.as_value())
+                Ok(include_func.call1(scope, path_jl_str.as_value()))
             });
         }
 
@@ -1307,7 +1308,7 @@ impl<'scope> Value<'scope, 'static> {
 
 impl<'data> Call<'data> for Value<'_, 'data> {
     #[inline(always)]
-    unsafe fn call0<'target, S>(self, scope: S) -> JlrsResult<JuliaResult<'target, 'data>>
+    unsafe fn call0<'target, S>(self, scope: S) -> JuliaResult<'target, 'data>
     where
         S: PartialScope<'target>,
     {
@@ -1320,7 +1321,7 @@ impl<'data> Call<'data> for Value<'_, 'data> {
         self,
         scope: S,
         arg0: Value<'_, 'data>,
-    ) -> JlrsResult<JuliaResult<'target, 'data>>
+    ) -> JuliaResult<'target, 'data>
     where
         S: PartialScope<'target>,
     {
@@ -1334,7 +1335,7 @@ impl<'data> Call<'data> for Value<'_, 'data> {
         scope: S,
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
-    ) -> JlrsResult<JuliaResult<'target, 'data>>
+    ) -> JuliaResult<'target, 'data>
     where
         S: PartialScope<'target>,
     {
@@ -1349,7 +1350,7 @@ impl<'data> Call<'data> for Value<'_, 'data> {
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
         arg2: Value<'_, 'data>,
-    ) -> JlrsResult<JuliaResult<'target, 'data>>
+    ) -> JuliaResult<'target, 'data>
     where
         S: PartialScope<'target>,
     {
@@ -1358,11 +1359,7 @@ impl<'data> Call<'data> for Value<'_, 'data> {
     }
 
     #[inline(always)]
-    unsafe fn call<'target, 'value, V, S>(
-        self,
-        scope: S,
-        args: V,
-    ) -> JlrsResult<JuliaResult<'target, 'data>>
+    unsafe fn call<'target, 'value, V, S>(self, scope: S, args: V) -> JuliaResult<'target, 'data>
     where
         V: AsRef<[Value<'value, 'data>]>,
         S: PartialScope<'target>,
@@ -2029,7 +2026,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
             self.value = arr.data_ptr().cast::<ValueRef>().add(index).read();
             self.offset = 0;
             if self.value.is_undefined() {
-                if let Ok(ty) = arr.element_type().cast::<DataType>() {
+                if let Ok(ty) = arr.element_type().value_unchecked().cast::<DataType>() {
                     if ty.is_concrete_type() {
                         self.current_field_type = ty.as_ref();
                     } else {
@@ -2052,7 +2049,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
             }
         } else if arr.is_union_array() {
             let mut tag = *jl_array_typetagdata(arr.unwrap(Private)).add(index) as i32;
-            let component = nth_union_component(arr.element_type(), &mut tag);
+            let component = nth_union_component(arr.element_type().value_unchecked(), &mut tag);
             debug_assert!(component.is_some());
             let ty = component.unwrap_unchecked();
             debug_assert!(ty.is::<DataType>());
@@ -2060,7 +2057,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
             debug_assert!(ty.is_concrete_type());
             self.current_field_type = ty.as_ref();
         } else {
-            let ty = arr.element_type();
+            let ty = arr.element_type().value_unchecked();
             debug_assert!(ty.is::<DataType>());
             self.current_field_type = ty.cast_unchecked::<DataType>().as_ref();
         }

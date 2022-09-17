@@ -7,13 +7,13 @@ mod tests {
     fn extend_lifetime() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(1, |_, mut frame| {
-                let output = frame.output()?;
+            jlrs.scope(|_, mut frame| {
+                let output = frame.output();
 
                 frame
                     .scope(|mut frame| {
                         let task = unsafe {
-                            Value::eval_string(&mut frame, "@task 1 + 2")?
+                            Value::eval_string(&mut frame, "@task 1 + 2")
                                 .into_jlrs_result()?
                                 .cast::<Task>()?
                                 .clone()

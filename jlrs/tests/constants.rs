@@ -13,7 +13,7 @@ mod tests {
                 JULIA.with(|j| {
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope_with_capacity(0, |global, _| {
+                    jlrs.scope(|global, _| {
                         let v1 = Value::$func(global);
                         let v2 = unsafe {
                             Module::core(global)
@@ -36,7 +36,7 @@ mod tests {
                 JULIA.with(|j| {
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope_with_capacity(0, |global, _| {
+                    jlrs.scope(|global, _| {
                         #[allow(unused_unsafe)]
                         unsafe {
                             let v1 = Value::$func(global);
@@ -62,7 +62,7 @@ mod tests {
                 JULIA.with(|j| {
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope_with_capacity(0, |global, _| {
+                    jlrs.scope(|global, _| {
                         #[allow(unused_unsafe)]
                         unsafe {
                             let v1 = Value::$func(global);
@@ -88,7 +88,7 @@ mod tests {
                 JULIA.with(|j| {
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope_with_capacity(0, |global, _| {
+                    jlrs.scope(|global, _| {
                         let v1 = UnionAll::$func(global);
                         let v2 = unsafe {
                             Module::core(global)
@@ -111,7 +111,7 @@ mod tests {
                 JULIA.with(|j| {
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope_with_capacity(0, |global, _| {
+                    jlrs.scope(|global, _| {
                         let v1 = UnionAll::$func(global);
                         let v2 = unsafe {
                             Module::core(global)
@@ -134,7 +134,7 @@ mod tests {
                 JULIA.with(|j| {
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope_with_capacity(0, |global, _| {
+                    jlrs.scope(|global, _| {
                         let v1 = DataType::$func(global);
                         let v2 = unsafe {
                             Module::core(global)

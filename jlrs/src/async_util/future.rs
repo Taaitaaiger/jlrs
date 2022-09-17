@@ -50,7 +50,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
 
         let values = values.as_ref();
         let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
-        let state_ptr_boxed = Value::new(&mut *frame, state_ptr)?;
+        let state_ptr_boxed = Value::new(&mut *frame, state_ptr);
 
         let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + values.len());
 
@@ -67,7 +67,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                 .wrapper_unchecked()
                 .function_ref("asynccall")?
                 .wrapper_unchecked()
-                .call(&mut *frame, &mut vals)?
+                .call(&mut *frame, &mut vals)
                 .map_err(|e| {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
                     JlrsError::exception(format!("asynccall threw an exception: {}", msg))
@@ -105,7 +105,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
 
         let values = values.as_ref();
         let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
-        let state_ptr_boxed = Value::new(&mut *frame, state_ptr)?;
+        let state_ptr_boxed = Value::new(&mut *frame, state_ptr);
 
         let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + values.len());
 
@@ -122,7 +122,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                 .wrapper_unchecked()
                 .function_ref("interactivecall")?
                 .wrapper_unchecked()
-                .call(&mut *frame, &mut vals)?
+                .call(&mut *frame, &mut vals)
                 .map_err(|e| {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
                     JlrsError::exception(format!("interactivecall threw an exception: {}", msg))
@@ -159,7 +159,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
 
         let values = values.as_ref();
         let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
-        let state_ptr_boxed = Value::new(&mut *frame, state_ptr)?;
+        let state_ptr_boxed = Value::new(&mut *frame, state_ptr);
 
         let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + values.len());
 
@@ -176,7 +176,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                 .wrapper_unchecked()
                 .function_ref("scheduleasynclocal")?
                 .wrapper_unchecked()
-                .call(&mut *frame, &mut vals)?
+                .call(&mut *frame, &mut vals)
                 .map_err(|e| {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
                     JlrsError::exception(format!("scheduleasynclocal threw an exception: {}", msg))
@@ -213,7 +213,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
 
         let values = values.as_ref();
         let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
-        let state_ptr_boxed = Value::new(&mut *frame, state_ptr)?;
+        let state_ptr_boxed = Value::new(&mut *frame, state_ptr);
 
         let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + values.len());
 
@@ -230,7 +230,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                 .wrapper_unchecked()
                 .function_ref("scheduleasync")?
                 .wrapper_unchecked()
-                .call(&mut *frame, &mut vals)?
+                .call(&mut *frame, &mut vals)
                 .map_err(|e| {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
                     JlrsError::exception(format!("scheduleasync threw an exception: {}", msg))
@@ -267,7 +267,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
 
         let values = values.as_ref();
         let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
-        let state_ptr_boxed = Value::new(&mut *frame, state_ptr)?;
+        let state_ptr_boxed = Value::new(&mut *frame, state_ptr);
 
         let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + values.len());
         vals.push(func.function());
@@ -284,7 +284,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                 .function_ref("asynccall")?
                 .wrapper_unchecked()
                 .provide_keywords(func.keywords())?
-                .call(&mut *frame, &mut vals)?
+                .call(&mut *frame, &mut vals)
                 .map_err(|e| {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
                     JlrsError::exception(format!("asynccall threw an exception: {}", msg))
@@ -323,7 +323,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
 
         let values = values.as_ref();
         let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
-        let state_ptr_boxed = Value::new(&mut *frame, state_ptr)?;
+        let state_ptr_boxed = Value::new(&mut *frame, state_ptr);
 
         let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + values.len());
         vals.push(func.function());
@@ -340,7 +340,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                 .function_ref("interactivecall")?
                 .wrapper_unchecked()
                 .provide_keywords(func.keywords())?
-                .call(&mut *frame, &mut vals)?
+                .call(&mut *frame, &mut vals)
                 .map_err(|e| {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
                     JlrsError::exception(format!("interactivecall threw an exception: {}", msg))
@@ -378,7 +378,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
 
         let values = values.as_ref();
         let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
-        let state_ptr_boxed = Value::new(&mut *frame, state_ptr)?;
+        let state_ptr_boxed = Value::new(&mut *frame, state_ptr);
 
         let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + values.len());
 
@@ -396,7 +396,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                 .function_ref("scheduleasynclocal")?
                 .wrapper_unchecked()
                 .provide_keywords(func.keywords())?
-                .call(&mut *frame, &mut vals)?
+                .call(&mut *frame, &mut vals)
                 .map_err(|e| {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
                     JlrsError::exception(format!("scheduleasynclocal threw an exception: {}", msg))
@@ -434,7 +434,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
 
         let values = values.as_ref();
         let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
-        let state_ptr_boxed = Value::new(&mut *frame, state_ptr)?;
+        let state_ptr_boxed = Value::new(&mut *frame, state_ptr);
 
         let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + values.len());
 
@@ -452,7 +452,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                 .function_ref("scheduleasync")?
                 .wrapper_unchecked()
                 .provide_keywords(func.keywords())?
-                .call(&mut *frame, &mut vals)?
+                .call(&mut *frame, &mut vals)
                 .map_err(|e| {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
                     JlrsError::exception(format!("scheduleasync threw an exception: {}", msg))

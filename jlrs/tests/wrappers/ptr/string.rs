@@ -12,8 +12,8 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unwrapped_string = jlrs
-                .scope_with_capacity(1, |_, mut frame| {
-                    frame.scope_with_capacity(1, |mut frame| {
+                .scope(|_, mut frame| {
+                    frame.scope(|mut frame| {
                         let string = JuliaString::new(&mut frame, "Hellõ world!")?;
                         Ok(string.as_str()?.to_string())
                     })
@@ -30,8 +30,8 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unwrapped_string = jlrs
-                .scope_with_capacity(1, |_, mut frame| {
-                    frame.scope_with_capacity(1, |mut frame| {
+                .scope(|_, mut frame| {
+                    frame.scope(|mut frame| {
                         let string = JuliaString::new(&mut frame, String::from("Hellõ world!"))?;
                         Ok(string.as_str()?.to_string())
                     })
@@ -48,8 +48,8 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let unwrapped_string = jlrs
-                .scope_with_capacity(1, |_, mut frame| {
-                    frame.scope_with_capacity(1, |mut frame| {
+                .scope(|_, mut frame| {
+                    frame.scope(|mut frame| {
                         let string = JuliaString::new(&mut frame, Cow::from("Hellõ world!"))?;
                         Ok(string.as_str()?.to_string())
                     })
@@ -65,7 +65,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_capacity(1, |_global, mut frame| {
+            jlrs.scope(|_global, mut frame| {
                 let v = JuliaString::new(&mut frame, "Foo bar")?;
                 assert!(v.as_value().is::<JuliaString>());
                 let string = v.as_value().cast::<JuliaString>()?;
@@ -87,7 +87,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_capacity(1, |_global, mut frame| {
+            jlrs.scope(|_global, mut frame| {
                 let string = JuliaString::new_bytes(&mut frame, &[129, 2, 0, 0])?;
                 assert!(string.as_value().is::<JuliaString>());
                 assert!(StringRef::valid_layout(
@@ -113,7 +113,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_capacity(1, |_global, mut frame| {
+            jlrs.scope(|_global, mut frame| {
                 let string = JuliaString::new_bytes(&mut frame, &[1])?;
 
                 let res = string.as_value().unbox::<String>()?;
@@ -132,7 +132,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_capacity(1, |_global, mut frame| {
+            jlrs.scope(|_global, mut frame| {
                 let string1 = JuliaString::new_bytes(&mut frame, &[129, 2, 0, 0])?;
                 let string2 = JuliaString::new(&mut frame, "Foo")?.clone();
 
@@ -152,8 +152,8 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_capacity(1, |_global, mut frame| {
-                let output = frame.output()?;
+            jlrs.scope(|_global, mut frame| {
+                let output = frame.output();
 
                 frame
                     .scope(|mut frame| {

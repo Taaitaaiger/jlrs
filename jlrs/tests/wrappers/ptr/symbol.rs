@@ -10,7 +10,7 @@ mod tests {
     fn create_symbol() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |global, _frame| {
+            jlrs.scope(|global, _frame| {
                 let smb = Symbol::new(global, "a");
                 smb.extend(global);
 
@@ -24,13 +24,13 @@ mod tests {
     fn function_returns_symbol() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(1, |global, mut frame| unsafe {
+            jlrs.scope(|global, mut frame| unsafe {
                 let smb = Module::main(global)
                     .submodule_ref("JlrsTests")?
                     .wrapper_unchecked()
                     .function_ref("symbol")?
                     .wrapper_unchecked();
-                let smb_val = smb.call0(&mut frame)?.unwrap();
+                let smb_val = smb.call0(&mut frame).unwrap();
 
                 assert!(smb_val.is::<Symbol>());
                 assert!(smb_val.cast::<Symbol>().is_ok());
@@ -48,7 +48,7 @@ mod tests {
     fn symbols_are_reused() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |global, _frame| {
+            jlrs.scope(|global, _frame| {
                 let s1 = Symbol::new(global, "foo");
                 let s2 = Symbol::new(global, "foo");
 
@@ -64,7 +64,7 @@ mod tests {
     fn symbols_are_not_collected() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |global, mut frame| {
+            jlrs.scope(|global, mut frame| {
                 let s1 = Symbol::new(global, "foo");
 
                 {
@@ -83,7 +83,7 @@ mod tests {
     fn jl_string_to_symbol() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(1, |global, mut frame| {
+            jlrs.scope(|global, mut frame| {
                 let string = JuliaString::new(&mut frame, "+")?;
                 assert!(Module::base(global).function_ref(string).is_ok());
 
@@ -98,7 +98,7 @@ mod tests {
     fn bytes_to_symbol() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(1, |_, mut frame| {
+            jlrs.scope(|_, mut frame| {
                 let sym = Symbol::new_bytes(&mut frame, &[1])?.into_jlrs_result();
                 assert!(sym.is_ok());
                 Ok(())
@@ -112,7 +112,7 @@ mod tests {
     fn bytes_to_symbol_err() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(1, |_, mut frame| {
+            jlrs.scope(|_, mut frame| {
                 let sym = Symbol::new_bytes(&mut frame, &[1, 0, 1])?.into_jlrs_result();
                 assert!(sym.is_err());
                 Ok(())
@@ -125,7 +125,7 @@ mod tests {
     fn bytes_to_symbol_unchecked() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(1, |global, _| {
+            jlrs.scope(|global, _| {
                 let sym = unsafe { Symbol::new_bytes_unchecked(global, &[129]) };
                 assert_eq!(sym.clone().as_cstr().to_bytes().len(), 1);
                 assert_eq!(sym.as_bytes().len(), 1);
@@ -141,7 +141,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
             let leaked = jlrs
-                .scope_with_capacity(0, |global, _frame| {
+                .scope(|global, _frame| {
                     let sym = Symbol::new(global, "a");
                     Ok(sym.as_leaked())
                 })
@@ -160,8 +160,8 @@ mod tests {
     fn extend_lifetime() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |_, mut frame| {
-                let output = frame.output()?;
+            jlrs.scope(|_, mut frame| {
+                let output = frame.output();
 
                 frame
                     .scope(|mut frame| {
@@ -180,7 +180,7 @@ mod tests {
     fn symbol_implements_hash() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |global, _| {
+            jlrs.scope(|global, _| {
                 let mut map = HashSet::new();
                 map.insert(Symbol::new(global, "foo"));
 

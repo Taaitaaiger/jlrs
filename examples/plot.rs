@@ -38,8 +38,8 @@ impl PersistentTask for MyTask {
                 .wrapper_unchecked();
 
             let ylabel_str = JuliaString::new(&mut *frame, &self.ylabel)?;
-            let ylabel = Tuple::new_unchecked(&mut *frame, &mut [ylabel_str.as_value()])?;
-            let kws = named_tuple!(&mut *frame, "yaxis" => ylabel)?;
+            let ylabel = Tuple::new_unchecked(&mut *frame, &mut [ylabel_str.as_value()]);
+            let kws = named_tuple!(&mut *frame, "yaxis" => ylabel);
 
             let plot = PyPlot::new_with_keywords(&mut *frame, plot_fn, &mut [], kws)?;
 
@@ -57,11 +57,11 @@ impl PersistentTask for MyTask {
         unsafe {
             println!("Update");
             // Add a line with 100 points to the plot
-            let n = Value::new(&mut frame, 100usize)?;
+            let n = Value::new(&mut frame, 100usize);
             let data = Module::base(global)
                 .function_ref("randn")?
                 .wrapper_unchecked()
-                .call1(&mut frame, n)?
+                .call1(&mut frame, n)
                 .into_jlrs_result()?;
 
             let plot_fn = Module::plots(global)
@@ -82,7 +82,7 @@ impl PersistentTask for MyTask {
         mut frame: AsyncGcFrame<'static>,
         state: &mut Self::State,
     ) {
-        // Wait until the plot window is closed.
+        // Wait until the plot window is closed.FMark
         println!("Exit");
         state.0.wait_async_main(&mut frame).await.unwrap();
         println!("Figure was closed");
@@ -94,7 +94,7 @@ async fn main() {
     let (julia, handle) = unsafe {
         RuntimeBuilder::new()
             .async_runtime::<Tokio, UnboundedChannel<_>>()
-            .start_async()
+            .start_async::<1>()
             .expect("Could not init Julia")
     };
 

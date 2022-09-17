@@ -44,7 +44,7 @@ impl<'scope> TypeMapEntry<'scope> {
     */
 
     /// Invasive linked list
-    /// TODO: check types
+    // TODO: check types
     pub fn next(self) -> ValueRef<'scope, 'static> {
         cfg_if! {
             if #[cfg(feature = "lts")] {

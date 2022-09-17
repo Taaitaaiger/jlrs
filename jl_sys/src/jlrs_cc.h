@@ -11,6 +11,7 @@ static inline T jl_atomic_load_relaxed(volatile T *obj)
 #endif
 
 #include <julia.h>
+#include <julia_gcext.h>
 
 //! The Julia C API can throw exceptions when used incorrectly, whenever this happens the code
 //! will try to jump to the nearest enclosing catch-block. If no enclosing catch-block exists the

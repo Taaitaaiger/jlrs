@@ -11,6 +11,16 @@
 
  - If a `JuliaString` is unboxed and contains non-utf8 data, all data is returned as a `Vec<u8>` rather than stopping at the first null character.
 
+ - Roots are stored in a `Stack` which can grow to the required size. As a result, a frame is never full and allocating never fails under normal circumstances. Allocating methods that can only fail due to an allocation error are now infallible thanks to this change, and return `T` rather than `JlrsResult<T>`. Methods that create a new scope no longer have `_with_capacity` variants.
+
+ - When the sync runtime or `CCall` is used, a reference to a `ContextFrame` must be provided.
+
+ - `Mode`, `Sync` and `Async` have been removed.
+
+ - `AsyncGcFrame` implements `Deref<Target = GcFrame>` and `DerefMut`. Several methods that previously took a mutable reference to a frame now take a mutable reference to a `GcFrame` specifically.
+
+ - Some fields of `Task` and `TypeName` can only be accessed if the `extra-fields` feature is enabled.
+
 #### v0.16
  - Support for Julia 1.7 has been dropped, by default Julia 1.8 is targeted.
 

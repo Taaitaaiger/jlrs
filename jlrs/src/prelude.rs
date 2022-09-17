@@ -11,7 +11,7 @@ pub use crate::runtime::async_rt::tokio_rt::*;
 #[cfg(any(feature = "async-rt", feature = "sync-rt"))]
 pub use crate::runtime::builder::RuntimeBuilder;
 #[cfg(feature = "sync-rt")]
-pub use crate::runtime::sync_rt::Julia;
+pub use crate::{runtime::sync_rt::Julia, memory::context::ContextFrame};
 #[cfg(feature = "async-rt")]
 pub use crate::runtime::{async_rt::AsyncJulia, builder::AsyncRuntimeBuilder};
 #[cfg(feature = "async")]
@@ -35,7 +35,7 @@ pub use crate::{
         ptr::{
             array::ArrayRef,
             array::TypedArrayRef,
-            array::{Array, TypedArray},
+            array::{Array, TypedArray, tracked::ArrayWrapper},
             datatype::DataType,
             datatype::DataTypeRef,
             module::Module,

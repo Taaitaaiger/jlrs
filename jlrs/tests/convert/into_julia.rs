@@ -54,7 +54,7 @@ mod tests {
                             .apply_type_unchecked(
                                 &mut frame,
                                 &mut [DataType::$assoc_ty(global).as_value()],
-                            )?;
+                            );
 
                         assert_eq!(ty, applied);
                         assert!(applied.cast::<DataType>()?.is::<*mut $type>());

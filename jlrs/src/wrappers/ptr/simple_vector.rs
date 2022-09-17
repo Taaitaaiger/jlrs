@@ -4,7 +4,7 @@ use crate::{
     error::{AccessError, JlrsResult},
     layout::{typecheck::Typecheck, valid_layout::ValidLayout},
     memory::{
-        frame::Frame,
+        frame::{Frame, GcFrame},
         global::Global,
         output::Output,
         scope::{private::PartialScopePriv, PartialScope},
@@ -81,9 +81,7 @@ pub struct SimpleVector<'scope>(NonNull<jl_svec_t>, PhantomData<&'scope ()>);
 
 impl<'scope> SimpleVector<'scope> {
     /// Create a new `SimpleVector` that can hold `n` values.
-    pub fn with_capacity<F>(frame: &mut F, n: usize) -> JlrsResult<Self>
-    where
-        F: Frame<'scope>,
+    pub fn with_capacity(frame: &mut GcFrame<'scope>, n: usize) -> Self
     {
         // Safety: the allocated data is immediately rooted
         unsafe {
@@ -96,10 +94,7 @@ impl<'scope> SimpleVector<'scope> {
     ///
     /// Safety: The contents must be set before calling Julia again, the contents must never be
     /// accessed before all elements are set.
-    pub unsafe fn with_capacity_uninit<F>(frame: &mut F, n: usize) -> JlrsResult<Self>
-    where
-        F: Frame<'scope>,
-    {
+    pub unsafe fn with_capacity_uninit(frame: &mut GcFrame<'scope>, n: usize) -> Self {
         let svec = NonNull::new_unchecked(jl_alloc_svec_uninit(n));
         frame.value(svec, Private)
     }

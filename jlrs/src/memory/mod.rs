@@ -64,14 +64,16 @@
 //! [`OutputScope`]: scope::OutputScope
 //! [`Output::into_scope`]: output::Output::into_scope
 //! [`Julia::scope`]: crate::runtime::sync_rt::Julia::scope
+pub mod accessor;
+pub mod context;
 pub mod frame;
 pub mod gc;
 pub mod global;
-pub mod mode;
 pub mod output;
 pub mod reusable_slot;
 pub mod scope;
-pub(crate) mod stack_page;
+pub mod ledger;
+pub mod target;
 
 use cfg_if::cfg_if;
 #[cfg(feature = "nightly")]

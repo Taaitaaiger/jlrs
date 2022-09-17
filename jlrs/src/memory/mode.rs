@@ -62,6 +62,7 @@ pub(crate) mod private {
         if #[cfg(feature = "lts")] {
             impl ModePriv for Sync {
                 unsafe fn push_frame(&self, raw_frame: &[Slot], _: Private) {
+                    println!("Push");
                     let rtls = NonNull::new_unchecked(jl_sys::jl_get_ptls_states()).as_mut();
                     raw_frame[0].set(null_mut());
                     raw_frame[1].set(rtls.pgcstack.cast());
@@ -69,6 +70,7 @@ pub(crate) mod private {
                 }
 
                 unsafe fn pop_frame(&self, _raw_frame: &[Slot], _: Private) {
+                    println!("Pop");
                     let rtls = NonNull::new_unchecked(jl_sys::jl_get_ptls_states()).as_mut();
                     rtls.pgcstack = NonNull::new_unchecked(rtls.pgcstack).as_ref().prev;
                 }
@@ -77,6 +79,7 @@ pub(crate) mod private {
             use jl_sys::{jl_get_current_task, jl_task_t};
             impl ModePriv for Sync {
                 unsafe fn push_frame(&self, raw_frame: &[Slot], _: Private) {
+                    println!("Push");
                     let task = NonNull::new_unchecked(jl_get_current_task().cast::<jl_task_t>()).as_mut();
                     raw_frame[0].set(null_mut());
                     raw_frame[1].set(task.gcstack.cast());
@@ -84,6 +87,7 @@ pub(crate) mod private {
                 }
 
                 unsafe fn pop_frame(&self, _raw_frame: &[Slot], _: Private) {
+                    println!("Pop");
                     let task = NonNull::new_unchecked(jl_get_current_task().cast::<jl_task_t>()).as_mut();
                     task.gcstack = NonNull::new_unchecked(task.gcstack).as_ref().prev;
                 }

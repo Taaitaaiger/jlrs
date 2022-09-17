@@ -5,7 +5,8 @@ fn main() {
     // Julia must be initialized before it can be used.
     // This is safe because this we're not initializing Julia from another
     // thread and crate at the same time.
-    let mut julia = unsafe { RuntimeBuilder::new().start().expect("Could not init Julia") };
+    let context_frame = ContextFrame::new();
+    let mut julia = unsafe { RuntimeBuilder::new().start(&context_frame).expect("Could not init Julia") };
 
     // Include some custom code defined in MyModule.jl.
     // This is safe because the included code doesn't do any strange things.
@@ -22,8 +23,8 @@ fn main() {
 
     let result = julia
         .scope(|global, mut frame| {
-            let dim = Value::new(&mut frame, 4isize)?;
-            let iters = Value::new(&mut frame, 1_000_000isize)?;
+            let dim = Value::new(&mut frame, 4isize);
+            let iters = Value::new(&mut frame, 1_000_000isize);
 
             unsafe {
                 Module::main(global)
@@ -35,7 +36,7 @@ fn main() {
                     .function_ref("complexfunc")?
                     .wrapper_unchecked()
                     // Call the function with the two arguments it takes
-                    .call2(&mut frame, dim, iters)?
+                    .call2(&mut frame, dim, iters)
                     // If you don't want to use the exception, it can be converted to a `JlrsError`
                     // In this case the error message will contain the message that calling
                     // `display` in Julia would show

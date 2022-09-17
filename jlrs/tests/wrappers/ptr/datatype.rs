@@ -23,8 +23,8 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_capacity(1, |_global, mut frame| {
-                let val = Value::new(&mut frame, 3.0f32)?;
+            jlrs.scope(|_global, mut frame| {
+                let val = Value::new(&mut frame, 3.0f32);
                 let dt = val.datatype();
 
                 assert_eq!(dt.size(), 4);
@@ -44,8 +44,8 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_capacity(1, |_global, mut frame| {
-                let val = Value::new(&mut frame, 3.0f32)?;
+            jlrs.scope(|_global, mut frame| {
+                let val = Value::new(&mut frame, 3.0f32);
                 let dt = val.datatype();
 
                 assert!(!dt.is::<Tuple>());
@@ -103,13 +103,13 @@ mod tests {
     fn function_returns_datatype() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(1, |global, mut frame| unsafe {
+            jlrs.scope(|global, mut frame| unsafe {
                 let dt = Module::main(global)
                     .submodule_ref("JlrsTests")?
                     .wrapper_unchecked()
                     .function_ref("datatype")?
                     .wrapper_unchecked();
-                let dt_val = dt.call0(&mut frame)?.unwrap();
+                let dt_val = dt.call0(&mut frame).unwrap();
 
                 assert!(dt_val.is::<DataType>());
                 assert!(dt_val.cast::<DataType>().is_ok());
@@ -124,7 +124,7 @@ mod tests {
     fn datatype_has_typename() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |global, _| unsafe {
+            jlrs.scope(|global, _| unsafe {
                 let dt = DataType::tvar_type(global);
                 let tn = dt.type_name().wrapper_unchecked();
                 let s = tn.name().wrapper_unchecked().as_string().unwrap();
@@ -141,7 +141,7 @@ mod tests {
     fn datatype_has_fieldnames() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |global, mut frame| unsafe {
+            jlrs.scope(|global, mut frame| unsafe {
                 let dt = DataType::tvar_type(global);
                 {
                     let frame = &mut frame;
@@ -166,7 +166,7 @@ mod tests {
     fn datatype_field_size() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |global, _| {
+            jlrs.scope(|global, _| {
                 let dt = DataType::tvar_type(global);
                 let sz = dt.field_size(1)?;
                 #[cfg(target_pointer_width = "64")]
@@ -189,7 +189,7 @@ mod tests {
     fn datatype_field_offset() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |global, _| {
+            jlrs.scope(|global, _| {
                 let dt = DataType::tvar_type(global);
                 let sz = dt.field_offset(1)?;
                 #[cfg(target_pointer_width = "64")]
@@ -209,7 +209,7 @@ mod tests {
     fn datatype_pointer_field() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |global, _| {
+            jlrs.scope(|global, _| {
                 let dt = DataType::tvar_type(global);
                 assert!(dt.is_pointer_field(1)?);
                 assert!(dt.is_pointer_field(25).is_err());
@@ -224,7 +224,7 @@ mod tests {
     fn datatype_isbits() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |global, _| {
+            jlrs.scope(|global, _| {
                 let dt = DataType::tvar_type(global);
                 assert!(!dt.is_bits());
 
@@ -238,7 +238,7 @@ mod tests {
     fn datatype_supertype() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |global, _| {
+            jlrs.scope(|global, _| {
                 let dt = DataType::tvar_type(global);
                 assert!(!dt.super_type().is_undefined());
 
@@ -252,7 +252,7 @@ mod tests {
     fn datatype_parameters() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |global, _| unsafe {
+            jlrs.scope(|global, _| unsafe {
                 assert_eq!(
                     Value::array_int32_type(global)
                         .cast::<DataType>()
@@ -273,7 +273,7 @@ mod tests {
     fn datatype_instance() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |global, _| {
+            jlrs.scope(|global, _| {
                 assert!(Value::array_int32_type(global)
                     .cast::<DataType>()
                     .unwrap()
@@ -292,7 +292,7 @@ mod tests {
     fn datatype_hash() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |global, _| {
+            jlrs.scope(|global, _| {
                 let dt = DataType::tvar_type(global);
                 assert!(dt.hash() != 0);
 
@@ -306,7 +306,7 @@ mod tests {
     fn datatype_abstract() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |global, _| {
+            jlrs.scope(|global, _| {
                 let dt = DataType::tvar_type(global);
                 assert!(!dt.is_abstract());
 
@@ -320,7 +320,7 @@ mod tests {
     fn datatype_mutable() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |global, _| {
+            jlrs.scope(|global, _| {
                 let dt = DataType::tvar_type(global);
                 assert!(dt.mutable());
 
@@ -334,7 +334,7 @@ mod tests {
     fn datatype_hasfreetypevast() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |global, _| {
+            jlrs.scope(|global, _| {
                 let dt = DataType::tvar_type(global);
                 assert!(!dt.has_free_type_vars());
 
@@ -348,7 +348,7 @@ mod tests {
     fn datatype_concrete() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |global, _| {
+            jlrs.scope(|global, _| {
                 let dt = DataType::tvar_type(global);
                 assert!(dt.is_concrete_type());
 
@@ -362,7 +362,7 @@ mod tests {
     fn datatype_dispatchtuple() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |global, _| {
+            jlrs.scope(|global, _| {
                 let dt = DataType::tvar_type(global);
                 assert!(!dt.is_dispatch_tuple());
 
@@ -376,7 +376,7 @@ mod tests {
     fn datatype_zeroinit() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |global, _| {
+            jlrs.scope(|global, _| {
                 unsafe {
                     let dt = UnionAll::array_type(global)
                         .body()
@@ -400,7 +400,7 @@ mod tests {
     fn datatype_concrete_subtype() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |global, _| {
+            jlrs.scope(|global, _| {
                 let dt = DataType::tvar_type(global);
                 assert!(dt.has_concrete_subtype());
 
@@ -414,7 +414,7 @@ mod tests {
     fn datatype_params() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |global, _| {
+            jlrs.scope(|global, _| {
                 let dt = unsafe { UnionAll::array_type(global).base_type().wrapper_unchecked() };
                 assert_eq!(dt.n_parameters(), 2);
                 let param = unsafe { dt.parameter(0).unwrap().value_unchecked() };
@@ -430,7 +430,7 @@ mod tests {
     fn datatype_field_type() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |global, _| {
+            jlrs.scope(|global, _| {
                 let val = unsafe {
                     DataType::unionall_type(global)
                         .field_type(0)
@@ -449,7 +449,7 @@ mod tests {
     fn datatype_concrete_field_type() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |global, _| {
+            jlrs.scope(|global, _| {
                 let val = unsafe {
                     DataType::unionall_type(global)
                         .field_type_concrete(0)
@@ -468,7 +468,7 @@ mod tests {
     fn datatype_field_name() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |global, _| {
+            jlrs.scope(|global, _| {
                 let name = DataType::uniontype_type(global)
                     .field_name(0)
                     .unwrap()
@@ -485,7 +485,7 @@ mod tests {
     fn datatype_field_name_str() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |global, _| {
+            jlrs.scope(|global, _| {
                 let name = DataType::uniontype_type(global).field_name_str(0).unwrap();
 
                 assert_eq!(name, "a");
@@ -501,7 +501,7 @@ mod tests {
     fn datatype_field_index_unchecked() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |global, _| {
+            jlrs.scope(|global, _| {
                 let idx = DataType::uniontype_type(global).field_index_unchecked("a");
 
                 assert_eq!(idx, 0);
@@ -520,7 +520,7 @@ mod tests {
     fn datatype_is_const_field() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |global, _| {
+            jlrs.scope(|global, _| {
                 let ty = unsafe {
                     Module::main(global)
                         .submodule_ref("JlrsStableTests")?
@@ -546,8 +546,8 @@ mod tests {
     fn cannot_instantiate_array() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |_, mut frame| {
-                let ty = TypedArray::<usize>::new(&mut frame, 1)?
+            jlrs.scope(|_, mut frame| {
+                let ty = TypedArray::<usize>::new(&mut frame, 1)
                     .into_jlrs_result()?
                     .as_value()
                     .datatype();
@@ -565,7 +565,7 @@ mod tests {
     fn cannot_instantiate_with_incorrect_params() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |global, mut frame| {
+            jlrs.scope(|global, mut frame| {
                 let ty = unsafe {
                     Module::main(global)
                         .submodule_ref("JlrsTests")?
@@ -588,7 +588,7 @@ mod tests {
     fn compare_with_value() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |global, _| {
+            jlrs.scope(|global, _| {
                 let ty = DataType::bool_type(global);
                 assert!(ty == ty.as_value());
 
@@ -605,7 +605,7 @@ mod tests {
     fn datatype_cached_by_hash() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(0, |global, _| {
+            jlrs.scope(|global, _| {
                 let ty = DataType::bool_type(global);
                 assert!(ty.cached_by_hash());
                 Ok(())
@@ -619,7 +619,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
             jlrs.scope(|_, mut frame| {
-                let output = frame.output()?;
+                let output = frame.output();
 
                 frame
                     .scope(|mut frame| {

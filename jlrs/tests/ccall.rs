@@ -12,10 +12,11 @@ mod tests {
     use jlrs::prelude::*;
 
     unsafe extern "C" fn uses_null_scope(array: TypedArray<f64>) -> bool {
-        let mut ccall = CCall::new();
+        let context_frame = ContextFrame::new();
+        let mut ccall = CCall::new(&context_frame);
 
-        let out = ccall.null_scope(|mut frame| {
-            let borrowed = array.inline_data(&mut frame)?;
+        let out = ccall.null_scope(|_| {
+            let borrowed = array.inline_data()?;
             Ok(borrowed[1] == 1.0)
         });
 
@@ -27,11 +28,12 @@ mod tests {
     }
 
     unsafe extern "C" fn uses_scope(array: TypedArray<f64>) -> bool {
-        let mut ccall = CCall::new();
+        let context_frame = ContextFrame::new();
+        let mut ccall = CCall::new(&context_frame);
 
         let out = ccall.scope(|_, mut frame| {
-            let _ = Value::new(&mut frame, 0usize)?;
-            let borrowed = array.inline_data(&mut frame)?;
+            let _ = Value::new(&mut frame, 0usize);
+            let borrowed = array.inline_data()?;
             Ok(borrowed[1] == 1.0)
         });
 
@@ -43,11 +45,12 @@ mod tests {
     }
 
     unsafe extern "C" fn uses_scope_with_slots(array: TypedArray<f64>) -> bool {
-        let mut ccall = CCall::new();
+        let context_frame = ContextFrame::new();
+        let mut ccall = CCall::new(&context_frame);
 
-        let out = ccall.scope_with_capacity(1, |_, mut frame| {
-            let _ = Value::new(&mut frame, 0usize)?;
-            let borrowed = array.inline_data(&mut frame)?;
+        let out = ccall.scope(|_, mut frame| {
+            let _ = Value::new(&mut frame, 0usize);
+            let borrowed = array.inline_data()?;
             Ok(borrowed[1] == 1.0)
         });
 
@@ -59,11 +62,12 @@ mod tests {
     }
 
     unsafe extern "C" fn uses_scope_with_realloced_slots(array: TypedArray<f64>) -> bool {
-        let mut ccall = CCall::new();
+        let context_frame = ContextFrame::new();
+        let mut ccall = CCall::new(&context_frame);
 
-        let out = ccall.scope_with_capacity(128, |_, mut frame| {
-            let _ = Value::new(&mut frame, 0usize)?;
-            let borrowed = array.inline_data(&mut frame)?;
+        let out = ccall.scope(|_, mut frame| {
+            let _ = Value::new(&mut frame, 0usize);
+            let borrowed = array.inline_data()?;
             Ok(borrowed[1] == 1.0)
         });
 
@@ -80,7 +84,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.scope(|global, mut frame| unsafe {
-                let fn_ptr = Value::new(&mut frame, uses_null_scope as *mut std::ffi::c_void)?;
+                let fn_ptr = Value::new(&mut frame, uses_null_scope as *mut std::ffi::c_void);
                 let mut arr_data = vec![0.0f64, 1.0f64];
                 let arr = Array::from_slice_unchecked(&mut frame, &mut arr_data, 2)?;
                 let func = Module::main(global)
@@ -89,7 +93,7 @@ mod tests {
                     .function_ref("callrustwitharr")?
                     .wrapper_unchecked();
 
-                let out = func.call2(&mut frame, fn_ptr, arr.as_value())?.unwrap();
+                let out = func.call2(&mut frame, fn_ptr, arr.as_value()).unwrap();
                 let ok = out.unbox::<bool>()?.as_bool();
                 assert!(ok);
                 Ok(())
@@ -104,7 +108,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.scope(|global, mut frame| unsafe {
-                let fn_ptr = Value::new(&mut frame, uses_scope as *mut std::ffi::c_void)?;
+                let fn_ptr = Value::new(&mut frame, uses_scope as *mut std::ffi::c_void);
                 let mut arr_data = vec![0.0f64, 1.0f64];
                 let arr = Array::from_slice_unchecked(&mut frame, &mut arr_data, 2)?;
                 let func = Module::main(global)
@@ -113,7 +117,7 @@ mod tests {
                     .function_ref("callrustwitharr")?
                     .wrapper_unchecked();
 
-                let out = func.call2(&mut frame, fn_ptr, arr.as_value())?.unwrap();
+                let out = func.call2(&mut frame, fn_ptr, arr.as_value()).unwrap();
                 let ok = out.unbox::<bool>()?.as_bool();
                 assert!(ok);
                 Ok(())
@@ -129,7 +133,7 @@ mod tests {
 
             jlrs.scope(|global, mut frame| unsafe {
                 let fn_ptr =
-                    Value::new(&mut frame, uses_scope_with_slots as *mut std::ffi::c_void)?;
+                    Value::new(&mut frame, uses_scope_with_slots as *mut std::ffi::c_void);
                 let mut arr_data = vec![0.0f64, 1.0f64];
                 let arr = Array::from_slice_unchecked(&mut frame, &mut arr_data, 2)?;
                 let func = Module::main(global)
@@ -138,7 +142,7 @@ mod tests {
                     .function_ref("callrustwitharr")?
                     .wrapper_unchecked();
 
-                let out = func.call2(&mut frame, fn_ptr, arr.as_value())?.unwrap();
+                let out = func.call2(&mut frame, fn_ptr, arr.as_value()).unwrap();
                 let ok = out.unbox::<bool>()?.as_bool();
                 assert!(ok);
                 Ok(())
@@ -156,7 +160,7 @@ mod tests {
                 let fn_ptr = Value::new(
                     &mut frame,
                     uses_scope_with_realloced_slots as *mut std::ffi::c_void,
-                )?;
+                );
                 let mut arr_data = vec![0.0f64, 1.0f64];
                 let arr = Array::from_slice_unchecked(&mut frame, &mut arr_data, 2)?;
                 let func = Module::main(global)
@@ -165,7 +169,7 @@ mod tests {
                     .function_ref("callrustwitharr")?
                     .wrapper_unchecked();
 
-                let out = func.call2(&mut frame, fn_ptr, arr.as_value())?.unwrap();
+                let out = func.call2(&mut frame, fn_ptr, arr.as_value()).unwrap();
                 let ok = out.unbox::<bool>()?.as_bool();
                 assert!(ok);
                 Ok(())
@@ -210,9 +214,9 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.scope(|global, mut frame| unsafe {
-                let fn_ptr = Value::new(&mut frame, multithreaded as *mut std::ffi::c_void)?;
+                let fn_ptr = Value::new(&mut frame, multithreaded as *mut std::ffi::c_void);
                 let destroy_handle_fn_ptr =
-                    Value::new(&mut frame, drop_handle as *mut std::ffi::c_void)?;
+                    Value::new(&mut frame, drop_handle as *mut std::ffi::c_void);
 
                 let func = Module::main(global)
                     .submodule_ref("JlrsTests")?
@@ -221,7 +225,7 @@ mod tests {
                     .wrapper_unchecked();
 
                 let out = func
-                    .call2(&mut frame, fn_ptr, destroy_handle_fn_ptr)?
+                    .call2(&mut frame, fn_ptr, destroy_handle_fn_ptr)
                     .unwrap();
                 let ok = out.unbox::<u32>()?;
                 assert_eq!(ok, 127);

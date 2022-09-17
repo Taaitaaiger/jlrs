@@ -181,12 +181,12 @@ impl<'scope> Module<'scope> {
         scope: S,
         name: N,
         value: Value<'_, 'static>,
-    ) -> JlrsResult<JuliaResult<'frame, 'static, ()>>
+    ) -> JuliaResult<'frame, 'static, ()>
     where
         N: ToSymbol,
         S: PartialScope<'frame>,
     {
-        let res = self.set_global_unrooted(scope.global(), name, value)?;
+        let res = self.set_global_unrooted(scope.global(), name, value);
         scope.exception(res, Private)
     }
 
@@ -202,7 +202,7 @@ impl<'scope> Module<'scope> {
         _: Global<'target>,
         name: N,
         value: Value<'_, 'static>,
-    ) -> JlrsResult<JuliaResultRef<'target, 'static, ()>>
+    ) -> JuliaResultRef<'target, 'static, ()>
     where
         N: ToSymbol,
     {
@@ -222,8 +222,8 @@ impl<'scope> Module<'scope> {
         };
 
         match catch_exceptions(&mut callback).unwrap() {
-            Ok(_) => Ok(Ok(())),
-            Err(e) => Ok(Err(e)),
+            Ok(_) => Ok(()),
+            Err(e) => Err(e),
         }
     }
 
@@ -254,7 +254,7 @@ impl<'scope> Module<'scope> {
         scope: S,
         name: N,
         value: Value<'_, 'static>,
-    ) -> JlrsResult<JuliaResult<'frame, 'static, ()>>
+    ) -> JuliaResult<'frame, 'static, ()>
     where
         N: ToSymbol,
         S: PartialScope<'frame>,
@@ -262,7 +262,7 @@ impl<'scope> Module<'scope> {
         // Safety: the pointer points to valid data, the C API function is called with
         // valid arguments and its result is checked. if an exception is thrown it's caught
         // and returned
-        let res = self.set_const_unrooted(scope.global(), name, value)?;
+        let res = self.set_const_unrooted(scope.global(), name, value);
         unsafe { scope.exception(res, Private) }
     }
 
@@ -274,7 +274,7 @@ impl<'scope> Module<'scope> {
         _: Global<'target>,
         name: N,
         value: Value<'_, 'static>,
-    ) -> JlrsResult<JuliaResultRef<'target, 'static, ()>>
+    ) -> JuliaResultRef<'target, 'static, ()>
     where
         N: ToSymbol,
     {
@@ -297,9 +297,9 @@ impl<'scope> Module<'scope> {
                 Ok(())
             };
 
-            match catch_exceptions(&mut callback)? {
-                Ok(_) => Ok(Ok(())),
-                Err(e) => Ok(Err(e)),
+            match catch_exceptions(&mut callback).unwrap() {
+                Ok(_) => Ok(()),
+                Err(e) => Err(e),
             }
         }
     }
@@ -441,7 +441,7 @@ impl<'scope> Module<'scope> {
         self,
         scope: S,
         module: N,
-    ) -> JlrsResult<JuliaResult<'target, 'static>>
+    ) -> JuliaResult<'target, 'static>
     where
         S: PartialScope<'target>,
         N: ToSymbol,

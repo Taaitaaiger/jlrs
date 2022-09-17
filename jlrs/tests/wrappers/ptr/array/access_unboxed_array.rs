@@ -11,12 +11,12 @@ mod tests {
                 JULIA.with(|j| {
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope_with_capacity(1, |_, mut frame| {
+                    jlrs.scope(|_, mut frame| {
                         let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
                         let array =
                             Array::from_vec(&mut frame, data, (2, 3, 4))?.into_jlrs_result()?;
-                        let d = array.copy_inline_data::<$value_type, _>(&frame)?;
+                        let d = unsafe { array.copy_inline_data::<$value_type>()? };
 
                         let mut out = 1 as $value_type;
                         for third in &[0, 1, 2, 3] {
@@ -42,12 +42,12 @@ mod tests {
                 JULIA.with(|j| {
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope_with_capacity(1, |_, mut frame| {
+                    jlrs.scope(|_, mut frame| {
                         let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
                         let array =
                             Array::from_vec(&mut frame, data, (2, 3, 4))?.into_jlrs_result()?;
-                        let mut d = array.copy_inline_data::<$value_type, _>(&frame)?;
+                        let mut d = unsafe { array.copy_inline_data::<$value_type>()? };
 
                         let mut out = 2 as $value_type;
                         for third in &[0, 1, 2, 3] {
@@ -79,12 +79,12 @@ mod tests {
                 JULIA.with(|j| {
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope_with_capacity(1, |_, mut frame| {
+                    jlrs.scope(|_, mut frame| {
                         let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
                         let array = Array::from_vec(&mut frame, data.clone(), (2, 3, 4))?
                             .into_jlrs_result()?;
-                        let d = array.copy_inline_data::<$value_type, _>(&frame)?;
+                        let d = unsafe { array.copy_inline_data::<$value_type>()? };
 
                         for (a, b) in data.iter().zip(d.as_slice()) {
                             assert_eq!(a, b)
@@ -101,12 +101,12 @@ mod tests {
                 JULIA.with(|j| {
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope_with_capacity(1, |_, mut frame| {
+                    jlrs.scope(|_, mut frame| {
                         let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
                         let array = Array::from_vec(&mut frame, data.clone(), (2, 3, 4))?
                             .into_jlrs_result()?;
-                        let mut d = array.copy_inline_data::<$value_type, _>(&frame)?;
+                        let mut d = unsafe { array.copy_inline_data::<$value_type>()? };
 
                         for (a, b) in data.iter().zip(d.as_mut_slice()) {
                             assert_eq!(a, b)
