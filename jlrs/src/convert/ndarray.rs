@@ -10,70 +10,70 @@ use crate::{
 use ndarray::{ArrayView, ArrayViewMut, Dim, IntoDimension, IxDynImpl, ShapeBuilder};
 
 /// Trait to borrow Julia arrays with inline data as `ndarray`'s `ArrayView`.
-pub trait NdArrayView<'borrow, T>: private::NdArrayPriv {
+pub trait NdArrayView<'view, T>: private::NdArrayPriv {
     /// Borrow the data in the array as an `ArrayView`.
-    fn array_view<'frame>(&'borrow self) -> ArrayView<'borrow, T, Dim<IxDynImpl>>;
+    fn array_view(&'view self) -> ArrayView<'view, T, Dim<IxDynImpl>>;
 }
 
 /// Trait to borrow Julia arrays with inline data as `ndarray`'s `ArrayView` and `ArrayViewMut`.
-pub trait NdArrayViewMut<'borrow, T>: NdArrayView<'borrow, T> {
+pub trait NdArrayViewMut<'view, T>: NdArrayView<'view, T> {
     /// Mutably borrow the data in the array as an `ArrayViewMut`.
-    fn array_view_mut<'frame>(&'borrow mut self) -> ArrayViewMut<'borrow, T, Dim<IxDynImpl>>;
+    fn array_view_mut(&'view mut self) -> ArrayViewMut<'view, T, Dim<IxDynImpl>>;
 }
 
-impl<'borrow, 'array, 'data, T, M> NdArrayView<'borrow, T>
+impl<'borrow: 'view, 'view, 'array, 'data, T, M> NdArrayView<'view, T>
     for BitsArrayAccessor<'borrow, 'array, 'data, T, M>
 where
     M: Mutability,
     T: ValidLayout + Clone,
 {
-    fn array_view<'frame>(&'borrow self) -> ArrayView<'borrow, T, Dim<IxDynImpl>> {
+    fn array_view(&'view self) -> ArrayView<'view, T, Dim<IxDynImpl>> {
         // Safety: while the array is borrowed nothing can be pushed or popped from it.
         let shape = unsafe { self.dimensions().as_slice().into_dimension().f() };
         ArrayView::from_shape(shape, self.as_slice()).unwrap()
     }
 }
 
-impl<'borrow, 'array, 'data, T, M> NdArrayView<'borrow, T>
+impl<'borrow: 'view, 'view, 'array, 'data, T, M> NdArrayView<'view, T>
     for InlinePtrArrayAccessor<'borrow, 'array, 'data, T, M>
 where
     M: Mutability,
     T: ValidLayout + Clone,
 {
-    fn array_view<'frame>(&'borrow self) -> ArrayView<'borrow, T, Dim<IxDynImpl>> {
+    fn array_view(&'view self) -> ArrayView<'view, T, Dim<IxDynImpl>> {
         // Safety: while the array is borrowed nothing can be pushed or popped from it.
         let shape = unsafe { self.dimensions().as_slice().into_dimension().f() };
         ArrayView::from_shape(shape, self.as_slice()).unwrap()
     }
 }
 
-impl<'borrow, 'array, 'data, T> NdArrayViewMut<'borrow, T>
+impl<'borrow: 'view, 'view, 'array, 'data, T> NdArrayViewMut<'view, T>
     for BitsArrayAccessor<'borrow, 'array, 'data, T, Mutable<'borrow, T>>
 where
     T: ValidLayout + Clone,
 {
-    fn array_view_mut<'frame>(&'borrow mut self) -> ArrayViewMut<'borrow, T, Dim<IxDynImpl>> {
+    fn array_view_mut(&'view mut self) -> ArrayViewMut<'view, T, Dim<IxDynImpl>> {
         // Safety: while the array is borrowed nothing can be pushed or popped from it.
         let shape = unsafe { self.dimensions().as_slice().into_dimension().f() };
         ArrayViewMut::from_shape(shape, self.as_mut_slice()).unwrap()
     }
 }
 
-impl<'borrow, T> NdArrayView<'borrow, T> for CopiedArray<T>
+impl<'view, T> NdArrayView<'view, T> for CopiedArray<T>
 where
     T: ValidLayout + Clone,
 {
-    fn array_view<'frame>(&'borrow self) -> ArrayView<'borrow, T, Dim<IxDynImpl>> {
+    fn array_view(&'view self) -> ArrayView<'view, T, Dim<IxDynImpl>> {
         let shape = self.dimensions().as_slice().into_dimension().f();
         ArrayView::from_shape(shape, self.as_slice()).unwrap()
     }
 }
 
-impl<'borrow, T> NdArrayViewMut<'borrow, T> for CopiedArray<T>
+impl<'view, T> NdArrayViewMut<'view, T> for CopiedArray<T>
 where
     T: ValidLayout + Clone,
 {
-    fn array_view_mut<'frame>(&'borrow mut self) -> ArrayViewMut<'borrow, T, Dim<IxDynImpl>> {
+    fn array_view_mut(&'view mut self) -> ArrayViewMut<'view, T, Dim<IxDynImpl>> {
         let shape = self.dimensions().as_slice().into_dimension().f();
         ArrayViewMut::from_shape(shape, self.as_mut_slice()).unwrap()
     }
@@ -111,7 +111,7 @@ mod private {
 #[cfg(feature = "sync-rt")]
 mod tests {
     use super::{NdArrayView, NdArrayViewMut};
-    use crate::util::JULIA;
+    use crate::util::test::JULIA;
     use crate::wrappers::ptr::array::{Array, TypedArray};
 
     #[test]
@@ -126,7 +126,7 @@ mod tests {
                     let borrowed =
                         unsafe { Array::from_slice_unchecked(&mut frame, slice, (3, 2))? };
 
-                    let data = borrowed.bits_data::<usize, _>(&mut frame)?;
+                    let data = unsafe { borrowed.bits_data::<usize>()? };
                     let x = data[(2, 1)];
 
                     let array = data.array_view();
@@ -147,8 +147,9 @@ mod tests {
                 .scope(|_global, mut frame| unsafe {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
-                    let borrowed = Array::from_slice_unchecked(&mut frame, slice, (3, 2))?;
-                    let mut inline = borrowed.bits_data_mut::<usize, _>(&mut frame)?;
+                    let mut borrowed = Array::from_slice_unchecked(&mut frame, slice, (3, 2))?;
+
+                    let mut inline = borrowed.bits_data_mut::<usize>()?;
                     let x = inline[(2, 1)];
 
                     inline[(2, 1)] = x + 1;
@@ -157,7 +158,8 @@ mod tests {
                     assert_eq!(array[[2, 1]], x + 1);
                     array[[2, 1]] -= 1;
 
-                    let inline = borrowed.bits_data_mut::<usize, _>(&mut frame)?;
+                    std::mem::drop(inline);
+                    let inline = borrowed.bits_data_mut::<usize>()?;
                     assert_eq!(inline[(2, 1)], x);
                     Ok(())
                 })
@@ -177,7 +179,7 @@ mod tests {
                     let borrowed =
                         unsafe { Array::from_slice_unchecked(&mut frame, slice, (3, 2))? };
 
-                    let data = borrowed.inline_data::<usize, _>(&mut frame)?;
+                    let data = unsafe { borrowed.inline_data::<usize>()? };
                     let x = data[(2, 1)];
 
                     let array = data.array_view();
@@ -200,7 +202,7 @@ mod tests {
                     let slice = &mut data.as_mut_slice();
                     let borrowed =
                         unsafe { TypedArray::from_slice_unchecked(&mut frame, slice, (3, 2))? };
-                    let copied = borrowed.copy_inline_data(&frame)?;
+                    let copied = unsafe { borrowed.copy_inline_data()? };
 
                     let x = copied[(2, 1)];
 
@@ -222,8 +224,8 @@ mod tests {
                 .scope(|_global, mut frame| unsafe {
                     let mut data = vec![1usize, 2, 3, 4, 5, 6];
                     let slice = &mut data.as_mut_slice();
-                    let borrowed = Array::from_slice_unchecked(&mut frame, slice, (3, 2))?;
-                    let mut copied = borrowed.copy_inline_data(&frame)?;
+                    let mut borrowed = Array::from_slice_unchecked(&mut frame, slice, (3, 2))?;
+                    let mut copied = unsafe {borrowed.copy_inline_data()?};
                     let x = copied[(2, 1)];
 
                     copied[(2, 1)] = x + 1;
@@ -232,7 +234,7 @@ mod tests {
                     assert_eq!(array[[2, 1]], x + 1);
                     array[[2, 1]] -= 1;
 
-                    let inline = borrowed.bits_data_mut::<usize, _>(&mut frame)?;
+                    let inline = borrowed.bits_data_mut::<usize>()?;
                     assert_eq!(inline[(2, 1)], x);
                     Ok(())
                 })

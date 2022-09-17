@@ -6,13 +6,13 @@
 //!
 //! ```
 //! # use jlrs::prelude::*;
-//! # use jlrs::util::JULIA;
+//! # use jlrs::util::test::JULIA;
 //! # fn main() {
 //! # JULIA.with(|j| {
 //! # let mut julia = j.borrow_mut();
 //! julia.scope(|global, mut frame| {
 //!     let tup = Tuple2(2i32, true);
-//!     let val = Value::new(&mut frame, tup)?;
+//!     let val = Value::new(&mut frame, tup);
 //!     assert!(val.is::<Tuple2<i32, bool>>());
 //!     assert!(val.unbox::<Tuple2<i32, bool>>().is_ok());
 //!     Ok(())
@@ -59,7 +59,7 @@ impl Tuple {
         S: Scope<'target, 'current, F>,
         F: Frame<'current>,
     {
-        let (output, frame) = scope.split()?;
+        let (output, frame) = scope.split();
         frame.scope(|mut frame| {
             let global = frame.as_scope().global();
             let types: smallvec::SmallVec<[_; MAX_SIZE]> = values
@@ -71,7 +71,7 @@ impl Tuple {
 
             let tuple_ty = DataType::tuple_type(global)
                 .as_value()
-                .apply_type(&mut frame, types)?
+                .apply_type(&mut frame, types)
                 .into_jlrs_result()?
                 .cast::<DataType>()?;
 
@@ -83,14 +83,14 @@ impl Tuple {
     pub unsafe fn new_unchecked<'target, 'current, 'value, 'borrow, V, S, F>(
         scope: S,
         values: V,
-    ) -> JlrsResult<Value<'target, 'borrow>>
+    ) -> Value<'target, 'borrow>
     where
         V: AsRef<[Value<'value, 'borrow>]>,
         S: Scope<'target, 'current, F>,
         F: Frame<'current>,
     {
         let global = scope.global();
-        let (output, frame) = scope.split()?;
+        let (output, frame) = scope.split();
 
         frame.scope(|mut frame| {
             let types: smallvec::SmallVec<[_; MAX_SIZE]> = values
@@ -105,11 +105,11 @@ impl Tuple {
             // concrete so the tuple type is concrete, too.
             let tuple_ty = DataType::tuple_type(global)
                 .as_value()
-                .apply_type_unchecked(&mut frame, types)?
+                .apply_type_unchecked(&mut frame, types)
                 .cast::<DataType>()?;
 
             tuple_ty.instantiate_unchecked(output, values)
-        })
+        }).unwrap()
     }
 }
 

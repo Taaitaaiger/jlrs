@@ -11,7 +11,7 @@ use crate::{
     private::Private,
     wrappers::ptr::{
         module::ModuleRef, private::WrapperPriv, simple_vector::SimpleVectorRef, symbol::SymbolRef,
-        value::ValueRef,
+        
     },
 };
 use cfg_if::cfg_if;
@@ -29,6 +29,17 @@ cfg_if! {
 
     } else {
         use jl_sys::{jl_opaque_closure_typename};
+    }
+}
+
+cfg_if! {
+    if #[cfg(feature = "extra-fields")] {
+        use crate::wrappers::ptr::value::ValueRef;
+    }
+}
+
+cfg_if! {
+    if #[cfg(all(not(feature = "lts"), feature = "extra-fields"))] {
         use std::sync::atomic::Ordering;
     }
 }

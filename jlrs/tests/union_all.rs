@@ -10,7 +10,7 @@ mod tests {
     fn create_new_unionall() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(3, |global, mut frame| unsafe {
+            jlrs.scope(|global, mut frame| unsafe {
                 let atype = UnionAll::array_type(global);
                 let body = atype.body().wrapper_unchecked();
                 let tvar = TypeVar::new(
@@ -21,7 +21,7 @@ mod tests {
                 )?
                 .into_jlrs_result()?;
 
-                let ua = UnionAll::new(&mut frame, tvar, body)?
+                let ua = UnionAll::new(&mut frame, tvar, body)
                     .into_jlrs_result()?
                     .cast::<UnionAll>()?;
                 let v = ua.var().wrapper().unwrap();
@@ -29,7 +29,7 @@ mod tests {
                 let equals = Module::base(global)
                     .function_ref("!=")?
                     .wrapper_unchecked()
-                    .call2(&mut frame, v.as_value(), atype.var().value_unchecked())?
+                    .call2(&mut frame, v.as_value(), atype.var().value_unchecked())
                     .unwrap()
                     .unbox::<bool>()?
                     .as_bool();
@@ -44,14 +44,14 @@ mod tests {
     fn instantiate_unionall() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(4, |global, mut frame| unsafe {
-                let v = Value::new(&mut frame, 3i8)?;
+            jlrs.scope(|global, mut frame| unsafe {
+                let v = Value::new(&mut frame, 3i8);
                 let out = Module::main(global)
                     .submodule_ref("JlrsTests")?
                     .wrapper_unchecked()
                     .global_ref("ParameterStruct")?
                     .wrapper_unchecked()
-                    .apply_type(&mut frame, &mut [DataType::int8_type(global).as_value()])?
+                    .apply_type(&mut frame, &mut [DataType::int8_type(global).as_value()])
                     .into_jlrs_result()?
                     .cast::<DataType>()?
                     .instantiate(&mut frame, &mut [v])?
@@ -70,9 +70,9 @@ mod tests {
     fn apply_value_type() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope_with_capacity(8, |global, mut frame| unsafe {
-                let ty1 = Value::new(&mut frame, 1isize)?;
-                let ty2 = Value::new(&mut frame, 2isize)?;
+            jlrs.scope(|global, mut frame| unsafe {
+                let ty1 = Value::new(&mut frame, 1isize);
+                let ty2 = Value::new(&mut frame, 2isize);
 
                 let vts = Module::main(global)
                     .submodule_ref("JlrsTests")?
@@ -81,14 +81,14 @@ mod tests {
                     .wrapper_unchecked();
 
                 let v1 = vts
-                    .apply_type(&mut frame, &mut [ty1])?
+                    .apply_type(&mut frame, &mut [ty1])
                     .into_jlrs_result()?
                     .cast::<DataType>()?
                     .instantiate(&mut frame, &mut [])?
                     .into_jlrs_result()?;
 
                 let v2 = vts
-                    .apply_type(&mut frame, &mut [ty2])?
+                    .apply_type(&mut frame, &mut [ty2])
                     .into_jlrs_result()?
                     .cast::<DataType>()?
                     .instantiate(&mut frame, &mut [])?
@@ -100,8 +100,8 @@ mod tests {
                     .function_ref("valuedispatch")?
                     .wrapper_unchecked();
 
-                let o1 = func.call1(&mut frame, v1)?.unwrap().unbox::<isize>()?;
-                let o2 = func.call1(&mut frame, v2)?.unwrap().unbox::<f64>()?;
+                let o1 = func.call1(&mut frame, v1).unwrap().unbox::<isize>()?;
+                let o2 = func.call1(&mut frame, v2).unwrap().unbox::<f64>()?;
 
                 assert_eq!(o1, 3isize);
                 assert_eq!(o2, 3.0f64);

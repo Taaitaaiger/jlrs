@@ -12,10 +12,10 @@ mod tests {
             let mut data = vec![1u64, 2, 3, 4];
 
             let unboxed = jlrs
-                .scope_with_capacity(1, |_, mut frame| {
+                .scope(|_, mut frame| {
                     let array = Array::from_slice(&mut frame, &mut data, 4)?.into_jlrs_result()?;
                     assert!(array.contains::<u64>());
-                    array.copy_inline_data::<u64, _>(&frame)
+                    unsafe { array.copy_inline_data::<u64>() }
                 })
                 .unwrap();
 
@@ -41,7 +41,7 @@ mod tests {
             };
 
             let unboxed = jlrs
-                .scope_with_capacity(1, |_, mut frame| {
+                .scope(|_, mut frame| {
                     let x = false;
 
                     let array = match x {
@@ -72,7 +72,7 @@ mod tests {
             let mut data = vec![1u64, 2, 3, 4];
 
             let unboxed = jlrs
-                .scope_with_capacity(1, |_, mut frame| {
+                .scope(|_, mut frame| {
                     let array = frame.value_scope_with_slots(0, |output, mut frame| {
                         let output = output.into_scope(frame);
                         Array::from_slice(output, &mut data, 4)
@@ -116,7 +116,7 @@ mod tests {
             let mut data = vec![1u64, 2, 3, 4];
 
             let unboxed = jlrs
-                .scope_with_capacity(1, |_, mut frame| {
+                .scope(|_, mut frame| {
                     let array = Array::from_slice(frame, &mut data, (2, 2))?;
                     array.cast::<Array>()?.copy_inline_data::<u64>()
                 })
@@ -157,7 +157,7 @@ mod tests {
             let mut data = vec![1u64, 2, 3, 4];
 
             let unboxed = jlrs
-                .scope_with_capacity(2, |global, mut frame| unsafe {
+                .scope(|global, mut frame| unsafe {
                     let array = Array::from_slice(&mut frame, &mut data, 4)?;
                     Module::base(global)
                         .function_ref("sum")?
@@ -180,8 +180,8 @@ mod tests {
             let mut data = vec![1u64, 2, 3, 4];
 
             let unboxed = jlrs
-                .scope_with_capacity(2, |global, mut frame| unsafe {
-                    let output = frame.output()?;
+                .scope(|global, mut frame| unsafe {
+                    let output = frame.output();
                     let array = frame
                         .scope(|mut frame| {
                             let borrowed = &mut data;
@@ -197,7 +197,7 @@ mod tests {
                     Module::base(global)
                         .function_ref("sum")?
                         .wrapper_unchecked()
-                        .call1(&mut frame, array.as_value())?
+                        .call1(&mut frame, array.as_value())
                         .unwrap()
                         .unbox::<u64>()
                 })

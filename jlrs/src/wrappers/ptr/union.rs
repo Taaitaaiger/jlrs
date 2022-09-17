@@ -1,7 +1,6 @@
 //! Wrapper for `Union`.
 
 use crate::{
-    error::JlrsResult,
     impl_julia_typecheck,
     memory::{global::Global, output::Output, scope::PartialScope},
     private::Private,
@@ -39,7 +38,7 @@ impl<'scope> Union<'scope> {
     /// [`Union`]: crate::wrappers::ptr::union::Union
     /// [`DataType`]: crate::wrappers::ptr::datatype::DataType
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub fn new<'target, V, S>(scope: S, types: V) -> JlrsResult<JuliaResult<'target, 'static>>
+    pub fn new<'target, V, S>(scope: S, types: V) -> JuliaResult<'target, 'static>
     where
         V: AsRef<[Value<'scope, 'static>]>,
         S: PartialScope<'target>,
@@ -58,9 +57,9 @@ impl<'scope> Union<'scope> {
                 Ok(())
             };
 
-            match catch_exceptions(&mut callback)? {
-                Ok(ptr) => Ok(Ok(scope.value(NonNull::new_unchecked(ptr), Private)?)),
-                Err(e) => Ok(Err(e.root(scope)?)),
+            match catch_exceptions(&mut callback).unwrap() {
+                Ok(ptr) => Ok(scope.value(NonNull::new_unchecked(ptr), Private)),
+                Err(e) => Err(scope.value(NonNull::new_unchecked(e.ptr()), Private)),
             }
         }
     }
@@ -76,10 +75,7 @@ impl<'scope> Union<'scope> {
     ///
     /// [`Union`]: crate::wrappers::ptr::union::Union
     /// [`DataType`]: crate::wrappers::ptr::datatype::DataType
-    pub unsafe fn new_unchecked<'target, V, S>(
-        scope: S,
-        types: V,
-    ) -> JlrsResult<Value<'target, 'static>>
+    pub unsafe fn new_unchecked<'target, V, S>(scope: S, types: V) -> Value<'target, 'static>
     where
         V: AsRef<[Value<'scope, 'static>]>,
         S: PartialScope<'target>,
@@ -100,7 +96,7 @@ impl<'scope> Union<'scope> {
     pub fn new_unrooted<'global, V>(
         _: Global<'global>,
         types: V,
-    ) -> JlrsResult<JuliaResultRef<'global, 'static>>
+    ) -> JuliaResultRef<'global, 'static>
     where
         V: AsRef<[Value<'scope, 'static>]>,
     {
@@ -118,9 +114,9 @@ impl<'scope> Union<'scope> {
                 Ok(())
             };
 
-            match catch_exceptions(&mut callback)? {
-                Ok(ptr) => Ok(Ok(ValueRef::wrap(ptr))),
-                Err(e) => Ok(Err(e)),
+            match catch_exceptions(&mut callback).unwrap() {
+                Ok(ptr) => Ok(ValueRef::wrap(ptr)),
+                Err(e) => Err(e),
             }
         }
     }

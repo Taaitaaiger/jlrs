@@ -100,6 +100,8 @@ pub enum AccessError {
         value_type: String,
         field_name: String,
     },
+    #[error("Data is already borrowed")]
+    BorrowError,
     #[error("field at index {idx} does not exist: {value_type} has {n_fields} fields")]
     OutOfBoundsField {
         idx: usize,

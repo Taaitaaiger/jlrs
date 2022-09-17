@@ -2,16 +2,19 @@
 //!
 //! This module is only available if the `ccall` feature is enabled.
 
+use std::{ptr::NonNull, cell::RefCell};
+
 use crate::{
     error::JlrsResult,
     memory::{
+        // stack_page::StackPage,
+        context::{Stack, ContextFrame},
         frame::{GcFrame, NullFrame},
-        global::Global,
-        mode::Sync,
-        stack_page::StackPage,
+        global::Global, ledger::Ledger,
     },
 };
 
+use cfg_if::cfg_if;
 #[cfg(feature = "uv")]
 use jl_sys::uv_async_send;
 
@@ -27,17 +30,32 @@ use jl_sys::uv_async_send;
 /// Unlike the runtimes, `CCall` postpones the allocation of the stack that is used for managing
 /// the GC until a `GcFrame` is created. If a null scope is created, this stack isn't allocated at
 /// all.
-pub struct CCall {
-    page: Option<StackPage>,
+pub struct CCall<'context> {
+    // page: Option<StackPage>,
+    context_frame: &'context ContextFrame,
+    pub(crate) ledger: RefCell<Ledger>,
 }
 
-impl CCall {
+impl<'context> CCall<'context> {
     /// Create a new `CCall`. The stack is not allocated until a [`GcFrame`] is created.
     ///
     /// Safety: This function must never be called outside a function called through `ccall` from
     /// Julia and must only be called once during that call.
-    pub unsafe fn new() -> Self {
-        CCall { page: None }
+    pub unsafe fn new(context_frame: &'context ContextFrame) -> Self {
+        cfg_if! {
+            if #[cfg(feature = "lts")] {
+                let rtls = NonNull::new_unchecked(jl_sys::jl_get_ptls_states()).as_mut();
+                context_frame.set_prev(rtls.pgcstack.cast());
+                rtls.pgcstack = context_frame as *const _ as *mut _;
+            } else {
+                use jl_sys::{jl_get_current_task, jl_task_t};
+                let task = NonNull::new_unchecked(jl_get_current_task().cast::<jl_task_t>()).as_mut();
+                context_frame.set_prev(task.gcstack.cast());
+                task.gcstack = context_frame as *const _ as *mut _;
+            }
+        }
+
+        CCall { context_frame, ledger: RefCell::default() }
     }
 
     /// Wake the task associated with `handle`.
@@ -58,31 +76,12 @@ impl CCall {
     /// Create a [`GcFrame`], call the given closure, and return its result.
     pub fn scope<T, F>(&mut self, func: F) -> JlrsResult<T>
     where
-        for<'base> F: FnOnce(Global<'base>, GcFrame<'base, Sync>) -> JlrsResult<T>,
+        for<'base> F: FnOnce(Global<'base>, GcFrame<'base>) -> JlrsResult<T>,
     {
         unsafe {
-            let page = self.get_init_page();
+            let ctx = self.get_context();
             let global = Global::new();
-            let (frame, owner) = GcFrame::new(page.as_ref(), Sync);
-            let ret = func(global, frame);
-            std::mem::drop(owner);
-            ret
-        }
-    }
-
-    /// Create a [`GcFrame`] with capacity for at least `capacity` roots, call the given closure
-    /// and return its result.
-    pub fn scope_with_capacity<T, F>(&mut self, capacity: usize, func: F) -> JlrsResult<T>
-    where
-        for<'base> F: FnOnce(Global<'base>, GcFrame<'base, Sync>) -> JlrsResult<T>,
-    {
-        unsafe {
-            let page = self.get_init_page();
-            let global = Global::new();
-            if capacity + 2 > page.size() {
-                *page = StackPage::new(capacity + 2);
-            }
-            let (frame, owner) = GcFrame::new(page.as_ref(), Sync);
+            let (frame, owner) = GcFrame::base(ctx, &self.ledger);
             let ret = func(global, frame);
             std::mem::drop(owner);
             ret
@@ -102,12 +101,32 @@ impl CCall {
         }
     }
 
-    #[inline(always)]
-    fn get_init_page(&mut self) -> &mut StackPage {
-        if self.page.is_none() {
-            self.page = Some(StackPage::default());
+    fn get_context(&mut self) -> &'context Stack {
+        if let Some(ctx) = self.context_frame.get() {
+            return ctx;
         }
 
-        self.page.as_mut().unwrap()
+        unsafe {
+            let ctx_ty = Stack::init();
+            let ctx = Stack::new(ctx_ty);
+            self.context_frame.set(ctx)
+        }
+    }
+}
+
+impl Drop for CCall<'_> {
+    fn drop(&mut self) {
+        unsafe {
+            cfg_if::cfg_if! {
+                if #[cfg(feature = "lts")] {
+                    let rtls = NonNull::new_unchecked(jl_sys::jl_get_ptls_states()).as_mut();
+                    rtls.pgcstack = self.context_frame.prev().cast();
+                } else {
+                    use jl_sys::{jl_get_current_task, jl_task_t};
+                    let task = NonNull::new_unchecked(jl_get_current_task().cast::<jl_task_t>()).as_mut();
+                    task.gcstack = self.context_frame.prev().cast();
+                }
+            }
+        }
     }
 }

@@ -75,7 +75,7 @@ impl<'scope, 'data> WrapperPriv<'scope, 'data> for Function<'scope, 'data> {
 }
 
 impl<'data> Call<'data> for Function<'_, 'data> {
-    unsafe fn call0<'target, S>(self, scope: S) -> JlrsResult<JuliaResult<'target, 'data>>
+    unsafe fn call0<'target, S>(self, scope: S) -> JuliaResult<'target, 'data>
     where
         S: PartialScope<'target>,
     {
@@ -86,7 +86,7 @@ impl<'data> Call<'data> for Function<'_, 'data> {
         self,
         scope: S,
         arg0: Value<'_, 'data>,
-    ) -> JlrsResult<JuliaResult<'target, 'data>>
+    ) -> JuliaResult<'target, 'data>
     where
         S: PartialScope<'target>,
     {
@@ -98,7 +98,7 @@ impl<'data> Call<'data> for Function<'_, 'data> {
         scope: S,
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
-    ) -> JlrsResult<JuliaResult<'target, 'data>>
+    ) -> JuliaResult<'target, 'data>
     where
         S: PartialScope<'target>,
     {
@@ -111,7 +111,7 @@ impl<'data> Call<'data> for Function<'_, 'data> {
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
         arg2: Value<'_, 'data>,
-    ) -> JlrsResult<JuliaResult<'target, 'data>>
+    ) -> JuliaResult<'target, 'data>
     where
         S: PartialScope<'target>,
     {
@@ -122,7 +122,7 @@ impl<'data> Call<'data> for Function<'_, 'data> {
         self,
         scope: S,
         args: V,
-    ) -> JlrsResult<JuliaResult<'target, 'data>>
+    ) -> JuliaResult<'target, 'data>
     where
         V: AsRef<[Value<'value, 'data>]>,
         S: PartialScope<'target>,

@@ -26,7 +26,7 @@ unsafe impl IntoJulia for f16 {
 #[cfg(feature = "sync-rt")]
 mod tests {
     use crate::prelude::*;
-    use crate::util::JULIA;
+    use crate::util::test::JULIA;
     use half::f16;
 
     #[test]
@@ -36,10 +36,10 @@ mod tests {
 
             julia
                 .scope(|global, mut frame| unsafe {
-                    let one = Value::new(&mut frame, f16::ONE)?;
-                    let func = Module::base(global).function(&mut frame, "-")?;
+                    let one = Value::new(&mut frame, f16::ONE);
+                    let func = Module::base(*global).function(&mut frame, "-")?;
                     let res = func
-                        .call2(&mut frame, one, one)?
+                        .call2(&mut frame, one, one)
                         .into_jlrs_result()?
                         .unbox::<f16>()?;
 

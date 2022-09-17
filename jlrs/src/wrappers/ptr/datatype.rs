@@ -589,7 +589,7 @@ impl<'scope> DataType<'scope> {
         V: AsRef<[Value<'value, 'data>]>,
     {
         let res = self.instantiate_unrooted(scope.global(), values)?;
-        unsafe { scope.call_result_ref(res, Private) }
+        unsafe { Ok(scope.call_result_ref(res, Private)) }
     }
 
     /// Create a new instance of this `DataType`, using `values` to set the fields.

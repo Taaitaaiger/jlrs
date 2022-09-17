@@ -1,13 +1,14 @@
 use super::{channel::Channel, task::PersistentTask};
-use crate::memory::mode::Async;
-use crate::memory::stack_page::StackPage;
+use crate::memory::context::Stack;
+use crate::memory::ledger::Ledger;
 use crate::{async_util::channel::ChannelReceiver, memory::global::Global};
 use crate::{async_util::channel::OneshotSender, memory::frame::AsyncGcFrame};
 use crate::{async_util::task::AsyncTask, runtime::async_rt::PersistentMessage};
-use crate::{error::JlrsResult, memory::stack_page::AsyncStackPage};
+use crate::{error::JlrsResult};
 use crate::{memory::frame::GcFrame, runtime::async_rt::PersistentHandle};
 use async_trait::async_trait;
 use futures::{future::LocalBoxFuture, FutureExt};
+use std::cell::RefCell;
 use std::{marker::PhantomData, num::NonZeroUsize, sync::Arc};
 
 pub(crate) type InnerPersistentMessage<P> = Box<
@@ -106,7 +107,7 @@ where
     ) -> JlrsResult<<Self::P as PersistentTask>::Output> {
         {
             let output = {
-                let (nested, owner) = frame.nest_async(Self::RUN_CAPACITY);
+                let (nested, owner) = frame.new_async();
                 let res = self.run(global, nested, state, input).await;
                 std::mem::drop(owner);
                 res
@@ -247,7 +248,7 @@ where
 
 #[async_trait(?Send)]
 pub(crate) trait PendingTaskEnvelope: Send + Sync {
-    async fn call(mut self: Box<Self>, mut stack: &mut AsyncStackPage);
+    async fn call(mut self: Box<Self>, mut stack: &'static Stack, ledger: &'static  RefCell<Ledger>);
 }
 
 #[async_trait(?Send)]
@@ -256,22 +257,14 @@ where
     O: OneshotSender<JlrsResult<A::Output>>,
     A: AsyncTask,
 {
-    async fn call(mut self: Box<Self>, stack: &mut AsyncStackPage) {
+    async fn call(mut self: Box<Self>, stack: &'static Stack, ledger: &'static  RefCell<Ledger>) {
         let (mut task, result_sender) = self.split();
 
         // Safety: the stack slots can be reallocated because it doesn't contain any frames
         // yet. The frame is dropped at the end of the scope, the nested hierarchy of scopes is
         // maintained.
         let res = unsafe {
-            if stack.size() < A::RUN_CAPACITY + 2 {
-                *stack.page_mut() = StackPage::new(A::RUN_CAPACITY + 2);
-            }
-
-            // Transmute to get static lifetimes. Should be okay because tasks can't leak
-            // Julia data and the frame is not dropped until the task has completed.
-            let mode = Async::new(std::mem::transmute(stack.top()));
-            let raw = std::mem::transmute(stack.slots());
-            let (frame, owner) = AsyncGcFrame::new(raw, mode);
+            let (frame, owner) = AsyncGcFrame::base_async(stack, ledger);
             let global = Global::new();
 
             let res = task.call_run(global, frame).await;
@@ -289,20 +282,14 @@ where
     O: OneshotSender<JlrsResult<()>>,
     A: AsyncTask,
 {
-    async fn call(mut self: Box<Self>, stack: &mut AsyncStackPage) {
+    async fn call(mut self: Box<Self>, stack: &'static Stack, ledger: &'static RefCell<Ledger>) {
         let sender = self.sender();
 
         // Safety: the stack slots can be reallocated because it doesn't contain any frames
         // yet. The frame is dropped at the end of the scope, the nested hierarchy of scopes is
         // maintained.
         let res = unsafe {
-            if stack.size() < A::REGISTER_CAPACITY + 2 {
-                *stack.page_mut() = StackPage::new(A::REGISTER_CAPACITY + 2);
-            }
-
-            let mode = Async::new(stack.top());
-            let raw = stack.slots();
-            let (frame, owner) = AsyncGcFrame::new(raw, mode);
+            let (frame, owner) = AsyncGcFrame::base_async(stack, ledger);
             let global = Global::new();
 
             let res = A::register(global, frame).await;
@@ -320,20 +307,14 @@ where
     O: OneshotSender<JlrsResult<()>>,
     P: PersistentTask,
 {
-    async fn call(mut self: Box<Self>, stack: &mut AsyncStackPage) {
+    async fn call(mut self: Box<Self>, stack: &'static Stack, ledger: &'static RefCell<Ledger>) {
         let sender = self.sender();
 
         // Safety: the stack slots can be reallocated because it doesn't contain any frames
         // yet. The frame is dropped at the end of the scope, the nested hierarchy of scopes is
         // maintained.
         let res = unsafe {
-            if stack.size() < P::REGISTER_CAPACITY + 2 {
-                *stack.page_mut() = StackPage::new(P::REGISTER_CAPACITY + 2);
-            }
-
-            let mode = Async::new(stack.top());
-            let raw = stack.slots();
-            let (frame, owner) = AsyncGcFrame::new(raw, mode);
+            let (frame, owner) = AsyncGcFrame::base_async(stack, ledger);
             let global = Global::new();
 
             let res = P::register(global, frame).await;
@@ -352,7 +333,7 @@ where
     O: OneshotSender<JlrsResult<PersistentHandle<P>>>,
     P: PersistentTask,
 {
-    async fn call(mut self: Box<Self>, stack: &mut AsyncStackPage) {
+    async fn call(mut self: Box<Self>, stack: &'static Stack, ledger: &'static RefCell<Ledger>) {
         let (mut persistent, handle_sender) = self.split();
         let handle_sender = handle_sender.sender;
         let (sender, mut receiver) = C::channel(NonZeroUsize::new(P::CHANNEL_CAPACITY));
@@ -360,15 +341,7 @@ where
         // yet. The frame is dropped at the end of the scope, the nested hierarchy of scopes is
         // maintained.
         unsafe {
-            if stack.size() < P::INIT_CAPACITY + 2 {
-                *stack.page_mut() = StackPage::new(P::INIT_CAPACITY + 2);
-            }
-
-            // Transmute to get static lifetimes. Should be okay because tasks can't leak
-            // Julia data and the frame is not dropped until the task is dropped.
-            let mode = Async::new(std::mem::transmute(stack.top()));
-            let raw = std::mem::transmute(stack.slots());
-            let (frame, owner) = AsyncGcFrame::new(raw, mode);
+            let (frame, mut owner) = AsyncGcFrame::base_async(stack, ledger);
             let global = Global::new();
 
             match persistent.call_init(global, frame).await {
@@ -376,6 +349,8 @@ where
                     handle_sender
                         .send(Ok(PersistentHandle::new(Arc::new(sender))))
                         .await;
+
+                    owner.set_offset(stack.size());
 
                     loop {
                         let mut msg = match receiver.recv().await {
@@ -405,27 +380,25 @@ where
 pub(crate) struct BlockingTask<F, O, T> {
     func: F,
     sender: O,
-    slots: usize,
     _res: PhantomData<T>,
 }
 
 impl<F, O, T> BlockingTask<F, O, T>
 where
     for<'base> F:
-        Send + Sync + FnOnce(Global<'base>, GcFrame<'base, Async<'base>>) -> JlrsResult<T>,
+        Send + Sync + FnOnce(Global<'base>, GcFrame<'base>) -> JlrsResult<T>,
     O: OneshotSender<JlrsResult<T>>,
     T: Send + Sync + 'static,
 {
-    pub(crate) fn new(func: F, sender: O, slots: usize) -> Self {
+    pub(crate) fn new(func: F, sender: O) -> Self {
         Self {
             func,
             sender,
-            slots,
             _res: PhantomData,
         }
     }
 
-    fn call<'scope>(self: Box<Self>, frame: GcFrame<'scope, Async<'scope>>) -> (JlrsResult<T>, O) {
+    fn call<'scope>(self: Box<Self>, frame: GcFrame<'scope>) -> (JlrsResult<T>, O) {
         // Safety: this method is called from a thread known to Julia, the lifetime is limited to
         // 'scope.
         let global = unsafe { Global::new() };
@@ -436,28 +409,22 @@ where
 }
 
 pub(crate) trait BlockingTaskEnvelope: Send + Sync {
-    fn call(self: Box<Self>, stack: &mut AsyncStackPage) -> LocalBoxFuture<()>;
+    fn call(self: Box<Self>, stack: &'static Stack, ledger: &'static RefCell<Ledger>) -> LocalBoxFuture<'static, ()>;
 }
 
 impl<F, O, T> BlockingTaskEnvelope for BlockingTask<F, O, T>
 where
     for<'base> F:
-        Send + Sync + FnOnce(Global<'base>, GcFrame<'base, Async<'base>>) -> JlrsResult<T>,
+        Send + Sync + FnOnce(Global<'base>, GcFrame<'base>) -> JlrsResult<T>,
     O: OneshotSender<JlrsResult<T>>,
     T: Send + Sync + 'static,
 {
-    fn call(self: Box<Self>, stack: &mut AsyncStackPage) -> LocalBoxFuture<'static, ()> {
+    fn call(self: Box<Self>, stack: &'static Stack, ledger: &'static RefCell<Ledger>) -> LocalBoxFuture<'static, ()> {
         // Safety: the stack slots can be reallocated because it doesn't contain any frames
         // yet. The frame is dropped at the end of the scope, the nested hierarchy of scopes is
         // maintained.
         let (res, ch) = unsafe {
-            if stack.size() < self.slots + 2 {
-                *stack.page_mut() = StackPage::new(self.slots + 2);
-            }
-
-            let mode = Async::new(stack.top());
-            let raw = stack.slots();
-            let (frame, owner) = GcFrame::new(raw, mode);
+            let (frame, owner) = GcFrame::base(stack, ledger);
             let res = self.call(frame);
             std::mem::drop(owner);
             res

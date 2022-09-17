@@ -46,8 +46,8 @@ use jl_sys::{jl_process_events, jl_yield};
 ///         global: Global<'base>,
 ///         mut frame: AsyncGcFrame<'base>,
 ///     ) -> JlrsResult<Self::Output> {
-///         let a = Value::new(&mut frame, self.a)?;
-///         let b = Value::new(&mut frame, self.b)?;
+///         let a = Value::new(&mut frame, self.a);
+///         let b = Value::new(&mut frame, self.b);
 ///
 ///         let func = Module::base(global).function(&mut frame, "+")?;
 ///         unsafe { func.call_async(&mut frame, &mut [a, b]) }
@@ -180,7 +180,7 @@ pub trait AsyncTask: 'static + Send + Sync {
 ///         unsafe {
 ///             Module::base(global)
 ///                 .function(&mut frame, "sum")?
-///                 .call1(&mut frame, state.array.as_value())?
+///                 .call1(&mut frame, state.array.as_value())
 ///                 .into_jlrs_result()?
 ///                 .unbox::<usize>()
 ///         }

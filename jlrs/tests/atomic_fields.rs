@@ -18,7 +18,7 @@ mod tests {
                         .value_unchecked()
                 };
 
-                let arg1 = Value::new(&mut frame, 3u32)?;
+                let arg1 = Value::new(&mut frame, 3u32);
                 let instance = ty
                     .cast::<DataType>()?
                     .instantiate(&mut frame, &mut [arg1])?
@@ -49,7 +49,7 @@ mod tests {
                         .value_unchecked()
                 };
 
-                let tup = Value::new(&mut frame, Tuple4(1u64, 2u64, 3u64, 4u64))?;
+                let tup = Value::new(&mut frame, Tuple4(1u64, 2u64, 3u64, 4u64));
 
                 let instance = ty
                     .cast::<DataType>()?
@@ -81,7 +81,7 @@ mod tests {
                         .value_unchecked()
                 };
 
-                let tup = Value::new(&mut frame, Tuple2(1u32, 2u16))?;
+                let tup = Value::new(&mut frame, Tuple2(1u32, 2u16));
 
                 let instance = ty
                     .cast::<DataType>()?

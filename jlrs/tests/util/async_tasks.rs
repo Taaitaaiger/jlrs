@@ -14,8 +14,8 @@ impl AsyncTask for MyTask {
         global: Global<'base>,
         mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
-        let dims = Value::new(&mut frame, self.dims)?;
-        let iters = Value::new(&mut frame, self.iters)?;
+        let dims = Value::new(&mut frame, self.dims);
+        let iters = Value::new(&mut frame, self.iters);
 
         let v = unsafe {
             Module::main(global)
@@ -48,8 +48,8 @@ impl AsyncTask for OtherRetTypeTask {
         global: Global<'base>,
         mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
-        let dims = Value::new(&mut frame, self.dims)?;
-        let iters = Value::new(&mut frame, self.iters)?;
+        let dims = Value::new(&mut frame, self.dims);
+        let iters = Value::new(&mut frame, self.iters);
 
         let v = unsafe {
             Module::main(global)
@@ -82,10 +82,10 @@ impl AsyncTask for KwTask {
         global: Global<'base>,
         mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
-        let dims = Value::new(&mut frame, self.dims)?;
-        let iters = Value::new(&mut frame, self.iters)?;
-        let kw = Value::new(&mut frame, 5.0f64)?;
-        let nt = named_tuple!(&mut frame, "kw" => kw)?;
+        let dims = Value::new(&mut frame, self.dims);
+        let iters = Value::new(&mut frame, self.iters);
+        let kw = Value::new(&mut frame, 5.0f64);
+        let nt = named_tuple!(&mut frame, "kw" => kw);
 
         let v = unsafe {
             Module::main(global)
@@ -145,11 +145,11 @@ impl AsyncTask for NestingTaskAsyncFrame {
         global: Global<'base>,
         mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
-        let dims = Value::new(&mut frame, self.dims)?;
-        let iters = Value::new(&mut frame, self.iters)?;
+        let dims = Value::new(&mut frame, self.dims);
+        let iters = Value::new(&mut frame, self.iters);
 
         let v = frame
-            .async_scope_with_capacity(1, |mut frame| async move {
+            .async_scope(|mut frame| async move {
                 unsafe {
                     Module::main(global)
                         .submodule_ref("AsyncTests")?
@@ -183,11 +183,11 @@ impl AsyncTask for NestingTaskAsyncValueFrame {
         global: Global<'base>,
         mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
-        let (output, mut frame) = frame.split()?;
+        let (output, mut frame) = frame.split();
         let v = (&mut frame)
             .async_scope(|mut frame| async move {
-                let iters = Value::new(&mut frame, self.iters)?;
-                let dims = Value::new(&mut frame, self.dims)?;
+                let iters = Value::new(&mut frame, self.iters);
+                let dims = Value::new(&mut frame, self.dims);
 
                 let out = unsafe {
                     Module::main(global)
@@ -224,11 +224,11 @@ impl AsyncTask for NestingTaskAsyncCallFrame {
         global: Global<'base>,
         mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
-        let (output, frame) = frame.split()?;
+        let (output, frame) = frame.split();
         let v = frame
-            .async_scope_with_capacity(3, |mut frame| async move {
-                let iters = Value::new(&mut frame, self.iters)?;
-                let dims = Value::new(&mut frame, self.dims)?;
+            .async_scope(|mut frame| async move {
+                let iters = Value::new(&mut frame, self.iters);
+                let dims = Value::new(&mut frame, self.dims);
 
                 let out = unsafe {
                     Module::main(global)
@@ -272,8 +272,8 @@ impl AsyncTask for NestingTaskAsyncGcFrame {
         global: Global<'base>,
         mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
-        let dims = Value::new(&mut frame, self.dims)?;
-        let iters = Value::new(&mut frame, self.iters)?;
+        let dims = Value::new(&mut frame, self.dims);
+        let iters = Value::new(&mut frame, self.iters);
 
         let v = frame
             .async_scope(|mut frame| async move {
@@ -310,11 +310,11 @@ impl AsyncTask for NestingTaskAsyncDynamicValueFrame {
         global: Global<'base>,
         mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
-        let (output, frame) = frame.split()?;
+        let (output, frame) = frame.split();
         let v = frame
             .async_scope(|mut frame| async move {
-                let iters = Value::new(&mut frame, self.iters)?;
-                let dims = Value::new(&mut frame, self.dims)?;
+                let iters = Value::new(&mut frame, self.iters);
+                let dims = Value::new(&mut frame, self.dims);
 
                 let out = unsafe {
                     Module::main(global)
@@ -351,11 +351,11 @@ impl AsyncTask for NestingTaskAsyncDynamicCallFrame {
         global: Global<'base>,
         mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
-        let (output, frame) = frame.split()?;
+        let (output, frame) = frame.split();
         let v = frame
             .async_scope(|mut frame| async move {
-                let iters = Value::new(&mut frame, self.iters)?;
-                let dims = Value::new(&mut frame, self.dims)?;
+                let iters = Value::new(&mut frame, self.iters);
+                let dims = Value::new(&mut frame, self.dims);
 
                 let out = unsafe {
                     Module::main(global)
@@ -406,7 +406,7 @@ impl PersistentTask for AccumulatorTask {
         mut frame: AsyncGcFrame<'frame>,
     ) -> JlrsResult<()> {
         unsafe {
-            Value::eval_string(&mut frame, "mutable struct MutFloat64 v::Float64 end")?
+            Value::eval_string(&mut frame, "mutable struct MutFloat64 v::Float64 end")
                 .into_jlrs_result()?;
         }
         Ok(())
@@ -418,7 +418,7 @@ impl PersistentTask for AccumulatorTask {
         frame: &mut AsyncGcFrame<'static>,
     ) -> JlrsResult<Value<'static, 'static>> {
         unsafe {
-            let (output, frame) = frame.split()?;
+            let (output, frame) = frame.split();
             let init_value = self.init_value;
             frame
                 .async_scope(|mut frame| {
@@ -428,11 +428,11 @@ impl PersistentTask for AccumulatorTask {
                         let func = Module::main(global)
                             .global_ref("MutFloat64")?
                             .value_unchecked();
-                        let init_v = Value::new(&mut frame, init_value)?;
+                        let init_v = Value::new(&mut frame, init_value);
 
                         let os = output.into_scope(&mut frame);
 
-                        func.call1(os, init_v)
+                        Ok(func.call1(os, init_v))
                     }
                 })
                 .await?
@@ -448,7 +448,7 @@ impl PersistentTask for AccumulatorTask {
         input: Self::Input,
     ) -> JlrsResult<Self::Output> {
         let value = state.field_accessor(&frame).field("v")?.access::<f64>()? + input;
-        let new_value = Value::new(&mut frame, value)?;
+        let new_value = Value::new(&mut frame, value);
 
         unsafe {
             state
@@ -474,8 +474,8 @@ impl AsyncTask for LocalTask {
         global: Global<'base>,
         mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
-        let dims = Value::new(&mut frame, self.dims)?;
-        let iters = Value::new(&mut frame, self.iters)?;
+        let dims = Value::new(&mut frame, self.dims);
+        let iters = Value::new(&mut frame, self.iters);
 
         let v = unsafe {
             Module::main(global)
@@ -507,8 +507,8 @@ impl AsyncTask for LocalSchedulingTask {
         global: Global<'base>,
         mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
-        let dims = Value::new(&mut frame, self.dims)?;
-        let iters = Value::new(&mut frame, self.iters)?;
+        let dims = Value::new(&mut frame, self.dims);
+        let iters = Value::new(&mut frame, self.iters);
 
         let v = unsafe {
             let task = Module::main(global)
@@ -521,7 +521,7 @@ impl AsyncTask for LocalSchedulingTask {
 
             Module::base(global)
                 .function(&mut frame, "fetch")?
-                .call1(&mut frame, task.as_value())?
+                .call1(&mut frame, task.as_value())
                 .into_jlrs_result()?
                 .unbox::<f64>()? as f32
         };
@@ -544,8 +544,8 @@ impl AsyncTask for MainTask {
         global: Global<'base>,
         mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
-        let dims = Value::new(&mut frame, self.dims)?;
-        let iters = Value::new(&mut frame, self.iters)?;
+        let dims = Value::new(&mut frame, self.dims);
+        let iters = Value::new(&mut frame, self.iters);
 
         let v = unsafe {
             Module::main(global)
@@ -577,8 +577,8 @@ impl AsyncTask for MainSchedulingTask {
         global: Global<'base>,
         mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
-        let dims = Value::new(&mut frame, self.dims)?;
-        let iters = Value::new(&mut frame, self.iters)?;
+        let dims = Value::new(&mut frame, self.dims);
+        let iters = Value::new(&mut frame, self.iters);
 
         let v = unsafe {
             let task = Module::main(global)
@@ -591,7 +591,7 @@ impl AsyncTask for MainSchedulingTask {
 
             Module::base(global)
                 .function(&mut frame, "fetch")?
-                .call1(&mut frame, task.as_value())?
+                .call1(&mut frame, task.as_value())
                 .into_jlrs_result()?
                 .unbox::<f64>()? as f32
         };
@@ -614,8 +614,8 @@ impl AsyncTask for SchedulingTask {
         global: Global<'base>,
         mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
-        let dims = Value::new(&mut frame, self.dims)?;
-        let iters = Value::new(&mut frame, self.iters)?;
+        let dims = Value::new(&mut frame, self.dims);
+        let iters = Value::new(&mut frame, self.iters);
 
         let v = unsafe {
             let task = Module::main(global)
@@ -628,7 +628,7 @@ impl AsyncTask for SchedulingTask {
 
             Module::base(global)
                 .function(&mut frame, "fetch")?
-                .call1(&mut frame, task.as_value())?
+                .call1(&mut frame, task.as_value())
                 .into_jlrs_result()?
                 .unbox::<f64>()? as f32
         };
@@ -651,12 +651,12 @@ impl AsyncTask for LocalKwSchedulingTask {
         global: Global<'base>,
         mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
-        let dims = Value::new(&mut frame, self.dims)?;
-        let iters = Value::new(&mut frame, self.iters)?;
+        let dims = Value::new(&mut frame, self.dims);
+        let iters = Value::new(&mut frame, self.iters);
 
         let v = unsafe {
-            let kw = Value::new(&mut frame, 5.0f64)?;
-            let nt = named_tuple!(&mut frame, "kw" => kw)?;
+            let kw = Value::new(&mut frame, 5.0f64);
+            let nt = named_tuple!(&mut frame, "kw" => kw);
 
             let task = Module::main(global)
                 .submodule_ref("AsyncTests")?
@@ -669,7 +669,7 @@ impl AsyncTask for LocalKwSchedulingTask {
 
             Module::base(global)
                 .function(&mut frame, "fetch")?
-                .call1(&mut frame, task.as_value())?
+                .call1(&mut frame, task.as_value())
                 .into_jlrs_result()?
                 .unbox::<f64>()? as f32
         };
@@ -692,12 +692,12 @@ impl AsyncTask for KwSchedulingTask {
         global: Global<'base>,
         mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
-        let dims = Value::new(&mut frame, self.dims)?;
-        let iters = Value::new(&mut frame, self.iters)?;
+        let dims = Value::new(&mut frame, self.dims);
+        let iters = Value::new(&mut frame, self.iters);
 
         let v = unsafe {
-            let kw = Value::new(&mut frame, 5.0f64)?;
-            let nt = named_tuple!(&mut frame, "kw" => kw)?;
+            let kw = Value::new(&mut frame, 5.0f64);
+            let nt = named_tuple!(&mut frame, "kw" => kw);
 
             let task = Module::main(global)
                 .submodule_ref("AsyncTests")?
@@ -710,7 +710,7 @@ impl AsyncTask for KwSchedulingTask {
 
             Module::base(global)
                 .function(&mut frame, "fetch")?
-                .call1(&mut frame, task.as_value())?
+                .call1(&mut frame, task.as_value())
                 .into_jlrs_result()?
                 .unbox::<f64>()? as f32
         };
@@ -733,12 +733,12 @@ impl AsyncTask for MainKwSchedulingTask {
         global: Global<'base>,
         mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
-        let dims = Value::new(&mut frame, self.dims)?;
-        let iters = Value::new(&mut frame, self.iters)?;
+        let dims = Value::new(&mut frame, self.dims);
+        let iters = Value::new(&mut frame, self.iters);
 
         let v = unsafe {
-            let kw = Value::new(&mut frame, 5.0f64)?;
-            let nt = named_tuple!(&mut frame, "kw" => kw)?;
+            let kw = Value::new(&mut frame, 5.0f64);
+            let nt = named_tuple!(&mut frame, "kw" => kw);
 
             let task = Module::main(global)
                 .submodule_ref("AsyncTests")?
@@ -751,7 +751,7 @@ impl AsyncTask for MainKwSchedulingTask {
 
             Module::base(global)
                 .function(&mut frame, "fetch")?
-                .call1(&mut frame, task.as_value())?
+                .call1(&mut frame, task.as_value())
                 .into_jlrs_result()?
                 .unbox::<f64>()? as f32
         };
@@ -774,10 +774,10 @@ impl AsyncTask for LocalKwTask {
         global: Global<'base>,
         mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
-        let dims = Value::new(&mut frame, self.dims)?;
-        let iters = Value::new(&mut frame, self.iters)?;
-        let kw = Value::new(&mut frame, 5.0f64)?;
-        let nt = named_tuple!(&mut frame, "kw" => kw)?;
+        let dims = Value::new(&mut frame, self.dims);
+        let iters = Value::new(&mut frame, self.iters);
+        let kw = Value::new(&mut frame, 5.0f64);
+        let nt = named_tuple!(&mut frame, "kw" => kw);
 
         let v = unsafe {
             Module::main(global)
@@ -810,10 +810,10 @@ impl AsyncTask for MainKwTask {
         global: Global<'base>,
         mut frame: AsyncGcFrame<'base>,
     ) -> JlrsResult<Self::Output> {
-        let dims = Value::new(&mut frame, self.dims)?;
-        let iters = Value::new(&mut frame, self.iters)?;
-        let kw = Value::new(&mut frame, 5.0f64)?;
-        let nt = named_tuple!(&mut frame, "kw" => kw)?;
+        let dims = Value::new(&mut frame, self.dims);
+        let iters = Value::new(&mut frame, self.iters);
+        let kw = Value::new(&mut frame, 5.0f64);
+        let nt = named_tuple!(&mut frame, "kw" => kw);
 
         let v = unsafe {
             Module::main(global)
@@ -845,7 +845,7 @@ impl AsyncTask for BorrowArrayData {
     ) -> JlrsResult<Self::Output> {
         let mut data = vec![2.0f64];
         let borrowed = &mut data;
-        let (output, frame) = frame.split()?;
+        let (output, frame) = frame.split();
         let v = unsafe {
             frame
                 .relaxed_async_scope(|mut frame| async move {
@@ -856,7 +856,7 @@ impl AsyncTask for BorrowArrayData {
                 .into_jlrs_result()?
         };
 
-        let data2 = v.inline_data::<f64, _>(frame)?;
+        let data2 = unsafe { v.inline_data::<f64>()? };
         // Uncommenting next line must be compile error
         // let _ = data[0];
         let v = data2[0];

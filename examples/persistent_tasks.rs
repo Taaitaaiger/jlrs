@@ -42,7 +42,7 @@ impl PersistentTask for AccumulatorTask {
         mut frame: AsyncGcFrame<'frame>,
     ) -> JlrsResult<()> {
         unsafe {
-            Value::eval_string(&mut frame, "mutable struct MutFloat64 v::Float64 end")?
+            Value::eval_string(&mut frame, "mutable struct MutFloat64 v::Float64 end")
                 .into_jlrs_result()?;
         }
         Ok(())
@@ -58,7 +58,7 @@ impl PersistentTask for AccumulatorTask {
         frame: &mut AsyncGcFrame<'static>,
     ) -> JlrsResult<Self::State> {
         unsafe {
-            let output = frame.output()?;
+            let output = frame.output();
             frame
                 .scope(|mut frame| {
                     // A nested scope is used to only root a single value in the frame provided to
@@ -66,9 +66,9 @@ impl PersistentTask for AccumulatorTask {
                     let func = Module::main(global)
                         .global_ref("MutFloat64")?
                         .value_unchecked();
-                    let init_v = Value::new(&mut frame, self.init_value)?;
+                    let init_v = Value::new(&mut frame, self.init_value);
 
-                    func.call1(output, init_v)
+                    Ok(func.call1(output, init_v))
                 })?
                 .into_jlrs_result()
         }
@@ -91,7 +91,7 @@ impl PersistentTask for AccumulatorTask {
             .field("v")?
             .access::<f64>()?
             + input;
-        let new_value = Value::new(&mut frame, value)?;
+        let new_value = Value::new(&mut frame, value);
 
         unsafe {
             state.set_field_unchecked("v", new_value)?;
@@ -114,7 +114,7 @@ fn main() {
     let (julia, handle) = unsafe {
         RuntimeBuilder::new()
             .async_runtime::<Tokio, UnboundedChannel<_>>()
-            .start()
+            .start::<1>()
             .expect("Could not init Julia")
     };
 

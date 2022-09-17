@@ -10,7 +10,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_capacity(1, |_, mut frame| {
+            jlrs.scope(|_, mut frame| {
                 let array =
                     Array::new::<f32, _, _, _>(&mut frame, &[1, 1, 1, 1, 1, 1, 1, 1, 1][..]);
                 assert!(array.is_ok());
@@ -25,7 +25,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_capacity(1, |_, mut frame| {
+            jlrs.scope(|_, mut frame| {
                 let array =
                     Array::from_vec(&mut frame, vec![1u64], &[1, 1, 1, 1, 1, 1, 1, 1, 1][..]);
                 assert!(array.is_ok());
@@ -40,7 +40,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_capacity(1, |_, mut frame| {
+            jlrs.scope(|_, mut frame| {
                 let mut data = vec![1u32];
                 let array = {
                     Array::from_slice(&mut frame, &mut data, &[1, 1, 1, 1, 1, 1, 1, 1, 1][..])?

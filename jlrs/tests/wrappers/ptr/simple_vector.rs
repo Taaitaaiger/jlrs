@@ -17,8 +17,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
             jlrs.scope(|_, mut frame| {
                 let svec = SimpleVector::with_capacity(&mut frame, 1);
-                assert!(svec.is_ok());
-                assert!(svec.unwrap().as_value().is::<SimpleVector>());
+                assert!(svec.as_value().is::<SimpleVector>());
                 Ok(())
             })
             .unwrap();
@@ -30,7 +29,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
             jlrs.scope(|_, mut frame| {
-                let svec = SimpleVector::with_capacity(&mut frame, 1)?;
+                let svec = SimpleVector::with_capacity(&mut frame, 1);
 
                 unsafe {
                     assert!(svec.unrestricted_typed_data::<SymbolRef>().is_ok());
@@ -46,8 +45,8 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
             jlrs.scope(|_, mut frame| {
-                let svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 1)? };
-                let value = Value::new(&mut frame, 1usize)?;
+                let svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 1) };
+                let value = Value::new(&mut frame, 1usize);
                 let mut data = svec.data(&mut frame);
 
                 unsafe {
@@ -64,8 +63,8 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
             jlrs.scope(|_, mut frame| {
-                let svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 1)? };
-                let value = Value::new(&mut frame, 1usize)?;
+                let svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 1) };
+                let value = Value::new(&mut frame, 1usize);
 
                 unsafe {
                     let mut data = svec.unrestricted_data();
@@ -82,7 +81,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
             jlrs.scope(|global, mut frame| {
-                let svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 1)? };
+                let svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 1) };
                 let sym = Symbol::new(global, "Foo");
                 let mut data = svec.data(&mut frame);
 
@@ -116,8 +115,8 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
             jlrs.scope(|_, mut frame| {
-                let svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 1)? };
-                let value = Value::new(&mut frame, 1usize)?;
+                let svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 1) };
+                let value = Value::new(&mut frame, 1usize);
                 let mut data = svec.data(&mut frame);
 
                 unsafe {
@@ -134,8 +133,8 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
             jlrs.scope(|_, mut frame| {
-                let svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 1)? };
-                let value = Value::new(&mut frame, 1usize)?;
+                let svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 1) };
+                let value = Value::new(&mut frame, 1usize);
 
                 unsafe {
                     let mut data = svec.unrestricted_data();
@@ -152,10 +151,10 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
             jlrs.scope(|_, mut frame| {
-                let output = frame.output()?;
+                let output = frame.output();
                 frame
                     .scope(|mut frame| {
-                        let svec = SimpleVector::with_capacity(&mut frame, 0)?.clone();
+                        let svec = SimpleVector::with_capacity(&mut frame, 0).clone();
                         Ok(svec.root(output))
                     })
                     .unwrap();
@@ -171,7 +170,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
             jlrs.scope(|global, mut frame| {
-                let svec = SimpleVector::with_capacity(&mut frame, 0)?;
+                let svec = SimpleVector::with_capacity(&mut frame, 0);
                 assert_eq!(svec.as_value(), SimpleVector::emptysvec(global));
 
                 Ok(())

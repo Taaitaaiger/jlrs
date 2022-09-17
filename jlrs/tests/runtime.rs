@@ -2,7 +2,7 @@ mod util;
 #[cfg(feature = "sync-rt")]
 mod tests {
     use super::util::JULIA;
-    use jlrs::prelude::*;
+    use jlrs::{prelude::*, memory::context::ContextFrame};
 
     #[test]
     fn error_include_nonexistent() {
@@ -14,7 +14,11 @@ mod tests {
 
     #[test]
     fn cannot_init_again() {
-        JULIA.with(|_j| unsafe { assert!(RuntimeBuilder::new().start().is_err()) });
+        JULIA.with(|_j| unsafe { 
+            let base = ContextFrame::new();
+            assert!(RuntimeBuilder::new().start(&base).is_err()) 
+        
+        });
     }
 
     #[test]

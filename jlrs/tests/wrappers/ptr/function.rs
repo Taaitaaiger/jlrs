@@ -8,7 +8,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
             jlrs.scope(|_, mut frame| {
-                let output = frame.output()?;
+                let output = frame.output();
 
                 frame
                     .scope(|mut frame| {

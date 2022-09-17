@@ -12,38 +12,29 @@
 //! [`CallAsync`]: crate::call::CallAsync
 //! [`memory`]: crate::memory
 
-use self::private::FrameOwner;
 use crate::{
-    error::JlrsResult,
-    memory::{
-        mode::Mode,
-        output::Output,
-        reusable_slot::ReusableSlot,
-        stack_page::{Slot, StackPage},
-    },
-    private::Private,
+    error::{AllocError, JlrsResult},
+    memory::{output::Output, reusable_slot::ReusableSlot},
 };
 use jl_sys::jl_value_t;
-use std::ptr::NonNull;
+use std::{
+    cell::RefCell,
+    ops::{Deref, DerefMut},
+    ptr::NonNull,
+};
 
-pub(crate) const MIN_FRAME_CAPACITY: usize = 16;
+use super::{context::Stack, ledger::Ledger};
 
-pub(crate) struct FrameSlice<'frame> {
-    raw_frame: &'frame [Slot],
-    size: usize,
+pub trait Frame<'scope> {
+    /// Create a new scope and call func with that scope's frame.
+    fn scope<T, F>(&mut self, func: F) -> JlrsResult<T>
+    where
+        for<'inner> F: FnOnce(GcFrame<'inner>) -> JlrsResult<T>;
+
+    fn ledger(&self) -> &'scope RefCell<Ledger>;
 }
 
-impl<'frame> FrameSlice<'frame> {
-    // Safety: The slots must have been reserved in an existing frame and must have been set to
-    // null.
-    pub(crate) unsafe fn new(slots: &'frame [Slot]) -> Self {
-        FrameSlice {
-            raw_frame: slots,
-            size: 0,
-        }
-    }
-}
-
+/*
 /// A frame that can be used to root Julia data.
 ///
 /// Frames created with a capacity can store at least that number of roots. A frame's capacity is
@@ -86,32 +77,198 @@ impl<'frame, M: Mode> GcFrame<'frame, M> {
         self.set_n_roots(n_roots + 1);
     }
 }
+*/
+
+pub(crate) struct FrameOwner<'scope> {
+    context: &'scope Stack,
+    ledger: &'scope RefCell<Ledger>,
+    offset: usize,
+    _marker: PhantomData<&'scope mut &'scope ()>,
+}
+
+impl FrameOwner<'_> {
+    pub fn n_roots(&self) -> usize {
+        self.context.size() - self.offset
+    }
+}
+
+#[cfg(feature = "async")]
+impl<'scope> FrameOwner<'scope> {
+    // Safety: only one `AsyncGcFrame` must exist at a time
+    pub(crate) unsafe fn reconstruct(&self) -> AsyncGcFrame<'scope> {
+        AsyncGcFrame {
+            frame: GcFrame {
+                context: self.context,
+                ledger: self.ledger,
+                offset: self.offset,
+                _marker: PhantomData,
+            },
+        }
+    }
+    // Safety: only one `AsyncGcFrame` must exist at a time
+    pub(crate) unsafe fn set_offset(&mut self, offset: usize) {
+        self.offset = offset
+    }
+}
+
+impl Drop for FrameOwner<'_> {
+    fn drop(&mut self) {
+        let n_roots = self.n_roots();
+        unsafe { self.context.pop_roots(n_roots) }
+    }
+}
+
+pub struct GcFrame<'scope> {
+    context: &'scope Stack,
+    pub(crate) ledger: &'scope RefCell<Ledger>,
+    offset: usize,
+    _marker: PhantomData<&'scope mut &'scope ()>,
+}
+
+impl<'scope> GcFrame<'scope> {
+    pub fn n_roots(&self) -> usize {
+        self.context.size() - self.offset
+    }
+
+    /// Convert the frame to a scope.
+    ///
+    /// This method takes a mutable reference to a frame and returns it, it can be used as an
+    /// alternative to borrowing a frame with when a [`Scope`] or [`PartialScope`] is needed.
+    ///
+    /// [`Scope`]: crate::memory::scope::Scope
+    /// [`PartialScope`]: crate::memory::scope::PartialScope
+    pub fn as_scope(&mut self) -> &mut Self {
+        self
+    }
+
+    /// Reserve a new output in the current frame.
+    pub fn output(&mut self) -> Output<'scope> {
+        unsafe {
+            let offset = self.reserve_slot();
+            Output::new(self.context, self.ledger, offset)
+        }
+    }
+
+    /// Reserve a new reusable slot in the current frame.
+    ///
+    /// Returns an error if the frame is full.
+    pub fn reusable_slot(&mut self) -> ReusableSlot<'scope> {
+        unsafe {
+            let offset = self.reserve_slot();
+            ReusableSlot::new(self.context, offset)
+        }
+    }
+
+    // Safety: frames must form a single nested hierarchy. A new frame owner must only be created
+    // when entering a new scope.
+    pub(crate) fn new<'nested>(&'nested mut self) -> (GcFrame<'nested>, FrameOwner<'nested>) {
+        let context = self.context;
+        let offset = context.size();
+
+        (
+            GcFrame {
+                context,
+                ledger: self.ledger,
+                offset,
+                _marker: PhantomData,
+            },
+            FrameOwner {
+                context,
+                ledger: self.ledger,
+                offset,
+                _marker: PhantomData,
+            },
+        )
+    }
+
+    // Safety: frames must form a single nested hierarchy. A new frame owner must only be created
+    // when entering a new scope.
+    pub(crate) unsafe fn base(
+        context: &'scope Stack,
+        ledger: &'scope RefCell<Ledger>,
+    ) -> (Self, FrameOwner<'scope>) {
+        (
+            GcFrame {
+                context,
+                ledger,
+                offset: 0,
+                _marker: PhantomData,
+            },
+            FrameOwner {
+                context,
+                ledger,
+                offset: 0,
+                _marker: PhantomData,
+            },
+        )
+    }
+
+    // Safety: capacity > n_roots, value must point to valid Julia data
+    pub(crate) unsafe fn push_root(&self, value: NonNull<jl_value_t>) {
+        self.context.push_root(value);
+    }
+
+    // safety: this slot must only be used while the frame exists.
+    pub(crate) unsafe fn reserve_slot(&mut self) -> usize {
+        self.context.reserve()
+    }
+}
+
+impl<'scope> Frame<'scope> for GcFrame<'scope> {
+    #[inline(never)]
+    fn scope<T, F>(&mut self, func: F) -> JlrsResult<T>
+    where
+        for<'inner> F: FnOnce(GcFrame<'inner>) -> JlrsResult<T>,
+    {
+        let (nested, owner) = self.new();
+        let ret = func(nested);
+        std::mem::drop(owner);
+        ret
+    }
+
+    fn ledger(&self) -> &'scope RefCell<Ledger> {
+        self.ledger
+    }
+}
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "ccall")] {
-        use crate::{ccall::CCall, error::AllocError};
+        use crate::{ccall::CCall};
         use std::marker::PhantomData;
 
         /// A frame that can't store any roots or be nested.
         ///
         /// A `NullFrame` can be used if you call Rust from Julia through `ccall` and want to
         /// borrow array data but not perform any allocations.
-        pub struct NullFrame<'frame>(PhantomData<&'frame ()>);
+        pub struct NullFrame<'frame>(&'frame RefCell<Ledger>);
 
         impl<'frame> NullFrame<'frame> {
             // Safety: frames must form a single nested hierarchy.
-            pub(crate) unsafe fn new(_: &'frame CCall) -> Self {
-                NullFrame(PhantomData)
+            pub(crate) unsafe fn new(ccall: &'frame CCall) -> Self {
+                NullFrame(&ccall.ledger)
+            }
+        }
+
+        impl<'scope> Frame<'scope> for NullFrame<'scope> {
+            fn scope<T, F>(&mut self, _: F) -> JlrsResult<T>
+                where
+                    for<'inner> F: FnOnce(GcFrame<'inner>) -> JlrsResult<T> {
+                Err(AllocError::NullFrame)?
+            }
+
+            fn ledger(&self) -> &'scope RefCell<Ledger> {
+                self.0
             }
         }
     }
+
 }
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "async")] {
-        use super::mode::Async;
         use std::future::Future;
 
+        /*
         /// A frame that can be used to root Julia data and call async methods.
         ///
         /// Frames created with a capacity can store at least that number of roots. A frame's
@@ -122,7 +279,17 @@ cfg_if::cfg_if! {
             mode: Async<'frame>,
             _marker: PhantomData<&'frame mut &'frame ()>
         }
+         */
 
+        /// A frame that can be used to root Julia data and call async methods.
+        ///
+        /// Frames created with a capacity can store at least that number of roots. A frame's
+        /// capacity is at least 16.
+        pub struct AsyncGcFrame<'scope> {
+            pub(crate) frame: GcFrame<'scope>
+        }
+
+        /*
         impl<'frame> AsyncGcFrame<'frame> {
             /// An async version of [`Frame::scope`].
             ///
@@ -269,7 +436,97 @@ cfg_if::cfg_if! {
                 self.set_n_roots(n_roots + 1);
             }
         }
+        */
+        impl<'scope> AsyncGcFrame<'scope> {
+            /// An async version of [`Frame::scope`].
+            ///
+            /// The closure `func` must return an async block. Note that the returned value is
+            /// required to live at least as long the current frame.
+            #[inline(never)]
+            pub async fn async_scope<'nested, T, F, G>(&'nested mut self, func: F) -> JlrsResult<T>
+            where
+                T: 'scope,
+                G: Future<Output = JlrsResult<T>>,
+                F:  FnOnce(AsyncGcFrame<'nested>) -> G,
+            {
+                // Safety: the lifetime of the borrow is extended, but it's valid during the call
+                // to func and data returned from func must live longer.
+                let (nested, owner) = self.new_async();
+                let ret =  func(nested).await;
+                std::mem::drop(owner);
+                ret
+            }
 
+            /// `AsyncFrame::async_scope` with less strict lifeitme bounds on the return value.
+            ///
+            /// Safety: because this method only requires that the returned data lives at least as
+            /// long as the borow of `self`, it's possible to return data rooted in that scope.
+            #[inline(never)]
+            pub async unsafe fn relaxed_async_scope<'nested, T, F, G>(&'nested mut self, func: F) -> JlrsResult<T>
+            where
+                T: 'nested,
+                G: Future<Output = JlrsResult<T>>,
+                F: FnOnce(AsyncGcFrame<'nested>) -> G,
+            {
+                let (nested, owner) = self.new_async();
+                let ret =  func(nested).await;
+                std::mem::drop(owner);
+                ret
+            }
+
+            // Safety: frames must form a single nested hierarchy. A new frame owner must only be created
+            // when entering a new scope.
+            pub(crate) fn new_async<'nested>(&'nested mut self) -> (AsyncGcFrame<'nested>, FrameOwner<'nested>) {
+                let (frame, owner) = self.frame.new();
+
+                (
+                    AsyncGcFrame { frame },
+                    owner,
+                )
+            }
+
+            // Safety: frames must form a single nested hierarchy. A new frame owner must only be created
+            // when entering a new scope.
+            pub(crate) unsafe fn base_async(context: &'scope Stack, ledger: &'scope RefCell<Ledger>) -> (Self, FrameOwner<'scope>) {
+                let (frame, owner) = GcFrame::base(context, ledger);
+                (
+                    AsyncGcFrame { frame },
+                    owner,
+                )
+            }
+        }
+
+        impl<'scope> Deref for AsyncGcFrame<'scope> {
+            type Target = GcFrame<'scope>;
+            fn deref(&self) -> &Self::Target {
+                &self.frame
+            }
+        }
+
+        impl<'scope> DerefMut for AsyncGcFrame<'scope> {
+            fn deref_mut(&mut self) -> &mut Self::Target {
+                &mut self.frame
+            }
+        }
+
+        impl<'scope> Frame<'scope> for AsyncGcFrame<'scope> {
+            #[inline(never)]
+            fn scope<T, F>(&mut self, func: F) -> JlrsResult<T>
+            where
+                for<'inner> F: FnOnce(GcFrame<'inner>) -> JlrsResult<T>,
+            {
+                let (nested, owner) = self.new();
+                let ret = func(nested);
+                std::mem::drop(owner);
+                ret
+            }
+
+            fn ledger(&self) -> &'scope RefCell<Ledger> {
+                self.frame.ledger
+            }
+        }
+
+        /*
         impl<'frame> Frame<'frame> for AsyncGcFrame<'frame> {
             fn reusable_slot(&mut self) -> JlrsResult<ReusableSlot<'frame>> {
                 // Safety: the slot can only be used while the frame exists.
@@ -295,9 +552,11 @@ cfg_if::cfg_if! {
                 }
             }
         }
+        */
     }
 }
 
+/*
 /// Functionality shared by the different frame types.
 pub trait Frame<'frame>: private::FramePriv<'frame> {
     /// Convert the frame to a scope.
@@ -432,24 +691,9 @@ impl<'frame> Frame<'frame> for NullFrame<'frame> {
         Err(AllocError::NullFrame)?
     }
 }
-
+ */
 pub(crate) mod private {
-    use crate::{
-        error::{AllocError, JlrsResult},
-        memory::{
-            frame::{Frame, GcFrame, MIN_FRAME_CAPACITY},
-            mode::Mode,
-            stack_page::{Slot, StackPage},
-        },
-        private::Private,
-        wrappers::ptr::private::WrapperPriv,
-    };
-    #[cfg(feature = "async")]
-    use std::marker::PhantomData;
-    use std::ptr::{null_mut, NonNull};
-
-    use super::FrameSlice;
-
+    /*
     pub struct FrameOwner<'frame, M: Mode> {
         mode: M,
         raw_frame: &'frame [Slot],
@@ -510,7 +754,9 @@ pub(crate) mod private {
             FrameOwner<'nested, Self::Mode>,
         );
     }
+    */
 
+    /*
     impl<'frame, M: Mode> FramePriv<'frame> for GcFrame<'frame, M> {
         type Mode = M;
 
@@ -754,9 +1000,10 @@ pub(crate) mod private {
                 }
             }
         }
-    }
+    } */
 }
 
+/*
 #[cfg(test)]
 #[cfg(feature = "sync-rt")]
 mod tests {
@@ -780,7 +1027,7 @@ mod tests {
 
     #[test]
     fn create_base_frame() {
-        util::JULIA.with(|julia| unsafe {
+        util::test::JULIA.with(|julia| unsafe {
             let julia = julia.borrow_mut();
             let page = julia.get_page();
             let page_size = page.size();
@@ -793,7 +1040,7 @@ mod tests {
 
     #[test]
     fn push_root() {
-        util::JULIA.with(|julia| unsafe {
+        util::test::JULIA.with(|julia| unsafe {
             let julia = julia.borrow_mut();
             let page = julia.get_page();
             let page_size = page.size();
@@ -807,7 +1054,7 @@ mod tests {
 
     #[test]
     fn push_too_many_roots() {
-        util::JULIA.with(|julia| unsafe {
+        util::test::JULIA.with(|julia| unsafe {
             let julia = julia.borrow_mut();
             let page = julia.get_page();
             let page_size = page.size();
@@ -825,7 +1072,7 @@ mod tests {
 
     #[test]
     fn push_new_frame() {
-        util::JULIA.with(|julia| unsafe {
+        util::test::JULIA.with(|julia| unsafe {
             let julia = julia.borrow_mut();
             let page = julia.get_page();
             let page_size = page.size();
@@ -841,7 +1088,7 @@ mod tests {
 
     #[test]
     fn push_large_new_frame() {
-        util::JULIA.with(|julia| unsafe {
+        util::test::JULIA.with(|julia| unsafe {
             let julia = julia.borrow_mut();
             let page = julia.get_page();
             let page_size = page.size();
@@ -859,7 +1106,7 @@ mod tests {
 
     #[test]
     fn reuse_large_page() {
-        util::JULIA.with(|julia| unsafe {
+        util::test::JULIA.with(|julia| unsafe {
             let julia = julia.borrow_mut();
             let page = julia.get_page();
             let page_size = page.size();
@@ -879,3 +1126,4 @@ mod tests {
         })
     }
 }
+ */

@@ -35,7 +35,7 @@ macro_rules! impl_root {
             {
                 if let Some(v) = Self::wrapper(value, Private) {
                     let ptr = v.unwrap_non_null(Private);
-                    scope.value(ptr, Private)
+                    Ok(scope.value(ptr, Private))
                 } else {
                     Err($crate::error::AccessError::UndefRef)?
                 }
@@ -58,7 +58,7 @@ macro_rules! impl_root {
                     <Self as $crate::wrappers::ptr::private::WrapperPriv>::wrapper(value, Private)
                 {
                     let ptr = v.unwrap_non_null(Private);
-                    scope.value(ptr, Private)
+                    Ok(scope.value(ptr, Private))
                 } else {
                     Err($crate::error::AccessError::UndefRef)?
                 }

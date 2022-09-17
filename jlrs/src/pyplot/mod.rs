@@ -10,7 +10,7 @@ use crate::{
     call::{Call, ProvideKeywords},
     convert::into_jlrs_result::IntoJlrsResult,
     error::JlrsResult,
-    memory::{frame::Frame, global::Global, scope::PartialScope},
+    memory::{frame::{Frame, GcFrame}, global::Global, scope::PartialScope},
     wrappers::ptr::{
         function::Function,
         module::Module,
@@ -33,28 +33,27 @@ pub struct PyPlot<'scope>(Value<'scope, 'static>);
 
 impl<'scope> PyPlot<'scope> {
     /// This metod must be called exactly once before this module can be used.
-    pub fn init<'frame, F: Frame<'frame>>(frame: &mut F) {
-        let global = frame.global();
+    pub fn init<'frame>(frame: &mut GcFrame<'frame>) {
+        let global = frame.as_scope().global();
         if Module::main(global).submodule_ref("JlrsPyPlot").is_ok() {
             return;
         }
-        unsafe { init_jlrs_py_plot(frame) };
+        unsafe { init_jlrs_py_plot(frame.as_scope()) };
     }
 
     /// Create a new plotting window by calling `plotfn(args...)`. The window stays open until it
     /// has been closed, even if all handles have been dropped. `plot_fn` must be a plotting
     /// function from the Plots.jl package, such as `plot` or `hexbin`. The resources associated
     /// with the window are only cleaned up if one of the `PyPlot::wait` methods is called.
-    pub unsafe fn new<'value, V, F>(
-        frame: &mut F,
+    pub unsafe fn new<'value, V>(
+        frame: &mut GcFrame<'scope>,
         plot_fn: Function<'_, 'static>,
         args: V,
     ) -> JlrsResult<Self>
     where
         V: AsRef<[Value<'value, 'static>]>,
-        F: Frame<'scope>,
     {
-        let global = frame.global();
+        let global = frame.as_scope().global();
         let args = args.as_ref();
         let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(1 + args.len());
         vals.push(plot_fn.as_value());
@@ -70,7 +69,7 @@ impl<'scope> PyPlot<'scope> {
             .function_ref("jlrsplot")
             .unwrap()
             .wrapper_unchecked()
-            .call(frame, vals)?
+            .call(frame.as_scope(), vals)
             .into_jlrs_result()?;
 
         Ok(PyPlot(plt))
@@ -81,17 +80,16 @@ impl<'scope> PyPlot<'scope> {
     /// plotting function from the Plots.jl package, such as `plot` or `hexbin`. The resources
     /// associated  with the window are only cleaned up if one of the `PyPlot::wait` methods is
     /// called.
-    pub unsafe fn new_with_keywords<'value, V, F>(
-        frame: &mut F,
+    pub unsafe fn new_with_keywords<'value, V>(
+        frame: &mut GcFrame<'scope>,
         plot_fn: Function<'_, 'static>,
         args: V,
         keywords: Value<'_, 'static>,
     ) -> JlrsResult<Self>
     where
         V: AsRef<[Value<'value, 'static>]>,
-        F: Frame<'scope>,
     {
-        let global = frame.global();
+        let global = frame.as_scope().global();
         let args = args.as_ref();
         let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(1 + args.len());
         vals.push(plot_fn.as_value());
@@ -108,7 +106,7 @@ impl<'scope> PyPlot<'scope> {
             .unwrap()
             .wrapper_unchecked()
             .provide_keywords(keywords)?
-            .call(frame, vals)?
+            .call(frame.as_scope(), vals)
             .into_jlrs_result()?;
 
         Ok(PyPlot(plt))
@@ -118,17 +116,16 @@ impl<'scope> PyPlot<'scope> {
     /// `plotfn(<plot associated with self>, args...)`. If the window has already been closed an
     /// error is returned. Note that if multiple plotting windows are currently open, only the
     /// most recently created one is redrawn automatically.
-    pub unsafe fn update<'value, 'frame, V, F>(
+    pub unsafe fn update<'value, 'frame, V>(
         self,
-        frame: &mut F,
+        frame: &mut GcFrame<'scope>,
         plot_fn: Function<'_, 'static>,
         args: V,
     ) -> JlrsResult<isize>
     where
         V: AsRef<[Value<'value, 'static>]>,
-        F: Frame<'frame>,
     {
-        let global = frame.global();
+        let global = frame.as_scope().global();
 
         let args = args.as_ref();
         let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + args.len());
@@ -146,7 +143,7 @@ impl<'scope> PyPlot<'scope> {
             .function_ref("updateplot!")
             .unwrap()
             .wrapper_unchecked()
-            .call(frame, vals)?
+            .call(frame.as_scope(), vals)
             .into_jlrs_result()?
             .unbox::<isize>()
     }
@@ -155,18 +152,17 @@ impl<'scope> PyPlot<'scope> {
     /// `plotfn(<plot associated with self>, args...; kwargs...)`. If the window has already been
     /// closed an error is returned. Note that if multiple plotting windows are currently open,
     /// only the most recently created one is redrawn automatically.
-    pub unsafe fn update_with_keywords<'value, 'frame, V, F>(
+    pub unsafe fn update_with_keywords<'value, 'frame, V>(
         self,
-        frame: &mut F,
+        frame: &mut GcFrame<'scope>,
         plot_fn: Function<'_, 'static>,
         args: V,
         keywords: Value<'_, 'static>,
     ) -> JlrsResult<isize>
     where
         V: AsRef<[Value<'value, 'static>]>,
-        F: Frame<'frame>,
     {
-        let global = frame.global();
+        let global = frame.as_scope().global();
 
         let args = args.as_ref();
         let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + args.len());
@@ -185,20 +181,21 @@ impl<'scope> PyPlot<'scope> {
             .unwrap()
             .wrapper_unchecked()
             .provide_keywords(keywords)?
-            .call(frame, vals)?
+            .call(frame.as_scope(), vals)
             .into_jlrs_result()?
             .unbox::<isize>()
     }
 
     /// Wait until the window associated with `self` has been closed.
-    pub fn wait<'frame, F: Frame<'frame>>(self, frame: &mut F) -> JlrsResult<()> {
+    pub fn wait<'frame>(self, 
+        frame: &mut GcFrame<'scope>,) -> JlrsResult<()> {
         unsafe {
-            let global = frame.global();
+            let global = frame.as_scope().global();
 
             Module::base(global)
                 .function_ref("wait")?
                 .wrapper_unchecked()
-                .call1(frame, self.0)?
+                .call1(frame.as_scope(), self.0)
                 .into_jlrs_result()?;
 
             Ok(())
@@ -209,14 +206,14 @@ impl<'scope> PyPlot<'scope> {
     /// created. Because all versions are protected from garbage collection until [`PyPlot::wait`]
     /// has returned, it's possible to change the pending version which will be used as the base
     /// plot when [`PyPlot::update`] is called.
-    pub fn set_pending_version<'frame, F: Frame<'frame>>(
+    pub fn set_pending_version<'frame>(
         self,
-        frame: &mut F,
+        frame: &mut GcFrame<'frame>,
         version: isize,
     ) -> JlrsResult<()> {
         frame.scope(|mut frame| unsafe {
             let global = frame.as_scope().global();
-            let version = Value::new(&mut frame, version)?;
+            let version = Value::new(&mut frame, version);
 
             Module::main(global)
                 .submodule_ref("JlrsPyPlot")
@@ -225,7 +222,7 @@ impl<'scope> PyPlot<'scope> {
                 .function_ref("setversion")
                 .unwrap()
                 .wrapper_unchecked()
-                .call1(&mut frame, version)?
+                .call1(&mut frame, version)
                 .into_jlrs_result()?;
 
             Ok(())

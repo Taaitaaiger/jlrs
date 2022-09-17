@@ -9,7 +9,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_capacity(1, |global, mut frame| {
+            jlrs.scope(|global, mut frame| {
                 let union_ty = DataType::uniontype_type(global)
                     .as_value()
                     .apply_type(
@@ -18,23 +18,18 @@ mod tests {
                             DataType::bool_type(global).as_value(),
                             DataType::nothing_type(global).as_value(),
                         ],
-                    )?
+                    )
                     .into_jlrs_result()?;
 
-                let arr = Array::new_for(&mut frame, 4, union_ty)?.into_jlrs_result()?;
+                let mut arr = Array::new_for(&mut frame, 4, union_ty).into_jlrs_result()?;
 
                 {
-                    let data = arr.union_data(&frame)?;
+                    let data = unsafe { arr.union_data()? };
                     assert_eq!(unsafe { data.dimensions().as_slice() }, &[4]);
                 }
 
                 unsafe {
-                    let data = arr.union_data_mut(&mut frame)?;
-                    assert_eq!(data.dimensions().as_slice(), &[4]);
-                }
-
-                unsafe {
-                    let data = arr.unrestricted_union_data_mut(&frame)?;
+                    let data = unsafe { arr.union_data_mut()? };
                     assert_eq!(data.dimensions().as_slice(), &[4]);
                 }
 
@@ -49,7 +44,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_capacity(1, |global, mut frame| unsafe {
+            jlrs.scope(|global, mut frame| unsafe {
                 let union_ty = DataType::uniontype_type(global)
                     .as_value()
                     .apply_type(
@@ -58,13 +53,13 @@ mod tests {
                             DataType::bool_type(global).as_value(),
                             DataType::nothing_type(global).as_value(),
                         ],
-                    )?
+                    )
                     .into_jlrs_result()?;
 
-                let arr = Array::new_for(&mut frame, 4, union_ty)?.into_jlrs_result()?;
+                let mut arr = Array::new_for(&mut frame, 4, union_ty).into_jlrs_result()?;
 
                 {
-                    let mut data = arr.union_data_mut(&mut frame)?;
+                    let mut data = unsafe { arr.union_data_mut()? };
                     assert!(data.contains(DataType::bool_type(global)));
                     data.set(0, DataType::bool_type(global), false)?;
                     assert_eq!(
@@ -75,24 +70,13 @@ mod tests {
                 }
 
                 {
-                    let data = arr.union_data(&frame)?;
+                    let data = unsafe { arr.union_data()? };
                     assert!(data.contains(DataType::bool_type(global)));
                     assert_eq!(
                         data.element_type(0)?.unwrap(),
                         DataType::bool_type(global).as_value()
                     );
                     assert_eq!(data.get::<bool, _>(0)?, false);
-                }
-
-                {
-                    let mut data = arr.unrestricted_union_data_mut(&frame)?;
-                    assert!(data.contains(DataType::bool_type(global)));
-                    data.set(0, DataType::bool_type(global), true)?;
-                    assert_eq!(
-                        data.element_type(0)?.unwrap(),
-                        DataType::bool_type(global).as_value()
-                    );
-                    assert_eq!(data.get::<bool, _>(0)?, true);
                 }
 
                 Ok(())
@@ -106,7 +90,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_capacity(1, |global, mut frame| unsafe {
+            jlrs.scope(|global, mut frame| unsafe {
                 let union_ty = DataType::uniontype_type(global)
                     .as_value()
                     .apply_type(
@@ -115,26 +99,20 @@ mod tests {
                             DataType::bool_type(global).as_value(),
                             DataType::int32_type(global).as_value(),
                         ],
-                    )?
+                    )
                     .into_jlrs_result()?;
 
-                let arr = Array::new_for(&mut frame, 4, union_ty)?.into_jlrs_result()?;
+                let mut arr = Array::new_for(&mut frame, 4, union_ty).into_jlrs_result()?;
 
                 {
-                    let mut data = arr.union_data_mut(&mut frame)?;
+                    let mut data = unsafe { arr.union_data_mut()? };
                     data.set(0, DataType::bool_type(global), false)?;
                     assert!(data.get::<i64, _>(0).is_err());
                     assert!(data.get::<i32, _>(0).is_err());
                 }
 
                 {
-                    let data = arr.union_data(&frame)?;
-                    assert!(data.get::<i64, _>(0).is_err());
-                    assert!(data.get::<i32, _>(0).is_err());
-                }
-
-                {
-                    let data = arr.unrestricted_union_data_mut(&frame)?;
+                    let data = unsafe { arr.union_data()? };
                     assert!(data.get::<i64, _>(0).is_err());
                     assert!(data.get::<i32, _>(0).is_err());
                 }
@@ -150,7 +128,7 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_capacity(1, |global, mut frame| {
+            jlrs.scope(|global, mut frame| {
                 let union_ty = DataType::uniontype_type(global)
                     .as_value()
                     .apply_type(
@@ -159,20 +137,13 @@ mod tests {
                             DataType::bool_type(global).as_value(),
                             DataType::int32_type(global).as_value(),
                         ],
-                    )?
+                    )
                     .into_jlrs_result()?;
 
-                let arr = Array::new_for(&mut frame, 4, union_ty)?.into_jlrs_result()?;
+                let mut arr = Array::new_for(&mut frame, 4, union_ty).into_jlrs_result()?;
 
                 unsafe {
-                    let mut data = arr.union_data_mut(&mut frame)?;
-                    assert!(data.set(0, DataType::bool_type(global), 4usize).is_err());
-                    assert!(data.set(0, DataType::int32_type(global), false).is_err());
-                    assert!(data.set(0, DataType::int64_type(global), 1i64).is_err());
-                }
-
-                unsafe {
-                    let mut data = arr.unrestricted_union_data_mut(&frame)?;
+                    let mut data = unsafe { arr.union_data_mut()? };
                     assert!(data.set(0, DataType::bool_type(global), 4usize).is_err());
                     assert!(data.set(0, DataType::int32_type(global), false).is_err());
                     assert!(data.set(0, DataType::int64_type(global), 1i64).is_err());

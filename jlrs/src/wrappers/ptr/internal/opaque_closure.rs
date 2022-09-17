@@ -2,7 +2,7 @@
 
 use crate::{
     call::Call,
-    error::{JlrsResult, JuliaResult, JuliaResultRef},
+    error::{JuliaResult, JuliaResultRef},
     layout::typecheck::Typecheck,
     memory::{global::Global, output::Output, scope::PartialScope},
     private::Private,
@@ -110,7 +110,7 @@ impl<'scope> WrapperPriv<'scope, 'static> for OpaqueClosure<'scope> {
 }
 
 impl<'data> Call<'data> for OpaqueClosure<'_> {
-    unsafe fn call0<'target, S>(self, scope: S) -> JlrsResult<JuliaResult<'target, 'data>>
+    unsafe fn call0<'target, S>(self, scope: S) -> JuliaResult<'target, 'data>
     where
         S: PartialScope<'target>,
     {
@@ -121,7 +121,7 @@ impl<'data> Call<'data> for OpaqueClosure<'_> {
         self,
         scope: S,
         arg0: Value<'_, 'data>,
-    ) -> JlrsResult<JuliaResult<'target, 'data>>
+    ) -> JuliaResult<'target, 'data>
     where
         S: PartialScope<'target>,
     {
@@ -133,7 +133,7 @@ impl<'data> Call<'data> for OpaqueClosure<'_> {
         scope: S,
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
-    ) -> JlrsResult<JuliaResult<'target, 'data>>
+    ) -> JuliaResult<'target, 'data>
     where
         S: PartialScope<'target>,
     {
@@ -146,7 +146,7 @@ impl<'data> Call<'data> for OpaqueClosure<'_> {
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
         arg2: Value<'_, 'data>,
-    ) -> JlrsResult<JuliaResult<'target, 'data>>
+    ) -> JuliaResult<'target, 'data>
     where
         S: PartialScope<'target>,
     {
@@ -157,7 +157,7 @@ impl<'data> Call<'data> for OpaqueClosure<'_> {
         self,
         scope: S,
         args: V,
-    ) -> JlrsResult<JuliaResult<'target, 'data>>
+    ) -> JuliaResult<'target, 'data>
     where
         V: AsRef<[Value<'value, 'data>]>,
         S: PartialScope<'target>,

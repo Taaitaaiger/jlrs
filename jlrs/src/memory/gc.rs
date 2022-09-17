@@ -87,7 +87,7 @@ pub trait Gc: private::GcPriv {
 }
 
 #[cfg(feature = "sync-rt")]
-impl Gc for Julia {}
+impl Gc for Julia<'_> {}
 impl<'frame, T: Frame<'frame>> Gc for T {}
 
 mod private {
@@ -97,5 +97,5 @@ mod private {
     pub trait GcPriv {}
     impl<'frame, F: Frame<'frame>> GcPriv for F {}
     #[cfg(feature = "sync-rt")]
-    impl GcPriv for Julia {}
+    impl GcPriv for Julia<'_> {}
 }

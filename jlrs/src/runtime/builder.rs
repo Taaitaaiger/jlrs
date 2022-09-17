@@ -10,7 +10,10 @@ use crate::error::JlrsResult;
 use std::path::{Path, PathBuf};
 
 #[cfg(feature = "sync-rt")]
-use super::sync_rt::Julia;
+use super::sync_rt::{Julia};
+#[cfg(feature = "sync-rt")]
+use crate::memory::context::ContextFrame;
+
 
 /// Build a sync runtime.
 ///
@@ -38,7 +41,6 @@ cfg_if::cfg_if! {
         {
             pub(crate) builder: RuntimeBuilder,
             pub(crate) n_threads: usize,
-            pub(crate) n_tasks: usize,
             pub(crate) channel_capacity: usize,
             pub(crate) recv_timeout: Duration,
             #[cfg(feature = "nightly")]
@@ -67,14 +69,6 @@ cfg_if::cfg_if! {
             #[cfg(feature = "nightly")]
             pub fn n_interactive_threads(mut self, n: usize) -> Self {
                 self.n_threadsi = n;
-                self
-            }
-
-            /// Set the maximum number of concurrently running tasks.
-            ///
-            /// If it's set to 0, the default value, the number is equal to the number of threads.
-            pub fn n_tasks(mut self, n: usize) -> Self {
-                self.n_tasks = n;
                 self
             }
 
@@ -120,13 +114,13 @@ cfg_if::cfg_if! {
             }
 
             /// Initialize Julia on another thread.
-            pub unsafe fn start(self) -> JlrsResult<(AsyncJulia<R>, std::thread::JoinHandle<JlrsResult<()>>)> {
-                AsyncJulia::init(self)
+            pub unsafe fn start<const N: usize>(self) -> JlrsResult<(AsyncJulia<R>, std::thread::JoinHandle<JlrsResult<()>>)> {
+                AsyncJulia::init::<_, N>(self)
             }
 
             /// Initialize Julia as a blocking task.
-            pub unsafe fn start_async(self) -> JlrsResult<(AsyncJulia<R>, R::RuntimeHandle)> {
-                AsyncJulia::init_async(self)
+            pub unsafe fn start_async<const N: usize>(self) -> JlrsResult<(AsyncJulia<R>, R::RuntimeHandle)> {
+                AsyncJulia::init_async::<_, N>(self)
             }
         }
     }
@@ -140,8 +134,8 @@ impl RuntimeBuilder {
 
     #[cfg(feature = "sync-rt")]
     /// initialize Julia on the current thread.
-    pub unsafe fn start(self) -> JlrsResult<Julia> {
-        Julia::init(self)
+    pub unsafe fn start<'context>(self, base_frame: &'context ContextFrame) -> JlrsResult<Julia> {
+        Julia::init(self, base_frame)
     }
 
     /// Upgrade this builder to an [`AsyncRuntimeBuilder`].
@@ -158,7 +152,7 @@ impl RuntimeBuilder {
     /// # fn main() {
     /// let (_julia, _thread_handle) = unsafe { RuntimeBuilder::new()
     ///     .async_runtime::<Tokio, UnboundedChannel<_>>()
-    ///     .start()
+    ///     .start::<1>()
     ///     .expect("Could not start Julia") };
     /// # }
     /// ```
@@ -171,7 +165,7 @@ impl RuntimeBuilder {
     /// # fn main() {
     /// let (_julia, _thread_handle) = unsafe { RuntimeBuilder::new()
     ///     .async_runtime::<AsyncStd, AsyncStdChannel<_>>()
-    ///     .start()
+    ///     .start::<1>()
     ///     .expect("Could not start Julia") };
     /// # }
     /// ```
@@ -184,7 +178,6 @@ impl RuntimeBuilder {
         AsyncRuntimeBuilder {
             builder: self,
             n_threads: 0,
-            n_tasks: 0,
             channel_capacity: 0,
             recv_timeout: Duration::from_millis(1),
             #[cfg(feature = "nightly")]

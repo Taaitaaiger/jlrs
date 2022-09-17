@@ -18,7 +18,7 @@ mod tests {
                         .value_unchecked()
                 };
 
-                let arg1 = Value::new(&mut frame, 3u32)?;
+                let arg1 = Value::new(&mut frame, 3u32);
                 let instance = ty
                     .cast::<DataType>()?
                     .instantiate(&mut frame, &mut [arg1])?

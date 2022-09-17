@@ -9,7 +9,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.scope(|_global, mut frame| unsafe {
-                Value::eval_string(&mut frame, "1 + 1")?.into_jlrs_result()?;
+                Value::eval_string(&mut frame, "1 + 1").into_jlrs_result()?;
 
                 Ok(())
             })
@@ -23,7 +23,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.scope(|_global, mut frame| unsafe {
-                Value::eval_string(&mut frame, "1 + \"a\"")?.into_jlrs_result()?;
+                Value::eval_string(&mut frame, "1 + \"a\"").into_jlrs_result()?;
 
                 Ok(())
             })

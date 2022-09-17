@@ -10,14 +10,14 @@ mod tests {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope_with_capacity(1, |global, mut frame| unsafe {
+            jlrs.scope(|global, mut frame| unsafe {
                 let func = Module::main(global)
                     .submodule_ref("JlrsTests")?
                     .wrapper_unchecked()
                     .function_ref("throws_exception")?
                     .wrapper_unchecked();
 
-                let res = func.call0(&mut frame)?;
+                let res = func.call0(&mut frame);
                 assert!(res.is_err());
                 Ok(())
             })
@@ -31,8 +31,8 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.scope(|global, mut frame| unsafe {
-                let arg = Value::new(&mut frame, 1usize)?;
-                let kw = named_tuple!(&mut frame, "a" => arg)?;
+                let arg = Value::new(&mut frame, 1usize);
+                let kw = named_tuple!(&mut frame, "a" => arg);
 
                 let func = Module::main(global)
                     .submodule_ref("JlrsTests")?
@@ -41,7 +41,7 @@ mod tests {
                     .wrapper_unchecked()
                     .provide_keywords(kw)?;
 
-                let res = func.call0(&mut frame)?;
+                let res = func.call0(&mut frame);
                 assert!(res.is_err());
                 Ok(())
             })
@@ -55,14 +55,14 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.scope(|global, mut frame| unsafe {
-                let arg = Value::new(&mut frame, 1usize)?;
+                let arg = Value::new(&mut frame, 1usize);
                 let func = Module::main(global)
                     .submodule_ref("JlrsTests")?
                     .wrapper_unchecked()
                     .function_ref("throws_exception")?
                     .wrapper_unchecked();
 
-                let res = func.call1(&mut frame, arg)?;
+                let res = func.call1(&mut frame, arg);
                 assert!(res.is_err());
                 Ok(())
             })
@@ -76,8 +76,8 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.scope(|global, mut frame| unsafe {
-                let arg = Value::new(&mut frame, 1usize)?;
-                let kw = named_tuple!(&mut frame, "a" => arg)?;
+                let arg = Value::new(&mut frame, 1usize);
+                let kw = named_tuple!(&mut frame, "a" => arg);
 
                 let func = Module::main(global)
                     .submodule_ref("JlrsTests")?
@@ -86,7 +86,7 @@ mod tests {
                     .wrapper_unchecked()
                     .provide_keywords(kw)?;
 
-                let res = func.call1(&mut frame, arg)?;
+                let res = func.call1(&mut frame, arg);
                 assert!(res.is_err());
                 Ok(())
             })
@@ -100,14 +100,14 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.scope(|global, mut frame| unsafe {
-                let arg = Value::new(&mut frame, 1usize)?;
+                let arg = Value::new(&mut frame, 1usize);
                 let func = Module::main(global)
                     .submodule_ref("JlrsTests")?
                     .wrapper_unchecked()
                     .function_ref("throws_exception")?
                     .wrapper_unchecked();
 
-                let res = func.call2(&mut frame, arg, arg)?;
+                let res = func.call2(&mut frame, arg, arg);
                 assert!(res.is_err());
                 Ok(())
             })
@@ -121,8 +121,8 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.scope(|global, mut frame| unsafe {
-                let arg = Value::new(&mut frame, 1usize)?;
-                let kw = named_tuple!(&mut frame, "a" => arg)?;
+                let arg = Value::new(&mut frame, 1usize);
+                let kw = named_tuple!(&mut frame, "a" => arg);
 
                 let func = Module::main(global)
                     .submodule_ref("JlrsTests")?
@@ -131,7 +131,7 @@ mod tests {
                     .wrapper_unchecked()
                     .provide_keywords(kw)?;
 
-                let res = func.call2(&mut frame, arg, arg)?;
+                let res = func.call2(&mut frame, arg, arg);
                 assert!(res.is_err());
                 Ok(())
             })
@@ -145,14 +145,14 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.scope(|global, mut frame| unsafe {
-                let arg = Value::new(&mut frame, 1usize)?;
+                let arg = Value::new(&mut frame, 1usize);
                 let func = Module::main(global)
                     .submodule_ref("JlrsTests")?
                     .wrapper_unchecked()
                     .function_ref("throws_exception")?
                     .wrapper_unchecked();
 
-                let res = func.call3(&mut frame, arg, arg, arg)?;
+                let res = func.call3(&mut frame, arg, arg, arg);
                 assert!(res.is_err());
                 Ok(())
             })
@@ -166,8 +166,8 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.scope(|global, mut frame| unsafe {
-                let arg = Value::new(&mut frame, 1usize)?;
-                let kw = named_tuple!(&mut frame, "a" => arg)?;
+                let arg = Value::new(&mut frame, 1usize);
+                let kw = named_tuple!(&mut frame, "a" => arg);
 
                 let func = Module::main(global)
                     .submodule_ref("JlrsTests")?
@@ -176,7 +176,7 @@ mod tests {
                     .wrapper_unchecked()
                     .provide_keywords(kw)?;
 
-                let res = func.call3(&mut frame, arg, arg, arg)?;
+                let res = func.call3(&mut frame, arg, arg, arg);
                 assert!(res.is_err());
                 Ok(())
             })
@@ -196,7 +196,7 @@ mod tests {
                     .function_ref("throws_exception")?
                     .wrapper_unchecked();
 
-                let res = func.call(&mut frame, [])?;
+                let res = func.call(&mut frame, []);
                 assert!(res.is_err());
                 Ok(())
             })
@@ -210,8 +210,8 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.scope(|global, mut frame| unsafe {
-                let arg = Value::new(&mut frame, 1usize)?;
-                let kw = named_tuple!(&mut frame, "a" => arg)?;
+                let arg = Value::new(&mut frame, 1usize);
+                let kw = named_tuple!(&mut frame, "a" => arg);
 
                 let func = Module::main(global)
                     .submodule_ref("JlrsTests")?
@@ -220,7 +220,7 @@ mod tests {
                     .wrapper_unchecked()
                     .provide_keywords(kw)?;
 
-                let res = func.call(&mut frame, [])?;
+                let res = func.call(&mut frame, []);
                 assert!(res.is_err());
                 Ok(())
             })
@@ -234,8 +234,8 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.scope(|_global, mut frame| unsafe {
-                let not_a_func = Value::new(&mut frame, 1usize)?;
-                let res = not_a_func.call0(&mut frame)?;
+                let not_a_func = Value::new(&mut frame, 1usize);
+                let res = not_a_func.call0(&mut frame);
                 assert!(res.is_err());
                 Ok(())
             })
