@@ -1,4 +1,4 @@
-//! Channel traits used to communicate with the async runtime
+//! Channel traits used to communicate with the async runtime.
 //!
 //! In order to communicate with the async runtime you must use channels that implement the traits
 //! defined in this module. Async runtimes and persistent tasks need a backing channel whose
@@ -106,21 +106,13 @@ pub trait ChannelReceiver<M: Send + Sync + 'static>: 'static + Send + Sync {
 /// Every time you send a new async or blocking task to the runtime, or call a persistent task,
 /// you must provide the sending half of a channel that implements this trait. When the task is
 /// done the result is sent to the receiving half.
-#[async_trait]
 pub trait OneshotSender<M: Send + 'static>: 'static + Send + Sync {
-    async fn send(self, msg: M);
-}
-
-#[async_trait::async_trait]
-impl<M: Send + 'static> OneshotSender<M> for Box<dyn OneshotSender<M>> {
-    async fn send(self, msg: M) {
-        self.send(msg).await;
-    }
+    fn send(self, msg: M);
 }
 
 #[async_trait::async_trait]
 impl<M: Send + 'static> OneshotSender<M> for crossbeam_channel::Sender<M> {
-    async fn send(self, msg: M) {
+    fn send(self, msg: M) {
         (&self).send(msg).ok();
     }
 }

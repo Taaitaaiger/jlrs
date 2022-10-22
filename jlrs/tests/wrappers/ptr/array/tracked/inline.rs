@@ -6,9 +6,10 @@ mod tests {
     #[test]
     fn args_test() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|_, mut frame| {
+            jlrs.instance(&mut frame).scope(|mut frame| {
                 let v1 = Value::new(&mut frame, 0usize);
 
                 frame.scope(|mut frame| {

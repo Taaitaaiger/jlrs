@@ -10,12 +10,9 @@
 //! [`Value`]: crate::wrappers::ptr::value::Value
 
 use crate::{
-    memory::global::Global,
+    memory::target::Target,
     private::Private,
-    wrappers::ptr::{
-        datatype::DataType, datatype::DataTypeRef, private::WrapperPriv, union_all::UnionAll,
-        value::Value, value::ValueRef, Wrapper,
-    },
+    wrappers::ptr::{datatype::DataType, private::WrapperPriv, union_all::UnionAll, value::Value},
 };
 use jl_sys::{
     jl_apply_type, jl_bool_type, jl_box_bool, jl_box_char, jl_box_float32, jl_box_float64,
@@ -42,21 +39,32 @@ pub unsafe trait IntoJulia: Sized + 'static {
     ///
     /// The layout of that type and the Rust type must match exactly, and it must be an `isbits`
     /// type, otherwise this trait has been implemented incorrectly.
-    fn julia_type<'scope>(_: Global<'scope>) -> DataTypeRef<'scope>;
+    fn julia_type<'scope, T>(target: T) -> T::Data
+    where
+        T: Target<'scope, 'static, DataType<'scope>>;
 
     #[doc(hidden)]
-    fn into_julia<'scope>(self, global: Global<'scope>) -> ValueRef<'scope, 'static> {
-        // Safety: trait is implemented incorrectly if this is incorrect.
+    fn into_julia<'scope, T>(self, target: T) -> T::Data
+    where
+        T: Target<'scope, 'static>,
+    {
+        // Safety: trait is implemented incorrectly if this is incorrect. A new instance of the
+        // associated
         unsafe {
-            let ty = Self::julia_type(global).wrapper();
+            // TODO: root this data until the data has been instantiated.
+            let ty = Self::julia_type(target.global()).wrapper();
             debug_assert!(ty.is_some());
             let ty = ty.unwrap_unchecked();
             debug_assert!(ty.is_bits());
 
-            let container = jl_new_struct_uninit(ty.unwrap(Private));
-            container.cast::<Self>().write(self);
-
-            ValueRef::wrap(container)
+            let instance = ty.instance();
+            if instance.is_undefined() {
+                let container = jl_new_struct_uninit(ty.unwrap(Private));
+                container.cast::<Self>().write(self);
+                target.data_from_ptr(NonNull::new_unchecked(container), Private)
+            } else {
+                target.data_from_ptr(NonNull::new_unchecked(instance.ptr()), Private)
+            }
         }
     }
 }
@@ -66,18 +74,29 @@ macro_rules! impl_into_julia {
         // Safety: These implemetations use a boxing function provided by Julia
         unsafe impl IntoJulia for $type {
             #[inline(always)]
-            fn julia_type<'scope>(
-                _: Global<'scope>,
-            ) -> $crate::wrappers::ptr::datatype::DataTypeRef<'scope> {
-                unsafe { $crate::wrappers::ptr::datatype::DataTypeRef::wrap($julia_type) }
+            fn julia_type<'scope, T>(target: T) -> T::Data
+            where
+                T: $crate::memory::target::Target<'scope, 'static, DataType<'scope>>,
+            {
+                unsafe {
+                    target.data_from_ptr(
+                        ::std::ptr::NonNull::new_unchecked($julia_type),
+                        $crate::private::Private,
+                    )
+                }
             }
 
             #[inline(always)]
-            fn into_julia<'scope>(
-                self,
-                _: Global<'scope>,
-            ) -> $crate::wrappers::ptr::value::ValueRef<'scope, 'static> {
-                unsafe { $crate::wrappers::ptr::value::ValueRef::wrap($boxer(self as _)) }
+            fn into_julia<'scope, T>(self, target: T) -> T::Data
+            where
+                T: $crate::memory::target::Target<'scope, 'static>,
+            {
+                unsafe {
+                    target.data_from_ptr(
+                        ::std::ptr::NonNull::new_unchecked($boxer(self as _)),
+                        $crate::private::Private,
+                    )
+                }
             }
         }
     };
@@ -110,16 +129,21 @@ impl_into_julia!(isize, jl_box_int32, jl_int32_type);
 impl_into_julia!(isize, jl_box_int64, jl_int64_type);
 
 // Safety: *mut T and Ptr{T} have the same layout
-unsafe impl<T: IntoJulia> IntoJulia for *mut T {
+unsafe impl<U: IntoJulia> IntoJulia for *mut U {
     #[inline]
-    fn julia_type<'scope>(global: Global<'scope>) -> DataTypeRef<'scope> {
-        let ptr_ua = UnionAll::pointer_type(global);
-        let inner_ty = T::julia_type(global);
+    fn julia_type<'scope, T>(target: T) -> T::Data
+    where
+        T: Target<'scope, 'static, DataType<'scope>>,
+    {
+        let global = target.global();
+        let ptr_ua = UnionAll::pointer_type(&global);
+        let inner_ty = U::julia_type(&global);
         let params = &mut [inner_ty];
         let param_ptr = params.as_mut_ptr().cast();
 
         // Safety: Not rooting the result should be fine. The result must be a concrete type,
         // which is globally rooted.
+        // TODO: investigate if this is true
         unsafe {
             let applied = jl_apply_type(ptr_ua.unwrap(Private).cast(), param_ptr, 1);
             debug_assert!(!applied.is_null());
@@ -127,7 +151,7 @@ unsafe impl<T: IntoJulia> IntoJulia for *mut T {
             debug_assert!(val.is::<DataType>());
             let ty = val.cast_unchecked::<DataType>();
             debug_assert!(ty.is_concrete_type());
-            ty.as_ref()
+            target.data_from_ptr(ty.unwrap_non_null(Private), Private)
         }
     }
 }

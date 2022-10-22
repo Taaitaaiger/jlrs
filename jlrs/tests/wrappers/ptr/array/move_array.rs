@@ -7,12 +7,15 @@ mod tests {
     #[test]
     fn move_array_1d() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope(|_, mut frame| {
+                .instance(&mut frame)
+                .scope(|mut frame| {
                     let data = vec![1.0f32, 2., 3.];
-                    let array = Array::from_vec(&mut frame, data, 3)?.into_jlrs_result()?;
+                    let array =
+                        Array::from_vec(frame.as_extended_target(), data, 3)?.into_jlrs_result()?;
                     unsafe { array.copy_inline_data::<f32>() }
                 })
                 .unwrap();
@@ -27,15 +30,17 @@ mod tests {
     #[test]
     fn move_array_1d_output() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope(|_, mut frame| {
-                    let (output, frame) = frame.split();
+                .instance(&mut frame)
+                .scope(|mut frame| {
+                    let output = frame.output();
                     let data = vec![1.0f32, 2., 3.];
                     let array = frame
                         .scope(|mut frame| {
-                            let output = output.into_scope(&mut frame);
+                            let output = output.into_extended_target(&mut frame);
                             Array::from_vec(output, data, 3)
                         })?
                         .into_jlrs_result()?;
@@ -53,13 +58,16 @@ mod tests {
     #[test]
     fn move_array_1d_nested() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope(|_, mut frame| {
+                .instance(&mut frame)
+                .scope(|mut frame| {
                     frame.scope(|mut frame| {
                         let data = vec![1.0f64, 2., 3.];
-                        let array = Array::from_vec(&mut frame, data, 3)?.into_jlrs_result()?;
+                        let array = Array::from_vec(frame.as_extended_target(), data, 3)?
+                            .into_jlrs_result()?;
                         unsafe { array.copy_inline_data::<f64>() }
                     })
                 })
@@ -75,13 +83,16 @@ mod tests {
     #[test]
     fn move_array_1d_nested_dynamic() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope(|_, mut frame| {
+                .instance(&mut frame)
+                .scope(|mut frame| {
                     frame.scope(|mut frame| {
                         let data = vec![1i8, 2, 3];
-                        let array = Array::from_vec(&mut frame, data, 3)?.into_jlrs_result()?;
+                        let array = Array::from_vec(frame.as_extended_target(), data, 3)?
+                            .into_jlrs_result()?;
                         unsafe { array.copy_inline_data::<i8>() }
                     })
                 })
@@ -97,12 +108,15 @@ mod tests {
     #[test]
     fn move_array_1d_dynamic() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope(|_, mut frame| {
+                .instance(&mut frame)
+                .scope(|mut frame| {
                     let data = vec![1i16, 2, 3];
-                    let array = Array::from_vec(&mut frame, data, 3)?.into_jlrs_result()?;
+                    let array =
+                        Array::from_vec(frame.as_extended_target(), data, 3)?.into_jlrs_result()?;
                     unsafe { array.copy_inline_data::<i16>() }
                 })
                 .unwrap();
@@ -117,13 +131,16 @@ mod tests {
     #[test]
     fn move_array_1d_dynamic_nested() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope(|_, mut frame| {
+                .instance(&mut frame)
+                .scope(|mut frame| {
                     frame.scope(|mut frame| {
                         let data = vec![1i32, 2, 3];
-                        let array = Array::from_vec(&mut frame, data, 3)?.into_jlrs_result()?;
+                        let array = Array::from_vec(frame.as_extended_target(), data, 3)?
+                            .into_jlrs_result()?;
                         unsafe { array.copy_inline_data::<i32>() }
                     })
                 })
@@ -139,13 +156,16 @@ mod tests {
     #[test]
     fn move_array_1d_dynamic_nested_dynamic() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope(|_, mut frame| {
+                .instance(&mut frame)
+                .scope(|mut frame| {
                     frame.scope(|mut frame| {
                         let data = vec![1i64, 2, 3];
-                        let array = Array::from_vec(&mut frame, data, 3)?.into_jlrs_result()?;
+                        let array = Array::from_vec(frame.as_extended_target(), data, 3)?
+                            .into_jlrs_result()?;
                         unsafe { array.copy_inline_data::<i64>() }
                     })
                 })
@@ -161,12 +181,15 @@ mod tests {
     #[test]
     fn move_array_2d() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope(|_, mut frame| {
+                .instance(&mut frame)
+                .scope(|mut frame| {
                     let data = vec![1u8, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4];
-                    let array = Array::from_vec(&mut frame, data, (3, 4))?.into_jlrs_result()?;
+                    let array = Array::from_vec(frame.as_extended_target(), data, (3, 4))?
+                        .into_jlrs_result()?;
                     unsafe { array.copy_inline_data::<u8>() }
                 })
                 .unwrap();
@@ -182,14 +205,16 @@ mod tests {
     #[test]
     fn move_array_2d_nested() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope(|_, mut frame| {
+                .instance(&mut frame)
+                .scope(|mut frame| {
                     frame.scope(|mut frame| {
                         let data = vec![1u16, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4];
-                        let array =
-                            Array::from_vec(&mut frame, data, (3, 4))?.into_jlrs_result()?;
+                        let array = Array::from_vec(frame.as_extended_target(), data, (3, 4))?
+                            .into_jlrs_result()?;
                         unsafe { array.copy_inline_data::<u16>() }
                     })
                 })
@@ -206,14 +231,16 @@ mod tests {
     #[test]
     fn move_array_2d_nested_dynamic() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope(|_, mut frame| {
+                .instance(&mut frame)
+                .scope(|mut frame| {
                     frame.scope(|mut frame| {
                         let data = vec![1u32, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4];
-                        let array =
-                            Array::from_vec(&mut frame, data, (3, 4))?.into_jlrs_result()?;
+                        let array = Array::from_vec(frame.as_extended_target(), data, (3, 4))?
+                            .into_jlrs_result()?;
                         unsafe { array.copy_inline_data::<u32>() }
                     })
                 })
@@ -230,12 +257,15 @@ mod tests {
     #[test]
     fn move_array_2d_dynamic() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope(|_, mut frame| {
+                .instance(&mut frame)
+                .scope(|mut frame| {
                     let data = vec![1u64, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4];
-                    let array = Array::from_vec(&mut frame, data, (3, 4))?.into_jlrs_result()?;
+                    let array = Array::from_vec(frame.as_extended_target(), data, (3, 4))?
+                        .into_jlrs_result()?;
                     unsafe { array.copy_inline_data::<u64>() }
                 })
                 .unwrap();
@@ -251,14 +281,16 @@ mod tests {
     #[test]
     fn move_array_2d_dynamic_nested() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope(|_, mut frame| {
+                .instance(&mut frame)
+                .scope(|mut frame| {
                     frame.scope(|mut frame| {
                         let data = vec![1usize, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4];
-                        let array =
-                            Array::from_vec(&mut frame, data, (3, 4))?.into_jlrs_result()?;
+                        let array = Array::from_vec(frame.as_extended_target(), data, (3, 4))?
+                            .into_jlrs_result()?;
                         unsafe { array.copy_inline_data::<usize>() }
                     })
                 })
@@ -275,14 +307,16 @@ mod tests {
     #[test]
     fn move_array_2d_dynamic_nested_dynamic() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
             let unboxed = jlrs
-                .scope(|_, mut frame| {
+                .instance(&mut frame)
+                .scope(|mut frame| {
                     frame.scope(|mut frame| {
                         let data = vec![1isize, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4];
-                        let array =
-                            Array::from_vec(&mut frame, data, (3, 4))?.into_jlrs_result()?;
+                        let array = Array::from_vec(frame.as_extended_target(), data, (3, 4))?
+                            .into_jlrs_result()?;
                         unsafe { array.copy_inline_data::<isize>() }
                     })
                 })

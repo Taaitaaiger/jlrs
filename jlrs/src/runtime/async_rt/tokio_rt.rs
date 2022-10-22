@@ -139,30 +139,26 @@ impl<M: Send + Sync + 'static> ChannelReceiver<M> for tokio::sync::mpsc::Unbound
     }
 }
 
-#[async_trait]
 impl<M: Send + 'static> OneshotSender<M> for tokio::sync::oneshot::Sender<M> {
-    async fn send(self, msg: M) {
+    fn send(self, msg: M) {
         self.send(msg).ok();
     }
 }
 
-#[async_trait]
 impl<M: Send + 'static> OneshotSender<M> for tokio::sync::mpsc::Sender<M> {
-    async fn send(self, msg: M) {
-        (&self).send(msg).await.ok();
+    fn send(self, msg: M) {
+        (&self).blocking_send(msg).ok();
     }
 }
 
-#[async_trait]
 impl<M: Send + 'static> OneshotSender<M> for tokio::sync::broadcast::Sender<M> {
-    async fn send(self, msg: M) {
+    fn send(self, msg: M) {
         (&self).send(msg).ok();
     }
 }
 
-#[async_trait]
 impl<M: Send + Sync + 'static> OneshotSender<M> for tokio::sync::watch::Sender<M> {
-    async fn send(self, msg: M) {
+    fn send(self, msg: M) {
         (&self).send(msg).ok();
     }
 }

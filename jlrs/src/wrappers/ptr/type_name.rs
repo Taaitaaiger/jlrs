@@ -7,11 +7,10 @@
 
 use crate::{
     impl_julia_typecheck,
-    memory::{global::Global, output::Output},
+    memory::target::Target,
     private::Private,
     wrappers::ptr::{
         module::ModuleRef, private::WrapperPriv, simple_vector::SimpleVectorRef, symbol::SymbolRef,
-        
     },
 };
 use cfg_if::cfg_if;
@@ -191,70 +190,96 @@ impl<'scope> TypeName<'scope> {
         unsafe { self.unwrap_non_null(Private).as_ref().mayinlinealloc() != 0 }
     }
 
-    /// Use the `Output` to extend the lifetime of this data.
-    pub fn root<'target>(self, output: Output<'target>) -> TypeName<'target> {
-        // Safety: the pointer points to valid data
-        unsafe {
-            let ptr = self.unwrap_non_null(Private);
-            output.set_root::<TypeName>(ptr);
-            TypeName::wrap_non_null(ptr, Private)
-        }
+    /// Use the target to reroot this data.
+    pub fn root<'target, T>(self, target: T) -> T::Data
+    where
+        T: Target<'target, 'static, TypeName<'target>>,
+    {
+        // Safety: the data is valid.
+        unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
     }
 }
 
 impl<'base> TypeName<'base> {
     /// The typename of the `UnionAll` `Type`.
-    pub fn of_type(_: Global<'base>) -> Self {
+    pub fn of_type<T>(_: &T) -> Self
+    where
+        T: Target<'base, 'static, Self>,
+    {
         // Safety: global constant
         unsafe { Self::wrap(jl_type_typename, Private) }
     }
 
     /// The typename of the `DataType` `Tuple`.
-    pub fn of_tuple(_: Global<'base>) -> Self {
+    pub fn of_tuple<T>(_: &T) -> Self
+    where
+        T: Target<'base, 'static, Self>,
+    {
         // Safety: global constant
         unsafe { Self::wrap(jl_tuple_typename, Private) }
     }
 
     /// The typename of the `UnionAll` `VecElement`.
-    pub fn of_vecelement(_: Global<'base>) -> Self {
+    pub fn of_vecelement<T>(_: &T) -> Self
+    where
+        T: Target<'base, 'static, Self>,
+    {
         // Safety: global constant
         unsafe { Self::wrap(jl_vecelement_typename, Private) }
     }
 
     /// The typename of the `UnionAll` `Vararg`.
     #[cfg(feature = "lts")]
-    pub fn of_vararg(_: Global<'base>) -> Self {
+    pub fn of_vararg<T>(_: &T) -> Self
+    where
+        T: Target<'base, 'static, Self>,
+    {
         // Safety: global constant
         unsafe { Self::wrap(jl_vararg_typename, Private) }
     }
 
     /// The typename of the `UnionAll` `Array`.
-    pub fn of_array(_: Global<'base>) -> Self {
+    pub fn of_array<T>(_: &T) -> Self
+    where
+        T: Target<'base, 'static, Self>,
+    {
         // Safety: global constant
         unsafe { Self::wrap(jl_array_typename, Private) }
     }
 
     /// The typename of the `UnionAll` `Ptr`.
     #[cfg(not(feature = "lts"))]
-    pub fn of_opaque_closure(_: Global<'base>) -> Self {
+    pub fn of_opaque_closure<T>(_: &T) -> Self
+    where
+        T: Target<'base, 'static, Self>,
+    {
         // Safety: global constant
         unsafe { Self::wrap(jl_opaque_closure_typename, Private) }
     }
 
     /// The typename of the `UnionAll` `Ptr`.
-    pub fn of_pointer(_: Global<'base>) -> Self {
+    pub fn of_pointer<T>(_: &T) -> Self
+    where
+        T: Target<'base, 'static, Self>,
+    {
         // Safety: global constant
         unsafe { Self::wrap(jl_pointer_typename, Private) }
     }
 
     /// The typename of the `UnionAll` `LLVMPtr`.
-    pub fn of_llvmpointer(_: Global<'base>) -> Self {
+    pub fn of_llvmpointer<T>(_: &T) -> Self
+    where
+        T: Target<'base, 'static, Self>,
+    {
         // Safety: global constant
         unsafe { Self::wrap(jl_llvmpointer_typename, Private) }
     }
 
     /// The typename of the `UnionAll` `NamedTuple`.
-    pub fn of_namedtuple(_: Global<'base>) -> Self {
+    pub fn of_namedtuple<T>(_: &T) -> Self
+    where
+        T: Target<'base, 'static, Self>,
+    {
         // Safety: global constant
         unsafe { Self::wrap(jl_namedtuple_typename, Private) }
     }
@@ -265,6 +290,7 @@ impl_debug!(TypeName<'_>);
 
 impl<'scope> WrapperPriv<'scope, '_> for TypeName<'scope> {
     type Wraps = jl_typename_t;
+    type StaticPriv = TypeName<'static>;
     const NAME: &'static str = "TypeName";
 
     // Safety: `inner` must not have been freed yet, the result must never be

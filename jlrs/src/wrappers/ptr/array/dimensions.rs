@@ -80,7 +80,6 @@ pub trait Dims: Sized + Debug {
     }
 }
 
-
 /// Dimensions of a Julia array.
 #[derive(Copy, Clone, Debug)]
 pub struct ArrayDimensions<'scope> {

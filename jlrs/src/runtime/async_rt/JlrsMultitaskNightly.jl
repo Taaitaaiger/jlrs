@@ -49,6 +49,7 @@ const outchannel = Channel{Task}(1)
 Base.Threads.@spawn :default begin
     while true
         local_task = take!(inchannel)
+
         task = @async begin
             try
                 Base.invokelatest(local_task.func, local_task.args...; local_task.kwargs...)
@@ -65,14 +66,18 @@ end
 function scheduleasynclocal(func::Function, wakeptr::Ptr{Cvoid}, args...; kwargs...)::Task
     @nospecialize func wakeptr args kwargs
     task = LocalTask(func, args, kwargs, wakeptr)
+    print("Put")
     put!(inchannel, task)
+    print("Task")
     take!(outchannel)
 end
 
 function scheduleasynclocal(func::Function, args...; kwargs...)::Task
     @nospecialize func args kwargs
     task = LocalTask(func, args, kwargs, C_NULL)
+    print("Put")
     put!(inchannel, task)
+    print("Task")
     take!(outchannel)
 end
 
@@ -93,4 +98,9 @@ function scheduleasync(func::Function, args...; kwargs...)::Task
     @nospecialize func args kwargs
     @async Base.invokelatest(func, args...; kwargs...)
 end
+
+# function borrowthread(func::Ptr{Cvoid})::Task
+#     Base.Threads.@spawn :default ccall(func, Cvoid, ())
+# end
 end
+

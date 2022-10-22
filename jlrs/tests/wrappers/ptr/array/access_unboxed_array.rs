@@ -9,112 +9,134 @@ mod tests {
             #[test]
             fn $name() {
                 JULIA.with(|j| {
+                    let mut frame = StackFrame::new();
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope(|_, mut frame| {
-                        let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
+                    jlrs.instance(&mut frame)
+                        .scope(|mut frame| {
+                            let data: Vec<$value_type> =
+                                (1..=24).map(|x| x as $value_type).collect();
 
-                        let array =
-                            Array::from_vec(&mut frame, data, (2, 3, 4))?.into_jlrs_result()?;
-                        let d = unsafe { array.copy_inline_data::<$value_type>()? };
+                            let array =
+                                Array::from_vec(frame.as_extended_target(), data, (2, 3, 4))?
+                                    .into_jlrs_result()?;
+                            let d = unsafe { array.copy_inline_data::<$value_type>()? };
 
-                        let mut out = 1 as $value_type;
-                        for third in &[0, 1, 2, 3] {
-                            for second in &[0, 1, 2] {
-                                for first in &[0, 1] {
-                                    assert_eq!(d[(*first, *second, *third)], out);
-                                    assert_eq!(*d.get((*first, *second, *third)).unwrap(), out);
-                                    out += 1 as $value_type;
+                            let mut out = 1 as $value_type;
+                            for third in &[0, 1, 2, 3] {
+                                for second in &[0, 1, 2] {
+                                    for first in &[0, 1] {
+                                        assert_eq!(d[(*first, *second, *third)], out);
+                                        assert_eq!(*d.get((*first, *second, *third)).unwrap(), out);
+                                        out += 1 as $value_type;
+                                    }
                                 }
                             }
-                        }
 
-                        assert!(d.get((7, 7, 7)).is_none());
+                            assert!(d.get((7, 7, 7)).is_none());
 
-                        Ok(())
-                    })
-                    .unwrap();
+                            Ok(())
+                        })
+                        .unwrap();
                 });
             }
 
             #[test]
             fn $name_mut() {
                 JULIA.with(|j| {
+                    let mut frame = StackFrame::new();
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope(|_, mut frame| {
-                        let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
+                    jlrs.instance(&mut frame)
+                        .scope(|mut frame| {
+                            let data: Vec<$value_type> =
+                                (1..=24).map(|x| x as $value_type).collect();
 
-                        let array =
-                            Array::from_vec(&mut frame, data, (2, 3, 4))?.into_jlrs_result()?;
-                        let mut d = unsafe { array.copy_inline_data::<$value_type>()? };
+                            let array =
+                                Array::from_vec(frame.as_extended_target(), data, (2, 3, 4))?
+                                    .into_jlrs_result()?;
+                            let mut d = unsafe { array.copy_inline_data::<$value_type>()? };
 
-                        let mut out = 2 as $value_type;
-                        for third in &[0, 1, 2, 3] {
-                            for second in &[0, 1, 2] {
-                                for first in &[0, 1] {
-                                    d[(*first, *second, *third)] += 1 as $value_type;
-                                    assert_eq!(d[(*first, *second, *third)], out);
-                                    let e = d.get_mut((*first, *second, *third)).unwrap();
-                                    *e = *e + 1 as $value_type;
-                                    assert_eq!(
-                                        d[(*first, *second, *third)],
-                                        out + 1 as $value_type
-                                    );
-                                    out += 1 as $value_type;
+                            let mut out = 2 as $value_type;
+                            for third in &[0, 1, 2, 3] {
+                                for second in &[0, 1, 2] {
+                                    for first in &[0, 1] {
+                                        d[(*first, *second, *third)] += 1 as $value_type;
+                                        assert_eq!(d[(*first, *second, *third)], out);
+                                        let e = d.get_mut((*first, *second, *third)).unwrap();
+                                        *e = *e + 1 as $value_type;
+                                        assert_eq!(
+                                            d[(*first, *second, *third)],
+                                            out + 1 as $value_type
+                                        );
+                                        out += 1 as $value_type;
+                                    }
                                 }
                             }
-                        }
 
-                        assert!(d.get_mut((7, 7, 7)).is_none());
+                            assert!(d.get_mut((7, 7, 7)).is_none());
 
-                        Ok(())
-                    })
-                    .unwrap();
+                            Ok(())
+                        })
+                        .unwrap();
                 });
             }
 
             #[test]
             fn $name_slice() {
                 JULIA.with(|j| {
+                    let mut frame = StackFrame::new();
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope(|_, mut frame| {
-                        let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
+                    jlrs.instance(&mut frame)
+                        .scope(|mut frame| {
+                            let data: Vec<$value_type> =
+                                (1..=24).map(|x| x as $value_type).collect();
 
-                        let array = Array::from_vec(&mut frame, data.clone(), (2, 3, 4))?
+                            let array = Array::from_vec(
+                                frame.as_extended_target(),
+                                data.clone(),
+                                (2, 3, 4),
+                            )?
                             .into_jlrs_result()?;
-                        let d = unsafe { array.copy_inline_data::<$value_type>()? };
+                            let d = unsafe { array.copy_inline_data::<$value_type>()? };
 
-                        for (a, b) in data.iter().zip(d.as_slice()) {
-                            assert_eq!(a, b)
-                        }
+                            for (a, b) in data.iter().zip(d.as_slice()) {
+                                assert_eq!(a, b)
+                            }
 
-                        Ok(())
-                    })
-                    .unwrap();
+                            Ok(())
+                        })
+                        .unwrap();
                 });
             }
 
             #[test]
             fn $name_slice_mut() {
                 JULIA.with(|j| {
+                    let mut frame = StackFrame::new();
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope(|_, mut frame| {
-                        let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
+                    jlrs.instance(&mut frame)
+                        .scope(|mut frame| {
+                            let data: Vec<$value_type> =
+                                (1..=24).map(|x| x as $value_type).collect();
 
-                        let array = Array::from_vec(&mut frame, data.clone(), (2, 3, 4))?
+                            let array = Array::from_vec(
+                                frame.as_extended_target(),
+                                data.clone(),
+                                (2, 3, 4),
+                            )?
                             .into_jlrs_result()?;
-                        let mut d = unsafe { array.copy_inline_data::<$value_type>()? };
+                            let mut d = unsafe { array.copy_inline_data::<$value_type>()? };
 
-                        for (a, b) in data.iter().zip(d.as_mut_slice()) {
-                            assert_eq!(a, b)
-                        }
+                            for (a, b) in data.iter().zip(d.as_mut_slice()) {
+                                assert_eq!(a, b)
+                            }
 
-                        Ok(())
-                    })
-                    .unwrap();
+                            Ok(())
+                        })
+                        .unwrap();
                 });
             }
         };

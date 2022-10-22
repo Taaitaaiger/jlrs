@@ -4,7 +4,7 @@ use crate::{
     convert::unbox::Unbox,
     error::{JlrsError, JlrsResult},
     impl_julia_typecheck,
-    memory::{global::Global, output::Output, scope::PartialScope},
+    memory::target::Target,
     private::Private,
     wrappers::ptr::{private::WrapperPriv, value::Value},
 };
@@ -27,56 +27,32 @@ pub struct JuliaString<'scope>(*const u8, PhantomData<&'scope ()>);
 
 impl<'scope> JuliaString<'scope> {
     /// Create a new Julia string.
-    pub fn new<'target, V, S>(scope: S, string: V) -> JlrsResult<JuliaString<'target>>
+    pub fn new<'target, V, T>(target: T, string: V) -> T::Data
     where
         V: AsRef<str>,
-        S: PartialScope<'target>,
+        T: Target<'target, 'static, JuliaString<'target>>,
     {
-        let global = scope.global();
-        // Safety: the result is immediately rooted
-        unsafe { JuliaString::new_unrooted(global, string).root(scope) }
-    }
-
-    /// Create a new Julia string. Unlike [`JuliaString::new`] this method doesn't root the
-    /// allocated value.
-    pub fn new_unrooted<'global, V>(_: Global<'global>, string: V) -> StringRef<'global>
-    where
-        V: AsRef<str>,
-    {
-        // Safety: the C API function is called with valid arguments
+        let str_ref = string.as_ref();
+        let len = str_ref.len();
+        let ptr = str_ref.as_ptr().cast();
         unsafe {
-            let str_ref = string.as_ref();
-            let len = str_ref.len();
-            let ptr = str_ref.as_ptr().cast();
             let s = jl_pchar_to_string(ptr, len);
-            StringRef::wrap(s.cast())
+            target.data_from_ptr(NonNull::new_unchecked(s).cast(), Private)
         }
     }
 
     /// Create a new Julia string.
-    pub fn new_bytes<'target, V, S>(scope: S, bytes: V) -> JlrsResult<JuliaString<'target>>
+    pub fn new_bytes<'target, V, T>(target: T, bytes: V) -> T::Data
     where
         V: AsRef<[u8]>,
-        S: PartialScope<'target>,
+        T: Target<'target, 'static, JuliaString<'target>>,
     {
-        let global = scope.global();
-        // Safety: the result is immediately rooted
-        unsafe { JuliaString::new_bytes_unrooted(global, bytes).root(scope) }
-    }
-
-    /// Create a new Julia string. Unlike [`JuliaString::new_bytes`] this method doesn't root the
-    /// allocated value.
-    pub fn new_bytes_unrooted<'global, V>(_: Global<'global>, bytes: V) -> StringRef<'global>
-    where
-        V: AsRef<[u8]>,
-    {
-        // Safety: the C API function is called with valid arguments
+        let bytes_ref = bytes.as_ref();
+        let len = bytes_ref.len();
+        let ptr = bytes_ref.as_ptr().cast();
         unsafe {
-            let str_ref = bytes.as_ref();
-            let len = str_ref.len();
-            let ptr = str_ref.as_ptr().cast();
             let s = jl_pchar_to_string(ptr, len);
-            StringRef::wrap(s.cast())
+            target.data_from_ptr(NonNull::new_unchecked(s).cast(), Private)
         }
     }
 
@@ -118,13 +94,13 @@ impl<'scope> JuliaString<'scope> {
         str::from_utf8_unchecked(self.as_c_str().to_bytes())
     }
 
-    /// Use the `Output` to extend the lifetime of this data.
-    pub fn root<'target>(self, output: Output<'target>) -> JuliaString<'target> {
-        unsafe {
-            let ptr = self.unwrap_non_null(Private);
-            output.set_root::<JuliaString>(ptr);
-            JuliaString::wrap_non_null(ptr, Private)
-        }
+    /// Use the target to reroot this data.
+    pub fn root<'target, T>(self, target: T) -> T::Data
+    where
+        T: Target<'target, 'static, JuliaString<'target>>,
+    {
+        // Safety: the data is valid.
+        unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
     }
 }
 
@@ -149,6 +125,7 @@ impl Debug for JuliaString<'_> {
 
 impl<'scope> WrapperPriv<'scope, '_> for JuliaString<'scope> {
     type Wraps = u8;
+    type StaticPriv = JuliaString<'static>;
     const NAME: &'static str = "String";
 
     // Safety: `inner` must not have been freed yet, the result must never be

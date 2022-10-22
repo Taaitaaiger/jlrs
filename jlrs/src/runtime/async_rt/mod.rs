@@ -10,7 +10,7 @@
 //! and async-std can be used by enabling the `tokio-rt` or `async-std-rt` feature respectively.
 //! To use a custom runtime, you can implement the `AsyncRuntime` trait.
 //!
-//! After initialization, a handle to the runtime, [`AsyncJulia`], is returned which can be shared
+//! After initialization a handle to the runtime, [`AsyncJulia`], is returned which can be shared
 //! across threads and can be used to send new tasks to the runtime. Three kinds of task exist:
 //! blocking, async, and persistent tasks. Blocking tasks block the runtime, the other two kinds
 //! of tasks can schedule Julia function calls and wait for them to complete. While the scheduled
@@ -28,28 +28,21 @@ use crate::{
         channel::{Channel, ChannelReceiver, ChannelSender, OneshotSender, TrySendError},
         future::wake_task,
         internal::{
-            BlockingTask, BlockingTaskEnvelope, CallPersistentTask, InnerPersistentMessage,
-            PendingTask, PendingTaskEnvelope, Persistent, PersistentComms, RegisterPersistent,
-            RegisterTask, Task,
+            BlockingTask, BlockingTaskEnvelope, CallPersistentTask, IncludeTask,
+            IncludeTaskEnvelope, InnerPersistentMessage, PendingTask, PendingTaskEnvelope,
+            Persistent, PersistentComms, RegisterPersistent, RegisterTask, SetErrorColorTask,
+            SetErrorColorTaskEnvelope, Task,
         },
         task::{AsyncTask, PersistentTask},
     },
-    call::Call,
     error::{IOError, JlrsError, JlrsResult, RuntimeError},
-    memory::{
-        context::{AsyncContextFrame, Stack, WrappedContext},
-        frame::GcFrame,
-        global::Global, ledger::Ledger,
-    },
+    memory::{context::stack::Stack, stack_frame::StackFrame, target::frame::GcFrame},
     runtime::{builder::AsyncRuntimeBuilder, init_jlrs, INIT},
-    wrappers::ptr::{module::Module, string::JuliaString, value::Value, Wrapper},
+    wrappers::ptr::{module::Module, value::Value},
 };
 use async_trait::async_trait;
 use futures::Future;
-use jl_sys::{
-    jl_atexit_hook, jl_init, jl_init_with_image, jl_is_initialized,
-    jl_process_events,
-};
+use jl_sys::{jl_atexit_hook, jl_init, jl_init_with_image, jl_is_initialized, jl_process_events};
 
 use jl_sys::jl_options;
 
@@ -59,9 +52,9 @@ use std::{
     fmt,
     marker::PhantomData,
     num::NonZeroUsize,
-    path::{Path, PathBuf},
+    path::Path,
     sync::{atomic::Ordering, Arc},
-    time::Duration, ptr::NonNull, cell::RefCell,
+    time::Duration,
 };
 
 #[cfg(feature = "nightly")]
@@ -257,14 +250,13 @@ where
     /// Send a new blocking task to the runtime.
     ///
     /// This method waits if there's no room in the channel. It takes two arguments, the first is
-    /// a closure that takes two arguments, a `Global` and a `GcFrame`, and must return a
-    /// `JlrsResult` whose inner type is both `Send` and `Sync`. The second is the sending half of
-    /// a channel which is used to send the result back after the task has completed. This task is
-    /// executed as soon as possible and can't call async methods, so it blocks the runtime.
+    /// a closure that takes a `GcFrame` and must return a `JlrsResult` whose inner type is both
+    /// `Send` and `Sync`. The second is the sending half of a channel which is used to send the
+    /// result back after the task has completed. This task is executed as soon as possible and
+    /// can't call async methods, so it blocks the runtime.
     pub async fn blocking_task<T, O, F>(&self, task: F, res_sender: O) -> JlrsResult<()>
     where
-        for<'base> F:
-            'static + Send + Sync + FnOnce(Global<'base>, GcFrame<'base>) -> JlrsResult<T>,
+        for<'base> F: 'static + Send + Sync + FnOnce(GcFrame<'base>) -> JlrsResult<T>,
         O: OneshotSender<JlrsResult<T>>,
         T: Send + Sync + 'static,
     {
@@ -281,15 +273,13 @@ where
     /// Try to send a new blocking task to the runtime.
     ///
     /// If there's no room in the backing channel an error is returned immediately. This method
-    /// takes two arguments, the first is a closure that takes two arguments, a `Global` and
-    /// a `GcFrame`, and must return a `JlrsResult` whose inner type is both `Send` and `Sync`.
-    /// The second is the sending half of a channel which is used to send the  result back after
-    /// the task has completed. This task is executed as soon as possible and can't call async
-    /// methods, so it blocks the runtime.
+    /// takes two arguments, the first is a closure that takes a `GcFrame` and must return a
+    /// `JlrsResult` whose inner type is both `Send` and `Sync`. The second is the sending half of
+    /// a channel which is used to send the  result back after the task has completed. This task
+    /// is executed as soon as possible and can't call async methods, so it blocks the runtime.
     pub fn try_blocking_task<T, O, F>(&self, task: F, res_sender: O) -> JlrsResult<()>
     where
-        for<'base> F:
-            'static + Send + Sync + FnOnce(Global<'base>, GcFrame<'base>) -> JlrsResult<T>,
+        for<'base> F: 'static + Send + Sync + FnOnce(GcFrame<'base>) -> JlrsResult<T>,
         O: OneshotSender<JlrsResult<T>>,
         T: Send + Sync + 'static,
     {
@@ -421,8 +411,10 @@ where
             })?
         }
 
+        let msg = IncludeTask::new(path.as_ref().into(), res_sender);
+
         self.sender
-            .send(MessageInner::Include(path.as_ref().to_path_buf(), Box::new(res_sender)).wrap())
+            .send(MessageInner::Include(Box::new(msg)).wrap())
             .await
             .map_err(|_| RuntimeError::ChannelClosed)?;
 
@@ -448,10 +440,10 @@ where
             })?
         }
 
+        let msg = IncludeTask::new(path.as_ref().into(), res_sender);
+
         self.sender
-            .try_send(
-                MessageInner::Include(path.as_ref().to_path_buf(), Box::new(res_sender)).wrap(),
-            )
+            .try_send(MessageInner::Include(Box::new(msg)).wrap())
             .map_err(|e| match e {
                 TrySendError::Full(_) => RuntimeError::ChannelFull,
                 TrySendError::Closed(_) => RuntimeError::ChannelClosed,
@@ -471,8 +463,10 @@ where
     where
         O: OneshotSender<JlrsResult<()>>,
     {
+        let msg = SetErrorColorTask::new(enable, res_sender);
+
         self.sender
-            .send(MessageInner::ErrorColor(enable, Box::new(res_sender)).wrap())
+            .send(MessageInner::ErrorColor(Box::new(msg)).wrap())
             .await
             .map_err(|_| RuntimeError::ChannelClosed)?;
 
@@ -490,8 +484,9 @@ where
     where
         O: OneshotSender<JlrsResult<()>>,
     {
+        let msg = SetErrorColorTask::new(enable, res_sender);
         self.sender
-            .try_send(MessageInner::ErrorColor(enable, Box::new(res_sender)).wrap())
+            .try_send(MessageInner::ErrorColor(Box::new(msg)).wrap())
             .map_err(|e| match e {
                 TrySendError::Full(_) => RuntimeError::ChannelFull,
                 TrySendError::Closed(_) => RuntimeError::ChannelClosed,
@@ -542,128 +537,96 @@ where
     where
         C: Channel<Message>,
     {
-        R::block_on(async {
-            unsafe {
-                if jl_is_initialized() != 0 || INIT.swap(true, Ordering::SeqCst) {
-                    Err(RuntimeError::AlreadyInitialized)?;
-                }
-
-                #[cfg(not(feature = "nightly"))]
-                {
-                    if builder.n_threads == 0 {
-                        jl_options.nthreads = -1;
-                    } else {
-                        jl_options.nthreads = builder.n_threads as _;
-                    }
-                }
-
-                #[cfg(feature = "nightly")]
-                {
-                    if builder.n_threadsi != 0 {
-                        if builder.n_threads == 0 {
-                            jl_options.nthreads = -1;
-                            jl_options.nthreadpools = 2;
-                            let perthread = Box::new([-1i16, builder.n_threadsi as _]);
-                            jl_options.nthreads_per_pool = Box::leak(perthread) as *const _;
-                        } else {
-                            jl_options.nthreads = builder.n_threads as _;
-                            jl_options.nthreadpools = 2;
-                            let perthread =
-                                Box::new([builder.n_threads as i16, builder.n_threadsi as i16]);
-                            jl_options.nthreads_per_pool = Box::leak(perthread) as *const _;
-                        }
-                    } else if builder.n_threads == 0 {
-                        jl_options.nthreads = -1;
-                        jl_options.nthreadpools = 1;
-                        let perthread = Box::new(-1i16);
-                        jl_options.nthreads_per_pool = Box::leak(perthread) as *const _;
-                    } else {
-                        jl_options.nthreads = builder.n_threads as _;
-                        jl_options.nthreadpools = 1;
-                        let perthread = Box::new(builder.n_threads as i16);
-                        jl_options.nthreads_per_pool = Box::leak(perthread) as *const _;
-                    }
-                }
-
-                if let Some((ref julia_bindir, ref image_path)) = builder.builder.image {
-                    let julia_bindir_str = julia_bindir.to_string_lossy().to_string();
-                    let image_path_str = image_path.to_string_lossy().to_string();
-
-                    if !julia_bindir.exists() {
-                        Err(IOError::NotFound {
-                            path: julia_bindir_str,
-                        })?;
-                        unreachable!()
-                    }
-
-                    if !image_path.exists() {
-                        Err(IOError::NotFound {
-                            path: image_path_str,
-                        })?;
-                        unreachable!()
-                    }
-
-                    let bindir = std::ffi::CString::new(julia_bindir_str).unwrap();
-                    let im_rel_path = std::ffi::CString::new(image_path_str).unwrap();
-
-                    jl_init_with_image(bindir.as_ptr(), im_rel_path.as_ptr());
+        unsafe {
+            if jl_is_initialized() != 0 || INIT.swap(true, Ordering::SeqCst) {
+                Err(RuntimeError::AlreadyInitialized)?;
+            }
+            #[cfg(not(feature = "nightly"))]
+            {
+                if builder.n_threads == 0 {
+                    jl_options.nthreads = -1;
                 } else {
-                    jl_init();
+                    jl_options.nthreads = builder.n_threads as _;
                 }
-
-                let base_frame = AsyncContextFrame::<N>::new();
-                Self::run_inner::<_, N>(builder, receiver, std::mem::transmute(&base_frame))
-                    .await?;
             }
 
-            Ok(())
-        })
+            #[cfg(feature = "nightly")]
+            {
+                if builder.n_threadsi != 0 {
+                    if builder.n_threads == 0 {
+                        jl_options.nthreads = -1;
+                        jl_options.nthreadpools = 2;
+                        let perthread = Box::new([-1i16, builder.n_threadsi as _]);
+                        jl_options.nthreads_per_pool = Box::leak(perthread) as *const _;
+                    } else {
+                        let nthreads = builder.n_threads as i16;
+                        let nthreadsi = builder.n_threadsi as i16;
+                        jl_options.nthreads = nthreads + nthreadsi;
+                        jl_options.nthreadpools = 2;
+                        let perthread = Box::new([nthreads, builder.n_threadsi as _]);
+                        jl_options.nthreads_per_pool = Box::leak(perthread) as *const _;
+                    }
+                } else if builder.n_threads == 0 {
+                    jl_options.nthreads = -1;
+                    jl_options.nthreadpools = 1;
+                    let perthread = Box::new(-1i16);
+                    jl_options.nthreads_per_pool = Box::leak(perthread) as *const _;
+                } else {
+                    let n_threads = builder.n_threads as _;
+                    jl_options.nthreads = n_threads;
+                    jl_options.nthreadpools = 1;
+                    let perthread = Box::new(n_threads);
+                    jl_options.nthreads_per_pool = Box::leak(perthread) as *const _;
+                }
+            }
+
+            if let Some((ref julia_bindir, ref image_path)) = builder.builder.image {
+                let julia_bindir_str = julia_bindir.to_string_lossy().to_string();
+                let image_path_str = image_path.to_string_lossy().to_string();
+
+                if !julia_bindir.exists() {
+                    return Err(IOError::NotFound {
+                        path: julia_bindir_str,
+                    })?;
+                }
+
+                if !image_path.exists() {
+                    return Err(IOError::NotFound {
+                        path: image_path_str,
+                    })?;
+                }
+
+                let bindir = std::ffi::CString::new(julia_bindir_str).unwrap();
+                let im_rel_path = std::ffi::CString::new(image_path_str).unwrap();
+
+                jl_init_with_image(bindir.as_ptr(), im_rel_path.as_ptr());
+            } else {
+                jl_init();
+            }
+        }
+
+        let mut base_frame = StackFrame::<N>::new_n();
+        R::block_on(unsafe { Self::run_inner(builder, receiver, &mut base_frame) })
     }
 
-    async unsafe fn run_inner<C, const N: usize>(
+    async unsafe fn run_inner<'ctx, C, const N: usize>(
         builder: AsyncRuntimeBuilder<R, C>,
         mut receiver: Box<dyn ChannelReceiver<Message>>,
-        base_frame: &'static AsyncContextFrame<N>,
+        base_frame: &'ctx mut StackFrame<N>,
     ) -> Result<(), Box<JlrsError>>
     where
         C: Channel<Message>,
     {
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "lts")] {
-                let rtls = NonNull::new_unchecked(jl_sys::jl_get_ptls_states()).as_mut();
-                rtls.pgcstack = base_frame as *const _ as *mut _;
-            } else {
-                use jl_sys::{jl_get_current_task, jl_task_t};
-                let task = NonNull::new_unchecked(jl_get_current_task().cast::<jl_task_t>()).as_mut();
-                task.gcstack = base_frame as *const _ as *mut _;
-            }
-        }
-
-        let ledger = RefCell::new(Ledger::default());
-        let ledger_ref: &'static RefCell<Ledger> = std::mem::transmute(&ledger);
+        let base_frame: &'static mut StackFrame<N> = std::mem::transmute(base_frame);
+        let mut pinned = base_frame.pin();
+        let base_frame = pinned.stack_frame();
 
         let recv_timeout = builder.recv_timeout;
 
         let mut free_stacks = VecDeque::with_capacity(N);
-        for i in 1..=N {
+        for i in 0..N {
             free_stacks.push_back(i);
         }
-
-        let mut stacks = {
-            let mut stacks = Vec::with_capacity(N + 1);
-            let ctx_ty = Stack::init();
-            let ctx = Stack::new(ctx_ty);
-            let context = base_frame.set_sync(ctx);
-            stacks.push(Some(context));
-
-            for i in 0..N {
-                let ctx = Stack::new(ctx_ty);
-                let context = base_frame.set(i, ctx);
-                stacks.push(Some(context));
-            }
-
-            stacks.into_boxed_slice()
-        };
 
         let mut running_tasks = Vec::with_capacity(N);
         for _ in 0..N {
@@ -675,10 +638,9 @@ where
         let mut n_running = 0usize;
 
         {
-            let stack = stacks[0].as_ref().expect("Async stack corrupted");
-            set_custom_fns(stack, ledger_ref)?;
+            let stack = base_frame.sync_stack();
+            set_custom_fns(stack)?;
         }
-
 
         loop {
             let wait_time = if n_running > 0 {
@@ -695,52 +657,42 @@ where
                 Some(Ok(msg)) => match msg.inner {
                     MessageInner::Task(task, sender) => {
                         if let Some(idx) = free_stacks.pop_front() {
-                            let mut stack = stacks[idx].take().expect("Async stack corrupted");
+                            let stack = base_frame.nth_stack(idx);
                             let task = R::spawn_local(async move {
-                                task.call(&mut stack, ledger_ref).await;
-                                let wrapped = WrappedContext::wrap(stack);
-                                sender
-                                    .send(MessageInner::Complete(idx, wrapped).wrap())
-                                    .await
-                                    .ok();
+                                task.call(stack).await;
+                                sender.send(MessageInner::Complete(idx).wrap()).await.ok();
                             });
                             n_running += 1;
-                            running_tasks[idx - 1] = Some(task);
+                            running_tasks[idx] = Some(task);
                         } else {
                             pending_tasks.push_back((task, sender));
                         }
                     }
-                    MessageInner::Complete(idx, stack) => {
-                        let stack = stack.unwrap();
-                        if let Some((jl_task, sender)) = pending_tasks.pop_front() {
+                    MessageInner::Complete(idx) => {
+                        if let Some((task, sender)) = pending_tasks.pop_front() {
+                            let stack = base_frame.nth_stack(idx);
                             let task = R::spawn_local(async move {
-                                jl_task.call(stack, ledger_ref).await;
-                                let wrapped = WrappedContext::wrap(stack);
-                                sender
-                                    .send(MessageInner::Complete(idx, wrapped).wrap())
-                                    .await
-                                    .ok();
+                                task.call(stack).await;
+                                sender.send(MessageInner::Complete(idx).wrap()).await.ok();
                             });
-                            running_tasks[idx - 1] = Some(task);
+                            running_tasks[idx] = Some(task);
                         } else {
-                            stacks[idx] = Some(stack);
                             n_running -= 1;
                             free_stacks.push_front(idx);
-                            running_tasks[idx - 1] = None;
+                            running_tasks[idx] = None;
                         }
                     }
                     MessageInner::BlockingTask(task) => {
-                        let stack = stacks[0].expect("Async stack corrupted");
-                        task.call(stack, ledger_ref).await; 
+                        let stack = base_frame.sync_stack();
+                        task.call(stack);
                     }
-                    MessageInner::Include(path, sender) => {
-                        let stack = stacks[0].expect("Async stack corrupted");
-                        let res = call_include(stack, ledger_ref, path);
-                        sender.send(res).await;
+                    MessageInner::Include(task) => {
+                        let stack = base_frame.sync_stack();
+                        task.call(stack);
                     }
-                    MessageInner::ErrorColor(enable, sender) => {
-                        let res = set_error_color(enable);
-                        sender.send(res).await;
+                    MessageInner::ErrorColor(task) => {
+                        let stack = base_frame.sync_stack();
+                        task.call(stack);
                     }
                 },
                 Some(Err(_)) => break,
@@ -769,9 +721,9 @@ pub(crate) enum MessageInner {
         Arc<dyn ChannelSender<Message>>,
     ),
     BlockingTask(Box<dyn BlockingTaskEnvelope>),
-    Include(PathBuf, Box<dyn OneshotSender<JlrsResult<()>>>),
-    ErrorColor(bool, Box<dyn OneshotSender<JlrsResult<()>>>),
-    Complete(usize, WrappedContext),
+    Include(Box<dyn IncludeTaskEnvelope>),
+    ErrorColor(Box<dyn SetErrorColorTaskEnvelope>),
+    Complete(usize),
 }
 
 impl fmt::Debug for Message {
@@ -786,65 +738,20 @@ impl MessageInner {
     }
 }
 
-unsafe fn call_include(stack: &Stack, ledger: &'static RefCell<Ledger>, path: PathBuf) -> JlrsResult<()> {
-    let global = Global::new();
-
-    let (mut frame, owner) = GcFrame::base(stack, ledger);
-
-    match path.to_str() {
-        Some(path) => {
-            let path = JuliaString::new(&mut frame, path)?;
-            Module::main(global)
-                .function_ref("include")?
-                .wrapper_unchecked()
-                .call1_unrooted(global, path.as_value())
-                .map_err(|e| {
-                    JlrsError::exception(format!("Include error: {:?}", e.value_unchecked()))
-                })?;
-        }
-        None => {}
-    }
-
-    std::mem::drop(owner);
-    Ok(())
-}
-
-fn set_error_color(enable: bool) -> JlrsResult<()> {
+fn set_custom_fns(stack: &Stack) -> JlrsResult<()> {
     unsafe {
-        let global = Global::new();
-
-        let enable = if enable {
-            Value::true_v(global)
-        } else {
-            Value::false_v(global)
-        };
-
-        Module::main(global)
-            .submodule_ref("Jlrs")?
-            .wrapper_unchecked()
-            .global_ref("color")?
-            .value_unchecked()
-            .set_nth_field_unchecked(0, enable);
-
-        Ok(())
-    }
-}
-
-fn set_custom_fns(stack: &Stack, ledger: &'static RefCell<Ledger>) -> JlrsResult<()> {
-    unsafe {
-        let global = Global::new();
-        let (mut frame, owner) = GcFrame::base(stack, ledger);
+        let (owner, mut frame) = GcFrame::base(stack);
 
         init_jlrs(&mut frame);
         init_multitask(&mut frame);
 
-        let jlrs_mod = Module::main(global)
-            .submodule_ref("JlrsMultitask")?
+        let jlrs_mod = Module::main(&frame)
+            .submodule(&frame, "JlrsMultitask")?
             .wrapper_unchecked();
 
         let wake_rust = Value::new(&mut frame, wake_task as *mut c_void);
         jlrs_mod
-            .global_ref("wakerust")?
+            .global(&frame, "wakerust")?
             .wrapper_unchecked()
             .set_nth_field_unchecked(0, wake_rust);
 

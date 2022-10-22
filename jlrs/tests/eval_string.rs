@@ -8,12 +8,14 @@ mod tests {
 
     fn eval_string(string: &str, with_result: impl for<'f> FnOnce(JuliaResult<'f, 'static>)) {
         JULIA.with(|j| unsafe {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
-            jlrs.scope(|_global, mut frame| {
-                with_result(Value::eval_string(&mut frame, string));
-                Ok(())
-            })
-            .unwrap();
+            jlrs.instance(&mut frame)
+                .scope(|mut frame| {
+                    with_result(Value::eval_string(&mut frame, string));
+                    Ok(())
+                })
+                .unwrap();
         });
     }
 
@@ -50,17 +52,19 @@ mod tests {
             assert_eq!(result.unwrap().unbox::<i32>().unwrap(), 13i32);
         });
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
-            jlrs.scope(|global, mut frame| unsafe {
-                let func = Module::main(global)
-                    .function_ref("increase")?
-                    .wrapper_unchecked();
-                let twelve = Value::new(&mut frame, 12i32);
-                let result = func.call1(&mut frame, twelve);
-                assert_eq!(result.unwrap().unbox::<i32>().unwrap(), 13i32);
-                Ok(())
-            })
-            .unwrap();
+            jlrs.instance(&mut frame)
+                .scope(|mut frame| unsafe {
+                    let func = Module::main(&frame)
+                        .function(&frame, "increase")?
+                        .wrapper_unchecked();
+                    let twelve = Value::new(&mut frame, 12i32);
+                    let result = func.call1(&mut frame, twelve);
+                    assert_eq!(result.unwrap().unbox::<i32>().unwrap(), 13i32);
+                    Ok(())
+                })
+                .unwrap();
         });
     }
 }

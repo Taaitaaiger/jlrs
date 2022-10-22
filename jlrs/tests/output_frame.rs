@@ -7,18 +7,14 @@ mod tests {
     #[test]
     fn nested_value_scope() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.scope(|_global, mut frame| {
-                let (output, frame) = frame.split();
+            let out = jlrs.instance(&mut frame).scope(|mut frame| {
+                let output = frame.output();
 
                 frame
-                    .scope(|mut frame| {
-                        frame.scope(|mut frame| {
-                            let output = output.into_scope(&mut frame);
-                            Ok(Value::new(output, 1usize))
-                        })
-                    })?
+                    .scope(|mut frame| frame.scope(|_| Ok(Value::new(output, 1usize))))?
                     .unbox::<usize>()
             });
 
@@ -29,18 +25,20 @@ mod tests {
     #[test]
     fn nested_result_scope() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.scope(|global, mut frame| {
-                let (output, frame) = frame.split();
+            let out = jlrs.instance(&mut frame).scope(|mut frame| {
+                let output = frame.output();
 
                 frame
                     .scope(|mut frame| {
                         frame.scope(|mut frame| unsafe {
-                            let func = Module::base(global).function_ref("+")?.wrapper_unchecked();
-                            let v1 = Value::new(frame.as_scope(), 1usize);
-                            let v2 = Value::new(frame.as_scope(), 2usize);
-                            let output = output.into_scope(&mut frame);
+                            let func = Module::base(&frame)
+                                .function(&frame, "+")?
+                                .wrapper_unchecked();
+                            let v1 = Value::new(frame.as_mut(), 1usize);
+                            let v2 = Value::new(frame.as_mut(), 2usize);
                             Ok(func.call2(output, v1, v2))
                         })
                     })?

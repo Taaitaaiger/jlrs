@@ -1,6 +1,6 @@
 [package]
 name = "jlrs"
-version = "0.16.0"
+version = "0.17.0"
 authors = ["Thomas van Doornmalen <thomas.vandoornmalen@gmail.com>"]
 description = """
 jlrs provides bindings to the Julia C API that enables Julia code to be called from Rust and more.
@@ -55,6 +55,8 @@ prelude = []
 pyplot = []
 # Enable `ccall` feature, link `libuv`, and enable `CCall::us_async_send`
 uv = ["jl-sys/uv", "ccall"]
+# Track borrowed array data separately for each thread, rather than globally.
+unsafe-ledger = []
 
 # Julia version
 
@@ -77,6 +79,7 @@ cfg-if = "1"
 jl-sys = {version = "0.18", path = "../jl_sys" }
 smallvec = "1"
 thiserror = "1"
+atomic_refcell = "0.1"
 
 async-std = { version = "1.12", features = ["unstable"], optional = true }
 async-trait = { version = "0.1", optional = true }

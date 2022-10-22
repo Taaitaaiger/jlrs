@@ -1,25 +1,28 @@
-use crate::call::{Call, ProvideKeywords, WithKeywords};
-use crate::error::CANNOT_DISPLAY_VALUE;
-use crate::memory::{frame::AsyncGcFrame, global::Global};
-use crate::wrappers::ptr::module::Module;
-use crate::wrappers::ptr::task::Task;
-use crate::wrappers::ptr::value::{Value, MAX_SIZE};
-use crate::wrappers::ptr::Wrapper;
 use crate::{
-    error::{JlrsError, JlrsResult, JuliaResult},
+    call::{Call, ProvideKeywords, WithKeywords},
+    error::{JlrsError, JlrsResult, JuliaResult, CANNOT_DISPLAY_VALUE},
+    memory::target::{frame::AsyncGcFrame, global::Global},
     private::Private,
-    wrappers::ptr::private::WrapperPriv,
+    wrappers::ptr::{
+        module::Module,
+        private::WrapperPriv,
+        task::Task,
+        value::{Value, MAX_SIZE},
+        Wrapper,
+    },
 };
-use futures::task::{Context, Poll, Waker};
-use futures::Future;
+use futures::{
+    task::{Context, Poll, Waker},
+    Future,
+};
 use jl_sys::{jl_call1, jl_exception_occurred};
 use smallvec::SmallVec;
-use std::ffi::c_void;
-use std::marker::PhantomData;
-use std::pin::Pin;
-use std::sync::{Arc, Mutex};
-
-use super::task::yield_task;
+use std::{
+    ffi::c_void,
+    marker::PhantomData,
+    pin::Pin,
+    sync::{Arc, Mutex},
+};
 
 pub(crate) struct TaskState<'frame, 'data> {
     completed: bool,
@@ -28,7 +31,7 @@ pub(crate) struct TaskState<'frame, 'data> {
     _marker: PhantomData<&'data ()>,
 }
 
-pub struct JuliaFuture<'frame, 'data> {
+pub(crate) struct JuliaFuture<'frame, 'data> {
     shared_state: Arc<Mutex<TaskState<'frame, 'data>>>,
 }
 
@@ -61,11 +64,10 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         // Safety: module contents are globally rooted, and the function is guaranteed to be safe
         // by the caller.
         let task = unsafe {
-            let global = Global::new();
-            Module::main(global)
-                .submodule_ref("JlrsMultitask")?
+            Module::main(&frame)
+                .submodule(&frame, "JlrsMultitask")?
                 .wrapper_unchecked()
-                .function_ref("asynccall")?
+                .function(&frame, "asynccall")?
                 .wrapper_unchecked()
                 .call(&mut *frame, &mut vals)
                 .map_err(|e| {
@@ -83,7 +85,6 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             }
         }
 
-        yield_task(frame);
         Ok(JuliaFuture { shared_state })
     }
 
@@ -116,11 +117,10 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         // Safety: module contents are globally rooted, and the function is guaranteed to be safe
         // by the caller.
         let task = unsafe {
-            let global = Global::new();
-            Module::main(global)
-                .submodule_ref("JlrsMultitask")?
+            Module::main(&frame)
+                .submodule(&frame, "JlrsMultitask")?
                 .wrapper_unchecked()
-                .function_ref("interactivecall")?
+                .function(&frame, "interactivecall")?
                 .wrapper_unchecked()
                 .call(&mut *frame, &mut vals)
                 .map_err(|e| {
@@ -138,7 +138,6 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             }
         }
 
-        yield_task(frame);
         Ok(JuliaFuture { shared_state })
     }
 
@@ -170,11 +169,10 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         // Safety: module contents are globally rooted, and the function is guaranteed to be safe
         // by the caller.
         let task = unsafe {
-            let global = Global::new();
-            Module::main(global)
-                .submodule_ref("JlrsMultitask")?
+            Module::main(&frame)
+                .submodule(&frame, "JlrsMultitask")?
                 .wrapper_unchecked()
-                .function_ref("scheduleasynclocal")?
+                .function(&frame, "scheduleasynclocal")?
                 .wrapper_unchecked()
                 .call(&mut *frame, &mut vals)
                 .map_err(|e| {
@@ -192,7 +190,6 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             }
         }
 
-        yield_task(frame);
         Ok(JuliaFuture { shared_state })
     }
 
@@ -224,11 +221,10 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         // Safety: module contents are globally rooted, and the function is guaranteed to be safe
         // by the caller.
         let task = unsafe {
-            let global = Global::new();
-            Module::main(global)
-                .submodule_ref("JlrsMultitask")?
+            Module::main(&frame)
+                .submodule(&frame, "JlrsMultitask")?
                 .wrapper_unchecked()
-                .function_ref("scheduleasync")?
+                .function(&frame, "scheduleasync")?
                 .wrapper_unchecked()
                 .call(&mut *frame, &mut vals)
                 .map_err(|e| {
@@ -246,7 +242,6 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             }
         }
 
-        yield_task(frame);
         Ok(JuliaFuture { shared_state })
     }
 
@@ -277,11 +272,10 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         // Safety: module contents are globally rooted, and the function is guaranteed to be safe
         // by the caller.
         let task = unsafe {
-            let global = Global::new();
-            Module::main(global)
-                .submodule_ref("JlrsMultitask")?
+            Module::main(&frame)
+                .submodule(&frame, "JlrsMultitask")?
                 .wrapper_unchecked()
-                .function_ref("asynccall")?
+                .function(&frame, "asynccall")?
                 .wrapper_unchecked()
                 .provide_keywords(func.keywords())?
                 .call(&mut *frame, &mut vals)
@@ -299,8 +293,6 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                 _ => JlrsError::exception_error("Cannot set task".into())?,
             }
         }
-
-        yield_task(frame);
 
         Ok(JuliaFuture { shared_state })
     }
@@ -333,11 +325,10 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         // Safety: module contents are globally rooted, and the function is guaranteed to be safe
         // by the caller.
         let task = unsafe {
-            let global = Global::new();
-            Module::main(global)
-                .submodule_ref("JlrsMultitask")?
+            Module::main(&frame)
+                .submodule(&frame, "JlrsMultitask")?
                 .wrapper_unchecked()
-                .function_ref("interactivecall")?
+                .function(&frame, "interactivecall")?
                 .wrapper_unchecked()
                 .provide_keywords(func.keywords())?
                 .call(&mut *frame, &mut vals)
@@ -355,8 +346,6 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                 _ => JlrsError::exception_error("Cannot set task".into())?,
             }
         }
-
-        yield_task(frame);
 
         Ok(JuliaFuture { shared_state })
     }
@@ -389,11 +378,10 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         // Safety: module contents are globally rooted, and the function is guaranteed to be safe
         // by the caller.
         unsafe {
-            let global = Global::new();
-            let task = Module::main(global)
-                .submodule_ref("JlrsMultitask")?
+            let task = Module::main(&frame)
+                .submodule(&frame, "JlrsMultitask")?
                 .wrapper_unchecked()
-                .function_ref("scheduleasynclocal")?
+                .function(&frame, "scheduleasynclocal")?
                 .wrapper_unchecked()
                 .provide_keywords(func.keywords())?
                 .call(&mut *frame, &mut vals)
@@ -410,8 +398,6 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                     _ => JlrsError::exception_error("Cannot set task".into())?,
                 }
             }
-
-            yield_task(frame);
 
             Ok(JuliaFuture { shared_state })
         }
@@ -445,11 +431,10 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         // Safety: module contents are globally rooted, and the function is guaranteed to be safe
         // by the caller.
         let task = unsafe {
-            let global = Global::new();
-            Module::main(global)
-                .submodule_ref("JlrsMultitask")?
+            Module::main(&frame)
+                .submodule(&frame, "JlrsMultitask")?
                 .wrapper_unchecked()
-                .function_ref("scheduleasync")?
+                .function(&frame, "scheduleasync")?
                 .wrapper_unchecked()
                 .provide_keywords(func.keywords())?
                 .call(&mut *frame, &mut vals)
@@ -468,7 +453,6 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             }
         }
 
-        yield_task(frame);
         Ok(JuliaFuture { shared_state })
     }
 }
@@ -483,8 +467,8 @@ impl<'frame, 'data> Future for JuliaFuture<'frame, 'data> {
                 // result is reachable through the task which must be rooted at ths point.
                 unsafe {
                     let global = Global::new();
-                    let f = Module::base(global)
-                        .function_ref("fetch")
+                    let f = Module::base(&global)
+                        .function(&global, "fetch")
                         .unwrap()
                         .wrapper_unchecked();
 
@@ -510,8 +494,7 @@ impl<'frame, 'data> Future for JuliaFuture<'frame, 'data> {
     }
 }
 
-// This function is set as a constant in `Main.Jlrs` and called using `ccall` to indicate a task has
-// completed.
+// This function is called using `ccall` to indicate a task has completed.
 #[cfg(feature = "async-rt")]
 pub(crate) unsafe extern "C" fn wake_task(state: *const Mutex<TaskState>) {
     let state = Arc::from_raw(state);

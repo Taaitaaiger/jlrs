@@ -2,7 +2,7 @@
 
 use crate::{
     impl_julia_typecheck,
-    memory::{global::Global, output::Output, scope::PartialScope},
+    memory::target::Target,
     private::Private,
     wrappers::ptr::{
         private::WrapperPriv,
@@ -10,17 +10,10 @@ use crate::{
         Wrapper,
     },
 };
-use cfg_if::cfg_if;
 use jl_sys::{jl_islayout_inline, jl_type_union, jl_uniontype_t, jl_uniontype_type};
 use std::{marker::PhantomData, ptr::NonNull};
 
 use super::Ref;
-
-cfg_if! {
-    if #[cfg(not(all(target_os = "windows", feature = "lts")))] {
-        use crate::error::{JuliaResult, JuliaResultRef};
-    }
-}
 
 /// A struct field can have a type that's a union of several types. In this case, the type of this
 /// field is an instance of `Union`.
@@ -38,10 +31,10 @@ impl<'scope> Union<'scope> {
     /// [`Union`]: crate::wrappers::ptr::union::Union
     /// [`DataType`]: crate::wrappers::ptr::datatype::DataType
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub fn new<'target, V, S>(scope: S, types: V) -> JuliaResult<'target, 'static>
+    pub fn new<'target, V, T>(target: T, types: V) -> T::Result
     where
         V: AsRef<[Value<'scope, 'static>]>,
-        S: PartialScope<'target>,
+        T: Target<'target, 'static>,
     {
         use crate::catch::catch_exceptions;
         use jl_sys::jl_value_t;
@@ -57,10 +50,12 @@ impl<'scope> Union<'scope> {
                 Ok(())
             };
 
-            match catch_exceptions(&mut callback).unwrap() {
-                Ok(ptr) => Ok(scope.value(NonNull::new_unchecked(ptr), Private)),
-                Err(e) => Err(scope.value(NonNull::new_unchecked(e.ptr()), Private)),
-            }
+            let res = match catch_exceptions(&mut callback).unwrap() {
+                Ok(ptr) => Ok(NonNull::new_unchecked(ptr)),
+                Err(e) => Err(NonNull::new_unchecked(e.ptr())),
+            };
+
+            target.result_from_ptr(res, Private)
         }
     }
 
@@ -75,74 +70,14 @@ impl<'scope> Union<'scope> {
     ///
     /// [`Union`]: crate::wrappers::ptr::union::Union
     /// [`DataType`]: crate::wrappers::ptr::datatype::DataType
-    pub unsafe fn new_unchecked<'target, V, S>(scope: S, types: V) -> Value<'target, 'static>
+    pub unsafe fn new_unchecked<'target, V, T>(target: T, types: V) -> T::Data
     where
         V: AsRef<[Value<'scope, 'static>]>,
-        S: PartialScope<'target>,
+        T: Target<'target, 'static>,
     {
         let types = types.as_ref();
         let un = jl_type_union(types.as_ptr() as *mut _, types.len());
-        scope.value(NonNull::new_unchecked(un), Private)
-    }
-
-    /// Returns the union of all types in `types`. For each of these types, [`Value::is_kind`]
-    /// must return `true`. Note that the result is not necessarily a [`Union`], for example the
-    /// union of a single [`DataType`] is that type, not a `Union` with a single variant. Unlike
-    /// [`Union::new`] this method doesn't root the allocated value or exception.
-    ///
-    /// [`Union`]: crate::wrappers::ptr::union::Union
-    /// [`DataType`]: crate::wrappers::ptr::datatype::DataType
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub fn new_unrooted<'global, V>(
-        _: Global<'global>,
-        types: V,
-    ) -> JuliaResultRef<'global, 'static>
-    where
-        V: AsRef<[Value<'scope, 'static>]>,
-    {
-        use crate::catch::catch_exceptions;
-        use jl_sys::jl_value_t;
-        use std::mem::MaybeUninit;
-
-        // Safety: if an exception is thrown it's caught, the result is immediately rooted
-        unsafe {
-            let types = types.as_ref();
-
-            let mut callback = |result: &mut MaybeUninit<*mut jl_value_t>| {
-                let res = jl_type_union(types.as_ptr() as *mut _, types.len());
-                result.write(res);
-                Ok(())
-            };
-
-            match catch_exceptions(&mut callback).unwrap() {
-                Ok(ptr) => Ok(ValueRef::wrap(ptr)),
-                Err(e) => Err(e),
-            }
-        }
-    }
-
-    /// Returns the union of all types in `types`. For each of these types, [`Value::is_kind`]
-    /// must return `true`. Note that the result is not necessarily a [`Union`], for example the
-    /// union of a single [`DataType`] is that type, not a `Union` with a single variant. Unlike
-    /// [`Union::new`] this method doesn't root the allocated value.
-    ///
-    /// If an exception is thrown it isn't caught.
-    ///
-    /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
-    /// function.
-    ///
-    /// [`Union`]: crate::wrappers::ptr::union::Union
-    /// [`DataType`]: crate::wrappers::ptr::datatype::DataType
-    pub unsafe fn new_unrooted_unchecked<'global, V>(
-        _: Global<'global>,
-        types: V,
-    ) -> ValueRef<'global, 'static>
-    where
-        V: AsRef<[Value<'scope, 'static>]>,
-    {
-        let types = types.as_ref();
-        let un = jl_type_union(types.as_ptr() as *mut _, types.len());
-        ValueRef::wrap(un)
+        target.data_from_ptr(NonNull::new_unchecked(un), Private)
     }
 
     /// Returns true if the bits-union optimization applies to this union type.
@@ -201,14 +136,13 @@ impl<'scope> Union<'scope> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().b) }
     }
 
-    /// Use the `Output` to extend the lifetime of this data.
-    pub fn root<'target>(self, output: Output<'target>) -> Union<'target> {
-        // Safety: the pointer points to valid data
-        unsafe {
-            let ptr = self.unwrap_non_null(Private);
-            output.set_root::<Union>(ptr);
-            Union::wrap_non_null(ptr, Private)
-        }
+    /// Use the target to reroot this data.
+    pub fn root<'target, T>(self, target: T) -> T::Data
+    where
+        T: Target<'target, 'static, Union<'target>>,
+    {
+        // Safety: the data is valid.
+        unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
     }
 }
 
@@ -217,6 +151,7 @@ impl_debug!(Union<'_>);
 
 impl<'scope> WrapperPriv<'scope, '_> for Union<'scope> {
     type Wraps = jl_uniontype_t;
+    type StaticPriv = Union<'static>;
     const NAME: &'static str = "Union";
 
     // Safety: `inner` must not have been freed yet, the result must never be

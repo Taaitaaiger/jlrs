@@ -188,6 +188,7 @@ fn main() {
             .header("src/jlrs_cc.h")
             .size_t_is_usize(true)
             .layout_tests(false)
+            .allowlist_function("jl_adopt_thread")
             .allowlist_function("jl_alloc_array_1d")
             .allowlist_function("jl_alloc_array_2d")
             .allowlist_function("jl_alloc_array_3d")
@@ -238,8 +239,10 @@ fn main() {
             .allowlist_function("jl_gc_enable")
             .allowlist_function("jl_gc_is_enabled")
             .allowlist_function("jl_gc_mark_queue_obj")
+            .allowlist_function("jl_gc_mark_queue_objarray")
             .allowlist_function("jl_gc_queue_root")
             .allowlist_function("jl_gc_safepoint")
+            .allowlist_function("jl_gc_schedule_foreign_sweepfunc")
             .allowlist_function("jl_get_current_task")
             .allowlist_function("jl_get_global")
             .allowlist_function("jl_get_libllvm")
@@ -263,6 +266,7 @@ fn main() {
             .allowlist_function("jl_ver_is_release")
             .allowlist_function("jl_isa")
             .allowlist_function("jl_islayout_inline")
+            .allowlist_function("jl_kwcall_func")
             .allowlist_function("jl_new_array")
             .allowlist_function("jl_new_foreign_type")
             .allowlist_function("jl_new_struct_uninit")
@@ -275,7 +279,6 @@ fn main() {
             .allowlist_function("jl_ptr_to_array")
             .allowlist_function("jl_ptr_to_array_1d")
             .allowlist_function("jl_reshape_array")
-            .allowlist_function("jl_gc_schedule_foreign_sweepfunc")
             .allowlist_function("jl_set_const")
             .allowlist_function("jl_set_global")
             .allowlist_function("jl_set_nth_field")
@@ -388,6 +391,7 @@ fn main() {
             .allowlist_var("jl_int8_type")
             .allowlist_var("jl_interrupt_exception")
             .allowlist_var("jl_intrinsic_type")
+            .allowlist_var("jl_kwcall_func")
             .allowlist_var("jl_lineinfonode_type")
             .allowlist_var("jl_linenumbernode_type")
             .allowlist_var("jl_llvmpointer_type")
@@ -453,8 +457,7 @@ fn main() {
             .allowlist_var("jl_vararg_typename")
             .allowlist_var("jl_vecelement_typename")
             .allowlist_var("jl_voidpointer_type")
-            .allowlist_var("jl_weakref_type")
-            .allowlist_var("jl_weakref_typejl_abstractslot_type");
+            .allowlist_var("jl_weakref_type");
 
         #[cfg(not(all(feature = "lts", any(windows, feature = "windows"))))]
         {

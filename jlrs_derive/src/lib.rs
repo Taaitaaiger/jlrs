@@ -182,20 +182,24 @@ fn impl_into_julia(ast: &syn::DeriveInput) -> TokenStream {
 
     let into_julia_impl = quote! {
         unsafe impl ::jlrs::convert::into_julia::IntoJulia for #name {
-            fn julia_type<'target>(global: ::jlrs::memory::global::Global<'target>) -> ::jlrs::wrappers::ptr::datatype::DataTypeRef<'target> {
+            fn julia_type<'scope, T>(target: T) -> T::Data
+            where
+                T: ::jlrs::memory::target::Target<'scope, 'static, ::jlrs::wrappers::ptr::datatype::DataType<'scope>>,
+            {
                 unsafe {
-                    ::jlrs::wrappers::ptr::module::Module::#func(global)
+                    let global = target.global();
+                    ::jlrs::wrappers::ptr::module::Module::#func(&global)
                         #(
-                            .submodule_ref(#modules_it)
+                            .submodule(&global, #modules_it)
                             .expect(&format!("Submodule {} cannot be found", #modules_it_b))
                             .wrapper_unchecked()
                         )*
-                        .global_ref(#ty)
+                        .global(&global, #ty)
                         .expect(&format!("Type {} cannot be found in module", #ty))
                         .value_unchecked()
                         .cast::<::jlrs::wrappers::ptr::datatype::DataType>()
                         .expect("Type is not a DataType")
-                        .as_ref()
+                        .root(target)
                 }
             }
 
@@ -302,7 +306,10 @@ fn impl_valid_layout(ast: &syn::DeriveInput) -> TokenStream {
                             return false;
                         }
 
-                        let field_types = dt.field_types().wrapper_unchecked().unrestricted_data().as_slice();
+                        let field_types = dt.field_types();
+                        let field_types_svec = field_types.wrapper_unchecked();
+                        let field_types_data = field_types_svec.data();
+                        let field_types = field_types_data.as_slice();
 
                         #(
                             if !<#rs_non_union_fields as ::jlrs::layout::valid_layout::ValidLayout>::valid_layout(field_types[#jl_non_union_field_idxs].wrapper_unchecked()) {

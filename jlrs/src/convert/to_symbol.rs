@@ -3,18 +3,22 @@
 //! Many things in Julia are accessed with [`Symbol`]s, the [`ToSymbol`] trait allows for
 //! strings to be used instead.
 
+use crate::memory::target::Target;
 use crate::wrappers::ptr::symbol::Symbol;
-use crate::{memory::global::Global, private::Private, wrappers::ptr::string::JuliaString};
+use crate::{private::Private, wrappers::ptr::string::JuliaString};
 
 /// Trait implemented by types that can be converted to a [`Symbol`].
 pub trait ToSymbol: private::ToSymbolPriv {
     /// Convert `self` to a `Symbol`.
-    fn to_symbol<'global>(&self, _: Global<'global>) -> Symbol<'global> {
-        // Safety: Requiring a Global guarantees this method can only be called from a thread
-        // known to Julia
+    ///
+    /// This method only needs a reference to a target because `Symbol` are globally rooted.
+    fn to_symbol<'target, T: Target<'target, 'static>>(&self, _: &T) -> Symbol<'target> {
+        // Safety: Requiring a reference to a target guarantees this method can only be called
+        // from a thread known to Julia.
         unsafe { self.to_symbol_priv(Private) }
     }
 }
+
 impl<T: AsRef<str>> ToSymbol for T {}
 impl ToSymbol for Symbol<'_> {}
 impl ToSymbol for JuliaString<'_> {}

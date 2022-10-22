@@ -10,27 +10,31 @@ mod tests {
             #[test]
             fn $name() {
                 JULIA.with(|j| {
+                    let mut frame = StackFrame::new();
                     let mut jlrs = j.borrow_mut();
-                    jlrs.scope(|_global, mut frame| {
-                        let val: $t = $val;
-                        let v = Value::new(&mut frame, val);
-                        assert!(<$t>::valid_layout(v.datatype().as_value()));
-                        Ok(())
-                    })
-                    .unwrap();
+                    jlrs.instance(&mut frame)
+                        .scope(|mut frame| {
+                            let val: $t = $val;
+                            let v = Value::new(&mut frame, val);
+                            assert!(<$t>::valid_layout(v.datatype().as_value()));
+                            Ok(())
+                        })
+                        .unwrap();
                 })
             }
 
             #[test]
             fn $invalid_name() {
                 JULIA.with(|j| {
+                    let mut frame = StackFrame::new();
                     let mut jlrs = j.borrow_mut();
-                    jlrs.scope(|_global, mut frame| {
-                        let v = Value::new(&mut frame, null_mut::<$t>());
-                        assert!(!<$t>::valid_layout(v.datatype().as_value()));
-                        Ok(())
-                    })
-                    .unwrap();
+                    jlrs.instance(&mut frame)
+                        .scope(|mut frame| {
+                            let v = Value::new(&mut frame, null_mut::<$t>());
+                            assert!(!<$t>::valid_layout(v.datatype().as_value()));
+                            Ok(())
+                        })
+                        .unwrap();
                 })
             }
         };
@@ -139,13 +143,15 @@ mod tests {
     #[test]
     fn invalid_ptr_layout() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
-            jlrs.scope(|_global, mut frame| {
-                let v = Value::new(&mut frame, null_mut::<u8>());
-                assert!(!<u8>::valid_layout(v.datatype().as_value()));
-                Ok(())
-            })
-            .unwrap();
+            jlrs.instance(&mut frame)
+                .scope(|mut frame| {
+                    let v = Value::new(&mut frame, null_mut::<u8>());
+                    assert!(!<u8>::valid_layout(v.datatype().as_value()));
+                    Ok(())
+                })
+                .unwrap();
         })
     }
 
@@ -153,23 +159,25 @@ mod tests {
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     fn valid_layout_array() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
-            jlrs.scope(|global, mut frame| {
-                unsafe {
-                    let v = Array::new::<i32, _, _, _>(&mut frame, (2, 2))
-                        .into_jlrs_result()?
-                        .as_value();
-                    assert!(ArrayRef::valid_layout(v.datatype().as_value()));
+            jlrs.instance(&mut frame)
+                .scope(|mut frame| {
+                    unsafe {
+                        let v = Array::new::<i32, _, _>(frame.as_extended_target(), (2, 2))
+                            .into_jlrs_result()?
+                            .as_value();
+                        assert!(ArrayRef::valid_layout(v.datatype().as_value()));
 
-                    let ua = Module::base(global)
-                        .global_ref("Array")?
-                        .wrapper_unchecked();
+                        let ua = Module::base(&frame)
+                            .global(&frame, "Array")?
+                            .wrapper_unchecked();
 
-                    assert!(ArrayRef::valid_layout(ua));
-                }
-                Ok(())
-            })
-            .unwrap();
+                        assert!(ArrayRef::valid_layout(ua));
+                    }
+                    Ok(())
+                })
+                .unwrap();
         })
     }
 
@@ -177,15 +185,17 @@ mod tests {
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     fn invalid_layout_array() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
-            jlrs.scope(|_global, mut frame| {
-                let v = Array::new::<i32, _, _, _>(&mut frame, (2, 2))
-                    .into_jlrs_result()?
-                    .as_value();
-                assert!(!bool::valid_layout(v));
-                Ok(())
-            })
-            .unwrap();
+            jlrs.instance(&mut frame)
+                .scope(|mut frame| {
+                    let v = Array::new::<i32, _, _>(frame.as_extended_target(), (2, 2))
+                        .into_jlrs_result()?
+                        .as_value();
+                    assert!(!bool::valid_layout(v));
+                    Ok(())
+                })
+                .unwrap();
         })
     }
 }

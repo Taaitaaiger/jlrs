@@ -10,10 +10,7 @@ use crate::error::JlrsResult;
 use std::path::{Path, PathBuf};
 
 #[cfg(feature = "sync-rt")]
-use super::sync_rt::{Julia};
-#[cfg(feature = "sync-rt")]
-use crate::memory::context::ContextFrame;
-
+use super::sync_rt::PendingJulia;
 
 /// Build a sync runtime.
 ///
@@ -67,6 +64,12 @@ cfg_if::cfg_if! {
             }
 
             #[cfg(feature = "nightly")]
+            /// Set the number of `:interactive` threads Julia can use.
+            ///
+            /// If it's set to 0, the default value, no threads are allocated to this pool.
+            ///
+            /// This method is not available for the LTS version, instead you must set the number
+            /// of threads using the `JULIA_NUM_THREADS` environment variable.
             pub fn n_interactive_threads(mut self, n: usize) -> Self {
                 self.n_threadsi = n;
                 self
@@ -114,11 +117,15 @@ cfg_if::cfg_if! {
             }
 
             /// Initialize Julia on another thread.
+            ///
+            /// You must set the maximum number of concurrent tasks with the `N` const generic.
             pub unsafe fn start<const N: usize>(self) -> JlrsResult<(AsyncJulia<R>, std::thread::JoinHandle<JlrsResult<()>>)> {
                 AsyncJulia::init::<_, N>(self)
             }
 
             /// Initialize Julia as a blocking task.
+            ///
+            /// You must set the maximum number of concurrent tasks with the `N` const generic.
             pub unsafe fn start_async<const N: usize>(self) -> JlrsResult<(AsyncJulia<R>, R::RuntimeHandle)> {
                 AsyncJulia::init_async::<_, N>(self)
             }
@@ -134,8 +141,8 @@ impl RuntimeBuilder {
 
     #[cfg(feature = "sync-rt")]
     /// initialize Julia on the current thread.
-    pub unsafe fn start<'context>(self, base_frame: &'context ContextFrame) -> JlrsResult<Julia> {
-        Julia::init(self, base_frame)
+    pub unsafe fn start<'context>(self) -> JlrsResult<PendingJulia> {
+        PendingJulia::init(self)
     }
 
     /// Upgrade this builder to an [`AsyncRuntimeBuilder`].

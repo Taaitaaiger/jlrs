@@ -11,19 +11,21 @@ mod tests {
             #[test]
             fn $func() {
                 JULIA.with(|j| {
+                    let mut frame = StackFrame::new();
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope(|global, _| {
-                        let v1 = Value::$func(global);
-                        let v2 = unsafe {
-                            Module::core(global)
-                                .global_ref($tyname)?
-                                .wrapper_unchecked()
-                        };
-                        assert!(v1.datatype().as_value() == v2);
-                        Ok(())
-                    })
-                    .unwrap();
+                    jlrs.instance(&mut frame)
+                        .scope(|frame| {
+                            let v1 = Value::$func(&frame);
+                            let v2 = unsafe {
+                                Module::core(&frame)
+                                    .global(&frame, $tyname)?
+                                    .wrapper_unchecked()
+                            };
+                            assert!(v1.datatype().as_value() == v2);
+                            Ok(())
+                        })
+                        .unwrap();
                 });
             }
         };
@@ -34,22 +36,24 @@ mod tests {
             #[test]
             fn $func() {
                 JULIA.with(|j| {
+                    let mut frame = StackFrame::new();
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope(|global, _| {
-                        #[allow(unused_unsafe)]
-                        unsafe {
-                            let v1 = Value::$func(global);
-                            let v2 = unsafe {
-                                Module::core(global)
-                                    .global_ref($tyname)?
-                                    .wrapper_unchecked()
-                            };
-                            assert!(v1.isa(v2));
-                        }
-                        Ok(())
-                    })
-                    .unwrap();
+                    jlrs.instance(&mut frame)
+                        .scope(|frame| {
+                            #[allow(unused_unsafe)]
+                            unsafe {
+                                let v1 = Value::$func(&frame);
+                                let v2 = unsafe {
+                                    Module::core(&frame)
+                                        .global(&frame, $tyname)?
+                                        .wrapper_unchecked()
+                                };
+                                assert!(v1.isa(v2));
+                            }
+                            Ok(())
+                        })
+                        .unwrap();
                 });
             }
         };
@@ -60,22 +64,24 @@ mod tests {
             #[test]
             fn $func() {
                 JULIA.with(|j| {
+                    let mut frame = StackFrame::new();
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope(|global, _| {
-                        #[allow(unused_unsafe)]
-                        unsafe {
-                            let v1 = Value::$func(global);
-                            let v2 = unsafe {
-                                Module::core(global)
-                                    .global_ref($tyname)?
-                                    .wrapper_unchecked()
-                            };
-                            assert!(v1.subtype(v2));
-                        }
-                        Ok(())
-                    })
-                    .unwrap();
+                    jlrs.instance(&mut frame)
+                        .scope(|frame| {
+                            #[allow(unused_unsafe)]
+                            unsafe {
+                                let v1 = Value::$func(&frame);
+                                let v2 = unsafe {
+                                    Module::core(&frame)
+                                        .global(&frame, $tyname)?
+                                        .wrapper_unchecked()
+                                };
+                                assert!(v1.subtype(v2));
+                            }
+                            Ok(())
+                        })
+                        .unwrap();
                 });
             }
         };
@@ -86,19 +92,21 @@ mod tests {
             #[test]
             fn $func() {
                 JULIA.with(|j| {
+                    let mut frame = StackFrame::new();
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope(|global, _| {
-                        let v1 = UnionAll::$func(global);
-                        let v2 = unsafe {
-                            Module::core(global)
-                                .global_ref($tyname)?
-                                .wrapper_unchecked()
-                        };
-                        assert!(v1.as_value() == v2);
-                        Ok(())
-                    })
-                    .unwrap();
+                    jlrs.instance(&mut frame)
+                        .scope(|frame| {
+                            let v1 = UnionAll::$func(&frame);
+                            let v2 = unsafe {
+                                Module::core(&frame)
+                                    .global(&frame, $tyname)?
+                                    .wrapper_unchecked()
+                            };
+                            assert!(v1.as_value() == v2);
+                            Ok(())
+                        })
+                        .unwrap();
                 });
             }
         };
@@ -109,19 +117,21 @@ mod tests {
             #[test]
             fn $func() {
                 JULIA.with(|j| {
+                    let mut frame = StackFrame::new();
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope(|global, _| {
-                        let v1 = UnionAll::$func(global);
-                        let v2 = unsafe {
-                            Module::core(global)
-                                .global_ref($tyname)?
-                                .wrapper_unchecked()
-                        };
-                        assert!(v1.as_value().isa(v2));
-                        Ok(())
-                    })
-                    .unwrap();
+                    jlrs.instance(&mut frame)
+                        .scope(|frame| {
+                            let v1 = UnionAll::$func(&frame);
+                            let v2 = unsafe {
+                                Module::core(&frame)
+                                    .global(&frame, $tyname)?
+                                    .wrapper_unchecked()
+                            };
+                            assert!(v1.as_value().isa(v2));
+                            Ok(())
+                        })
+                        .unwrap();
                 });
             }
         };
@@ -132,19 +142,21 @@ mod tests {
             #[test]
             fn $func() {
                 JULIA.with(|j| {
+                    let mut frame = StackFrame::new();
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope(|global, _| {
-                        let v1 = DataType::$func(global);
-                        let v2 = unsafe {
-                            Module::core(global)
-                                .global_ref($tyname)?
-                                .wrapper_unchecked()
-                        };
-                        assert!(v1.as_value().isa(v2));
-                        Ok(())
-                    })
-                    .unwrap();
+                    jlrs.instance(&mut frame)
+                        .scope(|frame| {
+                            let v1 = DataType::$func(&frame);
+                            let v2 = unsafe {
+                                Module::core(&frame)
+                                    .global(&frame, $tyname)?
+                                    .wrapper_unchecked()
+                            };
+                            assert!(v1.as_value().isa(v2));
+                            Ok(())
+                        })
+                        .unwrap();
                 });
             }
         };

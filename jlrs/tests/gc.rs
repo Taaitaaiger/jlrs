@@ -1,18 +1,24 @@
+mod util;
 #[cfg(feature = "sync-rt")]
 mod tests {
-    use super::super::super::util::JULIA;
-    use jlrs::memory::gc::{Gc, GcCollection};
+    use super::util::JULIA;
+    use jlrs::{
+        memory::gc::{Gc, GcCollection},
+        prelude::*,
+    };
 
     #[test]
     fn disable_enable_gc() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
+            let mut jlrs = jlrs.instance(&mut frame);
             jlrs.enable_gc(false);
             assert!(!jlrs.gc_is_enabled());
             jlrs.enable_gc(true);
             assert!(jlrs.gc_is_enabled());
 
-            jlrs.scope(|_global, mut frame| {
+            jlrs.scope(|frame| {
                 frame.enable_gc(false);
                 assert!(!frame.gc_is_enabled());
                 frame.enable_gc(true);
@@ -26,13 +32,15 @@ mod tests {
     #[test]
     fn collect_garbage() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
+            let mut jlrs = jlrs.instance(&mut frame);
 
             jlrs.gc_collect(GcCollection::Auto);
             jlrs.gc_collect(GcCollection::Incremental);
             jlrs.gc_collect(GcCollection::Full);
 
-            jlrs.scope(|_global, mut frame| {
+            jlrs.scope(|frame| {
                 frame.gc_collect(GcCollection::Auto);
                 frame.gc_collect(GcCollection::Incremental);
                 frame.gc_collect(GcCollection::Full);
@@ -46,10 +54,12 @@ mod tests {
     #[test]
     fn insert_safepoint() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
+            let mut jlrs = jlrs.instance(&mut frame);
             jlrs.gc_safepoint();
 
-            jlrs.scope(|_global, mut frame| {
+            jlrs.scope(|frame| {
                 frame.gc_safepoint();
                 Ok(())
             })

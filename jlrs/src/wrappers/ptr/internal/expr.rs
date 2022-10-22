@@ -2,7 +2,7 @@
 
 use crate::{
     impl_julia_typecheck,
-    memory::output::Output,
+    memory::target::Target,
     private::Private,
     wrappers::ptr::{array::ArrayRef, private::WrapperPriv, symbol::SymbolRef, Ref},
 };
@@ -35,14 +35,13 @@ impl<'scope> Expr<'scope> {
         unsafe { ArrayRef::wrap(self.unwrap_non_null(Private).as_ref().args) }
     }
 
-    /// Use the `Output` to extend the lifetime of this data.
-    pub fn root<'target>(self, output: Output<'target>) -> Expr<'target> {
-        // Safety: the pointer points to valid data
-        unsafe {
-            let ptr = self.unwrap_non_null(Private);
-            output.set_root::<Expr>(ptr);
-            Expr::wrap_non_null(ptr, Private)
-        }
+    /// Use the target to reroot this data.
+    pub fn root<'target, T>(self, target: T) -> T::Data
+    where
+        T: Target<'target, 'static, Expr<'target>>,
+    {
+        // Safety: the data is valid.
+        unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
     }
 }
 
@@ -51,6 +50,7 @@ impl_debug!(Expr<'_>);
 
 impl<'scope> WrapperPriv<'scope, '_> for Expr<'scope> {
     type Wraps = jl_expr_t;
+    type StaticPriv = Expr<'static>;
     const NAME: &'static str = "Expr";
 
     // Safety: `inner` must not have been freed yet, the result must never be

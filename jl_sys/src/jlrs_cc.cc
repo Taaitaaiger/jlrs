@@ -17,7 +17,6 @@ extern "C"
         {
             res = {.tag = JLRS_CATCH_EXCECPTION, .error = jl_current_exception()};
         }
-        jl_exception_clear();
 
         return res;
     }

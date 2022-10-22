@@ -4,75 +4,27 @@
 //! enforcing a degree of compile-time memory safety by applying reasonable lifetime bounds to
 //! Julia data.
 //!
-//! The Julia GC is unaware of any references to Julia data existing outside of Julia itself. To
-//! make these references known to the GC, data that is used must be rooted. This ensures the GC
-//! doesn't accidentally identify the data as unused and free it.
+//! The functionality is split across three submodules, [`target`], [`stack_frame`], and [`gc`].
+//! The first provides targets, which are used by methods that return Julia data, they ensure the
+//! returned data is of the correct type and has appropriate lifetimes assigned to it. The second
+//! provides a raw GC frame. The last provides access to methods that control the GC itself.
 //!
-//! A scope must be created before data can be rooted, the sync runtime lets you create a scope
-//! directly with [`Julia::scope`]. This method takes a closure which takes two arguments, the
-//! second is a [`GcFrame`]. A `GcFrame` is used to store roots, each scope has its own `GcFrame`,
-//! any Julia data rooted in this frame is guaranteed to be protected from being freed by the GC
-//! until you leave the scope.
+//! Julia data can be considered as being owned by the Julia GC because the GC is responsible for
+//! freeing this data after it has become inaccessible. In order to determine what data is still
+//! accessible a set of roots is maintained. These roots are pointers to Julia data, during the
+//! GC's marking phase these roots are used as a starting point to recursively mark all pointers
+//! to other Julia data that can be reached as accessible. Afterwards, inaccessible data is freed
+//! during the GC's sweep phase.
 //!
-//! There are two other frame types, [`AsyncGcFrame`] and [`NullFrame`], the first is used by the
-//! async runtime and is used with several async functions, while the latter is only available
-//! when calling Rust from Julia with its `ccall` interface. All these frame types implement the
-//! [`Frame`] trait.
-//!
-//! It's important to avoid rooting data longer than necessary. As more data is rooted, more
-//! memory remains in use, which causes the GC to run more often and require more time to run.
-//! Scopes can be nested by calling [`Frame::scope`], they form a single nested hierarchy. Any
-//! data rooted in the frame provided to this new scope is rooted until that new scope ends.
-//! Lifetimes ensure no data that is rooted in the child scope can be returned to the parent
-//! scope.
-//!
-//! To return rooted data from a child scope, it must be rooted in an ancestral scope. The method
-//! [`Frame::output`] can be used to reserve an [`Output`] in a frame. Methods that return rooted
-//! data generally take an implementation of [`PartialScope`] or [`Scope`]. Methods that take a
-//! `PartialScope` only need to root a single value, both `Output` and mutable references to an
-//! implementation of `Frame` implement this trait. In the first case the data is rooted in the
-//! frame targeted by the output, in the second it's rooted in the current frame. Methods that
-//! take a `Scope` need to root temporary data. While mutable references to an implementation of
-//! `Frame` implement this trait, `Output` doesn't. An `Output` must first be upgraded to an
-//! [`OutputScope`] by calling [`Output::into_scope`].
-//!
-//! Not all data needs to be rooted, roots form the starting point for the GC to trace the entire
-//! graph of reachable data. As long as data is reachable from a root, it won't be freed. Julia
-//! modules provide global scopes, their contents are rooted unless the module is reloaded or the
-//! data is overwritten some other way (e.g. by mutating a global value). If you never use the
-//! result of a Julia function call the result doesn't need to be rooted either. Most methods that
-//! return rooted Julia data have a corresponding method that leaves the result unrooted. These
-//! methods often only require a [`Global`], which ensures that this data can't be accessed before
-//! Julia has been initialized and that reasonable lifetime bounds are applied.
-//!
-//! The final tool that is available to manage the rootedness of Julia data is the
-//! [`ReusableSlot`], it can be created with [`Frame::reusable_slot`] and provides a slot in that
-//! frame that can be overwritten.
-//!
-//! [`Global`]: global::Global
-//! [`ReusableSlot`]: reusable_slot::ReusableSlot
-//! [`GcFrame`]: frame::GcFrame
-//! [`AsyncGcFrame`]: frame::AsyncGcFrame
-//! [`NullFrame`]: frame::NullFrame
-//! [`PartialScope`]: scope::PartialScope
-//! [`Scope`]: scope::Scope
-//! [`Frame`]: frame::Frame
-//! [`Frame::scope`]: frame::Frame::scope
-//! [`Frame::output`]: frame::Frame::output
-//! [`Frame::reusable_slot`]: frame::Frame::reusable_slot
-//! [`Output`]: output::Output
-//! [`OutputScope`]: scope::OutputScope
-//! [`Output::into_scope`]: output::Output::into_scope
-//! [`Julia::scope`]: crate::runtime::sync_rt::Julia::scope
-pub mod accessor;
-pub mod context;
-pub mod frame;
+//! When you're writing Julia code you don't have to worry about this because the Julia compiler
+//! ensures that data remains reachable while it's in use. Low-level code that interfaces directly
+//! with the C API, either through a `ccall`ed function or by embedding Julia, has to be more
+//! careful because the Julia compiler is completely unaware of references to Julia data existing
+//! outside of Julia code.
+
+pub(crate) mod context;
 pub mod gc;
-pub mod global;
-pub mod output;
-pub mod reusable_slot;
-pub mod scope;
-pub mod ledger;
+pub mod stack_frame;
 pub mod target;
 
 use cfg_if::cfg_if;
@@ -80,9 +32,9 @@ use cfg_if::cfg_if;
 use jl_sys::jl_ptls_t;
 #[cfg(not(feature = "nightly"))]
 use jl_sys::jl_tls_states_t;
+
 #[cfg(feature = "nightly")]
 pub type PTls = jl_ptls_t;
-
 #[cfg(not(feature = "nightly"))]
 pub type PTls = *mut jl_tls_states_t;
 

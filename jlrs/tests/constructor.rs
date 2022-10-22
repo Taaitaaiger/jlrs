@@ -20,116 +20,122 @@ mod tests {
     #[test]
     fn call_outer_constructor() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|global, mut frame| {
-                unsafe {
-                    let ty = Module::main(global)
-                        .submodule_ref("JlrsTests")?
-                        .wrapper_unchecked()
-                        .global_ref("HasConstructors")?
-                        .value_unchecked();
+            jlrs.instance(&mut frame)
+                .scope(|mut frame| {
+                    unsafe {
+                        let ty = Module::main(&frame)
+                            .submodule(&frame, "JlrsTests")?
+                            .wrapper_unchecked()
+                            .global(&frame, "HasConstructors")?
+                            .value_unchecked();
 
-                    assert!(ty.is::<DataType>());
+                        assert!(ty.is::<DataType>());
 
-                    let res = ty.call0(&mut frame);
-                    assert!(res.is_ok());
-                    let value = res.unwrap();
-                    let is_bool = value
-                        .field_accessor(&frame)
-                        .field("a")?
-                        .access::<DataTypeRef>()?
-                        .wrapper_unchecked()
-                        .is::<Bool>();
+                        let res = ty.call0(&mut frame);
+                        assert!(res.is_ok());
+                        let value = res.unwrap();
+                        let is_bool = value
+                            .field_accessor(&frame)
+                            .field("a")?
+                            .access::<DataTypeRef>()?
+                            .wrapper_unchecked()
+                            .is::<Bool>();
 
-                    assert!(is_bool);
+                        assert!(is_bool);
 
-                    let field_b = value.field_accessor(&frame).field("b")?.access::<i32>()?;
+                        let field_b = value.field_accessor(&frame).field("b")?.access::<i32>()?;
 
-                    assert_eq!(field_b, 0);
-                };
+                        assert_eq!(field_b, 0);
+                    };
 
-                Ok(())
-            })
-            .unwrap();
+                    Ok(())
+                })
+                .unwrap();
         });
     }
 
     #[test]
     fn call_inner_constructor() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|global, mut frame| {
-                unsafe {
-                    let ty = Module::main(global)
-                        .submodule_ref("JlrsTests")?
-                        .wrapper_unchecked()
-                        .global_ref("HasConstructors")?
-                        .value_unchecked();
+            jlrs.instance(&mut frame)
+                .scope(|mut frame| {
+                    unsafe {
+                        let ty = Module::main(&frame)
+                            .submodule(&frame, "JlrsTests")?
+                            .wrapper_unchecked()
+                            .global(&frame, "HasConstructors")?
+                            .value_unchecked();
 
-                    let arg = Value::new(&mut frame, 1i16);
+                        let arg = Value::new(&mut frame, 1i16);
 
-                    let res = ty.call1(&mut frame, arg);
-                    assert!(res.is_ok());
-                    let value = res.unwrap();
-                    let is_i16 = value
-                        .field_accessor(&frame)
-                        .field("a")?
-                        .access::<DataTypeRef>()?
-                        .wrapper_unchecked()
-                        .is::<i16>();
+                        let res = ty.call1(&mut frame, arg);
+                        assert!(res.is_ok());
+                        let value = res.unwrap();
+                        let is_i16 = value
+                            .field_accessor(&frame)
+                            .field("a")?
+                            .access::<DataTypeRef>()?
+                            .wrapper_unchecked()
+                            .is::<i16>();
 
-                    assert!(is_i16);
+                        assert!(is_i16);
 
-                    let field_b = value.field_accessor(&frame).field("b")?.access::<i16>()?;
+                        let field_b = value.field_accessor(&frame).field("b")?.access::<i16>()?;
 
-                    assert_eq!(field_b, 1);
-                };
+                        assert_eq!(field_b, 1);
+                    };
 
-                Ok(())
-            })
-            .unwrap();
+                    Ok(())
+                })
+                .unwrap();
         });
     }
 
     #[test]
     fn call_instantiate() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|global, mut frame| {
-                unsafe {
-                    let ty = Module::main(global)
-                        .submodule_ref("JlrsTests")?
-                        .wrapper_unchecked()
-                        .global_ref("HasConstructors")?
-                        .value_unchecked();
+            jlrs.instance(&mut frame)
+                .scope(|mut frame| {
+                    unsafe {
+                        let ty = Module::main(&frame)
+                            .submodule(&frame, "JlrsTests")?
+                            .wrapper_unchecked()
+                            .global(&frame, "HasConstructors")?
+                            .value_unchecked();
 
-                    let arg = Value::new(&mut frame, 1i16);
+                        let arg = Value::new(&mut frame, 1i16);
+                        let args = [DataType::int64_type(&frame).as_value(), arg];
 
-                    let value = ty.cast::<DataType>()?.instantiate_unchecked(
-                        &mut frame,
-                        [DataType::int64_type(global).as_value(), arg],
-                    )?;
+                        let value = ty
+                            .cast::<DataType>()?
+                            .instantiate_unchecked(&mut frame, args);
 
-                    let is_i64 = value
-                        .field_accessor(&frame)
-                        .field("a")?
-                        .access::<DataTypeRef>()?
-                        .wrapper_unchecked()
-                        .is::<i64>();
+                        let is_i64 = value
+                            .field_accessor(&frame)
+                            .field("a")?
+                            .access::<DataTypeRef>()?
+                            .wrapper_unchecked()
+                            .is::<i64>();
 
-                    assert!(is_i64);
+                        assert!(is_i64);
 
-                    let field_b = value.field_accessor(&frame).field("b")?.access::<i16>()?;
+                        let field_b = value.field_accessor(&frame).field("b")?.access::<i16>()?;
 
-                    assert_eq!(field_b, 1);
-                };
+                        assert_eq!(field_b, 1);
+                    };
 
-                Ok(())
-            })
-            .unwrap();
+                    Ok(())
+                })
+                .unwrap();
         });
     }
 }
