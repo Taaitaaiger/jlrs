@@ -2,6 +2,7 @@
 mod tests {
     use super::super::super::util::JULIA;
     use jlrs::convert::{into_julia::IntoJulia, unbox::Unbox};
+    use jlrs::prelude::*;
     use std::{ffi::c_void, ptr::null_mut};
 
     macro_rules! impl_test {
@@ -9,17 +10,19 @@ mod tests {
             #[test]
             fn $test_name() {
                 JULIA.with(|j| {
+                    let mut frame = StackFrame::new();
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope(|global, _frame| unsafe {
-                        let val: $type = $val;
-                        assert_eq!(
-                            <$type as Unbox>::unbox(val.into_julia(global).value_unchecked()),
-                            $val
-                        );
-                        Ok(())
-                    })
-                    .unwrap();
+                    jlrs.instance(&mut frame)
+                        .scope(|frame| unsafe {
+                            let val: $type = $val;
+                            assert_eq!(
+                                <$type as Unbox>::unbox(val.into_julia(&frame).value_unchecked()),
+                                $val
+                            );
+                            Ok(())
+                        })
+                        .unwrap();
                 });
             }
         };

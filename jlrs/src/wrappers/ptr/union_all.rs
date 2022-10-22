@@ -2,7 +2,7 @@
 
 use crate::{
     impl_julia_typecheck,
-    memory::{global::Global, output::Output, scope::PartialScope},
+    memory::target::Target,
     private::Private,
     wrappers::ptr::{
         datatype::DataType, datatype::DataTypeRef, private::WrapperPriv, type_var::TypeVar,
@@ -15,12 +15,6 @@ use jl_sys::{
     jl_llvmpointer_type, jl_namedtuple_type, jl_pointer_type, jl_ref_type, jl_type_type,
     jl_type_unionall, jl_unionall_t, jl_unionall_type,
 };
-
-cfg_if! {
-    if #[cfg(not(all(target_os = "windows", feature = "lts")))] {
-        use crate::error::{JuliaResult, JuliaResultRef};
-    }
-}
 
 cfg_if! {
     if #[cfg(feature = "lts")] {
@@ -43,13 +37,9 @@ pub struct UnionAll<'scope>(NonNull<jl_unionall_t>, PhantomData<&'scope ()>);
 impl<'scope> UnionAll<'scope> {
     /// Create a new `UnionAll`. If an exception is thrown, it's caught and returned.
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub fn new<'target, S>(
-        scope: S,
-        tvar: TypeVar,
-        body: Value<'_, 'static>,
-    ) -> JuliaResult<'target, 'static>
+    pub fn new<'target, T>(target: T, tvar: TypeVar, body: Value<'_, 'static>) -> T::Result
     where
-        S: PartialScope<'target>,
+        T: Target<'target, 'static>,
     {
         use crate::catch::catch_exceptions;
         use jl_sys::jl_value_t;
@@ -63,10 +53,12 @@ impl<'scope> UnionAll<'scope> {
                 Ok(())
             };
 
-            match catch_exceptions(&mut callback).unwrap() {
-                Ok(ptr) => Ok(scope.value(NonNull::new_unchecked(ptr), Private)),
-                Err(e) => Err(scope.value(NonNull::new_unchecked(e.ptr()), Private)),
-            }
+            let res = match catch_exceptions(&mut callback).unwrap() {
+                Ok(ptr) => Ok(NonNull::new_unchecked(ptr)),
+                Err(e) => Err(NonNull::new_unchecked(e.ptr())),
+            };
+
+            target.result_from_ptr(res, Private)
         }
     }
 
@@ -74,57 +66,16 @@ impl<'scope> UnionAll<'scope> {
     ///
     /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
     /// function.
-    pub unsafe fn new_unchecked<'target, S>(
-        scope: S,
+    pub unsafe fn new_unchecked<'target, T>(
+        target: T,
         tvar: TypeVar,
         body: Value<'_, 'static>,
-    ) -> Value<'target, 'static>
+    ) -> T::Data
     where
-        S: PartialScope<'target>,
+        T: Target<'target, 'static>,
     {
         let ua = jl_type_unionall(tvar.unwrap(Private), body.unwrap(Private));
-        scope.value(NonNull::new_unchecked(ua), Private)
-    }
-
-    /// Create a new `UnionAll`. Unlike [`UnionAll::new`] this method doesn't root the allocated
-    /// value or exception.
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub fn new_unrooted<'global>(
-        _: Global<'global>,
-        tvar: TypeVar,
-        body: Value<'_, 'static>,
-    ) -> JuliaResultRef<'global, 'static> {
-        use crate::catch::catch_exceptions;
-        use jl_sys::jl_value_t;
-        use std::mem::MaybeUninit;
-
-        // Safety: if an exception is thrown it's caught
-        unsafe {
-            let mut callback = |result: &mut MaybeUninit<*mut jl_value_t>| {
-                let res = jl_type_unionall(tvar.unwrap(Private), body.unwrap(Private));
-                result.write(res);
-                Ok(())
-            };
-
-            match catch_exceptions(&mut callback).unwrap() {
-                Ok(ptr) => Ok(ValueRef::wrap(ptr)),
-                Err(e) => Err(e),
-            }
-        }
-    }
-
-    /// Create a new `UnionAll`. Unlike [`UnionAll::new_unchecked`] this method doesn't root the
-    /// allocated value. If an exception is thrown it isn't caught
-    ///
-    /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
-    /// function.
-    pub unsafe fn new_unrooted_unchecked<'global>(
-        _: Global<'global>,
-        tvar: TypeVar,
-        body: Value<'_, 'static>,
-    ) -> ValueRef<'global, 'static> {
-        let ua = jl_type_unionall(tvar.unwrap(Private), body.unwrap(Private));
-        ValueRef::wrap(ua)
+        target.data_from_ptr(NonNull::new_unchecked(ua), Private)
     }
 
     /// The type at the bottom of this `UnionAll`.
@@ -170,82 +121,114 @@ impl<'scope> UnionAll<'scope> {
         unsafe { TypeVarRef::wrap(self.unwrap_non_null(Private).as_ref().var) }
     }
 
-    /// Use the `Output` to extend the lifetime of this data.
-    pub fn root<'target>(self, output: Output<'target>) -> UnionAll<'target> {
-        // Safety: pointer points to valid data
-        unsafe {
-            let ptr = self.unwrap_non_null(Private);
-            output.set_root::<UnionAll>(ptr);
-            UnionAll::wrap_non_null(ptr, Private)
-        }
+    /// Use the target to reroot this data.
+    pub fn root<'target, T>(self, target: T) -> T::Data
+    where
+        T: Target<'target, 'static, UnionAll<'target>>,
+    {
+        // Safety: the data is valid.
+        unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
     }
 }
 
 impl<'base> UnionAll<'base> {
     /// The `UnionAll` `Type`.
-    pub fn type_type(_: Global<'base>) -> Self {
+    pub fn type_type<T>(_: &T) -> Self
+    where
+        T: Target<'base, 'static, Self>,
+    {
         // Safety: global constant
         unsafe { UnionAll::wrap(jl_type_type, Private) }
     }
 
     /// `Type{T} where T<:Tuple`
-    pub fn anytuple_type_type(_: Global<'base>) -> Self {
+    pub fn anytuple_type_type<T>(_: &T) -> Self
+    where
+        T: Target<'base, 'static, Self>,
+    {
         // Safety: global constant
         unsafe { UnionAll::wrap(jl_anytuple_type_type, Private) }
     }
 
     /// The `UnionAll` `Vararg`.
     #[cfg(feature = "lts")]
-    pub fn vararg_type(_: Global<'base>) -> Self {
+    pub fn vararg_type<T>(_: &T) -> Self
+    where
+        T: Target<'base, 'static, Self>,
+    {
         // Safety: global constant
         unsafe { UnionAll::wrap(jl_vararg_type, Private) }
     }
 
     /// The `UnionAll` `AbstractArray`.
-    pub fn abstractarray_type(_: Global<'base>) -> Self {
+    pub fn abstractarray_type<T>(_: &T) -> Self
+    where
+        T: Target<'base, 'static, Self>,
+    {
         // Safety: global constant
         unsafe { UnionAll::wrap(jl_abstractarray_type, Private) }
     }
 
     /// The `UnionAll` `OpaqueClosure`.
     #[cfg(not(feature = "lts"))]
-    pub fn opaque_closure_type(_: Global<'base>) -> Self {
+    pub fn opaque_closure_type<T>(_: &T) -> Self
+    where
+        T: Target<'base, 'static, Self>,
+    {
         // Safety: global constant
         unsafe { UnionAll::wrap(jl_opaque_closure_type, Private) }
     }
 
     /// The `UnionAll` `DenseArray`.
-    pub fn densearray_type(_: Global<'base>) -> Self {
+    pub fn densearray_type<T>(_: &T) -> Self
+    where
+        T: Target<'base, 'static, Self>,
+    {
         // Safety: global constant
         unsafe { UnionAll::wrap(jl_densearray_type, Private) }
     }
 
     /// The `UnionAll` `Array`.
-    pub fn array_type(_: Global<'base>) -> Self {
+    pub fn array_type<T>(_: &T) -> Self
+    where
+        T: Target<'base, 'static, Self>,
+    {
         // Safety: global constant
         unsafe { UnionAll::wrap(jl_array_type, Private) }
     }
 
     /// The `UnionAll` `Ptr`.
-    pub fn pointer_type(_: Global<'base>) -> Self {
+    pub fn pointer_type<T>(_: &T) -> Self
+    where
+        T: Target<'base, 'static, Self>,
+    {
         // Safety: global constant
         unsafe { UnionAll::wrap(jl_pointer_type, Private) }
     }
 
     /// The `UnionAll` `LLVMPtr`.
-    pub fn llvmpointer_type(_: Global<'base>) -> Self {
+    pub fn llvmpointer_type<T>(_: &T) -> Self
+    where
+        T: Target<'base, 'static, Self>,
+    {
         // Safety: global constant
         unsafe { UnionAll::wrap(jl_llvmpointer_type, Private) }
     }
 
     /// The `UnionAll` `Ref`.
-    pub fn ref_type(_: Global<'base>) -> Self {
+    pub fn ref_type<T>(_: &T) -> Self
+    where
+        T: Target<'base, 'static, Self>,
+    {
         // Safety: global constant
         unsafe { UnionAll::wrap(jl_ref_type, Private) }
     }
 
     /// The `UnionAll` `NamedTuple`.
-    pub fn namedtuple_type(_: Global<'base>) -> Self {
+    pub fn namedtuple_type<T>(_: &T) -> Self
+    where
+        T: Target<'base, 'static, Self>,
+    {
         // Safety: global constant
         unsafe { UnionAll::wrap(jl_namedtuple_type, Private) }
     }
@@ -256,6 +239,7 @@ impl_debug!(UnionAll<'_>);
 
 impl<'scope> WrapperPriv<'scope, '_> for UnionAll<'scope> {
     type Wraps = jl_unionall_t;
+    type StaticPriv = UnionAll<'static>;
     const NAME: &'static str = "UnionAll";
 
     // Safety: `inner` must not have been freed yet, the result must never be

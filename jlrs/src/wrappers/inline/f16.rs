@@ -3,8 +3,9 @@
 use crate::{
     convert::{into_julia::IntoJulia, unbox::Unbox},
     impl_julia_typecheck, impl_valid_layout,
-    memory::global::Global,
-    wrappers::ptr::{datatype::DataType, datatype::DataTypeRef, Wrapper},
+    memory::target::Target,
+    private::Private,
+    wrappers::ptr::{datatype::DataType, private::WrapperPriv},
 };
 use half::f16;
 use jl_sys::jl_float16_type;
@@ -17,14 +18,19 @@ unsafe impl Unbox for f16 {
 }
 
 unsafe impl IntoJulia for f16 {
-    fn julia_type<'scope>(global: Global<'scope>) -> DataTypeRef<'scope> {
-        DataType::float16_type(global).as_ref()
+    fn julia_type<'scope, T>(target: T) -> T::Data
+    where
+        T: Target<'scope, 'static, DataType<'scope>>,
+    {
+        let dt = DataType::float16_type(&target);
+        unsafe { target.data_from_ptr(dt.unwrap_non_null(Private), Private) }
     }
 }
 
 #[cfg(test)]
 #[cfg(feature = "sync-rt")]
 mod tests {
+    use crate::memory::stack_frame::StackFrame;
     use crate::prelude::*;
     use crate::util::test::JULIA;
     use half::f16;
@@ -33,11 +39,13 @@ mod tests {
     fn one_minus_one_equals_zero() {
         JULIA.with(|j| {
             let mut julia = j.borrow_mut();
+            let mut frame = StackFrame::new();
 
             julia
-                .scope(|global, mut frame| unsafe {
+                .instance(&mut frame)
+                .scope(|mut frame| unsafe {
                     let one = Value::new(&mut frame, f16::ONE);
-                    let func = Module::base(*global).function(&mut frame, "-")?;
+                    let func = Module::base(&frame).function(&mut frame, "-")?;
                     let res = func
                         .call2(&mut frame, one, one)
                         .into_jlrs_result()?

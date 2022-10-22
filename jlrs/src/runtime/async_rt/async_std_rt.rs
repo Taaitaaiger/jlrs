@@ -95,10 +95,9 @@ impl<M: Send + Sync + 'static> ChannelReceiver<M> for Receiver<M> {
     }
 }
 
-#[async_trait]
 impl<M: Send + Sync + 'static> OneshotSender<M> for Sender<M> {
-    async fn send(self, msg: M) {
-        (&self).send(msg).await.ok();
+    fn send(self, msg: M) {
+        (&self).send_blocking(msg).ok();
     }
 }
 

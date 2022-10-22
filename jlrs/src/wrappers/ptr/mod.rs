@@ -26,16 +26,16 @@ macro_rules! impl_root {
             for $type<'value, 'data>
         {
             type Output = $type<'target, 'data>;
-            unsafe fn root<S>(
-                scope: S,
+            unsafe fn root<T>(
+                target: T,
                 value: $crate::wrappers::ptr::Ref<'value, 'data, Self>,
-            ) -> $crate::error::JlrsResult<Self::Output>
+            ) -> $crate::error::JlrsResult<T::Data>
             where
-                S: $crate::memory::scope::PartialScope<'target>,
+                T: $crate::memory::target::Target<'target, 'data, Self::Output>,
             {
                 if let Some(v) = Self::wrapper(value, Private) {
                     let ptr = v.unwrap_non_null(Private);
-                    Ok(scope.value(ptr, Private))
+                    Ok(target.data_from_ptr(ptr, Private))
                 } else {
                     Err($crate::error::AccessError::UndefRef)?
                 }
@@ -47,18 +47,18 @@ macro_rules! impl_root {
             for $type<'value>
         {
             type Output = $type<'target>;
-            unsafe fn root<S>(
-                scope: S,
+            unsafe fn root<T>(
+                target: T,
                 value: $crate::wrappers::ptr::Ref<'value, 'static, Self>,
-            ) -> $crate::error::JlrsResult<Self::Output>
+            ) -> $crate::error::JlrsResult<T::Data>
             where
-                S: $crate::memory::scope::PartialScope<'target>,
+                T: $crate::memory::target::Target<'target, 'static, Self::Output>,
             {
                 if let Some(v) =
                     <Self as $crate::wrappers::ptr::private::WrapperPriv>::wrapper(value, Private)
                 {
                     let ptr = v.unwrap_non_null(Private);
-                    Ok(scope.value(ptr, Private))
+                    Ok(target.data_from_ptr(ptr, Private))
                 } else {
                     Err($crate::error::AccessError::UndefRef)?
                 }
@@ -89,14 +89,11 @@ macro_rules! impl_ref_root {
             /// Root this data in `scope`.
             ///
             /// Safety: The data pointed to by `self` must not have been freed by the GC yet.
-            pub unsafe fn root<'target, S>(
-                self,
-                scope: S,
-            ) -> $crate::error::JlrsResult<$type<'target, 'data>>
+            pub unsafe fn root<'target, T>(self, target: T) -> $crate::error::JlrsResult<T::Data>
             where
-                S: $crate::memory::scope::PartialScope<'target>,
+                T: $crate::memory::target::Target<'target, 'data, $type<'target, 'data>>,
             {
-                <$type as $crate::wrappers::ptr::Root>::root(scope, self)
+                <$type as $crate::wrappers::ptr::Root>::root(target, self)
             }
         }
     };
@@ -105,14 +102,11 @@ macro_rules! impl_ref_root {
             /// Root this data in `scope`.
             ///
             /// Safety: The data pointed to by `self` must not have been freed by the GC yet.
-            pub unsafe fn root<'target, S>(
-                self,
-                scope: S,
-            ) -> $crate::error::JlrsResult<$type<'target>>
+            pub unsafe fn root<'target, T>(self, target: T) -> $crate::error::JlrsResult<T::Data>
             where
-                S: $crate::memory::scope::PartialScope<'target>,
+                T: $crate::memory::target::Target<'target, 'static, $type<'target>>,
             {
-                <$type as $crate::wrappers::ptr::Root>::root(scope, self)
+                <$type as $crate::wrappers::ptr::Root>::root(target, self)
             }
         }
     };
@@ -151,22 +145,23 @@ use crate::{
     call::Call,
     error::{JlrsError, JlrsResult, CANNOT_DISPLAY_VALUE},
     layout::valid_layout::ValidLayout,
-    memory::{global::Global, scope::PartialScope},
+    memory::{target::global::Global, target::Target},
     private::Private,
     wrappers::ptr::{module::Module, private::WrapperPriv as _, string::JuliaString, value::Value},
 };
 use std::{
+    ffi::c_void,
     fmt::{Debug, Formatter, Result as FmtResult},
     marker::PhantomData,
     ptr::null_mut,
 };
 
 pub(crate) trait Root<'target, 'value, 'data>: Wrapper<'value, 'data> {
-    type Output;
+    type Output: Wrapper<'target, 'data>;
     // Safety: `value` must point to valid Julia data.
-    unsafe fn root<S>(scope: S, value: Ref<'value, 'data, Self>) -> JlrsResult<Self::Output>
+    unsafe fn root<T>(target: T, value: Ref<'value, 'data, Self>) -> JlrsResult<T::Data>
     where
-        S: PartialScope<'target>;
+        T: Target<'target, 'data, Self::Output>;
 }
 
 /// Trait implemented by `Ref`.
@@ -187,6 +182,9 @@ where
 
 /// Trait implemented by all pointer wrapper types.
 pub trait Wrapper<'scope, 'data>: private::WrapperPriv<'scope, 'data> {
+    /// `Self`, but with the `'scope` lifetime replaced with the `'static` lifetime.
+    type Static: Wrapper<'static, 'data>;
+
     /// Convert the wrapper to a `Ref`.
     fn as_ref(self) -> Ref<'scope, 'data, Self> {
         Ref::wrap(self.unwrap(Private))
@@ -205,12 +203,12 @@ pub trait Wrapper<'scope, 'data>: private::WrapperPriv<'scope, 'data> {
         // to a String before the GC can free it.
         let s = unsafe {
             let global = Global::new();
-            Module::main(global)
-                .submodule_ref("Jlrs")?
+            Module::main(&global)
+                .submodule(&global, "Jlrs")?
                 .wrapper_unchecked()
-                .function_ref("valuestring")?
+                .function(&global, "valuestring")?
                 .wrapper_unchecked()
-                .call1_unrooted(global, self.as_value())
+                .call1(&global, self.as_value())
                 .map_err(|e| e.value_unchecked().error_string_or(CANNOT_DISPLAY_VALUE))
                 .map_err(|e| JlrsError::exception(format!("Jlrs.valuestring failed: {}", e)))?
                 .value_unchecked()
@@ -234,12 +232,12 @@ pub trait Wrapper<'scope, 'data>: private::WrapperPriv<'scope, 'data> {
         // to a String before the GC can free it.
         let s = unsafe {
             let global = Global::new();
-            Module::main(global)
-                .submodule_ref("Jlrs")?
+            Module::main(&global)
+                .submodule(&global, "Jlrs")?
                 .wrapper_unchecked()
-                .function_ref("errorstring")?
+                .function(&global, "errorstring")?
                 .wrapper_unchecked()
-                .call1_unrooted(global, self.as_value())
+                .call1(&global, self.as_value())
                 .map_err(|e| e.value_unchecked().error_string_or(CANNOT_DISPLAY_VALUE))
                 .map_err(|e| JlrsError::exception(format!("Jlrs.errorstring failed: {}", e)))?
                 .value_unchecked()
@@ -264,7 +262,12 @@ pub trait Wrapper<'scope, 'data>: private::WrapperPriv<'scope, 'data> {
     }
 }
 
-impl<'scope, 'data, W> Wrapper<'scope, 'data> for W where W: private::WrapperPriv<'scope, 'data> {}
+impl<'scope, 'data, W> Wrapper<'scope, 'data> for W
+where
+    W: private::WrapperPriv<'scope, 'data>,
+{
+    type Static = Self::StaticPriv;
+}
 
 /// An reference to Julia data that is not guaranteed to be rooted.
 ///
@@ -352,6 +355,23 @@ impl<'scope, 'data, T: Wrapper<'scope, 'data>> Ref<'scope, 'data, T> {
         T::value_unchecked(self, Private)
     }
 
+    /// Leaks `self` with a `'static` lifetime. This method is only available when the `ccall`
+    /// feature is enabled.
+    ///
+    /// This method erases the `'scope` lifetime, the `'data` lifetime is not erased.
+    ///
+    /// Safety: this must only be used to return freshly allocated Julia data from Rust to Julia
+    /// from a `ccall`ed function.
+    #[cfg(feature = "ccall")]
+    pub unsafe fn leak(self) -> Ref<'static, 'data, T::Static> {
+        Ref::wrap(self.ptr().cast())
+    }
+
+    /// Returns a pointer to the data,
+    pub fn data_ptr(self) -> *mut c_void {
+        self.0.cast()
+    }
+
     pub(crate) fn ptr(self) -> *mut T::Wraps {
         self.0
     }
@@ -364,6 +384,7 @@ pub(crate) mod private {
 
     pub trait WrapperPriv<'scope, 'data>: Copy + Debug {
         type Wraps;
+        type StaticPriv: WrapperPriv<'static, 'data>;
         const NAME: &'static str;
 
         // Safety: `inner` must point to valid data. If it is not

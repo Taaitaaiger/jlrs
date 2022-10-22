@@ -1,12 +1,10 @@
 use crate::{
-    error::JuliaResult,
     layout::valid_layout::ValidLayout,
-    memory::{frame::GcFrame, ledger::Ledger},
-    prelude::{Frame, JlrsResult, Scope, ValueRef},
+    memory::context::ledger::Ledger,
+    prelude::{JlrsResult, ValueRef},
     wrappers::ptr::WrapperRef,
 };
 use std::{
-    cell::RefCell,
     marker::PhantomData,
     mem::{self, ManuallyDrop},
     ops::{Deref, Range},
@@ -24,34 +22,31 @@ use super::{
     dimensions::{ArrayDimensions, Dims},
     Array, TypedArray,
 };
+use crate::memory::target::Target;
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use crate::memory::target::{ExceptionTarget, ExtendedTarget};
 
 pub trait ArrayWrapper<'scope, 'data>: Copy {
-    fn track<'borrow, 'frame: 'borrow, F: Frame<'frame>>(
-        &'borrow self,
-        frame: &F,
-    ) -> JlrsResult<TrackedArray<'borrow, 'scope, 'data, Self>>;
+    fn track<'borrow>(&'borrow self) -> JlrsResult<TrackedArray<'borrow, 'scope, 'data, Self>>;
 
-    fn track_mut<'borrow, 'frame: 'borrow, F: Frame<'frame>>(
+    fn track_mut<'borrow>(
         &'borrow mut self,
-        frame: &F,
     ) -> JlrsResult<TrackedArrayMut<'borrow, 'scope, 'data, Self>>;
 
     fn data_range(&self) -> Range<*const u8>;
 }
 
 impl<'scope, 'data> ArrayWrapper<'scope, 'data> for Array<'scope, 'data> {
-    fn track<'borrow, 'frame: 'borrow, F: Frame<'frame>>(
-        &'borrow self,
-        frame: &F,
-    ) -> JlrsResult<TrackedArray<'borrow, 'scope, 'data, Self>> {
-        Ledger::try_borrow_array(frame.ledger(), *self)
+    fn track<'borrow>(&'borrow self) -> JlrsResult<TrackedArray<'borrow, 'scope, 'data, Self>> {
+        Ledger::try_borrow(self.data_range())?;
+        unsafe { Ok(TrackedArray::new(self)) }
     }
 
-    fn track_mut<'borrow, 'frame: 'borrow, F: Frame<'frame>>(
+    fn track_mut<'borrow>(
         &'borrow mut self,
-        frame: &F,
     ) -> JlrsResult<TrackedArrayMut<'borrow, 'scope, 'data, Self>> {
-        Ledger::try_borrow_array_mut(frame.ledger(), *self)
+        Ledger::try_borrow_mut(self.data_range())?;
+        unsafe { Ok(TrackedArrayMut::new(self)) }
     }
 
     fn data_range(&self) -> Range<*const u8> {
@@ -64,19 +59,17 @@ impl<'scope, 'data> ArrayWrapper<'scope, 'data> for Array<'scope, 'data> {
     }
 }
 
-impl<'scope, 'data, T: ValidLayout> ArrayWrapper<'scope, 'data> for TypedArray<'scope, 'data, T> {
-    fn track<'borrow, 'frame: 'borrow, F: Frame<'frame>>(
-        &'borrow self,
-        frame: &F,
-    ) -> JlrsResult<TrackedArray<'borrow, 'scope, 'data, Self>> {
-        Ledger::try_borrow_array(frame.ledger(), *self)
+impl<'scope, 'data, U: ValidLayout> ArrayWrapper<'scope, 'data> for TypedArray<'scope, 'data, U> {
+    fn track<'borrow>(&'borrow self) -> JlrsResult<TrackedArray<'borrow, 'scope, 'data, Self>> {
+        Ledger::try_borrow(self.data_range())?;
+        unsafe { Ok(TrackedArray::new(self)) }
     }
 
-    fn track_mut<'borrow, 'frame: 'borrow, F: Frame<'frame>>(
+    fn track_mut<'borrow>(
         &'borrow mut self,
-        frame: &F,
     ) -> JlrsResult<TrackedArrayMut<'borrow, 'scope, 'data, Self>> {
-        Ledger::try_borrow_array_mut(frame.ledger(), *self)
+        Ledger::try_borrow_mut(self.data_range())?;
+        unsafe { Ok(TrackedArrayMut::new(self)) }
     }
 
     fn data_range(&self) -> Range<*const u8> {
@@ -94,9 +87,9 @@ pub struct TrackedArray<'tracked, 'scope, 'data, T>
 where
     T: ArrayWrapper<'scope, 'data>,
 {
-    ledger: &'tracked RefCell<Ledger>,
     data: T,
     _scope: PhantomData<&'scope ()>,
+    _tracked: PhantomData<&'tracked ()>,
     _data: PhantomData<&'data ()>,
 }
 
@@ -106,8 +99,8 @@ where
 {
     fn clone(&self) -> Self {
         unsafe {
-            Ledger::clone_shared(self.ledger, self.data);
-            Self::new(self.ledger, self.data)
+            Ledger::clone_shared(self.data.data_range());
+            Self::new_from_owned(self.data)
         }
     }
 }
@@ -116,11 +109,20 @@ impl<'tracked, 'scope, 'data, T> TrackedArray<'tracked, 'scope, 'data, T>
 where
     T: ArrayWrapper<'scope, 'data>,
 {
-    pub(crate) unsafe fn new(ledger: &'tracked RefCell<Ledger>, data: T) -> Self {
+    pub(crate) unsafe fn new(data: &'tracked T) -> Self {
         TrackedArray {
-            ledger,
-            data,
+            data: *data,
             _scope: PhantomData,
+            _tracked: PhantomData,
+            _data: PhantomData,
+        }
+    }
+
+    pub(crate) unsafe fn new_from_owned(data: T) -> Self {
+        TrackedArray {
+            data: data,
+            _scope: PhantomData,
+            _tracked: PhantomData,
             _data: PhantomData,
         }
     }
@@ -138,7 +140,7 @@ impl<'tracked, 'scope, 'data> TrackedArray<'tracked, 'scope, 'data, Array<'scope
         T: ValidLayout,
     {
         let data = self.data.try_as_typed::<T>()?;
-        let ret = unsafe { Ok(TrackedArray::new(self.ledger, data)) };
+        let ret = unsafe { Ok(TrackedArray::new_from_owned(data)) };
         mem::forget(self);
         ret
     }
@@ -150,7 +152,7 @@ impl<'tracked, 'scope, 'data> TrackedArray<'tracked, 'scope, 'data, Array<'scope
         T: ValidLayout,
     {
         let data = self.data.as_typed_unchecked::<T>();
-        let ret = TrackedArray::new(self.ledger, data);
+        let ret = TrackedArray::new_from_owned(data);
         mem::forget(self);
         ret
     }
@@ -208,30 +210,28 @@ impl<'tracked, 'scope, 'data> TrackedArray<'tracked, 'scope, 'data, Array<'scope
     }
 
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub fn reshape<'target, 'current, D, S, F>(
+    pub fn reshape<'target, 'current, 'borrow, D, S>(
         &self,
-        scope: S,
+        target: ExtendedTarget<'target, 'current, 'borrow, 'data, S, Array<'target, 'data>>,
         dims: D,
-    ) -> JuliaResult<'target, 'data, Array<'target, 'data>>
+    ) -> S::Result
     where
         D: Dims,
-        S: Scope<'target, 'current, F>,
-        F: Frame<'current>,
+        S: Target<'target, 'data, Array<'target, 'data>>,
     {
-        unsafe { self.data.reshape(scope, dims) }
+        unsafe { self.data.reshape(target, dims) }
     }
 
-    pub unsafe fn reshape_unchecked<'target, 'current, D, S, F>(
+    pub unsafe fn reshape_unchecked<'target, 'current, 'borrow, D, S>(
         &self,
-        scope: S,
+        target: ExtendedTarget<'target, 'current, 'borrow, 'data, S, Array<'target, 'data>>,
         dims: D,
-    ) -> Array<'target, 'data>
+    ) -> S::Data
     where
         D: Dims,
-        S: Scope<'target, 'current, F>,
-        F: Frame<'current>,
+        S: Target<'target, 'data, Array<'target, 'data>>,
     {
-        self.data.reshape_unchecked(scope, dims)
+        self.data.reshape_unchecked(target, dims)
     }
 }
 
@@ -262,30 +262,28 @@ where
     }
 
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub fn reshape<'target, 'current, D, S, F>(
+    pub fn reshape<'target, 'current, 'borrow, D, S>(
         &self,
-        scope: S,
+        target: ExtendedTarget<'target, 'current, 'borrow, 'data, S, TypedArray<'target, 'data, T>>,
         dims: D,
-    ) -> JuliaResult<'target, 'data, TypedArray<'target, 'data, T>>
+    ) -> S::Result
     where
         D: Dims,
-        S: Scope<'target, 'current, F>,
-        F: Frame<'current>,
+        S: Target<'target, 'data, TypedArray<'target, 'data, T>>,
     {
-        unsafe { self.data.reshape(scope, dims) }
+        unsafe { self.data.reshape(target, dims) }
     }
 
-    pub unsafe fn reshape_unchecked<'target, 'current, D, S, F>(
+    pub unsafe fn reshape_unchecked<'target, 'current, 'borrow, D, S>(
         &self,
-        scope: S,
+        target: ExtendedTarget<'target, 'current, 'borrow, 'data, S, TypedArray<'target, 'data, T>>,
         dims: D,
-    ) -> TypedArray<'target, 'data, T>
+    ) -> S::Data
     where
         D: Dims,
-        S: Scope<'target, 'current, F>,
-        F: Frame<'current>,
+        S: Target<'target, 'data, TypedArray<'target, 'data, T>>,
     {
-        self.data.reshape_unchecked(scope, dims)
+        self.data.reshape_unchecked(target, dims)
     }
 }
 
@@ -317,11 +315,7 @@ where
 
 impl<'scope, 'data, T: ArrayWrapper<'scope, 'data>> Drop for TrackedArray<'_, 'scope, 'data, T> {
     fn drop(&mut self) {
-        let mut ledger = self.ledger.borrow_mut();
-        let range = self.data.data_range();
-        let i = ledger.shared.iter().rposition(|r| r == &range).unwrap();
-
-        ledger.shared.remove(i);
+        Ledger::unborrow_shared(self.data.data_range());
     }
 }
 
@@ -336,9 +330,9 @@ impl<'tracked, 'scope, 'data, T> TrackedArrayMut<'tracked, 'scope, 'data, T>
 where
     T: ArrayWrapper<'scope, 'data>,
 {
-    pub(crate) unsafe fn new(ledger: &'tracked RefCell<Ledger>, data: T) -> Self {
+    pub(crate) unsafe fn new(data: &'tracked mut T) -> Self {
         TrackedArrayMut {
-            tracked: ManuallyDrop::new(TrackedArray::new(ledger, data)),
+            tracked: ManuallyDrop::new(TrackedArray::new(data)),
         }
     }
 }
@@ -392,12 +386,11 @@ impl<'tracked, 'scope, 'data> TrackedArrayMut<'tracked, 'scope, 'data, Array<'sc
 
 impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 'static>> {
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub unsafe fn grow_end<'current>(
-        &mut self,
-        frame: &mut GcFrame<'current>,
-        inc: usize,
-    ) -> JuliaResult<'current, 'static, ()> {
-        self.tracked.data.grow_end(frame, inc)
+    pub unsafe fn grow_end<'target, S>(&mut self, target: S, inc: usize) -> S::Exception
+    where
+        S: ExceptionTarget<'target, 'static>,
+    {
+        self.tracked.data.grow_end(target, inc)
     }
 
     pub unsafe fn grow_end_unchecked(&mut self, inc: usize) {
@@ -405,12 +398,11 @@ impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 
     }
 
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub unsafe fn del_end<'current>(
-        &mut self,
-        frame: &mut GcFrame<'current>,
-        dec: usize,
-    ) -> JuliaResult<'current, 'static, ()> {
-        self.tracked.data.del_end(frame, dec)
+    pub unsafe fn del_end<'target, S>(&mut self, target: S, dec: usize) -> S::Exception
+    where
+        S: ExceptionTarget<'target, 'static>,
+    {
+        self.tracked.data.del_end(target, dec)
     }
 
     pub unsafe fn del_end_unchecked(&mut self, dec: usize) {
@@ -418,12 +410,11 @@ impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 
     }
 
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub unsafe fn grow_begin<'current>(
-        &mut self,
-        frame: &mut GcFrame<'current>,
-        inc: usize,
-    ) -> JuliaResult<'current, 'static, ()> {
-        self.tracked.data.grow_begin(frame, inc)
+    pub unsafe fn grow_begin<'target, S>(&mut self, target: S, inc: usize) -> S::Exception
+    where
+        S: ExceptionTarget<'target, 'static>,
+    {
+        self.tracked.data.grow_begin(target, inc)
     }
 
     pub unsafe fn grow_begin_unchecked(&mut self, inc: usize) {
@@ -431,12 +422,11 @@ impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 
     }
 
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub unsafe fn del_begin<'current>(
-        &mut self,
-        frame: &mut GcFrame<'current>,
-        dec: usize,
-    ) -> JuliaResult<'current, 'static, ()> {
-        self.tracked.data.del_begin(frame, dec)
+    pub unsafe fn del_begin<'target, S>(&mut self, target: S, dec: usize) -> S::Exception
+    where
+        S: ExceptionTarget<'target, 'static>,
+    {
+        self.tracked.data.del_begin(target, dec)
     }
 
     pub unsafe fn del_begin_unchecked(&mut self, dec: usize) {
@@ -491,12 +481,11 @@ where
     T: ValidLayout,
 {
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub unsafe fn grow_end<'current>(
-        &mut self,
-        frame: &mut GcFrame<'current>,
-        inc: usize,
-    ) -> JuliaResult<'current, 'static, ()> {
-        self.tracked.data.grow_end(frame, inc)
+    pub unsafe fn grow_end<'target, S>(&mut self, target: S, inc: usize) -> S::Exception
+    where
+        S: ExceptionTarget<'target, 'static>,
+    {
+        self.tracked.data.grow_end(target, inc)
     }
 
     pub unsafe fn grow_end_unchecked(&mut self, inc: usize) {
@@ -504,12 +493,11 @@ where
     }
 
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub unsafe fn del_end<'current>(
-        &mut self,
-        frame: &mut GcFrame<'current>,
-        dec: usize,
-    ) -> JuliaResult<'current, 'static, ()> {
-        self.tracked.data.del_end(frame, dec)
+    pub unsafe fn del_end<'target, S>(&mut self, target: S, dec: usize) -> S::Exception
+    where
+        S: ExceptionTarget<'target, 'static>,
+    {
+        self.tracked.data.del_end(target, dec)
     }
 
     pub unsafe fn del_end_unchecked(&mut self, dec: usize) {
@@ -517,12 +505,11 @@ where
     }
 
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub unsafe fn grow_begin<'current>(
-        &mut self,
-        frame: &mut GcFrame<'current>,
-        inc: usize,
-    ) -> JuliaResult<'current, 'static, ()> {
-        self.tracked.data.grow_begin(frame, inc)
+    pub unsafe fn grow_begin<'target, S>(&mut self, target: S, inc: usize) -> S::Exception
+    where
+        S: ExceptionTarget<'target, 'static>,
+    {
+        self.tracked.data.grow_begin(target, inc)
     }
 
     pub unsafe fn grow_begin_unchecked(&mut self, inc: usize) {
@@ -530,12 +517,11 @@ where
     }
 
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub unsafe fn del_begin<'current>(
-        &mut self,
-        frame: &mut GcFrame<'current>,
-        dec: usize,
-    ) -> JuliaResult<'current, 'static, ()> {
-        self.tracked.data.del_begin(frame, dec)
+    pub unsafe fn del_begin<'target, S>(&mut self, target: S, dec: usize) -> S::Exception
+    where
+        S: ExceptionTarget<'target, 'static>,
+    {
+        self.tracked.data.del_begin(target, dec)
     }
 
     pub unsafe fn del_begin_unchecked(&mut self, dec: usize) {
@@ -565,16 +551,11 @@ where
     }
 }
 
-impl<'tracked, 'scope, 'data, T> Drop
-    for TrackedArrayMut<'tracked, 'scope, 'data, T>
+impl<'tracked, 'scope, 'data, T> Drop for TrackedArrayMut<'tracked, 'scope, 'data, T>
 where
     T: ArrayWrapper<'scope, 'data>,
 {
     fn drop(&mut self) {
-        let mut ledger = self.tracked.ledger.borrow_mut();
-        let range = self.tracked.data.data_range();
-        let i = ledger.owned.iter().rposition(|r| r == &range).unwrap();
-
-        ledger.owned.remove(i);
+        Ledger::unborrow_owned(self.tracked.data.data_range());
     }
 }

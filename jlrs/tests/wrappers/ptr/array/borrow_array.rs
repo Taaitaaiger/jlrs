@@ -8,12 +8,15 @@ mod tests {
     #[test]
     fn borrow_array_1d() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             let mut data = vec![1u64, 2, 3, 4];
 
             let unboxed = jlrs
-                .scope(|_, mut frame| {
-                    let array = Array::from_slice(&mut frame, &mut data, 4)?.into_jlrs_result()?;
+                .instance(&mut frame)
+                .scope(|mut frame| {
+                    let array = Array::from_slice(frame.as_extended_target(), &mut data, 4)?
+                        .into_jlrs_result()?;
                     assert!(array.contains::<u64>());
                     unsafe { array.copy_inline_data::<u64>() }
                 })
@@ -30,6 +33,7 @@ mod tests {
     #[test]
     fn borrow_array_1d_dynamic_type() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
             struct Foo<'a> {
@@ -41,7 +45,7 @@ mod tests {
             };
 
             let unboxed = jlrs
-                .scope(|_, mut frame| {
+                .scope(|mut frame| {
                     let x = false;
 
                     let array = match x {
@@ -68,11 +72,12 @@ mod tests {
     #[test]
     fn borrow_array_1d_output() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             let mut data = vec![1u64, 2, 3, 4];
 
             let unboxed = jlrs
-                .scope(|_, mut frame| {
+                .scope(|mut frame| {
                     let array = frame.value_scope_with_slots(0, |output, mut frame| {
                         let output = output.into_scope(frame);
                         Array::from_slice(output, &mut data, 4)
@@ -92,11 +97,12 @@ mod tests {
     #[test]
     fn borrow_array_1d_dynamic() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             let mut data = vec![1u64, 2, 3, 4];
 
             let unboxed = jlrs
-                .scope(|_, mut frame| {
+                .scope(|mut frame| {
                     let array = Array::from_slice(frame, &mut data, 4)?;
                     array.cast::<Array>()?.copy_inline_data::<u64>()
                 })
@@ -112,11 +118,12 @@ mod tests {
     #[test]
     fn borrow_array_2d() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             let mut data = vec![1u64, 2, 3, 4];
 
             let unboxed = jlrs
-                .scope(|_, mut frame| {
+                .scope(|mut frame| {
                     let array = Array::from_slice(frame, &mut data, (2, 2))?;
                     array.cast::<Array>()?.copy_inline_data::<u64>()
                 })
@@ -133,11 +140,12 @@ mod tests {
     #[test]
     fn borrow_array_2d_dynamic() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             let mut data = vec![1u64, 2, 3, 4];
 
             let unboxed = jlrs
-                .scope(|_, mut frame| {
+                .scope(|mut frame| {
                     let array = Array::from_slice(frame, &mut data, (2, 2))?;
                     array.cast::<Array>()?.copy_inline_data::<u64>()
                 })
@@ -153,14 +161,15 @@ mod tests {
     #[test]
     fn call_function_with_borrowed() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             let mut data = vec![1u64, 2, 3, 4];
 
             let unboxed = jlrs
-                .scope(|global, mut frame| unsafe {
+                .scope(|mut frame| unsafe {
                     let array = Array::from_slice(&mut frame, &mut data, 4)?;
-                    Module::base(global)
-                        .function_ref("sum")?
+                    Module::base(&frame)
+                        .function(&frame, "sum")?
                         .wrapper_unchecked()
                         .call1(&mut frame, array)?
                         .unwrap()
@@ -176,26 +185,29 @@ mod tests {
     #[test]
     fn borrow_in_nested_scope() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             let mut data = vec![1u64, 2, 3, 4];
 
             let unboxed = jlrs
-                .scope(|global, mut frame| unsafe {
+                .instance(&mut frame)
+                .scope(|mut frame| unsafe {
                     let output = frame.output();
-                    let array = frame
-                        .scope(|mut frame| {
-                            let borrowed = &mut data;
-                            let scope = output.into_scope(&mut frame);
-                            Array::from_slice(scope, borrowed, 4)
-                        })?
-                        .into_jlrs_result()?;
+                    let array = frame.scope(|mut frame| {
+                        let borrowed = &mut data;
+                        // TODO:
+                        // let scope = frame.extended_target(output);
+                        let arr = Array::from_slice(frame.as_extended_target(), borrowed, 4)?
+                            .into_jlrs_result()?;
+                        Ok(arr.root(output))
+                    })?;
 
                     // uncommenting the next line must lead to a compilation error due to multiple
                     // mutable borrows:
                     // let _reborrowed = &mut data[0];
 
-                    Module::base(global)
-                        .function_ref("sum")?
+                    Module::base(&frame)
+                        .function(&frame, "sum")?
                         .wrapper_unchecked()
                         .call1(&mut frame, array.as_value())
                         .unwrap()

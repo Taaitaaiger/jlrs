@@ -1855,6 +1855,14 @@ extern "C" {
     pub fn jl_gc_mark_queue_obj(ptls: jl_ptls_t, obj: *mut jl_value_t) -> ::std::os::raw::c_int;
 }
 extern "C" {
+    pub fn jl_gc_mark_queue_objarray(
+        ptls: jl_ptls_t,
+        parent: *mut jl_value_t,
+        objs: *mut *mut jl_value_t,
+        nobjs: usize,
+    );
+}
+extern "C" {
     pub fn jl_gc_schedule_foreign_sweepfunc(ptls: jl_ptls_t, bj: *mut jl_value_t);
 }
 pub const jlrs_catch_tag_t_JLRS_CATCH_OK: jlrs_catch_tag_t = 0;

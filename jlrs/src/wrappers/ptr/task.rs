@@ -5,7 +5,7 @@
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L1727
 use crate::{
-    impl_julia_typecheck, memory::output::Output, private::Private,
+    impl_julia_typecheck, memory::target::Target, private::Private,
     wrappers::ptr::private::WrapperPriv,
 };
 
@@ -136,14 +136,13 @@ impl<'scope> Task<'scope> {
         }
     }
 
-    /// Use the `Output` to extend the lifetime of this data.
-    pub fn root<'target>(self, output: Output<'target>) -> Task<'target> {
-        // Safety: the pointer points to valid data
-        unsafe {
-            let ptr = self.unwrap_non_null(Private);
-            output.set_root::<Task>(ptr);
-            Task::wrap_non_null(ptr, Private)
-        }
+    /// Use the target to reroot this data.
+    pub fn root<'target, T>(self, target: T) -> T::Data
+    where
+        T: Target<'target, 'static, Task<'target>>,
+    {
+        // Safety: the data is valid.
+        unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
     }
 }
 
@@ -152,6 +151,7 @@ impl_debug!(Task<'_>);
 
 impl<'scope> WrapperPriv<'scope, '_> for Task<'scope> {
     type Wraps = jl_task_t;
+    type StaticPriv = Task<'static>;
     const NAME: &'static str = "Task";
 
     // Safety: `inner` must not have been freed yet, the result must never be

@@ -13,13 +13,15 @@ mod tests {
             #[test]
             fn $name() {
                 JULIA.with(|j| {
+                    let mut frame = StackFrame::new();
                     let mut jlrs = j.borrow_mut();
+                    let mut jlrs = jlrs.instance(&mut frame);
 
-                    jlrs.scope(|global, mut frame| unsafe {
+                    jlrs.scope(|mut frame| unsafe {
                         let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
 
-                        let array =
-                            Array::from_vec(&mut frame, data, (2, 3, 4))?.into_jlrs_result()?;
+                        let array = Array::from_vec(frame.as_extended_target(), data, (2, 3, 4))?
+                            .into_jlrs_result()?;
                         let d = array.inline_data::<$value_type>()?;
 
                         let mut out = 1 as $value_type;
@@ -32,8 +34,8 @@ mod tests {
                             }
                         }
 
-                        let gi = Module::base(global)
-                            .function_ref("getindex")?
+                        let gi = Module::base(&frame)
+                            .function(&frame, "getindex")?
                             .wrapper_unchecked();
                         let one = Value::new(&mut frame, 1usize);
                         let two = Value::new(&mut frame, 2usize);
@@ -70,96 +72,119 @@ mod tests {
             #[test]
             fn $name_mut() {
                 JULIA.with(|j| {
+                    let mut frame = StackFrame::new();
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope(|global, mut frame| unsafe {
-                        let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
+                    jlrs.instance(&mut frame)
+                        .scope(|mut frame| unsafe {
+                            let data: Vec<$value_type> =
+                                (1..=24).map(|x| x as $value_type).collect();
 
-                        let mut array =
-                            Array::from_vec(&mut frame, data, (2, 3, 4))?.into_jlrs_result()?;
-                        let mut d = array.bits_data_mut::<$value_type>()?;
+                            let mut array =
+                                Array::from_vec(frame.as_extended_target(), data, (2, 3, 4))?
+                                    .into_jlrs_result()?;
+                            let mut d = array.bits_data_mut::<$value_type>()?;
 
-                        for third in &[0, 1, 2, 3] {
-                            for second in &[0, 1, 2] {
-                                for first in &[0, 1] {
-                                    d[(*first, *second, *third)] += 1 as $value_type;
+                            for third in &[0, 1, 2, 3] {
+                                for second in &[0, 1, 2] {
+                                    for first in &[0, 1] {
+                                        d[(*first, *second, *third)] += 1 as $value_type;
+                                    }
                                 }
                             }
-                        }
-                        let gi = Module::base(global)
-                            .function_ref("getindex")?
-                            .wrapper_unchecked();
-                        let one = Value::new(&mut frame, 1usize);
-                        let two = Value::new(&mut frame, 2usize);
-                        let three = Value::new(&mut frame, 3usize);
-                        let four = Value::new(&mut frame, 4usize);
+                            let gi = Module::base(&frame)
+                                .function(&frame, "getindex")?
+                                .wrapper_unchecked();
+                            let one = Value::new(&mut frame, 1usize);
+                            let two = Value::new(&mut frame, 2usize);
+                            let three = Value::new(&mut frame, 3usize);
+                            let four = Value::new(&mut frame, 4usize);
 
-                        let mut out = 2 as $value_type;
-                        for third in &[one, two, three, four] {
-                            for second in &[one, two, three] {
-                                for first in &[one, two] {
-                                    frame.scope(|mut frame| {
-                                        let v = gi
-                                            .call(
-                                                &mut frame,
-                                                &mut [array.as_value(), *first, *second, *third],
-                                            )
-                                            .unwrap();
-                                        assert_eq!(v.unbox::<$value_type>()?, out);
-                                        out += 1 as $value_type;
-                                        Ok(())
-                                    })?;
+                            let mut out = 2 as $value_type;
+                            for third in &[one, two, three, four] {
+                                for second in &[one, two, three] {
+                                    for first in &[one, two] {
+                                        frame.scope(|mut frame| {
+                                            let v = gi
+                                                .call(
+                                                    &mut frame,
+                                                    &mut [
+                                                        array.as_value(),
+                                                        *first,
+                                                        *second,
+                                                        *third,
+                                                    ],
+                                                )
+                                                .unwrap();
+                                            assert_eq!(v.unbox::<$value_type>()?, out);
+                                            out += 1 as $value_type;
+                                            Ok(())
+                                        })?;
+                                    }
                                 }
                             }
-                        }
 
-                        Ok(())
-                    })
-                    .unwrap();
+                            Ok(())
+                        })
+                        .unwrap();
                 });
             }
 
             #[test]
             fn $name_slice() {
                 JULIA.with(|j| {
+                    let mut frame = StackFrame::new();
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope(|_, mut frame| unsafe {
-                        let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
+                    jlrs.instance(&mut frame)
+                        .scope(|mut frame| unsafe {
+                            let data: Vec<$value_type> =
+                                (1..=24).map(|x| x as $value_type).collect();
 
-                        let array = Array::from_vec(&mut frame, data.clone(), (2, 3, 4))?
+                            let array = Array::from_vec(
+                                frame.as_extended_target(),
+                                data.clone(),
+                                (2, 3, 4),
+                            )?
                             .into_jlrs_result()?;
-                        let d = array.inline_data::<$value_type>()?;
+                            let d = array.inline_data::<$value_type>()?;
 
-                        for (a, b) in data.iter().zip(d.as_slice()) {
-                            assert_eq!(a, b)
-                        }
+                            for (a, b) in data.iter().zip(d.as_slice()) {
+                                assert_eq!(a, b)
+                            }
 
-                        Ok(())
-                    })
-                    .unwrap();
+                            Ok(())
+                        })
+                        .unwrap();
                 });
             }
 
             #[test]
             fn $name_slice_mut() {
                 JULIA.with(|j| {
+                    let mut frame = StackFrame::new();
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope(|_, mut frame| unsafe {
-                        let data: Vec<$value_type> = (1..=24).map(|x| x as $value_type).collect();
+                    jlrs.instance(&mut frame)
+                        .scope(|mut frame| unsafe {
+                            let data: Vec<$value_type> =
+                                (1..=24).map(|x| x as $value_type).collect();
 
-                        let mut array = Array::from_vec(&mut frame, data.clone(), (2, 3, 4))?
+                            let mut array = Array::from_vec(
+                                frame.as_extended_target(),
+                                data.clone(),
+                                (2, 3, 4),
+                            )?
                             .into_jlrs_result()?;
-                        let mut d = array.bits_data_mut::<$value_type>()?;
+                            let mut d = array.bits_data_mut::<$value_type>()?;
 
-                        for (a, b) in data.iter().zip(d.as_mut_slice()) {
-                            assert_eq!(a, b)
-                        }
+                            for (a, b) in data.iter().zip(d.as_mut_slice()) {
+                                assert_eq!(a, b)
+                            }
 
-                        Ok(())
-                    })
-                    .unwrap();
+                            Ok(())
+                        })
+                        .unwrap();
                 });
             }
         };
@@ -239,215 +264,232 @@ mod tests {
     #[test]
     fn borrow_nested() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|global, mut frame| unsafe {
-                let data: Vec<u8> = (1..=24).map(|x| x as u8).collect();
+            jlrs.instance(&mut frame)
+                .scope(|mut frame| unsafe {
+                    let data: Vec<u8> = (1..=24).map(|x| x as u8).collect();
 
-                let array = Array::from_vec(&mut frame, data, (2, 3, 4))?.into_jlrs_result()?;
+                    let array = Array::from_vec(frame.as_extended_target(), data, (2, 3, 4))?
+                        .into_jlrs_result()?;
 
-                frame.scope(|mut frame| {
-                    let d = unsafe { array.inline_data::<u8>()? };
+                    frame.scope(|mut frame| {
+                        let d = { array.inline_data::<u8>()? };
 
-                    let mut out = 1 as u8;
-                    for third in &[0, 1, 2, 3] {
-                        for second in &[0, 1, 2] {
-                            for first in &[0, 1] {
-                                assert_eq!(d[(*first, *second, *third)], out);
-                                out += 1 as u8;
-                            }
-                        }
-                    }
-
-                    let gi = Module::base(global)
-                        .function_ref("getindex")?
-                        .wrapper_unchecked();
-                    let one = Value::new(&mut frame, 1usize);
-                    let two = Value::new(&mut frame, 2usize);
-                    let three = Value::new(&mut frame, 3usize);
-                    let four = Value::new(&mut frame, 4usize);
-
-                    out = 1 as u8;
-                    for third in &[one, two, three, four] {
-                        for second in &[one, two, three] {
-                            for first in &[one, two] {
-                                frame.scope(|mut frame| {
-                                    let v = gi
-                                        .call(
-                                            &mut frame,
-                                            &mut [array.as_value(), *first, *second, *third],
-                                        )
-                                        .unwrap();
-                                    assert_eq!(v.unbox::<u8>()?, out);
+                        let mut out = 1 as u8;
+                        for third in &[0, 1, 2, 3] {
+                            for second in &[0, 1, 2] {
+                                for first in &[0, 1] {
+                                    assert_eq!(d[(*first, *second, *third)], out);
                                     out += 1 as u8;
-                                    Ok(())
-                                })?;
+                                }
                             }
                         }
-                    }
 
-                    Ok(())
+                        let gi = Module::base(&frame)
+                            .function(&frame, "getindex")?
+                            .wrapper_unchecked();
+                        let one = Value::new(&mut frame, 1usize);
+                        let two = Value::new(&mut frame, 2usize);
+                        let three = Value::new(&mut frame, 3usize);
+                        let four = Value::new(&mut frame, 4usize);
+
+                        out = 1 as u8;
+                        for third in &[one, two, three, four] {
+                            for second in &[one, two, three] {
+                                for first in &[one, two] {
+                                    frame.scope(|mut frame| {
+                                        let v = gi
+                                            .call(
+                                                &mut frame,
+                                                &mut [array.as_value(), *first, *second, *third],
+                                            )
+                                            .unwrap();
+                                        assert_eq!(v.unbox::<u8>()?, out);
+                                        out += 1 as u8;
+                                        Ok(())
+                                    })?;
+                                }
+                            }
+                        }
+
+                        Ok(())
+                    })
                 })
-            })
-            .unwrap();
+                .unwrap();
         });
     }
 
     #[test]
     fn access_borrowed_array_dimensions() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|_, mut frame| {
-                let arr_val = Array::new::<f32, _, _, _>(&mut frame, (1, 2)).into_jlrs_result()?;
-                let arr = arr_val;
+            jlrs.instance(&mut frame)
+                .scope(|mut frame| {
+                    let arr_val = Array::new::<f32, _, _>(frame.as_extended_target(), (1, 2))
+                        .into_jlrs_result()?;
+                    let arr = arr_val;
 
-                let data = unsafe {arr.inline_data::<f32>()?};
-                assert_eq!(data.dimensions().into_dimensions().as_slice(), &[1, 2]);
+                    let data = unsafe { arr.inline_data::<f32>()? };
+                    assert_eq!(data.dimensions().into_dimensions().as_slice(), &[1, 2]);
 
-                Ok(())
-            })
-            .unwrap();
+                    Ok(())
+                })
+                .unwrap();
         })
     }
 
     #[test]
     fn access_mutable_borrowed_array_dimensions() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|_, mut frame| unsafe {
-                let arr_val = Array::new::<f32, _, _, _>(&mut frame, (1, 2)).into_jlrs_result()?;
-                let mut arr = arr_val;
+            jlrs.instance(&mut frame)
+                .scope(|mut frame| {
+                    let arr_val = Array::new::<f32, _, _>(frame.as_extended_target(), (1, 2))
+                        .into_jlrs_result()?;
+                    let mut arr = arr_val;
 
-                let data = unsafe {arr.inline_data_mut::<f32>()?};
-                assert_eq!(data.dimensions().into_dimensions().as_slice(), &[1, 2]);
+                    let data = unsafe { arr.inline_data_mut::<f32>()? };
+                    assert_eq!(data.dimensions().into_dimensions().as_slice(), &[1, 2]);
 
-                Ok(())
-            })
-            .unwrap();
+                    Ok(())
+                })
+                .unwrap();
         })
     }
 
     #[test]
     fn value_data() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|global, mut frame| {
-                unsafe {
-                    let arr = Module::main(global)
-                        .submodule_ref("JlrsTests")?
-                        .wrapper_unchecked()
-                        .function_ref("vecofmodules")?
-                        .wrapper_unchecked()
-                        .call0(&mut frame)
-                        .unwrap()
-                        .cast::<Array>()?;
-                    let data = unsafe {arr.value_data()?};
+            jlrs.instance(&mut frame)
+                .scope(|mut frame| {
+                    unsafe {
+                        let arr = Module::main(&frame)
+                            .submodule(&frame, "JlrsTests")?
+                            .wrapper_unchecked()
+                            .function(&frame, "vecofmodules")?
+                            .wrapper_unchecked()
+                            .call0(&mut frame)
+                            .unwrap()
+                            .cast::<Array>()?;
+                        let data = { arr.value_data()? };
 
-                    assert!(data[0].wrapper_unchecked().is::<Module>());
-                }
-                Ok(())
-            })
-            .unwrap();
+                        assert!(data[0].wrapper_unchecked().is::<Module>());
+                    }
+                    Ok(())
+                })
+                .unwrap();
         })
     }
 
     #[test]
     fn value_data_mut() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|global, mut frame| {
-                unsafe {
-                    let submod = Module::main(global)
-                        .submodule_ref("JlrsTests")?
-                        .wrapper_unchecked();
-                    let mut arr = submod
-                        .function_ref("vecofmodules")?
-                        .wrapper_unchecked()
-                        .call0(&mut frame)
-                        .unwrap()
-                        .cast::<Array>()?;
-                    let mut data = unsafe {arr.value_data_mut()?};
-                    data.set(0, Some(submod.as_value()))?;
+            jlrs.instance(&mut frame)
+                .scope(|mut frame| {
+                    unsafe {
+                        let submod = Module::main(&frame)
+                            .submodule(&frame, "JlrsTests")?
+                            .wrapper_unchecked();
+                        let mut arr = submod
+                            .function(&frame, "vecofmodules")?
+                            .wrapper_unchecked()
+                            .call0(&mut frame)
+                            .unwrap()
+                            .cast::<Array>()?;
+                        let mut data = { arr.value_data_mut()? };
+                        data.set(0, Some(submod.as_value()))?;
 
-                    let getindex = Module::base(global)
-                        .function_ref("getindex")?
-                        .wrapper_unchecked();
-                    let idx = Value::new(&mut frame, 1usize);
-                    let entry = getindex
-                        .call2(&mut frame, arr.as_value(), idx)
-                        .unwrap()
-                        .cast::<Module>()?;
+                        let getindex = Module::base(&frame)
+                            .function(&frame, "getindex")?
+                            .wrapper_unchecked();
+                        let idx = Value::new(&mut frame, 1usize);
+                        let entry = getindex
+                            .call2(&mut frame, arr.as_value(), idx)
+                            .unwrap()
+                            .cast::<Module>()?;
 
-                    assert_eq!(entry.name().hash(), submod.name().hash());
-                }
-                Ok(())
-            })
-            .unwrap();
+                        assert_eq!(entry.name().hash(), submod.name().hash());
+                    }
+                    Ok(())
+                })
+                .unwrap();
         })
     }
 
     #[test]
     fn typed_array_value_data() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|global, mut frame| {
-                unsafe {
-                    let arr = Module::main(global)
-                        .submodule_ref("JlrsTests")?
-                        .wrapper_unchecked()
-                        .function_ref("vecofmodules")?
-                        .wrapper_unchecked()
-                        .call0(&mut frame)
-                        .unwrap()
-                        .cast::<TypedArray<ModuleRef>>()?;
-                    let data = unsafe {arr.value_data()?};
+            jlrs.instance(&mut frame)
+                .scope(|mut frame| {
+                    unsafe {
+                        let arr = Module::main(&frame)
+                            .submodule(&frame, "JlrsTests")?
+                            .wrapper_unchecked()
+                            .function(&frame, "vecofmodules")?
+                            .wrapper_unchecked()
+                            .call0(&mut frame)
+                            .unwrap()
+                            .cast::<TypedArray<ModuleRef>>()?;
+                        let data = { arr.value_data()? };
 
-                    assert!(data[0].wrapper_unchecked().is::<Module>());
-                }
-                Ok(())
-            })
-            .unwrap();
+                        assert!(data[0].wrapper_unchecked().is::<Module>());
+                    }
+                    Ok(())
+                })
+                .unwrap();
         })
     }
 
     #[test]
     fn typed_array_value_data_mut() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|global, mut frame| {
-                unsafe {
-                    let submod = Module::main(global)
-                        .submodule_ref("JlrsTests")?
-                        .wrapper_unchecked();
-                    let mut arr = submod
-                        .function_ref("vecofmodules")?
-                        .wrapper_unchecked()
-                        .call0(&mut frame)
-                        .unwrap()
-                        .cast::<TypedArray<ModuleRef>>()?;
-                    let mut data = unsafe {arr.value_data_mut()?};
-                    data.set(0, Some(submod.as_value()))?;
+            jlrs.instance(&mut frame)
+                .scope(|mut frame| {
+                    unsafe {
+                        let submod = Module::main(&frame)
+                            .submodule(&frame, "JlrsTests")?
+                            .wrapper_unchecked();
+                        let mut arr = submod
+                            .function(&frame, "vecofmodules")?
+                            .wrapper_unchecked()
+                            .call0(&mut frame)
+                            .unwrap()
+                            .cast::<TypedArray<ModuleRef>>()?;
+                        let mut data = { arr.value_data_mut()? };
+                        data.set(0, Some(submod.as_value()))?;
 
-                    let getindex = Module::base(global)
-                        .function_ref("getindex")?
-                        .wrapper_unchecked();
-                    let idx = Value::new(&mut frame, 1usize);
-                    let entry = getindex
-                        .call2(&mut frame, arr.as_value(), idx)
-                        .unwrap()
-                        .cast::<Module>()?;
+                        let getindex = Module::base(&frame)
+                            .function(&frame, "getindex")?
+                            .wrapper_unchecked();
+                        let idx = Value::new(&mut frame, 1usize);
+                        let entry = getindex
+                            .call2(&mut frame, arr.as_value(), idx)
+                            .unwrap()
+                            .cast::<Module>()?;
 
-                    assert_eq!(entry.name().hash(), submod.name().hash());
-                }
-                Ok(())
-            })
-            .unwrap();
+                        assert_eq!(entry.name().hash(), submod.name().hash());
+                    }
+                    Ok(())
+                })
+                .unwrap();
         })
     }
 }

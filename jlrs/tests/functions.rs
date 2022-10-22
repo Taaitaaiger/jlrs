@@ -7,149 +7,164 @@ mod tests {
     #[test]
     fn return_nothing() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|_global, mut frame| unsafe {
-                let func = Value::eval_string(
-                    &mut frame,
-                    "function x(a)::Nothing
+            jlrs.instance(&mut frame)
+                .scope(|mut frame| unsafe {
+                    let func = Value::eval_string(
+                        &mut frame,
+                        "function x(a)::Nothing
                     @assert 3 == a;
                 end",
-                )
-                .into_jlrs_result()?;
-                let v = Value::new(&mut frame, 3usize);
-                let v2 = func.call1(&mut frame, v).into_jlrs_result()?;
-                assert!(v2.is::<Nothing>());
-                Ok(())
-            })
-            .unwrap();
+                    )
+                    .into_jlrs_result()?;
+                    let v = Value::new(&mut frame, 3usize);
+                    let v2 = func.call1(&mut frame, v).into_jlrs_result()?;
+                    assert!(v2.is::<Nothing>());
+                    Ok(())
+                })
+                .unwrap();
         })
     }
 
     #[test]
     fn throw_nothing() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|_global, mut frame| unsafe {
-                let func = Value::eval_string(
-                    &mut frame,
-                    "function y()::Nothing
+            jlrs.instance(&mut frame)
+                .scope(|mut frame| unsafe {
+                    let func = Value::eval_string(
+                        &mut frame,
+                        "function y()::Nothing
                 throw(nothing)
                 end",
-                )
-                .into_jlrs_result()?;
-                let v = func.call0(&mut frame).unwrap_err();
-                assert!(v.is::<Nothing>());
-                Ok(())
-            })
-            .unwrap();
+                    )
+                    .into_jlrs_result()?;
+                    let v = func.call0(&mut frame).unwrap_err();
+                    assert!(v.is::<Nothing>());
+                    Ok(())
+                })
+                .unwrap();
         })
     }
 
     #[test]
     fn call0() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|global, mut frame| unsafe {
-                let func = Module::base(global)
-                    .function_ref("vect")?
-                    .wrapper_unchecked();
-                func.call0(&mut frame).unwrap();
-                Ok(())
-            })
-            .unwrap();
+            jlrs.instance(&mut frame)
+                .scope(|mut frame| unsafe {
+                    let func = Module::base(&frame)
+                        .function(&frame, "vect")?
+                        .wrapper_unchecked();
+                    func.call0(&mut frame).unwrap();
+                    Ok(())
+                })
+                .unwrap();
         });
     }
 
     #[test]
     fn call0_unrooted() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|global, _| unsafe {
-                Module::base(global)
-                    .function_ref("vect")?
-                    .wrapper_unchecked()
-                    .call0_unrooted(global)
-                    .unwrap();
+            jlrs.instance(&mut frame)
+                .scope(|frame| unsafe {
+                    Module::base(&frame)
+                        .function(&frame, "vect")?
+                        .wrapper_unchecked()
+                        .call0(&frame)
+                        .unwrap();
 
-                Ok(())
-            })
-            .unwrap();
+                    Ok(())
+                })
+                .unwrap();
         });
     }
 
     #[test]
     fn call0_output() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|global, mut frame| {
-                let (output, frame) = frame.split();
-                frame
-                    .scope(|mut frame| unsafe {
-                        let func = Module::base(global)
-                            .function_ref("vect")?
-                            .wrapper_unchecked();
-                        let output = output.into_scope(&mut frame);
-                        Ok(func.call0(output))
-                    })?
-                    .unwrap();
+            jlrs.instance(&mut frame)
+                .scope(|mut frame| {
+                    let output = frame.output();
+                    frame
+                        .scope(|frame| unsafe {
+                            let func = Module::base(&frame)
+                                .function(&frame, "vect")?
+                                .wrapper_unchecked();
 
-                Ok(())
-            })
-            .unwrap();
+                            Ok(func.call0(output))
+                        })?
+                        .unwrap();
+
+                    Ok(())
+                })
+                .unwrap();
         });
     }
 
     #[test]
     fn call0_dynamic() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|global, mut frame| unsafe {
-                let func = Module::base(global)
-                    .function_ref("vect")?
-                    .wrapper_unchecked();
-                func.call0(&mut frame).unwrap();
-                Ok(())
-            })
-            .unwrap();
+            jlrs.instance(&mut frame)
+                .scope(|mut frame| unsafe {
+                    let func = Module::base(&frame)
+                        .function(&frame, "vect")?
+                        .wrapper_unchecked();
+                    func.call0(&mut frame).unwrap();
+                    Ok(())
+                })
+                .unwrap();
         });
     }
 
     #[test]
     fn call0_dynamic_output() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|global, mut frame| {
-                let (output, frame) = frame.split();
-                frame
-                    .scope(|mut frame| unsafe {
-                        let func = Module::base(global)
-                            .function_ref("vect")?
-                            .wrapper_unchecked();
-                        let output = output.into_scope(&mut frame);
-                        Ok(func.call0(output))
-                    })?
-                    .unwrap();
-                Ok(())
-            })
-            .unwrap();
+            jlrs.instance(&mut frame)
+                .scope(|mut frame| {
+                    let output = frame.output();
+                    frame
+                        .scope(|frame| unsafe {
+                            let func = Module::base(&frame)
+                                .function(&frame, "vect")?
+                                .wrapper_unchecked();
+
+                            Ok(func.call0(output))
+                        })?
+                        .unwrap();
+                    Ok(())
+                })
+                .unwrap();
         });
     }
 
     #[test]
     fn call1() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.scope(|global, mut frame| unsafe {
-                let func = Module::base(global)
-                    .function_ref("cos")?
+            let out = jlrs.instance(&mut frame).scope(|mut frame| unsafe {
+                let func = Module::base(&frame)
+                    .function(&frame, "cos")?
                     .wrapper_unchecked();
                 let angle = Value::new(&mut frame, std::f32::consts::PI);
                 let out = func.call1(&mut frame, angle).unwrap();
@@ -163,14 +178,15 @@ mod tests {
     #[test]
     fn call1_unrooted() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.scope(|global, mut frame| unsafe {
-                let func = Module::base(global)
-                    .function_ref("cos")?
+            let out = jlrs.instance(&mut frame).scope(|mut frame| unsafe {
+                let func = Module::base(&frame)
+                    .function(&frame, "cos")?
                     .wrapper_unchecked();
                 let angle = Value::new(&mut frame, std::f32::consts::PI);
-                let out = func.call1_unrooted(global, angle).unwrap();
+                let out = func.call1(&frame, angle).unwrap();
                 out.wrapper_unchecked().unbox::<f32>()
             });
 
@@ -181,83 +197,92 @@ mod tests {
     #[test]
     fn call1_output() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|global, mut frame| unsafe {
-                let (output, frame) = frame.split();
-                let out = frame
-                    .scope(|mut frame| {
-                        let func = Module::base(global)
-                            .function_ref("cos")?
-                            .wrapper_unchecked();
-                        let angle = Value::new(&mut frame, std::f32::consts::PI);
-                        let output = output.into_scope(&mut frame);
-                        Ok(func.call1(output, angle))
-                    })?
-                    .unwrap()
-                    .unbox::<f32>();
-                assert_eq!(out.unwrap(), -1.);
-                Ok(())
-            })
-            .unwrap();
+            jlrs.instance(&mut frame)
+                .scope(|mut frame| unsafe {
+                    let output = frame.output();
+                    let out = frame
+                        .scope(|mut frame| {
+                            let func = Module::base(&frame)
+                                .function(&frame, "cos")?
+                                .wrapper_unchecked();
+                            let angle = Value::new(&mut frame, std::f32::consts::PI);
+
+                            Ok(func.call1(output, angle))
+                        })?
+                        .unwrap()
+                        .unbox::<f32>();
+                    assert_eq!(out.unwrap(), -1.);
+                    Ok(())
+                })
+                .unwrap();
         });
     }
 
     #[test]
     fn call1_dynamic() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|global, mut frame| {
-                let (output, frame) = frame.split();
-                let out = frame
-                    .scope(|mut frame| unsafe {
-                        let func = Module::base(global)
-                            .function_ref("cos")?
-                            .wrapper_unchecked();
-                        let angle = Value::new(&mut frame, std::f32::consts::PI);
-                        let output = output.into_scope(&mut frame);
-                        func.call1(output, angle).into_jlrs_result()
-                    })?
-                    .unbox::<f32>();
-                assert_eq!(out.unwrap(), -1.);
-                Ok(())
-            })
-            .unwrap();
+            jlrs.instance(&mut frame)
+                .scope(|mut frame| {
+                    let output = frame.output();
+                    let out = frame
+                        .scope(|mut frame| unsafe {
+                            let func = Module::base(&frame)
+                                .function(&frame, "cos")?
+                                .wrapper_unchecked();
+                            let angle = Value::new(&mut frame, std::f32::consts::PI);
+
+                            func.call1(output, angle).into_jlrs_result()
+                        })?
+                        .unbox::<f32>();
+                    assert_eq!(out.unwrap(), -1.);
+                    Ok(())
+                })
+                .unwrap();
         });
     }
 
     #[test]
     fn call1_dynamic_output() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|global, mut frame| {
-                let (output, frame) = frame.split();
-                let out = frame
-                    .scope(|mut frame| unsafe {
-                        let func = Module::base(global)
-                            .function_ref("cos")?
-                            .wrapper_unchecked();
-                        let angle = Value::new(&mut frame, std::f32::consts::PI);
-                        let output = output.into_scope(&mut frame);
-                        func.call1(output, angle).into_jlrs_result()
-                    })?
-                    .unbox::<f32>();
-                assert_eq!(out.unwrap(), -1.);
-                Ok(())
-            })
-            .unwrap();
+            jlrs.instance(&mut frame)
+                .scope(|mut frame| {
+                    let output = frame.output();
+                    let out = frame
+                        .scope(|mut frame| unsafe {
+                            let func = Module::base(&frame)
+                                .function(&frame, "cos")?
+                                .wrapper_unchecked();
+                            let angle = Value::new(&mut frame, std::f32::consts::PI);
+
+                            func.call1(output, angle).into_jlrs_result()
+                        })?
+                        .unbox::<f32>();
+                    assert_eq!(out.unwrap(), -1.);
+                    Ok(())
+                })
+                .unwrap();
         });
     }
 
     #[test]
     fn call2() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.scope(|global, mut frame| unsafe {
-                let func = Module::base(global).function_ref("+")?.wrapper_unchecked();
+            let out = jlrs.instance(&mut frame).scope(|mut frame| unsafe {
+                let func = Module::base(&frame)
+                    .function(&frame, "+")?
+                    .wrapper_unchecked();
                 let arg0 = Value::new(&mut frame, 1u32);
                 let arg1 = Value::new(&mut frame, 2u32);
                 let out = func.call2(&mut frame, arg0, arg1).unwrap();
@@ -271,13 +296,16 @@ mod tests {
     #[test]
     fn call2_unrooted() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.scope(|global, mut frame| unsafe {
-                let func = Module::base(global).function_ref("+")?.wrapper_unchecked();
+            let out = jlrs.instance(&mut frame).scope(|mut frame| unsafe {
+                let func = Module::base(&frame)
+                    .function(&frame, "+")?
+                    .wrapper_unchecked();
                 let arg0 = Value::new(&mut frame, 1u32);
                 let arg1 = Value::new(&mut frame, 2u32);
-                let out = func.call2_unrooted(global, arg0, arg1).unwrap();
+                let out = func.call2(&frame, arg0, arg1).unwrap();
                 out.wrapper_unchecked().unbox::<u32>()
             });
 
@@ -288,15 +316,18 @@ mod tests {
     #[test]
     fn call_multiple_scopes() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.scope(|global, mut frame| unsafe {
+            let out = jlrs.instance(&mut frame).scope(|mut frame| unsafe {
                 let arg0 = Value::new(&mut frame, 1u32);
 
                 let output = frame.output();
                 frame
                     .scope(|mut frame| {
-                        let func = Module::base(global).function_ref("+")?.wrapper_unchecked();
+                        let func = Module::base(&frame)
+                            .function(&frame, "+")?
+                            .wrapper_unchecked();
                         let arg1 = Value::new(&mut frame, 2u32);
                         Ok(func.call(output, [arg0, arg1]))
                     })?
@@ -311,16 +342,19 @@ mod tests {
     #[test]
     fn call2_output() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.scope(|global, mut frame| {
-                let (output, frame) = frame.split();
+            let out = jlrs.instance(&mut frame).scope(|mut frame| {
+                let output = frame.output();
                 frame
                     .scope(|mut frame| unsafe {
-                        let func = Module::base(global).function_ref("+")?.wrapper_unchecked();
+                        let func = Module::base(&frame)
+                            .function(&frame, "+")?
+                            .wrapper_unchecked();
                         let arg0 = Value::new(&mut frame, 1u32);
                         let arg1 = Value::new(&mut frame, 2u32);
-                        let output = output.into_scope(&mut frame);
+
                         Ok(func.call2(output, arg0, arg1))
                     })?
                     .unwrap()
@@ -334,10 +368,13 @@ mod tests {
     #[test]
     fn call2_dynamic() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.scope(|global, mut frame| unsafe {
-                let func = Module::base(global).function_ref("+")?.wrapper_unchecked();
+            let out = jlrs.instance(&mut frame).scope(|mut frame| unsafe {
+                let func = Module::base(&frame)
+                    .function(&frame, "+")?
+                    .wrapper_unchecked();
                 let arg0 = Value::new(&mut frame, 1u32);
                 let arg1 = Value::new(&mut frame, 2u32);
                 let out = func.call2(&mut frame, arg0, arg1).unwrap();
@@ -351,16 +388,19 @@ mod tests {
     #[test]
     fn call2_dynamic_output() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.scope(|global, mut frame| {
-                let (output, frame) = frame.split();
+            let out = jlrs.instance(&mut frame).scope(|mut frame| {
+                let output = frame.output();
                 frame
                     .scope(|mut frame| unsafe {
-                        let func = Module::base(global).function_ref("+")?.wrapper_unchecked();
+                        let func = Module::base(&frame)
+                            .function(&frame, "+")?
+                            .wrapper_unchecked();
                         let arg0 = Value::new(&mut frame, 1u32);
                         let arg1 = Value::new(&mut frame, 2u32);
-                        let output = output.into_scope(&mut frame);
+
                         Ok(func.call2(output, arg0, arg1))
                     })?
                     .unwrap()
@@ -374,10 +414,13 @@ mod tests {
     #[test]
     fn call3() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.scope(|global, mut frame| unsafe {
-                let func = Module::base(global).function_ref("+")?.wrapper_unchecked();
+            let out = jlrs.instance(&mut frame).scope(|mut frame| unsafe {
+                let func = Module::base(&frame)
+                    .function(&frame, "+")?
+                    .wrapper_unchecked();
                 let arg0 = Value::new(&mut frame, 1u32);
                 let arg1 = Value::new(&mut frame, 2u32);
                 let arg2 = Value::new(&mut frame, 3u32);
@@ -392,14 +435,17 @@ mod tests {
     #[test]
     fn call3_unrooted() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.scope(|global, mut frame| unsafe {
-                let func = Module::base(global).function_ref("+")?.wrapper_unchecked();
+            let out = jlrs.instance(&mut frame).scope(|mut frame| unsafe {
+                let func = Module::base(&frame)
+                    .function(&frame, "+")?
+                    .wrapper_unchecked();
                 let arg0 = Value::new(&mut frame, 1u32);
                 let arg1 = Value::new(&mut frame, 2u32);
                 let arg2 = Value::new(&mut frame, 3u32);
-                let out = func.call3_unrooted(global, arg0, arg1, arg2).unwrap();
+                let out = func.call3(&frame, arg0, arg1, arg2).unwrap();
                 out.wrapper_unchecked().unbox::<u32>()
             });
 
@@ -410,17 +456,20 @@ mod tests {
     #[test]
     fn call3_output() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.scope(|global, mut frame| {
-                let (output, frame) = frame.split();
+            let out = jlrs.instance(&mut frame).scope(|mut frame| {
+                let output = frame.output();
                 frame
                     .scope(|mut frame| unsafe {
-                        let func = Module::base(global).function_ref("+")?.wrapper_unchecked();
+                        let func = Module::base(&frame)
+                            .function(&frame, "+")?
+                            .wrapper_unchecked();
                         let arg0 = Value::new(&mut frame, 1u32);
                         let arg1 = Value::new(&mut frame, 2u32);
                         let arg2 = Value::new(&mut frame, 3u32);
-                        let output = output.into_scope(&mut frame);
+
                         Ok(func.call3(output, arg0, arg1, arg2))
                     })?
                     .unwrap()
@@ -434,10 +483,13 @@ mod tests {
     #[test]
     fn call3_dynamic() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.scope(|global, mut frame| unsafe {
-                let func = Module::base(global).function_ref("+")?.wrapper_unchecked();
+            let out = jlrs.instance(&mut frame).scope(|mut frame| unsafe {
+                let func = Module::base(&frame)
+                    .function(&frame, "+")?
+                    .wrapper_unchecked();
                 let arg0 = Value::new(&mut frame, 1u32);
                 let arg1 = Value::new(&mut frame, 2u32);
                 let arg2 = Value::new(&mut frame, 3u32);
@@ -452,17 +504,20 @@ mod tests {
     #[test]
     fn call3_dynamic_output() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.scope(|global, mut frame| {
-                let (output, frame) = frame.split();
+            let out = jlrs.instance(&mut frame).scope(|mut frame| {
+                let output = frame.output();
                 frame
                     .scope(|mut frame| unsafe {
-                        let func = Module::base(global).function_ref("+")?.wrapper_unchecked();
+                        let func = Module::base(&frame)
+                            .function(&frame, "+")?
+                            .wrapper_unchecked();
                         let arg0 = Value::new(&mut frame, 1u32);
                         let arg1 = Value::new(&mut frame, 2u32);
                         let arg2 = Value::new(&mut frame, 3u32);
-                        let output = output.into_scope(&mut frame);
+
                         Ok(func.call3(output, arg0, arg1, arg2))
                     })?
                     .unwrap()
@@ -476,10 +531,13 @@ mod tests {
     #[test]
     fn call() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.scope(|global, mut frame| unsafe {
-                let func = Module::base(global).function_ref("+")?.wrapper_unchecked();
+            let out = jlrs.instance(&mut frame).scope(|mut frame| unsafe {
+                let func = Module::base(&frame)
+                    .function(&frame, "+")?
+                    .wrapper_unchecked();
                 let arg0 = Value::new(&mut frame, 1u32);
                 let arg1 = Value::new(&mut frame, 2u32);
                 let arg2 = Value::new(&mut frame, 3u32);
@@ -497,17 +555,18 @@ mod tests {
     #[test]
     fn call_unrooted() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.scope(|global, mut frame| unsafe {
-                let func = Module::base(global).function_ref("+")?.wrapper_unchecked();
+            let out = jlrs.instance(&mut frame).scope(|mut frame| unsafe {
+                let func = Module::base(&frame)
+                    .function(&frame, "+")?
+                    .wrapper_unchecked();
                 let arg0 = Value::new(&mut frame, 1u32);
                 let arg1 = Value::new(&mut frame, 2u32);
                 let arg2 = Value::new(&mut frame, 3u32);
                 let arg3 = Value::new(&mut frame, 4u32);
-                let out = func
-                    .call_unrooted(global, &mut [arg0, arg1, arg2, arg3])
-                    .unwrap();
+                let out = func.call(&frame, &mut [arg0, arg1, arg2, arg3]).unwrap();
                 out.wrapper_unchecked().unbox::<u32>()
             });
 
@@ -518,18 +577,21 @@ mod tests {
     #[test]
     fn call_output() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.scope(|global, mut frame| {
-                let (output, frame) = frame.split();
+            let out = jlrs.instance(&mut frame).scope(|mut frame| {
+                let output = frame.output();
                 frame
                     .scope(|mut frame| unsafe {
-                        let func = Module::base(global).function_ref("+")?.wrapper_unchecked();
+                        let func = Module::base(&frame)
+                            .function(&frame, "+")?
+                            .wrapper_unchecked();
                         let arg0 = Value::new(&mut frame, 1u32);
                         let arg1 = Value::new(&mut frame, 2u32);
                         let arg2 = Value::new(&mut frame, 3u32);
                         let arg3 = Value::new(&mut frame, 4u32);
-                        let output = output.into_scope(&mut frame);
+
                         Ok(func.call(output, &mut [arg0, arg1, arg2, arg3]))
                     })?
                     .unwrap()
@@ -543,18 +605,21 @@ mod tests {
     #[test]
     fn call_dynamic() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.scope(|global, mut frame| {
-                let (output, frame) = frame.split();
+            let out = jlrs.instance(&mut frame).scope(|mut frame| {
+                let output = frame.output();
                 frame
                     .scope(|mut frame| unsafe {
-                        let func = Module::base(global).function_ref("+")?.wrapper_unchecked();
+                        let func = Module::base(&frame)
+                            .function(&frame, "+")?
+                            .wrapper_unchecked();
                         let arg0 = Value::new(&mut frame, 1u32);
                         let arg1 = Value::new(&mut frame, 2u32);
                         let arg2 = Value::new(&mut frame, 3u32);
                         let arg3 = Value::new(&mut frame, 4u32);
-                        let output = output.into_scope(&mut frame);
+
                         Ok(func.call(output, &mut [arg0, arg1, arg2, arg3]))
                     })?
                     .unwrap()
@@ -568,18 +633,21 @@ mod tests {
     #[test]
     fn call_dynamic_output() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            let out = jlrs.scope(|global, mut frame| {
-                let (output, frame) = frame.split();
+            let out = jlrs.instance(&mut frame).scope(|mut frame| {
+                let output = frame.output();
                 frame
                     .scope(|mut frame| unsafe {
-                        let func = Module::base(global).function_ref("+")?.wrapper_unchecked();
+                        let func = Module::base(&frame)
+                            .function(&frame, "+")?
+                            .wrapper_unchecked();
                         let arg0 = Value::new(&mut frame, 1u32);
                         let arg1 = Value::new(&mut frame, 2u32);
                         let arg2 = Value::new(&mut frame, 3u32);
                         let arg3 = Value::new(&mut frame, 4u32);
-                        let output = output.into_scope(&mut frame);
+
                         Ok(func.clone().call(output, &mut [arg0, arg1, arg2, arg3]))
                     })?
                     .unwrap()

@@ -1,4 +1,4 @@
-//! Unobox the contents of a Julia value.
+//! Unbox the contents of a Julia value.
 //!
 //! A [`Value`] contains a pointer to some data owned by Julia. The layout of this data depends on
 //! its [`DataType`]. It's often possible to provide a type defined in Rust that matches the
@@ -10,8 +10,7 @@
 //! a [`Bool`] respectively. The reason is that while using invalid `Char`s and `Bool`s is an
 //! error in Julia, it's undefined behavior to create them in Rust. Similarly, strings in Julia
 //! should be UTF-8 encoded, but to account for the possibility that the contents are invalid the
-//! implementation of `Unbox` returns a `String` if the contents are valid and a `Vec<u8>`
-//! otherwise.
+//! implementation of `Unbox` returns a `Result<String, Vec<u8>>`.
 //!
 //! Unlike [`IntoJulia`], the `Unbox` trait is not limited to bits-types. The only requirement is
 //! that the layout of the types in both languages match. Types that can be unboxed include those
@@ -47,7 +46,6 @@ use super::into_julia::IntoJulia;
 /// incorrect it must be overridden.
 ///
 /// [`Value::unbox`]: crate::wrappers::ptr::value::Value::unbox
-/// [`Value::unbox_unchecked`]: crate::wrappers::ptr::value::Value::unbox_unchecked
 /// [`ValidLayout`]: crate::layout::valid_layout::ValidLayout
 pub unsafe trait Unbox {
     /// The type of the unboxed data. Must be `#[repr(C)]`.
@@ -104,7 +102,6 @@ impl_unboxer!(usize, jl_unbox_uint64);
 #[cfg(target_pointer_width = "64")]
 impl_unboxer!(isize, jl_unbox_int64);
 
-// Safety: *mut T and Ptr{T} have the same layout
 unsafe impl<T: IntoJulia> Unbox for *mut T {
     type Output = Self;
 }

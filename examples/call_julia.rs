@@ -5,7 +5,7 @@ fn main() {
     // Julia must be initialized before it can be used.
     // This is safe because this we're not initializing Julia from another
     // thread and crate at the same time.
-    let context_frame = ContextFrame::new();
+    let mut frame = StackFrame::new();
     let mut julia = unsafe { RuntimeBuilder::new().start(&context_frame).expect("Could not init Julia") };
 
     // Include some custom code defined in MyModule.jl.

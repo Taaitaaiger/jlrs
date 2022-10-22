@@ -10,9 +10,11 @@ mod tests {
     fn derive_bits_type_bool() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
+            let mut frame = StackFrame::new();
 
             julia
-                .scope(|_global, mut frame| {
+                .instance(&mut frame)
+                .scope(|mut frame| {
                     let s = BitsTypeBool { a: Bool::new(true) };
                     let v = Value::new(&mut frame, s);
                     let first = v.get_nth_field(&mut frame, 0).unwrap();
@@ -23,7 +25,7 @@ mod tests {
 
                     Ok(())
                 })
-                .unwrap()
+                .unwrap();
         })
     }
 
@@ -31,9 +33,11 @@ mod tests {
     fn derive_bits_type_char() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
+            let mut frame = StackFrame::new();
 
             julia
-                .scope(|_global, mut frame| {
+                .instance(&mut frame)
+                .scope(|mut frame| {
                     let s = BitsTypeChar { a: Char::new('b') };
                     let v = Value::new(&mut frame, s);
                     let first = v.get_nth_field(&mut frame, 0).unwrap();
@@ -44,7 +48,7 @@ mod tests {
 
                     Ok(())
                 })
-                .unwrap()
+                .unwrap();
         })
     }
 
@@ -52,9 +56,11 @@ mod tests {
     fn derive_bits_type_uint8() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
+            let mut frame = StackFrame::new();
 
             julia
-                .scope(|_global, mut frame| {
+                .instance(&mut frame)
+                .scope(|mut frame| {
                     let s = BitsTypeUInt8 { a: 1 };
                     let v = Value::new(&mut frame, s);
                     let first = v.get_nth_field(&mut frame, 0).unwrap();
@@ -65,7 +71,7 @@ mod tests {
 
                     Ok(())
                 })
-                .unwrap()
+                .unwrap();
         })
     }
 
@@ -73,9 +79,11 @@ mod tests {
     fn derive_bits_type_uint16() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
+            let mut frame = StackFrame::new();
 
             julia
-                .scope(|_global, mut frame| {
+                .instance(&mut frame)
+                .scope(|mut frame| {
                     let s = BitsTypeUInt16 { a: 2 };
                     let v = Value::new(&mut frame, s);
                     let first = v.get_nth_field(&mut frame, 0).unwrap();
@@ -86,7 +94,7 @@ mod tests {
 
                     Ok(())
                 })
-                .unwrap()
+                .unwrap();
         })
     }
 
@@ -94,9 +102,11 @@ mod tests {
     fn derive_bits_type_uint32() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
+            let mut frame = StackFrame::new();
 
             julia
-                .scope(|_global, mut frame| {
+                .instance(&mut frame)
+                .scope(|mut frame| {
                     let s = BitsTypeUInt32 { a: 3 };
                     let v = Value::new(&mut frame, s);
                     let first = v.get_nth_field(&mut frame, 0).unwrap();
@@ -107,7 +117,7 @@ mod tests {
 
                     Ok(())
                 })
-                .unwrap()
+                .unwrap();
         })
     }
 
@@ -115,9 +125,11 @@ mod tests {
     fn derive_bits_type_uint64() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
+            let mut frame = StackFrame::new();
 
             julia
-                .scope(|_global, mut frame| {
+                .instance(&mut frame)
+                .scope(|mut frame| {
                     let s = BitsTypeUInt64 { a: 4 };
                     let v = Value::new(&mut frame, s);
                     let first = v.get_nth_field(&mut frame, 0).unwrap();
@@ -128,7 +140,7 @@ mod tests {
 
                     Ok(())
                 })
-                .unwrap()
+                .unwrap();
         })
     }
 
@@ -136,9 +148,11 @@ mod tests {
     fn derive_bits_type_uint() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
+            let mut frame = StackFrame::new();
 
             julia
-                .scope(|_global, mut frame| {
+                .instance(&mut frame)
+                .scope(|mut frame| {
                     let s = BitsTypeUInt { a: 5 };
                     let v = Value::new(&mut frame, s);
                     let first = v.get_nth_field(&mut frame, 0).unwrap();
@@ -149,7 +163,7 @@ mod tests {
 
                     Ok(())
                 })
-                .unwrap()
+                .unwrap();
         })
     }
 
@@ -157,9 +171,11 @@ mod tests {
     fn derive_bits_type_int8() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
+            let mut frame = StackFrame::new();
 
             julia
-                .scope(|_global, mut frame| {
+                .instance(&mut frame)
+                .scope(|mut frame| {
                     let s = BitsTypeInt8 { a: -1 };
                     let v = Value::new(&mut frame, s);
                     let first = v.get_nth_field(&mut frame, 0).unwrap();
@@ -170,7 +186,7 @@ mod tests {
 
                     Ok(())
                 })
-                .unwrap()
+                .unwrap();
         })
     }
 
@@ -178,9 +194,11 @@ mod tests {
     fn derive_bits_type_int16() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
+            let mut frame = StackFrame::new();
 
             julia
-                .scope(|_global, mut frame| {
+                .instance(&mut frame)
+                .scope(|mut frame| {
                     let s = BitsTypeInt16 { a: -2 };
                     let v = Value::new(&mut frame, s);
                     let first = v.get_nth_field(&mut frame, 0).unwrap();
@@ -191,7 +209,7 @@ mod tests {
 
                     Ok(())
                 })
-                .unwrap()
+                .unwrap();
         })
     }
 
@@ -199,9 +217,11 @@ mod tests {
     fn derive_bits_type_int32() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
+            let mut frame = StackFrame::new();
 
             julia
-                .scope(|_global, mut frame| {
+                .instance(&mut frame)
+                .scope(|mut frame| {
                     let s = BitsTypeInt32 { a: -3 };
                     let v = Value::new(&mut frame, s);
                     let first = v.get_nth_field(&mut frame, 0).unwrap();
@@ -212,7 +232,7 @@ mod tests {
 
                     Ok(())
                 })
-                .unwrap()
+                .unwrap();
         })
     }
 
@@ -220,9 +240,11 @@ mod tests {
     fn derive_bits_type_int64() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
+            let mut frame = StackFrame::new();
 
             julia
-                .scope(|_global, mut frame| {
+                .instance(&mut frame)
+                .scope(|mut frame| {
                     let s = BitsTypeInt64 { a: -4 };
                     let v = Value::new(&mut frame, s);
                     let first = v.get_nth_field(&mut frame, 0).unwrap();
@@ -233,7 +255,7 @@ mod tests {
 
                     Ok(())
                 })
-                .unwrap()
+                .unwrap();
         })
     }
 
@@ -241,9 +263,11 @@ mod tests {
     fn derive_bits_type_int() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
+            let mut frame = StackFrame::new();
 
             julia
-                .scope(|_global, mut frame| {
+                .instance(&mut frame)
+                .scope(|mut frame| {
                     let s = BitsTypeInt { a: -5 };
                     let v = Value::new(&mut frame, s);
                     let first = v.get_nth_field(&mut frame, 0).unwrap();
@@ -254,7 +278,7 @@ mod tests {
 
                     Ok(())
                 })
-                .unwrap()
+                .unwrap();
         })
     }
 
@@ -262,9 +286,11 @@ mod tests {
     fn derive_bits_type_float32() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
+            let mut frame = StackFrame::new();
 
             julia
-                .scope(|_global, mut frame| {
+                .instance(&mut frame)
+                .scope(|mut frame| {
                     let s = BitsTypeFloat32 { a: 1.2 };
                     let v = Value::new(&mut frame, s);
                     let first = v.get_nth_field(&mut frame, 0).unwrap();
@@ -275,7 +301,7 @@ mod tests {
 
                     Ok(())
                 })
-                .unwrap()
+                .unwrap();
         })
     }
 
@@ -283,9 +309,11 @@ mod tests {
     fn derive_bits_type_float64() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
+            let mut frame = StackFrame::new();
 
             julia
-                .scope(|_global, mut frame| {
+                .instance(&mut frame)
+                .scope(|mut frame| {
                     let s = BitsTypeFloat64 { a: -2.3 };
                     let v = Value::new(&mut frame, s);
                     let first = v.get_nth_field(&mut frame, 0).unwrap();
@@ -296,7 +324,7 @@ mod tests {
 
                     Ok(())
                 })
-                .unwrap()
+                .unwrap();
         })
     }
 
@@ -304,9 +332,11 @@ mod tests {
     fn derive_bits_char_float32_float64() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
+            let mut frame = StackFrame::new();
 
             julia
-                .scope(|_global, mut frame| {
+                .instance(&mut frame)
+                .scope(|mut frame| {
                     let s = BitsCharFloat32Float64 {
                         a: Char::new('a'),
                         b: 3.0,
@@ -321,7 +351,7 @@ mod tests {
 
                     Ok(())
                 })
-                .unwrap()
+                .unwrap();
         })
     }
 
@@ -329,9 +359,11 @@ mod tests {
     fn derive_bits_int_bool() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
+            let mut frame = StackFrame::new();
 
             julia
-                .scope(|_global, mut frame| {
+                .instance(&mut frame)
+                .scope(|mut frame| {
                     let s = BitsIntBool {
                         a: 1,
                         b: Bool::new(true),
@@ -345,7 +377,7 @@ mod tests {
 
                     Ok(())
                 })
-                .unwrap()
+                .unwrap();
         })
     }
 
@@ -353,9 +385,11 @@ mod tests {
     fn derive_bits_char_bits_int_char() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
+            let mut frame = StackFrame::new();
 
             julia
-                .scope(|_global, mut frame| {
+                .instance(&mut frame)
+                .scope(|mut frame| {
                     let s = BitsCharBitsIntChar {
                         a: Char::new('a'),
                         b: BitsIntChar {
@@ -371,7 +405,7 @@ mod tests {
 
                     Ok(())
                 })
-                .unwrap()
+                .unwrap();
         })
     }
 
@@ -379,9 +413,11 @@ mod tests {
     fn derive_bits_uint8_tuple_int32_int64() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
+            let mut frame = StackFrame::new();
 
             julia
-                .scope(|_global, mut frame| {
+                .instance(&mut frame)
+                .scope(|mut frame| {
                     let s = BitsUInt8TupleInt32Int64 {
                         a: 0,
                         b: Tuple2(-1, -3),
@@ -398,7 +434,7 @@ mod tests {
 
                     Ok(())
                 })
-                .unwrap()
+                .unwrap();
         })
     }
 
@@ -406,9 +442,11 @@ mod tests {
     fn derive_bits_uint8_tuple_int32_tuple_int16_uint16() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
+            let mut frame = StackFrame::new();
 
             julia
-                .scope(|global, mut frame| {
+                .instance(&mut frame)
+                .scope(|mut frame| {
                     let rs_val = BitsUInt8TupleInt32TupleInt16UInt16 {
                         a: 0,
                         b: Tuple2(-1, Tuple2(-1, 3)),
@@ -416,8 +454,8 @@ mod tests {
                     let jl_val = Value::new(&mut frame, rs_val.clone());
 
                     unsafe {
-                        assert!(Module::base(global)
-                            .function_ref("typeof")?
+                        assert!(Module::base(&frame)
+                            .function(&frame, "typeof")?
                             .wrapper_unchecked()
                             .call1(&mut frame, jl_val)
                             .unwrap()
@@ -441,7 +479,7 @@ mod tests {
 
                     Ok(())
                 })
-                .unwrap()
+                .unwrap();
         })
     }
 
@@ -449,21 +487,23 @@ mod tests {
     fn derive_single_variant() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
+            let mut frame = StackFrame::new();
 
             julia
-                .scope(|global, mut frame| unsafe {
-                    let constr = Module::main(global)
-                        .submodule_ref("WithBitsUnion")?
+                .instance(&mut frame)
+                .scope(|mut frame| unsafe {
+                    let constr = Module::main(&frame)
+                        .submodule(&frame, "WithBitsUnion")?
                         .wrapper_unchecked()
-                        .global_ref("SingleVariant")?
+                        .global(&frame, "SingleVariant")?
                         .wrapper_unchecked();
                     let v1 = Value::new(&mut frame, 1i8);
                     let v2 = Value::new(&mut frame, 2i32);
                     let v3 = Value::new(&mut frame, 3i8);
                     let jl_val = constr.call3(&mut frame, v1, v2, v3).unwrap();
 
-                    assert!(Module::base(global)
-                        .function_ref("typeof")?
+                    assert!(Module::base(&frame)
+                        .function(&frame, "typeof")?
                         .wrapper_unchecked()
                         .call1(&mut frame, jl_val)
                         .unwrap()
@@ -481,7 +521,7 @@ mod tests {
 
                     Ok(())
                 })
-                .unwrap()
+                .unwrap();
         })
     }
 
@@ -490,13 +530,15 @@ mod tests {
     fn derive_double_variant() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
+            let mut frame = StackFrame::new();
 
             julia
-                .scope(|global, mut frame| unsafe {
-                    let constr = Module::main(global)
-                        .submodule_ref("WithBitsUnion")?
+                .instance(&mut frame)
+                .scope(|mut frame| unsafe {
+                    let constr = Module::main(&frame)
+                        .submodule(&frame, "WithBitsUnion")?
                         .wrapper_unchecked()
-                        .global_ref("DoubleVariant")?
+                        .global(&frame, "DoubleVariant")?
                         .wrapper_unchecked()
                         .cast::<DataType>()?;
 
@@ -507,8 +549,8 @@ mod tests {
                         .instantiate(&mut frame, &mut [v1, v2, v3])?
                         .into_jlrs_result()?;
 
-                    assert!(Module::base(global)
-                        .function_ref("typeof")?
+                    assert!(Module::base(&frame)
+                        .function(&frame, "typeof")?
                         .wrapper_unchecked()
                         .call1(&mut frame, jl_val)
                         .unwrap()
@@ -529,7 +571,7 @@ mod tests {
 
                     Ok(())
                 })
-                .unwrap()
+                .unwrap();
         })
     }
 
@@ -537,13 +579,15 @@ mod tests {
     fn derive_size_align_mismatch() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
+            let mut frame = StackFrame::new();
 
             julia
-                .scope(|global, mut frame| unsafe {
-                    let constr = Module::main(global)
-                        .submodule_ref("WithBitsUnion")?
+                .instance(&mut frame)
+                .scope(|mut frame| unsafe {
+                    let constr = Module::main(&frame)
+                        .submodule(&frame, "WithBitsUnion")?
                         .wrapper_unchecked()
-                        .global_ref("SizeAlignMismatch")?
+                        .global(&frame, "SizeAlignMismatch")?
                         .wrapper_unchecked();
 
                     let v1 = Value::new(&mut frame, 1i8);
@@ -551,8 +595,8 @@ mod tests {
                     let v3 = Value::new(&mut frame, 3i8);
                     let jl_val = constr.call3(&mut frame, v1, v2, v3).unwrap();
 
-                    assert!(Module::base(global)
-                        .function_ref("typeof")?
+                    assert!(Module::base(&frame)
+                        .function(&frame, "typeof")?
                         .wrapper_unchecked()
                         .call1(&mut frame, jl_val)
                         .unwrap()
@@ -573,7 +617,7 @@ mod tests {
 
                     Ok(())
                 })
-                .unwrap()
+                .unwrap();
         })
     }
 
@@ -581,13 +625,15 @@ mod tests {
     fn derive_union_in_tuple() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
+            let mut frame = StackFrame::new();
 
             julia
-                .scope(|global, mut frame| unsafe {
-                    let constr = Module::main(global)
-                        .submodule_ref("WithBitsUnion")?
+                .instance(&mut frame)
+                .scope(|mut frame| unsafe {
+                    let constr = Module::main(&frame)
+                        .submodule(&frame, "WithBitsUnion")?
                         .wrapper_unchecked()
-                        .global_ref("UnionInTuple")?
+                        .global(&frame, "UnionInTuple")?
                         .wrapper_unchecked();
 
                     let v1 = Value::new(&mut frame, 1i8);
@@ -610,7 +656,7 @@ mod tests {
 
                     Ok(())
                 })
-                .unwrap()
+                .unwrap();
         })
     }
 
@@ -618,20 +664,22 @@ mod tests {
     fn derive_non_bits_union() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
+            let mut frame = StackFrame::new();
 
             julia
-                .scope(|global, mut frame| unsafe {
-                    let constr = Module::main(global)
-                        .submodule_ref("WithNonBitsUnion")?
+                .instance(&mut frame)
+                .scope(|mut frame| unsafe {
+                    let constr = Module::main(&frame)
+                        .submodule(&frame, "WithNonBitsUnion")?
                         .wrapper_unchecked()
-                        .global_ref("NonBitsUnion")?
+                        .global(&frame, "NonBitsUnion")?
                         .wrapper_unchecked();
 
                     let v1 = Value::new(&mut frame, 1i8);
                     let jl_val = constr.call1(&mut frame, v1).unwrap();
 
-                    assert!(Module::base(global)
-                        .function_ref("typeof")?
+                    assert!(Module::base(&frame)
+                        .function(&frame, "typeof")?
                         .wrapper_unchecked()
                         .call1(&mut frame, jl_val)
                         .unwrap()
@@ -646,63 +694,65 @@ mod tests {
 
                     Ok(())
                 })
-                .unwrap()
+                .unwrap();
         })
     }
 
     /*
-    #[test]
-    fn derive_string() {
-        JULIA_DERIVE.with(|j| {
-            let mut julia = j.borrow_mut();
+        #[test]
+        fn derive_string() {
+            JULIA_DERIVE.with(|j| {
+                let mut julia = j.borrow_mut();
+    let mut frame = StackFrame::new();
 
-            julia
-                .scope(|global, mut frame| unsafe  {
-                    let constr = Module::main(global)
-                        .submodule_ref("WithStrings")?.wrapper_unchecked()
-                        .global_ref("WithString")?.wrapper_unchecked();
+                julia.instance(&mut frame)                    .scope(|mut frame| unsafe  {
+                        let constr = Module::main(&frame)
+                            .submodule(&frame, "WithStrings")?.wrapper_unchecked()
+                            .global(&frame, "WithString")?.wrapper_unchecked();
 
-                    let v1 = Value::new(&mut frame, "foo")?;
-                    let jl_val = constr.call1(&mut frame, v1)?.unwrap();
+                        let v1 = Value::new(&mut frame, "foo")?;
+                        let jl_val = constr.call1(&mut frame, v1)?.unwrap();
 
-                    assert!(Module::base(global)
-                        .function_ref("typeof")?.wrapper_unchecked()
-                        .call1(&mut frame, jl_val)?
-                        .unwrap()
-                        .cast::<DataType>()?
-                        .is::<WithString>());
+                        assert!(Module::base(&frame)
+                            .function(&frame, "typeof")?.wrapper_unchecked()
+                            .call1(&mut frame, jl_val)?
+                            .unwrap()
+                            .cast::<DataType>()?
+                            .is::<WithString>());
 
-                    let first = jl_val.get_nth_field(&mut frame, 0).unwrap();
-                    assert_eq!(first.unbox::<String>().unwrap().unwrap(), "foo");
+                        let first = jl_val.get_nth_field(&mut frame, 0).unwrap();
+                        assert_eq!(first.unbox::<String>().unwrap().unwrap(), "foo");
 
-                    assert!(jl_val.is::<WithString>());
-                    assert!(jl_val.unbox::<WithString>().is_ok());
+                        assert!(jl_val.is::<WithString>());
+                        assert!(jl_val.unbox::<WithString>().is_ok());
 
-                    Ok(())
-                })
-                .unwrap()
-        })
-    }
-    */
+                        Ok(())
+                    })
+                    .unwrap()
+            })
+        }
+        */
 
     #[test]
     fn derive_with_generic_t_i32() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
+            let mut frame = StackFrame::new();
 
             julia
-                .scope(|global, mut frame| unsafe {
-                    let constr = Module::main(global)
-                        .submodule_ref("WithGeneric")?
+                .instance(&mut frame)
+                .scope(|mut frame| unsafe {
+                    let constr = Module::main(&frame)
+                        .submodule(&frame, "WithGeneric")?
                         .wrapper_unchecked()
-                        .global_ref("WithGenericT")?
+                        .global(&frame, "WithGenericT")?
                         .wrapper_unchecked();
 
                     let v1 = Value::new(&mut frame, 1i32);
                     let jl_val = constr.call1(&mut frame, v1).unwrap();
 
-                    assert!(Module::base(global)
-                        .function_ref("typeof")?
+                    assert!(Module::base(&frame)
+                        .function(&frame, "typeof")?
                         .wrapper_unchecked()
                         .call1(&mut frame, jl_val)
                         .unwrap()
@@ -717,7 +767,7 @@ mod tests {
 
                     Ok(())
                 })
-                .unwrap()
+                .unwrap();
         })
     }
 
@@ -725,28 +775,30 @@ mod tests {
     fn derive_with_unionall() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
+            let mut frame = StackFrame::new();
 
             julia
-                .scope(|global, mut frame| unsafe {
-                    let constr = Module::main(global)
-                        .submodule_ref("WithGeneric")?
+                .instance(&mut frame)
+                .scope(|mut frame| unsafe {
+                    let constr = Module::main(&frame)
+                        .submodule(&frame, "WithGeneric")?
                         .wrapper_unchecked()
-                        .global_ref("WithGenericT")?
+                        .global(&frame, "WithGenericT")?
                         .wrapper_unchecked();
 
                     let v1 = Value::new(&mut frame, 1i32);
                     let wgt = constr.call1(&mut frame, v1).unwrap();
 
-                    let constr = Module::main(global)
-                        .submodule_ref("WithGeneric")?
+                    let constr = Module::main(&frame)
+                        .submodule(&frame, "WithGeneric")?
                         .wrapper_unchecked()
-                        .global_ref("WithGenericUnionAll")?
+                        .global(&frame, "WithGenericUnionAll")?
                         .wrapper_unchecked();
 
                     let jl_val = constr.call1(&mut frame, wgt).unwrap();
 
-                    assert!(Module::base(global)
-                        .function_ref("typeof")?
+                    assert!(Module::base(&frame)
+                        .function(&frame, "typeof")?
                         .wrapper_unchecked()
                         .call1(&mut frame, jl_val)
                         .unwrap()
@@ -761,7 +813,7 @@ mod tests {
 
                     Ok(())
                 })
-                .unwrap()
+                .unwrap();
         })
     }
 
@@ -769,28 +821,30 @@ mod tests {
     fn derive_with_nested_generic() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
+            let mut frame = StackFrame::new();
 
             julia
-                .scope(|global, mut frame| unsafe {
-                    let constr = Module::main(global)
-                        .submodule_ref("WithGeneric")?
+                .instance(&mut frame)
+                .scope(|mut frame| unsafe {
+                    let constr = Module::main(&frame)
+                        .submodule(&frame, "WithGeneric")?
                         .wrapper_unchecked()
-                        .global_ref("WithGenericT")?
+                        .global(&frame, "WithGenericT")?
                         .wrapper_unchecked();
 
                     let v1 = Value::new(&mut frame, 1i32);
                     let wgt = constr.call1(&mut frame, v1).unwrap();
 
-                    let constr = Module::main(global)
-                        .submodule_ref("WithGeneric")?
+                    let constr = Module::main(&frame)
+                        .submodule(&frame, "WithGeneric")?
                         .wrapper_unchecked()
-                        .global_ref("WithNestedGenericT")?
+                        .global(&frame, "WithNestedGenericT")?
                         .wrapper_unchecked();
 
                     let jl_val = constr.call1(&mut frame, wgt).unwrap();
 
-                    assert!(Module::base(global)
-                        .function_ref("typeof")?
+                    assert!(Module::base(&frame)
+                        .function(&frame, "typeof")?
                         .wrapper_unchecked()
                         .call1(&mut frame, jl_val)
                         .unwrap()
@@ -805,7 +859,7 @@ mod tests {
 
                     Ok(())
                 })
-                .unwrap()
+                .unwrap();
         })
     }
 
@@ -813,29 +867,32 @@ mod tests {
     fn derive_with_propagated_lifetime() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
+            let mut frame = StackFrame::new();
 
             julia
-                .scope(|global, mut frame| unsafe {
-                    let constr = Module::main(global)
-                        .submodule_ref("WithGeneric")?
+                .instance(&mut frame)
+                .scope(|mut frame| unsafe {
+                    let global = frame.global();
+                    let constr = Module::main(&frame)
+                        .submodule(&frame, "WithGeneric")?
                         .wrapper_unchecked()
-                        .global_ref("WithGenericT")?
+                        .global(&frame, "WithGenericT")?
                         .wrapper_unchecked();
 
                     let wgt = constr
-                        .call1(&mut frame, Module::base(global).as_value())
+                        .call1(&mut frame, Module::base(&global).as_value())
                         .unwrap();
 
-                    let constr = Module::main(global)
-                        .submodule_ref("WithGeneric")?
+                    let constr = Module::main(&frame)
+                        .submodule(&frame, "WithGeneric")?
                         .wrapper_unchecked()
-                        .global_ref("WithPropagatedLifetime")?
+                        .global(&frame, "WithPropagatedLifetime")?
                         .wrapper_unchecked();
 
                     let jl_val = constr.call1(&mut frame, wgt).unwrap();
 
-                    assert!(Module::base(global)
-                        .function_ref("typeof")?
+                    assert!(Module::base(&frame)
+                        .function(&frame, "typeof")?
                         .wrapper_unchecked()
                         .call1(&mut frame, jl_val)
                         .unwrap()
@@ -850,7 +907,7 @@ mod tests {
 
                     Ok(())
                 })
-                .unwrap()
+                .unwrap();
         })
     }
 
@@ -859,36 +916,39 @@ mod tests {
     fn derive_with_propagated_lifetimes() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
+            let mut frame = StackFrame::new();
 
             julia
-                .scope(|global, mut frame| unsafe {
-                    let arr = Array::new::<i32, _, _, _>(&mut frame, (2, 2)).into_jlrs_result()?;
+                .instance(&mut frame)
+                .scope(|mut frame| unsafe {
+                    let arr = Array::new::<i32, _, _>(frame.as_extended_target(), (2, 2))
+                        .into_jlrs_result()?;
 
-                    let wgt_constr = Module::main(global)
-                        .submodule_ref("WithGeneric")?
+                    let wgt_constr = Module::main(&frame)
+                        .submodule(&frame, "WithGeneric")?
                         .wrapper_unchecked()
-                        .global_ref("WithGenericT")?
+                        .global(&frame, "WithGenericT")?
                         .wrapper_unchecked();
 
                     let wgt = wgt_constr.call1(&mut frame, arr.as_value()).unwrap();
 
-                    let constr = Module::base(global)
-                        .function_ref("tuple")?
+                    let constr = Module::base(&frame)
+                        .function(&frame, "tuple")?
                         .wrapper_unchecked();
                     let int = Value::new(&mut frame, 2i32);
                     let tup = constr.call2(&mut frame, int, wgt).unwrap();
 
                     let a = wgt_constr.call1(&mut frame, tup).unwrap();
-                    let constr = Module::main(global)
-                        .submodule_ref("WithGeneric")?
+                    let constr = Module::main(&frame)
+                        .submodule(&frame, "WithGeneric")?
                         .wrapper_unchecked()
-                        .global_ref("WithPropagatedLifetimes")?
+                        .global(&frame, "WithPropagatedLifetimes")?
                         .wrapper_unchecked();
 
                     let jl_val = constr.call1(&mut frame, a).unwrap();
 
-                    assert!(Module::base(global)
-                        .function_ref("typeof")?
+                    assert!(Module::base(&frame)
+                        .function(&frame, "typeof")?
                         .wrapper_unchecked()
                         .call1(&mut frame, jl_val)
                         .unwrap()
@@ -905,7 +965,7 @@ mod tests {
 
                     Ok(())
                 })
-                .unwrap()
+                .unwrap();
         })
     }
 
@@ -913,28 +973,30 @@ mod tests {
     fn derive_with_set_generic() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
+            let mut frame = StackFrame::new();
 
             julia
-                .scope(|global, mut frame| unsafe {
-                    let wgt_constr = Module::main(global)
-                        .submodule_ref("WithGeneric")?
+                .instance(&mut frame)
+                .scope(|mut frame| unsafe {
+                    let wgt_constr = Module::main(&frame)
+                        .submodule(&frame, "WithGeneric")?
                         .wrapper_unchecked()
-                        .global_ref("WithGenericT")?
+                        .global(&frame, "WithGenericT")?
                         .wrapper_unchecked();
 
                     let v1 = Value::new(&mut frame, 1i64);
                     let wgt = wgt_constr.call1(&mut frame, v1).unwrap();
 
-                    let constr = Module::main(global)
-                        .submodule_ref("WithGeneric")?
+                    let constr = Module::main(&frame)
+                        .submodule(&frame, "WithGeneric")?
                         .wrapper_unchecked()
-                        .global_ref("WithSetGeneric")?
+                        .global(&frame, "WithSetGeneric")?
                         .wrapper_unchecked();
 
                     let jl_val = constr.call1(&mut frame, wgt).unwrap();
 
-                    assert!(Module::base(global)
-                        .function_ref("typeof")?
+                    assert!(Module::base(&frame)
+                        .function(&frame, "typeof")?
                         .wrapper_unchecked()
                         .call1(&mut frame, jl_val)
                         .unwrap()
@@ -949,7 +1011,7 @@ mod tests {
 
                     Ok(())
                 })
-                .unwrap()
+                .unwrap();
         })
     }
 
@@ -957,33 +1019,35 @@ mod tests {
     fn derive_with_set_generic_tuple() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
+            let mut frame = StackFrame::new();
 
             julia
-                .scope(|global, mut frame| unsafe {
-                    let wgt_constr = Module::main(global)
-                        .submodule_ref("WithGeneric")?
+                .instance(&mut frame)
+                .scope(|mut frame| unsafe {
+                    let wgt_constr = Module::main(&frame)
+                        .submodule(&frame, "WithGeneric")?
                         .wrapper_unchecked()
-                        .global_ref("WithGenericT")?
+                        .global(&frame, "WithGenericT")?
                         .wrapper_unchecked();
 
                     let v1 = Value::new(&mut frame, 1i64);
                     let wgt = wgt_constr.call1(&mut frame, v1).unwrap();
 
-                    let tup_constr = Module::base(global)
-                        .function_ref("tuple")?
+                    let tup_constr = Module::base(&frame)
+                        .function(&frame, "tuple")?
                         .wrapper_unchecked();
                     let v2 = tup_constr.call1(&mut frame, wgt).unwrap();
 
-                    let constr = Module::main(global)
-                        .submodule_ref("WithGeneric")?
+                    let constr = Module::main(&frame)
+                        .submodule(&frame, "WithGeneric")?
                         .wrapper_unchecked()
-                        .global_ref("WithSetGenericTuple")?
+                        .global(&frame, "WithSetGenericTuple")?
                         .wrapper_unchecked();
 
                     let jl_val = constr.call1(&mut frame, v2).unwrap();
 
-                    assert!(Module::base(global)
-                        .function_ref("typeof")?
+                    assert!(Module::base(&frame)
+                        .function(&frame, "typeof")?
                         .wrapper_unchecked()
                         .call1(&mut frame, jl_val)
                         .unwrap()
@@ -998,7 +1062,7 @@ mod tests {
 
                     Ok(())
                 })
-                .unwrap()
+                .unwrap();
         })
     }
 
@@ -1006,20 +1070,22 @@ mod tests {
     fn derive_with_value_type() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
+            let mut frame = StackFrame::new();
 
             julia
-                .scope(|global, mut frame| unsafe {
-                    let wvt_constr = Module::main(global)
-                        .submodule_ref("WithGeneric")?
+                .instance(&mut frame)
+                .scope(|mut frame| unsafe {
+                    let wvt_constr = Module::main(&frame)
+                        .submodule(&frame, "WithGeneric")?
                         .wrapper_unchecked()
-                        .global_ref("withvaluetype")?
+                        .global(&frame, "withvaluetype")?
                         .wrapper_unchecked();
 
                     let v1 = Value::new(&mut frame, 1i64);
                     let jl_val = wvt_constr.call1(&mut frame, v1).unwrap();
 
-                    assert!(Module::base(global)
-                        .function_ref("typeof")?
+                    assert!(Module::base(&frame)
+                        .function(&frame, "typeof")?
                         .wrapper_unchecked()
                         .call1(&mut frame, jl_val)
                         .unwrap()
@@ -1034,22 +1100,24 @@ mod tests {
 
                     Ok(())
                 })
-                .unwrap()
+                .unwrap();
         })
     }
     #[test]
     fn derive_zero_sized() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
+            let mut frame = StackFrame::new();
 
             julia
-                .scope(|_global, mut frame| {
+                .instance(&mut frame)
+                .scope(|mut frame| {
                     let v = Value::new(&mut frame, ZeroSized {});
                     assert!(v.unbox::<ZeroSized>().is_ok());
 
                     Ok(())
                 })
-                .unwrap()
+                .unwrap();
         })
     }
 }

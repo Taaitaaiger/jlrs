@@ -6,41 +6,47 @@ mod tests {
     #[test]
     fn use_string_to_symbol() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|global, mut frame| {
-                assert!(Module::base(global).function(&mut frame, "+").is_ok());
-                Ok(())
-            })
-            .unwrap();
+            jlrs.instance(&mut frame)
+                .scope(|mut frame| {
+                    assert!(Module::base(&frame).function(&mut frame, "+").is_ok());
+                    Ok(())
+                })
+                .unwrap();
         });
     }
 
     #[test]
     fn use_julia_string_to_symbol() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|global, mut frame| {
-                let plus = JuliaString::new(&mut frame, "+")?;
-                assert!(Module::base(global).function(&mut frame, plus).is_ok());
-                Ok(())
-            })
-            .unwrap();
+            jlrs.instance(&mut frame)
+                .scope(|mut frame| {
+                    let plus = JuliaString::new(&mut frame, "+");
+                    assert!(Module::base(&frame).function(&mut frame, plus).is_ok());
+                    Ok(())
+                })
+                .unwrap();
         });
     }
 
     #[test]
     fn use_symbol_to_symbol() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|global, mut frame| {
-                let plus = Symbol::new(global, "+");
-                assert!(Module::base(global).function(&mut frame, plus).is_ok());
-                Ok(())
-            })
-            .unwrap();
+            jlrs.instance(&mut frame)
+                .scope(|mut frame| {
+                    let plus = Symbol::new(&frame, "+");
+                    assert!(Module::base(&frame).function(&mut frame, plus).is_ok());
+                    Ok(())
+                })
+                .unwrap();
         });
     }
 }
