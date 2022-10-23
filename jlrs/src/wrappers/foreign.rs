@@ -28,7 +28,8 @@ use jl_sys::{
 };
 
 use crate::{
-    convert::into_julia::IntoJulia,
+    convert::{into_julia::IntoJulia, unbox::Unbox},
+    layout::valid_layout::ValidLayout,
     memory::{get_tls, PTls},
     prelude::{DataType, Module, Symbol, Target},
     private::Private,
@@ -160,6 +161,21 @@ unsafe impl<F: ForeignType> IntoJulia for F {
             res
         }
     }
+}
+
+unsafe impl<T: ForeignType> ValidLayout for T {
+    fn valid_layout(ty: crate::prelude::Value) -> bool {
+        if let Ok(dt) = ty.cast::<DataType>() {
+            let ty = FOREIGN_TYPES.find::<T>().expect("Doesn't exist");
+            dt.unwrap(Private) == ty.unwrap(Private)
+        } else {
+            false
+        }
+    }
+}
+
+unsafe impl<T: ForeignType + Clone> Unbox for T {
+    type Output = T;
 }
 
 #[repr(transparent)]

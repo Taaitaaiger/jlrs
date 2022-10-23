@@ -2222,6 +2222,12 @@ extern "C" {
 extern "C" {
     pub fn jlrs_unlock(v: *mut jl_value_t);
 }
+extern "C" {
+    pub fn jl_enter_threaded_region();
+}
+extern "C" {
+    pub fn jl_exit_threaded_region();
+}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct _mallocarray_t {

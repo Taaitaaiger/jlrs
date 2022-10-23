@@ -25,7 +25,7 @@
 
  - A ledger is used to track borrowed Julia data, instances of `Array`s and `Value`s can be tracked.
  
- - `CCall::null_scope` and `NullFrame` have been removed. 
+ - `CCall::null_scope` and `NullFrame` have been replaced with `CCall::stackless_scope`.
 
  - `Ref::leak` and `Ref::data_ptr` have been added.
 
