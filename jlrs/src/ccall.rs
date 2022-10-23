@@ -6,7 +6,7 @@ use crate::{
     error::JlrsResult,
     memory::{
         stack_frame::{PinnedFrame, StackFrame},
-        target::frame::GcFrame,
+        target::{frame::GcFrame, global::Global},
     },
 };
 
@@ -59,5 +59,17 @@ impl<'context> CCall<'context> {
             std::mem::drop(owner);
             ret
         }
+    }
+
+    /// Create a [`Global`], call the given closure, and return its result.
+    ///
+    /// Unlike [`CCall::scope`] this method doesn't allocate a stack.
+    ///
+    /// Safety: must only be called from a `ccall`ed function that doesn't need to root any data.
+    pub unsafe fn stackless_scope<T, F>(func: F) -> JlrsResult<T>
+    where
+        for<'base> F: FnOnce(Global<'base>) -> JlrsResult<T>,
+    {
+        func(Global::new())
     }
 }

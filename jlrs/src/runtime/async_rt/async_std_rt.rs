@@ -37,11 +37,15 @@ impl AsyncRuntime for AsyncStd {
         async_std::task::spawn_blocking(rt_fn)
     }
 
-    fn block_on<F>(loop_fn: F) -> JlrsResult<()>
+    fn block_on<F>(loop_fn: F, _: Option<usize>) -> JlrsResult<()>
     where
         F: Future<Output = JlrsResult<()>>,
     {
         async_std::task::block_on(loop_fn)
+    }
+
+    async fn yield_now() {
+        async_std::task::yield_now().await
     }
 
     fn spawn_local<F>(future: F) -> Self::JoinHandle

@@ -47,6 +47,9 @@ extern "C"
     void jlrs_lock(jl_value_t *v);
     void jlrs_unlock(jl_value_t *v);
 #endif
+
+JL_DLLEXPORT void jl_enter_threaded_region(void);
+JL_DLLEXPORT void jl_exit_threaded_region(void);
 #ifdef __cplusplus
 }
 #endif

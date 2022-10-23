@@ -4,14 +4,14 @@ use std::ffi::c_void;
 
 #[cfg(feature = "sync-rt")]
 use crate::runtime::sync_rt::Julia;
+use crate::wrappers::ptr::value::Value;
 #[cfg(not(feature = "lts"))]
-use crate::{
-    call::Call,
-    wrappers::ptr::{module::Module, value::Value},
-};
+use crate::{call::Call, wrappers::ptr::module::Module};
+use crate::{private::Private, wrappers::ptr::private::WrapperPriv};
+
 use jl_sys::{
     jl_gc_collect, jl_gc_collection_t, jl_gc_enable, jl_gc_is_enabled, jl_gc_mark_queue_obj,
-    jl_gc_mark_queue_objarray, jl_gc_safepoint,
+    jl_gc_mark_queue_objarray, jl_gc_safepoint, jl_gc_wb,
 };
 
 use super::{target::Target, PTls};
@@ -106,6 +106,21 @@ pub unsafe fn mark_queue_objarray(ptls: PTls, parent: *mut c_void, objs: &[*mut 
         objs.as_ptr() as *mut c_void as _,
         objs.len(),
     )
+}
+
+/// Updates the write barrier.
+///
+/// When a pointer field of `data` has been set to `child`, this method must be called
+/// immediately after changing the field. This must only be done when the child has been
+/// mutated by directly changing the field and `data` is managed by Julia's GC.
+///
+/// This is necessary because the GC must remain aware of all old objects that contain
+/// references to young objects.
+///
+/// Safety: must be called whenever a field of `self` is set to `child` if `self` is
+/// maanged by the GC.
+pub unsafe fn write_barrier<T>(data: &mut T, child: Value) {
+    jl_gc_wb(data as *mut _ as *mut _, child.unwrap(Private))
 }
 
 #[cfg(feature = "sync-rt")]

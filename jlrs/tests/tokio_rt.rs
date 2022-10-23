@@ -16,7 +16,6 @@ mod tests {
                     RuntimeBuilder::new()
                      .async_runtime::<Tokio, UnboundedChannel<_>>()
                         .n_threads(2)
-                        .n_interactive_threads(2)
                         .start::<1>()
                         .expect("Could not init Julia")
                         .0

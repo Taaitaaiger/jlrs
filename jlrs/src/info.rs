@@ -38,6 +38,7 @@ impl Info {
 
     /// Number of threads Julia can use.
     pub fn n_threads(&self) -> usize {
+        // TODO: atomic!
         unsafe { jl_n_threads as usize }
     }
 

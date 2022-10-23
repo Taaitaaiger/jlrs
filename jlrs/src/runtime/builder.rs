@@ -42,6 +42,8 @@ cfg_if::cfg_if! {
             pub(crate) recv_timeout: Duration,
             #[cfg(feature = "nightly")]
             pub(crate) n_threadsi: usize,
+            #[cfg(feature = "nightly")]
+            pub(crate) n_workers: usize,
             _runtime: PhantomData<R>,
             _channel: PhantomData<C>,
         }
@@ -72,6 +74,18 @@ cfg_if::cfg_if! {
             /// of threads using the `JULIA_NUM_THREADS` environment variable.
             pub fn n_interactive_threads(mut self, n: usize) -> Self {
                 self.n_threadsi = n;
+                self
+            }
+
+
+            #[cfg(feature = "nightly")]
+            /// Set the number of worker threads jlrs creates in addition to the runtime thread.
+            ///
+            /// If it's set to 0, the default value, no worker threads are created.
+            ///
+            /// This method is not available for the LTS version.
+            pub fn n_worker_threads(mut self, n: usize) -> Self {
+                self.n_workers = n;
                 self
             }
 
@@ -189,6 +203,8 @@ impl RuntimeBuilder {
             recv_timeout: Duration::from_millis(1),
             #[cfg(feature = "nightly")]
             n_threadsi: 0,
+            #[cfg(feature = "nightly")]
+            n_workers: 0,
             _runtime: PhantomData,
             _channel: PhantomData,
         }
