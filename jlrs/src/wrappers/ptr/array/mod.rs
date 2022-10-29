@@ -20,6 +20,12 @@
 //! `[usize; N]` and `&[usize; N]` implement it for all `N`, `&[usize]` can be used if `N` is not
 //! a constant at compile time.
 
+use self::data::accessor::{
+    ArrayAccessor, BitsArrayAccessorI, BitsArrayAccessorMut, Immutable, IndeterminateArrayAccessor,
+    IndeterminateArrayAccessorI, InlinePtrArrayAccessorI, InlinePtrArrayAccessorMut, Mutable,
+    PtrArrayAccessorI, PtrArrayAccessorMut, UnionArrayAccessorI, UnionArrayAccessorMut,
+};
+use crate::memory::target::ExtendedTarget;
 use crate::{
     convert::into_julia::IntoJulia,
     error::{AccessError, ArrayLayoutError, InstantiationError, JlrsResult, CANNOT_DISPLAY_TYPE},
@@ -62,17 +68,11 @@ use std::{
     slice,
 };
 
-use self::data::accessor::{
-    ArrayAccessor, BitsArrayAccessorI, BitsArrayAccessorMut, Immutable, IndeterminateArrayAccessor,
-    IndeterminateArrayAccessorI, InlinePtrArrayAccessorI, InlinePtrArrayAccessorMut, Mutable,
-    PtrArrayAccessorI, PtrArrayAccessorMut, UnionArrayAccessorI, UnionArrayAccessorMut,
-};
-
 use super::{union_all::UnionAll, value::ValueRef, Ref, Root};
 
 cfg_if! {
     if #[cfg(not(all(target_os = "windows", feature = "lts")))] {
-        use crate::{catch::{catch_exceptions_with_slots, catch_exceptions}, memory::target::{ExtendedTarget, ExceptionTarget}};
+        use crate::{catch::{catch_exceptions_with_slots, catch_exceptions}, memory::target::{ExceptionTarget}};
         use std::mem::MaybeUninit;
     }
 }
