@@ -10,7 +10,10 @@ use std::{
 #[cfg(not(feature = "lts"))]
 use jl_sys::{jl_get_current_task, jl_task_t};
 
-use crate::{prelude::Value, private::Private, wrappers::ptr::private::WrapperPriv};
+use crate::{
+    private::Private,
+    wrappers::ptr::{private::WrapperPriv, value::Value},
+};
 
 use super::context::stack::Stack;
 

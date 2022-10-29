@@ -44,7 +44,10 @@ pub use crate::{
     },
 };
 #[cfg(feature = "sync-rt")]
-pub use crate::{memory::stack_frame::StackFrame, runtime::sync_rt::Julia};
+pub use crate::{
+    memory::stack_frame::StackFrame,
+    runtime::sync_rt::{Julia, PendingJulia},
+};
 #[cfg(feature = "async")]
 pub use async_trait::async_trait;
 #[cfg(feature = "jlrs-derive")]

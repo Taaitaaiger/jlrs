@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::VecDeque, rc::Rc, time::Duration};
 
 use jl_sys::{jl_adopt_thread, jl_gc_safepoint, jl_process_events};
 
-use crate::prelude::{JlrsResult, StackFrame};
+use crate::{error::JlrsResult, memory::stack_frame::StackFrame};
 
 use super::{queue::Receiver, AsyncRuntime, Message, MessageInner};
 
@@ -86,11 +86,11 @@ async unsafe fn run_inner<R: AsyncRuntime, const N: usize>(
                     let stack = base_frame.sync_stack();
                     task.call(stack);
                 }
-                // TODO: does this work?
                 MessageInner::Include(task) => {
                     let stack = base_frame.sync_stack();
                     task.call(stack);
                 }
+                // TODO: make this atomic in julia
                 MessageInner::ErrorColor(task) => {
                     let stack = base_frame.sync_stack();
                     task.call(stack);

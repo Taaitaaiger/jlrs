@@ -20,7 +20,7 @@ mod tests {
             unsafe {
                 let r = RefCell::new(
                     RuntimeBuilder::new()
-                        .async_runtime::<AsyncStd, AsyncStdChannel<_>>()
+                        .async_runtime::<AsyncStd>()
                         .n_threads(2)
                         .start::<1>()
                         .expect("Could not init Julia")

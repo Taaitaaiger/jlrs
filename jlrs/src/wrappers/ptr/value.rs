@@ -51,13 +51,15 @@ macro_rules! count {
 /// # fn main() {
 /// # JULIA.with(|j| {
 /// # let mut julia = j.borrow_mut();
+/// # let mut frame = StackFrame::new();
+/// # let mut julia = julia.instance(&mut frame);
 /// // Three slots; two for the inputs and one for the output.
-/// julia.scope(|global, mut frame| {
+/// julia.scope(|mut frame| {
 ///     // Create the two arguments, each value requires one slot
 ///     let i = Value::new(&mut frame, 2u64);
 ///     let j = Value::new(&mut frame, 1u32);
 ///
-///     let _nt = named_tuple!(&mut frame, "i" => i, "j" => j);
+///     let _nt = named_tuple!(frame.as_extended_target(), "i" => i, "j" => j);
 ///
 ///     Ok(())
 /// }).unwrap();
@@ -396,7 +398,9 @@ impl Value<'_, '_> {
     /// # fn main() {
     /// # JULIA.with(|j| {
     /// # let mut julia = j.borrow_mut();
-    /// julia.scope(|_global, mut frame| {
+    /// # let mut frame = StackFrame::new();
+    /// # let mut julia = julia.instance(&mut frame);
+    /// julia.scope(|mut frame| {
     ///     let i = Value::new(&mut frame, 2u64);
     ///     assert!(i.is::<u64>());
     ///     Ok(())
@@ -456,8 +460,17 @@ impl Value<'_, '_> {
     }
 }
 
-/// TODO: Docs
+/// Borrow the contents of Julia data.
+///
+/// Types that implement `InlineLayout` are guaranteed to have matching layouts in Rust and Julia.
+/// This data can be tracked, while it's tracked its contents can be accessed directly.
 impl<'scope, 'data> Value<'scope, 'data> {
+    /// Track `self` immutably.
+    ///
+    /// When this method is called on some `Value`, it's checked if the layout of `T` matches
+    /// that of the data and if the data is already mutably borrowed from Rust. If it's not, the
+    /// data is derefenced and returned as a `Tracked` which provides direct access to the
+    /// reference.
     pub fn track<'borrow, T: InlineLayout>(
         &'borrow self,
     ) -> JlrsResult<Tracked<'borrow, 'scope, 'data, T>> {
@@ -475,6 +488,26 @@ impl<'scope, 'data> Value<'scope, 'data> {
         }
     }
 
+    /// Track `self` mutably.
+    ///
+    /// When this method is called on some `Value`, it's checked if the layout of `T` matches
+    /// that of the data and if the data is already borrowed from Rust. If it's not, the data is
+    /// mutably derefenced and returned as a `TrackedMut` which provides direct access to the
+    /// mutable reference.
+    ///
+    /// Note that if `T` contains any references to Julia data, if such a field is mutated through
+    /// `TrackedMut` you must call [`write_barrier`] after mutating it. This ensures the garbage
+    /// collector remains aware of old-generation objects pointing to young-generation objects.
+    ///
+    /// In general, it's recommended that only fields that contain no references to Julia data are
+    /// updated through `TrackedMut`.
+    ///
+    /// Safety:
+    ///
+    /// This method can only track references that exist in Rust code. It also gives unrestricted
+    /// mutable access to the contents of the data, which is inherently unsafe.
+    ///
+    /// [`write_barrier`]: crate::memory::gc::write_barrier
     pub unsafe fn track_mut<'borrow, T: InlineLayout>(
         &'borrow mut self,
     ) -> JlrsResult<TrackedMut<'borrow, 'scope, 'data, T>> {
@@ -491,9 +524,20 @@ impl<'scope, 'data> Value<'scope, 'data> {
         }
 
         let start = self.data_ptr().as_ptr() as *mut u8;
-        let end = start.add(std::mem::size_of::<T>());
-        Ledger::try_borrow_mut(start..end)?;
+        Ledger::try_borrow_mut(start..start)?;
         Ok(TrackedMut::new(self))
+    }
+
+    /// Returns `true` if `self` is currently tracked.
+    pub fn is_tracked(self) -> bool {
+        let start = self.data_ptr().as_ptr() as *mut u8;
+        Ledger::is_borrowed(start..start)
+    }
+
+    /// Returns `true` if `self` is currently mutably tracked.
+    pub fn is_tracked_mut(self) -> bool {
+        let start = self.data_ptr().as_ptr() as *mut u8;
+        Ledger::is_borrowed_mut(start..start)
     }
 }
 
@@ -621,11 +665,10 @@ impl<'scope, 'data> Value<'scope, 'data> {
         self.datatype().n_fields() as _
     }
 
-    // TODO: lifetime
     /// Returns an accessor to access the contents of this value without allocating temporary Julia data.
     pub fn field_accessor<'current, 'borrow, T: Target<'current, 'data>>(
         self,
-        _frame: &T,
+        _frame: &'borrow T,
     ) -> FieldAccessor<'scope, 'data, 'borrow> {
         FieldAccessor {
             value: self.as_ref(),
@@ -1442,6 +1485,8 @@ enum ViewState {
     AtomicBuffer,
     Array,
 }
+
+// TODO: track
 
 /// Access the raw contents of a Julia value.
 ///

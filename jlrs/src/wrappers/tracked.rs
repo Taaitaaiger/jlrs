@@ -2,12 +2,17 @@
 ///
 /// By tracking Julia data it's possible to ensure no aliasing rules are broken from Rust when
 /// accessing their contents. While the data is tracked its contents can be derefenced.
+///
+///
 use std::{
     marker::PhantomData,
     ops::{Deref, DerefMut},
 };
 
-use crate::{layout::inline_layout::InlineLayout, memory::context::ledger::Ledger, prelude::Value};
+use crate::{
+    layout::inline_layout::InlineLayout, memory::context::ledger::Ledger,
+    wrappers::ptr::value::Value,
+};
 
 /// Immutable tracked data.
 #[repr(transparent)]

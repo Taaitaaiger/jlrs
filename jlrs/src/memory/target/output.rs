@@ -2,7 +2,7 @@
 
 use std::ptr::NonNull;
 
-use crate::{memory::context::stack::Stack, prelude::Wrapper, private::Private};
+use crate::{memory::context::stack::Stack, private::Private, wrappers::ptr::Wrapper};
 
 /// A target that uses a reserved slot in a frame.
 ///
@@ -63,6 +63,8 @@ use crate::{memory::context::stack::Stack, prelude::Wrapper, private::Private};
 /// # });
 /// # }
 /// ```
+///
+/// [`GcFrame::output`]: crate::memory::target::frame::GcFrame::output
 pub struct Output<'target> {
     pub(crate) stack: &'target Stack,
     pub(crate) offset: usize,

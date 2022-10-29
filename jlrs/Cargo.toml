@@ -72,7 +72,7 @@ i686 = ["jl-sys/i686"]
 # Internal
 
 # Used to generate docs for docs.rs
-docs = ["jl-sys/docs", "full"]
+docs = ["jl-sys/docs", "full", "nightly"]
 
 [dependencies]
 cfg-if = "1"

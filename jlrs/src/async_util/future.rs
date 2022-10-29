@@ -1,6 +1,6 @@
 use crate::{
     call::{Call, ProvideKeywords, WithKeywords},
-    error::{JlrsError, JlrsResult, JuliaResult, CANNOT_DISPLAY_VALUE},
+    error::{JuliaResult, CANNOT_DISPLAY_VALUE},
     memory::target::{frame::AsyncGcFrame, global::Global},
     private::Private,
     wrappers::ptr::{
@@ -36,11 +36,7 @@ pub(crate) struct JuliaFuture<'frame, 'data> {
 }
 
 impl<'frame, 'data> JuliaFuture<'frame, 'data> {
-    pub(crate) fn new<'value, V>(
-        frame: &mut AsyncGcFrame<'frame>,
-        func: Value,
-        values: V,
-    ) -> JlrsResult<Self>
+    pub(crate) fn new<'value, V>(frame: &mut AsyncGcFrame<'frame>, func: Value, values: V) -> Self
     where
         V: AsRef<[Value<'value, 'data>]>,
     {
@@ -65,15 +61,17 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         // by the caller.
         let task = unsafe {
             Module::main(&frame)
-                .submodule(&frame, "JlrsMultitask")?
+                .submodule(&frame, "JlrsMultitask")
+                .expect("JlrsMultitask not available")
                 .wrapper_unchecked()
-                .function(&frame, "asynccall")?
+                .function(&frame, "asynccall")
+                .expect("asynccall not available")
                 .wrapper_unchecked()
                 .call(&mut *frame, &mut vals)
-                .map_err(|e| {
+                .unwrap_or_else(|e| {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
-                    JlrsError::exception(format!("asynccall threw an exception: {}", msg))
-                })?
+                    panic!("asynccall threw an exception: {}", msg)
+                })
                 .cast_unchecked::<Task>()
         };
 
@@ -81,11 +79,11 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             let locked = shared_state.lock();
             match locked {
                 Ok(mut data) => data.task = Some(task),
-                _ => JlrsError::exception_error("Cannot set task".into())?,
+                _ => panic!("Lock poisoned"),
             }
         }
 
-        Ok(JuliaFuture { shared_state })
+        JuliaFuture { shared_state }
     }
 
     #[cfg(feature = "nightly")]
@@ -93,7 +91,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         frame: &mut AsyncGcFrame<'frame>,
         func: Value,
         values: V,
-    ) -> JlrsResult<Self>
+    ) -> Self
     where
         V: AsRef<[Value<'value, 'data>]>,
     {
@@ -118,15 +116,17 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         // by the caller.
         let task = unsafe {
             Module::main(&frame)
-                .submodule(&frame, "JlrsMultitask")?
+                .submodule(&frame, "JlrsMultitask")
+                .expect("JlrsMultitask not available")
                 .wrapper_unchecked()
-                .function(&frame, "interactivecall")?
+                .function(&frame, "interactivecall")
+                .expect("interactivecall not available")
                 .wrapper_unchecked()
                 .call(&mut *frame, &mut vals)
-                .map_err(|e| {
+                .unwrap_or_else(|e| {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
-                    JlrsError::exception(format!("interactivecall threw an exception: {}", msg))
-                })?
+                    panic!("interactivecall threw an exception: {}", msg)
+                })
                 .cast_unchecked::<Task>()
         };
 
@@ -134,18 +134,18 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             let locked = shared_state.lock();
             match locked {
                 Ok(mut data) => data.task = Some(task),
-                _ => JlrsError::exception_error("Cannot set task".into())?,
+                _ => panic!("Lock poisoned"),
             }
         }
 
-        Ok(JuliaFuture { shared_state })
+        JuliaFuture { shared_state }
     }
 
     pub(crate) fn new_local<'value, V>(
         frame: &mut AsyncGcFrame<'frame>,
         func: Value,
         values: V,
-    ) -> JlrsResult<Self>
+    ) -> Self
     where
         V: AsRef<[Value<'value, 'data>]>,
     {
@@ -170,15 +170,17 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         // by the caller.
         let task = unsafe {
             Module::main(&frame)
-                .submodule(&frame, "JlrsMultitask")?
+                .submodule(&frame, "JlrsMultitask")
+                .expect("JlrsMultitask not available")
                 .wrapper_unchecked()
-                .function(&frame, "scheduleasynclocal")?
+                .function(&frame, "scheduleasynclocal")
+                .expect("scheduleasynclocal not available")
                 .wrapper_unchecked()
                 .call(&mut *frame, &mut vals)
-                .map_err(|e| {
+                .unwrap_or_else(|e| {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
-                    JlrsError::exception(format!("scheduleasynclocal threw an exception: {}", msg))
-                })?
+                    panic!("scheduleasynclocal threw an exception: {}", msg)
+                })
                 .cast_unchecked::<Task>()
         };
 
@@ -186,18 +188,18 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             let locked = shared_state.lock();
             match locked {
                 Ok(mut data) => data.task = Some(task),
-                _ => JlrsError::exception_error("Cannot set task".into())?,
+                _ => panic!("Lock poisoned"),
             }
         }
 
-        Ok(JuliaFuture { shared_state })
+        JuliaFuture { shared_state }
     }
 
     pub(crate) fn new_main<'value, V>(
         frame: &mut AsyncGcFrame<'frame>,
         func: Value,
         values: V,
-    ) -> JlrsResult<Self>
+    ) -> Self
     where
         V: AsRef<[Value<'value, 'data>]>,
     {
@@ -222,15 +224,17 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         // by the caller.
         let task = unsafe {
             Module::main(&frame)
-                .submodule(&frame, "JlrsMultitask")?
+                .submodule(&frame, "JlrsMultitask")
+                .expect("JlrsMultitask not available")
                 .wrapper_unchecked()
-                .function(&frame, "scheduleasync")?
+                .function(&frame, "scheduleasync")
+                .expect("scheduleasync not available")
                 .wrapper_unchecked()
                 .call(&mut *frame, &mut vals)
-                .map_err(|e| {
+                .unwrap_or_else(|e| {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
-                    JlrsError::exception(format!("scheduleasync threw an exception: {}", msg))
-                })?
+                    panic!("scheduleasync threw an exception: {}", msg)
+                })
                 .cast_unchecked::<Task>()
         };
 
@@ -238,18 +242,18 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             let locked = shared_state.lock();
             match locked {
                 Ok(mut data) => data.task = Some(task),
-                _ => JlrsError::exception_error("Cannot set task".into())?,
+                _ => panic!("Lock poisoned"),
             }
         }
 
-        Ok(JuliaFuture { shared_state })
+        JuliaFuture { shared_state }
     }
 
     pub(crate) fn new_with_keywords<'value, V>(
         frame: &mut AsyncGcFrame<'frame>,
         func: WithKeywords,
         values: V,
-    ) -> JlrsResult<Self>
+    ) -> Self
     where
         V: AsRef<[Value<'value, 'data>]>,
     {
@@ -273,16 +277,19 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         // by the caller.
         let task = unsafe {
             Module::main(&frame)
-                .submodule(&frame, "JlrsMultitask")?
+                .submodule(&frame, "JlrsMultitask")
+                .expect("JlrsMultitask not available")
                 .wrapper_unchecked()
-                .function(&frame, "asynccall")?
+                .function(&frame, "asynccall")
+                .expect("asynccall not available")
                 .wrapper_unchecked()
-                .provide_keywords(func.keywords())?
+                .provide_keywords(func.keywords())
+                .expect("Keywords invalid")
                 .call(&mut *frame, &mut vals)
-                .map_err(|e| {
+                .unwrap_or_else(|e| {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
-                    JlrsError::exception(format!("asynccall threw an exception: {}", msg))
-                })?
+                    panic!("asynccall threw an exception: {}", msg)
+                })
                 .cast_unchecked::<Task>()
         };
 
@@ -290,11 +297,11 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             let locked = shared_state.lock();
             match locked {
                 Ok(mut data) => data.task = Some(task),
-                _ => JlrsError::exception_error("Cannot set task".into())?,
+                _ => panic!("Lock poisoned"),
             }
         }
 
-        Ok(JuliaFuture { shared_state })
+        JuliaFuture { shared_state }
     }
 
     #[cfg(feature = "nightly")]
@@ -302,7 +309,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         frame: &mut AsyncGcFrame<'frame>,
         func: WithKeywords,
         values: V,
-    ) -> JlrsResult<Self>
+    ) -> Self
     where
         V: AsRef<[Value<'value, 'data>]>,
     {
@@ -326,16 +333,19 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         // by the caller.
         let task = unsafe {
             Module::main(&frame)
-                .submodule(&frame, "JlrsMultitask")?
+                .submodule(&frame, "JlrsMultitask")
+                .expect("JlrsMultitask not available")
                 .wrapper_unchecked()
-                .function(&frame, "interactivecall")?
+                .function(&frame, "interactivecall")
+                .expect("interactivecall not available")
                 .wrapper_unchecked()
-                .provide_keywords(func.keywords())?
+                .provide_keywords(func.keywords())
+                .expect("Keywords invalid")
                 .call(&mut *frame, &mut vals)
-                .map_err(|e| {
+                .unwrap_or_else(|e| {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
-                    JlrsError::exception(format!("interactivecall threw an exception: {}", msg))
-                })?
+                    panic!("interactivecall threw an exception: {}", msg)
+                })
                 .cast_unchecked::<Task>()
         };
 
@@ -343,18 +353,18 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             let locked = shared_state.lock();
             match locked {
                 Ok(mut data) => data.task = Some(task),
-                _ => JlrsError::exception_error("Cannot set task".into())?,
+                _ => panic!("Lock poisoned"),
             }
         }
 
-        Ok(JuliaFuture { shared_state })
+        JuliaFuture { shared_state }
     }
 
     pub(crate) fn new_local_with_keywords<'value, V>(
         frame: &mut AsyncGcFrame<'frame>,
         func: WithKeywords,
         values: V,
-    ) -> JlrsResult<Self>
+    ) -> Self
     where
         V: AsRef<[Value<'value, 'data>]>,
     {
@@ -379,27 +389,30 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         // by the caller.
         unsafe {
             let task = Module::main(&frame)
-                .submodule(&frame, "JlrsMultitask")?
+                .submodule(&frame, "JlrsMultitask")
+                .expect("JlrsMultitask not available")
                 .wrapper_unchecked()
-                .function(&frame, "scheduleasynclocal")?
+                .function(&frame, "scheduleasynclocal")
+                .expect("scheduleasynclocal not available")
                 .wrapper_unchecked()
-                .provide_keywords(func.keywords())?
+                .provide_keywords(func.keywords())
+                .expect("Keywords invalid")
                 .call(&mut *frame, &mut vals)
-                .map_err(|e| {
+                .unwrap_or_else(|e| {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
-                    JlrsError::exception(format!("scheduleasynclocal threw an exception: {}", msg))
-                })?
+                    panic!("scheduleasynclocal threw an exception: {}", msg)
+                })
                 .cast_unchecked::<Task>();
 
             {
                 let locked = shared_state.lock();
                 match locked {
                     Ok(mut data) => data.task = Some(task),
-                    _ => JlrsError::exception_error("Cannot set task".into())?,
+                    _ => panic!("Lock poisoned"),
                 }
             }
 
-            Ok(JuliaFuture { shared_state })
+            JuliaFuture { shared_state }
         }
     }
 
@@ -407,7 +420,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         frame: &mut AsyncGcFrame<'frame>,
         func: WithKeywords,
         values: V,
-    ) -> JlrsResult<Self>
+    ) -> Self
     where
         V: AsRef<[Value<'value, 'data>]>,
     {
@@ -432,16 +445,19 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         // by the caller.
         let task = unsafe {
             Module::main(&frame)
-                .submodule(&frame, "JlrsMultitask")?
+                .submodule(&frame, "JlrsMultitask")
+                .expect("JlrsMultitask not available")
                 .wrapper_unchecked()
-                .function(&frame, "scheduleasync")?
+                .function(&frame, "scheduleasync")
+                .expect("scheduleasync not available")
                 .wrapper_unchecked()
-                .provide_keywords(func.keywords())?
+                .provide_keywords(func.keywords())
+                .expect("Keywords invalid")
                 .call(&mut *frame, &mut vals)
-                .map_err(|e| {
+                .unwrap_or_else(|e| {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
-                    JlrsError::exception(format!("scheduleasync threw an exception: {}", msg))
-                })?
+                    panic!("asynccall threw an exception: {}", msg)
+                })
                 .cast_unchecked::<Task>()
         };
 
@@ -449,11 +465,11 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             let locked = shared_state.lock();
             match locked {
                 Ok(mut data) => data.task = Some(task),
-                _ => JlrsError::exception_error("Cannot set task".into())?,
+                _ => panic!("Lock poisoned"),
             }
         }
 
-        Ok(JuliaFuture { shared_state })
+        JuliaFuture { shared_state }
     }
 }
 

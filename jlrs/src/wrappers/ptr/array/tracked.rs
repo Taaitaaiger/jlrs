@@ -1,8 +1,8 @@
 use crate::{
+    error::JlrsResult,
     layout::valid_layout::ValidLayout,
     memory::context::ledger::Ledger,
-    prelude::{JlrsResult, ValueRef},
-    wrappers::ptr::WrapperRef,
+    wrappers::ptr::{value::ValueRef, WrapperRef},
 };
 use std::{
     marker::PhantomData,

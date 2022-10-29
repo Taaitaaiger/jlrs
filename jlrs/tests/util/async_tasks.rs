@@ -21,7 +21,7 @@ impl AsyncTask for MyTask {
                 .wrapper_unchecked()
                 .as_value()
                 .call_async(&mut frame, &mut [dims, iters])
-                .await?
+                .await
                 .unwrap()
                 .unbox::<f64>()?
         };
@@ -51,7 +51,7 @@ impl AsyncTask for OtherRetTypeTask {
                 .wrapper_unchecked()
                 .as_value()
                 .call_async(&mut frame, &mut [dims, iters])
-                .await?
+                .await
                 .unwrap()
                 .unbox::<f64>()? as f32
         };
@@ -83,7 +83,7 @@ impl AsyncTask for KwTask {
                 .wrapper_unchecked()
                 .provide_keywords(nt)?
                 .call_async(&mut frame, &mut [dims, iters])
-                .await?
+                .await
                 .unwrap()
                 .unbox::<f64>()? as f32
         };
@@ -106,7 +106,7 @@ impl AsyncTask for ThrowingTask {
                 .function(&frame, "throwingfunc")?
                 .wrapper_unchecked()
                 .call_async(&mut frame, [])
-                .await?
+                .await
                 .into_jlrs_result()?
                 .unbox::<f64>()? as f32
         };
@@ -138,7 +138,7 @@ impl AsyncTask for NestingTaskAsyncFrame {
                         .wrapper_unchecked()
                         .as_value()
                         .call_async(&mut frame, &mut [dims, iters])
-                        .await?
+                        .await
                         .unwrap()
                         .unbox::<f64>()
                 }
@@ -173,7 +173,7 @@ impl AsyncTask for NestingTaskAsyncValueFrame {
                         .wrapper_unchecked()
                         .as_value()
                         .call_async(&mut frame, &mut [dims, iters])
-                        .await?
+                        .await
                         .unwrap()
                 };
 
@@ -210,7 +210,7 @@ impl AsyncTask for NestingTaskAsyncCallFrame {
                         .wrapper_unchecked()
                         .as_value()
                         .call_async(&mut frame, &mut [dims, iters])
-                        .await?
+                        .await
                 };
 
                 let out = unsafe {
@@ -253,7 +253,7 @@ impl AsyncTask for NestingTaskAsyncGcFrame {
                         .wrapper_unchecked()
                         .as_value()
                         .call_async(&mut frame, &mut [dims, iters])
-                        .await?
+                        .await
                         .unwrap()
                         .unbox::<f64>()
                 }
@@ -288,7 +288,7 @@ impl AsyncTask for NestingTaskAsyncDynamicValueFrame {
                         .wrapper_unchecked()
                         .as_value()
                         .call_async(&mut frame, &mut [dims, iters])
-                        .await?
+                        .await
                         .unwrap()
                 };
 
@@ -325,7 +325,7 @@ impl AsyncTask for NestingTaskAsyncDynamicCallFrame {
                         .wrapper_unchecked()
                         .as_value()
                         .call_async(&mut frame, &mut [dims, iters])
-                        .await?
+                        .await
                 };
 
                 let out = unsafe {
@@ -429,7 +429,7 @@ impl AsyncTask for LocalTask {
                 .function(&frame, "complexfunc")?
                 .wrapper_unchecked()
                 .call_async_local(&mut frame, &mut [dims, iters])
-                .await?
+                .await
                 .unwrap()
                 .unbox::<f64>()? as f32
         };
@@ -457,7 +457,7 @@ impl AsyncTask for LocalSchedulingTask {
                 .wrapper_unchecked()
                 .function(&frame, "complexfunc")?
                 .wrapper_unchecked()
-                .schedule_async_local(&mut frame, &mut [dims, iters])?
+                .schedule_async_local(&mut frame, &mut [dims, iters])
                 .unwrap();
 
             Module::base(&frame)
@@ -491,7 +491,7 @@ impl AsyncTask for MainTask {
                 .function(&frame, "complexfunc")?
                 .wrapper_unchecked()
                 .call_async_main(&mut frame, &mut [dims, iters])
-                .await?
+                .await
                 .unwrap()
                 .unbox::<f64>()? as f32
         };
@@ -519,7 +519,7 @@ impl AsyncTask for MainSchedulingTask {
                 .wrapper_unchecked()
                 .function(&frame, "complexfunc")?
                 .wrapper_unchecked()
-                .schedule_async_main(&mut frame, &mut [dims, iters])?
+                .schedule_async_main(&mut frame, &mut [dims, iters])
                 .unwrap();
 
             Module::base(&frame)
@@ -552,7 +552,7 @@ impl AsyncTask for SchedulingTask {
                 .wrapper_unchecked()
                 .function(&frame, "complexfunc")?
                 .wrapper_unchecked()
-                .schedule_async(&mut frame, &mut [dims, iters])?
+                .schedule_async(&mut frame, &mut [dims, iters])
                 .unwrap();
 
             Module::base(&frame)
@@ -589,7 +589,7 @@ impl AsyncTask for LocalKwSchedulingTask {
                 .function(&frame, "kwfunc")?
                 .wrapper_unchecked()
                 .provide_keywords(nt)?
-                .schedule_async_local(&mut frame, &mut [dims, iters])?
+                .schedule_async_local(&mut frame, &mut [dims, iters])
                 .unwrap();
 
             Module::base(&frame)
@@ -626,7 +626,7 @@ impl AsyncTask for KwSchedulingTask {
                 .function(&frame, "kwfunc")?
                 .wrapper_unchecked()
                 .provide_keywords(nt)?
-                .schedule_async(&mut frame, &mut [dims, iters])?
+                .schedule_async(&mut frame, &mut [dims, iters])
                 .unwrap();
 
             Module::base(&frame)
@@ -663,7 +663,7 @@ impl AsyncTask for MainKwSchedulingTask {
                 .function(&frame, "kwfunc")?
                 .wrapper_unchecked()
                 .provide_keywords(nt)?
-                .schedule_async_main(&mut frame, &mut [dims, iters])?
+                .schedule_async_main(&mut frame, &mut [dims, iters])
                 .unwrap();
 
             Module::base(&frame)
@@ -700,7 +700,7 @@ impl AsyncTask for LocalKwTask {
                 .wrapper_unchecked()
                 .provide_keywords(nt)?
                 .call_async_local(&mut frame, &mut [dims, iters])
-                .await?
+                .await
                 .unwrap()
                 .unbox::<f64>()? as f32
         };
@@ -732,7 +732,7 @@ impl AsyncTask for MainKwTask {
                 .wrapper_unchecked()
                 .provide_keywords(nt)?
                 .call_async_main(&mut frame, &mut [dims, iters])
-                .await?
+                .await
                 .unwrap()
                 .unbox::<f64>()? as f32
         };

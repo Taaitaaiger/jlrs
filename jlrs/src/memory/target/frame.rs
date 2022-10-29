@@ -11,11 +11,11 @@
 use std::{marker::PhantomData, ptr::NonNull};
 
 use crate::{
+    error::JlrsResult,
     memory::{
         context::stack::Stack,
         target::{ExtendedTarget, Target},
     },
-    prelude::JlrsResult,
     private::Private,
     wrappers::ptr::Wrapper,
 };
@@ -111,7 +111,7 @@ impl<'scope> GcFrame<'scope> {
     /// # JULIA.with(|j| {
     /// # let mut julia = j.borrow_mut();
     /// # let mut frame = StackFrame::new();
-    /// # let julia = julia.instance(&mut frame);
+    /// # let mut julia = julia.instance(&mut frame);
     ///   julia.scope(|mut frame| {
     ///       let output = frame.output();
     ///
@@ -119,10 +119,12 @@ impl<'scope> GcFrame<'scope> {
     ///           let i = Value::new(&mut frame, 1u64);
     ///           let j = Value::new(&mut frame, 2u64);
     ///
-    ///           Module::base(&frame)
-    ///               .function(&mut frame, "+")?
-    ///               .call2(output, i, j)
-    ///               .into_jlrs_result()
+    ///           unsafe {
+    ///               Module::base(&frame)
+    ///                   .function(&mut frame, "+")?
+    ///                   .call2(output, i, j)
+    ///                   .into_jlrs_result()
+    ///           }
     ///       })?;
     ///
     ///       Ok(())
@@ -181,9 +183,11 @@ cfg_if! {
         /// A frame associated with an async scope.
         ///
         /// The only difference between a `GcFrame` and an `AsyncGcFrame` is that the latter
-        /// allows calling several async methods, most importantly those of the [`CallAsync`]. An
+        /// allows calling several async methods, most importantly those of [`CallAsync`]. An
         /// `AsyncGcFrame` can be (mutably) dereferenced as a `GcFrame`, so all methods of `GcFrame`
         /// are available to `AsyncGcFrame`.
+        ///
+        /// [`CallAsync`]: crate::call::CallAsync
         pub struct AsyncGcFrame<'scope> {
             scope_context: GcFrame<'scope>,
         }

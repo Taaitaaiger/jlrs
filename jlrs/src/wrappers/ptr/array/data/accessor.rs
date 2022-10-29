@@ -99,6 +99,8 @@ impl<'borrow, T> Mutability for Mutable<'borrow, T> {}
 /// In addition to these four layouts, there's also [`UnknownLayout`] which doesn't impose any
 /// requirements on the layout, but as a result it can only access its contents with
 /// [`ArrayAccessor::get_value`] and mutate them with [`ArrayAccessor::set_value`].
+///
+/// [`ValueRef`]: crate::wrappers::ptr::value::ValueRef
 #[repr(transparent)]
 pub struct ArrayAccessor<'borrow, 'array, 'data, T, L: ArrayLayout, M: Mutability> {
     pub(crate) array: Array<'array, 'data>,

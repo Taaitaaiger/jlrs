@@ -56,7 +56,7 @@ cfg_if! {
 /// Julia type information. You can acquire a [`Value`]'s datatype by by calling
 /// [`Value::datatype`]. If a `DataType` is concrete and not a subtype of `Array` a new instance
 /// can be created with [`DataType::instantiate`]. This can also be achieved by converting the
-/// `DataType` to a `Value` with [`DataType::as_value`] and calling it as a Julia function.
+/// `DataType` to a `Value` with [`Wrapper::as_value`] and calling it as a Julia function.
 #[derive(Copy, Clone)]
 #[repr(transparent)]
 pub struct DataType<'scope>(NonNull<jl_datatype_t>, PhantomData<&'scope ()>);

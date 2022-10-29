@@ -34,10 +34,15 @@
 //! data should use extended targets. An extended target can be split into a `BorrowedFrame` and
 //! a target, the `BorrowedFrame` can be used to create a temporary scope and the target for the
 //! data that is returned.
+//!
+//! [`Ref`]: crate::wrappers::ptr::Ref
 
 use std::{future::Future, marker::PhantomData};
 
-use crate::prelude::{JlrsResult, Value, Wrapper};
+use crate::{
+    error::JlrsResult,
+    wrappers::ptr::{value::Value, Wrapper},
+};
 
 use self::private::{ExceptionTargetPriv, TargetPriv};
 
@@ -61,6 +66,7 @@ pub mod target_type;
 /// For more information see the [module-level] docs
 ///  
 /// [module-level]: self
+/// [`TargetType`]: crate::memory::target::target_type::TargetType
 pub trait Target<'target, 'data, W = Value<'target, 'data>>: TargetPriv<'target, 'data, W>
 where
     W: Wrapper<'target, 'data>,
@@ -209,7 +215,7 @@ where
 
 /// A frame that has been borrowed. A new scope must be created before it can be used as a target
 /// again.
-pub struct BorrowedFrame<'borrow, 'current, F: 'current>(&'borrow mut F, PhantomData<&'current ()>);
+pub struct BorrowedFrame<'borrow, 'current, F>(&'borrow mut F, PhantomData<&'current ()>);
 
 impl<'borrow, 'current> BorrowedFrame<'borrow, 'current, GcFrame<'current>> {
     /// Create a temporary scope by calling [`GcFrame::scope`].
@@ -325,9 +331,12 @@ pub(crate) mod private {
     use jl_sys::jl_value_t;
 
     use crate::{
-        prelude::{Value, ValueRef, Wrapper},
         private::Private,
-        wrappers::ptr::{private::WrapperPriv, Ref},
+        wrappers::ptr::{
+            private::WrapperPriv,
+            value::{Value, ValueRef},
+            Ref, Wrapper,
+        },
     };
 
     use super::{
@@ -359,8 +368,7 @@ pub(crate) mod private {
 
     impl<'target, T: TargetBase<'target>> TargetBase<'target> for &T {}
 
-    pub trait TargetPriv<'target, 'data, W>:
-        TargetBase<'target> + TargetType<'target, 'data, W>
+    pub trait TargetPriv<'target, 'data, W>: TargetType<'target, 'data, W>
     where
         W: Wrapper<'target, 'data>,
     {

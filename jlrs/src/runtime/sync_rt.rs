@@ -1,6 +1,9 @@
 //! Use Julia without support for multitasking.
 //!
-//! This module is only available if the `sync-rt` feature is enabled.
+//! This module is only available if the `sync-rt` feature is enabled, it provides the sync
+//! runtime which initializes Julia on the current thread.
+
+// TODO: document scope
 
 use crate::{
     call::Call,
@@ -63,6 +66,9 @@ impl PendingJulia {
         })
     }
 
+    /// Activate the pending instance.
+    ///
+    /// The provided `StackFrame` should be allocated on the stack.
     pub fn instance<'ctx>(&'ctx mut self, frame: &'ctx mut StackFrame<0>) -> Julia<'ctx> {
         unsafe {
             // Is popped when Julia is dropped.
@@ -138,10 +144,14 @@ impl Julia<'_> {
     ///
     /// ```no_run
     /// # use jlrs::prelude::*;
+    /// # use jlrs::util::test::JULIA;
     /// # fn main() {
+    /// # JULIA.with(|j| {
+    /// # let mut julia = j.borrow_mut();
     /// # let mut frame = StackFrame::new();
-    /// # let mut julia = unsafe { RuntimeBuilder::new().start(&context_frame).unwrap() };
+    /// # let mut julia = julia.instance(&mut frame);
     /// unsafe { julia.include("Path/To/MyJuliaCode.jl").unwrap(); }
+    /// # });
     /// # }
     /// ```
     pub unsafe fn include<P: AsRef<Path>>(&mut self, path: P) -> JlrsResult<()> {
@@ -163,7 +173,7 @@ impl Julia<'_> {
     }
 
     /// This method is a main entrypoint to interact with Julia. It takes a closure with one
-    /// arguments, a `GcFrame`, and can return arbitrary results.
+    /// argument, a `GcFrame`, and can return arbitrary results.
     ///
     /// Example:
     ///
@@ -173,7 +183,9 @@ impl Julia<'_> {
     /// # fn main() {
     /// # JULIA.with(|j| {
     /// # let mut julia = j.borrow_mut();
-    ///   julia.scope(|_global, mut frame| {
+    /// # let mut frame = StackFrame::new();
+    /// # let mut julia = julia.instance(&mut frame);
+    ///   julia.scope(| mut frame| {
     ///       let _i = Value::new(&mut frame, 1u64);
     ///       Ok(())
     ///   }).unwrap();
