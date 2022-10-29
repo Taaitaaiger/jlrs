@@ -276,6 +276,6 @@ pub fn sleep<'scope, 'data, T: Target<'scope, 'data>>(target: T, duration: Durat
             .expect("sleep not found")
             .value_unchecked()
             .call1(global, secs)
-            .expect("Sleep threw an exception");
+            .expect("sleep threw an exception");
     }
 }

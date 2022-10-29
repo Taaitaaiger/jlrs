@@ -1,8 +1,12 @@
 use std::{cell::RefCell, collections::VecDeque, rc::Rc, time::Duration};
 
-use jl_sys::{jl_adopt_thread, jl_gc_safepoint, jl_process_events};
+use jl_sys::{jl_adopt_thread, jl_gc_safepoint};
 
-use crate::{error::JlrsResult, memory::stack_frame::StackFrame};
+use crate::{
+    async_util::task::sleep,
+    error::JlrsResult,
+    memory::{stack_frame::StackFrame, target::global::Global},
+};
 
 use super::{queue::Receiver, AsyncRuntime, Message, MessageInner};
 
@@ -57,8 +61,9 @@ async unsafe fn run_inner<R: AsyncRuntime, const N: usize>(
 
     loop {
         if free_stacks.borrow().len() == 0 {
-            jl_process_events();
+            sleep(Global::new(), recv_timeout);
             R::yield_now().await;
+            jl_gc_safepoint();
             continue;
         }
 
@@ -119,10 +124,14 @@ async unsafe fn run_inner<R: AsyncRuntime, const N: usize>(
 
     // Wait for all tasks to complete without blocking the thread.
     for i in 0..N {
-        let task = running_tasks.borrow_mut()[i].take();
-        if let Some(task) = task {
-            task.await;
-            jl_gc_safepoint()
+        loop {
+            if running_tasks.borrow()[i].is_some() {
+                sleep(Global::new(), recv_timeout);
+                R::yield_now().await;
+                jl_gc_safepoint();
+            } else {
+                break;
+            }
         }
     }
 
