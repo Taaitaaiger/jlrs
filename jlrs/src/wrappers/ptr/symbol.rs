@@ -16,7 +16,7 @@ use std::{
 };
 
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
-use crate::{catch::catch_exceptions, memory::target::ExceptionTarget};
+use crate::catch::catch_exceptions;
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
 use std::mem::MaybeUninit;
 
@@ -54,7 +54,7 @@ impl<'scope> Symbol<'scope> {
     pub fn new_bytes<N, T>(target: T, symbol: N) -> T::Exception<'static, Self>
     where
         N: AsRef<[u8]>,
-        T: ExceptionTarget<'scope>,
+        T: Target<'scope>,
     {
         unsafe {
             let symbol = symbol.as_ref();
@@ -168,7 +168,7 @@ impl_debug!(Symbol<'_>);
 
 impl<'scope> WrapperPriv<'scope, '_> for Symbol<'scope> {
     type Wraps = jl_sym_t;
-    type StaticPriv = Symbol<'static>;
+    type TypeConstructorPriv<'target, 'da> = Symbol<'target>;
     const NAME: &'static str = "Symbol";
 
     // Safety: `inner` must not have been freed yet, the result must never be

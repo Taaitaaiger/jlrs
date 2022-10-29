@@ -22,8 +22,6 @@ use super::{
     dimensions::{ArrayDimensions, Dims},
     Array, ArrayData, TypedArray, TypedArrayData,
 };
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
-use crate::memory::target::ExceptionTarget;
 use crate::memory::target::{ExtendedTarget, Target};
 
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
@@ -395,7 +393,7 @@ impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 
         inc: usize,
     ) -> S::Exception<'static, ()>
     where
-        S: ExceptionTarget<'target>,
+        S: Target<'target>,
     {
         self.tracked.data.grow_end(target, inc)
     }
@@ -407,7 +405,7 @@ impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub unsafe fn del_end<'target, S>(&mut self, target: S, dec: usize) -> S::Exception<'static, ()>
     where
-        S: ExceptionTarget<'target>,
+        S: Target<'target>,
     {
         self.tracked.data.del_end(target, dec)
     }
@@ -423,7 +421,7 @@ impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 
         inc: usize,
     ) -> S::Exception<'static, ()>
     where
-        S: ExceptionTarget<'target>,
+        S: Target<'target>,
     {
         self.tracked.data.grow_begin(target, inc)
     }
@@ -439,7 +437,7 @@ impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 
         dec: usize,
     ) -> S::Exception<'static, ()>
     where
-        S: ExceptionTarget<'target>,
+        S: Target<'target>,
     {
         self.tracked.data.del_begin(target, dec)
     }
@@ -502,7 +500,7 @@ where
         inc: usize,
     ) -> S::Exception<'static, ()>
     where
-        S: ExceptionTarget<'target>,
+        S: Target<'target>,
     {
         self.tracked.data.grow_end(target, inc)
     }
@@ -514,7 +512,7 @@ where
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub unsafe fn del_end<'target, S>(&mut self, target: S, dec: usize) -> S::Exception<'static, ()>
     where
-        S: ExceptionTarget<'target>,
+        S: Target<'target>,
     {
         self.tracked.data.del_end(target, dec)
     }
@@ -530,7 +528,7 @@ where
         inc: usize,
     ) -> S::Exception<'static, ()>
     where
-        S: ExceptionTarget<'target>,
+        S: Target<'target>,
     {
         self.tracked.data.grow_begin(target, inc)
     }
@@ -546,7 +544,7 @@ where
         dec: usize,
     ) -> S::Exception<'static, ()>
     where
-        S: ExceptionTarget<'target>,
+        S: Target<'target>,
     {
         self.tracked.data.del_begin(target, dec)
     }

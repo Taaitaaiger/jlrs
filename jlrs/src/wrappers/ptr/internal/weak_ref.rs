@@ -43,7 +43,7 @@ impl_debug!(WeakRef<'_>);
 
 impl<'scope> WrapperPriv<'scope, '_> for WeakRef<'scope> {
     type Wraps = jl_weakref_t;
-    type StaticPriv = WeakRef<'static>;
+    type TypeConstructorPriv<'target, 'da> = WeakRef<'target>;
     const NAME: &'static str = "WeakRef";
 
     // Safety: `inner` must not have been freed yet, the result must never be

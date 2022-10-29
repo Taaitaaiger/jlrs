@@ -1423,7 +1423,7 @@ impl_julia_typecheck!(DataType<'frame>, jl_datatype_type, 'frame);
 
 impl<'scope> WrapperPriv<'scope, '_> for DataType<'scope> {
     type Wraps = jl_datatype_t;
-    type StaticPriv = DataType<'static>;
+    type TypeConstructorPriv<'target, 'da> = DataType<'target>;
     const NAME: &'static str = "DataType";
 
     // Safety: `inner` must not have been freed yet, the result must never be

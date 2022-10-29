@@ -97,9 +97,9 @@ unsafe impl Typecheck for OpaqueClosure<'_> {
 
 impl_debug!(OpaqueClosure<'_>);
 
-impl<'scope> WrapperPriv<'scope, 'static> for OpaqueClosure<'scope> {
+impl<'scope, 'data> WrapperPriv<'scope, 'data> for OpaqueClosure<'scope> {
     type Wraps = jl_opaque_closure_t;
-    type StaticPriv = OpaqueClosure<'static>;
+    type TypeConstructorPriv<'target, 'da> = OpaqueClosure<'target>;
     const NAME: &'static str = "OpaqueClosure";
 
     // Safety: `inner` must not have been freed yet, the result must never be

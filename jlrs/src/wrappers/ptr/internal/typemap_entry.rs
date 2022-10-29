@@ -129,7 +129,7 @@ impl_debug!(TypeMapEntry<'_>);
 
 impl<'scope> WrapperPriv<'scope, '_> for TypeMapEntry<'scope> {
     type Wraps = jl_typemap_entry_t;
-    type StaticPriv = TypeMapEntry<'static>;
+    type TypeConstructorPriv<'target, 'da> = TypeMapEntry<'target>;
     const NAME: &'static str = "TypeMapEntry";
 
     // Safety: `inner` must not have been freed yet, the result must never be

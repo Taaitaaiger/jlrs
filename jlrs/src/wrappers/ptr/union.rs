@@ -156,7 +156,7 @@ impl_debug!(Union<'_>);
 
 impl<'scope> WrapperPriv<'scope, '_> for Union<'scope> {
     type Wraps = jl_uniontype_t;
-    type StaticPriv = Union<'static>;
+    type TypeConstructorPriv<'target, 'da> = Union<'target>;
     const NAME: &'static str = "Union";
 
     // Safety: `inner` must not have been freed yet, the result must never be

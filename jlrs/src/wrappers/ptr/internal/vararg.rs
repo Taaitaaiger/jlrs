@@ -38,9 +38,9 @@ impl<'scope> Vararg<'scope> {
 impl_julia_typecheck!(Vararg<'scope>, jl_vararg_type, 'scope);
 impl_debug!(Vararg<'_>);
 
-impl<'scope> WrapperPriv<'scope, 'static> for Vararg<'scope> {
+impl<'scope, 'data> WrapperPriv<'scope, 'data> for Vararg<'scope> {
     type Wraps = jl_vararg_t;
-    type StaticPriv = Vararg<'static>;
+    type TypeConstructorPriv<'target, 'da> = Vararg<'target>;
     const NAME: &'static str = "Vararg";
 
     // Safety: `inner` must not have been freed yet, the result must never be

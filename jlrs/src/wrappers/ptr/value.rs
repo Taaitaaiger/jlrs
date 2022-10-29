@@ -156,9 +156,6 @@ use std::{
     usize,
 };
 
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
-use crate::memory::target::ExceptionTarget;
-
 use super::Ref;
 
 cfg_if! {
@@ -849,7 +846,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
         value: Value<'_, 'data>,
     ) -> JlrsResult<T::Exception<'data, ()>>
     where
-        T: ExceptionTarget<'target>,
+        T: Target<'target>,
     {
         use crate::catch::catch_exceptions;
 
@@ -916,7 +913,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     ) -> JlrsResult<T::Exception<'data, ()>>
     where
         N: ToSymbol,
-        T: ExceptionTarget<'target>,
+        T: Target<'target>,
     {
         use crate::catch::catch_exceptions;
 
@@ -1424,7 +1421,7 @@ impl_debug!(Value<'_, '_>);
 
 impl<'scope, 'data> WrapperPriv<'scope, 'data> for Value<'scope, 'data> {
     type Wraps = jl_value_t;
-    type StaticPriv = Value<'static, 'data>;
+    type TypeConstructorPriv<'target, 'da> = Value<'target, 'da>;
     const NAME: &'static str = "Value";
 
     // Safety: `inner` must not have been freed yet, the result must never be

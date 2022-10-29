@@ -209,7 +209,7 @@ impl<'scope> Debug for SimpleVector<'scope> {
 
 impl<'scope> WrapperPriv<'scope, '_> for SimpleVector<'scope> {
     type Wraps = jl_svec_t;
-    type StaticPriv = SimpleVector<'static>;
+    type TypeConstructorPriv<'target, 'da> = SimpleVector<'target>;
     const NAME: &'static str = "SimpleVector";
 
     // Safety: `inner` must not have been freed yet, the result must never be

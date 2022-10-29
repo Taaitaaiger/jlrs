@@ -129,7 +129,7 @@ impl_debug!(TypeVar<'_>);
 
 impl<'scope> WrapperPriv<'scope, '_> for TypeVar<'scope> {
     type Wraps = jl_tvar_t;
-    type StaticPriv = TypeVar<'static>;
+    type TypeConstructorPriv<'target, 'da> = TypeVar<'target>;
     const NAME: &'static str = "TypeVar";
 
     // Safety: `inner` must not have been freed yet, the result must never be

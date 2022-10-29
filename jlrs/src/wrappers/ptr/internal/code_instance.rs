@@ -217,7 +217,7 @@ impl_debug!(CodeInstance<'_>);
 
 impl<'scope> WrapperPriv<'scope, '_> for CodeInstance<'scope> {
     type Wraps = jl_code_instance_t;
-    type StaticPriv = CodeInstance<'static>;
+    type TypeConstructorPriv<'target, 'da> = CodeInstance<'target>;
     const NAME: &'static str = "CodeInstance";
 
     // Safety: `inner` must not have been freed yet, the result must never be

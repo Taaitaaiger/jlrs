@@ -126,7 +126,7 @@ impl_debug!(MethodInstance<'_>);
 
 impl<'scope> WrapperPriv<'scope, '_> for MethodInstance<'scope> {
     type Wraps = jl_method_instance_t;
-    type StaticPriv = MethodInstance<'static>;
+    type TypeConstructorPriv<'target, 'da> = MethodInstance<'target>;
     const NAME: &'static str = "MethodInstance";
 
     // Safety: `inner` must not have been freed yet, the result must never be

@@ -294,3 +294,54 @@ impl Drop for GcFrameOwner<'_> {
         unsafe { self.stack.pop_roots(self.offset) }
     }
 }
+
+/// A frame that has been borrowed. A new scope must be created before it can be used as a target
+/// again.
+// TODO privacy
+pub struct BorrowedFrame<'borrow, 'current, F>(
+    pub(crate) &'borrow mut F,
+    pub(crate) PhantomData<&'current ()>,
+);
+
+impl<'borrow, 'current> BorrowedFrame<'borrow, 'current, GcFrame<'current>> {
+    /// Create a temporary scope by calling [`GcFrame::scope`].
+    pub fn scope<T, F>(self, func: F) -> JlrsResult<T>
+    where
+        for<'inner> F: FnOnce(GcFrame<'inner>) -> JlrsResult<T>,
+    {
+        self.0.scope(func)
+    }
+}
+
+#[cfg(feature = "async")]
+impl<'borrow, 'current> BorrowedFrame<'borrow, 'current, AsyncGcFrame<'current>> {
+    /// Create a temporary scope by calling [`GcFrame::scope`].
+    pub fn scope<T, F>(self, func: F) -> JlrsResult<T>
+    where
+        for<'inner> F: FnOnce(GcFrame<'inner>) -> JlrsResult<T>,
+    {
+        self.0.scope(func)
+    }
+
+    /// Create a temporary scope by calling [`AsyncGcFrame::async_scope`].
+    pub async fn async_scope<'nested, T, F, G>(self, func: F) -> JlrsResult<T>
+    where
+        'borrow: 'nested,
+        T: 'current,
+        G: Future<Output = JlrsResult<T>>,
+        F: FnOnce(AsyncGcFrame<'nested>) -> G,
+    {
+        self.0.async_scope(func).await
+    }
+
+    /// Create a temporary scope by calling [`AsyncGcFrame::relaxed_async_scope`].
+    pub async unsafe fn relaxed_async_scope<'nested, T, F, G>(self, func: F) -> JlrsResult<T>
+    where
+        'borrow: 'nested,
+        T: 'nested,
+        G: Future<Output = JlrsResult<T>>,
+        F: FnOnce(AsyncGcFrame<'nested>) -> G,
+    {
+        self.0.relaxed_async_scope(func).await
+    }
+}

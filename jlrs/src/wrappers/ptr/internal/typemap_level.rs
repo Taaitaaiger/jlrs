@@ -151,7 +151,7 @@ impl_debug!(TypeMapLevel<'_>);
 
 impl<'scope> WrapperPriv<'scope, '_> for TypeMapLevel<'scope> {
     type Wraps = jl_typemap_level_t;
-    type StaticPriv = TypeMapLevel<'static>;
+    type TypeConstructorPriv<'target, 'da> = TypeMapLevel<'target>;
     const NAME: &'static str = "TypeMapLevel";
 
     // Safety: `inner` must not have been freed yet, the result must never be
