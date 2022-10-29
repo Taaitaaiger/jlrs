@@ -249,6 +249,50 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         JuliaFuture { shared_state }
     }
 
+    pub(crate) fn new_posted(
+        frame: &mut AsyncGcFrame<'frame>,
+        fn_ptr: Value<'_, '_>,
+        task_ptr: Value<'_, '_>,
+    ) -> Self {
+        let shared_state = Arc::new(Mutex::new(TaskState {
+            completed: false,
+            waker: None,
+            task: None,
+            _marker: PhantomData,
+        }));
+
+        let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
+        let state_ptr_boxed = Value::new(&mut *frame, state_ptr);
+
+        // Safety: module contents are globally rooted, and the function is guaranteed to be safe
+        // by the caller.
+        let task = unsafe {
+            Module::main(&frame)
+                .submodule(&frame, "JlrsMultitask")
+                .expect("JlrsMultitask not available")
+                .wrapper_unchecked()
+                .function(&frame, "postblocking")
+                .expect("postblocking not available")
+                .wrapper_unchecked()
+                .call3(&mut *frame, fn_ptr, task_ptr, state_ptr_boxed)
+                .unwrap_or_else(|e| {
+                    let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
+                    panic!("postblocking threw an exception: {}", msg)
+                })
+                .cast_unchecked::<Task>()
+        };
+
+        {
+            let locked = shared_state.lock();
+            match locked {
+                Ok(mut data) => data.task = Some(task),
+                _ => panic!("Lock poisoned"),
+            }
+        }
+
+        JuliaFuture { shared_state }
+    }
+
     pub(crate) fn new_with_keywords<'value, V>(
         frame: &mut AsyncGcFrame<'frame>,
         func: WithKeywords,

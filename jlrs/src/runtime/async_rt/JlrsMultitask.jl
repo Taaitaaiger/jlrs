@@ -75,4 +75,16 @@ function scheduleasync(func::Function, args...; kwargs...)::Task
     @nospecialize func args kwargs
     @async Base.invokelatest(func, args...; kwargs...)
 end
+
+function postblocking(func::Ptr{Cvoid}, task::Ptr{Cvoid}, wakeptr::Ptr{Cvoid})::Task 
+    Base.Threads.@spawn begin
+        try
+            ccall(func, Cvoid, (Ptr{Cvoid},), task)
+        finally
+            if wakeptr != C_NULL
+                ccall(wakerust[], Cvoid, (Ptr{Cvoid},), wakeptr)
+            end
+        end
+    end
+end
 end

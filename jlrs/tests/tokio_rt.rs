@@ -493,4 +493,33 @@ mod tests {
             assert_eq!(receiver.recv().unwrap().unwrap(), 2.0);
         });
     }
+
+    #[test]
+    fn test_post_task() {
+        JULIA.with(|j| {
+            let julia = j.borrow_mut();
+
+            let (sender, receiver) = crossbeam_channel::bounded(1);
+
+            julia
+                .try_post_blocking_task(
+                    |mut frame| {
+                        let one = Value::new(&mut frame, 1.0);
+                        unsafe {
+                            Module::base(&frame)
+                                .function(&frame, "+")
+                                .unwrap()
+                                .wrapper_unchecked()
+                                .call2(&mut frame, one, one)
+                                .into_jlrs_result()?
+                                .unbox::<f64>()
+                        }
+                    },
+                    sender,
+                )
+                .unwrap();
+
+            assert_eq!(receiver.recv().unwrap().unwrap(), 2.0);
+        });
+    }
 }

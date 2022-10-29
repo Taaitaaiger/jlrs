@@ -1,15 +1,18 @@
 use super::{channel::Channel, task::PersistentTask};
 use crate::async_util::channel::ChannelReceiver;
 use crate::async_util::channel::OneshotSender;
+use crate::async_util::future::JuliaFuture;
 use crate::call::Call;
 use crate::error::JlrsError;
 use crate::error::JlrsResult;
 use crate::memory::context::stack::Stack;
 use crate::memory::target::frame::{AsyncGcFrame, GcFrame};
+use crate::prelude::StackFrame;
 use crate::runtime::async_rt::PersistentHandle;
 use crate::wrappers::ptr::{module::Module, string::JuliaString, value::Value, Wrapper};
 use crate::{async_util::task::AsyncTask, runtime::async_rt::PersistentMessage};
 use async_trait::async_trait;
+use std::ffi::c_void;
 use std::path::PathBuf;
 use std::{marker::PhantomData, num::NonZeroUsize, sync::Arc};
 
@@ -390,10 +393,14 @@ where
     }
 }
 
+#[async_trait(?Send)]
 pub(crate) trait BlockingTaskEnvelope: Send + Sync {
     fn call<'scope>(self: Box<Self>, stack: &'scope Stack);
+
+    async fn post<'scope>(self: Box<Self>, stack: &'scope Stack);
 }
 
+#[async_trait(?Send)]
 impl<F, O, T> BlockingTaskEnvelope for BlockingTask<F, O, T>
 where
     for<'base> F: Send + Sync + FnOnce(GcFrame<'base>) -> JlrsResult<T>,
@@ -412,6 +419,32 @@ where
         };
 
         OneshotSender::send(ch, res);
+    }
+
+    async fn post<'scope>(self: Box<Self>, stack: &'scope Stack) {
+        let ptr = Box::leak(self) as *mut _ as *mut c_void;
+        unsafe {
+            let (owner, mut frame) = AsyncGcFrame::base(&stack);
+
+            unsafe extern "C" fn invoke<T: BlockingTaskEnvelope>(task: *mut c_void) {
+                let task = Box::from_raw(task.cast::<T>());
+                let mut frame = StackFrame::new();
+                let mut frame = frame.pin();
+                let frame = frame.stack_frame();
+
+                let stack = frame.sync_stack();
+                task.call(stack)
+            }
+
+            let invoke_j = Value::new(&mut frame, invoke::<Self> as *mut c_void);
+            let task_j = Value::new(&mut frame, ptr);
+
+            JuliaFuture::new_posted(&mut frame, invoke_j, task_j)
+                .await
+                .expect("Posted task failed");
+
+            std::mem::drop(owner);
+        };
     }
 }
 
