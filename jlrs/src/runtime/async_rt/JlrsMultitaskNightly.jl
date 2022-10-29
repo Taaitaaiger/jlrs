@@ -44,5 +44,16 @@ scheduleasynclocal(func::Function, args...; kwargs...)::Task = interactivecall(f
 scheduleasync(func::Function, wakeptr::Ptr{Cvoid}, args...; kwargs...)::Task = asynccall(func, wakeptr, args...; kwargs...)
 scheduleasync(func::Function, args...; kwargs...)::Task = asynccall(func, args...; kwargs...)
 
+function postblocking(func::Ptr{Cvoid}, task::Ptr{Cvoid}, wakeptr::Ptr{Cvoid})::Task 
+    Base.Threads.@spawn :default begin
+        try
+            ccall(func, Cvoid, (Ptr{Cvoid},), task)
+        finally
+            if wakeptr != C_NULL
+                ccall(wakerust[], Cvoid, (Ptr{Cvoid},), wakeptr)
+            end
+        end
+    end
+end
 end
 

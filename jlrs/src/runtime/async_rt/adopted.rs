@@ -86,6 +86,23 @@ async unsafe fn run_inner<R: AsyncRuntime, const N: usize>(
                     let stack = base_frame.sync_stack();
                     task.call(stack);
                 }
+                MessageInner::PostBlockingTask(task) => {
+                    let idx = free_stacks.borrow_mut().pop_front().unwrap();
+                    let stack = base_frame.nth_stack(idx);
+
+                    let task = {
+                        let free_stacks = free_stacks.clone();
+                        let running_tasks = running_tasks.clone();
+
+                        R::spawn_local(async move {
+                            task.post(stack).await;
+                            free_stacks.borrow_mut().push_back(idx);
+                            running_tasks.borrow_mut()[idx] = None;
+                        })
+                    };
+
+                    running_tasks.borrow_mut()[idx] = Some(task);
+                }
                 MessageInner::Include(task) => {
                     let stack = base_frame.sync_stack();
                     task.call(stack);

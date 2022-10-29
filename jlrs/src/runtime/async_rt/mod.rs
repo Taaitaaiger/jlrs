@@ -301,6 +301,45 @@ where
             .try_send(MessageInner::BlockingTask(boxed).wrap())
     }
 
+    /// Send a new blocking task to the runtime and schedule it on another thread.
+    ///
+    /// This method waits if there's no room in the channel. It takes two arguments, the first is
+    /// a closure that takes a `GcFrame` and must return a `JlrsResult` whose inner type is both
+    /// `Send` and `Sync`. The second is the sending half of a channel which is used to send the
+    /// result back after the task has completed. This task not called directly, but executed in
+    /// a spawned task.
+    pub async fn post_blocking_task<T, O, F>(&self, task: F, res_sender: O)
+    where
+        for<'base> F: 'static + Send + Sync + FnOnce(GcFrame<'base>) -> JlrsResult<T>,
+        O: OneshotSender<JlrsResult<T>>,
+        T: Send + Sync + 'static,
+    {
+        let msg = BlockingTask::new(task, res_sender);
+        let boxed = Box::new(msg);
+        self.sender
+            .send(MessageInner::PostBlockingTask(boxed).wrap())
+            .await
+    }
+
+    /// Try to send a new blocking task to the runtime and schedule it on another thread.
+    ///
+    /// If there's no room in the backing channel an error is returned immediately. This method
+    /// takes two arguments, the first is a closure that takes a `GcFrame` and must return a
+    /// `JlrsResult` whose inner type is both `Send` and `Sync`. The second is the sending half of
+    /// a channel which is used to send the  result back after the task has completed. This task
+    /// not called directly, but executed in a spawned task.
+    pub fn try_post_blocking_task<T, O, F>(&self, task: F, res_sender: O) -> JlrsResult<()>
+    where
+        for<'base> F: 'static + Send + Sync + FnOnce(GcFrame<'base>) -> JlrsResult<T>,
+        O: OneshotSender<JlrsResult<T>>,
+        T: Send + Sync + 'static,
+    {
+        let msg = BlockingTask::new(task, res_sender);
+        let boxed = Box::new(msg);
+        self.sender
+            .try_send(MessageInner::PostBlockingTask(boxed).wrap())
+    }
+
     /// Send a new persistent task to the runtime.
     ///
     /// This method waits if there's no room in the channel. It takes a two arguments, the task
@@ -645,6 +684,23 @@ where
                         let stack = base_frame.sync_stack();
                         task.call(stack);
                     }
+                    MessageInner::PostBlockingTask(task) => {
+                        let idx = free_stacks.borrow_mut().pop_front().unwrap();
+                        let stack = base_frame.nth_stack(idx);
+
+                        let task = {
+                            let free_stacks = free_stacks.clone();
+                            let running_tasks = running_tasks.clone();
+
+                            R::spawn_local(async move {
+                                task.post(stack).await;
+                                free_stacks.borrow_mut().push_back(idx);
+                                running_tasks.borrow_mut()[idx] = None;
+                            })
+                        };
+
+                        running_tasks.borrow_mut()[idx] = Some(task);
+                    }
                     MessageInner::Include(task) => {
                         let stack = base_frame.sync_stack();
                         task.call(stack);
@@ -699,6 +755,7 @@ pub struct Message {
 pub(crate) enum MessageInner {
     Task(Box<dyn PendingTaskEnvelope>),
     BlockingTask(Box<dyn BlockingTaskEnvelope>),
+    PostBlockingTask(Box<dyn BlockingTaskEnvelope>),
     Include(Box<dyn IncludeTaskEnvelope>),
     ErrorColor(Box<dyn SetErrorColorTaskEnvelope>),
 }

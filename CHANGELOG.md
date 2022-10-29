@@ -43,6 +43,9 @@
 
  - The `ForeignType` trait has been added which can be used to create new foreign types with custom mark functions.
 
+ - `AsyncJulia::post_blocking_task` has been added, which can be used to schedule a blocking task on an arbitrary thread owned by Julia.
+
+
 #### v0.16
  - Support for Julia 1.7 has been dropped, by default Julia 1.8 is targeted.
 
