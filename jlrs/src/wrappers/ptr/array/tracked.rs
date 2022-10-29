@@ -22,9 +22,9 @@ use super::{
     dimensions::{ArrayDimensions, Dims},
     Array, TypedArray,
 };
-use crate::memory::target::Target;
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
-use crate::memory::target::{ExceptionTarget, ExtendedTarget};
+use crate::memory::target::ExceptionTarget;
+use crate::memory::target::{ExtendedTarget, Target};
 
 pub trait ArrayWrapper<'scope, 'data>: Copy {
     fn track<'borrow>(&'borrow self) -> JlrsResult<TrackedArray<'borrow, 'scope, 'data, Self>>;
