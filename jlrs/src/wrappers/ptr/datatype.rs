@@ -1,6 +1,5 @@
 //! Wrapper for `DataType`, which provides access to type properties.
 
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
 use crate::memory::target::Target;
 
 use crate::{
