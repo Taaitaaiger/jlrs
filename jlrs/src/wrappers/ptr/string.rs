@@ -27,10 +27,10 @@ pub struct JuliaString<'scope>(*const u8, PhantomData<&'scope ()>);
 
 impl<'scope> JuliaString<'scope> {
     /// Create a new Julia string.
-    pub fn new<'target, V, T>(target: T, string: V) -> T::Data
+    pub fn new<'target, V, T>(target: T, string: V) -> StringData<'target, T>
     where
         V: AsRef<str>,
-        T: Target<'target, 'static, JuliaString<'target>>,
+        T: Target<'target>,
     {
         let str_ref = string.as_ref();
         let len = str_ref.len();
@@ -42,10 +42,10 @@ impl<'scope> JuliaString<'scope> {
     }
 
     /// Create a new Julia string.
-    pub fn new_bytes<'target, V, T>(target: T, bytes: V) -> T::Data
+    pub fn new_bytes<'target, V, T>(target: T, bytes: V) -> StringData<'target, T>
     where
         V: AsRef<[u8]>,
-        T: Target<'target, 'static, JuliaString<'target>>,
+        T: Target<'target>,
     {
         let bytes_ref = bytes.as_ref();
         let len = bytes_ref.len();
@@ -95,9 +95,9 @@ impl<'scope> JuliaString<'scope> {
     }
 
     /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> T::Data
+    pub fn root<'target, T>(self, target: T) -> StringData<'target, T>
     where
-        T: Target<'target, 'static, JuliaString<'target>>,
+        T: Target<'target>,
     {
         // Safety: the data is valid.
         unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
@@ -145,3 +145,8 @@ impl_root!(JuliaString, 1);
 pub type StringRef<'scope> = Ref<'scope, 'static, JuliaString<'scope>>;
 impl_valid_layout!(StringRef, String);
 impl_ref_root!(JuliaString, StringRef, 1);
+
+use crate::memory::target::target_type::TargetType;
+pub type StringData<'target, T> = <T as TargetType<'target>>::Data<'static, JuliaString<'target>>;
+pub type StringResult<'target, T> =
+    <T as TargetType<'target>>::Result<'static, JuliaString<'target>>;

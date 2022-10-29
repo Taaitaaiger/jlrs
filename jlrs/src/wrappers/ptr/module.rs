@@ -26,7 +26,11 @@ use jl_sys::{
 };
 use std::{marker::PhantomData, ptr::NonNull};
 
-use super::Ref;
+use super::{
+    function::FunctionData,
+    value::{ValueData, ValueResult},
+    Ref,
+};
 
 cfg_if! {
     if #[cfg(not(all(target_os = "windows", feature = "lts")))] {
@@ -63,9 +67,9 @@ impl<'scope> Module<'scope> {
     }
 
     /// Returns the parent of this module.
-    pub fn parent<'target, T>(self, target: T) -> T::Data
+    pub fn parent<'target, T>(self, target: T) -> ModuleData<'target, T>
     where
-        T: Target<'target, 'static, Module<'target>>,
+        T: Target<'target>,
     {
         // Safety: the pointer points to valid data, the parent is never null
         unsafe {
@@ -77,7 +81,7 @@ impl<'scope> Module<'scope> {
     /// Extend the lifetime of this module. This is safe as long as the module is never redefined.
     pub unsafe fn extend<'target, T>(self, _: &T) -> Module<'target>
     where
-        T: Target<'target, 'static>,
+        T: Target<'target>,
     {
         Module::wrap(self.unwrap(Private), Private)
     }
@@ -89,19 +93,19 @@ impl<'scope> Module<'scope> {
     /// [`Julia::include`]: crate::runtime::sync_rt::Julia::include
     /// [`AsyncJulia::include`]: crate::runtime::async_rt::AsyncJulia::include
     /// [`AsyncJulia::try_include`]: crate::runtime::async_rt::AsyncJulia::try_include
-    pub fn main<T: Target<'scope, 'static>>(_: &T) -> Self {
+    pub fn main<T: Target<'scope>>(_: &T) -> Self {
         // Safety: the Main module is globally rooted
         unsafe { Module::wrap(jl_main_module, Private) }
     }
 
     /// Returns a handle to Julia's `Core`-module.
-    pub fn core<T: Target<'scope, 'static>>(_: &T) -> Self {
+    pub fn core<T: Target<'scope>>(_: &T) -> Self {
         // Safety: the Core module is globally rooted
         unsafe { Module::wrap(jl_core_module, Private) }
     }
 
     /// Returns a handle to Julia's `Base`-module.
-    pub fn base<T: Target<'scope, 'static>>(_: &T) -> Self {
+    pub fn base<T: Target<'scope>>(_: &T) -> Self {
         // Safety: the Base module is globally rooted
         unsafe { Module::wrap(jl_base_module, Private) }
     }
@@ -121,10 +125,10 @@ impl<'scope> Module<'scope> {
     /// access `A` first and then `B`.
     ///
     /// Returns an error if the submodule doesn't exist.
-    pub fn submodule<'target, N, T>(self, target: T, name: N) -> JlrsResult<T::Data>
+    pub fn submodule<'target, N, T>(self, target: T, name: N) -> JlrsResult<ModuleData<'target, T>>
     where
         N: ToSymbol,
-        T: Target<'target, 'static, Module<'target>>,
+        T: Target<'target>,
     {
         // Safety: the pointer points to valid data, the C API function is called with
         // valid arguments and its result is checked.
@@ -163,10 +167,10 @@ impl<'scope> Module<'scope> {
         target: T,
         name: N,
         value: Value<'_, 'static>,
-    ) -> T::Exception
+    ) -> T::Exception<'static, ()>
     where
         N: ToSymbol,
-        T: ExceptionTarget<'target, 'static>,
+        T: ExceptionTarget<'target>,
     {
         use crate::catch::catch_exceptions;
         use std::mem::MaybeUninit;
@@ -218,10 +222,10 @@ impl<'scope> Module<'scope> {
         target: T,
         name: N,
         value: Value<'_, 'static>,
-    ) -> T::Exception
+    ) -> T::Exception<'static, Value<'scope, 'static>>
     where
         N: ToSymbol,
-        T: ExceptionTarget<'target, 'static, Value<'scope, 'static>>,
+        T: ExceptionTarget<'target>,
     {
         // Safety: the pointer points to valid data, the C API function is called with
         // valid arguments and its result is checked. if an exception is thrown it's caught
@@ -279,10 +283,14 @@ impl<'scope> Module<'scope> {
 
     /// Returns the global named `name` in this module.
     /// Returns an error if the global doesn't exist.
-    pub fn global<'target, N, T>(self, target: T, name: N) -> JlrsResult<T::Data>
+    pub fn global<'target, N, T>(
+        self,
+        target: T,
+        name: N,
+    ) -> JlrsResult<ValueData<'target, 'static, T>>
     where
         N: ToSymbol,
-        T: Target<'target, 'static>,
+        T: Target<'target>,
     {
         // Safety: the pointer points to valid data, the C API function is called with
         // valid arguments and its result is checked.
@@ -326,10 +334,14 @@ impl<'scope> Module<'scope> {
 
     /// Returns the function named `name` in this module.
     /// Returns an error if the function doesn't exist or if it's not a subtype of `Function`.
-    pub fn function<'target, N, T>(self, target: T, name: N) -> JlrsResult<T::Data>
+    pub fn function<'target, N, T>(
+        self,
+        target: T,
+        name: N,
+    ) -> JlrsResult<FunctionData<'target, 'static, T>>
     where
         N: ToSymbol,
-        T: Target<'target, 'static, Function<'target, 'static>>,
+        T: Target<'target>,
     {
         // Safety: the pointer points to valid data, the result is checked.
         unsafe {
@@ -364,9 +376,13 @@ impl<'scope> Module<'scope> {
     ///
     /// Safety: This method can execute arbitrary Julia code depending on the module that is
     /// loaded.
-    pub unsafe fn require<'target, T, N>(self, target: T, module: N) -> T::Result
+    pub unsafe fn require<'target, T, N>(
+        self,
+        target: T,
+        module: N,
+    ) -> ValueResult<'target, 'static, T>
     where
-        T: Target<'target, 'static>,
+        T: Target<'target>,
         N: ToSymbol,
     {
         let global = target.global();
@@ -382,9 +398,9 @@ impl<'scope> Module<'scope> {
     }
 
     /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> T::Data
+    pub fn root<'target, T>(self, target: T) -> ModuleData<'target, T>
     where
-        T: Target<'target, 'static, Module<'target>>,
+        T: Target<'target>,
     {
         // Safety: the data is valid.
         unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
@@ -416,3 +432,7 @@ impl_root!(Module, 1);
 pub type ModuleRef<'scope> = Ref<'scope, 'static, Module<'scope>>;
 impl_valid_layout!(ModuleRef, Module);
 impl_ref_root!(Module, ModuleRef, 1);
+
+use crate::memory::target::target_type::TargetType;
+pub type ModuleData<'target, T> = <T as TargetType<'target>>::Data<'static, Module<'target>>;
+pub type ModuleResult<'target, T> = <T as TargetType<'target>>::Result<'static, Module<'target>>;

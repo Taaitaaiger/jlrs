@@ -31,9 +31,9 @@ impl<'scope> TypeVar<'scope> {
         name: N,
         lower_bound: Option<Value>,
         upper_bound: Option<Value>,
-    ) -> T::Result
+    ) -> TypeVarResult<'target, T>
     where
-        T: Target<'target, 'static, TypeVar<'target>>,
+        T: Target<'target>,
         N: ToSymbol,
     {
         use crate::catch::catch_exceptions;
@@ -74,9 +74,9 @@ impl<'scope> TypeVar<'scope> {
         name: N,
         lower_bound: Option<Value>,
         upper_bound: Option<Value>,
-    ) -> T::Data
+    ) -> TypeVarData<'target, T>
     where
-        T: Target<'target, 'static, TypeVar<'target>>,
+        T: Target<'target>,
         N: ToSymbol,
     {
         let name = name.to_symbol_priv(Private);
@@ -115,9 +115,9 @@ impl<'scope> TypeVar<'scope> {
     }
 
     /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> T::Data
+    pub fn root<'target, T>(self, target: T) -> TypeVarData<'target, T>
     where
-        T: Target<'target, 'static, TypeVar<'target>>,
+        T: Target<'target>,
     {
         // Safety: the data is valid.
         unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
@@ -149,3 +149,7 @@ impl_root!(TypeVar, 1);
 pub type TypeVarRef<'scope> = Ref<'scope, 'static, TypeVar<'scope>>;
 impl_valid_layout!(TypeVarRef, TypeVar);
 impl_ref_root!(TypeVar, TypeVarRef, 1);
+
+use crate::memory::target::target_type::TargetType;
+pub type TypeVarData<'target, T> = <T as TargetType<'target>>::Data<'static, TypeVar<'target>>;
+pub type TypeVarResult<'target, T> = <T as TargetType<'target>>::Result<'static, TypeVar<'target>>;

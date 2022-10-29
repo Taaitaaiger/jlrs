@@ -137,9 +137,9 @@ impl<'scope> Task<'scope> {
     }
 
     /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> T::Data
+    pub fn root<'target, T>(self, target: T) -> TaskData<'target, T>
     where
-        T: Target<'target, 'static, Task<'target>>,
+        T: Target<'target>,
     {
         // Safety: the data is valid.
         unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
@@ -171,3 +171,7 @@ impl_root!(Task, 1);
 pub type TaskRef<'scope> = Ref<'scope, 'static, Task<'scope>>;
 impl_valid_layout!(TaskRef, Task);
 impl_ref_root!(Task, TaskRef, 1);
+
+use crate::memory::target::target_type::TargetType;
+pub type TaskData<'target, T> = <T as TargetType<'target>>::Data<'static, Task<'target>>;
+pub type TaskResult<'target, T> = <T as TargetType<'target>>::Result<'static, Task<'target>>;

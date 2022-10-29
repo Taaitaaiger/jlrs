@@ -14,7 +14,7 @@ use crate::{
     private::Private,
     wrappers::ptr::{
         array::{tracked::ArrayWrapper, Array},
-        value::{Value, MAX_SIZE},
+        value::{Value, ValueResult, MAX_SIZE},
     },
 };
 
@@ -72,9 +72,9 @@ pub trait Call<'data>: private::CallPriv {
     /// correctness. More information can be found in the [`safety`] module.
     ///
     /// [`safety`]: crate::safety
-    unsafe fn call0<'target, T>(self, target: T) -> T::Result
+    unsafe fn call0<'target, T>(self, target: T) -> ValueResult<'target, 'data, T>
     where
-        T: Target<'target, 'data>;
+        T: Target<'target>;
 
     /// Call a function with one argument.
     ///
@@ -83,9 +83,13 @@ pub trait Call<'data>: private::CallPriv {
     /// check if the argument is currently borrowed from Rust.
     ///
     /// [`safety`]: crate::safety
-    unsafe fn call1<'target, T>(self, target: T, arg0: Value<'_, 'data>) -> T::Result
+    unsafe fn call1<'target, T>(
+        self,
+        target: T,
+        arg0: Value<'_, 'data>,
+    ) -> ValueResult<'target, 'data, T>
     where
-        T: Target<'target, 'data>;
+        T: Target<'target>;
 
     /// Call a function with two arguments.
     ///
@@ -99,9 +103,9 @@ pub trait Call<'data>: private::CallPriv {
         target: T,
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
-    ) -> T::Result
+    ) -> ValueResult<'target, 'data, T>
     where
-        T: Target<'target, 'data>;
+        T: Target<'target>;
 
     /// Call a function with three arguments.
     ///
@@ -116,9 +120,9 @@ pub trait Call<'data>: private::CallPriv {
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
         arg2: Value<'_, 'data>,
-    ) -> T::Result
+    ) -> ValueResult<'target, 'data, T>
     where
-        T: Target<'target, 'data>;
+        T: Target<'target>;
 
     /// Call a function with an arbitrary number arguments.
     ///
@@ -127,10 +131,14 @@ pub trait Call<'data>: private::CallPriv {
     /// check if any of the arguments is currently borrowed from Rust.
     ///
     /// [`safety`]: crate::safety
-    unsafe fn call<'target, 'value, V, T>(self, target: T, args: V) -> T::Result
+    unsafe fn call<'target, 'value, V, T>(
+        self,
+        target: T,
+        args: V,
+    ) -> ValueResult<'target, 'data, T>
     where
         V: AsRef<[Value<'value, 'data>]>,
-        T: Target<'target, 'data>;
+        T: Target<'target>;
 
     /// Call a function with an arbitrary number arguments.
     ///
@@ -142,10 +150,14 @@ pub trait Call<'data>: private::CallPriv {
     /// correctness. More information can be found in the [`safety`] module.
     ///
     /// [`safety`]: crate::safety
-    unsafe fn call_tracked<'target, 'value, V, T>(self, target: T, args: V) -> JlrsResult<T::Result>
+    unsafe fn call_tracked<'target, 'value, V, T>(
+        self,
+        target: T,
+        args: V,
+    ) -> JlrsResult<ValueResult<'target, 'data, T>>
     where
         V: AsRef<[Value<'value, 'data>]>,
-        T: Target<'target, 'data>,
+        T: Target<'target>,
     {
         let args = args.as_ref();
         let res = args
@@ -224,9 +236,9 @@ pub trait ProvideKeywords<'value, 'data>: Call<'data> {
 }
 
 impl<'data> Call<'data> for WithKeywords<'_, 'data> {
-    unsafe fn call0<'target, T>(self, target: T) -> T::Result
+    unsafe fn call0<'target, T>(self, target: T) -> ValueResult<'target, 'data, T>
     where
-        T: Target<'target, 'data>,
+        T: Target<'target>,
     {
         #[cfg(not(feature = "nightly"))]
         let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
@@ -246,9 +258,13 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
         target.result_from_ptr(res, Private)
     }
 
-    unsafe fn call1<'target, T>(self, target: T, arg0: Value<'_, 'data>) -> T::Result
+    unsafe fn call1<'target, T>(
+        self,
+        target: T,
+        arg0: Value<'_, 'data>,
+    ) -> ValueResult<'target, 'data, T>
     where
-        T: Target<'target, 'data>,
+        T: Target<'target>,
     {
         #[cfg(not(feature = "nightly"))]
         let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
@@ -273,9 +289,9 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
         target: T,
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
-    ) -> T::Result
+    ) -> ValueResult<'target, 'data, T>
     where
-        T: Target<'target, 'data>,
+        T: Target<'target>,
     {
         #[cfg(not(feature = "nightly"))]
         let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
@@ -301,9 +317,9 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
         arg2: Value<'_, 'data>,
-    ) -> T::Result
+    ) -> ValueResult<'target, 'data, T>
     where
-        T: Target<'target, 'data>,
+        T: Target<'target>,
     {
         #[cfg(not(feature = "nightly"))]
         let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
@@ -323,10 +339,14 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
         target.result_from_ptr(res, Private)
     }
 
-    unsafe fn call<'target, 'value, V, T>(self, target: T, args: V) -> T::Result
+    unsafe fn call<'target, 'value, V, T>(
+        self,
+        target: T,
+        args: V,
+    ) -> ValueResult<'target, 'data, T>
     where
         V: AsRef<[Value<'value, 'data>]>,
-        T: Target<'target, 'data>,
+        T: Target<'target>,
     {
         #[cfg(not(feature = "nightly"))]
         let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
@@ -479,7 +499,7 @@ cfg_if::cfg_if! {
             ) -> JlrsResult<JuliaResult<Task<'target>, 'target, 'data>>
             where
                 V: AsRef<[Value<'value, 'data>]>,
-                T: Target<'target, 'data>,
+                T: Target<'target>,
             {
                 let args = args.as_ref();
                 let res = args
@@ -615,7 +635,7 @@ cfg_if::cfg_if! {
             ) -> JlrsResult<JuliaResult<Task<'target>, 'target, 'data>>
             where
                 V: AsRef<[Value<'value, 'data>]>,
-                T: Target<'target, 'data>,
+                T: Target<'target>,
             {
                 let args = args.as_ref();
                 let res = args
@@ -747,7 +767,7 @@ cfg_if::cfg_if! {
             ) -> JlrsResult<JuliaResult<Task<'target>, 'target, 'data>>
             where
                 V: AsRef<[Value<'value, 'data>]>,
-                T: Target<'target, 'data>,
+                T: Target<'target>,
             {
                 let args = args.as_ref();
                 let res = args
@@ -877,7 +897,7 @@ cfg_if::cfg_if! {
             ) -> JlrsResult<JuliaResult<Task<'target>, 'target, 'data>>
             where
                 V: AsRef<[Value<'value, 'data>]>,
-                T: Target<'target, 'data>,
+                T: Target<'target>,
             {
                 let args = args.as_ref();
                 let res = args

@@ -115,9 +115,9 @@ impl<'scope> TypeMapEntry<'scope> {
     }
 
     /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> T::Data
+    pub fn root<'target, T>(self, target: T) -> TypeMapEntryData<'target, T>
     where
-        T: Target<'target, 'static, TypeMapEntry<'target>>,
+        T: Target<'target>,
     {
         // Safety: the data is valid.
         unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
@@ -149,3 +149,9 @@ impl_root!(TypeMapEntry, 1);
 pub type TypeMapEntryRef<'scope> = Ref<'scope, 'static, TypeMapEntry<'scope>>;
 impl_valid_layout!(TypeMapEntryRef, TypeMapEntry);
 impl_ref_root!(TypeMapEntry, TypeMapEntryRef, 1);
+
+use crate::memory::target::target_type::TargetType;
+pub type TypeMapEntryData<'target, T> =
+    <T as TargetType<'target>>::Data<'static, TypeMapEntry<'target>>;
+pub type TypeMapEntryResult<'target, T> =
+    <T as TargetType<'target>>::Result<'static, TypeMapEntry<'target>>;

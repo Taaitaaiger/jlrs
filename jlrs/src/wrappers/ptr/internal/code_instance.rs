@@ -203,9 +203,9 @@ impl<'scope> CodeInstance<'scope> {
     }
 
     /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> T::Data
+    pub fn root<'target, T>(self, target: T) -> CodeInstanceData<'target, T>
     where
-        T: Target<'target, 'static, CodeInstance<'target>>,
+        T: Target<'target>,
     {
         // Safety: the data is valid.
         unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
@@ -237,3 +237,9 @@ impl_root!(CodeInstance, 1);
 pub type CodeInstanceRef<'scope> = Ref<'scope, 'static, CodeInstance<'scope>>;
 impl_valid_layout!(CodeInstanceRef, CodeInstance);
 impl_ref_root!(CodeInstance, CodeInstanceRef, 1);
+
+use crate::memory::target::target_type::TargetType;
+pub type CodeInstanceData<'target, T> =
+    <T as TargetType<'target>>::Data<'static, CodeInstance<'target>>;
+pub type CodeInstanceResult<'target, T> =
+    <T as TargetType<'target>>::Result<'static, CodeInstance<'target>>;

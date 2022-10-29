@@ -3,6 +3,11 @@
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
 use crate::memory::target::ExceptionTarget;
 
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use crate::wrappers::ptr::value::ValueResult;
+
+use crate::wrappers::ptr::value::ValueData;
+
 use crate::{
     error::{AccessError, JlrsResult, TypeError, CANNOT_DISPLAY_TYPE},
     layout::valid_layout::ValidLayout,
@@ -200,11 +205,16 @@ impl<'borrow, 'array, 'data, U, L: ArrayLayout, M: Mutability>
     /// Access the element at `index` and convert it to a `Value` rooted in `scope`.
     ///
     /// If an error is thrown by Julia it's caught and returned.
+
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub fn get_value<'frame, D, T>(&mut self, target: T, index: D) -> JlrsResult<T::Result>
+    pub fn get_value<'frame, D, T>(
+        &mut self,
+        target: T,
+        index: D,
+    ) -> JlrsResult<ValueResult<'frame, 'data, T>>
     where
         D: Dims,
-        T: Target<'frame, 'data>,
+        T: Target<'frame>,
     {
         use crate::catch::catch_exceptions;
         use jl_sys::jl_value_t;
@@ -236,10 +246,10 @@ impl<'borrow, 'array, 'data, U, L: ArrayLayout, M: Mutability>
         &mut self,
         target: T,
         index: D,
-    ) -> JlrsResult<T::Data>
+    ) -> JlrsResult<ValueData<'frame, 'data, T>>
     where
         D: Dims,
-        T: Target<'frame, 'data>,
+        T: Target<'frame>,
     {
         let idx = self.dimensions().index_of(&index)?;
         let res = jl_arrayref(self.array.unwrap(Private), idx);
@@ -264,10 +274,10 @@ impl<'borrow, 'array, 'data, U, L: ArrayLayout>
         target: T,
         index: D,
         value: Option<Value<'_, 'data>>,
-    ) -> JlrsResult<T::Exception>
+    ) -> JlrsResult<T::Exception<'data, ()>>
     where
         D: Dims,
-        T: ExceptionTarget<'target, 'data>,
+        T: ExceptionTarget<'target>,
     {
         use crate::catch::catch_exceptions;
         use std::mem::MaybeUninit;

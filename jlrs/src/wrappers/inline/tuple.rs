@@ -27,7 +27,7 @@
 
 use crate::wrappers::ptr::{
     datatype::DataType,
-    value::{Value, MAX_SIZE},
+    value::{Value, ValueData, MAX_SIZE},
 };
 use crate::wrappers::ptr::{private::WrapperPriv as _, Wrapper as _};
 use crate::{
@@ -36,6 +36,9 @@ use crate::{
     private::Private,
 };
 use jl_sys::jl_tuple_typename;
+
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use crate::wrappers::ptr::value::ValueResult;
 
 /// A tuple that has an arbitrary number of fields. This type can be used as a typecheck to check
 /// if the data is a tuple type, and to create tuples of arbitrary sizes.
@@ -46,12 +49,12 @@ impl Tuple {
     /// Create a new tuple from the contents of `values`.
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn new<'target, 'current, 'borrow, 'value, 'data, V, T>(
-        target: ExtendedTarget<'target, 'current, 'borrow, 'data, T>,
+        target: ExtendedTarget<'target, 'current, 'borrow, T>,
         values: V,
-    ) -> T::Result
+    ) -> ValueResult<'target, 'data, T>
     where
         V: AsRef<[Value<'value, 'data>]>,
-        T: Target<'target, 'data>,
+        T: Target<'target>,
     {
         let (output, frame) = target.split();
         frame
@@ -86,12 +89,12 @@ impl Tuple {
 
     /// Create a new tuple from the contents of `values`.
     pub unsafe fn new_unchecked<'target, 'current, 'borrow, 'value, 'data, V, T>(
-        target: ExtendedTarget<'target, 'current, 'borrow, 'data, T>,
+        target: ExtendedTarget<'target, 'current, 'borrow, T>,
         values: V,
-    ) -> T::Data
+    ) -> ValueData<'target, 'data, T>
     where
         V: AsRef<[Value<'value, 'data>]>,
-        T: Target<'target, 'data>,
+        T: Target<'target>,
     {
         let (output, frame) = target.split();
         frame
@@ -162,9 +165,9 @@ macro_rules! impl_tuple {
         {
             fn julia_type<'scope, T>(
                 target: T,
-            ) -> T::Data
+            ) -> $crate::wrappers::ptr::datatype::DataTypeData<'scope, T>
             where
-                T: $crate::memory::target::Target<'scope, 'static, $crate::wrappers::ptr::datatype::DataType<'scope>>
+                T: $crate::memory::target::Target<'scope>
             {
                 let types = &mut [
                     $(<$types as $crate::convert::into_julia::IntoJulia>::julia_type(&target)),+
@@ -234,9 +237,9 @@ macro_rules! impl_tuple {
         {
             fn julia_type<'scope, T>(
                 target: T,
-            ) -> T::Data
+            ) -> $crate::wrappers::ptr::datatype::DataTypeData<'scope, T>
             where
-                T: $crate::memory::target::Target<'scope, 'static, $crate::wrappers::ptr::datatype::DataType<'scope>>
+                T: $crate::memory::target::Target<'scope>
             {
                 unsafe {
                     let ptr = $crate::wrappers::ptr::datatype::DataType::emptytuple_type(&target).unwrap_non_null($crate::private::Private);
@@ -244,9 +247,9 @@ macro_rules! impl_tuple {
                 }
             }
 
-            fn into_julia<'scope, T>(self, target: T) -> T::Data
+            fn into_julia<'scope, T>(self, target: T) -> $crate::wrappers::ptr::value::ValueData<'scope, 'static, T>
             where
-                T: $crate::memory::target::Target<'scope, 'static>,
+                T: $crate::memory::target::Target<'scope>,
             {
                 unsafe {
                     let ptr = $crate::wrappers::ptr::value::Value::emptytuple(&target).unwrap_non_null($crate::private::Private);
