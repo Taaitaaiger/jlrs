@@ -155,7 +155,7 @@ impl_debug!(MethodTable<'_>);
 
 impl<'scope> WrapperPriv<'scope, '_> for MethodTable<'scope> {
     type Wraps = jl_methtable_t;
-    type StaticPriv = MethodTable<'static>;
+    type TypeConstructorPriv<'target, 'da> = MethodTable<'target>;
     const NAME: &'static str = "<MethodTable";
 
     // Safety: `inner` must not have been freed yet, the result must never be

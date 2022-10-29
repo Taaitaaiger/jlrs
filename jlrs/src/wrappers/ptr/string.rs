@@ -125,7 +125,7 @@ impl Debug for JuliaString<'_> {
 
 impl<'scope> WrapperPriv<'scope, '_> for JuliaString<'scope> {
     type Wraps = u8;
-    type StaticPriv = JuliaString<'static>;
+    type TypeConstructorPriv<'target, 'da> = JuliaString<'target>;
     const NAME: &'static str = "String";
 
     // Safety: `inner` must not have been freed yet, the result must never be

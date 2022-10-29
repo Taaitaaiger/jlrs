@@ -19,7 +19,6 @@ use crate::{
         Wrapper as _,
     },
 };
-use cfg_if::cfg_if;
 use jl_sys::{
     jl_base_module, jl_core_module, jl_get_global, jl_is_imported, jl_main_module, jl_module_t,
     jl_module_type, jl_set_const, jl_set_global,
@@ -31,12 +30,6 @@ use super::{
     value::{ValueData, ValueResult},
     Ref,
 };
-
-cfg_if! {
-    if #[cfg(not(all(target_os = "windows", feature = "lts")))] {
-        use crate::memory::target::ExceptionTarget;
-    }
-}
 
 /// Functionality in Julia can be accessed through its module system. You can get a handle to the
 /// three standard modules, `Main`, `Base`, and `Core` and access their submodules through them.
@@ -170,7 +163,7 @@ impl<'scope> Module<'scope> {
     ) -> T::Exception<'static, ()>
     where
         N: ToSymbol,
-        T: ExceptionTarget<'target>,
+        T: Target<'target>,
     {
         use crate::catch::catch_exceptions;
         use std::mem::MaybeUninit;
@@ -225,7 +218,7 @@ impl<'scope> Module<'scope> {
     ) -> T::Exception<'static, Value<'scope, 'static>>
     where
         N: ToSymbol,
-        T: ExceptionTarget<'target>,
+        T: Target<'target>,
     {
         // Safety: the pointer points to valid data, the C API function is called with
         // valid arguments and its result is checked. if an exception is thrown it's caught
@@ -412,7 +405,7 @@ impl_debug!(Module<'_>);
 
 impl<'scope> WrapperPriv<'scope, '_> for Module<'scope> {
     type Wraps = jl_module_t;
-    type StaticPriv = Module<'static>;
+    type TypeConstructorPriv<'target, 'da> = Module<'target>;
     const NAME: &'static str = "Module";
 
     // Safety: `inner` must not have been freed yet, the result must never be

@@ -56,7 +56,7 @@ impl_debug!(Function<'_, '_>);
 
 impl<'scope, 'data> WrapperPriv<'scope, 'data> for Function<'scope, 'data> {
     type Wraps = jl_value_t;
-    type StaticPriv = Function<'static, 'data>;
+    type TypeConstructorPriv<'target, 'da> = Function<'target, 'da>;
     const NAME: &'static str = "Function";
 
     // Safety: `inner` must not have been freed yet, the result must never be

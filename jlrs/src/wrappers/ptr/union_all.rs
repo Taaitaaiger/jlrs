@@ -245,7 +245,7 @@ impl_debug!(UnionAll<'_>);
 
 impl<'scope> WrapperPriv<'scope, '_> for UnionAll<'scope> {
     type Wraps = jl_unionall_t;
-    type StaticPriv = UnionAll<'static>;
+    type TypeConstructorPriv<'target, 'da> = UnionAll<'target>;
     const NAME: &'static str = "UnionAll";
 
     // Safety: `inner` must not have been freed yet, the result must never be

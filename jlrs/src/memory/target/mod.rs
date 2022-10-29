@@ -37,11 +37,9 @@
 //!
 //! [`Ref`]: crate::wrappers::ptr::Ref
 
-use std::{future::Future, marker::PhantomData};
+use std::marker::PhantomData;
 
-use crate::error::JlrsResult;
-
-use self::private::{ExceptionTargetPriv, TargetPriv};
+use self::{frame::BorrowedFrame, private::TargetPriv};
 
 #[cfg(feature = "async")]
 use self::frame::AsyncGcFrame;
@@ -96,33 +94,6 @@ pub trait Target<'target>: TargetPriv<'target> {
     }
 }
 
-/// Trait implemented by all targets.
-///
-/// This trait is similar to [`Target`], it's used with methods that don't return Julia data
-/// on success, but do return a caught exception on failure.
-///
-/// For more information see the [module-level] docs
-///  
-/// [module-level]: self
-pub trait ExceptionTarget<'target>: ExceptionTargetPriv<'target> {
-    /// Returns a new `Global`.
-    fn global(&self) -> Global<'target> {
-        unsafe { Global::new() }
-    }
-
-    /// Convert `self` to an `ExtendedExceptionTarget`.
-    fn into_extended_exception_target<'borrow, 'current>(
-        self,
-        frame: &'borrow mut GcFrame<'current>,
-    ) -> ExtendedExceptionTarget<'target, 'current, 'borrow, Self> {
-        ExtendedExceptionTarget {
-            target: self,
-            frame,
-            _target_marker: PhantomData,
-        }
-    }
-}
-
 /// A `Target` that borrows a frame for temporary allocations.
 pub struct ExtendedTarget<'target, 'current, 'borrow, T>
 where
@@ -138,26 +109,6 @@ where
     T: Target<'target>,
 {
     /// Split the `ExtendedTarget` into its `Target` and `BorrowedFrame`
-    pub fn split(self) -> (T, BorrowedFrame<'borrow, 'current, GcFrame<'current>>) {
-        (self.target, BorrowedFrame(self.frame, PhantomData))
-    }
-}
-
-/// An `ExceptionTarget` that borrows a frame for temporary allocations.
-pub struct ExtendedExceptionTarget<'target, 'current, 'borrow, T>
-where
-    T: ExceptionTarget<'target>,
-{
-    pub(crate) target: T,
-    pub(crate) frame: &'borrow mut GcFrame<'current>,
-    pub(crate) _target_marker: PhantomData<&'target ()>,
-}
-
-impl<'target, 'current, 'borrow, T> ExtendedExceptionTarget<'target, 'current, 'borrow, T>
-where
-    T: ExceptionTarget<'target>,
-{
-    /// Split the `ExtendedExceptionTarget` into its `ExceptionTarget` and `BorrowedFrame`.
     pub fn split(self) -> (T, BorrowedFrame<'borrow, 'current, GcFrame<'current>>) {
         (self.target, BorrowedFrame(self.frame, PhantomData))
     }
@@ -185,56 +136,6 @@ where
     }
 }
 
-// TODO: ExtendedExceptionTarget / ExtendedAsyncExceptionTarget
-// TODO: Unify?
-
-/// A frame that has been borrowed. A new scope must be created before it can be used as a target
-/// again.
-pub struct BorrowedFrame<'borrow, 'current, F>(&'borrow mut F, PhantomData<&'current ()>);
-
-impl<'borrow, 'current> BorrowedFrame<'borrow, 'current, GcFrame<'current>> {
-    /// Create a temporary scope by calling [`GcFrame::scope`].
-    pub fn scope<T, F>(self, func: F) -> JlrsResult<T>
-    where
-        for<'inner> F: FnOnce(GcFrame<'inner>) -> JlrsResult<T>,
-    {
-        self.0.scope(func)
-    }
-}
-
-#[cfg(feature = "async")]
-impl<'borrow, 'current> BorrowedFrame<'borrow, 'current, AsyncGcFrame<'current>> {
-    /// Create a temporary scope by calling [`GcFrame::scope`].
-    pub fn scope<T, F>(self, func: F) -> JlrsResult<T>
-    where
-        for<'inner> F: FnOnce(GcFrame<'inner>) -> JlrsResult<T>,
-    {
-        self.0.scope(func)
-    }
-
-    /// Create a temporary scope by calling [`AsyncGcFrame::async_scope`].
-    pub async fn async_scope<'nested, T, F, G>(self, func: F) -> JlrsResult<T>
-    where
-        'borrow: 'nested,
-        T: 'current,
-        G: Future<Output = JlrsResult<T>>,
-        F: FnOnce(AsyncGcFrame<'nested>) -> G,
-    {
-        self.0.async_scope(func).await
-    }
-
-    /// Create a temporary scope by calling [`AsyncGcFrame::relaxed_async_scope`].
-    pub async unsafe fn relaxed_async_scope<'nested, T, F, G>(self, func: F) -> JlrsResult<T>
-    where
-        'borrow: 'nested,
-        T: 'nested,
-        G: Future<Output = JlrsResult<T>>,
-        F: FnOnce(AsyncGcFrame<'nested>) -> G,
-    {
-        self.0.relaxed_async_scope(func).await
-    }
-}
-
 impl<'target> Target<'target> for GcFrame<'target> {}
 
 impl<'target> Target<'target> for &mut GcFrame<'target> {}
@@ -253,24 +154,6 @@ impl<'target> Target<'target> for &'target mut Output<'_> {}
 
 impl<'target, 'data, T> Target<'target> for &T where T: Target<'target> {}
 
-impl<'target> ExceptionTarget<'target> for GcFrame<'target> {}
-
-impl<'target> ExceptionTarget<'target> for &mut GcFrame<'target> {}
-
-#[cfg(feature = "async")]
-impl<'target> ExceptionTarget<'target> for AsyncGcFrame<'target> {}
-
-#[cfg(feature = "async")]
-impl<'target> ExceptionTarget<'target> for &mut AsyncGcFrame<'target> {}
-
-impl<'target> ExceptionTarget<'target> for Global<'target> {}
-
-impl<'target> ExceptionTarget<'target> for Output<'target> {}
-
-impl<'target> ExceptionTarget<'target> for &'target mut Output<'_> {}
-
-impl<'target, 'data, T> ExceptionTarget<'target> for &T where T: ExceptionTarget<'target> {}
-
 pub(crate) mod private {
     use std::ptr::NonNull;
 
@@ -285,11 +168,7 @@ pub(crate) mod private {
         },
     };
 
-    use super::{
-        global::Global,
-        target_type::{ExceptionTargetType, TargetType},
-        GcFrame, Output,
-    };
+    use super::{global::Global, target_type::TargetType, GcFrame, Output};
 
     #[cfg(feature = "async")]
     use super::AsyncGcFrame;
@@ -356,6 +235,13 @@ pub(crate) mod private {
 
             self.result_from_ptr(result, Private)
         }
+
+        // Safety: the pointer must point to valid data.
+        unsafe fn exception_from_ptr<'data, T>(
+            self,
+            result: Result<T, NonNull<jl_value_t>>,
+            _: Private,
+        ) -> Self::Exception<'data, T>;
     }
 
     impl<'target> TargetPriv<'target> for &mut GcFrame<'target> {
@@ -379,6 +265,18 @@ pub(crate) mod private {
                 Err(e) => Err(self.root(e)),
             }
         }
+
+        // Safety: the pointer must point to valid data.
+        unsafe fn exception_from_ptr<'data, T>(
+            self,
+            result: Result<T, NonNull<jl_value_t>>,
+            _: Private,
+        ) -> Self::Exception<'data, T> {
+            match result {
+                Ok(t) => Ok(t),
+                Err(e) => Err(self.root(e)),
+            }
+        }
     }
 
     impl<'target> TargetPriv<'target> for GcFrame<'target> {
@@ -399,6 +297,18 @@ pub(crate) mod private {
         ) -> Self::Result<'data, T> {
             match result {
                 Ok(t) => Ok(self.root(t)),
+                Err(e) => Err(self.root(e)),
+            }
+        }
+
+        // Safety: the pointer must point to valid data.
+        unsafe fn exception_from_ptr<'data, T>(
+            self,
+            result: Result<T, NonNull<jl_value_t>>,
+            _: Private,
+        ) -> Self::Exception<'data, T> {
+            match result {
+                Ok(t) => Ok(t),
                 Err(e) => Err(self.root(e)),
             }
         }
@@ -426,6 +336,18 @@ pub(crate) mod private {
                 Err(e) => Err(self.root(e)),
             }
         }
+
+        // Safety: the pointer must point to valid data.
+        unsafe fn exception_from_ptr<'data, T>(
+            self,
+            result: Result<T, NonNull<jl_value_t>>,
+            _: Private,
+        ) -> Self::Exception<'data, T> {
+            match result {
+                Ok(t) => Ok(t),
+                Err(e) => Err(self.root(e)),
+            }
+        }
     }
 
     #[cfg(feature = "async")]
@@ -447,6 +369,18 @@ pub(crate) mod private {
         ) -> Self::Result<'data, T> {
             match result {
                 Ok(t) => Ok(self.root(t)),
+                Err(e) => Err(self.root(e)),
+            }
+        }
+
+        // Safety: the pointer must point to valid data.
+        unsafe fn exception_from_ptr<'data, T>(
+            self,
+            result: Result<T, NonNull<jl_value_t>>,
+            _: Private,
+        ) -> Self::Exception<'data, T> {
+            match result {
+                Ok(t) => Ok(t),
                 Err(e) => Err(self.root(e)),
             }
         }
@@ -473,6 +407,18 @@ pub(crate) mod private {
                 Err(e) => Err(self.consume(e)),
             }
         }
+
+        // Safety: the pointer must point to valid data.
+        unsafe fn exception_from_ptr<'data, T>(
+            self,
+            result: Result<T, NonNull<jl_value_t>>,
+            _: Private,
+        ) -> Self::Exception<'data, T> {
+            match result {
+                Ok(t) => Ok(t),
+                Err(e) => Err(self.consume(e)),
+            }
+        }
     }
 
     impl<'target> TargetPriv<'target> for &'target mut Output<'_> {
@@ -493,6 +439,18 @@ pub(crate) mod private {
         ) -> Self::Result<'data, T> {
             match result {
                 Ok(t) => Ok(self.temporary(t)),
+                Err(e) => Err(self.temporary(e)),
+            }
+        }
+
+        // Safety: the pointer must point to valid data.
+        unsafe fn exception_from_ptr<'data, T>(
+            self,
+            result: Result<T, NonNull<jl_value_t>>,
+            _: Private,
+        ) -> Self::Exception<'data, T> {
+            match result {
+                Ok(t) => Ok(t),
                 Err(e) => Err(self.temporary(e)),
             }
         }
@@ -519,6 +477,18 @@ pub(crate) mod private {
                 Err(e) => Err(Ref::wrap(e.as_ptr())),
             }
         }
+
+        // Safety: the pointer must point to valid data.
+        unsafe fn exception_from_ptr<'data, T>(
+            self,
+            result: Result<T, NonNull<jl_value_t>>,
+            _: Private,
+        ) -> Self::Exception<'data, T> {
+            match result {
+                Ok(t) => Ok(t),
+                Err(e) => Err(Ref::wrap(e.as_ptr())),
+            }
+        }
     }
 
     impl<'target, U: TargetPriv<'target>> TargetPriv<'target> for &U {
@@ -542,120 +512,7 @@ pub(crate) mod private {
                 Err(e) => Err(Ref::wrap(e.as_ptr())),
             }
         }
-    }
 
-    pub trait ExceptionTargetPriv<'target>:
-        TargetBase<'target> + ExceptionTargetType<'target>
-    {
-        // Safety: the pointer must point to valid data.
-        unsafe fn exception_from_ptr<'data, T>(
-            self,
-            result: Result<T, NonNull<jl_value_t>>,
-            _: Private,
-        ) -> Self::Exception<'data, T>;
-    }
-
-    impl<'target> ExceptionTargetPriv<'target> for &mut GcFrame<'target> {
-        // Safety: the pointer must point to valid data.
-        unsafe fn exception_from_ptr<'data, T>(
-            self,
-            result: Result<T, NonNull<jl_value_t>>,
-            _: Private,
-        ) -> Self::Exception<'data, T> {
-            match result {
-                Ok(t) => Ok(t),
-                Err(e) => Err(self.root(e)),
-            }
-        }
-    }
-
-    impl<'target> ExceptionTargetPriv<'target> for GcFrame<'target> {
-        // Safety: the pointer must point to valid data.
-        unsafe fn exception_from_ptr<'data, T>(
-            self,
-            result: Result<T, NonNull<jl_value_t>>,
-            _: Private,
-        ) -> Self::Exception<'data, T> {
-            match result {
-                Ok(t) => Ok(t),
-                Err(e) => Err(self.root(e)),
-            }
-        }
-    }
-
-    #[cfg(feature = "async")]
-    impl<'target> ExceptionTargetPriv<'target> for &mut AsyncGcFrame<'target> {
-        // Safety: the pointer must point to valid data.
-        unsafe fn exception_from_ptr<'data, T>(
-            self,
-            result: Result<T, NonNull<jl_value_t>>,
-            _: Private,
-        ) -> Self::Exception<'data, T> {
-            match result {
-                Ok(t) => Ok(t),
-                Err(e) => Err(self.root(e)),
-            }
-        }
-    }
-
-    #[cfg(feature = "async")]
-    impl<'target> ExceptionTargetPriv<'target> for AsyncGcFrame<'target> {
-        // Safety: the pointer must point to valid data.
-        unsafe fn exception_from_ptr<'data, T>(
-            self,
-            result: Result<T, NonNull<jl_value_t>>,
-            _: Private,
-        ) -> Self::Exception<'data, T> {
-            match result {
-                Ok(t) => Ok(t),
-                Err(e) => Err(self.root(e)),
-            }
-        }
-    }
-
-    impl<'target> ExceptionTargetPriv<'target> for Output<'target> {
-        // Safety: the pointer must point to valid data.
-        unsafe fn exception_from_ptr<'data, T>(
-            self,
-            result: Result<T, NonNull<jl_value_t>>,
-            _: Private,
-        ) -> Self::Exception<'data, T> {
-            match result {
-                Ok(t) => Ok(t),
-                Err(e) => Err(self.consume(e)),
-            }
-        }
-    }
-
-    impl<'target> ExceptionTargetPriv<'target> for &'target mut Output<'_> {
-        // Safety: the pointer must point to valid data.
-        unsafe fn exception_from_ptr<'data, T>(
-            self,
-            result: Result<T, NonNull<jl_value_t>>,
-            _: Private,
-        ) -> Self::Exception<'data, T> {
-            match result {
-                Ok(t) => Ok(t),
-                Err(e) => Err(self.temporary(e)),
-            }
-        }
-    }
-
-    impl<'target> ExceptionTargetPriv<'target> for Global<'target> {
-        // Safety: the pointer must point to valid data.
-        unsafe fn exception_from_ptr<'data, T>(
-            self,
-            result: Result<T, NonNull<jl_value_t>>,
-            _: Private,
-        ) -> Self::Exception<'data, T> {
-            match result {
-                Ok(t) => Ok(t),
-                Err(e) => Err(Ref::wrap(e.as_ptr())),
-            }
-        }
-    }
-
-    impl<'target, E: ExceptionTargetPriv<'target>> ExceptionTargetPriv<'target> for &E {
         // Safety: the pointer must point to valid data.
         unsafe fn exception_from_ptr<'data, T>(
             self,

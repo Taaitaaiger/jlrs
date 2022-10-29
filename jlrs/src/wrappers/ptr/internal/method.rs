@@ -306,7 +306,7 @@ impl_debug!(Method<'_>);
 
 impl<'scope> WrapperPriv<'scope, '_> for Method<'scope> {
     type Wraps = jl_method_t;
-    type StaticPriv = Method<'static>;
+    type TypeConstructorPriv<'target, 'da> = Method<'target>;
     const NAME: &'static str = "Method";
 
     // Safety: `inner` must not have been freed yet, the result must never be

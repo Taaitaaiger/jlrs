@@ -72,7 +72,7 @@ impl_debug!(MethodMatch<'_>);
 
 impl<'scope> WrapperPriv<'scope, '_> for MethodMatch<'scope> {
     type Wraps = jl_method_match_t;
-    type StaticPriv = MethodMatch<'static>;
+    type TypeConstructorPriv<'target, 'da> = MethodMatch<'target>;
     const NAME: &'static str = "MethodMatch";
 
     // Safety: `inner` must not have been freed yet, the result must never be

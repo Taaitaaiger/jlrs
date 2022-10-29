@@ -151,7 +151,7 @@ impl_debug!(Task<'_>);
 
 impl<'scope> WrapperPriv<'scope, '_> for Task<'scope> {
     type Wraps = jl_task_t;
-    type StaticPriv = Task<'static>;
+    type TypeConstructorPriv<'target, 'da> = Task<'target>;
     const NAME: &'static str = "Task";
 
     // Safety: `inner` must not have been freed yet, the result must never be

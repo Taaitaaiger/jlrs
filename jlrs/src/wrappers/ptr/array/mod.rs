@@ -72,7 +72,7 @@ use super::{union_all::UnionAll, value::ValueRef, Ref, Root};
 
 cfg_if! {
     if #[cfg(not(all(target_os = "windows", feature = "lts")))] {
-        use crate::{catch::{catch_exceptions_with_slots, catch_exceptions}, memory::target::{ExceptionTarget}};
+        use crate::{catch::{catch_exceptions_with_slots, catch_exceptions}};
         use std::mem::MaybeUninit;
     }
 }
@@ -1199,7 +1199,7 @@ impl<'scope> Array<'scope, 'static> {
         inc: usize,
     ) -> S::Exception<'static, ()>
     where
-        S: ExceptionTarget<'target>,
+        S: Target<'target>,
     {
         // Safety: the C API function is called with valid data. If an exception is thrown it's caught.
 
@@ -1233,7 +1233,7 @@ impl<'scope> Array<'scope, 'static> {
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub unsafe fn del_end<'target, S>(&mut self, target: S, dec: usize) -> S::Exception<'static, ()>
     where
-        S: ExceptionTarget<'target>,
+        S: Target<'target>,
     {
         // Safety: the C API function is called with valid data. If an exception is thrown it's caught.
         let mut callback = |result: &mut MaybeUninit<()>| {
@@ -1270,7 +1270,7 @@ impl<'scope> Array<'scope, 'static> {
         inc: usize,
     ) -> S::Exception<'static, ()>
     where
-        S: ExceptionTarget<'target>,
+        S: Target<'target>,
     {
         // Safety: the C API function is called with valid data. If an exception is thrown it's caught.
         let mut callback = |result: &mut MaybeUninit<()>| {
@@ -1307,7 +1307,7 @@ impl<'scope> Array<'scope, 'static> {
         dec: usize,
     ) -> S::Exception<'static, ()>
     where
-        S: ExceptionTarget<'target>,
+        S: Target<'target>,
     {
         // Safety: the C API function is called with valid data. If an exception is thrown it's caught.
         let mut callback = |result: &mut MaybeUninit<()>| {
@@ -1345,7 +1345,7 @@ impl_debug!(Array<'_, '_>);
 
 impl<'scope, 'data> WrapperPriv<'scope, 'data> for Array<'scope, 'data> {
     type Wraps = jl_array_t;
-    type StaticPriv = Array<'static, 'data>;
+    type TypeConstructorPriv<'target, 'da> = Array<'target, 'da>;
     const NAME: &'static str = "Array";
 
     // Safety: `inner` must not have been freed yet, the result must never be
@@ -2075,7 +2075,7 @@ where
         inc: usize,
     ) -> S::Exception<'static, ()>
     where
-        S: ExceptionTarget<'target>,
+        S: Target<'target>,
     {
         self.as_array().grow_end(target, inc)
     }
@@ -2096,7 +2096,7 @@ where
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub unsafe fn del_end<'target, S>(&mut self, target: S, dec: usize) -> S::Exception<'static, ()>
     where
-        S: ExceptionTarget<'target>,
+        S: Target<'target>,
     {
         self.as_array().del_end(target, dec)
     }
@@ -2120,7 +2120,7 @@ where
         inc: usize,
     ) -> S::Exception<'static, ()>
     where
-        S: ExceptionTarget<'target>,
+        S: Target<'target>,
     {
         self.as_array().grow_begin(target, inc)
     }
@@ -2145,7 +2145,7 @@ where
         dec: usize,
     ) -> S::Exception<'static, ()>
     where
-        S: ExceptionTarget<'target>,
+        S: Target<'target>,
     {
         self.as_array().del_begin(target, dec)
     }
@@ -2183,7 +2183,7 @@ impl<T: ValidLayout> Debug for TypedArray<'_, '_, T> {
 
 impl<'scope, 'data, T: ValidLayout> WrapperPriv<'scope, 'data> for TypedArray<'scope, 'data, T> {
     type Wraps = jl_array_t;
-    type StaticPriv = TypedArray<'static, 'data, T>;
+    type TypeConstructorPriv<'target, 'da> = TypedArray<'target, 'da, T>;
     const NAME: &'static str = "Array";
 
     // Safety: `inner` must not have been freed yet, the result must never be

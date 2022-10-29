@@ -1,9 +1,6 @@
 //! Access and modify the contents of Julia arrays.
 
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
-use crate::memory::target::ExceptionTarget;
-
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
 use crate::wrappers::ptr::value::ValueResult;
 
 use crate::wrappers::ptr::value::ValueData;
@@ -277,7 +274,7 @@ impl<'borrow, 'array, 'data, U, L: ArrayLayout>
     ) -> JlrsResult<T::Exception<'data, ()>>
     where
         D: Dims,
-        T: ExceptionTarget<'target>,
+        T: Target<'target>,
     {
         use crate::catch::catch_exceptions;
         use std::mem::MaybeUninit;

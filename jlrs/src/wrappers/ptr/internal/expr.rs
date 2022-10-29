@@ -50,7 +50,7 @@ impl_debug!(Expr<'_>);
 
 impl<'scope> WrapperPriv<'scope, '_> for Expr<'scope> {
     type Wraps = jl_expr_t;
-    type StaticPriv = Expr<'static>;
+    type TypeConstructorPriv<'target, 'da> = Expr<'target>;
     const NAME: &'static str = "Expr";
 
     // Safety: `inner` must not have been freed yet, the result must never be

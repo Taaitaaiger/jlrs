@@ -191,8 +191,9 @@ where
 
 /// Trait implemented by all pointer wrapper types.
 pub trait Wrapper<'scope, 'data>: private::WrapperPriv<'scope, 'data> {
-    /// `Self`, but with the `'scope` lifetime replaced with the `'static` lifetime.
-    type Static: Wrapper<'static, 'data>;
+    /// `Self`, but with arbitrary lifetimes. Used to construct the appropriate type in generic
+    /// contexts.
+    type TypeConstructor<'target, 'da>: Wrapper<'target, 'da>;
 
     /// Convert the wrapper to a `Ref`.
     fn as_ref(self) -> Ref<'scope, 'data, Self> {
@@ -275,7 +276,7 @@ impl<'scope, 'data, W> Wrapper<'scope, 'data> for W
 where
     W: private::WrapperPriv<'scope, 'data>,
 {
-    type Static = Self::StaticPriv;
+    type TypeConstructor<'target, 'da> = Self::TypeConstructorPriv<'target, 'da>;
 }
 
 /// An reference to Julia data that is not guaranteed to be rooted.
@@ -372,7 +373,7 @@ impl<'scope, 'data, T: Wrapper<'scope, 'data>> Ref<'scope, 'data, T> {
     /// Safety: this must only be used to return freshly allocated Julia data from Rust to Julia
     /// from a `ccall`ed function.
     #[cfg(feature = "ccall")]
-    pub unsafe fn leak(self) -> Ref<'static, 'data, T::Static> {
+    pub unsafe fn leak(self) -> Ref<'static, 'data, T::TypeConstructor<'static, 'data>> {
         Ref::wrap(self.ptr().cast())
     }
 
@@ -393,7 +394,7 @@ pub(crate) mod private {
 
     pub trait WrapperPriv<'scope, 'data>: Copy + Debug {
         type Wraps;
-        type StaticPriv: WrapperPriv<'static, 'data>;
+        type TypeConstructorPriv<'target, 'da>: WrapperPriv<'target, 'da>;
         const NAME: &'static str;
 
         // Safety: `inner` must point to valid data. If it is not
