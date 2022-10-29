@@ -75,7 +75,7 @@ mod private {
 
         #[inline]
         fn array_index(&self, data: Array, _: Private) -> JlrsResult<usize> {
-            data.dimensions().index_of(self)
+            unsafe { data.dimensions().index_of(self) }
         }
     }
 }

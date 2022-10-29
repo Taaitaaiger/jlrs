@@ -2,7 +2,7 @@
 
 use crate::{
     impl_julia_typecheck,
-    memory::output::Output,
+    memory::target::Target,
     private::Private,
     wrappers::ptr::{private::WrapperPriv, value::ValueRef, Ref},
 };
@@ -25,13 +25,13 @@ impl<'scope> Vararg<'scope> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().N) }
     }
 
-    /// Use the `Output` to extend the lifetime of this data.
-    pub fn root<'target>(self, output: Output<'target>) -> Vararg<'target> {
-        unsafe {
-            let ptr = self.unwrap_non_null(Private);
-            output.set_root::<Vararg>(ptr);
-            Vararg::wrap_non_null(ptr, Private)
-        }
+    /// Use the target to reroot this data.
+    pub fn root<'target, T>(self, target: T) -> T::Data
+    where
+        T: Target<'target, 'static, Vararg<'target>>,
+    {
+        // Safety: the data is valid.
+        unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
     }
 }
 
@@ -40,6 +40,7 @@ impl_debug!(Vararg<'_>);
 
 impl<'scope> WrapperPriv<'scope, 'static> for Vararg<'scope> {
     type Wraps = jl_vararg_t;
+    type StaticPriv = Vararg<'static>;
     const NAME: &'static str = "Vararg";
 
     // Safety: `inner` must not have been freed yet, the result must never be

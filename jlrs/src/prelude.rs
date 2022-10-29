@@ -10,32 +10,26 @@ pub use crate::runtime::async_rt::async_std_rt::*;
 pub use crate::runtime::async_rt::tokio_rt::*;
 #[cfg(any(feature = "async-rt", feature = "sync-rt"))]
 pub use crate::runtime::builder::RuntimeBuilder;
-#[cfg(feature = "sync-rt")]
-pub use crate::runtime::sync_rt::Julia;
 #[cfg(feature = "async-rt")]
 pub use crate::runtime::{async_rt::AsyncJulia, builder::AsyncRuntimeBuilder};
 #[cfg(feature = "async")]
 pub use crate::{
     async_util::task::{yield_task, AsyncTask, PersistentTask},
     call::CallAsync,
-    memory::frame::AsyncGcFrame,
+    memory::target::frame::AsyncGcFrame,
 };
 pub use crate::{
     call::{Call, ProvideKeywords},
     convert::into_jlrs_result::IntoJlrsResult,
     error::JlrsResult,
-    memory::{
-        frame::Frame,
-        global::Global,
-        scope::{PartialScope, Scope},
-    },
+    memory::target::{target_type::TargetType, ExceptionTarget, Target},
     named_tuple,
     wrappers::{
         inline::{bool::Bool, char::Char, nothing::Nothing, tuple::*},
         ptr::{
             array::ArrayRef,
             array::TypedArrayRef,
-            array::{Array, TypedArray},
+            array::{tracked::ArrayWrapper, Array, TypedArray},
             datatype::DataType,
             datatype::DataTypeRef,
             module::Module,
@@ -48,6 +42,11 @@ pub use crate::{
             /*Ref,*/ Wrapper,
         },
     },
+};
+#[cfg(feature = "sync-rt")]
+pub use crate::{
+    memory::stack_frame::StackFrame,
+    runtime::sync_rt::{Julia, PendingJulia},
 };
 #[cfg(feature = "async")]
 pub use async_trait::async_trait;

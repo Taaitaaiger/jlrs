@@ -1,6 +1,6 @@
 [package]
 name = "jlrs"
-version = "0.16.0"
+version = "0.17.0"
 authors = ["Thomas van Doornmalen <thomas.vandoornmalen@gmail.com>"]
 description = """
 jlrs provides bindings to the Julia C API that enables Julia code to be called from Rust and more.
@@ -27,7 +27,7 @@ full = ["prelude", "sync-rt", "tokio-rt", "async-std-rt", "jlrs-ndarray", "f16",
 # Enable sync runtime
 sync-rt = []
 # Enable async runtime
-async-rt = ["async"]
+async-rt = ["async", "concurrent-queue", "deadqueue"]
 # Enable async-std as backing runtime
 async-std-rt = ["async-rt", "async-std"]
 # Enable tokio as backing runtime
@@ -55,6 +55,8 @@ prelude = []
 pyplot = []
 # Enable `ccall` feature, link `libuv`, and enable `CCall::us_async_send`
 uv = ["jl-sys/uv", "ccall"]
+# Track borrowed array data separately for each thread, rather than globally.
+unsafe-ledger = []
 
 # Julia version
 
@@ -70,13 +72,14 @@ i686 = ["jl-sys/i686"]
 # Internal
 
 # Used to generate docs for docs.rs
-docs = ["jl-sys/docs", "full"]
+docs = ["jl-sys/docs", "full", "nightly"]
 
 [dependencies]
 cfg-if = "1"
 jl-sys = {version = "0.18", path = "../jl_sys" }
 smallvec = "1"
 thiserror = "1"
+atomic_refcell = "0.1"
 
 async-std = { version = "1.12", features = ["unstable"], optional = true }
 async-trait = { version = "0.1", optional = true }
@@ -86,6 +89,8 @@ half = { version = "2", optional = true }
 jlrs-derive = { version = "0.4", optional = true, path = "../jlrs_derive" }
 ndarray = { version = "0.15", optional = true }
 tokio = { version = "1", optional = true, features = ["rt", "time", "sync"]}
+concurrent-queue = { version = "1.2", optional = true }
+deadqueue = { version = "0.2", optional = true, features = ["resizable"]}
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "rt", "time", "sync"]}

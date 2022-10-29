@@ -7,16 +7,14 @@
 use crate::{
     call::Call,
     convert::to_symbol::ToSymbol,
-    error::{AccessError, JlrsResult, JuliaResult, TypeError},
+    error::{AccessError, JlrsResult, TypeError},
     impl_julia_typecheck,
-    memory::{global::Global, output::Output, scope::PartialScope},
+    memory::target::Target,
     private::Private,
     wrappers::ptr::{
         function::Function,
-        function::FunctionRef,
         private::WrapperPriv,
         symbol::Symbol,
-        value::ValueRef,
         value::{LeakedValue, Value},
         Wrapper as _,
     },
@@ -32,7 +30,7 @@ use super::Ref;
 
 cfg_if! {
     if #[cfg(not(all(target_os = "windows", feature = "lts")))] {
-        use crate::error::JuliaResultRef;
+        use crate::memory::target::ExceptionTarget;
     }
 }
 
@@ -65,25 +63,22 @@ impl<'scope> Module<'scope> {
     }
 
     /// Returns the parent of this module.
-    pub fn parent<'target, S>(self, scope: S) -> JlrsResult<Module<'target>>
+    pub fn parent<'target, T>(self, target: T) -> T::Data
     where
-        S: PartialScope<'target>,
+        T: Target<'target, 'static, Module<'target>>,
     {
         // Safety: the pointer points to valid data, the parent is never null
         unsafe {
-            let parent_ref = self.parent_ref();
-            parent_ref.root(scope)
+            let parent = self.unwrap_non_null(Private).as_ref().parent;
+            target.data_from_ptr(NonNull::new_unchecked(parent), Private)
         }
     }
 
-    /// Returns the parent of this module without rooting it.
-    pub fn parent_ref(self) -> ModuleRef<'scope> {
-        // Safety: the pointer points to valid data, the parent is never null
-        unsafe { ModuleRef::wrap(self.unwrap_non_null(Private).as_ref().parent) }
-    }
-
     /// Extend the lifetime of this module. This is safe as long as the module is never redefined.
-    pub unsafe fn extend<'global>(self, _: Global<'global>) -> Module<'global> {
+    pub unsafe fn extend<'target, T>(self, _: &T) -> Module<'target>
+    where
+        T: Target<'target, 'static>,
+    {
         Module::wrap(self.unwrap(Private), Private)
     }
 
@@ -94,19 +89,19 @@ impl<'scope> Module<'scope> {
     /// [`Julia::include`]: crate::runtime::sync_rt::Julia::include
     /// [`AsyncJulia::include`]: crate::runtime::async_rt::AsyncJulia::include
     /// [`AsyncJulia::try_include`]: crate::runtime::async_rt::AsyncJulia::try_include
-    pub fn main(_: Global<'scope>) -> Self {
+    pub fn main<T: Target<'scope, 'static>>(_: &T) -> Self {
         // Safety: the Main module is globally rooted
         unsafe { Module::wrap(jl_main_module, Private) }
     }
 
     /// Returns a handle to Julia's `Core`-module.
-    pub fn core(_: Global<'scope>) -> Self {
+    pub fn core<T: Target<'scope, 'static>>(_: &T) -> Self {
         // Safety: the Core module is globally rooted
         unsafe { Module::wrap(jl_core_module, Private) }
     }
 
     /// Returns a handle to Julia's `Base`-module.
-    pub fn base(_: Global<'scope>) -> Self {
+    pub fn base<T: Target<'scope, 'static>>(_: &T) -> Self {
         // Safety: the Base module is globally rooted
         unsafe { Module::wrap(jl_base_module, Private) }
     }
@@ -126,23 +121,10 @@ impl<'scope> Module<'scope> {
     /// access `A` first and then `B`.
     ///
     /// Returns an error if the submodule doesn't exist.
-    pub fn submodule<'target, N, S>(self, scope: S, name: N) -> JlrsResult<Module<'target>>
+    pub fn submodule<'target, N, T>(self, target: T, name: N) -> JlrsResult<T::Data>
     where
         N: ToSymbol,
-        S: PartialScope<'target>,
-    {
-        let submodule_ref = self.submodule_ref(name)?;
-        unsafe { submodule_ref.root(scope) }
-    }
-
-    /// Returns the submodule named `name` relative to this module without rooting it. You have to
-    /// access this level by level: you can't access `Main.A.B` by calling this function with
-    /// `"A.B"`, but have to access `A` first and then `B`.
-    ///
-    /// Returns an error if the submodule doesn't exist.
-    pub fn submodule_ref<N>(self, name: N) -> JlrsResult<ModuleRef<'scope>>
-    where
-        N: ToSymbol,
+        T: Target<'target, 'static, Module<'target>>,
     {
         // Safety: the pointer points to valid data, the C API function is called with
         // valid arguments and its result is checked.
@@ -156,16 +138,16 @@ impl<'scope> Module<'scope> {
                 })?
             }
 
-            let submodule = Value::wrap_non_null(NonNull::new_unchecked(submodule), Private);
-
-            if let Ok(submodule) = submodule.cast::<Self>() {
-                Ok(submodule.as_ref())
-            } else {
+            let submodule_nn = NonNull::new_unchecked(submodule);
+            let submodule_v = Value::wrap_non_null(submodule_nn, Private);
+            if !submodule_v.is::<Self>() {
                 Err(TypeError::NotAModule {
                     name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
-                    type_str: submodule.datatype().name().into(),
+                    ty: submodule_v.datatype().name().into(),
                 })?
             }
+
+            Ok(target.data_from_ptr(submodule_nn.cast(), Private))
         }
     }
 
@@ -176,35 +158,15 @@ impl<'scope> Module<'scope> {
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
     /// this value is allowed.
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub unsafe fn set_global<'frame, N, S>(
+    pub unsafe fn set_global<'target, N, T>(
         self,
-        scope: S,
+        target: T,
         name: N,
         value: Value<'_, 'static>,
-    ) -> JlrsResult<JuliaResult<'frame, 'static, ()>>
+    ) -> T::Exception
     where
         N: ToSymbol,
-        S: PartialScope<'frame>,
-    {
-        let res = self.set_global_unrooted(scope.global(), name, value)?;
-        scope.exception(res, Private)
-    }
-
-    /// Set a global value in this module. Note that if this global already exists, this can
-    /// make the old value unreachable. If an exception is thrown it's caught but not rooted and
-    /// returned.
-    ///
-    /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
-    /// this value is allowed.
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub unsafe fn set_global_unrooted<'target, N>(
-        self,
-        _: Global<'target>,
-        name: N,
-        value: Value<'_, 'static>,
-    ) -> JlrsResult<JuliaResultRef<'target, 'static, ()>>
-    where
-        N: ToSymbol,
+        T: ExceptionTarget<'target, 'static>,
     {
         use crate::catch::catch_exceptions;
         use std::mem::MaybeUninit;
@@ -221,10 +183,12 @@ impl<'scope> Module<'scope> {
             Ok(())
         };
 
-        match catch_exceptions(&mut callback).unwrap() {
-            Ok(_) => Ok(Ok(())),
-            Err(e) => Ok(Err(e)),
-        }
+        let res = match catch_exceptions(&mut callback).unwrap() {
+            Ok(_) => Ok(()),
+            Err(e) => Err(NonNull::new_unchecked(e.ptr())),
+        };
+
+        target.exception_from_ptr(res, Private)
     }
 
     /// Set a global value in this module. Note that if this global already exists, this can
@@ -249,34 +213,15 @@ impl<'scope> Module<'scope> {
     /// current frame, if the exception can't be rooted a `JlrsError::AllocError` is returned. If
     /// no exception is thrown an unrooted reference to the constant is returned.
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub fn set_const<'frame, N, S>(
+    pub fn set_const<'target, N, T>(
         self,
-        scope: S,
+        target: T,
         name: N,
         value: Value<'_, 'static>,
-    ) -> JlrsResult<JuliaResult<'frame, 'static, ()>>
+    ) -> T::Exception
     where
         N: ToSymbol,
-        S: PartialScope<'frame>,
-    {
-        // Safety: the pointer points to valid data, the C API function is called with
-        // valid arguments and its result is checked. if an exception is thrown it's caught
-        // and returned
-        let res = self.set_const_unrooted(scope.global(), name, value)?;
-        unsafe { scope.exception(res, Private) }
-    }
-
-    /// Set a constant in this module. If Julia throws an exception it's caught. Otherwise an
-    /// unrooted reference to the constant is returned.
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub fn set_const_unrooted<'target, N>(
-        self,
-        _: Global<'target>,
-        name: N,
-        value: Value<'_, 'static>,
-    ) -> JlrsResult<JuliaResultRef<'target, 'static, ()>>
-    where
-        N: ToSymbol,
+        T: ExceptionTarget<'target, 'static, Value<'scope, 'static>>,
     {
         // Safety: the pointer points to valid data, the C API function is called with
         // valid arguments and its result is checked. if an exception is thrown it's caught
@@ -297,10 +242,15 @@ impl<'scope> Module<'scope> {
                 Ok(())
             };
 
-            match catch_exceptions(&mut callback)? {
-                Ok(_) => Ok(Ok(())),
-                Err(e) => Ok(Err(e)),
-            }
+            let res = match catch_exceptions(&mut callback).unwrap() {
+                Ok(_) => Ok(Value::wrap_non_null(
+                    value.unwrap_non_null(Private),
+                    Private,
+                )),
+                Err(e) => Err(NonNull::new_unchecked(e.ptr())),
+            };
+
+            target.exception_from_ptr(res, Private)
         }
     }
 
@@ -312,7 +262,7 @@ impl<'scope> Module<'scope> {
         self,
         name: N,
         value: Value<'_, 'static>,
-    ) -> ValueRef<'scope, 'static>
+    ) -> Value<'scope, 'static>
     where
         N: ToSymbol,
     {
@@ -324,25 +274,15 @@ impl<'scope> Module<'scope> {
             value.unwrap(Private),
         );
 
-        ValueRef::wrap(value.unwrap(Private))
+        Value::wrap_non_null(value.unwrap_non_null(Private), Private)
     }
 
     /// Returns the global named `name` in this module.
     /// Returns an error if the global doesn't exist.
-    pub fn global<'target, N, S>(self, scope: S, name: N) -> JlrsResult<Value<'target, 'static>>
+    pub fn global<'target, N, T>(self, target: T, name: N) -> JlrsResult<T::Data>
     where
         N: ToSymbol,
-        S: PartialScope<'target>,
-    {
-        let global_ref = self.global_ref(name)?;
-        unsafe { global_ref.root(scope) }
-    }
-
-    /// Returns the global named `name` in this module without rooting it.
-    /// Returns an error if the global doesn't exist.
-    pub fn global_ref<N>(self, name: N) -> JlrsResult<ValueRef<'scope, 'static>>
-    where
-        N: ToSymbol,
+        T: Target<'target, 'static>,
     {
         // Safety: the pointer points to valid data, the C API function is called with
         // valid arguments and its result is checked.
@@ -357,7 +297,7 @@ impl<'scope> Module<'scope> {
                 })?;
             }
 
-            Ok(ValueRef::wrap(global))
+            Ok(target.data_from_ptr(NonNull::new_unchecked(global), Private))
         }
     }
 
@@ -386,37 +326,24 @@ impl<'scope> Module<'scope> {
 
     /// Returns the function named `name` in this module.
     /// Returns an error if the function doesn't exist or if it's not a subtype of `Function`.
-    pub fn function<'target, N, S>(
-        self,
-        scope: S,
-        name: N,
-    ) -> JlrsResult<Function<'target, 'static>>
+    pub fn function<'target, N, T>(self, target: T, name: N) -> JlrsResult<T::Data>
     where
         N: ToSymbol,
-        S: PartialScope<'target>,
-    {
-        let function_ref = self.function_ref(name)?;
-        unsafe { function_ref.root(scope) }
-    }
-
-    /// Returns the function named `name` in this module without rooting it.
-    /// Returns an error if the function doesn't exist or if it's not a subtype of `Function`.
-    pub fn function_ref<N>(self, name: N) -> JlrsResult<FunctionRef<'scope, 'static>>
-    where
-        N: ToSymbol,
+        T: Target<'target, 'static, Function<'target, 'static>>,
     {
         // Safety: the pointer points to valid data, the result is checked.
         unsafe {
             let symbol = name.to_symbol_priv(Private);
-            let func = self.global_ref(symbol)?.wrapper_unchecked();
+            let global = target.global();
+            let func = self.global(global, symbol)?.wrapper_unchecked();
 
             if !func.is::<Function>() {
                 let name = symbol.as_str().unwrap_or("<Non-UTF8 string>").into();
                 let ty = func.datatype_name().unwrap_or("<Non-UTF8 string>").into();
-                Err(TypeError::NotAFunction { name, type_str: ty })?;
+                Err(TypeError::NotAFunction { name, ty: ty })?;
             }
 
-            Ok(FunctionRef::wrap(func.unwrap(Private)))
+            Ok(target.data_from_ptr(func.unwrap_non_null(Private).cast(), Private))
         }
     }
 
@@ -437,57 +364,30 @@ impl<'scope> Module<'scope> {
     ///
     /// Safety: This method can execute arbitrary Julia code depending on the module that is
     /// loaded.
-    pub unsafe fn require<'target, S, N>(
-        self,
-        scope: S,
-        module: N,
-    ) -> JlrsResult<JuliaResult<'target, 'static>>
+    pub unsafe fn require<'target, T, N>(self, target: T, module: N) -> T::Result
     where
-        S: PartialScope<'target>,
+        T: Target<'target, 'static>,
         N: ToSymbol,
     {
-        let res = self.require_unrooted(scope.global(), module);
-        scope.call_result_ref(res, Private)
-    }
-
-    /// Load a module by calling `Base.require` and return this module if it has been loaded
-    /// successfully. This method can be used to load parts of the standard library like
-    /// `LinearAlgebra`. Unlike `Module::require`, this method will panic if the module cannot
-    /// be loaded. Note that the loaded module is not made available in the module used to call
-    /// this method, you can use `Module::set_global` to do so.
-    ///
-    /// Note that when you want to call `using Submodule` in the `Main` module, you can do so by
-    /// evaluating the using-statement with [`Value::eval_string`].
-    ///
-    /// Safety: This method can execute arbitrary Julia code depending on the module that is
-    /// loaded.
-    pub unsafe fn require_unrooted<'target, S>(
-        self,
-        global: Global<'target>,
-        module: S,
-    ) -> JuliaResultRef<'target, 'static>
-    where
-        S: ToSymbol,
-    {
-        Module::base(global)
-            .function_ref("require")
+        let global = target.global();
+        Module::base(&global)
+            .function(global, "require")
             .unwrap()
             .wrapper_unchecked()
-            .call2_unrooted(
-                global,
+            .call2(
+                target,
                 self.as_value(),
                 module.to_symbol_priv(Private).as_value(),
             )
     }
 
-    /// Use the `Output` to extend the lifetime of this data.
-    pub fn root<'target>(self, output: Output<'target>) -> Module<'target> {
-        // safety: the pointer points to valid data
-        unsafe {
-            let ptr = self.unwrap_non_null(Private);
-            output.set_root::<Module>(ptr);
-            Module::wrap_non_null(ptr, Private)
-        }
+    /// Use the target to reroot this data.
+    pub fn root<'target, T>(self, target: T) -> T::Data
+    where
+        T: Target<'target, 'static, Module<'target>>,
+    {
+        // Safety: the data is valid.
+        unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
     }
 }
 
@@ -496,6 +396,7 @@ impl_debug!(Module<'_>);
 
 impl<'scope> WrapperPriv<'scope, '_> for Module<'scope> {
     type Wraps = jl_module_t;
+    type StaticPriv = Module<'static>;
     const NAME: &'static str = "Module";
 
     // Safety: `inner` must not have been freed yet, the result must never be

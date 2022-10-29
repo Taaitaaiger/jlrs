@@ -20,15 +20,16 @@ mod tests {
             unsafe {
                 let r = RefCell::new(
                     RuntimeBuilder::new()
-                        .async_runtime::<AsyncStd, AsyncStdChannel<_>>()
-                        .start()
+                        .async_runtime::<AsyncStd>()
+                        .n_threads(2)
+                        .start::<1>()
                         .expect("Could not init Julia")
                         .0
                 );
 
                 let (sender, recv) = tokio::sync::oneshot::channel();
-                r.borrow_mut().try_blocking_task(|_global, mut frame| {
-                    Value::eval_string(&mut frame, ASYNC_TESTS_JL)?.into_jlrs_result()?;
+                r.borrow_mut().try_blocking_task(|mut frame| {
+                    Value::eval_string(&mut frame, ASYNC_TESTS_JL).into_jlrs_result()?;
                     Ok(())
                 }, sender).expect("Could not send blocking task");
 

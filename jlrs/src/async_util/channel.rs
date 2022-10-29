@@ -1,13 +1,15 @@
-//! Channel traits used to communicate with the async runtime
+//! Channel traits used to communicate with a [`PersistentTask`].
 //!
-//! In order to communicate with the async runtime you must use channels that implement the traits
-//! defined in this module. Async runtimes and persistent tasks need a backing channel whose
-//! sending half implements [`ChannelSender`], whose receiving half implements
-//! [`ChannelReceiver`], and the pair must implement [`Channel`]. Async tasks, blocking tasks and
-//! calling persistent tasks need an implementation of [`OneshotSender`] to send their result.
+//! In order to communicate with a persistent task you must use channels that implement the traits
+//! defined in this module. Persistent tasks need a backing channel whose sending half implements
+//! [`ChannelSender`], whose receiving half implements [`ChannelReceiver`], and the pair must
+//! implement [`Channel`]. All tasks need an implementation of [`OneshotSender`] to send their
+//! result.
 //!
-//! Several implementations of this trait are provided by jlrs if the `async-std-rt` or `tokio-rt`
+//! Several implementations of these traits are provided by jlrs if the `async-std-rt` or `tokio-rt`
 //! feature is enabled.
+//!
+//! [`PersistentTask`]: crate::async_util::task::PersistentTask
 
 use crate::error::JlrsResult;
 use async_trait::async_trait;
@@ -58,20 +60,16 @@ impl<T> std::error::Error for TrySendError<T> {}
 
 /// An async channel.
 ///
-/// This channel is used to communicate with an async runtime or persistent task.
+/// This channel is used to communicate with a persistent task.
 pub trait Channel<M: Send + Sync + 'static>: 'static + Send + Sync {
     type Sender: ChannelSender<M>;
     type Receiver: ChannelReceiver<M>;
 
     /// Create a new channel.
-    ///
-    /// This method is used to create the backing channel for a task or runtime.
     fn channel(capacity: Option<NonZeroUsize>) -> (Self::Sender, Self::Receiver);
 }
 
 /// The sending half of an async channel.
-///
-/// The handle to a persistent task or async runtime contains a sender that implements this trait.
 #[async_trait]
 pub trait ChannelSender<M: Send + Sync + 'static>: 'static + Send + Sync {
     /// Send a message to the receiving half.
@@ -88,39 +86,24 @@ pub trait ChannelSender<M: Send + Sync + 'static>: 'static + Send + Sync {
 }
 
 /// The receiving half of an async channel.
-///
-/// An async runtime and a persistent task use a receiver that implements this trait to wait for
-/// new messages.
 #[async_trait]
 pub trait ChannelReceiver<M: Send + Sync + 'static>: 'static + Send + Sync {
     /// Receive a new message.
     ///
-    /// This method is called by an async runtime and persistent tasks to receive new commands.
-    /// It must be truly async, i.e. wait until a message is available without blocking the
-    /// thread it's called from.
+    /// This method is called by persistent tasks to receive new commands. It must be truly async,
+    /// i.e. wait until a message is available without blocking the thread it's called from.
     async fn recv(&mut self) -> JlrsResult<M>;
 }
 
 /// The sending half of a channel that sends back a result.
-///
-/// Every time you send a new async or blocking task to the runtime, or call a persistent task,
-/// you must provide the sending half of a channel that implements this trait. When the task is
-/// done the result is sent to the receiving half.
-#[async_trait]
 pub trait OneshotSender<M: Send + 'static>: 'static + Send + Sync {
-    async fn send(self, msg: M);
-}
-
-#[async_trait::async_trait]
-impl<M: Send + 'static> OneshotSender<M> for Box<dyn OneshotSender<M>> {
-    async fn send(self, msg: M) {
-        self.send(msg).await;
-    }
+    /// Send the message, consuming the sender.
+    fn send(self, msg: M);
 }
 
 #[async_trait::async_trait]
 impl<M: Send + 'static> OneshotSender<M> for crossbeam_channel::Sender<M> {
-    async fn send(self, msg: M) {
+    fn send(self, msg: M) {
         (&self).send(msg).ok();
     }
 }

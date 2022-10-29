@@ -2,9 +2,8 @@
 
 use crate::{
     call::Call,
-    error::{JlrsResult, JuliaResult, JuliaResultRef},
     layout::typecheck::Typecheck,
-    memory::{global::Global, output::Output, scope::PartialScope},
+    memory::{target::global::Global, target::Target},
     private::Private,
     wrappers::ptr::{
         datatype::DataType, internal::method::MethodRef, private::WrapperPriv, type_name::TypeName,
@@ -75,20 +74,19 @@ impl<'scope> OpaqueClosure<'scope> {
         unsafe { self.unwrap_non_null(Private).as_ref().specptr }
     }
 
-    /// Use the `Output` to extend the lifetime of this data.
-    pub fn root<'target>(self, output: Output<'target>) -> OpaqueClosure<'target> {
-        // Safety: the pointer points to valid data
-        unsafe {
-            let ptr = self.unwrap_non_null(Private);
-            output.set_root::<OpaqueClosure>(ptr);
-            OpaqueClosure::wrap_non_null(ptr, Private)
-        }
+    /// Use the target to reroot this data.
+    pub fn root<'target, T>(self, target: T) -> T::Data
+    where
+        T: Target<'target, 'static, OpaqueClosure<'target>>,
+    {
+        // Safety: the data is valid.
+        unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
     }
 }
 
 unsafe impl Typecheck for OpaqueClosure<'_> {
     fn typecheck(t: DataType) -> bool {
-        unsafe { t.type_name().wrapper_unchecked() == TypeName::of_opaque_closure(Global::new()) }
+        unsafe { t.type_name().wrapper_unchecked() == TypeName::of_opaque_closure(&Global::new()) }
     }
 }
 
@@ -96,6 +94,7 @@ impl_debug!(OpaqueClosure<'_>);
 
 impl<'scope> WrapperPriv<'scope, 'static> for OpaqueClosure<'scope> {
     type Wraps = jl_opaque_closure_t;
+    type StaticPriv = OpaqueClosure<'static>;
     const NAME: &'static str = "OpaqueClosure";
 
     // Safety: `inner` must not have been freed yet, the result must never be
@@ -110,104 +109,51 @@ impl<'scope> WrapperPriv<'scope, 'static> for OpaqueClosure<'scope> {
 }
 
 impl<'data> Call<'data> for OpaqueClosure<'_> {
-    unsafe fn call0<'target, S>(self, scope: S) -> JlrsResult<JuliaResult<'target, 'data>>
+    unsafe fn call0<'target, T>(self, target: T) -> T::Result
     where
-        S: PartialScope<'target>,
+        T: Target<'target, 'data>,
     {
-        self.as_value().call0(scope)
+        self.as_value().call0(target)
     }
 
-    unsafe fn call1<'target, S>(
-        self,
-        scope: S,
-        arg0: Value<'_, 'data>,
-    ) -> JlrsResult<JuliaResult<'target, 'data>>
+    unsafe fn call1<'target, T>(self, target: T, arg0: Value<'_, 'data>) -> T::Result
     where
-        S: PartialScope<'target>,
+        T: Target<'target, 'data>,
     {
-        self.as_value().call1(scope, arg0)
+        self.as_value().call1(target, arg0)
     }
 
-    unsafe fn call2<'target, S>(
+    unsafe fn call2<'target, T>(
         self,
-        scope: S,
+        target: T,
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
-    ) -> JlrsResult<JuliaResult<'target, 'data>>
+    ) -> T::Result
     where
-        S: PartialScope<'target>,
+        T: Target<'target, 'data>,
     {
-        self.as_value().call2(scope, arg0, arg1)
+        self.as_value().call2(target, arg0, arg1)
     }
 
-    unsafe fn call3<'target, S>(
+    unsafe fn call3<'target, T>(
         self,
-        scope: S,
+        target: T,
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
         arg2: Value<'_, 'data>,
-    ) -> JlrsResult<JuliaResult<'target, 'data>>
+    ) -> T::Result
     where
-        S: PartialScope<'target>,
+        T: Target<'target, 'data>,
     {
-        self.as_value().call3(scope, arg0, arg1, arg2)
+        self.as_value().call3(target, arg0, arg1, arg2)
     }
 
-    unsafe fn call<'target, 'value, V, S>(
-        self,
-        scope: S,
-        args: V,
-    ) -> JlrsResult<JuliaResult<'target, 'data>>
+    unsafe fn call<'target, 'value, V, T>(self, target: T, args: V) -> T::Result
     where
         V: AsRef<[Value<'value, 'data>]>,
-        S: PartialScope<'target>,
+        T: Target<'target, 'data>,
     {
-        self.as_value().call(scope, args)
-    }
-
-    unsafe fn call0_unrooted<'target>(
-        self,
-        global: Global<'target>,
-    ) -> JuliaResultRef<'target, 'data> {
-        self.as_value().call0_unrooted(global)
-    }
-
-    unsafe fn call1_unrooted<'target>(
-        self,
-        global: Global<'target>,
-        arg0: Value<'_, 'data>,
-    ) -> JuliaResultRef<'target, 'data> {
-        self.as_value().call1_unrooted(global, arg0)
-    }
-
-    unsafe fn call2_unrooted<'target>(
-        self,
-        global: Global<'target>,
-        arg0: Value<'_, 'data>,
-        arg1: Value<'_, 'data>,
-    ) -> JuliaResultRef<'target, 'data> {
-        self.as_value().call2_unrooted(global, arg0, arg1)
-    }
-
-    unsafe fn call3_unrooted<'target>(
-        self,
-        global: Global<'target>,
-        arg0: Value<'_, 'data>,
-        arg1: Value<'_, 'data>,
-        arg2: Value<'_, 'data>,
-    ) -> JuliaResultRef<'target, 'data> {
-        self.as_value().call3_unrooted(global, arg0, arg1, arg2)
-    }
-
-    unsafe fn call_unrooted<'target, 'value, V>(
-        self,
-        global: Global<'target>,
-        args: V,
-    ) -> JuliaResultRef<'target, 'data>
-    where
-        V: AsRef<[Value<'value, 'data>]>,
-    {
-        self.as_value().call_unrooted(global, args)
+        self.as_value().call(target, args)
     }
 }
 

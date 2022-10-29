@@ -11,43 +11,25 @@ mod tests {
     use super::util::JULIA;
     use jlrs::prelude::*;
 
-    unsafe extern "C" fn uses_null_scope(array: TypedArray<f64>) -> bool {
-        let mut ccall = CCall::new();
+    unsafe extern "C" fn doesnt_use_scope(array: TypedArray<f64>) -> bool {
+        let tracked = array.track().expect("Already borrowed");
 
-        let out = ccall.null_scope(|mut frame| {
-            let borrowed = array.inline_data(&mut frame)?;
-            Ok(borrowed[1] == 1.0)
-        });
+        let borrowed = tracked.inline_data().expect("Not inline");
 
-        if let Ok(o) = out {
-            o
+        if borrowed[1] == 1.0 {
+            true
         } else {
             false
         }
     }
 
     unsafe extern "C" fn uses_scope(array: TypedArray<f64>) -> bool {
-        let mut ccall = CCall::new();
+        let mut context_frame = StackFrame::new();
+        let mut ccall = CCall::new(&mut context_frame);
 
-        let out = ccall.scope(|_, mut frame| {
-            let _ = Value::new(&mut frame, 0usize)?;
-            let borrowed = array.inline_data(&mut frame)?;
-            Ok(borrowed[1] == 1.0)
-        });
-
-        if let Ok(o) = out {
-            o
-        } else {
-            false
-        }
-    }
-
-    unsafe extern "C" fn uses_scope_with_slots(array: TypedArray<f64>) -> bool {
-        let mut ccall = CCall::new();
-
-        let out = ccall.scope_with_capacity(1, |_, mut frame| {
-            let _ = Value::new(&mut frame, 0usize)?;
-            let borrowed = array.inline_data(&mut frame)?;
+        let out = ccall.scope(|mut frame| {
+            let _ = Value::new(&mut frame, 0usize);
+            let borrowed = array.inline_data()?;
             Ok(borrowed[1] == 1.0)
         });
 
@@ -59,11 +41,12 @@ mod tests {
     }
 
     unsafe extern "C" fn uses_scope_with_realloced_slots(array: TypedArray<f64>) -> bool {
-        let mut ccall = CCall::new();
+        let mut context_frame = StackFrame::new();
+        let mut ccall = CCall::new(&mut context_frame);
 
-        let out = ccall.scope_with_capacity(128, |_, mut frame| {
-            let _ = Value::new(&mut frame, 0usize)?;
-            let borrowed = array.inline_data(&mut frame)?;
+        let out = ccall.scope(|mut frame| {
+            let _ = Value::new(&mut frame, 0usize);
+            let borrowed = array.inline_data()?;
             Ok(borrowed[1] == 1.0)
         });
 
@@ -77,101 +60,85 @@ mod tests {
     #[test]
     fn ccall_with_array() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|global, mut frame| unsafe {
-                let fn_ptr = Value::new(&mut frame, uses_null_scope as *mut std::ffi::c_void)?;
-                let mut arr_data = vec![0.0f64, 1.0f64];
-                let arr = Array::from_slice_unchecked(&mut frame, &mut arr_data, 2)?;
-                let func = Module::main(global)
-                    .submodule_ref("JlrsTests")?
-                    .wrapper_unchecked()
-                    .function_ref("callrustwitharr")?
-                    .wrapper_unchecked();
+            jlrs.instance(&mut frame)
+                .scope(|mut frame| unsafe {
+                    let fn_ptr = Value::new(&mut frame, doesnt_use_scope as *mut std::ffi::c_void);
+                    let mut arr_data = vec![0.0f64, 1.0f64];
+                    let arr =
+                        Array::from_slice_unchecked(frame.as_extended_target(), &mut arr_data, 2)?;
+                    let func = Module::main(&frame)
+                        .submodule(&frame, "JlrsTests")?
+                        .wrapper_unchecked()
+                        .function(&frame, "callrustwitharr")?
+                        .wrapper_unchecked();
 
-                let out = func.call2(&mut frame, fn_ptr, arr.as_value())?.unwrap();
-                let ok = out.unbox::<bool>()?.as_bool();
-                assert!(ok);
-                Ok(())
-            })
-            .unwrap()
+                    let out = func.call2(&mut frame, fn_ptr, arr.as_value()).unwrap();
+                    let ok = out.unbox::<bool>()?.as_bool();
+                    assert!(ok);
+                    Ok(())
+                })
+                .unwrap();
         })
     }
 
     #[test]
     fn ccall_with_array_and_scope() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|global, mut frame| unsafe {
-                let fn_ptr = Value::new(&mut frame, uses_scope as *mut std::ffi::c_void)?;
-                let mut arr_data = vec![0.0f64, 1.0f64];
-                let arr = Array::from_slice_unchecked(&mut frame, &mut arr_data, 2)?;
-                let func = Module::main(global)
-                    .submodule_ref("JlrsTests")?
-                    .wrapper_unchecked()
-                    .function_ref("callrustwitharr")?
-                    .wrapper_unchecked();
+            jlrs.instance(&mut frame)
+                .scope(|mut frame| unsafe {
+                    let fn_ptr = Value::new(&mut frame, uses_scope as *mut std::ffi::c_void);
+                    let mut arr_data = vec![0.0f64, 1.0f64];
+                    let arr =
+                        Array::from_slice_unchecked(frame.as_extended_target(), &mut arr_data, 2)?;
+                    let func = Module::main(&frame)
+                        .submodule(&frame, "JlrsTests")?
+                        .wrapper_unchecked()
+                        .function(&frame, "callrustwitharr")?
+                        .wrapper_unchecked();
 
-                let out = func.call2(&mut frame, fn_ptr, arr.as_value())?.unwrap();
-                let ok = out.unbox::<bool>()?.as_bool();
-                assert!(ok);
-                Ok(())
-            })
-            .unwrap()
-        })
-    }
-
-    #[test]
-    fn ccall_with_array_and_scope_with_slots() {
-        JULIA.with(|j| {
-            let mut jlrs = j.borrow_mut();
-
-            jlrs.scope(|global, mut frame| unsafe {
-                let fn_ptr =
-                    Value::new(&mut frame, uses_scope_with_slots as *mut std::ffi::c_void)?;
-                let mut arr_data = vec![0.0f64, 1.0f64];
-                let arr = Array::from_slice_unchecked(&mut frame, &mut arr_data, 2)?;
-                let func = Module::main(global)
-                    .submodule_ref("JlrsTests")?
-                    .wrapper_unchecked()
-                    .function_ref("callrustwitharr")?
-                    .wrapper_unchecked();
-
-                let out = func.call2(&mut frame, fn_ptr, arr.as_value())?.unwrap();
-                let ok = out.unbox::<bool>()?.as_bool();
-                assert!(ok);
-                Ok(())
-            })
-            .unwrap()
+                    let out = func.call2(&mut frame, fn_ptr, arr.as_value()).unwrap();
+                    let ok = out.unbox::<bool>()?.as_bool();
+                    assert!(ok);
+                    Ok(())
+                })
+                .unwrap();
         })
     }
 
     #[test]
     fn ccall_with_array_and_reallocated_scope_with_slots() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|global, mut frame| unsafe {
-                let fn_ptr = Value::new(
-                    &mut frame,
-                    uses_scope_with_realloced_slots as *mut std::ffi::c_void,
-                )?;
-                let mut arr_data = vec![0.0f64, 1.0f64];
-                let arr = Array::from_slice_unchecked(&mut frame, &mut arr_data, 2)?;
-                let func = Module::main(global)
-                    .submodule_ref("JlrsTests")?
-                    .wrapper_unchecked()
-                    .function_ref("callrustwitharr")?
-                    .wrapper_unchecked();
+            jlrs.instance(&mut frame)
+                .scope(|mut frame| unsafe {
+                    let fn_ptr = Value::new(
+                        &mut frame,
+                        uses_scope_with_realloced_slots as *mut std::ffi::c_void,
+                    );
+                    let mut arr_data = vec![0.0f64, 1.0f64];
+                    let arr =
+                        Array::from_slice_unchecked(frame.as_extended_target(), &mut arr_data, 2)?;
+                    let func = Module::main(&frame)
+                        .submodule(&frame, "JlrsTests")?
+                        .wrapper_unchecked()
+                        .function(&frame, "callrustwitharr")?
+                        .wrapper_unchecked();
 
-                let out = func.call2(&mut frame, fn_ptr, arr.as_value())?.unwrap();
-                let ok = out.unbox::<bool>()?.as_bool();
-                assert!(ok);
-                Ok(())
-            })
-            .unwrap()
-        })
+                    let out = func.call2(&mut frame, fn_ptr, arr.as_value()).unwrap();
+                    let ok = out.unbox::<bool>()?.as_bool();
+                    assert!(ok);
+                    Ok(())
+                })
+                .unwrap();
+        });
     }
 
     #[repr(transparent)]
@@ -207,27 +174,29 @@ mod tests {
     #[cfg(feature = "uv")]
     fn ccall_with_async_condidtion() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|global, mut frame| unsafe {
-                let fn_ptr = Value::new(&mut frame, multithreaded as *mut std::ffi::c_void)?;
-                let destroy_handle_fn_ptr =
-                    Value::new(&mut frame, drop_handle as *mut std::ffi::c_void)?;
+            jlrs.instance(&mut frame)
+                .scope(|mut frame| unsafe {
+                    let fn_ptr = Value::new(&mut frame, multithreaded as *mut std::ffi::c_void);
+                    let destroy_handle_fn_ptr =
+                        Value::new(&mut frame, drop_handle as *mut std::ffi::c_void);
 
-                let func = Module::main(global)
-                    .submodule_ref("JlrsTests")?
-                    .wrapper_unchecked()
-                    .function_ref("callrustwithasynccond")?
-                    .wrapper_unchecked();
+                    let func = Module::main(&frame)
+                        .submodule(&frame, "JlrsTests")?
+                        .wrapper_unchecked()
+                        .function(&frame, "callrustwithasynccond")?
+                        .wrapper_unchecked();
 
-                let out = func
-                    .call2(&mut frame, fn_ptr, destroy_handle_fn_ptr)?
-                    .unwrap();
-                let ok = out.unbox::<u32>()?;
-                assert_eq!(ok, 127);
-                Ok(())
-            })
-            .unwrap()
+                    let out = func
+                        .call2(&mut frame, fn_ptr, destroy_handle_fn_ptr)
+                        .unwrap();
+                    let ok = out.unbox::<u32>()?;
+                    assert_eq!(ok, 127);
+                    Ok(())
+                })
+                .unwrap();
         })
     }
 }

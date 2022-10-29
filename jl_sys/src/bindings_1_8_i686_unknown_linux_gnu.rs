@@ -2094,6 +2094,41 @@ extern "C" {
 extern "C" {
     pub fn jl_get_current_task() -> *mut jl_task_t;
 }
+pub type jl_markfunc_t =
+    ::std::option::Option<unsafe extern "C" fn(arg1: jl_ptls_t, obj: *mut jl_value_t) -> usize>;
+pub type jl_sweepfunc_t = ::std::option::Option<unsafe extern "C" fn(obj: *mut jl_value_t)>;
+extern "C" {
+    pub fn jl_new_foreign_type(
+        name: *mut jl_sym_t,
+        module: *mut jl_module_t,
+        super_: *mut jl_datatype_t,
+        markfunc: jl_markfunc_t,
+        sweepfunc: jl_sweepfunc_t,
+        haspointers: ::std::os::raw::c_int,
+        large: ::std::os::raw::c_int,
+    ) -> *mut jl_datatype_t;
+}
+extern "C" {
+    pub fn jl_gc_alloc_typed(
+        ptls: jl_ptls_t,
+        sz: usize,
+        ty: *mut ::std::os::raw::c_void,
+    ) -> *mut ::std::os::raw::c_void;
+}
+extern "C" {
+    pub fn jl_gc_mark_queue_obj(ptls: jl_ptls_t, obj: *mut jl_value_t) -> ::std::os::raw::c_int;
+}
+extern "C" {
+    pub fn jl_gc_mark_queue_objarray(
+        ptls: jl_ptls_t,
+        parent: *mut jl_value_t,
+        objs: *mut *mut jl_value_t,
+        nobjs: usize,
+    );
+}
+extern "C" {
+    pub fn jl_gc_schedule_foreign_sweepfunc(ptls: jl_ptls_t, bj: *mut jl_value_t);
+}
 pub const jlrs_catch_tag_t_JLRS_CATCH_OK: jlrs_catch_tag_t = 0;
 pub const jlrs_catch_tag_t_JLRS_CATCH_ERR: jlrs_catch_tag_t = 1;
 pub const jlrs_catch_tag_t_JLRS_CATCH_EXCECPTION: jlrs_catch_tag_t = 2;

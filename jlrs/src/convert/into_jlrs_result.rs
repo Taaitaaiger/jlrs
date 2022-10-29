@@ -1,9 +1,8 @@
 //! Convert a `JuliaResult` to a `JlrsResult`.
 //!
-//! Methods that call the Julia C API and can throw an exception generally return a nested
-//! `Result`. The outer error contains no Julia data, while the inner error contains the thrown
-//! exception. The `IntoJlrsResult` trait can be used to convert the inner error into the outer
-//! error.
+//! A `JuliaResult` contains an exception in its `Err` variant, if you're only interested in
+//! the error message you can convert it to a `JlrsException` with the [`IntoJlrsResult`] trait
+//! defined in this module.
 
 use crate::{
     error::{JlrsError, JlrsResult, JuliaResult, CANNOT_DISPLAY_VALUE},
@@ -12,8 +11,8 @@ use crate::{
 
 /// Extension trait that lets you convert a `JuliaResult` to a `JlrsResult`.
 ///
-/// If an exception is thrown, this method converts the exception to an error message by calling
-/// `Base.showerror`.
+/// If an exception is thrown, this trait's only method converts the exception to an error message
+/// by calling `Base.showerror`.
 pub trait IntoJlrsResult<T>: private::IntoJlrsResultPriv {
     /// Convert `self` to `JlrsResult` by calling `Base.showerror` if an exception has been
     /// thrown.

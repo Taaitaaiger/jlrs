@@ -707,9 +707,9 @@ pub struct _jl_code_instance_t {
     pub argescapes: *mut jl_value_t,
     pub isspecsig: u8,
     pub precompile: ::std::sync::atomic::AtomicU8,
+    pub relocatability: u8,
     pub invoke: crate::atomic_c_fn_ptr::AtomicCFnPtr<jl_callptr_t>,
     pub specptr: _jl_code_instance_t__jl_generic_specptr_t,
-    pub relocatability: u8,
 }
 #[repr(C)]
 pub union _jl_code_instance_t__jl_generic_specptr_t {
@@ -1227,7 +1227,6 @@ pub struct _jl_methtable_t {
     pub leafcache: ::std::sync::atomic::AtomicPtr<jl_array_t>,
     pub cache: ::std::sync::atomic::AtomicPtr<jl_typemap_t>,
     pub max_args: isize,
-    pub kwsorter: *mut jl_value_t,
     pub module: *mut jl_module_t,
     pub backedges: *mut jl_array_t,
     pub writelock: jl_mutex_t,
@@ -1588,6 +1587,9 @@ extern "C" {
 extern "C" {
     pub static mut jl_nothing: *mut jl_value_t;
 }
+extern "C" {
+    pub static mut jl_kwcall_func: *mut jl_value_t;
+}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct _jl_gcframe_t {
@@ -1694,9 +1696,6 @@ extern "C" {
 }
 extern "C" {
     pub fn jl_symbol_n(str_: *const ::std::os::raw::c_char, len: usize) -> *mut jl_sym_t;
-}
-extern "C" {
-    pub fn jl_get_kwsorter(ty: *mut jl_value_t) -> *mut jl_function_t;
 }
 extern "C" {
     pub fn jl_box_bool(x: i8) -> *mut jl_value_t;
@@ -1930,6 +1929,9 @@ extern "C" {
     pub fn jl_atexit_hook(status: ::std::os::raw::c_int);
 }
 extern "C" {
+    pub fn jl_adopt_thread() -> *mut *mut jl_gcframe_t;
+}
+extern "C" {
     pub fn jl_eval_string(str_: *const ::std::os::raw::c_char) -> *mut jl_value_t;
 }
 extern "C" {
@@ -2150,6 +2152,41 @@ extern "C" {
 extern "C" {
     pub fn jl_get_current_task() -> *mut jl_task_t;
 }
+pub type jl_markfunc_t =
+    ::std::option::Option<unsafe extern "C" fn(arg1: jl_ptls_t, obj: *mut jl_value_t) -> usize>;
+pub type jl_sweepfunc_t = ::std::option::Option<unsafe extern "C" fn(obj: *mut jl_value_t)>;
+extern "C" {
+    pub fn jl_new_foreign_type(
+        name: *mut jl_sym_t,
+        module: *mut jl_module_t,
+        super_: *mut jl_datatype_t,
+        markfunc: jl_markfunc_t,
+        sweepfunc: jl_sweepfunc_t,
+        haspointers: ::std::os::raw::c_int,
+        large: ::std::os::raw::c_int,
+    ) -> *mut jl_datatype_t;
+}
+extern "C" {
+    pub fn jl_gc_alloc_typed(
+        ptls: jl_ptls_t,
+        sz: usize,
+        ty: *mut ::std::os::raw::c_void,
+    ) -> *mut ::std::os::raw::c_void;
+}
+extern "C" {
+    pub fn jl_gc_mark_queue_obj(ptls: jl_ptls_t, obj: *mut jl_value_t) -> ::std::os::raw::c_int;
+}
+extern "C" {
+    pub fn jl_gc_mark_queue_objarray(
+        ptls: jl_ptls_t,
+        parent: *mut jl_value_t,
+        objs: *mut *mut jl_value_t,
+        nobjs: usize,
+    );
+}
+extern "C" {
+    pub fn jl_gc_schedule_foreign_sweepfunc(ptls: jl_ptls_t, bj: *mut jl_value_t);
+}
 pub const jlrs_catch_tag_t_JLRS_CATCH_OK: jlrs_catch_tag_t = 0;
 pub const jlrs_catch_tag_t_JLRS_CATCH_ERR: jlrs_catch_tag_t = 1;
 pub const jlrs_catch_tag_t_JLRS_CATCH_EXCECPTION: jlrs_catch_tag_t = 2;
@@ -2184,6 +2221,12 @@ extern "C" {
 }
 extern "C" {
     pub fn jlrs_unlock(v: *mut jl_value_t);
+}
+extern "C" {
+    pub fn jl_enter_threaded_region();
+}
+extern "C" {
+    pub fn jl_exit_threaded_region();
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]

@@ -1,16 +1,16 @@
 //! Wrapper for `Function`, the supertype of all Julia functions.
 //!
 //! All Julia functions are subtypes of `Function`, a function can be called with the methods
-//! of the [`Call`] trait. Note that you don't need to cast a [`Value`] to a [`Function`] in order
-//! to call it because [`Value`] also implements [`Call`].
+//! of the [`Call`] trait. You don't need to cast a [`Value`] to a [`Function`] in order to call
+//! it because [`Value`] also implements [`Call`].
 //!
 //! [`Call`]: crate::call::Call
 
 use crate::{
     call::{Call, ProvideKeywords, WithKeywords},
-    error::{JlrsResult, JuliaResult, JuliaResultRef},
+    error::JlrsResult,
     layout::{typecheck::Typecheck, valid_layout::ValidLayout},
-    memory::{global::Global, output::Output, scope::PartialScope},
+    memory::{target::global::Global, target::Target},
     private::Private,
     wrappers::ptr::{datatype::DataType, private::WrapperPriv, value::Value, Wrapper},
 };
@@ -34,14 +34,13 @@ impl<'scope, 'data> Function<'scope, 'data> {
         self.as_value().datatype()
     }
 
-    /// Use the `Output` to extend the lifetime of this data.
-    pub fn root<'target>(self, output: Output<'target>) -> Function<'target, 'data> {
-        // The pointer points to valid data
-        unsafe {
-            let ptr = self.unwrap_non_null(Private);
-            output.set_root::<Function>(ptr);
-            Function::wrap_non_null(ptr, Private)
-        }
+    /// Use the target to reroot this data.
+    pub fn root<'target, T>(self, target: T) -> T::Data
+    where
+        T: Target<'target, 'data, Function<'target, 'data>>,
+    {
+        // Safety: the data is valid.
+        unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
     }
 }
 
@@ -57,6 +56,7 @@ impl_debug!(Function<'_, '_>);
 
 impl<'scope, 'data> WrapperPriv<'scope, 'data> for Function<'scope, 'data> {
     type Wraps = jl_value_t;
+    type StaticPriv = Function<'static, 'data>;
     const NAME: &'static str = "Function";
 
     // Safety: `inner` must not have been freed yet, the result must never be
@@ -75,104 +75,51 @@ impl<'scope, 'data> WrapperPriv<'scope, 'data> for Function<'scope, 'data> {
 }
 
 impl<'data> Call<'data> for Function<'_, 'data> {
-    unsafe fn call0<'target, S>(self, scope: S) -> JlrsResult<JuliaResult<'target, 'data>>
+    unsafe fn call0<'target, T>(self, target: T) -> T::Result
     where
-        S: PartialScope<'target>,
+        T: Target<'target, 'data>,
     {
-        self.as_value().call0(scope)
+        self.as_value().call0(target)
     }
 
-    unsafe fn call1<'target, S>(
-        self,
-        scope: S,
-        arg0: Value<'_, 'data>,
-    ) -> JlrsResult<JuliaResult<'target, 'data>>
+    unsafe fn call1<'target, T>(self, target: T, arg0: Value<'_, 'data>) -> T::Result
     where
-        S: PartialScope<'target>,
+        T: Target<'target, 'data>,
     {
-        self.as_value().call1(scope, arg0)
+        self.as_value().call1(target, arg0)
     }
 
-    unsafe fn call2<'target, S>(
+    unsafe fn call2<'target, T>(
         self,
-        scope: S,
+        target: T,
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
-    ) -> JlrsResult<JuliaResult<'target, 'data>>
+    ) -> T::Result
     where
-        S: PartialScope<'target>,
+        T: Target<'target, 'data>,
     {
-        self.as_value().call2(scope, arg0, arg1)
+        self.as_value().call2(target, arg0, arg1)
     }
 
-    unsafe fn call3<'target, S>(
+    unsafe fn call3<'target, T>(
         self,
-        scope: S,
+        target: T,
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
         arg2: Value<'_, 'data>,
-    ) -> JlrsResult<JuliaResult<'target, 'data>>
+    ) -> T::Result
     where
-        S: PartialScope<'target>,
+        T: Target<'target, 'data>,
     {
-        self.as_value().call3(scope, arg0, arg1, arg2)
+        self.as_value().call3(target, arg0, arg1, arg2)
     }
 
-    unsafe fn call<'target, 'value, V, S>(
-        self,
-        scope: S,
-        args: V,
-    ) -> JlrsResult<JuliaResult<'target, 'data>>
+    unsafe fn call<'target, 'value, V, T>(self, target: T, args: V) -> T::Result
     where
         V: AsRef<[Value<'value, 'data>]>,
-        S: PartialScope<'target>,
+        T: Target<'target, 'data>,
     {
-        self.as_value().call(scope, args)
-    }
-
-    unsafe fn call0_unrooted<'target>(
-        self,
-        global: Global<'target>,
-    ) -> JuliaResultRef<'target, 'data> {
-        self.as_value().call0_unrooted(global)
-    }
-
-    unsafe fn call1_unrooted<'target>(
-        self,
-        global: Global<'target>,
-        arg0: Value<'_, 'data>,
-    ) -> JuliaResultRef<'target, 'data> {
-        self.as_value().call1_unrooted(global, arg0)
-    }
-
-    unsafe fn call2_unrooted<'target>(
-        self,
-        global: Global<'target>,
-        arg0: Value<'_, 'data>,
-        arg1: Value<'_, 'data>,
-    ) -> JuliaResultRef<'target, 'data> {
-        self.as_value().call2_unrooted(global, arg0, arg1)
-    }
-
-    unsafe fn call3_unrooted<'target>(
-        self,
-        global: Global<'target>,
-        arg0: Value<'_, 'data>,
-        arg1: Value<'_, 'data>,
-        arg2: Value<'_, 'data>,
-    ) -> JuliaResultRef<'target, 'data> {
-        self.as_value().call3_unrooted(global, arg0, arg1, arg2)
-    }
-
-    unsafe fn call_unrooted<'target, 'value, V>(
-        self,
-        global: Global<'target>,
-        args: V,
-    ) -> JuliaResultRef<'target, 'data>
-    where
-        V: AsRef<[Value<'value, 'data>]>,
-    {
-        self.as_value().call_unrooted(global, args)
+        self.as_value().call(target, args)
     }
 }
 
@@ -194,7 +141,7 @@ pub type FunctionRef<'scope, 'data> = Ref<'scope, 'data, Function<'scope, 'data>
 unsafe impl ValidLayout for FunctionRef<'_, '_> {
     fn valid_layout(ty: Value) -> bool {
         let global = unsafe { Global::new() };
-        let function_type = DataType::function_type(global);
+        let function_type = DataType::function_type(&global);
         ty.subtype(function_type.as_value())
     }
 

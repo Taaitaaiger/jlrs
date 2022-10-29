@@ -6,7 +6,7 @@
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/f9720dc2ebd6cd9e3086365f281e62506444ef37/src/julia.h#L585
 use crate::{
     impl_julia_typecheck,
-    memory::output::Output,
+    memory::target::Target,
     private::Private,
     wrappers::ptr::{
         internal::method::MethodRef, private::WrapperPriv, simple_vector::SimpleVectorRef,
@@ -57,14 +57,13 @@ impl<'scope> MethodMatch<'scope> {
         unsafe { self.unwrap_non_null(Private).as_ref().fully_covers }
     }
 
-    /// Use the `Output` to extend the lifetime of this data.
-    pub fn root<'target>(self, output: Output<'target>) -> MethodMatch<'target> {
-        // Safety: the pointer points to valid data
-        unsafe {
-            let ptr = self.unwrap_non_null(Private);
-            output.set_root::<MethodMatch>(ptr);
-            MethodMatch::wrap_non_null(ptr, Private)
-        }
+    /// Use the target to reroot this data.
+    pub fn root<'target, T>(self, target: T) -> T::Data
+    where
+        T: Target<'target, 'static, MethodMatch<'target>>,
+    {
+        // Safety: the data is valid.
+        unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
     }
 }
 
@@ -73,6 +72,7 @@ impl_debug!(MethodMatch<'_>);
 
 impl<'scope> WrapperPriv<'scope, '_> for MethodMatch<'scope> {
     type Wraps = jl_method_match_t;
+    type StaticPriv = MethodMatch<'static>;
     const NAME: &'static str = "MethodMatch";
 
     // Safety: `inner` must not have been freed yet, the result must never be

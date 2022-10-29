@@ -1,8 +1,6 @@
 use crate::{
-    error::JuliaResultRef,
-    memory::frame::FrameSlice,
-    prelude::{Frame, JlrsResult},
-    private::Private,
+    error::{JlrsResult, JuliaResultRef},
+    memory::target::frame::GcFrame,
     wrappers::ptr::value::ValueRef,
 };
 use jl_sys::{
@@ -19,11 +17,11 @@ use std::{
 
 unsafe extern "C" fn trampoline_with_slots<
     'frame,
-    F: FnMut(&mut FrameSlice<'frame>, &mut MaybeUninit<T>) -> JlrsResult<()>,
+    F: FnMut(&mut GcFrame<'frame>, &mut MaybeUninit<T>) -> JlrsResult<()>,
     T,
 >(
     func: &mut F,
-    frame_slice: &mut FrameSlice<'frame>,
+    frame_slice: &mut GcFrame<'frame>,
     result: &mut MaybeUninit<T>,
 ) -> jlrs_catch_t {
     let res = catch_unwind(AssertUnwindSafe(|| func(frame_slice, result)));
@@ -49,7 +47,7 @@ unsafe extern "C" fn trampoline_with_slots<
 
 fn trampoline_with_slots_for<
     'frame,
-    F: FnMut(&mut FrameSlice<'frame>, &mut MaybeUninit<T>) -> JlrsResult<()>,
+    F: FnMut(&mut GcFrame<'frame>, &mut MaybeUninit<T>) -> JlrsResult<()>,
     T,
 >(
     _: &mut F,
@@ -59,7 +57,7 @@ fn trampoline_with_slots_for<
             Option<
                 unsafe extern "C" fn(
                     &mut F,
-                    &mut FrameSlice<'frame>,
+                    &mut GcFrame<'frame>,
                     &mut MaybeUninit<T>,
                 ) -> jlrs_catch_t,
             >,
@@ -68,27 +66,22 @@ fn trampoline_with_slots_for<
     }
 }
 
-pub(crate) unsafe fn catch_exceptions_with_slots<'frame, 'borrow, 'data, F, G, T>(
-    frame: &'borrow mut F,
-    slots: usize,
+pub(crate) unsafe fn catch_exceptions_with_slots<'frame, 'borrow, 'data, G, T>(
+    frame: &'borrow mut GcFrame<'frame>,
     func: &'borrow mut G,
 ) -> JlrsResult<JuliaResultRef<'frame, 'data, T>>
 where
     T: 'frame,
-    F: Frame<'frame>,
-    G: FnMut(&mut FrameSlice<'frame>, &mut MaybeUninit<T>) -> JlrsResult<()>,
+    G: FnMut(&mut GcFrame<'frame>, &mut MaybeUninit<T>) -> JlrsResult<()>,
 {
     let trampoline = trampoline_with_slots_for(func);
     let mut result = MaybeUninit::<T>::uninit();
-
-    let slots = frame.reserve_slots(slots, Private)?;
-    let mut frame_slice = FrameSlice::new(slots);
 
     let res = jlrs_catch_wrapper(
         func as *mut _ as *mut _,
         trampoline,
         (&mut result) as *mut _ as *mut _,
-        (&mut frame_slice) as *mut _ as *mut _,
+        frame as *mut _ as *mut _,
     );
 
     match res.tag {

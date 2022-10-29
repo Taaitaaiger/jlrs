@@ -2,7 +2,7 @@
 
 use crate::{
     impl_julia_typecheck,
-    memory::output::Output,
+    memory::target::Target,
     private::Private,
     wrappers::ptr::{private::WrapperPriv, value::ValueRef, Ref},
 };
@@ -28,14 +28,13 @@ impl<'scope> WeakRef<'scope> {
         unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().value) }
     }
 
-    /// Use the `Output` to extend the lifetime of this data.
-    pub fn root<'target>(self, output: Output<'target>) -> WeakRef<'target> {
-        // Safety: the pointer points to valid data
-        unsafe {
-            let ptr = self.unwrap_non_null(Private);
-            output.set_root::<WeakRef>(ptr);
-            WeakRef::wrap_non_null(ptr, Private)
-        }
+    /// Use the target to reroot this data.
+    pub fn root<'target, T>(self, target: T) -> T::Data
+    where
+        T: Target<'target, 'static, WeakRef<'target>>,
+    {
+        // Safety: the data is valid.
+        unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
     }
 }
 
@@ -44,6 +43,7 @@ impl_debug!(WeakRef<'_>);
 
 impl<'scope> WrapperPriv<'scope, '_> for WeakRef<'scope> {
     type Wraps = jl_weakref_t;
+    type StaticPriv = WeakRef<'static>;
     const NAME: &'static str = "WeakRef";
 
     // Safety: `inner` must not have been freed yet, the result must never be

@@ -47,12 +47,18 @@ impl AsyncRuntime for Tokio {
         tokio::task::spawn_blocking(rt_fn)
     }
 
-    fn block_on<F>(loop_fn: F) -> JlrsResult<()>
+    fn block_on<F>(loop_fn: F, worker_id: Option<usize>) -> JlrsResult<()>
     where
         F: Future<Output = JlrsResult<()>>,
     {
+        let thread_name = if let Some(id) = worker_id {
+            format!("jlrs-tokio-worker-{}", id)
+        } else {
+            "jlrs-tokio-runtime".into()
+        };
+
         let runtime = Builder::new_current_thread()
-            .thread_name("jlrs-tokio-runtime")
+            .thread_name(thread_name)
             .enable_time()
             .build()
             .expect("Unable to build tokio runtime");
@@ -66,6 +72,10 @@ impl AsyncRuntime for Tokio {
         F: Future<Output = ()> + 'static,
     {
         tokio::task::spawn_local(future)
+    }
+
+    async fn yield_now() {
+        tokio::task::yield_now().await
     }
 
     async fn timeout<F>(duration: Duration, future: F) -> Option<JlrsResult<Message>>
@@ -139,30 +149,26 @@ impl<M: Send + Sync + 'static> ChannelReceiver<M> for tokio::sync::mpsc::Unbound
     }
 }
 
-#[async_trait]
 impl<M: Send + 'static> OneshotSender<M> for tokio::sync::oneshot::Sender<M> {
-    async fn send(self, msg: M) {
+    fn send(self, msg: M) {
         self.send(msg).ok();
     }
 }
 
-#[async_trait]
 impl<M: Send + 'static> OneshotSender<M> for tokio::sync::mpsc::Sender<M> {
-    async fn send(self, msg: M) {
-        (&self).send(msg).await.ok();
+    fn send(self, msg: M) {
+        (&self).blocking_send(msg).ok();
     }
 }
 
-#[async_trait]
 impl<M: Send + 'static> OneshotSender<M> for tokio::sync::broadcast::Sender<M> {
-    async fn send(self, msg: M) {
+    fn send(self, msg: M) {
         (&self).send(msg).ok();
     }
 }
 
-#[async_trait]
 impl<M: Send + Sync + 'static> OneshotSender<M> for tokio::sync::watch::Sender<M> {
-    async fn send(self, msg: M) {
+    fn send(self, msg: M) {
         (&self).send(msg).ok();
     }
 }

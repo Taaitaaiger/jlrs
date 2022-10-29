@@ -9,31 +9,35 @@ mod tests {
             #[test]
             fn $type_test_name() {
                 JULIA.with(|j| {
+                    let mut frame = StackFrame::new();
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope(|global, _frame| unsafe {
-                        let ty = <$type as IntoJulia>::julia_type(global).value_unchecked();
-                        assert_eq!(ty, DataType::$assoc_ty(global).as_value());
-                        assert!(ty.cast::<DataType>()?.is::<$type>());
+                    jlrs.instance(&mut frame)
+                        .scope(|frame| unsafe {
+                            let ty = <$type as IntoJulia>::julia_type(&frame).value_unchecked();
+                            assert_eq!(ty, DataType::$assoc_ty(&frame).as_value());
+                            assert!(ty.cast::<DataType>()?.is::<$type>());
 
-                        Ok(())
-                    })
-                    .unwrap();
+                            Ok(())
+                        })
+                        .unwrap();
                 });
             }
 
             #[test]
             fn $into_test_name() {
                 JULIA.with(|j| {
+                    let mut frame = StackFrame::new();
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope(|global, _frame| unsafe {
-                        let val = $val.into_julia(global).value_unchecked();
-                        assert!(val.is::<$type>());
+                    jlrs.instance(&mut frame)
+                        .scope(|frame| unsafe {
+                            let val = $val.into_julia(&frame).value_unchecked();
+                            assert!(val.is::<$type>());
 
-                        Ok(())
-                    })
-                    .unwrap();
+                            Ok(())
+                        })
+                        .unwrap();
                 });
             }
         };
@@ -44,38 +48,41 @@ mod tests {
             #[test]
             fn $type_test_name() {
                 JULIA.with(|j| {
+                    let mut frame = StackFrame::new();
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope(|global, mut frame| unsafe {
-                        let ty = <*mut $type as IntoJulia>::julia_type(global).value_unchecked();
+                    jlrs.instance(&mut frame)
+                        .scope(|mut frame| unsafe {
+                            let ty =
+                                <*mut $type as IntoJulia>::julia_type(&frame).value_unchecked();
+                            let args = [DataType::$assoc_ty(&frame).as_value()];
 
-                        let applied = UnionAll::pointer_type(global)
-                            .as_value()
-                            .apply_type_unchecked(
-                                &mut frame,
-                                &mut [DataType::$assoc_ty(global).as_value()],
-                            )?;
+                            let applied = UnionAll::pointer_type(&frame)
+                                .as_value()
+                                .apply_type_unchecked(&mut frame, args);
 
-                        assert_eq!(ty, applied);
-                        assert!(applied.cast::<DataType>()?.is::<*mut $type>());
+                            assert_eq!(ty, applied);
+                            assert!(applied.cast::<DataType>()?.is::<*mut $type>());
 
-                        Ok(())
-                    })
-                    .unwrap();
+                            Ok(())
+                        })
+                        .unwrap();
                 });
             }
 
             #[test]
             fn $into_test_name() {
                 JULIA.with(|j| {
+                    let mut frame = StackFrame::new();
                     let mut jlrs = j.borrow_mut();
 
-                    jlrs.scope(|global, _frame| unsafe {
-                        let val = null_mut::<$type>().into_julia(global).value_unchecked();
-                        assert!(val.is::<*mut $type>());
-                        Ok(())
-                    })
-                    .unwrap();
+                    jlrs.instance(&mut frame)
+                        .scope(|frame| unsafe {
+                            let val = null_mut::<$type>().into_julia(&frame).value_unchecked();
+                            assert!(val.is::<*mut $type>());
+                            Ok(())
+                        })
+                        .unwrap();
                 });
             }
         };
@@ -180,29 +187,33 @@ mod tests {
     #[test]
     fn void_ptr_julia_type() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|global, _frame| unsafe {
-                let ty = <*mut c_void as IntoJulia>::julia_type(global).value_unchecked();
-                assert_eq!(ty, DataType::voidpointer_type(global).as_value());
-                assert!(ty.cast::<DataType>()?.is::<*mut c_void>());
-                Ok(())
-            })
-            .unwrap();
+            jlrs.instance(&mut frame)
+                .scope(|frame| unsafe {
+                    let ty = <*mut c_void as IntoJulia>::julia_type(&frame).value_unchecked();
+                    assert_eq!(ty, DataType::voidpointer_type(&frame).as_value());
+                    assert!(ty.cast::<DataType>()?.is::<*mut c_void>());
+                    Ok(())
+                })
+                .unwrap();
         });
     }
 
     #[test]
     fn void_ptr_into_julia() {
         JULIA.with(|j| {
+            let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
 
-            jlrs.scope(|global, _frame| unsafe {
-                let val = null_mut::<c_void>().into_julia(global).value_unchecked();
-                assert!(val.is::<*mut c_void>());
-                Ok(())
-            })
-            .unwrap();
+            jlrs.instance(&mut frame)
+                .scope(|frame| unsafe {
+                    let val = null_mut::<c_void>().into_julia(&frame).value_unchecked();
+                    assert!(val.is::<*mut c_void>());
+                    Ok(())
+                })
+                .unwrap();
         });
     }
 }

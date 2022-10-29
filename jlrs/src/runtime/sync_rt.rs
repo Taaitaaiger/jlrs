@@ -1,30 +1,34 @@
 //! Use Julia without support for multitasking.
 //!
-//! This module is only available if the `sync-rt` feature is enabled.
+//! This module is only available if the `sync-rt` feature is enabled, it provides the sync
+//! runtime which initializes Julia on the current thread.
+
+// TODO: document scope
 
 use crate::{
     call::Call,
     convert::into_jlrs_result::IntoJlrsResult,
     error::{IOError, JlrsResult, RuntimeError},
-    memory::{frame::GcFrame, global::Global, mode::Sync, stack_page::StackPage},
+    memory::{
+        context::stack::Stack,
+        stack_frame::{PinnedFrame, StackFrame},
+        target::frame::GcFrame,
+    },
     runtime::{builder::RuntimeBuilder, init_jlrs, INIT},
     wrappers::ptr::{module::Module, string::JuliaString, value::Value, Wrapper},
 };
 use jl_sys::{jl_atexit_hook, jl_init, jl_init_with_image, jl_is_initialized};
-use std::{path::Path, sync::atomic::Ordering};
+use std::{ffi::c_void, marker::PhantomData, path::Path, sync::atomic::Ordering};
 
-/// A Julia instance.
+/// A pending Julia instance.
 ///
-/// You must create this instance with [`RuntimeBuilder::start`] before you can start using
-/// Julia from Rust. While this struct exists Julia is active, dropping it causes the shutdown
-/// code to be called but this doesn't leave Julia in a state from which it can be reinitialized.
-///
-/// [`RuntimeBuilder::start`]: crate::runtime::builder::RuntimeBuilder::start
-pub struct Julia {
-    page: StackPage,
+/// This pending instance can be activated by calling [`PendingJulia::instance`].
+pub struct PendingJulia {
+    init: bool,
+    _not_send_sync: PhantomData<*mut c_void>,
 }
 
-impl Julia {
+impl PendingJulia {
     pub(crate) unsafe fn init(builder: RuntimeBuilder) -> JlrsResult<Self> {
         if jl_is_initialized() != 0 || INIT.swap(true, Ordering::SeqCst) {
             Err(RuntimeError::AlreadyInitialized)?;
@@ -35,17 +39,15 @@ impl Julia {
             let image_path_str = image_path.to_string_lossy().to_string();
 
             if !julia_bindir.exists() {
-                Err(IOError::NotFound {
+                return Err(IOError::NotFound {
                     path: julia_bindir_str,
                 })?;
-                unreachable!()
             }
 
             if !image_path.exists() {
-                Err(IOError::NotFound {
+                return Err(IOError::NotFound {
                     path: image_path_str,
                 })?;
-                unreachable!()
             }
 
             let bindir = std::ffi::CString::new(julia_bindir_str).unwrap();
@@ -58,36 +60,74 @@ impl Julia {
 
         assert!(jl_is_initialized() != 0);
 
-        let mut jl = Julia {
-            page: StackPage::default(),
-        };
-
-        jl.scope(|_, mut frame| {
-            init_jlrs(&mut frame);
-            Ok(())
+        Ok(PendingJulia {
+            init: false,
+            _not_send_sync: PhantomData,
         })
-        .ok();
-
-        Ok(jl)
     }
 
+    /// Activate the pending instance.
+    ///
+    /// The provided `StackFrame` should be allocated on the stack.
+    pub fn instance<'ctx>(&'ctx mut self, frame: &'ctx mut StackFrame<0>) -> Julia<'ctx> {
+        unsafe {
+            // Is popped when Julia is dropped.
+            let mut pinned = frame.pin();
+            let frame = pinned.stack_frame();
+            let context = frame.sync_stack();
+            let mut wrapped: Julia<'ctx> = Julia {
+                stack: context,
+                _frame: pinned,
+            };
+
+            if !self.init {
+                wrapped
+                    .scope(|mut frame| {
+                        init_jlrs(&mut frame);
+                        Ok(())
+                    })
+                    .unwrap();
+
+                self.init = true;
+            }
+
+            wrapped
+        }
+    }
+}
+
+impl Drop for PendingJulia {
+    fn drop(&mut self) {
+        unsafe {
+            jl_atexit_hook(0);
+        }
+    }
+}
+
+/// An active Julia instance.
+pub struct Julia<'context> {
+    _frame: PinnedFrame<'context, 0>,
+    stack: &'context Stack,
+}
+
+impl Julia<'_> {
     /// Enable or disable colored error messages originating from Julia. If this is enabled the
     /// error message in [`JlrsError::Exception`] can contain ANSI color codes. This feature is
     /// disabled by default.
     ///
     /// [`JlrsError::Exception`]: crate::error::JlrsError::Exception
     pub fn error_color(&mut self, enable: bool) -> JlrsResult<()> {
-        self.scope(|global, _frame| unsafe {
+        self.scope(|frame| unsafe {
             let enable = if enable {
-                Value::true_v(global)
+                Value::new_true_v(&frame)
             } else {
-                Value::false_v(global)
+                Value::new_false_v(&frame)
             };
 
-            Module::main(global)
-                .submodule_ref("Jlrs")?
+            Module::main(&frame)
+                .submodule(&frame, "Jlrs")?
                 .wrapper_unchecked()
-                .global_ref("color")?
+                .global(&frame, "color")?
                 .value_unchecked()
                 .set_field_unchecked("x", enable)
         })?;
@@ -104,19 +144,24 @@ impl Julia {
     ///
     /// ```no_run
     /// # use jlrs::prelude::*;
+    /// # use jlrs::util::test::JULIA;
     /// # fn main() {
-    /// # let mut julia = unsafe { RuntimeBuilder::new().start().unwrap() };
+    /// # JULIA.with(|j| {
+    /// # let mut julia = j.borrow_mut();
+    /// # let mut frame = StackFrame::new();
+    /// # let mut julia = julia.instance(&mut frame);
     /// unsafe { julia.include("Path/To/MyJuliaCode.jl").unwrap(); }
+    /// # });
     /// # }
     /// ```
     pub unsafe fn include<P: AsRef<Path>>(&mut self, path: P) -> JlrsResult<()> {
         if path.as_ref().exists() {
-            return self.scope(|global, mut frame| {
-                let path_jl_str = JuliaString::new(&mut frame, path.as_ref().to_string_lossy())?;
-                Module::main(global)
-                    .function_ref("include")?
+            return self.scope(|mut frame| {
+                let path_jl_str = JuliaString::new(&mut frame, path.as_ref().to_string_lossy());
+                Module::main(&frame)
+                    .function(&frame, "include")?
                     .wrapper_unchecked()
-                    .call1(&mut frame, path_jl_str.as_value())?
+                    .call1(&mut frame, path_jl_str.as_value())
                     .into_jlrs_result()
                     .map(|_| ())
             });
@@ -127,19 +172,21 @@ impl Julia {
         })?
     }
 
-    /// This method is a main entrypoint to interact with Julia. It takes a closure with two
-    /// arguments, a `Global` and a `GcFrame`, and can return arbitrary results.
+    /// This method is a main entrypoint to interact with Julia. It takes a closure with one
+    /// argument, a `GcFrame`, and can return arbitrary results.
     ///
     /// Example:
     ///
     /// ```
     /// # use jlrs::prelude::*;
-    /// # use jlrs::util::JULIA;
+    /// # use jlrs::util::test::JULIA;
     /// # fn main() {
     /// # JULIA.with(|j| {
     /// # let mut julia = j.borrow_mut();
-    ///   julia.scope(|_global, mut frame| {
-    ///       let _i = Value::new(&mut frame, 1u64)?;
+    /// # let mut frame = StackFrame::new();
+    /// # let mut julia = julia.instance(&mut frame);
+    ///   julia.scope(| mut frame| {
+    ///       let _i = Value::new(&mut frame, 1u64);
     ///       Ok(())
     ///   }).unwrap();
     /// # });
@@ -147,64 +194,14 @@ impl Julia {
     /// ```
     pub fn scope<T, F>(&mut self, func: F) -> JlrsResult<T>
     where
-        for<'base> F: FnOnce(Global<'base>, GcFrame<'base, Sync>) -> JlrsResult<T>,
+        for<'base> F: FnOnce(GcFrame<'base>) -> JlrsResult<T>,
     {
         unsafe {
-            let global = Global::new();
-            let (frame, owner) = GcFrame::new(self.page.as_ref(), Sync);
+            let (owner, frame) = GcFrame::base(&self.stack);
 
-            let ret = func(global, frame);
+            let ret = func(frame);
             std::mem::drop(owner);
             ret
-        }
-    }
-
-    /// This method is a main entrypoint to interact with Julia. It takes a closure with two
-    /// arguments, a `Global` and a `GcFrame`, and can return arbitrary results. The frame will
-    /// have capacity for at least `capacity` roots.
-    ///
-    /// Example:
-    ///
-    /// ```
-    /// # use jlrs::prelude::*;
-    /// # use jlrs::util::JULIA;
-    /// # fn main() {
-    /// # JULIA.with(|j| {
-    /// # let mut julia = j.borrow_mut();
-    ///   julia.scope_with_capacity(1, |_global, mut frame| {
-    ///       let _i = Value::new(&mut frame, 1u64)?;
-    ///       Ok(())
-    ///   }).unwrap();
-    /// # });
-    /// # }
-    /// ```
-    pub fn scope_with_capacity<T, F>(&mut self, capacity: usize, func: F) -> JlrsResult<T>
-    where
-        for<'base> F: FnOnce(Global<'base>, GcFrame<'base, Sync>) -> JlrsResult<T>,
-    {
-        unsafe {
-            let global = Global::new();
-            if capacity + 2 > self.page.size() {
-                self.page = StackPage::new(capacity + 2);
-            }
-            let (frame, owner) = GcFrame::new(self.page.as_ref(), Sync);
-
-            let ret = func(global, frame);
-            std::mem::drop(owner);
-            ret
-        }
-    }
-
-    #[cfg(test)]
-    pub(crate) fn get_page(&self) -> &StackPage {
-        &self.page
-    }
-}
-
-impl Drop for Julia {
-    fn drop(&mut self) {
-        unsafe {
-            jl_atexit_hook(0);
         }
     }
 }
