@@ -1,5 +1,6 @@
 use crate::{
-    error::JuliaResultRef, memory::target::frame::GcFrame, prelude::JlrsResult,
+    error::{JlrsResult, JuliaResultRef},
+    memory::target::frame::GcFrame,
     wrappers::ptr::value::ValueRef,
 };
 use jl_sys::{

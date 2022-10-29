@@ -30,9 +30,9 @@ use jl_sys::{
 use crate::{
     convert::{into_julia::IntoJulia, unbox::Unbox},
     layout::valid_layout::ValidLayout,
-    memory::{get_tls, PTls},
-    prelude::{DataType, Module, Symbol, Target},
+    memory::{get_tls, target::Target, PTls},
     private::Private,
+    wrappers::ptr::{datatype::DataType, module::Module, symbol::Symbol, value::Value},
 };
 
 use super::ptr::private::WrapperPriv;
@@ -164,7 +164,7 @@ unsafe impl<F: ForeignType> IntoJulia for F {
 }
 
 unsafe impl<T: ForeignType> ValidLayout for T {
-    fn valid_layout(ty: crate::prelude::Value) -> bool {
+    fn valid_layout(ty: Value) -> bool {
         if let Ok(dt) = ty.cast::<DataType>() {
             let ty = FOREIGN_TYPES.find::<T>().expect("Doesn't exist");
             dt.unwrap(Private) == ty.unwrap(Private)

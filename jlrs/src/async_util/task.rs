@@ -13,9 +13,16 @@
 //! [`GcFrame`]: crate::memory::frame::GcFrame
 //! [`CallAsync`]: crate::call::CallAsync
 
-use crate::{error::JlrsResult, memory::target::frame::AsyncGcFrame};
+use std::time::Duration;
+
+use crate::{
+    call::Call,
+    error::JlrsResult,
+    memory::target::{frame::AsyncGcFrame, Target},
+    wrappers::ptr::{module::Module, value::Value},
+};
 use async_trait::async_trait;
-use jl_sys::{jl_process_events, jl_yield};
+use jl_sys::jl_yield;
 
 /// A task that returns once.
 ///
@@ -48,7 +55,7 @@ use jl_sys::{jl_process_events, jl_yield};
 ///
 ///         let func = Module::base(&frame).function(&mut frame, "+")?;
 ///         unsafe { func.call_async(&mut frame, &mut [a, b]) }
-///             .await?
+///             .await
 ///             .into_jlrs_result()?
 ///             .unbox::<u64>()
 ///     }
@@ -76,6 +83,10 @@ pub trait AsyncTask: 'static + Send + Sync {
     }
 
     /// Run this task.
+    ///
+    /// See the [trait docs] for an example implementation.
+    ///
+    /// [trait docs]: AsyncTask
     async fn run<'frame>(&mut self, frame: AsyncGcFrame<'frame>) -> JlrsResult<Self::Output>;
 }
 
@@ -118,12 +129,12 @@ pub trait AsyncTask: 'static + Send + Sync {
 ///     // Julia data rooted in this frame.
 ///     async fn init(
 ///         &mut self,
-///         frame: &mut AsyncGcFrame<'static>,
+///         mut frame: AsyncGcFrame<'static>,
 ///     ) -> JlrsResult<Self::State> {
 ///         // A `Vec` can be moved from Rust to Julia if the element type
 ///         // implements `IntoJulia`.
 ///         let data = vec![0usize; self.n_values];
-///         let array = TypedArray::from_vec(&mut *frame, data, self.n_values)?
+///         let array = TypedArray::from_vec(frame.as_extended_target(), data, self.n_values)?
 ///             .into_jlrs_result()?;
 ///
 ///         Ok(AccumulatorTaskState {
@@ -143,12 +154,13 @@ pub trait AsyncTask: 'static + Send + Sync {
 ///     ) -> JlrsResult<Self::Output> {
 ///         {
 ///             // Array data can be directly accessed from Rust.
-///             // TypedArray::bits_data_mut can be used if the type
-///             // of the elements is concrete and immutable.
-///             // This is safe because this is the only active reference to
-///             // the array.
-///             let mut data = unsafe { state.array.bits_data_mut(&mut frame)? };
-///             data[state.offset] = input;
+///             // The data is tracked first to ensure it's not
+///             // already borrowed from Rust.
+///             unsafe {
+///                 let mut tracked = state.array.track_mut()?;
+///                 let mut data = tracked.bits_data_mut()?;
+///                 data[state.offset] = input;
+///             };
 ///
 ///             state.offset += 1;
 ///             if (state.offset == self.n_values) {
@@ -215,6 +227,10 @@ pub trait PersistentTask: 'static + Send + Sync {
     /// It's also provided with a mutable reference to its `state` and the `input` provided by the
     /// caller. While the state is mutable, it's not possible to allocate a new Julia value in
     /// `run` and assign it to the state because the frame doesn't live long enough.
+    ///
+    /// See the [trait docs] for an example implementation.
+    ///
+    /// [trait docs]: PersistentTask
     async fn run<'frame>(
         &mut self,
         frame: AsyncGcFrame<'frame>,
@@ -228,11 +244,38 @@ pub trait PersistentTask: 'static + Send + Sync {
     async fn exit(&mut self, _frame: AsyncGcFrame<'static>, _state: &mut Self::State) {}
 }
 
-/// Yield the root task.
+/// Yield the current Julia task.
+///
+/// Calling this function allows Julia to switch to another Julia task scheduled on the same
+/// thread.
 pub fn yield_task(_: &mut AsyncGcFrame) {
     // Safety: this function can only be called from a thread known to Julia.
     unsafe {
-        jl_process_events();
         jl_yield();
+    }
+}
+
+/// Sleep for `duration`.
+///
+/// The function calls `Base.sleep`. If `duration` is less than 1ms this function returns
+/// immediately.
+pub fn sleep<'scope, 'data, T: Target<'scope, 'data>>(target: T, duration: Duration) {
+    unsafe {
+        let millis = duration.as_millis();
+        if millis == 0 {
+            return;
+        }
+
+        let global = target.global();
+        // Is rooted when sleep is called.
+        let secs = duration.as_millis() as usize as f64 / 1000.;
+        let secs = Value::new(global, secs).value_unchecked();
+
+        Module::base(&global)
+            .global(global, "sleep")
+            .expect("sleep not found")
+            .value_unchecked()
+            .call1(global, secs)
+            .expect("Sleep threw an exception");
     }
 }

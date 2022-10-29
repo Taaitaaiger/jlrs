@@ -1,4 +1,5 @@
-/// Traits used to declare what type of data is returned by a target.
+//! Traits used to declare what type of data is returned by a target.
+
 use crate::{
     error::{JuliaResult, JuliaResultRef},
     memory::target::{frame::GcFrame, global::Global, output::Output},
@@ -10,11 +11,11 @@ use crate::{
 use crate::memory::target::frame::AsyncGcFrame;
 
 /// Defines the return types of a target, `Data` and `Result`.
-pub trait TargetType<'target, 'data, T: Wrapper<'target, 'data>> {
+pub trait TargetType<'target, 'data, T: Wrapper<'target, 'data>>: Sized {
     /// Type returned by methods that don't catch Julia exceptions.
     ///
     /// For rooting targets, this type is `T`.
-    /// For non-rooting targets, this type is [`JuliaResult<'target, 'data, T>`].
+    /// For non-rooting targets, this type is [`Ref<'target, 'data, T>`].
     type Data;
 
     /// Type returned by methods that catch Julia exceptions.

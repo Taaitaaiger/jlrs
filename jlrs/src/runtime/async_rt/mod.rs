@@ -1,22 +1,23 @@
 //! Use Julia with support for multitasking.
 //!
-//! This module is only available if the `async-rt` feature is enabled.
+//! This module is only available if the `async-rt` feature is enabled, it provides the async
+//! runtime. When the async runtime is used Julia is initialized on a separate thread, a
+//! thread-safe handle lets you send work to this thread: [`AsyncJulia`].
 //!
-//! While access to the Julia C API is not thread-safe, it is possible to create and schedule new
-//! tasks from the thread that has intialized Julia. To do so from Rust you must use an async
-//! runtime rather than the sync runtime.
-//!
-//! In order to use an async runtime, you'll have to choose a backing runtime. By default, tokio
+//! To use the async runtime you'll have to choose a backing runtime. By default, tokio
 //! and async-std can be used by enabling the `tokio-rt` or `async-std-rt` feature respectively.
-//! To use a custom runtime, you can implement the `AsyncRuntime` trait.
+//! To use a custom backing runtime, you can implement the `AsyncRuntime` trait.
 //!
-//! After initialization a handle to the runtime, [`AsyncJulia`], is returned which can be shared
-//! across threads and can be used to send new tasks to the runtime. Three kinds of task exist:
-//! blocking, async, and persistent tasks. Blocking tasks block the runtime, the other two kinds
-//! of tasks can schedule Julia function calls and wait for them to complete. While the scheduled
-//! Julia function hasn't returned the async runtime handles other tasks. Blocking tasks can be
-//! expressed as closures, the other two kinds of task require implementing the [`AsyncTask`] and
-//! [`PersistentTask`] traits respectively.
+//! In the stable and lts version of Julia, only one thread can be used by the async runtime. The
+//! nightly version can use any number of worker threads to spread the workload across multiple
+//! threads that can call into Julia.
+//!
+//! Work is sent to the async runtime as independent tasks. Three kinds of task exist: blocking,
+//! async, and persistent tasks. Blocking tasks block the thread they're called on until they've
+//! completed, the other two kinds of task can schedule Julia function calls and wait for them to
+//! complete. While the scheduled Julia function hasn't returned the async runtime can handle other
+//! tasks scheduled on that thread. Blocking tasks can be expressed as closures, the other two
+//! require implementing the [`AsyncTask`] and [`PersistentTask`] traits respectively.
 
 #[cfg(feature = "nightly")]
 pub mod adopted;
@@ -36,19 +37,25 @@ use crate::{
             Persistent, PersistentComms, RegisterPersistent, RegisterTask, SetErrorColorTask,
             SetErrorColorTaskEnvelope, Task,
         },
-        task::{AsyncTask, PersistentTask},
+        task::{sleep, AsyncTask, PersistentTask},
     },
     error::{IOError, JlrsError, JlrsResult, RuntimeError},
-    memory::{context::stack::Stack, stack_frame::StackFrame, target::frame::GcFrame},
+    memory::{
+        context::stack::Stack,
+        stack_frame::StackFrame,
+        target::{frame::GcFrame, global::Global},
+    },
     runtime::{builder::AsyncRuntimeBuilder, init_jlrs, INIT},
     wrappers::ptr::{module::Module, value::Value},
 };
 use async_trait::async_trait;
 use futures::Future;
 use jl_sys::{
-    jl_atexit_hook, jl_enter_threaded_region, jl_exit_threaded_region, jl_gc_safepoint, jl_init,
-    jl_init_with_image, jl_is_initialized, jl_process_events, jl_yield,
+    jl_atexit_hook, jl_init, jl_init_with_image, jl_is_initialized, jl_process_events, jl_yield,
 };
+
+#[cfg(feature = "nightly")]
+use jl_sys::{jl_enter_threaded_region, jl_exit_threaded_region};
 
 use jl_sys::jl_options;
 
@@ -64,10 +71,10 @@ use std::{
     time::Duration,
 };
 
-use self::{
-    adopted::init_worker,
-    queue::{channel, Receiver, Sender},
-};
+use self::queue::{channel, Receiver, Sender};
+
+#[cfg(feature = "nightly")]
+use self::adopted::init_worker;
 
 #[cfg(feature = "nightly")]
 init_fn!(init_multitask, JLRS_MULTITASK_JL, "JlrsMultitaskNightly.jl");
@@ -75,6 +82,7 @@ init_fn!(init_multitask, JLRS_MULTITASK_JL, "JlrsMultitaskNightly.jl");
 #[cfg(not(feature = "nightly"))]
 init_fn!(init_multitask, JLRS_MULTITASK_JL, "JlrsMultitask.jl");
 
+// TODO: this doesn't really belong in this module
 /// Convert `Self` to a `Result`.
 pub trait IntoResult<T, E> {
     /// Convert `self` to a `Result`.
@@ -107,8 +115,8 @@ impl<E> IntoResult<JlrsResult<()>, E> for Result<JlrsResult<()>, E> {
 
 /// Functionality that is necessary to use an async runtime with jlrs.
 ///
-/// If you want to use async-std or tokio, you can use one of the implementations provided by
-/// jlrs. If you want to use another crate you can implement this trait.
+/// If you want to use async-std or tokio you can use one of the implementations provided by
+/// jlrs. If you want to use another executor you can implement this trait.
 #[async_trait(?Send)]
 pub trait AsyncRuntime: Send + 'static {
     /// Error that is returned when a task can't be joined because it has panicked.
@@ -146,6 +154,7 @@ pub trait AsyncRuntime: Send + 'static {
     where
         F: Future<Output = JlrsResult<()>>;
 
+    /// Yield the current task, this allows the runtime to switch to another task.
     async fn yield_now();
 
     /// Spawn a local task, this method is called from the loop task to spawn an [`AsyncTask`] or
@@ -177,10 +186,18 @@ impl<R> AsyncJulia<R>
 where
     R: AsyncRuntime,
 {
+    /// Resize the task queue.
+    ///
+    /// No tasks are dropped if the queue is shrunk. This method return a future that doesn´t
+    /// resolve until the queue can be resized without dropping any tasks.
     pub fn resize_queue<'own>(&'own self, capacity: usize) -> impl 'own + Future<Output = ()> {
         self.sender.resize_queue(capacity)
     }
 
+    /// Resize the task queue.
+    ///
+    /// See [`AsyncJulia::resize_queue`] for more info, the only difference is that this is an
+    /// async method.
     pub async fn resize_queue_async(&self, capacity: usize) {
         self.resize_queue(capacity).await
     }
@@ -443,14 +460,11 @@ where
             .try_send(MessageInner::ErrorColor(Box::new(msg)).wrap())
     }
 
-    pub(crate) unsafe fn init<C, const N: usize>(
-        builder: AsyncRuntimeBuilder<R, C>,
-    ) -> JlrsResult<(Self, std::thread::JoinHandle<JlrsResult<()>>)>
-    where
-        C: Channel<Message>,
-    {
-        let (sender, receiver) = channel(builder.channel_capacity);
-        let handle = R::spawn_thread(move || Self::run_async::<_, N>(builder, receiver));
+    pub(crate) unsafe fn init<const N: usize>(
+        builder: AsyncRuntimeBuilder<R>,
+    ) -> JlrsResult<(Self, std::thread::JoinHandle<JlrsResult<()>>)> {
+        let (sender, receiver) = channel(builder.channel_capacity.get());
+        let handle = R::spawn_thread(move || Self::run_async::<N>(builder, receiver));
 
         let julia = AsyncJulia {
             sender,
@@ -460,14 +474,12 @@ where
         Ok((julia, handle))
     }
 
-    pub(crate) unsafe fn init_async<C, const N: usize>(
-        builder: AsyncRuntimeBuilder<R, C>,
-    ) -> JlrsResult<(Self, R::RuntimeHandle)>
-    where
-        C: Channel<Message>,
-    {
-        let (sender, receiver) = channel(builder.channel_capacity);
-        let handle = R::spawn_blocking(move || Self::run_async::<_, N>(builder, receiver));
+    // TODO: Remove?
+    pub(crate) unsafe fn init_async<const N: usize>(
+        builder: AsyncRuntimeBuilder<R>,
+    ) -> JlrsResult<(Self, R::RuntimeHandle)> {
+        let (sender, receiver) = channel(builder.channel_capacity.get());
+        let handle = R::spawn_blocking(move || Self::run_async::<N>(builder, receiver));
 
         let julia = AsyncJulia {
             sender,
@@ -477,13 +489,10 @@ where
         Ok((julia, handle))
     }
 
-    fn run_async<C, const N: usize>(
-        builder: AsyncRuntimeBuilder<R, C>,
+    fn run_async<const N: usize>(
+        builder: AsyncRuntimeBuilder<R>,
         receiver: Receiver<Message>,
-    ) -> JlrsResult<()>
-    where
-        C: Channel<Message>,
-    {
+    ) -> JlrsResult<()> {
         unsafe {
             if jl_is_initialized() != 0 || INIT.swap(true, Ordering::SeqCst) {
                 Err(RuntimeError::AlreadyInitialized)?;
@@ -559,14 +568,11 @@ where
         )
     }
 
-    async unsafe fn run_inner<'ctx, C, const N: usize>(
-        builder: AsyncRuntimeBuilder<R, C>,
+    async unsafe fn run_inner<'ctx, const N: usize>(
+        builder: AsyncRuntimeBuilder<R>,
         receiver: Receiver<Message>,
         base_frame: &'ctx mut StackFrame<N>,
-    ) -> Result<(), Box<JlrsError>>
-    where
-        C: Channel<Message>,
-    {
+    ) -> Result<(), Box<JlrsError>> {
         let base_frame: &'static mut StackFrame<N> = std::mem::transmute(base_frame);
         let mut pinned = base_frame.pin();
         let base_frame = pinned.stack_frame();
@@ -601,14 +607,14 @@ where
             workers.push(worker)
         }
 
+        #[cfg(feature = "nightly")]
         jl_enter_threaded_region();
 
         loop {
             if free_stacks.borrow().len() == 0 {
                 jl_process_events();
-                jl_yield();
                 R::yield_now().await;
-
+                jl_yield();
                 continue;
             }
 
@@ -619,7 +625,6 @@ where
                 }
                 Some(Ok(msg)) => match msg.inner {
                     MessageInner::Task(task) => {
-                        // TODO: only receive if free space available
                         let idx = free_stacks.borrow_mut().pop_front().unwrap();
                         let stack = base_frame.nth_stack(idx);
 
@@ -636,7 +641,6 @@ where
 
                         running_tasks.borrow_mut()[idx] = Some(task);
                     }
-                    // TODO: single trait
                     MessageInner::BlockingTask(task) => {
                         let stack = base_frame.sync_stack();
                         task.call(stack);
@@ -645,6 +649,7 @@ where
                         let stack = base_frame.sync_stack();
                         task.call(stack);
                     }
+                    // TODO: make this atomic in julia
                     MessageInner::ErrorColor(task) => {
                         let stack = base_frame.sync_stack();
                         task.call(stack);
@@ -655,9 +660,13 @@ where
         }
 
         for i in 0..N {
-            let task = running_tasks.borrow_mut()[i].take();
-            if let Some(task) = task {
-                task.await;
+            loop {
+                if running_tasks.borrow()[i].is_some() {
+                    sleep(Global::new(), recv_timeout);
+                    jl_process_events();
+                } else {
+                    break;
+                }
             }
         }
 
@@ -669,11 +678,12 @@ where
                     break;
                 }
 
-                jl_gc_safepoint();
-                // TODO: julia sleep?
+                sleep(Global::new(), recv_timeout);
+                jl_process_events();
             }
         }
 
+        #[cfg(feature = "nightly")]
         jl_exit_threaded_region();
 
         jl_atexit_hook(0);

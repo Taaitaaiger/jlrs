@@ -38,7 +38,7 @@ impl Info {
 
     /// Number of threads Julia can use.
     pub fn n_threads(&self) -> usize {
-        // TODO: atomic!
+        // TODO: atomic on nightly!
         unsafe { jl_n_threads as usize }
     }
 
@@ -133,7 +133,7 @@ pub type StrOrBytes<'scope> = Result<&'scope str, &'scope [u8]>;
 
 // TODO: Is this available before init? Implement as functions if so, should be thread-safe
 mod private {
-    use crate::prelude::Target;
+    use crate::memory::target::Target;
     #[cfg(feature = "sync-rt")]
     use crate::runtime::sync_rt::Julia;
 

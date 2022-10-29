@@ -29,6 +29,19 @@
 
  - `Ref::leak` and `Ref::data_ptr` have been added.
 
+ - `async_util::task::sleep` has been added.
+
+ - When calling Julia functions, it can now be checked that none of the arguments are borrowed from Rust.
+
+ - It's no longer possible to provide a backing channel for an async runtime.
+
+ - A `nightly` feature is available to test the latest nightly Julia features. 
+
+ - When the `nightly` feature is enabled, the async runtime can be started with additional worker threads.
+
+ - When the `nightly` feature is enabled, tasks are scheduled on one of the two available thread pools depending on the method. 
+
+ - The `ForeignType` trait has been added which can be used to create new foreign types with custom mark functions.
 
 #### v0.16
  - Support for Julia 1.7 has been dropped, by default Julia 1.8 is targeted.

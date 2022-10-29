@@ -685,7 +685,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
         ArrayDimensions::new(self)
     }
 
-    /// TODO: Rooted/unrooted
+    /// TODO: Rooted/unrooted through target.
     /// Returns the type of this array's elements.
     pub fn element_type(self) -> ValueRef<'scope, 'static> {
         // Safety: C API function is called valid arguments.

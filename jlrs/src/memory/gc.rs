@@ -94,11 +94,31 @@ pub trait Gc: private::GcPriv {
     }
 }
 
-// TODO
+/// Mark `obj`, returns `true` if `obj` points to young data.
+///
+/// This method can be used to implement custom mark functions. If a foreign type contains
+/// references to Julia data, a custom `mark` function must be implemented that calls this
+/// function on each of those references.
+///
+/// Safety
+///
+/// This method must only be called from `ForeignType::mark`, `obj` must be a pointer to Julia
+/// data.
 pub unsafe fn mark_queue_obj(ptls: PTls, obj: *mut c_void) -> bool {
     jl_gc_mark_queue_obj(ptls, obj.cast()) != 0
 }
 
+/// Mark `objs`.
+///
+/// This method can be used to implement custom mark functions. If a foreign type contains
+/// references to Julia data, a custom `mark` function must be implemented. This method can be
+/// used on arrays of references to Julia data instead of calling [`mark_queue_obj`] for each
+/// reference in that array.
+///
+/// Safety
+///
+/// This method must only be called from `ForeignType::mark`, `objs` must be slice of pointers to
+/// Julia data.
 pub unsafe fn mark_queue_objarray(ptls: PTls, parent: *mut c_void, objs: &[*mut c_void]) {
     jl_gc_mark_queue_objarray(
         ptls,
@@ -118,7 +138,7 @@ pub unsafe fn mark_queue_objarray(ptls: PTls, parent: *mut c_void, objs: &[*mut 
 /// references to young objects.
 ///
 /// Safety: must be called whenever a field of `self` is set to `child` if `self` is
-/// maanged by the GC.
+/// managed by the GC.
 pub unsafe fn write_barrier<T>(data: &mut T, child: Value) {
     jl_gc_wb(data as *mut _ as *mut _, child.unwrap(Private))
 }

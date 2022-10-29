@@ -217,7 +217,7 @@
 //! // Initializing Julia is unsafe for the same reasons as the sync runtime.
 //! let (_julia, _task_handle) = unsafe {
 //!     RuntimeBuilder::new()
-//!         .async_runtime::<Tokio, UnboundedChannel<_>>()
+//!         .async_runtime::<Tokio>()
 //!         .start::<3>()
 //!         .unwrap()
 //! };
@@ -234,7 +234,7 @@
 //!     // Initializing Julia is unsafe for the same reasons as the sync runtime.
 //!     let (_julia, _task_handle) = unsafe {
 //!         RuntimeBuilder::new()
-//!             .async_runtime::<Tokio, UnboundedChannel<_>>()
+//!             .async_runtime::<Tokio>()
 //!             .start_async::<3>()
 //!             .unwrap()
 //!     };
@@ -374,7 +374,7 @@
 //!         // thread and returns a Future that resolves when the scheduled
 //!         // function has returned or thrown an error.
 //!         unsafe { func.call_async(&mut frame, &mut [a, b]) }
-//!             .await?
+//!             .await
 //!             .into_jlrs_result()?
 //!             .unbox::<u64>()
 //!     }
@@ -421,12 +421,12 @@
 //!     // Julia data rooted in this frame.
 //!     async fn init(
 //!         &mut self,
-//!         frame: &mut AsyncGcFrame<'static>,
+//!         mut frame: AsyncGcFrame<'static>,
 //!     ) -> JlrsResult<Self::State> {
 //!         // A `Vec` can be moved from Rust to Julia if the element type
 //!         // implements `IntoJulia`.
 //!         let data = vec![0usize; self.n_values];
-//!         let array = TypedArray::from_vec(&mut *frame, data, self.n_values)?
+//!         let array = TypedArray::from_vec(frame.as_extended_target(), data, self.n_values)?
 //!             .into_jlrs_result()?;
 //!
 //!         Ok(AccumulatorTaskState {
@@ -446,12 +446,13 @@
 //!     ) -> JlrsResult<Self::Output> {
 //!         {
 //!             // Array data can be directly accessed from Rust.
-//!             // TypedArray::bits_data_mut can be used if the type
-//!             // of the elements is concrete and immutable.
-//!             // This is safe because this is the only active reference to
-//!             // the array.
-//!             let mut data = unsafe { state.array.bits_data_mut(&mut frame)? };
-//!             data[state.offset] = input;
+//!             // The data is tracked first to ensure it's not
+//!             // already borrowed from Rust.
+//!             unsafe {
+//!                 let mut tracked = state.array.track_mut()?;
+//!                 let mut data = tracked.bits_data_mut()?;
+//!                 data[state.offset] = input;
+//!             };
 //!
 //!             state.offset += 1;
 //!             if (state.offset == self.n_values) {
@@ -602,7 +603,7 @@
 //!     pub static JULIA: RefCell<AsyncJulia<Tokio>> = {
 //!         let julia = RefCell::new(unsafe {
 //!             RuntimeBuilder::new()
-//!                 .async_runtime::<Tokio, UnboundedChannel<_>>()
+//!                 .async_runtime::<Tokio>()
 //!                 .start::<1>()
 //!                 .unwrap()
 //!                 .0
@@ -650,8 +651,8 @@
 //! [`Julia::init_with_image`]: crate::runtime::sync_rt::Julia::init_with_image
 //! [`CCall`]: crate::ccall::CCall
 //! [`CCall::uv_async_send`]: crate::ccall::CCall::uv_async_send
-//! [`Global`]: crate::memory::global::Global
-//! [`GcFrame`]: crate::memory::frame::GcFrame
+//! [`Global`]: crate::memory::target::global::Global
+//! [`GcFrame`]: crate::memory::target::frame::GcFrame
 //! [`Module`]: crate::wrappers::ptr::module::Module
 //! [`Function`]: crate::wrappers::ptr::function::Function
 //! [`Value`]: crate::wrappers::ptr::value::Value
@@ -673,7 +674,7 @@
 //! [`ValidLayout`]: crate::layout::valid_layout::ValidLayout
 //! [`Unbox`]: crate::convert::unbox::Unbox
 //! [`CallAsync::call_async`]: crate::multitask::call_async::CallAsync
-//! [`AsyncGcFrame`]: crate::memory::frame::AsyncGcFrame
+//! [`AsyncGcFrame`]: crate::memory::target::frame::AsyncGcFrame
 //! [`Frame`]: crate::memory::frame::Frame
 //! [`AsyncTask`]: crate::async_util::task::AsyncTask
 //! [`PersistentTask`]: crate::async_util::task::PersistentTask
@@ -682,11 +683,6 @@
 //! [`CallAsync`]: crate::call::CallAsync
 //! [`DataType`]: crate::wrappers::ptr::datatype::DataType
 //! [`TypedArray`]: crate::wrappers::ptr::array::TypedArray
-//! [`Output`]: crate::memory::output::Output
-//! [`OutputScope`]: crate::memory::output::OutputScope
-//! [`Scope`]: crate::memory::scope::Scope
-//! [`Scope::value_scope`]: crate::memory::scope::Scope::value_scope
-//! [`Scope::result_scope`]: crate::memory::scope::Scope::result_scope
 //! [`RuntimeBuilder`]: crate::runtime::builder::RuntimeBuilder
 //! [`AsyncRuntimeBuilder`]: crate::runtime::builder::AsyncRuntimeBuilder
 //! [`jlrs::prelude`]: crate::prelude

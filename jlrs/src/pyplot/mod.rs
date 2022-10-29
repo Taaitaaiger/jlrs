@@ -227,7 +227,7 @@ impl<'scope> PyPlot<'scope> {
                 .function(&frame, "wait")?
                 .wrapper_unchecked()
                 .call_async_main(frame, &mut [self.0])
-                .await?
+                .await
                 .into_jlrs_result()?;
 
             Ok(())
@@ -246,7 +246,7 @@ impl<'scope> PyPlot<'scope> {
                 .function(&frame, "wait")?
                 .wrapper_unchecked()
                 .call_async_interactive(frame, &mut [self.0])
-                .await?
+                .await
                 .into_jlrs_result()?;
 
             Ok(())
@@ -265,7 +265,7 @@ impl<'scope> PyPlot<'scope> {
                 .function(&frame, "wait")?
                 .wrapper_unchecked()
                 .call_async_local(frame, &mut [self.0])
-                .await?
+                .await
                 .into_jlrs_result()?;
 
             Ok(())
@@ -281,7 +281,7 @@ impl<'scope> PyPlot<'scope> {
                 .function(&frame, "wait")?
                 .wrapper_unchecked()
                 .call_async(frame, &mut [self.0])
-                .await?
+                .await
                 .into_jlrs_result()?;
 
             Ok(())

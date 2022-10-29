@@ -195,8 +195,6 @@ mod tests {
                     let output = frame.output();
                     let array = frame.scope(|mut frame| {
                         let borrowed = &mut data;
-                        // TODO:
-                        // let scope = frame.extended_target(output);
                         let arr = Array::from_slice(frame.as_extended_target(), borrowed, 4)?
                             .into_jlrs_result()?;
                         Ok(arr.root(output))

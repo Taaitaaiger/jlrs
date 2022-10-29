@@ -6,10 +6,11 @@ use std::sync::{
 use deadqueue::resizable::Queue;
 use futures::Future;
 
-use crate::{error::RuntimeError, prelude::JlrsResult};
+use crate::error::{JlrsResult, RuntimeError};
 
 struct AsyncQueue<T> {
     queue: Queue<T>,
+    // there's no method that closes the queue, so the number of senders must be tracked.
     n_senders: AtomicUsize,
 }
 

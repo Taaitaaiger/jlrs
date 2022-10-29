@@ -10,10 +10,12 @@ use std::ptr::NonNull;
 use crate::wrappers::ptr::private::WrapperPriv as _;
 use crate::{
     error::{AccessError, JlrsResult, JuliaResult},
-    memory::target::Target,
-    prelude::{Array, ArrayWrapper},
+    memory::{context::ledger::Ledger, target::Target},
     private::Private,
-    wrappers::ptr::value::{Value, MAX_SIZE},
+    wrappers::ptr::{
+        array::{tracked::ArrayWrapper, Array},
+        value::{Value, MAX_SIZE},
+    },
 };
 
 #[cfg(not(feature = "nightly"))]
@@ -78,7 +80,7 @@ pub trait Call<'data>: private::CallPriv {
     ///
     /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
     /// correctness. More information can be found in the [`safety`] module. This method doesn't
-    /// check if the argument is an array whose data is currently borrowed from Rust.
+    /// check if the argument is currently borrowed from Rust.
     ///
     /// [`safety`]: crate::safety
     unsafe fn call1<'target, T>(self, target: T, arg0: Value<'_, 'data>) -> T::Result
@@ -89,7 +91,7 @@ pub trait Call<'data>: private::CallPriv {
     ///
     /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
     /// correctness. More information can be found in the [`safety`] module. This method doesn't
-    /// check if any of the arguments is an array whose data is currently borrowed from Rust.
+    /// check if any of the arguments is currently borrowed from Rust.
     ///
     /// [`safety`]: crate::safety
     unsafe fn call2<'target, T>(
@@ -105,7 +107,7 @@ pub trait Call<'data>: private::CallPriv {
     ///
     /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
     /// correctness. More information can be found in the [`safety`] module. This method doesn't
-    /// check if any of the arguments is an array whose data is currently borrowed from Rust.
+    /// check if any of the arguments is currently borrowed from Rust.
     ///
     /// [`safety`]: crate::safety
     unsafe fn call3<'target, T>(
@@ -122,7 +124,7 @@ pub trait Call<'data>: private::CallPriv {
     ///
     /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
     /// correctness. More information can be found in the [`safety`] module. This method doesn't
-    /// check if any of the arguments is an array whose data is currently borrowed from Rust.
+    /// check if any of the arguments is currently borrowed from Rust.
     ///
     /// [`safety`]: crate::safety
     unsafe fn call<'target, 'value, V, T>(self, target: T, args: V) -> T::Result
@@ -133,33 +135,40 @@ pub trait Call<'data>: private::CallPriv {
     /// Call a function with an arbitrary number arguments.
     ///
     /// Unlike the other methods of this trait, this method checks if any of the arguments is
-    /// an array whose data is currently borrowed.
+    /// currently borrowed from Rust, and returns an `AccessError::BorrowError` if any of the
+    /// arguments is.
     ///
     /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
     /// correctness. More information can be found in the [`safety`] module.
     ///
     /// [`safety`]: crate::safety
-    unsafe fn call_tracked<'target, 'value, V, T>(
-        self,
-        target: T,
-        mut args: V,
-    ) -> JlrsResult<T::Result>
+    unsafe fn call_tracked<'target, 'value, V, T>(self, target: T, args: V) -> JlrsResult<T::Result>
     where
-        V: AsMut<[Value<'value, 'data>]>,
+        V: AsRef<[Value<'value, 'data>]>,
         T: Target<'target, 'data>,
     {
-        let args = args.as_mut();
+        let args = args.as_ref();
         let res = args
-            .iter_mut()
-            .filter_map(|arg| match arg.is::<Array>() {
-                true => Some(std::mem::transmute::<&mut Value, &mut Array>(arg)),
-                false => None,
+            .iter()
+            .map(|arg| -> JlrsResult<()> {
+                if let Ok(arr) = arg.cast::<Array>() {
+                    let range = arr.data_range();
+                    if Ledger::is_borrowed_any(range) {
+                        Err(AccessError::BorrowError)?
+                    }
+                    Ok(())
+                } else {
+                    let start = arg.data_ptr().as_ptr() as *mut u8;
+                    if Ledger::is_borrowed_any(start..start) {
+                        Err(AccessError::BorrowError)?
+                    }
+                    Ok(())
+                }
             })
-            .map(|f| f.track_mut())
             .find(|f| f.is_err())
             .map_or_else(
                 || Ok(self.call(target, args)),
-                |_| Err(AccessError::BorrowError),
+                |_: _| Err(AccessError::BorrowError),
             )?;
 
         Ok(res)
@@ -167,6 +176,7 @@ pub trait Call<'data>: private::CallPriv {
 }
 
 /// Provide keyword arguments to a Julia function.
+// TODO: track array?
 pub trait ProvideKeywords<'value, 'data>: Call<'data> {
     /// Provide keyword arguments to the function. The keyword arguments must be a `NamedTuple`.
     ///
@@ -178,6 +188,8 @@ pub trait ProvideKeywords<'value, 'data>: Call<'data> {
     /// # fn main() {
     /// # JULIA.with(|j| {
     /// # let mut julia = j.borrow_mut();
+    /// # let mut frame = StackFrame::new();
+    /// # let mut julia = julia.instance(&mut frame);
     /// julia.scope(|mut frame| unsafe {
     ///     // The code we evaluate is a simple function definition, which is safe.
     ///     let func = unsafe {
@@ -187,7 +199,7 @@ pub trait ProvideKeywords<'value, 'data>: Call<'data> {
     ///
     ///     let a = Value::new(&mut frame, 1isize);
     ///     let b = Value::new(&mut frame, 2isize);
-    ///     let nt = named_tuple!(&mut frame, "a" => a, "b" => b);
+    ///     let nt = named_tuple!(frame.as_extended_target(), "a" => a, "b" => b);
     ///
     ///     // Call the previously defined function. This function simply sums its three
     ///     // keyword arguments and has no side effects, so it's safe to call.
@@ -205,7 +217,6 @@ pub trait ProvideKeywords<'value, 'data>: Call<'data> {
     /// # .unwrap();
     /// # });
     /// # }
-    // TODO: track array
     fn provide_keywords(
         self,
         keywords: Value<'value, 'data>,
@@ -364,8 +375,6 @@ cfg_if::cfg_if! {
         /// [`PersistentTask::init`]: crate::async_util::task::PersistentTask::init
         #[async_trait(?Send)]
         pub trait CallAsync<'data>: Call<'data> {
-            // TODO: track array
-
             /// Creates and schedules a new task with `Base.Threads.@spawn`, and returns a future
             /// that resolves when this task is finished.
             ///
@@ -373,14 +382,81 @@ cfg_if::cfg_if! {
             /// thread pool.
             ///
             /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
-            /// correctness. More information can be found in the [`safety`] module.
+            /// correctness. More information can be found in the [`safety`] module. This method doesn't
+            /// check if any of the arguments is currently borrowed from Rust.
             ///
             /// [`safety`]: crate::safety
             async unsafe fn call_async<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
+            ) -> JuliaResult<'target, 'data>
+            where
+                V: AsRef<[Value<'value, 'data>]>;
+
+            /// Creates and schedules a new task with `Base.Threads.@spawn`, and returns a future
+            /// that resolves when this task is finished.
+            ///
+            /// When the `nightly` feature is enabled, this task is spawned on the `:default`
+            /// thread pool.
+            ///
+            /// This method checks if any of the arguments is currently borrowed from Rust, and
+            /// returns an `AccessError::BorrowError` if any of the arguments is.
+            ///
+            /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
+            /// correctness. More information can be found in the [`safety`] module.
+            ///
+            /// [`safety`]: crate::safety
+            async unsafe fn call_async_tracked<'target, 'value, V>(
+                self,
+                frame: &mut AsyncGcFrame<'target>,
+                args: V,
             ) -> JlrsResult<JuliaResult<'target, 'data>>
+            where
+                V: AsRef<[Value<'value, 'data>]>
+            {
+                let args = args.as_ref();
+                let res = args
+                    .iter()
+                    .map(|arg| -> JlrsResult<()> {
+                        if let Ok(arr) = arg.cast::<Array>() {
+                            let range = arr.data_range();
+                            if Ledger::is_borrowed_any(range) {
+                                Err(AccessError::BorrowError)?
+                            }
+                            Ok(())
+                        } else {
+                            let start = arg.data_ptr().as_ptr() as *mut u8;
+                            if Ledger::is_borrowed_any(start..start) {
+                                Err(AccessError::BorrowError)?
+                            }
+                            Ok(())
+                        }
+                    })
+                    .find(|f| f.is_err())
+                    .map_or_else(
+                         || Ok(async { self.call_async(frame, args).await }),
+                        |_: _| Err(AccessError::BorrowError),
+                    )?.await;
+
+                Ok(res)
+            }
+
+            /// Does the same thing as [`CallAsync::call_async`], but the task is returned rather than an
+            /// awaitable `Future`. This method should only be called in [`PersistentTask::init`],
+            /// otherwise it's not guaranteed this task can make progress.
+            ///
+            /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
+            /// correctness. More information can be found in the [`safety`] module. This method doesn't
+            /// check if any of the arguments is currently borrowed from Rust.
+            ///
+            /// [`safety`]: crate::safety
+            /// [`PersistentTask::init`]: crate::async_util::task::PersistentTask::init
+            unsafe fn schedule_async<'target, 'value, V>(
+                self,
+                frame: &mut AsyncGcFrame<'target>,
+                args: V,
+            ) -> JuliaResult<Task<'target>, 'target, 'data>
             where
                 V: AsRef<[Value<'value, 'data>]>;
 
@@ -391,13 +467,63 @@ cfg_if::cfg_if! {
             /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
             /// correctness. More information can be found in the [`safety`] module.
             ///
+            /// This method checks if any of the arguments is currently borrowed from Rust, and
+            /// returns an `AccessError::BorrowError` if any of the arguments is.
+            ///
             /// [`safety`]: crate::safety
             /// [`PersistentTask::init`]: crate::async_util::task::PersistentTask::init
-            unsafe fn schedule_async<'target, 'value, V>(
+            unsafe fn schedule_async_tracked<'target, 'value, V, T>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JlrsResult<JuliaResult<Task<'target>, 'target, 'data>>
+            where
+                V: AsRef<[Value<'value, 'data>]>,
+                T: Target<'target, 'data>,
+            {
+                let args = args.as_ref();
+                let res = args
+                    .iter()
+                    .map(|arg| -> JlrsResult<()> {
+                        if let Ok(arr) = arg.cast::<Array>() {
+                            let range = arr.data_range();
+                            if Ledger::is_borrowed_any(range) {
+                                Err(AccessError::BorrowError)?
+                            }
+                            Ok(())
+                        } else {
+                            let start = arg.data_ptr().as_ptr() as *mut u8;
+                            if Ledger::is_borrowed_any(start..start) {
+                                Err(AccessError::BorrowError)?
+                            }
+                            Ok(())
+                        }
+                    })
+                    .find(|f| f.is_err())
+                    .map_or_else(
+                        || Ok(self.schedule_async(frame, args)),
+                       |_: _| Err(AccessError::BorrowError),
+                   )?;
+
+                Ok(res)
+            }
+
+            /// Call a function on another thread with the given arguments. This method uses
+            /// `Base.Threads.@spawn` to call the given function on another thread but return immediately.
+            /// While `await`ing the result the async runtime can work on other tasks, the current task
+            /// resumes after the function call on the other thread completes.
+            ///
+            /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
+            /// correctness. More information can be found in the [`safety`] module. This method doesn't
+            /// check if any of the arguments is currently borrowed from Rust.
+            ///
+            /// [`safety`]: crate::safety
+            #[cfg(feature = "nightly")]
+            async unsafe fn call_async_interactive<'target, 'value, V>(
+                self,
+                frame: &mut AsyncGcFrame<'target>,
+                args: V,
+            ) -> JuliaResult<'target, 'data>
             where
                 V: AsRef<[Value<'value, 'data>]>;
 
@@ -409,15 +535,65 @@ cfg_if::cfg_if! {
             /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
             /// correctness. More information can be found in the [`safety`] module.
             ///
+            /// This method checks if any of the arguments is currently borrowed from Rust, and
+            /// returns an `AccessError::BorrowError` if any of the arguments is.
+            ///
             /// [`safety`]: crate::safety
             #[cfg(feature = "nightly")]
-            async unsafe fn call_async_interactive<'target, 'value, V>(
+            async unsafe fn call_async_interactive_tracked<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JlrsResult<JuliaResult<'target, 'data>>
             where
+                V: AsRef<[Value<'value, 'data>]>
+            {
+                let args = args.as_ref();
+                let res = args
+                    .iter()
+                    .map(|arg| -> JlrsResult<()> {
+                        if let Ok(arr) = arg.cast::<Array>() {
+                            let range = arr.data_range();
+                            if Ledger::is_borrowed_any(range) {
+                                Err(AccessError::BorrowError)?
+                            }
+                            Ok(())
+                        } else {
+                            let start = arg.data_ptr().as_ptr() as *mut u8;
+                            if Ledger::is_borrowed_any(start..start) {
+                                Err(AccessError::BorrowError)?
+                            }
+                            Ok(())
+                        }
+                    })
+                    .find(|f| f.is_err())
+                    .map_or_else(
+                         || Ok(async { self.call_async_interactive(frame, args).await }),
+                        |_: _| Err(AccessError::BorrowError),
+                    )?.await;
+
+                Ok(res)
+            }
+
+            /// Does the same thing as [`CallAsync::call_async`], but the task is returned rather than an
+            /// awaitable `Future`. This method should only be called in [`PersistentTask::init`],
+            /// otherwise it's not guaranteed this task can make progress.
+            ///
+            /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
+            /// correctness. More information can be found in the [`safety`] module. This method doesn't
+            /// check if any of the arguments is currently borrowed from Rust.
+            ///
+            /// [`safety`]: crate::safety
+            /// [`PersistentTask::init`]: crate::async_util::task::PersistentTask::init
+            #[cfg(feature = "nightly")]
+            unsafe fn schedule_async_interactive<'target, 'value, V>(
+                self,
+                frame: &mut AsyncGcFrame<'target>,
+                args: V,
+            ) -> JuliaResult<Task<'target>, 'target, 'data>
+            where
                 V: AsRef<[Value<'value, 'data>]>;
+
 
             /// Does the same thing as [`CallAsync::call_async`], but the task is returned rather than an
             /// awaitable `Future`. This method should only be called in [`PersistentTask::init`],
@@ -426,14 +602,63 @@ cfg_if::cfg_if! {
             /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
             /// correctness. More information can be found in the [`safety`] module.
             ///
+            /// This method checks if any of the arguments is currently borrowed from Rust, and
+            /// returns an `AccessError::BorrowError` if any of the arguments is.
+            ///
             /// [`safety`]: crate::safety
             /// [`PersistentTask::init`]: crate::async_util::task::PersistentTask::init
             #[cfg(feature = "nightly")]
-            unsafe fn schedule_interactive<'target, 'value, V>(
+            unsafe fn schedule_async_interactive_tracked<'target, 'value, V, T>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JlrsResult<JuliaResult<Task<'target>, 'target, 'data>>
+            where
+                V: AsRef<[Value<'value, 'data>]>,
+                T: Target<'target, 'data>,
+            {
+                let args = args.as_ref();
+                let res = args
+                    .iter()
+                    .map(|arg| -> JlrsResult<()> {
+                        if let Ok(arr) = arg.cast::<Array>() {
+                            let range = arr.data_range();
+                            if Ledger::is_borrowed_any(range) {
+                                Err(AccessError::BorrowError)?
+                            }
+                            Ok(())
+                        } else {
+                            let start = arg.data_ptr().as_ptr() as *mut u8;
+                            if Ledger::is_borrowed_any(start..start) {
+                                Err(AccessError::BorrowError)?
+                            }
+                            Ok(())
+                        }
+                    })
+                    .find(|f| f.is_err())
+                    .map_or_else(
+                        || Ok(self.schedule_async_interactive(frame, args)),
+                        |_: _| Err(AccessError::BorrowError),
+                    )?;
+
+                Ok(res)
+            }
+
+            /// Call a function with the given arguments in an `@async` block. Like `call_async`, the
+            /// function is not called on the main thread, but on a separate thread that handles all
+            /// tasks created by this method. This method should only be used with functions that do very
+            /// little computational work but mostly spend their time waiting on IO.
+            ///
+            /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
+            /// correctness. More information can be found in the [`safety`] module. This method doesn't
+            /// check if any of the arguments is currently borrowed from Rust.
+            ///
+            /// [`safety`]: crate::safety
+            async unsafe fn call_async_local<'target, 'value, V>(
+                self,
+                frame: &mut AsyncGcFrame<'target>,
+                args: V,
+            ) -> JuliaResult<'target, 'data>
             where
                 V: AsRef<[Value<'value, 'data>]>;
 
@@ -445,14 +670,63 @@ cfg_if::cfg_if! {
             /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
             /// correctness. More information can be found in the [`safety`] module.
             ///
+            /// This method checks if any of the arguments is currently borrowed from Rust, and
+            /// returns an `AccessError::BorrowError` if any of the arguments is.
+            ///
             /// [`safety`]: crate::safety
-            async unsafe fn call_async_local<'target, 'value, V>(
+            async unsafe fn call_async_local_tracked<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JlrsResult<JuliaResult<'target, 'data>>
             where
+                V: AsRef<[Value<'value, 'data>]>
+            {
+                let args = args.as_ref();
+                let res = args
+                    .iter()
+                    .map(|arg| -> JlrsResult<()> {
+                        if let Ok(arr) = arg.cast::<Array>() {
+                            let range = arr.data_range();
+                            if Ledger::is_borrowed_any(range) {
+                                Err(AccessError::BorrowError)?
+                            }
+                            Ok(())
+                        } else {
+                            let start = arg.data_ptr().as_ptr() as *mut u8;
+                            if Ledger::is_borrowed_any(start..start) {
+                                Err(AccessError::BorrowError)?
+                            }
+                            Ok(())
+                        }
+                    })
+                    .find(|f| f.is_err())
+                    .map_or_else(
+                         || Ok(async { self.call_async_local(frame, args).await }),
+                        |_: _| Err(AccessError::BorrowError),
+                    )?.await;
+
+                Ok(res)
+            }
+
+            /// Does the same thing as [`CallAsync::call_async_local`], but the task is returned rather
+            /// than an awaitable `Future`. This method should only be called in [`PersistentTask::init`],
+            /// otherwise it's not guaranteed this task can make progress.
+            ///
+            /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
+            /// correctness. More information can be found in the [`safety`] module. This method doesn't
+            /// check if any of the arguments is currently borrowed from Rust.
+            ///
+            /// [`safety`]: crate::safety
+            /// [`PersistentTask::init`]: crate::async_util::task::PersistentTask::init
+            unsafe fn schedule_async_local<'target, 'value, V>(
+                self,
+                frame: &mut AsyncGcFrame<'target>,
+                args: V,
+            ) -> JuliaResult<Task<'target>, 'target, 'data>
+            where
                 V: AsRef<[Value<'value, 'data>]>;
+
 
             /// Does the same thing as [`CallAsync::call_async_local`], but the task is returned rather
             /// than an awaitable `Future`. This method should only be called in [`PersistentTask::init`],
@@ -461,15 +735,64 @@ cfg_if::cfg_if! {
             /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
             /// correctness. More information can be found in the [`safety`] module.
             ///
+            /// This method checks if any of the arguments is currently borrowed from Rust, and
+            /// returns an `AccessError::BorrowError` if any of the arguments is.
+            ///
             /// [`safety`]: crate::safety
             /// [`PersistentTask::init`]: crate::async_util::task::PersistentTask::init
-            unsafe fn schedule_async_local<'target, 'value, V>(
+            unsafe fn schedule_async_local_tracked<'target, 'value, V, T>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JlrsResult<JuliaResult<Task<'target>, 'target, 'data>>
             where
+                V: AsRef<[Value<'value, 'data>]>,
+                T: Target<'target, 'data>,
+            {
+                let args = args.as_ref();
+                let res = args
+                    .iter()
+                    .map(|arg| -> JlrsResult<()> {
+                        if let Ok(arr) = arg.cast::<Array>() {
+                            let range = arr.data_range();
+                            if Ledger::is_borrowed_any(range) {
+                                Err(AccessError::BorrowError)?
+                            }
+                            Ok(())
+                        } else {
+                            let start = arg.data_ptr().as_ptr() as *mut u8;
+                            if Ledger::is_borrowed_any(start..start) {
+                                Err(AccessError::BorrowError)?
+                            }
+                            Ok(())
+                        }
+                    })
+                    .find(|f| f.is_err())
+                    .map_or_else(
+                        || Ok(self.schedule_async_local(frame, args)),
+                        |_: _| Err(AccessError::BorrowError),
+                    )?;
+
+                Ok(res)
+            }
+
+            /// Call a function with the given arguments in an `@async` block. The task is scheduled on
+            /// the main thread. This method should only be used with functions that must run on the main
+            /// thread. The runtime is blocked while this task is active.
+            ///
+            /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
+            /// correctness. More information can be found in the [`safety`] module. This method doesn't
+            /// check if any of the arguments is currently borrowed from Rust.
+            ///
+            /// [`safety`]: crate::safety
+            async unsafe fn call_async_main<'target, 'value, V>(
+                self,
+                frame: &mut AsyncGcFrame<'target>,
+                args: V,
+            ) -> JuliaResult<'target, 'data>
+            where
                 V: AsRef<[Value<'value, 'data>]>;
+
 
             /// Call a function with the given arguments in an `@async` block. The task is scheduled on
             /// the main thread. This method should only be used with functions that must run on the main
@@ -478,12 +801,60 @@ cfg_if::cfg_if! {
             /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
             /// correctness. More information can be found in the [`safety`] module.
             ///
+            /// This method checks if any of the arguments is currently borrowed from Rust, and
+            /// returns an `AccessError::BorrowError` if any of the arguments is.
+            ///
             /// [`safety`]: crate::safety
-            async unsafe fn call_async_main<'target, 'value, V>(
+            async unsafe fn call_async_main_tracked<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JlrsResult<JuliaResult<'target, 'data>>
+            where
+                V: AsRef<[Value<'value, 'data>]>
+            {
+                let args = args.as_ref();
+                let res = args
+                    .iter()
+                    .map(|arg| -> JlrsResult<()> {
+                        if let Ok(arr) = arg.cast::<Array>() {
+                            let range = arr.data_range();
+                            if Ledger::is_borrowed_any(range) {
+                                Err(AccessError::BorrowError)?
+                            }
+                            Ok(())
+                        } else {
+                            let start = arg.data_ptr().as_ptr() as *mut u8;
+                            if Ledger::is_borrowed_any(start..start) {
+                                Err(AccessError::BorrowError)?
+                            }
+                            Ok(())
+                        }
+                    })
+                    .find(|f| f.is_err())
+                    .map_or_else(
+                         || Ok(async { self.call_async_main(frame, args).await }),
+                        |_: _| Err(AccessError::BorrowError),
+                    )?.await;
+
+                Ok(res)
+            }
+
+            /// Does the same thing as [`CallAsync::call_async_main`], but the task is returned rather
+            /// than an awaitable `Future`. This method should only be called in [`PersistentTask::init`],
+            /// otherwise it's not guaranteed this task can make progress.
+            ///
+            /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
+            /// correctness. More information can be found in the [`safety`] module. This method doesn't
+            /// check if any of the arguments is currently borrowed from Rust.
+            ///
+            /// [`safety`]: crate::safety
+            /// [`PersistentTask::init`]: crate::async_util::task::PersistentTask::init
+            unsafe fn schedule_async_main<'target, 'value, V>(
+                self,
+                frame: &mut AsyncGcFrame<'target>,
+                args: V,
+            ) ->JuliaResult<Task<'target>, 'target, 'data>
             where
                 V: AsRef<[Value<'value, 'data>]>;
 
@@ -494,15 +865,46 @@ cfg_if::cfg_if! {
             /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
             /// correctness. More information can be found in the [`safety`] module.
             ///
+            /// This method checks if any of the arguments is currently borrowed from Rust, and
+            /// returns an `AccessError::BorrowError` if any of the arguments is.
+            ///
             /// [`safety`]: crate::safety
             /// [`PersistentTask::init`]: crate::async_util::task::PersistentTask::init
-            unsafe fn schedule_async_main<'target, 'value, V>(
+            unsafe fn schedule_async_main_tracked<'target, 'value, V, T>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
             ) -> JlrsResult<JuliaResult<Task<'target>, 'target, 'data>>
             where
-                V: AsRef<[Value<'value, 'data>]>;
+                V: AsRef<[Value<'value, 'data>]>,
+                T: Target<'target, 'data>,
+            {
+                let args = args.as_ref();
+                let res = args
+                    .iter()
+                    .map(|arg| -> JlrsResult<()> {
+                        if let Ok(arr) = arg.cast::<Array>() {
+                            let range = arr.data_range();
+                            if Ledger::is_borrowed_any(range) {
+                                Err(AccessError::BorrowError)?
+                            }
+                            Ok(())
+                        } else {
+                            let start = arg.data_ptr().as_ptr() as *mut u8;
+                            if Ledger::is_borrowed_any(start..start) {
+                                Err(AccessError::BorrowError)?
+                            }
+                            Ok(())
+                        }
+                    })
+                    .find(|f| f.is_err())
+                    .map_or_else(
+                        || Ok(self.schedule_async_main(frame, args)),
+                        |_: _| Err(AccessError::BorrowError),
+                    )?;
+
+                Ok(res)
+            }
         }
 
         #[async_trait(?Send)]
@@ -511,11 +913,11 @@ cfg_if::cfg_if! {
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JlrsResult<JuliaResult<'target, 'data>>
+            ) -> JuliaResult<'target, 'data>
             where
                 V: AsRef<[Value<'value, 'data>]>,
             {
-                Ok(JuliaFuture::new(frame, self, args)?.await)
+                JuliaFuture::new(frame, self, args).await
             }
 
             #[cfg(feature = "nightly")]
@@ -523,19 +925,19 @@ cfg_if::cfg_if! {
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JlrsResult<JuliaResult<'target, 'data>>
+            ) -> JuliaResult<'target, 'data>
             where
                 V: AsRef<[Value<'value, 'data>]>
             {
-                Ok(JuliaFuture::new_interactive(frame, self, args)?.await)
+                JuliaFuture::new_interactive(frame, self, args).await
             }
 
             #[cfg(feature = "nightly")]
-            unsafe fn schedule_interactive<'target, 'value, V>(
+            unsafe fn schedule_async_interactive<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JlrsResult<JuliaResult<Task<'target>, 'target, 'data>>
+            ) -> JuliaResult<Task<'target>, 'target, 'data>
             where
                 V: AsRef<[Value<'value, 'data>]>,
             {
@@ -546,15 +948,17 @@ cfg_if::cfg_if! {
                 vals.extend_from_slice(values);
 
                 let task = Module::main(&frame)
-                    .submodule(&frame, "JlrsMultitask")?
+                    .submodule(&frame, "JlrsMultitask")
+                    .expect("JlrsMultitask not available")
                     .wrapper_unchecked()
-                    .function(&frame, "interactivecall")?
+                    .function(&frame, "interactivecall")
+                    .expect("interactivecall not available")
                     .wrapper_unchecked()
                     .call(&mut *frame, &mut vals);
 
                 match task {
-                    Ok(t) => Ok(Ok(t.cast_unchecked::<Task>())),
-                    Err(e) => Ok(Err(e)),
+                    Ok(t) => Ok(t.cast_unchecked::<Task>()),
+                    Err(e) => Err(e),
                 }
             }
 
@@ -562,7 +966,7 @@ cfg_if::cfg_if! {
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JlrsResult<JuliaResult<Task<'target>, 'target, 'data>>
+            ) -> JuliaResult<Task<'target>, 'target, 'data>
             where
                 V: AsRef<[Value<'value, 'data>]>,
             {
@@ -573,15 +977,17 @@ cfg_if::cfg_if! {
                 vals.extend_from_slice(values);
 
                 let task = Module::main(&frame)
-                    .submodule(&frame, "JlrsMultitask")?
+                    .submodule(&frame, "JlrsMultitask")
+                    .expect("JlrsMultitask not available")
                     .wrapper_unchecked()
-                    .function(&frame, "asynccall")?
+                    .function(&frame, "asynccall")
+                    .expect("asynccall not available")
                     .wrapper_unchecked()
                     .call(&mut *frame, &mut vals);
 
                 match task {
-                    Ok(t) => Ok(Ok(t.cast_unchecked::<Task>())),
-                    Err(e) => Ok(Err(e)),
+                    Ok(t) => Ok(t.cast_unchecked::<Task>()),
+                    Err(e) => Err(e),
                 }
             }
 
@@ -589,18 +995,18 @@ cfg_if::cfg_if! {
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JlrsResult<JuliaResult<'target, 'data>>
+            ) -> JuliaResult<'target, 'data>
             where
                 V: AsRef<[Value<'value, 'data>]>,
             {
-                Ok(JuliaFuture::new_local(frame, self, args)?.await)
+                JuliaFuture::new_local(frame, self, args).await
             }
 
             unsafe fn schedule_async_local<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JlrsResult<JuliaResult<Task<'target>, 'target, 'data>>
+            ) -> JuliaResult<Task<'target>, 'target, 'data>
             where
                 V: AsRef<[Value<'value, 'data>]>,
             {
@@ -611,15 +1017,17 @@ cfg_if::cfg_if! {
                 vals.extend_from_slice(values);
 
                 let task = Module::main(&frame)
-                    .submodule(&frame, "JlrsMultitask")?
+                    .submodule(&frame, "JlrsMultitask")
+                    .expect("JlrsMultitask not available")
                     .wrapper_unchecked()
-                    .function(&frame, "scheduleasynclocal")?
+                    .function(&frame, "scheduleasynclocal")
+                    .expect("scheduleasynclocal not available")
                     .wrapper_unchecked()
                     .call(&mut *frame, &mut vals);
 
                 match task {
-                    Ok(t) => Ok(Ok(t.cast_unchecked::<Task>())),
-                    Err(e) => Ok(Err(e)),
+                    Ok(t) => Ok(t.cast_unchecked::<Task>()),
+                    Err(e) => Err(e),
                 }
             }
 
@@ -627,18 +1035,18 @@ cfg_if::cfg_if! {
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JlrsResult<JuliaResult<'target, 'data>>
+            ) -> JuliaResult<'target, 'data>
             where
                 V: AsRef<[Value<'value, 'data>]>,
             {
-                Ok(JuliaFuture::new_main(frame, self, args)?.await)
+                JuliaFuture::new_main(frame, self, args).await
             }
 
             unsafe fn schedule_async_main<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JlrsResult<JuliaResult<Task<'target>, 'target, 'data>>
+            ) -> JuliaResult<Task<'target>, 'target, 'data>
             where
                 V: AsRef<[Value<'value, 'data>]>,
             {
@@ -649,15 +1057,17 @@ cfg_if::cfg_if! {
                 vals.extend_from_slice(values);
 
                 let task = Module::main(&frame)
-                    .submodule(&frame, "JlrsMultitask")?
+                    .submodule(&frame, "JlrsMultitask")
+                    .expect("JlrsMultitask not available")
                     .wrapper_unchecked()
-                    .function(&frame, "scheduleasync")?
+                    .function(&frame, "scheduleasync")
+                    .expect("scheduleasync not available")
                     .wrapper_unchecked()
                     .call(&mut *frame, &mut vals);
 
                 match task {
-                    Ok(t) => Ok(Ok(t.cast_unchecked::<Task>())),
-                    Err(e) => Ok(Err(e)),
+                    Ok(t) => Ok(t.cast_unchecked::<Task>()),
+                    Err(e) => Err(e),
                 }
             }
         }
@@ -668,11 +1078,11 @@ cfg_if::cfg_if! {
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JlrsResult<JuliaResult<'target, 'data>>
+            ) -> JuliaResult<'target, 'data>
             where
                 V: AsRef<[Value<'value, 'data>]>,
             {
-                Ok(JuliaFuture::new(frame, self.as_value(), args)?.await)
+                JuliaFuture::new(frame, self.as_value(), args).await
             }
 
             #[cfg(feature = "nightly")]
@@ -680,30 +1090,30 @@ cfg_if::cfg_if! {
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JlrsResult<JuliaResult<'target, 'data>>
+            ) -> JuliaResult<'target, 'data>
             where
                 V: AsRef<[Value<'value, 'data>]>,
             {
-                Ok(JuliaFuture::new_interactive(frame, self.as_value(), args)?.await)
+                JuliaFuture::new_interactive(frame, self.as_value(), args).await
             }
 
             #[cfg(feature = "nightly")]
-            unsafe fn schedule_interactive<'target, 'value, V>(
+            unsafe fn schedule_async_interactive<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JlrsResult<JuliaResult<Task<'target>, 'target, 'data>>
+            ) -> JuliaResult<Task<'target>, 'target, 'data>
             where
                 V: AsRef<[Value<'value, 'data>]>,
             {
-                self.as_value().schedule_interactive(frame, args)
+                self.as_value().schedule_async_interactive(frame, args)
             }
 
             unsafe fn schedule_async<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JlrsResult<JuliaResult<Task<'target>, 'target, 'data>>
+            ) -> JuliaResult<Task<'target>, 'target, 'data>
             where
                 V: AsRef<[Value<'value, 'data>]>,
             {
@@ -714,18 +1124,18 @@ cfg_if::cfg_if! {
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JlrsResult<JuliaResult<'target, 'data>>
+            ) -> JuliaResult<'target, 'data>
             where
                 V: AsRef<[Value<'value, 'data>]>,
             {
-                Ok(JuliaFuture::new_local(frame, self.as_value(), args)?.await)
+                JuliaFuture::new_local(frame, self.as_value(), args).await
             }
 
             unsafe fn schedule_async_local<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JlrsResult<JuliaResult<Task<'target>, 'target, 'data>>
+            ) -> JuliaResult<Task<'target>, 'target, 'data>
             where
                 V: AsRef<[Value<'value, 'data>]>,
             {
@@ -736,18 +1146,18 @@ cfg_if::cfg_if! {
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JlrsResult<JuliaResult<'target, 'data>>
+            ) -> JuliaResult<'target, 'data>
             where
                 V: AsRef<[Value<'value, 'data>]>,
             {
-                Ok(JuliaFuture::new_main(frame, self.as_value(), args)?.await)
+                JuliaFuture::new_main(frame, self.as_value(), args).await
             }
 
             unsafe fn schedule_async_main<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JlrsResult<JuliaResult<Task<'target>, 'target, 'data>>
+            ) -> JuliaResult<Task<'target>, 'target, 'data>
             where
                 V: AsRef<[Value<'value, 'data>]>,
             {
@@ -761,11 +1171,11 @@ cfg_if::cfg_if! {
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JlrsResult<JuliaResult<'target, 'data>>
+            ) -> JuliaResult<'target, 'data>
             where
                 V: AsRef<[Value<'value, 'data>]>,
             {
-                Ok(JuliaFuture::new_with_keywords(frame, self, args)?.await)
+                JuliaFuture::new_with_keywords(frame, self, args).await
             }
 
             #[cfg(feature = "nightly")]
@@ -773,19 +1183,19 @@ cfg_if::cfg_if! {
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JlrsResult<JuliaResult<'target, 'data>>
+            ) -> JuliaResult<'target, 'data>
             where
                 V: AsRef<[Value<'value, 'data>]>,
             {
-                Ok(JuliaFuture::new_interactive_with_keywords(frame, self, args)?.await)
+                JuliaFuture::new_interactive_with_keywords(frame, self, args).await
             }
 
             #[cfg(feature = "nightly")]
-            unsafe fn schedule_interactive<'target, 'value, V>(
+            unsafe fn schedule_async_interactive<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JlrsResult<JuliaResult<Task<'target>, 'target, 'data>>
+            ) -> JuliaResult<Task<'target>, 'target, 'data>
             where
                 V: AsRef<[Value<'value, 'data>]>,
             {
@@ -796,16 +1206,19 @@ cfg_if::cfg_if! {
                 vals.extend_from_slice(values);
 
                 let task = Module::main(&frame)
-                    .submodule(&frame, "JlrsMultitask")?
+                    .submodule(&frame, "JlrsMultitask")
+                    .expect("JlrsMultitask not available")
                     .wrapper_unchecked()
-                    .function(&frame, "interactivecall")?
+                    .function(&frame, "interactivecall")
+                    .expect("interactivecall not available")
                     .wrapper_unchecked()
-                    .provide_keywords(self.keywords())?
+                    .provide_keywords(self.keywords())
+                    .expect("Keywords invalid")
                     .call(&mut *frame, &mut vals);
 
                 match task {
-                    Ok(t) => Ok(Ok(t.cast_unchecked::<Task>())),
-                    Err(e) => Ok(Err(e)),
+                    Ok(t) => Ok(t.cast_unchecked::<Task>()),
+                    Err(e) => Err(e),
                 }
             }
 
@@ -813,7 +1226,7 @@ cfg_if::cfg_if! {
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JlrsResult<JuliaResult<Task<'target>, 'target, 'data>>
+            ) -> JuliaResult<Task<'target>, 'target, 'data>
             where
                 V: AsRef<[Value<'value, 'data>]>,
             {
@@ -824,16 +1237,19 @@ cfg_if::cfg_if! {
                 vals.extend_from_slice(values);
 
                 let task = Module::main(&frame)
-                    .submodule(&frame, "JlrsMultitask")?
+                    .submodule(&frame, "JlrsMultitask")
+                    .expect("JlrsMultitask not available")
                     .wrapper_unchecked()
-                    .function(&frame, "asynccall")?
+                    .function(&frame, "asynccall")
+                    .expect("asynccall not available")
                     .wrapper_unchecked()
-                    .provide_keywords(self.keywords())?
+                    .provide_keywords(self.keywords())
+                    .expect("Keywords invalid")
                     .call(&mut *frame, &mut vals);
 
                 match task {
-                    Ok(t) => Ok(Ok(t.cast_unchecked::<Task>())),
-                    Err(e) => Ok(Err(e)),
+                    Ok(t) => Ok(t.cast_unchecked::<Task>()),
+                    Err(e) => Err(e),
                 }
             }
 
@@ -841,18 +1257,18 @@ cfg_if::cfg_if! {
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JlrsResult<JuliaResult<'target, 'data>>
+            ) -> JuliaResult<'target, 'data>
             where
                 V: AsRef<[Value<'value, 'data>]>,
             {
-                Ok(JuliaFuture::new_local_with_keywords(frame, self, args)?.await)
+                JuliaFuture::new_local_with_keywords(frame, self, args).await
             }
 
             unsafe fn schedule_async_local<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JlrsResult<JuliaResult<Task<'target>, 'target, 'data>>
+            ) -> JuliaResult<Task<'target>, 'target, 'data>
             where
                 V: AsRef<[Value<'value, 'data>]>,
             {
@@ -863,16 +1279,19 @@ cfg_if::cfg_if! {
                 vals.extend_from_slice(values);
 
                 let task = Module::main(&frame)
-                    .submodule(&frame, "JlrsMultitask")?
+                    .submodule(&frame, "JlrsMultitask")
+                    .expect("JlrsMultitask not available")
                     .wrapper_unchecked()
-                    .function(&frame, "scheduleasynclocal")?
+                    .function(&frame, "scheduleasynclocal")
+                    .expect("scheduleasynclocal not available")
                     .wrapper_unchecked()
-                    .provide_keywords(self.keywords())?
+                    .provide_keywords(self.keywords())
+                    .expect("Keywords invalid")
                     .call(&mut *frame, &mut vals);
 
                 match task {
-                    Ok(t) => Ok(Ok(t.cast_unchecked::<Task>())),
-                    Err(e) => Ok(Err(e)),
+                    Ok(t) => Ok(t.cast_unchecked::<Task>()),
+                    Err(e) => Err(e),
                 }
             }
 
@@ -880,18 +1299,18 @@ cfg_if::cfg_if! {
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JlrsResult<JuliaResult<'target, 'data>>
+            ) -> JuliaResult<'target, 'data>
             where
                 V: AsRef<[Value<'value, 'data>]>,
             {
-                Ok(JuliaFuture::new_main_with_keywords(frame, self, args)?.await)
+                JuliaFuture::new_main_with_keywords(frame, self, args).await
             }
 
             unsafe fn schedule_async_main<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
                 args: V,
-            ) -> JlrsResult<JuliaResult<Task<'target>, 'target, 'data>>
+            ) -> JuliaResult<Task<'target>, 'target, 'data>
             where
                 V: AsRef<[Value<'value, 'data>]>,
             {
@@ -902,16 +1321,19 @@ cfg_if::cfg_if! {
                 vals.extend_from_slice(values);
 
                 let task = Module::main(&frame)
-                    .submodule(&frame, "JlrsMultitask")?
+                    .submodule(&frame, "JlrsMultitask")
+                    .expect("JlrsMultitask not available")
                     .wrapper_unchecked()
-                    .function(&frame, "scheduleasync")?
+                    .function(&frame, "scheduleasync")
+                    .expect("scheduleasync not available")
                     .wrapper_unchecked()
-                    .provide_keywords(self.keywords())?
+                    .provide_keywords(self.keywords())
+                    .expect("Keywords invalid")
                     .call(&mut *frame, &mut vals);
 
                 match task {
-                    Ok(t) => Ok(Ok(t.cast_unchecked::<Task>())),
-                    Err(e) => Ok(Err(e)),
+                    Ok(t) => Ok(t.cast_unchecked::<Task>()),
+                    Err(e) => Err(e),
                 }
             }
         }

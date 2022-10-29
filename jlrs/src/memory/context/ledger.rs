@@ -33,6 +33,60 @@ unsafe impl Send for Ledger {}
 unsafe impl Sync for Ledger {}
 
 impl Ledger {
+    // TODO: generic?
+    pub(crate) fn is_borrowed(range: Range<*const u8>) -> bool {
+        cfg_if! {
+            if #[cfg(feature = "unsafe-ledger")] {
+                LEDGER.with(|ledger| {
+                    let mut ledger = ledger.borrow_mut();
+                    check_overlap(ledger.shared.as_ref(), &range).is_err()
+                })
+            } else {
+                let ledger = THREADSAFE_LEDGER
+                    .lock()
+                    .expect("Corrupted ledger");
+
+                check_overlap(ledger.shared.as_ref(), &range).is_err()
+            }
+        }
+    }
+
+    pub(crate) fn is_borrowed_mut(range: Range<*const u8>) -> bool {
+        cfg_if! {
+            if #[cfg(feature = "unsafe-ledger")] {
+                LEDGER.with(|ledger| {
+                    let mut ledger = ledger.borrow_mut();
+                    check_overlap(ledger.owned.as_ref(), &range).is_err()
+                })
+            } else {
+                let ledger = THREADSAFE_LEDGER
+                    .lock()
+                    .expect("Corrupted ledger");
+
+                check_overlap(ledger.owned.as_ref(), &range).is_err()
+            }
+        }
+    }
+
+    pub(crate) fn is_borrowed_any(range: Range<*const u8>) -> bool {
+        cfg_if! {
+            if #[cfg(feature = "unsafe-ledger")] {
+                LEDGER.with(|ledger| {
+                    let mut ledger = ledger.borrow_mut();
+                    check_overlap(ledger.owned.as_ref(), &range).is_err() ||
+                        check_overlap(ledger.shared.as_ref(), &range).is_err()
+                })
+            } else {
+                let ledger = THREADSAFE_LEDGER
+                    .lock()
+                    .expect("Corrupted ledger");
+
+                check_overlap(ledger.owned.as_ref(), &range).is_err() ||
+                    check_overlap(ledger.shared.as_ref(), &range).is_err()
+            }
+        }
+    }
+
     pub(crate) unsafe fn clone_shared(range: Range<*const u8>) {
         cfg_if! {
             if #[cfg(feature = "unsafe-ledger")] {
