@@ -7,7 +7,7 @@
 
 use crate::{
     impl_julia_typecheck,
-    memory::output::Output,
+    memory::target::Target,
     private::Private,
     wrappers::ptr::{
         array::ArrayRef, module::ModuleRef, private::WrapperPriv, symbol::SymbolRef,
@@ -109,6 +109,7 @@ impl<'scope> MethodTable<'scope> {
         unsafe { self.unwrap_non_null(Private).as_ref().max_args }
     }
 
+    #[cfg(not(feature = "nightly"))]
     /// Keyword argument sorter function
     pub fn kw_sorter(self) -> ValueRef<'scope, 'static> {
         // Safety: the pointer points to valid data
@@ -139,14 +140,13 @@ impl<'scope> MethodTable<'scope> {
         unsafe { self.unwrap_non_null(Private).as_ref().frozen }
     }
 
-    /// Use the `Output` to extend the lifetime of this data.
-    pub fn root<'target>(self, output: Output<'target>) -> MethodTable<'target> {
-        // Safety: the pointer points to valid data
-        unsafe {
-            let ptr = self.unwrap_non_null(Private);
-            output.set_root::<MethodTable>(ptr);
-            MethodTable::wrap_non_null(ptr, Private)
-        }
+    /// Use the target to reroot this data.
+    pub fn root<'target, T>(self, target: T) -> T::Data
+    where
+        T: Target<'target, 'static, MethodTable<'target>>,
+    {
+        // Safety: the data is valid.
+        unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
     }
 }
 
@@ -155,6 +155,7 @@ impl_debug!(MethodTable<'_>);
 
 impl<'scope> WrapperPriv<'scope, '_> for MethodTable<'scope> {
     type Wraps = jl_methtable_t;
+    type StaticPriv = MethodTable<'static>;
     const NAME: &'static str = "<MethodTable";
 
     // Safety: `inner` must not have been freed yet, the result must never be

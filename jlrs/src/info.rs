@@ -6,18 +6,31 @@ use jl_sys::{
     jl_git_branch, jl_git_commit, jl_is_debugbuild, jl_n_threads, jl_ver_is_release, jl_ver_major,
     jl_ver_minor, jl_ver_patch, jl_ver_string,
 };
-use std::{ffi::CStr, marker::PhantomData};
+use std::{
+    ffi::{c_void, CStr},
+    marker::PhantomData,
+};
+
+/// Trait implemented by types that can access global Julia information.
+///
+/// This trait is implemented for [`Julia`] and [`Target`]s.
+///
+/// [`Julia`]: crate::runtime::sync_rt::Julia
+/// [`Target`]: crate::memory::target::Target
+pub trait InfoProvider: private::InfoProvider {
+    fn new(&self) -> Info {
+        Info { _priv: PhantomData }
+    }
+}
+
+impl<T: private::InfoProvider> InfoProvider for T {}
 
 /// Global Julia information.
 pub struct Info {
-    _priv: PhantomData<()>,
+    _priv: PhantomData<*mut c_void>,
 }
 
 impl Info {
-    pub(crate) unsafe fn new() -> Self {
-        Info { _priv: PhantomData }
-    }
-
     /// Number of threads the CPU supports.
     pub fn n_cpu_threads(&self) -> usize {
         unsafe { jl_cpu_threads() as usize }
@@ -25,6 +38,7 @@ impl Info {
 
     /// Number of threads Julia can use.
     pub fn n_threads(&self) -> usize {
+        // TODO: atomic on nightly!
         unsafe { jl_n_threads as usize }
     }
 
@@ -116,3 +130,17 @@ impl Info {
 /// Alias for a result that contains either a valid UTF8-encoded string slice, or the raw byte
 /// slice if the contents are not valid UTF8.
 pub type StrOrBytes<'scope> = Result<&'scope str, &'scope [u8]>;
+
+// TODO: Is this available before init? Implement as functions if so, should be thread-safe
+mod private {
+    use crate::memory::target::Target;
+    #[cfg(feature = "sync-rt")]
+    use crate::runtime::sync_rt::Julia;
+
+    pub trait InfoProvider {}
+
+    #[cfg(feature = "sync-rt")]
+    impl InfoProvider for Julia<'_> {}
+
+    impl<'target, 'data, T: Target<'target, 'data>> InfoProvider for T {}
+}

@@ -1,10 +1,9 @@
 //! Wrapper for `Symbol`. Symbols represent identifiers like module and function names.
 
 use crate::{
-    error::{JlrsError, JlrsResult, JuliaResult},
+    error::{JlrsError, JlrsResult},
     impl_julia_typecheck,
-    memory::{global::Global, output::Output},
-    prelude::PartialScope,
+    memory::target::Target,
     private::Private,
     wrappers::ptr::{private::WrapperPriv, value::LeakedValue},
 };
@@ -15,6 +14,11 @@ use std::{
     marker::PhantomData,
     ptr::NonNull,
 };
+
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use crate::{catch::catch_exceptions, memory::target::ExceptionTarget};
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use std::mem::MaybeUninit;
 
 use super::Ref;
 
@@ -31,7 +35,11 @@ pub struct Symbol<'scope>(NonNull<jl_sym_t>, PhantomData<&'scope ()>);
 
 impl<'scope> Symbol<'scope> {
     /// Convert the given string to a `Symbol`.
-    pub fn new<S: AsRef<str>>(_: Global<'scope>, symbol: S) -> Self {
+    pub fn new<S, T>(_: &T, symbol: S) -> Self
+    where
+        S: AsRef<str>,
+        T: Target<'scope, 'static, Self>,
+    {
         let bytes = symbol.as_ref().as_bytes();
         // Safety: Can only be called from a thread known to Julia, symbols are globally rooted
         unsafe {
@@ -42,13 +50,12 @@ impl<'scope> Symbol<'scope> {
 
     /// Convert the given byte slice to a `Symbol`.
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub fn new_bytes<N: AsRef<[u8]>, S: PartialScope<'scope>>(
-        scope: S,
-        symbol: N,
-    ) -> JlrsResult<JuliaResult<'scope, 'static, Self>> {
-        use crate::catch::catch_exceptions;
-        use std::mem::MaybeUninit;
 
+    pub fn new_bytes<N, T>(target: T, symbol: N) -> T::Exception
+    where
+        N: AsRef<[u8]>,
+        T: ExceptionTarget<'scope, 'static, Self>,
+    {
         unsafe {
             let symbol = symbol.as_ref();
 
@@ -58,17 +65,23 @@ impl<'scope> Symbol<'scope> {
                 Ok(())
             };
 
-            match catch_exceptions(&mut callback).unwrap() {
-                Ok(sym) => Ok(Ok(Symbol::wrap(sym, Private))),
-                Err(e) => Ok(Err(e.root(scope)?)),
-            }
+            let res = match catch_exceptions(&mut callback).unwrap() {
+                Ok(sym) => Ok(Symbol::wrap(sym, Private)),
+                Err(e) => Err(NonNull::new_unchecked(e.ptr())),
+            };
+
+            target.exception_from_ptr(res, Private)
         }
     }
 
     /// Convert the given byte slice to a `Symbol`.
     ///
     /// Safety: if `symbol` contains `0`, an error is thrown which is not caught.
-    pub unsafe fn new_bytes_unchecked<S: AsRef<[u8]>>(_: Global<'scope>, symbol: S) -> Self {
+    pub unsafe fn new_bytes_unchecked<S, T>(_: &T, symbol: S) -> Self
+    where
+        S: AsRef<[u8]>,
+        T: Target<'scope, 'static, Self>,
+    {
         let sym_b = symbol.as_ref();
         let sym = jl_symbol_n(sym_b.as_ptr().cast(), sym_b.len());
         Symbol::wrap(sym, Private)
@@ -78,7 +91,10 @@ impl<'scope> Symbol<'scope> {
     /// lifetime can be safely extended.
     ///
     /// [`Value`]: crate::wrappers::ptr::value::Value
-    pub fn extend<'global>(self, _: Global<'global>) -> Symbol<'global> {
+    pub fn extend<'target, T>(self, _: &T) -> Symbol<'target>
+    where
+        T: Target<'target, 'static>,
+    {
         // Safety: symbols are globally rooted
         unsafe { Symbol::wrap_non_null(self.unwrap_non_null(Private), Private) }
     }
@@ -129,15 +145,15 @@ impl<'scope> Symbol<'scope> {
         }
     }
 
-    /// Use the `Output` to extend the lifetime of this data. This is never nevessary
+    /// Use the target to reroot this data. This is never nevessary
     /// because a `Symbol` is never freed by the garbage collector.
-    pub fn root<'target>(self, output: Output<'target>) -> Symbol<'target> {
-        // Safety: symbols are globally rooted
-        unsafe {
-            let ptr = self.unwrap_non_null(Private);
-            output.set_root::<Symbol>(ptr);
-            Symbol::wrap_non_null(ptr, Private)
-        }
+    pub fn root<'target, T>(self, target: T) -> T::Data
+    where
+        T: Target<'target, 'static, Symbol<'target>>,
+    {
+        // Safety: the data is valid.
+        // TODO: don' root
+        unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
     }
 }
 
@@ -152,6 +168,7 @@ impl_debug!(Symbol<'_>);
 
 impl<'scope> WrapperPriv<'scope, '_> for Symbol<'scope> {
     type Wraps = jl_sym_t;
+    type StaticPriv = Symbol<'static>;
     const NAME: &'static str = "Symbol";
 
     // Safety: `inner` must not have been freed yet, the result must never be

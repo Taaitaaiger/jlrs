@@ -13,17 +13,15 @@ pub(crate) static CANNOT_DISPLAY_VALUE: &'static str = "<Cannot display value>";
 /// Alias that is used for most `Result`s in this crate.
 pub type JlrsResult<T> = Result<T, Box<JlrsError>>;
 
-/// Julia result or exception.
+/// Rooted Julia result or exception.
 ///
 /// Some functions from the Julia C API can throw exceptions. Many methods provided by jlrs will
-/// catch these exceptions and return a `JuliaResult`. The `Ok` variant contains the result if no
-/// exception has been thrown, otherwise the `Err` variant contains the exception.
+/// catch these exceptions and return a `JuliaResult`, the `Err` variant contains the exception.
 pub type JuliaResult<'frame, 'data, V = Value<'frame, 'data>> = Result<V, Value<'frame, 'data>>;
 
-/// Unrooted Julia result or exception.
+/// Potentially unrooted Julia result or exception.
 ///
-/// This type alias is similar to [`JuliaResult`], but contains unrooted data rather than rooted
-/// data.
+/// This type alias is similar to [`JuliaResult`], but can contain unrooted data.
 pub type JuliaResultRef<'frame, 'data, V = ValueRef<'frame, 'data>> =
     Result<V, ValueRef<'frame, 'data>>;
 
@@ -48,22 +46,25 @@ pub enum IOError {
 /// Type errors.
 #[derive(Debug, Error)]
 pub enum TypeError {
-    #[error("expected a Function, {name} is a {type_str}")]
-    NotAFunction { name: String, type_str: String },
-    #[error("expected a NamedTuple, got a {type_str}")]
-    NotANamedTuple { type_str: String },
-    #[error("expected a Module, {name} is a {type_str}")]
-    NotAModule { name: String, type_str: String },
-    #[error("{element_type_str} is not a {value_type_str}")]
+    #[error("expected a Function, {name} is a {ty}")]
+    NotAFunction { name: String, ty: String },
+    #[error("expected a NamedTuple, got a {ty}")]
+    NotANamedTuple { ty: String },
+    #[error("expected a Module, {name} is a {ty}")]
+    NotAModule { name: String, ty: String },
+    #[error("{element_type} is not a {value_type}")]
     IncompatibleType {
-        element_type_str: String,
-        value_type_str: String,
+        element_type: String,
+        value_type: String,
     },
     #[error("{value_type} is not subtype of {field_type}")]
     NotASubtype {
         value_type: String,
         field_type: String,
     },
+
+    #[error("{value_type} is immutable")]
+    Immutable { value_type: String },
 }
 
 /// Array layout errors.
@@ -87,8 +88,8 @@ pub enum AccessError {
         type_name: String,
         field_name: String,
     },
-    #[error("layout is invalid for {value_type_str}")]
-    InvalidLayout { value_type_str: String },
+    #[error("layout is invalid for {value_type}")]
+    InvalidLayout { value_type: String },
     #[error("no value named {name} in {module}")]
     GlobalNotFound { name: String, module: String },
     #[error("the current value is locked")]
@@ -100,6 +101,8 @@ pub enum AccessError {
         value_type: String,
         field_name: String,
     },
+    #[error("Data is already borrowed")]
+    BorrowError,
     #[error("field at index {idx} does not exist: {value_type} has {n_fields} fields")]
     OutOfBoundsField {
         idx: usize,
@@ -129,15 +132,6 @@ pub enum InstantiationError {
     ArraySizeMismatch { dim_size: usize, vec_size: usize },
 }
 
-/// Allocation error.
-#[derive(Debug, Error)]
-pub enum AllocError {
-    #[error("no free slots available, frame capacity: {cap} slots")]
-    Full { cap: usize },
-    #[error("cannot use NullFrame to root data")]
-    NullFrame,
-}
-
 /// Julia exception converted to a string.
 #[derive(Debug, Error)]
 #[error("{msg}")]
@@ -161,8 +155,6 @@ pub enum JlrsError {
     Exception(Exception),
     #[error("Runtime error: {0}")]
     RuntimeError(RuntimeError),
-    #[error("Alloc error: {0}")]
-    AllocError(AllocError),
     #[error("Type error: {0}")]
     TypeError(TypeError),
     #[error("IO error: {0}")]
@@ -214,7 +206,6 @@ macro_rules! impl_from {
 }
 
 impl_from!(RuntimeError);
-impl_from!(AllocError);
 impl_from!(TypeError);
 impl_from!(IOError);
 impl_from!(AccessError);

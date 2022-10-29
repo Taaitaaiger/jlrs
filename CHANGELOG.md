@@ -1,8 +1,4 @@
 #### v0.17
- - `Module::require_unrooted` returns a `JuliaResultRef`.
-
- - `Module::set_global_unrooted` and `Module::set_const_unrooted` now take a `Global` as their first argument.
-
  - Atomic struct fields are now atomic in the generated bindings.
 
  - `Value` implements `PartialEq` for all wrapper types, allowing a value to be compared with any other wrapper type directly.
@@ -11,8 +7,45 @@
 
  - If a `JuliaString` is unboxed and contains non-utf8 data, all data is returned as a `Vec<u8>` rather than stopping at the first null character.
 
+ - The GC stack is now implemented as a foreign type and can be resized. Methods that could previously only fail due to allocation errors are now infallible. `AllocError` has been removed.
+
+ - When the sync runtime or `CCall` is used, a reference to a `StackFrame` must be provided.
+
+ - `Frame`, `Mode`, `Sync` and `Async` have been removed.
+
+ - `AsyncGcFrame` implements `Deref<Target = GcFrame>` and `DerefMut`. Several methods that previously took a mutable reference to a frame now take a mutable reference to a `GcFrame` specifically.
+
+ - Some fields of `Task` and `TypeName` can only be accessed if the `extra-fields` feature is enabled.
+
+ - Methods that return Julia take a `Target`, `ExceptionTarget`, or one of their extended variants. Both rooting and non-rooting targets exists, specific methods that returned unrooted data have been removed because methods that take a target can return rooted or unrooted data depending on the used target. `Scope` and `PartialScope` have been removed completely.
+
+ - Mutable references to `Output` implement `Target`, if used as a `Target` the returned data is rooted until the borrow ends.
+
+ - Methods of the `Gc` trait take `self` by reference.
+
+ - A ledger is used to track borrowed Julia data, instances of `Array`s and `Value`s can be tracked.
+ 
+ - `CCall::null_scope` and `NullFrame` have been replaced with `CCall::stackless_scope`.
+
+ - `Ref::leak` and `Ref::data_ptr` have been added.
+
+ - `async_util::task::sleep` has been added.
+
+ - When calling Julia functions, it can now be checked that none of the arguments are borrowed from Rust.
+
+ - It's no longer possible to provide a backing channel for an async runtime.
+
+ - A `nightly` feature is available to test the latest nightly Julia features. 
+
+ - When the `nightly` feature is enabled, the async runtime can be started with additional worker threads.
+
+ - When the `nightly` feature is enabled, tasks are scheduled on one of the two available thread pools depending on the method. 
+
+ - The `ForeignType` trait has been added which can be used to create new foreign types with custom mark functions.
+
 #### v0.16
  - Support for Julia 1.7 has been dropped, by default Julia 1.8 is targeted.
+
 
 #### v0.15
  - jlrs can be used with 32-bits versions of Julia on Linux by enabling the `i686` feature.

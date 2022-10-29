@@ -7,18 +7,12 @@
 //! all of them have a lifetime which ensures the data can't escape the scope it has been rooted
 //! in.
 //!
-//! Methods in jlrs that return Julia data usually come in two flavors: the result is rooted, in
-//! this case a pointer wrapper is returned, or it's left unrooted. In the latter case a [`Ref`]
-//! is returned instead. It's always unsafe to convert a `Ref` to a pointer wrapper because jlrs
-//! can't guarantee that the data hasn't been freed yet. In general, a pointer wrapper can be
-//! assumed to be rooted and valid unless it was created from a `Ref`.
-//!
 //! In addition to pointer wrappers there are inline wrappers which provide a compatible layout
 //! for the contents of Julia data with some specific type. These types can be converted to a
 //! `Value` with [`Value::new`], and back to Rust with [`Value::unbox`]. Examples of inline
 //! wrappers are primitive types like `u8`, the custom [`Bool`] and [`Char`] types, and generic
 //! tuples that can have up to 32 elements which are available in the [`tuple`] module. Inline
-//! wrappers for other types can be generated with the JlrsReflect package.
+//! wrappers for other types can be generated with the JlrsReflect.jl package.
 //!
 //! [`Value`]: crate::wrappers::ptr::value::Value
 //! [`Value::new`]: crate::wrappers::ptr::value::Value::new
@@ -30,5 +24,7 @@
 //! [`Bool`]: crate::wrappers::inline::bool::Bool
 //! [`tuple`]: crate::wrappers::inline::tuple
 
+pub mod foreign;
 pub mod inline;
 pub mod ptr;
+pub mod tracked;
