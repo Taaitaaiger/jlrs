@@ -293,7 +293,7 @@ impl<'scope> PyPlot<'scope> {
 /// that provides access to the contents of the `Plots` package.
 pub trait AccessPlotsModule: private::AccessPlotsModulePriv {
     /// Returns the `Plots` module.
-    fn plots<'global, T: Target<'global, 'static>>(target: &T) -> Module<'global> {
+    fn plots<'global, T: Target<'global>>(target: &T) -> Module<'global> {
         unsafe {
             let global = target.global();
             Module::main(&global)

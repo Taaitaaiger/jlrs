@@ -26,9 +26,9 @@ impl<'scope> Vararg<'scope> {
     }
 
     /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> T::Data
+    pub fn root<'target, T>(self, target: T) -> VarargData<'target, T>
     where
-        T: Target<'target, 'static, Vararg<'target>>,
+        T: Target<'target>,
     {
         // Safety: the data is valid.
         unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
@@ -60,3 +60,7 @@ impl_root!(Vararg, 1);
 pub type VarargRef<'scope> = Ref<'scope, 'static, Vararg<'scope>>;
 impl_valid_layout!(VarargRef, Vararg);
 impl_ref_root!(Vararg, VarargRef, 1);
+
+use crate::memory::target::target_type::TargetType;
+pub type VarargData<'target, T> = <T as TargetType<'target>>::Data<'static, Vararg<'target>>;
+pub type VarargResult<'target, T> = <T as TargetType<'target>>::Result<'static, Vararg<'target>>;

@@ -12,7 +12,7 @@ pub trait ToSymbol: private::ToSymbolPriv {
     /// Convert `self` to a `Symbol`.
     ///
     /// This method only needs a reference to a target because `Symbol` are globally rooted.
-    fn to_symbol<'target, T: Target<'target, 'static>>(&self, _: &T) -> Symbol<'target> {
+    fn to_symbol<'target, T: Target<'target>>(&self, _: &T) -> Symbol<'target> {
         // Safety: Requiring a reference to a target guarantees this method can only be called
         // from a thread known to Julia.
         unsafe { self.to_symbol_priv(Private) }

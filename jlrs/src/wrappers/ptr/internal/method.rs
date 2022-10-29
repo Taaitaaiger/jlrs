@@ -292,9 +292,9 @@ impl<'scope> Method<'scope> {
     }
 
     /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> T::Data
+    pub fn root<'target, T>(self, target: T) -> MethodData<'target, T>
     where
-        T: Target<'target, 'static, Method<'target>>,
+        T: Target<'target>,
     {
         // Safety: the data is valid.
         unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
@@ -326,3 +326,7 @@ impl_root!(Method, 1);
 pub type MethodRef<'scope> = Ref<'scope, 'static, Method<'scope>>;
 impl_valid_layout!(MethodRef, Method);
 impl_ref_root!(Method, MethodRef, 1);
+
+use crate::memory::target::target_type::TargetType;
+pub type MethodData<'target, T> = <T as TargetType<'target>>::Data<'static, Method<'target>>;
+pub type MethodResult<'target, T> = <T as TargetType<'target>>::Result<'static, Method<'target>>;

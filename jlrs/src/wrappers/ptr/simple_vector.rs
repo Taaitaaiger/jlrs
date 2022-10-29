@@ -20,9 +20,9 @@ use super::{
     datatype::DataType, private::WrapperPriv, value::ValueRef, Ref, Root, Wrapper, WrapperRef,
 };
 
-/// Access and mutate the contents of a `SimpleVector`.
+/// Access and mutate the content of a `SimpleVector`.
 #[repr(transparent)]
-pub struct SimpleVectorData<'scope, 'borrow, T = ValueRef<'scope, 'static>>(
+pub struct SimpleVectorContent<'scope, 'borrow, T = ValueRef<'scope, 'static>>(
     NonNull<jl_svec_t>,
     PhantomData<&'scope ()>,
     PhantomData<&'borrow [T]>,
@@ -30,7 +30,7 @@ pub struct SimpleVectorData<'scope, 'borrow, T = ValueRef<'scope, 'static>>(
 where
     T: WrapperRef<'scope, 'static>;
 
-impl<'scope, 'borrow, T: WrapperRef<'scope, 'static>> SimpleVectorData<'scope, 'borrow, T> {
+impl<'scope, 'borrow, T: WrapperRef<'scope, 'static>> SimpleVectorContent<'scope, 'borrow, T> {
     /// Returns the length of this `SimpleVector`.
     pub fn len(&self) -> usize {
         // Safety: the pointer points to valid data
@@ -76,9 +76,9 @@ pub struct SimpleVector<'scope>(NonNull<jl_svec_t>, PhantomData<&'scope ()>);
 
 impl<'scope> SimpleVector<'scope> {
     /// Create a new `SimpleVector` that can hold `n` values.
-    pub fn with_capacity<T>(target: T, n: usize) -> T::Data
+    pub fn with_capacity<T>(target: T, n: usize) -> SimpleVectorData<'scope, T>
     where
-        T: Target<'scope, 'static, Self>,
+        T: Target<'scope>,
     {
         // Safety: the allocated data is immediately rooted
         unsafe {
@@ -91,9 +91,9 @@ impl<'scope> SimpleVector<'scope> {
     ///
     /// Safety: The contents must be set before calling Julia again, the contents must never be
     /// accessed before all elements are set.
-    pub unsafe fn with_capacity_uninit<T>(target: T, n: usize) -> T::Data
+    pub unsafe fn with_capacity_uninit<T>(target: T, n: usize) -> SimpleVectorData<'scope, T>
     where
-        T: Target<'scope, 'static, Self>,
+        T: Target<'scope>,
     {
         let svec = NonNull::new_unchecked(jl_alloc_svec_uninit(n));
         target.data_from_ptr(svec, Private)
@@ -102,8 +102,8 @@ impl<'scope> SimpleVector<'scope> {
     /// Access the contents of this `SimpleVector` as `ValueRef`.
     // TODO: ledger
     // TODO: mut
-    pub fn data<'borrow>(&'borrow self) -> SimpleVectorData<'scope, 'borrow> {
-        SimpleVectorData(self.unwrap_non_null(Private), PhantomData, PhantomData)
+    pub fn data<'borrow>(&'borrow self) -> SimpleVectorContent<'scope, 'borrow> {
+        SimpleVectorContent(self.unwrap_non_null(Private), PhantomData, PhantomData)
     }
 
     /// Access the contents of this `SimpleVector` as `U`.
@@ -111,7 +111,9 @@ impl<'scope> SimpleVector<'scope> {
     /// This method returns a `JlrsError::AccessError` if `U` isn't correct for all elements.
     // TODO: ledger
     // TODO: mut
-    pub fn typed_data<'borrow, U>(&'borrow self) -> JlrsResult<SimpleVectorData<'scope, 'borrow, U>>
+    pub fn typed_data<'borrow, U>(
+        &'borrow self,
+    ) -> JlrsResult<SimpleVectorContent<'scope, 'borrow, U>>
     where
         U: WrapperRef<'scope, 'static>,
     {
@@ -121,7 +123,7 @@ impl<'scope> SimpleVector<'scope> {
             })?;
         }
 
-        Ok(SimpleVectorData(
+        Ok(SimpleVectorContent(
             self.unwrap_non_null(Private),
             PhantomData,
             PhantomData,
@@ -133,11 +135,11 @@ impl<'scope> SimpleVector<'scope> {
     /// Safety: this method doesn't check if `U` is correct for all elements.
     pub unsafe fn typed_data_unchecked<'borrow, U>(
         &'borrow self,
-    ) -> SimpleVectorData<'scope, 'borrow, U>
+    ) -> SimpleVectorContent<'scope, 'borrow, U>
     where
         U: WrapperRef<'scope, 'static>,
     {
-        SimpleVectorData(self.unwrap_non_null(Private), PhantomData, PhantomData)
+        SimpleVectorContent(self.unwrap_non_null(Private), PhantomData, PhantomData)
     }
 
     fn is_typed<U: ValidLayout>(self) -> bool {
@@ -171,9 +173,9 @@ impl<'scope> SimpleVector<'scope> {
 
 impl<'scope> SimpleVector<'scope> {
     /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> T::Data
+    pub fn root<'target, T>(self, target: T) -> SimpleVectorData<'target, T>
     where
-        T: Target<'target, 'static, SimpleVector<'target>>,
+        T: Target<'target>,
     {
         // Safety: the data is valid.
         unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
@@ -182,7 +184,7 @@ impl<'scope> SimpleVector<'scope> {
 
 impl<'base> SimpleVector<'base> {
     /// The empty `SimpleVector`.
-    pub fn emptysvec<T: Target<'base, 'static>>(_: &T) -> Self {
+    pub fn emptysvec<T: Target<'base>>(_: &T) -> Self {
         // Safety: global constant
         unsafe { Self::wrap(jl_emptysvec, Private) }
     }
@@ -242,10 +244,16 @@ impl<'scope> SimpleVectorRef<'scope> {
     /// Root this reference to a SimpleVector in `scope`.
     ///
     /// Safety: self must point to valid data.
-    pub unsafe fn root<'target, T>(self, target: T) -> JlrsResult<T::Data>
+    pub unsafe fn root<'target, T>(self, target: T) -> JlrsResult<SimpleVectorData<'target, T>>
     where
-        T: Target<'target, 'static, SimpleVector<'target>>,
+        T: Target<'target>,
     {
         <SimpleVector as Root>::root(target, self)
     }
 }
+
+use crate::memory::target::target_type::TargetType;
+pub type SimpleVectorData<'target, T> =
+    <T as TargetType<'target>>::Data<'static, SimpleVector<'target>>;
+pub type SimpleVectorResult<'target, T> =
+    <T as TargetType<'target>>::Result<'static, SimpleVector<'target>>;

@@ -17,7 +17,7 @@ use crate::{
 use jl_sys::jl_value_t;
 use std::{marker::PhantomData, ptr::NonNull};
 
-use super::Ref;
+use super::{value::ValueResult, Ref};
 
 /// A Julia function.
 #[derive(Clone, Copy)]
@@ -35,9 +35,9 @@ impl<'scope, 'data> Function<'scope, 'data> {
     }
 
     /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> T::Data
+    pub fn root<'target, T>(self, target: T) -> FunctionData<'target, 'data, T>
     where
-        T: Target<'target, 'data, Function<'target, 'data>>,
+        T: Target<'target>,
     {
         // Safety: the data is valid.
         unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
@@ -75,16 +75,20 @@ impl<'scope, 'data> WrapperPriv<'scope, 'data> for Function<'scope, 'data> {
 }
 
 impl<'data> Call<'data> for Function<'_, 'data> {
-    unsafe fn call0<'target, T>(self, target: T) -> T::Result
+    unsafe fn call0<'target, T>(self, target: T) -> ValueResult<'target, 'data, T>
     where
-        T: Target<'target, 'data>,
+        T: Target<'target>,
     {
         self.as_value().call0(target)
     }
 
-    unsafe fn call1<'target, T>(self, target: T, arg0: Value<'_, 'data>) -> T::Result
+    unsafe fn call1<'target, T>(
+        self,
+        target: T,
+        arg0: Value<'_, 'data>,
+    ) -> ValueResult<'target, 'data, T>
     where
-        T: Target<'target, 'data>,
+        T: Target<'target>,
     {
         self.as_value().call1(target, arg0)
     }
@@ -94,9 +98,9 @@ impl<'data> Call<'data> for Function<'_, 'data> {
         target: T,
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
-    ) -> T::Result
+    ) -> ValueResult<'target, 'data, T>
     where
-        T: Target<'target, 'data>,
+        T: Target<'target>,
     {
         self.as_value().call2(target, arg0, arg1)
     }
@@ -107,17 +111,21 @@ impl<'data> Call<'data> for Function<'_, 'data> {
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
         arg2: Value<'_, 'data>,
-    ) -> T::Result
+    ) -> ValueResult<'target, 'data, T>
     where
-        T: Target<'target, 'data>,
+        T: Target<'target>,
     {
         self.as_value().call3(target, arg0, arg1, arg2)
     }
 
-    unsafe fn call<'target, 'value, V, T>(self, target: T, args: V) -> T::Result
+    unsafe fn call<'target, 'value, V, T>(
+        self,
+        target: T,
+        args: V,
+    ) -> ValueResult<'target, 'data, T>
     where
         V: AsRef<[Value<'value, 'data>]>,
-        T: Target<'target, 'data>,
+        T: Target<'target>,
     {
         self.as_value().call(target, args)
     }
@@ -149,3 +157,9 @@ unsafe impl ValidLayout for FunctionRef<'_, '_> {
 }
 
 impl_ref_root!(Function, FunctionRef, 2);
+
+use crate::memory::target::target_type::TargetType;
+pub type FunctionData<'target, 'data, T> =
+    <T as TargetType<'target>>::Data<'data, Function<'target, 'data>>;
+pub type FunctionResult<'target, 'data, T> =
+    <T as TargetType<'target>>::Result<'data, Function<'target, 'data>>;

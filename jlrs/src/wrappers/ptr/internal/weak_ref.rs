@@ -29,9 +29,9 @@ impl<'scope> WeakRef<'scope> {
     }
 
     /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> T::Data
+    pub fn root<'target, T>(self, target: T) -> WeakRefData<'target, T>
     where
-        T: Target<'target, 'static, WeakRef<'target>>,
+        T: Target<'target>,
     {
         // Safety: the data is valid.
         unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
@@ -63,3 +63,7 @@ impl_root!(WeakRef, 1);
 pub type WeakRefRef<'scope> = Ref<'scope, 'static, WeakRef<'scope>>;
 impl_valid_layout!(WeakRefRef, WeakRef);
 impl_ref_root!(WeakRef, WeakRefRef, 1);
+
+use crate::memory::target::target_type::TargetType;
+pub type WeakRefData<'target, T> = <T as TargetType<'target>>::Data<'static, WeakRef<'target>>;
+pub type WeakRefResult<'target, T> = <T as TargetType<'target>>::Result<'static, WeakRef<'target>>;

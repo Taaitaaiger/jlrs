@@ -142,5 +142,5 @@ mod private {
     #[cfg(feature = "sync-rt")]
     impl InfoProvider for Julia<'_> {}
 
-    impl<'target, 'data, T: Target<'target, 'data>> InfoProvider for T {}
+    impl<'target, T: Target<'target>> InfoProvider for T {}
 }

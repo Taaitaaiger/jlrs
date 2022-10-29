@@ -44,12 +44,14 @@ use std::{
     ptr::NonNull,
 };
 
+use super::value::ValueData;
 use super::Ref;
 
 cfg_if! {
     if #[cfg(not(all(target_os = "windows", feature = "lts")))] {
         use super::array::Array;
-    }
+        use super::value::ValueResult;
+}
 }
 
 /// Julia type information. You can acquire a [`Value`]'s datatype by by calling
@@ -606,9 +608,9 @@ impl<'scope> DataType<'scope> {
         self,
         target: T,
         values: V,
-    ) -> JlrsResult<T::Result>
+    ) -> JlrsResult<ValueResult<'target, 'data, T>>
     where
-        T: Target<'target, 'data>,
+        T: Target<'target>,
         V: AsRef<[Value<'value, 'data>]>,
     {
         use crate::{catch::catch_exceptions, error::InstantiationError};
@@ -656,9 +658,9 @@ impl<'scope> DataType<'scope> {
         self,
         target: T,
         values: V,
-    ) -> T::Data
+    ) -> ValueData<'target, 'data, T>
     where
-        T: Target<'target, 'data>,
+        T: Target<'target>,
         V: AsRef<[Value<'value, 'data>]>,
     {
         let values = values.as_ref();
@@ -686,9 +688,9 @@ impl<'scope> DataType<'scope> {
     }
 
     /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> T::Data
+    pub fn root<'target, T>(self, target: T) -> DataTypeData<'target, T>
     where
-        T: Target<'target, 'static, DataType<'target>>,
+        T: Target<'target>,
     {
         // Safety: the data is valid.
         unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
@@ -699,7 +701,7 @@ impl<'base> DataType<'base> {
     /// The type of the bottom type, `Union{}`.
     pub fn typeofbottom_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_typeofbottom_type), Private) }
@@ -708,7 +710,7 @@ impl<'base> DataType<'base> {
     /// The type `DataType`.
     pub fn datatype_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_datatype_type), Private) }
@@ -717,7 +719,7 @@ impl<'base> DataType<'base> {
     /// The type `Union`.
     pub fn uniontype_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_uniontype_type), Private) }
@@ -726,7 +728,7 @@ impl<'base> DataType<'base> {
     /// The type `UnionAll`.
     pub fn unionall_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_unionall_type), Private) }
@@ -735,7 +737,7 @@ impl<'base> DataType<'base> {
     /// The type `TypeVar`.
     pub fn tvar_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_tvar_type), Private) }
@@ -744,7 +746,7 @@ impl<'base> DataType<'base> {
     /// The type `Any`.
     pub fn any_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_any_type), Private) }
@@ -753,7 +755,7 @@ impl<'base> DataType<'base> {
     /// The type `TypeName`.
     pub fn typename_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_typename_type), Private) }
@@ -762,7 +764,7 @@ impl<'base> DataType<'base> {
     /// The type `Symbol`.
     pub fn symbol_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_symbol_type), Private) }
@@ -771,7 +773,7 @@ impl<'base> DataType<'base> {
     /// The type `SSAValue`.
     pub fn ssavalue_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_ssavalue_type), Private) }
@@ -780,7 +782,7 @@ impl<'base> DataType<'base> {
     /// The type `Slot`.
     pub fn abstractslot_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_abstractslot_type), Private) }
@@ -789,7 +791,7 @@ impl<'base> DataType<'base> {
     /// The type `SlotNumber`.
     pub fn slotnumber_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_slotnumber_type), Private) }
@@ -798,7 +800,7 @@ impl<'base> DataType<'base> {
     /// The type `TypedSlot`.
     pub fn typedslot_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_typedslot_type), Private) }
@@ -807,7 +809,7 @@ impl<'base> DataType<'base> {
     /// The type `Core.Argument`
     pub fn argument_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_argument_type), Private) }
@@ -816,7 +818,7 @@ impl<'base> DataType<'base> {
     /// The type `Core.Const`
     pub fn const_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_const_type), Private) }
@@ -825,7 +827,7 @@ impl<'base> DataType<'base> {
     /// The type `Core.PartialStruct`
     pub fn partial_struct_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_partial_struct_type), Private) }
@@ -835,7 +837,7 @@ impl<'base> DataType<'base> {
     #[cfg(not(feature = "lts"))]
     pub fn partial_opaque_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_partial_opaque_type), Private) }
@@ -845,7 +847,7 @@ impl<'base> DataType<'base> {
     #[cfg(not(feature = "lts"))]
     pub fn interconditional_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_interconditional_type), Private) }
@@ -854,7 +856,7 @@ impl<'base> DataType<'base> {
     /// The type `MethodMatch`
     pub fn method_match_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_method_match_type), Private) }
@@ -863,7 +865,7 @@ impl<'base> DataType<'base> {
     /// The type `SimpleVector`.
     pub fn simplevector_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_simplevector_type), Private) }
@@ -872,7 +874,7 @@ impl<'base> DataType<'base> {
     /// The type `Tuple`.
     pub fn anytuple_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_anytuple_type), Private) }
@@ -881,7 +883,7 @@ impl<'base> DataType<'base> {
     /// The type of an empty tuple.
     pub fn emptytuple_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_emptytuple_type), Private) }
@@ -890,7 +892,7 @@ impl<'base> DataType<'base> {
     /// The type `Tuple`.
     pub fn tuple_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_anytuple_type), Private) }
@@ -900,7 +902,7 @@ impl<'base> DataType<'base> {
     #[cfg(not(feature = "lts"))]
     pub fn vararg_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { DataType::wrap(jl_vararg_type, Private) }
@@ -909,7 +911,7 @@ impl<'base> DataType<'base> {
     /// The type `Function`.
     pub fn function_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_function_type), Private) }
@@ -918,7 +920,7 @@ impl<'base> DataType<'base> {
     /// The type `Builtin`.
     pub fn builtin_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_builtin_type), Private) }
@@ -927,7 +929,7 @@ impl<'base> DataType<'base> {
     /// The type `MethodInstance`.
     pub fn method_instance_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_method_instance_type), Private) }
@@ -936,7 +938,7 @@ impl<'base> DataType<'base> {
     /// The type `CodeInstance`.
     pub fn code_instance_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_code_instance_type), Private) }
@@ -945,7 +947,7 @@ impl<'base> DataType<'base> {
     /// The type `CodeInfo`.
     pub fn code_info_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_code_info_type), Private) }
@@ -954,7 +956,7 @@ impl<'base> DataType<'base> {
     /// The type `Method`.
     pub fn method_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_method_type), Private) }
@@ -963,7 +965,7 @@ impl<'base> DataType<'base> {
     /// The type `Module`.
     pub fn module_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_module_type), Private) }
@@ -972,7 +974,7 @@ impl<'base> DataType<'base> {
     /// The type `WeakRef`.
     pub fn weakref_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_weakref_type), Private) }
@@ -981,7 +983,7 @@ impl<'base> DataType<'base> {
     /// The type `AbstractString`.
     pub fn abstractstring_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_abstractstring_type), Private) }
@@ -990,7 +992,7 @@ impl<'base> DataType<'base> {
     /// The type `String`.
     pub fn string_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_string_type), Private) }
@@ -999,7 +1001,7 @@ impl<'base> DataType<'base> {
     /// The type `ErrorException`.
     pub fn errorexception_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_errorexception_type), Private) }
@@ -1008,7 +1010,7 @@ impl<'base> DataType<'base> {
     /// The type `ArgumentError`.
     pub fn argumenterror_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_argumenterror_type), Private) }
@@ -1017,7 +1019,7 @@ impl<'base> DataType<'base> {
     /// The type `LoadError`.
     pub fn loaderror_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_loaderror_type), Private) }
@@ -1026,7 +1028,7 @@ impl<'base> DataType<'base> {
     /// The type `InitError`.
     pub fn initerror_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_initerror_type), Private) }
@@ -1035,7 +1037,7 @@ impl<'base> DataType<'base> {
     /// The type `TypeError`.
     pub fn typeerror_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_typeerror_type), Private) }
@@ -1044,7 +1046,7 @@ impl<'base> DataType<'base> {
     /// The type `MethodError`.
     pub fn methoderror_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_methoderror_type), Private) }
@@ -1053,7 +1055,7 @@ impl<'base> DataType<'base> {
     /// The type `UndefVarError`.
     pub fn undefvarerror_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_undefvarerror_type), Private) }
@@ -1063,7 +1065,7 @@ impl<'base> DataType<'base> {
     #[cfg(not(feature = "lts"))]
     pub fn atomicerror_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_atomicerror_type), Private) }
@@ -1072,7 +1074,7 @@ impl<'base> DataType<'base> {
     /// The type `LineInfoNode`.
     pub fn lineinfonode_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_lineinfonode_type), Private) }
@@ -1081,7 +1083,7 @@ impl<'base> DataType<'base> {
     /// The type `BoundsError`.
     pub fn boundserror_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_boundserror_type), Private) }
@@ -1090,7 +1092,7 @@ impl<'base> DataType<'base> {
     /// The type `Bool`.
     pub fn bool_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_bool_type), Private) }
@@ -1099,7 +1101,7 @@ impl<'base> DataType<'base> {
     /// The type `Char`.
     pub fn char_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_char_type), Private) }
@@ -1108,7 +1110,7 @@ impl<'base> DataType<'base> {
     /// The type `Int8`.
     pub fn int8_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_int8_type), Private) }
@@ -1117,7 +1119,7 @@ impl<'base> DataType<'base> {
     /// The type `UInt8`.
     pub fn uint8_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_uint8_type), Private) }
@@ -1126,7 +1128,7 @@ impl<'base> DataType<'base> {
     /// The type `Int16`.
     pub fn int16_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_int16_type), Private) }
@@ -1135,7 +1137,7 @@ impl<'base> DataType<'base> {
     /// The type `UInt16`.
     pub fn uint16_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_uint16_type), Private) }
@@ -1144,7 +1146,7 @@ impl<'base> DataType<'base> {
     /// The type `Int32`.
     pub fn int32_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_int32_type), Private) }
@@ -1153,7 +1155,7 @@ impl<'base> DataType<'base> {
     /// The type `UInt32`.
     pub fn uint32_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_uint32_type), Private) }
@@ -1162,7 +1164,7 @@ impl<'base> DataType<'base> {
     /// The type `Int64`.
     pub fn int64_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_int64_type), Private) }
@@ -1171,7 +1173,7 @@ impl<'base> DataType<'base> {
     /// The type `UInt64`.
     pub fn uint64_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_uint64_type), Private) }
@@ -1180,7 +1182,7 @@ impl<'base> DataType<'base> {
     /// The type `Float16`.
     pub fn float16_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_float16_type), Private) }
@@ -1189,7 +1191,7 @@ impl<'base> DataType<'base> {
     /// The type `Float32`.
     pub fn float32_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_float32_type), Private) }
@@ -1198,7 +1200,7 @@ impl<'base> DataType<'base> {
     /// The type `Float64`.
     pub fn float64_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_float64_type), Private) }
@@ -1207,7 +1209,7 @@ impl<'base> DataType<'base> {
     /// The type `AbstractFloat`.
     pub fn floatingpoint_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_floatingpoint_type), Private) }
@@ -1216,7 +1218,7 @@ impl<'base> DataType<'base> {
     /// The type `Number`.
     pub fn number_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_number_type), Private) }
@@ -1225,7 +1227,7 @@ impl<'base> DataType<'base> {
     /// The type `Nothing`.
     pub fn nothing_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_nothing_type), Private) }
@@ -1234,7 +1236,7 @@ impl<'base> DataType<'base> {
     /// The type `Signed`.
     pub fn signed_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_signed_type), Private) }
@@ -1243,7 +1245,7 @@ impl<'base> DataType<'base> {
     /// The type `Ptr{Nothing}`.
     pub fn voidpointer_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_voidpointer_type), Private) }
@@ -1252,7 +1254,7 @@ impl<'base> DataType<'base> {
     /// The type `Task`.
     pub fn task_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_task_type), Private) }
@@ -1261,7 +1263,7 @@ impl<'base> DataType<'base> {
     /// The type `Expr`.
     pub fn expr_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_expr_type), Private) }
@@ -1270,7 +1272,7 @@ impl<'base> DataType<'base> {
     /// The type `GlobalRef`.
     pub fn globalref_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_globalref_type), Private) }
@@ -1279,7 +1281,7 @@ impl<'base> DataType<'base> {
     /// The type `LineNumberNode`.
     pub fn linenumbernode_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_linenumbernode_type), Private) }
@@ -1288,7 +1290,7 @@ impl<'base> DataType<'base> {
     /// The type `GotoNode`.
     pub fn gotonode_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_gotonode_type), Private) }
@@ -1297,7 +1299,7 @@ impl<'base> DataType<'base> {
     /// The type `GotoIfNot`.
     pub fn gotoifnot_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_gotoifnot_type), Private) }
@@ -1306,7 +1308,7 @@ impl<'base> DataType<'base> {
     /// The type `ReturnNode`.
     pub fn returnnode_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_returnnode_type), Private) }
@@ -1315,7 +1317,7 @@ impl<'base> DataType<'base> {
     /// The type `PhiNode`.
     pub fn phinode_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_phinode_type), Private) }
@@ -1324,7 +1326,7 @@ impl<'base> DataType<'base> {
     /// The type `PiNode`.
     pub fn pinode_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_pinode_type), Private) }
@@ -1333,7 +1335,7 @@ impl<'base> DataType<'base> {
     /// The type `PhiCNode`.
     pub fn phicnode_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_phicnode_type), Private) }
@@ -1342,7 +1344,7 @@ impl<'base> DataType<'base> {
     /// The type `UpsilonNode`.
     pub fn upsilonnode_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_upsilonnode_type), Private) }
@@ -1351,7 +1353,7 @@ impl<'base> DataType<'base> {
     /// The type `QuoteNode`.
     pub fn quotenode_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_quotenode_type), Private) }
@@ -1360,7 +1362,7 @@ impl<'base> DataType<'base> {
     /// The type `NewVarNode`.
     pub fn newvarnode_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_newvarnode_type), Private) }
@@ -1369,7 +1371,7 @@ impl<'base> DataType<'base> {
     /// The type `Intrinsic`.
     pub fn intrinsic_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_intrinsic_type), Private) }
@@ -1378,7 +1380,7 @@ impl<'base> DataType<'base> {
     /// The type `MethodTable`.
     pub fn methtable_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_methtable_type), Private) }
@@ -1387,7 +1389,7 @@ impl<'base> DataType<'base> {
     /// The type `TypeMapLevel`.
     pub fn typemap_level_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_typemap_level_type), Private) }
@@ -1396,7 +1398,7 @@ impl<'base> DataType<'base> {
     /// The type `TypeMapEntry`.
     pub fn typemap_entry_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_typemap_entry_type), Private) }
@@ -1441,3 +1443,8 @@ impl_root!(DataType, 1);
 pub type DataTypeRef<'scope> = Ref<'scope, 'static, DataType<'scope>>;
 impl_valid_layout!(DataTypeRef, DataType);
 impl_ref_root!(DataType, DataTypeRef, 1);
+
+use crate::memory::target::target_type::TargetType;
+pub type DataTypeData<'target, T> = <T as TargetType<'target>>::Data<'static, DataType<'target>>;
+pub type DataTypeResult<'target, T> =
+    <T as TargetType<'target>>::Result<'static, DataType<'target>>;

@@ -45,37 +45,29 @@ impl<'scope> GcFrame<'scope> {
     }
 
     /// Borrow this frame as an `ExtendedTarget` with the provided `target`.
-    pub fn extended_target<'target, 'borrow, 'data, T, W>(
+    pub fn extended_target<'target, 'borrow, T>(
         &'borrow mut self,
         target: T,
-    ) -> ExtendedTarget<'target, 'scope, 'borrow, 'data, T, W>
+    ) -> ExtendedTarget<'target, 'scope, 'borrow, T>
     where
-        T: Target<'target, 'data, W>,
-        W: Wrapper<'target, 'data>,
+        T: Target<'target>,
     {
         ExtendedTarget {
             target,
             frame: self,
-            _data_marker: PhantomData,
             _target_marker: PhantomData,
-            _wrapper_marker: PhantomData,
         }
     }
 
     /// Borrow this frame as an `ExtendedTarget` with an `Output` that targets this frame.
-    pub fn as_extended_target<'borrow, 'data, W>(
+    pub fn as_extended_target<'borrow>(
         &'borrow mut self,
-    ) -> ExtendedTarget<'scope, 'scope, 'borrow, 'data, Output<'scope>, W>
-    where
-        W: Wrapper<'scope, 'data>,
-    {
+    ) -> ExtendedTarget<'scope, 'scope, 'borrow, Output<'scope>> {
         let target = self.output();
         ExtendedTarget {
             target,
             frame: self,
-            _data_marker: PhantomData,
             _target_marker: PhantomData,
-            _wrapper_marker: PhantomData,
         }
     }
 

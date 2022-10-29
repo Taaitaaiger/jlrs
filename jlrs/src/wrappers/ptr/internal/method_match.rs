@@ -58,9 +58,9 @@ impl<'scope> MethodMatch<'scope> {
     }
 
     /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> T::Data
+    pub fn root<'target, T>(self, target: T) -> MethodMatchData<'target, T>
     where
-        T: Target<'target, 'static, MethodMatch<'target>>,
+        T: Target<'target>,
     {
         // Safety: the data is valid.
         unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
@@ -92,3 +92,9 @@ impl_root!(MethodMatch, 1);
 pub type MethodMatchRef<'scope> = Ref<'scope, 'static, MethodMatch<'scope>>;
 impl_valid_layout!(MethodMatchRef, MethodMatch);
 impl_ref_root!(MethodMatch, MethodMatchRef, 1);
+
+use crate::memory::target::target_type::TargetType;
+pub type MethodMatchData<'target, T> =
+    <T as TargetType<'target>>::Data<'static, MethodMatch<'target>>;
+pub type MethodMatchResult<'target, T> =
+    <T as TargetType<'target>>::Result<'static, MethodMatch<'target>>;
