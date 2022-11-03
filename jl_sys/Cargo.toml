@@ -23,22 +23,18 @@ lts = []
 nightly = []
 i686 = []
 windows = []
-use-bindgen = ["bindgen"
-#, "syn", "quote", "proc-macro2"
-]
+use-bindgen = ["bindgen", "syn", "quote", "proc-macro2"]
 
 [dependencies]
 
 [build-dependencies]
 bindgen = { git = "https://github.com/emilio/rust-bindgen", branch = "atomic", optional = true, default-features = false, features = ["runtime"] }
-# bindgen = { version = "0.60", optional = true, default-features = false, features = [
-#     "runtime",
-# ] }
+# bindgen = { version = "0.60", optional = true, default-features = false, features = [ "runtime" ] }
 cc = "1"
 cfg-if = "1"
-syn = { version = "1", optional = false, features = ["full"] }
-proc-macro2 = { version = "1", optional = false }
-quote = { version = "1", optional = false }
+syn = { version = "1", optional = true, features = ["full"] }
+proc-macro2 = { version = "1", optional = true }
+quote = { version = "1", optional = true }
 
 [package.metadata.docs.rs]
 features = ["docs"]
