@@ -86,7 +86,7 @@ fn set_flags(julia_dir: &str) {
                 }
             }
         } else if #[cfg(all(target_os = "windows", target_env = "msvc"))] {
-            println!("cargo:rustc-link-search={}/bin", &julia_dir);
+            /*println!("cargo:rustc-link-search={}/bin", &julia_dir);
 
             cfg_if! {
                 if #[cfg(feature = "debug")] {
@@ -102,7 +102,7 @@ fn set_flags(julia_dir: &str) {
                 if #[cfg(feature = "uv")] {
                     println!("cargo:rustc-link-lib=libuv-2");
                 }
-            }
+            }*/
         } else if #[cfg(all(target_os = "windows", target_env = "gnu"))] {
             println!("cargo:rustc-link-search={}/bin", &julia_dir);
 
@@ -129,13 +129,13 @@ fn set_flags(julia_dir: &str) {
 }
 
 fn main() {
-    println!("cargo:rerun-if-changed=src/jlrs_cc.cc");
-    println!("cargo:rerun-if-changed=src/jlrs_cc.h");
-    println!("cargo:rerun-if-env-changed=JULIA_DIR");
-
     if env::var("DOCS_RS").is_ok() {
         return;
     }
+
+    println!("cargo:rerun-if-changed=src/jlrs_cc.cc");
+    println!("cargo:rerun-if-changed=src/jlrs_cc.h");
+    println!("cargo:rerun-if-env-changed=JULIA_DIR");
 
     let julia_dir = match find_julia() {
         Some(julia_dir) => julia_dir,
@@ -164,6 +164,9 @@ fn main() {
 
     #[cfg(feature = "lts")]
     c.define("JLRS_LTS", None);
+
+    #[cfg(feature = "nightly")]
+    c.define("JLRS_NIGHTLY", None);
 
     c.compile("jlrs_cc");
 
@@ -475,7 +478,8 @@ fn main() {
         bindings
             .write(Box::new(&mut bindings_bytes))
             .expect("Couldn't write to vec");
-        let bindigs_str = String::from_utf8(bindings_bytes).unwrap();
-        fix_bindings(&include_dir, &bindigs_str, &out_path);
+
+        let bindings_str = String::from_utf8(bindings_bytes).unwrap();
+        fix_bindings(&include_dir, &bindings_str, &out_path);
     }
 }
