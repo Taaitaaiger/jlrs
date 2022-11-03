@@ -1,6 +1,7 @@
 //! System and Julia version information.
 
 use crate::{private::Private, wrappers::ptr::private::WrapperPriv, wrappers::ptr::symbol::Symbol};
+use cfg_if::cfg_if;
 use jl_sys::{
     jl_cpu_threads, jl_get_ARCH, jl_get_UNAME, jl_getallocationgranularity, jl_getpagesize,
     jl_git_branch, jl_git_commit, jl_is_debugbuild, jl_n_threads, jl_ver_is_release, jl_ver_major,
@@ -38,8 +39,13 @@ impl Info {
 
     /// Number of threads Julia can use.
     pub fn n_threads(&self) -> usize {
-        // TODO: atomic on nightly!
-        unsafe { jl_n_threads as usize }
+        cfg_if! {
+            if #[cfg(feature = "nightly")] {
+                unsafe { jl_n_threads.load(::std::sync::atomic::Ordering::Relaxed) as usize }
+            } else {
+                unsafe { jl_n_threads as usize }
+            }
+        }
     }
 
     /// The page size used by the garbage collector.

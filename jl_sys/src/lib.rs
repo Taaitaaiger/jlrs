@@ -310,6 +310,12 @@ pub const jl_init: unsafe extern "C" fn() = jl_init__threading;
 pub const jl_init_with_image: unsafe extern "C" fn(*const c_char, *const c_char) =
     jl_init_with_image__threading;
 
+#[cfg(all(target_os = "windows", target_env = "msvc"))]
+#[link(name = "libuv-2", kind = "raw-dylib")]
+extern "C" {
+    pub fn uv_async_send(async_: *mut c_void) -> ::std::os::raw::c_int;
+}
+#[cfg(not(all(target_os = "windows", target_env = "msvc")))]
 extern "C" {
     pub fn uv_async_send(async_: *mut c_void) -> ::std::os::raw::c_int;
 }
