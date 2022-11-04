@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{num::NonZeroUsize, path::PathBuf};
 
 use jlrs::prelude::*;
 
@@ -18,16 +18,14 @@ impl AsyncTask for MyTask {
     type Output = f64;
 
     // Include the custom code MyTask needs.
-    async fn register<'base>(
-        _global: Global<'base>,
-        mut frame: AsyncGcFrame<'base>,
-    ) -> JlrsResult<()> {
+    async fn register<'base>(mut frame: AsyncGcFrame<'base>) -> JlrsResult<()> {
         unsafe {
             let path = PathBuf::from("MyModule.jl");
             if path.exists() {
-                Value::include(&mut frame, "MyModule.jl")?.into_jlrs_result()?;
+                Value::include(frame.as_extended_target(), "MyModule.jl")?.into_jlrs_result()?;
             } else {
-                Value::include(&mut frame, "examples/MyModule.jl")?.into_jlrs_result()?;
+                Value::include(frame.as_extended_target(), "examples/MyModule.jl")?
+                    .into_jlrs_result()?;
             }
         }
         Ok(())
@@ -36,11 +34,7 @@ impl AsyncTask for MyTask {
     // This is the async variation of the closure you provide `Julia::scope` when using the sync
     // runtime. The `Global` can be used to access `Module`s and other static data, while the
     // `AsyncGcFrame` lets you create new Julia values, call functions, and create nested scopes.
-    async fn run<'base>(
-        &mut self,
-        global: Global<'base>,
-        mut frame: AsyncGcFrame<'base>,
-    ) -> JlrsResult<Self::Output> {
+    async fn run<'base>(&mut self, mut frame: AsyncGcFrame<'base>) -> JlrsResult<Self::Output> {
         // Convert the two arguments to values Julia can work with.
         let dims = Value::new(&mut frame, self.dims);
         let iters = Value::new(&mut frame, self.iters);
@@ -52,13 +46,13 @@ impl AsyncTask for MyTask {
         // The module and function don't have to be rooted because the module is never redefined,
         // so they're globally rooted.
         unsafe {
-            Module::main(global)
-                .submodule_ref("MyModule")?
+            Module::main(&frame)
+                .submodule(&frame, "MyModule")?
                 .wrapper_unchecked()
-                .function_ref("complexfunc")?
+                .function(&frame, "complexfunc")?
                 .wrapper_unchecked()
                 .call_async(&mut frame, &mut [dims, iters])
-                .await?
+                .await
                 .into_jlrs_result()?
                 .unbox::<f64>()
         }
@@ -82,7 +76,8 @@ async fn main() {
     // runtime is running.
     let (julia, handle) = unsafe {
         RuntimeBuilder::new()
-            .async_runtime::<Tokio, UnboundedChannel<_>>()
+            .async_runtime::<Tokio>()
+            .channel_capacity(NonZeroUsize::new(4).unwrap())
             .start_async::<1>()
             .expect("Could not init Julia")
     };
@@ -90,7 +85,7 @@ async fn main() {
     {
         // Include the custom code MyTask needs by registering it.
         let (sender, receiver) = tokio::sync::oneshot::channel();
-        julia.register_task::<MyTask, _>(sender).await.unwrap();
+        julia.register_task::<MyTask, _>(sender).await;
         receiver.await.unwrap().unwrap();
     }
 
@@ -109,8 +104,7 @@ async fn main() {
             },
             sender1,
         )
-        .await
-        .expect("Cannot send task");
+        .await;
 
     julia
         .task(
@@ -120,8 +114,7 @@ async fn main() {
             },
             sender2,
         )
-        .await
-        .expect("Cannot send task");
+        .await;
 
     julia
         .task(
@@ -131,8 +124,7 @@ async fn main() {
             },
             sender3,
         )
-        .await
-        .expect("Cannot send task");
+        .await;
 
     julia
         .task(
@@ -142,8 +134,7 @@ async fn main() {
             },
             sender4,
         )
-        .await
-        .expect("Cannot send task");
+        .await;
 
     // Receive the results of the tasks.
     let res1 = receiver1.await.unwrap().unwrap();

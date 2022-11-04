@@ -1,5 +1,5 @@
 use jlrs::prelude::*;
-use std::time::Duration;
+use std::{num::NonZeroUsize, time::Duration};
 
 // This struct contains the y-label of the plot.
 struct MyTask {
@@ -18,28 +18,22 @@ impl PersistentTask for MyTask {
     type Output = ();
     type State = (PyPlot<'static>, Value<'static, 'static>);
 
-    async fn register<'frame>(
-        _global: Global<'frame>,
-        mut frame: AsyncGcFrame<'frame>,
-    ) -> JlrsResult<()> {
+    async fn register<'frame>(mut frame: AsyncGcFrame<'frame>) -> JlrsResult<()> {
         PyPlot::init(&mut frame);
         Ok(())
     }
 
-    async fn init(
-        &mut self,
-        global: Global<'static>,
-        frame: &mut AsyncGcFrame<'static>,
-    ) -> JlrsResult<Self::State> {
+    async fn init(&mut self, mut frame: AsyncGcFrame<'static>) -> JlrsResult<Self::State> {
         unsafe {
             // Create the first plot with no data, but with a custom label for the y-axis.
-            let plot_fn = Module::plots(global)
-                .function_ref("plot")?
+            let plot_fn = Module::plots(&frame)
+                .function(&frame, "plot")?
                 .wrapper_unchecked();
 
-            let ylabel_str = JuliaString::new(&mut *frame, &self.ylabel)?;
-            let ylabel = Tuple::new_unchecked(&mut *frame, &mut [ylabel_str.as_value()]);
-            let kws = named_tuple!(&mut *frame, "yaxis" => ylabel);
+            let ylabel_str = JuliaString::new(&mut frame, &self.ylabel);
+            let ylabel =
+                Tuple::new_unchecked(frame.as_extended_target(), &mut [ylabel_str.as_value()]);
+            let kws = named_tuple!(frame.as_extended_target(), "yaxis" => ylabel);
 
             let plot = PyPlot::new_with_keywords(&mut *frame, plot_fn, &mut [], kws)?;
 
@@ -49,7 +43,6 @@ impl PersistentTask for MyTask {
 
     async fn run<'frame>(
         &mut self,
-        global: Global<'static>,
         mut frame: AsyncGcFrame<'frame>,
         state: &mut Self::State,
         _input: Self::Input,
@@ -58,14 +51,14 @@ impl PersistentTask for MyTask {
             println!("Update");
             // Add a line with 100 points to the plot
             let n = Value::new(&mut frame, 100usize);
-            let data = Module::base(global)
-                .function_ref("randn")?
+            let data = Module::base(&frame)
+                .function(&frame, "randn")?
                 .wrapper_unchecked()
                 .call1(&mut frame, n)
                 .into_jlrs_result()?;
 
-            let plot_fn = Module::plots(global)
-                .function_ref("plot")?
+            let plot_fn = Module::plots(&frame)
+                .function(&frame, "plot")?
                 .wrapper_unchecked();
 
             state
@@ -76,12 +69,7 @@ impl PersistentTask for MyTask {
         Ok(())
     }
 
-    async fn exit(
-        &mut self,
-        _: Global<'static>,
-        mut frame: AsyncGcFrame<'static>,
-        state: &mut Self::State,
-    ) {
+    async fn exit(&mut self, mut frame: AsyncGcFrame<'static>, state: &mut Self::State) {
         // Wait until the plot window is closed.FMark
         println!("Exit");
         state.0.wait_async_main(&mut frame).await.unwrap();
@@ -93,14 +81,15 @@ impl PersistentTask for MyTask {
 async fn main() {
     let (julia, handle) = unsafe {
         RuntimeBuilder::new()
-            .async_runtime::<Tokio, UnboundedChannel<_>>()
+            .async_runtime::<Tokio>()
+            .channel_capacity(NonZeroUsize::new(4).unwrap())
             .start_async::<1>()
             .expect("Could not init Julia")
     };
 
     {
         let (s, r) = tokio::sync::oneshot::channel();
-        julia.register_persistent::<MyTask, _>(s).await.unwrap();
+        julia.register_persistent::<MyTask, _>(s).await;
         r.await.unwrap().unwrap();
     }
 
@@ -113,8 +102,7 @@ async fn main() {
                 },
                 handle_sender,
             )
-            .await
-            .expect("Cannot send task");
+            .await;
 
         handle_receiver
             .await
