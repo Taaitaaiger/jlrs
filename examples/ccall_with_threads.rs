@@ -1,3 +1,5 @@
+// FIXME TODO this is awful
+
 use jlrs::prelude::*;
 use std::{ffi::c_void, thread, time::Duration};
 use thread::JoinHandle;
@@ -40,15 +42,12 @@ pub unsafe extern "C" fn drop_handle(handle: *mut JoinHandle<()>) {
 
 #[cfg(test)]
 mod tests {
-    use jlrs::util::test::static_context_frame;
-
     use super::*;
     use std::cell::RefCell;
 
     thread_local! {
-        pub static JULIA: RefCell<Julia<'static>> = {
-            let context_frame = static_context_frame();
-            RefCell::new(unsafe { RuntimeBuilder::new().start(context_frame).unwrap() })
+        pub static JULIA: RefCell<PendingJulia> = {
+            RefCell::new(unsafe { RuntimeBuilder::new().start().unwrap() })
         };
     }
 
@@ -56,7 +55,10 @@ mod tests {
     fn call_multithreaded() {
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
-            jlrs.scope(|global, mut frame| unsafe {
+            let mut frame = StackFrame::new();
+            let mut jlrs = jlrs.instance(&mut frame);
+
+            jlrs.scope(|mut frame| unsafe {
                 let multithreaded_ptr = Value::new(&mut frame, multithreaded as *mut std::ffi::c_void);
                 let drop_handle_ptr = Value::new(&mut frame, drop_handle as *mut std::ffi::c_void);
 
@@ -86,7 +88,7 @@ mod tests {
                     end"
                 ).into_jlrs_result()?;
 
-                let output = func.call2_unrooted(*global, multithreaded_ptr, drop_handle_ptr);
+                let output = func.call2(&frame, multithreaded_ptr, drop_handle_ptr);
                 assert!(output.is_ok());
 
                 Ok(())

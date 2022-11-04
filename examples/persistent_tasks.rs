@@ -30,17 +30,11 @@ impl PersistentTask for AccumulatorTask {
     // and PersistentTask::run respectively. By default they're 0 and no slots are preallocated.
     // The last sets the capacity of the channel that's used by the task and its handle to
     // communicate, by default it's 0, in which case an unbounded channel is used.
-    const REGISTER_CAPACITY: usize = 1;
-    const INIT_CAPACITY: usize = 1;
-    const RUN_CAPACITY: usize = 1;
     const CHANNEL_CAPACITY: usize = 2;
 
     // Register this task. This method can take care of custom initialization work, in this case
     // creating the mutable MutFloat64 type in the Main module.
-    async fn register<'frame>(
-        _global: Global<'frame>,
-        mut frame: AsyncGcFrame<'frame>,
-    ) -> JlrsResult<()> {
+    async fn register<'frame>(mut frame: AsyncGcFrame<'frame>) -> JlrsResult<()> {
         unsafe {
             Value::eval_string(&mut frame, "mutable struct MutFloat64 v::Float64 end")
                 .into_jlrs_result()?;
@@ -52,19 +46,15 @@ impl PersistentTask for AccumulatorTask {
     // have been dropped and every pending call has completed, Julia data rooted in this frame
     // can be returned as State. Here, the value we'll use as an accumulator is created and
     // returned.
-    async fn init(
-        &mut self,
-        global: Global<'static>,
-        frame: &mut AsyncGcFrame<'static>,
-    ) -> JlrsResult<Self::State> {
+    async fn init(&mut self, mut frame: AsyncGcFrame<'static>) -> JlrsResult<Self::State> {
         unsafe {
             let output = frame.output();
             frame
                 .scope(|mut frame| {
                     // A nested scope is used to only root a single value in the frame provided to
                     // init, rather than two.
-                    let func = Module::main(global)
-                        .global_ref("MutFloat64")?
+                    let func = Module::main(&frame)
+                        .global(&frame, "MutFloat64")?
                         .value_unchecked();
                     let init_v = Value::new(&mut frame, self.init_value);
 
@@ -79,7 +69,6 @@ impl PersistentTask for AccumulatorTask {
     // scope.
     async fn run<'frame>(
         &mut self,
-        _global: Global<'static>,
         mut frame: AsyncGcFrame<'frame>,
         state: &mut Self::State,
         input: Self::Input,
@@ -113,7 +102,7 @@ fn main() {
     // the channel is full, and yield control of the thread to Julia after one ms.
     let (julia, handle) = unsafe {
         RuntimeBuilder::new()
-            .async_runtime::<Tokio, UnboundedChannel<_>>()
+            .async_runtime::<Tokio>()
             .start::<1>()
             .expect("Could not init Julia")
     };
