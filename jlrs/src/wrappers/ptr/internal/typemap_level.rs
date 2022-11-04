@@ -173,7 +173,12 @@ impl_valid_layout!(TypeMapLevelRef, TypeMapLevel);
 impl_ref_root!(TypeMapLevel, TypeMapLevelRef, 1);
 
 use crate::memory::target::target_type::TargetType;
+
+/// `TypeMaLevely` or `TypeMaLevelyRef`, depending on the target type `T`.
 pub type TypeMapLevelData<'target, T> =
     <T as TargetType<'target>>::Data<'static, TypeMapLevel<'target>>;
+
+/// `JuliaResult<TypeMaLevely>` or `JuliaResultRef<TypeMapLevelRef>`, depending on the target type
+/// `T`.
 pub type TypeMapLevelResult<'target, T> =
     <T as TargetType<'target>>::Result<'static, TypeMapLevel<'target>>;

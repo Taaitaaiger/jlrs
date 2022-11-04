@@ -151,7 +151,12 @@ impl_valid_layout!(TypeMapEntryRef, TypeMapEntry);
 impl_ref_root!(TypeMapEntry, TypeMapEntryRef, 1);
 
 use crate::memory::target::target_type::TargetType;
+
+/// `TypeMapEntry` or `TypeMapEntryRef`, depending on the target type `T`.
 pub type TypeMapEntryData<'target, T> =
     <T as TargetType<'target>>::Data<'static, TypeMapEntry<'target>>;
+
+/// `JuliaResult<TypeMapEntry>` or `JuliaResultRef<TypeMapEntryRef>`, depending on the target type
+/// `T`.
 pub type TypeMapEntryResult<'target, T> =
     <T as TargetType<'target>>::Result<'static, TypeMapEntry<'target>>;

@@ -427,5 +427,9 @@ impl_valid_layout!(ModuleRef, Module);
 impl_ref_root!(Module, ModuleRef, 1);
 
 use crate::memory::target::target_type::TargetType;
+
+/// `Module` or `ModuleRef`, depending on the target type `T`.
 pub type ModuleData<'target, T> = <T as TargetType<'target>>::Data<'static, Module<'target>>;
+
+/// `JuliaResult<Module>` or `JuliaResultRef<ModuleRef>`, depending on the target type `T`.
 pub type ModuleResult<'target, T> = <T as TargetType<'target>>::Result<'static, Module<'target>>;

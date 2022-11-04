@@ -312,6 +312,10 @@ impl_valid_layout!(TypeNameRef, TypeName);
 impl_ref_root!(TypeName, TypeNameRef, 1);
 
 use crate::memory::target::target_type::TargetType;
+
+/// `TypeName` or `TypeNameRef`, depending on the target type `T`.
 pub type TypeNameData<'target, T> = <T as TargetType<'target>>::Data<'static, TypeName<'target>>;
+
+/// `JuliaResult<TypeName>` or `JuliaResultRef<TypeNameRef>`, depending on the target type `T`.
 pub type TypeNameResult<'target, T> =
     <T as TargetType<'target>>::Result<'static, TypeName<'target>>;

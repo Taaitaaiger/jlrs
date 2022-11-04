@@ -94,7 +94,12 @@ impl_valid_layout!(MethodMatchRef, MethodMatch);
 impl_ref_root!(MethodMatch, MethodMatchRef, 1);
 
 use crate::memory::target::target_type::TargetType;
+
+/// `MethodMetch` or `MethodMetchRef`, depending on the target type `T`.
 pub type MethodMatchData<'target, T> =
     <T as TargetType<'target>>::Data<'static, MethodMatch<'target>>;
+
+/// `JuliaResult<MethodMetch>` or `JuliaResultRef<MethodMetchRef>`, depending on the target type
+/// `T`.
 pub type MethodMatchResult<'target, T> =
     <T as TargetType<'target>>::Result<'static, MethodMatch<'target>>;

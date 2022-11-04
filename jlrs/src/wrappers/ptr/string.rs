@@ -147,6 +147,10 @@ impl_valid_layout!(StringRef, String);
 impl_ref_root!(JuliaString, StringRef, 1);
 
 use crate::memory::target::target_type::TargetType;
+
+/// `JuliaString` or `StringRef`, depending on the target type `T`.
 pub type StringData<'target, T> = <T as TargetType<'target>>::Data<'static, JuliaString<'target>>;
+
+/// `JuliaResult<JuliaString>` or `JuliaResultRef<StringRef>`, depending on the target type `T`.
 pub type StringResult<'target, T> =
     <T as TargetType<'target>>::Result<'static, JuliaString<'target>>;

@@ -245,5 +245,9 @@ impl_valid_layout!(UnionRef, Union);
 impl_ref_root!(Union, UnionRef, 1);
 
 use crate::memory::target::target_type::TargetType;
+
+/// `Union` or `UnionRef`, depending on the target type `T`.
 pub type UnionData<'target, T> = <T as TargetType<'target>>::Data<'static, Union<'target>>;
+
+/// `JuliaResult<Union>` or `JuliaResultRef<UnionRef>`, depending on the target type `T`.
 pub type UnionResult<'target, T> = <T as TargetType<'target>>::Result<'static, Union<'target>>;

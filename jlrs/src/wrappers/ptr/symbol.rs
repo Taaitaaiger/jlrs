@@ -190,5 +190,9 @@ impl_valid_layout!(SymbolRef, Symbol);
 impl_ref_root!(Symbol, SymbolRef, 1);
 
 use crate::memory::target::target_type::TargetType;
+
+/// `Task` or `TaskRef`, depending on the target type `T`.
 pub type SymbolData<'target, T> = <T as TargetType<'target>>::Data<'static, Symbol<'target>>;
+
+/// `JuliaResult<Task>` or `JuliaResultRef<TaskRef>`, depending on the target type `T`.
 pub type SymbolResult<'target, T> = <T as TargetType<'target>>::Result<'static, Symbol<'target>>;

@@ -72,5 +72,9 @@ impl_valid_layout!(ExprRef, Expr);
 impl_ref_root!(Expr, ExprRef, 1);
 
 use crate::memory::target::target_type::TargetType;
+
+/// `Expr` or `ExprRef`, depending on the target type `T`.
 pub type ExprData<'target, T> = <T as TargetType<'target>>::Data<'static, Expr<'target>>;
+
+/// `JuliaResult<Expr>` or `JuliaResultRef<ExprRef>`, depending on the target type `T`.
 pub type ExprResult<'target, T> = <T as TargetType<'target>>::Result<'static, Expr<'target>>;

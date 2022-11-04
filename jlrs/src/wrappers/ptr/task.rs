@@ -173,5 +173,9 @@ impl_valid_layout!(TaskRef, Task);
 impl_ref_root!(Task, TaskRef, 1);
 
 use crate::memory::target::target_type::TargetType;
+
+/// `Task` or `TaskRef`, depending on the target type `T`.
 pub type TaskData<'target, T> = <T as TargetType<'target>>::Data<'static, Task<'target>>;
+
+/// `JuliaResult<Task>` or `JuliaResultRef<TaskRef>`, depending on the target type `T`.
 pub type TaskResult<'target, T> = <T as TargetType<'target>>::Result<'static, Task<'target>>;

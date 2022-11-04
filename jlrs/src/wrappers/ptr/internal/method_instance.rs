@@ -147,7 +147,12 @@ impl_valid_layout!(MethodInstanceRef, MethodInstance);
 impl_ref_root!(MethodInstance, MethodInstanceRef, 1);
 
 use crate::memory::target::target_type::TargetType;
+
+/// `MethodInstance` or `MethodInstanceRef`, depending on the target type `T`.
 pub type MethodInstanceData<'target, T> =
     <T as TargetType<'target>>::Data<'static, MethodInstance<'target>>;
+
+/// `JuliaResult<MethodInstance>` or `JuliaResultRef<MethodInstanceRef>`, depending on the target
+/// type `T`.
 pub type MethodInstanceResult<'target, T> =
     <T as TargetType<'target>>::Result<'static, MethodInstance<'target>>;

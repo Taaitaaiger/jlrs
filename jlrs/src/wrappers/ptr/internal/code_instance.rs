@@ -239,7 +239,12 @@ impl_valid_layout!(CodeInstanceRef, CodeInstance);
 impl_ref_root!(CodeInstance, CodeInstanceRef, 1);
 
 use crate::memory::target::target_type::TargetType;
+
+/// `CodeInstance` or `CodeInstanceRef`, depending on the target type `T`.
 pub type CodeInstanceData<'target, T> =
     <T as TargetType<'target>>::Data<'static, CodeInstance<'target>>;
+
+/// `JuliaResult<CodeInstance>` or `JuliaResultRef<CodeInstanceRef>`, depending on the target type
+/// `T`.
 pub type CodeInstanceResult<'target, T> =
     <T as TargetType<'target>>::Result<'static, CodeInstance<'target>>;

@@ -2170,7 +2170,11 @@ unsafe impl ValidLayout for ValueRef<'_, '_> {
 impl_ref_root!(Value, ValueRef, 2);
 
 use crate::memory::target::target_type::TargetType;
+
+/// `Value` or `ValueRef`, depending on the target type `T`.
 pub type ValueData<'target, 'data, T> =
     <T as TargetType<'target>>::Data<'data, Value<'target, 'data>>;
+
+/// `JuliaResult<Value>` or `JuliaResultRef<ValueRef>`, depending on the target type `T`.
 pub type ValueResult<'target, 'data, T> =
     <T as TargetType<'target>>::Result<'data, Value<'target, 'data>>;

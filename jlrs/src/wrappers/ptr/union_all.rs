@@ -267,6 +267,10 @@ impl_valid_layout!(UnionAllRef, UnionAll);
 impl_ref_root!(UnionAll, UnionAllRef, 1);
 
 use crate::memory::target::target_type::TargetType;
+
+/// `UnionAll` or `UnionAllRef`, depending on the target type `T`.
 pub type UnionAllData<'target, T> = <T as TargetType<'target>>::Data<'static, UnionAll<'target>>;
+
+/// `JuliaResult<UnionAll>` or `JuliaResultRef<UnionAllRef>`, depending on the target type `T`.
 pub type UnionAllResult<'target, T> =
     <T as TargetType<'target>>::Result<'static, UnionAll<'target>>;
