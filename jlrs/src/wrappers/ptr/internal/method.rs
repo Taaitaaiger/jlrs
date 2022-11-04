@@ -328,5 +328,9 @@ impl_valid_layout!(MethodRef, Method);
 impl_ref_root!(Method, MethodRef, 1);
 
 use crate::memory::target::target_type::TargetType;
+
+/// `Method` or `MethodRef`, depending on the target type `T`.
 pub type MethodData<'target, T> = <T as TargetType<'target>>::Data<'static, Method<'target>>;
+
+/// `JuliaResult<Method>` or `JuliaResultRef<MethodRef>`, depending on the target type `T`.
 pub type MethodResult<'target, T> = <T as TargetType<'target>>::Result<'static, Method<'target>>;

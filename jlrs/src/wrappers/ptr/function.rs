@@ -159,7 +159,11 @@ unsafe impl ValidLayout for FunctionRef<'_, '_> {
 impl_ref_root!(Function, FunctionRef, 2);
 
 use crate::memory::target::target_type::TargetType;
+
+/// `Function` or `FunctionRef`, depending on the target type `T`.
 pub type FunctionData<'target, 'data, T> =
     <T as TargetType<'target>>::Data<'data, Function<'target, 'data>>;
+
+/// `JuliaResult<Function>` or `JuliaResultRef<FunctionRef>`, depending on the target type `T`.
 pub type FunctionResult<'target, 'data, T> =
     <T as TargetType<'target>>::Result<'data, Function<'target, 'data>>;

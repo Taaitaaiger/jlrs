@@ -62,5 +62,9 @@ impl_valid_layout!(VarargRef, Vararg);
 impl_ref_root!(Vararg, VarargRef, 1);
 
 use crate::memory::target::target_type::TargetType;
+
+/// `Vararg` or `VarargRef`, depending on the target type `T`.
 pub type VarargData<'target, T> = <T as TargetType<'target>>::Data<'static, Vararg<'target>>;
+
+/// `JuliaResult<Vararg>` or `JuliaResultRef<VarargRef>`, depending on the target type`T`.
 pub type VarargResult<'target, T> = <T as TargetType<'target>>::Result<'static, Vararg<'target>>;

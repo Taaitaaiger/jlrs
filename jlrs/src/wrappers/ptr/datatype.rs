@@ -1445,6 +1445,10 @@ impl_valid_layout!(DataTypeRef, DataType);
 impl_ref_root!(DataType, DataTypeRef, 1);
 
 use crate::memory::target::target_type::TargetType;
+
+/// `DataType` or `DataTypeRef`, depending on the target type `T`.
 pub type DataTypeData<'target, T> = <T as TargetType<'target>>::Data<'static, DataType<'target>>;
+
+/// `JuliaResult<DataType>` or `JuliaResultRef<DataTypeRef>`, depending on the target type `T`.
 pub type DataTypeResult<'target, T> =
     <T as TargetType<'target>>::Result<'static, DataType<'target>>;

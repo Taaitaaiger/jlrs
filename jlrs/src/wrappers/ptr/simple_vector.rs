@@ -253,7 +253,12 @@ impl<'scope> SimpleVectorRef<'scope> {
 }
 
 use crate::memory::target::target_type::TargetType;
+
+/// `SimpleVector` or `SimpleVectorRef`, depending on the target type `T`.
 pub type SimpleVectorData<'target, T> =
     <T as TargetType<'target>>::Data<'static, SimpleVector<'target>>;
+
+/// `JuliaResult<SimpleVector>` or `JuliaResultRef<SimpleVectorRef>`, depending on the target type
+/// `T`.
 pub type SimpleVectorResult<'target, T> =
     <T as TargetType<'target>>::Result<'static, SimpleVector<'target>>;

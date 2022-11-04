@@ -178,7 +178,12 @@ impl_valid_layout!(OpaqueClosureRef, OpaqueClosure);
 impl_ref_root!(OpaqueClosure, OpaqueClosureRef, 1);
 
 use crate::memory::target::target_type::TargetType;
+
+/// `OpaqueClosure` or `OpaqueClosureRef`, depending on the target type `T`.
 pub type OpaqueClosureData<'target, T> =
     <T as TargetType<'target>>::Data<'static, OpaqueClosure<'target>>;
+
+/// `JuliaResult<OpaqueClosure>` or `JuliaResultRef<OpaqueClosureRef>`, depending on the target
+/// type `T`.
 pub type OpaqueClosureResult<'target, T> =
     <T as TargetType<'target>>::Result<'static, OpaqueClosure<'target>>;

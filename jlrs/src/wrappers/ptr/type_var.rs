@@ -151,5 +151,9 @@ impl_valid_layout!(TypeVarRef, TypeVar);
 impl_ref_root!(TypeVar, TypeVarRef, 1);
 
 use crate::memory::target::target_type::TargetType;
+
+/// `TypeVar` or `TypeVarRef`, depending on the target type `T`.
 pub type TypeVarData<'target, T> = <T as TargetType<'target>>::Data<'static, TypeVar<'target>>;
+
+/// `JuliaResult<TypeVar>` or `JuliaResultRef<TypeVarRef>`, depending on the target type `T`.
 pub type TypeVarResult<'target, T> = <T as TargetType<'target>>::Result<'static, TypeVar<'target>>;

@@ -177,7 +177,12 @@ impl_valid_layout!(MethodTableRef, MethodTable);
 impl_ref_root!(MethodTable, MethodTableRef, 1);
 
 use crate::memory::target::target_type::TargetType;
+
+/// `MethodTable` or `MethodTableRef`, depending on the target type `T`.
 pub type MethodTableData<'target, T> =
     <T as TargetType<'target>>::Data<'static, MethodTable<'target>>;
+
+/// `JuliaResult<MethodTable>` or `JuliaResultRef<MethodTableRef>`, depending on the target type
+/// `T`.
 pub type MethodTableResult<'target, T> =
     <T as TargetType<'target>>::Result<'static, MethodTable<'target>>;

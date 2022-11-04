@@ -2364,12 +2364,20 @@ where
 }
 
 use crate::memory::target::target_type::TargetType;
+
+/// `Array` or `ArrayRef`, depending on the target type `T`.
 pub type ArrayData<'target, 'data, T> =
     <T as TargetType<'target>>::Data<'data, Array<'target, 'data>>;
+
+/// `JuliaResult<Array>` or `JuliaResultRef<ArrayRef>`, depending on the target type `T`.
 pub type ArrayResult<'target, 'data, T> =
     <T as TargetType<'target>>::Result<'data, Array<'target, 'data>>;
 
+/// `TypedArray<U>` or `TypedArrayRef<U>`, depending on the target type `T`.
 pub type TypedArrayData<'target, 'data, T, U> =
     <T as TargetType<'target>>::Data<'data, TypedArray<'target, 'data, U>>;
+
+/// `JuliaResult<TypedArray<U>>` or `JuliaResultRef<TypedArrayRef<U>>`, depending on the target
+/// type `T`.
 pub type TypedArrayResult<'target, 'data, T, U> =
     <T as TargetType<'target>>::Result<'data, TypedArray<'target, 'data, U>>;

@@ -65,5 +65,9 @@ impl_valid_layout!(WeakRefRef, WeakRef);
 impl_ref_root!(WeakRef, WeakRefRef, 1);
 
 use crate::memory::target::target_type::TargetType;
+
+/// `WeakRef` or `WeakRefRef`, depending on the target type `T`.
 pub type WeakRefData<'target, T> = <T as TargetType<'target>>::Data<'static, WeakRef<'target>>;
+
+/// `JuliaResult<WeakRef>` or `JuliaResultRef<WeakRefRef>`, depending on the target type`T`.
 pub type WeakRefResult<'target, T> = <T as TargetType<'target>>::Result<'static, WeakRef<'target>>;
