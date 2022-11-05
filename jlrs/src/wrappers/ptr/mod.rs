@@ -29,9 +29,9 @@ macro_rules! impl_root {
             unsafe fn root<T>(
                 target: T,
                 value: $crate::wrappers::ptr::Ref<'value, 'data, Self>,
-            ) -> $crate::error::JlrsResult<T::Data>
+            ) -> $crate::error::JlrsResult<T::Data<'data, Self::Output>>
             where
-                T: $crate::memory::target::Target<'target, 'data, Self::Output>,
+                T: $crate::memory::target::Target<'target>,
             {
                 if let Some(v) = Self::wrapper(value, Private) {
                     let ptr = v.unwrap_non_null(Private);
@@ -50,9 +50,9 @@ macro_rules! impl_root {
             unsafe fn root<T>(
                 target: T,
                 value: $crate::wrappers::ptr::Ref<'value, 'static, Self>,
-            ) -> $crate::error::JlrsResult<T::Data>
+            ) -> $crate::error::JlrsResult<T::Data<'static, Self::Output>>
             where
-                T: $crate::memory::target::Target<'target, 'static, Self::Output>,
+                T: $crate::memory::target::Target<'target>,
             {
                 if let Some(v) =
                     <Self as $crate::wrappers::ptr::private::WrapperPriv>::wrapper(value, Private)
@@ -89,9 +89,12 @@ macro_rules! impl_ref_root {
             /// Root this data in `scope`.
             ///
             /// Safety: The data pointed to by `self` must not have been freed by the GC yet.
-            pub unsafe fn root<'target, T>(self, target: T) -> $crate::error::JlrsResult<T::Data>
+            pub unsafe fn root<'target, T>(
+                self,
+                target: T,
+            ) -> $crate::error::JlrsResult<T::Data<'data, $type<'target, 'data>>>
             where
-                T: $crate::memory::target::Target<'target, 'data, $type<'target, 'data>>,
+                T: $crate::memory::target::Target<'target>,
             {
                 <$type as $crate::wrappers::ptr::Root>::root(target, self)
             }
@@ -102,9 +105,12 @@ macro_rules! impl_ref_root {
             /// Root this data in `scope`.
             ///
             /// Safety: The data pointed to by `self` must not have been freed by the GC yet.
-            pub unsafe fn root<'target, T>(self, target: T) -> $crate::error::JlrsResult<T::Data>
+            pub unsafe fn root<'target, T>(
+                self,
+                target: T,
+            ) -> $crate::error::JlrsResult<T::Data<'static, $type<'target>>>
             where
-                T: $crate::memory::target::Target<'target, 'static, $type<'target>>,
+                T: $crate::memory::target::Target<'target>,
             {
                 <$type as $crate::wrappers::ptr::Root>::root(target, self)
             }
@@ -159,9 +165,12 @@ use std::{
 pub(crate) trait Root<'target, 'value, 'data>: Wrapper<'value, 'data> {
     type Output: Wrapper<'target, 'data>;
     // Safety: `value` must point to valid Julia data.
-    unsafe fn root<T>(target: T, value: Ref<'value, 'data, Self>) -> JlrsResult<T::Data>
+    unsafe fn root<T>(
+        target: T,
+        value: Ref<'value, 'data, Self>,
+    ) -> JlrsResult<T::Data<'data, Self::Output>>
     where
-        T: Target<'target, 'data, Self::Output>;
+        T: Target<'target>;
 }
 
 /// Trait implemented by `Ref`.
@@ -182,8 +191,9 @@ where
 
 /// Trait implemented by all pointer wrapper types.
 pub trait Wrapper<'scope, 'data>: private::WrapperPriv<'scope, 'data> {
-    /// `Self`, but with the `'scope` lifetime replaced with the `'static` lifetime.
-    type Static: Wrapper<'static, 'data>;
+    /// `Self`, but with arbitrary lifetimes. Used to construct the appropriate type in generic
+    /// contexts.
+    type TypeConstructor<'target, 'da>: Wrapper<'target, 'da>;
 
     /// Convert the wrapper to a `Ref`.
     fn as_ref(self) -> Ref<'scope, 'data, Self> {
@@ -266,7 +276,7 @@ impl<'scope, 'data, W> Wrapper<'scope, 'data> for W
 where
     W: private::WrapperPriv<'scope, 'data>,
 {
-    type Static = Self::StaticPriv;
+    type TypeConstructor<'target, 'da> = Self::TypeConstructorPriv<'target, 'da>;
 }
 
 /// An reference to Julia data that is not guaranteed to be rooted.
@@ -363,7 +373,7 @@ impl<'scope, 'data, T: Wrapper<'scope, 'data>> Ref<'scope, 'data, T> {
     /// Safety: this must only be used to return freshly allocated Julia data from Rust to Julia
     /// from a `ccall`ed function.
     #[cfg(feature = "ccall")]
-    pub unsafe fn leak(self) -> Ref<'static, 'data, T::Static> {
+    pub unsafe fn leak(self) -> Ref<'static, 'data, T::TypeConstructor<'static, 'data>> {
         Ref::wrap(self.ptr().cast())
     }
 
@@ -384,7 +394,7 @@ pub(crate) mod private {
 
     pub trait WrapperPriv<'scope, 'data>: Copy + Debug {
         type Wraps;
-        type StaticPriv: WrapperPriv<'static, 'data>;
+        type TypeConstructorPriv<'target, 'da>: WrapperPriv<'target, 'da>;
         const NAME: &'static str;
 
         // Safety: `inner` must point to valid data. If it is not

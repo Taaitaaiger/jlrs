@@ -72,7 +72,7 @@ use super::{union_all::UnionAll, value::ValueRef, Ref, Root};
 
 cfg_if! {
     if #[cfg(not(all(target_os = "windows", feature = "lts")))] {
-        use crate::{catch::{catch_exceptions_with_slots, catch_exceptions}, memory::target::{ExceptionTarget}};
+        use crate::{catch::{catch_exceptions_with_slots, catch_exceptions}};
         use std::mem::MaybeUninit;
     }
 }
@@ -118,13 +118,13 @@ impl<'data> Array<'_, 'data> {
 
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn new<'target, 'current, 'borrow, T, D, S>(
-        target: ExtendedTarget<'target, 'current, 'borrow, 'static, S, Array<'target, 'static>>,
+        target: ExtendedTarget<'target, 'current, 'borrow, S>,
         dims: D,
-    ) -> S::Result
+    ) -> ArrayResult<'target, 'static, S>
     where
         T: IntoJulia,
         D: Dims,
-        S: Target<'target, 'static, Array<'target, 'static>>,
+        S: Target<'target>,
     {
         let (output, frame) = target.split();
         frame
@@ -189,13 +189,13 @@ impl<'data> Array<'_, 'data> {
     /// Safety: If the array size is too large, Julia will throw an error. This error is not
     /// caught, which is UB from a `ccall`ed function.
     pub unsafe fn new_unchecked<'target, 'current, 'borrow, T, D, S>(
-        target: ExtendedTarget<'target, 'current, 'borrow, 'static, S, Array<'target, 'static>>,
+        target: ExtendedTarget<'target, 'current, 'borrow, S>,
         dims: D,
-    ) -> S::Data
+    ) -> ArrayData<'target, 'static, S>
     where
         T: IntoJulia,
         D: Dims,
-        S: Target<'target, 'static, Array<'target, 'static>>,
+        S: Target<'target>,
     {
         let (output, frame) = target.split();
         frame
@@ -238,13 +238,13 @@ impl<'data> Array<'_, 'data> {
     /// error is caught and returned.
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn new_for<'target, 'current, 'borrow, D, S>(
-        target: ExtendedTarget<'target, 'current, 'borrow, 'static, S, Array<'target, 'static>>,
+        target: ExtendedTarget<'target, 'current, 'borrow, S>,
         dims: D,
         ty: Value,
-    ) -> S::Result
+    ) -> ArrayResult<'target, 'static, S>
     where
         D: Dims,
-        S: Target<'target, 'static, Array<'target, 'static>>,
+        S: Target<'target>,
     {
         let (output, frame) = target.split();
         frame
@@ -308,13 +308,13 @@ impl<'data> Array<'_, 'data> {
     /// Safety: If the array size is too large or if the type is invalid, Julia will throw an
     /// error. This error is not caught, which is UB from a `ccall`ed function.
     pub unsafe fn new_for_unchecked<'target, 'current, 'borrow, D, S>(
-        target: ExtendedTarget<'target, 'current, 'borrow, 'static, S, Array<'target, 'static>>,
+        target: ExtendedTarget<'target, 'current, 'borrow, S>,
         dims: D,
         ty: Value,
-    ) -> S::Data
+    ) -> ArrayData<'target, 'static, S>
     where
         D: Dims,
-        S: Target<'target, 'static, Array<'target, 'static>>,
+        S: Target<'target>,
     {
         let (output, frame) = target.split();
         frame
@@ -358,14 +358,14 @@ impl<'data> Array<'_, 'data> {
     /// returned.
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn from_slice<'target: 'current, 'current: 'borrow, 'borrow, T, D, S>(
-        target: ExtendedTarget<'target, 'current, 'borrow, 'data, S, Array<'target, 'data>>,
+        target: ExtendedTarget<'target, 'current, 'borrow, S>,
         data: &'data mut [T],
         dims: D,
-    ) -> JlrsResult<S::Result>
+    ) -> JlrsResult<ArrayResult<'target, 'data, S>>
     where
         T: IntoJulia,
         D: Dims,
-        S: Target<'target, 'data, Array<'target, 'data>>,
+        S: Target<'target>,
     {
         if dims.size() != data.len() {
             Err(InstantiationError::ArraySizeMismatch {
@@ -439,14 +439,14 @@ impl<'data> Array<'_, 'data> {
     /// Safety: If the array size is too large, Julia will throw an error. This error is not
     /// caught, which is UB from a `ccall`ed function.
     pub unsafe fn from_slice_unchecked<'target, 'current, 'borrow, T, D, S>(
-        target: ExtendedTarget<'target, 'current, 'borrow, 'data, S, Array<'target, 'data>>,
+        target: ExtendedTarget<'target, 'current, 'borrow, S>,
         data: &'data mut [T],
         dims: D,
-    ) -> JlrsResult<S::Data>
+    ) -> JlrsResult<ArrayData<'target, 'data, S>>
     where
         T: IntoJulia,
         D: Dims,
-        S: Target<'target, 'data, Array<'target, 'data>>,
+        S: Target<'target>,
     {
         if dims.size() != data.len() {
             Err(InstantiationError::ArraySizeMismatch {
@@ -502,14 +502,14 @@ impl<'data> Array<'_, 'data> {
     /// returned.
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn from_vec<'target, 'current, 'borrow, T, D, S>(
-        target: ExtendedTarget<'target, 'current, 'borrow, 'static, S, Array<'target, 'static>>,
+        target: ExtendedTarget<'target, 'current, 'borrow, S>,
         data: Vec<T>,
         dims: D,
-    ) -> JlrsResult<S::Result>
+    ) -> JlrsResult<ArrayResult<'target, 'static, S>>
     where
         T: IntoJulia,
         D: Dims,
-        S: Target<'target, 'static, Array<'target, 'static>>,
+        S: Target<'target>,
     {
         if dims.size() != data.len() {
             Err(InstantiationError::ArraySizeMismatch {
@@ -591,14 +591,14 @@ impl<'data> Array<'_, 'data> {
     /// Safety: If the array size is too large, Julia will throw an error. This error is not
     /// caught, which is UB from a `ccall`ed function.
     pub unsafe fn from_vec_unchecked<'target, 'current, 'borrow, T, D, S>(
-        target: ExtendedTarget<'target, 'current, 'borrow, 'static, S, Array<'target, 'static>>,
+        target: ExtendedTarget<'target, 'current, 'borrow, S>,
         data: Vec<T>,
         dims: D,
-    ) -> JlrsResult<S::Data>
+    ) -> JlrsResult<ArrayData<'target, 'static, S>>
     where
         T: IntoJulia,
         D: Dims,
-        S: Target<'target, 'static, Array<'target, 'static>>,
+        S: Target<'target>,
     {
         if dims.size() != data.len() {
             Err(InstantiationError::ArraySizeMismatch {
@@ -648,10 +648,10 @@ impl<'data> Array<'_, 'data> {
     }
 
     /// Convert a string to a Julia array.
-    pub fn from_string<'target, A, T>(target: T, data: A) -> T::Data
+    pub fn from_string<'target, A, T>(target: T, data: A) -> ArrayData<'target, 'static, T>
     where
         A: AsRef<str>,
-        T: Target<'target, 'static, Array<'target, 'static>>,
+        T: Target<'target>,
     {
         let string = data.as_ref();
         let nbytes = string.bytes().len();
@@ -664,9 +664,9 @@ impl<'data> Array<'_, 'data> {
     }
 
     /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> T::Data
+    pub fn root<'target, T>(self, target: T) -> ArrayData<'target, 'data, T>
     where
-        T: Target<'target, 'data, Array<'target, 'data>>,
+        T: Target<'target>,
     {
         // Safety: the data is valid.
         unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
@@ -1018,12 +1018,12 @@ impl<'scope, 'data> Array<'scope, 'data> {
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub unsafe fn reshape<'target, 'current, 'borrow, D, S>(
         &self,
-        target: ExtendedTarget<'target, 'current, 'borrow, 'data, S, Array<'target, 'data>>,
+        target: ExtendedTarget<'target, 'current, 'borrow, S>,
         dims: D,
-    ) -> S::Result
+    ) -> ArrayResult<'target, 'data, S>
     where
         D: Dims,
-        S: Target<'target, 'data, Array<'target, 'data>>,
+        S: Target<'target>,
     {
         let (output, scope) = target.split();
         scope
@@ -1072,12 +1072,12 @@ impl<'scope, 'data> Array<'scope, 'data> {
     /// This error is not caught, which is UB from a `ccall`ed function.
     pub unsafe fn reshape_unchecked<'target, 'current, 'borrow, D, S>(
         &self,
-        target: ExtendedTarget<'target, 'current, 'borrow, 'data, S, Array<'target, 'data>>,
+        target: ExtendedTarget<'target, 'current, 'borrow, S>,
         dims: D,
-    ) -> S::Data
+    ) -> ArrayData<'target, 'data, S>
     where
         D: Dims,
-        S: Target<'target, 'data, Array<'target, 'data>>,
+        S: Target<'target>,
     {
         let (output, scope) = target.split();
         scope
@@ -1193,9 +1193,13 @@ impl<'scope> Array<'scope, 'static> {
     /// The array must be 1D and not contain data borrowed or moved from Rust, otherwise an exception
     /// is returned.
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub unsafe fn grow_end<'target, S>(&mut self, target: S, inc: usize) -> S::Exception
+    pub unsafe fn grow_end<'target, S>(
+        &mut self,
+        target: S,
+        inc: usize,
+    ) -> S::Exception<'static, ()>
     where
-        S: ExceptionTarget<'target, 'static>,
+        S: Target<'target>,
     {
         // Safety: the C API function is called with valid data. If an exception is thrown it's caught.
 
@@ -1227,9 +1231,9 @@ impl<'scope> Array<'scope, 'static> {
     /// The array must be 1D, not contain data borrowed or moved from Rust, otherwise an exception
     /// is returned.
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub unsafe fn del_end<'target, S>(&mut self, target: S, dec: usize) -> S::Exception
+    pub unsafe fn del_end<'target, S>(&mut self, target: S, dec: usize) -> S::Exception<'static, ()>
     where
-        S: ExceptionTarget<'target, 'static>,
+        S: Target<'target>,
     {
         // Safety: the C API function is called with valid data. If an exception is thrown it's caught.
         let mut callback = |result: &mut MaybeUninit<()>| {
@@ -1260,9 +1264,13 @@ impl<'scope> Array<'scope, 'static> {
     /// The array must be 1D, not contain data borrowed or moved from Rust, otherwise an exception
     /// is returned.
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub unsafe fn grow_begin<'target, S>(&mut self, target: S, inc: usize) -> S::Exception
+    pub unsafe fn grow_begin<'target, S>(
+        &mut self,
+        target: S,
+        inc: usize,
+    ) -> S::Exception<'static, ()>
     where
-        S: ExceptionTarget<'target, 'static>,
+        S: Target<'target>,
     {
         // Safety: the C API function is called with valid data. If an exception is thrown it's caught.
         let mut callback = |result: &mut MaybeUninit<()>| {
@@ -1293,9 +1301,13 @@ impl<'scope> Array<'scope, 'static> {
     /// The array must be 1D, not contain data borrowed or moved from Rust, otherwise an exception
     /// is returned.
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub unsafe fn del_begin<'target, S>(&mut self, target: S, dec: usize) -> S::Exception
+    pub unsafe fn del_begin<'target, S>(
+        &mut self,
+        target: S,
+        dec: usize,
+    ) -> S::Exception<'static, ()>
     where
-        S: ExceptionTarget<'target, 'static>,
+        S: Target<'target>,
     {
         // Safety: the C API function is called with valid data. If an exception is thrown it's caught.
         let mut callback = |result: &mut MaybeUninit<()>| {
@@ -1333,7 +1345,7 @@ impl_debug!(Array<'_, '_>);
 
 impl<'scope, 'data> WrapperPriv<'scope, 'data> for Array<'scope, 'data> {
     type Wraps = jl_array_t;
-    type StaticPriv = Array<'static, 'data>;
+    type TypeConstructorPriv<'target, 'da> = Array<'target, 'da>;
     const NAME: &'static str = "Array";
 
     // Safety: `inner` must not have been freed yet, the result must never be
@@ -1383,19 +1395,12 @@ where
     /// returned.
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn new<'target, 'current, 'borrow, D, S>(
-        target: ExtendedTarget<
-            'target,
-            'current,
-            'borrow,
-            'static,
-            S,
-            TypedArray<'target, 'static, T>,
-        >,
+        target: ExtendedTarget<'target, 'current, 'borrow, S>,
         dims: D,
-    ) -> S::Result
+    ) -> TypedArrayResult<'target, 'static, S, T>
     where
         D: Dims,
-        S: Target<'target, 'static, TypedArray<'target, 'static, T>>,
+        S: Target<'target>,
     {
         unsafe {
             let (output, frame) = target.split();
@@ -1426,19 +1431,12 @@ where
     /// Safety: If the array size is too large, Julia will throw an error. This error is not
     /// caught, which is UB from a `ccall`ed function.
     pub unsafe fn new_unchecked<'target, 'current, 'borrow, D, S>(
-        target: ExtendedTarget<
-            'target,
-            'current,
-            'borrow,
-            'static,
-            S,
-            TypedArray<'target, 'static, T>,
-        >,
+        target: ExtendedTarget<'target, 'current, 'borrow, S>,
         dims: D,
-    ) -> S::Data
+    ) -> TypedArrayData<'target, 'data, S, T>
     where
         D: Dims,
-        S: Target<'target, 'static, TypedArray<'target, 'static, T>>,
+        S: Target<'target>,
     {
         let (output, frame) = target.split();
         frame
@@ -1465,14 +1463,14 @@ where
     /// returned.
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn from_slice<'target: 'current, 'current: 'borrow, 'borrow, D, S>(
-        target: ExtendedTarget<'target, 'current, 'borrow, 'data, S, TypedArray<'target, 'data, T>>,
+        target: ExtendedTarget<'target, 'current, 'borrow, S>,
         data: &'data mut [T],
         dims: D,
-    ) -> JlrsResult<S::Result>
+    ) -> JlrsResult<TypedArrayResult<'target, 'data, S, T>>
     where
         T: IntoJulia,
         D: Dims,
-        S: Target<'target, 'data, TypedArray<'target, 'data, T>>,
+        S: Target<'target>,
     {
         unsafe {
             let (output, frame) = target.split();
@@ -1502,14 +1500,14 @@ where
     /// Safety: If the array size is too large, Julia will throw an error. This error is not
     /// caught, which is UB from a `ccall`ed function.
     pub unsafe fn from_slice_unchecked<'target, 'current, 'borrow, D, S>(
-        target: ExtendedTarget<'target, 'current, 'borrow, 'data, S, TypedArray<'target, 'data, T>>,
+        target: ExtendedTarget<'target, 'current, 'borrow, S>,
         data: &'data mut [T],
         dims: D,
-    ) -> JlrsResult<S::Data>
+    ) -> JlrsResult<TypedArrayData<'target, 'data, S, T>>
     where
         T: IntoJulia,
         D: Dims,
-        S: Target<'target, 'data, TypedArray<'target, 'data, T>>,
+        S: Target<'target>,
     {
         let (output, frame) = target.split();
         frame.scope(|mut frame| {
@@ -1535,21 +1533,14 @@ where
     /// returned.
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn from_vec<'target, 'current, 'borrow, D, S>(
-        target: ExtendedTarget<
-            'target,
-            'current,
-            'borrow,
-            'static,
-            S,
-            TypedArray<'target, 'static, T>,
-        >,
+        target: ExtendedTarget<'target, 'current, 'borrow, S>,
         data: Vec<T>,
         dims: D,
-    ) -> JlrsResult<S::Result>
+    ) -> JlrsResult<TypedArrayResult<'target, 'static, S, T>>
     where
         T: IntoJulia,
         D: Dims,
-        S: Target<'target, 'static, TypedArray<'target, 'static, T>>,
+        S: Target<'target>,
     {
         unsafe {
             let (output, frame) = target.split();
@@ -1580,14 +1571,14 @@ where
     /// Safety: If the array size is too large, Julia will throw an error. This error is not
     /// caught, which is UB from a `ccall`ed function.
     pub unsafe fn from_vec_unchecked<'target, 'current, 'borrow, D, S>(
-        target: ExtendedTarget<'target, 'current, 'borrow, 'data, S, TypedArray<'target, 'data, T>>,
+        target: ExtendedTarget<'target, 'current, 'borrow, S>,
         data: Vec<T>,
         dims: D,
-    ) -> JlrsResult<S::Data>
+    ) -> JlrsResult<TypedArrayData<'target, 'static, S, T>>
     where
         T: IntoJulia,
         D: Dims,
-        S: Target<'target, 'data, TypedArray<'target, 'data, T>>,
+        S: Target<'target>,
     {
         let (output, frame) = target.split();
         frame.scope(|mut frame| {
@@ -1615,20 +1606,13 @@ where
     /// error is caught and returned.
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn new_for<'target, 'current, 'borrow, D, S>(
-        target: ExtendedTarget<
-            'target,
-            'current,
-            'borrow,
-            'static,
-            S,
-            TypedArray<'target, 'static, T>,
-        >,
+        target: ExtendedTarget<'target, 'current, 'borrow, S>,
         dims: D,
         ty: Value,
-    ) -> JlrsResult<S::Result>
+    ) -> JlrsResult<TypedArrayResult<'target, 'static, S, T>>
     where
         D: Dims,
-        S: Target<'target, 'static, TypedArray<'target, 'static, T>>,
+        S: Target<'target>,
     {
         if !T::valid_layout(ty) {
             let value_type = ty.display_string_or(CANNOT_DISPLAY_TYPE).into();
@@ -1662,20 +1646,13 @@ where
     /// Safety: If the array size is too large or if the type is invalid, Julia will throw an
     /// error. This error is not caught, which is UB from a `ccall`ed function.
     pub unsafe fn new_for_unchecked<'target, 'current, 'borrow, D, S>(
-        target: ExtendedTarget<
-            'target,
-            'current,
-            'borrow,
-            'static,
-            S,
-            TypedArray<'target, 'static, T>,
-        >,
+        target: ExtendedTarget<'target, 'current, 'borrow, S>,
         dims: D,
         ty: Value,
-    ) -> JlrsResult<S::Data>
+    ) -> JlrsResult<TypedArrayData<'target, 'static, S, T>>
     where
         D: Dims,
-        S: Target<'target, 'static, TypedArray<'target, 'static, T>>,
+        S: Target<'target>,
     {
         if !T::valid_layout(ty) {
             let value_type = ty.display_string_or(CANNOT_DISPLAY_TYPE).into();
@@ -1696,9 +1673,9 @@ where
     }
 
     /// Use the target to reroot this data.
-    pub fn root<'target, S>(self, target: S) -> S::Data
+    pub fn root<'target, S>(self, target: S) -> TypedArrayData<'target, 'data, S, T>
     where
-        S: Target<'target, 'data, TypedArray<'target, 'data, T>>,
+        S: Target<'target>,
     {
         // Safety: the data is valid.
         unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
@@ -1707,10 +1684,10 @@ where
 
 impl<'data> TypedArray<'_, 'data, u8> {
     /// Convert a string to a Julia array.
-    pub fn from_string<'target, A, T>(target: T, data: A) -> T::Data
+    pub fn from_string<'target, A, T>(target: T, data: A) -> TypedArrayData<'target, 'static, T, u8>
     where
         A: AsRef<str>,
-        T: Target<'target, 'static, TypedArray<'target, 'static, u8>>,
+        T: Target<'target>,
     {
         let string = data.as_ref();
         let nbytes = string.bytes().len();
@@ -1895,12 +1872,12 @@ where
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub unsafe fn reshape<'target, 'current, 'borrow, D, S>(
         &self,
-        target: ExtendedTarget<'target, 'current, 'borrow, 'data, S, TypedArray<'target, 'data, T>>,
+        target: ExtendedTarget<'target, 'current, 'borrow, S>,
         dims: D,
-    ) -> S::Result
+    ) -> TypedArrayResult<'target, 'data, S, T>
     where
         D: Dims,
-        S: Target<'target, 'data, TypedArray<'target, 'data, T>>,
+        S: Target<'target>,
     {
         let (output, frame) = target.split();
         frame
@@ -1928,12 +1905,12 @@ where
     /// This error is not caught, which is UB from a `ccall`ed function.
     pub unsafe fn reshape_unchecked<'target, 'current, 'borrow, D, S>(
         self,
-        target: ExtendedTarget<'target, 'current, 'borrow, 'data, S, TypedArray<'target, 'data, T>>,
+        target: ExtendedTarget<'target, 'current, 'borrow, S>,
         dims: D,
-    ) -> S::Data
+    ) -> TypedArrayData<'target, 'data, S, T>
     where
         D: Dims,
-        S: Target<'target, 'data, TypedArray<'target, 'data, T>>,
+        S: Target<'target>,
     {
         let (output, frame) = target.split();
         frame
@@ -2092,9 +2069,13 @@ where
     /// The array must be 1D and not contain data borrowed or moved from Rust, otherwise an exception
     /// is returned.
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub unsafe fn grow_end<'target, S>(&mut self, target: S, inc: usize) -> S::Exception
+    pub unsafe fn grow_end<'target, S>(
+        &mut self,
+        target: S,
+        inc: usize,
+    ) -> S::Exception<'static, ()>
     where
-        S: ExceptionTarget<'target, 'static>,
+        S: Target<'target>,
     {
         self.as_array().grow_end(target, inc)
     }
@@ -2113,9 +2094,9 @@ where
     /// The array must be 1D, not contain data borrowed or moved from Rust, otherwise an exception
     /// is returned.
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub unsafe fn del_end<'target, S>(&mut self, target: S, dec: usize) -> S::Exception
+    pub unsafe fn del_end<'target, S>(&mut self, target: S, dec: usize) -> S::Exception<'static, ()>
     where
-        S: ExceptionTarget<'target, 'static>,
+        S: Target<'target>,
     {
         self.as_array().del_end(target, dec)
     }
@@ -2133,9 +2114,13 @@ where
     /// The array must be 1D, not contain data borrowed or moved from Rust, otherwise an exception
     /// is returned.
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub unsafe fn grow_begin<'target, S>(&mut self, target: S, inc: usize) -> S::Exception
+    pub unsafe fn grow_begin<'target, S>(
+        &mut self,
+        target: S,
+        inc: usize,
+    ) -> S::Exception<'static, ()>
     where
-        S: ExceptionTarget<'target, 'static>,
+        S: Target<'target>,
     {
         self.as_array().grow_begin(target, inc)
     }
@@ -2154,9 +2139,13 @@ where
     /// The array must be 1D, not contain data borrowed or moved from Rust, otherwise an exception
     /// is returned.
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub unsafe fn del_begin<'target, S>(&mut self, target: S, dec: usize) -> S::Exception
+    pub unsafe fn del_begin<'target, S>(
+        &mut self,
+        target: S,
+        dec: usize,
+    ) -> S::Exception<'static, ()>
     where
-        S: ExceptionTarget<'target, 'static>,
+        S: Target<'target>,
     {
         self.as_array().del_begin(target, dec)
     }
@@ -2194,7 +2183,7 @@ impl<T: ValidLayout> Debug for TypedArray<'_, '_, T> {
 
 impl<'scope, 'data, T: ValidLayout> WrapperPriv<'scope, 'data> for TypedArray<'scope, 'data, T> {
     type Wraps = jl_array_t;
-    type StaticPriv = TypedArray<'static, 'data, T>;
+    type TypeConstructorPriv<'target, 'da> = TypedArray<'target, 'da, T>;
     const NAME: &'static str = "Array";
 
     // Safety: `inner` must not have been freed yet, the result must never be
@@ -2307,9 +2296,12 @@ where
     U: Debug + ValidLayout,
 {
     type Output = TypedArray<'target, 'data, U>;
-    unsafe fn root<T>(target: T, value: Ref<'value, 'data, Self>) -> JlrsResult<T::Data>
+    unsafe fn root<T>(
+        target: T,
+        value: Ref<'value, 'data, Self>,
+    ) -> JlrsResult<TypedArrayData<'target, 'data, T, U>>
     where
-        T: Target<'target, 'data, TypedArray<'target, 'data, U>>,
+        T: Target<'target>,
     {
         if let Some(v) = Self::wrapper(value, Private) {
             let ptr = v.unwrap_non_null(Private);
@@ -2360,10 +2352,32 @@ impl<'scope, 'data, U> TypedArrayRef<'scope, 'data, U>
 where
     U: ValidLayout + Debug,
 {
-    pub unsafe fn root<'target, T>(self, target: T) -> JlrsResult<T::Data>
+    pub unsafe fn root<'target, T>(
+        self,
+        target: T,
+    ) -> JlrsResult<TypedArrayData<'target, 'data, T, U>>
     where
-        T: Target<'target, 'data, TypedArray<'target, 'data, U>>,
+        T: Target<'target>,
     {
         <TypedArray<U> as Root>::root(target, self)
     }
 }
+
+use crate::memory::target::target_type::TargetType;
+
+/// `Array` or `ArrayRef`, depending on the target type `T`.
+pub type ArrayData<'target, 'data, T> =
+    <T as TargetType<'target>>::Data<'data, Array<'target, 'data>>;
+
+/// `JuliaResult<Array>` or `JuliaResultRef<ArrayRef>`, depending on the target type `T`.
+pub type ArrayResult<'target, 'data, T> =
+    <T as TargetType<'target>>::Result<'data, Array<'target, 'data>>;
+
+/// `TypedArray<U>` or `TypedArrayRef<U>`, depending on the target type `T`.
+pub type TypedArrayData<'target, 'data, T, U> =
+    <T as TargetType<'target>>::Data<'data, TypedArray<'target, 'data, U>>;
+
+/// `JuliaResult<TypedArray<U>>` or `JuliaResultRef<TypedArrayRef<U>>`, depending on the target
+/// type `T`.
+pub type TypedArrayResult<'target, 'data, T, U> =
+    <T as TargetType<'target>>::Result<'data, TypedArray<'target, 'data, U>>;

@@ -58,9 +58,9 @@ impl<'scope> MethodMatch<'scope> {
     }
 
     /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> T::Data
+    pub fn root<'target, T>(self, target: T) -> MethodMatchData<'target, T>
     where
-        T: Target<'target, 'static, MethodMatch<'target>>,
+        T: Target<'target>,
     {
         // Safety: the data is valid.
         unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
@@ -72,7 +72,7 @@ impl_debug!(MethodMatch<'_>);
 
 impl<'scope> WrapperPriv<'scope, '_> for MethodMatch<'scope> {
     type Wraps = jl_method_match_t;
-    type StaticPriv = MethodMatch<'static>;
+    type TypeConstructorPriv<'target, 'da> = MethodMatch<'target>;
     const NAME: &'static str = "MethodMatch";
 
     // Safety: `inner` must not have been freed yet, the result must never be
@@ -92,3 +92,14 @@ impl_root!(MethodMatch, 1);
 pub type MethodMatchRef<'scope> = Ref<'scope, 'static, MethodMatch<'scope>>;
 impl_valid_layout!(MethodMatchRef, MethodMatch);
 impl_ref_root!(MethodMatch, MethodMatchRef, 1);
+
+use crate::memory::target::target_type::TargetType;
+
+/// `MethodMetch` or `MethodMetchRef`, depending on the target type `T`.
+pub type MethodMatchData<'target, T> =
+    <T as TargetType<'target>>::Data<'static, MethodMatch<'target>>;
+
+/// `JuliaResult<MethodMetch>` or `JuliaResultRef<MethodMetchRef>`, depending on the target type
+/// `T`.
+pub type MethodMatchResult<'target, T> =
+    <T as TargetType<'target>>::Result<'static, MethodMatch<'target>>;

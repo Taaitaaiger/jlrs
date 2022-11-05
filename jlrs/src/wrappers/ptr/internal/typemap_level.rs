@@ -137,9 +137,9 @@ impl<'scope> TypeMapLevel<'scope> {
     }
 
     /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> T::Data
+    pub fn root<'target, T>(self, target: T) -> TypeMapLevelData<'target, T>
     where
-        T: Target<'target, 'static, TypeMapLevel<'target>>,
+        T: Target<'target>,
     {
         // Safety: the data is valid.
         unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
@@ -151,7 +151,7 @@ impl_debug!(TypeMapLevel<'_>);
 
 impl<'scope> WrapperPriv<'scope, '_> for TypeMapLevel<'scope> {
     type Wraps = jl_typemap_level_t;
-    type StaticPriv = TypeMapLevel<'static>;
+    type TypeConstructorPriv<'target, 'da> = TypeMapLevel<'target>;
     const NAME: &'static str = "TypeMapLevel";
 
     // Safety: `inner` must not have been freed yet, the result must never be
@@ -171,3 +171,14 @@ impl_root!(TypeMapLevel, 1);
 pub type TypeMapLevelRef<'scope> = Ref<'scope, 'static, TypeMapLevel<'scope>>;
 impl_valid_layout!(TypeMapLevelRef, TypeMapLevel);
 impl_ref_root!(TypeMapLevel, TypeMapLevelRef, 1);
+
+use crate::memory::target::target_type::TargetType;
+
+/// `TypeMaLevely` or `TypeMaLevelyRef`, depending on the target type `T`.
+pub type TypeMapLevelData<'target, T> =
+    <T as TargetType<'target>>::Data<'static, TypeMapLevel<'target>>;
+
+/// `JuliaResult<TypeMaLevely>` or `JuliaResultRef<TypeMapLevelRef>`, depending on the target type
+/// `T`.
+pub type TypeMapLevelResult<'target, T> =
+    <T as TargetType<'target>>::Result<'static, TypeMapLevel<'target>>;

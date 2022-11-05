@@ -29,9 +29,9 @@ impl<'scope> WeakRef<'scope> {
     }
 
     /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> T::Data
+    pub fn root<'target, T>(self, target: T) -> WeakRefData<'target, T>
     where
-        T: Target<'target, 'static, WeakRef<'target>>,
+        T: Target<'target>,
     {
         // Safety: the data is valid.
         unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
@@ -43,7 +43,7 @@ impl_debug!(WeakRef<'_>);
 
 impl<'scope> WrapperPriv<'scope, '_> for WeakRef<'scope> {
     type Wraps = jl_weakref_t;
-    type StaticPriv = WeakRef<'static>;
+    type TypeConstructorPriv<'target, 'da> = WeakRef<'target>;
     const NAME: &'static str = "WeakRef";
 
     // Safety: `inner` must not have been freed yet, the result must never be
@@ -63,3 +63,11 @@ impl_root!(WeakRef, 1);
 pub type WeakRefRef<'scope> = Ref<'scope, 'static, WeakRef<'scope>>;
 impl_valid_layout!(WeakRefRef, WeakRef);
 impl_ref_root!(WeakRef, WeakRefRef, 1);
+
+use crate::memory::target::target_type::TargetType;
+
+/// `WeakRef` or `WeakRefRef`, depending on the target type `T`.
+pub type WeakRefData<'target, T> = <T as TargetType<'target>>::Data<'static, WeakRef<'target>>;
+
+/// `JuliaResult<WeakRef>` or `JuliaResultRef<WeakRefRef>`, depending on the target type`T`.
+pub type WeakRefResult<'target, T> = <T as TargetType<'target>>::Result<'static, WeakRef<'target>>;

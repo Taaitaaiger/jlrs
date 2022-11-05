@@ -191,9 +191,9 @@ impl<'scope> TypeName<'scope> {
     }
 
     /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> T::Data
+    pub fn root<'target, T>(self, target: T) -> TypeNameData<'target, T>
     where
-        T: Target<'target, 'static, TypeName<'target>>,
+        T: Target<'target>,
     {
         // Safety: the data is valid.
         unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
@@ -204,7 +204,7 @@ impl<'base> TypeName<'base> {
     /// The typename of the `UnionAll` `Type`.
     pub fn of_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap(jl_type_typename, Private) }
@@ -213,7 +213,7 @@ impl<'base> TypeName<'base> {
     /// The typename of the `DataType` `Tuple`.
     pub fn of_tuple<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap(jl_tuple_typename, Private) }
@@ -222,7 +222,7 @@ impl<'base> TypeName<'base> {
     /// The typename of the `UnionAll` `VecElement`.
     pub fn of_vecelement<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap(jl_vecelement_typename, Private) }
@@ -232,7 +232,7 @@ impl<'base> TypeName<'base> {
     #[cfg(feature = "lts")]
     pub fn of_vararg<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap(jl_vararg_typename, Private) }
@@ -241,7 +241,7 @@ impl<'base> TypeName<'base> {
     /// The typename of the `UnionAll` `Array`.
     pub fn of_array<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap(jl_array_typename, Private) }
@@ -251,7 +251,7 @@ impl<'base> TypeName<'base> {
     #[cfg(not(feature = "lts"))]
     pub fn of_opaque_closure<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap(jl_opaque_closure_typename, Private) }
@@ -260,7 +260,7 @@ impl<'base> TypeName<'base> {
     /// The typename of the `UnionAll` `Ptr`.
     pub fn of_pointer<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap(jl_pointer_typename, Private) }
@@ -269,7 +269,7 @@ impl<'base> TypeName<'base> {
     /// The typename of the `UnionAll` `LLVMPtr`.
     pub fn of_llvmpointer<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap(jl_llvmpointer_typename, Private) }
@@ -278,7 +278,7 @@ impl<'base> TypeName<'base> {
     /// The typename of the `UnionAll` `NamedTuple`.
     pub fn of_namedtuple<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { Self::wrap(jl_namedtuple_typename, Private) }
@@ -290,7 +290,7 @@ impl_debug!(TypeName<'_>);
 
 impl<'scope> WrapperPriv<'scope, '_> for TypeName<'scope> {
     type Wraps = jl_typename_t;
-    type StaticPriv = TypeName<'static>;
+    type TypeConstructorPriv<'target, 'da> = TypeName<'target>;
     const NAME: &'static str = "TypeName";
 
     // Safety: `inner` must not have been freed yet, the result must never be
@@ -310,3 +310,12 @@ impl_root!(TypeName, 1);
 pub type TypeNameRef<'scope> = Ref<'scope, 'static, TypeName<'scope>>;
 impl_valid_layout!(TypeNameRef, TypeName);
 impl_ref_root!(TypeName, TypeNameRef, 1);
+
+use crate::memory::target::target_type::TargetType;
+
+/// `TypeName` or `TypeNameRef`, depending on the target type `T`.
+pub type TypeNameData<'target, T> = <T as TargetType<'target>>::Data<'static, TypeName<'target>>;
+
+/// `JuliaResult<TypeName>` or `JuliaResultRef<TypeNameRef>`, depending on the target type `T`.
+pub type TypeNameResult<'target, T> =
+    <T as TargetType<'target>>::Result<'static, TypeName<'target>>;

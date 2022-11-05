@@ -292,9 +292,9 @@ impl<'scope> Method<'scope> {
     }
 
     /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> T::Data
+    pub fn root<'target, T>(self, target: T) -> MethodData<'target, T>
     where
-        T: Target<'target, 'static, Method<'target>>,
+        T: Target<'target>,
     {
         // Safety: the data is valid.
         unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
@@ -306,7 +306,7 @@ impl_debug!(Method<'_>);
 
 impl<'scope> WrapperPriv<'scope, '_> for Method<'scope> {
     type Wraps = jl_method_t;
-    type StaticPriv = Method<'static>;
+    type TypeConstructorPriv<'target, 'da> = Method<'target>;
     const NAME: &'static str = "Method";
 
     // Safety: `inner` must not have been freed yet, the result must never be
@@ -326,3 +326,11 @@ impl_root!(Method, 1);
 pub type MethodRef<'scope> = Ref<'scope, 'static, Method<'scope>>;
 impl_valid_layout!(MethodRef, Method);
 impl_ref_root!(Method, MethodRef, 1);
+
+use crate::memory::target::target_type::TargetType;
+
+/// `Method` or `MethodRef`, depending on the target type `T`.
+pub type MethodData<'target, T> = <T as TargetType<'target>>::Data<'static, Method<'target>>;
+
+/// `JuliaResult<Method>` or `JuliaResultRef<MethodRef>`, depending on the target type `T`.
+pub type MethodResult<'target, T> = <T as TargetType<'target>>::Result<'static, Method<'target>>;

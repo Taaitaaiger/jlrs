@@ -182,9 +182,9 @@ fn impl_into_julia(ast: &syn::DeriveInput) -> TokenStream {
 
     let into_julia_impl = quote! {
         unsafe impl ::jlrs::convert::into_julia::IntoJulia for #name {
-            fn julia_type<'scope, T>(target: T) -> T::Data
+            fn julia_type<'scope, T>(target: T) -> ::jlrs::wrappers::ptr::datatype::DataTypeData<'scope, T>
             where
-                T: ::jlrs::memory::target::Target<'scope, 'static, ::jlrs::wrappers::ptr::datatype::DataType<'scope>>,
+                T: ::jlrs::memory::target::Target<'scope>,
             {
                 unsafe {
                     let global = target.global();
@@ -213,7 +213,10 @@ fn impl_into_julia(ast: &syn::DeriveInput) -> TokenStream {
 fn impl_into_julia_fn(attrs: &JlrsTypeAttrs) -> Option<TS2> {
     if attrs.zst {
         Some(quote! {
-            unsafe fn into_julia<'target>(self, global: ::jlrs::memory::global::Global<'target>) -> ::jlrs::wrappers::ptr::ValueRef<'target, 'static> {
+            unsafe fn into_julia<'target, T>(self, target: T) -> ::jlrs::wrappers::ptr::value::ValueData<'target, 'static, T>
+            where
+                T: ::jlrs::memory::target::Target<'scope>,
+            {
                 let ty = self.julia_type(global);
                 unsafe {
                     ty.wrapper_unchecked()

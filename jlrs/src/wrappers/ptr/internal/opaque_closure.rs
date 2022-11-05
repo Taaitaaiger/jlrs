@@ -6,8 +6,13 @@ use crate::{
     memory::{target::global::Global, target::Target},
     private::Private,
     wrappers::ptr::{
-        datatype::DataType, internal::method::MethodRef, private::WrapperPriv, type_name::TypeName,
-        value::Value, value::ValueRef, Ref, Wrapper as _,
+        datatype::DataType,
+        internal::method::MethodRef,
+        private::WrapperPriv,
+        type_name::TypeName,
+        value::ValueRef,
+        value::{Value, ValueResult},
+        Ref, Wrapper as _,
     },
 };
 use jl_sys::jl_opaque_closure_t;
@@ -75,9 +80,9 @@ impl<'scope> OpaqueClosure<'scope> {
     }
 
     /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> T::Data
+    pub fn root<'target, T>(self, target: T) -> OpaqueClosureData<'target, T>
     where
-        T: Target<'target, 'static, OpaqueClosure<'target>>,
+        T: Target<'target>,
     {
         // Safety: the data is valid.
         unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
@@ -92,9 +97,9 @@ unsafe impl Typecheck for OpaqueClosure<'_> {
 
 impl_debug!(OpaqueClosure<'_>);
 
-impl<'scope> WrapperPriv<'scope, 'static> for OpaqueClosure<'scope> {
+impl<'scope, 'data> WrapperPriv<'scope, 'data> for OpaqueClosure<'scope> {
     type Wraps = jl_opaque_closure_t;
-    type StaticPriv = OpaqueClosure<'static>;
+    type TypeConstructorPriv<'target, 'da> = OpaqueClosure<'target>;
     const NAME: &'static str = "OpaqueClosure";
 
     // Safety: `inner` must not have been freed yet, the result must never be
@@ -109,16 +114,20 @@ impl<'scope> WrapperPriv<'scope, 'static> for OpaqueClosure<'scope> {
 }
 
 impl<'data> Call<'data> for OpaqueClosure<'_> {
-    unsafe fn call0<'target, T>(self, target: T) -> T::Result
+    unsafe fn call0<'target, T>(self, target: T) -> ValueResult<'target, 'data, T>
     where
-        T: Target<'target, 'data>,
+        T: Target<'target>,
     {
         self.as_value().call0(target)
     }
 
-    unsafe fn call1<'target, T>(self, target: T, arg0: Value<'_, 'data>) -> T::Result
+    unsafe fn call1<'target, T>(
+        self,
+        target: T,
+        arg0: Value<'_, 'data>,
+    ) -> ValueResult<'target, 'data, T>
     where
-        T: Target<'target, 'data>,
+        T: Target<'target>,
     {
         self.as_value().call1(target, arg0)
     }
@@ -128,9 +137,9 @@ impl<'data> Call<'data> for OpaqueClosure<'_> {
         target: T,
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
-    ) -> T::Result
+    ) -> ValueResult<'target, 'data, T>
     where
-        T: Target<'target, 'data>,
+        T: Target<'target>,
     {
         self.as_value().call2(target, arg0, arg1)
     }
@@ -141,17 +150,21 @@ impl<'data> Call<'data> for OpaqueClosure<'_> {
         arg0: Value<'_, 'data>,
         arg1: Value<'_, 'data>,
         arg2: Value<'_, 'data>,
-    ) -> T::Result
+    ) -> ValueResult<'target, 'data, T>
     where
-        T: Target<'target, 'data>,
+        T: Target<'target>,
     {
         self.as_value().call3(target, arg0, arg1, arg2)
     }
 
-    unsafe fn call<'target, 'value, V, T>(self, target: T, args: V) -> T::Result
+    unsafe fn call<'target, 'value, V, T>(
+        self,
+        target: T,
+        args: V,
+    ) -> ValueResult<'target, 'data, T>
     where
         V: AsRef<[Value<'value, 'data>]>,
-        T: Target<'target, 'data>,
+        T: Target<'target>,
     {
         self.as_value().call(target, args)
     }
@@ -163,3 +176,14 @@ impl_root!(OpaqueClosure, 1);
 pub type OpaqueClosureRef<'scope> = Ref<'scope, 'static, OpaqueClosure<'scope>>;
 impl_valid_layout!(OpaqueClosureRef, OpaqueClosure);
 impl_ref_root!(OpaqueClosure, OpaqueClosureRef, 1);
+
+use crate::memory::target::target_type::TargetType;
+
+/// `OpaqueClosure` or `OpaqueClosureRef`, depending on the target type `T`.
+pub type OpaqueClosureData<'target, T> =
+    <T as TargetType<'target>>::Data<'static, OpaqueClosure<'target>>;
+
+/// `JuliaResult<OpaqueClosure>` or `JuliaResultRef<OpaqueClosureRef>`, depending on the target
+/// type `T`.
+pub type OpaqueClosureResult<'target, T> =
+    <T as TargetType<'target>>::Result<'static, OpaqueClosure<'target>>;

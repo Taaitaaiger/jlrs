@@ -20,15 +20,15 @@ jobs:
           - rust: nightly
             allow-fail: true
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v1
         with:
           version: '1.8'
 
-      - name: rust-toolchain
-        uses: actions-rs/toolchain@v1
+      - name: Setup Rust
+        uses:  dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
 
@@ -56,8 +56,8 @@ jobs:
         with:
           version: '1.8'
 
-      - name: rust-toolchain
-        uses: actions-rs/toolchain@v1
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
           override: true
@@ -86,19 +86,11 @@ jobs:
 
       - uses: ilammy/msvc-dev-cmd@v1
 
-      - name: rust-toolchain
-        uses: actions-rs/toolchain@v1
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
           override: true
-
-      - name: Create lib files
-        run: |
-          copy ./jl_sys/def/stable/*.def ${{ steps.setup-julia.outputs.julia-bindir }}
-          cd ${{ steps.setup-julia.outputs.julia-bindir }}
-          lib /def:libjulia.def /out:libjulia.lib /machine:x64
-          lib /def:libopenlibm.def /out:libopenlibm.lib /machine:x64
-          lib /def:libuv-2.def /out:libuv-2.lib /machine:x64
 
       - name: Run tests
         run: cargo test --features full --verbose -- --test-threads=1
@@ -118,8 +110,8 @@ jobs:
         with:
           version: '1.6'
 
-      - name: rust-toolchain
-        uses: actions-rs/toolchain@v1
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
 
@@ -144,8 +136,8 @@ jobs:
         with:
           version: '1.6'
 
-      - name: rust-toolchain
-        uses: actions-rs/toolchain@v1
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
           override: true
@@ -171,19 +163,11 @@ jobs:
 
       - uses: ilammy/msvc-dev-cmd@v1
 
-      - name: rust-toolchain
-        uses: actions-rs/toolchain@v1
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
           override: true
-
-      - name: Create lib files
-        run: |
-          copy ./jl_sys/def/lts/*.def ${{ steps.setup-julia.outputs.julia-bindir }}
-          cd ${{ steps.setup-julia.outputs.julia-bindir }}
-          lib /def:libjulia.def /out:libjulia.lib /machine:x64
-          lib /def:libopenlibm.def /out:libopenlibm.lib /machine:x64
-          lib /def:libuv-2.def /out:libuv-2.lib /machine:x64
 
       - name: Run tests
         run: cargo test --features full,lts --verbose -- --test-threads=1
@@ -197,10 +181,10 @@ jobs:
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v1
         with:
-          version: '~1.8.0-0'
+          version: '1.8'
 
-      - name: rust-toolchain
-        uses: actions-rs/toolchain@v1
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
 

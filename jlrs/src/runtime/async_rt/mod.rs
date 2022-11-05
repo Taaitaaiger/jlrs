@@ -718,7 +718,8 @@ where
         for i in 0..N {
             loop {
                 if running_tasks.borrow()[i].is_some() {
-                    sleep(Global::new(), recv_timeout);
+                    R::yield_now().await;
+                    sleep(&Global::new(), recv_timeout);
                     jl_process_events();
                 } else {
                     break;
@@ -734,7 +735,7 @@ where
                     break;
                 }
 
-                sleep(Global::new(), recv_timeout);
+                sleep(&Global::new(), recv_timeout);
                 jl_process_events();
             }
         }

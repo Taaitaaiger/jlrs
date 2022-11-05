@@ -26,7 +26,9 @@ cfg_if! {
 
 use std::{marker::PhantomData, ptr::NonNull};
 
-use super::Ref;
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use super::value::ValueResult;
+use super::{value::ValueData, Ref};
 
 /// An iterated union of types. If a struct field has a parametric type with some of its
 /// parameters unknown, its type is represented by a `UnionAll`.
@@ -37,9 +39,13 @@ pub struct UnionAll<'scope>(NonNull<jl_unionall_t>, PhantomData<&'scope ()>);
 impl<'scope> UnionAll<'scope> {
     /// Create a new `UnionAll`. If an exception is thrown, it's caught and returned.
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub fn new<'target, T>(target: T, tvar: TypeVar, body: Value<'_, 'static>) -> T::Result
+    pub fn new<'target, T>(
+        target: T,
+        tvar: TypeVar,
+        body: Value<'_, 'static>,
+    ) -> ValueResult<'target, 'static, T>
     where
-        T: Target<'target, 'static>,
+        T: Target<'target>,
     {
         use crate::catch::catch_exceptions;
         use jl_sys::jl_value_t;
@@ -70,9 +76,9 @@ impl<'scope> UnionAll<'scope> {
         target: T,
         tvar: TypeVar,
         body: Value<'_, 'static>,
-    ) -> T::Data
+    ) -> ValueData<'target, 'static, T>
     where
-        T: Target<'target, 'static>,
+        T: Target<'target>,
     {
         let ua = jl_type_unionall(tvar.unwrap(Private), body.unwrap(Private));
         target.data_from_ptr(NonNull::new_unchecked(ua), Private)
@@ -122,9 +128,9 @@ impl<'scope> UnionAll<'scope> {
     }
 
     /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> T::Data
+    pub fn root<'target, T>(self, target: T) -> UnionAllData<'target, T>
     where
-        T: Target<'target, 'static, UnionAll<'target>>,
+        T: Target<'target>,
     {
         // Safety: the data is valid.
         unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
@@ -135,7 +141,7 @@ impl<'base> UnionAll<'base> {
     /// The `UnionAll` `Type`.
     pub fn type_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { UnionAll::wrap(jl_type_type, Private) }
@@ -144,7 +150,7 @@ impl<'base> UnionAll<'base> {
     /// `Type{T} where T<:Tuple`
     pub fn anytuple_type_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { UnionAll::wrap(jl_anytuple_type_type, Private) }
@@ -154,7 +160,7 @@ impl<'base> UnionAll<'base> {
     #[cfg(feature = "lts")]
     pub fn vararg_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { UnionAll::wrap(jl_vararg_type, Private) }
@@ -163,7 +169,7 @@ impl<'base> UnionAll<'base> {
     /// The `UnionAll` `AbstractArray`.
     pub fn abstractarray_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { UnionAll::wrap(jl_abstractarray_type, Private) }
@@ -173,7 +179,7 @@ impl<'base> UnionAll<'base> {
     #[cfg(not(feature = "lts"))]
     pub fn opaque_closure_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { UnionAll::wrap(jl_opaque_closure_type, Private) }
@@ -182,7 +188,7 @@ impl<'base> UnionAll<'base> {
     /// The `UnionAll` `DenseArray`.
     pub fn densearray_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { UnionAll::wrap(jl_densearray_type, Private) }
@@ -191,7 +197,7 @@ impl<'base> UnionAll<'base> {
     /// The `UnionAll` `Array`.
     pub fn array_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { UnionAll::wrap(jl_array_type, Private) }
@@ -200,7 +206,7 @@ impl<'base> UnionAll<'base> {
     /// The `UnionAll` `Ptr`.
     pub fn pointer_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { UnionAll::wrap(jl_pointer_type, Private) }
@@ -209,7 +215,7 @@ impl<'base> UnionAll<'base> {
     /// The `UnionAll` `LLVMPtr`.
     pub fn llvmpointer_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { UnionAll::wrap(jl_llvmpointer_type, Private) }
@@ -218,7 +224,7 @@ impl<'base> UnionAll<'base> {
     /// The `UnionAll` `Ref`.
     pub fn ref_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { UnionAll::wrap(jl_ref_type, Private) }
@@ -227,7 +233,7 @@ impl<'base> UnionAll<'base> {
     /// The `UnionAll` `NamedTuple`.
     pub fn namedtuple_type<T>(_: &T) -> Self
     where
-        T: Target<'base, 'static, Self>,
+        T: Target<'base>,
     {
         // Safety: global constant
         unsafe { UnionAll::wrap(jl_namedtuple_type, Private) }
@@ -239,7 +245,7 @@ impl_debug!(UnionAll<'_>);
 
 impl<'scope> WrapperPriv<'scope, '_> for UnionAll<'scope> {
     type Wraps = jl_unionall_t;
-    type StaticPriv = UnionAll<'static>;
+    type TypeConstructorPriv<'target, 'da> = UnionAll<'target>;
     const NAME: &'static str = "UnionAll";
 
     // Safety: `inner` must not have been freed yet, the result must never be
@@ -259,3 +265,12 @@ impl_root!(UnionAll, 1);
 pub type UnionAllRef<'scope> = Ref<'scope, 'static, UnionAll<'scope>>;
 impl_valid_layout!(UnionAllRef, UnionAll);
 impl_ref_root!(UnionAll, UnionAllRef, 1);
+
+use crate::memory::target::target_type::TargetType;
+
+/// `UnionAll` or `UnionAllRef`, depending on the target type `T`.
+pub type UnionAllData<'target, T> = <T as TargetType<'target>>::Data<'static, UnionAll<'target>>;
+
+/// `JuliaResult<UnionAll>` or `JuliaResultRef<UnionAllRef>`, depending on the target type `T`.
+pub type UnionAllResult<'target, T> =
+    <T as TargetType<'target>>::Result<'static, UnionAll<'target>>;

@@ -22,7 +22,7 @@ pub use crate::{
     call::{Call, ProvideKeywords},
     convert::into_jlrs_result::IntoJlrsResult,
     error::JlrsResult,
-    memory::target::{target_type::TargetType, ExceptionTarget, Target},
+    memory::target::{target_type::TargetType, Target},
     named_tuple,
     wrappers::{
         inline::{bool::Bool, char::Char, nothing::Nothing, tuple::*},

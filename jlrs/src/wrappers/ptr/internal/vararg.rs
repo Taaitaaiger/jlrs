@@ -26,9 +26,9 @@ impl<'scope> Vararg<'scope> {
     }
 
     /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> T::Data
+    pub fn root<'target, T>(self, target: T) -> VarargData<'target, T>
     where
-        T: Target<'target, 'static, Vararg<'target>>,
+        T: Target<'target>,
     {
         // Safety: the data is valid.
         unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
@@ -38,9 +38,9 @@ impl<'scope> Vararg<'scope> {
 impl_julia_typecheck!(Vararg<'scope>, jl_vararg_type, 'scope);
 impl_debug!(Vararg<'_>);
 
-impl<'scope> WrapperPriv<'scope, 'static> for Vararg<'scope> {
+impl<'scope, 'data> WrapperPriv<'scope, 'data> for Vararg<'scope> {
     type Wraps = jl_vararg_t;
-    type StaticPriv = Vararg<'static>;
+    type TypeConstructorPriv<'target, 'da> = Vararg<'target>;
     const NAME: &'static str = "Vararg";
 
     // Safety: `inner` must not have been freed yet, the result must never be
@@ -60,3 +60,11 @@ impl_root!(Vararg, 1);
 pub type VarargRef<'scope> = Ref<'scope, 'static, Vararg<'scope>>;
 impl_valid_layout!(VarargRef, Vararg);
 impl_ref_root!(Vararg, VarargRef, 1);
+
+use crate::memory::target::target_type::TargetType;
+
+/// `Vararg` or `VarargRef`, depending on the target type `T`.
+pub type VarargData<'target, T> = <T as TargetType<'target>>::Data<'static, Vararg<'target>>;
+
+/// `JuliaResult<Vararg>` or `JuliaResultRef<VarargRef>`, depending on the target type`T`.
+pub type VarargResult<'target, T> = <T as TargetType<'target>>::Result<'static, Vararg<'target>>;

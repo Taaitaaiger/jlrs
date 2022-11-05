@@ -35,7 +35,7 @@ use crate::{
     wrappers::ptr::{datatype::DataType, module::Module, symbol::Symbol, value::Value},
 };
 
-use super::ptr::private::WrapperPriv;
+use super::ptr::{datatype::DataTypeData, private::WrapperPriv, value::ValueData};
 
 static FOREIGN_TYPES: ForeignTypes = ForeignTypes {
     data: RwLock::new(Vec::new()),
@@ -84,10 +84,10 @@ pub unsafe fn create_foreign_type<'target, U, T>(
     super_type: Option<DataType>,
     has_pointers: bool,
     large: bool,
-) -> T::Data
+) -> DataTypeData<'target, T>
 where
     U: ForeignType,
-    T: Target<'target, 'static, DataType<'target>>,
+    T: Target<'target>,
 {
     if let Some(ty) = FOREIGN_TYPES.find::<U>() {
         return target.data_from_ptr(ty.unwrap_non_null(Private), Private);
@@ -136,17 +136,17 @@ where
 }
 
 unsafe impl<F: ForeignType> IntoJulia for F {
-    fn julia_type<'scope, T>(target: T) -> T::Data
+    fn julia_type<'scope, T>(target: T) -> DataTypeData<'scope, T>
     where
-        T: Target<'scope, 'static, DataType<'scope>>,
+        T: Target<'scope>,
     {
         let ty = FOREIGN_TYPES.find::<F>().expect("Doesn't exist");
         unsafe { target.data_from_ptr(ty.unwrap_non_null(Private), Private) }
     }
 
-    fn into_julia<'scope, T>(self, target: T) -> T::Data
+    fn into_julia<'scope, T>(self, target: T) -> ValueData<'scope, 'static, T>
     where
-        T: Target<'scope, 'static>,
+        T: Target<'scope>,
     {
         unsafe {
             let ptls = get_tls();

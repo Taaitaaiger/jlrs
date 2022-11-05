@@ -137,9 +137,9 @@ impl<'scope> Task<'scope> {
     }
 
     /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> T::Data
+    pub fn root<'target, T>(self, target: T) -> TaskData<'target, T>
     where
-        T: Target<'target, 'static, Task<'target>>,
+        T: Target<'target>,
     {
         // Safety: the data is valid.
         unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
@@ -151,7 +151,7 @@ impl_debug!(Task<'_>);
 
 impl<'scope> WrapperPriv<'scope, '_> for Task<'scope> {
     type Wraps = jl_task_t;
-    type StaticPriv = Task<'static>;
+    type TypeConstructorPriv<'target, 'da> = Task<'target>;
     const NAME: &'static str = "Task";
 
     // Safety: `inner` must not have been freed yet, the result must never be
@@ -171,3 +171,11 @@ impl_root!(Task, 1);
 pub type TaskRef<'scope> = Ref<'scope, 'static, Task<'scope>>;
 impl_valid_layout!(TaskRef, Task);
 impl_ref_root!(Task, TaskRef, 1);
+
+use crate::memory::target::target_type::TargetType;
+
+/// `Task` or `TaskRef`, depending on the target type `T`.
+pub type TaskData<'target, T> = <T as TargetType<'target>>::Data<'static, Task<'target>>;
+
+/// `JuliaResult<Task>` or `JuliaResultRef<TaskRef>`, depending on the target type `T`.
+pub type TaskResult<'target, T> = <T as TargetType<'target>>::Result<'static, Task<'target>>;

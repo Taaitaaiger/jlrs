@@ -259,23 +259,22 @@ pub fn yield_task(_: &mut AsyncGcFrame) {
 ///
 /// The function calls `Base.sleep`. If `duration` is less than 1ms this function returns
 /// immediately.
-pub fn sleep<'scope, 'data, T: Target<'scope, 'data>>(target: T, duration: Duration) {
+pub fn sleep<'scope, 'data, T: Target<'scope>>(target: &T, duration: Duration) {
     unsafe {
         let millis = duration.as_millis();
         if millis == 0 {
             return;
         }
 
-        let global = target.global();
         // Is rooted when sleep is called.
         let secs = duration.as_millis() as usize as f64 / 1000.;
-        let secs = Value::new(global, secs).value_unchecked();
+        let secs = Value::new(target, secs).value_unchecked();
 
-        Module::base(&global)
-            .global(global, "sleep")
+        Module::base(target)
+            .global(target, "sleep")
             .expect("sleep not found")
             .value_unchecked()
-            .call1(global, secs)
-            .expect("Sleep threw an exception");
+            .call1(target, secs)
+            .expect("sleep threw an exception");
     }
 }

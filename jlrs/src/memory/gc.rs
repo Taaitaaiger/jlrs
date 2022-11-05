@@ -145,14 +145,14 @@ pub unsafe fn write_barrier<T>(data: &mut T, child: Value) {
 
 #[cfg(feature = "sync-rt")]
 impl Gc for Julia<'_> {}
-impl<'frame, 'data, T: Target<'frame, 'data>> Gc for T {}
+impl<'frame, T: Target<'frame>> Gc for T {}
 
 mod private {
     use crate::memory::target::Target;
     #[cfg(feature = "sync-rt")]
     use crate::runtime::sync_rt::Julia;
     pub trait GcPriv {}
-    impl<'frame, 'data, T: Target<'frame, 'data>> GcPriv for T {}
+    impl<'frame, T: Target<'frame>> GcPriv for T {}
     #[cfg(feature = "sync-rt")]
     impl GcPriv for Julia<'_> {}
 }
