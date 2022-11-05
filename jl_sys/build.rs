@@ -159,6 +159,14 @@ fn main() {
     ))]
     c.flag("/std:c++20");
 
+    #[cfg(target_env = "msvc")]
+    {
+        let julia_dll_a = format!("{}/lib/libjulia.dll.a", &julia_dir);
+        c.object(&julia_dll_a);
+        let openlibm_dll_a = format!("{}/lib/libopenlibm.dll.a", &julia_dir);
+        c.object(&openlibm_dll_a);
+    }
+
     #[cfg(all(feature = "lts", any(windows, feature = "windows")))]
     c.define("JLRS_WINDOWS_LTS", None);
 
