@@ -5,7 +5,10 @@ use crate::{
     impl_julia_typecheck, impl_valid_layout,
     memory::target::Target,
     private::Private,
-    wrappers::ptr::{datatype::DataType, private::WrapperPriv},
+    wrappers::ptr::{
+        datatype::{DataType, DataTypeData},
+        private::WrapperPriv,
+    },
 };
 use jl_sys::jl_nothing_type;
 
@@ -21,9 +24,9 @@ unsafe impl Unbox for Nothing {
 }
 
 unsafe impl IntoJulia for Nothing {
-    fn julia_type<'scope, T>(target: T) -> T::Data
+    fn julia_type<'scope, T>(target: T) -> DataTypeData<'scope, T>
     where
-        T: Target<'scope, 'static, DataType<'scope>>,
+        T: Target<'scope>,
     {
         let dt = DataType::nothing_type(&target);
         unsafe { target.data_from_ptr(dt.unwrap_non_null(Private), Private) }

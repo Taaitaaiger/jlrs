@@ -12,7 +12,12 @@
 use crate::{
     memory::target::Target,
     private::Private,
-    wrappers::ptr::{datatype::DataType, private::WrapperPriv, union_all::UnionAll, value::Value},
+    wrappers::ptr::{
+        datatype::{DataType, DataTypeData},
+        private::WrapperPriv,
+        union_all::UnionAll,
+        value::{Value, ValueData},
+    },
 };
 use jl_sys::{
     jl_apply_type, jl_bool_type, jl_box_bool, jl_box_char, jl_box_float32, jl_box_float64,
@@ -39,14 +44,14 @@ pub unsafe trait IntoJulia: Sized + 'static {
     ///
     /// The layout of that type and the Rust type must match exactly, and it must be an `isbits`
     /// type, otherwise this trait has been implemented incorrectly.
-    fn julia_type<'scope, T>(target: T) -> T::Data
+    fn julia_type<'scope, T>(target: T) -> DataTypeData<'scope, T>
     where
-        T: Target<'scope, 'static, DataType<'scope>>;
+        T: Target<'scope>;
 
     #[doc(hidden)]
-    fn into_julia<'scope, T>(self, target: T) -> T::Data
+    fn into_julia<'scope, T>(self, target: T) -> ValueData<'scope, 'static, T>
     where
-        T: Target<'scope, 'static>,
+        T: Target<'scope>,
     {
         // Safety: trait is implemented incorrectly if this is incorrect. A new instance of the
         // associated
@@ -74,9 +79,11 @@ macro_rules! impl_into_julia {
         // Safety: These implemetations use a boxing function provided by Julia
         unsafe impl IntoJulia for $type {
             #[inline(always)]
-            fn julia_type<'scope, T>(target: T) -> T::Data
+            fn julia_type<'scope, T>(
+                target: T,
+            ) -> $crate::wrappers::ptr::datatype::DataTypeData<'scope, T>
             where
-                T: $crate::memory::target::Target<'scope, 'static, DataType<'scope>>,
+                T: $crate::memory::target::Target<'scope>,
             {
                 unsafe {
                     target.data_from_ptr(
@@ -87,9 +94,12 @@ macro_rules! impl_into_julia {
             }
 
             #[inline(always)]
-            fn into_julia<'scope, T>(self, target: T) -> T::Data
+            fn into_julia<'scope, T>(
+                self,
+                target: T,
+            ) -> $crate::wrappers::ptr::value::ValueData<'scope, 'static, T>
             where
-                T: $crate::memory::target::Target<'scope, 'static>,
+                T: $crate::memory::target::Target<'scope>,
             {
                 unsafe {
                     target.data_from_ptr(
@@ -131,9 +141,9 @@ impl_into_julia!(isize, jl_box_int64, jl_int64_type);
 // Safety: *mut T and Ptr{T} have the same layout
 unsafe impl<U: IntoJulia> IntoJulia for *mut U {
     #[inline]
-    fn julia_type<'scope, T>(target: T) -> T::Data
+    fn julia_type<'scope, T>(target: T) -> DataTypeData<'scope, T>
     where
-        T: Target<'scope, 'static, DataType<'scope>>,
+        T: Target<'scope>,
     {
         let global = target.global();
         let ptr_ua = UnionAll::pointer_type(&global);

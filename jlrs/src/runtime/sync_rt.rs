@@ -119,9 +119,9 @@ impl Julia<'_> {
     pub fn error_color(&mut self, enable: bool) -> JlrsResult<()> {
         self.scope(|frame| unsafe {
             let enable = if enable {
-                Value::new_true_v(&frame)
+                Value::true_v(&frame)
             } else {
-                Value::new_false_v(&frame)
+                Value::false_v(&frame)
             };
 
             Module::main(&frame)

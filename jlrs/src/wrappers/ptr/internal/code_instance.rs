@@ -203,9 +203,9 @@ impl<'scope> CodeInstance<'scope> {
     }
 
     /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> T::Data
+    pub fn root<'target, T>(self, target: T) -> CodeInstanceData<'target, T>
     where
-        T: Target<'target, 'static, CodeInstance<'target>>,
+        T: Target<'target>,
     {
         // Safety: the data is valid.
         unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
@@ -217,7 +217,7 @@ impl_debug!(CodeInstance<'_>);
 
 impl<'scope> WrapperPriv<'scope, '_> for CodeInstance<'scope> {
     type Wraps = jl_code_instance_t;
-    type StaticPriv = CodeInstance<'static>;
+    type TypeConstructorPriv<'target, 'da> = CodeInstance<'target>;
     const NAME: &'static str = "CodeInstance";
 
     // Safety: `inner` must not have been freed yet, the result must never be
@@ -237,3 +237,14 @@ impl_root!(CodeInstance, 1);
 pub type CodeInstanceRef<'scope> = Ref<'scope, 'static, CodeInstance<'scope>>;
 impl_valid_layout!(CodeInstanceRef, CodeInstance);
 impl_ref_root!(CodeInstance, CodeInstanceRef, 1);
+
+use crate::memory::target::target_type::TargetType;
+
+/// `CodeInstance` or `CodeInstanceRef`, depending on the target type `T`.
+pub type CodeInstanceData<'target, T> =
+    <T as TargetType<'target>>::Data<'static, CodeInstance<'target>>;
+
+/// `JuliaResult<CodeInstance>` or `JuliaResultRef<CodeInstanceRef>`, depending on the target type
+/// `T`.
+pub type CodeInstanceResult<'target, T> =
+    <T as TargetType<'target>>::Result<'static, CodeInstance<'target>>;

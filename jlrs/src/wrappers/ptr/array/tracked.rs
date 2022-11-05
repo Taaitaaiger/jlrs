@@ -20,11 +20,12 @@ use super::{
         copied::CopiedArray,
     },
     dimensions::{ArrayDimensions, Dims},
-    Array, TypedArray,
+    Array, ArrayData, TypedArray, TypedArrayData,
 };
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
-use crate::memory::target::ExceptionTarget;
 use crate::memory::target::{ExtendedTarget, Target};
+
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use super::{ArrayResult, TypedArrayResult};
 
 pub trait ArrayWrapper<'scope, 'data>: Copy {
     fn track<'borrow>(&'borrow self) -> JlrsResult<TrackedArray<'borrow, 'scope, 'data, Self>>;
@@ -212,24 +213,24 @@ impl<'tracked, 'scope, 'data> TrackedArray<'tracked, 'scope, 'data, Array<'scope
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn reshape<'target, 'current, 'borrow, D, S>(
         &self,
-        target: ExtendedTarget<'target, 'current, 'borrow, 'data, S, Array<'target, 'data>>,
+        target: ExtendedTarget<'target, 'current, 'borrow, S>,
         dims: D,
-    ) -> S::Result
+    ) -> ArrayResult<'target, 'data, S>
     where
         D: Dims,
-        S: Target<'target, 'data, Array<'target, 'data>>,
+        S: Target<'target>,
     {
         unsafe { self.data.reshape(target, dims) }
     }
 
     pub unsafe fn reshape_unchecked<'target, 'current, 'borrow, D, S>(
         &self,
-        target: ExtendedTarget<'target, 'current, 'borrow, 'data, S, Array<'target, 'data>>,
+        target: ExtendedTarget<'target, 'current, 'borrow, S>,
         dims: D,
-    ) -> S::Data
+    ) -> ArrayData<'target, 'data, S>
     where
         D: Dims,
-        S: Target<'target, 'data, Array<'target, 'data>>,
+        S: Target<'target>,
     {
         self.data.reshape_unchecked(target, dims)
     }
@@ -264,24 +265,24 @@ where
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn reshape<'target, 'current, 'borrow, D, S>(
         &self,
-        target: ExtendedTarget<'target, 'current, 'borrow, 'data, S, TypedArray<'target, 'data, T>>,
+        target: ExtendedTarget<'target, 'current, 'borrow, S>,
         dims: D,
-    ) -> S::Result
+    ) -> TypedArrayResult<'target, 'data, S, T>
     where
         D: Dims,
-        S: Target<'target, 'data, TypedArray<'target, 'data, T>>,
+        S: Target<'target>,
     {
         unsafe { self.data.reshape(target, dims) }
     }
 
     pub unsafe fn reshape_unchecked<'target, 'current, 'borrow, D, S>(
         &self,
-        target: ExtendedTarget<'target, 'current, 'borrow, 'data, S, TypedArray<'target, 'data, T>>,
+        target: ExtendedTarget<'target, 'current, 'borrow, S>,
         dims: D,
-    ) -> S::Data
+    ) -> TypedArrayData<'target, 'data, S, T>
     where
         D: Dims,
-        S: Target<'target, 'data, TypedArray<'target, 'data, T>>,
+        S: Target<'target>,
     {
         self.data.reshape_unchecked(target, dims)
     }
@@ -386,9 +387,13 @@ impl<'tracked, 'scope, 'data> TrackedArrayMut<'tracked, 'scope, 'data, Array<'sc
 
 impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 'static>> {
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub unsafe fn grow_end<'target, S>(&mut self, target: S, inc: usize) -> S::Exception
+    pub unsafe fn grow_end<'target, S>(
+        &mut self,
+        target: S,
+        inc: usize,
+    ) -> S::Exception<'static, ()>
     where
-        S: ExceptionTarget<'target, 'static>,
+        S: Target<'target>,
     {
         self.tracked.data.grow_end(target, inc)
     }
@@ -398,9 +403,9 @@ impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 
     }
 
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub unsafe fn del_end<'target, S>(&mut self, target: S, dec: usize) -> S::Exception
+    pub unsafe fn del_end<'target, S>(&mut self, target: S, dec: usize) -> S::Exception<'static, ()>
     where
-        S: ExceptionTarget<'target, 'static>,
+        S: Target<'target>,
     {
         self.tracked.data.del_end(target, dec)
     }
@@ -410,9 +415,13 @@ impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 
     }
 
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub unsafe fn grow_begin<'target, S>(&mut self, target: S, inc: usize) -> S::Exception
+    pub unsafe fn grow_begin<'target, S>(
+        &mut self,
+        target: S,
+        inc: usize,
+    ) -> S::Exception<'static, ()>
     where
-        S: ExceptionTarget<'target, 'static>,
+        S: Target<'target>,
     {
         self.tracked.data.grow_begin(target, inc)
     }
@@ -422,9 +431,13 @@ impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 
     }
 
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub unsafe fn del_begin<'target, S>(&mut self, target: S, dec: usize) -> S::Exception
+    pub unsafe fn del_begin<'target, S>(
+        &mut self,
+        target: S,
+        dec: usize,
+    ) -> S::Exception<'static, ()>
     where
-        S: ExceptionTarget<'target, 'static>,
+        S: Target<'target>,
     {
         self.tracked.data.del_begin(target, dec)
     }
@@ -481,9 +494,13 @@ where
     T: ValidLayout,
 {
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub unsafe fn grow_end<'target, S>(&mut self, target: S, inc: usize) -> S::Exception
+    pub unsafe fn grow_end<'target, S>(
+        &mut self,
+        target: S,
+        inc: usize,
+    ) -> S::Exception<'static, ()>
     where
-        S: ExceptionTarget<'target, 'static>,
+        S: Target<'target>,
     {
         self.tracked.data.grow_end(target, inc)
     }
@@ -493,9 +510,9 @@ where
     }
 
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub unsafe fn del_end<'target, S>(&mut self, target: S, dec: usize) -> S::Exception
+    pub unsafe fn del_end<'target, S>(&mut self, target: S, dec: usize) -> S::Exception<'static, ()>
     where
-        S: ExceptionTarget<'target, 'static>,
+        S: Target<'target>,
     {
         self.tracked.data.del_end(target, dec)
     }
@@ -505,9 +522,13 @@ where
     }
 
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub unsafe fn grow_begin<'target, S>(&mut self, target: S, inc: usize) -> S::Exception
+    pub unsafe fn grow_begin<'target, S>(
+        &mut self,
+        target: S,
+        inc: usize,
+    ) -> S::Exception<'static, ()>
     where
-        S: ExceptionTarget<'target, 'static>,
+        S: Target<'target>,
     {
         self.tracked.data.grow_begin(target, inc)
     }
@@ -517,9 +538,13 @@ where
     }
 
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub unsafe fn del_begin<'target, S>(&mut self, target: S, dec: usize) -> S::Exception
+    pub unsafe fn del_begin<'target, S>(
+        &mut self,
+        target: S,
+        dec: usize,
+    ) -> S::Exception<'static, ()>
     where
-        S: ExceptionTarget<'target, 'static>,
+        S: Target<'target>,
     {
         self.tracked.data.del_begin(target, dec)
     }

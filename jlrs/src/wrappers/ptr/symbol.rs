@@ -16,7 +16,7 @@ use std::{
 };
 
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
-use crate::{catch::catch_exceptions, memory::target::ExceptionTarget};
+use crate::catch::catch_exceptions;
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
 use std::mem::MaybeUninit;
 
@@ -38,7 +38,7 @@ impl<'scope> Symbol<'scope> {
     pub fn new<S, T>(_: &T, symbol: S) -> Self
     where
         S: AsRef<str>,
-        T: Target<'scope, 'static, Self>,
+        T: Target<'scope>,
     {
         let bytes = symbol.as_ref().as_bytes();
         // Safety: Can only be called from a thread known to Julia, symbols are globally rooted
@@ -51,10 +51,10 @@ impl<'scope> Symbol<'scope> {
     /// Convert the given byte slice to a `Symbol`.
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
 
-    pub fn new_bytes<N, T>(target: T, symbol: N) -> T::Exception
+    pub fn new_bytes<N, T>(target: T, symbol: N) -> T::Exception<'static, Self>
     where
         N: AsRef<[u8]>,
-        T: ExceptionTarget<'scope, 'static, Self>,
+        T: Target<'scope>,
     {
         unsafe {
             let symbol = symbol.as_ref();
@@ -80,7 +80,7 @@ impl<'scope> Symbol<'scope> {
     pub unsafe fn new_bytes_unchecked<S, T>(_: &T, symbol: S) -> Self
     where
         S: AsRef<[u8]>,
-        T: Target<'scope, 'static, Self>,
+        T: Target<'scope>,
     {
         let sym_b = symbol.as_ref();
         let sym = jl_symbol_n(sym_b.as_ptr().cast(), sym_b.len());
@@ -93,7 +93,7 @@ impl<'scope> Symbol<'scope> {
     /// [`Value`]: crate::wrappers::ptr::value::Value
     pub fn extend<'target, T>(self, _: &T) -> Symbol<'target>
     where
-        T: Target<'target, 'static>,
+        T: Target<'target>,
     {
         // Safety: symbols are globally rooted
         unsafe { Symbol::wrap_non_null(self.unwrap_non_null(Private), Private) }
@@ -147,9 +147,9 @@ impl<'scope> Symbol<'scope> {
 
     /// Use the target to reroot this data. This is never nevessary
     /// because a `Symbol` is never freed by the garbage collector.
-    pub fn root<'target, T>(self, target: T) -> T::Data
+    pub fn root<'target, T>(self, target: T) -> SymbolData<'target, T>
     where
-        T: Target<'target, 'static, Symbol<'target>>,
+        T: Target<'target>,
     {
         // Safety: the data is valid.
         // TODO: don' root
@@ -168,7 +168,7 @@ impl_debug!(Symbol<'_>);
 
 impl<'scope> WrapperPriv<'scope, '_> for Symbol<'scope> {
     type Wraps = jl_sym_t;
-    type StaticPriv = Symbol<'static>;
+    type TypeConstructorPriv<'target, 'da> = Symbol<'target>;
     const NAME: &'static str = "Symbol";
 
     // Safety: `inner` must not have been freed yet, the result must never be
@@ -188,3 +188,11 @@ impl_root!(Symbol, 1);
 pub type SymbolRef<'scope> = Ref<'scope, 'static, Symbol<'scope>>;
 impl_valid_layout!(SymbolRef, Symbol);
 impl_ref_root!(Symbol, SymbolRef, 1);
+
+use crate::memory::target::target_type::TargetType;
+
+/// `Task` or `TaskRef`, depending on the target type `T`.
+pub type SymbolData<'target, T> = <T as TargetType<'target>>::Data<'static, Symbol<'target>>;
+
+/// `JuliaResult<Task>` or `JuliaResultRef<TaskRef>`, depending on the target type `T`.
+pub type SymbolResult<'target, T> = <T as TargetType<'target>>::Result<'static, Symbol<'target>>;

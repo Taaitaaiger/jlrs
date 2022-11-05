@@ -36,9 +36,9 @@ impl<'scope> Expr<'scope> {
     }
 
     /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> T::Data
+    pub fn root<'target, T>(self, target: T) -> ExprData<'target, T>
     where
-        T: Target<'target, 'static, Expr<'target>>,
+        T: Target<'target>,
     {
         // Safety: the data is valid.
         unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
@@ -50,7 +50,7 @@ impl_debug!(Expr<'_>);
 
 impl<'scope> WrapperPriv<'scope, '_> for Expr<'scope> {
     type Wraps = jl_expr_t;
-    type StaticPriv = Expr<'static>;
+    type TypeConstructorPriv<'target, 'da> = Expr<'target>;
     const NAME: &'static str = "Expr";
 
     // Safety: `inner` must not have been freed yet, the result must never be
@@ -70,3 +70,11 @@ impl_root!(Expr, 1);
 pub type ExprRef<'scope> = Ref<'scope, 'static, Expr<'scope>>;
 impl_valid_layout!(ExprRef, Expr);
 impl_ref_root!(Expr, ExprRef, 1);
+
+use crate::memory::target::target_type::TargetType;
+
+/// `Expr` or `ExprRef`, depending on the target type `T`.
+pub type ExprData<'target, T> = <T as TargetType<'target>>::Data<'static, Expr<'target>>;
+
+/// `JuliaResult<Expr>` or `JuliaResultRef<ExprRef>`, depending on the target type `T`.
+pub type ExprResult<'target, T> = <T as TargetType<'target>>::Result<'static, Expr<'target>>;

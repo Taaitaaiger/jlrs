@@ -1905,7 +1905,7 @@ extern "C" {
     pub fn jl_get_libllvm() -> *mut jl_value_t;
 }
 extern "C" {
-    pub static mut jl_n_threads: ::std::os::raw::c_int;
+    pub static mut jl_n_threads: ::std::sync::atomic::AtomicI32;
 }
 extern "C" {
     pub fn jl_environ(i: ::std::os::raw::c_int) -> *mut jl_value_t;

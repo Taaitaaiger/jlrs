@@ -13,7 +13,9 @@ use crate::{
 use jl_sys::{jl_islayout_inline, jl_type_union, jl_uniontype_t, jl_uniontype_type};
 use std::{marker::PhantomData, ptr::NonNull};
 
-use super::Ref;
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use super::value::ValueResult;
+use super::{value::ValueData, Ref};
 
 /// A struct field can have a type that's a union of several types. In this case, the type of this
 /// field is an instance of `Union`.
@@ -31,10 +33,10 @@ impl<'scope> Union<'scope> {
     /// [`Union`]: crate::wrappers::ptr::union::Union
     /// [`DataType`]: crate::wrappers::ptr::datatype::DataType
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub fn new<'target, V, T>(target: T, types: V) -> T::Result
+    pub fn new<'target, V, T>(target: T, types: V) -> ValueResult<'target, 'static, T>
     where
         V: AsRef<[Value<'scope, 'static>]>,
-        T: Target<'target, 'static>,
+        T: Target<'target>,
     {
         use crate::catch::catch_exceptions;
         use jl_sys::jl_value_t;
@@ -70,10 +72,13 @@ impl<'scope> Union<'scope> {
     ///
     /// [`Union`]: crate::wrappers::ptr::union::Union
     /// [`DataType`]: crate::wrappers::ptr::datatype::DataType
-    pub unsafe fn new_unchecked<'target, V, T>(target: T, types: V) -> T::Data
+    pub unsafe fn new_unchecked<'target, V, T>(
+        target: T,
+        types: V,
+    ) -> ValueData<'target, 'static, T>
     where
         V: AsRef<[Value<'scope, 'static>]>,
-        T: Target<'target, 'static>,
+        T: Target<'target>,
     {
         let types = types.as_ref();
         let un = jl_type_union(types.as_ptr() as *mut _, types.len());
@@ -137,9 +142,9 @@ impl<'scope> Union<'scope> {
     }
 
     /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> T::Data
+    pub fn root<'target, T>(self, target: T) -> UnionData<'target, T>
     where
-        T: Target<'target, 'static, Union<'target>>,
+        T: Target<'target>,
     {
         // Safety: the data is valid.
         unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
@@ -151,7 +156,7 @@ impl_debug!(Union<'_>);
 
 impl<'scope> WrapperPriv<'scope, '_> for Union<'scope> {
     type Wraps = jl_uniontype_t;
-    type StaticPriv = Union<'static>;
+    type TypeConstructorPriv<'target, 'da> = Union<'target>;
     const NAME: &'static str = "Union";
 
     // Safety: `inner` must not have been freed yet, the result must never be
@@ -238,3 +243,11 @@ impl_root!(Union, 1);
 pub type UnionRef<'scope> = Ref<'scope, 'static, Union<'scope>>;
 impl_valid_layout!(UnionRef, Union);
 impl_ref_root!(Union, UnionRef, 1);
+
+use crate::memory::target::target_type::TargetType;
+
+/// `Union` or `UnionRef`, depending on the target type `T`.
+pub type UnionData<'target, T> = <T as TargetType<'target>>::Data<'static, Union<'target>>;
+
+/// `JuliaResult<Union>` or `JuliaResultRef<UnionRef>`, depending on the target type `T`.
+pub type UnionResult<'target, T> = <T as TargetType<'target>>::Result<'static, Union<'target>>;

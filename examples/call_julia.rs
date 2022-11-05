@@ -6,7 +6,8 @@ fn main() {
     // This is safe because this we're not initializing Julia from another
     // thread and crate at the same time.
     let mut frame = StackFrame::new();
-    let mut julia = unsafe { RuntimeBuilder::new().start(&context_frame).expect("Could not init Julia") };
+    let mut pending = unsafe { RuntimeBuilder::new().start().expect("Could not init Julia") };
+    let mut julia = pending.instance(&mut frame);
 
     // Include some custom code defined in MyModule.jl.
     // This is safe because the included code doesn't do any strange things.
@@ -22,18 +23,18 @@ fn main() {
     }
 
     let result = julia
-        .scope(|global, mut frame| {
+        .scope(|mut frame| {
             let dim = Value::new(&mut frame, 4isize);
             let iters = Value::new(&mut frame, 1_000_000isize);
 
             unsafe {
-                Module::main(global)
+                Module::main(&frame)
                     // the submodule doesn't have to be rooted because it's never reloaded.
-                    .submodule_ref("MyModule")?
+                    .submodule(&frame, "MyModule")?
                     .wrapper_unchecked()
                     // the same holds true for the function: the module is never reloaded so it's
                     // globally rooted
-                    .function_ref("complexfunc")?
+                    .function(&frame, "complexfunc")?
                     .wrapper_unchecked()
                     // Call the function with the two arguments it takes
                     .call2(&mut frame, dim, iters)

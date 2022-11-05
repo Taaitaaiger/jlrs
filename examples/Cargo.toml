@@ -5,7 +5,7 @@ publish = false
 edition = "2018"
 
 [dev-dependencies]
-jlrs = { version = "0.16", path = "../jlrs", features = ["full"] }
+jlrs = { version = "0.17", path = "../jlrs", features = ["full"] }
 crossbeam-channel = "0.5"
 async-std = { version = "1", features = ["unstable", "attributes"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"]}

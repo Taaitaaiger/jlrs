@@ -1,3 +1,17 @@
+//! While bindgen is awesome, there are some issues with the generated bindings that have to be
+//! fixed:
+//!
+//!  - The generated bindings lack atomic fields and static atomic variables. These have to be
+//!    replaced with an appropriate atomic type. The main challenge is atomic function pointer
+//!    fields, which are currently represented with a custom `AtomicCFnPtr` type.
+//!
+//!  - The generated bindings for Windows lack annotations, everything defined in Julia has to be
+//!    annotated with `#[link(name = "libjulia", kind = "raw-dylib")]`. This is necessary because
+//!    Julia is distributed without any lib files.
+//!
+//! The content of julia.h is scanned to detect everything that has to be converted to an atomic.
+//! This information is used update the generated bindings.
+
 use std::{
     borrow::Cow,
     fmt::Debug,
@@ -10,8 +24,8 @@ use proc_macro2::TokenTree;
 use quote::{quote, ToTokens};
 
 #[cfg(any(feature = "windows", windows))]
-use syn::{parse::Parser, Attribute, ForeignItem, ItemForeignMod};
-use syn::{Field, ItemStruct, ItemUnion, Type, TypePath};
+use syn::{parse::Parser, Attribute, ItemForeignMod};
+use syn::{Field, ForeignItem, ItemStruct, ItemUnion, Type, TypePath};
 
 #[derive(Clone, Debug)]
 struct AtomicField<'a> {
@@ -68,6 +82,7 @@ impl<'a> HasAtomics<'a> {
     }
 }
 
+#[derive(Debug)]
 struct StructsWithAtomicFields<'a> {
     data: Vec<HasAtomics<'a>>,
 }
@@ -191,10 +206,11 @@ fn find_name<'a>(def: &'a str) -> &'a str {
     }
 }
 
-fn parse<'a>(header: &'a str) -> Vec<HasAtomics<'a>> {
+fn parse<'a>(header: &'a str) -> (Vec<HasAtomics<'a>>, Vec<AtomicField<'a>>) {
     let mut offset = 0;
     let mut struct_start = 0;
     let mut atomics = Vec::new();
+    let mut atomic_statics = vec![];
     let mut p = false;
 
     for line in header.lines() {
@@ -217,12 +233,30 @@ fn parse<'a>(header: &'a str) -> Vec<HasAtomics<'a>> {
                 atomics.push(s);
                 atomics.extend(e);
             }
+        } else if line.starts_with("extern") {
+            let line = &line[7..];
+            let split_line = line.split(" ").collect::<Vec<_>>();
+            let n_terms = split_line.len();
+            let ty = split_line[n_terms - 2];
+            if ty.starts_with("_Atomic") {
+                let name = split_line[n_terms - 1];
+                let name_len = name.len();
+                let name = &name[..name_len - 1];
+
+                let ty = &ty[8..];
+                let atomic_inner_end = ty
+                    .find(')')
+                    .expect("Can't find closing delimited of _Atomic field");
+
+                let ty = &ty[..atomic_inner_end];
+                atomic_statics.push(AtomicField { name, ty })
+            }
         }
 
         offset += line.len() + 1;
     }
 
-    atomics
+    (atomics, atomic_statics)
 }
 
 fn read_header<P: AsRef<Path>>(include_dir: P) -> String {
@@ -353,20 +387,30 @@ fn convert_union_to_atomic(field_def: &mut Field, info: &AtomicField) {
 }
 
 #[cfg(any(feature = "windows", windows))]
-fn static_is_in_libjulia(fmod: &mut ItemForeignMod) {
+fn item_is_in_libjulia(fmod: &mut ItemForeignMod) {
     if let ForeignItem::Static(_) = &fmod.items[0] {
         let attr = Attribute::parse_outer
-            .parse_str("#[link(name = \"libjulia\")]")
+            .parse_str("#[link(name = \"libjulia\", kind = \"raw-dylib\")]")
             .unwrap()[0]
             .clone();
         fmod.attrs.push(attr);
+    }
+
+    if let ForeignItem::Fn(f) = &fmod.items[0] {
+        if f.sig.ident.to_string().starts_with("jl_") {
+            let attr = Attribute::parse_outer
+                .parse_str("#[link(name = \"libjulia\", kind = \"raw-dylib\")]")
+                .unwrap()[0]
+                .clone();
+            fmod.attrs.push(attr);
+        }
     }
 }
 
 pub fn fix_bindings<P: AsRef<Path>, Q: AsRef<Path>>(header_path: P, bindings: &str, path: Q) {
     let header = read_header(header_path);
-    let parsed = parse(&header);
-    let b = StructsWithAtomicFields { data: parsed };
+    let (structs, statics) = parse(&header);
+    let b = StructsWithAtomicFields { data: structs };
 
     let mut stream = syn::parse_file(bindings).expect("msg");
     for item in &mut stream.items {
@@ -399,9 +443,26 @@ pub fn fix_bindings<P: AsRef<Path>, Q: AsRef<Path>>(header_path: P, bindings: &s
                     }
                 }
             }
-            #[cfg(any(feature = "windows", windows))]
             syn::Item::ForeignMod(fmod) => {
-                static_is_in_libjulia(fmod);
+                #[cfg(any(feature = "windows", windows))]
+                item_is_in_libjulia(fmod);
+
+                match &mut fmod.items[0] {
+                    ForeignItem::Static(foreign_static) => {
+                        let ident = foreign_static.ident.to_string();
+                        if let Some(field) = statics.iter().find(|f| f.name == ident) {
+                            if let Type::Path(p) = foreign_static.ty.as_mut() {
+                                *p = if field.ty == "int" {
+                                    syn::parse_str::<TypePath>("::std::sync::atomic::AtomicI32")
+                                        .unwrap()
+                                } else {
+                                    panic!("Unsupported type: {}", field.ty)
+                                };
+                            }
+                        }
+                    }
+                    _ => {}
+                }
             }
             _ => (),
         }

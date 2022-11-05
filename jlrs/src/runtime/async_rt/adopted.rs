@@ -61,7 +61,7 @@ async unsafe fn run_inner<R: AsyncRuntime, const N: usize>(
 
     loop {
         if free_stacks.borrow().len() == 0 {
-            sleep(Global::new(), recv_timeout);
+            sleep(&Global::new(), recv_timeout);
             R::yield_now().await;
             jl_gc_safepoint();
             continue;
@@ -126,7 +126,7 @@ async unsafe fn run_inner<R: AsyncRuntime, const N: usize>(
     for i in 0..N {
         loop {
             if running_tasks.borrow()[i].is_some() {
-                sleep(Global::new(), recv_timeout);
+                sleep(&Global::new(), recv_timeout);
                 R::yield_now().await;
                 jl_gc_safepoint();
             } else {
