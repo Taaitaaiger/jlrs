@@ -1,9 +1,10 @@
+//TODO
 //! Targets for methods that return Julia data.
 //!
 //! Many methods in jlrs return Julia data, these methods use targets to ensure the returned data
 //! has the correct type and appropriate lifetimes.
 //!
-//! Targets implement two traits, [`Target`] and [`ExceptionTarget`]. `Target` is used in
+//! Targets implement the [`Target`] trait. This trait is used in
 //! combination with methods that return `Data` or a `Result`. `Data` is simply some Julia data,
 //! while `Result` is a `Result` that contains Julia data in both its `Ok` and `Err` variants;
 //! if an `Err` is returned it contains a caught exception. An `ExceptionTarget` is used in
@@ -36,6 +37,7 @@
 //! data that is returned.
 //!
 //! [`Ref`]: crate::wrappers::ptr::Ref
+//! [`Wrapper`]: crate::wrappers::ptr::Wrapper
 
 use std::marker::PhantomData;
 
