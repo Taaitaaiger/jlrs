@@ -32,11 +32,10 @@ impl AsyncTask for MyTask {
     }
 
     // This is the async variation of the closure you provide `Julia::scope` when using the sync
-    // runtime. The `Global` can be used to access `Module`s and other static data, while the
-    // `AsyncGcFrame` lets you create new Julia values, call functions, and create nested scopes.
+    // runtime.
     async fn run<'base>(&mut self, mut frame: AsyncGcFrame<'base>) -> JlrsResult<Self::Output> {
-        // Nesting async frames works like nesting on ordinary scope. The main differences are the `async`
-        // block in the closure.
+        // Nesting async frames works like nesting on ordinary scope. The main difference is that
+        // the closure must return an async block.
         let output = frame.output();
         frame
             .async_scope(|mut frame| async move {
@@ -70,21 +69,11 @@ impl AsyncTask for MyTask {
 
 #[tokio::main]
 async fn main() {
-    // Initialize the async runtime.
+    // The first thing we need to do is initialize the async runtime. In this example tokio is
+    // used as backing runtime.
     //
-    // The runtime runs in a separate thread. It receives messages through a channel, a backlog
-    // can build up if a task which does a significant amount of work on the main thread is
-    // blocking the runtime. The queue size of this channel is set with the first argument of
-    // `AsyncJulia::init`. Here we allow for a backlog of 16 messages before the channel is full.
-    //
-    // When one or more functions are running in other threads but the runtime has no synchronous
-    // work to do, the garbage collector can't run. Similarly, async events in Julia (such as
-    // rescheduling a task that has yielded after calling `sleep` or `println`) will not be
-    // handled either. In order to fix this, event must be processed. We do so every millisecond.
-    //
-    // After calling this function we have an instance of `AsyncJulia` that can be used to send
-    // tasks and requests to include a file to the runtime, and a handle to the thread where the
-    // runtime is running.
+    // Afterwards we have an instance of `AsyncJulia` that can be used to interact with the
+    // runtime, and a handle to the thread where the runtime is running.
     let (julia, handle) = unsafe {
         RuntimeBuilder::new()
             .async_runtime::<Tokio>()
@@ -100,13 +89,10 @@ async fn main() {
         receiver.await.unwrap().unwrap();
     }
 
-    // Create channels for each of the tasks (this is not required but helps distinguish which
-    // result belongs to which task).
+    // Send two tasks to the runtime.
     let (sender1, receiver1) = tokio::sync::oneshot::channel();
     let (sender2, receiver2) = tokio::sync::oneshot::channel();
-    let (sender3, receiver3) = tokio::sync::oneshot::channel();
-    let (sender4, receiver4) = tokio::sync::oneshot::channel();
-    // Send four tasks to the runtime.
+
     julia
         .task(
             MyTask {
@@ -127,38 +113,15 @@ async fn main() {
         )
         .await;
 
-    julia
-        .task(
-            MyTask {
-                dims: 4,
-                iters: 1_000_000,
-            },
-            sender3,
-        )
-        .await;
-
-    julia
-        .task(
-            MyTask {
-                dims: 4,
-                iters: 1_000_000,
-            },
-            sender4,
-        )
-        .await;
-
     // Receive the results of the tasks.
     let res1 = receiver1.await.unwrap().unwrap();
     println!("Result of first task: {:?}", res1);
     let res2 = receiver2.await.unwrap().unwrap();
     println!("Result of second task: {:?}", res2);
-    let res3 = receiver3.await.unwrap().unwrap();
-    println!("Result of third task: {:?}", res3);
-    let res4 = receiver4.await.unwrap().unwrap();
-    println!("Result of fourth task: {:?}", res4);
 
     // Dropping `julia` causes the runtime to shut down Julia and itself if it was the final
-    // handle to the runtime.
+    // handle to the runtime. Await the runtime handle handle to wait for everything to shut
+    // down cleanly.
     std::mem::drop(julia);
     handle
         .await

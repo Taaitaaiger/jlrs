@@ -106,8 +106,8 @@ pub trait AsyncTask: 'static + Send + Sync {
 ///     n_values: usize
 /// }
 ///
-/// struct AccumulatorTaskState {
-///     array: TypedArray<'static, 'static, usize>,
+/// struct AccumulatorTaskState<'state> {
+///     array: TypedArray<'state, 'static, usize>,
 ///     offset: usize
 /// }
 ///
@@ -119,7 +119,7 @@ pub trait AsyncTask: 'static + Send + Sync {
 ///     // The type of the result of the task if it succeeds.
 ///     type Output = usize;
 ///     // The type of the task's internal state.
-///     type State = AccumulatorTaskState;
+///     type State<'state> = AccumulatorTaskState<'state>;
 ///     // The type of the additional data that the task must be called with.
 ///     type Input = usize;
 ///
@@ -127,10 +127,10 @@ pub trait AsyncTask: 'static + Send + Sync {
 ///     // lifetime of the frame is `'static`: the frame is not dropped until
 ///     // the task has completed, so the task's internal state can contain
 ///     // Julia data rooted in this frame.
-///     async fn init(
+///     async fn init<'frame>(
 ///         &mut self,
-///         mut frame: AsyncGcFrame<'static>,
-///     ) -> JlrsResult<Self::State> {
+///         mut frame: AsyncGcFrame<'frame>,
+///     ) -> JlrsResult<Self::State<'frame>> {
 ///         // A `Vec` can be moved from Rust to Julia if the element type
 ///         // implements `IntoJulia`.
 ///         let data = vec![0usize; self.n_values];
@@ -146,10 +146,10 @@ pub trait AsyncTask: 'static + Send + Sync {
 ///     // Whenever the task is called through its handle this method
 ///     // is called. Unlike `init`, the frame that this method can use
 ///     // is dropped after `run` returns.
-///     async fn run<'frame>(
+///     async fn run<'frame, 'state: 'frame>(
 ///         &mut self,
 ///         mut frame: AsyncGcFrame<'frame>,
-///         state: &mut Self::State,
+///         state: &mut Self::State<'state>,
 ///         input: Self::Input,
 ///     ) -> JlrsResult<Self::Output> {
 ///         {
@@ -187,9 +187,8 @@ pub trait AsyncTask: 'static + Send + Sync {
 pub trait PersistentTask: 'static + Send + Sync {
     /// The type of the result which is returned if `init` completes successfully.
     ///
-    /// This data is provided to every call of `run`. Because `init` takes a frame with the
-    /// `'static` lifetime, this type can contain Julia data.
-    type State: 'static;
+    /// This data is provided to every call of `run`.
+    type State<'state>;
 
     /// The type of the data that must be provided when calling this persistent through its
     /// handle.
@@ -219,7 +218,10 @@ pub trait PersistentTask: 'static + Send + Sync {
     /// You can interact with Julia inside this method, the frame is not dropped until the task
     /// itself is dropped. This means that `State` can contain arbitrary Julia data rooted in this
     /// frame. This data is provided to every call to `run`.
-    async fn init(&mut self, frame: AsyncGcFrame<'static>) -> JlrsResult<Self::State>;
+    async fn init<'frame>(
+        &mut self,
+        frame: AsyncGcFrame<'frame>,
+    ) -> JlrsResult<Self::State<'frame>>;
 
     /// Run the task.
     ///
@@ -231,17 +233,22 @@ pub trait PersistentTask: 'static + Send + Sync {
     /// See the [trait docs] for an example implementation.
     ///
     /// [trait docs]: PersistentTask
-    async fn run<'frame>(
+    async fn run<'frame, 'state: 'frame>(
         &mut self,
         frame: AsyncGcFrame<'frame>,
-        state: &mut Self::State,
+        state: &mut Self::State<'state>,
         input: Self::Input,
     ) -> JlrsResult<Self::Output>;
 
     /// Method that is called when all handles to the task have been dropped.
     ///
     /// This method is called with the same frame as `init`.
-    async fn exit(&mut self, _frame: AsyncGcFrame<'static>, _state: &mut Self::State) {}
+    async fn exit<'frame>(
+        &mut self,
+        _frame: AsyncGcFrame<'frame>,
+        _state: &mut Self::State<'frame>,
+    ) {
+    }
 }
 
 /// Yield the current Julia task.

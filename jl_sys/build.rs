@@ -88,7 +88,7 @@ fn set_flags(julia_dir: &str) {
         } else if #[cfg(all(target_os = "windows", target_env = "msvc"))] {
             println!("cargo:rustc-link-search={}/bin", &julia_dir);
             println!("cargo:rustc-link-search={}/lib", &julia_dir);
-            
+
             /*
             cfg_if! {
                 if #[cfg(feature = "debug")] {

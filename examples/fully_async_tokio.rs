@@ -32,8 +32,7 @@ impl AsyncTask for MyTask {
     }
 
     // This is the async variation of the closure you provide `Julia::scope` when using the sync
-    // runtime. The `Global` can be used to access `Module`s and other static data, while the
-    // `AsyncGcFrame` lets you create new Julia values, call functions, and create nested scopes.
+    // runtime.
     async fn run<'base>(&mut self, mut frame: AsyncGcFrame<'base>) -> JlrsResult<Self::Output> {
         // Convert the two arguments to values Julia can work with.
         let dims = Value::new(&mut frame, self.dims);
@@ -61,19 +60,11 @@ impl AsyncTask for MyTask {
 
 #[tokio::main]
 async fn main() {
-    // The first thing we need to do is initialize Julia in a separate thread, to do so the method
-    // AsyncJulia::init is used. This method takes three arguments: the maximum number of active
-    // tasks, the capacity of the channel used to communicate with the async runtime, and the
-    // timeout in ms that is used when trying to receive a new message. If the timeout happens
-    // while there are active tasks, control of the thread is yielded to Julia, this allows the
-    // garbage collector and scheduler to run.
+    // The first thing we need to do is initialize the async runtime. In this example tokio is
+    // used as backing runtime.
     //
-    // Here we allow four tasks to be running concurrently, a backlog of sixteen messages before
-    // the channel is full, and yield control of the thread to Julia after one ms.
-    //
-    // After calling this method we have an instance of `AsyncJulia` that can be used to send
-    // tasks and requests to include a file to the runtime, and a handle to the thread where the
-    // runtime is running.
+    // Afterwards we have an instance of `AsyncJulia` that can be used to interact with the
+    // runtime, and a handle to the thread where the runtime is running.
     let (julia, handle) = unsafe {
         RuntimeBuilder::new()
             .async_runtime::<Tokio>()
@@ -89,13 +80,10 @@ async fn main() {
         receiver.await.unwrap().unwrap();
     }
 
-    // Create channels for each of the tasks.
+    // Send two tasks to the runtime.
     let (sender1, receiver1) = tokio::sync::oneshot::channel();
     let (sender2, receiver2) = tokio::sync::oneshot::channel();
-    let (sender3, receiver3) = tokio::sync::oneshot::channel();
-    let (sender4, receiver4) = tokio::sync::oneshot::channel();
 
-    // Send four tasks to the runtime.
     julia
         .task(
             MyTask {
@@ -116,41 +104,18 @@ async fn main() {
         )
         .await;
 
-    julia
-        .task(
-            MyTask {
-                dims: 4,
-                iters: 1_000_000,
-            },
-            sender3,
-        )
-        .await;
-
-    julia
-        .task(
-            MyTask {
-                dims: 4,
-                iters: 1_000_000,
-            },
-            sender4,
-        )
-        .await;
-
     // Receive the results of the tasks.
     let res1 = receiver1.await.unwrap().unwrap();
     println!("Result of first task: {}", res1);
     let res2 = receiver2.await.unwrap().unwrap();
     println!("Result of second task: {}", res2);
-    let res3 = receiver3.await.unwrap().unwrap();
-    println!("Result of third task: {}", res3);
-    let res4 = receiver4.await.unwrap().unwrap();
-    println!("Result of fourth task: {}", res4);
 
     // Dropping `julia` causes the runtime to shut down Julia and itself if it was the final
-    // handle to the runtime.
+    // handle to the runtime. Await the runtime handle handle to wait for everything to shut
+    // down cleanly.
     std::mem::drop(julia);
     handle
         .await
         .expect("Julia exited with an error")
-        .expect("The Julia thread panicked");
+        .expect("The runtime thread panicked");
 }

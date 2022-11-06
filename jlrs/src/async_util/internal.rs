@@ -24,8 +24,7 @@ pub(crate) type InnerPersistentMessage<P> = Box<
 >;
 
 // What follows is a significant amount of indirection to allow different tasks to have a
-// different Output, and allow users to provide an arbitrary sender that implements ReturnChannel
-// to return some result.
+// different Output.
 pub(crate) enum Task {}
 pub(crate) enum RegisterTask {}
 pub(crate) enum Persistent {}
@@ -38,9 +37,7 @@ where
     S: OneshotSender<JlrsResult<O>>,
 {
     pub(crate) sender: S,
-
     pub(crate) input: Option<I>,
-
     pub(crate) _marker: PhantomData<O>,
 }
 
@@ -72,12 +69,12 @@ trait PersistentTaskEnvelope: Send {
     async fn call_init<'inner>(
         &'inner mut self,
         frame: AsyncGcFrame<'static>,
-    ) -> JlrsResult<<Self::P as PersistentTask>::State>;
+    ) -> JlrsResult<<Self::P as PersistentTask>::State<'static>>;
 
     async fn call_run<'inner>(
         &'inner mut self,
         frame: AsyncGcFrame<'static>,
-        state: &'inner mut <Self::P as PersistentTask>::State,
+        state: &'inner mut <Self::P as PersistentTask>::State<'static>,
         input: <Self::P as PersistentTask>::Input,
     ) -> JlrsResult<<Self::P as PersistentTask>::Output>;
 }
@@ -92,7 +89,7 @@ where
     async fn call_init<'inner>(
         &'inner mut self,
         frame: AsyncGcFrame<'static>,
-    ) -> JlrsResult<<Self::P as PersistentTask>::State> {
+    ) -> JlrsResult<<Self::P as PersistentTask>::State<'static>> {
         {
             self.init(frame).await
         }
@@ -101,7 +98,7 @@ where
     async fn call_run<'inner>(
         &'inner mut self,
         mut frame: AsyncGcFrame<'static>,
-        state: &'inner mut <Self::P as PersistentTask>::State,
+        state: &'inner mut <Self::P as PersistentTask>::State<'static>,
         input: <Self::P as PersistentTask>::Input,
     ) -> JlrsResult<<Self::P as PersistentTask>::Output> {
         {

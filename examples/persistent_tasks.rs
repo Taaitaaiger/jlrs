@@ -14,8 +14,8 @@ impl PersistentTask for AccumulatorTask {
     // State is the type of data that PersistentTask::init returns. The frame provided to
     // PersistentTask::init isn't dropped until the task is dropped so the state can contain
     // Julia data rooted in that frame. When PersistentTask::run is called it can use a mutable
-    // reference to this data. The state of this task is simply a Julia value.
-    type State = Value<'static, 'static>;
+    // reference to this data.
+    type State<'state> = Value<'state, 'static>;
 
     // Input is the type of data that must be provided when the task's handle is used to
     // call it. Like State, it's provided to PersistentTask::run. This tasks expects an f64.
@@ -25,11 +25,7 @@ impl PersistentTask for AccumulatorTask {
     // This result is returned to the caller through a channel.
     type Output = f64;
 
-    // The first three of these constants can be set to adjust the number of slots that are
-    // preallocated for the frames provided to PersistentTask::register, PersistentTask::init
-    // and PersistentTask::run respectively. By default they're 0 and no slots are preallocated.
-    // The last sets the capacity of the channel that's used by the task and its handle to
-    // communicate, by default it's 0, in which case an unbounded channel is used.
+    // The capacity of the channel used to communicate with this task
     const CHANNEL_CAPACITY: usize = 2;
 
     // Register this task. This method can take care of custom initialization work, in this case
@@ -46,7 +42,10 @@ impl PersistentTask for AccumulatorTask {
     // have been dropped and every pending call has completed, Julia data rooted in this frame
     // can be returned as State. Here, the value we'll use as an accumulator is created and
     // returned.
-    async fn init(&mut self, mut frame: AsyncGcFrame<'static>) -> JlrsResult<Self::State> {
+    async fn init<'frame>(
+        &mut self,
+        mut frame: AsyncGcFrame<'frame>,
+    ) -> JlrsResult<Self::State<'frame>> {
         unsafe {
             let output = frame.output();
             frame
@@ -67,10 +66,10 @@ impl PersistentTask for AccumulatorTask {
     // Call the task once. Note that while the state can be mutated, you can't replace any
     // Julia data that it contains with newly allocated data because it's called in a nested
     // scope.
-    async fn run<'frame>(
+    async fn run<'frame, 'state: 'frame>(
         &mut self,
         mut frame: AsyncGcFrame<'frame>,
-        state: &mut Self::State,
+        state: &mut Self::State<'state>,
         input: Self::Input,
     ) -> JlrsResult<Self::Output> {
         // Add call_cata to the accumulator and return its new value. The accumulator is mutable
@@ -91,15 +90,11 @@ impl PersistentTask for AccumulatorTask {
 }
 
 fn main() {
-    // The first thing we need to do is initialize Julia in a separate thread, to do so the method
-    // AsyncJulia::init is used. This method takes three arguments: the maximum number of active
-    // tasks, the capacity of the channel used to communicate with the async runtime, and the
-    // timeout in ms that is used when trying to receive a new message. If the timeout happens
-    // while there are active tasks, control of the thread is yielded to Julia, this allows the
-    // garbage collector and scheduler to run.
+    // The first thing we need to do is initialize the async runtime. In this example tokio is
+    // used as backing runtime.
     //
-    // Here we allow four tasks to be running concurrently, a backlog of sixteen messages before
-    // the channel is full, and yield control of the thread to Julia after one ms.
+    // Afterwards we have an instance of `AsyncJulia` that can be used to interact with the
+    // runtime, and a handle to the thread where the runtime is running.
     let (julia, handle) = unsafe {
         RuntimeBuilder::new()
             .async_runtime::<Tokio>()
@@ -153,6 +148,6 @@ fn main() {
     std::mem::drop(julia);
     handle
         .join()
-        .expect("Cannot join")
-        .expect("Unable to exit Julia");
+        .expect("Could not await the task")
+        .expect("Julia exited with an error");
 }

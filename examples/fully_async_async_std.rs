@@ -1,5 +1,6 @@
-use jlrs::prelude::*;
 use std::{num::NonZeroUsize, path::PathBuf};
+
+use jlrs::prelude::*;
 
 // This struct contains the data our task will need. This struct must be `Send`, `Sync`, and
 // contain no borrowed data.
@@ -17,7 +18,7 @@ impl AsyncTask for MyTask {
     type Output = f64;
 
     // Include the custom code MyTask needs.
-    async fn register<'base>(mut frame: AsyncGcFrame<'base>) -> JlrsResult<()> {
+    async fn register<'frame>(mut frame: AsyncGcFrame<'frame>) -> JlrsResult<()> {
         unsafe {
             let path = PathBuf::from("MyModule.jl");
             if path.exists() {
@@ -31,9 +32,8 @@ impl AsyncTask for MyTask {
     }
 
     // This is the async variation of the closure you provide `Julia::scope` when using the sync
-    // runtime. The `Global` can be used to access `Module`s and other static data, while the
-    // `AsyncGcFrame` lets you create new Julia values, call functions, and create nested scopes.
-    async fn run<'base>(&mut self, mut frame: AsyncGcFrame<'base>) -> JlrsResult<Self::Output> {
+    // runtime.
+    async fn run<'frame>(&mut self, mut frame: AsyncGcFrame<'frame>) -> JlrsResult<Self::Output> {
         // Convert the two arguments to values Julia can work with.
         let dims = Value::new(&mut frame, self.dims);
         let iters = Value::new(&mut frame, self.iters);
@@ -60,19 +60,11 @@ impl AsyncTask for MyTask {
 
 #[async_std::main]
 async fn main() {
-    // The first thing we need to do is initialize Julia in a separate thread, to do so the method
-    // AsyncJulia::init is used. This method takes three arguments: the maximum number of active
-    // tasks, the capacity of the channel used to communicate with the async runtime, and the
-    // timeout in ms that is used when trying to receive a new message. If the timeout happens
-    // while there are active tasks, control of the thread is yielded to Julia, this allows the
-    // garbage collector and scheduler to run.
+    // The first thing we need to do is initialize the async runtime. In this example async-std is
+    // used as backing runtime.
     //
-    // Here we allow four tasks to be running concurrently, a backlog of sixteen messages before
-    // the channel is full, and yield control of the thread to Julia after one ms.
-    //
-    // After calling this method we have an instance of `AsyncJulia` that can be used to send
-    // tasks and requests to include a file to the runtime, and a handle to the thread where the
-    // runtime is running.
+    // Afterwards we have an instance of `AsyncJulia` that can be used to interact with the
+    // runtime, and a handle to the thread where the runtime is running.
     let (julia, handle) = unsafe {
         RuntimeBuilder::new()
             .async_runtime::<AsyncStd>()
@@ -88,14 +80,10 @@ async fn main() {
         receiver.recv().await.unwrap().unwrap();
     }
 
-    // Create channels for each of the tasks (this is not required but helps distinguish which
-    // result belongs to which task).
+    // Send two tasks to the runtime.
     let (sender1, receiver1) = async_std::channel::bounded(1);
     let (sender2, receiver2) = async_std::channel::bounded(1);
-    let (sender3, receiver3) = async_std::channel::bounded(1);
-    let (sender4, receiver4) = async_std::channel::bounded(1);
 
-    // Send four tasks to the runtime.
     julia
         .task(
             MyTask {
@@ -116,38 +104,15 @@ async fn main() {
         )
         .await;
 
-    julia
-        .task(
-            MyTask {
-                dims: 4,
-                iters: 1_000_000,
-            },
-            sender3,
-        )
-        .await;
-
-    julia
-        .task(
-            MyTask {
-                dims: 4,
-                iters: 1_000_000,
-            },
-            sender4,
-        )
-        .await;
-
     // Receive the results of the tasks.
     let res1 = receiver1.recv().await.unwrap().unwrap();
     println!("Result of first task: {:?}", res1);
     let res2 = receiver2.recv().await.unwrap().unwrap();
     println!("Result of second task: {:?}", res2);
-    let res3 = receiver3.recv().await.unwrap().unwrap();
-    println!("Result of third task: {:?}", res3);
-    let res4 = receiver4.recv().await.unwrap().unwrap();
-    println!("Result of fourth task: {:?}", res4);
 
     // Dropping `julia` causes the runtime to shut down Julia and itself if it was the final
-    // handle to the runtime.
+    // handle to the runtime. Await the runtime handle handle to wait for everything to shut
+    // down cleanly.
     std::mem::drop(julia);
-    handle.await.expect("Julia exited with an error");
+    handle.await.expect("The runtime thread panicked");
 }

@@ -18,7 +18,7 @@ impl AsyncTask for MyTask {
     type Output = f64;
 
     // Include the custom code MyTask needs.
-    async fn register<'base>(mut frame: AsyncGcFrame<'base>) -> JlrsResult<()> {
+    async fn register<'frame>(mut frame: AsyncGcFrame<'frame>) -> JlrsResult<()> {
         unsafe {
             let path = PathBuf::from("MyModule.jl");
             if path.exists() {
@@ -32,9 +32,8 @@ impl AsyncTask for MyTask {
     }
 
     // This is the async variation of the closure you provide `Julia::scope` when using the sync
-    // runtime. The `Global` can be used to access `Module`s and other static data, while the
-    // `AsyncGcFrame` lets you create new Julia values, call functions, and create nested scopes.
-    async fn run<'base>(&mut self, mut frame: AsyncGcFrame<'base>) -> JlrsResult<Self::Output> {
+    // runtime.
+    async fn run<'frame>(&mut self, mut frame: AsyncGcFrame<'frame>) -> JlrsResult<Self::Output> {
         // Convert the two arguments to values Julia can work with.
         let dims = Value::new(&mut frame, self.dims);
         let iters = Value::new(&mut frame, self.iters);
@@ -60,12 +59,11 @@ impl AsyncTask for MyTask {
 }
 
 fn main() {
-    // The first thing we need to do is initialize Julia on a separate thread. In this example
-    // tokio is used.
+    // The first thing we need to do is initialize the async runtime. In this example tokio is
+    // used as backing runtime.
     //
-    // Afterwards we have an instance of `AsyncJulia` that can be used to send
-    // tasks and requests to include a file to the runtime, and a handle to the thread where the
-    // runtime is running.
+    // Afterwards we have an instance of `AsyncJulia` that can be used to interact with the
+    // runtime, and a handle to the thread where the runtime is running.
     let (julia, handle) = unsafe {
         RuntimeBuilder::new()
             .async_runtime::<Tokio>()
@@ -115,5 +113,5 @@ fn main() {
     handle
         .join()
         .expect("Cannot join")
-        .expect("Unable to init Julia");
+        .expect("The runtime thread panicked");
 }

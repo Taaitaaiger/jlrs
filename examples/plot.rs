@@ -16,14 +16,17 @@ impl PersistentTask for MyTask {
     // keyword arguments that will be reused.
     type Input = ();
     type Output = ();
-    type State = (PyPlot<'static>, Value<'static, 'static>);
+    type State<'state> = (PyPlot<'state>, Value<'state, 'static>);
 
     async fn register<'frame>(mut frame: AsyncGcFrame<'frame>) -> JlrsResult<()> {
         PyPlot::init(&mut frame);
         Ok(())
     }
 
-    async fn init(&mut self, mut frame: AsyncGcFrame<'static>) -> JlrsResult<Self::State> {
+    async fn init<'frame>(
+        &mut self,
+        mut frame: AsyncGcFrame<'frame>,
+    ) -> JlrsResult<Self::State<'frame>> {
         unsafe {
             // Create the first plot with no data, but with a custom label for the y-axis.
             let plot_fn = Module::plots(&frame)
@@ -41,10 +44,10 @@ impl PersistentTask for MyTask {
         }
     }
 
-    async fn run<'frame>(
+    async fn run<'frame, 'state: 'frame>(
         &mut self,
         mut frame: AsyncGcFrame<'frame>,
-        state: &mut Self::State,
+        state: &mut Self::State<'state>,
         _input: Self::Input,
     ) -> JlrsResult<Self::Output> {
         unsafe {
@@ -69,7 +72,11 @@ impl PersistentTask for MyTask {
         Ok(())
     }
 
-    async fn exit(&mut self, mut frame: AsyncGcFrame<'static>, state: &mut Self::State) {
+    async fn exit<'frame>(
+        &mut self,
+        mut frame: AsyncGcFrame<'frame>,
+        state: &mut Self::State<'frame>,
+    ) {
         // Wait until the plot window is closed.FMark
         println!("Exit");
         state.0.wait_async_main(&mut frame).await.unwrap();
@@ -79,6 +86,11 @@ impl PersistentTask for MyTask {
 
 #[tokio::main]
 async fn main() {
+    // The first thing we need to do is initialize the async runtime. In this example tokio is
+    // used as backing runtime.
+    //
+    // Afterwards we have an instance of `AsyncJulia` that can be used to interact with the
+    // runtime, and a handle to the thread where the runtime is running.
     let (julia, handle) = unsafe {
         RuntimeBuilder::new()
             .async_runtime::<Tokio>()
@@ -88,11 +100,14 @@ async fn main() {
     };
 
     {
+        // Register MyTask, otherwise MyTask::init returns an error.
         let (s, r) = tokio::sync::oneshot::channel();
         julia.register_persistent::<MyTask, _>(s).await;
         r.await.unwrap().unwrap();
     }
 
+    // Create a new MyTask, if MyTask::init completes successfully a handle to
+    // the task is returned.
     let persistent_handle = {
         let (handle_sender, handle_receiver) = tokio::sync::oneshot::channel();
         julia

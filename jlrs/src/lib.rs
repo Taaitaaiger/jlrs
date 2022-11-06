@@ -398,8 +398,8 @@
 //!     n_values: usize
 //! }
 //!
-//! struct AccumulatorTaskState {
-//!     array: TypedArray<'static, 'static, usize>,
+//! struct AccumulatorTaskState<'state> {
+//!     array: TypedArray<'state, 'static, usize>,
 //!     offset: usize
 //! }
 //!
@@ -411,7 +411,7 @@
 //!     // The type of the result of the task if it succeeds.
 //!     type Output = usize;
 //!     // The type of the task's internal state.
-//!     type State = AccumulatorTaskState;
+//!     type State<'state> = AccumulatorTaskState<'state>;
 //!     // The type of the additional data that the task must be called with.
 //!     type Input = usize;
 //!
@@ -419,10 +419,10 @@
 //!     // lifetime of the frame is `'static`: the frame is not dropped until
 //!     // the task has completed, so the task's internal state can contain
 //!     // Julia data rooted in this frame.
-//!     async fn init(
+//!     async fn init<'frame>(
 //!         &mut self,
-//!         mut frame: AsyncGcFrame<'static>,
-//!     ) -> JlrsResult<Self::State> {
+//!         mut frame: AsyncGcFrame<'frame>,
+//!     ) -> JlrsResult<Self::State<'frame>> {
 //!         // A `Vec` can be moved from Rust to Julia if the element type
 //!         // implements `IntoJulia`.
 //!         let data = vec![0usize; self.n_values];
@@ -438,10 +438,10 @@
 //!     // Whenever the task is called through its handle this method
 //!     // is called. Unlike `init`, the frame that this method can use
 //!     // is dropped after `run` returns.
-//!     async fn run<'frame>(
+//!     async fn run<'frame, 'state: 'frame>(
 //!         &mut self,
 //!         mut frame: AsyncGcFrame<'frame>,
-//!         state: &mut Self::State,
+//!         state: &mut Self::State<'state>,
 //!         input: Self::Input,
 //!     ) -> JlrsResult<Self::Output> {
 //!         {
