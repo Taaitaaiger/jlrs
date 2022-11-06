@@ -351,7 +351,7 @@ pub struct AccumulatorTask {
 
 #[async_trait(?Send)]
 impl PersistentTask for AccumulatorTask {
-    type State = Value<'static, 'static>;
+    type State<'state> = Value<'state, 'static>;
     type Input = f64;
     type Output = f64;
 
@@ -365,10 +365,10 @@ impl PersistentTask for AccumulatorTask {
         Ok(())
     }
 
-    async fn init(
+    async fn init<'frame>(
         &mut self,
-        mut frame: AsyncGcFrame<'static>,
-    ) -> JlrsResult<Value<'static, 'static>> {
+        mut frame: AsyncGcFrame<'frame>,
+    ) -> JlrsResult<Value<'frame, 'static>> {
         unsafe {
             let output = frame.output();
             let init_value = self.init_value;
@@ -390,10 +390,10 @@ impl PersistentTask for AccumulatorTask {
         }
     }
 
-    async fn run<'frame>(
+    async fn run<'frame, 'state: 'frame>(
         &mut self,
         mut frame: AsyncGcFrame<'frame>,
-        state: &mut Self::State,
+        state: &mut Self::State<'state>,
         input: Self::Input,
     ) -> JlrsResult<Self::Output> {
         let value = state.field_accessor(&frame).field("v")?.access::<f64>()? + input;

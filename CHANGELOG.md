@@ -45,6 +45,7 @@
 
  - `AsyncJulia::post_blocking_task` has been added, which can be used to schedule a blocking task on an arbitrary thread owned by Julia.
 
+ - `PersistentTask::State` is a GAT, which gets rid of the lifetime-hack that allows the state to contain Julia data.
 
 #### v0.16
  - Support for Julia 1.7 has been dropped, by default Julia 1.8 is targeted.

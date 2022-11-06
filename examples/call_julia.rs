@@ -22,6 +22,8 @@ fn main() {
         }
     }
 
+    // Create a scope, the closure provided to this method can use a `GcFrame` to ensure Julia
+    // data is not cleaned up by the GC while it's in use.
     let result = julia
         .scope(|mut frame| {
             let dim = Value::new(&mut frame, 4isize);
