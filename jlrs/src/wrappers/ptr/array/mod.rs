@@ -2,7 +2,7 @@
 //!
 //! You will find two wrappers in this module that can be used to work with Julia arrays from
 //! Rust. An [`Array`] is the Julia array itself, [`TypedArray`] is also available which can be
-//! used if the element type implements [`ValidLayout`].
+//! used if the element type implements [`ValidField`].
 //!
 //! Several methods are available to create new arrays. [`Array::new`] lets you create a new array
 //! for any type that implements [`IntoJulia`], while [`Array::new_for`] can be used to create a
@@ -94,11 +94,11 @@ pub mod tracked;
 /// Julia is backed by an an array of `f32`s. The data in these arrays can be accessed with
 /// [`Array::inline_data`] and [`Array::inline_data_mut`], and copied from Julia to Rust with
 /// [`Array::copy_inline_data`]. In order to call these methods the type of the elements must be
-/// provided, this type must implement [`ValidLayout`] to ensure the layouts in Rust and Julia are
+/// provided, this type must implement [`ValidField`] to ensure the layouts in Rust and Julia are
 /// compatible.
 ///
-/// If the data isn't inlined each element is stored as a [`Value`]. This data can be accessed
-/// using [`Array::value_data`] and [`Array::value_data_mut`].
+/// If the data isn't inlined, e.g. because it's mutable, each element is stored as a [`Value`].
+/// This data can be accessed using [`Array::value_data`] and [`Array::value_data_mut`].
 #[derive(Copy, Clone)]
 #[repr(transparent)]
 pub struct Array<'scope, 'data>(
@@ -820,7 +820,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
         self.ensure_bits_containing::<T>()?;
 
         // Safety: layouts are compatible, access is immutable.
-        let accessor = ArrayAccessor::new2(self);
+        let accessor = ArrayAccessor::new(self);
         Ok(accessor)
     }
 
@@ -842,7 +842,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     {
         self.ensure_bits_containing::<T>()?;
 
-        let accessor = ArrayAccessor::new2(self);
+        let accessor = ArrayAccessor::new(self);
         Ok(accessor)
     }
 
@@ -860,7 +860,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     {
         self.ensure_inline_containing::<T>()?;
 
-        let accessor = ArrayAccessor::new2(self);
+        let accessor = ArrayAccessor::new(self);
         Ok(accessor)
     }
 
@@ -881,7 +881,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     {
         self.ensure_inline_containing::<T>()?;
 
-        let accessor = ArrayAccessor::new2(self);
+        let accessor = ArrayAccessor::new(self);
         Ok(accessor)
     }
 
@@ -900,7 +900,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     {
         self.ensure_ptr_containing::<T>()?;
 
-        let accessor = ArrayAccessor::new2(self);
+        let accessor = ArrayAccessor::new(self);
         Ok(accessor)
     }
 
@@ -922,7 +922,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     {
         self.ensure_ptr_containing::<T>()?;
 
-        let accessor = ArrayAccessor::new2(self);
+        let accessor = ArrayAccessor::new(self);
         Ok(accessor)
     }
 
@@ -936,7 +936,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     ) -> JlrsResult<PtrArrayAccessorI<'borrow, 'scope, 'data, ValueRef<'scope, 'data>>> {
         self.ensure_ptr_containing::<ValueRef>()?;
 
-        let accessor = ArrayAccessor::new2(self);
+        let accessor = ArrayAccessor::new(self);
         Ok(accessor)
     }
 
@@ -953,7 +953,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     ) -> JlrsResult<PtrArrayAccessorMut<'borrow, 'scope, 'data, ValueRef<'scope, 'data>>> {
         self.ensure_ptr_containing::<ValueRef>()?;
 
-        let accessor = ArrayAccessor::new2(self);
+        let accessor = ArrayAccessor::new(self);
         Ok(accessor)
     }
 
@@ -967,7 +967,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     ) -> JlrsResult<UnionArrayAccessorI<'borrow, 'scope, 'data>> {
         self.ensure_union()?;
 
-        let accessor = ArrayAccessor::new2(self);
+        let accessor = ArrayAccessor::new(self);
         Ok(accessor)
     }
 
@@ -984,7 +984,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     ) -> JlrsResult<UnionArrayAccessorMut<'borrow, 'scope, 'data>> {
         self.ensure_union()?;
 
-        let accessor = ArrayAccessor::new2(self);
+        let accessor = ArrayAccessor::new(self);
         Ok(accessor)
     }
 
@@ -994,7 +994,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     pub unsafe fn indeterminate_data<'borrow>(
         &'borrow self,
     ) -> IndeterminateArrayAccessorI<'borrow, 'scope, 'data> {
-        ArrayAccessor::new2(self)
+        ArrayAccessor::new(self)
     }
 
     /// Mutably access the contents of this array.
@@ -1006,7 +1006,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     pub unsafe fn indeterminate_data_mut<'borrow>(
         &'borrow mut self,
     ) -> IndeterminateArrayAccessor<'borrow, 'scope, 'data, Mutable<'borrow, u8>> {
-        ArrayAccessor::new2(self)
+        ArrayAccessor::new(self)
     }
 
     /// Reshape the array, a new array is returned that has dimensions `dims`. The new array and
@@ -1780,7 +1780,7 @@ where
         self.ensure_bits()?;
 
         // Safety: layouts are compatible, access is immutable.
-        let accessor = ArrayAccessor::new2(self.as_array_ref());
+        let accessor = ArrayAccessor::new(self.as_array_ref());
         Ok(accessor)
     }
 
@@ -1800,7 +1800,7 @@ where
         self.ensure_bits()?;
 
         // Safety: layouts are compatible, access is immutable.
-        let accessor = ArrayAccessor::new2(self.as_array_ref());
+        let accessor = ArrayAccessor::new(self.as_array_ref());
         Ok(accessor)
     }
 
@@ -1819,7 +1819,7 @@ where
         self.ensure_inline()?;
 
         // Safety: layouts are compatible, access is immutable.
-        let accessor = ArrayAccessor::new2(self.as_array_ref());
+        let accessor = ArrayAccessor::new(self.as_array_ref());
         Ok(accessor)
     }
 
@@ -1841,7 +1841,7 @@ where
         self.ensure_inline()?;
 
         // Safety: layouts are compatible, access is immutable.
-        let accessor = ArrayAccessor::new2(self.as_array_ref());
+        let accessor = ArrayAccessor::new(self.as_array_ref());
         Ok(accessor)
     }
 
@@ -1927,7 +1927,7 @@ where
         &'borrow self,
     ) -> IndeterminateArrayAccessor<'borrow, 'scope, 'data, Immutable<'borrow, u8>> {
         // Safety: layouts are compatible, access is immutable.
-        ArrayAccessor::new2(self.as_array_ref())
+        ArrayAccessor::new(self.as_array_ref())
     }
 
     /// Mutably access the contents of this array.
@@ -1940,7 +1940,7 @@ where
         &'borrow mut self,
     ) -> IndeterminateArrayAccessor<'borrow, 'scope, 'data, Mutable<'borrow, u8>> {
         // Safety: layouts are compatible, access is immutable.
-        ArrayAccessor::new2(self.as_array_ref())
+        ArrayAccessor::new(self.as_array_ref())
     }
 }
 
@@ -1972,7 +1972,7 @@ where
         self.ensure_ptr()?;
 
         // Safety: layouts are compatible, access is immutable.
-        let accessor = ArrayAccessor::new2(self.as_array_ref());
+        let accessor = ArrayAccessor::new(self.as_array_ref());
         Ok(accessor)
     }
 
@@ -1991,7 +1991,7 @@ where
         self.ensure_ptr()?;
 
         // Safety: layouts are compatible, access is immutable.
-        let accessor = ArrayAccessor::new2(self.as_array_ref());
+        let accessor = ArrayAccessor::new(self.as_array_ref());
         Ok(accessor)
     }
 
@@ -2006,7 +2006,7 @@ where
         self.ensure_ptr()?;
 
         // Safety: layouts are compatible, access is immutable.
-        let accessor = ArrayAccessor::new2(self.as_array_ref());
+        let accessor = ArrayAccessor::new(self.as_array_ref());
         Ok(accessor)
     }
 
@@ -2024,7 +2024,7 @@ where
         self.ensure_ptr()?;
 
         // Safety: layouts are compatible, access is immutable.
-        let accessor = ArrayAccessor::new2(self.as_array_ref());
+        let accessor = ArrayAccessor::new(self.as_array_ref());
         Ok(accessor)
     }
 }
@@ -2321,7 +2321,7 @@ impl_ref_root!(Array, ArrayRef, 2);
 /// A reference to an [`TypedArray`] that has not been explicitly rooted.
 pub type TypedArrayRef<'scope, 'data, T> = Ref<'scope, 'data, TypedArray<'scope, 'data, T>>;
 
-unsafe impl<T: ValidField + Debug> ValidLayout for TypedArrayRef<'_, '_, T> {
+unsafe impl<T: ValidField> ValidLayout for TypedArrayRef<'_, '_, T> {
     fn valid_layout(v: Value) -> bool {
         if let Ok(dt) = v.cast::<DataType>() {
             dt.is::<TypedArray<T>>()
@@ -2335,7 +2335,7 @@ unsafe impl<T: ValidField + Debug> ValidLayout for TypedArrayRef<'_, '_, T> {
     const IS_REF: bool = true;
 }
 
-unsafe impl<T: ValidField + Debug> ValidField for Option<TypedArrayRef<'_, '_, T>> {
+unsafe impl<T: ValidField> ValidField for Option<TypedArrayRef<'_, '_, T>> {
     fn valid_field(v: Value) -> bool {
         if let Ok(dt) = v.cast::<DataType>() {
             dt.is::<TypedArray<T>>()
@@ -2349,7 +2349,7 @@ unsafe impl<T: ValidField + Debug> ValidField for Option<TypedArrayRef<'_, '_, T
 
 impl<'scope, 'data, U> TypedArrayRef<'scope, 'data, U>
 where
-    U: ValidField + Debug,
+    U: ValidField,
 {
     pub unsafe fn root<'target, T>(self, target: T) -> TypedArrayData<'target, 'data, T, U>
     where

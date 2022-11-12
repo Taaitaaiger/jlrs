@@ -26,6 +26,7 @@
 //! NB: Active development happens on the `dev` branch, the `master` branch points to the most
 //! recently released version.
 //!
+//!
 //! # Prerequisites
 //!
 //! Julia must be installed before jlrs can be used. Only version  1.6 and 1.8 are
@@ -69,21 +70,6 @@
 //! Note that while Julia 1.6 is supported on Windows, several methods are currently unavailable
 //! when this version is used.
 //!
-//! If you use the MSVC target, you must create two or three lib files using `lib.exe`. The def
-//! files required for this can be found in the [`def` folder] in the jl-sys crate. To create the
-//! lib files, copy the three files from either the `lts` or `stable` folder to the `bin`
-//! folder where Julia is installed. Afterwards, open a Developer Command Prompt for VS19 and
-//! execute the following commands:
-//!
-//! ```cmd
-//! cd C:\Path\To\Julia-x.y.z\bin
-//! lib /def:libjulia.def /out:libjulia.lib /machine:x64
-//! lib /def:libopenlibm.def /out:libopenlibm.lib /machine:x64
-//! lib /def:libuv-2.def /out:libuv-2.lib /machine:x64
-//! ```
-//!
-//! The final command only needs to be executed if the `uv` feature has been enabled. If you use
-//! the GNU target these lib files must not exist.
 //!
 //! # Features
 //!
@@ -627,8 +613,8 @@
 //! # Custom types
 //!
 //! In order to map a struct in Rust to one in Julia you can derive [`ValidLayout`], [`Unbox`],
-//! and [`Typecheck`]. If the struct in Julia has no type parameters and is a bits type you can
-//! also derive [`IntoJulia`].
+//! and [`Typecheck`] and [`ValidField`]. If the struct in Julia has no type parameters and is a
+//! bits type you can also derive [`IntoJulia`].
 //!
 //! You normally shouldn't need to implement these structs or traits manually. The JlrsReflect
 //! package can generate correct Rust struct and automatically derive the supported traits for
@@ -672,6 +658,7 @@
 //! [`IntoJulia`]: crate::convert::into_julia::IntoJulia
 //! [`Typecheck`]: crate::layout::typecheck::Typecheck
 //! [`ValidLayout`]: crate::layout::valid_layout::ValidLayout
+//! [`ValidField`]: crate::layout::valid_layout::ValidField
 //! [`Unbox`]: crate::convert::unbox::Unbox
 //! [`CallAsync::call_async`]: crate::multitask::call_async::CallAsync
 //! [`AsyncGcFrame`]: crate::memory::target::frame::AsyncGcFrame

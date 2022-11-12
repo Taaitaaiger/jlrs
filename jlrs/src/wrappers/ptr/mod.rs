@@ -11,10 +11,9 @@
 //! is returned. All pointer wrappers are valid [`Value`]s.
 //!
 //! One useful guarantee provided by wrappers is that they point to an existing value and are
-//! rooted. If a wrapper is returned that isn't rooted, jlrs will return a [`Ref`]. Unlike a
-//! wrapper a ref can be undefined, and since it's not rooted it's not guaranteed to remain valid
-//! while it can be used. For more information about rooting see the documentation of the
-//! [`memory`] module.
+//! rooted. If a wrapper is returned that isn't rooted, jlrs will return a [`Ref`]. Because it's
+//! not rooted it's not guaranteed to remain valid while it can be used. For more information
+//! about rooting see the documentation of the [`memory`] module.
 //!
 //! [`memory`]: crate::memory
 //! [`DataType`]: crate::wrappers::ptr::datatype::DataType
@@ -49,7 +48,7 @@ macro_rules! impl_valid_layout {
 macro_rules! impl_ref_root {
     ($type:tt, $reftype:tt, 2) => {
         impl<'scope, 'data> $reftype<'scope, 'data> {
-            /// Root this data in `scope`.
+            /// Use `target` to root this data.
             ///
             /// Safety: The data pointed to by `self` must not have been freed by the GC yet.
             pub unsafe fn root<'target, T>(self, target: T) -> T::Data<'data, $type<'target, 'data>>
@@ -62,7 +61,7 @@ macro_rules! impl_ref_root {
     };
     ($type:tt, $reftype:tt, 1) => {
         impl<'scope> $reftype<'scope> {
-            /// Root this data in `scope`.
+            /// Use `target` to root this data.
             ///
             /// Safety: The data pointed to by `self` must not have been freed by the GC yet.
             pub unsafe fn root<'target, T>(self, target: T) -> T::Data<'static, $type<'target>>

@@ -21,7 +21,7 @@ use crate::{
 };
 use cfg_if::cfg_if;
 
-use super::{global::Global, output::Output};
+use super::{global::Global, output::Output, reusable_slot::ReusableSlot};
 
 /// A frame associated with a scope.
 ///
@@ -81,6 +81,17 @@ impl<'scope> GcFrame<'scope> {
         unsafe {
             let offset = self.stack.reserve_slot();
             Output {
+                stack: self.stack,
+                offset,
+            }
+        }
+    }
+
+    /// Returns a `ReusableSlot` that targets the current frame.
+    pub fn reusable_slot(&self) -> ReusableSlot<'scope> {
+        unsafe {
+            let offset = self.stack.reserve_slot();
+            ReusableSlot {
                 stack: self.stack,
                 offset,
             }
