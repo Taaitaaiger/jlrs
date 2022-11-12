@@ -456,7 +456,7 @@ mod tests {
                     unsafe {
                         assert!(Module::base(&frame)
                             .function(&frame, "typeof")?
-                            .wrapper_unchecked()
+                            .wrapper()
                             .call1(&mut frame, jl_val)
                             .unwrap()
                             .cast::<DataType>()?
@@ -494,9 +494,9 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let constr = Module::main(&frame)
                         .submodule(&frame, "WithBitsUnion")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .global(&frame, "SingleVariant")?
-                        .wrapper_unchecked();
+                        .wrapper();
                     let v1 = Value::new(&mut frame, 1i8);
                     let v2 = Value::new(&mut frame, 2i32);
                     let v3 = Value::new(&mut frame, 3i8);
@@ -504,7 +504,7 @@ mod tests {
 
                     assert!(Module::base(&frame)
                         .function(&frame, "typeof")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .call1(&mut frame, jl_val)
                         .unwrap()
                         .cast::<DataType>()?
@@ -537,9 +537,9 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let constr = Module::main(&frame)
                         .submodule(&frame, "WithBitsUnion")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .global(&frame, "DoubleVariant")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .cast::<DataType>()?;
 
                     let v1 = Value::new(&mut frame, 1i8);
@@ -551,7 +551,7 @@ mod tests {
 
                     assert!(Module::base(&frame)
                         .function(&frame, "typeof")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .call1(&mut frame, jl_val)
                         .unwrap()
                         .cast::<DataType>()?
@@ -586,9 +586,9 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let constr = Module::main(&frame)
                         .submodule(&frame, "WithBitsUnion")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .global(&frame, "SizeAlignMismatch")?
-                        .wrapper_unchecked();
+                        .wrapper();
 
                     let v1 = Value::new(&mut frame, 1i8);
                     let v2 = Value::new(&mut frame, 2i32);
@@ -597,7 +597,7 @@ mod tests {
 
                     assert!(Module::base(&frame)
                         .function(&frame, "typeof")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .call1(&mut frame, jl_val)
                         .unwrap()
                         .cast::<DataType>()?
@@ -632,9 +632,9 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let constr = Module::main(&frame)
                         .submodule(&frame, "WithBitsUnion")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .global(&frame, "UnionInTuple")?
-                        .wrapper_unchecked();
+                        .wrapper();
 
                     let v1 = Value::new(&mut frame, 1i8);
                     let v2 = Value::new(&mut frame, Tuple1(2i32));
@@ -671,16 +671,16 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let constr = Module::main(&frame)
                         .submodule(&frame, "WithNonBitsUnion")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .global(&frame, "NonBitsUnion")?
-                        .wrapper_unchecked();
+                        .wrapper();
 
                     let v1 = Value::new(&mut frame, 1i8);
                     let jl_val = constr.call1(&mut frame, v1).unwrap();
 
                     assert!(Module::base(&frame)
                         .function(&frame, "typeof")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .call1(&mut frame, jl_val)
                         .unwrap()
                         .cast::<DataType>()?
@@ -707,14 +707,14 @@ mod tests {
 
                 julia.instance(&mut frame)                    .scope(|mut frame| unsafe  {
                         let constr = Module::main(&frame)
-                            .submodule(&frame, "WithStrings")?.wrapper_unchecked()
-                            .global(&frame, "WithString")?.wrapper_unchecked();
+                            .submodule(&frame, "WithStrings")?.wrapper()
+                            .global(&frame, "WithString")?.wrapper();
 
                         let v1 = Value::new(&mut frame, "foo")?;
                         let jl_val = constr.call1(&mut frame, v1)?.unwrap();
 
                         assert!(Module::base(&frame)
-                            .function(&frame, "typeof")?.wrapper_unchecked()
+                            .function(&frame, "typeof")?.wrapper()
                             .call1(&mut frame, jl_val)?
                             .unwrap()
                             .cast::<DataType>()?
@@ -744,16 +744,16 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let constr = Module::main(&frame)
                         .submodule(&frame, "WithGeneric")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .global(&frame, "WithGenericT")?
-                        .wrapper_unchecked();
+                        .wrapper();
 
                     let v1 = Value::new(&mut frame, 1i32);
                     let jl_val = constr.call1(&mut frame, v1).unwrap();
 
                     assert!(Module::base(&frame)
                         .function(&frame, "typeof")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .call1(&mut frame, jl_val)
                         .unwrap()
                         .cast::<DataType>()?
@@ -782,24 +782,24 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let constr = Module::main(&frame)
                         .submodule(&frame, "WithGeneric")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .global(&frame, "WithGenericT")?
-                        .wrapper_unchecked();
+                        .wrapper();
 
                     let v1 = Value::new(&mut frame, 1i32);
                     let wgt = constr.call1(&mut frame, v1).unwrap();
 
                     let constr = Module::main(&frame)
                         .submodule(&frame, "WithGeneric")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .global(&frame, "WithGenericUnionAll")?
-                        .wrapper_unchecked();
+                        .wrapper();
 
                     let jl_val = constr.call1(&mut frame, wgt).unwrap();
 
                     assert!(Module::base(&frame)
                         .function(&frame, "typeof")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .call1(&mut frame, jl_val)
                         .unwrap()
                         .cast::<DataType>()?
@@ -828,24 +828,24 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let constr = Module::main(&frame)
                         .submodule(&frame, "WithGeneric")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .global(&frame, "WithGenericT")?
-                        .wrapper_unchecked();
+                        .wrapper();
 
                     let v1 = Value::new(&mut frame, 1i32);
                     let wgt = constr.call1(&mut frame, v1).unwrap();
 
                     let constr = Module::main(&frame)
                         .submodule(&frame, "WithGeneric")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .global(&frame, "WithNestedGenericT")?
-                        .wrapper_unchecked();
+                        .wrapper();
 
                     let jl_val = constr.call1(&mut frame, wgt).unwrap();
 
                     assert!(Module::base(&frame)
                         .function(&frame, "typeof")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .call1(&mut frame, jl_val)
                         .unwrap()
                         .cast::<DataType>()?
@@ -875,9 +875,9 @@ mod tests {
                     let global = frame.global();
                     let constr = Module::main(&frame)
                         .submodule(&frame, "WithGeneric")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .global(&frame, "WithGenericT")?
-                        .wrapper_unchecked();
+                        .wrapper();
 
                     let wgt = constr
                         .call1(&mut frame, Module::base(&global).as_value())
@@ -885,22 +885,22 @@ mod tests {
 
                     let constr = Module::main(&frame)
                         .submodule(&frame, "WithGeneric")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .global(&frame, "WithPropagatedLifetime")?
-                        .wrapper_unchecked();
+                        .wrapper();
 
                     let jl_val = constr.call1(&mut frame, wgt).unwrap();
 
                     assert!(Module::base(&frame)
                         .function(&frame, "typeof")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .call1(&mut frame, jl_val)
                         .unwrap()
                         .cast::<DataType>()?
                         .is::<WithPropagatedLifetime>());
 
                     let first = jl_val.get_nth_field(&mut frame, 0).unwrap();
-                    assert!(first.unbox::<WithGenericT<ModuleRef>>().is_ok());
+                    assert!(first.unbox::<WithGenericT<Option<ModuleRef>>>().is_ok());
 
                     assert!(jl_val.is::<WithPropagatedLifetime>());
                     assert!(jl_val.unbox::<WithPropagatedLifetime>().is_ok());
@@ -926,30 +926,28 @@ mod tests {
 
                     let wgt_constr = Module::main(&frame)
                         .submodule(&frame, "WithGeneric")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .global(&frame, "WithGenericT")?
-                        .wrapper_unchecked();
+                        .wrapper();
 
                     let wgt = wgt_constr.call1(&mut frame, arr.as_value()).unwrap();
 
-                    let constr = Module::base(&frame)
-                        .function(&frame, "tuple")?
-                        .wrapper_unchecked();
+                    let constr = Module::base(&frame).function(&frame, "tuple")?.wrapper();
                     let int = Value::new(&mut frame, 2i32);
                     let tup = constr.call2(&mut frame, int, wgt).unwrap();
 
                     let a = wgt_constr.call1(&mut frame, tup).unwrap();
                     let constr = Module::main(&frame)
                         .submodule(&frame, "WithGeneric")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .global(&frame, "WithPropagatedLifetimes")?
-                        .wrapper_unchecked();
+                        .wrapper();
 
                     let jl_val = constr.call1(&mut frame, a).unwrap();
 
                     assert!(Module::base(&frame)
                         .function(&frame, "typeof")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .call1(&mut frame, jl_val)
                         .unwrap()
                         .cast::<DataType>()?
@@ -957,7 +955,7 @@ mod tests {
 
                     let first = jl_val.get_nth_field(&mut frame, 0).unwrap();
                     assert!(first
-                        .unbox::<WithGenericT<Tuple2<i32, WithGenericT<ArrayRef>>>>()
+                        .unbox::<WithGenericT<Tuple2<i32, WithGenericT<Option<ArrayRef>>>>>()
                         .is_ok());
 
                     assert!(jl_val.is::<WithPropagatedLifetimes>());
@@ -980,24 +978,24 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let wgt_constr = Module::main(&frame)
                         .submodule(&frame, "WithGeneric")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .global(&frame, "WithGenericT")?
-                        .wrapper_unchecked();
+                        .wrapper();
 
                     let v1 = Value::new(&mut frame, 1i64);
                     let wgt = wgt_constr.call1(&mut frame, v1).unwrap();
 
                     let constr = Module::main(&frame)
                         .submodule(&frame, "WithGeneric")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .global(&frame, "WithSetGeneric")?
-                        .wrapper_unchecked();
+                        .wrapper();
 
                     let jl_val = constr.call1(&mut frame, wgt).unwrap();
 
                     assert!(Module::base(&frame)
                         .function(&frame, "typeof")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .call1(&mut frame, jl_val)
                         .unwrap()
                         .cast::<DataType>()?
@@ -1026,29 +1024,27 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let wgt_constr = Module::main(&frame)
                         .submodule(&frame, "WithGeneric")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .global(&frame, "WithGenericT")?
-                        .wrapper_unchecked();
+                        .wrapper();
 
                     let v1 = Value::new(&mut frame, 1i64);
                     let wgt = wgt_constr.call1(&mut frame, v1).unwrap();
 
-                    let tup_constr = Module::base(&frame)
-                        .function(&frame, "tuple")?
-                        .wrapper_unchecked();
+                    let tup_constr = Module::base(&frame).function(&frame, "tuple")?.wrapper();
                     let v2 = tup_constr.call1(&mut frame, wgt).unwrap();
 
                     let constr = Module::main(&frame)
                         .submodule(&frame, "WithGeneric")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .global(&frame, "WithSetGenericTuple")?
-                        .wrapper_unchecked();
+                        .wrapper();
 
                     let jl_val = constr.call1(&mut frame, v2).unwrap();
 
                     assert!(Module::base(&frame)
                         .function(&frame, "typeof")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .call1(&mut frame, jl_val)
                         .unwrap()
                         .cast::<DataType>()?
@@ -1077,16 +1073,16 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let wvt_constr = Module::main(&frame)
                         .submodule(&frame, "WithGeneric")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .global(&frame, "withvaluetype")?
-                        .wrapper_unchecked();
+                        .wrapper();
 
                     let v1 = Value::new(&mut frame, 1i64);
                     let jl_val = wvt_constr.call1(&mut frame, v1).unwrap();
 
                     assert!(Module::base(&frame)
                         .function(&frame, "typeof")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .call1(&mut frame, jl_val)
                         .unwrap()
                         .cast::<DataType>()?

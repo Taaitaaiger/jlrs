@@ -56,9 +56,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
                 .scope(|mut frame| unsafe {
-                    let func = Module::main(&frame)
-                        .function(&frame, "increase")?
-                        .wrapper_unchecked();
+                    let func = Module::main(&frame).function(&frame, "increase")?.wrapper();
                     let twelve = Value::new(&mut frame, 12i32);
                     let result = func.call1(&mut frame, twelve);
                     assert_eq!(result.unwrap().unbox::<i32>().unwrap(), 13i32);

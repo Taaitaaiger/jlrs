@@ -12,7 +12,7 @@ use std::{
     ffi::c_void,
     mem::MaybeUninit,
     panic::{catch_unwind, AssertUnwindSafe},
-    ptr::null_mut,
+    ptr::{null_mut, NonNull},
 };
 
 unsafe extern "C" fn trampoline_with_slots<
@@ -87,9 +87,9 @@ where
     match res.tag {
         x if x == jlrs_catch_tag_t_JLRS_CATCH_OK => Ok(Ok(result.assume_init())),
         x if x == jlrs_catch_tag_t_JLRS_CATCH_ERR => Err(Box::from_raw(res.error.cast())),
-        x if x == jlrs_catch_tag_t_JLRS_CATCH_EXCECPTION => {
-            Ok(Err(ValueRef::wrap(res.error.cast())))
-        }
+        x if x == jlrs_catch_tag_t_JLRS_CATCH_EXCECPTION => Ok(Err(ValueRef::wrap(
+            NonNull::new_unchecked(res.error.cast()),
+        ))),
         x if x == jlrs_catch_tag_t_JLRS_CATCH_PANIC => {
             let err: Box<Box<dyn Any + Send>> = Box::from_raw(res.error.cast());
             std::panic::resume_unwind(err)
@@ -155,9 +155,9 @@ where
     match res.tag {
         x if x == jlrs_catch_tag_t_JLRS_CATCH_OK => Ok(Ok(result.assume_init())),
         x if x == jlrs_catch_tag_t_JLRS_CATCH_ERR => Err(Box::from_raw(res.error.cast())),
-        x if x == jlrs_catch_tag_t_JLRS_CATCH_EXCECPTION => {
-            Ok(Err(ValueRef::wrap(res.error.cast())))
-        }
+        x if x == jlrs_catch_tag_t_JLRS_CATCH_EXCECPTION => Ok(Err(ValueRef::wrap(
+            NonNull::new_unchecked(res.error.cast()),
+        ))),
         x if x == jlrs_catch_tag_t_JLRS_CATCH_PANIC => {
             let err: Box<Box<dyn Any + Send>> = Box::from_raw(res.error.cast());
             std::panic::resume_unwind(err)

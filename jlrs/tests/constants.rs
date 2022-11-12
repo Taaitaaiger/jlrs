@@ -17,11 +17,8 @@ mod tests {
                     jlrs.instance(&mut frame)
                         .scope(|frame| {
                             let v1 = Value::$func(&frame);
-                            let v2 = unsafe {
-                                Module::core(&frame)
-                                    .global(&frame, $tyname)?
-                                    .wrapper_unchecked()
-                            };
+                            let v2 =
+                                unsafe { Module::core(&frame).global(&frame, $tyname)?.wrapper() };
                             assert!(v1.datatype().as_value() == v2);
                             Ok(())
                         })
@@ -45,9 +42,7 @@ mod tests {
                             unsafe {
                                 let v1 = Value::$func(&frame);
                                 let v2 = unsafe {
-                                    Module::core(&frame)
-                                        .global(&frame, $tyname)?
-                                        .wrapper_unchecked()
+                                    Module::core(&frame).global(&frame, $tyname)?.wrapper()
                                 };
                                 assert!(v1.isa(v2));
                             }
@@ -73,9 +68,7 @@ mod tests {
                             unsafe {
                                 let v1 = Value::$func(&frame);
                                 let v2 = unsafe {
-                                    Module::core(&frame)
-                                        .global(&frame, $tyname)?
-                                        .wrapper_unchecked()
+                                    Module::core(&frame).global(&frame, $tyname)?.wrapper()
                                 };
                                 assert!(v1.subtype(v2));
                             }
@@ -98,11 +91,8 @@ mod tests {
                     jlrs.instance(&mut frame)
                         .scope(|frame| {
                             let v1 = UnionAll::$func(&frame);
-                            let v2 = unsafe {
-                                Module::core(&frame)
-                                    .global(&frame, $tyname)?
-                                    .wrapper_unchecked()
-                            };
+                            let v2 =
+                                unsafe { Module::core(&frame).global(&frame, $tyname)?.wrapper() };
                             assert!(v1.as_value() == v2);
                             Ok(())
                         })
@@ -123,11 +113,8 @@ mod tests {
                     jlrs.instance(&mut frame)
                         .scope(|frame| {
                             let v1 = UnionAll::$func(&frame);
-                            let v2 = unsafe {
-                                Module::core(&frame)
-                                    .global(&frame, $tyname)?
-                                    .wrapper_unchecked()
-                            };
+                            let v2 =
+                                unsafe { Module::core(&frame).global(&frame, $tyname)?.wrapper() };
                             assert!(v1.as_value().isa(v2));
                             Ok(())
                         })
@@ -148,11 +135,8 @@ mod tests {
                     jlrs.instance(&mut frame)
                         .scope(|frame| {
                             let v1 = DataType::$func(&frame);
-                            let v2 = unsafe {
-                                Module::core(&frame)
-                                    .global(&frame, $tyname)?
-                                    .wrapper_unchecked()
-                            };
+                            let v2 =
+                                unsafe { Module::core(&frame).global(&frame, $tyname)?.wrapper() };
                             assert!(v1.as_value().isa(v2));
                             Ok(())
                         })

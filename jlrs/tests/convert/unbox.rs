@@ -17,7 +17,7 @@ mod tests {
                         .scope(|frame| unsafe {
                             let val: $type = $val;
                             assert_eq!(
-                                <$type as Unbox>::unbox(val.into_julia(&frame).value_unchecked()),
+                                <$type as Unbox>::unbox(val.into_julia(&frame).value()),
                                 $val
                             );
                             Ok(())

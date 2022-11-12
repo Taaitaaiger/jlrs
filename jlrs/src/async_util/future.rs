@@ -21,6 +21,7 @@ use std::{
     ffi::c_void,
     marker::PhantomData,
     pin::Pin,
+    ptr::NonNull,
     sync::{Arc, Mutex},
 };
 
@@ -63,10 +64,10 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             Module::main(&frame)
                 .submodule(&frame, "JlrsMultitask")
                 .expect("JlrsMultitask not available")
-                .wrapper_unchecked()
+                .wrapper()
                 .function(&frame, "asynccall")
                 .expect("asynccall not available")
-                .wrapper_unchecked()
+                .wrapper()
                 .call(&mut *frame, &mut vals)
                 .unwrap_or_else(|e| {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
@@ -118,10 +119,10 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             Module::main(&frame)
                 .submodule(&frame, "JlrsMultitask")
                 .expect("JlrsMultitask not available")
-                .wrapper_unchecked()
+                .wrapper()
                 .function(&frame, "interactivecall")
                 .expect("interactivecall not available")
-                .wrapper_unchecked()
+                .wrapper()
                 .call(&mut *frame, &mut vals)
                 .unwrap_or_else(|e| {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
@@ -172,10 +173,10 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             Module::main(&frame)
                 .submodule(&frame, "JlrsMultitask")
                 .expect("JlrsMultitask not available")
-                .wrapper_unchecked()
+                .wrapper()
                 .function(&frame, "scheduleasynclocal")
                 .expect("scheduleasynclocal not available")
-                .wrapper_unchecked()
+                .wrapper()
                 .call(&mut *frame, &mut vals)
                 .unwrap_or_else(|e| {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
@@ -226,10 +227,10 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             Module::main(&frame)
                 .submodule(&frame, "JlrsMultitask")
                 .expect("JlrsMultitask not available")
-                .wrapper_unchecked()
+                .wrapper()
                 .function(&frame, "scheduleasync")
                 .expect("scheduleasync not available")
-                .wrapper_unchecked()
+                .wrapper()
                 .call(&mut *frame, &mut vals)
                 .unwrap_or_else(|e| {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
@@ -270,10 +271,10 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             Module::main(&frame)
                 .submodule(&frame, "JlrsMultitask")
                 .expect("JlrsMultitask not available")
-                .wrapper_unchecked()
+                .wrapper()
                 .function(&frame, "postblocking")
                 .expect("postblocking not available")
-                .wrapper_unchecked()
+                .wrapper()
                 .call3(&mut *frame, fn_ptr, task_ptr, state_ptr_boxed)
                 .unwrap_or_else(|e| {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
@@ -323,10 +324,10 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             Module::main(&frame)
                 .submodule(&frame, "JlrsMultitask")
                 .expect("JlrsMultitask not available")
-                .wrapper_unchecked()
+                .wrapper()
                 .function(&frame, "asynccall")
                 .expect("asynccall not available")
-                .wrapper_unchecked()
+                .wrapper()
                 .provide_keywords(func.keywords())
                 .expect("Keywords invalid")
                 .call(&mut *frame, &mut vals)
@@ -379,10 +380,10 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             Module::main(&frame)
                 .submodule(&frame, "JlrsMultitask")
                 .expect("JlrsMultitask not available")
-                .wrapper_unchecked()
+                .wrapper()
                 .function(&frame, "interactivecall")
                 .expect("interactivecall not available")
-                .wrapper_unchecked()
+                .wrapper()
                 .provide_keywords(func.keywords())
                 .expect("Keywords invalid")
                 .call(&mut *frame, &mut vals)
@@ -435,10 +436,10 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             let task = Module::main(&frame)
                 .submodule(&frame, "JlrsMultitask")
                 .expect("JlrsMultitask not available")
-                .wrapper_unchecked()
+                .wrapper()
                 .function(&frame, "scheduleasynclocal")
                 .expect("scheduleasynclocal not available")
-                .wrapper_unchecked()
+                .wrapper()
                 .provide_keywords(func.keywords())
                 .expect("Keywords invalid")
                 .call(&mut *frame, &mut vals)
@@ -491,10 +492,10 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             Module::main(&frame)
                 .submodule(&frame, "JlrsMultitask")
                 .expect("JlrsMultitask not available")
-                .wrapper_unchecked()
+                .wrapper()
                 .function(&frame, "scheduleasync")
                 .expect("scheduleasync not available")
-                .wrapper_unchecked()
+                .wrapper()
                 .provide_keywords(func.keywords())
                 .expect("Keywords invalid")
                 .call(&mut *frame, &mut vals)
@@ -530,15 +531,21 @@ impl<'frame, 'data> Future for JuliaFuture<'frame, 'data> {
                     let f = Module::base(&global)
                         .function(&global, "fetch")
                         .unwrap()
-                        .wrapper_unchecked();
+                        .wrapper();
 
                     let res = jl_call1(f.unwrap(Private), task.unwrap(Private).cast());
                     let exc = jl_exception_occurred();
 
                     if exc.is_null() {
-                        Poll::Ready(Ok(Value::wrap(res, Private)))
+                        Poll::Ready(Ok(Value::wrap_non_null(
+                            NonNull::new_unchecked(res),
+                            Private,
+                        )))
                     } else {
-                        Poll::Ready(Err(Value::wrap(exc, Private)))
+                        Poll::Ready(Err(Value::wrap_non_null(
+                            NonNull::new_unchecked(exc),
+                            Private,
+                        )))
                     }
                 }
             } else {

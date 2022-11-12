@@ -184,9 +184,9 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let base = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .function(&frame, "base")?
-                        .wrapper_unchecked();
+                        .wrapper();
                     let base_val = base.call0(&mut frame).unwrap();
 
                     assert!(base_val.is::<Module>());
@@ -271,7 +271,7 @@ mod tests {
                     main.set_global(&mut frame, "one", value)
                         .into_jlrs_result()?;
 
-                    let value = main.global(&frame, "one")?.wrapper_unchecked();
+                    let value = main.global(&frame, "one")?.wrapper();
                     assert_eq!(value.unbox::<usize>()?, 1);
                     Ok(())
                 })
@@ -291,7 +291,7 @@ mod tests {
                     main.set_const(&mut frame, "ONE", value)
                         .into_jlrs_result()?;
 
-                    let value = main.global(&frame, "ONE")?.wrapper_unchecked();
+                    let value = main.global(&frame, "ONE")?.wrapper();
                     assert_eq!(value.unbox::<usize>()?, 2);
                     Ok(())
                 })
@@ -312,7 +312,7 @@ mod tests {
                 let value1 = Value::new(&mut frame, 3usize);
                 let value2 = Value::new(&mut frame, 4usize);
                 main.set_const(&frame, "TWICE", value1)
-                    .map_err(|v| unsafe { v.value_unchecked() })
+                    .map_err(|v| unsafe { v.value() })
                     .into_jlrs_result()?;
                 main.set_const(&mut frame, "TWICE", value2)
                     .into_jlrs_result()?;

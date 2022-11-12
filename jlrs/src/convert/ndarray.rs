@@ -1,11 +1,8 @@
 //! Borrow data from Julia arrays as `ndarray`'s `ArrayView` and `ArrayViewMut`.
 
-use crate::{
-    layout::valid_layout::ValidLayout,
-    wrappers::ptr::array::data::{
-        accessor::{BitsArrayAccessor, InlinePtrArrayAccessor, Mutability, Mutable},
-        copied::CopiedArray,
-    },
+use crate::wrappers::ptr::array::data::{
+    accessor::{BitsArrayAccessor, InlinePtrArrayAccessor, Mutability, Mutable},
+    copied::CopiedArray,
 };
 use ndarray::{ArrayView, ArrayViewMut, Dim, IntoDimension, IxDynImpl, ShapeBuilder};
 
@@ -25,7 +22,6 @@ impl<'borrow: 'view, 'view, 'array, 'data, T, M> NdArrayView<'view, T>
     for BitsArrayAccessor<'borrow, 'array, 'data, T, M>
 where
     M: Mutability,
-    T: ValidLayout + Clone,
 {
     fn array_view(&'view self) -> ArrayView<'view, T, Dim<IxDynImpl>> {
         // Safety: while the array is borrowed nothing can be pushed or popped from it.
@@ -38,7 +34,6 @@ impl<'borrow: 'view, 'view, 'array, 'data, T, M> NdArrayView<'view, T>
     for InlinePtrArrayAccessor<'borrow, 'array, 'data, T, M>
 where
     M: Mutability,
-    T: ValidLayout + Clone,
 {
     fn array_view(&'view self) -> ArrayView<'view, T, Dim<IxDynImpl>> {
         // Safety: while the array is borrowed nothing can be pushed or popped from it.
@@ -49,8 +44,6 @@ where
 
 impl<'borrow: 'view, 'view, 'array, 'data, T> NdArrayViewMut<'view, T>
     for BitsArrayAccessor<'borrow, 'array, 'data, T, Mutable<'borrow, T>>
-where
-    T: ValidLayout + Clone,
 {
     fn array_view_mut(&'view mut self) -> ArrayViewMut<'view, T, Dim<IxDynImpl>> {
         // Safety: while the array is borrowed nothing can be pushed or popped from it.
@@ -59,20 +52,14 @@ where
     }
 }
 
-impl<'view, T> NdArrayView<'view, T> for CopiedArray<T>
-where
-    T: ValidLayout + Clone,
-{
+impl<'view, T> NdArrayView<'view, T> for CopiedArray<T> {
     fn array_view(&'view self) -> ArrayView<'view, T, Dim<IxDynImpl>> {
         let shape = self.dimensions().as_slice().into_dimension().f();
         ArrayView::from_shape(shape, self.as_slice()).unwrap()
     }
 }
 
-impl<'view, T> NdArrayViewMut<'view, T> for CopiedArray<T>
-where
-    T: ValidLayout + Clone,
-{
+impl<'view, T> NdArrayViewMut<'view, T> for CopiedArray<T> {
     fn array_view_mut(&'view mut self) -> ArrayViewMut<'view, T, Dim<IxDynImpl>> {
         let shape = self.dimensions().as_slice().into_dimension().f();
         ArrayViewMut::from_shape(shape, self.as_mut_slice()).unwrap()
@@ -80,31 +67,25 @@ where
 }
 
 mod private {
-    use crate::{
-        layout::valid_layout::ValidLayout,
-        wrappers::ptr::array::data::{
-            accessor::{BitsArrayAccessor, InlinePtrArrayAccessor, Mutability},
-            copied::CopiedArray,
-        },
+    use crate::wrappers::ptr::array::data::{
+        accessor::{BitsArrayAccessor, InlinePtrArrayAccessor, Mutability},
+        copied::CopiedArray,
     };
 
     pub trait NdArrayPriv {}
     impl<'borrow, 'array, 'data, T, M> NdArrayPriv
         for InlinePtrArrayAccessor<'borrow, 'array, 'data, T, M>
     where
-        T: Clone + ValidLayout,
         M: Mutability,
     {
     }
 
-    impl<'borrow, 'array, 'data, T, M> NdArrayPriv for BitsArrayAccessor<'borrow, 'array, 'data, T, M>
-    where
-        T: Clone + ValidLayout,
-        M: Mutability,
+    impl<'borrow, 'array, 'data, T, M> NdArrayPriv for BitsArrayAccessor<'borrow, 'array, 'data, T, M> where
+        M: Mutability
     {
     }
 
-    impl<T> NdArrayPriv for CopiedArray<T> where T: Clone + ValidLayout {}
+    impl<T> NdArrayPriv for CopiedArray<T> {}
 }
 
 #[cfg(test)]

@@ -112,9 +112,9 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let dt = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .function(&frame, "datatype")?
-                        .wrapper_unchecked();
+                        .wrapper();
                     let dt_val = dt.call0(&mut frame).unwrap();
 
                     assert!(dt_val.is::<DataType>());
@@ -134,8 +134,8 @@ mod tests {
             jlrs.instance(&mut frame)
                 .scope(|frame| unsafe {
                     let dt = DataType::tvar_type(&frame);
-                    let tn = dt.type_name().wrapper_unchecked();
-                    let s = tn.name().wrapper_unchecked().as_string().unwrap();
+                    let tn = dt.type_name().wrapper();
+                    let s = tn.name().wrapper().as_string().unwrap();
 
                     assert_eq!(s, "TypeVar");
 
@@ -154,12 +154,12 @@ mod tests {
                 .scope(|frame| unsafe {
                     let dt = DataType::tvar_type(&frame);
                     {
-                        let tn = dt.field_names().wrapper_unchecked();
+                        let tn = dt.field_names().unwrap().wrapper();
                         let tn = tn.typed_data::<SymbolRef>()?.as_slice();
 
-                        assert_eq!(tn[0].wrapper().unwrap().as_string().unwrap(), "name");
-                        assert_eq!(tn[1].wrapper().unwrap().as_string().unwrap(), "lb");
-                        assert_eq!(tn[2].wrapper().unwrap().as_string().unwrap(), "ub");
+                        assert_eq!(tn[0].unwrap().wrapper().as_string().unwrap(), "name");
+                        assert_eq!(tn[1].unwrap().wrapper().as_string().unwrap(), "lb");
+                        assert_eq!(tn[2].unwrap().wrapper().as_string().unwrap(), "ub");
                     }
 
                     Ok(())
@@ -254,9 +254,9 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
-                .scope(|frame| {
+                .scope(|frame| unsafe {
                     let dt = DataType::tvar_type(&frame);
-                    assert!(!dt.super_type().is_undefined());
+                    assert!(dt.super_type().wrapper() == DataType::any_type(&frame));
 
                     Ok(())
                 })
@@ -276,7 +276,7 @@ mod tests {
                             .cast::<DataType>()
                             .unwrap()
                             .parameters()
-                            .wrapper_unchecked()
+                            .wrapper()
                             .len(),
                         2
                     );
@@ -298,9 +298,9 @@ mod tests {
                         .cast::<DataType>()
                         .unwrap()
                         .instance()
-                        .is_undefined());
+                        .is_none());
 
-                    assert!(!DataType::nothing_type(&frame).instance().is_undefined());
+                    assert!(DataType::nothing_type(&frame).instance().is_some());
 
                     Ok(())
                 })
@@ -415,11 +415,9 @@ mod tests {
                         let dt = UnionAll::array_type(&frame)
                             .body()
                             .wrapper()
-                            .unwrap()
                             .cast::<UnionAll>()?
                             .body()
                             .wrapper()
-                            .unwrap()
                             .cast::<DataType>()?;
                         assert!(!dt.zero_init());
                     }
@@ -453,10 +451,9 @@ mod tests {
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
                 .scope(|frame| {
-                    let dt =
-                        unsafe { UnionAll::array_type(&frame).base_type().wrapper_unchecked() };
+                    let dt = unsafe { UnionAll::array_type(&frame).base_type().wrapper() };
                     assert_eq!(dt.n_parameters(), 2);
-                    let param = unsafe { dt.parameter(0).unwrap().value_unchecked() };
+                    let param = unsafe { dt.parameter(0).unwrap().value() };
                     assert!(param.is::<TypeVar>());
 
                     Ok(())
@@ -476,7 +473,7 @@ mod tests {
                         DataType::unionall_type(&frame)
                             .field_type(0)
                             .unwrap()
-                            .wrapper_unchecked()
+                            .wrapper()
                     };
 
                     assert!(val.is::<DataType>());
@@ -497,7 +494,7 @@ mod tests {
                         DataType::unionall_type(&frame)
                             .field_type_concrete(0)
                             .unwrap()
-                            .wrapper_unchecked()
+                            .wrapper()
                     };
 
                     assert!(val.is::<DataType>());
@@ -575,9 +572,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsStableTests")?
-                            .wrapper_unchecked()
+                            .wrapper()
                             .global(&frame, "WithConst")?
-                            .value_unchecked()
+                            .value()
                             .cast::<DataType>()?
                     };
 
@@ -624,9 +621,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper_unchecked()
+                            .wrapper()
                             .global(&frame, "WithAbstract")?
-                            .value_unchecked()
+                            .value()
                             .cast::<DataType>()?
                     };
 

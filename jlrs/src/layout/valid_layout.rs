@@ -47,6 +47,17 @@ macro_rules! impl_valid_layout {
 
             const IS_REF: bool = true;
         }
+
+        unsafe impl<$($lt),+> $crate::layout::valid_layout::ValidField for $type {
+            #[inline(always)]
+            fn valid_field(v: $crate::wrappers::ptr::value::Value) -> bool {
+                if let Ok(dt) = v.cast::<$crate::wrappers::ptr::datatype::DataType>() {
+                    dt.is::<$type>()
+                } else {
+                    false
+                }
+            }
+        }
     };
     ($t:ty) => {
         unsafe impl $crate::layout::valid_layout::ValidLayout for $t {
@@ -60,6 +71,17 @@ macro_rules! impl_valid_layout {
             }
 
             const IS_REF: bool = false;
+        }
+
+        unsafe impl $crate::layout::valid_layout::ValidField for $t {
+            #[inline(always)]
+            fn valid_field(v: $crate::wrappers::ptr::value::Value) -> bool {
+                if let Ok(dt) =  v.cast::<$crate::wrappers::ptr::datatype::DataType>() {
+                    dt.is::<$t>()
+                } else {
+                    false
+                }
+            }
         }
     }
 }
@@ -91,4 +113,10 @@ unsafe impl<T: IntoJulia> ValidLayout for *mut T {
     }
 
     const IS_REF: bool = false;
+}
+
+/// TODO: docs.
+pub unsafe trait ValidField {
+    /// Returns `true` if `Self` is the correct representation for Julia data of type `ty`.
+    fn valid_field(ty: Value) -> bool;
 }

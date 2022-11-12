@@ -10,6 +10,7 @@ use jl_sys::{
 use std::{
     ffi::{c_void, CStr},
     marker::PhantomData,
+    ptr::NonNull,
 };
 
 /// Trait implemented by types that can access global Julia information.
@@ -66,7 +67,8 @@ impl Info {
     /// Name and information of the kernel.
     pub fn uname(&self) -> StrOrBytes<'static> {
         unsafe {
-            let cstr = Symbol::wrap(jl_get_UNAME(), Private).as_cstr();
+            let cstr =
+                Symbol::wrap_non_null(NonNull::new_unchecked(jl_get_UNAME()), Private).as_cstr();
 
             if let Ok(rstr) = cstr.to_str() {
                 Ok(rstr)
@@ -79,7 +81,8 @@ impl Info {
     /// The CPU architecture.
     pub fn arch(&self) -> StrOrBytes<'static> {
         unsafe {
-            let cstr = Symbol::wrap(jl_get_ARCH(), Private).as_cstr();
+            let cstr =
+                Symbol::wrap_non_null(NonNull::new_unchecked(jl_get_ARCH()), Private).as_cstr();
 
             if let Ok(rstr) = cstr.to_str() {
                 Ok(rstr)

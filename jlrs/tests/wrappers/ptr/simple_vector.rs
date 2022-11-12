@@ -112,7 +112,7 @@ mod tests {
 
                     unsafe {
                         let data = svec.typed_data_unchecked::<SymbolRef>();
-                        assert_eq!(data.as_slice()[0].wrapper_unchecked(), sym);
+                        assert_eq!(data.as_slice()[0].unwrap().wrapper(), sym);
                     }
                     Ok(())
                 })
@@ -205,7 +205,7 @@ mod tests {
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
                     let res = unsafe { SimpleVector::emptysvec(&frame).as_ref().root(&mut frame) };
-                    assert!(res.is_ok());
+                    assert_eq!(res.len(), 0);
 
                     Ok(())
                 })

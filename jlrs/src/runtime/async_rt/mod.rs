@@ -782,12 +782,12 @@ fn set_custom_fns(stack: &Stack) -> JlrsResult<()> {
 
         let jlrs_mod = Module::main(&frame)
             .submodule(&frame, "JlrsMultitask")?
-            .wrapper_unchecked();
+            .wrapper();
 
         let wake_rust = Value::new(&mut frame, wake_task as *mut c_void);
         jlrs_mod
             .global(&frame, "wakerust")?
-            .wrapper_unchecked()
+            .wrapper()
             .set_nth_field_unchecked(0, wake_rust);
 
         std::mem::drop(owner);

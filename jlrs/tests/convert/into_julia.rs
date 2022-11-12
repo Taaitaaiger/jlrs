@@ -14,7 +14,7 @@ mod tests {
 
                     jlrs.instance(&mut frame)
                         .scope(|frame| unsafe {
-                            let ty = <$type as IntoJulia>::julia_type(&frame).value_unchecked();
+                            let ty = <$type as IntoJulia>::julia_type(&frame).value();
                             assert_eq!(ty, DataType::$assoc_ty(&frame).as_value());
                             assert!(ty.cast::<DataType>()?.is::<$type>());
 
@@ -32,7 +32,7 @@ mod tests {
 
                     jlrs.instance(&mut frame)
                         .scope(|frame| unsafe {
-                            let val = $val.into_julia(&frame).value_unchecked();
+                            let val = $val.into_julia(&frame).value();
                             assert!(val.is::<$type>());
 
                             Ok(())
@@ -53,8 +53,7 @@ mod tests {
 
                     jlrs.instance(&mut frame)
                         .scope(|mut frame| unsafe {
-                            let ty =
-                                <*mut $type as IntoJulia>::julia_type(&frame).value_unchecked();
+                            let ty = <*mut $type as IntoJulia>::julia_type(&frame).value();
                             let args = [DataType::$assoc_ty(&frame).as_value()];
 
                             let applied = UnionAll::pointer_type(&frame)
@@ -78,7 +77,7 @@ mod tests {
 
                     jlrs.instance(&mut frame)
                         .scope(|frame| unsafe {
-                            let val = null_mut::<$type>().into_julia(&frame).value_unchecked();
+                            let val = null_mut::<$type>().into_julia(&frame).value();
                             assert!(val.is::<*mut $type>());
                             Ok(())
                         })
@@ -192,7 +191,7 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|frame| unsafe {
-                    let ty = <*mut c_void as IntoJulia>::julia_type(&frame).value_unchecked();
+                    let ty = <*mut c_void as IntoJulia>::julia_type(&frame).value();
                     assert_eq!(ty, DataType::voidpointer_type(&frame).as_value());
                     assert!(ty.cast::<DataType>()?.is::<*mut c_void>());
                     Ok(())
@@ -209,7 +208,7 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|frame| unsafe {
-                    let val = null_mut::<c_void>().into_julia(&frame).value_unchecked();
+                    let val = null_mut::<c_void>().into_julia(&frame).value();
                     assert!(val.is::<*mut c_void>());
                     Ok(())
                 })

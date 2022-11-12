@@ -24,7 +24,7 @@ pub(crate) type InnerPersistentMessage<P> = Box<
 >;
 
 // What follows is a significant amount of indirection to allow different tasks to have a
-// different Output.
+// different Output types and be unaware of the used channels.
 pub(crate) enum Task {}
 pub(crate) enum RegisterTask {}
 pub(crate) enum Persistent {}
@@ -464,11 +464,9 @@ where
                 let path = JuliaString::new(&mut frame, path);
                 Module::main(&frame)
                     .function(&frame, "include")?
-                    .wrapper_unchecked()
+                    .wrapper()
                     .call1(&frame, path.as_value())
-                    .map_err(|e| {
-                        JlrsError::exception(format!("Include error: {:?}", e.value_unchecked()))
-                    })?;
+                    .map_err(|e| JlrsError::exception(format!("Include error: {:?}", e.value())))?;
             }
             None => {}
         }
@@ -532,9 +530,9 @@ where
 
         Module::main(&global)
             .submodule(&global, "Jlrs")?
-            .wrapper_unchecked()
+            .wrapper()
             .global(&global, "color")?
-            .value_unchecked()
+            .value()
             .set_nth_field_unchecked(0, enable);
 
         Ok(())

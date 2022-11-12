@@ -59,9 +59,9 @@ impl Stack {
 
         let dt_ref = create_foreign_type::<Self, _>(global, sym, module, None, true, false);
         let ptr = dt_ref.ptr();
-        frame.set_sync_root(ptr.cast());
+        frame.set_sync_root(ptr.cast().as_ptr());
 
-        let dt = dt_ref.wrapper_unchecked();
+        let dt = dt_ref.wrapper();
         module.set_const_unchecked(sym, dt.as_value());
     }
 
@@ -110,6 +110,6 @@ impl Stack {
     pub(crate) unsafe fn alloc() -> *mut Self {
         let global = Global::new();
         let stack = Value::new(global, Stack::default());
-        stack.ptr().cast()
+        stack.ptr().cast().as_ptr()
     }
 }

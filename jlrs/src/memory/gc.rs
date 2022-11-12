@@ -54,10 +54,10 @@ pub trait Gc: private::GcPriv {
             Module::base(&global)
                 .submodule(&global, "GC")
                 .expect("No GC module in Base")
-                .wrapper_unchecked()
+                .wrapper()
                 .function(&global, "enable_logging")
                 .expect("No enable_logging function in GC")
-                .wrapper_unchecked()
+                .wrapper()
         };
 
         let arg = if on {

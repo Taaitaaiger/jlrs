@@ -970,10 +970,10 @@ cfg_if::cfg_if! {
                 let task = Module::main(&frame)
                     .submodule(&frame, "JlrsMultitask")
                     .expect("JlrsMultitask not available")
-                    .wrapper_unchecked()
+                    .wrapper()
                     .function(&frame, "interactivecall")
                     .expect("interactivecall not available")
-                    .wrapper_unchecked()
+                    .wrapper()
                     .call(&mut *frame, &mut vals);
 
                 match task {
@@ -999,10 +999,10 @@ cfg_if::cfg_if! {
                 let task = Module::main(&frame)
                     .submodule(&frame, "JlrsMultitask")
                     .expect("JlrsMultitask not available")
-                    .wrapper_unchecked()
+                    .wrapper()
                     .function(&frame, "asynccall")
                     .expect("asynccall not available")
-                    .wrapper_unchecked()
+                    .wrapper()
                     .call(&mut *frame, &mut vals);
 
                 match task {
@@ -1039,10 +1039,10 @@ cfg_if::cfg_if! {
                 let task = Module::main(&frame)
                     .submodule(&frame, "JlrsMultitask")
                     .expect("JlrsMultitask not available")
-                    .wrapper_unchecked()
+                    .wrapper()
                     .function(&frame, "scheduleasynclocal")
                     .expect("scheduleasynclocal not available")
-                    .wrapper_unchecked()
+                    .wrapper()
                     .call(&mut *frame, &mut vals);
 
                 match task {
@@ -1079,10 +1079,10 @@ cfg_if::cfg_if! {
                 let task = Module::main(&frame)
                     .submodule(&frame, "JlrsMultitask")
                     .expect("JlrsMultitask not available")
-                    .wrapper_unchecked()
+                    .wrapper()
                     .function(&frame, "scheduleasync")
                     .expect("scheduleasync not available")
-                    .wrapper_unchecked()
+                    .wrapper()
                     .call(&mut *frame, &mut vals);
 
                 match task {
@@ -1228,10 +1228,10 @@ cfg_if::cfg_if! {
                 let task = Module::main(&frame)
                     .submodule(&frame, "JlrsMultitask")
                     .expect("JlrsMultitask not available")
-                    .wrapper_unchecked()
+                    .wrapper()
                     .function(&frame, "interactivecall")
                     .expect("interactivecall not available")
-                    .wrapper_unchecked()
+                    .wrapper()
                     .provide_keywords(self.keywords())
                     .expect("Keywords invalid")
                     .call(&mut *frame, &mut vals);
@@ -1259,10 +1259,10 @@ cfg_if::cfg_if! {
                 let task = Module::main(&frame)
                     .submodule(&frame, "JlrsMultitask")
                     .expect("JlrsMultitask not available")
-                    .wrapper_unchecked()
+                    .wrapper()
                     .function(&frame, "asynccall")
                     .expect("asynccall not available")
-                    .wrapper_unchecked()
+                    .wrapper()
                     .provide_keywords(self.keywords())
                     .expect("Keywords invalid")
                     .call(&mut *frame, &mut vals);
@@ -1301,10 +1301,10 @@ cfg_if::cfg_if! {
                 let task = Module::main(&frame)
                     .submodule(&frame, "JlrsMultitask")
                     .expect("JlrsMultitask not available")
-                    .wrapper_unchecked()
+                    .wrapper()
                     .function(&frame, "scheduleasynclocal")
                     .expect("scheduleasynclocal not available")
-                    .wrapper_unchecked()
+                    .wrapper()
                     .provide_keywords(self.keywords())
                     .expect("Keywords invalid")
                     .call(&mut *frame, &mut vals);
@@ -1343,10 +1343,10 @@ cfg_if::cfg_if! {
                 let task = Module::main(&frame)
                     .submodule(&frame, "JlrsMultitask")
                     .expect("JlrsMultitask not available")
-                    .wrapper_unchecked()
+                    .wrapper()
                     .function(&frame, "scheduleasync")
                     .expect("scheduleasync not available")
-                    .wrapper_unchecked()
+                    .wrapper()
                     .provide_keywords(self.keywords())
                     .expect("Keywords invalid")
                     .call(&mut *frame, &mut vals);

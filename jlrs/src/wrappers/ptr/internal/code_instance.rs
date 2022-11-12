@@ -7,7 +7,6 @@
 
 use crate::{
     impl_julia_typecheck,
-    memory::target::Target,
     private::Private,
     wrappers::ptr::{
         internal::method_instance::MethodInstanceRef, private::WrapperPriv, value::ValueRef, Ref,
@@ -51,22 +50,28 @@ impl<'scope> CodeInstance<'scope> {
     */
 
     /// Method this instance is specialized from.
-    pub fn def(self) -> MethodInstanceRef<'scope> {
+    pub fn def(self) -> Option<MethodInstanceRef<'scope>> {
         // Safety: the pointer points to valid data
-        unsafe { MethodInstanceRef::wrap(self.unwrap_non_null(Private).as_ref().def) }
+        unsafe {
+            let def = self.unwrap_non_null(Private).as_ref().def;
+            Some(MethodInstanceRef::wrap(NonNull::new(def)?))
+        }
     }
 
     /// Next cache entry.
-    pub fn next(self) -> CodeInstanceRef<'scope> {
+    pub fn next(self) -> Option<CodeInstanceRef<'scope>> {
         cfg_if! {
             if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
-                unsafe { CodeInstanceRef::wrap(self.unwrap_non_null(Private).as_ref().next) }
+                unsafe {
+                    let next = self.unwrap_non_null(Private).as_ref().next;
+                    Some(CodeInstanceRef::wrap(NonNull::new(next)?))
+                }
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let next = self.unwrap_non_null(Private).as_ref().next.load(Ordering::Relaxed);
-                    CodeInstanceRef::wrap(next)
+                    Some(CodeInstanceRef::wrap(NonNull::new(next)?))
                 }
             }
         }
@@ -85,28 +90,37 @@ impl<'scope> CodeInstance<'scope> {
     }
 
     /// Return type for fptr.
-    pub fn rettype(self) -> ValueRef<'scope, 'static> {
+    pub fn rettype(self) -> Option<ValueRef<'scope, 'static>> {
         // Safety: the pointer points to valid data
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().rettype) }
+        unsafe {
+            let rettype = self.unwrap_non_null(Private).as_ref().rettype;
+            Some(ValueRef::wrap(NonNull::new(rettype)?))
+        }
     }
 
     /// Inferred constant return value, or null
-    pub fn rettype_const(self) -> ValueRef<'scope, 'static> {
+    pub fn rettype_const(self) -> Option<ValueRef<'scope, 'static>> {
         // Safety: the pointer points to valid data
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().rettype_const) }
+        unsafe {
+            let rettype_const = self.unwrap_non_null(Private).as_ref().rettype_const;
+            Some(ValueRef::wrap(NonNull::new(rettype_const)?))
+        }
     }
 
     /// Inferred `CodeInfo`, `Nothing`, or `None`.
-    pub fn inferred(self) -> ValueRef<'scope, 'static> {
+    pub fn inferred(self) -> Option<ValueRef<'scope, 'static>> {
         // Safety: the pointer points to valid data
         cfg_if! {
             if #[cfg(not(feature = "nightly"))] {
-                unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().inferred) }
+                unsafe {
+                    let inferred = self.unwrap_non_null(Private).as_ref().inferred;
+                    Some(ValueRef::wrap(NonNull::new(inferred)?))
+                }
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let inferred = self.unwrap_non_null(Private).as_ref().inferred.load(Ordering::Relaxed);
-                    ValueRef::wrap(inferred)
+                    Some(ValueRef::wrap(NonNull::new(inferred)?))
                 }
             }
         }
@@ -138,9 +152,12 @@ impl<'scope> CodeInstance<'scope> {
 
     /// Method this instance is specialized from.
     #[cfg(not(feature = "lts"))]
-    pub fn argescapes(self) -> ValueRef<'scope, 'static> {
+    pub fn argescapes(self) -> Option<ValueRef<'scope, 'static>> {
         // Safety: the pointer points to valid data
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().argescapes) }
+        unsafe {
+            let argescapes = self.unwrap_non_null(Private).as_ref().argescapes;
+            Some(ValueRef::wrap(NonNull::new(argescapes)?))
+        }
     }
 
     /// If `specptr` is a specialized function signature for specTypes->rettype
@@ -158,7 +175,7 @@ impl<'scope> CodeInstance<'scope> {
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
-                    self.unwrap_non_null(Private).as_ref().precompile.load(Ordering::SeqCst) != 0
+                    self.unwrap_non_null(Private).as_ref().precompile.load(Ordering::Relaxed) != 0
                 }
             }
         }
@@ -201,15 +218,6 @@ impl<'scope> CodeInstance<'scope> {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().relocatability }
     }
-
-    /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> CodeInstanceData<'target, T>
-    where
-        T: Target<'target>,
-    {
-        // Safety: the data is valid.
-        unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
-    }
 }
 
 impl_julia_typecheck!(CodeInstance<'scope>, jl_code_instance_type, 'scope);
@@ -230,8 +238,6 @@ impl<'scope> WrapperPriv<'scope, '_> for CodeInstance<'scope> {
         self.0
     }
 }
-
-impl_root!(CodeInstance, 1);
 
 /// A reference to a [`CodeInstance`] that has not been explicitly rooted.
 pub type CodeInstanceRef<'scope> = Ref<'scope, 'static, CodeInstance<'scope>>;

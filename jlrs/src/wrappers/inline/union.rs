@@ -12,7 +12,7 @@ use crate::{
     layout::{
         bits_union::{Align, BitsUnionContainer, Flag},
         typecheck::Typecheck,
-        valid_layout::ValidLayout,
+        valid_layout::{ValidField, ValidLayout},
     },
     private::Private,
     wrappers::ptr::{
@@ -160,6 +160,12 @@ unsafe impl ValidLayout for EmptyUnion {
     }
 
     const IS_REF: bool = true;
+}
+
+unsafe impl ValidField for EmptyUnion {
+    fn valid_field(ty: Value) -> bool {
+        unsafe { ty.unwrap(Private) == jl_bottom_type }
+    }
 }
 
 unsafe impl Typecheck for EmptyUnion {

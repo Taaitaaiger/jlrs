@@ -54,7 +54,7 @@ impl<'scope> Union<'scope> {
 
             let res = match catch_exceptions(&mut callback).unwrap() {
                 Ok(ptr) => Ok(NonNull::new_unchecked(ptr)),
-                Err(e) => Err(NonNull::new_unchecked(e.ptr())),
+                Err(e) => Err(e.ptr()),
             };
 
             target.result_from_ptr(res, Private)
@@ -131,23 +131,22 @@ impl<'scope> Union<'scope> {
     /// returns one of its branches.
     pub fn a(self) -> ValueRef<'scope, 'static> {
         // Safety: the pointer points to valid data
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().a) }
+        unsafe {
+            let a = self.unwrap_non_null(Private).as_ref().a;
+            debug_assert!(!a.is_null());
+            ValueRef::wrap(NonNull::new_unchecked(a))
+        }
     }
 
     /// Unions are stored as binary trees, the arguments are stored as its leaves. This method
     /// returns one of its branches.
     pub fn b(self) -> ValueRef<'scope, 'static> {
         // Safety: the pointer points to valid data
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().b) }
-    }
-
-    /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> UnionData<'target, T>
-    where
-        T: Target<'target>,
-    {
-        // Safety: the data is valid.
-        unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
+        unsafe {
+            let b = self.unwrap_non_null(Private).as_ref().b;
+            debug_assert!(!b.is_null());
+            ValueRef::wrap(NonNull::new_unchecked(b))
+        }
     }
 }
 
@@ -178,12 +177,12 @@ pub(crate) fn nth_union_component<'scope, 'data>(
     unsafe {
         match v.cast::<Union>() {
             Ok(un) => {
-                let a = nth_union_component(un.a().value_unchecked(), pi);
+                let a = nth_union_component(un.a().value(), pi);
                 if a.is_some() {
                     a
                 } else {
                     *pi -= 1;
-                    return nth_union_component(un.b().value_unchecked(), pi);
+                    return nth_union_component(un.b().value(), pi);
                 }
             }
             Err(_) => {
@@ -202,8 +201,8 @@ fn collect<'scope>(value: Value<'scope, 'static>, comps: &mut Vec<ValueRef<'scop
     unsafe {
         match value.cast::<Union>() {
             Ok(u) => {
-                collect(u.a().value_unchecked(), comps);
-                collect(u.b().value_unchecked(), comps);
+                collect(u.a().value(), comps);
+                collect(u.b().value(), comps);
             }
             Err(_) => {
                 comps.push(value.as_ref());
@@ -217,9 +216,9 @@ pub(crate) fn find_union_component(haystack: Value, needle: Value, nth: &mut u32
     unsafe {
         match haystack.cast::<Union>() {
             Ok(hs) => {
-                if find_union_component(hs.a().value_unchecked(), needle, nth) {
+                if find_union_component(hs.a().value(), needle, nth) {
                     true
-                } else if find_union_component(hs.b().value_unchecked(), needle, nth) {
+                } else if find_union_component(hs.b().value(), needle, nth) {
                     true
                 } else {
                     false
@@ -236,8 +235,6 @@ pub(crate) fn find_union_component(haystack: Value, needle: Value, nth: &mut u32
         }
     }
 }
-
-impl_root!(Union, 1);
 
 /// A reference to a [`Union`] that has not been explicitly rooted.
 pub type UnionRef<'scope> = Ref<'scope, 'static, Union<'scope>>;

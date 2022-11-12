@@ -25,6 +25,7 @@ use self::data::accessor::{
     IndeterminateArrayAccessorI, InlinePtrArrayAccessorI, InlinePtrArrayAccessorMut, Mutable,
     PtrArrayAccessorI, PtrArrayAccessorMut, UnionArrayAccessorI, UnionArrayAccessorMut,
 };
+use crate::layout::valid_layout::ValidField;
 use crate::memory::target::ExtendedTarget;
 use crate::{
     convert::into_julia::IntoJulia,
@@ -68,7 +69,7 @@ use std::{
     slice,
 };
 
-use super::{union_all::UnionAll, value::ValueRef, Ref, Root};
+use super::{union_all::UnionAll, value::ValueRef, Ref};
 
 cfg_if! {
     if #[cfg(not(all(target_os = "windows", feature = "lts")))] {
@@ -138,7 +139,7 @@ impl<'data> Array<'_, 'data> {
                     let mut callback =
                         |frame: &mut GcFrame, result: &mut MaybeUninit<*mut jl_array_t>| {
                             let array_type =
-                                jl_apply_array_type(elty_ptr.cast(), dims.n_dimensions());
+                                jl_apply_array_type(elty_ptr.as_ptr().cast(), dims.n_dimensions());
                             let _: Value = frame
                                 .as_mut()
                                 .data_from_ptr(NonNull::new_unchecked(array_type), Private);
@@ -173,7 +174,7 @@ impl<'data> Array<'_, 'data> {
                     let res = match catch_exceptions_with_slots(&mut frame, &mut callback).unwrap()
                     {
                         Ok(array_ptr) => Ok(NonNull::new_unchecked(array_ptr)),
-                        Err(e) => Err(NonNull::new_unchecked(e.ptr())),
+                        Err(e) => Err(e.ptr()),
                     };
 
                     Ok(output.result_from_ptr(res, Private))
@@ -201,7 +202,7 @@ impl<'data> Array<'_, 'data> {
         frame
             .scope(|mut frame| {
                 let elty_ptr = T::julia_type(&frame).ptr();
-                let array_type = jl_apply_array_type(elty_ptr.cast(), dims.n_dimensions());
+                let array_type = jl_apply_array_type(elty_ptr.cast().as_ptr(), dims.n_dimensions());
                 let _: Value = frame
                     .as_mut()
                     .data_from_ptr(NonNull::new_unchecked(array_type), Private);
@@ -291,7 +292,7 @@ impl<'data> Array<'_, 'data> {
                     let res = match catch_exceptions_with_slots(&mut frame, &mut callback).unwrap()
                     {
                         Ok(array_ptr) => Ok(NonNull::new_unchecked(array_ptr)),
-                        Err(e) => Err(NonNull::new_unchecked(e.ptr())),
+                        Err(e) => Err(e.ptr()),
                     };
 
                     Ok(output.result_from_ptr(res, Private))
@@ -384,7 +385,8 @@ impl<'data> Array<'_, 'data> {
             unsafe {
                 let mut callback =
                     |frame: &mut GcFrame, result: &mut MaybeUninit<*mut jl_array_t>| {
-                        let array_type = jl_apply_array_type(elty_ptr, dims.n_dimensions());
+                        let array_type =
+                            jl_apply_array_type(elty_ptr.as_ptr(), dims.n_dimensions());
                         let _: Value = frame
                             .as_mut()
                             .data_from_ptr(NonNull::new_unchecked(array_type), Private);
@@ -422,7 +424,7 @@ impl<'data> Array<'_, 'data> {
 
                 let res = match catch_exceptions_with_slots(&mut frame, &mut callback).unwrap() {
                     Ok(array_ptr) => Ok(NonNull::new_unchecked(array_ptr)),
-                    Err(e) => Err(NonNull::new_unchecked(e.ptr())),
+                    Err(e) => Err(e.ptr()),
                 };
 
                 Ok(output.result_from_ptr(res, Private))
@@ -457,8 +459,10 @@ impl<'data> Array<'_, 'data> {
 
         let (output, frame) = target.split();
         frame.scope(|mut frame| {
-            let array_type =
-                jl_apply_array_type(T::julia_type(&frame).ptr().cast(), dims.n_dimensions());
+            let array_type = jl_apply_array_type(
+                T::julia_type(&frame).ptr().cast().as_ptr(),
+                dims.n_dimensions(),
+            );
             let _: Value = frame
                 .as_mut()
                 .data_from_ptr(NonNull::new_unchecked(array_type), Private);
@@ -529,7 +533,8 @@ impl<'data> Array<'_, 'data> {
             unsafe {
                 let mut callback =
                     |frame: &mut GcFrame, result: &mut MaybeUninit<*mut jl_array_t>| {
-                        let array_type = jl_apply_array_type(elty_ptr, dims.n_dimensions());
+                        let array_type =
+                            jl_apply_array_type(elty_ptr.as_ptr(), dims.n_dimensions());
                         let _: Value = frame
                             .as_mut()
                             .data_from_ptr(NonNull::new_unchecked(array_type), Private);
@@ -573,7 +578,7 @@ impl<'data> Array<'_, 'data> {
 
                 let res = match catch_exceptions_with_slots(&mut frame, &mut callback).unwrap() {
                     Ok(array_ptr) => Ok(NonNull::new_unchecked(array_ptr)),
-                    Err(e) => Err(NonNull::new_unchecked(e.ptr())),
+                    Err(e) => Err(e.ptr()),
                 };
 
                 Ok(output.result_from_ptr(res, Private))
@@ -609,8 +614,10 @@ impl<'data> Array<'_, 'data> {
 
         let (output, scope) = target.split();
         scope.scope(|mut frame| {
-            let array_type =
-                jl_apply_array_type(T::julia_type(&frame).ptr().cast(), dims.n_dimensions());
+            let array_type = jl_apply_array_type(
+                T::julia_type(&frame).ptr().cast().as_ptr(),
+                dims.n_dimensions(),
+            );
             let _: Value = frame
                 .as_mut()
                 .data_from_ptr(NonNull::new_unchecked(array_type), Private);
@@ -663,15 +670,6 @@ impl<'data> Array<'_, 'data> {
         }
     }
 
-    /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> ArrayData<'target, 'data, T>
-    where
-        T: Target<'target>,
-    {
-        // Safety: the data is valid.
-        unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
-    }
-
     #[inline(always)]
     pub(crate) fn data_ptr(self) -> *mut c_void {
         // Safety: the pointer points to valid data.
@@ -689,7 +687,11 @@ impl<'scope, 'data> Array<'scope, 'data> {
     /// Returns the type of this array's elements.
     pub fn element_type(self) -> ValueRef<'scope, 'static> {
         // Safety: C API function is called valid arguments.
-        unsafe { ValueRef::wrap(jl_array_eltype(self.unwrap(Private).cast()).cast()) }
+        unsafe {
+            ValueRef::wrap(NonNull::new_unchecked(
+                jl_array_eltype(self.unwrap(Private).cast()).cast(),
+            ))
+        }
     }
 
     /// Returns the size of this array's elements.
@@ -699,19 +701,14 @@ impl<'scope, 'data> Array<'scope, 'data> {
     }
 
     /// Returns `true` if the layout of the elements is compatible with `T`.
-    pub fn contains<T: ValidLayout>(self) -> bool {
+    pub fn contains<T: ValidField>(self) -> bool {
         // Safety: C API function is called valid arguments.
-        unsafe {
-            T::valid_layout(Value::wrap(
-                jl_array_eltype(self.unwrap(Private).cast()).cast(),
-                Private,
-            ))
-        }
+        unsafe { T::valid_field(self.element_type().value()) }
     }
 
     /// Returns `true` if the layout of the elements is compatible with `T` and these elements are
     /// stored inline.
-    pub fn contains_inline<T: ValidLayout>(self) -> bool {
+    pub fn contains_inline<T: ValidField>(self) -> bool {
         self.contains::<T>() && self.is_inline_array()
     }
 
@@ -724,7 +721,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     /// Returns `true` if the elements of the array are stored inline and the element type is a
     /// union type.
     pub fn is_union_array(self) -> bool {
-        self.is_inline_array() && unsafe { self.element_type().value_unchecked().is::<Union>() }
+        self.is_inline_array() && unsafe { self.element_type().value().is::<Union>() }
     }
 
     /// Returns true if the elements of the array are stored inline and at least one of the fields
@@ -746,7 +743,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
                 return true;
             }
 
-            let elty = self.element_type().value_unchecked();
+            let elty = self.element_type().value();
             if let Ok(dt) = elty.cast::<DataType>() {
                 return dt.zero_init();
             } else {
@@ -763,7 +760,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     /// Convert this untyped array to a [`TypedArray`].
     pub fn try_as_typed<T>(self) -> JlrsResult<TypedArray<'scope, 'data, T>>
     where
-        T: ValidLayout,
+        T: ValidField,
     {
         if self.contains::<T>() {
             let ptr = self.unwrap_non_null(Private);
@@ -772,7 +769,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
         } else {
             let value_type = unsafe {
                 self.element_type()
-                    .value_unchecked()
+                    .value()
                     .display_string_or(CANNOT_DISPLAY_TYPE)
             };
             Err(AccessError::InvalidLayout { value_type })?
@@ -785,7 +782,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     /// Safety: `T` must be a valid representation of the data stored in the array.
     pub unsafe fn as_typed_unchecked<T>(self) -> TypedArray<'scope, 'data, T>
     where
-        T: ValidLayout,
+        T: ValidField,
     {
         TypedArray::wrap_non_null(self.unwrap_non_null(Private), Private)
     }
@@ -796,7 +793,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     /// if the type of the elements is incorrect.
     pub unsafe fn copy_inline_data<T>(&self) -> JlrsResult<CopiedArray<T>>
     where
-        T: 'static + ValidLayout,
+        T: 'static + ValidField,
     {
         self.ensure_bits_containing::<T>()?;
 
@@ -818,7 +815,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
         &'borrow self,
     ) -> JlrsResult<BitsArrayAccessorI<'borrow, 'scope, 'data, T>>
     where
-        T: ValidLayout,
+        T: ValidField,
     {
         self.ensure_bits_containing::<T>()?;
 
@@ -841,7 +838,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
         &'borrow mut self,
     ) -> JlrsResult<BitsArrayAccessorMut<'borrow, 'scope, 'data, T>>
     where
-        T: ValidLayout,
+        T: ValidField,
     {
         self.ensure_bits_containing::<T>()?;
 
@@ -859,7 +856,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
         &'borrow self,
     ) -> JlrsResult<InlinePtrArrayAccessorI<'borrow, 'scope, 'data, T>>
     where
-        T: ValidLayout,
+        T: ValidField,
     {
         self.ensure_inline_containing::<T>()?;
 
@@ -880,7 +877,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
         &'borrow mut self,
     ) -> JlrsResult<InlinePtrArrayAccessorMut<'borrow, 'scope, 'data, T>>
     where
-        T: ValidLayout,
+        T: ValidField,
     {
         self.ensure_inline_containing::<T>()?;
 
@@ -899,6 +896,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     ) -> JlrsResult<PtrArrayAccessorI<'borrow, 'scope, 'data, T>>
     where
         T: WrapperRef<'scope, 'data>,
+        Option<T>: ValidField,
     {
         self.ensure_ptr_containing::<T>()?;
 
@@ -920,6 +918,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     ) -> JlrsResult<PtrArrayAccessorMut<'borrow, 'scope, 'data, T>>
     where
         T: WrapperRef<'scope, 'data>,
+        Option<T>: ValidField,
     {
         self.ensure_ptr_containing::<T>()?;
 
@@ -1028,7 +1027,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
         let (output, scope) = target.split();
         scope
             .scope(|mut frame| {
-                let elty_ptr = self.element_type().value_unchecked().unwrap(Private);
+                let elty_ptr = self.element_type().value().unwrap(Private);
 
                 // Safety: The array type is rooted until the array has been constructed, all C API
                 // functions are called with valid data. If an exception is thrown it's caught.
@@ -1057,7 +1056,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
 
                 let res = match catch_exceptions_with_slots(&mut frame, &mut callback).unwrap() {
                     Ok(array_ptr) => Ok(NonNull::new_unchecked(array_ptr)),
-                    Err(e) => Err(NonNull::new_unchecked(e.ptr())),
+                    Err(e) => Err(e.ptr()),
                 };
 
                 Ok(output.result_from_ptr(res, Private))
@@ -1082,7 +1081,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
         let (output, scope) = target.split();
         scope
             .scope(|mut frame| {
-                let elty_ptr = self.element_type().value_unchecked().unwrap(Private);
+                let elty_ptr = self.element_type().value().unwrap(Private);
                 let array_type = jl_apply_array_type(elty_ptr.cast(), dims.n_dimensions());
                 let _: Value = frame
                     .as_mut()
@@ -1102,11 +1101,11 @@ impl<'scope, 'data> Array<'scope, 'data> {
 
     fn ensure_bits_containing<T>(self) -> JlrsResult<()>
     where
-        T: ValidLayout,
+        T: ValidField,
     {
         if !self.is_inline_array() {
             Err(ArrayLayoutError::NotInline {
-                element_type: unsafe { self.element_type().value_unchecked() }
+                element_type: unsafe { self.element_type().value() }
                     .display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
@@ -1114,19 +1113,19 @@ impl<'scope, 'data> Array<'scope, 'data> {
         // Safety: Inline array must have a DataType as element type
         if unsafe {
             self.element_type()
-                .value_unchecked()
+                .value()
                 .cast_unchecked::<DataType>()
                 .has_pointer_fields()?
         } {
             Err(ArrayLayoutError::NotBits {
-                element_type: unsafe { self.element_type().value_unchecked() }
+                element_type: unsafe { self.element_type().value() }
                     .display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
 
         if !self.contains::<T>() {
             Err(AccessError::InvalidLayout {
-                value_type: unsafe { self.element_type().value_unchecked() }
+                value_type: unsafe { self.element_type().value() }
                     .display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
@@ -1136,18 +1135,18 @@ impl<'scope, 'data> Array<'scope, 'data> {
 
     fn ensure_inline_containing<T>(self) -> JlrsResult<()>
     where
-        T: ValidLayout,
+        T: ValidField,
     {
         if !self.is_inline_array() {
             Err(ArrayLayoutError::NotInline {
-                element_type: unsafe { self.element_type().value_unchecked() }
+                element_type: unsafe { self.element_type().value() }
                     .display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
 
         if !self.contains::<T>() {
             Err(AccessError::InvalidLayout {
-                value_type: unsafe { self.element_type().value_unchecked() }
+                value_type: unsafe { self.element_type().value() }
                     .display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
@@ -1158,17 +1157,18 @@ impl<'scope, 'data> Array<'scope, 'data> {
     fn ensure_ptr_containing<'fr, 'da, T>(self) -> JlrsResult<()>
     where
         T: WrapperRef<'fr, 'da>,
+        Option<T>: ValidField,
     {
         if !self.is_value_array() {
             Err(ArrayLayoutError::NotPointer {
-                element_type: unsafe { self.element_type().value_unchecked() }
+                element_type: unsafe { self.element_type().value() }
                     .display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
 
-        if !self.contains::<T>() {
+        if !self.contains::<Option<T>>() {
             Err(AccessError::InvalidLayout {
-                value_type: unsafe { self.element_type().value_unchecked() }
+                value_type: unsafe { self.element_type().value() }
                     .display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
@@ -1178,8 +1178,8 @@ impl<'scope, 'data> Array<'scope, 'data> {
 
     fn ensure_union(self) -> JlrsResult<()> {
         if !self.is_union_array() {
-            let element_type = unsafe { self.element_type().value_unchecked() }
-                .display_string_or(CANNOT_DISPLAY_TYPE);
+            let element_type =
+                unsafe { self.element_type().value() }.display_string_or(CANNOT_DISPLAY_TYPE);
             Err(ArrayLayoutError::NotUnion { element_type })?
         }
 
@@ -1211,7 +1211,7 @@ impl<'scope> Array<'scope, 'static> {
 
         let res = match catch_exceptions(&mut callback).unwrap() {
             Ok(_) => Ok(()),
-            Err(e) => Err(NonNull::new_unchecked(e.ptr())),
+            Err(e) => Err(e.ptr()),
         };
 
         target.exception_from_ptr(res, Private)
@@ -1244,7 +1244,7 @@ impl<'scope> Array<'scope, 'static> {
 
         let res = match catch_exceptions(&mut callback).unwrap() {
             Ok(_) => Ok(()),
-            Err(e) => Err(NonNull::new_unchecked(e.ptr())),
+            Err(e) => Err(e.ptr()),
         };
 
         target.exception_from_ptr(res, Private)
@@ -1281,7 +1281,7 @@ impl<'scope> Array<'scope, 'static> {
 
         let res = match catch_exceptions(&mut callback).unwrap() {
             Ok(_) => Ok(()),
-            Err(e) => Err(NonNull::new_unchecked(e.ptr())),
+            Err(e) => Err(e.ptr()),
         };
 
         target.exception_from_ptr(res, Private)
@@ -1318,7 +1318,7 @@ impl<'scope> Array<'scope, 'static> {
 
         let res = match catch_exceptions(&mut callback).unwrap() {
             Ok(_) => Ok(()),
-            Err(e) => Err(NonNull::new_unchecked(e.ptr())),
+            Err(e) => Err(e.ptr()),
         };
 
         target.exception_from_ptr(res, Private)
@@ -1337,7 +1337,7 @@ impl<'scope> Array<'scope, 'static> {
 unsafe impl<'scope, 'data> Typecheck for Array<'scope, 'data> {
     fn typecheck(t: DataType) -> bool {
         // Safety: Array is a UnionAll. so check if the typenames match
-        unsafe { t.type_name().wrapper_unchecked() == TypeName::of_array(&Global::new()) }
+        unsafe { t.type_name().wrapper() == TypeName::of_array(&Global::new()) }
     }
 }
 
@@ -1369,21 +1369,21 @@ pub struct TypedArray<'scope, 'data, T>(
     PhantomData<T>,
 )
 where
-    T: ValidLayout;
+    T: ValidField;
 
 impl<'scope, 'data, T> Clone for TypedArray<'scope, 'data, T>
 where
-    T: ValidLayout,
+    T: ValidField,
 {
     fn clone(&self) -> Self {
         unsafe { TypedArray::wrap_non_null(self.unwrap_non_null(Private), Private) }
     }
 }
-impl<'scope, 'data, T> Copy for TypedArray<'scope, 'data, T> where T: ValidLayout {}
+impl<'scope, 'data, T> Copy for TypedArray<'scope, 'data, T> where T: ValidField {}
 
 impl<'data, T> TypedArray<'_, 'data, T>
 where
-    T: ValidLayout + IntoJulia,
+    T: ValidField + IntoJulia,
 {
     /// Allocate a new n-dimensional Julia array of dimensions `dims` for data of type `T`.
     ///
@@ -1412,10 +1412,10 @@ where
 
                     let res = match x {
                         Ok(arr) => Ok(arr
-                            .wrapper_unchecked()
+                            .wrapper()
                             .as_typed_unchecked::<T>()
                             .unwrap_non_null(Private)),
-                        Err(e) => Err(e.wrapper_unchecked().unwrap_non_null(Private)),
+                        Err(e) => Err(e.wrapper().unwrap_non_null(Private)),
                     };
 
                     Ok(output.result_from_ptr(res, Private))
@@ -1445,7 +1445,7 @@ where
                 let target = frame.extended_target(inner_output);
 
                 let res = Array::new_unchecked::<T, _, _>(target, dims)
-                    .wrapper_unchecked()
+                    .wrapper()
                     .as_typed_unchecked::<T>();
 
                 Ok(output.data_from_ptr(res.unwrap_non_null(Private), Private))
@@ -1480,10 +1480,10 @@ where
 
                 let res = match Array::from_slice::<T, _, _>(target, data, dims)? {
                     Ok(arr) => Ok(arr
-                        .wrapper_unchecked()
+                        .wrapper()
                         .as_typed_unchecked::<T>()
                         .unwrap_non_null(Private)),
-                    Err(e) => Err(e.wrapper_unchecked().unwrap_non_null(Private)),
+                    Err(e) => Err(e.wrapper().unwrap_non_null(Private)),
                 };
 
                 Ok(output.result_from_ptr(res, Private))
@@ -1515,7 +1515,7 @@ where
             let target = frame.extended_target(inner_output);
 
             let res = Array::from_slice_unchecked::<T, _, _>(target, data, dims)?
-                .wrapper_unchecked()
+                .wrapper()
                 .as_typed_unchecked::<T>();
 
             Ok(output.data_from_ptr(res.unwrap_non_null(Private), Private))
@@ -1550,10 +1550,10 @@ where
 
                 let res = match Array::from_vec::<T, _, _>(target, data, dims)? {
                     Ok(arr) => Ok(arr
-                        .wrapper_unchecked()
+                        .wrapper()
                         .as_typed_unchecked::<T>()
                         .unwrap_non_null(Private)),
-                    Err(e) => Err(e.wrapper_unchecked().unwrap_non_null(Private)),
+                    Err(e) => Err(e.wrapper().unwrap_non_null(Private)),
                 };
 
                 Ok(output.result_from_ptr(res, Private))
@@ -1586,7 +1586,7 @@ where
             let target = frame.extended_target(inner_output);
 
             let res = Array::from_vec_unchecked::<T, _, _>(target, data, dims)?
-                .wrapper_unchecked()
+                .wrapper()
                 .as_typed_unchecked::<T>();
 
             Ok(output.data_from_ptr(res.unwrap_non_null(Private), Private))
@@ -1596,7 +1596,7 @@ where
 
 impl<'data, T> TypedArray<'_, 'data, T>
 where
-    T: ValidLayout,
+    T: ValidField,
 {
     /// Allocate a new n-dimensional Julia array of dimensions `dims` for data of type `ty`.
     ///
@@ -1614,7 +1614,7 @@ where
         D: Dims,
         S: Target<'target>,
     {
-        if !T::valid_layout(ty) {
+        if !T::valid_field(ty) {
             let value_type = ty.display_string_or(CANNOT_DISPLAY_TYPE).into();
             Err(AccessError::InvalidLayout { value_type })?;
         }
@@ -1627,10 +1627,10 @@ where
 
                 let res = match Array::new_for(target, dims, ty) {
                     Ok(arr) => Ok(arr
-                        .wrapper_unchecked()
+                        .wrapper()
                         .as_typed_unchecked::<T>()
                         .unwrap_non_null(Private)),
-                    Err(e) => Err(e.wrapper_unchecked().unwrap_non_null(Private)),
+                    Err(e) => Err(e.wrapper().unwrap_non_null(Private)),
                 };
 
                 Ok(output.result_from_ptr(res, Private))
@@ -1654,7 +1654,7 @@ where
         D: Dims,
         S: Target<'target>,
     {
-        if !T::valid_layout(ty) {
+        if !T::valid_field(ty) {
             let value_type = ty.display_string_or(CANNOT_DISPLAY_TYPE).into();
             Err(AccessError::InvalidLayout { value_type })?;
         }
@@ -1665,20 +1665,11 @@ where
             let target = frame.extended_target(inner_output);
 
             let res = Array::new_for_unchecked(target, dims, ty)
-                .wrapper_unchecked()
+                .wrapper()
                 .as_typed_unchecked::<T>();
 
             Ok(output.data_from_ptr(res.unwrap_non_null(Private), Private))
         })
-    }
-
-    /// Use the target to reroot this data.
-    pub fn root<'target, S>(self, target: S) -> TypedArrayData<'target, 'data, S, T>
-    where
-        S: Target<'target>,
-    {
-        // Safety: the data is valid.
-        unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
     }
 }
 
@@ -1703,7 +1694,7 @@ impl<'data> TypedArray<'_, 'data, u8> {
 
 impl<'scope, 'data, T> TypedArray<'scope, 'data, T>
 where
-    T: ValidLayout,
+    T: ValidField,
 {
     /// Returns the array's dimensions.
     pub unsafe fn dimensions(self) -> ArrayDimensions<'scope> {
@@ -1744,7 +1735,7 @@ where
     fn ensure_bits(self) -> JlrsResult<()> {
         if !self.is_inline_array() {
             Err(ArrayLayoutError::NotInline {
-                element_type: unsafe { self.element_type().value_unchecked() }
+                element_type: unsafe { self.element_type().value() }
                     .display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
@@ -1752,12 +1743,12 @@ where
         // Safety: Inline array must have a DataType as element type
         if unsafe {
             self.element_type()
-                .value_unchecked()
+                .value()
                 .cast_unchecked::<DataType>()
                 .has_pointer_fields()?
         } {
             Err(ArrayLayoutError::NotBits {
-                element_type: unsafe { self.element_type().value_unchecked() }
+                element_type: unsafe { self.element_type().value() }
                     .display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
@@ -1768,7 +1759,7 @@ where
     fn ensure_inline(self) -> JlrsResult<()> {
         if !self.is_inline_array() {
             Err(ArrayLayoutError::NotInline {
-                element_type: unsafe { self.element_type().value_unchecked() }
+                element_type: unsafe { self.element_type().value() }
                     .display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
@@ -1823,7 +1814,7 @@ where
         &'borrow self,
     ) -> JlrsResult<InlinePtrArrayAccessorI<'borrow, 'scope, 'data, T>>
     where
-        T: ValidLayout,
+        T: ValidField,
     {
         self.ensure_inline()?;
 
@@ -1845,7 +1836,7 @@ where
         &'borrow mut self,
     ) -> JlrsResult<InlinePtrArrayAccessorMut<'borrow, 'scope, 'data, T>>
     where
-        T: ValidLayout,
+        T: ValidField,
     {
         self.ensure_inline()?;
 
@@ -1887,10 +1878,10 @@ where
 
                 let res = match self.as_array().reshape(target, dims) {
                     Ok(arr) => Ok(arr
-                        .wrapper_unchecked()
+                        .wrapper()
                         .as_typed_unchecked::<T>()
                         .unwrap_non_null(Private)),
-                    Err(e) => Err(e.wrapper_unchecked().unwrap_non_null(Private)),
+                    Err(e) => Err(e.wrapper().unwrap_non_null(Private)),
                 };
 
                 Ok(output.result_from_ptr(res, Private))
@@ -1921,7 +1912,7 @@ where
                 let res = self
                     .as_array()
                     .reshape_unchecked(target, dims)
-                    .wrapper_unchecked()
+                    .wrapper()
                     .as_typed_unchecked::<T>()
                     .unwrap_non_null(Private);
                 Ok(output.data_from_ptr(res, Private))
@@ -1953,11 +1944,15 @@ where
     }
 }
 
-impl<'scope, 'data, T: WrapperRef<'scope, 'data> + ValidLayout> TypedArray<'scope, 'data, T> {
+impl<'scope, 'data, T> TypedArray<'scope, 'data, Option<T>>
+where
+    T: WrapperRef<'scope, 'data>,
+    Option<T>: ValidField,
+{
     fn ensure_ptr(self) -> JlrsResult<()> {
         if !self.as_array().is_value_array() {
             Err(ArrayLayoutError::NotPointer {
-                element_type: unsafe { self.element_type().value_unchecked() }
+                element_type: unsafe { self.element_type().value() }
                     .display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
@@ -2036,7 +2031,7 @@ impl<'scope, 'data, T: WrapperRef<'scope, 'data> + ValidLayout> TypedArray<'scop
 
 impl<'scope, 'data, T> TypedArray<'scope, 'data, T>
 where
-    T: 'static + ValidLayout,
+    T: 'static + ValidField,
 {
     /// Copy the data of an inline array to Rust.
     ///
@@ -2062,7 +2057,7 @@ where
 
 impl<'scope, T> TypedArray<'scope, 'static, T>
 where
-    T: ValidLayout,
+    T: ValidField,
 {
     /// Insert `inc` elements at the end of the array.
     ///
@@ -2160,19 +2155,21 @@ where
     }
 }
 
-unsafe impl<'scope, 'data, T: ValidLayout> Typecheck for TypedArray<'scope, 'data, T> {
+unsafe impl<'scope, 'data, T: ValidField> Typecheck for TypedArray<'scope, 'data, T> {
     fn typecheck(t: DataType) -> bool {
         // Safety: borrow is only temporary
         unsafe {
             t.is::<Array>()
-                && T::valid_layout(
-                    t.parameters().wrapper_unchecked().data().as_slice()[0].value_unchecked(),
+                && T::valid_field(
+                    t.parameters().wrapper().data().as_slice()[0]
+                        .unwrap()
+                        .value(),
                 )
         }
     }
 }
 
-impl<T: ValidLayout> Debug for TypedArray<'_, '_, T> {
+impl<T: ValidField> Debug for TypedArray<'_, '_, T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self.display_string() {
             Ok(s) => write!(f, "{}", s),
@@ -2181,7 +2178,7 @@ impl<T: ValidLayout> Debug for TypedArray<'_, '_, T> {
     }
 }
 
-impl<'scope, 'data, T: ValidLayout> WrapperPriv<'scope, 'data> for TypedArray<'scope, 'data, T> {
+impl<'scope, 'data, T: ValidField> WrapperPriv<'scope, 'data> for TypedArray<'scope, 'data, T> {
     type Wraps = jl_array_t;
     type TypeConstructorPriv<'target, 'da> = TypedArray<'target, 'da, T>;
     const NAME: &'static str = "Array";
@@ -2203,7 +2200,7 @@ thread_local! {
     // requires a mutable pointer to this array so an `UnsafeCell` is used to store it.
     static JL_LONG_TYPE: UnsafeCell<[*mut jl_datatype_t; 8]> = unsafe {
         let global = Global::new();
-        let t = isize::julia_type(global).ptr();
+        let t = isize::julia_type(global).ptr().as_ptr();
         UnsafeCell::new([
             t,
             t,
@@ -2290,28 +2287,6 @@ unsafe extern "C" fn droparray<T>(a: Array) {
     mem::drop(data);
 }
 
-impl_root!(Array, 2);
-impl<'target, 'value, 'data, U> Root<'target, 'value, 'data> for TypedArray<'value, 'data, U>
-where
-    U: Debug + ValidLayout,
-{
-    type Output = TypedArray<'target, 'data, U>;
-    unsafe fn root<T>(
-        target: T,
-        value: Ref<'value, 'data, Self>,
-    ) -> JlrsResult<TypedArrayData<'target, 'data, T, U>>
-    where
-        T: Target<'target>,
-    {
-        if let Some(v) = Self::wrapper(value, Private) {
-            let ptr = v.unwrap_non_null(Private);
-            Ok(target.data_from_ptr(ptr, Private))
-        } else {
-            Err(crate::error::AccessError::UndefRef)?
-        }
-    }
-}
-
 /// A reference to an [`Array`] that has not been explicitly rooted.
 pub type ArrayRef<'scope, 'data> = Ref<'scope, 'data, Array<'scope, 'data>>;
 
@@ -2320,13 +2295,25 @@ unsafe impl ValidLayout for ArrayRef<'_, '_> {
         if let Ok(dt) = v.cast::<DataType>() {
             dt.is::<Array>()
         } else if let Ok(ua) = v.cast::<UnionAll>() {
-            unsafe { ua.base_type().wrapper_unchecked().is::<Array>() }
+            unsafe { ua.base_type().wrapper().is::<Array>() }
         } else {
             false
         }
     }
 
     const IS_REF: bool = true;
+}
+
+unsafe impl ValidField for Option<ArrayRef<'_, '_>> {
+    fn valid_field(v: Value) -> bool {
+        if let Ok(dt) = v.cast::<DataType>() {
+            dt.is::<Array>()
+        } else if let Ok(ua) = v.cast::<UnionAll>() {
+            unsafe { ua.base_type().wrapper().is::<Array>() }
+        } else {
+            false
+        }
+    }
 }
 
 impl_ref_root!(Array, ArrayRef, 2);
@@ -2334,12 +2321,12 @@ impl_ref_root!(Array, ArrayRef, 2);
 /// A reference to an [`TypedArray`] that has not been explicitly rooted.
 pub type TypedArrayRef<'scope, 'data, T> = Ref<'scope, 'data, TypedArray<'scope, 'data, T>>;
 
-unsafe impl<T: ValidLayout + Debug> ValidLayout for TypedArrayRef<'_, '_, T> {
+unsafe impl<T: ValidField + Debug> ValidLayout for TypedArrayRef<'_, '_, T> {
     fn valid_layout(v: Value) -> bool {
         if let Ok(dt) = v.cast::<DataType>() {
             dt.is::<TypedArray<T>>()
         } else if let Ok(ua) = v.cast::<UnionAll>() {
-            unsafe { ua.base_type().wrapper_unchecked().is::<TypedArray<T>>() }
+            unsafe { ua.base_type().wrapper().is::<TypedArray<T>>() }
         } else {
             false
         }
@@ -2348,18 +2335,27 @@ unsafe impl<T: ValidLayout + Debug> ValidLayout for TypedArrayRef<'_, '_, T> {
     const IS_REF: bool = true;
 }
 
+unsafe impl<T: ValidField + Debug> ValidField for Option<TypedArrayRef<'_, '_, T>> {
+    fn valid_field(v: Value) -> bool {
+        if let Ok(dt) = v.cast::<DataType>() {
+            dt.is::<TypedArray<T>>()
+        } else if let Ok(ua) = v.cast::<UnionAll>() {
+            unsafe { ua.base_type().wrapper().is::<TypedArray<T>>() }
+        } else {
+            false
+        }
+    }
+}
+
 impl<'scope, 'data, U> TypedArrayRef<'scope, 'data, U>
 where
-    U: ValidLayout + Debug,
+    U: ValidField + Debug,
 {
-    pub unsafe fn root<'target, T>(
-        self,
-        target: T,
-    ) -> JlrsResult<TypedArrayData<'target, 'data, T, U>>
+    pub unsafe fn root<'target, T>(self, target: T) -> TypedArrayData<'target, 'data, T, U>
     where
         T: Target<'target>,
     {
-        <TypedArray<U> as Root>::root(target, self)
+        target.data_from_ptr(self.ptr(), Private)
     }
 }
 

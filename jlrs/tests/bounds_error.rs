@@ -18,9 +18,7 @@ mod tests {
                         let data = vec![1.0f64, 2., 3.];
                         let array = Array::from_vec(frame.as_extended_target(), data, 3)?
                             .into_jlrs_result()?;
-                        let func = Module::base(&frame)
-                            .function(&frame, "getindex")?
-                            .wrapper_unchecked();
+                        let func = Module::base(&frame).function(&frame, "getindex")?.wrapper();
                         let out = func.call2(&mut frame, array.as_value(), idx).unwrap_err();
 
                         assert_eq!(out.datatype_name().unwrap(), "BoundsError");

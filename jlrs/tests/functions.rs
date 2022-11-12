@@ -59,9 +59,7 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|mut frame| unsafe {
-                    let func = Module::base(&frame)
-                        .function(&frame, "vect")?
-                        .wrapper_unchecked();
+                    let func = Module::base(&frame).function(&frame, "vect")?.wrapper();
                     func.call0(&mut frame).unwrap();
                     Ok(())
                 })
@@ -79,7 +77,7 @@ mod tests {
                 .scope(|frame| unsafe {
                     Module::base(&frame)
                         .function(&frame, "vect")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .call0(&frame)
                         .unwrap();
 
@@ -100,9 +98,7 @@ mod tests {
                     let output = frame.output();
                     frame
                         .scope(|frame| unsafe {
-                            let func = Module::base(&frame)
-                                .function(&frame, "vect")?
-                                .wrapper_unchecked();
+                            let func = Module::base(&frame).function(&frame, "vect")?.wrapper();
 
                             Ok(func.call0(output))
                         })?
@@ -122,9 +118,7 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|mut frame| unsafe {
-                    let func = Module::base(&frame)
-                        .function(&frame, "vect")?
-                        .wrapper_unchecked();
+                    let func = Module::base(&frame).function(&frame, "vect")?.wrapper();
                     func.call0(&mut frame).unwrap();
                     Ok(())
                 })
@@ -143,9 +137,7 @@ mod tests {
                     let output = frame.output();
                     frame
                         .scope(|frame| unsafe {
-                            let func = Module::base(&frame)
-                                .function(&frame, "vect")?
-                                .wrapper_unchecked();
+                            let func = Module::base(&frame).function(&frame, "vect")?.wrapper();
 
                             Ok(func.call0(output))
                         })?
@@ -163,9 +155,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let out = jlrs.instance(&mut frame).scope(|mut frame| unsafe {
-                let func = Module::base(&frame)
-                    .function(&frame, "cos")?
-                    .wrapper_unchecked();
+                let func = Module::base(&frame).function(&frame, "cos")?.wrapper();
                 let angle = Value::new(&mut frame, std::f32::consts::PI);
                 let out = func.call1(&mut frame, angle).unwrap();
                 out.unbox::<f32>()
@@ -182,12 +172,10 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let out = jlrs.instance(&mut frame).scope(|mut frame| unsafe {
-                let func = Module::base(&frame)
-                    .function(&frame, "cos")?
-                    .wrapper_unchecked();
+                let func = Module::base(&frame).function(&frame, "cos")?.wrapper();
                 let angle = Value::new(&mut frame, std::f32::consts::PI);
                 let out = func.call1(&frame, angle).unwrap();
-                out.wrapper_unchecked().unbox::<f32>()
+                out.wrapper().unbox::<f32>()
             });
 
             assert_eq!(out.unwrap(), -1.);
@@ -205,9 +193,7 @@ mod tests {
                     let output = frame.output();
                     let out = frame
                         .scope(|mut frame| {
-                            let func = Module::base(&frame)
-                                .function(&frame, "cos")?
-                                .wrapper_unchecked();
+                            let func = Module::base(&frame).function(&frame, "cos")?.wrapper();
                             let angle = Value::new(&mut frame, std::f32::consts::PI);
 
                             Ok(func.call1(output, angle))
@@ -232,9 +218,7 @@ mod tests {
                     let output = frame.output();
                     let out = frame
                         .scope(|mut frame| unsafe {
-                            let func = Module::base(&frame)
-                                .function(&frame, "cos")?
-                                .wrapper_unchecked();
+                            let func = Module::base(&frame).function(&frame, "cos")?.wrapper();
                             let angle = Value::new(&mut frame, std::f32::consts::PI);
 
                             func.call1(output, angle).into_jlrs_result()
@@ -258,9 +242,7 @@ mod tests {
                     let output = frame.output();
                     let out = frame
                         .scope(|mut frame| unsafe {
-                            let func = Module::base(&frame)
-                                .function(&frame, "cos")?
-                                .wrapper_unchecked();
+                            let func = Module::base(&frame).function(&frame, "cos")?.wrapper();
                             let angle = Value::new(&mut frame, std::f32::consts::PI);
 
                             func.call1(output, angle).into_jlrs_result()
@@ -280,9 +262,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let out = jlrs.instance(&mut frame).scope(|mut frame| unsafe {
-                let func = Module::base(&frame)
-                    .function(&frame, "+")?
-                    .wrapper_unchecked();
+                let func = Module::base(&frame).function(&frame, "+")?.wrapper();
                 let arg0 = Value::new(&mut frame, 1u32);
                 let arg1 = Value::new(&mut frame, 2u32);
                 let out = func.call2(&mut frame, arg0, arg1).unwrap();
@@ -300,13 +280,11 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let out = jlrs.instance(&mut frame).scope(|mut frame| unsafe {
-                let func = Module::base(&frame)
-                    .function(&frame, "+")?
-                    .wrapper_unchecked();
+                let func = Module::base(&frame).function(&frame, "+")?.wrapper();
                 let arg0 = Value::new(&mut frame, 1u32);
                 let arg1 = Value::new(&mut frame, 2u32);
                 let out = func.call2(&frame, arg0, arg1).unwrap();
-                out.wrapper_unchecked().unbox::<u32>()
+                out.wrapper().unbox::<u32>()
             });
 
             assert_eq!(out.unwrap(), 3);
@@ -325,9 +303,7 @@ mod tests {
                 let output = frame.output();
                 frame
                     .scope(|mut frame| {
-                        let func = Module::base(&frame)
-                            .function(&frame, "+")?
-                            .wrapper_unchecked();
+                        let func = Module::base(&frame).function(&frame, "+")?.wrapper();
                         let arg1 = Value::new(&mut frame, 2u32);
                         Ok(func.call(output, [arg0, arg1]))
                     })?
@@ -349,9 +325,7 @@ mod tests {
                 let output = frame.output();
                 frame
                     .scope(|mut frame| unsafe {
-                        let func = Module::base(&frame)
-                            .function(&frame, "+")?
-                            .wrapper_unchecked();
+                        let func = Module::base(&frame).function(&frame, "+")?.wrapper();
                         let arg0 = Value::new(&mut frame, 1u32);
                         let arg1 = Value::new(&mut frame, 2u32);
 
@@ -372,9 +346,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let out = jlrs.instance(&mut frame).scope(|mut frame| unsafe {
-                let func = Module::base(&frame)
-                    .function(&frame, "+")?
-                    .wrapper_unchecked();
+                let func = Module::base(&frame).function(&frame, "+")?.wrapper();
                 let arg0 = Value::new(&mut frame, 1u32);
                 let arg1 = Value::new(&mut frame, 2u32);
                 let out = func.call2(&mut frame, arg0, arg1).unwrap();
@@ -395,9 +367,7 @@ mod tests {
                 let output = frame.output();
                 frame
                     .scope(|mut frame| unsafe {
-                        let func = Module::base(&frame)
-                            .function(&frame, "+")?
-                            .wrapper_unchecked();
+                        let func = Module::base(&frame).function(&frame, "+")?.wrapper();
                         let arg0 = Value::new(&mut frame, 1u32);
                         let arg1 = Value::new(&mut frame, 2u32);
 
@@ -418,9 +388,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let out = jlrs.instance(&mut frame).scope(|mut frame| unsafe {
-                let func = Module::base(&frame)
-                    .function(&frame, "+")?
-                    .wrapper_unchecked();
+                let func = Module::base(&frame).function(&frame, "+")?.wrapper();
                 let arg0 = Value::new(&mut frame, 1u32);
                 let arg1 = Value::new(&mut frame, 2u32);
                 let arg2 = Value::new(&mut frame, 3u32);
@@ -439,14 +407,12 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let out = jlrs.instance(&mut frame).scope(|mut frame| unsafe {
-                let func = Module::base(&frame)
-                    .function(&frame, "+")?
-                    .wrapper_unchecked();
+                let func = Module::base(&frame).function(&frame, "+")?.wrapper();
                 let arg0 = Value::new(&mut frame, 1u32);
                 let arg1 = Value::new(&mut frame, 2u32);
                 let arg2 = Value::new(&mut frame, 3u32);
                 let out = func.call3(&frame, arg0, arg1, arg2).unwrap();
-                out.wrapper_unchecked().unbox::<u32>()
+                out.wrapper().unbox::<u32>()
             });
 
             assert_eq!(out.unwrap(), 6);
@@ -463,9 +429,7 @@ mod tests {
                 let output = frame.output();
                 frame
                     .scope(|mut frame| unsafe {
-                        let func = Module::base(&frame)
-                            .function(&frame, "+")?
-                            .wrapper_unchecked();
+                        let func = Module::base(&frame).function(&frame, "+")?.wrapper();
                         let arg0 = Value::new(&mut frame, 1u32);
                         let arg1 = Value::new(&mut frame, 2u32);
                         let arg2 = Value::new(&mut frame, 3u32);
@@ -487,9 +451,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let out = jlrs.instance(&mut frame).scope(|mut frame| unsafe {
-                let func = Module::base(&frame)
-                    .function(&frame, "+")?
-                    .wrapper_unchecked();
+                let func = Module::base(&frame).function(&frame, "+")?.wrapper();
                 let arg0 = Value::new(&mut frame, 1u32);
                 let arg1 = Value::new(&mut frame, 2u32);
                 let arg2 = Value::new(&mut frame, 3u32);
@@ -511,9 +473,7 @@ mod tests {
                 let output = frame.output();
                 frame
                     .scope(|mut frame| unsafe {
-                        let func = Module::base(&frame)
-                            .function(&frame, "+")?
-                            .wrapper_unchecked();
+                        let func = Module::base(&frame).function(&frame, "+")?.wrapper();
                         let arg0 = Value::new(&mut frame, 1u32);
                         let arg1 = Value::new(&mut frame, 2u32);
                         let arg2 = Value::new(&mut frame, 3u32);
@@ -535,9 +495,7 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let out = jlrs.instance(&mut frame).scope(|mut frame| unsafe {
-                let func = Module::base(&frame)
-                    .function(&frame, "+")?
-                    .wrapper_unchecked();
+                let func = Module::base(&frame).function(&frame, "+")?.wrapper();
                 let arg0 = Value::new(&mut frame, 1u32);
                 let arg1 = Value::new(&mut frame, 2u32);
                 let arg2 = Value::new(&mut frame, 3u32);
@@ -559,15 +517,13 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             let out = jlrs.instance(&mut frame).scope(|mut frame| unsafe {
-                let func = Module::base(&frame)
-                    .function(&frame, "+")?
-                    .wrapper_unchecked();
+                let func = Module::base(&frame).function(&frame, "+")?.wrapper();
                 let arg0 = Value::new(&mut frame, 1u32);
                 let arg1 = Value::new(&mut frame, 2u32);
                 let arg2 = Value::new(&mut frame, 3u32);
                 let arg3 = Value::new(&mut frame, 4u32);
                 let out = func.call(&frame, &mut [arg0, arg1, arg2, arg3]).unwrap();
-                out.wrapper_unchecked().unbox::<u32>()
+                out.wrapper().unbox::<u32>()
             });
 
             assert_eq!(out.unwrap(), 10);
@@ -584,9 +540,7 @@ mod tests {
                 let output = frame.output();
                 frame
                     .scope(|mut frame| unsafe {
-                        let func = Module::base(&frame)
-                            .function(&frame, "+")?
-                            .wrapper_unchecked();
+                        let func = Module::base(&frame).function(&frame, "+")?.wrapper();
                         let arg0 = Value::new(&mut frame, 1u32);
                         let arg1 = Value::new(&mut frame, 2u32);
                         let arg2 = Value::new(&mut frame, 3u32);
@@ -612,9 +566,7 @@ mod tests {
                 let output = frame.output();
                 frame
                     .scope(|mut frame| unsafe {
-                        let func = Module::base(&frame)
-                            .function(&frame, "+")?
-                            .wrapper_unchecked();
+                        let func = Module::base(&frame).function(&frame, "+")?.wrapper();
                         let arg0 = Value::new(&mut frame, 1u32);
                         let arg1 = Value::new(&mut frame, 2u32);
                         let arg2 = Value::new(&mut frame, 3u32);
@@ -640,9 +592,7 @@ mod tests {
                 let output = frame.output();
                 frame
                     .scope(|mut frame| unsafe {
-                        let func = Module::base(&frame)
-                            .function(&frame, "+")?
-                            .wrapper_unchecked();
+                        let func = Module::base(&frame).function(&frame, "+")?.wrapper();
                         let arg0 = Value::new(&mut frame, 1u32);
                         let arg1 = Value::new(&mut frame, 2u32);
                         let arg2 = Value::new(&mut frame, 3u32);

@@ -58,17 +58,15 @@ pub unsafe trait IntoJulia: Sized + 'static {
         unsafe {
             // TODO: root this data until the data has been instantiated.
             let ty = Self::julia_type(target.global()).wrapper();
-            debug_assert!(ty.is_some());
-            let ty = ty.unwrap_unchecked();
             debug_assert!(ty.is_bits());
 
             let instance = ty.instance();
-            if instance.is_undefined() {
+            if instance.is_none() {
                 let container = jl_new_struct_uninit(ty.unwrap(Private));
                 container.cast::<Self>().write(self);
                 target.data_from_ptr(NonNull::new_unchecked(container), Private)
             } else {
-                target.data_from_ptr(NonNull::new_unchecked(instance.ptr()), Private)
+                target.data_from_ptr(instance.unwrap().ptr(), Private)
             }
         }
     }

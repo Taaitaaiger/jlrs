@@ -15,9 +15,9 @@ mod tests {
                     let a_value = Value::new(&mut frame, 1isize);
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .function(&frame, "funcwithkw")?
-                        .wrapper_unchecked();
+                        .wrapper();
 
                     let v = func
                         .call(&mut frame, &mut [a_value])
@@ -43,9 +43,9 @@ mod tests {
                     let b_value = Value::new(&mut frame, 10isize);
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .function(&frame, "funcwithkw")?
-                        .wrapper_unchecked();
+                        .wrapper();
 
                     let kw = named_tuple!(frame.as_extended_target(), "b" => b_value);
                     let v = func
@@ -72,9 +72,9 @@ mod tests {
                     let b_value = Value::new(&mut frame, 10isize);
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .function(&frame, "funcwithkw")?
-                        .wrapper_unchecked();
+                        .wrapper();
 
                     let kw = named_tuple!(frame.as_extended_target(), "b" => b_value);
                     let v = func
@@ -102,9 +102,9 @@ mod tests {
                     let b_value = Value::new(&mut frame, 10isize);
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .function(&frame, "funcwithkw")?
-                        .wrapper_unchecked();
+                        .wrapper();
 
                     let kw = named_tuple!(frame.as_extended_target(), "b" => b_value);
                     let v = func
@@ -133,9 +133,9 @@ mod tests {
                     let c_value = Value::new(&mut frame, 5isize);
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .function(&frame, "funcwithkw")?
-                        .wrapper_unchecked();
+                        .wrapper();
 
                     let kw = named_tuple!(frame.as_extended_target(), "b" => b_value);
                     let v = func
@@ -164,9 +164,9 @@ mod tests {
                     let c_value = Value::new(&mut frame, 5isize);
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .function(&frame, "funcwithkw")?
-                        .wrapper_unchecked();
+                        .wrapper();
 
                     let kw = named_tuple!(frame.as_extended_target(), "b" => b_value);
                     let v = func
@@ -196,9 +196,9 @@ mod tests {
                     let d_value = Value::new(&mut frame, 4isize);
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .function(&frame, "funcwithkw")?
-                        .wrapper_unchecked();
+                        .wrapper();
 
                     let kw = named_tuple!(frame.as_extended_target(), "b" => b_value);
                     let v = func
@@ -229,9 +229,9 @@ mod tests {
                     let e_value = Value::new(&mut frame, 2isize);
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .function(&frame, "funcwithkw")?
-                        .wrapper_unchecked();
+                        .wrapper();
 
                     let kw = named_tuple!(frame.as_extended_target(), "b" => b_value);
                     let v = func
@@ -259,9 +259,9 @@ mod tests {
                     let b_value = Value::new(&mut frame, 10f32);
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .function(&frame, "funcwithabstractkw")?
-                        .wrapper_unchecked();
+                        .wrapper();
 
                     let kw = named_tuple!(frame.as_extended_target(), "b" => b_value);
                     let v = func
@@ -289,9 +289,9 @@ mod tests {
                     let b_value = Value::new(&mut frame, 10f64);
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .function(&frame, "funcwithabstractkw")?
-                        .wrapper_unchecked();
+                        .wrapper();
 
                     let kw = named_tuple!(frame.as_extended_target(), "b" => b_value);
                     let v = func

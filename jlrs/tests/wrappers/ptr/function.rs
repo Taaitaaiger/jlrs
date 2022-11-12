@@ -14,11 +14,8 @@ mod tests {
 
                     frame
                         .scope(|frame| {
-                            let func = unsafe {
-                                Module::base(&frame)
-                                    .function(&frame, "+")?
-                                    .wrapper_unchecked()
-                            };
+                            let func =
+                                unsafe { Module::base(&frame).function(&frame, "+")?.wrapper() };
                             Ok(func.root(output))
                         })
                         .unwrap();
@@ -39,7 +36,7 @@ mod tests {
                     let func_ty = unsafe {
                         Module::base(&frame)
                             .function(&frame, "+")?
-                            .wrapper_unchecked()
+                            .wrapper()
                             .datatype()
                     };
 
