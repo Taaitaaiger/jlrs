@@ -21,9 +21,9 @@ mod tests {
                     let mut tys = [Value::new(&mut frame, 0usize)];
                     let res = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .global(&frame, "WithEmpty")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .apply_type(&mut frame, &mut tys)
                         .into_jlrs_result()?
                         .cast::<DataType>()?
@@ -51,9 +51,9 @@ mod tests {
                     // Returns (1, 2, 3) as Tuple{UInt32, UInt16, Int64}
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .function(&frame, "inlinetuple")?
-                        .wrapper_unchecked();
+                        .wrapper();
                     let tup = func.call0(&mut frame).unwrap();
 
                     assert!(tup.is::<Tuple>());
@@ -83,9 +83,9 @@ mod tests {
                     // Returns (1, 2, 3) as Tuple{UInt32, UInt16, Int64}
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .function(&frame, "inlinetuple")?
-                        .wrapper_unchecked();
+                        .wrapper();
                     let tup = func.call0(&mut frame).unwrap();
                     assert!(tup.get_nth_field(&mut frame, 3).is_err());
 
@@ -105,9 +105,9 @@ mod tests {
                     // Returns (1, 2, 3) as Tuple{UInt32, UInt16, Int64}
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .function(&frame, "inlinetuple")?
-                        .wrapper_unchecked();
+                        .wrapper();
                     let tup = func.call0(&mut frame).unwrap();
                     assert!(tup.get_nth_field_ref(2).is_err());
 
@@ -131,9 +131,9 @@ mod tests {
                     //end
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .global(&frame, "MutableStruct")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .cast::<DataType>()?;
 
                     let x = Value::new(&mut frame, 2.0f32);
@@ -148,7 +148,7 @@ mod tests {
                     let x_val = mut_struct.get_field_ref("x");
                     assert!(x_val.is_ok());
                     {
-                        assert!(x_val.unwrap().wrapper().unwrap().is::<f32>());
+                        assert!(x_val.unwrap().unwrap().wrapper().is::<f32>());
                     }
                     let output = frame.output();
                     let _ = frame.scope(|_| mut_struct.get_field(output, "y"))?;
@@ -174,9 +174,9 @@ mod tests {
                     //end
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .global(&frame, "MutableStruct")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .cast::<DataType>()?;
 
                     let x = Value::new(&mut frame, 2.0f32);
@@ -206,9 +206,7 @@ mod tests {
                     let idx = Value::new(&mut frame, 4usize);
                     let data = vec![1.0f64, 2., 3.];
                     let array = Array::from_vec_unchecked(frame.as_extended_target(), data, 3)?;
-                    let func = Module::base(&frame)
-                        .function(&frame, "getindex")?
-                        .wrapper_unchecked();
+                    let func = Module::base(&frame).function(&frame, "getindex")?.wrapper();
                     let out = func.call2(&mut frame, array.as_value(), idx).unwrap_err();
 
                     assert_eq!(out.datatype_name().unwrap(), "BoundsError");
@@ -242,9 +240,7 @@ mod tests {
                     let idx = Value::new(&mut frame, 4usize);
                     let data = vec![1.0f64, 2., 3.];
                     let array = Array::from_vec_unchecked(frame.as_extended_target(), data, 3)?;
-                    let func = Module::base(&frame)
-                        .function(&frame, "getindex")?
-                        .wrapper_unchecked();
+                    let func = Module::base(&frame).function(&frame, "getindex")?.wrapper();
                     let out = func.call2(&mut frame, array.as_value(), idx).unwrap_err();
 
                     let field_names = out.field_names();
@@ -269,9 +265,7 @@ mod tests {
                     let idx = Value::new(&mut frame, 4usize);
                     let data = vec![1.0f64, 2., 3.];
                     let array = Array::from_vec_unchecked(frame.as_extended_target(), data, 3)?;
-                    let func = Module::base(&frame)
-                        .function(&frame, "getindex")?
-                        .wrapper_unchecked();
+                    let func = Module::base(&frame).function(&frame, "getindex")?.wrapper();
                     let out = func.call2(&mut frame, array.as_value(), idx).unwrap_err();
 
                     let field_names = out.field_names();
@@ -298,9 +292,7 @@ mod tests {
                     let idx = Value::new(&mut frame, 4usize);
                     let data = vec![1.0f64, 2., 3.];
                     let array = Array::from_vec_unchecked(frame.as_extended_target(), data, 3)?;
-                    let func = Module::base(&frame)
-                        .function(&frame, "getindex")?
-                        .wrapper_unchecked();
+                    let func = Module::base(&frame).function(&frame, "getindex")?.wrapper();
                     let out = func.call2(&mut frame, array.as_value(), idx).unwrap_err();
 
                     let field_names = out.field_names();
@@ -328,7 +320,7 @@ mod tests {
                         .into_jlrs_result()?
                         .cast::<Module>()?
                         .global(&frame, "mixedbag")?
-                        .wrapper_unchecked();
+                        .wrapper();
 
                     {
                         let field = value
@@ -383,7 +375,7 @@ mod tests {
                             .field("normal_union")?
                             .access::<ModuleRef>()?;
 
-                        assert_eq!(field.wrapper_unchecked(), Module::main(&frame));
+                        assert_eq!(field.wrapper(), Module::main(&frame));
                     }
 
                     #[cfg(not(feature = "lts"))]
@@ -454,7 +446,7 @@ mod tests {
                                 .field("ptr")?
                                 .access::<ModuleRef>()?;
 
-                            assert_eq!(field.wrapper_unchecked(), Module::main(&frame));
+                            assert_eq!(field.wrapper(), Module::main(&frame));
                         }
 
                         {
@@ -466,7 +458,7 @@ mod tests {
                                 .field((0,))?
                                 .access::<ModuleRef>()?;
 
-                            assert_eq!(field.wrapper_unchecked(), Module::base(&frame));
+                            assert_eq!(field.wrapper(), Module::base(&frame));
                         }
                     }
 
@@ -511,7 +503,7 @@ mod tests {
                             .field("normal_union")?
                             .access::<ModuleRef>()?;
 
-                        assert_eq!(field.wrapper_unchecked(), Module::main(&frame));
+                        assert_eq!(field.wrapper(), Module::main(&frame));
                     }
 
                     {
@@ -604,7 +596,7 @@ mod tests {
                                 .field("ptr")?
                                 .access::<ModuleRef>()?;
 
-                            assert_eq!(field.wrapper_unchecked(), Module::main(&frame));
+                            assert_eq!(field.wrapper(), Module::main(&frame));
                         }
 
                         {
@@ -616,7 +608,7 @@ mod tests {
                                 .field((0,))?
                                 .access::<ModuleRef>()?;
 
-                            assert_eq!(field.wrapper_unchecked(), Module::base(&frame));
+                            assert_eq!(field.wrapper(), Module::base(&frame));
                         }
                     }
                     {
@@ -735,7 +727,7 @@ mod tests {
                             .field(1)?
                             .access::<ModuleRef>()?;
 
-                        assert_eq!(field.wrapper_unchecked(), Module::base(&frame));
+                        assert_eq!(field.wrapper(), Module::base(&frame));
                     }
 
                     {
@@ -822,9 +814,9 @@ mod tests {
                         let field = value
                             .field_accessor(&mut frame)
                             .field("nonexistent")?
-                            .access::<ValueRef>()?;
+                            .access::<ValueRef>();
 
-                        assert!(field.is_undefined());
+                        assert!(field.is_err());
                     }
 
                     Ok(())

@@ -126,9 +126,9 @@ impl Julia<'_> {
 
             Module::main(&frame)
                 .submodule(&frame, "Jlrs")?
-                .wrapper_unchecked()
+                .wrapper()
                 .global(&frame, "color")?
-                .value_unchecked()
+                .value()
                 .set_field_unchecked("x", enable)
         })?;
 
@@ -160,7 +160,7 @@ impl Julia<'_> {
                 let path_jl_str = JuliaString::new(&mut frame, path.as_ref().to_string_lossy());
                 Module::main(&frame)
                     .function(&frame, "include")?
-                    .wrapper_unchecked()
+                    .wrapper()
                     .call1(&mut frame, path_jl_str.as_value())
                     .into_jlrs_result()
                     .map(|_| ())

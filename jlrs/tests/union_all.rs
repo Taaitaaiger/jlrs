@@ -14,7 +14,7 @@ mod tests {
             jlrs.instance(&mut frame)
                 .scope(|mut frame| unsafe {
                     let atype = UnionAll::array_type(&frame);
-                    let body = atype.body().wrapper_unchecked();
+                    let body = atype.body().wrapper();
                     let number_type = DataType::number_type(&frame).as_value();
                     let tvar = TypeVar::new(&mut frame, "V", None, Some(number_type))
                         .into_jlrs_result()?;
@@ -22,12 +22,12 @@ mod tests {
                     let ua = UnionAll::new(&mut frame, tvar, body)
                         .into_jlrs_result()?
                         .cast::<UnionAll>()?;
-                    let v = ua.var().wrapper().unwrap();
+                    let v = ua.var().wrapper();
 
                     let equals = Module::base(&frame)
                         .function(&frame, "!=")?
-                        .wrapper_unchecked()
-                        .call2(&mut frame, v.as_value(), atype.var().value_unchecked())
+                        .wrapper()
+                        .call2(&mut frame, v.as_value(), atype.var().value())
                         .unwrap()
                         .unbox::<bool>()?
                         .as_bool();
@@ -49,9 +49,9 @@ mod tests {
                     let args = [DataType::int8_type(&frame).as_value()];
                     let out = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .global(&frame, "ParameterStruct")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .apply_type(&mut frame, args)
                         .into_jlrs_result()?
                         .cast::<DataType>()?
@@ -79,9 +79,9 @@ mod tests {
 
                     let vts = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .global(&frame, "ValueTypeStruct")?
-                        .wrapper_unchecked();
+                        .wrapper();
 
                     let v1 = vts
                         .apply_type(&mut frame, &mut [ty1])
@@ -99,9 +99,9 @@ mod tests {
 
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .function(&frame, "valuedispatch")?
-                        .wrapper_unchecked();
+                        .wrapper();
 
                     let o1 = func.call1(&mut frame, v1).unwrap().unbox::<isize>()?;
                     let o2 = func.call1(&mut frame, v2).unwrap().unbox::<f64>()?;

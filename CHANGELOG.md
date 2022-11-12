@@ -3,7 +3,7 @@
 
  - `Value` implements `PartialEq` for all wrapper types, allowing a value to be compared with any other wrapper type directly.
 
- - `JuliaString::to_bytes` has been renamed to `JuliaString::as_bytes`, and returns all data. 
+ - `JuliaString::to_bytes` has been renamed to `JuliaString::as_bytes`, and returns all data.
 
  - If a `JuliaString` is unboxed and contains non-utf8 data, all data is returned as a `Vec<u8>` rather than stopping at the first null character.
 
@@ -24,7 +24,7 @@
  - Methods of the `Gc` trait take `self` by reference.
 
  - A ledger is used to track borrowed Julia data, instances of `Array`s and `Value`s can be tracked.
- 
+
  - `CCall::null_scope` and `NullFrame` have been replaced with `CCall::stackless_scope`.
 
  - `Ref::leak` and `Ref::data_ptr` have been added.
@@ -35,17 +35,22 @@
 
  - It's no longer possible to provide a backing channel for an async runtime.
 
- - A `nightly` feature is available to test the latest nightly Julia features. 
+ - A `nightly` feature is available to test the latest nightly Julia features.
 
  - When the `nightly` feature is enabled, the async runtime can be started with additional worker threads.
 
- - When the `nightly` feature is enabled, tasks are scheduled on one of the two available thread pools depending on the method. 
+ - When the `nightly` feature is enabled, tasks are scheduled on one of the two available thread pools depending on the method.
 
  - The `ForeignType` trait has been added which can be used to create new foreign types with custom mark functions.
 
  - `AsyncJulia::post_blocking_task` has been added, which can be used to schedule a blocking task on an arbitrary thread owned by Julia.
 
  - `PersistentTask::State` is a GAT, which gets rid of the lifetime-hack that allows the state to contain Julia data.
+
+ - `Ref` wraps a `NonNull` pointer to Julia data, like wrappers do. Undefinedness is expressed through `Option`.
+
+ - Uses of `ValidLayout` have been mostly replaced with `ValidField`. `ValidField` is not implemented for mutable structs because they're not stored inline when used as a field of some other type.
+
 
 #### v0.16
  - Support for Julia 1.7 has been dropped, by default Julia 1.8 is targeted.

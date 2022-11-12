@@ -13,15 +13,14 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let field = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .global(&frame, "has_module")?
-                        .value_unchecked()
+                        .value()
                         .field_accessor(&mut frame)
                         .field("a")?
                         .access::<ValueRef>()?;
 
-                    assert!(!field.is_undefined());
-                    assert!(field.value_unchecked().is::<Module>());
+                    assert!(field.value().is::<Module>());
 
                     Ok(())
                 })
@@ -38,9 +37,9 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let _field = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .global(&frame, "has_nothing")?
-                        .value_unchecked()
+                        .value()
                         .field_accessor(&mut frame)
                         .field("a")?
                         .access::<Nothing>()?;

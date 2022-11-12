@@ -515,7 +515,7 @@ mod tests {
                             Module::base(&frame)
                                 .function(&frame, "+")
                                 .unwrap()
-                                .wrapper_unchecked()
+                                .wrapper()
                                 .call2(&mut frame, one, one)
                                 .into_jlrs_result()?
                                 .unbox::<f64>()

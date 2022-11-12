@@ -109,7 +109,7 @@ use crate::{
         field_index::FieldIndex,
         inline_layout::InlineLayout,
         typecheck::{NamedTuple, Typecheck},
-        valid_layout::ValidLayout,
+        valid_layout::{ValidField, ValidLayout},
     },
     memory::{
         context::ledger::Ledger,
@@ -316,7 +316,7 @@ impl Value<'_, '_> {
 
             let res = match catch_exceptions(&mut callback).unwrap() {
                 Ok(ptr) => Ok(NonNull::new_unchecked(ptr)),
-                Err(e) => Err(NonNull::new_unchecked(e.ptr())),
+                Err(e) => Err(e.ptr()),
             };
 
             target.result_from_ptr(res, Private)
@@ -367,7 +367,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
                 .__bindgen_anon_1
                 .header;
             let ptr = (header & !15usize) as *mut jl_value_t;
-            DataType::wrap(ptr.cast(), Private)
+            DataType::wrap_non_null(NonNull::new_unchecked(ptr.cast()), Private)
         }
     }
 
@@ -419,7 +419,7 @@ impl Value<'_, '_> {
     }
 
     /// Returns true if the value is an array with elements of type `T`.
-    pub fn is_array_of<T: ValidLayout>(self) -> bool {
+    pub fn is_array_of<T: ValidField>(self) -> bool {
         match self.cast::<Array>() {
             Ok(arr) => arr.contains::<T>(),
             Err(_) => false,
@@ -557,15 +557,6 @@ impl<'scope, 'data> Value<'scope, 'data> {
     pub unsafe fn assume_owned(self) -> Value<'scope, 'static> {
         Value::wrap_non_null(self.unwrap_non_null(Private), Private)
     }
-
-    /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> ValueData<'target, 'data, T>
-    where
-        T: Target<'target>,
-    {
-        // Safety: the data is valid.
-        unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
-    }
 }
 
 /// # Conversions
@@ -586,7 +577,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     pub fn cast<T: Wrapper<'scope, 'data> + Typecheck>(self) -> JlrsResult<T> {
         if self.is::<T>() {
             // Safety: self.is::<T>() returning true guarantees this is safe
-            unsafe { Ok(T::cast(self, Private)) }
+            unsafe { Ok(self.cast_unchecked()) }
         } else {
             Err(AccessError::InvalidLayout {
                 value_type: self.datatype().display_string_or(CANNOT_DISPLAY_TYPE),
@@ -598,7 +589,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     ///
     /// Safety: You must guarantee `self.is::<T>()` would have returned `true`.
     pub unsafe fn cast_unchecked<T: Wrapper<'scope, 'data>>(self) -> T {
-        T::cast(self, Private)
+        T::from_value_unchecked(self, Private)
     }
 
     /// Unbox the contents of the value as the output type associated with `T`. Returns an error
@@ -654,7 +645,8 @@ impl<'scope, 'data> Value<'scope, 'data> {
             std::mem::transmute(
                 self.datatype()
                     .field_names()
-                    .wrapper_unchecked()
+                    .unwrap()
+                    .wrapper()
                     .data()
                     .as_slice(),
             )
@@ -672,8 +664,8 @@ impl<'scope, 'data> Value<'scope, 'data> {
         _frame: &'borrow T,
     ) -> FieldAccessor<'scope, 'data, 'borrow> {
         FieldAccessor {
-            value: self.as_ref(),
-            current_field_type: self.datatype().as_ref(),
+            value: Some(self.as_ref()),
+            current_field_type: Some(self.datatype().as_ref()),
             offset: 0,
             #[cfg(not(feature = "lts"))]
             buffer: AtomicBuffer::new(),
@@ -747,9 +739,8 @@ impl<'scope, 'data> Value<'scope, 'data> {
                 })?
             }
 
-            Ok(ValueRef::wrap(jl_get_nth_field_noalloc(
-                self.unwrap(Private),
-                idx,
+            Ok(ValueRef::wrap(NonNull::new_unchecked(
+                jl_get_nth_field_noalloc(self.unwrap(Private), idx),
             )))
         }
     }
@@ -791,7 +782,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     ///
     /// If the field doesn't exist or if the field can't be referenced because its data is stored
     /// inline, a `JlrsError::AccessError` is returned.
-    pub fn get_field_ref<N>(self, field_name: N) -> JlrsResult<ValueRef<'scope, 'data>>
+    pub fn get_field_ref<N>(self, field_name: N) -> JlrsResult<Option<ValueRef<'scope, 'data>>>
     where
         N: ToSymbol,
     {
@@ -824,10 +815,13 @@ impl<'scope, 'data> Value<'scope, 'data> {
                 })?
             }
 
-            Ok(ValueRef::wrap(jl_get_nth_field_noalloc(
-                self.unwrap(Private),
-                idx as _,
-            )))
+            let ptr = jl_get_nth_field_noalloc(self.unwrap(Private), idx as _);
+
+            if ptr.is_null() {
+                Ok(None)
+            } else {
+                Ok(Some(ValueRef::wrap(NonNull::new_unchecked(ptr))))
+            }
         }
     }
 
@@ -859,13 +853,9 @@ impl<'scope, 'data> Value<'scope, 'data> {
             })?;
         }
 
-        let field_type = self
-            .datatype()
-            .field_types()
-            .wrapper_unchecked()
-            .data()
-            .as_slice()[idx as usize]
-            .value_unchecked();
+        let field_type = self.datatype().field_types().wrapper().data().as_slice()[idx as usize]
+            .unwrap()
+            .value();
         let dt = value.datatype();
 
         if !Value::subtype(dt.as_value(), field_type) {
@@ -883,7 +873,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
 
         let res = match catch_exceptions(&mut callback)? {
             Ok(_) => Ok(()),
-            Err(e) => Err(NonNull::new_unchecked(e.ptr())),
+            Err(e) => Err(e.ptr()),
         };
 
         Ok(target.exception_from_ptr(res, Private))
@@ -927,13 +917,9 @@ impl<'scope, 'data> Value<'scope, 'data> {
             })?
         }
 
-        let field_type = self
-            .datatype()
-            .field_types()
-            .wrapper_unchecked()
-            .data()
-            .as_slice()[idx as usize]
-            .value_unchecked();
+        let field_type = self.datatype().field_types().wrapper().data().as_slice()[idx as usize]
+            .unwrap()
+            .value();
         let dt = value.datatype();
 
         if !Value::subtype(dt.as_value(), field_type) {
@@ -951,7 +937,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
 
         let res = match catch_exceptions(&mut callback)? {
             Ok(_) => Ok(()),
-            Err(e) => Err(NonNull::new_unchecked(e.ptr())),
+            Err(e) => Err(e.ptr()),
         };
 
         Ok(target.exception_from_ptr(res, Private))
@@ -1056,9 +1042,7 @@ impl Value<'_, '_> {
             let (output, scope) = target.split();
             return scope.scope(|mut frame| {
                 let path_jl_str = JuliaString::new(&mut frame, path.as_ref().to_string_lossy());
-                let include_func = Module::main(&frame)
-                    .function(&frame, "include")?
-                    .wrapper_unchecked();
+                let include_func = Module::main(&frame).function(&frame, "include")?.wrapper();
 
                 Ok(include_func.call1(output, path_jl_str.as_value()))
             });
@@ -1283,7 +1267,7 @@ impl<'scope> Value<'scope, 'static> {
 }
 
 impl<'data> Call<'data> for Value<'_, 'data> {
-    #[inline(always)]
+    #[inline]
     unsafe fn call0<'target, T>(self, target: T) -> ValueResult<'target, 'data, T>
     where
         T: Target<'target>,
@@ -1300,7 +1284,7 @@ impl<'data> Call<'data> for Value<'_, 'data> {
         target.result_from_ptr(res, Private)
     }
 
-    #[inline(always)]
+    #[inline]
     unsafe fn call1<'target, T>(
         self,
         target: T,
@@ -1321,7 +1305,7 @@ impl<'data> Call<'data> for Value<'_, 'data> {
         target.result_from_ptr(res, Private)
     }
 
-    #[inline(always)]
+    #[inline]
     unsafe fn call2<'target, T>(
         self,
         target: T,
@@ -1347,7 +1331,7 @@ impl<'data> Call<'data> for Value<'_, 'data> {
         target.result_from_ptr(res, Private)
     }
 
-    #[inline(always)]
+    #[inline]
     unsafe fn call3<'target, T>(
         self,
         target: T,
@@ -1375,7 +1359,7 @@ impl<'data> Call<'data> for Value<'_, 'data> {
         target.result_from_ptr(res, Private)
     }
 
-    #[inline(always)]
+    #[inline]
     unsafe fn call<'target, 'value, V, T>(
         self,
         target: T,
@@ -1443,11 +1427,6 @@ pub struct LeakedValue(Value<'static, 'static>);
 
 impl LeakedValue {
     // Safety: ptr must point to valid Julia data
-    pub(crate) unsafe fn wrap(ptr: *mut jl_value_t) -> Self {
-        LeakedValue(Value::wrap(ptr, Private))
-    }
-
-    // Safety: ptr must point to valid Julia data
     pub(crate) unsafe fn wrap_non_null(ptr: NonNull<jl_value_t>) -> Self {
         LeakedValue(Value::wrap_non_null(ptr, Private))
     }
@@ -1499,8 +1478,8 @@ enum ViewState {
 /// used with types that have named fields, the second must be used with tuples, and the last one
 /// with arrays.
 pub struct FieldAccessor<'scope, 'data, 'borrow> {
-    value: ValueRef<'scope, 'data>,
-    current_field_type: DataTypeRef<'scope>,
+    value: Option<ValueRef<'scope, 'data>>,
+    current_field_type: Option<DataTypeRef<'scope>>,
     #[cfg(not(feature = "lts"))]
     buffer: AtomicBuffer,
     offset: u32,
@@ -1517,7 +1496,11 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
     /// as a `ModuleRef`. In all other cases an inline wrapper type must be used. For example, an
     /// untyped field that currently holds a `Float64` must be accessed as `f64`.
     pub fn access<T: ValidLayout>(self) -> JlrsResult<T> {
-        if self.current_field_type.is_undefined() {
+        if self.current_field_type.is_none() {
+            Err(AccessError::UndefRef)?;
+        }
+
+        if self.value.is_none() {
             Err(AccessError::UndefRef)?;
         }
 
@@ -1528,7 +1511,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
         // Otherwise, the field is read at the offset where it has been determined
         // to be stored.
         unsafe {
-            let ty = self.current_field_type.value_unchecked();
+            let ty = self.current_field_type.unwrap().value();
             if !T::valid_layout(ty) {
                 let value_type = ty.display_string_or(CANNOT_DISPLAY_TYPE).into();
                 Err(AccessError::InvalidLayout { value_type })?;
@@ -1548,7 +1531,8 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
             } else if self.state == ViewState::Array {
                 Ok(self
                     .value
-                    .value_unchecked()
+                    .unwrap()
+                    .value()
                     .cast_unchecked::<Array>()
                     .data_ptr()
                     .cast::<u8>()
@@ -1558,8 +1542,10 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
             } else {
                 Ok(self
                     .value
+                    .unwrap()
                     .ptr()
                     .cast::<u8>()
+                    .as_ptr()
                     .add(self.offset as usize)
                     .cast::<T>()
                     .read())
@@ -1569,12 +1555,12 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
 
     /// Returns `true` if `self.access::<T>()` will succeed, `false` if it will fail.
     pub fn can_access_as<T: ValidLayout>(&self) -> bool {
-        if self.current_field_type.is_undefined() {
+        if self.current_field_type.is_none() {
             return false;
         }
 
         // Safety: the current_field_type field is not undefined.
-        let ty = unsafe { self.current_field_type.value_unchecked() };
+        let ty = unsafe { self.current_field_type.unwrap().value() };
         if !T::valid_layout(ty) {
             return false;
         }
@@ -1595,11 +1581,11 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
     /// `Relaxed` for pointer fields, `SeqCst` for small inline fields, and a lock for large
     /// inline fields.
     pub fn field<F: FieldIndex>(mut self, field: F) -> JlrsResult<Self> {
-        if self.value.is_undefined() {
+        if self.value.is_none() {
             Err(AccessError::UndefRef)?
         }
 
-        if self.current_field_type.is_undefined() {
+        if self.current_field_type.is_none() {
             Err(AccessError::UndefRef)?
         }
 
@@ -1609,9 +1595,9 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
         // to be rooted, all pointer fields are either reachablle or undefined. If a field is
         // atomic, atomic accesses (or locks for large atomic fields) are used.
         unsafe {
-            let current_field_type = self.current_field_type.wrapper_unchecked();
+            let current_field_type = self.current_field_type.unwrap().wrapper();
             if self.state == ViewState::Array && current_field_type.is::<Array>() {
-                let arr = self.value.value_unchecked().cast_unchecked::<Array>();
+                let arr = self.value.unwrap().value().cast_unchecked::<Array>();
                 // accessing an array, find the offset of the requested element
                 let index = field.array_index(arr, Private)?;
                 self.get_array_field(arr, index);
@@ -1621,11 +1607,8 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
             let index = field.field_index(current_field_type, Private)?;
 
             let next_field_type = current_field_type.field_type_unchecked(index);
-            if next_field_type.is_undefined() {
-                Err(AccessError::UndefRef)?
-            }
 
-            let next_field_type = next_field_type.wrapper_unchecked();
+            let next_field_type = next_field_type.wrapper();
             let is_pointer_field = current_field_type.is_pointer_field_unchecked(index);
             let field_offset = current_field_type.field_offset_unchecked(index);
             self.offset += field_offset;
@@ -1663,11 +1646,11 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
     /// [`FieldAccessor::field`] for more information.
     #[cfg(not(feature = "lts"))]
     pub fn atomic_field<F: FieldIndex>(mut self, field: F, ordering: Ordering) -> JlrsResult<Self> {
-        if self.value.is_undefined() {
+        if self.value.is_none() {
             Err(AccessError::UndefRef)?
         }
 
-        if self.current_field_type.is_undefined() {
+        if self.current_field_type.is_none() {
             Err(AccessError::UndefRef)?
         }
 
@@ -1677,9 +1660,9 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
         // to be rooted, all pointer fields are either reachablle or undefined. If a field is
         // atomic, atomic accesses (or locks for large atomic fields) are used.
         unsafe {
-            let current_field_type = self.current_field_type.wrapper_unchecked();
+            let current_field_type = self.current_field_type.unwrap().wrapper();
             if self.state == ViewState::Array && current_field_type.is::<Array>() {
-                let arr = self.value.value_unchecked().cast_unchecked::<Array>();
+                let arr = self.value.unwrap().value().cast_unchecked::<Array>();
                 // accessing an array, find the offset of the requested element
                 let index = field.array_index(arr, Private)?;
                 self.get_array_field(arr, index);
@@ -1689,11 +1672,8 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
             let index = field.field_index(current_field_type, Private)?;
 
             let next_field_type = current_field_type.field_type_unchecked(index);
-            if next_field_type.is_undefined() {
-                Err(AccessError::UndefRef)?
-            }
 
-            let next_field_type = next_field_type.wrapper_unchecked();
+            let next_field_type = next_field_type.wrapper();
             let is_pointer_field = current_field_type.is_pointer_field_unchecked(index);
             let field_offset = current_field_type.field_offset_unchecked(index);
             self.offset += field_offset;
@@ -1755,12 +1735,12 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
     }
 
     /// Returns the type of the field the accessor is currently pointing at.
-    pub fn current_field_type(&self) -> DataTypeRef<'scope> {
+    pub fn current_field_type(&self) -> Option<DataTypeRef<'scope>> {
         self.current_field_type
     }
 
     /// Returns the value the accessor is currently inspecting.
-    pub fn value(&self) -> ValueRef<'scope, 'data> {
+    pub fn value(&self) -> Option<ValueRef<'scope, 'data>> {
         self.value
     }
 
@@ -1773,24 +1753,30 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
     ) {
         if is_pointer_field {
             debug_assert_eq!(self.offset, 0);
-            self.value = ValueRef::wrap(self.buffer.ptr);
+            let ptr = self.buffer.ptr;
+            if ptr.is_null() {
+                self.value = None;
+            } else {
+                self.value = Some(ValueRef::wrap(NonNull::new_unchecked(ptr)));
+            }
+
             self.state = ViewState::Unlocked;
-            if self.value.is_undefined() {
+            if self.value.is_none() {
                 if let Ok(ty) = next_field_type.cast::<DataType>() {
                     if ty.is_concrete_type() {
-                        self.current_field_type = ty.as_ref();
+                        self.current_field_type = Some(ty.as_ref());
                     } else {
-                        self.current_field_type = DataTypeRef::undefined_ref();
+                        self.current_field_type = None;
                     }
                 } else {
-                    self.current_field_type = DataTypeRef::undefined_ref();
+                    self.current_field_type = None;
                 }
             } else {
-                self.current_field_type = self.value.wrapper_unchecked().datatype().as_ref();
+                self.current_field_type = Some(self.value.unwrap().wrapper().datatype().as_ref());
             }
         } else {
             debug_assert!(next_field_type.is::<DataType>());
-            self.current_field_type = next_field_type.cast_unchecked::<DataType>().as_ref();
+            self.current_field_type = Some(next_field_type.cast_unchecked::<DataType>().as_ref());
         }
     }
 
@@ -1816,7 +1802,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
             self.get_bits_union_field(un);
         } else {
             debug_assert!(next_field_type.is::<DataType>());
-            self.current_field_type = next_field_type.cast_unchecked::<DataType>().as_ref();
+            self.current_field_type = Some(next_field_type.cast_unchecked::<DataType>().as_ref());
 
             if is_atomic_field {
                 self.lock_or_copy_atomic(inline_ordering);
@@ -1841,7 +1827,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
             self.get_bits_union_field(un);
         } else {
             debug_assert!(next_field_type.is::<DataType>());
-            self.current_field_type = next_field_type.cast_unchecked::<DataType>().as_ref();
+            self.current_field_type = Some(next_field_type.cast_unchecked::<DataType>().as_ref());
         }
     }
 
@@ -1858,7 +1844,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
             self.get_bits_union_field(un);
         } else {
             debug_assert!(next_field_type.is::<DataType>());
-            self.current_field_type = next_field_type.cast_unchecked::<DataType>().as_ref();
+            self.current_field_type = Some(next_field_type.cast_unchecked::<DataType>().as_ref());
         }
     }
 
@@ -1872,32 +1858,33 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
         if is_pointer_field {
             self.value = self
                 .value
-                .value_unchecked()
+                .unwrap()
+                .value()
                 .cast::<Array>()?
                 .data_ptr()
                 .cast::<MaybeUninit<u8>>()
                 .add(self.offset as usize)
-                .cast::<ValueRef>()
+                .cast::<Option<ValueRef>>()
                 .read();
 
             self.offset = 0;
             self.state = ViewState::Unlocked;
 
-            if self.value.is_undefined() {
+            if self.value.is_none() {
                 if let Ok(ty) = next_field_type.cast::<DataType>() {
                     if ty.is_concrete_type() {
-                        self.current_field_type = ty.as_ref();
+                        self.current_field_type = Some(ty.as_ref());
                     } else {
-                        self.current_field_type = DataTypeRef::undefined_ref();
+                        self.current_field_type = None;
                     }
                 } else {
-                    self.current_field_type = DataTypeRef::undefined_ref();
+                    self.current_field_type = None;
                 }
             } else {
-                self.current_field_type = self.value.value_unchecked().datatype().as_ref();
+                self.current_field_type = Some(self.value.unwrap().value().datatype().as_ref());
             }
         } else {
-            self.current_field_type = next_field_type.cast::<DataType>()?.as_ref();
+            self.current_field_type = Some(next_field_type.cast::<DataType>()?.as_ref());
         }
 
         Ok(())
@@ -1908,11 +1895,13 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
     unsafe fn lock_or_copy_atomic(&mut self, ordering: Ordering) {
         let ptr = self
             .value
+            .unwrap()
             .ptr()
             .cast::<MaybeUninit<u8>>()
+            .as_ptr()
             .add(self.offset as usize);
 
-        match self.current_field_type.wrapper_unchecked().size() {
+        match self.current_field_type.unwrap().wrapper().size() {
             0 => (),
             1 => {
                 let atomic = &*ptr.cast::<AtomicU8>();
@@ -1955,7 +1944,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
                 self.offset = 0;
             }
             _ => {
-                jlrs_lock(self.value.ptr());
+                jlrs_lock(self.value.unwrap().ptr().as_ptr());
                 self.state = ViewState::Locked;
             }
         }
@@ -1968,43 +1957,43 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
         self.offset = (index * el_size) as u32;
 
         if arr.is_value_array() {
-            self.value = arr.data_ptr().cast::<ValueRef>().add(index).read();
+            self.value = arr.data_ptr().cast::<Option<ValueRef>>().add(index).read();
             self.offset = 0;
-            if self.value.is_undefined() {
-                if let Ok(ty) = arr.element_type().value_unchecked().cast::<DataType>() {
+            if self.value.is_none() {
+                if let Ok(ty) = arr.element_type().value().cast::<DataType>() {
                     if ty.is_concrete_type() {
-                        self.current_field_type = ty.as_ref();
+                        self.current_field_type = Some(ty.as_ref());
                     } else {
-                        self.current_field_type = DataTypeRef::undefined_ref();
+                        self.current_field_type = None;
                     }
 
                     if !ty.is::<Array>() {
                         self.state = ViewState::Unlocked;
                     }
                 } else {
-                    self.current_field_type = DataTypeRef::undefined_ref();
+                    self.current_field_type = None;
                     self.state = ViewState::Unlocked;
                 }
             } else {
-                let ty = self.value.value_unchecked().datatype();
-                self.current_field_type = ty.as_ref();
+                let ty = self.value.unwrap().value().datatype();
+                self.current_field_type = Some(ty.as_ref());
                 if !ty.is::<Array>() {
                     self.state = ViewState::Unlocked;
                 }
             }
         } else if arr.is_union_array() {
             let mut tag = *jl_array_typetagdata(arr.unwrap(Private)).add(index) as i32;
-            let component = nth_union_component(arr.element_type().value_unchecked(), &mut tag);
+            let component = nth_union_component(arr.element_type().value(), &mut tag);
             debug_assert!(component.is_some());
             let ty = component.unwrap_unchecked();
             debug_assert!(ty.is::<DataType>());
             let ty = ty.cast_unchecked::<DataType>();
             debug_assert!(ty.is_concrete_type());
-            self.current_field_type = ty.as_ref();
+            self.current_field_type = Some(ty.as_ref());
         } else {
-            let ty = arr.element_type().value_unchecked();
+            let ty = arr.element_type().value();
             debug_assert!(ty.is::<DataType>());
-            self.current_field_type = ty.cast_unchecked::<DataType>().as_ref();
+            self.current_field_type = Some(ty.cast_unchecked::<DataType>().as_ref());
         }
     }
 
@@ -2013,33 +2002,35 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
     unsafe fn get_pointer_field(&mut self, locked: bool, next_field_type: Value<'scope, 'data>) {
         let value = self
             .value
+            .unwrap()
             .ptr()
             .cast::<u8>()
+            .as_ptr()
             .add(self.offset as usize)
-            .cast::<ValueRef>()
+            .cast::<Option<ValueRef>>()
             .read();
 
         if locked {
-            jlrs_unlock(self.value.ptr());
+            jlrs_unlock(self.value.unwrap().ptr().as_ptr());
             self.state = ViewState::Unlocked;
         }
 
         self.value = value;
         self.offset = 0;
 
-        if self.value.is_undefined() {
+        if self.value.is_none() {
             if let Ok(ty) = next_field_type.cast::<DataType>() {
                 if ty.is_concrete_type() {
-                    self.current_field_type = ty.as_ref();
+                    self.current_field_type = Some(ty.as_ref());
                 } else {
-                    self.current_field_type = DataTypeRef::undefined_ref();
+                    self.current_field_type = None;
                 }
             } else {
-                self.current_field_type = DataTypeRef::undefined_ref();
+                self.current_field_type = None;
             }
         } else {
-            let value = self.value.value_unchecked();
-            self.current_field_type = value.datatype().as_ref();
+            let value = self.value.unwrap().value();
+            self.current_field_type = Some(value.datatype().as_ref());
             if value.is::<Array>() {
                 self.state = ViewState::Array;
             }
@@ -2071,7 +2062,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
                 self.current_field_type = DataTypeRef::undefined_ref();
             }
         } else {
-            let value = self.value.value_unchecked();
+            let value = self.value.value();
             self.current_field_type = value.datatype().as_ref();
             if value.is::<Array>() {
                 self.state = ViewState::Array;
@@ -2088,28 +2079,35 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
     ) {
         let v = &*self
             .value
+            .unwrap()
             .ptr()
             .cast::<u8>()
+            .as_ptr()
             .add(self.offset as usize)
             .cast::<AtomicPtr<jl_value_t>>();
 
         let ptr = v.load(ordering);
-        self.value = ValueRef::wrap(ptr);
+        if ptr.is_null() {
+            self.value = None;
+        } else {
+            self.value = Some(ValueRef::wrap(NonNull::new_unchecked(ptr)));
+        }
+
         self.offset = 0;
 
-        if self.value.is_undefined() {
+        if self.value.is_none() {
             if let Ok(ty) = next_field_type.cast::<DataType>() {
                 if ty.is_concrete_type() {
-                    self.current_field_type = ty.as_ref();
+                    self.current_field_type = Some(ty.as_ref());
                 } else {
-                    self.current_field_type = DataTypeRef::undefined_ref();
+                    self.current_field_type = None;
                 }
             } else {
-                self.current_field_type = DataTypeRef::undefined_ref();
+                self.current_field_type = None;
             }
         } else {
-            let value = self.value.value_unchecked();
-            self.current_field_type = value.datatype().as_ref();
+            let value = self.value.unwrap().value();
+            self.current_field_type = Some(value.datatype().as_ref());
             if value.is::<Array>() {
                 self.state = ViewState::Array;
             }
@@ -2122,7 +2120,14 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
         let isbits = union.isbits_size_align(&mut size, &mut 0);
         debug_assert!(isbits);
         let flag_offset = self.offset as usize + size;
-        let mut flag = self.value.ptr().cast::<u8>().add(flag_offset).read() as i32;
+        let mut flag = self
+            .value
+            .unwrap()
+            .ptr()
+            .cast::<u8>()
+            .as_ptr()
+            .add(flag_offset)
+            .read() as i32;
 
         let active_ty = nth_union_component(union.as_value(), &mut flag);
         debug_assert!(active_ty.is_some());
@@ -2131,7 +2136,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
 
         let ty = active_ty.cast_unchecked::<DataType>();
         debug_assert!(ty.is_concrete_type());
-        self.current_field_type = ty.as_ref();
+        self.current_field_type = Some(ty.as_ref());
     }
 }
 
@@ -2139,14 +2144,12 @@ impl Drop for FieldAccessor<'_, '_, '_> {
     fn drop(&mut self) {
         #[cfg(not(feature = "lts"))]
         if self.state == ViewState::Locked {
-            debug_assert!(!self.value.is_undefined());
+            debug_assert!(!self.value.is_none());
             // Safety: the value is currently locked.
-            unsafe { jlrs_unlock(self.value.ptr()) }
+            unsafe { jlrs_unlock(self.value.unwrap().ptr().as_ptr()) }
         }
     }
 }
-
-impl_root!(Value, 2);
 
 /// A reference to a [`Value`] that has not been explicitly rooted.
 pub type ValueRef<'scope, 'data> = Ref<'scope, 'data, Value<'scope, 'data>>;
@@ -2165,6 +2168,19 @@ unsafe impl ValidLayout for ValueRef<'_, '_> {
     }
 
     const IS_REF: bool = true;
+}
+unsafe impl ValidField for Option<ValueRef<'_, '_>> {
+    fn valid_field(v: Value) -> bool {
+        if let Ok(dt) = v.cast::<DataType>() {
+            !dt.is_inline_alloc()
+        } else if v.cast::<UnionAll>().is_ok() {
+            true
+        } else if let Ok(u) = v.cast::<Union>() {
+            !u.is_bits_union()
+        } else {
+            false
+        }
+    }
 }
 
 impl_ref_root!(Value, ValueRef, 2);

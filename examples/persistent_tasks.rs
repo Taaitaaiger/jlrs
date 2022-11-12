@@ -52,9 +52,7 @@ impl PersistentTask for AccumulatorTask {
                 .scope(|mut frame| {
                     // A nested scope is used to only root a single value in the frame provided to
                     // init, rather than two.
-                    let func = Module::main(&frame)
-                        .global(&frame, "MutFloat64")?
-                        .value_unchecked();
+                    let func = Module::main(&frame).global(&frame, "MutFloat64")?.value();
                     let init_v = Value::new(&mut frame, self.init_value);
 
                     Ok(func.call1(output, init_v))

@@ -4,10 +4,7 @@
 //! in [`julia.h`]
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L1727
-use crate::{
-    impl_julia_typecheck, memory::target::Target, private::Private,
-    wrappers::ptr::private::WrapperPriv,
-};
+use crate::{impl_julia_typecheck, private::Private, wrappers::ptr::private::WrapperPriv};
 
 #[cfg(feature = "extra-fields")]
 use crate::wrappers::ptr::value::ValueRef;
@@ -50,51 +47,79 @@ impl<'scope> Task<'scope> {
 
     /// Invasive linked list for scheduler
     #[cfg(feature = "extra-fields")]
-    pub fn next(self) -> TaskRef<'scope> {
+    pub fn next(self) -> ValueRef<'scope, 'static> {
         // Safety: the pointer points to valid data
-        unsafe { TaskRef::wrap(self.unwrap_non_null(Private).as_ref().next.cast()) }
+        unsafe {
+            let next = self.unwrap_non_null(Private).as_ref().next;
+            debug_assert!(!next.is_null());
+            ValueRef::wrap(NonNull::new_unchecked(next))
+        }
     }
 
     /// Invasive linked list for scheduler
     #[cfg(feature = "extra-fields")]
-    pub fn queue(self) -> ValueRef<'scope, 'static> {
+    pub fn queue(self) -> Option<ValueRef<'scope, 'static>> {
         // Safety: the pointer points to valid data
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().queue) }
+        unsafe {
+            let queue = self.unwrap_non_null(Private).as_ref().queue;
+            let queue = NonNull::new(queue)?;
+            Some(ValueRef::wrap(queue))
+        }
     }
 
     /// The `tls` field, called `Task.storage` in Julia.
     #[cfg(feature = "extra-fields")]
-    pub fn storage(self) -> ValueRef<'scope, 'static> {
+    pub fn storage(self) -> Option<ValueRef<'scope, 'static>> {
         // Safety: the pointer points to valid data
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().tls) }
+        unsafe {
+            let storage = self.unwrap_non_null(Private).as_ref().tls;
+            let storage = NonNull::new(storage)?;
+            Some(ValueRef::wrap(storage))
+        }
     }
 
     /// The `donenotify` field.
     #[cfg(feature = "extra-fields")]
-    pub fn done_notify(self) -> ValueRef<'scope, 'static> {
+    pub fn done_notify(self) -> Option<ValueRef<'scope, 'static>> {
         // Safety: the pointer points to valid data
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().donenotify) }
+        unsafe {
+            let donenotify = self.unwrap_non_null(Private).as_ref().donenotify;
+            let donenotify = NonNull::new(donenotify)?;
+            Some(ValueRef::wrap(donenotify))
+        }
     }
 
     /// The `result` field.
     #[cfg(feature = "extra-fields")]
-    pub fn result(self) -> ValueRef<'scope, 'static> {
+    pub fn result(self) -> Option<ValueRef<'scope, 'static>> {
         // Safety: the pointer points to valid data
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().result) }
+        unsafe {
+            let result = self.unwrap_non_null(Private).as_ref().result;
+            let result = NonNull::new(result)?;
+            Some(ValueRef::wrap(result))
+        }
     }
 
     /// The `logstate` field.
     #[cfg(feature = "extra-fields")]
-    pub fn log_state(self) -> ValueRef<'scope, 'static> {
+    pub fn log_state(self) -> Option<ValueRef<'scope, 'static>> {
         // Safety: the pointer points to valid data
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().logstate) }
+        unsafe {
+            let logstate = self.unwrap_non_null(Private).as_ref().logstate;
+            let logstate = NonNull::new(logstate)?;
+            Some(ValueRef::wrap(logstate))
+        }
     }
 
     /// The `start` field.
     #[cfg(feature = "extra-fields")]
-    pub fn start(self) -> ValueRef<'scope, 'static> {
+    pub fn start(self) -> Option<ValueRef<'scope, 'static>> {
         // Safety: the pointer points to valid data
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().start) }
+        unsafe {
+            let start = self.unwrap_non_null(Private).as_ref().start;
+            let start = NonNull::new(start)?;
+            Some(ValueRef::wrap(start))
+        }
     }
 
     /// The `_state` field.
@@ -135,15 +160,6 @@ impl<'scope> Task<'scope> {
             }
         }
     }
-
-    /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> TaskData<'target, T>
-    where
-        T: Target<'target>,
-    {
-        // Safety: the data is valid.
-        unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
-    }
 }
 
 impl_julia_typecheck!(Task<'scope>, jl_task_type, 'scope);
@@ -164,8 +180,6 @@ impl<'scope> WrapperPriv<'scope, '_> for Task<'scope> {
         self.0
     }
 }
-
-impl_root!(Task, 1);
 
 /// A reference to a [`Task`] that has not been explicitly rooted.
 pub type TaskRef<'scope> = Ref<'scope, 'static, Task<'scope>>;

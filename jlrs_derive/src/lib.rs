@@ -154,6 +154,12 @@ pub fn valid_layout_derive(input: TokenStream) -> TokenStream {
     impl_valid_layout(&ast)
 }
 
+#[proc_macro_derive(ValidField, attributes(jlrs))]
+pub fn valid_field_derive(input: TokenStream) -> TokenStream {
+    let ast = syn::parse(input).unwrap();
+    impl_valid_field(&ast)
+}
+
 fn impl_into_julia(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
     if !is_repr_c(ast) {
@@ -192,11 +198,11 @@ fn impl_into_julia(ast: &syn::DeriveInput) -> TokenStream {
                         #(
                             .submodule(&global, #modules_it)
                             .expect(&format!("Submodule {} cannot be found", #modules_it_b))
-                            .wrapper_unchecked()
+                            .wrapper()
                         )*
                         .global(&global, #ty)
                         .expect(&format!("Type {} cannot be found in module", #ty))
-                        .value_unchecked()
+                        .value()
                         .cast::<::jlrs::wrappers::ptr::datatype::DataType>()
                         .expect("Type is not a DataType")
                         .root(target)
@@ -219,7 +225,7 @@ fn impl_into_julia_fn(attrs: &JlrsTypeAttrs) -> Option<TS2> {
             {
                 let ty = self.julia_type(global);
                 unsafe {
-                    ty.wrapper_unchecked()
+                    ty.wrapper()
                         .instance()
                         .value()
                         .expect("Instance is undefined")
@@ -310,18 +316,18 @@ fn impl_valid_layout(ast: &syn::DeriveInput) -> TokenStream {
                         }
 
                         let field_types = dt.field_types();
-                        let field_types_svec = field_types.wrapper_unchecked();
+                        let field_types_svec = field_types.wrapper();
                         let field_types_data = field_types_svec.data();
                         let field_types = field_types_data.as_slice();
 
                         #(
-                            if !<#rs_non_union_fields as ::jlrs::layout::valid_layout::ValidLayout>::valid_layout(field_types[#jl_non_union_field_idxs].wrapper_unchecked()) {
+                            if !<#rs_non_union_fields as ::jlrs::layout::valid_layout::ValidField>::valid_field(field_types[#jl_non_union_field_idxs].unwrap().wrapper()) {
                                 return false;
                             }
                         )*
 
                         #(
-                            if let Ok(u) = field_types[#jl_union_field_idxs].wrapper_unchecked().cast::<::jlrs::wrappers::ptr::union::Union>() {
+                            if let Ok(u) = field_types[#jl_union_field_idxs].unwrap().wrapper().cast::<::jlrs::wrappers::ptr::union::Union>() {
                                 if !::jlrs::wrappers::inline::union::correct_layout_for::<#rs_align_fields, #rs_union_fields, #rs_flag_fields>(u) {
                                     return false
                                 }
@@ -343,6 +349,26 @@ fn impl_valid_layout(ast: &syn::DeriveInput) -> TokenStream {
     };
 
     valid_layout_impl.into()
+}
+
+fn impl_valid_field(ast: &syn::DeriveInput) -> TokenStream {
+    let name = &ast.ident;
+    if !is_repr_c(ast) {
+        panic!("ValidLayout can only be derived for types with the attribute #[repr(C)].");
+    }
+
+    let generics = &ast.generics;
+    let where_clause = &ast.generics.where_clause;
+
+    let valid_field_impl = quote! {
+        unsafe impl #generics ::jlrs::layout::valid_layout::ValidField for #name #generics #where_clause {
+            fn valid_field(v: ::jlrs::wrappers::ptr::value::Value) -> bool {
+                <Self as ::jlrs::layout::valid_layout::ValidLayout>::valid_layout(v)
+            }
+        }
+    };
+
+    valid_field_impl.into()
 }
 
 fn is_repr_c(ast: &syn::DeriveInput) -> bool {

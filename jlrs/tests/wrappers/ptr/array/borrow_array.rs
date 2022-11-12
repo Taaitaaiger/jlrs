@@ -170,7 +170,7 @@ mod tests {
                     let array = Array::from_slice(&mut frame, &mut data, 4)?;
                     Module::base(&frame)
                         .function(&frame, "sum")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .call1(&mut frame, array)?
                         .unwrap()
                         .unbox::<u64>()
@@ -206,7 +206,7 @@ mod tests {
 
                     Module::base(&frame)
                         .function(&frame, "sum")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .call1(&mut frame, array.as_value())
                         .unwrap()
                         .unbox::<u64>()

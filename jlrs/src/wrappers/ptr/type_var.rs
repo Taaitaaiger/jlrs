@@ -56,7 +56,7 @@ impl<'scope> TypeVar<'scope> {
 
             let res = match catch_exceptions(&mut callback).unwrap() {
                 Ok(tvar) => Ok(NonNull::new_unchecked(tvar)),
-                Err(e) => Err(NonNull::new_unchecked(e.ptr())),
+                Err(e) => Err(e.ptr()),
             };
 
             target.result_from_ptr(res, Private)
@@ -99,28 +99,31 @@ impl<'scope> TypeVar<'scope> {
     /// The name of this `TypeVar`.
     pub fn name(self) -> SymbolRef<'scope> {
         // Safety: pointer points to valid data
-        unsafe { SymbolRef::wrap(self.unwrap_non_null(Private).as_ref().name) }
+        unsafe {
+            let name = self.unwrap_non_null(Private).as_ref().name;
+            debug_assert!(!name.is_null());
+            SymbolRef::wrap(NonNull::new_unchecked(name))
+        }
     }
 
     /// The lower bound of this `TypeVar`.
     pub fn lower_bound(self) -> ValueRef<'scope, 'static> {
         // Safety: pointer points to valid data
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().lb) }
+        unsafe {
+            let lb = self.unwrap_non_null(Private).as_ref().lb;
+            debug_assert!(!lb.is_null());
+            ValueRef::wrap(NonNull::new_unchecked(lb))
+        }
     }
 
     /// The upper bound of this `TypeVar`.
     pub fn upper_bound(self) -> ValueRef<'scope, 'static> {
         // Safety: pointer points to valid data
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().ub) }
-    }
-
-    /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> TypeVarData<'target, T>
-    where
-        T: Target<'target>,
-    {
-        // Safety: the data is valid.
-        unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
+        unsafe {
+            let ub = self.unwrap_non_null(Private).as_ref().ub;
+            debug_assert!(!ub.is_null());
+            ValueRef::wrap(NonNull::new_unchecked(ub))
+        }
     }
 }
 
@@ -142,8 +145,6 @@ impl<'scope> WrapperPriv<'scope, '_> for TypeVar<'scope> {
         self.0
     }
 }
-
-impl_root!(TypeVar, 1);
 
 /// A reference to a [`TypeVar`] that has not been explicitly rooted.
 pub type TypeVarRef<'scope> = Ref<'scope, 'static, TypeVar<'scope>>;

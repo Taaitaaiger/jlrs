@@ -28,9 +28,9 @@ mod tests {
                     unsafe {
                         let ty = Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper_unchecked()
+                            .wrapper()
                             .global(&frame, "HasConstructors")?
-                            .value_unchecked();
+                            .value();
 
                         assert!(ty.is::<DataType>());
 
@@ -41,7 +41,7 @@ mod tests {
                             .field_accessor(&frame)
                             .field("a")?
                             .access::<DataTypeRef>()?
-                            .wrapper_unchecked()
+                            .wrapper()
                             .is::<Bool>();
 
                         assert!(is_bool);
@@ -68,9 +68,9 @@ mod tests {
                     unsafe {
                         let ty = Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper_unchecked()
+                            .wrapper()
                             .global(&frame, "HasConstructors")?
-                            .value_unchecked();
+                            .value();
 
                         let arg = Value::new(&mut frame, 1i16);
 
@@ -81,7 +81,7 @@ mod tests {
                             .field_accessor(&frame)
                             .field("a")?
                             .access::<DataTypeRef>()?
-                            .wrapper_unchecked()
+                            .wrapper()
                             .is::<i16>();
 
                         assert!(is_i16);
@@ -108,9 +108,9 @@ mod tests {
                     unsafe {
                         let ty = Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper_unchecked()
+                            .wrapper()
                             .global(&frame, "HasConstructors")?
-                            .value_unchecked();
+                            .value();
 
                         let arg = Value::new(&mut frame, 1i16);
                         let args = [DataType::int64_type(&frame).as_value(), arg];
@@ -123,7 +123,7 @@ mod tests {
                             .field_accessor(&frame)
                             .field("a")?
                             .access::<DataTypeRef>()?
-                            .wrapper_unchecked()
+                            .wrapper()
                             .is::<i64>();
 
                         assert!(is_i64);

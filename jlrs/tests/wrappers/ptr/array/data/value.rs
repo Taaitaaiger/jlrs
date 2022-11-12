@@ -66,39 +66,36 @@ mod tests {
 
                     unsafe {
                         let mut data = arr.value_data_mut()?;
-                        assert!(data[0].is_undefined());
+                        assert!(data[0].is_none());
                         assert!(data.set(0, Some(module)).is_ok());
                         assert!(data.set(1, Some(module)).is_ok());
-                        assert!(!data[0].is_undefined());
-                        assert_eq!(data[0].value_unchecked(), module);
-                        assert_eq!(data.get(0).unwrap().value_unchecked(), module);
+                        assert!(!data[0].is_none());
+                        assert_eq!(data[0].unwrap().value(), module);
+                        assert_eq!(data.get(0).unwrap().value(), module);
                     }
 
                     unsafe {
                         let data = arr.value_data()?;
-                        assert_eq!(data[0].value_unchecked(), module);
-                        assert_eq!(data.get(0).unwrap().value_unchecked(), module);
+                        assert_eq!(data[0].unwrap().value(), module);
+                        assert_eq!(data.get(0).unwrap().value(), module);
                     }
 
                     unsafe {
                         let data = arr.wrapper_data::<ModuleRef>()?;
-                        assert_eq!(data[1].value_unchecked(), module);
-                        assert_eq!(
-                            data.get(1).unwrap().wrapper_unchecked(),
-                            module.cast::<Module>()?
-                        );
+                        assert_eq!(data[1].unwrap().value(), module);
+                        assert_eq!(data.get(1).unwrap().wrapper(), module.cast::<Module>()?);
                     }
 
                     unsafe {
                         let mut data = arr.wrapper_data_mut::<ModuleRef>()?;
-                        assert!(data[2].is_undefined());
+                        assert!(data[2].is_none());
                         assert!(data.set(2, Some(module)).is_ok());
-                        assert!(!data[2].is_undefined());
-                        assert_eq!(data[2].value_unchecked(), module);
-                        assert_eq!(data.get(2).unwrap().value_unchecked(), module);
+                        assert!(!data[2].is_none());
+                        assert_eq!(data[2].unwrap().value(), module);
+                        assert_eq!(data.get(2).unwrap().value(), module);
 
                         assert!(data.set(2, None).is_ok());
-                        assert!(data[2].is_undefined());
+                        assert!(data[2].is_none());
                     }
 
                     Ok(())

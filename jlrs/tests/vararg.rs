@@ -24,10 +24,10 @@ mod not_lts {
 
                     let vararg = vararg.cast::<Vararg>()?;
                     assert_eq!(
-                        vararg.t().value_unchecked().cast::<DataType>()?,
+                        vararg.t().unwrap().value().cast::<DataType>()?,
                         DataType::int32_type(&frame)
                     );
-                    assert!(vararg.n().is_undefined());
+                    assert!(vararg.n().is_none());
                     Ok(())
                 })
                 .unwrap();
@@ -50,8 +50,8 @@ mod not_lts {
                     assert!(instance.is::<Vararg>());
 
                     let vararg = instance.cast::<Vararg>()?;
-                    assert!(vararg.t().is_undefined());
-                    assert!(vararg.n().is_undefined());
+                    assert!(vararg.t().is_none());
+                    assert!(vararg.n().is_none());
                     Ok(())
                 })
                 .unwrap();
@@ -76,10 +76,10 @@ mod not_lts {
 
                     let vararg = instance.cast::<Vararg>()?;
                     assert_eq!(
-                        vararg.t().value_unchecked().cast::<DataType>()?,
+                        vararg.t().unwrap().value().cast::<DataType>()?,
                         DataType::int32_type(&frame)
                     );
-                    assert!(vararg.n().is_undefined());
+                    assert!(vararg.n().is_none());
                     Ok(())
                 })
                 .unwrap();
@@ -105,10 +105,10 @@ mod not_lts {
 
                     let vararg = instance.cast::<Vararg>()?;
                     assert_eq!(
-                        vararg.t().value_unchecked().cast::<DataType>()?,
+                        vararg.t().unwrap().value().cast::<DataType>()?,
                         DataType::int32_type(&frame)
                     );
-                    assert_eq!(vararg.n().value_unchecked().unbox::<isize>()?, 3);
+                    assert_eq!(vararg.n().unwrap().value().unbox::<isize>()?, 3);
                     Ok(())
                 })
                 .unwrap();

@@ -9,7 +9,10 @@
 use crate::{
     call::{Call, ProvideKeywords, WithKeywords},
     error::JlrsResult,
-    layout::{typecheck::Typecheck, valid_layout::ValidLayout},
+    layout::{
+        typecheck::Typecheck,
+        valid_layout::{ValidField, ValidLayout},
+    },
     memory::{target::global::Global, target::Target},
     private::Private,
     wrappers::ptr::{datatype::DataType, private::WrapperPriv, value::Value, Wrapper},
@@ -32,15 +35,6 @@ impl<'scope, 'data> Function<'scope, 'data> {
     /// Returns the `DataType` of this function. In Julia, every function has its own `DataType`.
     pub fn datatype(self) -> DataType<'scope> {
         self.as_value().datatype()
-    }
-
-    /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> FunctionData<'target, 'data, T>
-    where
-        T: Target<'target>,
-    {
-        // Safety: the data is valid.
-        unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
     }
 }
 
@@ -140,8 +134,6 @@ impl<'value, 'data> ProvideKeywords<'value, 'data> for Function<'value, 'data> {
     }
 }
 
-impl_root!(Function, 2);
-
 /// A reference to an [`Function`] that has not been explicitly rooted.
 pub type FunctionRef<'scope, 'data> = Ref<'scope, 'data, Function<'scope, 'data>>;
 
@@ -154,6 +146,14 @@ unsafe impl ValidLayout for FunctionRef<'_, '_> {
     }
 
     const IS_REF: bool = true;
+}
+
+unsafe impl ValidField for Option<FunctionRef<'_, '_>> {
+    fn valid_field(ty: Value) -> bool {
+        let global = unsafe { Global::new() };
+        let function_type = DataType::function_type(&global);
+        ty.subtype(function_type.as_value())
+    }
 }
 
 impl_ref_root!(Function, FunctionRef, 2);

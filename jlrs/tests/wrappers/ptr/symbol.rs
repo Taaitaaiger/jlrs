@@ -31,9 +31,9 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let smb = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .function(&frame, "symbol")?
-                        .wrapper_unchecked();
+                        .wrapper();
                     let smb_val = smb.call0(&mut frame).unwrap();
 
                     assert!(smb_val.is::<Symbol>());

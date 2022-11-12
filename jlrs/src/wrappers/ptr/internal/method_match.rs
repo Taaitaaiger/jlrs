@@ -6,7 +6,6 @@
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/f9720dc2ebd6cd9e3086365f281e62506444ef37/src/julia.h#L585
 use crate::{
     impl_julia_typecheck,
-    memory::target::Target,
     private::Private,
     wrappers::ptr::{
         internal::method::MethodRef, private::WrapperPriv, simple_vector::SimpleVectorRef,
@@ -33,21 +32,33 @@ impl<'scope> MethodMatch<'scope> {
     */
 
     /// The `spec_types` field.
-    pub fn spec_types(self) -> ValueRef<'scope, 'static> {
+    pub fn spec_types(self) -> Option<ValueRef<'scope, 'static>> {
         // Safety: the pointer points to valid data
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().spec_types.cast()) }
+        unsafe {
+            let data = self.unwrap_non_null(Private).as_ref().spec_types.cast();
+            let data = NonNull::new(data)?;
+            Some(ValueRef::wrap(data))
+        }
     }
 
     /// The `sparams` field.
-    pub fn sparams(self) -> SimpleVectorRef<'scope> {
-        // Safety: the pointer points to valid data
-        unsafe { SimpleVectorRef::wrap(self.unwrap_non_null(Private).as_ref().sparams) }
+    pub fn sparams(self) -> Option<SimpleVectorRef<'scope>> {
+        //> Safety: the pointer points to valid data
+        unsafe {
+            let data = self.unwrap_non_null(Private).as_ref().sparams;
+            let data = NonNull::new(data)?;
+            Some(SimpleVectorRef::wrap(data))
+        }
     }
 
     /// The `method` field.
-    pub fn method(self) -> MethodRef<'scope> {
-        // Safety: the pointer points to valid data
-        unsafe { MethodRef::wrap(self.unwrap_non_null(Private).as_ref().method) }
+    pub fn method(self) -> Option<MethodRef<'scope>> {
+        //> Safety: the pointer points to valid data
+        unsafe {
+            let data = self.unwrap_non_null(Private).as_ref().method;
+            let data = NonNull::new(data)?;
+            Some(MethodRef::wrap(data))
+        }
     }
 
     /// A bool on the julia side, but can be temporarily 0x2 as a sentinel
@@ -55,15 +66,6 @@ impl<'scope> MethodMatch<'scope> {
     pub fn fully_covers(self) -> u8 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().fully_covers }
-    }
-
-    /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> MethodMatchData<'target, T>
-    where
-        T: Target<'target>,
-    {
-        // Safety: the data is valid.
-        unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
     }
 }
 
@@ -85,8 +87,6 @@ impl<'scope> WrapperPriv<'scope, '_> for MethodMatch<'scope> {
         self.0
     }
 }
-
-impl_root!(MethodMatch, 1);
 
 /// A reference to a [`MethodMatch`] that has not been explicitly rooted.
 pub type MethodMatchRef<'scope> = Ref<'scope, 'static, MethodMatch<'scope>>;

@@ -52,9 +52,9 @@ impl AsyncTask for MyTask {
                 let out = unsafe {
                     Module::main(&frame)
                         .submodule(&frame, "MyModule")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .function(&frame, "complexfunc")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .call_async(&mut frame, &mut [dims, iters])
                         .await
                         .into_jlrs_result()?

@@ -169,9 +169,7 @@ mod tests {
                             .as_value();
                         assert!(ArrayRef::valid_layout(v.datatype().as_value()));
 
-                        let ua = Module::base(&frame)
-                            .global(&frame, "Array")?
-                            .wrapper_unchecked();
+                        let ua = Module::base(&frame).global(&frame, "Array")?.wrapper();
 
                         assert!(ArrayRef::valid_layout(ua));
                     }

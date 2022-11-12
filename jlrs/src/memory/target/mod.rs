@@ -217,8 +217,8 @@ pub(crate) mod private {
             _: Private,
         ) -> Self::Result<'data, T> {
             let result = match result {
-                Ok(v) => Ok(NonNull::new_unchecked(v.ptr())),
-                Err(e) => Err(NonNull::new_unchecked(e.ptr())),
+                Ok(v) => Ok(v.ptr()),
+                Err(e) => Err(e.ptr()),
             };
 
             self.result_from_ptr(result, Private)
@@ -465,7 +465,7 @@ pub(crate) mod private {
             value: NonNull<T::Wraps>,
             _: Private,
         ) -> Self::Data<'data, T> {
-            Ref::wrap(value.as_ptr())
+            Ref::wrap(value)
         }
 
         // Safety: the pointer must point to valid data.
@@ -475,8 +475,8 @@ pub(crate) mod private {
             _: Private,
         ) -> Self::Result<'data, T> {
             match result {
-                Ok(t) => Ok(Ref::wrap(t.as_ptr())),
-                Err(e) => Err(Ref::wrap(e.as_ptr())),
+                Ok(t) => Ok(Ref::wrap(t)),
+                Err(e) => Err(Ref::wrap(e)),
             }
         }
 
@@ -488,7 +488,7 @@ pub(crate) mod private {
         ) -> Self::Exception<'data, T> {
             match result {
                 Ok(t) => Ok(t),
-                Err(e) => Err(Ref::wrap(e.as_ptr())),
+                Err(e) => Err(Ref::wrap(e)),
             }
         }
     }
@@ -500,7 +500,7 @@ pub(crate) mod private {
             value: NonNull<T::Wraps>,
             _: Private,
         ) -> Self::Data<'data, T> {
-            Ref::wrap(value.as_ptr())
+            Ref::wrap(value)
         }
 
         // Safety: the pointer must point to valid data.
@@ -510,8 +510,8 @@ pub(crate) mod private {
             _: Private,
         ) -> Self::Result<'data, T> {
             match result {
-                Ok(t) => Ok(Ref::wrap(t.as_ptr())),
-                Err(e) => Err(Ref::wrap(e.as_ptr())),
+                Ok(t) => Ok(Ref::wrap(t)),
+                Err(e) => Err(Ref::wrap(e)),
             }
         }
 
@@ -523,7 +523,7 @@ pub(crate) mod private {
         ) -> Self::Exception<'data, T> {
             match result {
                 Ok(t) => Ok(t),
-                Err(e) => Err(Ref::wrap(e.as_ptr())),
+                Err(e) => Err(Ref::wrap(e)),
             }
         }
     }

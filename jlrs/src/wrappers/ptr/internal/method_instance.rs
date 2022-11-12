@@ -6,7 +6,6 @@
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L321
 use crate::{
     impl_julia_typecheck,
-    memory::target::Target,
     private::Private,
     wrappers::ptr::{
         internal::code_instance::CodeInstanceRef, private::WrapperPriv,
@@ -47,52 +46,81 @@ impl<'scope> MethodInstance<'scope> {
     */
 
     /// pointer back to the context for this code
-    pub fn def(self) -> ValueRef<'scope, 'static> {
+    pub fn def(self) -> Option<ValueRef<'scope, 'static>> {
         // Safety: the pointer points to valid data
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().def.value) }
+        unsafe {
+            let def = self.unwrap_non_null(Private).as_ref().def.value;
+            let def = NonNull::new(def)?;
+            Some(ValueRef::wrap(def))
+        }
     }
 
     /// Argument types this was specialized for
-    pub fn spec_types(self) -> ValueRef<'scope, 'static> {
+    pub fn spec_types(self) -> Option<ValueRef<'scope, 'static>> {
         // Safety: the pointer points to valid data
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().specTypes) }
+        unsafe {
+            let spec_types = self.unwrap_non_null(Private).as_ref().specTypes;
+            let spec_types = NonNull::new(spec_types)?;
+            Some(ValueRef::wrap(spec_types))
+        }
     }
 
     /// Static parameter values, indexed by def.method->sparam_syms
-    pub fn sparam_vals(self) -> SimpleVectorRef<'scope> {
+    pub fn sparam_vals(self) -> Option<SimpleVectorRef<'scope>> {
         // Safety: the pointer points to valid data
-        unsafe { SimpleVectorRef::wrap(self.unwrap_non_null(Private).as_ref().sparam_vals) }
+        unsafe {
+            let sparam_vals = self.unwrap_non_null(Private).as_ref().sparam_vals;
+            let sparam_vals = NonNull::new(sparam_vals)?;
+            Some(SimpleVectorRef::wrap(sparam_vals))
+        }
     }
 
     /// Cached uncompressed code, for generated functions, top-level thunks, or the interpreter
-    pub fn uninferred(self) -> ValueRef<'scope, 'static> {
+    pub fn uninferred(self) -> Option<ValueRef<'scope, 'static>> {
         // Safety: the pointer points to valid data
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().uninferred) }
+        unsafe {
+            let uninferred = self.unwrap_non_null(Private).as_ref().uninferred;
+            let uninferred = NonNull::new(uninferred)?;
+            Some(ValueRef::wrap(uninferred))
+        }
     }
 
     /// List of method-instances which contain a call into this method-instance
-    pub fn backedges(self) -> ValueRef<'scope, 'static> {
+    pub fn backedges(self) -> Option<ValueRef<'scope, 'static>> {
         // Safety: the pointer points to valid data
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().backedges.cast()) }
+        unsafe {
+            let backedges = self.unwrap_non_null(Private).as_ref().backedges;
+            let backedges = NonNull::new(backedges)?;
+            Some(ValueRef::wrap(backedges.cast()))
+        }
     }
 
     /// list of callback functions to inform external caches about invalidations
-    pub fn callbacks(self) -> ValueRef<'scope, 'static> {
+    pub fn callbacks(self) -> Option<ValueRef<'scope, 'static>> {
         // Safety: the pointer points to valid data
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().callbacks.cast()) }
+        unsafe {
+            let callbacks = self.unwrap_non_null(Private).as_ref().callbacks;
+            let callbacks = NonNull::new(callbacks)?;
+            Some(ValueRef::wrap(callbacks.cast()))
+        }
     }
 
     /// The `cache` field.
-    pub fn cache(self) -> CodeInstanceRef<'scope> {
+    pub fn cache(self) -> Option<CodeInstanceRef<'scope>> {
         cfg_if! {
             if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
-                unsafe { CodeInstanceRef::wrap(self.unwrap_non_null(Private).as_ref().cache) }
+                unsafe {
+                    let cache = self.unwrap_non_null(Private).as_ref().cache;
+                    let cache = NonNull::new(cache)?;
+                    Some(CodeInstanceRef::wrap(cache))
+                }
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let cache = self.unwrap_non_null(Private).as_ref().cache.load(Ordering::Relaxed);
-                    CodeInstanceRef::wrap(cache)
+                    let cache = NonNull::new(cache)?;
+                    Some(CodeInstanceRef::wrap(cache))
                 }
             }
         }
@@ -109,15 +137,6 @@ impl<'scope> MethodInstance<'scope> {
     pub fn precompiled(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().precompiled != 0 }
-    }
-
-    /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> MethodInstanceData<'target, T>
-    where
-        T: Target<'target>,
-    {
-        // Safety: the data is valid.
-        unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
     }
 }
 
@@ -140,7 +159,6 @@ impl<'scope> WrapperPriv<'scope, '_> for MethodInstance<'scope> {
     }
 }
 
-impl_root!(MethodInstance, 1);
 /// A reference to a [`MethodInstance`] that has not been explicitly rooted.
 pub type MethodInstanceRef<'scope> = Ref<'scope, 'static, MethodInstance<'scope>>;
 impl_valid_layout!(MethodInstanceRef, MethodInstance);

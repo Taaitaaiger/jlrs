@@ -61,7 +61,7 @@ impl<'scope> UnionAll<'scope> {
 
             let res = match catch_exceptions(&mut callback).unwrap() {
                 Ok(ptr) => Ok(NonNull::new_unchecked(ptr)),
-                Err(e) => Err(NonNull::new_unchecked(e.ptr())),
+                Err(e) => Err(e.ptr()),
             };
 
             target.result_from_ptr(res, Private)
@@ -90,8 +90,8 @@ impl<'scope> UnionAll<'scope> {
 
         // Safety: pointer points to valid data
         unsafe {
-            while b.body().value_unchecked().is::<UnionAll>() {
-                b = b.body().value_unchecked().cast_unchecked::<UnionAll>();
+            while b.body().value().is::<UnionAll>() {
+                b = b.body().value().cast_unchecked::<UnionAll>();
             }
         }
 
@@ -99,10 +99,10 @@ impl<'scope> UnionAll<'scope> {
         unsafe {
             DataTypeRef::wrap(
                 b.body()
-                    .value_unchecked()
+                    .value()
                     .cast::<DataType>()
                     .unwrap()
-                    .unwrap(Private),
+                    .unwrap_non_null(Private),
             )
         }
     }
@@ -118,22 +118,21 @@ impl<'scope> UnionAll<'scope> {
     /// The body of this `UnionAll`. This is either another `UnionAll` or a `DataType`.
     pub fn body(self) -> ValueRef<'scope, 'static> {
         // Safety: pointer points to valid data
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().body) }
+        unsafe {
+            let body = self.unwrap_non_null(Private).as_ref().body;
+            debug_assert!(!body.is_null());
+            ValueRef::wrap(NonNull::new_unchecked(body))
+        }
     }
 
     /// The type variable associated with this "layer" of the `UnionAll`.
     pub fn var(self) -> TypeVarRef<'scope> {
         // Safety: pointer points to valid data
-        unsafe { TypeVarRef::wrap(self.unwrap_non_null(Private).as_ref().var) }
-    }
-
-    /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> UnionAllData<'target, T>
-    where
-        T: Target<'target>,
-    {
-        // Safety: the data is valid.
-        unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
+        unsafe {
+            let var = self.unwrap_non_null(Private).as_ref().var;
+            debug_assert!(!var.is_null());
+            TypeVarRef::wrap(NonNull::new_unchecked(var))
+        }
     }
 }
 
@@ -144,7 +143,7 @@ impl<'base> UnionAll<'base> {
         T: Target<'base>,
     {
         // Safety: global constant
-        unsafe { UnionAll::wrap(jl_type_type, Private) }
+        unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_type_type), Private) }
     }
 
     /// `Type{T} where T<:Tuple`
@@ -153,7 +152,7 @@ impl<'base> UnionAll<'base> {
         T: Target<'base>,
     {
         // Safety: global constant
-        unsafe { UnionAll::wrap(jl_anytuple_type_type, Private) }
+        unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_anytuple_type_type), Private) }
     }
 
     /// The `UnionAll` `Vararg`.
@@ -163,7 +162,7 @@ impl<'base> UnionAll<'base> {
         T: Target<'base>,
     {
         // Safety: global constant
-        unsafe { UnionAll::wrap(jl_vararg_type, Private) }
+        unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_vararg_type), Private) }
     }
 
     /// The `UnionAll` `AbstractArray`.
@@ -172,7 +171,7 @@ impl<'base> UnionAll<'base> {
         T: Target<'base>,
     {
         // Safety: global constant
-        unsafe { UnionAll::wrap(jl_abstractarray_type, Private) }
+        unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_abstractarray_type), Private) }
     }
 
     /// The `UnionAll` `OpaqueClosure`.
@@ -182,7 +181,7 @@ impl<'base> UnionAll<'base> {
         T: Target<'base>,
     {
         // Safety: global constant
-        unsafe { UnionAll::wrap(jl_opaque_closure_type, Private) }
+        unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_opaque_closure_type), Private) }
     }
 
     /// The `UnionAll` `DenseArray`.
@@ -191,7 +190,7 @@ impl<'base> UnionAll<'base> {
         T: Target<'base>,
     {
         // Safety: global constant
-        unsafe { UnionAll::wrap(jl_densearray_type, Private) }
+        unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_densearray_type), Private) }
     }
 
     /// The `UnionAll` `Array`.
@@ -200,7 +199,7 @@ impl<'base> UnionAll<'base> {
         T: Target<'base>,
     {
         // Safety: global constant
-        unsafe { UnionAll::wrap(jl_array_type, Private) }
+        unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_array_type), Private) }
     }
 
     /// The `UnionAll` `Ptr`.
@@ -209,7 +208,7 @@ impl<'base> UnionAll<'base> {
         T: Target<'base>,
     {
         // Safety: global constant
-        unsafe { UnionAll::wrap(jl_pointer_type, Private) }
+        unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_pointer_type), Private) }
     }
 
     /// The `UnionAll` `LLVMPtr`.
@@ -218,7 +217,7 @@ impl<'base> UnionAll<'base> {
         T: Target<'base>,
     {
         // Safety: global constant
-        unsafe { UnionAll::wrap(jl_llvmpointer_type, Private) }
+        unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_llvmpointer_type), Private) }
     }
 
     /// The `UnionAll` `Ref`.
@@ -227,7 +226,7 @@ impl<'base> UnionAll<'base> {
         T: Target<'base>,
     {
         // Safety: global constant
-        unsafe { UnionAll::wrap(jl_ref_type, Private) }
+        unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_ref_type), Private) }
     }
 
     /// The `UnionAll` `NamedTuple`.
@@ -236,7 +235,7 @@ impl<'base> UnionAll<'base> {
         T: Target<'base>,
     {
         // Safety: global constant
-        unsafe { UnionAll::wrap(jl_namedtuple_type, Private) }
+        unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_namedtuple_type), Private) }
     }
 }
 
@@ -258,8 +257,6 @@ impl<'scope> WrapperPriv<'scope, '_> for UnionAll<'scope> {
         self.0
     }
 }
-
-impl_root!(UnionAll, 1);
 
 /// A reference to a [`UnionAll`] that has not been explicitly rooted.
 pub type UnionAllRef<'scope> = Ref<'scope, 'static, UnionAll<'scope>>;

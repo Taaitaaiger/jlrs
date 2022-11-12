@@ -2,7 +2,6 @@
 
 use crate::{
     impl_julia_typecheck,
-    memory::target::Target,
     private::Private,
     wrappers::ptr::{private::WrapperPriv, value::ValueRef, Ref},
 };
@@ -23,18 +22,12 @@ impl<'scope> WeakRef<'scope> {
     */
 
     /// The referenced `Value`.
-    pub fn value(self) -> ValueRef<'scope, 'static> {
-        // Safety: the pointer points to valid data
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().value) }
-    }
-
-    /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> WeakRefData<'target, T>
-    where
-        T: Target<'target>,
-    {
-        // Safety: the data is valid.
-        unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
+    pub fn value(self) -> Option<ValueRef<'scope, 'static>> {
+        unsafe {
+            let value = self.unwrap_non_null(Private).as_ref().value;
+            let value = NonNull::new(value)?;
+            Some(ValueRef::wrap(value))
+        }
     }
 }
 
@@ -56,8 +49,6 @@ impl<'scope> WrapperPriv<'scope, '_> for WeakRef<'scope> {
         self.0
     }
 }
-
-impl_root!(WeakRef, 1);
 
 /// A reference to a [`WeakRef`] that has not been explicitly rooted.
 pub type WeakRefRef<'scope> = Ref<'scope, 'static, WeakRef<'scope>>;

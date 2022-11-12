@@ -15,9 +15,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsStableTests")?
-                            .wrapper_unchecked()
+                            .wrapper()
                             .global(&frame, "WithAtomic")?
-                            .value_unchecked()
+                            .value()
                     };
 
                     let arg1 = Value::new(&mut frame, 3u32);
@@ -48,9 +48,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsStableTests")?
-                            .wrapper_unchecked()
+                            .wrapper()
                             .global(&frame, "WithLargeAtomic")?
-                            .value_unchecked()
+                            .value()
                     };
 
                     let tup = Value::new(&mut frame, Tuple4(1u64, 2u64, 3u64, 4u64));
@@ -82,9 +82,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsStableTests")?
-                            .wrapper_unchecked()
+                            .wrapper()
                             .global(&frame, "WithOddlySizedAtomic")?
-                            .value_unchecked()
+                            .value()
                     };
 
                     let tup = Value::new(&mut frame, Tuple2(1u32, 2u16));
@@ -116,9 +116,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsStableTests")?
-                            .wrapper_unchecked()
+                            .wrapper()
                             .global(&frame, "WithAtomicUnion")?
-                            .value_unchecked()
+                            .value()
                     };
 
                     assert!(ty.cast::<DataType>()?.is_pointer_field(0)?);
@@ -143,9 +143,9 @@ mod tests {
                         assert_eq!(
                             DataType::datatype_type(&frame)
                                 .type_name()
-                                .wrapper_unchecked()
+                                .wrapper()
                                 .cache()
-                                .wrapper_unchecked()
+                                .wrapper()
                                 .len(),
                             0
                         )

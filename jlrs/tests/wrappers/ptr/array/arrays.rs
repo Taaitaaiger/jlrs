@@ -98,10 +98,7 @@ mod tests {
                     assert!(!arr.is_value_array());
                     unsafe {
                         assert_eq!(
-                            arr.element_type()
-                                .wrapper_unchecked()
-                                .cast::<DataType>()?
-                                .name(),
+                            arr.element_type().wrapper().cast::<DataType>()?.name(),
                             "Float32"
                         );
                     }
@@ -213,7 +210,7 @@ mod tests {
 
                     assert!(arr_val
                         .cast::<Array>()?
-                        .copy_inline_data::<ValueRef>()
+                        .copy_inline_data::<Option<ValueRef>>()
                         .is_err());
 
                     Ok(())
@@ -231,7 +228,10 @@ mod tests {
             jlrs.instance(&mut frame)
                 .scope(|frame| unsafe {
                     let arr_val = Value::an_empty_vec_any(&frame);
-                    assert!(arr_val.cast::<Array>()?.inline_data::<ValueRef>().is_err());
+                    assert!(arr_val
+                        .cast::<Array>()?
+                        .inline_data::<Option<ValueRef>>()
+                        .is_err());
                     Ok(())
                 })
                 .unwrap();
@@ -249,7 +249,7 @@ mod tests {
                     let arr_val = Value::an_empty_vec_any(&frame);
                     assert!(arr_val
                         .cast::<Array>()?
-                        .inline_data_mut::<ValueRef>()
+                        .inline_data_mut::<Option<ValueRef>>()
                         .is_err());
                     Ok(())
                 })
@@ -268,7 +268,7 @@ mod tests {
                     let arr_val = Value::an_empty_vec_any(&frame);
                     assert!(arr_val
                         .cast::<Array>()?
-                        .inline_data_mut::<ValueRef>()
+                        .inline_data_mut::<Option<ValueRef>>()
                         .is_err());
                     Ok(())
                 })
