@@ -189,7 +189,7 @@ impl<'borrow, 'array, 'data, T, L: ArrayLayout> Clone
 impl<'borrow, 'array, 'data, U, L: ArrayLayout, M: Mutability>
     ArrayAccessor<'borrow, 'array, 'data, U, L, M>
 {
-    pub(crate) unsafe fn new2(array: &'borrow Array<'array, 'data>) -> Self {
+    pub(crate) unsafe fn new(array: &'borrow Array<'array, 'data>) -> Self {
         ArrayAccessor {
             array: *array,
             _lt_marker: PhantomData,

@@ -10,6 +10,8 @@ use crate::{
 #[cfg(feature = "async")]
 use crate::memory::target::frame::AsyncGcFrame;
 
+use super::reusable_slot::ReusableSlot;
+
 /// Defines the return types of a target, `Data` and `Result`.
 pub trait TargetType<'target>: Sized {
     /// Type returned by methods that don't catch Julia exceptions.
@@ -68,6 +70,19 @@ impl<'target> TargetType<'target> for &'target mut Output<'_> {
     type Data<'data, T: Wrapper<'target, 'data>> = T;
     type Result<'data, T: Wrapper<'target, 'data>> = JuliaResult<'target, 'data, T>;
     type Exception<'data, T> = JuliaResult<'target, 'data, T>;
+}
+
+impl<'target> TargetType<'target> for ReusableSlot<'target> {
+    type Data<'data, T: Wrapper<'target, 'data>> = T;
+    type Result<'data, T: Wrapper<'target, 'data>> = JuliaResult<'target, 'data, T>;
+    type Exception<'data, T> = JuliaResult<'target, 'data, T>;
+}
+
+impl<'target> TargetType<'target> for &mut ReusableSlot<'target> {
+    type Data<'data, T: Wrapper<'target, 'data>> = Ref<'target, 'data, T>;
+    type Result<'data, T: Wrapper<'target, 'data>> =
+        JuliaResultRef<'target, 'data, Ref<'target, 'data, T>>;
+    type Exception<'data, T> = JuliaResultRef<'target, 'data, T>;
 }
 
 impl<'target> TargetType<'target> for Global<'target> {

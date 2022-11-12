@@ -37,7 +37,6 @@ use std::ffi::c_void;
 /// [`Value::is`]: crate::wrappers::ptr::value::Value::is
 /// [`Unbox`]: crate::convert::unbox::Unbox
 /// [`Wrapper`]: crate::wrappers::ptr::Wrapper
-/// [`ValidLayout`]: crate::layout::valid_layout::ValidLayout
 pub unsafe trait Typecheck {
     /// Returns whether the property implied by `Self` holds true.
     fn typecheck(t: DataType) -> bool;
