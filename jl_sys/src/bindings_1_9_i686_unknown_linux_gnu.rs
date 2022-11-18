@@ -1,4 +1,4 @@
-/* generated from Julia version 1.9.0-dev */
+/* generated from Julia version 1.9.0-alpha1 */
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct __BindgenBitfieldUnit<Storage> {
@@ -85,17 +85,17 @@ pub type __int16_t = ::std::os::raw::c_short;
 pub type __uint16_t = ::std::os::raw::c_ushort;
 pub type __int32_t = ::std::os::raw::c_int;
 pub type __uint32_t = ::std::os::raw::c_uint;
-pub type __int64_t = ::std::os::raw::c_long;
-pub type __uint64_t = ::std::os::raw::c_ulong;
+pub type __int64_t = ::std::os::raw::c_longlong;
+pub type __uint64_t = ::std::os::raw::c_ulonglong;
 pub type __sig_atomic_t = ::std::os::raw::c_int;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct __sigset_t {
-    pub __val: [::std::os::raw::c_ulong; 16usize],
+    pub __val: [::std::os::raw::c_ulong; 32usize],
 }
 pub type pthread_t = ::std::os::raw::c_ulong;
 pub type sig_atomic_t = __sig_atomic_t;
-pub type __jmp_buf = [::std::os::raw::c_long; 8usize];
+pub type __jmp_buf = [::std::os::raw::c_int; 6usize];
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct __jmp_buf_tag {
@@ -104,7 +104,7 @@ pub struct __jmp_buf_tag {
     pub __saved_mask: __sigset_t,
 }
 pub type jl_gcframe_t = _jl_gcframe_t;
-pub type uint_t = u64;
+pub type uint_t = u32;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct htable_t {
@@ -152,7 +152,7 @@ pub type jl_thread_t = pthread_t;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct jl_mutex_t {
-    pub owner: u64,
+    pub owner: u32,
     pub count: u32,
 }
 #[repr(C)]
@@ -186,7 +186,7 @@ pub struct jl_thread_heap_t {
     pub remset_nptr: ::std::os::raw::c_int,
     pub remset: *mut arraylist_t,
     pub last_remset: *mut arraylist_t,
-    pub norm_pools: [jl_gc_pool_t; 49usize],
+    pub norm_pools: [jl_gc_pool_t; 51usize],
     pub free_stacks: [arraylist_t; 16usize],
 }
 #[repr(C)]
@@ -235,7 +235,7 @@ pub struct _jl_tls_states_t {
     pub heap: jl_thread_heap_t,
     pub gc_num: jl_thread_gc_num_t,
     pub defer_signal: sig_atomic_t,
-    pub current_task: u64,
+    pub current_task: u32,
     pub next_task: *mut _jl_task_t,
     pub previous_task: *mut _jl_task_t,
     pub root_task: *mut _jl_task_t,
@@ -269,22 +269,22 @@ extern "C" {
 }
 pub type jl_value_t = _jl_value_t;
 #[repr(C)]
-#[repr(align(8))]
+#[repr(align(4))]
 #[derive(Debug, Copy, Clone)]
 pub struct _jl_taggedvalue_bits {
     pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 1usize]>,
-    pub __bindgen_padding_0: [u8; 7usize],
+    pub __bindgen_padding_0: [u8; 3usize],
 }
 impl _jl_taggedvalue_bits {
     #[inline]
     pub fn gc(&self) -> usize {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(0usize, 2u8) as u64) }
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(0usize, 2u8) as u32) }
     }
     #[inline]
     pub fn set_gc(&mut self, val: usize) {
         unsafe {
-            let val: u64 = ::std::mem::transmute(val);
+            let val: u32 = ::std::mem::transmute(val);
             self._bitfield_1.set(0usize, 2u8, val as u64)
         }
     }
@@ -292,7 +292,7 @@ impl _jl_taggedvalue_bits {
     pub fn new_bitfield_1(gc: usize) -> __BindgenBitfieldUnit<[u8; 1usize]> {
         let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 1usize]> = Default::default();
         __bindgen_bitfield_unit.set(0usize, 2u8, {
-            let gc: u64 = unsafe { ::std::mem::transmute(gc) };
+            let gc: u32 = unsafe { ::std::mem::transmute(gc) };
             gc as u64
         });
         __bindgen_bitfield_unit
@@ -2034,7 +2034,6 @@ pub struct _jl_task_t {
     pub bufsz: usize,
     pub _bitfield_align_1: [u32; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 4usize]>,
-    pub __bindgen_padding_0: u32,
 }
 impl _jl_task_t {
     #[inline]

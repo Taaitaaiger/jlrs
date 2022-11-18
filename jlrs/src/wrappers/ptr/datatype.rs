@@ -301,9 +301,24 @@ impl<'scope> DataType<'scope> {
     }
 
     /// Returns the size of a value of this type in bytes.
-    pub fn size(self) -> i32 {
+    pub fn size(self) -> u32 {
         // Safety: the pointer points to valid data
-        unsafe { self.unwrap_non_null(Private).as_ref().size }
+        cfg_if! {
+            if #[cfg(not(any(feature = "beta", feature = "nightly")))] {
+                unsafe {
+                    self.unwrap_non_null(Private).as_ref().size as u32
+                }
+            } else {
+                unsafe {
+                    self.layout()
+                        .cast::<jl_datatype_layout_t>()
+                        .as_ref()
+                        .unwrap()
+                        .size
+
+                }
+            }
+        }
     }
 
     /// Returns the hash of this type.
@@ -466,7 +481,7 @@ impl<'scope> DataType<'scope> {
     }
 
     /// Returns the size of a value of this type in bits.
-    pub fn n_bits(self) -> i32 {
+    pub fn n_bits(self) -> u32 {
         self.size() * 8
     }
 
