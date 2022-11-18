@@ -1,9 +1,8 @@
-/// Tracked Julia data.
-///
-/// By tracking Julia data it's possible to ensure no aliasing rules are broken from Rust when
-/// accessing their contents. While the data is tracked its contents can be derefenced.
-///
-///
+//! Tracked Julia data.
+//!
+//! By tracking Julia data it's possible to ensure no aliasing rules are broken from Rust when
+//! accessing their contents. While the data is tracked its contents can be derefenced.
+
 use std::{
     marker::PhantomData,
     ops::{Deref, DerefMut},

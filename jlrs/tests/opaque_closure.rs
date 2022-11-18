@@ -9,7 +9,6 @@ mod not_lts {
         wrappers::ptr::internal::opaque_closure::OpaqueClosureRef,
     };
 
-    #[test]
     fn create_opaque_closure() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -33,7 +32,6 @@ mod not_lts {
         });
     }
 
-    #[test]
     fn call_opaque_closure() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -61,7 +59,6 @@ mod not_lts {
         });
     }
 
-    #[test]
     fn call_opaque_closure_wrong_argtype() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -86,7 +83,6 @@ mod not_lts {
         });
     }
 
-    #[test]
     fn call_opaque_closure_wrong_n_args() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -111,7 +107,6 @@ mod not_lts {
         });
     }
 
-    #[test]
     fn call_vararg_opaque_closure_2args() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -137,5 +132,14 @@ mod not_lts {
                 })
                 .unwrap();
         });
+    }
+
+    #[test]
+    fn opaque_closure_tests() {
+        create_opaque_closure();
+        call_opaque_closure();
+        call_opaque_closure_wrong_argtype();
+        call_opaque_closure_wrong_n_args();
+        call_vararg_opaque_closure_2args();
     }
 }

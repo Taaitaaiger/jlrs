@@ -2,9 +2,13 @@
 
 use crate::{
     impl_julia_typecheck,
-    memory::target::Target,
+    prelude::Target,
     private::Private,
-    wrappers::ptr::{private::WrapperPriv, value::ValueRef, Ref},
+    wrappers::ptr::{
+        private::WrapperPriv,
+        value::{ValueData, ValueRef},
+        Ref,
+    },
 };
 use jl_sys::{jl_vararg_t, jl_vararg_type};
 use std::{marker::PhantomData, ptr::NonNull};
@@ -16,22 +20,27 @@ pub struct Vararg<'scope>(NonNull<jl_vararg_t>, PhantomData<&'scope ()>);
 
 impl<'scope> Vararg<'scope> {
     /// The type of the arguments, i.e. the `T` in `Vararg{T, N}`.
-    pub fn t(self) -> ValueRef<'scope, 'static> {
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().T) }
-    }
-
-    /// The number of arguments, i.e. the `N` in `Vararg{T, N}`.
-    pub fn n(self) -> ValueRef<'scope, 'static> {
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().N) }
-    }
-
-    /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> VarargData<'target, T>
+    pub fn t<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
     {
-        // Safety: the data is valid.
-        unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
+        unsafe {
+            let t = self.unwrap_non_null(Private).as_ref().T;
+            let t = NonNull::new(t)?;
+            Some(ValueRef::wrap(t).root(target))
+        }
+    }
+
+    /// The number of arguments, i.e. the `N` in `Vararg{T, N}`.
+    pub fn n<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
+        unsafe {
+            let n = self.unwrap_non_null(Private).as_ref().N;
+            let n = NonNull::new(n)?;
+            Some(ValueRef::wrap(n).root(target))
+        }
     }
 }
 
@@ -53,8 +62,6 @@ impl<'scope, 'data> WrapperPriv<'scope, 'data> for Vararg<'scope> {
         self.0
     }
 }
-
-impl_root!(Vararg, 1);
 
 /// A reference to a [`Vararg`] that has not been explicitly rooted.
 pub type VarargRef<'scope> = Ref<'scope, 'static, Vararg<'scope>>;

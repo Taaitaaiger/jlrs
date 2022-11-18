@@ -7,10 +7,12 @@
 
 use crate::{
     impl_julia_typecheck,
-    memory::target::Target,
+    prelude::{Target, Value},
     private::Private,
     wrappers::ptr::{
-        internal::method_instance::MethodInstanceRef, private::WrapperPriv, value::ValueRef, Ref,
+        private::WrapperPriv,
+        value::{ValueData, ValueRef},
+        Ref,
     },
 };
 use cfg_if::cfg_if;
@@ -30,43 +32,51 @@ pub struct CodeInstance<'scope>(NonNull<jl_code_instance_t>, PhantomData<&'scope
 
 impl<'scope> CodeInstance<'scope> {
     /*
-    for (a, b) in zip(fieldnames(Core.CodeInstance), fieldtypes(Core.CodeInstance))
-        println(a, ": ", b)
-    end
-    def: Core.MethodInstance
-    next: Core.CodeInstance
-    min_world: UInt64
-    max_world: UInt64
-    rettype: Any
-    rettype_const: Any
-    inferred: Any
-    ipo_purity_bits: UInt32
-    purity_bits: UInt32
-    argescapes: Any
-    isspecsig: Bool
-    precompile: Bool _Atomic
-    invoke: Ptr{Nothing} _Atomic
-    specptr: Ptr{Nothing} _Atomic
-    relocatability: UInt8
+    inspect(Core.CodeInstance):
+
+    def: Core.MethodInstance (const)
+    next: Core.CodeInstance (mut)
+    min_world: UInt64 (const)
+    max_world: UInt64 (const)
+    rettype: Any (const)
+    rettype_const: Any (const)
+    inferred: Any (mut)
+    ipo_purity_bits: UInt32 (const)
+    purity_bits: UInt32 (mut)
+    argescapes: Any (const)
+    isspecsig: Bool (mut)
+    precompile: Bool (mut) _Atomic
+    relocatability: UInt8 (mut)
+    invoke: Ptr{Nothing} (mut) _Atomic
+    specptr: Ptr{Nothing} (mut) _Atomic
     */
 
     /// Method this instance is specialized from.
-    pub fn def(self) -> MethodInstanceRef<'scope> {
+    pub fn def(self) -> Option<MethodInstance<'scope>> {
         // Safety: the pointer points to valid data
-        unsafe { MethodInstanceRef::wrap(self.unwrap_non_null(Private).as_ref().def) }
+        unsafe {
+            let def = self.unwrap_non_null(Private).as_ref().def;
+            Some(MethodInstance::wrap_non_null(NonNull::new(def)?, Private))
+        }
     }
 
     /// Next cache entry.
-    pub fn next(self) -> CodeInstanceRef<'scope> {
+    pub fn next<'target, T>(self, target: T) -> Option<CodeInstanceData<'target, T>>
+    where
+        T: Target<'target>,
+    {
         cfg_if! {
             if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
-                unsafe { CodeInstanceRef::wrap(self.unwrap_non_null(Private).as_ref().next) }
+                unsafe {
+                    let next = self.unwrap_non_null(Private).as_ref().next;
+                    Some(CodeInstanceRef::wrap(NonNull::new(next)?).root(target))
+                }
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let next = self.unwrap_non_null(Private).as_ref().next.load(Ordering::Relaxed);
-                    CodeInstanceRef::wrap(next)
+                    Some(CodeInstanceRef::wrap(NonNull::new(next)?).root(target))
                 }
             }
         }
@@ -85,28 +95,40 @@ impl<'scope> CodeInstance<'scope> {
     }
 
     /// Return type for fptr.
-    pub fn rettype(self) -> ValueRef<'scope, 'static> {
+    pub fn rettype(self) -> Option<Value<'scope, 'static>> {
         // Safety: the pointer points to valid data
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().rettype) }
+        unsafe {
+            let rettype = self.unwrap_non_null(Private).as_ref().rettype;
+            Some(Value::wrap_non_null(NonNull::new(rettype)?, Private))
+        }
     }
 
     /// Inferred constant return value, or null
-    pub fn rettype_const(self) -> ValueRef<'scope, 'static> {
+    pub fn rettype_const(self) -> Option<Value<'scope, 'static>> {
         // Safety: the pointer points to valid data
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().rettype_const) }
+        unsafe {
+            let rettype_const = self.unwrap_non_null(Private).as_ref().rettype_const;
+            Some(Value::wrap_non_null(NonNull::new(rettype_const)?, Private))
+        }
     }
 
     /// Inferred `CodeInfo`, `Nothing`, or `None`.
-    pub fn inferred(self) -> ValueRef<'scope, 'static> {
+    pub fn inferred<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
         // Safety: the pointer points to valid data
         cfg_if! {
-            if #[cfg(not(feature = "nightly"))] {
-                unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().inferred) }
+            if #[cfg(not(any(feature = "nightly", feature = "beta")))] {
+                unsafe {
+                    let inferred = self.unwrap_non_null(Private).as_ref().inferred;
+                    Some(ValueRef::wrap(NonNull::new(inferred)?).root(target))
+                }
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let inferred = self.unwrap_non_null(Private).as_ref().inferred.load(Ordering::Relaxed);
-                    ValueRef::wrap(inferred)
+                    Some(ValueRef::wrap(NonNull::new(inferred)?).root(target))
                 }
             }
         }
@@ -123,14 +145,14 @@ impl<'scope> CodeInstance<'scope> {
     #[cfg(not(feature = "lts"))]
     pub fn purity_bits(self) -> u32 {
         // Safety: the pointer points to valid data
-        #[cfg(feature = "nightly")]
+        #[cfg(any(feature = "nightly", feature = "beta"))]
         unsafe {
             self.unwrap_non_null(Private)
                 .as_ref()
                 .purity_bits
                 .load(Ordering::Relaxed)
         }
-        #[cfg(not(feature = "nightly"))]
+        #[cfg(not(any(feature = "nightly", feature = "beta")))]
         unsafe {
             self.unwrap_non_null(Private).as_ref().purity_bits
         }
@@ -138,9 +160,12 @@ impl<'scope> CodeInstance<'scope> {
 
     /// Method this instance is specialized from.
     #[cfg(not(feature = "lts"))]
-    pub fn argescapes(self) -> ValueRef<'scope, 'static> {
+    pub fn argescapes(self) -> Option<Value<'scope, 'static>> {
         // Safety: the pointer points to valid data
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().argescapes) }
+        unsafe {
+            let argescapes = self.unwrap_non_null(Private).as_ref().argescapes;
+            Some(Value::wrap_non_null(NonNull::new(argescapes)?, Private))
+        }
     }
 
     /// If `specptr` is a specialized function signature for specTypes->rettype
@@ -158,7 +183,7 @@ impl<'scope> CodeInstance<'scope> {
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
-                    self.unwrap_non_null(Private).as_ref().precompile.load(Ordering::SeqCst) != 0
+                    self.unwrap_non_null(Private).as_ref().precompile.load(Ordering::Relaxed) != 0
                 }
             }
         }
@@ -201,15 +226,6 @@ impl<'scope> CodeInstance<'scope> {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().relocatability }
     }
-
-    /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> CodeInstanceData<'target, T>
-    where
-        T: Target<'target>,
-    {
-        // Safety: the data is valid.
-        unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
-    }
 }
 
 impl_julia_typecheck!(CodeInstance<'scope>, jl_code_instance_type, 'scope);
@@ -231,14 +247,14 @@ impl<'scope> WrapperPriv<'scope, '_> for CodeInstance<'scope> {
     }
 }
 
-impl_root!(CodeInstance, 1);
-
 /// A reference to a [`CodeInstance`] that has not been explicitly rooted.
 pub type CodeInstanceRef<'scope> = Ref<'scope, 'static, CodeInstance<'scope>>;
 impl_valid_layout!(CodeInstanceRef, CodeInstance);
 impl_ref_root!(CodeInstance, CodeInstanceRef, 1);
 
 use crate::memory::target::target_type::TargetType;
+
+use super::method_instance::MethodInstance;
 
 /// `CodeInstance` or `CodeInstanceRef`, depending on the target type `T`.
 pub type CodeInstanceData<'target, T> =

@@ -57,7 +57,6 @@ mod tests {
         }
     }
 
-    #[test]
     fn ccall_with_array() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -71,9 +70,9 @@ mod tests {
                         Array::from_slice_unchecked(frame.as_extended_target(), &mut arr_data, 2)?;
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .function(&frame, "callrustwitharr")?
-                        .wrapper_unchecked();
+                        .wrapper();
 
                     let out = func.call2(&mut frame, fn_ptr, arr.as_value()).unwrap();
                     let ok = out.unbox::<bool>()?.as_bool();
@@ -84,7 +83,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn ccall_with_array_and_scope() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -98,9 +96,9 @@ mod tests {
                         Array::from_slice_unchecked(frame.as_extended_target(), &mut arr_data, 2)?;
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .function(&frame, "callrustwitharr")?
-                        .wrapper_unchecked();
+                        .wrapper();
 
                     let out = func.call2(&mut frame, fn_ptr, arr.as_value()).unwrap();
                     let ok = out.unbox::<bool>()?.as_bool();
@@ -111,7 +109,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn ccall_with_array_and_reallocated_scope_with_slots() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -128,9 +125,9 @@ mod tests {
                         Array::from_slice_unchecked(frame.as_extended_target(), &mut arr_data, 2)?;
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .function(&frame, "callrustwitharr")?
-                        .wrapper_unchecked();
+                        .wrapper();
 
                     let out = func.call2(&mut frame, fn_ptr, arr.as_value()).unwrap();
                     let ok = out.unbox::<bool>()?.as_bool();
@@ -170,9 +167,8 @@ mod tests {
         Box::from_raw(handle).join().ok();
     }
 
-    #[test]
     #[cfg(feature = "uv")]
-    fn ccall_with_async_condidtion() {
+    fn ccall_with_async_condition() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
@@ -185,9 +181,9 @@ mod tests {
 
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .function(&frame, "callrustwithasynccond")?
-                        .wrapper_unchecked();
+                        .wrapper();
 
                     let out = func
                         .call2(&mut frame, fn_ptr, destroy_handle_fn_ptr)
@@ -198,5 +194,14 @@ mod tests {
                 })
                 .unwrap();
         })
+    }
+
+    #[test]
+    fn ccall_tests() {
+        ccall_with_array();
+        ccall_with_array_and_scope();
+        ccall_with_array_and_reallocated_scope_with_slots();
+        #[cfg(feature = "uv")]
+        ccall_with_async_condition();
     }
 }

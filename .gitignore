@@ -17,3 +17,5 @@ tarpaulin-report.html
 **/*.o
 **/coverage_report.dat
 **/coverage_summary.dat
+
+_tests

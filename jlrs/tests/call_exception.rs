@@ -5,7 +5,6 @@ mod tests {
     use super::util::JULIA;
     use jlrs::prelude::*;
 
-    #[test]
     fn call0_exception_is_caught() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -15,9 +14,9 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .function(&frame, "throws_exception")?
-                        .wrapper_unchecked();
+                        .wrapper();
 
                     let res = func.call0(&mut frame);
                     assert!(res.is_err());
@@ -27,7 +26,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call0_kw_exception_is_caught() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -40,9 +38,9 @@ mod tests {
 
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .function(&frame, "throws_exception")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .provide_keywords(kw)?;
 
                     let res = func.call0(&mut frame);
@@ -53,7 +51,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call1_exception_is_caught() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -64,9 +61,9 @@ mod tests {
                     let arg = Value::new(&mut frame, 1usize);
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .function(&frame, "throws_exception")?
-                        .wrapper_unchecked();
+                        .wrapper();
 
                     let res = func.call1(&mut frame, arg);
                     assert!(res.is_err());
@@ -76,7 +73,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call1_kw_exception_is_caught() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -89,9 +85,9 @@ mod tests {
 
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .function(&frame, "throws_exception")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .provide_keywords(kw)?;
 
                     let res = func.call1(&mut frame, arg);
@@ -102,7 +98,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call2_exception_is_caught() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -113,9 +108,9 @@ mod tests {
                     let arg = Value::new(&mut frame, 1usize);
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .function(&frame, "throws_exception")?
-                        .wrapper_unchecked();
+                        .wrapper();
 
                     let res = func.call2(&mut frame, arg, arg);
                     assert!(res.is_err());
@@ -125,7 +120,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call2_kw_exception_is_caught() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -138,9 +132,9 @@ mod tests {
 
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .function(&frame, "throws_exception")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .provide_keywords(kw)?;
 
                     let res = func.call2(&mut frame, arg, arg);
@@ -151,7 +145,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call3_exception_is_caught() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -162,9 +155,9 @@ mod tests {
                     let arg = Value::new(&mut frame, 1usize);
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .function(&frame, "throws_exception")?
-                        .wrapper_unchecked();
+                        .wrapper();
 
                     let res = func.call3(&mut frame, arg, arg, arg);
                     assert!(res.is_err());
@@ -174,7 +167,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call3_kw_exception_is_caught() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -187,9 +179,9 @@ mod tests {
 
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .function(&frame, "throws_exception")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .provide_keywords(kw)?;
 
                     let res = func.call3(&mut frame, arg, arg, arg);
@@ -200,7 +192,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call_exception_is_caught() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -210,9 +201,9 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .function(&frame, "throws_exception")?
-                        .wrapper_unchecked();
+                        .wrapper();
 
                     let res = func.call(&mut frame, []);
                     assert!(res.is_err());
@@ -222,7 +213,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call_kw_exception_is_caught() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -235,9 +225,9 @@ mod tests {
 
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .function(&frame, "throws_exception")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .provide_keywords(kw)?;
 
                     let res = func.call(&mut frame, []);
@@ -248,7 +238,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn method_error_is_caught() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -263,5 +252,20 @@ mod tests {
                 })
                 .unwrap();
         });
+    }
+
+    #[test]
+    fn call_exception_tests() {
+        call0_exception_is_caught();
+        call0_kw_exception_is_caught();
+        call1_exception_is_caught();
+        call1_kw_exception_is_caught();
+        call2_exception_is_caught();
+        call2_kw_exception_is_caught();
+        call3_exception_is_caught();
+        call3_kw_exception_is_caught();
+        call_exception_is_caught();
+        call_kw_exception_is_caught();
+        method_error_is_caught();
     }
 }

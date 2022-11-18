@@ -965,6 +965,7 @@ impl jl_fielddesc32_t {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct jl_datatype_layout_t {
+    pub size: u32,
     pub nfields: u32,
     pub npointers: u32,
     pub first_ptr: i32,
@@ -1022,11 +1023,10 @@ pub struct _jl_datatype_t {
     pub types: *mut jl_svec_t,
     pub instance: *mut jl_value_t,
     pub layout: *const jl_datatype_layout_t,
-    pub size: i32,
     pub hash: u32,
     pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 1usize]>,
-    pub __bindgen_padding_0: [u8; 7usize],
+    pub __bindgen_padding_0: [u8; 3usize],
 }
 impl _jl_datatype_t {
     #[inline]
@@ -1107,6 +1107,17 @@ impl _jl_datatype_t {
         }
     }
     #[inline]
+    pub fn isprimitivetype(&self) -> u8 {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(7usize, 1u8) as u8) }
+    }
+    #[inline]
+    pub fn set_isprimitivetype(&mut self, val: u8) {
+        unsafe {
+            let val: u8 = ::std::mem::transmute(val);
+            self._bitfield_1.set(7usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
     pub fn new_bitfield_1(
         hasfreetypevars: u8,
         isconcretetype: u8,
@@ -1115,6 +1126,7 @@ impl _jl_datatype_t {
         zeroinit: u8,
         has_concrete_subtype: u8,
         cached_by_hash: u8,
+        isprimitivetype: u8,
     ) -> __BindgenBitfieldUnit<[u8; 1usize]> {
         let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 1usize]> = Default::default();
         __bindgen_bitfield_unit.set(0usize, 1u8, {
@@ -1144,6 +1156,10 @@ impl _jl_datatype_t {
         __bindgen_bitfield_unit.set(6usize, 1u8, {
             let cached_by_hash: u8 = unsafe { ::std::mem::transmute(cached_by_hash) };
             cached_by_hash as u64
+        });
+        __bindgen_bitfield_unit.set(7usize, 1u8, {
+            let isprimitivetype: u8 = unsafe { ::std::mem::transmute(isprimitivetype) };
+            isprimitivetype as u64
         });
         __bindgen_bitfield_unit
     }

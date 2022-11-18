@@ -4,16 +4,16 @@ use crate::{
     convert::to_symbol::ToSymbol,
     impl_julia_typecheck,
     memory::target::Target,
+    prelude::Symbol,
     private::Private,
     wrappers::ptr::{
-        datatype::DataType, private::WrapperPriv, symbol::SymbolRef, value::Value, value::ValueRef,
-        Wrapper,
+        datatype::DataType, private::WrapperPriv, value::Value, value::ValueRef, Wrapper,
     },
 };
 use jl_sys::{jl_new_typevar, jl_tvar_t, jl_tvar_type};
 use std::{marker::PhantomData, ptr::NonNull};
 
-use super::Ref;
+use super::{value::ValueData, Ref};
 
 /// An unknown, but possibly restricted, type parameter. In `Array{T, N}`, `T` and `N` are
 /// `TypeVar`s.
@@ -56,7 +56,7 @@ impl<'scope> TypeVar<'scope> {
 
             let res = match catch_exceptions(&mut callback).unwrap() {
                 Ok(tvar) => Ok(NonNull::new_unchecked(tvar)),
-                Err(e) => Err(NonNull::new_unchecked(e.ptr())),
+                Err(e) => Err(e.ptr()),
             };
 
             target.result_from_ptr(res, Private)
@@ -88,39 +88,47 @@ impl<'scope> TypeVar<'scope> {
     }
 
     /*
-    for (a, b) in zip(fieldnames(TypeVar), fieldtypes(TypeVar))
-        println(a, ": ", b)
-    end
-    name: Symbol
-    lb: Any
-    ub: Any
+    inspect(TypeVar):
+
+    name: Symbol (mut)
+    lb: Any (mut)
+    ub: Any (mut)
     */
 
     /// The name of this `TypeVar`.
-    pub fn name(self) -> SymbolRef<'scope> {
+    pub fn name(self) -> Symbol<'scope> {
         // Safety: pointer points to valid data
-        unsafe { SymbolRef::wrap(self.unwrap_non_null(Private).as_ref().name) }
+        unsafe {
+            let name = self.unwrap_non_null(Private).as_ref().name;
+            debug_assert!(!name.is_null());
+            Symbol::wrap_non_null(NonNull::new_unchecked(name), Private)
+        }
     }
 
     /// The lower bound of this `TypeVar`.
-    pub fn lower_bound(self) -> ValueRef<'scope, 'static> {
-        // Safety: pointer points to valid data
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().lb) }
-    }
-
-    /// The upper bound of this `TypeVar`.
-    pub fn upper_bound(self) -> ValueRef<'scope, 'static> {
-        // Safety: pointer points to valid data
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().ub) }
-    }
-
-    /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> TypeVarData<'target, T>
+    pub fn lower_bound<'target, T>(self, target: T) -> ValueData<'target, 'static, T>
     where
         T: Target<'target>,
     {
-        // Safety: the data is valid.
-        unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
+        // Safety: pointer points to valid data
+        unsafe {
+            let lb = self.unwrap_non_null(Private).as_ref().lb;
+            debug_assert!(!lb.is_null());
+            ValueRef::wrap(NonNull::new_unchecked(lb)).root(target)
+        }
+    }
+
+    /// The upper bound of this `TypeVar`.
+    pub fn upper_bound<'target, T>(self, target: T) -> ValueData<'target, 'static, T>
+    where
+        T: Target<'target>,
+    {
+        // Safety: pointer points to valid data
+        unsafe {
+            let ub = self.unwrap_non_null(Private).as_ref().ub;
+            debug_assert!(!ub.is_null());
+            ValueRef::wrap(NonNull::new_unchecked(ub)).root(target)
+        }
     }
 }
 
@@ -142,8 +150,6 @@ impl<'scope> WrapperPriv<'scope, '_> for TypeVar<'scope> {
         self.0
     }
 }
-
-impl_root!(TypeVar, 1);
 
 /// A reference to a [`TypeVar`] that has not been explicitly rooted.
 pub type TypeVarRef<'scope> = Ref<'scope, 'static, TypeVar<'scope>>;

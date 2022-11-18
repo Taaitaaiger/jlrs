@@ -7,10 +7,8 @@ use crate::{
     private::Private,
     wrappers::ptr::{
         datatype::DataType,
-        internal::method::MethodRef,
         private::WrapperPriv,
         type_name::TypeName,
-        value::ValueRef,
         value::{Value, ValueResult},
         Ref, Wrapper as _,
     },
@@ -32,20 +30,23 @@ impl<'scope> OpaqueClosure<'scope> {
     using Base.Experimental
     oq = Base.Experimental.@opaque (x) -> 2x
     ty = typeof(oq)
-    for (a, b) in zip(fieldnames(ty), fieldtypes(ty))
-        println(a, ": ", b)
-    end
-    captures: Any
-    world: Int64
-    source: Any
-    invoke: Ptr{Nothing}
-    specptr: Ptr{Nothing}
+    inspect(ty):
+
+    captures: Any (const)
+    world: Int64 (const)
+    source: Any (const)
+    invoke: Ptr{Nothing} (const)
+    specptr: Ptr{Nothing} (const)
     */
 
     /// The data captured by this `OpaqueClosure`.
-    pub fn captures(self) -> ValueRef<'scope, 'static> {
+    pub fn captures(self) -> Option<Value<'scope, 'static>> {
         // Safety: the pointer points to valid data
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().captures) }
+        unsafe {
+            let data = self.unwrap_non_null(Private).as_ref().captures;
+            let data = NonNull::new(data)?;
+            Some(Value::wrap_non_null(data, Private))
+        }
     }
 
     /// Returns the world age of this `OpaqueClosure`.
@@ -55,9 +56,13 @@ impl<'scope> OpaqueClosure<'scope> {
     }
 
     /// Returns the `source` field of this `OpaqueClosure`.
-    pub fn source(self) -> MethodRef<'scope> {
+    pub fn source(self) -> Option<Value<'scope, 'static>> {
         // Safety: the pointer points to valid data
-        unsafe { MethodRef::wrap(self.unwrap_non_null(Private).as_ref().source) }
+        unsafe {
+            let data = self.unwrap_non_null(Private).as_ref().source;
+            let data = NonNull::new(data)?;
+            Some(Value::wrap_non_null(data.cast(), Private))
+        }
     }
 
     /// Returns a function pointer that can be used to call this `OpaqueClosure`. Using this is
@@ -78,20 +83,11 @@ impl<'scope> OpaqueClosure<'scope> {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().specptr }
     }
-
-    /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> OpaqueClosureData<'target, T>
-    where
-        T: Target<'target>,
-    {
-        // Safety: the data is valid.
-        unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
-    }
 }
 
 unsafe impl Typecheck for OpaqueClosure<'_> {
     fn typecheck(t: DataType) -> bool {
-        unsafe { t.type_name().wrapper_unchecked() == TypeName::of_opaque_closure(&Global::new()) }
+        unsafe { t.type_name() == TypeName::of_opaque_closure(&Global::new()) }
     }
 }
 
@@ -169,8 +165,6 @@ impl<'data> Call<'data> for OpaqueClosure<'_> {
         self.as_value().call(target, args)
     }
 }
-
-impl_root!(OpaqueClosure, 1);
 
 /// A reference to an [`OpaqueClosure`] that has not been explicitly rooted.
 pub type OpaqueClosureRef<'scope> = Ref<'scope, 'static, OpaqueClosure<'scope>>;

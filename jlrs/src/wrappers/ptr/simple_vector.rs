@@ -2,7 +2,10 @@
 
 use crate::{
     error::{AccessError, JlrsResult},
-    layout::{typecheck::Typecheck, valid_layout::ValidLayout},
+    layout::{
+        typecheck::Typecheck,
+        valid_layout::{ValidField, ValidLayout},
+    },
     memory::{target::global::Global, target::Target},
     private::Private,
     wrappers::ptr::value::Value,
@@ -17,7 +20,8 @@ use std::{
 };
 
 use super::{
-    datatype::DataType, private::WrapperPriv, value::ValueRef, Ref, Root, Wrapper, WrapperRef,
+    datatype::DataType, private::WrapperPriv, value::ValueRef, Ref, Wrapper, WrapperRef,
+    WrapperType,
 };
 
 /// Access and mutate the content of a `SimpleVector`.
@@ -25,7 +29,7 @@ use super::{
 pub struct SimpleVectorContent<'scope, 'borrow, T = ValueRef<'scope, 'static>>(
     NonNull<jl_svec_t>,
     PhantomData<&'scope ()>,
-    PhantomData<&'borrow [T]>,
+    PhantomData<&'borrow [Option<T>]>,
 )
 where
     T: WrapperRef<'scope, 'static>;
@@ -38,7 +42,7 @@ impl<'scope, 'borrow, T: WrapperRef<'scope, 'static>> SimpleVectorContent<'scope
     }
 
     /// Returns the contents of this `SimpleVector` as a slice.
-    pub fn as_slice(&self) -> &'borrow [T] {
+    pub fn as_slice(&self) -> &'borrow [Option<T>] {
         // Safety: the C API function is called with valid data
         unsafe { std::slice::from_raw_parts(jl_svec_data(self.0.as_ptr()).cast(), self.len()) }
     }
@@ -48,7 +52,11 @@ impl<'scope, 'borrow, T: WrapperRef<'scope, 'static>> SimpleVectorContent<'scope
     ///
     /// Safety: you may only mutate a `SimpleVector` after creating it, they should generally be
     /// considered immutable.
-    pub unsafe fn set(&mut self, index: usize, value: Option<T::Wrapper>) -> JlrsResult<()> {
+    pub unsafe fn set(
+        &mut self,
+        index: usize,
+        value: Option<WrapperType<'_, 'scope, 'static, T>>,
+    ) -> JlrsResult<()> {
         if index >= self.len() {
             Err(AccessError::OutOfBoundsSVec {
                 idx: index,
@@ -57,7 +65,8 @@ impl<'scope, 'borrow, T: WrapperRef<'scope, 'static>> SimpleVectorContent<'scope
         }
 
         jl_svec_data(self.0.as_ptr())
-            .cast::<Option<T::Wrapper>>()
+            .cast::<Option<<T::Wrapper as Wrapper<'scope, 'static>>::TypeConstructor<'_, 'static>>>(
+            )
             .add(index)
             .write(value);
 
@@ -116,6 +125,7 @@ impl<'scope> SimpleVector<'scope> {
     ) -> JlrsResult<SimpleVectorContent<'scope, 'borrow, U>>
     where
         U: WrapperRef<'scope, 'static>,
+        Option<U>: ValidField,
     {
         if !self.is_typed::<U>() {
             Err(AccessError::InvalidLayout {
@@ -142,17 +152,23 @@ impl<'scope> SimpleVector<'scope> {
         SimpleVectorContent(self.unwrap_non_null(Private), PhantomData, PhantomData)
     }
 
-    fn is_typed<U: ValidLayout>(self) -> bool {
+    fn is_typed<U>(self) -> bool
+    where
+        U: WrapperRef<'scope, 'static>,
+        Option<U>: ValidField,
+    {
         // Safety: the pointer points to valid data
         unsafe {
             let len = self.unwrap_non_null(Private).as_ref().length;
             let ptr = self.unwrap_non_null(Private).as_ptr();
-            let slice = std::slice::from_raw_parts(jl_svec_data(ptr).cast::<ValueRef>(), len);
+            let slice =
+                std::slice::from_raw_parts(jl_svec_data(ptr).cast::<Option<ValueRef>>(), len);
 
             for element in slice.iter().copied() {
-                match element.value() {
+                match element {
                     Some(value) => {
-                        if !U::valid_layout(value.datatype().as_value()) {
+                        let value = value.value();
+                        if !Option::<U>::valid_field(value.datatype().as_value()) {
                             return false;
                         }
                     }
@@ -171,22 +187,11 @@ impl<'scope> SimpleVector<'scope> {
     }
 }
 
-impl<'scope> SimpleVector<'scope> {
-    /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> SimpleVectorData<'target, T>
-    where
-        T: Target<'target>,
-    {
-        // Safety: the data is valid.
-        unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
-    }
-}
-
 impl<'base> SimpleVector<'base> {
     /// The empty `SimpleVector`.
     pub fn emptysvec<T: Target<'base>>(_: &T) -> Self {
         // Safety: global constant
-        unsafe { Self::wrap(jl_emptysvec, Private) }
+        unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_emptysvec), Private) }
     }
 }
 
@@ -223,8 +228,6 @@ impl<'scope> WrapperPriv<'scope, '_> for SimpleVector<'scope> {
     }
 }
 
-impl_root!(SimpleVector, 1);
-
 /// A reference to a [`SimpleVector`] that has not been explicitly rooted.
 pub type SimpleVectorRef<'scope> = Ref<'scope, 'static, SimpleVector<'scope>>;
 
@@ -240,15 +243,25 @@ unsafe impl<'scope> ValidLayout for SimpleVectorRef<'scope> {
     const IS_REF: bool = true;
 }
 
+unsafe impl<'scope> ValidField for Option<SimpleVectorRef<'scope>> {
+    fn valid_field(v: Value) -> bool {
+        if let Ok(dt) = v.cast::<DataType>() {
+            dt.is::<SimpleVector>()
+        } else {
+            false
+        }
+    }
+}
+
 impl<'scope> SimpleVectorRef<'scope> {
     /// Root this reference to a SimpleVector in `scope`.
     ///
     /// Safety: self must point to valid data.
-    pub unsafe fn root<'target, T>(self, target: T) -> JlrsResult<SimpleVectorData<'target, T>>
+    pub unsafe fn root<'target, T>(self, target: T) -> SimpleVectorData<'target, T>
     where
         T: Target<'target>,
     {
-        <SimpleVector as Root>::root(target, self)
+        target.data_from_ptr(self.ptr(), Private)
     }
 }
 

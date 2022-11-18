@@ -6,7 +6,6 @@ mod not_lts {
     use jlrs::wrappers::ptr::internal::vararg::Vararg;
     use jlrs::{layout::valid_layout::ValidLayout, wrappers::ptr::internal::vararg::VarargRef};
 
-    #[test]
     fn access_vararg() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -24,17 +23,16 @@ mod not_lts {
 
                     let vararg = vararg.cast::<Vararg>()?;
                     assert_eq!(
-                        vararg.t().value_unchecked().cast::<DataType>()?,
+                        vararg.t(&frame).unwrap().value().cast::<DataType>()?,
                         DataType::int32_type(&frame)
                     );
-                    assert!(vararg.n().is_undefined());
+                    assert!(vararg.n(&frame).is_none());
                     Ok(())
                 })
                 .unwrap();
         });
     }
 
-    #[test]
     fn create_emtpy_vararg() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -50,15 +48,14 @@ mod not_lts {
                     assert!(instance.is::<Vararg>());
 
                     let vararg = instance.cast::<Vararg>()?;
-                    assert!(vararg.t().is_undefined());
-                    assert!(vararg.n().is_undefined());
+                    assert!(vararg.t(&frame).is_none());
+                    assert!(vararg.n(&frame).is_none());
                     Ok(())
                 })
                 .unwrap();
         });
     }
 
-    #[test]
     fn create_typed_vararg() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -76,17 +73,16 @@ mod not_lts {
 
                     let vararg = instance.cast::<Vararg>()?;
                     assert_eq!(
-                        vararg.t().value_unchecked().cast::<DataType>()?,
+                        vararg.t(&frame).unwrap().value().cast::<DataType>()?,
                         DataType::int32_type(&frame)
                     );
-                    assert!(vararg.n().is_undefined());
+                    assert!(vararg.n(&frame).is_none());
                     Ok(())
                 })
                 .unwrap();
         });
     }
 
-    #[test]
     fn create_typed_and_sized_vararg() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -105,13 +101,21 @@ mod not_lts {
 
                     let vararg = instance.cast::<Vararg>()?;
                     assert_eq!(
-                        vararg.t().value_unchecked().cast::<DataType>()?,
+                        vararg.t(&frame).unwrap().value().cast::<DataType>()?,
                         DataType::int32_type(&frame)
                     );
-                    assert_eq!(vararg.n().value_unchecked().unbox::<isize>()?, 3);
+                    assert_eq!(vararg.n(&frame).unwrap().value().unbox::<isize>()?, 3);
                     Ok(())
                 })
                 .unwrap();
         });
+    }
+
+    #[test]
+    fn vararg_tests() {
+        access_vararg();
+        create_emtpy_vararg();
+        create_typed_vararg();
+        create_typed_and_sized_vararg();
     }
 }

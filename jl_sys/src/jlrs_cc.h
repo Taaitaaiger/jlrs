@@ -44,8 +44,8 @@ extern "C"
 #endif
 
 #if defined(JLRS_NIGHTLY)
-    JL_DLLEXPORT void jl_enter_threaded_region(void);
-    JL_DLLEXPORT void jl_exit_threaded_region(void);
+    void jl_enter_threaded_region(void);
+    void jl_exit_threaded_region(void);
 #endif
 #ifdef __cplusplus
 }

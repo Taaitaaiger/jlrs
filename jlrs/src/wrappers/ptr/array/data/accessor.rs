@@ -1,5 +1,6 @@
 //! Access and modify the contents of Julia arrays.
 
+use crate::layout::valid_layout::ValidField;
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
 use crate::wrappers::ptr::value::ValueResult;
 
@@ -7,7 +8,6 @@ use crate::wrappers::ptr::value::ValueData;
 
 use crate::{
     error::{AccessError, JlrsResult, TypeError, CANNOT_DISPLAY_TYPE},
-    layout::valid_layout::ValidLayout,
     memory::target::Target,
     private::Private,
     wrappers::ptr::{
@@ -189,7 +189,7 @@ impl<'borrow, 'array, 'data, T, L: ArrayLayout> Clone
 impl<'borrow, 'array, 'data, U, L: ArrayLayout, M: Mutability>
     ArrayAccessor<'borrow, 'array, 'data, U, L, M>
 {
-    pub(crate) unsafe fn new2(array: &'borrow Array<'array, 'data>) -> Self {
+    pub(crate) unsafe fn new(array: &'borrow Array<'array, 'data>) -> Self {
         ArrayAccessor {
             array: *array,
             _lt_marker: PhantomData,
@@ -208,7 +208,7 @@ impl<'borrow, 'array, 'data, U, L: ArrayLayout, M: Mutability>
         &mut self,
         target: T,
         index: D,
-    ) -> JlrsResult<ValueResult<'frame, 'data, T>>
+    ) -> JlrsResult<Option<ValueResult<'frame, 'data, T>>>
     where
         D: Dims,
         T: Target<'frame>,
@@ -228,11 +228,17 @@ impl<'borrow, 'array, 'data, U, L: ArrayLayout, M: Mutability>
             };
 
             let res = match catch_exceptions(&mut callback)? {
-                Ok(ptr) => Ok(NonNull::new_unchecked(ptr)),
-                Err(e) => Err(NonNull::new_unchecked(e.ptr())),
+                Ok(ptr) => {
+                    if ptr.is_null() {
+                        return Ok(None);
+                    } else {
+                        Ok(NonNull::new_unchecked(ptr))
+                    }
+                }
+                Err(e) => Err(e.ptr()),
             };
 
-            Ok(target.result_from_ptr(res, Private))
+            Ok(Some(target.result_from_ptr(res, Private)))
         }
     }
 
@@ -243,14 +249,20 @@ impl<'borrow, 'array, 'data, U, L: ArrayLayout, M: Mutability>
         &mut self,
         target: T,
         index: D,
-    ) -> JlrsResult<ValueData<'frame, 'data, T>>
+    ) -> JlrsResult<Option<ValueData<'frame, 'data, T>>>
     where
         D: Dims,
         T: Target<'frame>,
     {
         let idx = self.dimensions().index_of(&index)?;
         let res = jl_arrayref(self.array.unwrap(Private), idx);
-        Ok(target.data_from_ptr(NonNull::new_unchecked(res), Private))
+        if res.is_null() {
+            return Ok(None);
+        }
+
+        Ok(Some(
+            target.data_from_ptr(NonNull::new_unchecked(res), Private),
+        ))
     }
 
     /// Returns the array's dimensions.
@@ -292,7 +304,7 @@ impl<'borrow, 'array, 'data, U, L: ArrayLayout>
 
             let res = match catch_exceptions(&mut callback).unwrap() {
                 Ok(()) => Ok(()),
-                Err(e) => Err(NonNull::new_unchecked(e.ptr())),
+                Err(e) => Err(e.ptr()),
             };
 
             Ok(target.exception_from_ptr(res, Private))
@@ -314,6 +326,7 @@ impl<'borrow, 'array, 'data, U, L: ArrayLayout>
     }
 }
 
+// TODO: Rooting
 impl<'borrow, 'array, 'data, T: WrapperRef<'array, 'data>, M: Mutability>
     PtrArrayAccessor<'borrow, 'array, 'data, T, M>
 {
@@ -328,17 +341,17 @@ impl<'borrow, 'array, 'data, T: WrapperRef<'array, 'data>, M: Mutability>
     }
 
     /// Returns the array's data as a slice, the data is in column-major order.
-    pub fn as_slice(&self) -> &[T] {
+    pub fn as_slice(&self) -> &[Option<T>] {
         let n_elems = self.dimensions().size();
-        let arr_data = self.array.data_ptr().cast::<T>();
+        let arr_data = self.array.data_ptr().cast::<Option<T>>();
         // Safety: the layout is compatible and the lifetime is limited.
         unsafe { slice::from_raw_parts(arr_data, n_elems) }
     }
 
     /// Returns the array's data as a slice, the data is in column-major order.
-    pub fn into_slice(self) -> &'borrow [T] {
+    pub fn into_slice(self) -> &'borrow [Option<T>] {
         let n_elems = self.dimensions().size();
-        let arr_data = self.array.data_ptr().cast::<T>();
+        let arr_data = self.array.data_ptr().cast::<Option<T>>();
         // Safety: the layout is compatible and the lifetime is limited.
         unsafe { slice::from_raw_parts(arr_data, n_elems) }
     }
@@ -356,7 +369,7 @@ impl<'borrow, 'array, 'data, T: WrapperRef<'array, 'data>>
         let idx = self.dimensions().index_of(&index)?;
 
         let data_ptr = if let Some(value) = value {
-            let ty = unsafe { self.array.element_type().value_unchecked() };
+            let ty = self.array.element_type();
             if !value.isa(ty) {
                 let element_type = ty.display_string_or(CANNOT_DISPLAY_TYPE);
                 let value_type = value.datatype().display_string_or(CANNOT_DISPLAY_TYPE);
@@ -384,11 +397,18 @@ where
     T: WrapperRef<'array, 'data>,
     M: Mutability,
 {
-    type Output = T;
+    type Output = Option<T>;
     fn index(&self, index: D) -> &Self::Output {
         let idx = self.dimensions().index_of(&index).unwrap();
         // Safety: the index is in bounds
-        unsafe { self.array.data_ptr().cast::<T>().add(idx).as_ref().unwrap() }
+        unsafe {
+            self.array
+                .data_ptr()
+                .cast::<Option<T>>()
+                .add(idx)
+                .as_ref()
+                .unwrap()
+        }
     }
 }
 
@@ -554,11 +574,7 @@ impl<'borrow, 'array, 'data, M: Mutability> UnionArrayAccessor<'borrow, 'array, 
     /// Returns `true` if `ty` if a value of that type can be stored in this array.
     pub fn contains(&self, ty: DataType) -> bool {
         let mut tag = 0;
-        find_union_component(
-            unsafe { self.array.element_type().value_unchecked() },
-            ty.as_value(),
-            &mut tag,
-        )
+        find_union_component(self.array.element_type(), ty.as_value(), &mut tag)
     }
 
     /// Returns the type of the element at index `idx`.
@@ -566,7 +582,7 @@ impl<'borrow, 'array, 'data, M: Mutability> UnionArrayAccessor<'borrow, 'array, 
     where
         D: Dims,
     {
-        let elty = unsafe { self.array.element_type().value_unchecked() };
+        let elty = self.array.element_type();
         let idx = self.dimensions().index_of(&index)?;
 
         // Safety: the index is in bounds.
@@ -582,10 +598,10 @@ impl<'borrow, 'array, 'data, M: Mutability> UnionArrayAccessor<'borrow, 'array, 
     /// element stored there.
     pub fn get<T, D>(&self, index: D) -> JlrsResult<T>
     where
-        T: ValidLayout + Clone,
+        T: 'static + ValidField + Clone,
         D: Dims,
     {
-        let elty = unsafe { self.array.element_type().value_unchecked() };
+        let elty = self.array.element_type();
         let idx = self.dimensions().index_of(&index)?;
 
         // Safety: The index is in bounds and layout compatibility is checked.
@@ -594,7 +610,7 @@ impl<'borrow, 'array, 'data, M: Mutability> UnionArrayAccessor<'borrow, 'array, 
             let mut tag = *tags.add(idx) as _;
 
             if let Some(ty) = nth_union_component(elty, &mut tag) {
-                if T::valid_layout(ty) {
+                if T::valid_field(ty) {
                     let offset = idx * self.array.unwrap_non_null(Private).as_ref().elsize as usize;
                     let ptr = self.array.data_ptr().cast::<i8>().add(offset).cast::<T>();
                     return Ok((&*ptr).clone());
@@ -619,16 +635,16 @@ impl<'borrow, 'array, 'data> UnionArrayAccessor<'borrow, 'array, 'data, Mutable<
     /// of all possible element types.
     pub unsafe fn set<T, D>(&mut self, index: D, ty: DataType, value: T) -> JlrsResult<()>
     where
-        T: ValidLayout + Clone,
+        T: 'static + ValidField + Clone,
         D: Dims,
     {
-        if !T::valid_layout(ty.as_value()) {
+        if !T::valid_field(ty.as_value()) {
             let value_type = ty.display_string_or(CANNOT_DISPLAY_TYPE).into();
             Err(AccessError::InvalidLayout { value_type })?;
         }
 
         let mut tag = 0;
-        let elty = self.array.element_type().value_unchecked();
+        let elty = self.array.element_type();
         if !find_union_component(elty, ty.as_value(), &mut tag) {
             let element_type = elty.display_string_or(CANNOT_DISPLAY_TYPE);
             let value_type = ty.display_string_or(CANNOT_DISPLAY_TYPE);

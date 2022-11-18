@@ -7,11 +7,13 @@
 
 use crate::{
     impl_julia_typecheck,
-    memory::target::Target,
+    prelude::{Module, Symbol, Target},
     private::Private,
     wrappers::ptr::{
-        array::ArrayRef, module::ModuleRef, private::WrapperPriv, symbol::SymbolRef,
-        value::ValueRef, Ref,
+        array::{ArrayData, ArrayRef},
+        private::WrapperPriv,
+        value::{ValueData, ValueRef},
+        Ref,
     },
 };
 use cfg_if::cfg_if;
@@ -31,73 +33,98 @@ pub struct MethodTable<'scope>(NonNull<jl_methtable_t>, PhantomData<&'scope ()>)
 
 impl<'scope> MethodTable<'scope> {
     /*
-    for (a, b) in zip(fieldnames(Core.MethodTable), fieldtypes(Core.MethodTable))
-        println(a, ": ", b)
-    end
-    name: Symbol
-    defs: Any _Atomic
-    leafcache: Any _Atomic
-    cache: Any _Atomic
-    max_args: Int64
-    kwsorter: Any
-    module: Module
-    backedges: Vector{Any}
-    : Int64
-    : Int64
-    offs: UInt8
-    : UInt8
+    inspect(Core.MethodTable):
+
+    name: Symbol (mut)
+    defs: Any (mut) _Atomic
+    leafcache: Any (mut) _Atomic
+    cache: Any (mut) _Atomic
+    max_args: Int64 (mut)
+    module: Module (const)
+    backedges: Vector{Any} (mut)
+    : Int64 (mut)
+    : Int64 (mut)
+    offs: UInt8 (mut)
+    : UInt8 (mut)
     */
 
     /// Sometimes a hack used by serialization to handle kwsorter
-    pub fn name(self) -> SymbolRef<'scope> {
+    pub fn name(self) -> Option<Symbol<'scope>> {
         // Safety: the pointer points to valid data
-        unsafe { SymbolRef::wrap(self.unwrap_non_null(Private).as_ref().name) }
+        unsafe {
+            let name = self.unwrap_non_null(Private).as_ref().name;
+            let name = NonNull::new(name)?;
+            Some(Symbol::wrap_non_null(name, Private))
+        }
     }
 
     /// The `defs` field.
-    pub fn defs(self) -> ValueRef<'scope, 'static> {
+    pub fn defs<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
         cfg_if! {
             if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
-                unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().defs) }
+                unsafe {
+                    let data = self.unwrap_non_null(Private).as_ref().defs;
+                    let data = NonNull::new(data)?;
+                    Some(ValueRef::wrap(data).root(target))
+                }
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
-                    let defs = self.unwrap_non_null(Private).as_ref().defs.load(Ordering::Relaxed);
-                    ValueRef::wrap(defs)
+                    let data = self.unwrap_non_null(Private).as_ref().defs.load(Ordering::Relaxed);
+                    let data = NonNull::new(data)?;
+                    Some(ValueRef::wrap(data).root(target))
                 }
             }
         }
     }
 
     /// The `leafcache` field.
-    pub fn leafcache(self) -> ArrayRef<'scope, 'static> {
+    pub fn leafcache<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
         cfg_if! {
             if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
-                unsafe { ArrayRef::wrap(self.unwrap_non_null(Private).as_ref().leafcache) }
+                unsafe {
+                    let data = self.unwrap_non_null(Private).as_ref().leafcache;
+                    let data = NonNull::new(data)?;
+                    Some(ValueRef::wrap(data.cast()).root(target))
+                }
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
-                    let leafcache =
-                        self.unwrap_non_null(Private).as_ref().leafcache.load(Ordering::Relaxed);
-                    ArrayRef::wrap(leafcache)
+                    let data = self.unwrap_non_null(Private).as_ref().leafcache.load(Ordering::Relaxed);
+                    let data = NonNull::new(data)?;
+                    Some(ValueRef::wrap(data.cast()).root(target))
                 }
             }
         }
     }
 
     /// The `cache` field.
-    pub fn cache(self) -> ValueRef<'scope, 'static> {
+    pub fn cache<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
         cfg_if! {
             if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
-                unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().cache) }
+                unsafe {
+                    let data = self.unwrap_non_null(Private).as_ref().cache;
+                    let data = NonNull::new(data)?;
+                    Some(ValueRef::wrap(data).root(target))
+                }
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
-                    let cache = self.unwrap_non_null(Private).as_ref().cache.load(Ordering::Relaxed);
-                    ValueRef::wrap(cache)
+                    let data = self.unwrap_non_null(Private).as_ref().cache.load(Ordering::Relaxed);
+                    let data = NonNull::new(data)?;
+                    Some(ValueRef::wrap(data).root(target))
                 }
             }
         }
@@ -109,23 +136,41 @@ impl<'scope> MethodTable<'scope> {
         unsafe { self.unwrap_non_null(Private).as_ref().max_args }
     }
 
-    #[cfg(not(feature = "nightly"))]
+    #[cfg(not(any(feature = "nightly", feature = "beta")))]
     /// Keyword argument sorter function
-    pub fn kw_sorter(self) -> ValueRef<'scope, 'static> {
+    pub fn kw_sorter<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
         // Safety: the pointer points to valid data
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().kwsorter) }
+        unsafe {
+            let kw_sorter = self.unwrap_non_null(Private).as_ref().kwsorter;
+            let kw_sorter = NonNull::new(kw_sorter)?;
+            Some(ValueRef::wrap(kw_sorter).root(target))
+        }
     }
 
     /// Used for incremental serialization to locate original binding
-    pub fn module(self) -> ModuleRef<'scope> {
+    pub fn module(self) -> Option<Module<'scope>> {
         // Safety: the pointer points to valid data
-        unsafe { ModuleRef::wrap(self.unwrap_non_null(Private).as_ref().module) }
+        unsafe {
+            let module = self.unwrap_non_null(Private).as_ref().module;
+            let module = NonNull::new(module)?;
+            Some(Module::wrap_non_null(module, Private))
+        }
     }
 
     /// The `backedges` field.
-    pub fn backedges(self) -> ArrayRef<'scope, 'static> {
+    pub fn backedges<'target, T>(self, target: T) -> Option<ArrayData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
         // Safety: the pointer points to valid data
-        unsafe { ArrayRef::wrap(self.unwrap_non_null(Private).as_ref().backedges) }
+        unsafe {
+            let backedges = self.unwrap_non_null(Private).as_ref().backedges;
+            let backedges = NonNull::new(backedges)?;
+            Some(ArrayRef::wrap(backedges).root(target))
+        }
     }
 
     /// 0, or 1 to skip splitting typemap on first (function) argument
@@ -138,15 +183,6 @@ impl<'scope> MethodTable<'scope> {
     pub fn frozen(self) -> u8 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().frozen }
-    }
-
-    /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> MethodTableData<'target, T>
-    where
-        T: Target<'target>,
-    {
-        // Safety: the data is valid.
-        unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
     }
 }
 
@@ -168,8 +204,6 @@ impl<'scope> WrapperPriv<'scope, '_> for MethodTable<'scope> {
         self.0
     }
 }
-
-impl_root!(MethodTable, 1);
 
 /// A reference to a [`MethodTable`] that has not been explicitly rooted.
 pub type MethodTableRef<'scope> = Ref<'scope, 'static, MethodTable<'scope>>;

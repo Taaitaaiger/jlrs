@@ -8,11 +8,11 @@
 use crate::{
     impl_julia_typecheck,
     memory::target::Target,
+    prelude::{Module, Symbol},
     private::Private,
-    wrappers::ptr::{
-        module::ModuleRef, private::WrapperPriv, simple_vector::SimpleVectorRef, symbol::SymbolRef,
-    },
+    wrappers::ptr::{private::WrapperPriv, simple_vector::SimpleVector},
 };
+
 use cfg_if::cfg_if;
 use jl_sys::{
     jl_array_typename, jl_llvmpointer_typename, jl_namedtuple_typename, jl_pointer_typename,
@@ -33,7 +33,10 @@ cfg_if! {
 
 cfg_if! {
     if #[cfg(feature = "extra-fields")] {
-        use crate::wrappers::ptr::value::ValueRef;
+        use crate::wrappers::ptr::{value::ValueRef, simple_vector::{SimpleVectorRef, SimpleVectorData}};
+        use super::value::ValueData;
+        use crate::prelude::Value;
+
     }
 }
 
@@ -51,39 +54,53 @@ pub struct TypeName<'scope>(NonNull<jl_typename_t>, PhantomData<&'scope ()>);
 
 impl<'scope> TypeName<'scope> {
     /*
-    for (a, b) in zip(fieldnames(Core.TypeName), fieldtypes(Core.TypeName))
-        println(a, ": ", b)
-    end
-    name: Symbol
-    module: Module
-    names: Core.SimpleVector
-    atomicfields: Ptr{Nothing}
-    wrapper: Type
-    cache: Core.SimpleVector _Atomic
-    linearcache: Core.SimpleVector _Atomic
-    mt: Core.MethodTable
-    partial: Any
-    hash: Int64
-    n_uninitialized: Int32
-    flags: UInt8
+    inspect(Core.TypeName):
+
+    name: Symbol (const)
+    module: Module (const)
+    names: Core.SimpleVector (const)
+    atomicfields: Ptr{Nothing} (const)
+    constfields: Ptr{Nothing} (const)
+    wrapper: Type (const)
+    Typeofwrapper: Type (mut, atomic) // TODO
+    cache: Core.SimpleVector (mut, atomic)
+    linearcache: Core.SimpleVector (mut, atomic)
+    mt: Core.MethodTable (const)
+    partial: Any (mut)
+    hash: Int64 (const)
+    n_uninitialized: Int32 (const)
+    flags: UInt8 (const)
+    max_methods: UInt8 (mut)
     */
 
     /// The `name` field.
-    pub fn name(self) -> SymbolRef<'scope> {
+    pub fn name(self) -> Symbol<'scope> {
         // Safety: the pointer points to valid data
-        unsafe { SymbolRef::wrap(self.unwrap_non_null(Private).as_ref().name) }
+        unsafe {
+            let name = self.unwrap_non_null(Private).as_ref().name;
+            debug_assert!(!name.is_null());
+            Symbol::wrap_non_null(NonNull::new_unchecked(name), Private)
+        }
     }
 
     /// The `module` field.
-    pub fn module(self) -> ModuleRef<'scope> {
+    pub fn module(self) -> Module<'scope> {
         // Safety: the pointer points to valid data
-        unsafe { ModuleRef::wrap(self.unwrap_non_null(Private).as_ref().module) }
+        unsafe {
+            let module = self.unwrap_non_null(Private).as_ref().module;
+            debug_assert!(!module.is_null());
+            Module::wrap_non_null(NonNull::new_unchecked(module), Private)
+        }
     }
 
     /// Field names.
-    pub fn names(self) -> SimpleVectorRef<'scope> {
+    pub fn names(self) -> SimpleVector<'scope> {
         // Safety: the pointer points to valid data
-        unsafe { SimpleVectorRef::wrap(self.unwrap_non_null(Private).as_ref().names) }
+        unsafe {
+            let names = self.unwrap_non_null(Private).as_ref().names;
+            debug_assert!(!names.is_null());
+            SimpleVector::wrap_non_null(NonNull::new_unchecked(names), Private)
+        }
     }
 
     /// The `atomicfields` field.
@@ -103,23 +120,36 @@ impl<'scope> TypeName<'scope> {
     /// Either the only instantiation of the type (if no parameters) or a `UnionAll` accepting
     /// parameters to make an instantiation.
     #[cfg(feature = "extra-fields")]
-    pub fn wrapper(self) -> ValueRef<'scope, 'static> {
+    pub fn wrapper(self) -> Value<'scope, 'static> {
         // Safety: the pointer points to valid data
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().wrapper) }
+
+        unsafe {
+            let wrapper = self.unwrap_non_null(Private).as_ref().wrapper;
+            debug_assert!(!wrapper.is_null());
+            Value::wrap_non_null(NonNull::new_unchecked(wrapper), Private)
+        }
     }
 
     /// Sorted array.
     #[cfg(feature = "extra-fields")]
-    pub fn cache(self) -> SimpleVectorRef<'scope> {
+    pub fn cache<'target, T>(self, target: T) -> SimpleVectorData<'target, T>
+    where
+        T: Target<'target>,
+    {
         cfg_if! {
             if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
-                unsafe { SimpleVectorRef::wrap(self.unwrap_non_null(Private).as_ref().cache) }
+                unsafe {
+                    let cache = self.unwrap_non_null(Private).as_ref().cache;
+                    debug_assert!(!cache.is_null());
+                    SimpleVectorRef::wrap(NonNull::new_unchecked(cache)).root(target)
+                }
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let cache = self.unwrap_non_null(Private).as_ref().cache.load(Ordering::Relaxed);
-                    SimpleVectorRef::wrap(cache)
+                    debug_assert!(!cache.is_null());
+                    SimpleVectorRef::wrap(NonNull::new_unchecked(cache)).root(target)
                 }
             }
         }
@@ -127,16 +157,24 @@ impl<'scope> TypeName<'scope> {
 
     /// Unsorted array.
     #[cfg(feature = "extra-fields")]
-    pub fn linear_cache(self) -> SimpleVectorRef<'scope> {
+    pub fn linear_cache<'target, T>(self, target: T) -> SimpleVectorData<'target, T>
+    where
+        T: Target<'target>,
+    {
         cfg_if! {
             if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
-                unsafe { SimpleVectorRef::wrap(self.unwrap_non_null(Private).as_ref().linearcache) }
+                unsafe {
+                    let cache = self.unwrap_non_null(Private).as_ref().linearcache;
+                    debug_assert!(!cache.is_null());
+                    SimpleVectorRef::wrap(NonNull::new_unchecked(cache)).root(target)
+                }
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let cache = self.unwrap_non_null(Private).as_ref().linearcache.load(Ordering::Relaxed);
-                    SimpleVectorRef::wrap(cache)
+                    debug_assert!(!cache.is_null());
+                    SimpleVectorRef::wrap(NonNull::new_unchecked(cache)).root(target)
                 }
             }
         }
@@ -144,16 +182,30 @@ impl<'scope> TypeName<'scope> {
 
     /// The `mt` field.
     #[cfg(feature = "extra-fields")]
-    pub fn mt(self) -> ValueRef<'scope, 'static> {
+    pub fn mt<'target, T>(self, target: T) -> ValueData<'target, 'static, T>
+    where
+        T: Target<'target>,
+    {
         // Safety: the pointer points to valid data
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().mt.cast()) }
+        unsafe {
+            let mt = self.unwrap_non_null(Private).as_ref().mt;
+            debug_assert!(!mt.is_null());
+            ValueRef::wrap(NonNull::new_unchecked(mt.cast())).root(target)
+        }
     }
 
     /// Incomplete instantiations of this type.
     #[cfg(feature = "extra-fields")]
-    pub fn partial(self) -> ValueRef<'scope, 'static> {
+    pub fn partial<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
         // Safety: the pointer points to valid data
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().partial.cast()) }
+        unsafe {
+            let partial = self.unwrap_non_null(Private).as_ref().partial;
+            let partial = NonNull::new(partial)?;
+            Some(ValueRef::wrap(partial.cast()).root(target))
+        }
     }
 
     /// The `hash` field.
@@ -189,15 +241,6 @@ impl<'scope> TypeName<'scope> {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().mayinlinealloc() != 0 }
     }
-
-    /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> TypeNameData<'target, T>
-    where
-        T: Target<'target>,
-    {
-        // Safety: the data is valid.
-        unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
-    }
 }
 
 impl<'base> TypeName<'base> {
@@ -207,7 +250,7 @@ impl<'base> TypeName<'base> {
         T: Target<'base>,
     {
         // Safety: global constant
-        unsafe { Self::wrap(jl_type_typename, Private) }
+        unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_type_typename), Private) }
     }
 
     /// The typename of the `DataType` `Tuple`.
@@ -216,7 +259,7 @@ impl<'base> TypeName<'base> {
         T: Target<'base>,
     {
         // Safety: global constant
-        unsafe { Self::wrap(jl_tuple_typename, Private) }
+        unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_tuple_typename), Private) }
     }
 
     /// The typename of the `UnionAll` `VecElement`.
@@ -225,7 +268,7 @@ impl<'base> TypeName<'base> {
         T: Target<'base>,
     {
         // Safety: global constant
-        unsafe { Self::wrap(jl_vecelement_typename, Private) }
+        unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_vecelement_typename), Private) }
     }
 
     /// The typename of the `UnionAll` `Vararg`.
@@ -235,7 +278,7 @@ impl<'base> TypeName<'base> {
         T: Target<'base>,
     {
         // Safety: global constant
-        unsafe { Self::wrap(jl_vararg_typename, Private) }
+        unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_vararg_typename), Private) }
     }
 
     /// The typename of the `UnionAll` `Array`.
@@ -244,7 +287,7 @@ impl<'base> TypeName<'base> {
         T: Target<'base>,
     {
         // Safety: global constant
-        unsafe { Self::wrap(jl_array_typename, Private) }
+        unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_array_typename), Private) }
     }
 
     /// The typename of the `UnionAll` `Ptr`.
@@ -254,7 +297,7 @@ impl<'base> TypeName<'base> {
         T: Target<'base>,
     {
         // Safety: global constant
-        unsafe { Self::wrap(jl_opaque_closure_typename, Private) }
+        unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_opaque_closure_typename), Private) }
     }
 
     /// The typename of the `UnionAll` `Ptr`.
@@ -263,7 +306,7 @@ impl<'base> TypeName<'base> {
         T: Target<'base>,
     {
         // Safety: global constant
-        unsafe { Self::wrap(jl_pointer_typename, Private) }
+        unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_pointer_typename), Private) }
     }
 
     /// The typename of the `UnionAll` `LLVMPtr`.
@@ -272,7 +315,7 @@ impl<'base> TypeName<'base> {
         T: Target<'base>,
     {
         // Safety: global constant
-        unsafe { Self::wrap(jl_llvmpointer_typename, Private) }
+        unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_llvmpointer_typename), Private) }
     }
 
     /// The typename of the `UnionAll` `NamedTuple`.
@@ -281,7 +324,7 @@ impl<'base> TypeName<'base> {
         T: Target<'base>,
     {
         // Safety: global constant
-        unsafe { Self::wrap(jl_namedtuple_typename, Private) }
+        unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_namedtuple_typename), Private) }
     }
 }
 
@@ -303,8 +346,6 @@ impl<'scope> WrapperPriv<'scope, '_> for TypeName<'scope> {
         self.0
     }
 }
-
-impl_root!(TypeName, 1);
 
 /// A reference to a [`TypeName`] that has not been explicitly rooted.
 pub type TypeNameRef<'scope> = Ref<'scope, 'static, TypeName<'scope>>;

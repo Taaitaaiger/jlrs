@@ -4,7 +4,6 @@ mod tests {
     use super::util::JULIA;
     use jlrs::prelude::*;
 
-    #[test]
     fn ptr_union_fields_access_something() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -13,15 +12,14 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let field = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .global(&frame, "has_module")?
-                        .value_unchecked()
+                        .value()
                         .field_accessor(&mut frame)
                         .field("a")?
                         .access::<ValueRef>()?;
 
-                    assert!(!field.is_undefined());
-                    assert!(field.value_unchecked().is::<Module>());
+                    assert!(field.value().is::<Module>());
 
                     Ok(())
                 })
@@ -29,7 +27,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn ptr_union_fields_nothing_is_not_null() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -38,9 +35,9 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let _field = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper_unchecked()
+                        .wrapper()
                         .global(&frame, "has_nothing")?
-                        .value_unchecked()
+                        .value()
                         .field_accessor(&mut frame)
                         .field("a")?
                         .access::<Nothing>()?;
@@ -49,5 +46,11 @@ mod tests {
                 })
                 .unwrap();
         })
+    }
+
+    #[test]
+    fn union_layout_tests() {
+        ptr_union_fields_access_something();
+        ptr_union_fields_nothing_is_not_null();
     }
 }

@@ -36,7 +36,7 @@ jobs:
         run: |
           export JULIA_DIR="$(dirname $(dirname $(which julia)))"
           export LD_LIBRARY_PATH="${JULIA_DIR}/lib:${JULIA_DIR}/lib/julia:${LD_LIBRARY_PATH}"
-          cargo test --features full --verbose -- --test-threads=1
+          cargo test --features full --verbose
 
   test-windows-gnu:
     runs-on: windows-latest
@@ -63,7 +63,7 @@ jobs:
           override: true
 
       - name: Run tests
-        run: cargo test --features full --verbose -- --test-threads=1
+        run: cargo test --features full --verbose
 
   test-windows-msvc:
     runs-on: windows-latest
@@ -93,7 +93,7 @@ jobs:
           override: true
 
       - name: Run tests
-        run: cargo test --features full --verbose -- --test-threads=1
+        run: cargo test --features full --verbose
 
   test-linux-lts:
     runs-on: ubuntu-latest
@@ -119,7 +119,7 @@ jobs:
         run: |
           export JULIA_DIR="$(dirname $(dirname $(which julia)))"
           export LD_LIBRARY_PATH="${JULIA_DIR}/lib:${JULIA_DIR}/lib/julia:${LD_LIBRARY_PATH}"
-          cargo test --features full,lts --verbose -- --test-threads=1
+          cargo test --features full,lts --verbose
 
   test-windows-gnu-lts:
     runs-on: windows-latest
@@ -143,7 +143,7 @@ jobs:
           override: true
 
       - name: Run tests
-        run: cargo test --features full,lts --verbose -- --test-threads=1
+        run: cargo test --features full,lts --verbose
 
   test-windows-msvc-lts:
     runs-on: windows-latest
@@ -170,7 +170,7 @@ jobs:
           override: true
 
       - name: Run tests
-        run: cargo test --features full,lts --verbose -- --test-threads=1
+        run: cargo test --features full,lts --verbose
 
   docs:
     runs-on: ubuntu-latest

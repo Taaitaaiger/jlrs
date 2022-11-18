@@ -19,7 +19,7 @@
 //! tasks scheduled on that thread. Blocking tasks can be expressed as closures, the other two
 //! require implementing the [`AsyncTask`] and [`PersistentTask`] traits respectively.
 
-#[cfg(feature = "nightly")]
+#[cfg(any(feature = "nightly", feature = "beta"))]
 pub mod adopted;
 #[cfg(feature = "async-std-rt")]
 pub mod async_std_rt;
@@ -54,7 +54,7 @@ use jl_sys::{
     jl_atexit_hook, jl_init, jl_init_with_image, jl_is_initialized, jl_process_events, jl_yield,
 };
 
-#[cfg(feature = "nightly")]
+#[cfg(any(feature = "nightly", feature = "beta"))]
 use jl_sys::{jl_enter_threaded_region, jl_exit_threaded_region};
 
 use jl_sys::jl_options;
@@ -73,13 +73,13 @@ use std::{
 
 use self::queue::{channel, Receiver, Sender};
 
-#[cfg(feature = "nightly")]
+#[cfg(any(feature = "nightly", feature = "beta"))]
 use self::adopted::init_worker;
 
-#[cfg(feature = "nightly")]
+#[cfg(any(feature = "nightly", feature = "beta"))]
 init_fn!(init_multitask, JLRS_MULTITASK_JL, "JlrsMultitaskNightly.jl");
 
-#[cfg(not(feature = "nightly"))]
+#[cfg(not(any(feature = "nightly", feature = "beta")))]
 init_fn!(init_multitask, JLRS_MULTITASK_JL, "JlrsMultitask.jl");
 
 // TODO: this doesn't really belong in this module
@@ -536,7 +536,7 @@ where
             if jl_is_initialized() != 0 || INIT.swap(true, Ordering::SeqCst) {
                 Err(RuntimeError::AlreadyInitialized)?;
             }
-            #[cfg(not(feature = "nightly"))]
+            #[cfg(not(any(feature = "nightly", feature = "beta")))]
             {
                 if builder.n_threads == 0 {
                     jl_options.nthreads = -1;
@@ -545,7 +545,7 @@ where
                 }
             }
 
-            #[cfg(feature = "nightly")]
+            #[cfg(any(feature = "nightly", feature = "beta"))]
             {
                 if builder.n_threadsi != 0 {
                     if builder.n_threads == 0 {
@@ -638,15 +638,15 @@ where
 
         let recv_timeout = builder.recv_timeout;
 
-        #[cfg(feature = "nightly")]
+        #[cfg(any(feature = "nightly", feature = "beta"))]
         let mut workers = Vec::with_capacity(builder.n_workers);
-        #[cfg(feature = "nightly")]
+        #[cfg(any(feature = "nightly", feature = "beta"))]
         for i in 0..builder.n_workers {
             let worker = init_worker::<R, N>(i, recv_timeout, receiver.clone());
             workers.push(worker)
         }
 
-        #[cfg(feature = "nightly")]
+        #[cfg(any(feature = "nightly", feature = "beta"))]
         jl_enter_threaded_region();
 
         loop {
@@ -727,7 +727,7 @@ where
             }
         }
 
-        #[cfg(feature = "nightly")]
+        #[cfg(any(feature = "nightly", feature = "beta"))]
         for worker in workers.into_iter() {
             loop {
                 if worker.is_finished() {
@@ -740,7 +740,7 @@ where
             }
         }
 
-        #[cfg(feature = "nightly")]
+        #[cfg(any(feature = "nightly", feature = "beta"))]
         jl_exit_threaded_region();
 
         jl_atexit_hook(0);
@@ -782,12 +782,12 @@ fn set_custom_fns(stack: &Stack) -> JlrsResult<()> {
 
         let jlrs_mod = Module::main(&frame)
             .submodule(&frame, "JlrsMultitask")?
-            .wrapper_unchecked();
+            .wrapper();
 
         let wake_rust = Value::new(&mut frame, wake_task as *mut c_void);
         jlrs_mod
             .global(&frame, "wakerust")?
-            .wrapper_unchecked()
+            .wrapper()
             .set_nth_field_unchecked(0, wake_rust);
 
         std::mem::drop(owner);

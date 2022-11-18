@@ -60,14 +60,11 @@ impl<'scope> Module<'scope> {
     }
 
     /// Returns the parent of this module.
-    pub fn parent<'target, T>(self, target: T) -> ModuleData<'target, T>
-    where
-        T: Target<'target>,
-    {
+    pub fn parent(self) -> Module<'scope> {
         // Safety: the pointer points to valid data, the parent is never null
         unsafe {
             let parent = self.unwrap_non_null(Private).as_ref().parent;
-            target.data_from_ptr(NonNull::new_unchecked(parent), Private)
+            Module(NonNull::new_unchecked(parent), PhantomData)
         }
     }
 
@@ -76,7 +73,7 @@ impl<'scope> Module<'scope> {
     where
         T: Target<'target>,
     {
-        Module::wrap(self.unwrap(Private), Private)
+        Module::wrap_non_null(self.unwrap_non_null(Private), Private)
     }
 
     /// Returns a handle to Julia's `Main`-module. If you include your own Julia code with
@@ -88,19 +85,19 @@ impl<'scope> Module<'scope> {
     /// [`AsyncJulia::try_include`]: crate::runtime::async_rt::AsyncJulia::try_include
     pub fn main<T: Target<'scope>>(_: &T) -> Self {
         // Safety: the Main module is globally rooted
-        unsafe { Module::wrap(jl_main_module, Private) }
+        unsafe { Module::wrap_non_null(NonNull::new_unchecked(jl_main_module), Private) }
     }
 
     /// Returns a handle to Julia's `Core`-module.
     pub fn core<T: Target<'scope>>(_: &T) -> Self {
         // Safety: the Core module is globally rooted
-        unsafe { Module::wrap(jl_core_module, Private) }
+        unsafe { Module::wrap_non_null(NonNull::new_unchecked(jl_core_module), Private) }
     }
 
     /// Returns a handle to Julia's `Base`-module.
     pub fn base<T: Target<'scope>>(_: &T) -> Self {
         // Safety: the Base module is globally rooted
-        unsafe { Module::wrap(jl_base_module, Private) }
+        unsafe { Module::wrap_non_null(NonNull::new_unchecked(jl_base_module), Private) }
     }
 
     /// Returns `true` if `self` has imported `sym`.
@@ -182,7 +179,7 @@ impl<'scope> Module<'scope> {
 
         let res = match catch_exceptions(&mut callback).unwrap() {
             Ok(_) => Ok(()),
-            Err(e) => Err(NonNull::new_unchecked(e.ptr())),
+            Err(e) => Err(e.ptr()),
         };
 
         target.exception_from_ptr(res, Private)
@@ -244,7 +241,7 @@ impl<'scope> Module<'scope> {
                     value.unwrap_non_null(Private),
                     Private,
                 )),
-                Err(e) => Err(NonNull::new_unchecked(e.ptr())),
+                Err(e) => Err(e.ptr()),
             };
 
             target.exception_from_ptr(res, Private)
@@ -321,7 +318,7 @@ impl<'scope> Module<'scope> {
                 })?;
             }
 
-            Ok(LeakedValue::wrap(global))
+            Ok(LeakedValue::wrap_non_null(NonNull::new_unchecked(global)))
         }
     }
 
@@ -340,7 +337,7 @@ impl<'scope> Module<'scope> {
         unsafe {
             let symbol = name.to_symbol_priv(Private);
             let global = target.global();
-            let func = self.global(global, symbol)?.wrapper_unchecked();
+            let func = self.global(global, symbol)?.wrapper();
 
             if !func.is::<Function>() {
                 let name = symbol.as_str().unwrap_or("<Non-UTF8 string>").into();
@@ -382,21 +379,12 @@ impl<'scope> Module<'scope> {
         Module::base(&global)
             .function(global, "require")
             .unwrap()
-            .wrapper_unchecked()
+            .wrapper()
             .call2(
                 target,
                 self.as_value(),
                 module.to_symbol_priv(Private).as_value(),
             )
-    }
-
-    /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> ModuleData<'target, T>
-    where
-        T: Target<'target>,
-    {
-        // Safety: the data is valid.
-        unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
     }
 }
 
@@ -418,8 +406,6 @@ impl<'scope> WrapperPriv<'scope, '_> for Module<'scope> {
         self.0
     }
 }
-
-impl_root!(Module, 1);
 
 /// A reference to a [`Module`] that has not been explicitly rooted.
 pub type ModuleRef<'scope> = Ref<'scope, 'static, Module<'scope>>;

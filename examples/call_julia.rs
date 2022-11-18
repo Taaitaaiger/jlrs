@@ -33,11 +33,11 @@ fn main() {
                 Module::main(&frame)
                     // the submodule doesn't have to be rooted because it's never reloaded.
                     .submodule(&frame, "MyModule")?
-                    .wrapper_unchecked()
+                    .wrapper()
                     // the same holds true for the function: the module is never reloaded so it's
                     // globally rooted
                     .function(&frame, "complexfunc")?
-                    .wrapper_unchecked()
+                    .wrapper()
                     // Call the function with the two arguments it takes
                     .call2(&mut frame, dim, iters)
                     // If you don't want to use the exception, it can be converted to a `JlrsError`

@@ -141,10 +141,10 @@ macro_rules! count {
 
 macro_rules! check {
     ($fieldtypes:expr, $n:expr, $t:ident, $($x:ident),+) => {
-        <$t>::valid_layout($fieldtypes[$n - 1 - count!($($x),+)].wrapper_unchecked()) && check!($fieldtypes, $n, $($x),+)
+        <$t>::valid_field($fieldtypes[$n - 1 - count!($($x),+)].unwrap().wrapper()) && check!($fieldtypes, $n, $($x),+)
     };
     ($fieldtypes:expr, $n:expr, $t:ident) => {
-        <$t>::valid_layout($fieldtypes[$n - 1].wrapper_unchecked())
+        <$t>::valid_field($fieldtypes[$n - 1].unwrap().wrapper())
     };
 }
 
@@ -184,19 +184,20 @@ macro_rules! impl_tuple {
 
         unsafe impl<$($types),+> $crate::layout::valid_layout::ValidLayout for $name<$($types),+>
         where
-            $($types: $crate::layout::valid_layout::ValidLayout + Clone + ::std::fmt::Debug),+
+            $($types: $crate::layout::valid_layout::ValidField + Clone + ::std::fmt::Debug),+
         {
             fn valid_layout(v: $crate::wrappers::ptr::value::Value) -> bool {
                 unsafe {
                     if let Ok(dt) = v.cast::<$crate::wrappers::ptr::datatype::DataType>() {
-                        let fieldtypes = dt.field_types();
+                        let global = v.global();
+                        let fieldtypes = dt.field_types(global);
                         let n = count!($($types),+);
-                        if fieldtypes.wrapper_unchecked().len() != n {
+                        if fieldtypes.wrapper().len() != n {
                             return false;
                         }
 
 
-                        let types = fieldtypes.wrapper_unchecked();
+                        let types = fieldtypes.wrapper();
                         let types = types.data().as_slice();
                         if !check!(types, n, $($types),+) {
                             return false
@@ -212,16 +213,45 @@ macro_rules! impl_tuple {
             const IS_REF: bool = false;
         }
 
+        unsafe impl<$($types),+> $crate::layout::valid_layout::ValidField for $name<$($types),+>
+        where
+            $($types: $crate::layout::valid_layout::ValidField + Clone + ::std::fmt::Debug),+
+        {
+            fn valid_field(v: $crate::wrappers::ptr::value::Value) -> bool {
+                unsafe {
+                    if let Ok(dt) = v.cast::<$crate::wrappers::ptr::datatype::DataType>() {
+                        let global = v.global();
+                        let fieldtypes = dt.field_types(global);
+                        let n = count!($($types),+);
+                        if fieldtypes.wrapper().len() != n {
+                            return false;
+                        }
+
+
+                        let types = fieldtypes.wrapper();
+                        let types = types.data().as_slice();
+                        if !check!(types, n, $($types),+) {
+                            return false
+                        }
+
+                        return true
+                    }
+
+                    false
+                }
+            }
+        }
+
         unsafe impl<$($types),+> $crate::convert::unbox::Unbox for $name<$($types),+>
         where
-            $($types: $crate::layout::valid_layout::ValidLayout + Clone + ::std::fmt::Debug),+
+            $($types: $crate::layout::valid_layout::ValidField + Clone + ::std::fmt::Debug),+
         {
             type Output = Self;
         }
 
         unsafe impl<$($types),+> $crate::layout::typecheck::Typecheck for $name<$($types),+>
         where
-            $($types: $crate::layout::valid_layout::ValidLayout + Clone + ::std::fmt::Debug),+
+            $($types: $crate::layout::valid_layout::ValidField + Clone + ::std::fmt::Debug),+
         {
             fn typecheck(t: $crate::wrappers::ptr::datatype::DataType) -> bool {
                 <Self as $crate::layout::valid_layout::ValidLayout>::valid_layout(t.as_value())
@@ -269,6 +299,17 @@ macro_rules! impl_tuple {
             }
 
             const IS_REF: bool = false;
+        }
+
+        unsafe impl $crate::layout::valid_layout::ValidField for $name {
+            fn valid_field(v: $crate::wrappers::ptr::value::Value) -> bool {
+                if let Ok(dt) = v.cast::<$crate::wrappers::ptr::datatype::DataType>() {
+                    let global = unsafe {$crate::memory::target::global::Global::new()};
+                    return dt == $crate::wrappers::ptr::datatype::DataType::emptytuple_type(&global)
+                }
+
+                false
+            }
         }
 
         unsafe impl $crate::convert::unbox::Unbox for $name {

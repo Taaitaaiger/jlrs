@@ -5,7 +5,6 @@ mod tests {
     use super::util::JULIA;
     use jlrs::prelude::*;
 
-    #[test]
     fn read_atomic_field() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -15,9 +14,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsStableTests")?
-                            .wrapper_unchecked()
+                            .wrapper()
                             .global(&frame, "WithAtomic")?
-                            .value_unchecked()
+                            .value()
                     };
 
                     let arg1 = Value::new(&mut frame, 3u32);
@@ -38,7 +37,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn read_large_atomic_field() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -48,9 +46,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsStableTests")?
-                            .wrapper_unchecked()
+                            .wrapper()
                             .global(&frame, "WithLargeAtomic")?
-                            .value_unchecked()
+                            .value()
                     };
 
                     let tup = Value::new(&mut frame, Tuple4(1u64, 2u64, 3u64, 4u64));
@@ -72,7 +70,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn read_oddly_sized_atomic_field() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -82,9 +79,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsStableTests")?
-                            .wrapper_unchecked()
+                            .wrapper()
                             .global(&frame, "WithOddlySizedAtomic")?
-                            .value_unchecked()
+                            .value()
                     };
 
                     let tup = Value::new(&mut frame, Tuple2(1u32, 2u16));
@@ -106,7 +103,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn atomic_union_is_pointer_field() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -116,9 +112,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsStableTests")?
-                            .wrapper_unchecked()
+                            .wrapper()
                             .global(&frame, "WithAtomicUnion")?
-                            .value_unchecked()
+                            .value()
                     };
 
                     assert!(ty.cast::<DataType>()?.is_pointer_field(0)?);
@@ -131,7 +127,6 @@ mod tests {
         })
     }
 
-    #[test]
     #[cfg(feature = "extra-fields")]
     fn read_atomic_field_of_ptr_wrapper() {
         JULIA.with(|j| {
@@ -143,9 +138,8 @@ mod tests {
                         assert_eq!(
                             DataType::datatype_type(&frame)
                                 .type_name()
-                                .wrapper_unchecked()
-                                .cache()
-                                .wrapper_unchecked()
+                                .cache(&frame)
+                                .wrapper()
                                 .len(),
                             0
                         )
@@ -155,5 +149,15 @@ mod tests {
                 })
                 .unwrap();
         })
+    }
+
+    #[test]
+    fn atomic_field_tests() {
+        read_atomic_field();
+        read_large_atomic_field();
+        read_oddly_sized_atomic_field();
+        atomic_union_is_pointer_field();
+        #[cfg(feature = "extra-fields")]
+        read_atomic_field_of_ptr_wrapper();
     }
 }

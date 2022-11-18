@@ -63,10 +63,10 @@ impl<'scope> PyPlot<'scope> {
         let plt = Module::main(&frame)
             .submodule(&frame, "JlrsPyPlot")
             .unwrap()
-            .wrapper_unchecked()
+            .wrapper()
             .function(&frame, "jlrsplot")
             .unwrap()
-            .wrapper_unchecked()
+            .wrapper()
             .call(frame, vals)
             .into_jlrs_result()?;
 
@@ -98,10 +98,10 @@ impl<'scope> PyPlot<'scope> {
         let plt = Module::main(&frame)
             .submodule(&frame, "JlrsPyPlot")
             .unwrap()
-            .wrapper_unchecked()
+            .wrapper()
             .function(&frame, "jlrsplot")
             .unwrap()
-            .wrapper_unchecked()
+            .wrapper()
             .provide_keywords(keywords)?
             .call(frame, vals)
             .into_jlrs_result()?;
@@ -134,10 +134,10 @@ impl<'scope> PyPlot<'scope> {
         Module::main(&frame)
             .submodule(&frame, "JlrsPyPlot")
             .unwrap()
-            .wrapper_unchecked()
+            .wrapper()
             .function(&frame, "updateplot!")
             .unwrap()
-            .wrapper_unchecked()
+            .wrapper()
             .call(frame, vals)
             .into_jlrs_result()?
             .unbox::<isize>()
@@ -169,10 +169,10 @@ impl<'scope> PyPlot<'scope> {
         Module::main(&frame)
             .submodule(&frame, "JlrsPyPlot")
             .unwrap()
-            .wrapper_unchecked()
+            .wrapper()
             .function(&frame, "updateplot!")
             .unwrap()
-            .wrapper_unchecked()
+            .wrapper()
             .provide_keywords(keywords)?
             .call(frame, vals)
             .into_jlrs_result()?
@@ -184,7 +184,7 @@ impl<'scope> PyPlot<'scope> {
         unsafe {
             Module::base(&frame)
                 .function(&frame, "wait")?
-                .wrapper_unchecked()
+                .wrapper()
                 .call1(frame, self.0)
                 .into_jlrs_result()?;
 
@@ -207,10 +207,10 @@ impl<'scope> PyPlot<'scope> {
             Module::main(&frame)
                 .submodule(&frame, "JlrsPyPlot")
                 .unwrap()
-                .wrapper_unchecked()
+                .wrapper()
                 .function(&frame, "setversion")
                 .unwrap()
-                .wrapper_unchecked()
+                .wrapper()
                 .call1(frame, version)
                 .into_jlrs_result()?;
 
@@ -225,7 +225,7 @@ impl<'scope> PyPlot<'scope> {
         unsafe {
             Module::base(&frame)
                 .function(&frame, "wait")?
-                .wrapper_unchecked()
+                .wrapper()
                 .call_async_main(frame, &mut [self.0])
                 .await
                 .into_jlrs_result()?;
@@ -236,7 +236,7 @@ impl<'scope> PyPlot<'scope> {
 
     /// Wait until the window associated with `self` has been closed in a new task scheduled
     /// on the `:interactive` thread pool.
-    #[cfg(all(feature = "async", feature = "nightly"))]
+    #[cfg(all(feature = "async", any(feature = "nightly", feature = "beta")))]
     pub async fn wait_async_interactive<'frame>(
         self,
         frame: &mut AsyncGcFrame<'frame>,
@@ -244,7 +244,7 @@ impl<'scope> PyPlot<'scope> {
         unsafe {
             Module::base(&frame)
                 .function(&frame, "wait")?
-                .wrapper_unchecked()
+                .wrapper()
                 .call_async_interactive(frame, &mut [self.0])
                 .await
                 .into_jlrs_result()?;
@@ -263,7 +263,7 @@ impl<'scope> PyPlot<'scope> {
         unsafe {
             Module::base(&frame)
                 .function(&frame, "wait")?
-                .wrapper_unchecked()
+                .wrapper()
                 .call_async_local(frame, &mut [self.0])
                 .await
                 .into_jlrs_result()?;
@@ -279,7 +279,7 @@ impl<'scope> PyPlot<'scope> {
         unsafe {
             Module::base(&frame)
                 .function(&frame, "wait")?
-                .wrapper_unchecked()
+                .wrapper()
                 .call_async(frame, &mut [self.0])
                 .await
                 .into_jlrs_result()?;
@@ -299,10 +299,10 @@ pub trait AccessPlotsModule: private::AccessPlotsModulePriv {
             Module::main(&global)
                 .submodule(&global, "JlrsPyPlot")
                 .unwrap()
-                .wrapper_unchecked()
+                .wrapper()
                 .submodule(&global, "Plots")
                 .unwrap()
-                .wrapper_unchecked()
+                .wrapper()
         }
     }
 }

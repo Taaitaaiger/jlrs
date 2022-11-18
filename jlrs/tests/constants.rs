@@ -8,7 +8,6 @@ mod tests {
 
     macro_rules! impl_constant_test {
         ($func:ident, $tyname:expr) => {
-            #[test]
             fn $func() {
                 JULIA.with(|j| {
                     let mut frame = StackFrame::new();
@@ -17,11 +16,8 @@ mod tests {
                     jlrs.instance(&mut frame)
                         .scope(|frame| {
                             let v1 = Value::$func(&frame);
-                            let v2 = unsafe {
-                                Module::core(&frame)
-                                    .global(&frame, $tyname)?
-                                    .wrapper_unchecked()
-                            };
+                            let v2 =
+                                unsafe { Module::core(&frame).global(&frame, $tyname)?.wrapper() };
                             assert!(v1.datatype().as_value() == v2);
                             Ok(())
                         })
@@ -33,7 +29,6 @@ mod tests {
 
     macro_rules! impl_constant_isa_test {
         ($func:ident, $tyname:expr) => {
-            #[test]
             fn $func() {
                 JULIA.with(|j| {
                     let mut frame = StackFrame::new();
@@ -45,9 +40,7 @@ mod tests {
                             unsafe {
                                 let v1 = Value::$func(&frame);
                                 let v2 = unsafe {
-                                    Module::core(&frame)
-                                        .global(&frame, $tyname)?
-                                        .wrapper_unchecked()
+                                    Module::core(&frame).global(&frame, $tyname)?.wrapper()
                                 };
                                 assert!(v1.isa(v2));
                             }
@@ -61,7 +54,6 @@ mod tests {
 
     macro_rules! impl_constant_subtype_test {
         ($func:ident, $tyname:expr) => {
-            #[test]
             fn $func() {
                 JULIA.with(|j| {
                     let mut frame = StackFrame::new();
@@ -73,9 +65,7 @@ mod tests {
                             unsafe {
                                 let v1 = Value::$func(&frame);
                                 let v2 = unsafe {
-                                    Module::core(&frame)
-                                        .global(&frame, $tyname)?
-                                        .wrapper_unchecked()
+                                    Module::core(&frame).global(&frame, $tyname)?.wrapper()
                                 };
                                 assert!(v1.subtype(v2));
                             }
@@ -89,7 +79,6 @@ mod tests {
 
     macro_rules! impl_unionall_constant_test {
         ($func:ident, $tyname:expr) => {
-            #[test]
             fn $func() {
                 JULIA.with(|j| {
                     let mut frame = StackFrame::new();
@@ -98,11 +87,8 @@ mod tests {
                     jlrs.instance(&mut frame)
                         .scope(|frame| {
                             let v1 = UnionAll::$func(&frame);
-                            let v2 = unsafe {
-                                Module::core(&frame)
-                                    .global(&frame, $tyname)?
-                                    .wrapper_unchecked()
-                            };
+                            let v2 =
+                                unsafe { Module::core(&frame).global(&frame, $tyname)?.wrapper() };
                             assert!(v1.as_value() == v2);
                             Ok(())
                         })
@@ -114,7 +100,6 @@ mod tests {
 
     macro_rules! impl_unionall_constant_isa_test {
         ($func:ident, $tyname:expr) => {
-            #[test]
             fn $func() {
                 JULIA.with(|j| {
                     let mut frame = StackFrame::new();
@@ -123,11 +108,8 @@ mod tests {
                     jlrs.instance(&mut frame)
                         .scope(|frame| {
                             let v1 = UnionAll::$func(&frame);
-                            let v2 = unsafe {
-                                Module::core(&frame)
-                                    .global(&frame, $tyname)?
-                                    .wrapper_unchecked()
-                            };
+                            let v2 =
+                                unsafe { Module::core(&frame).global(&frame, $tyname)?.wrapper() };
                             assert!(v1.as_value().isa(v2));
                             Ok(())
                         })
@@ -139,7 +121,6 @@ mod tests {
 
     macro_rules! impl_datatype_constant_isa_test {
         ($func:ident, $tyname:expr) => {
-            #[test]
             fn $func() {
                 JULIA.with(|j| {
                     let mut frame = StackFrame::new();
@@ -148,11 +129,8 @@ mod tests {
                     jlrs.instance(&mut frame)
                         .scope(|frame| {
                             let v1 = DataType::$func(&frame);
-                            let v2 = unsafe {
-                                Module::core(&frame)
-                                    .global(&frame, $tyname)?
-                                    .wrapper_unchecked()
-                            };
+                            let v2 =
+                                unsafe { Module::core(&frame).global(&frame, $tyname)?.wrapper() };
                             assert!(v1.as_value().isa(v2));
                             Ok(())
                         })
@@ -258,4 +236,102 @@ mod tests {
     impl_datatype_constant_isa_test!(methtable_type, "DataType");
     impl_datatype_constant_isa_test!(typemap_level_type, "DataType");
     impl_datatype_constant_isa_test!(typemap_entry_type, "DataType");
+
+    #[test]
+    fn constant_tests() {
+        bottom_type();
+        stackovf_exception();
+        memory_exception();
+        readonlymemory_exception();
+        diverror_exception();
+        undefref_exception();
+        interrupt_exception();
+        an_empty_vec_any();
+        an_empty_string();
+        array_uint8_type();
+        array_any_type();
+        array_symbol_type();
+        array_int32_type();
+        emptytuple();
+        true_v();
+        false_v();
+        nothing();
+        type_type();
+        anytuple_type_type();
+        abstractarray_type();
+        densearray_type();
+        array_type();
+        pointer_type();
+        llvmpointer_type();
+        ref_type();
+        namedtuple_type();
+        typeofbottom_type();
+        datatype_type();
+        uniontype_type();
+        unionall_type();
+        tvar_type();
+        any_type();
+        typename_type();
+        symbol_type();
+        ssavalue_type();
+        abstractslot_type();
+        slotnumber_type();
+        typedslot_type();
+        simplevector_type();
+        anytuple_type();
+        tuple_type();
+        emptytuple_type();
+        function_type();
+        builtin_type();
+        method_instance_type();
+        code_instance_type();
+        code_info_type();
+        method_type();
+        module_type();
+        weakref_type();
+        abstractstring_type();
+        string_type();
+        errorexception_type();
+        argumenterror_type();
+        loaderror_type();
+        initerror_type();
+        typeerror_type();
+        methoderror_type();
+        undefvarerror_type();
+        lineinfonode_type();
+        boundserror_type();
+        bool_type();
+        char_type();
+        int8_type();
+        uint8_type();
+        int16_type();
+        uint16_type();
+        int32_type();
+        uint32_type();
+        int64_type();
+        uint64_type();
+        float16_type();
+        float32_type();
+        float64_type();
+        floatingpoint_type();
+        number_type();
+        nothing_type();
+        signed_type();
+        voidpointer_type();
+        task_type();
+        expr_type();
+        globalref_type();
+        linenumbernode_type();
+        gotonode_type();
+        phinode_type();
+        pinode_type();
+        phicnode_type();
+        upsilonnode_type();
+        quotenode_type();
+        newvarnode_type();
+        intrinsic_type();
+        methtable_type();
+        typemap_level_type();
+        typemap_entry_type();
+    }
 }

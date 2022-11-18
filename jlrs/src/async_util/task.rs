@@ -275,12 +275,12 @@ pub fn sleep<'scope, 'data, T: Target<'scope>>(target: &T, duration: Duration) {
 
         // Is rooted when sleep is called.
         let secs = duration.as_millis() as usize as f64 / 1000.;
-        let secs = Value::new(target, secs).value_unchecked();
+        let secs = Value::new(target, secs).value();
 
         Module::base(target)
             .global(target, "sleep")
             .expect("sleep not found")
-            .value_unchecked()
+            .value()
             .call1(target, secs)
             .expect("sleep threw an exception");
     }

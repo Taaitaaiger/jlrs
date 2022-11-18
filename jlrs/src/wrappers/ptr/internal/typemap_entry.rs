@@ -7,9 +7,13 @@
 
 use crate::{
     impl_julia_typecheck,
-    memory::target::Target,
+    prelude::{Target, Value},
     private::Private,
-    wrappers::ptr::{private::WrapperPriv, value::ValueRef, Ref},
+    wrappers::ptr::{
+        private::WrapperPriv,
+        value::{ValueData, ValueRef},
+        Ref,
+    },
 };
 use cfg_if::cfg_if;
 use jl_sys::{jl_typemap_entry_t, jl_typemap_entry_type};
@@ -28,54 +32,73 @@ pub struct TypeMapEntry<'scope>(NonNull<jl_typemap_entry_t>, PhantomData<&'scope
 
 impl<'scope> TypeMapEntry<'scope> {
     /*
-    for (a,b) in zip(fieldnames(Core.TypeMapEntry), fieldtypes(Core.TypeMapEntry))
-         println(a,": ", b)
-    end
-    next: Any _Atomic
-    sig: Type
-    simplesig: Any
-    guardsigs: Any
-    min_world: UInt64
-    max_world: UInt64
-    func: Any
-    isleafsig: Bool
-    issimplesig: Bool
-    va: Bool
+    inspect(Core.TypeMapEntry):
+
+    next: Any (mut) _Atomic
+    sig: Type (const)
+    simplesig: Any (const)
+    guardsigs: Any (const)
+    min_world: UInt64 (const)
+    max_world: UInt64 (const)
+    func: Any (const)
+    isleafsig: Bool (const)
+    issimplesig: Bool (const)
+    va: Bool (const)
     */
 
     /// Invasive linked list
     // TODO: check types
-    pub fn next(self) -> ValueRef<'scope, 'static> {
+    pub fn next<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
         cfg_if! {
             if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
-                unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().next.cast()) }
+                unsafe {
+                    let next = self.unwrap_non_null(Private).as_ref().next.cast();
+                    let next = NonNull::new(next)?;
+                    Some(ValueRef::wrap(next).root(target))
+                }
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
-                    let next = self.unwrap_non_null(Private).as_ref().next.load(Ordering::Relaxed);
-                    ValueRef::wrap(next.cast())
+                    let next = self.unwrap_non_null(Private).as_ref().next.load(Ordering::Relaxed).cast();
+                    let next = NonNull::new(next)?;
+                    Some(ValueRef::wrap(next).root(target))
                 }
             }
         }
     }
 
     /// The type sig for this entry
-    pub fn sig(self) -> ValueRef<'scope, 'static> {
+    pub fn sig(self) -> Option<Value<'scope, 'static>> {
         // Safety: the pointer points to valid data
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().sig.cast()) }
+        unsafe {
+            let data = self.unwrap_non_null(Private).as_ref().sig.cast();
+            let data = NonNull::new(data)?;
+            Some(Value::wrap_non_null(data, Private))
+        }
     }
 
     /// A simple signature for fast rejection
-    pub fn simple_sig(self) -> ValueRef<'scope, 'static> {
+    pub fn simple_sig(self) -> Option<Value<'scope, 'static>> {
         // Safety: the pointer points to valid data
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().simplesig.cast()) }
+        unsafe {
+            let data = self.unwrap_non_null(Private).as_ref().simplesig.cast();
+            let data = NonNull::new(data)?;
+            Some(Value::wrap_non_null(data, Private))
+        }
     }
 
     /// The `guardsigs` field.
-    pub fn guard_sigs(self) -> ValueRef<'scope, 'static> {
+    pub fn guard_sigs(self) -> Option<Value<'scope, 'static>> {
         // Safety: the pointer points to valid data
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().guardsigs.cast()) }
+        unsafe {
+            let data = self.unwrap_non_null(Private).as_ref().guardsigs.cast();
+            let data = NonNull::new(data)?;
+            Some(Value::wrap_non_null(data, Private))
+        }
     }
 
     /// The `min_world` field.
@@ -91,9 +114,13 @@ impl<'scope> TypeMapEntry<'scope> {
     }
 
     /// The `func` field.
-    pub fn func(self) -> ValueRef<'scope, 'static> {
+    pub fn func(self) -> Option<Value<'scope, 'static>> {
         // Safety: the pointer points to valid data
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().func.value) }
+        unsafe {
+            let data = self.unwrap_non_null(Private).as_ref().func.value;
+            let data = NonNull::new(data)?;
+            Some(Value::wrap_non_null(data, Private))
+        }
     }
 
     /// `isleaftype(sig) & !any(isType, sig)` : unsorted and very fast
@@ -112,15 +139,6 @@ impl<'scope> TypeMapEntry<'scope> {
     pub fn is_vararg(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().va != 0 }
-    }
-
-    /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> TypeMapEntryData<'target, T>
-    where
-        T: Target<'target>,
-    {
-        // Safety: the data is valid.
-        unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
     }
 }
 
@@ -142,8 +160,6 @@ impl<'scope> WrapperPriv<'scope, '_> for TypeMapEntry<'scope> {
         self.0
     }
 }
-
-impl_root!(TypeMapEntry, 1);
 
 /// A reference to a [`TypeMapEntry`] that has not been explicitly rooted.
 pub type TypeMapEntryRef<'scope> = Ref<'scope, 'static, TypeMapEntry<'scope>>;

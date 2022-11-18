@@ -44,7 +44,7 @@ impl<'scope> Symbol<'scope> {
         // Safety: Can only be called from a thread known to Julia, symbols are globally rooted
         unsafe {
             let sym = jl_symbol_n(bytes.as_ptr().cast(), bytes.len());
-            Symbol::wrap(sym, Private)
+            Symbol::wrap_non_null(NonNull::new_unchecked(sym), Private)
         }
     }
 
@@ -66,8 +66,8 @@ impl<'scope> Symbol<'scope> {
             };
 
             let res = match catch_exceptions(&mut callback).unwrap() {
-                Ok(sym) => Ok(Symbol::wrap(sym, Private)),
-                Err(e) => Err(NonNull::new_unchecked(e.ptr())),
+                Ok(sym) => Ok(Symbol::wrap_non_null(NonNull::new_unchecked(sym), Private)),
+                Err(e) => Err(e.ptr()),
             };
 
             target.exception_from_ptr(res, Private)
@@ -84,7 +84,7 @@ impl<'scope> Symbol<'scope> {
     {
         let sym_b = symbol.as_ref();
         let sym = jl_symbol_n(sym_b.as_ptr().cast(), sym_b.len());
-        Symbol::wrap(sym, Private)
+        Symbol::wrap_non_null(NonNull::new_unchecked(sym), Private)
     }
 
     /// Extend the `Symbol`'s lifetime. A `Symbol` is never freed by the garbage collector, its
@@ -144,17 +144,6 @@ impl<'scope> Symbol<'scope> {
             symbol.to_bytes()
         }
     }
-
-    /// Use the target to reroot this data. This is never nevessary
-    /// because a `Symbol` is never freed by the garbage collector.
-    pub fn root<'target, T>(self, target: T) -> SymbolData<'target, T>
-    where
-        T: Target<'target>,
-    {
-        // Safety: the data is valid.
-        // TODO: don' root
-        unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
-    }
 }
 
 impl Hash for Symbol<'_> {
@@ -181,8 +170,6 @@ impl<'scope> WrapperPriv<'scope, '_> for Symbol<'scope> {
         self.0
     }
 }
-
-impl_root!(Symbol, 1);
 
 /// A reference to a [`Symbol`] that has not been explicitly rooted.
 pub type SymbolRef<'scope> = Ref<'scope, 'static, Symbol<'scope>>;

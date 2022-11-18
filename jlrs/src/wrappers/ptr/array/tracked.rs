@@ -1,6 +1,6 @@
 use crate::{
     error::JlrsResult,
-    layout::valid_layout::ValidLayout,
+    layout::valid_layout::ValidField,
     memory::context::ledger::Ledger,
     wrappers::ptr::{value::ValueRef, WrapperRef},
 };
@@ -60,7 +60,7 @@ impl<'scope, 'data> ArrayWrapper<'scope, 'data> for Array<'scope, 'data> {
     }
 }
 
-impl<'scope, 'data, U: ValidLayout> ArrayWrapper<'scope, 'data> for TypedArray<'scope, 'data, U> {
+impl<'scope, 'data, U: ValidField> ArrayWrapper<'scope, 'data> for TypedArray<'scope, 'data, U> {
     fn track<'borrow>(&'borrow self) -> JlrsResult<TrackedArray<'borrow, 'scope, 'data, Self>> {
         Ledger::try_borrow(self.data_range())?;
         unsafe { Ok(TrackedArray::new(self)) }
@@ -138,7 +138,7 @@ impl<'tracked, 'scope, 'data> TrackedArray<'tracked, 'scope, 'data, Array<'scope
         self,
     ) -> JlrsResult<TrackedArray<'tracked, 'scope, 'data, TypedArray<'scope, 'data, T>>>
     where
-        T: ValidLayout,
+        T: ValidField,
     {
         let data = self.data.try_as_typed::<T>()?;
         let ret = unsafe { Ok(TrackedArray::new_from_owned(data)) };
@@ -150,7 +150,7 @@ impl<'tracked, 'scope, 'data> TrackedArray<'tracked, 'scope, 'data, Array<'scope
         self,
     ) -> TrackedArray<'tracked, 'scope, 'data, TypedArray<'scope, 'data, T>>
     where
-        T: ValidLayout,
+        T: ValidField,
     {
         let data = self.data.as_typed_unchecked::<T>();
         let ret = TrackedArray::new_from_owned(data);
@@ -160,7 +160,7 @@ impl<'tracked, 'scope, 'data> TrackedArray<'tracked, 'scope, 'data, Array<'scope
 
     pub fn copy_inline_data<T>(&self) -> JlrsResult<CopiedArray<T>>
     where
-        T: 'static + ValidLayout,
+        T: 'static + ValidField,
     {
         unsafe { self.data.copy_inline_data() }
     }
@@ -169,7 +169,7 @@ impl<'tracked, 'scope, 'data> TrackedArray<'tracked, 'scope, 'data, Array<'scope
         &'borrow self,
     ) -> JlrsResult<BitsArrayAccessorI<'borrow, 'scope, 'data, T>>
     where
-        T: ValidLayout,
+        T: ValidField,
     {
         unsafe { self.data.bits_data() }
     }
@@ -178,7 +178,7 @@ impl<'tracked, 'scope, 'data> TrackedArray<'tracked, 'scope, 'data, Array<'scope
         &'borrow self,
     ) -> JlrsResult<InlinePtrArrayAccessorI<'borrow, 'scope, 'data, T>>
     where
-        T: ValidLayout,
+        T: ValidField,
     {
         unsafe { self.data.inline_data() }
     }
@@ -188,6 +188,7 @@ impl<'tracked, 'scope, 'data> TrackedArray<'tracked, 'scope, 'data, Array<'scope
     ) -> JlrsResult<PtrArrayAccessorI<'borrow, 'scope, 'data, T>>
     where
         T: WrapperRef<'scope, 'data>,
+        Option<T>: ValidField,
     {
         unsafe { self.data.wrapper_data() }
     }
@@ -238,7 +239,7 @@ impl<'tracked, 'scope, 'data> TrackedArray<'tracked, 'scope, 'data, Array<'scope
 
 impl<'tracked, 'scope, 'data, T> TrackedArray<'tracked, 'scope, 'data, TypedArray<'scope, 'data, T>>
 where
-    T: ValidLayout,
+    T: ValidField,
 {
     pub fn dimensions<'borrow>(&'borrow self) -> ArrayDimensions<'borrow> {
         unsafe { self.data.dimensions() }
@@ -288,9 +289,11 @@ where
     }
 }
 
-impl<'tracked, 'scope, 'data, T> TrackedArray<'tracked, 'scope, 'data, TypedArray<'scope, 'data, T>>
+impl<'tracked, 'scope, 'data, T>
+    TrackedArray<'tracked, 'scope, 'data, TypedArray<'scope, 'data, Option<T>>>
 where
     T: WrapperRef<'scope, 'data>,
+    Option<T>: ValidField,
 {
     pub fn wrapper_data<'borrow>(
         &'borrow self,
@@ -307,7 +310,7 @@ where
 
 impl<'tracked, 'scope, 'data, T> TrackedArray<'tracked, 'scope, 'data, TypedArray<'scope, 'data, T>>
 where
-    T: 'static + ValidLayout,
+    T: 'static + ValidField,
 {
     pub fn copy_inline_data(&self) -> JlrsResult<CopiedArray<T>> {
         unsafe { self.data.copy_inline_data() }
@@ -343,7 +346,7 @@ impl<'tracked, 'scope, 'data> TrackedArrayMut<'tracked, 'scope, 'data, Array<'sc
         &'borrow mut self,
     ) -> JlrsResult<BitsArrayAccessorMut<'borrow, 'scope, 'data, T>>
     where
-        T: ValidLayout,
+        T: ValidField,
     {
         self.tracked.data.bits_data_mut()
     }
@@ -352,7 +355,7 @@ impl<'tracked, 'scope, 'data> TrackedArrayMut<'tracked, 'scope, 'data, Array<'sc
         &'borrow mut self,
     ) -> JlrsResult<InlinePtrArrayAccessorMut<'borrow, 'scope, 'data, T>>
     where
-        T: ValidLayout,
+        T: ValidField,
     {
         self.tracked.data.inline_data_mut()
     }
@@ -362,6 +365,7 @@ impl<'tracked, 'scope, 'data> TrackedArrayMut<'tracked, 'scope, 'data, Array<'sc
     ) -> JlrsResult<PtrArrayAccessorMut<'borrow, 'scope, 'data, T>>
     where
         T: WrapperRef<'scope, 'data>,
+        Option<T>: ValidField,
     {
         self.tracked.data.wrapper_data_mut()
     }
@@ -450,7 +454,7 @@ impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 
 impl<'tracked, 'scope, 'data, T>
     TrackedArrayMut<'tracked, 'scope, 'data, TypedArray<'scope, 'data, T>>
 where
-    T: ValidLayout,
+    T: ValidField,
 {
     pub unsafe fn bits_data_mut<'borrow>(
         &'borrow mut self,
@@ -472,9 +476,10 @@ where
 }
 
 impl<'tracked, 'scope, 'data, T>
-    TrackedArrayMut<'tracked, 'scope, 'data, TypedArray<'scope, 'data, T>>
+    TrackedArrayMut<'tracked, 'scope, 'data, TypedArray<'scope, 'data, Option<T>>>
 where
     T: WrapperRef<'scope, 'data>,
+    Option<T>: ValidField,
 {
     pub unsafe fn wrapper_data_mut<'borrow>(
         &'borrow mut self,
@@ -491,7 +496,7 @@ where
 
 impl<'tracked, 'scope, T> TrackedArrayMut<'tracked, 'scope, 'static, TypedArray<'scope, 'static, T>>
 where
-    T: ValidLayout,
+    T: ValidField,
 {
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub unsafe fn grow_end<'target, S>(
@@ -567,7 +572,7 @@ impl<'tracked, 'scope, 'data> Deref
 impl<'tracked, 'scope, 'data, T> Deref
     for TrackedArrayMut<'tracked, 'scope, 'data, TypedArray<'scope, 'data, T>>
 where
-    T: ValidLayout,
+    T: ValidField,
 {
     type Target = TrackedArray<'tracked, 'scope, 'data, TypedArray<'scope, 'data, T>>;
 

@@ -2,9 +2,13 @@
 
 use crate::{
     impl_julia_typecheck,
-    memory::target::Target,
+    prelude::Target,
     private::Private,
-    wrappers::ptr::{private::WrapperPriv, value::ValueRef, Ref},
+    wrappers::ptr::{
+        private::WrapperPriv,
+        value::{ValueData, ValueRef},
+        Ref,
+    },
 };
 use jl_sys::{jl_weakref_t, jl_weakref_type};
 use std::{marker::PhantomData, ptr::NonNull};
@@ -23,18 +27,15 @@ impl<'scope> WeakRef<'scope> {
     */
 
     /// The referenced `Value`.
-    pub fn value(self) -> ValueRef<'scope, 'static> {
-        // Safety: the pointer points to valid data
-        unsafe { ValueRef::wrap(self.unwrap_non_null(Private).as_ref().value) }
-    }
-
-    /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> WeakRefData<'target, T>
+    pub fn value<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
     {
-        // Safety: the data is valid.
-        unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
+        unsafe {
+            let value = self.unwrap_non_null(Private).as_ref().value;
+            let value = NonNull::new(value)?;
+            Some(ValueRef::wrap(value).root(target))
+        }
     }
 }
 
@@ -56,8 +57,6 @@ impl<'scope> WrapperPriv<'scope, '_> for WeakRef<'scope> {
         self.0
     }
 }
-
-impl_root!(WeakRef, 1);
 
 /// A reference to a [`WeakRef`] that has not been explicitly rooted.
 pub type WeakRefRef<'scope> = Ref<'scope, 'static, WeakRef<'scope>>;

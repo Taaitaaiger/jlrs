@@ -2,9 +2,13 @@
 
 use crate::{
     impl_julia_typecheck,
-    memory::target::Target,
+    prelude::{Symbol, Target},
     private::Private,
-    wrappers::ptr::{array::ArrayRef, private::WrapperPriv, symbol::SymbolRef, Ref},
+    wrappers::ptr::{
+        array::{ArrayData, ArrayRef},
+        private::WrapperPriv,
+        Ref,
+    },
 };
 use jl_sys::{jl_expr_t, jl_expr_type};
 use std::{marker::PhantomData, ptr::NonNull};
@@ -16,32 +20,33 @@ pub struct Expr<'scope>(NonNull<jl_expr_t>, PhantomData<&'scope ()>);
 
 impl<'scope> Expr<'scope> {
     /*
-    for (a, b) in zip(fieldnames(Expr), fieldtypes(Expr))
-        println(a, ": ", b)
-    end
-    head: Symbol
-    args: Vector{Any}
+    inspect(Core.Expr):
+
+    head: Symbol (mut)
+    args: Vector{Any} (mut)
     */
 
     /// Returns the head of the expression.
-    pub fn head(self) -> SymbolRef<'scope> {
+    pub fn head(self) -> Option<Symbol<'scope>> {
         // Safety: the pointer points to valid data
-        unsafe { SymbolRef::wrap(self.unwrap_non_null(Private).as_ref().head) }
+        unsafe {
+            let head = self.unwrap_non_null(Private).as_ref().head;
+            let head = NonNull::new(head)?;
+            Some(Symbol::wrap_non_null(head, Private))
+        }
     }
 
     /// Returns the arguments of the expression.
-    pub fn args(self) -> ArrayRef<'scope, 'static> {
-        // Safety: the pointer points to valid data
-        unsafe { ArrayRef::wrap(self.unwrap_non_null(Private).as_ref().args) }
-    }
-
-    /// Use the target to reroot this data.
-    pub fn root<'target, T>(self, target: T) -> ExprData<'target, T>
+    pub fn args<'target, T>(self, target: T) -> Option<ArrayData<'target, 'static, T>>
     where
         T: Target<'target>,
     {
-        // Safety: the data is valid.
-        unsafe { target.data_from_ptr(self.unwrap_non_null(Private), Private) }
+        // Safety: the pointer points to valid data
+        unsafe {
+            let args = self.unwrap_non_null(Private).as_ref().args;
+            let args = NonNull::new(args)?;
+            Some(ArrayRef::wrap(args).root(target))
+        }
     }
 }
 
@@ -63,8 +68,6 @@ impl<'scope> WrapperPriv<'scope, '_> for Expr<'scope> {
         self.0
     }
 }
-
-impl_root!(Expr, 1);
 
 /// A reference to an [`Expr`] that has not been explicitly rooted.
 pub type ExprRef<'scope> = Ref<'scope, 'static, Expr<'scope>>;

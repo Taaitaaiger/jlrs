@@ -5,7 +5,6 @@ mod tests {
     use super::util::JULIA;
     use jlrs::prelude::*;
 
-    #[test]
     fn access_raw_fields_bits() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -15,9 +14,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper_unchecked()
+                            .wrapper()
                             .global(&frame, "NoUnionsBits")?
-                            .value_unchecked()
+                            .value()
                     };
                     let arg1 = Value::new(&mut frame, 3i16);
                     let arg2 = Value::new(&mut frame, -3i32);
@@ -44,7 +43,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn access_raw_fields_bits_and_ptr() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -54,9 +52,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper_unchecked()
+                            .wrapper()
                             .global(&frame, "NoUnionsBitsPtr")?
-                            .value_unchecked()
+                            .value()
                     };
                     let arg1 = Value::new(&mut frame, 3i16);
                     let arg2 = DataType::bool_type(&frame);
@@ -75,7 +73,7 @@ mod tests {
                         .field_accessor(&mut frame)
                         .field("b")?
                         .access::<DataTypeRef>()?;
-                    assert_eq!(unsafe { b.wrapper_unchecked() }, arg2);
+                    assert_eq!(unsafe { b.wrapper() }, arg2);
 
                     Ok(())
                 })
@@ -83,7 +81,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn access_raw_fields_bits_and_bits_union() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -93,9 +90,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper_unchecked()
+                            .wrapper()
                             .global(&frame, "BitsBitsUnion")?
-                            .value_unchecked()
+                            .value()
                     };
                     let arg1 = Value::new(&mut frame, 3i16);
                     let arg2 = Value::new(&mut frame, -3i32);
@@ -122,7 +119,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn access_raw_fields_ptr_and_bits_union() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -132,9 +128,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper_unchecked()
+                            .wrapper()
                             .global(&frame, "PtrBitsUnion")?
-                            .value_unchecked()
+                            .value()
                     };
                     let arg1 = DataType::bool_type(&frame);
                     let arg2 = Value::new(&mut frame, -3i32);
@@ -147,7 +143,7 @@ mod tests {
                         .field_accessor(&mut frame)
                         .field("a")?
                         .access::<DataTypeRef>()?;
-                    assert_eq!(unsafe { a.wrapper_unchecked() }, arg1);
+                    assert_eq!(unsafe { a.wrapper() }, arg1);
 
                     let b = instance
                         .field_accessor(&mut frame)
@@ -161,7 +157,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn access_raw_fields_ptr_and_non_bits_union() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -171,9 +166,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper_unchecked()
+                            .wrapper()
                             .global(&frame, "PtrNonBitsUnion")?
-                            .value_unchecked()
+                            .value()
                     };
                     let arg1 = DataType::bool_type(&frame);
                     let arg2 = Value::new(&mut frame, -3i32);
@@ -186,7 +181,7 @@ mod tests {
                         .field_accessor(&mut frame)
                         .field("a")?
                         .access::<DataTypeRef>()?;
-                    assert_eq!(unsafe { a.wrapper_unchecked() }, arg1);
+                    assert_eq!(unsafe { a.wrapper() }, arg1);
 
                     let b = instance
                         .field_accessor(&mut frame)
@@ -200,7 +195,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn access_raw_fields_wrong_ty() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -210,9 +204,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper_unchecked()
+                            .wrapper()
                             .global(&frame, "PtrNonBitsUnion")?
-                            .value_unchecked()
+                            .value()
                     };
                     let arg1 = DataType::bool_type(&frame);
                     let arg2 = Value::new(&mut frame, -3i32);
@@ -239,7 +233,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn access_array_field() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -249,9 +242,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper_unchecked()
+                            .wrapper()
                             .global(&frame, "HasArray")?
-                            .value_unchecked()
+                            .value()
                     };
                     let data = vec![1.0, 2.0, 3.0, 4.0];
                     let arg1 = Array::from_vec(frame.as_extended_target(), data, (2, 2))?
@@ -283,7 +276,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn access_ua_array_field() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -293,9 +285,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper_unchecked()
+                            .wrapper()
                             .global(&frame, "UaArray")?
-                            .value_unchecked()
+                            .value()
                     };
                     let data = vec![1.0, 2.0, 3.0, 4.0];
                     let arg1 = Array::from_vec(frame.as_extended_target(), data, (2, 2))?
@@ -327,7 +319,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn access_raw_fields_nonexistent_name() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -337,9 +328,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper_unchecked()
+                            .wrapper()
                             .global(&frame, "PtrNonBitsUnion")?
-                            .value_unchecked()
+                            .value()
                     };
                     let arg1 = DataType::bool_type(&frame);
                     let arg2 = Value::new(&mut frame, -3i32);
@@ -355,7 +346,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn access_nth_raw_fields_bits() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -365,9 +355,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper_unchecked()
+                            .wrapper()
                             .global(&frame, "NoUnionsBits")?
-                            .value_unchecked()
+                            .value()
                     };
                     let arg1 = Value::new(&mut frame, 3i16);
                     let arg2 = Value::new(&mut frame, -3i32);
@@ -394,7 +384,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn access_nth_raw_fields_bits_and_ptr() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -404,9 +393,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper_unchecked()
+                            .wrapper()
                             .global(&frame, "NoUnionsBitsPtr")?
-                            .value_unchecked()
+                            .value()
                     };
                     let arg1 = Value::new(&mut frame, 3i16);
                     let arg2 = DataType::bool_type(&frame);
@@ -425,7 +414,7 @@ mod tests {
                         .field_accessor(&mut frame)
                         .field(1)?
                         .access::<DataTypeRef>()?;
-                    assert_eq!(unsafe { b.wrapper_unchecked() }, arg2);
+                    assert_eq!(unsafe { b.wrapper() }, arg2);
 
                     Ok(())
                 })
@@ -433,7 +422,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn access_nth_raw_fields_bits_and_bits_union() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -443,9 +431,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper_unchecked()
+                            .wrapper()
                             .global(&frame, "BitsBitsUnion")?
-                            .value_unchecked()
+                            .value()
                     };
                     let arg1 = Value::new(&mut frame, 3i16);
                     let arg2 = Value::new(&mut frame, -3i32);
@@ -472,7 +460,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn access_nth_raw_fields_ptr_and_non_bits_union() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -482,9 +469,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper_unchecked()
+                            .wrapper()
                             .global(&frame, "PtrNonBitsUnion")?
-                            .value_unchecked()
+                            .value()
                     };
                     let arg1 = DataType::bool_type(&frame);
                     let arg2 = Value::new(&mut frame, -3i32);
@@ -497,7 +484,7 @@ mod tests {
                         .field_accessor(&mut frame)
                         .field(0)?
                         .access::<DataTypeRef>()?;
-                    assert_eq!(unsafe { a.wrapper_unchecked() }, arg1);
+                    assert_eq!(unsafe { a.wrapper() }, arg1);
 
                     let b = instance
                         .field_accessor(&mut frame)
@@ -511,7 +498,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn access_nth_raw_fields_wrong_ty() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -521,9 +507,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper_unchecked()
+                            .wrapper()
                             .global(&frame, "PtrNonBitsUnion")?
-                            .value_unchecked()
+                            .value()
                     };
                     let arg1 = DataType::bool_type(&frame);
                     let arg2 = Value::new(&mut frame, -3i32);
@@ -550,7 +536,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn access_nth_array_field() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -560,9 +545,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper_unchecked()
+                            .wrapper()
                             .global(&frame, "HasArray")?
-                            .value_unchecked()
+                            .value()
                     };
                     let data = vec![1.0, 2.0, 3.0, 4.0];
                     let arg1 = Array::from_vec(frame.as_extended_target(), data, (2, 2))?
@@ -594,7 +579,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn access_ua_array_field_by_idx() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -604,9 +588,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper_unchecked()
+                            .wrapper()
                             .global(&frame, "UaArray")?
-                            .value_unchecked()
+                            .value()
                     };
                     let data = vec![1.0, 2.0, 3.0, 4.0];
                     let arg1 = Array::from_vec(frame.as_extended_target(), data, (2, 2))?
@@ -638,7 +622,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn access_raw_fields_nonexistent_idx() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -648,9 +631,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper_unchecked()
+                            .wrapper()
                             .global(&frame, "PtrNonBitsUnion")?
-                            .value_unchecked()
+                            .value()
                     };
                     let arg1 = DataType::bool_type(&frame);
                     let arg2 = Value::new(&mut frame, -3i32);
@@ -664,5 +647,26 @@ mod tests {
                 })
                 .unwrap();
         })
+    }
+
+    #[test]
+    fn access_raw_field_tests() {
+        access_raw_fields_bits();
+        access_raw_fields_bits_and_ptr();
+        access_raw_fields_bits_and_bits_union();
+        access_raw_fields_ptr_and_bits_union();
+        access_raw_fields_ptr_and_non_bits_union();
+        access_raw_fields_wrong_ty();
+        access_array_field();
+        access_ua_array_field();
+        access_raw_fields_nonexistent_name();
+        access_nth_raw_fields_bits();
+        access_nth_raw_fields_bits_and_ptr();
+        access_nth_raw_fields_bits_and_bits_union();
+        access_nth_raw_fields_ptr_and_non_bits_union();
+        access_nth_raw_fields_wrong_ty();
+        access_nth_array_field();
+        access_ua_array_field_by_idx();
+        access_raw_fields_nonexistent_idx();
     }
 }
