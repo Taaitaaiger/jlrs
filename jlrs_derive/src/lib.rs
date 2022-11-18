@@ -315,7 +315,8 @@ fn impl_valid_layout(ast: &syn::DeriveInput) -> TokenStream {
                             return false;
                         }
 
-                        let field_types = dt.field_types();
+                        let global = v.global();
+                        let field_types = dt.field_types(global);
                         let field_types_svec = field_types.wrapper();
                         let field_types_data = field_types_svec.data();
                         let field_types = field_types_data.as_slice();

@@ -7,8 +7,13 @@
 
 use crate::{
     impl_julia_typecheck,
+    prelude::{Target, Value},
     private::Private,
-    wrappers::ptr::{private::WrapperPriv, value::ValueRef, Ref},
+    wrappers::ptr::{
+        private::WrapperPriv,
+        value::{ValueData, ValueRef},
+        Ref,
+    },
 };
 use cfg_if::cfg_if;
 use jl_sys::{jl_typemap_entry_t, jl_typemap_entry_type};
@@ -27,70 +32,72 @@ pub struct TypeMapEntry<'scope>(NonNull<jl_typemap_entry_t>, PhantomData<&'scope
 
 impl<'scope> TypeMapEntry<'scope> {
     /*
-    for (a,b) in zip(fieldnames(Core.TypeMapEntry), fieldtypes(Core.TypeMapEntry))
-         println(a,": ", b)
-    end
-    next: Any _Atomic
-    sig: Type
-    simplesig: Any
-    guardsigs: Any
-    min_world: UInt64
-    max_world: UInt64
-    func: Any
-    isleafsig: Bool
-    issimplesig: Bool
-    va: Bool
+    inspect(Core.TypeMapEntry):
+
+    next: Any (mut) _Atomic
+    sig: Type (const)
+    simplesig: Any (const)
+    guardsigs: Any (const)
+    min_world: UInt64 (const)
+    max_world: UInt64 (const)
+    func: Any (const)
+    isleafsig: Bool (const)
+    issimplesig: Bool (const)
+    va: Bool (const)
     */
 
     /// Invasive linked list
     // TODO: check types
-    pub fn next(self) -> Option<ValueRef<'scope, 'static>> {
+    pub fn next<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
         cfg_if! {
             if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let next = self.unwrap_non_null(Private).as_ref().next.cast();
                     let next = NonNull::new(next)?;
-                    Some(ValueRef::wrap(next))
+                    Some(ValueRef::wrap(next).root(target))
                 }
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let next = self.unwrap_non_null(Private).as_ref().next.load(Ordering::Relaxed).cast();
                     let next = NonNull::new(next)?;
-                    Some(ValueRef::wrap(next))
+                    Some(ValueRef::wrap(next).root(target))
                 }
             }
         }
     }
 
     /// The type sig for this entry
-    pub fn sig(self) -> Option<ValueRef<'scope, 'static>> {
+    pub fn sig(self) -> Option<Value<'scope, 'static>> {
         // Safety: the pointer points to valid data
         unsafe {
             let data = self.unwrap_non_null(Private).as_ref().sig.cast();
             let data = NonNull::new(data)?;
-            Some(ValueRef::wrap(data))
+            Some(Value::wrap_non_null(data, Private))
         }
     }
 
     /// A simple signature for fast rejection
-    pub fn simple_sig(self) -> Option<ValueRef<'scope, 'static>> {
+    pub fn simple_sig(self) -> Option<Value<'scope, 'static>> {
         // Safety: the pointer points to valid data
         unsafe {
             let data = self.unwrap_non_null(Private).as_ref().simplesig.cast();
             let data = NonNull::new(data)?;
-            Some(ValueRef::wrap(data))
+            Some(Value::wrap_non_null(data, Private))
         }
     }
 
     /// The `guardsigs` field.
-    pub fn guard_sigs(self) -> Option<ValueRef<'scope, 'static>> {
+    pub fn guard_sigs(self) -> Option<Value<'scope, 'static>> {
         // Safety: the pointer points to valid data
         unsafe {
             let data = self.unwrap_non_null(Private).as_ref().guardsigs.cast();
             let data = NonNull::new(data)?;
-            Some(ValueRef::wrap(data))
+            Some(Value::wrap_non_null(data, Private))
         }
     }
 
@@ -107,12 +114,12 @@ impl<'scope> TypeMapEntry<'scope> {
     }
 
     /// The `func` field.
-    pub fn func(self) -> Option<ValueRef<'scope, 'static>> {
+    pub fn func(self) -> Option<Value<'scope, 'static>> {
         // Safety: the pointer points to valid data
         unsafe {
             let data = self.unwrap_non_null(Private).as_ref().func.value;
             let data = NonNull::new(data)?;
-            Some(ValueRef::wrap(data))
+            Some(Value::wrap_non_null(data, Private))
         }
     }
 

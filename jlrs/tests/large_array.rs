@@ -5,7 +5,6 @@ mod tests {
     use super::util::JULIA;
     use jlrs::prelude::*;
 
-    #[test]
     fn create_large_array() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -24,7 +23,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn move_large_array() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -44,7 +42,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn borrow_large_array() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -68,7 +65,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn create_large_typed_array() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -87,7 +83,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn move_large_typed_array() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -107,7 +102,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn borrow_large_typed_array() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -129,5 +123,15 @@ mod tests {
                 })
                 .unwrap();
         });
+    }
+
+    #[test]
+    fn large_array_tests() {
+        create_large_array();
+        move_large_array();
+        borrow_large_array();
+        create_large_typed_array();
+        move_large_typed_array();
+        borrow_large_typed_array();
     }
 }

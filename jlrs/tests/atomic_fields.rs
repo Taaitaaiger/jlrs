@@ -5,7 +5,6 @@ mod tests {
     use super::util::JULIA;
     use jlrs::prelude::*;
 
-    #[test]
     fn read_atomic_field() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -38,7 +37,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn read_large_atomic_field() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -72,7 +70,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn read_oddly_sized_atomic_field() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -106,7 +103,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn atomic_union_is_pointer_field() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -131,7 +127,6 @@ mod tests {
         })
     }
 
-    #[test]
     #[cfg(feature = "extra-fields")]
     fn read_atomic_field_of_ptr_wrapper() {
         JULIA.with(|j| {
@@ -143,8 +138,7 @@ mod tests {
                         assert_eq!(
                             DataType::datatype_type(&frame)
                                 .type_name()
-                                .wrapper()
-                                .cache()
+                                .cache(&frame)
                                 .wrapper()
                                 .len(),
                             0
@@ -155,5 +149,15 @@ mod tests {
                 })
                 .unwrap();
         })
+    }
+
+    #[test]
+    fn atomic_field_tests() {
+        read_atomic_field();
+        read_large_atomic_field();
+        read_oddly_sized_atomic_field();
+        atomic_union_is_pointer_field();
+        #[cfg(feature = "extra-fields")]
+        read_atomic_field_of_ptr_wrapper();
     }
 }

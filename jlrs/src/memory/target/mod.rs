@@ -16,14 +16,17 @@
 //! used. The following targets currently exist, the `'scope` lifetime indicates the lifetime of
 //! the returned data:
 //!
-//! | Type                              | Rooting |
-//! |-----------------------------------|---------|
-//! | `(Async)GcFrame<'scope>`          | Yes     |
-//! | `&mut (Async)GcFrame<'scope>`     | Yes     |
-//! | `Output<'scope>`                  | Yes     |
-//! | `&'scope mut Output<'_>`          | Yes     |
-//! | `Global<'scope>`                  | No      |
-//! | `&<T: (Exception)Target<'scope>>` | No      |
+//! | Type                          | Rooting |
+//! |-------------------------------|---------|
+//! | `(Async)GcFrame<'scope>`      | Yes     |
+//! | `&mut (Async)GcFrame<'scope>` | Yes     |
+//! | `Output<'scope>`              | Yes     |
+//! | `&'scope mut Output<'_>`      | Yes     |
+//! | `ReusableSlot<'target>`       | Yes     |
+//! | `&mut ReusableSlot<'target>`  | Yes     |
+//! | `Global<'scope>`              | No      |
+//! | `&<T: Target<'scope>>`        | No      |
+//!
 //!
 //! The last row means that any target `T` can be used as a non-rooting target by using a
 //! reference to that target. When a non-rooting target is used, Julia data is returned as a
@@ -58,8 +61,9 @@ pub mod target_type;
 ///
 /// Whenever a function in jlrs returns new Julia data, it will take a target which implements
 /// this trait. Every target implements [`TargetType`], which defines the type that is returned.
-/// These functions return either `TargetType::Data` or `TargetType::Result`, the first is used
-/// when exceptions aren't caught, while the second is used when they are caught.
+/// These functions return either `TargetType::Data`, `TargetType::Exception` or
+/// `TargetType::Result`, the first is used when exceptions aren't caught, while the second is
+/// used when they are caught.
 ///
 /// For more information see the [module-level] docs
 ///  

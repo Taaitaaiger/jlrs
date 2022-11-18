@@ -43,10 +43,7 @@ mod tests {
         };
     }
 
-    #[test]
     fn call_add() {
-        let id = std::thread::current().id();
-        println!("ID: {:?}", id);
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
             let mut frame = StackFrame::new();
@@ -71,10 +68,7 @@ mod tests {
         })
     }
 
-    #[test]
     fn call_incr_array() {
-        let id = std::thread::current().id();
-        println!("ID: {:?}", id);
         JULIA.with(|j| {
             let mut jlrs = j.borrow_mut();
             let mut frame = StackFrame::new();
@@ -107,5 +101,11 @@ mod tests {
                 Ok(())
             }).unwrap();
         })
+    }
+
+    #[test]
+    fn ccall_tests() {
+        call_add();
+        call_incr_array();
     }
 }

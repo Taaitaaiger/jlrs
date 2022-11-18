@@ -2,8 +2,13 @@
 
 use crate::{
     impl_julia_typecheck,
+    prelude::Target,
     private::Private,
-    wrappers::ptr::{private::WrapperPriv, value::ValueRef, Ref},
+    wrappers::ptr::{
+        private::WrapperPriv,
+        value::{ValueData, ValueRef},
+        Ref,
+    },
 };
 use jl_sys::{jl_vararg_t, jl_vararg_type};
 use std::{marker::PhantomData, ptr::NonNull};
@@ -15,20 +20,26 @@ pub struct Vararg<'scope>(NonNull<jl_vararg_t>, PhantomData<&'scope ()>);
 
 impl<'scope> Vararg<'scope> {
     /// The type of the arguments, i.e. the `T` in `Vararg{T, N}`.
-    pub fn t(self) -> Option<ValueRef<'scope, 'static>> {
+    pub fn t<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
         unsafe {
             let t = self.unwrap_non_null(Private).as_ref().T;
             let t = NonNull::new(t)?;
-            Some(ValueRef::wrap(t))
+            Some(ValueRef::wrap(t).root(target))
         }
     }
 
     /// The number of arguments, i.e. the `N` in `Vararg{T, N}`.
-    pub fn n(self) -> Option<ValueRef<'scope, 'static>> {
+    pub fn n<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
         unsafe {
             let n = self.unwrap_non_null(Private).as_ref().N;
             let n = NonNull::new(n)?;
-            Some(ValueRef::wrap(n))
+            Some(ValueRef::wrap(n).root(target))
         }
     }
 }

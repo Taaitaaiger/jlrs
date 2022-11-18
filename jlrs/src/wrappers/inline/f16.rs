@@ -29,35 +29,3 @@ unsafe impl IntoJulia for f16 {
         unsafe { target.data_from_ptr(dt.unwrap_non_null(Private), Private) }
     }
 }
-
-#[cfg(test)]
-#[cfg(feature = "sync-rt")]
-mod tests {
-    use crate::memory::stack_frame::StackFrame;
-    use crate::prelude::*;
-    use crate::util::test::JULIA;
-    use half::f16;
-
-    #[test]
-    fn one_minus_one_equals_zero() {
-        JULIA.with(|j| {
-            let mut julia = j.borrow_mut();
-            let mut frame = StackFrame::new();
-
-            julia
-                .instance(&mut frame)
-                .scope(|mut frame| unsafe {
-                    let one = Value::new(&mut frame, f16::ONE);
-                    let func = Module::base(&frame).function(&mut frame, "-")?;
-                    let res = func
-                        .call2(&mut frame, one, one)
-                        .into_jlrs_result()?
-                        .unbox::<f16>()?;
-
-                    assert_eq!(res, f16::ZERO);
-                    Ok(())
-                })
-                .unwrap();
-        });
-    }
-}

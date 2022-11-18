@@ -7,10 +7,8 @@ use crate::{
     private::Private,
     wrappers::ptr::{
         datatype::DataType,
-        internal::method::MethodRef,
         private::WrapperPriv,
         type_name::TypeName,
-        value::ValueRef,
         value::{Value, ValueResult},
         Ref, Wrapper as _,
     },
@@ -32,23 +30,22 @@ impl<'scope> OpaqueClosure<'scope> {
     using Base.Experimental
     oq = Base.Experimental.@opaque (x) -> 2x
     ty = typeof(oq)
-    for (a, b) in zip(fieldnames(ty), fieldtypes(ty))
-        println(a, ": ", b)
-    end
-    captures: Any
-    world: Int64
-    source: Any
-    invoke: Ptr{Nothing}
-    specptr: Ptr{Nothing}
+    inspect(ty):
+
+    captures: Any (const)
+    world: Int64 (const)
+    source: Any (const)
+    invoke: Ptr{Nothing} (const)
+    specptr: Ptr{Nothing} (const)
     */
 
     /// The data captured by this `OpaqueClosure`.
-    pub fn captures(self) -> Option<ValueRef<'scope, 'static>> {
+    pub fn captures(self) -> Option<Value<'scope, 'static>> {
         // Safety: the pointer points to valid data
         unsafe {
             let data = self.unwrap_non_null(Private).as_ref().captures;
             let data = NonNull::new(data)?;
-            Some(ValueRef::wrap(data))
+            Some(Value::wrap_non_null(data, Private))
         }
     }
 
@@ -59,12 +56,12 @@ impl<'scope> OpaqueClosure<'scope> {
     }
 
     /// Returns the `source` field of this `OpaqueClosure`.
-    pub fn source(self) -> Option<MethodRef<'scope>> {
+    pub fn source(self) -> Option<Value<'scope, 'static>> {
         // Safety: the pointer points to valid data
         unsafe {
             let data = self.unwrap_non_null(Private).as_ref().source;
             let data = NonNull::new(data)?;
-            Some(MethodRef::wrap(data))
+            Some(Value::wrap_non_null(data.cast(), Private))
         }
     }
 
@@ -90,7 +87,7 @@ impl<'scope> OpaqueClosure<'scope> {
 
 unsafe impl Typecheck for OpaqueClosure<'_> {
     fn typecheck(t: DataType) -> bool {
-        unsafe { t.type_name().wrapper() == TypeName::of_opaque_closure(&Global::new()) }
+        unsafe { t.type_name() == TypeName::of_opaque_closure(&Global::new()) }
     }
 }
 

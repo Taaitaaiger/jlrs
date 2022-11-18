@@ -57,7 +57,6 @@ mod tests {
         }
     }
 
-    #[test]
     fn ccall_with_array() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -84,7 +83,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn ccall_with_array_and_scope() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -111,7 +109,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn ccall_with_array_and_reallocated_scope_with_slots() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -170,9 +167,8 @@ mod tests {
         Box::from_raw(handle).join().ok();
     }
 
-    #[test]
     #[cfg(feature = "uv")]
-    fn ccall_with_async_condidtion() {
+    fn ccall_with_async_condition() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
@@ -198,5 +194,14 @@ mod tests {
                 })
                 .unwrap();
         })
+    }
+
+    #[test]
+    fn ccall_tests() {
+        ccall_with_array();
+        ccall_with_array_and_scope();
+        ccall_with_array_and_reallocated_scope_with_slots();
+        #[cfg(feature = "uv")]
+        ccall_with_async_condition();
     }
 }

@@ -4,7 +4,6 @@ mod tests {
     use super::util::JULIA;
     use jlrs::prelude::*;
 
-    #[test]
     fn create_cast_tuple0() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -21,7 +20,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn create_cast_tuple1() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -38,7 +36,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn create_cast_tuple2() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -53,5 +50,12 @@ mod tests {
                 })
                 .unwrap();
         })
+    }
+
+    #[test]
+    fn tuple_tests() {
+        create_cast_tuple0();
+        create_cast_tuple1();
+        create_cast_tuple2();
     }
 }

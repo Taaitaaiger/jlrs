@@ -19,21 +19,18 @@ mod tests {
         });
     }
 
-    #[test]
     fn basic_math() {
         eval_string("Int32(2) + Int32(3)", |result| {
             assert_eq!(result.unwrap().unbox::<i32>().unwrap(), 5i32);
         });
     }
 
-    #[test]
     fn runtime_error() {
         eval_string("[1, 2, 3][4]", |result| {
             assert_eq!(result.unwrap_err().datatype_name().unwrap(), "BoundsError");
         });
     }
 
-    #[test]
     fn syntax_error() {
         eval_string("asdf fdsa asdf fdsa", |result| {
             assert_eq!(
@@ -43,7 +40,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn define_then_use() {
         eval_string("increase(x) = x + Int32(1)", |result| {
             assert!(result.is_ok());
@@ -64,5 +60,13 @@ mod tests {
                 })
                 .unwrap();
         });
+    }
+
+    #[test]
+    fn eval_string_tests() {
+        basic_math();
+        runtime_error();
+        syntax_error();
+        define_then_use();
     }
 }

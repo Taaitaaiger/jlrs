@@ -66,7 +66,7 @@ pub unsafe trait IntoJulia: Sized + 'static {
                 container.cast::<Self>().write(self);
                 target.data_from_ptr(NonNull::new_unchecked(container), Private)
             } else {
-                target.data_from_ptr(instance.unwrap().ptr(), Private)
+                target.data_from_ptr(instance.unwrap().unwrap_non_null(Private), Private)
             }
         }
     }

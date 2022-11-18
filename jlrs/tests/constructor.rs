@@ -17,7 +17,6 @@ mod tests {
     use crate::util::JULIA;
     use jlrs::prelude::*;
 
-    #[test]
     fn call_outer_constructor() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -57,7 +56,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call_inner_constructor() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -97,7 +95,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call_instantiate() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -137,5 +134,12 @@ mod tests {
                 })
                 .unwrap();
         });
+    }
+
+    #[test]
+    fn constructor_tests() {
+        call_outer_constructor();
+        call_inner_constructor();
+        call_instantiate();
     }
 }
