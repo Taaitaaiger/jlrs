@@ -236,7 +236,7 @@ impl<'scope> PyPlot<'scope> {
 
     /// Wait until the window associated with `self` has been closed in a new task scheduled
     /// on the `:interactive` thread pool.
-    #[cfg(all(feature = "async", feature = "nightly"))]
+    #[cfg(all(feature = "async", any(feature = "nightly", feature = "beta")))]
     pub async fn wait_async_interactive<'frame>(
         self,
         frame: &mut AsyncGcFrame<'frame>,

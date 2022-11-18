@@ -2,6 +2,7 @@
 
 LD_LIBRARY_PATH=
 NIGHTLY="n"
+BETA="n"
 
 function parse_args() {
     local help="n"
@@ -10,6 +11,10 @@ function parse_args() {
         case $1 in
             --nightly)
                 NIGHTLY="y"
+                shift
+                ;;
+            --beta)
+                BETA="y"
                 shift
                 ;;
             -h | --help)
@@ -54,11 +59,11 @@ function print_help() {
     echo "default paths can be overridden with environment variables:"
     echo ""
     echo -e "\033[1m      Version                   Default path${spacing}Override\033[0m"
-    echo "  Linux 64-bit stable:      $HOME/julia-1.8.0           JULIA_STABLE_DIR"
+    echo "  Linux 64-bit stable:      $HOME/julia-1.8.3           JULIA_STABLE_DIR"
     echo "  Linux 64-bit lts:         $HOME/julia-1.6.7           JULIA_LTS_DIR"
-    echo "  Linux 32-bit stable:      $HOME/julia-1.8.0-32        JULIA_STABLE_DIR_32"
+    echo "  Linux 32-bit stable:      $HOME/julia-1.8.3-32        JULIA_STABLE_DIR_32"
     echo "  Linux 32-bit lts:         $HOME/julia-1.6.7-32        JULIA_LTS_DIR_32"
-    echo "  Windows 64-bit stable:    $HOME/julia-1.8.0-win       JULIA_STABLE_DIR_WIN"
+    echo "  Windows 64-bit stable:    $HOME/julia-1.8.3-win       JULIA_STABLE_DIR_WIN"
     echo "  Windows 64-bit lts:       $HOME/julia-1.6.7-win       JULIA_LTS_DIR_WIN"
     echo ""
     echo "When the nightly flag is set, the following is expected:"
@@ -92,7 +97,7 @@ if [ "${NIGHTLY}" = "y" ]; then
     fi
 
     cargo clean
-    JULIA_DIR=$JULIA_NIGHTLY_DIR cargo build --features use-bindgen
+    JULIA_DIR=$JULIA_NIGHTLY_DIR cargo build --features use-bindgen,nightly
     echo "/* generated from Julia version 1.9.0-dev */" > ./src/bindings_nightly_x86_64_unknown_linux_gnu.rs
     cat ../target/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings_nightly_x86_64_unknown_linux_gnu.rs
 
@@ -101,8 +106,53 @@ if [ "${NIGHTLY}" = "y" ]; then
     exit
 fi
 
+if [ "${BETA}" = "y" ]; then
+    if [ -z "$JULIA_BETA_DIR" ]; then
+        JULIA_BETA_DIR=${HOME}/julia-1.9.0-alpha1
+    fi
+    if [ ! -d "$JULIA_BETA_DIR" ]; then
+        echo "Error: $JULIA_BETA_DIR does not exist" >&2
+        exit 1
+    fi
+
+    if [ -z "$JULIA_BETA_DIR_32" ]; then
+        JULIA_BETA_DIR_32=${HOME}/julia-1.9.0-alpha1-32
+    fi
+    if [ ! -d "$JULIA_BETA_DIR_32" ]; then
+        echo "Error: $JULIA_BETA_DIR_32 does not exist" >&2
+        exit 1
+    fi
+
+    if [ -z "$JULIA_BETA_DIR_WIN" ]; then
+        JULIA_BETA_DIR_WIN=${HOME}/julia-1.9.0-alpha1-win
+    fi
+    if [ ! -d "$JULIA_BETA_DIR_WIN" ]; then
+        echo "Error: $JULIA_BETA_DIR_WIN does not exist" >&2
+        exit 1
+    fi
+
+    cargo clean
+    JULIA_DIR=$JULIA_BETA_DIR cargo build --features use-bindgen,beta
+    echo "/* generated from Julia version 1.9.0-alpha1 */" > ./src/bindings_1_9_x86_64_unknown_linux_gnu.rs
+    cat ../target/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings_1_9_x86_64_unknown_linux_gnu.rs
+
+    cargo clean
+    JULIA_DIR=$JULIA_BETA_DIR_32 cargo build --features use-bindgen,i686,beta --target i686-unknown-linux-gnu
+    echo "/* generated from Julia version 1.9.0-alpha1 */" > ./src/bindings_1_9_i686_unknown_linux_gnu.rs
+    cat ../target/i686-unknown-linux-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings_1_9_i686_unknown_linux_gnu.rs
+
+    cargo clean
+    JULIA_DIR=$JULIA_BETA_DIR_WIN cargo build --features use-bindgen,windows,beta --target x86_64-pc-windows-gnu
+    echo "/* generated from Julia version 1.9.0-alpha1 */" > ./src/bindings_1_9_x86_64_pc_windows_gnu.rs
+    cat ../target/x86_64-pc-windows-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings_1_9_x86_64_pc_windows_gnu.rs
+
+    cargo fmt
+
+    exit
+fi
+
 if [ -z "$JULIA_STABLE_DIR" ]; then
-    JULIA_STABLE_DIR=${HOME}/julia-1.8.0
+    JULIA_STABLE_DIR=${HOME}/julia-1.8.3
 fi
 if [ ! -d "$JULIA_STABLE_DIR" ]; then
     echo "Error: $JULIA_STABLE_DIR does not exist" >&2
@@ -166,17 +216,17 @@ cat ../target/x86_64-pc-windows-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src
 
 cargo clean
 JULIA_DIR=$JULIA_STABLE_DIR cargo build --features use-bindgen
-echo "/* generated from Julia version 1.8.0 */" > ./src/bindings_1_8_x86_64_unknown_linux_gnu.rs
+echo "/* generated from Julia version 1.8.3 */" > ./src/bindings_1_8_x86_64_unknown_linux_gnu.rs
 cat ../target/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings_1_8_x86_64_unknown_linux_gnu.rs
 
 cargo clean
 JULIA_DIR=$JULIA_STABLE_DIR_32 cargo build --features use-bindgen,i686 --target i686-unknown-linux-gnu
-echo "/* generated from Julia version 1.8.0 */" > ./src/bindings_1_8_i686_unknown_linux_gnu.rs
+echo "/* generated from Julia version 1.8.3 */" > ./src/bindings_1_8_i686_unknown_linux_gnu.rs
 cat ../target/i686-unknown-linux-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings_1_8_i686_unknown_linux_gnu.rs
 
 cargo clean
 JULIA_DIR=$JULIA_STABLE_DIR_WIN cargo build --features use-bindgen,windows --target x86_64-pc-windows-gnu
-echo "/* generated from Julia version 1.8.0 */" > ./src/bindings_1_8_x86_64_pc_windows_gnu.rs
+echo "/* generated from Julia version 1.8.3 */" > ./src/bindings_1_8_x86_64_pc_windows_gnu.rs
 cat ../target/x86_64-pc-windows-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings_1_8_x86_64_pc_windows_gnu.rs
 
 cargo fmt

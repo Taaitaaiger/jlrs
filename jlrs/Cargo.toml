@@ -64,6 +64,8 @@ unsafe-ledger = []
 debug = ["jl-sys/debug"]
 # Link LTS version of Julia
 lts = ["jl-sys/lts"]
+# Link beta version of Julia
+beta = ["jl-sys/beta"]
 # link nightly version of Julia
 nightly = ["jl-sys/nightly"]
 # Link 32-bits version of Julia on Linux

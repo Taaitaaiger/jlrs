@@ -28,14 +28,14 @@ pub mod stack_frame;
 pub mod target;
 
 use cfg_if::cfg_if;
-#[cfg(feature = "nightly")]
+#[cfg(any(feature = "nightly", feature = "beta"))]
 use jl_sys::jl_ptls_t;
-#[cfg(not(feature = "nightly"))]
+#[cfg(not(any(feature = "nightly", feature = "beta")))]
 use jl_sys::jl_tls_states_t;
 
-#[cfg(feature = "nightly")]
+#[cfg(any(feature = "nightly", feature = "beta"))]
 pub type PTls = jl_ptls_t;
-#[cfg(not(feature = "nightly"))]
+#[cfg(not(any(feature = "nightly", feature = "beta")))]
 pub type PTls = *mut jl_tls_states_t;
 
 pub(crate) unsafe fn get_tls() -> PTls {

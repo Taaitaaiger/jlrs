@@ -6,7 +6,7 @@
 
 use std::ptr::NonNull;
 
-#[cfg(not(feature = "nightly"))]
+#[cfg(not(any(feature = "nightly", feature = "beta")))]
 use crate::wrappers::ptr::private::WrapperPriv as _;
 use crate::{
     error::{AccessError, JlrsResult, JuliaResult},
@@ -18,9 +18,9 @@ use crate::{
     },
 };
 
-#[cfg(not(feature = "nightly"))]
+#[cfg(not(any(feature = "nightly", feature = "beta")))]
 use jl_sys::jl_get_kwsorter;
-#[cfg(feature = "nightly")]
+#[cfg(any(feature = "nightly", feature = "beta"))]
 use jl_sys::jl_kwcall_func;
 use jl_sys::{jl_call, jl_exception_occurred};
 use smallvec::SmallVec;
@@ -240,9 +240,9 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
     where
         T: Target<'target>,
     {
-        #[cfg(not(feature = "nightly"))]
+        #[cfg(not(any(feature = "nightly", feature = "beta")))]
         let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
-        #[cfg(feature = "nightly")]
+        #[cfg(any(feature = "nightly", feature = "beta"))]
         let func = jl_kwcall_func; // jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
         let args = &mut [self.keywords, self.func];
 
@@ -266,9 +266,9 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
     where
         T: Target<'target>,
     {
-        #[cfg(not(feature = "nightly"))]
+        #[cfg(not(any(feature = "nightly", feature = "beta")))]
         let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
-        #[cfg(feature = "nightly")]
+        #[cfg(any(feature = "nightly", feature = "beta"))]
         let func = jl_kwcall_func;
         let args = &mut [self.keywords, self.func, arg0];
 
@@ -293,9 +293,9 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
     where
         T: Target<'target>,
     {
-        #[cfg(not(feature = "nightly"))]
+        #[cfg(not(any(feature = "nightly", feature = "beta")))]
         let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
-        #[cfg(feature = "nightly")]
+        #[cfg(any(feature = "nightly", feature = "beta"))]
         let func = jl_kwcall_func;
         let args = &mut [self.keywords, self.func, arg0, arg1];
 
@@ -321,9 +321,9 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
     where
         T: Target<'target>,
     {
-        #[cfg(not(feature = "nightly"))]
+        #[cfg(not(any(feature = "nightly", feature = "beta")))]
         let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
-        #[cfg(feature = "nightly")]
+        #[cfg(any(feature = "nightly", feature = "beta"))]
         let func = jl_kwcall_func;
         let args = &mut [self.keywords, self.func, arg0, arg1, arg2];
 
@@ -348,9 +348,9 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
         V: AsRef<[Value<'value, 'data>]>,
         T: Target<'target>,
     {
-        #[cfg(not(feature = "nightly"))]
+        #[cfg(not(any(feature = "nightly", feature = "beta")))]
         let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
-        #[cfg(feature = "nightly")]
+        #[cfg(any(feature = "nightly", feature = "beta"))]
         let func = jl_kwcall_func;
         let args = args.as_ref();
         let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + args.len());
@@ -538,7 +538,7 @@ cfg_if::cfg_if! {
             /// check if any of the arguments is currently borrowed from Rust.
             ///
             /// [`safety`]: crate::safety
-            #[cfg(feature = "nightly")]
+            #[cfg(any(feature = "nightly", feature = "beta"))]
             async unsafe fn call_async_interactive<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
@@ -559,7 +559,7 @@ cfg_if::cfg_if! {
             /// returns an `AccessError::BorrowError` if any of the arguments is.
             ///
             /// [`safety`]: crate::safety
-            #[cfg(feature = "nightly")]
+            #[cfg(any(feature = "nightly", feature = "beta"))]
             async unsafe fn call_async_interactive_tracked<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
@@ -605,7 +605,7 @@ cfg_if::cfg_if! {
             ///
             /// [`safety`]: crate::safety
             /// [`PersistentTask::init`]: crate::async_util::task::PersistentTask::init
-            #[cfg(feature = "nightly")]
+            #[cfg(any(feature = "nightly", feature = "beta"))]
             unsafe fn schedule_async_interactive<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
@@ -627,7 +627,7 @@ cfg_if::cfg_if! {
             ///
             /// [`safety`]: crate::safety
             /// [`PersistentTask::init`]: crate::async_util::task::PersistentTask::init
-            #[cfg(feature = "nightly")]
+            #[cfg(any(feature = "nightly", feature = "beta"))]
             unsafe fn schedule_async_interactive_tracked<'target, 'value, V, T>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
@@ -940,7 +940,7 @@ cfg_if::cfg_if! {
                 JuliaFuture::new(frame, self, args).await
             }
 
-            #[cfg(feature = "nightly")]
+            #[cfg(any(feature = "nightly", feature = "beta"))]
             async unsafe fn call_async_interactive<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
@@ -952,7 +952,7 @@ cfg_if::cfg_if! {
                 JuliaFuture::new_interactive(frame, self, args).await
             }
 
-            #[cfg(feature = "nightly")]
+            #[cfg(any(feature = "nightly", feature = "beta"))]
             unsafe fn schedule_async_interactive<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
@@ -1105,7 +1105,7 @@ cfg_if::cfg_if! {
                 JuliaFuture::new(frame, self.as_value(), args).await
             }
 
-            #[cfg(feature = "nightly")]
+            #[cfg(any(feature = "nightly", feature = "beta"))]
             async unsafe fn call_async_interactive<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
@@ -1117,7 +1117,7 @@ cfg_if::cfg_if! {
                 JuliaFuture::new_interactive(frame, self.as_value(), args).await
             }
 
-            #[cfg(feature = "nightly")]
+            #[cfg(any(feature = "nightly", feature = "beta"))]
             unsafe fn schedule_async_interactive<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
@@ -1198,7 +1198,7 @@ cfg_if::cfg_if! {
                 JuliaFuture::new_with_keywords(frame, self, args).await
             }
 
-            #[cfg(feature = "nightly")]
+            #[cfg(any(feature = "nightly", feature = "beta"))]
             async unsafe fn call_async_interactive<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
@@ -1210,7 +1210,7 @@ cfg_if::cfg_if! {
                 JuliaFuture::new_interactive_with_keywords(frame, self, args).await
             }
 
-            #[cfg(feature = "nightly")]
+            #[cfg(any(feature = "nightly", feature = "beta"))]
             unsafe fn schedule_async_interactive<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,

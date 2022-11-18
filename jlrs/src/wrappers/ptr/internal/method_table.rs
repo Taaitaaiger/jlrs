@@ -136,7 +136,7 @@ impl<'scope> MethodTable<'scope> {
         unsafe { self.unwrap_non_null(Private).as_ref().max_args }
     }
 
-    #[cfg(not(feature = "nightly"))]
+    #[cfg(not(any(feature = "nightly", feature = "beta")))]
     /// Keyword argument sorter function
     pub fn kw_sorter<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where

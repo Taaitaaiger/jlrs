@@ -56,13 +56,6 @@ impl<const N: usize> StackFrame<N> {
     pub(crate) unsafe fn pin<'scope>(&'scope mut self) -> PinnedFrame<'scope, N> {
         PinnedFrame::new(self)
     }
-
-    // // Safety: Must only be called once, if a new frame is pushed it must be popped before
-    // // this one is.
-    // #[cfg(feature = "nightly")]
-    // pub(crate) unsafe fn pin_with_prev<'scope>(&'scope mut self, prev: *mut *mut jl_gcframe_t) -> PinnedFrame<'scope, N> {
-    //     PinnedFrame::with_prev(self, prev)
-    // }
 }
 
 pub(crate) struct PinnedFrame<'scope, const N: usize> {
@@ -85,14 +78,6 @@ impl<'scope, const N: usize> PinnedFrame<'scope, N> {
 
         PinnedFrame { raw: Pin::new(raw) }
     }
-
-    // #[cfg(feature = "nightly")]
-    // unsafe fn with_prev(raw: &'scope mut StackFrame<N>, prev: *mut *mut jl_gcframe_t) -> Self {
-    //     raw.prev = prev.cast();
-    //     prev.write(raw as *mut _ as _);
-    //
-    //     PinnedFrame { raw: Pin::new(raw) }
-    // }
 
     pub(crate) unsafe fn stack_frame<'inner>(
         &'inner mut self,

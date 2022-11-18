@@ -119,7 +119,7 @@ impl<'scope> CodeInstance<'scope> {
     {
         // Safety: the pointer points to valid data
         cfg_if! {
-            if #[cfg(not(feature = "nightly"))] {
+            if #[cfg(not(any(feature = "nightly", feature = "beta")))] {
                 unsafe {
                     let inferred = self.unwrap_non_null(Private).as_ref().inferred;
                     Some(ValueRef::wrap(NonNull::new(inferred)?).root(target))
@@ -145,14 +145,14 @@ impl<'scope> CodeInstance<'scope> {
     #[cfg(not(feature = "lts"))]
     pub fn purity_bits(self) -> u32 {
         // Safety: the pointer points to valid data
-        #[cfg(feature = "nightly")]
+        #[cfg(any(feature = "nightly", feature = "beta"))]
         unsafe {
             self.unwrap_non_null(Private)
                 .as_ref()
                 .purity_bits
                 .load(Ordering::Relaxed)
         }
-        #[cfg(not(feature = "nightly"))]
+        #[cfg(not(any(feature = "nightly", feature = "beta")))]
         unsafe {
             self.unwrap_non_null(Private).as_ref().purity_bits
         }

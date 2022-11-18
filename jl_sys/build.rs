@@ -173,7 +173,7 @@ fn main() {
     #[cfg(feature = "lts")]
     c.define("JLRS_LTS", None);
 
-    #[cfg(feature = "nightly")]
+    #[cfg(any(feature = "nightly", feature = "beta"))]
     c.define("JLRS_NIGHTLY", None);
 
     c.compile("jlrs_cc");
@@ -193,9 +193,24 @@ fn main() {
         #[cfg(not(feature = "i686"))]
         let arch_flag = "";
 
+        builder = builder.clang_arg(include_dir_flag).clang_arg(arch_flag);
+
+        #[cfg(any(feature = "nightly", feature = "beta"))]
+        {
+            builder = builder.clang_arg("-DJLRS_NIGHTLY");
+        }
+
+        #[cfg(feature = "lts")]
+        {
+            builder = builder.clang_arg("-DJLRS_LTS");
+        }
+
+        #[cfg(all(feature = "lts", any(windows, feature = "windows")))]
+        {
+            builder = builder.clang_arg("-DJLRS_WINDOWS_LTS");
+        }
+
         builder = builder
-            .clang_arg(include_dir_flag)
-            .clang_arg(arch_flag)
             .header("src/jlrs_cc.h")
             .size_t_is_usize(true)
             .layout_tests(false)

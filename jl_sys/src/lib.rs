@@ -18,6 +18,7 @@ use ::std::os::raw::c_char;
 #[cfg(all(
     not(feature = "use-bindgen"),
     feature = "lts",
+    not(feature = "beta"),
     target_os = "linux",
     target_pointer_width = "64"
 ))]
@@ -25,6 +26,7 @@ mod bindings_1_6_x86_64_unknown_linux_gnu;
 #[cfg(all(
     not(feature = "use-bindgen"),
     feature = "lts",
+    not(feature = "beta"),
     target_os = "linux",
     target_pointer_width = "64"
 ))]
@@ -34,6 +36,7 @@ pub use bindings_1_6_x86_64_unknown_linux_gnu::*;
 #[cfg(all(
     not(feature = "use-bindgen"),
     feature = "lts",
+    not(feature = "beta"),
     target_os = "linux",
     target_pointer_width = "32"
 ))]
@@ -41,15 +44,26 @@ mod bindings_1_6_i686_unknown_linux_gnu;
 #[cfg(all(
     not(feature = "use-bindgen"),
     feature = "lts",
+    not(feature = "beta"),
     target_os = "linux",
     target_pointer_width = "32"
 ))]
 pub use bindings_1_6_i686_unknown_linux_gnu::*;
 
 // Windows 64-bit LTS bindings
-#[cfg(all(not(feature = "use-bindgen"), feature = "lts", target_os = "windows"))]
+#[cfg(all(
+    not(feature = "use-bindgen"),
+    feature = "lts",
+    not(feature = "beta"),
+    target_os = "windows"
+))]
 mod bindings_1_6_x86_64_pc_windows_gnu;
-#[cfg(all(not(feature = "use-bindgen"), feature = "lts", target_os = "windows"))]
+#[cfg(all(
+    not(feature = "use-bindgen"),
+    feature = "lts",
+    not(feature = "beta"),
+    target_os = "windows"
+))]
 pub use bindings_1_6_x86_64_pc_windows_gnu::*;
 
 // Stable
@@ -58,6 +72,7 @@ pub use bindings_1_6_x86_64_pc_windows_gnu::*;
 #[cfg(all(
     not(feature = "use-bindgen"),
     not(feature = "lts"),
+    not(feature = "beta"),
     not(feature = "nightly"),
     target_os = "linux",
     target_pointer_width = "64"
@@ -66,6 +81,7 @@ mod bindings_1_8_x86_64_unknown_linux_gnu;
 #[cfg(all(
     not(feature = "use-bindgen"),
     not(feature = "lts"),
+    not(feature = "beta"),
     not(feature = "nightly"),
     target_os = "linux",
     target_pointer_width = "64"
@@ -76,6 +92,7 @@ pub use bindings_1_8_x86_64_unknown_linux_gnu::*;
 #[cfg(all(
     not(feature = "use-bindgen"),
     not(feature = "lts"),
+    not(feature = "beta"),
     target_os = "linux",
     target_pointer_width = "32"
 ))]
@@ -83,6 +100,7 @@ mod bindings_1_8_i686_unknown_linux_gnu;
 #[cfg(all(
     not(feature = "use-bindgen"),
     not(feature = "lts"),
+    not(feature = "beta"),
     target_os = "linux",
     target_pointer_width = "32"
 ))]
@@ -92,15 +110,73 @@ pub use bindings_1_8_i686_unknown_linux_gnu::*;
 #[cfg(all(
     not(feature = "use-bindgen"),
     not(feature = "lts"),
+    not(feature = "beta"),
     target_os = "windows"
 ))]
 mod bindings_1_8_x86_64_pc_windows_gnu;
 #[cfg(all(
     not(feature = "use-bindgen"),
     not(feature = "lts"),
+    not(feature = "beta"),
     target_os = "windows"
 ))]
 pub use bindings_1_8_x86_64_pc_windows_gnu::*;
+
+// Beta
+
+// Linux 64-bit beta bindings
+#[cfg(all(
+    not(feature = "use-bindgen"),
+    not(feature = "lts"),
+    feature = "beta",
+    not(feature = "nightly"),
+    target_os = "linux",
+    target_pointer_width = "64"
+))]
+mod bindings_1_9_x86_64_unknown_linux_gnu;
+#[cfg(all(
+    not(feature = "use-bindgen"),
+    not(feature = "lts"),
+    feature = "beta",
+    not(feature = "nightly"),
+    target_os = "linux",
+    target_pointer_width = "64"
+))]
+pub use bindings_1_9_x86_64_unknown_linux_gnu::*;
+
+// Linux 32-bit beta bindings
+#[cfg(all(
+    not(feature = "use-bindgen"),
+    not(feature = "lts"),
+    feature = "beta",
+    target_os = "linux",
+    target_pointer_width = "32"
+))]
+mod bindings_1_9_i686_unknown_linux_gnu;
+#[cfg(all(
+    not(feature = "use-bindgen"),
+    not(feature = "lts"),
+    feature = "beta",
+    target_os = "linux",
+    target_pointer_width = "32"
+))]
+pub use bindings_1_9_i686_unknown_linux_gnu::*;
+
+// Windows 64-bit beta bindings
+#[cfg(all(
+    not(feature = "use-bindgen"),
+    not(feature = "lts"),
+    feature = "beta",
+    target_os = "windows"
+))]
+mod bindings_1_9_x86_64_pc_windows_gnu;
+#[cfg(all(
+    not(feature = "use-bindgen"),
+    not(feature = "lts"),
+    feature = "beta",
+    target_os = "windows"
+))]
+pub use bindings_1_9_x86_64_pc_windows_gnu::*;
 
 // Nightly
 
@@ -109,6 +185,7 @@ pub use bindings_1_8_x86_64_pc_windows_gnu::*;
     not(feature = "use-bindgen"),
     target_os = "linux",
     feature = "nightly",
+    not(feature = "beta"),
     target_pointer_width = "64"
 ))]
 mod bindings_nightly_x86_64_unknown_linux_gnu;
@@ -116,6 +193,7 @@ mod bindings_nightly_x86_64_unknown_linux_gnu;
     not(feature = "use-bindgen"),
     target_os = "linux",
     feature = "nightly",
+    not(feature = "beta"),
     target_pointer_width = "64"
 ))]
 pub use bindings_nightly_x86_64_unknown_linux_gnu::*;
