@@ -679,18 +679,21 @@ impl<'data> Array<'_, 'data> {
 
 impl<'scope, 'data> Array<'scope, 'data> {
     /// Returns the array's dimensions.
+    ///
+    /// TODO safety
+    /// TODO make safe? Mutation is unsafe already
     pub unsafe fn dimensions(self) -> ArrayDimensions<'scope> {
         ArrayDimensions::new(self)
     }
 
-    /// TODO: Rooted/unrooted through target.
     /// Returns the type of this array's elements.
-    pub fn element_type(self) -> ValueRef<'scope, 'static> {
+    pub fn element_type(self) -> Value<'scope, 'static> {
         // Safety: C API function is called valid arguments.
         unsafe {
-            ValueRef::wrap(NonNull::new_unchecked(
-                jl_array_eltype(self.unwrap(Private).cast()).cast(),
-            ))
+            Value::wrap_non_null(
+                NonNull::new_unchecked(jl_array_eltype(self.unwrap(Private).cast()).cast()),
+                Private,
+            )
         }
     }
 
@@ -703,7 +706,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     /// Returns `true` if the layout of the elements is compatible with `T`.
     pub fn contains<T: ValidField>(self) -> bool {
         // Safety: C API function is called valid arguments.
-        unsafe { T::valid_field(self.element_type().value()) }
+        T::valid_field(self.element_type())
     }
 
     /// Returns `true` if the layout of the elements is compatible with `T` and these elements are
@@ -721,7 +724,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     /// Returns `true` if the elements of the array are stored inline and the element type is a
     /// union type.
     pub fn is_union_array(self) -> bool {
-        self.is_inline_array() && unsafe { self.element_type().value().is::<Union>() }
+        self.is_inline_array() && self.element_type().is::<Union>()
     }
 
     /// Returns true if the elements of the array are stored inline and at least one of the fields
@@ -743,7 +746,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
                 return true;
             }
 
-            let elty = self.element_type().value();
+            let elty = self.element_type();
             if let Ok(dt) = elty.cast::<DataType>() {
                 return dt.zero_init();
             } else {
@@ -767,11 +770,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
             // Safety: the type is correct
             unsafe { Ok(TypedArray::wrap_non_null(ptr, Private)) }
         } else {
-            let value_type = unsafe {
-                self.element_type()
-                    .value()
-                    .display_string_or(CANNOT_DISPLAY_TYPE)
-            };
+            let value_type = self.element_type().display_string_or(CANNOT_DISPLAY_TYPE);
             Err(AccessError::InvalidLayout { value_type })?
         }
     }
@@ -811,6 +810,8 @@ impl<'scope, 'data> Array<'scope, 'data> {
         Ok(CopiedArray::new(data.into_boxed_slice(), dimensions))
     }
 
+    // TODO docs
+    // TODO safety for all
     pub unsafe fn bits_data<'borrow, T>(
         &'borrow self,
     ) -> JlrsResult<BitsArrayAccessorI<'borrow, 'scope, 'data, T>>
@@ -1027,7 +1028,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
         let (output, scope) = target.split();
         scope
             .scope(|mut frame| {
-                let elty_ptr = self.element_type().value().unwrap(Private);
+                let elty_ptr = self.element_type().unwrap(Private);
 
                 // Safety: The array type is rooted until the array has been constructed, all C API
                 // functions are called with valid data. If an exception is thrown it's caught.
@@ -1081,7 +1082,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
         let (output, scope) = target.split();
         scope
             .scope(|mut frame| {
-                let elty_ptr = self.element_type().value().unwrap(Private);
+                let elty_ptr = self.element_type().unwrap(Private);
                 let array_type = jl_apply_array_type(elty_ptr.cast(), dims.n_dimensions());
                 let _: Value = frame
                     .as_mut()
@@ -1105,28 +1106,24 @@ impl<'scope, 'data> Array<'scope, 'data> {
     {
         if !self.is_inline_array() {
             Err(ArrayLayoutError::NotInline {
-                element_type: unsafe { self.element_type().value() }
-                    .display_string_or(CANNOT_DISPLAY_TYPE),
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
 
         // Safety: Inline array must have a DataType as element type
         if unsafe {
             self.element_type()
-                .value()
                 .cast_unchecked::<DataType>()
                 .has_pointer_fields()?
         } {
             Err(ArrayLayoutError::NotBits {
-                element_type: unsafe { self.element_type().value() }
-                    .display_string_or(CANNOT_DISPLAY_TYPE),
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
 
         if !self.contains::<T>() {
             Err(AccessError::InvalidLayout {
-                value_type: unsafe { self.element_type().value() }
-                    .display_string_or(CANNOT_DISPLAY_TYPE),
+                value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
 
@@ -1139,15 +1136,13 @@ impl<'scope, 'data> Array<'scope, 'data> {
     {
         if !self.is_inline_array() {
             Err(ArrayLayoutError::NotInline {
-                element_type: unsafe { self.element_type().value() }
-                    .display_string_or(CANNOT_DISPLAY_TYPE),
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
 
         if !self.contains::<T>() {
             Err(AccessError::InvalidLayout {
-                value_type: unsafe { self.element_type().value() }
-                    .display_string_or(CANNOT_DISPLAY_TYPE),
+                value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
 
@@ -1161,15 +1156,13 @@ impl<'scope, 'data> Array<'scope, 'data> {
     {
         if !self.is_value_array() {
             Err(ArrayLayoutError::NotPointer {
-                element_type: unsafe { self.element_type().value() }
-                    .display_string_or(CANNOT_DISPLAY_TYPE),
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
 
         if !self.contains::<Option<T>>() {
             Err(AccessError::InvalidLayout {
-                value_type: unsafe { self.element_type().value() }
-                    .display_string_or(CANNOT_DISPLAY_TYPE),
+                value_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
 
@@ -1178,8 +1171,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
 
     fn ensure_union(self) -> JlrsResult<()> {
         if !self.is_union_array() {
-            let element_type =
-                unsafe { self.element_type().value() }.display_string_or(CANNOT_DISPLAY_TYPE);
+            let element_type = self.element_type().display_string_or(CANNOT_DISPLAY_TYPE);
             Err(ArrayLayoutError::NotUnion { element_type })?
         }
 
@@ -1337,7 +1329,7 @@ impl<'scope> Array<'scope, 'static> {
 unsafe impl<'scope, 'data> Typecheck for Array<'scope, 'data> {
     fn typecheck(t: DataType) -> bool {
         // Safety: Array is a UnionAll. so check if the typenames match
-        unsafe { t.type_name().wrapper() == TypeName::of_array(&Global::new()) }
+        unsafe { t.type_name() == TypeName::of_array(&Global::new()) }
     }
 }
 
@@ -1702,7 +1694,7 @@ where
     }
 
     /// Returns the type of this array's elements.
-    pub fn element_type(self) -> ValueRef<'scope, 'static> {
+    pub fn element_type(self) -> Value<'scope, 'static> {
         self.as_array().element_type()
     }
 
@@ -1735,21 +1727,18 @@ where
     fn ensure_bits(self) -> JlrsResult<()> {
         if !self.is_inline_array() {
             Err(ArrayLayoutError::NotInline {
-                element_type: unsafe { self.element_type().value() }
-                    .display_string_or(CANNOT_DISPLAY_TYPE),
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
 
         // Safety: Inline array must have a DataType as element type
         if unsafe {
             self.element_type()
-                .value()
                 .cast_unchecked::<DataType>()
                 .has_pointer_fields()?
         } {
             Err(ArrayLayoutError::NotBits {
-                element_type: unsafe { self.element_type().value() }
-                    .display_string_or(CANNOT_DISPLAY_TYPE),
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
 
@@ -1759,8 +1748,7 @@ where
     fn ensure_inline(self) -> JlrsResult<()> {
         if !self.is_inline_array() {
             Err(ArrayLayoutError::NotInline {
-                element_type: unsafe { self.element_type().value() }
-                    .display_string_or(CANNOT_DISPLAY_TYPE),
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
 
@@ -1952,8 +1940,7 @@ where
     fn ensure_ptr(self) -> JlrsResult<()> {
         if !self.as_array().is_value_array() {
             Err(ArrayLayoutError::NotPointer {
-                element_type: unsafe { self.element_type().value() }
-                    .display_string_or(CANNOT_DISPLAY_TYPE),
+                element_type: self.element_type().display_string_or(CANNOT_DISPLAY_TYPE),
             })?;
         }
 
@@ -2159,12 +2146,7 @@ unsafe impl<'scope, 'data, T: ValidField> Typecheck for TypedArray<'scope, 'data
     fn typecheck(t: DataType) -> bool {
         // Safety: borrow is only temporary
         unsafe {
-            t.is::<Array>()
-                && T::valid_field(
-                    t.parameters().wrapper().data().as_slice()[0]
-                        .unwrap()
-                        .value(),
-                )
+            t.is::<Array>() && T::valid_field(t.parameters().data().as_slice()[0].unwrap().value())
         }
     }
 }
@@ -2295,7 +2277,7 @@ unsafe impl ValidLayout for ArrayRef<'_, '_> {
         if let Ok(dt) = v.cast::<DataType>() {
             dt.is::<Array>()
         } else if let Ok(ua) = v.cast::<UnionAll>() {
-            unsafe { ua.base_type().wrapper().is::<Array>() }
+            ua.base_type().is::<Array>()
         } else {
             false
         }
@@ -2309,7 +2291,7 @@ unsafe impl ValidField for Option<ArrayRef<'_, '_>> {
         if let Ok(dt) = v.cast::<DataType>() {
             dt.is::<Array>()
         } else if let Ok(ua) = v.cast::<UnionAll>() {
-            unsafe { ua.base_type().wrapper().is::<Array>() }
+            ua.base_type().is::<Array>()
         } else {
             false
         }
@@ -2326,7 +2308,7 @@ unsafe impl<T: ValidField> ValidLayout for TypedArrayRef<'_, '_, T> {
         if let Ok(dt) = v.cast::<DataType>() {
             dt.is::<TypedArray<T>>()
         } else if let Ok(ua) = v.cast::<UnionAll>() {
-            unsafe { ua.base_type().wrapper().is::<TypedArray<T>>() }
+            ua.base_type().is::<TypedArray<T>>()
         } else {
             false
         }
@@ -2340,7 +2322,7 @@ unsafe impl<T: ValidField> ValidField for Option<TypedArrayRef<'_, '_, T>> {
         if let Ok(dt) = v.cast::<DataType>() {
             dt.is::<TypedArray<T>>()
         } else if let Ok(ua) = v.cast::<UnionAll>() {
-            unsafe { ua.base_type().wrapper().is::<TypedArray<T>>() }
+            ua.base_type().is::<TypedArray<T>>()
         } else {
             false
         }

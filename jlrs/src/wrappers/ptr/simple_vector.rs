@@ -19,7 +19,10 @@ use std::{
     ptr::NonNull,
 };
 
-use super::{datatype::DataType, private::WrapperPriv, value::ValueRef, Ref, Wrapper, WrapperRef};
+use super::{
+    datatype::DataType, private::WrapperPriv, value::ValueRef, Ref, Wrapper, WrapperRef,
+    WrapperType,
+};
 
 /// Access and mutate the content of a `SimpleVector`.
 #[repr(transparent)]
@@ -49,7 +52,11 @@ impl<'scope, 'borrow, T: WrapperRef<'scope, 'static>> SimpleVectorContent<'scope
     ///
     /// Safety: you may only mutate a `SimpleVector` after creating it, they should generally be
     /// considered immutable.
-    pub unsafe fn set(&mut self, index: usize, value: Option<T::Wrapper>) -> JlrsResult<()> {
+    pub unsafe fn set(
+        &mut self,
+        index: usize,
+        value: Option<WrapperType<'_, 'scope, 'static, T>>,
+    ) -> JlrsResult<()> {
         if index >= self.len() {
             Err(AccessError::OutOfBoundsSVec {
                 idx: index,
@@ -58,7 +65,8 @@ impl<'scope, 'borrow, T: WrapperRef<'scope, 'static>> SimpleVectorContent<'scope
         }
 
         jl_svec_data(self.0.as_ptr())
-            .cast::<Option<T::Wrapper>>()
+            .cast::<Option<<T::Wrapper as Wrapper<'scope, 'static>>::TypeConstructor<'_, 'static>>>(
+            )
             .add(index)
             .write(value);
 
@@ -234,6 +242,7 @@ unsafe impl<'scope> ValidLayout for SimpleVectorRef<'scope> {
 
     const IS_REF: bool = true;
 }
+
 unsafe impl<'scope> ValidField for Option<SimpleVectorRef<'scope>> {
     fn valid_field(v: Value) -> bool {
         if let Ok(dt) = v.cast::<DataType>() {

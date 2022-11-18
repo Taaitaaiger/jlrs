@@ -7,7 +7,10 @@
 use crate::{impl_julia_typecheck, private::Private, wrappers::ptr::private::WrapperPriv};
 
 #[cfg(feature = "extra-fields")]
-use crate::wrappers::ptr::value::ValueRef;
+use crate::{
+    memory::target::Target,
+    wrappers::ptr::value::{ValueData, ValueRef},
+};
 use jl_sys::{jl_task_t, jl_task_type};
 use std::{marker::PhantomData, ptr::NonNull};
 
@@ -26,99 +29,120 @@ pub struct Task<'scope>(NonNull<jl_task_t>, PhantomData<&'scope ()>);
 
 impl<'scope> Task<'scope> {
     /*
-    for (a, b) in zip(fieldnames(Task), fieldtypes(Task))
-        println(a, ": ", b)
-    end
-    next: Union{Task, Nothing}
-    queue: Any
-    storage: Any
-    donenotify: Any
-    result: Any
-    logstate: Any
-    code: Any
-    rngState0: UInt64
-    rngState1: UInt64
-    rngState2: UInt64
-    rngState3: UInt64
-    _state: UInt8 _Atomic
-    sticky: Bool
-    _isexception: Bool _Atomic
+    inspect(Task):
+
+    next: Union{Task, Nothing} (mut)
+    queue: Any (mut)
+    storage: Any (mut)
+    donenotify: Any (mut)
+    result: Any (mut)
+    logstate: Any (mut)
+    code: Any (mut)
+    rngState0: UInt64 (mut)
+    rngState1: UInt64 (mut)
+    rngState2: UInt64 (mut)
+    rngState3: UInt64 (mut)
+    _state: UInt8 (mut) _Atomic
+    sticky: Bool (mut)
+    _isexception: Bool (mut) _Atomic
+    priority: UInt16 (mut)
     */
 
     /// Invasive linked list for scheduler
     #[cfg(feature = "extra-fields")]
-    pub fn next(self) -> ValueRef<'scope, 'static> {
+    pub fn next<'target, T>(self, target: T) -> ValueData<'target, 'static, T>
+    where
+        T: Target<'target>,
+    {
         // Safety: the pointer points to valid data
         unsafe {
             let next = self.unwrap_non_null(Private).as_ref().next;
             debug_assert!(!next.is_null());
-            ValueRef::wrap(NonNull::new_unchecked(next))
+            ValueRef::wrap(NonNull::new_unchecked(next)).root(target)
         }
     }
 
     /// Invasive linked list for scheduler
     #[cfg(feature = "extra-fields")]
-    pub fn queue(self) -> Option<ValueRef<'scope, 'static>> {
+    pub fn queue<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
         // Safety: the pointer points to valid data
         unsafe {
             let queue = self.unwrap_non_null(Private).as_ref().queue;
             let queue = NonNull::new(queue)?;
-            Some(ValueRef::wrap(queue))
+            Some(ValueRef::wrap(queue).root(target))
         }
     }
 
     /// The `tls` field, called `Task.storage` in Julia.
     #[cfg(feature = "extra-fields")]
-    pub fn storage(self) -> Option<ValueRef<'scope, 'static>> {
+    pub fn storage<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
         // Safety: the pointer points to valid data
         unsafe {
             let storage = self.unwrap_non_null(Private).as_ref().tls;
             let storage = NonNull::new(storage)?;
-            Some(ValueRef::wrap(storage))
+            Some(ValueRef::wrap(storage).root(target))
         }
     }
 
     /// The `donenotify` field.
     #[cfg(feature = "extra-fields")]
-    pub fn done_notify(self) -> Option<ValueRef<'scope, 'static>> {
+    pub fn done_notify<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
         // Safety: the pointer points to valid data
         unsafe {
             let donenotify = self.unwrap_non_null(Private).as_ref().donenotify;
             let donenotify = NonNull::new(donenotify)?;
-            Some(ValueRef::wrap(donenotify))
+            Some(ValueRef::wrap(donenotify).root(target))
         }
     }
 
     /// The `result` field.
     #[cfg(feature = "extra-fields")]
-    pub fn result(self) -> Option<ValueRef<'scope, 'static>> {
+    pub fn result<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
         // Safety: the pointer points to valid data
         unsafe {
             let result = self.unwrap_non_null(Private).as_ref().result;
             let result = NonNull::new(result)?;
-            Some(ValueRef::wrap(result))
+            Some(ValueRef::wrap(result).root(target))
         }
     }
 
     /// The `logstate` field.
     #[cfg(feature = "extra-fields")]
-    pub fn log_state(self) -> Option<ValueRef<'scope, 'static>> {
+    pub fn log_state<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
         // Safety: the pointer points to valid data
         unsafe {
             let logstate = self.unwrap_non_null(Private).as_ref().logstate;
             let logstate = NonNull::new(logstate)?;
-            Some(ValueRef::wrap(logstate))
+            Some(ValueRef::wrap(logstate).root(target))
         }
     }
 
     /// The `start` field.
     #[cfg(feature = "extra-fields")]
-    pub fn start(self) -> Option<ValueRef<'scope, 'static>> {
+    pub fn start<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
         // Safety: the pointer points to valid data
         unsafe {
             let start = self.unwrap_non_null(Private).as_ref().start;
             let start = NonNull::new(start)?;
-            Some(ValueRef::wrap(start))
+            Some(ValueRef::wrap(start).root(target))
         }
     }
 

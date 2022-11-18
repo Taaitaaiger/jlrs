@@ -369,7 +369,7 @@ impl<'borrow, 'array, 'data, T: WrapperRef<'array, 'data>>
         let idx = self.dimensions().index_of(&index)?;
 
         let data_ptr = if let Some(value) = value {
-            let ty = unsafe { self.array.element_type().value() };
+            let ty = self.array.element_type();
             if !value.isa(ty) {
                 let element_type = ty.display_string_or(CANNOT_DISPLAY_TYPE);
                 let value_type = value.datatype().display_string_or(CANNOT_DISPLAY_TYPE);
@@ -574,11 +574,7 @@ impl<'borrow, 'array, 'data, M: Mutability> UnionArrayAccessor<'borrow, 'array, 
     /// Returns `true` if `ty` if a value of that type can be stored in this array.
     pub fn contains(&self, ty: DataType) -> bool {
         let mut tag = 0;
-        find_union_component(
-            unsafe { self.array.element_type().value() },
-            ty.as_value(),
-            &mut tag,
-        )
+        find_union_component(self.array.element_type(), ty.as_value(), &mut tag)
     }
 
     /// Returns the type of the element at index `idx`.
@@ -586,7 +582,7 @@ impl<'borrow, 'array, 'data, M: Mutability> UnionArrayAccessor<'borrow, 'array, 
     where
         D: Dims,
     {
-        let elty = unsafe { self.array.element_type().value() };
+        let elty = self.array.element_type();
         let idx = self.dimensions().index_of(&index)?;
 
         // Safety: the index is in bounds.
@@ -605,7 +601,7 @@ impl<'borrow, 'array, 'data, M: Mutability> UnionArrayAccessor<'borrow, 'array, 
         T: 'static + ValidField + Clone,
         D: Dims,
     {
-        let elty = unsafe { self.array.element_type().value() };
+        let elty = self.array.element_type();
         let idx = self.dimensions().index_of(&index)?;
 
         // Safety: The index is in bounds and layout compatibility is checked.
@@ -648,7 +644,7 @@ impl<'borrow, 'array, 'data> UnionArrayAccessor<'borrow, 'array, 'data, Mutable<
         }
 
         let mut tag = 0;
-        let elty = self.array.element_type().value();
+        let elty = self.array.element_type();
         if !find_union_component(elty, ty.as_value(), &mut tag) {
             let element_type = elty.display_string_or(CANNOT_DISPLAY_TYPE);
             let value_type = ty.display_string_or(CANNOT_DISPLAY_TYPE);

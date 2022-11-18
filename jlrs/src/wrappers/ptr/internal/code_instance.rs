@@ -7,9 +7,12 @@
 
 use crate::{
     impl_julia_typecheck,
+    prelude::{Target, Value},
     private::Private,
     wrappers::ptr::{
-        internal::method_instance::MethodInstanceRef, private::WrapperPriv, value::ValueRef, Ref,
+        private::WrapperPriv,
+        value::{ValueData, ValueRef},
+        Ref,
     },
 };
 use cfg_if::cfg_if;
@@ -29,49 +32,51 @@ pub struct CodeInstance<'scope>(NonNull<jl_code_instance_t>, PhantomData<&'scope
 
 impl<'scope> CodeInstance<'scope> {
     /*
-    for (a, b) in zip(fieldnames(Core.CodeInstance), fieldtypes(Core.CodeInstance))
-        println(a, ": ", b)
-    end
-    def: Core.MethodInstance
-    next: Core.CodeInstance
-    min_world: UInt64
-    max_world: UInt64
-    rettype: Any
-    rettype_const: Any
-    inferred: Any
-    ipo_purity_bits: UInt32
-    purity_bits: UInt32
-    argescapes: Any
-    isspecsig: Bool
-    precompile: Bool _Atomic
-    invoke: Ptr{Nothing} _Atomic
-    specptr: Ptr{Nothing} _Atomic
-    relocatability: UInt8
+    inspect(Core.CodeInstance):
+
+    def: Core.MethodInstance (const)
+    next: Core.CodeInstance (mut)
+    min_world: UInt64 (const)
+    max_world: UInt64 (const)
+    rettype: Any (const)
+    rettype_const: Any (const)
+    inferred: Any (mut)
+    ipo_purity_bits: UInt32 (const)
+    purity_bits: UInt32 (mut)
+    argescapes: Any (const)
+    isspecsig: Bool (mut)
+    precompile: Bool (mut) _Atomic
+    relocatability: UInt8 (mut)
+    invoke: Ptr{Nothing} (mut) _Atomic
+    specptr: Ptr{Nothing} (mut) _Atomic
     */
 
     /// Method this instance is specialized from.
-    pub fn def(self) -> Option<MethodInstanceRef<'scope>> {
+    pub fn def(self) -> Option<MethodInstance<'scope>> {
         // Safety: the pointer points to valid data
         unsafe {
             let def = self.unwrap_non_null(Private).as_ref().def;
-            Some(MethodInstanceRef::wrap(NonNull::new(def)?))
+            Some(MethodInstance::wrap_non_null(NonNull::new(def)?, Private))
         }
     }
 
     /// Next cache entry.
-    pub fn next(self) -> Option<CodeInstanceRef<'scope>> {
+    pub fn next<'target, T>(self, target: T) -> Option<CodeInstanceData<'target, T>>
+    where
+        T: Target<'target>,
+    {
         cfg_if! {
             if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let next = self.unwrap_non_null(Private).as_ref().next;
-                    Some(CodeInstanceRef::wrap(NonNull::new(next)?))
+                    Some(CodeInstanceRef::wrap(NonNull::new(next)?).root(target))
                 }
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let next = self.unwrap_non_null(Private).as_ref().next.load(Ordering::Relaxed);
-                    Some(CodeInstanceRef::wrap(NonNull::new(next)?))
+                    Some(CodeInstanceRef::wrap(NonNull::new(next)?).root(target))
                 }
             }
         }
@@ -90,37 +95,40 @@ impl<'scope> CodeInstance<'scope> {
     }
 
     /// Return type for fptr.
-    pub fn rettype(self) -> Option<ValueRef<'scope, 'static>> {
+    pub fn rettype(self) -> Option<Value<'scope, 'static>> {
         // Safety: the pointer points to valid data
         unsafe {
             let rettype = self.unwrap_non_null(Private).as_ref().rettype;
-            Some(ValueRef::wrap(NonNull::new(rettype)?))
+            Some(Value::wrap_non_null(NonNull::new(rettype)?, Private))
         }
     }
 
     /// Inferred constant return value, or null
-    pub fn rettype_const(self) -> Option<ValueRef<'scope, 'static>> {
+    pub fn rettype_const(self) -> Option<Value<'scope, 'static>> {
         // Safety: the pointer points to valid data
         unsafe {
             let rettype_const = self.unwrap_non_null(Private).as_ref().rettype_const;
-            Some(ValueRef::wrap(NonNull::new(rettype_const)?))
+            Some(Value::wrap_non_null(NonNull::new(rettype_const)?, Private))
         }
     }
 
     /// Inferred `CodeInfo`, `Nothing`, or `None`.
-    pub fn inferred(self) -> Option<ValueRef<'scope, 'static>> {
+    pub fn inferred<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
         // Safety: the pointer points to valid data
         cfg_if! {
             if #[cfg(not(feature = "nightly"))] {
                 unsafe {
                     let inferred = self.unwrap_non_null(Private).as_ref().inferred;
-                    Some(ValueRef::wrap(NonNull::new(inferred)?))
+                    Some(ValueRef::wrap(NonNull::new(inferred)?).root(target))
                 }
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let inferred = self.unwrap_non_null(Private).as_ref().inferred.load(Ordering::Relaxed);
-                    Some(ValueRef::wrap(NonNull::new(inferred)?))
+                    Some(ValueRef::wrap(NonNull::new(inferred)?).root(target))
                 }
             }
         }
@@ -152,11 +160,11 @@ impl<'scope> CodeInstance<'scope> {
 
     /// Method this instance is specialized from.
     #[cfg(not(feature = "lts"))]
-    pub fn argescapes(self) -> Option<ValueRef<'scope, 'static>> {
+    pub fn argescapes(self) -> Option<Value<'scope, 'static>> {
         // Safety: the pointer points to valid data
         unsafe {
             let argescapes = self.unwrap_non_null(Private).as_ref().argescapes;
-            Some(ValueRef::wrap(NonNull::new(argescapes)?))
+            Some(Value::wrap_non_null(NonNull::new(argescapes)?, Private))
         }
     }
 
@@ -245,6 +253,8 @@ impl_valid_layout!(CodeInstanceRef, CodeInstance);
 impl_ref_root!(CodeInstance, CodeInstanceRef, 1);
 
 use crate::memory::target::target_type::TargetType;
+
+use super::method_instance::MethodInstance;
 
 /// `CodeInstance` or `CodeInstanceRef`, depending on the target type `T`.
 pub type CodeInstanceData<'target, T> =

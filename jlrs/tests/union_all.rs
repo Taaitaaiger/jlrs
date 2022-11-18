@@ -6,7 +6,6 @@ mod tests {
     use jlrs::prelude::*;
     use jlrs::wrappers::ptr::{type_var::TypeVar, union_all::UnionAll};
 
-    #[test]
     fn create_new_unionall() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -14,7 +13,7 @@ mod tests {
             jlrs.instance(&mut frame)
                 .scope(|mut frame| unsafe {
                     let atype = UnionAll::array_type(&frame);
-                    let body = atype.body().wrapper();
+                    let body = atype.body();
                     let number_type = DataType::number_type(&frame).as_value();
                     let tvar = TypeVar::new(&mut frame, "V", None, Some(number_type))
                         .into_jlrs_result()?;
@@ -22,12 +21,12 @@ mod tests {
                     let ua = UnionAll::new(&mut frame, tvar, body)
                         .into_jlrs_result()?
                         .cast::<UnionAll>()?;
-                    let v = ua.var().wrapper();
+                    let v = ua.var();
 
                     let equals = Module::base(&frame)
                         .function(&frame, "!=")?
                         .wrapper()
-                        .call2(&mut frame, v.as_value(), atype.var().value())
+                        .call2(&mut frame, v.as_value(), atype.var().as_value())
                         .unwrap()
                         .unbox::<bool>()?
                         .as_bool();
@@ -38,7 +37,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn instantiate_unionall() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -67,7 +65,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn apply_value_type() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -112,5 +109,12 @@ mod tests {
                 })
                 .unwrap();
         })
+    }
+
+    #[test]
+    fn union_all_tests() {
+        create_new_unionall();
+        instantiate_unionall();
+        apply_value_type();
     }
 }

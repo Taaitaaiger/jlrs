@@ -5,7 +5,6 @@ mod tests {
     use jlrs::layout::typecheck::NamedTuple;
     use jlrs::prelude::*;
 
-    #[test]
     fn create_named_tuple() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -24,7 +23,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn create_named_tuple_macro() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -44,5 +42,11 @@ mod tests {
                 })
                 .unwrap();
         });
+    }
+
+    #[test]
+    fn named_tuple_tests() {
+        create_named_tuple();
+        create_named_tuple_macro();
     }
 }

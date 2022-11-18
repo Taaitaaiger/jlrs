@@ -189,7 +189,8 @@ macro_rules! impl_tuple {
             fn valid_layout(v: $crate::wrappers::ptr::value::Value) -> bool {
                 unsafe {
                     if let Ok(dt) = v.cast::<$crate::wrappers::ptr::datatype::DataType>() {
-                        let fieldtypes = dt.field_types();
+                        let global = v.global();
+                        let fieldtypes = dt.field_types(global);
                         let n = count!($($types),+);
                         if fieldtypes.wrapper().len() != n {
                             return false;
@@ -219,7 +220,8 @@ macro_rules! impl_tuple {
             fn valid_field(v: $crate::wrappers::ptr::value::Value) -> bool {
                 unsafe {
                     if let Ok(dt) = v.cast::<$crate::wrappers::ptr::datatype::DataType>() {
-                        let fieldtypes = dt.field_types();
+                        let global = v.global();
+                        let fieldtypes = dt.field_types(global);
                         let n = count!($($types),+);
                         if fieldtypes.wrapper().len() != n {
                             return false;

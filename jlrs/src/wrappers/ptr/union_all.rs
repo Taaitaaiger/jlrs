@@ -4,10 +4,7 @@ use crate::{
     impl_julia_typecheck,
     memory::target::Target,
     private::Private,
-    wrappers::ptr::{
-        datatype::DataType, datatype::DataTypeRef, private::WrapperPriv, type_var::TypeVar,
-        type_var::TypeVarRef, value::Value, value::ValueRef,
-    },
+    wrappers::ptr::{datatype::DataType, private::WrapperPriv, type_var::TypeVar, value::Value},
 };
 use cfg_if::cfg_if;
 use jl_sys::{
@@ -85,53 +82,42 @@ impl<'scope> UnionAll<'scope> {
     }
 
     /// The type at the bottom of this `UnionAll`.
-    pub fn base_type(self) -> DataTypeRef<'scope> {
+    pub fn base_type(self) -> DataType<'scope> {
         let mut b = self;
 
         // Safety: pointer points to valid data
-        unsafe {
-            while b.body().value().is::<UnionAll>() {
-                b = b.body().value().cast_unchecked::<UnionAll>();
-            }
+        while let Ok(body_ua) = b.body().cast::<UnionAll>() {
+            b = body_ua;
         }
 
         // Safety: type at the base must be a DataType
-        unsafe {
-            DataTypeRef::wrap(
-                b.body()
-                    .value()
-                    .cast::<DataType>()
-                    .unwrap()
-                    .unwrap_non_null(Private),
-            )
-        }
+        b.body().cast::<DataType>().unwrap()
     }
 
     /*
-    for (a,b) in zip(fieldnames(UnionAll), fieldtypes(UnionAll))
-        println(a,": ", b)
-    end
-    var: TypeVar
-    body: Any
+    inspect(UnionAll):
+
+    var: TypeVar (const)
+    body: Any (const)
     */
 
     /// The body of this `UnionAll`. This is either another `UnionAll` or a `DataType`.
-    pub fn body(self) -> ValueRef<'scope, 'static> {
+    pub fn body(self) -> Value<'scope, 'static> {
         // Safety: pointer points to valid data
         unsafe {
             let body = self.unwrap_non_null(Private).as_ref().body;
             debug_assert!(!body.is_null());
-            ValueRef::wrap(NonNull::new_unchecked(body))
+            Value::wrap_non_null(NonNull::new_unchecked(body), Private)
         }
     }
 
     /// The type variable associated with this "layer" of the `UnionAll`.
-    pub fn var(self) -> TypeVarRef<'scope> {
+    pub fn var(self) -> TypeVar<'scope> {
         // Safety: pointer points to valid data
         unsafe {
             let var = self.unwrap_non_null(Private).as_ref().var;
             debug_assert!(!var.is_null());
-            TypeVarRef::wrap(NonNull::new_unchecked(var))
+            TypeVar::wrap_non_null(NonNull::new_unchecked(var), Private)
         }
     }
 }

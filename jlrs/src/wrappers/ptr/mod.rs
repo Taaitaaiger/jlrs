@@ -19,6 +19,15 @@
 //! [`DataType`]: crate::wrappers::ptr::datatype::DataType
 //! [`Array`]: crate::wrappers::ptr::array::Array
 
+// NB: inspect layout of builtin types with:
+/*
+function inspect(ty)
+    for (a, b) in zip(fieldnames(ty), fieldtypes(ty))
+        println(a, ": ", b, " (", isconst(ty, a) ? "const" : "mut", ")")
+    end
+end
+*/
+
 macro_rules! impl_valid_layout {
     ($ref_type:ident, $type:ident) => {
         unsafe impl $crate::layout::valid_layout::ValidLayout for $ref_type<'_> {
@@ -161,6 +170,11 @@ pub trait Wrapper<'scope, 'data>: private::WrapperPriv<'scope, 'data> {
         unsafe { target.data_from_ptr(self.unwrap_non_null(Private).cast(), Private) }
     }
 
+    /// Returns a new `Global`.
+    fn global(self) -> Global<'scope> {
+        unsafe { Global::new() }
+    }
+
     /// Convert the wrapper to its display string, i.e. the string that is shown when calling
     /// `Base.show`.
     fn display_string(self) -> JlrsResult<String> {
@@ -226,6 +240,12 @@ pub trait Wrapper<'scope, 'data>: private::WrapperPriv<'scope, 'data> {
         self.error_string().unwrap_or(default.into())
     }
 }
+
+type WrapperType<'target, 'scope, 'data, T> =
+    <<T as WrapperRef<'scope, 'data>>::Wrapper as Wrapper<'scope, 'data>>::TypeConstructor<
+        'target,
+        'data,
+    >;
 
 impl<'scope, 'data, W> Wrapper<'scope, 'data> for W
 where

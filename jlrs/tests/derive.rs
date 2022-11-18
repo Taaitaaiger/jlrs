@@ -6,7 +6,6 @@ mod tests {
     use super::util::JULIA_DERIVE;
     use jlrs::prelude::*;
 
-    #[test]
     fn derive_bits_type_bool() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
@@ -29,7 +28,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn derive_bits_type_char() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
@@ -52,7 +50,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn derive_bits_type_uint8() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
@@ -75,7 +72,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn derive_bits_type_uint16() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
@@ -98,7 +94,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn derive_bits_type_uint32() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
@@ -121,7 +116,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn derive_bits_type_uint64() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
@@ -144,7 +138,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn derive_bits_type_uint() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
@@ -167,7 +160,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn derive_bits_type_int8() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
@@ -190,7 +182,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn derive_bits_type_int16() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
@@ -213,7 +204,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn derive_bits_type_int32() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
@@ -236,7 +226,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn derive_bits_type_int64() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
@@ -259,7 +248,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn derive_bits_type_int() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
@@ -282,7 +270,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn derive_bits_type_float32() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
@@ -305,7 +292,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn derive_bits_type_float64() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
@@ -328,7 +314,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn derive_bits_char_float32_float64() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
@@ -355,7 +340,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn derive_bits_int_bool() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
@@ -381,7 +365,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn derive_bits_char_bits_int_char() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
@@ -409,7 +392,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn derive_bits_uint8_tuple_int32_int64() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
@@ -438,7 +420,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn derive_bits_uint8_tuple_int32_tuple_int16_uint16() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
@@ -483,7 +464,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn derive_single_variant() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
@@ -525,7 +505,6 @@ mod tests {
         })
     }
 
-    #[test]
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     fn derive_double_variant() {
         JULIA_DERIVE.with(|j| {
@@ -575,7 +554,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn derive_size_align_mismatch() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
@@ -621,7 +599,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn derive_union_in_tuple() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
@@ -660,7 +637,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn derive_non_bits_union() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
@@ -733,7 +709,6 @@ mod tests {
         }
         */
 
-    #[test]
     fn derive_with_generic_t_i32() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
@@ -771,7 +746,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn derive_with_unionall() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
@@ -817,7 +791,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn derive_with_nested_generic() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
@@ -863,7 +836,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn derive_with_propagated_lifetime() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
@@ -911,7 +883,6 @@ mod tests {
         })
     }
 
-    #[test]
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     fn derive_with_propagated_lifetimes() {
         JULIA_DERIVE.with(|j| {
@@ -967,7 +938,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn derive_with_set_generic() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
@@ -1013,7 +983,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn derive_with_set_generic_tuple() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
@@ -1062,7 +1031,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn derive_with_value_type() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
@@ -1099,7 +1067,7 @@ mod tests {
                 .unwrap();
         })
     }
-    #[test]
+
     fn derive_zero_sized() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
@@ -1115,5 +1083,44 @@ mod tests {
                 })
                 .unwrap();
         })
+    }
+
+    #[test]
+    fn derive_tests() {
+        derive_bits_type_bool();
+        derive_bits_type_char();
+        derive_bits_type_uint8();
+        derive_bits_type_uint16();
+        derive_bits_type_uint32();
+        derive_bits_type_uint64();
+        derive_bits_type_uint();
+        derive_bits_type_int8();
+        derive_bits_type_int16();
+        derive_bits_type_int32();
+        derive_bits_type_int64();
+        derive_bits_type_int();
+        derive_bits_type_float32();
+        derive_bits_type_float64();
+        derive_bits_char_float32_float64();
+        derive_bits_int_bool();
+        derive_bits_char_bits_int_char();
+        derive_bits_uint8_tuple_int32_int64();
+        derive_bits_uint8_tuple_int32_tuple_int16_uint16();
+        derive_single_variant();
+        derive_size_align_mismatch();
+        derive_union_in_tuple();
+        derive_non_bits_union();
+        derive_with_generic_t_i32();
+        derive_with_unionall();
+        derive_with_nested_generic();
+        derive_with_propagated_lifetime();
+        derive_with_set_generic();
+        derive_with_set_generic_tuple();
+        derive_with_value_type();
+        derive_zero_sized();
+        #[cfg(not(all(target_os = "windows", feature = "lts")))]
+        derive_double_variant();
+        #[cfg(not(all(target_os = "windows", feature = "lts")))]
+        derive_with_propagated_lifetimes();
     }
 }

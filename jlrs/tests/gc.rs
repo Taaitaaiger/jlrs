@@ -7,7 +7,6 @@ mod tests {
         prelude::*,
     };
 
-    #[test]
     fn disable_enable_gc() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -29,7 +28,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn collect_garbage() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -51,7 +49,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn insert_safepoint() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -65,5 +62,12 @@ mod tests {
             })
             .unwrap();
         })
+    }
+
+    #[test]
+    fn gc_tests() {
+        disable_enable_gc();
+        collect_garbage();
+        insert_safepoint();
     }
 }

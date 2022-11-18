@@ -4,7 +4,6 @@ mod tests {
     use super::util::JULIA;
     use jlrs::prelude::*;
 
-    #[test]
     fn load_module() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -21,7 +20,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn cannot_load_nonexistent_module() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -38,7 +36,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call_function_from_loaded_module() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -72,5 +69,12 @@ mod tests {
                 })
                 .unwrap();
         });
+    }
+
+    #[test]
+    fn require_tests() {
+        load_module();
+        cannot_load_nonexistent_module();
+        call_function_from_loaded_module();
     }
 }

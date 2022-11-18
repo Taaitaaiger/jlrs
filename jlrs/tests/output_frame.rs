@@ -4,8 +4,7 @@ mod tests {
     use super::util::JULIA;
     use jlrs::prelude::*;
 
-    #[test]
-    fn nested_value_scope() {
+    fn return_value_from_scope() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
@@ -22,8 +21,7 @@ mod tests {
         });
     }
 
-    #[test]
-    fn nested_result_scope() {
+    fn return_result_from_scope() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
@@ -46,5 +44,11 @@ mod tests {
 
             assert_eq!(out.unwrap(), 3);
         });
+    }
+
+    #[test]
+    fn output_frame_tests() {
+        return_value_from_scope();
+        return_result_from_scope();
     }
 }

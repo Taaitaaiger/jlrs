@@ -3,7 +3,7 @@ mod util;
 mod tests {
     use super::util::JULIA;
     use jlrs::prelude::*;
-    #[test]
+
     fn create_and_cast_uints() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -35,7 +35,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn create_and_cast_uints_dynamic() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -67,7 +66,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn create_and_cast_ints() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -99,7 +97,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn create_and_cast_ints_dynamic() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -131,7 +128,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn create_and_cast_floats() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -154,7 +150,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn create_and_cast_floats_dynamic() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -177,7 +172,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn create_and_cast_bool() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -194,7 +188,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn create_and_cast_bool_dynamic() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -211,7 +204,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn create_and_cast_char() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -228,7 +220,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn create_and_cast_char_dynamic() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -245,7 +236,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn create_nothing() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -270,7 +260,6 @@ mod tests {
 
     macro_rules! cannot_cast_wrong_type {
         ($name:ident, $val:expr, $from:ty, $to:ty) => {
-            #[test]
             fn $name() {
                 JULIA.with(|j| {
                     let mut frame = StackFrame::new();
@@ -306,7 +295,6 @@ mod tests {
         true
     }
 
-    #[test]
     fn function_pointer() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -336,5 +324,33 @@ mod tests {
                 })
                 .unwrap();
         });
+    }
+
+    #[test]
+    fn primitives_test() {
+        create_and_cast_uints();
+        create_and_cast_uints_dynamic();
+        create_and_cast_ints();
+        create_and_cast_ints_dynamic();
+        create_and_cast_floats();
+        create_and_cast_floats_dynamic();
+        create_and_cast_bool();
+        create_and_cast_bool_dynamic();
+        create_and_cast_char();
+        create_and_cast_char_dynamic();
+        create_nothing();
+        function_pointer();
+        cannot_cast_u8_as_u16();
+        cannot_cast_u16_as_u32();
+        cannot_cast_u32_as_u64();
+        cannot_cast_u64_as_i8();
+        cannot_cast_i8_as_i16();
+        cannot_cast_i16_as_i32();
+        cannot_cast_i32_as_i64();
+        cannot_cast_i64_as_u8();
+        cannot_cast_bool_as_char();
+        cannot_cast_char_as_bool();
+        cannot_cast_f32_as_64();
+        cannot_cast_f64_as_32();
     }
 }

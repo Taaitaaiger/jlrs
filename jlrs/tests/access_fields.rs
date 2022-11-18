@@ -10,7 +10,6 @@ mod tests {
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     use jlrs::{layout::typecheck::Mutable, wrappers::inline::union::EmptyUnion};
 
-    #[test]
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     fn empty_union_field() {
         JULIA.with(|j| {
@@ -41,7 +40,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn access_tuple_fields() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -73,7 +71,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn cannot_access_oob_tuple_field() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -95,7 +92,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn access_non_pointer_tuple_field_must_alloc() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -117,7 +113,6 @@ mod tests {
         })
     }
 
-    #[test]
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     fn access_mutable_struct_fields() {
         JULIA.with(|j| {
@@ -160,7 +155,6 @@ mod tests {
         })
     }
 
-    #[test]
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     fn cannot_access_unknown_mutable_struct_field() {
         JULIA.with(|j| {
@@ -194,7 +188,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn access_bounds_error_fields() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -229,7 +222,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn access_bounds_error_fields_oob() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -254,7 +246,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn access_bounds_error_fields_output() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -281,7 +272,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn access_bounds_error_fields_output_oob() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -309,7 +299,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn access_nested_field() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -823,5 +812,23 @@ mod tests {
                 })
                 .unwrap();
         })
+    }
+
+    #[test]
+    fn access_field_tests() {
+        #[cfg(not(all(target_os = "windows", feature = "lts")))]
+        empty_union_field();
+        #[cfg(not(all(target_os = "windows", feature = "lts")))]
+        access_mutable_struct_fields();
+        #[cfg(not(all(target_os = "windows", feature = "lts")))]
+        cannot_access_unknown_mutable_struct_field();
+        access_tuple_fields();
+        cannot_access_oob_tuple_field();
+        access_non_pointer_tuple_field_must_alloc();
+        access_bounds_error_fields();
+        access_bounds_error_fields_oob();
+        access_bounds_error_fields_output();
+        access_bounds_error_fields_output_oob();
+        access_nested_field();
     }
 }

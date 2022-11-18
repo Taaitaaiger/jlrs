@@ -4,7 +4,6 @@ mod tests {
     use super::util::JULIA;
     use jlrs::prelude::*;
 
-    #[test]
     fn return_nothing() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -28,7 +27,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn throw_nothing() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -51,7 +49,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn call0() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -67,7 +64,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call0_unrooted() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -87,7 +83,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call0_output() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -110,7 +105,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call0_dynamic() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -126,7 +120,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call0_dynamic_output() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -148,7 +141,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call1() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -165,7 +157,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call1_unrooted() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -182,7 +173,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call1_output() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -207,7 +197,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call1_dynamic() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -231,7 +220,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call1_dynamic_output() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -255,7 +243,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call2() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -273,7 +260,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call2_unrooted() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -291,7 +277,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call_multiple_scopes() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -315,7 +300,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call2_output() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -339,7 +323,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call2_dynamic() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -357,7 +340,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call2_dynamic_output() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -381,7 +363,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call3() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -400,7 +381,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call3_unrooted() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -419,7 +399,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call3_output() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -444,7 +423,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call3_dynamic() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -463,7 +441,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call3_dynamic_output() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -488,7 +465,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -510,7 +486,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call_unrooted() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -530,7 +505,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call_output() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -556,7 +530,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call_dynamic() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -582,7 +555,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call_dynamic_output() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -606,5 +578,38 @@ mod tests {
 
             assert_eq!(out.unwrap(), 10);
         });
+    }
+
+    #[test]
+
+    fn function_tests() {
+        return_nothing();
+        throw_nothing();
+        call0();
+        call0_unrooted();
+        call0_output();
+        call0_dynamic();
+        call0_dynamic_output();
+        call1();
+        call1_unrooted();
+        call1_output();
+        call1_dynamic();
+        call1_dynamic_output();
+        call2();
+        call2_unrooted();
+        call_multiple_scopes();
+        call2_output();
+        call2_dynamic();
+        call2_dynamic_output();
+        call3();
+        call3_unrooted();
+        call3_output();
+        call3_dynamic();
+        call3_dynamic_output();
+        call();
+        call_unrooted();
+        call_output();
+        call_dynamic();
+        call_dynamic_output();
     }
 }

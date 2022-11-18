@@ -7,8 +7,13 @@
 
 use crate::{
     impl_julia_typecheck,
+    prelude::Target,
     private::Private,
-    wrappers::ptr::{private::WrapperPriv, value::ValueRef, Ref},
+    wrappers::ptr::{
+        private::WrapperPriv,
+        value::{ValueData, ValueRef},
+        Ref,
+    },
 };
 use cfg_if::cfg_if;
 use jl_sys::{jl_typemap_level_t, jl_typemap_level_type};
@@ -28,138 +33,155 @@ pub struct TypeMapLevel<'scope>(NonNull<jl_typemap_level_t>, PhantomData<&'scope
 
 impl<'scope> TypeMapLevel<'scope> {
     /*
-    for (a,b) in zip(fieldnames(Core.TypeMapLevel), fieldtypes(Core.TypeMapLevel))
-         println(a,": ", b)
-    end
-    arg1: Any _Atomic
-    targ: Any _Atomic
-    name1: Any _Atomic
-    tname: Any _Atomic
-    list: Any _Atomic
-    any: Any _Atomic
+    inspect(Core.TypeMapLevel):
+
+    arg1: Any (mut) _Atomic
+    targ: Any (mut) _Atomic
+    name1: Any (mut) _Atomic
+    tname: Any (mut) _Atomic
+    list: Any (mut) _Atomic
+    any: Any (mut) _Atomic
     */
 
     /// The `arg1` field.
-    pub fn arg1(self) -> Option<ValueRef<'scope, 'static>> {
+    pub fn arg1<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
         cfg_if! {
             if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let arg1 = self.unwrap_non_null(Private).as_ref().arg1;
                     let arg1 = NonNull::new(arg1.cast())?;
-                    Some(ValueRef::wrap(arg1))
+                    Some(ValueRef::wrap(arg1).root(target))
                 }
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let arg1 = self.unwrap_non_null(Private).as_ref().arg1.load(Ordering::Relaxed);
                     let arg1 = NonNull::new(arg1.cast())?;
-                    Some(ValueRef::wrap(arg1))
+                    Some(ValueRef::wrap(arg1).root(target))
                 }
             }
         }
     }
 
     /// The `targ` field.
-    pub fn targ(self) -> Option<ValueRef<'scope, 'static>> {
+    pub fn targ<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
         cfg_if! {
             if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let targ = self.unwrap_non_null(Private).as_ref().targ;
                     let targ = NonNull::new(targ.cast())?;
-                    Some(ValueRef::wrap(targ))
+                    Some(ValueRef::wrap(targ).root(target))
                 }
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let targ = self.unwrap_non_null(Private).as_ref().targ.load(Ordering::Relaxed);
                     let targ = NonNull::new(targ.cast())?;
-                    Some(ValueRef::wrap(targ))
+                    Some(ValueRef::wrap(targ).root(target))
                 }
             }
         }
     }
 
     /// The `name1` field.
-    pub fn name1(self) -> Option<ValueRef<'scope, 'static>> {
+    pub fn name1<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
         cfg_if! {
             if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let name1 = self.unwrap_non_null(Private).as_ref().name1;
                     let name1 = NonNull::new(name1.cast())?;
-                    Some(ValueRef::wrap(name1))
+                    Some(ValueRef::wrap(name1).root(target))
                 }
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let name1 = self.unwrap_non_null(Private).as_ref().name1.load(Ordering::Relaxed);
                     let name1 = NonNull::new(name1.cast())?;
-                    Some(ValueRef::wrap(name1))
+                    Some(ValueRef::wrap(name1).root(target))
                 }
             }
         }
     }
 
     /// The `tname` field.
-    pub fn tname(self) -> Option<ValueRef<'scope, 'static>> {
+    pub fn tname<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
         cfg_if! {
             if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let tname = self.unwrap_non_null(Private).as_ref().tname;
                     let tname = NonNull::new(tname.cast())?;
-                    Some(ValueRef::wrap(tname))
+                    Some(ValueRef::wrap(tname).root(target))
                 }
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let tname = self.unwrap_non_null(Private).as_ref().tname.load(Ordering::Relaxed);
                     let tname = NonNull::new(tname.cast())?;
-                    Some(ValueRef::wrap(tname))
+                    Some(ValueRef::wrap(tname).root(target))
                 }
             }
         }
     }
 
     /// The `linear` field, which is called `list` in `Core.TypemapLevel`.
-    pub fn list(self) -> Option<ValueRef<'scope, 'static>> {
+    pub fn list<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
         cfg_if! {
             if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let linear = self.unwrap_non_null(Private).as_ref().linear;
                     let linear = NonNull::new(linear.cast())?;
-                    Some(ValueRef::wrap(linear))
+                    Some(ValueRef::wrap(linear).root(target))
                 }
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let linear = self.unwrap_non_null(Private).as_ref().linear.load(Ordering::Relaxed);
                     let linear = NonNull::new(linear.cast())?;
-                    Some(ValueRef::wrap(linear))
+                    Some(ValueRef::wrap(linear).root(target))
                 }
             }
         }
     }
 
     /// The `any` field.
-    pub fn any(self) -> Option<ValueRef<'scope, 'static>> {
+    pub fn any<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
         cfg_if! {
             if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let any = self.unwrap_non_null(Private).as_ref().any;
                     let any = NonNull::new(any.cast())?;
-                    Some(ValueRef::wrap(any))
+                    Some(ValueRef::wrap(any).root(target))
                 }
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let any = self.unwrap_non_null(Private).as_ref().any.load(Ordering::Relaxed);
                     let any = NonNull::new(any.cast())?;
-                    Some(ValueRef::wrap(any))
+                    Some(ValueRef::wrap(any).root(target))
                 }
             }
         }

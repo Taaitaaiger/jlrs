@@ -2,9 +2,13 @@
 
 use crate::{
     impl_julia_typecheck,
-    prelude::Symbol,
+    prelude::{Symbol, Target},
     private::Private,
-    wrappers::ptr::{array::ArrayRef, private::WrapperPriv, Ref},
+    wrappers::ptr::{
+        array::{ArrayData, ArrayRef},
+        private::WrapperPriv,
+        Ref,
+    },
 };
 use jl_sys::{jl_expr_t, jl_expr_type};
 use std::{marker::PhantomData, ptr::NonNull};
@@ -16,11 +20,10 @@ pub struct Expr<'scope>(NonNull<jl_expr_t>, PhantomData<&'scope ()>);
 
 impl<'scope> Expr<'scope> {
     /*
-    for (a, b) in zip(fieldnames(Expr), fieldtypes(Expr))
-        println(a, ": ", b)
-    end
-    head: Symbol
-    args: Vector{Any}
+    inspect(Core.Expr):
+
+    head: Symbol (mut)
+    args: Vector{Any} (mut)
     */
 
     /// Returns the head of the expression.
@@ -34,12 +37,15 @@ impl<'scope> Expr<'scope> {
     }
 
     /// Returns the arguments of the expression.
-    pub fn args(self) -> Option<ArrayRef<'scope, 'static>> {
+    pub fn args<'target, T>(self, target: T) -> Option<ArrayData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
         // Safety: the pointer points to valid data
         unsafe {
             let args = self.unwrap_non_null(Private).as_ref().args;
             let args = NonNull::new(args)?;
-            Some(ArrayRef::wrap(args))
+            Some(ArrayRef::wrap(args).root(target))
         }
     }
 }

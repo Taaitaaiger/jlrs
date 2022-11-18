@@ -5,7 +5,6 @@ mod tests {
     use super::util::JULIA;
     use jlrs::prelude::*;
 
-    #[test]
     fn access_raw_fields_bits() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -44,7 +43,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn access_raw_fields_bits_and_ptr() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -83,7 +81,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn access_raw_fields_bits_and_bits_union() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -122,7 +119,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn access_raw_fields_ptr_and_bits_union() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -161,7 +157,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn access_raw_fields_ptr_and_non_bits_union() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -200,7 +195,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn access_raw_fields_wrong_ty() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -239,7 +233,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn access_array_field() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -283,7 +276,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn access_ua_array_field() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -327,7 +319,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn access_raw_fields_nonexistent_name() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -355,7 +346,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn access_nth_raw_fields_bits() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -394,7 +384,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn access_nth_raw_fields_bits_and_ptr() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -433,7 +422,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn access_nth_raw_fields_bits_and_bits_union() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -472,7 +460,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn access_nth_raw_fields_ptr_and_non_bits_union() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -511,7 +498,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn access_nth_raw_fields_wrong_ty() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -550,7 +536,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn access_nth_array_field() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -594,7 +579,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn access_ua_array_field_by_idx() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -638,7 +622,6 @@ mod tests {
         })
     }
 
-    #[test]
     fn access_raw_fields_nonexistent_idx() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -664,5 +647,26 @@ mod tests {
                 })
                 .unwrap();
         })
+    }
+
+    #[test]
+    fn access_raw_field_tests() {
+        access_raw_fields_bits();
+        access_raw_fields_bits_and_ptr();
+        access_raw_fields_bits_and_bits_union();
+        access_raw_fields_ptr_and_bits_union();
+        access_raw_fields_ptr_and_non_bits_union();
+        access_raw_fields_wrong_ty();
+        access_array_field();
+        access_ua_array_field();
+        access_raw_fields_nonexistent_name();
+        access_nth_raw_fields_bits();
+        access_nth_raw_fields_bits_and_ptr();
+        access_nth_raw_fields_bits_and_bits_union();
+        access_nth_raw_fields_ptr_and_non_bits_union();
+        access_nth_raw_fields_wrong_ty();
+        access_nth_array_field();
+        access_ua_array_field_by_idx();
+        access_raw_fields_nonexistent_idx();
     }
 }

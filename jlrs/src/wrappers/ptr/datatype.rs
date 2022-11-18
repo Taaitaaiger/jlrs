@@ -2,6 +2,7 @@
 
 use crate::memory::target::Target;
 
+use crate::wrappers::ptr::simple_vector::SimpleVector;
 use crate::{
     convert::to_symbol::ToSymbol,
     error::{AccessError, JlrsResult, CANNOT_DISPLAY_TYPE},
@@ -10,7 +11,7 @@ use crate::{
     private::Private,
     wrappers::ptr::{
         private::WrapperPriv, simple_vector::SimpleVectorRef, symbol::Symbol, symbol::SymbolRef,
-        type_name::TypeNameRef, value::Value, value::ValueRef, Wrapper,
+        value::Value, Wrapper,
     },
 };
 use cfg_if::cfg_if;
@@ -43,6 +44,8 @@ use std::{
     ptr::NonNull,
 };
 
+use super::simple_vector::SimpleVectorData;
+use super::type_name::TypeName;
 use super::value::ValueData;
 use super::Ref;
 
@@ -63,110 +66,172 @@ pub struct DataType<'scope>(NonNull<jl_datatype_t>, PhantomData<&'scope ()>);
 
 impl<'scope> DataType<'scope> {
     /*
-    for (a, b) in zip(fieldnames(DataType), fieldtypes(DataType))
-        println(a, ": ", b)
-    end
-    name: Core.TypeName
-    super: DataType
-    parameters: Core.SimpleVector
-    types: Core.SimpleVector
-    instance: Any
-    layout: Ptr{Nothing}
-    size: Int32
-    hash: Int32
-    flags: UInt8
+    inspect(DataType):
+
+    name: Core.TypeName (const)
+    super: DataType (const)
+    parameters: Core.SimpleVector (const)
+    types: Core.SimpleVector (mut)
+    instance: Any (const)
+    layout: Ptr{Nothing} (mut)
+    size: Int32 (mut)
+    hash: Int32 (const)
+    flags: UInt8 (mut)
     */
 
     /// Returns the `TypeName` of this type.
-    pub fn type_name(self) -> TypeNameRef<'scope> {
-        // Safety: the pointer points to valid data
+    pub fn type_name(self) -> TypeName<'scope> {
+        // Safety: the pointer points to valid data, and the typename of a type never changes
         unsafe {
             let name = self.unwrap_non_null(Private).as_ref().name;
             debug_assert!(!name.is_null());
-            TypeNameRef::wrap(NonNull::new_unchecked(name))
+            TypeName::wrap_non_null(NonNull::new_unchecked(name), Private)
         }
     }
 
-    /// Returns the super type of this type.
-    pub fn super_type(self) -> DataTypeRef<'scope> {
-        // Safety: the pointer points to valid data
+    /// Returns the super-type of this type.
+    pub fn super_type(self) -> DataType<'scope> {
+        // Safety: the pointer points to valid data, and the super-type of a type never changes
         unsafe {
             let super_ty = self.unwrap_non_null(Private).as_ref().super_;
             debug_assert!(!super_ty.is_null());
-            DataTypeRef::wrap(NonNull::new_unchecked(super_ty))
+            DataType::wrap_non_null(NonNull::new_unchecked(super_ty), Private)
         }
     }
 
     /// Returns the type parameters of this type.
-    pub fn parameters(self) -> SimpleVectorRef<'scope> {
-        // Safety: the pointer points to valid data
+    pub fn parameters(self) -> SimpleVector<'scope> {
+        // Safety: the pointer points to valid data and this data is const
         unsafe {
             let parameters = self.unwrap_non_null(Private).as_ref().parameters;
             debug_assert!(!parameters.is_null());
-            SimpleVectorRef::wrap(NonNull::new_unchecked(parameters))
+            SimpleVector::wrap_non_null(NonNull::new_unchecked(parameters), Private)
         }
     }
 
     /// Returns the number of type parameters.
     pub fn n_parameters(self) -> usize {
         // Safety: the pointer points to valid data, the parameters field is never null
-        unsafe { self.parameters().wrapper().len() }
+        self.parameters().len()
     }
 
     /// Returns the type parameter at position `idx`, or `None` if the index is out of bounds.
-    pub fn parameter(self, idx: usize) -> Option<ValueRef<'scope, 'static>> {
+    pub fn parameter<'target, T>(
+        self,
+        target: T,
+        idx: usize,
+    ) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
         // Safety: the pointer points to valid data, the parameters field is never null
-        unsafe { *self.parameters().wrapper().data().as_slice().get(idx)? }
+        unsafe {
+            Some(
+                self.parameters()
+                    .data()
+                    .as_slice()
+                    .get(idx)?
+                    .as_ref()?
+                    .root(target),
+            )
+        }
     }
 
     /// Returns the field types of this type.
-    pub fn field_types(self) -> SimpleVectorRef<'scope> {
+    pub fn field_types<'target, T>(self, target: T) -> SimpleVectorData<'target, T>
+    where
+        T: Target<'target>,
+    {
         // Safety: the pointer points to valid data, the C API function is called with a valid argument
         unsafe {
             let field_types = jl_get_fieldtypes(self.unwrap(Private));
             debug_assert!(!field_types.is_null());
-            SimpleVectorRef::wrap(NonNull::new_unchecked(field_types))
+            SimpleVectorRef::wrap(NonNull::new_unchecked(field_types)).root(target)
         }
     }
 
     /// Returns the field type of the field at position `idx`, or `None` if the index is out of
     /// bounds.
-    pub fn field_type(self, idx: usize) -> Option<ValueRef<'scope, 'static>> {
+    pub fn field_type<'target, T>(
+        self,
+        target: T,
+        idx: usize,
+    ) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
         // Safety: the pointer points to valid data, the field_types field is never null
-        unsafe { *self.field_types().wrapper().data().as_slice().get(idx)? }
+        unsafe {
+            Some(
+                self.field_types(&target)
+                    .wrapper()
+                    .data()
+                    .as_slice()
+                    .get(idx)?
+                    .as_ref()?
+                    .root(target),
+            )
+        }
     }
 
     /// Returns the field type of the field at position `idx` without performing a bounds check.
     ///
     /// Safety: `idx` must be in-bounds.
-    pub unsafe fn field_type_unchecked(self, idx: usize) -> ValueRef<'scope, 'static> {
-        self.field_types()
-            .wrapper()
-            .data()
-            .as_slice()
-            .get_unchecked(idx)
-            .unwrap()
+    pub unsafe fn field_type_unchecked<'target, T>(
+        self,
+        target: T,
+        idx: usize,
+    ) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
+        Some(
+            self.field_types(&target)
+                .wrapper()
+                .data()
+                .as_slice()
+                .get_unchecked(idx)
+                .as_ref()?
+                .root(target),
+        )
     }
 
     /// Returns the field type of the field at position `idx`.
-    pub fn field_type_concrete(self, idx: usize) -> Option<ValueRef<'scope, 'static>> {
+    // TODO
+    pub fn field_type_concrete<'target, T>(
+        self,
+        target: T,
+        idx: usize,
+    ) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
         // Safety: the pointer points to valid data, an assert checks that the types field
         // isn't null.
-        unsafe { *self.field_types().wrapper().data().as_slice().get(idx)? }
+        unsafe {
+            Some(
+                self.field_types(&target)
+                    .wrapper()
+                    .data()
+                    .as_slice()
+                    .get(idx)?
+                    .as_ref()?
+                    .root(target),
+            )
+        }
     }
 
     /// Returns the field names of this type.
-    pub fn field_names(self) -> Option<SimpleVectorRef<'scope>> {
+    pub fn field_names(self) -> SimpleVector<'scope> {
         // Safety: the pointer points to valid data, so it must have a TypeName.
-        unsafe { self.type_name().wrapper().names() }
+        self.type_name().names()
     }
 
     /// Returns the name of the field at position `idx`.
     pub fn field_name(self, idx: usize) -> Option<Symbol<'scope>> {
         // Safety: the pointer points to valid data, so it must have a TypeName.
         unsafe {
-            self.field_names()?
-                .wrapper()
+            self.field_names()
                 .typed_data_unchecked::<SymbolRef>()
                 .as_slice()
                 .get(idx)?
@@ -213,14 +278,17 @@ impl<'scope> DataType<'scope> {
     }
 
     /// Returns the instance if this type is a singleton.
-    pub fn instance(self) -> Option<ValueRef<'scope, 'static>> {
+    pub fn instance(self) -> Option<Value<'scope, 'static>> {
         // Safety: the pointer points to valid data
         unsafe {
             let instance = self.unwrap_non_null(Private).as_ref().instance;
             if instance.is_null() {
                 None
             } else {
-                Some(ValueRef::wrap(NonNull::new_unchecked(instance)))
+                Some(Value::wrap_non_null(
+                    NonNull::new_unchecked(instance),
+                    Private,
+                ))
             }
         }
     }
@@ -252,7 +320,7 @@ impl<'scope> DataType<'scope> {
                 unsafe { self.unwrap_non_null(Private).as_ref().abstract_ != 0 }
             } else {
                 // Safety: the pointer points to valid data, so it must have a TypeName.
-                unsafe { self.type_name().wrapper().abstract_() }
+                self.type_name().abstract_()
             }
         }
     }
@@ -265,7 +333,7 @@ impl<'scope> DataType<'scope> {
                 unsafe { self.unwrap_non_null(Private).as_ref().mutabl != 0 }
             } else {
                 // Safety: the pointer points to valid data, so it must have a TypeName.
-                unsafe { self.type_name().wrapper().mutabl() }
+                self.type_name().mutabl()
             }
         }
     }
@@ -344,7 +412,7 @@ impl<'scope> DataType<'scope> {
             } else {
                 // Safety: the pointer points to valid data, so it must have a TypeName.
                 unsafe {
-                    self.type_name().wrapper().mayinlinealloc()
+                    self.type_name().mayinlinealloc()
                         && !self.unwrap_non_null(Private).as_ref().layout.is_null()
                 }
             }
@@ -520,7 +588,7 @@ impl<'scope> DataType<'scope> {
             }
             return 0;
         */
-        let atomicfields = self.type_name().wrapper().atomicfields();
+        let atomicfields = self.type_name().atomicfields();
         if atomicfields.is_null() {
             return false;
         }
@@ -561,7 +629,7 @@ impl<'scope> DataType<'scope> {
         }
         return 0;
         */
-        let tn = self.type_name().wrapper();
+        let tn = self.type_name();
         if !tn.mutabl() {
             return true;
         }

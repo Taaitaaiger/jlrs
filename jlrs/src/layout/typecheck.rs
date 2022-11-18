@@ -100,11 +100,11 @@ unsafe impl<T: IntoJulia> Typecheck for *mut T {
             let global = Global::new();
             let ptr_tname = TypeName::of_pointer(&global);
 
-            if t.type_name().wrapper() != ptr_tname {
+            if t.type_name() != ptr_tname {
                 return false;
             }
 
-            let params = t.parameters().wrapper();
+            let params = t.parameters();
             let params = params.data().as_slice();
             let inner_ty = T::julia_type(global);
             if params[0].unwrap().value() != inner_ty.value() {
@@ -153,13 +153,11 @@ pub struct AbstractRef;
 unsafe impl Typecheck for AbstractRef {
     fn typecheck(t: DataType) -> bool {
         unsafe {
-            t.type_name().wrapper()
+            t.type_name()
                 == UnionAll::ref_type(&Global::new())
                     .body()
-                    .value()
                     .cast_unchecked::<DataType>()
                     .type_name()
-                    .wrapper()
         }
     }
 }
@@ -170,7 +168,7 @@ pub struct VecElement;
 unsafe impl Typecheck for VecElement {
     #[inline(always)]
     fn typecheck(t: DataType) -> bool {
-        unsafe { t.type_name().wrapper() == TypeName::of_vecelement(&Global::new()) }
+        unsafe { t.type_name() == TypeName::of_vecelement(&Global::new()) }
     }
 }
 
@@ -180,13 +178,11 @@ pub struct TypeType;
 unsafe impl Typecheck for TypeType {
     fn typecheck(t: DataType) -> bool {
         unsafe {
-            t.type_name().wrapper()
+            t.type_name()
                 == UnionAll::type_type(&Global::new())
                     .body()
-                    .value()
                     .cast_unchecked::<DataType>()
                     .type_name()
-                    .wrapper()
         }
     }
 }
@@ -333,7 +329,7 @@ pub struct Pointer;
 unsafe impl Typecheck for Pointer {
     #[inline(always)]
     fn typecheck(t: DataType) -> bool {
-        unsafe { t.type_name().wrapper() == TypeName::of_pointer(&Global::new()) }
+        unsafe { t.type_name() == TypeName::of_pointer(&Global::new()) }
     }
 }
 
@@ -343,7 +339,7 @@ pub struct LLVMPointer;
 unsafe impl Typecheck for LLVMPointer {
     #[inline(always)]
     fn typecheck(t: DataType) -> bool {
-        unsafe { t.type_name().wrapper() == TypeName::of_llvmpointer(&Global::new()) }
+        unsafe { t.type_name() == TypeName::of_llvmpointer(&Global::new()) }
     }
 }
 

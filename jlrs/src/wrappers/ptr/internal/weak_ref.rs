@@ -2,8 +2,13 @@
 
 use crate::{
     impl_julia_typecheck,
+    prelude::Target,
     private::Private,
-    wrappers::ptr::{private::WrapperPriv, value::ValueRef, Ref},
+    wrappers::ptr::{
+        private::WrapperPriv,
+        value::{ValueData, ValueRef},
+        Ref,
+    },
 };
 use jl_sys::{jl_weakref_t, jl_weakref_type};
 use std::{marker::PhantomData, ptr::NonNull};
@@ -22,11 +27,14 @@ impl<'scope> WeakRef<'scope> {
     */
 
     /// The referenced `Value`.
-    pub fn value(self) -> Option<ValueRef<'scope, 'static>> {
+    pub fn value<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
         unsafe {
             let value = self.unwrap_non_null(Private).as_ref().value;
             let value = NonNull::new(value)?;
-            Some(ValueRef::wrap(value))
+            Some(ValueRef::wrap(value).root(target))
         }
     }
 }

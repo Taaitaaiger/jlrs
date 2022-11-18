@@ -60,14 +60,11 @@ impl<'scope> Module<'scope> {
     }
 
     /// Returns the parent of this module.
-    pub fn parent<'target, T>(self, target: T) -> ModuleData<'target, T>
-    where
-        T: Target<'target>,
-    {
+    pub fn parent(self) -> Module<'scope> {
         // Safety: the pointer points to valid data, the parent is never null
         unsafe {
             let parent = self.unwrap_non_null(Private).as_ref().parent;
-            target.data_from_ptr(NonNull::new_unchecked(parent), Private)
+            Module(NonNull::new_unchecked(parent), PhantomData)
         }
     }
 

@@ -4,7 +4,6 @@ mod tests {
     use super::util::JULIA;
     use jlrs::prelude::*;
 
-    #[test]
     fn call_no_kw() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -31,7 +30,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call_with_kw() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -61,7 +59,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call_with_kw_and_no_arg() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -90,7 +87,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call_with_kw_and_1_arg() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -120,7 +116,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call_with_kw_and_1_vararg() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -151,7 +146,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call_with_kw_and_2_vararg() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -182,7 +176,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call_with_kw_and_3_vararg() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -214,7 +207,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call_with_kw_and_4_vararg() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -247,7 +239,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call_with_abstract_kw_f32() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -277,7 +268,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call_with_abstract_kw_f64() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -305,5 +295,19 @@ mod tests {
                 })
                 .unwrap();
         });
+    }
+
+    #[test]
+    fn kw_func_test() {
+        call_no_kw();
+        call_with_kw();
+        call_with_kw_and_no_arg();
+        call_with_kw_and_1_arg();
+        call_with_kw_and_1_vararg();
+        call_with_kw_and_2_vararg();
+        call_with_kw_and_3_vararg();
+        call_with_kw_and_4_vararg();
+        call_with_abstract_kw_f32();
+        call_with_abstract_kw_f64();
     }
 }

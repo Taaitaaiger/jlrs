@@ -7,11 +7,16 @@
 
 use crate::{
     impl_julia_typecheck,
-    prelude::Symbol,
+    prelude::{Symbol, Target},
     private::Private,
     wrappers::ptr::{
-        array::ArrayRef, internal::method_instance::MethodInstanceRef, module::ModuleRef,
-        private::WrapperPriv, simple_vector::SimpleVectorRef, value::ValueRef, Ref,
+        array::{ArrayData, ArrayRef},
+        internal::method_instance::MethodInstanceRef,
+        module::{ModuleData, ModuleRef},
+        private::WrapperPriv,
+        simple_vector::{SimpleVectorData, SimpleVectorRef},
+        value::{ValueData, ValueRef},
+        Ref,
     },
 };
 use cfg_if::cfg_if;
@@ -25,6 +30,8 @@ cfg_if! {
 }
 
 #[cfg(not(feature = "lts"))]
+use crate::wrappers::ptr::array::TypedArrayData;
+#[cfg(not(feature = "lts"))]
 use crate::wrappers::ptr::array::TypedArrayRef;
 
 /// This type describes a single method definition, and stores data shared by the specializations
@@ -35,38 +42,37 @@ pub struct Method<'scope>(NonNull<jl_method_t>, PhantomData<&'scope ()>);
 
 impl<'scope> Method<'scope> {
     /*
-    for (a, b) in zip(fieldnames(Method), fieldtypes(Method))
-        println(a, ": ", b)
-    end
-    name: Symbol
-    module: Module
-    file: Symbol
-    line: Int32
-    primary_world: UInt64
-    deleted_world: UInt64
-    sig: Type
-    specializations: Core.SimpleVector _Atomic
-    speckeyset: Array _Atomic
-    slot_syms: String
-    external_mt: Any
-    source: Any
-    unspecialized: Core.MethodInstance _Atomic
-    generator: Any
-    roots: Vector{Any}
-    root_blocks: Vector{UInt64}
-    nroots_sysimg: Int32
-    ccallable: Core.SimpleVector
-    invokes: Any _Atomic
-    recursion_relation: Any
-    nargs: Int32
-    called: Int32
-    nospecialize: Int32
-    nkw: Int32
-    isva: Bool
-    pure: Bool
-    is_for_opaque_closure: Bool
-    constprop: UInt8
-    purity: UInt8
+    inspect(Core.Method):
+
+    name: Symbol (mut)
+    module: Module (mut)
+    file: Symbol (mut)
+    line: Int32 (mut)
+    primary_world: UInt64 (mut)
+    deleted_world: UInt64 (mut)
+    sig: Type (mut)
+    specializations: Core.SimpleVector (mut) _Atomic
+    speckeyset: Array (mut) _Atomic
+    slot_syms: String (mut)
+    external_mt: Any (mut)
+    source: Any (mut)
+    unspecialized: Core.MethodInstance (mut) _Atomic
+    generator: Any (mut)
+    roots: Vector{Any} (mut)
+    root_blocks: Vector{UInt64} (mut)
+    nroots_sysimg: Int32 (mut)
+    ccallable: Core.SimpleVector (mut)
+    invokes: Any (mut) _Atomic
+    recursion_relation: Any (mut)
+    nargs: Int32 (mut)
+    called: Int32 (mut)
+    nospecialize: Int32 (mut)
+    nkw: Int32 (mut)
+    isva: Bool (mut)
+    pure: Bool (mut)
+    is_for_opaque_closure: Bool (mut)
+    constprop: UInt8 (mut)
+    purity: UInt8 (mut)
     */
 
     /// Method name for error reporting
@@ -80,12 +86,15 @@ impl<'scope> Method<'scope> {
     }
 
     /// Method module
-    pub fn module(self) -> Option<ModuleRef<'scope>> {
+    pub fn module<'target, T>(self, target: T) -> Option<ModuleData<'target, T>>
+    where
+        T: Target<'target>,
+    {
         // Safety: the pointer points to valid data
         unsafe {
             let module = self.unwrap_non_null(Private).as_ref().module;
             let module = NonNull::new(module)?;
-            Some(ModuleRef::wrap(module))
+            Some(ModuleRef::wrap(module).root(target))
         }
     }
 
@@ -118,64 +127,76 @@ impl<'scope> Method<'scope> {
     }
 
     /// Method's type signature.
-    pub fn signature(self) -> Option<ValueRef<'scope, 'static>> {
+    pub fn signature<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
         // Safety: the pointer points to valid data
         unsafe {
             let sig = self.unwrap_non_null(Private).as_ref().sig;
             let sig = NonNull::new(sig)?;
-            Some(ValueRef::wrap(sig))
+            Some(ValueRef::wrap(sig).root(target))
         }
     }
 
     /// Table of all `Method` specializations, allocated as [hashable, ..., NULL, linear, ....]
-    pub fn specializations(self) -> Option<SimpleVectorRef<'scope>> {
+    pub fn specializations<'target, T>(self, target: T) -> Option<SimpleVectorData<'target, T>>
+    where
+        T: Target<'target>,
+    {
         cfg_if! {
             if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let specializations = self.unwrap_non_null(Private).as_ref().specializations;
                     let specializations = NonNull::new(specializations)?;
-                    Some(SimpleVectorRef::wrap(specializations))
+                    Some(SimpleVectorRef::wrap(specializations).root(target))
                 }
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let specializations = self.unwrap_non_null(Private).as_ref().specializations.load(Ordering::Relaxed);
                     let specializations = NonNull::new(specializations)?;
-                    Some(SimpleVectorRef::wrap(specializations))
+                    Some(SimpleVectorRef::wrap(specializations).root(target))
                 }
             }
         }
     }
 
     /// Index lookup by hash into specializations
-    pub fn spec_key_set(self) -> Option<ArrayRef<'scope, 'static>> {
+    pub fn spec_key_set<'target, T>(self, target: T) -> Option<ArrayData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
         cfg_if! {
             if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let speckeyset = self.unwrap_non_null(Private).as_ref().speckeyset;
                     let speckeyset = NonNull::new(speckeyset)?;
-                    Some(ArrayRef::wrap(speckeyset))
+                    Some(ArrayRef::wrap(speckeyset).root(target))
                 }
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let speckeyset = self.unwrap_non_null(Private).as_ref().speckeyset.load(Ordering::Relaxed);
                     let speckeyset = NonNull::new(speckeyset)?;
-                    Some(ArrayRef::wrap(speckeyset))
+                    Some(ArrayRef::wrap(speckeyset).root(target))
                 }
             }
         }
     }
 
     /// Compacted list of slot names (String)
-    pub fn slot_syms(self) -> Option<ValueRef<'scope, 'static>> {
+    pub fn slot_syms<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
         // Safety: the pointer points to valid data
         unsafe {
             let slot_syms = self.unwrap_non_null(Private).as_ref().slot_syms;
             let slot_syms = NonNull::new(slot_syms)?;
-            Some(ValueRef::wrap(slot_syms))
+            Some(ValueRef::wrap(slot_syms).root(target))
         }
     }
 
@@ -191,64 +212,83 @@ impl<'scope> Method<'scope> {
     }
 
     // Original code template (`Core.CodeInfo`, but may be compressed), `None` for builtins.
-    pub fn source(self) -> Option<ValueRef<'scope, 'static>> {
+    pub fn source<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
         // Safety: the pointer points to valid data
         unsafe {
             let data = self.unwrap_non_null(Private).as_ref().source;
             let data = NonNull::new(data)?;
-            Some(ValueRef::wrap(data))
+            Some(ValueRef::wrap(data).root(target))
         }
     }
 
     /// Unspecialized executable method instance, or `None`
-    pub fn unspecialized(self) -> Option<MethodInstanceRef<'scope>> {
+    pub fn unspecialized<'target, T>(self, target: T) -> Option<MethodInstanceData<'target, T>>
+    where
+        T: Target<'target>,
+    {
         cfg_if! {
             if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let unspecialized = self.unwrap_non_null(Private).as_ref().unspecialized;
                     let unspecialized = NonNull::new(unspecialized)?;
-                    Some(MethodInstanceRef::wrap(unspecialized))
+                    Some(MethodInstanceRef::wrap(unspecialized).root(target))
                 }
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let unspecialized = self.unwrap_non_null(Private).as_ref().unspecialized.load(Ordering::Relaxed);
                     let unspecialized = NonNull::new(unspecialized)?;
-                    Some(MethodInstanceRef::wrap(unspecialized))
+                    Some(MethodInstanceRef::wrap(unspecialized).root(target))
                 }
             }
         }
     }
 
     /// Executable code-generating function if available
-    pub fn generator(self) -> Option<ValueRef<'scope, 'static>> {
+    pub fn generator<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
         // Safety: the pointer points to valid data
         unsafe {
             let data = self.unwrap_non_null(Private).as_ref().generator;
             let data = NonNull::new(data)?;
-            Some(ValueRef::wrap(data))
+            Some(ValueRef::wrap(data).root(target))
         }
     }
 
     /// Pointers in generated code (shared to reduce memory), or `None`
-    pub fn roots(self) -> Option<ArrayRef<'scope, 'static>> {
+    pub fn roots<'target, T>(self, target: T) -> Option<ArrayData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
         // Safety: the pointer points to valid data
         unsafe {
             let data = self.unwrap_non_null(Private).as_ref().roots;
             let data = NonNull::new(data)?;
-            Some(ArrayRef::wrap(data))
+            Some(ArrayRef::wrap(data).root(target))
         }
     }
 
     /// RLE (build_id, offset) pairs (even/odd indexing)
     #[cfg(not(feature = "lts"))]
-    pub fn root_blocks(self) -> Option<TypedArrayRef<'scope, 'static, u64>> {
+    pub fn root_blocks<'target, T>(
+        self,
+        target: T,
+    ) -> Option<TypedArrayData<'target, 'static, T, u64>>
+    where
+        T: Target<'target>,
+    {
         // Safety: the pointer points to valid data
+
         unsafe {
             let data = self.unwrap_non_null(Private).as_ref().root_blocks;
             let data = NonNull::new(data)?;
-            Some(TypedArrayRef::wrap(data))
+            Some(TypedArrayRef::wrap(data).root(target))
         }
     }
 
@@ -260,33 +300,39 @@ impl<'scope> Method<'scope> {
     }
 
     /// `SimpleVector(rettype, sig)` if a ccallable entry point is requested for this
-    pub fn ccallable(self) -> Option<SimpleVectorRef<'scope>> {
+    pub fn ccallable<'target, T>(self, target: T) -> Option<SimpleVectorData<'target, T>>
+    where
+        T: Target<'target>,
+    {
         // Safety: the pointer points to valid data
         unsafe {
             let data = self.unwrap_non_null(Private).as_ref().ccallable;
             let data = NonNull::new(data)?;
-            Some(SimpleVectorRef::wrap(data))
+            Some(SimpleVectorRef::wrap(data).root(target))
         }
     }
 
     /// Cache of specializations of this method for invoke(), i.e.
     /// cases where this method was called even though it was not necessarily
     /// the most specific for the argument types.
-    pub fn invokes(self) -> Option<ValueRef<'scope, 'static>> {
+    pub fn invokes<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
         cfg_if! {
             if #[cfg(feature = "lts")] {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let invokes = self.unwrap_non_null(Private).as_ref().invokes;
                     let invokes = NonNull::new(invokes)?;
-                    Some(ValueRef::wrap(invokes))
+                    Some(ValueRef::wrap(invokes).root(target))
                 }
             } else {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let invokes = self.unwrap_non_null(Private).as_ref().invokes.load(Ordering::Relaxed);
                     let invokes = NonNull::new(invokes)?;
-                    Some(ValueRef::wrap(invokes))
+                    Some(ValueRef::wrap(invokes).root(target))
                 }
             }
         }
@@ -377,6 +423,8 @@ impl_valid_layout!(MethodRef, Method);
 impl_ref_root!(Method, MethodRef, 1);
 
 use crate::memory::target::target_type::TargetType;
+
+use super::method_instance::MethodInstanceData;
 
 /// `Method` or `MethodRef`, depending on the target type `T`.
 pub type MethodData<'target, T> = <T as TargetType<'target>>::Data<'static, Method<'target>>;

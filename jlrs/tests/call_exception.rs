@@ -5,7 +5,6 @@ mod tests {
     use super::util::JULIA;
     use jlrs::prelude::*;
 
-    #[test]
     fn call0_exception_is_caught() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -27,7 +26,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call0_kw_exception_is_caught() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -53,7 +51,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call1_exception_is_caught() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -76,7 +73,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call1_kw_exception_is_caught() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -102,7 +98,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call2_exception_is_caught() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -125,7 +120,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call2_kw_exception_is_caught() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -151,7 +145,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call3_exception_is_caught() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -174,7 +167,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call3_kw_exception_is_caught() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -200,7 +192,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call_exception_is_caught() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -222,7 +213,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn call_kw_exception_is_caught() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -248,7 +238,6 @@ mod tests {
         });
     }
 
-    #[test]
     fn method_error_is_caught() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -263,5 +252,20 @@ mod tests {
                 })
                 .unwrap();
         });
+    }
+
+    #[test]
+    fn call_exception_tests() {
+        call0_exception_is_caught();
+        call0_kw_exception_is_caught();
+        call1_exception_is_caught();
+        call1_kw_exception_is_caught();
+        call2_exception_is_caught();
+        call2_kw_exception_is_caught();
+        call3_exception_is_caught();
+        call3_kw_exception_is_caught();
+        call_exception_is_caught();
+        call_kw_exception_is_caught();
+        method_error_is_caught();
     }
 }

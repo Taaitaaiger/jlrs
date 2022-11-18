@@ -4,11 +4,7 @@ use crate::{
     impl_julia_typecheck,
     memory::target::Target,
     private::Private,
-    wrappers::ptr::{
-        private::WrapperPriv,
-        value::{Value, ValueRef},
-        Wrapper,
-    },
+    wrappers::ptr::{private::WrapperPriv, value::Value, Wrapper},
 };
 use jl_sys::{jl_islayout_inline, jl_type_union, jl_uniontype_t, jl_uniontype_type};
 use std::{marker::PhantomData, ptr::NonNull};
@@ -113,39 +109,37 @@ impl<'scope> Union<'scope> {
     }
 
     /// Returns a vector of all type variants this union can have.
-    pub fn variants(self) -> Vec<ValueRef<'scope, 'static>> {
+    pub fn variants(self) -> Vec<Value<'scope, 'static>> {
         let mut comps = vec![];
         collect(self.as_value(), &mut comps);
         comps
     }
 
-    /*
-    for (a, b) in zip(fieldnames(Union), fieldtypes(Union))
-        println(a, ": ", b)
-    end
-    a: Any
-    b: Any
+    /*inspect(Union):
+
+    a: Any (const)
+    b: Any (const)
     */
 
     /// Unions are stored as binary trees, the arguments are stored as its leaves. This method
     /// returns one of its branches.
-    pub fn a(self) -> ValueRef<'scope, 'static> {
+    pub fn a(self) -> Value<'scope, 'static> {
         // Safety: the pointer points to valid data
         unsafe {
             let a = self.unwrap_non_null(Private).as_ref().a;
             debug_assert!(!a.is_null());
-            ValueRef::wrap(NonNull::new_unchecked(a))
+            Value::wrap_non_null(NonNull::new_unchecked(a), Private)
         }
     }
 
     /// Unions are stored as binary trees, the arguments are stored as its leaves. This method
     /// returns one of its branches.
-    pub fn b(self) -> ValueRef<'scope, 'static> {
+    pub fn b(self) -> Value<'scope, 'static> {
         // Safety: the pointer points to valid data
         unsafe {
             let b = self.unwrap_non_null(Private).as_ref().b;
             debug_assert!(!b.is_null());
-            ValueRef::wrap(NonNull::new_unchecked(b))
+            Value::wrap_non_null(NonNull::new_unchecked(b), Private)
         }
     }
 }
@@ -174,63 +168,57 @@ pub(crate) fn nth_union_component<'scope, 'data>(
     pi: &mut i32,
 ) -> Option<Value<'scope, 'data>> {
     // Safety: both a and b are never null
-    unsafe {
-        match v.cast::<Union>() {
-            Ok(un) => {
-                let a = nth_union_component(un.a().value(), pi);
-                if a.is_some() {
-                    a
-                } else {
-                    *pi -= 1;
-                    return nth_union_component(un.b().value(), pi);
-                }
+    match v.cast::<Union>() {
+        Ok(un) => {
+            let a = nth_union_component(un.a(), pi);
+            if a.is_some() {
+                a
+            } else {
+                *pi -= 1;
+                return nth_union_component(un.b(), pi);
             }
-            Err(_) => {
-                if *pi == 0 {
-                    Some(v)
-                } else {
-                    None
-                }
+        }
+        Err(_) => {
+            if *pi == 0 {
+                Some(v)
+            } else {
+                None
             }
         }
     }
 }
 
-fn collect<'scope>(value: Value<'scope, 'static>, comps: &mut Vec<ValueRef<'scope, 'static>>) {
+fn collect<'scope>(value: Value<'scope, 'static>, comps: &mut Vec<Value<'scope, 'static>>) {
     // Safety: both a and b are never null
-    unsafe {
-        match value.cast::<Union>() {
-            Ok(u) => {
-                collect(u.a().value(), comps);
-                collect(u.b().value(), comps);
-            }
-            Err(_) => {
-                comps.push(value.as_ref());
-            }
+    match value.cast::<Union>() {
+        Ok(u) => {
+            collect(u.a(), comps);
+            collect(u.b(), comps);
+        }
+        Err(_) => {
+            comps.push(value);
         }
     }
 }
 
 pub(crate) fn find_union_component(haystack: Value, needle: Value, nth: &mut u32) -> bool {
     // Safety: both a and b are never null
-    unsafe {
-        match haystack.cast::<Union>() {
-            Ok(hs) => {
-                if find_union_component(hs.a().value(), needle, nth) {
-                    true
-                } else if find_union_component(hs.b().value(), needle, nth) {
-                    true
-                } else {
-                    false
-                }
+    match haystack.cast::<Union>() {
+        Ok(hs) => {
+            if find_union_component(hs.a(), needle, nth) {
+                true
+            } else if find_union_component(hs.b(), needle, nth) {
+                true
+            } else {
+                false
             }
-            Err(_) => {
-                if needle.unwrap_non_null(Private) == haystack.unwrap_non_null(Private) {
-                    return true;
-                } else {
-                    *nth += 1;
-                    false
-                }
+        }
+        Err(_) => {
+            if needle.unwrap_non_null(Private) == haystack.unwrap_non_null(Private) {
+                return true;
+            } else {
+                *nth += 1;
+                false
             }
         }
     }
