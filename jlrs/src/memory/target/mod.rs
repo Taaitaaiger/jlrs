@@ -24,7 +24,7 @@
 //! | `&'scope mut Output<'_>`      | Yes     |
 //! | `ReusableSlot<'target>`       | Yes     |
 //! | `&mut ReusableSlot<'target>`  | Yes     |
-//! | `Global<'scope>`              | No      |
+//! | `Unrooted<'scope>`            | No      |
 //! | `&<T: Target<'scope>>`        | No      |
 //!
 //!
@@ -48,17 +48,17 @@ use std::marker::PhantomData;
 use self::frame::AsyncGcFrame;
 use self::{
     frame::{BorrowedFrame, GcFrame},
-    global::Global,
     output::Output,
     private::TargetPriv,
     reusable_slot::ReusableSlot,
+    unrooted::Unrooted,
 };
 
 pub mod frame;
-pub mod global;
 pub mod output;
 pub mod reusable_slot;
 pub mod target_type;
+pub mod unrooted;
 
 /// Trait implemented by all targets.
 ///
@@ -73,9 +73,9 @@ pub mod target_type;
 /// [module-level]: self
 /// [`TargetType`]: crate::memory::target::target_type::TargetType
 pub trait Target<'target>: TargetPriv<'target> {
-    /// Returns a new `Global`.
-    fn global(&self) -> Global<'target> {
-        unsafe { Global::new() }
+    /// Returns a new `Unrooted`.
+    fn unrooted(&self) -> Unrooted<'target> {
+        unsafe { Unrooted::new() }
     }
 
     /// Convert `self` to an `ExtendedTarget`.
@@ -156,7 +156,7 @@ impl<'target> Target<'target> for AsyncGcFrame<'target> {}
 #[cfg(feature = "async")]
 impl<'target> Target<'target> for &mut AsyncGcFrame<'target> {}
 
-impl<'target> Target<'target> for Global<'target> {}
+impl<'target> Target<'target> for Unrooted<'target> {}
 
 impl<'target> Target<'target> for Output<'target> {}
 
@@ -176,14 +176,19 @@ pub(crate) mod private {
     #[cfg(feature = "async")]
     use super::AsyncGcFrame;
     use super::{
-        global::Global, reusable_slot::ReusableSlot, target_type::TargetType, GcFrame, Output,
+        reusable_slot::ReusableSlot,
+        target_type::TargetType,
+        unrooted::Unrooted,
+        GcFrame,
+        Output,
     };
     use crate::{
         private::Private,
         wrappers::ptr::{
             private::WrapperPriv,
             value::{Value, ValueRef},
-            Ref, Wrapper,
+            Ref,
+            Wrapper,
         },
     };
 
@@ -207,7 +212,7 @@ pub(crate) mod private {
 
     impl<'target> TargetBase<'target> for &mut ReusableSlot<'target> {}
 
-    impl<'target> TargetBase<'target> for Global<'target> {}
+    impl<'target> TargetBase<'target> for Unrooted<'target> {}
 
     impl<'target, T: TargetBase<'target>> TargetBase<'target> for &T {}
 
@@ -544,7 +549,7 @@ pub(crate) mod private {
         }
     }
 
-    impl<'target> TargetPriv<'target> for Global<'target> {
+    impl<'target> TargetPriv<'target> for Unrooted<'target> {
         // Safety: the pointer must point to valid data.
         unsafe fn data_from_ptr<'data, T: Wrapper<'target, 'data>>(
             self,

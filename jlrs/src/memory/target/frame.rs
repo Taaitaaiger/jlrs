@@ -5,14 +5,14 @@
 //! be used until its scope ends. This hold true even if the frame is dropped before its scope
 //! ends.
 //!
-//! In addition to being usable as targets, frames can also be used to create [`Output`]s and
-//! [`Global`]s, and child scopes with their own frame.
+//! In addition to being usable as targets, frames can also be used to create [`Output`]s,
+//! [`ReusableSlot`]s, [`Unrooted`]s, and child scopes with their own frame.
 
 use std::{marker::PhantomData, ptr::NonNull};
 
 use cfg_if::cfg_if;
 
-use super::{global::Global, output::Output, reusable_slot::ReusableSlot};
+use super::{output::Output, reusable_slot::ReusableSlot, unrooted::Unrooted};
 use crate::{
     error::JlrsResult,
     memory::{
@@ -98,9 +98,9 @@ impl<'scope> GcFrame<'scope> {
         }
     }
 
-    /// Returns a `Global` that targets the current frame.
-    pub fn global(&self) -> Global<'scope> {
-        unsafe { Global::new() }
+    /// Returns a `Unrooted` that targets the current frame.
+    pub fn unrooted(&self) -> Unrooted<'scope> {
+        unsafe { Unrooted::new() }
     }
 
     /// Create a temporary scope and call `func` with that scope's `GcFrame`.
@@ -115,23 +115,25 @@ impl<'scope> GcFrame<'scope> {
     /// # let mut julia = j.borrow_mut();
     /// # let mut frame = StackFrame::new();
     /// # let mut julia = julia.instance(&mut frame);
-    ///   julia.scope(|mut frame| {
-    ///       let output = frame.output();
+    /// julia
+    ///     .scope(|mut frame| {
+    ///         let output = frame.output();
     ///
-    ///       let _sum = frame.scope(|mut frame| {
-    ///           let i = Value::new(&mut frame, 1u64);
-    ///           let j = Value::new(&mut frame, 2u64);
+    ///         let _sum = frame.scope(|mut frame| {
+    ///             let i = Value::new(&mut frame, 1u64);
+    ///             let j = Value::new(&mut frame, 2u64);
     ///
-    ///           unsafe {
-    ///               Module::base(&frame)
-    ///                   .function(&mut frame, "+")?
-    ///                   .call2(output, i, j)
-    ///                   .into_jlrs_result()
-    ///           }
-    ///       })?;
+    ///             unsafe {
+    ///                 Module::base(&frame)
+    ///                     .function(&mut frame, "+")?
+    ///                     .call2(output, i, j)
+    ///                     .into_jlrs_result()
+    ///             }
+    ///         })?;
     ///
-    ///       Ok(())
-    ///   }).unwrap();
+    ///         Ok(())
+    ///     })
+    ///     .unwrap();
     /// # });
     /// # }
     /// ```

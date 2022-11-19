@@ -123,7 +123,7 @@ use crate::{
     call::Call,
     error::{JlrsError, JlrsResult, CANNOT_DISPLAY_VALUE},
     layout::valid_layout::{ValidField, ValidLayout},
-    memory::target::{global::Global, Target},
+    memory::target::{unrooted::Unrooted, Target},
     private::Private,
     wrappers::ptr::{module::Module, private::WrapperPriv as _, string::JuliaString, value::Value},
 };
@@ -170,9 +170,9 @@ pub trait Wrapper<'scope, 'data>: private::WrapperPriv<'scope, 'data> {
         unsafe { target.data_from_ptr(self.unwrap_non_null(Private).cast(), Private) }
     }
 
-    /// Returns a new `Global`.
-    fn global(self) -> Global<'scope> {
-        unsafe { Global::new() }
+    /// Returns a new `Unrooted`.
+    fn unrooted_target(self) -> Unrooted<'scope> {
+        unsafe { Unrooted::new() }
     }
 
     /// Convert the wrapper to its display string, i.e. the string that is shown when calling
@@ -181,7 +181,7 @@ pub trait Wrapper<'scope, 'data>: private::WrapperPriv<'scope, 'data> {
         // Safety: all Julia data that is accessed is globally rooted, the result is converted
         // to a String before the GC can free it.
         let s = unsafe {
-            let global = Global::new();
+            let global = Unrooted::new();
             Module::main(&global)
                 .submodule(&global, "Jlrs")?
                 .wrapper()
@@ -210,7 +210,7 @@ pub trait Wrapper<'scope, 'data>: private::WrapperPriv<'scope, 'data> {
         // Safety: all Julia data that is accessed is globally rooted, the result is converted
         // to a String before the GC can free it.
         let s = unsafe {
-            let global = Global::new();
+            let global = Unrooted::new();
             Module::main(&global)
                 .submodule(&global, "Jlrs")?
                 .wrapper()

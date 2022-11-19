@@ -442,7 +442,7 @@ where
 
             JuliaFuture::new_posted(&mut frame, invoke_j, task_j)
                 .await
-                .expect("Posted task failed");
+                .expect("Posting task failed");
 
             std::mem::drop(owner);
         };
@@ -524,18 +524,18 @@ where
     }
 
     unsafe fn call_inner<'scope>(frame: GcFrame<'scope>, enable: bool) -> JlrsResult<()> {
-        let global = frame.global();
+        let unrooted = frame.unrooted();
 
         let enable = if enable {
-            Value::true_v(&global)
+            Value::true_v(&unrooted)
         } else {
-            Value::false_v(&global)
+            Value::false_v(&unrooted)
         };
 
-        Module::main(&global)
-            .submodule(&global, "Jlrs")?
+        Module::main(&unrooted)
+            .submodule(&unrooted, "Jlrs")?
             .wrapper()
-            .global(&global, "color")?
+            .global(&unrooted, "color")?
             .value()
             .set_nth_field_unchecked(0, enable);
 

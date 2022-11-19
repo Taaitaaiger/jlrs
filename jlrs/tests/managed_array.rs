@@ -1390,7 +1390,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     let new_array = Array::new_for(
                         frame.as_extended_target(),
                         3,
@@ -1416,7 +1416,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     let output = frame.output();
                     let array = frame
                         .scope(|mut frame| {
@@ -1448,7 +1448,7 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| {
-                        let global = frame.global();
+                        let global = frame.unrooted();
                         let new_array = Array::new_for(
                             frame.as_extended_target(),
                             3,
@@ -1475,7 +1475,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     frame.scope(|mut frame| {
                         let new_array = Array::new_for(
                             frame.as_extended_target(),
@@ -1503,7 +1503,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     let new_array = Array::new_for(
                         frame.as_extended_target(),
                         3,
@@ -1529,7 +1529,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     frame.scope(|mut frame| {
                         let new_array = Array::new_for(
                             frame.as_extended_target(),
@@ -1557,7 +1557,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     frame.scope(|mut frame| {
                         let new_array = Array::new_for(
                             frame.as_extended_target(),
@@ -1585,7 +1585,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     let new_array = Array::new_for(
                         frame.as_extended_target(),
                         (3, 4),
@@ -1613,7 +1613,7 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| {
-                        let global = frame.global();
+                        let global = frame.unrooted();
                         let new_array = Array::new_for(
                             frame.as_extended_target(),
                             (3, 4),
@@ -1641,7 +1641,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     frame.scope(|mut frame| {
                         let new_array = Array::new_for(
                             frame.as_extended_target(),
@@ -1670,7 +1670,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     let new_array = Array::new_for(
                         frame.as_extended_target(),
                         (3, 4),
@@ -1698,7 +1698,7 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| {
-                        let global = frame.global();
+                        let global = frame.unrooted();
                         let new_array = Array::new_for(
                             frame.as_extended_target(),
                             (3, 4),
@@ -1727,7 +1727,7 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| {
-                        let global = frame.global();
+                        let global = frame.unrooted();
                         let new_array = Array::new_for(
                             frame.as_extended_target(),
                             (3, 4),
@@ -1755,7 +1755,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     let new_array = Array::new_for(
                         frame.as_extended_target(),
                         (3, 4, 5),
@@ -1784,7 +1784,7 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| {
-                        let global = frame.global();
+                        let global = frame.unrooted();
                         let new_array = Array::new_for(
                             frame.as_extended_target(),
                             (3, 4, 5),
@@ -1813,7 +1813,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     frame.scope(|mut frame| {
                         let new_array = Array::new_for(
                             frame.as_extended_target(),
@@ -1843,7 +1843,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     let new_array = Array::new_for(
                         frame.as_extended_target(),
                         (3, 4, 5),
@@ -1871,7 +1871,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     frame.scope(|mut frame| {
                         let new_array = Array::new_for(
                             frame.as_extended_target(),
@@ -1902,7 +1902,7 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| {
-                        let global = frame.global();
+                        let global = frame.unrooted();
                         let new_array = Array::new_for(
                             frame.as_extended_target(),
                             (3, 4, 5),
@@ -1931,7 +1931,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     let new_array = Array::new_for(
                         frame.as_extended_target(),
                         (3, 4, 5, 6),
@@ -1960,7 +1960,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     frame.scope(|mut frame| {
                         let new_array = Array::new_for(
                             frame.as_extended_target(),
@@ -1992,7 +1992,7 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| {
-                        let global = frame.global();
+                        let global = frame.unrooted();
                         let new_array = Array::new_for(
                             frame.as_extended_target(),
                             (3, 4, 5, 6),
@@ -2022,7 +2022,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     let new_array = Array::new_for(
                         frame.as_extended_target(),
                         (3, 4, 5, 6),
@@ -2052,7 +2052,7 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| {
-                        let global = frame.global();
+                        let global = frame.unrooted();
                         let new_array = Array::new_for(
                             frame.as_extended_target(),
                             (3, 4, 5, 6),
@@ -2083,7 +2083,7 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| {
-                        let global = frame.global();
+                        let global = frame.unrooted();
                         let new_array = Array::new_for(
                             frame.as_extended_target(),
                             (3, 4, 5, 6),
@@ -2114,7 +2114,7 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| {
-                        let global = frame.global();
+                        let global = frame.unrooted();
                         let new_array = Array::new_for(
                             frame.as_extended_target(),
                             (3, 4, 5, 6),
@@ -2145,7 +2145,7 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| {
-                        let global = frame.global();
+                        let global = frame.unrooted();
                         let new_array = Array::new_for(
                             frame.as_extended_target(),
                             (3, 4, 5, 6),
@@ -2175,7 +2175,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| unsafe {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     let new_array = Array::new_for_unchecked(
                         frame.as_extended_target(),
                         3,
@@ -2200,7 +2200,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     let output = frame.output();
                     let array = frame.scope(|mut frame| unsafe {
                         let output = output.into_extended_target(&mut frame);
@@ -2230,7 +2230,7 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| unsafe {
-                        let global = frame.global();
+                        let global = frame.unrooted();
                         let new_array = Array::new_for_unchecked(
                             frame.as_extended_target(),
                             3,
@@ -2257,7 +2257,7 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| unsafe {
-                        let global = frame.global();
+                        let global = frame.unrooted();
                         let new_array = Array::new_for_unchecked(
                             frame.as_extended_target(),
                             3,
@@ -2283,7 +2283,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| unsafe {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     let new_array = Array::new_for_unchecked(
                         frame.as_extended_target(),
                         3,
@@ -2309,7 +2309,7 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| unsafe {
-                        let global = frame.global();
+                        let global = frame.unrooted();
                         let new_array = Array::new_for_unchecked(
                             frame.as_extended_target(),
                             3,
@@ -2335,7 +2335,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     frame.scope(|mut frame| unsafe {
                         let new_array = Array::new_for_unchecked(
                             frame.as_extended_target(),
@@ -2362,7 +2362,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| unsafe {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     let new_array = Array::new_for_unchecked(
                         frame.as_extended_target(),
                         (3, 4),
@@ -2389,7 +2389,7 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| unsafe {
-                        let global = frame.global();
+                        let global = frame.unrooted();
                         let new_array = Array::new_for_unchecked(
                             frame.as_extended_target(),
                             (3, 4),
@@ -2417,7 +2417,7 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| unsafe {
-                        let global = frame.global();
+                        let global = frame.unrooted();
                         let new_array = Array::new_for_unchecked(
                             frame.as_extended_target(),
                             (3, 4),
@@ -2444,7 +2444,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| unsafe {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     let new_array = Array::new_for_unchecked(
                         frame.as_extended_target(),
                         (3, 4),
@@ -2470,7 +2470,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     frame.scope(|mut frame| unsafe {
                         let new_array = Array::new_for_unchecked(
                             frame.as_extended_target(),
@@ -2498,7 +2498,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     frame.scope(|mut frame| unsafe {
                         let new_array = Array::new_for_unchecked(
                             frame.as_extended_target(),
@@ -2526,7 +2526,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| unsafe {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     let new_array = Array::new_for_unchecked(
                         frame.as_extended_target(),
                         (3, 4, 5),
@@ -2553,7 +2553,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     frame.scope(|mut frame| unsafe {
                         let new_array = Array::new_for_unchecked(
                             frame.as_extended_target(),
@@ -2583,7 +2583,7 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| unsafe {
-                        let global = frame.global();
+                        let global = frame.unrooted();
                         let new_array = Array::new_for_unchecked(
                             frame.as_extended_target(),
                             (3, 4, 5),
@@ -2611,7 +2611,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| unsafe {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     let new_array = Array::new_for_unchecked(
                         frame.as_extended_target(),
                         (3, 4, 5),
@@ -2639,7 +2639,7 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| unsafe {
-                        let global = frame.global();
+                        let global = frame.unrooted();
                         let new_array = Array::new_for_unchecked(
                             frame.as_extended_target(),
                             (3, 4, 5),
@@ -2668,7 +2668,7 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| unsafe {
-                        let global = frame.global();
+                        let global = frame.unrooted();
                         let new_array = Array::new_for_unchecked(
                             frame.as_extended_target(),
                             (3, 4, 5),
@@ -2696,7 +2696,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| unsafe {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     let new_array = Array::new_for_unchecked(
                         frame.as_extended_target(),
                         (3, 4, 5, 6),
@@ -2724,7 +2724,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     frame.scope(|mut frame| unsafe {
                         let new_array = Array::new_for_unchecked(
                             frame.as_extended_target(),
@@ -2754,7 +2754,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     frame.scope(|mut frame| unsafe {
                         let new_array = Array::new_for_unchecked(
                             frame.as_extended_target(),
@@ -2784,7 +2784,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| unsafe {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     let new_array = Array::new_for_unchecked(
                         frame.as_extended_target(),
                         (3, 4, 5, 6),
@@ -2812,7 +2812,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     frame.scope(|mut frame| unsafe {
                         let new_array = Array::new_for_unchecked(
                             frame.as_extended_target(),
@@ -2842,7 +2842,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     frame.scope(|mut frame| unsafe {
                         let new_array = Array::new_for_unchecked(
                             frame.as_extended_target(),
@@ -2872,7 +2872,7 @@ mod tests {
             let unboxed = jlrs
                 .instance(&mut frame)
                 .scope(|mut frame| {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     frame.scope(|mut frame| unsafe {
                         let new_array = Array::new_for_unchecked(
                             frame.as_extended_target(),
@@ -2903,7 +2903,7 @@ mod tests {
                 .instance(&mut frame)
                 .scope(|mut frame| {
                     frame.scope(|mut frame| unsafe {
-                        let global = frame.global();
+                        let global = frame.unrooted();
                         let new_array = Array::new_for_unchecked(
                             frame.as_extended_target(),
                             (3, 4, 5, 6),

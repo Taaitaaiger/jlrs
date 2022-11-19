@@ -3,8 +3,14 @@
 use std::ffi::c_void;
 
 use jl_sys::{
-    jl_gc_collect, jl_gc_collection_t, jl_gc_enable, jl_gc_is_enabled, jl_gc_mark_queue_obj,
-    jl_gc_mark_queue_objarray, jl_gc_safepoint, jl_gc_wb,
+    jl_gc_collect,
+    jl_gc_collection_t,
+    jl_gc_enable,
+    jl_gc_is_enabled,
+    jl_gc_mark_queue_obj,
+    jl_gc_mark_queue_objarray,
+    jl_gc_safepoint,
+    jl_gc_wb,
 };
 
 use super::{target::Target, PTls};
@@ -46,9 +52,9 @@ pub trait Gc: private::GcPriv {
         // Safety: Julia is active, this method is called from a thread known to Julia, and no
         // Julia data is returned by this method.
 
-        use super::target::global::Global;
+        use super::target::unrooted::Unrooted;
 
-        let global = unsafe { Global::new() };
+        let global = unsafe { Unrooted::new() };
 
         // Safety: everything is globally rooted.
         let func = unsafe {

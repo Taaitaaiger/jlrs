@@ -14,7 +14,7 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     let union_ty = DataType::uniontype_type(&frame)
                         .as_value()
                         .apply_type(
@@ -52,7 +52,7 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|mut frame| unsafe {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     let union_ty = DataType::uniontype_type(&frame)
                         .as_value()
                         .apply_type(
@@ -101,7 +101,7 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|mut frame| unsafe {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     let union_ty = DataType::uniontype_type(&frame)
                         .as_value()
                         .apply_type(
@@ -142,7 +142,7 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     let union_ty = DataType::uniontype_type(&frame)
                         .as_value()
                         .apply_type(

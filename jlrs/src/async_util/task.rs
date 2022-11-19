@@ -52,10 +52,7 @@ use crate::{
 ///     // The type of the result of this task if it succeeds.
 ///     type Output = u64;
 ///
-///     async fn run<'base>(
-///         &mut self,
-///         mut frame: AsyncGcFrame<'base>,
-///     ) -> JlrsResult<Self::Output> {
+///     async fn run<'base>(&mut self, mut frame: AsyncGcFrame<'base>) -> JlrsResult<Self::Output> {
 ///         let a = Value::new(&mut frame, self.a);
 ///         let b = Value::new(&mut frame, self.b);
 ///
@@ -113,12 +110,12 @@ pub trait AsyncTask: 'static + Send + Sync {
 /// use jlrs::prelude::*;
 ///
 /// struct AccumulatorTask {
-///     n_values: usize
+///     n_values: usize,
 /// }
 ///
 /// struct AccumulatorTaskState<'state> {
 ///     array: TypedArray<'state, 'static, usize>,
-///     offset: usize
+///     offset: usize,
 /// }
 ///
 /// // Only the runtime thread can call the Julia C API, so the async trait
@@ -147,10 +144,7 @@ pub trait AsyncTask: 'static + Send + Sync {
 ///         let array = TypedArray::from_vec(frame.as_extended_target(), data, self.n_values)?
 ///             .into_jlrs_result()?;
 ///
-///         Ok(AccumulatorTaskState {
-///             array,
-///             offset: 0
-///         })
+///         Ok(AccumulatorTaskState { array, offset: 0 })
 ///     }
 ///
 ///     // Whenever the task is called through its handle this method

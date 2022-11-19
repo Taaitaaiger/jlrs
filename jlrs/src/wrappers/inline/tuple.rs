@@ -12,13 +12,15 @@
 //! # let mut julia = j.borrow_mut();
 //! # let mut frame = StackFrame::new();
 //! # let mut julia = julia.instance(&mut frame);
-//! julia.scope(|mut frame| {
-//!     let tup = Tuple2(2i32, true);
-//!     let val = Value::new(&mut frame, tup);
-//!     assert!(val.is::<Tuple2<i32, bool>>());
-//!     assert!(val.unbox::<Tuple2<i32, bool>>().is_ok());
-//!     Ok(())
-//! }).unwrap();
+//! julia
+//!     .scope(|mut frame| {
+//!         let tup = Tuple2(2i32, true);
+//!         let val = Value::new(&mut frame, tup);
+//!         assert!(val.is::<Tuple2<i32, bool>>());
+//!         assert!(val.unbox::<Tuple2<i32, bool>>().is_ok());
+//!         Ok(())
+//!     })
+//!     .unwrap();
 //! # });
 //! # }
 //! ```
@@ -190,7 +192,7 @@ macro_rules! impl_tuple {
             fn valid_layout(v: $crate::wrappers::ptr::value::Value) -> bool {
                 unsafe {
                     if let Ok(dt) = v.cast::<$crate::wrappers::ptr::datatype::DataType>() {
-                        let global = v.global();
+                        let global = v.unrooted_target();
                         let fieldtypes = dt.field_types(global);
                         let n = count!($($types),+);
                         if fieldtypes.wrapper().len() != n {
@@ -221,7 +223,7 @@ macro_rules! impl_tuple {
             fn valid_field(v: $crate::wrappers::ptr::value::Value) -> bool {
                 unsafe {
                     if let Ok(dt) = v.cast::<$crate::wrappers::ptr::datatype::DataType>() {
-                        let global = v.global();
+                        let global = v.unrooted_target();
                         let fieldtypes = dt.field_types(global);
                         let n = count!($($types),+);
                         if fieldtypes.wrapper().len() != n {
@@ -292,7 +294,7 @@ macro_rules! impl_tuple {
         unsafe impl $crate::layout::valid_layout::ValidLayout for $name {
             fn valid_layout(v: $crate::wrappers::ptr::value::Value) -> bool {
                 if let Ok(dt) = v.cast::<$crate::wrappers::ptr::datatype::DataType>() {
-                    let global = unsafe {$crate::memory::target::global::Global::new()};
+                    let global = unsafe {$crate::memory::target::unrooted::Unrooted::new()};
                     return dt == $crate::wrappers::ptr::datatype::DataType::emptytuple_type(&global)
                 }
 
@@ -305,7 +307,7 @@ macro_rules! impl_tuple {
         unsafe impl $crate::layout::valid_layout::ValidField for $name {
             fn valid_field(v: $crate::wrappers::ptr::value::Value) -> bool {
                 if let Ok(dt) = v.cast::<$crate::wrappers::ptr::datatype::DataType>() {
-                    let global = unsafe {$crate::memory::target::global::Global::new()};
+                    let global = unsafe {$crate::memory::target::unrooted::Unrooted::new()};
                     return dt == $crate::wrappers::ptr::datatype::DataType::emptytuple_type(&global)
                 }
 

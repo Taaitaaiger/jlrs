@@ -11,14 +11,15 @@ use jl_sys::jl_opaque_closure_t;
 use crate::{
     call::Call,
     layout::typecheck::Typecheck,
-    memory::target::{global::Global, Target},
+    memory::target::{unrooted::Unrooted, Target},
     private::Private,
     wrappers::ptr::{
         datatype::DataType,
         private::WrapperPriv,
         type_name::TypeName,
         value::{Value, ValueResult},
-        Ref, Wrapper as _,
+        Ref,
+        Wrapper as _,
     },
 };
 
@@ -89,7 +90,7 @@ impl<'scope> OpaqueClosure<'scope> {
 
 unsafe impl Typecheck for OpaqueClosure<'_> {
     fn typecheck(t: DataType) -> bool {
-        unsafe { t.type_name() == TypeName::of_opaque_closure(&Global::new()) }
+        unsafe { t.type_name() == TypeName::of_opaque_closure(&Unrooted::new()) }
     }
 }
 

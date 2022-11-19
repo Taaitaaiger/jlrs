@@ -12,11 +12,33 @@
 use std::{ffi::c_void, ptr::NonNull};
 
 use jl_sys::{
-    jl_apply_type, jl_bool_type, jl_box_bool, jl_box_char, jl_box_float32, jl_box_float64,
-    jl_box_int16, jl_box_int32, jl_box_int64, jl_box_int8, jl_box_uint16, jl_box_uint32,
-    jl_box_uint64, jl_box_uint8, jl_box_voidpointer, jl_char_type, jl_float32_type,
-    jl_float64_type, jl_int16_type, jl_int32_type, jl_int64_type, jl_int8_type,
-    jl_new_struct_uninit, jl_uint16_type, jl_uint32_type, jl_uint64_type, jl_uint8_type,
+    jl_apply_type,
+    jl_bool_type,
+    jl_box_bool,
+    jl_box_char,
+    jl_box_float32,
+    jl_box_float64,
+    jl_box_int16,
+    jl_box_int32,
+    jl_box_int64,
+    jl_box_int8,
+    jl_box_uint16,
+    jl_box_uint32,
+    jl_box_uint64,
+    jl_box_uint8,
+    jl_box_voidpointer,
+    jl_char_type,
+    jl_float32_type,
+    jl_float64_type,
+    jl_int16_type,
+    jl_int32_type,
+    jl_int64_type,
+    jl_int8_type,
+    jl_new_struct_uninit,
+    jl_uint16_type,
+    jl_uint32_type,
+    jl_uint64_type,
+    jl_uint8_type,
     jl_voidpointer_type,
 };
 
@@ -59,7 +81,7 @@ pub unsafe trait IntoJulia: Sized + 'static {
         // associated
         unsafe {
             // TODO: root this data until the data has been instantiated.
-            let ty = Self::julia_type(target.global()).wrapper();
+            let ty = Self::julia_type(&target).wrapper();
             debug_assert!(ty.is_bits());
 
             let instance = ty.instance();
@@ -145,9 +167,8 @@ unsafe impl<U: IntoJulia> IntoJulia for *mut U {
     where
         T: Target<'scope>,
     {
-        let global = target.global();
-        let ptr_ua = UnionAll::pointer_type(&global);
-        let inner_ty = U::julia_type(&global);
+        let ptr_ua = UnionAll::pointer_type(&target);
+        let inner_ty = U::julia_type(&target);
         let params = &mut [inner_ty];
         let param_ptr = params.as_mut_ptr().cast();
 

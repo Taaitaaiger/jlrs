@@ -7,8 +7,15 @@
 use std::{marker::PhantomData, ptr::NonNull};
 
 use jl_sys::{
-    jl_base_module, jl_core_module, jl_get_global, jl_is_imported, jl_main_module, jl_module_t,
-    jl_module_type, jl_set_const, jl_set_global,
+    jl_base_module,
+    jl_core_module,
+    jl_get_global,
+    jl_is_imported,
+    jl_main_module,
+    jl_module_t,
+    jl_module_type,
+    jl_set_const,
+    jl_set_global,
 };
 
 use super::{
@@ -339,8 +346,7 @@ impl<'scope> Module<'scope> {
         // Safety: the pointer points to valid data, the result is checked.
         unsafe {
             let symbol = name.to_symbol_priv(Private);
-            let global = target.global();
-            let func = self.global(global, symbol)?.wrapper();
+            let func = self.global(&target, symbol)?.wrapper();
 
             if !func.is::<Function>() {
                 let name = symbol.as_str().unwrap_or("<Non-UTF8 string>").into();
@@ -378,9 +384,8 @@ impl<'scope> Module<'scope> {
         T: Target<'target>,
         N: ToSymbol,
     {
-        let global = target.global();
-        Module::base(&global)
-            .function(global, "require")
+        Module::base(&target)
+            .function(&target, "require")
             .unwrap()
             .wrapper()
             .call2(

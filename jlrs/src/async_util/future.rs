@@ -16,7 +16,7 @@ use smallvec::SmallVec;
 use crate::{
     call::{Call, ProvideKeywords, WithKeywords},
     error::{JuliaResult, CANNOT_DISPLAY_VALUE},
-    memory::target::{frame::AsyncGcFrame, global::Global},
+    memory::target::{frame::AsyncGcFrame, unrooted::Unrooted},
     private::Private,
     wrappers::ptr::{
         module::Module,
@@ -529,7 +529,7 @@ impl<'frame, 'data> Future for JuliaFuture<'frame, 'data> {
                 // Safety: module contents are globally rooted, and fetch is safe to call. The
                 // result is reachable through the task which must be rooted at ths point.
                 unsafe {
-                    let global = Global::new();
+                    let global = Unrooted::new();
                     let f = Module::base(&global)
                         .function(&global, "fetch")
                         .unwrap()

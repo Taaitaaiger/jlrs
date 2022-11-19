@@ -167,10 +167,12 @@ impl RuntimeBuilder {
     /// use jlrs::prelude::*;
     ///
     /// # fn main() {
-    /// let (_julia, _thread_handle) = unsafe { RuntimeBuilder::new()
-    ///     .async_runtime::<Tokio>()
-    ///     .start::<1>()
-    ///     .expect("Could not start Julia") };
+    /// let (_julia, _thread_handle) = unsafe {
+    ///     RuntimeBuilder::new()
+    ///         .async_runtime::<Tokio>()
+    ///         .start::<1>()
+    ///         .expect("Could not start Julia")
+    /// };
     /// # }
     /// ```
     ///
@@ -180,10 +182,12 @@ impl RuntimeBuilder {
     /// use jlrs::prelude::*;
     ///
     /// # fn main() {
-    /// let (_julia, _thread_handle) = unsafe { RuntimeBuilder::new()
-    ///     .async_runtime::<AsyncStd>()
-    ///     .start::<1>()
-    ///     .expect("Could not start Julia") };
+    /// let (_julia, _thread_handle) = unsafe {
+    ///     RuntimeBuilder::new()
+    ///         .async_runtime::<AsyncStd>()
+    ///         .start::<1>()
+    ///         .expect("Could not start Julia")
+    /// };
     /// # }
     /// ```
     #[cfg(feature = "async-rt")]

@@ -12,18 +12,33 @@
 use std::ffi::c_void;
 
 use jl_sys::{
-    jl_code_info_type, jl_globalref_type, jl_gotonode_type, jl_intrinsic_type,
-    jl_linenumbernode_type, jl_namedtuple_typename, jl_newvarnode_type, jl_phicnode_type,
-    jl_phinode_type, jl_pinode_type, jl_quotenode_type, jl_slotnumber_type, jl_string_type,
-    jl_typedslot_type, jl_upsilonnode_type,
+    jl_code_info_type,
+    jl_globalref_type,
+    jl_gotonode_type,
+    jl_intrinsic_type,
+    jl_linenumbernode_type,
+    jl_namedtuple_typename,
+    jl_newvarnode_type,
+    jl_phicnode_type,
+    jl_phinode_type,
+    jl_pinode_type,
+    jl_quotenode_type,
+    jl_slotnumber_type,
+    jl_string_type,
+    jl_typedslot_type,
+    jl_upsilonnode_type,
 };
 
 use crate::{
     convert::into_julia::IntoJulia,
-    memory::target::global::Global,
+    memory::target::unrooted::Unrooted,
     private::Private,
     wrappers::ptr::{
-        datatype::DataType, private::WrapperPriv, type_name::TypeName, union_all::UnionAll, Wrapper,
+        datatype::DataType,
+        private::WrapperPriv,
+        type_name::TypeName,
+        union_all::UnionAll,
+        Wrapper,
     },
 };
 
@@ -70,7 +85,7 @@ macro_rules! impl_julia_typecheck {
             #[inline(always)]
             fn typecheck(t: crate::wrappers::ptr::datatype::DataType) -> bool {
                 unsafe {
-                    let global = $crate::memory::target::global::Global::new();
+                    let global = $crate::memory::target::unrooted::Unrooted::new();
                     <$crate::wrappers::ptr::datatype::DataType as $crate::wrappers::ptr::private::WrapperPriv>::unwrap(t, crate::private::Private) == <$type as $crate::convert::into_julia::IntoJulia>::julia_type(global).ptr().as_ptr()
                 }
             }
@@ -97,7 +112,7 @@ impl_julia_typecheck!(*mut c_void);
 unsafe impl<T: IntoJulia> Typecheck for *mut T {
     fn typecheck(t: DataType) -> bool {
         unsafe {
-            let global = Global::new();
+            let global = Unrooted::new();
             let ptr_tname = TypeName::of_pointer(&global);
 
             if t.type_name() != ptr_tname {
@@ -154,7 +169,7 @@ unsafe impl Typecheck for AbstractRef {
     fn typecheck(t: DataType) -> bool {
         unsafe {
             t.type_name()
-                == UnionAll::ref_type(&Global::new())
+                == UnionAll::ref_type(&Unrooted::new())
                     .body()
                     .cast_unchecked::<DataType>()
                     .type_name()
@@ -168,7 +183,7 @@ pub struct VecElement;
 unsafe impl Typecheck for VecElement {
     #[inline(always)]
     fn typecheck(t: DataType) -> bool {
-        unsafe { t.type_name() == TypeName::of_vecelement(&Global::new()) }
+        unsafe { t.type_name() == TypeName::of_vecelement(&Unrooted::new()) }
     }
 }
 
@@ -179,7 +194,7 @@ unsafe impl Typecheck for TypeType {
     fn typecheck(t: DataType) -> bool {
         unsafe {
             t.type_name()
-                == UnionAll::type_type(&Global::new())
+                == UnionAll::type_type(&Unrooted::new())
                     .body()
                     .cast_unchecked::<DataType>()
                     .type_name()
@@ -329,7 +344,7 @@ pub struct Pointer;
 unsafe impl Typecheck for Pointer {
     #[inline(always)]
     fn typecheck(t: DataType) -> bool {
-        unsafe { t.type_name() == TypeName::of_pointer(&Global::new()) }
+        unsafe { t.type_name() == TypeName::of_pointer(&Unrooted::new()) }
     }
 }
 
@@ -339,7 +354,7 @@ pub struct LLVMPointer;
 unsafe impl Typecheck for LLVMPointer {
     #[inline(always)]
     fn typecheck(t: DataType) -> bool {
-        unsafe { t.type_name() == TypeName::of_llvmpointer(&Global::new()) }
+        unsafe { t.type_name() == TypeName::of_llvmpointer(&Unrooted::new()) }
     }
 }
 

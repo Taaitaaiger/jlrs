@@ -15,7 +15,12 @@ use async_trait::async_trait;
 
 use crate::{
     async_util::channel::{
-        Channel, ChannelReceiver, ChannelSender, OneshotSender, SendError, TrySendError,
+        Channel,
+        ChannelReceiver,
+        ChannelSender,
+        OneshotSender,
+        SendError,
+        TrySendError,
     },
     error::{JlrsError, JlrsResult},
     runtime::async_rt::{AsyncRuntime, Message},
