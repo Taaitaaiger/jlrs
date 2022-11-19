@@ -153,3 +153,17 @@ mod private {
 
     impl<'target, T: Target<'target>> InfoProvider for T {}
 }
+
+#[cfg(test)]
+mod test {
+    use std::marker::PhantomData;
+
+    use super::Info;
+
+    #[test]
+    fn is_global() {
+        let info = Info { _priv: PhantomData };
+        assert_eq!(info.major_version(), 1);
+        assert_eq!(info.n_threads(), 0);
+    }
+}

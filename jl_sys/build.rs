@@ -315,6 +315,7 @@ fn main() {
             .allowlist_function("jl_subtype")
             .allowlist_function("jl_symbol")
             .allowlist_function("jl_symbol_n")
+            .allowlist_function("jl_throw")
             .allowlist_function("jl_typename_str")
             .allowlist_function("jl_typeof_str")
             .allowlist_function("jl_type_union")

@@ -6,9 +6,8 @@
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/f9720dc2ebd6cd9e3086365f281e62506444ef37/src/julia.h#L585
 use crate::{
     impl_julia_typecheck,
-    prelude::Value,
     private::Private,
-    wrappers::ptr::{private::WrapperPriv, simple_vector::SimpleVector, Ref},
+    wrappers::ptr::{private::WrapperPriv, simple_vector::SimpleVector, value::Value, Ref},
 };
 use jl_sys::{jl_method_match_t, jl_method_match_type};
 use std::{marker::PhantomData, ptr::NonNull};

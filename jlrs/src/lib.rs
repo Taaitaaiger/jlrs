@@ -110,6 +110,11 @@
 //!
 //!   Use the current LTS version of Julia (1.6) instead of the current stable version (1.8).
 //!
+//! - `beta`
+//!
+//!  Use the current beta version of Julia (1.9.0-alpha1) instead of the current stable version
+//!  (1.8).
+//!
 //! - `async`
 //!
 //!   Enable the features of the async runtime which don't depend on the backing runtime. This
@@ -171,7 +176,7 @@
 //! When Julia is embedded in an application, it must be initialized before it can be used. The
 //! following snippet initializes the sync runtime:
 //!
-//! ```no_run
+//! ```
 //! use jlrs::prelude::*;
 //!
 //! # fn main() {
@@ -189,14 +194,14 @@
 //! ```
 //!
 //! To use the async runtime you must upgrade the [`RuntimeBuilder`] to an
-//! [`AsyncRuntimeBuilder`] by providing a backing runtime and channel. Implementations for tokio
+//! [`AsyncRuntimeBuilder`] by providing a backing runtime. Implementations for tokio
 //! and async-std are available if these features have been enabled. When starting the async
 //! runtime, you must declare the maximum number of concurrent tasks as a const generic.
 //!
 //! For example, an async runtime backed by tokio and an unbounded channel, that supports 3
 //! concurrent task can be initialized as follows if the `tokio-rt` feature is enabled:
 //!
-//! ```no_run
+//! ```
 //! use jlrs::prelude::*;
 //!
 //! # fn main() {
@@ -210,9 +215,9 @@
 //! # }
 //! ```
 //!
-//! The async runtime can also be started asynchronously:
+//! The async runtime can also be spawned as a blocking task on an existing executor:
 //!
-//! ```no_run
+//! ```
 //! use jlrs::prelude::*;
 //!
 //! #[tokio::main]
@@ -274,7 +279,7 @@
 //!
 //! As a simple example, let's convert two numbers to Julia values and add them:
 //!
-//! ```no_run
+//! ```
 //! use jlrs::prelude::*;
 //!
 //! # fn main() {
@@ -467,7 +472,7 @@
 //!
 //! A function can be cast to a void pointer and converted to a [`Value`]:
 //!
-//! ```no_run
+//! ```
 //! use jlrs::prelude::*;
 //!
 //! // This function will be provided to Julia as a pointer, so its name can be mangled.
@@ -557,57 +562,70 @@
 //! # Testing
 //!
 //! The restriction that Julia can be initialized once must be taken into account when running
-//! tests that use `jlrs`. The recommended approach is to create a thread-local static `RefCell`:
+//! tests that use `jlrs`. Because tests defined in a single crate are not guaranteed to be run
+//! from the same thread you must guarantee that each crate has only one test that initializes
+//! Julia. It's recommended you only use jlrs in integration tests because each top-level
+//! integration test file is treated as a separate crate.
 //!
-//! ```no_run
+//! ```
 //! use jlrs::prelude::*;
-//! use std::cell::RefCell;
-//! thread_local! {
-//!     pub static JULIA: RefCell<PendingJulia> = {
-//!         let mut julia = RefCell::new(unsafe { RuntimeBuilder::new().start().unwrap() });
-//!         let mut frame = StackFrame::new();
 //!
-//!         julia
-//!             .borrow_mut()
-//!             .instance(&mut frame)
-//!             .scope(|_frame| unsafe {
-//!                 /* include everything you need to use */
-//!                 Ok(())
-//!             }).unwrap();
+//! fn test_1(julia: &mut Julia) {
+//!     // use instance
+//! }
+//! fn test_2(julia: &mut Julia) {
+//!     // use instance
+//! }
 //!
-//!         julia
-//!     };
+//! #[test]
+//! fn call_tests() {
+//!     let mut pending = unsafe { RuntimeBuilder::new().start().unwrap() };
+//!     let mut frame = StackFrame::new();
+//!     let mut julia = pending.instance(&mut frame);
+//!
+//!     test_1(&mut julia);
+//!     test_2(&mut julia);
 //! }
 //! ```
 //!
-//! A similar approach works for the async runtime:
+//! Because `AsyncJulia` is thread-safe, it is possible to have multiple tests in a single crate
+//! when the async runtime is used:
 //!
-//! ```no_run
+//! ```
 //! use jlrs::prelude::*;
-//! use std::cell::RefCell;
-//! thread_local! {
-//!     pub static JULIA: RefCell<AsyncJulia<Tokio>> = {
-//!         let julia = RefCell::new(unsafe {
+//! use once_cell::sync::OnceCell;
+//! use std::{num::NonZeroUsize, sync::Arc};
+//!
+//! fn init() -> Arc<AsyncJulia<Tokio>> {
+//!     unsafe {
+//!         Arc::new(
 //!             RuntimeBuilder::new()
 //!                 .async_runtime::<Tokio>()
-//!                 .start::<1>()
-//!                 .unwrap()
-//!                 .0
-//!         });
+//!                 .n_threads(4)
+//!                 .channel_capacity(NonZeroUsize::new_unchecked(32))
+//!                 .start::<4>()
+//!                 .expect("Could not init Julia")
+//!                 .0,
+//!         )
+//!     }
+//! }
 //!
-//!         /* include everything you need to use */
+//! pub static JULIA: OnceCell<Arc<AsyncJulia<Tokio>>> = OnceCell::new();
 //!
-//!         julia
-//!     };
+//! #[test]
+//! fn test_1() {
+//!     let julia = JULIA.get_or_init(init);
+//!
+//!     // use instance
+//! }
+//!
+//! #[test]
+//! fn test_2() {
+//!     let julia = JULIA.get_or_init(init);
+//!
+//!     // use instance
 //! }
 //! ```
-//!
-//! Tests that use these constructs can only use one thread for testing, so you must use
-//! `cargo test -- --test-threads=1`, otherwise the code above will panic when a test tries to
-//! initialize Julia a second time from another thread.
-//!
-//! If you want to run all of jlrs's tests, this requirement must be taken into account:
-//! `cargo test --features full -- --test-threads=1`.
 //!
 //!
 //! # Custom types

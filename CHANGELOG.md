@@ -49,8 +49,9 @@
 
  - `Ref` wraps a `NonNull` pointer to Julia data, like wrappers do. Undefinedness is expressed through `Option`.
 
- - Uses of `ValidLayout` have been mostly replaced with `ValidField`. `ValidField` is not implemented for mutable structs because they're not stored inline when used as a field of some other type.
+ - Uses of `ValidLayout` have been mostly replaced with `ValidField`. `ValidField` is not implemented for mutable structs because they're not stored inline when used as a field of some other type. 
 
+ - `CCall::throw_exception` has been added and can be used to throw an exception from a `ccall`ed function.
 
 #### v0.16
  - Support for Julia 1.7 has been dropped, by default Julia 1.8 is targeted.

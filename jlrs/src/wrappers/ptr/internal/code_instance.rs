@@ -7,11 +7,11 @@
 
 use crate::{
     impl_julia_typecheck,
-    prelude::{Target, Value},
+    memory::target::Target,
     private::Private,
     wrappers::ptr::{
         private::WrapperPriv,
-        value::{ValueData, ValueRef},
+        value::{Value, ValueData, ValueRef},
         Ref,
     },
 };

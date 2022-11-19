@@ -7,11 +7,13 @@
 
 use crate::{
     impl_julia_typecheck,
-    prelude::{Module, Symbol, Target},
+    memory::target::Target,
     private::Private,
     wrappers::ptr::{
         array::{ArrayData, ArrayRef},
+        module::Module,
         private::WrapperPriv,
+        symbol::Symbol,
         value::{ValueData, ValueRef},
         Ref,
     },

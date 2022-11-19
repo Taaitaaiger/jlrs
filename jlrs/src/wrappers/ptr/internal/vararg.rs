@@ -2,7 +2,7 @@
 
 use crate::{
     impl_julia_typecheck,
-    prelude::Target,
+    memory::target::Target,
     private::Private,
     wrappers::ptr::{
         private::WrapperPriv,

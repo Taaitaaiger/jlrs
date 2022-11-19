@@ -2,8 +2,7 @@
 //! fixed:
 //!
 //!  - The generated bindings lack atomic fields and static atomic variables. These have to be
-//!    replaced with an appropriate atomic type. The main challenge is atomic function pointer
-//!    fields, which are currently represented with a custom `AtomicCFnPtr` type.
+//!    replaced with an appropriate atomic type.
 //!
 //!  - The generated bindings for Windows lack annotations, everything defined in Julia has to be
 //!    annotated with `#[link(name = "libjulia", kind = "raw-dylib")]`. This is necessary because
@@ -338,14 +337,11 @@ fn convert_to_atomic(field_def: &mut Field, info: &AtomicField) {
         } else if info.ty == "int16_t" {
             syn::parse_str::<TypePath>("::std::sync::atomic::AtomicI16").unwrap()
         } else if info.ty == "jl_callptr_t" {
-            syn::parse_str::<TypePath>("crate::atomic_c_fn_ptr::AtomicCFnPtr<jl_callptr_t>")
-                .unwrap()
+            syn::parse_str::<TypePath>("::atomic::Atomic<jl_callptr_t>").unwrap()
         } else if info.ty == "jl_fptr_args_t" {
-            syn::parse_str::<TypePath>("crate::atomic_c_fn_ptr::AtomicCFnPtr<jl_fptr_args_t>")
-                .unwrap()
+            syn::parse_str::<TypePath>("::atomic::Atomic<jl_fptr_args_t>").unwrap()
         } else if info.ty == "jl_fptr_sparam_t" {
-            syn::parse_str::<TypePath>("crate::atomic_c_fn_ptr::AtomicCFnPtr<jl_fptr_sparam_t>")
-                .unwrap()
+            syn::parse_str::<TypePath>("::atomic::Atomic<jl_fptr_sparam_t>").unwrap()
         } else {
             panic!("Unsupported type: {}", info.ty);
         };
@@ -366,18 +362,14 @@ fn convert_union_to_atomic(field_def: &mut Field, info: &AtomicField) {
             );
             syn::parse_str::<TypePath>(&new_ty).unwrap()
         } else if info.ty == "jl_callptr_t" {
-            syn::parse_str::<TypePath>(
-                "::std::mem::ManuallyDrop<crate::atomic_c_fn_ptr::AtomicCFnPtr<jl_callptr_t>>",
-            )
-            .unwrap()
+            syn::parse_str::<TypePath>("::std::mem::ManuallyDrop<::atomic::Atomic<jl_callptr_t>>")
+                .unwrap()
         } else if info.ty == "jl_fptr_args_t" {
-            syn::parse_str::<TypePath>(
-                "::std::mem::ManuallyDrop<crate::atomic_c_fn_ptr::AtomicCFnPtr<jl_fptr_args_t>>",
-            )
-            .unwrap()
+            syn::parse_str::<TypePath>("::std::mem::ManuallyDrop<::atomic::Atomic<jl_fptr_args_t>>")
+                .unwrap()
         } else if info.ty == "jl_fptr_sparam_t" {
             syn::parse_str::<TypePath>(
-                "::std::mem::ManuallyDrop<crate::atomic_c_fn_ptr::AtomicCFnPtr<jl_fptr_sparam_t>>",
+                "::std::mem::ManuallyDrop<::atomic::Atomic<jl_fptr_sparam_t>>",
             )
             .unwrap()
         } else {

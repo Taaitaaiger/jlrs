@@ -116,8 +116,7 @@ use crate::{
     call::Call,
     error::{JlrsError, JlrsResult, CANNOT_DISPLAY_VALUE},
     layout::valid_layout::{ValidField, ValidLayout},
-    memory::target::global::Global,
-    prelude::Target,
+    memory::target::{global::Global, Target},
     private::Private,
     wrappers::ptr::{module::Module, private::WrapperPriv as _, string::JuliaString, value::Value},
 };

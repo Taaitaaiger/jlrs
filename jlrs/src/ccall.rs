@@ -5,13 +5,21 @@
 use crate::{
     error::JlrsResult,
     memory::{
+        context::stack::Stack,
         stack_frame::{PinnedFrame, StackFrame},
         target::{frame::GcFrame, global::Global},
+    },
+    private::Private,
+    wrappers::ptr::{
+        private::WrapperPriv,
+        value::{Value, ValueRef},
     },
 };
 
 #[cfg(feature = "uv")]
 use jl_sys::uv_async_send;
+
+use jl_sys::jl_throw;
 
 /// Use Julia from a Rust function called through `ccall`.
 ///
@@ -19,6 +27,9 @@ use jl_sys::uv_async_send;
 /// initialize it again causes a crash. In order to still be able to call Julia from Rust
 /// you must create a scope first. You can use this struct to do so. It must never be used outside
 /// functions called through `ccall`, and only once for each `ccall`ed function.
+///
+/// Julia code called from a `ccall`ed function must not throw an exception. Exceptions must only
+/// be thrown by calling [`CCall::throw_exception`].
 pub struct CCall<'context> {
     frame: PinnedFrame<'context, 0>,
 }
@@ -61,6 +72,28 @@ impl<'context> CCall<'context> {
         }
     }
 
+    /// Create and throw an exception.
+    ///
+    /// This method calls `func` and throws the result as a Julia exception.
+    ///
+    /// Safety:
+    ///
+    /// Julia exceptions are implemented with `setjmp` / `longjmp`. This means that when an
+    /// exception is thrown, control flow is returned to a `catch` block by jumping over
+    /// intermediate stack frames. It's undefined behaviour to jump over frames that have pending
+    /// drops, so you must take care to structure your code such that none of the intermediate
+    /// frames have any pending drops.
+    #[inline(never)]
+    pub unsafe fn throw_exception<F>(mut self, func: F)
+    where
+        F: for<'scope> FnOnce(&mut GcFrame<'scope>) -> Value<'scope, 'static>,
+    {
+        let value = throw_exception_internal(self.frame.stack_frame().sync_stack(), func);
+        // catch unwinds the GC stack, so it's okay to forget self.
+        std::mem::forget(self);
+        jl_throw(value.ptr().as_ptr())
+    }
+
     /// Create a [`Global`], call the given closure, and return its result.
     ///
     /// Unlike [`CCall::scope`] this method doesn't allocate a stack.
@@ -72,4 +105,18 @@ impl<'context> CCall<'context> {
     {
         func(Global::new())
     }
+}
+
+#[inline(never)]
+unsafe fn throw_exception_internal<'stack, F>(
+    stack: &'stack Stack,
+    func: F,
+) -> ValueRef<'stack, 'static>
+where
+    for<'scope> F: FnOnce(&mut GcFrame<'scope>) -> Value<'scope, 'static>,
+{
+    let (owner, mut frame) = GcFrame::base(stack);
+    let ret = func(&mut frame);
+    std::mem::drop(owner);
+    ValueRef::wrap(ret.unwrap_non_null(Private))
 }
