@@ -7,15 +7,8 @@
 use std::{marker::PhantomData, ptr::NonNull};
 
 use jl_sys::{
-    jl_base_module,
-    jl_core_module,
-    jl_get_global,
-    jl_is_imported,
-    jl_main_module,
-    jl_module_t,
-    jl_module_type,
-    jl_set_const,
-    jl_set_global,
+    jl_base_module, jl_core_module, jl_get_global, jl_is_imported, jl_main_module, jl_module_t,
+    jl_module_type, jl_set_const, jl_set_global,
 };
 
 use super::{

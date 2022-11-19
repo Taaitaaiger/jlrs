@@ -3,14 +3,8 @@
 use std::ffi::c_void;
 
 use jl_sys::{
-    jl_gc_collect,
-    jl_gc_collection_t,
-    jl_gc_enable,
-    jl_gc_is_enabled,
-    jl_gc_mark_queue_obj,
-    jl_gc_mark_queue_objarray,
-    jl_gc_safepoint,
-    jl_gc_wb,
+    jl_gc_collect, jl_gc_collection_t, jl_gc_enable, jl_gc_is_enabled, jl_gc_mark_queue_obj,
+    jl_gc_mark_queue_objarray, jl_gc_safepoint, jl_gc_wb,
 };
 
 use super::{target::Target, PTls};

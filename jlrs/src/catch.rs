@@ -7,12 +7,8 @@ use std::{
 };
 
 use jl_sys::{
-    jlrs_catch_t,
-    jlrs_catch_tag_t_JLRS_CATCH_ERR,
-    jlrs_catch_tag_t_JLRS_CATCH_EXCECPTION,
-    jlrs_catch_tag_t_JLRS_CATCH_OK,
-    jlrs_catch_tag_t_JLRS_CATCH_PANIC,
-    jlrs_catch_wrapper,
+    jlrs_catch_t, jlrs_catch_tag_t_JLRS_CATCH_ERR, jlrs_catch_tag_t_JLRS_CATCH_EXCECPTION,
+    jlrs_catch_tag_t_JLRS_CATCH_OK, jlrs_catch_tag_t_JLRS_CATCH_PANIC, jlrs_catch_wrapper,
 };
 
 use crate::{

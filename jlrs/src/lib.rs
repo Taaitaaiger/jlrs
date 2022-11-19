@@ -550,9 +550,8 @@
 //! an FFI boundary is undefined behaviour. If you're not sure your code will never panic, wrap it
 //! with `std::panic::catch_unwind`.
 //!
-//! Most features provided by jlrs including accessing modules, calling functions, and borrowing
-//! array data require a [`Unrooted`] or a frame. You can access these by creating an instance of
-//! [`CCall`] first. Another method provided by [`CCall`] is [`CCall::uv_async_send`], this method
+//! Many features provided by jlrs require a `Target`. This requires creating an instance of
+//! `CCall` first. Another method provided by [`CCall`] is [`CCall::uv_async_send`], this method
 //! can be used to wake an `Base.AsyncCondition`. In particular, it can be used to write a
 //! `ccall`able function that does its actual work on another thread, returns early and then
 //! `wait`ing on the async condition from Julia. The advantage of this is that the long-running

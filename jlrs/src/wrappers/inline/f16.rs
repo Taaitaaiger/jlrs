@@ -5,8 +5,7 @@ use jl_sys::jl_float16_type;
 
 use crate::{
     convert::{into_julia::IntoJulia, unbox::Unbox},
-    impl_julia_typecheck,
-    impl_valid_layout,
+    impl_julia_typecheck, impl_valid_layout,
     memory::target::Target,
     private::Private,
     wrappers::ptr::{

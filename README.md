@@ -6,7 +6,8 @@
 jlrs is a crate that provides access to most of the Julia C API, it can be used to embed Julia
 in Rust applications and to use functionality from the Julia C API when writing `ccall`able
 functions in Rust. Currently this crate is only tested on Linux and Windows in combination
-with Julia 1.6 and 1.8.0 and is not compatible with other versions of Julia.
+with Julia 1.6 and 1.8 and is not compatible with other versions of Julia. Using Julia 1.8 is
+highly recommended. The minimum supported Rust version is currently 1.65.
 
 The documentation assumes you're already familiar with the Julia programming language.
 
@@ -14,7 +15,7 @@ An incomplete list of features that are currently supported by jlrs:
 
  - Access arbitrary Julia modules and their contents.
  - Call Julia functions, including functions that take keyword arguments.
- - Exceptions can be handled or converted to their error message, optionally with color.
+ - Handle exceptions or convert them to an error message, optionally with color.
  - Include and call your own Julia code.
  - Use a custom system image.
  - Create values that Julia can use, and convert them back to Rust, from Rust.
@@ -30,10 +31,11 @@ An incomplete list of features that are currently supported by jlrs:
 NB: Active development happens on the `dev` branch, the `master` branch points to the most
 recently released version.
 
+
 ## Prerequisites
 
-Julia must be installed before jlrs can be used. Only version  1.6 and 1.8.0 are
-supported. Using version 1.6 requires enabling the `lts`.
+Julia must be installed before jlrs can be used. Only version  1.6 and 1.8 are
+supported. Using version 1.6 requires enabling the `lts` feature.
 
 ### Linux
 
@@ -59,11 +61,11 @@ because this can break tools currently installed on your system.
 ### Windows
 
 Julia can be installed using juliaup, or with the installer or portable installation
-downloaded from the official website. In the first case, Julia has been likely placed in
-`%USERPROFILE%\.julia\juliaup\julia-x.y.z+0~x64`, while installing or extracting allows
-you to pick the destination. After installation or extraction a folder called `Julia-x.y.z`
-exists, which contains several folders including a `bin` folder containing `julia.exe`. The
-path to the `bin` folder must be added to the `Path` environment variable.
+downloaded from the official website. In the first case, Julia has been likely installed in
+`%USERPROFILE%\.julia\juliaup\julia-x.y.z+0~x64`, while using the installer or extracting
+allows you to pick the destination. After installation or extraction a folder called
+`Julia-x.y.z` exists, which contains several folders including a `bin` folder containing
+`julia.exe`. The path to the `bin` folder must be added to the `Path` environment variable.
 
 Julia is automatically detected by executing the command `where julia`. If this returns
 multiple locations the first one is used. The default can be overridden by setting the
@@ -73,21 +75,6 @@ the environment variable must be set.
 Note that while Julia 1.6 is supported on Windows, several methods are currently unavailable
 when this version is used.
 
-If you use the MSVC target, you must create two or three lib files using `lib.exe`. The def
-files required for this can be found in the [`def` folder](https://github.com/Taaitaaiger/jlrs/tree/master/jl_sys/def) in the jl-sys crate. To create the
-lib files, copy the three files from either the `lts` or `stable` folder to the `bin`
-folder where Julia is installed. Afterwards, open a Developer Command Prompt for VS19 and
-execute the following commands:
-
-```cmd
-cd C:\Path\To\Julia-x.y.z\bin
-lib /def:libjulia.def /out:libjulia.lib /machine:x64
-lib /def:libopenlibm.def /out:libopenlibm.lib /machine:x64
-lib /def:libuv-2.def /out:libuv-2.lib /machine:x64
-```
-
-The final command only needs to be executed if the `uv` feature has been enabled. If you use
-the GNU target these lib files must not exist.
 
 ## Features
 
@@ -98,16 +85,19 @@ A runtime lets you call Julia from Rust, you must enable one of them if you want
 Julia in a Rust application. The following features enable a runtime:
 
 - `sync-rt`
+
   Enables the sync runtime, `Julia`. The sync runtime provides single-threaded, blocking
   access to the Julia C API.
 
 - `async-rt`
+
   Enables the async runtime, `AsyncJulia`. The async runtime runs on a separate thread and
   can be used from multiple threads. While access to the C API is single-threaded, the async
   runtime can run multiple tasks in parallel by making use of Julia's task system and Rust's
   async/await syntax. To use this feature you must provide a backing runtime.
 
 - `tokio-rt` and `async-std-rt`
+
   These features provide a backing runtime for the async runtime. The first uses tokio, the
   second async-std. The `async-rt` feature is automatically enabled when one of these features
   is enabled.
@@ -118,59 +108,75 @@ used by a Rust application that embeds Julia, no runtime is required.
 In addition to these runtimes, the following utility features are available:
 
 - `prelude`
-  Provide a prelude module, `jlrs::prelude`. This feature is enabled by default.
+
+  Provides a prelude module, `jlrs::prelude`. This feature is enabled by default.
 
 - `lts`
+
   Use the current LTS version of Julia (1.6) instead of the current stable version (1.8).
 
+- `beta`
+
+ Use the current beta version of Julia (1.9.0-alpha1) instead of the current stable version
+ (1.8).
+
 - `async`
+
   Enable the features of the async runtime which don't depend on the backing runtime. This
   can be used in libraries which provide implementations of tasks that the async runtime can
   handle.
 
 - `jlrs-derive`
-  This features should be used in combination with the JlrsReflect.jl package. This package
+
+  This feature should be used in combination with the JlrsReflect.jl package. This package
   generates Rust bindings for Julia structs, these bindings use the custom derive macros to
   enable the safe conversion of data from Julia to Rust, and from Rust to Julia in some cases.
 
 - `jlrs-ndarray`
+
   Access the contents of a Julia array as an `ArrayView` or `ArrayViewMut` from ndarray.
 
 - `f16`
+
   Adds support for working with Julia's `Float16` type from Rust using half's `f16` type.
 
 - `ccall`
+
   Julia's `ccall` interface can be used to call functions written in Rust from Julia. No
   runtime can be used in this case because Julia has already been initialized, when this
   feature is enabled the `CCall` struct is available which offers the same functionality as
   the sync runtime without initializing Julia.
 
 - `uv`
+
   This feature enables the method `CCall::uv_async_send`, which can be used to wake a Julia
   `AsyncCondition` from Rust. The `ccall` feature is automically enabled when this feature
   is used.
 
 - `pyplot`
+
   This feature lets you plot data using the Pyplot package and Gtk 3 from Rust.
 
 - `i686`
+
   Link with a 32-bit build of Julia on Linux.
 
 - `debug`
-  Link with a debug build of Julia.
+
+  Link with a debug build of Julia on Linux.
 
 You can enable all features except `lts` and `debug` by enabling the `full` feature.
 
 
 ## Using this crate
 
-If you want to embed Julia and call it from Rust, you must enable a runtime feature:
+If you want to embed Julia in a Rust application, you must enable a runtime feature:
 
-`jlrs = {version = "0.16", features = ["sync-rt"]}`
+`jlrs = {version = "0.17", features = ["sync-rt"]}`
 
-`jlrs = {version = "0.16", features = ["tokio-rt"]}`
+`jlrs = {version = "0.17", features = ["tokio-rt"]}`
 
-`jlrs = {version = "0.16", features = ["async-std-rt"]}`
+`jlrs = {version = "0.17", features = ["async-std-rt"]}`
 
 When Julia is embedded in an application, it must be initialized before it can be used. The
 following snippet initializes the sync runtime:
@@ -178,32 +184,39 @@ following snippet initializes the sync runtime:
 ```rust
 use jlrs::prelude::*;
 
+# fn main() {
 // Initializing Julia is unsafe because this can load arbitrary
 // Julia code, and because it can race with other crates unrelated
 // to jlrs. It returns an error if Julia has already been
 // initialized.
-let _julia = unsafe { RuntimeBuilder::new().start().unwrap() };
+let mut julia = unsafe { RuntimeBuilder::new().start().unwrap() };
+
+// A StackFrame must be provided to ensure Julia's GC can be made aware
+// of references to Julia data that exist in Rust code.
+let mut frame = StackFrame::new();
+let _instance = julia.instance(&mut frame);
+# }
 ```
 
 To use the async runtime you must upgrade the `RuntimeBuilder` to an
-`AsyncRuntimeBuilder` by providing a backing runtime and channel. Implementations for tokio
-and async-std are available if these features have been enabled. For example, an async runtime
-backed by tokio and an unbounded channel can be initialized as follows if the `tokio-rt`
-feature is enabled:
+`AsyncRuntimeBuilder` by providing a backing runtime. Implementations for tokio
+and async-std are available if these features have been enabled. When starting the async
+runtime, you must declare the maximum number of concurrent tasks as a const generic.
+
+For example, an async runtime backed by tokio and an unbounded channel, that supports 3
+concurrent task can be initialized as follows if the `tokio-rt` feature is enabled:
 
 ```rust
-use jlrs::prelude::*;
-
 // Initializing Julia is unsafe for the same reasons as the sync runtime.
 let (_julia, _task_handle) = unsafe {
     RuntimeBuilder::new()
-        .async_runtime::<Tokio, UnboundedChannel<_>>()
-        .start()
+        .async_runtime::<Tokio>()
+        .start::<3>()
         .unwrap()
 };
 ```
 
-The async runtime can also be started asynchronously:
+The async runtime can also be spawned as a blocking task on an existing executor:
 
 ```rust
 use jlrs::prelude::*;
@@ -213,8 +226,8 @@ async fn main() {
     // Initializing Julia is unsafe for the same reasons as the sync runtime.
     let (_julia, _task_handle) = unsafe {
         RuntimeBuilder::new()
-            .async_runtime::<Tokio, UnboundedChannel<_>>()
-            .start_async()
+            .async_runtime::<Tokio>()
+            .start_async::<3>()
             .unwrap()
     };
 }
@@ -230,26 +243,22 @@ This section will focus on some topics that are common between the sync and asyn
 
 After initialization you have an instance of `Julia` or `AsyncJulia`, both provide a
 method called `include` that lets you include files with custom Julia code. In order to
-create Julia data and call Julia functions, a scope must be created.
+create Julia data and call Julia functions, a scope must be created first.
 
-When the sync runtime is used this can be done by calling the methods `Julia::scope` and
-`Julia::scope_with_capacity`. These methods take a closure with two arguments, a `Global`
-and a `GcFrame` (frame). The first is an access token for global Julia data, the second is
-used to root non-global data. While non-global data is rooted, it won't be freed by Julia's
-garbage collector (GC). The frame is created when `Julia::scope(_with_capacity)` is called
-and dropped when it returns, so any data rooted in the frame associated with a scope won't
-be freed by the GC until leaving that scope.
+When the sync runtime is used this can be done by calling the method `Julia::scope`. This
+method takes a closure with a single argument, a `GcFrame` (frame). This frame can be used
+to access Julia data, and ensure it's not freed by the GC while it's accessible from Rust.
 
-Because `AsyncJulia` is a handle to the async runtime which runs on another thread it's not
-possible to directly create a scope. Rather, the async runtime deals with tasks. The simplest
-of these is a blocking task, which can be executed by calling
-`AsyncJulia::(try_)blocking_task(_with_capacity)`. These methods accept any closure
-`Julia::scope` can handle with the additional requirement that it must be `Send` and `Sync`.
-It's called a blocking task because the runtime is blocked while executing this task. The
-other kinds of tasks that the async runtime can handle will be introduced later.
+The async runtime can't create a new scope directly, `AsyncJulia` is a handle to the async
+runtime which runs on another thread. Instead, the async runtime deals with tasks, each task
+runs in its own scope. The simplest kind of task is a blocking task, which can be executed by
+calling `AsyncJulia::(try_)blocking_task`. These methods accept any closure `Julia::scope` can
+handle with the additional requirement that it must be `Send` and `Sync`. It's called a
+blocking task because the runtime is blocked while executing this task. The other kinds of
+tasks that the async runtime can handle will be introduced later.
 
 Inside the closure provided to `Julia::scope` or `AsyncJulia::blocking_task` it's possible to
-interact with Julia. Global Julia data can be accessed through its module system, the methods
+interact with Julia. Unrooted Julia data can be accessed through its module system, the methods
 `Module::main`, `Module::base`, and `Module::core` can be used to access the `Main`,
 `Base`, and `Core` modules respectively. The contents of these modules can then be accessed by
 calling `Module::function` which returns a `Function`, `Module::global` which returns a
@@ -259,27 +268,15 @@ calling `Module::function` which returns a `Function`, `Module::global` which re
 `Value::eval_string`, which evaluates the contents of the string passed to it and returns
 the result as a `Value`. For example, you can evaluate `2` to convert it to  `Value`. In
 practice, this method should rarely be used. It can be used to evaluate simple function calls
-like `sqrt(2)`, but it must be parsed, compiled, and can't take any arguments. Its most
+like `sqrt(2)`, but it must be parsed, compiled, and can't take any non-literal arguments. Its most
 important use-case is importing installed and standard library packages by evaluating an
 `import` or `using` statement.
 
 A more interesting method, `Value::new`, can be used with data of any type that implements
 `IntoJulia`. This trait is implemented by primitive types like `i8` and `char`. Any type
 that implements `IntoJulia` also implements `Unbox` which is used to extract the contents
-of a `Value`. Because `sqrt(2)` returns a `Float64`, it can be unboxed as an `f64`. Pointer
-wrapper types don't implement `IntoJulia` or `Unbox`, if they can be created from Rust
-they provide methods to do so.
-
-It's possible to call anything that implements `Call` as a Julia function. Functions can be
-called with any number of positional arguments and can be provided with keyword arguments.
-Keywords must be provided as a `NamedTuple`, which can be created with the `named_tuple`
-macro.
-
-Evaluating raw code and calling Julia functions is always unsafe. Nothing prevents you from
-calling a function like `nasaldemons() = unsafe_load(Ptr{Float64}(0x05391A445))`. Similarly,
-mutating Julia data is unsafe because nothing prevents you from mutating data that shouldn't
-be mutated, e.g. the contents of the `Core` module. A full overview of the rules that you
-should keep in mind can be found in the `safety` module.
+of a `Value`. Pointer wrapper types like `Array` don't implement `IntoJulia` or `Unbox`,
+if they can be created from Rust they provide methods to do so.
 
 As a simple example, let's convert two numbers to Julia values and add them:
 
@@ -289,27 +286,35 @@ use jlrs::prelude::*;
 // Initializing Julia is unsafe because it can race with another crate that does
 // the same.
 let mut julia = unsafe { RuntimeBuilder::new().start().unwrap() };
+let mut frame = StackFrame::new();
+let mut julia = julia.instance(&mut frame);
 
-let res = julia.scope(|global, mut frame| {
+let res = julia.scope(|mut frame| {
     // Create the two arguments.
-    let i = Value::new(&mut frame, 2u64)?;
-    let j = Value::new(&mut frame, 1u32)?;
+    let i = Value::new(&mut frame, 2u64);
+    let j = Value::new(&mut frame, 1u32);
 
     // The `+` function can be found in the base module.
-    let func = Module::base(global).function(&mut frame, "+")?;
+    let func = Module::base(&frame).function(&mut frame, "+")?;
 
     // Call the function and unbox the result as a `u64`. The result of the function
     // call is a nested `Result`; the outer error doesn't contain to any Julia
     // data, while the inner error contains the exception if one is thrown. Here the
     // exception is converted to the outer error type by calling `into_jlrs_result`, this new
     // error contains the error message Julia would have shown.
-    unsafe { func.call2(&mut frame, i, j)? }
+    unsafe { func.call2(&mut frame, i, j) }
         .into_jlrs_result()?
         .unbox::<u64>()
 }).unwrap();
 
 assert_eq!(res, 3);
 ```
+
+Evaluating raw code and calling Julia functions is always unsafe. Nothing prevents you from
+calling a function like `nasaldemons() = unsafe_load(Ptr{Float64}(0x05391A445))`. Similarly,
+mutating Julia data is unsafe because nothing prevents you from mutating data that shouldn't
+be mutated, e.g. the contents of the `Core` module. A full overview of the rules that you
+should keep in mind can be found in the `safety` module.
 
 #### Async and persistent tasks
 
@@ -318,12 +323,12 @@ the `AsyncTask` trait, and persistent tasks which implement `PersistentTask`. Bo
 these traits are async traits.
 
 An async task is similar to a blocking task, except that you must implement the async `run`
-method instead of providing a closure. This method takes a `Global` and an `AsyncGcFrame`.
-This new frame type not only provides access to the same features as `GcFrame`, it can also
-be used to call async methods provided by the `CallAsync` trait. These methods schedule a
-function call as a new Julia `Task` and can be `await`ed until this task has completed. The
-async runtime can switch to another task while the result is pending, allowing multiple
-tasks to progress.
+method instead of providing a closure. This method takes an `AsyncGcFrame`. This new frame
+type not only provides access to the same features as `GcFrame`, it can also be used to call
+async methods provided by the `CallAsync` trait. These methods schedule a function call as a
+new Julia `Task` and can be `await`ed until this task has completed. The async runtime can
+switch to another task while the result is pending, allowing multiple tasks to run
+concurrently.
 
 The previous example can be rewritten as an async task:
 
@@ -348,19 +353,18 @@ impl AsyncTask for AdditionTask {
     // can be used in combination with methods from the `CallAsync` trait.
     async fn run<'frame>(
         &mut self,
-        global: Global<'frame>,
         mut frame: AsyncGcFrame<'frame>,
     ) -> JlrsResult<Self::Output> {
-        let a = Value::new(&mut frame, self.a)?;
-        let b = Value::new(&mut frame, self.b)?;
+        let a = Value::new(&mut frame, self.a);
+        let b = Value::new(&mut frame, self.b);
 
-        let func = Module::base(global).function(&mut frame, "+")?;
+        let func = Module::base(&frame).function(&mut frame, "+")?;
 
         // CallAsync::call_async schedules the function call on another
         // thread and returns a Future that resolves when the scheduled
         // function has returned or thrown an error.
         unsafe { func.call_async(&mut frame, &mut [a, b]) }
-            .await?
+            .await
             .into_jlrs_result()?
             .unbox::<u64>()
     }
@@ -376,15 +380,17 @@ As an example, let's accumulate some number of values in a Julia array and retur
 its contents:
 
 ```rust
+# #[cfg(not(all(target_os = "windows", feature = "lts")))]
+# {
 use jlrs::prelude::*;
 
 struct AccumulatorTask {
-    n_values: usize
+    n_values: usize,
 }
 
-struct AccumulatorTaskState {
-    array: TypedArray<'static, 'static, usize>,
-    offset: usize
+struct AccumulatorTaskState<'state> {
+    array: TypedArray<'state, 'static, usize>,
+    offset: usize,
 }
 
 // Only the runtime thread can call the Julia C API, so the async trait
@@ -395,7 +401,7 @@ impl PersistentTask for AccumulatorTask {
     // The type of the result of the task if it succeeds.
     type Output = usize;
     // The type of the task's internal state.
-    type State = AccumulatorTaskState;
+    type State<'state> = AccumulatorTaskState<'state>;
     // The type of the additional data that the task must be called with.
     type Input = usize;
 
@@ -403,41 +409,37 @@ impl PersistentTask for AccumulatorTask {
     // lifetime of the frame is `'static`: the frame is not dropped until
     // the task has completed, so the task's internal state can contain
     // Julia data rooted in this frame.
-    async fn init(
+    async fn init<'frame>(
         &mut self,
-        _global: Global<'static>,
-        mut frame: AsyncGcFrame<'static>,
-    ) -> JlrsResult<Self::State> {
+        mut frame: AsyncGcFrame<'frame>,
+    ) -> JlrsResult<Self::State<'frame>> {
         // A `Vec` can be moved from Rust to Julia if the element type
         // implements `IntoJulia`.
         let data = vec![0usize; self.n_values];
-        let array = TypedArray::from_vec(&mut frame, data, self.n_values)?
+        let array = TypedArray::from_vec(frame.as_extended_target(), data, self.n_values)?
             .into_jlrs_result()?;
 
-        Ok(AccumulatorTaskState {
-            array,
-            offset: 0
-        })
+        Ok(AccumulatorTaskState { array, offset: 0 })
     }
 
     // Whenever the task is called through its handle this method
     // is called. Unlike `init`, the frame that this method can use
     // is dropped after `run` returns.
-    async fn run<'frame>(
+    async fn run<'frame, 'state: 'frame>(
         &mut self,
-        global: Global<'static>,
         mut frame: AsyncGcFrame<'frame>,
-        state: &mut Self::State,
+        state: &mut Self::State<'state>,
         input: Self::Input,
     ) -> JlrsResult<Self::Output> {
         {
             // Array data can be directly accessed from Rust.
-            // TypedArray::bits_data_mut can be used if the type
-            // of the elements is concrete and immutable.
-            // This is safe because this is the only active reference to
-            // the array.
-            let mut data = unsafe { state.array.bits_data_mut(&mut frame)? };
-            data[state.offset] = input;
+            // The data is tracked first to ensure it's not
+            // already borrowed from Rust.
+            unsafe {
+                let mut tracked = state.array.track_mut()?;
+                let mut data = tracked.bits_data_mut()?;
+                data[state.offset] = input;
+            };
 
             state.offset += 1;
             if (state.offset == self.n_values) {
@@ -447,14 +449,15 @@ impl PersistentTask for AccumulatorTask {
 
         // Return the sum of the contents of `state.array`.
         unsafe {
-            Module::base(global)
-                .function(&mut *frame, "sum")?
-                .call1(&mut frame, state.array.as_value())?
+            Module::base(&frame)
+                .function(&mut frame, "sum")?
+                .call1(&mut frame, state.array.as_value())
                 .into_jlrs_result()?
                 .unbox::<usize>()
         }
     }
 }
+# }
 ```
 
 ### Calling Rust from Julia
@@ -477,26 +480,33 @@ unsafe extern "C" fn call_me(arg: bool) -> isize {
     }
 }
 
+let mut frame = StackFrame::new();
 let mut julia = unsafe { RuntimeBuilder::new().start().unwrap() };
-julia.scope(|global, mut frame| unsafe {
-    // Cast the function to a void pointer
-    let call_me_val = Value::new(&mut frame, call_me as *mut std::ffi::c_void)?;
+let mut julia = julia.instance(&mut frame);
 
-    // Value::eval_string can be used to create new functions.
-    let func = Value::eval_string(
-        &mut frame,
-        "myfunc(callme::Ptr{Cvoid})::Int = ccall(callme, Int, (Bool,), true)"
-    )?.into_jlrs_result()?;
+julia
+    .scope(|mut frame| unsafe {
+        // Cast the function to a void pointer
+        let call_me_val = Value::new(&mut frame, call_me as *mut std::ffi::c_void);
 
-    // Call the function and unbox the result.
-    let output = func.call1(&mut frame, call_me_val)?
-        .into_jlrs_result()?
-        .unbox::<isize>()?;
+        // Value::eval_string can be used to create new functions.
+        let func = Value::eval_string(
+            &mut frame,
+            "myfunc(callme::Ptr{Cvoid})::Int = ccall(callme, Int, (Bool,), true)",
+        )
+        .into_jlrs_result()?;
 
-    assert_eq!(output, 1);
+        // Call the function and unbox the result.
+        let result = func
+            .call1(&mut frame, call_me_val)
+            .into_jlrs_result()?
+            .unbox::<isize>()?;
 
-    Ok(())
-}).unwrap();
+        assert_eq!(result, 1);
+
+        Ok(())
+    })
+    .unwrap();
 ```
 
 You can also use functions defined in `dylib` and `cdylib` libraries. In order to create such
@@ -537,8 +547,7 @@ One important aspect of calling Rust from other languages in general is that pan
 an FFI boundary is undefined behaviour. If you're not sure your code will never panic, wrap it
 with `std::panic::catch_unwind`.
 
-Most features provided by jlrs including accessing modules, calling functions, and borrowing
-array data require a `Global` or a frame. You can access these by creating an instance of
+Many features provided by jlrs require a `Target`. This requires creating an instance of
 `CCall` first. Another method provided by `CCall` is `CCall::uv_async_send`, this method
 can be used to wake an `Base.AsyncCondition`. In particular, it can be used to write a
 `ccall`able function that does its actual work on another thread, returns early and then
@@ -550,58 +559,78 @@ is aware that the use of this data is still in use after the `ccall` has returne
 ## Testing
 
 The restriction that Julia can be initialized once must be taken into account when running
-tests that use `jlrs`. The recommended approach is to create a thread-local static `RefCell`:
+tests that use `jlrs`. Because tests defined in a single crate are not guaranteed to be run
+from the same thread you must guarantee that each crate has only one test that initializes
+Julia. It's recommended you only use jlrs in integration tests because each top-level
+integration test file is treated as a separate crate.
 
 ```rust
 use jlrs::prelude::*;
-use std::cell::RefCell;
-thread_local! {
-    pub static JULIA: RefCell<Julia> = {
-        let julia = RefCell::new(unsafe { RuntimeBuilder::new().start().unwrap() });
 
-        /* include everything you need to use */
+fn test_1(julia: &mut Julia) {
+    // use instance
+}
+fn test_2(julia: &mut Julia) {
+    // use instance
+}
 
-        julia
-    };
+#[test]
+fn call_tests() {
+    let mut pending = unsafe { RuntimeBuilder::new().start().unwrap() };
+    let mut frame = StackFrame::new();
+    let mut julia = pending.instance(&mut frame);
+
+    test_1(&mut julia);
+    test_2(&mut julia);
 }
 ```
 
-A similar approach works for the async runtime:
+Because `AsyncJulia` is thread-safe, it is possible to have multiple tests in a single crate
+when the async runtime is used:
 
 ```rust
+use std::{num::NonZeroUsize, sync::Arc};
+
 use jlrs::prelude::*;
-use std::cell::RefCell;
-thread_local! {
-    pub static JULIA: RefCell<AsyncJulia<Tokio>> = {
-        let julia = RefCell::new(unsafe {
+use once_cell::sync::OnceCell;
+
+fn init() -> Arc<AsyncJulia<Tokio>> {
+    unsafe {
+        Arc::new(
             RuntimeBuilder::new()
-                .async_runtime::<Tokio, UnboundedChannel<_>>()
-                .start()
-                .unwrap()
-                .0
-        });
+                .async_runtime::<Tokio>()
+                .n_threads(4)
+                .channel_capacity(NonZeroUsize::new_unchecked(32))
+                .start::<4>()
+                .expect("Could not init Julia")
+                .0,
+        )
+    }
+}
 
-        /* include everything you need to use */
+pub static JULIA: OnceCell<Arc<AsyncJulia<Tokio>>> = OnceCell::new();
 
-        julia
-    };
+#[test]
+fn test_1() {
+    let julia = JULIA.get_or_init(init);
+
+    // use instance
+}
+
+#[test]
+fn test_2() {
+    let julia = JULIA.get_or_init(init);
+
+    // use instance
 }
 ```
-
-Tests that use these constructs can only use one thread for testing, so you must use
-`cargo test -- --test-threads=1`, otherwise the code above will panic when a test tries to
-initialize Julia a second time from another thread.
-
-If you want to run all of jlrs's tests, this requirement must be taken into account:
-`cargo test --all-features -- --test-threads=1`. Testing with the `--all-features` flag only
-works with Julia 1.8 because this overrides the `lts` and `debug` features.
 
 
 ## Custom types
 
-In order to map a struct in Rust to one in Julia you can derive `ValidLayout`, `Unbox`,
-and `Typecheck`. If the struct in Julia has no type parameters and is a bits type you can
-also derive `IntoJulia`.
+In order to map a struct in Rust to one in Julia you can derive `Unbox`, `Typecheck` and
+`ValidLayout`. If the struct in Julia is immutable `ValidField` can also be derived,
+if it has no type parameters `IntoJulia`.
 
 You normally shouldn't need to implement these structs or traits manually. The JlrsReflect
 package can generate correct Rust struct and automatically derive the supported traits for

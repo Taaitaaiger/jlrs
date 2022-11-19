@@ -78,7 +78,7 @@ docs = ["jl-sys/docs", "full", "nightly"]
 
 [dependencies]
 cfg-if = "1"
-jl-sys = {version = "0.18", path = "../jl_sys" }
+jl-sys = {version = "0.19", path = "../jl_sys" }
 smallvec = "1"
 thiserror = "1"
 atomic_refcell = "0.1"

@@ -55,6 +55,8 @@
 
  - Add `Affinity` so tasks can be explicitly scheduled on the main runtime thread.
 
+ - `Global` has been renamed to `Unrooted`. 
+
 
 #### v0.16
  - Support for Julia 1.7 has been dropped, by default Julia 1.8 is targeted.

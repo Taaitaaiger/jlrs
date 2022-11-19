@@ -25,8 +25,7 @@ use crate::{
         private::WrapperPriv,
         union::{find_union_component, nth_union_component},
         value::{Value, ValueData},
-        Wrapper,
-        WrapperRef,
+        Wrapper, WrapperRef,
     },
 };
 

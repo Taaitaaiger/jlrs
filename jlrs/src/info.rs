@@ -8,20 +8,9 @@ use std::{
 
 use cfg_if::cfg_if;
 use jl_sys::{
-    jl_cpu_threads,
-    jl_get_ARCH,
-    jl_get_UNAME,
-    jl_getallocationgranularity,
-    jl_getpagesize,
-    jl_git_branch,
-    jl_git_commit,
-    jl_is_debugbuild,
-    jl_n_threads,
-    jl_ver_is_release,
-    jl_ver_major,
-    jl_ver_minor,
-    jl_ver_patch,
-    jl_ver_string,
+    jl_cpu_threads, jl_get_ARCH, jl_get_UNAME, jl_getallocationgranularity, jl_getpagesize,
+    jl_git_branch, jl_git_commit, jl_is_debugbuild, jl_n_threads, jl_ver_is_release, jl_ver_major,
+    jl_ver_minor, jl_ver_patch, jl_ver_string,
 };
 
 use crate::{
