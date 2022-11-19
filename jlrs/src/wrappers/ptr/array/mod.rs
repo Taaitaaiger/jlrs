@@ -32,44 +32,17 @@ use std::{
 
 use cfg_if::cfg_if;
 use jl_sys::{
-    jl_alloc_array_1d,
-    jl_alloc_array_2d,
-    jl_alloc_array_3d,
-    jl_apply_array_type,
-    jl_apply_tuple_type_v,
-    jl_array_data,
-    jl_array_del_beg,
-    jl_array_del_end,
-    jl_array_dims_ptr,
-    jl_array_eltype,
-    jl_array_grow_beg,
-    jl_array_grow_end,
-    jl_array_ndims,
-    jl_array_t,
-    jl_datatype_t,
-    jl_gc_add_ptr_finalizer,
-    jl_new_array,
-    jl_new_struct_uninit,
-    jl_pchar_to_array,
-    jl_ptr_to_array,
-    jl_ptr_to_array_1d,
-    jl_reshape_array,
+    jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_apply_array_type,
+    jl_apply_tuple_type_v, jl_array_data, jl_array_del_beg, jl_array_del_end, jl_array_dims_ptr,
+    jl_array_eltype, jl_array_grow_beg, jl_array_grow_end, jl_array_ndims, jl_array_t,
+    jl_datatype_t, jl_gc_add_ptr_finalizer, jl_new_array, jl_new_struct_uninit, jl_pchar_to_array,
+    jl_ptr_to_array, jl_ptr_to_array_1d, jl_reshape_array,
 };
 
 use self::data::accessor::{
-    ArrayAccessor,
-    BitsArrayAccessorI,
-    BitsArrayAccessorMut,
-    Immutable,
-    IndeterminateArrayAccessor,
-    IndeterminateArrayAccessorI,
-    InlinePtrArrayAccessorI,
-    InlinePtrArrayAccessorMut,
-    Mutable,
-    PtrArrayAccessorI,
-    PtrArrayAccessorMut,
-    UnionArrayAccessorI,
-    UnionArrayAccessorMut,
+    ArrayAccessor, BitsArrayAccessorI, BitsArrayAccessorMut, Immutable, IndeterminateArrayAccessor,
+    IndeterminateArrayAccessorI, InlinePtrArrayAccessorI, InlinePtrArrayAccessorMut, Mutable,
+    PtrArrayAccessorI, PtrArrayAccessorMut, UnionArrayAccessorI, UnionArrayAccessorMut,
 };
 use super::{union_all::UnionAll, value::ValueRef, Ref};
 use crate::{
@@ -94,8 +67,7 @@ use crate::{
         type_name::TypeName,
         union::Union,
         value::Value,
-        Wrapper,
-        WrapperRef,
+        Wrapper, WrapperRef,
     },
 };
 

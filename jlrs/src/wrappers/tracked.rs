@@ -9,8 +9,7 @@ use std::{
 };
 
 use crate::{
-    layout::inline_layout::InlineLayout,
-    memory::context::ledger::Ledger,
+    layout::inline_layout::InlineLayout, memory::context::ledger::Ledger,
     wrappers::ptr::value::Value,
 };
 

@@ -7,24 +7,14 @@ use std::{
 use super::{
     data::{
         accessor::{
-            BitsArrayAccessorI,
-            BitsArrayAccessorMut,
-            IndeterminateArrayAccessorI,
-            IndeterminateArrayAccessorMut,
-            InlinePtrArrayAccessorI,
-            InlinePtrArrayAccessorMut,
-            PtrArrayAccessorI,
-            PtrArrayAccessorMut,
-            UnionArrayAccessorI,
-            UnionArrayAccessorMut,
+            BitsArrayAccessorI, BitsArrayAccessorMut, IndeterminateArrayAccessorI,
+            IndeterminateArrayAccessorMut, InlinePtrArrayAccessorI, InlinePtrArrayAccessorMut,
+            PtrArrayAccessorI, PtrArrayAccessorMut, UnionArrayAccessorI, UnionArrayAccessorMut,
         },
         copied::CopiedArray,
     },
     dimensions::{ArrayDimensions, Dims},
-    Array,
-    ArrayData,
-    TypedArray,
-    TypedArrayData,
+    Array, ArrayData, TypedArray, TypedArrayData,
 };
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
 use super::{ArrayResult, TypedArrayResult};

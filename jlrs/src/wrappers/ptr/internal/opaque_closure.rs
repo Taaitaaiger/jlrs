@@ -18,8 +18,7 @@ use crate::{
         private::WrapperPriv,
         type_name::TypeName,
         value::{Value, ValueResult},
-        Ref,
-        Wrapper as _,
+        Ref, Wrapper as _,
     },
 };
 

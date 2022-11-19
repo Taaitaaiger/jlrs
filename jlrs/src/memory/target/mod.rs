@@ -176,19 +176,14 @@ pub(crate) mod private {
     #[cfg(feature = "async")]
     use super::AsyncGcFrame;
     use super::{
-        reusable_slot::ReusableSlot,
-        target_type::TargetType,
-        unrooted::Unrooted,
-        GcFrame,
-        Output,
+        reusable_slot::ReusableSlot, target_type::TargetType, unrooted::Unrooted, GcFrame, Output,
     };
     use crate::{
         private::Private,
         wrappers::ptr::{
             private::WrapperPriv,
             value::{Value, ValueRef},
-            Ref,
-            Wrapper,
+            Ref, Wrapper,
         },
     };
 

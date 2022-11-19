@@ -9,8 +9,7 @@ use jl_sys::{jl_char_type, jl_unbox_uint32};
 
 use crate::{
     convert::unbox::Unbox,
-    impl_julia_typecheck,
-    impl_valid_layout,
+    impl_julia_typecheck, impl_valid_layout,
     private::Private,
     wrappers::ptr::{private::WrapperPriv, value::Value},
 };

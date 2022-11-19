@@ -15,12 +15,8 @@ mod tests {
         layout::typecheck::*,
         prelude::*,
         wrappers::ptr::{
-            simple_vector::SimpleVector,
-            symbol::SymbolRef,
-            type_name::TypeName,
-            type_var::TypeVar,
-            union::Union,
-            union_all::UnionAll,
+            simple_vector::SimpleVector, symbol::SymbolRef, type_name::TypeName, type_var::TypeVar,
+            union::Union, union_all::UnionAll,
         },
     };
 
