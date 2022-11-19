@@ -3,9 +3,6 @@ mod util;
 #[cfg(feature = "sync-rt")]
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
 mod tests {
-    use crate::util::JULIA;
-    use jlrs::layout::typecheck::*;
-    use jlrs::prelude::*;
     #[cfg(feature = "internal-types")]
     use jlrs::wrappers::ptr::internal::code_instance::CodeInstance;
     #[cfg(feature = "internal-types")]
@@ -14,11 +11,16 @@ mod tests {
     use jlrs::wrappers::ptr::internal::method::Method;
     #[cfg(feature = "internal-types")]
     use jlrs::wrappers::ptr::internal::method_instance::MethodInstance;
-    use jlrs::wrappers::ptr::type_name::TypeName;
-    use jlrs::wrappers::ptr::type_var::TypeVar;
-    use jlrs::wrappers::ptr::union::Union;
-    use jlrs::wrappers::ptr::union_all::UnionAll;
-    use jlrs::wrappers::ptr::{simple_vector::SimpleVector, symbol::SymbolRef};
+    use jlrs::{
+        layout::typecheck::*,
+        prelude::*,
+        wrappers::ptr::{
+            simple_vector::SimpleVector, symbol::SymbolRef, type_name::TypeName, type_var::TypeVar,
+            union::Union, union_all::UnionAll,
+        },
+    };
+
+    use crate::util::JULIA;
 
     fn datatype_methods() {
         JULIA.with(|j| {

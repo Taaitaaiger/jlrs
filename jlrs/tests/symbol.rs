@@ -4,9 +4,12 @@ mod util;
 mod tests {
     use std::collections::HashSet;
 
+    use jlrs::{
+        memory::gc::{Gc, GcCollection},
+        prelude::*,
+    };
+
     use super::util::JULIA;
-    use jlrs::memory::gc::{Gc, GcCollection};
-    use jlrs::prelude::*;
 
     fn create_symbol() {
         JULIA.with(|j| {

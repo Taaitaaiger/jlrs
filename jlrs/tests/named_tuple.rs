@@ -1,9 +1,9 @@
 mod util;
 #[cfg(feature = "sync-rt")]
 mod tests {
+    use jlrs::{layout::typecheck::NamedTuple, prelude::*};
+
     use super::util::JULIA;
-    use jlrs::layout::typecheck::NamedTuple;
-    use jlrs::prelude::*;
 
     fn create_named_tuple() {
         JULIA.with(|j| {

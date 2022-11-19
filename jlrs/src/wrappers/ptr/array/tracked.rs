@@ -1,9 +1,3 @@
-use crate::{
-    error::JlrsResult,
-    layout::valid_layout::ValidField,
-    memory::context::ledger::Ledger,
-    wrappers::ptr::{value::ValueRef, WrapperRef},
-};
 use std::{
     marker::PhantomData,
     mem::{self, ManuallyDrop},
@@ -22,10 +16,17 @@ use super::{
     dimensions::{ArrayDimensions, Dims},
     Array, ArrayData, TypedArray, TypedArrayData,
 };
-use crate::memory::target::{ExtendedTarget, Target};
-
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
 use super::{ArrayResult, TypedArrayResult};
+use crate::{
+    error::JlrsResult,
+    layout::valid_layout::ValidField,
+    memory::{
+        context::ledger::Ledger,
+        target::{ExtendedTarget, Target},
+    },
+    wrappers::ptr::{value::ValueRef, WrapperRef},
+};
 
 pub trait ArrayWrapper<'scope, 'data>: Copy {
     fn track<'borrow>(&'borrow self) -> JlrsResult<TrackedArray<'borrow, 'scope, 'data, Self>>;

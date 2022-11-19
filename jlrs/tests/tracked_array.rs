@@ -3,8 +3,9 @@ mod util;
 #[cfg(feature = "sync-rt")]
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
 mod tests {
-    use crate::util::JULIA;
     use jlrs::prelude::*;
+
+    use crate::util::JULIA;
 
     fn create_tracked_array() {
         JULIA.with(|j| {

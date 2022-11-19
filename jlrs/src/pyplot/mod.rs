@@ -6,11 +6,15 @@
 //!
 //! When multiple figures are open, only the most recently opened one is updated automatically.
 
+use smallvec::SmallVec;
+
+#[cfg(feature = "async")]
+use crate::{call::CallAsync, memory::target::frame::AsyncGcFrame};
 use crate::{
     call::{Call, ProvideKeywords},
     convert::into_jlrs_result::IntoJlrsResult,
     error::JlrsResult,
-    memory::{target::frame::GcFrame, target::Target},
+    memory::target::{frame::GcFrame, Target},
     wrappers::ptr::{
         function::Function,
         module::Module,
@@ -18,11 +22,6 @@ use crate::{
         Wrapper,
     },
 };
-
-#[cfg(feature = "async")]
-use crate::{call::CallAsync, memory::target::frame::AsyncGcFrame};
-
-use smallvec::SmallVec;
 
 init_fn!(init_jlrs_py_plot, JLRS_PY_PLOT_JL, "JlrsPyPlot.jl");
 

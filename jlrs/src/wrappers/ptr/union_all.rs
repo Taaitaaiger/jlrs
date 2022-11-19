@@ -1,16 +1,17 @@
 //! Wrapper for `UnionAll`, A union of types over all values of a type parameter.
 
-use crate::{
-    impl_julia_typecheck,
-    memory::target::Target,
-    private::Private,
-    wrappers::ptr::{datatype::DataType, private::WrapperPriv, type_var::TypeVar, value::Value},
-};
 use cfg_if::cfg_if;
 use jl_sys::{
     jl_abstractarray_type, jl_anytuple_type_type, jl_array_type, jl_densearray_type,
     jl_llvmpointer_type, jl_namedtuple_type, jl_pointer_type, jl_ref_type, jl_type_type,
     jl_type_unionall, jl_unionall_t, jl_unionall_type,
+};
+
+use crate::{
+    impl_julia_typecheck,
+    memory::target::Target,
+    private::Private,
+    wrappers::ptr::{datatype::DataType, private::WrapperPriv, type_var::TypeVar, value::Value},
 };
 
 cfg_if! {
@@ -44,9 +45,11 @@ impl<'scope> UnionAll<'scope> {
     where
         T: Target<'target>,
     {
-        use crate::catch::catch_exceptions;
-        use jl_sys::jl_value_t;
         use std::mem::MaybeUninit;
+
+        use jl_sys::jl_value_t;
+
+        use crate::catch::catch_exceptions;
 
         // Safety: if an exception is thrown it's caught, the result is immediately rooted
         unsafe {

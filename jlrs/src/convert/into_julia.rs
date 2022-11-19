@@ -9,6 +9,17 @@
 //! [`Value::new`]: crate::wrappers::ptr::value::Value::new
 //! [`Value`]: crate::wrappers::ptr::value::Value
 
+use std::{ffi::c_void, ptr::NonNull};
+
+use jl_sys::{
+    jl_apply_type, jl_bool_type, jl_box_bool, jl_box_char, jl_box_float32, jl_box_float64,
+    jl_box_int16, jl_box_int32, jl_box_int64, jl_box_int8, jl_box_uint16, jl_box_uint32,
+    jl_box_uint64, jl_box_uint8, jl_box_voidpointer, jl_char_type, jl_float32_type,
+    jl_float64_type, jl_int16_type, jl_int32_type, jl_int64_type, jl_int8_type,
+    jl_new_struct_uninit, jl_uint16_type, jl_uint32_type, jl_uint64_type, jl_uint8_type,
+    jl_voidpointer_type,
+};
+
 use crate::{
     memory::target::Target,
     private::Private,
@@ -19,15 +30,6 @@ use crate::{
         value::{Value, ValueData},
     },
 };
-use jl_sys::{
-    jl_apply_type, jl_bool_type, jl_box_bool, jl_box_char, jl_box_float32, jl_box_float64,
-    jl_box_int16, jl_box_int32, jl_box_int64, jl_box_int8, jl_box_uint16, jl_box_uint32,
-    jl_box_uint64, jl_box_uint8, jl_box_voidpointer, jl_char_type, jl_float32_type,
-    jl_float64_type, jl_int16_type, jl_int32_type, jl_int64_type, jl_int8_type,
-    jl_new_struct_uninit, jl_uint16_type, jl_uint32_type, jl_uint64_type, jl_uint8_type,
-    jl_voidpointer_type,
-};
-use std::{ffi::c_void, ptr::NonNull};
 
 /// Trait implemented by types that can be converted to a Julia value in combination with
 /// [`Value::new`]. This trait can be derived, it's recommended to use JlrsReflect.jl to

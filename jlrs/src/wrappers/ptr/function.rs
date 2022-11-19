@@ -6,6 +6,11 @@
 //!
 //! [`Call`]: crate::call::Call
 
+use std::{marker::PhantomData, ptr::NonNull};
+
+use jl_sys::jl_value_t;
+
+use super::{value::ValueResult, Ref};
 use crate::{
     call::{Call, ProvideKeywords, WithKeywords},
     error::JlrsResult,
@@ -13,14 +18,10 @@ use crate::{
         typecheck::Typecheck,
         valid_layout::{ValidField, ValidLayout},
     },
-    memory::{target::global::Global, target::Target},
+    memory::target::{global::Global, Target},
     private::Private,
     wrappers::ptr::{datatype::DataType, private::WrapperPriv, value::Value, Wrapper},
 };
-use jl_sys::jl_value_t;
-use std::{marker::PhantomData, ptr::NonNull};
-
-use super::{value::ValueResult, Ref};
 
 /// A Julia function.
 #[derive(Clone, Copy)]

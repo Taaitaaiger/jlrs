@@ -2,9 +2,12 @@ mod util;
 #[cfg(feature = "sync-rt")]
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
 mod tests {
+    use jlrs::{
+        prelude::*,
+        wrappers::ptr::{type_var::TypeVar, union_all::UnionAll},
+    };
+
     use super::util::JULIA;
-    use jlrs::prelude::*;
-    use jlrs::wrappers::ptr::{type_var::TypeVar, union_all::UnionAll};
 
     fn create_new_unionall() {
         JULIA.with(|j| {

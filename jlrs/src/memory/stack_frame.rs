@@ -10,12 +10,11 @@ use std::{
 #[cfg(not(feature = "lts"))]
 use jl_sys::{jl_get_current_task, jl_task_t};
 
+use super::context::stack::Stack;
 use crate::{
     private::Private,
     wrappers::ptr::{private::WrapperPriv, value::Value},
 };
-
-use super::context::stack::Stack;
 
 const ROOT: Cell<*mut c_void> = Cell::new(null_mut());
 

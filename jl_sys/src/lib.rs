@@ -2,10 +2,12 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 
-use std::ffi::c_void;
-use std::mem::size_of;
-use std::ptr::{null_mut, NonNull};
-use std::sync::atomic::{AtomicPtr, Ordering};
+use std::{
+    ffi::c_void,
+    mem::size_of,
+    ptr::{null_mut, NonNull},
+    sync::atomic::{AtomicPtr, Ordering},
+};
 
 #[cfg(feature = "lts")]
 use ::std::os::raw::c_char;
@@ -398,8 +400,9 @@ extern "C" {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::ffi::CString;
+
+    use super::*;
 
     #[test]
     fn sanity() {

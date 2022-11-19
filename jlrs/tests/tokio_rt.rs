@@ -5,10 +5,12 @@ mod util;
 #[cfg(all(feature = "tokio-rt", not(all(target_os = "windows", feature = "lts"))))]
 #[cfg(test)]
 mod tests {
-    use super::util::{async_tasks::*, ASYNC_TESTS_JL};
+    use std::{num::NonZeroUsize, sync::Arc};
+
     use jlrs::prelude::*;
     use once_cell::sync::OnceCell;
-    use std::{num::NonZeroUsize, sync::Arc};
+
+    use super::util::{async_tasks::*, ASYNC_TESTS_JL};
 
     fn init() -> Arc<AsyncJulia<Tokio>> {
         unsafe {

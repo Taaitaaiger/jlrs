@@ -1,19 +1,24 @@
-use super::{channel::Channel, task::PersistentTask};
-use crate::async_util::channel::ChannelReceiver;
-use crate::async_util::channel::OneshotSender;
-use crate::async_util::future::JuliaFuture;
-use crate::call::Call;
-use crate::error::JlrsError;
-use crate::error::JlrsResult;
-use crate::memory::target::frame::{AsyncGcFrame, GcFrame};
-use crate::memory::{context::stack::Stack, stack_frame::StackFrame};
-use crate::runtime::async_rt::PersistentHandle;
-use crate::wrappers::ptr::{module::Module, string::JuliaString, value::Value, Wrapper};
-use crate::{async_util::task::AsyncTask, runtime::async_rt::PersistentMessage};
+use std::{ffi::c_void, marker::PhantomData, num::NonZeroUsize, path::PathBuf, sync::Arc};
+
 use async_trait::async_trait;
-use std::ffi::c_void;
-use std::path::PathBuf;
-use std::{marker::PhantomData, num::NonZeroUsize, sync::Arc};
+
+use super::{channel::Channel, task::PersistentTask};
+use crate::{
+    async_util::{
+        channel::{ChannelReceiver, OneshotSender},
+        future::JuliaFuture,
+        task::AsyncTask,
+    },
+    call::Call,
+    error::{JlrsError, JlrsResult},
+    memory::{
+        context::stack::Stack,
+        stack_frame::StackFrame,
+        target::frame::{AsyncGcFrame, GcFrame},
+    },
+    runtime::async_rt::{PersistentHandle, PersistentMessage},
+    wrappers::ptr::{module::Module, string::JuliaString, value::Value, Wrapper},
+};
 
 pub(crate) type InnerPersistentMessage<P> = Box<
     dyn CallPersistentTaskEnvelope<

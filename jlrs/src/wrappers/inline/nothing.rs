@@ -1,5 +1,7 @@
 //! Wrapper for `Nothing`.
 
+use jl_sys::jl_nothing_type;
+
 use crate::{
     convert::{into_julia::IntoJulia, unbox::Unbox},
     impl_julia_typecheck, impl_valid_layout,
@@ -10,7 +12,6 @@ use crate::{
         private::WrapperPriv,
     },
 };
-use jl_sys::jl_nothing_type;
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

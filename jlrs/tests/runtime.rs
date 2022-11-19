@@ -1,8 +1,9 @@
 mod util;
 #[cfg(feature = "sync-rt")]
 mod tests {
-    use super::util::JULIA;
     use jlrs::prelude::*;
+
+    use super::util::JULIA;
 
     fn error_include_nonexistent() {
         JULIA.with(|j| unsafe {

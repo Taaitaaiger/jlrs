@@ -112,6 +112,13 @@ pub mod union;
 pub mod union_all;
 pub mod value;
 
+use std::{
+    ffi::c_void,
+    fmt::{Debug, Formatter, Result as FmtResult},
+    marker::PhantomData,
+    ptr::NonNull,
+};
+
 use crate::{
     call::Call,
     error::{JlrsError, JlrsResult, CANNOT_DISPLAY_VALUE},
@@ -119,12 +126,6 @@ use crate::{
     memory::target::{global::Global, Target},
     private::Private,
     wrappers::ptr::{module::Module, private::WrapperPriv as _, string::JuliaString, value::Value},
-};
-use std::{
-    ffi::c_void,
-    fmt::{Debug, Formatter, Result as FmtResult},
-    marker::PhantomData,
-    ptr::NonNull,
 };
 
 /// Trait implemented by `Ref`.
@@ -330,9 +331,12 @@ impl<'scope, 'data, T: Wrapper<'scope, 'data>> Ref<'scope, 'data, T> {
 }
 
 pub(crate) mod private {
-    use crate::private::Private;
-    use crate::wrappers::ptr::{value::Value, Ref};
     use std::{fmt::Debug, ptr::NonNull};
+
+    use crate::{
+        private::Private,
+        wrappers::ptr::{value::Value, Ref},
+    };
 
     pub trait WrapperPriv<'scope, 'data>: Copy + Debug {
         type Wraps;

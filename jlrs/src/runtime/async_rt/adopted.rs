@@ -2,13 +2,12 @@ use std::{cell::RefCell, collections::VecDeque, rc::Rc, time::Duration};
 
 use jl_sys::{jl_adopt_thread, jl_gc_safepoint};
 
+use super::{queue::Receiver, AsyncRuntime, Message, MessageInner};
 use crate::{
     async_util::task::sleep,
     error::JlrsResult,
     memory::{stack_frame::StackFrame, target::global::Global},
 };
-
-use super::{queue::Receiver, AsyncRuntime, Message, MessageInner};
 
 pub(crate) unsafe fn init_worker<R: AsyncRuntime, const N: usize>(
     worker_id: usize,

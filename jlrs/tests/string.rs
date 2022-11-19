@@ -2,11 +2,11 @@ mod util;
 
 #[cfg(feature = "sync-rt")]
 mod tests {
-    use crate::util::JULIA;
-    use jlrs::layout::valid_layout::ValidLayout;
-    use jlrs::prelude::*;
-    use jlrs::wrappers::ptr::string::JuliaString;
     use std::borrow::Cow;
+
+    use jlrs::{layout::valid_layout::ValidLayout, prelude::*, wrappers::ptr::string::JuliaString};
+
+    use crate::util::JULIA;
 
     fn create_and_unbox_str_data() {
         JULIA.with(|j| {

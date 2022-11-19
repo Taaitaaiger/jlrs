@@ -1,5 +1,8 @@
 //! Wrapper for `Float16`.
 
+use half::f16;
+use jl_sys::jl_float16_type;
+
 use crate::{
     convert::{into_julia::IntoJulia, unbox::Unbox},
     impl_julia_typecheck, impl_valid_layout,
@@ -10,8 +13,6 @@ use crate::{
         private::WrapperPriv,
     },
 };
-use half::f16;
-use jl_sys::jl_float16_type;
 
 impl_julia_typecheck!(f16, jl_float16_type);
 impl_valid_layout!(f16);

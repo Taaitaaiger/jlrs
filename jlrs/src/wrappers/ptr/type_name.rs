@@ -5,6 +5,15 @@
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L380
 
+use std::{marker::PhantomData, ptr::NonNull};
+
+use cfg_if::cfg_if;
+use jl_sys::{
+    jl_array_typename, jl_llvmpointer_typename, jl_namedtuple_typename, jl_pointer_typename,
+    jl_tuple_typename, jl_type_typename, jl_typename_t, jl_typename_type, jl_vecelement_typename,
+};
+
+use super::Ref;
 use crate::{
     impl_julia_typecheck,
     memory::target::Target,
@@ -13,15 +22,6 @@ use crate::{
         module::Module, private::WrapperPriv, simple_vector::SimpleVector, symbol::Symbol,
     },
 };
-
-use cfg_if::cfg_if;
-use jl_sys::{
-    jl_array_typename, jl_llvmpointer_typename, jl_namedtuple_typename, jl_pointer_typename,
-    jl_tuple_typename, jl_type_typename, jl_typename_t, jl_typename_type, jl_vecelement_typename,
-};
-use std::{marker::PhantomData, ptr::NonNull};
-
-use super::Ref;
 
 cfg_if! {
     if #[cfg(feature = "lts")] {

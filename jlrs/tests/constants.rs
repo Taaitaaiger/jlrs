@@ -2,9 +2,9 @@ mod util;
 #[cfg(feature = "sync-rt")]
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
 mod tests {
+    use jlrs::{prelude::*, wrappers::ptr::union_all::UnionAll};
+
     use super::util::JULIA;
-    use jlrs::prelude::*;
-    use jlrs::wrappers::ptr::union_all::UnionAll;
 
     macro_rules! impl_constant_test {
         ($func:ident, $tyname:expr) => {

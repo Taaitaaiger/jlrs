@@ -2,6 +2,10 @@
 //!
 //! This module is only available if the `ccall` feature is enabled.
 
+use jl_sys::jl_throw;
+#[cfg(feature = "uv")]
+use jl_sys::uv_async_send;
+
 use crate::{
     error::JlrsResult,
     memory::{
@@ -15,11 +19,6 @@ use crate::{
         value::{Value, ValueRef},
     },
 };
-
-#[cfg(feature = "uv")]
-use jl_sys::uv_async_send;
-
-use jl_sys::jl_throw;
 
 /// Use Julia from a Rust function called through `ccall`.
 ///

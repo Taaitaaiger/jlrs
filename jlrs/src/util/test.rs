@@ -1,5 +1,6 @@
-use crate::runtime::{builder::RuntimeBuilder, sync_rt::PendingJulia};
 use std::cell::RefCell;
+
+use crate::runtime::{builder::RuntimeBuilder, sync_rt::PendingJulia};
 
 thread_local! {
     #[doc(hidden)]

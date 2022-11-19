@@ -23,15 +23,16 @@
 //! [`DataType`]: crate::wrappers::ptr::datatype::DataType
 //! [`IntoJulia`]: crate::convert::into_julia::IntoJulia
 
-use crate::wrappers::ptr::value::Value;
+use std::ffi::c_void;
+
 use jl_sys::{
     jl_unbox_float32, jl_unbox_float64, jl_unbox_int16, jl_unbox_int32, jl_unbox_int64,
     jl_unbox_int8, jl_unbox_uint16, jl_unbox_uint32, jl_unbox_uint64, jl_unbox_uint8,
     jl_unbox_voidpointer,
 };
-use std::ffi::c_void;
 
 use super::into_julia::IntoJulia;
+use crate::wrappers::ptr::value::Value;
 
 /// A trait implemented by types that can be extracted from a Julia value with [`Value::unbox`].
 ///

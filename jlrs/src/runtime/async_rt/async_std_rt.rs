@@ -5,6 +5,14 @@
 //! `Receiver` from async-std. The sending half of this channel also implements
 //! [`OneshotSender`].
 
+use std::{future::Future, num::NonZeroUsize, time::Duration};
+
+use async_std::{
+    channel::{bounded, unbounded, Receiver, Sender},
+    task::JoinHandle,
+};
+use async_trait::async_trait;
+
 use crate::{
     async_util::channel::{
         Channel, ChannelReceiver, ChannelSender, OneshotSender, SendError, TrySendError,
@@ -12,12 +20,6 @@ use crate::{
     error::{JlrsError, JlrsResult},
     runtime::async_rt::{AsyncRuntime, Message},
 };
-use async_std::{
-    channel::{bounded, unbounded, Receiver, Sender},
-    task::JoinHandle,
-};
-use async_trait::async_trait;
-use std::{future::Future, num::NonZeroUsize, time::Duration};
 
 /// Struct for which [`AsyncRuntime`] is implemented using async-std.
 pub struct AsyncStd;

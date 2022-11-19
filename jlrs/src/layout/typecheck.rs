@@ -9,6 +9,8 @@
 //! [`Value::is`]: crate::wrappers::ptr::value::Value::is
 //! [`Wrapper`]: crate::wrappers::ptr::Wrapper
 //! [`Unbox`]: crate::convert::unbox::Unbox
+use std::ffi::c_void;
+
 use jl_sys::{
     jl_code_info_type, jl_globalref_type, jl_gotonode_type, jl_intrinsic_type,
     jl_linenumbernode_type, jl_namedtuple_typename, jl_newvarnode_type, jl_phicnode_type,
@@ -20,12 +22,10 @@ use crate::{
     convert::into_julia::IntoJulia,
     memory::target::global::Global,
     private::Private,
-    wrappers::ptr::Wrapper,
     wrappers::ptr::{
-        datatype::DataType, private::WrapperPriv, type_name::TypeName, union_all::UnionAll,
+        datatype::DataType, private::WrapperPriv, type_name::TypeName, union_all::UnionAll, Wrapper,
     },
 };
-use std::ffi::c_void;
 
 /// This trait is used in combination with [`Value::is`] and [`DataType::is`] to check if that
 /// property holds true.

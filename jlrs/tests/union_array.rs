@@ -3,8 +3,9 @@ mod util;
 #[cfg(feature = "sync-rt")]
 #[cfg(not(feature = "lts"))]
 mod tests {
-    use crate::util::JULIA;
     use jlrs::prelude::*;
+
+    use crate::util::JULIA;
 
     fn access_union_array_dimensions() {
         JULIA.with(|j| {

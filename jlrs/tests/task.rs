@@ -2,8 +2,9 @@ mod util;
 
 #[cfg(feature = "sync-rt")]
 mod tests {
-    use super::util::JULIA;
     use jlrs::{prelude::*, wrappers::ptr::task::Task};
+
+    use super::util::JULIA;
 
     #[test]
     fn extend_lifetime() {

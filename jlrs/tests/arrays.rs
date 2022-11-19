@@ -3,10 +3,11 @@ mod util;
 #[cfg(feature = "sync-rt")]
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
 mod tests {
+    use jlrs::{
+        layout::valid_layout::ValidLayout, prelude::*, wrappers::ptr::array::dimensions::Dims,
+    };
+
     use crate::util::JULIA;
-    use jlrs::layout::valid_layout::ValidLayout;
-    use jlrs::prelude::*;
-    use jlrs::wrappers::ptr::array::dimensions::Dims;
 
     fn array_can_be_cast() {
         JULIA.with(|j| {

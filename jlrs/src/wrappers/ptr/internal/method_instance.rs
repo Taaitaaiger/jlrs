@@ -4,6 +4,11 @@
 //! in [`julia.h`]
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L321
+use std::{marker::PhantomData, ptr::NonNull};
+
+use cfg_if::cfg_if;
+use jl_sys::{jl_method_instance_t, jl_method_instance_type};
+
 use crate::{
     impl_julia_typecheck,
     memory::target::Target,
@@ -16,9 +21,6 @@ use crate::{
         Ref,
     },
 };
-use cfg_if::cfg_if;
-use jl_sys::{jl_method_instance_t, jl_method_instance_type};
-use std::{marker::PhantomData, ptr::NonNull};
 
 cfg_if! {
     if #[cfg(not(feature = "lts"))] {
@@ -188,9 +190,8 @@ pub type MethodInstanceRef<'scope> = Ref<'scope, 'static, MethodInstance<'scope>
 impl_valid_layout!(MethodInstanceRef, MethodInstance);
 impl_ref_root!(MethodInstance, MethodInstanceRef, 1);
 
-use crate::memory::target::target_type::TargetType;
-
 use super::code_instance::CodeInstanceData;
+use crate::memory::target::target_type::TargetType;
 
 /// `MethodInstance` or `MethodInstanceRef`, depending on the target type `T`.
 pub type MethodInstanceData<'target, T> =

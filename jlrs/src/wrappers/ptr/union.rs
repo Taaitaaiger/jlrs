@@ -1,17 +1,18 @@
 //! Wrapper for `Union`.
 
+use std::{marker::PhantomData, ptr::NonNull};
+
+use jl_sys::{jl_islayout_inline, jl_type_union, jl_uniontype_t, jl_uniontype_type};
+
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use super::value::ValueResult;
+use super::{value::ValueData, Ref};
 use crate::{
     impl_julia_typecheck,
     memory::target::Target,
     private::Private,
     wrappers::ptr::{private::WrapperPriv, value::Value, Wrapper},
 };
-use jl_sys::{jl_islayout_inline, jl_type_union, jl_uniontype_t, jl_uniontype_type};
-use std::{marker::PhantomData, ptr::NonNull};
-
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
-use super::value::ValueResult;
-use super::{value::ValueData, Ref};
 
 /// A struct field can have a type that's a union of several types. In this case, the type of this
 /// field is an instance of `Union`.
@@ -34,9 +35,11 @@ impl<'scope> Union<'scope> {
         V: AsRef<[Value<'scope, 'static>]>,
         T: Target<'target>,
     {
-        use crate::catch::catch_exceptions;
-        use jl_sys::jl_value_t;
         use std::mem::MaybeUninit;
+
+        use jl_sys::jl_value_t;
+
+        use crate::catch::catch_exceptions;
 
         // Safety: if an exception is thrown it's caught, the result is immediately rooted
         unsafe {

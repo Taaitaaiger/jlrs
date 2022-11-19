@@ -20,22 +20,41 @@
 //! `[usize; N]` and `&[usize; N]` implement it for all `N`, `&[usize]` can be used if `N` is not
 //! a constant at compile time.
 
+use std::{
+    cell::UnsafeCell,
+    ffi::c_void,
+    fmt::{Debug, Formatter, Result as FmtResult},
+    marker::PhantomData,
+    mem,
+    ptr::{null_mut, NonNull},
+    slice,
+};
+
+use cfg_if::cfg_if;
+use jl_sys::{
+    jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_apply_array_type,
+    jl_apply_tuple_type_v, jl_array_data, jl_array_del_beg, jl_array_del_end, jl_array_dims_ptr,
+    jl_array_eltype, jl_array_grow_beg, jl_array_grow_end, jl_array_ndims, jl_array_t,
+    jl_datatype_t, jl_gc_add_ptr_finalizer, jl_new_array, jl_new_struct_uninit, jl_pchar_to_array,
+    jl_ptr_to_array, jl_ptr_to_array_1d, jl_reshape_array,
+};
+
 use self::data::accessor::{
     ArrayAccessor, BitsArrayAccessorI, BitsArrayAccessorMut, Immutable, IndeterminateArrayAccessor,
     IndeterminateArrayAccessorI, InlinePtrArrayAccessorI, InlinePtrArrayAccessorMut, Mutable,
     PtrArrayAccessorI, PtrArrayAccessorMut, UnionArrayAccessorI, UnionArrayAccessorMut,
 };
-use crate::layout::valid_layout::ValidField;
-use crate::memory::target::ExtendedTarget;
+use super::{union_all::UnionAll, value::ValueRef, Ref};
 use crate::{
     convert::into_julia::IntoJulia,
     error::{AccessError, ArrayLayoutError, InstantiationError, JlrsResult, CANNOT_DISPLAY_TYPE},
-    layout::{typecheck::Typecheck, valid_layout::ValidLayout},
+    layout::{
+        typecheck::Typecheck,
+        valid_layout::{ValidField, ValidLayout},
+    },
     memory::{
         get_tls,
-        target::frame::GcFrame,
-        target::global::Global,
-        target::{private::TargetPriv, Target},
+        target::{frame::GcFrame, global::Global, private::TargetPriv, ExtendedTarget, Target},
     },
     private::Private,
     wrappers::ptr::{
@@ -51,25 +70,6 @@ use crate::{
         Wrapper, WrapperRef,
     },
 };
-use cfg_if::cfg_if;
-use jl_sys::{
-    jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_apply_array_type,
-    jl_apply_tuple_type_v, jl_array_data, jl_array_del_beg, jl_array_del_end, jl_array_dims_ptr,
-    jl_array_eltype, jl_array_grow_beg, jl_array_grow_end, jl_array_ndims, jl_array_t,
-    jl_datatype_t, jl_gc_add_ptr_finalizer, jl_new_array, jl_new_struct_uninit, jl_pchar_to_array,
-    jl_ptr_to_array, jl_ptr_to_array_1d, jl_reshape_array,
-};
-use std::{
-    cell::UnsafeCell,
-    ffi::c_void,
-    fmt::{Debug, Formatter, Result as FmtResult},
-    marker::PhantomData,
-    mem,
-    ptr::{null_mut, NonNull},
-    slice,
-};
-
-use super::{union_all::UnionAll, value::ValueRef, Ref};
 
 cfg_if! {
     if #[cfg(not(all(target_os = "windows", feature = "lts")))] {

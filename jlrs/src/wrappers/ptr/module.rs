@@ -4,6 +4,18 @@
 //! modules, `Main`, `Base` and `Core`. Any Julia code that you include in jlrs is made available
 //! relative to the `Main` module.
 
+use std::{marker::PhantomData, ptr::NonNull};
+
+use jl_sys::{
+    jl_base_module, jl_core_module, jl_get_global, jl_is_imported, jl_main_module, jl_module_t,
+    jl_module_type, jl_set_const, jl_set_global,
+};
+
+use super::{
+    function::FunctionData,
+    value::{ValueData, ValueResult},
+    Ref,
+};
 use crate::{
     call::Call,
     convert::to_symbol::ToSymbol,
@@ -18,17 +30,6 @@ use crate::{
         value::{LeakedValue, Value},
         Wrapper as _,
     },
-};
-use jl_sys::{
-    jl_base_module, jl_core_module, jl_get_global, jl_is_imported, jl_main_module, jl_module_t,
-    jl_module_type, jl_set_const, jl_set_global,
-};
-use std::{marker::PhantomData, ptr::NonNull};
-
-use super::{
-    function::FunctionData,
-    value::{ValueData, ValueResult},
-    Ref,
 };
 
 /// Functionality in Julia can be accessed through its module system. You can get a handle to the
@@ -162,8 +163,9 @@ impl<'scope> Module<'scope> {
         N: ToSymbol,
         T: Target<'target>,
     {
-        use crate::catch::catch_exceptions;
         use std::mem::MaybeUninit;
+
+        use crate::catch::catch_exceptions;
         let symbol = name.to_symbol_priv(Private);
 
         let mut callback = |result: &mut MaybeUninit<()>| {
@@ -221,8 +223,9 @@ impl<'scope> Module<'scope> {
         // valid arguments and its result is checked. if an exception is thrown it's caught
         // and returned
         unsafe {
-            use crate::catch::catch_exceptions;
             use std::mem::MaybeUninit;
+
+            use crate::catch::catch_exceptions;
             let symbol = name.to_symbol_priv(Private);
 
             let mut callback = |result: &mut MaybeUninit<()>| {

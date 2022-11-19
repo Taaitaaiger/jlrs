@@ -1,19 +1,11 @@
 //! Wrapper for `DataType`, which provides access to type properties.
 
-use crate::memory::target::Target;
-
-use crate::wrappers::ptr::simple_vector::SimpleVector;
-use crate::{
-    convert::to_symbol::ToSymbol,
-    error::{AccessError, JlrsResult, CANNOT_DISPLAY_TYPE},
-    impl_julia_typecheck,
-    layout::typecheck::Typecheck,
-    private::Private,
-    wrappers::ptr::{
-        private::WrapperPriv, simple_vector::SimpleVectorRef, symbol::Symbol, symbol::SymbolRef,
-        value::Value, Wrapper,
-    },
+use std::{
+    ffi::{c_void, CStr},
+    marker::PhantomData,
+    ptr::NonNull,
 };
+
 use cfg_if::cfg_if;
 use jl_sys::{
     jl_abstractslot_type, jl_abstractstring_type, jl_any_type, jl_anytuple_type, jl_argument_type,
@@ -38,16 +30,23 @@ use jl_sys::{
 use jl_sys::{
     jl_atomicerror_type, jl_interconditional_type, jl_partial_opaque_type, jl_vararg_type,
 };
-use std::{
-    ffi::{c_void, CStr},
-    marker::PhantomData,
-    ptr::NonNull,
-};
 
-use super::simple_vector::SimpleVectorData;
-use super::type_name::TypeName;
-use super::value::ValueData;
-use super::Ref;
+use super::{simple_vector::SimpleVectorData, type_name::TypeName, value::ValueData, Ref};
+use crate::{
+    convert::to_symbol::ToSymbol,
+    error::{AccessError, JlrsResult, CANNOT_DISPLAY_TYPE},
+    impl_julia_typecheck,
+    layout::typecheck::Typecheck,
+    memory::target::Target,
+    private::Private,
+    wrappers::ptr::{
+        private::WrapperPriv,
+        simple_vector::{SimpleVector, SimpleVectorRef},
+        symbol::{Symbol, SymbolRef},
+        value::Value,
+        Wrapper,
+    },
+};
 
 cfg_if! {
     if #[cfg(not(all(target_os = "windows", feature = "lts")))] {
@@ -695,9 +694,11 @@ impl<'scope> DataType<'scope> {
         T: Target<'target>,
         V: AsRef<[Value<'value, 'data>]>,
     {
-        use crate::{catch::catch_exceptions, error::InstantiationError};
-        use jl_sys::jl_value_t;
         use std::mem::MaybeUninit;
+
+        use jl_sys::jl_value_t;
+
+        use crate::{catch::catch_exceptions, error::InstantiationError};
 
         // Safety: the pointer points to valid data, if an exception is thrown it's caught
         unsafe {

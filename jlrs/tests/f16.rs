@@ -3,9 +3,10 @@ mod util;
 #[cfg(test)]
 #[cfg(feature = "sync-rt")]
 mod tests {
-    use super::util::JULIA;
     use half::f16;
     use jlrs::prelude::*;
+
+    use super::util::JULIA;
 
     #[test]
     fn one_minus_one_equals_zero() {

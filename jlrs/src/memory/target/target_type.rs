@@ -1,16 +1,13 @@
 //! Traits used to declare what type of data is returned by a target.
 
+use super::reusable_slot::ReusableSlot;
+#[cfg(feature = "async")]
+use crate::memory::target::frame::AsyncGcFrame;
 use crate::{
     error::{JuliaResult, JuliaResultRef},
     memory::target::{frame::GcFrame, global::Global, output::Output},
-    wrappers::ptr::Ref,
-    wrappers::ptr::Wrapper,
+    wrappers::ptr::{Ref, Wrapper},
 };
-
-#[cfg(feature = "async")]
-use crate::memory::target::frame::AsyncGcFrame;
-
-use super::reusable_slot::ReusableSlot;
 
 /// Defines the return types of a target, `Data` and `Result`.
 pub trait TargetType<'target>: Sized {

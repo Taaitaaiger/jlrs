@@ -44,12 +44,15 @@
 
 use std::marker::PhantomData;
 
-use self::{frame::BorrowedFrame, private::TargetPriv, reusable_slot::ReusableSlot};
-
 #[cfg(feature = "async")]
 use self::frame::AsyncGcFrame;
-
-use self::{frame::GcFrame, global::Global, output::Output};
+use self::{
+    frame::{BorrowedFrame, GcFrame},
+    global::Global,
+    output::Output,
+    private::TargetPriv,
+    reusable_slot::ReusableSlot,
+};
 
 pub mod frame;
 pub mod global;
@@ -170,6 +173,11 @@ pub(crate) mod private {
 
     use jl_sys::jl_value_t;
 
+    #[cfg(feature = "async")]
+    use super::AsyncGcFrame;
+    use super::{
+        global::Global, reusable_slot::ReusableSlot, target_type::TargetType, GcFrame, Output,
+    };
     use crate::{
         private::Private,
         wrappers::ptr::{
@@ -178,13 +186,6 @@ pub(crate) mod private {
             Ref, Wrapper,
         },
     };
-
-    use super::{
-        global::Global, reusable_slot::ReusableSlot, target_type::TargetType, GcFrame, Output,
-    };
-
-    #[cfg(feature = "async")]
-    use super::AsyncGcFrame;
 
     pub trait TargetBase<'target>: Sized {}
 

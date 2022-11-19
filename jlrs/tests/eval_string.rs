@@ -2,9 +2,9 @@ mod util;
 #[cfg(feature = "sync-rt")]
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
 mod tests {
+    use jlrs::{error::JuliaResult, prelude::*};
+
     use super::util::JULIA;
-    use jlrs::error::JuliaResult;
-    use jlrs::prelude::*;
 
     fn eval_string(string: &str, with_result: impl for<'f> FnOnce(JuliaResult<'f, 'static>)) {
         JULIA.with(|j| unsafe {

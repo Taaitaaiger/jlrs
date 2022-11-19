@@ -1,10 +1,11 @@
-use jlrs::prelude::*;
 use std::{
     ffi::c_void,
     sync::atomic::{AtomicU32, Ordering},
     thread,
     time::Duration,
 };
+
+use jlrs::prelude::*;
 use thread::JoinHandle;
 
 // This crate is called `ccall_with_threads`, so the library is called
@@ -86,8 +87,9 @@ pub unsafe extern "C" fn drop_handle(handle: *mut JoinHandle<()>) {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::cell::RefCell;
+
+    use super::*;
 
     thread_local! {
         pub static JULIA: RefCell<PendingJulia> = {

@@ -2,10 +2,14 @@ mod util;
 
 #[cfg(feature = "sync-rt")]
 mod tests {
-    use super::util::JULIA;
-    use jlrs::convert::{into_julia::IntoJulia, unbox::Unbox};
-    use jlrs::prelude::*;
     use std::{ffi::c_void, ptr::null_mut};
+
+    use jlrs::{
+        convert::{into_julia::IntoJulia, unbox::Unbox},
+        prelude::*,
+    };
+
+    use super::util::JULIA;
 
     macro_rules! impl_test {
         ($type:ty, $test_name:ident, $failing_test_name:ident, $val:expr) => {

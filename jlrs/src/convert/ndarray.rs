@@ -1,10 +1,11 @@
 //! Borrow data from Julia arrays as `ndarray`'s `ArrayView` and `ArrayViewMut`.
 
+use ndarray::{ArrayView, ArrayViewMut, Dim, IntoDimension, IxDynImpl, ShapeBuilder};
+
 use crate::wrappers::ptr::array::data::{
     accessor::{BitsArrayAccessor, InlinePtrArrayAccessor, Mutability, Mutable},
     copied::CopiedArray,
 };
-use ndarray::{ArrayView, ArrayViewMut, Dim, IntoDimension, IxDynImpl, ShapeBuilder};
 
 /// Trait to borrow Julia arrays with inline data as `ndarray`'s `ArrayView`.
 pub trait NdArrayView<'view, T>: private::NdArrayPriv {

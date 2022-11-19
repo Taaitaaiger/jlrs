@@ -3,8 +3,9 @@ mod util;
 #[cfg(feature = "sync-rt")]
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
 mod tests {
-    use crate::util::JULIA;
     use jlrs::{prelude::*, wrappers::ptr::array::dimensions::Dims};
+
+    use crate::util::JULIA;
 
     fn move_array_1d() {
         JULIA.with(|j| {

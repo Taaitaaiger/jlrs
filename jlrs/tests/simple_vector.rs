@@ -2,7 +2,6 @@ mod util;
 
 #[cfg(feature = "sync-rt")]
 mod tests {
-    use crate::util::JULIA;
     use jlrs::{
         layout::valid_layout::ValidLayout,
         prelude::*,
@@ -12,6 +11,8 @@ mod tests {
             union_all::UnionAll,
         },
     };
+
+    use crate::util::JULIA;
 
     fn create_simple_vector() {
         JULIA.with(|j| {

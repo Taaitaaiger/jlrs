@@ -5,6 +5,11 @@
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#525
 
+use std::{marker::PhantomData, ptr::NonNull};
+
+use cfg_if::cfg_if;
+use jl_sys::{jl_typemap_level_t, jl_typemap_level_type};
+
 use crate::{
     impl_julia_typecheck,
     memory::target::Target,
@@ -15,9 +20,6 @@ use crate::{
         Ref,
     },
 };
-use cfg_if::cfg_if;
-use jl_sys::{jl_typemap_level_t, jl_typemap_level_type};
-use std::{marker::PhantomData, ptr::NonNull};
 
 cfg_if! {
     if #[cfg(not(feature = "lts"))] {

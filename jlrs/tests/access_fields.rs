@@ -4,11 +4,11 @@ mod tests {
     #[cfg(not(feature = "lts"))]
     use std::sync::atomic::Ordering;
 
-    use super::util::{JULIA, MIXED_BAG_JL};
-    use jlrs::convert::to_symbol::ToSymbol;
-    use jlrs::prelude::*;
+    use jlrs::{convert::to_symbol::ToSymbol, prelude::*};
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     use jlrs::{layout::typecheck::Mutable, wrappers::inline::union::EmptyUnion};
+
+    use super::util::{JULIA, MIXED_BAG_JL};
 
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     fn empty_union_field() {

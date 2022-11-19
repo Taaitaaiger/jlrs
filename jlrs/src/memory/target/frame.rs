@@ -10,6 +10,9 @@
 
 use std::{marker::PhantomData, ptr::NonNull};
 
+use cfg_if::cfg_if;
+
+use super::{global::Global, output::Output, reusable_slot::ReusableSlot};
 use crate::{
     error::JlrsResult,
     memory::{
@@ -19,9 +22,6 @@ use crate::{
     private::Private,
     wrappers::ptr::Wrapper,
 };
-use cfg_if::cfg_if;
-
-use super::{global::Global, output::Output, reusable_slot::ReusableSlot};
 
 /// A frame associated with a scope.
 ///
