@@ -1,8 +1,10 @@
 //! Wrapper for `SSAVAlue`.
 
-use crate::{convert::unbox::Unbox, impl_julia_typecheck, impl_valid_layout};
-use jl_sys::jl_ssavalue_type;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
+
+use jl_sys::jl_ssavalue_type;
+
+use crate::{convert::unbox::Unbox, impl_julia_typecheck, impl_valid_layout};
 
 /// A Julia `SSAValue`.
 #[repr(C)]

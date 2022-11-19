@@ -1,13 +1,19 @@
 //! Access and modify the contents of Julia arrays.
 
-use crate::layout::valid_layout::ValidField;
+use std::{
+    marker::PhantomData,
+    ops::{Index, IndexMut},
+    ptr::{null_mut, NonNull},
+    slice,
+};
+
+use jl_sys::{jl_array_ptr_set, jl_array_typetagdata, jl_arrayref, jl_arrayset};
+
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
 use crate::wrappers::ptr::value::ValueResult;
-
-use crate::wrappers::ptr::value::ValueData;
-
 use crate::{
     error::{AccessError, JlrsResult, TypeError, CANNOT_DISPLAY_TYPE},
+    layout::valid_layout::ValidField,
     memory::target::Target,
     private::Private,
     wrappers::ptr::{
@@ -18,16 +24,9 @@ use crate::{
         datatype::DataType,
         private::WrapperPriv,
         union::{find_union_component, nth_union_component},
-        value::Value,
+        value::{Value, ValueData},
         Wrapper, WrapperRef,
     },
-};
-use jl_sys::{jl_array_ptr_set, jl_array_typetagdata, jl_arrayref, jl_arrayset};
-use std::{
-    marker::PhantomData,
-    ops::{Index, IndexMut},
-    ptr::{null_mut, NonNull},
-    slice,
 };
 
 /// Trait used to indicate how the elements are laid out.
@@ -213,9 +212,11 @@ impl<'borrow, 'array, 'data, U, L: ArrayLayout, M: Mutability>
         D: Dims,
         T: Target<'frame>,
     {
-        use crate::catch::catch_exceptions;
-        use jl_sys::jl_value_t;
         use std::mem::MaybeUninit;
+
+        use jl_sys::jl_value_t;
+
+        use crate::catch::catch_exceptions;
 
         let idx = self.dimensions().index_of(&index)?;
 
@@ -288,8 +289,9 @@ impl<'borrow, 'array, 'data, U, L: ArrayLayout>
         D: Dims,
         T: Target<'target>,
     {
-        use crate::catch::catch_exceptions;
         use std::mem::MaybeUninit;
+
+        use crate::catch::catch_exceptions;
 
         let idx = self.dimensions().index_of(&index)?;
         let ptr = value.map(|v| v.unwrap(Private)).unwrap_or(null_mut());

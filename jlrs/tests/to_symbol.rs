@@ -2,8 +2,9 @@ mod util;
 
 #[cfg(feature = "sync-rt")]
 mod tests {
-    use super::util::JULIA;
     use jlrs::{prelude::*, wrappers::ptr::symbol::Symbol};
+
+    use super::util::JULIA;
 
     fn use_string_to_symbol() {
         JULIA.with(|j| {

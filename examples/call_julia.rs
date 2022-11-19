@@ -1,5 +1,6 @@
-use jlrs::prelude::*;
 use std::path::PathBuf;
+
+use jlrs::prelude::*;
 
 fn main() {
     // Julia must be initialized before it can be used.

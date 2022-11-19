@@ -14,8 +14,9 @@ mod tests {
     HasConstructors() = HasConstructors(false)
     */
 
-    use crate::util::JULIA;
     use jlrs::prelude::*;
+
+    use crate::util::JULIA;
 
     fn call_outer_constructor() {
         JULIA.with(|j| {

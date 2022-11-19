@@ -1,19 +1,23 @@
 //! Wrapper for `TypeVar`.
 
+use std::{marker::PhantomData, ptr::NonNull};
+
+use jl_sys::{jl_new_typevar, jl_tvar_t, jl_tvar_type};
+
+use super::{value::ValueData, Ref};
 use crate::{
     convert::to_symbol::ToSymbol,
     impl_julia_typecheck,
     memory::target::Target,
     private::Private,
     wrappers::ptr::{
-        datatype::DataType, private::WrapperPriv, symbol::Symbol, value::Value, value::ValueRef,
+        datatype::DataType,
+        private::WrapperPriv,
+        symbol::Symbol,
+        value::{Value, ValueRef},
         Wrapper,
     },
 };
-use jl_sys::{jl_new_typevar, jl_tvar_t, jl_tvar_type};
-use std::{marker::PhantomData, ptr::NonNull};
-
-use super::{value::ValueData, Ref};
 
 /// An unknown, but possibly restricted, type parameter. In `Array{T, N}`, `T` and `N` are
 /// `TypeVar`s.
@@ -36,8 +40,9 @@ impl<'scope> TypeVar<'scope> {
         T: Target<'target>,
         N: ToSymbol,
     {
-        use crate::catch::catch_exceptions;
         use std::mem::MaybeUninit;
+
+        use crate::catch::catch_exceptions;
 
         // Safety: if an exception is thrown it's caught and returned
         unsafe {

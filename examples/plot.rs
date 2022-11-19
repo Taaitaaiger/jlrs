@@ -1,5 +1,6 @@
-use jlrs::prelude::*;
 use std::{num::NonZeroUsize, time::Duration};
+
+use jlrs::prelude::*;
 
 // This struct contains the y-label of the plot.
 struct MyTask {

@@ -2,8 +2,9 @@ mod util;
 
 #[cfg(feature = "sync-rt")]
 mod tests {
-    use crate::util::JULIA;
     use jlrs::prelude::*;
+
+    use crate::util::JULIA;
 
     fn extend_lifetime() {
         JULIA.with(|j| {

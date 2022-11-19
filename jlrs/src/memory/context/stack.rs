@@ -20,8 +20,10 @@ use jl_sys::{jl_gc_wb, jl_value_t};
 
 use crate::{
     memory::{gc::mark_queue_objarray, stack_frame::PinnedFrame, target::global::Global, PTls},
-    wrappers::foreign::{create_foreign_type, ForeignType},
-    wrappers::ptr::{module::Module, symbol::Symbol, value::Value, Wrapper},
+    wrappers::{
+        foreign::{create_foreign_type, ForeignType},
+        ptr::{module::Module, symbol::Symbol, value::Value, Wrapper},
+    },
 };
 
 #[repr(C)]

@@ -1,5 +1,9 @@
 //! Wrapper for `Expr`.
 
+use std::{marker::PhantomData, ptr::NonNull};
+
+use jl_sys::{jl_expr_t, jl_expr_type};
+
 use crate::{
     impl_julia_typecheck,
     memory::target::Target,
@@ -11,8 +15,6 @@ use crate::{
         Ref,
     },
 };
-use jl_sys::{jl_expr_t, jl_expr_type};
-use std::{marker::PhantomData, ptr::NonNull};
 
 /// A compound expression in Julia ASTs.
 #[derive(Copy, Clone)]

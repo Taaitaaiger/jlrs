@@ -4,23 +4,22 @@
 //! in [`julia.h`]
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L1727
-use crate::{impl_julia_typecheck, private::Private, wrappers::ptr::private::WrapperPriv};
+#[cfg(feature = "extra-fields")]
+#[cfg(not(feature = "lts"))]
+use std::sync::atomic::Ordering;
+use std::{marker::PhantomData, ptr::NonNull};
 
+#[cfg(feature = "extra-fields")]
+use cfg_if::cfg_if;
+use jl_sys::{jl_task_t, jl_task_type};
+
+use super::Ref;
+use crate::{impl_julia_typecheck, private::Private, wrappers::ptr::private::WrapperPriv};
 #[cfg(feature = "extra-fields")]
 use crate::{
     memory::target::Target,
     wrappers::ptr::value::{ValueData, ValueRef},
 };
-use jl_sys::{jl_task_t, jl_task_type};
-use std::{marker::PhantomData, ptr::NonNull};
-
-#[cfg(feature = "extra-fields")]
-use cfg_if::cfg_if;
-#[cfg(feature = "extra-fields")]
-#[cfg(not(feature = "lts"))]
-use std::sync::atomic::Ordering;
-
-use super::Ref;
 
 /// A Julia `Task` (coroutine).
 #[derive(Copy, Clone)]

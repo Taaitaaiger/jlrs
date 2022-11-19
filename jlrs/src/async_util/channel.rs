@@ -11,9 +11,11 @@
 //!
 //! [`PersistentTask`]: crate::async_util::task::PersistentTask
 
-use crate::error::JlrsResult;
-use async_trait::async_trait;
 use std::{fmt, num::NonZeroUsize};
+
+use async_trait::async_trait;
+
+use crate::error::JlrsResult;
 
 /// A sending error that indicates the channel is closed.
 pub struct SendError<T>(pub T);

@@ -1,18 +1,20 @@
-use crate::{
-    error::{JlrsResult, JuliaResultRef},
-    memory::target::frame::GcFrame,
-    wrappers::ptr::value::ValueRef,
-};
-use jl_sys::{
-    jlrs_catch_t, jlrs_catch_tag_t_JLRS_CATCH_ERR, jlrs_catch_tag_t_JLRS_CATCH_EXCECPTION,
-    jlrs_catch_tag_t_JLRS_CATCH_OK, jlrs_catch_tag_t_JLRS_CATCH_PANIC, jlrs_catch_wrapper,
-};
 use std::{
     any::Any,
     ffi::c_void,
     mem::MaybeUninit,
     panic::{catch_unwind, AssertUnwindSafe},
     ptr::{null_mut, NonNull},
+};
+
+use jl_sys::{
+    jlrs_catch_t, jlrs_catch_tag_t_JLRS_CATCH_ERR, jlrs_catch_tag_t_JLRS_CATCH_EXCECPTION,
+    jlrs_catch_tag_t_JLRS_CATCH_OK, jlrs_catch_tag_t_JLRS_CATCH_PANIC, jlrs_catch_wrapper,
+};
+
+use crate::{
+    error::{JlrsResult, JuliaResultRef},
+    memory::target::frame::GcFrame,
+    wrappers::ptr::value::ValueRef,
 };
 
 unsafe extern "C" fn trampoline_with_slots<

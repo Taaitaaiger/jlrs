@@ -25,20 +25,21 @@
 //!
 //! Additionally, [`Tuple` ] can be used to create a tuple from an arbitrary number of `Value`s.
 
-use crate::wrappers::ptr::{
-    datatype::DataType,
-    value::{Value, ValueData, MAX_SIZE},
-};
-use crate::wrappers::ptr::{private::WrapperPriv as _, Wrapper as _};
-use crate::{
-    layout::typecheck::Typecheck,
-    memory::target::{ExtendedTarget, Target},
-    private::Private,
-};
 use jl_sys::jl_tuple_typename;
 
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
 use crate::wrappers::ptr::value::ValueResult;
+use crate::{
+    layout::typecheck::Typecheck,
+    memory::target::{ExtendedTarget, Target},
+    private::Private,
+    wrappers::ptr::{
+        datatype::DataType,
+        private::WrapperPriv as _,
+        value::{Value, ValueData, MAX_SIZE},
+        Wrapper as _,
+    },
+};
 
 /// A tuple that has an arbitrary number of fields. This type can be used as a typecheck to check
 /// if the data is a tuple type, and to create tuples of arbitrary sizes.

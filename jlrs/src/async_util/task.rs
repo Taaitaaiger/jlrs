@@ -15,12 +15,6 @@
 
 use std::time::Duration;
 
-use crate::{
-    call::Call,
-    error::JlrsResult,
-    memory::target::{frame::AsyncGcFrame, Target},
-    wrappers::ptr::{module::Module, value::Value},
-};
 use async_trait::async_trait;
 use jl_sys::jl_yield;
 
@@ -28,6 +22,12 @@ use jl_sys::jl_yield;
 use crate::{
     async_util::internal::{BlockingTaskEnvelope, PendingTaskEnvelope},
     runtime::async_rt::{queue::Sender, Message, MessageInner},
+};
+use crate::{
+    call::Call,
+    error::JlrsResult,
+    memory::target::{frame::AsyncGcFrame, Target},
+    wrappers::ptr::{module::Module, value::Value},
 };
 
 /// A task that returns once.

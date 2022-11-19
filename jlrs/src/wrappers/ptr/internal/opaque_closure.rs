@@ -1,9 +1,17 @@
 //! Wrapper for `OpaqueClosure`.
 
+use std::{
+    ffi::c_void,
+    marker::PhantomData,
+    ptr::{null_mut, NonNull},
+};
+
+use jl_sys::jl_opaque_closure_t;
+
 use crate::{
     call::Call,
     layout::typecheck::Typecheck,
-    memory::{target::global::Global, target::Target},
+    memory::target::{global::Global, Target},
     private::Private,
     wrappers::ptr::{
         datatype::DataType,
@@ -12,12 +20,6 @@ use crate::{
         value::{Value, ValueResult},
         Ref, Wrapper as _,
     },
-};
-use jl_sys::jl_opaque_closure_t;
-use std::{
-    ffi::c_void,
-    marker::PhantomData,
-    ptr::{null_mut, NonNull},
 };
 
 /// An opaque closure. Note that opaque closures are currently an experimental feature in Julia.

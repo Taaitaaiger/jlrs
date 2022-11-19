@@ -1,3 +1,18 @@
+use std::{
+    ffi::c_void,
+    marker::PhantomData,
+    pin::Pin,
+    ptr::NonNull,
+    sync::{Arc, Mutex},
+};
+
+use futures::{
+    task::{Context, Poll, Waker},
+    Future,
+};
+use jl_sys::{jl_call1, jl_exception_occurred};
+use smallvec::SmallVec;
+
 use crate::{
     call::{Call, ProvideKeywords, WithKeywords},
     error::{JuliaResult, CANNOT_DISPLAY_VALUE},
@@ -10,19 +25,6 @@ use crate::{
         value::{Value, MAX_SIZE},
         Wrapper,
     },
-};
-use futures::{
-    task::{Context, Poll, Waker},
-    Future,
-};
-use jl_sys::{jl_call1, jl_exception_occurred};
-use smallvec::SmallVec;
-use std::{
-    ffi::c_void,
-    marker::PhantomData,
-    pin::Pin,
-    ptr::NonNull,
-    sync::{Arc, Mutex},
 };
 
 pub(crate) struct TaskState<'frame, 'data> {

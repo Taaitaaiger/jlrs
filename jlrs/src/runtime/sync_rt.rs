@@ -5,6 +5,10 @@
 
 // TODO: document scope
 
+use std::{ffi::c_void, marker::PhantomData, path::Path, sync::atomic::Ordering};
+
+use jl_sys::{jl_atexit_hook, jl_init, jl_init_with_image, jl_is_initialized};
+
 use crate::{
     call::Call,
     convert::into_jlrs_result::IntoJlrsResult,
@@ -17,8 +21,6 @@ use crate::{
     runtime::{builder::RuntimeBuilder, init_jlrs, INIT},
     wrappers::ptr::{module::Module, string::JuliaString, value::Value, Wrapper},
 };
-use jl_sys::{jl_atexit_hook, jl_init, jl_init_with_image, jl_is_initialized};
-use std::{ffi::c_void, marker::PhantomData, path::Path, sync::atomic::Ordering};
 
 /// A pending Julia instance.
 ///

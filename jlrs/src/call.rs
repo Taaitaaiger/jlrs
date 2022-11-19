@@ -7,6 +7,13 @@
 use std::ptr::NonNull;
 
 #[cfg(not(any(feature = "nightly", feature = "beta")))]
+use jl_sys::jl_get_kwsorter;
+#[cfg(any(feature = "nightly", feature = "beta"))]
+use jl_sys::jl_kwcall_func;
+use jl_sys::{jl_call, jl_exception_occurred};
+use smallvec::SmallVec;
+
+#[cfg(not(any(feature = "nightly", feature = "beta")))]
 use crate::wrappers::ptr::private::WrapperPriv as _;
 use crate::{
     error::{AccessError, JlrsResult, JuliaResult},
@@ -17,13 +24,6 @@ use crate::{
         value::{Value, ValueResult, MAX_SIZE},
     },
 };
-
-#[cfg(not(any(feature = "nightly", feature = "beta")))]
-use jl_sys::jl_get_kwsorter;
-#[cfg(any(feature = "nightly", feature = "beta"))]
-use jl_sys::jl_kwcall_func;
-use jl_sys::{jl_call, jl_exception_occurred};
-use smallvec::SmallVec;
 
 /// A function and its keyword arguments.
 pub struct WithKeywords<'scope, 'data> {
@@ -1361,12 +1361,10 @@ cfg_if::cfg_if! {
 }
 
 mod private {
-    use crate::wrappers::ptr::{function::Function, value::Value};
-
+    use super::WithKeywords;
     #[cfg(all(not(feature = "lts"), feature = "internal-types"))]
     use crate::wrappers::ptr::internal::opaque_closure::OpaqueClosure;
-
-    use super::WithKeywords;
+    use crate::wrappers::ptr::{function::Function, value::Value};
     pub trait CallPriv: Sized {}
     impl CallPriv for WithKeywords<'_, '_> {}
     impl CallPriv for Function<'_, '_> {}

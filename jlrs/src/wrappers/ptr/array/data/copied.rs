@@ -1,7 +1,8 @@
 //! Array data that has been copied from Julia to Rust.
 
-use crate::wrappers::ptr::array::dimensions::{Dimensions, Dims};
 use std::ops::{Index, IndexMut};
+
+use crate::wrappers::ptr::array::dimensions::{Dimensions, Dims};
 
 /// An n-dimensional array whose contents have been copied from Julia to Rust.
 ///

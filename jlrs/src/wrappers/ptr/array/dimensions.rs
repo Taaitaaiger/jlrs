@@ -7,15 +7,17 @@
 //! if you want to access the third column of the second row of an array, you can use both
 //! `[1, 2]` or `(1, 2)`. Note that unlike Julia, array indexing starts at 0.
 
+use std::{
+    fmt::{Debug, Display, Formatter, Result as FmtResult},
+    marker::PhantomData,
+};
+
+use jl_sys::{jl_array_dims_ptr, jl_array_ndims};
+
 use crate::{
     error::{AccessError, JlrsResult},
     private::Private,
     wrappers::ptr::{array::Array, private::WrapperPriv as _},
-};
-use jl_sys::{jl_array_dims_ptr, jl_array_ndims};
-use std::{
-    fmt::{Debug, Display, Formatter, Result as FmtResult},
-    marker::PhantomData,
 };
 
 /// Trait implemented by types that can be used as n-dimensional indices.

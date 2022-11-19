@@ -34,8 +34,9 @@ pub unsafe extern "C" fn incr_array(mut arr: TypedArray<f64>) {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::cell::RefCell;
+
+    use super::*;
 
     thread_local! {
         pub static JULIA: RefCell<PendingJulia> = {

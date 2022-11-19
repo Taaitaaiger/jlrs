@@ -1,5 +1,10 @@
 //! Reexports structs and traits you're likely to need.
 
+#[cfg(feature = "async")]
+pub use async_trait::async_trait;
+#[cfg(feature = "jlrs-derive")]
+pub use jlrs_derive::*;
+
 #[cfg(feature = "ccall")]
 pub use crate::ccall::CCall;
 #[cfg(feature = "pyplot")]
@@ -48,7 +53,3 @@ pub use crate::{
     memory::stack_frame::StackFrame,
     runtime::sync_rt::{Julia, PendingJulia},
 };
-#[cfg(feature = "async")]
-pub use async_trait::async_trait;
-#[cfg(feature = "jlrs-derive")]
-pub use jlrs_derive::*;

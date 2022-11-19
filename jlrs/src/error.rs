@@ -1,11 +1,13 @@
 //! Everything related to errors.
 
+use std::error::Error as StdErr;
+
+use thiserror::Error;
+
 use crate::wrappers::ptr::{
     array::dimensions::Dimensions,
     value::{Value, ValueRef},
 };
-use std::error::Error as StdErr;
-use thiserror::Error;
 
 pub(crate) static CANNOT_DISPLAY_TYPE: &'static str = "<Cannot display type>";
 pub(crate) static CANNOT_DISPLAY_VALUE: &'static str = "<Cannot display value>";

@@ -11,7 +11,7 @@
 //! In the stable and lts version of Julia, only one thread can be used by the async runtime. The
 //! nightly and beta version can use any number of worker threads to spread the workload across
 //! multiple threads that can call into Julia. The number of worker threads can be set with the
-//! [`AsyncRuntimeBuilder`]. 
+//! [`AsyncRuntimeBuilder`].
 //!
 //! Work is sent to the async runtime as independent tasks. Three kinds of task exist: blocking,
 //! async, and persistent tasks. Blocking tasks block the thread they're called on until they've
@@ -28,6 +28,30 @@ pub mod queue;
 #[cfg(feature = "tokio-rt")]
 pub mod tokio_rt;
 
+use std::{
+    cell::RefCell,
+    collections::VecDeque,
+    ffi::c_void,
+    fmt,
+    marker::PhantomData,
+    path::Path,
+    rc::Rc,
+    sync::{atomic::Ordering, Arc},
+    time::Duration,
+};
+
+use async_trait::async_trait;
+use futures::Future;
+use jl_sys::{
+    jl_atexit_hook, jl_init, jl_init_with_image, jl_is_initialized, jl_options, jl_process_events,
+    jl_yield,
+};
+#[cfg(any(feature = "nightly", feature = "beta"))]
+use jl_sys::{jl_enter_threaded_region, jl_exit_threaded_region};
+
+#[cfg(any(feature = "nightly", feature = "beta"))]
+use self::adopted::init_worker;
+use self::queue::{channel, Receiver, Sender};
 use crate::{
     async_util::{
         channel::{Channel, ChannelSender, OneshotSender, TrySendError},
@@ -49,33 +73,6 @@ use crate::{
     runtime::{builder::AsyncRuntimeBuilder, init_jlrs, INIT},
     wrappers::ptr::{module::Module, value::Value},
 };
-use async_trait::async_trait;
-use futures::Future;
-use jl_sys::{
-    jl_atexit_hook, jl_init, jl_init_with_image, jl_is_initialized, jl_process_events, jl_yield,
-};
-
-#[cfg(any(feature = "nightly", feature = "beta"))]
-use jl_sys::{jl_enter_threaded_region, jl_exit_threaded_region};
-
-use jl_sys::jl_options;
-
-use std::{
-    cell::RefCell,
-    collections::VecDeque,
-    ffi::c_void,
-    fmt,
-    marker::PhantomData,
-    path::Path,
-    rc::Rc,
-    sync::{atomic::Ordering, Arc},
-    time::Duration,
-};
-
-use self::queue::{channel, Receiver, Sender};
-
-#[cfg(any(feature = "nightly", feature = "beta"))]
-use self::adopted::init_worker;
 
 #[cfg(any(feature = "nightly", feature = "beta"))]
 init_fn!(init_multitask, JLRS_MULTITASK_JL, "JlrsMultitaskNightly.jl");

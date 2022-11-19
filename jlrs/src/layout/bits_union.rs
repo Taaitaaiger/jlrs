@@ -34,8 +34,9 @@ pub unsafe trait Flag: private::FlagPriv {}
 unsafe impl Flag for u8 {}
 
 mod private {
-    use crate::wrappers::inline::union::{Align1, Align16, Align2, Align4, Align8, BitsUnion};
     use std::fmt::Debug;
+
+    use crate::wrappers::inline::union::{Align1, Align16, Align2, Align4, Align8, BitsUnion};
 
     pub trait AlignPriv: Copy + Debug {}
     impl AlignPriv for Align1 {}

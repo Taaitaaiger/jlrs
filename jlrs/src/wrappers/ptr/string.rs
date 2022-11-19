@@ -1,14 +1,5 @@
 //! Wrapper for `String`.
 
-use crate::{
-    convert::unbox::Unbox,
-    error::{JlrsError, JlrsResult},
-    impl_julia_typecheck,
-    memory::target::Target,
-    private::Private,
-    wrappers::ptr::{private::WrapperPriv, value::Value},
-};
-use jl_sys::{jl_pchar_to_string, jl_string_type};
 use std::{
     ffi::CStr,
     fmt::{Debug, Formatter, Result as FmtResult},
@@ -18,7 +9,17 @@ use std::{
     str,
 };
 
+use jl_sys::{jl_pchar_to_string, jl_string_type};
+
 use super::Ref;
+use crate::{
+    convert::unbox::Unbox,
+    error::{JlrsError, JlrsResult},
+    impl_julia_typecheck,
+    memory::target::Target,
+    private::Private,
+    wrappers::ptr::{private::WrapperPriv, value::Value},
+};
 
 /// A Julia string.
 #[derive(Copy, Clone)]

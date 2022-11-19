@@ -1,27 +1,28 @@
 //! Wrapper for `SimpleVector`.
 
-use crate::{
-    error::{AccessError, JlrsResult},
-    layout::{
-        typecheck::Typecheck,
-        valid_layout::{ValidField, ValidLayout},
-    },
-    memory::{target::global::Global, target::Target},
-    private::Private,
-    wrappers::ptr::value::Value,
-};
-use jl_sys::{
-    jl_alloc_svec, jl_alloc_svec_uninit, jl_emptysvec, jl_gc_wb, jl_svec_data, jl_svec_t,
-};
 use std::{
     fmt::{Debug, Formatter, Result as FmtResult},
     marker::PhantomData,
     ptr::NonNull,
 };
 
+use jl_sys::{
+    jl_alloc_svec, jl_alloc_svec_uninit, jl_emptysvec, jl_gc_wb, jl_svec_data, jl_svec_t,
+};
+
 use super::{
     datatype::DataType, private::WrapperPriv, value::ValueRef, Ref, Wrapper, WrapperRef,
     WrapperType,
+};
+use crate::{
+    error::{AccessError, JlrsResult},
+    layout::{
+        typecheck::Typecheck,
+        valid_layout::{ValidField, ValidLayout},
+    },
+    memory::target::{global::Global, Target},
+    private::Private,
+    wrappers::ptr::value::Value,
 };
 
 /// Access and mutate the content of a `SimpleVector`.

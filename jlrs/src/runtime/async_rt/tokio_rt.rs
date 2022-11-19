@@ -12,21 +12,23 @@
 //! All sending halves of channels provided by tokio, that is the oneshot, mpsc, broadcast, and
 //! watch `Sender`s, implement the [`OneshotSender`] trait.
 
-use crate::{
-    async_util::channel::{
-        Channel, ChannelReceiver, ChannelSender, OneshotSender, SendError, TrySendError,
-    },
-    error::{JlrsError, JlrsResult},
-    runtime::async_rt::{AsyncRuntime, Message},
-};
-use async_trait::async_trait;
 use std::{future::Future, num::NonZeroUsize, time::Duration};
+
+use async_trait::async_trait;
 use tokio::{
     runtime::Builder,
     sync::mpsc::{
         Receiver as BoundedReceiver, Sender as BoundedSender, UnboundedReceiver, UnboundedSender,
     },
     task::{JoinError, JoinHandle, LocalSet},
+};
+
+use crate::{
+    async_util::channel::{
+        Channel, ChannelReceiver, ChannelSender, OneshotSender, SendError, TrySendError,
+    },
+    error::{JlrsError, JlrsResult},
+    runtime::async_rt::{AsyncRuntime, Message},
 };
 
 /// Struct for which [`AsyncRuntime`] is implemented using tokio.

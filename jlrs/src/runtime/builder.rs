@@ -5,8 +5,6 @@
 //! provide a custom system image, [`AsyncRuntimeBuilder`] provides additional methods to set the
 //! number of threads available to Julia among others.
 
-#[cfg(any(feature = "sync-rt", feature = "async-rt"))]
-use crate::error::JlrsResult;
 use std::{
     num::NonZeroUsize,
     path::{Path, PathBuf},
@@ -14,6 +12,8 @@ use std::{
 
 #[cfg(feature = "sync-rt")]
 use super::sync_rt::PendingJulia;
+#[cfg(any(feature = "sync-rt", feature = "async-rt"))]
+use crate::error::JlrsResult;
 
 /// Build a sync runtime.
 ///

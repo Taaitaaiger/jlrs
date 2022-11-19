@@ -1,5 +1,9 @@
 //! Wrapper for `WeakRef`.
 
+use std::{marker::PhantomData, ptr::NonNull};
+
+use jl_sys::{jl_weakref_t, jl_weakref_type};
+
 use crate::{
     impl_julia_typecheck,
     memory::target::Target,
@@ -10,8 +14,6 @@ use crate::{
         Ref,
     },
 };
-use jl_sys::{jl_weakref_t, jl_weakref_type};
-use std::{marker::PhantomData, ptr::NonNull};
 
 /// A weak reference.
 #[derive(Copy, Clone)]

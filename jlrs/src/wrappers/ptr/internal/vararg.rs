@@ -1,5 +1,9 @@
 //! Wrapper for `Vararg`.
 
+use std::{marker::PhantomData, ptr::NonNull};
+
+use jl_sys::{jl_vararg_t, jl_vararg_type};
+
 use crate::{
     impl_julia_typecheck,
     memory::target::Target,
@@ -10,8 +14,6 @@ use crate::{
         Ref,
     },
 };
-use jl_sys::{jl_vararg_t, jl_vararg_type};
-use std::{marker::PhantomData, ptr::NonNull};
 
 /// A wrapper for `Vararg`.
 #[derive(Copy, Clone)]

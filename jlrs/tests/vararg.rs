@@ -1,10 +1,13 @@
 mod util;
 #[cfg(all(not(feature = "lts"), feature = "sync-rt", feature = "internal-types"))]
 mod not_lts {
+    use jlrs::{
+        layout::valid_layout::ValidLayout,
+        prelude::*,
+        wrappers::ptr::internal::vararg::{Vararg, VarargRef},
+    };
+
     use super::util::JULIA;
-    use jlrs::prelude::*;
-    use jlrs::wrappers::ptr::internal::vararg::Vararg;
-    use jlrs::{layout::valid_layout::ValidLayout, wrappers::ptr::internal::vararg::VarargRef};
 
     fn access_vararg() {
         JULIA.with(|j| {

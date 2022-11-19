@@ -2,18 +2,16 @@
 use std::ffi::OsStr;
 #[cfg(target_os = "linux")]
 use std::os::unix::prelude::OsStrExt;
-use std::path::PathBuf;
 #[cfg(target_os = "windows")]
 use std::str::FromStr;
-use std::{env, process::Command};
+use std::{env, path::PathBuf, process::Command};
 
 #[cfg(feature = "use-bindgen")]
 #[path = "build/fix_bindings.rs"]
 mod fix_bindings;
+use cfg_if::cfg_if;
 #[cfg(feature = "use-bindgen")]
 use fix_bindings::fix_bindings;
-
-use cfg_if::cfg_if;
 
 fn find_julia() -> Option<String> {
     cfg_if! {

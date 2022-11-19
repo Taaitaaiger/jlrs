@@ -2,11 +2,11 @@ mod util;
 
 #[cfg(feature = "sync-rt")]
 mod tests {
-    use super::util::JULIA;
-    use jlrs::layout::typecheck::*;
-    use jlrs::prelude::*;
-    use jlrs::wrappers::ptr::union_all::UnionAll;
     use std::{ffi::c_void, ptr::null_mut};
+
+    use jlrs::{layout::typecheck::*, prelude::*, wrappers::ptr::union_all::UnionAll};
+
+    use super::util::JULIA;
 
     macro_rules! impl_typecheck_test {
         ($name:ident, $invalid_name:ident, $t:ty, $val:expr) => {

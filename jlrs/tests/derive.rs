@@ -2,9 +2,9 @@ mod util;
 
 #[cfg(all(test, feature = "jlrs-derive", feature = "sync-rt"))]
 mod tests {
-    use super::util::derive_impls::*;
-    use super::util::JULIA_DERIVE;
     use jlrs::prelude::*;
+
+    use super::util::{derive_impls::*, JULIA_DERIVE};
 
     fn derive_bits_type_bool() {
         JULIA_DERIVE.with(|j| {

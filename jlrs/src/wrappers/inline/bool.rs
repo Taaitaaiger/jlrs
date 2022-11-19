@@ -2,14 +2,16 @@
 //!
 //! In Rust it's unsound to create an invalid `bool`, while a `Bool` in Julia can be an arbitrary
 //! `i8` in some rare cases. Rather than treating all `Bool`s as `i8` or `bool`s jlrs provides
+use std::fmt::{Debug, Formatter, Result as FmtResult};
+
+use jl_sys::{jl_bool_type, jl_unbox_int8};
+
 /// a wrapper for this type.
 use crate::{convert::unbox::Unbox, impl_julia_typecheck, impl_valid_layout};
 use crate::{
     private::Private,
     wrappers::ptr::{private::WrapperPriv, value::Value},
 };
-use jl_sys::{jl_bool_type, jl_unbox_int8};
-use std::fmt::{Debug, Formatter, Result as FmtResult};
 
 /// A Julia `Bool`.
 #[repr(C)]

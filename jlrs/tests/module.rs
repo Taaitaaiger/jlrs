@@ -3,9 +3,11 @@ mod util;
 #[cfg(feature = "sync-rt")]
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
 mod tests {
-    use crate::util::JULIA;
-    use jlrs::{memory::gc::Gc, prelude::*};
     use std::borrow::Cow;
+
+    use jlrs::{memory::gc::Gc, prelude::*};
+
+    use crate::util::JULIA;
 
     fn core_module() {
         JULIA.with(|j| {

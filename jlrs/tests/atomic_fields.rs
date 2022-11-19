@@ -2,8 +2,9 @@ mod util;
 #[cfg(feature = "sync-rt")]
 #[cfg(not(feature = "lts"))]
 mod tests {
-    use super::util::JULIA;
     use jlrs::prelude::*;
+
+    use super::util::JULIA;
 
     fn read_atomic_field() {
         JULIA.with(|j| {

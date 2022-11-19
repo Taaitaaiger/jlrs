@@ -2,10 +2,11 @@ mod util;
 
 #[cfg(feature = "sync-rt")]
 mod tests {
-    use super::util::JULIA;
-    use jlrs::layout::valid_layout::ValidLayout;
-    use jlrs::prelude::*;
     use std::ptr::null_mut;
+
+    use jlrs::{layout::valid_layout::ValidLayout, prelude::*};
+
+    use super::util::JULIA;
 
     macro_rules! impl_valid_layout_test {
         ($name:ident, $invalid_name:ident, $t:ty, $val:expr) => {

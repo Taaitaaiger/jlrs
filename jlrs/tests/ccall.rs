@@ -8,8 +8,9 @@ mod tests {
         thread::{self, JoinHandle},
     };
 
-    use super::util::JULIA;
     use jlrs::prelude::*;
+
+    use super::util::JULIA;
 
     unsafe extern "C" fn doesnt_use_scope(array: TypedArray<f64>) -> bool {
         let tracked = array.track().expect("Already borrowed");

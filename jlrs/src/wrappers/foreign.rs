@@ -27,6 +27,7 @@ use jl_sys::{
     jl_gc_alloc_typed, jl_gc_schedule_foreign_sweepfunc, jl_new_foreign_type, jl_value_t,
 };
 
+use super::ptr::{datatype::DataTypeData, private::WrapperPriv, value::ValueData};
 use crate::{
     convert::{into_julia::IntoJulia, unbox::Unbox},
     layout::valid_layout::ValidLayout,
@@ -34,8 +35,6 @@ use crate::{
     private::Private,
     wrappers::ptr::{datatype::DataType, module::Module, symbol::Symbol, value::Value},
 };
-
-use super::ptr::{datatype::DataTypeData, private::WrapperPriv, value::ValueData};
 
 static FOREIGN_TYPES: ForeignTypes = ForeignTypes {
     data: RwLock::new(Vec::new()),

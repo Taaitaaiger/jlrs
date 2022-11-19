@@ -3,9 +3,11 @@
 //! Many things in Julia are accessed with [`Symbol`]s, the [`ToSymbol`] trait allows for
 //! strings to be used instead.
 
-use crate::memory::target::Target;
-use crate::wrappers::ptr::symbol::Symbol;
-use crate::{private::Private, wrappers::ptr::string::JuliaString};
+use crate::{
+    memory::target::Target,
+    private::Private,
+    wrappers::ptr::{string::JuliaString, symbol::Symbol},
+};
 
 /// Trait implemented by types that can be converted to a [`Symbol`].
 pub trait ToSymbol: private::ToSymbolPriv {
@@ -24,12 +26,14 @@ impl ToSymbol for Symbol<'_> {}
 impl ToSymbol for JuliaString<'_> {}
 
 pub(crate) mod private {
-    use crate::private::Private;
-    use crate::wrappers::ptr::private::WrapperPriv;
-    use crate::wrappers::ptr::string::JuliaString;
-    use crate::wrappers::ptr::symbol::Symbol;
-    use jl_sys::{jl_symbol, jl_symbol_n};
     use std::ptr::NonNull;
+
+    use jl_sys::{jl_symbol, jl_symbol_n};
+
+    use crate::{
+        private::Private,
+        wrappers::ptr::{private::WrapperPriv, string::JuliaString, symbol::Symbol},
+    };
 
     pub trait ToSymbolPriv {
         // Safety: this method must only be called from a thread known to Julia

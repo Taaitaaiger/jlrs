@@ -21,7 +21,6 @@ use std::{
 
 use proc_macro2::TokenTree;
 use quote::{quote, ToTokens};
-
 #[cfg(any(feature = "windows", windows))]
 use syn::{parse::Parser, Attribute, ItemForeignMod};
 use syn::{Field, ForeignItem, ItemStruct, ItemUnion, Type, TypePath};

@@ -1,13 +1,7 @@
 //! Wrapper for `Symbol`. Symbols represent identifiers like module and function names.
 
-use crate::{
-    error::{JlrsError, JlrsResult},
-    impl_julia_typecheck,
-    memory::target::Target,
-    private::Private,
-    wrappers::ptr::{private::WrapperPriv, value::LeakedValue},
-};
-use jl_sys::{jl_sym_t, jl_symbol_n, jl_symbol_name_ as jl_symbol_name, jl_symbol_type};
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use std::mem::MaybeUninit;
 use std::{
     ffi::CStr,
     hash::{Hash, Hasher},
@@ -15,12 +9,18 @@ use std::{
     ptr::NonNull,
 };
 
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
-use crate::catch::catch_exceptions;
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
-use std::mem::MaybeUninit;
+use jl_sys::{jl_sym_t, jl_symbol_n, jl_symbol_name_ as jl_symbol_name, jl_symbol_type};
 
 use super::Ref;
+#[cfg(not(all(target_os = "windows", feature = "lts")))]
+use crate::catch::catch_exceptions;
+use crate::{
+    error::{JlrsError, JlrsResult},
+    impl_julia_typecheck,
+    memory::target::Target,
+    private::Private,
+    wrappers::ptr::{private::WrapperPriv, value::LeakedValue},
+};
 
 /// `Symbol`s are used Julia to represent identifiers, `:x` represents the `Symbol` `x`. Things
 /// that can be accessed using a `Symbol` include submodules, functions, and globals. However,

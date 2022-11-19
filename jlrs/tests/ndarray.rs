@@ -3,10 +3,13 @@ mod util;
 #[cfg(test)]
 #[cfg(all(feature = "sync-rt", feature = "jlrs-ndarray"))]
 mod tests {
+    use jlrs::{
+        convert::ndarray::{NdArrayView, NdArrayViewMut},
+        memory::stack_frame::StackFrame,
+        wrappers::ptr::array::{Array, TypedArray},
+    };
+
     use super::util::JULIA;
-    use jlrs::convert::ndarray::{NdArrayView, NdArrayViewMut};
-    use jlrs::memory::stack_frame::StackFrame;
-    use jlrs::wrappers::ptr::array::{Array, TypedArray};
 
     fn bits_array_view() {
         JULIA.with(|j| {

@@ -1,10 +1,11 @@
+use std::cell::RefCell;
+
 #[cfg(feature = "sync-rt")]
 use jlrs::{
     memory::stack_frame::StackFrame,
     runtime::{builder::RuntimeBuilder, sync_rt::PendingJulia},
     wrappers::ptr::value::Value,
 };
-use std::cell::RefCell;
 
 #[cfg(feature = "sync-rt")]
 #[allow(dead_code)]

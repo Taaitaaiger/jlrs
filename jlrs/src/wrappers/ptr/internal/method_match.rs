@@ -4,13 +4,15 @@
 //! in [`julia.h`]
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/f9720dc2ebd6cd9e3086365f281e62506444ef37/src/julia.h#L585
+use std::{marker::PhantomData, ptr::NonNull};
+
+use jl_sys::{jl_method_match_t, jl_method_match_type};
+
 use crate::{
     impl_julia_typecheck,
     private::Private,
     wrappers::ptr::{private::WrapperPriv, simple_vector::SimpleVector, value::Value, Ref},
 };
-use jl_sys::{jl_method_match_t, jl_method_match_type};
-use std::{marker::PhantomData, ptr::NonNull};
 
 /// Wrapper for `MethodMatch`.
 #[derive(Copy, Clone)]
@@ -89,9 +91,8 @@ pub type MethodMatchRef<'scope> = Ref<'scope, 'static, MethodMatch<'scope>>;
 impl_valid_layout!(MethodMatchRef, MethodMatch);
 impl_ref_root!(MethodMatch, MethodMatchRef, 1);
 
-use crate::memory::target::target_type::TargetType;
-
 use super::method::Method;
+use crate::memory::target::target_type::TargetType;
 
 /// `MethodMetch` or `MethodMetchRef`, depending on the target type `T`.
 pub type MethodMatchData<'target, T> =

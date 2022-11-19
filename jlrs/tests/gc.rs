@@ -1,11 +1,12 @@
 mod util;
 #[cfg(feature = "sync-rt")]
 mod tests {
-    use super::util::JULIA;
     use jlrs::{
         memory::gc::{Gc, GcCollection},
         prelude::*,
     };
+
+    use super::util::JULIA;
 
     fn disable_enable_gc() {
         JULIA.with(|j| {
