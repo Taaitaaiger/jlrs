@@ -166,7 +166,6 @@ impl<'scope> WrapperPriv<'scope, '_> for TypeMapEntry<'scope> {
 /// A reference to a [`TypeMapEntry`] that has not been explicitly rooted.
 pub type TypeMapEntryRef<'scope> = Ref<'scope, 'static, TypeMapEntry<'scope>>;
 impl_valid_layout!(TypeMapEntryRef, TypeMapEntry);
-impl_ref_root!(TypeMapEntry, TypeMapEntryRef, 1);
 
 use crate::memory::target::target_type::TargetType;
 

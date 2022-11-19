@@ -165,8 +165,11 @@ unsafe impl<F: ForeignType> IntoJulia for F {
 unsafe impl<T: ForeignType> ValidLayout for T {
     fn valid_layout(ty: Value) -> bool {
         if let Ok(dt) = ty.cast::<DataType>() {
-            let ty = FOREIGN_TYPES.find::<T>().expect("Doesn't exist");
-            dt.unwrap(Private) == ty.unwrap(Private)
+            if let Some(ty) = FOREIGN_TYPES.find::<T>() {
+                dt.unwrap(Private) == ty.unwrap(Private)
+            } else {
+                false
+            }
         } else {
             false
         }

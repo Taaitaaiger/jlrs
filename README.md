@@ -117,8 +117,8 @@ In addition to these runtimes, the following utility features are available:
 
 - `beta`
 
- Use the current beta version of Julia (1.9.0-alpha1) instead of the current stable version
- (1.8).
+  Use the current beta version of Julia (1.9.0-alpha1) instead of the current stable version
+  (1.8).
 
 - `async`
 

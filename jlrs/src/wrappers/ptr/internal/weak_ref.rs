@@ -63,7 +63,6 @@ impl<'scope> WrapperPriv<'scope, '_> for WeakRef<'scope> {
 /// A reference to a [`WeakRef`] that has not been explicitly rooted.
 pub type WeakRefRef<'scope> = Ref<'scope, 'static, WeakRef<'scope>>;
 impl_valid_layout!(WeakRefRef, WeakRef);
-impl_ref_root!(WeakRef, WeakRefRef, 1);
 
 use crate::memory::target::target_type::TargetType;
 

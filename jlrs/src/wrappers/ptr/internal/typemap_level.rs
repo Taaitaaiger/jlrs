@@ -212,7 +212,6 @@ impl<'scope> WrapperPriv<'scope, '_> for TypeMapLevel<'scope> {
 /// A reference to a [`TypeMapLevel`] that has not been explicitly rooted.
 pub type TypeMapLevelRef<'scope> = Ref<'scope, 'static, TypeMapLevel<'scope>>;
 impl_valid_layout!(TypeMapLevelRef, TypeMapLevel);
-impl_ref_root!(TypeMapLevel, TypeMapLevelRef, 1);
 
 use crate::memory::target::target_type::TargetType;
 

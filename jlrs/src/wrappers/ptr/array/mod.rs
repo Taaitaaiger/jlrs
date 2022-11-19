@@ -2297,8 +2297,6 @@ unsafe impl ValidField for Option<ArrayRef<'_, '_>> {
     }
 }
 
-impl_ref_root!(Array, ArrayRef, 2);
-
 /// A reference to an [`TypedArray`] that has not been explicitly rooted.
 pub type TypedArrayRef<'scope, 'data, T> = Ref<'scope, 'data, TypedArray<'scope, 'data, T>>;
 
@@ -2325,18 +2323,6 @@ unsafe impl<T: ValidField> ValidField for Option<TypedArrayRef<'_, '_, T>> {
         } else {
             false
         }
-    }
-}
-
-impl<'scope, 'data, U> TypedArrayRef<'scope, 'data, U>
-where
-    U: ValidField,
-{
-    pub unsafe fn root<'target, T>(self, target: T) -> TypedArrayData<'target, 'data, T, U>
-    where
-        T: Target<'target>,
-    {
-        target.data_from_ptr(self.ptr(), Private)
     }
 }
 

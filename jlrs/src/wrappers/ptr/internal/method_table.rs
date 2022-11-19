@@ -212,7 +212,6 @@ impl<'scope> WrapperPriv<'scope, '_> for MethodTable<'scope> {
 /// A reference to a [`MethodTable`] that has not been explicitly rooted.
 pub type MethodTableRef<'scope> = Ref<'scope, 'static, MethodTable<'scope>>;
 impl_valid_layout!(MethodTableRef, MethodTable);
-impl_ref_root!(MethodTable, MethodTableRef, 1);
 
 use crate::memory::target::target_type::TargetType;
 

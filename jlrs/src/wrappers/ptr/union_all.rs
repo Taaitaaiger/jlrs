@@ -250,7 +250,6 @@ impl<'scope> WrapperPriv<'scope, '_> for UnionAll<'scope> {
 /// A reference to a [`UnionAll`] that has not been explicitly rooted.
 pub type UnionAllRef<'scope> = Ref<'scope, 'static, UnionAll<'scope>>;
 impl_valid_layout!(UnionAllRef, UnionAll);
-impl_ref_root!(UnionAll, UnionAllRef, 1);
 
 use crate::memory::target::target_type::TargetType;
 

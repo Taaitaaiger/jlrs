@@ -54,35 +54,6 @@ macro_rules! impl_valid_layout {
     };
 }
 
-macro_rules! impl_ref_root {
-    ($type:tt, $reftype:tt, 2) => {
-        impl<'scope, 'data> $reftype<'scope, 'data> {
-            /// Use `target` to root this data.
-            ///
-            /// Safety: The data pointed to by `self` must not have been freed by the GC yet.
-            pub unsafe fn root<'target, T>(self, target: T) -> T::Data<'data, $type<'target, 'data>>
-            where
-                T: $crate::memory::target::Target<'target>,
-            {
-                target.data_from_ptr(self.ptr(), $crate::private::Private)
-            }
-        }
-    };
-    ($type:tt, $reftype:tt, 1) => {
-        impl<'scope> $reftype<'scope> {
-            /// Use `target` to root this data.
-            ///
-            /// Safety: The data pointed to by `self` must not have been freed by the GC yet.
-            pub unsafe fn root<'target, T>(self, target: T) -> T::Data<'static, $type<'target>>
-            where
-                T: $crate::memory::target::Target<'target>,
-            {
-                target.data_from_ptr(self.ptr(), $crate::private::Private)
-            }
-        }
-    };
-}
-
 macro_rules! impl_debug {
     ($type:ty) => {
         impl ::std::fmt::Debug for $type {
@@ -241,7 +212,8 @@ pub trait Wrapper<'scope, 'data>: private::WrapperPriv<'scope, 'data> {
     }
 }
 
-type WrapperType<'target, 'scope, 'data, T> =
+/// The wrapper type W<'target, 'data> assocatiated with the reference type T<'scope, 'data>.
+pub type WrapperType<'target, 'scope, 'data, T> =
     <<T as WrapperRef<'scope, 'data>>::Wrapper as Wrapper<'scope, 'data>>::TypeConstructor<
         'target,
         'data,
@@ -285,8 +257,21 @@ impl<'scope, 'data, T: Wrapper<'scope, 'data>> Debug for Ref<'scope, 'data, T> {
     }
 }
 
-impl<'scope, 'data, T: Wrapper<'scope, 'data>> Ref<'scope, 'data, T> {
-    pub(crate) fn wrap(ptr: NonNull<T::Wraps>) -> Self {
+impl<'scope, 'data, W: Wrapper<'scope, 'data>> Ref<'scope, 'data, W> {
+    /// Use `target` to root this data.
+    ///
+    /// Safety: The data pointed to by `self` must not have been freed by the GC yet.
+    pub unsafe fn root<'target, T>(
+        self,
+        target: T,
+    ) -> T::Data<'data, W::TypeConstructor<'target, 'data>>
+    where
+        T: Target<'target>,
+    {
+        target.data_from_ptr(self.ptr().cast(), Private)
+    }
+
+    pub(crate) fn wrap(ptr: NonNull<W::Wraps>) -> Self {
         Ref(ptr, PhantomData, PhantomData)
     }
 
@@ -295,8 +280,8 @@ impl<'scope, 'data, T: Wrapper<'scope, 'data>> Ref<'scope, 'data, T> {
     /// Safety: a reference is only guaranteed to be valid as long as it's reachable from some
     /// GC root. If the reference is unreachable, the GC can free it. The GC can run whenever a
     /// safepoint is reached, this is typically the case when new Julia data is allocated.
-    pub unsafe fn wrapper(self) -> T {
-        T::wrapper(self, Private)
+    pub unsafe fn wrapper(self) -> W {
+        W::wrapper(self, Private)
     }
 
     /// Assume the reference still points to valid Julia data and convert it to a `Value`.
@@ -305,7 +290,7 @@ impl<'scope, 'data, T: Wrapper<'scope, 'data>> Ref<'scope, 'data, T> {
     /// GC root. If the reference is unreachable, the GC can free it. The GC can run whenever a
     /// safepoint is reached, this is typically the case when new Julia data is allocated.
     pub unsafe fn value(self) -> Value<'scope, 'data> {
-        T::value(self, Private)
+        W::value(self, Private)
     }
 
     /// Leaks `self` with a `'static` lifetime. This method is only available when the `ccall`
@@ -316,7 +301,7 @@ impl<'scope, 'data, T: Wrapper<'scope, 'data>> Ref<'scope, 'data, T> {
     /// Safety: this must only be used to return freshly allocated Julia data from Rust to Julia
     /// from a `ccall`ed function.
     #[cfg(feature = "ccall")]
-    pub unsafe fn leak(self) -> Ref<'static, 'data, T::TypeConstructor<'static, 'data>> {
+    pub unsafe fn leak(self) -> Ref<'static, 'data, W::TypeConstructor<'static, 'data>> {
         Ref::wrap(self.ptr().cast())
     }
 
@@ -325,7 +310,7 @@ impl<'scope, 'data, T: Wrapper<'scope, 'data>> Ref<'scope, 'data, T> {
         self.ptr().cast()
     }
 
-    pub(crate) fn ptr(self) -> NonNull<T::Wraps> {
+    pub(crate) fn ptr(self) -> NonNull<W::Wraps> {
         self.0
     }
 }

@@ -230,7 +230,6 @@ pub(crate) fn find_union_component(haystack: Value, needle: Value, nth: &mut u32
 /// A reference to a [`Union`] that has not been explicitly rooted.
 pub type UnionRef<'scope> = Ref<'scope, 'static, Union<'scope>>;
 impl_valid_layout!(UnionRef, Union);
-impl_ref_root!(Union, UnionRef, 1);
 
 use crate::memory::target::target_type::TargetType;
 

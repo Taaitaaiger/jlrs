@@ -157,8 +157,6 @@ unsafe impl ValidField for Option<FunctionRef<'_, '_>> {
     }
 }
 
-impl_ref_root!(Function, FunctionRef, 2);
-
 use crate::memory::target::target_type::TargetType;
 
 /// `Function` or `FunctionRef`, depending on the target type `T`.

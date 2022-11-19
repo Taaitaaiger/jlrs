@@ -68,7 +68,6 @@ impl<'scope, 'data> WrapperPriv<'scope, 'data> for Vararg<'scope> {
 /// A reference to a [`Vararg`] that has not been explicitly rooted.
 pub type VarargRef<'scope> = Ref<'scope, 'static, Vararg<'scope>>;
 impl_valid_layout!(VarargRef, Vararg);
-impl_ref_root!(Vararg, VarargRef, 1);
 
 use crate::memory::target::target_type::TargetType;
 
