@@ -24,6 +24,12 @@ use crate::{
 use async_trait::async_trait;
 use jl_sys::jl_yield;
 
+#[cfg(feature = "async-rt")]
+use crate::{
+    async_util::internal::{BlockingTaskEnvelope, PendingTaskEnvelope},
+    runtime::async_rt::{queue::Sender, Message, MessageInner},
+};
+
 /// A task that returns once.
 ///
 /// In order to schedule the task you must use [`AsyncJulia::task`] or [`AsyncJulia::try_task`].
@@ -68,6 +74,10 @@ use jl_sys::jl_yield;
 pub trait AsyncTask: 'static + Send + Sync {
     /// The type of the result which is returned if `run` completes successfully.
     type Output: 'static + Send;
+
+    /// The thread-affinity of this task. Can be set to Affinity::Main to ensure the task is
+    /// always scheduled on the main runtime thread.
+    const AFFINITY: Affinity = Affinity::Any;
 
     /// Register the task.
     ///
@@ -200,6 +210,10 @@ pub trait PersistentTask: 'static + Send + Sync {
     // The capacity of the channel used to communicate with this task.
     const CHANNEL_CAPACITY: usize = 0;
 
+    /// The thread-affinity of this task. Can be set to Affinity::Main to ensure the task is
+    /// always scheduled on the main runtime thread.
+    const AFFINITY: Affinity = Affinity::Any;
+
     /// Register this persistent task.
     ///
     /// Note that this method is not called automatically, but only if
@@ -248,6 +262,97 @@ pub trait PersistentTask: 'static + Send + Sync {
         _frame: AsyncGcFrame<'frame>,
         _state: &mut Self::State<'frame>,
     ) {
+    }
+}
+
+/// The thread-affinity of a task.
+///
+/// If the affinity of a task is set to `Main` the task is always scheduled on the main runtime
+/// thread. If no worker threads are used the affinity is irrelevant.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum Affinity {
+    Main,
+    Any,
+}
+
+#[cfg(feature = "async-rt")]
+impl Affinity {
+    pub(crate) async fn schedule(
+        self,
+        sender: &Sender<Message>,
+        msg: Box<dyn PendingTaskEnvelope>,
+    ) {
+        match self {
+            Affinity::Any => sender.send(MessageInner::Task(msg).wrap()).await,
+            Affinity::Main => sender.send_main(MessageInner::Task(msg).wrap()).await,
+        }
+    }
+
+    pub(crate) fn try_schedule(
+        self,
+        sender: &Sender<Message>,
+        msg: Box<dyn PendingTaskEnvelope>,
+    ) -> JlrsResult<()> {
+        match self {
+            Affinity::Any => sender.try_send(MessageInner::Task(msg).wrap()),
+            Affinity::Main => sender.try_send_main(MessageInner::Task(msg).wrap()),
+        }
+    }
+
+    pub(crate) async fn schedule_blocking(
+        self,
+        sender: &Sender<Message>,
+        msg: Box<dyn BlockingTaskEnvelope>,
+    ) {
+        match self {
+            Affinity::Any => sender.send(MessageInner::BlockingTask(msg).wrap()).await,
+            Affinity::Main => {
+                sender
+                    .send_main(MessageInner::BlockingTask(msg).wrap())
+                    .await
+            }
+        }
+    }
+
+    pub(crate) fn try_schedule_blocking(
+        self,
+        sender: &Sender<Message>,
+        msg: Box<dyn BlockingTaskEnvelope>,
+    ) -> JlrsResult<()> {
+        match self {
+            Affinity::Any => sender.try_send(MessageInner::BlockingTask(msg).wrap()),
+            Affinity::Main => sender.try_send_main(MessageInner::BlockingTask(msg).wrap()),
+        }
+    }
+
+    pub(crate) async fn schedule_post_blocking(
+        self,
+        sender: &Sender<Message>,
+        msg: Box<dyn BlockingTaskEnvelope>,
+    ) {
+        match self {
+            Affinity::Any => {
+                sender
+                    .send(MessageInner::PostBlockingTask(msg).wrap())
+                    .await
+            }
+            Affinity::Main => {
+                sender
+                    .send_main(MessageInner::PostBlockingTask(msg).wrap())
+                    .await
+            }
+        }
+    }
+
+    pub(crate) fn try_schedule_post_blocking(
+        self,
+        sender: &Sender<Message>,
+        msg: Box<dyn BlockingTaskEnvelope>,
+    ) -> JlrsResult<()> {
+        match self {
+            Affinity::Any => sender.try_send(MessageInner::PostBlockingTask(msg).wrap()),
+            Affinity::Main => sender.try_send_main(MessageInner::PostBlockingTask(msg).wrap()),
+        }
     }
 }
 

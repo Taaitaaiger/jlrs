@@ -53,6 +53,9 @@
 
  - `CCall::throw_exception` has been added and can be used to throw an exception from a `ccall`ed function.
 
+ - Add `Affinity` so tasks can be explicitly scheduled on the main runtime thread.
+
+
 #### v0.16
  - Support for Julia 1.7 has been dropped, by default Julia 1.8 is targeted.
 

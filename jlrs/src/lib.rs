@@ -2,7 +2,7 @@
 //! in Rust applications and to use functionality from the Julia C API when writing `ccall`able
 //! functions in Rust. Currently this crate is only tested on Linux and Windows in combination
 //! with Julia 1.6 and 1.8 and is not compatible with other versions of Julia. Using Julia 1.8 is
-//! highly recommended.
+//! highly recommended. The minimum supported Rust version is currently 1.65.
 //!
 //! The documentation assumes you're already familiar with the Julia programming language.
 //!
@@ -630,9 +630,9 @@
 //!
 //! # Custom types
 //!
-//! In order to map a struct in Rust to one in Julia you can derive [`ValidLayout`], [`Unbox`],
-//! and [`Typecheck`] and [`ValidField`]. If the struct in Julia has no type parameters and is a
-//! bits type you can also derive [`IntoJulia`].
+//! In order to map a struct in Rust to one in Julia you can derive [`Unbox`], [`Typecheck`] and
+//! [`ValidLayout`]. If the struct in Julia is immutable [`ValidField`] can also be derived,
+//! if it has no type parameters [`IntoJulia`].
 //!
 //! You normally shouldn't need to implement these structs or traits manually. The JlrsReflect
 //! package can generate correct Rust struct and automatically derive the supported traits for

@@ -36,6 +36,7 @@ mod tests {
                         Ok(())
                     },
                     sender,
+                    Affinity::Any,
                 )
                 .expect("Could not send blocking task");
 
@@ -487,6 +488,7 @@ mod tests {
                     }
                 },
                 sender,
+                Affinity::Any,
             )
             .unwrap();
 
