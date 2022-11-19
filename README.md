@@ -184,7 +184,6 @@ following snippet initializes the sync runtime:
 ```rust
 use jlrs::prelude::*;
 
-# fn main() {
 // Initializing Julia is unsafe because this can load arbitrary
 // Julia code, and because it can race with other crates unrelated
 // to jlrs. It returns an error if Julia has already been
@@ -195,7 +194,6 @@ let mut julia = unsafe { RuntimeBuilder::new().start().unwrap() };
 // of references to Julia data that exist in Rust code.
 let mut frame = StackFrame::new();
 let _instance = julia.instance(&mut frame);
-# }
 ```
 
 To use the async runtime you must upgrade the `RuntimeBuilder` to an
@@ -380,8 +378,6 @@ As an example, let's accumulate some number of values in a Julia array and retur
 its contents:
 
 ```rust
-# #[cfg(not(all(target_os = "windows", feature = "lts")))]
-# {
 use jlrs::prelude::*;
 
 struct AccumulatorTask {
@@ -457,7 +453,6 @@ impl PersistentTask for AccumulatorTask {
         }
     }
 }
-# }
 ```
 
 ### Calling Rust from Julia

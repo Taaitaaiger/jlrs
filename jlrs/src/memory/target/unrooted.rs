@@ -1,9 +1,7 @@
 //! A non-rooting target.
 //!
-//! While any target can be used as a non-rooting target by using a reference to that target,
-//! targets are aware of their return type and can't be used as a non-rooting target with methods
-//! that return data of a different type. This can be particularly problematic with methods that
-//! take a generic target.
+//! While any target can be used as a non-rooting target by using a reference to that target, this
+//! can be problematic in nested expressions.
 
 use std::marker::PhantomData;
 
@@ -13,11 +11,11 @@ use std::marker::PhantomData;
 ///
 /// [`Target::unrooted`]: crate::memory::target::Target::unrooted
 #[derive(Copy, Clone, Debug)]
-pub struct Unrooted<'scope> {
-    _marker: PhantomData<&'scope ()>,
+pub struct Unrooted<'target> {
+    _marker: PhantomData<&'target ()>,
 }
 
-impl<'scope> Unrooted<'scope> {
+impl<'target> Unrooted<'target> {
     pub(crate) unsafe fn new() -> Self {
         Unrooted {
             _marker: PhantomData,

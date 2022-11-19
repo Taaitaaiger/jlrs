@@ -35,16 +35,19 @@ pub struct GcFrame<'scope> {
 
 impl<'scope> GcFrame<'scope> {
     /// Returns a mutable reference to this frame.
+    #[inline]
     pub fn as_mut(&mut self) -> &mut Self {
         self
     }
 
     /// Reserve capacity for at least `additional` roots.
+    #[inline]
     pub fn reserve(&mut self, additional: usize) {
         self.stack.reserve(additional)
     }
 
     /// Borrow this frame as an `ExtendedTarget` with the provided `target`.
+    #[inline]
     pub fn extended_target<'target, 'borrow, T>(
         &'borrow mut self,
         target: T,
@@ -60,6 +63,7 @@ impl<'scope> GcFrame<'scope> {
     }
 
     /// Borrow this frame as an `ExtendedTarget` with an `Output` that targets this frame.
+    #[inline]
     pub fn as_extended_target<'borrow>(
         &'borrow mut self,
     ) -> ExtendedTarget<'scope, 'scope, 'borrow, Output<'scope>> {
@@ -72,11 +76,19 @@ impl<'scope> GcFrame<'scope> {
     }
 
     /// Returns the number of values rooted in this frame.
+    #[inline]
     pub fn n_roots(&self) -> usize {
-        self.stack.size() - self.offset
+        self.stack_size() - self.offset
+    }
+
+    /// Returns the number of values rooted in this frame.
+    #[inline]
+    pub fn stack_size(&self) -> usize {
+        self.stack.size()
     }
 
     /// Returns an `Output` that targets the current frame.
+    #[inline]
     pub fn output(&self) -> Output<'scope> {
         unsafe {
             let offset = self.stack.reserve_slot();
@@ -88,6 +100,7 @@ impl<'scope> GcFrame<'scope> {
     }
 
     /// Returns a `ReusableSlot` that targets the current frame.
+    #[inline]
     pub fn reusable_slot(&self) -> ReusableSlot<'scope> {
         unsafe {
             let offset = self.stack.reserve_slot();
@@ -99,6 +112,7 @@ impl<'scope> GcFrame<'scope> {
     }
 
     /// Returns a `Unrooted` that targets the current frame.
+    #[inline]
     pub fn unrooted(&self) -> Unrooted<'scope> {
         unsafe { Unrooted::new() }
     }
@@ -137,6 +151,7 @@ impl<'scope> GcFrame<'scope> {
     /// # });
     /// # }
     /// ```
+    #[inline(never)]
     pub fn scope<T, F>(&mut self, func: F) -> JlrsResult<T>
     where
         for<'inner> F: FnOnce(GcFrame<'inner>) -> JlrsResult<T>,
@@ -318,6 +333,7 @@ pub struct BorrowedFrame<'borrow, 'current, F>(
 
 impl<'borrow, 'current> BorrowedFrame<'borrow, 'current, GcFrame<'current>> {
     /// Create a temporary scope by calling [`GcFrame::scope`].
+    #[inline(never)]
     pub fn scope<T, F>(self, func: F) -> JlrsResult<T>
     where
         for<'inner> F: FnOnce(GcFrame<'inner>) -> JlrsResult<T>,
@@ -329,6 +345,7 @@ impl<'borrow, 'current> BorrowedFrame<'borrow, 'current, GcFrame<'current>> {
 #[cfg(feature = "async")]
 impl<'borrow, 'current> BorrowedFrame<'borrow, 'current, AsyncGcFrame<'current>> {
     /// Create a temporary scope by calling [`GcFrame::scope`].
+    #[inline(never)]
     pub fn scope<T, F>(self, func: F) -> JlrsResult<T>
     where
         for<'inner> F: FnOnce(GcFrame<'inner>) -> JlrsResult<T>,
@@ -337,6 +354,7 @@ impl<'borrow, 'current> BorrowedFrame<'borrow, 'current, AsyncGcFrame<'current>>
     }
 
     /// Create a temporary scope by calling [`AsyncGcFrame::async_scope`].
+    #[inline(never)]
     pub async fn async_scope<'nested, T, F, G>(self, func: F) -> JlrsResult<T>
     where
         'borrow: 'nested,
@@ -348,6 +366,7 @@ impl<'borrow, 'current> BorrowedFrame<'borrow, 'current, AsyncGcFrame<'current>>
     }
 
     /// Create a temporary scope by calling [`AsyncGcFrame::relaxed_async_scope`].
+    #[inline(never)]
     pub async unsafe fn relaxed_async_scope<'nested, T, F, G>(self, func: F) -> JlrsResult<T>
     where
         'borrow: 'nested,

@@ -22,8 +22,8 @@
 //! | `&mut (Async)GcFrame<'scope>` | Yes     |
 //! | `Output<'scope>`              | Yes     |
 //! | `&'scope mut Output<'_>`      | Yes     |
-//! | `ReusableSlot<'target>`       | Yes     |
-//! | `&mut ReusableSlot<'target>`  | Yes     |
+//! | `ReusableSlot<'scope>`        | Yes     |
+//! | `&mut ReusableSlot<'scope>`   | Yes     |
 //! | `Unrooted<'scope>`            | No      |
 //! | `&<T: Target<'scope>>`        | No      |
 //!
