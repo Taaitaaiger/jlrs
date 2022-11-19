@@ -1,4 +1,4 @@
-//! Traits used to declare what type of data is returned by a target.
+//! Trait used to declare what type of data is returned by a target.
 
 use super::reusable_slot::ReusableSlot;
 #[cfg(feature = "async")]
@@ -9,7 +9,7 @@ use crate::{
     wrappers::ptr::{Ref, Wrapper},
 };
 
-/// Defines the return types of a target, `Data` and `Result`.
+/// Defines the return types of a target, `Data`, `Exception`, and `Result`.
 pub trait TargetType<'target>: Sized {
     /// Type returned by methods that don't catch Julia exceptions.
     ///
