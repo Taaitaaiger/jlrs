@@ -411,7 +411,6 @@ impl<'scope> WrapperPriv<'scope, '_> for Module<'scope> {
 /// A reference to a [`Module`] that has not been explicitly rooted.
 pub type ModuleRef<'scope> = Ref<'scope, 'static, Module<'scope>>;
 impl_valid_layout!(ModuleRef, Module);
-impl_ref_root!(Module, ModuleRef, 1);
 
 use crate::memory::target::target_type::TargetType;
 

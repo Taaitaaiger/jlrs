@@ -1492,7 +1492,6 @@ impl<'scope> WrapperPriv<'scope, '_> for DataType<'scope> {
 /// A reference to a [`DataType`] that has not been explicitly rooted.
 pub type DataTypeRef<'scope> = Ref<'scope, 'static, DataType<'scope>>;
 impl_valid_layout!(DataTypeRef, DataType);
-impl_ref_root!(DataType, DataTypeRef, 1);
 
 use crate::memory::target::target_type::TargetType;
 

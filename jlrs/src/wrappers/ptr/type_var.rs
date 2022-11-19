@@ -157,7 +157,6 @@ impl<'scope> WrapperPriv<'scope, '_> for TypeVar<'scope> {
 /// A reference to a [`TypeVar`] that has not been explicitly rooted.
 pub type TypeVarRef<'scope> = Ref<'scope, 'static, TypeVar<'scope>>;
 impl_valid_layout!(TypeVarRef, TypeVar);
-impl_ref_root!(TypeVar, TypeVarRef, 1);
 
 use crate::memory::target::target_type::TargetType;
 

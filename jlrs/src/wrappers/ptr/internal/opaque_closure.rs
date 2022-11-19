@@ -30,8 +30,8 @@ pub struct OpaqueClosure<'scope>(NonNull<jl_opaque_closure_t>, PhantomData<&'sco
 impl<'scope> OpaqueClosure<'scope> {
     /*
     using Base.Experimental
-    oq = Base.Experimental.@opaque (x) -> 2x
-    ty = typeof(oq)
+    oc = Base.Experimental.@opaque (x) -> 2x
+    ty = typeof(oc)
     inspect(ty):
 
     captures: Any (const)
@@ -171,7 +171,6 @@ impl<'data> Call<'data> for OpaqueClosure<'_> {
 /// A reference to an [`OpaqueClosure`] that has not been explicitly rooted.
 pub type OpaqueClosureRef<'scope> = Ref<'scope, 'static, OpaqueClosure<'scope>>;
 impl_valid_layout!(OpaqueClosureRef, OpaqueClosure);
-impl_ref_root!(OpaqueClosure, OpaqueClosureRef, 1);
 
 use crate::memory::target::target_type::TargetType;
 

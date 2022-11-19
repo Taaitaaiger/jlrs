@@ -188,7 +188,6 @@ impl<'scope> WrapperPriv<'scope, '_> for MethodInstance<'scope> {
 /// A reference to a [`MethodInstance`] that has not been explicitly rooted.
 pub type MethodInstanceRef<'scope> = Ref<'scope, 'static, MethodInstance<'scope>>;
 impl_valid_layout!(MethodInstanceRef, MethodInstance);
-impl_ref_root!(MethodInstance, MethodInstanceRef, 1);
 
 use super::code_instance::CodeInstanceData;
 use crate::memory::target::target_type::TargetType;

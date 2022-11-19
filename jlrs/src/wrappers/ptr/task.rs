@@ -207,7 +207,6 @@ impl<'scope> WrapperPriv<'scope, '_> for Task<'scope> {
 /// A reference to a [`Task`] that has not been explicitly rooted.
 pub type TaskRef<'scope> = Ref<'scope, 'static, Task<'scope>>;
 impl_valid_layout!(TaskRef, Task);
-impl_ref_root!(Task, TaskRef, 1);
 
 use crate::memory::target::target_type::TargetType;
 

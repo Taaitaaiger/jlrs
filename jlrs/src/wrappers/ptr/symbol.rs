@@ -174,7 +174,6 @@ impl<'scope> WrapperPriv<'scope, '_> for Symbol<'scope> {
 /// A reference to a [`Symbol`] that has not been explicitly rooted.
 pub type SymbolRef<'scope> = Ref<'scope, 'static, Symbol<'scope>>;
 impl_valid_layout!(SymbolRef, Symbol);
-impl_ref_root!(Symbol, SymbolRef, 1);
 
 use crate::memory::target::target_type::TargetType;
 

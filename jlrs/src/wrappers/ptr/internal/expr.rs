@@ -75,7 +75,6 @@ impl<'scope> WrapperPriv<'scope, '_> for Expr<'scope> {
 /// A reference to an [`Expr`] that has not been explicitly rooted.
 pub type ExprRef<'scope> = Ref<'scope, 'static, Expr<'scope>>;
 impl_valid_layout!(ExprRef, Expr);
-impl_ref_root!(Expr, ExprRef, 1);
 
 use crate::memory::target::target_type::TargetType;
 

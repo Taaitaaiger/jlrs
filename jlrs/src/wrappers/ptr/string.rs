@@ -134,7 +134,6 @@ impl<'scope> WrapperPriv<'scope, '_> for JuliaString<'scope> {
 /// A reference to a [`JuliaString`] that has not been explicitly rooted.
 pub type StringRef<'scope> = Ref<'scope, 'static, JuliaString<'scope>>;
 impl_valid_layout!(StringRef, String);
-impl_ref_root!(JuliaString, StringRef, 1);
 
 use crate::memory::target::target_type::TargetType;
 

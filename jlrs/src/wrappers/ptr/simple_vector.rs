@@ -254,18 +254,6 @@ unsafe impl<'scope> ValidField for Option<SimpleVectorRef<'scope>> {
     }
 }
 
-impl<'scope> SimpleVectorRef<'scope> {
-    /// Root this reference to a SimpleVector in `scope`.
-    ///
-    /// Safety: self must point to valid data.
-    pub unsafe fn root<'target, T>(self, target: T) -> SimpleVectorData<'target, T>
-    where
-        T: Target<'target>,
-    {
-        target.data_from_ptr(self.ptr(), Private)
-    }
-}
-
 use crate::memory::target::target_type::TargetType;
 
 /// `SimpleVector` or `SimpleVectorRef`, depending on the target type `T`.

@@ -2194,8 +2194,6 @@ unsafe impl ValidField for Option<ValueRef<'_, '_>> {
     }
 }
 
-impl_ref_root!(Value, ValueRef, 2);
-
 use crate::memory::target::target_type::TargetType;
 
 /// `Value` or `ValueRef`, depending on the target type `T`.

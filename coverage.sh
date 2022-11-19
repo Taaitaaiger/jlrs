@@ -2,7 +2,7 @@
 
 set -euxo pipefail
 
-JULIA_DIR=$HOME/julia-1.8.0
+JULIA_DIR=$HOME/julia-1.8.3
 LD_LIBRARY_PATH=$JULIA_DIR/lib:$JULIA_DIR/lib/julia
 echo "backend: Gtk3Agg" > matplotlibrc
 

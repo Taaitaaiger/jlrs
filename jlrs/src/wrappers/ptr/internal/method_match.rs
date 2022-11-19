@@ -89,7 +89,6 @@ impl<'scope> WrapperPriv<'scope, '_> for MethodMatch<'scope> {
 /// A reference to a [`MethodMatch`] that has not been explicitly rooted.
 pub type MethodMatchRef<'scope> = Ref<'scope, 'static, MethodMatch<'scope>>;
 impl_valid_layout!(MethodMatchRef, MethodMatch);
-impl_ref_root!(MethodMatch, MethodMatchRef, 1);
 
 use super::method::Method;
 use crate::memory::target::target_type::TargetType;
