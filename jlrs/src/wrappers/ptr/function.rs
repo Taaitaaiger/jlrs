@@ -18,7 +18,7 @@ use crate::{
         typecheck::Typecheck,
         valid_layout::{ValidField, ValidLayout},
     },
-    memory::target::{global::Global, Target},
+    memory::target::{unrooted::Unrooted, Target},
     private::Private,
     wrappers::ptr::{datatype::DataType, private::WrapperPriv, value::Value, Wrapper},
 };
@@ -141,7 +141,7 @@ pub type FunctionRef<'scope, 'data> = Ref<'scope, 'data, Function<'scope, 'data>
 // Safety: FunctionRef is valid for ty if ty is a subtype of Function
 unsafe impl ValidLayout for FunctionRef<'_, '_> {
     fn valid_layout(ty: Value) -> bool {
-        let global = unsafe { Global::new() };
+        let global = unsafe { Unrooted::new() };
         let function_type = DataType::function_type(&global);
         ty.subtype(function_type.as_value())
     }
@@ -151,7 +151,7 @@ unsafe impl ValidLayout for FunctionRef<'_, '_> {
 
 unsafe impl ValidField for Option<FunctionRef<'_, '_>> {
     fn valid_field(ty: Value) -> bool {
-        let global = unsafe { Global::new() };
+        let global = unsafe { Unrooted::new() };
         let function_type = DataType::function_type(&global);
         ty.subtype(function_type.as_value())
     }

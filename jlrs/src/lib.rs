@@ -257,7 +257,7 @@
 //! tasks that the async runtime can handle will be introduced later.
 //!
 //! Inside the closure provided to `Julia::scope` or `AsyncJulia::blocking_task` it's possible to
-//! interact with Julia. Global Julia data can be accessed through its module system, the methods
+//! interact with Julia. Unrooted Julia data can be accessed through its module system, the methods
 //! [`Module::main`], [`Module::base`], and [`Module::core`] can be used to access the `Main`,
 //! `Base`, and `Core` modules respectively. The contents of these modules can then be accessed by
 //! calling [`Module::function`] which returns a [`Function`], [`Module::global`] which returns a
@@ -386,12 +386,12 @@
 //! use jlrs::prelude::*;
 //!
 //! struct AccumulatorTask {
-//!     n_values: usize
+//!     n_values: usize,
 //! }
 //!
 //! struct AccumulatorTaskState<'state> {
 //!     array: TypedArray<'state, 'static, usize>,
-//!     offset: usize
+//!     offset: usize,
 //! }
 //!
 //! // Only the runtime thread can call the Julia C API, so the async trait
@@ -420,10 +420,7 @@
 //!         let array = TypedArray::from_vec(frame.as_extended_target(), data, self.n_values)?
 //!             .into_jlrs_result()?;
 //!
-//!         Ok(AccumulatorTaskState {
-//!             array,
-//!             offset: 0
-//!         })
+//!         Ok(AccumulatorTaskState { array, offset: 0 })
 //!     }
 //!
 //!     // Whenever the task is called through its handle this method
@@ -489,25 +486,29 @@
 //! let mut julia = unsafe { RuntimeBuilder::new().start().unwrap() };
 //! let mut julia = julia.instance(&mut frame);
 //!
-//! julia.scope(|mut frame| unsafe {
-//!     // Cast the function to a void pointer
-//!     let call_me_val = Value::new(&mut frame, call_me as *mut std::ffi::c_void);
+//! julia
+//!     .scope(|mut frame| unsafe {
+//!         // Cast the function to a void pointer
+//!         let call_me_val = Value::new(&mut frame, call_me as *mut std::ffi::c_void);
 //!
-//!     // Value::eval_string can be used to create new functions.
-//!     let func = Value::eval_string(
-//!         &mut frame,
-//!         "myfunc(callme::Ptr{Cvoid})::Int = ccall(callme, Int, (Bool,), true)"
-//!     ).into_jlrs_result()?;
+//!         // Value::eval_string can be used to create new functions.
+//!         let func = Value::eval_string(
+//!             &mut frame,
+//!             "myfunc(callme::Ptr{Cvoid})::Int = ccall(callme, Int, (Bool,), true)",
+//!         )
+//!         .into_jlrs_result()?;
 //!
-//!     // Call the function and unbox the result.
-//!     let result = func.call1(&mut frame, call_me_val)
-//!         .into_jlrs_result()?
-//!         .unbox::<isize>()?;
+//!         // Call the function and unbox the result.
+//!         let result = func
+//!             .call1(&mut frame, call_me_val)
+//!             .into_jlrs_result()?
+//!             .unbox::<isize>()?;
 //!
-//!     assert_eq!(result, 1);
+//!         assert_eq!(result, 1);
 //!
-//!     Ok(())
-//! }).unwrap();
+//!         Ok(())
+//!     })
+//!     .unwrap();
 //! # }
 //! ```
 //!
@@ -550,7 +551,7 @@
 //! with `std::panic::catch_unwind`.
 //!
 //! Most features provided by jlrs including accessing modules, calling functions, and borrowing
-//! array data require a [`Global`] or a frame. You can access these by creating an instance of
+//! array data require a [`Unrooted`] or a frame. You can access these by creating an instance of
 //! [`CCall`] first. Another method provided by [`CCall`] is [`CCall::uv_async_send`], this method
 //! can be used to wake an `Base.AsyncCondition`. In particular, it can be used to write a
 //! `ccall`able function that does its actual work on another thread, returns early and then
@@ -592,9 +593,10 @@
 //! when the async runtime is used:
 //!
 //! ```
+//! use std::{num::NonZeroUsize, sync::Arc};
+//!
 //! use jlrs::prelude::*;
 //! use once_cell::sync::OnceCell;
-//! use std::{num::NonZeroUsize, sync::Arc};
 //!
 //! fn init() -> Arc<AsyncJulia<Tokio>> {
 //!     unsafe {
@@ -655,7 +657,7 @@
 //! [`Julia::init_with_image`]: crate::runtime::sync_rt::Julia::init_with_image
 //! [`CCall`]: crate::ccall::CCall
 //! [`CCall::uv_async_send`]: crate::ccall::CCall::uv_async_send
-//! [`Global`]: crate::memory::target::global::Global
+//! [`Unrooted`]: crate::memory::target::unrooted::Unrooted
 //! [`GcFrame`]: crate::memory::target::frame::GcFrame
 //! [`Module`]: crate::wrappers::ptr::module::Module
 //! [`Function`]: crate::wrappers::ptr::function::Function

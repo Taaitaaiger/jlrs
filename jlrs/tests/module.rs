@@ -348,10 +348,10 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             let res = jlrs.instance(&mut frame).scope(|mut frame| {
-                let global = frame.global();
+                let global = frame.unrooted();
                 frame
                     .scope(|frame| {
-                        let inner_global = frame.global();
+                        let inner_global = frame.unrooted();
                         let main = Module::main(&inner_global);
                         unsafe { Ok(main.extend(&global)) }
                     })
@@ -373,7 +373,7 @@ mod tests {
 
                 frame
                     .scope(|frame| {
-                        let inner_global = frame.global();
+                        let inner_global = frame.unrooted();
                         Ok(Module::main(&inner_global).root(output))
                     })
                     .unwrap();

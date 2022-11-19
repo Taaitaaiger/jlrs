@@ -5,7 +5,7 @@ use super::reusable_slot::ReusableSlot;
 use crate::memory::target::frame::AsyncGcFrame;
 use crate::{
     error::{JuliaResult, JuliaResultRef},
-    memory::target::{frame::GcFrame, global::Global, output::Output},
+    memory::target::{frame::GcFrame, output::Output, unrooted::Unrooted},
     wrappers::ptr::{Ref, Wrapper},
 };
 
@@ -82,7 +82,7 @@ impl<'target> TargetType<'target> for &mut ReusableSlot<'target> {
     type Exception<'data, T> = JuliaResultRef<'target, 'data, T>;
 }
 
-impl<'target> TargetType<'target> for Global<'target> {
+impl<'target> TargetType<'target> for Unrooted<'target> {
     type Data<'data, T: Wrapper<'target, 'data>> = Ref<'target, 'data, T>;
     type Result<'data, T: Wrapper<'target, 'data>> =
         JuliaResultRef<'target, 'data, Ref<'target, 'data, T>>;

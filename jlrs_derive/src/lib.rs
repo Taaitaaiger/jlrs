@@ -193,7 +193,7 @@ fn impl_into_julia(ast: &syn::DeriveInput) -> TokenStream {
                 T: ::jlrs::memory::target::Target<'scope>,
             {
                 unsafe {
-                    let global = target.global();
+                    let global = target.unrooted();
                     ::jlrs::wrappers::ptr::module::Module::#func(&global)
                         #(
                             .submodule(&global, #modules_it)
@@ -315,7 +315,7 @@ fn impl_valid_layout(ast: &syn::DeriveInput) -> TokenStream {
                             return false;
                         }
 
-                        let global = v.global();
+                        let global = v.unrooted_target();
                         let field_types = dt.field_types(global);
                         let field_types_svec = field_types.wrapper();
                         let field_types_data = field_types_svec.data();

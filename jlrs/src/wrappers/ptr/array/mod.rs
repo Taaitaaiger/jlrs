@@ -32,17 +32,44 @@ use std::{
 
 use cfg_if::cfg_if;
 use jl_sys::{
-    jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_apply_array_type,
-    jl_apply_tuple_type_v, jl_array_data, jl_array_del_beg, jl_array_del_end, jl_array_dims_ptr,
-    jl_array_eltype, jl_array_grow_beg, jl_array_grow_end, jl_array_ndims, jl_array_t,
-    jl_datatype_t, jl_gc_add_ptr_finalizer, jl_new_array, jl_new_struct_uninit, jl_pchar_to_array,
-    jl_ptr_to_array, jl_ptr_to_array_1d, jl_reshape_array,
+    jl_alloc_array_1d,
+    jl_alloc_array_2d,
+    jl_alloc_array_3d,
+    jl_apply_array_type,
+    jl_apply_tuple_type_v,
+    jl_array_data,
+    jl_array_del_beg,
+    jl_array_del_end,
+    jl_array_dims_ptr,
+    jl_array_eltype,
+    jl_array_grow_beg,
+    jl_array_grow_end,
+    jl_array_ndims,
+    jl_array_t,
+    jl_datatype_t,
+    jl_gc_add_ptr_finalizer,
+    jl_new_array,
+    jl_new_struct_uninit,
+    jl_pchar_to_array,
+    jl_ptr_to_array,
+    jl_ptr_to_array_1d,
+    jl_reshape_array,
 };
 
 use self::data::accessor::{
-    ArrayAccessor, BitsArrayAccessorI, BitsArrayAccessorMut, Immutable, IndeterminateArrayAccessor,
-    IndeterminateArrayAccessorI, InlinePtrArrayAccessorI, InlinePtrArrayAccessorMut, Mutable,
-    PtrArrayAccessorI, PtrArrayAccessorMut, UnionArrayAccessorI, UnionArrayAccessorMut,
+    ArrayAccessor,
+    BitsArrayAccessorI,
+    BitsArrayAccessorMut,
+    Immutable,
+    IndeterminateArrayAccessor,
+    IndeterminateArrayAccessorI,
+    InlinePtrArrayAccessorI,
+    InlinePtrArrayAccessorMut,
+    Mutable,
+    PtrArrayAccessorI,
+    PtrArrayAccessorMut,
+    UnionArrayAccessorI,
+    UnionArrayAccessorMut,
 };
 use super::{union_all::UnionAll, value::ValueRef, Ref};
 use crate::{
@@ -54,7 +81,7 @@ use crate::{
     },
     memory::{
         get_tls,
-        target::{frame::GcFrame, global::Global, private::TargetPriv, ExtendedTarget, Target},
+        target::{frame::GcFrame, private::TargetPriv, unrooted::Unrooted, ExtendedTarget, Target},
     },
     private::Private,
     wrappers::ptr::{
@@ -67,7 +94,8 @@ use crate::{
         type_name::TypeName,
         union::Union,
         value::Value,
-        Wrapper, WrapperRef,
+        Wrapper,
+        WrapperRef,
     },
 };
 
@@ -130,8 +158,7 @@ impl<'data> Array<'_, 'data> {
         let (output, frame) = target.split();
         frame
             .scope(|mut frame| {
-                let global = frame.global();
-                let elty_ptr = T::julia_type(&global).ptr();
+                let elty_ptr = T::julia_type(&frame).ptr();
 
                 // Safety: The array type is rooted until the array has been constructed, all C API
                 // functions are called with valid data.
@@ -1329,7 +1356,7 @@ impl<'scope> Array<'scope, 'static> {
 unsafe impl<'scope, 'data> Typecheck for Array<'scope, 'data> {
     fn typecheck(t: DataType) -> bool {
         // Safety: Array is a UnionAll. so check if the typenames match
-        unsafe { t.type_name() == TypeName::of_array(&Global::new()) }
+        unsafe { t.type_name() == TypeName::of_array(&Unrooted::new()) }
     }
 }
 
@@ -1398,7 +1425,7 @@ where
             let (output, frame) = target.split();
             frame
                 .scope(|mut frame| {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     let target = frame.extended_target(global);
                     let x = Array::new::<T, _, _>(target, dims);
 
@@ -1433,7 +1460,7 @@ where
         let (output, frame) = target.split();
         frame
             .scope(|mut frame| {
-                let inner_output = frame.global();
+                let inner_output = frame.unrooted();
                 let target = frame.extended_target(inner_output);
 
                 let res = Array::new_unchecked::<T, _, _>(target, dims)
@@ -1467,7 +1494,7 @@ where
         unsafe {
             let (output, frame) = target.split();
             frame.scope(|mut frame| {
-                let global = frame.global();
+                let global = frame.unrooted();
                 let target = frame.extended_target(global);
 
                 let res = match Array::from_slice::<T, _, _>(target, data, dims)? {
@@ -1503,7 +1530,7 @@ where
     {
         let (output, frame) = target.split();
         frame.scope(|mut frame| {
-            let inner_output = frame.global();
+            let inner_output = frame.unrooted();
             let target = frame.extended_target(inner_output);
 
             let res = Array::from_slice_unchecked::<T, _, _>(target, data, dims)?
@@ -1537,7 +1564,7 @@ where
         unsafe {
             let (output, frame) = target.split();
             frame.scope(|mut frame| {
-                let global = frame.global();
+                let global = frame.unrooted();
                 let target = frame.extended_target(global);
 
                 let res = match Array::from_vec::<T, _, _>(target, data, dims)? {
@@ -1574,7 +1601,7 @@ where
     {
         let (output, frame) = target.split();
         frame.scope(|mut frame| {
-            let inner_output = frame.global();
+            let inner_output = frame.unrooted();
             let target = frame.extended_target(inner_output);
 
             let res = Array::from_vec_unchecked::<T, _, _>(target, data, dims)?
@@ -1614,7 +1641,7 @@ where
         unsafe {
             let (output, frame) = target.split();
             frame.scope(|mut frame| {
-                let global = frame.global();
+                let global = frame.unrooted();
                 let target = frame.extended_target(global);
 
                 let res = match Array::new_for(target, dims, ty) {
@@ -1653,7 +1680,7 @@ where
 
         let (output, frame) = target.split();
         frame.scope(|mut frame| {
-            let inner_output = frame.global();
+            let inner_output = frame.unrooted();
             let target = frame.extended_target(inner_output);
 
             let res = Array::new_for_unchecked(target, dims, ty)
@@ -1861,7 +1888,7 @@ where
         let (output, frame) = target.split();
         frame
             .scope(|mut frame| {
-                let global = frame.global();
+                let global = frame.unrooted();
                 let target = frame.extended_target(global);
 
                 let res = match self.as_array().reshape(target, dims) {
@@ -1894,7 +1921,7 @@ where
         let (output, frame) = target.split();
         frame
             .scope(|mut frame| {
-                let inner_output = frame.global();
+                let inner_output = frame.unrooted();
                 let target = frame.extended_target(inner_output);
 
                 let res = self
@@ -2181,7 +2208,7 @@ thread_local! {
     // when `with` is first called, which happens after `Julia::init` has been called. The C API
     // requires a mutable pointer to this array so an `UnsafeCell` is used to store it.
     static JL_LONG_TYPE: UnsafeCell<[*mut jl_datatype_t; 8]> = unsafe {
-        let global = Global::new();
+        let global = Unrooted::new();
         let t = isize::julia_type(global).ptr().as_ptr();
         UnsafeCell::new([
             t,

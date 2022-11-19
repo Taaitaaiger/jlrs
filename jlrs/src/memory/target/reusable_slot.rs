@@ -24,18 +24,20 @@ use crate::{
 /// # let mut frame = StackFrame::new();
 /// # let mut julia = julia.instance(&mut frame);
 ///
-///   julia.scope(|mut frame| {
-///       let reusable_slot = frame.reusable_slot();
+/// julia
+///     .scope(|mut frame| {
+///         let reusable_slot = frame.reusable_slot();
 ///
-///       let _v = frame.scope(|_| {
-///           // The reusableslot has been allocated in the parent
-///           // scope's frame, so by using it as a target the  
-///           // result can be returned from this child scope.
-///           Ok(Value::new(reusable_slot, 1u64))
-///       })?;
+///         let _v = frame.scope(|_| {
+///             // The reusableslot has been allocated in the parent
+///             // scope's frame, so by using it as a target the
+///             // result can be returned from this child scope.
+///             Ok(Value::new(reusable_slot, 1u64))
+///         })?;
 ///
-///       Ok(())
-///   }).unwrap();
+///         Ok(())
+///     })
+///     .unwrap();
 /// # });
 /// # }
 /// ```
@@ -53,20 +55,22 @@ use crate::{
 /// # let mut frame = StackFrame::new();
 /// # let mut julia = julia.instance(&mut frame);
 ///
-///   julia.scope(|mut frame| {
-///       let mut reusable_slot = frame.reusable_slot();
+/// julia
+///     .scope(|mut frame| {
+///         let mut reusable_slot = frame.reusable_slot();
 ///
-///       let _v = frame.scope(|_| {
-///           // _v1 can be used even after the slot has been used again, it's
-///           // your responsibility that you don't use this data after the slot
-///           // has been reused.
-///           let _v1 = Value::new(&mut reusable_slot, 2u64);
+///         let _v = frame.scope(|_| {
+///             // _v1 can be used even after the slot has been used again, it's
+///             // your responsibility that you don't use this data after the slot
+///             // has been reused.
+///             let _v1 = Value::new(&mut reusable_slot, 2u64);
 ///
-///           Ok(Value::new(reusable_slot, 1u64))
-///       })?;
+///             Ok(Value::new(reusable_slot, 1u64))
+///         })?;
 ///
-///       Ok(())
-///   }).unwrap();
+///         Ok(())
+///     })
+///     .unwrap();
 /// # });
 /// # }
 /// ```

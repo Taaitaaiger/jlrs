@@ -47,9 +47,8 @@ impl<'scope> TypeVar<'scope> {
         // Safety: if an exception is thrown it's caught and returned
         unsafe {
             let name = name.to_symbol_priv(Private);
-            let global = target.global();
-            let lb = lower_bound.unwrap_or_else(|| Value::bottom_type(&global));
-            let ub = upper_bound.unwrap_or_else(|| DataType::any_type(&global).as_value());
+            let lb = lower_bound.unwrap_or_else(|| Value::bottom_type(&target));
+            let ub = upper_bound.unwrap_or_else(|| DataType::any_type(&target).as_value());
 
             let mut callback = |result: &mut MaybeUninit<*mut jl_tvar_t>| {
                 let res =
@@ -85,9 +84,8 @@ impl<'scope> TypeVar<'scope> {
         N: ToSymbol,
     {
         let name = name.to_symbol_priv(Private);
-        let global = target.global();
-        let lb = lower_bound.unwrap_or_else(|| Value::bottom_type(&global));
-        let ub = upper_bound.unwrap_or_else(|| DataType::any_type(&global).as_value());
+        let lb = lower_bound.unwrap_or_else(|| Value::bottom_type(&target));
+        let ub = upper_bound.unwrap_or_else(|| DataType::any_type(&target).as_value());
         let tvar = jl_new_typevar(name.unwrap(Private), lb.unwrap(Private), ub.unwrap(Private));
         target.data_from_ptr(NonNull::new_unchecked(tvar), Private)
     }

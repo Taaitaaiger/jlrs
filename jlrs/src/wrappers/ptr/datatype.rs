@@ -8,27 +8,95 @@ use std::{
 
 use cfg_if::cfg_if;
 use jl_sys::{
-    jl_abstractslot_type, jl_abstractstring_type, jl_any_type, jl_anytuple_type, jl_argument_type,
-    jl_argumenterror_type, jl_bool_type, jl_boundserror_type, jl_builtin_type, jl_char_type,
-    jl_code_info_type, jl_code_instance_type, jl_const_type, jl_datatype_layout_t, jl_datatype_t,
-    jl_datatype_type, jl_emptytuple_type, jl_errorexception_type, jl_expr_type, jl_field_index,
-    jl_field_isptr, jl_field_offset, jl_field_size, jl_float16_type, jl_float32_type,
-    jl_float64_type, jl_floatingpoint_type, jl_function_type, jl_get_fieldtypes, jl_globalref_type,
-    jl_gotoifnot_type, jl_gotonode_type, jl_initerror_type, jl_int16_type, jl_int32_type,
-    jl_int64_type, jl_int8_type, jl_intrinsic_type, jl_lineinfonode_type, jl_linenumbernode_type,
-    jl_loaderror_type, jl_method_instance_type, jl_method_match_type, jl_method_type,
-    jl_methoderror_type, jl_methtable_type, jl_module_type, jl_new_structv, jl_newvarnode_type,
-    jl_nothing_type, jl_number_type, jl_partial_struct_type, jl_phicnode_type, jl_phinode_type,
-    jl_pinode_type, jl_quotenode_type, jl_returnnode_type, jl_signed_type, jl_simplevector_type,
-    jl_slotnumber_type, jl_ssavalue_type, jl_string_type, jl_symbol_type, jl_task_type,
-    jl_tvar_type, jl_typedslot_type, jl_typeerror_type, jl_typemap_entry_type,
-    jl_typemap_level_type, jl_typename_str, jl_typename_type, jl_typeofbottom_type, jl_uint16_type,
-    jl_uint32_type, jl_uint64_type, jl_uint8_type, jl_undefvarerror_type, jl_unionall_type,
-    jl_uniontype_type, jl_upsilonnode_type, jl_voidpointer_type, jl_weakref_type,
+    jl_abstractslot_type,
+    jl_abstractstring_type,
+    jl_any_type,
+    jl_anytuple_type,
+    jl_argument_type,
+    jl_argumenterror_type,
+    jl_bool_type,
+    jl_boundserror_type,
+    jl_builtin_type,
+    jl_char_type,
+    jl_code_info_type,
+    jl_code_instance_type,
+    jl_const_type,
+    jl_datatype_layout_t,
+    jl_datatype_t,
+    jl_datatype_type,
+    jl_emptytuple_type,
+    jl_errorexception_type,
+    jl_expr_type,
+    jl_field_index,
+    jl_field_isptr,
+    jl_field_offset,
+    jl_field_size,
+    jl_float16_type,
+    jl_float32_type,
+    jl_float64_type,
+    jl_floatingpoint_type,
+    jl_function_type,
+    jl_get_fieldtypes,
+    jl_globalref_type,
+    jl_gotoifnot_type,
+    jl_gotonode_type,
+    jl_initerror_type,
+    jl_int16_type,
+    jl_int32_type,
+    jl_int64_type,
+    jl_int8_type,
+    jl_intrinsic_type,
+    jl_lineinfonode_type,
+    jl_linenumbernode_type,
+    jl_loaderror_type,
+    jl_method_instance_type,
+    jl_method_match_type,
+    jl_method_type,
+    jl_methoderror_type,
+    jl_methtable_type,
+    jl_module_type,
+    jl_new_structv,
+    jl_newvarnode_type,
+    jl_nothing_type,
+    jl_number_type,
+    jl_partial_struct_type,
+    jl_phicnode_type,
+    jl_phinode_type,
+    jl_pinode_type,
+    jl_quotenode_type,
+    jl_returnnode_type,
+    jl_signed_type,
+    jl_simplevector_type,
+    jl_slotnumber_type,
+    jl_ssavalue_type,
+    jl_string_type,
+    jl_symbol_type,
+    jl_task_type,
+    jl_tvar_type,
+    jl_typedslot_type,
+    jl_typeerror_type,
+    jl_typemap_entry_type,
+    jl_typemap_level_type,
+    jl_typename_str,
+    jl_typename_type,
+    jl_typeofbottom_type,
+    jl_uint16_type,
+    jl_uint32_type,
+    jl_uint64_type,
+    jl_uint8_type,
+    jl_undefvarerror_type,
+    jl_unionall_type,
+    jl_uniontype_type,
+    jl_upsilonnode_type,
+    jl_voidpointer_type,
+    jl_weakref_type,
 };
 #[cfg(not(feature = "lts"))]
 use jl_sys::{
-    jl_atomicerror_type, jl_interconditional_type, jl_partial_opaque_type, jl_vararg_type,
+    jl_atomicerror_type,
+    jl_interconditional_type,
+    jl_partial_opaque_type,
+    jl_vararg_type,
 };
 
 use super::{simple_vector::SimpleVectorData, type_name::TypeName, value::ValueData, Ref};
@@ -657,33 +725,11 @@ impl<'scope> DataType<'scope> {
         isconst != 0
     }
 
-    /*
     /// Create a new instance of this `DataType`, using `values` to set the fields.
     /// This is essentially a more powerful version of [`Value::new`] that can instantiate
     /// arbitrary concrete `DataType`s, at the cost that each of its fields must have already been
     /// allocated as a `Value`. This functions returns an error if the given `DataType` isn't
     /// concrete or is an array type. For custom array types you must use [`Array::new_for`].
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
-    pub fn instantiate<'target, 'value, 'data, V, S>(
-        self,
-        scope: S,
-        values: V,
-    ) -> JlrsResult<JuliaResult<'target, 'data>>
-    where
-        S: PartialScope<'target>,
-        V: AsRef<[Value<'value, 'data>]>,
-    {
-        let res = self.instantiate_unrooted(scope.global(), values)?;
-        unsafe { Ok(scope.call_result_ref(res, Private)) }
-    }
-    */
-
-    /// Create a new instance of this `DataType`, using `values` to set the fields.
-    /// This is essentially a more powerful version of [`Value::new`] that can instantiate
-    /// arbitrary concrete `DataType`s, at the cost that each of its fields must have already been
-    /// allocated as a `Value`. This functions returns an error if the given `DataType` isn't
-    /// concrete or is an array type. For custom array types you must use [`Array::new_for`].
-
     #[cfg(not(all(target_os = "windows", feature = "lts")))]
     pub fn instantiate<'target, 'value, 'data, V, T>(
         self,

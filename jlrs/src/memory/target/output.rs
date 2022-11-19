@@ -20,18 +20,20 @@ use crate::{memory::context::stack::Stack, private::Private, wrappers::ptr::Wrap
 /// # let mut frame = StackFrame::new();
 /// # let mut julia = julia.instance(&mut frame);
 ///
-///   julia.scope(|mut frame| {
-///       let output = frame.output();
+/// julia
+///     .scope(|mut frame| {
+///         let output = frame.output();
 ///
-///       let _v = frame.scope(|_| {
-///           // The output has been allocated in the parent
-///           // scope's frame, so by using it as a target the  
-///           // result can be returned from this child scope.
-///           Ok(Value::new(output, 1u64))
-///       })?;
+///         let _v = frame.scope(|_| {
+///             // The output has been allocated in the parent
+///             // scope's frame, so by using it as a target the
+///             // result can be returned from this child scope.
+///             Ok(Value::new(output, 1u64))
+///         })?;
 ///
-///       Ok(())
-///   }).unwrap();
+///         Ok(())
+///     })
+///     .unwrap();
 /// # });
 /// # }
 /// ```
@@ -48,18 +50,20 @@ use crate::{memory::context::stack::Stack, private::Private, wrappers::ptr::Wrap
 /// # let mut frame = StackFrame::new();
 /// # let mut julia = julia.instance(&mut frame);
 ///
-///   julia.scope(|mut frame| {
-///       let mut output = frame.output();
+/// julia
+///     .scope(|mut frame| {
+///         let mut output = frame.output();
 ///
-///       let _v = frame.scope(|_| {
-///           // _v1 can be used until the output is used again.
-///           let _v1 = Value::new(&mut output, 2u64);
+///         let _v = frame.scope(|_| {
+///             // _v1 can be used until the output is used again.
+///             let _v1 = Value::new(&mut output, 2u64);
 ///
-///           Ok(Value::new(output, 1u64))
-///       })?;
+///             Ok(Value::new(output, 1u64))
+///         })?;
 ///
-///       Ok(())
-///   }).unwrap();
+///         Ok(())
+///     })
+///     .unwrap();
 /// # });
 /// # }
 /// ```

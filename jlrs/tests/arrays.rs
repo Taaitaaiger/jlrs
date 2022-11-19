@@ -4,7 +4,9 @@ mod util;
 #[cfg(not(all(target_os = "windows", feature = "lts")))]
 mod tests {
     use jlrs::{
-        layout::valid_layout::ValidLayout, prelude::*, wrappers::ptr::array::dimensions::Dims,
+        layout::valid_layout::ValidLayout,
+        prelude::*,
+        wrappers::ptr::array::dimensions::Dims,
     };
 
     use crate::util::JULIA;

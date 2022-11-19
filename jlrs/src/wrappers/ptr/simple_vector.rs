@@ -7,11 +7,21 @@ use std::{
 };
 
 use jl_sys::{
-    jl_alloc_svec, jl_alloc_svec_uninit, jl_emptysvec, jl_gc_wb, jl_svec_data, jl_svec_t,
+    jl_alloc_svec,
+    jl_alloc_svec_uninit,
+    jl_emptysvec,
+    jl_gc_wb,
+    jl_svec_data,
+    jl_svec_t,
 };
 
 use super::{
-    datatype::DataType, private::WrapperPriv, value::ValueRef, Ref, Wrapper, WrapperRef,
+    datatype::DataType,
+    private::WrapperPriv,
+    value::ValueRef,
+    Ref,
+    Wrapper,
+    WrapperRef,
     WrapperType,
 };
 use crate::{
@@ -20,7 +30,7 @@ use crate::{
         typecheck::Typecheck,
         valid_layout::{ValidField, ValidLayout},
     },
-    memory::target::{global::Global, Target},
+    memory::target::{unrooted::Unrooted, Target},
     private::Private,
     wrappers::ptr::value::Value,
 };
@@ -200,7 +210,7 @@ impl<'base> SimpleVector<'base> {
 unsafe impl<'scope> Typecheck for SimpleVector<'scope> {
     fn typecheck(t: DataType) -> bool {
         // Safety: can only be called from a thread known to Julia
-        t == DataType::simplevector_type(unsafe { &Global::new() })
+        t == DataType::simplevector_type(unsafe { &Unrooted::new() })
     }
 }
 

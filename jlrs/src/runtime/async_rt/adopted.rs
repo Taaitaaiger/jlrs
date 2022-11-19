@@ -6,7 +6,7 @@ use super::{queue::Receiver, AsyncRuntime, Message, MessageInner};
 use crate::{
     async_util::task::sleep,
     error::JlrsResult,
-    memory::{stack_frame::StackFrame, target::global::Global},
+    memory::{stack_frame::StackFrame, target::unrooted::Unrooted},
 };
 
 pub(crate) unsafe fn init_worker<R: AsyncRuntime, const N: usize>(
@@ -60,7 +60,7 @@ async unsafe fn run_inner<R: AsyncRuntime, const N: usize>(
 
     loop {
         if free_stacks.borrow().len() == 0 {
-            sleep(&Global::new(), recv_timeout);
+            sleep(&Unrooted::new(), recv_timeout);
             R::yield_now().await;
             jl_gc_safepoint();
             continue;
@@ -126,7 +126,7 @@ async unsafe fn run_inner<R: AsyncRuntime, const N: usize>(
         loop {
             if running_tasks.borrow()[i].is_some() {
                 R::yield_now().await;
-                sleep(&Global::new(), recv_timeout);
+                sleep(&Unrooted::new(), recv_timeout);
                 jl_gc_safepoint();
             } else {
                 break;

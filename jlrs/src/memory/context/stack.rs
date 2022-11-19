@@ -19,7 +19,7 @@ use atomic_refcell::AtomicRefCell;
 use jl_sys::{jl_gc_wb, jl_value_t};
 
 use crate::{
-    memory::{gc::mark_queue_objarray, stack_frame::PinnedFrame, target::global::Global, PTls},
+    memory::{gc::mark_queue_objarray, stack_frame::PinnedFrame, target::unrooted::Unrooted, PTls},
     wrappers::{
         foreign::{create_foreign_type, ForeignType},
         ptr::{module::Module, symbol::Symbol, value::Value, Wrapper},
@@ -51,7 +51,7 @@ unsafe impl ForeignType for Stack {
 impl Stack {
     // Create the foreign type __JlrsStack__, or return it immediately if it already exists.
     pub(crate) unsafe fn register<const N: usize>(frame: &PinnedFrame<'_, N>) {
-        let global = Global::new();
+        let global = Unrooted::new();
         let sym = Symbol::new(&global, "__JlrsStack__");
         let module = Module::main(&global);
 
@@ -110,7 +110,7 @@ impl Stack {
     // Allocate a new Stack through Julia's GC.
     // Safety: root after allocating
     pub(crate) unsafe fn alloc() -> *mut Self {
-        let global = Global::new();
+        let global = Unrooted::new();
         let stack = Value::new(global, Stack::default());
         stack.ptr().cast().as_ptr()
     }

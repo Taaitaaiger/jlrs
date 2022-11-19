@@ -152,7 +152,9 @@ impl Julia<'_> {
     /// # let mut julia = j.borrow_mut();
     /// # let mut frame = StackFrame::new();
     /// # let mut julia = julia.instance(&mut frame);
-    /// unsafe { julia.include("Path/To/MyJuliaCode.jl").unwrap(); }
+    /// unsafe {
+    ///     julia.include("Path/To/MyJuliaCode.jl").unwrap();
+    /// }
     /// # });
     /// # }
     /// ```
@@ -187,10 +189,12 @@ impl Julia<'_> {
     /// # let mut julia = j.borrow_mut();
     /// # let mut frame = StackFrame::new();
     /// # let mut julia = julia.instance(&mut frame);
-    ///   julia.scope(| mut frame| {
-    ///       let _i = Value::new(&mut frame, 1u64);
-    ///       Ok(())
-    ///   }).unwrap();
+    /// julia
+    ///     .scope(|mut frame| {
+    ///         let _i = Value::new(&mut frame, 1u64);
+    ///         Ok(())
+    ///     })
+    ///     .unwrap();
     /// # });
     /// # }
     /// ```

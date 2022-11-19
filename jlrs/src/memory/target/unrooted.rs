@@ -9,17 +9,17 @@ use std::marker::PhantomData;
 
 /// A non-rooting target.
 ///
-/// A new [`Global`] can be created with [`Target::global`].
+/// A new [`Unrooted`] can be created with [`Target::unrooted`].
 ///
-/// [`Target::global`]: crate::memory::target::Target::global
+/// [`Target::unrooted`]: crate::memory::target::Target::unrooted
 #[derive(Copy, Clone, Debug)]
-pub struct Global<'scope> {
+pub struct Unrooted<'scope> {
     _marker: PhantomData<&'scope ()>,
 }
 
-impl<'scope> Global<'scope> {
+impl<'scope> Unrooted<'scope> {
     pub(crate) unsafe fn new() -> Self {
-        Global {
+        Unrooted {
             _marker: PhantomData,
         }
     }

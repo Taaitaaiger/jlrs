@@ -14,7 +14,7 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     let mut arr = Array::new_for(
                         frame.as_extended_target(),
                         4,
@@ -55,7 +55,7 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     let mut arr = Array::new_for(
                         frame.as_extended_target(),
                         4,
@@ -112,7 +112,7 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     let mut arr = Array::new_for(
                         frame.as_extended_target(),
                         4,
@@ -145,7 +145,7 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     let mut arr = Array::new_for(
                         frame.as_extended_target(),
                         4,

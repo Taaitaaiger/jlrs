@@ -844,7 +844,7 @@ mod tests {
             julia
                 .instance(&mut frame)
                 .scope(|mut frame| unsafe {
-                    let global = frame.global();
+                    let global = frame.unrooted();
                     let constr = Module::main(&frame)
                         .submodule(&frame, "WithGeneric")?
                         .wrapper()

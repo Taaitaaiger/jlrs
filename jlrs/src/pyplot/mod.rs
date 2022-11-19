@@ -294,12 +294,11 @@ pub trait AccessPlotsModule: private::AccessPlotsModulePriv {
     /// Returns the `Plots` module.
     fn plots<'global, T: Target<'global>>(target: &T) -> Module<'global> {
         unsafe {
-            let global = target.global();
-            Module::main(&global)
-                .submodule(&global, "JlrsPyPlot")
+            Module::main(target)
+                .submodule(target, "JlrsPyPlot")
                 .unwrap()
                 .wrapper()
-                .submodule(&global, "Plots")
+                .submodule(target, "Plots")
                 .unwrap()
                 .wrapper()
         }

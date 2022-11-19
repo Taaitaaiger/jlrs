@@ -110,14 +110,47 @@ use std::{
 
 use cfg_if::cfg_if;
 use jl_sys::{
-    jl_an_empty_string, jl_an_empty_vec_any, jl_apply_type, jl_array_any_type, jl_array_int32_type,
-    jl_array_symbol_type, jl_array_typetagdata, jl_array_uint8_type, jl_astaggedvalue,
-    jl_bottom_type, jl_call, jl_call0, jl_call1, jl_call2, jl_call3, jl_diverror_exception,
-    jl_egal, jl_emptytuple, jl_eval_string, jl_exception_occurred, jl_false, jl_field_index,
-    jl_field_isptr, jl_gc_add_finalizer, jl_gc_add_ptr_finalizer, jl_get_nth_field,
-    jl_get_nth_field_noalloc, jl_interrupt_exception, jl_isa, jl_memory_exception, jl_nothing,
-    jl_object_id, jl_readonlymemory_exception, jl_set_nth_field, jl_stackovf_exception,
-    jl_stderr_obj, jl_stdout_obj, jl_subtype, jl_true, jl_typeof_str, jl_undefref_exception,
+    jl_an_empty_string,
+    jl_an_empty_vec_any,
+    jl_apply_type,
+    jl_array_any_type,
+    jl_array_int32_type,
+    jl_array_symbol_type,
+    jl_array_typetagdata,
+    jl_array_uint8_type,
+    jl_astaggedvalue,
+    jl_bottom_type,
+    jl_call,
+    jl_call0,
+    jl_call1,
+    jl_call2,
+    jl_call3,
+    jl_diverror_exception,
+    jl_egal,
+    jl_emptytuple,
+    jl_eval_string,
+    jl_exception_occurred,
+    jl_false,
+    jl_field_index,
+    jl_field_isptr,
+    jl_gc_add_finalizer,
+    jl_gc_add_ptr_finalizer,
+    jl_get_nth_field,
+    jl_get_nth_field_noalloc,
+    jl_interrupt_exception,
+    jl_isa,
+    jl_memory_exception,
+    jl_nothing,
+    jl_object_id,
+    jl_readonlymemory_exception,
+    jl_set_nth_field,
+    jl_stackovf_exception,
+    jl_stderr_obj,
+    jl_stdout_obj,
+    jl_subtype,
+    jl_true,
+    jl_typeof_str,
+    jl_undefref_exception,
     jl_value_t,
 };
 
@@ -126,7 +159,12 @@ use crate::{
     call::{Call, ProvideKeywords, WithKeywords},
     convert::{into_julia::IntoJulia, to_symbol::ToSymbol, unbox::Unbox},
     error::{
-        AccessError, IOError, InstantiationError, JlrsError, JlrsResult, TypeError,
+        AccessError,
+        IOError,
+        InstantiationError,
+        JlrsError,
+        JlrsResult,
+        TypeError,
         CANNOT_DISPLAY_TYPE,
     },
     layout::{
@@ -138,7 +176,7 @@ use crate::{
     memory::{
         context::ledger::Ledger,
         get_tls,
-        target::{global::Global, ExtendedTarget, Target},
+        target::{unrooted::Unrooted, ExtendedTarget, Target},
     },
     private::Private,
     wrappers::{
@@ -400,11 +438,13 @@ impl Value<'_, '_> {
     /// # let mut julia = j.borrow_mut();
     /// # let mut frame = StackFrame::new();
     /// # let mut julia = julia.instance(&mut frame);
-    /// julia.scope(|mut frame| {
-    ///     let i = Value::new(&mut frame, 2u64);
-    ///     assert!(i.is::<u64>());
-    ///     Ok(())
-    /// }).unwrap();
+    /// julia
+    ///     .scope(|mut frame| {
+    ///         let i = Value::new(&mut frame, 2u64);
+    ///         assert!(i.is::<u64>());
+    ///         Ok(())
+    ///     })
+    ///     .unwrap();
     /// # });
     /// # }
     /// ```
@@ -437,7 +477,7 @@ impl Value<'_, '_> {
     pub fn is_kind(self) -> bool {
         // Safety: this method can only be called from a thread known to Julia, its lifetime is
         // never used
-        let global = unsafe { Global::new() };
+        let global = unsafe { Unrooted::new() };
 
         let ptr = self.unwrap(Private);
         ptr == DataType::datatype_type(&global).unwrap(Private).cast()
@@ -1431,7 +1471,7 @@ impl LeakedValue {
         LeakedValue(Value::wrap_non_null(ptr, Private))
     }
 
-    /// Convert this [`LeakedValue`] back to a [`Value`]. This requires a [`Global`], so this
+    /// Convert this [`LeakedValue`] back to a [`Value`]. This requires an [`Unrooted`], so this
     /// method can only be called inside a closure taken by one of the `scope`-methods.
     ///
     /// Safety: you must guarantee this value has not been freed by the garbage collector. While
@@ -1605,7 +1645,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
             }
 
             let index = field.field_index(current_field_type, Private)?;
-            let global = Global::new();
+            let global = Unrooted::new();
 
             let next_field_type = match current_field_type.field_type_unchecked(global, index) {
                 Some(ty) => ty,
@@ -1674,7 +1714,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
             }
 
             let index = field.field_index(current_field_type, Private)?;
-            let global = Global::new();
+            let global = Unrooted::new();
 
             let next_field_type = match current_field_type.field_type_unchecked(global, index) {
                 Some(ty) => ty,
