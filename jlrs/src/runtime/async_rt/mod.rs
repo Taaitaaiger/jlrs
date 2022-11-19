@@ -11,7 +11,7 @@
 //! In the stable and lts version of Julia, only one thread can be used by the async runtime. The
 //! nightly and beta version can use any number of worker threads to spread the workload across
 //! multiple threads that can call into Julia. The number of worker threads can be set with the
-//! [`AsyncRuntimeBuilder`]
+//! [`AsyncRuntimeBuilder`]. 
 //!
 //! Work is sent to the async runtime as independent tasks. Three kinds of task exist: blocking,
 //! async, and persistent tasks. Blocking tasks block the thread they're called on until they've
@@ -38,7 +38,7 @@ use crate::{
             Persistent, PersistentComms, RegisterPersistent, RegisterTask, SetErrorColorTask,
             SetErrorColorTaskEnvelope, Task,
         },
-        task::{sleep, AsyncTask, PersistentTask},
+        task::{sleep, Affinity, AsyncTask, PersistentTask},
     },
     error::{IOError, JlrsError, JlrsResult, RuntimeError},
     memory::{
@@ -203,6 +203,22 @@ where
         self.resize_queue(capacity).await
     }
 
+    /// Resize the task queue of the main runtime thread.
+    ///
+    /// No tasks are dropped if the queue is shrunk. This method return a future that doesn´t
+    /// resolve until the queue can be resized without dropping any tasks.
+    pub fn resize_main_queue<'own>(&'own self, capacity: usize) -> impl 'own + Future<Output = ()> {
+        self.sender.resize_main_queue(capacity)
+    }
+
+    /// Resize the task queue of the main runtime thread.
+    ///
+    /// See [`AsyncJulia::resize_main_queue`] for more info, the only difference is that this is an
+    /// async method.
+    pub async fn resize_main_queue_async(&self, capacity: usize) {
+        self.resize_main_queue(capacity).await
+    }
+
     /// Send a new async task to the runtime.
     ///
     /// This method waits if there's no room in the channel. It takes two arguments, the task and
@@ -215,7 +231,7 @@ where
     {
         let msg = PendingTask::<_, _, Task>::new(task, res_sender);
         let boxed = Box::new(msg);
-        self.sender.send(MessageInner::Task(boxed).wrap()).await
+        A::AFFINITY.schedule(&self.sender, boxed).await
     }
 
     /// Try to send a new async task to the runtime.
@@ -230,7 +246,7 @@ where
     {
         let msg = PendingTask::<_, _, Task>::new(task, res_sender);
         let boxed = Box::new(msg);
-        self.sender.try_send(MessageInner::Task(boxed).wrap())
+        A::AFFINITY.try_schedule(&self.sender, boxed)
     }
 
     /// Register an async task.
@@ -245,7 +261,7 @@ where
     {
         let msg = PendingTask::<_, A, RegisterTask>::new(res_sender);
         let boxed = Box::new(msg);
-        self.sender.send(MessageInner::Task(boxed).wrap()).await
+        A::AFFINITY.schedule(&self.sender, boxed).await
     }
 
     /// Try to register an async task.
@@ -260,7 +276,7 @@ where
     {
         let msg = PendingTask::<_, A, RegisterTask>::new(res_sender);
         let boxed = Box::new(msg);
-        self.sender.try_send(MessageInner::Task(boxed).wrap())
+        A::AFFINITY.try_schedule(&self.sender, boxed)
     }
 
     /// Send a new blocking task to the runtime.
@@ -270,7 +286,7 @@ where
     /// `Send` and `Sync`. The second is the sending half of a channel which is used to send the
     /// result back after the task has completed. This task is executed as soon as possible and
     /// can't call async methods, so it blocks the runtime.
-    pub async fn blocking_task<T, O, F>(&self, task: F, res_sender: O)
+    pub async fn blocking_task<T, O, F>(&self, task: F, res_sender: O, affinity: Affinity)
     where
         for<'base> F: 'static + Send + Sync + FnOnce(GcFrame<'base>) -> JlrsResult<T>,
         O: OneshotSender<JlrsResult<T>>,
@@ -278,9 +294,7 @@ where
     {
         let msg = BlockingTask::new(task, res_sender);
         let boxed = Box::new(msg);
-        self.sender
-            .send(MessageInner::BlockingTask(boxed).wrap())
-            .await
+        affinity.schedule_blocking(&self.sender, boxed).await
     }
 
     /// Try to send a new blocking task to the runtime.
@@ -290,7 +304,12 @@ where
     /// `JlrsResult` whose inner type is both `Send` and `Sync`. The second is the sending half of
     /// a channel which is used to send the  result back after the task has completed. This task
     /// is executed as soon as possible and can't call async methods, so it blocks the runtime.
-    pub fn try_blocking_task<T, O, F>(&self, task: F, res_sender: O) -> JlrsResult<()>
+    pub fn try_blocking_task<T, O, F>(
+        &self,
+        task: F,
+        res_sender: O,
+        affinity: Affinity,
+    ) -> JlrsResult<()>
     where
         for<'base> F: 'static + Send + Sync + FnOnce(GcFrame<'base>) -> JlrsResult<T>,
         O: OneshotSender<JlrsResult<T>>,
@@ -298,8 +317,7 @@ where
     {
         let msg = BlockingTask::new(task, res_sender);
         let boxed = Box::new(msg);
-        self.sender
-            .try_send(MessageInner::BlockingTask(boxed).wrap())
+        affinity.try_schedule_blocking(&self.sender, boxed)
     }
 
     /// Send a new blocking task to the runtime and schedule it on another thread.
@@ -309,7 +327,7 @@ where
     /// `Send` and `Sync`. The second is the sending half of a channel which is used to send the
     /// result back after the task has completed. This task not called directly, but executed in
     /// a spawned task.
-    pub async fn post_blocking_task<T, O, F>(&self, task: F, res_sender: O)
+    pub async fn post_blocking_task<T, O, F>(&self, task: F, res_sender: O, affinity: Affinity)
     where
         for<'base> F: 'static + Send + Sync + FnOnce(GcFrame<'base>) -> JlrsResult<T>,
         O: OneshotSender<JlrsResult<T>>,
@@ -317,9 +335,8 @@ where
     {
         let msg = BlockingTask::new(task, res_sender);
         let boxed = Box::new(msg);
-        self.sender
-            .send(MessageInner::PostBlockingTask(boxed).wrap())
-            .await
+
+        affinity.schedule_post_blocking(&self.sender, boxed).await
     }
 
     /// Try to send a new blocking task to the runtime and schedule it on another thread.
@@ -329,7 +346,12 @@ where
     /// `JlrsResult` whose inner type is both `Send` and `Sync`. The second is the sending half of
     /// a channel which is used to send the  result back after the task has completed. This task
     /// not called directly, but executed in a spawned task.
-    pub fn try_post_blocking_task<T, O, F>(&self, task: F, res_sender: O) -> JlrsResult<()>
+    pub fn try_post_blocking_task<T, O, F>(
+        &self,
+        task: F,
+        res_sender: O,
+        affinity: Affinity,
+    ) -> JlrsResult<()>
     where
         for<'base> F: 'static + Send + Sync + FnOnce(GcFrame<'base>) -> JlrsResult<T>,
         O: OneshotSender<JlrsResult<T>>,
@@ -337,8 +359,7 @@ where
     {
         let msg = BlockingTask::new(task, res_sender);
         let boxed = Box::new(msg);
-        self.sender
-            .try_send(MessageInner::PostBlockingTask(boxed).wrap())
+        affinity.try_schedule_post_blocking(&self.sender, boxed)
     }
 
     /// Send a new persistent task to the runtime.
@@ -359,7 +380,7 @@ where
         );
         let boxed = Box::new(msg);
 
-        self.sender.send(MessageInner::Task(boxed).wrap()).await
+        P::AFFINITY.schedule(&self.sender, boxed).await
     }
 
     /// Try to send a new persistent task to the runtime.
@@ -380,7 +401,7 @@ where
             PersistentComms::<C, _, _>::new(handle_sender),
         );
         let boxed = Box::new(msg);
-        self.sender.try_send(MessageInner::Task(boxed).wrap())
+        P::AFFINITY.try_schedule(&self.sender, boxed)
     }
 
     /// Register a persistent task.
@@ -395,7 +416,7 @@ where
     {
         let msg = PendingTask::<_, P, RegisterPersistent>::new(res_sender);
         let boxed = Box::new(msg);
-        self.sender.send(MessageInner::Task(boxed).wrap()).await
+        P::AFFINITY.schedule(&self.sender, boxed).await
     }
 
     /// Try to register a persistent task.
@@ -410,7 +431,7 @@ where
     {
         let msg = PendingTask::<_, P, RegisterPersistent>::new(res_sender);
         let boxed = Box::new(msg);
-        self.sender.try_send(MessageInner::Task(boxed).wrap())
+        P::AFFINITY.try_schedule(&self.sender, boxed)
     }
 
     /// Include a Julia file by calling `Main.include` as a blocking task.
@@ -435,7 +456,7 @@ where
         let msg = IncludeTask::new(path.as_ref().into(), res_sender);
 
         self.sender
-            .send(MessageInner::Include(Box::new(msg)).wrap())
+            .send_main(MessageInner::Include(Box::new(msg)).wrap())
             .await;
 
         Ok(())
@@ -463,7 +484,7 @@ where
         let msg = IncludeTask::new(path.as_ref().into(), res_sender);
 
         self.sender
-            .try_send(MessageInner::Include(Box::new(msg)).wrap())
+            .try_send_main(MessageInner::Include(Box::new(msg)).wrap())
     }
 
     /// Enable or disable colored error messages originating from Julia as a blocking task.
@@ -480,7 +501,7 @@ where
         let msg = SetErrorColorTask::new(enable, res_sender);
 
         self.sender
-            .send(MessageInner::ErrorColor(Box::new(msg)).wrap())
+            .send_main(MessageInner::ErrorColor(Box::new(msg)).wrap())
             .await
     }
 
@@ -497,7 +518,7 @@ where
     {
         let msg = SetErrorColorTask::new(enable, res_sender);
         self.sender
-            .try_send(MessageInner::ErrorColor(Box::new(msg)).wrap())
+            .try_send_main(MessageInner::ErrorColor(Box::new(msg)).wrap())
     }
 
     pub(crate) unsafe fn init<const N: usize>(
@@ -658,7 +679,7 @@ where
                 continue;
             }
 
-            match R::timeout(recv_timeout, receiver.recv()).await {
+            match R::timeout(recv_timeout, receiver.recv_main()).await {
                 None => {
                     jl_process_events();
                     jl_yield();

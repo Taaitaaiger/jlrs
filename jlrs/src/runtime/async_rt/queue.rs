@@ -5,11 +5,13 @@ use std::sync::{
 
 use deadqueue::resizable::Queue;
 use futures::Future;
+use futures_concurrency::future::Race;
 
 use crate::error::{JlrsResult, RuntimeError};
 
 struct AsyncQueue<T> {
     queue: Queue<T>,
+    main_queue: Queue<T>,
     // there's no method that closes the queue, so the number of senders must be tracked.
     n_senders: AtomicUsize,
 }
@@ -18,6 +20,7 @@ impl<T> AsyncQueue<T> {
     fn new(capacity: usize) -> Arc<Self> {
         Arc::new(AsyncQueue {
             queue: Queue::new(capacity),
+            main_queue: Queue::new(capacity),
             n_senders: AtomicUsize::new(1),
         })
     }
@@ -58,11 +61,31 @@ impl<T: Send> Sender<T> {
         Ok(())
     }
 
+    pub(crate) async fn send_main(&self, item: T) {
+        self.queue.main_queue.push(item).await
+    }
+
+    pub(crate) fn try_send_main(&self, item: T) -> JlrsResult<()> {
+        self.queue
+            .main_queue
+            .try_push(item)
+            .map_err(|_| RuntimeError::ChannelFull)?;
+
+        Ok(())
+    }
+
     pub(crate) fn resize_queue<'own>(
         &'own self,
         capacity: usize,
     ) -> impl 'own + Future<Output = ()> {
         self.queue.queue.resize(capacity)
+    }
+
+    pub(crate) fn resize_main_queue<'own>(
+        &'own self,
+        capacity: usize,
+    ) -> impl 'own + Future<Output = ()> {
+        self.queue.main_queue.resize(capacity)
     }
 }
 
@@ -82,6 +105,7 @@ impl<T> Clone for Receiver<T> {
 }
 
 impl<T: Send> Receiver<T> {
+    #[cfg(any(feature = "beta", feature = "nightly"))]
     pub(crate) async fn recv(&self) -> JlrsResult<T> {
         if self.queue.n_senders.load(Ordering::Acquire) == 0 {
             return match self.try_recv() {
@@ -93,7 +117,29 @@ impl<T: Send> Receiver<T> {
         Ok(self.queue.queue.pop().await)
     }
 
+    #[cfg(any(feature = "beta", feature = "nightly"))]
     fn try_recv(&self) -> Option<T> {
+        self.queue.queue.try_pop()
+    }
+
+    pub(crate) async fn recv_main(&self) -> JlrsResult<T> {
+        if self.queue.n_senders.load(Ordering::Acquire) == 0 {
+            return match self.try_recv_main() {
+                Some(t) => Ok(t),
+                None => Err(RuntimeError::ChannelClosed)?,
+            };
+        }
+
+        Ok((self.queue.main_queue.pop(), self.queue.queue.pop())
+            .race()
+            .await)
+    }
+
+    fn try_recv_main(&self) -> Option<T> {
+        if let Some(popped_main) = self.queue.main_queue.try_pop() {
+            return Some(popped_main);
+        }
+
         self.queue.queue.try_pop()
     }
 }
