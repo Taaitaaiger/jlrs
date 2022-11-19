@@ -673,15 +673,15 @@ pub struct _jl_code_instance_t {
     pub argescapes: *mut jl_value_t,
     pub isspecsig: u8,
     pub precompile: ::std::sync::atomic::AtomicU8,
-    pub invoke: crate::atomic_c_fn_ptr::AtomicCFnPtr<jl_callptr_t>,
+    pub invoke: ::atomic::Atomic<jl_callptr_t>,
     pub specptr: _jl_code_instance_t__jl_generic_specptr_t,
     pub relocatability: u8,
 }
 #[repr(C)]
 pub union _jl_code_instance_t__jl_generic_specptr_t {
     pub fptr: ::std::mem::ManuallyDrop<::std::sync::atomic::AtomicPtr<::std::ffi::c_void>>,
-    pub fptr1: ::std::mem::ManuallyDrop<crate::atomic_c_fn_ptr::AtomicCFnPtr<jl_fptr_args_t>>,
-    pub fptr3: ::std::mem::ManuallyDrop<crate::atomic_c_fn_ptr::AtomicCFnPtr<jl_fptr_sparam_t>>,
+    pub fptr1: ::std::mem::ManuallyDrop<::atomic::Atomic<jl_fptr_args_t>>,
+    pub fptr3: ::std::mem::ManuallyDrop<::atomic::Atomic<jl_fptr_sparam_t>>,
 }
 pub type jl_code_instance_t = _jl_code_instance_t;
 pub type jl_function_t = jl_value_t;
@@ -2007,6 +2007,9 @@ impl _jl_task_t {
     }
 }
 pub type jl_task_t = _jl_task_t;
+extern "C" {
+    pub fn jl_throw(e: *mut jl_value_t);
+}
 extern "C" {
     pub fn jl_process_events() -> ::std::os::raw::c_int;
 }

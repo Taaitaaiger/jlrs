@@ -8,9 +8,10 @@
 use crate::{
     impl_julia_typecheck,
     memory::target::Target,
-    prelude::{Module, Symbol},
     private::Private,
-    wrappers::ptr::{private::WrapperPriv, simple_vector::SimpleVector},
+    wrappers::ptr::{
+        module::Module, private::WrapperPriv, simple_vector::SimpleVector, symbol::Symbol,
+    },
 };
 
 use cfg_if::cfg_if;
@@ -33,10 +34,8 @@ cfg_if! {
 
 cfg_if! {
     if #[cfg(feature = "extra-fields")] {
-        use crate::wrappers::ptr::{value::ValueRef, simple_vector::{SimpleVectorRef, SimpleVectorData}};
+        use crate::wrappers::ptr::{value::{ValueRef, Value}, simple_vector::{SimpleVectorRef, SimpleVectorData}};
         use super::value::ValueData;
-        use crate::prelude::Value;
-
     }
 }
 

@@ -1938,6 +1938,10 @@ impl _jl_task_t {
 pub type jl_task_t = _jl_task_t;
 #[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
+    pub fn jl_throw(e: *mut jl_value_t);
+}
+#[link(name = "libjulia", kind = "raw-dylib")]
+extern "C" {
     pub fn jl_process_events() -> ::std::os::raw::c_int;
 }
 #[link(name = "libjulia", kind = "raw-dylib")]

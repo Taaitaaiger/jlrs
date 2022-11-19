@@ -6,7 +6,7 @@
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L321
 use crate::{
     impl_julia_typecheck,
-    prelude::Target,
+    memory::target::Target,
     private::Private,
     wrappers::ptr::{
         internal::code_instance::CodeInstanceRef,

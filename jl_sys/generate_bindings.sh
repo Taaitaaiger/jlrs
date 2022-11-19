@@ -46,9 +46,9 @@ function check_dir() {
 }
 
 function print_help() {
-    local spacing=$(printf %$((11 + ${#HOME}))s)
+    local spacing=$(printf %$((15 + ${#HOME}))s)
 
-    echo "    generate_bindings.sh [--nightly]"
+    echo "    generate_bindings.sh [--nightly] [--beta]"
     echo ""
     echo "This script can be used to generate Rust bindings to the Julia C API with"
     echo "bindgen. It can either generate bindings for all supported versions of Julia,"
@@ -59,17 +59,26 @@ function print_help() {
     echo "default paths can be overridden with environment variables:"
     echo ""
     echo -e "\033[1m      Version                   Default path${spacing}Override\033[0m"
-    echo "  Linux 64-bit stable:      $HOME/julia-1.8.3           JULIA_STABLE_DIR"
-    echo "  Linux 64-bit lts:         $HOME/julia-1.6.7           JULIA_LTS_DIR"
-    echo "  Linux 32-bit stable:      $HOME/julia-1.8.3-32        JULIA_STABLE_DIR_32"
-    echo "  Linux 32-bit lts:         $HOME/julia-1.6.7-32        JULIA_LTS_DIR_32"
-    echo "  Windows 64-bit stable:    $HOME/julia-1.8.3-win       JULIA_STABLE_DIR_WIN"
-    echo "  Windows 64-bit lts:       $HOME/julia-1.6.7-win       JULIA_LTS_DIR_WIN"
+    echo "  Linux 64-bit stable:      $HOME/julia-1.8.3               JULIA_STABLE_DIR"
+    echo "  Linux 64-bit lts:         $HOME/julia-1.6.7               JULIA_LTS_DIR"
+    echo "  Linux 32-bit stable:      $HOME/julia-1.8.3-32            JULIA_STABLE_DIR_32"
+    echo "  Linux 32-bit lts:         $HOME/julia-1.6.7-32            JULIA_LTS_DIR_32"
+    echo "  Windows 64-bit stable:    $HOME/julia-1.8.3-win           JULIA_STABLE_DIR_WIN"
+    echo "  Windows 64-bit lts:       $HOME/julia-1.6.7-win           JULIA_LTS_DIR_WIN"
+    echo ""
     echo ""
     echo "When the nightly flag is set, the following is expected:"
     echo ""
     echo -e "\033[1m      Version                   Default path${spacing}Override\033[0m"
-    echo "  Linux 64-bit nightly:     $HOME/Projects/C/julia/usr  JULIA_NIGHTLY_DIR"
+    echo "  Linux 64-bit nightly:     $HOME/Projects/C/julia/usr      JULIA_NIGHTLY_DIR"
+    echo ""
+    echo ""
+    echo "When the beta flag is set, the following is expected:"
+    echo ""
+    echo "  Linux 64-bit beta:        $HOME/julia-1.9.0-alpha1        JULIA_BETA_DIR"
+    echo "  Linux 32-bit beta:        $HOME/julia-1.9.0-alpha1-32     JULIA_BETA_DIR_32"
+    echo "  Windows 64-bit beta:      $HOME/julia-1.9.0-alpha1-win    JULIA_BETA_DIR_WIN"
+    echo ""
     echo ""
     echo "All dependencies must have been installed before running this script. The"
     echo "following should be sufficient on Ubuntu:"
@@ -90,7 +99,6 @@ if [ "${NIGHTLY}" = "y" ]; then
     if [ -z "$JULIA_NIGHTLY_DIR" ]; then
         JULIA_NIGHTLY_DIR=${HOME}/Projects/C/julia/usr
     fi
-
     if [ ! -d "$JULIA_NIGHTLY_DIR" ]; then
         echo "Error: $JULIA_NIGHTLY_DIR does not exist" >&2
         exit 1
@@ -103,7 +111,9 @@ if [ "${NIGHTLY}" = "y" ]; then
 
     cargo fmt
 
-    exit
+    if [ "${BETA}" != "y" ]; then
+        exit
+    fi
 fi
 
 if [ "${BETA}" = "y" ]; then

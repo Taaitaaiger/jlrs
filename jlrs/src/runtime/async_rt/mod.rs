@@ -9,8 +9,9 @@
 //! To use a custom backing runtime, you can implement the `AsyncRuntime` trait.
 //!
 //! In the stable and lts version of Julia, only one thread can be used by the async runtime. The
-//! nightly version can use any number of worker threads to spread the workload across multiple
-//! threads that can call into Julia.
+//! nightly and beta version can use any number of worker threads to spread the workload across
+//! multiple threads that can call into Julia. The number of worker threads can be set with the
+//! [`AsyncRuntimeBuilder`]
 //!
 //! Work is sent to the async runtime as independent tasks. Three kinds of task exist: blocking,
 //! async, and persistent tasks. Blocking tasks block the thread they're called on until they've
@@ -116,7 +117,7 @@ impl<E> IntoResult<JlrsResult<()>, E> for Result<JlrsResult<()>, E> {
 /// Functionality that is necessary to use an async runtime with jlrs.
 ///
 /// If you want to use async-std or tokio you can use one of the implementations provided by
-/// jlrs. If you want to use another executor you can implement this trait.
+/// jlrs. If you want to use a custom executor you can implement this trait.
 #[async_trait(?Send)]
 pub trait AsyncRuntime: Send + 'static {
     /// Error that is returned when a task can't be joined because it has panicked.
@@ -134,7 +135,7 @@ pub trait AsyncRuntime: Send + 'static {
     /// The handle type of the runtime task spawned by `AsyncRuntime::spawn_local`.
     type RuntimeHandle: Future<Output = Self::RuntimeOutput>;
 
-    /// Spawn the async runtime a new thread, this method called if `AsyncBuilder::start` is
+    /// Spawn the async runtime on a new thread, this method called if `AsyncBuilder::start` is
     /// called.
     fn spawn_thread<F>(rt_fn: F) -> std::thread::JoinHandle<JlrsResult<()>>
     where
@@ -143,8 +144,8 @@ pub trait AsyncRuntime: Send + 'static {
         std::thread::spawn(rt_fn)
     }
 
-    /// Spawn the async runtime a blocking task, this method called if `AsyncBuilder::start_async`
-    /// is called.
+    /// Spawn the async runtime as a blocking task, this method called if
+    /// `AsyncBuilder::start_async` is called.
     fn spawn_blocking<F>(rt_fn: F) -> Self::RuntimeHandle
     where
         F: FnOnce() -> JlrsResult<()> + Send + 'static;
@@ -173,7 +174,7 @@ pub trait AsyncRuntime: Send + 'static {
 /// A handle to the async runtime.
 ///
 /// This handle can be used to include files and send new tasks to the runtime. The runtime shuts
-/// down when the last handle is dropped.
+/// down when the last handle is dropped and all active tasks have completed.
 pub struct AsyncJulia<R>
 where
     R: AsyncRuntime,

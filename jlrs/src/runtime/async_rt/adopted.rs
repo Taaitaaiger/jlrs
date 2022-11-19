@@ -126,8 +126,8 @@ async unsafe fn run_inner<R: AsyncRuntime, const N: usize>(
     for i in 0..N {
         loop {
             if running_tasks.borrow()[i].is_some() {
-                sleep(&Global::new(), recv_timeout);
                 R::yield_now().await;
+                sleep(&Global::new(), recv_timeout);
                 jl_gc_safepoint();
             } else {
                 break;

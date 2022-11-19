@@ -1747,6 +1747,9 @@ impl _jl_task_t {
 }
 pub type jl_task_t = _jl_task_t;
 extern "C" {
+    pub fn jl_throw(e: *mut jl_value_t);
+}
+extern "C" {
     pub fn jl_process_events() -> ::std::os::raw::c_int;
 }
 extern "C" {

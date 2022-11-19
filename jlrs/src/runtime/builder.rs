@@ -33,7 +33,7 @@ cfg_if::cfg_if! {
         };
         use super::async_rt::{AsyncRuntime, AsyncJulia};
 
-        /// Build the async runtime backed by `R`.
+        /// Build the async runtime backed by some runtime `R`.
         pub struct AsyncRuntimeBuilder<R>
         where
             R: AsyncRuntime,
@@ -58,15 +58,15 @@ cfg_if::cfg_if! {
             /// If it's set to 0, the default value, the number of threads is the number of CPU
             /// cores.
             ///
-            /// NB: When the `nightly` feature is enabled, this sets the number of `:default`
-            /// threads Julia can use,
+            /// NB: When the `nightly` or `beta` feature is enabled, this sets the number of
+            /// threads allocated to the `:default` pool.
             pub fn n_threads(mut self, n: usize) -> Self {
                 self.n_threads = n;
                 self
             }
 
             #[cfg(any(feature = "nightly", feature = "beta"))]
-            /// Set the number of `:interactive` threads Julia can use.
+            /// Set the number of threads allocated to the `:interactive` pool.
             ///
             /// If it's set to 0, the default value, no threads are allocated to this pool.
             pub fn n_interactive_threads(mut self, n: usize) -> Self {
@@ -86,7 +86,7 @@ cfg_if::cfg_if! {
 
             /// Set the capacity of the channel used to communicate with the async runtime.
             ///
-            /// By default it's 1.
+            /// The default value is 16.
             pub fn channel_capacity(mut self, capacity: NonZeroUsize) -> Self {
                 self.channel_capacity = capacity;
                 self
@@ -95,8 +95,10 @@ cfg_if::cfg_if! {
             /// Set the receive timeout of the channel used to communicate with the async runtime.
             ///
             /// If no message is received before the timeout occurs, the async runtime yields
-            /// control to Julia to ensure the scheduler can run and events are processed
-            /// periodically. By default it's 1 millisecond.
+            /// control to Julia to ensure the scheduler and garbage collector can run, and events
+            /// are processed periodically.
+            ///
+            /// The default value is 1 millisecond.
             pub fn recv_timeout(mut self, timeout: Duration) -> Self {
                 self.recv_timeout = timeout;
                 self
@@ -192,7 +194,7 @@ impl RuntimeBuilder {
         AsyncRuntimeBuilder {
             builder: self,
             n_threads: 0,
-            channel_capacity: unsafe { NonZeroUsize::new_unchecked(1) },
+            channel_capacity: unsafe { NonZeroUsize::new_unchecked(16) },
             recv_timeout: Duration::from_millis(1),
             #[cfg(any(feature = "nightly", feature = "beta"))]
             n_threadsi: 0,

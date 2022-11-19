@@ -4,10 +4,10 @@ use crate::{
     convert::to_symbol::ToSymbol,
     impl_julia_typecheck,
     memory::target::Target,
-    prelude::Symbol,
     private::Private,
     wrappers::ptr::{
-        datatype::DataType, private::WrapperPriv, value::Value, value::ValueRef, Wrapper,
+        datatype::DataType, private::WrapperPriv, symbol::Symbol, value::Value, value::ValueRef,
+        Wrapper,
     },
 };
 use jl_sys::{jl_new_typevar, jl_tvar_t, jl_tvar_type};

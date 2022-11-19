@@ -2,8 +2,8 @@
 //!
 //! There are two ways Julia can be embedded in a Rust application using jlrs, either as a sync or
 //! async runtime. The sync runtime initializes Julia on the current thread and you can interact
-//! with it directly, while an async runtime is run on a separate thread and uses a task-based
-//! system. More information is available in the [`sync_rt`] and [`async_rt`] modules
+//! with it directly, while an async runtime is run on one or more separate threads and uses a
+//! task-based system. More information is available in the [`sync_rt`] and [`async_rt`] modules
 //! respectively.
 //!
 //! To create a runtime, you must use a [`RuntimeBuilder`]. See the [`builder`] module for more

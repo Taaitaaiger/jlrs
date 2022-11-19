@@ -2,11 +2,12 @@
 
 use crate::{
     impl_julia_typecheck,
-    prelude::{Symbol, Target},
+    memory::target::Target,
     private::Private,
     wrappers::ptr::{
         array::{ArrayData, ArrayRef},
         private::WrapperPriv,
+        symbol::Symbol,
         Ref,
     },
 };

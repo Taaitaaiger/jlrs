@@ -7,8 +7,6 @@ use std::mem::size_of;
 use std::ptr::{null_mut, NonNull};
 use std::sync::atomic::{AtomicPtr, Ordering};
 
-pub mod atomic_c_fn_ptr;
-
 #[cfg(feature = "lts")]
 use ::std::os::raw::c_char;
 
