@@ -24,7 +24,10 @@ use std::{
 };
 
 use jl_sys::{
-    jl_gc_alloc_typed, jl_gc_schedule_foreign_sweepfunc, jl_new_foreign_type, jl_value_t,
+    jl_gc_alloc_typed,
+    jl_gc_schedule_foreign_sweepfunc,
+    jl_new_foreign_type,
+    jl_value_t,
 };
 
 use super::ptr::{datatype::DataTypeData, private::WrapperPriv, value::ValueData};

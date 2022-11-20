@@ -2,9 +2,18 @@
 
 use cfg_if::cfg_if;
 use jl_sys::{
-    jl_abstractarray_type, jl_anytuple_type_type, jl_array_type, jl_densearray_type,
-    jl_llvmpointer_type, jl_namedtuple_type, jl_pointer_type, jl_ref_type, jl_type_type,
-    jl_type_unionall, jl_unionall_t, jl_unionall_type,
+    jl_abstractarray_type,
+    jl_anytuple_type_type,
+    jl_array_type,
+    jl_densearray_type,
+    jl_llvmpointer_type,
+    jl_namedtuple_type,
+    jl_pointer_type,
+    jl_ref_type,
+    jl_type_type,
+    jl_type_unionall,
+    jl_unionall_t,
+    jl_unionall_type,
 };
 
 use crate::{

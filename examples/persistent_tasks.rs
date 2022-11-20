@@ -72,11 +72,7 @@ impl PersistentTask for AccumulatorTask {
     ) -> JlrsResult<Self::Output> {
         // Add call_cata to the accumulator and return its new value. The accumulator is mutable
         // Julia data so its contents can be changed.
-        let value = state
-            .field_accessor(&mut frame)
-            .field("v")?
-            .access::<f64>()?
-            + input;
+        let value = state.field_accessor().field("v")?.access::<f64>()? + input;
         let new_value = Value::new(&mut frame, value);
 
         unsafe {

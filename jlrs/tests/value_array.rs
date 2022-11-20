@@ -72,19 +72,19 @@ mod tests {
                         assert!(data.set(1, Some(module)).is_ok());
                         assert!(!data[0].is_none());
                         assert_eq!(data[0].unwrap().value(), module);
-                        assert_eq!(data.get(0).unwrap().value(), module);
+                        assert_eq!(data.get(&mut frame, 0).unwrap(), module);
                     }
 
                     unsafe {
                         let data = arr.value_data()?;
                         assert_eq!(data[0].unwrap().value(), module);
-                        assert_eq!(data.get(0).unwrap().value(), module);
+                        assert_eq!(data.get(&mut frame, 0).unwrap(), module);
                     }
 
                     unsafe {
                         let data = arr.wrapper_data::<ModuleRef>()?;
                         assert_eq!(data[1].unwrap().value(), module);
-                        assert_eq!(data.get(1).unwrap().wrapper(), module.cast::<Module>()?);
+                        assert_eq!(data.get(&mut frame, 1).unwrap(), module.cast::<Module>()?);
                     }
 
                     unsafe {
@@ -93,7 +93,7 @@ mod tests {
                         assert!(data.set(2, Some(module)).is_ok());
                         assert!(!data[2].is_none());
                         assert_eq!(data[2].unwrap().value(), module);
-                        assert_eq!(data.get(2).unwrap().value(), module);
+                        assert_eq!(data.get(&frame, 2).unwrap().value(), module);
 
                         assert!(data.set(2, None).is_ok());
                         assert!(data[2].is_none());

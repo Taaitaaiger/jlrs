@@ -12,10 +12,21 @@
 use std::ffi::c_void;
 
 use jl_sys::{
-    jl_code_info_type, jl_globalref_type, jl_gotonode_type, jl_intrinsic_type,
-    jl_linenumbernode_type, jl_namedtuple_typename, jl_newvarnode_type, jl_phicnode_type,
-    jl_phinode_type, jl_pinode_type, jl_quotenode_type, jl_slotnumber_type, jl_string_type,
-    jl_typedslot_type, jl_upsilonnode_type,
+    jl_code_info_type,
+    jl_globalref_type,
+    jl_gotonode_type,
+    jl_intrinsic_type,
+    jl_linenumbernode_type,
+    jl_namedtuple_typename,
+    jl_newvarnode_type,
+    jl_phicnode_type,
+    jl_phinode_type,
+    jl_pinode_type,
+    jl_quotenode_type,
+    jl_slotnumber_type,
+    jl_string_type,
+    jl_typedslot_type,
+    jl_upsilonnode_type,
 };
 
 use crate::{
@@ -23,7 +34,11 @@ use crate::{
     memory::target::unrooted::Unrooted,
     private::Private,
     wrappers::ptr::{
-        datatype::DataType, private::WrapperPriv, type_name::TypeName, union_all::UnionAll, Wrapper,
+        datatype::DataType,
+        private::WrapperPriv,
+        type_name::TypeName,
+        union_all::UnionAll,
+        Wrapper,
     },
 };
 

@@ -38,7 +38,7 @@ mod tests {
                         assert!(res.is_ok());
                         let value = res.unwrap();
                         let is_bool = value
-                            .field_accessor(&frame)
+                            .field_accessor()
                             .field("a")?
                             .access::<DataTypeRef>()?
                             .wrapper()
@@ -46,7 +46,7 @@ mod tests {
 
                         assert!(is_bool);
 
-                        let field_b = value.field_accessor(&frame).field("b")?.access::<i32>()?;
+                        let field_b = value.field_accessor().field("b")?.access::<i32>()?;
 
                         assert_eq!(field_b, 0);
                     };
@@ -77,7 +77,7 @@ mod tests {
                         assert!(res.is_ok());
                         let value = res.unwrap();
                         let is_i16 = value
-                            .field_accessor(&frame)
+                            .field_accessor()
                             .field("a")?
                             .access::<DataTypeRef>()?
                             .wrapper()
@@ -85,7 +85,7 @@ mod tests {
 
                         assert!(is_i16);
 
-                        let field_b = value.field_accessor(&frame).field("b")?.access::<i16>()?;
+                        let field_b = value.field_accessor().field("b")?.access::<i16>()?;
 
                         assert_eq!(field_b, 1);
                     };
@@ -118,7 +118,7 @@ mod tests {
                             .instantiate_unchecked(&mut frame, args);
 
                         let is_i64 = value
-                            .field_accessor(&frame)
+                            .field_accessor()
                             .field("a")?
                             .access::<DataTypeRef>()?
                             .wrapper()
@@ -126,7 +126,7 @@ mod tests {
 
                         assert!(is_i64);
 
-                        let field_b = value.field_accessor(&frame).field("b")?.access::<i16>()?;
+                        let field_b = value.field_accessor().field("b")?.access::<i16>()?;
 
                         assert_eq!(field_b, 1);
                     };

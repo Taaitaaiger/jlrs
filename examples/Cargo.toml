@@ -45,6 +45,12 @@ crate-type = ["cdylib"]
 test = true
 
 [[example]]
+name = "ccall_throw_exception"
+path = "ccall_throw_exception.rs"
+crate-type = ["cdylib"]
+test = true
+
+[[example]]
 name = "ccall_with_threads"
 path = "ccall_with_threads.rs"
 crate-type = ["cdylib"]

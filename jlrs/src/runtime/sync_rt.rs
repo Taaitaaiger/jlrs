@@ -3,8 +3,6 @@
 //! This module is only available if the `sync-rt` feature is enabled, it provides the sync
 //! runtime which initializes Julia on the current thread.
 
-// TODO: document scope
-
 use std::{ffi::c_void, marker::PhantomData, path::Path, sync::atomic::Ordering};
 
 use jl_sys::{jl_atexit_hook, jl_init, jl_init_with_image, jl_is_initialized};

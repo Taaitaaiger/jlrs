@@ -49,7 +49,6 @@ impl<'scope> TypeMapEntry<'scope> {
     */
 
     /// Invasive linked list
-    // TODO: check types
     pub fn next<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
