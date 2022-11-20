@@ -25,7 +25,9 @@ use crate::{
         private::WrapperPriv,
         union::{find_union_component, nth_union_component},
         value::{Value, ValueData},
-        Wrapper, WrapperRef,
+        Wrapper,
+        WrapperRef,
+        WrapperType,
     },
 };
 
@@ -328,32 +330,46 @@ impl<'borrow, 'array, 'data, U, L: ArrayLayout>
     }
 }
 
-// TODO: Rooting
-impl<'borrow, 'array, 'data, T: WrapperRef<'array, 'data>, M: Mutability>
-    PtrArrayAccessor<'borrow, 'array, 'data, T, M>
+impl<'borrow, 'array, 'data, W: WrapperRef<'array, 'data>, M: Mutability>
+    PtrArrayAccessor<'borrow, 'array, 'data, W, M>
 {
     /// Get a reference to the value at `index`, or `None` if the index is out of bounds.
-    pub fn get<D>(&self, index: D) -> Option<T>
+    pub fn get<'target, D, T>(
+        &self,
+        target: T,
+        index: D,
+    ) -> Option<T::Data<'data, WrapperType<'target, 'array, 'data, W>>>
     where
         D: Dims,
+        T: Target<'target>,
     {
         let idx = self.dimensions().index_of(&index).ok()?;
         // The index is in-bounds, the type has been checked in advance
-        unsafe { self.array.data_ptr().cast::<T>().add(idx).as_ref().cloned() }
+        unsafe {
+            let x = self
+                .array
+                .data_ptr()
+                .cast::<W::Wrapper>()
+                .add(idx)
+                .as_ref()
+                .cloned()?;
+
+            Some(target.data_from_ptr(x.unwrap_non_null(Private).cast(), Private))
+        }
     }
 
     /// Returns the array's data as a slice, the data is in column-major order.
-    pub fn as_slice(&self) -> &[Option<T>] {
+    pub fn as_slice(&self) -> &[Option<W>] {
         let n_elems = self.dimensions().size();
-        let arr_data = self.array.data_ptr().cast::<Option<T>>();
+        let arr_data = self.array.data_ptr().cast::<Option<W>>();
         // Safety: the layout is compatible and the lifetime is limited.
         unsafe { slice::from_raw_parts(arr_data, n_elems) }
     }
 
     /// Returns the array's data as a slice, the data is in column-major order.
-    pub fn into_slice(self) -> &'borrow [Option<T>] {
+    pub fn into_slice(self) -> &'borrow [Option<W>] {
         let n_elems = self.dimensions().size();
-        let arr_data = self.array.data_ptr().cast::<Option<T>>();
+        let arr_data = self.array.data_ptr().cast::<Option<W>>();
         // Safety: the layout is compatible and the lifetime is limited.
         unsafe { slice::from_raw_parts(arr_data, n_elems) }
     }

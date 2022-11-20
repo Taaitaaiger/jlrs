@@ -27,8 +27,7 @@ use crate::{
 /// you must create a scope first. You can use this struct to do so. It must never be used outside
 /// functions called through `ccall`, and only once for each `ccall`ed function.
 ///
-/// Julia code called from a `ccall`ed function must not throw an exception. Exceptions must only
-/// be thrown by calling [`CCall::throw_exception`].
+/// Exceptions must only be thrown by calling [`CCall::throw_exception`].
 pub struct CCall<'context> {
     frame: PinnedFrame<'context, 0>,
 }
@@ -60,7 +59,7 @@ impl<'context> CCall<'context> {
     /// Create a [`GcFrame`], call the given closure, and return its result.
     pub fn scope<T, F>(&mut self, func: F) -> JlrsResult<T>
     where
-        for<'base> F: FnOnce(GcFrame<'base>) -> JlrsResult<T>,
+        for<'scope> F: FnOnce(GcFrame<'scope>) -> JlrsResult<T>,
     {
         unsafe {
             let stack = self.frame.stack_frame().sync_stack();
@@ -87,10 +86,11 @@ impl<'context> CCall<'context> {
     where
         F: for<'scope> FnOnce(&mut GcFrame<'scope>) -> Value<'scope, 'static>,
     {
-        let value = throw_exception_internal(self.frame.stack_frame().sync_stack(), func);
+        let exception = construct_exception(self.frame.stack_frame().sync_stack(), func);
         // catch unwinds the GC stack, so it's okay to forget self.
         std::mem::forget(self);
-        jl_throw(value.ptr().as_ptr())
+        jl_throw(exception.ptr().as_ptr());
+        unreachable!()
     }
 
     /// Create an [`Unrooted`], call the given closure, and return its result.
@@ -100,22 +100,20 @@ impl<'context> CCall<'context> {
     /// Safety: must only be called from a `ccall`ed function that doesn't need to root any data.
     pub unsafe fn stackless_scope<T, F>(func: F) -> JlrsResult<T>
     where
-        for<'base> F: FnOnce(Unrooted<'base>) -> JlrsResult<T>,
+        for<'scope> F: FnOnce(Unrooted<'scope>) -> JlrsResult<T>,
     {
         func(Unrooted::new())
     }
 }
 
 #[inline(never)]
-unsafe fn throw_exception_internal<'stack, F>(
-    stack: &'stack Stack,
-    func: F,
-) -> ValueRef<'stack, 'static>
+unsafe fn construct_exception<'stack, F>(stack: &'stack Stack, func: F) -> ValueRef<'stack, 'static>
 where
     for<'scope> F: FnOnce(&mut GcFrame<'scope>) -> Value<'scope, 'static>,
 {
     let (owner, mut frame) = GcFrame::base(stack);
     let ret = func(&mut frame);
+    let rewrapped = ValueRef::wrap(ret.unwrap_non_null(Private));
     std::mem::drop(owner);
-    ValueRef::wrap(ret.unwrap_non_null(Private))
+    rewrapped
 }

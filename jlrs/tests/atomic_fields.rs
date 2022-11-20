@@ -26,10 +26,7 @@ mod tests {
                         .instantiate(&mut frame, &mut [arg1])?
                         .into_jlrs_result()?;
 
-                    let a = instance
-                        .field_accessor(&mut frame)
-                        .field("a")?
-                        .access::<u32>()?;
+                    let a = instance.field_accessor().field("a")?.access::<u32>()?;
                     assert_eq!(a, 3);
 
                     Ok(())
@@ -60,7 +57,7 @@ mod tests {
                         .into_jlrs_result()?;
 
                     let a = instance
-                        .field_accessor(&mut frame)
+                        .field_accessor()
                         .field("a")?
                         .access::<Tuple4<u64, u64, u64, u64>>()?;
                     assert_eq!(a, Tuple4(1, 2, 3, 4));
@@ -93,7 +90,7 @@ mod tests {
                         .into_jlrs_result()?;
 
                     let a = instance
-                        .field_accessor(&mut frame)
+                        .field_accessor()
                         .field("a")?
                         .access::<Tuple2<u32, u16>>()?;
                     assert_eq!(a, Tuple2(1, 2));

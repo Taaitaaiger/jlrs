@@ -1,34 +1,98 @@
 //! Wrapper for `DataType`, which provides access to type properties.
 
-use std::{
-    ffi::{c_void, CStr},
-    marker::PhantomData,
-    ptr::NonNull,
-};
+use std::{ffi::CStr, marker::PhantomData, ptr::NonNull};
 
 use cfg_if::cfg_if;
 use jl_sys::{
-    jl_abstractslot_type, jl_abstractstring_type, jl_any_type, jl_anytuple_type, jl_argument_type,
-    jl_argumenterror_type, jl_bool_type, jl_boundserror_type, jl_builtin_type, jl_char_type,
-    jl_code_info_type, jl_code_instance_type, jl_const_type, jl_datatype_layout_t, jl_datatype_t,
-    jl_datatype_type, jl_emptytuple_type, jl_errorexception_type, jl_expr_type, jl_field_index,
-    jl_field_isptr, jl_field_offset, jl_field_size, jl_float16_type, jl_float32_type,
-    jl_float64_type, jl_floatingpoint_type, jl_function_type, jl_get_fieldtypes, jl_globalref_type,
-    jl_gotoifnot_type, jl_gotonode_type, jl_initerror_type, jl_int16_type, jl_int32_type,
-    jl_int64_type, jl_int8_type, jl_intrinsic_type, jl_lineinfonode_type, jl_linenumbernode_type,
-    jl_loaderror_type, jl_method_instance_type, jl_method_match_type, jl_method_type,
-    jl_methoderror_type, jl_methtable_type, jl_module_type, jl_new_structv, jl_newvarnode_type,
-    jl_nothing_type, jl_number_type, jl_partial_struct_type, jl_phicnode_type, jl_phinode_type,
-    jl_pinode_type, jl_quotenode_type, jl_returnnode_type, jl_signed_type, jl_simplevector_type,
-    jl_slotnumber_type, jl_ssavalue_type, jl_string_type, jl_symbol_type, jl_task_type,
-    jl_tvar_type, jl_typedslot_type, jl_typeerror_type, jl_typemap_entry_type,
-    jl_typemap_level_type, jl_typename_str, jl_typename_type, jl_typeofbottom_type, jl_uint16_type,
-    jl_uint32_type, jl_uint64_type, jl_uint8_type, jl_undefvarerror_type, jl_unionall_type,
-    jl_uniontype_type, jl_upsilonnode_type, jl_voidpointer_type, jl_weakref_type,
+    jl_abstractslot_type,
+    jl_abstractstring_type,
+    jl_any_type,
+    jl_anytuple_type,
+    jl_argument_type,
+    jl_argumenterror_type,
+    jl_bool_type,
+    jl_boundserror_type,
+    jl_builtin_type,
+    jl_char_type,
+    jl_code_info_type,
+    jl_code_instance_type,
+    jl_const_type,
+    jl_datatype_layout_t,
+    jl_datatype_t,
+    jl_datatype_type,
+    jl_emptytuple_type,
+    jl_errorexception_type,
+    jl_expr_type,
+    jl_field_index,
+    jl_field_isptr,
+    jl_field_offset,
+    jl_field_size,
+    jl_float16_type,
+    jl_float32_type,
+    jl_float64_type,
+    jl_floatingpoint_type,
+    jl_function_type,
+    jl_get_fieldtypes,
+    jl_globalref_type,
+    jl_gotoifnot_type,
+    jl_gotonode_type,
+    jl_initerror_type,
+    jl_int16_type,
+    jl_int32_type,
+    jl_int64_type,
+    jl_int8_type,
+    jl_intrinsic_type,
+    jl_lineinfonode_type,
+    jl_linenumbernode_type,
+    jl_loaderror_type,
+    jl_method_instance_type,
+    jl_method_match_type,
+    jl_method_type,
+    jl_methoderror_type,
+    jl_methtable_type,
+    jl_module_type,
+    jl_new_structv,
+    jl_newvarnode_type,
+    jl_nothing_type,
+    jl_number_type,
+    jl_partial_struct_type,
+    jl_phicnode_type,
+    jl_phinode_type,
+    jl_pinode_type,
+    jl_quotenode_type,
+    jl_returnnode_type,
+    jl_signed_type,
+    jl_simplevector_type,
+    jl_slotnumber_type,
+    jl_ssavalue_type,
+    jl_string_type,
+    jl_symbol_type,
+    jl_task_type,
+    jl_tvar_type,
+    jl_typedslot_type,
+    jl_typeerror_type,
+    jl_typemap_entry_type,
+    jl_typemap_level_type,
+    jl_typename_str,
+    jl_typename_type,
+    jl_typeofbottom_type,
+    jl_uint16_type,
+    jl_uint32_type,
+    jl_uint64_type,
+    jl_uint8_type,
+    jl_undefvarerror_type,
+    jl_unionall_type,
+    jl_uniontype_type,
+    jl_upsilonnode_type,
+    jl_voidpointer_type,
+    jl_weakref_type,
 };
 #[cfg(not(feature = "lts"))]
 use jl_sys::{
-    jl_atomicerror_type, jl_interconditional_type, jl_partial_opaque_type, jl_vararg_type,
+    jl_atomicerror_type,
+    jl_interconditional_type,
+    jl_partial_opaque_type,
+    jl_vararg_type,
 };
 
 use super::{simple_vector::SimpleVectorData, type_name::TypeName, value::ValueData, Ref};
@@ -196,7 +260,6 @@ impl<'scope> DataType<'scope> {
     }
 
     /// Returns the field type of the field at position `idx`.
-    // TODO
     pub fn field_type_concrete<'target, T>(
         self,
         target: T,
@@ -292,11 +355,14 @@ impl<'scope> DataType<'scope> {
         }
     }
 
-    // TODO: Allow using this information
     /// Returns a pointer to the layout of this `DataType`.
-    pub fn layout(self) -> *const c_void {
+    pub fn layout(self) -> DatatypeLayout<'scope> {
         // Safety: the pointer points to valid data
-        unsafe { self.unwrap_non_null(Private).as_ref().layout as _ }
+        unsafe {
+            let layout = NonNull::new(self.unwrap_non_null(Private).as_ref().layout as *mut _)
+                .expect("Layout is null");
+            DatatypeLayout(layout, PhantomData)
+        }
     }
 
     /// Returns the size of a value of this type in bytes.
@@ -308,14 +374,9 @@ impl<'scope> DataType<'scope> {
                     self.unwrap_non_null(Private).as_ref().size as u32
                 }
             } else {
-                unsafe {
                     self.layout()
-                        .cast::<jl_datatype_layout_t>()
-                        .as_ref()
-                        .unwrap()
-                        .size
+                        .size()
 
-                }
             }
         }
     }
@@ -334,7 +395,7 @@ impl<'scope> DataType<'scope> {
                 unsafe { self.unwrap_non_null(Private).as_ref().abstract_ != 0 }
             } else {
                 // Safety: the pointer points to valid data, so it must have a TypeName.
-                self.type_name().abstract_()
+                self.type_name().is_abstract()
             }
         }
     }
@@ -347,7 +408,7 @@ impl<'scope> DataType<'scope> {
                 unsafe { self.unwrap_non_null(Private).as_ref().mutabl != 0 }
             } else {
                 // Safety: the pointer points to valid data, so it must have a TypeName.
-                self.type_name().mutabl()
+                self.type_name().is_mutable()
             }
         }
     }
@@ -470,13 +531,7 @@ impl<'scope> DataType<'scope> {
     pub fn align(self) -> u16 {
         // Safety: the pointer points to valid data, if the layout is null the code
         // panics.
-        unsafe {
-            self.layout()
-                .cast::<jl_datatype_layout_t>()
-                .as_ref()
-                .unwrap()
-                .alignment
-        }
+        self.layout().alignment()
     }
 
     /// Returns the size of a value of this type in bits.
@@ -488,13 +543,7 @@ impl<'scope> DataType<'scope> {
     pub fn n_fields(self) -> u32 {
         // Safety: the pointer points to valid data, if the layout is null the code
         // panics.
-        unsafe {
-            self.layout()
-                .cast::<jl_datatype_layout_t>()
-                .as_ref()
-                .unwrap()
-                .nfields
-        }
+        self.layout().n_fields()
     }
 
     /// Returns the name of this type.
@@ -644,7 +693,7 @@ impl<'scope> DataType<'scope> {
         return 0;
         */
         let tn = self.type_name();
-        if !tn.mutabl() {
+        if !tn.is_mutable() {
             return true;
         }
 
@@ -737,15 +786,7 @@ impl<'scope> DataType<'scope> {
     pub fn has_pointer_fields(self) -> JlrsResult<bool> {
         // Safety: the pointer points to valid data, if the layout is null the code
         // panics.
-        unsafe {
-            Ok(self
-                .layout()
-                .cast::<jl_datatype_layout_t>()
-                .as_ref()
-                .unwrap()
-                .first_ptr
-                != -1)
-        }
+        Ok(self.layout().first_ptr() != -1)
     }
 }
 
@@ -1501,3 +1542,45 @@ pub type DataTypeData<'target, T> = <T as TargetType<'target>>::Data<'static, Da
 /// `JuliaResult<DataType>` or `JuliaResultRef<DataTypeRef>`, depending on the target type `T`.
 pub type DataTypeResult<'target, T> =
     <T as TargetType<'target>>::Result<'static, DataType<'target>>;
+
+/// `DataType` layout information.
+#[derive(Copy, Clone)]
+pub struct DatatypeLayout<'scope>(NonNull<jl_datatype_layout_t>, PhantomData<&'scope ()>);
+
+impl DatatypeLayout<'_> {
+    /// Returns the size of the `DataType`.
+    #[cfg(any(feature = "beta", feature = "nightly"))]
+    pub fn size(self) -> u32 {
+        unsafe { self.0.as_ref().size }
+    }
+
+    /// Returns the number of fields of the `DataType`.
+    pub fn n_fields(self) -> u32 {
+        unsafe { self.0.as_ref().nfields }
+    }
+
+    /// Returns the number of pointers in the `DataType`.
+    pub fn n_pointers(self) -> u32 {
+        unsafe { self.0.as_ref().npointers }
+    }
+
+    /// Returns the offset to the first pointer, or -1 if the `DataType` contains no pointers.
+    pub fn first_ptr(self) -> i32 {
+        unsafe { self.0.as_ref().first_ptr }
+    }
+
+    /// Returns the alignment of the `DataType`.
+    pub fn alignment(self) -> u16 {
+        unsafe { self.0.as_ref().alignment }
+    }
+
+    /// Returns whether the `DataType` contains unitialized data.
+    pub fn has_padding(self) -> u16 {
+        unsafe { self.0.as_ref().haspadding() }
+    }
+
+    /// Returns the field descriptor type of this `DataType`.
+    pub fn fielddesc_type(self) -> u16 {
+        unsafe { self.0.as_ref().fielddesc_type() }
+    }
+}

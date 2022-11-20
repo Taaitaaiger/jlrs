@@ -27,10 +27,7 @@ mod tests {
                         .instantiate(&mut frame, &mut [arg1])?
                         .into_jlrs_result()?;
 
-                    let field = instance
-                        .field_accessor(&mut frame)
-                        .field("a")?
-                        .access::<u32>()?;
+                    let field = instance.field_accessor().field("a")?.access::<u32>()?;
                     assert_eq!(field, 3);
 
                     Ok(())

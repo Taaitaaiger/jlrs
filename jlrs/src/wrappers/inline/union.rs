@@ -16,7 +16,11 @@ use crate::{
     },
     private::Private,
     wrappers::ptr::{
-        datatype::DataType, private::WrapperPriv as _, union::Union, value::Value, Wrapper,
+        datatype::DataType,
+        private::WrapperPriv as _,
+        union::Union,
+        value::Value,
+        Wrapper,
     },
 };
 

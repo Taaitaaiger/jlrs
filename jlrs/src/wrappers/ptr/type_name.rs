@@ -9,8 +9,15 @@ use std::{marker::PhantomData, ptr::NonNull};
 
 use cfg_if::cfg_if;
 use jl_sys::{
-    jl_array_typename, jl_llvmpointer_typename, jl_namedtuple_typename, jl_pointer_typename,
-    jl_tuple_typename, jl_type_typename, jl_typename_t, jl_typename_type, jl_vecelement_typename,
+    jl_array_typename,
+    jl_llvmpointer_typename,
+    jl_namedtuple_typename,
+    jl_pointer_typename,
+    jl_tuple_typename,
+    jl_type_typename,
+    jl_typename_t,
+    jl_typename_type,
+    jl_vecelement_typename,
 };
 
 use super::Ref;
@@ -19,7 +26,10 @@ use crate::{
     memory::target::Target,
     private::Private,
     wrappers::ptr::{
-        module::Module, private::WrapperPriv, simple_vector::SimpleVector, symbol::Symbol,
+        module::Module,
+        private::WrapperPriv,
+        simple_vector::SimpleVector,
+        symbol::Symbol,
     },
 };
 
@@ -222,14 +232,14 @@ impl<'scope> TypeName<'scope> {
 
     /// The `abstract` field.
     #[cfg(not(feature = "lts"))]
-    pub fn abstract_(self) -> bool {
+    pub fn is_abstract(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().abstract_() != 0 }
     }
 
     /// The `mutabl` field.
     #[cfg(not(feature = "lts"))]
-    pub fn mutabl(self) -> bool {
+    pub fn is_mutable(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().mutabl() != 0 }
     }

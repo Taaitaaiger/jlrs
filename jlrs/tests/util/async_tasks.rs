@@ -394,7 +394,7 @@ impl PersistentTask for AccumulatorTask {
         state: &mut Self::State<'state>,
         input: Self::Input,
     ) -> JlrsResult<Self::Output> {
-        let value = state.field_accessor(&frame).field("v")?.access::<f64>()? + input;
+        let value = state.field_accessor().field("v")?.access::<f64>()? + input;
         let new_value = Value::new(&mut frame, value);
 
         unsafe {

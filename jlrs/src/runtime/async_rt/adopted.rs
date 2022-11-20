@@ -111,7 +111,6 @@ async unsafe fn run_inner<R: AsyncRuntime, const N: usize>(
                     let stack = base_frame.sync_stack();
                     task.call(stack);
                 }
-                // TODO: make this atomic in julia
                 MessageInner::ErrorColor(task) => {
                     let stack = base_frame.sync_stack();
                     task.call(stack);

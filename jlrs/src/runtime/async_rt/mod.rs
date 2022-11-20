@@ -43,7 +43,12 @@ use std::{
 use async_trait::async_trait;
 use futures::Future;
 use jl_sys::{
-    jl_atexit_hook, jl_init, jl_init_with_image, jl_is_initialized, jl_options, jl_process_events,
+    jl_atexit_hook,
+    jl_init,
+    jl_init_with_image,
+    jl_is_initialized,
+    jl_options,
+    jl_process_events,
     jl_yield,
 };
 #[cfg(any(feature = "nightly", feature = "beta"))]
@@ -57,10 +62,21 @@ use crate::{
         channel::{Channel, ChannelSender, OneshotSender, TrySendError},
         future::wake_task,
         internal::{
-            BlockingTask, BlockingTaskEnvelope, CallPersistentTask, IncludeTask,
-            IncludeTaskEnvelope, InnerPersistentMessage, PendingTask, PendingTaskEnvelope,
-            Persistent, PersistentComms, RegisterPersistent, RegisterTask, SetErrorColorTask,
-            SetErrorColorTaskEnvelope, Task,
+            BlockingTask,
+            BlockingTaskEnvelope,
+            CallPersistentTask,
+            IncludeTask,
+            IncludeTaskEnvelope,
+            InnerPersistentMessage,
+            PendingTask,
+            PendingTaskEnvelope,
+            Persistent,
+            PersistentComms,
+            RegisterPersistent,
+            RegisterTask,
+            SetErrorColorTask,
+            SetErrorColorTaskEnvelope,
+            Task,
         },
         task::{sleep, Affinity, AsyncTask, PersistentTask},
     },
@@ -724,7 +740,6 @@ where
                         let stack = base_frame.sync_stack();
                         task.call(stack);
                     }
-                    // TODO: make this atomic in julia
                     MessageInner::ErrorColor(task) => {
                         let stack = base_frame.sync_stack();
                         task.call(stack);

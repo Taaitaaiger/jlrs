@@ -110,14 +110,47 @@ use std::{
 
 use cfg_if::cfg_if;
 use jl_sys::{
-    jl_an_empty_string, jl_an_empty_vec_any, jl_apply_type, jl_array_any_type, jl_array_int32_type,
-    jl_array_symbol_type, jl_array_typetagdata, jl_array_uint8_type, jl_astaggedvalue,
-    jl_bottom_type, jl_call, jl_call0, jl_call1, jl_call2, jl_call3, jl_diverror_exception,
-    jl_egal, jl_emptytuple, jl_eval_string, jl_exception_occurred, jl_false, jl_field_index,
-    jl_field_isptr, jl_gc_add_finalizer, jl_gc_add_ptr_finalizer, jl_get_nth_field,
-    jl_get_nth_field_noalloc, jl_interrupt_exception, jl_isa, jl_memory_exception, jl_nothing,
-    jl_object_id, jl_readonlymemory_exception, jl_set_nth_field, jl_stackovf_exception,
-    jl_stderr_obj, jl_stdout_obj, jl_subtype, jl_true, jl_typeof_str, jl_undefref_exception,
+    jl_an_empty_string,
+    jl_an_empty_vec_any,
+    jl_apply_type,
+    jl_array_any_type,
+    jl_array_int32_type,
+    jl_array_symbol_type,
+    jl_array_typetagdata,
+    jl_array_uint8_type,
+    jl_astaggedvalue,
+    jl_bottom_type,
+    jl_call,
+    jl_call0,
+    jl_call1,
+    jl_call2,
+    jl_call3,
+    jl_diverror_exception,
+    jl_egal,
+    jl_emptytuple,
+    jl_eval_string,
+    jl_exception_occurred,
+    jl_false,
+    jl_field_index,
+    jl_field_isptr,
+    jl_gc_add_finalizer,
+    jl_gc_add_ptr_finalizer,
+    jl_get_nth_field,
+    jl_get_nth_field_noalloc,
+    jl_interrupt_exception,
+    jl_isa,
+    jl_memory_exception,
+    jl_nothing,
+    jl_object_id,
+    jl_readonlymemory_exception,
+    jl_set_nth_field,
+    jl_stackovf_exception,
+    jl_stderr_obj,
+    jl_stdout_obj,
+    jl_subtype,
+    jl_true,
+    jl_typeof_str,
+    jl_undefref_exception,
     jl_value_t,
 };
 
@@ -126,7 +159,12 @@ use crate::{
     call::{Call, ProvideKeywords, WithKeywords},
     convert::{into_julia::IntoJulia, to_symbol::ToSymbol, unbox::Unbox},
     error::{
-        AccessError, IOError, InstantiationError, JlrsError, JlrsResult, TypeError,
+        AccessError,
+        IOError,
+        InstantiationError,
+        JlrsError,
+        JlrsResult,
+        TypeError,
         CANNOT_DISPLAY_TYPE,
     },
     layout::{
@@ -651,10 +689,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     }
 
     /// Returns an accessor to access the contents of this value without allocating temporary Julia data.
-    pub fn field_accessor<'current, 'borrow, T: Target<'current>>(
-        self,
-        _frame: &'borrow T,
-    ) -> FieldAccessor<'scope, 'data, 'borrow> {
+    pub fn field_accessor(self) -> FieldAccessor<'scope, 'data> {
         FieldAccessor {
             value: Some(self.as_ref()),
             current_field_type: Some(self.datatype().as_ref()),
@@ -662,7 +697,6 @@ impl<'scope, 'data> Value<'scope, 'data> {
             #[cfg(not(feature = "lts"))]
             buffer: AtomicBuffer::new(),
             state: ViewState::Unlocked,
-            _frame: PhantomData,
         }
     }
 
@@ -1479,17 +1513,16 @@ enum ViewState {
 /// field names, numerical field indices, and n-dimensional array indices. The first two can be
 /// used with types that have named fields, the second must be used with tuples, and the last one
 /// with arrays.
-pub struct FieldAccessor<'scope, 'data, 'borrow> {
+pub struct FieldAccessor<'scope, 'data> {
     value: Option<ValueRef<'scope, 'data>>,
     current_field_type: Option<DataTypeRef<'scope>>,
     #[cfg(not(feature = "lts"))]
     buffer: AtomicBuffer,
     offset: u32,
     state: ViewState,
-    _frame: PhantomData<&'borrow ()>,
 }
 
-impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
+impl<'scope, 'data> FieldAccessor<'scope, 'data> {
     /// Access the field the accessor is currenty pointing to as a value of type `T`.
     ///
     /// This method accesses the field using its concrete type. If the concrete type of the field
@@ -1728,7 +1761,6 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
             #[cfg(not(feature = "lts"))]
             buffer: self.buffer.clone(),
             state: self.state,
-            _frame: PhantomData,
         })
     }
 
@@ -2151,7 +2183,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data, '_> {
     }
 }
 
-impl Drop for FieldAccessor<'_, '_, '_> {
+impl Drop for FieldAccessor<'_, '_> {
     fn drop(&mut self) {
         #[cfg(not(feature = "lts"))]
         if self.state == ViewState::Locked {

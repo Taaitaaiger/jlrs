@@ -7,11 +7,21 @@ use std::{
 };
 
 use jl_sys::{
-    jl_alloc_svec, jl_alloc_svec_uninit, jl_emptysvec, jl_gc_wb, jl_svec_data, jl_svec_t,
+    jl_alloc_svec,
+    jl_alloc_svec_uninit,
+    jl_emptysvec,
+    jl_gc_wb,
+    jl_svec_data,
+    jl_svec_t,
 };
 
 use super::{
-    datatype::DataType, private::WrapperPriv, value::ValueRef, Ref, Wrapper, WrapperRef,
+    datatype::DataType,
+    private::WrapperPriv,
+    value::ValueRef,
+    Ref,
+    Wrapper,
+    WrapperRef,
     WrapperType,
 };
 use crate::{
@@ -25,17 +35,39 @@ use crate::{
     wrappers::ptr::value::Value,
 };
 
-/// Access and mutate the content of a `SimpleVector`.
+/// Access
 #[repr(transparent)]
 pub struct SimpleVectorContent<'scope, 'borrow, T = ValueRef<'scope, 'static>>(
     NonNull<jl_svec_t>,
     PhantomData<&'scope ()>,
     PhantomData<&'borrow [Option<T>]>,
+);
+
+impl<'scope, 'borrow, T: WrapperRef<'scope, 'static>> SimpleVectorContent<'scope, 'borrow, T> {
+    /// Returns the length of this `SimpleVector`.
+    pub fn len(&self) -> usize {
+        // Safety: the pointer points to valid data
+        unsafe { self.0.as_ref().length }
+    }
+
+    /// Returns the contents of this `SimpleVector` as a slice.
+    pub fn as_slice(&self) -> &'borrow [Option<T>] {
+        // Safety: the C API function is called with valid data
+        unsafe { std::slice::from_raw_parts(jl_svec_data(self.0.as_ptr()).cast(), self.len()) }
+    }
+}
+
+/// Access and mutate the content of a `SimpleVector`.
+#[repr(transparent)]
+pub struct SimpleVectorContentMut<'scope, 'borrow, T = ValueRef<'scope, 'static>>(
+    NonNull<jl_svec_t>,
+    PhantomData<&'scope ()>,
+    PhantomData<&'borrow mut [Option<T>]>,
 )
 where
     T: WrapperRef<'scope, 'static>;
 
-impl<'scope, 'borrow, T: WrapperRef<'scope, 'static>> SimpleVectorContent<'scope, 'borrow, T> {
+impl<'scope, 'borrow, T: WrapperRef<'scope, 'static>> SimpleVectorContentMut<'scope, 'borrow, T> {
     /// Returns the length of this `SimpleVector`.
     pub fn len(&self) -> usize {
         // Safety: the pointer points to valid data
@@ -66,8 +98,7 @@ impl<'scope, 'borrow, T: WrapperRef<'scope, 'static>> SimpleVectorContent<'scope
         }
 
         jl_svec_data(self.0.as_ptr())
-            .cast::<Option<<T::Wrapper as Wrapper<'scope, 'static>>::TypeConstructor<'_, 'static>>>(
-            )
+            .cast::<Option<WrapperType<'_, 'scope, 'static, T>>>()
             .add(index)
             .write(value);
 
@@ -111,16 +142,19 @@ impl<'scope> SimpleVector<'scope> {
 
     /// Access the contents of this `SimpleVector` as `ValueRef`.
     // TODO: ledger
-    // TODO: mut
     pub fn data<'borrow>(&'borrow self) -> SimpleVectorContent<'scope, 'borrow> {
         SimpleVectorContent(self.unwrap_non_null(Private), PhantomData, PhantomData)
+    }
+
+    /// Mutably ccess the contents of this `SimpleVector` as `ValueRef`.
+    pub unsafe fn data_mut<'borrow>(&'borrow mut self) -> SimpleVectorContentMut<'scope, 'borrow> {
+        SimpleVectorContentMut(self.unwrap_non_null(Private), PhantomData, PhantomData)
     }
 
     /// Access the contents of this `SimpleVector` as `U`.
     ///
     /// This method returns a `JlrsError::AccessError` if `U` isn't correct for all elements.
     // TODO: ledger
-    // TODO: mut
     pub fn typed_data<'borrow, U>(
         &'borrow self,
     ) -> JlrsResult<SimpleVectorContent<'scope, 'borrow, U>>
@@ -141,6 +175,29 @@ impl<'scope> SimpleVector<'scope> {
         ))
     }
 
+    /// Mutably access the contents of this `SimpleVector` as `U`.
+    ///
+    /// This method returns a `JlrsError::AccessError` if `U` isn't correct for all elements.
+    pub unsafe fn typed_data_mut<'borrow, U>(
+        &'borrow mut self,
+    ) -> JlrsResult<SimpleVectorContentMut<'scope, 'borrow, U>>
+    where
+        U: WrapperRef<'scope, 'static>,
+        Option<U>: ValidField,
+    {
+        if !self.is_typed::<U>() {
+            Err(AccessError::InvalidLayout {
+                value_type: String::from("this SimpleVector"),
+            })?;
+        }
+
+        Ok(SimpleVectorContentMut(
+            self.unwrap_non_null(Private),
+            PhantomData,
+            PhantomData,
+        ))
+    }
+
     /// Access the contents of this `SimpleVector` as `U`.
     ///
     /// Safety: this method doesn't check if `U` is correct for all elements.
@@ -151,6 +208,18 @@ impl<'scope> SimpleVector<'scope> {
         U: WrapperRef<'scope, 'static>,
     {
         SimpleVectorContent(self.unwrap_non_null(Private), PhantomData, PhantomData)
+    }
+
+    /// Mutably access the contents of this `SimpleVector` as `U`.
+    ///
+    /// Safety: this method doesn't check if `U` is correct for all elements.
+    pub unsafe fn typed_data_mut_unchecked<'borrow, U>(
+        &'borrow mut self,
+    ) -> SimpleVectorContentMut<'scope, 'borrow, U>
+    where
+        U: WrapperRef<'scope, 'static>,
+    {
+        SimpleVectorContentMut(self.unwrap_non_null(Private), PhantomData, PhantomData)
     }
 
     fn is_typed<U>(self) -> bool

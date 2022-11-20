@@ -30,7 +30,7 @@ mod tests {
                         .into_jlrs_result()?;
 
                     assert!(res
-                        .field_accessor(&mut frame)
+                        .field_accessor()
                         .field(1)?
                         .access::<EmptyUnion>()
                         .is_err());
@@ -313,7 +313,7 @@ mod tests {
 
                     {
                         let field = value
-                            .field_accessor(&mut frame)
+                            .field_accessor()
                             .field("mutabl")?
                             .field("mutable_unions")?
                             .field("bits_union")?
@@ -325,7 +325,7 @@ mod tests {
                     #[cfg(not(feature = "lts"))]
                     {
                         let field = value
-                            .field_accessor(&mut frame)
+                            .field_accessor()
                             .field("mutabl")?
                             .field("mutable_unions")?
                             .atomic_field("atomic_union", Ordering::Relaxed)?
@@ -336,7 +336,7 @@ mod tests {
 
                     {
                         let field = value
-                            .field_accessor(&mut frame)
+                            .field_accessor()
                             .field("mutabl")?
                             .field("mutable_unions")?
                             .field("normal_union")?
@@ -347,7 +347,7 @@ mod tests {
 
                     {
                         let field = value
-                            .field_accessor(&mut frame)
+                            .field_accessor()
                             .field("mutabl")?
                             .field("immutable_unions")?
                             .field("bits_union")?
@@ -358,7 +358,7 @@ mod tests {
 
                     {
                         let field = value
-                            .field_accessor(&mut frame)
+                            .field_accessor()
                             .field("mutabl")?
                             .field("immutable_unions")?
                             .field("normal_union")?
@@ -371,7 +371,7 @@ mod tests {
                     {
                         {
                             let field = value
-                                .field_accessor(&mut frame)
+                                .field_accessor()
                                 .field("mutabl")?
                                 .field("atomics")?
                                 .field("i8")?
@@ -382,7 +382,7 @@ mod tests {
 
                         {
                             let field = value
-                                .field_accessor(&mut frame)
+                                .field_accessor()
                                 .field("mutabl")?
                                 .field("atomics")?
                                 .atomic_field("i16", Ordering::Acquire)?
@@ -393,7 +393,7 @@ mod tests {
 
                         {
                             let field = value
-                                .field_accessor(&mut frame)
+                                .field_accessor()
                                 .field("mutabl")?
                                 .field("atomics")?
                                 .field("i24")?
@@ -405,7 +405,7 @@ mod tests {
 
                         {
                             let field = value
-                                .field_accessor(&mut frame)
+                                .field_accessor()
                                 .field("mutabl")?
                                 .field("atomics")?
                                 .field("i48")?
@@ -417,7 +417,7 @@ mod tests {
 
                         {
                             let field = value
-                                .field_accessor(&mut frame)
+                                .field_accessor()
                                 .field("mutabl")?
                                 .field("atomics")?
                                 .field("i72")?
@@ -429,7 +429,7 @@ mod tests {
 
                         {
                             let field = value
-                                .field_accessor(&mut frame)
+                                .field_accessor()
                                 .field("mutabl")?
                                 .field("atomics")?
                                 .field("ptr")?
@@ -440,7 +440,7 @@ mod tests {
 
                         {
                             let field = value
-                                .field_accessor(&mut frame)
+                                .field_accessor()
                                 .field("mutabl")?
                                 .field("atomics")?
                                 .field("wrapped_ptr")?
@@ -453,7 +453,7 @@ mod tests {
 
                     {
                         let field = value
-                            .field_accessor(&mut frame)
+                            .field_accessor()
                             .field("mutabl")?
                             .field("number")?
                             .access::<f64>()?;
@@ -463,7 +463,7 @@ mod tests {
 
                     {
                         let field = value
-                            .field_accessor(&mut frame)
+                            .field_accessor()
                             .field("immutabl")?
                             .field("mutable_unions")?
                             .field("bits_union")?
@@ -475,7 +475,7 @@ mod tests {
                     #[cfg(not(feature = "lts"))]
                     {
                         let field = value
-                            .field_accessor(&mut frame)
+                            .field_accessor()
                             .field("immutabl")?
                             .field("mutable_unions")?
                             .atomic_field("atomic_union", Ordering::Relaxed)?
@@ -486,7 +486,7 @@ mod tests {
 
                     {
                         let field = value
-                            .field_accessor(&mut frame)
+                            .field_accessor()
                             .field("immutabl")?
                             .field("mutable_unions")?
                             .field("normal_union")?
@@ -497,7 +497,7 @@ mod tests {
 
                     {
                         let field = value
-                            .field_accessor(&mut frame)
+                            .field_accessor()
                             .field("immutabl")?
                             .field("immutable_unions")?
                             .field("bits_union")?
@@ -508,7 +508,7 @@ mod tests {
 
                     {
                         let field = value
-                            .field_accessor(&mut frame)
+                            .field_accessor()
                             .field("immutabl")?
                             .field("immutable_unions")?
                             .field("normal_union")?
@@ -521,7 +521,7 @@ mod tests {
                     {
                         {
                             let field = value
-                                .field_accessor(&mut frame)
+                                .field_accessor()
                                 .field("immutabl")?
                                 .field("atomics")?
                                 .field("i8")?
@@ -532,7 +532,7 @@ mod tests {
 
                         {
                             let field = value
-                                .field_accessor(&mut frame)
+                                .field_accessor()
                                 .field("immutabl")?
                                 .field("atomics")?
                                 .atomic_field("i16", Ordering::Acquire)?
@@ -543,7 +543,7 @@ mod tests {
 
                         {
                             let field = value
-                                .field_accessor(&mut frame)
+                                .field_accessor()
                                 .field("immutabl")?
                                 .field("atomics")?
                                 .field("i24")?
@@ -555,7 +555,7 @@ mod tests {
 
                         {
                             let field = value
-                                .field_accessor(&mut frame)
+                                .field_accessor()
                                 .field("immutabl")?
                                 .field("atomics")?
                                 .field("i48")?
@@ -567,7 +567,7 @@ mod tests {
 
                         {
                             let field = value
-                                .field_accessor(&mut frame)
+                                .field_accessor()
                                 .field("immutabl")?
                                 .field("atomics")?
                                 .field("i72")?
@@ -579,7 +579,7 @@ mod tests {
 
                         {
                             let field = value
-                                .field_accessor(&mut frame)
+                                .field_accessor()
                                 .field("immutabl")?
                                 .field("atomics")?
                                 .field("ptr")?
@@ -590,7 +590,7 @@ mod tests {
 
                         {
                             let field = value
-                                .field_accessor(&mut frame)
+                                .field_accessor()
                                 .field("immutabl")?
                                 .field("atomics")?
                                 .field("wrapped_ptr")?
@@ -602,7 +602,7 @@ mod tests {
                     }
                     {
                         let field = value
-                            .field_accessor(&mut frame)
+                            .field_accessor()
                             .field("immutabl")?
                             .field("number")?
                             .access::<i16>()?;
@@ -612,7 +612,7 @@ mod tests {
 
                     {
                         let field = value
-                            .field_accessor(&mut frame)
+                            .field_accessor()
                             .field("tuples")?
                             .field("empty")?
                             .access::<Tuple0>()?;
@@ -622,7 +622,7 @@ mod tests {
 
                     {
                         let field = value
-                            .field_accessor(&mut frame)
+                            .field_accessor()
                             .field("tuples")?
                             .field("single")?
                             .field(0)?
@@ -634,7 +634,7 @@ mod tests {
                     {
                         let s = JuliaString::new(&mut frame, "double");
                         let field = value
-                            .field_accessor(&mut frame)
+                            .field_accessor()
                             .field("tuples")?
                             .field(s)?
                             .field(1)?
@@ -646,7 +646,7 @@ mod tests {
                     {
                         let s = "double".to_symbol(&frame);
                         let field = value
-                            .field_accessor(&mut frame)
+                            .field_accessor()
                             .field("tuples")?
                             .field(s)?
                             .field(1)?
@@ -657,7 +657,7 @@ mod tests {
 
                     {
                         assert!(value
-                            .field_accessor(&mut frame)
+                            .field_accessor()
                             .field("tuples")?
                             .field("double")?
                             .field((1, 1))
@@ -666,7 +666,7 @@ mod tests {
 
                     {
                         let field = value
-                            .field_accessor(&mut frame)
+                            .field_accessor()
                             .field("tuples")?
                             .field("abstract")?
                             .field(1)?
@@ -677,7 +677,7 @@ mod tests {
 
                     {
                         let field = value
-                            .field_accessor(&mut frame)
+                            .field_accessor()
                             .field("arrays")?
                             .field("u8vec")?
                             .field(1)?
@@ -688,7 +688,7 @@ mod tests {
 
                     {
                         let field = value
-                            .field_accessor(&mut frame)
+                            .field_accessor()
                             .field("arrays")?
                             .field("unionvec")?
                             .field(0)?
@@ -699,7 +699,7 @@ mod tests {
 
                     {
                         let field = value
-                            .field_accessor(&mut frame)
+                            .field_accessor()
                             .field("arrays")?
                             .field("unionvec")?
                             .field(1)?
@@ -710,7 +710,7 @@ mod tests {
 
                     {
                         let field = value
-                            .field_accessor(&mut frame)
+                            .field_accessor()
                             .field("arrays")?
                             .field("wrappervec")?
                             .field(1)?
@@ -721,7 +721,7 @@ mod tests {
 
                     {
                         let field = value
-                            .field_accessor(&mut frame)
+                            .field_accessor()
                             .field("arrays")?
                             .field("ptrvec")?
                             .field(1)?
@@ -733,7 +733,7 @@ mod tests {
 
                     {
                         let field = value
-                            .field_accessor(&mut frame)
+                            .field_accessor()
                             .field("arrays")?
                             .field("inlinedptrvec")?
                             .field(2)?
@@ -745,7 +745,7 @@ mod tests {
 
                     {
                         let field = value
-                            .field_accessor(&mut frame)
+                            .field_accessor()
                             .field("arrays")?
                             .field("inlinedptrvec")?
                             .field(1)?
@@ -758,7 +758,7 @@ mod tests {
 
                     {
                         let field = value
-                            .field_accessor(&mut frame)
+                            .field_accessor()
                             .field("arrays")?
                             .field("u8array")?
                             .field((1, 1))?
@@ -769,7 +769,7 @@ mod tests {
 
                     {
                         assert!(value
-                            .field_accessor(&mut frame)
+                            .field_accessor()
                             .field("arrays")?
                             .field("u8array")?
                             .field("wrongkind")
@@ -779,7 +779,7 @@ mod tests {
                     {
                         let sym = "wrongkind".to_symbol(&frame);
                         assert!(value
-                            .field_accessor(&mut frame)
+                            .field_accessor()
                             .field("arrays")?
                             .field("u8array")?
                             .field(sym)
@@ -788,7 +788,7 @@ mod tests {
 
                     {
                         let field = value
-                            .field_accessor(&mut frame)
+                            .field_accessor()
                             .field("arrays")?
                             .field("inlinedptrarray")?
                             .field((1, 0))?
@@ -801,7 +801,7 @@ mod tests {
 
                     {
                         let field = value
-                            .field_accessor(&mut frame)
+                            .field_accessor()
                             .field("nonexistent")?
                             .access::<ValueRef>();
 

@@ -10,13 +10,13 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
-                .scope(|mut frame| unsafe {
+                .scope(|frame| unsafe {
                     let field = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
                         .wrapper()
                         .global(&frame, "has_module")?
                         .value()
-                        .field_accessor(&mut frame)
+                        .field_accessor()
                         .field("a")?
                         .access::<ValueRef>()?;
 
@@ -33,13 +33,13 @@ mod tests {
             let mut frame = StackFrame::new();
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
-                .scope(|mut frame| unsafe {
+                .scope(|frame| unsafe {
                     let _field = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
                         .wrapper()
                         .global(&frame, "has_nothing")?
                         .value()
-                        .field_accessor(&mut frame)
+                        .field_accessor()
                         .field("a")?
                         .access::<Nothing>()?;
 

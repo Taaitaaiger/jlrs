@@ -51,11 +51,11 @@ mod tests {
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
-                    let svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 1) };
+                    let mut svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 1) };
                     let value = Value::new(&mut frame, 1usize);
-                    let mut data = svec.data();
 
                     unsafe {
+                        let mut data = svec.data_mut();
                         assert!(data.set(0, Some(value)).is_ok());
                     }
                     Ok(())
@@ -70,11 +70,11 @@ mod tests {
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
-                    let svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 1) };
+                    let mut svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 1) };
                     let value = Value::new(&mut frame, 1usize);
 
                     unsafe {
-                        let mut data = svec.data();
+                        let mut data = svec.data_mut();
                         assert!(data.set(0, Some(value)).is_ok());
                     }
                     Ok(())
@@ -89,11 +89,11 @@ mod tests {
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
-                    let svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 1) };
+                    let mut svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 1) };
                     let sym = Symbol::new(&frame, "Foo");
-                    let mut data = svec.data();
 
                     unsafe {
+                        let mut data = svec.data_mut();
                         assert!(data.set(0, Some(sym.as_value())).is_ok());
                     }
 
@@ -124,11 +124,11 @@ mod tests {
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
-                    let svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 1) };
+                    let mut svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 1) };
                     let value = Value::new(&mut frame, 1usize);
-                    let mut data = svec.data();
 
                     unsafe {
+                        let mut data = svec.data_mut();
                         assert!(data.set(1, Some(value)).is_err());
                     }
                     Ok(())
@@ -143,11 +143,11 @@ mod tests {
             let mut jlrs = j.borrow_mut();
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
-                    let svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 1) };
+                    let mut svec = unsafe { SimpleVector::with_capacity_uninit(&mut frame, 1) };
                     let value = Value::new(&mut frame, 1usize);
 
                     unsafe {
-                        let mut data = svec.data();
+                        let mut data = svec.data_mut();
                         assert!(data.set(1, Some(value)).is_err());
                     }
                     Ok(())
