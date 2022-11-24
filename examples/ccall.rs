@@ -1,5 +1,3 @@
-// TODO: actually  use CCall
-
 use jlrs::prelude::*;
 
 // This crate is called `ccall`, so the library is called `libccall`. The functions are

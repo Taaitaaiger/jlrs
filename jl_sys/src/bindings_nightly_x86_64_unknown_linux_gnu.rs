@@ -970,9 +970,8 @@ pub struct jl_datatype_layout_t {
     pub npointers: u32,
     pub first_ptr: i32,
     pub alignment: u16,
-    pub _bitfield_align_1: [u8; 0],
-    pub _bitfield_1: __BindgenBitfieldUnit<[u8; 1usize]>,
-    pub __bindgen_padding_0: u8,
+    pub _bitfield_align_1: [u16; 0],
+    pub _bitfield_1: __BindgenBitfieldUnit<[u8; 2usize]>,
 }
 impl jl_datatype_layout_t {
     #[inline]
@@ -998,11 +997,23 @@ impl jl_datatype_layout_t {
         }
     }
     #[inline]
+    pub fn padding(&self) -> u16 {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(3usize, 13u8) as u16) }
+    }
+    #[inline]
+    pub fn set_padding(&mut self, val: u16) {
+        unsafe {
+            let val: u16 = ::std::mem::transmute(val);
+            self._bitfield_1.set(3usize, 13u8, val as u64)
+        }
+    }
+    #[inline]
     pub fn new_bitfield_1(
         haspadding: u16,
         fielddesc_type: u16,
-    ) -> __BindgenBitfieldUnit<[u8; 1usize]> {
-        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 1usize]> = Default::default();
+        padding: u16,
+    ) -> __BindgenBitfieldUnit<[u8; 2usize]> {
+        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 2usize]> = Default::default();
         __bindgen_bitfield_unit.set(0usize, 1u8, {
             let haspadding: u16 = unsafe { ::std::mem::transmute(haspadding) };
             haspadding as u64
@@ -1010,6 +1021,10 @@ impl jl_datatype_layout_t {
         __bindgen_bitfield_unit.set(1usize, 2u8, {
             let fielddesc_type: u16 = unsafe { ::std::mem::transmute(fielddesc_type) };
             fielddesc_type as u64
+        });
+        __bindgen_bitfield_unit.set(3usize, 13u8, {
+            let padding: u16 = unsafe { ::std::mem::transmute(padding) };
+            padding as u64
         });
         __bindgen_bitfield_unit
     }
@@ -2032,6 +2047,9 @@ pub struct _jl_task_t {
     pub ctx: jl_ucontext_t,
     pub stkbuf: *mut ::std::os::raw::c_void,
     pub bufsz: usize,
+    pub inference_start_time: u64,
+    pub reentrant_inference: ::std::os::raw::c_uint,
+    pub reentrant_codegen: ::std::os::raw::c_uint,
     pub _bitfield_align_1: [u32; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 4usize]>,
     pub __bindgen_padding_0: u32,

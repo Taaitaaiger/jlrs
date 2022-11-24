@@ -13,6 +13,7 @@ keywords = ["Julia", "math", "mathematics", "bindings", "ffi"]
 categories = ["api-bindings", "mathematics"]
 license = "MIT"
 edition = "2018"
+rust-version = "1.65"
 
 [features]
 # The only default feature is the prelude module
@@ -46,7 +47,7 @@ f16 = ["half"]
 internal-types = []
 # Enable converting a Julia array to an `ArrayView(Mut)` from ndarray
 jlrs-ndarray = ["ndarray"]
-
+# Provide several extra field accessor methods.
 extra-fields = []
 
 # Enable the `prelude` module

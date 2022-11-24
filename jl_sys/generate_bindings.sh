@@ -3,6 +3,7 @@
 LD_LIBRARY_PATH=
 NIGHTLY="n"
 BETA="n"
+ALL="n"
 
 function parse_args() {
     local help="n"
@@ -15,6 +16,10 @@ function parse_args() {
                 ;;
             --beta)
                 BETA="y"
+                shift
+                ;;
+            --all)
+                ALL="y"
                 shift
                 ;;
             -h | --help)
@@ -48,7 +53,7 @@ function check_dir() {
 function print_help() {
     local spacing=$(printf %$((15 + ${#HOME}))s)
 
-    echo "    generate_bindings.sh [--nightly] [--beta]"
+    echo "    generate_bindings.sh [--nightly] [--beta] [--all]"
     echo ""
     echo "This script can be used to generate Rust bindings to the Julia C API with"
     echo "bindgen. It can either generate bindings for all supported versions of Julia,"
@@ -58,26 +63,27 @@ function print_help() {
     echo "must be available. The following versions and default paths are expected, the"
     echo "default paths can be overridden with environment variables:"
     echo ""
-    echo -e "\033[1m      Version                   Default path${spacing}Override\033[0m"
-    echo "  Linux 64-bit stable:      $HOME/julia-1.8.3               JULIA_STABLE_DIR"
-    echo "  Linux 64-bit lts:         $HOME/julia-1.6.7               JULIA_LTS_DIR"
-    echo "  Linux 32-bit stable:      $HOME/julia-1.8.3-32            JULIA_STABLE_DIR_32"
-    echo "  Linux 32-bit lts:         $HOME/julia-1.6.7-32            JULIA_LTS_DIR_32"
-    echo "  Windows 64-bit stable:    $HOME/julia-1.8.3-win           JULIA_STABLE_DIR_WIN"
-    echo "  Windows 64-bit lts:       $HOME/julia-1.6.7-win           JULIA_LTS_DIR_WIN"
+    echo -e "\033[1m      Version                  Default path${spacing}Override\033[0m"
+    echo "  Linux 64-bit stable      $HOME/julia-1.8.3               JULIA_STABLE_DIR"
+    echo "  Linux 64-bit lts         $HOME/julia-1.6.7               JULIA_LTS_DIR"
+    echo "  Linux 32-bit stable      $HOME/julia-1.8.3-32            JULIA_STABLE_DIR_32"
+    echo "  Linux 32-bit lts         $HOME/julia-1.6.7-32            JULIA_LTS_DIR_32"
+    echo "  Windows 64-bit stable    $HOME/julia-1.8.3-win           JULIA_STABLE_DIR_WIN"
+    echo "  Windows 64-bit lts       $HOME/julia-1.6.7-win           JULIA_LTS_DIR_WIN"
     echo ""
     echo ""
     echo "When the nightly flag is set, the following is expected:"
     echo ""
-    echo -e "\033[1m      Version                   Default path${spacing}Override\033[0m"
-    echo "  Linux 64-bit nightly:     $HOME/Projects/C/julia/usr      JULIA_NIGHTLY_DIR"
+    echo -e "\033[1m      Version                  Default path${spacing}Override\033[0m"
+    echo "  Linux 64-bit nightly     $HOME/Projects/C/julia/usr      JULIA_NIGHTLY_DIR"
     echo ""
     echo ""
     echo "When the beta flag is set, the following is expected:"
     echo ""
-    echo "  Linux 64-bit beta:        $HOME/julia-1.9.0-alpha1        JULIA_BETA_DIR"
-    echo "  Linux 32-bit beta:        $HOME/julia-1.9.0-alpha1-32     JULIA_BETA_DIR_32"
-    echo "  Windows 64-bit beta:      $HOME/julia-1.9.0-alpha1-win    JULIA_BETA_DIR_WIN"
+    echo -e "\033[1m      Version                  Default path${spacing}Override\033[0m"
+    echo "  Linux 64-bit beta        $HOME/julia-1.9.0-alpha1        JULIA_BETA_DIR"
+    echo "  Linux 32-bit beta        $HOME/julia-1.9.0-alpha1-32     JULIA_BETA_DIR_32"
+    echo "  Windows 64-bit beta      $HOME/julia-1.9.0-alpha1-win    JULIA_BETA_DIR_WIN"
     echo ""
     echo ""
     echo "All dependencies must have been installed before running this script. The"
@@ -95,7 +101,7 @@ function print_help() {
 parse_args $@
 check_dir
 
-if [ "${NIGHTLY}" = "y" ]; then
+if [ "${NIGHTLY}" = "y" -o "${ALL}" = "y" ]; then
     if [ -z "$JULIA_NIGHTLY_DIR" ]; then
         JULIA_NIGHTLY_DIR=${HOME}/Projects/C/julia/usr
     fi
@@ -109,14 +115,13 @@ if [ "${NIGHTLY}" = "y" ]; then
     echo "/* generated from Julia version 1.9.0-dev */" > ./src/bindings_nightly_x86_64_unknown_linux_gnu.rs
     cat ../target/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings_nightly_x86_64_unknown_linux_gnu.rs
 
-    cargo fmt
-
-    if [ "${BETA}" != "y" ]; then
+    if [ "${BETA}" != "y" -a "${ALL}" != "y"  ]; then
+        cargo fmt
         exit
     fi
 fi
 
-if [ "${BETA}" = "y" ]; then
+if [ "${BETA}" = "y" -o "${ALL}" = "y" ]; then
     if [ -z "$JULIA_BETA_DIR" ]; then
         JULIA_BETA_DIR=${HOME}/julia-1.9.0-alpha1
     fi
@@ -156,9 +161,10 @@ if [ "${BETA}" = "y" ]; then
     echo "/* generated from Julia version 1.9.0-alpha1 */" > ./src/bindings_1_9_x86_64_pc_windows_gnu.rs
     cat ../target/x86_64-pc-windows-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings_1_9_x86_64_pc_windows_gnu.rs
 
-    cargo fmt
-
-    exit
+    if [ "${ALL}" != "y"  ]; then
+        cargo fmt
+        exit
+    fi
 fi
 
 if [ -z "$JULIA_STABLE_DIR" ]; then
