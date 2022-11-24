@@ -19,3 +19,4 @@ tarpaulin-report.html
 **/coverage_summary.dat
 
 _tests
+releasenotes.md

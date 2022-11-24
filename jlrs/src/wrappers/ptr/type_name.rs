@@ -44,14 +44,14 @@ cfg_if! {
 
 cfg_if! {
     if #[cfg(feature = "extra-fields")] {
-        use crate::wrappers::ptr::{value::{ValueRef, Value}, simple_vector::{SimpleVectorRef, SimpleVectorData}};
-        use super::value::ValueData;
+        use crate::wrappers::ptr::{value::Value, simple_vector::{SimpleVectorRef, SimpleVectorData}};
     }
 }
 
 cfg_if! {
     if #[cfg(all(not(feature = "lts"), feature = "extra-fields"))] {
         use std::sync::atomic::Ordering;
+        use crate::wrappers::ptr::value::{ValueData, ValueRef};
     }
 }
 
@@ -136,6 +136,25 @@ impl<'scope> TypeName<'scope> {
             let wrapper = self.unwrap_non_null(Private).as_ref().wrapper;
             debug_assert!(!wrapper.is_null());
             Value::wrap_non_null(NonNull::new_unchecked(wrapper), Private)
+        }
+    }
+
+    /// cache for Type{wrapper}
+    #[cfg(all(any(feature = "beta", feature = "nightly"), feature = "extra-fields"))]
+    pub fn typeof_wrapper<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
+        // Safety: the pointer points to valid data
+        unsafe {
+            let typeof_wrapper = self
+                .unwrap_non_null(Private)
+                .as_ref()
+                .Typeofwrapper
+                .load(Ordering::Relaxed);
+
+            let typeof_wrapper = NonNull::new(typeof_wrapper)?;
+            Some(ValueRef::wrap(typeof_wrapper).root(target))
         }
     }
 

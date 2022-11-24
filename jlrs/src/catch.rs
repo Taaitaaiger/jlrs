@@ -21,15 +21,14 @@ use crate::{
     wrappers::ptr::value::ValueRef,
 };
 
-unsafe extern "C" fn trampoline_with_slots<
-    'frame,
-    F: FnMut(&mut GcFrame<'frame>, &mut MaybeUninit<T>) -> JlrsResult<()>,
-    T,
->(
+unsafe extern "C" fn trampoline_with_slots<'frame, F, T>(
     func: &mut F,
     frame_slice: &mut GcFrame<'frame>,
     result: &mut MaybeUninit<T>,
-) -> jlrs_catch_t {
+) -> jlrs_catch_t
+where
+    F: FnMut(&mut GcFrame<'frame>, &mut MaybeUninit<T>) -> JlrsResult<()>,
+{
     let res = catch_unwind(AssertUnwindSafe(|| func(frame_slice, result)));
 
     match res {

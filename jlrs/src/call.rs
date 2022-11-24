@@ -57,9 +57,7 @@ impl<'scope, 'data> WithKeywords<'scope, 'data> {
 /// constructors of a `DataType` can be called by converting the `DataType` to a `Value` and
 /// calling it.
 ///
-/// All of these methods are unsafe, there are several reasons for this. First and foremost these
-/// methods let you call arbitrary Julia functions which can't be checked for correctness, and if
-/// the second lifetime of an argument is not `'static`, it must never be assigned to a global.
+/// All of these methods are unsafe, arbitrary Julia functions can't be checked for correctness.
 /// More information can be found in the [`safety`] module.
 ///
 /// [`Function`]: crate::wrappers::ptr::function::Function

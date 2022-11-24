@@ -79,6 +79,14 @@ pub unsafe trait ForeignType: Sized + 'static {
     }
 }
 
+/// Create a new foreign type `U`. This method must be called before `U` can be used as a foreign
+/// type.
+///
+/// Safety:
+///
+/// The new type is not set as a constant in `module`, you must do this manually after calling
+/// this function. `large` must be `true` if the size of `U` is larger than 2032 bytes.
+/// `has_pointers` must be only be `true` if `U` contains references to Julia data.
 pub unsafe fn create_foreign_type<'target, U, T>(
     target: T,
     name: Symbol,
@@ -184,6 +192,6 @@ unsafe impl<T: ForeignType + Clone> Unbox for T {
 }
 
 #[repr(transparent)]
-pub struct ForeignValue<T: ForeignType> {
+struct ForeignValue<T: ForeignType> {
     pub data: MaybeUninit<T>,
 }
