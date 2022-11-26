@@ -31,8 +31,8 @@ use-bindgen = ["bindgen", "syn", "quote", "proc-macro2"]
 atomic = "0.5"
 
 [build-dependencies]
-# bindgen = { git = "https://github.com/Taaitaaiger/rust-bindgen", branch = "atomic", optional = true, default-features = false, features = ["runtime"] }
-bindgen = { version = "0.63", optional = true, default-features = false, features = [ "runtime" ] }
+bindgen = { git = "https://github.com/Taaitaaiger/rust-bindgen", branch = "atomic", optional = true, default-features = false, features = ["runtime"] }
+# bindgen = { version = "0.63", optional = true, default-features = false, features = [ "runtime" ] }
 cc = "1"
 cfg-if = "1"
 syn = { version = "1", optional = true, features = ["full"] }
