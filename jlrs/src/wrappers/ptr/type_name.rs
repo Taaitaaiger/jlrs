@@ -34,7 +34,7 @@ use crate::{
 };
 
 cfg_if! {
-    if #[cfg(feature = "lts")] {
+    if #[cfg(feature = "julia-1-6")] {
         use jl_sys::jl_vararg_typename;
 
     } else {
@@ -49,7 +49,7 @@ cfg_if! {
 }
 
 cfg_if! {
-    if #[cfg(all(not(feature = "lts"), feature = "extra-fields"))] {
+    if #[cfg(all(not(feature = "julia-1-6"), feature = "extra-fields"))] {
         use std::sync::atomic::Ordering;
         use crate::wrappers::ptr::value::{ValueData, ValueRef};
     }
@@ -113,14 +113,14 @@ impl<'scope> TypeName<'scope> {
     }
 
     /// The `atomicfields` field.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(feature = "julia-1-6"))]
     pub fn atomicfields(self) -> *const u32 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().atomicfields }
     }
 
     /// The `atomicfields` field.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7")))]
     pub fn constfields(self) -> *const u32 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().constfields }
@@ -140,7 +140,10 @@ impl<'scope> TypeName<'scope> {
     }
 
     /// cache for Type{wrapper}
-    #[cfg(all(any(feature = "beta", feature = "nightly"), feature = "extra-fields"))]
+    #[cfg(all(
+        any(feature = "julia-1-9", feature = "julia-1-10"),
+        feature = "extra-fields"
+    ))]
     pub fn typeof_wrapper<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
@@ -165,7 +168,7 @@ impl<'scope> TypeName<'scope> {
         T: Target<'target>,
     {
         cfg_if! {
-            if #[cfg(feature = "lts")] {
+            if #[cfg(feature = "julia-1-6")] {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let cache = self.unwrap_non_null(Private).as_ref().cache;
@@ -190,7 +193,7 @@ impl<'scope> TypeName<'scope> {
         T: Target<'target>,
     {
         cfg_if! {
-            if #[cfg(feature = "lts")] {
+            if #[cfg(feature = "julia-1-6")] {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let cache = self.unwrap_non_null(Private).as_ref().linearcache;
@@ -243,28 +246,28 @@ impl<'scope> TypeName<'scope> {
     }
 
     /// The `n_uninitialized` field.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(feature = "julia-1-6"))]
     pub fn n_uninitialized(self) -> i32 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().n_uninitialized }
     }
 
     /// The `abstract` field.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(feature = "julia-1-6"))]
     pub fn is_abstract(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().abstract_() != 0 }
     }
 
     /// The `mutabl` field.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(feature = "julia-1-6"))]
     pub fn is_mutable(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().mutabl() != 0 }
     }
 
     /// The `mayinlinealloc` field.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(feature = "julia-1-6"))]
     pub fn mayinlinealloc(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().mayinlinealloc() != 0 }
@@ -300,7 +303,7 @@ impl<'base> TypeName<'base> {
     }
 
     /// The typename of the `UnionAll` `Vararg`.
-    #[cfg(feature = "lts")]
+    #[cfg(feature = "julia-1-6")]
     pub fn of_vararg<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -319,7 +322,7 @@ impl<'base> TypeName<'base> {
     }
 
     /// The typename of the `UnionAll` `Ptr`.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(feature = "julia-1-6"))]
     pub fn of_opaque_closure<T>(_: &T) -> Self
     where
         T: Target<'base>,

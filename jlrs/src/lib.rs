@@ -381,7 +381,7 @@
 //! its contents:
 //!
 //! ```
-//! # #[cfg(not(all(target_os = "windows", feature = "lts")))]
+//! # #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
 //! # {
 //! use jlrs::prelude::*;
 //!
@@ -720,7 +720,7 @@ macro_rules! init_fn {
 #[cfg(feature = "async")]
 pub mod async_util;
 pub mod call;
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
+#[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
 pub(crate) mod catch;
 #[cfg(feature = "ccall")]
 pub mod ccall;

@@ -27,14 +27,14 @@ use crate::{
 };
 
 cfg_if! {
-    if #[cfg(not(feature = "lts"))] {
+    if #[cfg(not(feature = "julia-1-6"))] {
         use std::sync::atomic::Ordering;
     }
 }
 
-#[cfg(not(feature = "lts"))]
+#[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7")))]
 use crate::wrappers::ptr::array::TypedArrayData;
-#[cfg(not(feature = "lts"))]
+#[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7")))]
 use crate::wrappers::ptr::array::TypedArrayRef;
 
 /// This type describes a single method definition, and stores data shared by the specializations
@@ -148,7 +148,7 @@ impl<'scope> Method<'scope> {
         T: Target<'target>,
     {
         cfg_if! {
-            if #[cfg(feature = "lts")] {
+            if #[cfg(feature = "julia-1-6")] {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let specializations = self.unwrap_non_null(Private).as_ref().specializations;
@@ -172,7 +172,7 @@ impl<'scope> Method<'scope> {
         T: Target<'target>,
     {
         cfg_if! {
-            if #[cfg(feature = "lts")] {
+            if #[cfg(feature = "julia-1-6")] {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let speckeyset = self.unwrap_non_null(Private).as_ref().speckeyset;
@@ -204,7 +204,7 @@ impl<'scope> Method<'scope> {
     }
 
     /// reference to the method table this method is part of, null if part of the internal table
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(feature = "julia-1-6"))]
     pub fn external_mt(self) -> Option<ValueRef<'scope, 'static>> {
         // Safety: the pointer points to valid data
         unsafe {
@@ -233,7 +233,7 @@ impl<'scope> Method<'scope> {
         T: Target<'target>,
     {
         cfg_if! {
-            if #[cfg(feature = "lts")] {
+            if #[cfg(feature = "julia-1-6")] {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let unspecialized = self.unwrap_non_null(Private).as_ref().unspecialized;
@@ -278,7 +278,7 @@ impl<'scope> Method<'scope> {
     }
 
     /// RLE (build_id, offset) pairs (even/odd indexing)
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7")))]
     pub fn root_blocks<'target, T>(
         self,
         target: T,
@@ -296,7 +296,7 @@ impl<'scope> Method<'scope> {
     }
 
     /// # of roots stored in the system image
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7")))]
     pub fn nroots_sysimg(self) -> i32 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().nroots_sysimg }
@@ -323,7 +323,7 @@ impl<'scope> Method<'scope> {
         T: Target<'target>,
     {
         cfg_if! {
-            if #[cfg(feature = "lts")] {
+            if #[cfg(feature = "julia-1-6")] {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let invokes = self.unwrap_non_null(Private).as_ref().invokes;
@@ -379,14 +379,14 @@ impl<'scope> Method<'scope> {
     }
 
     /// The `is_for_opaque_closure` field of this `Method`
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(feature = "julia-1-6"))]
     pub fn is_for_opaque_closure(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().is_for_opaque_closure != 0 }
     }
 
     /// 0x00 = use heuristic; 0x01 = aggressive; 0x02 = none
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7")))]
     pub fn constprop(self) -> u8 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().constprop }
@@ -394,7 +394,7 @@ impl<'scope> Method<'scope> {
 
     /// Override the conclusions of inter-procedural effect analysis,
     /// forcing the conclusion to always true.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7")))]
     pub fn purity(self) -> u8 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().purity.bits }

@@ -29,7 +29,7 @@ impl<'scope> TypeVar<'scope> {
     /// Create a new `TypeVar`, the optional lower and upper bounds must be subtypes of `Type`,
     /// their default values are `Union{}` and `Any` respectively. The returned value can be
     /// cast to a [`TypeVar`]. If Julia throws an exception, it's caught, rooted and returned.
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     pub fn new<'target, N, T>(
         target: T,
         name: N,

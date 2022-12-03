@@ -25,7 +25,7 @@ use crate::{
 };
 
 cfg_if! {
-    if #[cfg(not(feature = "lts"))] {
+    if #[cfg(not(feature = "julia-1-6"))] {
         use std::sync::atomic::Ordering;
     }
 }
@@ -68,7 +68,7 @@ impl<'scope> MethodTable<'scope> {
         T: Target<'target>,
     {
         cfg_if! {
-            if #[cfg(feature = "lts")] {
+            if #[cfg(feature = "julia-1-6")] {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let data = self.unwrap_non_null(Private).as_ref().defs;
@@ -92,7 +92,7 @@ impl<'scope> MethodTable<'scope> {
         T: Target<'target>,
     {
         cfg_if! {
-            if #[cfg(feature = "lts")] {
+            if #[cfg(feature = "julia-1-6")] {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let data = self.unwrap_non_null(Private).as_ref().leafcache;
@@ -116,7 +116,7 @@ impl<'scope> MethodTable<'scope> {
         T: Target<'target>,
     {
         cfg_if! {
-            if #[cfg(feature = "lts")] {
+            if #[cfg(feature = "julia-1-6")] {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let data = self.unwrap_non_null(Private).as_ref().cache;
@@ -140,7 +140,7 @@ impl<'scope> MethodTable<'scope> {
         unsafe { self.unwrap_non_null(Private).as_ref().max_args }
     }
 
-    #[cfg(not(any(feature = "nightly", feature = "beta")))]
+    #[cfg(not(any(feature = "julia-1-10", feature = "julia-1-9")))]
     /// Keyword argument sorter function
     pub fn kw_sorter<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where

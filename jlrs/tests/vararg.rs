@@ -1,5 +1,9 @@
 mod util;
-#[cfg(all(not(feature = "lts"), feature = "sync-rt", feature = "internal-types"))]
+#[cfg(all(
+    not(feature = "julia-1-6"),
+    feature = "sync-rt",
+    feature = "internal-types"
+))]
 mod not_lts {
     use jlrs::{
         layout::valid_layout::ValidLayout,

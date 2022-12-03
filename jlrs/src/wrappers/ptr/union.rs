@@ -4,7 +4,7 @@ use std::{marker::PhantomData, ptr::NonNull};
 
 use jl_sys::{jl_islayout_inline, jl_type_union, jl_uniontype_t, jl_uniontype_type};
 
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
+#[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
 use super::value::ValueResult;
 use super::{value::ValueData, Ref};
 use crate::{
@@ -29,7 +29,7 @@ impl<'scope> Union<'scope> {
     ///
     /// [`Union`]: crate::wrappers::ptr::union::Union
     /// [`DataType`]: crate::wrappers::ptr::datatype::DataType
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     pub fn new<'target, V, T>(target: T, types: V) -> ValueResult<'target, 'static, T>
     where
         V: AsRef<[Value<'scope, 'static>]>,

@@ -155,7 +155,7 @@ mod tests {
         })
     }
 
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     fn valid_layout_array() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -178,7 +178,7 @@ mod tests {
         })
     }
 
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     fn invalid_layout_array() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -256,9 +256,9 @@ mod tests {
         invalid_layout_char_ptr();
 
         invalid_ptr_layout();
-        #[cfg(not(all(target_os = "windows", feature = "lts")))]
+        #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
         valid_layout_array();
-        #[cfg(not(all(target_os = "windows", feature = "lts")))]
+        #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
         invalid_layout_array();
     }
 }

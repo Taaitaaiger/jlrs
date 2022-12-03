@@ -1,4 +1,4 @@
-/* generated from julia version 1.8.3 */
+/* generated from julia version 1.7.3 */
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct __BindgenBitfieldUnit<Storage> {
@@ -85,7 +85,72 @@ pub type __sig_atomic_t = ::std::os::raw::c_int;
 pub struct __sigset_t {
     pub __val: [::std::os::raw::c_ulong; 32usize],
 }
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union __atomic_wide_counter {
+    pub __value64: ::std::os::raw::c_ulonglong,
+    pub __value32: __atomic_wide_counter__bindgen_ty_1,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct __atomic_wide_counter__bindgen_ty_1 {
+    pub __low: ::std::os::raw::c_uint,
+    pub __high: ::std::os::raw::c_uint,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct __pthread_internal_slist {
+    pub __next: *mut __pthread_internal_slist,
+}
+pub type __pthread_slist_t = __pthread_internal_slist;
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct __pthread_mutex_s {
+    pub __lock: ::std::os::raw::c_int,
+    pub __count: ::std::os::raw::c_uint,
+    pub __owner: ::std::os::raw::c_int,
+    pub __kind: ::std::os::raw::c_int,
+    pub __nusers: ::std::os::raw::c_uint,
+    pub __bindgen_anon_1: __pthread_mutex_s__bindgen_ty_1,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union __pthread_mutex_s__bindgen_ty_1 {
+    pub __elision_data: __pthread_mutex_s__bindgen_ty_1__bindgen_ty_1,
+    pub __list: __pthread_slist_t,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct __pthread_mutex_s__bindgen_ty_1__bindgen_ty_1 {
+    pub __espins: ::std::os::raw::c_short,
+    pub __eelision: ::std::os::raw::c_short,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct __pthread_cond_s {
+    pub __wseq: __atomic_wide_counter,
+    pub __g1_start: __atomic_wide_counter,
+    pub __g_refs: [::std::os::raw::c_uint; 2usize],
+    pub __g_size: [::std::os::raw::c_uint; 2usize],
+    pub __g1_orig_size: ::std::os::raw::c_uint,
+    pub __wrefs: ::std::os::raw::c_uint,
+    pub __g_signals: [::std::os::raw::c_uint; 2usize],
+}
 pub type pthread_t = ::std::os::raw::c_ulong;
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union pthread_mutex_t {
+    pub __data: __pthread_mutex_s,
+    pub __size: [::std::os::raw::c_char; 24usize],
+    pub __align: ::std::os::raw::c_long,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union pthread_cond_t {
+    pub __data: __pthread_cond_s,
+    pub __size: [::std::os::raw::c_char; 48usize],
+    pub __align: ::std::os::raw::c_longlong,
+}
 pub type sig_atomic_t = __sig_atomic_t;
 pub type __jmp_buf = [::std::os::raw::c_int; 6usize];
 #[repr(C)]
@@ -95,6 +160,8 @@ pub struct __jmp_buf_tag {
     pub __mask_was_saved: ::std::os::raw::c_int,
     pub __saved_mask: __sigset_t,
 }
+pub type uv_mutex_t = pthread_mutex_t;
+pub type uv_cond_t = pthread_cond_t;
 pub type jl_gcframe_t = _jl_gcframe_t;
 pub type uint_t = u32;
 #[repr(C)]
@@ -127,18 +194,7 @@ pub type jl_taggedvalue_t = _jl_taggedvalue_t;
 pub struct jl_stack_context_t {
     pub uc_mcontext: sigjmp_buf,
 }
-pub type _jl_ucontext_t = jl_stack_context_t;
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub struct jl_ucontext_t {
-    pub __bindgen_anon_1: jl_ucontext_t__bindgen_ty_1,
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union jl_ucontext_t__bindgen_ty_1 {
-    pub ctx: _jl_ucontext_t,
-    pub copy_ctx: jl_stack_context_t,
-}
+pub type jl_ucontext_t = jl_stack_context_t;
 pub type jl_thread_t = pthread_t;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -177,7 +233,7 @@ pub struct jl_thread_heap_t {
     pub remset_nptr: ::std::os::raw::c_int,
     pub remset: *mut arraylist_t,
     pub last_remset: *mut arraylist_t,
-    pub norm_pools: [jl_gc_pool_t; 51usize],
+    pub norm_pools: [jl_gc_pool_t; 43usize],
     pub free_stacks: [arraylist_t; 16usize],
 }
 #[repr(C)]
@@ -201,6 +257,7 @@ pub struct jl_gc_mark_cache_t {
     pub scanned_bytes: usize,
     pub nbig_obj: usize,
     pub big_obj: [*mut ::std::os::raw::c_void; 1024usize],
+    pub stack_lock: jl_mutex_t,
     pub pc_stack: *mut *mut ::std::os::raw::c_void,
     pub pc_stack_end: *mut *mut ::std::os::raw::c_void,
     pub data_stack: *mut jl_gc_mark_data_t,
@@ -224,6 +281,8 @@ pub struct _jl_tls_states_t {
     pub finalizers_inhibited: ::std::os::raw::c_int,
     pub heap: jl_thread_heap_t,
     pub gc_num: jl_thread_gc_num_t,
+    pub sleep_lock: uv_mutex_t,
+    pub wake_signal: uv_cond_t,
     pub defer_signal: sig_atomic_t,
     pub current_task: u32,
     pub next_task: *mut _jl_task_t,
@@ -236,7 +295,6 @@ pub struct _jl_tls_states_t {
     pub sig_exception: *mut _jl_value_t,
     pub bt_data: *mut _jl_bt_element_t,
     pub bt_size: usize,
-    pub profiling_bt_buffer: *mut _jl_bt_element_t,
     pub signal_request: u32,
     pub io_wait: sig_atomic_t,
     pub signal_stack: *mut ::std::os::raw::c_void,
@@ -251,13 +309,13 @@ pub struct _jl_tls_states_t {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union _jl_tls_states_t__bindgen_ty_1 {
-    pub base_ctx: _jl_ucontext_t,
+    pub base_ctx: jl_ucontext_t,
     pub copy_stack_ctx: jl_stack_context_t,
 }
 pub type jl_tls_states_t = _jl_tls_states_t;
 pub type jl_ptls_t = *mut jl_tls_states_t;
 extern "C" {
-    pub fn jl_get_ptls_states() -> *mut ::std::os::raw::c_void;
+    pub fn jl_gc_safepoint();
 }
 pub type jl_value_t = _jl_value_t;
 #[repr(C)]
@@ -488,108 +546,7 @@ pub type jl_fptr_sparam_t = ::std::option::Option<
 >;
 pub type jl_method_instance_t = _jl_method_instance_t;
 #[repr(C)]
-#[derive(Copy, Clone)]
-pub union __jl_purity_overrides_t {
-    pub overrides: __jl_purity_overrides_t__bindgen_ty_1,
-    pub bits: u8,
-}
-#[repr(C, packed)]
-#[derive(Debug, Copy, Clone)]
-pub struct __jl_purity_overrides_t__bindgen_ty_1 {
-    pub _bitfield_align_1: [u8; 0],
-    pub _bitfield_1: __BindgenBitfieldUnit<[u8; 1usize]>,
-}
-impl __jl_purity_overrides_t__bindgen_ty_1 {
-    #[inline]
-    pub fn ipo_consistent(&self) -> u8 {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(0usize, 1u8) as u8) }
-    }
-    #[inline]
-    pub fn set_ipo_consistent(&mut self, val: u8) {
-        unsafe {
-            let val: u8 = ::std::mem::transmute(val);
-            self._bitfield_1.set(0usize, 1u8, val as u64)
-        }
-    }
-    #[inline]
-    pub fn ipo_effect_free(&self) -> u8 {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(1usize, 1u8) as u8) }
-    }
-    #[inline]
-    pub fn set_ipo_effect_free(&mut self, val: u8) {
-        unsafe {
-            let val: u8 = ::std::mem::transmute(val);
-            self._bitfield_1.set(1usize, 1u8, val as u64)
-        }
-    }
-    #[inline]
-    pub fn ipo_nothrow(&self) -> u8 {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(2usize, 1u8) as u8) }
-    }
-    #[inline]
-    pub fn set_ipo_nothrow(&mut self, val: u8) {
-        unsafe {
-            let val: u8 = ::std::mem::transmute(val);
-            self._bitfield_1.set(2usize, 1u8, val as u64)
-        }
-    }
-    #[inline]
-    pub fn ipo_terminates(&self) -> u8 {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(3usize, 1u8) as u8) }
-    }
-    #[inline]
-    pub fn set_ipo_terminates(&mut self, val: u8) {
-        unsafe {
-            let val: u8 = ::std::mem::transmute(val);
-            self._bitfield_1.set(3usize, 1u8, val as u64)
-        }
-    }
-    #[inline]
-    pub fn ipo_terminates_locally(&self) -> u8 {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(4usize, 1u8) as u8) }
-    }
-    #[inline]
-    pub fn set_ipo_terminates_locally(&mut self, val: u8) {
-        unsafe {
-            let val: u8 = ::std::mem::transmute(val);
-            self._bitfield_1.set(4usize, 1u8, val as u64)
-        }
-    }
-    #[inline]
-    pub fn new_bitfield_1(
-        ipo_consistent: u8,
-        ipo_effect_free: u8,
-        ipo_nothrow: u8,
-        ipo_terminates: u8,
-        ipo_terminates_locally: u8,
-    ) -> __BindgenBitfieldUnit<[u8; 1usize]> {
-        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 1usize]> = Default::default();
-        __bindgen_bitfield_unit.set(0usize, 1u8, {
-            let ipo_consistent: u8 = unsafe { ::std::mem::transmute(ipo_consistent) };
-            ipo_consistent as u64
-        });
-        __bindgen_bitfield_unit.set(1usize, 1u8, {
-            let ipo_effect_free: u8 = unsafe { ::std::mem::transmute(ipo_effect_free) };
-            ipo_effect_free as u64
-        });
-        __bindgen_bitfield_unit.set(2usize, 1u8, {
-            let ipo_nothrow: u8 = unsafe { ::std::mem::transmute(ipo_nothrow) };
-            ipo_nothrow as u64
-        });
-        __bindgen_bitfield_unit.set(3usize, 1u8, {
-            let ipo_terminates: u8 = unsafe { ::std::mem::transmute(ipo_terminates) };
-            ipo_terminates as u64
-        });
-        __bindgen_bitfield_unit.set(4usize, 1u8, {
-            let ipo_terminates_locally: u8 =
-                unsafe { ::std::mem::transmute(ipo_terminates_locally) };
-            ipo_terminates_locally as u64
-        });
-        __bindgen_bitfield_unit
-    }
-}
-pub type _jl_purity_overrides_t = __jl_purity_overrides_t;
-#[repr(C)]
+#[derive(Debug)]
 pub struct _jl_method_t {
     pub name: *mut jl_sym_t,
     pub module: *mut _jl_module_t,
@@ -606,20 +563,17 @@ pub struct _jl_method_t {
     pub unspecialized: ::std::sync::atomic::AtomicPtr<_jl_method_instance_t>,
     pub generator: *mut jl_value_t,
     pub roots: *mut jl_array_t,
-    pub root_blocks: *mut jl_array_t,
-    pub nroots_sysimg: i32,
     pub ccallable: *mut jl_svec_t,
     pub invokes: ::std::sync::atomic::AtomicPtr<jl_typemap_t>,
     pub recursion_relation: *mut jl_value_t,
-    pub nargs: u32,
-    pub called: u32,
-    pub nospecialize: u32,
-    pub nkw: u32,
+    pub nargs: i32,
+    pub called: i32,
+    pub nospecialize: i32,
+    pub nkw: i32,
     pub isva: u8,
     pub pure_: u8,
     pub is_for_opaque_closure: u8,
-    pub constprop: u8,
-    pub purity: _jl_purity_overrides_t,
+    pub aggressive_constprop: u8,
     pub writelock: jl_mutex_t,
 }
 pub type jl_method_t = _jl_method_t;
@@ -633,7 +587,6 @@ pub struct _jl_method_instance_t {
     pub callbacks: *mut jl_array_t,
     pub cache: ::std::sync::atomic::AtomicPtr<_jl_code_instance_t>,
     pub inInference: u8,
-    pub precompiled: u8,
 }
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -646,6 +599,7 @@ pub union _jl_method_instance_t__bindgen_ty_1 {
 #[derive(Debug, Copy, Clone)]
 pub struct jl_opaque_closure_t {
     pub captures: *mut jl_value_t,
+    pub isva: u8,
     pub world: usize,
     pub source: *mut jl_method_t,
     pub invoke: jl_fptr_args_t,
@@ -660,14 +614,10 @@ pub struct _jl_code_instance_t {
     pub rettype: *mut jl_value_t,
     pub rettype_const: *mut jl_value_t,
     pub inferred: *mut jl_value_t,
-    pub ipo_purity_bits: u32,
-    pub purity_bits: u32,
-    pub argescapes: *mut jl_value_t,
     pub isspecsig: u8,
     pub precompile: ::std::sync::atomic::AtomicU8,
     pub invoke: ::atomic::Atomic<jl_callptr_t>,
     pub specptr: _jl_code_instance_t__jl_generic_specptr_t,
-    pub relocatability: u8,
 }
 #[repr(C)]
 pub union _jl_code_instance_t__jl_generic_specptr_t {
@@ -697,7 +647,6 @@ pub struct jl_typename_t {
     pub module: *mut _jl_module_t,
     pub names: *mut jl_svec_t,
     pub atomicfields: *const u32,
-    pub constfields: *const u32,
     pub wrapper: *mut jl_value_t,
     pub cache: ::std::sync::atomic::AtomicPtr<jl_svec_t>,
     pub linearcache: ::std::sync::atomic::AtomicPtr<jl_svec_t>,
@@ -1124,7 +1073,6 @@ pub struct _jl_module_t {
     pub compile: i8,
     pub infer: i8,
     pub istopmod: u8,
-    pub max_methods: i8,
     pub lock: jl_mutex_t,
 }
 pub type jl_module_t = _jl_module_t;
@@ -1562,9 +1510,6 @@ extern "C" {
     pub fn jl_gc_queue_root(root: *const jl_value_t);
 }
 extern "C" {
-    pub fn jl_gc_safepoint();
-}
-extern "C" {
     pub fn jl_array_typetagdata(a: *mut jl_array_t) -> *mut ::std::os::raw::c_char;
 }
 extern "C" {
@@ -1884,7 +1829,7 @@ extern "C" {
     pub fn jl_call(
         f: *mut jl_function_t,
         args: *mut *mut jl_value_t,
-        nargs: u32,
+        nargs: i32,
     ) -> *mut jl_value_t;
 }
 extern "C" {
@@ -1940,7 +1885,10 @@ pub struct _jl_task_t {
     pub result: *mut jl_value_t,
     pub logstate: *mut jl_value_t,
     pub start: *mut jl_function_t,
-    pub rngState: [u64; 4usize],
+    pub rngState0: u64,
+    pub rngState1: u64,
+    pub rngState2: u64,
+    pub rngState3: u64,
     pub _state: ::std::sync::atomic::AtomicU8,
     pub sticky: u8,
     pub _isexception: ::std::sync::atomic::AtomicU8,
@@ -1948,14 +1896,20 @@ pub struct _jl_task_t {
     pub prio: i16,
     pub gcstack: *mut jl_gcframe_t,
     pub world_age: usize,
-    pub ptls: jl_ptls_t,
+    pub ptls: *mut jl_tls_states_t,
     pub excstack: *mut jl_excstack_t,
     pub eh: *mut jl_handler_t,
-    pub ctx: jl_ucontext_t,
+    pub __bindgen_anon_1: _jl_task_t__bindgen_ty_1,
     pub stkbuf: *mut ::std::os::raw::c_void,
     pub bufsz: usize,
     pub _bitfield_align_1: [u32; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 4usize]>,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union _jl_task_t__bindgen_ty_1 {
+    pub ctx: jl_ucontext_t,
+    pub copy_stack_ctx: jl_stack_context_t,
 }
 impl _jl_task_t {
     #[inline]
@@ -2031,7 +1985,6 @@ pub struct jl_options_t {
     pub compile_enabled: i8,
     pub code_coverage: i8,
     pub malloc_log: i8,
-    pub tracked_path: *const ::std::os::raw::c_char,
     pub opt_level: i8,
     pub opt_level_min: i8,
     pub debug_level: i8,
@@ -2059,8 +2012,6 @@ pub struct jl_options_t {
     pub warn_scope: i8,
     pub image_codegen: i8,
     pub rr_detach: i8,
-    pub strip_metadata: i8,
-    pub strip_ir: i8,
 }
 extern "C" {
     pub static mut jl_options: jl_options_t;

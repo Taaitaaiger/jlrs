@@ -1,6 +1,6 @@
 mod util;
 #[cfg(feature = "sync-rt")]
-#[cfg(not(feature = "lts"))]
+#[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7")))]
 mod tests {
     use jlrs::prelude::*;
 

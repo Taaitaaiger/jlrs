@@ -214,7 +214,7 @@ mod tests {
         })
     }
 
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(feature = "julia-1-6"))]
     fn vec_element_typecheck() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -709,7 +709,7 @@ mod tests {
         intrinsic_typecheck();
         concrete_typecheck();
         dispatch_tuple_typecheck();
-        #[cfg(not(feature = "lts"))]
+        #[cfg(not(feature = "julia-1-6"))]
         vec_element_typecheck();
     }
 }

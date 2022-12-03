@@ -1,4 +1,4 @@
-/* generated from Julia version 1.9.0-alpha1 */
+/* generated from julia version 1.9.0-alpha1 */
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct __BindgenBitfieldUnit<Storage> {
@@ -79,14 +79,6 @@ where
         }
     }
 }
-pub type __int8_t = ::std::os::raw::c_schar;
-pub type __uint8_t = ::std::os::raw::c_uchar;
-pub type __int16_t = ::std::os::raw::c_short;
-pub type __uint16_t = ::std::os::raw::c_ushort;
-pub type __int32_t = ::std::os::raw::c_int;
-pub type __uint32_t = ::std::os::raw::c_uint;
-pub type __int64_t = ::std::os::raw::c_long;
-pub type __uint64_t = ::std::os::raw::c_ulong;
 pub type __sig_atomic_t = ::std::os::raw::c_int;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -2078,7 +2070,7 @@ impl _jl_task_t {
 }
 pub type jl_task_t = _jl_task_t;
 extern "C" {
-    pub fn jl_throw(e: *mut jl_value_t);
+    pub fn jl_throw(e: *mut jl_value_t) -> !;
 }
 extern "C" {
     pub fn jl_process_events() -> ::std::os::raw::c_int;

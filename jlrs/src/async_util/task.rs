@@ -105,7 +105,7 @@ pub trait AsyncTask: 'static + Send + Sync {
 /// Example:
 ///
 /// ```
-/// # #[cfg(not(all(target_os = "windows", feature = "lts")))]
+/// # #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
 /// # {
 /// use jlrs::prelude::*;
 ///

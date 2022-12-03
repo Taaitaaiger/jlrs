@@ -23,6 +23,8 @@ use std::{
     sync::RwLock,
 };
 
+#[cfg(feature = "julia-1-10")]
+use jl_sys::jl_reinit_foreign_type;
 use jl_sys::{
     jl_gc_alloc_typed,
     jl_gc_schedule_foreign_sweepfunc,
@@ -135,6 +137,40 @@ where
         ));
 
     target.data_from_ptr(NonNull::new_unchecked(ty), Private)
+}
+
+#[cfg(feature = "julia-1-10")]
+pub unsafe fn reinit_foreign_type<U>(datatype: DataType) -> bool
+where
+    U: ForeignType,
+{
+    if let Some(_) = FOREIGN_TYPES.find::<U>() {
+        return true;
+    }
+
+    unsafe extern "C" fn mark<T: ForeignType>(ptls: PTls, value: *mut jl_value_t) -> usize {
+        T::mark(ptls, NonNull::new_unchecked(value.cast()).as_ref())
+    }
+
+    unsafe extern "C" fn sweep<T: ForeignType>(value: *mut jl_value_t) {
+        do_sweep::<T>(NonNull::new_unchecked(value.cast()).as_mut())
+    }
+
+    let ty = datatype.unwrap(Private);
+    let ret = jl_reinit_foreign_type(ty, Some(mark::<U>), Some(sweep::<U>));
+    if ret != 0 {
+        FOREIGN_TYPES
+            .data
+            .write()
+            .expect("Foreign type lock was poisoned")
+            .push((
+                TypeId::of::<U>(),
+                DataType::wrap_non_null(NonNull::new_unchecked(ty), Private),
+            ));
+        true
+    } else {
+        false
+    }
 }
 
 #[inline(always)]

@@ -24,7 +24,7 @@ use crate::{
 };
 
 cfg_if! {
-    if #[cfg(feature = "lts")] {
+    if #[cfg(feature = "julia-1-6")] {
         use jl_sys::jl_vararg_type;
     }else {
         use jl_sys::jl_opaque_closure_type;
@@ -33,7 +33,7 @@ cfg_if! {
 
 use std::{marker::PhantomData, ptr::NonNull};
 
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
+#[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
 use super::value::ValueResult;
 use super::{value::ValueData, Ref};
 
@@ -45,7 +45,7 @@ pub struct UnionAll<'scope>(NonNull<jl_unionall_t>, PhantomData<&'scope ()>);
 
 impl<'scope> UnionAll<'scope> {
     /// Create a new `UnionAll`. If an exception is thrown, it's caught and returned.
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     pub fn new<'target, T>(
         target: T,
         tvar: TypeVar,
@@ -154,7 +154,7 @@ impl<'base> UnionAll<'base> {
     }
 
     /// The `UnionAll` `Vararg`.
-    #[cfg(feature = "lts")]
+    #[cfg(feature = "julia-1-6")]
     pub fn vararg_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -173,7 +173,7 @@ impl<'base> UnionAll<'base> {
     }
 
     /// The `UnionAll` `OpaqueClosure`.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(feature = "julia-1-6"))]
     pub fn opaque_closure_type<T>(_: &T) -> Self
     where
         T: Target<'base>,

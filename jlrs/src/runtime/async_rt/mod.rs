@@ -20,7 +20,7 @@
 //! tasks scheduled on that thread. Blocking tasks can be expressed as closures, the other two
 //! require implementing the [`AsyncTask`] and [`PersistentTask`] traits respectively.
 
-#[cfg(any(feature = "nightly", feature = "beta"))]
+#[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
 pub mod adopted;
 #[cfg(feature = "async-std-rt")]
 pub mod async_std_rt;
@@ -51,10 +51,10 @@ use jl_sys::{
     jl_process_events,
     jl_yield,
 };
-#[cfg(any(feature = "nightly", feature = "beta"))]
+#[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
 use jl_sys::{jl_enter_threaded_region, jl_exit_threaded_region};
 
-#[cfg(any(feature = "nightly", feature = "beta"))]
+#[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
 use self::adopted::init_worker;
 use self::queue::{channel, Receiver, Sender};
 use crate::{
@@ -90,10 +90,10 @@ use crate::{
     wrappers::ptr::{module::Module, value::Value},
 };
 
-#[cfg(any(feature = "nightly", feature = "beta"))]
+#[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
 init_fn!(init_multitask, JLRS_MULTITASK_JL, "JlrsMultitaskNightly.jl");
 
-#[cfg(not(any(feature = "nightly", feature = "beta")))]
+#[cfg(not(any(feature = "julia-1-10", feature = "julia-1-9")))]
 init_fn!(init_multitask, JLRS_MULTITASK_JL, "JlrsMultitask.jl");
 
 // TODO: this doesn't really belong in this module
@@ -571,7 +571,7 @@ where
             if jl_is_initialized() != 0 || INIT.swap(true, Ordering::SeqCst) {
                 Err(RuntimeError::AlreadyInitialized)?;
             }
-            #[cfg(not(any(feature = "nightly", feature = "beta")))]
+            #[cfg(not(any(feature = "julia-1-10", feature = "julia-1-9")))]
             {
                 if builder.n_threads == 0 {
                     jl_options.nthreads = -1;
@@ -580,7 +580,7 @@ where
                 }
             }
 
-            #[cfg(any(feature = "nightly", feature = "beta"))]
+            #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
             {
                 if builder.n_threadsi != 0 {
                     if builder.n_threads == 0 {
@@ -673,15 +673,15 @@ where
 
         let recv_timeout = builder.recv_timeout;
 
-        #[cfg(any(feature = "nightly", feature = "beta"))]
+        #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
         let mut workers = Vec::with_capacity(builder.n_workers);
-        #[cfg(any(feature = "nightly", feature = "beta"))]
+        #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
         for i in 0..builder.n_workers {
             let worker = init_worker::<R, N>(i, recv_timeout, receiver.clone());
             workers.push(worker)
         }
 
-        #[cfg(any(feature = "nightly", feature = "beta"))]
+        #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
         jl_enter_threaded_region();
 
         loop {
@@ -761,7 +761,7 @@ where
             }
         }
 
-        #[cfg(any(feature = "nightly", feature = "beta"))]
+        #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
         for worker in workers.into_iter() {
             loop {
                 if worker.is_finished() {
@@ -774,7 +774,7 @@ where
             }
         }
 
-        #[cfg(any(feature = "nightly", feature = "beta"))]
+        #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
         jl_exit_threaded_region();
 
         jl_atexit_hook(0);

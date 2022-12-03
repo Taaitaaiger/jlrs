@@ -1,13 +1,13 @@
 #[cfg(all(
     feature = "async-std-rt",
-    not(all(target_os = "windows", feature = "lts")),
+    not(all(target_os = "windows", feature = "julia-1-6")),
     test
 ))]
 mod util;
 
 #[cfg(all(
     feature = "async-std-rt",
-    not(all(target_os = "windows", feature = "lts")),
+    not(all(target_os = "windows", feature = "julia-1-6")),
     test
 ))]
 mod tests {
