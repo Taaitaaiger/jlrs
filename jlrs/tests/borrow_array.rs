@@ -3,7 +3,7 @@ mod util;
 #[cfg(feature = "sync-rt")]
 #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
 mod tests {
-    use jlrs::{prelude::*, wrappers::ptr::array::dimensions::Dims};
+    use jlrs::{data::managed::array::dimensions::Dims, prelude::*};
 
     use crate::util::JULIA;
 
@@ -53,7 +53,7 @@ mod tests {
 
                     Module::base(&frame)
                         .function(&frame, "sum")?
-                        .wrapper()
+                        .as_managed()
                         .call1(&mut frame, array.as_value())
                         .unwrap()
                         .unbox::<u64>()

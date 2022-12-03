@@ -14,15 +14,15 @@ use jl_sys::{jl_call, jl_exception_occurred};
 use smallvec::SmallVec;
 
 #[cfg(not(any(feature = "julia-1-10", feature = "julia-1-9")))]
-use crate::wrappers::ptr::private::WrapperPriv as _;
+use crate::data::managed::private::ManagedPriv as _;
 use crate::{
-    error::{AccessError, JlrsResult, JuliaResult},
-    memory::{context::ledger::Ledger, target::Target},
-    private::Private,
-    wrappers::ptr::{
+    data::managed::{
         array::{tracked::ArrayWrapper, Array},
         value::{Value, ValueResult, MAX_SIZE},
     },
+    error::{AccessError, JlrsResult, JuliaResult},
+    memory::{context::ledger::Ledger, target::Target},
+    private::Private,
 };
 
 /// A function and its keyword arguments.
@@ -60,8 +60,8 @@ impl<'scope, 'data> WithKeywords<'scope, 'data> {
 /// All of these methods are unsafe, arbitrary Julia functions can't be checked for correctness.
 /// More information can be found in the [`safety`] module.
 ///
-/// [`Function`]: crate::wrappers::ptr::function::Function
-/// [`OpaqueClosure`]: crate::wrappers::ptr::internal::opaque_closure::OpaqueClosure
+/// [`Function`]: crate::data::managed::function::Function
+/// [`OpaqueClosure`]: crate::data::managed::internal::opaque_closure::OpaqueClosure
 /// [`safety`]: crate::safety
 pub trait Call<'data>: private::CallPriv {
     /// Call a function with no arguments.
@@ -375,8 +375,8 @@ cfg_if::cfg_if! {
         use async_trait::async_trait;
         use crate::{
             memory::target::frame::AsyncGcFrame,
-            wrappers::ptr::{
-                Wrapper,
+            data::managed::{
+                Managed,
                 task::Task,
                 module::Module,
                 function::Function
@@ -968,10 +968,10 @@ cfg_if::cfg_if! {
                 let task = Module::main(&frame)
                     .submodule(&frame, "JlrsMultitask")
                     .expect("JlrsMultitask not available")
-                    .wrapper()
+                    .as_managed()
                     .function(&frame, "interactivecall")
                     .expect("interactivecall not available")
-                    .wrapper()
+                    .as_managed()
                     .call(&mut *frame, &mut vals);
 
                 match task {
@@ -997,10 +997,10 @@ cfg_if::cfg_if! {
                 let task = Module::main(&frame)
                     .submodule(&frame, "JlrsMultitask")
                     .expect("JlrsMultitask not available")
-                    .wrapper()
+                    .as_managed()
                     .function(&frame, "asynccall")
                     .expect("asynccall not available")
-                    .wrapper()
+                    .as_managed()
                     .call(&mut *frame, &mut vals);
 
                 match task {
@@ -1037,10 +1037,10 @@ cfg_if::cfg_if! {
                 let task = Module::main(&frame)
                     .submodule(&frame, "JlrsMultitask")
                     .expect("JlrsMultitask not available")
-                    .wrapper()
+                    .as_managed()
                     .function(&frame, "scheduleasynclocal")
                     .expect("scheduleasynclocal not available")
-                    .wrapper()
+                    .as_managed()
                     .call(&mut *frame, &mut vals);
 
                 match task {
@@ -1077,10 +1077,10 @@ cfg_if::cfg_if! {
                 let task = Module::main(&frame)
                     .submodule(&frame, "JlrsMultitask")
                     .expect("JlrsMultitask not available")
-                    .wrapper()
+                    .as_managed()
                     .function(&frame, "scheduleasync")
                     .expect("scheduleasync not available")
-                    .wrapper()
+                    .as_managed()
                     .call(&mut *frame, &mut vals);
 
                 match task {
@@ -1226,10 +1226,10 @@ cfg_if::cfg_if! {
                 let task = Module::main(&frame)
                     .submodule(&frame, "JlrsMultitask")
                     .expect("JlrsMultitask not available")
-                    .wrapper()
+                    .as_managed()
                     .function(&frame, "interactivecall")
                     .expect("interactivecall not available")
-                    .wrapper()
+                    .as_managed()
                     .provide_keywords(self.keywords())
                     .expect("Keywords invalid")
                     .call(&mut *frame, &mut vals);
@@ -1257,10 +1257,10 @@ cfg_if::cfg_if! {
                 let task = Module::main(&frame)
                     .submodule(&frame, "JlrsMultitask")
                     .expect("JlrsMultitask not available")
-                    .wrapper()
+                    .as_managed()
                     .function(&frame, "asynccall")
                     .expect("asynccall not available")
-                    .wrapper()
+                    .as_managed()
                     .provide_keywords(self.keywords())
                     .expect("Keywords invalid")
                     .call(&mut *frame, &mut vals);
@@ -1299,10 +1299,10 @@ cfg_if::cfg_if! {
                 let task = Module::main(&frame)
                     .submodule(&frame, "JlrsMultitask")
                     .expect("JlrsMultitask not available")
-                    .wrapper()
+                    .as_managed()
                     .function(&frame, "scheduleasynclocal")
                     .expect("scheduleasynclocal not available")
-                    .wrapper()
+                    .as_managed()
                     .provide_keywords(self.keywords())
                     .expect("Keywords invalid")
                     .call(&mut *frame, &mut vals);
@@ -1341,10 +1341,10 @@ cfg_if::cfg_if! {
                 let task = Module::main(&frame)
                     .submodule(&frame, "JlrsMultitask")
                     .expect("JlrsMultitask not available")
-                    .wrapper()
+                    .as_managed()
                     .function(&frame, "scheduleasync")
                     .expect("scheduleasync not available")
-                    .wrapper()
+                    .as_managed()
                     .provide_keywords(self.keywords())
                     .expect("Keywords invalid")
                     .call(&mut *frame, &mut vals);
@@ -1361,8 +1361,8 @@ cfg_if::cfg_if! {
 mod private {
     use super::WithKeywords;
     #[cfg(all(not(feature = "julia-1-6"), feature = "internal-types"))]
-    use crate::wrappers::ptr::internal::opaque_closure::OpaqueClosure;
-    use crate::wrappers::ptr::{function::Function, value::Value};
+    use crate::data::managed::internal::opaque_closure::OpaqueClosure;
+    use crate::data::managed::{function::Function, value::Value};
     pub trait CallPriv: Sized {}
     impl CallPriv for WithKeywords<'_, '_> {}
     impl CallPriv for Function<'_, '_> {}

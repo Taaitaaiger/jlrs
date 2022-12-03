@@ -4,7 +4,7 @@ use std::error::Error as StdErr;
 
 use thiserror::Error;
 
-use crate::wrappers::ptr::{
+use crate::data::managed::{
     array::dimensions::Dimensions,
     value::{Value, ValueRef},
 };

@@ -16,9 +16,9 @@ impl AsyncTask for MyTask {
         let v = unsafe {
             Module::main(&frame)
                 .submodule(&frame, "AsyncTests")?
-                .wrapper()
+                .as_managed()
                 .function(&frame, "complexfunc")?
-                .wrapper()
+                .as_managed()
                 .as_value()
                 .call_async(&mut frame, &mut [dims, iters])
                 .await
@@ -46,9 +46,9 @@ impl AsyncTask for OtherRetTypeTask {
         let v = unsafe {
             Module::main(&frame)
                 .submodule(&frame, "AsyncTests")?
-                .wrapper()
+                .as_managed()
                 .function(&frame, "complexfunc")?
-                .wrapper()
+                .as_managed()
                 .as_value()
                 .call_async(&mut frame, &mut [dims, iters])
                 .await
@@ -78,9 +78,9 @@ impl AsyncTask for KwTask {
         let v = unsafe {
             Module::main(&frame)
                 .submodule(&frame, "AsyncTests")?
-                .wrapper()
+                .as_managed()
                 .function(&frame, "kwfunc")?
-                .wrapper()
+                .as_managed()
                 .provide_keywords(nt)?
                 .call_async(&mut frame, &mut [dims, iters])
                 .await
@@ -102,9 +102,9 @@ impl AsyncTask for ThrowingTask {
         let v = unsafe {
             Module::main(&frame)
                 .submodule(&frame, "AsyncTests")?
-                .wrapper()
+                .as_managed()
                 .function(&frame, "throwingfunc")?
-                .wrapper()
+                .as_managed()
                 .call_async(&mut frame, [])
                 .await
                 .into_jlrs_result()?
@@ -133,9 +133,9 @@ impl AsyncTask for NestingTaskAsyncFrame {
                 unsafe {
                     Module::main(&frame)
                         .submodule(&frame, "AsyncTests")?
-                        .wrapper()
+                        .as_managed()
                         .function(&frame, "complexfunc")?
-                        .wrapper()
+                        .as_managed()
                         .as_value()
                         .call_async(&mut frame, &mut [dims, iters])
                         .await
@@ -168,9 +168,9 @@ impl AsyncTask for NestingTaskAsyncValueFrame {
                 let out = unsafe {
                     Module::main(&frame)
                         .submodule(&frame, "AsyncTests")?
-                        .wrapper()
+                        .as_managed()
                         .function(&frame, "complexfunc")?
-                        .wrapper()
+                        .as_managed()
                         .as_value()
                         .call_async(&mut frame, &mut [dims, iters])
                         .await
@@ -205,9 +205,9 @@ impl AsyncTask for NestingTaskAsyncCallFrame {
                 let out = unsafe {
                     Module::main(&frame)
                         .submodule(&frame, "AsyncTests")?
-                        .wrapper()
+                        .as_managed()
                         .function(&frame, "complexfunc")?
-                        .wrapper()
+                        .as_managed()
                         .as_value()
                         .call_async(&mut frame, &mut [dims, iters])
                         .await
@@ -248,9 +248,9 @@ impl AsyncTask for NestingTaskAsyncGcFrame {
                 unsafe {
                     Module::main(&frame)
                         .submodule(&frame, "AsyncTests")?
-                        .wrapper()
+                        .as_managed()
                         .function(&frame, "complexfunc")?
-                        .wrapper()
+                        .as_managed()
                         .as_value()
                         .call_async(&mut frame, &mut [dims, iters])
                         .await
@@ -283,9 +283,9 @@ impl AsyncTask for NestingTaskAsyncDynamicValueFrame {
                 let out = unsafe {
                     Module::main(&frame)
                         .submodule(&frame, "AsyncTests")?
-                        .wrapper()
+                        .as_managed()
                         .function(&frame, "complexfunc")?
-                        .wrapper()
+                        .as_managed()
                         .as_value()
                         .call_async(&mut frame, &mut [dims, iters])
                         .await
@@ -320,9 +320,9 @@ impl AsyncTask for NestingTaskAsyncDynamicCallFrame {
                 let out = unsafe {
                     Module::main(&frame)
                         .submodule(&frame, "AsyncTests")?
-                        .wrapper()
+                        .as_managed()
                         .function(&frame, "complexfunc")?
-                        .wrapper()
+                        .as_managed()
                         .as_value()
                         .call_async(&mut frame, &mut [dims, iters])
                         .await
@@ -377,7 +377,9 @@ impl PersistentTask for AccumulatorTask {
                     async move {
                         // A nested scope is used to only root a single value in the frame provided to
                         // init, rather than two.
-                        let func = Module::main(&frame).global(&frame, "MutFloat64")?.value();
+                        let func = Module::main(&frame)
+                            .global(&frame, "MutFloat64")?
+                            .as_value();
                         let init_v = Value::new(&mut frame, init_value);
 
                         Ok(func.call1(output, init_v))
@@ -423,9 +425,9 @@ impl AsyncTask for LocalTask {
         let v = unsafe {
             Module::main(&frame)
                 .submodule(&frame, "AsyncTests")?
-                .wrapper()
+                .as_managed()
                 .function(&frame, "complexfunc")?
-                .wrapper()
+                .as_managed()
                 .call_async_local(&mut frame, &mut [dims, iters])
                 .await
                 .unwrap()
@@ -452,9 +454,9 @@ impl AsyncTask for LocalSchedulingTask {
         let v = unsafe {
             let task = Module::main(&frame)
                 .submodule(&frame, "AsyncTests")?
-                .wrapper()
+                .as_managed()
                 .function(&frame, "complexfunc")?
-                .wrapper()
+                .as_managed()
                 .schedule_async_local(&mut frame, &mut [dims, iters])
                 .unwrap();
 
@@ -485,9 +487,9 @@ impl AsyncTask for MainTask {
         let v = unsafe {
             Module::main(&frame)
                 .submodule(&frame, "AsyncTests")?
-                .wrapper()
+                .as_managed()
                 .function(&frame, "complexfunc")?
-                .wrapper()
+                .as_managed()
                 .call_async_main(&mut frame, &mut [dims, iters])
                 .await
                 .unwrap()
@@ -514,9 +516,9 @@ impl AsyncTask for MainSchedulingTask {
         let v = unsafe {
             let task = Module::main(&frame)
                 .submodule(&frame, "AsyncTests")?
-                .wrapper()
+                .as_managed()
                 .function(&frame, "complexfunc")?
-                .wrapper()
+                .as_managed()
                 .schedule_async_main(&mut frame, &mut [dims, iters])
                 .unwrap();
 
@@ -547,9 +549,9 @@ impl AsyncTask for SchedulingTask {
         let v = unsafe {
             let task = Module::main(&frame)
                 .submodule(&frame, "AsyncTests")?
-                .wrapper()
+                .as_managed()
                 .function(&frame, "complexfunc")?
-                .wrapper()
+                .as_managed()
                 .schedule_async(&mut frame, &mut [dims, iters])
                 .unwrap();
 
@@ -583,9 +585,9 @@ impl AsyncTask for LocalKwSchedulingTask {
 
             let task = Module::main(&frame)
                 .submodule(&frame, "AsyncTests")?
-                .wrapper()
+                .as_managed()
                 .function(&frame, "kwfunc")?
-                .wrapper()
+                .as_managed()
                 .provide_keywords(nt)?
                 .schedule_async_local(&mut frame, &mut [dims, iters])
                 .unwrap();
@@ -620,9 +622,9 @@ impl AsyncTask for KwSchedulingTask {
 
             let task = Module::main(&frame)
                 .submodule(&frame, "AsyncTests")?
-                .wrapper()
+                .as_managed()
                 .function(&frame, "kwfunc")?
-                .wrapper()
+                .as_managed()
                 .provide_keywords(nt)?
                 .schedule_async(&mut frame, &mut [dims, iters])
                 .unwrap();
@@ -657,9 +659,9 @@ impl AsyncTask for MainKwSchedulingTask {
 
             let task = Module::main(&frame)
                 .submodule(&frame, "AsyncTests")?
-                .wrapper()
+                .as_managed()
                 .function(&frame, "kwfunc")?
-                .wrapper()
+                .as_managed()
                 .provide_keywords(nt)?
                 .schedule_async_main(&mut frame, &mut [dims, iters])
                 .unwrap();
@@ -693,9 +695,9 @@ impl AsyncTask for LocalKwTask {
         let v = unsafe {
             Module::main(&frame)
                 .submodule(&frame, "AsyncTests")?
-                .wrapper()
+                .as_managed()
                 .function(&frame, "kwfunc")?
-                .wrapper()
+                .as_managed()
                 .provide_keywords(nt)?
                 .call_async_local(&mut frame, &mut [dims, iters])
                 .await
@@ -725,9 +727,9 @@ impl AsyncTask for MainKwTask {
         let v = unsafe {
             Module::main(&frame)
                 .submodule(&frame, "AsyncTests")?
-                .wrapper()
+                .as_managed()
                 .function(&frame, "kwfunc")?
-                .wrapper()
+                .as_managed()
                 .provide_keywords(nt)?
                 .call_async_main(&mut frame, &mut [dims, iters])
                 .await

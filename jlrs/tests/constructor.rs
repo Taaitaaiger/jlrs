@@ -28,9 +28,9 @@ mod tests {
                     unsafe {
                         let ty = Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper()
+                            .as_managed()
                             .global(&frame, "HasConstructors")?
-                            .value();
+                            .as_value();
 
                         assert!(ty.is::<DataType>());
 
@@ -41,7 +41,7 @@ mod tests {
                             .field_accessor()
                             .field("a")?
                             .access::<DataTypeRef>()?
-                            .wrapper()
+                            .as_managed()
                             .is::<Bool>();
 
                         assert!(is_bool);
@@ -67,9 +67,9 @@ mod tests {
                     unsafe {
                         let ty = Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper()
+                            .as_managed()
                             .global(&frame, "HasConstructors")?
-                            .value();
+                            .as_value();
 
                         let arg = Value::new(&mut frame, 1i16);
 
@@ -80,7 +80,7 @@ mod tests {
                             .field_accessor()
                             .field("a")?
                             .access::<DataTypeRef>()?
-                            .wrapper()
+                            .as_managed()
                             .is::<i16>();
 
                         assert!(is_i16);
@@ -106,9 +106,9 @@ mod tests {
                     unsafe {
                         let ty = Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper()
+                            .as_managed()
                             .global(&frame, "HasConstructors")?
-                            .value();
+                            .as_value();
 
                         let arg = Value::new(&mut frame, 1i16);
                         let args = [DataType::int64_type(&frame).as_value(), arg];
@@ -121,7 +121,7 @@ mod tests {
                             .field_accessor()
                             .field("a")?
                             .access::<DataTypeRef>()?
-                            .wrapper()
+                            .as_managed()
                             .is::<i64>();
 
                         assert!(is_i64);

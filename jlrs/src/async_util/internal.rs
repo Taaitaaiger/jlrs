@@ -10,6 +10,7 @@ use crate::{
         task::AsyncTask,
     },
     call::Call,
+    data::managed::{module::Module, string::JuliaString, value::Value, Managed},
     error::{JlrsError, JlrsResult},
     memory::{
         context::stack::Stack,
@@ -17,7 +18,6 @@ use crate::{
         target::frame::{AsyncGcFrame, GcFrame},
     },
     runtime::async_rt::{PersistentHandle, PersistentMessage},
-    wrappers::ptr::{module::Module, string::JuliaString, value::Value, Wrapper},
 };
 
 pub(crate) type InnerPersistentMessage<P> = Box<
@@ -468,9 +468,11 @@ where
                 let path = JuliaString::new(&mut frame, path);
                 Module::main(&frame)
                     .function(&frame, "include")?
-                    .wrapper()
+                    .as_managed()
                     .call1(&frame, path.as_value())
-                    .map_err(|e| JlrsError::exception(format!("Include error: {:?}", e.value())))?;
+                    .map_err(|e| {
+                        JlrsError::exception(format!("Include error: {:?}", e.as_value()))
+                    })?;
             }
             None => {}
         }
@@ -534,9 +536,9 @@ where
 
         Module::main(&unrooted)
             .submodule(&unrooted, "Jlrs")?
-            .wrapper()
+            .as_managed()
             .global(&unrooted, "color")?
-            .value()
+            .as_value()
             .set_nth_field_unchecked(0, enable);
 
         Ok(())

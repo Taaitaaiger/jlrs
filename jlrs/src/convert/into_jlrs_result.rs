@@ -5,8 +5,8 @@
 //! defined in this module.
 
 use crate::{
+    data::managed::Managed,
     error::{JlrsError, JlrsResult, JuliaResult, CANNOT_DISPLAY_VALUE},
-    wrappers::ptr::Wrapper,
 };
 
 /// Extension trait that lets you convert a `JuliaResult` to a `JlrsResult`.

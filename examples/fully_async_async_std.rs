@@ -47,9 +47,9 @@ impl AsyncTask for MyTask {
         unsafe {
             Module::main(&frame)
                 .submodule(&frame, "MyModule")?
-                .wrapper()
+                .as_managed()
                 .function(&frame, "complexfunc")?
-                .wrapper()
+                .as_managed()
                 .call_async(&mut frame, &mut [dims, iters])
                 .await
                 .into_jlrs_result()?

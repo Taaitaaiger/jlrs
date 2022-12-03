@@ -15,16 +15,16 @@ use smallvec::SmallVec;
 
 use crate::{
     call::{Call, ProvideKeywords, WithKeywords},
+    data::managed::{
+        module::Module,
+        private::ManagedPriv,
+        task::Task,
+        value::{Value, MAX_SIZE},
+        Managed,
+    },
     error::{JuliaResult, CANNOT_DISPLAY_VALUE},
     memory::target::{frame::AsyncGcFrame, unrooted::Unrooted},
     private::Private,
-    wrappers::ptr::{
-        module::Module,
-        private::WrapperPriv,
-        task::Task,
-        value::{Value, MAX_SIZE},
-        Wrapper,
-    },
 };
 
 pub(crate) struct TaskState<'frame, 'data> {
@@ -66,10 +66,10 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             Module::main(&frame)
                 .submodule(&frame, "JlrsMultitask")
                 .expect("JlrsMultitask not available")
-                .wrapper()
+                .as_managed()
                 .function(&frame, "asynccall")
                 .expect("asynccall not available")
-                .wrapper()
+                .as_managed()
                 .call(&mut *frame, &mut vals)
                 .unwrap_or_else(|e| {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
@@ -121,10 +121,10 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             Module::main(&frame)
                 .submodule(&frame, "JlrsMultitask")
                 .expect("JlrsMultitask not available")
-                .wrapper()
+                .as_managed()
                 .function(&frame, "interactivecall")
                 .expect("interactivecall not available")
-                .wrapper()
+                .as_managed()
                 .call(&mut *frame, &mut vals)
                 .unwrap_or_else(|e| {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
@@ -175,10 +175,10 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             Module::main(&frame)
                 .submodule(&frame, "JlrsMultitask")
                 .expect("JlrsMultitask not available")
-                .wrapper()
+                .as_managed()
                 .function(&frame, "scheduleasynclocal")
                 .expect("scheduleasynclocal not available")
-                .wrapper()
+                .as_managed()
                 .call(&mut *frame, &mut vals)
                 .unwrap_or_else(|e| {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
@@ -229,10 +229,10 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             Module::main(&frame)
                 .submodule(&frame, "JlrsMultitask")
                 .expect("JlrsMultitask not available")
-                .wrapper()
+                .as_managed()
                 .function(&frame, "scheduleasync")
                 .expect("scheduleasync not available")
-                .wrapper()
+                .as_managed()
                 .call(&mut *frame, &mut vals)
                 .unwrap_or_else(|e| {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
@@ -273,10 +273,10 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             Module::main(&frame)
                 .submodule(&frame, "JlrsMultitask")
                 .expect("JlrsMultitask not available")
-                .wrapper()
+                .as_managed()
                 .function(&frame, "postblocking")
                 .expect("postblocking not available")
-                .wrapper()
+                .as_managed()
                 .call3(&mut *frame, fn_ptr, task_ptr, state_ptr_boxed)
                 .unwrap_or_else(|e| {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
@@ -326,10 +326,10 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             Module::main(&frame)
                 .submodule(&frame, "JlrsMultitask")
                 .expect("JlrsMultitask not available")
-                .wrapper()
+                .as_managed()
                 .function(&frame, "asynccall")
                 .expect("asynccall not available")
-                .wrapper()
+                .as_managed()
                 .provide_keywords(func.keywords())
                 .expect("Keywords invalid")
                 .call(&mut *frame, &mut vals)
@@ -382,10 +382,10 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             Module::main(&frame)
                 .submodule(&frame, "JlrsMultitask")
                 .expect("JlrsMultitask not available")
-                .wrapper()
+                .as_managed()
                 .function(&frame, "interactivecall")
                 .expect("interactivecall not available")
-                .wrapper()
+                .as_managed()
                 .provide_keywords(func.keywords())
                 .expect("Keywords invalid")
                 .call(&mut *frame, &mut vals)
@@ -438,10 +438,10 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             let task = Module::main(&frame)
                 .submodule(&frame, "JlrsMultitask")
                 .expect("JlrsMultitask not available")
-                .wrapper()
+                .as_managed()
                 .function(&frame, "scheduleasynclocal")
                 .expect("scheduleasynclocal not available")
-                .wrapper()
+                .as_managed()
                 .provide_keywords(func.keywords())
                 .expect("Keywords invalid")
                 .call(&mut *frame, &mut vals)
@@ -494,10 +494,10 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
             Module::main(&frame)
                 .submodule(&frame, "JlrsMultitask")
                 .expect("JlrsMultitask not available")
-                .wrapper()
+                .as_managed()
                 .function(&frame, "scheduleasync")
                 .expect("scheduleasync not available")
-                .wrapper()
+                .as_managed()
                 .provide_keywords(func.keywords())
                 .expect("Keywords invalid")
                 .call(&mut *frame, &mut vals)
@@ -533,7 +533,7 @@ impl<'frame, 'data> Future for JuliaFuture<'frame, 'data> {
                     let f = Module::base(&global)
                         .function(&global, "fetch")
                         .unwrap()
-                        .wrapper();
+                        .as_managed();
 
                     let res = jl_call1(f.unwrap(Private), task.unwrap(Private).cast());
                     let exc = jl_exception_occurred();

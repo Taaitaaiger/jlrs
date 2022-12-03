@@ -168,7 +168,7 @@ mod tests {
                             .as_value();
                         assert!(ArrayRef::valid_layout(v.datatype().as_value()));
 
-                        let ua = Module::base(&frame).global(&frame, "Array")?.wrapper();
+                        let ua = Module::base(&frame).global(&frame, "Array")?.as_managed();
 
                         assert!(ArrayRef::valid_layout(ua));
                     }

@@ -2,7 +2,7 @@ mod util;
 
 #[cfg(feature = "sync-rt")]
 mod tests {
-    use jlrs::{prelude::*, wrappers::ptr::symbol::Symbol};
+    use jlrs::{data::managed::symbol::Symbol, prelude::*};
 
     use super::util::JULIA;
 

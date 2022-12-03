@@ -658,20 +658,20 @@
 //! [`CCall::uv_async_send`]: crate::ccall::CCall::uv_async_send
 //! [`Unrooted`]: crate::memory::target::unrooted::Unrooted
 //! [`GcFrame`]: crate::memory::target::frame::GcFrame
-//! [`Module`]: crate::wrappers::ptr::module::Module
-//! [`Function`]: crate::wrappers::ptr::function::Function
-//! [`Value`]: crate::wrappers::ptr::value::Value
+//! [`Module`]: crate::data::managed::module::Module
+//! [`Function`]: crate::data::managed::function::Function
+//! [`Value`]: crate::data::managed::value::Value
 //! [`Call`]: crate::call::Call
-//! [`Value::eval_string`]: crate::wrappers::ptr::value::Value::eval_string
-//! [`Value::new`]: crate::wrappers::ptr::value::Value::new
-//! [`Array`]: crate::wrappers::ptr::array::Array
-//! [`JuliaString`]: crate::wrappers::ptr::string::JuliaString
-//! [`Module::main`]: crate::wrappers::ptr::module::Module::main
-//! [`Module::base`]: crate::wrappers::ptr::module::Module::base
-//! [`Module::core`]: crate::wrappers::ptr::module::Module::core
-//! [`Module::function`]: crate::wrappers::ptr::module::Module::function
-//! [`Module::global`]: crate::wrappers::ptr::module::Module::global
-//! [`Module::submodule`]: crate::wrappers::ptr::module::Module::submodule
+//! [`Value::eval_string`]: crate::data::managed::value::Value::eval_string
+//! [`Value::new`]: crate::data::managed::value::Value::new
+//! [`Array`]: crate::data::managed::array::Array
+//! [`JuliaString`]: crate::data::managed::string::JuliaString
+//! [`Module::main`]: crate::data::managed::module::Module::main
+//! [`Module::base`]: crate::data::managed::module::Module::base
+//! [`Module::core`]: crate::data::managed::module::Module::core
+//! [`Module::function`]: crate::data::managed::module::Module::function
+//! [`Module::global`]: crate::data::managed::module::Module::global
+//! [`Module::submodule`]: crate::data::managed::module::Module::submodule
 //! [`AsyncJulia::init_with_image`]: crate::multitask::runtime::AsyncJulia::init_with_image
 //! [`AsyncJulia::init_with_image_async`]: crate::multitask::runtime::AsyncJulia::init_with_image_async
 //! [`IntoJulia`]: crate::convert::into_julia::IntoJulia
@@ -687,8 +687,8 @@
 //! [`PersistentHandle`]: crate::runtime::async_rt::PersistentHandle
 //! [`AsyncJulia`]: crate::runtime::async_rt::AsyncJulia
 //! [`CallAsync`]: crate::call::CallAsync
-//! [`DataType`]: crate::wrappers::ptr::datatype::DataType
-//! [`TypedArray`]: crate::wrappers::ptr::array::TypedArray
+//! [`DataType`]: crate::data::managed::datatype::DataType
+//! [`TypedArray`]: crate::data::managed::array::TypedArray
 //! [`RuntimeBuilder`]: crate::runtime::builder::RuntimeBuilder
 //! [`AsyncRuntimeBuilder`]: crate::runtime::builder::AsyncRuntimeBuilder
 //! [`jlrs::prelude`]: crate::prelude
@@ -701,12 +701,12 @@ macro_rules! init_fn {
         pub(crate) unsafe fn $name<'frame>(
             frame: &mut $crate::memory::target::frame::GcFrame<'frame>,
         ) -> () {
-            match $crate::wrappers::ptr::value::Value::eval_string(frame, $include) {
+            match $crate::data::managed::value::Value::eval_string(frame, $include) {
                 Ok(_) => (),
                 Err(e) => {
                     panic!(
                         "{}",
-                        $crate::wrappers::ptr::Wrapper::error_string_or(
+                        $crate::data::managed::Managed::error_string_or(
                             e,
                             $crate::error::CANNOT_DISPLAY_VALUE
                         )
@@ -725,6 +725,7 @@ pub(crate) mod catch;
 #[cfg(feature = "ccall")]
 pub mod ccall;
 pub mod convert;
+pub mod data;
 pub mod error;
 pub mod info;
 pub mod layout;
@@ -740,4 +741,3 @@ pub mod safety;
 #[doc(hidden)]
 #[cfg(feature = "sync-rt")]
 pub mod util;
-pub mod wrappers;

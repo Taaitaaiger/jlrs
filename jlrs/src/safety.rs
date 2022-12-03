@@ -100,8 +100,8 @@
 //! in Rust. Exceptions in Julia are implemented as jumps, and jumping over a Rust function back
 //! to Julia is undefined behavior.
 //!
-//! [`Bool`]: crate::wrappers::inline::bool::Bool
-//! [`Char`]: crate::wrappers::inline::char::Char
-//! [`Value`]: crate::wrappers::ptr::value::Value
-//! [`Array`]: crate::wrappers::ptr::array::Array
-//! [`TypedArray<T>`]: crate::wrappers::ptr::array::TypedArray
+//! [`Bool`]: crate::data::layout::bool::Bool
+//! [`Char`]: crate::data::layout::char::Char
+//! [`Value`]: crate::data::managed::value::Value
+//! [`Array`]: crate::data::managed::array::Array
+//! [`TypedArray<T>`]: crate::data::managed::array::TypedArray

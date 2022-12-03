@@ -10,6 +10,7 @@ use jl_sys::{jl_atexit_hook, jl_init, jl_init_with_image, jl_is_initialized};
 use crate::{
     call::Call,
     convert::into_jlrs_result::IntoJlrsResult,
+    data::managed::{module::Module, string::JuliaString, value::Value, Managed},
     error::{IOError, JlrsResult, RuntimeError},
     memory::{
         context::stack::Stack,
@@ -17,7 +18,6 @@ use crate::{
         target::frame::GcFrame,
     },
     runtime::{builder::RuntimeBuilder, init_jlrs, INIT},
-    wrappers::ptr::{module::Module, string::JuliaString, value::Value, Wrapper},
 };
 
 /// A pending Julia instance.
@@ -126,9 +126,9 @@ impl Julia<'_> {
 
             Module::main(&frame)
                 .submodule(&frame, "Jlrs")?
-                .wrapper()
+                .as_managed()
                 .global(&frame, "color")?
-                .value()
+                .as_value()
                 .set_field_unchecked("x", enable)
         })?;
 
@@ -162,7 +162,7 @@ impl Julia<'_> {
                 let path_jl_str = JuliaString::new(&mut frame, path.as_ref().to_string_lossy());
                 Module::main(&frame)
                     .function(&frame, "include")?
-                    .wrapper()
+                    .as_managed()
                     .call1(&mut frame, path_jl_str.as_value())
                     .into_jlrs_result()
                     .map(|_| ())

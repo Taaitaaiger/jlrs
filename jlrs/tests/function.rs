@@ -17,7 +17,7 @@ mod tests {
                     frame
                         .scope(|frame| {
                             let func =
-                                unsafe { Module::base(&frame).function(&frame, "+")?.wrapper() };
+                                unsafe { Module::base(&frame).function(&frame, "+")?.as_managed() };
                             Ok(func.root(output))
                         })
                         .unwrap();
@@ -37,7 +37,7 @@ mod tests {
                     let func_ty = unsafe {
                         Module::base(&frame)
                             .function(&frame, "+")?
-                            .wrapper()
+                            .as_managed()
                             .datatype()
                     };
 

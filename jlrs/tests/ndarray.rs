@@ -5,8 +5,8 @@ mod util;
 mod tests {
     use jlrs::{
         convert::ndarray::{NdArrayView, NdArrayViewMut},
+        data::managed::array::{Array, TypedArray},
         memory::stack_frame::StackFrame,
-        wrappers::ptr::array::{Array, TypedArray},
     };
 
     use super::util::JULIA;

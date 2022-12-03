@@ -13,14 +13,14 @@ mod tests {
                 .scope(|frame| unsafe {
                     let field = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper()
+                        .as_managed()
                         .global(&frame, "has_module")?
-                        .value()
+                        .as_value()
                         .field_accessor()
                         .field("a")?
                         .access::<ValueRef>()?;
 
-                    assert!(field.value().is::<Module>());
+                    assert!(field.as_value().is::<Module>());
 
                     Ok(())
                 })
@@ -36,9 +36,9 @@ mod tests {
                 .scope(|frame| unsafe {
                     let _field = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper()
+                        .as_managed()
                         .global(&frame, "has_nothing")?
-                        .value()
+                        .as_value()
                         .field_accessor()
                         .field("a")?
                         .access::<Nothing>()?;

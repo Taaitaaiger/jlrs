@@ -2,9 +2,9 @@ use std::cell::RefCell;
 
 #[cfg(feature = "sync-rt")]
 use jlrs::{
+    data::managed::value::Value,
     memory::stack_frame::StackFrame,
     runtime::{builder::RuntimeBuilder, sync_rt::PendingJulia},
-    wrappers::ptr::value::Value,
 };
 
 #[cfg(feature = "sync-rt")]

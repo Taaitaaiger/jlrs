@@ -4,24 +4,20 @@ mod util;
 #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
 mod tests {
     #[cfg(feature = "internal-types")]
-    use jlrs::wrappers::ptr::internal::code_instance::CodeInstance;
+    use jlrs::data::managed::internal::code_instance::CodeInstance;
     #[cfg(feature = "internal-types")]
-    use jlrs::wrappers::ptr::internal::expr::Expr;
+    use jlrs::data::managed::internal::expr::Expr;
     #[cfg(feature = "internal-types")]
-    use jlrs::wrappers::ptr::internal::method::Method;
+    use jlrs::data::managed::internal::method::Method;
     #[cfg(feature = "internal-types")]
-    use jlrs::wrappers::ptr::internal::method_instance::MethodInstance;
+    use jlrs::data::managed::internal::method_instance::MethodInstance;
     use jlrs::{
+        data::managed::{
+            simple_vector::SimpleVector, symbol::SymbolRef, type_name::TypeName, type_var::TypeVar,
+            union::Union, union_all::UnionAll,
+        },
         layout::typecheck::*,
         prelude::*,
-        wrappers::ptr::{
-            simple_vector::SimpleVector,
-            symbol::SymbolRef,
-            type_name::TypeName,
-            type_var::TypeVar,
-            union::Union,
-            union_all::UnionAll,
-        },
     };
 
     use crate::util::JULIA;
@@ -117,9 +113,9 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let dt = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper()
+                        .as_managed()
                         .function(&frame, "datatype")?
-                        .wrapper();
+                        .as_managed();
                     let dt_val = dt.call0(&mut frame).unwrap();
 
                     assert!(dt_val.is::<DataType>());
@@ -160,9 +156,9 @@ mod tests {
                         let tn = dt.field_names();
                         let tn = tn.typed_data::<SymbolRef>()?.as_slice();
 
-                        assert_eq!(tn[0].unwrap().wrapper().as_string().unwrap(), "name");
-                        assert_eq!(tn[1].unwrap().wrapper().as_string().unwrap(), "lb");
-                        assert_eq!(tn[2].unwrap().wrapper().as_string().unwrap(), "ub");
+                        assert_eq!(tn[0].unwrap().as_managed().as_string().unwrap(), "name");
+                        assert_eq!(tn[1].unwrap().as_managed().as_string().unwrap(), "lb");
+                        assert_eq!(tn[2].unwrap().as_managed().as_string().unwrap(), "ub");
                     }
 
                     Ok(())
@@ -435,7 +431,7 @@ mod tests {
                 .scope(|frame| {
                     let dt = UnionAll::array_type(&frame).base_type();
                     assert_eq!(dt.n_parameters(), 2);
-                    let param = unsafe { dt.parameter(&frame, 0).unwrap().value() };
+                    let param = unsafe { dt.parameter(&frame, 0).unwrap().as_value() };
                     assert!(param.is::<TypeVar>());
 
                     Ok(())
@@ -454,7 +450,7 @@ mod tests {
                         DataType::unionall_type(&frame)
                             .field_type(&frame, 0)
                             .unwrap()
-                            .wrapper()
+                            .as_managed()
                     };
 
                     assert!(val.is::<DataType>());
@@ -474,7 +470,7 @@ mod tests {
                         DataType::unionall_type(&frame)
                             .field_type_concrete(&frame, 0)
                             .unwrap()
-                            .wrapper()
+                            .as_managed()
                     };
 
                     assert!(val.is::<DataType>());
@@ -548,9 +544,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsStableTests")?
-                            .wrapper()
+                            .as_managed()
                             .global(&frame, "WithConst")?
-                            .value()
+                            .as_value()
                             .cast::<DataType>()?
                     };
 
@@ -595,9 +591,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper()
+                            .as_managed()
                             .global(&frame, "WithAbstract")?
-                            .value()
+                            .as_value()
                             .cast::<DataType>()?
                     };
 

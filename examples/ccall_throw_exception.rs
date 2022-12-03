@@ -16,7 +16,7 @@ pub unsafe extern "C" fn assert_less_than(a: i32, b: i32) {
             Module::core(&frame)
                 .global(&frame, "AssertionError")
                 .expect("AssertionError does not exist in Core")
-                .value()
+                .as_value()
                 .cast::<DataType>()
                 .expect("AssertionError is not a DataType")
                 .instantiate_unchecked(frame.as_mut(), [msg])

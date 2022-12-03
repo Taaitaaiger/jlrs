@@ -3,24 +3,18 @@
 use std::ffi::c_void;
 
 use jl_sys::{
-    jl_gc_collect,
-    jl_gc_collection_t,
-    jl_gc_enable,
-    jl_gc_is_enabled,
-    jl_gc_mark_queue_obj,
-    jl_gc_mark_queue_objarray,
-    jl_gc_safepoint,
-    jl_gc_wb,
+    jl_gc_collect, jl_gc_collection_t, jl_gc_enable, jl_gc_is_enabled, jl_gc_mark_queue_obj,
+    jl_gc_mark_queue_objarray, jl_gc_safepoint, jl_gc_wb,
 };
 
 use super::{target::Target, PTls};
 #[cfg(feature = "sync-rt")]
 use crate::runtime::sync_rt::Julia;
 #[cfg(not(feature = "julia-1-6"))]
-use crate::{call::Call, wrappers::ptr::module::Module};
+use crate::{call::Call, data::managed::module::Module};
 use crate::{
+    data::managed::{private::ManagedPriv, value::Value},
     private::Private,
-    wrappers::ptr::{private::WrapperPriv, value::Value},
 };
 
 /// The different collection modes.
@@ -61,10 +55,10 @@ pub trait Gc: private::GcPriv {
             Module::base(&global)
                 .submodule(&global, "GC")
                 .expect("No GC module in Base")
-                .wrapper()
+                .as_managed()
                 .function(&global, "enable_logging")
                 .expect("No enable_logging function in GC")
-                .wrapper()
+                .as_managed()
         };
 
         let arg = if on {

@@ -4,7 +4,7 @@ mod util;
 mod tests {
     use std::{ffi::c_void, ptr::null_mut};
 
-    use jlrs::{layout::typecheck::*, prelude::*, wrappers::ptr::union_all::UnionAll};
+    use jlrs::{data::managed::union_all::UnionAll, layout::typecheck::*, prelude::*};
 
     use super::util::JULIA;
 

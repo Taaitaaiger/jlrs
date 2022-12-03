@@ -309,9 +309,9 @@ mod tests {
                     let res = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper()
+                            .as_managed()
                             .function(&frame, "callrust")?
-                            .wrapper()
+                            .as_managed()
                             .call1(&mut frame, val)
                             .unwrap()
                             .unbox::<bool>()?

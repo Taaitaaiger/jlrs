@@ -3,9 +3,9 @@
 use std::ptr::NonNull;
 
 use crate::{
+    data::managed::{Managed, Ref},
     memory::context::stack::Stack,
     private::Private,
-    wrappers::ptr::{Ref, Wrapper},
 };
 
 /// A target that uses a reserved slot in a frame.
@@ -82,7 +82,7 @@ pub struct ReusableSlot<'target> {
 }
 
 impl<'scope> ReusableSlot<'scope> {
-    pub(crate) unsafe fn consume<'data, T: Wrapper<'scope, 'data>>(
+    pub(crate) unsafe fn consume<'data, T: Managed<'scope, 'data>>(
         self,
         ptr: NonNull<T::Wraps>,
     ) -> T {
@@ -90,7 +90,7 @@ impl<'scope> ReusableSlot<'scope> {
         T::wrap_non_null(ptr, Private)
     }
 
-    pub(crate) unsafe fn temporary<'data, T: Wrapper<'scope, 'data>>(
+    pub(crate) unsafe fn temporary<'data, T: Managed<'scope, 'data>>(
         &mut self,
         ptr: NonNull<T::Wraps>,
     ) -> Ref<'scope, 'data, T> {

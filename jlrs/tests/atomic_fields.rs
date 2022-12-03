@@ -15,9 +15,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsStableTests")?
-                            .wrapper()
+                            .as_managed()
                             .global(&frame, "WithAtomic")?
-                            .value()
+                            .as_value()
                     };
 
                     let arg1 = Value::new(&mut frame, 3u32);
@@ -44,9 +44,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsStableTests")?
-                            .wrapper()
+                            .as_managed()
                             .global(&frame, "WithLargeAtomic")?
-                            .value()
+                            .as_value()
                     };
 
                     let tup = Value::new(&mut frame, Tuple4(1u64, 2u64, 3u64, 4u64));
@@ -77,9 +77,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsStableTests")?
-                            .wrapper()
+                            .as_managed()
                             .global(&frame, "WithOddlySizedAtomic")?
-                            .value()
+                            .as_value()
                     };
 
                     let tup = Value::new(&mut frame, Tuple2(1u32, 2u16));
@@ -110,9 +110,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsStableTests")?
-                            .wrapper()
+                            .as_managed()
                             .global(&frame, "WithAtomicUnion")?
-                            .value()
+                            .as_value()
                     };
 
                     assert!(ty.cast::<DataType>()?.is_pointer_field(0)?);
@@ -137,7 +137,7 @@ mod tests {
                             DataType::datatype_type(&frame)
                                 .type_name()
                                 .cache(&frame)
-                                .wrapper()
+                                .as_managed()
                                 .len(),
                             0
                         )

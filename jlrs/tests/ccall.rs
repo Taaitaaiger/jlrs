@@ -71,9 +71,9 @@ mod tests {
                         Array::from_slice_unchecked(frame.as_extended_target(), &mut arr_data, 2)?;
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper()
+                        .as_managed()
                         .function(&frame, "callrustwitharr")?
-                        .wrapper();
+                        .as_managed();
 
                     let out = func.call2(&mut frame, fn_ptr, arr.as_value()).unwrap();
                     let ok = out.unbox::<bool>()?.as_bool();
@@ -97,9 +97,9 @@ mod tests {
                         Array::from_slice_unchecked(frame.as_extended_target(), &mut arr_data, 2)?;
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper()
+                        .as_managed()
                         .function(&frame, "callrustwitharr")?
-                        .wrapper();
+                        .as_managed();
 
                     let out = func.call2(&mut frame, fn_ptr, arr.as_value()).unwrap();
                     let ok = out.unbox::<bool>()?.as_bool();
@@ -126,9 +126,9 @@ mod tests {
                         Array::from_slice_unchecked(frame.as_extended_target(), &mut arr_data, 2)?;
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper()
+                        .as_managed()
                         .function(&frame, "callrustwitharr")?
-                        .wrapper();
+                        .as_managed();
 
                     let out = func.call2(&mut frame, fn_ptr, arr.as_value()).unwrap();
                     let ok = out.unbox::<bool>()?.as_bool();
@@ -182,9 +182,9 @@ mod tests {
 
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper()
+                        .as_managed()
                         .function(&frame, "callrustwithasynccond")?
-                        .wrapper();
+                        .as_managed();
 
                     let out = func
                         .call2(&mut frame, fn_ptr, destroy_handle_fn_ptr)
