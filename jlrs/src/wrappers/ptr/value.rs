@@ -196,7 +196,7 @@ use crate::{
 };
 
 cfg_if! {
-    if #[cfg(not(feature = "lts"))] {
+    if #[cfg(not(feature = "julia-1-6"))] {
         use jl_sys::{jlrs_lock, jlrs_unlock};
 
         use std::{
@@ -328,7 +328,7 @@ impl Value<'_, '_> {
     /// If the types can't be applied to `self` this methods catches and returns the exception.
     ///
     /// [`Union::new`]: crate::wrappers::ptr::union::Union::new
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     pub fn apply_type<'target, 'value, 'data, V, T>(
         self,
         target: T,
@@ -694,7 +694,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
             value: Some(self.as_ref()),
             current_field_type: Some(self.datatype().as_ref()),
             offset: 0,
-            #[cfg(not(feature = "lts"))]
+            #[cfg(not(feature = "julia-1-6"))]
             buffer: AtomicBuffer::new(),
             state: ViewState::Unlocked,
         }
@@ -858,7 +858,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// Safety: Mutating things that should absolutely not be mutated, like the fields of a
     /// `DataType`, is not prevented.
 
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     pub unsafe fn set_nth_field<'target, T>(
         self,
         target: T,
@@ -925,7 +925,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     ///
     /// Safety: Mutating things that should absolutely not be mutated, like the fields of a
     /// `DataType`, is not prevented.
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     pub unsafe fn set_field<'target, N, T>(
         self,
         target: T,
@@ -1480,13 +1480,13 @@ impl LeakedValue {
 
 #[repr(C)]
 #[derive(Clone, Copy)]
-#[cfg(not(feature = "lts"))]
+#[cfg(not(feature = "julia-1-6"))]
 union AtomicBuffer {
     bytes: [MaybeUninit<u8>; 8],
     ptr: *mut jl_value_t,
 }
 
-#[cfg(not(feature = "lts"))]
+#[cfg(not(feature = "julia-1-6"))]
 impl AtomicBuffer {
     fn new() -> Self {
         AtomicBuffer { ptr: null_mut() }
@@ -1495,10 +1495,10 @@ impl AtomicBuffer {
 
 #[derive(Copy, Clone, PartialEq)]
 enum ViewState {
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(feature = "julia-1-6"))]
     Locked,
     Unlocked,
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(feature = "julia-1-6"))]
     AtomicBuffer,
     Array,
 }
@@ -1516,7 +1516,7 @@ enum ViewState {
 pub struct FieldAccessor<'scope, 'data> {
     value: Option<ValueRef<'scope, 'data>>,
     current_field_type: Option<DataTypeRef<'scope>>,
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(feature = "julia-1-6"))]
     buffer: AtomicBuffer,
     offset: u32,
     state: ViewState,
@@ -1552,7 +1552,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
                 Err(AccessError::InvalidLayout { value_type })?;
             }
 
-            #[cfg(not(feature = "lts"))]
+            #[cfg(not(feature = "julia-1-6"))]
             if self.state == ViewState::AtomicBuffer {
                 debug_assert!(!T::IS_REF);
                 debug_assert!(std::mem::size_of::<T>() <= 8);
@@ -1664,11 +1664,11 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
                     Ordering::Relaxed,
                     Ordering::SeqCst,
                 ),
-                #[cfg(not(feature = "lts"))]
+                #[cfg(not(feature = "julia-1-6"))]
                 ViewState::Locked => {
                     self.get_locked_inline_field(is_pointer_field, next_field_type)
                 }
-                #[cfg(not(feature = "lts"))]
+                #[cfg(not(feature = "julia-1-6"))]
                 ViewState::AtomicBuffer => {
                     self.get_atomic_buffer_field(is_pointer_field, next_field_type)
                 }
@@ -1683,7 +1683,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
     /// If the field is a small atomic field `ordering` is used to read it. The ordering is
     /// ignored for non-atomic fields and fields that require a lock to access. See
     /// [`FieldAccessor::field`] for more information.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(feature = "julia-1-6"))]
     pub fn atomic_field<F: FieldIndex>(mut self, field: F, ordering: Ordering) -> JlrsResult<Self> {
         if self.value.is_none() {
             Err(AccessError::UndefRef)?
@@ -1749,7 +1749,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
     ///
     /// If the current value this accessor is accessing is locked an error is returned.
     pub fn try_clone(&self) -> JlrsResult<Self> {
-        #[cfg(not(feature = "lts"))]
+        #[cfg(not(feature = "julia-1-6"))]
         if self.state == ViewState::Locked {
             Err(AccessError::Locked)?;
         }
@@ -1758,20 +1758,20 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
             value: self.value,
             current_field_type: self.current_field_type,
             offset: self.offset,
-            #[cfg(not(feature = "lts"))]
+            #[cfg(not(feature = "julia-1-6"))]
             buffer: self.buffer.clone(),
             state: self.state,
         })
     }
 
     /// Returns `true` if the current value the accessor is accessing is locked.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(feature = "julia-1-6"))]
     pub fn is_locked(&self) -> bool {
         self.state == ViewState::Locked
     }
 
     /// Returns `true` if the current value the accessor is accessing is locked.
-    #[cfg(feature = "lts")]
+    #[cfg(feature = "julia-1-6")]
     pub fn is_locked(&self) -> bool {
         false
     }
@@ -1786,7 +1786,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
         self.value
     }
 
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(feature = "julia-1-6"))]
     // Safety: the view state must be ViewState::AtomicBuffer
     unsafe fn get_atomic_buffer_field(
         &mut self,
@@ -1823,7 +1823,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
     }
 
     // Safety: the view state must be ViewState::Unlocked
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(feature = "julia-1-6"))]
     unsafe fn get_unlocked_inline_field(
         &mut self,
         is_pointer_field: bool,
@@ -1853,7 +1853,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
     }
 
     // Safety: the view state must be ViewState::Unlocked
-    #[cfg(feature = "lts")]
+    #[cfg(feature = "julia-1-6")]
     unsafe fn get_unlocked_inline_field(
         &mut self,
         is_pointer_field: bool,
@@ -1874,7 +1874,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
     }
 
     // Safety: the view state must be ViewState::Locked
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(feature = "julia-1-6"))]
     unsafe fn get_locked_inline_field(
         &mut self,
         is_pointer_field: bool,
@@ -1932,7 +1932,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
         Ok(())
     }
 
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(feature = "julia-1-6"))]
     // Safety: must only be used to read an atomic field
     unsafe fn lock_or_copy_atomic(&mut self, ordering: Ordering) {
         let ptr = self
@@ -2039,7 +2039,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
         }
     }
 
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(feature = "julia-1-6"))]
     // Safety: must only be used to read an pointer field
     unsafe fn get_pointer_field(&mut self, locked: bool, next_field_type: Value<'scope, 'data>) {
         let value = self
@@ -2079,7 +2079,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
         }
     }
 
-    #[cfg(feature = "lts")]
+    #[cfg(feature = "julia-1-6")]
     // Safety: must only be used to read an pointer field
     unsafe fn get_pointer_field(&mut self, _locked: bool, next_field_type: Value<'scope, 'data>) {
         self.value = self
@@ -2113,7 +2113,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
         }
     }
 
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(feature = "julia-1-6"))]
     // Safety: must only be used to read an atomic pointer field
     unsafe fn get_atomic_pointer_field(
         &mut self,
@@ -2185,7 +2185,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
 
 impl Drop for FieldAccessor<'_, '_> {
     fn drop(&mut self) {
-        #[cfg(not(feature = "lts"))]
+        #[cfg(not(feature = "julia-1-6"))]
         if self.state == ViewState::Locked {
             debug_assert!(!self.value.is_none());
             // Safety: the value is currently locked.

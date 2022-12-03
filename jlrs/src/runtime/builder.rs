@@ -42,9 +42,9 @@ cfg_if::cfg_if! {
             pub(crate) n_threads: usize,
             pub(crate) channel_capacity: NonZeroUsize,
             pub(crate) recv_timeout: Duration,
-            #[cfg(any(feature = "nightly", feature = "beta"))]
+            #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
             pub(crate) n_threadsi: usize,
-            #[cfg(any(feature = "nightly", feature = "beta"))]
+            #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
             pub(crate) n_workers: usize,
             _runtime: PhantomData<R>,
         }
@@ -65,7 +65,7 @@ cfg_if::cfg_if! {
                 self
             }
 
-            #[cfg(any(feature = "nightly", feature = "beta"))]
+            #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
             /// Set the number of threads allocated to the `:interactive` pool.
             ///
             /// If it's set to 0, the default value, no threads are allocated to this pool.
@@ -75,7 +75,7 @@ cfg_if::cfg_if! {
             }
 
 
-            #[cfg(any(feature = "nightly", feature = "beta"))]
+            #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
             /// Set the number of worker threads jlrs creates in addition to the runtime thread.
             ///
             /// If it's set to 0, the default value, no worker threads are created.
@@ -200,9 +200,9 @@ impl RuntimeBuilder {
             n_threads: 0,
             channel_capacity: unsafe { NonZeroUsize::new_unchecked(16) },
             recv_timeout: Duration::from_millis(1),
-            #[cfg(any(feature = "nightly", feature = "beta"))]
+            #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
             n_threadsi: 0,
-            #[cfg(any(feature = "nightly", feature = "beta"))]
+            #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
             n_workers: 0,
             _runtime: PhantomData,
         }

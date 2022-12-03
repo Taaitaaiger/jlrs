@@ -100,7 +100,7 @@ use crate::{
 };
 
 cfg_if! {
-    if #[cfg(not(all(target_os = "windows", feature = "lts")))] {
+    if #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))] {
         use crate::{catch::{catch_exceptions_with_slots, catch_exceptions}};
         use std::mem::MaybeUninit;
     }
@@ -145,7 +145,7 @@ impl<'data> Array<'_, 'data> {
     /// If the array size is too large, Julia will throw an error. This error is caught and
     /// returned.
 
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     pub fn new<'target, 'current, 'borrow, T, D, S>(
         target: ExtendedTarget<'target, 'current, 'borrow, S>,
         dims: D,
@@ -264,7 +264,7 @@ impl<'data> Array<'_, 'data> {
     ///
     /// If the array size is too large or if the type is invalid, Julia will throw an error. This
     /// error is caught and returned.
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     pub fn new_for<'target, 'current, 'borrow, D, S>(
         target: ExtendedTarget<'target, 'current, 'borrow, S>,
         dims: D,
@@ -384,7 +384,7 @@ impl<'data> Array<'_, 'data> {
     ///
     /// If the array size is too large, Julia will throw an error. This error is caught and
     /// returned.
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     pub fn from_slice<'target: 'current, 'current: 'borrow, 'borrow, T, D, S>(
         target: ExtendedTarget<'target, 'current, 'borrow, S>,
         data: &'data mut [T],
@@ -531,7 +531,7 @@ impl<'data> Array<'_, 'data> {
     ///
     /// If the array size is too large, Julia will throw an error. This error is caught and
     /// returned.
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     pub fn from_vec<'target, 'current, 'borrow, T, D, S>(
         target: ExtendedTarget<'target, 'current, 'borrow, S>,
         data: Vec<T>,
@@ -1035,12 +1035,24 @@ impl<'scope, 'data> Array<'scope, 'data> {
         ArrayAccessor::new(self)
     }
 
+    pub unsafe fn as_slice_unchecked<'borrow, T>(&'borrow self) -> &'borrow [T] {
+        let len = self.dimensions().size();
+        let data = self.data_ptr().cast::<T>();
+        std::slice::from_raw_parts(data, len)
+    }
+
+    pub unsafe fn as_mut_slice_unchecked<'borrow, T>(&'borrow mut self) -> &'borrow mut [T] {
+        let len = self.dimensions().size();
+        let data = self.data_ptr().cast::<T>();
+        std::slice::from_raw_parts_mut(data, len)
+    }
+
     /// Reshape the array, a new array is returned that has dimensions `dims`. The new array and
     /// `self` share their data.
     ///
     /// This method returns an exception if the old and new array have a different number of
     /// elements.
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     pub unsafe fn reshape<'target, 'current, 'borrow, D, S>(
         &self,
         target: ExtendedTarget<'target, 'current, 'borrow, S>,
@@ -1209,7 +1221,7 @@ impl<'scope> Array<'scope, 'static> {
     ///
     /// The array must be 1D and not contain data borrowed or moved from Rust, otherwise an exception
     /// is returned.
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     pub unsafe fn grow_end<'target, S>(
         &mut self,
         target: S,
@@ -1247,7 +1259,7 @@ impl<'scope> Array<'scope, 'static> {
     ///
     /// The array must be 1D, not contain data borrowed or moved from Rust, otherwise an exception
     /// is returned.
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     pub unsafe fn del_end<'target, S>(&mut self, target: S, dec: usize) -> S::Exception<'static, ()>
     where
         S: Target<'target>,
@@ -1280,7 +1292,7 @@ impl<'scope> Array<'scope, 'static> {
     ///
     /// The array must be 1D, not contain data borrowed or moved from Rust, otherwise an exception
     /// is returned.
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     pub unsafe fn grow_begin<'target, S>(
         &mut self,
         target: S,
@@ -1317,7 +1329,7 @@ impl<'scope> Array<'scope, 'static> {
     ///
     /// The array must be 1D, not contain data borrowed or moved from Rust, otherwise an exception
     /// is returned.
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     pub unsafe fn del_begin<'target, S>(
         &mut self,
         target: S,
@@ -1410,7 +1422,7 @@ where
     ///
     /// If the array size is too large, Julia will throw an error. This error is caught and
     /// returned.
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     pub fn new<'target, 'current, 'borrow, D, S>(
         target: ExtendedTarget<'target, 'current, 'borrow, S>,
         dims: D,
@@ -1478,7 +1490,7 @@ where
     ///
     /// If the array size is too large, Julia will throw an error. This error is caught and
     /// returned.
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     pub fn from_slice<'target: 'current, 'current: 'borrow, 'borrow, D, S>(
         target: ExtendedTarget<'target, 'current, 'borrow, S>,
         data: &'data mut [T],
@@ -1548,7 +1560,7 @@ where
     ///
     /// If the array size is too large, Julia will throw an error. This error is caught and
     /// returned.
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     pub fn from_vec<'target, 'current, 'borrow, D, S>(
         target: ExtendedTarget<'target, 'current, 'borrow, S>,
         data: Vec<T>,
@@ -1621,7 +1633,7 @@ where
     ///
     /// If the array size is too large or if the type is invalid, Julia will throw an error. This
     /// error is caught and returned.
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     pub fn new_for<'target, 'current, 'borrow, D, S>(
         target: ExtendedTarget<'target, 'current, 'borrow, S>,
         dims: D,
@@ -1873,7 +1885,7 @@ where
     ///
     /// This method returns an exception if the old and new array have a different number of
     /// elements.
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     pub unsafe fn reshape<'target, 'current, 'borrow, D, S>(
         &self,
         target: ExtendedTarget<'target, 'current, 'borrow, S>,
@@ -2075,7 +2087,7 @@ where
     ///
     /// The array must be 1D and not contain data borrowed or moved from Rust, otherwise an exception
     /// is returned.
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     pub unsafe fn grow_end<'target, S>(
         &mut self,
         target: S,
@@ -2100,7 +2112,7 @@ where
     ///
     /// The array must be 1D, not contain data borrowed or moved from Rust, otherwise an exception
     /// is returned.
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     pub unsafe fn del_end<'target, S>(&mut self, target: S, dec: usize) -> S::Exception<'static, ()>
     where
         S: Target<'target>,
@@ -2120,7 +2132,7 @@ where
     ///
     /// The array must be 1D, not contain data borrowed or moved from Rust, otherwise an exception
     /// is returned.
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     pub unsafe fn grow_begin<'target, S>(
         &mut self,
         target: S,
@@ -2145,7 +2157,7 @@ where
     ///
     /// The array must be 1D, not contain data borrowed or moved from Rust, otherwise an exception
     /// is returned.
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     pub unsafe fn del_begin<'target, S>(
         &mut self,
         target: S,

@@ -505,7 +505,7 @@ mod tests {
         })
     }
 
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     fn derive_double_variant() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
@@ -883,7 +883,7 @@ mod tests {
         })
     }
 
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     fn derive_with_propagated_lifetimes() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
@@ -1118,9 +1118,9 @@ mod tests {
         derive_with_set_generic_tuple();
         derive_with_value_type();
         derive_zero_sized();
-        #[cfg(not(all(target_os = "windows", feature = "lts")))]
+        #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
         derive_double_variant();
-        #[cfg(not(all(target_os = "windows", feature = "lts")))]
+        #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
         derive_with_propagated_lifetimes();
     }
 }

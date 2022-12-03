@@ -16,7 +16,7 @@ use jl_sys::{
 use super::{target::Target, PTls};
 #[cfg(feature = "sync-rt")]
 use crate::runtime::sync_rt::Julia;
-#[cfg(not(feature = "lts"))]
+#[cfg(not(feature = "julia-1-6"))]
 use crate::{call::Call, wrappers::ptr::module::Module};
 use crate::{
     private::Private,
@@ -47,7 +47,7 @@ pub trait Gc: private::GcPriv {
     /// Enable or disable GC logging.
     ///
     /// This method is not available when the `lts` feature is enabled.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(feature = "julia-1-6"))]
     fn enable_gc_logging(&self, on: bool) {
         // Safety: Julia is active, this method is called from a thread known to Julia, and no
         // Julia data is returned by this method.

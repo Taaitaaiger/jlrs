@@ -64,22 +64,33 @@ unsafe-ledger = []
 # Link debug build of Julia
 debug = ["jl-sys/debug"]
 # Link LTS version of Julia
-lts = ["jl-sys/lts"]
+lts = ["jl-sys/lts", "julia-1-6"]
 # Link beta version of Julia
-beta = ["jl-sys/beta"]
+beta = ["jl-sys/beta", "julia-1-9"]
 # link nightly version of Julia
-nightly = ["jl-sys/nightly"]
+nightly = ["jl-sys/nightly", "julia-1-10"]
 # Link 32-bits version of Julia on Linux
 i686 = ["jl-sys/i686"]
+
+# Link Julia 1.6
+julia-1-6 = ["jl-sys/julia-1-6"]
+# Link Julia 1.7
+julia-1-7 = ["jl-sys/julia-1-7"]
+# Link Julia 1.8
+julia-1-8 = ["jl-sys/julia-1-8"]
+# Link Julia 1.9
+julia-1-9 = ["jl-sys/julia-1-9"]
+# Link Julia 1.10
+julia-1-10 = ["jl-sys/julia-1-10"]
 
 # Internal
 
 # Used to generate docs for docs.rs
-docs = ["jl-sys/docs", "full", "nightly"]
+docs = ["jl-sys/docs", "full", "julia-1-9"]
 
 [dependencies]
 cfg-if = "1"
-jl-sys = {version = "0.19", path = "../jl_sys" }
+jl-sys = { version = "0.20", path = "../jl_sys" }
 smallvec = "1"
 thiserror = "1"
 atomic_refcell = "0.1"

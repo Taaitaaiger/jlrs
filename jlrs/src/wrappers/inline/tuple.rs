@@ -29,7 +29,7 @@
 
 use jl_sys::jl_tuple_typename;
 
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
+#[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
 use crate::wrappers::ptr::value::ValueResult;
 use crate::{
     layout::typecheck::Typecheck,
@@ -50,7 +50,7 @@ pub struct Tuple;
 
 impl Tuple {
     /// Create a new tuple from the contents of `values`.
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     pub fn new<'target, 'current, 'borrow, 'value, 'data, V, T>(
         target: ExtendedTarget<'target, 'current, 'borrow, T>,
         values: V,

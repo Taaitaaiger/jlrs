@@ -1,6 +1,6 @@
 mod util;
 #[cfg(all(feature = "sync-rt", feature = "ccall"))]
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
+#[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
 mod tests {
     #[cfg(feature = "uv")]
     use std::{

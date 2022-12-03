@@ -1,7 +1,7 @@
 mod util;
 
 #[cfg(feature = "sync-rt")]
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
+#[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
 mod tests {
     #[cfg(feature = "internal-types")]
     use jlrs::wrappers::ptr::internal::code_instance::CodeInstance;
@@ -538,7 +538,7 @@ mod tests {
         })
     }
 
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7")))]
     fn datatype_is_const_field() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -679,7 +679,7 @@ mod tests {
                         assert_eq!(ty.name(), "GotoIfNot");
                     }
 
-                    #[cfg(not(feature = "lts"))]
+                    #[cfg(not(feature = "julia-1-6"))]
                     {
                         let ty = DataType::atomicerror_type(&frame);
                         assert_eq!(ty.name(), "ConcurrencyViolationError");
@@ -690,13 +690,13 @@ mod tests {
                         assert_eq!(ty.name(), "MethodMatch");
                     }
 
-                    #[cfg(not(feature = "lts"))]
+                    #[cfg(not(feature = "julia-1-6"))]
                     {
                         let ty = DataType::interconditional_type(&frame);
                         assert_eq!(ty.name(), "InterConditional");
                     }
 
-                    #[cfg(not(feature = "lts"))]
+                    #[cfg(not(feature = "julia-1-6"))]
                     {
                         let ty = DataType::partial_opaque_type(&frame);
                         assert_eq!(ty.name(), "PartialOpaque");
@@ -752,7 +752,7 @@ mod tests {
         datatype_field_name_str();
         datatype_field_index_unchecked();
         cannot_instantiate_array();
-        #[cfg(not(feature = "lts"))]
+        #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7")))]
         datatype_is_const_field();
         cannot_instantiate_with_incorrect_params();
         compare_with_value();

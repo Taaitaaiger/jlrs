@@ -1,8 +1,14 @@
-#[cfg(all(feature = "tokio-rt", not(all(target_os = "windows", feature = "lts"))))]
+#[cfg(all(
+    feature = "tokio-rt",
+    not(all(target_os = "windows", feature = "julia-1-6"))
+))]
 #[cfg(test)]
 mod util;
 
-#[cfg(all(feature = "tokio-rt", not(all(target_os = "windows", feature = "lts"))))]
+#[cfg(all(
+    feature = "tokio-rt",
+    not(all(target_os = "windows", feature = "julia-1-6"))
+))]
 #[cfg(test)]
 mod tests {
     use std::{num::NonZeroUsize, sync::Arc};

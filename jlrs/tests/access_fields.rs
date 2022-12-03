@@ -1,16 +1,16 @@
 mod util;
 #[cfg(feature = "sync-rt")]
 mod tests {
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(feature = "julia-1-6"))]
     use std::sync::atomic::Ordering;
 
     use jlrs::{convert::to_symbol::ToSymbol, prelude::*};
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     use jlrs::{layout::typecheck::Mutable, wrappers::inline::union::EmptyUnion};
 
     use super::util::{JULIA, MIXED_BAG_JL};
 
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     fn empty_union_field() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -113,7 +113,7 @@ mod tests {
         })
     }
 
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     fn access_mutable_struct_fields() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -155,7 +155,7 @@ mod tests {
         })
     }
 
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     fn cannot_access_unknown_mutable_struct_field() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -322,7 +322,7 @@ mod tests {
                         assert_eq!(field, 3);
                     }
 
-                    #[cfg(not(feature = "lts"))]
+                    #[cfg(not(feature = "julia-1-6"))]
                     {
                         let field = value
                             .field_accessor()
@@ -367,7 +367,7 @@ mod tests {
                         assert_eq!(field.wrapper(), Module::main(&frame));
                     }
 
-                    #[cfg(not(feature = "lts"))]
+                    #[cfg(not(feature = "julia-1-6"))]
                     {
                         {
                             let field = value
@@ -472,7 +472,7 @@ mod tests {
                         assert_eq!(field, -3);
                     }
 
-                    #[cfg(not(feature = "lts"))]
+                    #[cfg(not(feature = "julia-1-6"))]
                     {
                         let field = value
                             .field_accessor()
@@ -517,7 +517,7 @@ mod tests {
                         assert_eq!(field, Nothing);
                     }
 
-                    #[cfg(not(feature = "lts"))]
+                    #[cfg(not(feature = "julia-1-6"))]
                     {
                         {
                             let field = value
@@ -816,11 +816,11 @@ mod tests {
 
     #[test]
     fn access_field_tests() {
-        #[cfg(not(all(target_os = "windows", feature = "lts")))]
+        #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
         empty_union_field();
-        #[cfg(not(all(target_os = "windows", feature = "lts")))]
+        #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
         access_mutable_struct_fields();
-        #[cfg(not(all(target_os = "windows", feature = "lts")))]
+        #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
         cannot_access_unknown_mutable_struct_field();
         access_tuple_fields();
         cannot_access_oob_tuple_field();

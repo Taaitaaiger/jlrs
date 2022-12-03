@@ -7,7 +7,7 @@ use std::{
     ptr::{null_mut, NonNull},
 };
 
-#[cfg(not(feature = "lts"))]
+#[cfg(not(feature = "julia-1-6"))]
 use jl_sys::{jl_get_current_task, jl_task_t};
 
 use super::context::stack::Stack;
@@ -64,7 +64,7 @@ pub(crate) struct PinnedFrame<'scope, const N: usize> {
 impl<'scope, const N: usize> PinnedFrame<'scope, N> {
     unsafe fn new(raw: &'scope mut StackFrame<N>) -> Self {
         cfg_if::cfg_if! {
-            if #[cfg(feature = "lts")] {
+            if #[cfg(feature = "julia-1-6")] {
                 let rtls = NonNull::new_unchecked(jl_sys::jl_get_ptls_states()).as_mut();
                 raw.prev = rtls.pgcstack.cast();
                 rtls.pgcstack = raw as *mut _ as *mut _;
@@ -100,7 +100,7 @@ impl<'scope, const N: usize> Drop for PinnedFrame<'scope, N> {
     fn drop(&mut self) {
         unsafe {
             cfg_if::cfg_if! {
-                if #[cfg(feature = "lts")] {
+                if #[cfg(feature = "julia-1-6")] {
                     let rtls = NonNull::new_unchecked(jl_sys::jl_get_ptls_states()).as_mut();
                     rtls.pgcstack = self.raw.prev.cast();
                 } else {

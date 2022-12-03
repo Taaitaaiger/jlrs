@@ -159,7 +159,7 @@ impl<'scope> Module<'scope> {
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
     /// this value is allowed.
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     pub unsafe fn set_global<'target, N, T>(
         self,
         target: T,
@@ -215,7 +215,7 @@ impl<'scope> Module<'scope> {
     /// Set a constant in this module. If Julia throws an exception it's caught and rooted in the
     /// current frame, if the exception can't be rooted a `JlrsError::AllocError` is returned. If
     /// no exception is thrown an unrooted reference to the constant is returned.
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     pub fn set_const<'target, N, T>(
         self,
         target: T,

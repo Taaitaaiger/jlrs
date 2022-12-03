@@ -1,4 +1,4 @@
-/* generated from Julia version 1.8.3 */
+/* generated from julia version 1.8.3 */
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct __BindgenBitfieldUnit<Storage> {
@@ -2227,7 +2227,7 @@ impl _jl_task_t {
 pub type jl_task_t = _jl_task_t;
 #[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
 extern "C" {
-    pub fn jl_throw(e: *mut jl_value_t);
+    pub fn jl_throw(e: *mut jl_value_t) -> !;
 }
 #[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
 extern "C" {

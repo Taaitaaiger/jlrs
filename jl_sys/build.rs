@@ -155,7 +155,7 @@ fn main() {
 
     #[cfg(all(
         target_env = "msvc",
-        not(all(feature = "lts", any(windows, feature = "windows")))
+        not(all(feature = "julia-1-6", any(windows, feature = "windows")))
     ))]
     c.flag("/std:c++20");
 
@@ -165,13 +165,13 @@ fn main() {
         c.object(&julia_dll_a);
     }
 
-    #[cfg(all(feature = "lts", any(windows, feature = "windows")))]
+    #[cfg(all(feature = "julia-1-6", any(windows, feature = "windows")))]
     c.define("JLRS_WINDOWS_LTS", None);
 
-    #[cfg(feature = "lts")]
+    #[cfg(feature = "julia-1-6")]
     c.define("JLRS_LTS", None);
 
-    #[cfg(any(feature = "nightly", feature = "beta"))]
+    #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
     c.define("JLRS_NIGHTLY", None);
 
     c.compile("jlrs_cc");
@@ -193,17 +193,17 @@ fn main() {
 
         builder = builder.clang_arg(include_dir_flag).clang_arg(arch_flag);
 
-        #[cfg(any(feature = "nightly", feature = "beta"))]
+        #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
         {
             builder = builder.clang_arg("-DJLRS_NIGHTLY");
         }
 
-        #[cfg(feature = "lts")]
+        #[cfg(feature = "julia-1-6")]
         {
             builder = builder.clang_arg("-DJLRS_LTS");
         }
 
-        #[cfg(all(feature = "lts", any(windows, feature = "windows")))]
+        #[cfg(all(feature = "julia-1-6", any(windows, feature = "windows")))]
         {
             builder = builder.clang_arg("-DJLRS_WINDOWS_LTS");
         }
@@ -304,6 +304,7 @@ fn main() {
             .allowlist_function("jl_process_events")
             .allowlist_function("jl_ptr_to_array")
             .allowlist_function("jl_ptr_to_array_1d")
+            .allowlist_function("jl_reinit_foreign_type")
             .allowlist_function("jl_reshape_array")
             .allowlist_function("jl_set_const")
             .allowlist_function("jl_set_global")
@@ -486,7 +487,7 @@ fn main() {
             .allowlist_var("jl_voidpointer_type")
             .allowlist_var("jl_weakref_type");
 
-        #[cfg(not(all(feature = "lts", any(windows, feature = "windows"))))]
+        #[cfg(not(all(feature = "julia-1-6", any(windows, feature = "windows"))))]
         {
             builder = builder.allowlist_function("jlrs_catch_wrapper");
         }
