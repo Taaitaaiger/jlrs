@@ -1,4 +1,4 @@
-/* generated from Julia version 1.9.0-dev */
+/* generated from julia version 1.10.0-DEV */
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct __BindgenBitfieldUnit<Storage> {
@@ -79,14 +79,6 @@ where
         }
     }
 }
-pub type __int8_t = ::std::os::raw::c_schar;
-pub type __uint8_t = ::std::os::raw::c_uchar;
-pub type __int16_t = ::std::os::raw::c_short;
-pub type __uint16_t = ::std::os::raw::c_ushort;
-pub type __int32_t = ::std::os::raw::c_int;
-pub type __uint32_t = ::std::os::raw::c_uint;
-pub type __int64_t = ::std::os::raw::c_long;
-pub type __uint64_t = ::std::os::raw::c_ulong;
 pub type __sig_atomic_t = ::std::os::raw::c_int;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -1205,7 +1197,7 @@ pub struct _jl_module_t {
     pub parent: *mut _jl_module_t,
     pub bindings: htable_t,
     pub usings: arraylist_t,
-    pub build_id: u64,
+    pub build_id: jl_uuid_t,
     pub uuid: jl_uuid_t,
     pub primary_world: usize,
     pub counter: ::std::sync::atomic::AtomicU32,
@@ -1216,6 +1208,7 @@ pub struct _jl_module_t {
     pub istopmod: u8,
     pub max_methods: i8,
     pub lock: jl_mutex_t,
+    pub hash: isize,
 }
 pub type jl_module_t = _jl_module_t;
 #[repr(C)]
@@ -2048,11 +2041,10 @@ pub struct _jl_task_t {
     pub stkbuf: *mut ::std::os::raw::c_void,
     pub bufsz: usize,
     pub inference_start_time: u64,
-    pub reentrant_inference: ::std::os::raw::c_uint,
-    pub reentrant_codegen: ::std::os::raw::c_uint,
+    pub reentrant_inference: u16,
+    pub reentrant_codegen: u16,
     pub _bitfield_align_1: [u32; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 4usize]>,
-    pub __bindgen_padding_0: u32,
 }
 impl _jl_task_t {
     #[inline]
@@ -2096,7 +2088,7 @@ impl _jl_task_t {
 }
 pub type jl_task_t = _jl_task_t;
 extern "C" {
-    pub fn jl_throw(e: *mut jl_value_t);
+    pub fn jl_throw(e: *mut jl_value_t) -> !;
 }
 extern "C" {
     pub fn jl_process_events() -> ::std::os::raw::c_int;
@@ -2202,6 +2194,13 @@ extern "C" {
         haspointers: ::std::os::raw::c_int,
         large: ::std::os::raw::c_int,
     ) -> *mut jl_datatype_t;
+}
+extern "C" {
+    pub fn jl_reinit_foreign_type(
+        dt: *mut jl_datatype_t,
+        markfunc: jl_markfunc_t,
+        sweepfunc: jl_sweepfunc_t,
+    ) -> ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn jl_gc_alloc_typed(

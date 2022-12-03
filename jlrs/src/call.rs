@@ -6,14 +6,14 @@
 
 use std::ptr::NonNull;
 
-#[cfg(not(any(feature = "nightly", feature = "beta")))]
+#[cfg(not(any(feature = "julia-1-10", feature = "julia-1-9")))]
 use jl_sys::jl_get_kwsorter;
-#[cfg(any(feature = "nightly", feature = "beta"))]
+#[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
 use jl_sys::jl_kwcall_func;
 use jl_sys::{jl_call, jl_exception_occurred};
 use smallvec::SmallVec;
 
-#[cfg(not(any(feature = "nightly", feature = "beta")))]
+#[cfg(not(any(feature = "julia-1-10", feature = "julia-1-9")))]
 use crate::wrappers::ptr::private::WrapperPriv as _;
 use crate::{
     error::{AccessError, JlrsResult, JuliaResult},
@@ -238,9 +238,9 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
     where
         T: Target<'target>,
     {
-        #[cfg(not(any(feature = "nightly", feature = "beta")))]
+        #[cfg(not(any(feature = "julia-1-10", feature = "julia-1-9")))]
         let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
-        #[cfg(any(feature = "nightly", feature = "beta"))]
+        #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
         let func = jl_kwcall_func; // jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
         let args = &mut [self.keywords, self.func];
 
@@ -264,9 +264,9 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
     where
         T: Target<'target>,
     {
-        #[cfg(not(any(feature = "nightly", feature = "beta")))]
+        #[cfg(not(any(feature = "julia-1-10", feature = "julia-1-9")))]
         let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
-        #[cfg(any(feature = "nightly", feature = "beta"))]
+        #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
         let func = jl_kwcall_func;
         let args = &mut [self.keywords, self.func, arg0];
 
@@ -291,9 +291,9 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
     where
         T: Target<'target>,
     {
-        #[cfg(not(any(feature = "nightly", feature = "beta")))]
+        #[cfg(not(any(feature = "julia-1-10", feature = "julia-1-9")))]
         let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
-        #[cfg(any(feature = "nightly", feature = "beta"))]
+        #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
         let func = jl_kwcall_func;
         let args = &mut [self.keywords, self.func, arg0, arg1];
 
@@ -319,9 +319,9 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
     where
         T: Target<'target>,
     {
-        #[cfg(not(any(feature = "nightly", feature = "beta")))]
+        #[cfg(not(any(feature = "julia-1-10", feature = "julia-1-9")))]
         let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
-        #[cfg(any(feature = "nightly", feature = "beta"))]
+        #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
         let func = jl_kwcall_func;
         let args = &mut [self.keywords, self.func, arg0, arg1, arg2];
 
@@ -346,9 +346,9 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
         V: AsRef<[Value<'value, 'data>]>,
         T: Target<'target>,
     {
-        #[cfg(not(any(feature = "nightly", feature = "beta")))]
+        #[cfg(not(any(feature = "julia-1-10", feature = "julia-1-9")))]
         let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
-        #[cfg(any(feature = "nightly", feature = "beta"))]
+        #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
         let func = jl_kwcall_func;
         let args = args.as_ref();
         let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + args.len());
@@ -536,7 +536,7 @@ cfg_if::cfg_if! {
             /// check if any of the arguments is currently borrowed from Rust.
             ///
             /// [`safety`]: crate::safety
-            #[cfg(any(feature = "nightly", feature = "beta"))]
+            #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
             async unsafe fn call_async_interactive<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
@@ -557,7 +557,7 @@ cfg_if::cfg_if! {
             /// returns an `AccessError::BorrowError` if any of the arguments is.
             ///
             /// [`safety`]: crate::safety
-            #[cfg(any(feature = "nightly", feature = "beta"))]
+            #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
             async unsafe fn call_async_interactive_tracked<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
@@ -603,7 +603,7 @@ cfg_if::cfg_if! {
             ///
             /// [`safety`]: crate::safety
             /// [`PersistentTask::init`]: crate::async_util::task::PersistentTask::init
-            #[cfg(any(feature = "nightly", feature = "beta"))]
+            #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
             unsafe fn schedule_async_interactive<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
@@ -625,7 +625,7 @@ cfg_if::cfg_if! {
             ///
             /// [`safety`]: crate::safety
             /// [`PersistentTask::init`]: crate::async_util::task::PersistentTask::init
-            #[cfg(any(feature = "nightly", feature = "beta"))]
+            #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
             unsafe fn schedule_async_interactive_tracked<'target, 'value, V, T>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
@@ -938,7 +938,7 @@ cfg_if::cfg_if! {
                 JuliaFuture::new(frame, self, args).await
             }
 
-            #[cfg(any(feature = "nightly", feature = "beta"))]
+            #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
             async unsafe fn call_async_interactive<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
@@ -950,7 +950,7 @@ cfg_if::cfg_if! {
                 JuliaFuture::new_interactive(frame, self, args).await
             }
 
-            #[cfg(any(feature = "nightly", feature = "beta"))]
+            #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
             unsafe fn schedule_async_interactive<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
@@ -1103,7 +1103,7 @@ cfg_if::cfg_if! {
                 JuliaFuture::new(frame, self.as_value(), args).await
             }
 
-            #[cfg(any(feature = "nightly", feature = "beta"))]
+            #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
             async unsafe fn call_async_interactive<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
@@ -1115,7 +1115,7 @@ cfg_if::cfg_if! {
                 JuliaFuture::new_interactive(frame, self.as_value(), args).await
             }
 
-            #[cfg(any(feature = "nightly", feature = "beta"))]
+            #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
             unsafe fn schedule_async_interactive<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
@@ -1196,7 +1196,7 @@ cfg_if::cfg_if! {
                 JuliaFuture::new_with_keywords(frame, self, args).await
             }
 
-            #[cfg(any(feature = "nightly", feature = "beta"))]
+            #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
             async unsafe fn call_async_interactive<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
@@ -1208,7 +1208,7 @@ cfg_if::cfg_if! {
                 JuliaFuture::new_interactive_with_keywords(frame, self, args).await
             }
 
-            #[cfg(any(feature = "nightly", feature = "beta"))]
+            #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
             unsafe fn schedule_async_interactive<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
@@ -1360,13 +1360,13 @@ cfg_if::cfg_if! {
 
 mod private {
     use super::WithKeywords;
-    #[cfg(all(not(feature = "lts"), feature = "internal-types"))]
+    #[cfg(all(not(feature = "julia-1-6"), feature = "internal-types"))]
     use crate::wrappers::ptr::internal::opaque_closure::OpaqueClosure;
     use crate::wrappers::ptr::{function::Function, value::Value};
     pub trait CallPriv: Sized {}
     impl CallPriv for WithKeywords<'_, '_> {}
     impl CallPriv for Function<'_, '_> {}
-    #[cfg(all(not(feature = "lts"), feature = "internal-types"))]
+    #[cfg(all(not(feature = "julia-1-6"), feature = "internal-types"))]
     impl CallPriv for OpaqueClosure<'_> {}
     impl CallPriv for Value<'_, '_> {}
 }

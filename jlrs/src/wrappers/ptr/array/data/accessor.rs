@@ -9,7 +9,7 @@ use std::{
 
 use jl_sys::{jl_array_ptr_set, jl_array_typetagdata, jl_arrayref, jl_arrayset};
 
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
+#[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
 use crate::wrappers::ptr::value::ValueResult;
 use crate::{
     error::{AccessError, JlrsResult, TypeError, CANNOT_DISPLAY_TYPE},
@@ -204,7 +204,7 @@ impl<'borrow, 'array, 'data, U, L: ArrayLayout, M: Mutability>
     ///
     /// If an error is thrown by Julia it's caught and returned.
 
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     pub fn get_value<'frame, D, T>(
         &mut self,
         target: T,
@@ -280,7 +280,7 @@ impl<'borrow, 'array, 'data, U, L: ArrayLayout>
     /// Set the element at `index` to `value`.
     ///
     /// If an error is thrown by Julia it's caught and returned.
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     pub fn set_value<'target, D, T>(
         &mut self,
         target: T,

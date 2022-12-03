@@ -105,7 +105,7 @@ impl<T> Clone for Receiver<T> {
 }
 
 impl<T: Send> Receiver<T> {
-    #[cfg(any(feature = "beta", feature = "nightly"))]
+    #[cfg(any(feature = "julia-1-9", feature = "julia-1-10"))]
     pub(crate) async fn recv(&self) -> JlrsResult<T> {
         if self.queue.n_senders.load(Ordering::Acquire) == 0 {
             return match self.try_recv() {
@@ -117,7 +117,7 @@ impl<T: Send> Receiver<T> {
         Ok(self.queue.queue.pop().await)
     }
 
-    #[cfg(any(feature = "beta", feature = "nightly"))]
+    #[cfg(any(feature = "julia-1-9", feature = "julia-1-10"))]
     fn try_recv(&self) -> Option<T> {
         self.queue.queue.try_pop()
     }

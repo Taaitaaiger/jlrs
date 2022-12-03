@@ -82,15 +82,14 @@ impl<'context> CCall<'context> {
     /// drops, so you must take care to structure your code such that none of the intermediate
     /// frames have any pending drops.
     #[inline(never)]
-    pub unsafe fn throw_exception<F>(mut self, func: F)
+    pub unsafe fn throw_exception<F>(mut self, func: F) -> !
     where
         F: for<'scope> FnOnce(&mut GcFrame<'scope>) -> Value<'scope, 'static>,
     {
         let exception = construct_exception(self.frame.stack_frame().sync_stack(), func);
         // catch unwinds the GC stack, so it's okay to forget self.
         std::mem::forget(self);
-        jl_throw(exception.ptr().as_ptr());
-        unreachable!()
+        jl_throw(exception.ptr().as_ptr())
     }
 
     /// Create an [`Unrooted`], call the given closure, and return its result.

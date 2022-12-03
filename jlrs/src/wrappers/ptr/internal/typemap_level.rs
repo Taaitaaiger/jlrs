@@ -22,7 +22,7 @@ use crate::{
 };
 
 cfg_if! {
-    if #[cfg(not(feature = "lts"))] {
+    if #[cfg(not(feature = "julia-1-6"))] {
         use std::sync::atomic::Ordering;
     }
 }
@@ -51,7 +51,7 @@ impl<'scope> TypeMapLevel<'scope> {
         T: Target<'target>,
     {
         cfg_if! {
-            if #[cfg(feature = "lts")] {
+            if #[cfg(feature = "julia-1-6")] {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let arg1 = self.unwrap_non_null(Private).as_ref().arg1;
@@ -75,7 +75,7 @@ impl<'scope> TypeMapLevel<'scope> {
         T: Target<'target>,
     {
         cfg_if! {
-            if #[cfg(feature = "lts")] {
+            if #[cfg(feature = "julia-1-6")] {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let targ = self.unwrap_non_null(Private).as_ref().targ;
@@ -99,7 +99,7 @@ impl<'scope> TypeMapLevel<'scope> {
         T: Target<'target>,
     {
         cfg_if! {
-            if #[cfg(feature = "lts")] {
+            if #[cfg(feature = "julia-1-6")] {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let name1 = self.unwrap_non_null(Private).as_ref().name1;
@@ -123,7 +123,7 @@ impl<'scope> TypeMapLevel<'scope> {
         T: Target<'target>,
     {
         cfg_if! {
-            if #[cfg(feature = "lts")] {
+            if #[cfg(feature = "julia-1-6")] {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let tname = self.unwrap_non_null(Private).as_ref().tname;
@@ -147,7 +147,7 @@ impl<'scope> TypeMapLevel<'scope> {
         T: Target<'target>,
     {
         cfg_if! {
-            if #[cfg(feature = "lts")] {
+            if #[cfg(feature = "julia-1-6")] {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let linear = self.unwrap_non_null(Private).as_ref().linear;
@@ -171,7 +171,7 @@ impl<'scope> TypeMapLevel<'scope> {
         T: Target<'target>,
     {
         cfg_if! {
-            if #[cfg(feature = "lts")] {
+            if #[cfg(feature = "julia-1-6")] {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let any = self.unwrap_non_null(Private).as_ref().any;

@@ -87,7 +87,7 @@ use jl_sys::{
     jl_voidpointer_type,
     jl_weakref_type,
 };
-#[cfg(not(feature = "lts"))]
+#[cfg(not(feature = "julia-1-6"))]
 use jl_sys::{
     jl_atomicerror_type,
     jl_interconditional_type,
@@ -113,7 +113,7 @@ use crate::{
 };
 
 cfg_if! {
-    if #[cfg(not(all(target_os = "windows", feature = "lts")))] {
+    if #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))] {
         use super::array::Array;
         use super::value::ValueResult;
 }
@@ -369,7 +369,7 @@ impl<'scope> DataType<'scope> {
     pub fn size(self) -> u32 {
         // Safety: the pointer points to valid data
         cfg_if! {
-            if #[cfg(not(any(feature = "beta", feature = "nightly")))] {
+            if #[cfg(not(any(feature = "julia-1-9", feature = "julia-1-10")))] {
                 unsafe {
                     self.unwrap_non_null(Private).as_ref().size as u32
                 }
@@ -390,7 +390,7 @@ impl<'scope> DataType<'scope> {
     /// Returns true if this is an abstract type.
     pub fn is_abstract(self) -> bool {
         cfg_if! {
-            if #[cfg(feature = "lts")] {
+            if #[cfg(feature = "julia-1-6")] {
                 // Safety: the pointer points to valid data
                 unsafe { self.unwrap_non_null(Private).as_ref().abstract_ != 0 }
             } else {
@@ -403,7 +403,7 @@ impl<'scope> DataType<'scope> {
     /// Returns true if this is a mutable type.
     pub fn mutable(self) -> bool {
         cfg_if! {
-            if #[cfg(feature = "lts")] {
+            if #[cfg(feature = "julia-1-6")] {
                 // Safety: the pointer points to valid data
                 unsafe { self.unwrap_non_null(Private).as_ref().mutabl != 0 }
             } else {
@@ -416,7 +416,7 @@ impl<'scope> DataType<'scope> {
     /// Returns true if one or more of the type parameters has not been set.
     pub fn has_free_type_vars(self) -> bool {
         cfg_if! {
-            if #[cfg(feature = "lts")] {
+            if #[cfg(feature = "julia-1-6")] {
                 // Safety: the pointer points to valid data
                 unsafe { self.unwrap_non_null(Private).as_ref().hasfreetypevars != 0 }
             } else {
@@ -429,7 +429,7 @@ impl<'scope> DataType<'scope> {
     /// Returns true if this type can have instances
     pub fn is_concrete_type(self) -> bool {
         cfg_if! {
-            if #[cfg(feature = "lts")] {
+            if #[cfg(feature = "julia-1-6")] {
                 // Safety: the pointer points to valid data
                 unsafe { self.unwrap_non_null(Private).as_ref().isconcretetype != 0 }
             } else {
@@ -442,7 +442,7 @@ impl<'scope> DataType<'scope> {
     /// Returns true if this type is a dispatch, or leaf, tuple type.
     pub fn is_dispatch_tuple(self) -> bool {
         cfg_if! {
-            if #[cfg(feature = "lts")] {
+            if #[cfg(feature = "julia-1-6")] {
                 // Safety: the pointer points to valid data
                 unsafe { self.unwrap_non_null(Private).as_ref().isdispatchtuple != 0 }
             } else {
@@ -455,7 +455,7 @@ impl<'scope> DataType<'scope> {
     /// Returns true if this type is a bits-type.
     pub fn is_bits(self) -> bool {
         cfg_if! {
-            if #[cfg(feature = "lts")] {
+            if #[cfg(feature = "julia-1-6")] {
                 // Safety: the pointer points to valid data
                 unsafe { self.unwrap_non_null(Private).as_ref().isbitstype != 0 }
             } else {
@@ -468,7 +468,7 @@ impl<'scope> DataType<'scope> {
     /// Returns true if values of this type are zero-initialized.
     pub fn zero_init(self) -> bool {
         cfg_if! {
-            if #[cfg(feature = "lts")] {
+            if #[cfg(feature = "julia-1-6")] {
                 // Safety: the pointer points to valid data
                 unsafe { self.unwrap_non_null(Private).as_ref().zeroinit != 0 }
             } else {
@@ -481,7 +481,7 @@ impl<'scope> DataType<'scope> {
     /// Returns true if a value of this type stores its data inline.
     pub fn is_inline_alloc(self) -> bool {
         cfg_if! {
-            if #[cfg(feature = "lts")] {
+            if #[cfg(feature = "julia-1-6")] {
                 // Safety: the pointer points to valid data
                 unsafe { self.unwrap_non_null(Private).as_ref().isinlinealloc != 0 }
             } else {
@@ -497,7 +497,7 @@ impl<'scope> DataType<'scope> {
     /// If false, no value will have this type.
     pub fn has_concrete_subtype(self) -> bool {
         cfg_if! {
-            if #[cfg(feature = "lts")] {
+            if #[cfg(feature = "julia-1-6")] {
                 // Safety: the pointer points to valid data
                 unsafe { self.unwrap_non_null(Private).as_ref().has_concrete_subtype != 0 }
             } else {
@@ -510,7 +510,7 @@ impl<'scope> DataType<'scope> {
     /// If true, the type is stored in hash-based set cache (instead of linear cache).
     pub fn cached_by_hash(self) -> bool {
         cfg_if! {
-            if #[cfg(feature = "lts")] {
+            if #[cfg(feature = "julia-1-6")] {
                 // Safety: the pointer points to valid data
                 unsafe { self.unwrap_non_null(Private).as_ref().cached_by_hash != 0 }
             } else {
@@ -622,7 +622,7 @@ impl<'scope> DataType<'scope> {
         jl_field_isptr(self.unwrap(Private), idx as _)
     }
 
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(feature = "julia-1-6"))]
     /// Returns true if the field at position `idx` is an atomic field.
     pub fn is_atomic_field(self, idx: usize) -> JlrsResult<bool> {
         if idx >= self.n_fields() as usize {
@@ -637,7 +637,7 @@ impl<'scope> DataType<'scope> {
         unsafe { Ok(self.is_atomic_field_unchecked(idx)) }
     }
 
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(feature = "julia-1-6"))]
     /// Returns true if the field at position `idx` is an atomic field.
     ///
     /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
@@ -660,7 +660,7 @@ impl<'scope> DataType<'scope> {
         isatomic != 0
     }
 
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7")))]
     /// Returns true if the field at position `idx` is a constant field.
     pub fn is_const_field(self, idx: usize) -> JlrsResult<bool> {
         if idx >= self.n_fields() as usize {
@@ -675,7 +675,7 @@ impl<'scope> DataType<'scope> {
         unsafe { Ok(self.is_const_field_unchecked(idx)) }
     }
 
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7")))]
     /// Returns true if the field at position `idx` is a constant field.
     ///
     /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
@@ -711,7 +711,7 @@ impl<'scope> DataType<'scope> {
     /// arbitrary concrete `DataType`s, at the cost that each of its fields must have already been
     /// allocated as a `Value`. This functions returns an error if the given `DataType` isn't
     /// concrete or is an array type. For custom array types you must use [`Array::new_for`].
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     pub fn instantiate<'target, 'value, 'data, V, T>(
         self,
         target: T,
@@ -927,7 +927,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Core.PartialOpaque`
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(feature = "julia-1-6"))]
     pub fn partial_opaque_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -937,7 +937,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Core.InterConditional`
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(feature = "julia-1-6"))]
     pub fn interconditional_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -992,7 +992,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Vararg`.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(feature = "julia-1-6"))]
     pub fn vararg_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1155,7 +1155,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Core.AtomicError`.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(feature = "julia-1-6"))]
     pub fn atomicerror_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1549,7 +1549,7 @@ pub struct DatatypeLayout<'scope>(NonNull<jl_datatype_layout_t>, PhantomData<&'s
 
 impl DatatypeLayout<'_> {
     /// Returns the size of the `DataType`.
-    #[cfg(any(feature = "beta", feature = "nightly"))]
+    #[cfg(any(feature = "julia-1-9", feature = "julia-1-10"))]
     pub fn size(self) -> u32 {
         unsafe { self.0.as_ref().size }
     }

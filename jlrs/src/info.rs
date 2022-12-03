@@ -37,7 +37,7 @@ impl Info {
     /// Number of threads Julia can use.
     pub fn n_threads() -> usize {
         cfg_if! {
-            if #[cfg(any(feature = "nightly", feature = "beta"))] {
+            if #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))] {
                 unsafe { jl_n_threads.load(::std::sync::atomic::Ordering::Relaxed) as usize }
             } else {
                 unsafe { jl_n_threads as usize }

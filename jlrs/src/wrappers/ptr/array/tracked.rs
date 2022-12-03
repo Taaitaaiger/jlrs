@@ -26,7 +26,7 @@ use super::{
     TypedArray,
     TypedArrayData,
 };
-#[cfg(not(all(target_os = "windows", feature = "lts")))]
+#[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
 use super::{ArrayResult, TypedArrayResult};
 use crate::{
     error::JlrsResult,
@@ -176,6 +176,10 @@ impl<'tracked, 'scope, 'data> TrackedArray<'tracked, 'scope, 'data, Array<'scope
         unsafe { self.data.copy_inline_data() }
     }
 
+    pub fn as_slice_unchecked<'borrow, T>(&'borrow self) -> &'borrow [T] {
+        unsafe { self.data.as_slice_unchecked() }
+    }
+
     pub fn bits_data<'borrow, T>(
         &'borrow self,
     ) -> JlrsResult<BitsArrayAccessorI<'borrow, 'scope, 'data, T>>
@@ -222,7 +226,7 @@ impl<'tracked, 'scope, 'data> TrackedArray<'tracked, 'scope, 'data, Array<'scope
         unsafe { self.data.indeterminate_data() }
     }
 
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     pub fn reshape<'target, 'current, 'borrow, D, S>(
         &self,
         target: ExtendedTarget<'target, 'current, 'borrow, S>,
@@ -274,7 +278,7 @@ where
         unsafe { self.data.indeterminate_data() }
     }
 
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     pub fn reshape<'target, 'current, 'borrow, D, S>(
         &self,
         target: ExtendedTarget<'target, 'current, 'borrow, S>,
@@ -398,10 +402,14 @@ impl<'tracked, 'scope, 'data> TrackedArrayMut<'tracked, 'scope, 'data, Array<'sc
     ) -> IndeterminateArrayAccessorMut<'borrow, 'scope, 'data> {
         self.tracked.data.indeterminate_data_mut()
     }
+
+    pub unsafe fn as_mut_slice_unchecked<'borrow, T>(&'borrow mut self) -> &'borrow mut [T] {
+        self.tracked.data.as_mut_slice_unchecked()
+    }
 }
 
 impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 'static>> {
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     pub unsafe fn grow_end<'target, S>(
         &mut self,
         target: S,
@@ -417,7 +425,7 @@ impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 
         self.tracked.data.grow_end_unchecked(inc)
     }
 
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     pub unsafe fn del_end<'target, S>(&mut self, target: S, dec: usize) -> S::Exception<'static, ()>
     where
         S: Target<'target>,
@@ -429,7 +437,7 @@ impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 
         self.tracked.data.del_end_unchecked(dec)
     }
 
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     pub unsafe fn grow_begin<'target, S>(
         &mut self,
         target: S,
@@ -445,7 +453,7 @@ impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 
         self.tracked.data.grow_begin_unchecked(inc)
     }
 
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     pub unsafe fn del_begin<'target, S>(
         &mut self,
         target: S,
@@ -509,7 +517,7 @@ impl<'tracked, 'scope, T> TrackedArrayMut<'tracked, 'scope, 'static, TypedArray<
 where
     T: ValidField,
 {
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     pub unsafe fn grow_end<'target, S>(
         &mut self,
         target: S,
@@ -525,7 +533,7 @@ where
         self.tracked.data.grow_end_unchecked(inc)
     }
 
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     pub unsafe fn del_end<'target, S>(&mut self, target: S, dec: usize) -> S::Exception<'static, ()>
     where
         S: Target<'target>,
@@ -537,7 +545,7 @@ where
         self.tracked.data.del_end_unchecked(dec)
     }
 
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     pub unsafe fn grow_begin<'target, S>(
         &mut self,
         target: S,
@@ -553,7 +561,7 @@ where
         self.tracked.data.grow_begin_unchecked(inc)
     }
 
-    #[cfg(not(all(target_os = "windows", feature = "lts")))]
+    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     pub unsafe fn del_begin<'target, S>(
         &mut self,
         target: S,

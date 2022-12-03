@@ -5,7 +5,7 @@
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L1727
 #[cfg(feature = "extra-fields")]
-#[cfg(not(feature = "lts"))]
+#[cfg(not(feature = "julia-1-6"))]
 use std::sync::atomic::Ordering;
 use std::{marker::PhantomData, ptr::NonNull};
 
@@ -149,7 +149,7 @@ impl<'scope> Task<'scope> {
     #[cfg(feature = "extra-fields")]
     pub fn state(self) -> u8 {
         cfg_if! {
-            if #[cfg(feature = "lts")] {
+            if #[cfg(feature = "julia-1-6")] {
                 // Safety: the pointer points to valid data
                 unsafe { self.unwrap_non_null(Private).as_ref()._state }
             } else {
@@ -172,7 +172,7 @@ impl<'scope> Task<'scope> {
     #[cfg(feature = "extra-fields")]
     pub fn is_exception(self) -> bool {
         cfg_if! {
-            if #[cfg(feature = "lts")] {
+            if #[cfg(feature = "julia-1-6")] {
                 // Safety: the pointer points to valid data
                 unsafe { self.unwrap_non_null(Private).as_ref()._isexception != 0 }
             } else {

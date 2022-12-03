@@ -89,7 +89,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         JuliaFuture { shared_state }
     }
 
-    #[cfg(any(feature = "nightly", feature = "beta"))]
+    #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
     pub(crate) fn new_interactive<'value, V>(
         frame: &mut AsyncGcFrame<'frame>,
         func: Value,
@@ -351,7 +351,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         JuliaFuture { shared_state }
     }
 
-    #[cfg(any(feature = "nightly", feature = "beta"))]
+    #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
     pub(crate) fn new_interactive_with_keywords<'value, V>(
         frame: &mut AsyncGcFrame<'frame>,
         func: WithKeywords,

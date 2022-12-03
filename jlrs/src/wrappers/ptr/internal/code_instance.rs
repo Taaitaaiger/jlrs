@@ -22,7 +22,7 @@ use crate::{
 };
 
 cfg_if! {
-    if #[cfg(not(feature = "lts"))] {
+    if #[cfg(not(feature = "julia-1-6"))] {
         use std::{sync::atomic::Ordering, ptr::null_mut};
     }
 }
@@ -68,7 +68,7 @@ impl<'scope> CodeInstance<'scope> {
         T: Target<'target>,
     {
         cfg_if! {
-            if #[cfg(feature = "lts")] {
+            if #[cfg(feature = "julia-1-6")] {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let next = self.unwrap_non_null(Private).as_ref().next;
@@ -121,7 +121,7 @@ impl<'scope> CodeInstance<'scope> {
     {
         // Safety: the pointer points to valid data
         cfg_if! {
-            if #[cfg(not(any(feature = "nightly", feature = "beta")))] {
+            if #[cfg(not(any(feature = "julia-1-10", feature = "julia-1-9")))] {
                 unsafe {
                     let inferred = self.unwrap_non_null(Private).as_ref().inferred;
                     Some(ValueRef::wrap(NonNull::new(inferred)?).root(target))
@@ -137,31 +137,31 @@ impl<'scope> CodeInstance<'scope> {
     }
 
     /// The `ipo_purity_bits` field of this `CodeInstance`.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7")))]
     pub fn ipo_purity_bits(self) -> u32 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().ipo_purity_bits }
     }
 
     /// The `purity_bits` field of this `CodeInstance`.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7")))]
     pub fn purity_bits(self) -> u32 {
         // Safety: the pointer points to valid data
-        #[cfg(any(feature = "nightly", feature = "beta"))]
+        #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
         unsafe {
             self.unwrap_non_null(Private)
                 .as_ref()
                 .purity_bits
                 .load(Ordering::Relaxed)
         }
-        #[cfg(not(any(feature = "nightly", feature = "beta")))]
+        #[cfg(not(any(feature = "julia-1-10", feature = "julia-1-9")))]
         unsafe {
             self.unwrap_non_null(Private).as_ref().purity_bits
         }
     }
 
     /// Method this instance is specialized from.
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7")))]
     pub fn argescapes(self) -> Option<Value<'scope, 'static>> {
         // Safety: the pointer points to valid data
         unsafe {
@@ -179,7 +179,7 @@ impl<'scope> CodeInstance<'scope> {
     /// If `specptr` is a specialized function signature for specTypes->rettype
     pub fn precompile(self) -> bool {
         cfg_if! {
-            if #[cfg(feature = "lts")] {
+            if #[cfg(feature = "julia-1-6")] {
                 // Safety: the pointer points to valid data
                 unsafe { self.unwrap_non_null(Private).as_ref().precompile != 0 }
             } else {
@@ -194,7 +194,7 @@ impl<'scope> CodeInstance<'scope> {
     /// jlcall entry point
     pub fn invoke(self) -> *mut c_void {
         cfg_if! {
-            if #[cfg(feature = "lts")] {
+            if #[cfg(feature = "julia-1-6")] {
                 use std::ptr::null_mut;
                 // Safety: the pointer points to valid data
                 unsafe { self.unwrap_non_null(Private).as_ref().invoke.map(|x| x as *mut c_void).unwrap_or(null_mut()) }
@@ -210,7 +210,7 @@ impl<'scope> CodeInstance<'scope> {
     /// private data for `jlcall entry point
     pub fn specptr(self) -> *mut c_void {
         cfg_if! {
-            if #[cfg(feature = "lts")] {
+            if #[cfg(feature = "julia-1-6")] {
                 // Safety: the pointer points to valid data
                 unsafe { self.unwrap_non_null(Private).as_ref().specptr.fptr }
             } else {
@@ -223,7 +223,7 @@ impl<'scope> CodeInstance<'scope> {
     }
 
     /// nonzero if all roots are built into sysimg or tagged by module key
-    #[cfg(not(feature = "lts"))]
+    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7")))]
     pub fn relocatability(self) -> u8 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().relocatability }

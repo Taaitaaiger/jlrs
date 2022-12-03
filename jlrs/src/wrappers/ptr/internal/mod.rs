@@ -8,10 +8,10 @@ pub mod method;
 pub mod method_instance;
 pub mod method_match;
 pub mod method_table;
-#[cfg(not(feature = "lts"))]
+#[cfg(not(feature = "julia-1-6"))]
 pub mod opaque_closure;
 pub mod typemap_entry;
 pub mod typemap_level;
-#[cfg(not(feature = "lts"))]
+#[cfg(not(feature = "julia-1-6"))]
 pub mod vararg;
 pub mod weak_ref;

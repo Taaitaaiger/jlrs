@@ -22,7 +22,7 @@ use crate::{
 };
 
 cfg_if! {
-    if #[cfg(not(feature = "lts"))] {
+    if #[cfg(not(feature = "julia-1-6"))] {
         use std::sync::atomic::Ordering;
     }
 }
@@ -54,7 +54,7 @@ impl<'scope> TypeMapEntry<'scope> {
         T: Target<'target>,
     {
         cfg_if! {
-            if #[cfg(feature = "lts")] {
+            if #[cfg(feature = "julia-1-6")] {
                 // Safety: the pointer points to valid data
                 unsafe {
                     let next = self.unwrap_non_null(Private).as_ref().next.cast();
