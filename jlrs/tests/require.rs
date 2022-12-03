@@ -49,7 +49,7 @@ mod tests {
                         .expect("Cannot load LinearAlgebra")
                         .cast::<Module>()?
                         .function(&frame, "dot")?
-                        .wrapper();
+                        .as_managed();
 
                     let mut arr1 = vec![1.0f64, 2.0f64];
                     let mut arr2 = vec![2.0f64, 3.0f64];

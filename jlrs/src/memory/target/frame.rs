@@ -14,13 +14,13 @@ use cfg_if::cfg_if;
 
 use super::{output::Output, reusable_slot::ReusableSlot, unrooted::Unrooted};
 use crate::{
+    data::managed::Managed,
     error::JlrsResult,
     memory::{
         context::stack::Stack,
         target::{ExtendedTarget, Target},
     },
     private::Private,
-    wrappers::ptr::Wrapper,
 };
 
 /// A frame associated with a scope.
@@ -163,7 +163,7 @@ impl<'scope> GcFrame<'scope> {
     }
 
     // Safety: ptr must be a valid pointer to T
-    pub(crate) unsafe fn root<'data, T: Wrapper<'scope, 'data>>(
+    pub(crate) unsafe fn root<'data, T: Managed<'scope, 'data>>(
         &self,
         ptr: NonNull<T::Wraps>,
     ) -> T {

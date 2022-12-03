@@ -30,7 +30,7 @@
 //!
 //! The last row means that any target `T` can be used as a non-rooting target by using a
 //! reference to that target. When a non-rooting target is used, Julia data is returned as a
-//! [`Ref`] rather than a [`Wrapper`]. This is useful in cases where it can be guaranteed the
+//! [`Ref`] rather than a [`Managed`]. This is useful in cases where it can be guaranteed the
 //! data is globally rooted, or if you don't care about the result. More information about these
 //! target types can be found in the submodules that define them.
 //!
@@ -39,8 +39,8 @@
 //! a target, the `BorrowedFrame` can be used to create a temporary scope and the target for the
 //! data that is returned.
 //!
-//! [`Ref`]: crate::wrappers::ptr::Ref
-//! [`Wrapper`]: crate::wrappers::ptr::Wrapper
+//! [`Ref`]: crate::data::managed::Ref
+//! [`Managed`]: crate::data::managed::Managed
 
 use std::marker::PhantomData;
 
@@ -176,20 +176,15 @@ pub(crate) mod private {
     #[cfg(feature = "async")]
     use super::AsyncGcFrame;
     use super::{
-        reusable_slot::ReusableSlot,
-        target_type::TargetType,
-        unrooted::Unrooted,
-        GcFrame,
-        Output,
+        reusable_slot::ReusableSlot, target_type::TargetType, unrooted::Unrooted, GcFrame, Output,
     };
     use crate::{
-        private::Private,
-        wrappers::ptr::{
-            private::WrapperPriv,
+        data::managed::{
+            private::ManagedPriv,
             value::{Value, ValueRef},
-            Ref,
-            Wrapper,
+            Managed, Ref,
         },
+        private::Private,
     };
 
     pub trait TargetBase<'target>: Sized {}
@@ -218,21 +213,21 @@ pub(crate) mod private {
 
     pub trait TargetPriv<'target>: TargetType<'target> {
         // Safety: the pointer must point to valid data.
-        unsafe fn data_from_ptr<'data, T: Wrapper<'target, 'data>>(
+        unsafe fn data_from_ptr<'data, T: Managed<'target, 'data>>(
             self,
             value: NonNull<T::Wraps>,
             _: Private,
         ) -> Self::Data<'data, T>;
 
         // Safety: the pointer must point to valid data.
-        unsafe fn result_from_ptr<'data, T: Wrapper<'target, 'data>>(
+        unsafe fn result_from_ptr<'data, T: Managed<'target, 'data>>(
             self,
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
             _: Private,
         ) -> Self::Result<'data, T>;
 
         // Safety: the pointer must point to valid data.
-        unsafe fn result_from_unrooted<'data, T: Wrapper<'target, 'data>>(
+        unsafe fn result_from_unrooted<'data, T: Managed<'target, 'data>>(
             self,
             result: Result<Ref<'target, 'data, T>, ValueRef<'target, 'data>>,
             _: Private,
@@ -246,7 +241,7 @@ pub(crate) mod private {
         }
 
         // Safety: the pointer must point to valid data.
-        unsafe fn result_from_rooted<'data, T: Wrapper<'target, 'data>>(
+        unsafe fn result_from_rooted<'data, T: Managed<'target, 'data>>(
             self,
             result: Result<T, Value<'target, 'data>>,
             _: Private,
@@ -269,7 +264,7 @@ pub(crate) mod private {
 
     impl<'target> TargetPriv<'target> for &mut GcFrame<'target> {
         // Safety: the pointer must point to valid data.
-        unsafe fn data_from_ptr<'data, T: Wrapper<'target, 'data>>(
+        unsafe fn data_from_ptr<'data, T: Managed<'target, 'data>>(
             self,
             value: NonNull<T::Wraps>,
             _: Private,
@@ -278,7 +273,7 @@ pub(crate) mod private {
         }
 
         // Safety: the pointer must point to valid data.
-        unsafe fn result_from_ptr<'data, T: Wrapper<'target, 'data>>(
+        unsafe fn result_from_ptr<'data, T: Managed<'target, 'data>>(
             self,
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
             _: Private,
@@ -304,7 +299,7 @@ pub(crate) mod private {
 
     impl<'target> TargetPriv<'target> for GcFrame<'target> {
         // Safety: the pointer must point to valid data.
-        unsafe fn data_from_ptr<'data, T: Wrapper<'target, 'data>>(
+        unsafe fn data_from_ptr<'data, T: Managed<'target, 'data>>(
             self,
             value: NonNull<T::Wraps>,
             _: Private,
@@ -313,7 +308,7 @@ pub(crate) mod private {
         }
 
         // Safety: the pointer must point to valid data.
-        unsafe fn result_from_ptr<'data, T: Wrapper<'target, 'data>>(
+        unsafe fn result_from_ptr<'data, T: Managed<'target, 'data>>(
             self,
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
             _: Private,
@@ -340,7 +335,7 @@ pub(crate) mod private {
     #[cfg(feature = "async")]
     impl<'target> TargetPriv<'target> for &mut AsyncGcFrame<'target> {
         // Safety: the pointer must point to valid data.
-        unsafe fn data_from_ptr<'data, T: Wrapper<'target, 'data>>(
+        unsafe fn data_from_ptr<'data, T: Managed<'target, 'data>>(
             self,
             value: NonNull<T::Wraps>,
             _: Private,
@@ -349,7 +344,7 @@ pub(crate) mod private {
         }
 
         // Safety: the pointer must point to valid data.
-        unsafe fn result_from_ptr<'data, T: Wrapper<'target, 'data>>(
+        unsafe fn result_from_ptr<'data, T: Managed<'target, 'data>>(
             self,
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
             _: Private,
@@ -376,7 +371,7 @@ pub(crate) mod private {
     #[cfg(feature = "async")]
     impl<'target> TargetPriv<'target> for AsyncGcFrame<'target> {
         // Safety: the pointer must point to valid data.
-        unsafe fn data_from_ptr<'data, T: Wrapper<'target, 'data>>(
+        unsafe fn data_from_ptr<'data, T: Managed<'target, 'data>>(
             self,
             value: NonNull<T::Wraps>,
             _: Private,
@@ -385,7 +380,7 @@ pub(crate) mod private {
         }
 
         // Safety: the pointer must point to valid data.
-        unsafe fn result_from_ptr<'data, T: Wrapper<'target, 'data>>(
+        unsafe fn result_from_ptr<'data, T: Managed<'target, 'data>>(
             self,
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
             _: Private,
@@ -411,7 +406,7 @@ pub(crate) mod private {
 
     impl<'target> TargetPriv<'target> for Output<'target> {
         // Safety: the pointer must point to valid data.
-        unsafe fn data_from_ptr<'data, T: Wrapper<'target, 'data>>(
+        unsafe fn data_from_ptr<'data, T: Managed<'target, 'data>>(
             self,
             value: NonNull<T::Wraps>,
             _: Private,
@@ -420,7 +415,7 @@ pub(crate) mod private {
         }
 
         // Safety: the pointer must point to valid data.
-        unsafe fn result_from_ptr<'data, T: Wrapper<'target, 'data>>(
+        unsafe fn result_from_ptr<'data, T: Managed<'target, 'data>>(
             self,
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
             _: Private,
@@ -446,7 +441,7 @@ pub(crate) mod private {
 
     impl<'target> TargetPriv<'target> for &'target mut Output<'_> {
         // Safety: the pointer must point to valid data.
-        unsafe fn data_from_ptr<'data, T: Wrapper<'target, 'data>>(
+        unsafe fn data_from_ptr<'data, T: Managed<'target, 'data>>(
             self,
             value: NonNull<T::Wraps>,
             _: Private,
@@ -455,7 +450,7 @@ pub(crate) mod private {
         }
 
         // Safety: the pointer must point to valid data.
-        unsafe fn result_from_ptr<'data, T: Wrapper<'target, 'data>>(
+        unsafe fn result_from_ptr<'data, T: Managed<'target, 'data>>(
             self,
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
             _: Private,
@@ -481,7 +476,7 @@ pub(crate) mod private {
 
     impl<'target> TargetPriv<'target> for ReusableSlot<'target> {
         // Safety: the pointer must point to valid data.
-        unsafe fn data_from_ptr<'data, T: Wrapper<'target, 'data>>(
+        unsafe fn data_from_ptr<'data, T: Managed<'target, 'data>>(
             self,
             value: NonNull<T::Wraps>,
             _: Private,
@@ -490,7 +485,7 @@ pub(crate) mod private {
         }
 
         // Safety: the pointer must point to valid data.
-        unsafe fn result_from_ptr<'data, T: Wrapper<'target, 'data>>(
+        unsafe fn result_from_ptr<'data, T: Managed<'target, 'data>>(
             self,
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
             _: Private,
@@ -516,7 +511,7 @@ pub(crate) mod private {
 
     impl<'target> TargetPriv<'target> for &mut ReusableSlot<'target> {
         // Safety: the pointer must point to valid data.
-        unsafe fn data_from_ptr<'data, T: Wrapper<'target, 'data>>(
+        unsafe fn data_from_ptr<'data, T: Managed<'target, 'data>>(
             self,
             value: NonNull<T::Wraps>,
             _: Private,
@@ -525,7 +520,7 @@ pub(crate) mod private {
         }
 
         // Safety: the pointer must point to valid data.
-        unsafe fn result_from_ptr<'data, T: Wrapper<'target, 'data>>(
+        unsafe fn result_from_ptr<'data, T: Managed<'target, 'data>>(
             self,
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
             _: Private,
@@ -551,7 +546,7 @@ pub(crate) mod private {
 
     impl<'target> TargetPriv<'target> for Unrooted<'target> {
         // Safety: the pointer must point to valid data.
-        unsafe fn data_from_ptr<'data, T: Wrapper<'target, 'data>>(
+        unsafe fn data_from_ptr<'data, T: Managed<'target, 'data>>(
             self,
             value: NonNull<T::Wraps>,
             _: Private,
@@ -560,7 +555,7 @@ pub(crate) mod private {
         }
 
         // Safety: the pointer must point to valid data.
-        unsafe fn result_from_ptr<'data, T: Wrapper<'target, 'data>>(
+        unsafe fn result_from_ptr<'data, T: Managed<'target, 'data>>(
             self,
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
             _: Private,
@@ -586,7 +581,7 @@ pub(crate) mod private {
 
     impl<'target, U: TargetPriv<'target>> TargetPriv<'target> for &U {
         // Safety: the pointer must point to valid data.
-        unsafe fn data_from_ptr<'data, T: Wrapper<'target, 'data>>(
+        unsafe fn data_from_ptr<'data, T: Managed<'target, 'data>>(
             self,
             value: NonNull<T::Wraps>,
             _: Private,
@@ -595,7 +590,7 @@ pub(crate) mod private {
         }
 
         // Safety: the pointer must point to valid data.
-        unsafe fn result_from_ptr<'data, T: Wrapper<'target, 'data>>(
+        unsafe fn result_from_ptr<'data, T: Managed<'target, 'data>>(
             self,
             result: Result<NonNull<T::Wraps>, NonNull<jl_value_t>>,
             _: Private,

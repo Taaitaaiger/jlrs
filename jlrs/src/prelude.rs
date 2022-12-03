@@ -26,12 +26,9 @@ pub use crate::{
 pub use crate::{
     call::{Call, ProvideKeywords},
     convert::into_jlrs_result::IntoJlrsResult,
-    error::JlrsResult,
-    memory::target::{target_type::TargetType, Target},
-    named_tuple,
-    wrappers::{
-        inline::{bool::Bool, char::Char, nothing::Nothing, tuple::*},
-        ptr::{
+    data::{
+        layout::{bool::Bool, char::Char, nothing::Nothing, tuple::*},
+        managed::{
             array::ArrayRef,
             array::TypedArrayRef,
             array::{tracked::ArrayWrapper, Array, TypedArray},
@@ -44,9 +41,12 @@ pub use crate::{
             symbol::Symbol,
             value::Value,
             value::ValueRef,
-            /* Ref, */ Wrapper,
+            /* Ref, */ Managed,
         },
     },
+    error::JlrsResult,
+    memory::target::{target_type::TargetType, Target},
+    named_tuple,
 };
 #[cfg(feature = "sync-rt")]
 pub use crate::{

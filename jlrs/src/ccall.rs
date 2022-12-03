@@ -7,6 +7,10 @@ use jl_sys::jl_throw;
 use jl_sys::uv_async_send;
 
 use crate::{
+    data::managed::{
+        private::ManagedPriv,
+        value::{Value, ValueRef},
+    },
     error::JlrsResult,
     memory::{
         context::stack::Stack,
@@ -14,10 +18,6 @@ use crate::{
         target::{frame::GcFrame, unrooted::Unrooted},
     },
     private::Private,
-    wrappers::ptr::{
-        private::WrapperPriv,
-        value::{Value, ValueRef},
-    },
 };
 
 /// Use Julia from a Rust function called through `ccall`.

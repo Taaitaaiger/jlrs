@@ -2,44 +2,29 @@
 //!
 //! Several properties of Julia data can be checked by using [`Value::is`] and [`DataType::is`],
 //! these methods must be used in combination with a type that implements the [`Typecheck`] trait.
-//! Most types that implement this trait also implement [`Wrapper`] or [`Unbox`], for these types
+//! Most types that implement this trait also implement [`Managed`] or [`Unbox`], for these types
 //! the typecheck indicates whether or not it's valid to cast the value to or unbox it as that
 //! type.
 //!
-//! [`Value::is`]: crate::wrappers::ptr::value::Value::is
-//! [`Wrapper`]: crate::wrappers::ptr::Wrapper
+//! [`Value::is`]: crate::data::managed::value::Value::is
+//! [`Managed`]: crate::data::managed::Managed
 //! [`Unbox`]: crate::convert::unbox::Unbox
 use std::ffi::c_void;
 
 use jl_sys::{
-    jl_code_info_type,
-    jl_globalref_type,
-    jl_gotonode_type,
-    jl_intrinsic_type,
-    jl_linenumbernode_type,
-    jl_namedtuple_typename,
-    jl_newvarnode_type,
-    jl_phicnode_type,
-    jl_phinode_type,
-    jl_pinode_type,
-    jl_quotenode_type,
-    jl_slotnumber_type,
-    jl_string_type,
-    jl_typedslot_type,
-    jl_upsilonnode_type,
+    jl_code_info_type, jl_globalref_type, jl_gotonode_type, jl_intrinsic_type,
+    jl_linenumbernode_type, jl_namedtuple_typename, jl_newvarnode_type, jl_phicnode_type,
+    jl_phinode_type, jl_pinode_type, jl_quotenode_type, jl_slotnumber_type, jl_string_type,
+    jl_typedslot_type, jl_upsilonnode_type,
 };
 
 use crate::{
     convert::into_julia::IntoJulia,
+    data::managed::{
+        datatype::DataType, private::ManagedPriv, type_name::TypeName, union_all::UnionAll, Managed,
+    },
     memory::target::unrooted::Unrooted,
     private::Private,
-    wrappers::ptr::{
-        datatype::DataType,
-        private::WrapperPriv,
-        type_name::TypeName,
-        union_all::UnionAll,
-        Wrapper,
-    },
 };
 
 /// This trait is used in combination with [`Value::is`] and [`DataType::is`] to check if that
@@ -49,9 +34,9 @@ use crate::{
 /// method `typecheck` must only return `true` if it's guaranteed that `Unbox::unbox` can safely
 /// be called for values whose type is that method's argument.
 ///
-/// [`Value::is`]: crate::wrappers::ptr::value::Value::is
+/// [`Value::is`]: crate::data::managed::value::Value::is
 /// [`Unbox`]: crate::convert::unbox::Unbox
-/// [`Wrapper`]: crate::wrappers::ptr::Wrapper
+/// [`Managed`]: crate::data::managed::Managed
 pub unsafe trait Typecheck {
     /// Returns whether the property implied by `Self` holds true.
     fn typecheck(t: DataType) -> bool;
@@ -63,9 +48,9 @@ macro_rules! impl_julia_typecheck {
     ($type:ty, $jl_type:expr, $($lt:lifetime),+) => {
         unsafe impl<$($lt),+> crate::layout::typecheck::Typecheck for $type {
             #[inline(always)]
-            fn typecheck(t: $crate::wrappers::ptr::datatype::DataType) -> bool {
+            fn typecheck(t: $crate::data::managed::datatype::DataType) -> bool {
                 unsafe {
-                    <$crate::wrappers::ptr::datatype::DataType as $crate::wrappers::ptr::private::WrapperPriv>::unwrap(t, crate::private::Private) == $jl_type
+                    <$crate::data::managed::datatype::DataType as $crate::data::managed::private::ManagedPriv>::unwrap(t, crate::private::Private) == $jl_type
                 }
             }
         }
@@ -73,9 +58,9 @@ macro_rules! impl_julia_typecheck {
     ($type:ty, $jl_type:expr) => {
         unsafe impl crate::layout::typecheck::Typecheck for $type {
             #[inline(always)]
-            fn typecheck(t: $crate::wrappers::ptr::datatype::DataType) -> bool {
+            fn typecheck(t: $crate::data::managed::datatype::DataType) -> bool {
                 unsafe {
-                    <$crate::wrappers::ptr::datatype::DataType as $crate::wrappers::ptr::private::WrapperPriv>::unwrap(t, crate::private::Private) == $jl_type
+                    <$crate::data::managed::datatype::DataType as $crate::data::managed::private::ManagedPriv>::unwrap(t, crate::private::Private) == $jl_type
                 }
             }
         }
@@ -83,10 +68,10 @@ macro_rules! impl_julia_typecheck {
     ($type:ty) => {
         unsafe impl crate::layout::typecheck::Typecheck for $type {
             #[inline(always)]
-            fn typecheck(t: crate::wrappers::ptr::datatype::DataType) -> bool {
+            fn typecheck(t: crate::data::managed::datatype::DataType) -> bool {
                 unsafe {
                     let global = $crate::memory::target::unrooted::Unrooted::new();
-                    <$crate::wrappers::ptr::datatype::DataType as $crate::wrappers::ptr::private::WrapperPriv>::unwrap(t, crate::private::Private) == <$type as $crate::convert::into_julia::IntoJulia>::julia_type(global).ptr().as_ptr()
+                    <$crate::data::managed::datatype::DataType as $crate::data::managed::private::ManagedPriv>::unwrap(t, crate::private::Private) == <$type as $crate::convert::into_julia::IntoJulia>::julia_type(global).ptr().as_ptr()
                 }
             }
         }
@@ -122,7 +107,7 @@ unsafe impl<T: IntoJulia> Typecheck for *mut T {
             let params = t.parameters();
             let params = params.data().as_slice();
             let inner_ty = T::julia_type(global);
-            if params[0].unwrap().value() != inner_ty.value() {
+            if params[0].unwrap().as_value() != inner_ty.as_value() {
                 return false;
             }
 

@@ -43,12 +43,7 @@ use std::{
 use async_trait::async_trait;
 use futures::Future;
 use jl_sys::{
-    jl_atexit_hook,
-    jl_init,
-    jl_init_with_image,
-    jl_is_initialized,
-    jl_options,
-    jl_process_events,
+    jl_atexit_hook, jl_init, jl_init_with_image, jl_is_initialized, jl_options, jl_process_events,
     jl_yield,
 };
 #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
@@ -62,24 +57,14 @@ use crate::{
         channel::{Channel, ChannelSender, OneshotSender, TrySendError},
         future::wake_task,
         internal::{
-            BlockingTask,
-            BlockingTaskEnvelope,
-            CallPersistentTask,
-            IncludeTask,
-            IncludeTaskEnvelope,
-            InnerPersistentMessage,
-            PendingTask,
-            PendingTaskEnvelope,
-            Persistent,
-            PersistentComms,
-            RegisterPersistent,
-            RegisterTask,
-            SetErrorColorTask,
-            SetErrorColorTaskEnvelope,
-            Task,
+            BlockingTask, BlockingTaskEnvelope, CallPersistentTask, IncludeTask,
+            IncludeTaskEnvelope, InnerPersistentMessage, PendingTask, PendingTaskEnvelope,
+            Persistent, PersistentComms, RegisterPersistent, RegisterTask, SetErrorColorTask,
+            SetErrorColorTaskEnvelope, Task,
         },
         task::{sleep, Affinity, AsyncTask, PersistentTask},
     },
+    data::managed::{module::Module, value::Value},
     error::{IOError, JlrsError, JlrsResult, RuntimeError},
     memory::{
         context::stack::Stack,
@@ -87,7 +72,6 @@ use crate::{
         target::{frame::GcFrame, unrooted::Unrooted},
     },
     runtime::{builder::AsyncRuntimeBuilder, init_jlrs, INIT},
-    wrappers::ptr::{module::Module, value::Value},
 };
 
 #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
@@ -816,12 +800,12 @@ fn set_custom_fns(stack: &Stack) -> JlrsResult<()> {
 
         let jlrs_mod = Module::main(&frame)
             .submodule(&frame, "JlrsMultitask")?
-            .wrapper();
+            .as_managed();
 
         let wake_rust = Value::new(&mut frame, wake_task as *mut c_void);
         jlrs_mod
             .global(&frame, "wakerust")?
-            .wrapper()
+            .as_managed()
             .set_nth_field_unchecked(0, wake_rust);
 
         std::mem::drop(owner);

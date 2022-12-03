@@ -16,9 +16,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper()
+                            .as_managed()
                             .global(&frame, "WithAbstract")?
-                            .value()
+                            .as_value()
                     };
 
                     let arg1 = Value::new(&mut frame, 3u32);

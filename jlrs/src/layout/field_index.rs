@@ -3,22 +3,22 @@
 /// Trait implemented by types that can be used in combination with a
 /// [`FieldAccessor`].
 ///
-/// [`FieldAccessor`]: crate::wrappers::ptr::value::FieldAccessor
+/// [`FieldAccessor`]: crate::data::managed::value::FieldAccessor
 pub trait FieldIndex: private::FieldIndexPriv {}
 impl<I: private::FieldIndexPriv> FieldIndex for I {}
 
 mod private {
     use crate::{
         convert::to_symbol::private::ToSymbolPriv,
-        error::{AccessError, JlrsResult, CANNOT_DISPLAY_TYPE},
-        private::Private,
-        wrappers::ptr::{
+        data::managed::{
             array::{dimensions::Dims, Array},
             datatype::DataType,
             string::JuliaString,
             symbol::Symbol,
-            Wrapper,
+            Managed,
         },
+        error::{AccessError, JlrsResult, CANNOT_DISPLAY_TYPE},
+        private::Private,
     };
 
     pub trait FieldIndexPriv {

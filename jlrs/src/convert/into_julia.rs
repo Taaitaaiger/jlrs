@@ -6,51 +6,29 @@
 //! isbits-types, and should not be implemented manually. Rather, you should use JlrsReflect.jl to
 //! automatically derive it for compatible types.
 //!
-//! [`Value::new`]: crate::wrappers::ptr::value::Value::new
-//! [`Value`]: crate::wrappers::ptr::value::Value
+//! [`Value::new`]: crate::data::managed::value::Value::new
+//! [`Value`]: crate::data::managed::value::Value
 
 use std::{ffi::c_void, ptr::NonNull};
 
 use jl_sys::{
-    jl_apply_type,
-    jl_bool_type,
-    jl_box_bool,
-    jl_box_char,
-    jl_box_float32,
-    jl_box_float64,
-    jl_box_int16,
-    jl_box_int32,
-    jl_box_int64,
-    jl_box_int8,
-    jl_box_uint16,
-    jl_box_uint32,
-    jl_box_uint64,
-    jl_box_uint8,
-    jl_box_voidpointer,
-    jl_char_type,
-    jl_float32_type,
-    jl_float64_type,
-    jl_int16_type,
-    jl_int32_type,
-    jl_int64_type,
-    jl_int8_type,
-    jl_new_struct_uninit,
-    jl_uint16_type,
-    jl_uint32_type,
-    jl_uint64_type,
-    jl_uint8_type,
+    jl_apply_type, jl_bool_type, jl_box_bool, jl_box_char, jl_box_float32, jl_box_float64,
+    jl_box_int16, jl_box_int32, jl_box_int64, jl_box_int8, jl_box_uint16, jl_box_uint32,
+    jl_box_uint64, jl_box_uint8, jl_box_voidpointer, jl_char_type, jl_float32_type,
+    jl_float64_type, jl_int16_type, jl_int32_type, jl_int64_type, jl_int8_type,
+    jl_new_struct_uninit, jl_uint16_type, jl_uint32_type, jl_uint64_type, jl_uint8_type,
     jl_voidpointer_type,
 };
 
 use crate::{
-    memory::target::Target,
-    private::Private,
-    wrappers::ptr::{
+    data::managed::{
         datatype::{DataType, DataTypeData},
-        private::WrapperPriv,
+        private::ManagedPriv,
         union_all::UnionAll,
         value::{Value, ValueData},
     },
+    memory::target::Target,
+    private::Private,
 };
 
 /// Trait implemented by types that can be converted to a Julia value in combination with
@@ -62,7 +40,7 @@ use crate::{
 /// type and the type in Rust must match exactly. Incompatible layouts will cause undefined
 /// behavior. The type in Rust must always be `#[repr(C)]`. The `DataType` must be an isbits-type.
 ///
-/// [`Value::new`]: crate::wrappers::ptr::value::Value::new
+/// [`Value::new`]: crate::data::managed::value::Value::new
 pub unsafe trait IntoJulia: Sized + 'static {
     /// Returns the associated Julia type of the implementor.
     ///
@@ -81,7 +59,7 @@ pub unsafe trait IntoJulia: Sized + 'static {
         // associated
         unsafe {
             // TODO: root this data until the data has been instantiated.
-            let ty = Self::julia_type(&target).wrapper();
+            let ty = Self::julia_type(&target).as_managed();
             debug_assert!(ty.is_bits());
 
             let instance = ty.instance();
@@ -103,7 +81,7 @@ macro_rules! impl_into_julia {
             #[inline(always)]
             fn julia_type<'scope, T>(
                 target: T,
-            ) -> $crate::wrappers::ptr::datatype::DataTypeData<'scope, T>
+            ) -> $crate::data::managed::datatype::DataTypeData<'scope, T>
             where
                 T: $crate::memory::target::Target<'scope>,
             {
@@ -119,7 +97,7 @@ macro_rules! impl_into_julia {
             fn into_julia<'scope, T>(
                 self,
                 target: T,
-            ) -> $crate::wrappers::ptr::value::ValueData<'scope, 'static, T>
+            ) -> $crate::data::managed::value::ValueData<'scope, 'static, T>
             where
                 T: $crate::memory::target::Target<'scope>,
             {

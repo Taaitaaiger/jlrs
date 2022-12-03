@@ -2,7 +2,7 @@
 
 use ndarray::{ArrayView, ArrayViewMut, Dim, IntoDimension, IxDynImpl, ShapeBuilder};
 
-use crate::wrappers::ptr::array::data::{
+use crate::data::managed::array::data::{
     accessor::{BitsArrayAccessor, InlinePtrArrayAccessor, Mutability, Mutable},
     copied::CopiedArray,
 };
@@ -68,7 +68,7 @@ impl<'view, T> NdArrayViewMut<'view, T> for CopiedArray<T> {
 }
 
 mod private {
-    use crate::wrappers::ptr::array::data::{
+    use crate::data::managed::array::data::{
         accessor::{BitsArrayAccessor, InlinePtrArrayAccessor, Mutability},
         copied::CopiedArray,
     };

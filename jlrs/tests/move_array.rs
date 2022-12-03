@@ -3,7 +3,7 @@ mod util;
 #[cfg(feature = "sync-rt")]
 #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
 mod tests {
-    use jlrs::{prelude::*, wrappers::ptr::array::dimensions::Dims};
+    use jlrs::{data::managed::array::dimensions::Dims, prelude::*};
 
     use crate::util::JULIA;
 

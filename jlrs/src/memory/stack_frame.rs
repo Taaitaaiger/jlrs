@@ -12,8 +12,8 @@ use jl_sys::{jl_get_current_task, jl_task_t};
 
 use super::context::stack::Stack;
 use crate::{
+    data::managed::{private::ManagedPriv, value::Value},
     private::Private,
-    wrappers::ptr::{private::WrapperPriv, value::Value},
 };
 
 const ROOT: Cell<*mut c_void> = Cell::new(null_mut());

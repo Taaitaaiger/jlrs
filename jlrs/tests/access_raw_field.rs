@@ -15,9 +15,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper()
+                            .as_managed()
                             .global(&frame, "NoUnionsBits")?
-                            .value()
+                            .as_value()
                     };
                     let arg1 = Value::new(&mut frame, 3i16);
                     let arg2 = Value::new(&mut frame, -3i32);
@@ -47,9 +47,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper()
+                            .as_managed()
                             .global(&frame, "NoUnionsBitsPtr")?
-                            .value()
+                            .as_value()
                     };
                     let arg1 = Value::new(&mut frame, 3i16);
                     let arg2 = DataType::bool_type(&frame);
@@ -65,7 +65,7 @@ mod tests {
                         .field_accessor()
                         .field("b")?
                         .access::<DataTypeRef>()?;
-                    assert_eq!(unsafe { b.wrapper() }, arg2);
+                    assert_eq!(unsafe { b.as_managed() }, arg2);
 
                     Ok(())
                 })
@@ -82,9 +82,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper()
+                            .as_managed()
                             .global(&frame, "BitsBitsUnion")?
-                            .value()
+                            .as_value()
                     };
                     let arg1 = Value::new(&mut frame, 3i16);
                     let arg2 = Value::new(&mut frame, -3i32);
@@ -114,9 +114,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper()
+                            .as_managed()
                             .global(&frame, "PtrBitsUnion")?
-                            .value()
+                            .as_value()
                     };
                     let arg1 = DataType::bool_type(&frame);
                     let arg2 = Value::new(&mut frame, -3i32);
@@ -129,7 +129,7 @@ mod tests {
                         .field_accessor()
                         .field("a")?
                         .access::<DataTypeRef>()?;
-                    assert_eq!(unsafe { a.wrapper() }, arg1);
+                    assert_eq!(unsafe { a.as_managed() }, arg1);
 
                     let b = instance.field_accessor().field("b")?.access::<i32>()?;
                     assert_eq!(b, -3);
@@ -149,9 +149,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper()
+                            .as_managed()
                             .global(&frame, "PtrNonBitsUnion")?
-                            .value()
+                            .as_value()
                     };
                     let arg1 = DataType::bool_type(&frame);
                     let arg2 = Value::new(&mut frame, -3i32);
@@ -164,7 +164,7 @@ mod tests {
                         .field_accessor()
                         .field("a")?
                         .access::<DataTypeRef>()?;
-                    assert_eq!(unsafe { a.wrapper() }, arg1);
+                    assert_eq!(unsafe { a.as_managed() }, arg1);
 
                     let b = instance.field_accessor().field("b")?.access::<i32>()?;
                     assert_eq!(b, -3);
@@ -184,9 +184,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper()
+                            .as_managed()
                             .global(&frame, "PtrNonBitsUnion")?
-                            .value()
+                            .as_value()
                     };
                     let arg1 = DataType::bool_type(&frame);
                     let arg2 = Value::new(&mut frame, -3i32);
@@ -219,9 +219,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper()
+                            .as_managed()
                             .global(&frame, "HasArray")?
-                            .value()
+                            .as_value()
                     };
                     let data = vec![1.0, 2.0, 3.0, 4.0];
                     let arg1 = Array::from_vec(frame.as_extended_target(), data, (2, 2))?
@@ -262,9 +262,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper()
+                            .as_managed()
                             .global(&frame, "UaArray")?
-                            .value()
+                            .as_value()
                     };
                     let data = vec![1.0, 2.0, 3.0, 4.0];
                     let arg1 = Array::from_vec(frame.as_extended_target(), data, (2, 2))?
@@ -305,9 +305,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper()
+                            .as_managed()
                             .global(&frame, "PtrNonBitsUnion")?
-                            .value()
+                            .as_value()
                     };
                     let arg1 = DataType::bool_type(&frame);
                     let arg2 = Value::new(&mut frame, -3i32);
@@ -332,9 +332,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper()
+                            .as_managed()
                             .global(&frame, "NoUnionsBits")?
-                            .value()
+                            .as_value()
                     };
                     let arg1 = Value::new(&mut frame, 3i16);
                     let arg2 = Value::new(&mut frame, -3i32);
@@ -364,9 +364,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper()
+                            .as_managed()
                             .global(&frame, "NoUnionsBitsPtr")?
-                            .value()
+                            .as_value()
                     };
                     let arg1 = Value::new(&mut frame, 3i16);
                     let arg2 = DataType::bool_type(&frame);
@@ -382,7 +382,7 @@ mod tests {
                         .field_accessor()
                         .field(1)?
                         .access::<DataTypeRef>()?;
-                    assert_eq!(unsafe { b.wrapper() }, arg2);
+                    assert_eq!(unsafe { b.as_managed() }, arg2);
 
                     Ok(())
                 })
@@ -399,9 +399,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper()
+                            .as_managed()
                             .global(&frame, "BitsBitsUnion")?
-                            .value()
+                            .as_value()
                     };
                     let arg1 = Value::new(&mut frame, 3i16);
                     let arg2 = Value::new(&mut frame, -3i32);
@@ -431,9 +431,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper()
+                            .as_managed()
                             .global(&frame, "PtrNonBitsUnion")?
-                            .value()
+                            .as_value()
                     };
                     let arg1 = DataType::bool_type(&frame);
                     let arg2 = Value::new(&mut frame, -3i32);
@@ -446,7 +446,7 @@ mod tests {
                         .field_accessor()
                         .field(0)?
                         .access::<DataTypeRef>()?;
-                    assert_eq!(unsafe { a.wrapper() }, arg1);
+                    assert_eq!(unsafe { a.as_managed() }, arg1);
 
                     let b = instance.field_accessor().field(1)?.access::<i32>()?;
                     assert_eq!(b, -3);
@@ -466,9 +466,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper()
+                            .as_managed()
                             .global(&frame, "PtrNonBitsUnion")?
-                            .value()
+                            .as_value()
                     };
                     let arg1 = DataType::bool_type(&frame);
                     let arg2 = Value::new(&mut frame, -3i32);
@@ -501,9 +501,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper()
+                            .as_managed()
                             .global(&frame, "HasArray")?
-                            .value()
+                            .as_value()
                     };
                     let data = vec![1.0, 2.0, 3.0, 4.0];
                     let arg1 = Array::from_vec(frame.as_extended_target(), data, (2, 2))?
@@ -544,9 +544,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper()
+                            .as_managed()
                             .global(&frame, "UaArray")?
-                            .value()
+                            .as_value()
                     };
                     let data = vec![1.0, 2.0, 3.0, 4.0];
                     let arg1 = Array::from_vec(frame.as_extended_target(), data, (2, 2))?
@@ -587,9 +587,9 @@ mod tests {
                     let ty = unsafe {
                         Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper()
+                            .as_managed()
                             .global(&frame, "PtrNonBitsUnion")?
-                            .value()
+                            .as_value()
                     };
                     let arg1 = DataType::bool_type(&frame);
                     let arg2 = Value::new(&mut frame, -3i32);

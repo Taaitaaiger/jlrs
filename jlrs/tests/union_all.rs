@@ -3,8 +3,8 @@ mod util;
 #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
 mod tests {
     use jlrs::{
+        data::managed::{type_var::TypeVar, union_all::UnionAll},
         prelude::*,
-        wrappers::ptr::{type_var::TypeVar, union_all::UnionAll},
     };
 
     use super::util::JULIA;
@@ -28,7 +28,7 @@ mod tests {
 
                     let equals = Module::base(&frame)
                         .function(&frame, "!=")?
-                        .wrapper()
+                        .as_managed()
                         .call2(&mut frame, v.as_value(), atype.var().as_value())
                         .unwrap()
                         .unbox::<bool>()?
@@ -50,9 +50,9 @@ mod tests {
                     let args = [DataType::int8_type(&frame).as_value()];
                     let out = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper()
+                        .as_managed()
                         .global(&frame, "ParameterStruct")?
-                        .wrapper()
+                        .as_managed()
                         .apply_type(&mut frame, args)
                         .into_jlrs_result()?
                         .cast::<DataType>()?
@@ -79,9 +79,9 @@ mod tests {
 
                     let vts = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper()
+                        .as_managed()
                         .global(&frame, "ValueTypeStruct")?
-                        .wrapper();
+                        .as_managed();
 
                     let v1 = vts
                         .apply_type(&mut frame, &mut [ty1])
@@ -99,9 +99,9 @@ mod tests {
 
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper()
+                        .as_managed()
                         .function(&frame, "valuedispatch")?
-                        .wrapper();
+                        .as_managed();
 
                     let o1 = func.call1(&mut frame, v1).unwrap().unbox::<isize>()?;
                     let o2 = func.call1(&mut frame, v2).unwrap().unbox::<f64>()?;

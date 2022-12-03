@@ -6,13 +6,13 @@
 //! has the same layout as a given Julia type. It is implemented automatically by JlrsReflect.jl,
 //! you should not implement it manually.
 //!
-//! [`DataType`]: crate::wrappers::ptr::datatype::DataType
+//! [`DataType`]: crate::data::managed::datatype::DataType
 
 use std::ffi::c_void;
 
 use crate::{
     convert::into_julia::IntoJulia,
-    wrappers::ptr::{datatype::DataType, value::Value},
+    data::managed::{datatype::DataType, value::Value},
 };
 
 /// Trait used to check if a Rust type and Julia type have matching layouts.
@@ -21,9 +21,9 @@ use crate::{
 /// checked recursively to determine if the value can be unboxed as that type.
 pub unsafe trait ValidLayout {
     /// Must be `true` if the Rust type is a pointer wrapper type, i.e. if `Self` implements
-    /// [`WrapperRef`], `false` otherwise.
+    /// [`ManagedRef`], `false` otherwise.
     ///
-    /// [`WrapperRef`]: crate::wrappers::ptr::WrapperRef
+    /// [`ManagedRef`]: crate::data::managed::ManagedRef
     const IS_REF: bool = false;
 
     /// Check if the layout of the implementor is compatible with the layout of `ty`. This
@@ -38,8 +38,8 @@ macro_rules! impl_valid_layout {
     ($type:ty, $($lt:lifetime),+) => {
         unsafe impl<$($lt),+> $crate::layout::valid_layout::ValidLayout for $type {
             #[inline(always)]
-            fn valid_layout(v: $crate::wrappers::ptr::value::Value) -> bool {
-                if let Ok(dt) = v.cast::<$crate::wrappers::ptr::datatype::DataType>() {
+            fn valid_layout(v: $crate::data::managed::value::Value) -> bool {
+                if let Ok(dt) = v.cast::<$crate::data::managed::datatype::DataType>() {
                     dt.is::<$type>()
                 } else {
                     false
@@ -51,8 +51,8 @@ macro_rules! impl_valid_layout {
 
         unsafe impl<$($lt),+> $crate::layout::valid_layout::ValidField for $type {
             #[inline(always)]
-            fn valid_field(v: $crate::wrappers::ptr::value::Value) -> bool {
-                if let Ok(dt) = v.cast::<$crate::wrappers::ptr::datatype::DataType>() {
+            fn valid_field(v: $crate::data::managed::value::Value) -> bool {
+                if let Ok(dt) = v.cast::<$crate::data::managed::datatype::DataType>() {
                     dt.is::<$type>()
                 } else {
                     false
@@ -63,8 +63,8 @@ macro_rules! impl_valid_layout {
     ($t:ty) => {
         unsafe impl $crate::layout::valid_layout::ValidLayout for $t {
             #[inline(always)]
-            fn valid_layout(v: $crate::wrappers::ptr::value::Value) -> bool {
-                if let Ok(dt) =  v.cast::<$crate::wrappers::ptr::datatype::DataType>() {
+            fn valid_layout(v: $crate::data::managed::value::Value) -> bool {
+                if let Ok(dt) =  v.cast::<$crate::data::managed::datatype::DataType>() {
                     dt.is::<$t>()
                 } else {
                     false
@@ -76,8 +76,8 @@ macro_rules! impl_valid_layout {
 
         unsafe impl $crate::layout::valid_layout::ValidField for $t {
             #[inline(always)]
-            fn valid_field(v: $crate::wrappers::ptr::value::Value) -> bool {
-                if let Ok(dt) =  v.cast::<$crate::wrappers::ptr::datatype::DataType>() {
+            fn valid_field(v: $crate::data::managed::value::Value) -> bool {
+                if let Ok(dt) =  v.cast::<$crate::data::managed::datatype::DataType>() {
                     dt.is::<$t>()
                 } else {
                     false
