@@ -25,9 +25,9 @@ use crate::{
 };
 use crate::{
     call::Call,
+    data::managed::{module::Module, value::Value},
     error::JlrsResult,
     memory::target::{frame::AsyncGcFrame, Target},
-    wrappers::ptr::{module::Module, value::Value},
 };
 
 /// A task that returns once.
@@ -374,12 +374,12 @@ pub fn sleep<'scope, 'data, T: Target<'scope>>(target: &T, duration: Duration) {
 
         // Is rooted when sleep is called.
         let secs = duration.as_millis() as usize as f64 / 1000.;
-        let secs = Value::new(target, secs).value();
+        let secs = Value::new(target, secs).as_value();
 
         Module::base(target)
             .global(target, "sleep")
             .expect("sleep not found")
-            .value()
+            .as_value()
             .call1(target, secs)
             .expect("sleep threw an exception");
     }

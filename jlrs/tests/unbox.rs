@@ -22,7 +22,7 @@ mod tests {
                         .scope(|frame| unsafe {
                             let val: $type = $val;
                             assert_eq!(
-                                <$type as Unbox>::unbox(val.into_julia(&frame).value()),
+                                <$type as Unbox>::unbox(val.into_julia(&frame).as_value()),
                                 $val
                             );
                             Ok(())

@@ -6,9 +6,9 @@ mod util;
 ))]
 mod not_lts {
     use jlrs::{
+        data::managed::internal::opaque_closure::{OpaqueClosure, OpaqueClosureRef},
         layout::valid_layout::ValidLayout,
         prelude::*,
-        wrappers::ptr::internal::opaque_closure::{OpaqueClosure, OpaqueClosureRef},
     };
 
     use super::util::JULIA;

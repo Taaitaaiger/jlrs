@@ -188,22 +188,22 @@ fn impl_into_julia(ast: &syn::DeriveInput) -> TokenStream {
 
     let into_julia_impl = quote! {
         unsafe impl ::jlrs::convert::into_julia::IntoJulia for #name {
-            fn julia_type<'scope, T>(target: T) -> ::jlrs::wrappers::ptr::datatype::DataTypeData<'scope, T>
+            fn julia_type<'scope, T>(target: T) -> ::jlrs::data::managed::datatype::DataTypeData<'scope, T>
             where
                 T: ::jlrs::memory::target::Target<'scope>,
             {
                 unsafe {
                     let global = target.unrooted();
-                    ::jlrs::wrappers::ptr::module::Module::#func(&global)
+                    ::jlrs::data::managed::module::Module::#func(&global)
                         #(
                             .submodule(&global, #modules_it)
                             .expect(&format!("Submodule {} cannot be found", #modules_it_b))
-                            .wrapper()
+                            .as_managed()
                         )*
                         .global(&global, #ty)
                         .expect(&format!("Type {} cannot be found in module", #ty))
-                        .value()
-                        .cast::<::jlrs::wrappers::ptr::datatype::DataType>()
+                        .as_value()
+                        .cast::<::jlrs::data::managed::datatype::DataType>()
                         .expect("Type is not a DataType")
                         .root(target)
                 }
@@ -219,15 +219,15 @@ fn impl_into_julia(ast: &syn::DeriveInput) -> TokenStream {
 fn impl_into_julia_fn(attrs: &JlrsTypeAttrs) -> Option<TS2> {
     if attrs.zst {
         Some(quote! {
-            unsafe fn into_julia<'target, T>(self, target: T) -> ::jlrs::wrappers::ptr::value::ValueData<'target, 'static, T>
+            unsafe fn into_julia<'target, T>(self, target: T) -> ::jlrs::data::managed::value::ValueData<'target, 'static, T>
             where
                 T: ::jlrs::memory::target::Target<'scope>,
             {
                 let ty = self.julia_type(global);
                 unsafe {
-                    ty.wrapper()
+                    ty.as_managed()
                         .instance()
-                        .value()
+                        .as_value()
                         .expect("Instance is undefined")
                         .as_ref()
                 }
@@ -267,7 +267,7 @@ fn impl_typecheck(ast: &syn::DeriveInput) -> TokenStream {
 
     let typecheck_impl = quote! {
         unsafe impl #generics ::jlrs::layout::typecheck::Typecheck for #name #generics #where_clause {
-            fn typecheck(dt: ::jlrs::wrappers::ptr::datatype::DataType) -> bool {
+            fn typecheck(dt: ::jlrs::data::managed::datatype::DataType) -> bool {
                 <Self as ::jlrs::layout::valid_layout::ValidLayout>::valid_layout(dt.as_value())
             }
         }
@@ -308,28 +308,28 @@ fn impl_valid_layout(ast: &syn::DeriveInput) -> TokenStream {
 
     let valid_layout_impl = quote! {
         unsafe impl #generics ::jlrs::layout::valid_layout::ValidLayout for #name #generics #where_clause {
-            fn valid_layout(v: ::jlrs::wrappers::ptr::value::Value) -> bool {
+            fn valid_layout(v: ::jlrs::data::managed::value::Value) -> bool {
                 unsafe {
-                    if let Ok(dt) = v.cast::<::jlrs::wrappers::ptr::datatype::DataType>() {
+                    if let Ok(dt) = v.cast::<::jlrs::data::managed::datatype::DataType>() {
                         if dt.n_fields() as usize != #n_fields {
                             return false;
                         }
 
                         let global = v.unrooted_target();
                         let field_types = dt.field_types(global);
-                        let field_types_svec = field_types.wrapper();
+                        let field_types_svec = field_types.as_managed();
                         let field_types_data = field_types_svec.data();
                         let field_types = field_types_data.as_slice();
 
                         #(
-                            if !<#rs_non_union_fields as ::jlrs::layout::valid_layout::ValidField>::valid_field(field_types[#jl_non_union_field_idxs].unwrap().wrapper()) {
+                            if !<#rs_non_union_fields as ::jlrs::layout::valid_layout::ValidField>::valid_field(field_types[#jl_non_union_field_idxs].unwrap().as_managed()) {
                                 return false;
                             }
                         )*
 
                         #(
-                            if let Ok(u) = field_types[#jl_union_field_idxs].unwrap().wrapper().cast::<::jlrs::wrappers::ptr::union::Union>() {
-                                if !::jlrs::wrappers::inline::union::correct_layout_for::<#rs_align_fields, #rs_union_fields, #rs_flag_fields>(u) {
+                            if let Ok(u) = field_types[#jl_union_field_idxs].unwrap().as_managed().cast::<::jlrs::data::managed::union::Union>() {
+                                if !::jlrs::data::layout::union::correct_layout_for::<#rs_align_fields, #rs_union_fields, #rs_flag_fields>(u) {
                                     return false
                                 }
                             } else {
@@ -363,7 +363,7 @@ fn impl_valid_field(ast: &syn::DeriveInput) -> TokenStream {
 
     let valid_field_impl = quote! {
         unsafe impl #generics ::jlrs::layout::valid_layout::ValidField for #name #generics #where_clause {
-            fn valid_field(v: ::jlrs::wrappers::ptr::value::Value) -> bool {
+            fn valid_field(v: ::jlrs::data::managed::value::Value) -> bool {
                 <Self as ::jlrs::layout::valid_layout::ValidLayout>::valid_layout(v)
             }
         }

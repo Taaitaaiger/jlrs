@@ -6,9 +6,9 @@ mod util;
 ))]
 mod not_lts {
     use jlrs::{
+        data::managed::internal::vararg::{Vararg, VarargRef},
         layout::valid_layout::ValidLayout,
         prelude::*,
-        wrappers::ptr::internal::vararg::{Vararg, VarargRef},
     };
 
     use super::util::JULIA;
@@ -30,7 +30,7 @@ mod not_lts {
 
                     let vararg = vararg.cast::<Vararg>()?;
                     assert_eq!(
-                        vararg.t(&frame).unwrap().value().cast::<DataType>()?,
+                        vararg.t(&frame).unwrap().as_value().cast::<DataType>()?,
                         DataType::int32_type(&frame)
                     );
                     assert!(vararg.n(&frame).is_none());
@@ -80,7 +80,7 @@ mod not_lts {
 
                     let vararg = instance.cast::<Vararg>()?;
                     assert_eq!(
-                        vararg.t(&frame).unwrap().value().cast::<DataType>()?,
+                        vararg.t(&frame).unwrap().as_value().cast::<DataType>()?,
                         DataType::int32_type(&frame)
                     );
                     assert!(vararg.n(&frame).is_none());
@@ -108,10 +108,10 @@ mod not_lts {
 
                     let vararg = instance.cast::<Vararg>()?;
                     assert_eq!(
-                        vararg.t(&frame).unwrap().value().cast::<DataType>()?,
+                        vararg.t(&frame).unwrap().as_value().cast::<DataType>()?,
                         DataType::int32_type(&frame)
                     );
-                    assert_eq!(vararg.n(&frame).unwrap().value().unbox::<isize>()?, 3);
+                    assert_eq!(vararg.n(&frame).unwrap().as_value().unbox::<isize>()?, 3);
                     Ok(())
                 })
                 .unwrap();

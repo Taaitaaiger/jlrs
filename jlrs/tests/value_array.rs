@@ -33,12 +33,12 @@ mod tests {
                     }
 
                     {
-                        let data = unsafe { arr.wrapper_data::<ModuleRef>()? };
+                        let data = unsafe { arr.managed_data::<ModuleRef>()? };
                         assert_eq!(unsafe { data.dimensions().as_slice() }, &[4]);
                     }
 
                     unsafe {
-                        let data = arr.wrapper_data_mut::<ModuleRef>()?;
+                        let data = arr.managed_data_mut::<ModuleRef>()?;
                         assert_eq!(data.dimensions().as_slice(), &[4]);
                     }
 
@@ -71,29 +71,29 @@ mod tests {
                         assert!(data.set(0, Some(module)).is_ok());
                         assert!(data.set(1, Some(module)).is_ok());
                         assert!(!data[0].is_none());
-                        assert_eq!(data[0].unwrap().value(), module);
+                        assert_eq!(data[0].unwrap().as_value(), module);
                         assert_eq!(data.get(&mut frame, 0).unwrap(), module);
                     }
 
                     unsafe {
                         let data = arr.value_data()?;
-                        assert_eq!(data[0].unwrap().value(), module);
+                        assert_eq!(data[0].unwrap().as_value(), module);
                         assert_eq!(data.get(&mut frame, 0).unwrap(), module);
                     }
 
                     unsafe {
-                        let data = arr.wrapper_data::<ModuleRef>()?;
-                        assert_eq!(data[1].unwrap().value(), module);
+                        let data = arr.managed_data::<ModuleRef>()?;
+                        assert_eq!(data[1].unwrap().as_value(), module);
                         assert_eq!(data.get(&mut frame, 1).unwrap(), module.cast::<Module>()?);
                     }
 
                     unsafe {
-                        let mut data = arr.wrapper_data_mut::<ModuleRef>()?;
+                        let mut data = arr.managed_data_mut::<ModuleRef>()?;
                         assert!(data[2].is_none());
                         assert!(data.set(2, Some(module)).is_ok());
                         assert!(!data[2].is_none());
-                        assert_eq!(data[2].unwrap().value(), module);
-                        assert_eq!(data.get(&frame, 2).unwrap().value(), module);
+                        assert_eq!(data[2].unwrap().as_value(), module);
+                        assert_eq!(data.get(&frame, 2).unwrap().as_value(), module);
 
                         assert!(data.set(2, None).is_ok());
                         assert!(data[2].is_none());
@@ -128,7 +128,7 @@ mod tests {
                     }
 
                     {
-                        let mut data = unsafe { arr.wrapper_data_mut::<ModuleRef>()? };
+                        let mut data = unsafe { arr.managed_data_mut::<ModuleRef>()? };
                         assert!(data.set(0, Some(module)).is_err());
                     }
 
@@ -166,13 +166,13 @@ mod tests {
                     }
 
                     {
-                        let data = unsafe { arr.wrapper_data::<ModuleRef>()? };
+                        let data = unsafe { arr.managed_data::<ModuleRef>()? };
                         let slice = data.as_slice();
                         assert_eq!(slice.len(), 4)
                     }
 
                     {
-                        let data = unsafe { arr.wrapper_data_mut::<ModuleRef>()? };
+                        let data = unsafe { arr.managed_data_mut::<ModuleRef>()? };
                         let slice = data.as_slice();
                         assert_eq!(slice.len(), 4)
                     }

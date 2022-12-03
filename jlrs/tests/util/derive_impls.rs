@@ -4,7 +4,7 @@ use jlrs::prelude::*;
 #[derive(Clone, Debug, Unbox, ValidLayout, ValidField, Typecheck, IntoJulia)]
 #[jlrs(julia_type = "Main.BitsWithCustom.BitsCharBitsIntChar")]
 pub struct BitsCharBitsIntChar {
-    pub a: ::jlrs::wrappers::inline::char::Char,
+    pub a: ::jlrs::data::layout::char::Char,
     pub b: BitsIntChar,
 }
 
@@ -14,7 +14,7 @@ pub struct BitsCharBitsIntChar {
 #[jlrs(julia_type = "Main.BitsWithCustom.BitsIntChar")]
 pub struct BitsIntChar {
     pub a: i64,
-    pub b: ::jlrs::wrappers::inline::char::Char,
+    pub b: ::jlrs::data::layout::char::Char,
 }
 
 #[cfg(target_pointer_width = "32")]
@@ -23,7 +23,7 @@ pub struct BitsIntChar {
 #[jlrs(julia_type = "Main.BitsWithCustom.BitsIntChar")]
 pub struct BitsIntChar {
     pub a: i32,
-    pub b: ::jlrs::wrappers::inline::char::Char,
+    pub b: ::jlrs::data::layout::char::Char,
 }
 
 #[repr(C)]
@@ -31,7 +31,7 @@ pub struct BitsIntChar {
 #[jlrs(julia_type = "Main.BitsWithTuples.BitsUInt8TupleInt32Int64")]
 pub struct BitsUInt8TupleInt32Int64 {
     pub a: u8,
-    pub b: ::jlrs::wrappers::inline::tuple::Tuple2<i32, i64>,
+    pub b: ::jlrs::data::layout::tuple::Tuple2<i32, i64>,
 }
 
 #[repr(C)]
@@ -39,17 +39,14 @@ pub struct BitsUInt8TupleInt32Int64 {
 #[jlrs(julia_type = "Main.BitsWithTuples.BitsUInt8TupleInt32TupleInt16UInt16")]
 pub struct BitsUInt8TupleInt32TupleInt16UInt16 {
     pub a: u8,
-    pub b: ::jlrs::wrappers::inline::tuple::Tuple2<
-        i32,
-        ::jlrs::wrappers::inline::tuple::Tuple2<i16, u16>,
-    >,
+    pub b: ::jlrs::data::layout::tuple::Tuple2<i32, ::jlrs::data::layout::tuple::Tuple2<i16, u16>>,
 }
 
 #[repr(C)]
 #[derive(Clone, Debug, Unbox, ValidLayout, ValidField, Typecheck, IntoJulia)]
 #[jlrs(julia_type = "Main.MultiFieldBits.BitsCharFloat32Float64")]
 pub struct BitsCharFloat32Float64 {
-    pub a: ::jlrs::wrappers::inline::char::Char,
+    pub a: ::jlrs::data::layout::char::Char,
     pub b: f32,
     pub c: f64,
 }
@@ -60,7 +57,7 @@ pub struct BitsCharFloat32Float64 {
 #[jlrs(julia_type = "Main.MultiFieldBits.BitsIntBool")]
 pub struct BitsIntBool {
     pub a: i64,
-    pub b: ::jlrs::wrappers::inline::bool::Bool,
+    pub b: ::jlrs::data::layout::bool::Bool,
 }
 
 #[cfg(target_pointer_width = "32")]
@@ -69,21 +66,21 @@ pub struct BitsIntBool {
 #[jlrs(julia_type = "Main.MultiFieldBits.BitsIntBool")]
 pub struct BitsIntBool {
     pub a: i32,
-    pub b: ::jlrs::wrappers::inline::bool::Bool,
+    pub b: ::jlrs::data::layout::bool::Bool,
 }
 
 #[repr(C)]
 #[derive(Clone, Debug, Unbox, ValidLayout, ValidField, Typecheck, IntoJulia)]
 #[jlrs(julia_type = "Main.SingleFieldBits.BitsTypeBool")]
 pub struct BitsTypeBool {
-    pub a: ::jlrs::wrappers::inline::bool::Bool,
+    pub a: ::jlrs::data::layout::bool::Bool,
 }
 
 #[repr(C)]
 #[derive(Clone, Debug, Unbox, ValidLayout, ValidField, Typecheck, IntoJulia)]
 #[jlrs(julia_type = "Main.SingleFieldBits.BitsTypeChar")]
 pub struct BitsTypeChar {
-    pub a: ::jlrs::wrappers::inline::char::Char,
+    pub a: ::jlrs::data::layout::char::Char,
 }
 
 #[repr(C)]
@@ -193,9 +190,9 @@ pub struct BitsTypeUInt8 {
 pub struct DoubleVariant {
     pub a: i8,
     #[jlrs(bits_union_align)]
-    _b_align: ::jlrs::wrappers::inline::union::Align4,
+    _b_align: ::jlrs::data::layout::union::Align4,
     #[jlrs(bits_union)]
-    pub b: ::jlrs::wrappers::inline::union::BitsUnion<4>,
+    pub b: ::jlrs::data::layout::union::BitsUnion<4>,
     #[jlrs(bits_union_flag)]
     pub b_flag: u8,
     pub c: i8,
@@ -216,9 +213,9 @@ pub struct SingleVariant {
 pub struct SizeAlignMismatch {
     pub a: i8,
     #[jlrs(bits_union_align)]
-    _b_align: ::jlrs::wrappers::inline::union::Align4,
+    _b_align: ::jlrs::data::layout::union::Align4,
     #[jlrs(bits_union)]
-    pub b: ::jlrs::wrappers::inline::union::BitsUnion<6>,
+    pub b: ::jlrs::data::layout::union::BitsUnion<6>,
     #[jlrs(bits_union_flag)]
     pub b_flag: u8,
     pub c: i8,
@@ -229,7 +226,7 @@ pub struct SizeAlignMismatch {
 #[jlrs(julia_type = "Main.WithBitsUnion.UnionInTuple")]
 pub struct UnionInTuple<'frame, 'data> {
     pub a: i8,
-    pub b: ::std::option::Option<::jlrs::wrappers::ptr::value::ValueRef<'frame, 'data>>,
+    pub b: ::std::option::Option<::jlrs::data::managed::value::ValueRef<'frame, 'data>>,
     pub c: i8,
 }
 
@@ -247,7 +244,7 @@ where
 #[derive(Clone, Debug, Unbox, ValidLayout, ValidField, Typecheck)]
 #[jlrs(julia_type = "Main.WithGeneric.WithGenericUnionAll")]
 pub struct WithGenericUnionAll<'frame, 'data> {
-    pub a: ::std::option::Option<::jlrs::wrappers::ptr::value::ValueRef<'frame, 'data>>,
+    pub a: ::std::option::Option<::jlrs::data::managed::value::ValueRef<'frame, 'data>>,
 }
 
 #[repr(C)]
@@ -264,7 +261,7 @@ where
 #[derive(Clone, Debug, Unbox, ValidLayout, ValidField, Typecheck)]
 #[jlrs(julia_type = "Main.WithGeneric.WithPropagatedLifetime")]
 pub struct WithPropagatedLifetime<'frame> {
-    pub a: WithGenericT<::std::option::Option<::jlrs::wrappers::ptr::module::ModuleRef<'frame>>>,
+    pub a: WithGenericT<::std::option::Option<::jlrs::data::managed::module::ModuleRef<'frame>>>,
 }
 
 #[repr(C)]
@@ -272,10 +269,10 @@ pub struct WithPropagatedLifetime<'frame> {
 #[jlrs(julia_type = "Main.WithGeneric.WithPropagatedLifetimes")]
 pub struct WithPropagatedLifetimes<'frame, 'data> {
     pub a: WithGenericT<
-        ::jlrs::wrappers::inline::tuple::Tuple2<
+        ::jlrs::data::layout::tuple::Tuple2<
             i32,
             WithGenericT<
-                ::std::option::Option<::jlrs::wrappers::ptr::array::ArrayRef<'frame, 'data>>,
+                ::std::option::Option<::jlrs::data::managed::array::ArrayRef<'frame, 'data>>,
             >,
         >,
     >,
@@ -292,7 +289,7 @@ pub struct WithSetGeneric {
 #[derive(Clone, Debug, Unbox, ValidLayout, ValidField, Typecheck, IntoJulia)]
 #[jlrs(julia_type = "Main.WithGeneric.WithSetGenericTuple")]
 pub struct WithSetGenericTuple {
-    pub a: ::jlrs::wrappers::inline::tuple::Tuple1<WithGenericT<i64>>,
+    pub a: ::jlrs::data::layout::tuple::Tuple1<WithGenericT<i64>>,
 }
 
 #[repr(C)]
@@ -306,7 +303,7 @@ pub struct WithValueType {
 #[derive(Clone, Debug, Unbox, ValidLayout, ValidField, Typecheck)]
 #[jlrs(julia_type = "Main.WithNonBitsUnion.NonBitsUnion")]
 pub struct NonBitsUnion<'frame, 'data> {
-    pub a: ::std::option::Option<::jlrs::wrappers::ptr::value::ValueRef<'frame, 'data>>,
+    pub a: ::std::option::Option<::jlrs::data::managed::value::ValueRef<'frame, 'data>>,
 }
 
 #[repr(C)]

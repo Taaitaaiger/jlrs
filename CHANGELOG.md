@@ -1,3 +1,9 @@
+#### v0.18
+ - jlrs is compatible with Julia 1.7 again, but this version not actively tested or supported. Version features have been added to select a particular version of Julia.
+
+ - Foreign types can be reinitialized with `reinit_foreign_type`, this is only available when Julia 1.10 (the current nightly version) is used.
+
+
 #### v0.17
  - Atomic struct fields are now atomic in the generated bindings.
 

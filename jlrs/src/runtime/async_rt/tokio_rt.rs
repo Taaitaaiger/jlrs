@@ -18,22 +18,14 @@ use async_trait::async_trait;
 use tokio::{
     runtime::Builder,
     sync::mpsc::{
-        Receiver as BoundedReceiver,
-        Sender as BoundedSender,
-        UnboundedReceiver,
-        UnboundedSender,
+        Receiver as BoundedReceiver, Sender as BoundedSender, UnboundedReceiver, UnboundedSender,
     },
     task::{JoinError, JoinHandle, LocalSet},
 };
 
 use crate::{
     async_util::channel::{
-        Channel,
-        ChannelReceiver,
-        ChannelSender,
-        OneshotSender,
-        SendError,
-        TrySendError,
+        Channel, ChannelReceiver, ChannelSender, OneshotSender, SendError, TrySendError,
     },
     error::{JlrsError, JlrsResult},
     runtime::async_rt::{AsyncRuntime, Message},

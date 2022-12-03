@@ -18,29 +18,21 @@
 //! JlrsReflect.jl [`Unbox`] is always derived.
 //!
 //! [`Cast`]: crate::convert::cast::Cast
-//! [`Bool`]: crate::wrappers::inline::bool::Bool
-//! [`Char`]: crate::wrappers::inline::char::Char
-//! [`DataType`]: crate::wrappers::ptr::datatype::DataType
+//! [`Bool`]: crate::data::layout::bool::Bool
+//! [`Char`]: crate::data::layout::char::Char
+//! [`DataType`]: crate::data::managed::datatype::DataType
 //! [`IntoJulia`]: crate::convert::into_julia::IntoJulia
 
 use std::ffi::c_void;
 
 use jl_sys::{
-    jl_unbox_float32,
-    jl_unbox_float64,
-    jl_unbox_int16,
-    jl_unbox_int32,
-    jl_unbox_int64,
-    jl_unbox_int8,
-    jl_unbox_uint16,
-    jl_unbox_uint32,
-    jl_unbox_uint64,
-    jl_unbox_uint8,
+    jl_unbox_float32, jl_unbox_float64, jl_unbox_int16, jl_unbox_int32, jl_unbox_int64,
+    jl_unbox_int8, jl_unbox_uint16, jl_unbox_uint32, jl_unbox_uint64, jl_unbox_uint8,
     jl_unbox_voidpointer,
 };
 
 use super::into_julia::IntoJulia;
-use crate::wrappers::ptr::value::Value;
+use crate::data::managed::value::Value;
 
 /// A trait implemented by types that can be extracted from a Julia value with [`Value::unbox`].
 ///
@@ -54,7 +46,7 @@ use crate::wrappers::ptr::value::Value;
 /// `unbox` dereferences the value as `&Self::Output` and clones it. If this implementation is
 /// incorrect it must be overridden.
 ///
-/// [`Value::unbox`]: crate::wrappers::ptr::value::Value::unbox
+/// [`Value::unbox`]: crate::data::managed::value::Value::unbox
 /// [`ValidLayout`]: crate::layout::valid_layout::ValidLayout
 pub unsafe trait Unbox {
     /// The type of the unboxed data. Must be `#[repr(C)]`.
@@ -77,7 +69,7 @@ macro_rules! impl_unboxer {
             #[inline(always)]
             unsafe fn unbox(value: Value) -> $type {
                 $unboxer(
-                    <Value as crate::wrappers::ptr::private::WrapperPriv>::unwrap(
+                    <Value as crate::data::managed::private::ManagedPriv>::unwrap(
                         value,
                         $crate::private::Private,
                     ),

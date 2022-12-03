@@ -19,11 +19,11 @@ use atomic_refcell::AtomicRefCell;
 use jl_sys::{jl_gc_wb, jl_value_t};
 
 use crate::{
-    memory::{gc::mark_queue_objarray, stack_frame::PinnedFrame, target::unrooted::Unrooted, PTls},
-    wrappers::{
-        foreign::{create_foreign_type, ForeignType},
-        ptr::{module::Module, symbol::Symbol, value::Value, Wrapper},
+    data::{
+        layout::foreign::{create_foreign_type, ForeignType},
+        managed::{module::Module, symbol::Symbol, value::Value, Managed},
     },
+    memory::{gc::mark_queue_objarray, stack_frame::PinnedFrame, target::unrooted::Unrooted, PTls},
 };
 
 #[repr(C)]
@@ -63,7 +63,7 @@ impl Stack {
         let ptr = dt_ref.ptr();
         frame.set_sync_root(ptr.cast().as_ptr());
 
-        let dt = dt_ref.wrapper();
+        let dt = dt_ref.as_managed();
         module.set_const_unchecked(sym, dt.as_value());
     }
 

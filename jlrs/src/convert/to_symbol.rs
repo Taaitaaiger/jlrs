@@ -4,9 +4,9 @@
 //! strings to be used instead.
 
 use crate::{
+    data::managed::{string::JuliaString, symbol::Symbol},
     memory::target::Target,
     private::Private,
-    wrappers::ptr::{string::JuliaString, symbol::Symbol},
 };
 
 /// Trait implemented by types that can be converted to a [`Symbol`].
@@ -31,8 +31,8 @@ pub(crate) mod private {
     use jl_sys::{jl_symbol, jl_symbol_n};
 
     use crate::{
+        data::managed::{private::ManagedPriv, string::JuliaString, symbol::Symbol},
         private::Private,
-        wrappers::ptr::{private::WrapperPriv, string::JuliaString, symbol::Symbol},
     };
 
     pub trait ToSymbolPriv {

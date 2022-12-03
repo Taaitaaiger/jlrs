@@ -15,9 +15,9 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper()
+                        .as_managed()
                         .function(&frame, "throws_exception")?
-                        .wrapper();
+                        .as_managed();
 
                     let res = func.call0(&mut frame);
                     assert!(res.is_err());
@@ -39,9 +39,9 @@ mod tests {
 
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper()
+                        .as_managed()
                         .function(&frame, "throws_exception")?
-                        .wrapper()
+                        .as_managed()
                         .provide_keywords(kw)?;
 
                     let res = func.call0(&mut frame);
@@ -62,9 +62,9 @@ mod tests {
                     let arg = Value::new(&mut frame, 1usize);
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper()
+                        .as_managed()
                         .function(&frame, "throws_exception")?
-                        .wrapper();
+                        .as_managed();
 
                     let res = func.call1(&mut frame, arg);
                     assert!(res.is_err());
@@ -86,9 +86,9 @@ mod tests {
 
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper()
+                        .as_managed()
                         .function(&frame, "throws_exception")?
-                        .wrapper()
+                        .as_managed()
                         .provide_keywords(kw)?;
 
                     let res = func.call1(&mut frame, arg);
@@ -109,9 +109,9 @@ mod tests {
                     let arg = Value::new(&mut frame, 1usize);
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper()
+                        .as_managed()
                         .function(&frame, "throws_exception")?
-                        .wrapper();
+                        .as_managed();
 
                     let res = func.call2(&mut frame, arg, arg);
                     assert!(res.is_err());
@@ -133,9 +133,9 @@ mod tests {
 
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper()
+                        .as_managed()
                         .function(&frame, "throws_exception")?
-                        .wrapper()
+                        .as_managed()
                         .provide_keywords(kw)?;
 
                     let res = func.call2(&mut frame, arg, arg);
@@ -156,9 +156,9 @@ mod tests {
                     let arg = Value::new(&mut frame, 1usize);
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper()
+                        .as_managed()
                         .function(&frame, "throws_exception")?
-                        .wrapper();
+                        .as_managed();
 
                     let res = func.call3(&mut frame, arg, arg, arg);
                     assert!(res.is_err());
@@ -180,9 +180,9 @@ mod tests {
 
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper()
+                        .as_managed()
                         .function(&frame, "throws_exception")?
-                        .wrapper()
+                        .as_managed()
                         .provide_keywords(kw)?;
 
                     let res = func.call3(&mut frame, arg, arg, arg);
@@ -202,9 +202,9 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper()
+                        .as_managed()
                         .function(&frame, "throws_exception")?
-                        .wrapper();
+                        .as_managed();
 
                     let res = func.call(&mut frame, []);
                     assert!(res.is_err());
@@ -226,9 +226,9 @@ mod tests {
 
                     let func = Module::main(&frame)
                         .submodule(&frame, "JlrsTests")?
-                        .wrapper()
+                        .as_managed()
                         .function(&frame, "throws_exception")?
-                        .wrapper()
+                        .as_managed()
                         .provide_keywords(kw)?;
 
                     let res = func.call(&mut frame, []);

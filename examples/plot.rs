@@ -30,7 +30,7 @@ impl PersistentTask for MyTask {
     ) -> JlrsResult<Self::State<'frame>> {
         unsafe {
             // Create the first plot with no data, but with a custom label for the y-axis.
-            let plot_fn = Module::plots(&frame).function(&frame, "plot")?.wrapper();
+            let plot_fn = Module::plots(&frame).function(&frame, "plot")?.as_managed();
 
             let ylabel_str = JuliaString::new(&mut frame, &self.ylabel);
             let ylabel =
@@ -55,11 +55,11 @@ impl PersistentTask for MyTask {
             let n = Value::new(&mut frame, 100usize);
             let data = Module::base(&frame)
                 .function(&frame, "randn")?
-                .wrapper()
+                .as_managed()
                 .call1(&mut frame, n)
                 .into_jlrs_result()?;
 
-            let plot_fn = Module::plots(&frame).function(&frame, "plot")?.wrapper();
+            let plot_fn = Module::plots(&frame).function(&frame, "plot")?.as_managed();
 
             state
                 .0

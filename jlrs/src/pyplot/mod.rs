@@ -13,14 +13,14 @@ use crate::{call::CallAsync, memory::target::frame::AsyncGcFrame};
 use crate::{
     call::{Call, ProvideKeywords},
     convert::into_jlrs_result::IntoJlrsResult,
-    error::JlrsResult,
-    memory::target::{frame::GcFrame, Target},
-    wrappers::ptr::{
+    data::managed::{
         function::Function,
         module::Module,
         value::{Value, MAX_SIZE},
-        Wrapper,
+        Managed,
     },
+    error::JlrsResult,
+    memory::target::{frame::GcFrame, Target},
 };
 
 init_fn!(init_jlrs_py_plot, JLRS_PY_PLOT_JL, "JlrsPyPlot.jl");
@@ -62,10 +62,10 @@ impl<'scope> PyPlot<'scope> {
         let plt = Module::main(&frame)
             .submodule(&frame, "JlrsPyPlot")
             .unwrap()
-            .wrapper()
+            .as_managed()
             .function(&frame, "jlrsplot")
             .unwrap()
-            .wrapper()
+            .as_managed()
             .call(frame, vals)
             .into_jlrs_result()?;
 
@@ -97,10 +97,10 @@ impl<'scope> PyPlot<'scope> {
         let plt = Module::main(&frame)
             .submodule(&frame, "JlrsPyPlot")
             .unwrap()
-            .wrapper()
+            .as_managed()
             .function(&frame, "jlrsplot")
             .unwrap()
-            .wrapper()
+            .as_managed()
             .provide_keywords(keywords)?
             .call(frame, vals)
             .into_jlrs_result()?;
@@ -133,10 +133,10 @@ impl<'scope> PyPlot<'scope> {
         Module::main(&frame)
             .submodule(&frame, "JlrsPyPlot")
             .unwrap()
-            .wrapper()
+            .as_managed()
             .function(&frame, "updateplot!")
             .unwrap()
-            .wrapper()
+            .as_managed()
             .call(frame, vals)
             .into_jlrs_result()?
             .unbox::<isize>()
@@ -168,10 +168,10 @@ impl<'scope> PyPlot<'scope> {
         Module::main(&frame)
             .submodule(&frame, "JlrsPyPlot")
             .unwrap()
-            .wrapper()
+            .as_managed()
             .function(&frame, "updateplot!")
             .unwrap()
-            .wrapper()
+            .as_managed()
             .provide_keywords(keywords)?
             .call(frame, vals)
             .into_jlrs_result()?
@@ -183,7 +183,7 @@ impl<'scope> PyPlot<'scope> {
         unsafe {
             Module::base(&frame)
                 .function(&frame, "wait")?
-                .wrapper()
+                .as_managed()
                 .call1(frame, self.0)
                 .into_jlrs_result()?;
 
@@ -206,10 +206,10 @@ impl<'scope> PyPlot<'scope> {
             Module::main(&frame)
                 .submodule(&frame, "JlrsPyPlot")
                 .unwrap()
-                .wrapper()
+                .as_managed()
                 .function(&frame, "setversion")
                 .unwrap()
-                .wrapper()
+                .as_managed()
                 .call1(frame, version)
                 .into_jlrs_result()?;
 
@@ -224,7 +224,7 @@ impl<'scope> PyPlot<'scope> {
         unsafe {
             Module::base(&frame)
                 .function(&frame, "wait")?
-                .wrapper()
+                .as_managed()
                 .call_async_main(frame, &mut [self.0])
                 .await
                 .into_jlrs_result()?;
@@ -243,7 +243,7 @@ impl<'scope> PyPlot<'scope> {
         unsafe {
             Module::base(&frame)
                 .function(&frame, "wait")?
-                .wrapper()
+                .as_managed()
                 .call_async_interactive(frame, &mut [self.0])
                 .await
                 .into_jlrs_result()?;
@@ -262,7 +262,7 @@ impl<'scope> PyPlot<'scope> {
         unsafe {
             Module::base(&frame)
                 .function(&frame, "wait")?
-                .wrapper()
+                .as_managed()
                 .call_async_local(frame, &mut [self.0])
                 .await
                 .into_jlrs_result()?;
@@ -278,7 +278,7 @@ impl<'scope> PyPlot<'scope> {
         unsafe {
             Module::base(&frame)
                 .function(&frame, "wait")?
-                .wrapper()
+                .as_managed()
                 .call_async(frame, &mut [self.0])
                 .await
                 .into_jlrs_result()?;
@@ -297,10 +297,10 @@ pub trait AccessPlotsModule: private::AccessPlotsModulePriv {
             Module::main(target)
                 .submodule(target, "JlrsPyPlot")
                 .unwrap()
-                .wrapper()
+                .as_managed()
                 .submodule(target, "Plots")
                 .unwrap()
-                .wrapper()
+                .as_managed()
         }
     }
 }
@@ -308,7 +308,7 @@ pub trait AccessPlotsModule: private::AccessPlotsModulePriv {
 impl<'scope> AccessPlotsModule for Module<'scope> {}
 
 mod private {
-    use crate::wrappers::ptr::module::Module;
+    use crate::data::managed::module::Module;
 
     pub trait AccessPlotsModulePriv {}
 

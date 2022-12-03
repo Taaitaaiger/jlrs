@@ -437,7 +437,7 @@ mod tests {
                     unsafe {
                         assert!(Module::base(&frame)
                             .function(&frame, "typeof")?
-                            .wrapper()
+                            .as_managed()
                             .call1(&mut frame, jl_val)
                             .unwrap()
                             .cast::<DataType>()?
@@ -474,9 +474,9 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let constr = Module::main(&frame)
                         .submodule(&frame, "WithBitsUnion")?
-                        .wrapper()
+                        .as_managed()
                         .global(&frame, "SingleVariant")?
-                        .wrapper();
+                        .as_managed();
                     let v1 = Value::new(&mut frame, 1i8);
                     let v2 = Value::new(&mut frame, 2i32);
                     let v3 = Value::new(&mut frame, 3i8);
@@ -484,7 +484,7 @@ mod tests {
 
                     assert!(Module::base(&frame)
                         .function(&frame, "typeof")?
-                        .wrapper()
+                        .as_managed()
                         .call1(&mut frame, jl_val)
                         .unwrap()
                         .cast::<DataType>()?
@@ -516,9 +516,9 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let constr = Module::main(&frame)
                         .submodule(&frame, "WithBitsUnion")?
-                        .wrapper()
+                        .as_managed()
                         .global(&frame, "DoubleVariant")?
-                        .wrapper()
+                        .as_managed()
                         .cast::<DataType>()?;
 
                     let v1 = Value::new(&mut frame, 1i8);
@@ -530,7 +530,7 @@ mod tests {
 
                     assert!(Module::base(&frame)
                         .function(&frame, "typeof")?
-                        .wrapper()
+                        .as_managed()
                         .call1(&mut frame, jl_val)
                         .unwrap()
                         .cast::<DataType>()?
@@ -564,9 +564,9 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let constr = Module::main(&frame)
                         .submodule(&frame, "WithBitsUnion")?
-                        .wrapper()
+                        .as_managed()
                         .global(&frame, "SizeAlignMismatch")?
-                        .wrapper();
+                        .as_managed();
 
                     let v1 = Value::new(&mut frame, 1i8);
                     let v2 = Value::new(&mut frame, 2i32);
@@ -575,7 +575,7 @@ mod tests {
 
                     assert!(Module::base(&frame)
                         .function(&frame, "typeof")?
-                        .wrapper()
+                        .as_managed()
                         .call1(&mut frame, jl_val)
                         .unwrap()
                         .cast::<DataType>()?
@@ -609,9 +609,9 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let constr = Module::main(&frame)
                         .submodule(&frame, "WithBitsUnion")?
-                        .wrapper()
+                        .as_managed()
                         .global(&frame, "UnionInTuple")?
-                        .wrapper();
+                        .as_managed();
 
                     let v1 = Value::new(&mut frame, 1i8);
                     let v2 = Value::new(&mut frame, Tuple1(2i32));
@@ -647,16 +647,16 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let constr = Module::main(&frame)
                         .submodule(&frame, "WithNonBitsUnion")?
-                        .wrapper()
+                        .as_managed()
                         .global(&frame, "NonBitsUnion")?
-                        .wrapper();
+                        .as_managed();
 
                     let v1 = Value::new(&mut frame, 1i8);
                     let jl_val = constr.call1(&mut frame, v1).unwrap();
 
                     assert!(Module::base(&frame)
                         .function(&frame, "typeof")?
-                        .wrapper()
+                        .as_managed()
                         .call1(&mut frame, jl_val)
                         .unwrap()
                         .cast::<DataType>()?
@@ -683,14 +683,14 @@ mod tests {
 
                 julia.instance(&mut frame)                    .scope(|mut frame| unsafe  {
                         let constr = Module::main(&frame)
-                            .submodule(&frame, "WithStrings")?.wrapper()
-                            .global(&frame, "WithString")?.wrapper();
+                            .submodule(&frame, "WithStrings")?.as_managed()
+                            .global(&frame, "WithString")?.as_managed();
 
                         let v1 = Value::new(&mut frame, "foo")?;
                         let jl_val = constr.call1(&mut frame, v1)?.unwrap();
 
                         assert!(Module::base(&frame)
-                            .function(&frame, "typeof")?.wrapper()
+                            .function(&frame, "typeof")?.as_managed()
                             .call1(&mut frame, jl_val)?
                             .unwrap()
                             .cast::<DataType>()?
@@ -719,16 +719,16 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let constr = Module::main(&frame)
                         .submodule(&frame, "WithGeneric")?
-                        .wrapper()
+                        .as_managed()
                         .global(&frame, "WithGenericT")?
-                        .wrapper();
+                        .as_managed();
 
                     let v1 = Value::new(&mut frame, 1i32);
                     let jl_val = constr.call1(&mut frame, v1).unwrap();
 
                     assert!(Module::base(&frame)
                         .function(&frame, "typeof")?
-                        .wrapper()
+                        .as_managed()
                         .call1(&mut frame, jl_val)
                         .unwrap()
                         .cast::<DataType>()?
@@ -756,24 +756,24 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let constr = Module::main(&frame)
                         .submodule(&frame, "WithGeneric")?
-                        .wrapper()
+                        .as_managed()
                         .global(&frame, "WithGenericT")?
-                        .wrapper();
+                        .as_managed();
 
                     let v1 = Value::new(&mut frame, 1i32);
                     let wgt = constr.call1(&mut frame, v1).unwrap();
 
                     let constr = Module::main(&frame)
                         .submodule(&frame, "WithGeneric")?
-                        .wrapper()
+                        .as_managed()
                         .global(&frame, "WithGenericUnionAll")?
-                        .wrapper();
+                        .as_managed();
 
                     let jl_val = constr.call1(&mut frame, wgt).unwrap();
 
                     assert!(Module::base(&frame)
                         .function(&frame, "typeof")?
-                        .wrapper()
+                        .as_managed()
                         .call1(&mut frame, jl_val)
                         .unwrap()
                         .cast::<DataType>()?
@@ -801,24 +801,24 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let constr = Module::main(&frame)
                         .submodule(&frame, "WithGeneric")?
-                        .wrapper()
+                        .as_managed()
                         .global(&frame, "WithGenericT")?
-                        .wrapper();
+                        .as_managed();
 
                     let v1 = Value::new(&mut frame, 1i32);
                     let wgt = constr.call1(&mut frame, v1).unwrap();
 
                     let constr = Module::main(&frame)
                         .submodule(&frame, "WithGeneric")?
-                        .wrapper()
+                        .as_managed()
                         .global(&frame, "WithNestedGenericT")?
-                        .wrapper();
+                        .as_managed();
 
                     let jl_val = constr.call1(&mut frame, wgt).unwrap();
 
                     assert!(Module::base(&frame)
                         .function(&frame, "typeof")?
-                        .wrapper()
+                        .as_managed()
                         .call1(&mut frame, jl_val)
                         .unwrap()
                         .cast::<DataType>()?
@@ -847,9 +847,9 @@ mod tests {
                     let global = frame.unrooted();
                     let constr = Module::main(&frame)
                         .submodule(&frame, "WithGeneric")?
-                        .wrapper()
+                        .as_managed()
                         .global(&frame, "WithGenericT")?
-                        .wrapper();
+                        .as_managed();
 
                     let wgt = constr
                         .call1(&mut frame, Module::base(&global).as_value())
@@ -857,15 +857,15 @@ mod tests {
 
                     let constr = Module::main(&frame)
                         .submodule(&frame, "WithGeneric")?
-                        .wrapper()
+                        .as_managed()
                         .global(&frame, "WithPropagatedLifetime")?
-                        .wrapper();
+                        .as_managed();
 
                     let jl_val = constr.call1(&mut frame, wgt).unwrap();
 
                     assert!(Module::base(&frame)
                         .function(&frame, "typeof")?
-                        .wrapper()
+                        .as_managed()
                         .call1(&mut frame, jl_val)
                         .unwrap()
                         .cast::<DataType>()?
@@ -897,28 +897,28 @@ mod tests {
 
                     let wgt_constr = Module::main(&frame)
                         .submodule(&frame, "WithGeneric")?
-                        .wrapper()
+                        .as_managed()
                         .global(&frame, "WithGenericT")?
-                        .wrapper();
+                        .as_managed();
 
                     let wgt = wgt_constr.call1(&mut frame, arr.as_value()).unwrap();
 
-                    let constr = Module::base(&frame).function(&frame, "tuple")?.wrapper();
+                    let constr = Module::base(&frame).function(&frame, "tuple")?.as_managed();
                     let int = Value::new(&mut frame, 2i32);
                     let tup = constr.call2(&mut frame, int, wgt).unwrap();
 
                     let a = wgt_constr.call1(&mut frame, tup).unwrap();
                     let constr = Module::main(&frame)
                         .submodule(&frame, "WithGeneric")?
-                        .wrapper()
+                        .as_managed()
                         .global(&frame, "WithPropagatedLifetimes")?
-                        .wrapper();
+                        .as_managed();
 
                     let jl_val = constr.call1(&mut frame, a).unwrap();
 
                     assert!(Module::base(&frame)
                         .function(&frame, "typeof")?
-                        .wrapper()
+                        .as_managed()
                         .call1(&mut frame, jl_val)
                         .unwrap()
                         .cast::<DataType>()?
@@ -948,24 +948,24 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let wgt_constr = Module::main(&frame)
                         .submodule(&frame, "WithGeneric")?
-                        .wrapper()
+                        .as_managed()
                         .global(&frame, "WithGenericT")?
-                        .wrapper();
+                        .as_managed();
 
                     let v1 = Value::new(&mut frame, 1i64);
                     let wgt = wgt_constr.call1(&mut frame, v1).unwrap();
 
                     let constr = Module::main(&frame)
                         .submodule(&frame, "WithGeneric")?
-                        .wrapper()
+                        .as_managed()
                         .global(&frame, "WithSetGeneric")?
-                        .wrapper();
+                        .as_managed();
 
                     let jl_val = constr.call1(&mut frame, wgt).unwrap();
 
                     assert!(Module::base(&frame)
                         .function(&frame, "typeof")?
-                        .wrapper()
+                        .as_managed()
                         .call1(&mut frame, jl_val)
                         .unwrap()
                         .cast::<DataType>()?
@@ -993,27 +993,27 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let wgt_constr = Module::main(&frame)
                         .submodule(&frame, "WithGeneric")?
-                        .wrapper()
+                        .as_managed()
                         .global(&frame, "WithGenericT")?
-                        .wrapper();
+                        .as_managed();
 
                     let v1 = Value::new(&mut frame, 1i64);
                     let wgt = wgt_constr.call1(&mut frame, v1).unwrap();
 
-                    let tup_constr = Module::base(&frame).function(&frame, "tuple")?.wrapper();
+                    let tup_constr = Module::base(&frame).function(&frame, "tuple")?.as_managed();
                     let v2 = tup_constr.call1(&mut frame, wgt).unwrap();
 
                     let constr = Module::main(&frame)
                         .submodule(&frame, "WithGeneric")?
-                        .wrapper()
+                        .as_managed()
                         .global(&frame, "WithSetGenericTuple")?
-                        .wrapper();
+                        .as_managed();
 
                     let jl_val = constr.call1(&mut frame, v2).unwrap();
 
                     assert!(Module::base(&frame)
                         .function(&frame, "typeof")?
-                        .wrapper()
+                        .as_managed()
                         .call1(&mut frame, jl_val)
                         .unwrap()
                         .cast::<DataType>()?
@@ -1041,16 +1041,16 @@ mod tests {
                 .scope(|mut frame| unsafe {
                     let wvt_constr = Module::main(&frame)
                         .submodule(&frame, "WithGeneric")?
-                        .wrapper()
+                        .as_managed()
                         .global(&frame, "withvaluetype")?
-                        .wrapper();
+                        .as_managed();
 
                     let v1 = Value::new(&mut frame, 1i64);
                     let jl_val = wvt_constr.call1(&mut frame, v1).unwrap();
 
                     assert!(Module::base(&frame)
                         .function(&frame, "typeof")?
-                        .wrapper()
+                        .as_managed()
                         .call1(&mut frame, jl_val)
                         .unwrap()
                         .cast::<DataType>()?

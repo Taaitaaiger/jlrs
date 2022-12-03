@@ -3,13 +3,13 @@ mod util;
 #[cfg(feature = "sync-rt")]
 mod tests {
     use jlrs::{
-        layout::valid_layout::ValidLayout,
-        prelude::*,
-        wrappers::ptr::{
+        data::managed::{
             simple_vector::{SimpleVector, SimpleVectorRef},
             symbol::SymbolRef,
             union_all::UnionAll,
         },
+        layout::valid_layout::ValidLayout,
+        prelude::*,
     };
 
     use crate::util::JULIA;
@@ -110,7 +110,7 @@ mod tests {
 
                     unsafe {
                         let data = svec.typed_data_unchecked::<SymbolRef>();
-                        assert_eq!(data.as_slice()[0].unwrap().wrapper(), sym);
+                        assert_eq!(data.as_slice()[0].unwrap().as_managed(), sym);
                     }
                     Ok(())
                 })

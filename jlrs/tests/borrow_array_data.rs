@@ -4,9 +4,9 @@ mod util;
 #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
 mod tests {
     use jlrs::{
+        data::managed::array::dimensions::Dims,
         memory::gc::{Gc, GcCollection},
         prelude::*,
-        wrappers::ptr::array::dimensions::Dims,
     };
 
     use crate::util::JULIA;
@@ -36,7 +36,9 @@ mod tests {
                             }
                         }
 
-                        let gi = Module::base(&frame).function(&frame, "getindex")?.wrapper();
+                        let gi = Module::base(&frame)
+                            .function(&frame, "getindex")?
+                            .as_managed();
                         let one = Value::new(&mut frame, 1usize);
                         let two = Value::new(&mut frame, 2usize);
                         let three = Value::new(&mut frame, 3usize);
@@ -91,7 +93,9 @@ mod tests {
                                     }
                                 }
                             }
-                            let gi = Module::base(&frame).function(&frame, "getindex")?.wrapper();
+                            let gi = Module::base(&frame)
+                                .function(&frame, "getindex")?
+                                .as_managed();
                             let one = Value::new(&mut frame, 1usize);
                             let two = Value::new(&mut frame, 2usize);
                             let three = Value::new(&mut frame, 3usize);
@@ -281,7 +285,9 @@ mod tests {
                             }
                         }
 
-                        let gi = Module::base(&frame).function(&frame, "getindex")?.wrapper();
+                        let gi = Module::base(&frame)
+                            .function(&frame, "getindex")?
+                            .as_managed();
                         let one = Value::new(&mut frame, 1usize);
                         let two = Value::new(&mut frame, 2usize);
                         let three = Value::new(&mut frame, 3usize);
@@ -363,15 +369,15 @@ mod tests {
                     unsafe {
                         let arr = Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper()
+                            .as_managed()
                             .function(&frame, "vecofmodules")?
-                            .wrapper()
+                            .as_managed()
                             .call0(&mut frame)
                             .unwrap()
                             .cast::<Array>()?;
                         let data = { arr.value_data()? };
 
-                        assert!(data[0].unwrap().wrapper().is::<Module>());
+                        assert!(data[0].unwrap().as_managed().is::<Module>());
                     }
                     Ok(())
                 })
@@ -389,17 +395,19 @@ mod tests {
                     unsafe {
                         let submod = Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper();
+                            .as_managed();
                         let mut arr = submod
                             .function(&frame, "vecofmodules")?
-                            .wrapper()
+                            .as_managed()
                             .call0(&mut frame)
                             .unwrap()
                             .cast::<Array>()?;
                         let mut data = { arr.value_data_mut()? };
                         data.set(0, Some(submod.as_value()))?;
 
-                        let getindex = Module::base(&frame).function(&frame, "getindex")?.wrapper();
+                        let getindex = Module::base(&frame)
+                            .function(&frame, "getindex")?
+                            .as_managed();
                         let idx = Value::new(&mut frame, 1usize);
                         let entry = getindex
                             .call2(&mut frame, arr.as_value(), idx)
@@ -424,15 +432,15 @@ mod tests {
                     unsafe {
                         let arr = Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper()
+                            .as_managed()
                             .function(&frame, "vecofmodules")?
-                            .wrapper()
+                            .as_managed()
                             .call0(&mut frame)
                             .unwrap()
                             .cast::<TypedArray<Option<ModuleRef>>>()?;
                         let data = { arr.value_data()? };
 
-                        assert!(data[0].unwrap().wrapper().is::<Module>());
+                        assert!(data[0].unwrap().as_managed().is::<Module>());
                     }
                     Ok(())
                 })
@@ -450,17 +458,19 @@ mod tests {
                     unsafe {
                         let submod = Module::main(&frame)
                             .submodule(&frame, "JlrsTests")?
-                            .wrapper();
+                            .as_managed();
                         let mut arr = submod
                             .function(&frame, "vecofmodules")?
-                            .wrapper()
+                            .as_managed()
                             .call0(&mut frame)
                             .unwrap()
                             .cast::<TypedArray<Option<ModuleRef>>>()?;
                         let mut data = { arr.value_data_mut()? };
                         data.set(0, Some(submod.as_value()))?;
 
-                        let getindex = Module::base(&frame).function(&frame, "getindex")?.wrapper();
+                        let getindex = Module::base(&frame)
+                            .function(&frame, "getindex")?
+                            .as_managed();
                         let idx = Value::new(&mut frame, 1usize);
                         let entry = getindex
                             .call2(&mut frame, arr.as_value(), idx)
