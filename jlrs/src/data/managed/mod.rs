@@ -30,7 +30,7 @@ end
 
 macro_rules! impl_valid_layout {
     ($ref_type:ident, $type:ident) => {
-        unsafe impl $crate::layout::valid_layout::ValidLayout for $ref_type<'_> {
+        unsafe impl $crate::data::layout::valid_layout::ValidLayout for $ref_type<'_> {
             fn valid_layout(ty: $crate::data::managed::value::Value) -> bool {
                 if let Ok(dt) = ty.cast::<$crate::data::managed::datatype::DataType>() {
                     dt.is::<$type>()
@@ -42,7 +42,7 @@ macro_rules! impl_valid_layout {
             const IS_REF: bool = true;
         }
 
-        unsafe impl $crate::layout::valid_layout::ValidField for Option<$ref_type<'_>> {
+        unsafe impl $crate::data::layout::valid_layout::ValidField for Option<$ref_type<'_>> {
             fn valid_field(ty: $crate::data::managed::value::Value) -> bool {
                 if let Ok(dt) = ty.cast::<$crate::data::managed::datatype::DataType>() {
                     dt.is::<$type>()
@@ -79,6 +79,7 @@ pub mod symbol;
 pub mod task;
 pub mod type_name;
 pub mod type_var;
+pub mod typecheck;
 pub mod union;
 pub mod union_all;
 pub mod value;
@@ -92,9 +93,11 @@ use std::{
 
 use crate::{
     call::Call,
-    data::managed::{module::Module, private::ManagedPriv as _, string::JuliaString, value::Value},
+    data::{
+        layout::valid_layout::{ValidField, ValidLayout},
+        managed::{module::Module, private::ManagedPriv as _, string::JuliaString, value::Value},
+    },
     error::{JlrsError, JlrsResult, CANNOT_DISPLAY_VALUE},
-    layout::valid_layout::{ValidField, ValidLayout},
     memory::target::{unrooted::Unrooted, Target},
     private::Private,
 };

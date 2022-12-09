@@ -8,14 +8,14 @@ use std::{
 
 use jl_sys::jl_bottom_type;
 
+use super::{
+    bits_union::{Align, BitsUnionContainer, Flag},
+    valid_layout::{ValidField, ValidLayout},
+};
 use crate::{
     data::managed::{
-        datatype::DataType, private::ManagedPriv as _, union::Union, value::Value, Managed,
-    },
-    layout::{
-        bits_union::{Align, BitsUnionContainer, Flag},
-        typecheck::Typecheck,
-        valid_layout::{ValidField, ValidLayout},
+        datatype::DataType, private::ManagedPriv as _, typecheck::Typecheck, union::Union,
+        value::Value, Managed,
     },
     private::Private,
 };

@@ -6,7 +6,7 @@ mod tests {
 
     use jlrs::{convert::to_symbol::ToSymbol, prelude::*};
     #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
-    use jlrs::{data::layout::union::EmptyUnion, layout::typecheck::Mutable};
+    use jlrs::{data::layout::union::EmptyUnion, data::managed::typecheck::Mutable};
 
     use super::util::{JULIA, MIXED_BAG_JL};
 

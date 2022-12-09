@@ -43,50 +43,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
     where
         V: AsRef<[Value<'value, 'data>]>,
     {
-        let shared_state = Arc::new(Mutex::new(TaskState {
-            completed: false,
-            waker: None,
-            task: None,
-            _marker: PhantomData,
-        }));
-
-        let values = values.as_ref();
-        let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
-        let state_ptr_boxed = Value::new(&mut *frame, state_ptr);
-
-        let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + values.len());
-
-        vals.push(func);
-        vals.push(state_ptr_boxed);
-        vals.extend_from_slice(values);
-
-        // Safety: module contents are globally rooted, and the function is guaranteed to be safe
-        // by the caller.
-        let task = unsafe {
-            Module::main(&frame)
-                .submodule(&frame, "JlrsMultitask")
-                .expect("JlrsMultitask not available")
-                .as_managed()
-                .function(&frame, "asynccall")
-                .expect("asynccall not available")
-                .as_managed()
-                .call(&mut *frame, &mut vals)
-                .unwrap_or_else(|e| {
-                    let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
-                    panic!("asynccall threw an exception: {}", msg)
-                })
-                .cast_unchecked::<Task>()
-        };
-
-        {
-            let locked = shared_state.lock();
-            match locked {
-                Ok(mut data) => data.task = Some(task),
-                _ => panic!("Lock poisoned"),
-            }
-        }
-
-        JuliaFuture { shared_state }
+        Self::new_future(frame, func, values, "asynccall")
     }
 
     #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
@@ -98,50 +55,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
     where
         V: AsRef<[Value<'value, 'data>]>,
     {
-        let shared_state = Arc::new(Mutex::new(TaskState {
-            completed: false,
-            waker: None,
-            task: None,
-            _marker: PhantomData,
-        }));
-
-        let values = values.as_ref();
-        let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
-        let state_ptr_boxed = Value::new(&mut *frame, state_ptr);
-
-        let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + values.len());
-
-        vals.push(func);
-        vals.push(state_ptr_boxed);
-        vals.extend_from_slice(values);
-
-        // Safety: module contents are globally rooted, and the function is guaranteed to be safe
-        // by the caller.
-        let task = unsafe {
-            Module::main(&frame)
-                .submodule(&frame, "JlrsMultitask")
-                .expect("JlrsMultitask not available")
-                .as_managed()
-                .function(&frame, "interactivecall")
-                .expect("interactivecall not available")
-                .as_managed()
-                .call(&mut *frame, &mut vals)
-                .unwrap_or_else(|e| {
-                    let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
-                    panic!("interactivecall threw an exception: {}", msg)
-                })
-                .cast_unchecked::<Task>()
-        };
-
-        {
-            let locked = shared_state.lock();
-            match locked {
-                Ok(mut data) => data.task = Some(task),
-                _ => panic!("Lock poisoned"),
-            }
-        }
-
-        JuliaFuture { shared_state }
+        Self::new_future(frame, func, values, "interactivecall")
     }
 
     pub(crate) fn new_local<'value, V>(
@@ -152,50 +66,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
     where
         V: AsRef<[Value<'value, 'data>]>,
     {
-        let shared_state = Arc::new(Mutex::new(TaskState {
-            completed: false,
-            waker: None,
-            task: None,
-            _marker: PhantomData,
-        }));
-
-        let values = values.as_ref();
-        let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
-        let state_ptr_boxed = Value::new(&mut *frame, state_ptr);
-
-        let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + values.len());
-
-        vals.push(func);
-        vals.push(state_ptr_boxed);
-        vals.extend_from_slice(values);
-
-        // Safety: module contents are globally rooted, and the function is guaranteed to be safe
-        // by the caller.
-        let task = unsafe {
-            Module::main(&frame)
-                .submodule(&frame, "JlrsMultitask")
-                .expect("JlrsMultitask not available")
-                .as_managed()
-                .function(&frame, "scheduleasynclocal")
-                .expect("scheduleasynclocal not available")
-                .as_managed()
-                .call(&mut *frame, &mut vals)
-                .unwrap_or_else(|e| {
-                    let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
-                    panic!("scheduleasynclocal threw an exception: {}", msg)
-                })
-                .cast_unchecked::<Task>()
-        };
-
-        {
-            let locked = shared_state.lock();
-            match locked {
-                Ok(mut data) => data.task = Some(task),
-                _ => panic!("Lock poisoned"),
-            }
-        }
-
-        JuliaFuture { shared_state }
+        Self::new_future(frame, func, values, "scheduleasynclocal")
     }
 
     pub(crate) fn new_main<'value, V>(
@@ -206,50 +77,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
     where
         V: AsRef<[Value<'value, 'data>]>,
     {
-        let shared_state = Arc::new(Mutex::new(TaskState {
-            completed: false,
-            waker: None,
-            task: None,
-            _marker: PhantomData,
-        }));
-
-        let values = values.as_ref();
-        let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
-        let state_ptr_boxed = Value::new(&mut *frame, state_ptr);
-
-        let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + values.len());
-
-        vals.push(func);
-        vals.push(state_ptr_boxed);
-        vals.extend_from_slice(values);
-
-        // Safety: module contents are globally rooted, and the function is guaranteed to be safe
-        // by the caller.
-        let task = unsafe {
-            Module::main(&frame)
-                .submodule(&frame, "JlrsMultitask")
-                .expect("JlrsMultitask not available")
-                .as_managed()
-                .function(&frame, "scheduleasync")
-                .expect("scheduleasync not available")
-                .as_managed()
-                .call(&mut *frame, &mut vals)
-                .unwrap_or_else(|e| {
-                    let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
-                    panic!("scheduleasync threw an exception: {}", msg)
-                })
-                .cast_unchecked::<Task>()
-        };
-
-        {
-            let locked = shared_state.lock();
-            match locked {
-                Ok(mut data) => data.task = Some(task),
-                _ => panic!("Lock poisoned"),
-            }
-        }
-
-        JuliaFuture { shared_state }
+        Self::new_future(frame, func, values, "scheduleasync")
     }
 
     pub(crate) fn new_posted(
@@ -304,51 +132,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
     where
         V: AsRef<[Value<'value, 'data>]>,
     {
-        let shared_state = Arc::new(Mutex::new(TaskState {
-            completed: false,
-            waker: None,
-            task: None,
-            _marker: PhantomData,
-        }));
-
-        let values = values.as_ref();
-        let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
-        let state_ptr_boxed = Value::new(&mut *frame, state_ptr);
-
-        let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + values.len());
-        vals.push(func.function());
-        vals.push(state_ptr_boxed);
-        vals.extend_from_slice(values);
-
-        // Safety: module contents are globally rooted, and the function is guaranteed to be safe
-        // by the caller.
-        let task = unsafe {
-            Module::main(&frame)
-                .submodule(&frame, "JlrsMultitask")
-                .expect("JlrsMultitask not available")
-                .as_managed()
-                .function(&frame, "asynccall")
-                .expect("asynccall not available")
-                .as_managed()
-                .provide_keywords(func.keywords())
-                .expect("Keywords invalid")
-                .call(&mut *frame, &mut vals)
-                .unwrap_or_else(|e| {
-                    let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
-                    panic!("asynccall threw an exception: {}", msg)
-                })
-                .cast_unchecked::<Task>()
-        };
-
-        {
-            let locked = shared_state.lock();
-            match locked {
-                Ok(mut data) => data.task = Some(task),
-                _ => panic!("Lock poisoned"),
-            }
-        }
-
-        JuliaFuture { shared_state }
+        Self::new_future_with_keywords(frame, func, values, "asynccall")
     }
 
     #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
@@ -360,6 +144,40 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
     where
         V: AsRef<[Value<'value, 'data>]>,
     {
+        Self::new_future_with_keywords(frame, func, values, "interactivecall")
+    }
+
+    pub(crate) fn new_local_with_keywords<'value, V>(
+        frame: &mut AsyncGcFrame<'frame>,
+        func: WithKeywords,
+        values: V,
+    ) -> Self
+    where
+        V: AsRef<[Value<'value, 'data>]>,
+    {
+        Self::new_future_with_keywords(frame, func, values, "scheduleasynclocal")
+    }
+
+    pub(crate) fn new_main_with_keywords<'value, V>(
+        frame: &mut AsyncGcFrame<'frame>,
+        func: WithKeywords,
+        values: V,
+    ) -> Self
+    where
+        V: AsRef<[Value<'value, 'data>]>,
+    {
+        Self::new_future_with_keywords(frame, func, values, "scheduleasync")
+    }
+
+    fn new_future<'value, V>(
+        frame: &mut AsyncGcFrame<'frame>,
+        func: Value,
+        values: V,
+        method: &str,
+    ) -> Self
+    where
+        V: AsRef<[Value<'value, 'data>]>,
+    {
         let shared_state = Arc::new(Mutex::new(TaskState {
             completed: false,
             waker: None,
@@ -372,7 +190,8 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         let state_ptr_boxed = Value::new(&mut *frame, state_ptr);
 
         let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + values.len());
-        vals.push(func.function());
+
+        vals.push(func);
         vals.push(state_ptr_boxed);
         vals.extend_from_slice(values);
 
@@ -383,15 +202,13 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                 .submodule(&frame, "JlrsMultitask")
                 .expect("JlrsMultitask not available")
                 .as_managed()
-                .function(&frame, "interactivecall")
-                .expect("interactivecall not available")
+                .function(&frame, method)
+                .expect(format!("{} not available", method).as_str())
                 .as_managed()
-                .provide_keywords(func.keywords())
-                .expect("Keywords invalid")
                 .call(&mut *frame, &mut vals)
                 .unwrap_or_else(|e| {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
-                    panic!("interactivecall threw an exception: {}", msg)
+                    panic!("{} threw an exception: {}", method, msg)
                 })
                 .cast_unchecked::<Task>()
         };
@@ -407,10 +224,11 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         JuliaFuture { shared_state }
     }
 
-    pub(crate) fn new_local_with_keywords<'value, V>(
+    fn new_future_with_keywords<'value, V>(
         frame: &mut AsyncGcFrame<'frame>,
         func: WithKeywords,
         values: V,
+        method: &str,
     ) -> Self
     where
         V: AsRef<[Value<'value, 'data>]>,
@@ -427,63 +245,6 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         let state_ptr_boxed = Value::new(&mut *frame, state_ptr);
 
         let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + values.len());
-
-        vals.push(func.function());
-        vals.push(state_ptr_boxed);
-        vals.extend_from_slice(values);
-
-        // Safety: module contents are globally rooted, and the function is guaranteed to be safe
-        // by the caller.
-        unsafe {
-            let task = Module::main(&frame)
-                .submodule(&frame, "JlrsMultitask")
-                .expect("JlrsMultitask not available")
-                .as_managed()
-                .function(&frame, "scheduleasynclocal")
-                .expect("scheduleasynclocal not available")
-                .as_managed()
-                .provide_keywords(func.keywords())
-                .expect("Keywords invalid")
-                .call(&mut *frame, &mut vals)
-                .unwrap_or_else(|e| {
-                    let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
-                    panic!("scheduleasynclocal threw an exception: {}", msg)
-                })
-                .cast_unchecked::<Task>();
-
-            {
-                let locked = shared_state.lock();
-                match locked {
-                    Ok(mut data) => data.task = Some(task),
-                    _ => panic!("Lock poisoned"),
-                }
-            }
-
-            JuliaFuture { shared_state }
-        }
-    }
-
-    pub(crate) fn new_main_with_keywords<'value, V>(
-        frame: &mut AsyncGcFrame<'frame>,
-        func: WithKeywords,
-        values: V,
-    ) -> Self
-    where
-        V: AsRef<[Value<'value, 'data>]>,
-    {
-        let shared_state = Arc::new(Mutex::new(TaskState {
-            completed: false,
-            waker: None,
-            task: None,
-            _marker: PhantomData,
-        }));
-
-        let values = values.as_ref();
-        let state_ptr = Arc::into_raw(shared_state.clone()) as *mut c_void;
-        let state_ptr_boxed = Value::new(&mut *frame, state_ptr);
-
-        let mut vals: SmallVec<[Value; MAX_SIZE]> = SmallVec::with_capacity(2 + values.len());
-
         vals.push(func.function());
         vals.push(state_ptr_boxed);
         vals.extend_from_slice(values);
@@ -495,15 +256,15 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
                 .submodule(&frame, "JlrsMultitask")
                 .expect("JlrsMultitask not available")
                 .as_managed()
-                .function(&frame, "scheduleasync")
-                .expect("scheduleasync not available")
+                .function(&frame, method)
+                .expect(format!("{} not available", method).as_str())
                 .as_managed()
                 .provide_keywords(func.keywords())
                 .expect("Keywords invalid")
                 .call(&mut *frame, &mut vals)
                 .unwrap_or_else(|e| {
                     let msg = e.display_string_or(CANNOT_DISPLAY_VALUE);
-                    panic!("asynccall threw an exception: {}", msg)
+                    panic!("{} threw an exception: {}", method, msg)
                 })
                 .cast_unchecked::<Task>()
         };

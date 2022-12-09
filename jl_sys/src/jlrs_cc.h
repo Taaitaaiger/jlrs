@@ -13,6 +13,10 @@ static inline T jl_atomic_load_relaxed(volatile T *obj)
 #include <julia.h>
 #include <julia_gcext.h>
 
+#if defined(JLRS_WINDOWS) && defined(JULIA_1_6)
+#define JLRS_WINDOWS_LTS
+#endif
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -22,7 +26,7 @@ extern "C"
     {
         JLRS_CATCH_OK = 0,
         JLRS_CATCH_ERR = 1,
-        JLRS_CATCH_EXCECPTION = 2,
+        JLRS_CATCH_EXCEPTION = 2,
         JLRS_CATCH_PANIC = 3,
     } jlrs_catch_tag_t;
 
@@ -43,7 +47,7 @@ extern "C"
     void jlrs_unlock(jl_value_t *v);
 #endif
 
-#if defined(JLRS_NIGHTLY)
+#if !defined(JULIA_1_6) && !defined(JULIA_1_7) && !defined(JULIA_1_8)
     void jl_enter_threaded_region(void);
     void jl_exit_threaded_region(void);
 #endif

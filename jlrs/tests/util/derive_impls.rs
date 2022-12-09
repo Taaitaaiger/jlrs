@@ -235,7 +235,7 @@ pub struct UnionInTuple<'frame, 'data> {
 #[jlrs(julia_type = "Main.WithGeneric.WithGenericT")]
 pub struct WithGenericT<T>
 where
-    T: ::jlrs::layout::valid_layout::ValidField + Clone,
+    T: ::jlrs::data::layout::valid_layout::ValidField + Clone,
 {
     pub a: T,
 }
@@ -252,7 +252,7 @@ pub struct WithGenericUnionAll<'frame, 'data> {
 #[jlrs(julia_type = "Main.WithGeneric.WithNestedGenericT")]
 pub struct WithNestedGenericT<T>
 where
-    T: ::jlrs::layout::valid_layout::ValidField + Clone,
+    T: ::jlrs::data::layout::valid_layout::ValidField + Clone,
 {
     pub a: WithGenericT<T>,
 }

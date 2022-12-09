@@ -12,19 +12,21 @@ use jl_sys::{jl_array_ptr_set, jl_array_typetagdata, jl_arrayref, jl_arrayset};
 #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
 use crate::data::managed::value::ValueResult;
 use crate::{
-    data::managed::{
-        array::{
-            dimensions::{ArrayDimensions, Dims},
-            Array,
+    data::{
+        layout::valid_layout::ValidField,
+        managed::{
+            array::{
+                dimensions::{ArrayDimensions, Dims},
+                Array,
+            },
+            datatype::DataType,
+            private::ManagedPriv,
+            union::{find_union_component, nth_union_component},
+            value::{Value, ValueData},
+            Managed, ManagedRef, ManagedType,
         },
-        datatype::DataType,
-        private::ManagedPriv,
-        union::{find_union_component, nth_union_component},
-        value::{Value, ValueData},
-        Managed, ManagedRef, ManagedType,
     },
     error::{AccessError, JlrsResult, TypeError, CANNOT_DISPLAY_TYPE},
-    layout::valid_layout::ValidField,
     memory::target::Target,
     private::Private,
 };

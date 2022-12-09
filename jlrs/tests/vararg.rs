@@ -6,8 +6,10 @@ mod util;
 ))]
 mod not_lts {
     use jlrs::{
-        data::managed::internal::vararg::{Vararg, VarargRef},
-        layout::valid_layout::ValidLayout,
+        data::{
+            layout::valid_layout::ValidLayout,
+            managed::internal::vararg::{Vararg, VarargRef},
+        },
         prelude::*,
     };
 

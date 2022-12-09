@@ -6,8 +6,10 @@ mod util;
 ))]
 mod not_lts {
     use jlrs::{
-        data::managed::internal::opaque_closure::{OpaqueClosure, OpaqueClosureRef},
-        layout::valid_layout::ValidLayout,
+        data::{
+            layout::valid_layout::ValidLayout,
+            managed::internal::opaque_closure::{OpaqueClosure, OpaqueClosureRef},
+        },
         prelude::*,
     };
 

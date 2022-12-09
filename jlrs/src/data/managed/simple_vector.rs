@@ -15,12 +15,11 @@ use super::{
     Ref,
 };
 use crate::{
-    data::managed::value::Value,
-    error::{AccessError, JlrsResult},
-    layout::{
-        typecheck::Typecheck,
-        valid_layout::{ValidField, ValidLayout},
+    data::{
+        layout::valid_layout::{ValidField, ValidLayout},
+        managed::{typecheck::Typecheck, value::Value},
     },
+    error::{AccessError, JlrsResult},
     memory::target::{unrooted::Unrooted, Target},
     private::Private,
 };

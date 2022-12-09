@@ -35,10 +35,10 @@ use crate::{
     data::managed::{
         datatype::DataType,
         private::ManagedPriv as _,
+        typecheck::Typecheck,
         value::{Value, ValueData, MAX_SIZE},
         Managed as _,
     },
-    layout::typecheck::Typecheck,
     memory::target::{ExtendedTarget, Target},
     private::Private,
 };
@@ -185,9 +185,9 @@ macro_rules! impl_tuple {
             }
         }
 
-        unsafe impl<$($types),+> $crate::layout::valid_layout::ValidLayout for $name<$($types),+>
+        unsafe impl<$($types),+> $crate::data::layout::valid_layout::ValidLayout for $name<$($types),+>
         where
-            $($types: $crate::layout::valid_layout::ValidField + Clone + ::std::fmt::Debug),+
+            $($types: $crate::data::layout::valid_layout::ValidField + Clone + ::std::fmt::Debug),+
         {
             fn valid_layout(v: $crate::data::managed::value::Value) -> bool {
                 unsafe {
@@ -216,9 +216,9 @@ macro_rules! impl_tuple {
             const IS_REF: bool = false;
         }
 
-        unsafe impl<$($types),+> $crate::layout::valid_layout::ValidField for $name<$($types),+>
+        unsafe impl<$($types),+> $crate::data::layout::valid_layout::ValidField for $name<$($types),+>
         where
-            $($types: $crate::layout::valid_layout::ValidField + Clone + ::std::fmt::Debug),+
+            $($types: $crate::data::layout::valid_layout::ValidField + Clone + ::std::fmt::Debug),+
         {
             fn valid_field(v: $crate::data::managed::value::Value) -> bool {
                 unsafe {
@@ -247,17 +247,17 @@ macro_rules! impl_tuple {
 
         unsafe impl<$($types),+> $crate::convert::unbox::Unbox for $name<$($types),+>
         where
-            $($types: $crate::layout::valid_layout::ValidField + Clone + ::std::fmt::Debug),+
+            $($types: $crate::data::layout::valid_layout::ValidField + Clone + ::std::fmt::Debug),+
         {
             type Output = Self;
         }
 
-        unsafe impl<$($types),+> $crate::layout::typecheck::Typecheck for $name<$($types),+>
+        unsafe impl<$($types),+> $crate::data::managed::typecheck::Typecheck for $name<$($types),+>
         where
-            $($types: $crate::layout::valid_layout::ValidField + Clone + ::std::fmt::Debug),+
+            $($types: $crate::data::layout::valid_layout::ValidField + Clone + ::std::fmt::Debug),+
         {
             fn typecheck(t: $crate::data::managed::datatype::DataType) -> bool {
-                <Self as $crate::layout::valid_layout::ValidLayout>::valid_layout(t.as_value())
+                <Self as $crate::data::layout::valid_layout::ValidLayout>::valid_layout(t.as_value())
             }
         }
     };
@@ -291,7 +291,7 @@ macro_rules! impl_tuple {
             }
         }
 
-        unsafe impl $crate::layout::valid_layout::ValidLayout for $name {
+        unsafe impl $crate::data::layout::valid_layout::ValidLayout for $name {
             fn valid_layout(v: $crate::data::managed::value::Value) -> bool {
                 if let Ok(dt) = v.cast::<$crate::data::managed::datatype::DataType>() {
                     let global = unsafe {$crate::memory::target::unrooted::Unrooted::new()};
@@ -304,7 +304,7 @@ macro_rules! impl_tuple {
             const IS_REF: bool = false;
         }
 
-        unsafe impl $crate::layout::valid_layout::ValidField for $name {
+        unsafe impl $crate::data::layout::valid_layout::ValidField for $name {
             fn valid_field(v: $crate::data::managed::value::Value) -> bool {
                 if let Ok(dt) = v.cast::<$crate::data::managed::datatype::DataType>() {
                     let global = unsafe {$crate::memory::target::unrooted::Unrooted::new()};
@@ -323,9 +323,9 @@ macro_rules! impl_tuple {
             }
         }
 
-        unsafe impl $crate::layout::typecheck::Typecheck for $name {
+        unsafe impl $crate::data::managed::typecheck::Typecheck for $name {
             fn typecheck(t: $crate::data::managed::datatype::DataType) -> bool {
-                <Self as $crate::layout::valid_layout::ValidLayout>::valid_layout(t.as_value())
+                <Self as $crate::data::layout::valid_layout::ValidLayout>::valid_layout(t.as_value())
             }
         }
     };

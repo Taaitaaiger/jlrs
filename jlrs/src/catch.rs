@@ -7,7 +7,7 @@ use std::{
 };
 
 use jl_sys::{
-    jlrs_catch_t, jlrs_catch_tag_t_JLRS_CATCH_ERR, jlrs_catch_tag_t_JLRS_CATCH_EXCECPTION,
+    jlrs_catch_t, jlrs_catch_tag_t_JLRS_CATCH_ERR, jlrs_catch_tag_t_JLRS_CATCH_EXCEPTION,
     jlrs_catch_tag_t_JLRS_CATCH_OK, jlrs_catch_tag_t_JLRS_CATCH_PANIC, jlrs_catch_wrapper,
 };
 
@@ -88,7 +88,7 @@ where
     match res.tag {
         x if x == jlrs_catch_tag_t_JLRS_CATCH_OK => Ok(Ok(result.assume_init())),
         x if x == jlrs_catch_tag_t_JLRS_CATCH_ERR => Err(Box::from_raw(res.error.cast())),
-        x if x == jlrs_catch_tag_t_JLRS_CATCH_EXCECPTION => Ok(Err(ValueRef::wrap(
+        x if x == jlrs_catch_tag_t_JLRS_CATCH_EXCEPTION => Ok(Err(ValueRef::wrap(
             NonNull::new_unchecked(res.error.cast()),
         ))),
         x if x == jlrs_catch_tag_t_JLRS_CATCH_PANIC => {
@@ -156,7 +156,7 @@ where
     match res.tag {
         x if x == jlrs_catch_tag_t_JLRS_CATCH_OK => Ok(Ok(result.assume_init())),
         x if x == jlrs_catch_tag_t_JLRS_CATCH_ERR => Err(Box::from_raw(res.error.cast())),
-        x if x == jlrs_catch_tag_t_JLRS_CATCH_EXCECPTION => Ok(Err(ValueRef::wrap(
+        x if x == jlrs_catch_tag_t_JLRS_CATCH_EXCEPTION => Ok(Err(ValueRef::wrap(
             NonNull::new_unchecked(res.error.cast()),
         ))),
         x if x == jlrs_catch_tag_t_JLRS_CATCH_PANIC => {

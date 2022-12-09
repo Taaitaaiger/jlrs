@@ -14,10 +14,10 @@ use crate::{
         datatype::DataType,
         private::ManagedPriv,
         type_name::TypeName,
+        typecheck::Typecheck,
         value::{Value, ValueResult},
         Managed as _, Ref,
     },
-    layout::typecheck::Typecheck,
     memory::target::{unrooted::Unrooted, Target},
     private::Private,
 };

@@ -728,7 +728,6 @@ pub mod convert;
 pub mod data;
 pub mod error;
 pub mod info;
-pub mod layout;
 pub mod memory;
 #[cfg(feature = "prelude")]
 pub mod prelude;
