@@ -266,9 +266,9 @@ fn impl_typecheck(ast: &syn::DeriveInput) -> TokenStream {
     let where_clause = &ast.generics.where_clause;
 
     let typecheck_impl = quote! {
-        unsafe impl #generics ::jlrs::layout::typecheck::Typecheck for #name #generics #where_clause {
+        unsafe impl #generics ::jlrs::data::managed::typecheck::Typecheck for #name #generics #where_clause {
             fn typecheck(dt: ::jlrs::data::managed::datatype::DataType) -> bool {
-                <Self as ::jlrs::layout::valid_layout::ValidLayout>::valid_layout(dt.as_value())
+                <Self as ::jlrs::data::layout::valid_layout::ValidLayout>::valid_layout(dt.as_value())
             }
         }
     };
@@ -307,7 +307,7 @@ fn impl_valid_layout(ast: &syn::DeriveInput) -> TokenStream {
         + classified_fields.jl_non_union_field_idxs.len();
 
     let valid_layout_impl = quote! {
-        unsafe impl #generics ::jlrs::layout::valid_layout::ValidLayout for #name #generics #where_clause {
+        unsafe impl #generics ::jlrs::data::layout::valid_layout::ValidLayout for #name #generics #where_clause {
             fn valid_layout(v: ::jlrs::data::managed::value::Value) -> bool {
                 unsafe {
                     if let Ok(dt) = v.cast::<::jlrs::data::managed::datatype::DataType>() {
@@ -322,7 +322,7 @@ fn impl_valid_layout(ast: &syn::DeriveInput) -> TokenStream {
                         let field_types = field_types_data.as_slice();
 
                         #(
-                            if !<#rs_non_union_fields as ::jlrs::layout::valid_layout::ValidField>::valid_field(field_types[#jl_non_union_field_idxs].unwrap().as_managed()) {
+                            if !<#rs_non_union_fields as ::jlrs::data::layout::valid_layout::ValidField>::valid_field(field_types[#jl_non_union_field_idxs].unwrap().as_managed()) {
                                 return false;
                             }
                         )*
@@ -362,9 +362,9 @@ fn impl_valid_field(ast: &syn::DeriveInput) -> TokenStream {
     let where_clause = &ast.generics.where_clause;
 
     let valid_field_impl = quote! {
-        unsafe impl #generics ::jlrs::layout::valid_layout::ValidField for #name #generics #where_clause {
+        unsafe impl #generics ::jlrs::data::layout::valid_layout::ValidField for #name #generics #where_clause {
             fn valid_field(v: ::jlrs::data::managed::value::Value) -> bool {
-                <Self as ::jlrs::layout::valid_layout::ValidLayout>::valid_layout(v)
+                <Self as ::jlrs::data::layout::valid_layout::ValidLayout>::valid_layout(v)
             }
         }
     };

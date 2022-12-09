@@ -2200,7 +2200,7 @@ extern "C" {
 }
 pub const jlrs_catch_tag_t_JLRS_CATCH_OK: jlrs_catch_tag_t = 0;
 pub const jlrs_catch_tag_t_JLRS_CATCH_ERR: jlrs_catch_tag_t = 1;
-pub const jlrs_catch_tag_t_JLRS_CATCH_EXCECPTION: jlrs_catch_tag_t = 2;
+pub const jlrs_catch_tag_t_JLRS_CATCH_EXCEPTION: jlrs_catch_tag_t = 2;
 pub const jlrs_catch_tag_t_JLRS_CATCH_PANIC: jlrs_catch_tag_t = 3;
 pub type jlrs_catch_tag_t = ::std::os::raw::c_uint;
 #[repr(C)]

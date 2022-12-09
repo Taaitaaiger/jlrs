@@ -14,9 +14,8 @@ mod tests {
     use jlrs::{
         data::managed::{
             simple_vector::SimpleVector, symbol::SymbolRef, type_name::TypeName, type_var::TypeVar,
-            union::Union, union_all::UnionAll,
+            typecheck::*, union::Union, union_all::UnionAll,
         },
-        layout::typecheck::*,
         prelude::*,
     };
 

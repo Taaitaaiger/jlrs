@@ -61,7 +61,7 @@ macro_rules! impl_valid_layout {
         }
     };
     ($t:ty) => {
-        unsafe impl $crate::layout::valid_layout::ValidLayout for $t {
+        unsafe impl $crate::data::layout::valid_layout::ValidLayout for $t {
             #[inline(always)]
             fn valid_layout(v: $crate::data::managed::value::Value) -> bool {
                 if let Ok(dt) =  v.cast::<$crate::data::managed::datatype::DataType>() {
@@ -74,7 +74,7 @@ macro_rules! impl_valid_layout {
             const IS_REF: bool = false;
         }
 
-        unsafe impl $crate::layout::valid_layout::ValidField for $t {
+        unsafe impl $crate::data::layout::valid_layout::ValidField for $t {
             #[inline(always)]
             fn valid_field(v: $crate::data::managed::value::Value) -> bool {
                 if let Ok(dt) =  v.cast::<$crate::data::managed::datatype::DataType>() {

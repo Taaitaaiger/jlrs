@@ -47,23 +47,23 @@ use self::data::accessor::{
 use super::{union_all::UnionAll, value::ValueRef, Ref};
 use crate::{
     convert::into_julia::IntoJulia,
-    data::managed::{
-        array::{
-            data::copied::CopiedArray,
-            dimensions::{ArrayDimensions, Dims},
+    data::{
+        layout::valid_layout::{ValidField, ValidLayout},
+        managed::{
+            array::{
+                data::copied::CopiedArray,
+                dimensions::{ArrayDimensions, Dims},
+            },
+            datatype::DataType,
+            private::ManagedPriv,
+            type_name::TypeName,
+            typecheck::Typecheck,
+            union::Union,
+            value::Value,
+            Managed, ManagedRef,
         },
-        datatype::DataType,
-        private::ManagedPriv,
-        type_name::TypeName,
-        union::Union,
-        value::Value,
-        Managed, ManagedRef,
     },
     error::{AccessError, ArrayLayoutError, InstantiationError, JlrsResult, CANNOT_DISPLAY_TYPE},
-    layout::{
-        typecheck::Typecheck,
-        valid_layout::{ValidField, ValidLayout},
-    },
     memory::{
         get_tls,
         target::{frame::GcFrame, private::TargetPriv, unrooted::Unrooted, ExtendedTarget, Target},

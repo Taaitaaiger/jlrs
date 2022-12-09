@@ -13,12 +13,13 @@ use jl_sys::jl_value_t;
 use super::{value::ValueResult, Ref};
 use crate::{
     call::{Call, ProvideKeywords, WithKeywords},
-    data::managed::{datatype::DataType, private::ManagedPriv, value::Value, Managed},
-    error::JlrsResult,
-    layout::{
-        typecheck::Typecheck,
-        valid_layout::{ValidField, ValidLayout},
+    data::{
+        layout::valid_layout::{ValidField, ValidLayout},
+        managed::{
+            datatype::DataType, private::ManagedPriv, typecheck::Typecheck, value::Value, Managed,
+        },
     },
+    error::JlrsResult,
     memory::target::{unrooted::Unrooted, Target},
     private::Private,
 };

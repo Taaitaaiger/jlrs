@@ -55,13 +55,13 @@ use self::queue::{channel, Receiver, Sender};
 use crate::{
     async_util::{
         channel::{Channel, ChannelSender, OneshotSender, TrySendError},
-        future::wake_task,
-        internal::{
+        envelopes::{
             BlockingTask, BlockingTaskEnvelope, CallPersistentTask, IncludeTask,
             IncludeTaskEnvelope, InnerPersistentMessage, PendingTask, PendingTaskEnvelope,
             Persistent, PersistentComms, RegisterPersistent, RegisterTask, SetErrorColorTask,
             SetErrorColorTaskEnvelope, Task,
         },
+        future::wake_task,
         task::{sleep, Affinity, AsyncTask, PersistentTask},
     },
     data::managed::{module::Module, value::Value},

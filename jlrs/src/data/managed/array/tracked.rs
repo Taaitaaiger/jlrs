@@ -19,9 +19,11 @@ use super::{
 #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
 use super::{ArrayResult, TypedArrayResult};
 use crate::{
-    data::managed::{value::ValueRef, ManagedRef},
+    data::{
+        layout::valid_layout::ValidField,
+        managed::{value::ValueRef, ManagedRef},
+    },
     error::JlrsResult,
-    layout::valid_layout::ValidField,
     memory::{
         context::ledger::Ledger,
         target::{ExtendedTarget, Target},

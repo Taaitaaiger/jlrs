@@ -3,12 +3,14 @@ mod util;
 #[cfg(feature = "sync-rt")]
 mod tests {
     use jlrs::{
-        data::managed::{
-            simple_vector::{SimpleVector, SimpleVectorRef},
-            symbol::SymbolRef,
-            union_all::UnionAll,
+        data::{
+            layout::valid_layout::ValidLayout,
+            managed::{
+                simple_vector::{SimpleVector, SimpleVectorRef},
+                symbol::SymbolRef,
+                union_all::UnionAll,
+            },
         },
-        layout::valid_layout::ValidLayout,
         prelude::*,
     };
 
