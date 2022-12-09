@@ -12,10 +12,12 @@
 /// `Self: 'static`. This means you'll need to erase the lifetimes of this data, or store them as
 /// raw pointers. If a foreign type contains Julia data, [`ForeignType::mark`] must be
 /// implemented. Whenever Julia data in an instance of a foreign type is mutated,
-/// [`InlineLayout::write_barrier`] must be called if the foreign data is owned by Julia.
+/// [`write_barrier`] must be called if the foreign data is owned by Julia.
 ///
 /// It's recommended that `ForeignType` is only implemented for types that are thread-safe, and
 /// if a foreign type needs to be mutable this should be achieved through interior mutability.
+///
+/// [`write_barrier`]: crate::memory::gc::write_barrier
 use std::{
     any::TypeId,
     mem::MaybeUninit,
@@ -31,14 +33,16 @@ use jl_sys::{
 
 use crate::{
     convert::{into_julia::IntoJulia, unbox::Unbox},
-    data::managed::{
-        datatype::{DataType, DataTypeData},
-        module::Module,
-        private::ManagedPriv,
-        symbol::Symbol,
-        value::{Value, ValueData},
+    data::{
+        layout::valid_layout::ValidLayout,
+        managed::{
+            datatype::{DataType, DataTypeData},
+            module::Module,
+            private::ManagedPriv,
+            symbol::Symbol,
+            value::{Value, ValueData},
+        },
     },
-    layout::valid_layout::ValidLayout,
     memory::{get_tls, target::Target, PTls},
     private::Private,
 };

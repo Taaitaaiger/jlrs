@@ -3,6 +3,10 @@
 
  - Foreign types can be reinitialized with `reinit_foreign_type`, this is only available when Julia 1.10 (the current nightly version) is used.
 
+ - The wrappers module has been renamed to data. Pointer wrappers are now called managed data or Julia data, and inline wrappers are layouts. Traits and methods dealing with wrappers have been renamed accordingly.
+
+ - The traits in the `layout` module have been moved to the `data` module. Most can be found in `data::layout`, `typecheck` has been moved to `data::managed`, and `field_index::FieldIndex` has been moved to `data::managed::value::field_accessor`.
+
 
 #### v0.17
  - Atomic struct fields are now atomic in the generated bindings.

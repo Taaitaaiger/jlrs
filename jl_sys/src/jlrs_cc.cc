@@ -15,7 +15,7 @@ extern "C"
         }
         JL_CATCH
         {
-            res = {.tag = JLRS_CATCH_EXCECPTION, .error = jl_current_exception()};
+            res = {.tag = JLRS_CATCH_EXCEPTION, .error = jl_current_exception()};
         }
 
         return res;
@@ -27,7 +27,7 @@ extern "C"
         return jl_array_data_owner_offset(n_dims);
     }
 
-#if !defined(JLRS_LTS)
+#if !defined(JLRS_WINDOWS_LTS)
     void jlrs_lock(jl_value_t *v)
     {
         jl_task_t *self = jl_current_task;

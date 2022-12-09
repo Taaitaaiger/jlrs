@@ -4,7 +4,7 @@ mod util;
 mod tests {
     use std::ptr::null_mut;
 
-    use jlrs::{layout::valid_layout::ValidLayout, prelude::*};
+    use jlrs::{data::layout::valid_layout::ValidLayout, prelude::*};
 
     use super::util::JULIA;
 

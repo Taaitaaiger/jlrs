@@ -4,7 +4,8 @@ mod util;
 #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
 mod tests {
     use jlrs::{
-        data::managed::array::dimensions::Dims, layout::valid_layout::ValidLayout, prelude::*,
+        data::{layout::valid_layout::ValidLayout, managed::array::dimensions::Dims},
+        prelude::*,
     };
 
     use crate::util::JULIA;

@@ -4,7 +4,10 @@ mod util;
 mod tests {
     use std::borrow::Cow;
 
-    use jlrs::{data::managed::string::JuliaString, layout::valid_layout::ValidLayout, prelude::*};
+    use jlrs::{
+        data::{layout::valid_layout::ValidLayout, managed::string::JuliaString},
+        prelude::*,
+    };
 
     use crate::util::JULIA;
 

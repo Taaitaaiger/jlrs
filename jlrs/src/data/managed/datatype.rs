@@ -34,12 +34,12 @@ use crate::{
         private::ManagedPriv,
         simple_vector::{SimpleVector, SimpleVectorRef},
         symbol::{Symbol, SymbolRef},
+        typecheck::Typecheck,
         value::Value,
         Managed,
     },
     error::{AccessError, JlrsResult, CANNOT_DISPLAY_TYPE},
     impl_julia_typecheck,
-    layout::typecheck::Typecheck,
     memory::target::Target,
     private::Private,
 };

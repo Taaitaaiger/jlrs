@@ -127,26 +127,28 @@ use super::Ref;
 use crate::{
     call::{Call, ProvideKeywords, WithKeywords},
     convert::{into_julia::IntoJulia, to_symbol::ToSymbol, unbox::Unbox},
-    data::managed::{
-        array::Array,
-        datatype::DataType,
-        module::Module,
-        private::ManagedPriv,
-        string::JuliaString,
-        symbol::Symbol,
-        union::Union,
-        union_all::UnionAll,
-        value::tracked::{Tracked, TrackedMut},
-        Managed,
+    data::{
+        layout::{
+            inline_layout::InlineLayout,
+            valid_layout::{ValidField, ValidLayout},
+        },
+        managed::{
+            array::Array,
+            datatype::DataType,
+            module::Module,
+            private::ManagedPriv,
+            string::JuliaString,
+            symbol::Symbol,
+            typecheck::{NamedTuple, Typecheck},
+            union::Union,
+            union_all::UnionAll,
+            value::tracked::{Tracked, TrackedMut},
+            Managed,
+        },
     },
     error::{
         AccessError, IOError, InstantiationError, JlrsError, JlrsResult, TypeError,
         CANNOT_DISPLAY_TYPE,
-    },
-    layout::{
-        inline_layout::InlineLayout,
-        typecheck::{NamedTuple, Typecheck},
-        valid_layout::{ValidField, ValidLayout},
     },
     memory::{
         context::ledger::Ledger,

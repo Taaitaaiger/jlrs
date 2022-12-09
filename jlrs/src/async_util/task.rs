@@ -20,7 +20,7 @@ use jl_sys::jl_yield;
 
 #[cfg(feature = "async-rt")]
 use crate::{
-    async_util::internal::{BlockingTaskEnvelope, PendingTaskEnvelope},
+    async_util::envelopes::{BlockingTaskEnvelope, PendingTaskEnvelope},
     runtime::async_rt::{queue::Sender, Message, MessageInner},
 };
 use crate::{

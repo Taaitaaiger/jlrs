@@ -9,7 +9,7 @@ use std::{
 };
 
 use crate::{
-    data::managed::value::Value, layout::inline_layout::InlineLayout,
+    data::{layout::inline_layout::InlineLayout, managed::value::Value},
     memory::context::ledger::Ledger,
 };
 

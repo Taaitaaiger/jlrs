@@ -1,7 +1,7 @@
 mod util;
 #[cfg(feature = "sync-rt")]
 mod tests {
-    use jlrs::{layout::typecheck::NamedTuple, prelude::*};
+    use jlrs::{data::managed::typecheck::NamedTuple, prelude::*};
 
     use super::util::JULIA;
 

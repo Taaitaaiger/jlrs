@@ -1,4 +1,4 @@
-//! Trait for checking Julia type properties.
+//! Trait for checking properties of Julia data.
 //!
 //! Several properties of Julia data can be checked by using [`Value::is`] and [`DataType::is`],
 //! these methods must be used in combination with a type that implements the [`Typecheck`] trait.
@@ -46,7 +46,7 @@ pub unsafe trait Typecheck {
 #[macro_export]
 macro_rules! impl_julia_typecheck {
     ($type:ty, $jl_type:expr, $($lt:lifetime),+) => {
-        unsafe impl<$($lt),+> crate::layout::typecheck::Typecheck for $type {
+        unsafe impl<$($lt),+> crate::data::managed::typecheck::Typecheck for $type {
             #[inline(always)]
             fn typecheck(t: $crate::data::managed::datatype::DataType) -> bool {
                 unsafe {
@@ -56,7 +56,7 @@ macro_rules! impl_julia_typecheck {
         }
     };
     ($type:ty, $jl_type:expr) => {
-        unsafe impl crate::layout::typecheck::Typecheck for $type {
+        unsafe impl crate::data::managed::typecheck::Typecheck for $type {
             #[inline(always)]
             fn typecheck(t: $crate::data::managed::datatype::DataType) -> bool {
                 unsafe {
@@ -66,7 +66,7 @@ macro_rules! impl_julia_typecheck {
         }
     };
     ($type:ty) => {
-        unsafe impl crate::layout::typecheck::Typecheck for $type {
+        unsafe impl crate::data::managed::typecheck::Typecheck for $type {
             #[inline(always)]
             fn typecheck(t: crate::data::managed::datatype::DataType) -> bool {
                 unsafe {
