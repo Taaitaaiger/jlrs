@@ -18,12 +18,8 @@ use std::time::Duration;
 use async_trait::async_trait;
 use jl_sys::jl_yield;
 
-#[cfg(feature = "async-rt")]
 use crate::{
-    async_util::envelopes::{BlockingTaskEnvelope, PendingTaskEnvelope},
-    runtime::async_rt::{queue::Sender, Message, MessageInner},
-};
-use crate::{
+    async_util::affinity::Affinity,
     call::Call,
     data::managed::{module::Module, value::Value},
     error::JlrsResult,
@@ -52,6 +48,9 @@ use crate::{
 ///     // The type of the result of this task if it succeeds.
 ///     type Output = u64;
 ///
+///     // TODO
+///     type Affinity = DispatchAny;
+///
 ///     async fn run<'base>(&mut self, mut frame: AsyncGcFrame<'base>) -> JlrsResult<Self::Output> {
 ///         let a = Value::new(&mut frame, self.a);
 ///         let b = Value::new(&mut frame, self.b);
@@ -68,13 +67,17 @@ use crate::{
 /// [`AsyncJulia::task`]: crate::runtime::async_rt::AsyncJulia::task
 /// [`AsyncJulia::try_task`]: crate::runtime::async_rt::AsyncJulia::try_task
 #[async_trait(?Send)]
-pub trait AsyncTask: 'static + Send + Sync {
+pub trait AsyncTask: 'static + Send {
     /// The type of the result which is returned if `run` completes successfully.
     type Output: 'static + Send;
 
-    /// The thread-affinity of this task. Can be set to Affinity::Main to ensure the task is
-    /// always scheduled on the main runtime thread.
-    const AFFINITY: Affinity = Affinity::Any;
+    /// The thread-affinity of this task. Can be set to [`DispatchAny`], [`DispatchMain`], or
+    /// [`DispatchWorker`]
+    ///
+    /// [`DispatchAny`]: crate::runtime::async_rt::queue::dispatch::DispatchAny
+    /// [`DispatchMain`]: crate::runtime::async_rt::queue::dispatch::DispatchMain
+    /// [`DispatchWorker`]: crate::runtime::async_rt::queue::dispatch::DispatchWorker
+    type Affinity: Affinity;
 
     /// Register the task.
     ///
@@ -129,6 +132,8 @@ pub trait AsyncTask: 'static + Send + Sync {
 ///     type State<'state> = AccumulatorTaskState<'state>;
 ///     // The type of the additional data that the task must be called with.
 ///     type Input = usize;
+///
+///     type Affinity = DispatchAny;
 ///
 ///     // This method is called before the handle is returned. Note that the
 ///     // lifetime of the frame is `'static`: the frame is not dropped until
@@ -188,7 +193,7 @@ pub trait AsyncTask: 'static + Send + Sync {
 /// [`AsyncJulia::persistent`]: crate::runtime::async_rt::AsyncJulia::persistent
 /// [`AsyncJulia::try_persistent`]: crate::runtime::async_rt::AsyncJulia::try_persistent
 #[async_trait(?Send)]
-pub trait PersistentTask: 'static + Send + Sync {
+pub trait PersistentTask: 'static + Send {
     /// The type of the result which is returned if `init` completes successfully.
     ///
     /// This data is provided to every call of `run`.
@@ -196,17 +201,21 @@ pub trait PersistentTask: 'static + Send + Sync {
 
     /// The type of the data that must be provided when calling this persistent through its
     /// handle.
-    type Input: 'static + Send + Sync;
+    type Input: 'static + Send;
 
     /// The type of the result which is returned if `run` completes successfully.
-    type Output: 'static + Send + Sync;
+    type Output: 'static + Send;
+
+    /// The thread-affinity of this task. Can be set to [`DispatchAny`], [`DispatchMain`], or
+    /// [`DispatchWorker`]
+    ///
+    /// [`DispatchAny`]: crate::runtime::async_rt::queue::dispatch::DispatchAny
+    /// [`DispatchMain`]: crate::runtime::async_rt::queue::dispatch::DispatchMain
+    /// [`DispatchWorker`]: crate::runtime::async_rt::queue::dispatch::DispatchWorker
+    type Affinity: Affinity;
 
     // The capacity of the channel used to communicate with this task.
     const CHANNEL_CAPACITY: usize = 0;
-
-    /// The thread-affinity of this task. Can be set to Affinity::Main to ensure the task is
-    /// always scheduled on the main runtime thread.
-    const AFFINITY: Affinity = Affinity::Any;
 
     /// Register this persistent task.
     ///
@@ -259,6 +268,7 @@ pub trait PersistentTask: 'static + Send + Sync {
     }
 }
 
+/*
 /// The thread-affinity of a task.
 ///
 /// If the affinity of a task is set to `Main` the task is always scheduled on the main runtime
@@ -349,7 +359,7 @@ impl Affinity {
         }
     }
 }
-
+ */
 /// Yield the current Julia task.
 ///
 /// Calling this function allows Julia to switch to another Julia task scheduled on the same

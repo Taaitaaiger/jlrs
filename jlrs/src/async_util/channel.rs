@@ -1,4 +1,4 @@
-//! Channel traits used to communicate with a [`PersistentTask`].
+//! Channel traits used to communicate with the async runtime.
 //!
 //! In order to communicate with a persistent task you must use channels that implement the traits
 //! defined in this module. Persistent tasks need a backing channel whose sending half implements
@@ -63,7 +63,7 @@ impl<T> std::error::Error for TrySendError<T> {}
 /// An async channel.
 ///
 /// This channel is used to communicate with a persistent task.
-pub trait Channel<M: Send + Sync + 'static>: 'static + Send + Sync {
+pub trait Channel<M: Send + 'static>: 'static + Send + Sync {
     type Sender: ChannelSender<M>;
     type Receiver: ChannelReceiver<M>;
 
@@ -73,7 +73,7 @@ pub trait Channel<M: Send + Sync + 'static>: 'static + Send + Sync {
 
 /// The sending half of an async channel.
 #[async_trait]
-pub trait ChannelSender<M: Send + Sync + 'static>: 'static + Send + Sync {
+pub trait ChannelSender<M: Send + 'static>: 'static + Send + Sync {
     /// Send a message to the receiving half.
     ///
     /// This method must wait until the message can be sent. If the channel is closed it must
@@ -89,7 +89,7 @@ pub trait ChannelSender<M: Send + Sync + 'static>: 'static + Send + Sync {
 
 /// The receiving half of an async channel.
 #[async_trait]
-pub trait ChannelReceiver<M: Send + Sync + 'static>: 'static + Send + Sync {
+pub trait ChannelReceiver<M: Send + 'static>: 'static + Send + Sync {
     /// Receive a new message.
     ///
     /// This method is called by persistent tasks to receive new commands. It must be truly async,

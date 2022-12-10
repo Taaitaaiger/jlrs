@@ -1,7 +1,7 @@
 mod util;
 
 #[cfg(test)]
-#[cfg(feature = "sync-rt")]
+#[cfg( all(feature = "sync-rt", feature = "f16"))]
 mod tests {
     use half::f16;
     use jlrs::prelude::*;

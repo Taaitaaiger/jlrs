@@ -25,6 +25,8 @@ impl PersistentTask for AccumulatorTask {
     // This result is returned to the caller through a channel.
     type Output = f64;
 
+    type Affinity = DispatchAny;
+
     // The capacity of the channel used to communicate with this task
     const CHANNEL_CAPACITY: usize = 2;
 
@@ -102,7 +104,8 @@ fn main() {
         // Register AccumulatorTask, otherwise AccumulatorTask::init returns an error.
         let (init_sender, init_receiver) = crossbeam_channel::bounded(1);
         julia
-            .try_register_persistent::<AccumulatorTask, _>(init_sender)
+            .register_persistent::<AccumulatorTask, _>(init_sender)
+            .try_dispatch_any()
             .unwrap();
         init_receiver.recv().unwrap().unwrap();
     }
@@ -112,10 +115,11 @@ fn main() {
     let persistent = {
         let (handle_sender, handle_receiver) = crossbeam_channel::bounded(1);
         julia
-            .try_persistent::<UnboundedChannel<_>, _, _>(
+            .persistent::<UnboundedChannel<_>, _, _>(
                 AccumulatorTask { init_value: 5.0 },
                 handle_sender,
             )
+            .try_dispatch_any()
             .expect("Cannot send task");
 
         handle_receiver

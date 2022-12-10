@@ -7,6 +7,7 @@
 
  - The traits in the `layout` module have been moved to the `data` module. Most can be found in `data::layout`, `typecheck` has been moved to `data::managed`, and `field_index::FieldIndex` has been moved to `data::managed::value::field_accessor`.
 
+ - Dispatch / Affinity
 
 #### v0.17
  - Atomic struct fields are now atomic in the generated bindings.

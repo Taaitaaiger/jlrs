@@ -140,6 +140,18 @@ cfg_if::cfg_if! {
             pub unsafe fn start_async<const N: usize>(self) -> JlrsResult<(AsyncJulia<R>, R::RuntimeHandle)> {
                 AsyncJulia::init_async::<N>(self)
             }
+
+            pub(crate) fn has_workers(&self) -> bool {
+                #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
+                {
+                    self.n_workers > 0
+                }
+
+                #[cfg(not(any(feature = "julia-1-10", feature = "julia-1-9")))]
+                {
+                    false
+                }
+            }
         }
     }
 }
