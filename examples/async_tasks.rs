@@ -16,6 +16,7 @@ struct MyTask {
 impl AsyncTask for MyTask {
     // Different tasks can return different results. If successful, this task returns an `f64`.
     type Output = f64;
+    type Affinity = DispatchAny;
 
     // Include the custom code MyTask needs.
     async fn register<'frame>(mut frame: AsyncGcFrame<'frame>) -> JlrsResult<()> {
@@ -75,7 +76,10 @@ fn main() {
     {
         // Include the custom code MyTask needs by registering it.
         let (sender, receiver) = crossbeam_channel::bounded(1);
-        julia.try_register_task::<MyTask, _>(sender).unwrap();
+        julia
+            .register_task::<MyTask, _>(sender)
+            .try_dispatch_any()
+            .unwrap();
         receiver.recv().unwrap().unwrap();
     }
 
@@ -86,7 +90,7 @@ fn main() {
             iters: 1_000_000,
         };
         let (sender, receiver) = crossbeam_channel::bounded(1);
-        julia.try_task(task, sender).unwrap();
+        julia.task(task, sender).try_dispatch_any().unwrap();
         receiver
     };
 
@@ -96,7 +100,7 @@ fn main() {
             iters: 1_000_000,
         };
         let (sender, receiver) = crossbeam_channel::bounded(1);
-        julia.try_task(task, sender).unwrap();
+        julia.task(task, sender).try_dispatch_any().unwrap();
         receiver
     };
 

@@ -32,14 +32,14 @@ mod tests {
 
             let (sender, recv) = tokio::sync::oneshot::channel();
             r.as_ref()
-                .try_blocking_task(
+                .blocking_task(
                     |mut frame| {
                         Value::eval_string(&mut frame, ASYNC_TESTS_JL).into_jlrs_result()?;
                         Ok(())
                     },
                     sender,
-                    Affinity::Any,
                 )
+                .try_dispatch_any()
                 .expect("Could not send blocking task");
 
             recv.blocking_recv()
@@ -59,13 +59,14 @@ mod tests {
         let (sender, receiver) = crossbeam_channel::bounded(1);
 
         julia
-            .try_task(
+            .task(
                 MyTask {
                     dims: 4,
                     iters: 5_000_000,
                 },
                 sender,
             )
+            .try_dispatch_any()
             .unwrap();
 
         assert_eq!(receiver.recv().unwrap().unwrap(), 20_000_004.0);
@@ -78,13 +79,14 @@ mod tests {
         let (sender, receiver) = crossbeam_channel::bounded(1);
 
         julia
-            .try_task(
+            .task(
                 OtherRetTypeTask {
                     dims: 4,
                     iters: 5_000_000,
                 },
                 sender,
             )
+            .try_dispatch_any()
             .unwrap();
 
         assert_eq!(receiver.recv().unwrap().unwrap(), 20_000_004.0);
@@ -97,13 +99,14 @@ mod tests {
         let (sender, receiver) = crossbeam_channel::bounded(1);
 
         julia
-            .try_task(
+            .task(
                 KwTask {
                     dims: 4,
                     iters: 5_000,
                 },
                 sender,
             )
+            .try_dispatch_any()
             .unwrap();
 
         assert_eq!(receiver.recv().unwrap().unwrap(), 20_009.0);
@@ -115,7 +118,7 @@ mod tests {
 
         let (sender, receiver) = crossbeam_channel::bounded(1);
 
-        julia.try_task(ThrowingTask, sender).unwrap();
+        julia.task(ThrowingTask, sender).try_dispatch_any().unwrap();
 
         assert!(receiver.recv().unwrap().is_err());
     }
@@ -127,13 +130,14 @@ mod tests {
         let (sender, receiver) = crossbeam_channel::bounded(1);
 
         julia
-            .try_task(
+            .task(
                 NestingTaskAsyncFrame {
                     dims: 6,
                     iters: 5_000_000,
                 },
                 sender,
             )
+            .try_dispatch_any()
             .unwrap();
 
         assert_eq!(receiver.recv().unwrap().unwrap(), 30_000_006.0);
@@ -146,13 +150,14 @@ mod tests {
         let (sender, receiver) = crossbeam_channel::bounded(1);
 
         julia
-            .try_task(
+            .task(
                 NestingTaskAsyncValueFrame {
                     dims: 6,
                     iters: 5_000_000,
                 },
                 sender,
             )
+            .try_dispatch_any()
             .unwrap();
 
         assert_eq!(receiver.recv().unwrap().unwrap(), 30_000_006.0);
@@ -165,13 +170,14 @@ mod tests {
         let (sender, receiver) = crossbeam_channel::bounded(1);
 
         julia
-            .try_task(
+            .task(
                 NestingTaskAsyncCallFrame {
                     dims: 6,
                     iters: 5_000_000,
                 },
                 sender,
             )
+            .try_dispatch_any()
             .unwrap();
 
         assert_eq!(receiver.recv().unwrap().unwrap(), 30_000_006.0);
@@ -184,13 +190,14 @@ mod tests {
         let (sender, receiver) = crossbeam_channel::bounded(1);
 
         julia
-            .try_task(
+            .task(
                 NestingTaskAsyncGcFrame {
                     dims: 6,
                     iters: 5_000_000,
                 },
                 sender,
             )
+            .try_dispatch_any()
             .unwrap();
 
         assert_eq!(receiver.recv().unwrap().unwrap(), 30_000_006.0);
@@ -203,13 +210,14 @@ mod tests {
         let (sender, receiver) = crossbeam_channel::bounded(1);
 
         julia
-            .try_task(
+            .task(
                 NestingTaskAsyncDynamicValueFrame {
                     dims: 6,
                     iters: 5_000_000,
                 },
                 sender,
             )
+            .try_dispatch_any()
             .unwrap();
 
         assert_eq!(receiver.recv().unwrap().unwrap(), 30_000_006.0);
@@ -222,13 +230,14 @@ mod tests {
         let (sender, receiver) = crossbeam_channel::bounded(1);
 
         julia
-            .try_task(
+            .task(
                 NestingTaskAsyncDynamicCallFrame {
                     dims: 6,
                     iters: 5_000_000,
                 },
                 sender,
             )
+            .try_dispatch_any()
             .unwrap();
 
         assert_eq!(receiver.recv().unwrap().unwrap(), 30_000_006.0);
@@ -240,7 +249,8 @@ mod tests {
 
         let (is, ir) = crossbeam_channel::bounded(1);
         julia
-            .try_register_persistent::<AccumulatorTask, _>(is)
+            .register_persistent::<AccumulatorTask, _>(is)
+            .try_dispatch_any()
             .unwrap();
         ir.recv().unwrap().unwrap();
 
@@ -249,10 +259,11 @@ mod tests {
         let handle = {
             let (handle_sender, handle_receiver) = crossbeam_channel::bounded(1);
             julia
-                .try_persistent::<AsyncStdChannel<_>, _, _>(
+                .persistent::<AsyncStdChannel<_>, _, _>(
                     AccumulatorTask { init_value: 5.0 },
                     handle_sender,
                 )
+                .try_dispatch_any()
                 .expect("Cannot send task");
 
             handle_receiver
@@ -275,13 +286,14 @@ mod tests {
         let (sender, receiver) = crossbeam_channel::bounded(1);
 
         julia
-            .try_task(
+            .task(
                 LocalTask {
                     dims: 4,
                     iters: 5_000,
                 },
                 sender,
             )
+            .try_dispatch_any()
             .unwrap();
 
         assert_eq!(receiver.recv().unwrap().unwrap(), 20_004.0);
@@ -294,13 +306,14 @@ mod tests {
         let (sender, receiver) = crossbeam_channel::bounded(1);
 
         julia
-            .try_task(
+            .task(
                 LocalSchedulingTask {
                     dims: 4,
                     iters: 5_000,
                 },
                 sender,
             )
+            .try_dispatch_any()
             .unwrap();
 
         assert_eq!(receiver.recv().unwrap().unwrap(), 20_004.0);
@@ -313,13 +326,14 @@ mod tests {
         let (sender, receiver) = crossbeam_channel::bounded(1);
 
         julia
-            .try_task(
+            .task(
                 MainTask {
                     dims: 4,
                     iters: 5_000,
                 },
                 sender,
             )
+            .try_dispatch_any()
             .unwrap();
 
         assert_eq!(receiver.recv().unwrap().unwrap(), 20_004.0);
@@ -332,13 +346,14 @@ mod tests {
         let (sender, receiver) = crossbeam_channel::bounded(1);
 
         julia
-            .try_task(
+            .task(
                 MainSchedulingTask {
                     dims: 4,
                     iters: 5_000,
                 },
                 sender,
             )
+            .try_dispatch_any()
             .unwrap();
 
         assert_eq!(receiver.recv().unwrap().unwrap(), 20_004.0);
@@ -351,13 +366,14 @@ mod tests {
         let (sender, receiver) = crossbeam_channel::bounded(1);
 
         julia
-            .try_task(
+            .task(
                 SchedulingTask {
                     dims: 4,
                     iters: 5_000,
                 },
                 sender,
             )
+            .try_dispatch_any()
             .unwrap();
 
         assert_eq!(receiver.recv().unwrap().unwrap(), 20_004.0);
@@ -370,13 +386,14 @@ mod tests {
         let (sender, receiver) = crossbeam_channel::bounded(1);
 
         julia
-            .try_task(
+            .task(
                 LocalKwSchedulingTask {
                     dims: 4,
                     iters: 5_000,
                 },
                 sender,
             )
+            .try_dispatch_any()
             .unwrap();
 
         assert_eq!(receiver.recv().unwrap().unwrap(), 20_009.0);
@@ -389,13 +406,14 @@ mod tests {
         let (sender, receiver) = crossbeam_channel::bounded(1);
 
         julia
-            .try_task(
+            .task(
                 KwSchedulingTask {
                     dims: 4,
                     iters: 5_000,
                 },
                 sender,
             )
+            .try_dispatch_any()
             .unwrap();
 
         assert_eq!(receiver.recv().unwrap().unwrap(), 20_009.0);
@@ -408,13 +426,14 @@ mod tests {
         let (sender, receiver) = crossbeam_channel::bounded(1);
 
         julia
-            .try_task(
+            .task(
                 MainKwSchedulingTask {
                     dims: 4,
                     iters: 5_000,
                 },
                 sender,
             )
+            .try_dispatch_any()
             .unwrap();
 
         assert_eq!(receiver.recv().unwrap().unwrap(), 20_009.0);
@@ -427,13 +446,14 @@ mod tests {
         let (sender, receiver) = crossbeam_channel::bounded(1);
 
         julia
-            .try_task(
+            .task(
                 LocalKwTask {
                     dims: 4,
                     iters: 5_000,
                 },
                 sender,
             )
+            .try_dispatch_any()
             .unwrap();
 
         assert_eq!(receiver.recv().unwrap().unwrap(), 20_009.0);
@@ -446,13 +466,14 @@ mod tests {
         let (sender, receiver) = crossbeam_channel::bounded(1);
 
         julia
-            .try_task(
+            .task(
                 MainKwTask {
                     dims: 4,
                     iters: 5_000,
                 },
                 sender,
             )
+            .try_dispatch_any()
             .unwrap();
 
         assert_eq!(receiver.recv().unwrap().unwrap(), 20_009.0);
@@ -464,7 +485,10 @@ mod tests {
 
         let (sender, receiver) = crossbeam_channel::bounded(1);
 
-        julia.try_task(BorrowArrayData, sender).unwrap();
+        julia
+            .task(BorrowArrayData, sender)
+            .try_dispatch_any()
+            .unwrap();
 
         assert_eq!(receiver.recv().unwrap().unwrap(), 2.0);
     }
@@ -476,7 +500,7 @@ mod tests {
         let (sender, receiver) = crossbeam_channel::bounded(1);
 
         julia
-            .try_post_blocking_task(
+            .post_blocking_task(
                 |mut frame| {
                     let one = Value::new(&mut frame, 1.0);
                     unsafe {
@@ -490,8 +514,8 @@ mod tests {
                     }
                 },
                 sender,
-                Affinity::Any,
             )
+            .try_dispatch_any()
             .unwrap();
 
         assert_eq!(receiver.recv().unwrap().unwrap(), 2.0);

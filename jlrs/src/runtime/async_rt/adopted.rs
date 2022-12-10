@@ -66,7 +66,7 @@ async unsafe fn run_inner<R: AsyncRuntime, const N: usize>(
             continue;
         }
 
-        match R::timeout(recv_timeout, receiver.recv()).await {
+        match R::timeout(recv_timeout, receiver.recv_worker()).await {
             None => jl_gc_safepoint(),
             Some(Ok(msg)) => match msg.inner {
                 MessageInner::Task(task) => {
