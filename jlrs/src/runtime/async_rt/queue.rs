@@ -64,11 +64,11 @@ impl<T: Send> Sender<T> {
         }
     }
 
-    pub(crate) fn try_send_or_return(&self, item: T) -> Option<T> {
+    pub(crate) fn try_send(&self, item: T) -> Option<T> {
         if let Some(ref q) = self.queues.any_queue {
             q.try_push(item).err()?;
         } else {
-            self.try_send_main_or_return(item)?;
+            self.try_send_main(item)?;
         }
         None
     }
@@ -84,7 +84,7 @@ impl<T: Send> Sender<T> {
         self.queues.main_queue.push(item).await
     }
 
-    pub(crate) fn try_send_main_or_return(&self, item: T) -> Option<T> {
+    pub(crate) fn try_send_main(&self, item: T) -> Option<T> {
         self.queues.main_queue.try_push(item).err()?;
         None
     }
@@ -104,11 +104,11 @@ impl<T: Send> Sender<T> {
         }
     }
 
-    pub(crate) fn try_send_worker_or_return(&self, item: T) -> Option<T> {
+    pub(crate) fn try_send_worker(&self, item: T) -> Option<T> {
         if let Some(ref q) = self.queues.worker_queue {
             q.try_push(item).err()?;
         } else {
-            self.try_send_main_or_return(item)?;
+            self.try_send_main(item)?;
         }
         None
     }
