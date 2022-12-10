@@ -88,7 +88,7 @@ impl AsyncRuntime for Tokio {
     }
 }
 
-impl<M: Send + Sync + 'static> Channel<M> for BoundedChannel<M> {
+impl<M: Send + 'static> Channel<M> for BoundedChannel<M> {
     type Sender = tokio::sync::mpsc::Sender<M>;
     type Receiver = tokio::sync::mpsc::Receiver<M>;
 
@@ -97,7 +97,7 @@ impl<M: Send + Sync + 'static> Channel<M> for BoundedChannel<M> {
     }
 }
 
-impl<M: Send + Sync + 'static> Channel<M> for UnboundedChannel<M> {
+impl<M: Send + 'static> Channel<M> for UnboundedChannel<M> {
     type Sender = tokio::sync::mpsc::UnboundedSender<M>;
     type Receiver = tokio::sync::mpsc::UnboundedReceiver<M>;
 
@@ -107,7 +107,7 @@ impl<M: Send + Sync + 'static> Channel<M> for UnboundedChannel<M> {
 }
 
 #[async_trait]
-impl<M: Send + Sync + 'static> ChannelSender<M> for tokio::sync::mpsc::Sender<M> {
+impl<M: Send + 'static> ChannelSender<M> for tokio::sync::mpsc::Sender<M> {
     async fn send(&self, msg: M) -> Result<(), SendError<M>> {
         Ok((&*self).send(msg).await.map_err(|e| SendError(e.0))?)
     }
@@ -121,7 +121,7 @@ impl<M: Send + Sync + 'static> ChannelSender<M> for tokio::sync::mpsc::Sender<M>
 }
 
 #[async_trait]
-impl<M: Send + Sync + 'static> ChannelReceiver<M> for tokio::sync::mpsc::Receiver<M> {
+impl<M: Send + 'static> ChannelReceiver<M> for tokio::sync::mpsc::Receiver<M> {
     async fn recv(&mut self) -> JlrsResult<M> {
         match self.recv().await {
             Some(m) => Ok(m),
@@ -131,7 +131,7 @@ impl<M: Send + Sync + 'static> ChannelReceiver<M> for tokio::sync::mpsc::Receive
 }
 
 #[async_trait]
-impl<M: Send + Sync + 'static> ChannelSender<M> for tokio::sync::mpsc::UnboundedSender<M> {
+impl<M: Send + 'static> ChannelSender<M> for tokio::sync::mpsc::UnboundedSender<M> {
     async fn send(&self, msg: M) -> Result<(), SendError<M>> {
         Ok((&*self).send(msg).map_err(|e| SendError(e.0))?)
     }
@@ -142,7 +142,7 @@ impl<M: Send + Sync + 'static> ChannelSender<M> for tokio::sync::mpsc::Unbounded
 }
 
 #[async_trait]
-impl<M: Send + Sync + 'static> ChannelReceiver<M> for tokio::sync::mpsc::UnboundedReceiver<M> {
+impl<M: Send + 'static> ChannelReceiver<M> for tokio::sync::mpsc::UnboundedReceiver<M> {
     async fn recv(&mut self) -> JlrsResult<M> {
         match self.recv().await {
             Some(m) => Ok(m),

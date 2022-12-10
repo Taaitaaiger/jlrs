@@ -65,7 +65,7 @@ impl AsyncRuntime for AsyncStd {
     }
 }
 
-impl<M: Send + Sync + 'static> Channel<M> for (Sender<M>, Receiver<M>) {
+impl<M: Send + 'static> Channel<M> for (Sender<M>, Receiver<M>) {
     type Sender = Sender<M>;
     type Receiver = Receiver<M>;
 
@@ -78,7 +78,7 @@ impl<M: Send + Sync + 'static> Channel<M> for (Sender<M>, Receiver<M>) {
 }
 
 #[async_trait]
-impl<M: Send + Sync + 'static> ChannelSender<M> for Sender<M> {
+impl<M: Send + 'static> ChannelSender<M> for Sender<M> {
     async fn send(&self, msg: M) -> Result<(), SendError<M>> {
         Ok((&*self).send(msg).await.map_err(|e| SendError(e.0))?)
     }
@@ -92,7 +92,7 @@ impl<M: Send + Sync + 'static> ChannelSender<M> for Sender<M> {
 }
 
 #[async_trait]
-impl<M: Send + Sync + 'static> ChannelReceiver<M> for Receiver<M> {
+impl<M: Send + 'static> ChannelReceiver<M> for Receiver<M> {
     async fn recv(&mut self) -> JlrsResult<M> {
         match (&*self).recv().await {
             Ok(m) => Ok(m),
@@ -101,7 +101,7 @@ impl<M: Send + Sync + 'static> ChannelReceiver<M> for Receiver<M> {
     }
 }
 
-impl<M: Send + Sync + 'static> OneshotSender<M> for Sender<M> {
+impl<M: Send + 'static> OneshotSender<M> for Sender<M> {
     fn send(self, msg: M) {
         (&self).send_blocking(msg).ok();
     }
