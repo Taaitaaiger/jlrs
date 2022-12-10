@@ -453,7 +453,6 @@ where
         receiver: Receiver<Message>,
     ) -> JlrsResult<()> {
         unsafe {
-            println!("start");
             if jl_is_initialized() != 0 || INIT.swap(true, Ordering::SeqCst) {
                 Err(RuntimeError::AlreadyInitialized)?;
             }
@@ -466,9 +465,8 @@ where
                 }
             }
 
-            /*#[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
+            #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
             {
-                println!("set threads {} {}", builder.n_threads, builder.n_threadsi);
                 if builder.n_threadsi != 0 {
                     if builder.n_threads == 0 {
                         jl_options.nthreads = -1;
@@ -495,7 +493,7 @@ where
                     let perthread = Box::new(n_threads);
                     jl_options.nthreads_per_pool = Box::leak(perthread) as *const _;
                 }
-            }*/
+            }
 
             if let Some((ref julia_bindir, ref image_path)) = builder.builder.image {
                 let julia_bindir_str = julia_bindir.to_string_lossy().to_string();
@@ -518,9 +516,7 @@ where
 
                 jl_init_with_image(bindir.as_ptr(), im_rel_path.as_ptr());
             } else {
-                println!("pre-init");
                 jl_init();
-                println!("post-init");
             }
         }
 
@@ -536,7 +532,6 @@ where
         receiver: Receiver<Message>,
         base_frame: &'ctx mut StackFrame<N>,
     ) -> Result<(), Box<JlrsError>> {
-        println!("inner");
         let base_frame: &'static mut StackFrame<N> = std::mem::transmute(base_frame);
         let mut pinned = base_frame.pin();
         let base_frame = pinned.stack_frame();
@@ -567,7 +562,6 @@ where
         let mut workers = Vec::with_capacity(builder.n_workers);
         #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
         for i in 0..builder.n_workers {
-            println!("worker");
             let worker = init_worker::<R, N>(i, recv_timeout, receiver.clone());
             workers.push(worker)
         }
@@ -576,8 +570,6 @@ where
         jl_enter_threaded_region();
 
         loop {
-            println!("tick");
-
             if free_stacks.borrow().len() == 0 {
                 jl_process_events();
                 R::yield_now().await;

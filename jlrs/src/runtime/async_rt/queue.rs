@@ -68,7 +68,7 @@ impl<T: Send> Sender<T> {
         if let Some(ref q) = self.queues.any_queue {
             q.try_push(item).err()?;
         } else {
-            self.try_send_worker_or_return(item)?;
+            self.try_send_main_or_return(item)?;
         }
         None
     }
@@ -108,7 +108,7 @@ impl<T: Send> Sender<T> {
         if let Some(ref q) = self.queues.worker_queue {
             q.try_push(item).err()?;
         } else {
-            self.try_send_worker_or_return(item)?;
+            self.try_send_main_or_return(item)?;
         }
         None
     }
