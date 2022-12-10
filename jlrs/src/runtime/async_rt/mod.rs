@@ -24,6 +24,7 @@
 pub mod adopted;
 #[cfg(feature = "async-std-rt")]
 pub mod async_std_rt;
+pub mod dispatch;
 pub mod queue;
 #[cfg(feature = "tokio-rt")]
 pub mod tokio_rt;
@@ -51,9 +52,13 @@ use jl_sys::{jl_enter_threaded_region, jl_exit_threaded_region};
 
 #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
 use self::adopted::init_worker;
-use self::queue::{channel, Receiver, Sender};
+use self::{
+    dispatch::Dispatch,
+    queue::{channel, Receiver, Sender},
+};
 use crate::{
     async_util::{
+        affinity::{Affinity, DispatchAny, DispatchMain},
         channel::{Channel, ChannelSender, OneshotSender, TrySendError},
         envelopes::{
             BlockingTask, BlockingTaskEnvelope, CallPersistentTask, IncludeTask,
@@ -62,7 +67,7 @@ use crate::{
             SetErrorColorTaskEnvelope, Task,
         },
         future::wake_task,
-        task::{sleep, Affinity, AsyncTask, PersistentTask},
+        task::{sleep, AsyncTask, PersistentTask},
     },
     data::managed::{module::Module, value::Value},
     error::{IOError, JlrsError, JlrsResult, RuntimeError},
@@ -116,7 +121,7 @@ impl<E> IntoResult<JlrsResult<()>, E> for Result<JlrsResult<()>, E> {
 /// If you want to use async-std or tokio you can use one of the implementations provided by
 /// jlrs. If you want to use a custom executor you can implement this trait.
 #[async_trait(?Send)]
-pub trait AsyncRuntime: Send + 'static {
+pub trait AsyncRuntime: Send + Sync + 'static {
     /// Error that is returned when a task can't be joined because it has panicked.
     type JoinError;
 
@@ -172,13 +177,12 @@ pub trait AsyncRuntime: Send + 'static {
 ///
 /// This handle can be used to include files and send new tasks to the runtime. The runtime shuts
 /// down when the last handle is dropped and all active tasks have completed.
-pub struct AsyncJulia<R>
-where
-    R: AsyncRuntime,
-{
+pub struct AsyncJulia<R> {
     sender: Sender<Message>,
     _runtime: PhantomData<R>,
 }
+
+impl<R: AsyncRuntime> RequireSendSync for AsyncJulia<R> {}
 
 impl<R> AsyncJulia<R>
 where
@@ -188,7 +192,10 @@ where
     ///
     /// No tasks are dropped if the queue is shrunk. This method return a future that doesn´t
     /// resolve until the queue can be resized without dropping any tasks.
-    pub fn resize_queue<'own>(&'own self, capacity: usize) -> impl 'own + Future<Output = ()> {
+    pub fn resize_queue<'own>(
+        &'own self,
+        capacity: usize,
+    ) -> Option<impl 'own + Future<Output = ()>> {
         self.sender.resize_queue(capacity)
     }
 
@@ -196,8 +203,12 @@ where
     ///
     /// See [`AsyncJulia::resize_queue`] for more info, the only difference is that this is an
     /// async method.
-    pub async fn resize_queue_async(&self, capacity: usize) {
-        self.resize_queue(capacity).await
+    pub async fn resize_queue_async(&self, capacity: usize) -> Option<()> {
+        if let Some(fut) = self.resize_queue(capacity) {
+            Some(fut.await)
+        } else {
+            None
+        }
     }
 
     /// Resize the task queue of the main runtime thread.
@@ -208,7 +219,7 @@ where
         self.sender.resize_main_queue(capacity)
     }
 
-    /// Resize the task queue of the main runtime thread.
+    /// Resize the task queue of the worker threads.
     ///
     /// See [`AsyncJulia::resize_main_queue`] for more info, the only difference is that this is an
     /// async method.
@@ -216,34 +227,43 @@ where
         self.resize_main_queue(capacity).await
     }
 
+    /// Resize the task queue of the worker threads.
+    ///
+    /// No tasks are dropped if the queue is shrunk. This method return a future that doesn´t
+    /// resolve until the queue can be resized without dropping any tasks.
+    pub fn resize_worker_queue<'own>(
+        &'own self,
+        capacity: usize,
+    ) -> Option<impl 'own + Future<Output = ()>> {
+        self.sender.resize_worker_queue(capacity)
+    }
+
+    /// Resize the task queue of the main runtime thread.
+    ///
+    /// See [`AsyncJulia::resize_main_queue`] for more info, the only difference is that this is an
+    /// async method.
+    pub async fn resize_worker_queue_async(&self, capacity: usize) -> Option<()> {
+        if let Some(fut) = self.resize_worker_queue(capacity) {
+            Some(fut.await)
+        } else {
+            None
+        }
+    }
+
     /// Send a new async task to the runtime.
     ///
     /// This method waits if there's no room in the channel. It takes two arguments, the task and
     /// the sending half of a channel which is used to send the result back after the task has
     /// completed.
-    pub async fn task<A, O>(&self, task: A, res_sender: O)
+    pub fn task<A, O>(&self, task: A, res_sender: O) -> Dispatch<A::Affinity>
     where
         A: AsyncTask,
         O: OneshotSender<JlrsResult<A::Output>>,
     {
-        let msg = PendingTask::<_, _, Task>::new(task, res_sender);
-        let boxed = Box::new(msg);
-        A::AFFINITY.schedule(&self.sender, boxed).await
-    }
-
-    /// Try to send a new async task to the runtime.
-    ///
-    /// If there's no room in the backing channel an error is returned immediately. This method
-    /// takes two arguments, the task and the sending half of a channel which is used to send the
-    /// result back after the task has completed.
-    pub fn try_task<A, O>(&self, task: A, res_sender: O) -> JlrsResult<()>
-    where
-        A: AsyncTask,
-        O: OneshotSender<JlrsResult<A::Output>>,
-    {
-        let msg = PendingTask::<_, _, Task>::new(task, res_sender);
-        let boxed = Box::new(msg);
-        A::AFFINITY.try_schedule(&self.sender, boxed)
+        let pending_task = PendingTask::<_, _, Task>::new(task, res_sender);
+        let boxed = Box::new(pending_task);
+        let msg = MessageInner::Task(boxed).wrap();
+        Dispatch::new(&self.sender, msg)
     }
 
     /// Register an async task.
@@ -251,112 +271,73 @@ where
     /// This method waits if there's no room in the channel. It takes one argument, the sending
     /// half of a channel which is used to send the result back after the registration has
     /// completed.
-    pub async fn register_task<A, O>(&self, res_sender: O)
+    pub fn register_task<A, O>(&self, res_sender: O) -> Dispatch<A::Affinity>
     where
         A: AsyncTask,
         O: OneshotSender<JlrsResult<()>>,
     {
-        let msg = PendingTask::<_, A, RegisterTask>::new(res_sender);
-        let boxed = Box::new(msg);
-        A::AFFINITY.schedule(&self.sender, boxed).await
-    }
-
-    /// Try to register an async task.
-    ///
-    /// If there's no room in the channel an error is returned immediately. This method takes one
-    /// argument, the sending half of a channel which is used to send the result back after the
-    /// registration has completed.
-    pub fn try_register_task<A, O>(&self, res_sender: O) -> JlrsResult<()>
-    where
-        A: AsyncTask,
-        O: OneshotSender<JlrsResult<()>>,
-    {
-        let msg = PendingTask::<_, A, RegisterTask>::new(res_sender);
-        let boxed = Box::new(msg);
-        A::AFFINITY.try_schedule(&self.sender, boxed)
+        let pending_task = PendingTask::<_, A, RegisterTask>::new(res_sender);
+        let boxed = Box::new(pending_task);
+        let msg = MessageInner::Task(boxed).wrap();
+        Dispatch::new(&self.sender, msg)
     }
 
     /// Send a new blocking task to the runtime.
     ///
     /// This method waits if there's no room in the channel. It takes two arguments, the first is
-    /// a closure that takes a `GcFrame` and must return a `JlrsResult` whose inner type is both
-    /// `Send` and `Sync`. The second is the sending half of a channel which is used to send the
+    /// a closure that takes a `GcFrame` and must return a `JlrsResult` whose inner type implements
+    /// `Send`. The second is the sending half of a channel which is used to send the
     /// result back after the task has completed. This task is executed as soon as possible and
     /// can't call async methods, so it blocks the runtime.
-    pub async fn blocking_task<T, O, F>(&self, task: F, res_sender: O, affinity: Affinity)
+    pub fn blocking_task<T, O, F>(&self, task: F, res_sender: O) -> Dispatch<DispatchAny>
     where
-        for<'base> F: 'static + Send + Sync + FnOnce(GcFrame<'base>) -> JlrsResult<T>,
+        for<'base> F: 'static + Send + FnOnce(GcFrame<'base>) -> JlrsResult<T>,
         O: OneshotSender<JlrsResult<T>>,
-        T: Send + Sync + 'static,
+        T: Send + 'static,
     {
-        let msg = BlockingTask::new(task, res_sender);
-        let boxed = Box::new(msg);
-        affinity.schedule_blocking(&self.sender, boxed).await
+        let pending_task = BlockingTask::new(task, res_sender);
+        let boxed = Box::new(pending_task);
+        let msg = MessageInner::BlockingTask(boxed).wrap();
+        Dispatch::new(&self.sender, msg)
     }
 
-    /// Try to send a new blocking task to the runtime.
+    /// Send a new blocking task to the runtime.
     ///
-    /// If there's no room in the backing channel an error is returned immediately. This method
-    /// takes two arguments, the first is a closure that takes a `GcFrame` and must return a
-    /// `JlrsResult` whose inner type is both `Send` and `Sync`. The second is the sending half of
-    /// a channel which is used to send the  result back after the task has completed. This task
-    /// is executed as soon as possible and can't call async methods, so it blocks the runtime.
-    pub fn try_blocking_task<T, O, F>(
-        &self,
-        task: F,
-        res_sender: O,
-        affinity: Affinity,
-    ) -> JlrsResult<()>
+    /// This method waits if there's no room in the channel. It takes two arguments, the first is
+    /// a closure that takes a `GcFrame` and must return a `JlrsResult` whose inner type implements
+    /// `Send`. The second is the sending half of a channel which is used to send the
+    /// result back after the task has completed. This task is executed as soon as possible and
+    /// can't call async methods, so it blocks the runtime.
+    pub fn blocking_task_with_affinity<A, T, O, F>(&self, task: F, res_sender: O) -> Dispatch<A>
     where
-        for<'base> F: 'static + Send + Sync + FnOnce(GcFrame<'base>) -> JlrsResult<T>,
+        A: Affinity,
+        for<'base> F: 'static + Send + FnOnce(GcFrame<'base>) -> JlrsResult<T>,
         O: OneshotSender<JlrsResult<T>>,
-        T: Send + Sync + 'static,
+        T: Send + 'static,
     {
-        let msg = BlockingTask::new(task, res_sender);
-        let boxed = Box::new(msg);
-        affinity.try_schedule_blocking(&self.sender, boxed)
+        let pending_task = BlockingTask::new(task, res_sender);
+        let boxed = Box::new(pending_task);
+        let msg = MessageInner::BlockingTask(boxed).wrap();
+        Dispatch::new(&self.sender, msg)
     }
 
     /// Send a new blocking task to the runtime and schedule it on another thread.
     ///
     /// This method waits if there's no room in the channel. It takes two arguments, the first is
-    /// a closure that takes a `GcFrame` and must return a `JlrsResult` whose inner type is both
-    /// `Send` and `Sync`. The second is the sending half of a channel which is used to send the
+    /// a closure that takes a `GcFrame` and must return a `JlrsResult` whose inner type implements
+    /// `Send`. The second is the sending half of a channel which is used to send the
     /// result back after the task has completed. This task not called directly, but executed in
     /// a spawned task.
-    pub async fn post_blocking_task<T, O, F>(&self, task: F, res_sender: O, affinity: Affinity)
+    pub fn post_blocking_task<T, O, F>(&self, task: F, res_sender: O) -> Dispatch<DispatchAny>
     where
-        for<'base> F: 'static + Send + Sync + FnOnce(GcFrame<'base>) -> JlrsResult<T>,
+        for<'base> F: 'static + Send + FnOnce(GcFrame<'base>) -> JlrsResult<T>,
         O: OneshotSender<JlrsResult<T>>,
-        T: Send + Sync + 'static,
+        T: Send + 'static,
     {
-        let msg = BlockingTask::new(task, res_sender);
-        let boxed = Box::new(msg);
-
-        affinity.schedule_post_blocking(&self.sender, boxed).await
-    }
-
-    /// Try to send a new blocking task to the runtime and schedule it on another thread.
-    ///
-    /// If there's no room in the backing channel an error is returned immediately. This method
-    /// takes two arguments, the first is a closure that takes a `GcFrame` and must return a
-    /// `JlrsResult` whose inner type is both `Send` and `Sync`. The second is the sending half of
-    /// a channel which is used to send the  result back after the task has completed. This task
-    /// not called directly, but executed in a spawned task.
-    pub fn try_post_blocking_task<T, O, F>(
-        &self,
-        task: F,
-        res_sender: O,
-        affinity: Affinity,
-    ) -> JlrsResult<()>
-    where
-        for<'base> F: 'static + Send + Sync + FnOnce(GcFrame<'base>) -> JlrsResult<T>,
-        O: OneshotSender<JlrsResult<T>>,
-        T: Send + Sync + 'static,
-    {
-        let msg = BlockingTask::new(task, res_sender);
-        let boxed = Box::new(msg);
-        affinity.try_schedule_post_blocking(&self.sender, boxed)
+        let pending_task = BlockingTask::new(task, res_sender);
+        let boxed = Box::new(pending_task);
+        let msg = MessageInner::PostBlockingTask(boxed).wrap();
+        Dispatch::new(&self.sender, msg)
     }
 
     /// Send a new persistent task to the runtime.
@@ -365,40 +346,19 @@ where
     /// and a `OneshotSender` to send a [`PersistentHandle`] after the task's `init` method has
     /// completed. You must also provide an implementation of [`Channel`] as a type parameter.
     /// This channel is used by the handle to communicate with the persistent task.
-    pub async fn persistent<C, P, O>(&self, task: P, handle_sender: O)
+    pub fn persistent<C, P, O>(&self, task: P, handle_sender: O) -> Dispatch<P::Affinity>
     where
         C: Channel<PersistentMessage<P>>,
         P: PersistentTask,
         O: OneshotSender<JlrsResult<PersistentHandle<P>>>,
     {
-        let msg = PendingTask::<_, _, Persistent>::new(
+        let pending_task = PendingTask::<_, _, Persistent>::new(
             task,
             PersistentComms::<C, _, _>::new(handle_sender),
         );
-        let boxed = Box::new(msg);
-
-        P::AFFINITY.schedule(&self.sender, boxed).await
-    }
-
-    /// Try to send a new persistent task to the runtime.
-    ///
-    /// If there's no room in the backing channel an error is returned immediately. This method
-    /// takes a two arguments, the task  and a `OneshotSender` to send a [`PersistentHandle`]
-    /// after the task's `init` method has completed. You must also provide an implementation of
-    /// [`Channel`] as a type parameter. This channel is used by the handle to communicate with
-    /// the persistent task.
-    pub fn try_persistent<C, P, O>(&self, task: P, handle_sender: O) -> JlrsResult<()>
-    where
-        C: Channel<PersistentMessage<P>>,
-        P: PersistentTask,
-        O: OneshotSender<JlrsResult<PersistentHandle<P>>>,
-    {
-        let msg = PendingTask::<_, _, Persistent>::new(
-            task,
-            PersistentComms::<C, _, _>::new(handle_sender),
-        );
-        let boxed = Box::new(msg);
-        P::AFFINITY.try_schedule(&self.sender, boxed)
+        let boxed = Box::new(pending_task);
+        let msg = MessageInner::Task(boxed).wrap();
+        Dispatch::new(&self.sender, msg)
     }
 
     /// Register a persistent task.
@@ -406,29 +366,15 @@ where
     /// This method waits if there's no room in the channel. It takes one argument, the sending
     /// half of a channel which is used to send the result back after the registration has
     /// completed.
-    pub async fn register_persistent<P, O>(&self, res_sender: O)
+    pub fn register_persistent<P, O>(&self, res_sender: O) -> Dispatch<P::Affinity>
     where
         P: PersistentTask,
         O: OneshotSender<JlrsResult<()>>,
     {
-        let msg = PendingTask::<_, P, RegisterPersistent>::new(res_sender);
-        let boxed = Box::new(msg);
-        P::AFFINITY.schedule(&self.sender, boxed).await
-    }
-
-    /// Try to register a persistent task.
-    ///
-    /// If there's no room in the channel an error is returned immediately. This method takes one
-    /// argument, the sending half of a channel which is used to send the result back after the
-    /// registration has completed.
-    pub fn try_register_persistent<P, O>(&self, res_sender: O) -> JlrsResult<()>
-    where
-        P: PersistentTask,
-        O: OneshotSender<JlrsResult<()>>,
-    {
-        let msg = PendingTask::<_, P, RegisterPersistent>::new(res_sender);
-        let boxed = Box::new(msg);
-        P::AFFINITY.try_schedule(&self.sender, boxed)
+        let pending_task = PendingTask::<_, P, RegisterPersistent>::new(res_sender);
+        let boxed = Box::new(pending_task);
+        let msg = MessageInner::Task(boxed).wrap();
+        Dispatch::new(&self.sender, msg)
     }
 
     /// Include a Julia file by calling `Main.include` as a blocking task.
@@ -439,7 +385,7 @@ where
     ///
     /// Safety: this method evaluates the contents of the file if it exists, which can't be
     /// checked for correctness.
-    pub async unsafe fn include<P, O>(&self, path: P, res_sender: O) -> JlrsResult<()>
+    pub unsafe fn include<P, O>(&self, path: P, res_sender: O) -> JlrsResult<Dispatch<DispatchMain>>
     where
         P: AsRef<Path>,
         O: OneshotSender<JlrsResult<()>>,
@@ -450,38 +396,9 @@ where
             })?
         }
 
-        let msg = IncludeTask::new(path.as_ref().into(), res_sender);
-
-        self.sender
-            .send_main(MessageInner::Include(Box::new(msg)).wrap())
-            .await;
-
-        Ok(())
-    }
-
-    /// Try to include a Julia file by calling `Main.include` as a blocking task.
-    ///
-    /// If there's no room in the channel an error is returned immediately. This method takes two
-    /// arguments, the path to the file and the sending half of a channel which is used to send
-    /// the result back after the file has been included.
-    ///
-    /// Safety: this method evaluates the contents of the file if it exists, which can't be
-    /// checked for correctness.
-    pub unsafe fn try_include<P, O>(&self, path: P, res_sender: O) -> JlrsResult<()>
-    where
-        P: AsRef<Path>,
-        O: OneshotSender<JlrsResult<()>>,
-    {
-        if !path.as_ref().exists() {
-            Err(IOError::NotFound {
-                path: path.as_ref().to_string_lossy().into(),
-            })?
-        }
-
-        let msg = IncludeTask::new(path.as_ref().into(), res_sender);
-
-        self.sender
-            .try_send_main(MessageInner::Include(Box::new(msg)).wrap())
+        let pending_task = IncludeTask::new(path.as_ref().into(), res_sender);
+        let msg = MessageInner::Include(Box::new(pending_task)).wrap();
+        Ok(Dispatch::new(&self.sender, msg))
     }
 
     /// Enable or disable colored error messages originating from Julia as a blocking task.
@@ -491,37 +408,20 @@ where
     /// to send the result back after the option is set.
     ///
     /// This feature is disabled by default.
-    pub async fn error_color<O>(&self, enable: bool, res_sender: O)
+    pub fn error_color<O>(&self, enable: bool, res_sender: O) -> Dispatch<DispatchMain>
     where
         O: OneshotSender<JlrsResult<()>>,
     {
-        let msg = SetErrorColorTask::new(enable, res_sender);
-
-        self.sender
-            .send_main(MessageInner::ErrorColor(Box::new(msg)).wrap())
-            .await
-    }
-
-    /// Try to enable or disable colored error messages originating from Julia as a blocking task.
-    ///
-    /// If there's no room in the channel an error is returned immediately. This method takes two
-    /// arguments, a `bool` to enable or disable colored error messages and the sending half of a
-    /// channel which is used to send the result back after the option is set.
-    ///
-    /// This feature is disabled by default.
-    pub fn try_error_color<O>(&self, enable: bool, res_sender: O) -> JlrsResult<()>
-    where
-        O: OneshotSender<JlrsResult<()>>,
-    {
-        let msg = SetErrorColorTask::new(enable, res_sender);
-        self.sender
-            .try_send_main(MessageInner::ErrorColor(Box::new(msg)).wrap())
+        let pending_task = SetErrorColorTask::new(enable, res_sender);
+        let msg = MessageInner::ErrorColor(Box::new(pending_task)).wrap();
+        Dispatch::new(&self.sender, msg)
     }
 
     pub(crate) unsafe fn init<const N: usize>(
         builder: AsyncRuntimeBuilder<R>,
     ) -> JlrsResult<(Self, std::thread::JoinHandle<JlrsResult<()>>)> {
-        let (sender, receiver) = channel(builder.channel_capacity.get());
+        let has_workers = builder.has_workers();
+        let (sender, receiver) = channel(builder.channel_capacity.get(), has_workers);
         let handle = R::spawn_thread(move || Self::run_async::<N>(builder, receiver));
 
         let julia = AsyncJulia {
@@ -536,7 +436,8 @@ where
     pub(crate) unsafe fn init_async<const N: usize>(
         builder: AsyncRuntimeBuilder<R>,
     ) -> JlrsResult<(Self, R::RuntimeHandle)> {
-        let (sender, receiver) = channel(builder.channel_capacity.get());
+        let has_workers = builder.has_workers();
+        let (sender, receiver) = channel(builder.channel_capacity.get(), has_workers);
         let handle = R::spawn_blocking(move || Self::run_async::<N>(builder, receiver));
 
         let julia = AsyncJulia {
@@ -552,6 +453,7 @@ where
         receiver: Receiver<Message>,
     ) -> JlrsResult<()> {
         unsafe {
+            println!("start");
             if jl_is_initialized() != 0 || INIT.swap(true, Ordering::SeqCst) {
                 Err(RuntimeError::AlreadyInitialized)?;
             }
@@ -564,8 +466,9 @@ where
                 }
             }
 
-            #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
+            /*#[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
             {
+                println!("set threads {} {}", builder.n_threads, builder.n_threadsi);
                 if builder.n_threadsi != 0 {
                     if builder.n_threads == 0 {
                         jl_options.nthreads = -1;
@@ -592,7 +495,7 @@ where
                     let perthread = Box::new(n_threads);
                     jl_options.nthreads_per_pool = Box::leak(perthread) as *const _;
                 }
-            }
+            }*/
 
             if let Some((ref julia_bindir, ref image_path)) = builder.builder.image {
                 let julia_bindir_str = julia_bindir.to_string_lossy().to_string();
@@ -615,7 +518,9 @@ where
 
                 jl_init_with_image(bindir.as_ptr(), im_rel_path.as_ptr());
             } else {
+                println!("pre-init");
                 jl_init();
+                println!("post-init");
             }
         }
 
@@ -631,6 +536,7 @@ where
         receiver: Receiver<Message>,
         base_frame: &'ctx mut StackFrame<N>,
     ) -> Result<(), Box<JlrsError>> {
+        println!("inner");
         let base_frame: &'static mut StackFrame<N> = std::mem::transmute(base_frame);
         let mut pinned = base_frame.pin();
         let base_frame = pinned.stack_frame();
@@ -661,6 +567,7 @@ where
         let mut workers = Vec::with_capacity(builder.n_workers);
         #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
         for i in 0..builder.n_workers {
+            println!("worker");
             let worker = init_worker::<R, N>(i, recv_timeout, receiver.clone());
             workers.push(worker)
         }
@@ -669,6 +576,8 @@ where
         jl_enter_threaded_region();
 
         loop {
+            println!("tick");
+
             if free_stacks.borrow().len() == 0 {
                 jl_process_events();
                 R::yield_now().await;
@@ -785,6 +694,8 @@ impl fmt::Debug for Message {
     }
 }
 
+unsafe impl Sync for Message {}
+
 impl MessageInner {
     pub(crate) fn wrap(self) -> Message {
         Message { inner: self }
@@ -820,6 +731,8 @@ where
 {
     pub(crate) msg: InnerPersistentMessage<P>,
 }
+
+unsafe impl<P> Sync for PersistentMessage<P> where P: PersistentTask {}
 
 impl<P> fmt::Debug for PersistentMessage<P>
 where
@@ -899,7 +812,7 @@ where
     }
 }
 
-pub trait RequireSendSync: 'static + Send {}
+trait RequireSendSync: 'static + Send + Sync {}
 
 // Ensure the handle can be shared across threads
 impl<P: PersistentTask> RequireSendSync for PersistentHandle<P> {}

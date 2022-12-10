@@ -36,8 +36,8 @@ pub(crate) enum RegisterPersistent {}
 
 pub(crate) struct CallPersistentTask<I, O, S>
 where
-    I: Send + Sync,
-    O: Send + Sync + 'static,
+    I: Send,
+    O: Send + 'static,
     S: OneshotSender<JlrsResult<O>>,
 {
     pub(crate) sender: S,
@@ -118,7 +118,7 @@ where
     }
 }
 
-pub(crate) trait CallPersistentTaskEnvelope: Send + Sync {
+pub(crate) trait CallPersistentTaskEnvelope: Send {
     type Input;
     type Output;
 
@@ -128,8 +128,8 @@ pub(crate) trait CallPersistentTaskEnvelope: Send + Sync {
 
 impl<I, O, S> CallPersistentTaskEnvelope for CallPersistentTask<I, O, S>
 where
-    I: Send + Sync,
-    O: Send + Sync,
+    I: Send,
+    O: Send,
     S: OneshotSender<JlrsResult<O>>,
 {
     type Input = I;
@@ -373,9 +373,9 @@ pub(crate) struct BlockingTask<F, O, T> {
 
 impl<F, O, T> BlockingTask<F, O, T>
 where
-    for<'base> F: Send + Sync + FnOnce(GcFrame<'base>) -> JlrsResult<T>,
+    for<'base> F: Send + FnOnce(GcFrame<'base>) -> JlrsResult<T>,
     O: OneshotSender<JlrsResult<T>>,
-    T: Send + Sync + 'static,
+    T: Send + 'static,
 {
     pub(crate) fn new(func: F, sender: O) -> Self {
         Self {
@@ -395,7 +395,7 @@ where
 }
 
 #[async_trait(?Send)]
-pub(crate) trait BlockingTaskEnvelope: Send + Sync {
+pub(crate) trait BlockingTaskEnvelope: Send {
     fn call<'scope>(self: Box<Self>, stack: &'scope Stack);
 
     async fn post<'scope>(self: Box<Self>, stack: &'scope Stack);
@@ -404,9 +404,9 @@ pub(crate) trait BlockingTaskEnvelope: Send + Sync {
 #[async_trait(?Send)]
 impl<F, O, T> BlockingTaskEnvelope for BlockingTask<F, O, T>
 where
-    for<'base> F: Send + Sync + FnOnce(GcFrame<'base>) -> JlrsResult<T>,
+    for<'base> F: Send + FnOnce(GcFrame<'base>) -> JlrsResult<T>,
     O: OneshotSender<JlrsResult<T>>,
-    T: Send + Sync + 'static,
+    T: Send + 'static,
 {
     fn call<'scope>(self: Box<Self>, stack: &'scope Stack) {
         // Safety: the stack slots can be reallocated because it doesn't contain any frames
@@ -489,7 +489,7 @@ where
     }
 }
 
-pub(crate) trait IncludeTaskEnvelope: Send + Sync {
+pub(crate) trait IncludeTaskEnvelope: Send {
     fn call(self: Box<Self>, stack: &'static Stack);
 }
 
@@ -553,7 +553,7 @@ where
     }
 }
 
-pub(crate) trait SetErrorColorTaskEnvelope: Send + Sync {
+pub(crate) trait SetErrorColorTaskEnvelope: Send {
     fn call(self: Box<Self>, stack: &'static Stack);
 }
 

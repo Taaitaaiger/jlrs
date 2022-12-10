@@ -18,6 +18,7 @@ impl PersistentTask for MyTask {
     type Input = ();
     type Output = ();
     type State<'state> = (PyPlot<'state>, Value<'state, 'static>);
+    type Affinity = DispatchMain;
 
     async fn register<'frame>(mut frame: AsyncGcFrame<'frame>) -> JlrsResult<()> {
         PyPlot::init(&mut frame);
@@ -99,7 +100,10 @@ async fn main() {
     {
         // Register MyTask, otherwise MyTask::init returns an error.
         let (s, r) = tokio::sync::oneshot::channel();
-        julia.register_persistent::<MyTask, _>(s).await;
+        julia
+            .register_persistent::<MyTask, _>(s)
+            .dispatch_main()
+            .await;
         r.await.unwrap().unwrap();
     }
 
@@ -114,6 +118,7 @@ async fn main() {
                 },
                 handle_sender,
             )
+            .dispatch_main()
             .await;
 
         handle_receiver

@@ -349,6 +349,8 @@
 //!     // The type of the result of this task if it succeeds.
 //!     type Output = u64;
 //!
+//!     type Affinity = DispatchAny;
+//!
 //!     // This async method replaces the closure from the previous examples,
 //!     // an `AsyncGcFrame` can be used the same way as a `GcFrame` but also
 //!     // can be used in combination with methods from the `CallAsync` trait.
@@ -405,6 +407,8 @@
 //!     type State<'state> = AccumulatorTaskState<'state>;
 //!     // The type of the additional data that the task must be called with.
 //!     type Input = usize;
+//!
+//!     type Affinity = DispatchAny;
 //!
 //!     // This method is called before the task can be called. Note that the
 //!     // lifetime of the frame is `'static`: the frame is not dropped until

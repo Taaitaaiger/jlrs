@@ -16,6 +16,7 @@ struct MyTask {
 impl AsyncTask for MyTask {
     // Different tasks can return different results. If successful, this task returns an `f64`.
     type Output = f64;
+    type Affinity = DispatchAny;
 
     // Include the custom code MyTask needs.
     async fn register<'base>(mut frame: AsyncGcFrame<'base>) -> JlrsResult<()> {
@@ -85,7 +86,10 @@ async fn main() {
     {
         // Include the custom code MyTask needs by registering it.
         let (sender, receiver) = tokio::sync::oneshot::channel();
-        julia.register_task::<MyTask, _>(sender).await;
+        julia
+            .register_task::<MyTask, _>(sender)
+            .dispatch_any()
+            .await;
         receiver.await.unwrap().unwrap();
     }
 
@@ -101,6 +105,7 @@ async fn main() {
             },
             sender1,
         )
+        .dispatch_any()
         .await;
 
     julia
@@ -111,6 +116,7 @@ async fn main() {
             },
             sender2,
         )
+        .dispatch_any()
         .await;
 
     // Receive the results of the tasks.

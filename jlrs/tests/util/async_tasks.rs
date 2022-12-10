@@ -8,6 +8,7 @@ pub struct MyTask {
 #[async_trait(?Send)]
 impl AsyncTask for MyTask {
     type Output = f64;
+    type Affinity = DispatchAny;
 
     async fn run<'base>(&mut self, mut frame: AsyncGcFrame<'base>) -> JlrsResult<Self::Output> {
         let dims = Value::new(&mut frame, self.dims);
@@ -38,6 +39,7 @@ pub struct OtherRetTypeTask {
 #[async_trait(?Send)]
 impl AsyncTask for OtherRetTypeTask {
     type Output = f32;
+    type Affinity = DispatchAny;
 
     async fn run<'base>(&mut self, mut frame: AsyncGcFrame<'base>) -> JlrsResult<Self::Output> {
         let dims = Value::new(&mut frame, self.dims);
@@ -68,6 +70,7 @@ pub struct KwTask {
 #[async_trait(?Send)]
 impl AsyncTask for KwTask {
     type Output = f32;
+    type Affinity = DispatchAny;
 
     async fn run<'base>(&mut self, mut frame: AsyncGcFrame<'base>) -> JlrsResult<Self::Output> {
         let dims = Value::new(&mut frame, self.dims);
@@ -97,6 +100,7 @@ pub struct ThrowingTask;
 #[async_trait(?Send)]
 impl AsyncTask for ThrowingTask {
     type Output = f32;
+    type Affinity = DispatchAny;
 
     async fn run<'base>(&mut self, mut frame: AsyncGcFrame<'base>) -> JlrsResult<Self::Output> {
         let v = unsafe {
@@ -123,6 +127,7 @@ pub struct NestingTaskAsyncFrame {
 #[async_trait(?Send)]
 impl AsyncTask for NestingTaskAsyncFrame {
     type Output = f64;
+    type Affinity = DispatchAny;
 
     async fn run<'base>(&mut self, mut frame: AsyncGcFrame<'base>) -> JlrsResult<Self::Output> {
         let dims = Value::new(&mut frame, self.dims);
@@ -157,6 +162,7 @@ pub struct NestingTaskAsyncValueFrame {
 #[async_trait(?Send)]
 impl AsyncTask for NestingTaskAsyncValueFrame {
     type Output = f64;
+    type Affinity = DispatchAny;
 
     async fn run<'base>(&mut self, mut frame: AsyncGcFrame<'base>) -> JlrsResult<Self::Output> {
         let output = frame.output();
@@ -194,6 +200,7 @@ pub struct NestingTaskAsyncCallFrame {
 #[async_trait(?Send)]
 impl AsyncTask for NestingTaskAsyncCallFrame {
     type Output = f64;
+    type Affinity = DispatchAny;
 
     async fn run<'base>(&mut self, mut frame: AsyncGcFrame<'base>) -> JlrsResult<Self::Output> {
         let output = frame.output();
@@ -238,6 +245,7 @@ pub struct NestingTaskAsyncGcFrame {
 #[async_trait(?Send)]
 impl AsyncTask for NestingTaskAsyncGcFrame {
     type Output = f64;
+    type Affinity = DispatchAny;
 
     async fn run<'base>(&mut self, mut frame: AsyncGcFrame<'base>) -> JlrsResult<Self::Output> {
         let dims = Value::new(&mut frame, self.dims);
@@ -272,6 +280,7 @@ pub struct NestingTaskAsyncDynamicValueFrame {
 #[async_trait(?Send)]
 impl AsyncTask for NestingTaskAsyncDynamicValueFrame {
     type Output = f64;
+    type Affinity = DispatchAny;
 
     async fn run<'base>(&mut self, mut frame: AsyncGcFrame<'base>) -> JlrsResult<Self::Output> {
         let output = frame.output();
@@ -309,6 +318,7 @@ pub struct NestingTaskAsyncDynamicCallFrame {
 #[async_trait(?Send)]
 impl AsyncTask for NestingTaskAsyncDynamicCallFrame {
     type Output = f64;
+    type Affinity = DispatchAny;
 
     async fn run<'base>(&mut self, mut frame: AsyncGcFrame<'base>) -> JlrsResult<Self::Output> {
         let output = frame.output();
@@ -354,6 +364,7 @@ impl PersistentTask for AccumulatorTask {
     type State<'state> = Value<'state, 'static>;
     type Input = f64;
     type Output = f64;
+    type Affinity = DispatchAny;
 
     const CHANNEL_CAPACITY: usize = 2;
 
@@ -417,6 +428,7 @@ pub struct LocalTask {
 #[async_trait(?Send)]
 impl AsyncTask for LocalTask {
     type Output = f32;
+    type Affinity = DispatchAny;
 
     async fn run<'base>(&mut self, mut frame: AsyncGcFrame<'base>) -> JlrsResult<Self::Output> {
         let dims = Value::new(&mut frame, self.dims);
@@ -446,6 +458,7 @@ pub struct LocalSchedulingTask {
 #[async_trait(?Send)]
 impl AsyncTask for LocalSchedulingTask {
     type Output = f32;
+    type Affinity = DispatchAny;
 
     async fn run<'base>(&mut self, mut frame: AsyncGcFrame<'base>) -> JlrsResult<Self::Output> {
         let dims = Value::new(&mut frame, self.dims);
@@ -479,6 +492,7 @@ pub struct MainTask {
 #[async_trait(?Send)]
 impl AsyncTask for MainTask {
     type Output = f32;
+    type Affinity = DispatchAny;
 
     async fn run<'base>(&mut self, mut frame: AsyncGcFrame<'base>) -> JlrsResult<Self::Output> {
         let dims = Value::new(&mut frame, self.dims);
@@ -508,6 +522,7 @@ pub struct MainSchedulingTask {
 #[async_trait(?Send)]
 impl AsyncTask for MainSchedulingTask {
     type Output = f32;
+    type Affinity = DispatchAny;
 
     async fn run<'base>(&mut self, mut frame: AsyncGcFrame<'base>) -> JlrsResult<Self::Output> {
         let dims = Value::new(&mut frame, self.dims);
@@ -541,6 +556,7 @@ pub struct SchedulingTask {
 #[async_trait(?Send)]
 impl AsyncTask for SchedulingTask {
     type Output = f32;
+    type Affinity = DispatchAny;
 
     async fn run<'base>(&mut self, mut frame: AsyncGcFrame<'base>) -> JlrsResult<Self::Output> {
         let dims = Value::new(&mut frame, self.dims);
@@ -574,6 +590,7 @@ pub struct LocalKwSchedulingTask {
 #[async_trait(?Send)]
 impl AsyncTask for LocalKwSchedulingTask {
     type Output = f32;
+    type Affinity = DispatchAny;
 
     async fn run<'base>(&mut self, mut frame: AsyncGcFrame<'base>) -> JlrsResult<Self::Output> {
         let dims = Value::new(&mut frame, self.dims);
@@ -611,6 +628,7 @@ pub struct KwSchedulingTask {
 #[async_trait(?Send)]
 impl AsyncTask for KwSchedulingTask {
     type Output = f32;
+    type Affinity = DispatchAny;
 
     async fn run<'base>(&mut self, mut frame: AsyncGcFrame<'base>) -> JlrsResult<Self::Output> {
         let dims = Value::new(&mut frame, self.dims);
@@ -648,6 +666,7 @@ pub struct MainKwSchedulingTask {
 #[async_trait(?Send)]
 impl AsyncTask for MainKwSchedulingTask {
     type Output = f32;
+    type Affinity = DispatchAny;
 
     async fn run<'base>(&mut self, mut frame: AsyncGcFrame<'base>) -> JlrsResult<Self::Output> {
         let dims = Value::new(&mut frame, self.dims);
@@ -685,6 +704,7 @@ pub struct LocalKwTask {
 #[async_trait(?Send)]
 impl AsyncTask for LocalKwTask {
     type Output = f32;
+    type Affinity = DispatchAny;
 
     async fn run<'base>(&mut self, mut frame: AsyncGcFrame<'base>) -> JlrsResult<Self::Output> {
         let dims = Value::new(&mut frame, self.dims);
@@ -717,6 +737,7 @@ pub struct MainKwTask {
 #[async_trait(?Send)]
 impl AsyncTask for MainKwTask {
     type Output = f32;
+    type Affinity = DispatchAny;
 
     async fn run<'base>(&mut self, mut frame: AsyncGcFrame<'base>) -> JlrsResult<Self::Output> {
         let dims = Value::new(&mut frame, self.dims);
@@ -746,6 +767,7 @@ pub struct BorrowArrayData;
 #[async_trait(?Send)]
 impl AsyncTask for BorrowArrayData {
     type Output = f64;
+    type Affinity = DispatchAny;
 
     async fn run<'base>(&mut self, mut frame: AsyncGcFrame<'base>) -> JlrsResult<Self::Output> {
         let mut data = vec![2.0f64];

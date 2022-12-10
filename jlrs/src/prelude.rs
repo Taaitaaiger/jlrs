@@ -19,7 +19,10 @@ pub use crate::runtime::builder::RuntimeBuilder;
 pub use crate::runtime::{async_rt::AsyncJulia, builder::AsyncRuntimeBuilder};
 #[cfg(feature = "async")]
 pub use crate::{
-    async_util::task::{yield_task, Affinity, AsyncTask, PersistentTask},
+    async_util::{
+        affinity::{Affinity, DispatchAny, DispatchMain, DispatchWorker},
+        task::{yield_task, AsyncTask, PersistentTask},
+    },
     call::CallAsync,
     memory::target::frame::AsyncGcFrame,
 };
