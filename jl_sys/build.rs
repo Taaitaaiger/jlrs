@@ -149,14 +149,27 @@ fn compile_jlrs_cc(julia_dir: &str) {
 
     #[cfg(feature = "julia-1-6")]
     c.define("JULIA_1_6", None);
+
     #[cfg(feature = "julia-1-7")]
     c.define("JULIA_1_7", None);
+
     #[cfg(feature = "julia-1-8")]
     c.define("JULIA_1_8", None);
+
     #[cfg(feature = "julia-1-9")]
     c.define("JULIA_1_9", None);
+
     #[cfg(feature = "julia-1-10")]
     c.define("JULIA_1_10", None);
+
+    #[cfg(not(any(
+        feature = "julia-1-6",
+        feature = "julia-1-7",
+        feature = "julia-1-8",
+        feature = "julia-1-9",
+        feature = "julia-1-10"
+    )))]
+    c.define("JULIA_1_8", None);
 
     c.compile("jlrs_cc");
 }
@@ -179,14 +192,40 @@ fn generate_bindings(julia_dir: &str) {
 
     builder = builder.clang_arg(include_dir_flag).clang_arg(arch_flag);
 
-    #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
-    {
-        builder = builder.clang_arg("-DJLRS_NIGHTLY");
-    }
-
     #[cfg(feature = "julia-1-6")]
     {
-        builder = builder.clang_arg("-DJLRS_LTS");
+        builder = builder.clang_arg("-DJULIA_1_6");
+    }
+
+    #[cfg(feature = "julia-1-7")]
+    {
+        builder = builder.clang_arg("-DJULIA_1_7");
+    }
+
+    #[cfg(feature = "julia-1-8")]
+    {
+        builder = builder.clang_arg("-DJULIA_1_8");
+    }
+
+    #[cfg(feature = "julia-1-9")]
+    {
+        builder = builder.clang_arg("-DJULIA_1_9");
+    }
+
+    #[cfg(feature = "julia-1-10")]
+    {
+        builder = builder.clang_arg("-DJULIA_1_10");
+    }
+
+    #[cfg(not(any(
+        feature = "julia-1-6",
+        feature = "julia-1-7",
+        feature = "julia-1-8",
+        feature = "julia-1-9",
+        feature = "julia-1-10"
+    )))]
+    {
+        builder = builder.clang_arg("-DJULIA_1_8");
     }
 
     #[cfg(all(feature = "julia-1-6", any(windows, feature = "windows")))]
@@ -471,7 +510,9 @@ fn generate_bindings(julia_dir: &str) {
         .allowlist_var("jl_vararg_typename")
         .allowlist_var("jl_vecelement_typename")
         .allowlist_var("jl_voidpointer_type")
-        .allowlist_var("jl_weakref_type");
+        .allowlist_var("jl_weakref_type")
+        .opaque_type("uv_mutex_t")
+        .opaque_type("uv_cond_t");
 
     #[cfg(not(all(feature = "julia-1-6", any(windows, feature = "windows"))))]
     {

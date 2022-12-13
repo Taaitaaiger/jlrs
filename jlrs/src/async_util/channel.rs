@@ -8,8 +8,6 @@
 //!
 //! Several implementations of these traits are provided by jlrs if the `async-std-rt` or `tokio-rt`
 //! feature is enabled.
-//!
-//! [`PersistentTask`]: crate::async_util::task::PersistentTask
 
 use std::{fmt, num::NonZeroUsize};
 

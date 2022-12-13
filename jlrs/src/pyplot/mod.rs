@@ -6,6 +6,8 @@
 //!
 //! When multiple figures are open, only the most recently opened one is updated automatically.
 
+#[cfg(feature = "async")]
+use jlrs_macros::julia_version;
 use smallvec::SmallVec;
 
 #[cfg(feature = "async")]
@@ -235,7 +237,8 @@ impl<'scope> PyPlot<'scope> {
 
     /// Wait until the window associated with `self` has been closed in a new task scheduled
     /// on the `:interactive` thread pool.
-    #[cfg(all(feature = "async", any(feature = "julia-1-10", feature = "julia-1-9")))]
+    #[cfg(feature = "async")]
+    #[julia_version(since = "1.9")]
     pub async fn wait_async_interactive<'frame>(
         self,
         frame: &mut AsyncGcFrame<'frame>,

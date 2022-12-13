@@ -6,12 +6,11 @@
 //! defined by the C API, a compatible type is available which provides access to relevant
 //! functionality from the C API through the methods and traits it implements.
 //!
-//! If you want to unbox the content of Julia data, you'll have to provide the layout of that
-//! data. The [`layout`] module provides valid layouts for many types of primitive data and
-//! tuples, layouts for other types of Julia data can be generated with JlrsReflect.jl. The
-//! [`ForeignType`] trait is also provided by this module, it can be used to move Rust data to
+//! If you want to unbox or otherwise access the content of Julia data, you'll have to provide the
+//! layout of that data. The [`layout`] module provides valid layouts for many types of primitive
+//! data and tuples, layouts for other types of Julia data can be generated with JlrsReflect.jl.
+//! The [`ForeignType`] trait is also provided by this module, it can be used to move Rust data to
 //! Julia and make the GC responsible for freeing it.
-//!
 //!
 //! [`Value`]: crate::data::managed::value::Value
 //! [`Array`]: crate::data::managed::array::Array

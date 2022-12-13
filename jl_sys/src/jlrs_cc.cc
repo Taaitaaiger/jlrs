@@ -27,7 +27,7 @@ extern "C"
         return jl_array_data_owner_offset(n_dims);
     }
 
-#if !defined(JLRS_WINDOWS_LTS)
+#if !defined(JULIA_1_6)
     void jlrs_lock(jl_value_t *v)
     {
         jl_task_t *self = jl_current_task;

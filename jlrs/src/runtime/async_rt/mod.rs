@@ -47,10 +47,11 @@ use jl_sys::{
     jl_atexit_hook, jl_init, jl_init_with_image, jl_is_initialized, jl_options, jl_process_events,
     jl_yield,
 };
-#[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
+#[julia_version(since = "1.9")]
 use jl_sys::{jl_enter_threaded_region, jl_exit_threaded_region};
+use jlrs_macros::julia_version;
 
-#[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
+#[julia_version(since = "1.9")]
 use self::adopted::init_worker;
 use self::{
     dispatch::Dispatch,
@@ -60,7 +61,7 @@ use crate::{
     async_util::{
         affinity::{Affinity, DispatchAny, DispatchMain},
         channel::{Channel, ChannelSender, OneshotSender, TrySendError},
-        envelopes::{
+        envelope::{
             BlockingTask, BlockingTaskEnvelope, CallPersistentTask, IncludeTask,
             IncludeTaskEnvelope, InnerPersistentMessage, PendingTask, PendingTaskEnvelope,
             Persistent, PersistentComms, RegisterPersistent, RegisterTask, SetErrorColorTask,
@@ -79,10 +80,10 @@ use crate::{
     runtime::{builder::AsyncRuntimeBuilder, init_jlrs, INIT},
 };
 
-#[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
+#[julia_version(since = "1.9")]
 init_fn!(init_multitask, JLRS_MULTITASK_JL, "JlrsMultitaskNightly.jl");
 
-#[cfg(not(any(feature = "julia-1-10", feature = "julia-1-9")))]
+#[julia_version(until = "1.8")]
 init_fn!(init_multitask, JLRS_MULTITASK_JL, "JlrsMultitask.jl");
 
 // TODO: this doesn't really belong in this module

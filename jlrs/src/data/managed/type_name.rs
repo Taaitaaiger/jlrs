@@ -1,4 +1,4 @@
-//! Managed for `TypeName`.
+//! Managed type for `TypeName`.
 //!
 //! The documentation for this module has been slightly adapted from the comments for this struct
 //! in [`julia.h`]
@@ -8,10 +8,15 @@
 use std::{marker::PhantomData, ptr::NonNull};
 
 use cfg_if::cfg_if;
+#[julia_version(since = "1.7")]
+use jl_sys::jl_opaque_closure_typename;
+#[julia_version(until = "1.6")]
+use jl_sys::jl_vararg_typename;
 use jl_sys::{
     jl_array_typename, jl_llvmpointer_typename, jl_namedtuple_typename, jl_pointer_typename,
     jl_tuple_typename, jl_type_typename, jl_typename_t, jl_typename_type, jl_vecelement_typename,
 };
+use jlrs_macros::julia_version;
 
 use super::Ref;
 use crate::{
@@ -24,21 +29,14 @@ use crate::{
 };
 
 cfg_if! {
-    if #[cfg(feature = "julia-1-6")] {
-        use jl_sys::jl_vararg_typename;
-    } else {
-        use jl_sys::{jl_opaque_closure_typename};
-    }
-}
-
-cfg_if! {
     if #[cfg(feature = "extra-fields")] {
         use crate::data::managed::{value::Value, simple_vector::{SimpleVectorRef, SimpleVectorData}};
     }
 }
 
+#[julia_version(since = "1.7")]
 cfg_if! {
-    if #[cfg(all(not(feature = "julia-1-6"), feature = "extra-fields"))] {
+    if #[cfg(feature = "extra-fields")] {
         use std::sync::atomic::Ordering;
         use crate::data::managed::value::{ValueData, ValueRef};
     }
@@ -102,14 +100,14 @@ impl<'scope> TypeName<'scope> {
     }
 
     /// The `atomicfields` field.
-    #[cfg(not(feature = "julia-1-6"))]
+    #[julia_version(since = "1.7")]
     pub fn atomicfields(self) -> *const u32 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().atomicfields }
     }
 
     /// The `atomicfields` field.
-    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7")))]
+    #[julia_version(since = "1.8")]
     pub fn constfields(self) -> *const u32 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().constfields }
@@ -120,7 +118,6 @@ impl<'scope> TypeName<'scope> {
     #[cfg(feature = "extra-fields")]
     pub fn wrapper(self) -> Value<'scope, 'static> {
         // Safety: the pointer points to valid data
-
         unsafe {
             let wrapper = self.unwrap_non_null(Private).as_ref().wrapper;
             debug_assert!(!wrapper.is_null());
@@ -129,10 +126,8 @@ impl<'scope> TypeName<'scope> {
     }
 
     /// cache for Type{wrapper}
-    #[cfg(all(
-        any(feature = "julia-1-9", feature = "julia-1-10"),
-        feature = "extra-fields"
-    ))]
+    #[julia_version(since = "1.9")]
+    #[cfg(feature = "extra-fields")]
     pub fn typeof_wrapper<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
@@ -152,51 +147,69 @@ impl<'scope> TypeName<'scope> {
 
     /// Sorted array.
     #[cfg(feature = "extra-fields")]
+    #[julia_version(until = "1.6")]
     pub fn cache<'target, T>(self, target: T) -> SimpleVectorData<'target, T>
     where
         T: Target<'target>,
     {
-        cfg_if! {
-            if #[cfg(feature = "julia-1-6")] {
-                // Safety: the pointer points to valid data
-                unsafe {
-                    let cache = self.unwrap_non_null(Private).as_ref().cache;
-                    debug_assert!(!cache.is_null());
-                    SimpleVectorRef::wrap(NonNull::new_unchecked(cache)).root(target)
-                }
-            } else {
-                // Safety: the pointer points to valid data
-                unsafe {
-                    let cache = self.unwrap_non_null(Private).as_ref().cache.load(Ordering::Relaxed);
-                    debug_assert!(!cache.is_null());
-                    SimpleVectorRef::wrap(NonNull::new_unchecked(cache)).root(target)
-                }
-            }
+        // Safety: the pointer points to valid data
+        unsafe {
+            let cache = self.unwrap_non_null(Private).as_ref().cache;
+            debug_assert!(!cache.is_null());
+            SimpleVectorRef::wrap(NonNull::new_unchecked(cache)).root(target)
+        }
+    }
+
+    /// Sorted array.
+    #[cfg(feature = "extra-fields")]
+    #[julia_version(since = "1.7")]
+    pub fn cache<'target, T>(self, target: T) -> SimpleVectorData<'target, T>
+    where
+        T: Target<'target>,
+    {
+        // Safety: the pointer points to valid data
+        unsafe {
+            let cache = self
+                .unwrap_non_null(Private)
+                .as_ref()
+                .cache
+                .load(Ordering::Relaxed);
+            debug_assert!(!cache.is_null());
+            SimpleVectorRef::wrap(NonNull::new_unchecked(cache)).root(target)
         }
     }
 
     /// Unsorted array.
+    #[julia_version(until = "1.6")]
     #[cfg(feature = "extra-fields")]
     pub fn linear_cache<'target, T>(self, target: T) -> SimpleVectorData<'target, T>
     where
         T: Target<'target>,
     {
-        cfg_if! {
-            if #[cfg(feature = "julia-1-6")] {
-                // Safety: the pointer points to valid data
-                unsafe {
-                    let cache = self.unwrap_non_null(Private).as_ref().linearcache;
-                    debug_assert!(!cache.is_null());
-                    SimpleVectorRef::wrap(NonNull::new_unchecked(cache)).root(target)
-                }
-            } else {
-                // Safety: the pointer points to valid data
-                unsafe {
-                    let cache = self.unwrap_non_null(Private).as_ref().linearcache.load(Ordering::Relaxed);
-                    debug_assert!(!cache.is_null());
-                    SimpleVectorRef::wrap(NonNull::new_unchecked(cache)).root(target)
-                }
-            }
+        // Safety: the pointer points to valid data
+        unsafe {
+            let cache = self.unwrap_non_null(Private).as_ref().linearcache;
+            debug_assert!(!cache.is_null());
+            SimpleVectorRef::wrap(NonNull::new_unchecked(cache)).root(target)
+        }
+    }
+
+    /// Unsorted array.
+    #[julia_version(since = "1.7")]
+    #[cfg(feature = "extra-fields")]
+    pub fn linear_cache<'target, T>(self, target: T) -> SimpleVectorData<'target, T>
+    where
+        T: Target<'target>,
+    {
+        // Safety: the pointer points to valid data
+        unsafe {
+            let cache = self
+                .unwrap_non_null(Private)
+                .as_ref()
+                .linearcache
+                .load(Ordering::Relaxed);
+            debug_assert!(!cache.is_null());
+            SimpleVectorRef::wrap(NonNull::new_unchecked(cache)).root(target)
         }
     }
 
@@ -235,28 +248,28 @@ impl<'scope> TypeName<'scope> {
     }
 
     /// The `n_uninitialized` field.
-    #[cfg(not(feature = "julia-1-6"))]
+    #[julia_version(since = "1.7")]
     pub fn n_uninitialized(self) -> i32 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().n_uninitialized }
     }
 
     /// The `abstract` field.
-    #[cfg(not(feature = "julia-1-6"))]
+    #[julia_version(since = "1.7")]
     pub fn is_abstract(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().abstract_() != 0 }
     }
 
     /// The `mutabl` field.
-    #[cfg(not(feature = "julia-1-6"))]
+    #[julia_version(since = "1.7")]
     pub fn is_mutable(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().mutabl() != 0 }
     }
 
     /// The `mayinlinealloc` field.
-    #[cfg(not(feature = "julia-1-6"))]
+    #[julia_version(since = "1.7")]
     pub fn mayinlinealloc(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().mayinlinealloc() != 0 }
@@ -292,7 +305,7 @@ impl<'base> TypeName<'base> {
     }
 
     /// The typename of the `UnionAll` `Vararg`.
-    #[cfg(feature = "julia-1-6")]
+    #[julia_version(until = "1.6")]
     pub fn of_vararg<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -311,7 +324,7 @@ impl<'base> TypeName<'base> {
     }
 
     /// The typename of the `UnionAll` `Ptr`.
-    #[cfg(not(feature = "julia-1-6"))]
+    #[julia_version(since = "1.7")]
     pub fn of_opaque_closure<T>(_: &T) -> Self
     where
         T: Target<'base>,

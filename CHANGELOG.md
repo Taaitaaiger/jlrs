@@ -7,7 +7,10 @@
 
  - The traits in the `layout` module have been moved to the `data` module. Most can be found in `data::layout`, `typecheck` has been moved to `data::managed`, and `field_index::FieldIndex` has been moved to `data::managed::value::field_accessor`.
 
- - Dispatch / Affinity
+ - Tasks must now declare their affinity with an associated `Affinity` type, the affinity can be either `DispatchAny`, `DispatchMain`, or `DispatchWorker`. The `try_` methods have been removed from `AsyncJulia`, the non-try methods are now sync and return a `Dispatch` which is used to actually dispatch the task to the async runtime. Which dispatching methods are available for the returned instance of `Dispatch` depends on the `Affinity` of the task. There is both an async and a sync variant for each dispatching method, the async variant waits until the task can be dispatched, the sync variant returns the dispatcher if the targeted queue is full to allow retrying to dispatch the task.
+
+ - The `Compatible` trait has been added which allows a type that implements `ValidLayout` to declare that it has exactly the same layout as another type. The `CompatibleCast` trait lets references to and arrays of types that implement `ValidLayout` to be cast to that compatible type without copying the data.
+ 
 
 #### v0.17
  - Atomic struct fields are now atomic in the generated bindings.

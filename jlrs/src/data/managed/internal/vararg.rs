@@ -1,4 +1,4 @@
-//! Managed for `Vararg`.
+//! Managed type for `Vararg`.
 
 use std::{marker::PhantomData, ptr::NonNull};
 
@@ -15,7 +15,7 @@ use crate::{
     private::Private,
 };
 
-/// A wrapper for `Vararg`.
+/// A Julia `Vararg`.
 #[derive(Copy, Clone)]
 #[repr(transparent)]
 pub struct Vararg<'scope>(NonNull<jl_vararg_t>, PhantomData<&'scope ()>);

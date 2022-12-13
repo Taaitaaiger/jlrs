@@ -6,6 +6,7 @@ use std::sync::{
 use deadqueue::resizable::Queue;
 use futures::Future;
 use futures_concurrency::future::Race;
+use jlrs_macros::julia_version;
 
 use crate::error::{JlrsResult, RuntimeError};
 
@@ -168,7 +169,7 @@ impl<T: Send> Receiver<T> {
         self.queue.any_queue.as_ref().map(|q| q.try_pop()).flatten()
     }
 
-    #[cfg(any(feature = "julia-1-9", feature = "julia-1-10"))]
+    #[julia_version(since = "1.9")]
     pub(crate) async fn recv_worker(&self) -> JlrsResult<T> {
         if self.queue.n_senders.load(Ordering::Acquire) == 0 {
             return match self.try_recv_worker() {
@@ -185,7 +186,7 @@ impl<T: Send> Receiver<T> {
             .await)
     }
 
-    #[cfg(any(feature = "julia-1-9", feature = "julia-1-10"))]
+    #[julia_version(since = "1.9")]
     fn try_recv_worker(&self) -> Option<T> {
         if let Some(popped_worker) = self.queue.worker_queue.as_ref().unwrap().try_pop() {
             return Some(popped_worker);

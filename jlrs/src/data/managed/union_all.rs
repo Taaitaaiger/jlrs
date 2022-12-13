@@ -1,32 +1,27 @@
-//! Managed for `UnionAll`, A union of types over all values of a type parameter.
+//! Managed type for `UnionAll`, A union of types over all values of a type parameter.
 
-use cfg_if::cfg_if;
+use std::{marker::PhantomData, ptr::NonNull};
+
+#[julia_version(since = "1.7")]
+use jl_sys::jl_opaque_closure_type;
+#[julia_version(until = "1.6")]
+use jl_sys::jl_vararg_type;
 use jl_sys::{
     jl_abstractarray_type, jl_anytuple_type_type, jl_array_type, jl_densearray_type,
     jl_llvmpointer_type, jl_namedtuple_type, jl_pointer_type, jl_ref_type, jl_type_type,
     jl_type_unionall, jl_unionall_t, jl_unionall_type,
 };
+use jlrs_macros::julia_version;
 
+#[julia_version(windows_lts = false)]
+use super::value::ValueResult;
+use super::{value::ValueData, Ref};
 use crate::{
     data::managed::{datatype::DataType, private::ManagedPriv, type_var::TypeVar, value::Value},
     impl_julia_typecheck,
     memory::target::Target,
     private::Private,
 };
-
-cfg_if! {
-    if #[cfg(feature = "julia-1-6")] {
-        use jl_sys::jl_vararg_type;
-    }else {
-        use jl_sys::jl_opaque_closure_type;
-    }
-}
-
-use std::{marker::PhantomData, ptr::NonNull};
-
-#[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
-use super::value::ValueResult;
-use super::{value::ValueData, Ref};
 
 /// An iterated union of types. If a struct field has a parametric type with some of its
 /// parameters unknown, its type is represented by a `UnionAll`.
@@ -36,7 +31,7 @@ pub struct UnionAll<'scope>(NonNull<jl_unionall_t>, PhantomData<&'scope ()>);
 
 impl<'scope> UnionAll<'scope> {
     /// Create a new `UnionAll`. If an exception is thrown, it's caught and returned.
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+    #[julia_version(windows_lts = false)]
     pub fn new<'target, T>(
         target: T,
         tvar: TypeVar,
@@ -145,7 +140,7 @@ impl<'base> UnionAll<'base> {
     }
 
     /// The `UnionAll` `Vararg`.
-    #[cfg(feature = "julia-1-6")]
+    #[julia_version(until = "1.6")]
     pub fn vararg_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -164,7 +159,7 @@ impl<'base> UnionAll<'base> {
     }
 
     /// The `UnionAll` `OpaqueClosure`.
-    #[cfg(not(feature = "julia-1-6"))]
+    #[julia_version(since = "1.7")]
     pub fn opaque_closure_type<T>(_: &T) -> Self
     where
         T: Target<'base>,

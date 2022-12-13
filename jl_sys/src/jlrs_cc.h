@@ -42,7 +42,7 @@ extern "C"
 
     uint_t jlrs_array_data_owner_offset(uint16_t n_dims);
 
-#if !defined(JLRS_WINDOWS_LTS)
+#if !defined(JULIA_1_6)
     void jlrs_lock(jl_value_t *v);
     void jlrs_unlock(jl_value_t *v);
 #endif

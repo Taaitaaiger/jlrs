@@ -1,14 +1,16 @@
-//! Managed for `TypeMapEntry`.
+//! Managed type for `TypeMapEntry`.
 //!
 //! The documentation for this module has been slightly adapted from the comments for this struct
 //! in [`julia.h`]
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#505
 
+#[julia_version(since = "1.7")]
+use std::sync::atomic::Ordering;
 use std::{marker::PhantomData, ptr::NonNull};
 
-use cfg_if::cfg_if;
 use jl_sys::{jl_typemap_entry_t, jl_typemap_entry_type};
+use jlrs_macros::julia_version;
 
 use crate::{
     data::managed::{
@@ -20,12 +22,6 @@ use crate::{
     memory::target::Target,
     private::Private,
 };
-
-cfg_if! {
-    if #[cfg(not(feature = "julia-1-6"))] {
-        use std::sync::atomic::Ordering;
-    }
-}
 
 /// One Type-to-Value entry
 #[derive(Copy, Clone)]
@@ -49,26 +45,35 @@ impl<'scope> TypeMapEntry<'scope> {
     */
 
     /// Invasive linked list
+    #[julia_version(until = "1.6")]
     pub fn next<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
     {
-        cfg_if! {
-            if #[cfg(feature = "julia-1-6")] {
-                // Safety: the pointer points to valid data
-                unsafe {
-                    let next = self.unwrap_non_null(Private).as_ref().next.cast();
-                    let next = NonNull::new(next)?;
-                    Some(ValueRef::wrap(next).root(target))
-                }
-            } else {
-                // Safety: the pointer points to valid data
-                unsafe {
-                    let next = self.unwrap_non_null(Private).as_ref().next.load(Ordering::Relaxed).cast();
-                    let next = NonNull::new(next)?;
-                    Some(ValueRef::wrap(next).root(target))
-                }
-            }
+        // Safety: the pointer points to valid data
+        unsafe {
+            let next = self.unwrap_non_null(Private).as_ref().next.cast();
+            let next = NonNull::new(next)?;
+            Some(ValueRef::wrap(next).root(target))
+        }
+    }
+
+    /// Invasive linked list
+    #[julia_version(since = "1.7")]
+    pub fn next<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
+        // Safety: the pointer points to valid data
+        unsafe {
+            let next = self
+                .unwrap_non_null(Private)
+                .as_ref()
+                .next
+                .load(Ordering::Relaxed)
+                .cast();
+            let next = NonNull::new(next)?;
+            Some(ValueRef::wrap(next).root(target))
         }
     }
 

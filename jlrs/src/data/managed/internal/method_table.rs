@@ -1,14 +1,16 @@
-//! Managed for `MethodTable`.
+//! Managed type for `MethodTable`.
 //!
 //! The documentation for this module has been slightly adapted from the comments for this struct
 //! in [`julia.h`]
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L535
 
+#[julia_version(since = "1.7")]
+use std::sync::atomic::Ordering;
 use std::{marker::PhantomData, ptr::NonNull};
 
-use cfg_if::cfg_if;
 use jl_sys::{jl_methtable_t, jl_methtable_type};
+use jlrs_macros::julia_version;
 
 use crate::{
     data::managed::{
@@ -23,12 +25,6 @@ use crate::{
     memory::target::Target,
     private::Private,
 };
-
-cfg_if! {
-    if #[cfg(not(feature = "julia-1-6"))] {
-        use std::sync::atomic::Ordering;
-    }
-}
 
 /// contains the TypeMap for one Type
 #[derive(Copy, Clone)]
@@ -63,74 +59,98 @@ impl<'scope> MethodTable<'scope> {
     }
 
     /// The `defs` field.
+    #[julia_version(until = "1.6")]
     pub fn defs<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
     {
-        cfg_if! {
-            if #[cfg(feature = "julia-1-6")] {
-                // Safety: the pointer points to valid data
-                unsafe {
-                    let data = self.unwrap_non_null(Private).as_ref().defs;
-                    let data = NonNull::new(data)?;
-                    Some(ValueRef::wrap(data).root(target))
-                }
-            } else {
-                // Safety: the pointer points to valid data
-                unsafe {
-                    let data = self.unwrap_non_null(Private).as_ref().defs.load(Ordering::Relaxed);
-                    let data = NonNull::new(data)?;
-                    Some(ValueRef::wrap(data).root(target))
-                }
-            }
+        // Safety: the pointer points to valid data
+        unsafe {
+            let data = self.unwrap_non_null(Private).as_ref().defs;
+            let data = NonNull::new(data)?;
+            Some(ValueRef::wrap(data).root(target))
+        }
+    }
+
+    /// The `defs` field.
+    #[julia_version(since = "1.7")]
+    pub fn defs<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
+        // Safety: the pointer points to valid data
+        unsafe {
+            let data = self
+                .unwrap_non_null(Private)
+                .as_ref()
+                .defs
+                .load(Ordering::Relaxed);
+            let data = NonNull::new(data)?;
+            Some(ValueRef::wrap(data).root(target))
         }
     }
 
     /// The `leafcache` field.
+    #[julia_version(until = "1.6")]
     pub fn leafcache<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
     {
-        cfg_if! {
-            if #[cfg(feature = "julia-1-6")] {
-                // Safety: the pointer points to valid data
-                unsafe {
-                    let data = self.unwrap_non_null(Private).as_ref().leafcache;
-                    let data = NonNull::new(data)?;
-                    Some(ValueRef::wrap(data.cast()).root(target))
-                }
-            } else {
-                // Safety: the pointer points to valid data
-                unsafe {
-                    let data = self.unwrap_non_null(Private).as_ref().leafcache.load(Ordering::Relaxed);
-                    let data = NonNull::new(data)?;
-                    Some(ValueRef::wrap(data.cast()).root(target))
-                }
-            }
+        // Safety: the pointer points to valid data
+        unsafe {
+            let data = self.unwrap_non_null(Private).as_ref().leafcache;
+            let data = NonNull::new(data)?;
+            Some(ValueRef::wrap(data.cast()).root(target))
+        }
+    }
+
+    /// The `leafcache` field.
+    #[julia_version(since = "1.7")]
+    pub fn leafcache<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
+        // Safety: the pointer points to valid data
+        unsafe {
+            let data = self
+                .unwrap_non_null(Private)
+                .as_ref()
+                .leafcache
+                .load(Ordering::Relaxed);
+            let data = NonNull::new(data)?;
+            Some(ValueRef::wrap(data.cast()).root(target))
         }
     }
 
     /// The `cache` field.
+    #[julia_version(until = "1.6")]
     pub fn cache<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
     {
-        cfg_if! {
-            if #[cfg(feature = "julia-1-6")] {
-                // Safety: the pointer points to valid data
-                unsafe {
-                    let data = self.unwrap_non_null(Private).as_ref().cache;
-                    let data = NonNull::new(data)?;
-                    Some(ValueRef::wrap(data).root(target))
-                }
-            } else {
-                // Safety: the pointer points to valid data
-                unsafe {
-                    let data = self.unwrap_non_null(Private).as_ref().cache.load(Ordering::Relaxed);
-                    let data = NonNull::new(data)?;
-                    Some(ValueRef::wrap(data).root(target))
-                }
-            }
+        // Safety: the pointer points to valid data
+        unsafe {
+            let data = self.unwrap_non_null(Private).as_ref().cache;
+            let data = NonNull::new(data)?;
+            Some(ValueRef::wrap(data).root(target))
+        }
+    }
+
+    /// The `cache` field.
+    #[julia_version(since = "1.7")]
+    pub fn cache<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
+        // Safety: the pointer points to valid data
+        unsafe {
+            let data = self
+                .unwrap_non_null(Private)
+                .as_ref()
+                .cache
+                .load(Ordering::Relaxed);
+            let data = NonNull::new(data)?;
+            Some(ValueRef::wrap(data).root(target))
         }
     }
 
@@ -140,7 +160,7 @@ impl<'scope> MethodTable<'scope> {
         unsafe { self.unwrap_non_null(Private).as_ref().max_args }
     }
 
-    #[cfg(not(any(feature = "julia-1-10", feature = "julia-1-9")))]
+    #[julia_version(until = "1.8")]
     /// Keyword argument sorter function
     pub fn kw_sorter<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where

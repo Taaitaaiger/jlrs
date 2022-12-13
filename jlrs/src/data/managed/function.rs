@@ -1,4 +1,4 @@
-//! Managed for `Function`, the supertype of all Julia functions.
+//! Managed type for `Function`, the supertype of all Julia functions.
 //!
 //! All Julia functions are subtypes of `Function`, a function can be called with the methods
 //! of the [`Call`] trait. You don't need to cast a [`Value`] to a [`Function`] in order to call

@@ -28,8 +28,9 @@
 //! Additionally, [`Tuple` ] can be used to create a tuple from an arbitrary number of `Value`s.
 
 use jl_sys::jl_tuple_typename;
+use jlrs_macros::julia_version;
 
-#[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+#[julia_version(windows_lts = false)]
 use crate::data::managed::value::ValueResult;
 use crate::{
     data::managed::{
@@ -50,7 +51,7 @@ pub struct Tuple;
 
 impl Tuple {
     /// Create a new tuple from the contents of `values`.
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+    #[julia_version(windows_lts = false)]
     pub fn new<'target, 'current, 'borrow, 'value, 'data, V, T>(
         target: ExtendedTarget<'target, 'current, 'borrow, T>,
         values: V,

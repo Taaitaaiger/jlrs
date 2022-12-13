@@ -1,4 +1,4 @@
-//! Wrappers for internal types.
+//! Managed types that are mostly used internally in Julia.
 //!
 //! To use these types you must enable the `internal-types` feature.
 

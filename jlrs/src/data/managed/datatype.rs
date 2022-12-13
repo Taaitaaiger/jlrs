@@ -1,8 +1,7 @@
-//! Managed for `DataType`, which provides access to type properties.
+//! Managed type for `DataType`, which provides access to type properties.
 
 use std::{ffi::CStr, marker::PhantomData, ptr::NonNull};
 
-use cfg_if::cfg_if;
 use jl_sys::{
     jl_abstractslot_type, jl_abstractstring_type, jl_any_type, jl_anytuple_type, jl_argument_type,
     jl_argumenterror_type, jl_bool_type, jl_boundserror_type, jl_builtin_type, jl_char_type,
@@ -22,12 +21,17 @@ use jl_sys::{
     jl_uint32_type, jl_uint64_type, jl_uint8_type, jl_undefvarerror_type, jl_unionall_type,
     jl_uniontype_type, jl_upsilonnode_type, jl_voidpointer_type, jl_weakref_type,
 };
-#[cfg(not(feature = "julia-1-6"))]
+#[julia_version(since = "1.7")]
 use jl_sys::{
     jl_atomicerror_type, jl_interconditional_type, jl_partial_opaque_type, jl_vararg_type,
 };
+use jlrs_macros::julia_version;
 
 use super::{simple_vector::SimpleVectorData, type_name::TypeName, value::ValueData, Ref};
+#[julia_version(windows_lts = false)]
+use crate::data::managed::array::Array;
+#[julia_version(windows_lts = false)]
+use crate::data::managed::value::ValueResult;
 use crate::{
     convert::to_symbol::ToSymbol,
     data::managed::{
@@ -44,14 +48,7 @@ use crate::{
     private::Private,
 };
 
-cfg_if! {
-    if #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))] {
-        use crate::data::managed::array::Array;
-        use crate::data::managed::value::ValueResult;
-}
-}
-
-/// Julia type information. You can acquire a [`Value`]'s datatype by by calling
+/// Julia type information. You can access a [`Value`]'s datatype by by calling
 /// [`Value::datatype`]. If a `DataType` is concrete and not a subtype of `Array` a new instance
 /// can be created with [`DataType::instantiate`]. This can also be achieved by converting the
 /// `DataType` to a `Value` with [`Managed::as_value`] and calling it as a Julia function.
@@ -298,19 +295,16 @@ impl<'scope> DataType<'scope> {
     }
 
     /// Returns the size of a value of this type in bytes.
+    #[julia_version(since = "1.9")]
+    pub fn size(self) -> u32 {
+        self.layout().size()
+    }
+
+    /// Returns the size of a value of this type in bytes.
+    #[julia_version(until = "1.8")]
     pub fn size(self) -> u32 {
         // Safety: the pointer points to valid data
-        cfg_if! {
-            if #[cfg(not(any(feature = "julia-1-9", feature = "julia-1-10")))] {
-                unsafe {
-                    self.unwrap_non_null(Private).as_ref().size as u32
-                }
-            } else {
-                    self.layout()
-                        .size()
-
-            }
-        }
+        unsafe { self.unwrap_non_null(Private).as_ref().size as u32 }
     }
 
     /// Returns the hash of this type.
@@ -320,136 +314,149 @@ impl<'scope> DataType<'scope> {
     }
 
     /// Returns true if this is an abstract type.
+    #[julia_version(until = "1.6")]
     pub fn is_abstract(self) -> bool {
-        cfg_if! {
-            if #[cfg(feature = "julia-1-6")] {
-                // Safety: the pointer points to valid data
-                unsafe { self.unwrap_non_null(Private).as_ref().abstract_ != 0 }
-            } else {
-                // Safety: the pointer points to valid data, so it must have a TypeName.
-                self.type_name().is_abstract()
-            }
-        }
+        // Safety: the pointer points to valid data
+        unsafe { self.unwrap_non_null(Private).as_ref().abstract_ != 0 }
+    }
+
+    /// Returns true if this is an abstract type.
+    #[julia_version(since = "1.7")]
+    pub fn is_abstract(self) -> bool {
+        self.type_name().is_abstract()
     }
 
     /// Returns true if this is a mutable type.
+    #[julia_version(until = "1.6")]
     pub fn mutable(self) -> bool {
-        cfg_if! {
-            if #[cfg(feature = "julia-1-6")] {
-                // Safety: the pointer points to valid data
-                unsafe { self.unwrap_non_null(Private).as_ref().mutabl != 0 }
-            } else {
-                // Safety: the pointer points to valid data, so it must have a TypeName.
-                self.type_name().is_mutable()
-            }
-        }
+        // Safety: the pointer points to valid data
+        unsafe { self.unwrap_non_null(Private).as_ref().mutabl != 0 }
+    }
+
+    /// Returns true if this is a mutable type.
+    #[julia_version(since = "1.7")]
+    pub fn mutable(self) -> bool {
+        self.type_name().is_mutable()
     }
 
     /// Returns true if one or more of the type parameters has not been set.
+    #[julia_version(until = "1.6")]
     pub fn has_free_type_vars(self) -> bool {
-        cfg_if! {
-            if #[cfg(feature = "julia-1-6")] {
-                // Safety: the pointer points to valid data
-                unsafe { self.unwrap_non_null(Private).as_ref().hasfreetypevars != 0 }
-            } else {
-                // Safety: the pointer points to valid data
-                unsafe { self.unwrap_non_null(Private).as_ref().hasfreetypevars() != 0 }
-            }
-        }
+        // Safety: the pointer points to valid data
+        unsafe { self.unwrap_non_null(Private).as_ref().hasfreetypevars != 0 }
+    }
+
+    /// Returns true if one or more of the type parameters has not been set.
+    #[julia_version(since = "1.7")]
+    pub fn has_free_type_vars(self) -> bool {
+        // Safety: the pointer points to valid data
+        unsafe { self.unwrap_non_null(Private).as_ref().hasfreetypevars() != 0 }
     }
 
     /// Returns true if this type can have instances
+    #[julia_version(until = "1.6")]
     pub fn is_concrete_type(self) -> bool {
-        cfg_if! {
-            if #[cfg(feature = "julia-1-6")] {
-                // Safety: the pointer points to valid data
-                unsafe { self.unwrap_non_null(Private).as_ref().isconcretetype != 0 }
-            } else {
-                // Safety: the pointer points to valid data
-                unsafe { self.unwrap_non_null(Private).as_ref().isconcretetype() != 0 }
-            }
-        }
+        // Safety: the pointer points to valid data
+        unsafe { self.unwrap_non_null(Private).as_ref().isconcretetype != 0 }
+    }
+
+    /// Returns true if this type can have instances
+    #[julia_version(since = "1.7")]
+    pub fn is_concrete_type(self) -> bool {
+        // Safety: the pointer points to valid data
+        unsafe { self.unwrap_non_null(Private).as_ref().isconcretetype() != 0 }
     }
 
     /// Returns true if this type is a dispatch, or leaf, tuple type.
+    #[julia_version(until = "1.6")]
     pub fn is_dispatch_tuple(self) -> bool {
-        cfg_if! {
-            if #[cfg(feature = "julia-1-6")] {
-                // Safety: the pointer points to valid data
-                unsafe { self.unwrap_non_null(Private).as_ref().isdispatchtuple != 0 }
-            } else {
-                // Safety: the pointer points to valid data
-                unsafe { self.unwrap_non_null(Private).as_ref().isdispatchtuple() != 0 }
-            }
-        }
+        // Safety: the pointer points to valid data
+        unsafe { self.unwrap_non_null(Private).as_ref().isdispatchtuple != 0 }
+    }
+
+    /// Returns true if this type is a dispatch, or leaf, tuple type.
+    #[julia_version(since = "1.7")]
+    pub fn is_dispatch_tuple(self) -> bool {
+        // Safety: the pointer points to valid data
+        unsafe { self.unwrap_non_null(Private).as_ref().isdispatchtuple() != 0 }
     }
 
     /// Returns true if this type is a bits-type.
+    #[julia_version(until = "1.6")]
     pub fn is_bits(self) -> bool {
-        cfg_if! {
-            if #[cfg(feature = "julia-1-6")] {
-                // Safety: the pointer points to valid data
-                unsafe { self.unwrap_non_null(Private).as_ref().isbitstype != 0 }
-            } else {
-                // Safety: the pointer points to valid data
-                unsafe { self.unwrap_non_null(Private).as_ref().isbitstype() != 0 }
-            }
-        }
+        // Safety: the pointer points to valid data
+        unsafe { self.unwrap_non_null(Private).as_ref().isbitstype != 0 }
+    }
+
+    /// Returns true if this type is a bits-type.
+    #[julia_version(since = "1.7")]
+    pub fn is_bits(self) -> bool {
+        // Safety: the pointer points to valid data
+        unsafe { self.unwrap_non_null(Private).as_ref().isbitstype() != 0 }
     }
 
     /// Returns true if values of this type are zero-initialized.
+    #[julia_version(until = "1.6")]
     pub fn zero_init(self) -> bool {
-        cfg_if! {
-            if #[cfg(feature = "julia-1-6")] {
-                // Safety: the pointer points to valid data
-                unsafe { self.unwrap_non_null(Private).as_ref().zeroinit != 0 }
-            } else {
-                // Safety: the pointer points to valid data
-                unsafe { self.unwrap_non_null(Private).as_ref().zeroinit() != 0 }
-            }
-        }
+        // Safety: the pointer points to valid data
+        unsafe { self.unwrap_non_null(Private).as_ref().zeroinit != 0 }
+    }
+
+    /// Returns true if values of this type are zero-initialized.
+    #[julia_version(since = "1.7")]
+    pub fn zero_init(self) -> bool {
+        // Safety: the pointer points to valid data
+        unsafe { self.unwrap_non_null(Private).as_ref().zeroinit() != 0 }
     }
 
     /// Returns true if a value of this type stores its data inline.
+    #[julia_version(until = "1.6")]
     pub fn is_inline_alloc(self) -> bool {
-        cfg_if! {
-            if #[cfg(feature = "julia-1-6")] {
-                // Safety: the pointer points to valid data
-                unsafe { self.unwrap_non_null(Private).as_ref().isinlinealloc != 0 }
-            } else {
-                // Safety: the pointer points to valid data, so it must have a TypeName.
-                unsafe {
-                    self.type_name().mayinlinealloc()
-                        && !self.unwrap_non_null(Private).as_ref().layout.is_null()
-                }
-            }
+        // Safety: the pointer points to valid data
+        unsafe { self.unwrap_non_null(Private).as_ref().isinlinealloc != 0 }
+    }
+
+    /// Returns true if a value of this type stores its data inline.
+    #[julia_version(since = "1.7")]
+    pub fn is_inline_alloc(self) -> bool {
+        // Safety: the pointer points to valid data, so it must have a TypeName.
+        unsafe {
+            self.type_name().mayinlinealloc()
+                && !self.unwrap_non_null(Private).as_ref().layout.is_null()
         }
     }
 
     /// If false, no value will have this type.
+    #[julia_version(until = "1.6")]
     pub fn has_concrete_subtype(self) -> bool {
-        cfg_if! {
-            if #[cfg(feature = "julia-1-6")] {
-                // Safety: the pointer points to valid data
-                unsafe { self.unwrap_non_null(Private).as_ref().has_concrete_subtype != 0 }
-            } else {
-                // Safety: the pointer points to valid data
-                unsafe { self.unwrap_non_null(Private).as_ref().has_concrete_subtype() != 0 }
-            }
+        // Safety: the pointer points to valid data
+        unsafe { self.unwrap_non_null(Private).as_ref().has_concrete_subtype != 0 }
+    }
+
+    /// If false, no value will have this type.
+    #[julia_version(since = "1.7")]
+    pub fn has_concrete_subtype(self) -> bool {
+        // Safety: the pointer points to valid data
+        unsafe {
+            self.unwrap_non_null(Private)
+                .as_ref()
+                .has_concrete_subtype()
+                != 0
         }
     }
 
     /// If true, the type is stored in hash-based set cache (instead of linear cache).
+    #[julia_version(until = "1.6")]
     pub fn cached_by_hash(self) -> bool {
-        cfg_if! {
-            if #[cfg(feature = "julia-1-6")] {
-                // Safety: the pointer points to valid data
-                unsafe { self.unwrap_non_null(Private).as_ref().cached_by_hash != 0 }
-            } else {
-                // Safety: the pointer points to valid data
-                unsafe { self.unwrap_non_null(Private).as_ref().cached_by_hash() != 0 }
-            }
-        }
+        // Safety: the pointer points to valid data
+        unsafe { self.unwrap_non_null(Private).as_ref().cached_by_hash != 0 }
+    }
+
+    /// If true, the type is stored in hash-based set cache (instead of linear cache).
+    #[julia_version(since = "1.7")]
+    pub fn cached_by_hash(self) -> bool {
+        // Safety: the pointer points to valid data
+        unsafe { self.unwrap_non_null(Private).as_ref().cached_by_hash() != 0 }
     }
 }
 
@@ -554,8 +561,8 @@ impl<'scope> DataType<'scope> {
         jl_field_isptr(self.unwrap(Private), idx as _)
     }
 
-    #[cfg(not(feature = "julia-1-6"))]
     /// Returns true if the field at position `idx` is an atomic field.
+    #[julia_version(since = "1.7")]
     pub fn is_atomic_field(self, idx: usize) -> JlrsResult<bool> {
         if idx >= self.n_fields() as usize {
             Err(AccessError::OutOfBoundsField {
@@ -569,11 +576,11 @@ impl<'scope> DataType<'scope> {
         unsafe { Ok(self.is_atomic_field_unchecked(idx)) }
     }
 
-    #[cfg(not(feature = "julia-1-6"))]
     /// Returns true if the field at position `idx` is an atomic field.
     ///
     /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
     /// function.
+    #[julia_version(since = "1.7")]
     pub unsafe fn is_atomic_field_unchecked(self, idx: usize) -> bool {
         /*
             const uint32_t *atomicfields = st->name->atomicfields;
@@ -592,7 +599,7 @@ impl<'scope> DataType<'scope> {
         isatomic != 0
     }
 
-    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7")))]
+    #[julia_version(since = "1.8")]
     /// Returns true if the field at position `idx` is a constant field.
     pub fn is_const_field(self, idx: usize) -> JlrsResult<bool> {
         if idx >= self.n_fields() as usize {
@@ -607,7 +614,7 @@ impl<'scope> DataType<'scope> {
         unsafe { Ok(self.is_const_field_unchecked(idx)) }
     }
 
-    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7")))]
+    #[julia_version(since = "1.8")]
     /// Returns true if the field at position `idx` is a constant field.
     ///
     /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
@@ -643,7 +650,7 @@ impl<'scope> DataType<'scope> {
     /// arbitrary concrete `DataType`s, at the cost that each of its fields must have already been
     /// allocated as a `Value`. This functions returns an error if the given `DataType` isn't
     /// concrete or is an array type. For custom array types you must use [`Array::new_for`].
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+    #[julia_version(windows_lts = false)]
     pub fn instantiate<'target, 'value, 'data, V, T>(
         self,
         target: T,
@@ -859,7 +866,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Core.PartialOpaque`
-    #[cfg(not(feature = "julia-1-6"))]
+    #[julia_version(since = "1.7")]
     pub fn partial_opaque_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -869,7 +876,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Core.InterConditional`
-    #[cfg(not(feature = "julia-1-6"))]
+    #[julia_version(since = "1.7")]
     pub fn interconditional_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -924,7 +931,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Vararg`.
-    #[cfg(not(feature = "julia-1-6"))]
+    #[julia_version(since = "1.7")]
     pub fn vararg_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1087,7 +1094,7 @@ impl<'base> DataType<'base> {
     }
 
     /// The type `Core.AtomicError`.
-    #[cfg(not(feature = "julia-1-6"))]
+    #[julia_version(since = "1.7")]
     pub fn atomicerror_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1481,7 +1488,7 @@ pub struct DatatypeLayout<'scope>(NonNull<jl_datatype_layout_t>, PhantomData<&'s
 
 impl DatatypeLayout<'_> {
     /// Returns the size of the `DataType`.
-    #[cfg(any(feature = "julia-1-9", feature = "julia-1-10"))]
+    #[julia_version(since = "1.9")]
     pub fn size(self) -> u32 {
         unsafe { self.0.as_ref().size }
     }

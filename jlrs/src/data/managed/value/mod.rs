@@ -1,4 +1,4 @@
-//! Managed for arbitrary Julia data.
+//! Managed type for arbitrary Julia data.
 //!
 //! Julia data returned by the C API is often returned as a pointer to `jl_value_t`, which is
 //! an opaque type. This pointer is wrapped in jlrs by [`Value`]. The layout of the data that is
@@ -10,11 +10,10 @@
 //! Julia's internal array type, `jl_array_t`. In the first case tha value can be unboxed as a
 //! `u8`, in the second case it can be cast to [`Array`] or [`TypedArray<isize>`].
 //!
-//! The `Value` wrapper is very commonly used in jlrs. A `Value` can be called as a Julia
-//! function, the arguments such a function takes are all `Value`s, and it will return either a
-//! `Value` or an exception which is also a `Value`. This wrapper also provides methods to create
-//! new `Value`s, access their fields, cast them to the appropriate pointer wrapper type, and
-//! unbox their contents.
+//! The `Value` type is very commonly used in jlrs. A `Value` can be called as a Julia function,
+//! the arguments such a function takes are all `Value`s, and it will return either a `Value` or
+//! an exception which is also a `Value`. This type also provides methods to create new `Value`s,
+//! access their fields, cast them to the appropriate managed type, and unbox their contents.
 //!
 //! One special kind of value is the `NamedTuple`. You will need to create values of this type in
 //! order to call functions with keyword arguments. The macro [`named_tuple`] is defined in this
@@ -121,6 +120,7 @@ use jl_sys::{
     jl_set_nth_field, jl_stackovf_exception, jl_stderr_obj, jl_stdout_obj, jl_subtype, jl_true,
     jl_typeof_str, jl_undefref_exception, jl_value_t,
 };
+use jlrs_macros::julia_version;
 
 use self::field_accessor::FieldAccessor;
 use super::Ref;
@@ -164,15 +164,17 @@ use crate::{
 /// heap allocation is required to store them.
 pub const MAX_SIZE: usize = 8;
 
-/// See the [module-level documentation] for more information.
+/// Arbitrary Julia data.
 ///
-/// A `Value` is a wrapper around a non-null pointer to some data owned by the Julia garbage
-/// collector, it has two lifetimes: `'scope` and `'data`. The first of these ensures that a
+/// A `Value` is essentially a non-null pointer to some data owned by the Julia garbage
+/// collector with two lifetimes: `'scope` and `'data`. The first of these ensures that a
 /// `Value` can only be used while it's rooted, the second accounts for data borrowed from Rust.
 /// The only way to borrow data from Rust is to create an Julia array that borrows its contents
 ///  by calling [`Array::from_slice`]; if a Julia function is called with such an array as an
 /// argument the result will inherit the second lifetime of the borrowed data to ensure that
 /// such a `Value` can only be used while the borrow is active.
+///
+/// See the [module-level documentation] for more information.
 #[repr(transparent)]
 #[derive(Copy, Clone, Eq)]
 pub struct Value<'scope, 'data>(
@@ -280,7 +282,7 @@ impl Value<'_, '_> {
     /// If the types can't be applied to `self` this methods catches and returns the exception.
     ///
     /// [`Union::new`]: crate::data::managed::union::Union::new
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+    #[julia_version(windows_lts = false)]
     pub fn apply_type<'target, 'value, 'data, V, T>(
         self,
         target: T,
@@ -553,9 +555,9 @@ impl<'scope, 'data> Value<'scope, 'data> {
 /// # Conversions
 ///
 /// There are two ways to convert a [`Value`] to some other type. The first is casting, which is
-/// used to convert a [`Value`] to the appropriate pointer wrapper type. For example, if the
+/// used to convert a [`Value`] to the appropriate managed type. For example, if the
 /// [`Value`] is a Julia array it can be cast to [`Array`]. Because this only involves a pointer
-/// cast it's always possible to convert a wrapper to a [`Value`] by calling
+/// cast it's always possible to convert a managed type to a [`Value`] by calling
 /// [`Managed::as_value`]. The second way is unboxing, which is used to copy the data the
 /// [`Value`] points to to Rust. If a [`Value`] is a `UInt8`, it can be unboxed as a `u8`. By
 /// default, jlrs can unbox the default primitive types and Julia strings, but the [`Unbox`] trait
@@ -563,8 +565,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
 /// Unlike casting, unboxing dereferences the pointer. As a result it loses its header, so an
 /// unboxed value can't be used as a [`Value`] again without reallocating it.
 impl<'scope, 'data> Value<'scope, 'data> {
-    /// Cast the value to a pointer wrapper type `T`. Returns an error if the conversion is
-    /// invalid.
+    /// Cast the value to a managed type `T`. Returns an error if the conversion is invalid.
     pub fn cast<T: Managed<'scope, 'data> + Typecheck>(self) -> JlrsResult<T> {
         if self.is::<T>() {
             // Safety: self.is::<T>() returning true guarantees this is safe
@@ -576,7 +577,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
         }
     }
 
-    /// Cast the value to a pointer wrapper type `T` without checking if this conversion is valid.
+    /// Cast the value to a managed type `T` without checking if this conversion is valid.
     ///
     /// Safety: You must guarantee `self.is::<T>()` would have returned `true`.
     pub unsafe fn cast_unchecked<T: Managed<'scope, 'data>>(self) -> T {
@@ -803,7 +804,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// Safety: Mutating things that should absolutely not be mutated, like the fields of a
     /// `DataType`, is not prevented.
 
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+    #[julia_version(windows_lts = false)]
     pub unsafe fn set_nth_field<'target, T>(
         self,
         target: T,
@@ -870,7 +871,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     ///
     /// Safety: Mutating things that should absolutely not be mutated, like the fields of a
     /// `DataType`, is not prevented.
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+    #[julia_version(windows_lts = false)]
     pub unsafe fn set_field<'target, N, T>(
         self,
         target: T,

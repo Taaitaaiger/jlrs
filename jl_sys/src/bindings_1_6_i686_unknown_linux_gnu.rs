@@ -85,72 +85,7 @@ pub type __sig_atomic_t = ::std::os::raw::c_int;
 pub struct __sigset_t {
     pub __val: [::std::os::raw::c_ulong; 32usize],
 }
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union __atomic_wide_counter {
-    pub __value64: ::std::os::raw::c_ulonglong,
-    pub __value32: __atomic_wide_counter__bindgen_ty_1,
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct __atomic_wide_counter__bindgen_ty_1 {
-    pub __low: ::std::os::raw::c_uint,
-    pub __high: ::std::os::raw::c_uint,
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct __pthread_internal_slist {
-    pub __next: *mut __pthread_internal_slist,
-}
-pub type __pthread_slist_t = __pthread_internal_slist;
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub struct __pthread_mutex_s {
-    pub __lock: ::std::os::raw::c_int,
-    pub __count: ::std::os::raw::c_uint,
-    pub __owner: ::std::os::raw::c_int,
-    pub __kind: ::std::os::raw::c_int,
-    pub __nusers: ::std::os::raw::c_uint,
-    pub __bindgen_anon_1: __pthread_mutex_s__bindgen_ty_1,
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union __pthread_mutex_s__bindgen_ty_1 {
-    pub __elision_data: __pthread_mutex_s__bindgen_ty_1__bindgen_ty_1,
-    pub __list: __pthread_slist_t,
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct __pthread_mutex_s__bindgen_ty_1__bindgen_ty_1 {
-    pub __espins: ::std::os::raw::c_short,
-    pub __eelision: ::std::os::raw::c_short,
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub struct __pthread_cond_s {
-    pub __wseq: __atomic_wide_counter,
-    pub __g1_start: __atomic_wide_counter,
-    pub __g_refs: [::std::os::raw::c_uint; 2usize],
-    pub __g_size: [::std::os::raw::c_uint; 2usize],
-    pub __g1_orig_size: ::std::os::raw::c_uint,
-    pub __wrefs: ::std::os::raw::c_uint,
-    pub __g_signals: [::std::os::raw::c_uint; 2usize],
-}
 pub type pthread_t = ::std::os::raw::c_ulong;
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union pthread_mutex_t {
-    pub __data: __pthread_mutex_s,
-    pub __size: [::std::os::raw::c_char; 24usize],
-    pub __align: ::std::os::raw::c_long,
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union pthread_cond_t {
-    pub __data: __pthread_cond_s,
-    pub __size: [::std::os::raw::c_char; 48usize],
-    pub __align: ::std::os::raw::c_longlong,
-}
 pub type sig_atomic_t = __sig_atomic_t;
 pub type __jmp_buf = [::std::os::raw::c_int; 6usize];
 #[repr(C)]
@@ -160,8 +95,8 @@ pub struct __jmp_buf_tag {
     pub __mask_was_saved: ::std::os::raw::c_int,
     pub __saved_mask: __sigset_t,
 }
-pub type uv_mutex_t = pthread_mutex_t;
-pub type uv_cond_t = pthread_cond_t;
+pub type uv_mutex_t = [u32; 6usize];
+pub type uv_cond_t = [u32; 12usize];
 pub type uint_t = u32;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -271,7 +206,7 @@ pub struct _jl_bt_element_t {
     _unused: [u8; 0],
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct _jl_tls_states_t {
     pub pgcstack: *mut _jl_gcframe_t,
     pub world_age: usize,
@@ -1888,12 +1823,6 @@ extern "C" {
 }
 extern "C" {
     pub fn jlrs_array_data_owner_offset(n_dims: u16) -> uint_t;
-}
-extern "C" {
-    pub fn jlrs_lock(v: *mut jl_value_t);
-}
-extern "C" {
-    pub fn jlrs_unlock(v: *mut jl_value_t);
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]

@@ -1,15 +1,21 @@
-//! Managed for `Method`.
+//! Managed type for `Method`.
 //!
 //! The documentation for this module has been slightly adapted from the comments for this struct
 //! in [`julia.h`]
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L273
 
+#[julia_version(since = "1.7")]
+use std::sync::atomic::Ordering;
 use std::{marker::PhantomData, ptr::NonNull};
 
-use cfg_if::cfg_if;
 use jl_sys::{jl_method_t, jl_method_type};
+use jlrs_macros::julia_version;
 
+#[julia_version(since = "1.8")]
+use crate::data::managed::array::TypedArrayData;
+#[julia_version(since = "1.8")]
+use crate::data::managed::array::TypedArrayRef;
 use crate::{
     data::managed::{
         array::{ArrayData, ArrayRef},
@@ -25,17 +31,6 @@ use crate::{
     memory::target::Target,
     private::Private,
 };
-
-cfg_if! {
-    if #[cfg(not(feature = "julia-1-6"))] {
-        use std::sync::atomic::Ordering;
-    }
-}
-
-#[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7")))]
-use crate::data::managed::array::TypedArrayData;
-#[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7")))]
-use crate::data::managed::array::TypedArrayRef;
 
 /// This type describes a single method definition, and stores data shared by the specializations
 /// of a function.
@@ -143,50 +138,66 @@ impl<'scope> Method<'scope> {
     }
 
     /// Table of all `Method` specializations, allocated as [hashable, ..., NULL, linear, ....]
+    #[julia_version(until = "1.6")]
     pub fn specializations<'target, T>(self, target: T) -> Option<SimpleVectorData<'target, T>>
     where
         T: Target<'target>,
     {
-        cfg_if! {
-            if #[cfg(feature = "julia-1-6")] {
-                // Safety: the pointer points to valid data
-                unsafe {
-                    let specializations = self.unwrap_non_null(Private).as_ref().specializations;
-                    let specializations = NonNull::new(specializations)?;
-                    Some(SimpleVectorRef::wrap(specializations).root(target))
-                }
-            } else {
-                // Safety: the pointer points to valid data
-                unsafe {
-                    let specializations = self.unwrap_non_null(Private).as_ref().specializations.load(Ordering::Relaxed);
-                    let specializations = NonNull::new(specializations)?;
-                    Some(SimpleVectorRef::wrap(specializations).root(target))
-                }
-            }
+        // Safety: the pointer points to valid data
+        unsafe {
+            let specializations = self.unwrap_non_null(Private).as_ref().specializations;
+            let specializations = NonNull::new(specializations)?;
+            Some(SimpleVectorRef::wrap(specializations).root(target))
+        }
+    }
+
+    /// Table of all `Method` specializations, allocated as [hashable, ..., NULL, linear, ....]
+    #[julia_version(since = "1.7")]
+    pub fn specializations<'target, T>(self, target: T) -> Option<SimpleVectorData<'target, T>>
+    where
+        T: Target<'target>,
+    {
+        // Safety: the pointer points to valid data
+        unsafe {
+            let specializations = self
+                .unwrap_non_null(Private)
+                .as_ref()
+                .specializations
+                .load(Ordering::Relaxed);
+            let specializations = NonNull::new(specializations)?;
+            Some(SimpleVectorRef::wrap(specializations).root(target))
         }
     }
 
     /// Index lookup by hash into specializations
+    #[julia_version(until = "1.6")]
     pub fn spec_key_set<'target, T>(self, target: T) -> Option<ArrayData<'target, 'static, T>>
     where
         T: Target<'target>,
     {
-        cfg_if! {
-            if #[cfg(feature = "julia-1-6")] {
-                // Safety: the pointer points to valid data
-                unsafe {
-                    let speckeyset = self.unwrap_non_null(Private).as_ref().speckeyset;
-                    let speckeyset = NonNull::new(speckeyset)?;
-                    Some(ArrayRef::wrap(speckeyset).root(target))
-                }
-            } else {
-                // Safety: the pointer points to valid data
-                unsafe {
-                    let speckeyset = self.unwrap_non_null(Private).as_ref().speckeyset.load(Ordering::Relaxed);
-                    let speckeyset = NonNull::new(speckeyset)?;
-                    Some(ArrayRef::wrap(speckeyset).root(target))
-                }
-            }
+        // Safety: the pointer points to valid data
+        unsafe {
+            let speckeyset = self.unwrap_non_null(Private).as_ref().speckeyset;
+            let speckeyset = NonNull::new(speckeyset)?;
+            Some(ArrayRef::wrap(speckeyset).root(target))
+        }
+    }
+
+    /// Index lookup by hash into specializations
+    #[julia_version(since = "1.7")]
+    pub fn spec_key_set<'target, T>(self, target: T) -> Option<ArrayData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
+        // Safety: the pointer points to valid data
+        unsafe {
+            let speckeyset = self
+                .unwrap_non_null(Private)
+                .as_ref()
+                .speckeyset
+                .load(Ordering::Relaxed);
+            let speckeyset = NonNull::new(speckeyset)?;
+            Some(ArrayRef::wrap(speckeyset).root(target))
         }
     }
 
@@ -204,7 +215,7 @@ impl<'scope> Method<'scope> {
     }
 
     /// reference to the method table this method is part of, null if part of the internal table
-    #[cfg(not(feature = "julia-1-6"))]
+    #[julia_version(since = "1.7")]
     pub fn external_mt(self) -> Option<ValueRef<'scope, 'static>> {
         // Safety: the pointer points to valid data
         unsafe {
@@ -228,26 +239,34 @@ impl<'scope> Method<'scope> {
     }
 
     /// Unspecialized executable method instance, or `None`
+    #[julia_version(until = "1.6")]
     pub fn unspecialized<'target, T>(self, target: T) -> Option<MethodInstanceData<'target, T>>
     where
         T: Target<'target>,
     {
-        cfg_if! {
-            if #[cfg(feature = "julia-1-6")] {
-                // Safety: the pointer points to valid data
-                unsafe {
-                    let unspecialized = self.unwrap_non_null(Private).as_ref().unspecialized;
-                    let unspecialized = NonNull::new(unspecialized)?;
-                    Some(MethodInstanceRef::wrap(unspecialized).root(target))
-                }
-            } else {
-                // Safety: the pointer points to valid data
-                unsafe {
-                    let unspecialized = self.unwrap_non_null(Private).as_ref().unspecialized.load(Ordering::Relaxed);
-                    let unspecialized = NonNull::new(unspecialized)?;
-                    Some(MethodInstanceRef::wrap(unspecialized).root(target))
-                }
-            }
+        // Safety: the pointer points to valid data
+        unsafe {
+            let unspecialized = self.unwrap_non_null(Private).as_ref().unspecialized;
+            let unspecialized = NonNull::new(unspecialized)?;
+            Some(MethodInstanceRef::wrap(unspecialized).root(target))
+        }
+    }
+
+    /// Unspecialized executable method instance, or `None`
+    #[julia_version(since = "1.7")]
+    pub fn unspecialized<'target, T>(self, target: T) -> Option<MethodInstanceData<'target, T>>
+    where
+        T: Target<'target>,
+    {
+        // Safety: the pointer points to valid data
+        unsafe {
+            let unspecialized = self
+                .unwrap_non_null(Private)
+                .as_ref()
+                .unspecialized
+                .load(Ordering::Relaxed);
+            let unspecialized = NonNull::new(unspecialized)?;
+            Some(MethodInstanceRef::wrap(unspecialized).root(target))
         }
     }
 
@@ -278,7 +297,7 @@ impl<'scope> Method<'scope> {
     }
 
     /// RLE (build_id, offset) pairs (even/odd indexing)
-    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7")))]
+    #[julia_version(since = "1.8")]
     pub fn root_blocks<'target, T>(
         self,
         target: T,
@@ -296,7 +315,7 @@ impl<'scope> Method<'scope> {
     }
 
     /// # of roots stored in the system image
-    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7")))]
+    #[julia_version(since = "1.8")]
     pub fn nroots_sysimg(self) -> i32 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().nroots_sysimg }
@@ -318,26 +337,36 @@ impl<'scope> Method<'scope> {
     /// Cache of specializations of this method for invoke(), i.e.
     /// cases where this method was called even though it was not necessarily
     /// the most specific for the argument types.
+    #[julia_version(until = "1.6")]
     pub fn invokes<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
     {
-        cfg_if! {
-            if #[cfg(feature = "julia-1-6")] {
-                // Safety: the pointer points to valid data
-                unsafe {
-                    let invokes = self.unwrap_non_null(Private).as_ref().invokes;
-                    let invokes = NonNull::new(invokes)?;
-                    Some(ValueRef::wrap(invokes).root(target))
-                }
-            } else {
-                // Safety: the pointer points to valid data
-                unsafe {
-                    let invokes = self.unwrap_non_null(Private).as_ref().invokes.load(Ordering::Relaxed);
-                    let invokes = NonNull::new(invokes)?;
-                    Some(ValueRef::wrap(invokes).root(target))
-                }
-            }
+        // Safety: the pointer points to valid data
+        unsafe {
+            let invokes = self.unwrap_non_null(Private).as_ref().invokes;
+            let invokes = NonNull::new(invokes)?;
+            Some(ValueRef::wrap(invokes).root(target))
+        }
+    }
+
+    /// Cache of specializations of this method for invoke(), i.e.
+    /// cases where this method was called even though it was not necessarily
+    /// the most specific for the argument types.
+    #[julia_version(since = "1.7")]
+    pub fn invokes<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
+        // Safety: the pointer points to valid data
+        unsafe {
+            let invokes = self
+                .unwrap_non_null(Private)
+                .as_ref()
+                .invokes
+                .load(Ordering::Relaxed);
+            let invokes = NonNull::new(invokes)?;
+            Some(ValueRef::wrap(invokes).root(target))
         }
     }
 
@@ -379,14 +408,14 @@ impl<'scope> Method<'scope> {
     }
 
     /// The `is_for_opaque_closure` field of this `Method`
-    #[cfg(not(feature = "julia-1-6"))]
+    #[julia_version(since = "1.7")]
     pub fn is_for_opaque_closure(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().is_for_opaque_closure != 0 }
     }
 
     /// 0x00 = use heuristic; 0x01 = aggressive; 0x02 = none
-    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7")))]
+    #[julia_version(since = "1.8")]
     pub fn constprop(self) -> u8 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().constprop }
@@ -394,7 +423,7 @@ impl<'scope> Method<'scope> {
 
     /// Override the conclusions of inter-procedural effect analysis,
     /// forcing the conclusion to always true.
-    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7")))]
+    #[julia_version(since = "1.8")]
     pub fn purity(self) -> u8 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().purity.bits }
