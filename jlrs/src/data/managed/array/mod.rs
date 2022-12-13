@@ -105,6 +105,7 @@ pub struct Array<'scope, 'data>(
 );
 
 impl<'data> Array<'_, 'data> {
+    #[julia_version(windows_lts = false)]
     /// Allocate a new n-dimensional Julia array of dimensions `dims` for data of type `T`.
     ///
     /// This method can only be used in combination with types that implement `IntoJulia`. If you
@@ -114,7 +115,6 @@ impl<'data> Array<'_, 'data> {
     /// If the array size is too large, Julia will throw an error. This error is caught and
     /// returned.
 
-    #[julia_version(windows_lts = false)]
     pub fn new<'target, 'current, 'borrow, T, D, S>(
         target: ExtendedTarget<'target, 'current, 'borrow, S>,
         dims: D,
@@ -227,13 +227,13 @@ impl<'data> Array<'_, 'data> {
             .unwrap()
     }
 
+    #[julia_version(windows_lts = false)]
     /// Allocate a new n-dimensional Julia array of dimensions `dims` for data of type `ty`.
     ///
     /// The elementy type, ty` must be a` Union`, `UnionAll` or `DataType`.
     ///
     /// If the array size is too large or if the type is invalid, Julia will throw an error. This
     /// error is caught and returned.
-    #[julia_version(windows_lts = false)]
     pub fn new_for<'target, 'current, 'borrow, D, S>(
         target: ExtendedTarget<'target, 'current, 'borrow, S>,
         dims: D,
@@ -345,6 +345,7 @@ impl<'data> Array<'_, 'data> {
             .unwrap()
     }
 
+    #[julia_version(windows_lts = false)]
     /// Create a new n-dimensional Julia array of dimensions `dims` that borrows data from Rust.
     ///
     /// This method can only be used in combination with types that implement `IntoJulia`. Because
@@ -353,7 +354,6 @@ impl<'data> Array<'_, 'data> {
     ///
     /// If the array size is too large, Julia will throw an error. This error is caught and
     /// returned.
-    #[julia_version(windows_lts = false)]
     pub fn from_slice<'target: 'current, 'current: 'borrow, 'borrow, T, D, S>(
         target: ExtendedTarget<'target, 'current, 'borrow, S>,
         data: &'data mut [T],
@@ -491,6 +491,7 @@ impl<'data> Array<'_, 'data> {
         })
     }
 
+    #[julia_version(windows_lts = false)]
     /// Create a new n-dimensional Julia array of dimensions `dims` that takes ownership of Rust
     /// data.
     ///
@@ -500,7 +501,6 @@ impl<'data> Array<'_, 'data> {
     ///
     /// If the array size is too large, Julia will throw an error. This error is caught and
     /// returned.
-    #[julia_version(windows_lts = false)]
     pub fn from_vec<'target, 'current, 'borrow, T, D, S>(
         target: ExtendedTarget<'target, 'current, 'borrow, S>,
         data: Vec<T>,
@@ -1016,12 +1016,12 @@ impl<'scope, 'data> Array<'scope, 'data> {
         std::slice::from_raw_parts_mut(data, len)
     }
 
+    #[julia_version(windows_lts = false)]
     /// Reshape the array, a new array is returned that has dimensions `dims`. The new array and
     /// `self` share their data.
     ///
     /// This method returns an exception if the old and new array have a different number of
     /// elements.
-    #[julia_version(windows_lts = false)]
     pub unsafe fn reshape<'target, 'current, 'borrow, D, S>(
         &self,
         target: ExtendedTarget<'target, 'current, 'borrow, S>,
@@ -1186,11 +1186,11 @@ impl<'scope, 'data> Array<'scope, 'data> {
 }
 
 impl<'scope> Array<'scope, 'static> {
+    #[julia_version(windows_lts = false)]
     /// Insert `inc` elements at the end of the array.
     ///
     /// The array must be 1D and not contain data borrowed or moved from Rust, otherwise an exception
     /// is returned.
-    #[julia_version(windows_lts = false)]
     pub unsafe fn grow_end<'target, S>(
         &mut self,
         target: S,
@@ -1224,11 +1224,11 @@ impl<'scope> Array<'scope, 'static> {
         jl_array_grow_end(self.unwrap(Private), inc);
     }
 
+    #[julia_version(windows_lts = false)]
     /// Remove `dec` elements from the end of the array.
     ///
     /// The array must be 1D, not contain data borrowed or moved from Rust, otherwise an exception
     /// is returned.
-    #[julia_version(windows_lts = false)]
     pub unsafe fn del_end<'target, S>(&mut self, target: S, dec: usize) -> S::Exception<'static, ()>
     where
         S: Target<'target>,
@@ -1257,11 +1257,11 @@ impl<'scope> Array<'scope, 'static> {
         jl_array_del_end(self.unwrap(Private), dec);
     }
 
+    #[julia_version(windows_lts = false)]
     /// Insert `inc` elements at the beginning of the array.
     ///
     /// The array must be 1D, not contain data borrowed or moved from Rust, otherwise an exception
     /// is returned.
-    #[julia_version(windows_lts = false)]
     pub unsafe fn grow_begin<'target, S>(
         &mut self,
         target: S,
@@ -1294,11 +1294,11 @@ impl<'scope> Array<'scope, 'static> {
         jl_array_grow_beg(self.unwrap(Private), inc);
     }
 
+    #[julia_version(windows_lts = false)]
     /// Remove `dec` elements from the beginning of the array.
     ///
     /// The array must be 1D, not contain data borrowed or moved from Rust, otherwise an exception
     /// is returned.
-    #[julia_version(windows_lts = false)]
     pub unsafe fn del_begin<'target, S>(
         &mut self,
         target: S,
@@ -1383,6 +1383,7 @@ impl<'data, T> TypedArray<'_, 'data, T>
 where
     T: ValidField + IntoJulia,
 {
+    #[julia_version(windows_lts = false)]
     /// Allocate a new n-dimensional Julia array of dimensions `dims` for data of type `T`.
     ///
     /// This method can only be used in combination with types that implement `IntoJulia`. If you
@@ -1391,7 +1392,6 @@ where
     ///
     /// If the array size is too large, Julia will throw an error. This error is caught and
     /// returned.
-    #[julia_version(windows_lts = false)]
     pub fn new<'target, 'current, 'borrow, D, S>(
         target: ExtendedTarget<'target, 'current, 'borrow, S>,
         dims: D,
@@ -1451,6 +1451,7 @@ where
             .unwrap()
     }
 
+    #[julia_version(windows_lts = false)]
     /// Create a new n-dimensional Julia array of dimensions `dims` that borrows data from Rust.
     ///
     /// This method can only be used in combination with types that implement `IntoJulia`. Because
@@ -1459,7 +1460,6 @@ where
     ///
     /// If the array size is too large, Julia will throw an error. This error is caught and
     /// returned.
-    #[julia_version(windows_lts = false)]
     pub fn from_slice<'target: 'current, 'current: 'borrow, 'borrow, D, S>(
         target: ExtendedTarget<'target, 'current, 'borrow, S>,
         data: &'data mut [T],
@@ -1520,6 +1520,7 @@ where
         })
     }
 
+    #[julia_version(windows_lts = false)]
     /// Create a new n-dimensional Julia array of dimensions `dims` that takes ownership of Rust
     /// data.
     ///
@@ -1529,7 +1530,6 @@ where
     ///
     /// If the array size is too large, Julia will throw an error. This error is caught and
     /// returned.
-    #[julia_version(windows_lts = false)]
     pub fn from_vec<'target, 'current, 'borrow, D, S>(
         target: ExtendedTarget<'target, 'current, 'borrow, S>,
         data: Vec<T>,
@@ -1596,13 +1596,13 @@ impl<'data, T> TypedArray<'_, 'data, T>
 where
     T: ValidField,
 {
+    #[julia_version(windows_lts = false)]
     /// Allocate a new n-dimensional Julia array of dimensions `dims` for data of type `ty`.
     ///
     /// The elementy type, ty` must be a `Union`, `UnionAll` or `DataType`.
     ///
     /// If the array size is too large or if the type is invalid, Julia will throw an error. This
     /// error is caught and returned.
-    #[julia_version(windows_lts = false)]
     pub fn new_for<'target, 'current, 'borrow, D, S>(
         target: ExtendedTarget<'target, 'current, 'borrow, S>,
         dims: D,
@@ -1849,12 +1849,12 @@ where
         unsafe { std::mem::transmute(self) }
     }
 
+    #[julia_version(windows_lts = false)]
     /// Reshape the array, a new array is returned that has dimensions `dims`. The new array and
     /// `self` share their data.
     ///
     /// This method returns an exception if the old and new array have a different number of
     /// elements.
-    #[julia_version(windows_lts = false)]
     pub unsafe fn reshape<'target, 'current, 'borrow, D, S>(
         &self,
         target: ExtendedTarget<'target, 'current, 'borrow, S>,
@@ -2052,11 +2052,11 @@ impl<'scope, T> TypedArray<'scope, 'static, T>
 where
     T: ValidField,
 {
+    #[julia_version(windows_lts = false)]
     /// Insert `inc` elements at the end of the array.
     ///
     /// The array must be 1D and not contain data borrowed or moved from Rust, otherwise an exception
     /// is returned.
-    #[julia_version(windows_lts = false)]
     pub unsafe fn grow_end<'target, S>(
         &mut self,
         target: S,
@@ -2077,11 +2077,11 @@ where
         self.as_array().grow_end_unchecked(inc)
     }
 
+    #[julia_version(windows_lts = false)]
     /// Remove `dec` elements from the end of the array.
     ///
     /// The array must be 1D, not contain data borrowed or moved from Rust, otherwise an exception
     /// is returned.
-    #[julia_version(windows_lts = false)]
     pub unsafe fn del_end<'target, S>(&mut self, target: S, dec: usize) -> S::Exception<'static, ()>
     where
         S: Target<'target>,
@@ -2097,11 +2097,11 @@ where
         self.as_array().del_end_unchecked(dec)
     }
 
+    #[julia_version(windows_lts = false)]
     /// Insert `inc` elements at the beginning of the array.
     ///
     /// The array must be 1D, not contain data borrowed or moved from Rust, otherwise an exception
     /// is returned.
-    #[julia_version(windows_lts = false)]
     pub unsafe fn grow_begin<'target, S>(
         &mut self,
         target: S,
@@ -2122,11 +2122,11 @@ where
         self.as_array().grow_begin_unchecked(inc)
     }
 
+    #[julia_version(windows_lts = false)]
     /// Remove `dec` elements from the beginning of the array.
     ///
     /// The array must be 1D, not contain data borrowed or moved from Rust, otherwise an exception
     /// is returned.
-    #[julia_version(windows_lts = false)]
     pub unsafe fn del_begin<'target, S>(
         &mut self,
         target: S,

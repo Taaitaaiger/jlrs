@@ -238,12 +238,12 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
         Ok(self)
     }
 
+    #[julia_version(since = "1.7")]
     /// Update the accessor to point to `field`.
     ///
     /// If the field is a small atomic field `ordering` is used to read it. The ordering is
     /// ignored for non-atomic fields and fields that require a lock to access. See
     /// [`FieldAccessor::field`] for more information.
-    #[julia_version(since = "1.7")]
     pub fn atomic_field<F: FieldIndex>(mut self, field: F, ordering: Ordering) -> JlrsResult<Self> {
         if self.value.is_none() {
             Err(AccessError::UndefRef)?
@@ -324,14 +324,14 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
         })
     }
 
-    /// Returns `true` if the current value the accessor is accessing is locked.
     #[julia_version(since = "1.7")]
+    /// Returns `true` if the current value the accessor is accessing is locked.
     pub fn is_locked(&self) -> bool {
         self.state == ViewState::Locked
     }
 
-    /// Returns `true` if the current value the accessor is accessing is locked.
     #[julia_version(until = "1.6")]
+    /// Returns `true` if the current value the accessor is accessing is locked.
     pub fn is_locked(&self) -> bool {
         false
     }
@@ -383,8 +383,8 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
         }
     }
 
-    // Safety: the view state must be ViewState::Unlocked
     #[julia_version(since = "1.7")]
+    // Safety: the view state must be ViewState::Unlocked
     unsafe fn get_unlocked_inline_field(
         &mut self,
         is_pointer_field: bool,
@@ -413,8 +413,8 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
         }
     }
 
-    // Safety: the view state must be ViewState::Unlocked
     #[julia_version(until = "1.6")]
+    // Safety: the view state must be ViewState::Unlocked
     unsafe fn get_unlocked_inline_field(
         &mut self,
         is_pointer_field: bool,
@@ -434,8 +434,8 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
         }
     }
 
-    // Safety: the view state must be ViewState::Locked
     #[julia_version(since = "1.7")]
+    // Safety: the view state must be ViewState::Locked
     unsafe fn get_locked_inline_field(
         &mut self,
         is_pointer_field: bool,

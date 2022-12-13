@@ -142,13 +142,13 @@ impl<'scope> Module<'scope> {
         }
     }
 
+    #[julia_version(windows_lts = false)]
     /// Set a global value in this module. Note that if this global already exists, this can
     /// make the old value unreachable. If an excection is thrown, it's caught, rooted and
     /// returned.
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
     /// this value is allowed.
-    #[julia_version(windows_lts = false)]
     pub unsafe fn set_global<'target, N, T>(
         self,
         target: T,
@@ -201,10 +201,10 @@ impl<'scope> Module<'scope> {
         );
     }
 
+    #[julia_version(windows_lts = false)]
     /// Set a constant in this module. If Julia throws an exception it's caught and rooted in the
     /// current frame, if the exception can't be rooted a `JlrsError::AllocError` is returned. If
     /// no exception is thrown an unrooted reference to the constant is returned.
-    #[julia_version(windows_lts = false)]
     pub fn set_const<'target, N, T>(
         self,
         target: T,

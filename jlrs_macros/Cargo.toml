@@ -20,10 +20,12 @@ julia-1-8 = []
 julia-1-9 = []
 julia-1-10 = []
 
+derive = ["proc-macro2", "syn", "quote"]
+
 [lib]
 proc-macro = true
 
 [dependencies]
-proc-macro2 = "1"
-syn = "1"
-quote = "1"
+proc-macro2 = { version = "1", optional = true }
+syn = { version = "1", optional = true }
+quote = { version = "1", optional = true }

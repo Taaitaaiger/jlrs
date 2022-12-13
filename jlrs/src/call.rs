@@ -527,6 +527,7 @@ cfg_if::cfg_if! {
                 Ok(res)
             }
 
+            #[julia_version(since = "1.9")]
             /// Call a function on another thread with the given arguments. This method uses
             /// `Base.Threads.@spawn` to call the given function on another thread but return immediately.
             /// While `await`ing the result the async runtime can work on other tasks, the current task
@@ -537,7 +538,6 @@ cfg_if::cfg_if! {
             /// check if any of the arguments is currently borrowed from Rust.
             ///
             /// [`safety`]: crate::safety
-            #[julia_version(since = "1.9")]
             async unsafe fn call_async_interactive<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
@@ -546,6 +546,7 @@ cfg_if::cfg_if! {
             where
                 V: AsRef<[Value<'value, 'data>]>;
 
+                #[julia_version(since = "1.9")]
             /// Call a function on another thread with the given arguments. This method uses
             /// `Base.Threads.@spawn` to call the given function on another thread but return immediately.
             /// While `await`ing the result the async runtime can work on other tasks, the current task
@@ -558,7 +559,6 @@ cfg_if::cfg_if! {
             /// returns an `AccessError::BorrowError` if any of the arguments is.
             ///
             /// [`safety`]: crate::safety
-            #[julia_version(since = "1.9")]
             async unsafe fn call_async_interactive_tracked<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
@@ -594,6 +594,7 @@ cfg_if::cfg_if! {
                 Ok(res)
             }
 
+            #[julia_version(since = "1.9")]
             /// Does the same thing as [`CallAsync::call_async`], but the task is returned rather than an
             /// awaitable `Future`. This method should only be called in [`PersistentTask::init`],
             /// otherwise it's not guaranteed this task can make progress.
@@ -604,7 +605,6 @@ cfg_if::cfg_if! {
             ///
             /// [`safety`]: crate::safety
             /// [`PersistentTask::init`]: crate::async_util::task::PersistentTask::init
-            #[julia_version(since = "1.9")]
             unsafe fn schedule_async_interactive<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
@@ -614,7 +614,8 @@ cfg_if::cfg_if! {
                 V: AsRef<[Value<'value, 'data>]>;
 
 
-            /// Does the same thing as [`CallAsync::call_async`], but the task is returned rather than an
+                #[julia_version(since = "1.9")]
+                /// Does the same thing as [`CallAsync::call_async`], but the task is returned rather than an
             /// awaitable `Future`. This method should only be called in [`PersistentTask::init`],
             /// otherwise it's not guaranteed this task can make progress.
             ///
@@ -626,7 +627,6 @@ cfg_if::cfg_if! {
             ///
             /// [`safety`]: crate::safety
             /// [`PersistentTask::init`]: crate::async_util::task::PersistentTask::init
-            #[julia_version(since = "1.9")]
             unsafe fn schedule_async_interactive_tracked<'target, 'value, V, T>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,

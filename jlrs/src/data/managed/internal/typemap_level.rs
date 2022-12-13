@@ -41,8 +41,8 @@ impl<'scope> TypeMapLevel<'scope> {
     any: Any (mut) _Atomic
     */
 
-    /// The `arg1` field.
     #[julia_version(until = "1.6")]
+    /// The `arg1` field.
     pub fn arg1<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
@@ -55,8 +55,8 @@ impl<'scope> TypeMapLevel<'scope> {
         }
     }
 
-    /// The `arg1` field.
     #[julia_version(since = "1.7")]
+    /// The `arg1` field.
     pub fn arg1<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
@@ -73,8 +73,8 @@ impl<'scope> TypeMapLevel<'scope> {
         }
     }
 
-    /// The `targ` field.
     #[julia_version(until = "1.6")]
+    /// The `targ` field.
     pub fn targ<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
@@ -87,8 +87,8 @@ impl<'scope> TypeMapLevel<'scope> {
         }
     }
 
-    /// The `targ` field.
     #[julia_version(since = "1.7")]
+    /// The `targ` field.
     pub fn targ<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
@@ -105,8 +105,8 @@ impl<'scope> TypeMapLevel<'scope> {
         }
     }
 
-    /// The `name1` field.
     #[julia_version(until = "1.6")]
+    /// The `name1` field.
     pub fn name1<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
@@ -119,8 +119,8 @@ impl<'scope> TypeMapLevel<'scope> {
         }
     }
 
-    /// The `name1` field.
     #[julia_version(since = "1.7")]
+    /// The `name1` field.
     pub fn name1<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
@@ -137,8 +137,8 @@ impl<'scope> TypeMapLevel<'scope> {
         }
     }
 
-    /// The `tname` field.
     #[julia_version(until = "1.6")]
+    /// The `tname` field.
     pub fn tname<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
@@ -151,8 +151,8 @@ impl<'scope> TypeMapLevel<'scope> {
         }
     }
 
-    /// The `tname` field.
     #[julia_version(since = "1.7")]
+    /// The `tname` field.
     pub fn tname<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
@@ -169,8 +169,8 @@ impl<'scope> TypeMapLevel<'scope> {
         }
     }
 
-    /// The `linear` field, which is called `list` in `Core.TypemapLevel`.
     #[julia_version(until = "1.6")]
+    /// The `linear` field, which is called `list` in `Core.TypemapLevel`.
     pub fn list<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
@@ -183,8 +183,8 @@ impl<'scope> TypeMapLevel<'scope> {
         }
     }
 
-    /// The `linear` field, which is called `list` in `Core.TypemapLevel`.
     #[julia_version(since = "1.7")]
+    /// The `linear` field, which is called `list` in `Core.TypemapLevel`.
     pub fn list<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
@@ -201,8 +201,8 @@ impl<'scope> TypeMapLevel<'scope> {
         }
     }
 
-    /// The `any` field.
     #[julia_version(until = "1.6")]
+    /// The `any` field.
     pub fn any<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
@@ -215,8 +215,8 @@ impl<'scope> TypeMapLevel<'scope> {
         }
     }
 
-    /// The `any` field.
     #[julia_version(since = "1.7")]
+    /// The `any` field.
     pub fn any<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,

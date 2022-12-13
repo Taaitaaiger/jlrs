@@ -99,23 +99,23 @@ impl<'scope> TypeName<'scope> {
         }
     }
 
-    /// The `atomicfields` field.
     #[julia_version(since = "1.7")]
+    /// The `atomicfields` field.
     pub fn atomicfields(self) -> *const u32 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().atomicfields }
     }
 
-    /// The `atomicfields` field.
     #[julia_version(since = "1.8")]
+    /// The `atomicfields` field.
     pub fn constfields(self) -> *const u32 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().constfields }
     }
 
+    #[cfg(feature = "extra-fields")]
     /// Either the only instantiation of the type (if no parameters) or a `UnionAll` accepting
     /// parameters to make an instantiation.
-    #[cfg(feature = "extra-fields")]
     pub fn wrapper(self) -> Value<'scope, 'static> {
         // Safety: the pointer points to valid data
         unsafe {
@@ -125,9 +125,9 @@ impl<'scope> TypeName<'scope> {
         }
     }
 
-    /// cache for Type{wrapper}
     #[julia_version(since = "1.9")]
     #[cfg(feature = "extra-fields")]
+    /// cache for Type{wrapper}
     pub fn typeof_wrapper<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
@@ -145,9 +145,9 @@ impl<'scope> TypeName<'scope> {
         }
     }
 
-    /// Sorted array.
     #[cfg(feature = "extra-fields")]
     #[julia_version(until = "1.6")]
+    /// Sorted array.
     pub fn cache<'target, T>(self, target: T) -> SimpleVectorData<'target, T>
     where
         T: Target<'target>,
@@ -160,9 +160,9 @@ impl<'scope> TypeName<'scope> {
         }
     }
 
-    /// Sorted array.
     #[cfg(feature = "extra-fields")]
     #[julia_version(since = "1.7")]
+    /// Sorted array.
     pub fn cache<'target, T>(self, target: T) -> SimpleVectorData<'target, T>
     where
         T: Target<'target>,
@@ -179,9 +179,9 @@ impl<'scope> TypeName<'scope> {
         }
     }
 
-    /// Unsorted array.
     #[julia_version(until = "1.6")]
     #[cfg(feature = "extra-fields")]
+    /// Unsorted array.
     pub fn linear_cache<'target, T>(self, target: T) -> SimpleVectorData<'target, T>
     where
         T: Target<'target>,
@@ -194,9 +194,9 @@ impl<'scope> TypeName<'scope> {
         }
     }
 
-    /// Unsorted array.
     #[julia_version(since = "1.7")]
     #[cfg(feature = "extra-fields")]
+    /// Unsorted array.
     pub fn linear_cache<'target, T>(self, target: T) -> SimpleVectorData<'target, T>
     where
         T: Target<'target>,
@@ -247,29 +247,29 @@ impl<'scope> TypeName<'scope> {
         unsafe { self.unwrap_non_null(Private).as_ref().hash }
     }
 
-    /// The `n_uninitialized` field.
     #[julia_version(since = "1.7")]
+    /// The `n_uninitialized` field.
     pub fn n_uninitialized(self) -> i32 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().n_uninitialized }
     }
 
-    /// The `abstract` field.
     #[julia_version(since = "1.7")]
+    /// The `abstract` field.
     pub fn is_abstract(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().abstract_() != 0 }
     }
 
-    /// The `mutabl` field.
     #[julia_version(since = "1.7")]
+    /// The `mutabl` field.
     pub fn is_mutable(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().mutabl() != 0 }
     }
 
-    /// The `mayinlinealloc` field.
     #[julia_version(since = "1.7")]
+    /// The `mayinlinealloc` field.
     pub fn mayinlinealloc(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().mayinlinealloc() != 0 }
@@ -304,8 +304,8 @@ impl<'base> TypeName<'base> {
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_vecelement_typename), Private) }
     }
 
-    /// The typename of the `UnionAll` `Vararg`.
     #[julia_version(until = "1.6")]
+    /// The typename of the `UnionAll` `Vararg`.
     pub fn of_vararg<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -323,8 +323,8 @@ impl<'base> TypeName<'base> {
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_array_typename), Private) }
     }
 
-    /// The typename of the `UnionAll` `Ptr`.
     #[julia_version(since = "1.7")]
+    /// The typename of the `UnionAll` `Ptr`.
     pub fn of_opaque_closure<T>(_: &T) -> Self
     where
         T: Target<'base>,

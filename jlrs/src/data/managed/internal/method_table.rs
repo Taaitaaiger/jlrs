@@ -58,8 +58,8 @@ impl<'scope> MethodTable<'scope> {
         }
     }
 
-    /// The `defs` field.
     #[julia_version(until = "1.6")]
+    /// The `defs` field.
     pub fn defs<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
@@ -72,8 +72,8 @@ impl<'scope> MethodTable<'scope> {
         }
     }
 
-    /// The `defs` field.
     #[julia_version(since = "1.7")]
+    /// The `defs` field.
     pub fn defs<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
@@ -90,8 +90,8 @@ impl<'scope> MethodTable<'scope> {
         }
     }
 
-    /// The `leafcache` field.
     #[julia_version(until = "1.6")]
+    /// The `leafcache` field.
     pub fn leafcache<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
@@ -104,8 +104,8 @@ impl<'scope> MethodTable<'scope> {
         }
     }
 
-    /// The `leafcache` field.
     #[julia_version(since = "1.7")]
+    /// The `leafcache` field.
     pub fn leafcache<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
@@ -122,8 +122,8 @@ impl<'scope> MethodTable<'scope> {
         }
     }
 
-    /// The `cache` field.
     #[julia_version(until = "1.6")]
+    /// The `cache` field.
     pub fn cache<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
@@ -136,8 +136,8 @@ impl<'scope> MethodTable<'scope> {
         }
     }
 
-    /// The `cache` field.
     #[julia_version(since = "1.7")]
+    /// The `cache` field.
     pub fn cache<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,

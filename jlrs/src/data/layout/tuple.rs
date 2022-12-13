@@ -50,8 +50,8 @@ use crate::{
 pub struct Tuple;
 
 impl Tuple {
-    /// Create a new tuple from the contents of `values`.
     #[julia_version(windows_lts = false)]
+    /// Create a new tuple from the contents of `values`.
     pub fn new<'target, 'current, 'borrow, 'value, 'data, V, T>(
         target: ExtendedTarget<'target, 'current, 'borrow, T>,
         values: V,

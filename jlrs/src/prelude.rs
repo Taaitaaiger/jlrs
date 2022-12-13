@@ -2,8 +2,9 @@
 
 #[cfg(feature = "async")]
 pub use async_trait::async_trait;
+pub use jlrs_macros::julia_version;
 #[cfg(feature = "jlrs-derive")]
-pub use jlrs_derive::*;
+pub use jlrs_macros::{IntoJulia, Typecheck, Unbox, ValidField, ValidLayout};
 
 #[cfg(feature = "ccall")]
 pub use crate::ccall::CCall;
