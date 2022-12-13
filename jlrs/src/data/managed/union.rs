@@ -22,6 +22,7 @@ use crate::{
 pub struct Union<'scope>(NonNull<jl_uniontype_t>, PhantomData<&'scope ()>);
 
 impl<'scope> Union<'scope> {
+    #[julia_version(windows_lts = false)]
     /// Returns the union of all types in `types`. For each of these types, [`Value::is_kind`]
     /// must return `true`. Note that the result is not necessarily a [`Union`], for example the
     /// union of a single [`DataType`] is that type, not a `Union` with a single variant.
@@ -30,7 +31,6 @@ impl<'scope> Union<'scope> {
     ///
     /// [`Union`]: crate::data::managed::union::Union
     /// [`DataType`]: crate::data::managed::datatype::DataType
-    #[julia_version(windows_lts = false)]
     pub fn new<'target, V, T>(target: T, types: V) -> ValueResult<'target, 'static, T>
     where
         V: AsRef<[Value<'scope, 'static>]>,

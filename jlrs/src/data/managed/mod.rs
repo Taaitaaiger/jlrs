@@ -73,6 +73,7 @@ pub mod function;
 #[cfg(feature = "internal-types")]
 pub mod internal;
 pub mod module;
+pub mod parachute;
 pub mod simple_vector;
 pub mod string;
 pub mod symbol;

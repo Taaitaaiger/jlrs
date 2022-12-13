@@ -137,8 +137,8 @@ impl<'scope> Method<'scope> {
         }
     }
 
-    /// Table of all `Method` specializations, allocated as [hashable, ..., NULL, linear, ....]
     #[julia_version(until = "1.6")]
+    /// Table of all `Method` specializations, allocated as [hashable, ..., NULL, linear, ....]
     pub fn specializations<'target, T>(self, target: T) -> Option<SimpleVectorData<'target, T>>
     where
         T: Target<'target>,
@@ -151,8 +151,8 @@ impl<'scope> Method<'scope> {
         }
     }
 
-    /// Table of all `Method` specializations, allocated as [hashable, ..., NULL, linear, ....]
     #[julia_version(since = "1.7")]
+    /// Table of all `Method` specializations, allocated as [hashable, ..., NULL, linear, ....]
     pub fn specializations<'target, T>(self, target: T) -> Option<SimpleVectorData<'target, T>>
     where
         T: Target<'target>,
@@ -169,8 +169,8 @@ impl<'scope> Method<'scope> {
         }
     }
 
-    /// Index lookup by hash into specializations
     #[julia_version(until = "1.6")]
+    /// Index lookup by hash into specializations
     pub fn spec_key_set<'target, T>(self, target: T) -> Option<ArrayData<'target, 'static, T>>
     where
         T: Target<'target>,
@@ -183,8 +183,8 @@ impl<'scope> Method<'scope> {
         }
     }
 
-    /// Index lookup by hash into specializations
     #[julia_version(since = "1.7")]
+    /// Index lookup by hash into specializations
     pub fn spec_key_set<'target, T>(self, target: T) -> Option<ArrayData<'target, 'static, T>>
     where
         T: Target<'target>,
@@ -214,8 +214,8 @@ impl<'scope> Method<'scope> {
         }
     }
 
-    /// reference to the method table this method is part of, null if part of the internal table
     #[julia_version(since = "1.7")]
+    /// reference to the method table this method is part of, null if part of the internal table
     pub fn external_mt(self) -> Option<ValueRef<'scope, 'static>> {
         // Safety: the pointer points to valid data
         unsafe {
@@ -238,8 +238,8 @@ impl<'scope> Method<'scope> {
         }
     }
 
-    /// Unspecialized executable method instance, or `None`
     #[julia_version(until = "1.6")]
+    /// Unspecialized executable method instance, or `None`
     pub fn unspecialized<'target, T>(self, target: T) -> Option<MethodInstanceData<'target, T>>
     where
         T: Target<'target>,
@@ -252,8 +252,8 @@ impl<'scope> Method<'scope> {
         }
     }
 
-    /// Unspecialized executable method instance, or `None`
     #[julia_version(since = "1.7")]
+    /// Unspecialized executable method instance, or `None`
     pub fn unspecialized<'target, T>(self, target: T) -> Option<MethodInstanceData<'target, T>>
     where
         T: Target<'target>,
@@ -296,8 +296,8 @@ impl<'scope> Method<'scope> {
         }
     }
 
-    /// RLE (build_id, offset) pairs (even/odd indexing)
     #[julia_version(since = "1.8")]
+    /// RLE (build_id, offset) pairs (even/odd indexing)
     pub fn root_blocks<'target, T>(
         self,
         target: T,
@@ -314,8 +314,8 @@ impl<'scope> Method<'scope> {
         }
     }
 
-    /// # of roots stored in the system image
     #[julia_version(since = "1.8")]
+    /// # of roots stored in the system image
     pub fn nroots_sysimg(self) -> i32 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().nroots_sysimg }
@@ -334,10 +334,10 @@ impl<'scope> Method<'scope> {
         }
     }
 
+    #[julia_version(until = "1.6")]
     /// Cache of specializations of this method for invoke(), i.e.
     /// cases where this method was called even though it was not necessarily
     /// the most specific for the argument types.
-    #[julia_version(until = "1.6")]
     pub fn invokes<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
@@ -350,10 +350,10 @@ impl<'scope> Method<'scope> {
         }
     }
 
+    #[julia_version(since = "1.7")]
     /// Cache of specializations of this method for invoke(), i.e.
     /// cases where this method was called even though it was not necessarily
     /// the most specific for the argument types.
-    #[julia_version(since = "1.7")]
     pub fn invokes<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
@@ -407,23 +407,23 @@ impl<'scope> Method<'scope> {
         unsafe { self.unwrap_non_null(Private).as_ref().pure_ != 0 }
     }
 
-    /// The `is_for_opaque_closure` field of this `Method`
     #[julia_version(since = "1.7")]
+    /// The `is_for_opaque_closure` field of this `Method`
     pub fn is_for_opaque_closure(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().is_for_opaque_closure != 0 }
     }
 
-    /// 0x00 = use heuristic; 0x01 = aggressive; 0x02 = none
     #[julia_version(since = "1.8")]
+    /// 0x00 = use heuristic; 0x01 = aggressive; 0x02 = none
     pub fn constprop(self) -> u8 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().constprop }
     }
 
+    #[julia_version(since = "1.8")]
     /// Override the conclusions of inter-procedural effect analysis,
     /// forcing the conclusion to always true.
-    #[julia_version(since = "1.8")]
     pub fn purity(self) -> u8 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().purity.bits }

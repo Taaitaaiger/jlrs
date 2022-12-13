@@ -145,17 +145,17 @@ impl<'scope> Task<'scope> {
         }
     }
 
-    /// The `_state` field.
     #[cfg(feature = "extra-fields")]
     #[julia_version(until = "1.6")]
+    /// The `_state` field.
     pub fn state(self) -> u8 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref()._state }
     }
 
-    /// The `_state` field.
     #[cfg(feature = "extra-fields")]
     #[julia_version(since = "1.7")]
+    /// The `_state` field.
     pub fn state(self) -> u8 {
         // Safety: the pointer points to valid data
         unsafe {
@@ -173,17 +173,17 @@ impl<'scope> Task<'scope> {
         unsafe { self.unwrap_non_null(Private).as_ref().sticky != 0 }
     }
 
-    /// set if `result` is an exception to throw or that we exited with
     #[cfg(feature = "extra-fields")]
     #[julia_version(until = "1.6")]
+    /// set if `result` is an exception to throw or that we exited with
     pub fn is_exception(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref()._isexception != 0 }
     }
 
-    /// set if `result` is an exception to throw or that we exited with
     #[cfg(feature = "extra-fields")]
     #[julia_version(since = "1.7")]
+    /// set if `result` is an exception to throw or that we exited with
     pub fn is_exception(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe {

@@ -201,11 +201,11 @@ impl<'borrow, 'array, 'data, U, L: ArrayLayout, M: Mutability>
         }
     }
 
+    #[julia_version(windows_lts = false)]
     /// Access the element at `index` and convert it to a `Value` rooted in `scope`.
     ///
     /// If an error is thrown by Julia it's caught and returned.
 
-    #[julia_version(windows_lts = false)]
     pub fn get_value<'frame, D, T>(
         &mut self,
         target: T,
@@ -278,10 +278,10 @@ impl<'borrow, 'array, 'data, U, L: ArrayLayout, M: Mutability>
 impl<'borrow, 'array, 'data, U, L: ArrayLayout>
     ArrayAccessor<'borrow, 'array, 'data, U, L, Mutable<'borrow, U>>
 {
+    #[julia_version(windows_lts = false)]
     /// Set the element at `index` to `value`.
     ///
     /// If an error is thrown by Julia it's caught and returned.
-    #[julia_version(windows_lts = false)]
     pub fn set_value<'target, D, T>(
         &mut self,
         target: T,

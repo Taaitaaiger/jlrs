@@ -39,10 +39,10 @@ pub trait Gc: private::GcPriv {
         unsafe { jl_gc_enable(on as i32) != 0 }
     }
 
+    #[julia_version(since = "1.7")]
     /// Enable or disable GC logging.
     ///
     /// This method is not available when the `lts` feature is enabled.
-    #[julia_version(since = "1.7")]
     fn enable_gc_logging(&self, on: bool) {
         // Safety: Julia is active, this method is called from a thread known to Julia, and no
         // Julia data is returned by this method.

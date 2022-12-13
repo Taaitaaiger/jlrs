@@ -1,12 +1,10 @@
-extern crate proc_macro;
-
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TS2;
 use quote::quote;
 use syn::{self, Meta};
 
 #[derive(Default)]
-struct ClassifiedFields<'a> {
+pub struct ClassifiedFields<'a> {
     rs_flag_fields: Vec<&'a syn::Type>,
     rs_align_fields: Vec<&'a syn::Type>,
     rs_union_fields: Vec<&'a syn::Type>,
@@ -65,7 +63,7 @@ impl<'a> ClassifiedFields<'a> {
     }
 }
 
-struct JlrsTypeAttrs {
+pub struct JlrsTypeAttrs {
     julia_type: Option<String>,
     zst: bool,
 }
@@ -130,37 +128,7 @@ impl JlrsFieldAttr {
     }
 }
 
-#[proc_macro_derive(IntoJulia, attributes(jlrs))]
-pub fn into_julia_derive(input: TokenStream) -> TokenStream {
-    let ast = syn::parse(input).unwrap();
-    impl_into_julia(&ast)
-}
-
-#[proc_macro_derive(Unbox, attributes(jlrs))]
-pub fn unbox_derive(input: TokenStream) -> TokenStream {
-    let ast = syn::parse(input).unwrap();
-    impl_unbox(&ast)
-}
-
-#[proc_macro_derive(Typecheck, attributes(jlrs))]
-pub fn typecheck_derive(input: TokenStream) -> TokenStream {
-    let ast = syn::parse(input).unwrap();
-    impl_typecheck(&ast)
-}
-
-#[proc_macro_derive(ValidLayout, attributes(jlrs))]
-pub fn valid_layout_derive(input: TokenStream) -> TokenStream {
-    let ast = syn::parse(input).unwrap();
-    impl_valid_layout(&ast)
-}
-
-#[proc_macro_derive(ValidField, attributes(jlrs))]
-pub fn valid_field_derive(input: TokenStream) -> TokenStream {
-    let ast = syn::parse(input).unwrap();
-    impl_valid_field(&ast)
-}
-
-fn impl_into_julia(ast: &syn::DeriveInput) -> TokenStream {
+pub fn impl_into_julia(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
     if !is_repr_c(ast) {
         panic!("IntoJulia can only be derived for types with the attribute #[repr(C)].");
@@ -216,7 +184,7 @@ fn impl_into_julia(ast: &syn::DeriveInput) -> TokenStream {
     into_julia_impl.into()
 }
 
-fn impl_into_julia_fn(attrs: &JlrsTypeAttrs) -> Option<TS2> {
+pub fn impl_into_julia_fn(attrs: &JlrsTypeAttrs) -> Option<TS2> {
     if attrs.zst {
         Some(quote! {
             unsafe fn into_julia<'target, T>(self, target: T) -> ::jlrs::data::managed::value::ValueData<'target, 'static, T>
@@ -238,7 +206,7 @@ fn impl_into_julia_fn(attrs: &JlrsTypeAttrs) -> Option<TS2> {
     }
 }
 
-fn impl_unbox(ast: &syn::DeriveInput) -> TokenStream {
+pub fn impl_unbox(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
     if !is_repr_c(ast) {
         panic!("Unbox can only be derived for types with the attribute #[repr(C)].");
@@ -256,7 +224,7 @@ fn impl_unbox(ast: &syn::DeriveInput) -> TokenStream {
     unbox_impl.into()
 }
 
-fn impl_typecheck(ast: &syn::DeriveInput) -> TokenStream {
+pub fn impl_typecheck(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
     if !is_repr_c(ast) {
         panic!("Typecheck can only be derived for types with the attribute #[repr(C)].");
@@ -276,7 +244,7 @@ fn impl_typecheck(ast: &syn::DeriveInput) -> TokenStream {
     typecheck_impl.into()
 }
 
-fn impl_valid_layout(ast: &syn::DeriveInput) -> TokenStream {
+pub fn impl_valid_layout(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
     if !is_repr_c(ast) {
         panic!("ValidLayout can only be derived for types with the attribute #[repr(C)].");
@@ -352,7 +320,7 @@ fn impl_valid_layout(ast: &syn::DeriveInput) -> TokenStream {
     valid_layout_impl.into()
 }
 
-fn impl_valid_field(ast: &syn::DeriveInput) -> TokenStream {
+pub fn impl_valid_field(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
     if !is_repr_c(ast) {
         panic!("ValidLayout can only be derived for types with the attribute #[repr(C)].");
