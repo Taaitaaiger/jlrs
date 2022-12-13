@@ -30,8 +30,8 @@ use crate::{
 pub struct UnionAll<'scope>(NonNull<jl_unionall_t>, PhantomData<&'scope ()>);
 
 impl<'scope> UnionAll<'scope> {
-    /// Create a new `UnionAll`. If an exception is thrown, it's caught and returned.
     #[julia_version(windows_lts = false)]
+    /// Create a new `UnionAll`. If an exception is thrown, it's caught and returned.
     pub fn new<'target, T>(
         target: T,
         tvar: TypeVar,
@@ -139,8 +139,8 @@ impl<'base> UnionAll<'base> {
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_anytuple_type_type), Private) }
     }
 
-    /// The `UnionAll` `Vararg`.
     #[julia_version(until = "1.6")]
+    /// The `UnionAll` `Vararg`.
     pub fn vararg_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -158,8 +158,8 @@ impl<'base> UnionAll<'base> {
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_abstractarray_type), Private) }
     }
 
-    /// The `UnionAll` `OpaqueClosure`.
     #[julia_version(since = "1.7")]
+    /// The `UnionAll` `OpaqueClosure`.
     pub fn opaque_closure_type<T>(_: &T) -> Self
     where
         T: Target<'base>,

@@ -49,8 +49,8 @@ impl<'scope> Symbol<'scope> {
         }
     }
 
-    /// Convert the given byte slice to a `Symbol`.
     #[julia_version(windows_lts = false)]
+    /// Convert the given byte slice to a `Symbol`.
     pub fn new_bytes<N, T>(target: T, symbol: N) -> T::Exception<'static, Self>
     where
         N: AsRef<[u8]>,

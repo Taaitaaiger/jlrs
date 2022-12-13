@@ -294,14 +294,14 @@ impl<'scope> DataType<'scope> {
         }
     }
 
-    /// Returns the size of a value of this type in bytes.
     #[julia_version(since = "1.9")]
+    /// Returns the size of a value of this type in bytes.
     pub fn size(self) -> u32 {
         self.layout().size()
     }
 
-    /// Returns the size of a value of this type in bytes.
     #[julia_version(until = "1.8")]
+    /// Returns the size of a value of this type in bytes.
     pub fn size(self) -> u32 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().size as u32 }
@@ -313,111 +313,111 @@ impl<'scope> DataType<'scope> {
         unsafe { self.unwrap_non_null(Private).as_ref().hash }
     }
 
-    /// Returns true if this is an abstract type.
     #[julia_version(until = "1.6")]
+    /// Returns true if this is an abstract type.
     pub fn is_abstract(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().abstract_ != 0 }
     }
 
-    /// Returns true if this is an abstract type.
     #[julia_version(since = "1.7")]
+    /// Returns true if this is an abstract type.
     pub fn is_abstract(self) -> bool {
         self.type_name().is_abstract()
     }
 
-    /// Returns true if this is a mutable type.
     #[julia_version(until = "1.6")]
+    /// Returns true if this is a mutable type.
     pub fn mutable(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().mutabl != 0 }
     }
 
-    /// Returns true if this is a mutable type.
     #[julia_version(since = "1.7")]
+    /// Returns true if this is a mutable type.
     pub fn mutable(self) -> bool {
         self.type_name().is_mutable()
     }
 
-    /// Returns true if one or more of the type parameters has not been set.
     #[julia_version(until = "1.6")]
+    /// Returns true if one or more of the type parameters has not been set.
     pub fn has_free_type_vars(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().hasfreetypevars != 0 }
     }
 
-    /// Returns true if one or more of the type parameters has not been set.
     #[julia_version(since = "1.7")]
+    /// Returns true if one or more of the type parameters has not been set.
     pub fn has_free_type_vars(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().hasfreetypevars() != 0 }
     }
 
-    /// Returns true if this type can have instances
     #[julia_version(until = "1.6")]
+    /// Returns true if this type can have instances
     pub fn is_concrete_type(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().isconcretetype != 0 }
     }
 
-    /// Returns true if this type can have instances
     #[julia_version(since = "1.7")]
+    /// Returns true if this type can have instances
     pub fn is_concrete_type(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().isconcretetype() != 0 }
     }
 
-    /// Returns true if this type is a dispatch, or leaf, tuple type.
     #[julia_version(until = "1.6")]
+    /// Returns true if this type is a dispatch, or leaf, tuple type.
     pub fn is_dispatch_tuple(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().isdispatchtuple != 0 }
     }
 
-    /// Returns true if this type is a dispatch, or leaf, tuple type.
     #[julia_version(since = "1.7")]
+    /// Returns true if this type is a dispatch, or leaf, tuple type.
     pub fn is_dispatch_tuple(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().isdispatchtuple() != 0 }
     }
 
-    /// Returns true if this type is a bits-type.
     #[julia_version(until = "1.6")]
+    /// Returns true if this type is a bits-type.
     pub fn is_bits(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().isbitstype != 0 }
     }
 
-    /// Returns true if this type is a bits-type.
     #[julia_version(since = "1.7")]
+    /// Returns true if this type is a bits-type.
     pub fn is_bits(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().isbitstype() != 0 }
     }
 
-    /// Returns true if values of this type are zero-initialized.
     #[julia_version(until = "1.6")]
+    /// Returns true if values of this type are zero-initialized.
     pub fn zero_init(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().zeroinit != 0 }
     }
 
-    /// Returns true if values of this type are zero-initialized.
     #[julia_version(since = "1.7")]
+    /// Returns true if values of this type are zero-initialized.
     pub fn zero_init(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().zeroinit() != 0 }
     }
 
-    /// Returns true if a value of this type stores its data inline.
     #[julia_version(until = "1.6")]
+    /// Returns true if a value of this type stores its data inline.
     pub fn is_inline_alloc(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().isinlinealloc != 0 }
     }
 
-    /// Returns true if a value of this type stores its data inline.
     #[julia_version(since = "1.7")]
+    /// Returns true if a value of this type stores its data inline.
     pub fn is_inline_alloc(self) -> bool {
         // Safety: the pointer points to valid data, so it must have a TypeName.
         unsafe {
@@ -426,15 +426,15 @@ impl<'scope> DataType<'scope> {
         }
     }
 
-    /// If false, no value will have this type.
     #[julia_version(until = "1.6")]
+    /// If false, no value will have this type.
     pub fn has_concrete_subtype(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().has_concrete_subtype != 0 }
     }
 
-    /// If false, no value will have this type.
     #[julia_version(since = "1.7")]
+    /// If false, no value will have this type.
     pub fn has_concrete_subtype(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe {
@@ -445,15 +445,15 @@ impl<'scope> DataType<'scope> {
         }
     }
 
-    /// If true, the type is stored in hash-based set cache (instead of linear cache).
     #[julia_version(until = "1.6")]
+    /// If true, the type is stored in hash-based set cache (instead of linear cache).
     pub fn cached_by_hash(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().cached_by_hash != 0 }
     }
 
-    /// If true, the type is stored in hash-based set cache (instead of linear cache).
     #[julia_version(since = "1.7")]
+    /// If true, the type is stored in hash-based set cache (instead of linear cache).
     pub fn cached_by_hash(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().cached_by_hash() != 0 }
@@ -561,8 +561,8 @@ impl<'scope> DataType<'scope> {
         jl_field_isptr(self.unwrap(Private), idx as _)
     }
 
-    /// Returns true if the field at position `idx` is an atomic field.
     #[julia_version(since = "1.7")]
+    /// Returns true if the field at position `idx` is an atomic field.
     pub fn is_atomic_field(self, idx: usize) -> JlrsResult<bool> {
         if idx >= self.n_fields() as usize {
             Err(AccessError::OutOfBoundsField {
@@ -576,11 +576,11 @@ impl<'scope> DataType<'scope> {
         unsafe { Ok(self.is_atomic_field_unchecked(idx)) }
     }
 
+    #[julia_version(since = "1.7")]
     /// Returns true if the field at position `idx` is an atomic field.
     ///
     /// Safety: an exception must not be thrown if this method is called from a `ccall`ed
     /// function.
-    #[julia_version(since = "1.7")]
     pub unsafe fn is_atomic_field_unchecked(self, idx: usize) -> bool {
         /*
             const uint32_t *atomicfields = st->name->atomicfields;
@@ -645,12 +645,12 @@ impl<'scope> DataType<'scope> {
         isconst != 0
     }
 
+    #[julia_version(windows_lts = false)]
     /// Create a new instance of this `DataType`, using `values` to set the fields.
     /// This is essentially a more powerful version of [`Value::new`] that can instantiate
     /// arbitrary concrete `DataType`s, at the cost that each of its fields must have already been
     /// allocated as a `Value`. This functions returns an error if the given `DataType` isn't
     /// concrete or is an array type. For custom array types you must use [`Array::new_for`].
-    #[julia_version(windows_lts = false)]
     pub fn instantiate<'target, 'value, 'data, V, T>(
         self,
         target: T,
@@ -865,8 +865,8 @@ impl<'base> DataType<'base> {
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_partial_struct_type), Private) }
     }
 
-    /// The type `Core.PartialOpaque`
     #[julia_version(since = "1.7")]
+    /// The type `Core.PartialOpaque`
     pub fn partial_opaque_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -875,8 +875,8 @@ impl<'base> DataType<'base> {
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_partial_opaque_type), Private) }
     }
 
-    /// The type `Core.InterConditional`
     #[julia_version(since = "1.7")]
+    /// The type `Core.InterConditional`
     pub fn interconditional_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -930,8 +930,8 @@ impl<'base> DataType<'base> {
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_anytuple_type), Private) }
     }
 
-    /// The type `Vararg`.
     #[julia_version(since = "1.7")]
+    /// The type `Vararg`.
     pub fn vararg_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1093,8 +1093,8 @@ impl<'base> DataType<'base> {
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_undefvarerror_type), Private) }
     }
 
-    /// The type `Core.AtomicError`.
     #[julia_version(since = "1.7")]
+    /// The type `Core.AtomicError`.
     pub fn atomicerror_type<T>(_: &T) -> Self
     where
         T: Target<'base>,
@@ -1487,8 +1487,8 @@ pub type DataTypeResult<'target, T> =
 pub struct DatatypeLayout<'scope>(NonNull<jl_datatype_layout_t>, PhantomData<&'scope ()>);
 
 impl DatatypeLayout<'_> {
-    /// Returns the size of the `DataType`.
     #[julia_version(since = "1.9")]
+    /// Returns the size of the `DataType`.
     pub fn size(self) -> u32 {
         unsafe { self.0.as_ref().size }
     }

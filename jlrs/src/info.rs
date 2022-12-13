@@ -23,14 +23,14 @@ impl Info {
         unsafe { jl_cpu_threads() as usize }
     }
 
-    /// Number of threads Julia can use.
     #[julia_version(until = "1.8")]
+    /// Number of threads Julia can use.
     pub fn n_threads() -> usize {
         unsafe { jl_n_threads as usize }
     }
 
-    /// Number of threads Julia can use.
     #[julia_version(since = "1.9")]
+    /// Number of threads Julia can use.
     pub fn n_threads() -> usize {
         unsafe { jl_n_threads.load(::std::sync::atomic::Ordering::Relaxed) as usize }
     }

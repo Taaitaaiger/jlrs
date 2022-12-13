@@ -271,6 +271,7 @@ impl Value<'_, '_> {
         })
     }
 
+    #[julia_version(windows_lts = false)]
     /// Apply the given types to `self`.
     ///
     /// If `self` is the [`DataType`] `anytuple_type`, calling this method will return a new
@@ -282,7 +283,6 @@ impl Value<'_, '_> {
     /// If the types can't be applied to `self` this methods catches and returns the exception.
     ///
     /// [`Union::new`]: crate::data::managed::union::Union::new
-    #[julia_version(windows_lts = false)]
     pub fn apply_type<'target, 'value, 'data, V, T>(
         self,
         target: T,
@@ -797,6 +797,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
         }
     }
 
+    #[julia_version(windows_lts = false)]
     /// Set the value of the field at `idx`. If Julia throws an exception it's caught, rooted in
     /// the frame, and returned. If the index is out of bounds or the value is not a subtype of
     /// the field an error is returned,
@@ -804,7 +805,6 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// Safety: Mutating things that should absolutely not be mutated, like the fields of a
     /// `DataType`, is not prevented.
 
-    #[julia_version(windows_lts = false)]
     pub unsafe fn set_nth_field<'target, T>(
         self,
         target: T,
@@ -865,13 +865,13 @@ impl<'scope, 'data> Value<'scope, 'data> {
         jl_set_nth_field(self.unwrap(Private), idx, value.unwrap(Private))
     }
 
+    #[julia_version(windows_lts = false)]
     /// Set the value of the field with the name `field_name`. If Julia throws an exception it's
     /// caught, rooted in the frame, and returned. If there's no field with the given name or the
     /// value is not a subtype of the field an error is returned.
     ///
     /// Safety: Mutating things that should absolutely not be mutated, like the fields of a
     /// `DataType`, is not prevented.
-    #[julia_version(windows_lts = false)]
     pub unsafe fn set_field<'target, N, T>(
         self,
         target: T,

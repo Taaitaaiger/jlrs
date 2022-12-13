@@ -44,8 +44,8 @@ impl<'scope> TypeMapEntry<'scope> {
     va: Bool (const)
     */
 
-    /// Invasive linked list
     #[julia_version(until = "1.6")]
+    /// Invasive linked list
     pub fn next<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
@@ -58,8 +58,8 @@ impl<'scope> TypeMapEntry<'scope> {
         }
     }
 
-    /// Invasive linked list
     #[julia_version(since = "1.7")]
+    /// Invasive linked list
     pub fn next<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,

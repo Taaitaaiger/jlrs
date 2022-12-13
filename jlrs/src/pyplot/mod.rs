@@ -235,10 +235,10 @@ impl<'scope> PyPlot<'scope> {
         }
     }
 
-    /// Wait until the window associated with `self` has been closed in a new task scheduled
-    /// on the `:interactive` thread pool.
     #[cfg(feature = "async")]
     #[julia_version(since = "1.9")]
+    /// Wait until the window associated with `self` has been closed in a new task scheduled
+    /// on the `:interactive` thread pool.
     pub async fn wait_async_interactive<'frame>(
         self,
         frame: &mut AsyncGcFrame<'frame>,

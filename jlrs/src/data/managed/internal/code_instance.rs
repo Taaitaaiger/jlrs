@@ -58,8 +58,8 @@ impl<'scope> CodeInstance<'scope> {
         }
     }
 
-    /// Next cache entry.
     #[julia_version(until = "1.6")]
+    /// Next cache entry.
     pub fn next<'target, T>(self, target: T) -> Option<CodeInstanceData<'target, T>>
     where
         T: Target<'target>,
@@ -71,8 +71,8 @@ impl<'scope> CodeInstance<'scope> {
         }
     }
 
-    /// Next cache entry.
     #[julia_version(since = "1.7")]
+    /// Next cache entry.
     pub fn next<'target, T>(self, target: T) -> Option<CodeInstanceData<'target, T>>
     where
         T: Target<'target>,
@@ -118,8 +118,8 @@ impl<'scope> CodeInstance<'scope> {
         }
     }
 
-    /// Inferred `CodeInfo`, `Nothing`, or `None`.
     #[julia_version(until = "1.8")]
+    /// Inferred `CodeInfo`, `Nothing`, or `None`.
     pub fn inferred<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
@@ -131,8 +131,8 @@ impl<'scope> CodeInstance<'scope> {
         }
     }
 
-    /// Inferred `CodeInfo`, `Nothing`, or `None`.
     #[julia_version(since = "1.9")]
+    /// Inferred `CodeInfo`, `Nothing`, or `None`.
     pub fn inferred<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
@@ -149,22 +149,22 @@ impl<'scope> CodeInstance<'scope> {
         }
     }
 
-    /// The `ipo_purity_bits` field of this `CodeInstance`.
     #[julia_version(since = "1.8")]
+    /// The `ipo_purity_bits` field of this `CodeInstance`.
     pub fn ipo_purity_bits(self) -> u32 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().ipo_purity_bits }
     }
 
-    /// The `purity_bits` field of this `CodeInstance`.
     #[julia_version(since = "1.8", until = "1.8")]
+    /// The `purity_bits` field of this `CodeInstance`.
     pub fn purity_bits(self) -> u32 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().purity_bits }
     }
 
-    /// The `purity_bits` field of this `CodeInstance`.
     #[julia_version(since = "1.9")]
+    /// The `purity_bits` field of this `CodeInstance`.
     pub fn purity_bits(self) -> u32 {
         // Safety: the pointer points to valid data
         unsafe {
@@ -175,8 +175,8 @@ impl<'scope> CodeInstance<'scope> {
         }
     }
 
-    /// Method this instance is specialized from.
     #[julia_version(since = "1.8")]
+    /// Method this instance is specialized from.
     pub fn argescapes(self) -> Option<Value<'scope, 'static>> {
         // Safety: the pointer points to valid data
         unsafe {
@@ -191,15 +191,15 @@ impl<'scope> CodeInstance<'scope> {
         unsafe { self.unwrap_non_null(Private).as_ref().isspecsig != 0 }
     }
 
-    /// If `specptr` is a specialized function signature for specTypes->rettype
     #[julia_version(until = "1.6")]
+    /// If `specptr` is a specialized function signature for specTypes->rettype
     pub fn precompile(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().precompile != 0 }
     }
 
-    /// If `specptr` is a specialized function signature for specTypes->rettype
     #[julia_version(since = "1.7")]
+    /// If `specptr` is a specialized function signature for specTypes->rettype
     pub fn precompile(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe {
@@ -211,8 +211,8 @@ impl<'scope> CodeInstance<'scope> {
         }
     }
 
-    /// jlcall entry point
     #[julia_version(until = "1.6")]
+    /// jlcall entry point
     pub fn invoke(self) -> *mut c_void {
         use std::ptr::null_mut;
         // Safety: the pointer points to valid data
@@ -225,8 +225,8 @@ impl<'scope> CodeInstance<'scope> {
         }
     }
 
-    /// jlcall entry point
     #[julia_version(since = "1.7")]
+    /// jlcall entry point
     pub fn invoke(self) -> *mut c_void {
         // Safety: the pointer points to valid data
         unsafe {
@@ -239,15 +239,15 @@ impl<'scope> CodeInstance<'scope> {
         }
     }
 
-    /// private data for `jlcall entry point
     #[julia_version(until = "1.6")]
+    /// private data for `jlcall entry point
     pub fn specptr(self) -> *mut c_void {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().specptr.fptr }
     }
 
-    /// private data for `jlcall entry point
     #[julia_version(since = "1.7")]
+    /// private data for `jlcall entry point
     pub fn specptr(self) -> *mut c_void {
         // Safety: the pointer points to valid data
         unsafe {
@@ -259,8 +259,8 @@ impl<'scope> CodeInstance<'scope> {
         }
     }
 
-    /// nonzero if all roots are built into sysimg or tagged by module key
     #[julia_version(since = "1.8")]
+    /// nonzero if all roots are built into sysimg or tagged by module key
     pub fn relocatability(self) -> u8 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().relocatability }

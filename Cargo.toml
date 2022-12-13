@@ -1,9 +1,3 @@
 
 [workspace]
-members = [
-    "jlrs_macros",
-    "jlrs",
-    "jlrs_derive",
-    "jl_sys",
-    "examples"
-]
+members = ["examples", "jl_sys", "jlrs", "jlrs_macros"]
