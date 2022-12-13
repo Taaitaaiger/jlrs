@@ -27,26 +27,28 @@ pub mod gc;
 pub mod stack_frame;
 pub mod target;
 
-use cfg_if::cfg_if;
-#[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
+#[julia_version(since = "1.9")]
 use jl_sys::jl_ptls_t;
-#[cfg(not(any(feature = "julia-1-10", feature = "julia-1-9")))]
+#[julia_version(until = "1.8")]
 use jl_sys::jl_tls_states_t;
+use jlrs_macros::julia_version;
 
-#[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
+#[julia_version(since = "1.9")]
 pub type PTls = jl_ptls_t;
-#[cfg(not(any(feature = "julia-1-10", feature = "julia-1-9")))]
+
+#[julia_version(until = "1.8")]
 pub type PTls = *mut jl_tls_states_t;
 
+#[julia_version(until = "1.6")]
 pub(crate) unsafe fn get_tls() -> PTls {
-    cfg_if! {
-        if #[cfg(feature = "julia-1-6")] {
-            use jl_sys::jl_get_ptls_states;
-            jl_get_ptls_states()
-        } else {
-            use jl_sys::jl_get_current_task;
-            use std::ptr::NonNull;
-            NonNull::new_unchecked(jl_get_current_task()).as_ref().ptls
-        }
-    }
+    use jl_sys::jl_get_ptls_states;
+    jl_get_ptls_states()
+}
+
+#[julia_version(since = "1.7")]
+pub(crate) unsafe fn get_tls() -> PTls {
+    use std::ptr::NonNull;
+
+    use jl_sys::jl_get_current_task;
+    NonNull::new_unchecked(jl_get_current_task()).as_ref().ptls
 }

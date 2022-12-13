@@ -1,17 +1,17 @@
-//! Managed for `Task`.
+//! Managed type for `Task`.
 //!
 //! The documentation for this module has been slightly adapted from the comments for this struct
 //! in [`julia.h`]
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L1727
 #[cfg(feature = "extra-fields")]
-#[cfg(not(feature = "julia-1-6"))]
+#[julia_version(since = "1.7")]
 use std::sync::atomic::Ordering;
 use std::{marker::PhantomData, ptr::NonNull};
 
-#[cfg(feature = "extra-fields")]
-use cfg_if::cfg_if;
 use jl_sys::{jl_task_t, jl_task_type};
+#[cfg(feature = "extra-fields")]
+use jlrs_macros::julia_version;
 
 use super::Ref;
 use crate::{data::managed::private::ManagedPriv, impl_julia_typecheck, private::Private};
@@ -147,17 +147,22 @@ impl<'scope> Task<'scope> {
 
     /// The `_state` field.
     #[cfg(feature = "extra-fields")]
+    #[julia_version(until = "1.6")]
     pub fn state(self) -> u8 {
-        cfg_if! {
-            if #[cfg(feature = "julia-1-6")] {
-                // Safety: the pointer points to valid data
-                unsafe { self.unwrap_non_null(Private).as_ref()._state }
-            } else {
-                // Safety: the pointer points to valid data
-                unsafe {
-                    self.unwrap_non_null(Private).as_ref()._state.load(Ordering::SeqCst)
-                }
-            }
+        // Safety: the pointer points to valid data
+        unsafe { self.unwrap_non_null(Private).as_ref()._state }
+    }
+
+    /// The `_state` field.
+    #[cfg(feature = "extra-fields")]
+    #[julia_version(since = "1.7")]
+    pub fn state(self) -> u8 {
+        // Safety: the pointer points to valid data
+        unsafe {
+            self.unwrap_non_null(Private)
+                .as_ref()
+                ._state
+                .load(Ordering::SeqCst)
         }
     }
 
@@ -170,17 +175,23 @@ impl<'scope> Task<'scope> {
 
     /// set if `result` is an exception to throw or that we exited with
     #[cfg(feature = "extra-fields")]
+    #[julia_version(until = "1.6")]
     pub fn is_exception(self) -> bool {
-        cfg_if! {
-            if #[cfg(feature = "julia-1-6")] {
-                // Safety: the pointer points to valid data
-                unsafe { self.unwrap_non_null(Private).as_ref()._isexception != 0 }
-            } else {
-                // Safety: the pointer points to valid data
-                unsafe {
-                    self.unwrap_non_null(Private).as_ref()._isexception.load(Ordering::SeqCst) != 0
-                }
-            }
+        // Safety: the pointer points to valid data
+        unsafe { self.unwrap_non_null(Private).as_ref()._isexception != 0 }
+    }
+
+    /// set if `result` is an exception to throw or that we exited with
+    #[cfg(feature = "extra-fields")]
+    #[julia_version(since = "1.7")]
+    pub fn is_exception(self) -> bool {
+        // Safety: the pointer points to valid data
+        unsafe {
+            self.unwrap_non_null(Private)
+                .as_ref()
+                ._isexception
+                .load(Ordering::SeqCst)
+                != 0
         }
     }
 }

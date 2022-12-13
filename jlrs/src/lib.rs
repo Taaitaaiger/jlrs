@@ -274,8 +274,8 @@
 //! A more interesting method, [`Value::new`], can be used with data of any type that implements
 //! [`IntoJulia`]. This trait is implemented by primitive types like `i8` and `char`. Any type
 //! that implements [`IntoJulia`] also implements [`Unbox`] which is used to extract the contents
-//! of a `Value`. Pointer wrapper types like [`Array`] don't implement [`IntoJulia`] or [`Unbox`],
-//! if they can be created from Rust they provide methods to do so.
+//! of a `Value`. Managed types like [`Array`] don't implement [`IntoJulia`] or [`Unbox`], if they
+//! can be created from Rust they provide methods to do so.
 //!
 //! As a simple example, let's convert two numbers to Julia values and add them:
 //!
@@ -679,9 +679,9 @@
 //! [`AsyncJulia::init_with_image`]: crate::multitask::runtime::AsyncJulia::init_with_image
 //! [`AsyncJulia::init_with_image_async`]: crate::multitask::runtime::AsyncJulia::init_with_image_async
 //! [`IntoJulia`]: crate::convert::into_julia::IntoJulia
-//! [`Typecheck`]: crate::layout::typecheck::Typecheck
-//! [`ValidLayout`]: crate::layout::valid_layout::ValidLayout
-//! [`ValidField`]: crate::layout::valid_layout::ValidField
+//! [`Typecheck`]: crate::data::managed::typecheck::Typecheck
+//! [`ValidLayout`]: crate::data::layout::valid_layout::ValidLayout
+//! [`ValidField`]: crate::data::layout::valid_layout::ValidField
 //! [`Unbox`]: crate::convert::unbox::Unbox
 //! [`CallAsync::call_async`]: crate::multitask::call_async::CallAsync
 //! [`AsyncGcFrame`]: crate::memory::target::frame::AsyncGcFrame

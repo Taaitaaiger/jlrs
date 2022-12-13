@@ -1,6 +1,6 @@
-//! Managed for `Symbol`. Symbols represent identifiers like module and function names.
+//! Managed type for `Symbol`. Symbols represent identifiers like module and function names.
 
-#[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+#[julia_version(windows_lts = false)]
 use std::mem::MaybeUninit;
 use std::{
     ffi::CStr,
@@ -10,9 +10,10 @@ use std::{
 };
 
 use jl_sys::{jl_sym_t, jl_symbol_n, jl_symbol_name_ as jl_symbol_name, jl_symbol_type};
+use jlrs_macros::julia_version;
 
 use super::Ref;
-#[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+#[julia_version(windows_lts = false)]
 use crate::catch::catch_exceptions;
 use crate::{
     data::managed::{private::ManagedPriv, value::leaked::LeakedValue},
@@ -49,8 +50,7 @@ impl<'scope> Symbol<'scope> {
     }
 
     /// Convert the given byte slice to a `Symbol`.
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
-
+    #[julia_version(windows_lts = false)]
     pub fn new_bytes<N, T>(target: T, symbol: N) -> T::Exception<'static, Self>
     where
         N: AsRef<[u8]>,

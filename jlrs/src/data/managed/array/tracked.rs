@@ -4,6 +4,8 @@ use std::{
     ops::{Deref, Range},
 };
 
+use jlrs_macros::julia_version;
+
 use super::{
     data::{
         accessor::{
@@ -16,7 +18,7 @@ use super::{
     dimensions::{ArrayDimensions, Dims},
     Array, ArrayData, TypedArray, TypedArrayData,
 };
-#[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+#[julia_version(windows_lts = false)]
 use super::{ArrayResult, TypedArrayResult};
 use crate::{
     data::{
@@ -218,7 +220,7 @@ impl<'tracked, 'scope, 'data> TrackedArray<'tracked, 'scope, 'data, Array<'scope
         unsafe { self.data.indeterminate_data() }
     }
 
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+    #[julia_version(windows_lts = false)]
     pub fn reshape<'target, 'current, 'borrow, D, S>(
         &self,
         target: ExtendedTarget<'target, 'current, 'borrow, S>,
@@ -270,7 +272,7 @@ where
         unsafe { self.data.indeterminate_data() }
     }
 
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+    #[julia_version(windows_lts = false)]
     pub fn reshape<'target, 'current, 'borrow, D, S>(
         &self,
         target: ExtendedTarget<'target, 'current, 'borrow, S>,
@@ -401,7 +403,7 @@ impl<'tracked, 'scope, 'data> TrackedArrayMut<'tracked, 'scope, 'data, Array<'sc
 }
 
 impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 'static>> {
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+    #[julia_version(windows_lts = false)]
     pub unsafe fn grow_end<'target, S>(
         &mut self,
         target: S,
@@ -417,7 +419,7 @@ impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 
         self.tracked.data.grow_end_unchecked(inc)
     }
 
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+    #[julia_version(windows_lts = false)]
     pub unsafe fn del_end<'target, S>(&mut self, target: S, dec: usize) -> S::Exception<'static, ()>
     where
         S: Target<'target>,
@@ -429,7 +431,7 @@ impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 
         self.tracked.data.del_end_unchecked(dec)
     }
 
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+    #[julia_version(windows_lts = false)]
     pub unsafe fn grow_begin<'target, S>(
         &mut self,
         target: S,
@@ -445,7 +447,7 @@ impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 
         self.tracked.data.grow_begin_unchecked(inc)
     }
 
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+    #[julia_version(windows_lts = false)]
     pub unsafe fn del_begin<'target, S>(
         &mut self,
         target: S,
@@ -509,7 +511,7 @@ impl<'tracked, 'scope, T> TrackedArrayMut<'tracked, 'scope, 'static, TypedArray<
 where
     T: ValidField,
 {
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+    #[julia_version(windows_lts = false)]
     pub unsafe fn grow_end<'target, S>(
         &mut self,
         target: S,
@@ -525,7 +527,7 @@ where
         self.tracked.data.grow_end_unchecked(inc)
     }
 
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+    #[julia_version(windows_lts = false)]
     pub unsafe fn del_end<'target, S>(&mut self, target: S, dec: usize) -> S::Exception<'static, ()>
     where
         S: Target<'target>,
@@ -537,7 +539,7 @@ where
         self.tracked.data.del_end_unchecked(dec)
     }
 
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+    #[julia_version(windows_lts = false)]
     pub unsafe fn grow_begin<'target, S>(
         &mut self,
         target: S,
@@ -553,7 +555,7 @@ where
         self.tracked.data.grow_begin_unchecked(inc)
     }
 
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+    #[julia_version(windows_lts = false)]
     pub unsafe fn del_begin<'target, S>(
         &mut self,
         target: S,

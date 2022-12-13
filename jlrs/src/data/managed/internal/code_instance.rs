@@ -1,4 +1,4 @@
-//! Managed for `CodeInstance`.
+//! Managed type for `CodeInstance`.
 //!
 //! The documentation for this module has been slightly adapted from the comments for this struct
 //! in [`julia.h`]
@@ -6,9 +6,11 @@
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#L273
 
 use std::{ffi::c_void, marker::PhantomData, ptr::NonNull};
+#[julia_version(since = "1.7")]
+use std::{ptr::null_mut, sync::atomic::Ordering};
 
-use cfg_if::cfg_if;
 use jl_sys::{jl_code_instance_t, jl_code_instance_type};
+use jlrs_macros::julia_version;
 
 use crate::{
     data::managed::{
@@ -20,12 +22,6 @@ use crate::{
     memory::target::Target,
     private::Private,
 };
-
-cfg_if! {
-    if #[cfg(not(feature = "julia-1-6"))] {
-        use std::{sync::atomic::Ordering, ptr::null_mut};
-    }
-}
 
 /// A `CodeInstance` represents an executable operation.
 #[derive(Copy, Clone)]
@@ -63,24 +59,32 @@ impl<'scope> CodeInstance<'scope> {
     }
 
     /// Next cache entry.
+    #[julia_version(until = "1.6")]
     pub fn next<'target, T>(self, target: T) -> Option<CodeInstanceData<'target, T>>
     where
         T: Target<'target>,
     {
-        cfg_if! {
-            if #[cfg(feature = "julia-1-6")] {
-                // Safety: the pointer points to valid data
-                unsafe {
-                    let next = self.unwrap_non_null(Private).as_ref().next;
-                    Some(CodeInstanceRef::wrap(NonNull::new(next)?).root(target))
-                }
-            } else {
-                // Safety: the pointer points to valid data
-                unsafe {
-                    let next = self.unwrap_non_null(Private).as_ref().next.load(Ordering::Relaxed);
-                    Some(CodeInstanceRef::wrap(NonNull::new(next)?).root(target))
-                }
-            }
+        // Safety: the pointer points to valid data
+        unsafe {
+            let next = self.unwrap_non_null(Private).as_ref().next;
+            Some(CodeInstanceRef::wrap(NonNull::new(next)?).root(target))
+        }
+    }
+
+    /// Next cache entry.
+    #[julia_version(since = "1.7")]
+    pub fn next<'target, T>(self, target: T) -> Option<CodeInstanceData<'target, T>>
+    where
+        T: Target<'target>,
+    {
+        // Safety: the pointer points to valid data
+        unsafe {
+            let next = self
+                .unwrap_non_null(Private)
+                .as_ref()
+                .next
+                .load(Ordering::Relaxed);
+            Some(CodeInstanceRef::wrap(NonNull::new(next)?).root(target))
         }
     }
 
@@ -115,53 +119,64 @@ impl<'scope> CodeInstance<'scope> {
     }
 
     /// Inferred `CodeInfo`, `Nothing`, or `None`.
+    #[julia_version(until = "1.8")]
     pub fn inferred<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
     {
         // Safety: the pointer points to valid data
-        cfg_if! {
-            if #[cfg(not(any(feature = "julia-1-10", feature = "julia-1-9")))] {
-                unsafe {
-                    let inferred = self.unwrap_non_null(Private).as_ref().inferred;
-                    Some(ValueRef::wrap(NonNull::new(inferred)?).root(target))
-                }
-            } else {
-                // Safety: the pointer points to valid data
-                unsafe {
-                    let inferred = self.unwrap_non_null(Private).as_ref().inferred.load(Ordering::Relaxed);
-                    Some(ValueRef::wrap(NonNull::new(inferred)?).root(target))
-                }
-            }
+        unsafe {
+            let inferred = self.unwrap_non_null(Private).as_ref().inferred;
+            Some(ValueRef::wrap(NonNull::new(inferred)?).root(target))
+        }
+    }
+
+    /// Inferred `CodeInfo`, `Nothing`, or `None`.
+    #[julia_version(since = "1.9")]
+    pub fn inferred<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
+        // Safety: the pointer points to valid data
+        // Safety: the pointer points to valid data
+        unsafe {
+            let inferred = self
+                .unwrap_non_null(Private)
+                .as_ref()
+                .inferred
+                .load(Ordering::Relaxed);
+            Some(ValueRef::wrap(NonNull::new(inferred)?).root(target))
         }
     }
 
     /// The `ipo_purity_bits` field of this `CodeInstance`.
-    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7")))]
+    #[julia_version(since = "1.8")]
     pub fn ipo_purity_bits(self) -> u32 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().ipo_purity_bits }
     }
 
     /// The `purity_bits` field of this `CodeInstance`.
-    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7")))]
+    #[julia_version(since = "1.8", until = "1.8")]
     pub fn purity_bits(self) -> u32 {
         // Safety: the pointer points to valid data
-        #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
+        unsafe { self.unwrap_non_null(Private).as_ref().purity_bits }
+    }
+
+    /// The `purity_bits` field of this `CodeInstance`.
+    #[julia_version(since = "1.9")]
+    pub fn purity_bits(self) -> u32 {
+        // Safety: the pointer points to valid data
         unsafe {
             self.unwrap_non_null(Private)
                 .as_ref()
                 .purity_bits
                 .load(Ordering::Relaxed)
         }
-        #[cfg(not(any(feature = "julia-1-10", feature = "julia-1-9")))]
-        unsafe {
-            self.unwrap_non_null(Private).as_ref().purity_bits
-        }
     }
 
     /// Method this instance is specialized from.
-    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7")))]
+    #[julia_version(since = "1.8")]
     pub fn argescapes(self) -> Option<Value<'scope, 'static>> {
         // Safety: the pointer points to valid data
         unsafe {
@@ -177,53 +192,75 @@ impl<'scope> CodeInstance<'scope> {
     }
 
     /// If `specptr` is a specialized function signature for specTypes->rettype
+    #[julia_version(until = "1.6")]
     pub fn precompile(self) -> bool {
-        cfg_if! {
-            if #[cfg(feature = "julia-1-6")] {
-                // Safety: the pointer points to valid data
-                unsafe { self.unwrap_non_null(Private).as_ref().precompile != 0 }
-            } else {
-                // Safety: the pointer points to valid data
-                unsafe {
-                    self.unwrap_non_null(Private).as_ref().precompile.load(Ordering::Relaxed) != 0
-                }
-            }
+        // Safety: the pointer points to valid data
+        unsafe { self.unwrap_non_null(Private).as_ref().precompile != 0 }
+    }
+
+    /// If `specptr` is a specialized function signature for specTypes->rettype
+    #[julia_version(since = "1.7")]
+    pub fn precompile(self) -> bool {
+        // Safety: the pointer points to valid data
+        unsafe {
+            self.unwrap_non_null(Private)
+                .as_ref()
+                .precompile
+                .load(Ordering::Relaxed)
+                != 0
         }
     }
 
     /// jlcall entry point
+    #[julia_version(until = "1.6")]
     pub fn invoke(self) -> *mut c_void {
-        cfg_if! {
-            if #[cfg(feature = "julia-1-6")] {
-                use std::ptr::null_mut;
-                // Safety: the pointer points to valid data
-                unsafe { self.unwrap_non_null(Private).as_ref().invoke.map(|x| x as *mut c_void).unwrap_or(null_mut()) }
-            } else {
-                // Safety: the pointer points to valid data
-                unsafe {
-                    self.unwrap_non_null(Private).as_ref().invoke.load(Ordering::Relaxed).map(|x| x as *mut c_void).unwrap_or(null_mut())
-                }
-            }
+        use std::ptr::null_mut;
+        // Safety: the pointer points to valid data
+        unsafe {
+            self.unwrap_non_null(Private)
+                .as_ref()
+                .invoke
+                .map(|x| x as *mut c_void)
+                .unwrap_or(null_mut())
+        }
+    }
+
+    /// jlcall entry point
+    #[julia_version(since = "1.7")]
+    pub fn invoke(self) -> *mut c_void {
+        // Safety: the pointer points to valid data
+        unsafe {
+            self.unwrap_non_null(Private)
+                .as_ref()
+                .invoke
+                .load(Ordering::Relaxed)
+                .map(|x| x as *mut c_void)
+                .unwrap_or(null_mut())
         }
     }
 
     /// private data for `jlcall entry point
+    #[julia_version(until = "1.6")]
     pub fn specptr(self) -> *mut c_void {
-        cfg_if! {
-            if #[cfg(feature = "julia-1-6")] {
-                // Safety: the pointer points to valid data
-                unsafe { self.unwrap_non_null(Private).as_ref().specptr.fptr }
-            } else {
-                // Safety: the pointer points to valid data
-                unsafe {
-                    self.unwrap_non_null(Private).as_ref().specptr.fptr.load(Ordering::Relaxed)
-                }
-            }
+        // Safety: the pointer points to valid data
+        unsafe { self.unwrap_non_null(Private).as_ref().specptr.fptr }
+    }
+
+    /// private data for `jlcall entry point
+    #[julia_version(since = "1.7")]
+    pub fn specptr(self) -> *mut c_void {
+        // Safety: the pointer points to valid data
+        unsafe {
+            self.unwrap_non_null(Private)
+                .as_ref()
+                .specptr
+                .fptr
+                .load(Ordering::Relaxed)
         }
     }
 
     /// nonzero if all roots are built into sysimg or tagged by module key
-    #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7")))]
+    #[julia_version(since = "1.8")]
     pub fn relocatability(self) -> u8 {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().relocatability }

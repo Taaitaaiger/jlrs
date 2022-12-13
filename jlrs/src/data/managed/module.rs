@@ -1,4 +1,4 @@
-//! Managed for `Module`, which provides access to Julia's modules and their contents.
+//! Managed type for `Module`, which provides access to Julia's modules and their contents.
 //!
 //! In Julia, each module introduces a separate global scope. There are three important "root"
 //! modules, `Main`, `Base` and `Core`. Any Julia code that you include in jlrs is made available
@@ -10,6 +10,7 @@ use jl_sys::{
     jl_base_module, jl_core_module, jl_get_global, jl_is_imported, jl_main_module, jl_module_t,
     jl_module_type, jl_set_const, jl_set_global,
 };
+use jlrs_macros::julia_version;
 
 use super::{
     function::FunctionData,
@@ -34,18 +35,14 @@ use crate::{
 
 /// Functionality in Julia can be accessed through its module system. You can get a handle to the
 /// three standard modules, `Main`, `Base`, and `Core` and access their submodules through them.
-/// If you include your own Julia code with [`Julia::include`], [`AsyncJulia::include`], or
-/// [`AsyncJulia::try_include`] its contents are made available relative to `Main`.
+/// If you include your own Julia code with [`Julia::include`] or [`AsyncJulia::include`], its
+/// contents are made available relative to `Main`.
 ///
-/// The most important methods offered by this wrapper are those that let you access submodules,
-/// functions, and other global values defined in the module. These come in two variants: one that
-/// roots the result and one that doesn't. If you never redefine the module, it's safe to leave
-/// named functions, constants and submodules unrooted when you use them from Rust. The same holds
-/// true for other global values that are never redefined to point at another value.
+/// The most important methods offered are those that let you access submodules, functions, and
+/// other global values defined in the module.
 ///
 /// [`Julia::include`]: crate::runtime::sync_rt::Julia::include
 /// [`AsyncJulia::include`]: crate::runtime::async_rt::AsyncJulia::include
-/// [`AsyncJulia::try_include`]: crate::runtime::async_rt::AsyncJulia::try_include
 #[derive(Copy, Clone, PartialEq)]
 #[repr(transparent)]
 pub struct Module<'scope>(NonNull<jl_module_t>, PhantomData<&'scope ()>);
@@ -78,12 +75,11 @@ impl<'scope> Module<'scope> {
     }
 
     /// Returns a handle to Julia's `Main`-module. If you include your own Julia code with
-    /// [`Julia::include`], [`AsyncJulia::include`], or [`AsyncJulia::try_include`] its contents
-    ///  are made available relative to `Main`.
+    /// [`Julia::include`] or [`AsyncJulia::include`] its contents are made available relative to
+    /// `Main`.
     ///
     /// [`Julia::include`]: crate::runtime::sync_rt::Julia::include
     /// [`AsyncJulia::include`]: crate::runtime::async_rt::AsyncJulia::include
-    /// [`AsyncJulia::try_include`]: crate::runtime::async_rt::AsyncJulia::try_include
     pub fn main<T: Target<'scope>>(_: &T) -> Self {
         // Safety: the Main module is globally rooted
         unsafe { Module::wrap_non_null(NonNull::new_unchecked(jl_main_module), Private) }
@@ -152,7 +148,7 @@ impl<'scope> Module<'scope> {
     ///
     /// Safety: Mutating Julia data is generally unsafe because it can't be guaranteed mutating
     /// this value is allowed.
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+    #[julia_version(windows_lts = false)]
     pub unsafe fn set_global<'target, N, T>(
         self,
         target: T,
@@ -208,7 +204,7 @@ impl<'scope> Module<'scope> {
     /// Set a constant in this module. If Julia throws an exception it's caught and rooted in the
     /// current frame, if the exception can't be rooted a `JlrsError::AllocError` is returned. If
     /// no exception is thrown an unrooted reference to the constant is returned.
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+    #[julia_version(windows_lts = false)]
     pub fn set_const<'target, N, T>(
         self,
         target: T,

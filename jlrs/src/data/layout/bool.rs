@@ -1,15 +1,16 @@
-//! Managed for `Bool`.
+//! Layout type for `Bool`.
 //!
 //! In Rust it's unsound to create an invalid `bool`, while a `Bool` in Julia can be an arbitrary
 //! `i8` in some rare cases. Rather than treating all `Bool`s as `i8` or `bool`s jlrs provides
+//! a custom layout for this type, [`Bool`].
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 
 use jl_sys::{jl_bool_type, jl_unbox_int8};
 
-/// a wrapper for this type.
-use crate::{convert::unbox::Unbox, impl_julia_typecheck, impl_valid_layout};
 use crate::{
+    convert::unbox::Unbox,
     data::managed::{private::ManagedPriv, value::Value},
+    impl_julia_typecheck, impl_valid_layout,
     private::Private,
 };
 

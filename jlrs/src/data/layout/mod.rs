@@ -1,6 +1,5 @@
-//! Wrappers for inline types
+//! Field and type layouts of Julia data.
 
-pub mod bits_union;
 pub mod bool;
 pub mod char;
 #[cfg(feature = "f16")]

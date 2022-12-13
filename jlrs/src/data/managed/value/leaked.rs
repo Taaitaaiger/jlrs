@@ -8,6 +8,9 @@ use crate::{data::managed::private::ManagedPriv, memory::target::Target, private
 /// While jlrs generally enforces that Julia data can only exist and be used while a frame is
 /// active, it's possible to leak global values: [`Symbol`]s, [`Module`]s, and globals defined in
 /// those modules.
+///
+/// [`Symbol`]: crate::data::managed::symbol::Symbol
+/// [`Module`]: crate::data::managed::module::Module
 #[derive(Copy, Clone)]
 pub struct LeakedValue(Value<'static, 'static>);
 
@@ -22,6 +25,8 @@ impl LeakedValue {
     ///
     /// Safety: you must guarantee this value has not been freed by the garbage collector. While
     /// `Symbol`s are never garbage collected, modules and their contents can be redefined.
+    ///
+    /// [`Unrooted`]: crate::memory::target::unrooted::Unrooted
     #[inline(always)]
     pub unsafe fn as_value<'scope, T: Target<'scope>>(self, _: &T) -> Value<'scope, 'static> {
         self.0

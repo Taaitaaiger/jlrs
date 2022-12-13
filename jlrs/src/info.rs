@@ -2,12 +2,12 @@
 
 use std::{ffi::CStr, ptr::NonNull};
 
-use cfg_if::cfg_if;
 use jl_sys::{
     jl_cpu_threads, jl_get_ARCH, jl_get_UNAME, jl_getallocationgranularity, jl_getpagesize,
     jl_git_branch, jl_git_commit, jl_is_debugbuild, jl_n_threads, jl_ver_is_release, jl_ver_major,
     jl_ver_minor, jl_ver_patch, jl_ver_string,
 };
+use jlrs_macros::julia_version;
 
 use crate::{
     data::managed::{private::ManagedPriv, symbol::Symbol},
@@ -24,14 +24,15 @@ impl Info {
     }
 
     /// Number of threads Julia can use.
+    #[julia_version(until = "1.8")]
     pub fn n_threads() -> usize {
-        cfg_if! {
-            if #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))] {
-                unsafe { jl_n_threads.load(::std::sync::atomic::Ordering::Relaxed) as usize }
-            } else {
-                unsafe { jl_n_threads as usize }
-            }
-        }
+        unsafe { jl_n_threads as usize }
+    }
+
+    /// Number of threads Julia can use.
+    #[julia_version(since = "1.9")]
+    pub fn n_threads() -> usize {
+        unsafe { jl_n_threads.load(::std::sync::atomic::Ordering::Relaxed) as usize }
     }
 
     /// The page size used by the garbage collector.

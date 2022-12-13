@@ -6,11 +6,12 @@ use jl_sys::{
     jl_gc_collect, jl_gc_collection_t, jl_gc_enable, jl_gc_is_enabled, jl_gc_mark_queue_obj,
     jl_gc_mark_queue_objarray, jl_gc_safepoint, jl_gc_wb,
 };
+use jlrs_macros::julia_version;
 
 use super::{target::Target, PTls};
 #[cfg(feature = "sync-rt")]
 use crate::runtime::sync_rt::Julia;
-#[cfg(not(feature = "julia-1-6"))]
+#[julia_version(since = "1.7")]
 use crate::{call::Call, data::managed::module::Module};
 use crate::{
     data::managed::{private::ManagedPriv, value::Value},
@@ -41,7 +42,7 @@ pub trait Gc: private::GcPriv {
     /// Enable or disable GC logging.
     ///
     /// This method is not available when the `lts` feature is enabled.
-    #[cfg(not(feature = "julia-1-6"))]
+    #[julia_version(since = "1.7")]
     fn enable_gc_logging(&self, on: bool) {
         // Safety: Julia is active, this method is called from a thread known to Julia, and no
         // Julia data is returned by this method.

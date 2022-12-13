@@ -1,4 +1,4 @@
-//! Managed for `String`.
+//! Managed type for `String`.
 
 use std::{
     ffi::CStr,

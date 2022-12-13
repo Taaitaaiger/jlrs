@@ -1,14 +1,16 @@
-//! Managed for `TypeMapLevel`.
+//! Managed type for `TypeMapLevel`.
 //!
 //! The documentation for this module has been slightly adapted from the comments for this struct
 //! in [`julia.h`]
 //!
 //! [`julia.h`]: https://github.com/JuliaLang/julia/blob/96786e22ccabfdafd073122abb1fb69cea921e17/src/julia.h#525
 
+#[julia_version(since = "1.7")]
+use std::sync::atomic::Ordering;
 use std::{marker::PhantomData, ptr::NonNull};
 
-use cfg_if::cfg_if;
 use jl_sys::{jl_typemap_level_t, jl_typemap_level_type};
+use jlrs_macros::julia_version;
 
 use crate::{
     data::managed::{
@@ -20,12 +22,6 @@ use crate::{
     memory::target::Target,
     private::Private,
 };
-
-cfg_if! {
-    if #[cfg(not(feature = "julia-1-6"))] {
-        use std::sync::atomic::Ordering;
-    }
-}
 
 /// One level in a TypeMap tree
 /// Indexed by key if it is a sublevel in an array
@@ -46,146 +42,194 @@ impl<'scope> TypeMapLevel<'scope> {
     */
 
     /// The `arg1` field.
+    #[julia_version(until = "1.6")]
     pub fn arg1<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
     {
-        cfg_if! {
-            if #[cfg(feature = "julia-1-6")] {
-                // Safety: the pointer points to valid data
-                unsafe {
-                    let arg1 = self.unwrap_non_null(Private).as_ref().arg1;
-                    let arg1 = NonNull::new(arg1.cast())?;
-                    Some(ValueRef::wrap(arg1).root(target))
-                }
-            } else {
-                // Safety: the pointer points to valid data
-                unsafe {
-                    let arg1 = self.unwrap_non_null(Private).as_ref().arg1.load(Ordering::Relaxed);
-                    let arg1 = NonNull::new(arg1.cast())?;
-                    Some(ValueRef::wrap(arg1).root(target))
-                }
-            }
+        // Safety: the pointer points to valid data
+        unsafe {
+            let arg1 = self.unwrap_non_null(Private).as_ref().arg1;
+            let arg1 = NonNull::new(arg1.cast())?;
+            Some(ValueRef::wrap(arg1).root(target))
+        }
+    }
+
+    /// The `arg1` field.
+    #[julia_version(since = "1.7")]
+    pub fn arg1<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
+        // Safety: the pointer points to valid data
+        unsafe {
+            let arg1 = self
+                .unwrap_non_null(Private)
+                .as_ref()
+                .arg1
+                .load(Ordering::Relaxed);
+            let arg1 = NonNull::new(arg1.cast())?;
+            Some(ValueRef::wrap(arg1).root(target))
         }
     }
 
     /// The `targ` field.
+    #[julia_version(until = "1.6")]
     pub fn targ<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
     {
-        cfg_if! {
-            if #[cfg(feature = "julia-1-6")] {
-                // Safety: the pointer points to valid data
-                unsafe {
-                    let targ = self.unwrap_non_null(Private).as_ref().targ;
-                    let targ = NonNull::new(targ.cast())?;
-                    Some(ValueRef::wrap(targ).root(target))
-                }
-            } else {
-                // Safety: the pointer points to valid data
-                unsafe {
-                    let targ = self.unwrap_non_null(Private).as_ref().targ.load(Ordering::Relaxed);
-                    let targ = NonNull::new(targ.cast())?;
-                    Some(ValueRef::wrap(targ).root(target))
-                }
-            }
+        // Safety: the pointer points to valid data
+        unsafe {
+            let targ = self.unwrap_non_null(Private).as_ref().targ;
+            let targ = NonNull::new(targ.cast())?;
+            Some(ValueRef::wrap(targ).root(target))
+        }
+    }
+
+    /// The `targ` field.
+    #[julia_version(since = "1.7")]
+    pub fn targ<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
+        // Safety: the pointer points to valid data
+        unsafe {
+            let targ = self
+                .unwrap_non_null(Private)
+                .as_ref()
+                .targ
+                .load(Ordering::Relaxed);
+            let targ = NonNull::new(targ.cast())?;
+            Some(ValueRef::wrap(targ).root(target))
         }
     }
 
     /// The `name1` field.
+    #[julia_version(until = "1.6")]
     pub fn name1<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
     {
-        cfg_if! {
-            if #[cfg(feature = "julia-1-6")] {
-                // Safety: the pointer points to valid data
-                unsafe {
-                    let name1 = self.unwrap_non_null(Private).as_ref().name1;
-                    let name1 = NonNull::new(name1.cast())?;
-                    Some(ValueRef::wrap(name1).root(target))
-                }
-            } else {
-                // Safety: the pointer points to valid data
-                unsafe {
-                    let name1 = self.unwrap_non_null(Private).as_ref().name1.load(Ordering::Relaxed);
-                    let name1 = NonNull::new(name1.cast())?;
-                    Some(ValueRef::wrap(name1).root(target))
-                }
-            }
+        // Safety: the pointer points to valid data
+        unsafe {
+            let name1 = self.unwrap_non_null(Private).as_ref().name1;
+            let name1 = NonNull::new(name1.cast())?;
+            Some(ValueRef::wrap(name1).root(target))
+        }
+    }
+
+    /// The `name1` field.
+    #[julia_version(since = "1.7")]
+    pub fn name1<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
+        // Safety: the pointer points to valid data
+        unsafe {
+            let name1 = self
+                .unwrap_non_null(Private)
+                .as_ref()
+                .name1
+                .load(Ordering::Relaxed);
+            let name1 = NonNull::new(name1.cast())?;
+            Some(ValueRef::wrap(name1).root(target))
         }
     }
 
     /// The `tname` field.
+    #[julia_version(until = "1.6")]
     pub fn tname<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
     {
-        cfg_if! {
-            if #[cfg(feature = "julia-1-6")] {
-                // Safety: the pointer points to valid data
-                unsafe {
-                    let tname = self.unwrap_non_null(Private).as_ref().tname;
-                    let tname = NonNull::new(tname.cast())?;
-                    Some(ValueRef::wrap(tname).root(target))
-                }
-            } else {
-                // Safety: the pointer points to valid data
-                unsafe {
-                    let tname = self.unwrap_non_null(Private).as_ref().tname.load(Ordering::Relaxed);
-                    let tname = NonNull::new(tname.cast())?;
-                    Some(ValueRef::wrap(tname).root(target))
-                }
-            }
+        // Safety: the pointer points to valid data
+        unsafe {
+            let tname = self.unwrap_non_null(Private).as_ref().tname;
+            let tname = NonNull::new(tname.cast())?;
+            Some(ValueRef::wrap(tname).root(target))
+        }
+    }
+
+    /// The `tname` field.
+    #[julia_version(since = "1.7")]
+    pub fn tname<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
+        // Safety: the pointer points to valid data
+        unsafe {
+            let tname = self
+                .unwrap_non_null(Private)
+                .as_ref()
+                .tname
+                .load(Ordering::Relaxed);
+            let tname = NonNull::new(tname.cast())?;
+            Some(ValueRef::wrap(tname).root(target))
         }
     }
 
     /// The `linear` field, which is called `list` in `Core.TypemapLevel`.
+    #[julia_version(until = "1.6")]
     pub fn list<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
     {
-        cfg_if! {
-            if #[cfg(feature = "julia-1-6")] {
-                // Safety: the pointer points to valid data
-                unsafe {
-                    let linear = self.unwrap_non_null(Private).as_ref().linear;
-                    let linear = NonNull::new(linear.cast())?;
-                    Some(ValueRef::wrap(linear).root(target))
-                }
-            } else {
-                // Safety: the pointer points to valid data
-                unsafe {
-                    let linear = self.unwrap_non_null(Private).as_ref().linear.load(Ordering::Relaxed);
-                    let linear = NonNull::new(linear.cast())?;
-                    Some(ValueRef::wrap(linear).root(target))
-                }
-            }
+        // Safety: the pointer points to valid data
+        unsafe {
+            let linear = self.unwrap_non_null(Private).as_ref().linear;
+            let linear = NonNull::new(linear.cast())?;
+            Some(ValueRef::wrap(linear).root(target))
+        }
+    }
+
+    /// The `linear` field, which is called `list` in `Core.TypemapLevel`.
+    #[julia_version(since = "1.7")]
+    pub fn list<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
+        // Safety: the pointer points to valid data
+        unsafe {
+            let linear = self
+                .unwrap_non_null(Private)
+                .as_ref()
+                .linear
+                .load(Ordering::Relaxed);
+            let linear = NonNull::new(linear.cast())?;
+            Some(ValueRef::wrap(linear).root(target))
         }
     }
 
     /// The `any` field.
+    #[julia_version(until = "1.6")]
     pub fn any<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
     {
-        cfg_if! {
-            if #[cfg(feature = "julia-1-6")] {
-                // Safety: the pointer points to valid data
-                unsafe {
-                    let any = self.unwrap_non_null(Private).as_ref().any;
-                    let any = NonNull::new(any.cast())?;
-                    Some(ValueRef::wrap(any).root(target))
-                }
-            } else {
-                // Safety: the pointer points to valid data
-                unsafe {
-                    let any = self.unwrap_non_null(Private).as_ref().any.load(Ordering::Relaxed);
-                    let any = NonNull::new(any.cast())?;
-                    Some(ValueRef::wrap(any).root(target))
-                }
-            }
+        // Safety: the pointer points to valid data
+        unsafe {
+            let any = self.unwrap_non_null(Private).as_ref().any;
+            let any = NonNull::new(any.cast())?;
+            Some(ValueRef::wrap(any).root(target))
+        }
+    }
+
+    /// The `any` field.
+    #[julia_version(since = "1.7")]
+    pub fn any<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
+        // Safety: the pointer points to valid data
+        unsafe {
+            let any = self
+                .unwrap_non_null(Private)
+                .as_ref()
+                .any
+                .load(Ordering::Relaxed);
+            let any = NonNull::new(any.cast())?;
+            Some(ValueRef::wrap(any).root(target))
         }
     }
 }

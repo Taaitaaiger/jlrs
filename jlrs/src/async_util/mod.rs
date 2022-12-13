@@ -3,6 +3,6 @@
 pub mod affinity;
 pub mod channel;
 #[cfg(feature = "async-rt")]
-pub(crate) mod envelopes;
+pub(crate) mod envelope;
 pub(crate) mod future;
 pub mod task;

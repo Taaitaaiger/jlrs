@@ -1,4 +1,4 @@
-//! Managed for `OpaqueClosure`.
+//! Managed type for `OpaqueClosure`.
 
 use std::{
     ffi::c_void,

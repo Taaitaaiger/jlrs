@@ -1,7 +1,15 @@
-use std::{mem::MaybeUninit, ptr::NonNull, sync::atomic::Ordering, usize};
+use std::{mem::MaybeUninit, sync::atomic::Ordering, usize};
+#[julia_version(since = "1.7")]
+use std::{
+    ptr::null_mut,
+    ptr::NonNull,
+    sync::atomic::{AtomicPtr, AtomicU16, AtomicU32, AtomicU64, AtomicU8},
+};
 
-use cfg_if::cfg_if;
-use jl_sys::{jl_array_typetagdata, jl_value_t};
+use jl_sys::jl_array_typetagdata;
+#[julia_version(since = "1.7")]
+use jl_sys::{jl_value_t, jlrs_lock, jlrs_unlock};
+use jlrs_macros::julia_version;
 
 use super::{Value, ValueRef};
 use crate::{
@@ -20,26 +28,15 @@ use crate::{
     private::Private,
 };
 
-cfg_if! {
-    if #[cfg(not(feature = "julia-1-6"))] {
-        use jl_sys::{jlrs_lock, jlrs_unlock};
-
-        use std::{
-            ptr::null_mut,
-            sync::atomic::{AtomicPtr, AtomicU16, AtomicU32, AtomicU64, AtomicU8},
-        };
-    }
-}
-
+#[julia_version(since = "1.7")]
 #[repr(C)]
 #[derive(Clone, Copy)]
-#[cfg(not(feature = "julia-1-6"))]
 union AtomicBuffer {
     bytes: [MaybeUninit<u8>; 8],
     ptr: *mut jl_value_t,
 }
 
-#[cfg(not(feature = "julia-1-6"))]
+#[julia_version(since = "1.7")]
 impl AtomicBuffer {
     fn new() -> Self {
         AtomicBuffer { ptr: null_mut() }
@@ -89,10 +86,10 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
     /// Access the field the accessor is currenty pointing to as a value of type `T`.
     ///
     /// This method accesses the field using its concrete type. If the concrete type of the field
-    /// has a matching pointer wrapper type it can be accessed as a `ValueRef` or a `Ref` of to
-    /// that pointer wrapper type. For example, a field that contains a `Module` can be accessed
-    /// as a `ModuleRef`. In all other cases an inline wrapper type must be used. For example, an
-    /// untyped field that currently holds a `Float64` must be accessed as `f64`.
+    /// has a matching managed type it can be accessed as a `ValueRef` or a `Ref` of that managed
+    /// type. For example, a field that contains a `Module` can be accessed as a `ModuleRef`. In
+    /// all other cases a layout type must be used. For example, an untyped field that currently
+    /// holds a `Float64` must be accessed as `f64`.
     pub fn access<T: ValidLayout>(self) -> JlrsResult<T> {
         if self.current_field_type.is_none() {
             Err(AccessError::UndefRef)?;
@@ -246,7 +243,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
     /// If the field is a small atomic field `ordering` is used to read it. The ordering is
     /// ignored for non-atomic fields and fields that require a lock to access. See
     /// [`FieldAccessor::field`] for more information.
-    #[cfg(not(feature = "julia-1-6"))]
+    #[julia_version(since = "1.7")]
     pub fn atomic_field<F: FieldIndex>(mut self, field: F, ordering: Ordering) -> JlrsResult<Self> {
         if self.value.is_none() {
             Err(AccessError::UndefRef)?
@@ -328,13 +325,13 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
     }
 
     /// Returns `true` if the current value the accessor is accessing is locked.
-    #[cfg(not(feature = "julia-1-6"))]
+    #[julia_version(since = "1.7")]
     pub fn is_locked(&self) -> bool {
         self.state == ViewState::Locked
     }
 
     /// Returns `true` if the current value the accessor is accessing is locked.
-    #[cfg(feature = "julia-1-6")]
+    #[julia_version(until = "1.6")]
     pub fn is_locked(&self) -> bool {
         false
     }
@@ -349,7 +346,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
         self.value
     }
 
-    #[cfg(not(feature = "julia-1-6"))]
+    #[julia_version(since = "1.7")]
     // Safety: the view state must be ViewState::AtomicBuffer
     unsafe fn get_atomic_buffer_field(
         &mut self,
@@ -387,7 +384,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
     }
 
     // Safety: the view state must be ViewState::Unlocked
-    #[cfg(not(feature = "julia-1-6"))]
+    #[julia_version(since = "1.7")]
     unsafe fn get_unlocked_inline_field(
         &mut self,
         is_pointer_field: bool,
@@ -417,7 +414,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
     }
 
     // Safety: the view state must be ViewState::Unlocked
-    #[cfg(feature = "julia-1-6")]
+    #[julia_version(until = "1.6")]
     unsafe fn get_unlocked_inline_field(
         &mut self,
         is_pointer_field: bool,
@@ -438,7 +435,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
     }
 
     // Safety: the view state must be ViewState::Locked
-    #[cfg(not(feature = "julia-1-6"))]
+    #[julia_version(since = "1.7")]
     unsafe fn get_locked_inline_field(
         &mut self,
         is_pointer_field: bool,
@@ -496,7 +493,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
         Ok(())
     }
 
-    #[cfg(not(feature = "julia-1-6"))]
+    #[julia_version(since = "1.7")]
     // Safety: must only be used to read an atomic field
     unsafe fn lock_or_copy_atomic(&mut self, ordering: Ordering) {
         let ptr = self
@@ -603,7 +600,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
         }
     }
 
-    #[cfg(not(feature = "julia-1-6"))]
+    #[julia_version(since = "1.7")]
     // Safety: must only be used to read an pointer field
     unsafe fn get_pointer_field(&mut self, locked: bool, next_field_type: Value<'scope, 'data>) {
         let value = self
@@ -643,7 +640,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
         }
     }
 
-    #[cfg(feature = "julia-1-6")]
+    #[julia_version(until = "1.6")]
     // Safety: must only be used to read an pointer field
     unsafe fn get_pointer_field(&mut self, _locked: bool, next_field_type: Value<'scope, 'data>) {
         self.value = self
@@ -677,7 +674,7 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
         }
     }
 
-    #[cfg(not(feature = "julia-1-6"))]
+    #[julia_version(since = "1.7")]
     // Safety: must only be used to read an atomic pointer field
     unsafe fn get_atomic_pointer_field(
         &mut self,
@@ -760,7 +757,7 @@ impl Drop for FieldAccessor<'_, '_> {
 /// Trait implemented by types that can be used in combination with a
 /// [`FieldAccessor`] as the index for a field.
 ///
-/// [`FieldAccessor`]: crate::data::managed::value::FieldAccessor
+/// [`FieldAccessor`]: crate::data::managed::value::field_accessor::FieldAccessor
 pub trait FieldIndex: private::FieldIndexPriv {}
 impl<I: private::FieldIndexPriv> FieldIndex for I {}
 

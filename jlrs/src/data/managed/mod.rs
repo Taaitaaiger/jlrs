@@ -1,19 +1,19 @@
-//! Wrappers for builtin pointer types.
+//! Builtin managed types.
 //!
-//! In this module you'll find wrappers for all builtin pointer types. These are types like
-//! [`Module`], [`DataType`], and [`Array`]. These types often provide access to some specific
-//! functionality from the C API. For example, the [`Module`] wrapper provides access to the
-//! contents of Julia modules, and the [`Array`] wrapper access to the contents of n-dimensional
-//! Julia arrays.
+//! In this module you'll find types that represent Julia's builtin managed types. These are
+//! mutable types like [`Module`], [`DataType`], and [`Array`] which are defined by the C API and
+//! provide access to some specific functionality from that API. For example, [`Module`] provides
+//! access to the contents of Julia modules, and [`Array`] access to the contents of Julia arrays.
 //!
-//! The most common of these wrappers is [`Value`], it represents some arbitrary data that Julia
-//! can use. Whenever you call a Julia function its arguments must be of this type, and a new one
-//! is returned. All pointer wrappers are valid [`Value`]s.
+//! The most common of these types is [`Value`], which represents some arbitrary managed data.
+//! Whenever you call a Julia function its arguments must be of this type, and a new one is
+//! returned. All managed data is a valid [`Value`] and can be converted to that type by calling
+//! [`Managed::as_value`].
 //!
-//! One useful guarantee provided by wrappers is that they point to an existing value and are
-//! rooted. If a wrapper is returned that isn't rooted, jlrs will return a [`Ref`]. Because it's
-//! not rooted it's not guaranteed to remain valid while it can be used. For more information
-//! about rooting see the documentation of the [`memory`] module.
+//! One useful guarantee provided by managed types is that they point to existing data and are
+//! rooted. If data is returned that isn't rooted, jlrs will return a [`Ref`] instead of the
+//! managed type. Because the data isn't rooted it's not guaranteed to remain valid while it can
+//! be used. For more information about rooting see the documentation of the [`memory`] module.
 //!
 //! [`memory`]: crate::memory
 //! [`DataType`]: crate::data::managed::datatype::DataType
@@ -106,7 +106,7 @@ use crate::{
 pub trait ManagedRef<'scope, 'data>:
     private::ManagedRef<'scope, 'data> + Copy + Debug + ValidLayout
 {
-    /// The pointer wrapper type associated with this `Ref`.
+    /// The managed type associated with this `Ref`.
     type Managed: Managed<'scope, 'data>;
 }
 
@@ -119,20 +119,20 @@ where
     type Managed = T;
 }
 
-/// Trait implemented by all pointer wrapper types.
+/// Trait implemented by all managed types.
 pub trait Managed<'scope, 'data>: private::ManagedPriv<'scope, 'data> {
     /// `Self`, but with arbitrary lifetimes. Used to construct the appropriate type in generic
     /// contexts.
     type TypeConstructor<'target, 'da>: Managed<'target, 'da>;
 
-    /// Convert the wrapper to a `Ref`.
+    /// Convert the data to a `Ref`.
     fn as_ref(self) -> Ref<'scope, 'data, Self> {
         Ref::wrap(self.unwrap_non_null(Private))
     }
 
-    /// Convert the wrapper to a `Value`.
+    /// Convert the data to a `Value`.
     fn as_value(self) -> Value<'scope, 'data> {
-        // Safety: Pointer wrappers can always be converted to a Value
+        // Safety: Managed types can always be converted to a Value
         unsafe { Value::wrap_non_null(self.unwrap_non_null(Private).cast(), Private) }
     }
 
@@ -149,7 +149,7 @@ pub trait Managed<'scope, 'data>: private::ManagedPriv<'scope, 'data> {
         unsafe { Unrooted::new() }
     }
 
-    /// Convert the wrapper to its display string, i.e. the string that is shown when calling
+    /// Convert the data to its display string, i.e. the string that is shown when calling
     /// `Base.show`.
     fn display_string(self) -> JlrsResult<String> {
         // Safety: all Julia data that is accessed is globally rooted, the result is converted
@@ -174,13 +174,12 @@ pub trait Managed<'scope, 'data>: private::ManagedPriv<'scope, 'data> {
         Ok(s)
     }
 
-    /// Convert the wrapper to its error string, i.e. the string that is shown when calling
+    /// Convert the data to its error string, i.e. the string that is shown when calling
     /// `Base.showerror`. This string can contain ANSI color codes if this is enabled by calling
-    /// [`Julia::error_color`], [`AsyncJulia::error_color`], or [`AsyncJulia::try_error_color`], .
+    /// [`Julia::error_color`] or [`AsyncJulia::error_color`].
     ///
     /// [`Julia::error_color`]: crate::runtime::sync_rt::Julia::error_color
     /// [`AsyncJulia::error_color`]: crate::runtime::async_rt::AsyncJulia::error_color
-    /// [`AsyncJulia::try_error_color`]: crate::runtime::async_rt::AsyncJulia::try_error_color
     fn error_string(self) -> JlrsResult<String> {
         // Safety: all Julia data that is accessed is globally rooted, the result is converted
         // to a String before the GC can free it.
@@ -204,20 +203,20 @@ pub trait Managed<'scope, 'data>: private::ManagedPriv<'scope, 'data> {
         Ok(s)
     }
 
-    /// Convert the wrapper to its display string, i.e. the string that is shown by calling
+    /// Convert the data to its display string, i.e. the string that is shown by calling
     /// `Base.display`, or some default value.
     fn display_string_or<S: Into<String>>(self, default: S) -> String {
         self.display_string().unwrap_or(default.into())
     }
 
-    /// Convert the wrapper to its error string, i.e. the string that is shown when this value is
+    /// Convert the data to its error string, i.e. the string that is shown when this value is
     /// thrown as an exception, or some default value.
     fn error_string_or<S: Into<String>>(self, default: S) -> String {
         self.error_string().unwrap_or(default.into())
     }
 }
 
-/// The wrapper type W<'target, 'data> assocatiated with the reference type T<'scope, 'data>.
+/// The managed type `W<'target, 'data>` assocatiated with the reference type `T<'scope, 'data>`.
 pub type ManagedType<'target, 'scope, 'data, T> =
     <<T as ManagedRef<'scope, 'data>>::Managed as Managed<'scope, 'data>>::TypeConstructor<
         'target,
@@ -233,7 +232,7 @@ where
 
 /// A reference to Julia data that is not guaranteed to be rooted.
 ///
-/// Pointer wrappers are generally guaranteed to wrap valid, rooted data. In some cases this
+/// Managed types are generally guaranteed to wrap valid, rooted data. In some cases this
 /// guarantee is too strong. The garbage collector uses the roots as a starting point to
 /// determine what values can be reached, as long as you can guarantee a value is reachable it's
 /// safe to use. Whenever data is not rooted jlrs returns a `Ref`. Because it's not rooted it's
@@ -280,7 +279,7 @@ impl<'scope, 'data, W: Managed<'scope, 'data>> Ref<'scope, 'data, W> {
         Ref(ptr, PhantomData, PhantomData)
     }
 
-    /// Assume the reference still points to valid Julia data and convert it to its wrapper type.
+    /// Assume the reference still points to valid Julia data and convert it to its managed type.
     ///
     /// Safety: a reference is only guaranteed to be valid as long as it's reachable from some
     /// GC root. If the reference is unreachable, the GC can free it. The GC can run whenever a

@@ -1,4 +1,6 @@
-//! Managed for `Float16`.
+//! Layout type for `Float16`.
+//!
+//! This module is only available if the `f16` feature has been enabled.
 
 use half::f16;
 use jl_sys::jl_float16_type;

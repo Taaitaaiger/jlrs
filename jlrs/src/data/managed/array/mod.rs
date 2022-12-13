@@ -1,6 +1,6 @@
-//! Wrappers for `Array`, create and access n-dimensional Julia arrays from Rust.
+//! Managed types for `Array`, create and access n-dimensional Julia arrays from Rust.
 //!
-//! You will find two wrappers in this module that can be used to work with Julia arrays from
+//! You will find two managed types in this module that can be used to work with Julia arrays from
 //! Rust. An [`Array`] is the Julia array itself, [`TypedArray`] is also available which can be
 //! used if the element type implements [`ValidField`].
 //!
@@ -13,13 +13,15 @@
 //!
 //! How the contents of the array must be accessed from Rust depends on the type of the elements.
 //! [`Array`] provides methods to (mutably) access their contents for all three possible
-//! layouts of the elements: inline, pointer, and bits union.   
+//! layouts of the elements: inline, pointer, and bits union.
 //!
 //! Accessing the contents of an array requires an n-dimensional index. The [`Dims`] trait is
 //! available for this purpose. This trait is implemented for tuples of four or fewer `usize`s;
 //! `[usize; N]` and `&[usize; N]` implement it for all `N`, `&[usize]` can be used if `N` is not
 //! a constant at compile time.
 
+#[julia_version(windows_lts = false)]
+use std::mem::MaybeUninit;
 use std::{
     cell::UnsafeCell,
     ffi::c_void,
@@ -30,7 +32,6 @@ use std::{
     slice,
 };
 
-use cfg_if::cfg_if;
 use jl_sys::{
     jl_alloc_array_1d, jl_alloc_array_2d, jl_alloc_array_3d, jl_apply_array_type,
     jl_apply_tuple_type_v, jl_array_data, jl_array_del_beg, jl_array_del_end, jl_array_dims_ptr,
@@ -38,6 +39,7 @@ use jl_sys::{
     jl_datatype_t, jl_gc_add_ptr_finalizer, jl_new_array, jl_new_struct_uninit, jl_pchar_to_array,
     jl_ptr_to_array, jl_ptr_to_array_1d, jl_reshape_array,
 };
+use jlrs_macros::julia_version;
 
 use self::data::accessor::{
     ArrayAccessor, BitsArrayAccessorI, BitsArrayAccessorMut, Immutable, IndeterminateArrayAccessor,
@@ -45,6 +47,8 @@ use self::data::accessor::{
     PtrArrayAccessorI, PtrArrayAccessorMut, UnionArrayAccessorI, UnionArrayAccessorMut,
 };
 use super::{union_all::UnionAll, value::ValueRef, Ref};
+#[julia_version(windows_lts = false)]
+use crate::catch::{catch_exceptions, catch_exceptions_with_slots};
 use crate::{
     convert::into_julia::IntoJulia,
     data::{
@@ -70,13 +74,6 @@ use crate::{
     },
     private::Private,
 };
-
-cfg_if! {
-    if #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))] {
-        use crate::{catch::{catch_exceptions_with_slots, catch_exceptions}};
-        use std::mem::MaybeUninit;
-    }
-}
 
 pub mod data;
 pub mod dimensions;
@@ -117,7 +114,7 @@ impl<'data> Array<'_, 'data> {
     /// If the array size is too large, Julia will throw an error. This error is caught and
     /// returned.
 
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+    #[julia_version(windows_lts = false)]
     pub fn new<'target, 'current, 'borrow, T, D, S>(
         target: ExtendedTarget<'target, 'current, 'borrow, S>,
         dims: D,
@@ -236,7 +233,7 @@ impl<'data> Array<'_, 'data> {
     ///
     /// If the array size is too large or if the type is invalid, Julia will throw an error. This
     /// error is caught and returned.
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+    #[julia_version(windows_lts = false)]
     pub fn new_for<'target, 'current, 'borrow, D, S>(
         target: ExtendedTarget<'target, 'current, 'borrow, S>,
         dims: D,
@@ -356,7 +353,7 @@ impl<'data> Array<'_, 'data> {
     ///
     /// If the array size is too large, Julia will throw an error. This error is caught and
     /// returned.
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+    #[julia_version(windows_lts = false)]
     pub fn from_slice<'target: 'current, 'current: 'borrow, 'borrow, T, D, S>(
         target: ExtendedTarget<'target, 'current, 'borrow, S>,
         data: &'data mut [T],
@@ -503,7 +500,7 @@ impl<'data> Array<'_, 'data> {
     ///
     /// If the array size is too large, Julia will throw an error. This error is caught and
     /// returned.
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+    #[julia_version(windows_lts = false)]
     pub fn from_vec<'target, 'current, 'borrow, T, D, S>(
         target: ExtendedTarget<'target, 'current, 'borrow, S>,
         data: Vec<T>,
@@ -1024,7 +1021,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     ///
     /// This method returns an exception if the old and new array have a different number of
     /// elements.
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+    #[julia_version(windows_lts = false)]
     pub unsafe fn reshape<'target, 'current, 'borrow, D, S>(
         &self,
         target: ExtendedTarget<'target, 'current, 'borrow, S>,
@@ -1193,7 +1190,7 @@ impl<'scope> Array<'scope, 'static> {
     ///
     /// The array must be 1D and not contain data borrowed or moved from Rust, otherwise an exception
     /// is returned.
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+    #[julia_version(windows_lts = false)]
     pub unsafe fn grow_end<'target, S>(
         &mut self,
         target: S,
@@ -1231,7 +1228,7 @@ impl<'scope> Array<'scope, 'static> {
     ///
     /// The array must be 1D, not contain data borrowed or moved from Rust, otherwise an exception
     /// is returned.
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+    #[julia_version(windows_lts = false)]
     pub unsafe fn del_end<'target, S>(&mut self, target: S, dec: usize) -> S::Exception<'static, ()>
     where
         S: Target<'target>,
@@ -1264,7 +1261,7 @@ impl<'scope> Array<'scope, 'static> {
     ///
     /// The array must be 1D, not contain data borrowed or moved from Rust, otherwise an exception
     /// is returned.
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+    #[julia_version(windows_lts = false)]
     pub unsafe fn grow_begin<'target, S>(
         &mut self,
         target: S,
@@ -1301,7 +1298,7 @@ impl<'scope> Array<'scope, 'static> {
     ///
     /// The array must be 1D, not contain data borrowed or moved from Rust, otherwise an exception
     /// is returned.
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+    #[julia_version(windows_lts = false)]
     pub unsafe fn del_begin<'target, S>(
         &mut self,
         target: S,
@@ -1394,7 +1391,7 @@ where
     ///
     /// If the array size is too large, Julia will throw an error. This error is caught and
     /// returned.
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+    #[julia_version(windows_lts = false)]
     pub fn new<'target, 'current, 'borrow, D, S>(
         target: ExtendedTarget<'target, 'current, 'borrow, S>,
         dims: D,
@@ -1462,7 +1459,7 @@ where
     ///
     /// If the array size is too large, Julia will throw an error. This error is caught and
     /// returned.
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+    #[julia_version(windows_lts = false)]
     pub fn from_slice<'target: 'current, 'current: 'borrow, 'borrow, D, S>(
         target: ExtendedTarget<'target, 'current, 'borrow, S>,
         data: &'data mut [T],
@@ -1532,7 +1529,7 @@ where
     ///
     /// If the array size is too large, Julia will throw an error. This error is caught and
     /// returned.
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+    #[julia_version(windows_lts = false)]
     pub fn from_vec<'target, 'current, 'borrow, D, S>(
         target: ExtendedTarget<'target, 'current, 'borrow, S>,
         data: Vec<T>,
@@ -1605,7 +1602,7 @@ where
     ///
     /// If the array size is too large or if the type is invalid, Julia will throw an error. This
     /// error is caught and returned.
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+    #[julia_version(windows_lts = false)]
     pub fn new_for<'target, 'current, 'borrow, D, S>(
         target: ExtendedTarget<'target, 'current, 'borrow, S>,
         dims: D,
@@ -1857,7 +1854,7 @@ where
     ///
     /// This method returns an exception if the old and new array have a different number of
     /// elements.
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+    #[julia_version(windows_lts = false)]
     pub unsafe fn reshape<'target, 'current, 'borrow, D, S>(
         &self,
         target: ExtendedTarget<'target, 'current, 'borrow, S>,
@@ -2059,7 +2056,7 @@ where
     ///
     /// The array must be 1D and not contain data borrowed or moved from Rust, otherwise an exception
     /// is returned.
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+    #[julia_version(windows_lts = false)]
     pub unsafe fn grow_end<'target, S>(
         &mut self,
         target: S,
@@ -2084,7 +2081,7 @@ where
     ///
     /// The array must be 1D, not contain data borrowed or moved from Rust, otherwise an exception
     /// is returned.
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+    #[julia_version(windows_lts = false)]
     pub unsafe fn del_end<'target, S>(&mut self, target: S, dec: usize) -> S::Exception<'static, ()>
     where
         S: Target<'target>,
@@ -2104,7 +2101,7 @@ where
     ///
     /// The array must be 1D, not contain data borrowed or moved from Rust, otherwise an exception
     /// is returned.
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+    #[julia_version(windows_lts = false)]
     pub unsafe fn grow_begin<'target, S>(
         &mut self,
         target: S,
@@ -2129,7 +2126,7 @@ where
     ///
     /// The array must be 1D, not contain data borrowed or moved from Rust, otherwise an exception
     /// is returned.
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+    #[julia_version(windows_lts = false)]
     pub unsafe fn del_begin<'target, S>(
         &mut self,
         target: S,

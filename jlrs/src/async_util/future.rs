@@ -11,6 +11,7 @@ use futures::{
     Future,
 };
 use jl_sys::{jl_call1, jl_exception_occurred};
+use jlrs_macros::julia_version;
 use smallvec::SmallVec;
 
 use crate::{
@@ -46,7 +47,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         Self::new_future(frame, func, values, "asynccall")
     }
 
-    #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
+    #[julia_version(since = "1.9")]
     pub(crate) fn new_interactive<'value, V>(
         frame: &mut AsyncGcFrame<'frame>,
         func: Value,
@@ -135,7 +136,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         Self::new_future_with_keywords(frame, func, values, "asynccall")
     }
 
-    #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
+    #[julia_version(since = "1.9")]
     pub(crate) fn new_interactive_with_keywords<'value, V>(
         frame: &mut AsyncGcFrame<'frame>,
         func: WithKeywords,
