@@ -8,8 +8,9 @@ use std::{
 };
 
 use jl_sys::{jl_array_ptr_set, jl_array_typetagdata, jl_arrayref, jl_arrayset};
+use jlrs_macros::julia_version;
 
-#[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+#[julia_version(windows_lts = false)]
 use crate::data::managed::value::ValueResult;
 use crate::{
     data::{
@@ -204,7 +205,7 @@ impl<'borrow, 'array, 'data, U, L: ArrayLayout, M: Mutability>
     ///
     /// If an error is thrown by Julia it's caught and returned.
 
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+    #[julia_version(windows_lts = false)]
     pub fn get_value<'frame, D, T>(
         &mut self,
         target: T,
@@ -280,7 +281,7 @@ impl<'borrow, 'array, 'data, U, L: ArrayLayout>
     /// Set the element at `index` to `value`.
     ///
     /// If an error is thrown by Julia it's caught and returned.
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+    #[julia_version(windows_lts = false)]
     pub fn set_value<'target, D, T>(
         &mut self,
         target: T,

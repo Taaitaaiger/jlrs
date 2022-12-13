@@ -1,4 +1,4 @@
-//! Managed for `WeakRef`.
+//! Managed type for `WeakRef`.
 
 use std::{marker::PhantomData, ptr::NonNull};
 

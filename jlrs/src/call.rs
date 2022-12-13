@@ -6,14 +6,15 @@
 
 use std::ptr::NonNull;
 
-#[cfg(not(any(feature = "julia-1-10", feature = "julia-1-9")))]
+#[julia_version(until = "1.8")]
 use jl_sys::jl_get_kwsorter;
-#[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
+#[julia_version(since = "1.9")]
 use jl_sys::jl_kwcall_func;
 use jl_sys::{jl_call, jl_exception_occurred};
+use jlrs_macros::julia_version;
 use smallvec::SmallVec;
 
-#[cfg(not(any(feature = "julia-1-10", feature = "julia-1-9")))]
+#[julia_version(until = "1.8")]
 use crate::data::managed::private::ManagedPriv as _;
 use crate::{
     data::managed::{
@@ -536,7 +537,7 @@ cfg_if::cfg_if! {
             /// check if any of the arguments is currently borrowed from Rust.
             ///
             /// [`safety`]: crate::safety
-            #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
+            #[julia_version(since = "1.9")]
             async unsafe fn call_async_interactive<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
@@ -557,7 +558,7 @@ cfg_if::cfg_if! {
             /// returns an `AccessError::BorrowError` if any of the arguments is.
             ///
             /// [`safety`]: crate::safety
-            #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
+            #[julia_version(since = "1.9")]
             async unsafe fn call_async_interactive_tracked<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
@@ -603,7 +604,7 @@ cfg_if::cfg_if! {
             ///
             /// [`safety`]: crate::safety
             /// [`PersistentTask::init`]: crate::async_util::task::PersistentTask::init
-            #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
+            #[julia_version(since = "1.9")]
             unsafe fn schedule_async_interactive<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
@@ -625,7 +626,7 @@ cfg_if::cfg_if! {
             ///
             /// [`safety`]: crate::safety
             /// [`PersistentTask::init`]: crate::async_util::task::PersistentTask::init
-            #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
+            #[julia_version(since = "1.9")]
             unsafe fn schedule_async_interactive_tracked<'target, 'value, V, T>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
@@ -938,7 +939,7 @@ cfg_if::cfg_if! {
                 JuliaFuture::new(frame, self, args).await
             }
 
-            #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
+            #[julia_version(since = "1.9")]
             async unsafe fn call_async_interactive<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
@@ -950,7 +951,7 @@ cfg_if::cfg_if! {
                 JuliaFuture::new_interactive(frame, self, args).await
             }
 
-            #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
+            #[julia_version(since = "1.9")]
             unsafe fn schedule_async_interactive<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
@@ -1103,7 +1104,7 @@ cfg_if::cfg_if! {
                 JuliaFuture::new(frame, self.as_value(), args).await
             }
 
-            #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
+            #[julia_version(since = "1.9")]
             async unsafe fn call_async_interactive<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
@@ -1115,7 +1116,7 @@ cfg_if::cfg_if! {
                 JuliaFuture::new_interactive(frame, self.as_value(), args).await
             }
 
-            #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
+            #[julia_version(since = "1.9")]
             unsafe fn schedule_async_interactive<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
@@ -1196,7 +1197,7 @@ cfg_if::cfg_if! {
                 JuliaFuture::new_with_keywords(frame, self, args).await
             }
 
-            #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
+            #[julia_version(since = "1.9")]
             async unsafe fn call_async_interactive<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
@@ -1208,7 +1209,7 @@ cfg_if::cfg_if! {
                 JuliaFuture::new_interactive_with_keywords(frame, self, args).await
             }
 
-            #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
+            #[julia_version(since = "1.9")]
             unsafe fn schedule_async_interactive<'target, 'value, V>(
                 self,
                 frame: &mut AsyncGcFrame<'target>,
@@ -1359,14 +1360,18 @@ cfg_if::cfg_if! {
 }
 
 mod private {
+    use jlrs_macros::julia_version;
+
     use super::WithKeywords;
-    #[cfg(all(not(feature = "julia-1-6"), feature = "internal-types"))]
+    #[cfg(feature = "internal-types")]
+    #[julia_version(since = "1.7")]
     use crate::data::managed::internal::opaque_closure::OpaqueClosure;
     use crate::data::managed::{function::Function, value::Value};
     pub trait CallPriv: Sized {}
     impl CallPriv for WithKeywords<'_, '_> {}
     impl CallPriv for Function<'_, '_> {}
-    #[cfg(all(not(feature = "julia-1-6"), feature = "internal-types"))]
+    #[cfg(feature = "internal-types")]
+    #[julia_version(since = "1.7")]
     impl CallPriv for OpaqueClosure<'_> {}
     impl CallPriv for Value<'_, '_> {}
 }

@@ -1,10 +1,11 @@
-//! Managed for `Union`.
+//! Managed type for `Union`.
 
 use std::{marker::PhantomData, ptr::NonNull};
 
 use jl_sys::{jl_islayout_inline, jl_type_union, jl_uniontype_t, jl_uniontype_type};
+use jlrs_macros::julia_version;
 
-#[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+#[julia_version(windows_lts = false)]
 use super::value::ValueResult;
 use super::{value::ValueData, Ref};
 use crate::{
@@ -29,7 +30,7 @@ impl<'scope> Union<'scope> {
     ///
     /// [`Union`]: crate::data::managed::union::Union
     /// [`DataType`]: crate::data::managed::datatype::DataType
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+    #[julia_version(windows_lts = false)]
     pub fn new<'target, V, T>(target: T, types: V) -> ValueResult<'target, 'static, T>
     where
         V: AsRef<[Value<'scope, 'static>]>,

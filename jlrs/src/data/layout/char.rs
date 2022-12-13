@@ -1,8 +1,8 @@
-//! Managed for `Char`.
+//! Layout type for `Char`.
 //!
 //! In Rust it's unsafe to create an invalid `char`, while a `Char` in Julia can be an arbitrary
 //! `u32` in some rare cases. Rather than treating all `Char`s as `u32` or `char`s, jlrs provides
-//! a wrapper for this type.
+//! a custom layout for this type, [`Char`].
 use std::fmt::{Debug, Formatter, Result as FmtResult, Write};
 
 use jl_sys::{jl_char_type, jl_unbox_uint32};

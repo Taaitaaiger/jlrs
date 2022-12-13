@@ -1,4 +1,4 @@
-//! Managed for `SSAVAlue`.
+//! Layout type for `SSAVAlue`.
 
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 

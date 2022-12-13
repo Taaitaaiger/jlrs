@@ -1,8 +1,9 @@
-//! Managed for `TypeVar`.
+//! Managed type for `TypeVar`.
 
 use std::{marker::PhantomData, ptr::NonNull};
 
 use jl_sys::{jl_new_typevar, jl_tvar_t, jl_tvar_type};
+use jlrs_macros::julia_version;
 
 use super::{value::ValueData, Ref};
 use crate::{
@@ -29,7 +30,7 @@ impl<'scope> TypeVar<'scope> {
     /// Create a new `TypeVar`, the optional lower and upper bounds must be subtypes of `Type`,
     /// their default values are `Union{}` and `Any` respectively. The returned value can be
     /// cast to a [`TypeVar`]. If Julia throws an exception, it's caught, rooted and returned.
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
+    #[julia_version(windows_lts = false)]
     pub fn new<'target, N, T>(
         target: T,
         name: N,

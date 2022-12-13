@@ -1,6 +1,7 @@
 
 [workspace]
 members = [
+    "jlrs_macros",
     "jlrs",
     "jlrs_derive",
     "jl_sys",

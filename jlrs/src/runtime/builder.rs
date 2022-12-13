@@ -10,6 +10,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use jlrs_macros::julia_version;
+
 #[cfg(feature = "sync-rt")]
 use super::sync_rt::PendingJulia;
 #[cfg(any(feature = "sync-rt", feature = "async-rt"))]
@@ -65,7 +67,7 @@ cfg_if::cfg_if! {
                 self
             }
 
-            #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
+            #[julia_version(since = "1.9")]
             /// Set the number of threads allocated to the `:interactive` pool.
             ///
             /// If it's set to 0, the default value, no threads are allocated to this pool.
@@ -75,7 +77,7 @@ cfg_if::cfg_if! {
             }
 
 
-            #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
+            #[julia_version(since = "1.9")]
             /// Set the number of worker threads jlrs creates in addition to the runtime thread.
             ///
             /// If it's set to 0, the default value, no worker threads are created.

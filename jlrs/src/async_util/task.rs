@@ -28,7 +28,7 @@ use crate::{
 
 /// A task that returns once.
 ///
-/// In order to schedule the task you must use [`AsyncJulia::task`] or [`AsyncJulia::try_task`].
+/// In order to schedule the task you must use [`AsyncJulia::task`].
 ///
 /// Example:
 ///
@@ -74,20 +74,19 @@ pub trait AsyncTask: 'static + Send {
     /// The thread-affinity of this task. Can be set to [`DispatchAny`], [`DispatchMain`], or
     /// [`DispatchWorker`]
     ///
-    /// [`DispatchAny`]: crate::runtime::async_rt::queue::dispatch::DispatchAny
-    /// [`DispatchMain`]: crate::runtime::async_rt::queue::dispatch::DispatchMain
-    /// [`DispatchWorker`]: crate::runtime::async_rt::queue::dispatch::DispatchWorker
+    /// [`DispatchAny`]: crate::async_util::affinity::DispatchAny
+    /// [`DispatchMain`]: crate::async_util::affinity::DispatchMain
+    /// [`DispatchWorker`]: crate::async_util::affinity::DispatchWorker
     type Affinity: Affinity;
 
     /// Register the task.
     ///
     /// Note that this method is not called automatically, but only if
-    /// [`AsyncJulia::register_task`] or [`AsyncJulia::try_register_task`] is used. This method
+    /// [`AsyncJulia::register_task`] is used. This method
     /// can be implemented to take care of everything required to execute the task successfully,
     /// like loading packages.
     ///
     /// [`AsyncJulia::register_task`]: crate::runtime::async_rt::AsyncJulia::register_task
-    /// [`AsyncJulia::try_register_task`]: crate::runtime::async_rt::AsyncJulia::try_register_task
     async fn register<'frame>(_frame: AsyncGcFrame<'frame>) -> JlrsResult<()> {
         Ok(())
     }
@@ -102,8 +101,7 @@ pub trait AsyncTask: 'static + Send {
 
 /// A task that can be called multiple times.
 ///
-/// In order to schedule the task you must use [`AsyncJulia::persistent`] or
-/// [`AsyncJulia::try_persistent`].
+/// In order to schedule the task you must use [`AsyncJulia::persistent`].
 ///
 /// Example:
 ///
@@ -209,9 +207,9 @@ pub trait PersistentTask: 'static + Send {
     /// The thread-affinity of this task. Can be set to [`DispatchAny`], [`DispatchMain`], or
     /// [`DispatchWorker`]
     ///
-    /// [`DispatchAny`]: crate::runtime::async_rt::queue::dispatch::DispatchAny
-    /// [`DispatchMain`]: crate::runtime::async_rt::queue::dispatch::DispatchMain
-    /// [`DispatchWorker`]: crate::runtime::async_rt::queue::dispatch::DispatchWorker
+    /// [`DispatchAny`]: crate::async_util::affinity::DispatchAny
+    /// [`DispatchMain`]: crate::async_util::affinity::DispatchMain
+    /// [`DispatchWorker`]: crate::async_util::affinity::DispatchWorker
     type Affinity: Affinity;
 
     // The capacity of the channel used to communicate with this task.
@@ -220,7 +218,7 @@ pub trait PersistentTask: 'static + Send {
     /// Register this persistent task.
     ///
     /// Note that this method is not called automatically, but only if
-    /// [`AsyncJulia::register_persistent`] or [`AsyncJulia::try_register_persistent`] is used.
+    /// [`AsyncJulia::register_persistent`]is used.
     /// This method can be implemented to take care of everything required to execute the task
     /// successfully, like loading packages.
     ///

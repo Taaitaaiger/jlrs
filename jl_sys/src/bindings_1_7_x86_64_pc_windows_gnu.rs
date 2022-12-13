@@ -79,54 +79,9 @@ where
         }
     }
 }
-pub type WORD = ::std::os::raw::c_ushort;
 pub type DWORD = ::std::os::raw::c_ulong;
-pub type ULONG_PTR = ::std::os::raw::c_ulonglong;
-pub type PVOID = *mut ::std::os::raw::c_void;
-pub type LONG = ::std::os::raw::c_long;
-pub type HANDLE = *mut ::std::os::raw::c_void;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct _LIST_ENTRY {
-    pub Flink: *mut _LIST_ENTRY,
-    pub Blink: *mut _LIST_ENTRY,
-}
-pub type LIST_ENTRY = _LIST_ENTRY;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct _RTL_CRITICAL_SECTION_DEBUG {
-    pub Type: WORD,
-    pub CreatorBackTraceIndex: WORD,
-    pub CriticalSection: *mut _RTL_CRITICAL_SECTION,
-    pub ProcessLocksList: LIST_ENTRY,
-    pub EntryCount: DWORD,
-    pub ContentionCount: DWORD,
-    pub Flags: DWORD,
-    pub CreatorBackTraceIndexHigh: WORD,
-    pub SpareWORD: WORD,
-}
-pub type PRTL_CRITICAL_SECTION_DEBUG = *mut _RTL_CRITICAL_SECTION_DEBUG;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct _RTL_CRITICAL_SECTION {
-    pub DebugInfo: PRTL_CRITICAL_SECTION_DEBUG,
-    pub LockCount: LONG,
-    pub RecursionCount: LONG,
-    pub OwningThread: HANDLE,
-    pub LockSemaphore: HANDLE,
-    pub SpinCount: ULONG_PTR,
-}
-pub type RTL_CRITICAL_SECTION = _RTL_CRITICAL_SECTION;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct _RTL_CONDITION_VARIABLE {
-    pub Ptr: PVOID,
-}
-pub type RTL_CONDITION_VARIABLE = _RTL_CONDITION_VARIABLE;
-pub type CRITICAL_SECTION = RTL_CRITICAL_SECTION;
-pub type CONDITION_VARIABLE = RTL_CONDITION_VARIABLE;
-pub type uv_mutex_t = CRITICAL_SECTION;
-pub type uv_cond_t = CONDITION_VARIABLE;
+pub type uv_mutex_t = [u64; 5usize];
+pub type uv_cond_t = u64;
 pub type jl_gcframe_t = _jl_gcframe_t;
 pub type uint_t = u64;
 #[repr(C)]

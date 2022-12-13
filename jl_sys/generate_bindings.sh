@@ -115,7 +115,7 @@ if [ "${NIGHTLY}" = "y" -o "${ALL}" = "y" ]; then
 
     cargo clean
     JULIA_VERSION=$($JULIA_NIGHTLY_DIR/bin/julia --version)
-    JULIA_DIR=$JULIA_NIGHTLY_DIR cargo build --features use-bindgen,nightly
+    JULIA_DIR=$JULIA_NIGHTLY_DIR cargo build --features use-bindgen,julia-1-10
     echo "/* generated from $JULIA_VERSION */" > ./src/bindings_nightly_x86_64_unknown_linux_gnu.rs
     cat ../target/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings_nightly_x86_64_unknown_linux_gnu.rs
 
@@ -152,17 +152,17 @@ if [ "${BETA}" = "y" -o "${ALL}" = "y" ]; then
 
     cargo clean
     JULIA_VERSION=$($JULIA_1_9_DIR/bin/julia --version)
-    JULIA_DIR=$JULIA_1_9_DIR cargo build --features use-bindgen,beta
+    JULIA_DIR=$JULIA_1_9_DIR cargo build --features use-bindgen,julia-1-9
     echo "/* generated from $JULIA_VERSION */" > ./src/bindings_1_9_x86_64_unknown_linux_gnu.rs
     cat ../target/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings_1_9_x86_64_unknown_linux_gnu.rs
 
     cargo clean
-    JULIA_DIR=$JULIA_1_9_DIR_32 cargo build --features use-bindgen,i686,beta --target i686-unknown-linux-gnu
+    JULIA_DIR=$JULIA_1_9_DIR_32 cargo build --features use-bindgen,i686,julia-1-9 --target i686-unknown-linux-gnu
     echo "/* generated from $JULIA_VERSION */" > ./src/bindings_1_9_i686_unknown_linux_gnu.rs
     cat ../target/i686-unknown-linux-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings_1_9_i686_unknown_linux_gnu.rs
 
     cargo clean
-    JULIA_DIR=$JULIA_1_9_DIR_WIN cargo build --features use-bindgen,windows,beta --target x86_64-pc-windows-gnu
+    JULIA_DIR=$JULIA_1_9_DIR_WIN cargo build --features use-bindgen,windows,julia-1-9 --target x86_64-pc-windows-gnu
     echo "/* generated from $JULIA_VERSION */" > ./src/bindings_1_9_x86_64_pc_windows_gnu.rs
     cat ../target/x86_64-pc-windows-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings_1_9_x86_64_pc_windows_gnu.rs
 
@@ -246,49 +246,49 @@ fi
 
 cargo clean
 JULIA_VERSION=$($JULIA_1_6_DIR/bin/julia --version)
-JULIA_DIR=$JULIA_1_6_DIR cargo build --features use-bindgen,lts
+JULIA_DIR=$JULIA_1_6_DIR cargo build --features use-bindgen,julia-1-6
 echo "/* generated from $JULIA_VERSION */" > ./src/bindings_1_6_x86_64_unknown_linux_gnu.rs
 cat ../target/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings_1_6_x86_64_unknown_linux_gnu.rs
 
 cargo clean
-JULIA_DIR=$JULIA_1_6_DIR_32 cargo build --features use-bindgen,lts,i686 --target i686-unknown-linux-gnu
+JULIA_DIR=$JULIA_1_6_DIR_32 cargo build --features use-bindgen,julia-1-6,i686 --target i686-unknown-linux-gnu
 echo "/* generated from $JULIA_VERSION */" > ./src/bindings_1_6_i686_unknown_linux_gnu.rs
 cat ../target/i686-unknown-linux-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings_1_6_i686_unknown_linux_gnu.rs
 
 cargo clean
-JULIA_DIR=$JULIA_1_6_DIR_WIN cargo build --features use-bindgen,windows,lts --target x86_64-pc-windows-gnu
+JULIA_DIR=$JULIA_1_6_DIR_WIN cargo build --features use-bindgen,windows,julia-1-6 --target x86_64-pc-windows-gnu
 echo "/* generated from $JULIA_VERSION */" > ./src/bindings_1_6_x86_64_pc_windows_gnu.rs
 cat ../target/x86_64-pc-windows-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings_1_6_x86_64_pc_windows_gnu.rs
 
 cargo clean
 JULIA_VERSION=$($JULIA_1_7_DIR/bin/julia --version)
-JULIA_DIR=$JULIA_1_7_DIR cargo build --features use-bindgen
+JULIA_DIR=$JULIA_1_7_DIR cargo build --features use-bindgen,julia-1-7
 echo "/* generated from $JULIA_VERSION */" > ./src/bindings_1_7_x86_64_unknown_linux_gnu.rs
 cat ../target/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings_1_7_x86_64_unknown_linux_gnu.rs
 
 cargo clean
-JULIA_DIR=$JULIA_1_7_DIR_32 cargo build --features use-bindgen,i686 --target i686-unknown-linux-gnu
+JULIA_DIR=$JULIA_1_7_DIR_32 cargo build --features use-bindgen,i686,julia-1-7 --target i686-unknown-linux-gnu
 echo "/* generated from $JULIA_VERSION */" > ./src/bindings_1_7_i686_unknown_linux_gnu.rs
 cat ../target/i686-unknown-linux-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings_1_7_i686_unknown_linux_gnu.rs
 
 cargo clean
-JULIA_DIR=$JULIA_1_7_DIR_WIN cargo build --features use-bindgen,windows --target x86_64-pc-windows-gnu
+JULIA_DIR=$JULIA_1_7_DIR_WIN cargo build --features use-bindgen,windows,julia-1-7 --target x86_64-pc-windows-gnu
 echo "/* generated from $JULIA_VERSION */" > ./src/bindings_1_7_x86_64_pc_windows_gnu.rs
 cat ../target/x86_64-pc-windows-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings_1_7_x86_64_pc_windows_gnu.rs
 
 cargo clean
 JULIA_VERSION=$($JULIA_1_8_DIR/bin/julia --version)
-JULIA_DIR=$JULIA_1_8_DIR cargo build --features use-bindgen
+JULIA_DIR=$JULIA_1_8_DIR cargo build --features use-bindgen,julia-1-8
 echo "/* generated from $JULIA_VERSION */" > ./src/bindings_1_8_x86_64_unknown_linux_gnu.rs
 cat ../target/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings_1_8_x86_64_unknown_linux_gnu.rs
 
 cargo clean
-JULIA_DIR=$JULIA_1_8_DIR_32 cargo build --features use-bindgen,i686 --target i686-unknown-linux-gnu
+JULIA_DIR=$JULIA_1_8_DIR_32 cargo build --features use-bindgen,i686,julia-1-8 --target i686-unknown-linux-gnu
 echo "/* generated from $JULIA_VERSION */" > ./src/bindings_1_8_i686_unknown_linux_gnu.rs
 cat ../target/i686-unknown-linux-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings_1_8_i686_unknown_linux_gnu.rs
 
 cargo clean
-JULIA_DIR=$JULIA_1_8_DIR_WIN cargo build --features use-bindgen,windows --target x86_64-pc-windows-gnu
+JULIA_DIR=$JULIA_1_8_DIR_WIN cargo build --features use-bindgen,windows,julia-1-8 --target x86_64-pc-windows-gnu
 echo "/* generated from $JULIA_VERSION */" > ./src/bindings_1_8_x86_64_pc_windows_gnu.rs
 cat ../target/x86_64-pc-windows-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings_1_8_x86_64_pc_windows_gnu.rs
 

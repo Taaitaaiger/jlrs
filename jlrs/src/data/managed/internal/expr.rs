@@ -1,4 +1,4 @@
-//! Managed for `Expr`.
+//! Managed type for `Expr`.
 
 use std::{marker::PhantomData, ptr::NonNull};
 

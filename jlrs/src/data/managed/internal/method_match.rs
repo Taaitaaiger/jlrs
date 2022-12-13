@@ -1,4 +1,4 @@
-//! Managed for `MethodMatch`.
+//! Managed type for `MethodMatch`.
 //!
 //! The documentation for this module has been slightly adapted from the comments for this struct
 //! in [`julia.h`]
@@ -14,7 +14,7 @@ use crate::{
     private::Private,
 };
 
-/// Managed for `MethodMatch`.
+/// Managed type for `MethodMatch`.
 #[derive(Copy, Clone)]
 #[repr(transparent)]
 pub struct MethodMatch<'scope>(NonNull<jl_method_match_t>, PhantomData<&'scope ()>);

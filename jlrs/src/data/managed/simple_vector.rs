@@ -1,4 +1,4 @@
-//! Managed for `SimpleVector`.
+//! Managed type for `SimpleVector`.
 
 use std::{
     fmt::{Debug, Formatter, Result as FmtResult},

@@ -1,4 +1,4 @@
-//! Managed for `Nothing`.
+//! Layout type for `Nothing`.
 
 use jl_sys::jl_nothing_type;
 

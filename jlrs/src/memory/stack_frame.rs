@@ -7,8 +7,9 @@ use std::{
     ptr::{null_mut, NonNull},
 };
 
-#[cfg(not(feature = "julia-1-6"))]
+#[julia_version(since = "1.7")]
 use jl_sys::{jl_get_current_task, jl_task_t};
+use jlrs_macros::julia_version;
 
 use super::context::stack::Stack;
 use crate::{
@@ -62,18 +63,20 @@ pub(crate) struct PinnedFrame<'scope, const N: usize> {
 }
 
 impl<'scope, const N: usize> PinnedFrame<'scope, N> {
+    #[julia_version(until = "1.6")]
     unsafe fn new(raw: &'scope mut StackFrame<N>) -> Self {
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "julia-1-6")] {
-                let rtls = NonNull::new_unchecked(jl_sys::jl_get_ptls_states()).as_mut();
-                raw.prev = rtls.pgcstack.cast();
-                rtls.pgcstack = raw as *mut _ as *mut _;
-            } else {
-                let task = NonNull::new_unchecked(jl_get_current_task().cast::<jl_task_t>()).as_mut();
-                raw.prev = task.gcstack.cast();
-                task.gcstack = raw as *mut _ as *mut _;
-            }
-        }
+        let rtls = NonNull::new_unchecked(jl_sys::jl_get_ptls_states()).as_mut();
+        raw.prev = rtls.pgcstack.cast();
+        rtls.pgcstack = raw as *mut _ as *mut _;
+
+        PinnedFrame { raw: Pin::new(raw) }
+    }
+
+    #[julia_version(since = "1.7")]
+    unsafe fn new(raw: &'scope mut StackFrame<N>) -> Self {
+        let task = NonNull::new_unchecked(jl_get_current_task().cast::<jl_task_t>()).as_mut();
+        raw.prev = task.gcstack.cast();
+        task.gcstack = raw as *mut _ as *mut _;
 
         PinnedFrame { raw: Pin::new(raw) }
     }
@@ -97,19 +100,21 @@ impl<'scope, const N: usize> PinnedFrame<'scope, N> {
 }
 
 impl<'scope, const N: usize> Drop for PinnedFrame<'scope, N> {
+    #[julia_version(until = "1.6")]
     fn drop(&mut self) {
         unsafe {
-            cfg_if::cfg_if! {
-                if #[cfg(feature = "julia-1-6")] {
-                    let rtls = NonNull::new_unchecked(jl_sys::jl_get_ptls_states()).as_mut();
-                    rtls.pgcstack = self.raw.prev.cast();
-                } else {
-                    use jl_sys::{jl_get_current_task, jl_task_t};
-                    let task = NonNull::new_unchecked(jl_get_current_task().cast::<jl_task_t>()).as_mut();
-                    task.gcstack = self.raw.prev.cast();
-                }
-            }
+            let rtls = NonNull::new_unchecked(jl_sys::jl_get_ptls_states()).as_mut();
+            rtls.pgcstack = self.raw.prev.cast();
+            self.clear_roots();
+        }
+    }
 
+    #[julia_version(since = "1.7")]
+    fn drop(&mut self) {
+        unsafe {
+            use jl_sys::{jl_get_current_task, jl_task_t};
+            let task = NonNull::new_unchecked(jl_get_current_task().cast::<jl_task_t>()).as_mut();
+            task.gcstack = self.raw.prev.cast();
             self.clear_roots();
         }
     }

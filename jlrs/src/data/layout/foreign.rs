@@ -25,11 +25,12 @@ use std::{
     sync::RwLock,
 };
 
-#[cfg(feature = "julia-1-10")]
+#[julia_version(since = "1.10")]
 use jl_sys::jl_reinit_foreign_type;
 use jl_sys::{
     jl_gc_alloc_typed, jl_gc_schedule_foreign_sweepfunc, jl_new_foreign_type, jl_value_t,
 };
+use jlrs_macros::julia_version;
 
 use crate::{
     convert::{into_julia::IntoJulia, unbox::Unbox},
@@ -145,7 +146,7 @@ where
     target.data_from_ptr(NonNull::new_unchecked(ty), Private)
 }
 
-#[cfg(feature = "julia-1-10")]
+#[julia_version(since = "1.10")]
 pub unsafe fn reinit_foreign_type<U>(datatype: DataType) -> bool
 where
     U: ForeignType,

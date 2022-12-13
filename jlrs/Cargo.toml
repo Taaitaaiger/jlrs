@@ -41,7 +41,7 @@ tokio-rt = ["async-rt", "tokio"]
 async = ["futures", "crossbeam-channel", "async-trait"]
 # Enable `ccall` module for use from `ccall`ed Rust functions
 ccall = []
-# Enable using `f16` as an inline wrapper for `Float16` data
+# Enable using `f16` as a layout for `Float16` data
 f16 = ["half"]
 # Enable all internal types
 internal-types = []
@@ -73,15 +73,15 @@ nightly = ["jl-sys/nightly", "julia-1-10"]
 i686 = ["jl-sys/i686"]
 
 # Link Julia 1.6
-julia-1-6 = ["jl-sys/julia-1-6"]
+julia-1-6 = ["jl-sys/julia-1-6", "jlrs-macros/julia-1-6"]
 # Link Julia 1.7
-julia-1-7 = ["jl-sys/julia-1-7"]
+julia-1-7 = ["jl-sys/julia-1-7", "jlrs-macros/julia-1-7"]
 # Link Julia 1.8
-julia-1-8 = ["jl-sys/julia-1-8"]
+julia-1-8 = ["jl-sys/julia-1-8", "jlrs-macros/julia-1-8"]
 # Link Julia 1.9
-julia-1-9 = ["jl-sys/julia-1-9"]
+julia-1-9 = ["jl-sys/julia-1-9", "jlrs-macros/julia-1-9"]
 # Link Julia 1.10
-julia-1-10 = ["jl-sys/julia-1-10"]
+julia-1-10 = ["jl-sys/julia-1-10", "jlrs-macros/julia-1-10"]
 
 # Internal
 
@@ -91,6 +91,7 @@ docs = ["jl-sys/docs", "full", "julia-1-9"]
 [dependencies]
 cfg-if = "1"
 jl-sys = { version = "0.20", path = "../jl_sys" }
+jlrs-macros = { version = "0.1", path = "../jlrs_macros" }
 smallvec = "1"
 thiserror = "1"
 atomic_refcell = "0.1"
