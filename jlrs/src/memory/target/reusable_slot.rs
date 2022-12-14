@@ -2,6 +2,7 @@
 
 use std::ptr::NonNull;
 
+use super::output::Output;
 use crate::{
     data::managed::{Managed, Ref},
     memory::context::stack::Stack,
@@ -96,5 +97,12 @@ impl<'scope> ReusableSlot<'scope> {
     ) -> Ref<'scope, 'data, T> {
         self.stack.set_root(self.offset, ptr.cast());
         Ref::<T>::wrap(ptr)
+    }
+
+    pub(crate) fn into_output(self) -> Output<'scope> {
+        Output {
+            stack: self.stack,
+            offset: self.offset,
+        }
     }
 }

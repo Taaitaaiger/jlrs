@@ -104,6 +104,12 @@ pub trait Target<'target>: TargetPriv<'target> {
     }
 }
 
+/// A trait that indicates that this target roots the returned data.
+pub trait RootingTarget<'target>: Target<'target> {
+    /// Convert this target into an `Output`.
+    fn into_output(self) -> Output<'target>;
+}
+
 /// A `Target` that borrows a frame for temporary allocations.
 pub struct ExtendedTarget<'target, 'current, 'borrow, T>
 where
@@ -147,22 +153,59 @@ where
 }
 
 impl<'target> Target<'target> for GcFrame<'target> {}
+impl<'target> RootingTarget<'target> for GcFrame<'target> {
+    fn into_output(self) -> Output<'target> {
+        self.output()
+    }
+}
 
 impl<'target> Target<'target> for &mut GcFrame<'target> {}
+impl<'target> RootingTarget<'target> for &mut GcFrame<'target> {
+    fn into_output(self) -> Output<'target> {
+        self.output()
+    }
+}
 
 #[cfg(feature = "async")]
 impl<'target> Target<'target> for AsyncGcFrame<'target> {}
+#[cfg(feature = "async")]
+impl<'target> RootingTarget<'target> for AsyncGcFrame<'target> {
+    fn into_output(self) -> Output<'target> {
+        self.output()
+    }
+}
 
 #[cfg(feature = "async")]
 impl<'target> Target<'target> for &mut AsyncGcFrame<'target> {}
+#[cfg(feature = "async")]
+impl<'target> RootingTarget<'target> for &mut AsyncGcFrame<'target> {
+    fn into_output(self) -> Output<'target> {
+        self.output()
+    }
+}
 
 impl<'target> Target<'target> for Unrooted<'target> {}
 
 impl<'target> Target<'target> for Output<'target> {}
+impl<'target> RootingTarget<'target> for Output<'target> {
+    fn into_output(self) -> Output<'target> {
+        self
+    }
+}
 
 impl<'target> Target<'target> for &'target mut Output<'_> {}
+impl<'target> RootingTarget<'target> for &'target mut Output<'_> {
+    fn into_output(self) -> Output<'target> {
+        self.restrict()
+    }
+}
 
 impl<'target> Target<'target> for ReusableSlot<'target> {}
+impl<'target> RootingTarget<'target> for ReusableSlot<'target> {
+    fn into_output(self) -> Output<'target> {
+        self.into_output()
+    }
+}
 
 impl<'target> Target<'target> for &mut ReusableSlot<'target> {}
 

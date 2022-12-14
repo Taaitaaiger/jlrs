@@ -90,4 +90,11 @@ impl<'scope> Output<'scope> {
         self.stack.set_root(self.offset, ptr.cast());
         T::wrap_non_null(ptr, Private)
     }
+
+    pub(crate) fn restrict<'target>(&'target mut self) -> Output<'target> {
+        Output {
+            stack: self.stack,
+            offset: self.offset,
+        }
+    }
 }

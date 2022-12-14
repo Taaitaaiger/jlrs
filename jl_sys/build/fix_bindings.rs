@@ -335,6 +335,8 @@ fn convert_to_atomic(field_def: &mut Field, info: &AtomicField) {
             syn::parse_str::<TypePath>("::std::sync::atomic::AtomicU32").unwrap()
         } else if info.ty == "int16_t" {
             syn::parse_str::<TypePath>("::std::sync::atomic::AtomicI16").unwrap()
+        } else if info.ty == "intptr_t" {
+            syn::parse_str::<TypePath>("::std::sync::atomic::AtomicIsize").unwrap()
         } else if info.ty == "jl_callptr_t" {
             syn::parse_str::<TypePath>("::atomic::Atomic<jl_callptr_t>").unwrap()
         } else if info.ty == "jl_fptr_args_t" {
