@@ -18,5 +18,5 @@ tarpaulin-report.html
 **/coverage_report.dat
 **/coverage_summary.dat
 
-_tests
+matplotlibrc
 releasenotes.md

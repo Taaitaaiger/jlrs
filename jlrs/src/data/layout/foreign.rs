@@ -74,6 +74,9 @@ unsafe impl Sync for ForeignTypes {}
 
 /// A trait that allows arbitrary Rust data to be converted to Julia.
 pub unsafe trait ForeignType: Sized + 'static {
+    #[doc(hidden)]
+    const TYPE_FN: Option<unsafe fn() -> DataType<'static>> = None;
+
     /// Mark all references to Julia data.
     ///
     /// If a foreign type contains references to Julia data, this method must be overridden.
@@ -146,6 +149,43 @@ where
     target.data_from_ptr(NonNull::new_unchecked(ty), Private)
 }
 
+pub(crate) unsafe fn create_foreign_type_internal<'target, U, T>(
+    target: T,
+    name: Symbol,
+    module: Module,
+    super_type: Option<DataType>,
+    has_pointers: bool,
+    large: bool,
+) -> DataTypeData<'target, T>
+where
+    U: ForeignType,
+    T: Target<'target>,
+{
+    let large = large as _;
+    let has_pointers = has_pointers as _;
+
+    unsafe extern "C" fn mark<T: ForeignType>(ptls: PTls, value: *mut jl_value_t) -> usize {
+        T::mark(ptls, NonNull::new_unchecked(value.cast()).as_ref())
+    }
+
+    unsafe extern "C" fn sweep<T: ForeignType>(value: *mut jl_value_t) {
+        do_sweep::<T>(NonNull::new_unchecked(value.cast()).as_mut())
+    }
+
+    let ty = jl_new_foreign_type(
+        name.unwrap(Private),
+        module.unwrap(Private),
+        super_type.map_or(null_mut(), |s| s.unwrap(Private)),
+        Some(mark::<U>),
+        Some(sweep::<U>),
+        has_pointers,
+        large,
+    );
+
+    target.data_from_ptr(NonNull::new_unchecked(ty), Private)
+}
+
+// TODO: docs
 #[julia_version(since = "1.10")]
 pub unsafe fn reinit_foreign_type<U>(datatype: DataType) -> bool
 where
@@ -204,7 +244,34 @@ unsafe impl<F: ForeignType> IntoJulia for F {
         unsafe {
             let ptls = get_tls();
             let sz = std::mem::size_of::<Self>();
-            let ty = FOREIGN_TYPES.find::<F>().expect("Doesn't exist");
+            let maybe_ty = FOREIGN_TYPES.find::<F>();
+
+            let ty = match maybe_ty {
+                None => {
+                    if let Some(func) = Self::TYPE_FN {
+                        let mut guard = FOREIGN_TYPES
+                            .data
+                            .write()
+                            .expect("Foreign type lock was poisoned");
+
+                        // Check again
+                        let tid = TypeId::of::<Self>();
+                        if let Some(ty) = guard.iter().find_map(|s| match s {
+                            &(type_id, ty) if type_id == tid => Some(ty),
+                            _ => None,
+                        }) {
+                            ty
+                        } else {
+                            let ty = func();
+                            guard.push((TypeId::of::<Self>(), ty));
+                            ty
+                        }
+                    } else {
+                        maybe_ty.expect("Doesn't exist")
+                    }
+                }
+                Some(t) => t,
+            };
 
             let ptr: *mut Self = jl_gc_alloc_typed(ptls, sz, ty.unwrap(Private).cast()).cast();
             ptr.write(self);

@@ -18,13 +18,14 @@ use std::{
     ptr::NonNull,
 };
 
-use super::{private::ManagedPriv, Managed};
+use super::private::ManagedPriv;
 use crate::{
     data::{
-        layout::foreign::{create_foreign_type, ForeignType},
+        layout::foreign::{create_foreign_type_internal, ForeignType},
         managed::{module::Module, symbol::Symbol, value::Value},
     },
-    memory::target::{output::Output, RootingTarget},
+    memory::target::{unrooted::Unrooted, RootingTarget},
+    prelude::{DataType, StackFrame},
     private::Private,
 };
 
@@ -43,11 +44,11 @@ use crate::{
 ///
 /// [`Managed`]: crate::data::managed::Managed
 /// [module-level docs]: self
-pub struct WithParachute<'scope, T: Sync + 'static> {
+pub struct WithParachute<'scope, T> {
     data: &'scope mut Option<T>,
 }
 
-impl<'scope, T: 'static + Sync> WithParachute<'scope, T> {
+impl<'scope, T> WithParachute<'scope, T> {
     /// Remove the parachute.
     ///
     /// Returns ownership of the data from Julia to Rust.
@@ -56,14 +57,14 @@ impl<'scope, T: 'static + Sync> WithParachute<'scope, T> {
     }
 }
 
-impl<'scope, T: 'static + Sync> Deref for WithParachute<'scope, T> {
+impl<'scope, T> Deref for WithParachute<'scope, T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
         self.data.as_ref().expect("Data is None")
     }
 }
 
-impl<'scope, T: 'static + Sync> DerefMut for WithParachute<'scope, T> {
+impl<'scope, T> DerefMut for WithParachute<'scope, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.data.as_mut().expect("Data is None")
     }
@@ -79,9 +80,7 @@ pub trait AttachParachute: 'static + Sized + Sync {
         self,
         target: T,
     ) -> WithParachute<'scope, Self> {
-        // Parachute::<Self>::register(frame)
-        let mut output = target.into_output();
-        Parachute::<Self>::register(&mut output);
+        let output = target.into_output();
         let parachute = Parachute { _data: Some(self) };
         let data = Value::new(output, parachute);
         unsafe {
@@ -98,52 +97,33 @@ pub(crate) struct Parachute<T: Sync + 'static> {
     _data: Option<T>,
 }
 
-// Safety: `T` contains no references to Julia data to the default implementation of `mark` is
+// Safety: `T` contains no references to Julia data so the default implementation of `mark` is
 // correct.
-unsafe impl<T: Sync + 'static> ForeignType for Parachute<T> {}
-
-struct UnitHasher(u64);
-
-#[inline(always)]
-fn to_8_u8s(data: &[u8]) -> [u8; 8] {
-    let mut out = [0u8; 8];
-    for i in 0..data.len().min(8) {
-        out[i] = data[i];
-    }
-    out
+unsafe impl<T: Sync + 'static> ForeignType for Parachute<T> {
+    const TYPE_FN: Option<unsafe fn() -> DataType<'static>> = Some(init_foreign::<Self>);
 }
 
-impl Hasher for UnitHasher {
-    #[inline(always)]
-    fn finish(&self) -> u64 {
-        self.0
-    }
+#[doc(hidden)]
+unsafe fn init_foreign<T: ForeignType>() -> DataType<'static> {
+    let mut hasher = hashers::fnv::FNV1aHasher64::default();
+    let type_id = TypeId::of::<T>();
+    type_id.hash(&mut hasher);
+    let type_id_hash = hasher.finish();
 
-    #[inline(always)]
-    fn write(&mut self, bytes: &[u8]) {
-        self.0 = u64::from_ne_bytes(to_8_u8s(bytes));
-    }
-}
+    let name = format!("__Parachute_{:x}__", type_id_hash);
 
-impl<T: Sync + 'static> Parachute<T> {
-    fn register<'scope>(output: &mut Output<'scope>) {
-        let type_id = TypeId::of::<T>();
-        debug_assert_eq!(std::mem::size_of_val(&type_id), 8);
+    unsafe {
+        let unrooted = Unrooted::new();
+        let sym = Symbol::new(&unrooted, name.as_str());
+        let module = Module::main(&unrooted);
 
-        let mut hasher = UnitHasher(0);
-        type_id.hash(&mut hasher);
-        let hashed = hasher.finish();
-        let name = format!("__Parachute_{:x}__", hashed);
-        let sym = Symbol::new(&output, name.as_str());
-        let module = Module::main(&output);
+        let mut frame = StackFrame::new();
+        let pinned = frame.pin();
+        let dt = create_foreign_type_internal::<T, _>(unrooted, sym, module, None, false, false);
+        pinned.set_sync_root(dt.ptr().as_ptr().cast());
+        module.set_const_unchecked(sym, dt.as_value());
+        std::mem::drop(pinned);
 
-        if module.global(&output, sym).is_ok() {
-            return;
-        }
-
-        unsafe {
-            let dt = create_foreign_type::<Self, _>(output, sym, module, None, false, false);
-            module.set_const_unchecked(sym, dt.as_value());
-        }
+        DataType::wrap_non_null(dt.ptr(), Private)
     }
 }
