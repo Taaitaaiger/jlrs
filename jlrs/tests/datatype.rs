@@ -551,7 +551,6 @@ mod tests {
 
                     assert!(ty.is_const_field(0)?);
                     assert!(DataType::uniontype_type(&frame).is_const_field(0)?);
-                    assert!(!DataType::tvar_type(&frame).is_const_field(0)?);
                     assert!(!ty.clone().is_const_field(1)?);
                     assert!(ty.is_const_field(2).is_err());
 
