@@ -154,10 +154,23 @@ impl<'scope> MethodTable<'scope> {
         }
     }
 
+    #[julia_version(until = "1.9")]
     /// Max # of non-vararg arguments in a signature
     pub fn max_args(self) -> isize {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().max_args }
+    }
+
+    #[julia_version(since = "1.10")]
+    /// Max # of non-vararg arguments in a signature
+    pub fn max_args(self) -> isize {
+        // Safety: the pointer points to valid data
+        unsafe {
+            self.unwrap_non_null(Private)
+                .as_ref()
+                .max_args
+                .load(Ordering::Relaxed)
+        }
     }
 
     #[julia_version(until = "1.8")]

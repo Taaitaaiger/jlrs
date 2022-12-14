@@ -662,12 +662,12 @@ pub struct _jl_method_instance_t {
     pub def: _jl_method_instance_t__bindgen_ty_1,
     pub specTypes: *mut jl_value_t,
     pub sparam_vals: *mut jl_svec_t,
-    pub uninferred: *mut jl_value_t,
+    pub uninferred: ::std::sync::atomic::AtomicPtr<jl_value_t>,
     pub backedges: *mut jl_array_t,
     pub callbacks: *mut jl_array_t,
     pub cache: ::std::sync::atomic::AtomicPtr<_jl_code_instance_t>,
     pub inInference: u8,
-    pub precompiled: u8,
+    pub precompiled: ::std::sync::atomic::AtomicU8,
 }
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -1250,7 +1250,7 @@ pub struct _jl_methtable_t {
     pub defs: ::std::sync::atomic::AtomicPtr<jl_typemap_t>,
     pub leafcache: ::std::sync::atomic::AtomicPtr<jl_array_t>,
     pub cache: ::std::sync::atomic::AtomicPtr<jl_typemap_t>,
-    pub max_args: isize,
+    pub max_args: ::std::sync::atomic::AtomicIsize,
     pub module: *mut jl_module_t,
     pub backedges: *mut jl_array_t,
     pub writelock: jl_mutex_t,

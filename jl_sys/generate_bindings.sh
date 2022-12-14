@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+export RUST_BACKTRACE=1
 LD_LIBRARY_PATH=
 NIGHTLY="n"
 BETA="n"
@@ -292,4 +293,4 @@ JULIA_DIR=$JULIA_1_8_DIR_WIN cargo build --features use-bindgen,windows,julia-1-
 echo "/* generated from $JULIA_VERSION */" > ./src/bindings_1_8_x86_64_pc_windows_gnu.rs
 cat ../target/x86_64-pc-windows-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings_1_8_x86_64_pc_windows_gnu.rs
 
-rustfmt ./src/bindings_*
+# rustfmt ./src/bindings_*
