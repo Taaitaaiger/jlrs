@@ -97,6 +97,8 @@ jlrs-macros = { version = "0.1", path = "../jlrs_macros" }
 smallvec = "1"
 thiserror = "1"
 atomic_refcell = "0.1"
+atomic = "0.5"
+hashers = "1"
 
 async-std = { version = "1.12", features = ["unstable"], optional = true }
 async-trait = { version = "0.1", optional = true }
