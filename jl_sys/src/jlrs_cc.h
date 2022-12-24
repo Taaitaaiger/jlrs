@@ -3,7 +3,6 @@
 #ifdef _MSC_VER
 #include <windows.h>
 
-#if !defined(JLRS_WINDOWS_LTS)
 template <typename T>
 static inline T jl_atomic_load_relaxed(volatile T *obj)
 {
@@ -14,10 +13,6 @@ static inline T jl_atomic_load_relaxed(volatile T *obj)
 
 #include <julia.h>
 #include <julia_gcext.h>
-
-#if defined(JLRS_WINDOWS) && defined(JULIA_1_6)
-#define JLRS_WINDOWS_LTS
-#endif
 
 #ifdef __cplusplus
 extern "C"

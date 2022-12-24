@@ -136,7 +136,7 @@ fn compile_jlrs_cc(julia_dir: &str) {
 
     #[cfg(target_env = "msvc")]
     {
-        #[cfg(feature = "julia-1-6")]
+        #[cfg(not(feature = "julia-1-6"))]
         c.flag("/std:c++20");
 
         let julia_dll_a = format!("{}/lib/libjulia.dll.a", julia_dir);
