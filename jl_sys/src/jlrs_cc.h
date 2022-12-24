@@ -3,11 +3,21 @@
 #ifdef _MSC_VER
 #include <windows.h>
 
+#ifdef JULIA_1_6
+template <typename T>
+static inline T jl_atomic_load_relaxed(volatile T *obj)
+{
+    T val = *obj;
+    _ReadWriteBarrier();
+    return val;
+}
+#else 
 template <typename T>
 static inline T jl_atomic_load_relaxed(volatile T *obj)
 {
     return jl_atomic_load_acquire(obj);
 }
+#endif
 #endif
 
 #include <julia.h>
