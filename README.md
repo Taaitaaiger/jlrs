@@ -29,7 +29,8 @@ An incomplete list of features that are currently supported by jlrs:
    scheduling Julia `Task`s and `await`ing the result without blocking the runtime thread.
 
 NB: Active development happens on the `dev` branch, the `master` branch points to the most
-recently released version.
+recently released version. If you want to open a PR for a bug fix, target the `master` branch, if
+you want to provide another kind of contribution target the `dev` branch instead
 
 
 ## Prerequisites

@@ -6,6 +6,10 @@
 
 use std::{marker::PhantomData, ptr::NonNull};
 
+#[julia_version(since = "1.8", until = "1.9")]
+use jl_sys::jl_binding_type as jl_get_binding_type;
+#[julia_version(since = "1.10")]
+use jl_sys::jl_get_binding_type;
 use jl_sys::{
     jl_base_module, jl_core_module, jl_get_global, jl_is_imported, jl_main_module, jl_module_t,
     jl_module_type, jl_set_const, jl_set_global,
@@ -104,6 +108,26 @@ impl<'scope> Module<'scope> {
         unsafe {
             let sym = sym.to_symbol_priv(Private);
             jl_is_imported(self.unwrap(Private), sym.unwrap(Private)) != 0
+        }
+    }
+
+    #[julia_version(since = "1.8")]
+    /// Returns the type of the binding in this module with the name `var`,
+    pub fn binding_type<'target, N, T>(
+        self,
+        target: T,
+        var: N,
+    ) -> Option<ValueData<'target, 'static, T>>
+    where
+        N: ToSymbol,
+        T: Target<'target>,
+    {
+        let ptr = self.unwrap(Private);
+        unsafe {
+            let sym = var.to_symbol_priv(Private);
+            let ty = jl_get_binding_type(ptr, sym.unwrap(Private));
+            let ty = NonNull::new(ty)?;
+            Some(target.data_from_ptr(ty, Private))
         }
     }
 
