@@ -15,6 +15,7 @@
 
  - A managed type for `Binding` has been added, this is only available when Julia 1.10 (the current nightly version) is used.
 
+
 #### v0.17
  - Atomic struct fields are now atomic in the generated bindings.
 
