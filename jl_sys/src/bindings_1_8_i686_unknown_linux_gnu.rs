@@ -1103,6 +1103,90 @@ pub struct jl_weakref_t {
     pub value: *mut jl_value_t,
 }
 #[repr(C)]
+#[derive(Debug)]
+pub struct jl_binding_t {
+    pub name: *mut jl_sym_t,
+    pub value: ::std::sync::atomic::AtomicPtr<jl_value_t>,
+    pub globalref: ::std::sync::atomic::AtomicPtr<jl_value_t>,
+    pub owner: *mut _jl_module_t,
+    pub ty: ::std::sync::atomic::AtomicPtr<jl_value_t>,
+    pub _bitfield_align_1: [u8; 0],
+    pub _bitfield_1: __BindgenBitfieldUnit<[u8; 1usize]>,
+    pub __bindgen_padding_0: [u8; 3usize],
+}
+impl jl_binding_t {
+    #[inline]
+    pub fn constp(&self) -> u8 {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(0usize, 1u8) as u8) }
+    }
+    #[inline]
+    pub fn set_constp(&mut self, val: u8) {
+        unsafe {
+            let val: u8 = ::std::mem::transmute(val);
+            self._bitfield_1.set(0usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn exportp(&self) -> u8 {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(1usize, 1u8) as u8) }
+    }
+    #[inline]
+    pub fn set_exportp(&mut self, val: u8) {
+        unsafe {
+            let val: u8 = ::std::mem::transmute(val);
+            self._bitfield_1.set(1usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn imported(&self) -> u8 {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(2usize, 1u8) as u8) }
+    }
+    #[inline]
+    pub fn set_imported(&mut self, val: u8) {
+        unsafe {
+            let val: u8 = ::std::mem::transmute(val);
+            self._bitfield_1.set(2usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn deprecated(&self) -> u8 {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(3usize, 2u8) as u8) }
+    }
+    #[inline]
+    pub fn set_deprecated(&mut self, val: u8) {
+        unsafe {
+            let val: u8 = ::std::mem::transmute(val);
+            self._bitfield_1.set(3usize, 2u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn new_bitfield_1(
+        constp: u8,
+        exportp: u8,
+        imported: u8,
+        deprecated: u8,
+    ) -> __BindgenBitfieldUnit<[u8; 1usize]> {
+        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 1usize]> = Default::default();
+        __bindgen_bitfield_unit.set(0usize, 1u8, {
+            let constp: u8 = unsafe { ::std::mem::transmute(constp) };
+            constp as u64
+        });
+        __bindgen_bitfield_unit.set(1usize, 1u8, {
+            let exportp: u8 = unsafe { ::std::mem::transmute(exportp) };
+            exportp as u64
+        });
+        __bindgen_bitfield_unit.set(2usize, 1u8, {
+            let imported: u8 = unsafe { ::std::mem::transmute(imported) };
+            imported as u64
+        });
+        __bindgen_bitfield_unit.set(3usize, 2u8, {
+            let deprecated: u8 = unsafe { ::std::mem::transmute(deprecated) };
+            deprecated as u64
+        });
+        __bindgen_bitfield_unit
+    }
+}
+#[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct jl_uuid_t {
     pub hi: u64,
@@ -1812,6 +1896,9 @@ extern "C" {
 }
 extern "C" {
     pub static mut jl_base_module: *mut jl_module_t;
+}
+extern "C" {
+    pub fn jl_binding_type(m: *mut jl_module_t, var: *mut jl_sym_t) -> *mut jl_value_t;
 }
 extern "C" {
     pub fn jl_get_global(m: *mut jl_module_t, var: *mut jl_sym_t) -> *mut jl_value_t;

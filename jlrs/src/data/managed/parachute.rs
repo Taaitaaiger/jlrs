@@ -71,7 +71,7 @@ impl<'scope, T> DerefMut for WithParachute<'scope, T> {
 }
 
 /// Attach a parachute to this data to ensure it's safely dropped if Julia jumps.
-pub trait AttachParachute: 'static + Sized + Sync {
+pub trait AttachParachute: 'static + Sized + Send + Sync {
     /// Attach a parachute to this data.
     ///
     /// By attaching a parachute, you move ownership of the data from Rust to Julia. This ensures
@@ -90,7 +90,7 @@ pub trait AttachParachute: 'static + Sized + Sync {
     }
 }
 
-impl<T: 'static + Sized + Sync> AttachParachute for T {}
+impl<T: 'static + Sized + Send + Sync> AttachParachute for T {}
 
 #[repr(transparent)]
 pub(crate) struct Parachute<T: Sync + 'static> {
@@ -99,7 +99,7 @@ pub(crate) struct Parachute<T: Sync + 'static> {
 
 // Safety: `T` contains no references to Julia data so the default implementation of `mark` is
 // correct.
-unsafe impl<T: Sync + 'static> ForeignType for Parachute<T> {
+unsafe impl<T: Send + Sync + 'static> ForeignType for Parachute<T> {
     const TYPE_FN: Option<unsafe fn() -> DataType<'static>> = Some(init_foreign::<Self>);
 }
 

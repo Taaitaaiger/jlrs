@@ -2,6 +2,8 @@
 
 use std::{ffi::CStr, marker::PhantomData, ptr::NonNull};
 
+#[julia_version(since = "1.10")]
+use jl_sys::jl_binding_type;
 use jl_sys::{
     jl_abstractslot_type, jl_abstractstring_type, jl_any_type, jl_anytuple_type, jl_argument_type,
     jl_argumenterror_type, jl_bool_type, jl_boundserror_type, jl_builtin_type, jl_char_type,
@@ -1299,6 +1301,16 @@ impl<'base> DataType<'base> {
     {
         // Safety: global constant
         unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_expr_type), Private) }
+    }
+
+    #[julia_version(since = "1.10")]
+    /// The type `Expr`.
+    pub fn binding_type<T>(_: &T) -> Self
+    where
+        T: Target<'base>,
+    {
+        // Safety: global constant
+        unsafe { Self::wrap_non_null(NonNull::new_unchecked(jl_binding_type), Private) }
     }
 
     /// The type `GlobalRef`.

@@ -234,24 +234,24 @@ impl Value<'_, '_> {
 
         scope.scope(|mut frame| {
             let symbol_ty = DataType::symbol_type(&frame).as_value();
-            let mut symbol_type_vec = vec![symbol_ty; n_names];
+            let symbol_type_vec = vec![symbol_ty; n_names];
 
             // Safety: this method can only be called from a thread known to Julia. The
             // unchecked methods are used because it can be guaranteed they won't throw
             // an exception for the given arguments.
             unsafe {
-                let mut field_names_vec = field_names
+                let field_names_vec = field_names
                     .iter()
                     .map(|name| name.to_symbol_priv(Private).as_value())
                     .collect::<smallvec::SmallVec<[_; MAX_SIZE]>>();
 
                 let names = DataType::anytuple_type(&frame)
                     .as_value()
-                    .apply_type_unchecked(&mut frame, &mut symbol_type_vec)
+                    .apply_type_unchecked(&mut frame, &symbol_type_vec)
                     .cast::<DataType>()?
-                    .instantiate_unchecked(&mut frame, &mut field_names_vec);
+                    .instantiate_unchecked(&mut frame, &field_names_vec);
 
-                let mut field_types_vec = values_m
+                let field_types_vec = values_m
                     .iter()
                     .copied()
                     .map(|val| val.datatype().as_value())
@@ -259,11 +259,11 @@ impl Value<'_, '_> {
 
                 let field_type_tup = DataType::anytuple_type(&frame)
                     .as_value()
-                    .apply_type_unchecked(&mut frame, &mut field_types_vec);
+                    .apply_type_unchecked(&mut frame, &field_types_vec);
 
                 let ty = UnionAll::namedtuple_type(&frame)
                     .as_value()
-                    .apply_type_unchecked(&mut frame, &mut [names, field_type_tup])
+                    .apply_type_unchecked(&mut frame, &[names, field_type_tup])
                     .cast::<DataType>()?;
 
                 Ok(ty.instantiate_unchecked(output, values_m))
