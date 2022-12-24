@@ -3,11 +3,13 @@
 #ifdef _MSC_VER
 #include <windows.h>
 
+#if !defined(JLRS_WINDOWS_LTS)
 template <typename T>
 static inline T jl_atomic_load_relaxed(volatile T *obj)
 {
     return jl_atomic_load_acquire(obj);
 }
+#endif
 #endif
 
 #include <julia.h>
