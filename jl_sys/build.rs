@@ -38,7 +38,6 @@ fn find_julia() -> Option<String> {
 
     cfg_if! {
         if #[cfg(target_os = "linux")] {
-
             let out = Command::new("which").arg("julia").output().ok()?.stdout;
             let mut julia_path = PathBuf::from(OsStr::from_bytes(out.as_ref()));
 
@@ -294,6 +293,7 @@ fn generate_bindings(julia_dir: &str) {
         .allowlist_function("jl_gc_queue_root")
         .allowlist_function("jl_gc_safepoint")
         .allowlist_function("jl_gc_schedule_foreign_sweepfunc")
+        .allowlist_function("jl_get_binding_type")
         .allowlist_function("jl_get_current_task")
         .allowlist_function("jl_get_global")
         .allowlist_function("jl_get_libllvm")
@@ -364,6 +364,7 @@ fn generate_bindings(julia_dir: &str) {
         .allowlist_function("jlrs_lock")
         .allowlist_function("jlrs_unlock")
         .allowlist_function("jlrs_array_data_owner_offset")
+        .allowlist_type("jl_binding_t")
         .allowlist_type("jl_callptr_t")
         .allowlist_type("jl_code_instance_t")
         .allowlist_type("jl_datatype_t")
@@ -517,6 +518,16 @@ fn generate_bindings(julia_dir: &str) {
     #[cfg(not(all(feature = "julia-1-6", any(windows, feature = "windows"))))]
     {
         builder = builder.allowlist_function("jlrs_catch_wrapper");
+    }
+
+    #[cfg(feature = "julia-1-10")]
+    {
+        builder = builder.allowlist_var("jl_binding_type");
+    }
+
+    #[cfg(not(feature = "julia-1-10"))]
+    {
+        builder = builder.allowlist_function("jl_binding_type");
     }
 
     let bindings = builder.generate().expect("Unable to generate bindings");

@@ -19,7 +19,7 @@ rust-version = "1.65"
 # The only default feature is the prelude module
 default = ["prelude"]
 
-# Enable all features except `lts` and `debug`
+# Enable all features except any version features
 full = ["prelude", "sync-rt", "tokio-rt", "async-std-rt", "jlrs-ndarray", "f16", "pyplot", "internal-types", "uv", "jlrs-derive"]
 
 
@@ -74,14 +74,19 @@ julia-1-9 = ["jl-sys/julia-1-9", "jlrs-macros/julia-1-9"]
 # Link Julia 1.10 
 julia-1-10 = ["jl-sys/julia-1-10", "jlrs-macros/julia-1-10"]
 
+# Julia version aliases
+
+# Link LTS version of Julia
+lts = ["julia-1-6"]
+# Link beta version of Julia
+beta = ["julia-1-9"]
+# link nightly version of Julia
+nightly = ["julia-1-10"]
+
+# Specific Julia build or arch
+
 # Link debug build of Julia
 debug = ["jl-sys/debug"]
-# Link LTS version of Julia
-lts = ["jl-sys/lts", "julia-1-6"]
-# Link beta version of Julia
-beta = ["jl-sys/beta", "julia-1-9"]
-# link nightly version of Julia
-nightly = ["jl-sys/nightly", "julia-1-10"]
 # Link 32-bits version of Julia on Linux
 i686 = ["jl-sys/i686"]
 
@@ -96,7 +101,6 @@ jl-sys = { version = "0.20", path = "../jl_sys" }
 jlrs-macros = { version = "0.1", path = "../jlrs_macros" }
 smallvec = "1"
 thiserror = "1"
-atomic_refcell = "0.1"
 atomic = "0.5"
 hashers = "1"
 

@@ -73,7 +73,7 @@ impl ForeignTypes {
 unsafe impl Sync for ForeignTypes {}
 
 /// A trait that allows arbitrary Rust data to be converted to Julia.
-pub unsafe trait ForeignType: Sized + 'static {
+pub unsafe trait ForeignType: Sized + Send + Sync + 'static {
     #[doc(hidden)]
     const TYPE_FN: Option<unsafe fn() -> DataType<'static>> = None;
 
@@ -123,7 +123,7 @@ where
     }
 
     unsafe extern "C" fn sweep<T: ForeignType>(value: *mut jl_value_t) {
-        do_sweep::<T>(NonNull::new_unchecked(value.cast()).as_mut())
+        do_sweep::<T>(&mut *value.cast())
     }
 
     let ty = jl_new_foreign_type(

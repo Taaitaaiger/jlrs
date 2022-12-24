@@ -1,7 +1,8 @@
 //! Managed types that are mostly used internally in Julia.
 //!
 //! To use these types you must enable the `internal-types` feature.
-
+#[cfg(feature = "julia-1-10")]
+pub mod binding;
 pub mod code_instance;
 pub mod expr;
 pub mod method;
