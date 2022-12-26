@@ -6,11 +6,10 @@ use crate::{
     convert::{into_julia::IntoJulia, unbox::Unbox},
     data::managed::{
         datatype::{DataType, DataTypeData},
-        private::ManagedPriv,
+        Managed,
     },
     impl_julia_typecheck, impl_valid_layout,
     memory::target::Target,
-    private::Private,
 };
 
 #[repr(C)]
@@ -29,7 +28,6 @@ unsafe impl IntoJulia for Nothing {
     where
         T: Target<'scope>,
     {
-        let dt = DataType::nothing_type(&target);
-        unsafe { target.data_from_ptr(dt.unwrap_non_null(Private), Private) }
+        DataType::nothing_type(&target).root(target)
     }
 }

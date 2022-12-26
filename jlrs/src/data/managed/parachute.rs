@@ -22,10 +22,12 @@ use super::private::ManagedPriv;
 use crate::{
     data::{
         layout::foreign::{create_foreign_type_internal, ForeignType},
-        managed::{module::Module, symbol::Symbol, value::Value},
+        managed::{datatype::DataType, module::Module, symbol::Symbol, value::Value},
     },
-    memory::target::{unrooted::Unrooted, RootingTarget},
-    prelude::{DataType, StackFrame},
+    memory::{
+        stack_frame::StackFrame,
+        target::{unrooted::Unrooted, RootingTarget},
+    },
     private::Private,
 };
 
