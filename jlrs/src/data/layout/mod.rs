@@ -5,7 +5,7 @@ pub mod char;
 #[cfg(feature = "f16")]
 pub mod f16;
 pub mod foreign;
-pub mod inline_layout;
+pub mod matching_layout;
 pub mod nothing;
 #[cfg(feature = "internal-types")]
 pub mod ssa_value;

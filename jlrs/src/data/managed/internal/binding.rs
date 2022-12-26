@@ -10,10 +10,11 @@ use std::{marker::PhantomData, ptr::NonNull, sync::atomic::Ordering};
 use jl_sys::{jl_binding_t, jl_binding_type};
 
 use crate::{
-    data::managed::{module::ModuleData, private::ManagedPriv, value::ValueData, Ref},
+    data::managed::{
+        module::ModuleData, private::ManagedPriv, symbol::Symbol, value::ValueData, Ref,
+    },
     impl_julia_typecheck,
     memory::target::Target,
-    prelude::Symbol,
     private::Private,
 };
 

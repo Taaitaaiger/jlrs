@@ -28,7 +28,7 @@ pub enum DispatchWorker {}
 impl Affinity for DispatchWorker {}
 impl ToWorker for DispatchWorker {}
 
-/// Affinity to worker threads.
+/// Affinity to the main thread.
 ///
 /// A task with this affinity is guaranteed to be handled by the main thread.
 pub enum DispatchMain {}

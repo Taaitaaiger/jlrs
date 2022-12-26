@@ -129,7 +129,7 @@ use crate::{
     convert::{into_julia::IntoJulia, to_symbol::ToSymbol, unbox::Unbox},
     data::{
         layout::{
-            inline_layout::InlineLayout,
+            matching_layout::MatchingLayout,
             valid_layout::{ValidField, ValidLayout},
         },
         managed::{
@@ -465,7 +465,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// that of the data and if the data is already mutably borrowed from Rust. If it's not, the
     /// data is derefenced and returned as a `Tracked` which provides direct access to the
     /// reference.
-    pub fn track<'borrow, T: InlineLayout>(
+    pub fn track<'borrow, T: MatchingLayout>(
         &'borrow self,
     ) -> JlrsResult<Tracked<'borrow, 'scope, 'data, T>> {
         let ty = self.datatype();
@@ -502,7 +502,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// mutable access to the contents of the data, which is inherently unsafe.
     ///
     /// [`write_barrier`]: crate::memory::gc::write_barrier
-    pub unsafe fn track_mut<'borrow, T: InlineLayout>(
+    pub unsafe fn track_mut<'borrow, T: MatchingLayout>(
         &'borrow mut self,
     ) -> JlrsResult<TrackedMut<'borrow, 'scope, 'data, T>> {
         let ty = self.datatype();
