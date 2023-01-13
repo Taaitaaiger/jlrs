@@ -155,8 +155,15 @@ impl<'scope> ManagedPriv<'scope, '_> for TypeVar<'scope> {
     }
 }
 
+impl_construct_type_managed!(Option<TypeVarRef<'_>>, jl_tvar_type);
+
 /// A reference to a [`TypeVar`] that has not been explicitly rooted.
 pub type TypeVarRef<'scope> = Ref<'scope, 'static, TypeVar<'scope>>;
+
+/// A [`TypeVarRef`] with static lifetimes. This is a useful shorthand for signatures of
+/// `ccall`able functions that return a [`TypeVar`].
+pub type TypeVarRet = Ref<'static, 'static, TypeVar<'static>>;
+
 impl_valid_layout!(TypeVarRef, TypeVar);
 
 use crate::memory::target::target_type::TargetType;
@@ -166,3 +173,5 @@ pub type TypeVarData<'target, T> = <T as TargetType<'target>>::Data<'static, Typ
 
 /// `JuliaResult<TypeVar>` or `JuliaResultRef<TypeVarRef>`, depending on the target type `T`.
 pub type TypeVarResult<'target, T> = <T as TargetType<'target>>::Result<'static, TypeVar<'target>>;
+
+impl_ccall_arg_managed!(TypeVar, 1);

@@ -1,13 +1,15 @@
 #[cfg(all(
     feature = "tokio-rt",
-    not(all(target_os = "windows", feature = "julia-1-6"))
+    not(all(target_os = "windows", feature = "julia-1-6")),
+    not(feature = "julia-1-7")
 ))]
 #[cfg(test)]
 mod util;
 
 #[cfg(all(
     feature = "tokio-rt",
-    not(all(target_os = "windows", feature = "julia-1-6"))
+    not(all(target_os = "windows", feature = "julia-1-6")),
+    not(feature = "julia-1-7")
 ))]
 #[cfg(test)]
 mod tests {

@@ -32,7 +32,7 @@ pub mod tokio_rt;
 use std::{
     cell::RefCell,
     collections::VecDeque,
-    ffi::c_void,
+    ffi::{c_void, CStr},
     fmt,
     marker::PhantomData,
     path::Path,
@@ -70,52 +70,17 @@ use crate::{
         future::wake_task,
         task::{sleep, AsyncTask, PersistentTask},
     },
+    convert::into_result::IntoResult,
     data::managed::{module::Module, value::Value},
     error::{IOError, JlrsError, JlrsResult, RuntimeError},
+    init_jlrs,
     memory::{
         context::stack::Stack,
         stack_frame::StackFrame,
         target::{frame::GcFrame, unrooted::Unrooted},
     },
-    runtime::{builder::AsyncRuntimeBuilder, init_jlrs, INIT},
+    runtime::{builder::AsyncRuntimeBuilder, INIT},
 };
-
-#[julia_version(since = "1.9")]
-init_fn!(init_multitask, JLRS_MULTITASK_JL, "JlrsMultitaskNightly.jl");
-
-#[julia_version(until = "1.8")]
-init_fn!(init_multitask, JLRS_MULTITASK_JL, "JlrsMultitask.jl");
-
-// TODO: this doesn't really belong in this module
-/// Convert `Self` to a `Result`.
-pub trait IntoResult<T, E> {
-    /// Convert `self` to a `Result`.
-    fn into_result(self) -> Result<T, E>;
-}
-
-impl<E> IntoResult<(), E> for () {
-    fn into_result(self) -> Result<(), E> {
-        Ok(self)
-    }
-}
-
-impl<E> IntoResult<JlrsResult<()>, E> for JlrsResult<()> {
-    fn into_result(self) -> Result<JlrsResult<()>, E> {
-        Ok(self)
-    }
-}
-
-impl<E> IntoResult<(), E> for Result<(), E> {
-    fn into_result(self) -> Result<(), E> {
-        self
-    }
-}
-
-impl<E> IntoResult<JlrsResult<()>, E> for Result<JlrsResult<()>, E> {
-    fn into_result(self) -> Result<JlrsResult<()>, E> {
-        self
-    }
-}
 
 /// Functionality that is necessary to use an async runtime with jlrs.
 ///
@@ -220,7 +185,7 @@ where
         self.sender.resize_main_queue(capacity)
     }
 
-    /// Resize the task queue of the worker threads.
+    /// Resize the task queue of the main runtime thread.
     ///
     /// See [`AsyncJulia::resize_main_queue`] for more info, the only difference is that this is an
     /// async method.
@@ -239,7 +204,7 @@ where
         self.sender.resize_worker_queue(capacity)
     }
 
-    /// Resize the task queue of the main runtime thread.
+    /// Resize the task queue of the worker threads.
     ///
     /// See [`AsyncJulia::resize_main_queue`] for more info, the only difference is that this is an
     /// async method.
@@ -454,7 +419,7 @@ where
         receiver: Receiver<Message>,
     ) -> JlrsResult<()> {
         unsafe {
-            if jl_is_initialized() != 0 || INIT.swap(true, Ordering::SeqCst) {
+            if jl_is_initialized() != 0 || INIT.swap(true, Ordering::Relaxed) {
                 Err(RuntimeError::AlreadyInitialized)?;
             }
             #[cfg(not(any(feature = "julia-1-10", feature = "julia-1-9")))]
@@ -535,6 +500,9 @@ where
     ) -> Result<(), Box<JlrsError>> {
         let base_frame: &'static mut StackFrame<N> = std::mem::transmute(base_frame);
         let mut pinned = base_frame.pin();
+
+        init_jlrs(&mut pinned);
+
         let base_frame = pinned.stack_frame();
 
         set_custom_fns(base_frame.sync_stack())?;
@@ -699,15 +667,13 @@ fn set_custom_fns(stack: &Stack) -> JlrsResult<()> {
     unsafe {
         let (owner, mut frame) = GcFrame::base(stack);
 
-        init_jlrs(&mut frame);
-        init_multitask(&mut frame);
-
-        let jlrs_mod = Module::main(&frame)
-            .submodule(&frame, "JlrsMultitask")?
-            .as_managed();
+        let cmd = CStr::from_bytes_with_nul_unchecked(b"const JlrsThreads = Jlrs.Threads\0");
+        Value::eval_cstring(&mut frame, cmd).expect("using Jlrs threw an exception");
 
         let wake_rust = Value::new(&mut frame, wake_task as *mut c_void);
-        jlrs_mod
+        Module::main(&frame)
+            .submodule(&frame, "JlrsThreads")?
+            .as_managed()
             .global(&frame, "wakerust")?
             .as_managed()
             .set_nth_field_unchecked(0, wake_rust);

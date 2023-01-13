@@ -1,9 +1,8 @@
 #### v0.18
- - jlrs is compatible with Julia 1.7 again, but this version not actively tested or supported. Version features have been added to select a particular version of Julia.
 
- - Foreign types can be reinitialized with `reinit_foreign_type`, this is only available when Julia 1.10 (the current nightly version) is used.
+ - jlrs is compatible with Julia 1.7 again, but this version isn't actively tested or supported. Version features have been added to select a particular version of Julia, picking a specific version is required.
 
- - The wrappers module has been renamed to data. Pointer wrappers are now called managed data or Julia data, and inline wrappers are layouts. Traits and methods dealing with wrappers have been renamed accordingly.
+ - The `wrappers` module has been renamed to `data`. Pointer wrappers are now called managed data, and inline wrappers are layouts. Traits and methods dealing with wrappers have been renamed accordingly.
 
  - The traits in the `layout` module have been moved to the `data` module. Most can be found in `data::layout`, `typecheck` has been moved to `data::managed`, and `field_index::FieldIndex` has been moved to `data::managed::value::field_accessor`.
 
@@ -11,13 +10,27 @@
 
  - The `Compatible` trait has been added which allows a type that implements `ValidLayout` to declare that it has exactly the same layout as another type. The `CompatibleCast` trait lets references to and arrays of types that implement `ValidLayout` to be cast to that compatible type without copying the data.
 
- - `ForeignType` requires `Send + Sync`.
+ - `ForeignType` requires `Send + Sync`, whether a `ForeignType` is large or contains pointers to managed data is now expressed with the associated constants `LARGE` and `HAS_POINTERS`, the super type is returned by the trait method `ForeignType::super_type`. Foreign types can be reinitialized with `reinit_foreign_type`, which is available since Julia 1.9.
 
- - A managed type for `Binding` has been added, this is only available when Julia 1.10 (the current nightly version) is used.
+ - A managed type for `Binding` has been added, this is available since Julia 1.10.
 
- - The jlrs-derive crate is now part of jlrs-macros, which also offers a `julia_version` macro as an alternative to writing big cfgs to handle differences between Julia versions.
+ - The `Jlrs` Julia module is no longer included with jlrs, but published as a separate package.
+
+ - The jlrs-derive crate is now part of jlrs-macros. Two additional macros are available: `julia_version` can be used as an alternative to writing big cfgs to handle differences between Julia versions, and `julia_module` to generate the data that `Jlrs.Wrap` uses to expose the exported functions, methods, types, constant and globals to Julia.
+
+ - Several traits have been added to implement the `julia_module` macro: `CCallArg`, `CCallReturn`, and `ConstructType`, the first two provide a mapping from a Rust type to the types Julia should use in generated Julia functions, the latter is used to construct the `DataType` at runtime. The managed type `TypedValue` has been added to make more types constructible. Similarly, `RankedArray` and `TypedRankedArray` have been added, only the latter implements `ConstructType`. 
+ 
+ - The `no-link` feature has been added to skip linking Julia.
+
+ - `Dims::n_dimensions` has been renamed to `Dims::rank`.
+
+ - `RankedArray` and `TypedRankedArray` have been added to the `array` module.
+
+ - `Symbol::generate` and `Symbol::generate_tagged` have been added.
+
 
 #### v0.17
+
  - Atomic struct fields are now atomic in the generated bindings.
 
  - `Value` implements `PartialEq` for all wrapper types, allowing a value to be compared with any other wrapper type directly.
@@ -78,10 +91,12 @@
 
 
 #### v0.16
+
  - Support for Julia 1.7 has been dropped, by default Julia 1.8 is targeted.
 
 
 #### v0.15
+
  - jlrs can be used with 32-bits versions of Julia on Linux by enabling the `i686` feature.
 
  - Methods that can catch exceptions thrown by Julia, eg `Module::set_const`, return a `JlrsResult<JuliaResult<T>>`.
@@ -96,6 +111,7 @@
 
 
 #### v0.14
+
  - `TemporarySymbol` has been renamed to `ToSymbol`. The method `ToSymbol::to_symbol` has been added to this trait.
 
  - The wrappers for `CodeInstance`, `Expr`, `MethodInstance`, `MethodMatch`, `MethodTable`, `Method`, `OpaqueClosure`, `SSAValue`, `TypemapEntry`, `TypemapLevel` and `WeakRef` are considered internal types, they are only available when the `internal-types` feature is enabled.

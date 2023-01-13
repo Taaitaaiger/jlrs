@@ -16,12 +16,14 @@ use smallvec::SmallVec;
 
 #[julia_version(until = "1.8")]
 use crate::data::managed::private::ManagedPriv as _;
+#[cfg(feature = "async")]
+use crate::error::JuliaResult;
 use crate::{
     data::managed::{
-        array::{tracked::ArrayWrapper, Array},
+        array::{tracked::TrackArray, Array},
         value::{Value, ValueResult, MAX_SIZE},
     },
-    error::{AccessError, JlrsResult, JuliaResult},
+    error::{AccessError, JlrsResult},
     memory::{context::ledger::Ledger, target::Target},
     private::Private,
 };
@@ -242,7 +244,7 @@ impl<'data> Call<'data> for WithKeywords<'_, 'data> {
         #[cfg(not(any(feature = "julia-1-10", feature = "julia-1-9")))]
         let func = jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
         #[cfg(any(feature = "julia-1-10", feature = "julia-1-9"))]
-        let func = jl_kwcall_func; // jl_get_kwsorter(self.func.datatype().unwrap(Private).cast());
+        let func = jl_kwcall_func;
         let args = &mut [self.keywords, self.func];
 
         let res = jl_call(func, args.as_mut_ptr().cast(), 2);
@@ -397,8 +399,7 @@ cfg_if::cfg_if! {
             /// Creates and schedules a new task with `Base.Threads.@spawn`, and returns a future
             /// that resolves when this task is finished.
             ///
-            /// When the `nightly` feature is enabled, this task is spawned on the `:default`
-            /// thread pool.
+            /// Since Julia 1.9 this task is spawned on the `:default` thread pool.
             ///
             /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
             /// correctness. More information can be found in the [`safety`] module. This method doesn't
@@ -416,8 +417,7 @@ cfg_if::cfg_if! {
             /// Creates and schedules a new task with `Base.Threads.@spawn`, and returns a future
             /// that resolves when this task is finished.
             ///
-            /// When the `nightly` feature is enabled, this task is spawned on the `:default`
-            /// thread pool.
+            /// Since Julia 1.9 this task is spawned on the `:default` thread pool.
             ///
             /// This method checks if any of the arguments is currently borrowed from Rust, and
             /// returns an `AccessError::BorrowError` if any of the arguments is.
@@ -465,6 +465,8 @@ cfg_if::cfg_if! {
             /// awaitable `Future`. This method should only be called in [`PersistentTask::init`],
             /// otherwise it's not guaranteed this task can make progress.
             ///
+            /// Since Julia 1.9 this task is spawned on the `:default` thread pool.
+            ///
             /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
             /// correctness. More information can be found in the [`safety`] module. This method doesn't
             /// check if any of the arguments is currently borrowed from Rust.
@@ -482,6 +484,8 @@ cfg_if::cfg_if! {
             /// Does the same thing as [`CallAsync::call_async`], but the task is returned rather than an
             /// awaitable `Future`. This method should only be called in [`PersistentTask::init`],
             /// otherwise it's not guaranteed this task can make progress.
+            ///
+            /// Since Julia 1.9 this task is spawned on the `:default` thread pool.
             ///
             /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
             /// correctness. More information can be found in the [`safety`] module.
@@ -533,6 +537,8 @@ cfg_if::cfg_if! {
             /// While `await`ing the result the async runtime can work on other tasks, the current task
             /// resumes after the function call on the other thread completes.
             ///
+            /// This task is spawned on the `:interactive` thread pool.
+            ///
             /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
             /// correctness. More information can be found in the [`safety`] module. This method doesn't
             /// check if any of the arguments is currently borrowed from Rust.
@@ -551,6 +557,8 @@ cfg_if::cfg_if! {
             /// `Base.Threads.@spawn` to call the given function on another thread but return immediately.
             /// While `await`ing the result the async runtime can work on other tasks, the current task
             /// resumes after the function call on the other thread completes.
+            ///
+            /// This task is spawned on the `:interactive` thread pool.
             ///
             /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
             /// correctness. More information can be found in the [`safety`] module.
@@ -599,6 +607,8 @@ cfg_if::cfg_if! {
             /// awaitable `Future`. This method should only be called in [`PersistentTask::init`],
             /// otherwise it's not guaranteed this task can make progress.
             ///
+            /// This task is spawned on the `:interactive` thread pool.
+            ///
             /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
             /// correctness. More information can be found in the [`safety`] module. This method doesn't
             /// check if any of the arguments is currently borrowed from Rust.
@@ -618,6 +628,8 @@ cfg_if::cfg_if! {
                 /// Does the same thing as [`CallAsync::call_async`], but the task is returned rather than an
             /// awaitable `Future`. This method should only be called in [`PersistentTask::init`],
             /// otherwise it's not guaranteed this task can make progress.
+            ///
+            /// This task is spawned on the `:interactive` thread pool.
             ///
             /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
             /// correctness. More information can be found in the [`safety`] module.
@@ -668,6 +680,8 @@ cfg_if::cfg_if! {
             /// tasks created by this method. This method should only be used with functions that do very
             /// little computational work but mostly spend their time waiting on IO.
             ///
+            /// Since Julia 1.9 this task is spawned on the `:interactive` thread pool.
+            ///
             /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
             /// correctness. More information can be found in the [`safety`] module. This method doesn't
             /// check if any of the arguments is currently borrowed from Rust.
@@ -685,6 +699,8 @@ cfg_if::cfg_if! {
             /// function is not called on the main thread, but on a separate thread that handles all
             /// tasks created by this method. This method should only be used with functions that do very
             /// little computational work but mostly spend their time waiting on IO.
+            ///
+            /// Since Julia 1.9 this task is spawned on the `:interactive` thread pool.
             ///
             /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
             /// correctness. More information can be found in the [`safety`] module.
@@ -732,6 +748,8 @@ cfg_if::cfg_if! {
             /// than an awaitable `Future`. This method should only be called in [`PersistentTask::init`],
             /// otherwise it's not guaranteed this task can make progress.
             ///
+            /// Since Julia 1.9 this task is spawned on the `:interactive` thread pool.
+            ///
             /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
             /// correctness. More information can be found in the [`safety`] module. This method doesn't
             /// check if any of the arguments is currently borrowed from Rust.
@@ -750,6 +768,8 @@ cfg_if::cfg_if! {
             /// Does the same thing as [`CallAsync::call_async_local`], but the task is returned rather
             /// than an awaitable `Future`. This method should only be called in [`PersistentTask::init`],
             /// otherwise it's not guaranteed this task can make progress.
+            ///
+            /// Since Julia 1.9 this task is spawned on the `:interactive` thread pool.
             ///
             /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
             /// correctness. More information can be found in the [`safety`] module.
@@ -799,6 +819,8 @@ cfg_if::cfg_if! {
             /// the main thread. This method should only be used with functions that must run on the main
             /// thread. The runtime is blocked while this task is active.
             ///
+            /// Since Julia 1.9 this task is spawned on the `:interactive` thread pool.
+            ///
             /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
             /// correctness. More information can be found in the [`safety`] module. This method doesn't
             /// check if any of the arguments is currently borrowed from Rust.
@@ -816,6 +838,8 @@ cfg_if::cfg_if! {
             /// Call a function with the given arguments in an `@async` block. The task is scheduled on
             /// the main thread. This method should only be used with functions that must run on the main
             /// thread. The runtime is blocked while this task is active.
+            ///
+            /// Since Julia 1.9 this task is spawned on the `:interactive` thread pool.
             ///
             /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
             /// correctness. More information can be found in the [`safety`] module.
@@ -863,6 +887,8 @@ cfg_if::cfg_if! {
             /// than an awaitable `Future`. This method should only be called in [`PersistentTask::init`],
             /// otherwise it's not guaranteed this task can make progress.
             ///
+            /// Since Julia 1.9 this task is spawned on the `:interactive` thread pool.
+            ///
             /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
             /// correctness. More information can be found in the [`safety`] module. This method doesn't
             /// check if any of the arguments is currently borrowed from Rust.
@@ -880,6 +906,8 @@ cfg_if::cfg_if! {
             /// Does the same thing as [`CallAsync::call_async_main`], but the task is returned rather
             /// than an awaitable `Future`. This method should only be called in [`PersistentTask::init`],
             /// otherwise it's not guaranteed this task can make progress.
+            ///
+            /// Since Julia 1.9 this task is spawned on the `:interactive` thread pool.
             ///
             /// Safety: this method lets you call arbitrary Julia functions which can't be checked for
             /// correctness. More information can be found in the [`safety`] module.
@@ -967,8 +995,8 @@ cfg_if::cfg_if! {
                 vals.extend_from_slice(values);
 
                 let task = Module::main(&frame)
-                    .submodule(&frame, "JlrsMultitask")
-                    .expect("JlrsMultitask not available")
+                    .submodule(&frame, "JlrsThreads")
+                    .expect("Jlrs.Threads not available")
                     .as_managed()
                     .function(&frame, "interactivecall")
                     .expect("interactivecall not available")
@@ -996,8 +1024,8 @@ cfg_if::cfg_if! {
                 vals.extend_from_slice(values);
 
                 let task = Module::main(&frame)
-                    .submodule(&frame, "JlrsMultitask")
-                    .expect("JlrsMultitask not available")
+                    .submodule(&frame, "JlrsThreads")
+                    .expect("Jlrs.Threads not available")
                     .as_managed()
                     .function(&frame, "asynccall")
                     .expect("asynccall not available")
@@ -1036,8 +1064,8 @@ cfg_if::cfg_if! {
                 vals.extend_from_slice(values);
 
                 let task = Module::main(&frame)
-                    .submodule(&frame, "JlrsMultitask")
-                    .expect("JlrsMultitask not available")
+                    .submodule(&frame, "JlrsThreads")
+                    .expect("Jlrs.Threads not available")
                     .as_managed()
                     .function(&frame, "scheduleasynclocal")
                     .expect("scheduleasynclocal not available")
@@ -1076,8 +1104,8 @@ cfg_if::cfg_if! {
                 vals.extend_from_slice(values);
 
                 let task = Module::main(&frame)
-                    .submodule(&frame, "JlrsMultitask")
-                    .expect("JlrsMultitask not available")
+                    .submodule(&frame, "JlrsThreads")
+                    .expect("Jlrs.Threads not available")
                     .as_managed()
                     .function(&frame, "scheduleasync")
                     .expect("scheduleasync not available")
@@ -1225,8 +1253,8 @@ cfg_if::cfg_if! {
                 vals.extend_from_slice(values);
 
                 let task = Module::main(&frame)
-                    .submodule(&frame, "JlrsMultitask")
-                    .expect("JlrsMultitask not available")
+                    .submodule(&frame, "JlrsThreads")
+                    .expect("Jlrs.Threads not available")
                     .as_managed()
                     .function(&frame, "interactivecall")
                     .expect("interactivecall not available")
@@ -1256,8 +1284,8 @@ cfg_if::cfg_if! {
                 vals.extend_from_slice(values);
 
                 let task = Module::main(&frame)
-                    .submodule(&frame, "JlrsMultitask")
-                    .expect("JlrsMultitask not available")
+                    .submodule(&frame, "JlrsThreads")
+                    .expect("Jlrs.Threads not available")
                     .as_managed()
                     .function(&frame, "asynccall")
                     .expect("asynccall not available")
@@ -1298,8 +1326,8 @@ cfg_if::cfg_if! {
                 vals.extend_from_slice(values);
 
                 let task = Module::main(&frame)
-                    .submodule(&frame, "JlrsMultitask")
-                    .expect("JlrsMultitask not available")
+                    .submodule(&frame, "JlrsThreads")
+                    .expect("Jlrs.Threads not available")
                     .as_managed()
                     .function(&frame, "scheduleasynclocal")
                     .expect("scheduleasynclocal not available")
@@ -1340,8 +1368,8 @@ cfg_if::cfg_if! {
                 vals.extend_from_slice(values);
 
                 let task = Module::main(&frame)
-                    .submodule(&frame, "JlrsMultitask")
-                    .expect("JlrsMultitask not available")
+                    .submodule(&frame, "JlrsThreads")
+                    .expect("Jlrs.Threads not available")
                     .as_managed()
                     .function(&frame, "scheduleasync")
                     .expect("scheduleasync not available")
@@ -1360,6 +1388,7 @@ cfg_if::cfg_if! {
 }
 
 mod private {
+    #[cfg(feature = "internal-types")]
     use jlrs_macros::julia_version;
 
     use super::WithKeywords;

@@ -167,8 +167,15 @@ impl<'scope> ManagedPriv<'scope, '_> for TypeMapEntry<'scope> {
     }
 }
 
+impl_construct_type_managed!(Option<TypeMapEntryRef<'_>>, jl_typemap_entry_type);
+
 /// A reference to a [`TypeMapEntry`] that has not been explicitly rooted.
 pub type TypeMapEntryRef<'scope> = Ref<'scope, 'static, TypeMapEntry<'scope>>;
+
+/// A [`TypeMapEntryRef`] with static lifetimes. This is a useful shorthand for signatures of
+/// `ccall`able functions that return a [`TypeMapEntry`].
+pub type TypeMapEntryRet = Ref<'static, 'static, TypeMapEntry<'static>>;
+
 impl_valid_layout!(TypeMapEntryRef, TypeMapEntry);
 
 use crate::memory::target::target_type::TargetType;
@@ -181,3 +188,5 @@ pub type TypeMapEntryData<'target, T> =
 /// `T`.
 pub type TypeMapEntryResult<'target, T> =
     <T as TargetType<'target>>::Result<'static, TypeMapEntry<'target>>;
+
+impl_ccall_arg_managed!(TypeMapEntry, 1);

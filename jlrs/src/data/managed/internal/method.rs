@@ -449,8 +449,15 @@ impl<'scope> ManagedPriv<'scope, '_> for Method<'scope> {
     }
 }
 
+impl_construct_type_managed!(Option<MethodRef<'_>>, jl_method_type);
+
 /// A reference to a [`Method`] that has not been explicitly rooted.
 pub type MethodRef<'scope> = Ref<'scope, 'static, Method<'scope>>;
+
+/// A [`MethodRef`] with static lifetimes. This is a useful shorthand for signatures of
+/// `ccall`able functions that return a [`Method`].
+pub type MethodRet = Ref<'static, 'static, Method<'static>>;
+
 impl_valid_layout!(MethodRef, Method);
 
 use super::method_instance::MethodInstanceData;
@@ -461,3 +468,5 @@ pub type MethodData<'target, T> = <T as TargetType<'target>>::Data<'static, Meth
 
 /// `JuliaResult<Method>` or `JuliaResultRef<MethodRef>`, depending on the target type `T`.
 pub type MethodResult<'target, T> = <T as TargetType<'target>>::Result<'static, Method<'target>>;
+
+impl_ccall_arg_managed!(Method, 1);

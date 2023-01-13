@@ -50,7 +50,12 @@ use super::{union_all::UnionAll, value::ValueRef, Ref};
 #[julia_version(windows_lts = false)]
 use crate::catch::{catch_exceptions, catch_exceptions_with_slots};
 use crate::{
-    convert::into_julia::IntoJulia,
+    convert::{
+        ccall_types::{CCallArg, CCallReturn},
+        construct_type::{ConstructType, ConstructTypeRelaxed},
+        into_julia::IntoJulia,
+        unbox::Unbox,
+    },
     data::{
         layout::valid_layout::{ValidField, ValidLayout},
         managed::{
@@ -135,12 +140,12 @@ impl<'data> Array<'_, 'data> {
                     let mut callback =
                         |frame: &mut GcFrame, result: &mut MaybeUninit<*mut jl_array_t>| {
                             let array_type =
-                                jl_apply_array_type(elty_ptr.as_ptr().cast(), dims.n_dimensions());
+                                jl_apply_array_type(elty_ptr.as_ptr().cast(), dims.rank());
                             let _: Value = frame
                                 .as_mut()
                                 .data_from_ptr(NonNull::new_unchecked(array_type), Private);
 
-                            let array = match dims.n_dimensions() {
+                            let array = match dims.rank() {
                                 1 => jl_alloc_array_1d(array_type, dims.n_elements(0)),
                                 2 => jl_alloc_array_2d(
                                     array_type,
@@ -198,12 +203,12 @@ impl<'data> Array<'_, 'data> {
         frame
             .scope(|mut frame| {
                 let elty_ptr = T::julia_type(&frame).ptr();
-                let array_type = jl_apply_array_type(elty_ptr.cast().as_ptr(), dims.n_dimensions());
+                let array_type = jl_apply_array_type(elty_ptr.cast().as_ptr(), dims.rank());
                 let _: Value = frame
                     .as_mut()
                     .data_from_ptr(NonNull::new_unchecked(array_type), Private);
 
-                let array = match dims.n_dimensions() {
+                let array = match dims.rank() {
                     1 => jl_alloc_array_1d(array_type, dims.n_elements(0)),
                     2 => jl_alloc_array_2d(array_type, dims.n_elements(0), dims.n_elements(1)),
                     3 => jl_alloc_array_3d(
@@ -252,13 +257,12 @@ impl<'data> Array<'_, 'data> {
                 unsafe {
                     let mut callback =
                         |frame: &mut GcFrame, result: &mut MaybeUninit<*mut jl_array_t>| {
-                            let array_type =
-                                jl_apply_array_type(elty_ptr.cast(), dims.n_dimensions());
+                            let array_type = jl_apply_array_type(elty_ptr.cast(), dims.rank());
                             let _: Value = frame
                                 .as_mut()
                                 .data_from_ptr(NonNull::new_unchecked(array_type), Private);
 
-                            let array = match dims.n_dimensions() {
+                            let array = match dims.rank() {
                                 1 => jl_alloc_array_1d(array_type, dims.n_elements(0)),
                                 2 => jl_alloc_array_2d(
                                     array_type,
@@ -316,12 +320,12 @@ impl<'data> Array<'_, 'data> {
         let (output, frame) = target.split();
         frame
             .scope(|mut frame| {
-                let array_type = jl_apply_array_type(ty.unwrap(Private), dims.n_dimensions());
+                let array_type = jl_apply_array_type(ty.unwrap(Private), dims.rank());
                 let _: Value = frame
                     .as_mut()
                     .data_from_ptr(NonNull::new_unchecked(array_type), Private);
 
-                let array = match dims.n_dimensions() {
+                let array = match dims.rank() {
                     1 => jl_alloc_array_1d(array_type, dims.n_elements(0)),
                     2 => jl_alloc_array_2d(array_type, dims.n_elements(0), dims.n_elements(1)),
                     3 => jl_alloc_array_3d(
@@ -381,13 +385,12 @@ impl<'data> Array<'_, 'data> {
             unsafe {
                 let mut callback =
                     |frame: &mut GcFrame, result: &mut MaybeUninit<*mut jl_array_t>| {
-                        let array_type =
-                            jl_apply_array_type(elty_ptr.as_ptr(), dims.n_dimensions());
+                        let array_type = jl_apply_array_type(elty_ptr.as_ptr(), dims.rank());
                         let _: Value = frame
                             .as_mut()
                             .data_from_ptr(NonNull::new_unchecked(array_type), Private);
 
-                        let array = match dims.n_dimensions() {
+                        let array = match dims.rank() {
                             1 => jl_ptr_to_array_1d(
                                 array_type,
                                 data.as_mut_ptr().cast(),
@@ -455,15 +458,13 @@ impl<'data> Array<'_, 'data> {
 
         let (output, frame) = target.split();
         frame.scope(|mut frame| {
-            let array_type = jl_apply_array_type(
-                T::julia_type(&frame).ptr().cast().as_ptr(),
-                dims.n_dimensions(),
-            );
+            let array_type =
+                jl_apply_array_type(T::julia_type(&frame).ptr().cast().as_ptr(), dims.rank());
             let _: Value = frame
                 .as_mut()
                 .data_from_ptr(NonNull::new_unchecked(array_type), Private);
 
-            let array = match dims.n_dimensions() {
+            let array = match dims.rank() {
                 1 => {
                     jl_ptr_to_array_1d(array_type, data.as_mut_ptr().cast(), dims.n_elements(0), 0)
                 }
@@ -529,13 +530,12 @@ impl<'data> Array<'_, 'data> {
             unsafe {
                 let mut callback =
                     |frame: &mut GcFrame, result: &mut MaybeUninit<*mut jl_array_t>| {
-                        let array_type =
-                            jl_apply_array_type(elty_ptr.as_ptr(), dims.n_dimensions());
+                        let array_type = jl_apply_array_type(elty_ptr.as_ptr(), dims.rank());
                         let _: Value = frame
                             .as_mut()
                             .data_from_ptr(NonNull::new_unchecked(array_type), Private);
 
-                        let array = match dims.n_dimensions() {
+                        let array = match dims.rank() {
                             1 => jl_ptr_to_array_1d(
                                 array_type,
                                 data.as_mut_ptr().cast(),
@@ -610,15 +610,13 @@ impl<'data> Array<'_, 'data> {
 
         let (output, scope) = target.split();
         scope.scope(|mut frame| {
-            let array_type = jl_apply_array_type(
-                T::julia_type(&frame).ptr().cast().as_ptr(),
-                dims.n_dimensions(),
-            );
+            let array_type =
+                jl_apply_array_type(T::julia_type(&frame).ptr().cast().as_ptr(), dims.rank());
             let _: Value = frame
                 .as_mut()
                 .data_from_ptr(NonNull::new_unchecked(array_type), Private);
 
-            let array = match dims.n_dimensions() {
+            let array = match dims.rank() {
                 1 => jl_ptr_to_array_1d(
                     array_type,
                     Box::into_raw(data.into_boxed_slice()).cast(),
@@ -769,6 +767,37 @@ impl<'scope, 'data> Array<'scope, 'data> {
         }
     }
 
+    /// Convert this array to a [`RankedArray`].
+    pub fn try_as_ranked<const N: isize>(self) -> JlrsResult<RankedArray<'scope, 'data, N>> {
+        unsafe {
+            if self.dimensions().rank() == N as usize {
+                Ok(RankedArray(self.0, PhantomData, PhantomData))
+            } else {
+                let value_type = self.element_type().display_string_or(CANNOT_DISPLAY_TYPE);
+                Err(AccessError::InvalidLayout { value_type })?
+            }
+        }
+    }
+
+    /// Convert this array to a [`TypedRankedArray`].
+    pub fn try_as_typed_ranked<U: ValidField, const N: isize>(
+        self,
+    ) -> JlrsResult<TypedRankedArray<'scope, 'data, U, N>> {
+        unsafe {
+            if self.dimensions().rank() == N as usize && self.contains::<U>() {
+                Ok(TypedRankedArray(
+                    self.0,
+                    PhantomData,
+                    PhantomData,
+                    PhantomData,
+                ))
+            } else {
+                let value_type = self.element_type().display_string_or(CANNOT_DISPLAY_TYPE);
+                Err(AccessError::InvalidLayout { value_type })?
+            }
+        }
+    }
+
     /// Convert this untyped array to a [`TypedArray`] without checking if this conversion is
     /// valid.
     ///
@@ -786,7 +815,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     /// if the type of the elements is incorrect.
     pub unsafe fn copy_inline_data<T>(&self) -> JlrsResult<CopiedArray<T>>
     where
-        T: 'static + ValidField,
+        T: 'static + ValidField + Unbox,
     {
         self.ensure_bits_containing::<T>()?;
 
@@ -806,6 +835,13 @@ impl<'scope, 'data> Array<'scope, 'data> {
 
     // TODO docs
     // TODO safety for all
+    /// Immutably access the contents of this array. The elements must have an `isbits` type.
+    ///
+    /// Returns `ArrayLayoutError::NotInline` if the data is not stored inline, `ArrayLayoutError::NotBits`
+    /// if the type is not an `isbits` type, or `AccessError::InvalidLayout` if `T` is not a valid
+    /// layout for the array elements.
+    ///
+    /// Safety: it's not checked if the content of this array are already borrowed by Rust code.
     pub unsafe fn bits_data<'borrow, T>(
         &'borrow self,
     ) -> JlrsResult<BitsArrayAccessorI<'borrow, 'scope, 'data, T>>
@@ -820,8 +856,6 @@ impl<'scope, 'data> Array<'scope, 'data> {
     }
 
     /// Mutably access the contents of this array. The elements must have an `isbits` type.
-    ///
-    /// This method can be used to gain mutable access to the contents of a single array.
     ///
     /// Returns `ArrayLayoutError::NotInline` if the data is not stored inline, `ArrayLayoutError::NotBits`
     /// if the type is not an `isbits` type, or `AccessError::InvalidLayout` if `T` is not a valid
@@ -1040,12 +1074,12 @@ impl<'scope, 'data> Array<'scope, 'data> {
                 // functions are called with valid data. If an exception is thrown it's caught.
                 let mut callback =
                     |frame: &mut GcFrame, result: &mut MaybeUninit<*mut jl_array_t>| {
-                        let array_type = jl_apply_array_type(elty_ptr, dims.n_dimensions());
+                        let array_type = jl_apply_array_type(elty_ptr, dims.rank());
                         let _: Value = frame
                             .as_mut()
                             .data_from_ptr(NonNull::new_unchecked(array_type), Private);
 
-                        let tuple = if dims.n_dimensions() <= 8 {
+                        let tuple = if dims.rank() <= 8 {
                             small_dim_tuple(frame, &dims)
                         } else {
                             large_dim_tuple(frame, &dims)
@@ -1089,12 +1123,12 @@ impl<'scope, 'data> Array<'scope, 'data> {
         scope
             .scope(|mut frame| {
                 let elty_ptr = self.element_type().unwrap(Private);
-                let array_type = jl_apply_array_type(elty_ptr.cast(), dims.n_dimensions());
+                let array_type = jl_apply_array_type(elty_ptr.cast(), dims.rank());
                 let _: Value = frame
                     .as_mut()
                     .data_from_ptr(NonNull::new_unchecked(array_type), Private);
 
-                let tuple = if dims.n_dimensions() <= 8 {
+                let tuple = if dims.rank() <= 8 {
                     small_dim_tuple(&mut frame, &dims)
                 } else {
                     large_dim_tuple(&mut frame, &dims)
@@ -1186,6 +1220,12 @@ impl<'scope, 'data> Array<'scope, 'data> {
 }
 
 impl<'scope> Array<'scope, 'static> {
+    /*
+        TODO
+        jl_array_ptr_1d_push
+        jl_array_ptr_1d_append
+    */
+
     #[julia_version(windows_lts = false)]
     /// Insert `inc` elements at the end of the array.
     ///
@@ -1358,6 +1398,20 @@ impl<'scope, 'data> ManagedPriv<'scope, 'data> for Array<'scope, 'data> {
     }
 }
 
+unsafe impl<'scope, 'data> ConstructTypeRelaxed for Option<ArrayRef<'scope, 'data>> {
+    fn construct_type_relaxed<'target, T>(
+        target: ExtendedTarget<'target, '_, '_, T>,
+    ) -> super::value::ValueData<'target, 'static, T>
+    where
+        T: Target<'target>,
+    {
+        let (target, _) = target.split();
+        UnionAll::array_type(&target).as_value().root(target)
+    }
+}
+
+impl_ccall_arg_managed!(Array, 2);
+
 /// Exactly the same as [`Array`], except it has an explicit element type `T`.
 #[repr(transparent)]
 pub struct TypedArray<'scope, 'data, T>(
@@ -1365,9 +1419,7 @@ pub struct TypedArray<'scope, 'data, T>(
     PhantomData<&'scope ()>,
     PhantomData<&'data ()>,
     PhantomData<T>,
-)
-where
-    T: ValidField;
+);
 
 impl<'scope, 'data, T> Clone for TypedArray<'scope, 'data, T>
 where
@@ -1844,6 +1896,37 @@ where
         unsafe { Array::wrap_non_null(self.unwrap_non_null(Private), Private) }
     }
 
+    /// Convert this array to a [`RankedArray`].
+    pub fn try_as_ranked<const N: isize>(self) -> JlrsResult<RankedArray<'scope, 'data, N>> {
+        unsafe {
+            if self.dimensions().rank() == N as usize {
+                Ok(RankedArray(self.0, PhantomData, PhantomData))
+            } else {
+                let value_type = self.element_type().display_string_or(CANNOT_DISPLAY_TYPE);
+                Err(AccessError::InvalidLayout { value_type })?
+            }
+        }
+    }
+
+    /// Convert this array to a [`TypedRankedArray`].
+    pub fn try_as_typed_ranked<U: ValidField, const N: isize>(
+        self,
+    ) -> JlrsResult<TypedRankedArray<'scope, 'data, U, N>> {
+        unsafe {
+            if self.dimensions().rank() == N as usize {
+                Ok(TypedRankedArray(
+                    self.0,
+                    PhantomData,
+                    PhantomData,
+                    PhantomData,
+                ))
+            } else {
+                let value_type = self.element_type().display_string_or(CANNOT_DISPLAY_TYPE);
+                Err(AccessError::InvalidLayout { value_type })?
+            }
+        }
+    }
+
     /// Convert `self` to `Array`.
     pub fn as_array_ref(&self) -> &Array<'scope, 'data> {
         unsafe { std::mem::transmute(self) }
@@ -2148,6 +2231,29 @@ where
     }
 }
 
+unsafe impl<'scope, 'data, U: ConstructTypeRelaxed + ValidField> ConstructTypeRelaxed
+    for Option<TypedArrayRef<'scope, 'data, U>>
+{
+    fn construct_type_relaxed<'target, T>(
+        target: ExtendedTarget<'target, '_, '_, T>,
+    ) -> super::value::ValueData<'target, 'static, T>
+    where
+        T: Target<'target>,
+    {
+        let (target, frame) = target.split();
+        frame
+            .scope(|mut frame| {
+                let ua = UnionAll::array_type(&target);
+                let t0 = U::construct_type_relaxed(frame.as_extended_target());
+                unsafe {
+                    let o = ua.apply_types_unchecked(target, [t0]);
+                    Ok(o)
+                }
+            })
+            .unwrap()
+    }
+}
+
 unsafe impl<'scope, 'data, T: ValidField> Typecheck for TypedArray<'scope, 'data, T> {
     fn typecheck(t: DataType) -> bool {
         // Safety: borrow is only temporary
@@ -2211,7 +2317,7 @@ unsafe fn small_dim_tuple<'scope, D>(
 where
     D: Dims,
 {
-    let n = dims.n_dimensions();
+    let n = dims.rank();
     debug_assert!(n <= 8, "Too many dimensions for small_dim_tuple");
     let elem_types = JL_LONG_TYPE.with(|longs| longs.get());
     let tuple_type = jl_apply_tuple_type_v(elem_types.cast(), n);
@@ -2232,7 +2338,7 @@ where
 {
     // Safety: all C API functions are called with valid arguments.
     unsafe {
-        let n = dims.n_dimensions();
+        let n = dims.rank();
         let mut elem_types = vec![isize::julia_type(&frame); n];
         let tuple_type = jl_apply_tuple_type_v(elem_types.as_mut_ptr().cast(), n);
         let tuple = jl_new_struct_uninit(tuple_type);
@@ -2276,8 +2382,12 @@ unsafe extern "C" fn droparray<T>(a: Array) {
     mem::drop(data);
 }
 
-/// A reference to an [`Array`] that has not been explicitly rooted.
+/// A reference to a [`Array`] that has not been explicitly rooted.
 pub type ArrayRef<'scope, 'data> = Ref<'scope, 'data, Array<'scope, 'data>>;
+
+/// A [`ArrayRef`] with static lifetimes. This is a useful shorthand for signatures of
+/// `ccall`able functions that return a [`Array`].
+pub type ArrayRet = Ref<'static, 'static, Array<'static, 'static>>;
 
 unsafe impl ValidLayout for ArrayRef<'_, '_> {
     fn valid_layout(v: Value) -> bool {
@@ -2307,6 +2417,10 @@ unsafe impl ValidField for Option<ArrayRef<'_, '_>> {
 
 /// A reference to an [`TypedArray`] that has not been explicitly rooted.
 pub type TypedArrayRef<'scope, 'data, T> = Ref<'scope, 'data, TypedArray<'scope, 'data, T>>;
+
+/// A [`TypedArrayRef`] with static lifetimes. This is a useful shorthand for signatures of
+/// `ccall`able functions that return a [`TypedArray`].
+pub type TypedArrayRet<T> = Ref<'static, 'static, TypedArray<'static, 'static, T>>;
 
 unsafe impl<T: ValidField> ValidLayout for TypedArrayRef<'_, '_, T> {
     fn valid_layout(v: Value) -> bool {
@@ -2352,3 +2466,305 @@ pub type TypedArrayData<'target, 'data, T, U> =
 /// type `T`.
 pub type TypedArrayResult<'target, 'data, T, U> =
     <T as TargetType<'target>>::Result<'data, TypedArray<'target, 'data, U>>;
+
+unsafe impl<'scope, 'data, T: ValidField> CCallArg for TypedArray<'scope, 'data, T> {
+    type CCallArgType = Option<ValueRef<'scope, 'data>>;
+    type FunctionArgType = Option<ValueRef<'scope, 'data>>;
+}
+
+unsafe impl<T: ValidField> CCallReturn for TypedArrayRef<'static, 'static, T> {
+    type CCallReturnType = Option<ValueRef<'static, 'static>>;
+    type FunctionReturnType = Option<ValueRef<'static, 'static>>;
+}
+
+/// An array with a definite rank.
+#[repr(transparent)]
+pub struct RankedArray<'scope, 'data, const N: isize>(
+    NonNull<jl_array_t>,
+    PhantomData<&'scope ()>,
+    PhantomData<&'data mut ()>,
+);
+
+impl<const N: isize> Clone for RankedArray<'_, '_, N> {
+    fn clone(&self) -> Self {
+        RankedArray(self.0, PhantomData, PhantomData)
+    }
+}
+
+impl<const N: isize> Copy for RankedArray<'_, '_, N> {}
+
+impl<'scope, 'data, const N: isize> ManagedPriv<'scope, 'data> for RankedArray<'scope, 'data, N> {
+    type Wraps = jl_array_t;
+    type TypeConstructorPriv<'target, 'da> = RankedArray<'target, 'da, N>;
+    const NAME: &'static str = "Array";
+
+    // Safety: `inner` must not have been freed yet, the result must never be
+    // used after the GC might have freed it.
+    unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
+        Self(inner, PhantomData, PhantomData)
+    }
+
+    #[inline(always)]
+    fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
+        self.0
+    }
+}
+
+unsafe impl<const N: isize> ConstructTypeRelaxed for Option<RankedArrayRef<'_, '_, N>> {
+    fn construct_type_relaxed<'target, T>(
+        target: ExtendedTarget<'target, '_, '_, T>,
+    ) -> super::value::ValueData<'target, 'static, T>
+    where
+        T: Target<'target>,
+    {
+        let (target, frame) = target.split();
+        frame
+            .scope(|mut frame| {
+                let ua = UnionAll::array_type(&target);
+                unsafe {
+                    let inner = ua.body();
+                    let var = ua.var();
+                    let rank = Value::new(&mut frame, N);
+                    let ty = inner.apply_type_unchecked(&mut frame, [rank]);
+
+                    let out = UnionAll::new_unchecked(target, var, ty);
+                    Ok(out)
+                }
+            })
+            .unwrap()
+    }
+}
+
+unsafe impl<const N: isize> Typecheck for RankedArray<'_, '_, N> {
+    fn typecheck(t: DataType) -> bool {
+        // Safety: Array is a UnionAll. so check if the typenames match
+        unsafe {
+            if !Array::typecheck(t) {
+                return false;
+            }
+
+            let unrooted = t.unrooted_target();
+            if let Some(param) = t.parameter(unrooted, 1) {
+                if let Ok(rank) = param.as_value().unbox::<isize>() {
+                    rank == N
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        }
+    }
+}
+
+impl<const N: isize> Debug for RankedArray<'_, '_, N> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        match self.display_string() {
+            Ok(s) => write!(f, "{}", s),
+            Err(e) => write!(f, "<Cannot display value: {}>", e),
+        }
+    }
+}
+
+/// A reference to an [`RankedArray`] that has not been explicitly rooted.
+pub type RankedArrayRef<'scope, 'data, const N: isize> =
+    Ref<'scope, 'data, RankedArray<'scope, 'data, N>>;
+
+/// A [`RankedArrayRef`] with static lifetimes. This is a useful shorthand for signatures of
+/// `ccall`able functions that return a [`RankedArray`].
+pub type RankedArrayRet<const N: isize> = Ref<'static, 'static, RankedArray<'static, 'static, N>>;
+
+unsafe impl<const N: isize> ValidLayout for RankedArrayRef<'_, '_, N> {
+    fn valid_layout(v: Value) -> bool {
+        if let Ok(dt) = v.cast::<DataType>() {
+            dt.is::<Array>()
+        } else if let Ok(ua) = v.cast::<UnionAll>() {
+            ua.base_type().is::<RankedArray<N>>()
+        } else {
+            false
+        }
+    }
+
+    const IS_REF: bool = true;
+}
+
+unsafe impl<const N: isize> ValidField for Option<RankedArrayRef<'_, '_, N>> {
+    fn valid_field(v: Value) -> bool {
+        if let Ok(dt) = v.cast::<DataType>() {
+            dt.is::<Array>()
+        } else if let Ok(ua) = v.cast::<UnionAll>() {
+            ua.base_type().is::<RankedArray<N>>()
+        } else {
+            false
+        }
+    }
+}
+
+unsafe impl<'scope, 'data, const N: isize> CCallArg for RankedArray<'scope, 'data, N> {
+    type CCallArgType = Option<ValueRef<'scope, 'data>>;
+    type FunctionArgType = Option<ValueRef<'scope, 'data>>;
+}
+
+unsafe impl<'scope, 'data, const N: isize> CCallReturn for RankedArray<'scope, 'data, N> {
+    type CCallReturnType = Option<ValueRef<'scope, 'data>>;
+    type FunctionReturnType = Option<ValueRef<'scope, 'data>>;
+}
+
+/// An array with a set element type and a definite rank.
+#[repr(transparent)]
+pub struct TypedRankedArray<'scope, 'data, U, const N: isize>(
+    NonNull<jl_array_t>,
+    PhantomData<&'scope ()>,
+    PhantomData<&'data mut ()>,
+    PhantomData<U>,
+);
+
+impl<U, const N: isize> Clone for TypedRankedArray<'_, '_, U, N> {
+    fn clone(&self) -> Self {
+        TypedRankedArray(self.0, PhantomData, PhantomData, PhantomData)
+    }
+}
+
+impl<U, const N: isize> Copy for TypedRankedArray<'_, '_, U, N> {}
+
+unsafe impl<U: ConstructTypeRelaxed + ValidField, const N: isize> ConstructType
+    for Option<TypedRankedArrayRef<'_, '_, U, N>>
+{
+    fn base_type<'target, T>(target: &T) -> Value<'target, 'static>
+    where
+        T: Target<'target>,
+    {
+        UnionAll::array_type(target).as_value()
+    }
+
+    fn construct_type<'target, T>(
+        target: ExtendedTarget<'target, '_, '_, T>,
+    ) -> super::datatype::DataTypeData<'target, T>
+    where
+        T: Target<'target>,
+    {
+        let (target, frame) = target.split();
+        frame
+            .scope(|mut frame| {
+                let ua = UnionAll::array_type(&target);
+                unsafe {
+                    let inner = ua.body();
+                    let ty_var = ua.var();
+                    let elem_ty = U::construct_type_relaxed(frame.as_extended_target());
+                    let rank = Value::new(&mut frame, N);
+                    let with_rank = inner.apply_type_unchecked(&mut frame, [rank]);
+
+                    let rewrap = UnionAll::new_unchecked(&mut frame, ty_var, with_rank);
+                    let ty = rewrap
+                        .apply_type_unchecked(&target, [elem_ty])
+                        .as_value()
+                        .cast_unchecked::<DataType>()
+                        .root(target);
+                    Ok(ty)
+                }
+            })
+            .unwrap()
+    }
+}
+
+unsafe impl<U: ValidField, const N: isize> Typecheck for TypedRankedArray<'_, '_, U, N> {
+    fn typecheck(t: DataType) -> bool {
+        // Safety: Array is a UnionAll. so check if the typenames match
+        unsafe {
+            if !TypedArray::<U>::typecheck(t) {
+                return false;
+            }
+
+            let unrooted = t.unrooted_target();
+            if let Some(param) = t.parameter(unrooted, 1) {
+                if let Ok(rank) = param.as_value().unbox::<isize>() {
+                    rank == N
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        }
+    }
+}
+
+impl<U: ValidField, const N: isize> Debug for TypedRankedArray<'_, '_, U, N> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        match self.display_string() {
+            Ok(s) => write!(f, "{}", s),
+            Err(e) => write!(f, "<Cannot display value: {}>", e),
+        }
+    }
+}
+
+impl<'scope, 'data, U: ValidField, const N: isize> ManagedPriv<'scope, 'data>
+    for TypedRankedArray<'scope, 'data, U, N>
+{
+    type Wraps = jl_array_t;
+    type TypeConstructorPriv<'target, 'da> = TypedRankedArray<'target, 'da, U, N>;
+    const NAME: &'static str = "Array";
+
+    // Safety: `inner` must not have been freed yet, the result must never be
+    // used after the GC might have freed it. T must be correct
+    unsafe fn wrap_non_null(inner: NonNull<Self::Wraps>, _: Private) -> Self {
+        Self(inner, PhantomData, PhantomData, PhantomData)
+    }
+
+    fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
+        self.0
+    }
+}
+
+/// A reference to an [`RankedArray`] that has not been explicitly rooted.
+pub type TypedRankedArrayRef<'scope, 'data, U, const N: isize> =
+    Ref<'scope, 'data, TypedRankedArray<'scope, 'data, U, N>>;
+
+/// A [`TypedRankedArrayRef`] with static lifetimes. This is a useful shorthand for signatures of
+/// `ccall`able functions that return a [`TypedRankedArray`].
+pub type TypedRankedArrayRet<U, const N: isize> =
+    Ref<'static, 'static, TypedRankedArray<'static, 'static, U, N>>;
+
+unsafe impl<U: ValidField, const N: isize> ValidLayout for TypedRankedArrayRef<'_, '_, U, N> {
+    fn valid_layout(v: Value) -> bool {
+        if let Ok(dt) = v.cast::<DataType>() {
+            dt.is::<Array>()
+        } else if let Ok(ua) = v.cast::<UnionAll>() {
+            ua.base_type().is::<TypedRankedArray<U, N>>()
+        } else {
+            false
+        }
+    }
+
+    const IS_REF: bool = true;
+}
+
+unsafe impl<U: ValidField, const N: isize> ValidField
+    for Option<TypedRankedArrayRef<'_, '_, U, N>>
+{
+    fn valid_field(v: Value) -> bool {
+        if let Ok(dt) = v.cast::<DataType>() {
+            dt.is::<Array>()
+        } else if let Ok(ua) = v.cast::<UnionAll>() {
+            ua.base_type().is::<TypedRankedArray<U, N>>()
+        } else {
+            false
+        }
+    }
+}
+
+unsafe impl<'scope, 'data, U: ValidField + ConstructTypeRelaxed, const N: isize> CCallArg
+    for TypedRankedArray<'scope, 'data, U, N>
+{
+    type CCallArgType = Option<TypedRankedArrayRef<'scope, 'data, U, N>>;
+    type FunctionArgType = Option<TypedRankedArrayRef<'scope, 'data, U, N>>;
+}
+
+unsafe impl<'scope, 'data, U: ValidField + ConstructTypeRelaxed, const N: isize> CCallReturn
+    for TypedRankedArrayRef<'scope, 'data, U, N>
+{
+    type CCallReturnType = Option<TypedRankedArrayRef<'scope, 'data, U, N>>;
+    type FunctionReturnType = Option<TypedRankedArrayRef<'scope, 'data, U, N>>;
+}
+
+// TODO: conversions

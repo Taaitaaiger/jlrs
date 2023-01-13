@@ -28,6 +28,68 @@ function inspect(ty)
 end
 */
 
+macro_rules! impl_construct_type_managed {
+    ($ty:ty, $jl_ty:expr) => {
+        unsafe impl crate::convert::construct_type::ConstructType for $ty {
+            fn base_type<'target, T>(_: &T) -> $crate::data::managed::value::Value<'target, 'static>
+            where
+                T: $crate::memory::target::Target<'target>,
+            {
+                unsafe {
+                    $crate::data::managed::value::Value::wrap_non_null(
+                        NonNull::new_unchecked($jl_ty.cast()),
+                        $crate::private::Private,
+                    )
+                }
+            }
+
+            fn construct_type<'target, 'current, 'borrow, T>(
+                target: crate::memory::target::ExtendedTarget<'target, 'current, 'borrow, T>,
+            ) -> $crate::data::managed::datatype::DataTypeData<'target, T>
+            where
+                T: $crate::memory::target::Target<'target>,
+            {
+                let (target, _) = target.split();
+                unsafe {
+                    target.data_from_ptr(NonNull::new_unchecked($jl_ty), $crate::private::Private)
+                }
+            }
+        }
+    };
+}
+
+macro_rules! impl_ccall_arg_managed {
+    ($ty:ident, 1) => {
+        unsafe impl<'scope> $crate::convert::ccall_types::CCallArg for $ty<'scope> {
+            type CCallArgType = Option<$crate::data::managed::value::ValueRef<'scope, 'static>>;
+            type FunctionArgType = Option<$crate::data::managed::Ref<'scope, 'static, $ty<'scope>>>;
+        }
+
+        unsafe impl $crate::convert::ccall_types::CCallReturn
+            for $crate::data::managed::Ref<'static, 'static, $ty<'static>>
+        {
+            type CCallReturnType = Option<$crate::data::managed::value::ValueRef<'static, 'static>>;
+            type FunctionReturnType =
+                Option<$crate::data::managed::Ref<'static, 'static, $ty<'static>>>;
+        }
+    };
+
+    ($ty:ident, 2) => {
+        unsafe impl<'scope, 'data> $crate::convert::ccall_types::CCallArg for $ty<'scope, 'data> {
+            type CCallArgType = Option<$crate::data::managed::value::ValueRef<'scope, 'data>>;
+            type FunctionArgType = Option<$crate::data::managed::value::ValueRef<'scope, 'data>>;
+        }
+
+        unsafe impl $crate::convert::ccall_types::CCallReturn
+            for $crate::data::managed::Ref<'static, 'static, $ty<'static, 'static>>
+        {
+            type CCallReturnType = Option<$crate::data::managed::value::ValueRef<'static, 'static>>;
+            type FunctionReturnType =
+                Option<$crate::data::managed::value::ValueRef<'static, 'static>>;
+        }
+    };
+}
+
 macro_rules! impl_valid_layout {
     ($ref_type:ident, $type:ident) => {
         unsafe impl $crate::data::layout::valid_layout::ValidLayout for $ref_type<'_> {
@@ -74,6 +136,7 @@ pub mod function;
 pub mod internal;
 pub mod module;
 pub mod parachute;
+pub mod rust_result;
 pub mod simple_vector;
 pub mod string;
 pub mod symbol;
@@ -187,6 +250,7 @@ pub trait Managed<'scope, 'data>: private::ManagedPriv<'scope, 'data> {
         let global = self.unrooted_target();
 
         let s = unsafe {
+            // TODO: caching?
             Module::main(&global)
                 .submodule(&global, "Jlrs")?
                 .as_managed()
@@ -298,18 +362,6 @@ impl<'scope, 'data, W: Managed<'scope, 'data>> Ref<'scope, 'data, W> {
         Value::wrap_non_null(self.data_ptr().cast(), Private)
     }
 
-    /// Leaks `self` with a `'static` lifetime. This method is only available when the `ccall`
-    /// feature is enabled.
-    ///
-    /// This method erases the `'scope` lifetime, the `'data` lifetime is not erased.
-    ///
-    /// Safety: this must only be used to return freshly allocated Julia data from Rust to Julia
-    /// from a `ccall`ed function.
-    #[cfg(feature = "ccall")]
-    pub unsafe fn leak(self) -> Ref<'static, 'data, W::TypeConstructor<'static, 'data>> {
-        Ref::wrap(self.ptr().cast())
-    }
-
     /// Returns a pointer to the data,
     pub fn data_ptr(self) -> NonNull<c_void> {
         self.ptr().cast()
@@ -317,6 +369,20 @@ impl<'scope, 'data, W: Managed<'scope, 'data>> Ref<'scope, 'data, W> {
 
     pub(crate) fn ptr(self) -> NonNull<W::Wraps> {
         self.0
+    }
+}
+
+impl<'scope, W: Managed<'scope, 'static>> Ref<'scope, 'static, W> {
+    /// Leaks `self` with a `'static` lifetime. This method is only available when the `ccall`
+    /// feature is enabled.
+    ///
+    /// This method erases the `'scope` lifetime, the `'data` lifetime must already be `'static`.
+    ///
+    /// Safety: this must only be used to return freshly allocated Julia data from Rust to Julia
+    /// from a `ccall`ed function.
+    #[cfg(feature = "ccall")]
+    pub unsafe fn leak(self) -> Ref<'static, 'static, W::TypeConstructor<'static, 'static>> {
+        Ref::wrap(self.ptr().cast())
     }
 }
 

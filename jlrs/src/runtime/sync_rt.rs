@@ -12,25 +12,25 @@ use crate::{
     convert::into_jlrs_result::IntoJlrsResult,
     data::managed::{module::Module, string::JuliaString, value::Value, Managed},
     error::{IOError, JlrsResult, RuntimeError},
+    init_jlrs,
     memory::{
         context::stack::Stack,
         stack_frame::{PinnedFrame, StackFrame},
         target::frame::GcFrame,
     },
-    runtime::{builder::RuntimeBuilder, init_jlrs, INIT},
+    runtime::{builder::RuntimeBuilder, INIT},
 };
 
 /// A pending Julia instance.
 ///
 /// This pending instance can be activated by calling [`PendingJulia::instance`].
 pub struct PendingJulia {
-    init: bool,
     _not_send_sync: PhantomData<*mut c_void>,
 }
 
 impl PendingJulia {
     pub(crate) unsafe fn init(builder: RuntimeBuilder) -> JlrsResult<Self> {
-        if jl_is_initialized() != 0 || INIT.swap(true, Ordering::SeqCst) {
+        if jl_is_initialized() != 0 || INIT.swap(true, Ordering::Relaxed) {
             Err(RuntimeError::AlreadyInitialized)?;
         }
 
@@ -61,7 +61,6 @@ impl PendingJulia {
         assert!(jl_is_initialized() != 0);
 
         Ok(PendingJulia {
-            init: false,
             _not_send_sync: PhantomData,
         })
     }
@@ -73,23 +72,15 @@ impl PendingJulia {
         unsafe {
             // Is popped when Julia is dropped.
             let mut pinned = frame.pin();
+
+            init_jlrs(&mut pinned);
+
             let frame = pinned.stack_frame();
             let context = frame.sync_stack();
-            let mut wrapped: Julia<'ctx> = Julia {
+            let wrapped: Julia<'ctx> = Julia {
                 stack: context,
                 _frame: pinned,
             };
-
-            if !self.init {
-                wrapped
-                    .scope(|mut frame| {
-                        init_jlrs(&mut frame);
-                        Ok(())
-                    })
-                    .unwrap();
-
-                self.init = true;
-            }
 
             wrapped
         }
@@ -138,7 +129,7 @@ impl Julia<'_> {
     /// Calls `include` in the `Main` module in Julia, which executes the file's contents in that
     /// module. This has the same effect as calling `include` in the Julia REPL.
     ///
-    /// This is unsafe because the contents of the file are evaluated.
+    /// This is unsafe because the content of the file is evaluated.
     ///
     /// Example:
     ///

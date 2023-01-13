@@ -1,5 +1,7 @@
 //! Managed type for `DataType`, which provides access to type properties.
 
+// todo: jl_new_primitivetype, jl_new_datatype,jl_has_free_typevars
+
 use std::{ffi::CStr, marker::PhantomData, ptr::NonNull};
 
 #[julia_version(since = "1.10")]
@@ -50,10 +52,12 @@ use crate::{
     private::Private,
 };
 
-/// Julia type information. You can access a [`Value`]'s datatype by by calling
-/// [`Value::datatype`]. If a `DataType` is concrete and not a subtype of `Array` a new instance
-/// can be created with [`DataType::instantiate`]. This can also be achieved by converting the
-/// `DataType` to a `Value` with [`Managed::as_value`] and calling it as a Julia function.
+/// Julia type information.
+///
+///  You can access a [`Value`]'s datatype by by calling [`Value::datatype`]. If a `DataType` is
+/// concrete and not a subtype of `Array` a new instance can be created with
+/// [`DataType::instantiate`]. This can also be achieved by converting the `DataType` to a
+/// `Value` with [`Managed::as_value`] and calling it as a Julia function.
 #[derive(Copy, Clone)]
 #[repr(transparent)]
 pub struct DataType<'scope>(NonNull<jl_datatype_t>, PhantomData<&'scope ()>);
@@ -1481,8 +1485,15 @@ impl<'scope> ManagedPriv<'scope, '_> for DataType<'scope> {
     }
 }
 
+impl_construct_type_managed!(Option<DataTypeRef<'_>>, jl_datatype_type);
+
 /// A reference to a [`DataType`] that has not been explicitly rooted.
 pub type DataTypeRef<'scope> = Ref<'scope, 'static, DataType<'scope>>;
+
+/// A [`DataTypeRef`] with static lifetimes. This is a useful shorthand for signatures of
+/// `ccall`able functions that return a [`DataType`].
+pub type DataTypeRet = Ref<'static, 'static, DataType<'static>>;
+
 impl_valid_layout!(DataTypeRef, DataType);
 
 use crate::memory::target::target_type::TargetType;
@@ -1535,3 +1546,5 @@ impl DatatypeLayout<'_> {
         unsafe { self.0.as_ref().fielddesc_type() }
     }
 }
+
+impl_ccall_arg_managed!(DataType, 1);

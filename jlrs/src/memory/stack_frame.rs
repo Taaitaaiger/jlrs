@@ -127,8 +127,6 @@ pub(crate) struct JlrsStackFrame<'scope, 'inner, const N: usize> {
 impl<'scope, 'inner, const N: usize> JlrsStackFrame<'scope, 'inner, N> {
     unsafe fn new(pinned: &'inner mut PinnedFrame<'scope, N>) -> Self {
         if !Self::is_init(&pinned) {
-            Stack::register(pinned);
-
             {
                 let ptr = Stack::alloc();
                 pinned.raw.sync.set(ptr.cast());
@@ -148,6 +146,7 @@ impl<'scope, 'inner, const N: usize> JlrsStackFrame<'scope, 'inner, N> {
             .as_ref()
     }
 
+    #[cfg(feature = "async")]
     pub(crate) unsafe fn nth_stack(&self, n: usize) -> &'scope Stack {
         NonNull::new_unchecked(self.pinned.raw.roots[n].get())
             .cast()
@@ -158,7 +157,7 @@ impl<'scope, 'inner, const N: usize> JlrsStackFrame<'scope, 'inner, N> {
         let ptr = pinned.raw.sync.get();
         if !ptr.is_null() {
             let v = unsafe { Value::wrap_non_null(NonNull::new_unchecked(ptr).cast(), Private) };
-            return v.datatype_name().unwrap_or("") == "__JlrsStack__";
+            return v.datatype_name().unwrap_or("") == "Stack";
         }
 
         false

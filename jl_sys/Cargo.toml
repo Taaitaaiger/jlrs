@@ -17,22 +17,20 @@ links = "julia"
 rust-version = "1.65"
 
 [features]
-docs = []
-uv = []
-debug = []
-
-lts = ["julia-1-6"]
-beta = ["julia-1-9"]
-nightly = ["julia-1-10"]
 julia-1-6 = []
 julia-1-7 = []
 julia-1-8 = []
 julia-1-9 = []
 julia-1-10 = []
 
+no-link = []
+uv = []
 i686 = []
+debug = []
+
 windows = []
 use-bindgen = ["bindgen", "syn", "quote", "proc-macro2"]
+docs = []
 
 [dependencies]
 atomic = "0.5"

@@ -811,7 +811,7 @@ mod private {
         fn field_index(&self, ty: DataType, _: Private) -> JlrsResult<usize> {
             debug_assert!(!ty.is::<Array>());
 
-            if self.n_dimensions() != 1 {
+            if self.rank() != 1 {
                 Err(AccessError::FieldNeedsSimpleIndex)?
             }
 

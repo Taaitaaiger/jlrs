@@ -17,7 +17,7 @@ static JLRS_STABLE_TESTS_JL: &'static str = include_str!("JlrsStableTests.jl");
 
 #[cfg(all(feature = "jlrs-derive", feature = "sync-rt"))]
 #[allow(dead_code)]
-pub static JLRS_DERIVE_TESTS_JL: &'static str = include_str!("JlrsDeriveTests.jl");
+pub static JLRS_DERIVE_TESTS_JL: &'static str = include_str!("JlrsNewDeriveTests.jl");
 
 #[cfg(all(feature = "sync-rt", not(feature = "julia-1-6")))]
 #[allow(dead_code)]
@@ -41,7 +41,7 @@ pub static ASYNC_TESTS_JL: &'static str = include_str!("AsyncTests.jl");
 pub mod async_tasks;
 
 #[cfg(feature = "jlrs-derive")]
-pub mod derive_impls;
+pub mod new_derive_impls;
 
 thread_local! {
     #[cfg(feature = "sync-rt")]

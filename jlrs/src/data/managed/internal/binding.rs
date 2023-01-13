@@ -10,9 +10,7 @@ use std::{marker::PhantomData, ptr::NonNull, sync::atomic::Ordering};
 use jl_sys::{jl_binding_t, jl_binding_type};
 
 use crate::{
-    data::managed::{
-        module::ModuleData, private::ManagedPriv, symbol::Symbol, value::ValueData, Ref,
-    },
+    data::managed::{private::ManagedPriv, value::ValueData, Ref},
     impl_julia_typecheck,
     memory::target::Target,
     private::Private,
@@ -34,18 +32,6 @@ impl<'scope> Binding<'scope> {
     flags: UInt8 (mut)
     */
 
-    pub fn name<'target, T>(self, _: &T) -> Symbol<'target>
-    where
-        T: Target<'target>,
-    {
-        // Safety: the pointer points to valid data
-        unsafe {
-            let name = self.unwrap_non_null(Private).as_ref().name;
-            debug_assert!(!name.is_null());
-            Symbol::wrap_non_null(NonNull::new_unchecked(name), Private)
-        }
-    }
-
     pub fn value<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
     where
         T: Target<'target>,
@@ -62,31 +48,18 @@ impl<'scope> Binding<'scope> {
         }
     }
 
-    /// cached GlobalRef for this binding
-    pub fn globalref<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    /// for individual imported bindings -- TODO: make _Atomic
+    pub fn owner<'target, T>(self, target: T) -> Option<BindingData<'target, T>>
     where
         T: Target<'target>,
     {
         // Safety: the pointer points to valid data
         unsafe {
-            let globalref = self
+            let owner = self
                 .unwrap_non_null(Private)
                 .as_ref()
-                .globalref
+                .owner
                 .load(Ordering::Relaxed);
-            let ptr = NonNull::new(globalref)?;
-            Some(target.data_from_ptr(ptr, Private))
-        }
-    }
-
-    /// for individual imported bindings -- TODO: make _Atomic
-    pub fn owner<'target, T>(self, target: T) -> Option<ModuleData<'target, T>>
-    where
-        T: Target<'target>,
-    {
-        // Safety: the pointer points to valid data
-        unsafe {
-            let owner = self.unwrap_non_null(Private).as_ref().owner;
             let ptr = NonNull::new(owner)?;
             Some(target.data_from_ptr(ptr, Private))
         }
@@ -146,8 +119,15 @@ impl<'scope> ManagedPriv<'scope, '_> for Binding<'scope> {
     }
 }
 
+impl_construct_type_managed!(Option<BindingRef<'_>>, jl_binding_type);
+
 /// A reference to a [`Binding`] that has not been explicitly rooted.
 pub type BindingRef<'scope> = Ref<'scope, 'static, Binding<'scope>>;
+
+/// A [`BindingRef`] with static lifetimes. This is a useful shorthand for signatures of
+/// `ccall`able functions that return a [`Binding`].
+pub type BindingRet = Ref<'static, 'static, Binding<'static>>;
+
 impl_valid_layout!(BindingRef, Binding);
 
 use crate::memory::target::target_type::TargetType;
@@ -158,3 +138,5 @@ pub type BindingData<'target, T> = <T as TargetType<'target>>::Data<'static, Bin
 /// `JuliaResult<Binding>` or `JuliaResultRef<BindingRef>`, depending on the target type
 /// `T`.
 pub type BindingResult<'target, T> = <T as TargetType<'target>>::Result<'static, Binding<'target>>;
+
+impl_ccall_arg_managed!(Binding, 1);

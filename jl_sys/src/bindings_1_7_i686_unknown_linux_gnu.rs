@@ -1421,6 +1421,9 @@ extern "C" {
     pub static mut jl_task_type: *mut jl_datatype_t;
 }
 extern "C" {
+    pub static mut jl_pair_type: *mut jl_value_t;
+}
+extern "C" {
     pub static mut jl_array_uint8_type: *mut jl_value_t;
 }
 extern "C" {
@@ -1546,6 +1549,9 @@ extern "C" {
     pub fn jl_object_id(v: *mut jl_value_t) -> usize;
 }
 extern "C" {
+    pub fn jl_has_free_typevars(v: *mut jl_value_t) -> ::std::os::raw::c_int;
+}
+extern "C" {
     pub fn jl_isa(a: *mut jl_value_t, t: *mut jl_value_t) -> ::std::os::raw::c_int;
 }
 extern "C" {
@@ -1578,6 +1584,68 @@ extern "C" {
     pub fn jl_apply_tuple_type_v(p: *mut *mut jl_value_t, np: usize) -> *mut jl_tupletype_t;
 }
 extern "C" {
+    pub fn jl_new_datatype(
+        name: *mut jl_sym_t,
+        module: *mut jl_module_t,
+        super_: *mut jl_datatype_t,
+        parameters: *mut jl_svec_t,
+        fnames: *mut jl_svec_t,
+        ftypes: *mut jl_svec_t,
+        fattrs: *mut jl_svec_t,
+        abstract_: ::std::os::raw::c_int,
+        mutabl: ::std::os::raw::c_int,
+        ninitialized: ::std::os::raw::c_int,
+    ) -> *mut jl_datatype_t;
+}
+extern "C" {
+    pub fn jl_new_primitivetype(
+        name: *mut jl_value_t,
+        module: *mut jl_module_t,
+        super_: *mut jl_datatype_t,
+        parameters: *mut jl_svec_t,
+        nbits: usize,
+    ) -> *mut jl_datatype_t;
+}
+extern "C" {
+    pub fn jl_atomic_new_bits(
+        dt: *mut jl_value_t,
+        src: *const ::std::os::raw::c_char,
+    ) -> *mut jl_value_t;
+}
+extern "C" {
+    pub fn jl_atomic_store_bits(
+        dst: *mut ::std::os::raw::c_char,
+        src: *const jl_value_t,
+        nb: ::std::os::raw::c_int,
+    );
+}
+extern "C" {
+    pub fn jl_atomic_swap_bits(
+        dt: *mut jl_value_t,
+        dst: *mut ::std::os::raw::c_char,
+        src: *const jl_value_t,
+        nb: ::std::os::raw::c_int,
+    ) -> *mut jl_value_t;
+}
+extern "C" {
+    pub fn jl_atomic_bool_cmpswap_bits(
+        dst: *mut ::std::os::raw::c_char,
+        expected: *const jl_value_t,
+        src: *const jl_value_t,
+        nb: ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
+}
+extern "C" {
+    pub fn jl_atomic_cmpswap_bits(
+        dt: *mut jl_datatype_t,
+        rettype: *mut jl_datatype_t,
+        dst: *mut ::std::os::raw::c_char,
+        expected: *const jl_value_t,
+        src: *const jl_value_t,
+        nb: ::std::os::raw::c_int,
+    ) -> *mut jl_value_t;
+}
+extern "C" {
     pub fn jl_new_structv(
         type_: *mut jl_datatype_t,
         args: *mut *mut jl_value_t,
@@ -1598,6 +1666,12 @@ extern "C" {
 }
 extern "C" {
     pub fn jl_symbol_n(str_: *const ::std::os::raw::c_char, len: usize) -> *mut jl_sym_t;
+}
+extern "C" {
+    pub fn jl_gensym() -> *mut jl_sym_t;
+}
+extern "C" {
+    pub fn jl_tagged_gensym(str_: *const ::std::os::raw::c_char, len: usize) -> *mut jl_sym_t;
 }
 extern "C" {
     pub fn jl_get_kwsorter(ty: *mut jl_value_t) -> *mut jl_function_t;
@@ -1762,6 +1836,12 @@ extern "C" {
     pub fn jl_array_del_beg(a: *mut jl_array_t, dec: usize);
 }
 extern "C" {
+    pub fn jl_array_ptr_1d_push(a: *mut jl_array_t, item: *mut jl_value_t);
+}
+extern "C" {
+    pub fn jl_array_ptr_1d_append(a: *mut jl_array_t, a2: *mut jl_array_t);
+}
+extern "C" {
     pub fn jl_apply_array_type(type_: *mut jl_value_t, dim: usize) -> *mut jl_value_t;
 }
 extern "C" {
@@ -1775,6 +1855,9 @@ extern "C" {
 }
 extern "C" {
     pub static mut jl_base_module: *mut jl_module_t;
+}
+extern "C" {
+    pub fn jl_new_module(name: *mut jl_sym_t) -> *mut jl_module_t;
 }
 extern "C" {
     pub fn jl_get_global(m: *mut jl_module_t, var: *mut jl_sym_t) -> *mut jl_value_t;

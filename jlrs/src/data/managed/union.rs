@@ -228,8 +228,15 @@ pub(crate) fn find_union_component(haystack: Value, needle: Value, nth: &mut u32
     }
 }
 
+impl_construct_type_managed!(Option<UnionRef<'_>>, jl_uniontype_type);
+
 /// A reference to a [`Union`] that has not been explicitly rooted.
 pub type UnionRef<'scope> = Ref<'scope, 'static, Union<'scope>>;
+
+/// A [`UnionRef`] with static lifetimes. This is a useful shorthand for signatures of
+/// `ccall`able functions that return a [`Union`].
+pub type UnionRet = Ref<'static, 'static, Union<'static>>;
+
 impl_valid_layout!(UnionRef, Union);
 
 use crate::memory::target::target_type::TargetType;
@@ -239,3 +246,5 @@ pub type UnionData<'target, T> = <T as TargetType<'target>>::Data<'static, Union
 
 /// `JuliaResult<Union>` or `JuliaResultRef<UnionRef>`, depending on the target type `T`.
 pub type UnionResult<'target, T> = <T as TargetType<'target>>::Result<'static, Union<'target>>;
+
+impl_ccall_arg_managed!(Union, 1);

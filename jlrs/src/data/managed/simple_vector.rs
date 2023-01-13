@@ -7,7 +7,8 @@ use std::{
 };
 
 use jl_sys::{
-    jl_alloc_svec, jl_alloc_svec_uninit, jl_emptysvec, jl_gc_wb, jl_svec_data, jl_svec_t,
+    jl_alloc_svec, jl_alloc_svec_uninit, jl_emptysvec, jl_gc_wb, jl_simplevector_type,
+    jl_svec_data, jl_svec_t,
 };
 
 use super::{
@@ -24,7 +25,7 @@ use crate::{
     private::Private,
 };
 
-/// Access
+/// Access the content of a `SimpleVector`.
 #[repr(transparent)]
 pub struct SimpleVectorContent<'scope, 'borrow, T = ValueRef<'scope, 'static>>(
     NonNull<jl_svec_t>,
@@ -39,7 +40,7 @@ impl<'scope, 'borrow, T: ManagedRef<'scope, 'static>> SimpleVectorContent<'scope
         unsafe { self.0.as_ref().length }
     }
 
-    /// Returns the contents of this `SimpleVector` as a slice.
+    /// Returns the content of this `SimpleVector` as a slice.
     pub fn as_slice(&self) -> &'borrow [Option<T>] {
         // Safety: the C API function is called with valid data
         unsafe { std::slice::from_raw_parts(jl_svec_data(self.0.as_ptr()).cast(), self.len()) }
@@ -287,8 +288,14 @@ impl<'scope> ManagedPriv<'scope, '_> for SimpleVector<'scope> {
     }
 }
 
+impl_construct_type_managed!(Option<SimpleVectorRef<'_>>, jl_simplevector_type);
+
 /// A reference to a [`SimpleVector`] that has not been explicitly rooted.
 pub type SimpleVectorRef<'scope> = Ref<'scope, 'static, SimpleVector<'scope>>;
+
+/// A [`SimpleVectorRef`] with static lifetimes. This is a useful shorthand for signatures of
+/// `ccall`able functions that return a [`SimpleVector`].
+pub type SimpleVectorRet = Ref<'static, 'static, SimpleVector<'static>>;
 
 unsafe impl<'scope> ValidLayout for SimpleVectorRef<'scope> {
     fn valid_layout(v: Value) -> bool {
@@ -322,3 +329,5 @@ pub type SimpleVectorData<'target, T> =
 /// `T`.
 pub type SimpleVectorResult<'target, T> =
     <T as TargetType<'target>>::Result<'static, SimpleVector<'target>>;
+
+impl_ccall_arg_managed!(SimpleVector, 1);

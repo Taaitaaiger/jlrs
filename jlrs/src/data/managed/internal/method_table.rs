@@ -242,8 +242,15 @@ impl<'scope> ManagedPriv<'scope, '_> for MethodTable<'scope> {
     }
 }
 
+impl_construct_type_managed!(Option<MethodTableRef<'_>>, jl_methtable_type);
+
 /// A reference to a [`MethodTable`] that has not been explicitly rooted.
 pub type MethodTableRef<'scope> = Ref<'scope, 'static, MethodTable<'scope>>;
+
+/// A [`MethodTableRef`] with static lifetimes. This is a useful shorthand for signatures of
+/// `ccall`able functions that return a [`MethodTable`].
+pub type MethodTableRet = Ref<'static, 'static, MethodTable<'static>>;
+
 impl_valid_layout!(MethodTableRef, MethodTable);
 
 use crate::memory::target::target_type::TargetType;
@@ -256,3 +263,5 @@ pub type MethodTableData<'target, T> =
 /// `T`.
 pub type MethodTableResult<'target, T> =
     <T as TargetType<'target>>::Result<'static, MethodTable<'target>>;
+
+impl_ccall_arg_managed!(MethodTable, 1);

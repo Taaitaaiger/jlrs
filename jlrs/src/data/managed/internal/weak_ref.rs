@@ -60,8 +60,15 @@ impl<'scope> ManagedPriv<'scope, '_> for WeakRef<'scope> {
     }
 }
 
+impl_construct_type_managed!(Option<WeakRefRef<'_>>, jl_weakref_type);
+
 /// A reference to a [`WeakRef`] that has not been explicitly rooted.
 pub type WeakRefRef<'scope> = Ref<'scope, 'static, WeakRef<'scope>>;
+
+/// A [`WeakRefRef`] with static lifetimes. This is a useful shorthand for signatures of
+/// `ccall`able functions that return a [`WeakRef`].
+pub type WeakRefRet = Ref<'static, 'static, WeakRef<'static>>;
+
 impl_valid_layout!(WeakRefRef, WeakRef);
 
 use crate::memory::target::target_type::TargetType;
@@ -71,3 +78,5 @@ pub type WeakRefData<'target, T> = <T as TargetType<'target>>::Data<'static, Wea
 
 /// `JuliaResult<WeakRef>` or `JuliaResultRef<WeakRefRef>`, depending on the target type`T`.
 pub type WeakRefResult<'target, T> = <T as TargetType<'target>>::Result<'static, WeakRef<'target>>;
+
+impl_ccall_arg_managed!(WeakRef, 1);

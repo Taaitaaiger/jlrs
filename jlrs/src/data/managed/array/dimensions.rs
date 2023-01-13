@@ -25,7 +25,7 @@ pub trait Dims: Sized + Debug {
     const SIZE: isize;
 
     /// Returns the number of dimensions.
-    fn n_dimensions(&self) -> usize;
+    fn rank(&self) -> usize;
 
     /// Returns the number of elements of the nth dimension. Indexing starts at 0.
     fn n_elements(&self, dimension: usize) -> usize;
@@ -34,7 +34,7 @@ pub trait Dims: Sized + Debug {
     /// each dimension.
     fn size(&self) -> usize {
         let mut acc = 1;
-        for i in 0..self.n_dimensions() {
+        for i in 0..self.rank() {
             acc *= self.n_elements(i);
         }
 
@@ -45,15 +45,15 @@ pub trait Dims: Sized + Debug {
     ///
     /// The default implementation must not be overridden.
     fn index_of<D: Dims>(&self, dim_index: &D) -> JlrsResult<usize> {
-        if self.n_dimensions() != dim_index.n_dimensions() {
+        if self.rank() != dim_index.rank() {
             Err(AccessError::InvalidIndex {
                 idx: dim_index.into_dimensions(),
                 sz: self.into_dimensions(),
             })?;
         }
 
-        let n_dims = self.n_dimensions();
-        if self.n_dimensions() == 0 {
+        let n_dims = self.rank();
+        if self.rank() == 0 {
             return Ok(0);
         }
 
@@ -118,7 +118,7 @@ impl<'scope> ArrayDimensions<'scope> {
 impl<'scope> Dims for ArrayDimensions<'scope> {
     const SIZE: isize = -1;
 
-    fn n_dimensions(&self) -> usize {
+    fn rank(&self) -> usize {
         self.n
     }
 
@@ -135,7 +135,7 @@ impl<'scope> Dims for ArrayDimensions<'scope> {
 impl Dims for () {
     const SIZE: isize = 0;
 
-    fn n_dimensions(&self) -> usize {
+    fn rank(&self) -> usize {
         0
     }
 
@@ -147,7 +147,7 @@ impl Dims for () {
 impl Dims for usize {
     const SIZE: isize = 1;
 
-    fn n_dimensions(&self) -> usize {
+    fn rank(&self) -> usize {
         1
     }
 
@@ -163,7 +163,7 @@ impl Dims for usize {
 impl Dims for (usize,) {
     const SIZE: isize = 1;
 
-    fn n_dimensions(&self) -> usize {
+    fn rank(&self) -> usize {
         1
     }
 
@@ -179,7 +179,7 @@ impl Dims for (usize,) {
 impl Dims for (usize, usize) {
     const SIZE: isize = 2;
 
-    fn n_dimensions(&self) -> usize {
+    fn rank(&self) -> usize {
         2
     }
 
@@ -195,7 +195,7 @@ impl Dims for (usize, usize) {
 impl Dims for (usize, usize, usize) {
     const SIZE: isize = 3;
 
-    fn n_dimensions(&self) -> usize {
+    fn rank(&self) -> usize {
         3
     }
 
@@ -212,7 +212,7 @@ impl Dims for (usize, usize, usize) {
 impl Dims for (usize, usize, usize, usize) {
     const SIZE: isize = 4;
 
-    fn n_dimensions(&self) -> usize {
+    fn rank(&self) -> usize {
         4
     }
 
@@ -230,7 +230,7 @@ impl Dims for (usize, usize, usize, usize) {
 impl<const N: usize> Dims for &[usize; N] {
     const SIZE: isize = N as isize;
 
-    fn n_dimensions(&self) -> usize {
+    fn rank(&self) -> usize {
         N
     }
 
@@ -246,7 +246,7 @@ impl<const N: usize> Dims for &[usize; N] {
 impl<const N: usize> Dims for [usize; N] {
     const SIZE: isize = N as isize;
 
-    fn n_dimensions(&self) -> usize {
+    fn rank(&self) -> usize {
         N
     }
 
@@ -262,7 +262,7 @@ impl<const N: usize> Dims for [usize; N] {
 impl Dims for &[usize] {
     const SIZE: isize = -1;
 
-    fn n_dimensions(&self) -> usize {
+    fn rank(&self) -> usize {
         self.len()
     }
 
@@ -287,7 +287,7 @@ pub enum Dimensions {
 impl Dimensions {
     /// Convert an implementation of `Dims` to `Dimensions`.
     pub fn from_dims<D: Dims>(dims: &D) -> Self {
-        match dims.n_dimensions() {
+        match dims.rank() {
             0 => Dimensions::Few([0, 0, 0, 0]),
             1 => Dimensions::Few([1, dims.n_elements(0), 0, 0]),
             2 => Dimensions::Few([2, dims.n_elements(0), dims.n_elements(1), 0]),
@@ -321,7 +321,7 @@ impl Dimensions {
 impl Dims for Dimensions {
     const SIZE: isize = -1;
 
-    fn n_dimensions(&self) -> usize {
+    fn rank(&self) -> usize {
         match self {
             Dimensions::Few([n, _, _, _]) => *n,
             Dimensions::Many(ref dims) => dims[0],
@@ -329,7 +329,7 @@ impl Dims for Dimensions {
     }
 
     fn n_elements(&self, dim: usize) -> usize {
-        if dim < self.n_dimensions() {
+        if dim < self.rank() {
             match self {
                 Dimensions::Few(dims) => dims[dim + 1],
                 Dimensions::Many(ref dims) => dims[dim + 1],
@@ -340,7 +340,7 @@ impl Dims for Dimensions {
     }
 
     fn size(&self) -> usize {
-        if self.n_dimensions() == 0 {
+        if self.rank() == 0 {
             return 0;
         }
 
@@ -382,7 +382,7 @@ mod tests {
     #[test]
     fn convert_usize() {
         let d: Dimensions = 4.into_dimensions();
-        assert_eq!(d.n_dimensions(), 1);
+        assert_eq!(d.rank(), 1);
         assert_eq!(d.n_elements(0), 4);
         assert_eq!(d.size(), 4);
     }
@@ -390,7 +390,7 @@ mod tests {
     #[test]
     fn convert_tuple_0d() {
         let d: Dimensions = ().into_dimensions();
-        assert_eq!(d.n_dimensions(), 0);
+        assert_eq!(d.rank(), 0);
         assert_eq!(d.n_elements(0), 0);
         assert_eq!(d.size(), 0);
     }
@@ -398,7 +398,7 @@ mod tests {
     #[test]
     fn convert_tuple_1d() {
         let d: Dimensions = (4,).into_dimensions();
-        assert_eq!(d.n_dimensions(), 1);
+        assert_eq!(d.rank(), 1);
         assert_eq!(d.n_elements(0), 4);
         assert_eq!(d.size(), 4);
     }
@@ -406,7 +406,7 @@ mod tests {
     #[test]
     fn convert_tuple_2d() {
         let d: Dimensions = (4, 3).into_dimensions();
-        assert_eq!(d.n_dimensions(), 2);
+        assert_eq!(d.rank(), 2);
         assert_eq!(d.n_elements(0), 4);
         assert_eq!(d.n_elements(1), 3);
         assert_eq!(d.size(), 12);
@@ -415,7 +415,7 @@ mod tests {
     #[test]
     fn convert_tuple_3d() {
         let d: Dimensions = (4, 3, 2).into_dimensions();
-        assert_eq!(d.n_dimensions(), 3);
+        assert_eq!(d.rank(), 3);
         assert_eq!(d.n_elements(0), 4);
         assert_eq!(d.n_elements(1), 3);
         assert_eq!(d.n_elements(2), 2);
@@ -425,7 +425,7 @@ mod tests {
     #[test]
     fn convert_tuple_4d() {
         let d: Dimensions = (4, 3, 2, 1).into_dimensions();
-        assert_eq!(d.n_dimensions(), 4);
+        assert_eq!(d.rank(), 4);
         assert_eq!(d.n_elements(0), 4);
         assert_eq!(d.n_elements(1), 3);
         assert_eq!(d.n_elements(2), 2);
@@ -436,7 +436,7 @@ mod tests {
     #[test]
     fn convert_tuple_5d() {
         let d: Dimensions = (&[4, 3, 2, 1, 2]).into_dimensions();
-        assert_eq!(d.n_dimensions(), 5);
+        assert_eq!(d.rank(), 5);
         assert_eq!(d.n_elements(0), 4);
         assert_eq!(d.n_elements(1), 3);
         assert_eq!(d.n_elements(2), 2);
@@ -449,7 +449,7 @@ mod tests {
     fn convert_tuple_nd() {
         let v = [1, 2, 3];
         let d: Dimensions = v.into_dimensions();
-        assert_eq!(d.n_dimensions(), 3);
+        assert_eq!(d.rank(), 3);
         assert_eq!(d.n_elements(0), 1);
         assert_eq!(d.n_elements(1), 2);
         assert_eq!(d.n_elements(2), 3);

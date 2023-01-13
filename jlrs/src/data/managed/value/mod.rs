@@ -22,9 +22,19 @@
 //! [`TypedArray<isize>`]: crate::data::managed::array::TypedArray
 //! [`named_tuple`]: crate::named_tuple!
 
+/*
+TODO:
+jl_atomic_cmpswap_bits
+jl_atomic_bool_cmpswap_bits
+jl_atomic_new_bits
+jl_atomic_store_bits
+jl_atomic_swap_bits
+*/
+
 pub mod field_accessor;
 pub mod leaked;
 pub mod tracked;
+pub mod typed;
 
 #[doc(hidden)]
 #[macro_export]
@@ -110,15 +120,18 @@ use std::{
     usize,
 };
 
+#[julia_version(since = "1.7")]
+use jl_sys::jl_pair_type;
 use jl_sys::{
-    jl_an_empty_string, jl_an_empty_vec_any, jl_apply_type, jl_array_any_type, jl_array_int32_type,
-    jl_array_symbol_type, jl_array_uint8_type, jl_astaggedvalue, jl_bottom_type, jl_call, jl_call0,
-    jl_call1, jl_call2, jl_call3, jl_diverror_exception, jl_egal, jl_emptytuple, jl_eval_string,
-    jl_exception_occurred, jl_false, jl_field_index, jl_field_isptr, jl_gc_add_finalizer,
-    jl_gc_add_ptr_finalizer, jl_get_nth_field, jl_get_nth_field_noalloc, jl_interrupt_exception,
-    jl_isa, jl_memory_exception, jl_nothing, jl_object_id, jl_readonlymemory_exception,
-    jl_set_nth_field, jl_stackovf_exception, jl_stderr_obj, jl_stdout_obj, jl_subtype, jl_true,
-    jl_typeof_str, jl_undefref_exception, jl_value_t,
+    jl_an_empty_string, jl_an_empty_vec_any, jl_any_type, jl_apply_type, jl_array_any_type,
+    jl_array_int32_type, jl_array_symbol_type, jl_array_uint8_type, jl_astaggedvalue,
+    jl_bottom_type, jl_call, jl_call0, jl_call1, jl_call2, jl_call3, jl_diverror_exception,
+    jl_egal, jl_emptytuple, jl_eval_string, jl_exception_occurred, jl_false, jl_field_index,
+    jl_field_isptr, jl_gc_add_finalizer, jl_gc_add_ptr_finalizer, jl_get_nth_field,
+    jl_get_nth_field_noalloc, jl_interrupt_exception, jl_isa, jl_memory_exception, jl_nothing,
+    jl_object_id, jl_readonlymemory_exception, jl_set_nth_field, jl_stackovf_exception,
+    jl_stderr_obj, jl_stdout_obj, jl_subtype, jl_true, jl_typeof_str, jl_undefref_exception,
+    jl_value_t,
 };
 use jlrs_macros::julia_version;
 
@@ -128,10 +141,7 @@ use crate::{
     call::{Call, ProvideKeywords, WithKeywords},
     convert::{into_julia::IntoJulia, to_symbol::ToSymbol, unbox::Unbox},
     data::{
-        layout::{
-            matching_layout::MatchingLayout,
-            valid_layout::{ValidField, ValidLayout},
-        },
+        layout::valid_layout::{ValidField, ValidLayout},
         managed::{
             array::Array,
             datatype::DataType,
@@ -465,7 +475,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// that of the data and if the data is already mutably borrowed from Rust. If it's not, the
     /// data is derefenced and returned as a `Tracked` which provides direct access to the
     /// reference.
-    pub fn track<'borrow, T: MatchingLayout>(
+    pub fn track<'borrow, T: ValidLayout>(
         &'borrow self,
     ) -> JlrsResult<Tracked<'borrow, 'scope, 'data, T>> {
         let ty = self.datatype();
@@ -502,7 +512,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// mutable access to the contents of the data, which is inherently unsafe.
     ///
     /// [`write_barrier`]: crate::memory::gc::write_barrier
-    pub unsafe fn track_mut<'borrow, T: MatchingLayout>(
+    pub unsafe fn track_mut<'borrow, T: ValidLayout>(
         &'borrow mut self,
     ) -> JlrsResult<TrackedMut<'borrow, 'scope, 'data, T>> {
         let ty = self.datatype();
@@ -1248,6 +1258,16 @@ impl<'scope> Value<'scope, 'static> {
         // Safety: global constant
         unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_stderr_obj()), Private) }
     }
+
+    #[julia_version(since = "1.7")]
+    /// The `Pair` type
+    pub fn pair_type<T>(_: &T) -> Self
+    where
+        T: Target<'scope>,
+    {
+        // Safety: global constant
+        unsafe { Value::wrap_non_null(NonNull::new_unchecked(jl_pair_type), Private) }
+    }
 }
 
 impl<'data> Call<'data> for Value<'_, 'data> {
@@ -1403,8 +1423,14 @@ impl<'scope, 'data> ManagedPriv<'scope, 'data> for Value<'scope, 'data> {
     }
 }
 
+impl_construct_type_managed!(Option<ValueRef<'_, '_>>, jl_any_type);
+
 /// A reference to a [`Value`] that has not been explicitly rooted.
 pub type ValueRef<'scope, 'data> = Ref<'scope, 'data, Value<'scope, 'data>>;
+
+/// A [`ValueRef`] with static lifetimes. This is a useful shorthand for signatures of
+/// `ccall`able functions that return a [`Value`].
+pub type ValueRet = Ref<'static, 'static, Value<'static, 'static>>;
 
 unsafe impl ValidLayout for ValueRef<'_, '_> {
     fn valid_layout(v: Value) -> bool {
@@ -1444,3 +1470,5 @@ pub type ValueData<'target, 'data, T> =
 /// `JuliaResult<Value>` or `JuliaResultRef<ValueRef>`, depending on the target type `T`.
 pub type ValueResult<'target, 'data, T> =
     <T as TargetType<'target>>::Result<'data, Value<'target, 'data>>;
+
+impl_ccall_arg_managed!(Value, 2);

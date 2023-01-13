@@ -23,7 +23,7 @@ mod tests {
                 .unwrap();
 
             let (data, dims) = unboxed.splat();
-            assert_eq!(dims.n_dimensions(), 1);
+            assert_eq!(dims.rank(), 1);
             assert_eq!(dims.n_elements(0), 3);
             assert_eq!(data.to_vec(), vec![1., 2., 3.]);
         });
@@ -50,7 +50,7 @@ mod tests {
                 .unwrap();
 
             let (data, dims) = unboxed.splat();
-            assert_eq!(dims.n_dimensions(), 1);
+            assert_eq!(dims.rank(), 1);
             assert_eq!(dims.n_elements(0), 3);
             assert_eq!(data.to_vec(), vec![1., 2., 3.]);
         });
@@ -74,7 +74,7 @@ mod tests {
                 .unwrap();
 
             let (data, dims) = unboxed.splat();
-            assert_eq!(dims.n_dimensions(), 1);
+            assert_eq!(dims.rank(), 1);
             assert_eq!(dims.n_elements(0), 3);
             assert_eq!(data.to_vec(), vec![1., 2., 3.]);
         });
@@ -98,7 +98,7 @@ mod tests {
                 .unwrap();
 
             let (data, dims) = unboxed.splat();
-            assert_eq!(dims.n_dimensions(), 1);
+            assert_eq!(dims.rank(), 1);
             assert_eq!(dims.n_elements(0), 3);
             assert_eq!(data.to_vec(), vec![1, 2, 3]);
         });
@@ -120,7 +120,7 @@ mod tests {
                 .unwrap();
 
             let (data, dims) = unboxed.splat();
-            assert_eq!(dims.n_dimensions(), 1);
+            assert_eq!(dims.rank(), 1);
             assert_eq!(dims.n_elements(0), 3);
             assert_eq!(data.to_vec(), vec![1, 2, 3]);
         });
@@ -144,7 +144,7 @@ mod tests {
                 .unwrap();
 
             let (data, dims) = unboxed.splat();
-            assert_eq!(dims.n_dimensions(), 1);
+            assert_eq!(dims.rank(), 1);
             assert_eq!(dims.n_elements(0), 3);
             assert_eq!(data.to_vec(), vec![1, 2, 3]);
         });
@@ -168,7 +168,7 @@ mod tests {
                 .unwrap();
 
             let (data, dims) = unboxed.splat();
-            assert_eq!(dims.n_dimensions(), 1);
+            assert_eq!(dims.rank(), 1);
             assert_eq!(dims.n_elements(0), 3);
             assert_eq!(data.to_vec(), vec![1, 2, 3]);
         });
@@ -190,7 +190,7 @@ mod tests {
                 .unwrap();
 
             let (data, dims) = unboxed.splat();
-            assert_eq!(dims.n_dimensions(), 2);
+            assert_eq!(dims.rank(), 2);
             assert_eq!(dims.n_elements(0), 3);
             assert_eq!(dims.n_elements(1), 4);
             assert_eq!(data.to_vec(), vec![1u8, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4]);
@@ -215,7 +215,7 @@ mod tests {
                 .unwrap();
 
             let (data, dims) = unboxed.splat();
-            assert_eq!(dims.n_dimensions(), 2);
+            assert_eq!(dims.rank(), 2);
             assert_eq!(dims.n_elements(0), 3);
             assert_eq!(dims.n_elements(1), 4);
             assert_eq!(data.to_vec(), vec![1u16, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4]);
@@ -240,7 +240,7 @@ mod tests {
                 .unwrap();
 
             let (data, dims) = unboxed.splat();
-            assert_eq!(dims.n_dimensions(), 2);
+            assert_eq!(dims.rank(), 2);
             assert_eq!(dims.n_elements(0), 3);
             assert_eq!(dims.n_elements(1), 4);
             assert_eq!(data.to_vec(), vec![1u32, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4]);
@@ -263,7 +263,7 @@ mod tests {
                 .unwrap();
 
             let (data, dims) = unboxed.splat();
-            assert_eq!(dims.n_dimensions(), 2);
+            assert_eq!(dims.rank(), 2);
             assert_eq!(dims.n_elements(0), 3);
             assert_eq!(dims.n_elements(1), 4);
             assert_eq!(data.to_vec(), vec![1u64, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4]);
@@ -288,7 +288,7 @@ mod tests {
                 .unwrap();
 
             let (data, dims) = unboxed.splat();
-            assert_eq!(dims.n_dimensions(), 2);
+            assert_eq!(dims.rank(), 2);
             assert_eq!(dims.n_elements(0), 3);
             assert_eq!(dims.n_elements(1), 4);
             assert_eq!(data.to_vec(), vec![1usize, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4]);
@@ -313,7 +313,7 @@ mod tests {
                 .unwrap();
 
             let (data, dims) = unboxed.splat();
-            assert_eq!(dims.n_dimensions(), 2);
+            assert_eq!(dims.rank(), 2);
             assert_eq!(dims.n_elements(0), 3);
             assert_eq!(dims.n_elements(1), 4);
             assert_eq!(data.to_vec(), vec![1isize, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4]);

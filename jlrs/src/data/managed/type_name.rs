@@ -58,7 +58,7 @@ impl<'scope> TypeName<'scope> {
     atomicfields: Ptr{Nothing} (const)
     constfields: Ptr{Nothing} (const)
     wrapper: Type (const)
-    Typeofwrapper: Type (mut, atomic) // TODO
+    Typeofwrapper: Type (mut, atomic)
     cache: Core.SimpleVector (mut, atomic)
     linearcache: Core.SimpleVector (mut, atomic)
     mt: Core.MethodTable (const)
@@ -380,8 +380,15 @@ impl<'scope> ManagedPriv<'scope, '_> for TypeName<'scope> {
     }
 }
 
+impl_construct_type_managed!(Option<TypeNameRef<'_>>, jl_typename_type);
+
 /// A reference to a [`TypeName`] that has not been explicitly rooted.
 pub type TypeNameRef<'scope> = Ref<'scope, 'static, TypeName<'scope>>;
+
+/// A [`TypeNameRef`] with static lifetimes. This is a useful shorthand for signatures of
+/// `ccall`able functions that return a [`TypeName`].
+pub type TypeNameRet = Ref<'static, 'static, TypeName<'static>>;
+
 impl_valid_layout!(TypeNameRef, TypeName);
 
 use crate::memory::target::target_type::TargetType;
@@ -392,3 +399,5 @@ pub type TypeNameData<'target, T> = <T as TargetType<'target>>::Data<'static, Ty
 /// `JuliaResult<TypeName>` or `JuliaResultRef<TypeNameRef>`, depending on the target type `T`.
 pub type TypeNameResult<'target, T> =
     <T as TargetType<'target>>::Result<'static, TypeName<'target>>;
+
+impl_ccall_arg_managed!(TypeName, 1);

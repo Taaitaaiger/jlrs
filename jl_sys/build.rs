@@ -24,6 +24,7 @@ fn main() {
     let julia_dir =
         find_julia().expect("JULIA_DIR is not set and no installed version of Julia can be found");
 
+    #[cfg(not(feature = "no-link"))]
     set_flags(&julia_dir);
     compile_jlrs_cc(&julia_dir);
 
@@ -77,6 +78,7 @@ fn find_julia() -> Option<String> {
     }
 }
 
+#[cfg(not(feature = "no-link"))]
 fn set_flags(julia_dir: &str) {
     cfg_if! {
         if #[cfg(target_os = "linux")] {
@@ -163,15 +165,6 @@ fn compile_jlrs_cc(julia_dir: &str) {
     #[cfg(feature = "julia-1-10")]
     c.define("JULIA_1_10", None);
 
-    #[cfg(not(any(
-        feature = "julia-1-6",
-        feature = "julia-1-7",
-        feature = "julia-1-8",
-        feature = "julia-1-9",
-        feature = "julia-1-10"
-    )))]
-    c.define("JULIA_1_8", None);
-
     c.compile("jlrs_cc");
 }
 
@@ -218,17 +211,6 @@ fn generate_bindings(julia_dir: &str) {
         builder = builder.clang_arg("-DJULIA_1_10");
     }
 
-    #[cfg(not(any(
-        feature = "julia-1-6",
-        feature = "julia-1-7",
-        feature = "julia-1-8",
-        feature = "julia-1-9",
-        feature = "julia-1-10"
-    )))]
-    {
-        builder = builder.clang_arg("-DJULIA_1_8");
-    }
-
     #[cfg(all(feature = "julia-1-6", any(windows, feature = "windows")))]
     {
         builder = builder.clang_arg("-DJLRS_WINDOWS_LTS");
@@ -248,6 +230,8 @@ fn generate_bindings(julia_dir: &str) {
         .allowlist_function("jl_apply_generic")
         .allowlist_function("jl_apply_tuple_type_v")
         .allowlist_function("jl_apply_type")
+        .allowlist_function("jl_array_ptr_1d_push")
+        .allowlist_function("jl_array_ptr_1d_append")
         .allowlist_function("jl_array_del_beg")
         .allowlist_function("jl_array_del_end")
         .allowlist_function("jl_array_eltype")
@@ -257,6 +241,11 @@ fn generate_bindings(julia_dir: &str) {
         .allowlist_function("jl_arrayset")
         .allowlist_function("jl_arrayref")
         .allowlist_function("jl_atexit_hook")
+        .allowlist_function("jl_atomic_cmpswap_bits")
+        .allowlist_function("jl_atomic_bool_cmpswap_bits")
+        .allowlist_function("jl_atomic_new_bits")
+        .allowlist_function("jl_atomic_store_bits")
+        .allowlist_function("jl_atomic_swap_bits")
         .allowlist_function("jl_box_bool")
         .allowlist_function("jl_box_char")
         .allowlist_function("jl_box_float32")
@@ -295,6 +284,8 @@ fn generate_bindings(julia_dir: &str) {
         .allowlist_function("jl_gc_queue_root")
         .allowlist_function("jl_gc_safepoint")
         .allowlist_function("jl_gc_schedule_foreign_sweepfunc")
+        .allowlist_function("jl_gc_set_max_memory")
+        .allowlist_function("jl_gensym")
         .allowlist_function("jl_get_binding_type")
         .allowlist_function("jl_get_current_task")
         .allowlist_function("jl_get_global")
@@ -309,6 +300,7 @@ fn generate_bindings(julia_dir: &str) {
         .allowlist_function("jl_getpagesize")
         .allowlist_function("jl_git_branch")
         .allowlist_function("jl_git_commit")
+        .allowlist_function("jl_has_free_typevars")
         .allowlist_function("jl_init")
         .allowlist_function("jl_init__threading")
         .allowlist_function("jl_init_with_image")
@@ -321,7 +313,10 @@ fn generate_bindings(julia_dir: &str) {
         .allowlist_function("jl_islayout_inline")
         .allowlist_function("jl_kwcall_func")
         .allowlist_function("jl_new_array")
+        .allowlist_function("jl_new_datatype")
         .allowlist_function("jl_new_foreign_type")
+        .allowlist_function("jl_new_module")
+        .allowlist_function("jl_new_primitivetype")
         .allowlist_function("jl_new_struct_uninit")
         .allowlist_function("jl_new_structv")
         .allowlist_function("jl_new_typevar")
@@ -341,6 +336,7 @@ fn generate_bindings(julia_dir: &str) {
         .allowlist_function("jl_subtype")
         .allowlist_function("jl_symbol")
         .allowlist_function("jl_symbol_n")
+        .allowlist_function("jl_tagged_gensym")
         .allowlist_function("jl_throw")
         .allowlist_function("jl_typename_str")
         .allowlist_function("jl_typeof_str")
@@ -471,6 +467,7 @@ fn generate_bindings(julia_dir: &str) {
         .allowlist_var("jl_opaque_closure_type")
         .allowlist_var("jl_opaque_closure_typename")
         .allowlist_var("jl_options")
+        .allowlist_var("jl_pair_type")
         .allowlist_var("jl_phicnode_type")
         .allowlist_var("jl_phinode_type")
         .allowlist_var("jl_pinode_type")

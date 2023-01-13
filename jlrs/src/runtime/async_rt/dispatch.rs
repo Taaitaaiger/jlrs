@@ -7,7 +7,7 @@ use crate::{
     runtime::async_rt::{queue::Sender, Message},
 };
 
-/// Dispatches a task to the aasync runtime.
+/// Dispatch a task to the async runtime.
 pub struct Dispatch<'a, D> {
     msg: Message,
     sender: &'a Sender<Message>,

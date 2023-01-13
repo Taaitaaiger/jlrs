@@ -121,7 +121,7 @@ unsafe fn init_foreign<T: ForeignType>() -> DataType<'static> {
 
         let mut frame = StackFrame::new();
         let pinned = frame.pin();
-        let dt = create_foreign_type_internal::<T, _>(unrooted, sym, module, None, false, false);
+        let dt = create_foreign_type_internal::<T, _>(unrooted, sym, module);
         pinned.set_sync_root(dt.ptr().as_ptr().cast());
         module.set_const_unchecked(sym, dt.as_value());
         std::mem::drop(pinned);

@@ -113,6 +113,21 @@ mod tests {
         });
     }
 
+    fn jlrs_module() {
+        JULIA.with(|j| {
+            let mut frame = StackFrame::new();
+            let mut jlrs = j.borrow_mut();
+
+            jlrs.instance(&mut frame)
+                .scope(|frame| {
+                    let jlrs_module = Module::package_root_module(&frame, "Jlrs");
+                    assert!(jlrs_module.is_some());
+                    Ok(())
+                })
+                .unwrap();
+        });
+    }
+
     fn error_nonexistent_function() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -564,6 +579,7 @@ mod tests {
         base_module_dynamic();
         main_module();
         main_module_dynamic();
+        jlrs_module();
         error_nonexistent_function();
         error_nonexistent_function_dynamic();
         error_nonexistent_submodule();

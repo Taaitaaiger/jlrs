@@ -170,6 +170,11 @@ impl<'data> Call<'data> for OpaqueClosure<'_> {
 
 /// A reference to an [`OpaqueClosure`] that has not been explicitly rooted.
 pub type OpaqueClosureRef<'scope> = Ref<'scope, 'static, OpaqueClosure<'scope>>;
+
+/// An [`OpaqueClosureRef`] with static lifetimes. This is a useful shorthand for signatures of
+/// `ccall`able functions that return a [`OpaqueClosure`].
+pub type OpaqueClosureRet = Ref<'static, 'static, OpaqueClosure<'static>>;
+
 impl_valid_layout!(OpaqueClosureRef, OpaqueClosure);
 
 use crate::memory::target::target_type::TargetType;
@@ -182,3 +187,15 @@ pub type OpaqueClosureData<'target, T> =
 /// type `T`.
 pub type OpaqueClosureResult<'target, T> =
     <T as TargetType<'target>>::Result<'static, OpaqueClosure<'target>>;
+
+unsafe impl<'scope> crate::convert::ccall_types::CCallArg for OpaqueClosure<'scope> {
+    type CCallArgType = Option<crate::data::managed::value::ValueRef<'scope, 'static>>;
+    type FunctionArgType = Option<crate::data::managed::value::ValueRef<'scope, 'static>>;
+}
+
+unsafe impl crate::convert::ccall_types::CCallReturn
+    for crate::data::managed::Ref<'static, 'static, OpaqueClosure<'static>>
+{
+    type CCallReturnType = Option<crate::data::managed::value::ValueRef<'static, 'static>>;
+    type FunctionReturnType = Option<crate::data::managed::value::ValueRef<'static, 'static>>;
+}
