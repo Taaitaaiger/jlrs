@@ -166,7 +166,7 @@ impl RuntimeBuilder {
 
     #[cfg(feature = "sync-rt")]
     /// initialize Julia on the current thread.
-    pub unsafe fn start<'context>(self) -> JlrsResult<PendingJulia> {
+    pub unsafe fn start(self) -> JlrsResult<PendingJulia> {
         PendingJulia::init(self)
     }
 

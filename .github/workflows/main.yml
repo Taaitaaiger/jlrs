@@ -36,7 +36,7 @@ jobs:
         run: |
           export JULIA_DIR="$(dirname $(dirname $(which julia)))"
           export LD_LIBRARY_PATH="${JULIA_DIR}/lib:${JULIA_DIR}/lib/julia:${LD_LIBRARY_PATH}"
-          cargo test --features full --verbose
+          cargo test --features full,julia-1-8 --verbose
 
   test-windows-gnu:
     runs-on: windows-latest
@@ -63,7 +63,7 @@ jobs:
           override: true
 
       - name: Run tests
-        run: cargo test --features full --verbose
+        run: cargo test --features full,julia-1-8 --verbose
 
   test-windows-msvc:
     runs-on: windows-latest
@@ -93,7 +93,7 @@ jobs:
           override: true
 
       - name: Run tests
-        run: cargo test --features full --verbose
+        run: cargo test --features full,julia-1-8 --verbose
 
   test-linux-lts:
     runs-on: ubuntu-latest
@@ -117,9 +117,10 @@ jobs:
 
       - name: Run tests
         run: |
+          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/Jlrs.jl\")"
           export JULIA_DIR="$(dirname $(dirname $(which julia)))"
           export LD_LIBRARY_PATH="${JULIA_DIR}/lib:${JULIA_DIR}/lib/julia:${LD_LIBRARY_PATH}"
-          cargo test --features full,lts --verbose
+          cargo test --features full,julia-1-6 --verbose
 
   test-windows-gnu-lts:
     runs-on: windows-latest
@@ -143,7 +144,9 @@ jobs:
           override: true
 
       - name: Run tests
-        run: cargo test --features full,lts --verbose
+        run: |
+          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/Jlrs.jl\")"
+          cargo test --features full,julia-1-6 --verbose
 
   test-windows-msvc-lts:
     runs-on: windows-latest
@@ -170,7 +173,9 @@ jobs:
           override: true
 
       - name: Run tests
-        run: cargo test --features full,lts --verbose
+        run: |
+          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/Jlrs.jl\")"
+          cargo test --features full,julia-1-6 --verbose
 
   docs:
     runs-on: ubuntu-latest
@@ -195,4 +200,4 @@ jobs:
           echo "JULIA_DIR=${JULIA_DIR}" >> $GITHUB_ENV
 
       - name: Build Docs
-        run: cargo doc --features docs
+        run: cargo doc --features docs,julia-1-10

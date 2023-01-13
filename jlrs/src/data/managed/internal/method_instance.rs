@@ -221,8 +221,15 @@ impl<'scope> ManagedPriv<'scope, '_> for MethodInstance<'scope> {
     }
 }
 
+impl_construct_type_managed!(Option<MethodInstanceRef<'_>>, jl_method_instance_type);
+
 /// A reference to a [`MethodInstance`] that has not been explicitly rooted.
 pub type MethodInstanceRef<'scope> = Ref<'scope, 'static, MethodInstance<'scope>>;
+
+/// A [`MethodInstanceRef`] with static lifetimes. This is a useful shorthand for signatures of
+/// `ccall`able functions that return a [`MethodInstance`].
+pub type MethodInstanceRet = Ref<'static, 'static, MethodInstance<'static>>;
+
 impl_valid_layout!(MethodInstanceRef, MethodInstance);
 
 use super::code_instance::CodeInstanceData;
@@ -236,3 +243,5 @@ pub type MethodInstanceData<'target, T> =
 /// type `T`.
 pub type MethodInstanceResult<'target, T> =
     <T as TargetType<'target>>::Result<'static, MethodInstance<'target>>;
+
+impl_ccall_arg_managed!(MethodInstance, 1);

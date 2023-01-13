@@ -231,7 +231,7 @@ pub struct UnionInTuple<'frame, 'data> {
 }
 
 #[repr(C)]
-#[derive(Clone, Debug, Unbox, ValidLayout, ValidField, Typecheck)]
+#[derive(Clone, Debug, Unbox, ValidLayout, ValidField, Typecheck, ConstructType)]
 #[jlrs(julia_type = "Main.WithGeneric.WithGenericT")]
 pub struct WithGenericT<T>
 where

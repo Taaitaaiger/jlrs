@@ -2,6 +2,8 @@
 
 use std::ffi::c_void;
 
+#[julia_version(since = "1.10")]
+use jl_sys::jl_gc_set_max_memory;
 use jl_sys::{
     jl_gc_collect, jl_gc_collection_t, jl_gc_enable, jl_gc_is_enabled, jl_gc_mark_queue_obj,
     jl_gc_mark_queue_objarray, jl_gc_safepoint, jl_gc_wb,
@@ -93,6 +95,12 @@ pub trait Gc: private::GcPriv {
         unsafe {
             jl_gc_safepoint();
         }
+    }
+
+    #[julia_version(since = "1.10")]
+    /// Set GC memory trigger in bytes for greedy memory collecting
+    fn gc_set_max_memory(max_mem: u64) {
+        unsafe { jl_gc_set_max_memory(max_mem) }
     }
 }
 

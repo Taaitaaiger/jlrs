@@ -1,8 +1,10 @@
-//! Managed type for `Module`, which provides access to Julia's modules and their contents.
+//! Managed type for `Module`, which provides access to Julia's modules and their content.
 //!
 //! In Julia, each module introduces a separate global scope. There are three important "root"
 //! modules, `Main`, `Base` and `Core`. Any Julia code that you include in jlrs is made available
 //! relative to the `Main` module.
+
+// todo: jl_new_module
 
 use std::{marker::PhantomData, ptr::NonNull};
 
@@ -15,6 +17,7 @@ use jl_sys::{
     jl_module_type, jl_set_const, jl_set_global,
 };
 use jlrs_macros::julia_version;
+use once_cell::sync::OnceCell;
 
 use super::{
     function::FunctionData,
@@ -34,6 +37,7 @@ use crate::{
     error::{AccessError, JlrsResult, TypeError},
     impl_julia_typecheck,
     memory::target::Target,
+    prelude::Nothing,
     private::Private,
 };
 
@@ -164,6 +168,40 @@ impl<'scope> Module<'scope> {
 
             Ok(target.data_from_ptr(submodule_nn.cast(), Private))
         }
+    }
+
+    /// Returns the root module of the package named `name`.
+    ///
+    /// All loaded packages can be accessed with this method. If the package doesn't exist or
+    /// hasn't been loaded yet, `None` is returned.
+    pub fn package_root_module<'target, N: ToSymbol, T: Target<'target>>(
+        target: T,
+        name: N,
+    ) -> Option<Module<'target>> {
+        static FUNC: OnceCell<unsafe extern "C" fn(Symbol) -> Value> = OnceCell::new();
+
+        let func = FUNC.get_or_init(|| unsafe {
+            let ptr = Module::main(&target)
+                .submodule(&target, "Jlrs")
+                .unwrap()
+                .as_managed()
+                .global(&target, "root_module_c")
+                .unwrap()
+                .as_value()
+                .data_ptr()
+                .cast::<unsafe extern "C" fn(Symbol) -> Value>()
+                .as_ptr();
+
+            *ptr
+        });
+
+        let name = name.to_symbol(&target);
+        let module = unsafe { func(name) };
+        if module.is::<Nothing>() {
+            return None;
+        }
+
+        unsafe { Some(module.cast_unchecked()) }
     }
 
     #[julia_version(windows_lts = false)]
@@ -428,8 +466,15 @@ impl<'scope> ManagedPriv<'scope, '_> for Module<'scope> {
     }
 }
 
+impl_construct_type_managed!(Option<ModuleRef<'_>>, jl_module_type);
+
 /// A reference to a [`Module`] that has not been explicitly rooted.
 pub type ModuleRef<'scope> = Ref<'scope, 'static, Module<'scope>>;
+
+/// A [`ModuleRef`] with static lifetimes. This is a useful shorthand for signatures of
+/// `ccall`able functions that return a [`Module`].
+pub type ModuleRet = Ref<'static, 'static, Module<'static>>;
+
 impl_valid_layout!(ModuleRef, Module);
 
 use crate::memory::target::target_type::TargetType;
@@ -439,3 +484,5 @@ pub type ModuleData<'target, T> = <T as TargetType<'target>>::Data<'static, Modu
 
 /// `JuliaResult<Module>` or `JuliaResultRef<ModuleRef>`, depending on the target type `T`.
 pub type ModuleResult<'target, T> = <T as TargetType<'target>>::Result<'static, Module<'target>>;
+
+impl_ccall_arg_managed!(Module, 1);

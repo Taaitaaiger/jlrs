@@ -7,11 +7,13 @@ use jl_sys::jl_throw;
 use jl_sys::uv_async_send;
 
 use crate::{
+    convert::ccall_types::CCallReturn,
     data::managed::{
         private::ManagedPriv,
         value::{Value, ValueRef},
     },
     error::JlrsResult,
+    init_jlrs,
     memory::{
         context::stack::Stack,
         stack_frame::{PinnedFrame, StackFrame},
@@ -20,14 +22,14 @@ use crate::{
     private::Private,
 };
 
-/// Use Julia from a Rust function called through `ccall`.
+/// Interact with Julia from a Rust function called through `ccall`.
 ///
 /// When you call Rust from Julia through `ccall`, Julia has already been initialized and trying to
 /// initialize it again causes a crash. In order to still be able to call Julia from Rust
 /// you must create a scope first. You can use this struct to do so. It must never be used outside
 /// functions called through `ccall`, and only once for each `ccall`ed function.
 ///
-/// Exceptions must only be thrown by calling [`CCall::throw_exception`].
+/// Exceptions must only be thrown indirectly by returning a `RustResult`.
 pub struct CCall<'context> {
     frame: PinnedFrame<'context, 0>,
 }
@@ -70,6 +72,39 @@ impl<'context> CCall<'context> {
         }
     }
 
+    /// Create an instance of `CCall` and use it to invoke the provided closure.
+    ///
+    /// Safety: this method must only be called from `ccall`ed functions. The returned data is
+    /// unrooted and must be returned to Julia immediately.
+    pub unsafe fn invoke<T, F>(func: F) -> T
+    where
+        T: 'static + CCallReturn,
+        for<'scope> F: FnOnce(GcFrame<'scope>) -> T,
+    {
+        let mut frame = StackFrame::new();
+        let mut ccall = std::mem::ManuallyDrop::new(CCall::new(&mut frame));
+
+        let stack = ccall.frame.stack_frame().sync_stack();
+        let (owner, frame) = GcFrame::base(stack);
+        let owner = std::mem::ManuallyDrop::new(owner);
+        let ret = func(frame);
+        std::mem::drop(owner);
+        std::mem::drop(ccall);
+        ret
+    }
+
+    /// Invoke the provided closure.
+    ///
+    /// Safety: this method must only be called from `ccall`ed functions. The returned data is
+    /// unrooted and must be returned to Julia immediately.
+    pub unsafe fn stackless_invoke<T, F>(func: F) -> T
+    where
+        T: 'static + CCallReturn,
+        for<'scope> F: FnOnce(Unrooted<'scope>) -> T,
+    {
+        func(Unrooted::new())
+    }
+
     /// Create and throw an exception.
     ///
     /// This method calls `func` and throws the result as a Julia exception.
@@ -102,6 +137,12 @@ impl<'context> CCall<'context> {
         for<'scope> F: FnOnce(Unrooted<'scope>) -> JlrsResult<T>,
     {
         func(Unrooted::new())
+    }
+
+    /// This function must be called before jlrs can be used. If a runtime or the `julia_module` macro
+    /// is used this function is called automatically.
+    pub fn init_jlrs(&mut self) {
+        unsafe { init_jlrs(&mut self.frame) }
     }
 }
 

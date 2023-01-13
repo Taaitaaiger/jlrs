@@ -18,6 +18,14 @@ cfg_if! {
         all(feature = "julia-1-9", feature = "julia-1-10"),
     ))] {
         compile_error!("Cannot enable multiple Julia version features simultaneously");
+    } else if #[cfg(not(any(
+        feature = "julia-1-6",
+        feature = "julia-1-7",
+        feature = "julia-1-8",
+        feature = "julia-1-9",
+        feature = "julia-1-10",
+    )))] {
+        compile_error!("A Julia version feature must be enabled");
     } else {
         use std::{
             ffi::c_void,
@@ -31,40 +39,6 @@ cfg_if! {
 
         #[rustfmt::skip]
         macro_rules! bindings_for {
-            ($bindings:tt, $version:literal, $os:literal, $pointer_width:literal, default) => {
-                #[cfg(all(
-                    not(feature = "use-bindgen"),
-                    any(
-                        feature = $version,
-                        not(any(
-                            feature = "julia-1-6",
-                            feature = "julia-1-7",
-                            feature = "julia-1-8",
-                            feature = "julia-1-9",
-                            feature = "julia-1-10"
-                        ))
-                    ),
-                    target_os = $os,
-                    target_pointer_width = $pointer_width
-                ))]
-                mod $bindings;
-                #[cfg(all(
-                    not(feature = "use-bindgen"),
-                    any(
-                        feature = $version,
-                        not(any(
-                            feature = "julia-1-6",
-                            feature = "julia-1-7",
-                            feature = "julia-1-8",
-                            feature = "julia-1-9",
-                            feature = "julia-1-10"
-                        ))
-                    ),
-                    target_os = $os,
-                    target_pointer_width = $pointer_width
-                ))]
-                pub use $bindings::*;
-            };
             ($bindings:tt, $version:literal, $os:literal, $pointer_width:literal) => {
                 #[cfg(all(
                     not(feature = "use-bindgen"),
@@ -127,22 +101,19 @@ cfg_if! {
             bindings_1_8_x86_64_unknown_linux_gnu,
             "julia-1-8",
             "linux",
-            "64",
-            default
+            "64"
         );
         bindings_for!(
             bindings_1_8_i686_unknown_linux_gnu,
             "julia-1-8",
             "linux",
-            "32",
-            default
+            "32"
         );
         bindings_for!(
             bindings_1_8_x86_64_pc_windows_gnu,
             "julia-1-8",
             "windows",
-            "64",
-            default
+            "64"
         );
 
         bindings_for!(

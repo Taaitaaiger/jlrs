@@ -20,20 +20,22 @@
 /// [`write_barrier`]: crate::memory::gc::write_barrier
 use std::{
     any::TypeId,
+    ffi::c_void,
     mem::MaybeUninit,
-    ptr::{null_mut, NonNull},
-    sync::RwLock,
+    ptr::NonNull,
+    sync::{Arc, RwLock},
 };
 
-#[julia_version(since = "1.10")]
+#[julia_version(since = "1.9")]
 use jl_sys::jl_reinit_foreign_type;
 use jl_sys::{
     jl_gc_alloc_typed, jl_gc_schedule_foreign_sweepfunc, jl_new_foreign_type, jl_value_t,
 };
 use jlrs_macros::julia_version;
+use once_cell::sync::OnceCell;
 
 use crate::{
-    convert::{into_julia::IntoJulia, unbox::Unbox},
+    convert::{construct_type::ConstructType, into_julia::IntoJulia, unbox::Unbox},
     data::{
         layout::valid_layout::ValidLayout,
         managed::{
@@ -44,13 +46,33 @@ use crate::{
             value::{Value, ValueData},
         },
     },
-    memory::{get_tls, target::Target, PTls},
+    memory::{
+        get_tls,
+        target::{ExtendedTarget, Target},
+        PTls,
+    },
+    prelude::Managed,
     private::Private,
 };
 
-static FOREIGN_TYPES: ForeignTypes = ForeignTypes {
-    data: RwLock::new(Vec::new()),
-};
+static FOREIGN_TYPE_REGISTRY: OnceCell<Arc<ForeignTypes>> = OnceCell::new();
+
+pub(crate) unsafe extern "C" fn init_foreign_type_registry(registry_ref: &mut *mut c_void) {
+    if registry_ref.is_null() {
+        FOREIGN_TYPE_REGISTRY.get_or_init(|| {
+            let registry = Arc::new(ForeignTypes {
+                data: RwLock::new(Vec::new()),
+            });
+            let cloned = registry.clone();
+            *registry_ref = Arc::into_raw(registry) as *mut c_void;
+            cloned
+        });
+    } else {
+        FOREIGN_TYPE_REGISTRY.get_or_init(|| {
+            std::mem::transmute::<&mut *mut c_void, &Arc<ForeignTypes>>(registry_ref).clone()
+        });
+    }
+}
 
 struct ForeignTypes {
     data: RwLock<Vec<(TypeId, DataType<'static>)>>,
@@ -71,11 +93,22 @@ impl ForeignTypes {
 }
 
 unsafe impl Sync for ForeignTypes {}
+unsafe impl Send for ForeignTypes {}
 
 /// A trait that allows arbitrary Rust data to be converted to Julia.
 pub unsafe trait ForeignType: Sized + Send + Sync + 'static {
     #[doc(hidden)]
     const TYPE_FN: Option<unsafe fn() -> DataType<'static>> = None;
+
+    const LARGE: bool = false;
+    const HAS_POINTERS: bool = false;
+
+    fn super_type<'target, T>(target: T) -> DataTypeData<'target, T>
+    where
+        T: Target<'target>,
+    {
+        DataType::any_type(&target).root(target)
+    }
 
     /// Mark all references to Julia data.
     ///
@@ -103,20 +136,17 @@ pub unsafe fn create_foreign_type<'target, U, T>(
     target: T,
     name: Symbol,
     module: Module,
-    super_type: Option<DataType>,
-    has_pointers: bool,
-    large: bool,
 ) -> DataTypeData<'target, T>
 where
     U: ForeignType,
     T: Target<'target>,
 {
-    if let Some(ty) = FOREIGN_TYPES.find::<U>() {
+    if let Some(ty) = FOREIGN_TYPE_REGISTRY.get().unwrap().find::<U>() {
         return target.data_from_ptr(ty.unwrap_non_null(Private), Private);
     }
 
-    let large = large as _;
-    let has_pointers = has_pointers as _;
+    let large = U::LARGE as _;
+    let has_pointers = U::HAS_POINTERS as _;
 
     unsafe extern "C" fn mark<T: ForeignType>(ptls: PTls, value: *mut jl_value_t) -> usize {
         T::mark(ptls, NonNull::new_unchecked(value.cast()).as_ref())
@@ -126,10 +156,12 @@ where
         do_sweep::<T>(&mut *value.cast())
     }
 
+    let super_type = U::super_type(&target).ptr().as_ptr();
+
     let ty = jl_new_foreign_type(
         name.unwrap(Private),
         module.unwrap(Private),
-        super_type.map_or(null_mut(), |s| s.unwrap(Private)),
+        super_type,
         Some(mark::<U>),
         Some(sweep::<U>),
         has_pointers,
@@ -137,7 +169,9 @@ where
     );
 
     debug_assert!(!ty.is_null());
-    FOREIGN_TYPES
+    FOREIGN_TYPE_REGISTRY
+        .get()
+        .unwrap()
         .data
         .write()
         .expect("Foreign type lock was poisoned")
@@ -153,16 +187,13 @@ pub(crate) unsafe fn create_foreign_type_internal<'target, U, T>(
     target: T,
     name: Symbol,
     module: Module,
-    super_type: Option<DataType>,
-    has_pointers: bool,
-    large: bool,
 ) -> DataTypeData<'target, T>
 where
     U: ForeignType,
     T: Target<'target>,
 {
-    let large = large as _;
-    let has_pointers = has_pointers as _;
+    let large = U::LARGE as _;
+    let has_pointers = U::HAS_POINTERS as _;
 
     unsafe extern "C" fn mark<T: ForeignType>(ptls: PTls, value: *mut jl_value_t) -> usize {
         T::mark(ptls, NonNull::new_unchecked(value.cast()).as_ref())
@@ -172,10 +203,12 @@ where
         do_sweep::<T>(NonNull::new_unchecked(value.cast()).as_mut())
     }
 
+    let super_type = U::super_type(&target).ptr().as_ptr();
+
     let ty = jl_new_foreign_type(
         name.unwrap(Private),
         module.unwrap(Private),
-        super_type.map_or(null_mut(), |s| s.unwrap(Private)),
+        super_type,
         Some(mark::<U>),
         Some(sweep::<U>),
         has_pointers,
@@ -186,12 +219,12 @@ where
 }
 
 // TODO: docs
-#[julia_version(since = "1.10")]
+#[julia_version(since = "1.9")]
 pub unsafe fn reinit_foreign_type<U>(datatype: DataType) -> bool
 where
     U: ForeignType,
 {
-    if let Some(_) = FOREIGN_TYPES.find::<U>() {
+    if let Some(_) = FOREIGN_TYPE_REGISTRY.get().unwrap().find::<U>() {
         return true;
     }
 
@@ -206,7 +239,9 @@ where
     let ty = datatype.unwrap(Private);
     let ret = jl_reinit_foreign_type(ty, Some(mark::<U>), Some(sweep::<U>));
     if ret != 0 {
-        FOREIGN_TYPES
+        FOREIGN_TYPE_REGISTRY
+            .get()
+            .unwrap()
             .data
             .write()
             .expect("Foreign type lock was poisoned")
@@ -233,7 +268,11 @@ unsafe impl<F: ForeignType> IntoJulia for F {
     where
         T: Target<'scope>,
     {
-        let ty = FOREIGN_TYPES.find::<F>().expect("Doesn't exist");
+        let ty = FOREIGN_TYPE_REGISTRY
+            .get()
+            .unwrap()
+            .find::<F>()
+            .expect("Doesn't exist");
         unsafe { target.data_from_ptr(ty.unwrap_non_null(Private), Private) }
     }
 
@@ -244,12 +283,14 @@ unsafe impl<F: ForeignType> IntoJulia for F {
         unsafe {
             let ptls = get_tls();
             let sz = std::mem::size_of::<Self>();
-            let maybe_ty = FOREIGN_TYPES.find::<F>();
+            let maybe_ty = FOREIGN_TYPE_REGISTRY.get().unwrap().find::<F>();
 
             let ty = match maybe_ty {
                 None => {
                     if let Some(func) = Self::TYPE_FN {
-                        let mut guard = FOREIGN_TYPES
+                        let mut guard = FOREIGN_TYPE_REGISTRY
+                            .get()
+                            .unwrap()
                             .data
                             .write()
                             .expect("Foreign type lock was poisoned");
@@ -286,7 +327,7 @@ unsafe impl<F: ForeignType> IntoJulia for F {
 unsafe impl<T: ForeignType> ValidLayout for T {
     fn valid_layout(ty: Value) -> bool {
         if let Ok(dt) = ty.cast::<DataType>() {
-            if let Some(ty) = FOREIGN_TYPES.find::<T>() {
+            if let Some(ty) = FOREIGN_TYPE_REGISTRY.get().unwrap().find::<T>() {
                 dt.unwrap(Private) == ty.unwrap(Private)
             } else {
                 false
@@ -304,4 +345,23 @@ unsafe impl<T: ForeignType + Clone> Unbox for T {
 #[repr(transparent)]
 struct ForeignValue<T: ForeignType> {
     pub data: MaybeUninit<T>,
+}
+
+unsafe impl<U: ForeignType> ConstructType for U {
+    fn base_type<'target, T>(target: &T) -> crate::data::managed::value::Value<'target, 'static>
+    where
+        T: Target<'target>,
+    {
+        unsafe { <U as crate::convert::into_julia::IntoJulia>::julia_type(target).as_value() }
+    }
+
+    fn construct_type<'target, 'current, 'borrow, T>(
+        target: ExtendedTarget<'target, 'current, 'borrow, T>,
+    ) -> DataTypeData<'target, T>
+    where
+        T: Target<'target>,
+    {
+        let (target, _) = target.split();
+        <U as crate::convert::into_julia::IntoJulia>::julia_type(target)
+    }
 }

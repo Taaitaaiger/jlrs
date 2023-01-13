@@ -261,6 +261,40 @@ macro_rules! impl_tuple {
                 <Self as $crate::data::layout::valid_layout::ValidLayout>::valid_layout(t.as_value())
             }
         }
+
+        unsafe impl<$($types),+> $crate::convert::construct_type::ConstructType for $name<$($types),+>
+        where
+            $($types: $crate::convert::construct_type::ConstructType + Clone + ::std::fmt::Debug),+
+        {
+            fn base_type<'target, T>(target: &T) -> $crate::data::managed::value::Value<'target, 'static>
+            where
+                T: $crate::memory::target::Target<'target>,
+            {
+                $crate::data::managed::datatype::DataType::anytuple_type(target).as_value()
+            }
+
+            fn construct_type<'target, 'current, 'borrow, T>(
+                target: $crate::memory::target::ExtendedTarget<'target, 'current, 'borrow, T>,
+            ) -> $crate::data::managed::datatype::DataTypeData<'target, T>
+            where
+                T: $crate::memory::target::Target<'target>,
+            {
+                let (target, frame) = target.split();
+
+                frame.scope(|mut frame| {
+                    let types = &mut [
+                        $(<$types as $crate::convert::construct_type::ConstructType>::construct_type(frame.as_extended_target())),+
+                    ];
+
+                    unsafe {
+                        Ok(target.data_from_ptr(
+                            ::std::ptr::NonNull::new_unchecked(::jl_sys::jl_apply_tuple_type_v(types.as_mut_ptr().cast(), types.len())),
+                            $crate::private::Private,
+                        ))
+                    }
+                }).unwrap()
+            }
+        }
     };
     ($name:ident) => {
         #[repr(C)]
@@ -327,6 +361,25 @@ macro_rules! impl_tuple {
         unsafe impl $crate::data::managed::typecheck::Typecheck for $name {
             fn typecheck(t: $crate::data::managed::datatype::DataType) -> bool {
                 <Self as $crate::data::layout::valid_layout::ValidLayout>::valid_layout(t.as_value())
+            }
+        }
+
+        unsafe impl $crate::convert::construct_type::ConstructType for $name {
+            fn base_type<'target, T>(target: &T) -> $crate::data::managed::value::Value<'target, 'static>
+            where
+                T: $crate::memory::target::Target<'target>,
+            {
+                unsafe { <Self as $crate::convert::into_julia::IntoJulia>::julia_type(target).as_value() }
+            }
+
+            fn construct_type<'target, 'current, 'borrow, T>(
+                target: $crate::memory::target::ExtendedTarget<'target, 'current, 'borrow, T>,
+            ) -> $crate::data::managed::datatype::DataTypeData<'target, T>
+            where
+                T: $crate::memory::target::Target<'target>,
+            {
+                let (target, _) = target.split();
+                <Self as $crate::convert::into_julia::IntoJulia>::julia_type(target)
             }
         }
     };

@@ -9,7 +9,10 @@ use std::{
     ptr::NonNull,
 };
 
-use jl_sys::{jl_sym_t, jl_symbol_n, jl_symbol_name_ as jl_symbol_name, jl_symbol_type};
+use jl_sys::{
+    jl_gensym, jl_sym_t, jl_symbol_n, jl_symbol_name_ as jl_symbol_name, jl_symbol_type,
+    jl_tagged_gensym,
+};
 use jlrs_macros::julia_version;
 
 use super::Ref;
@@ -85,6 +88,30 @@ impl<'scope> Symbol<'scope> {
         let sym_b = symbol.as_ref();
         let sym = jl_symbol_n(sym_b.as_ptr().cast(), sym_b.len());
         Symbol::wrap_non_null(NonNull::new_unchecked(sym), Private)
+    }
+
+    /// Generate a new unique `Symbol`.
+    pub fn generate<T>(_: &T) -> Self
+    where
+        T: Target<'scope>,
+    {
+        unsafe {
+            let sym = jl_gensym();
+            Symbol::wrap_non_null(NonNull::new_unchecked(sym), Private)
+        }
+    }
+
+    /// Generate a new unique tagged `Symbol`.
+    pub fn generate_tagged<S, T>(_: &T, tag: S) -> Self
+    where
+        S: AsRef<str>,
+        T: Target<'scope>,
+    {
+        unsafe {
+            let tag = tag.as_ref().as_bytes();
+            let sym = jl_tagged_gensym(tag.as_ptr() as _, tag.len());
+            Symbol::wrap_non_null(NonNull::new_unchecked(sym), Private)
+        }
     }
 
     /// Extend the `Symbol`'s lifetime. A `Symbol` is never freed by the garbage collector, its
@@ -171,8 +198,15 @@ impl<'scope> ManagedPriv<'scope, '_> for Symbol<'scope> {
     }
 }
 
+impl_construct_type_managed!(Option<SymbolRef<'_>>, jl_symbol_type);
+
 /// A reference to a [`Symbol`] that has not been explicitly rooted.
 pub type SymbolRef<'scope> = Ref<'scope, 'static, Symbol<'scope>>;
+
+/// A [`SymbolRef`] with static lifetimes. This is a useful shorthand for signatures of
+/// `ccall`able functions that return a [`Symbol`].
+pub type SymbolRet = Ref<'static, 'static, Symbol<'static>>;
+
 impl_valid_layout!(SymbolRef, Symbol);
 
 use crate::memory::target::target_type::TargetType;
@@ -182,3 +216,5 @@ pub type SymbolData<'target, T> = <T as TargetType<'target>>::Data<'static, Symb
 
 /// `JuliaResult<Task>` or `JuliaResultRef<TaskRef>`, depending on the target type `T`.
 pub type SymbolResult<'target, T> = <T as TargetType<'target>>::Result<'static, Symbol<'target>>;
+
+impl_ccall_arg_managed!(Symbol, 1);

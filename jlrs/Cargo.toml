@@ -40,7 +40,7 @@ tokio-rt = ["async-rt", "tokio"]
 # Enable task and channel traits used by the async runtime
 async = ["futures", "crossbeam-channel", "async-trait"]
 # Enable `ccall` module for use from `ccall`ed Rust functions
-ccall = []
+ccall = ["jlrs-macros/ccall"]
 # Enable using `f16` as a layout for `Float16` data
 f16 = ["half"]
 # Enable all internal types
@@ -89,6 +89,9 @@ nightly = ["julia-1-10"]
 debug = ["jl-sys/debug"]
 # Link 32-bits version of Julia on Linux
 i686 = ["jl-sys/i686"]
+# Don't link Julia, useful when building a shared library that will be
+# loaded by and used from Julia.
+no-link = ["jl-sys/no-link"]
 
 # Internal
 
@@ -103,6 +106,7 @@ smallvec = "1"
 thiserror = "1"
 atomic = "0.5"
 hashers = "1"
+once_cell = "1"
 
 async-std = { version = "1.12", features = ["unstable"], optional = true }
 async-trait = { version = "0.1", optional = true }

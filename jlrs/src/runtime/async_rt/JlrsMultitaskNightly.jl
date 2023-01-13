@@ -1,4 +1,4 @@
-module JlrsMultitask
+module JlrsThreads
 
 const wakerust = Ref{Ptr{Cvoid}}(C_NULL)
 

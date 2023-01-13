@@ -1,4 +1,4 @@
-module JlrsMultitask
+module JlrsThreads
 struct LocalTask
     func::Function
     args::Tuple

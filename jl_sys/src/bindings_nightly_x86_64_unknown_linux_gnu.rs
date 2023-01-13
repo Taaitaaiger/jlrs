@@ -99,13 +99,6 @@ pub type jl_gcframe_t = _jl_gcframe_t;
 pub type uint_t = u64;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct htable_t {
-    pub size: usize,
-    pub table: *mut *mut ::std::os::raw::c_void,
-    pub _space: [*mut ::std::os::raw::c_void; 32usize],
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
 pub struct arraylist_t {
     pub len: usize,
     pub max: usize,
@@ -460,6 +453,8 @@ pub union jl_array_t__bindgen_ty_1 {
     pub ncols: usize,
 }
 pub type jl_tupletype_t = _jl_datatype_t;
+pub type jl_method_instance_t = _jl_method_instance_t;
+pub type jl_globalref_t = _jl_globalref_t;
 pub type jl_typemap_t = jl_value_t;
 pub type jl_call_t = ::std::option::Option<
     unsafe extern "C" fn(
@@ -485,7 +480,6 @@ pub type jl_fptr_sparam_t = ::std::option::Option<
         arg4: *mut jl_svec_t,
     ) -> *mut jl_value_t,
 >;
-pub type jl_method_instance_t = _jl_method_instance_t;
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union __jl_purity_overrides_t {
@@ -636,7 +630,7 @@ pub struct _jl_method_t {
     pub slot_syms: *mut jl_value_t,
     pub external_mt: *mut jl_value_t,
     pub source: *mut jl_value_t,
-    pub unspecialized: ::std::sync::atomic::AtomicPtr<_jl_method_instance_t>,
+    pub unspecialized: ::std::sync::atomic::AtomicPtr<jl_method_instance_t>,
     pub generator: *mut jl_value_t,
     pub roots: *mut jl_array_t,
     pub root_blocks: *mut jl_array_t,
@@ -677,13 +671,14 @@ pub union _jl_method_instance_t__bindgen_ty_1 {
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct jl_opaque_closure_t {
+pub struct _jl_opaque_closure_t {
     pub captures: *mut jl_value_t,
     pub world: usize,
     pub source: *mut jl_method_t,
     pub invoke: jl_fptr_args_t,
     pub specptr: *mut ::std::os::raw::c_void,
 }
+pub type jl_opaque_closure_t = _jl_opaque_closure_t;
 #[repr(C)]
 pub struct _jl_code_instance_t {
     pub def: *mut jl_method_instance_t,
@@ -1031,141 +1026,173 @@ pub struct _jl_datatype_t {
     pub layout: *const jl_datatype_layout_t,
     pub hash: u32,
     pub _bitfield_align_1: [u8; 0],
-    pub _bitfield_1: __BindgenBitfieldUnit<[u8; 1usize]>,
-    pub __bindgen_padding_0: [u8; 3usize],
+    pub _bitfield_1: __BindgenBitfieldUnit<[u8; 2usize]>,
+    pub __bindgen_padding_0: u16,
 }
 impl _jl_datatype_t {
     #[inline]
-    pub fn hasfreetypevars(&self) -> u8 {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(0usize, 1u8) as u8) }
+    pub fn hasfreetypevars(&self) -> u16 {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(0usize, 1u8) as u16) }
     }
     #[inline]
-    pub fn set_hasfreetypevars(&mut self, val: u8) {
+    pub fn set_hasfreetypevars(&mut self, val: u16) {
         unsafe {
-            let val: u8 = ::std::mem::transmute(val);
+            let val: u16 = ::std::mem::transmute(val);
             self._bitfield_1.set(0usize, 1u8, val as u64)
         }
     }
     #[inline]
-    pub fn isconcretetype(&self) -> u8 {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(1usize, 1u8) as u8) }
+    pub fn isconcretetype(&self) -> u16 {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(1usize, 1u8) as u16) }
     }
     #[inline]
-    pub fn set_isconcretetype(&mut self, val: u8) {
+    pub fn set_isconcretetype(&mut self, val: u16) {
         unsafe {
-            let val: u8 = ::std::mem::transmute(val);
+            let val: u16 = ::std::mem::transmute(val);
             self._bitfield_1.set(1usize, 1u8, val as u64)
         }
     }
     #[inline]
-    pub fn isdispatchtuple(&self) -> u8 {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(2usize, 1u8) as u8) }
+    pub fn isdispatchtuple(&self) -> u16 {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(2usize, 1u8) as u16) }
     }
     #[inline]
-    pub fn set_isdispatchtuple(&mut self, val: u8) {
+    pub fn set_isdispatchtuple(&mut self, val: u16) {
         unsafe {
-            let val: u8 = ::std::mem::transmute(val);
+            let val: u16 = ::std::mem::transmute(val);
             self._bitfield_1.set(2usize, 1u8, val as u64)
         }
     }
     #[inline]
-    pub fn isbitstype(&self) -> u8 {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(3usize, 1u8) as u8) }
+    pub fn isbitstype(&self) -> u16 {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(3usize, 1u8) as u16) }
     }
     #[inline]
-    pub fn set_isbitstype(&mut self, val: u8) {
+    pub fn set_isbitstype(&mut self, val: u16) {
         unsafe {
-            let val: u8 = ::std::mem::transmute(val);
+            let val: u16 = ::std::mem::transmute(val);
             self._bitfield_1.set(3usize, 1u8, val as u64)
         }
     }
     #[inline]
-    pub fn zeroinit(&self) -> u8 {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(4usize, 1u8) as u8) }
+    pub fn zeroinit(&self) -> u16 {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(4usize, 1u8) as u16) }
     }
     #[inline]
-    pub fn set_zeroinit(&mut self, val: u8) {
+    pub fn set_zeroinit(&mut self, val: u16) {
         unsafe {
-            let val: u8 = ::std::mem::transmute(val);
+            let val: u16 = ::std::mem::transmute(val);
             self._bitfield_1.set(4usize, 1u8, val as u64)
         }
     }
     #[inline]
-    pub fn has_concrete_subtype(&self) -> u8 {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(5usize, 1u8) as u8) }
+    pub fn has_concrete_subtype(&self) -> u16 {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(5usize, 1u8) as u16) }
     }
     #[inline]
-    pub fn set_has_concrete_subtype(&mut self, val: u8) {
+    pub fn set_has_concrete_subtype(&mut self, val: u16) {
         unsafe {
-            let val: u8 = ::std::mem::transmute(val);
+            let val: u16 = ::std::mem::transmute(val);
             self._bitfield_1.set(5usize, 1u8, val as u64)
         }
     }
     #[inline]
-    pub fn cached_by_hash(&self) -> u8 {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(6usize, 1u8) as u8) }
+    pub fn cached_by_hash(&self) -> u16 {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(6usize, 1u8) as u16) }
     }
     #[inline]
-    pub fn set_cached_by_hash(&mut self, val: u8) {
+    pub fn set_cached_by_hash(&mut self, val: u16) {
         unsafe {
-            let val: u8 = ::std::mem::transmute(val);
+            let val: u16 = ::std::mem::transmute(val);
             self._bitfield_1.set(6usize, 1u8, val as u64)
         }
     }
     #[inline]
-    pub fn isprimitivetype(&self) -> u8 {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(7usize, 1u8) as u8) }
+    pub fn isprimitivetype(&self) -> u16 {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(7usize, 1u8) as u16) }
     }
     #[inline]
-    pub fn set_isprimitivetype(&mut self, val: u8) {
+    pub fn set_isprimitivetype(&mut self, val: u16) {
         unsafe {
-            let val: u8 = ::std::mem::transmute(val);
+            let val: u16 = ::std::mem::transmute(val);
             self._bitfield_1.set(7usize, 1u8, val as u64)
         }
     }
     #[inline]
+    pub fn ismutationfree(&self) -> u16 {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(8usize, 1u8) as u16) }
+    }
+    #[inline]
+    pub fn set_ismutationfree(&mut self, val: u16) {
+        unsafe {
+            let val: u16 = ::std::mem::transmute(val);
+            self._bitfield_1.set(8usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn isidentityfree(&self) -> u16 {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(9usize, 1u8) as u16) }
+    }
+    #[inline]
+    pub fn set_isidentityfree(&mut self, val: u16) {
+        unsafe {
+            let val: u16 = ::std::mem::transmute(val);
+            self._bitfield_1.set(9usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
     pub fn new_bitfield_1(
-        hasfreetypevars: u8,
-        isconcretetype: u8,
-        isdispatchtuple: u8,
-        isbitstype: u8,
-        zeroinit: u8,
-        has_concrete_subtype: u8,
-        cached_by_hash: u8,
-        isprimitivetype: u8,
-    ) -> __BindgenBitfieldUnit<[u8; 1usize]> {
-        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 1usize]> = Default::default();
+        hasfreetypevars: u16,
+        isconcretetype: u16,
+        isdispatchtuple: u16,
+        isbitstype: u16,
+        zeroinit: u16,
+        has_concrete_subtype: u16,
+        cached_by_hash: u16,
+        isprimitivetype: u16,
+        ismutationfree: u16,
+        isidentityfree: u16,
+    ) -> __BindgenBitfieldUnit<[u8; 2usize]> {
+        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 2usize]> = Default::default();
         __bindgen_bitfield_unit.set(0usize, 1u8, {
-            let hasfreetypevars: u8 = unsafe { ::std::mem::transmute(hasfreetypevars) };
+            let hasfreetypevars: u16 = unsafe { ::std::mem::transmute(hasfreetypevars) };
             hasfreetypevars as u64
         });
         __bindgen_bitfield_unit.set(1usize, 1u8, {
-            let isconcretetype: u8 = unsafe { ::std::mem::transmute(isconcretetype) };
+            let isconcretetype: u16 = unsafe { ::std::mem::transmute(isconcretetype) };
             isconcretetype as u64
         });
         __bindgen_bitfield_unit.set(2usize, 1u8, {
-            let isdispatchtuple: u8 = unsafe { ::std::mem::transmute(isdispatchtuple) };
+            let isdispatchtuple: u16 = unsafe { ::std::mem::transmute(isdispatchtuple) };
             isdispatchtuple as u64
         });
         __bindgen_bitfield_unit.set(3usize, 1u8, {
-            let isbitstype: u8 = unsafe { ::std::mem::transmute(isbitstype) };
+            let isbitstype: u16 = unsafe { ::std::mem::transmute(isbitstype) };
             isbitstype as u64
         });
         __bindgen_bitfield_unit.set(4usize, 1u8, {
-            let zeroinit: u8 = unsafe { ::std::mem::transmute(zeroinit) };
+            let zeroinit: u16 = unsafe { ::std::mem::transmute(zeroinit) };
             zeroinit as u64
         });
         __bindgen_bitfield_unit.set(5usize, 1u8, {
-            let has_concrete_subtype: u8 = unsafe { ::std::mem::transmute(has_concrete_subtype) };
+            let has_concrete_subtype: u16 = unsafe { ::std::mem::transmute(has_concrete_subtype) };
             has_concrete_subtype as u64
         });
         __bindgen_bitfield_unit.set(6usize, 1u8, {
-            let cached_by_hash: u8 = unsafe { ::std::mem::transmute(cached_by_hash) };
+            let cached_by_hash: u16 = unsafe { ::std::mem::transmute(cached_by_hash) };
             cached_by_hash as u64
         });
         __bindgen_bitfield_unit.set(7usize, 1u8, {
-            let isprimitivetype: u8 = unsafe { ::std::mem::transmute(isprimitivetype) };
+            let isprimitivetype: u16 = unsafe { ::std::mem::transmute(isprimitivetype) };
             isprimitivetype as u64
+        });
+        __bindgen_bitfield_unit.set(8usize, 1u8, {
+            let ismutationfree: u16 = unsafe { ::std::mem::transmute(ismutationfree) };
+            ismutationfree as u64
+        });
+        __bindgen_bitfield_unit.set(9usize, 1u8, {
+            let isidentityfree: u16 = unsafe { ::std::mem::transmute(isidentityfree) };
+            isidentityfree as u64
         });
         __bindgen_bitfield_unit
     }
@@ -1180,22 +1207,22 @@ pub struct _jl_vararg_t {
 pub type jl_vararg_t = _jl_vararg_t;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct jl_weakref_t {
+pub struct _jl_weakref_t {
     pub value: *mut jl_value_t,
 }
+pub type jl_weakref_t = _jl_weakref_t;
 #[repr(C)]
 #[derive(Debug)]
-pub struct jl_binding_t {
-    pub name: *mut jl_sym_t,
+pub struct _jl_binding_t {
     pub value: ::std::sync::atomic::AtomicPtr<jl_value_t>,
-    pub globalref: ::std::sync::atomic::AtomicPtr<jl_value_t>,
-    pub owner: *mut _jl_module_t,
+    pub globalref: *mut jl_globalref_t,
+    pub owner: ::std::sync::atomic::AtomicPtr<_jl_binding_t>,
     pub ty: ::std::sync::atomic::AtomicPtr<jl_value_t>,
     pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 1usize]>,
     pub __bindgen_padding_0: [u8; 7usize],
 }
-impl jl_binding_t {
+impl _jl_binding_t {
     #[inline]
     pub fn constp(&self) -> u8 {
         unsafe { ::std::mem::transmute(self._bitfield_1.get(0usize, 1u8) as u8) }
@@ -1230,14 +1257,25 @@ impl jl_binding_t {
         }
     }
     #[inline]
+    pub fn usingfailed(&self) -> u8 {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(3usize, 1u8) as u8) }
+    }
+    #[inline]
+    pub fn set_usingfailed(&mut self, val: u8) {
+        unsafe {
+            let val: u8 = ::std::mem::transmute(val);
+            self._bitfield_1.set(3usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
     pub fn deprecated(&self) -> u8 {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(3usize, 2u8) as u8) }
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(4usize, 2u8) as u8) }
     }
     #[inline]
     pub fn set_deprecated(&mut self, val: u8) {
         unsafe {
             let val: u8 = ::std::mem::transmute(val);
-            self._bitfield_1.set(3usize, 2u8, val as u64)
+            self._bitfield_1.set(4usize, 2u8, val as u64)
         }
     }
     #[inline]
@@ -1245,6 +1283,7 @@ impl jl_binding_t {
         constp: u8,
         exportp: u8,
         imported: u8,
+        usingfailed: u8,
         deprecated: u8,
     ) -> __BindgenBitfieldUnit<[u8; 1usize]> {
         let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 1usize]> = Default::default();
@@ -1260,13 +1299,18 @@ impl jl_binding_t {
             let imported: u8 = unsafe { ::std::mem::transmute(imported) };
             imported as u64
         });
-        __bindgen_bitfield_unit.set(3usize, 2u8, {
+        __bindgen_bitfield_unit.set(3usize, 1u8, {
+            let usingfailed: u8 = unsafe { ::std::mem::transmute(usingfailed) };
+            usingfailed as u64
+        });
+        __bindgen_bitfield_unit.set(4usize, 2u8, {
             let deprecated: u8 = unsafe { ::std::mem::transmute(deprecated) };
             deprecated as u64
         });
         __bindgen_bitfield_unit
     }
 }
+pub type jl_binding_t = _jl_binding_t;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct jl_uuid_t {
@@ -1278,7 +1322,8 @@ pub struct jl_uuid_t {
 pub struct _jl_module_t {
     pub name: *mut jl_sym_t,
     pub parent: *mut _jl_module_t,
-    pub bindings: htable_t,
+    pub bindings: ::std::sync::atomic::AtomicPtr<jl_svec_t>,
+    pub bindingkeyset: ::std::sync::atomic::AtomicPtr<jl_array_t>,
     pub usings: arraylist_t,
     pub build_id: jl_uuid_t,
     pub uuid: jl_uuid_t,
@@ -1294,6 +1339,13 @@ pub struct _jl_module_t {
     pub hash: isize,
 }
 pub type jl_module_t = _jl_module_t;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct _jl_globalref_t {
+    pub mod_: *mut jl_module_t,
+    pub name: *mut jl_sym_t,
+    pub binding: *mut jl_binding_t,
+}
 #[repr(C)]
 pub struct _jl_typemap_entry_t {
     pub next: ::std::sync::atomic::AtomicPtr<_jl_typemap_entry_t>,
@@ -1620,6 +1672,9 @@ extern "C" {
     pub static mut jl_task_type: *mut jl_datatype_t;
 }
 extern "C" {
+    pub static mut jl_pair_type: *mut jl_value_t;
+}
+extern "C" {
     pub static mut jl_array_uint8_type: *mut jl_value_t;
 }
 extern "C" {
@@ -1730,6 +1785,9 @@ extern "C" {
     );
 }
 extern "C" {
+    pub fn jl_gc_set_max_memory(max_mem: u64);
+}
+extern "C" {
     pub fn jl_gc_queue_root(root: *const jl_value_t);
 }
 extern "C" {
@@ -1752,6 +1810,9 @@ extern "C" {
 }
 extern "C" {
     pub fn jl_object_id(v: *mut jl_value_t) -> usize;
+}
+extern "C" {
+    pub fn jl_has_free_typevars(v: *mut jl_value_t) -> ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn jl_isa(a: *mut jl_value_t, t: *mut jl_value_t) -> ::std::os::raw::c_int;
@@ -1786,6 +1847,68 @@ extern "C" {
     pub fn jl_apply_tuple_type_v(p: *mut *mut jl_value_t, np: usize) -> *mut jl_tupletype_t;
 }
 extern "C" {
+    pub fn jl_new_datatype(
+        name: *mut jl_sym_t,
+        module: *mut jl_module_t,
+        super_: *mut jl_datatype_t,
+        parameters: *mut jl_svec_t,
+        fnames: *mut jl_svec_t,
+        ftypes: *mut jl_svec_t,
+        fattrs: *mut jl_svec_t,
+        abstract_: ::std::os::raw::c_int,
+        mutabl: ::std::os::raw::c_int,
+        ninitialized: ::std::os::raw::c_int,
+    ) -> *mut jl_datatype_t;
+}
+extern "C" {
+    pub fn jl_new_primitivetype(
+        name: *mut jl_value_t,
+        module: *mut jl_module_t,
+        super_: *mut jl_datatype_t,
+        parameters: *mut jl_svec_t,
+        nbits: usize,
+    ) -> *mut jl_datatype_t;
+}
+extern "C" {
+    pub fn jl_atomic_new_bits(
+        dt: *mut jl_value_t,
+        src: *const ::std::os::raw::c_char,
+    ) -> *mut jl_value_t;
+}
+extern "C" {
+    pub fn jl_atomic_store_bits(
+        dst: *mut ::std::os::raw::c_char,
+        src: *const jl_value_t,
+        nb: ::std::os::raw::c_int,
+    );
+}
+extern "C" {
+    pub fn jl_atomic_swap_bits(
+        dt: *mut jl_value_t,
+        dst: *mut ::std::os::raw::c_char,
+        src: *const jl_value_t,
+        nb: ::std::os::raw::c_int,
+    ) -> *mut jl_value_t;
+}
+extern "C" {
+    pub fn jl_atomic_bool_cmpswap_bits(
+        dst: *mut ::std::os::raw::c_char,
+        expected: *const jl_value_t,
+        src: *const jl_value_t,
+        nb: ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
+}
+extern "C" {
+    pub fn jl_atomic_cmpswap_bits(
+        dt: *mut jl_datatype_t,
+        rettype: *mut jl_datatype_t,
+        dst: *mut ::std::os::raw::c_char,
+        expected: *const jl_value_t,
+        src: *const jl_value_t,
+        nb: ::std::os::raw::c_int,
+    ) -> *mut jl_value_t;
+}
+extern "C" {
     pub fn jl_new_structv(
         type_: *mut jl_datatype_t,
         args: *mut *mut jl_value_t,
@@ -1806,6 +1929,12 @@ extern "C" {
 }
 extern "C" {
     pub fn jl_symbol_n(str_: *const ::std::os::raw::c_char, len: usize) -> *mut jl_sym_t;
+}
+extern "C" {
+    pub fn jl_gensym() -> *mut jl_sym_t;
+}
+extern "C" {
+    pub fn jl_tagged_gensym(str_: *const ::std::os::raw::c_char, len: usize) -> *mut jl_sym_t;
 }
 extern "C" {
     pub fn jl_box_bool(x: i8) -> *mut jl_value_t;
@@ -1967,6 +2096,12 @@ extern "C" {
     pub fn jl_array_del_beg(a: *mut jl_array_t, dec: usize);
 }
 extern "C" {
+    pub fn jl_array_ptr_1d_push(a: *mut jl_array_t, item: *mut jl_value_t);
+}
+extern "C" {
+    pub fn jl_array_ptr_1d_append(a: *mut jl_array_t, a2: *mut jl_array_t);
+}
+extern "C" {
     pub fn jl_apply_array_type(type_: *mut jl_value_t, dim: usize) -> *mut jl_value_t;
 }
 extern "C" {
@@ -1980,6 +2115,9 @@ extern "C" {
 }
 extern "C" {
     pub static mut jl_base_module: *mut jl_module_t;
+}
+extern "C" {
+    pub fn jl_new_module(name: *mut jl_sym_t, parent: *mut jl_module_t) -> *mut jl_module_t;
 }
 extern "C" {
     pub fn jl_get_binding_type(m: *mut jl_module_t, var: *mut jl_sym_t) -> *mut jl_value_t;
@@ -2131,7 +2269,7 @@ pub struct _jl_task_t {
     pub bufsz: usize,
     pub inference_start_time: u64,
     pub reentrant_inference: u16,
-    pub reentrant_codegen: u16,
+    pub reentrant_timing: u16,
     pub _bitfield_align_1: [u32; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 4usize]>,
 }
@@ -2227,6 +2365,7 @@ pub struct jl_options_t {
     pub handle_signals: i8,
     pub use_sysimage_native_code: i8,
     pub use_compiled_modules: i8,
+    pub use_pkgimages: i8,
     pub bindto: *const ::std::os::raw::c_char,
     pub outputbc: *const ::std::os::raw::c_char,
     pub outputunoptbc: *const ::std::os::raw::c_char,

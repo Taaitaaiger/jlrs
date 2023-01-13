@@ -86,8 +86,15 @@ impl<'scope> ManagedPriv<'scope, '_> for MethodMatch<'scope> {
     }
 }
 
+impl_construct_type_managed!(Option<MethodMatchRef<'_>>, jl_method_match_type);
+
 /// A reference to a [`MethodMatch`] that has not been explicitly rooted.
 pub type MethodMatchRef<'scope> = Ref<'scope, 'static, MethodMatch<'scope>>;
+
+/// A [`MethodMatchRef`] with static lifetimes. This is a useful shorthand for signatures of
+/// `ccall`able functions that return a [`MethodMatch`].
+pub type MethodMatchRet = Ref<'static, 'static, MethodMatch<'static>>;
+
 impl_valid_layout!(MethodMatchRef, MethodMatch);
 
 use super::method::Method;
@@ -101,3 +108,5 @@ pub type MethodMatchData<'target, T> =
 /// `T`.
 pub type MethodMatchResult<'target, T> =
     <T as TargetType<'target>>::Result<'static, MethodMatch<'target>>;
+
+impl_ccall_arg_managed!(MethodMatch, 1);

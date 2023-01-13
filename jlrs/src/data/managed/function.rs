@@ -139,6 +139,10 @@ impl<'value, 'data> ProvideKeywords<'value, 'data> for Function<'value, 'data> {
 /// A reference to an [`Function`] that has not been explicitly rooted.
 pub type FunctionRef<'scope, 'data> = Ref<'scope, 'data, Function<'scope, 'data>>;
 
+/// A [`FunctionRef`] with static lifetimes. This is a useful shorthand for signatures of
+/// `ccall`able functions that return a [`Function`].
+pub type FunctionRet = Ref<'static, 'static, Function<'static, 'static>>;
+
 // Safety: FunctionRef is valid for ty if ty is a subtype of Function
 unsafe impl ValidLayout for FunctionRef<'_, '_> {
     fn valid_layout(ty: Value) -> bool {
@@ -167,3 +171,5 @@ pub type FunctionData<'target, 'data, T> =
 /// `JuliaResult<Function>` or `JuliaResultRef<FunctionRef>`, depending on the target type `T`.
 pub type FunctionResult<'target, 'data, T> =
     <T as TargetType<'target>>::Result<'data, Function<'target, 'data>>;
+
+impl_ccall_arg_managed!(Function, 2);

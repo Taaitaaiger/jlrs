@@ -24,7 +24,7 @@ mod tests {
                 .unwrap();
 
             let (data, dims) = unboxed.splat();
-            assert_eq!(dims.n_dimensions(), 1);
+            assert_eq!(dims.rank(), 1);
             assert_eq!(dims.n_elements(0), 4);
             assert_eq!(data, vec![1, 2, 3, 4].into_boxed_slice());
         });

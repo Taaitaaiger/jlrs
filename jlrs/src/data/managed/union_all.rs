@@ -7,15 +7,15 @@ use jl_sys::jl_opaque_closure_type;
 #[julia_version(until = "1.6")]
 use jl_sys::jl_vararg_type;
 use jl_sys::{
-    jl_abstractarray_type, jl_anytuple_type_type, jl_array_type, jl_densearray_type,
+    jl_abstractarray_type, jl_anytuple_type_type, jl_apply_type, jl_array_type, jl_densearray_type,
     jl_llvmpointer_type, jl_namedtuple_type, jl_pointer_type, jl_ref_type, jl_type_type,
-    jl_type_unionall, jl_unionall_t, jl_unionall_type,
+    jl_type_unionall, jl_unionall_t, jl_unionall_type, jl_value_t,
 };
 use jlrs_macros::julia_version;
 
 #[julia_version(windows_lts = false)]
 use super::value::ValueResult;
-use super::{value::ValueData, Ref};
+use super::{value::ValueData, Managed, Ref};
 use crate::{
     data::managed::{datatype::DataType, private::ManagedPriv, type_var::TypeVar, value::Value},
     impl_julia_typecheck,
@@ -117,6 +117,57 @@ impl<'scope> UnionAll<'scope> {
             debug_assert!(!var.is_null());
             TypeVar::wrap_non_null(NonNull::new_unchecked(var), Private)
         }
+    }
+
+    #[julia_version(windows_lts = false)]
+    pub unsafe fn apply_types<'target, 'params, V, T>(
+        self,
+        target: T,
+        types: V,
+    ) -> ValueResult<'target, 'static, T>
+    where
+        V: AsRef<[Value<'params, 'static>]>,
+        T: Target<'target>,
+    {
+        use std::mem::MaybeUninit;
+
+        use crate::catch::catch_exceptions;
+
+        let types = types.as_ref();
+        let n = types.len();
+        let types_ptr = types.as_ptr() as *mut *mut jl_value_t;
+        unsafe {
+            let mut callback = |result: &mut MaybeUninit<*mut jl_value_t>| {
+                let v = jl_apply_type(self.as_value().unwrap(Private), types_ptr, n);
+
+                result.write(v);
+                Ok(())
+            };
+
+            let res = match catch_exceptions(&mut callback).unwrap() {
+                Ok(ptr) => Ok(NonNull::new_unchecked(ptr)),
+                Err(e) => Err(e.ptr()),
+            };
+
+            target.result_from_ptr(res, Private)
+        }
+    }
+
+    pub unsafe fn apply_types_unchecked<'target, 'params, V, T>(
+        self,
+        target: T,
+        types: V,
+    ) -> ValueData<'target, 'static, T>
+    where
+        V: AsRef<[Value<'params, 'static>]>,
+        T: Target<'target>,
+    {
+        let types = types.as_ref();
+        let n = types.len();
+        let types_ptr = types.as_ptr() as *mut *mut jl_value_t;
+        let applied = jl_apply_type(self.as_value().unwrap(Private), types_ptr, n);
+        debug_assert!(!applied.is_null());
+        target.data_from_ptr(NonNull::new_unchecked(applied), Private)
     }
 }
 
@@ -242,8 +293,15 @@ impl<'scope> ManagedPriv<'scope, '_> for UnionAll<'scope> {
     }
 }
 
+impl_construct_type_managed!(Option<UnionAllRef<'_>>, jl_unionall_type);
+
 /// A reference to a [`UnionAll`] that has not been explicitly rooted.
 pub type UnionAllRef<'scope> = Ref<'scope, 'static, UnionAll<'scope>>;
+
+/// A [`UnionAllRef`] with static lifetimes. This is a useful shorthand for signatures of
+/// `ccall`able functions that return a [`UnionAll`].
+pub type UnionAllRet = Ref<'static, 'static, UnionAll<'static>>;
+
 impl_valid_layout!(UnionAllRef, UnionAll);
 
 use crate::memory::target::target_type::TargetType;
@@ -254,3 +312,5 @@ pub type UnionAllData<'target, T> = <T as TargetType<'target>>::Data<'static, Un
 /// `JuliaResult<UnionAll>` or `JuliaResultRef<UnionAllRef>`, depending on the target type `T`.
 pub type UnionAllResult<'target, T> =
     <T as TargetType<'target>>::Result<'static, UnionAll<'target>>;
+
+impl_ccall_arg_managed!(UnionAll, 1);

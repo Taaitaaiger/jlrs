@@ -1455,6 +1455,10 @@ extern "C" {
 }
 #[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
 extern "C" {
+    pub fn jl_has_free_typevars(v: *mut jl_value_t) -> ::std::os::raw::c_int;
+}
+#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+extern "C" {
     pub fn jl_isa(a: *mut jl_value_t, t: *mut jl_value_t) -> ::std::os::raw::c_int;
 }
 #[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
@@ -1495,6 +1499,30 @@ extern "C" {
 }
 #[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
 extern "C" {
+    pub fn jl_new_datatype(
+        name: *mut jl_sym_t,
+        module: *mut jl_module_t,
+        super_: *mut jl_datatype_t,
+        parameters: *mut jl_svec_t,
+        fnames: *mut jl_svec_t,
+        ftypes: *mut jl_svec_t,
+        abstract_: ::std::os::raw::c_int,
+        mutabl: ::std::os::raw::c_int,
+        ninitialized: ::std::os::raw::c_int,
+    ) -> *mut jl_datatype_t;
+}
+#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+extern "C" {
+    pub fn jl_new_primitivetype(
+        name: *mut jl_value_t,
+        module: *mut jl_module_t,
+        super_: *mut jl_datatype_t,
+        parameters: *mut jl_svec_t,
+        nbits: usize,
+    ) -> *mut jl_datatype_t;
+}
+#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+extern "C" {
     pub fn jl_new_structv(
         type_: *mut jl_datatype_t,
         args: *mut *mut jl_value_t,
@@ -1520,6 +1548,14 @@ extern "C" {
 #[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
 extern "C" {
     pub fn jl_symbol_n(str_: *const ::std::os::raw::c_char, len: usize) -> *mut jl_sym_t;
+}
+#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+extern "C" {
+    pub fn jl_gensym() -> *mut jl_sym_t;
+}
+#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+extern "C" {
+    pub fn jl_tagged_gensym(str_: *const ::std::os::raw::c_char, len: usize) -> *mut jl_sym_t;
 }
 #[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
 extern "C" {
@@ -1730,6 +1766,14 @@ extern "C" {
 }
 #[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
 extern "C" {
+    pub fn jl_array_ptr_1d_push(a: *mut jl_array_t, item: *mut jl_value_t);
+}
+#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+extern "C" {
+    pub fn jl_array_ptr_1d_append(a: *mut jl_array_t, a2: *mut jl_array_t);
+}
+#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+extern "C" {
     pub fn jl_apply_array_type(type_: *mut jl_value_t, dim: usize) -> *mut jl_value_t;
 }
 #[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
@@ -1747,6 +1791,10 @@ extern "C" {
 #[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
 extern "C" {
     pub static mut jl_base_module: *mut jl_module_t;
+}
+#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+extern "C" {
+    pub fn jl_new_module(name: *mut jl_sym_t) -> *mut jl_module_t;
 }
 #[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
 extern "C" {

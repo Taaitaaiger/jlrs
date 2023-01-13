@@ -96,6 +96,8 @@ impl<'scope> JuliaString<'scope> {
     }
 }
 
+impl_construct_type_managed!(Option<StringRef<'_>>, jl_string_type);
+
 impl_julia_typecheck!(JuliaString<'scope>, jl_string_type, 'scope);
 
 unsafe impl Unbox for String {
@@ -133,6 +135,11 @@ impl<'scope> ManagedPriv<'scope, '_> for JuliaString<'scope> {
 
 /// A reference to a [`JuliaString`] that has not been explicitly rooted.
 pub type StringRef<'scope> = Ref<'scope, 'static, JuliaString<'scope>>;
+
+/// A [`StringRef`] with static lifetimes. This is a useful shorthand for signatures of
+/// `ccall`able functions that return a [`JuliaString`].
+pub type StringRet = Ref<'static, 'static, JuliaString<'static>>;
+
 impl_valid_layout!(StringRef, String);
 
 use crate::memory::target::target_type::TargetType;
@@ -143,3 +150,5 @@ pub type StringData<'target, T> = <T as TargetType<'target>>::Data<'static, Juli
 /// `JuliaResult<JuliaString>` or `JuliaResultRef<StringRef>`, depending on the target type `T`.
 pub type StringResult<'target, T> =
     <T as TargetType<'target>>::Result<'static, JuliaString<'target>>;
+
+impl_ccall_arg_managed!(JuliaString, 1);

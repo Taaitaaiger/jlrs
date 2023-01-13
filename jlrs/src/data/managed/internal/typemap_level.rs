@@ -253,8 +253,15 @@ impl<'scope> ManagedPriv<'scope, '_> for TypeMapLevel<'scope> {
     }
 }
 
+impl_construct_type_managed!(Option<TypeMapLevelRef<'_>>, jl_typemap_level_type);
+
 /// A reference to a [`TypeMapLevel`] that has not been explicitly rooted.
 pub type TypeMapLevelRef<'scope> = Ref<'scope, 'static, TypeMapLevel<'scope>>;
+
+/// A [`TypeMapLevelRef`] with static lifetimes. This is a useful shorthand for signatures of
+/// `ccall`able functions that return a [`TypeMapLevel`].
+pub type TypeMapLevelRet = Ref<'static, 'static, TypeMapLevel<'static>>;
+
 impl_valid_layout!(TypeMapLevelRef, TypeMapLevel);
 
 use crate::memory::target::target_type::TargetType;
@@ -267,3 +274,5 @@ pub type TypeMapLevelData<'target, T> =
 /// `T`.
 pub type TypeMapLevelResult<'target, T> =
     <T as TargetType<'target>>::Result<'static, TypeMapLevel<'target>>;
+
+impl_ccall_arg_managed!(TypeMapLevel, 1);

@@ -1,5 +1,14 @@
 //! Field and type layouts of Julia data.
 
+macro_rules! impl_ccall_arg {
+    ($ty:ident) => {
+        unsafe impl $crate::convert::ccall_types::CCallArg for $ty {
+            type CCallArgType = Self;
+            type FunctionArgType = Self;
+        }
+    };
+}
+
 pub mod bool;
 pub mod char;
 #[cfg(feature = "f16")]

@@ -162,7 +162,7 @@ impl<'scope> Task<'scope> {
             self.unwrap_non_null(Private)
                 .as_ref()
                 ._state
-                .load(Ordering::SeqCst)
+                .load(Ordering::Relaxed)
         }
     }
 
@@ -190,7 +190,7 @@ impl<'scope> Task<'scope> {
             self.unwrap_non_null(Private)
                 .as_ref()
                 ._isexception
-                .load(Ordering::SeqCst)
+                .load(Ordering::Relaxed)
                 != 0
         }
     }
@@ -215,8 +215,15 @@ impl<'scope> ManagedPriv<'scope, '_> for Task<'scope> {
     }
 }
 
+impl_construct_type_managed!(Option<TaskRef<'_>>, jl_task_type);
+
 /// A reference to a [`Task`] that has not been explicitly rooted.
 pub type TaskRef<'scope> = Ref<'scope, 'static, Task<'scope>>;
+
+/// A [`TaskRef`] with static lifetimes. This is a useful shorthand for signatures of
+/// `ccall`able functions that return a [`Task`].
+pub type TaskRet = Ref<'static, 'static, Task<'static>>;
+
 impl_valid_layout!(TaskRef, Task);
 
 use crate::memory::target::target_type::TargetType;
@@ -226,3 +233,5 @@ pub type TaskData<'target, T> = <T as TargetType<'target>>::Data<'static, Task<'
 
 /// `JuliaResult<Task>` or `JuliaResultRef<TaskRef>`, depending on the target type `T`.
 pub type TaskResult<'target, T> = <T as TargetType<'target>>::Result<'static, Task<'target>>;
+
+impl_ccall_arg_managed!(Task, 1);

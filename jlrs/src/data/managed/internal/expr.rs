@@ -72,8 +72,15 @@ impl<'scope> ManagedPriv<'scope, '_> for Expr<'scope> {
     }
 }
 
+impl_construct_type_managed!(Option<ExprRef<'_>>, jl_expr_type);
+
 /// A reference to an [`Expr`] that has not been explicitly rooted.
 pub type ExprRef<'scope> = Ref<'scope, 'static, Expr<'scope>>;
+
+/// An [`ExprRef`] with static lifetimes. This is a useful shorthand for signatures of
+/// `ccall`able functions that return a [`Expr`].
+pub type ExprRet = Ref<'static, 'static, Expr<'static>>;
+
 impl_valid_layout!(ExprRef, Expr);
 
 use crate::memory::target::target_type::TargetType;
@@ -83,3 +90,5 @@ pub type ExprData<'target, T> = <T as TargetType<'target>>::Data<'static, Expr<'
 
 /// `JuliaResult<Expr>` or `JuliaResultRef<ExprRef>`, depending on the target type `T`.
 pub type ExprResult<'target, T> = <T as TargetType<'target>>::Result<'static, Expr<'target>>;
+
+impl_ccall_arg_managed!(Expr, 1);

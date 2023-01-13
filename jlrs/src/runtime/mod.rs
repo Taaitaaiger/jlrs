@@ -20,5 +20,3 @@ pub mod builder;
 pub mod sync_rt;
 
 pub(crate) static INIT: AtomicBool = AtomicBool::new(false);
-
-init_fn!(init_jlrs, JLRS_JL, "Jlrs.jl");

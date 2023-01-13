@@ -85,9 +85,9 @@ function print_help() {
     echo "When the beta flag is set, the following is expected:"
     echo ""
     echo -e "\033[1m      Version                  Default path${spacing}Override\033[0m"
-    echo "  Linux 64-bit 1.9         $HOME/julia-1.9.0-alpha1        JULIA_1_9_DIR"
-    echo "  Linux 32-bit 1.9         $HOME/julia-1.9.0-alpha1-32     JULIA_1_9_DIR_32"
-    echo "  Windows 64-bit 1.9       $HOME/julia-1.9.0-alpha1-win    JULIA_1_9_DIR_WIN"
+    echo "  Linux 64-bit 1.9         $HOME/julia-1.9.0-beta2        JULIA_1_9_DIR"
+    echo "  Linux 32-bit 1.9         $HOME/julia-1.9.0-beta2-32     JULIA_1_9_DIR_32"
+    echo "  Windows 64-bit 1.9       $HOME/julia-1.9.0-beta2-win    JULIA_1_9_DIR_WIN"
     echo ""
     echo ""
     echo "All dependencies must have been installed before running this script. The"
@@ -128,7 +128,7 @@ fi
 
 if [ "${BETA}" = "y" -o "${ALL}" = "y" ]; then
     if [ -z "$JULIA_1_9_DIR" ]; then
-        JULIA_1_9_DIR=${HOME}/julia-1.9.0-alpha1
+        JULIA_1_9_DIR=${HOME}/julia-1.9.0-beta2
     fi
     if [ ! -d "$JULIA_1_9_DIR" ]; then
         echo "Error: $JULIA_1_9_DIR does not exist" >&2
@@ -136,7 +136,7 @@ if [ "${BETA}" = "y" -o "${ALL}" = "y" ]; then
     fi
 
     if [ -z "$JULIA_1_9_DIR_32" ]; then
-        JULIA_1_9_DIR_32=${HOME}/julia-1.9.0-alpha1-32
+        JULIA_1_9_DIR_32=${HOME}/julia-1.9.0-beta2-32
     fi
     if [ ! -d "$JULIA_1_9_DIR_32" ]; then
         echo "Error: $JULIA_1_9_DIR_32 does not exist" >&2
@@ -144,7 +144,7 @@ if [ "${BETA}" = "y" -o "${ALL}" = "y" ]; then
     fi
 
     if [ -z "$JULIA_1_9_DIR_WIN" ]; then
-        JULIA_1_9_DIR_WIN=${HOME}/julia-1.9.0-alpha1-win
+        JULIA_1_9_DIR_WIN=${HOME}/julia-1.9.0-beta2-win
     fi
     if [ ! -d "$JULIA_1_9_DIR_WIN" ]; then
         echo "Error: $JULIA_1_9_DIR_WIN does not exist" >&2
