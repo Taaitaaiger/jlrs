@@ -96,7 +96,7 @@ no-link = ["jl-sys/no-link"]
 # Internal
 
 # Used to generate docs for docs.rs
-docs = ["jl-sys/docs", "full", "julia-1-9"]
+docs = ["jl-sys/docs", "full"]
 
 [dependencies]
 cfg-if = "1"
