@@ -72,7 +72,7 @@ impl<'scope> ManagedPriv<'scope, '_> for Expr<'scope> {
     }
 }
 
-impl_construct_type_managed!(Option<ExprRef<'_>>, jl_expr_type);
+impl_construct_type_managed!(Expr<'_>, jl_expr_type);
 
 /// A reference to an [`Expr`] that has not been explicitly rooted.
 pub type ExprRef<'scope> = Ref<'scope, 'static, Expr<'scope>>;
@@ -92,3 +92,4 @@ pub type ExprData<'target, T> = <T as TargetType<'target>>::Data<'static, Expr<'
 pub type ExprResult<'target, T> = <T as TargetType<'target>>::Result<'static, Expr<'target>>;
 
 impl_ccall_arg_managed!(Expr, 1);
+impl_into_typed!(Expr);

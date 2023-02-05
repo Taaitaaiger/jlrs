@@ -67,7 +67,7 @@ fn trampoline_with_slots_for<
     }
 }
 
-pub(crate) unsafe fn catch_exceptions_with_slots<'frame, 'borrow, 'data, G, T>(
+pub(crate) unsafe fn catch_exceptions_with_slots<'frame, 'borrow, 'data, 'env: 'frame, G, T>(
     frame: &'borrow mut GcFrame<'frame>,
     func: &'borrow mut G,
 ) -> JlrsResult<JuliaResultRef<'frame, 'data, T>>

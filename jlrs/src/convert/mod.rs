@@ -2,7 +2,6 @@
 
 pub mod ccall_types;
 pub mod compatible;
-pub mod construct_type;
 pub mod into_jlrs_result;
 pub mod into_julia;
 #[cfg(feature = "async-rt")]

@@ -228,7 +228,7 @@ pub(crate) fn find_union_component(haystack: Value, needle: Value, nth: &mut u32
     }
 }
 
-impl_construct_type_managed!(Option<UnionRef<'_>>, jl_uniontype_type);
+impl_construct_type_managed!(Union<'_>, jl_uniontype_type);
 
 /// A reference to a [`Union`] that has not been explicitly rooted.
 pub type UnionRef<'scope> = Ref<'scope, 'static, Union<'scope>>;
@@ -248,3 +248,4 @@ pub type UnionData<'target, T> = <T as TargetType<'target>>::Data<'static, Union
 pub type UnionResult<'target, T> = <T as TargetType<'target>>::Result<'static, Union<'target>>;
 
 impl_ccall_arg_managed!(Union, 1);
+impl_into_typed!(Union);

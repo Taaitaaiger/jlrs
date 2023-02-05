@@ -1,4 +1,4 @@
-/* generated from julia version 1.9.0-beta2 */
+/* generated from julia version 1.9.0-beta3 */
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct __BindgenBitfieldUnit<Storage> {
@@ -2437,7 +2437,7 @@ pub struct _jl_task_t {
     pub bufsz: usize,
     pub inference_start_time: u64,
     pub reentrant_inference: u16,
-    pub reentrant_codegen: u16,
+    pub reentrant_timing: u16,
     pub _bitfield_align_1: [u32; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 4usize]>,
 }

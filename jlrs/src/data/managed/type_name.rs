@@ -380,7 +380,7 @@ impl<'scope> ManagedPriv<'scope, '_> for TypeName<'scope> {
     }
 }
 
-impl_construct_type_managed!(Option<TypeNameRef<'_>>, jl_typename_type);
+impl_construct_type_managed!(TypeName<'_>, jl_typename_type);
 
 /// A reference to a [`TypeName`] that has not been explicitly rooted.
 pub type TypeNameRef<'scope> = Ref<'scope, 'static, TypeName<'scope>>;
@@ -401,3 +401,4 @@ pub type TypeNameResult<'target, T> =
     <T as TargetType<'target>>::Result<'static, TypeName<'target>>;
 
 impl_ccall_arg_managed!(TypeName, 1);
+impl_into_typed!(TypeName);

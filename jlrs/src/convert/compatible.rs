@@ -2,9 +2,9 @@
 //!
 //! Crates that use jlrs can implement traits like `ValidLayout`, but they can only be implemented
 //! for types defined in that crate. It's not possible to implement that trait for, say,
-//! `num_complex::Complex` outside of jlrs and num_complex due to the orphan rule. This is a
-//! shame, because `num_complex::Complex` and `Complex` in Julia have exactly the same layout and
-//! crates like `rustfft` provide functions that take `num_complex::Complex`.
+//! `num_complex::Complex` outside of jlrs and num_complex due to the orphan rule. This can be
+//! problematic, because `num_complex::Complex` and `Complex` in Julia have exactly the same
+//! layout and crates like `rustfft` provide functions that take `num_complex::Complex`.
 //!
 //! In order to work around this limitation without having to copy data, jlrs lets you declare
 //! that two types are compatible by implementing the [`Compatible`] trait. This trait may only

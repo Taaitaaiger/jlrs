@@ -1,19 +1,20 @@
-//! Builtin managed types.
+//! Types that directly reference data managed by Julia.
 //!
-//! In this module you'll find types that represent Julia's builtin managed types. These are
-//! mutable types like [`Module`], [`DataType`], and [`Array`] which are defined by the C API and
-//! provide access to some specific functionality from that API. For example, [`Module`] provides
-//! access to the contents of Julia modules, and [`Array`] access to the contents of Julia arrays.
+//! In this module you'll find types that represent Julia's managed types. These are mutable types
+//! like [`Module`], [`DataType`], and [`Array`] which are defined by the C API and provide access
+//! to some specific functionality from that API. For example, [`Module`] provides access to the
+//! contents of Julia modules, and [`Array`] access to the contents of Julia arrays.
 //!
 //! The most common of these types is [`Value`], which represents some arbitrary managed data.
 //! Whenever you call a Julia function its arguments must be of this type, and a new one is
 //! returned. All managed data is a valid [`Value`] and can be converted to that type by calling
 //! [`Managed::as_value`].
 //!
-//! One useful guarantee provided by managed types is that they point to existing data and are
-//! rooted. If data is returned that isn't rooted, jlrs will return a [`Ref`] instead of the
-//! managed type. Because the data isn't rooted it's not guaranteed to remain valid while it can
-//! be used. For more information about rooting see the documentation of the [`memory`] module.
+//! One useful guarantee provided by managed types is that they point to existing data which won't
+//! be freed until its lifetime has expired. If data is returned that isn't rooted, jlrs returns a
+//! [`Ref`] instead of the managed type. Because the data isn't rooted it's not guaranteed to
+//! remain valid while it can be used. For more information about rooting see the documentation of
+//! the [`memory`] module.
 //!
 //! [`memory`]: crate::memory
 //! [`DataType`]: crate::data::managed::datatype::DataType
@@ -30,28 +31,19 @@ end
 
 macro_rules! impl_construct_type_managed {
     ($ty:ty, $jl_ty:expr) => {
-        unsafe impl crate::convert::construct_type::ConstructType for $ty {
-            fn base_type<'target, T>(_: &T) -> $crate::data::managed::value::Value<'target, 'static>
-            where
-                T: $crate::memory::target::Target<'target>,
-            {
-                unsafe {
-                    $crate::data::managed::value::Value::wrap_non_null(
-                        NonNull::new_unchecked($jl_ty.cast()),
-                        $crate::private::Private,
-                    )
-                }
-            }
-
+        unsafe impl crate::data::types::construct_type::ConstructType for $ty {
             fn construct_type<'target, 'current, 'borrow, T>(
-                target: crate::memory::target::ExtendedTarget<'target, 'current, 'borrow, T>,
-            ) -> $crate::data::managed::datatype::DataTypeData<'target, T>
+                target: crate::memory::target::ExtendedTarget<'target, '_, '_, T>,
+            ) -> $crate::data::managed::value::ValueData<'target, 'static, T>
             where
                 T: $crate::memory::target::Target<'target>,
             {
                 let (target, _) = target.split();
                 unsafe {
-                    target.data_from_ptr(NonNull::new_unchecked($jl_ty), $crate::private::Private)
+                    target.data_from_ptr(
+                        NonNull::new_unchecked($jl_ty.cast::<::jl_sys::jl_value_t>()),
+                        $crate::private::Private,
+                    )
                 }
             }
         }
@@ -61,31 +53,52 @@ macro_rules! impl_construct_type_managed {
 macro_rules! impl_ccall_arg_managed {
     ($ty:ident, 1) => {
         unsafe impl<'scope> $crate::convert::ccall_types::CCallArg for $ty<'scope> {
-            type CCallArgType = Option<$crate::data::managed::value::ValueRef<'scope, 'static>>;
-            type FunctionArgType = Option<$crate::data::managed::Ref<'scope, 'static, $ty<'scope>>>;
+            type CCallArgType = $crate::data::managed::value::Value<'scope, 'static>;
+            type FunctionArgType = $ty<'scope>;
         }
 
         unsafe impl $crate::convert::ccall_types::CCallReturn
             for $crate::data::managed::Ref<'static, 'static, $ty<'static>>
         {
-            type CCallReturnType = Option<$crate::data::managed::value::ValueRef<'static, 'static>>;
-            type FunctionReturnType =
-                Option<$crate::data::managed::Ref<'static, 'static, $ty<'static>>>;
+            type CCallReturnType = $crate::data::managed::value::Value<'static, 'static>;
+            type FunctionReturnType = $ty<'static>;
         }
     };
 
     ($ty:ident, 2) => {
         unsafe impl<'scope, 'data> $crate::convert::ccall_types::CCallArg for $ty<'scope, 'data> {
-            type CCallArgType = Option<$crate::data::managed::value::ValueRef<'scope, 'data>>;
-            type FunctionArgType = Option<$crate::data::managed::value::ValueRef<'scope, 'data>>;
+            type CCallArgType = $crate::data::managed::value::Value<'static, 'static>;
+            type FunctionArgType = $ty<'scope, 'data>;
         }
 
         unsafe impl $crate::convert::ccall_types::CCallReturn
             for $crate::data::managed::Ref<'static, 'static, $ty<'static, 'static>>
         {
-            type CCallReturnType = Option<$crate::data::managed::value::ValueRef<'static, 'static>>;
-            type FunctionReturnType =
-                Option<$crate::data::managed::value::ValueRef<'static, 'static>>;
+            type CCallReturnType = $crate::data::managed::value::Value<'static, 'static>;
+            type FunctionReturnType = $ty<'static, 'static>;
+        }
+    };
+}
+
+macro_rules! impl_into_typed {
+    ($ty:ident) => {
+        impl<'scope, 'data> $crate::data::managed::value::typed::AsTyped<'scope, 'data>
+            for $ty<'scope>
+        {
+            fn as_typed(
+                self,
+            ) -> $crate::error::JlrsResult<
+                $crate::data::managed::value::typed::TypedValue<'scope, 'data, Self>,
+            > {
+                unsafe {
+                    Ok(
+                        $crate::data::managed::value::typed::TypedValue::wrap_non_null(
+                            self.unwrap_non_null($crate::private::Private).cast(),
+                            $crate::private::Private,
+                        ),
+                    )
+                }
+            }
         }
     };
 }
@@ -143,7 +156,6 @@ pub mod symbol;
 pub mod task;
 pub mod type_name;
 pub mod type_var;
-pub mod typecheck;
 pub mod union;
 pub mod union_all;
 pub mod value;
@@ -279,6 +291,17 @@ pub trait Managed<'scope, 'data>: private::ManagedPriv<'scope, 'data> {
     fn error_string_or<S: Into<String>>(self, default: S) -> String {
         self.error_string().unwrap_or(default.into())
     }
+
+    /// Extends the `'scope` lifetime to `'static`, which allows this managed data to be leaked
+    /// from a scope.
+    ///
+    /// This method only extends the `'scope` lifetime, the `'data` lifetime must already be
+    /// `'static`. This method should only be used to return Julia data from a `ccall`ed function,
+    /// and in combination with the `ForeignType` trait to store references to Julia data in types
+    /// that that implement that trait.
+    fn leak(self) -> Ref<'static, 'data, Self::TypeConstructor<'static, 'data>> {
+        self.as_ref().leak()
+    }
 }
 
 /// The managed type `W<'target, 'data>` assocatiated with the reference type `T<'scope, 'data>`.
@@ -372,16 +395,15 @@ impl<'scope, 'data, W: Managed<'scope, 'data>> Ref<'scope, 'data, W> {
     }
 }
 
-impl<'scope, W: Managed<'scope, 'static>> Ref<'scope, 'static, W> {
-    /// Leaks `self` with a `'static` lifetime. This method is only available when the `ccall`
-    /// feature is enabled.
+impl<'scope, 'data, W: Managed<'scope, 'data>> Ref<'scope, 'data, W> {
+    /// Extends the `'scope` lifetime to `'static`, which allows this reference to Julia data to
+    /// be leaked from a scope.
     ///
-    /// This method erases the `'scope` lifetime, the `'data` lifetime must already be `'static`.
-    ///
-    /// Safety: this must only be used to return freshly allocated Julia data from Rust to Julia
-    /// from a `ccall`ed function.
-    #[cfg(feature = "ccall")]
-    pub unsafe fn leak(self) -> Ref<'static, 'static, W::TypeConstructor<'static, 'static>> {
+    /// This method only extends the `'scope` lifetime, the `'data` lifetime must already be
+    /// `'static`. This method should only be used to return Julia data from a `ccall`ed function,
+    /// and in combination with the `ForeignType` trait to store references to Julia data in types
+    /// that that implement that trait.
+    pub fn leak(self) -> Ref<'static, 'data, W::TypeConstructor<'static, 'data>> {
         Ref::wrap(self.ptr().cast())
     }
 }

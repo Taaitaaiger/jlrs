@@ -449,7 +449,7 @@ impl<'scope> ManagedPriv<'scope, '_> for Method<'scope> {
     }
 }
 
-impl_construct_type_managed!(Option<MethodRef<'_>>, jl_method_type);
+impl_construct_type_managed!(Method<'_>, jl_method_type);
 
 /// A reference to a [`Method`] that has not been explicitly rooted.
 pub type MethodRef<'scope> = Ref<'scope, 'static, Method<'scope>>;
@@ -470,3 +470,4 @@ pub type MethodData<'target, T> = <T as TargetType<'target>>::Data<'static, Meth
 pub type MethodResult<'target, T> = <T as TargetType<'target>>::Result<'static, Method<'target>>;
 
 impl_ccall_arg_managed!(Method, 1);
+impl_into_typed!(Method);

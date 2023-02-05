@@ -31,6 +31,7 @@ use crate::{
 pub struct GcFrame<'scope> {
     stack: &'scope Stack,
     offset: usize,
+    _marker: PhantomData<&'scope mut &'scope ()>,
 }
 
 impl<'scope> GcFrame<'scope> {
@@ -179,19 +180,29 @@ impl<'scope> GcFrame<'scope> {
         let owner = GcFrameOwner {
             stack: self.stack(),
             offset: self.stack.size(),
+            _marker: PhantomData,
         };
         let frame = GcFrame {
             stack: self.stack(),
             offset: self.stack.size(),
+            _marker: PhantomData,
         };
         (owner, frame)
     }
 
     // Safety: only one base frame can exist per `Stack`
-    pub(crate) unsafe fn base<'base>(stack: &'base Stack) -> (GcFrameOwner<'base>, GcFrame<'base>) {
+    pub(crate) unsafe fn base(stack: &'scope Stack) -> (GcFrameOwner<'scope>, GcFrame<'scope>) {
         debug_assert_eq!(stack.size(), 0);
-        let owner = GcFrameOwner { stack, offset: 0 };
-        let frame = GcFrame { stack, offset: 0 };
+        let owner = GcFrameOwner {
+            stack,
+            offset: 0,
+            _marker: PhantomData,
+        };
+        let frame = GcFrame {
+            stack,
+            offset: 0,
+            _marker: PhantomData,
+        };
         (owner, frame)
     }
 }
@@ -254,17 +265,19 @@ cfg_if! {
             }
 
             // Safety: only one base frame can exist per `Stack`
-            pub(crate) unsafe fn base<'base>(
-                stack: &'base Stack,
-            ) -> (GcFrameOwner<'base>, AsyncGcFrame<'base>) {
+            pub(crate) unsafe fn base(
+                stack: &'scope Stack,
+            ) -> (GcFrameOwner<'scope>, AsyncGcFrame<'scope>) {
                 let owner = GcFrameOwner {
                     stack,
                     offset: 0,
+                    _marker: PhantomData,
                 };
                 let frame = AsyncGcFrame {
                     scope_context: GcFrame {
                         stack,
                         offset: 0,
+                        _marker: PhantomData,
                     },
                 };
                 (owner, frame)
@@ -302,9 +315,19 @@ cfg_if! {
 pub(crate) struct GcFrameOwner<'scope> {
     stack: &'scope Stack,
     offset: usize,
+    _marker: PhantomData<&'scope mut &'scope ()>,
 }
 
 impl<'scope> GcFrameOwner<'scope> {
+    #[cfg(feature = "ccall")]
+    pub(crate) fn restore(&self) -> GcFrame<'scope> {
+        GcFrame {
+            stack: self.stack,
+            offset: self.stack.size(),
+            _marker: PhantomData,
+        }
+    }
+
     #[cfg(feature = "async")]
     pub(crate) unsafe fn reconstruct(&self, offset: usize) -> AsyncGcFrame<'scope> {
         self.stack.pop_roots(offset);
@@ -312,6 +335,7 @@ impl<'scope> GcFrameOwner<'scope> {
             scope_context: GcFrame {
                 stack: self.stack,
                 offset,
+                _marker: PhantomData,
             },
         }
     }
@@ -331,7 +355,7 @@ pub struct BorrowedFrame<'borrow, 'current, F>(
     pub(crate) PhantomData<&'current ()>,
 );
 
-impl<'borrow, 'current> BorrowedFrame<'borrow, 'current, GcFrame<'current>> {
+impl<'borrow, 'current: 'current> BorrowedFrame<'borrow, 'current, GcFrame<'current>> {
     /// Create a temporary scope by calling [`GcFrame::scope`].
     #[inline(never)]
     pub fn scope<T, F>(self, func: F) -> JlrsResult<T>
@@ -343,7 +367,7 @@ impl<'borrow, 'current> BorrowedFrame<'borrow, 'current, GcFrame<'current>> {
 }
 
 #[cfg(feature = "async")]
-impl<'borrow, 'current> BorrowedFrame<'borrow, 'current, AsyncGcFrame<'current>> {
+impl<'borrow, 'current: 'current> BorrowedFrame<'borrow, 'current, AsyncGcFrame<'current>> {
     /// Create a temporary scope by calling [`GcFrame::scope`].
     #[inline(never)]
     pub fn scope<T, F>(self, func: F) -> JlrsResult<T>

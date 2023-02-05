@@ -242,7 +242,7 @@ impl<'scope> ManagedPriv<'scope, '_> for MethodTable<'scope> {
     }
 }
 
-impl_construct_type_managed!(Option<MethodTableRef<'_>>, jl_methtable_type);
+impl_construct_type_managed!(MethodTable<'_>, jl_methtable_type);
 
 /// A reference to a [`MethodTable`] that has not been explicitly rooted.
 pub type MethodTableRef<'scope> = Ref<'scope, 'static, MethodTable<'scope>>;
@@ -265,3 +265,4 @@ pub type MethodTableResult<'target, T> =
     <T as TargetType<'target>>::Result<'static, MethodTable<'target>>;
 
 impl_ccall_arg_managed!(MethodTable, 1);
+impl_into_typed!(MethodTable);

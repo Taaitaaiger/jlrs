@@ -3,10 +3,9 @@ mod util;
 
 #[cfg(all(test, feature = "jlrs-derive", feature = "sync-rt"))]
 mod tests {
-    use jlrs::{convert::construct_type::ConstructType, prelude::*};
+    use jlrs::prelude::*;
 
     use super::util::{new_derive_impls::*, JULIA_DERIVE};
-
     fn derive_bits_type_bool() {
         JULIA_DERIVE.with(|j| {
             let mut julia = j.borrow_mut();
@@ -29,26 +28,27 @@ mod tests {
         })
     }
 
-    fn derive_generic_tu() {
-        JULIA_DERIVE.with(|j| {
-            let mut julia = j.borrow_mut();
-            let mut frame = StackFrame::new();
+    /*
+       fn derive_generic_tu() {
+           JULIA_DERIVE.with(|j| {
+               let mut julia = j.borrow_mut();
+               let mut frame = StackFrame::new();
 
-            julia
-                .instance(&mut frame)
-                .scope(|mut frame| {
-                    let ty =
-                        WithGenericTU::<isize, usize>::construct_type(frame.as_extended_target());
-                    assert_eq!(
-                        ty.size() as usize,
-                        std::mem::size_of::<isize>() + std::mem::size_of::<usize>()
-                    );
-                    Ok(())
-                })
-                .unwrap();
-        })
-    }
-
+               julia
+                   .instance(&mut frame)
+                   .scope(|mut frame| {
+                       let ty =
+                           WithGenericTU::<isize, usize>::construct_type(frame.as_extended_target());
+                       assert_eq!(
+                           ty.size() as usize,
+                           std::mem::size_of::<isize>() + std::mem::size_of::<usize>()
+                       );
+                       Ok(())
+                   })
+                   .unwrap();
+           })
+       }
+    */
     /*
     fn derive_bits_type_char() {
         JULIA_DERIVE.with(|j| {
@@ -1100,7 +1100,7 @@ mod tests {
     #[test]
     fn derive_tests() {
         derive_bits_type_bool();
-        derive_generic_tu();
+        //derive_generic_tu();
         // derive_bits_type_char();
         // derive_bits_type_uint8();
         // derive_bits_type_uint16();

@@ -60,7 +60,7 @@ impl<'scope> ManagedPriv<'scope, '_> for WeakRef<'scope> {
     }
 }
 
-impl_construct_type_managed!(Option<WeakRefRef<'_>>, jl_weakref_type);
+impl_construct_type_managed!(WeakRef<'_>, jl_weakref_type);
 
 /// A reference to a [`WeakRef`] that has not been explicitly rooted.
 pub type WeakRefRef<'scope> = Ref<'scope, 'static, WeakRef<'scope>>;
@@ -80,3 +80,4 @@ pub type WeakRefData<'target, T> = <T as TargetType<'target>>::Data<'static, Wea
 pub type WeakRefResult<'target, T> = <T as TargetType<'target>>::Result<'static, WeakRef<'target>>;
 
 impl_ccall_arg_managed!(WeakRef, 1);
+impl_into_typed!(WeakRef);

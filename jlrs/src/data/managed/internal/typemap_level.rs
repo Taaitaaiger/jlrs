@@ -253,7 +253,7 @@ impl<'scope> ManagedPriv<'scope, '_> for TypeMapLevel<'scope> {
     }
 }
 
-impl_construct_type_managed!(Option<TypeMapLevelRef<'_>>, jl_typemap_level_type);
+impl_construct_type_managed!(TypeMapLevel<'_>, jl_typemap_level_type);
 
 /// A reference to a [`TypeMapLevel`] that has not been explicitly rooted.
 pub type TypeMapLevelRef<'scope> = Ref<'scope, 'static, TypeMapLevel<'scope>>;
@@ -276,3 +276,4 @@ pub type TypeMapLevelResult<'target, T> =
     <T as TargetType<'target>>::Result<'static, TypeMapLevel<'target>>;
 
 impl_ccall_arg_managed!(TypeMapLevel, 1);
+impl_into_typed!(TypeMapLevel);

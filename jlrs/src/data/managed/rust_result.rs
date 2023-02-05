@@ -4,7 +4,7 @@
 //! `RustResult{T}` is a type provided by the Jlrs package that contains either data or an
 //! exception. It can be converted to `T`, if it contains an exception that exception is thrown.
 //!
-//! This is useful when writing functions that are exposed to Julia with the [`julia_module`]
+//! This is useful when writing functions that are exported to Julia with the [`julia_module`]
 //! macro. By returning a [`RustResult`], this conversion is automatically invoked by the
 //! generated Julia function.
 //!
@@ -12,59 +12,28 @@
 
 use std::{marker::PhantomData, ptr::NonNull};
 
-use jl_sys::{jl_gc_enable, jl_gc_is_enabled};
-use stack_frame::StackFrame;
-
 use super::{
-    datatype::DataTypeData, typecheck::Typecheck, union_all::UnionAll, value::typed::TypedValue,
+    union_all::UnionAll,
+    value::{typed::TypedValue, ValueData},
     Ref,
 };
+#[cfg(feature = "ccall")]
+use crate::{ccall::CCall, memory::stack_frame::StackFrame};
 use crate::{
-    ccall::CCall,
-    convert::{
-        ccall_types::{CCallArg, CCallReturn},
-        construct_type::ConstructType,
-    },
-    data::{
-        layout::valid_layout::{ValidField, ValidLayout},
-        managed::private::ManagedPriv,
-    },
-    memory::{
-        stack_frame,
-        target::{unrooted::Unrooted, ExtendedTarget},
-    },
-    prelude::{Bool, DataType, Managed, Module, Target, TargetType, Value, ValueRef},
+    convert::ccall_types::{CCallArg, CCallReturn},
+    data::{managed::private::ManagedPriv, types::construct_type::ConstructType},
+    error::JlrsError,
+    memory::target::ExtendedTarget,
+    prelude::{Bool, DataType, JuliaString, Managed, Module, Target, TargetType, Value, ValueRef},
     private::Private,
 };
-
-// TODO: other traits
-/// The layout of a [`RustResult`].
-#[repr(C)]
-pub struct RustResultLayout<'scope, 'data, U: CCallReturn> {
-    data: Option<ValueRef<'scope, 'data>>,
-    is_exc: Bool,
-    _marker: PhantomData<*mut U>,
-}
-
-impl<'scope, 'data, U: CCallReturn> Clone for RustResultLayout<'scope, 'data, U> {
-    fn clone(&self) -> Self {
-        RustResultLayout {
-            data: self.data,
-            is_exc: self.is_exc,
-            _marker: PhantomData,
-        }
-    }
-}
-
-impl<'scope, 'data, U: CCallReturn> Copy for RustResultLayout<'scope, 'data, U> {}
-
 /// A `RustResult` can contain either typed data or an exception.
 #[derive(PartialEq)]
 #[repr(transparent)]
-pub struct RustResult<'scope, 'data, U: CCallReturn>(NonNull<RustResultLayout<'scope, 'data, U>>);
+pub struct RustResult<'scope, 'data, U: ConstructType>(NonNull<RustResultLayout<'scope, 'data, U>>);
 
-impl<'target, 'data, U: CCallReturn + ValidLayout + ConstructType> RustResult<'target, 'data, U> {
-    /// Construct a `RustResult` that contains data.
+impl<'target, 'data, U: ConstructType> RustResult<'target, 'data, U> {
+    /// Constructs a `RustResult` that contains data.
     pub fn ok<T: Target<'target>>(
         target: ExtendedTarget<'target, '_, '_, T>,
         data: TypedValue<'_, 'data, U>,
@@ -75,8 +44,7 @@ impl<'target, 'data, U: CCallReturn + ValidLayout + ConstructType> RustResult<'t
             .scope(|mut frame| {
                 let unrooted = frame.unrooted();
                 unsafe {
-                    let ty = Self::base_type(&frame)
-                        .apply_type_unchecked(&mut frame, [data.datatype().as_value()])
+                    let ty = Self::construct_type(frame.as_extended_target())
                         .cast_unchecked::<DataType>();
 
                     Ok(ty
@@ -89,8 +57,8 @@ impl<'target, 'data, U: CCallReturn + ValidLayout + ConstructType> RustResult<'t
             .unwrap()
     }
 
-    /// Construct a `RustResult` that contains an exception.
-    pub fn err<T: Target<'target>>(
+    /// Constructs a `RustResult` that contains an exception.
+    pub fn error<T: Target<'target>>(
         target: ExtendedTarget<'target, '_, '_, T>,
         error: Value<'_, 'data>,
     ) -> RustResultData<'target, 'data, U, T> {
@@ -100,7 +68,8 @@ impl<'target, 'data, U: CCallReturn + ValidLayout + ConstructType> RustResult<'t
             .scope(|mut frame| {
                 let unrooted = frame.unrooted();
                 unsafe {
-                    let ty = Self::construct_type(frame.as_extended_target());
+                    let ty = Self::construct_type(frame.as_extended_target())
+                        .cast_unchecked::<DataType>();
                     Ok(ty
                         .instantiate_unchecked(&frame, [error, Value::true_v(&unrooted)])
                         .as_value()
@@ -111,7 +80,8 @@ impl<'target, 'data, U: CCallReturn + ValidLayout + ConstructType> RustResult<'t
             .unwrap()
     }
 
-    pub fn borrow_err<T: Target<'target>>(
+    /// Constructs a `RustResult` that contains a `Jlrs.BorrowException`.
+    pub fn borrow_error<T: Target<'target>>(
         target: ExtendedTarget<'target, '_, '_, T>,
     ) -> RustResultData<'target, 'data, U, T> {
         let (target, frame) = target.split();
@@ -131,7 +101,42 @@ impl<'target, 'data, U: CCallReturn + ValidLayout + ConstructType> RustResult<'t
                         .instance()
                         .unwrap();
 
-                    let ty = Self::construct_type(frame.as_extended_target());
+                    let ty = Self::construct_type(frame.as_extended_target())
+                        .cast_unchecked::<DataType>();
+                    Ok(ty
+                        .instantiate_unchecked(&frame, [error, Value::true_v(&unrooted)])
+                        .as_value()
+                        .cast_unchecked::<RustResult<U>>()
+                        .root(target))
+                }
+            })
+            .unwrap()
+    }
+
+    /// Constructs a `RustResult` that contains `error`, which is converted to a `Jlrs.JlrsError`.
+    pub fn jlrs_error<T: Target<'target>>(
+        target: ExtendedTarget<'target, '_, '_, T>,
+        error: JlrsError,
+    ) -> RustResultData<'target, 'data, U, T> {
+        let (target, frame) = target.split();
+
+        frame
+            .scope(|mut frame| {
+                let unrooted = frame.unrooted();
+                unsafe {
+                    let msg = JuliaString::new(&mut frame, format!("{}", error));
+                    let error = Module::main(&unrooted)
+                        .submodule(unrooted, "Jlrs")
+                        .unwrap()
+                        .as_managed()
+                        .global(unrooted, "JlrsError")
+                        .unwrap()
+                        .as_value()
+                        .cast_unchecked::<DataType>()
+                        .instantiate_unchecked(&mut frame, [msg.as_value()]);
+
+                    let ty = Self::construct_type(frame.as_extended_target())
+                        .cast_unchecked::<DataType>();
                     Ok(ty
                         .instantiate_unchecked(&frame, [error, Value::true_v(&unrooted)])
                         .as_value()
@@ -144,7 +149,7 @@ impl<'target, 'data, U: CCallReturn + ValidLayout + ConstructType> RustResult<'t
 
     #[doc(hidden)]
     #[cfg(feature = "ccall")]
-    pub unsafe fn borrow_err_internal() -> RustResultRef<'static, 'static, U> {
+    pub unsafe fn borrow_error_internal() -> RustResultRef<'static, 'static, U> {
         let mut frame = StackFrame::new();
         let mut ccall = CCall::new(&mut frame);
 
@@ -163,7 +168,8 @@ impl<'target, 'data, U: CCallReturn + ValidLayout + ConstructType> RustResult<'t
                         .instance()
                         .unwrap();
 
-                    let ty = Self::construct_type(frame.as_extended_target());
+                    let ty = Self::construct_type(frame.as_extended_target())
+                        .cast_unchecked::<DataType>();
                     Ok(ty
                         .instantiate_unchecked(&frame, [error, Value::true_v(&unrooted)])
                         .as_value()
@@ -176,15 +182,19 @@ impl<'target, 'data, U: CCallReturn + ValidLayout + ConstructType> RustResult<'t
     }
 }
 
-impl<'scope, 'data, U: CCallReturn> Clone for RustResult<'scope, 'data, U> {
+impl<'scope, 'data, U: ConstructType> Clone for RustResult<'scope, 'data, U> {
     fn clone(&self) -> Self {
         RustResult(self.0)
     }
 }
 
-impl<'scope, 'data, U: CCallReturn> Copy for RustResult<'scope, 'data, U> {}
+impl<'scope, 'data, U: ConstructType> Copy for RustResult<'scope, 'data, U> {}
 
-unsafe impl<U: CCallReturn> Typecheck for RustResult<'_, '_, U> {
+// TODO: not sure if this should be implemented or not. RustResult is only intended to be returned
+// from ccalled functions, so it's not necessary to support Typecheck, ValidLayout, and
+// ValidField.  The main issue is that unlike other implementations of these traits, an
+// ExtendedTarget is needed to construct the type object associated with U.
+/*unsafe impl<U: ConstructType> Typecheck for RustResult<'_, '_, U> {
     fn typecheck(t: crate::prelude::DataType) -> bool {
         unsafe {
             let unrooted = Unrooted::new();
@@ -203,30 +213,12 @@ unsafe impl<U: CCallReturn> Typecheck for RustResult<'_, '_, U> {
                 return false;
             }
 
-            let enabled = jl_gc_is_enabled();
-            jl_gc_enable(0);
-            let mut stack_frame = StackFrame::new();
-            let mut ccall = CCall::new(&mut stack_frame);
-
-            let res = ccall.scope(|mut frame| {
-                let ty = <U::CCallReturnType as ConstructType>::construct_type(
-                    frame.as_extended_target(),
-                );
-                let param_ty = t.parameters().data().as_slice()[0]
-                    .unwrap()
-                    .as_value()
-                    .cast::<DataType>()?;
-
-                Ok(param_ty == ty)
-            });
-
-            jl_gc_enable(enabled);
-            res.unwrap()
+            todo!()
         }
     }
-}
+}*/
 
-impl<U: CCallReturn> ::std::fmt::Debug for RustResult<'_, '_, U> {
+impl<U: ConstructType> ::std::fmt::Debug for RustResult<'_, '_, U> {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
         match self.display_string() {
             Ok(s) => f.write_str(&s),
@@ -235,7 +227,7 @@ impl<U: CCallReturn> ::std::fmt::Debug for RustResult<'_, '_, U> {
     }
 }
 
-impl<'scope, 'data, U: CCallReturn> ManagedPriv<'scope, 'data> for RustResult<'scope, 'data, U> {
+impl<'scope, 'data, U: ConstructType> ManagedPriv<'scope, 'data> for RustResult<'scope, 'data, U> {
     type Wraps = RustResultLayout<'scope, 'data, U>;
     type TypeConstructorPriv<'target, 'da> = RustResult<'target, 'da, U>;
     const NAME: &'static str = "RustResult";
@@ -251,27 +243,10 @@ impl<'scope, 'data, U: CCallReturn> ManagedPriv<'scope, 'data> for RustResult<'s
     }
 }
 
-unsafe impl<'scope, 'data, U: ConstructType + CCallReturn> ConstructType
-    for RustResult<'scope, 'data, U>
-{
-    fn base_type<'target, T>(target: &T) -> Value<'target, 'static>
-    where
-        T: Target<'target>,
-    {
-        unsafe {
-            Module::main(target)
-                .submodule(target, "Jlrs")
-                .unwrap()
-                .as_managed()
-                .global(target, "RustResult")
-                .unwrap()
-                .as_value()
-        }
-    }
-
+unsafe impl<'scope, 'data, U: ConstructType> ConstructType for RustResult<'scope, 'data, U> {
     fn construct_type<'target, 'current, 'borrow, T>(
-        target: ExtendedTarget<'target, 'current, 'borrow, T>,
-    ) -> DataTypeData<'target, T>
+        target: ExtendedTarget<'target, '_, '_, T>,
+    ) -> ValueData<'target, 'static, T>
     where
         T: Target<'target>,
     {
@@ -280,18 +255,23 @@ unsafe impl<'scope, 'data, U: ConstructType + CCallReturn> ConstructType
             .scope(|mut frame| {
                 let param_ty = U::construct_type(frame.as_extended_target());
                 unsafe {
-                    Ok(Self::base_type(&frame)
+                    let base_type = Module::main(&frame)
+                        .submodule(&frame, "Jlrs")
+                        .unwrap()
+                        .as_managed()
+                        .global(&frame, "RustResult")
+                        .unwrap()
+                        .as_value();
+
+                    Ok(base_type
                         .cast::<UnionAll>()
                         .unwrap()
                         .apply_types_unchecked(&frame, [param_ty.as_value()])
                         .as_value()
-                        .cast::<DataType>()
-                        .unwrap()
                         .root(target))
                 }
             })
             .unwrap()
-        //
     }
 }
 
@@ -302,7 +282,7 @@ pub type RustResultRef<'scope, 'data, U> = Ref<'scope, 'data, RustResult<'scope,
 /// `ccall`able functions that return a [`RustResult`].
 pub type RustResultRet<U> = Ref<'static, 'static, RustResult<'static, 'static, U>>;
 
-unsafe impl<'scope, 'data, U: CCallReturn> ValidLayout for RustResultRef<'scope, 'data, U> {
+/*unsafe impl<'scope, 'data, U: ConstructType> ValidLayout for RustResultRef<'scope, 'data, U> {
     fn valid_layout(ty: Value) -> bool {
         if let Ok(dt) = ty.cast::<DataType>() {
             dt.is::<RustResult<U>>()
@@ -314,7 +294,7 @@ unsafe impl<'scope, 'data, U: CCallReturn> ValidLayout for RustResultRef<'scope,
     const IS_REF: bool = true;
 }
 
-unsafe impl<'scope, 'data, U: CCallReturn> ValidField for Option<RustResultRef<'scope, 'data, U>> {
+unsafe impl<'scope, 'data, U: ConstructType> ValidField for Option<RustResultRef<'scope, 'data, U>> {
     fn valid_field(ty: Value) -> bool {
         if let Ok(dt) = ty.cast::<DataType>() {
             dt.is::<RustResult<U>>()
@@ -322,7 +302,7 @@ unsafe impl<'scope, 'data, U: CCallReturn> ValidField for Option<RustResultRef<'
             false
         }
     }
-}
+}*/
 
 /// `RustResult<U>` or `RustResultRef<U>`, depending on the target type `T`.
 pub type RustResultData<'target, 'data, U, T> =
@@ -332,12 +312,34 @@ pub type RustResultData<'target, 'data, U, T> =
 pub type RustResultResult<'target, 'data, U, T> =
     <T as TargetType<'target>>::Result<'data, RustResult<'target, 'data, U>>;
 
-unsafe impl<'scope, 'data, U: CCallReturn> CCallArg for RustResult<'scope, 'data, U> {
-    type CCallArgType = Option<ValueRef<'scope, 'data>>;
-    type FunctionArgType = Option<ValueRef<'scope, 'data>>;
+unsafe impl<'scope, 'data, U: ConstructType> CCallArg for RustResult<'scope, 'data, U> {
+    type CCallArgType = Value<'scope, 'data>;
+    type FunctionArgType = Value<'scope, 'static>;
 }
 
-unsafe impl<U: CCallReturn> CCallReturn for Ref<'static, 'static, RustResult<'static, 'static, U>> {
-    type CCallReturnType = Option<ValueRef<'static, 'static>>;
-    type FunctionReturnType = U::FunctionReturnType;
+unsafe impl<U: ConstructType> CCallReturn
+    for Ref<'static, 'static, RustResult<'static, 'static, U>>
+{
+    type CCallReturnType = Value<'static, 'static>;
+    type FunctionReturnType = U;
 }
+
+/// The layout of a [`RustResult`].
+#[repr(C)]
+pub struct RustResultLayout<'scope, 'data, U: ConstructType> {
+    data: Option<ValueRef<'scope, 'data>>,
+    is_exc: Bool,
+    _marker: PhantomData<U>,
+}
+
+impl<'scope, 'data, U: ConstructType> Clone for RustResultLayout<'scope, 'data, U> {
+    fn clone(&self) -> Self {
+        RustResultLayout {
+            data: self.data,
+            is_exc: self.is_exc,
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<'scope, 'data, U: ConstructType> Copy for RustResultLayout<'scope, 'data, U> {}

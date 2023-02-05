@@ -5,7 +5,7 @@ mod tests {
     use std::{ffi::c_void, ptr::null_mut};
 
     use jlrs::{
-        data::managed::{typecheck::*, union_all::UnionAll},
+        data::{managed::union_all::UnionAll, types::typecheck::*},
         prelude::*,
     };
 

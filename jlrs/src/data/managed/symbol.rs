@@ -19,7 +19,7 @@ use super::Ref;
 #[julia_version(windows_lts = false)]
 use crate::catch::catch_exceptions;
 use crate::{
-    data::managed::{private::ManagedPriv, value::leaked::LeakedValue},
+    data::managed::private::ManagedPriv,
     error::{JlrsError, JlrsResult},
     impl_julia_typecheck,
     memory::target::Target,
@@ -132,12 +132,6 @@ impl<'scope> Symbol<'scope> {
         unsafe { self.unwrap_non_null(Private).as_ref().hash }
     }
 
-    /// Convert `self` to a `LeakedValue`.
-    pub fn as_leaked(self) -> LeakedValue {
-        // Safety: symbols are globally rooted
-        unsafe { LeakedValue::wrap_non_null(self.unwrap_non_null(Private).cast()) }
-    }
-
     /// Convert `self` to a `String`.
     pub fn as_string(self) -> JlrsResult<String> {
         self.as_str().map(Into::into)
@@ -198,7 +192,7 @@ impl<'scope> ManagedPriv<'scope, '_> for Symbol<'scope> {
     }
 }
 
-impl_construct_type_managed!(Option<SymbolRef<'_>>, jl_symbol_type);
+impl_construct_type_managed!(Symbol<'_>, jl_symbol_type);
 
 /// A reference to a [`Symbol`] that has not been explicitly rooted.
 pub type SymbolRef<'scope> = Ref<'scope, 'static, Symbol<'scope>>;
@@ -218,3 +212,4 @@ pub type SymbolData<'target, T> = <T as TargetType<'target>>::Data<'static, Symb
 pub type SymbolResult<'target, T> = <T as TargetType<'target>>::Result<'static, Symbol<'target>>;
 
 impl_ccall_arg_managed!(Symbol, 1);
+impl_into_typed!(Symbol);

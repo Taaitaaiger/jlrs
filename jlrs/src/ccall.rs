@@ -2,25 +2,107 @@
 //!
 //! This module is only available if the `ccall` feature is enabled.
 
-use jl_sys::jl_throw;
+use std::{
+    cell::UnsafeCell,
+    ffi::c_void,
+    fmt::Debug,
+    hint::spin_loop,
+    sync::{atomic::AtomicBool, Arc},
+};
+
+use atomic::Ordering;
 #[cfg(feature = "uv")]
 use jl_sys::uv_async_send;
+use jl_sys::{jl_cpu_threads, jl_throw};
+use once_cell::sync::OnceCell;
+use threadpool::ThreadPool;
 
 use crate::{
-    convert::ccall_types::CCallReturn,
-    data::managed::{
-        private::ManagedPriv,
-        value::{Value, ValueRef},
+    call::Call,
+    convert::{ccall_types::CCallReturn, into_julia::IntoJulia},
+    data::{
+        managed::{
+            private::ManagedPriv,
+            rust_result::{RustResult, RustResultRet},
+            value::{Value, ValueRef},
+        },
+        types::construct_type::ConstructType,
     },
-    error::JlrsResult,
+    error::{JlrsError, JlrsResult},
     init_jlrs,
     memory::{
         context::stack::Stack,
         stack_frame::{PinnedFrame, StackFrame},
         target::{frame::GcFrame, unrooted::Unrooted},
     },
+    prelude::{Managed, Module},
     private::Private,
 };
+
+thread_local! {
+    static POOL: OnceCell<ThreadPool> = OnceCell::new();
+}
+
+unsafe extern "C" fn set_pool_size(size: usize) {
+    POOL.with(|pool| {
+        let mut pool = pool
+            .get_or_init(|| {
+                let unrooted = Unrooted::new();
+                let pool_ptr = Module::package_root_module(unrooted, "Jlrs")
+                    .unwrap()
+                    .global(unrooted, "pool")
+                    .unwrap()
+                    .as_value()
+                    .unbox::<*mut c_void>()
+                    .unwrap() as *const _ as *const ThreadPool;
+
+                assert!(!pool_ptr.is_null());
+                (&*pool_ptr).clone()
+            })
+            .clone();
+
+        let size = if size == 0 {
+            unsafe { jl_cpu_threads() as usize }
+        } else {
+            size
+        };
+
+        pool.set_num_threads(size)
+    })
+}
+
+/*
+ */
+
+// When a Rust crate is compiled to a cdylib it will contain its own copy of all statics
+// introduced by jlrs, but the ledger must be shared between all "instances" of jlrs.
+pub(crate) unsafe extern "C" fn init_pool(
+    pool_ref: &mut *mut c_void,
+    size: usize,
+    set_pool_size_fn: &mut *mut c_void,
+) {
+    let size = if size == 0 {
+        unsafe { jl_cpu_threads() as usize }
+    } else {
+        size
+    };
+
+    POOL.with(|pool| {
+        if pool_ref.is_null() {
+            pool.get_or_init(|| {
+                let pool = ThreadPool::with_name("jlrs-ccall-pool".into(), size);
+                *pool_ref = Box::leak(Box::new(pool.clone())) as *mut _ as *mut c_void;
+                *set_pool_size_fn = set_pool_size as _;
+                pool
+            });
+        } else {
+            pool.get_or_init(|| {
+                let ptr = pool_ref as *mut *mut _ as *const *const ThreadPool;
+                (&**ptr).clone()
+            });
+        }
+    })
+}
 
 /// Interact with Julia from a Rust function called through `ccall`.
 ///
@@ -93,6 +175,36 @@ impl<'context> CCall<'context> {
         ret
     }
 
+    /// Create an instance of `CCall` and use it to invoke the provided closure.
+    ///
+    /// Safety: this method must only be called from `ccall`ed functions. The returned data is
+    /// unrooted and must be returned to Julia immediately.
+    pub unsafe fn invoke_fallible<T, F>(func: F) -> RustResultRet<T>
+    where
+        T: ConstructType,
+        for<'scope> F: FnOnce(GcFrame<'scope>) -> JlrsResult<RustResultRet<T>>,
+    {
+        let mut frame = StackFrame::new();
+        let mut ccall = std::mem::ManuallyDrop::new(CCall::new(&mut frame));
+
+        let stack = ccall.frame.stack_frame().sync_stack();
+        let (owner, frame) = GcFrame::base(stack);
+        let owner = std::mem::ManuallyDrop::new(owner);
+
+        let ret = match func(frame) {
+            Ok(res) => res,
+            Err(e) => {
+                let mut frame = owner.restore();
+                RustResult::<T>::jlrs_error(frame.as_extended_target(), *e)
+                    .as_ref()
+                    .leak()
+            }
+        };
+        std::mem::drop(owner);
+        std::mem::drop(ccall);
+        ret
+    }
+
     /// Invoke the provided closure.
     ///
     /// Safety: this method must only be called from `ccall`ed functions. The returned data is
@@ -139,10 +251,55 @@ impl<'context> CCall<'context> {
         func(Unrooted::new())
     }
 
+    /// Set the size of the internal thread pool.
+    pub fn set_pool_size(&self, size: usize) {
+        unsafe { set_pool_size(size) }
+    }
+
+    pub fn dispatch_to_pool<F, T>(func: F) -> Arc<DispatchHandle<T>>
+    where
+        F: FnOnce(Arc<DispatchHandle<T>>) + Send + 'static,
+        T: IntoJulia + Send + Sync + ConstructType,
+    {
+        let handle = DispatchHandle::new();
+        let cloned = handle.clone();
+        POOL.with(|pool| {
+            pool.get_or_init(|| unsafe {
+                let unrooted = Unrooted::new();
+                let pool_ptr = Module::package_root_module(unrooted, "Jlrs")
+                    .unwrap()
+                    .global(unrooted, "pool")
+                    .unwrap()
+                    .as_value()
+                    .unbox::<*mut c_void>()
+                    .unwrap() as *const _ as *const ThreadPool;
+
+                assert!(!pool_ptr.is_null());
+                (&*pool_ptr).clone()
+            })
+            .execute(|| func(cloned));
+        });
+
+        handle
+    }
+
     /// This function must be called before jlrs can be used. If a runtime or the `julia_module` macro
     /// is used this function is called automatically.
+    #[inline(never)]
     pub fn init_jlrs(&mut self) {
-        unsafe { init_jlrs(&mut self.frame) }
+        unsafe {
+            init_jlrs(&mut self.frame);
+
+            // init thread pool
+            let unrooted = Unrooted::new();
+            let init_thread_pool_jl = Module::package_root_module(unrooted, "Jlrs")
+                .unwrap()
+                .global(unrooted, "init_thread_pool")
+                .unwrap()
+                .as_value();
+            let fn_ptr = Value::new(unrooted, init_pool as *mut c_void).as_value();
+            init_thread_pool_jl.call1(unrooted, fn_ptr).unwrap();
+        }
     }
 }
 
@@ -157,3 +314,97 @@ where
     std::mem::drop(owner);
     rewrapped
 }
+
+#[doc(hidden)]
+#[repr(transparent)]
+pub struct AsyncConditionHandle(pub *mut c_void);
+unsafe impl Send for AsyncConditionHandle {}
+unsafe impl Sync for AsyncConditionHandle {}
+
+#[doc(hidden)]
+#[repr(C)]
+pub struct AsyncCCall {
+    pub join_handle: *mut c_void,
+    pub join_func: *mut c_void,
+}
+
+unsafe impl ConstructType for AsyncCCall {
+    fn construct_type<'target, T>(
+        target: crate::memory::target::ExtendedTarget<'target, '_, '_, T>,
+    ) -> crate::data::managed::value::ValueData<'target, 'static, T>
+    where
+        T: crate::prelude::Target<'target>,
+    {
+        let (target, _) = target.split();
+        unsafe {
+            Module::package_root_module(&target, "Jlrs")
+                .unwrap()
+                .submodule(&target, "Wrap")
+                .unwrap()
+                .as_managed()
+                .global(target, "AsyncCCall")
+                .unwrap()
+        }
+    }
+}
+
+/// Closures that implement this trait can be invoked on a separate thread to avoid blocking
+/// Julia.
+pub trait AsyncCallback<T: IntoJulia + Send + Sync + ConstructType>:
+    'static + Send + Sync + FnOnce() -> JlrsResult<T>
+{
+}
+
+impl<
+        T: IntoJulia + Send + Sync + ConstructType,
+        U: 'static + Send + Sync + FnOnce() -> JlrsResult<T>,
+    > AsyncCallback<T> for U
+{
+}
+
+pub struct DispatchHandle<T> {
+    result: UnsafeCell<Option<JlrsResult<T>>>,
+    flag: AtomicBool,
+}
+
+impl<T> Debug for DispatchHandle<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DispatchHandle")
+            .field("Completed", &self.flag.load(Ordering::Relaxed))
+            .finish()
+    }
+}
+
+impl<T: IntoJulia> DispatchHandle<T> {
+    pub fn new() -> Arc<Self> {
+        Arc::new(DispatchHandle {
+            result: UnsafeCell::new(None),
+            flag: AtomicBool::new(false),
+        })
+    }
+
+    pub unsafe fn set(self: Arc<Self>, result: JlrsResult<T>) {
+        let res_ptr = self.result.get();
+        *res_ptr = Some(result);
+        self.flag.store(true, Ordering::Release)
+    }
+
+    pub unsafe fn join(self: Arc<Self>) -> JlrsResult<T> {
+        while !self.flag.load(Ordering::Acquire) {
+            spin_loop();
+        }
+
+        let mut unwrapped = Arc::try_unwrap(self).unwrap();
+
+        match unwrapped.result.get_mut().take() {
+            Some(Ok(res)) => Ok(res),
+            Some(Err(e)) => Err(e),
+            None => Err(Box::new(JlrsError::exception(
+                "Unexpected error: no result",
+            ))),
+        }
+    }
+}
+
+unsafe impl<T> Sync for DispatchHandle<T> {}
+unsafe impl<T> Send for DispatchHandle<T> {}

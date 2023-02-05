@@ -18,7 +18,8 @@ use super::{
 use crate::{
     data::{
         layout::valid_layout::{ValidField, ValidLayout},
-        managed::{typecheck::Typecheck, value::Value},
+        managed::value::Value,
+        types::typecheck::Typecheck,
     },
     error::{AccessError, JlrsResult},
     memory::target::{unrooted::Unrooted, Target},
@@ -288,7 +289,7 @@ impl<'scope> ManagedPriv<'scope, '_> for SimpleVector<'scope> {
     }
 }
 
-impl_construct_type_managed!(Option<SimpleVectorRef<'_>>, jl_simplevector_type);
+impl_construct_type_managed!(SimpleVector<'_>, jl_simplevector_type);
 
 /// A reference to a [`SimpleVector`] that has not been explicitly rooted.
 pub type SimpleVectorRef<'scope> = Ref<'scope, 'static, SimpleVector<'scope>>;
@@ -331,3 +332,4 @@ pub type SimpleVectorResult<'target, T> =
     <T as TargetType<'target>>::Result<'static, SimpleVector<'target>>;
 
 impl_ccall_arg_managed!(SimpleVector, 1);
+impl_into_typed!(SimpleVector);

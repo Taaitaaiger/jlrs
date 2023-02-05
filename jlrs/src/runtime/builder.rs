@@ -5,11 +5,11 @@
 //! provide a custom system image, [`AsyncRuntimeBuilder`] provides additional methods to set the
 //! number of threads available to Julia among others.
 
-use std::{
-    num::NonZeroUsize,
-    path::{Path, PathBuf},
-};
+#[cfg(feature = "async-rt")]
+use std::num::NonZeroUsize;
+use std::path::{Path, PathBuf};
 
+#[cfg(feature = "async-rt")]
 use jlrs_macros::julia_version;
 
 #[cfg(feature = "sync-rt")]

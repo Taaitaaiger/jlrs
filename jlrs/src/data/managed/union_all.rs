@@ -19,7 +19,7 @@ use super::{value::ValueData, Managed, Ref};
 use crate::{
     data::managed::{datatype::DataType, private::ManagedPriv, type_var::TypeVar, value::Value},
     impl_julia_typecheck,
-    memory::target::Target,
+    memory::target::{ExtendedTarget, Target},
     private::Private,
 };
 
@@ -151,6 +151,33 @@ impl<'scope> UnionAll<'scope> {
 
             target.result_from_ptr(res, Private)
         }
+    }
+
+    pub fn rewrap<'target, T: Target<'target>>(
+        target: ExtendedTarget<'target, '_, '_, T>,
+        ty: DataType,
+    ) -> ValueData<'target, 'static, T> {
+        //
+        let (target, frame) = target.split();
+
+        frame
+            .scope(|mut frame| {
+                let params = ty.parameters();
+                let params = params.data().as_slice();
+                let mut body = ty.as_value();
+
+                for param in params.iter().copied() {
+                    unsafe {
+                        let param = param.unwrap().as_value();
+                        if let Ok(tvar) = param.cast::<TypeVar>() {
+                            body = UnionAll::new_unchecked(&mut frame, tvar, body).as_value();
+                        }
+                    }
+                }
+
+                Ok(body.root(target))
+            })
+            .unwrap()
     }
 
     pub unsafe fn apply_types_unchecked<'target, 'params, V, T>(
@@ -293,7 +320,7 @@ impl<'scope> ManagedPriv<'scope, '_> for UnionAll<'scope> {
     }
 }
 
-impl_construct_type_managed!(Option<UnionAllRef<'_>>, jl_unionall_type);
+impl_construct_type_managed!(UnionAll<'_>, jl_unionall_type);
 
 /// A reference to a [`UnionAll`] that has not been explicitly rooted.
 pub type UnionAllRef<'scope> = Ref<'scope, 'static, UnionAll<'scope>>;
@@ -314,3 +341,4 @@ pub type UnionAllResult<'target, T> =
     <T as TargetType<'target>>::Result<'static, UnionAll<'target>>;
 
 impl_ccall_arg_managed!(UnionAll, 1);
+impl_into_typed!(UnionAll);

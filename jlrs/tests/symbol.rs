@@ -149,28 +149,6 @@ mod tests {
         })
     }
 
-    fn leak_symbol() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-            let leaked = jlrs
-                .instance(&mut frame)
-                .scope(|frame| {
-                    let sym = Symbol::new(&frame, "a");
-                    Ok(sym.as_leaked())
-                })
-                .unwrap();
-
-            jlrs.instance(&mut frame)
-                .scope(|frame| {
-                    let unleak = unsafe { leaked.as_value(&frame) };
-                    assert!(unleak.is::<Symbol>());
-                    Ok(())
-                })
-                .unwrap();
-        })
-    }
-
     fn extend_lifetime() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -217,7 +195,6 @@ mod tests {
         symbols_are_not_collected();
         jl_string_to_symbol();
         bytes_to_symbol_unchecked();
-        leak_symbol();
         extend_lifetime();
         symbol_implements_hash();
         #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]

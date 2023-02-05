@@ -33,12 +33,14 @@ use jlrs_macros::julia_version;
 #[julia_version(windows_lts = false)]
 use crate::data::managed::value::ValueResult;
 use crate::{
-    data::managed::{
-        datatype::DataType,
-        private::ManagedPriv as _,
-        typecheck::Typecheck,
-        value::{Value, ValueData, MAX_SIZE},
-        Managed as _,
+    data::{
+        managed::{
+            datatype::DataType,
+            private::ManagedPriv as _,
+            value::{Value, ValueData, MAX_SIZE},
+            Managed as _,
+        },
+        types::typecheck::Typecheck,
     },
     memory::target::{ExtendedTarget, Target},
     private::Private,
@@ -53,7 +55,7 @@ impl Tuple {
     #[julia_version(windows_lts = false)]
     /// Create a new tuple from the contents of `values`.
     pub fn new<'target, 'current, 'borrow, 'value, 'data, V, T>(
-        target: ExtendedTarget<'target, 'current, 'borrow, T>,
+        target: ExtendedTarget<'target, '_, '_, T>,
         values: V,
     ) -> ValueResult<'target, 'data, T>
     where
@@ -93,7 +95,7 @@ impl Tuple {
 
     /// Create a new tuple from the contents of `values`.
     pub unsafe fn new_unchecked<'target, 'current, 'borrow, 'value, 'data, V, T>(
-        target: ExtendedTarget<'target, 'current, 'borrow, T>,
+        target: ExtendedTarget<'target, '_, '_, T>,
         values: V,
     ) -> ValueData<'target, 'data, T>
     where
@@ -156,7 +158,7 @@ macro_rules! impl_tuple {
     ($name:ident, $($types:tt),+) => {
         #[repr(C)]
         #[derive(Clone, Debug, PartialEq, Eq)]
-        pub struct $name<$($types: Clone + ::std::fmt::Debug),+>($(pub $types),+);
+        pub struct $name<$($types),+>($(pub $types),+);
 
         impl<$($types),+> Copy for $name<$($types),+>
         where
@@ -253,7 +255,7 @@ macro_rules! impl_tuple {
             type Output = Self;
         }
 
-        unsafe impl<$($types),+> $crate::data::managed::typecheck::Typecheck for $name<$($types),+>
+        unsafe impl<$($types),+> $crate::data::types::typecheck::Typecheck for $name<$($types),+>
         where
             $($types: $crate::data::layout::valid_layout::ValidField + Clone + ::std::fmt::Debug),+
         {
@@ -262,33 +264,26 @@ macro_rules! impl_tuple {
             }
         }
 
-        unsafe impl<$($types),+> $crate::convert::construct_type::ConstructType for $name<$($types),+>
+        unsafe impl<$($types),+> $crate::data::types::construct_type::ConstructType for $name<$($types),+>
         where
-            $($types: $crate::convert::construct_type::ConstructType + Clone + ::std::fmt::Debug),+
+            $($types: $crate::data::types::construct_type::ConstructType),+
         {
-            fn base_type<'target, T>(target: &T) -> $crate::data::managed::value::Value<'target, 'static>
+            fn construct_type<'target, Tgt>(
+                target: $crate::memory::target::ExtendedTarget<'target, '_, '_, Tgt>,
+            ) -> $crate::data::managed::value::ValueData<'target, 'static, Tgt>
             where
-                T: $crate::memory::target::Target<'target>,
-            {
-                $crate::data::managed::datatype::DataType::anytuple_type(target).as_value()
-            }
-
-            fn construct_type<'target, 'current, 'borrow, T>(
-                target: $crate::memory::target::ExtendedTarget<'target, 'current, 'borrow, T>,
-            ) -> $crate::data::managed::datatype::DataTypeData<'target, T>
-            where
-                T: $crate::memory::target::Target<'target>,
+                Tgt: $crate::memory::target::Target<'target>,
             {
                 let (target, frame) = target.split();
 
                 frame.scope(|mut frame| {
                     let types = &mut [
-                        $(<$types as $crate::convert::construct_type::ConstructType>::construct_type(frame.as_extended_target())),+
+                        $(<$types as $crate::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())),+
                     ];
 
                     unsafe {
                         Ok(target.data_from_ptr(
-                            ::std::ptr::NonNull::new_unchecked(::jl_sys::jl_apply_tuple_type_v(types.as_mut_ptr().cast(), types.len())),
+                            ::std::ptr::NonNull::new_unchecked(::jl_sys::jl_apply_tuple_type_v(types.as_mut_ptr().cast(), types.len()).cast()),
                             $crate::private::Private,
                         ))
                     }
@@ -358,28 +353,21 @@ macro_rules! impl_tuple {
             }
         }
 
-        unsafe impl $crate::data::managed::typecheck::Typecheck for $name {
+        unsafe impl $crate::data::types::typecheck::Typecheck for $name {
             fn typecheck(t: $crate::data::managed::datatype::DataType) -> bool {
                 <Self as $crate::data::layout::valid_layout::ValidLayout>::valid_layout(t.as_value())
             }
         }
 
-        unsafe impl $crate::convert::construct_type::ConstructType for $name {
-            fn base_type<'target, T>(target: &T) -> $crate::data::managed::value::Value<'target, 'static>
+        unsafe impl $crate::data::types::construct_type::ConstructType for $name {
+            fn construct_type<'target, Tgt>(
+                target: $crate::memory::target::ExtendedTarget<'target, '_, '_, Tgt>,
+            ) -> $crate::data::managed::value::ValueData<'target, 'static, Tgt>
             where
-                T: $crate::memory::target::Target<'target>,
-            {
-                unsafe { <Self as $crate::convert::into_julia::IntoJulia>::julia_type(target).as_value() }
-            }
-
-            fn construct_type<'target, 'current, 'borrow, T>(
-                target: $crate::memory::target::ExtendedTarget<'target, 'current, 'borrow, T>,
-            ) -> $crate::data::managed::datatype::DataTypeData<'target, T>
-            where
-                T: $crate::memory::target::Target<'target>,
+                Tgt: $crate::memory::target::Target<'target>,
             {
                 let (target, _) = target.split();
-                <Self as $crate::convert::into_julia::IntoJulia>::julia_type(target)
+                $crate::data::managed::datatype::DataType::emptytuple_type(&target).as_value().root(target)
             }
         }
     };

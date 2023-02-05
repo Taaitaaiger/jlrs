@@ -254,7 +254,7 @@ impl<'tracked, 'scope, 'data> TrackedArray<'tracked, 'scope, 'data, Array<'scope
     /// the original array. The old and new dimensions must have an equal number of elements.
     pub fn reshape<'target, 'current, 'borrow, D, S>(
         &self,
-        target: ExtendedTarget<'target, 'current, 'borrow, S>,
+        target: ExtendedTarget<'target, '_, '_, S>,
         dims: D,
     ) -> ArrayResult<'target, 'data, S>
     where
@@ -272,7 +272,7 @@ impl<'tracked, 'scope, 'data> TrackedArray<'tracked, 'scope, 'data, Array<'scope
     /// Safety: if an exception is thrown it isn't caught.
     pub unsafe fn reshape_unchecked<'target, 'current, 'borrow, D, S>(
         &self,
-        target: ExtendedTarget<'target, 'current, 'borrow, S>,
+        target: ExtendedTarget<'target, '_, '_, S>,
         dims: D,
     ) -> ArrayData<'target, 'data, S>
     where
@@ -338,7 +338,7 @@ where
     /// the original array. The old and new dimensions must have an equal number of elements.
     pub fn reshape<'target, 'current, 'borrow, D, S>(
         &self,
-        target: ExtendedTarget<'target, 'current, 'borrow, S>,
+        target: ExtendedTarget<'target, '_, '_, S>,
         dims: D,
     ) -> TypedArrayResult<'target, 'data, S, T>
     where
@@ -356,7 +356,7 @@ where
     /// Safety: if an exception is thrown it isn't caught.
     pub unsafe fn reshape_unchecked<'target, 'current, 'borrow, D, S>(
         &self,
-        target: ExtendedTarget<'target, 'current, 'borrow, S>,
+        target: ExtendedTarget<'target, '_, '_, S>,
         dims: D,
     ) -> TypedArrayData<'target, 'data, S, T>
     where
@@ -509,7 +509,11 @@ impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 
     where
         S: Target<'target>,
     {
-        self.tracked.data.grow_end(target, inc)
+        let current_range = self.tracked.data.data_range();
+        let res = self.tracked.data.grow_end(target, inc);
+        let new_range = self.tracked.data.data_range();
+        Ledger::replace_borrow_mut(current_range, new_range);
+        res
     }
 
     /// Add capacity for `inc` more elements at the end of the array. The array must be
@@ -518,7 +522,10 @@ impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 
     /// Safety: Mutating things that should absolutely not be mutated is not prevented. If an
     /// exception is thrown, it isn't caught.
     pub unsafe fn grow_end_unchecked(&mut self, inc: usize) {
-        self.tracked.data.grow_end_unchecked(inc)
+        let current_range = self.tracked.data.data_range();
+        self.tracked.data.grow_end_unchecked(inc);
+        let new_range = self.tracked.data.data_range();
+        Ledger::replace_borrow_mut(current_range, new_range);
     }
 
     #[julia_version(windows_lts = false)]
@@ -530,7 +537,11 @@ impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 
     where
         S: Target<'target>,
     {
-        self.tracked.data.del_end(target, dec)
+        let current_range = self.tracked.data.data_range();
+        let res = self.tracked.data.del_end(target, dec);
+        let new_range = self.tracked.data.data_range();
+        Ledger::replace_borrow_mut(current_range, new_range);
+        res
     }
 
     /// Remove `dec` elements from the end of the array.  The array must be one-dimensional. If
@@ -539,7 +550,10 @@ impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 
     /// Safety: Mutating things that should absolutely not be mutated is not prevented. If an
     /// exception is thrown, it isn't caught.
     pub unsafe fn del_end_unchecked(&mut self, dec: usize) {
-        self.tracked.data.del_end_unchecked(dec)
+        let current_range = self.tracked.data.data_range();
+        self.tracked.data.del_end_unchecked(dec);
+        let new_range = self.tracked.data.data_range();
+        Ledger::replace_borrow_mut(current_range, new_range);
     }
 
     #[julia_version(windows_lts = false)]
@@ -555,7 +569,11 @@ impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 
     where
         S: Target<'target>,
     {
-        self.tracked.data.grow_begin(target, inc)
+        let current_range = self.tracked.data.data_range();
+        let res = self.tracked.data.grow_begin(target, inc);
+        let new_range = self.tracked.data.data_range();
+        Ledger::replace_borrow_mut(current_range, new_range);
+        res
     }
 
     /// Add capacity for `inc` more elements at the start of the array. The array must be
@@ -564,7 +582,10 @@ impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 
     /// Safety: Mutating things that should absolutely not be mutated is not prevented. If an
     /// exception is thrown, it isn't caught.
     pub unsafe fn grow_begin_unchecked(&mut self, inc: usize) {
-        self.tracked.data.grow_begin_unchecked(inc)
+        let current_range = self.tracked.data.data_range();
+        self.tracked.data.grow_begin_unchecked(inc);
+        let new_range = self.tracked.data.data_range();
+        Ledger::replace_borrow_mut(current_range, new_range);
     }
 
     #[julia_version(windows_lts = false)]
@@ -580,7 +601,11 @@ impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 
     where
         S: Target<'target>,
     {
-        self.tracked.data.del_begin(target, dec)
+        let current_range = self.tracked.data.data_range();
+        let res = self.tracked.data.del_begin(target, dec);
+        let new_range = self.tracked.data.data_range();
+        Ledger::replace_borrow_mut(current_range, new_range);
+        res
     }
 
     /// Remove `dec` elements from the start of the array.  The array must be one-dimensional. If
@@ -589,7 +614,10 @@ impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 
     /// Safety: Mutating things that should absolutely not be mutated is not prevented. If an
     /// exception is thrown, it isn't caught.
     pub unsafe fn del_begin_unchecked(&mut self, dec: usize) {
-        self.tracked.data.del_begin_unchecked(dec)
+        let current_range = self.tracked.data.data_range();
+        self.tracked.data.del_begin_unchecked(dec);
+        let new_range = self.tracked.data.data_range();
+        Ledger::replace_borrow_mut(current_range, new_range);
     }
 }
 
@@ -598,6 +626,14 @@ impl<'tracked, 'scope, 'data, T>
 where
     T: ValidField,
 {
+    /// Convert this array to a slice.
+    pub fn as_mut_slice<'borrow>(&'borrow mut self) -> &'borrow mut [T] {
+        unsafe {
+            let arr = std::mem::transmute::<&'borrow mut Self, &'borrow mut Array>(self);
+            arr.as_mut_slice_unchecked()
+        }
+    }
+
     /// Create a mutable accessor for the content of the array if the element type is an isbits
     /// type.
     ///

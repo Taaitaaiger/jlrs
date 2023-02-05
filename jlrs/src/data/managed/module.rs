@@ -28,11 +28,7 @@ use crate::{
     call::Call,
     convert::to_symbol::ToSymbol,
     data::managed::{
-        function::Function,
-        private::ManagedPriv,
-        symbol::Symbol,
-        value::{leaked::LeakedValue, Value},
-        Managed as _,
+        function::Function, private::ManagedPriv, symbol::Symbol, value::Value, Managed as _,
     },
     error::{AccessError, JlrsResult, TypeError},
     impl_julia_typecheck,
@@ -360,29 +356,6 @@ impl<'scope> Module<'scope> {
         }
     }
 
-    /// Returns the global named `name` in this module as a [`LeakedValue`].
-    /// Returns an error if the global doesn't exist.
-    pub fn leaked_global<N>(self, name: N) -> JlrsResult<LeakedValue>
-    where
-        N: ToSymbol,
-    {
-        // Safety: the pointer points to valid data, the C API function is called with
-        // valid arguments and its result is checked.
-        unsafe {
-            let symbol = name.to_symbol_priv(Private);
-
-            let global = jl_get_global(self.unwrap(Private), symbol.unwrap(Private));
-            if global.is_null() {
-                Err(AccessError::GlobalNotFound {
-                    name: symbol.as_str().unwrap_or("<Non-UTF8 symbol>").into(),
-                    module: self.name().as_str().unwrap_or("<Non-UTF8 symbol>").into(),
-                })?;
-            }
-
-            Ok(LeakedValue::wrap_non_null(NonNull::new_unchecked(global)))
-        }
-    }
-
     /// Returns the function named `name` in this module.
     /// Returns an error if the function doesn't exist or if it's not a subtype of `Function`.
     pub fn function<'target, N, T>(
@@ -407,12 +380,6 @@ impl<'scope> Module<'scope> {
 
             Ok(target.data_from_ptr(func.unwrap_non_null(Private).cast(), Private))
         }
-    }
-
-    /// Convert `self` to a `LeakedValue`.
-    pub fn as_leaked(self) -> LeakedValue {
-        // Safety: the pointer points to valid data
-        unsafe { LeakedValue::wrap_non_null(self.unwrap_non_null(Private).cast()) }
     }
 
     /// Load a module by calling `Base.require` and return this module if it has been loaded
@@ -466,7 +433,7 @@ impl<'scope> ManagedPriv<'scope, '_> for Module<'scope> {
     }
 }
 
-impl_construct_type_managed!(Option<ModuleRef<'_>>, jl_module_type);
+impl_construct_type_managed!(Module<'_>, jl_module_type);
 
 /// A reference to a [`Module`] that has not been explicitly rooted.
 pub type ModuleRef<'scope> = Ref<'scope, 'static, Module<'scope>>;
@@ -486,3 +453,4 @@ pub type ModuleData<'target, T> = <T as TargetType<'target>>::Data<'static, Modu
 pub type ModuleResult<'target, T> = <T as TargetType<'target>>::Result<'static, Module<'target>>;
 
 impl_ccall_arg_managed!(Module, 1);
+impl_into_typed!(Module);

@@ -1,13 +1,13 @@
 #[cfg(all(
     feature = "tokio-rt",
-    not(all(target_os = "windows", feature = "julia-1-6")),
+    not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")),
 ))]
 #[cfg(test)]
 mod util;
 
 #[cfg(all(
     feature = "tokio-rt",
-    not(all(target_os = "windows", feature = "julia-1-6")),
+    not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")),
 ))]
 #[cfg(test)]
 mod tests {
@@ -24,6 +24,7 @@ mod tests {
                 RuntimeBuilder::new()
                     .async_runtime::<Tokio>()
                     .n_threads(4)
+                    .n_worker_threads(4)
                     .channel_capacity(NonZeroUsize::new_unchecked(32))
                     .start::<4>()
                     .expect("Could not init Julia")

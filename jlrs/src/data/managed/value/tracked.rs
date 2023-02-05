@@ -73,20 +73,14 @@ impl<'borrow, 'scope, 'data, T: ValidLayout> DerefMut for TrackedMut<'borrow, 's
 
 impl<T> Drop for Tracked<'_, '_, '_, T> {
     fn drop(&mut self) {
-        unsafe {
-            let start = self.tracked as *const _ as *mut u8;
-            let end = start.add(std::mem::size_of::<T>());
-            Ledger::unborrow_shared(start..end)
-        }
+        let start = self.tracked as *const _ as *mut u8;
+        Ledger::unborrow_shared(start..start)
     }
 }
 
 impl<T: ValidLayout> Drop for TrackedMut<'_, '_, '_, T> {
     fn drop(&mut self) {
-        unsafe {
-            let start = self.t as *const _ as *mut u8;
-            let end = start.add(std::mem::size_of::<T>());
-            Ledger::unborrow_owned(start..end)
-        }
+        let start = self.t as *const _ as *mut u8;
+        Ledger::unborrow_owned(start..start)
     }
 }

@@ -1,10 +1,20 @@
-//! A `Value` with typed contents.
+//! A `Value` annotated with its type constructor
 //!
-//! When exposing functions written in Rust to Julia with the [`julia_module`] macro, the argument
-//! and return types of the generated function are generated using the types of the Rust function.
-//! By using a `TypedValue` as an argument, that data is guaranteed to be passed to the Rust
-//! function as managed data. By using it as a return type, the generated function is guaranteed
-//! to return data of that type.
+//! When a Rust function is exported to Julia with the [`julia_module`] macro, the generated Julia
+//! function looks like this:
+//!
+//! ```julia
+//! function fn_name(arg1::FnArg1, arg2::FnArg2, ...)::FnRet
+//!     ccall(fn_ptr, CCallRet, (CCallArg1, CCallArg2, ...), arg1, arg2, ...)
+//! end
+//! ```
+//!
+//! The argument and return types are generated from the signature of the exported function. When
+//! `TypedValue<Ty>` is used as an argument, the `CCallArg` is `Any` and the `FnArg` is the type
+//! that is constructed from `Ty`. The same is true for `CCallRet` and `FnRet` when
+//! `TypedValueRet<Ty>` is returned.
+//!
+//! [`julia_module`]: ::jlrs_macros::julia_module
 
 use std::{
     fmt::Debug,
@@ -17,24 +27,30 @@ use jl_sys::jl_value_t;
 
 use super::{
     tracked::{Tracked, TrackedMut},
-    Value, ValueRef,
+    Value, ValueData, ValueRef,
 };
 use crate::{
     convert::{
         ccall_types::{CCallArg, CCallReturn},
-        construct_type::ConstructType,
         into_julia::IntoJulia,
     },
     data::{
         layout::valid_layout::{ValidField, ValidLayout},
-        managed::{datatype::DataTypeData, private::ManagedPriv, typecheck::Typecheck, Ref},
+        managed::{private::ManagedPriv, Ref},
+        types::{construct_type::ConstructType, typecheck::Typecheck},
     },
-    memory::target::ExtendedTarget,
+    error::TypeError,
+    memory::target::{frame::GcFrame, ExtendedTarget},
     prelude::{JlrsResult, Managed, Target},
     private::Private,
 };
 
-/// A `Value` with typed contents.
+/// Convert managed data to a `TypedValue`.
+pub trait AsTyped<'scope, 'data>: Managed<'scope, 'data> {
+    fn as_typed(self) -> JlrsResult<TypedValue<'scope, 'data, Self>>;
+}
+
+/// A `Value` and its type constructor.
 #[repr(transparent)]
 pub struct TypedValue<'scope, 'data, T>(
     NonNull<jl_value_t>,
@@ -43,7 +59,7 @@ pub struct TypedValue<'scope, 'data, T>(
     PhantomData<&'data ()>,
 );
 
-impl<U: ValidLayout + ConstructType + IntoJulia> TypedValue<'_, '_, U> {
+impl<U: ConstructType + IntoJulia> TypedValue<'_, '_, U> {
     /// Create a new typed value, any type that implements [`IntoJulia`] can be converted using
     /// this function.
     pub fn new<'target, T>(target: T, data: U) -> TypedValueData<'target, 'static, U, T>
@@ -56,6 +72,41 @@ impl<U: ValidLayout + ConstructType + IntoJulia> TypedValue<'_, '_, U> {
                 .cast_unchecked::<TypedValue<U>>()
                 .root(target)
         }
+    }
+}
+
+impl<'scope, 'data, U: ConstructType> TypedValue<'scope, 'data, U> {
+    /// Create a new typed value from an existing value.
+    pub fn from_value(
+        frame: &mut GcFrame,
+        value: Value<'scope, 'data>,
+    ) -> JlrsResult<TypedValue<'scope, 'data, U>> {
+        frame.scope(|mut frame| {
+            let ty = U::construct_type(frame.as_extended_target());
+            if value.isa(ty) {
+                unsafe {
+                    Ok(TypedValue::<U>::wrap_non_null(
+                        value.unwrap_non_null(Private),
+                        Private,
+                    ))
+                }
+            } else {
+                Err(TypeError::NotA {
+                    value: value.display_string_or("<Cannot display value>"),
+                    field_type: ty.display_string_or("<Cannot display type>"),
+                })?
+            }
+        })
+    }
+
+    /// Create a new typed value from an existing value without checking the value is an instance
+    /// of `U`.
+    ///
+    /// Safety: `value` must be an instance of the constructed type `U`.
+    pub unsafe fn from_value_unchecked(
+        value: Value<'scope, 'data>,
+    ) -> TypedValue<'scope, 'data, U> {
+        TypedValue::<U>::wrap_non_null(value.unwrap_non_null(Private), Private)
     }
 }
 
@@ -92,7 +143,7 @@ impl<'scope, 'data, U: ValidLayout + ConstructType> DerefMut for TypedValue<'sco
 
 impl<T> Debug for TypedValue<'_, '_, T>
 where
-    T: ValidLayout + ConstructType,
+    T: ConstructType,
 {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(fmt, "{:?}", self.as_value())
@@ -101,18 +152,18 @@ where
 
 impl<T> Clone for TypedValue<'_, '_, T>
 where
-    T: ValidLayout + ConstructType,
+    T: ConstructType,
 {
     fn clone(&self) -> Self {
         unsafe { Self::wrap_non_null(self.unwrap_non_null(Private), Private) }
     }
 }
 
-impl<T> Copy for TypedValue<'_, '_, T> where T: ValidLayout + ConstructType {}
+impl<T> Copy for TypedValue<'_, '_, T> where T: ConstructType {}
 
 unsafe impl<T> ValidLayout for TypedValue<'_, '_, T>
 where
-    T: ValidLayout + ConstructType,
+    T: ConstructType,
 {
     fn valid_layout(v: Value) -> bool {
         ValueRef::valid_layout(v)
@@ -122,7 +173,7 @@ where
 }
 unsafe impl<T> ValidField for Option<TypedValue<'_, '_, T>>
 where
-    T: ValidLayout + ConstructType,
+    T: ConstructType,
 {
     fn valid_field(v: Value) -> bool {
         Option::<ValueRef>::valid_field(v)
@@ -137,7 +188,7 @@ pub type TypedValueRet<T> = Ref<'static, 'static, TypedValue<'static, 'static, T
 
 impl<'scope, 'data, T> ManagedPriv<'scope, 'data> for TypedValue<'scope, 'data, T>
 where
-    T: ValidLayout + ConstructType,
+    T: ConstructType,
 {
     type Wraps = jl_value_t;
     type TypeConstructorPriv<'target, 'da> = TypedValue<'target, 'da, T>;
@@ -163,20 +214,13 @@ where
     }
 }
 
-unsafe impl<U> ConstructType for Option<TypedValueRef<'_, 'static, U>>
+unsafe impl<U> ConstructType for TypedValue<'_, 'static, U>
 where
-    U: ValidLayout + ConstructType,
+    U: ConstructType,
 {
-    fn base_type<'target, T>(target: &T) -> Value<'target, 'static>
-    where
-        T: Target<'target>,
-    {
-        U::base_type(target)
-    }
-
     fn construct_type<'target, 'current, 'borrow, T>(
-        target: ExtendedTarget<'target, 'current, 'borrow, T>,
-    ) -> DataTypeData<'target, T>
+        target: ExtendedTarget<'target, '_, '_, T>,
+    ) -> ValueData<'target, 'static, T>
     where
         T: Target<'target>,
     {
@@ -195,14 +239,12 @@ pub type TypedValueData<'target, 'data, U, T> =
 pub type TypedValueResult<'target, 'data, U, T> =
     <T as TargetType<'target>>::Result<'data, TypedValue<'target, 'data, U>>;
 
-unsafe impl<'scope, 'data, T: ConstructType + ValidLayout> CCallArg
-    for TypedValue<'scope, 'data, T>
-{
-    type CCallArgType = Option<ValueRef<'scope, 'data>>;
+unsafe impl<'scope, 'data, T: ConstructType> CCallArg for TypedValue<'scope, 'data, T> {
+    type CCallArgType = Value<'scope, 'data>;
     type FunctionArgType = T;
 }
 
-unsafe impl<T: ConstructType + ValidLayout> CCallReturn for TypedValueRef<'static, 'static, T> {
-    type CCallReturnType = Option<ValueRef<'static, 'static>>;
+unsafe impl<T: ConstructType> CCallReturn for TypedValueRef<'static, 'static, T> {
+    type CCallReturnType = Value<'static, 'static>;
     type FunctionReturnType = T;
 }
