@@ -65,13 +65,13 @@ function print_help() {
     echo "default paths can be overridden with environment variables:"
     echo ""
     echo -e "\033[1m      Version                  Default path${spacing}Override\033[0m"
-    echo "  Linux 64-bit 1.8         $HOME/julia-1.8.3               JULIA_1_8_DIR"
+    echo "  Linux 64-bit 1.8         $HOME/julia-1.8.5               JULIA_1_8_DIR"
     echo "  Linux 64-bit 1.7         $HOME/julia-1.7.3               JULIA_1_7_DIR"
     echo "  Linux 64-bit 1.6         $HOME/julia-1.6.7               JULIA_1_6_DIR"
-    echo "  Linux 32-bit 1.8         $HOME/julia-1.8.3-32            JULIA_1_8_DIR_32"
+    echo "  Linux 32-bit 1.8         $HOME/julia-1.8.5-32            JULIA_1_8_DIR_32"
     echo "  Linux 32-bit 1.7         $HOME/julia-1.7.3-32            JULIA_1_7_DIR_32"
     echo "  Linux 32-bit 1.8         $HOME/julia-1.6.7-32            JULIA_1_6_DIR_32"
-    echo "  Windows 64-bit 1.8       $HOME/julia-1.8.3-win           JULIA_1_8_DIR_WIN"
+    echo "  Windows 64-bit 1.8       $HOME/julia-1.8.5-win           JULIA_1_8_DIR_WIN"
     echo "  Windows 64-bit 1.7       $HOME/julia-1.7.3-win           JULIA_1_7_DIR_WIN"
     echo "  Windows 64-bit 1.6       $HOME/julia-1.6.7-win           JULIA_1_6_DIR_WIN"
     echo ""
@@ -116,8 +116,10 @@ if [ "${NIGHTLY}" = "y" -o "${ALL}" = "y" ]; then
 
     cargo clean
     JULIA_VERSION=$($JULIA_NIGHTLY_DIR/bin/julia --version)
+    JULIA_COMMIT=$($JULIA_NIGHTLY_DIR/bin/julia -E "Base.GIT_VERSION_INFO.commit_short" | grep -oEe "[^\"]+")
+    JULIA_COMMIT_DATE=$($JULIA_NIGHTLY_DIR/bin/julia -E "Base.GIT_VERSION_INFO.date_string" | grep -oEe "[^\"]+")
     JULIA_DIR=$JULIA_NIGHTLY_DIR cargo build --features use-bindgen,julia-1-10
-    echo "/* generated from $JULIA_VERSION */" > ./src/bindings_nightly_x86_64_unknown_linux_gnu.rs
+    echo "/* generated from $JULIA_VERSION (Commit: $JULIA_COMMIT $JULIA_COMMIT_DATE) */" > ./src/bindings_nightly_x86_64_unknown_linux_gnu.rs
     cat ../target/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings_nightly_x86_64_unknown_linux_gnu.rs
 
     if [ "${BETA}" != "y" -a "${ALL}" != "y"  ]; then
@@ -174,7 +176,7 @@ if [ "${BETA}" = "y" -o "${ALL}" = "y" ]; then
 fi
 
 if [ -z "$JULIA_1_8_DIR" ]; then
-    JULIA_1_8_DIR=${HOME}/julia-1.8.3
+    JULIA_1_8_DIR=${HOME}/julia-1.8.5
 fi
 if [ ! -d "$JULIA_1_8_DIR" ]; then
     echo "Error: $JULIA_1_8_DIR does not exist" >&2
