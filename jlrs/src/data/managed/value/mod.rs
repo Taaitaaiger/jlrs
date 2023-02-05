@@ -32,7 +32,6 @@ jl_atomic_swap_bits
 */
 
 pub mod field_accessor;
-pub mod leaked;
 pub mod tracked;
 pub mod typed;
 
@@ -135,7 +134,7 @@ use jl_sys::{
 };
 use jlrs_macros::julia_version;
 
-use self::field_accessor::FieldAccessor;
+use self::{field_accessor::FieldAccessor, typed::TypedValue};
 use super::Ref;
 use crate::{
     call::{Call, ProvideKeywords, WithKeywords},
@@ -149,11 +148,14 @@ use crate::{
             private::ManagedPriv,
             string::JuliaString,
             symbol::Symbol,
-            typecheck::{NamedTuple, Typecheck},
             union::Union,
             union_all::UnionAll,
             value::tracked::{Tracked, TrackedMut},
             Managed,
+        },
+        types::{
+            construct_type::ConstructType,
+            typecheck::{NamedTuple, Typecheck},
         },
     },
     error::{
@@ -163,7 +165,7 @@ use crate::{
     memory::{
         context::ledger::Ledger,
         get_tls,
-        target::{unrooted::Unrooted, ExtendedTarget, Target},
+        target::{frame::GcFrame, unrooted::Unrooted, ExtendedTarget, Target},
     },
     private::Private,
 };
@@ -220,7 +222,7 @@ impl Value<'_, '_> {
 
     /// Create a new named tuple, you should use the `named_tuple` macro rather than this method.
     pub fn new_named_tuple<'target, 'current, 'borrow, 'value, 'data, S, N, T, V>(
-        scope: ExtendedTarget<'target, 'current, 'borrow, S>,
+        scope: ExtendedTarget<'target, '_, '_, S>,
         field_names: N,
         values: V,
     ) -> JlrsResult<ValueData<'target, 'data, S>>
@@ -486,8 +488,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
 
         let start = self.data_ptr().as_ptr() as *mut u8;
         unsafe {
-            let end = start.add(std::mem::size_of::<T>());
-            Ledger::try_borrow(start..end)?;
+            Ledger::try_borrow(start..start)?;
             Ok(Tracked::new(self))
         }
     }
@@ -613,6 +614,31 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// Safety: You must guarantee `self.is::<T>()` would have returned `true`.
     pub unsafe fn unbox_unchecked<T: Unbox>(self) -> T::Output {
         T::unbox(self)
+    }
+
+    /// Convert this value to a typed value if this value is an instance of the constructed type.
+    pub fn as_typed<T: ConstructType>(
+        self,
+        frame: &mut GcFrame<'_>,
+    ) -> JlrsResult<TypedValue<'scope, 'data, T>> {
+        frame.scope(|mut frame| {
+            let ty = T::construct_type(frame.as_extended_target());
+            if self.isa(ty) {
+                unsafe { Ok(TypedValue::<T>::from_value_unchecked(self)) }
+            } else {
+                Err(TypeError::NotA {
+                    value: self.display_string_or("<Cannot display value>"),
+                    field_type: ty.display_string_or("<Cannot display type>"),
+                })?
+            }
+        })
+    }
+
+    /// Convert this value to a typed value without checking if the conversion is valid.
+    ///
+    /// Safety: the converted value must be an instance of the constructed type.
+    pub unsafe fn as_typed_unchecked<T: ConstructType>(self) -> TypedValue<'scope, 'data, T> {
+        TypedValue::<T>::from_value_unchecked(self)
     }
 
     /// Returns a pointer to the data, this is useful when the output type of `Unbox` is different
@@ -1023,7 +1049,7 @@ impl Value<'_, '_> {
     /// Safety: The content of the file can't be checked for correctness, nothing prevents you
     /// from causing a segmentation fault with code like `unsafe_load(Ptr{Float64}(C_NULL))`.
     pub unsafe fn include<'target, 'current, 'borrow, P, T>(
-        target: ExtendedTarget<'target, 'current, 'borrow, T>,
+        target: ExtendedTarget<'target, '_, '_, T>,
         path: P,
     ) -> JlrsResult<ValueResult<'target, 'static, T>>
     where
@@ -1472,3 +1498,5 @@ pub type ValueResult<'target, 'data, T> =
     <T as TargetType<'target>>::Result<'data, Value<'target, 'data>>;
 
 impl_ccall_arg_managed!(Value, 2);
+
+impl_construct_type_managed!(Value<'_, '_>, jl_any_type);

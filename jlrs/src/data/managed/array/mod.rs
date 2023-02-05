@@ -46,13 +46,16 @@ use self::data::accessor::{
     IndeterminateArrayAccessorI, InlinePtrArrayAccessorI, InlinePtrArrayAccessorMut, Mutable,
     PtrArrayAccessorI, PtrArrayAccessorMut, UnionArrayAccessorI, UnionArrayAccessorMut,
 };
-use super::{union_all::UnionAll, value::ValueRef, Ref};
+use super::{
+    union_all::UnionAll,
+    value::{typed::TypedValue, ValueRef},
+    Ref,
+};
 #[julia_version(windows_lts = false)]
 use crate::catch::{catch_exceptions, catch_exceptions_with_slots};
 use crate::{
     convert::{
         ccall_types::{CCallArg, CCallReturn},
-        construct_type::{ConstructType, ConstructTypeRelaxed},
         into_julia::IntoJulia,
         unbox::Unbox,
     },
@@ -66,13 +69,19 @@ use crate::{
             datatype::DataType,
             private::ManagedPriv,
             type_name::TypeName,
-            typecheck::Typecheck,
             union::Union,
             value::Value,
             Managed, ManagedRef,
         },
+        types::{
+            construct_type::{ArrayTypeConstructor, ConstantIsize, ConstructType},
+            typecheck::Typecheck,
+        },
     },
-    error::{AccessError, ArrayLayoutError, InstantiationError, JlrsResult, CANNOT_DISPLAY_TYPE},
+    error::{
+        AccessError, ArrayLayoutError, InstantiationError, JlrsResult, TypeError,
+        CANNOT_DISPLAY_TYPE,
+    },
     memory::{
         get_tls,
         target::{frame::GcFrame, private::TargetPriv, unrooted::Unrooted, ExtendedTarget, Target},
@@ -121,7 +130,7 @@ impl<'data> Array<'_, 'data> {
     /// returned.
 
     pub fn new<'target, 'current, 'borrow, T, D, S>(
-        target: ExtendedTarget<'target, 'current, 'borrow, S>,
+        target: ExtendedTarget<'target, '_, '_, S>,
         dims: D,
     ) -> ArrayResult<'target, 'static, S>
     where
@@ -191,7 +200,7 @@ impl<'data> Array<'_, 'data> {
     /// Safety: If the array size is too large, Julia will throw an error. This error is not
     /// caught, which is UB from a `ccall`ed function.
     pub unsafe fn new_unchecked<'target, 'current, 'borrow, T, D, S>(
-        target: ExtendedTarget<'target, 'current, 'borrow, S>,
+        target: ExtendedTarget<'target, '_, '_, S>,
         dims: D,
     ) -> ArrayData<'target, 'static, S>
     where
@@ -240,7 +249,7 @@ impl<'data> Array<'_, 'data> {
     /// If the array size is too large or if the type is invalid, Julia will throw an error. This
     /// error is caught and returned.
     pub fn new_for<'target, 'current, 'borrow, D, S>(
-        target: ExtendedTarget<'target, 'current, 'borrow, S>,
+        target: ExtendedTarget<'target, '_, '_, S>,
         dims: D,
         ty: Value,
     ) -> ArrayResult<'target, 'static, S>
@@ -309,7 +318,7 @@ impl<'data> Array<'_, 'data> {
     /// Safety: If the array size is too large or if the type is invalid, Julia will throw an
     /// error. This error is not caught, which is UB from a `ccall`ed function.
     pub unsafe fn new_for_unchecked<'target, 'current, 'borrow, D, S>(
-        target: ExtendedTarget<'target, 'current, 'borrow, S>,
+        target: ExtendedTarget<'target, '_, '_, S>,
         dims: D,
         ty: Value,
     ) -> ArrayData<'target, 'static, S>
@@ -359,7 +368,7 @@ impl<'data> Array<'_, 'data> {
     /// If the array size is too large, Julia will throw an error. This error is caught and
     /// returned.
     pub fn from_slice<'target: 'current, 'current: 'borrow, 'borrow, T, D, S>(
-        target: ExtendedTarget<'target, 'current, 'borrow, S>,
+        target: ExtendedTarget<'target, '_, '_, S>,
         data: &'data mut [T],
         dims: D,
     ) -> JlrsResult<ArrayResult<'target, 'data, S>>
@@ -440,7 +449,7 @@ impl<'data> Array<'_, 'data> {
     /// Safety: If the array size is too large, Julia will throw an error. This error is not
     /// caught, which is UB from a `ccall`ed function.
     pub unsafe fn from_slice_unchecked<'target, 'current, 'borrow, T, D, S>(
-        target: ExtendedTarget<'target, 'current, 'borrow, S>,
+        target: ExtendedTarget<'target, '_, '_, S>,
         data: &'data mut [T],
         dims: D,
     ) -> JlrsResult<ArrayData<'target, 'data, S>>
@@ -503,7 +512,7 @@ impl<'data> Array<'_, 'data> {
     /// If the array size is too large, Julia will throw an error. This error is caught and
     /// returned.
     pub fn from_vec<'target, 'current, 'borrow, T, D, S>(
-        target: ExtendedTarget<'target, 'current, 'borrow, S>,
+        target: ExtendedTarget<'target, '_, '_, S>,
         data: Vec<T>,
         dims: D,
     ) -> JlrsResult<ArrayResult<'target, 'static, S>>
@@ -592,7 +601,7 @@ impl<'data> Array<'_, 'data> {
     /// Safety: If the array size is too large, Julia will throw an error. This error is not
     /// caught, which is UB from a `ccall`ed function.
     pub unsafe fn from_vec_unchecked<'target, 'current, 'borrow, T, D, S>(
-        target: ExtendedTarget<'target, 'current, 'borrow, S>,
+        target: ExtendedTarget<'target, '_, '_, S>,
         data: Vec<T>,
         dims: D,
     ) -> JlrsResult<ArrayData<'target, 'static, S>>
@@ -765,6 +774,45 @@ impl<'scope, 'data> Array<'scope, 'data> {
             let value_type = self.element_type().display_string_or(CANNOT_DISPLAY_TYPE);
             Err(AccessError::InvalidLayout { value_type })?
         }
+    }
+
+    /// Convert this array to a [`TypedValue`].
+    pub fn as_typed_value<T: ConstructType, const N: isize>(
+        self,
+        frame: &mut GcFrame,
+    ) -> JlrsResult<TypedValue<'scope, 'data, ArrayType<T, N>>> {
+        frame.scope(|mut frame| {
+            let ty = T::construct_type(frame.as_extended_target());
+            let elty = self.element_type();
+            if ty != elty {
+                // err
+                Err(TypeError::IncompatibleType {
+                    element_type: elty.display_string_or("<Cannot display type>"),
+                    value_type: ty.display_string_or("<Cannot display type>"),
+                })?;
+            }
+
+            unsafe {
+                let rank = self.dimensions().rank();
+                if rank != N as _ {
+                    Err(ArrayLayoutError::RankMismatch {
+                        found: rank as isize,
+                        provided: N,
+                    })?;
+                }
+
+                Ok(TypedValue::<ArrayType<T, N>>::from_value_unchecked(
+                    self.as_value(),
+                ))
+            }
+        })
+    }
+
+    /// Convert this array to a [`TypedValue`] without checking if the layout is compatible.
+    pub unsafe fn as_typed_value_unchecked<T: ConstructType, const N: isize>(
+        self,
+    ) -> TypedValue<'scope, 'data, ArrayType<T, N>> {
+        TypedValue::<ArrayType<T, N>>::from_value_unchecked(self.as_value())
     }
 
     /// Convert this array to a [`RankedArray`].
@@ -1038,10 +1086,22 @@ impl<'scope, 'data> Array<'scope, 'data> {
         ArrayAccessor::new(self)
     }
 
+    pub unsafe fn into_slice_unchecked<T>(self) -> &'scope [T] {
+        let len = self.dimensions().size();
+        let data = self.data_ptr().cast::<T>();
+        std::slice::from_raw_parts(data, len)
+    }
+
     pub unsafe fn as_slice_unchecked<'borrow, T>(&'borrow self) -> &'borrow [T] {
         let len = self.dimensions().size();
         let data = self.data_ptr().cast::<T>();
         std::slice::from_raw_parts(data, len)
+    }
+
+    pub unsafe fn into_mut_slice_unchecked<T>(self) -> &'scope mut [T] {
+        let len = self.dimensions().size();
+        let data = self.data_ptr().cast::<T>();
+        std::slice::from_raw_parts_mut(data, len)
     }
 
     pub unsafe fn as_mut_slice_unchecked<'borrow, T>(&'borrow mut self) -> &'borrow mut [T] {
@@ -1058,7 +1118,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     /// elements.
     pub unsafe fn reshape<'target, 'current, 'borrow, D, S>(
         &self,
-        target: ExtendedTarget<'target, 'current, 'borrow, S>,
+        target: ExtendedTarget<'target, '_, '_, S>,
         dims: D,
     ) -> ArrayResult<'target, 'data, S>
     where
@@ -1112,7 +1172,7 @@ impl<'scope, 'data> Array<'scope, 'data> {
     /// This error is not caught, which is UB from a `ccall`ed function.
     pub unsafe fn reshape_unchecked<'target, 'current, 'borrow, D, S>(
         &self,
-        target: ExtendedTarget<'target, 'current, 'borrow, S>,
+        target: ExtendedTarget<'target, '_, '_, S>,
         dims: D,
     ) -> ArrayData<'target, 'data, S>
     where
@@ -1398,18 +1458,6 @@ impl<'scope, 'data> ManagedPriv<'scope, 'data> for Array<'scope, 'data> {
     }
 }
 
-unsafe impl<'scope, 'data> ConstructTypeRelaxed for Option<ArrayRef<'scope, 'data>> {
-    fn construct_type_relaxed<'target, T>(
-        target: ExtendedTarget<'target, '_, '_, T>,
-    ) -> super::value::ValueData<'target, 'static, T>
-    where
-        T: Target<'target>,
-    {
-        let (target, _) = target.split();
-        UnionAll::array_type(&target).as_value().root(target)
-    }
-}
-
 impl_ccall_arg_managed!(Array, 2);
 
 /// Exactly the same as [`Array`], except it has an explicit element type `T`.
@@ -1420,6 +1468,60 @@ pub struct TypedArray<'scope, 'data, T>(
     PhantomData<&'data ()>,
     PhantomData<T>,
 );
+
+impl<'scope, 'data, T> TypedArray<'scope, 'data, T> {
+    /// Returns the array's dimensions.
+    pub unsafe fn dimensions(self) -> ArrayDimensions<'scope> {
+        self.as_array().dimensions()
+    }
+
+    /// Returns the type of this array's elements.
+    pub fn element_type(self) -> Value<'scope, 'static> {
+        self.as_array().element_type()
+    }
+
+    /// Returns the size of this array's elements.
+    pub fn element_size(self) -> usize {
+        self.as_array().element_size()
+    }
+
+    /// Convert `self` to `Array`.
+    pub fn as_array(self) -> Array<'scope, 'data> {
+        unsafe { Array::wrap_non_null(self.0, Private) }
+    }
+}
+
+impl<'scope, 'data, T: ConstructType> TypedArray<'scope, 'data, T> {
+    /// Convert this array to a [`TypedValue`].
+    pub fn as_typed_value<const N: isize>(
+        self,
+    ) -> JlrsResult<TypedValue<'scope, 'data, ArrayType<T, N>>> {
+        unsafe {
+            let ptr = self.0;
+            let rank = self.dimensions().rank();
+            if rank != N as _ {
+                Err(ArrayLayoutError::RankMismatch {
+                    found: rank as isize,
+                    provided: N,
+                })?;
+            }
+
+            Ok(TypedValue::<ArrayType<T, N>>::from_value_unchecked(
+                Value::wrap_non_null(ptr.cast(), Private),
+            ))
+        }
+    }
+
+    /// Convert this array to a [`TypedValue`] without checking if the layout is compatible.
+    pub unsafe fn as_typed_value_unchecked<const N: isize>(
+        self,
+    ) -> TypedValue<'scope, 'data, ArrayType<T, N>> {
+        TypedValue::<ArrayType<T, N>>::from_value_unchecked(Value::wrap_non_null(
+            self.0.cast(),
+            Private,
+        ))
+    }
+}
 
 impl<'scope, 'data, T> Clone for TypedArray<'scope, 'data, T>
 where
@@ -1445,7 +1547,7 @@ where
     /// If the array size is too large, Julia will throw an error. This error is caught and
     /// returned.
     pub fn new<'target, 'current, 'borrow, D, S>(
-        target: ExtendedTarget<'target, 'current, 'borrow, S>,
+        target: ExtendedTarget<'target, '_, '_, S>,
         dims: D,
     ) -> TypedArrayResult<'target, 'static, S, T>
     where
@@ -1481,7 +1583,7 @@ where
     /// Safety: If the array size is too large, Julia will throw an error. This error is not
     /// caught, which is UB from a `ccall`ed function.
     pub unsafe fn new_unchecked<'target, 'current, 'borrow, D, S>(
-        target: ExtendedTarget<'target, 'current, 'borrow, S>,
+        target: ExtendedTarget<'target, '_, '_, S>,
         dims: D,
     ) -> TypedArrayData<'target, 'data, S, T>
     where
@@ -1513,7 +1615,7 @@ where
     /// If the array size is too large, Julia will throw an error. This error is caught and
     /// returned.
     pub fn from_slice<'target: 'current, 'current: 'borrow, 'borrow, D, S>(
-        target: ExtendedTarget<'target, 'current, 'borrow, S>,
+        target: ExtendedTarget<'target, '_, '_, S>,
         data: &'data mut [T],
         dims: D,
     ) -> JlrsResult<TypedArrayResult<'target, 'data, S, T>>
@@ -1550,7 +1652,7 @@ where
     /// Safety: If the array size is too large, Julia will throw an error. This error is not
     /// caught, which is UB from a `ccall`ed function.
     pub unsafe fn from_slice_unchecked<'target, 'current, 'borrow, D, S>(
-        target: ExtendedTarget<'target, 'current, 'borrow, S>,
+        target: ExtendedTarget<'target, '_, '_, S>,
         data: &'data mut [T],
         dims: D,
     ) -> JlrsResult<TypedArrayData<'target, 'data, S, T>>
@@ -1583,7 +1685,7 @@ where
     /// If the array size is too large, Julia will throw an error. This error is caught and
     /// returned.
     pub fn from_vec<'target, 'current, 'borrow, D, S>(
-        target: ExtendedTarget<'target, 'current, 'borrow, S>,
+        target: ExtendedTarget<'target, '_, '_, S>,
         data: Vec<T>,
         dims: D,
     ) -> JlrsResult<TypedArrayResult<'target, 'static, S, T>>
@@ -1621,7 +1723,7 @@ where
     /// Safety: If the array size is too large, Julia will throw an error. This error is not
     /// caught, which is UB from a `ccall`ed function.
     pub unsafe fn from_vec_unchecked<'target, 'current, 'borrow, D, S>(
-        target: ExtendedTarget<'target, 'current, 'borrow, S>,
+        target: ExtendedTarget<'target, '_, '_, S>,
         data: Vec<T>,
         dims: D,
     ) -> JlrsResult<TypedArrayData<'target, 'static, S, T>>
@@ -1656,7 +1758,7 @@ where
     /// If the array size is too large or if the type is invalid, Julia will throw an error. This
     /// error is caught and returned.
     pub fn new_for<'target, 'current, 'borrow, D, S>(
-        target: ExtendedTarget<'target, 'current, 'borrow, S>,
+        target: ExtendedTarget<'target, '_, '_, S>,
         dims: D,
         ty: Value,
     ) -> JlrsResult<TypedArrayResult<'target, 'static, S, T>>
@@ -1696,7 +1798,7 @@ where
     /// Safety: If the array size is too large or if the type is invalid, Julia will throw an
     /// error. This error is not caught, which is UB from a `ccall`ed function.
     pub unsafe fn new_for_unchecked<'target, 'current, 'borrow, D, S>(
-        target: ExtendedTarget<'target, 'current, 'borrow, S>,
+        target: ExtendedTarget<'target, '_, '_, S>,
         dims: D,
         ty: Value,
     ) -> JlrsResult<TypedArrayData<'target, 'static, S, T>>
@@ -1746,21 +1848,6 @@ impl<'scope, 'data, T> TypedArray<'scope, 'data, T>
 where
     T: ValidField,
 {
-    /// Returns the array's dimensions.
-    pub unsafe fn dimensions(self) -> ArrayDimensions<'scope> {
-        self.as_array().dimensions()
-    }
-
-    /// Returns the type of this array's elements.
-    pub fn element_type(self) -> Value<'scope, 'static> {
-        self.as_array().element_type()
-    }
-
-    /// Returns the size of this array's elements.
-    pub fn element_size(self) -> usize {
-        self.as_array().element_size()
-    }
-
     /// Returns `true` if the elements of the array are stored inline.
     pub fn is_inline_array(self) -> bool {
         self.as_array().is_inline_array()
@@ -1891,11 +1978,6 @@ where
         Ok(accessor)
     }
 
-    /// Convert `self` to `Array`.
-    pub fn as_array(self) -> Array<'scope, 'data> {
-        unsafe { Array::wrap_non_null(self.unwrap_non_null(Private), Private) }
-    }
-
     /// Convert this array to a [`RankedArray`].
     pub fn try_as_ranked<const N: isize>(self) -> JlrsResult<RankedArray<'scope, 'data, N>> {
         unsafe {
@@ -1940,7 +2022,7 @@ where
     /// elements.
     pub unsafe fn reshape<'target, 'current, 'borrow, D, S>(
         &self,
-        target: ExtendedTarget<'target, 'current, 'borrow, S>,
+        target: ExtendedTarget<'target, '_, '_, S>,
         dims: D,
     ) -> TypedArrayResult<'target, 'data, S, T>
     where
@@ -1973,7 +2055,7 @@ where
     /// This error is not caught, which is UB from a `ccall`ed function.
     pub unsafe fn reshape_unchecked<'target, 'current, 'borrow, D, S>(
         self,
-        target: ExtendedTarget<'target, 'current, 'borrow, S>,
+        target: ExtendedTarget<'target, '_, '_, S>,
         dims: D,
     ) -> TypedArrayData<'target, 'data, S, T>
     where
@@ -2231,29 +2313,6 @@ where
     }
 }
 
-unsafe impl<'scope, 'data, U: ConstructTypeRelaxed + ValidField> ConstructTypeRelaxed
-    for Option<TypedArrayRef<'scope, 'data, U>>
-{
-    fn construct_type_relaxed<'target, T>(
-        target: ExtendedTarget<'target, '_, '_, T>,
-    ) -> super::value::ValueData<'target, 'static, T>
-    where
-        T: Target<'target>,
-    {
-        let (target, frame) = target.split();
-        frame
-            .scope(|mut frame| {
-                let ua = UnionAll::array_type(&target);
-                let t0 = U::construct_type_relaxed(frame.as_extended_target());
-                unsafe {
-                    let o = ua.apply_types_unchecked(target, [t0]);
-                    Ok(o)
-                }
-            })
-            .unwrap()
-    }
-}
-
 unsafe impl<'scope, 'data, T: ValidField> Typecheck for TypedArray<'scope, 'data, T> {
     fn typecheck(t: DataType) -> bool {
         // Safety: borrow is only temporary
@@ -2389,6 +2448,18 @@ pub type ArrayRef<'scope, 'data> = Ref<'scope, 'data, Array<'scope, 'data>>;
 /// `ccall`able functions that return a [`Array`].
 pub type ArrayRet = Ref<'static, 'static, Array<'static, 'static>>;
 
+unsafe impl ConstructType for Array<'_, '_> {
+    fn construct_type<'target, T>(
+        target: ExtendedTarget<'target, '_, '_, T>,
+    ) -> super::value::ValueData<'target, 'static, T>
+    where
+        T: Target<'target>,
+    {
+        let (target, _) = target.split();
+        UnionAll::array_type(&target).as_value().root(target)
+    }
+}
+
 unsafe impl ValidLayout for ArrayRef<'_, '_> {
     fn valid_layout(v: Value) -> bool {
         if let Ok(dt) = v.cast::<DataType>() {
@@ -2485,6 +2556,45 @@ pub struct RankedArray<'scope, 'data, const N: isize>(
     PhantomData<&'data mut ()>,
 );
 
+impl<'scope, 'data, const N: isize> RankedArray<'scope, 'data, N> {
+    /// Convert `self` to `Array`.
+    pub fn as_array(self) -> Array<'scope, 'data> {
+        unsafe { Array::wrap_non_null(self.0, Private) }
+    }
+
+    /// Convert this array to a [`TypedValue`].
+    pub fn as_typed_value<T: ConstructType>(
+        self,
+        frame: &mut GcFrame,
+    ) -> JlrsResult<TypedValue<'scope, 'data, ArrayType<T, N>>> {
+        frame.scope(|mut frame| {
+            let ty = T::construct_type(frame.as_extended_target());
+            let arr = self.as_array();
+            let elty = arr.element_type();
+            if ty != elty {
+                // err
+                Err(TypeError::IncompatibleType {
+                    element_type: elty.display_string_or("<Cannot display type>"),
+                    value_type: ty.display_string_or("<Cannot display type>"),
+                })?;
+            }
+
+            unsafe {
+                Ok(TypedValue::<ArrayType<T, N>>::from_value_unchecked(
+                    self.as_value(),
+                ))
+            }
+        })
+    }
+
+    /// Convert this array to a [`TypedValue`] without checking if the layout is compatible.
+    pub unsafe fn as_typed_value_unchecked<T: ConstructType>(
+        self,
+    ) -> TypedValue<'scope, 'data, ArrayType<T, N>> {
+        TypedValue::<ArrayType<T, N>>::from_value_unchecked(self.as_value())
+    }
+}
+
 impl<const N: isize> Clone for RankedArray<'_, '_, N> {
     fn clone(&self) -> Self {
         RankedArray(self.0, PhantomData, PhantomData)
@@ -2507,31 +2617,6 @@ impl<'scope, 'data, const N: isize> ManagedPriv<'scope, 'data> for RankedArray<'
     #[inline(always)]
     fn unwrap_non_null(self, _: Private) -> NonNull<Self::Wraps> {
         self.0
-    }
-}
-
-unsafe impl<const N: isize> ConstructTypeRelaxed for Option<RankedArrayRef<'_, '_, N>> {
-    fn construct_type_relaxed<'target, T>(
-        target: ExtendedTarget<'target, '_, '_, T>,
-    ) -> super::value::ValueData<'target, 'static, T>
-    where
-        T: Target<'target>,
-    {
-        let (target, frame) = target.split();
-        frame
-            .scope(|mut frame| {
-                let ua = UnionAll::array_type(&target);
-                unsafe {
-                    let inner = ua.body();
-                    let var = ua.var();
-                    let rank = Value::new(&mut frame, N);
-                    let ty = inner.apply_type_unchecked(&mut frame, [rank]);
-
-                    let out = UnionAll::new_unchecked(target, var, ty);
-                    Ok(out)
-                }
-            })
-            .unwrap()
     }
 }
 
@@ -2619,6 +2704,48 @@ pub struct TypedRankedArray<'scope, 'data, U, const N: isize>(
     PhantomData<U>,
 );
 
+impl<'scope, 'data, U: ConstructType, const N: isize> TypedRankedArray<'scope, 'data, U, N> {
+    pub fn as_typed(self) -> TypedArray<'scope, 'data, U> {
+        TypedArray(self.0, PhantomData, PhantomData, PhantomData)
+    }
+
+    /// Convert `self` to `Array`.
+    pub fn as_array(self) -> Array<'scope, 'data> {
+        unsafe { Array::wrap_non_null(self.0, Private) }
+    }
+
+    /// Convert this array to a [`TypedValue`].
+    pub fn as_typed_value(
+        self,
+        frame: &mut GcFrame,
+    ) -> JlrsResult<TypedValue<'scope, 'data, ArrayType<U, N>>> {
+        frame.scope(|mut frame| {
+            let ty = U::construct_type(frame.as_extended_target());
+            let arr = self.as_array();
+            let elty = arr.element_type();
+            if ty != elty {
+                // err
+                Err(TypeError::IncompatibleType {
+                    element_type: elty.display_string_or("<Cannot display type>"),
+                    value_type: ty.display_string_or("<Cannot display type>"),
+                })?;
+            }
+
+            unsafe {
+                Ok(TypedValue::<ArrayType<U, N>>::from_value_unchecked(
+                    arr.as_value(),
+                ))
+            }
+        })
+    }
+
+    /// Convert this array to a [`TypedValue`] without checking if the layout is compatible.
+    pub unsafe fn as_typed_value_unchecked(self) -> TypedValue<'scope, 'data, ArrayType<U, N>> {
+        let arr = self.as_array();
+        TypedValue::<ArrayType<U, N>>::from_value_unchecked(arr.as_value())
+    }
+}
+
 impl<U, const N: isize> Clone for TypedRankedArray<'_, '_, U, N> {
     fn clone(&self) -> Self {
         TypedRankedArray(self.0, PhantomData, PhantomData, PhantomData)
@@ -2627,19 +2754,12 @@ impl<U, const N: isize> Clone for TypedRankedArray<'_, '_, U, N> {
 
 impl<U, const N: isize> Copy for TypedRankedArray<'_, '_, U, N> {}
 
-unsafe impl<U: ConstructTypeRelaxed + ValidField, const N: isize> ConstructType
-    for Option<TypedRankedArrayRef<'_, '_, U, N>>
+unsafe impl<U: ConstructType + ValidField, const N: isize> ConstructType
+    for TypedRankedArray<'_, '_, U, N>
 {
-    fn base_type<'target, T>(target: &T) -> Value<'target, 'static>
-    where
-        T: Target<'target>,
-    {
-        UnionAll::array_type(target).as_value()
-    }
-
     fn construct_type<'target, T>(
         target: ExtendedTarget<'target, '_, '_, T>,
-    ) -> super::datatype::DataTypeData<'target, T>
+    ) -> super::value::ValueData<'target, 'static, T>
     where
         T: Target<'target>,
     {
@@ -2650,7 +2770,7 @@ unsafe impl<U: ConstructTypeRelaxed + ValidField, const N: isize> ConstructType
                 unsafe {
                     let inner = ua.body();
                     let ty_var = ua.var();
-                    let elem_ty = U::construct_type_relaxed(frame.as_extended_target());
+                    let elem_ty = U::construct_type(frame.as_extended_target());
                     let rank = Value::new(&mut frame, N);
                     let with_rank = inner.apply_type_unchecked(&mut frame, [rank]);
 
@@ -2658,7 +2778,6 @@ unsafe impl<U: ConstructTypeRelaxed + ValidField, const N: isize> ConstructType
                     let ty = rewrap
                         .apply_type_unchecked(&target, [elem_ty])
                         .as_value()
-                        .cast_unchecked::<DataType>()
                         .root(target);
                     Ok(ty)
                 }
@@ -2753,18 +2872,21 @@ unsafe impl<U: ValidField, const N: isize> ValidField
     }
 }
 
-unsafe impl<'scope, 'data, U: ValidField + ConstructTypeRelaxed, const N: isize> CCallArg
+unsafe impl<'scope, 'data, U: ValidField + ConstructType, const N: isize> CCallArg
     for TypedRankedArray<'scope, 'data, U, N>
 {
-    type CCallArgType = Option<TypedRankedArrayRef<'scope, 'data, U, N>>;
-    type FunctionArgType = Option<TypedRankedArrayRef<'scope, 'data, U, N>>;
+    type CCallArgType = TypedRankedArray<'scope, 'data, U, N>;
+    type FunctionArgType = TypedRankedArray<'scope, 'data, U, N>;
 }
 
-unsafe impl<'scope, 'data, U: ValidField + ConstructTypeRelaxed, const N: isize> CCallReturn
+unsafe impl<'scope, 'data, U: ValidField + ConstructType, const N: isize> CCallReturn
     for TypedRankedArrayRef<'scope, 'data, U, N>
 {
-    type CCallReturnType = Option<TypedRankedArrayRef<'scope, 'data, U, N>>;
-    type FunctionReturnType = Option<TypedRankedArrayRef<'scope, 'data, U, N>>;
+    type CCallReturnType = TypedRankedArray<'scope, 'data, U, N>;
+    type FunctionReturnType = TypedRankedArray<'scope, 'data, U, N>;
 }
 
 // TODO: conversions
+
+/// Alias for `ArrayTypeConstructor<T, ConstantIsize<N>>`.
+pub type ArrayType<T, const N: isize> = ArrayTypeConstructor<T, ConstantIsize<N>>;

@@ -26,9 +26,11 @@ use jl_sys::jl_bottom_type;
 
 use super::valid_layout::{ValidField, ValidLayout};
 use crate::{
-    data::managed::{
-        datatype::DataType, private::ManagedPriv as _, typecheck::Typecheck, union::Union,
-        value::Value, Managed,
+    data::{
+        managed::{
+            datatype::DataType, private::ManagedPriv as _, union::Union, value::Value, Managed,
+        },
+        types::typecheck::Typecheck,
     },
     private::Private,
 };

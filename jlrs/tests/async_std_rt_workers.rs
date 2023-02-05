@@ -1,13 +1,13 @@
 #[cfg(all(
-    feature = "tokio-rt",
-    not(all(target_os = "windows", feature = "julia-1-6")),
+    feature = "async-std-rt",
+    not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")),
 ))]
 #[cfg(test)]
 mod util;
 
 #[cfg(all(
-    feature = "tokio-rt",
-    not(all(target_os = "windows", feature = "julia-1-6")),
+    feature = "async-std-rt",
+    not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")),
 ))]
 #[cfg(test)]
 mod tests {
@@ -18,19 +18,20 @@ mod tests {
 
     use super::util::{async_tasks::*, ASYNC_TESTS_JL};
 
-    fn init() -> Arc<AsyncJulia<Tokio>> {
+    fn init() -> Arc<AsyncJulia<AsyncStd>> {
         unsafe {
             let r = Arc::new(
                 RuntimeBuilder::new()
-                    .async_runtime::<Tokio>()
+                    .async_runtime::<AsyncStd>()
                     .n_threads(4)
                     .channel_capacity(NonZeroUsize::new_unchecked(32))
+                    .n_worker_threads(4)
                     .start::<4>()
                     .expect("Could not init Julia")
                     .0,
             );
 
-            let (sender, recv) = tokio::sync::oneshot::channel();
+            let (sender, recv) = async_std::channel::unbounded();
             r.as_ref()
                 .blocking_task(
                     |mut frame| {
@@ -42,7 +43,7 @@ mod tests {
                 .try_dispatch_any()
                 .expect("Could not send blocking task");
 
-            recv.blocking_recv()
+            async_std::task::block_on(async { recv.recv().await })
                 .expect("Could not receive reply")
                 .expect("Could not load AsyncTests module");
 
@@ -50,7 +51,7 @@ mod tests {
         }
     }
 
-    pub static JULIA: OnceCell<Arc<AsyncJulia<Tokio>>> = OnceCell::new();
+    pub static JULIA: OnceCell<Arc<AsyncJulia<AsyncStd>>> = OnceCell::new();
 
     #[test]
     fn test_task() {
@@ -223,7 +224,6 @@ mod tests {
         assert_eq!(receiver.recv().unwrap().unwrap(), 30_000_006.0);
     }
 
-    /*
     #[test]
     fn test_nesting_call_dynamic_task() {
         let julia = JULIA.get_or_init(init);
@@ -243,7 +243,6 @@ mod tests {
 
         assert_eq!(receiver.recv().unwrap().unwrap(), 30_000_006.0);
     }
-    */
 
     #[test]
     fn test_persistent() {
@@ -261,7 +260,7 @@ mod tests {
         let handle = {
             let (handle_sender, handle_receiver) = crossbeam_channel::bounded(1);
             julia
-                .persistent::<UnboundedChannel<_>, _, _>(
+                .persistent::<AsyncStdChannel<_>, _, _>(
                     AccumulatorTask { init_value: 5.0 },
                     handle_sender,
                 )

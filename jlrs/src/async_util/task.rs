@@ -48,7 +48,9 @@ use crate::{
 ///     // The type of the result of this task if it succeeds.
 ///     type Output = u64;
 ///
-///     // TODO
+///     // The thread-affinity of this task. This lets you control whether this kind of task is
+///     // always dispatched to the main thread, to a worker thread if they're used, or to either.
+///     // This task can be dispatched to either the main thread or a worker thread.
 ///     type Affinity = DispatchAny;
 ///
 ///     async fn run<'base>(&mut self, mut frame: AsyncGcFrame<'base>) -> JlrsResult<Self::Output> {
@@ -126,11 +128,16 @@ pub trait AsyncTask: 'static + Send {
 /// impl PersistentTask for AccumulatorTask {
 ///     // The type of the result of the task if it succeeds.
 ///     type Output = usize;
+///
 ///     // The type of the task's internal state.
 ///     type State<'state> = AccumulatorTaskState<'state>;
+///
 ///     // The type of the additional data that the task must be called with.
 ///     type Input = usize;
 ///
+///     // The thread-affinity of this task. This lets you control whether this kind of task is
+///     // always dispatched to the main thread, to a worker thread if they're used, or to either.
+///     // This task can be dispatched to either the main thread or a worker thread.
 ///     type Affinity = DispatchAny;
 ///
 ///     // This method is called before the handle is returned. Note that the

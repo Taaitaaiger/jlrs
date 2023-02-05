@@ -12,9 +12,12 @@ mod tests {
     #[cfg(feature = "internal-types")]
     use jlrs::data::managed::internal::method_instance::MethodInstance;
     use jlrs::{
-        data::managed::{
-            simple_vector::SimpleVector, symbol::SymbolRef, type_name::TypeName, type_var::TypeVar,
-            typecheck::*, union::Union, union_all::UnionAll,
+        data::{
+            managed::{
+                simple_vector::SimpleVector, symbol::SymbolRef, type_name::TypeName,
+                type_var::TypeVar, union::Union, union_all::UnionAll,
+            },
+            types::typecheck::*,
         },
         prelude::*,
     };

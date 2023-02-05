@@ -8,12 +8,13 @@ use syn::{
     parse_quote,
     punctuated::Punctuated,
     token::Comma,
-    Attribute, Error, Expr, FnArg, Ident, ItemFn, Result, ReturnType, Signature, Token, Type,
+    AttrStyle, Attribute, Error, Expr, FnArg, GenericArgument, Ident, ItemFn, Lit, Meta,
+    NestedMeta, PathArguments, Result, ReturnType, Signature, Token, Type, TypeParamBound,
 };
 
 type RenameFragments = Punctuated<Ident, Token![.]>;
 
-// TODO: Doc fragments
+// TODO: threadcall?
 
 struct InitFn {
     _become_token: Token![become],
@@ -142,6 +143,44 @@ impl Parse for ExportedMethod {
     }
 }
 
+struct ExportedAsyncCallback {
+    _async_token: Token![async],
+    func: Signature,
+    _as_token: Option<Token![as]>,
+    name_override: Option<RenameFragments>,
+    exclamation_mark_token: Option<Token![!]>,
+}
+
+impl Parse for ExportedAsyncCallback {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let async_token = input.parse()?;
+        let func = input.parse()?;
+
+        let lookahead = input.lookahead1();
+        if lookahead.peek(Token![as]) {
+            let as_token = input.parse()?;
+            let name_override = RenameFragments::parse_separated_nonempty(input)?;
+            let exclamation_mark_token = input.parse()?;
+
+            Ok(ExportedAsyncCallback {
+                _async_token: async_token,
+                func,
+                _as_token: Some(as_token),
+                name_override: Some(name_override),
+                exclamation_mark_token,
+            })
+        } else {
+            Ok(ExportedAsyncCallback {
+                _async_token: async_token,
+                func,
+                _as_token: None,
+                name_override: None,
+                exclamation_mark_token: None,
+            })
+        }
+    }
+}
+
 struct ExportedConst {
     _const_token: Token![const],
     name: Ident,
@@ -225,10 +264,77 @@ impl Parse for ExportedGlobal {
         }
     }
 }
+
+struct DocString {
+    doc: String,
+    generic: bool,
+}
+
 struct ItemWithAttrs {
     _attrs: Vec<Attribute>,
     item: Box<ModuleItem>,
 }
+
+impl ItemWithAttrs {
+    fn get_docstr(&self) -> DocString {
+        for attr in self._attrs.iter() {
+            match attr.style {
+                AttrStyle::Outer => (),
+                _ => panic!(
+                    "expected either `#[doc(\"docs...\")]` or `#[doc(\"docs...\", generic)]`"
+                ),
+            }
+            if let Ok(syn::Meta::List(m)) = attr.parse_meta() {
+                if m.path.segments.len() != 1 {
+                    panic!("expected either `doc(\"docs...\")` or `doc(\"docs...\", generic)`");
+                }
+
+                let doc_ident = &m.path.segments.first().unwrap().ident;
+                if doc_ident.to_string() != "doc" {
+                    panic!("expected either `doc(\"docs...\")` or `doc(\"docs...\", generic)`");
+                }
+
+                match m.nested.len() {
+                    1 => {
+                        let first = m.nested.first().unwrap();
+                        if let NestedMeta::Lit(Lit::Str(s)) = first {
+                            return DocString {
+                                doc: s.value(),
+                                generic: false,
+                            };
+                        }
+                    }
+                    2 => {
+                        let first = m.nested.first().unwrap();
+                        let last = m.nested.last().unwrap();
+                        if let NestedMeta::Lit(Lit::Str(s)) = first {
+                            if let NestedMeta::Meta(Meta::Path(p)) = last {
+                                if p.segments.len() > 1 {
+                                    panic!("expected either `doc(\"docs...\")` or `doc(\"docs...\", generic)`")
+                                }
+
+                                if p.segments.first().unwrap().ident.to_string() != "generic" {
+                                    panic!("expected either `doc(\"docs...\")` or `doc(\"docs...\", generic)`")
+                                }
+
+                                return DocString {
+                                    doc: s.value(),
+                                    generic: true,
+                                };
+                            }
+                        }
+                    }
+                    _ => {
+                        panic!("expected either `doc(\"docs...\")` or `doc(\"docs...\", generic)`")
+                    }
+                }
+            }
+        }
+
+        panic!("expected either `doc(\"docs...\")` or `doc(\"docs...\", generic)`")
+    }
+}
+
 impl Parse for ItemWithAttrs {
     fn parse(input: ParseStream) -> Result<Self> {
         let attr: Vec<Attribute> = input.call(Attribute::parse_outer)?;
@@ -245,6 +351,7 @@ enum ModuleItem {
     ExportedType(ExportedType),
     ExportedFunction(ExportedFunction),
     ExportedMethod(ExportedMethod),
+    ExportedAsyncCallback(ExportedAsyncCallback),
     ExportedConst(ExportedConst),
     ExportedGlobal(ExportedGlobal),
     ItemWithAttrs(ItemWithAttrs),
@@ -298,6 +405,32 @@ impl ModuleItem {
             ModuleItem::ExportedMethod(ref exported_method) => exported_method,
             ModuleItem::ItemWithAttrs(ItemWithAttrs { item, .. }) if item.is_exported_method() => {
                 item.get_exported_method()
+            }
+            _ => panic!(),
+        }
+    }
+
+    fn is_exported_async_callback(&self) -> bool {
+        match self {
+            ModuleItem::ExportedAsyncCallback(_) => true,
+            ModuleItem::ItemWithAttrs(ItemWithAttrs { item, .. })
+                if item.is_exported_async_callback() =>
+            {
+                true
+            }
+            _ => false,
+        }
+    }
+
+    fn get_exported_async_callback(&self) -> &ExportedAsyncCallback {
+        match self {
+            ModuleItem::ExportedAsyncCallback(ref exported_async_callback) => {
+                exported_async_callback
+            }
+            ModuleItem::ItemWithAttrs(ItemWithAttrs { item, .. })
+                if item.is_exported_async_callback() =>
+            {
+                item.get_exported_async_callback()
             }
             _ => panic!(),
         }
@@ -363,12 +496,17 @@ impl ModuleItem {
         }
     }
 
-    fn _get_attrs(&self) -> Option<_Attributes> {
+    fn has_attrs(&self) -> bool {
         match self {
-            ModuleItem::ItemWithAttrs(ItemWithAttrs { _attrs: attrs, .. }) => {
-                Some(_Attributes { attrs })
-            }
-            _ => None,
+            ModuleItem::ItemWithAttrs(_) => true,
+            _ => false,
+        }
+    }
+
+    fn get_attrs(&self) -> &ItemWithAttrs {
+        match self {
+            ModuleItem::ItemWithAttrs(ref item) => item,
+            _ => panic!(),
         }
     }
 }
@@ -384,6 +522,8 @@ impl Parse for ModuleItem {
             input.parse().map(ModuleItem::ExportedFunction)
         } else if lookahead.peek(Token![in]) {
             input.parse().map(ModuleItem::ExportedMethod)
+        } else if lookahead.peek(Token![async]) {
+            input.parse().map(ModuleItem::ExportedAsyncCallback)
         } else if lookahead.peek(Token![const]) {
             input.parse().map(ModuleItem::ExportedConst)
         } else if lookahead.peek(Token![static]) {
@@ -424,9 +564,11 @@ impl JuliaModule {
 
         let fn_fragments = FunctionFragments::generate(&self, init_fn);
         let method_fragments = MethodFragments::generate(&self, init_fn);
+        let async_callback_fragments = AsyncCallbackFragments::generate(&self, init_fn);
         let type_fragments = TypeFragments::generate(&self, init_fn);
         let const_fragments = ConstFragments::generate(&self, init_fn);
         let global_fragments = GlobalFragments::generate(&self, init_fn);
+        let doc_fragments = DocFragments::generate(&self, init_fn);
 
         // DocFragments::generate
 
@@ -438,10 +580,14 @@ impl JuliaModule {
         let function_init_fn_ident = fn_fragments.init_functions_fn_ident;
         let method_init_fn = method_fragments.init_methods_fn;
         let method_init_fn_ident = method_fragments.init_methods_fn_ident;
+        let async_callback_init_fn = async_callback_fragments.init_async_callbacks_fn;
+        let async_callback_init_fn_ident = async_callback_fragments.init_async_callbacks_fn_ident;
         let const_init_fn = const_fragments.const_init_fn;
         let const_init_fn_ident = const_fragments.const_init_ident;
         let global_init_fn = global_fragments.global_init_fn;
         let global_init_fn_ident = global_fragments.global_init_ident;
+        let doc_init_fn = doc_fragments.init_docs_fn;
+        let doc_init_fn_ident = doc_fragments.init_docs_fn_ident;
 
         let invoke_type_init: Expr = if type_reinit_fn_ident.is_none() {
             parse_quote! {
@@ -486,9 +632,13 @@ impl JuliaModule {
 
                 #method_init_fn
 
+                #async_callback_init_fn
+
                 #const_init_fn
 
                 #global_init_fn
+
+                #doc_init_fn
 
                 static IS_INIT: ::std::sync::atomic::AtomicBool = ::std::sync::atomic::AtomicBool::new(false);
                 if IS_INIT.compare_exchange(false, true, ::std::sync::atomic::Ordering::Relaxed, ::std::sync::atomic::Ordering::Relaxed).is_err() {
@@ -502,14 +652,28 @@ impl JuliaModule {
                 ccall.init_jlrs();
 
                 ccall.scope(|mut frame| {
-                    let function_info_ty = ::jlrs::data::managed::module::Module::main(&frame)
+                    let wrap_mod = ::jlrs::data::managed::module::Module::main(&frame)
                         .submodule(&frame, "Jlrs")
                         .unwrap()
                         .as_managed()
                         .submodule(&frame, "Wrap")
                         .unwrap()
-                        .as_managed()
+                        .as_managed();
+
+                    let function_info_ty = wrap_mod
                         .global(&frame, "JlrsFunctionInfo")
+                        .unwrap()
+                        .as_value()
+                        .cast_unchecked::<::jlrs::data::managed::datatype::DataType>();
+
+                    let doc_item_ty = wrap_mod
+                        .global(&frame, "DocItem")
+                        .unwrap()
+                        .as_value()
+                        .cast_unchecked::<::jlrs::data::managed::datatype::DataType>();
+
+                    let module_info_ty = wrap_mod
+                        .global(&frame, "JlrsModuleInfo")
                         .unwrap()
                         .as_value()
                         .cast_unchecked::<::jlrs::data::managed::datatype::DataType>();
@@ -521,8 +685,13 @@ impl JuliaModule {
                     let mut arr = ::jlrs::data::managed::array::Array::new_for_unchecked(frame.as_extended_target(), 0, function_info_ty.as_value());
                     #function_init_fn_ident(&mut frame, &mut arr, module, function_info_ty);
                     #method_init_fn_ident(&mut frame, &mut arr, module, function_info_ty);
+                    #async_callback_init_fn_ident(&mut frame, &mut arr, module, function_info_ty);
 
-                    Ok(arr.as_value().as_ref().leak())
+                    let mut doc_items = ::jlrs::data::managed::array::Array::new_for_unchecked(frame.as_extended_target(), 0, doc_item_ty.as_value());
+                    if precompiling == 1 {
+                        #doc_init_fn_ident(&mut frame, &mut doc_items, module, doc_item_ty);
+                    }
+                    Ok(module_info_ty.instantiate_unchecked(&frame, [arr.as_value(), doc_items.as_value()]).leak())
                 }).unwrap()
             }
         };
@@ -561,6 +730,13 @@ impl JuliaModule {
             .map(|it| it.get_exported_method())
     }
 
+    fn get_exported_async_callbacks(&self) -> impl Iterator<Item = &ExportedAsyncCallback> {
+        self.items
+            .iter()
+            .filter(|it| it.is_exported_async_callback())
+            .map(|it| it.get_exported_async_callback())
+    }
+
     fn get_exported_types(&self) -> impl Iterator<Item = &ExportedType> {
         self.items
             .iter()
@@ -580,6 +756,55 @@ impl JuliaModule {
             .iter()
             .filter(|it| it.is_exported_global())
             .map(|it| it.get_exported_global())
+    }
+
+    fn get_items_with_attrs(&self) -> impl Iterator<Item = &ItemWithAttrs> {
+        self.items
+            .iter()
+            .filter(|it| it.has_attrs())
+            .map(|it| it.get_attrs())
+    }
+}
+
+struct DocFragments {
+    init_docs_fn_ident: Ident,
+    init_docs_fn: ItemFn,
+}
+
+impl DocFragments {
+    fn generate(module: &JuliaModule, init_fn: &InitFn) -> Self {
+        let init_docs_fn_ident = format_ident!("{}_docs", init_fn.init_fn);
+        let n_docs = module.get_items_with_attrs().count();
+
+        let doc_init_fragments = module
+            .get_items_with_attrs()
+            .enumerate()
+            .map(doc_info_fragment);
+
+        let init_docs_fn = parse_quote! {
+            unsafe fn #init_docs_fn_ident(
+                frame: &mut ::jlrs::memory::target::frame::GcFrame,
+                array: &mut ::jlrs::data::managed::array::Array<'_, 'static>,
+                module: ::jlrs::data::managed::module::Module,
+                doc_item_ty: ::jlrs::data::managed::datatype::DataType,
+            ) {
+                frame.scope(move |mut frame| {
+                    array.grow_end_unchecked(#n_docs);
+                    let mut accessor = array.indeterminate_data_mut();
+
+                    #(
+                        #doc_init_fragments
+                    )*
+
+                    Ok(())
+                }).unwrap()
+            }
+        };
+
+        DocFragments {
+            init_docs_fn_ident,
+            init_docs_fn,
+        }
     }
 }
 
@@ -605,7 +830,7 @@ impl FunctionFragments {
                 module: ::jlrs::data::managed::module::Module,
                 function_info_ty: ::jlrs::data::managed::datatype::DataType,
             ) {
-                frame.scope(|mut frame| {
+                frame.scope(move |mut frame| {
                     array.grow_end_unchecked(#n_functions);
                     let mut accessor = array.value_data_mut().unwrap();
 
@@ -647,7 +872,7 @@ impl MethodFragments {
                 module: ::jlrs::data::managed::module::Module,
                 function_info_ty: ::jlrs::data::managed::datatype::DataType,
             ) {
-                frame.scope(|mut frame| {
+                frame.scope(move |mut frame| {
                     array.grow_end_unchecked(#n_methods);
                     let mut accessor = array.value_data_mut().unwrap();
                     let offset = ::jlrs::data::managed::array::dimensions::Dims::size(&accessor.dimensions()) - #n_methods;
@@ -664,6 +889,49 @@ impl MethodFragments {
         MethodFragments {
             init_methods_fn_ident,
             init_methods_fn,
+        }
+    }
+}
+
+struct AsyncCallbackFragments {
+    init_async_callbacks_fn_ident: Ident,
+    init_async_callbacks_fn: ItemFn,
+}
+
+impl AsyncCallbackFragments {
+    fn generate(module: &JuliaModule, init_fn: &InitFn) -> Self {
+        let init_async_callbacks_fn_ident = format_ident!("{}_async_callbacks", init_fn.init_fn);
+        let n_async_callbacks = module.get_exported_async_callbacks().count();
+
+        let async_callback_init_fragments = module
+            .get_exported_async_callbacks()
+            .enumerate()
+            .map(async_callback_info_fragment);
+
+        let init_async_callbacks_fn = parse_quote! {
+            unsafe fn #init_async_callbacks_fn_ident(
+                frame: &mut ::jlrs::memory::target::frame::GcFrame,
+                array: &mut ::jlrs::data::managed::array::Array<'_, 'static>,
+                module: ::jlrs::data::managed::module::Module,
+                function_info_ty: ::jlrs::data::managed::datatype::DataType,
+            ) {
+                frame.scope(move |mut frame| {
+                    array.grow_end_unchecked(#n_async_callbacks);
+                    let mut accessor = array.value_data_mut().unwrap();
+                    let offset = ::jlrs::data::managed::array::dimensions::Dims::size(&accessor.dimensions()) - #n_async_callbacks;
+
+                    #(
+                        #async_callback_init_fragments
+                    )*
+
+                    Ok(())
+                }).unwrap()
+            }
+        };
+
+        AsyncCallbackFragments {
+            init_async_callbacks_fn_ident,
+            init_async_callbacks_fn,
         }
     }
 }
@@ -697,44 +965,31 @@ impl TypeFragments {
             }
         };
 
-        #[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
-        {
-            let reinit_types_fn_ident = format_ident!("{}_reinittypes", init_fn.init_fn);
-            let reinit_types_fragments = info.get_exported_types().map(reinit_type_fragment);
+        let reinit_types_fn_ident = format_ident!("{}_reinittypes", init_fn.init_fn);
+        let reinit_types_fragments = info.get_exported_types().map(reinit_type_fragment);
 
-            let type_reinit_fn = parse_quote! {
-                unsafe fn #reinit_types_fn_ident(
-                    frame: &mut ::jlrs::memory::target::frame::GcFrame,
-                    module: jlrs::data::managed::module::Module
-                ) {
-                    frame.scope(|frame| {
-                        let mut output = frame.output();
+        let type_reinit_fn = parse_quote! {
+            unsafe fn #reinit_types_fn_ident(
+                frame: &mut ::jlrs::memory::target::frame::GcFrame,
+                module: jlrs::data::managed::module::Module
+            ) {
+                frame.scope(|frame| {
+                    let mut output = frame.output();
 
-                        #(
-                            #reinit_types_fragments
-                        )*
+                    #(
+                        #reinit_types_fragments
+                    )*
 
-                        Ok(())
-                    }).unwrap();
-                }
-            };
-
-            TypeFragments {
-                type_init_fn,
-                type_init_ident: init_types_fn_ident,
-                type_reinit_fn: Some(type_reinit_fn),
-                type_reinit_ident: Some(reinit_types_fn_ident),
+                    Ok(())
+                }).unwrap();
             }
-        }
+        };
 
-        #[cfg(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8"))]
-        {
-            TypeFragments {
-                type_init_fn,
-                type_init_ident: init_types_fn_ident,
-                type_reinit_fn: None,
-                type_reinit_ident: None,
-            }
+        TypeFragments {
+            type_init_fn,
+            type_init_ident: init_types_fn_ident,
+            type_reinit_fn: Some(type_reinit_fn),
+            type_reinit_ident: Some(reinit_types_fn_ident),
         }
     }
 }
@@ -794,6 +1049,228 @@ impl GlobalFragments {
             global_init_ident,
             global_init_fn,
         }
+    }
+}
+
+fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Expr {
+    match info.item.as_ref() {
+        ModuleItem::InitFn(_) => panic!("Init function can't be documented"),
+        ModuleItem::ExportedType(ty) => {
+            let override_module_fragment = override_module_fragment(&ty.name_override);
+            let name_ident = &ty.name;
+
+            let rename = ty
+                .name_override
+                .as_ref()
+                .map(|parts| parts.last())
+                .flatten()
+                .unwrap_or(name_ident)
+                .to_string();
+
+            let docstr = info.get_docstr();
+            let doc = docstr.doc;
+            parse_quote! {
+                {
+                    frame.scope(|mut frame| {
+                        unsafe {
+                            let module = #override_module_fragment;
+                            let item = ::jlrs::data::managed::symbol::Symbol::new(&frame, #rename);
+                            let signature = ::jlrs::data::managed::value::Value::bottom_type(&frame);
+                            let doc = ::jlrs::data::managed::string::JuliaString::new(&mut frame, #doc);
+
+                            let doc_it = doc_item_ty.instantiate_unchecked(&mut frame, [module.as_value(), item.as_value(), signature, doc.as_value()]);
+                            accessor.set_value_unchecked(#index, Some(doc_it)).unwrap();
+                        }
+
+                        Ok(())
+                    }).unwrap();
+                }
+
+            }
+        }
+        ModuleItem::ExportedFunction(func) => {
+            let name_ident = &func.func.ident;
+
+            let override_module_fragment = override_module_fragment(&func.name_override);
+            let mut rename = func
+                .name_override
+                .as_ref()
+                .map(|parts| parts.last())
+                .flatten()
+                .unwrap_or(name_ident)
+                .to_string();
+
+            if func.exclamation_mark_token.is_some() {
+                rename.push('!')
+            }
+
+            let docstr = info.get_docstr();
+            let doc = docstr.doc;
+            let generic = docstr.generic;
+            parse_quote! {
+                {
+                    frame.scope(|mut frame| {
+                        unsafe {
+                            let module = #override_module_fragment;
+                            let item = ::jlrs::data::managed::symbol::Symbol::new(&frame, #rename);
+                            let signature = if #generic {
+                                ::jlrs::data::managed::value::Value::bottom_type(&frame)
+                            } else {
+                                // TODO
+                                ::jlrs::data::managed::value::Value::bottom_type(&frame)
+                            };
+
+                            let doc = ::jlrs::data::managed::string::JuliaString::new(&mut frame, #doc);
+
+                            let doc_it = doc_item_ty.instantiate_unchecked(&mut frame, [module.as_value(), item.as_value(), signature, doc.as_value()]);
+                            accessor.set_value_unchecked(#index, Some(doc_it)).unwrap();
+                        }
+
+                        Ok(())
+                    }).unwrap();
+                }
+
+            }
+        }
+        ModuleItem::ExportedMethod(func) => {
+            let name_ident = &func.func.ident;
+
+            let override_module_fragment = override_module_fragment(&func.name_override);
+            let mut rename = func
+                .name_override
+                .as_ref()
+                .map(|parts| parts.last())
+                .flatten()
+                .unwrap_or(name_ident)
+                .to_string();
+
+            if func.exclamation_mark_token.is_some() {
+                rename.push('!')
+            }
+
+            let docstr = info.get_docstr();
+            let doc = docstr.doc;
+            let generic = docstr.generic;
+            parse_quote! {
+                {
+                    frame.scope(|mut frame| {
+                        unsafe {
+                            let module = #override_module_fragment;
+                            let item = ::jlrs::data::managed::symbol::Symbol::new(&frame, #rename);
+                            let signature = if #generic {
+                                ::jlrs::data::managed::value::Value::bottom_type(&frame)
+                            } else {
+                                // TODO
+                                ::jlrs::data::managed::value::Value::bottom_type(&frame)
+                            };
+
+                            let doc = ::jlrs::data::managed::string::JuliaString::new(&mut frame, #doc);
+
+                            let doc_it = doc_item_ty.instantiate_unchecked(&mut frame, [module.as_value(), item.as_value(), signature, doc.as_value()]);
+                            accessor.set_value_unchecked(#index, Some(doc_it)).unwrap();
+                        }
+
+                        Ok(())
+                    }).unwrap();
+                }
+
+            }
+        }
+        ModuleItem::ExportedAsyncCallback(func) => {
+            let name_ident = &func.func.ident;
+
+            let override_module_fragment = override_module_fragment(&func.name_override);
+            let mut rename = func
+                .name_override
+                .as_ref()
+                .map(|parts| parts.last())
+                .flatten()
+                .unwrap_or(name_ident)
+                .to_string();
+
+            if func.exclamation_mark_token.is_some() {
+                rename.push('!')
+            }
+
+            let docstr = info.get_docstr();
+            let doc = docstr.doc;
+            let generic = docstr.generic;
+            parse_quote! {
+                {
+                    frame.scope(|mut frame| {
+                        unsafe {
+                            let module = #override_module_fragment;
+                            let item = ::jlrs::data::managed::symbol::Symbol::new(&frame, #rename);
+                            let signature = if #generic {
+                                ::jlrs::data::managed::value::Value::bottom_type(&frame)
+                            } else {
+                                // TODO
+                                ::jlrs::data::managed::value::Value::bottom_type(&frame)
+                            };
+
+                            let doc = ::jlrs::data::managed::string::JuliaString::new(&mut frame, #doc);
+
+                            let doc_it = doc_item_ty.instantiate_unchecked(&mut frame, [module.as_value(), item.as_value(), signature, doc.as_value()]);
+                            accessor.set_value_unchecked(#index, Some(doc_it)).unwrap();
+                        }
+
+                        Ok(())
+                    }).unwrap();
+                }
+
+            }
+        }
+        ModuleItem::ExportedConst(val) => {
+            let name_ident = &val.name;
+
+            let rename = val.name_override.as_ref().unwrap_or(name_ident).to_string();
+
+            let docstr = info.get_docstr();
+            let doc = docstr.doc;
+            parse_quote! {
+                {
+                    frame.scope(|mut frame| {
+                        unsafe {
+                            let item = ::jlrs::data::managed::symbol::Symbol::new(&frame, #rename);
+                            let signature = ::jlrs::data::managed::value::Value::bottom_type(&frame);
+                            let doc = ::jlrs::data::managed::string::JuliaString::new(&mut frame, #doc);
+
+                            let doc_it = doc_item_ty.instantiate_unchecked(&mut frame, [module.as_value(), item.as_value(), signature, doc.as_value()]);
+                            accessor.set_value_unchecked(#index, Some(doc_it)).unwrap();
+                        }
+
+                        Ok(())
+                    }).unwrap();
+                }
+
+            }
+        }
+        ModuleItem::ExportedGlobal(val) => {
+            let name_ident = &val.name;
+
+            let rename = val.name_override.as_ref().unwrap_or(name_ident).to_string();
+
+            let docstr = info.get_docstr();
+            let doc = docstr.doc;
+            parse_quote! {
+                {
+                    frame.scope(|mut frame| {
+                        unsafe {
+                            let item = ::jlrs::data::managed::symbol::Symbol::new(&frame, #rename);
+                            let signature = ::jlrs::data::managed::value::Value::bottom_type(&frame);
+                            let doc = ::jlrs::data::managed::string::JuliaString::new(&mut frame, #doc);
+
+                            let doc_it = doc_item_ty.instantiate_unchecked(&mut frame, [module.as_value(), item.as_value(), signature, doc.as_value()]);
+                            accessor.set_value_unchecked(#index, Some(doc_it)).unwrap();
+                        }
+
+                        Ok(())
+                    }).unwrap();
+                }
+
+            }
+        }
+        ModuleItem::ItemWithAttrs(_) => unreachable!(),
     }
 }
 
@@ -863,6 +1340,7 @@ fn function_info_fragment((index, info): (usize, &ExportedFunction)) -> Expr {
 
                     let module = #override_module_fragment;
 
+                    let false_v = ::jlrs::data::managed::value::Value::false_v(&frame);
                     let instance = function_info_ty.instantiate_unchecked(&mut frame, [
                         name.as_value(),
                         ccall_arg_types.as_value(),
@@ -870,7 +1348,8 @@ fn function_info_fragment((index, info): (usize, &ExportedFunction)) -> Expr {
                         ccall_return_type.as_value(),
                         julia_return_type.as_value(),
                         func,
-                        module.as_value()
+                        module.as_value(),
+                        false_v
                     ]);
 
                     accessor.set(#index, Some(instance)).unwrap();
@@ -920,7 +1399,7 @@ fn return_type_fragments(ret_ty: &ReturnType) -> (Expr, Expr) {
     match ret_ty {
         ReturnType::Default => {
             let ccall_ret_type: Expr = parse_quote! {
-                ::jlrs::data::managed::datatype::DataType::nothing_type(&frame)
+                ::jlrs::data::managed::datatype::DataType::nothing_type(&frame).as_value()
             };
 
             let julia_ret_type = ccall_ret_type.clone();
@@ -928,15 +1407,58 @@ fn return_type_fragments(ret_ty: &ReturnType) -> (Expr, Expr) {
         }
         ReturnType::Type(_, ref ty) => {
             let ccall_ret_type = parse_quote! {
-                <<#ty as ::jlrs::convert::ccall_types::CCallReturn>::CCallReturnType as ::jlrs::convert::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+                <<#ty as ::jlrs::convert::ccall_types::CCallReturn>::CCallReturnType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
             };
             let julia_ret_type = parse_quote! {
-                <<#ty as ::jlrs::convert::ccall_types::CCallReturn>::FunctionReturnType as ::jlrs::convert::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+                <<#ty as ::jlrs::convert::ccall_types::CCallReturn>::FunctionReturnType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
             };
 
             (ccall_ret_type, julia_ret_type)
         }
     }
+}
+
+fn async_callbackreturn_type_fragments(ret_ty: &ReturnType) -> Type {
+    match ret_ty {
+        ReturnType::Default => panic!(),
+        ReturnType::Type(_, ty) => {
+            match &**ty {
+                &Type::ImplTrait(ref timplt) => {
+                    let bounds_iter = timplt.bounds.iter();
+                    for bound in bounds_iter {
+                        match bound {
+                            TypeParamBound::Trait(t) => {
+                                let segment = t.path.segments.last();
+                                if segment.is_none() {
+                                    continue;
+                                }
+
+                                match &segment.unwrap().arguments {
+                                    PathArguments::AngleBracketed(p) => {
+                                        //
+                                        let arg = p.args.iter().last();
+                                        if arg.is_none() {
+                                            continue;
+                                        }
+
+                                        match arg.unwrap() {
+                                            GenericArgument::Type(ref t) => return t.clone(),
+                                            _ => continue,
+                                        }
+                                    }
+                                    _ => continue,
+                                }
+                            }
+                            _ => continue,
+                        }
+                    }
+                }
+                _ => panic!(),
+            }
+        }
+    }
+
+    panic!()
 }
 
 fn arg_type_fragments<'a>(
@@ -963,7 +1485,7 @@ fn arg_type_fragments<'a>(
         })
         .map(|ty| {
             parse_quote! {
-                <<#ty as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::convert::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+                <<#ty as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
             }
         });
 
@@ -975,7 +1497,7 @@ fn arg_type_fragments<'a>(
         })
         .map(|ty| {
             parse_quote! {
-                <<#ty as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::convert::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+                <<#ty as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
             }
         });
 
@@ -1000,13 +1522,12 @@ fn init_type_fragment(info: &ExportedType) -> Expr {
         {
             let sym = ::jlrs::data::managed::symbol::Symbol::new(&frame, #rename);
             let module = #override_module_fragment;
-            let ty = ::jlrs::data::layout::foreign::create_foreign_type::<#ty, _>(&mut output, sym, module);
+            let ty = <#ty as ::jlrs::data::types::foreign_type::OpaqueType>::create_type(&mut output, sym, module);
             module.set_const_unchecked(sym, <::jlrs::data::managed::datatype::DataType as ::jlrs::data::managed::Managed>::as_value(ty));
         }
     }
 }
 
-#[cfg(not(any(feature = "julia-1-6", feature = "julia-1-7", feature = "julia-1-8")))]
 fn reinit_type_fragment(info: &ExportedType) -> Expr {
     {
         let override_module_fragment = override_module_fragment(&info.name_override);
@@ -1033,7 +1554,7 @@ fn reinit_type_fragment(info: &ExportedType) -> Expr {
                     .cast::<::jlrs::data::managed::datatype::DataType>()
                     .unwrap();
 
-                ::jlrs::data::layout::foreign::reinit_foreign_type::<#ty>(dt);
+                <#ty as ::jlrs::data::types::foreign_type::OpaqueType>::reinit_type(dt);
             }
         }
     }
@@ -1100,14 +1621,110 @@ fn method_info_fragment((index, info): (usize, &ExportedMethod)) -> Expr {
 
                     let module = #override_module_fragment;
 
+                    let false_v = ::jlrs::data::managed::value::Value::false_v(&frame);
                     let instance = function_info_ty.instantiate_unchecked(&mut frame, [
                         name.as_value(),
                         ccall_arg_types.as_value(),
                         julia_arg_types.as_value(),
-                        ccall_return_type.as_value(),
-                        julia_return_type.as_value(),
+                        ccall_return_type,
+                        julia_return_type,
                         func,
-                        module.as_value()
+                        module.as_value(),
+                        false_v
+                    ]);
+
+                    accessor.set(#index + offset, Some(instance)).unwrap();
+                }
+
+                Ok(())
+            }).unwrap();
+        }
+    }
+}
+
+fn async_callback_info_fragment((index, info): (usize, &ExportedAsyncCallback)) -> Expr {
+    let n_args = info.func.inputs.len();
+    let name_ident = &info.func.ident;
+
+    let override_module_fragment = override_module_fragment(&info.name_override);
+    let mut rename = info
+        .name_override
+        .as_ref()
+        .map(|parts| parts.last())
+        .flatten()
+        .unwrap_or(name_ident)
+        .to_string();
+
+    if info.exclamation_mark_token.is_some() {
+        rename.push('!')
+    }
+
+    let ret_ty = &info.func.output;
+    let inner_ret_ty = async_callbackreturn_type_fragments(ret_ty);
+    let ccall_ret_type: Expr = parse_quote! {
+        <::jlrs::ccall::AsyncCCall as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+    };
+    let julia_ret_type: Expr = parse_quote! {
+        <#inner_ret_ty as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+    };
+
+    let (ccall_arg_types, julia_arg_types, invoke_fn) =
+        async_callback_arg_type_fragments(info, &inner_ret_ty);
+
+    let first_arg: Expr = syn::parse_quote! {
+        <*mut ::std::ffi::c_void as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+    };
+
+    let ccall_arg_idx = 0..n_args;
+    let julia_arg_idx = 0..n_args;
+
+    parse_quote! {
+        {
+            frame.scope(|mut frame| {
+                let unrooted = frame.unrooted();
+                let name = Symbol::new(&frame, #rename);
+                let type_type = ::jlrs::data::managed::union_all::UnionAll::type_type(&unrooted).as_value();
+
+                #invoke_fn;
+
+                let func = Value::new(&mut frame, invoke as *mut ::std::ffi::c_void);
+
+                unsafe {
+                    let mut ccall_arg_types = ::jlrs::data::managed::array::Array::new_for_unchecked(
+                        frame.as_extended_target(),
+                        #n_args + 1,
+                        type_type);
+
+                    let mut ccall_arg_types_ref = ccall_arg_types.value_data_mut().unwrap();
+
+                    let mut julia_arg_types = ::jlrs::data::managed::array::Array::new_for_unchecked(
+                        frame.as_extended_target(),
+                        #n_args,
+                        type_type);
+
+                    let mut julia_arg_types_ref = julia_arg_types.value_data_mut().unwrap();
+
+                    ccall_arg_types_ref.set(0, Some(#first_arg)).unwrap();
+                    #(
+                        ccall_arg_types_ref.set(#ccall_arg_idx + 1, Some(#ccall_arg_types.as_value())).unwrap();
+                        julia_arg_types_ref.set(#julia_arg_idx, Some(#julia_arg_types.as_value())).unwrap();
+                    )*
+
+                    let ccall_return_type = #ccall_ret_type;
+                    let julia_return_type = #julia_ret_type;
+
+                    let module = #override_module_fragment;
+
+                    let true_v = ::jlrs::data::managed::value::Value::true_v(&frame);
+                    let instance = function_info_ty.instantiate_unchecked(&mut frame, [
+                        name.as_value(),
+                        ccall_arg_types.as_value(),
+                        julia_arg_types.as_value(),
+                        ccall_return_type,
+                        julia_return_type,
+                        func,
+                        module.as_value(),
+                        true_v
                     ]);
 
                     accessor.set(#index + offset, Some(instance)).unwrap();
@@ -1126,7 +1743,7 @@ fn const_info_fragment(info: &ExportedConst) -> Expr {
 
     parse_quote! {
         {
-            frame.scope(|mut frame| {
+            frame.scope(move |mut frame| {
                 let v: #ty = #name;
                 let value = ::jlrs::data::managed::value::Value::new(&mut frame, v);
 
@@ -1148,7 +1765,7 @@ fn global_info_fragment(info: &ExportedGlobal) -> Expr {
 
     parse_quote! {
         {
-            frame.scope(|mut frame| {
+            frame.scope(move |mut frame| {
                 let v: #ty = #name;
                 let value = ::jlrs::data::managed::value::Value::new(&mut frame, v);
 
@@ -1197,13 +1814,13 @@ fn method_arg_type_fragments<'a>(
                 FnArg::Typed(ty) => {
                     let ty = &ty.ty;
                     parse_quote! {
-                        <<#ty as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::convert::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+                        <<#ty as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
                     }
                 },
                 _ => {
 
                     parse_quote! {
-                        <<TypedValue::<#parent> as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::convert::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+                        <<TypedValue::<#parent> as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
                     }
                 },
             }
@@ -1216,13 +1833,12 @@ fn method_arg_type_fragments<'a>(
                 FnArg::Typed(ty) => {
                     let ty = &ty.ty;
                     parse_quote! {
-                        <<#ty as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::convert::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+                        <<#ty as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
                     }
                 },
                 _ => {
-
                     parse_quote! {
-                        <<TypedValue<#parent> as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::convert::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+                        <<TypedValue<#parent> as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
                     }
                 },
             }
@@ -1231,6 +1847,102 @@ fn method_arg_type_fragments<'a>(
     (ccall_arg_types, julia_arg_types, invoke_fn)
 }
 
+fn async_callback_arg_type_fragments<'a>(
+    info: &'a ExportedAsyncCallback,
+    inner_ret_ty: &Type,
+) -> (
+    impl 'a + Iterator<Item = Expr>,
+    impl 'a + Iterator<Item = Expr>,
+    Option<ItemFn>,
+) {
+    let inputs = &info.func.inputs;
+    let n_args = inputs.len();
+
+    if n_args > 0 {
+        match inputs.first().unwrap() {
+            FnArg::Receiver(_) => panic!(),
+            FnArg::Typed(_) => (),
+        }
+    }
+
+    let invoke_fn = invoke_async_callback(info, inner_ret_ty);
+
+    let ccall_arg_types = inputs
+        .iter()
+        .map(move |arg| {
+            match arg {
+                FnArg::Typed(ty) => {
+                    let ty = &ty.ty;
+                    parse_quote! {
+                        <<#ty as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+                    }
+                },
+                _ => panic!()
+            }
+        });
+
+    let julia_arg_types = inputs
+        .iter()
+        .map(move |arg| {
+            match arg {
+                FnArg::Typed(ty) => {
+                    let ty = &ty.ty;
+                    parse_quote! {
+                        <<#ty as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+                    }
+                },
+                _ => panic!()
+            }
+        });
+
+    (ccall_arg_types, julia_arg_types, Some(invoke_fn))
+}
+
+fn invoke_async_callback(info: &ExportedAsyncCallback, ret_ty: &Type) -> ItemFn {
+    let name = &info.func.ident;
+    let args = &info.func.inputs;
+    let mut extended_args = args.clone();
+    extended_args.insert(
+        0,
+        syn::parse_quote! { jlrs_async_condition_handle: ::jlrs::ccall::AsyncConditionHandle },
+    );
+
+    let names = args.iter().map(|arg| match arg {
+        FnArg::Typed(ty) => &ty.pat,
+        _ => unreachable!(),
+    });
+
+    let names = Punctuated::<_, Comma>::from_iter(names);
+
+    parse_quote! {
+        unsafe extern "C" fn invoke(#extended_args) -> ::jlrs::ccall::AsyncCCall {
+            let callback = #name(#names);
+            let join_handle = ::jlrs::ccall::CCall::dispatch_to_pool(move |dispatch_handle| {
+                let handle = jlrs_async_condition_handle;
+                let res = callback();
+                unsafe { dispatch_handle.set(res); }
+                ::jlrs::ccall::CCall::uv_async_send(handle.0);
+            });
+            let join_handle = Arc::into_raw(join_handle);
+
+            unsafe extern "C" fn join_func(
+                handle: *mut ::jlrs::ccall::DispatchHandle<#ret_ty>
+            ) -> ::jlrs::data::managed::rust_result::RustResultRet<#ret_ty> {
+                let handle = ::std::sync::Arc::from_raw(handle);
+                ::jlrs::ccall::CCall::invoke_fallible(|mut frame| {
+                    let unrooted = frame.unrooted();
+                    let res = TypedValue::new(&mut frame, handle.join()?);
+                    Ok(RustResult::ok(unrooted.into_extended_target(&mut frame), res).leak())
+                })
+            }
+
+            ::jlrs::ccall::AsyncCCall {
+                join_handle: join_handle as *mut ::jlrs::ccall::DispatchHandle<#ret_ty> as *mut ::std::ffi::c_void,
+                join_func: join_func as *mut ::std::ffi::c_void
+            }
+        }
+    }
+}
 fn invoke_fn_no_self_method_fragment(info: &ExportedMethod) -> ItemFn {
     let name = &info.func.ident;
     let ty = &info.parent;
@@ -1275,7 +1987,7 @@ fn invoke_fn_ref_self_method_fragment(info: &ExportedMethod) -> ItemFn {
         unsafe extern "C" fn invoke(#args_self_renamed) #ret_ty {
             match (&this).track() {
                 Ok(this) => this.#name(#names),
-                Err(_) => ::jlrs::data::managed::rust_result::RustResult::borrow_err_internal()
+                Err(_) => ::jlrs::data::managed::rust_result::RustResult::borrow_error_internal()
             }
         }
     }
@@ -1306,7 +2018,7 @@ fn invoke_fn_move_self_method_fragment(info: &ExportedMethod) -> ItemFn {
         unsafe extern "C" fn invoke(#args_self_renamed) #ret_ty {
             match (&this).track() {
                 Ok(this) => this.clone().#name(#names),
-                Err(_) => ::jlrs::data::managed::rust_result::RustResult::borrow_err_internal()
+                Err(_) => ::jlrs::data::managed::rust_result::RustResult::borrow_error_internal()
             }
         }
     }
@@ -1337,7 +2049,7 @@ fn invoke_fn_mut_self_method_fragment(info: &ExportedMethod) -> ItemFn {
         unsafe extern "C" fn invoke(#args_self_renamed) #ret_ty {
             match (&mut this).track_mut() {
                 Ok(mut this) => this.#name(#names),
-                Err(_) => ::jlrs::data::managed::rust_result::RustResult::borrow_err_internal()
+                Err(_) => ::jlrs::data::managed::rust_result::RustResult::borrow_error_internal()
             }
         }
     }

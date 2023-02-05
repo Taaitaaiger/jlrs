@@ -10,13 +10,15 @@ use jl_sys::jl_opaque_closure_t;
 
 use crate::{
     call::Call,
-    data::managed::{
-        datatype::DataType,
-        private::ManagedPriv,
-        type_name::TypeName,
-        typecheck::Typecheck,
-        value::{Value, ValueResult},
-        Managed as _, Ref,
+    data::{
+        managed::{
+            datatype::DataType,
+            private::ManagedPriv,
+            type_name::TypeName,
+            value::{Value, ValueResult},
+            Managed as _, Ref,
+        },
+        types::typecheck::Typecheck,
     },
     memory::target::{unrooted::Unrooted, Target},
     private::Private,

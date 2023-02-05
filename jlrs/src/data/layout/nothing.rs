@@ -3,13 +3,13 @@
 use jl_sys::jl_nothing_type;
 
 use crate::{
-    convert::{construct_type::ConstructType, into_julia::IntoJulia, unbox::Unbox},
+    convert::{ccall_types::CCallReturn, into_julia::IntoJulia, unbox::Unbox},
     data::managed::{
         datatype::{DataType, DataTypeData},
         Managed,
     },
     impl_julia_typecheck, impl_valid_layout,
-    memory::target::{ExtendedTarget, Target},
+    memory::target::Target,
 };
 
 #[repr(C)]
@@ -32,21 +32,9 @@ unsafe impl IntoJulia for Nothing {
     }
 }
 
-unsafe impl ConstructType for Nothing {
-    fn base_type<'target, T>(target: &T) -> crate::data::managed::value::Value<'target, 'static>
-    where
-        T: Target<'target>,
-    {
-        unsafe { <Self as crate::convert::into_julia::IntoJulia>::julia_type(target).as_value() }
-    }
-
-    fn construct_type<'target, 'current, 'borrow, T>(
-        target: ExtendedTarget<'target, 'current, 'borrow, T>,
-    ) -> DataTypeData<'target, T>
-    where
-        T: Target<'target>,
-    {
-        let (target, _) = target.split();
-        <Nothing as crate::convert::into_julia::IntoJulia>::julia_type(target)
-    }
+unsafe impl CCallReturn for Nothing {
+    type FunctionReturnType = Nothing;
+    type CCallReturnType = Nothing;
 }
+
+impl_construct_julia_type!(Nothing, jl_nothing_type);

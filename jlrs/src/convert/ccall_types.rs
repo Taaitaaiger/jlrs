@@ -16,11 +16,15 @@
 //!
 //! You shoudldn't manually implement these traits, they're automatically implemented
 //! derived by `JlrsReflect`.
+//!
+//! [`julia_module`]: ::jlrs_macros::julia_module
 
-use super::construct_type::ConstructType;
+use crate::data::types::construct_type::ConstructType;
 
 /// Trait implemented by types that can be used as argument types of Rust functions exposed by the
 /// [`julia_module`] macro.
+///
+/// [`julia_module`]: ::jlrs_macros::julia_module
 pub unsafe trait CCallArg {
     type CCallArgType: ConstructType;
     type FunctionArgType: ConstructType;
@@ -28,8 +32,9 @@ pub unsafe trait CCallArg {
 
 /// Trait implemented by types that can be used as return types of Rust functions exposed by the
 /// [`julia_module`] macro.
+///
+/// [`julia_module`]: ::jlrs_macros::julia_module
 pub unsafe trait CCallReturn {
-    // TODO: relax? E.g to enable generating return types like `Union{Module, Nothing}`
     type FunctionReturnType: ConstructType;
     type CCallReturnType: ConstructType;
 }

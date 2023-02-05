@@ -96,7 +96,7 @@ impl<'scope> JuliaString<'scope> {
     }
 }
 
-impl_construct_type_managed!(Option<StringRef<'_>>, jl_string_type);
+impl_construct_type_managed!(JuliaString<'_>, jl_string_type);
 
 impl_julia_typecheck!(JuliaString<'scope>, jl_string_type, 'scope);
 
@@ -152,3 +152,4 @@ pub type StringResult<'target, T> =
     <T as TargetType<'target>>::Result<'static, JuliaString<'target>>;
 
 impl_ccall_arg_managed!(JuliaString, 1);
+impl_into_typed!(JuliaString);

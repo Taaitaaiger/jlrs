@@ -1,6 +1,6 @@
 [package]
 name = "jlrs"
-version = "0.17.1"
+version = "0.18.0"
 authors = ["Thomas van Doornmalen <thomas.vandoornmalen@gmail.com>"]
 description = """
 jlrs provides bindings to the Julia C API that enables Julia code to be called from Rust and more.
@@ -40,7 +40,7 @@ tokio-rt = ["async-rt", "tokio"]
 # Enable task and channel traits used by the async runtime
 async = ["futures", "crossbeam-channel", "async-trait"]
 # Enable `ccall` module for use from `ccall`ed Rust functions
-ccall = ["jlrs-macros/ccall"]
+ccall = ["jlrs-macros/ccall", "threadpool"]
 # Enable using `f16` as a layout for `Float16` data
 f16 = ["half"]
 # Enable all internal types
@@ -107,6 +107,8 @@ thiserror = "1"
 atomic = "0.5"
 hashers = "1"
 once_cell = "1"
+
+threadpool = { version = "1", optional = true }
 
 async-std = { version = "1.12", features = ["unstable"], optional = true }
 async-trait = { version = "0.1", optional = true }

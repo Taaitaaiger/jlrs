@@ -38,13 +38,15 @@ use crate::data::managed::array::Array;
 use crate::data::managed::value::ValueResult;
 use crate::{
     convert::to_symbol::ToSymbol,
-    data::managed::{
-        private::ManagedPriv,
-        simple_vector::{SimpleVector, SimpleVectorRef},
-        symbol::{Symbol, SymbolRef},
-        typecheck::Typecheck,
-        value::Value,
-        Managed,
+    data::{
+        managed::{
+            private::ManagedPriv,
+            simple_vector::{SimpleVector, SimpleVectorRef},
+            symbol::{Symbol, SymbolRef},
+            value::Value,
+            Managed,
+        },
+        types::typecheck::Typecheck,
     },
     error::{AccessError, JlrsResult, CANNOT_DISPLAY_TYPE},
     impl_julia_typecheck,
@@ -1485,7 +1487,7 @@ impl<'scope> ManagedPriv<'scope, '_> for DataType<'scope> {
     }
 }
 
-impl_construct_type_managed!(Option<DataTypeRef<'_>>, jl_datatype_type);
+impl_construct_type_managed!(DataType<'_>, jl_datatype_type);
 
 /// A reference to a [`DataType`] that has not been explicitly rooted.
 pub type DataTypeRef<'scope> = Ref<'scope, 'static, DataType<'scope>>;
@@ -1548,3 +1550,4 @@ impl DatatypeLayout<'_> {
 }
 
 impl_ccall_arg_managed!(DataType, 1);
+impl_into_typed!(DataType);

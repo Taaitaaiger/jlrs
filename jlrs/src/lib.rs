@@ -31,14 +31,8 @@
 //! # Prerequisites
 //!
 //! Julia must be installed before jlrs can be used, jlrs is compatible with Julia 1.6 up to and
-//! including Julia 1.9. The Jlrs package must also have been added:
-//!
-//! ```julia
-//! using Pkg
-//! Pkg.add("Jlrs")
-//! ```
-//!
-//! If this package hasn't been added, it will automatically be added when jlrs is initialized.
+//! including Julia 1.9. The Jlrs package must also have been added, if this is not the case it
+//! will automatically be added when jlrs is initialized.
 //!
 //! ## Linux
 //!
@@ -196,7 +190,13 @@
 //!
 //!   Link with a debug build of Julia on Linux.
 //!
-//! You can enable all features except `lts` and `debug` by enabling the `full` feature.
+//! - `no-link`
+//!
+//!   Don't link Julia, linking can be skipped when writing libraries that will be loaded by
+//!   Julia.
+//!
+//! You can enable all features except `debug`, `i686` and `no-link` by enabling the `full`
+//! feature.
 //!
 //!
 //! # Using this crate
@@ -655,23 +655,18 @@
 //!
 //! # Custom types
 //!
-//! In order to map a struct in Rust to one in Julia you can derive [`Unbox`], [`Typecheck`] and
-//! [`ValidLayout`]. If the struct in Julia is immutable [`ValidField`] can also be derived,
-//! if it has no type parameters [`IntoJulia`].
+//! In order to map a struct in Rust to one in Julia you can derive several traits. You normally
+//! shouldn't need to implement these structs or traits manually. The `reflect` function defined
+//! in the `Jlrs.Reflect` module can generate Rust structs whose layouts match their counterparts
+//! in Julia and automatically derive the supported traits.
 //!
-//! You normally shouldn't need to implement these structs or traits manually. The `reflect`
-//! function defined in the `Jlrs.Reflect` module can generate Rust structs whose layouts match
-//! their counterparts in Julia and automatically derive the supported traits. The main
-//! restriction is that structs with atomic fields, and tuple or union fields with type parameters
-//! are not supported. The reason for this restriction is that the layout of such fields can be
-//! very different depending on the parameters in a way that can't be easily represented in Rust.
+//! The main restriction is that structs with atomic fields, and tuple or union fields with type
+//! parameters are not supported. The reason for this restriction is that the layout of such
+//! fields can be very different depending on the parameters in a way that can't be easily
+//! represented in Rust.
 //!
 //! These custom types can also be used when you call Rust from Julia with `ccall`.
 //!
-//! [their User Guide]: https://rust-lang.github.io/rust-bindgen/requirements.html
-//! [on Microsoft's website]: https://docs.microsoft.com/en-us/windows/wsl/install-win10
-//! [the examples directory of the repo]: https://github.com/Taaitaaiger/jlrs/tree/master/examples
-//! [`def` folder]: https://github.com/Taaitaaiger/jlrs/tree/master/jl_sys/def
 //! [`Julia`]: crate::runtime::sync_rt::Julia
 //! [`Julia::scope`]: crate::runtime::sync_rt::Julia::scope
 //! [`Julia::scope_with_capacity`]: crate::runtime::sync_rt::Julia::scope_with_capacity
@@ -700,7 +695,7 @@
 //! [`AsyncJulia::init_with_image`]: crate::multitask::runtime::AsyncJulia::init_with_image
 //! [`AsyncJulia::init_with_image_async`]: crate::multitask::runtime::AsyncJulia::init_with_image_async
 //! [`IntoJulia`]: crate::convert::into_julia::IntoJulia
-//! [`Typecheck`]: crate::data::managed::typecheck::Typecheck
+//! [`Typecheck`]: crate::data::types::typecheck::Typecheck
 //! [`ValidLayout`]: crate::data::layout::valid_layout::ValidLayout
 //! [`ValidField`]: crate::data::layout::valid_layout::ValidField
 //! [`Unbox`]: crate::convert::unbox::Unbox
@@ -728,7 +723,7 @@ use memory::stack_frame::PinnedFrame;
 use prelude::Call;
 
 use crate::{
-    data::layout::foreign::init_foreign_type_registry,
+    data::types::foreign_type::init_foreign_type_registry,
     memory::{
         context::{ledger::init_ledger, stack::Stack},
         target::unrooted::Unrooted,
@@ -736,7 +731,7 @@ use crate::{
     prelude::{Module, Value},
 };
 
-#[cfg(any(feature = "sync-rt", feature = "async-rt", feature = "pyplot"))]
+#[cfg(feature = "pyplot")]
 macro_rules! init_fn {
     ($name:ident, $include:ident, $file:expr) => {
         pub(crate) static $include: &'static str = include_str!($file);
@@ -794,13 +789,13 @@ pub(crate) unsafe fn init_jlrs<const N: usize>(frame: &mut PinnedFrame<N>) {
     Value::eval_string(
         unrooted,
         "if !isdefined(Main, :Jlrs) 
-        try
-            using Jlrs 
-        catch e
-            import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/Jlrs.jl\")
-            using Jlrs
-        end
-    end",
+            try
+                using Jlrs 
+            catch e
+                import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/Jlrs.jl\")
+                using Jlrs
+            end
+        end",
     )
     .expect("Failed to load or install Jlrs package");
 

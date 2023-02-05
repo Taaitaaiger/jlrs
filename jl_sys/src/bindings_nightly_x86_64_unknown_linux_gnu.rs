@@ -174,18 +174,14 @@ pub struct jl_thread_heap_t {
     pub free_stacks: [arraylist_t; 16usize],
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
-pub struct _jl_gc_mark_data {
-    _unused: [u8; 0],
-}
-pub type jl_gc_mark_data_t = _jl_gc_mark_data;
-#[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct jl_gc_mark_sp_t {
-    pub pc: *mut *mut ::std::os::raw::c_void,
-    pub data: *mut jl_gc_mark_data_t,
-    pub pc_start: *mut *mut ::std::os::raw::c_void,
-    pub pc_end: *mut *mut ::std::os::raw::c_void,
+pub struct jl_gc_markqueue_t {
+    pub chunk_start: *mut _jl_gc_chunk_t,
+    pub current_chunk: *mut _jl_gc_chunk_t,
+    pub chunk_end: *mut _jl_gc_chunk_t,
+    pub start: *mut *mut _jl_value_t,
+    pub current: *mut *mut _jl_value_t,
+    pub end: *mut *mut _jl_value_t,
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -194,9 +190,6 @@ pub struct jl_gc_mark_cache_t {
     pub scanned_bytes: usize,
     pub nbig_obj: usize,
     pub big_obj: [*mut ::std::os::raw::c_void; 1024usize],
-    pub pc_stack: *mut *mut ::std::os::raw::c_void,
-    pub pc_stack_end: *mut *mut ::std::os::raw::c_void,
-    pub data_stack: *mut jl_gc_mark_data_t,
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -236,9 +229,9 @@ pub struct _jl_tls_states_t {
     pub signal_stack: *mut ::std::os::raw::c_void,
     pub system_id: jl_thread_t,
     pub finalizers: arraylist_t,
+    pub mark_queue: jl_gc_markqueue_t,
     pub gc_cache: jl_gc_mark_cache_t,
     pub sweep_objs: arraylist_t,
-    pub gc_mark_sp: jl_gc_mark_sp_t,
     pub previous_exception: *mut _jl_value_t,
     pub locks: small_arraylist_t,
 }
@@ -2504,11 +2497,16 @@ pub struct _bigval_t {
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct _jl_timing_block_t {
+pub struct _jl_gc_chunk_t {
     pub _address: u8,
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct _jl_value_t {
+    pub _address: u8,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct _jl_timing_block_t {
     pub _address: u8,
 }

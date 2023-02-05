@@ -13,11 +13,11 @@ use jl_sys::jl_value_t;
 use super::{value::ValueResult, Ref};
 use crate::{
     call::{Call, ProvideKeywords, WithKeywords},
+    convert::ccall_types::{CCallArg, CCallReturn},
     data::{
         layout::valid_layout::{ValidField, ValidLayout},
-        managed::{
-            datatype::DataType, private::ManagedPriv, typecheck::Typecheck, value::Value, Managed,
-        },
+        managed::{datatype::DataType, private::ManagedPriv, value::Value, Managed},
+        types::typecheck::Typecheck,
     },
     error::JlrsResult,
     memory::target::{unrooted::Unrooted, Target},
@@ -172,4 +172,12 @@ pub type FunctionData<'target, 'data, T> =
 pub type FunctionResult<'target, 'data, T> =
     <T as TargetType<'target>>::Result<'data, Function<'target, 'data>>;
 
-impl_ccall_arg_managed!(Function, 2);
+unsafe impl<'scope, 'data> CCallArg for Function<'scope, 'data> {
+    type CCallArgType = Value<'scope, 'data>;
+    type FunctionArgType = Value<'scope, 'data>;
+}
+
+unsafe impl CCallReturn for FunctionRet {
+    type CCallReturnType = Value<'static, 'static>;
+    type FunctionReturnType = Value<'static, 'static>;
+}

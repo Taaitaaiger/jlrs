@@ -4,13 +4,7 @@ use std::fmt::{Debug, Formatter, Result as FmtResult};
 
 use jl_sys::jl_ssavalue_type;
 
-use crate::{
-    convert::{construct_type::ConstructType, unbox::Unbox},
-    data::managed::datatype::DataTypeData,
-    impl_julia_typecheck, impl_valid_layout,
-    memory::target::ExtendedTarget,
-    prelude::{DataType, Managed, Target},
-};
+use crate::{convert::unbox::Unbox, impl_julia_typecheck, impl_valid_layout};
 
 /// A Julia `SSAValue`.
 #[repr(C)]
@@ -37,23 +31,5 @@ unsafe impl Unbox for SSAValue {
     type Output = Self;
 }
 
-unsafe impl ConstructType for SSAValue {
-    fn base_type<'target, T>(target: &T) -> crate::data::managed::value::Value<'target, 'static>
-    where
-        T: Target<'target>,
-    {
-        DataType::ssavalue_type(target).as_value()
-    }
-
-    fn construct_type<'target, 'current, 'borrow, T>(
-        target: ExtendedTarget<'target, 'current, 'borrow, T>,
-    ) -> DataTypeData<'target, T>
-    where
-        T: Target<'target>,
-    {
-        let (target, _) = target.split();
-        DataType::ssavalue_type(&target).root(target)
-    }
-}
-
 impl_ccall_arg!(SSAValue);
+impl_construct_julia_type!(SSAValue, jl_ssavalue_type);

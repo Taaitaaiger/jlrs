@@ -4,7 +4,7 @@
 
  - The `wrappers` module has been renamed to `data`. Pointer wrappers are now called managed data, and inline wrappers are layouts. Traits and methods dealing with wrappers have been renamed accordingly.
 
- - The traits in the `layout` module have been moved to the `data` module. Most can be found in `data::layout`, `typecheck` has been moved to `data::managed`, and `field_index::FieldIndex` has been moved to `data::managed::value::field_accessor`.
+ - The traits in the `layout` module have been moved to the `data` module. Most can be found in `data::layout`, `typecheck` has been moved to `data::types`, and `field_index::FieldIndex` has been moved to `data::managed::value::field_accessor`.
 
  - Tasks must now declare their affinity with an associated `Affinity` type, the affinity can be either `DispatchAny`, `DispatchMain`, or `DispatchWorker`. The `try_` methods have been removed from `AsyncJulia`, the non-try methods are now sync and return a `Dispatch` which is used to actually dispatch the task to the async runtime. Which dispatching methods are available for the returned instance of `Dispatch` depends on the `Affinity` of the task. There is both an async and a sync variant for each dispatching method, the async variant waits until the task can be dispatched, the sync variant returns the dispatcher if the targeted queue is full to allow retrying to dispatch the task.
 
@@ -12,13 +12,15 @@
 
  - `ForeignType` requires `Send + Sync`, whether a `ForeignType` is large or contains pointers to managed data is now expressed with the associated constants `LARGE` and `HAS_POINTERS`, the super type is returned by the trait method `ForeignType::super_type`. Foreign types can be reinitialized with `reinit_foreign_type`, which is available since Julia 1.9.
 
+ - `OpaqueType` has been added, which is similar to `ForeignType` except that it can contain no references to Julia data. 
+
  - A managed type for `Binding` has been added, this is available since Julia 1.10.
 
  - The `Jlrs` Julia module is no longer included with jlrs, but published as a separate package.
 
- - The jlrs-derive crate is now part of jlrs-macros. Two additional macros are available: `julia_version` can be used as an alternative to writing big cfgs to handle differences between Julia versions, and `julia_module` to generate the data that `Jlrs.Wrap` uses to expose the exported functions, methods, types, constant and globals to Julia.
+ - The jlrs-derive crate is now part of jlrs-macros. Two additional macros are available: `julia_version` can be used as an alternative to writing big cfgs to handle differences between Julia versions, and `julia_module` to generate the data that `Jlrs.Wrap` uses to make the exported functions, methods, types, constant and globals available in a Julia module.
 
- - Several traits have been added to implement the `julia_module` macro: `CCallArg`, `CCallReturn`, and `ConstructType`, the first two provide a mapping from a Rust type to the types Julia should use in generated Julia functions, the latter is used to construct the `DataType` at runtime. The managed type `TypedValue` has been added to make more types constructible. Similarly, `RankedArray` and `TypedRankedArray` have been added, only the latter implements `ConstructType`. 
+ - Several traits have been added to implement the `julia_module` macro: `CCallArg`, `CCallReturn`, and `ConstructType`, the first two provide a mapping from a Rust type to the types Julia should use in generated Julia functions, the latter is used to construct the `DataType` at runtime. The managed type `TypedValue` has been added to make more types constructible, and `RustResult` to enable writing fallible `ccall`able functions. Similarly, `RankedArray` and `TypedRankedArray` have been added.
  
  - The `no-link` feature has been added to skip linking Julia.
 
@@ -27,6 +29,8 @@
  - `RankedArray` and `TypedRankedArray` have been added to the `array` module.
 
  - `Symbol::generate` and `Symbol::generate_tagged` have been added.
+
+ - `LeakedValue` has been removed in favor of making managed data generally leakable by erasing the `'scope` lifetime with `Managed::leak` or `Ref::leak`.
 
 
 #### v0.17

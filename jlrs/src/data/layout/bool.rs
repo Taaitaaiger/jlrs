@@ -8,11 +8,9 @@ use std::fmt::{Debug, Formatter, Result as FmtResult};
 use jl_sys::{jl_bool_type, jl_unbox_int8};
 
 use crate::{
-    convert::{construct_type::ConstructType, unbox::Unbox},
-    data::managed::{datatype::DataTypeData, private::ManagedPriv, value::Value},
+    convert::unbox::Unbox,
+    data::managed::{private::ManagedPriv, value::Value},
     impl_julia_typecheck, impl_valid_layout,
-    memory::target::ExtendedTarget,
-    prelude::Target,
     private::Private,
 };
 
@@ -81,23 +79,5 @@ unsafe impl Unbox for bool {
     }
 }
 
-unsafe impl ConstructType for Bool {
-    fn base_type<'target, T>(target: &T) -> crate::data::managed::value::Value<'target, 'static>
-    where
-        T: Target<'target>,
-    {
-        unsafe { <bool as crate::convert::into_julia::IntoJulia>::julia_type(target).as_value() }
-    }
-
-    fn construct_type<'target, 'current, 'borrow, T>(
-        target: ExtendedTarget<'target, 'current, 'borrow, T>,
-    ) -> DataTypeData<'target, T>
-    where
-        T: Target<'target>,
-    {
-        let (target, _) = target.split();
-        <bool as crate::convert::into_julia::IntoJulia>::julia_type(target)
-    }
-}
-
 impl_ccall_arg!(Bool);
+impl_construct_julia_type!(Bool, jl_bool_type);

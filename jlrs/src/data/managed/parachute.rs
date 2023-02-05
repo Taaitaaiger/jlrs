@@ -21,8 +21,8 @@ use std::{
 use super::private::ManagedPriv;
 use crate::{
     data::{
-        layout::foreign::{create_foreign_type_internal, ForeignType},
         managed::{datatype::DataType, module::Module, symbol::Symbol, value::Value},
+        types::foreign_type::{create_foreign_type_internal, ForeignType},
     },
     memory::{
         stack_frame::StackFrame,
@@ -99,10 +99,12 @@ pub(crate) struct Parachute<T: Sync + 'static> {
     _data: Option<T>,
 }
 
-// Safety: `T` contains no references to Julia data so the default implementation of `mark` is
-// correct.
 unsafe impl<T: Send + Sync + 'static> ForeignType for Parachute<T> {
     const TYPE_FN: Option<unsafe fn() -> DataType<'static>> = Some(init_foreign::<Self>);
+    const HAS_POINTERS: bool = false;
+    fn mark(_: crate::memory::PTls, _: &Self) -> usize {
+        0
+    }
 }
 
 #[doc(hidden)]

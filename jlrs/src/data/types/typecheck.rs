@@ -46,7 +46,7 @@ pub unsafe trait Typecheck {
 #[macro_export]
 macro_rules! impl_julia_typecheck {
     ($type:ty, $jl_type:expr, $($lt:lifetime),+) => {
-        unsafe impl<$($lt),+> crate::data::managed::typecheck::Typecheck for $type {
+        unsafe impl<$($lt),+> crate::data::types::typecheck::Typecheck for $type {
             #[inline(always)]
             fn typecheck(t: $crate::data::managed::datatype::DataType) -> bool {
                 unsafe {
@@ -56,7 +56,7 @@ macro_rules! impl_julia_typecheck {
         }
     };
     ($type:ty, $jl_type:expr) => {
-        unsafe impl crate::data::managed::typecheck::Typecheck for $type {
+        unsafe impl crate::data::types::typecheck::Typecheck for $type {
             #[inline(always)]
             fn typecheck(t: $crate::data::managed::datatype::DataType) -> bool {
                 unsafe {
@@ -66,7 +66,7 @@ macro_rules! impl_julia_typecheck {
         }
     };
     ($type:ty) => {
-        unsafe impl crate::data::managed::typecheck::Typecheck for $type {
+        unsafe impl crate::data::types::typecheck::Typecheck for $type {
             #[inline(always)]
             fn typecheck(t: crate::data::managed::datatype::DataType) -> bool {
                 unsafe {

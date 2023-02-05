@@ -215,7 +215,7 @@ impl<'scope> ManagedPriv<'scope, '_> for Task<'scope> {
     }
 }
 
-impl_construct_type_managed!(Option<TaskRef<'_>>, jl_task_type);
+impl_construct_type_managed!(Task<'_>, jl_task_type);
 
 /// A reference to a [`Task`] that has not been explicitly rooted.
 pub type TaskRef<'scope> = Ref<'scope, 'static, Task<'scope>>;
@@ -235,3 +235,4 @@ pub type TaskData<'target, T> = <T as TargetType<'target>>::Data<'static, Task<'
 pub type TaskResult<'target, T> = <T as TargetType<'target>>::Result<'static, Task<'target>>;
 
 impl_ccall_arg_managed!(Task, 1);
+impl_into_typed!(Task);

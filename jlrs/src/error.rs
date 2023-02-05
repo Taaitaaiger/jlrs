@@ -64,7 +64,8 @@ pub enum TypeError {
         value_type: String,
         field_type: String,
     },
-
+    #[error("{value} is not a {field_type}")]
+    NotA { value: String, field_type: String },
     #[error("{value_type} is immutable")]
     Immutable { value_type: String },
 }
@@ -80,6 +81,8 @@ pub enum ArrayLayoutError {
     NotBits { element_type: String },
     #[error("element type is {element_type}, which is stored inline")]
     NotPointer { element_type: String },
+    #[error("rank is {found}, not {provided}")]
+    RankMismatch { found: isize, provided: isize },
 }
 
 /// Data access errors.
@@ -176,8 +179,8 @@ impl JlrsError {
     }
 
     /// Convert an error message to `JlrsError::Exception`.
-    pub fn exception(msg: String) -> Self {
-        JlrsError::Exception(Exception { msg })
+    pub fn exception<S: Into<String>>(msg: S) -> Self {
+        JlrsError::Exception(Exception { msg: msg.into() })
     }
 
     /// Convert an arbitrary error to `Err(JlrsError::Other)`.

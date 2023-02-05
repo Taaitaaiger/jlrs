@@ -86,7 +86,7 @@ impl<'scope> ManagedPriv<'scope, '_> for MethodMatch<'scope> {
     }
 }
 
-impl_construct_type_managed!(Option<MethodMatchRef<'_>>, jl_method_match_type);
+impl_construct_type_managed!(MethodMatch<'_>, jl_method_match_type);
 
 /// A reference to a [`MethodMatch`] that has not been explicitly rooted.
 pub type MethodMatchRef<'scope> = Ref<'scope, 'static, MethodMatch<'scope>>;
@@ -110,3 +110,4 @@ pub type MethodMatchResult<'target, T> =
     <T as TargetType<'target>>::Result<'static, MethodMatch<'target>>;
 
 impl_ccall_arg_managed!(MethodMatch, 1);
+impl_into_typed!(MethodMatch);

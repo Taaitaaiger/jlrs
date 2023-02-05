@@ -1,3 +1,4 @@
+#[cfg(feature = "sync-rt")]
 use std::cell::RefCell;
 
 #[cfg(feature = "sync-rt")]

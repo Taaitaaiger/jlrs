@@ -14,8 +14,10 @@ pub struct Ledger {
 }
 
 use std::sync::{Arc, Mutex};
-static LEDGER: OnceCell<Arc<Mutex<Ledger>>> = OnceCell::new();
+pub(crate) static LEDGER: OnceCell<Arc<Mutex<Ledger>>> = OnceCell::new();
 
+// When a Rust crate is compiled to a cdylib it will contain its own copy of all statics
+// introduced by jlrs, but the ledger must be shared between all "instances" of jlrs.
 pub(crate) unsafe extern "C" fn init_ledger(ledger_ref: &mut *mut c_void) {
     if ledger_ref.is_null() {
         LEDGER.get_or_init(|| {
@@ -26,7 +28,8 @@ pub(crate) unsafe extern "C" fn init_ledger(ledger_ref: &mut *mut c_void) {
         });
     } else {
         LEDGER.get_or_init(|| {
-            std::mem::transmute::<&mut *mut c_void, &Arc<Mutex<Ledger>>>(ledger_ref).clone()
+            let ptr = *std::mem::transmute::<&mut *mut c_void, &*const Mutex<Ledger>>(ledger_ref);
+            Arc::from_raw(ptr).clone()
         });
     }
 }
@@ -93,6 +96,22 @@ impl Ledger {
             .lock()
             .expect("Corrupted ledger")
             .try_add_borrow_mut(range.clone())
+    }
+
+    // Update the range of an existing mutable borrow.
+    pub(crate) unsafe fn replace_borrow_mut(
+        old_range: Range<*const u8>,
+        new_range: Range<*const u8>,
+    ) {
+        if old_range == new_range {
+            return;
+        }
+
+        let mut ledger = LEDGER.get().unwrap().lock().expect("Corrupted ledger");
+
+        let i = ledger.owned.iter().rposition(|r| r == &old_range).unwrap();
+        ledger.owned.remove(i);
+        ledger.owned.push(new_range);
     }
 
     // Try to add an immutable borrow to the ledger

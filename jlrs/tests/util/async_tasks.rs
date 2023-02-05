@@ -1,4 +1,4 @@
-use jlrs::prelude::*;
+use jlrs::{memory::gc::Gc, prelude::*};
 
 pub struct MyTask {
     pub dims: isize,
@@ -286,7 +286,10 @@ impl AsyncTask for NestingTaskAsyncDynamicValueFrame {
         let output = frame.output();
         let v = frame
             .async_scope(|mut frame| async move {
+                frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
                 let iters = Value::new(&mut frame, self.iters);
+                frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
+                frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
                 let dims = Value::new(&mut frame, self.dims);
 
                 let out = unsafe {
@@ -324,8 +327,11 @@ impl AsyncTask for NestingTaskAsyncDynamicCallFrame {
         let output = frame.output();
         let v = frame
             .async_scope(|mut frame| async move {
+                frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
                 let iters = Value::new(&mut frame, self.iters);
+                frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
                 let dims = Value::new(&mut frame, self.dims);
+                frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
 
                 let out = unsafe {
                     Module::main(&frame)
@@ -337,6 +343,7 @@ impl AsyncTask for NestingTaskAsyncDynamicCallFrame {
                         .call_async(&mut frame, &mut [dims, iters])
                         .await
                 };
+                frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
 
                 let out = unsafe {
                     match out {
@@ -344,6 +351,7 @@ impl AsyncTask for NestingTaskAsyncDynamicCallFrame {
                         Err(e) => Err(e.as_ref().root(output)),
                     }
                 };
+                frame.gc_collect(jlrs::memory::gc::GcCollection::Full);
 
                 Ok(out)
             })

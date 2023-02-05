@@ -119,7 +119,7 @@ impl<'scope> ManagedPriv<'scope, '_> for Binding<'scope> {
     }
 }
 
-impl_construct_type_managed!(Option<BindingRef<'_>>, jl_binding_type);
+impl_construct_type_managed!(Binding<'_>, jl_binding_type);
 
 /// A reference to a [`Binding`] that has not been explicitly rooted.
 pub type BindingRef<'scope> = Ref<'scope, 'static, Binding<'scope>>;
@@ -140,3 +140,4 @@ pub type BindingData<'target, T> = <T as TargetType<'target>>::Data<'static, Bin
 pub type BindingResult<'target, T> = <T as TargetType<'target>>::Result<'static, Binding<'target>>;
 
 impl_ccall_arg_managed!(Binding, 1);
+impl_into_typed!(Binding);

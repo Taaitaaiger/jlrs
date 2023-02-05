@@ -11,18 +11,18 @@ use std::{
     cell::{Cell, UnsafeCell},
     ffi::c_void,
     ptr::{null_mut, NonNull},
-    slice,
 };
 
 use jl_sys::{jl_gc_wb, jl_value_t};
+use jlrs_macros::julia_version;
 
 use crate::{
     call::Call,
     data::{
-        layout::foreign::{create_foreign_type, ForeignType},
         managed::{module::Module, symbol::Symbol, value::Value, Managed},
+        types::foreign_type::{ForeignType, OpaqueType},
     },
-    memory::{gc::mark_queue_objarray, stack_frame::PinnedFrame, target::unrooted::Unrooted, PTls},
+    memory::{stack_frame::PinnedFrame, target::unrooted::Unrooted, PTls},
 };
 
 #[repr(C)]
@@ -40,21 +40,41 @@ unsafe impl Send for Stack {}
 unsafe impl Sync for Stack {}
 
 unsafe impl ForeignType for Stack {
-    const HAS_POINTERS: bool = true;
-
+    #[julia_version(since = "1.10")]
     fn mark(ptls: PTls, data: &Self) -> usize {
         // We can only get here while the GC is running, so there are no active mutable borrows,
         // but this function might be called from multiple threads so an immutable reference must
         // be used.
         let slots = unsafe { &*data.slots.get() };
-        let slots_ptr = slots.as_ptr() as *mut *mut c_void;
+
+        let mut n = 0;
+        unsafe {
+            for slot in slots {
+                if !slot.get().is_null() {
+                    if crate::memory::gc::mark_queue_obj(ptls, slot.get()) {
+                        n += 1;
+                    }
+                }
+            }
+        }
+
+        n
+    }
+
+    #[julia_version(until = "1.9")]
+    fn mark(ptls: PTls, data: &Self) -> usize {
+        // We can only get here while the GC is running, so there are no active mutable borrows,
+        // but this function might be called from multiple threads so an immutable reference must
+        // be used.
+        let slots = unsafe { &*data.slots.get() };
+        let slots_ptr = slots.as_ptr() as *const *mut c_void;
         let n_slots = slots.len();
-        let raw_slots = unsafe { slice::from_raw_parts(slots_ptr, n_slots) };
+        let raw_slots = unsafe { std::slice::from_raw_parts(slots_ptr, n_slots) };
         let self_ptr = data as *const _ as *mut c_void;
 
         // Called from ForeignType::mark, objs is a slice of pointers to Julia data.
         unsafe {
-            mark_queue_objarray(ptls, self_ptr, raw_slots);
+            crate::memory::gc::mark_queue_objarray(ptls, self_ptr, raw_slots);
         }
 
         0
@@ -72,56 +92,34 @@ impl Stack {
             return;
         }
 
-        // Safety: frame ensures this method has been called from a thread known to Julia,
-        // nothing is returned.
-        let init_closure = Box::new(move |module: Module| {
-            let global = module.unrooted_target();
+        unsafe {
+            let lock_fn = module.global(&global, "lock_init_lock").unwrap().as_value();
+
+            let unlock_fn = module
+                .global(&global, "unlock_init_lock")
+                .unwrap()
+                .as_value();
+
             let sym = Symbol::new(&global, "Stack");
+
+            lock_fn.call0(global).unwrap();
+
             if module.global(global, sym).is_ok() {
+                unlock_fn.call0(global).unwrap();
                 return;
             }
 
             // Safety: create_foreign_type is called with the correct arguments, the new type is
             // rooted until the constant has been set, and we've just checked if Jlrs.Stack
             // already exists.
-            unsafe {
-                let dt_ref = create_foreign_type::<Self, _>(global, sym, module);
-                let ptr = dt_ref.ptr();
-                frame.set_sync_root(ptr.cast().as_ptr());
+            let dt_ref = Self::create_type(global, sym, module);
+            let ptr = dt_ref.ptr();
+            frame.set_sync_root(ptr.cast().as_ptr());
 
-                let dt = dt_ref.as_managed();
-                module.set_const_unchecked(sym, dt.as_value());
-            }
-        });
+            let dt = dt_ref.as_managed();
+            module.set_const_unchecked(sym, dt.as_value());
 
-        fn trampoline_for<F: Fn(Module)>(_: &Box<F>) -> unsafe extern "C" fn(&F, Module) {
-            unsafe extern "C" fn trampoline<F: Fn(Module)>(func: &F, module: Module) {
-                func(module)
-            }
-
-            trampoline
-        }
-
-        unsafe {
-            let init_stack_type_func = module
-                .global(&global, "init_stack_type")
-                .unwrap()
-                .as_value();
-
-            let trampoline = Value::new(global, trampoline_for(&init_closure) as *mut c_void);
-            frame.set_sync_root(trampoline.ptr().as_ptr().cast());
-
-            // We can only root one value, but call3 internally roots all the arguments the
-            // function is called with so it's okay to leave this value unrooted.
-            let closure = Value::new(global, Box::leak(init_closure) as *mut _ as *mut c_void);
-            init_stack_type_func
-                .call3(
-                    global,
-                    trampoline.as_value(),
-                    closure.as_value(),
-                    module.as_value(),
-                )
-                .unwrap();
+            unlock_fn.call0(global).unwrap();
         };
     }
 

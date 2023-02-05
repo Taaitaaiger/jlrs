@@ -5,7 +5,7 @@ mod util;
 mod tests {
     use std::borrow::Cow;
 
-    use jlrs::{memory::gc::Gc, prelude::*};
+    use jlrs::prelude::*;
 
     use crate::util::JULIA;
 
@@ -512,65 +512,6 @@ mod tests {
         })
     }
 
-    fn global_can_be_leaked() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-            let mut instance = jlrs.instance(&mut frame);
-            let leaked = instance
-                .scope(|mut frame| {
-                    let main = Module::base(&frame);
-
-                    let value = Value::new(&mut frame, 1usize);
-                    unsafe { main.set_const_unchecked("QUX", value) };
-                    main.leaked_global("QUX")
-                })
-                .unwrap();
-
-            instance.gc_collect(jlrs::memory::gc::GcCollection::Full);
-
-            let res = instance.scope(|frame| {
-                let value = unsafe { leaked.as_value(&frame) };
-                assert_eq!(value.unbox::<usize>()?, 1);
-                Ok(())
-            });
-
-            assert!(res.is_ok());
-        })
-    }
-
-    fn leaked_global_must_exist() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-            let res = jlrs.instance(&mut frame).scope(|frame| {
-                let main = Module::base(&frame);
-                main.leaked_global("QUx")
-            });
-
-            assert!(res.is_err());
-        })
-    }
-
-    fn module_can_be_leaked() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-            let leaked = jlrs
-                .instance(&mut frame)
-                .scope(|frame| Ok(Module::base(&frame).as_leaked()))
-                .unwrap();
-
-            let res = jlrs.instance(&mut frame).scope(|frame| {
-                let value = unsafe { leaked.as_value(&frame) };
-                assert_eq!(value, Module::base(&frame).clone());
-                Ok(())
-            });
-
-            assert!(res.is_ok());
-        })
-    }
-
     #[test]
     fn module_tests() {
         core_module();
@@ -602,8 +543,5 @@ mod tests {
         set_global_unchecked();
         set_const_unchecked();
         function_must_be_function();
-        global_can_be_leaked();
-        leaked_global_must_exist();
-        module_can_be_leaked();
     }
 }

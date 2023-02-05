@@ -1,15 +1,13 @@
 #[cfg(all(
-    feature = "tokio-rt",
+    feature = "async-std-rt",
     not(all(target_os = "windows", feature = "julia-1-6")),
-    not(feature = "julia-1-7")
 ))]
 #[cfg(test)]
 mod util;
 
 #[cfg(all(
-    feature = "tokio-rt",
+    feature = "async-std-rt",
     not(all(target_os = "windows", feature = "julia-1-6")),
-    not(feature = "julia-1-7")
 ))]
 #[cfg(test)]
 mod tests {
@@ -32,7 +30,7 @@ mod tests {
                     .0,
             );
 
-            let (sender, recv) = tokio::sync::oneshot::channel();
+            let (sender, recv) = async_std::channel::unbounded();
             r.as_ref()
                 .blocking_task(
                     |mut frame| {
@@ -44,7 +42,7 @@ mod tests {
                 .try_dispatch_any()
                 .expect("Could not send blocking task");
 
-            recv.blocking_recv()
+            async_std::task::block_on(async { recv.recv().await })
                 .expect("Could not receive reply")
                 .expect("Could not load AsyncTests module");
 

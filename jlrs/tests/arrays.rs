@@ -4,15 +4,7 @@ mod util;
 #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
 mod tests {
     use jlrs::{
-        convert::construct_type::ConstructTypeRelaxed,
-        data::{
-            layout::valid_layout::ValidLayout,
-            managed::{
-                array::{dimensions::Dims, RankedArrayRef, TypedRankedArrayRef},
-                type_var::TypeVar,
-                union_all::UnionAll,
-            },
-        },
+        data::{layout::valid_layout::ValidLayout, managed::array::dimensions::Dims},
         prelude::*,
     };
 
@@ -343,59 +335,6 @@ mod tests {
         });
     }
 
-    fn construct_type_relaxed() {
-        JULIA.with(|j| {
-            let mut frame = StackFrame::new();
-            let mut jlrs = j.borrow_mut();
-
-            jlrs.instance(&mut frame)
-                .scope(|mut frame| {
-                    let array_ty =
-                        Option::<ArrayRef>::construct_type_relaxed(frame.as_extended_target());
-                    assert_eq!(array_ty, UnionAll::array_type(&frame));
-
-                    let array_ty = Option::<TypedArrayRef<i8>>::construct_type_relaxed(
-                        frame.as_extended_target(),
-                    );
-                    assert!(array_ty.is::<UnionAll>());
-                    let array_body = array_ty.cast::<UnionAll>().unwrap().body();
-                    assert!(array_body.is::<DataType>());
-                    let array_params = array_body.cast::<DataType>().unwrap().parameters();
-                    let array_params_data = array_params.data().as_slice();
-                    unsafe {
-                        assert!(array_params_data[0].unwrap().as_value().is::<DataType>());
-                        assert!(array_params_data[1].unwrap().as_value().is::<TypeVar>());
-                    }
-
-                    let array_ty = Option::<RankedArrayRef<2>>::construct_type_relaxed(
-                        frame.as_extended_target(),
-                    );
-                    assert!(array_ty.is::<UnionAll>());
-                    let array_body = array_ty.cast::<UnionAll>().unwrap().body();
-                    assert!(array_body.is::<DataType>());
-                    let array_params = array_body.cast::<DataType>().unwrap().parameters();
-                    let array_params_data = array_params.data().as_slice();
-                    unsafe {
-                        assert!(array_params_data[0].unwrap().as_value().is::<TypeVar>());
-                        assert!(array_params_data[1].unwrap().as_value().is::<isize>());
-                    }
-
-                    let array_ty = Option::<TypedRankedArrayRef<u32, 2>>::construct_type_relaxed(
-                        frame.as_extended_target(),
-                    );
-                    assert!(array_ty.is::<DataType>());
-                    let array_params = array_ty.cast::<DataType>().unwrap().parameters();
-                    let array_params_data = array_params.data().as_slice();
-                    unsafe {
-                        assert!(array_params_data[0].unwrap().as_value().is::<DataType>());
-                        assert!(array_params_data[1].unwrap().as_value().is::<isize>());
-                    }
-                    Ok(())
-                })
-                .unwrap();
-        });
-    }
-
     #[test]
     fn arrays_tests() {
         array_can_be_cast();
@@ -416,6 +355,5 @@ mod tests {
         cannot_access_f32_as_unrestricted_value_mut();
         convert_back_to_value();
         invalid_layout();
-        construct_type_relaxed()
     }
 }
