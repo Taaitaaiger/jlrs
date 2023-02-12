@@ -2176,6 +2176,9 @@ extern "C" {
     pub fn jl_throw(e: *mut jl_value_t) -> !;
 }
 extern "C" {
+    pub fn jl_get_pgcstack() -> *mut *mut jl_gcframe_t;
+}
+extern "C" {
     pub fn jl_enter_handler(eh: *mut jl_handler_t);
 }
 extern "C" {

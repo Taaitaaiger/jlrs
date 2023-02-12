@@ -368,6 +368,7 @@ fn generate_bindings(julia_dir: &str) {
         .allowlist_function("jl_eh_restore_state")
         .allowlist_function("jl_current_exception")
         .allowlist_function("jl_restore_excstack")
+        .allowlist_function("jl_get_pgcstack")
         .allowlist_type("jl_binding_t")
         .allowlist_type("jl_callptr_t")
         .allowlist_type("jl_code_instance_t")
