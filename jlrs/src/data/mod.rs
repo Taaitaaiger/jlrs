@@ -1,6 +1,6 @@
 //! Create and use Julia data.
 //!
-//! There are three major aspects to Julia data: it's owned by the Julia GC, it has a type, and it
+//! There are three major sides to Julia data: it's owned by the Julia GC, it has a type, and it
 //! has a layout.
 //!
 //! Let's start with the fact that Julia data is owned by the GC. Whenever the C API returns Julia

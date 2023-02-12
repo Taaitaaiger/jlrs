@@ -1,4 +1,4 @@
-/* generated from julia version 1.9.0-beta3 */
+/* generated from julia version 1.9.0-beta4 */
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct __BindgenBitfieldUnit<Storage> {
@@ -2089,6 +2089,9 @@ extern "C" {
     pub fn jl_environ(i: ::std::os::raw::c_int) -> *mut jl_value_t;
 }
 extern "C" {
+    pub fn jl_current_exception() -> *mut jl_value_t;
+}
+extern "C" {
     pub fn jl_exception_occurred() -> *mut jl_value_t;
 }
 extern "C" {
@@ -2243,6 +2246,18 @@ impl _jl_task_t {
 pub type jl_task_t = _jl_task_t;
 extern "C" {
     pub fn jl_throw(e: *mut jl_value_t) -> !;
+}
+extern "C" {
+    pub fn jl_enter_handler(eh: *mut jl_handler_t);
+}
+extern "C" {
+    pub fn jl_eh_restore_state(eh: *mut jl_handler_t);
+}
+extern "C" {
+    pub fn jl_excstack_state() -> usize;
+}
+extern "C" {
+    pub fn jl_restore_excstack(state: usize);
 }
 extern "C" {
     pub fn jl_process_events() -> ::std::os::raw::c_int;
