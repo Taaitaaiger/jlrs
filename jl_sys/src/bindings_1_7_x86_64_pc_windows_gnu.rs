@@ -2301,6 +2301,10 @@ extern "C" {
 }
 #[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
+    pub fn jl_get_pgcstack() -> *mut *mut jl_gcframe_t;
+}
+#[link(name = "libjulia", kind = "raw-dylib")]
+extern "C" {
     pub fn jl_enter_handler(eh: *mut jl_handler_t);
 }
 #[link(name = "libjulia", kind = "raw-dylib")]
