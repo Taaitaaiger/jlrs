@@ -383,7 +383,7 @@ fn convert_union_to_atomic(field_def: &mut Field, info: &AtomicField) {
 fn item_is_in_libjulia(fmod: &mut ItemForeignMod) {
     if let ForeignItem::Static(_) = &fmod.items[0] {
         let attr = Attribute::parse_outer
-            .parse_str("#[cfg_attr(target_env = \"msvc\", link(name = \"libjulia\", kind = \"raw-dylib\"))]")
+            .parse_str("#[link(name = \"libjulia\", kind = \"raw-dylib\")]")
             .unwrap()[0]
             .clone();
         fmod.attrs.push(attr);
@@ -392,7 +392,7 @@ fn item_is_in_libjulia(fmod: &mut ItemForeignMod) {
     if let ForeignItem::Fn(f) = &fmod.items[0] {
         if f.sig.ident.to_string().starts_with("jl_") {
             let attr = Attribute::parse_outer
-                .parse_str("#[cfg_attr(target_env = \"msvc\", link(name = \"libjulia\", kind = \"raw-dylib\"))]")
+                .parse_str("#[link(name = \"libjulia\", kind = \"raw-dylib\")]")
                 .unwrap()[0]
                 .clone();
             fmod.attrs.push(attr);

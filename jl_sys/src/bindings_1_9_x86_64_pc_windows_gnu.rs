@@ -1,4 +1,4 @@
-/* generated from julia version 1.9.0-beta3 */
+/* generated from julia version 1.9.0-beta4 */
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct __BindgenBitfieldUnit<Storage> {
@@ -263,7 +263,7 @@ pub union _jl_tls_states_t__bindgen_ty_1 {
     pub base_ctx: _jl_ucontext_t,
     pub copy_stack_ctx: jl_stack_context_t,
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_get_ptls_states() -> *mut ::std::os::raw::c_void;
 }
@@ -1348,463 +1348,463 @@ pub struct jl_method_match_t {
     pub method: *mut jl_method_t,
     pub fully_covers: u8,
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_typeofbottom_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_datatype_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_uniontype_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_unionall_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_tvar_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_any_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_type_type: *mut jl_unionall_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_typename_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_type_typename: *mut jl_typename_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_symbol_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_ssavalue_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_abstractslot_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_slotnumber_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_typedslot_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_argument_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_const_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_partial_struct_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_partial_opaque_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_interconditional_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_method_match_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_simplevector_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_tuple_typename: *mut jl_typename_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_vecelement_typename: *mut jl_typename_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_anytuple_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_emptytuple_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_anytuple_type_type: *mut jl_unionall_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_vararg_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_function_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_builtin_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_opaque_closure_type: *mut jl_unionall_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_opaque_closure_typename: *mut jl_typename_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_bottom_type: *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_method_instance_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_code_instance_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_code_info_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_method_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_module_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_abstractarray_type: *mut jl_unionall_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_densearray_type: *mut jl_unionall_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_array_type: *mut jl_unionall_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_array_typename: *mut jl_typename_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_weakref_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_abstractstring_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_string_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_errorexception_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_argumenterror_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_loaderror_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_initerror_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_typeerror_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_methoderror_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_undefvarerror_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_atomicerror_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_lineinfonode_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_stackovf_exception: *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_memory_exception: *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_readonlymemory_exception: *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_diverror_exception: *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_undefref_exception: *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_interrupt_exception: *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_boundserror_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_an_empty_vec_any: *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_an_empty_string: *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_bool_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_char_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_int8_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_uint8_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_int16_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_uint16_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_int32_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_uint32_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_int64_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_uint64_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_float16_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_float32_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_float64_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_floatingpoint_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_number_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_nothing_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_signed_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_voidpointer_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_pointer_type: *mut jl_unionall_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_llvmpointer_type: *mut jl_unionall_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_ref_type: *mut jl_unionall_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_pointer_typename: *mut jl_typename_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_llvmpointer_typename: *mut jl_typename_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_namedtuple_typename: *mut jl_typename_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_namedtuple_type: *mut jl_unionall_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_task_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_pair_type: *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_array_uint8_type: *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_array_any_type: *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_array_symbol_type: *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_array_int32_type: *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_expr_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_globalref_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_linenumbernode_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_gotonode_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_gotoifnot_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_returnnode_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_phinode_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_pinode_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_phicnode_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_upsilonnode_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_quotenode_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_newvarnode_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_intrinsic_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_methtable_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_typemap_level_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_typemap_entry_type: *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_emptysvec: *mut jl_svec_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_emptytuple: *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_true: *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_false: *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_nothing: *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_kwcall_func: *mut jl_value_t;
 }
@@ -1814,11 +1814,11 @@ pub struct _jl_gcframe_t {
     pub nroots: usize,
     pub prev: *mut _jl_gcframe_t,
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_gc_enable(on: ::std::os::raw::c_int) -> ::std::os::raw::c_int;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_gc_is_enabled() -> ::std::os::raw::c_int;
 }
@@ -1826,15 +1826,15 @@ pub const jl_gc_collection_t_JL_GC_AUTO: jl_gc_collection_t = 0;
 pub const jl_gc_collection_t_JL_GC_FULL: jl_gc_collection_t = 1;
 pub const jl_gc_collection_t_JL_GC_INCREMENTAL: jl_gc_collection_t = 2;
 pub type jl_gc_collection_t = ::std::os::raw::c_uint;
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_gc_collect(arg1: jl_gc_collection_t);
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_gc_add_finalizer(v: *mut jl_value_t, f: *mut jl_function_t);
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_gc_add_ptr_finalizer(
         ptls: jl_ptls_t,
@@ -1842,62 +1842,62 @@ extern "C" {
         f: *mut ::std::os::raw::c_void,
     );
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_gc_queue_root(root: *const jl_value_t);
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_gc_safepoint();
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_array_typetagdata(a: *mut jl_array_t) -> *mut ::std::os::raw::c_char;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_compute_fieldtypes(
         st: *mut jl_datatype_t,
         stack: *mut ::std::os::raw::c_void,
     ) -> *mut jl_svec_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_subtype(a: *mut jl_value_t, b: *mut jl_value_t) -> ::std::os::raw::c_int;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_egal(a: *const jl_value_t, b: *const jl_value_t) -> ::std::os::raw::c_int;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_object_id(v: *mut jl_value_t) -> usize;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_has_free_typevars(v: *mut jl_value_t) -> ::std::os::raw::c_int;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_isa(a: *mut jl_value_t, t: *mut jl_value_t) -> ::std::os::raw::c_int;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_type_union(ts: *mut *mut jl_value_t, n: usize) -> *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_type_unionall(v: *mut jl_tvar_t, body: *mut jl_value_t) -> *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_typename_str(v: *mut jl_value_t) -> *const ::std::os::raw::c_char;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_typeof_str(v: *mut jl_value_t) -> *const ::std::os::raw::c_char;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_new_typevar(
         name: *mut jl_sym_t,
@@ -1905,7 +1905,7 @@ extern "C" {
         ub: *mut jl_value_t,
     ) -> *mut jl_tvar_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_apply_type(
         tc: *mut jl_value_t,
@@ -1913,11 +1913,11 @@ extern "C" {
         n: usize,
     ) -> *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_apply_tuple_type_v(p: *mut *mut jl_value_t, np: usize) -> *mut jl_tupletype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_new_datatype(
         name: *mut jl_sym_t,
@@ -1932,7 +1932,7 @@ extern "C" {
         ninitialized: ::std::os::raw::c_int,
     ) -> *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_new_primitivetype(
         name: *mut jl_value_t,
@@ -1942,14 +1942,14 @@ extern "C" {
         nbits: usize,
     ) -> *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_atomic_new_bits(
         dt: *mut jl_value_t,
         src: *const ::std::os::raw::c_char,
     ) -> *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_atomic_store_bits(
         dst: *mut ::std::os::raw::c_char,
@@ -1957,7 +1957,7 @@ extern "C" {
         nb: ::std::os::raw::c_int,
     );
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_atomic_swap_bits(
         dt: *mut jl_value_t,
@@ -1966,7 +1966,7 @@ extern "C" {
         nb: ::std::os::raw::c_int,
     ) -> *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_atomic_bool_cmpswap_bits(
         dst: *mut ::std::os::raw::c_char,
@@ -1975,7 +1975,7 @@ extern "C" {
         nb: ::std::os::raw::c_int,
     ) -> ::std::os::raw::c_int;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_atomic_cmpswap_bits(
         dt: *mut jl_datatype_t,
@@ -1986,7 +1986,7 @@ extern "C" {
         nb: ::std::os::raw::c_int,
     ) -> *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_new_structv(
         type_: *mut jl_datatype_t,
@@ -1994,131 +1994,131 @@ extern "C" {
         na: u32,
     ) -> *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_new_struct_uninit(type_: *mut jl_datatype_t) -> *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_alloc_svec(n: usize) -> *mut jl_svec_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_alloc_svec_uninit(n: usize) -> *mut jl_svec_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_symbol(str_: *const ::std::os::raw::c_char) -> *mut jl_sym_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_symbol_n(str_: *const ::std::os::raw::c_char, len: usize) -> *mut jl_sym_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_gensym() -> *mut jl_sym_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_tagged_gensym(str_: *const ::std::os::raw::c_char, len: usize) -> *mut jl_sym_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_box_bool(x: i8) -> *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_box_int8(x: i8) -> *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_box_uint8(x: u8) -> *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_box_int16(x: i16) -> *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_box_uint16(x: u16) -> *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_box_int32(x: i32) -> *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_box_uint32(x: u32) -> *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_box_char(x: u32) -> *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_box_int64(x: i64) -> *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_box_uint64(x: u64) -> *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_box_float32(x: f32) -> *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_box_float64(x: f64) -> *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_box_voidpointer(x: *mut ::std::os::raw::c_void) -> *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_unbox_int8(v: *mut jl_value_t) -> i8;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_unbox_uint8(v: *mut jl_value_t) -> u8;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_unbox_int16(v: *mut jl_value_t) -> i16;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_unbox_uint16(v: *mut jl_value_t) -> u16;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_unbox_int32(v: *mut jl_value_t) -> i32;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_unbox_uint32(v: *mut jl_value_t) -> u32;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_unbox_int64(v: *mut jl_value_t) -> i64;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_unbox_uint64(v: *mut jl_value_t) -> u64;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_unbox_float32(v: *mut jl_value_t) -> f32;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_unbox_float64(v: *mut jl_value_t) -> f64;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_unbox_voidpointer(v: *mut jl_value_t) -> *mut ::std::os::raw::c_void;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_field_index(
         t: *mut jl_datatype_t,
@@ -2126,19 +2126,19 @@ extern "C" {
         err: ::std::os::raw::c_int,
     ) -> ::std::os::raw::c_int;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_get_nth_field(v: *mut jl_value_t, i: usize) -> *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_get_nth_field_noalloc(v: *mut jl_value_t, i: usize) -> *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_set_nth_field(v: *mut jl_value_t, i: usize, rhs: *mut jl_value_t);
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_islayout_inline(
         eltype: *mut jl_value_t,
@@ -2146,11 +2146,11 @@ extern "C" {
         al: *mut usize,
     ) -> ::std::os::raw::c_int;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_new_array(atype: *mut jl_value_t, dims: *mut jl_value_t) -> *mut jl_array_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_reshape_array(
         atype: *mut jl_value_t,
@@ -2158,7 +2158,7 @@ extern "C" {
         dims: *mut jl_value_t,
     ) -> *mut jl_array_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_ptr_to_array_1d(
         atype: *mut jl_value_t,
@@ -2167,7 +2167,7 @@ extern "C" {
         own_buffer: ::std::os::raw::c_int,
     ) -> *mut jl_array_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_ptr_to_array(
         atype: *mut jl_value_t,
@@ -2176,15 +2176,15 @@ extern "C" {
         own_buffer: ::std::os::raw::c_int,
     ) -> *mut jl_array_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_alloc_array_1d(atype: *mut jl_value_t, nr: usize) -> *mut jl_array_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_alloc_array_2d(atype: *mut jl_value_t, nr: usize, nc: usize) -> *mut jl_array_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_alloc_array_3d(
         atype: *mut jl_value_t,
@@ -2193,158 +2193,162 @@ extern "C" {
         z: usize,
     ) -> *mut jl_array_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_pchar_to_array(str_: *const ::std::os::raw::c_char, len: usize) -> *mut jl_array_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_pchar_to_string(str_: *const ::std::os::raw::c_char, len: usize) -> *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_arrayref(a: *mut jl_array_t, i: usize) -> *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_arrayset(a: *mut jl_array_t, v: *mut jl_value_t, i: usize);
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_array_grow_end(a: *mut jl_array_t, inc: usize);
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_array_del_end(a: *mut jl_array_t, dec: usize);
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_array_grow_beg(a: *mut jl_array_t, inc: usize);
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_array_del_beg(a: *mut jl_array_t, dec: usize);
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_array_ptr_1d_push(a: *mut jl_array_t, item: *mut jl_value_t);
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_array_ptr_1d_append(a: *mut jl_array_t, a2: *mut jl_array_t);
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_apply_array_type(type_: *mut jl_value_t, dim: usize) -> *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_array_eltype(a: *mut jl_value_t) -> *mut ::std::os::raw::c_void;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_main_module: *mut jl_module_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_core_module: *mut jl_module_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_base_module: *mut jl_module_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_new_module(name: *mut jl_sym_t) -> *mut jl_module_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_binding_type(m: *mut jl_module_t, var: *mut jl_sym_t) -> *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_get_global(m: *mut jl_module_t, var: *mut jl_sym_t) -> *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_set_global(m: *mut jl_module_t, var: *mut jl_sym_t, val: *mut jl_value_t);
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_set_const(m: *mut jl_module_t, var: *mut jl_sym_t, val: *mut jl_value_t);
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_is_imported(m: *mut jl_module_t, s: *mut jl_sym_t) -> ::std::os::raw::c_int;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_cpu_threads() -> ::std::os::raw::c_int;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_getpagesize() -> ::std::os::raw::c_long;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_getallocationgranularity() -> ::std::os::raw::c_long;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_is_debugbuild() -> ::std::os::raw::c_int;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_get_UNAME() -> *mut jl_sym_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_get_ARCH() -> *mut jl_sym_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_get_libllvm() -> *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_n_threads: ::std::sync::atomic::AtomicI32;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_environ(i: ::std::os::raw::c_int) -> *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
+extern "C" {
+    pub fn jl_current_exception() -> *mut jl_value_t;
+}
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_exception_occurred() -> *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_init();
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_init_with_image(
         julia_bindir: *const ::std::os::raw::c_char,
         image_path: *const ::std::os::raw::c_char,
     );
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_is_initialized() -> ::std::os::raw::c_int;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_atexit_hook(status: ::std::os::raw::c_int);
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_adopt_thread() -> *mut *mut jl_gcframe_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_eval_string(str_: *const ::std::os::raw::c_char) -> *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_apply_generic(
         F: *mut jl_value_t,
@@ -2352,7 +2356,7 @@ extern "C" {
         nargs: u32,
     ) -> *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_call(
         f: *mut jl_function_t,
@@ -2360,15 +2364,15 @@ extern "C" {
         nargs: u32,
     ) -> *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_call0(f: *mut jl_function_t) -> *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_call1(f: *mut jl_function_t, a: *mut jl_value_t) -> *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_call2(
         f: *mut jl_function_t,
@@ -2376,7 +2380,7 @@ extern "C" {
         b: *mut jl_value_t,
     ) -> *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_call3(
         f: *mut jl_function_t,
@@ -2385,7 +2389,7 @@ extern "C" {
         c: *mut jl_value_t,
     ) -> *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_yield();
 }
@@ -2482,19 +2486,39 @@ impl _jl_task_t {
     }
 }
 pub type jl_task_t = _jl_task_t;
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_throw(e: *mut jl_value_t) -> !;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
+extern "C" {
+    pub fn jl_enter_handler(eh: *mut jl_handler_t);
+}
+#[link(name = "libjulia", kind = "raw-dylib")]
+extern "C" {
+    pub fn jl_eh_restore_state(eh: *mut jl_handler_t);
+}
+#[link(name = "libjulia", kind = "raw-dylib")]
+extern "C" {
+    pub fn jl_excstack_state() -> usize;
+}
+#[link(name = "libjulia", kind = "raw-dylib")]
+extern "C" {
+    pub fn jl_restore_excstack(state: usize);
+}
+#[link(name = "libjulia", kind = "raw-dylib")]
+extern "C" {
+    pub fn jl_setjmp(_Buf: *mut _JBTYPE) -> ::std::os::raw::c_int;
+}
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_process_events() -> ::std::os::raw::c_int;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_stdout_obj() -> *mut jl_value_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_stderr_obj() -> *mut jl_value_t;
 }
@@ -2554,46 +2578,46 @@ pub struct jl_options_t {
     pub strip_ir: i8,
     pub heap_size_hint: u64,
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub static mut jl_options: jl_options_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_ver_major() -> ::std::os::raw::c_int;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_ver_minor() -> ::std::os::raw::c_int;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_ver_patch() -> ::std::os::raw::c_int;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_ver_is_release() -> ::std::os::raw::c_int;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_ver_string() -> *const ::std::os::raw::c_char;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_git_branch() -> *const ::std::os::raw::c_char;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_git_commit() -> *const ::std::os::raw::c_char;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_get_current_task() -> *mut jl_task_t;
 }
 pub type jl_markfunc_t =
     ::std::option::Option<unsafe extern "C" fn(arg1: jl_ptls_t, obj: *mut jl_value_t) -> usize>;
 pub type jl_sweepfunc_t = ::std::option::Option<unsafe extern "C" fn(obj: *mut jl_value_t)>;
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_new_foreign_type(
         name: *mut jl_sym_t,
@@ -2605,7 +2629,7 @@ extern "C" {
         large: ::std::os::raw::c_int,
     ) -> *mut jl_datatype_t;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_reinit_foreign_type(
         dt: *mut jl_datatype_t,
@@ -2613,7 +2637,7 @@ extern "C" {
         sweepfunc: jl_sweepfunc_t,
     ) -> ::std::os::raw::c_int;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_gc_alloc_typed(
         ptls: jl_ptls_t,
@@ -2621,11 +2645,11 @@ extern "C" {
         ty: *mut ::std::os::raw::c_void,
     ) -> *mut ::std::os::raw::c_void;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_gc_mark_queue_obj(ptls: jl_ptls_t, obj: *mut jl_value_t) -> ::std::os::raw::c_int;
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_gc_mark_queue_objarray(
         ptls: jl_ptls_t,
@@ -2634,7 +2658,7 @@ extern "C" {
         nobjs: usize,
     );
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_gc_schedule_foreign_sweepfunc(ptls: jl_ptls_t, bj: *mut jl_value_t);
 }
@@ -2673,11 +2697,11 @@ extern "C" {
 extern "C" {
     pub fn jlrs_unlock(v: *mut jl_value_t);
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_enter_threaded_region();
 }
-#[cfg_attr(target_env = "msvc", link(name = "libjulia", kind = "raw-dylib"))]
+#[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
     pub fn jl_exit_threaded_region();
 }

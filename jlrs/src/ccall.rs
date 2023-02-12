@@ -71,11 +71,8 @@ unsafe extern "C" fn set_pool_size(size: usize) {
     })
 }
 
-/*
- */
-
 // When a Rust crate is compiled to a cdylib it will contain its own copy of all statics
-// introduced by jlrs, but the ledger must be shared between all "instances" of jlrs.
+// introduced by jlrs, but this pool must be shared between all "instances" of jlrs.
 pub(crate) unsafe extern "C" fn init_pool(
     pool_ref: &mut *mut c_void,
     size: usize,
@@ -355,10 +352,10 @@ pub trait AsyncCallback<T: IntoJulia + Send + Sync + ConstructType>:
 {
 }
 
-impl<
-        T: IntoJulia + Send + Sync + ConstructType,
-        U: 'static + Send + Sync + FnOnce() -> JlrsResult<T>,
-    > AsyncCallback<T> for U
+impl<T, U> AsyncCallback<T> for U
+where
+    T: IntoJulia + Send + Sync + ConstructType,
+    U: 'static + Send + Sync + FnOnce() -> JlrsResult<T>,
 {
 }
 
