@@ -92,6 +92,7 @@ i686 = ["jl-sys/i686"]
 # Don't link Julia, useful when building a shared library that will be
 # loaded by and used from Julia.
 no-link = ["jl-sys/no-link"]
+yggdrasil = ["jl-sys/yggdrasil"]
 
 # Internal
 

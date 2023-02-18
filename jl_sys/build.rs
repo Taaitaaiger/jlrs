@@ -131,21 +131,30 @@ fn compile_jlrs_cc(julia_dir: &str) {
     let include_dir = format!("{}/include/julia/", julia_dir);
 
     let mut c = cc::Build::new();
-    c.file("src/jlrs_cc.cc").include(&include_dir).cpp(true);
+    c.file("src/jlrs_cc.cc")
+        .include(&include_dir)
+        .cpp(true)
+        .flag_if_supported("-fPIC");
 
-    #[cfg(feature = "i686")]
-    c.flag("-march=pentium4");
+    cfg_if! {
+        if #[cfg(feature = "yggdrasil")] {
+            #[cfg(feature = "i686")]
+            c.no_default_flags(true);
 
-    #[cfg(target_env = "msvc")]
-    {
-        c.flag("/std:c++20");
+            c.flag("-O2");
+        } else {
+            #[cfg(feature = "i686")]
+            c.flag("-march=pentium4");
 
-        let julia_dll_a = format!("{}/lib/libjulia.dll.a", julia_dir);
-        c.object(&julia_dll_a);
+            #[cfg(target_env = "msvc")]
+            {
+                c.flag("/std:c++20");
+
+                let julia_dll_a = format!("{}/lib/libjulia.dll.a", julia_dir);
+                c.object(&julia_dll_a);
+            }
+        }
     }
-
-    #[cfg(any(windows, feature = "windows"))]
-    c.define("JLRS_WINDOWS", None);
 
     #[cfg(feature = "julia-1-6")]
     c.define("JULIA_1_6", None);
