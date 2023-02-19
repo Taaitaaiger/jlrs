@@ -139,9 +139,13 @@ fn compile_jlrs_cc(julia_dir: &str) {
     cfg_if! {
         if #[cfg(feature = "yggdrasil")] {
             #[cfg(feature = "i686")]
-            c.no_default_flags(true);
+            {
+                c.no_default_flags(true);
+                c.flag("-O3");
+            }
 
-            c.flag("-O2");
+            #[cfg(feature = "windows")]
+            c.flag("-mwindows");
         } else {
             #[cfg(feature = "i686")]
             c.flag("-march=pentium4");
