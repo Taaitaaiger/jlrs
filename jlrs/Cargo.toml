@@ -93,7 +93,7 @@ i686 = ["jl-sys/i686"]
 # loaded by and used from Julia.
 no-link = ["jl-sys/no-link"]
 yggdrasil = ["jl-sys/yggdrasil"]
-windows = ["jl-sys/windows"]
+windows = ["jl-sys/windows", "jlrs-macros/windows"]
 
 # Internal
 

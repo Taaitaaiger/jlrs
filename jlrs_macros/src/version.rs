@@ -211,7 +211,7 @@ fn should_emit(since: Version, until: Version, windows_lts: bool, except: &[Vers
         return false;
     }
 
-    #[cfg(target_os = "windows")]
+    #[cfg(any(feature = "windows", target_os = "windows"))]
     if selected.minor == LTS_MINOR_VERSION && !windows_lts {
         return false;
     }

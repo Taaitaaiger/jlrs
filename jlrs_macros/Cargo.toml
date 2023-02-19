@@ -19,6 +19,7 @@ julia-1-7 = []
 julia-1-8 = []
 julia-1-9 = []
 julia-1-10 = []
+windows = []
 
 derive = ["proc-macro2", "syn", "quote"]
 ccall = ["proc-macro2", "syn", "quote"]
