@@ -1,153 +1,254 @@
-// Adapted from neon:
-// https://github.com/neon-bindings/neon/blob/09c04b3129798b16021549352c74323f629d5bb0/crates/neon/src/types/buffer/lock.rs
+// The ledger is used to track Julia data. It's implemented in a separate crate and distributed
+// as JlrsLedger_jll which is a dependency of Jlrs.jl. The reason it works this way is because
+// multiple packages could use different versions of jlrs and have been compiled with different
+// versions of Rust, all of these packages must use the same ledger.
+//
+// The ledger is not a lock, nothing prevents you from creating a copy of a `Value` that's
+// currently tracked. It does work well with opaque types, because tracking is the only way to
+// access a managed instance of an opaque type.
 
-use std::{ffi::c_void, ops::Range};
+use std::ffi::c_void;
 
 use once_cell::sync::OnceCell;
 
-use crate::error::{AccessError, JlrsResult};
+use crate::{
+    data::managed::{module::Module, value::Value},
+    error::{JlrsError, JlrsResult},
+    memory::target::unrooted::Unrooted,
+};
 
-#[derive(Debug, Default)]
-pub struct Ledger {
-    owned: Vec<Range<*const u8>>,
-    shared: Vec<Range<*const u8>>,
+const API_VERSION: usize = 1;
+
+#[derive(PartialEq, Eq, Debug)]
+#[repr(u8)]
+#[allow(dead_code)]
+pub(crate) enum LedgerResult {
+    OkFalse = 0u8,
+    OkTrue = 1u8,
+    Err = 2u8,
+    Poison = 3u8,
 }
 
-use std::sync::{Arc, Mutex};
-pub(crate) static LEDGER: OnceCell<Arc<Mutex<Ledger>>> = OnceCell::new();
+pub(crate) static LEDGER: OnceCell<Ledger> = OnceCell::new();
 
-// When a Rust crate is compiled to a cdylib it will contain its own copy of all statics
-// introduced by jlrs, but the ledger must be shared between all "instances" of jlrs.
-pub(crate) unsafe extern "C" fn init_ledger(ledger_ref: &mut *mut c_void) {
-    if ledger_ref.is_null() {
-        LEDGER.get_or_init(|| {
-            let ledger = Arc::new(Mutex::new(Ledger::default()));
-            let cloned = ledger.clone();
-            *ledger_ref = Arc::into_raw(ledger) as *mut c_void;
-            cloned
-        });
-    } else {
-        LEDGER.get_or_init(|| {
-            let ptr = *std::mem::transmute::<&mut *mut c_void, &*const Mutex<Ledger>>(ledger_ref);
-            Arc::from_raw(ptr).clone()
-        });
-    }
+pub(crate) struct Ledger {
+    api_version: unsafe extern "C" fn() -> usize,
+    is_borrowed_shared: unsafe extern "C" fn(*const c_void) -> LedgerResult,
+    is_borrowed_exclusive: unsafe extern "C" fn(*const c_void) -> LedgerResult,
+    is_borrowed: unsafe extern "C" fn(*const c_void) -> LedgerResult,
+    borrow_shared_unchecked: unsafe extern "C" fn(ptr: *const c_void) -> LedgerResult,
+    unborrow_shared: unsafe extern "C" fn(ptr: *const c_void) -> LedgerResult,
+    unborrow_exclusive: unsafe extern "C" fn(ptr: *const c_void) -> LedgerResult,
+    try_borrow_shared: unsafe extern "C" fn(ptr: *const c_void) -> LedgerResult,
+    try_borrow_exclusive: unsafe extern "C" fn(ptr: *const c_void) -> LedgerResult,
 }
 
-unsafe impl Send for Ledger {}
-unsafe impl Sync for Ledger {}
+pub(crate) unsafe extern "C" fn init_ledger() {
+    LEDGER.get_or_init(|| {
+        let unrooted = Unrooted::new();
+        let module = Module::main(&unrooted)
+            .submodule(unrooted, "Jlrs")
+            .unwrap()
+            .as_managed();
+
+        let module = module.submodule(unrooted, "Ledger").unwrap().as_managed();
+
+        let api_version = *module
+            .global(unrooted, "API_VERSION_FN")
+            .unwrap()
+            .as_value()
+            .data_ptr()
+            .cast::<Option<unsafe extern "C" fn() -> usize>>()
+            .as_ref()
+            .as_ref()
+            .unwrap();
+
+        let is_borrowed_shared = *module
+            .global(unrooted, "IS_BORROWED_SHARED")
+            .unwrap()
+            .as_value()
+            .data_ptr()
+            .cast::<Option<unsafe extern "C" fn(*const c_void) -> LedgerResult>>()
+            .as_ref()
+            .as_ref()
+            .unwrap();
+
+        let is_borrowed_exclusive = *module
+            .global(unrooted, "IS_BORROWED_EXCLUSIVE")
+            .unwrap()
+            .as_value()
+            .data_ptr()
+            .cast::<Option<unsafe extern "C" fn(*const c_void) -> LedgerResult>>()
+            .as_ref()
+            .as_ref()
+            .unwrap();
+
+        let is_borrowed = *module
+            .global(unrooted, "IS_BORROWED")
+            .unwrap()
+            .as_value()
+            .data_ptr()
+            .cast::<Option<unsafe extern "C" fn(*const c_void) -> LedgerResult>>()
+            .as_ref()
+            .as_ref()
+            .unwrap();
+
+        let try_borrow_shared = *module
+            .global(unrooted, "BORROW_SHARED")
+            .unwrap()
+            .as_value()
+            .data_ptr()
+            .cast::<Option<unsafe extern "C" fn(ptr: *const c_void) -> LedgerResult>>()
+            .as_ref()
+            .as_ref()
+            .unwrap();
+
+        let try_borrow_exclusive = *module
+            .global(unrooted, "BORROW_EXCLUSIVE")
+            .unwrap()
+            .as_value()
+            .data_ptr()
+            .cast::<Option<unsafe extern "C" fn(ptr: *const c_void) -> LedgerResult>>()
+            .as_ref()
+            .as_ref()
+            .unwrap();
+
+        let borrow_shared_unchecked = *module
+            .global(unrooted, "BORROW_SHARED_UNCHECKED")
+            .unwrap()
+            .as_value()
+            .data_ptr()
+            .cast::<Option<unsafe extern "C" fn(ptr: *const c_void) -> LedgerResult>>()
+            .as_ref()
+            .as_ref()
+            .unwrap();
+
+        let unborrow_shared = *module
+            .global(unrooted, "UNBORROW_SHARED")
+            .unwrap()
+            .as_value()
+            .data_ptr()
+            .cast::<Option<unsafe extern "C" fn(ptr: *const c_void) -> LedgerResult>>()
+            .as_ref()
+            .as_ref()
+            .unwrap();
+
+        let unborrow_exclusive = *module
+            .global(unrooted, "UNBORROW_EXCLUSIVE")
+            .unwrap()
+            .as_value()
+            .data_ptr()
+            .cast::<Option<unsafe extern "C" fn(ptr: *const c_void) -> LedgerResult>>()
+            .as_ref()
+            .as_ref()
+            .unwrap();
+
+        Ledger {
+            api_version,
+            is_borrowed_shared,
+            is_borrowed_exclusive,
+            is_borrowed,
+            try_borrow_shared,
+            try_borrow_exclusive,
+            borrow_shared_unchecked,
+            unborrow_shared,
+            unborrow_exclusive,
+        }
+    });
+
+    assert_eq!(Ledger::api_version(), API_VERSION);
+}
 
 impl Ledger {
-    // TODO: generic?
-    pub(crate) fn is_borrowed(range: Range<*const u8>) -> bool {
-        let ledger = LEDGER.get().unwrap().lock().expect("Corrupted ledger");
-        check_overlap(ledger.shared.as_ref(), &range).is_err()
+    pub(crate) fn api_version() -> usize {
+        unsafe { (LEDGER.get_unchecked().api_version)() }
     }
 
-    pub(crate) fn is_borrowed_mut(range: Range<*const u8>) -> bool {
-        let ledger = LEDGER.get().unwrap().lock().expect("Corrupted ledger");
-        check_overlap(ledger.owned.as_ref(), &range).is_err()
-    }
-
-    pub(crate) fn is_borrowed_any(range: Range<*const u8>) -> bool {
-        let ledger = LEDGER.get().unwrap().lock().expect("Corrupted ledger");
-        check_overlap(ledger.shared.as_ref(), &range).is_err()
-            || check_overlap(ledger.owned.as_ref(), &range).is_err()
-    }
-
-    pub(crate) unsafe fn clone_shared(range: Range<*const u8>) {
-        LEDGER
-            .get()
-            .unwrap()
-            .lock()
-            .expect("Corrupted ledger")
-            .shared
-            .push(range.clone())
-    }
-
-    pub(crate) fn unborrow_shared(range: Range<*const u8>) {
-        let mut ledger = LEDGER.get().unwrap().lock().expect("Corrupted ledger");
-        let i = ledger.shared.iter().rposition(|r| r == &range).unwrap();
-        ledger.shared.remove(i);
-    }
-
-    pub(crate) fn unborrow_owned(range: Range<*const u8>) {
-        let mut ledger = LEDGER.get().unwrap().lock().expect("Corrupted ledger");
-        let i = ledger.owned.iter().rposition(|r| r == &range).unwrap();
-        ledger.owned.remove(i);
-    }
-
-    // Dynamically check a slice conforms to borrow rules
-    pub(crate) fn try_borrow(range: Range<*const u8>) -> JlrsResult<()> {
-        LEDGER
-            .get()
-            .unwrap()
-            .lock()
-            .expect("Corrupted ledger")
-            .try_add_borrow(range.clone())
-    }
-
-    // Dynamically check a mutable slice conforms to borrow rules before returning by
-    // using interior mutability of the ledger.
-    pub(crate) fn try_borrow_mut(range: Range<*const u8>) -> JlrsResult<()> {
-        LEDGER
-            .get()
-            .unwrap()
-            .lock()
-            .expect("Corrupted ledger")
-            .try_add_borrow_mut(range.clone())
-    }
-
-    // Update the range of an existing mutable borrow.
-    pub(crate) unsafe fn replace_borrow_mut(
-        old_range: Range<*const u8>,
-        new_range: Range<*const u8>,
-    ) {
-        if old_range == new_range {
-            return;
+    pub(crate) fn is_borrowed_shared(data: Value) -> JlrsResult<bool> {
+        unsafe {
+            match (LEDGER.get_unchecked().is_borrowed_shared)(data.data_ptr().as_ptr()) {
+                LedgerResult::OkFalse => Ok(false),
+                LedgerResult::OkTrue => Ok(true),
+                LedgerResult::Err => Err(JlrsError::exception("unexpected error"))?,
+                LedgerResult::Poison => Err(JlrsError::exception("poisoned mutex"))?,
+            }
         }
-
-        let mut ledger = LEDGER.get().unwrap().lock().expect("Corrupted ledger");
-
-        let i = ledger.owned.iter().rposition(|r| r == &old_range).unwrap();
-        ledger.owned.remove(i);
-        ledger.owned.push(new_range);
     }
 
-    // Try to add an immutable borrow to the ledger
-    fn try_add_borrow(&mut self, range: Range<*const u8>) -> JlrsResult<()> {
-        // Check if the borrow overlaps with any active mutable borrow
-        check_overlap(&self.owned, &range)?;
-
-        // Record a record of the immutable borrow
-        self.shared.push(range);
-
-        Ok(())
+    pub(crate) fn is_borrowed_exclusive(data: Value) -> JlrsResult<bool> {
+        unsafe {
+            match (LEDGER.get_unchecked().is_borrowed_exclusive)(data.data_ptr().as_ptr()) {
+                LedgerResult::OkFalse => Ok(false),
+                LedgerResult::OkTrue => Ok(true),
+                LedgerResult::Err => Err(JlrsError::exception("unexpected error"))?,
+                LedgerResult::Poison => Err(JlrsError::exception("poisoned mutex"))?,
+            }
+        }
     }
 
-    // Try to add a mutable borrow to the ledger
-    fn try_add_borrow_mut(&mut self, range: Range<*const u8>) -> JlrsResult<()> {
-        // Check if the borrow overlaps with any active mutable borrow
-        check_overlap(&self.owned, &range)?;
-
-        // Check if the borrow overlaps with any active immutable borrow
-        check_overlap(&self.shared, &range)?;
-
-        // Record a record of the mutable borrow
-        self.owned.push(range);
-
-        Ok(())
+    pub(crate) fn is_borrowed(data: Value) -> JlrsResult<bool> {
+        unsafe {
+            match (LEDGER.get_unchecked().is_borrowed)(data.data_ptr().as_ptr()) {
+                LedgerResult::OkFalse => Ok(false),
+                LedgerResult::OkTrue => Ok(true),
+                LedgerResult::Err => Err(JlrsError::exception("unexpected error"))?,
+                LedgerResult::Poison => Err(JlrsError::exception("poisoned mutex"))?,
+            }
+        }
     }
-}
 
-fn is_disjoint(a: &Range<*const u8>, b: &Range<*const u8>) -> bool {
-    b.start >= a.end || a.start >= b.end
-}
+    pub(crate) fn try_borrow_shared(data: Value) -> JlrsResult<bool> {
+        unsafe {
+            match (LEDGER.get_unchecked().try_borrow_shared)(data.data_ptr().as_ptr()) {
+                LedgerResult::OkFalse => Ok(false),
+                LedgerResult::OkTrue => Ok(true),
+                LedgerResult::Err => Err(JlrsError::exception("already exclusively borrowed"))?,
+                LedgerResult::Poison => Err(JlrsError::exception("poisoned mutex"))?,
+            }
+        }
+    }
 
-fn check_overlap(existing: &[Range<*const u8>], range: &Range<*const u8>) -> JlrsResult<()> {
-    if existing.iter().all(|i| is_disjoint(i, range)) {
-        Ok(())
-    } else {
-        Err(AccessError::BorrowError)?
+    pub(crate) fn try_borrow_exclusive(data: Value) -> JlrsResult<bool> {
+        unsafe {
+            match (LEDGER.get_unchecked().try_borrow_exclusive)(data.data_ptr().as_ptr()) {
+                LedgerResult::OkFalse => Ok(false),
+                LedgerResult::OkTrue => Ok(true),
+                LedgerResult::Err => Err(JlrsError::exception("already exclusively borrowed"))?,
+                LedgerResult::Poison => Err(JlrsError::exception("poisoned mutex"))?,
+            }
+        }
+    }
+
+    pub(crate) unsafe fn borrow_shared_unchecked(data: Value) -> JlrsResult<bool> {
+        unsafe {
+            match (LEDGER.get_unchecked().borrow_shared_unchecked)(data.data_ptr().as_ptr()) {
+                LedgerResult::OkFalse => Ok(false),
+                LedgerResult::OkTrue => Ok(true),
+                LedgerResult::Err => Err(JlrsError::exception("already exclusively borrowed"))?,
+                LedgerResult::Poison => Err(JlrsError::exception("poisoned mutex"))?,
+            }
+        }
+    }
+
+    pub(crate) unsafe fn unborrow_shared(data: Value) -> JlrsResult<bool> {
+        unsafe {
+            match (LEDGER.get_unchecked().unborrow_shared)(data.data_ptr().as_ptr()) {
+                LedgerResult::OkFalse => Ok(false),
+                LedgerResult::OkTrue => Ok(true),
+                LedgerResult::Err => Err(JlrsError::exception("not borrowed"))?,
+                LedgerResult::Poison => Err(JlrsError::exception("poisoned mutex"))?,
+            }
+        }
+    }
+
+    pub(crate) unsafe fn unborrow_exclusive(data: Value) -> JlrsResult<bool> {
+        unsafe {
+            match (LEDGER.get_unchecked().unborrow_exclusive)(data.data_ptr().as_ptr()) {
+                LedgerResult::OkFalse => Ok(false),
+                LedgerResult::OkTrue => Ok(true),
+                LedgerResult::Err => Err(JlrsError::exception("not borrowed"))?,
+                LedgerResult::Poison => Err(JlrsError::exception("poisoned mutex"))?,
+            }
+        }
     }
 }

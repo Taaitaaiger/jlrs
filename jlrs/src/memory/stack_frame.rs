@@ -11,7 +11,7 @@ use std::{
 use jl_sys::{jl_get_current_task, jl_task_t};
 use jlrs_macros::julia_version;
 
-use super::context::stack::Stack;
+use super::context::stack::{Stack, STACK_TYPE_NAME};
 use crate::{
     data::managed::{private::ManagedPriv, value::Value},
     private::Private,
@@ -157,7 +157,8 @@ impl<'scope, 'inner, const N: usize> JlrsStackFrame<'scope, 'inner, N> {
         let ptr = pinned.raw.sync.get();
         if !ptr.is_null() {
             let v = unsafe { Value::wrap_non_null(NonNull::new_unchecked(ptr).cast(), Private) };
-            return v.datatype_name().unwrap_or("") == "Stack";
+            let sym = STACK_TYPE_NAME.as_symbol();
+            return v.datatype_name().unwrap_or("") == sym.as_str().unwrap();
         }
 
         false

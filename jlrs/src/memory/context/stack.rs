@@ -13,16 +13,18 @@ use std::{
     ptr::{null_mut, NonNull},
 };
 
-use jl_sys::{jl_gc_wb, jl_value_t};
+use jl_sys::{jl_gc_wb, jl_tagged_gensym, jl_value_t};
 use jlrs_macros::julia_version;
+use once_cell::sync::Lazy;
 
 use crate::{
     call::Call,
     data::{
-        managed::{module::Module, symbol::Symbol, value::Value, Managed},
+        managed::{module::Module, private::ManagedPriv, symbol::Symbol, value::Value, Managed},
         types::foreign_type::{ForeignType, OpaqueType},
     },
     memory::{stack_frame::PinnedFrame, target::unrooted::Unrooted, PTls},
+    private::Private,
 };
 
 #[repr(C)]
@@ -81,13 +83,33 @@ unsafe impl ForeignType for Stack {
     }
 }
 
+pub(crate) struct StaticSymbol(Symbol<'static>);
+impl StaticSymbol {
+    pub(crate) fn as_symbol(&self) -> Symbol {
+        self.0
+    }
+}
+unsafe impl Send for StaticSymbol {}
+unsafe impl Sync for StaticSymbol {}
+
+// Each "instance" of jlrs needs its own stack type to account for multiple versions of jlrs being
+// used by different crates, and that libraries distributed as JLLs might be compiled with
+// different versions of Rust.
+//
+// Safety: This data can only be initialized after Julia has been initialized, and must only be
+// accessed from threads that can call into Julia.
+pub(crate) static STACK_TYPE_NAME: Lazy<StaticSymbol> = Lazy::new(|| unsafe {
+    let stack = "Stack";
+    let sym = jl_tagged_gensym(stack.as_ptr().cast(), stack.len());
+    StaticSymbol(Symbol::wrap_non_null(NonNull::new_unchecked(sym), Private))
+});
+
 impl Stack {
     // Create the foreign type Stack in the Jlrs module, or return immediately if it already
     // exists.
     pub(crate) fn init<const N: usize>(frame: &PinnedFrame<N>, module: Module) {
         let global = module.unrooted_target();
-        let sym = Symbol::new(&global, "Stack");
-
+        let sym = STACK_TYPE_NAME.as_symbol();
         if module.global(&global, sym).is_ok() {
             return;
         }
@@ -99,8 +121,6 @@ impl Stack {
                 .global(&global, "unlock_init_lock")
                 .unwrap()
                 .as_value();
-
-            let sym = Symbol::new(&global, "Stack");
 
             lock_fn.call0(global).unwrap();
 

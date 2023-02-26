@@ -19,10 +19,7 @@ use crate::data::managed::private::ManagedPriv as _;
 #[cfg(feature = "async")]
 use crate::error::JuliaResult;
 use crate::{
-    data::managed::{
-        array::{tracked::TrackArray, Array},
-        value::{Value, ValueResult, MAX_SIZE},
-    },
+    data::managed::value::{Value, ValueResult, MAX_SIZE},
     error::{AccessError, JlrsResult},
     memory::{context::ledger::Ledger, target::Target},
     private::Private,
@@ -163,20 +160,12 @@ pub trait Call<'data>: private::CallPriv {
         let args = args.as_ref();
         let res = args
             .iter()
+            .copied()
             .map(|arg| -> JlrsResult<()> {
-                if let Ok(arr) = arg.cast::<Array>() {
-                    let range = arr.data_range();
-                    if Ledger::is_borrowed_any(range) {
-                        Err(AccessError::BorrowError)?
-                    }
-                    Ok(())
-                } else {
-                    let start = arg.data_ptr().as_ptr() as *mut u8;
-                    if Ledger::is_borrowed_any(start..start) {
-                        Err(AccessError::BorrowError)?
-                    }
-                    Ok(())
+                if Ledger::is_borrowed(arg)? {
+                    Err(AccessError::BorrowError)?
                 }
+                Ok(())
             })
             .find(|f| f.is_err())
             .map_or_else(
@@ -437,20 +426,13 @@ cfg_if::cfg_if! {
                 let args = args.as_ref();
                 let res = args
                     .iter()
+                    .copied()
                     .map(|arg| -> JlrsResult<()> {
-                        if let Ok(arr) = arg.cast::<Array>() {
-                            let range = arr.data_range();
-                            if Ledger::is_borrowed_any(range) {
+
+                            if Ledger::is_borrowed(arg)? {
                                 Err(AccessError::BorrowError)?
                             }
                             Ok(())
-                        } else {
-                            let start = arg.data_ptr().as_ptr() as *mut u8;
-                            if Ledger::is_borrowed_any(start..start) {
-                                Err(AccessError::BorrowError)?
-                            }
-                            Ok(())
-                        }
                     })
                     .find(|f| f.is_err())
                     .map_or_else(
@@ -507,20 +489,12 @@ cfg_if::cfg_if! {
                 let args = args.as_ref();
                 let res = args
                     .iter()
+                    .copied()
                     .map(|arg| -> JlrsResult<()> {
-                        if let Ok(arr) = arg.cast::<Array>() {
-                            let range = arr.data_range();
-                            if Ledger::is_borrowed_any(range) {
-                                Err(AccessError::BorrowError)?
-                            }
-                            Ok(())
-                        } else {
-                            let start = arg.data_ptr().as_ptr() as *mut u8;
-                            if Ledger::is_borrowed_any(start..start) {
-                                Err(AccessError::BorrowError)?
-                            }
-                            Ok(())
-                        }
+                         if Ledger::is_borrowed(arg)? {
+                             Err(AccessError::BorrowError)?
+                         }
+                         Ok(())
                     })
                     .find(|f| f.is_err())
                     .map_or_else(
@@ -578,20 +552,12 @@ cfg_if::cfg_if! {
                 let args = args.as_ref();
                 let res = args
                     .iter()
+                    .copied()
                     .map(|arg| -> JlrsResult<()> {
-                        if let Ok(arr) = arg.cast::<Array>() {
-                            let range = arr.data_range();
-                            if Ledger::is_borrowed_any(range) {
-                                Err(AccessError::BorrowError)?
-                            }
-                            Ok(())
-                        } else {
-                            let start = arg.data_ptr().as_ptr() as *mut u8;
-                            if Ledger::is_borrowed_any(start..start) {
-                                Err(AccessError::BorrowError)?
-                            }
-                            Ok(())
+                        if Ledger::is_borrowed(arg)? {
+                            Err(AccessError::BorrowError)?
                         }
+                        Ok(())
                     })
                     .find(|f| f.is_err())
                     .map_or_else(
@@ -651,20 +617,12 @@ cfg_if::cfg_if! {
                 let args = args.as_ref();
                 let res = args
                     .iter()
+                    .copied()
                     .map(|arg| -> JlrsResult<()> {
-                        if let Ok(arr) = arg.cast::<Array>() {
-                            let range = arr.data_range();
-                            if Ledger::is_borrowed_any(range) {
-                                Err(AccessError::BorrowError)?
-                            }
-                            Ok(())
-                        } else {
-                            let start = arg.data_ptr().as_ptr() as *mut u8;
-                            if Ledger::is_borrowed_any(start..start) {
-                                Err(AccessError::BorrowError)?
-                            }
-                            Ok(())
+                        if Ledger::is_borrowed(arg)? {
+                            Err(AccessError::BorrowError)?
                         }
+                        Ok(())
                     })
                     .find(|f| f.is_err())
                     .map_or_else(
@@ -720,20 +678,12 @@ cfg_if::cfg_if! {
                 let args = args.as_ref();
                 let res = args
                     .iter()
+                    .copied()
                     .map(|arg| -> JlrsResult<()> {
-                        if let Ok(arr) = arg.cast::<Array>() {
-                            let range = arr.data_range();
-                            if Ledger::is_borrowed_any(range) {
-                                Err(AccessError::BorrowError)?
-                            }
-                            Ok(())
-                        } else {
-                            let start = arg.data_ptr().as_ptr() as *mut u8;
-                            if Ledger::is_borrowed_any(start..start) {
-                                Err(AccessError::BorrowError)?
-                            }
-                            Ok(())
+                        if Ledger::is_borrowed(arg)? {
+                            Err(AccessError::BorrowError)?
                         }
+                        Ok(())
                     })
                     .find(|f| f.is_err())
                     .map_or_else(
@@ -791,20 +741,12 @@ cfg_if::cfg_if! {
                 let args = args.as_ref();
                 let res = args
                     .iter()
+                    .copied()
                     .map(|arg| -> JlrsResult<()> {
-                        if let Ok(arr) = arg.cast::<Array>() {
-                            let range = arr.data_range();
-                            if Ledger::is_borrowed_any(range) {
-                                Err(AccessError::BorrowError)?
-                            }
-                            Ok(())
-                        } else {
-                            let start = arg.data_ptr().as_ptr() as *mut u8;
-                            if Ledger::is_borrowed_any(start..start) {
-                                Err(AccessError::BorrowError)?
-                            }
-                            Ok(())
+                        if Ledger::is_borrowed(arg)? {
+                            Err(AccessError::BorrowError)?
                         }
+                        Ok(())
                     })
                     .find(|f| f.is_err())
                     .map_or_else(
@@ -859,20 +801,12 @@ cfg_if::cfg_if! {
                 let args = args.as_ref();
                 let res = args
                     .iter()
+                    .copied()
                     .map(|arg| -> JlrsResult<()> {
-                        if let Ok(arr) = arg.cast::<Array>() {
-                            let range = arr.data_range();
-                            if Ledger::is_borrowed_any(range) {
-                                Err(AccessError::BorrowError)?
-                            }
-                            Ok(())
-                        } else {
-                            let start = arg.data_ptr().as_ptr() as *mut u8;
-                            if Ledger::is_borrowed_any(start..start) {
-                                Err(AccessError::BorrowError)?
-                            }
-                            Ok(())
+                        if Ledger::is_borrowed(arg)? {
+                            Err(AccessError::BorrowError)?
                         }
+                        Ok(())
                     })
                     .find(|f| f.is_err())
                     .map_or_else(
@@ -929,20 +863,12 @@ cfg_if::cfg_if! {
                 let args = args.as_ref();
                 let res = args
                     .iter()
+                    .copied()
                     .map(|arg| -> JlrsResult<()> {
-                        if let Ok(arr) = arg.cast::<Array>() {
-                            let range = arr.data_range();
-                            if Ledger::is_borrowed_any(range) {
-                                Err(AccessError::BorrowError)?
-                            }
-                            Ok(())
-                        } else {
-                            let start = arg.data_ptr().as_ptr() as *mut u8;
-                            if Ledger::is_borrowed_any(start..start) {
-                                Err(AccessError::BorrowError)?
-                            }
-                            Ok(())
+                        if Ledger::is_borrowed(arg)? {
+                            Err(AccessError::BorrowError)?
                         }
+                        Ok(())
                     })
                     .find(|f| f.is_err())
                     .map_or_else(

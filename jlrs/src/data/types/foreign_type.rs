@@ -79,6 +79,7 @@ use crate::{
             private::ManagedPriv,
             symbol::Symbol,
             value::{Value, ValueData},
+            Managed,
         },
         types::construct_type::ConstructType,
     },
@@ -87,32 +88,17 @@ use crate::{
         target::{ExtendedTarget, Target},
         PTls,
     },
-    prelude::Managed,
     private::Private,
 };
 
 static FOREIGN_TYPE_REGISTRY: OnceCell<Arc<ForeignTypes>> = OnceCell::new();
 
-// When a Rust crate is compiled to a cdylib it will contain its own copy of all statics
-// introduced by jlrs, but the foreign type registry must be shared between all "instances" of
-// jlrs.
-pub(crate) unsafe extern "C" fn init_foreign_type_registry(registry_ref: &mut *mut c_void) {
-    if registry_ref.is_null() {
-        FOREIGN_TYPE_REGISTRY.get_or_init(|| {
-            let registry = Arc::new(ForeignTypes {
-                data: RwLock::new(Vec::new()),
-            });
-            let cloned = registry.clone();
-            *registry_ref = Arc::into_raw(registry) as *mut c_void;
-            cloned
-        });
-    } else {
-        FOREIGN_TYPE_REGISTRY.get_or_init(|| {
-            let registry_ptr = registry_ref as *mut _ as *const *const ForeignTypes;
-            let ptr = *registry_ptr;
-            Arc::from_raw(ptr).clone()
-        });
-    }
+pub(crate) unsafe extern "C" fn init_foreign_type_registry() {
+    FOREIGN_TYPE_REGISTRY.get_or_init(|| {
+        Arc::new(ForeignTypes {
+            data: RwLock::new(Vec::new()),
+        })
+    });
 }
 
 struct ForeignTypes {

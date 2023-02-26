@@ -36,12 +36,11 @@ use crate::{
     },
     data::{
         layout::valid_layout::{ValidField, ValidLayout},
-        managed::{private::ManagedPriv, Ref},
+        managed::{datatype::DataType, private::ManagedPriv, Managed, Ref},
         types::{construct_type::ConstructType, typecheck::Typecheck},
     },
-    error::TypeError,
-    memory::target::{frame::GcFrame, ExtendedTarget},
-    prelude::{JlrsResult, Managed, Target},
+    error::{JlrsResult, TypeError},
+    memory::target::{frame::GcFrame, ExtendedTarget, Target},
     private::Private,
 };
 
@@ -209,7 +208,7 @@ unsafe impl<'scope, 'data, T> Typecheck for TypedValue<'scope, 'data, T>
 where
     T: ValidLayout + ConstructType,
 {
-    fn typecheck(t: crate::prelude::DataType) -> bool {
+    fn typecheck(t: DataType) -> bool {
         T::valid_layout(t.as_value())
     }
 }

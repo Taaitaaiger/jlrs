@@ -6,11 +6,18 @@
 use std::{
     marker::PhantomData,
     ops::{Deref, DerefMut},
+    ptr::NonNull,
 };
 
+use jl_sys::jl_value_t;
+
 use crate::{
-    data::{layout::valid_layout::ValidLayout, managed::value::Value},
+    data::{
+        layout::valid_layout::ValidLayout,
+        managed::{private::ManagedPriv, value::Value},
+    },
     memory::context::ledger::Ledger,
+    private::Private,
 };
 
 /// Immutable tracked data.
@@ -31,6 +38,18 @@ impl<'borrow, 'scope, 'data, T: ValidLayout> Tracked<'borrow, 'scope, 'data, T> 
     }
 }
 
+impl<'scope, 'data, T: ValidLayout> Tracked<'scope, 'scope, 'data, T> {
+    pub(crate) unsafe fn new_owned(value: Value<'scope, 'data>) -> Self {
+        Tracked {
+            tracked: value.data_ptr().cast::<T>().as_ref(),
+            _s: PhantomData,
+            _d: PhantomData,
+        }
+    }
+}
+
+// TODO: Clone
+
 /// Mutable tracked data.
 #[repr(transparent)]
 pub struct TrackedMut<'borrow, 'scope, 'data, T: ValidLayout> {
@@ -41,6 +60,16 @@ pub struct TrackedMut<'borrow, 'scope, 'data, T: ValidLayout> {
 
 impl<'borrow, 'scope, 'data, T: ValidLayout> TrackedMut<'borrow, 'scope, 'data, T> {
     pub(crate) unsafe fn new(value: &'borrow mut Value<'scope, 'data>) -> Self {
+        TrackedMut {
+            t: value.data_ptr().cast::<T>().as_mut(),
+            _s: PhantomData,
+            _d: PhantomData,
+        }
+    }
+}
+
+impl<'scope, 'data, T: ValidLayout> TrackedMut<'scope, 'scope, 'data, T> {
+    pub(crate) unsafe fn new_owned(value: Value<'scope, 'data>) -> Self {
         TrackedMut {
             t: value.data_ptr().cast::<T>().as_mut(),
             _s: PhantomData,
@@ -73,14 +102,24 @@ impl<'borrow, 'scope, 'data, T: ValidLayout> DerefMut for TrackedMut<'borrow, 's
 
 impl<T> Drop for Tracked<'_, '_, '_, T> {
     fn drop(&mut self) {
-        let start = self.tracked as *const _ as *mut u8;
-        Ledger::unborrow_shared(start..start)
+        unsafe {
+            let v = Value::wrap_non_null(
+                NonNull::new_unchecked(self.tracked as *const _ as *mut jl_value_t),
+                Private,
+            );
+            Ledger::unborrow_shared(v).unwrap();
+        }
     }
 }
 
 impl<T: ValidLayout> Drop for TrackedMut<'_, '_, '_, T> {
     fn drop(&mut self) {
-        let start = self.t as *const _ as *mut u8;
-        Ledger::unborrow_owned(start..start)
+        unsafe {
+            let v = Value::wrap_non_null(
+                NonNull::new_unchecked(self.t as *const _ as *mut jl_value_t),
+                Private,
+            );
+            Ledger::unborrow_exclusive(v).unwrap();
+        }
     }
 }

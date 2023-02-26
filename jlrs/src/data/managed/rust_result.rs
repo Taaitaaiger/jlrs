@@ -21,10 +21,20 @@ use super::{
 use crate::{ccall::CCall, memory::stack_frame::StackFrame};
 use crate::{
     convert::ccall_types::{CCallArg, CCallReturn},
-    data::{managed::private::ManagedPriv, types::construct_type::ConstructType},
+    data::{
+        layout::bool::Bool,
+        managed::{
+            datatype::DataType,
+            module::Module,
+            private::ManagedPriv,
+            string::JuliaString,
+            value::{Value, ValueRef},
+            Managed,
+        },
+        types::construct_type::ConstructType,
+    },
     error::JlrsError,
-    memory::target::ExtendedTarget,
-    prelude::{Bool, DataType, JuliaString, Managed, Module, Target, TargetType, Value, ValueRef},
+    memory::target::{target_type::TargetType, ExtendedTarget, Target},
     private::Private,
 };
 /// A `RustResult` can contain either typed data or an exception.
@@ -195,7 +205,7 @@ impl<'scope, 'data, U: ConstructType> Copy for RustResult<'scope, 'data, U> {}
 // ValidField.  The main issue is that unlike other implementations of these traits, an
 // ExtendedTarget is needed to construct the type object associated with U.
 /*unsafe impl<U: ConstructType> Typecheck for RustResult<'_, '_, U> {
-    fn typecheck(t: crate::prelude::DataType) -> bool {
+    fn typecheck(t: DataType) -> bool {
         unsafe {
             let unrooted = Unrooted::new();
             let rust_result_typename = Module::main(&unrooted)

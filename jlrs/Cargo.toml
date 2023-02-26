@@ -58,8 +58,6 @@ prelude = []
 pyplot = []
 # Enable `ccall` feature, link `libuv`, and enable `CCall::us_async_send`
 uv = ["jl-sys/uv", "ccall"]
-# Track borrowed array data separately for each thread, rather than globally.
-unsafe-ledger = []
 
 # Julia version
 
@@ -74,16 +72,8 @@ julia-1-9 = ["jl-sys/julia-1-9", "jlrs-macros/julia-1-9"]
 # Link Julia 1.10 
 julia-1-10 = ["jl-sys/julia-1-10", "jlrs-macros/julia-1-10"]
 
-# Julia version aliases
 
-# Link LTS version of Julia
-lts = ["julia-1-6"]
-# Link beta version of Julia
-beta = ["julia-1-9"]
-# link nightly version of Julia
-nightly = ["julia-1-10"]
-
-# Specific Julia build or arch
+# Target or link a specific Julia build or arch.
 
 # Link debug build of Julia
 debug = ["jl-sys/debug"]
@@ -92,7 +82,9 @@ i686 = ["jl-sys/i686"]
 # Don't link Julia, useful when building a shared library that will be
 # loaded by and used from Julia.
 no-link = ["jl-sys/no-link"]
+# Compile from BinaryBuilder's cross-compilation environment
 yggdrasil = ["jl-sys/yggdrasil"]
+# Cross-compile to Windows
 windows = ["jl-sys/windows", "jlrs-macros/windows"]
 
 # Internal

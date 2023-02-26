@@ -1,9 +1,9 @@
 
 [workspace]
 members = [
-    "examples", 
-    "jl_sys", 
-    "jlrs", 
-    "jlrs_macros", 
+    "examples",
+    "jl_sys",
+    "jlrs",
+    "jlrs_macros",
 #    "playground"
 ]
