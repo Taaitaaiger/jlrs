@@ -132,6 +132,15 @@ where
     _data: PhantomData<&'data ()>,
 }
 
+unsafe impl<'tracked, 'scope, 'data, T: TrackArray<'scope, 'data>> Send
+    for TrackedArray<'tracked, 'scope, 'data, T>
+{
+}
+unsafe impl<'tracked, 'scope, 'data, T: TrackArray<'scope, 'data>> Sync
+    for TrackedArray<'tracked, 'scope, 'data, T>
+{
+}
+
 impl<'tracked, 'scope, 'data, T> Clone for TrackedArray<'tracked, 'scope, 'data, T>
 where
     T: TrackArray<'scope, 'data>,
@@ -664,6 +673,15 @@ where
     ) -> IndeterminateArrayAccessorMut<'borrow, 'scope, 'data> {
         self.tracked.data.indeterminate_data_mut()
     }
+}
+
+unsafe impl<'tracked, 'scope, 'data, T: TrackArray<'scope, 'data>> Send
+    for TrackedArrayMut<'tracked, 'scope, 'data, T>
+{
+}
+unsafe impl<'tracked, 'scope, 'data, T: TrackArray<'scope, 'data>> Sync
+    for TrackedArrayMut<'tracked, 'scope, 'data, T>
+{
 }
 
 impl<'tracked, 'scope, 'data, T>
