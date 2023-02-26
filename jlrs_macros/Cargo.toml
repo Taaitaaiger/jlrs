@@ -24,7 +24,6 @@ windows = []
 derive = ["proc-macro2", "syn", "quote"]
 ccall = ["proc-macro2", "syn", "quote"]
 
-
 [lib]
 proc-macro = true
 

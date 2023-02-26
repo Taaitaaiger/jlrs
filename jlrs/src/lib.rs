@@ -23,6 +23,9 @@
 //!  - Structs that can be mapped to Rust include those with type parameters and bits unions.
 //!  - An async runtime is available which can be used from multiple threads and supports
 //!    scheduling Julia `Task`s and `await`ing the result without blocking the runtime thread.
+//!  - Crates can export Rust types, methods and functions to Julia using the `julia_module`
+//!    macro, these crates can be distributed as JLLs.
+//!    
 //!
 //! NB: Active development happens on the `dev` branch, the `master` branch points to the most
 //! recently released version.
@@ -46,7 +49,7 @@
 //! `$(which julia)/../include/julia/julia.h` and the path to the library
 //! `$(which julia)/../lib/libjulia.so`. If you want to override this default behaviour the
 //! `JULIA_DIR` environment variable must be set to the path to the appropriate `julia.x-y-z`
-//! directory; in this case `$JULIA_DIR/include/julia/julia.h` and
+//! directory, in this case `$JULIA_DIR/include/julia/julia.h` and
 //! `$JULIA_DIR/lib/libjulia.so` are used instead.
 //!
 //! In order to be able to load `libjulia.so` this file must be on the library search path. If
@@ -186,6 +189,10 @@
 //!
 //!   Link with a 32-bit build of Julia on Linux.
 //!
+//! - `windows`
+//!
+//!   Flag that must be enabled when cross-compiling for Windows from Linux.
+//!
 //! - `debug`
 //!
 //!   Link with a debug build of Julia on Linux.
@@ -195,8 +202,12 @@
 //!   Don't link Julia, linking can be skipped when writing libraries that will be loaded by
 //!   Julia.
 //!
-//! You can enable all features except `debug`, `i686` and `no-link` by enabling the `full`
-//! feature.
+//! - `yggdrasil`
+//!
+//!   Flag that must be enabled when compiling from BinaryBuilder's cross-compilation environment.
+//!
+//! You can enable all features except `debug`, `i686`, `windows`, `no-link` and `yggdrasil` by
+//! enabling the `full` feature.
 //!
 //!
 //! # Using this crate
@@ -568,19 +579,51 @@
 //! crate-type = ["cdylib"]
 //! ```
 //!
-//! to your crate's `Cargo.toml`. On Linux, such a crate will be compiled to `lib<crate_name>.so`.
+//! to your crate's `Cargo.toml`.
 //!
-//! The [`julia_module`] macro can be used in combination with the `@wrapmodule` and `@initjlrs`
-//! macros from the `Jlrs.Wrap` module to easily generate a Julia module that exposes functions,
-//! foreign types, and data defined in Rust.
+//! The easiest way to export Rust functions like `call_me` from the previous example is by
+//! using the [`julia_module`] macro. The content of the macro is converted to an initialization
+//! function that can be called from Julia to generate the module.
 //!
-//! Many features provided by jlrs require a `Target`. This requires creating an instance of
-//! `CCall` first. Another method provided by [`CCall`] is [`CCall::uv_async_send`], this method
-//! can be used to wake an `Base.AsyncCondition`. In particular, it can be used to write a
-//! `ccall`able function that does its actual work on another thread, returns early and then
-//! `wait`ing on the async condition from Julia. The advantage of this is that the long-running
-//! function won't block Julia. In this case you will need to use `GC.@preserve` to ensure Julia
-//! is aware that the use of this data is still in use after the `ccall` has returned.
+//! In Rust, the macro can be used like this:
+//!
+//! ```ignore
+//! julia_module! {
+//!     become callme_init_fn;
+//!     fn call_me(arg: bool) -> isize;
+//! }
+//! ```
+//!
+//! while on the Julia side things look like this:
+//!
+//! ```julia
+//! module CallMe
+//! using Jlrs.Wrap
+//!
+//! @wrapmodule("./path/to/libcallme.so", :callme_init_fn)
+//!
+//! function __init__()
+//!     @initjlrs
+//! end
+//! end
+//! ```
+//!
+//! All Julia functions are automatically generated and have the same name as the exported
+//! function:
+//!
+//! ```julia
+//! @assert CallMe.call_me(true) == 1
+//! @assert CallMe.call_me(false) == -1
+//! ```
+//!
+//! This macro has many more capabilities than just exporting extern "C" functions, for more
+//! information see the [documentation]. A practical example that uses this macro is the
+//! [rustfft-jl] crate, which uses this macro to expose RustFFT to Julia. The recipe for Yggdrasil
+//! can be found [here].
+//!
+//! While `call_me` doesn't call back into Julia, it is possible to call arbitrary functions from
+//! jlrs from a `ccall`ed function. This eill often require a `Target`, to create a target you
+//! must create an instance of `CCall` first.
 //!
 //!
 //! # Testing
@@ -713,22 +756,26 @@
 //! [`AsyncRuntimeBuilder`]: crate::runtime::builder::AsyncRuntimeBuilder
 //! [`jlrs::prelude`]: crate::prelude
 //! [`julia_module`]: jlrs_macros::julia_module
+//! [documentation]: jlrs_macros::julia_module
+//! [rustfft_jl]: https://github.com/Taaitaaiger/rustfft-jl
+//! [here]: https://github.com/JuliaPackaging/Yggdrasil/tree/master/R/rustfft-jl
 
 #![forbid(rustdoc::broken_intra_doc_links)]
 
-use std::{ffi::c_void, sync::atomic::AtomicBool};
+use std::sync::atomic::AtomicBool;
 
 use atomic::Ordering;
 use memory::stack_frame::PinnedFrame;
-use prelude::Call;
 
 use crate::{
-    data::types::foreign_type::init_foreign_type_registry,
+    data::{
+        managed::{module::Module, value::Value},
+        types::foreign_type::init_foreign_type_registry,
+    },
     memory::{
         context::{ledger::init_ledger, stack::Stack},
         target::unrooted::Unrooted,
     },
-    prelude::{Module, Value},
 };
 
 #[cfg(feature = "pyplot")]
@@ -804,34 +851,10 @@ pub(crate) unsafe fn init_jlrs<const N: usize>(frame: &mut PinnedFrame<N>) {
         .unwrap()
         .as_managed();
 
-    // Init ledger
-    let init_ledger_func = jlrs_module
-        .global(unrooted, "init_ledger")
-        .unwrap()
-        .as_value();
-
-    let init_ledger_ptr = Value::new(unrooted, init_ledger as *mut c_void);
-
-    frame.set_sync_root(init_ledger_ptr.ptr().as_ptr().cast());
-
-    init_ledger_func
-        .call1(unrooted, init_ledger_ptr.as_value())
-        .unwrap();
+    init_ledger();
 
     // Init foreign type registry
-    let init_foreign_type_registry_func = jlrs_module
-        .global(unrooted, "init_foreign_type_registry")
-        .unwrap()
-        .as_value();
-
-    let init_foreign_type_registry_ptr =
-        Value::new(unrooted, init_foreign_type_registry as *mut c_void);
-
-    frame.set_sync_root(init_foreign_type_registry_ptr.ptr().as_ptr().cast());
-
-    init_foreign_type_registry_func
-        .call1(unrooted, init_foreign_type_registry_ptr.as_value())
-        .unwrap();
+    init_foreign_type_registry();
 
     // Init foreign Stack type
     Stack::init(frame, jlrs_module);

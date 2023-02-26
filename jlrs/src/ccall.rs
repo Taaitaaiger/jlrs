@@ -7,24 +7,28 @@ use std::{
     ffi::c_void,
     fmt::Debug,
     hint::spin_loop,
-    sync::{atomic::AtomicBool, Arc},
+    ptr::NonNull,
+    sync::{atomic::AtomicBool, Arc, Mutex},
 };
 
 use atomic::Ordering;
 #[cfg(feature = "uv")]
 use jl_sys::uv_async_send;
-use jl_sys::{jl_cpu_threads, jl_throw};
+use jl_sys::{jl_tagged_gensym, jl_throw};
 use once_cell::sync::OnceCell;
-use threadpool::ThreadPool;
+use threadpool::{Builder, ThreadPool};
 
 use crate::{
     call::Call,
     convert::{ccall_types::CCallReturn, into_julia::IntoJulia},
     data::{
         managed::{
+            module::Module,
             private::ManagedPriv,
             rust_result::{RustResult, RustResultRet},
+            symbol::Symbol,
             value::{Value, ValueRef},
+            Managed,
         },
         types::construct_type::ConstructType,
     },
@@ -33,72 +37,51 @@ use crate::{
     memory::{
         context::stack::Stack,
         stack_frame::{PinnedFrame, StackFrame},
-        target::{frame::GcFrame, unrooted::Unrooted},
+        target::{frame::GcFrame, unrooted::Unrooted, Target},
     },
-    prelude::{Managed, Module},
     private::Private,
 };
 
+// The pool is lazily created either when it's first used, or when the number of threads is set.
+// ThreadPool is !Sync, but it is safe to clone it (which creates a new handle to the pool) and
+// use that handle to schedule new jobs to avoid having to lock the pool whenever a new job is
+// scheduled.
+static POOL: OnceCell<Mutex<ThreadPool>> = OnceCell::new();
+static POOL_NAME: OnceCell<String> = OnceCell::new();
 thread_local! {
-    static POOL: OnceCell<ThreadPool> = OnceCell::new();
+    static LOCAL_POOL: ThreadPool = unsafe {
+        init_pool().lock().unwrap().clone()
+    }
+}
+
+unsafe fn init_pool() -> &'static Mutex<ThreadPool> {
+    POOL.get_or_init(|| {
+        let name = POOL_NAME.get_or_init(|| {
+            let pool_name = "jlrs-pool";
+            let sym = jl_tagged_gensym(pool_name.as_ptr().cast(), pool_name.len());
+            Symbol::wrap_non_null(NonNull::new_unchecked(sym), Private)
+                .as_string()
+                .unwrap()
+        });
+
+        let pool = Builder::new()
+            .num_threads(1)
+            .thread_name(name.clone())
+            .build();
+
+        Mutex::new(pool)
+    })
 }
 
 unsafe extern "C" fn set_pool_size(size: usize) {
-    POOL.with(|pool| {
-        let mut pool = pool
-            .get_or_init(|| {
-                let unrooted = Unrooted::new();
-                let pool_ptr = Module::package_root_module(unrooted, "Jlrs")
-                    .unwrap()
-                    .global(unrooted, "pool")
-                    .unwrap()
-                    .as_value()
-                    .unbox::<*mut c_void>()
-                    .unwrap() as *const _ as *const ThreadPool;
-
-                assert!(!pool_ptr.is_null());
-                (&*pool_ptr).clone()
-            })
-            .clone();
-
-        let size = if size == 0 {
-            unsafe { jl_cpu_threads() as usize }
-        } else {
-            size
-        };
-
-        pool.set_num_threads(size)
-    })
+    init_pool().lock().unwrap().set_num_threads(size);
 }
 
-// When a Rust crate is compiled to a cdylib it will contain its own copy of all statics
-// introduced by jlrs, but this pool must be shared between all "instances" of jlrs.
-pub(crate) unsafe extern "C" fn init_pool(
-    pool_ref: &mut *mut c_void,
-    size: usize,
-    set_pool_size_fn: &mut *mut c_void,
-) {
-    let size = if size == 0 {
-        unsafe { jl_cpu_threads() as usize }
-    } else {
-        size
-    };
-
-    POOL.with(|pool| {
-        if pool_ref.is_null() {
-            pool.get_or_init(|| {
-                let pool = ThreadPool::with_name("jlrs-ccall-pool".into(), size);
-                *pool_ref = Box::leak(Box::new(pool.clone())) as *mut _ as *mut c_void;
-                *set_pool_size_fn = set_pool_size as _;
-                pool
-            });
-        } else {
-            pool.get_or_init(|| {
-                let ptr = pool_ref as *mut *mut _ as *const *const ThreadPool;
-                (&**ptr).clone()
-            });
-        }
-    })
+unsafe extern "C" fn set_pool_name(module: Module) {
+    POOL_NAME.get_or_init(|| {
+        let name = module.name().as_str().unwrap();
+        format!("{}-pool", name)
+    });
 }
 
 /// Interact with Julia from a Rust function called through `ccall`.
@@ -260,21 +243,8 @@ impl<'context> CCall<'context> {
     {
         let handle = DispatchHandle::new();
         let cloned = handle.clone();
-        POOL.with(|pool| {
-            pool.get_or_init(|| unsafe {
-                let unrooted = Unrooted::new();
-                let pool_ptr = Module::package_root_module(unrooted, "Jlrs")
-                    .unwrap()
-                    .global(unrooted, "pool")
-                    .unwrap()
-                    .as_value()
-                    .unbox::<*mut c_void>()
-                    .unwrap() as *const _ as *const ThreadPool;
-
-                assert!(!pool_ptr.is_null());
-                (&*pool_ptr).clone()
-            })
-            .execute(|| func(cloned));
+        LOCAL_POOL.with(|pool| {
+            pool.execute(|| func(cloned));
         });
 
         handle
@@ -282,20 +252,29 @@ impl<'context> CCall<'context> {
 
     /// This function must be called before jlrs can be used. If a runtime or the `julia_module` macro
     /// is used this function is called automatically.
+    ///
+    /// A module can be provided to allow setting the size of the internal thread pool from Julia
+    /// by calling `Jlrs.set_pool_size`.
     #[inline(never)]
-    pub fn init_jlrs(&mut self) {
+    pub fn init_jlrs(&mut self, module: Option<Module>) {
         unsafe {
             init_jlrs(&mut self.frame);
 
-            // init thread pool
-            let unrooted = Unrooted::new();
-            let init_thread_pool_jl = Module::package_root_module(unrooted, "Jlrs")
-                .unwrap()
-                .global(unrooted, "init_thread_pool")
-                .unwrap()
-                .as_value();
-            let fn_ptr = Value::new(unrooted, init_pool as *mut c_void).as_value();
-            init_thread_pool_jl.call1(unrooted, fn_ptr).unwrap();
+            // Expose thread pool to Julia
+            if let Some(module) = module {
+                let unrooted = Unrooted::new();
+
+                set_pool_name(module);
+
+                let add_pool = Module::package_root_module(&unrooted, "Jlrs")
+                    .unwrap()
+                    .global(unrooted, "add_pool")
+                    .unwrap()
+                    .as_value();
+
+                let fn_ptr = Value::new(unrooted, set_pool_size as *mut c_void).as_value();
+                add_pool.call2(unrooted, module.as_value(), fn_ptr).unwrap();
+            }
         }
     }
 }
@@ -330,7 +309,7 @@ unsafe impl ConstructType for AsyncCCall {
         target: crate::memory::target::ExtendedTarget<'target, '_, '_, T>,
     ) -> crate::data::managed::value::ValueData<'target, 'static, T>
     where
-        T: crate::prelude::Target<'target>,
+        T: Target<'target>,
     {
         let (target, _) = target.split();
         unsafe {

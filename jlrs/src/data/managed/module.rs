@@ -27,13 +27,15 @@ use super::{
 use crate::{
     call::Call,
     convert::to_symbol::ToSymbol,
-    data::managed::{
-        function::Function, private::ManagedPriv, symbol::Symbol, value::Value, Managed as _,
+    data::{
+        layout::nothing::Nothing,
+        managed::{
+            function::Function, private::ManagedPriv, symbol::Symbol, value::Value, Managed as _,
+        },
     },
     error::{AccessError, JlrsResult, TypeError},
     impl_julia_typecheck,
     memory::target::Target,
-    prelude::Nothing,
     private::Private,
 };
 
@@ -171,7 +173,7 @@ impl<'scope> Module<'scope> {
     /// All loaded packages can be accessed with this method. If the package doesn't exist or
     /// hasn't been loaded yet, `None` is returned.
     pub fn package_root_module<'target, N: ToSymbol, T: Target<'target>>(
-        target: T,
+        target: &T,
         name: N,
     ) -> Option<Module<'target>> {
         static FUNC: OnceCell<unsafe extern "C" fn(Symbol) -> Value> = OnceCell::new();

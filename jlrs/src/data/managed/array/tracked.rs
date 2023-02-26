@@ -3,7 +3,7 @@
 use std::{
     marker::PhantomData,
     mem::{self, ManuallyDrop},
-    ops::{Deref, Range},
+    ops::Deref,
 };
 
 use jlrs_macros::julia_version;
@@ -26,7 +26,10 @@ use crate::{
     convert::unbox::Unbox,
     data::{
         layout::valid_layout::ValidField,
-        managed::{value::ValueRef, ManagedRef},
+        managed::{
+            value::{Value, ValueRef},
+            Managed, ManagedRef,
+        },
     },
     error::JlrsResult,
     memory::{
@@ -49,54 +52,42 @@ pub trait TrackArray<'scope, 'data>: Copy {
         &'borrow mut self,
     ) -> JlrsResult<TrackedArrayMut<'borrow, 'scope, 'data, Self>>;
 
-    #[doc(hidden)]
-    fn data_range(&self) -> Range<*const u8>;
+    fn tracked_value(self) -> Value<'scope, 'data>;
 }
 
 impl<'scope, 'data> TrackArray<'scope, 'data> for Array<'scope, 'data> {
     fn track<'borrow>(&'borrow self) -> JlrsResult<TrackedArray<'borrow, 'scope, 'data, Self>> {
-        Ledger::try_borrow(self.data_range())?;
+        Ledger::try_borrow_shared(self.as_value())?;
         unsafe { Ok(TrackedArray::new(self)) }
     }
 
     fn track_mut<'borrow>(
         &'borrow mut self,
     ) -> JlrsResult<TrackedArrayMut<'borrow, 'scope, 'data, Self>> {
-        Ledger::try_borrow_mut(self.data_range())?;
+        Ledger::try_borrow_exclusive(self.as_value())?;
         unsafe { Ok(TrackedArrayMut::new(self)) }
     }
 
-    fn data_range(&self) -> Range<*const u8> {
-        let ptr = self.data_ptr().cast();
-
-        unsafe {
-            let n_bytes = self.element_size() * self.dimensions().size();
-            ptr..ptr.add(n_bytes)
-        }
+    fn tracked_value(self) -> Value<'scope, 'data> {
+        <Self as Managed>::as_value(self)
     }
 }
 
 impl<'scope, 'data, U: ValidField> TrackArray<'scope, 'data> for TypedArray<'scope, 'data, U> {
     fn track<'borrow>(&'borrow self) -> JlrsResult<TrackedArray<'borrow, 'scope, 'data, Self>> {
-        Ledger::try_borrow(self.data_range())?;
+        Ledger::try_borrow_shared(self.as_value())?;
         unsafe { Ok(TrackedArray::new(self)) }
     }
 
     fn track_mut<'borrow>(
         &'borrow mut self,
     ) -> JlrsResult<TrackedArrayMut<'borrow, 'scope, 'data, Self>> {
-        Ledger::try_borrow_mut(self.data_range())?;
+        Ledger::try_borrow_exclusive(self.as_value())?;
         unsafe { Ok(TrackedArrayMut::new(self)) }
     }
 
-    fn data_range(&self) -> Range<*const u8> {
-        let arr = self.as_array();
-        let ptr = arr.data_ptr().cast();
-
-        unsafe {
-            let n_bytes = arr.element_size() * arr.dimensions().size();
-            ptr..ptr.add(n_bytes)
-        }
+    fn tracked_value(self) -> Value<'scope, 'data> {
+        <Self as Managed>::as_value(self)
     }
 }
 
@@ -117,7 +108,7 @@ where
 {
     fn clone(&self) -> Self {
         unsafe {
-            Ledger::clone_shared(self.data.data_range());
+            Ledger::borrow_shared_unchecked(self.data.tracked_value()).unwrap();
             Self::new_from_owned(self.data)
         }
     }
@@ -391,7 +382,9 @@ where
 
 impl<'scope, 'data, T: TrackArray<'scope, 'data>> Drop for TrackedArray<'_, 'scope, 'data, T> {
     fn drop(&mut self) {
-        Ledger::unborrow_shared(self.data.data_range());
+        unsafe {
+            Ledger::unborrow_shared(self.data.tracked_value()).unwrap();
+        }
     }
 }
 
@@ -509,11 +502,7 @@ impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 
     where
         S: Target<'target>,
     {
-        let current_range = self.tracked.data.data_range();
-        let res = self.tracked.data.grow_end(target, inc);
-        let new_range = self.tracked.data.data_range();
-        Ledger::replace_borrow_mut(current_range, new_range);
-        res
+        self.tracked.data.grow_end(target, inc)
     }
 
     /// Add capacity for `inc` more elements at the end of the array. The array must be
@@ -522,10 +511,7 @@ impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 
     /// Safety: Mutating things that should absolutely not be mutated is not prevented. If an
     /// exception is thrown, it isn't caught.
     pub unsafe fn grow_end_unchecked(&mut self, inc: usize) {
-        let current_range = self.tracked.data.data_range();
         self.tracked.data.grow_end_unchecked(inc);
-        let new_range = self.tracked.data.data_range();
-        Ledger::replace_borrow_mut(current_range, new_range);
     }
 
     #[julia_version(windows_lts = false)]
@@ -537,11 +523,7 @@ impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 
     where
         S: Target<'target>,
     {
-        let current_range = self.tracked.data.data_range();
-        let res = self.tracked.data.del_end(target, dec);
-        let new_range = self.tracked.data.data_range();
-        Ledger::replace_borrow_mut(current_range, new_range);
-        res
+        self.tracked.data.del_end(target, dec)
     }
 
     /// Remove `dec` elements from the end of the array.  The array must be one-dimensional. If
@@ -550,10 +532,7 @@ impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 
     /// Safety: Mutating things that should absolutely not be mutated is not prevented. If an
     /// exception is thrown, it isn't caught.
     pub unsafe fn del_end_unchecked(&mut self, dec: usize) {
-        let current_range = self.tracked.data.data_range();
         self.tracked.data.del_end_unchecked(dec);
-        let new_range = self.tracked.data.data_range();
-        Ledger::replace_borrow_mut(current_range, new_range);
     }
 
     #[julia_version(windows_lts = false)]
@@ -569,11 +548,7 @@ impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 
     where
         S: Target<'target>,
     {
-        let current_range = self.tracked.data.data_range();
-        let res = self.tracked.data.grow_begin(target, inc);
-        let new_range = self.tracked.data.data_range();
-        Ledger::replace_borrow_mut(current_range, new_range);
-        res
+        self.tracked.data.grow_begin(target, inc)
     }
 
     /// Add capacity for `inc` more elements at the start of the array. The array must be
@@ -582,10 +557,7 @@ impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 
     /// Safety: Mutating things that should absolutely not be mutated is not prevented. If an
     /// exception is thrown, it isn't caught.
     pub unsafe fn grow_begin_unchecked(&mut self, inc: usize) {
-        let current_range = self.tracked.data.data_range();
         self.tracked.data.grow_begin_unchecked(inc);
-        let new_range = self.tracked.data.data_range();
-        Ledger::replace_borrow_mut(current_range, new_range);
     }
 
     #[julia_version(windows_lts = false)]
@@ -601,11 +573,7 @@ impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 
     where
         S: Target<'target>,
     {
-        let current_range = self.tracked.data.data_range();
-        let res = self.tracked.data.del_begin(target, dec);
-        let new_range = self.tracked.data.data_range();
-        Ledger::replace_borrow_mut(current_range, new_range);
-        res
+        self.tracked.data.del_begin(target, dec)
     }
 
     /// Remove `dec` elements from the start of the array.  The array must be one-dimensional. If
@@ -614,10 +582,7 @@ impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 
     /// Safety: Mutating things that should absolutely not be mutated is not prevented. If an
     /// exception is thrown, it isn't caught.
     pub unsafe fn del_begin_unchecked(&mut self, dec: usize) {
-        let current_range = self.tracked.data.data_range();
         self.tracked.data.del_begin_unchecked(dec);
-        let new_range = self.tracked.data.data_range();
-        Ledger::replace_borrow_mut(current_range, new_range);
     }
 }
 
@@ -820,6 +785,8 @@ where
     T: TrackArray<'scope, 'data>,
 {
     fn drop(&mut self) {
-        Ledger::unborrow_owned(self.tracked.data.data_range());
+        unsafe {
+            Ledger::unborrow_exclusive(self.tracked.data.tracked_value()).unwrap();
+        }
     }
 }

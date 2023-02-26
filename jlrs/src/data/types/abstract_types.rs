@@ -11,10 +11,9 @@ use super::construct_type::ConstructType;
 use crate::{
     data::managed::{
         datatype::DataType, module::Module, type_var::TypeVar, union_all::UnionAll,
-        value::ValueData,
+        value::ValueData, Managed,
     },
     memory::target::{ExtendedTarget, Target},
-    prelude::Managed,
     private::Private,
 };
 

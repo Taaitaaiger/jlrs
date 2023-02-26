@@ -10,9 +10,15 @@ use jl_sys::{
 
 use super::abstract_types::AnyType;
 use crate::{
-    data::managed::{type_var::TypeVar, union::Union, union_all::UnionAll, value::ValueData},
-    memory::target::ExtendedTarget,
-    prelude::{DataType, Managed, Target, Value},
+    data::managed::{
+        datatype::DataType,
+        type_var::TypeVar,
+        union::Union,
+        union_all::UnionAll,
+        value::{Value, ValueData},
+        Managed,
+    },
+    memory::target::{ExtendedTarget, Target},
     private::Private,
 };
 

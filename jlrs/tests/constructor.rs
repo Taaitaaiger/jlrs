@@ -54,6 +54,38 @@ mod tests {
                     Ok(())
                 })
                 .unwrap();
+
+            jlrs.instance(&mut frame)
+                .scope(|mut frame| {
+                    unsafe {
+                        let ty = Module::main(&frame)
+                            .submodule(&frame, "JlrsTests")?
+                            .as_managed()
+                            .global(&frame, "HasConstructors")?
+                            .as_value();
+
+                        assert!(ty.is::<DataType>());
+
+                        let res = ty.call0(&mut frame);
+                        assert!(res.is_ok());
+                        let value = res.unwrap();
+                        let is_bool = value
+                            .field_accessor()
+                            .field("a")?
+                            .access::<DataTypeRef>()?
+                            .as_managed()
+                            .is::<Bool>();
+
+                        assert!(is_bool);
+
+                        let field_b = value.field_accessor().field("b")?.access::<i32>()?;
+
+                        assert_eq!(field_b, 0);
+                    };
+
+                    Ok(())
+                })
+                .unwrap();
         });
     }
 
