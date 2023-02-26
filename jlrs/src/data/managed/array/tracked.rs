@@ -45,12 +45,22 @@ pub trait TrackArray<'scope, 'data>: Copy {
     /// While an array is tracked, it can't be mutably tracked.
     fn track<'borrow>(&'borrow self) -> JlrsResult<TrackedArray<'borrow, 'scope, 'data, Self>>;
 
+    /// Track this array.
+    ///
+    /// While an array is tracked, it can't be mutably tracked.
+    fn track_owned(self) -> JlrsResult<TrackedArray<'scope, 'scope, 'data, Self>>;
+
     /// Mutably track this array.
     ///
     /// While an array is mutably tracked, it can't be tracked otherwise.
     fn track_mut<'borrow>(
         &'borrow mut self,
     ) -> JlrsResult<TrackedArrayMut<'borrow, 'scope, 'data, Self>>;
+
+    /// Mutably track this array.
+    ///
+    /// While an array is mutably tracked, it can't be tracked otherwise.
+    fn track_mut_owned(self) -> JlrsResult<TrackedArrayMut<'scope, 'scope, 'data, Self>>;
 
     fn tracked_value(self) -> Value<'scope, 'data>;
 }
@@ -61,11 +71,21 @@ impl<'scope, 'data> TrackArray<'scope, 'data> for Array<'scope, 'data> {
         unsafe { Ok(TrackedArray::new(self)) }
     }
 
+    fn track_owned(self) -> JlrsResult<TrackedArray<'scope, 'scope, 'data, Self>> {
+        Ledger::try_borrow_shared(self.as_value())?;
+        unsafe { Ok(TrackedArray::new_from_owned(self)) }
+    }
+
     fn track_mut<'borrow>(
         &'borrow mut self,
     ) -> JlrsResult<TrackedArrayMut<'borrow, 'scope, 'data, Self>> {
         Ledger::try_borrow_exclusive(self.as_value())?;
         unsafe { Ok(TrackedArrayMut::new(self)) }
+    }
+
+    fn track_mut_owned(self) -> JlrsResult<TrackedArrayMut<'scope, 'scope, 'data, Self>> {
+        Ledger::try_borrow_exclusive(self.as_value())?;
+        unsafe { Ok(TrackedArrayMut::new_from_owned(self)) }
     }
 
     fn tracked_value(self) -> Value<'scope, 'data> {
@@ -79,11 +99,21 @@ impl<'scope, 'data, U: ValidField> TrackArray<'scope, 'data> for TypedArray<'sco
         unsafe { Ok(TrackedArray::new(self)) }
     }
 
+    fn track_owned(self) -> JlrsResult<TrackedArray<'scope, 'scope, 'data, Self>> {
+        Ledger::try_borrow_shared(self.as_value())?;
+        unsafe { Ok(TrackedArray::new_from_owned(self)) }
+    }
+
     fn track_mut<'borrow>(
         &'borrow mut self,
     ) -> JlrsResult<TrackedArrayMut<'borrow, 'scope, 'data, Self>> {
         Ledger::try_borrow_exclusive(self.as_value())?;
         unsafe { Ok(TrackedArrayMut::new(self)) }
+    }
+
+    fn track_mut_owned(self) -> JlrsResult<TrackedArrayMut<'scope, 'scope, 'data, Self>> {
+        Ledger::try_borrow_exclusive(self.as_value())?;
+        unsafe { Ok(TrackedArrayMut::new_from_owned(self)) }
     }
 
     fn tracked_value(self) -> Value<'scope, 'data> {
@@ -402,6 +432,12 @@ where
     pub(crate) unsafe fn new(data: &'tracked mut T) -> Self {
         TrackedArrayMut {
             tracked: ManuallyDrop::new(TrackedArray::new(data)),
+        }
+    }
+
+    pub(crate) unsafe fn new_from_owned(data: T) -> Self {
+        TrackedArrayMut {
+            tracked: ManuallyDrop::new(TrackedArray::new_from_owned(data)),
         }
     }
 }
