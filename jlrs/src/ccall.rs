@@ -138,6 +138,7 @@ impl<'context> CCall<'context> {
     ///
     /// Safety: this method must only be called from `ccall`ed functions. The returned data is
     /// unrooted and must be returned to Julia immediately.
+    #[inline(never)]
     pub unsafe fn invoke<T, F>(func: F) -> T
     where
         T: 'static + CCallReturn,
@@ -236,6 +237,7 @@ impl<'context> CCall<'context> {
         unsafe { set_pool_size(size) }
     }
 
+    /// Dispatch `func` to a thread pool.
     pub fn dispatch_to_pool<F, T>(func: F) -> Arc<DispatchHandle<T>>
     where
         F: FnOnce(Arc<DispatchHandle<T>>) + Send + 'static,
@@ -250,8 +252,8 @@ impl<'context> CCall<'context> {
         handle
     }
 
-    /// This function must be called before jlrs can be used. If a runtime or the `julia_module` macro
-    /// is used this function is called automatically.
+    /// This function must be called before jlrs can be used. When the `julia_module` macro is
+    /// used this function is called automatically.
     ///
     /// A module can be provided to allow setting the size of the internal thread pool from Julia
     /// by calling `Jlrs.set_pool_size`.
@@ -322,22 +324,58 @@ unsafe impl ConstructType for AsyncCCall {
                 .unwrap()
         }
     }
+
+    fn base_type<'target, Tgt>(
+        target: &Tgt,
+    ) -> Option<crate::data::managed::value::Value<'target, 'static>>
+    where
+        Tgt: crate::memory::target::Target<'target>,
+    {
+        unsafe {
+            Some(
+                Module::package_root_module(target, "Jlrs")
+                    .unwrap()
+                    .submodule(target, "Wrap")
+                    .unwrap()
+                    .as_managed()
+                    .global(target, "AsyncCCall")
+                    .unwrap()
+                    .as_value(),
+            )
+        }
+    }
 }
 
-/// Closures that implement this trait can be invoked on a separate thread to avoid blocking
-/// Julia.
-pub trait AsyncCallback<T: IntoJulia + Send + Sync + ConstructType>:
-    'static + Send + Sync + FnOnce() -> JlrsResult<T>
+/// Trait implemented by closures that can be dispatched to a thread pool.
+pub trait AsyncCallback<T: IntoJulia + Send + ConstructType>:
+    'static + Send + FnOnce() -> JlrsResult<T>
 {
 }
 
 impl<T, U> AsyncCallback<T> for U
 where
-    T: IntoJulia + Send + Sync + ConstructType,
-    U: 'static + Send + Sync + FnOnce() -> JlrsResult<T>,
+    T: IntoJulia + Send + ConstructType,
+    U: 'static + Send + FnOnce() -> JlrsResult<T>,
 {
 }
 
+pub trait OuterAsyncCallback<T, U>
+where
+    T: IntoJulia + Send + ConstructType,
+    U: AsyncCallback<T>,
+{
+    type InnerReturnType: IntoJulia + Send + ConstructType;
+}
+
+impl<T, U> OuterAsyncCallback<T, U> for JlrsResult<U>
+where
+    T: IntoJulia + Send + ConstructType,
+    U: AsyncCallback<T>,
+{
+    type InnerReturnType = T;
+}
+
+/// A handle to a function call that has been dispatched to a thread pool.
 pub struct DispatchHandle<T> {
     result: UnsafeCell<Option<JlrsResult<T>>>,
     flag: AtomicBool,
@@ -352,6 +390,7 @@ impl<T> Debug for DispatchHandle<T> {
 }
 
 impl<T: IntoJulia> DispatchHandle<T> {
+    /// Create a new `DispatchHandle`.
     pub fn new() -> Arc<Self> {
         Arc::new(DispatchHandle {
             result: UnsafeCell::new(None),
@@ -359,12 +398,18 @@ impl<T: IntoJulia> DispatchHandle<T> {
         })
     }
 
+    /// Set the value of the handle to `result`.
+    ///
+    /// Safety: this method must only be called once.
     pub unsafe fn set(self: Arc<Self>, result: JlrsResult<T>) {
         let res_ptr = self.result.get();
         *res_ptr = Some(result);
         self.flag.store(true, Ordering::Release)
     }
 
+    /// Wait until the value of the handle has been set, and return that value.
+    ///
+    /// Safety: this method must only be called once.
     pub unsafe fn join(self: Arc<Self>) -> JlrsResult<T> {
         while !self.flag.load(Ordering::Acquire) {
             spin_loop();

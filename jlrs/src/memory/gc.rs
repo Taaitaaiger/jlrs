@@ -1,7 +1,5 @@
 //! Manage the garbage collector.
 
-use std::ffi::c_void;
-
 #[julia_version(since = "1.10")]
 use jl_sys::jl_gc_set_max_memory;
 use jl_sys::{
@@ -16,7 +14,10 @@ use crate::runtime::sync_rt::Julia;
 #[julia_version(since = "1.7")]
 use crate::{call::Call, data::managed::module::Module};
 use crate::{
-    data::managed::{private::ManagedPriv, value::Value},
+    data::managed::{
+        private::ManagedPriv,
+        value::{Value, ValueRef},
+    },
     private::Private,
 };
 
@@ -112,10 +113,9 @@ pub trait Gc: private::GcPriv {
 ///
 /// Safety
 ///
-/// This method must only be called from `ForeignType::mark`, `obj` must be a pointer to Julia
-/// data.
-pub unsafe fn mark_queue_obj(ptls: PTls, obj: *mut c_void) -> bool {
-    jl_gc_mark_queue_obj(ptls, obj.cast()) != 0
+/// This method must only be called from `ForeignType::mark`.
+pub unsafe fn mark_queue_obj(ptls: PTls, obj: ValueRef) -> bool {
+    jl_gc_mark_queue_obj(ptls, obj.ptr().as_ptr()) != 0
 }
 
 /// Mark `objs`.
@@ -127,15 +127,9 @@ pub unsafe fn mark_queue_obj(ptls: PTls, obj: *mut c_void) -> bool {
 ///
 /// Safety
 ///
-/// This method must only be called from `ForeignType::mark`, `objs` must be slice of pointers to
-/// Julia data.
-pub unsafe fn mark_queue_objarray(ptls: PTls, parent: *mut c_void, objs: &[*mut c_void]) {
-    jl_gc_mark_queue_objarray(
-        ptls,
-        parent.cast(),
-        objs.as_ptr() as *mut c_void as _,
-        objs.len(),
-    )
+/// This method must only be called from `ForeignType::mark`.
+pub unsafe fn mark_queue_objarray(ptls: PTls, parent: ValueRef, objs: &[Option<ValueRef>]) {
+    jl_gc_mark_queue_objarray(ptls, parent.ptr().as_ptr(), objs.as_ptr() as _, objs.len())
 }
 
 /// Updates the write barrier.
@@ -152,6 +146,47 @@ pub unsafe fn mark_queue_objarray(ptls: PTls, parent: *mut c_void, objs: &[*mut 
 pub unsafe fn write_barrier<T>(data: &mut T, child: Value) {
     jl_gc_wb(data as *mut _ as *mut _, child.unwrap(Private))
 }
+
+/*
+void jl_gc_queue_multiroot(const jl_value_t *parent, const jl_value_t *ptr) JL_NOTSAFEPOINT
+{
+    // first check if this is really necessary
+    // TODO: should we store this info in one of the extra gc bits?
+    jl_datatype_t *dt = (jl_datatype_t*)jl_typeof(ptr);
+    const jl_datatype_layout_t *ly = dt->layout;
+    uint32_t npointers = ly->npointers;
+    //if (npointers == 0) // this was checked by the caller
+    //    return;
+    jl_value_t *ptrf = ((jl_value_t**)ptr)[ly->first_ptr];
+    if (ptrf && (jl_astaggedvalue(ptrf)->bits.gc & 1) == 0) {
+        // this pointer was young, move the barrier back now
+        jl_gc_wb_back(parent);
+        return;
+    }
+    const uint8_t *ptrs8 = (const uint8_t *)jl_dt_layout_ptrs(ly);
+    const uint16_t *ptrs16 = (const uint16_t *)jl_dt_layout_ptrs(ly);
+    const uint32_t *ptrs32 = (const uint32_t*)jl_dt_layout_ptrs(ly);
+    for (size_t i = 1; i < npointers; i++) {
+        uint32_t fld;
+        if (ly->fielddesc_type == 0) {
+            fld = ptrs8[i];
+        }
+        else if (ly->fielddesc_type == 1) {
+            fld = ptrs16[i];
+        }
+        else {
+            assert(ly->fielddesc_type == 2);
+            fld = ptrs32[i];
+        }
+        jl_value_t *ptrf = ((jl_value_t**)ptr)[fld];
+        if (ptrf && (jl_astaggedvalue(ptrf)->bits.gc & 1) == 0) {
+            // this pointer was young, move the barrier back now
+            jl_gc_wb_back(parent);
+            return;
+        }
+    }
+}
+ */
 
 #[cfg(feature = "sync-rt")]
 impl Gc for Julia<'_> {}

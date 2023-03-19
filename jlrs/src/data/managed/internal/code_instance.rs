@@ -185,21 +185,36 @@ impl<'scope> CodeInstance<'scope> {
         }
     }
 
+    #[julia_version(until = "1.8")]
     /// If `specptr` is a specialized function signature for specTypes->rettype
     pub fn is_specsig(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().isspecsig != 0 }
     }
 
+    #[julia_version(since = "1.9")]
+    /// & 0b001 == specptr is a specialized function signature for specTypes->rettype
+    /// & 0b010 == invokeptr matches specptr
+    /// & 0b100 == From image
+    pub fn specsigflags(self) -> u8 {
+        // Safety: the pointer points to valid data
+        unsafe {
+            self.unwrap_non_null(Private)
+                .as_ref()
+                .specsigflags
+                .load(Ordering::Relaxed)
+        }
+    }
+
     #[julia_version(until = "1.6")]
-    /// If `specptr` is a specialized function signature for specTypes->rettype
+    /// if set, this will be added to the output system image
     pub fn precompile(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().precompile != 0 }
     }
 
     #[julia_version(since = "1.7")]
-    /// If `specptr` is a specialized function signature for specTypes->rettype
+    /// if set, this will be added to the output system image
     pub fn precompile(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe {

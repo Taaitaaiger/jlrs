@@ -43,21 +43,21 @@ unsafe impl Send for UvHandle {}
 ///     task = @async begin
 ///         condition = Base.AsyncCondition()
 ///         output = AtomicUInt32(0)
-///     
+///
 ///         GC.@preserve output begin
 ///             joinhandle = ccall(("multithreaded", :libccall_with_threads), Ptr{Cvoid},
 ///                 (Any, Ptr{Cvoid}), output, condition.handle)
 ///             wait(condition)
 ///             ccall(("drop_handle", :libccall_with_threads), Cvoid, (Ptr{Cvoid},), joinhandle)
-///     
+///
 ///             @atomic output.v
 ///         end
 ///      end
-///     
+///
 ///      task2 = @async begin
 ///         @assert fetch(task) == 127 \"Wrong result\"
 ///      end
-///     
+///
 ///      wait(task)
 ///      wait(task2)
 /// end

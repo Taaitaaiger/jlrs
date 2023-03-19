@@ -181,8 +181,20 @@ mod tests {
     impl_datatype_constant_isa_test!(typename_type, "DataType");
     impl_datatype_constant_isa_test!(symbol_type, "DataType");
     impl_datatype_constant_isa_test!(ssavalue_type, "DataType");
+    #[cfg(any(
+        feature = "julia-1-6",
+        feature = "julia-1-7",
+        feature = "julia-1-8",
+        feature = "julia-1-9"
+    ))]
     impl_datatype_constant_isa_test!(abstractslot_type, "DataType");
     impl_datatype_constant_isa_test!(slotnumber_type, "DataType");
+    #[cfg(any(
+        feature = "julia-1-6",
+        feature = "julia-1-7",
+        feature = "julia-1-8",
+        feature = "julia-1-9"
+    ))]
     impl_datatype_constant_isa_test!(typedslot_type, "DataType");
     impl_datatype_constant_isa_test!(simplevector_type, "DataType");
     impl_datatype_constant_isa_test!(anytuple_type, "DataType");
@@ -278,8 +290,20 @@ mod tests {
         typename_type();
         symbol_type();
         ssavalue_type();
+        #[cfg(any(
+            feature = "julia-1-6",
+            feature = "julia-1-7",
+            feature = "julia-1-8",
+            feature = "julia-1-9"
+        ))]
         abstractslot_type();
         slotnumber_type();
+        #[cfg(any(
+            feature = "julia-1-6",
+            feature = "julia-1-7",
+            feature = "julia-1-8",
+            feature = "julia-1-9"
+        ))]
         typedslot_type();
         simplevector_type();
         anytuple_type();

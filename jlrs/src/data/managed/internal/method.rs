@@ -401,6 +401,7 @@ impl<'scope> Method<'scope> {
         unsafe { self.unwrap_non_null(Private).as_ref().isva != 0 }
     }
 
+    #[julia_version(until = "1.9")]
     /// The `pure` field.
     pub fn pure(self) -> bool {
         // Safety: the pointer points to valid data

@@ -69,7 +69,7 @@ pub mod unrooted;
 /// used when they are caught.
 ///
 /// For more information see the [module-level] docs
-///  
+///
 /// [module-level]: self
 /// [`TargetType`]: crate::memory::target::target_type::TargetType
 pub trait Target<'target>: TargetPriv<'target> {

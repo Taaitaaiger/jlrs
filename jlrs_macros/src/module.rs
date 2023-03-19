@@ -5,11 +5,13 @@ use proc_macro2::Span;
 use quote::format_ident;
 use syn::{
     parse::{Parse, ParseStream},
-    parse_quote,
+    parse_quote, parse_quote_spanned,
     punctuated::Punctuated,
+    spanned::Spanned,
     token::Comma,
     AttrStyle, Attribute, Error, Expr, FnArg, GenericArgument, Ident, ItemFn, Lit, Meta,
-    NestedMeta, PathArguments, Result, ReturnType, Signature, Token, Type, TypeParamBound,
+    NestedMeta, Path, PathArguments, Result, ReturnType, Signature, Token, Type, TypeImplTrait,
+    TypeParamBound,
 };
 
 type RenameFragments = Punctuated<Ident, Token![.]>;
@@ -268,6 +270,17 @@ impl Parse for ExportedGlobal {
 struct DocString {
     doc: String,
     generic: bool,
+    indent: bool,
+}
+
+impl DocString {
+    fn get_doc(&self) -> String {
+        if self.indent {
+            format!("    {}", self.doc)
+        } else {
+            self.doc.clone()
+        }
+    }
 }
 
 struct ItemWithAttrs {
@@ -281,17 +294,36 @@ impl ItemWithAttrs {
             match attr.style {
                 AttrStyle::Outer => (),
                 _ => panic!(
-                    "expected either `#[doc(\"docs...\")]` or `#[doc(\"docs...\", generic)]`"
+                    "expected one of:
+                        - `#doc(\"docs...\")`
+                        - `#doc(\"docs...\", generic)`
+                        - `#doc(\"docs...\", indent)`
+                        - `#doc(\"docs...\", generic, indent)`
+                        - `#doc(\"docs...\", indent, generic)`"
                 ),
             }
             if let Ok(syn::Meta::List(m)) = attr.parse_meta() {
                 if m.path.segments.len() != 1 {
-                    panic!("expected either `doc(\"docs...\")` or `doc(\"docs...\", generic)`");
+                    panic!(
+                        "expected one of:
+                        - `#doc(\"docs...\")`
+                        - `#doc(\"docs...\", generic)`
+                        - `#doc(\"docs...\", indent)`
+                        - `#doc(\"docs...\", generic, indent)`
+                        - `#doc(\"docs...\", indent, generic)`"
+                    )
                 }
 
                 let doc_ident = &m.path.segments.first().unwrap().ident;
                 if doc_ident.to_string() != "doc" {
-                    panic!("expected either `doc(\"docs...\")` or `doc(\"docs...\", generic)`");
+                    panic!(
+                        "expected one of:
+                         - `#doc(\"docs...\")`
+                         - `#doc(\"docs...\", generic)`
+                         - `#doc(\"docs...\", indent)`
+                         - `#doc(\"docs...\", generic, indent)`
+                         - `#doc(\"docs...\", indent, generic)`"
+                    )
                 }
 
                 match m.nested.len() {
@@ -301,6 +333,7 @@ impl ItemWithAttrs {
                             return DocString {
                                 doc: s.value(),
                                 generic: false,
+                                indent: false,
                             };
                         }
                     }
@@ -310,17 +343,104 @@ impl ItemWithAttrs {
                         if let NestedMeta::Lit(Lit::Str(s)) = first {
                             if let NestedMeta::Meta(Meta::Path(p)) = last {
                                 if p.segments.len() > 1 {
-                                    panic!("expected either `doc(\"docs...\")` or `doc(\"docs...\", generic)`")
+                                    panic!(
+                                        "expected one of:
+                                        - `#doc(\"docs...\")`
+                                        - `#doc(\"docs...\", generic)`
+                                        - `#doc(\"docs...\", indent)`
+                                        - `#doc(\"docs...\", generic, indent)`
+                                        - `#doc(\"docs...\", indent, generic)`"
+                                    )
                                 }
 
-                                if p.segments.first().unwrap().ident.to_string() != "generic" {
-                                    panic!("expected either `doc(\"docs...\")` or `doc(\"docs...\", generic)`")
+                                let ident = p.segments.first().unwrap().ident.to_string();
+                                let mut generic = false;
+                                let mut indent = false;
+                                match ident.as_ref() {
+                                    "generic" => {
+                                        generic = true;
+                                    }
+                                    "indent" => {
+                                        indent = true;
+                                    }
+                                    _ => panic!(
+                                        "expected one of:
+                                        - `#doc(\"docs...\")`
+                                        - `#doc(\"docs...\", generic)`
+                                        - `#doc(\"docs...\", indent)`
+                                        - `#doc(\"docs...\", generic, indent)`
+                                        - `#doc(\"docs...\", indent, generic)`"
+                                    ),
                                 }
 
                                 return DocString {
                                     doc: s.value(),
-                                    generic: true,
+                                    generic,
+                                    indent,
                                 };
+                            }
+                        }
+                    }
+                    3 => {
+                        let first = m.nested.first().unwrap();
+                        let middle = m.nested.last().unwrap();
+                        let last = m.nested.last().unwrap();
+                        if let NestedMeta::Lit(Lit::Str(s)) = first {
+                            if let NestedMeta::Meta(Meta::Path(p1)) = middle {
+                                if let NestedMeta::Meta(Meta::Path(p2)) = last {
+                                    if p1.segments.len() > 1 || p2.segments.len() > 1 {
+                                        panic!(
+                                            "expected one of:
+                                        - `#doc(\"docs...\")`
+                                        - `#doc(\"docs...\", generic)`
+                                        - `#doc(\"docs...\", indent)`
+                                        - `#doc(\"docs...\", generic, indent)`
+                                        - `#doc(\"docs...\", indent, generic)`"
+                                        )
+                                    }
+
+                                    let mut generic = false;
+                                    let mut indent = false;
+                                    match p1.segments.first().unwrap().ident.to_string().as_ref() {
+                                        "generic" => {
+                                            generic = true;
+                                        }
+                                        "indent" => {
+                                            indent = true;
+                                        }
+                                        _ => panic!(
+                                            "expected one of:
+                                        - `#doc(\"docs...\")`
+                                        - `#doc(\"docs...\", generic)`
+                                        - `#doc(\"docs...\", indent)`
+                                        - `#doc(\"docs...\", generic, indent)`
+                                        - `#doc(\"docs...\", indent, generic)`"
+                                        ),
+                                    }
+
+                                    match p2.segments.first().unwrap().ident.to_string().as_ref() {
+                                        "generic" if !generic => {
+                                            generic = true;
+                                        }
+                                        "indent" if !indent => {
+                                            indent = true;
+                                        }
+                                        _ => panic!(
+                                            "expected one of:
+                                        - `#doc(\"docs...\")`
+                                        - `#doc(\"docs...\", generic)`
+                                        - `#doc(\"docs...\", indent)`
+                                        - `#doc(\"docs...\", generic, indent)`
+                                        - `#doc(\"docs...\", indent, generic)`"
+                                        ),
+                                    }
+
+                                    return DocString {
+                                        doc: s.value(),
+                                        generic,
+                                        indent,
+                                    };
+                                }
                             }
                         }
                     }
@@ -1068,7 +1188,7 @@ fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Expr {
                 .to_string();
 
             let docstr = info.get_docstr();
-            let doc = docstr.doc;
+            let doc = docstr.get_doc();
             parse_quote! {
                 {
                     frame.scope(|mut frame| {
@@ -1105,7 +1225,7 @@ fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Expr {
             }
 
             let docstr = info.get_docstr();
-            let doc = docstr.doc;
+            let doc = docstr.get_doc();
             let generic = docstr.generic;
             parse_quote! {
                 {
@@ -1149,7 +1269,7 @@ fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Expr {
             }
 
             let docstr = info.get_docstr();
-            let doc = docstr.doc;
+            let doc = docstr.get_doc();
             let generic = docstr.generic;
             parse_quote! {
                 {
@@ -1193,7 +1313,7 @@ fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Expr {
             }
 
             let docstr = info.get_docstr();
-            let doc = docstr.doc;
+            let doc = docstr.get_doc();
             let generic = docstr.generic;
             parse_quote! {
                 {
@@ -1226,7 +1346,7 @@ fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Expr {
             let rename = val.name_override.as_ref().unwrap_or(name_ident).to_string();
 
             let docstr = info.get_docstr();
-            let doc = docstr.doc;
+            let doc = docstr.get_doc();
             parse_quote! {
                 {
                     frame.scope(|mut frame| {
@@ -1251,7 +1371,7 @@ fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Expr {
             let rename = val.name_override.as_ref().unwrap_or(name_ident).to_string();
 
             let docstr = info.get_docstr();
-            let doc = docstr.doc;
+            let doc = docstr.get_doc();
             parse_quote! {
                 {
                     frame.scope(|mut frame| {
@@ -1406,11 +1526,12 @@ fn return_type_fragments(ret_ty: &ReturnType) -> (Expr, Expr) {
             (ccall_ret_type, julia_ret_type)
         }
         ReturnType::Type(_, ref ty) => {
-            let ccall_ret_type = parse_quote! {
-                <<#ty as ::jlrs::convert::ccall_types::CCallReturn>::CCallReturnType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+            let span = ty.span();
+            let ccall_ret_type = parse_quote_spanned! {
+                span=> <<#ty as ::jlrs::convert::ccall_types::CCallReturn>::CCallReturnType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
             };
-            let julia_ret_type = parse_quote! {
-                <<#ty as ::jlrs::convert::ccall_types::CCallReturn>::FunctionReturnType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+            let julia_ret_type = parse_quote_spanned! {
+                span=> <<#ty as ::jlrs::convert::ccall_types::CCallReturn>::FunctionReturnType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
             };
 
             (ccall_ret_type, julia_ret_type)
@@ -1418,47 +1539,75 @@ fn return_type_fragments(ret_ty: &ReturnType) -> (Expr, Expr) {
     }
 }
 
-fn async_callbackreturn_type_fragments(ret_ty: &ReturnType) -> Type {
-    match ret_ty {
-        ReturnType::Default => panic!(),
-        ReturnType::Type(_, ty) => {
-            match &**ty {
-                &Type::ImplTrait(ref timplt) => {
-                    let bounds_iter = timplt.bounds.iter();
-                    for bound in bounds_iter {
-                        match bound {
-                            TypeParamBound::Trait(t) => {
-                                let segment = t.path.segments.last();
-                                if segment.is_none() {
-                                    continue;
-                                }
+// FIXME
 
-                                match &segment.unwrap().arguments {
-                                    PathArguments::AngleBracketed(p) => {
-                                        //
-                                        let arg = p.args.iter().last();
-                                        if arg.is_none() {
-                                            continue;
-                                        }
+fn extract_return_type_from_impl_trait(timplt: &TypeImplTrait) -> Option<Type> {
+    let bounds_iter = timplt.bounds.iter();
+    for bound in bounds_iter {
+        match bound {
+            TypeParamBound::Trait(t) => {
+                let segment = t.path.segments.last();
+                if segment.is_none() {
+                    continue;
+                }
 
-                                        match arg.unwrap() {
-                                            GenericArgument::Type(ref t) => return t.clone(),
-                                            _ => continue,
-                                        }
-                                    }
-                                    _ => continue,
-                                }
-                            }
+                match &segment.unwrap().arguments {
+                    PathArguments::AngleBracketed(p) => {
+                        let arg = p.args.iter().last();
+                        if arg.is_none() {
+                            continue;
+                        }
+
+                        match arg.unwrap() {
+                            GenericArgument::Type(ref t) => return Some(t.clone()),
                             _ => continue,
                         }
                     }
+                    _ => continue,
                 }
-                _ => panic!(),
             }
+            _ => continue,
         }
     }
 
-    panic!()
+    None
+}
+
+fn extract_inner_return_type_from_path(path: &Path) -> Option<Type> {
+    if let Some(segment) = path.segments.last() {
+        match segment.arguments {
+            PathArguments::AngleBracketed(ref args) => {
+                if let Some(arg) = args.args.first() {
+                    match arg {
+                        GenericArgument::Type(t) => match t {
+                            &Type::ImplTrait(ref timplt) => {
+                                return extract_return_type_from_impl_trait(timplt)
+                            }
+                            _ => (),
+                        },
+                        _ => (),
+                    }
+                }
+            }
+            _ => (),
+        }
+    }
+
+    None
+}
+
+fn extract_inner_return_type(ty: &Type) -> Option<Type> {
+    match ty {
+        Type::Path(ref p) => extract_inner_return_type_from_path(&p.path),
+        _ => None,
+    }
+}
+
+fn async_callbackreturn_type_fragments(ret_ty: &ReturnType) -> Option<Type> {
+    match ret_ty {
+        ReturnType::Type(_, ty) => extract_inner_return_type(&*ty),
+        _ => None,
+    }
 }
 
 fn arg_type_fragments<'a>(
@@ -1661,6 +1810,15 @@ fn async_callback_info_fragment((index, info): (usize, &ExportedAsyncCallback)) 
 
     let ret_ty = &info.func.output;
     let inner_ret_ty = async_callbackreturn_type_fragments(ret_ty);
+    if inner_ret_ty.is_none() {
+        return parse_quote_spanned! {
+            name_ident.span() => {
+                compile_error!("Async callback must return JlrsResult<impl AsyncCallback<T>> where T is some type that implements IntoJulia");
+            }
+        };
+    }
+
+    let inner_ret_ty = inner_ret_ty.unwrap();
     let ccall_ret_type: Expr = parse_quote! {
         <::jlrs::ccall::AsyncCCall as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
     };
@@ -1813,14 +1971,16 @@ fn method_arg_type_fragments<'a>(
             match arg {
                 FnArg::Typed(ty) => {
                     let ty = &ty.ty;
-                    parse_quote! {
-                        <<#ty as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+                    let span = ty.span();
+                    parse_quote_spanned! {
+                        span=> <<#ty as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
                     }
                 },
                 _ => {
 
-                    parse_quote! {
-                        <<TypedValue::<#parent> as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+                    let span = parent.span();
+                    parse_quote_spanned! {
+                        span=> <<TypedValue::<#parent> as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
                     }
                 },
             }
@@ -1832,13 +1992,15 @@ fn method_arg_type_fragments<'a>(
             match arg {
                 FnArg::Typed(ty) => {
                     let ty = &ty.ty;
-                    parse_quote! {
-                        <<#ty as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+                    let span = ty.span();
+                    parse_quote_spanned! {
+                        span=> <<#ty as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
                     }
                 },
                 _ => {
-                    parse_quote! {
-                        <<TypedValue<#parent> as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
+                    let span = parent.span();
+                    parse_quote_spanned! {
+                        span=> <<::jlrs::data::managed::value::typed::TypedValue<#parent> as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
                     }
                 },
             }
@@ -1898,9 +2060,11 @@ fn async_callback_arg_type_fragments<'a>(
     (ccall_arg_types, julia_arg_types, Some(invoke_fn))
 }
 
+// FIXME: require impl AsyncCallback
 fn invoke_async_callback(info: &ExportedAsyncCallback, ret_ty: &Type) -> ItemFn {
     let name = &info.func.ident;
     let args = &info.func.inputs;
+    let span = info.func.ident.span();
     let mut extended_args = args.clone();
     extended_args.insert(
         0,
@@ -1914,16 +2078,28 @@ fn invoke_async_callback(info: &ExportedAsyncCallback, ret_ty: &Type) -> ItemFn 
 
     let names = Punctuated::<_, Comma>::from_iter(names);
 
-    parse_quote! {
-        unsafe extern "C" fn invoke(#extended_args) -> ::jlrs::ccall::AsyncCCall {
-            let callback = #name(#names);
-            let join_handle = ::jlrs::ccall::CCall::dispatch_to_pool(move |dispatch_handle| {
-                let handle = jlrs_async_condition_handle;
-                let res = callback();
-                unsafe { dispatch_handle.set(res); }
-                ::jlrs::ccall::CCall::uv_async_send(handle.0);
-            });
-            let join_handle = Arc::into_raw(join_handle);
+    parse_quote_spanned! {
+        span=> unsafe extern "C" fn invoke(#extended_args) -> ::jlrs::ccall::AsyncCCall {
+            let join_handle: ::std::sync::Arc<::jlrs::ccall::DispatchHandle<#ret_ty>> = match #name(#names) {
+                Ok(callback) => {
+                    ::jlrs::ccall::CCall::dispatch_to_pool(move |dispatch_handle| {
+                        let handle = jlrs_async_condition_handle;
+                        let res = callback();
+                        unsafe { dispatch_handle.set(res); }
+                        ::jlrs::ccall::CCall::uv_async_send(handle.0);
+                    })
+                },
+                Err(e) => {
+                     ::jlrs::ccall::CCall::dispatch_to_pool(move |dispatch_handle| {
+                        let handle = jlrs_async_condition_handle;
+                        let res: ::jlrs::error::JlrsResult<#ret_ty> = Err(e);
+                        unsafe { dispatch_handle.set(res); }
+                        ::jlrs::ccall::CCall::uv_async_send(handle.0);
+                    })
+                }
+            };
+
+            let join_handle = ::std::sync::Arc::into_raw(join_handle);
 
             unsafe extern "C" fn join_func(
                 handle: *mut ::jlrs::ccall::DispatchHandle<#ret_ty>
@@ -1931,8 +2107,8 @@ fn invoke_async_callback(info: &ExportedAsyncCallback, ret_ty: &Type) -> ItemFn 
                 let handle = ::std::sync::Arc::from_raw(handle);
                 ::jlrs::ccall::CCall::invoke_fallible(|mut frame| {
                     let unrooted = frame.unrooted();
-                    let res = TypedValue::new(&mut frame, handle.join()?);
-                    Ok(RustResult::ok(unrooted.into_extended_target(&mut frame), res).leak())
+                    let res = ::jlrs::data::managed::value::typed::TypedValue::new(&mut frame, handle.join()?);
+                    Ok(::jlrs::data::managed::rust_result::RustResult::ok(unrooted.into_extended_target(&mut frame), res).leak())
                 })
             }
 
@@ -1943,8 +2119,10 @@ fn invoke_async_callback(info: &ExportedAsyncCallback, ret_ty: &Type) -> ItemFn 
         }
     }
 }
+
 fn invoke_fn_no_self_method_fragment(info: &ExportedMethod) -> ItemFn {
     let name = &info.func.ident;
+    let span = info.func.ident.span();
     let ty = &info.parent;
     let ret_ty = &info.func.output;
     let args = &info.func.inputs;
@@ -1955,8 +2133,8 @@ fn invoke_fn_no_self_method_fragment(info: &ExportedMethod) -> ItemFn {
 
     let names = Punctuated::<_, Comma>::from_iter(names);
 
-    parse_quote! {
-        unsafe extern "C" fn invoke(#args) #ret_ty {
+    parse_quote_spanned! {
+        span=> unsafe extern "C" fn invoke(#args) #ret_ty {
             <#ty>::#name(#names)
         }
     }
@@ -1964,6 +2142,7 @@ fn invoke_fn_no_self_method_fragment(info: &ExportedMethod) -> ItemFn {
 
 fn invoke_fn_ref_self_method_fragment(info: &ExportedMethod) -> ItemFn {
     let name = &info.func.ident;
+    let span = info.func.ident.span();
     let ty = &info.parent;
     let ret_ty = &info.func.output;
     let args = &info.func.inputs;
@@ -1983,9 +2162,9 @@ fn invoke_fn_ref_self_method_fragment(info: &ExportedMethod) -> ItemFn {
 
     let names = Punctuated::<_, Comma>::from_iter(names);
 
-    parse_quote! {
-        unsafe extern "C" fn invoke(#args_self_renamed) #ret_ty {
-            match (&this).track() {
+    parse_quote_spanned! {
+        span=> unsafe extern "C" fn invoke(#args_self_renamed) #ret_ty {
+            match (&this).track_shared() {
                 Ok(this) => this.#name(#names),
                 Err(_) => ::jlrs::data::managed::rust_result::RustResult::borrow_error_internal()
             }
@@ -1995,6 +2174,7 @@ fn invoke_fn_ref_self_method_fragment(info: &ExportedMethod) -> ItemFn {
 
 fn invoke_fn_move_self_method_fragment(info: &ExportedMethod) -> ItemFn {
     let name = &info.func.ident;
+    let span = info.func.ident.span();
     let ty = &info.parent;
     let ret_ty = &info.func.output;
     let args = &info.func.inputs;
@@ -2014,9 +2194,9 @@ fn invoke_fn_move_self_method_fragment(info: &ExportedMethod) -> ItemFn {
 
     let names = Punctuated::<_, Comma>::from_iter(names);
 
-    parse_quote! {
-        unsafe extern "C" fn invoke(#args_self_renamed) #ret_ty {
-            match (&this).track() {
+    parse_quote_spanned! {
+        span=> unsafe extern "C" fn invoke(#args_self_renamed) #ret_ty {
+            match (&this).track_shared() {
                 Ok(this) => this.clone().#name(#names),
                 Err(_) => ::jlrs::data::managed::rust_result::RustResult::borrow_error_internal()
             }
@@ -2026,6 +2206,7 @@ fn invoke_fn_move_self_method_fragment(info: &ExportedMethod) -> ItemFn {
 
 fn invoke_fn_mut_self_method_fragment(info: &ExportedMethod) -> ItemFn {
     let name = &info.func.ident;
+    let span = info.func.ident.span();
     let ty = &info.parent;
     let ret_ty = &info.func.output;
     let args = &info.func.inputs;
@@ -2045,9 +2226,9 @@ fn invoke_fn_mut_self_method_fragment(info: &ExportedMethod) -> ItemFn {
 
     let names = Punctuated::<_, Comma>::from_iter(names);
 
-    parse_quote! {
-        unsafe extern "C" fn invoke(#args_self_renamed) #ret_ty {
-            match (&mut this).track_mut() {
+    parse_quote_spanned! {
+        span=> unsafe extern "C" fn invoke(#args_self_renamed) #ret_ty {
+            match (&mut this).track_exclusive() {
                 Ok(mut this) => this.#name(#names),
                 Err(_) => ::jlrs::data::managed::rust_result::RustResult::borrow_error_internal()
             }

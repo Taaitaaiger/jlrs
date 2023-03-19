@@ -43,7 +43,7 @@ pub use crate::{
         managed::{
             array::ArrayRef,
             array::TypedArrayRef,
-            array::{tracked::TrackArray, Array, TypedArray},
+            array::{Array, TypedArray},
             datatype::DataType,
             datatype::DataTypeRef,
             module::Module,

@@ -2343,6 +2343,13 @@ extern "C" {
     pub fn jlrs_array_data_owner_offset(n_dims: u16) -> uint_t;
 }
 extern "C" {
+    pub fn jlrs_gc_queue_multiroot(
+        parent: *mut jl_value_t,
+        dt: *mut jl_datatype_t,
+        ptr: *const ::std::os::raw::c_void,
+    );
+}
+extern "C" {
     pub fn jlrs_lock(v: *mut jl_value_t);
 }
 extern "C" {

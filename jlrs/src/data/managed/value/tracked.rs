@@ -1,7 +1,7 @@
 //! Tracked Julia data.
 //!
-//! By tracking Julia data it's possible to ensure no aliasing rules are broken from Rust when
-//! accessing their contents. While the data is tracked its contents can be derefenced.
+//! Tracking data is the only way to get a (mutable) reference to Julia data in jlrs. Data can be
+//! tracked mutably or immutably with [`Value::track_shared`] and [`Value::track_exclusive`].
 
 use std::{
     marker::PhantomData,
@@ -22,14 +22,14 @@ use crate::{
 
 /// Immutable tracked data.
 #[repr(transparent)]
-pub struct Tracked<'borrow, 'scope, 'data, T> {
-    tracked: &'borrow T,
+pub struct Tracked<'tracked, 'scope, 'data, T> {
+    tracked: &'tracked T,
     _s: PhantomData<&'scope ()>,
     _d: PhantomData<&'data ()>,
 }
 
-impl<'borrow, 'scope, 'data, T: ValidLayout> Tracked<'borrow, 'scope, 'data, T> {
-    pub(crate) unsafe fn new(value: &'borrow Value<'scope, 'data>) -> Self {
+impl<'tracked, 'scope, 'data, T: ValidLayout> Tracked<'tracked, 'scope, 'data, T> {
+    pub(crate) unsafe fn new(value: &'tracked Value<'scope, 'data>) -> Self {
         Tracked {
             tracked: value.data_ptr().cast::<T>().as_ref(),
             _s: PhantomData,
@@ -48,18 +48,46 @@ impl<'scope, 'data, T: ValidLayout> Tracked<'scope, 'scope, 'data, T> {
     }
 }
 
+impl<'tracked, 'scope, 'data, T: ValidLayout> Deref for Tracked<'tracked, 'scope, 'data, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        self.tracked
+    }
+}
+
+unsafe impl<'tracked, 'scope, 'data, T: ValidLayout + Send> Send
+    for Tracked<'tracked, 'scope, 'data, T>
+{
+}
+
+impl<T> Drop for Tracked<'_, '_, '_, T> {
+    fn drop(&mut self) {
+        unsafe {
+            let v = Value::wrap_non_null(
+                NonNull::new_unchecked(self.tracked as *const _ as *mut jl_value_t),
+                Private,
+            );
+
+            if v.datatype().mutable() {
+                Ledger::unborrow_shared(v).unwrap();
+            }
+        }
+    }
+}
+
 // TODO: Clone
 
 /// Mutable tracked data.
 #[repr(transparent)]
-pub struct TrackedMut<'borrow, 'scope, 'data, T: ValidLayout> {
-    t: &'borrow mut T,
+pub struct TrackedMut<'tracked, 'scope, 'data, T: ValidLayout> {
+    t: &'tracked mut T,
     _s: PhantomData<&'scope ()>,
     _d: PhantomData<&'data ()>,
 }
 
-impl<'borrow, 'scope, 'data, T: ValidLayout> TrackedMut<'borrow, 'scope, 'data, T> {
-    pub(crate) unsafe fn new(value: &'borrow mut Value<'scope, 'data>) -> Self {
+impl<'tracked, 'scope, 'data, T: ValidLayout> TrackedMut<'tracked, 'scope, 'data, T> {
+    pub(crate) unsafe fn new(value: &'tracked mut Value<'scope, 'data>) -> Self {
         TrackedMut {
             t: value.data_ptr().cast::<T>().as_mut(),
             _s: PhantomData,
@@ -78,15 +106,7 @@ impl<'scope, 'data, T: ValidLayout> TrackedMut<'scope, 'scope, 'data, T> {
     }
 }
 
-impl<'borrow, 'scope, 'data, T: ValidLayout> Deref for Tracked<'borrow, 'scope, 'data, T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        self.tracked
-    }
-}
-
-impl<'borrow, 'scope, 'data, T: ValidLayout> Deref for TrackedMut<'borrow, 'scope, 'data, T> {
+impl<'tracked, 'scope, 'data, T: ValidLayout> Deref for TrackedMut<'tracked, 'scope, 'data, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -94,22 +114,15 @@ impl<'borrow, 'scope, 'data, T: ValidLayout> Deref for TrackedMut<'borrow, 'scop
     }
 }
 
-impl<'borrow, 'scope, 'data, T: ValidLayout> DerefMut for TrackedMut<'borrow, 'scope, 'data, T> {
+impl<'tracked, 'scope, 'data, T: ValidLayout> DerefMut for TrackedMut<'tracked, 'scope, 'data, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.t
     }
 }
 
-impl<T> Drop for Tracked<'_, '_, '_, T> {
-    fn drop(&mut self) {
-        unsafe {
-            let v = Value::wrap_non_null(
-                NonNull::new_unchecked(self.tracked as *const _ as *mut jl_value_t),
-                Private,
-            );
-            Ledger::unborrow_shared(v).unwrap();
-        }
-    }
+unsafe impl<'tracked, 'scope, 'data, T: ValidLayout + Send> Send
+    for TrackedMut<'tracked, 'scope, 'data, T>
+{
 }
 
 impl<T: ValidLayout> Drop for TrackedMut<'_, '_, '_, T> {

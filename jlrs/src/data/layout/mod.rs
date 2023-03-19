@@ -42,6 +42,17 @@ macro_rules! impl_construct_julia_type {
                     target.data_from_ptr(ptr, $crate::private::Private)
                 }
             }
+
+            fn base_type<'target, Tgt>(_target: &Tgt) -> Option<$crate::data::managed::value::Value<'target, 'static>>
+            where
+                Tgt: $crate::memory::target::Target<'target>,
+            {
+                unsafe {
+                    let ptr =
+                        ::std::ptr::NonNull::new_unchecked($jl_ty.cast::<::jl_sys::jl_value_t>());
+                    Some(<$crate::data::managed::value::Value as $crate::data::managed::private::ManagedPriv>::wrap_non_null(ptr, $crate::private::Private))
+                }
+            }
         }
     };
 }

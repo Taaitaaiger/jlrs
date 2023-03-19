@@ -16,7 +16,7 @@ mod tests {
                 .scope(|mut frame| {
                     let arr = Array::new::<f32, _, _>(frame.as_extended_target(), (1, 2))
                         .into_jlrs_result()?;
-                    assert!(arr.track().is_ok());
+                    assert!(arr.track_shared().is_ok());
                     Ok(())
                 })
                 .unwrap();
@@ -32,8 +32,8 @@ mod tests {
                 .scope(|mut frame| {
                     let arr = Array::new::<f32, _, _>(frame.as_extended_target(), (1, 2))
                         .into_jlrs_result()?;
-                    let t1 = arr.track();
-                    let t2 = arr.track();
+                    let t1 = arr.track_shared();
+                    let t2 = arr.track_shared();
                     assert!(t1.is_ok());
                     assert!(t2.is_ok());
                     Ok(())
@@ -48,10 +48,10 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
-                .scope(|mut frame| {
+                .scope(|mut frame| unsafe {
                     let mut arr = Array::new::<f32, _, _>(frame.as_extended_target(), (1, 2))
                         .into_jlrs_result()?;
-                    assert!(arr.track_mut().is_ok());
+                    assert!(arr.track_exclusive().is_ok());
                     Ok(())
                 })
                 .unwrap();
@@ -64,22 +64,22 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
-                .scope(|mut frame| {
+                .scope(|mut frame| unsafe {
                     let mut arr = Array::new::<f32, _, _>(frame.as_extended_target(), (1, 2))
                         .into_jlrs_result()?;
                     let mut arr2 = arr;
 
                     {
-                        let t1 = arr.track_mut();
-                        assert!(arr2.track_mut().is_err());
-                        assert!(arr2.track().is_err());
+                        let t1 = arr.track_exclusive();
+                        assert!(arr2.track_exclusive().is_err());
+                        assert!(arr2.track_shared().is_err());
                         assert!(t1.is_ok());
                     }
 
                     {
-                        let t1 = arr.track();
-                        assert!(arr2.track_mut().is_err());
-                        assert!(arr2.track().is_ok());
+                        let t1 = arr.track_shared();
+                        assert!(arr2.track_exclusive().is_err());
+                        assert!(arr2.track_shared().is_ok());
                         assert!(t1.is_ok());
                     }
 
@@ -98,7 +98,7 @@ mod tests {
                 .scope(|mut frame| {
                     let arr = TypedArray::<f32>::new(frame.as_extended_target(), (1, 2))
                         .into_jlrs_result()?;
-                    assert!(arr.track().is_ok());
+                    assert!(arr.track_shared().is_ok());
                     Ok(())
                 })
                 .unwrap();
@@ -114,8 +114,8 @@ mod tests {
                 .scope(|mut frame| {
                     let arr = TypedArray::<f32>::new(frame.as_extended_target(), (1, 2))
                         .into_jlrs_result()?;
-                    let t1 = arr.track();
-                    let t2 = arr.track();
+                    let t1 = arr.track_shared();
+                    let t2 = arr.track_shared();
                     assert!(t1.is_ok());
                     assert!(t2.is_ok());
                     Ok(())
@@ -130,10 +130,10 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
-                .scope(|mut frame| {
+                .scope(|mut frame| unsafe {
                     let mut arr = TypedArray::<f32>::new(frame.as_extended_target(), (1, 2))
                         .into_jlrs_result()?;
-                    assert!(arr.track_mut().is_ok());
+                    assert!(arr.track_exclusive().is_ok());
                     Ok(())
                 })
                 .unwrap();
@@ -146,22 +146,22 @@ mod tests {
             let mut jlrs = j.borrow_mut();
 
             jlrs.instance(&mut frame)
-                .scope(|mut frame| {
+                .scope(|mut frame| unsafe {
                     let mut arr = TypedArray::<f32>::new(frame.as_extended_target(), (1, 2))
                         .into_jlrs_result()?;
                     let mut arr2 = arr;
 
                     {
-                        let t1 = arr.track_mut();
-                        assert!(arr2.track_mut().is_err());
-                        assert!(arr2.track().is_err());
+                        let t1 = arr.track_exclusive();
+                        assert!(arr2.track_exclusive().is_err());
+                        assert!(arr2.track_shared().is_err());
                         assert!(t1.is_ok());
                     }
 
                     {
-                        let t1 = arr.track();
-                        assert!(arr2.track_mut().is_err());
-                        assert!(arr2.track().is_ok());
+                        let t1 = arr.track_shared();
+                        assert!(arr2.track_exclusive().is_err());
+                        assert!(arr2.track_shared().is_ok());
                         assert!(t1.is_ok());
                     }
 

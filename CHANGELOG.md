@@ -12,7 +12,7 @@
 
  - `ForeignType` requires `Send + Sync`, whether a `ForeignType` is large or contains pointers to managed data is now expressed with the associated constants `LARGE` and `HAS_POINTERS`, the super type is returned by the trait method `ForeignType::super_type`. Foreign types can be reinitialized with `reinit_foreign_type`, which is available since Julia 1.9.
 
- - `OpaqueType` has been added, which is similar to `ForeignType` except that it can contain no references to Julia data. 
+ - `OpaqueType` has been added, which is similar to `ForeignType` except that it can contain no references to Julia data.
 
  - A managed type for `Binding` has been added, this is available since Julia 1.10.
 
@@ -20,8 +20,8 @@
 
  - The jlrs-derive crate is now part of jlrs-macros. Two additional macros are available: `julia_version` can be used as an alternative to writing big cfgs to handle differences between Julia versions, and `julia_module` to generate the data that `Jlrs.Wrap` uses to make the exported functions, methods, types, constant and globals available in a Julia module.
 
- - Several traits have been added to implement the `julia_module` macro: `CCallArg`, `CCallReturn`, and `ConstructType`, the first two provide a mapping from a Rust type to the types Julia should use in generated Julia functions, the latter is used to construct the `DataType` at runtime. The managed type `TypedValue` has been added to make more types constructible, and `RustResult` to enable writing fallible `ccall`able functions. Similarly, `RankedArray` and `TypedRankedArray` have been added.
- 
+ - Several traits have been added to implement the `julia_module` macro: `CCallArg`, `CCallReturn`, and `ConstructType`, the first two provide a mapping from a Rust type to the types Julia should use in generated Julia functions, the latter is used to construct the `DataType` at runtime. The managed type `TypedValue` has been added to make more types constructible, and `RustResult` to enable writing fallible `ccall`able functions. Similarly, `RankedArray` and `TypedRankedArray` have been added. A `CCallRef` type has been added to work with Julia `Ref`s that have been used as arguments of `ccall`ed functions.
+
  - The `no-link` feature has been added to skip linking Julia.
 
  - `Dims::n_dimensions` has been renamed to `Dims::rank`.
@@ -31,6 +31,10 @@
  - `Symbol::generate` and `Symbol::generate_tagged` have been added.
 
  - `LeakedValue` has been removed in favor of making managed data generally leakable by erasing the `'scope` lifetime with `Managed::leak` or `Ref::leak`.
+
+ - `CCall` now has `invoke` methods to avoid having to manually create a stack frame.
+
+ - Global Julia data can be cached in a static container by using `StaticGlobal` and `StaticSymbol`.
 
 
 #### v0.17
@@ -85,13 +89,13 @@
 
  - `Ref` wraps a `NonNull` pointer to Julia data, like wrappers do. Undefinedness is expressed through `Option`.
 
- - Uses of `ValidLayout` have been mostly replaced with `ValidField`. `ValidField` is not implemented for mutable structs because they're not stored inline when used as a field of some other type. 
+ - Uses of `ValidLayout` have been mostly replaced with `ValidField`. `ValidField` is not implemented for mutable structs because they're not stored inline when used as a field of some other type.
 
  - `CCall::throw_exception` has been added and can be used to throw an exception from a `ccall`ed function.
 
  - Add `Affinity` so tasks can be explicitly scheduled on the main runtime thread.
 
- - `Global` has been renamed to `Unrooted`. 
+ - `Global` has been renamed to `Unrooted`.
 
 
 #### v0.16

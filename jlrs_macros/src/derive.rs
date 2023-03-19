@@ -141,17 +141,17 @@ pub fn impl_into_julia(ast: &syn::DeriveInput) -> TokenStream {
 
     let mut type_it = jl_type.split('.');
     let func: syn::Expr = match type_it.next() {
-        Some("Main") => syn::parse_quote! { 
+        Some("Main") => syn::parse_quote! {
             {
                 ::jlrs::data::managed::module::Module::main(&global)
             }
         },
-        Some("Base") => syn::parse_quote! { 
+        Some("Base") => syn::parse_quote! {
             {
                 ::jlrs::data::managed::module::Module::base(&global)
             }
         },
-        Some("Core") => syn::parse_quote! { 
+        Some("Core") => syn::parse_quote! {
             {
                 ::jlrs::data::managed::module::Module::corr(&global)
             }
@@ -331,17 +331,17 @@ pub fn impl_construct_type(ast: &syn::DeriveInput) -> TokenStream {
 
     let mut type_it = jl_type.split('.');
     let func: syn::Expr = match type_it.next() {
-        Some("Main") => syn::parse_quote! { 
+        Some("Main") => syn::parse_quote! {
             {
                 ::jlrs::data::managed::module::Module::main(&frame)
             }
         },
-        Some("Base") => syn::parse_quote! { 
+        Some("Base") => syn::parse_quote! {
             {
                 ::jlrs::data::managed::module::Module::base(&frame)
             }
         },
-        Some("Core") => syn::parse_quote! { 
+        Some("Core") => syn::parse_quote! {
             {
                 ::jlrs::data::managed::module::Module::corr(&frame)
             }
@@ -362,6 +362,8 @@ pub fn impl_construct_type(ast: &syn::DeriveInput) -> TokenStream {
     let ty = modules.pop().expect("ConstructType can only be derived if the corresponding Julia type is set with #[jlrs(julia_type = \"Main.MyModule.Submodule.StructType\")]");
     let modules_it = modules.iter();
     let modules_it_b = modules_it.clone();
+    let modules_it_c = modules_it.clone();
+    let modules_it_d = modules_it.clone();
 
     let generics = &ast.generics;
     let wc = match ast.generics.where_clause.as_ref() {
@@ -440,6 +442,28 @@ pub fn impl_construct_type(ast: &syn::DeriveInput) -> TokenStream {
                         ))
                     }
                 }).unwrap()
+            }
+
+            fn base_type<'target, Tgt>(
+                target: &Tgt
+            ) -> Option<::jlrs::data::managed::value::Value<'target, 'static>>
+            where
+                Tgt: ::jlrs::memory::target::Target<'target>,
+            {
+                let frame = target;
+                let base_type = unsafe {
+                    #func
+                    #(
+                        .submodule(target, #modules_it_c)
+                        .expect(&format!("Submodule {} cannot be found", #modules_it_d))
+                        .as_managed()
+                    )*
+                    .global(target, #ty)
+                    .expect(&format!("Type {} cannot be found in module", #ty))
+                    .as_value()
+                };
+
+                Some(base_type)
             }
         }
     };

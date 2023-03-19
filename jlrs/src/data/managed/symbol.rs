@@ -211,5 +211,7 @@ pub type SymbolData<'target, T> = <T as TargetType<'target>>::Data<'static, Symb
 /// `JuliaResult<Task>` or `JuliaResultRef<TaskRef>`, depending on the target type `T`.
 pub type SymbolResult<'target, T> = <T as TargetType<'target>>::Result<'static, Symbol<'target>>;
 
+pub type SymbolUnbound = Symbol<'static>;
+
 impl_ccall_arg_managed!(Symbol, 1);
 impl_into_typed!(Symbol);

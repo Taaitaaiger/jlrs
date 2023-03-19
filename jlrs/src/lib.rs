@@ -25,7 +25,7 @@
 //!    scheduling Julia `Task`s and `await`ing the result without blocking the runtime thread.
 //!  - Crates can export Rust types, methods and functions to Julia using the `julia_module`
 //!    macro, these crates can be distributed as JLLs.
-//!    
+//!
 //!
 //! NB: Active development happens on the `dev` branch, the `master` branch points to the most
 //! recently released version.
@@ -499,7 +499,7 @@
 //!             // The data is tracked first to ensure it's not
 //!             // already borrowed from Rust.
 //!             unsafe {
-//!                 let mut tracked = state.array.track_mut()?;
+//!                 let mut tracked = state.array.track_exclusive()?;
 //!                 let mut data = tracked.bits_data_mut()?;
 //!                 data[state.offset] = input;
 //!             };
@@ -835,9 +835,9 @@ pub(crate) unsafe fn init_jlrs<const N: usize>(frame: &mut PinnedFrame<N>) {
     let unrooted = Unrooted::new();
     Value::eval_string(
         unrooted,
-        "if !isdefined(Main, :Jlrs) 
+        "if !isdefined(Main, :Jlrs)
             try
-                using Jlrs 
+                using Jlrs
             catch e
                 import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/Jlrs.jl\")
                 using Jlrs

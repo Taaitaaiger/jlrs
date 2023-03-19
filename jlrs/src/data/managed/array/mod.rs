@@ -41,10 +41,14 @@ use jl_sys::{
 };
 use jlrs_macros::julia_version;
 
-use self::data::accessor::{
-    ArrayAccessor, BitsArrayAccessorI, BitsArrayAccessorMut, Immutable, IndeterminateArrayAccessor,
-    IndeterminateArrayAccessorI, InlinePtrArrayAccessorI, InlinePtrArrayAccessorMut, Mutable,
-    PtrArrayAccessorI, PtrArrayAccessorMut, UnionArrayAccessorI, UnionArrayAccessorMut,
+use self::{
+    data::accessor::{
+        ArrayAccessor, BitsArrayAccessorI, BitsArrayAccessorMut, Immutable,
+        IndeterminateArrayAccessor, IndeterminateArrayAccessorI, InlinePtrArrayAccessorI,
+        InlinePtrArrayAccessorMut, Mutable, PtrArrayAccessorI, PtrArrayAccessorMut,
+        UnionArrayAccessorI, UnionArrayAccessorMut,
+    },
+    tracked::{TrackedArray, TrackedArrayMut},
 };
 use super::{
     union_all::UnionAll,
@@ -74,7 +78,9 @@ use crate::{
             Managed, ManagedRef,
         },
         types::{
-            construct_type::{ArrayTypeConstructor, ConstantIsize, ConstructType},
+            construct_type::{
+                ArrayTypeConstructor, ConstantIsize, ConstructType, Name, TypeVarConstructor,
+            },
             typecheck::Typecheck,
         },
     },
@@ -83,6 +89,7 @@ use crate::{
         CANNOT_DISPLAY_TYPE,
     },
     memory::{
+        context::ledger::Ledger,
         get_tls,
         target::{frame::GcFrame, private::TargetPriv, unrooted::Unrooted, ExtendedTarget, Target},
     },
@@ -857,6 +864,26 @@ impl<'scope, 'data> Array<'scope, 'data> {
         TypedArray::wrap_non_null(self.unwrap_non_null(Private), Private)
     }
 
+    /// Track this array.
+    ///
+    /// While an array is tracked, it can't be exclusively tracked.
+    pub fn track_shared<'borrow>(
+        &'borrow self,
+    ) -> JlrsResult<TrackedArray<'borrow, 'scope, 'data, Self>> {
+        Ledger::try_borrow_shared(self.as_value())?;
+        unsafe { Ok(TrackedArray::new(self)) }
+    }
+
+    /// Exclusively track this array.
+    ///
+    /// While an array is exclusively tracked, it can't be tracked otherwise.
+    pub unsafe fn track_exclusive<'borrow>(
+        &'borrow mut self,
+    ) -> JlrsResult<TrackedArrayMut<'borrow, 'scope, 'data, Self>> {
+        Ledger::try_borrow_exclusive(self.as_value())?;
+        unsafe { Ok(TrackedArrayMut::new(self)) }
+    }
+
     /// Copy the data of an inline array to Rust.
     ///
     /// Returns `ArrayLayoutError::NotInline` if the data is not stored inline or `AccessError::InvalidLayout`
@@ -1491,6 +1518,28 @@ impl<'scope, 'data, T> TypedArray<'scope, 'data, T> {
     }
 }
 
+impl<'scope, 'data, U: ValidField> TypedArray<'scope, 'data, U> {
+    /// Track this array.
+    ///
+    /// While an array is tracked, it can't be exclusively tracked.
+    pub fn track_shared<'borrow>(
+        &'borrow self,
+    ) -> JlrsResult<TrackedArray<'borrow, 'scope, 'data, Self>> {
+        Ledger::try_borrow_shared(self.as_value())?;
+        unsafe { Ok(TrackedArray::new(self)) }
+    }
+
+    /// Exclusively track this array.
+    ///
+    /// While an array is exclusively tracked, it can't be tracked otherwise.
+    pub unsafe fn track_exclusive<'borrow>(
+        &'borrow mut self,
+    ) -> JlrsResult<TrackedArrayMut<'borrow, 'scope, 'data, Self>> {
+        Ledger::try_borrow_exclusive(self.as_value())?;
+        unsafe { Ok(TrackedArrayMut::new(self)) }
+    }
+}
+
 impl<'scope, 'data, T: ConstructType> TypedArray<'scope, 'data, T> {
     /// Convert this array to a [`TypedValue`].
     pub fn as_typed_value<const N: isize>(
@@ -1531,6 +1580,7 @@ where
         unsafe { TypedArray::wrap_non_null(self.unwrap_non_null(Private), Private) }
     }
 }
+
 impl<'scope, 'data, T> Copy for TypedArray<'scope, 'data, T> where T: ValidField {}
 
 impl<'data, T> TypedArray<'_, 'data, T>
@@ -2444,6 +2494,33 @@ unsafe extern "C" fn droparray<T>(a: Array) {
 /// A reference to a [`Array`] that has not been explicitly rooted.
 pub type ArrayRef<'scope, 'data> = Ref<'scope, 'data, Array<'scope, 'data>>;
 
+/// An [`Array`] with static lifetimes.
+///
+/// This is a useful shorthand for signatures of `ccall`able functions that take a [`Array`].
+///
+/// See [`TypedArrayUnbound`] for more information.
+pub type ArrayUnbound = Array<'static, 'static>;
+
+impl ArrayUnbound {
+    /// Track this array.
+    ///
+    /// While an array is tracked, it can't be exclusively tracked.
+    pub fn track_shared_unbound(self) -> JlrsResult<TrackedArray<'static, 'static, 'static, Self>> {
+        Ledger::try_borrow_shared(self.as_value())?;
+        unsafe { Ok(TrackedArray::new_from_owned(self)) }
+    }
+
+    /// Exclusively track this array.
+    ///
+    /// While an array is exclusively tracked, it can't be tracked otherwise.
+    pub unsafe fn track_exclusive_unbound(
+        self,
+    ) -> JlrsResult<TrackedArrayMut<'static, 'static, 'static, Self>> {
+        Ledger::try_borrow_exclusive(self.as_value())?;
+        unsafe { Ok(TrackedArrayMut::new_from_owned(self)) }
+    }
+}
+
 /// A [`ArrayRef`] with static lifetimes. This is a useful shorthand for signatures of
 /// `ccall`able functions that return a [`Array`].
 pub type ArrayRet = Ref<'static, 'static, Array<'static, 'static>>;
@@ -2457,6 +2534,13 @@ unsafe impl ConstructType for Array<'_, '_> {
     {
         let (target, _) = target.split();
         UnionAll::array_type(&target).as_value().root(target)
+    }
+
+    fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
+    where
+        Tgt: Target<'target>,
+    {
+        Some(UnionAll::array_type(&target).as_value())
     }
 }
 
@@ -2488,6 +2572,53 @@ unsafe impl ValidField for Option<ArrayRef<'_, '_>> {
 
 /// A reference to an [`TypedArray`] that has not been explicitly rooted.
 pub type TypedArrayRef<'scope, 'data, T> = Ref<'scope, 'data, TypedArray<'scope, 'data, T>>;
+
+/// A [`TypedArray`] with static lifetimes.
+///
+/// This is a useful shorthand for signatures of `ccall`able functions that take a [`TypedArray`]
+/// and operate on its contents in another thread. Example:
+///
+/// ```
+/// use jlrs::{ccall::AsyncCallback, data::managed::array::TypedArrayUnbound, prelude::*};
+///
+/// fn sum_dispatched(data: TypedArrayUnbound<f32>) -> JlrsResult<impl AsyncCallback<f32>> {
+///     let tracked = data.track_shared_unbound()?;
+///     Ok(move || Ok(tracked.as_slice().iter().sum()))
+/// }
+///
+/// julia_module! {
+///     become init_fn_name;
+///
+///     async fn sum_dispatched(
+///         data: TypedArrayUnbound<f32>
+///     ) -> JlrsResult<impl AsyncCallback<f32>>;
+/// }
+/// ```
+///
+/// In order for `tracked` to be moved to another thread, all lifetimes of `data` must be
+/// `'static`. The generated Julia function guarantees that the array won't be freed by the GC
+/// until the dispatched callback has completed.
+pub type TypedArrayUnbound<T> = TypedArray<'static, 'static, T>;
+
+impl<T: ValidField> TypedArrayUnbound<T> {
+    /// Track this array.
+    ///
+    /// While an array is tracked, it can't be exclusively tracked.
+    pub fn track_shared_unbound(self) -> JlrsResult<TrackedArray<'static, 'static, 'static, Self>> {
+        Ledger::try_borrow_shared(self.as_value())?;
+        unsafe { Ok(TrackedArray::new_from_owned(self)) }
+    }
+
+    /// Exclusively track this array.
+    ///
+    /// While an array is exclusively tracked, it can't be tracked otherwise.
+    pub unsafe fn track_exclusive_unbound(
+        self,
+    ) -> JlrsResult<TrackedArrayMut<'static, 'static, 'static, Self>> {
+        Ledger::try_borrow_exclusive(self.as_value())?;
+        unsafe { Ok(TrackedArrayMut::new_from_owned(self)) }
+    }
+}
 
 /// A [`TypedArrayRef`] with static lifetimes. This is a useful shorthand for signatures of
 /// `ccall`able functions that return a [`TypedArray`].
@@ -2538,14 +2669,18 @@ pub type TypedArrayData<'target, 'data, T, U> =
 pub type TypedArrayResult<'target, 'data, T, U> =
     <T as TargetType<'target>>::Result<'data, TypedArray<'target, 'data, U>>;
 
-unsafe impl<'scope, 'data, T: ValidField> CCallArg for TypedArray<'scope, 'data, T> {
-    type CCallArgType = Option<ValueRef<'scope, 'data>>;
-    type FunctionArgType = Option<ValueRef<'scope, 'data>>;
+unsafe impl<'scope, 'data, T: ValidField + ConstructType> CCallArg
+    for TypedArray<'scope, 'data, T>
+{
+    type CCallArgType = Value<'scope, 'data>;
+    type FunctionArgType =
+        TypedValue<'scope, 'static, ArrayTypeConstructor<T, TypeVarConstructor<Name<'N'>>>>;
 }
 
-unsafe impl<T: ValidField> CCallReturn for TypedArrayRef<'static, 'static, T> {
-    type CCallReturnType = Option<ValueRef<'static, 'static>>;
-    type FunctionReturnType = Option<ValueRef<'static, 'static>>;
+unsafe impl<T: ValidField + ConstructType> CCallReturn for TypedArrayRet<T> {
+    type CCallReturnType = Value<'static, 'static>;
+    type FunctionReturnType =
+        TypedValue<'static, 'static, ArrayTypeConstructor<T, TypeVarConstructor<Name<'N'>>>>;
 }
 
 /// An array with a definite rank.
@@ -2686,13 +2821,13 @@ unsafe impl<const N: isize> ValidField for Option<RankedArrayRef<'_, '_, N>> {
 }
 
 unsafe impl<'scope, 'data, const N: isize> CCallArg for RankedArray<'scope, 'data, N> {
-    type CCallArgType = Option<ValueRef<'scope, 'data>>;
-    type FunctionArgType = Option<ValueRef<'scope, 'data>>;
+    type CCallArgType = Value<'scope, 'data>;
+    type FunctionArgType = ArrayTypeConstructor<TypeVarConstructor<Name<'T'>>, ConstantIsize<N>>;
 }
 
 unsafe impl<'scope, 'data, const N: isize> CCallReturn for RankedArray<'scope, 'data, N> {
-    type CCallReturnType = Option<ValueRef<'scope, 'data>>;
-    type FunctionReturnType = Option<ValueRef<'scope, 'data>>;
+    type CCallReturnType = Value<'scope, 'data>;
+    type FunctionReturnType = ArrayTypeConstructor<TypeVarConstructor<Name<'T'>>, ConstantIsize<N>>;
 }
 
 /// An array with a set element type and a definite rank.
@@ -2783,6 +2918,13 @@ unsafe impl<U: ConstructType + ValidField, const N: isize> ConstructType
                 }
             })
             .unwrap()
+    }
+
+    fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
+    where
+        Tgt: Target<'target>,
+    {
+        Some(UnionAll::array_type(&target).as_value())
     }
 }
 

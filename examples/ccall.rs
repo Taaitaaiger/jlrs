@@ -17,7 +17,7 @@ pub unsafe extern "C" fn add(a: i32, b: i32) -> i32 {
 // `Array{Float64}`.
 #[no_mangle]
 pub unsafe extern "C" fn incr_array(mut arr: TypedArray<f64>) {
-    let Ok(mut arr) = arr.track_mut() else {
+    let Ok(mut arr) = arr.track_exclusive() else {
         return;
     };
 

@@ -289,6 +289,13 @@ macro_rules! impl_tuple {
                     }
                 }).unwrap()
             }
+
+            fn base_type<'target, Tgt>(target: &Tgt) -> Option<$crate::data::managed::value::Value<'target, 'static>>
+            where
+                Tgt: $crate::memory::target::Target<'target>,
+            {
+                Some($crate::data::managed::datatype::DataType::tuple_type(target).as_value())
+            }
         }
     };
     ($name:ident) => {
@@ -368,6 +375,13 @@ macro_rules! impl_tuple {
             {
                 let (target, _) = target.split();
                 $crate::data::managed::datatype::DataType::emptytuple_type(&target).as_value().root(target)
+            }
+
+            fn base_type<'target, Tgt>(target: &Tgt) -> Option<$crate::data::managed::value::Value<'target, 'static>>
+            where
+                Tgt: $crate::memory::target::Target<'target>,
+            {
+                Some($crate::data::managed::datatype::DataType::tuple_type(target).as_value())
             }
         }
     };

@@ -11,7 +11,7 @@ static inline T jl_atomic_load_relaxed(volatile T *obj)
     _ReadWriteBarrier();
     return val;
 }
-#else 
+#else
 template <typename T>
 static inline T jl_atomic_load_relaxed(volatile T *obj)
 {
@@ -47,6 +47,7 @@ extern "C"
 #endif
 
     uint_t jlrs_array_data_owner_offset(uint16_t n_dims);
+    void jlrs_gc_queue_multiroot(jl_value_t *parent, jl_datatype_t *dt, const void *ptr) JL_NOTSAFEPOINT;
 
 #if !defined(JULIA_1_6)
     void jlrs_lock(jl_value_t *v);

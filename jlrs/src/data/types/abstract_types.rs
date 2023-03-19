@@ -10,8 +10,13 @@ use jlrs_macros::julia_version;
 use super::construct_type::ConstructType;
 use crate::{
     data::managed::{
-        datatype::DataType, module::Module, type_var::TypeVar, union_all::UnionAll,
-        value::ValueData, Managed,
+        datatype::DataType,
+        module::Module,
+        private::ManagedPriv,
+        type_var::TypeVar,
+        union_all::UnionAll,
+        value::{Value, ValueData},
+        Managed,
     },
     memory::target::{ExtendedTarget, Target},
     private::Private,
@@ -33,6 +38,20 @@ macro_rules! impl_construct_julia_type_abstract {
                 Module::$mod(&target)
                     .global(target, stringify!($ty))
                     .unwrap()
+            }
+
+            fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
+            where
+                Tgt: Target<'target>,
+            {
+                unsafe {
+                    Some(
+                        Module::$mod(target)
+                            .global(target, stringify!($ty))
+                            .unwrap()
+                            .as_value(),
+                    )
+                }
             }
         }
     };
@@ -134,6 +153,16 @@ unsafe impl ConstructType for AnyType {
             target.data_from_ptr(ptr, Private)
         }
     }
+
+    fn base_type<'target, Tgt>(_target: &Tgt) -> Option<Value<'target, 'static>>
+    where
+        Tgt: Target<'target>,
+    {
+        unsafe {
+            let ptr = NonNull::new_unchecked(jl_any_type.cast::<jl_value_t>());
+            Some(Value::wrap_non_null(ptr, Private))
+        }
+    }
 }
 
 /// Construct a new `AbstractArray` type object from the provided type parameters.
@@ -169,6 +198,13 @@ unsafe impl<T: ConstructType, N: ConstructType> ConstructType for AbstractArray<
                 }
             })
             .unwrap()
+    }
+
+    fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
+    where
+        Tgt: Target<'target>,
+    {
+        Some(UnionAll::abstractarray_type(target).as_value())
     }
 }
 
@@ -206,6 +242,13 @@ unsafe impl<T: ConstructType, N: ConstructType> ConstructType for DenseArray<T, 
             })
             .unwrap()
     }
+
+    fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
+    where
+        Tgt: Target<'target>,
+    {
+        Some(UnionAll::densearray_type(target).as_value())
+    }
 }
 
 /// Construct a new `Ref` type object from the provided type parameters.
@@ -240,6 +283,13 @@ unsafe impl<T: ConstructType> ConstructType for RefTypeConstructor<T> {
             })
             .unwrap()
     }
+
+    fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
+    where
+        Tgt: Target<'target>,
+    {
+        Some(UnionAll::ref_type(target).as_value())
+    }
 }
 
 /// Construct a new `Type` type object from the provided type parameters.
@@ -273,6 +323,13 @@ unsafe impl<T: ConstructType> ConstructType for TypeTypeConstructor<T> {
                 }
             })
             .unwrap()
+    }
+
+    fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
+    where
+        Tgt: Target<'target>,
+    {
+        Some(UnionAll::type_type(target).as_value())
     }
 }
 
@@ -309,6 +366,20 @@ unsafe impl<T: ConstructType> ConstructType for AbstractChannel<T> {
                 }
             })
             .unwrap()
+    }
+
+    fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
+    where
+        Tgt: Target<'target>,
+    {
+        unsafe {
+            Some(
+                Module::base(target)
+                    .global(target, "AbstractChannel")
+                    .unwrap()
+                    .as_value(),
+            )
+        }
     }
 }
 
@@ -348,6 +419,20 @@ unsafe impl<K: ConstructType, V: ConstructType> ConstructType for AbstractDict<K
             })
             .unwrap()
     }
+
+    fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
+    where
+        Tgt: Target<'target>,
+    {
+        unsafe {
+            Some(
+                Module::base(target)
+                    .global(target, "AbstractDict")
+                    .unwrap()
+                    .as_value(),
+            )
+        }
+    }
 }
 
 /// Construct a new `AbstractMatrix` type object from the provided type parameters.
@@ -383,6 +468,20 @@ unsafe impl<T: ConstructType> ConstructType for AbstractMatrix<T> {
                 }
             })
             .unwrap()
+    }
+
+    fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
+    where
+        Tgt: Target<'target>,
+    {
+        unsafe {
+            Some(
+                Module::base(target)
+                    .global(target, "AbstractMatrix")
+                    .unwrap()
+                    .as_value(),
+            )
+        }
     }
 }
 
@@ -420,6 +519,20 @@ unsafe impl<T: ConstructType> ConstructType for AbstractRange<T> {
             })
             .unwrap()
     }
+
+    fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
+    where
+        Tgt: Target<'target>,
+    {
+        unsafe {
+            Some(
+                Module::base(target)
+                    .global(target, "AbstractRange")
+                    .unwrap()
+                    .as_value(),
+            )
+        }
+    }
 }
 
 /// Construct a new `AbstractSet` type object from the provided type parameters.
@@ -455,6 +568,20 @@ unsafe impl<T: ConstructType> ConstructType for AbstractSet<T> {
                 }
             })
             .unwrap()
+    }
+
+    fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
+    where
+        Tgt: Target<'target>,
+    {
+        unsafe {
+            Some(
+                Module::base(target)
+                    .global(target, "AbstractSet")
+                    .unwrap()
+                    .as_value(),
+            )
+        }
     }
 }
 
@@ -497,6 +624,20 @@ unsafe impl<T: ConstructType, N: ConstructType> ConstructType for AbstractSlices
             })
             .unwrap()
     }
+
+    fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
+    where
+        Tgt: Target<'target>,
+    {
+        unsafe {
+            Some(
+                Module::base(target)
+                    .global(target, "AbstractSlices")
+                    .unwrap()
+                    .as_value(),
+            )
+        }
+    }
 }
 
 /// Construct a new `AbstractUnitRange` type object from the provided type parameters.
@@ -530,6 +671,20 @@ unsafe impl<T: ConstructType> ConstructType for AbstractUnitRange<T> {
                 }
             })
             .unwrap()
+    }
+
+    fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
+    where
+        Tgt: Target<'target>,
+    {
+        unsafe {
+            Some(
+                Module::base(target)
+                    .global(target, "AbstractUnitRange")
+                    .unwrap()
+                    .as_value(),
+            )
+        }
     }
 }
 
@@ -569,6 +724,20 @@ unsafe impl<T: ConstructType> ConstructType for AbstractVector<T> {
             })
             .unwrap()
     }
+
+    fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
+    where
+        Tgt: Target<'target>,
+    {
+        unsafe {
+            Some(
+                Module::base(target)
+                    .global(target, "AbstractVector")
+                    .unwrap()
+                    .as_value(),
+            )
+        }
+    }
 }
 
 /// Construct a new `DenseMatrix` type object from the provided type parameters.
@@ -605,6 +774,20 @@ unsafe impl<T: ConstructType> ConstructType for DenseMatrix<T> {
             })
             .unwrap()
     }
+
+    fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
+    where
+        Tgt: Target<'target>,
+    {
+        unsafe {
+            Some(
+                Module::base(target)
+                    .global(target, "DenseMatrix")
+                    .unwrap()
+                    .as_value(),
+            )
+        }
+    }
 }
 
 /// Construct a new `DenseVector` type object from the provided type parameters.
@@ -640,6 +823,20 @@ unsafe impl<T: ConstructType> ConstructType for DenseVector<T> {
                 }
             })
             .unwrap()
+    }
+
+    fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
+    where
+        Tgt: Target<'target>,
+    {
+        unsafe {
+            Some(
+                Module::base(target)
+                    .global(target, "DenseVector")
+                    .unwrap()
+                    .as_value(),
+            )
+        }
     }
 }
 
@@ -689,6 +886,20 @@ unsafe impl<T: ConstructType> ConstructType for Enum<T> {
             })
             .unwrap()
     }
+
+    fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
+    where
+        Tgt: Target<'target>,
+    {
+        unsafe {
+            Some(
+                Module::base(target)
+                    .global(target, "Enum")
+                    .unwrap()
+                    .as_value(),
+            )
+        }
+    }
 }
 
 /// Construct a new `OrdinalRange` type object from the provided type parameters.
@@ -726,6 +937,20 @@ unsafe impl<T: ConstructType, S: ConstructType> ConstructType for OrdinalRange<T
                 }
             })
             .unwrap()
+    }
+
+    fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
+    where
+        Tgt: Target<'target>,
+    {
+        unsafe {
+            Some(
+                Module::base(target)
+                    .global(target, "OrdinalRange")
+                    .unwrap()
+                    .as_value(),
+            )
+        }
     }
 }
 

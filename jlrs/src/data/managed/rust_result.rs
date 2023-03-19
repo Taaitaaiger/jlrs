@@ -20,7 +20,7 @@ use super::{
 #[cfg(feature = "ccall")]
 use crate::{ccall::CCall, memory::stack_frame::StackFrame};
 use crate::{
-    convert::ccall_types::{CCallArg, CCallReturn},
+    convert::ccall_types::CCallReturn,
     data::{
         layout::bool::Bool,
         managed::{
@@ -31,9 +31,10 @@ use crate::{
             value::{Value, ValueRef},
             Managed,
         },
-        types::construct_type::ConstructType,
+        types::{abstract_types::AnyType, construct_type::ConstructType},
     },
     error::JlrsError,
+    inline_static_global,
     memory::target::{target_type::TargetType, ExtendedTarget, Target},
     private::Private,
 };
@@ -54,14 +55,14 @@ impl<'target, 'data, U: ConstructType> RustResult<'target, 'data, U> {
             .scope(|mut frame| {
                 let unrooted = frame.unrooted();
                 unsafe {
-                    let ty = Self::construct_type(frame.as_extended_target())
-                        .cast_unchecked::<DataType>();
-
-                    Ok(ty
+                    let instance = Self::construct_type(frame.as_extended_target())
+                        .cast_unchecked::<DataType>()
                         .instantiate_unchecked(&frame, [data.as_value(), Value::false_v(&unrooted)])
                         .as_value()
                         .cast_unchecked::<RustResult<U>>()
-                        .root(target))
+                        .root(target);
+
+                    Ok(instance)
                 }
             })
             .unwrap()
@@ -78,13 +79,14 @@ impl<'target, 'data, U: ConstructType> RustResult<'target, 'data, U> {
             .scope(|mut frame| {
                 let unrooted = frame.unrooted();
                 unsafe {
-                    let ty = Self::construct_type(frame.as_extended_target())
-                        .cast_unchecked::<DataType>();
-                    Ok(ty
+                    let instance = Self::construct_type(frame.as_extended_target())
+                        .cast_unchecked::<DataType>()
                         .instantiate_unchecked(&frame, [error, Value::true_v(&unrooted)])
                         .as_value()
                         .cast_unchecked::<RustResult<U>>()
-                        .root(target))
+                        .root(target);
+
+                    Ok(instance)
                 }
             })
             .unwrap()
@@ -111,13 +113,14 @@ impl<'target, 'data, U: ConstructType> RustResult<'target, 'data, U> {
                         .instance()
                         .unwrap();
 
-                    let ty = Self::construct_type(frame.as_extended_target())
-                        .cast_unchecked::<DataType>();
-                    Ok(ty
+                    let instance = Self::construct_type(frame.as_extended_target())
+                        .cast_unchecked::<DataType>()
                         .instantiate_unchecked(&frame, [error, Value::true_v(&unrooted)])
                         .as_value()
                         .cast_unchecked::<RustResult<U>>()
-                        .root(target))
+                        .root(target);
+
+                    Ok(instance)
                 }
             })
             .unwrap()
@@ -178,14 +181,15 @@ impl<'target, 'data, U: ConstructType> RustResult<'target, 'data, U> {
                         .instance()
                         .unwrap();
 
-                    let ty = Self::construct_type(frame.as_extended_target())
-                        .cast_unchecked::<DataType>();
-                    Ok(ty
+                    let instance = Self::construct_type(frame.as_extended_target())
+                        .cast_unchecked::<DataType>()
                         .instantiate_unchecked(&frame, [error, Value::true_v(&unrooted)])
                         .as_value()
                         .cast_unchecked::<RustResult<U>>()
                         .as_ref()
-                        .leak())
+                        .leak();
+
+                    Ok(instance)
                 }
             })
             .unwrap()
@@ -199,34 +203,6 @@ impl<'scope, 'data, U: ConstructType> Clone for RustResult<'scope, 'data, U> {
 }
 
 impl<'scope, 'data, U: ConstructType> Copy for RustResult<'scope, 'data, U> {}
-
-// TODO: not sure if this should be implemented or not. RustResult is only intended to be returned
-// from ccalled functions, so it's not necessary to support Typecheck, ValidLayout, and
-// ValidField.  The main issue is that unlike other implementations of these traits, an
-// ExtendedTarget is needed to construct the type object associated with U.
-/*unsafe impl<U: ConstructType> Typecheck for RustResult<'_, '_, U> {
-    fn typecheck(t: DataType) -> bool {
-        unsafe {
-            let unrooted = Unrooted::new();
-            let rust_result_typename = Module::main(&unrooted)
-                .submodule(unrooted, "Jlrs")
-                .unwrap()
-                .as_managed()
-                .global(unrooted, "RustResult")
-                .unwrap()
-                .as_value()
-                .cast_unchecked::<UnionAll>()
-                .base_type()
-                .type_name();
-
-            if t.type_name() != rust_result_typename {
-                return false;
-            }
-
-            todo!()
-        }
-    }
-}*/
 
 impl<U: ConstructType> ::std::fmt::Debug for RustResult<'_, '_, U> {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
@@ -265,23 +241,25 @@ unsafe impl<'scope, 'data, U: ConstructType> ConstructType for RustResult<'scope
             .scope(|mut frame| {
                 let param_ty = U::construct_type(frame.as_extended_target());
                 unsafe {
-                    let base_type = Module::main(&frame)
-                        .submodule(&frame, "Jlrs")
-                        .unwrap()
-                        .as_managed()
-                        .global(&frame, "RustResult")
-                        .unwrap()
-                        .as_value();
-
-                    Ok(base_type
-                        .cast::<UnionAll>()
-                        .unwrap()
+                    let ty = Self::base_type(&frame)
+                        .unwrap_unchecked()
+                        .cast_unchecked::<UnionAll>()
                         .apply_types_unchecked(&frame, [param_ty.as_value()])
                         .as_value()
-                        .root(target))
+                        .root(target);
+
+                    Ok(ty)
                 }
             })
             .unwrap()
+    }
+
+    fn base_type<'target, Tgt>(target: &Tgt) -> Option<Value<'target, 'static>>
+    where
+        Tgt: Target<'target>,
+    {
+        let base_type = inline_static_global!(BASE_TYPE, "Jlrs.RustResult", target);
+        Some(base_type)
     }
 }
 
@@ -322,15 +300,10 @@ pub type RustResultData<'target, 'data, U, T> =
 pub type RustResultResult<'target, 'data, U, T> =
     <T as TargetType<'target>>::Result<'data, RustResult<'target, 'data, U>>;
 
-unsafe impl<'scope, 'data, U: ConstructType> CCallArg for RustResult<'scope, 'data, U> {
-    type CCallArgType = Value<'scope, 'data>;
-    type FunctionArgType = Value<'scope, 'static>;
-}
-
 unsafe impl<U: ConstructType> CCallReturn
     for Ref<'static, 'static, RustResult<'static, 'static, U>>
 {
-    type CCallReturnType = Value<'static, 'static>;
+    type CCallReturnType = AnyType;
     type FunctionReturnType = U;
 }
 

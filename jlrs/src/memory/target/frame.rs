@@ -47,6 +47,15 @@ impl<'scope> GcFrame<'scope> {
         self.stack.reserve(additional)
     }
 
+    /// Borrow the current frame.
+    ///
+    /// When a frame is borrowed, no more roots can be pushed until a new scope has been created.
+    /// This is useful when a function needs to root Julia data but doesn't return Julia data.
+    #[inline]
+    pub fn borrow<'borrow>(&'borrow mut self) -> BorrowedFrame<'borrow, 'scope, Self> {
+        BorrowedFrame(self, PhantomData)
+    }
+
     /// Borrow this frame as an `ExtendedTarget` with the provided `target`.
     #[inline]
     pub fn extended_target<'target, 'borrow, T>(
@@ -152,7 +161,8 @@ impl<'scope> GcFrame<'scope> {
     /// # });
     /// # }
     /// ```
-    #[inline(never)]
+
+    #[inline]
     pub fn scope<T, F>(&mut self, func: F) -> JlrsResult<T>
     where
         for<'inner> F: FnOnce(GcFrame<'inner>) -> JlrsResult<T>,
@@ -172,7 +182,7 @@ impl<'scope> GcFrame<'scope> {
         T::wrap_non_null(ptr, Private)
     }
 
-    pub(crate) fn stack<'nested>(&'nested self) -> &'nested Stack {
+    pub(crate) fn stack(&self) -> &Stack {
         self.stack
     }
 
@@ -228,7 +238,8 @@ cfg_if! {
             ///
             /// The closure `func` must return an async block. Note that the returned value is
             /// required to live at least as long the current frame.
-            #[inline(never)]
+
+            #[inline]
             pub async fn async_scope<'nested, T, F, G>(&'nested mut self, func: F) -> JlrsResult<T>
             where
                 T: 'scope,
@@ -248,7 +259,8 @@ cfg_if! {
             /// Safety: because this method only requires that the returned data lives at least as
             /// long as the borrow of `self`, it's possible to return data rooted in that scope
             /// which you must not do.
-            #[inline(never)]
+
+            #[inline]
             pub async unsafe fn relaxed_async_scope<'nested, T, F, G>(
                 &'nested mut self,
                 func: F,
@@ -355,9 +367,10 @@ pub struct BorrowedFrame<'borrow, 'current, F>(
     pub(crate) PhantomData<&'current ()>,
 );
 
-impl<'borrow, 'current: 'current> BorrowedFrame<'borrow, 'current, GcFrame<'current>> {
+impl<'borrow, 'current> BorrowedFrame<'borrow, 'current, GcFrame<'current>> {
     /// Create a temporary scope by calling [`GcFrame::scope`].
-    #[inline(never)]
+
+    #[inline]
     pub fn scope<T, F>(self, func: F) -> JlrsResult<T>
     where
         for<'inner> F: FnOnce(GcFrame<'inner>) -> JlrsResult<T>,
@@ -367,9 +380,10 @@ impl<'borrow, 'current: 'current> BorrowedFrame<'borrow, 'current, GcFrame<'curr
 }
 
 #[cfg(feature = "async")]
-impl<'borrow, 'current: 'current> BorrowedFrame<'borrow, 'current, AsyncGcFrame<'current>> {
+impl<'borrow, 'current> BorrowedFrame<'borrow, 'current, AsyncGcFrame<'current>> {
     /// Create a temporary scope by calling [`GcFrame::scope`].
-    #[inline(never)]
+
+    #[inline]
     pub fn scope<T, F>(self, func: F) -> JlrsResult<T>
     where
         for<'inner> F: FnOnce(GcFrame<'inner>) -> JlrsResult<T>,
@@ -378,7 +392,8 @@ impl<'borrow, 'current: 'current> BorrowedFrame<'borrow, 'current, AsyncGcFrame<
     }
 
     /// Create a temporary scope by calling [`AsyncGcFrame::async_scope`].
-    #[inline(never)]
+
+    #[inline]
     pub async fn async_scope<'nested, T, F, G>(self, func: F) -> JlrsResult<T>
     where
         'borrow: 'nested,
@@ -390,7 +405,7 @@ impl<'borrow, 'current: 'current> BorrowedFrame<'borrow, 'current, AsyncGcFrame<
     }
 
     /// Create a temporary scope by calling [`AsyncGcFrame::relaxed_async_scope`].
-    #[inline(never)]
+    #[inline]
     pub async unsafe fn relaxed_async_scope<'nested, T, F, G>(self, func: F) -> JlrsResult<T>
     where
         'borrow: 'nested,

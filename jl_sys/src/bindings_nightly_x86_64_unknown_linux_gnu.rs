@@ -1,4 +1,4 @@
-/* generated from julia version 1.10.0-DEV (Commit: 94ad62892f 2023-02-12 16:35 UTC) */
+/* generated from julia version 1.10.0-DEV (Commit: 0a9abc1919 2023-03-18 04:56 UTC) */
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct __BindgenBitfieldUnit<Storage> {
@@ -636,7 +636,6 @@ pub struct _jl_method_t {
     pub nospecialize: u32,
     pub nkw: u32,
     pub isva: u8,
-    pub pure_: u8,
     pub is_for_opaque_closure: u8,
     pub constprop: u8,
     pub purity: _jl_purity_overrides_t,
@@ -653,6 +652,7 @@ pub struct _jl_method_instance_t {
     pub callbacks: *mut jl_array_t,
     pub cache: ::std::sync::atomic::AtomicPtr<_jl_code_instance_t>,
     pub inInference: u8,
+    pub cache_with_orig: u8,
     pub precompiled: ::std::sync::atomic::AtomicU8,
 }
 #[repr(C)]
@@ -684,7 +684,7 @@ pub struct _jl_code_instance_t {
     pub ipo_purity_bits: u32,
     pub purity_bits: ::std::sync::atomic::AtomicU32,
     pub argescapes: *mut jl_value_t,
-    pub isspecsig: u8,
+    pub specsigflags: ::std::sync::atomic::AtomicU8,
     pub precompile: ::std::sync::atomic::AtomicU8,
     pub relocatability: u8,
     pub invoke: ::atomic::Atomic<jl_callptr_t>,
@@ -1434,13 +1434,7 @@ extern "C" {
     pub static mut jl_ssavalue_type: *mut jl_datatype_t;
 }
 extern "C" {
-    pub static mut jl_abstractslot_type: *mut jl_datatype_t;
-}
-extern "C" {
     pub static mut jl_slotnumber_type: *mut jl_datatype_t;
-}
-extern "C" {
-    pub static mut jl_typedslot_type: *mut jl_datatype_t;
 }
 extern "C" {
     pub static mut jl_argument_type: *mut jl_datatype_t;
@@ -2490,6 +2484,13 @@ extern "C" {
 }
 extern "C" {
     pub fn jlrs_array_data_owner_offset(n_dims: u16) -> uint_t;
+}
+extern "C" {
+    pub fn jlrs_gc_queue_multiroot(
+        parent: *mut jl_value_t,
+        dt: *mut jl_datatype_t,
+        ptr: *const ::std::os::raw::c_void,
+    );
 }
 extern "C" {
     pub fn jlrs_lock(v: *mut jl_value_t);
