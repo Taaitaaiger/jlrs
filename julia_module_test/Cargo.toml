@@ -1,0 +1,19 @@
+[package]
+name = "julia_module_test"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+julia-1-6 = ["jlrs/julia-1-6"]
+julia-1-7 = ["jlrs/julia-1-7"]
+julia-1-8 = ["jlrs/julia-1-8"]
+julia-1-9 = ["jlrs/julia-1-9"]
+julia-1-10 = ["jlrs/julia-1-10"]
+windows = ["jlrs/windows"]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+jlrs = { path = "../jlrs", features = ["ccall", "uv", "no-link"] }

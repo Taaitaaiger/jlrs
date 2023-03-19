@@ -3,22 +3,26 @@
 use std::{ffi::c_void, marker::PhantomData, ptr::NonNull};
 
 use jl_sys::{
-    jl_bool_type, jl_bottom_type, jl_char_type, jl_float32_type, jl_float64_type, jl_int16_type,
-    jl_int32_type, jl_int64_type, jl_int8_type, jl_uint16_type, jl_uint32_type, jl_uint64_type,
-    jl_uint8_type, jl_value_t, jl_voidpointer_type,
+    jl_array_type, jl_bool_type, jl_bottom_type, jl_char_type, jl_float32_type, jl_float64_type,
+    jl_int16_type, jl_int32_type, jl_int64_type, jl_int8_type, jl_pointer_type, jl_uint16_type,
+    jl_uint32_type, jl_uint64_type, jl_uint8_type, jl_uniontype_type, jl_value_t,
+    jl_voidpointer_type,
 };
 
 use super::abstract_types::AnyType;
 use crate::{
-    data::managed::{
-        datatype::DataType,
-        type_var::TypeVar,
-        union::Union,
-        union_all::UnionAll,
-        value::{Value, ValueData},
-        Managed,
+    data::{
+        layout::valid_layout::ValidField,
+        managed::{
+            datatype::DataType,
+            type_var::TypeVar,
+            union::Union,
+            union_all::UnionAll,
+            value::{Value, ValueData},
+            Managed,
+        },
     },
-    memory::target::{ExtendedTarget, Target},
+    memory::target::{frame::GcFrame, ExtendedTarget, Target},
     private::Private,
 };
 
@@ -35,6 +39,24 @@ pub unsafe trait ConstructType {
     ) -> ValueData<'target, 'static, T>
     where
         T: Target<'target>;
+
+    /// Returns the base type object associated with this type.
+    ///
+    /// The base type object is the type object without any types applied to it. If there is no
+    /// such type object, e.g. when `Self` is a value type, `None` is returned. The base type must
+    /// assumed to be globally rooted.
+    fn base_type<'target, T>(target: &T) -> Option<Value<'target, 'static>>
+    where
+        T: Target<'target>;
+
+    /// Returns `true` if `T` is a valid field layout for instances of the constructed type.
+    fn is_compatible<T>(frame: &mut GcFrame) -> bool
+    where
+        T: ValidField,
+    {
+        let ty = Self::construct_type(frame.as_extended_target());
+        T::valid_field(ty)
+    }
 }
 
 macro_rules! impl_construct_julia_type_constant {
@@ -48,6 +70,13 @@ macro_rules! impl_construct_julia_type_constant {
             {
                 let (target, _) = target.split();
                 Value::new(target, N)
+            }
+
+            fn base_type<'target, T>(_target: &T) -> Option<Value<'target, 'static>>
+            where
+                T: Target<'target>,
+            {
+                None
             }
         }
     };
@@ -66,6 +95,21 @@ macro_rules! impl_construct_julia_type_primitive {
                 unsafe {
                     let ptr = NonNull::new_unchecked($jl_ty.cast::<jl_value_t>());
                     target.data_from_ptr(ptr, Private)
+                }
+            }
+
+            fn base_type<'target, T>(_target: &T) -> Option<Value<'target, 'static>>
+            where
+                T: Target<'target>,
+            {
+                unsafe {
+                    let ptr = NonNull::new_unchecked($jl_ty.cast::<jl_value_t>());
+                    Some(
+                        <Value as $crate::data::managed::private::ManagedPriv>::wrap_non_null(
+                            ptr,
+                            $crate::private::Private,
+                        ),
+                    )
                 }
             }
         }
@@ -171,6 +215,13 @@ unsafe impl<N: TypeVarName, U: ConstructType, L: ConstructType> ConstructType
             })
             .unwrap()
     }
+
+    fn base_type<'target, T>(_target: &T) -> Option<Value<'target, 'static>>
+    where
+        T: Target<'target>,
+    {
+        None
+    }
 }
 
 /// Construct a new `Array` type from the provided type parameters.
@@ -205,6 +256,21 @@ unsafe impl<T: ConstructType, N: ConstructType> ConstructType for ArrayTypeConst
             })
             .unwrap()
     }
+
+    fn base_type<'target, Tgt>(_target: &Tgt) -> Option<Value<'target, 'static>>
+    where
+        Tgt: Target<'target>,
+    {
+        unsafe {
+            let ptr = NonNull::new_unchecked(jl_array_type.cast::<jl_value_t>());
+            Some(
+                <Value as crate::data::managed::private::ManagedPriv>::wrap_non_null(
+                    ptr,
+                    crate::private::Private,
+                ),
+            )
+        }
+    }
 }
 
 pub type RankedArrayType<T, const N: isize> = ArrayTypeConstructor<T, ConstantIsize<N>>;
@@ -234,6 +300,21 @@ unsafe impl<L: ConstructType, R: ConstructType> ConstructType for UnionTypeConst
             })
             .unwrap()
     }
+
+    fn base_type<'target, Tgt>(_target: &Tgt) -> Option<Value<'target, 'static>>
+    where
+        Tgt: Target<'target>,
+    {
+        unsafe {
+            let ptr = NonNull::new_unchecked(jl_uniontype_type.cast::<jl_value_t>());
+            Some(
+                <Value as crate::data::managed::private::ManagedPriv>::wrap_non_null(
+                    ptr,
+                    crate::private::Private,
+                ),
+            )
+        }
+    }
 }
 
 pub struct BottomType;
@@ -249,6 +330,21 @@ unsafe impl ConstructType for BottomType {
         unsafe {
             let ptr = NonNull::new_unchecked(jl_bottom_type.cast::<jl_value_t>());
             target.data_from_ptr(ptr, Private)
+        }
+    }
+
+    fn base_type<'target, Tgt>(_target: &Tgt) -> Option<Value<'target, 'static>>
+    where
+        Tgt: Target<'target>,
+    {
+        unsafe {
+            let ptr = NonNull::new_unchecked(jl_bottom_type.cast::<jl_value_t>());
+            Some(
+                <Value as crate::data::managed::private::ManagedPriv>::wrap_non_null(
+                    ptr,
+                    crate::private::Private,
+                ),
+            )
         }
     }
 }
@@ -299,5 +395,20 @@ unsafe impl<U: ConstructType> ConstructType for *mut U {
                 }
             })
             .unwrap()
+    }
+
+    fn base_type<'target, Tgt>(_target: &Tgt) -> Option<Value<'target, 'static>>
+    where
+        Tgt: Target<'target>,
+    {
+        unsafe {
+            let ptr = NonNull::new_unchecked(jl_pointer_type.cast::<jl_value_t>());
+            Some(
+                <Value as crate::data::managed::private::ManagedPriv>::wrap_non_null(
+                    ptr,
+                    crate::private::Private,
+                ),
+            )
+        }
     }
 }

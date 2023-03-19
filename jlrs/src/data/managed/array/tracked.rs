@@ -26,10 +26,7 @@ use crate::{
     convert::unbox::Unbox,
     data::{
         layout::valid_layout::ValidField,
-        managed::{
-            value::{Value, ValueRef},
-            Managed, ManagedRef,
-        },
+        managed::{value::ValueRef, Managed, ManagedRef},
     },
     error::JlrsResult,
     memory::{
@@ -38,125 +35,31 @@ use crate::{
     },
 };
 
-// TODO: make method, not trait
-pub trait TrackArray<'scope, 'data>: Copy {
-    /// Track this array.
-    ///
-    /// While an array is tracked, it can't be mutably tracked.
-    fn track<'borrow>(&'borrow self) -> JlrsResult<TrackedArray<'borrow, 'scope, 'data, Self>>;
-
-    /// Track this array.
-    ///
-    /// While an array is tracked, it can't be mutably tracked.
-    fn track_owned(self) -> JlrsResult<TrackedArray<'scope, 'scope, 'data, Self>>;
-
-    /// Mutably track this array.
-    ///
-    /// While an array is mutably tracked, it can't be tracked otherwise.
-    fn track_mut<'borrow>(
-        &'borrow mut self,
-    ) -> JlrsResult<TrackedArrayMut<'borrow, 'scope, 'data, Self>>;
-
-    /// Mutably track this array.
-    ///
-    /// While an array is mutably tracked, it can't be tracked otherwise.
-    fn track_mut_owned(self) -> JlrsResult<TrackedArrayMut<'scope, 'scope, 'data, Self>>;
-
-    fn tracked_value(self) -> Value<'scope, 'data>;
-}
-
-impl<'scope, 'data> TrackArray<'scope, 'data> for Array<'scope, 'data> {
-    fn track<'borrow>(&'borrow self) -> JlrsResult<TrackedArray<'borrow, 'scope, 'data, Self>> {
-        Ledger::try_borrow_shared(self.as_value())?;
-        unsafe { Ok(TrackedArray::new(self)) }
-    }
-
-    fn track_owned(self) -> JlrsResult<TrackedArray<'scope, 'scope, 'data, Self>> {
-        Ledger::try_borrow_shared(self.as_value())?;
-        unsafe { Ok(TrackedArray::new_from_owned(self)) }
-    }
-
-    fn track_mut<'borrow>(
-        &'borrow mut self,
-    ) -> JlrsResult<TrackedArrayMut<'borrow, 'scope, 'data, Self>> {
-        Ledger::try_borrow_exclusive(self.as_value())?;
-        unsafe { Ok(TrackedArrayMut::new(self)) }
-    }
-
-    fn track_mut_owned(self) -> JlrsResult<TrackedArrayMut<'scope, 'scope, 'data, Self>> {
-        Ledger::try_borrow_exclusive(self.as_value())?;
-        unsafe { Ok(TrackedArrayMut::new_from_owned(self)) }
-    }
-
-    fn tracked_value(self) -> Value<'scope, 'data> {
-        <Self as Managed>::as_value(self)
-    }
-}
-
-impl<'scope, 'data, U: ValidField> TrackArray<'scope, 'data> for TypedArray<'scope, 'data, U> {
-    fn track<'borrow>(&'borrow self) -> JlrsResult<TrackedArray<'borrow, 'scope, 'data, Self>> {
-        Ledger::try_borrow_shared(self.as_value())?;
-        unsafe { Ok(TrackedArray::new(self)) }
-    }
-
-    fn track_owned(self) -> JlrsResult<TrackedArray<'scope, 'scope, 'data, Self>> {
-        Ledger::try_borrow_shared(self.as_value())?;
-        unsafe { Ok(TrackedArray::new_from_owned(self)) }
-    }
-
-    fn track_mut<'borrow>(
-        &'borrow mut self,
-    ) -> JlrsResult<TrackedArrayMut<'borrow, 'scope, 'data, Self>> {
-        Ledger::try_borrow_exclusive(self.as_value())?;
-        unsafe { Ok(TrackedArrayMut::new(self)) }
-    }
-
-    fn track_mut_owned(self) -> JlrsResult<TrackedArrayMut<'scope, 'scope, 'data, Self>> {
-        Ledger::try_borrow_exclusive(self.as_value())?;
-        unsafe { Ok(TrackedArrayMut::new_from_owned(self)) }
-    }
-
-    fn tracked_value(self) -> Value<'scope, 'data> {
-        <Self as Managed>::as_value(self)
-    }
-}
-
 /// An array that has been tracked immutably.
-pub struct TrackedArray<'tracked, 'scope, 'data, T>
-where
-    T: TrackArray<'scope, 'data>,
-{
+pub struct TrackedArray<'tracked, 'scope, 'data, T: Managed<'scope, 'data>> {
     data: T,
     _scope: PhantomData<&'scope ()>,
     _tracked: PhantomData<&'tracked ()>,
     _data: PhantomData<&'data ()>,
 }
 
-unsafe impl<'tracked, 'scope, 'data, T: TrackArray<'scope, 'data>> Send
-    for TrackedArray<'tracked, 'scope, 'data, T>
-{
-}
-unsafe impl<'tracked, 'scope, 'data, T: TrackArray<'scope, 'data>> Sync
+unsafe impl<'tracked, 'scope, 'data, T: Managed<'scope, 'data>> Send
     for TrackedArray<'tracked, 'scope, 'data, T>
 {
 }
 
-impl<'tracked, 'scope, 'data, T> Clone for TrackedArray<'tracked, 'scope, 'data, T>
-where
-    T: TrackArray<'scope, 'data>,
+impl<'tracked, 'scope, 'data, T: Managed<'scope, 'data>> Clone
+    for TrackedArray<'tracked, 'scope, 'data, T>
 {
     fn clone(&self) -> Self {
         unsafe {
-            Ledger::borrow_shared_unchecked(self.data.tracked_value()).unwrap();
+            Ledger::borrow_shared_unchecked(self.data.as_value()).unwrap();
             Self::new_from_owned(self.data)
         }
     }
 }
 
-impl<'tracked, 'scope, 'data, T> TrackedArray<'tracked, 'scope, 'data, T>
-where
-    T: TrackArray<'scope, 'data>,
-{
+impl<'tracked, 'scope, 'data, T: Managed<'scope, 'data>> TrackedArray<'tracked, 'scope, 'data, T> {
     pub(crate) unsafe fn new(data: &'tracked T) -> Self {
         TrackedArray {
             data: *data,
@@ -419,24 +322,20 @@ where
     }
 }
 
-impl<'scope, 'data, T: TrackArray<'scope, 'data>> Drop for TrackedArray<'_, 'scope, 'data, T> {
+impl<'scope, 'data, T: Managed<'scope, 'data>> Drop for TrackedArray<'_, 'scope, 'data, T> {
     fn drop(&mut self) {
         unsafe {
-            Ledger::unborrow_shared(self.data.tracked_value()).unwrap();
+            Ledger::unborrow_shared(self.data.as_value()).unwrap();
         }
     }
 }
 
-pub struct TrackedArrayMut<'tracked, 'scope, 'data, T>
-where
-    T: TrackArray<'scope, 'data>,
-{
+pub struct TrackedArrayMut<'tracked, 'scope, 'data, T: Managed<'scope, 'data>> {
     tracked: ManuallyDrop<TrackedArray<'tracked, 'scope, 'data, T>>,
 }
 
-impl<'tracked, 'scope, 'data, T> TrackedArrayMut<'tracked, 'scope, 'data, T>
-where
-    T: TrackArray<'scope, 'data>,
+impl<'tracked, 'scope, 'data, T: Managed<'scope, 'data>>
+    TrackedArrayMut<'tracked, 'scope, 'data, T>
 {
     pub(crate) unsafe fn new(data: &'tracked mut T) -> Self {
         TrackedArrayMut {
@@ -675,11 +574,7 @@ where
     }
 }
 
-unsafe impl<'tracked, 'scope, 'data, T: TrackArray<'scope, 'data>> Send
-    for TrackedArrayMut<'tracked, 'scope, 'data, T>
-{
-}
-unsafe impl<'tracked, 'scope, 'data, T: TrackArray<'scope, 'data>> Sync
+unsafe impl<'tracked, 'scope, 'data, T: Managed<'scope, 'data>> Send
     for TrackedArrayMut<'tracked, 'scope, 'data, T>
 {
 }
@@ -834,13 +729,12 @@ where
     }
 }
 
-impl<'tracked, 'scope, 'data, T> Drop for TrackedArrayMut<'tracked, 'scope, 'data, T>
-where
-    T: TrackArray<'scope, 'data>,
+impl<'tracked, 'scope, 'data, T: Managed<'scope, 'data>> Drop
+    for TrackedArrayMut<'tracked, 'scope, 'data, T>
 {
     fn drop(&mut self) {
         unsafe {
-            Ledger::unborrow_exclusive(self.tracked.data.tracked_value()).unwrap();
+            Ledger::unborrow_exclusive(self.tracked.data.as_value()).unwrap();
         }
     }
 }

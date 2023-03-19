@@ -33,7 +33,7 @@ macro_rules! impl_construct_type_managed {
     ($ty:ty, $jl_ty:expr) => {
         unsafe impl crate::data::types::construct_type::ConstructType for $ty {
             fn construct_type<'target, 'current, 'borrow, T>(
-                target: crate::memory::target::ExtendedTarget<'target, '_, '_, T>,
+                target: $crate::memory::target::ExtendedTarget<'target, '_, '_, T>,
             ) -> $crate::data::managed::value::ValueData<'target, 'static, T>
             where
                 T: $crate::memory::target::Target<'target>,
@@ -44,6 +44,19 @@ macro_rules! impl_construct_type_managed {
                         NonNull::new_unchecked($jl_ty.cast::<::jl_sys::jl_value_t>()),
                         $crate::private::Private,
                     )
+                }
+            }
+
+            fn base_type<'target, Tgt>(_target: &Tgt) -> Option<$crate::data::managed::value::Value<'target, 'static>>
+            where
+                Tgt: crate::memory::target::Target<'target>,
+            {
+                unsafe {
+                    let ptr = NonNull::new_unchecked($jl_ty.cast::<::jl_sys::jl_value_t>());
+                    Some(<$crate::data::managed::value::Value as $crate::data::managed::private::ManagedPriv>::wrap_non_null(
+                        ptr,
+                        $crate::private::Private,
+                    ))
                 }
             }
         }
@@ -126,6 +139,28 @@ macro_rules! impl_valid_layout {
                 }
             }
         }
+
+        unsafe impl $crate::data::layout::valid_layout::ValidLayout for $type<'_> {
+            fn valid_layout(ty: $crate::data::managed::value::Value) -> bool {
+                if let Ok(dt) = ty.cast::<$crate::data::managed::datatype::DataType>() {
+                    dt.is::<$type>()
+                } else {
+                    false
+                }
+            }
+
+            const IS_REF: bool = true;
+        }
+
+        unsafe impl $crate::data::layout::valid_layout::ValidField for Option<$type<'_>> {
+            fn valid_field(ty: $crate::data::managed::value::Value) -> bool {
+                if let Ok(dt) = ty.cast::<$crate::data::managed::datatype::DataType>() {
+                    dt.is::<$type>()
+                } else {
+                    false
+                }
+            }
+        }
     };
 }
 
@@ -143,6 +178,7 @@ macro_rules! impl_debug {
 }
 
 pub mod array;
+pub mod ccall_ref;
 pub mod datatype;
 pub mod function;
 #[cfg(feature = "internal-types")]
@@ -385,6 +421,23 @@ impl<'scope, 'data, W: Managed<'scope, 'data>> Ref<'scope, 'data, W> {
         Value::wrap_non_null(self.data_ptr().cast(), Private)
     }
 
+    /// Extends the `'data` lifetime to `'static`.
+    ///
+    /// Safety: this method should only be used when no data borrowed from Rust is referenced by
+    /// this Julia data.
+    pub unsafe fn assume_owned(self) -> Ref<'scope, 'static, W::TypeConstructor<'scope, 'static>> {
+        Ref::wrap(self.ptr().cast())
+    }
+
+    /// Extends the `'scope` lifetime to `'static`, which allows this reference to Julia data to
+    /// be leaked from a scope.
+    ///
+    /// Safety: this method should only be called to return Julia data from a `ccall`ed function
+    /// or when storing Julia data in a foreign type.
+    pub fn leak(self) -> Ref<'static, 'data, W::TypeConstructor<'static, 'data>> {
+        Ref::wrap(self.ptr().cast())
+    }
+
     /// Returns a pointer to the data,
     pub fn data_ptr(self) -> NonNull<c_void> {
         self.ptr().cast()
@@ -392,19 +445,6 @@ impl<'scope, 'data, W: Managed<'scope, 'data>> Ref<'scope, 'data, W> {
 
     pub(crate) fn ptr(self) -> NonNull<W::Wraps> {
         self.0
-    }
-}
-
-impl<'scope, 'data, W: Managed<'scope, 'data>> Ref<'scope, 'data, W> {
-    /// Extends the `'scope` lifetime to `'static`, which allows this reference to Julia data to
-    /// be leaked from a scope.
-    ///
-    /// This method only extends the `'scope` lifetime, the `'data` lifetime must already be
-    /// `'static`. This method should only be used to return Julia data from a `ccall`ed function,
-    /// and in combination with the `ForeignType` trait to store references to Julia data in types
-    /// that that implement that trait.
-    pub fn leak(self) -> Ref<'static, 'data, W::TypeConstructor<'static, 'data>> {
-        Ref::wrap(self.ptr().cast())
     }
 }
 

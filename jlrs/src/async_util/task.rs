@@ -171,7 +171,7 @@ pub trait AsyncTask: 'static + Send {
 ///             // The data is tracked first to ensure it's not
 ///             // already borrowed from Rust.
 ///             unsafe {
-///                 let mut tracked = state.array.track_mut()?;
+///                 let mut tracked = state.array.track_exclusive()?;
 ///                 let mut data = tracked.bits_data_mut()?;
 ///                 data[state.offset] = input;
 ///             };

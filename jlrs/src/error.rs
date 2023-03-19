@@ -68,6 +68,10 @@ pub enum TypeError {
     NotA { value: String, field_type: String },
     #[error("{value_type} is immutable")]
     Immutable { value_type: String },
+    #[error("No base type is available")]
+    NoBaseType,
+    #[error("The layout of this type is incompatible with {base_type}")]
+    IncompatibleBaseType { base_type: String },
 }
 
 /// Array layout errors.

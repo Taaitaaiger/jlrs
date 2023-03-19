@@ -13,7 +13,7 @@ mod tests {
     use super::util::JULIA;
 
     unsafe extern "C" fn doesnt_use_scope(array: TypedArray<f64>) -> bool {
-        let tracked = array.track().expect("Already borrowed");
+        let tracked = array.track_shared().expect("Already borrowed");
 
         let borrowed = tracked.inline_data().expect("Not inline");
 

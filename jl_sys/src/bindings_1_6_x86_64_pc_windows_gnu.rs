@@ -2174,6 +2174,13 @@ extern "C" {
 extern "C" {
     pub fn jlrs_array_data_owner_offset(n_dims: u16) -> uint_t;
 }
+extern "C" {
+    pub fn jlrs_gc_queue_multiroot(
+        parent: *mut jl_value_t,
+        dt: *mut jl_datatype_t,
+        ptr: *const ::std::os::raw::c_void,
+    );
+}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct _mallocarray_t {

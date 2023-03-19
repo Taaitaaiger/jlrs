@@ -369,6 +369,12 @@ mod tests {
         })
     }
 
+    #[cfg(any(
+        feature = "julia-1-6",
+        feature = "julia-1-7",
+        feature = "julia-1-8",
+        feature = "julia-1-9"
+    ))]
     fn slot_typecheck() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -682,7 +688,6 @@ mod tests {
         char_ptr_failing_typecheck();
         void_ptr_typecheck();
         failing_void_ptr_typecheck();
-
         type_typecheck();
         bits_typecheck();
         abstract_typecheck();
@@ -695,6 +700,12 @@ mod tests {
         primitive_type_typecheck();
         struct_type_typecheck();
         singleton_typecheck();
+        #[cfg(any(
+            feature = "julia-1-6",
+            feature = "julia-1-7",
+            feature = "julia-1-8",
+            feature = "julia-1-9"
+        ))]
         slot_typecheck();
         global_ref_typecheck();
         goto_node_typecheck();

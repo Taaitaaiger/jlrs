@@ -18,69 +18,89 @@ use self::version::emit_if_compatible;
 /// macros provided by the `Jlrs.Wrap` module to automatically generate the content of that
 /// module.
 ///
-/// The following items can be exported to Julia with this macro:
-///
-///  - `unsafe extern "C" fn`s where all arguments implement `CCallArg` and the return type
-///    implements `CCallReturn`.
-///
-///  - Types that implement `OpaqueType` (including implentations of `ForeignType`).
-///
-///  - Methods of such types, taking `&self` or `&mut self` is supported, taking `self` by value
-///    is only supported if its type implements `Clone`. While these methods don't have to be
-///    `unsafe extern "C"`, methods that take `self` in some way must return a `RustResultRet` to
-///    account for the possibility that the data can't be tracked.
-///
-///  - functions that return `impl AsyncCallback<T>` where `T: IntoJulia + ConstructType`. The
-///    async callback is executed on a separate thread pool. It can be used to call long-running
-///    functions written in Rust that don't need to call back into Julia. Julia data passed to
-///    this function are guaranteed to be rooted as long as the callback is running.
-///
-///  - Constant and static data whose type implements `IntoJulia` can be exposed as a constant or
-///    global value.
-///
 /// The syntax is as follows:
 ///
 /// ```ignore
 /// julia_macro! {
 ///     // init_function_name is the name of the generated initialization function.
+///     //
+///     // The name of the generated function must be unique, it's recommended you prefix it with
+///     // the crate name. If your crate is named foo-jl, you should use a name like
+///     // `foo_jl_init`.
 ///     become init_function_name;
 ///
-///     // Exposes the function `foo` as `bar`. The `unsafe extern "C" is elided, the signature is
-///     // verified in the generated code to ensure it's correct and that the function uses the
-///     // C ABI. The `as <exposed_name>` part is optional, by default the function is exported
-///     // with the same name it has in Rust. A docstring can also be provided; if multiple
-///     // functions are exported with the same name, it shoud only be documented once.
-///     #[doc("    bar(arr::Array)
+///     // Exports the function `foo` as `bar`.
+///     //
+///     // The `unsafe extern "C" part of the signature must be elided, the signature is verified
+///     // in the generated code to ensure it's correct and that the function uses the C ABI.
+///     //
+///     // The `as <exposed_name>` part is optional, by default the function is exported with the
+///     // name it has in Rust, the exposed name can end in an exclamation mark.
+///     //
+///     // A docstring can also be provided; if multiple functions are exported with the same name
+///     // it shoud only be documented once. The `indent` flag can be used to ensure the docstring
+///     // starts with four spaces.
+///     #[doc("bar(arr::Array)
 ///
-///     Documentation for this function")]
+///     Documentation for this function", indent)]
 ///     fn foo(arr: Array) -> usize as bar;
 ///
-///     // Exposes the function `foo` as `bar` in the `Base` module. This syntax can be used to
-///     // extend existing functions.
-///     fn foo(arr: Array) -> usize as Base.bar;
+///     // Exports the function `foo` as `bar!` in the `Base` module.
+///     //
+///     // This syntax can be used to extend existing functions.
+///     fn foo(arr: Array) -> usize as Base.bar!;
 ///
-///     // Exposes the struct `MyType` as `MyForeignType`. `MyType` must implement `OpaqueType`.
+///     // Exports the struct `MyType` as `MyForeignType`. `MyType` must implement `OpaqueType`
+///     // or `ForeignType`.
 ///     struct MyType as MyForeignType;
 ///
-///     // Exposes `MyType::new` as `MyForeignType`, turning it into a constructor for that type.
+///     // Exports `MyType::new` as `MyForeignType`, turning it into a constructor for that type.
+///     //
 ///     // A Rust function is generated to call this method, so unlike free-standing functions
-///     // methods don't have to use the C ABI.
+///     // exported methods don't have to use the C ABI.
 ///     in MyType fn new(arg0: TypedValue<u32>) -> TypedValueRet<MyType> as MyForeignType;
 ///
-///     // Exposes `MyType::add` as the function `increment!`. Methods that take `self` in some
-///     // way must return a `RustResultRet` because the generated function tracks the borrow of
-///     // `self` before calling `MyType::add`.
+///     // Exports `MyType::add` as the function `increment!`.
+///     //
+///     // Methods that take `self` in some way must return a `RustResultRet` because the
+///     // generated function tracks the borrow of `self` before calling the exported method. If
+///     // `self` is taken by value, it's cloned after being tracked.
 ///     in MyType fn add(&mut self, incr: u32) -> RustResultRet<u32>  as increment!;
 ///
-///     // Exposes the function `long_running_func`.
-///     async fn long_running_func(array: Array<'static, 'static>) -> impl AsyncCallback<i32>;
+///     // Exports the function `long_running_func`, the returned `AsyncCallback` is executed on
+///     // another thread.
+///     //
+///     // `AsyncCallback` is essentially a trait alias for a closure with a specific signature:
+///     //
+///     // ```
+///     // impl<T, U> AsyncCallback<T> for U
+///     // where
+///     //     T: IntoJulia + Send + ConstructType,
+///     //     U: 'static + Send + FnOnce() -> JlrsResult<T>,
+///     // {
+///     // }
+///     // ```
+///     //
+///     // I.e., the exported function must return a closure. The generated Julia function waits
+///     // for the closure to finish using an `AsyncCondition`. Because the closure is executed on
+///     // another thread you can't call Julia functions or allocate Julia data from it, but it is
+///     // possible to (mutably) access Julia data by tracking it.
+///     //
+///     // In order to be able to use tracked data from the closure,  `Unbound` managed types must
+///     // be used. Only `(Typed)ValueUnbound` and `(Typed)ArrayUnbound` exist,  they're aliases
+///     // for `(Typed)Value` and `(Typed)Array` with static lifetimes. The generated Julia
+///     // function guarantees all data passed as an argument lives at least until the closure has
+///     // finished, the tracked data must only be shared with that closure.
+///     async fn long_running_func(
+///         array: ArrayUnbound
+///     ) -> JlrsResult<impl AsyncCallback<i32>>;
 ///
-///     // Exposes `MY_CONST` as the constant `MY_CONST`, its type must implement `IntoJulia`.
+///     // Exports `MY_CONST` as the constant `MY_CONST`, its type must implement `IntoJulia`.
 ///     // `MY_CONST` can be defined in Rust as either static or constant data, i.e. both
 ///     // `static MY_CONST: u8 = 1` and `const MY_CONST: u8 = 1` can be exposed this way.
 ///     const MY_CONST: u8;
 ///
-///     // Exposes `MY_CONST` as the global `MY_GLOBAL`, its type must implement `IntoJulia`.
+///     // Exports `MY_CONST` as the global `MY_GLOBAL`, its type must implement `IntoJulia`.
 ///     // `MY_CONST` can be defined in Rust as either static or constant data, i.e. both
 ///     // `static MY_CONST: u8 = 1` and `const MY_CONST: u8 = 1` can be exposed this way.
 ///     static MY_CONST: u8 as MY_GLOBAL;

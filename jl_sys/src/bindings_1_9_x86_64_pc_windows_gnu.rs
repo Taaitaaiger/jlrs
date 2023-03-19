@@ -1,4 +1,4 @@
-/* generated from julia version 1.9.0-beta4 */
+/* generated from julia version 1.9.0-rc1 */
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct __BindgenBitfieldUnit<Storage> {
@@ -675,6 +675,7 @@ pub struct _jl_method_instance_t {
     pub callbacks: *mut jl_array_t,
     pub cache: ::std::sync::atomic::AtomicPtr<_jl_code_instance_t>,
     pub inInference: u8,
+    pub cache_with_orig: u8,
     pub precompiled: u8,
 }
 #[repr(C)]
@@ -705,7 +706,7 @@ pub struct _jl_code_instance_t {
     pub ipo_purity_bits: u32,
     pub purity_bits: ::std::sync::atomic::AtomicU32,
     pub argescapes: *mut jl_value_t,
-    pub isspecsig: u8,
+    pub specsigflags: ::std::sync::atomic::AtomicU8,
     pub precompile: ::std::sync::atomic::AtomicU8,
     pub relocatability: u8,
     pub invoke: ::atomic::Atomic<jl_callptr_t>,
@@ -2694,6 +2695,13 @@ extern "C" {
 }
 extern "C" {
     pub fn jlrs_array_data_owner_offset(n_dims: u16) -> uint_t;
+}
+extern "C" {
+    pub fn jlrs_gc_queue_multiroot(
+        parent: *mut jl_value_t,
+        dt: *mut jl_datatype_t,
+        ptr: *const ::std::os::raw::c_void,
+    );
 }
 extern "C" {
     pub fn jlrs_lock(v: *mut jl_value_t);

@@ -14,7 +14,6 @@ use std::{
 };
 
 use jl_sys::{jl_gc_wb, jl_tagged_gensym, jl_value_t};
-use jlrs_macros::julia_version;
 use once_cell::sync::Lazy;
 
 use crate::{
@@ -42,41 +41,38 @@ unsafe impl Send for Stack {}
 unsafe impl Sync for Stack {}
 
 unsafe impl ForeignType for Stack {
-    #[julia_version(since = "1.10")]
+    // #[julia_version(since = "1.10")]
+    // fn mark(ptls: PTls, data: &Self) -> usize {
+    //     // We can only get here while the GC is running, so there are no active mutable borrows,
+    //     // but this function might be called from multiple threads so an immutable reference must
+    //     // be used.
+    //     let slots = unsafe { &*data.slots.get() };
+    //
+    //     let mut n = 0;
+    //     unsafe {
+    //         for slot in slots {
+    //             if !slot.get().is_null() {
+    //                 if crate::memory::gc::mark_queue_obj(ptls, slot.get()) {
+    //                     n += 1;
+    //                 }
+    //             }
+    //         }
+    //     }
+    //
+    //     n
+    // }
+
     fn mark(ptls: PTls, data: &Self) -> usize {
         // We can only get here while the GC is running, so there are no active mutable borrows,
         // but this function might be called from multiple threads so an immutable reference must
         // be used.
         let slots = unsafe { &*data.slots.get() };
-
-        let mut n = 0;
-        unsafe {
-            for slot in slots {
-                if !slot.get().is_null() {
-                    if crate::memory::gc::mark_queue_obj(ptls, slot.get()) {
-                        n += 1;
-                    }
-                }
-            }
-        }
-
-        n
-    }
-
-    #[julia_version(until = "1.9")]
-    fn mark(ptls: PTls, data: &Self) -> usize {
-        // We can only get here while the GC is running, so there are no active mutable borrows,
-        // but this function might be called from multiple threads so an immutable reference must
-        // be used.
-        let slots = unsafe { &*data.slots.get() };
-        let slots_ptr = slots.as_ptr() as *const *mut c_void;
+        let slots_ptr = slots.as_ptr() as *const _;
         let n_slots = slots.len();
-        let raw_slots = unsafe { std::slice::from_raw_parts(slots_ptr, n_slots) };
-        let self_ptr = data as *const _ as *mut c_void;
+        let value_slots = unsafe { std::slice::from_raw_parts(slots_ptr, n_slots) };
 
-        // Called from ForeignType::mark, objs is a slice of pointers to Julia data.
         unsafe {
-            crate::memory::gc::mark_queue_objarray(ptls, self_ptr, raw_slots);
+            crate::memory::gc::mark_queue_objarray(ptls, data.as_value_ref(), value_slots);
         }
 
         0

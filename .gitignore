@@ -22,3 +22,4 @@ matplotlibrc
 releasenotes.md
 ARCHITECTURE.md
 playground
+libjulia_module_test.so

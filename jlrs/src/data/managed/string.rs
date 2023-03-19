@@ -140,7 +140,7 @@ pub type StringRef<'scope> = Ref<'scope, 'static, JuliaString<'scope>>;
 /// `ccall`able functions that return a [`JuliaString`].
 pub type StringRet = Ref<'static, 'static, JuliaString<'static>>;
 
-impl_valid_layout!(StringRef, String);
+impl_valid_layout!(StringRef, JuliaString);
 
 use crate::memory::target::target_type::TargetType;
 

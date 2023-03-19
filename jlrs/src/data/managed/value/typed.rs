@@ -37,7 +37,7 @@ use crate::{
     data::{
         layout::valid_layout::{ValidField, ValidLayout},
         managed::{datatype::DataType, private::ManagedPriv, Managed, Ref},
-        types::{construct_type::ConstructType, typecheck::Typecheck},
+        types::{abstract_types::AnyType, construct_type::ConstructType, typecheck::Typecheck},
     },
     error::{JlrsResult, TypeError},
     memory::target::{frame::GcFrame, ExtendedTarget, Target},
@@ -53,7 +53,7 @@ pub trait AsTyped<'scope, 'data>: Managed<'scope, 'data> {
 #[repr(transparent)]
 pub struct TypedValue<'scope, 'data, T>(
     NonNull<jl_value_t>,
-    PhantomData<NonNull<T>>,
+    PhantomData<T>,
     PhantomData<&'scope ()>,
     PhantomData<&'data ()>,
 );
@@ -112,29 +112,89 @@ impl<'scope, 'data, U: ConstructType> TypedValue<'scope, 'data, U> {
 impl<'scope, 'data, U: ValidLayout + ConstructType> TypedValue<'scope, 'data, U> {
     /// Track `self` immutably.
     ///
-    /// See [`Value::track`] for more information.
-    pub unsafe fn track<'borrow>(&'borrow self) -> JlrsResult<Tracked<'borrow, 'scope, 'data, U>> {
-        self.deref().track()
+    /// See [`Value::track_shared`] for more information.
+    pub unsafe fn track_shared<'tracked>(
+        &'tracked self,
+    ) -> JlrsResult<Tracked<'tracked, 'scope, 'data, U>> {
+        self.deref().track_shared()
     }
 
     /// Track `self` mutably.
     ///
-    /// See [`Value::track_mut`] for more information.
-    pub unsafe fn track_mut<'borrow>(
-        &'borrow mut self,
-    ) -> JlrsResult<TrackedMut<'borrow, 'scope, 'data, U>> {
-        self.deref_mut().track_mut()
+    /// See [`Value::track_exclusive`] for more information.
+    pub unsafe fn track_exclusive<'tracked>(
+        &'tracked mut self,
+    ) -> JlrsResult<TrackedMut<'tracked, 'scope, 'data, U>> {
+        self.deref_mut().track_exclusive()
     }
 }
 
-impl<'scope, 'data, U: ValidLayout + ConstructType> Deref for TypedValue<'scope, 'data, U> {
+impl<'scope, 'data, U: ConstructType> TypedValue<'scope, 'data, U> {
+    /// Track `self` immutably.
+    ///
+    /// See [`Value::track_shared`] for more information.
+    pub unsafe fn track_shared_as<'tracked, V: ValidLayout>(
+        &'tracked self,
+    ) -> JlrsResult<Tracked<'tracked, 'scope, 'data, V>> {
+        self.deref().track_shared()
+    }
+
+    /// Track `self` mutably.
+    ///
+    /// See [`Value::track_exclusive`] for more information.
+    pub unsafe fn track_exclusive_as<'tracked, V: ValidLayout>(
+        &'tracked mut self,
+    ) -> JlrsResult<TrackedMut<'tracked, 'scope, 'data, V>> {
+        self.deref_mut().track_exclusive()
+    }
+}
+
+impl<U: ConstructType + ValidLayout + Send> TypedValueUnbound<U> {
+    /// Track `self` immutably.
+    ///
+    /// See [`Value::track_shared_unbound`] for more information.
+    pub unsafe fn track_shared_unbound(self) -> JlrsResult<Tracked<'static, 'static, 'static, U>> {
+        self.as_value().track_shared_unbound()
+    }
+
+    /// Track `self` mutably.
+    ///
+    /// See [`Value::track_exclusive_unbound`] for more information.
+    pub unsafe fn track_exclusive_unbound(
+        self,
+    ) -> JlrsResult<TrackedMut<'static, 'static, 'static, U>> {
+        self.as_value().track_exclusive_unbound()
+    }
+}
+
+impl<U: ConstructType> TypedValueUnbound<U> {
+    /// Track `self` immutably.
+    ///
+    /// See [`Value::track_shared_unbound`] for more information.
+    pub unsafe fn track_shared_unbound_as<V: ValidLayout + Send>(
+        self,
+    ) -> JlrsResult<Tracked<'static, 'static, 'static, V>> {
+        self.as_value().track_shared_unbound()
+    }
+
+    /// Track `self` mutably.
+    ///
+    /// See [`Value::track_exclusive_unbound`] for more information.
+    pub unsafe fn track_exclusive_unbound_as<V: ValidLayout + Send>(
+        self,
+    ) -> JlrsResult<TrackedMut<'static, 'static, 'static, V>> {
+        self.as_value().track_exclusive_unbound()
+    }
+}
+
+impl<'scope, 'data, U: ConstructType> Deref for TypedValue<'scope, 'data, U> {
     type Target = Value<'scope, 'data>;
 
     fn deref(&self) -> &Self::Target {
         unsafe { std::mem::transmute(self) }
     }
 }
-impl<'scope, 'data, U: ValidLayout + ConstructType> DerefMut for TypedValue<'scope, 'data, U> {
+impl<'scope, 'data, U: ConstructType> DerefMut for TypedValue<'scope, 'data, U> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { std::mem::transmute(self) }
     }
@@ -179,12 +239,6 @@ where
     }
 }
 
-pub type TypedValueRef<'scope, 'data, T> = Ref<'scope, 'data, TypedValue<'scope, 'data, T>>;
-
-/// A [`TypedValueRef`] with static lifetimes. This is a useful shorthand for signatures of
-/// `ccall`able functions that return a [`TypedValue`].
-pub type TypedValueRet<T> = Ref<'static, 'static, TypedValue<'static, 'static, T>>;
-
 impl<'scope, 'data, T> ManagedPriv<'scope, 'data> for TypedValue<'scope, 'data, T>
 where
     T: ConstructType,
@@ -217,7 +271,7 @@ unsafe impl<U> ConstructType for TypedValue<'_, 'static, U>
 where
     U: ConstructType,
 {
-    fn construct_type<'target, 'current, 'borrow, T>(
+    fn construct_type<'target, T>(
         target: ExtendedTarget<'target, '_, '_, T>,
     ) -> ValueData<'target, 'static, T>
     where
@@ -225,9 +279,28 @@ where
     {
         U::construct_type(target)
     }
+
+    fn base_type<'target, Tgt>(_target: &Tgt) -> Option<Value<'target, 'static>>
+    where
+        Tgt: Target<'target>,
+    {
+        None
+    }
 }
 
 use crate::memory::target::target_type::TargetType;
+
+pub type TypedValueRef<'scope, 'data, T> = Ref<'scope, 'data, TypedValue<'scope, 'data, T>>;
+
+impl<'scope, 'data> TypedValueRef<'scope, 'data, AnyType> {
+    pub fn from_value_ref(value_ref: ValueRef<'scope, 'data>) -> Self {
+        TypedValueRef::wrap(value_ref.ptr())
+    }
+}
+
+/// A [`TypedValueRef`] with static lifetimes. This is a useful shorthand for signatures of
+/// `ccall`able functions that return a [`TypedValue`].
+pub type TypedValueRet<T> = Ref<'static, 'static, TypedValue<'static, 'static, T>>;
 
 /// `TypedValue` or `TypedValueRef`, depending on the target type `T`.
 pub type TypedValueData<'target, 'data, U, T> =
@@ -237,6 +310,8 @@ pub type TypedValueData<'target, 'data, U, T> =
 /// `T`.
 pub type TypedValueResult<'target, 'data, U, T> =
     <T as TargetType<'target>>::Result<'data, TypedValue<'target, 'data, U>>;
+
+pub type TypedValueUnbound<T> = TypedValue<'static, 'static, T>;
 
 unsafe impl<'scope, 'data, T: ConstructType> CCallArg for TypedValue<'scope, 'data, T> {
     type CCallArgType = Value<'scope, 'data>;

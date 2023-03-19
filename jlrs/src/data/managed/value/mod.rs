@@ -466,10 +466,17 @@ impl Value<'_, '_> {
     }
 }
 
-/// Borrow the contents of Julia data.
+/// These methods let you track a `Value`, while it's tracked it's internal pointer is
+/// dereferenced and you can access its contents directly.
 ///
-/// Types that implement `InlineLayout` are guaranteed to have matching layouts in Rust and Julia.
-/// This data can be tracked, while it's tracked its contents can be accessed directly.
+/// Tracking works with a ledger that's shared between all active instances of jlrs. This ledger
+/// contains a list of all active borrows, which lets it be used to prevent mutable aliasing.
+/// Unfortunately, this system isn't perfect, it's unaware of how this data is used in Julia. It's
+/// your responsibility that you only try to access data which isn't being used by some task
+/// running in the background. The raw ledger API is available in `Jlrs.Ledger`, you can prevent
+/// mutable access to data by tracking from Julia by calling these functions. If you do so, you
+/// should use a finalizer to ensure the borrow is removed from the ledger when the data is
+/// finalized.
 impl<'scope, 'data> Value<'scope, 'data> {
     /// Track `self` immutably.
     ///
@@ -477,7 +484,10 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// that of the data and if the data is already mutably borrowed from Rust. If it's not, the
     /// data is derefenced and returned as a `Tracked` which provides direct access to the
     /// reference.
-    pub fn track<'borrow, T: ValidLayout>(
+    ///
+    /// If the data is immutable the borrow isn't tracked by the ledger because it can't be
+    /// mutably borrowed.
+    pub fn track_shared<'borrow, T: ValidLayout>(
         &'borrow self,
     ) -> JlrsResult<Tracked<'borrow, 'scope, 'data, T>> {
         let ty = self.datatype();
@@ -486,41 +496,29 @@ impl<'scope, 'data> Value<'scope, 'data> {
             Err(AccessError::InvalidLayout { value_type })?;
         }
 
+        if !ty.mutable() {
+            unsafe {
+                return Ok(Tracked::new(self));
+            }
+        }
+
         unsafe {
             Ledger::try_borrow_shared(*self)?;
             Ok(Tracked::new(self))
         }
     }
 
-    /// Track `self` immutably.
-    ///
-    /// When this method is called on some `Value`, it's checked if the layout of `T` matches
-    /// that of the data and if the data is already mutably borrowed from Rust. If it's not, the
-    /// data is derefenced and returned as a `Tracked` which provides direct access to the
-    /// reference.
-    pub fn track_owned<T: ValidLayout>(self) -> JlrsResult<Tracked<'scope, 'scope, 'data, T>> {
-        let ty = self.datatype();
-        if !T::valid_layout(ty.as_value()) {
-            let value_type = ty.display_string_or(CANNOT_DISPLAY_TYPE).into();
-            Err(AccessError::InvalidLayout { value_type })?;
-        }
-
-        unsafe {
-            Ledger::try_borrow_shared(self)?;
-            Ok(Tracked::new_owned(self))
-        }
-    }
-
-    /// Track `self` mutably.
+    /// Track `self` exclusively.
     ///
     /// When this method is called on some `Value`, it's checked if the layout of `T` matches
     /// that of the data and if the data is already borrowed from Rust. If it's not, the data is
     /// mutably derefenced and returned as a `TrackedMut` which provides direct access to the
     /// mutable reference.
     ///
-    /// Note that if `T` contains any references to Julia data, if such a field is mutated through
-    /// `TrackedMut` you must call [`write_barrier`] after mutating it. This ensures the garbage
-    /// collector remains aware of old-generation objects pointing to young-generation objects.
+    /// Note that if `T` contains any references to Julia data, if such a reference is mutated
+    /// through `TrackedMut` you must call [`write_barrier`] after mutating it. This ensures the
+    /// garbage collector remains aware of old-generation objects pointing to young-generation
+    /// objects.
     ///
     /// In general, it's recommended that only fields that contain no references to Julia data are
     /// updated through `TrackedMut`.
@@ -531,7 +529,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// mutable access to the contents of the data, which is inherently unsafe.
     ///
     /// [`write_barrier`]: crate::memory::gc::write_barrier
-    pub unsafe fn track_mut<'borrow, T: ValidLayout>(
+    pub unsafe fn track_exclusive<'borrow, T: ValidLayout>(
         &'borrow mut self,
     ) -> JlrsResult<TrackedMut<'borrow, 'scope, 'data, T>> {
         let ty = self.datatype();
@@ -550,29 +548,65 @@ impl<'scope, 'data> Value<'scope, 'data> {
         Ok(TrackedMut::new(self))
     }
 
-    /// Track `self` mutably.
+    /// Returns `true` if `self` is currently tracked.
+    pub fn is_tracked(self) -> JlrsResult<bool> {
+        Ledger::is_borrowed(self)
+    }
+
+    /// Returns `true` if `self` is currently tracked.
+    pub fn is_tracked_shared(self) -> JlrsResult<bool> {
+        Ledger::is_borrowed_shared(self)
+    }
+
+    /// Returns `true` if `self` is currently mutably tracked.
+    pub fn is_tracked_exclusive(self) -> JlrsResult<bool> {
+        Ledger::is_borrowed_exclusive(self)
+    }
+}
+
+impl ValueUnbound {
+    /// Track `self` immutably.
     ///
-    /// When this method is called on some `Value`, it's checked if the layout of `T` matches
-    /// that of the data and if the data is already borrowed from Rust. If it's not, the data is
-    /// mutably derefenced and returned as a `TrackedMut` which provides direct access to the
-    /// mutable reference.
+    /// This method is equivalent to [`Value::track_shared`] except it takes `self` by value and
+    /// can only be used with `ValueUnbound`. This is intended to be used from `ccall`able
+    /// functions that take a [`Value`] and operate on its contents in another thread.
     ///
-    /// Note that if `T` contains any references to Julia data, if such a field is mutated through
-    /// `TrackedMut` you must call [`write_barrier`] after mutating it. This ensures the garbage
-    /// collector remains aware of old-generation objects pointing to young-generation objects.
-    ///
-    /// In general, it's recommended that only fields that contain no references to Julia data are
-    /// updated through `TrackedMut`.
+    /// Because `T: Send`, it's not possible to track types that contain references to Julia data.
     ///
     /// Safety:
     ///
-    /// This method can only track references that exist in Rust code. It also gives unrestricted
-    /// mutable access to the contents of the data, which is inherently unsafe.
-    ///
-    /// [`write_barrier`]: crate::memory::gc::write_barrier
-    pub unsafe fn track_mut_owned<T: ValidLayout>(
+    /// The returned instance of `Tracked` must only be used in the `ccall`ed function and the
+    /// `AsyncCallback`.
+    pub unsafe fn track_shared_unbound<T: ValidLayout + Send>(
         self,
-    ) -> JlrsResult<TrackedMut<'scope, 'scope, 'data, T>> {
+    ) -> JlrsResult<Tracked<'static, 'static, 'static, T>> {
+        let ty = self.datatype();
+        if !T::valid_layout(ty.as_value()) {
+            let value_type = ty.display_string_or(CANNOT_DISPLAY_TYPE).into();
+            Err(AccessError::InvalidLayout { value_type })?;
+        }
+
+        unsafe {
+            Ledger::try_borrow_shared(self)?;
+            Ok(Tracked::new_owned(self))
+        }
+    }
+
+    /// Track `self` exclusively.
+    ///
+    /// This method is equivalent to [`Value::track_exclusive`] except it takes `self` by value
+    /// and can only be used with `ValueUnbound`. This is intended to be used from `ccall`able
+    /// functions that take a [`Value`] and operate on its contents in another thread.
+    ///
+    /// Because `T: Send`, it's not possible to track types that contain references to Julia data.
+    ///
+    /// Safety:
+    ///
+    /// The returned instance of `TrackedMut` must only be used in the `ccall`ed function and the
+    /// `AsyncCallback`.
+    pub unsafe fn track_exclusive_unbound<T: ValidLayout + Send>(
+        self,
+    ) -> JlrsResult<TrackedMut<'static, 'static, 'static, T>> {
         let ty = self.datatype();
 
         if !ty.mutable() {
@@ -587,21 +621,6 @@ impl<'scope, 'data> Value<'scope, 'data> {
 
         Ledger::try_borrow_exclusive(self)?;
         Ok(TrackedMut::new_owned(self))
-    }
-
-    /// Returns `true` if `self` is currently tracked.
-    pub fn is_tracked(self) -> JlrsResult<bool> {
-        Ledger::is_borrowed(self)
-    }
-
-    /// Returns `true` if `self` is currently tracked.
-    pub fn is_tracked_shared(self) -> JlrsResult<bool> {
-        Ledger::is_borrowed_shared(self)
-    }
-
-    /// Returns `true` if `self` is currently mutably tracked.
-    pub fn is_tracked_mut(self) -> JlrsResult<bool> {
-        Ledger::is_borrowed_exclusive(self)
     }
 }
 
@@ -1516,6 +1535,12 @@ pub type ValueRef<'scope, 'data> = Ref<'scope, 'data, Value<'scope, 'data>>;
 /// A [`ValueRef`] with static lifetimes. This is a useful shorthand for signatures of
 /// `ccall`able functions that return a [`Value`].
 pub type ValueRet = Ref<'static, 'static, Value<'static, 'static>>;
+
+/// A [`Value`] with static lifetimes.
+///
+/// This is a useful shorthand for signatures of `ccall`able functions that take a [`Value`] and
+/// operate on its contents in another thread.
+pub type ValueUnbound = Value<'static, 'static>;
 
 unsafe impl ValidLayout for ValueRef<'_, '_> {
     fn valid_layout(v: Value) -> bool {

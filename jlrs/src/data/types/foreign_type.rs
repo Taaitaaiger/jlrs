@@ -78,7 +78,7 @@ use crate::{
             module::Module,
             private::ManagedPriv,
             symbol::Symbol,
-            value::{Value, ValueData},
+            value::{Value, ValueData, ValueRef},
             Managed,
         },
         types::construct_type::ConstructType,
@@ -231,6 +231,11 @@ pub unsafe trait ForeignType: Sized + Send + 'static {
         T: Target<'target>,
     {
         DataType::any_type(&target).root(target)
+    }
+
+    /// Convert a reference to this foreign type to a `ValueRef`.
+    fn as_value_ref<'scope>(&'scope self) -> ValueRef<'scope, 'static> {
+        unsafe { ValueRef::wrap(NonNull::new_unchecked(self as *const _ as *mut jl_value_t)) }
     }
 
     /// Mark all references to Julia data.
@@ -626,5 +631,19 @@ unsafe impl<T: OpaqueType> ConstructType for T {
             .unwrap()
             .as_value()
             .root(target)
+    }
+
+    fn base_type<'target, Tgt>(_target: &Tgt) -> Option<Value<'target, 'static>>
+    where
+        Tgt: Target<'target>,
+    {
+        Some(
+            FOREIGN_TYPE_REGISTRY
+                .get()
+                .unwrap()
+                .find::<T>()
+                .unwrap()
+                .as_value(),
+        )
     }
 }
