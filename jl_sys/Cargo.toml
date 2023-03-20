@@ -42,7 +42,7 @@ bindgen = { git = "https://github.com/Taaitaaiger/rust-bindgen", branch = "atomi
 # bindgen = { version = "0.63", optional = true, default-features = false, features = [ "runtime" ] }
 cc = "1"
 cfg-if = "1"
-syn = { version = "1", optional = true, features = ["full"] }
+syn = { version = "2", optional = true, features = ["full"] }
 proc-macro2 = { version = "1", optional = true }
 quote = { version = "1", optional = true }
 

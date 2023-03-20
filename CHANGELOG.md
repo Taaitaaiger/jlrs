@@ -10,9 +10,9 @@
 
  - The `Compatible` trait has been added which allows a type that implements `ValidLayout` to declare that it has exactly the same layout as another type. The `CompatibleCast` trait lets references to and arrays of types that implement `ValidLayout` to be cast to that compatible type without copying the data.
 
- - `ForeignType` requires `Send + Sync`, whether a `ForeignType` is large or contains pointers to managed data is now expressed with the associated constants `LARGE` and `HAS_POINTERS`, the super type is returned by the trait method `ForeignType::super_type`. Foreign types can be reinitialized with `reinit_foreign_type`, which is available since Julia 1.9.
+ - `ForeignType` requires `Send + Sync`, whether a `ForeignType` is large or contains pointers to managed data is now expressed with the associated constant `LARGE`, the super type is returned by the trait method `ForeignType::super_type`. Foreign types can be reinitialized with `reinit_foreign_type`, which is available since Julia 1.9.
 
- - `OpaqueType` has been added, which is similar to `ForeignType` except that it can contain no references to Julia data.
+ - `OpaqueType` has been added, which is similar to `ForeignType` except that it can't contain any references to Julia data.
 
  - A managed type for `Binding` has been added, this is available since Julia 1.10.
 
@@ -35,6 +35,8 @@
  - `CCall` now has `invoke` methods to avoid having to manually create a stack frame.
 
  - Global Julia data can be cached in a static container by using `StaticGlobal` and `StaticSymbol`.
+
+ - `TrackArray` has been removed, the trait methods are now implemented directly by `(Typed)Array`. The tracking methods have been renamed to `track_shared` and `track_exclusive`.
 
 
 #### v0.17

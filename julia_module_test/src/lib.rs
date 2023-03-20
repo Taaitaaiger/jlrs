@@ -232,6 +232,9 @@ julia_module! {
 
     in UnexportedType fn assoc_func() -> isize;
 
+    #[doc = "    async_callback(array::Array{Int})::Int"]
+    #[doc = ""]
+    #[doc = "...docs for async_callback"]
     async fn async_callback(arr: TypedArrayUnbound<isize>) -> JlrsResult<impl AsyncCallback<isize>>;
     async fn async_callback_init_err() -> JlrsResult<impl AsyncCallback<isize>>;
     async fn async_callback_callback_err() -> JlrsResult<impl AsyncCallback<isize>>;

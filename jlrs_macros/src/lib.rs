@@ -37,12 +37,12 @@ use self::version::emit_if_compatible;
 ///     // The `as <exposed_name>` part is optional, by default the function is exported with the
 ///     // name it has in Rust, the exposed name can end in an exclamation mark.
 ///     //
-///     // A docstring can also be provided; if multiple functions are exported with the same name
-///     // it shoud only be documented once. The `indent` flag can be used to ensure the docstring
-///     // starts with four spaces.
-///     #[doc("bar(arr::Array)
-///
-///     Documentation for this function", indent)]
+///     // A docstring can be provided with the doc attribute; if multiple functions are exported
+///     // with the same name it shoud only be documented once. A multi-line docstring can be
+///     // created by providing multiple doc attributes for the same item:
+///     #[doc = "    bar(arr::Array)"]
+///     #[doc = ""]
+///     #[doc = "Documentation for this function"]
 ///     fn foo(arr: Array) -> usize as bar;
 ///
 ///     // Exports the function `foo` as `bar!` in the `Base` module.

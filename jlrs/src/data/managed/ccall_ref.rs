@@ -1,5 +1,5 @@
 //! A Julia `Ref` used as an argument of a `ccall`ed function.
-//!  
+//!
 //! To quote the Julia docs, a `Ref` is an object that safely references data of type `T`. This
 //! type is guaranteed to point to valid, Julia-allocated memory of the correct type. The
 //! underlying data is protected from freeing by the garbage collector as long as the `Ref`
@@ -29,7 +29,7 @@ use crate::{
     convert::ccall_types::CCallArg,
     data::{
         layout::valid_layout::ValidLayout,
-        managed::value::Value,
+        managed::{datatype::DataType, value::Value},
         types::{
             abstract_types::{AnyType, RefTypeConstructor},
             construct_type::ConstructType,
@@ -41,7 +41,6 @@ use crate::{
         frame::{BorrowedFrame, GcFrame},
         unrooted::Unrooted,
     },
-    prelude::DataType,
 };
 
 #[repr(C)]

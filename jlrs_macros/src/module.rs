@@ -9,9 +9,8 @@ use syn::{
     punctuated::Punctuated,
     spanned::Spanned,
     token::Comma,
-    AttrStyle, Attribute, Error, Expr, FnArg, GenericArgument, Ident, ItemFn, Lit, Meta,
-    NestedMeta, Path, PathArguments, Result, ReturnType, Signature, Token, Type, TypeImplTrait,
-    TypeParamBound,
+    AttrStyle, Attribute, Error, Expr, ExprLit, FnArg, GenericArgument, Ident, ItemFn, Lit, Meta,
+    Path, PathArguments, Result, ReturnType, Signature, Token, Type, TypeImplTrait, TypeParamBound,
 };
 
 type RenameFragments = Punctuated<Ident, Token![.]>;
@@ -267,191 +266,46 @@ impl Parse for ExportedGlobal {
     }
 }
 
-struct DocString {
-    doc: String,
-    generic: bool,
-    indent: bool,
-}
-
-impl DocString {
-    fn get_doc(&self) -> String {
-        if self.indent {
-            format!("    {}", self.doc)
-        } else {
-            self.doc.clone()
-        }
-    }
-}
-
 struct ItemWithAttrs {
-    _attrs: Vec<Attribute>,
+    attrs: Vec<Attribute>,
     item: Box<ModuleItem>,
 }
 
 impl ItemWithAttrs {
-    fn get_docstr(&self) -> DocString {
-        for attr in self._attrs.iter() {
+    fn get_docstr(&self) -> String {
+        let mut doc = String::new();
+        for attr in self.attrs.iter() {
             match attr.style {
                 AttrStyle::Outer => (),
-                _ => panic!(
-                    "expected one of:
-                        - `#doc(\"docs...\")`
-                        - `#doc(\"docs...\", generic)`
-                        - `#doc(\"docs...\", indent)`
-                        - `#doc(\"docs...\", generic, indent)`
-                        - `#doc(\"docs...\", indent, generic)`"
-                ),
+                _ => panic!("expected `#[doc = \"docs...\"]`"),
             }
-            if let Ok(syn::Meta::List(m)) = attr.parse_meta() {
-                if m.path.segments.len() != 1 {
-                    panic!(
-                        "expected one of:
-                        - `#doc(\"docs...\")`
-                        - `#doc(\"docs...\", generic)`
-                        - `#doc(\"docs...\", indent)`
-                        - `#doc(\"docs...\", generic, indent)`
-                        - `#doc(\"docs...\", indent, generic)`"
-                    )
+
+            let line = match &attr.meta {
+                Meta::NameValue(kv) => {
+                    if kv.path.is_ident("doc") {
+                        match &kv.value {
+                            Expr::Lit(ExprLit {
+                                lit: Lit::Str(s), ..
+                            }) => s.value(),
+                            _ => panic!("expected `doc = \"docs...\"`"),
+                        }
+                    } else {
+                        panic!("expected identifier `doc`")
+                    }
                 }
+                _ => panic!("expected `doc = \"docs...\"`"),
+            };
 
-                let doc_ident = &m.path.segments.first().unwrap().ident;
-                if doc_ident.to_string() != "doc" {
-                    panic!(
-                        "expected one of:
-                         - `#doc(\"docs...\")`
-                         - `#doc(\"docs...\", generic)`
-                         - `#doc(\"docs...\", indent)`
-                         - `#doc(\"docs...\", generic, indent)`
-                         - `#doc(\"docs...\", indent, generic)`"
-                    )
-                }
-
-                match m.nested.len() {
-                    1 => {
-                        let first = m.nested.first().unwrap();
-                        if let NestedMeta::Lit(Lit::Str(s)) = first {
-                            return DocString {
-                                doc: s.value(),
-                                generic: false,
-                                indent: false,
-                            };
-                        }
-                    }
-                    2 => {
-                        let first = m.nested.first().unwrap();
-                        let last = m.nested.last().unwrap();
-                        if let NestedMeta::Lit(Lit::Str(s)) = first {
-                            if let NestedMeta::Meta(Meta::Path(p)) = last {
-                                if p.segments.len() > 1 {
-                                    panic!(
-                                        "expected one of:
-                                        - `#doc(\"docs...\")`
-                                        - `#doc(\"docs...\", generic)`
-                                        - `#doc(\"docs...\", indent)`
-                                        - `#doc(\"docs...\", generic, indent)`
-                                        - `#doc(\"docs...\", indent, generic)`"
-                                    )
-                                }
-
-                                let ident = p.segments.first().unwrap().ident.to_string();
-                                let mut generic = false;
-                                let mut indent = false;
-                                match ident.as_ref() {
-                                    "generic" => {
-                                        generic = true;
-                                    }
-                                    "indent" => {
-                                        indent = true;
-                                    }
-                                    _ => panic!(
-                                        "expected one of:
-                                        - `#doc(\"docs...\")`
-                                        - `#doc(\"docs...\", generic)`
-                                        - `#doc(\"docs...\", indent)`
-                                        - `#doc(\"docs...\", generic, indent)`
-                                        - `#doc(\"docs...\", indent, generic)`"
-                                    ),
-                                }
-
-                                return DocString {
-                                    doc: s.value(),
-                                    generic,
-                                    indent,
-                                };
-                            }
-                        }
-                    }
-                    3 => {
-                        let first = m.nested.first().unwrap();
-                        let middle = m.nested.last().unwrap();
-                        let last = m.nested.last().unwrap();
-                        if let NestedMeta::Lit(Lit::Str(s)) = first {
-                            if let NestedMeta::Meta(Meta::Path(p1)) = middle {
-                                if let NestedMeta::Meta(Meta::Path(p2)) = last {
-                                    if p1.segments.len() > 1 || p2.segments.len() > 1 {
-                                        panic!(
-                                            "expected one of:
-                                        - `#doc(\"docs...\")`
-                                        - `#doc(\"docs...\", generic)`
-                                        - `#doc(\"docs...\", indent)`
-                                        - `#doc(\"docs...\", generic, indent)`
-                                        - `#doc(\"docs...\", indent, generic)`"
-                                        )
-                                    }
-
-                                    let mut generic = false;
-                                    let mut indent = false;
-                                    match p1.segments.first().unwrap().ident.to_string().as_ref() {
-                                        "generic" => {
-                                            generic = true;
-                                        }
-                                        "indent" => {
-                                            indent = true;
-                                        }
-                                        _ => panic!(
-                                            "expected one of:
-                                        - `#doc(\"docs...\")`
-                                        - `#doc(\"docs...\", generic)`
-                                        - `#doc(\"docs...\", indent)`
-                                        - `#doc(\"docs...\", generic, indent)`
-                                        - `#doc(\"docs...\", indent, generic)`"
-                                        ),
-                                    }
-
-                                    match p2.segments.first().unwrap().ident.to_string().as_ref() {
-                                        "generic" if !generic => {
-                                            generic = true;
-                                        }
-                                        "indent" if !indent => {
-                                            indent = true;
-                                        }
-                                        _ => panic!(
-                                            "expected one of:
-                                        - `#doc(\"docs...\")`
-                                        - `#doc(\"docs...\", generic)`
-                                        - `#doc(\"docs...\", indent)`
-                                        - `#doc(\"docs...\", generic, indent)`
-                                        - `#doc(\"docs...\", indent, generic)`"
-                                        ),
-                                    }
-
-                                    return DocString {
-                                        doc: s.value(),
-                                        generic,
-                                        indent,
-                                    };
-                                }
-                            }
-                        }
-                    }
-                    _ => {
-                        panic!("expected either `doc(\"docs...\")` or `doc(\"docs...\", generic)`")
-                    }
+            match doc.len() {
+                0 => doc.push_str(&line),
+                _ => {
+                    doc.push('\n');
+                    doc.push_str(&line);
                 }
             }
         }
 
-        panic!("expected either `doc(\"docs...\")` or `doc(\"docs...\", generic)`")
+        doc
     }
 }
 
@@ -460,7 +314,7 @@ impl Parse for ItemWithAttrs {
         let attr: Vec<Attribute> = input.call(Attribute::parse_outer)?;
         let item: ModuleItem = input.parse()?;
         Ok(ItemWithAttrs {
-            _attrs: attr,
+            attrs: attr,
             item: Box::new(item),
         })
     }
@@ -659,10 +513,6 @@ impl Parse for ModuleItem {
     }
 }
 
-struct _Attributes<'a> {
-    attrs: &'a [Attribute],
-}
-
 pub(crate) struct JuliaModule {
     items: Punctuated<ModuleItem, Token![;]>,
 }
@@ -670,10 +520,9 @@ pub(crate) struct JuliaModule {
 impl Parse for JuliaModule {
     fn parse(input: ParseStream) -> Result<Self> {
         let content = input;
+        let items = content.parse_terminated(ModuleItem::parse, Token![;])?;
 
-        Ok(JuliaModule {
-            items: content.parse_terminated(ModuleItem::parse)?,
-        })
+        Ok(JuliaModule { items: items })
     }
 }
 
@@ -689,8 +538,6 @@ impl JuliaModule {
         let const_fragments = ConstFragments::generate(&self, init_fn);
         let global_fragments = GlobalFragments::generate(&self, init_fn);
         let doc_fragments = DocFragments::generate(&self, init_fn);
-
-        // DocFragments::generate
 
         let type_init_fn = type_fragments.type_init_fn;
         let type_init_fn_ident = type_fragments.type_init_ident;
@@ -1187,8 +1034,8 @@ fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Expr {
                 .unwrap_or(name_ident)
                 .to_string();
 
-            let docstr = info.get_docstr();
-            let doc = docstr.get_doc();
+            let doc = info.get_docstr();
+
             parse_quote! {
                 {
                     frame.scope(|mut frame| {
@@ -1224,22 +1071,15 @@ fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Expr {
                 rename.push('!')
             }
 
-            let docstr = info.get_docstr();
-            let doc = docstr.get_doc();
-            let generic = docstr.generic;
+            let doc = info.get_docstr();
+
             parse_quote! {
                 {
                     frame.scope(|mut frame| {
                         unsafe {
                             let module = #override_module_fragment;
                             let item = ::jlrs::data::managed::symbol::Symbol::new(&frame, #rename);
-                            let signature = if #generic {
-                                ::jlrs::data::managed::value::Value::bottom_type(&frame)
-                            } else {
-                                // TODO
-                                ::jlrs::data::managed::value::Value::bottom_type(&frame)
-                            };
-
+                            let signature = ::jlrs::data::managed::value::Value::bottom_type(&frame);
                             let doc = ::jlrs::data::managed::string::JuliaString::new(&mut frame, #doc);
 
                             let doc_it = doc_item_ty.instantiate_unchecked(&mut frame, [module.as_value(), item.as_value(), signature, doc.as_value()]);
@@ -1268,22 +1108,15 @@ fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Expr {
                 rename.push('!')
             }
 
-            let docstr = info.get_docstr();
-            let doc = docstr.get_doc();
-            let generic = docstr.generic;
+            let doc = info.get_docstr();
+
             parse_quote! {
                 {
                     frame.scope(|mut frame| {
                         unsafe {
                             let module = #override_module_fragment;
                             let item = ::jlrs::data::managed::symbol::Symbol::new(&frame, #rename);
-                            let signature = if #generic {
-                                ::jlrs::data::managed::value::Value::bottom_type(&frame)
-                            } else {
-                                // TODO
-                                ::jlrs::data::managed::value::Value::bottom_type(&frame)
-                            };
-
+                            let signature ::jlrs::data::managed::value::Value::bottom_type(&frame);
                             let doc = ::jlrs::data::managed::string::JuliaString::new(&mut frame, #doc);
 
                             let doc_it = doc_item_ty.instantiate_unchecked(&mut frame, [module.as_value(), item.as_value(), signature, doc.as_value()]);
@@ -1312,22 +1145,15 @@ fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Expr {
                 rename.push('!')
             }
 
-            let docstr = info.get_docstr();
-            let doc = docstr.get_doc();
-            let generic = docstr.generic;
+            let doc = info.get_docstr();
+
             parse_quote! {
                 {
                     frame.scope(|mut frame| {
                         unsafe {
                             let module = #override_module_fragment;
                             let item = ::jlrs::data::managed::symbol::Symbol::new(&frame, #rename);
-                            let signature = if #generic {
-                                ::jlrs::data::managed::value::Value::bottom_type(&frame)
-                            } else {
-                                // TODO
-                                ::jlrs::data::managed::value::Value::bottom_type(&frame)
-                            };
-
+                            let signature = ::jlrs::data::managed::value::Value::bottom_type(&frame);
                             let doc = ::jlrs::data::managed::string::JuliaString::new(&mut frame, #doc);
 
                             let doc_it = doc_item_ty.instantiate_unchecked(&mut frame, [module.as_value(), item.as_value(), signature, doc.as_value()]);
@@ -1342,11 +1168,9 @@ fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Expr {
         }
         ModuleItem::ExportedConst(val) => {
             let name_ident = &val.name;
-
             let rename = val.name_override.as_ref().unwrap_or(name_ident).to_string();
+            let doc = info.get_docstr();
 
-            let docstr = info.get_docstr();
-            let doc = docstr.get_doc();
             parse_quote! {
                 {
                     frame.scope(|mut frame| {
@@ -1367,11 +1191,9 @@ fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Expr {
         }
         ModuleItem::ExportedGlobal(val) => {
             let name_ident = &val.name;
-
             let rename = val.name_override.as_ref().unwrap_or(name_ident).to_string();
+            let doc = info.get_docstr();
 
-            let docstr = info.get_docstr();
-            let doc = docstr.get_doc();
             parse_quote! {
                 {
                     frame.scope(|mut frame| {

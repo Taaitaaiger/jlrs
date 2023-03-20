@@ -19,11 +19,13 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use proc_macro2::TokenTree;
-use quote::{quote, ToTokens};
+use quote::ToTokens;
 #[cfg(any(feature = "windows", windows))]
 use syn::{parse::Parser, Attribute, ItemForeignMod};
-use syn::{Field, ForeignItem, ItemStruct, ItemUnion, Type, TypePath};
+use syn::{
+    punctuated::Punctuated, Field, ForeignItem, Ident, ItemStruct, ItemUnion, Meta, Token, Type,
+    TypePath,
+};
 
 #[derive(Clone, Debug)]
 struct AtomicField<'a> {
@@ -274,25 +276,21 @@ fn clear_derives(struct_def: &mut ItemStruct) {
     for (idx, attr) in struct_def.attrs.iter_mut().enumerate() {
         let mut derives_debug = false;
 
-        if attr.path.segments[0].ident.to_string() == "derive" {
-            let cloned = attr.tokens.clone().into_iter().collect::<Vec<_>>();
-            if let TokenTree::Group(group) = &cloned[0] {
-                for tt in group.stream().into_iter() {
-                    if let TokenTree::Ident(i) = tt {
-                        if i == "Debug" {
-                            derives_debug = true;
-                            break;
-                        }
-                    }
+        if attr.meta.path().is_ident("derive") {
+            let list = attr.meta.require_list().unwrap();
+            let parsed = list
+                .parse_args_with(Punctuated::<Ident, Token![,]>::parse_terminated)
+                .unwrap();
+            for item in parsed {
+                if item.to_string() == "Debug" {
+                    derives_debug = true;
+                    break;
                 }
             }
 
             if derives_debug {
-                let s = quote! {
-                    (Debug)
-                };
-                attr.tokens = s;
-
+                let meta: Meta = syn::parse_str("derive(Debug)").unwrap();
+                attr.meta = meta;
                 return;
             } else {
                 remove_nth_attr = idx;
@@ -307,7 +305,7 @@ fn clear_derives(struct_def: &mut ItemStruct) {
 fn clear_derives_union(struct_def: &mut ItemUnion) {
     let mut n = None;
     for (idx, attr) in struct_def.attrs.iter_mut().enumerate() {
-        if attr.path.segments[0].ident.to_string() == "derive" {
+        if attr.meta.path().is_ident("derive") {
             n = Some(idx);
             break;
         }

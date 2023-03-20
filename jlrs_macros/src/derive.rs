@@ -1,7 +1,7 @@
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TS2;
 use quote::quote;
-use syn::{self, punctuated::Punctuated, token::Comma, Meta, WherePredicate};
+use syn::{self, punctuated::Punctuated, token::Comma, Expr, Lit, Meta, Token, WherePredicate};
 
 #[derive(Default)]
 pub struct ClassifiedFields<'a> {
@@ -70,27 +70,26 @@ pub struct JlrsTypeAttrs {
 
 impl JlrsTypeAttrs {
     fn parse(ast: &syn::DeriveInput) -> Self {
-        let mut julia_type = None;
+        let mut julia_type: Option<String> = None;
         let mut zst = false;
         for attr in &ast.attrs {
-            if attr.path.is_ident("jlrs") {
-                if let Ok(Meta::List(p)) = attr.parse_meta() {
-                    for item in &p.nested {
-                        match item {
-                            syn::NestedMeta::Meta(Meta::NameValue(nv)) => {
-                                if nv.path.is_ident("julia_type") {
-                                    if let syn::Lit::Str(string) = &nv.lit {
-                                        julia_type = Some(string.value())
-                                    }
-                                }
-                            }
-                            syn::NestedMeta::Meta(Meta::Path(pt)) => {
-                                if pt.is_ident("zst") {
-                                    zst = true;
-                                }
-                            }
-                            _ => continue,
+            if attr.path().is_ident("jlrs") {
+                let nested = attr
+                    .parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)
+                    .unwrap();
+                for meta in nested {
+                    match meta {
+                        Meta::Path(path) if path.is_ident("zero_sized_type") => {
+                            zst = true;
                         }
+                        Meta::NameValue(mnv) if mnv.path.is_ident("julia_type") => {
+                            if let Expr::Lit(lit) = mnv.value {
+                                if let Lit::Str(s) = lit.lit {
+                                    julia_type = Some(s.value());
+                                }
+                            }
+                        }
+                        _ => todo!(),
                     }
                 }
             }
@@ -108,17 +107,20 @@ enum JlrsFieldAttr {
 
 impl JlrsFieldAttr {
     pub fn parse(attr: &syn::Attribute) -> Option<Self> {
-        if let Ok(Meta::List(p)) = attr.parse_meta() {
-            if let Some(syn::NestedMeta::Meta(syn::Meta::Path(m))) = p.nested.first() {
-                if m.is_ident("bits_union") {
+        if attr.path().is_ident("jlrs") {
+            let nested = attr
+                .parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)
+                .unwrap();
+            for meta in nested {
+                let Meta::Path(path) = meta else {
+                    return None
+                };
+
+                if path.is_ident("bits_union") {
                     return Some(JlrsFieldAttr::BitsUnion);
-                }
-
-                if m.is_ident("bits_union_align") {
+                } else if path.is_ident("bits_union_align") {
                     return Some(JlrsFieldAttr::BitsUnionAlign);
-                }
-
-                if m.is_ident("bits_union_flag") {
+                } else if path.is_ident("bits_union_flag") {
                     return Some(JlrsFieldAttr::BitsUnionFlag);
                 }
             }
@@ -208,17 +210,17 @@ pub fn impl_into_julia(ast: &syn::DeriveInput) -> TokenStream {
 pub fn impl_into_julia_fn(attrs: &JlrsTypeAttrs) -> Option<TS2> {
     if attrs.zst {
         Some(quote! {
-            unsafe fn into_julia<'target, T>(self, target: T) -> ::jlrs::data::managed::value::ValueData<'target, 'static, T>
+            fn into_julia<'target, T>(self, target: T) -> ::jlrs::data::managed::value::ValueData<'target, 'static, T>
             where
-                T: ::jlrs::memory::target::Target<'scope>,
+                T: ::jlrs::memory::target::Target<'target>,
             {
-                let ty = self.julia_type(global);
+                let ty = Self::julia_type(&target);
                 unsafe {
                     ty.as_managed()
                         .instance()
-                        .as_value()
                         .expect("Instance is undefined")
-                        .as_ref()
+                        .as_value()
+                        .root(target)
                 }
             }
         })
@@ -840,12 +842,11 @@ pub fn impl_ccall_return(ast: &syn::DeriveInput) -> TokenStream {
 
 fn is_repr_c(ast: &syn::DeriveInput) -> bool {
     for attr in &ast.attrs {
-        if attr.path.is_ident("repr") {
-            if let Ok(Meta::List(p)) = attr.parse_meta() {
-                if let Some(syn::NestedMeta::Meta(syn::Meta::Path(m))) = p.nested.first() {
-                    if m.is_ident("C") {
-                        return true;
-                    }
+        if attr.path().is_ident("repr") {
+            let p: Result<syn::Path, _> = attr.parse_args();
+            if let Ok(p) = p {
+                if p.is_ident("C") {
+                    return true;
                 }
             }
         }
