@@ -13,8 +13,8 @@ use once_cell::sync::OnceCell;
 
 use super::{managed::symbol::SymbolUnbound, types::typecheck::Typecheck};
 use crate::{
-    data::managed::value::ValueUnbound,
-    prelude::{Managed, Module, Symbol, Target},
+    data::managed::{module::Module, symbol::Symbol, value::ValueUnbound, Managed},
+    memory::target::Target,
 };
 
 struct StaticDataInner<T>(ValueUnbound, PhantomData<T>);

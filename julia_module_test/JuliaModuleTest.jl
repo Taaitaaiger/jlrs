@@ -28,7 +28,7 @@ end
 
     @test JuliaModuleTest.freestanding_func_bitsarg(UInt(3)) == 4
     @inferred JuliaModuleTest.freestanding_func_bitsarg(UInt(3))
-    
+
     @test JuliaModuleTest.freestanding_func_ref_bitsarg(UInt(3)) == 4
     @test JuliaModuleTest.freestanding_func_ref_mutarg(Main) == 0
     @test JuliaModuleTest.freestanding_func_ref_any(Main) == 0
@@ -120,34 +120,34 @@ end
     @test !isconst(JuliaModuleTest, :STATIC_U8)
 end
 
-using BenchmarkTools
-
-v = Vector{UInt32}()
-v2 = Vector{AbstractChar}()
-ty = Int32
-
-println("Benchmark freestanding_func_trivial")
-@btime JuliaModuleTest.freestanding_func_trivial()
-println("Benchmark freestanding_func_noargs")
-@btime JuliaModuleTest.freestanding_func_noargs()
-println("Benchmark freestanding_func_bitsarg")
-@btime JuliaModuleTest.freestanding_func_bitsarg(UInt(3))
-println("Benchmark freestanding_func_ref_bitsarg")
-@btime JuliaModuleTest.freestanding_func_ref_bitsarg(UInt(3))
-println("Benchmark freestanding_func_ref_mutarg")
-@btime JuliaModuleTest.freestanding_func_ref_mutarg(Main)
-println("Benchmark freestanding_func_ref_any")
-@btime JuliaModuleTest.freestanding_func_ref_any(Main)
-println("Benchmark freestanding_func_ref_abstract")
-@btime JuliaModuleTest.freestanding_func_ref_abstract(1)
-println("Benchmark freestanding_func_arrayarg")
-@btime JuliaModuleTest.freestanding_func_arrayarg(v)
-println("Benchmark freestanding_func_arrayarg")
-@btime JuliaModuleTest.freestanding_func_arrayarg(v2)
-println("Benchmark freestanding_func_typevaluearg")
-@btime JuliaModuleTest.freestanding_func_typevaluearg(UInt(3))
-println("Benchmark freestanding_func_ret_array")
-@btime JuliaModuleTest.freestanding_func_ret_array(ty)
-println("Benchmark freestanding_func_ret_rust_result")
-@btime JuliaModuleTest.freestanding_func_ret_rust_result(false)
+# using BenchmarkTools
+#
+# v = Vector{UInt32}()
+# v2 = Vector{AbstractChar}()
+# ty = Int32
+#
+# println("Benchmark freestanding_func_trivial")
+# @btime JuliaModuleTest.freestanding_func_trivial()
+# println("Benchmark freestanding_func_noargs")
+# @btime JuliaModuleTest.freestanding_func_noargs()
+# println("Benchmark freestanding_func_bitsarg")
+# @btime JuliaModuleTest.freestanding_func_bitsarg(UInt(3))
+# println("Benchmark freestanding_func_ref_bitsarg")
+# @btime JuliaModuleTest.freestanding_func_ref_bitsarg(UInt(3))
+# println("Benchmark freestanding_func_ref_mutarg")
+# @btime JuliaModuleTest.freestanding_func_ref_mutarg(Main)
+# println("Benchmark freestanding_func_ref_any")
+# @btime JuliaModuleTest.freestanding_func_ref_any(Main)
+# println("Benchmark freestanding_func_ref_abstract")
+# @btime JuliaModuleTest.freestanding_func_ref_abstract(1)
+# println("Benchmark freestanding_func_arrayarg")
+# @btime JuliaModuleTest.freestanding_func_arrayarg(v)
+# println("Benchmark freestanding_func_arrayarg")
+# @btime JuliaModuleTest.freestanding_func_arrayarg(v2)
+# println("Benchmark freestanding_func_typevaluearg")
+# @btime JuliaModuleTest.freestanding_func_typevaluearg(UInt(3))
+# println("Benchmark freestanding_func_ret_array")
+# @btime JuliaModuleTest.freestanding_func_ret_array(ty)
+# println("Benchmark freestanding_func_ret_rust_result")
+# @btime JuliaModuleTest.freestanding_func_ret_rust_result(false)
 end
