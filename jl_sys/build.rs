@@ -146,6 +146,12 @@ fn compile_jlrs_cc(julia_dir: &str) {
 
             #[cfg(feature = "windows")]
             c.flag("-mwindows");
+
+            #[cfg(all(feature = "windows", feature = "uv"))]
+            {
+                println!("cargo:rustc-link-search={}/bin", &julia_dir);
+                println!("cargo:rustc-link-lib=uv-2");
+            }
         } else {
             #[cfg(feature = "i686")]
             c.flag("-march=pentium4");
