@@ -114,9 +114,9 @@ pub(crate) unsafe fn catch_exceptions_with_slots<'frame, 'borrow, 'data, G, T>(
 ) -> JlrsResult<JuliaResultRef<'frame, 'data, T>>
 where
     T: 'frame,
-    G: FnMut(&mut MaybeUninit<T>) -> JlrsResult<()>,
+    G: FnMut(&mut GcFrame<'frame>, &mut MaybeUninit<T>) -> JlrsResult<()>,
 {
-    let trampoline = trampoline_for(func);
+    let trampoline = trampoline_with_slots_for(func);
     let mut result = MaybeUninit::<T>::uninit();
 
     let unrooted = Unrooted::new();
