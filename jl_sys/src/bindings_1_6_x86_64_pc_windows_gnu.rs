@@ -2171,6 +2171,32 @@ extern "C" {
 extern "C" {
     pub fn jl_gc_schedule_foreign_sweepfunc(ptls: jl_ptls_t, bj: *mut jl_value_t);
 }
+pub const jlrs_catch_tag_t_JLRS_CATCH_OK: jlrs_catch_tag_t = 0;
+pub const jlrs_catch_tag_t_JLRS_CATCH_ERR: jlrs_catch_tag_t = 1;
+pub const jlrs_catch_tag_t_JLRS_CATCH_EXCEPTION: jlrs_catch_tag_t = 2;
+pub const jlrs_catch_tag_t_JLRS_CATCH_PANIC: jlrs_catch_tag_t = 3;
+pub type jlrs_catch_tag_t = ::std::os::raw::c_uint;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct jlrs_catch_t {
+    pub tag: jlrs_catch_tag_t,
+    pub error: *mut ::std::os::raw::c_void,
+}
+pub type jlrs_callback_caller_t = ::std::option::Option<
+    unsafe extern "C" fn(
+        arg1: *mut ::std::os::raw::c_void,
+        arg2: *mut ::std::os::raw::c_void,
+        arg3: *mut ::std::os::raw::c_void,
+    ) -> jlrs_catch_t,
+>;
+extern "C" {
+    pub fn jlrs_catch_wrapper(
+        callback: *mut ::std::os::raw::c_void,
+        caller: jlrs_callback_caller_t,
+        result: *mut ::std::os::raw::c_void,
+        frame_slice: *mut ::std::os::raw::c_void,
+    ) -> jlrs_catch_t;
+}
 extern "C" {
     pub fn jlrs_array_data_owner_offset(n_dims: u16) -> uint_t;
 }

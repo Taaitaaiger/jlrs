@@ -103,7 +103,6 @@ mod tests {
         })
     }
 
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     fn bytes_to_symbol() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -118,7 +117,6 @@ mod tests {
         })
     }
 
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     fn bytes_to_symbol_err() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -197,9 +195,7 @@ mod tests {
         bytes_to_symbol_unchecked();
         extend_lifetime();
         symbol_implements_hash();
-        #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
         bytes_to_symbol();
-        #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
         bytes_to_symbol_err();
     }
 }

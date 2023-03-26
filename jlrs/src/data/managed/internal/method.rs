@@ -151,7 +151,7 @@ impl<'scope> Method<'scope> {
         }
     }
 
-    #[julia_version(since = "1.7")]
+    #[julia_version(since = "1.7", until = "1.9")]
     /// Table of all `Method` specializations, allocated as [hashable, ..., NULL, linear, ....]
     pub fn specializations<'target, T>(self, target: T) -> Option<SimpleVectorData<'target, T>>
     where
@@ -166,6 +166,24 @@ impl<'scope> Method<'scope> {
                 .load(Ordering::Relaxed);
             let specializations = NonNull::new(specializations)?;
             Some(SimpleVectorRef::wrap(specializations).root(target))
+        }
+    }
+
+    #[julia_version(since = "1.10")]
+    /// Table of all `Method` specializations, allocated as [hashable, ..., NULL, linear, ....]
+    pub fn specializations<'target, T>(self, target: T) -> Option<ValueData<'target, 'static, T>>
+    where
+        T: Target<'target>,
+    {
+        // Safety: the pointer points to valid data
+        unsafe {
+            let specializations = self
+                .unwrap_non_null(Private)
+                .as_ref()
+                .specializations
+                .load(Ordering::Relaxed);
+            let specializations = NonNull::new(specializations)?;
+            Some(ValueRef::wrap(specializations).root(target))
         }
     }
 

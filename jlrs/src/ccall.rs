@@ -359,22 +359,6 @@ where
 {
 }
 
-pub trait OuterAsyncCallback<T, U>
-where
-    T: IntoJulia + Send + ConstructType,
-    U: AsyncCallback<T>,
-{
-    type InnerReturnType: IntoJulia + Send + ConstructType;
-}
-
-impl<T, U> OuterAsyncCallback<T, U> for JlrsResult<U>
-where
-    T: IntoJulia + Send + ConstructType,
-    U: AsyncCallback<T>,
-{
-    type InnerReturnType = T;
-}
-
 /// A handle to a function call that has been dispatched to a thread pool.
 pub struct DispatchHandle<T> {
     result: UnsafeCell<Option<JlrsResult<T>>>,

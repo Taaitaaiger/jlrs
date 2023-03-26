@@ -2,7 +2,7 @@ use std::iter::FromIterator;
 
 use proc_macro::TokenStream;
 use proc_macro2::Span;
-use quote::format_ident;
+use quote::{format_ident, ToTokens};
 use syn::{
     parse::{Parse, ParseStream},
     parse_quote, parse_quote_spanned,
@@ -14,8 +14,6 @@ use syn::{
 };
 
 type RenameFragments = Punctuated<Ident, Token![.]>;
-
-// TODO: threadcall?
 
 struct InitFn {
     _become_token: Token![become],
@@ -272,12 +270,15 @@ struct ItemWithAttrs {
 }
 
 impl ItemWithAttrs {
-    fn get_docstr(&self) -> String {
+    fn get_docstr(&self) -> Result<String> {
         let mut doc = String::new();
         for attr in self.attrs.iter() {
             match attr.style {
                 AttrStyle::Outer => (),
-                _ => panic!("expected `#[doc = \"docs...\"]`"),
+                _ => Err(syn::Error::new_spanned(
+                    attr.to_token_stream(),
+                    "expected `#[doc = \"docs...\"]`",
+                ))?,
             }
 
             let line = match &attr.meta {
@@ -287,13 +288,22 @@ impl ItemWithAttrs {
                             Expr::Lit(ExprLit {
                                 lit: Lit::Str(s), ..
                             }) => s.value(),
-                            _ => panic!("expected `doc = \"docs...\"`"),
+                            _ => Err(syn::Error::new_spanned(
+                                attr.to_token_stream(),
+                                "expected `#[doc = \"docs...\"]`",
+                            ))?,
                         }
                     } else {
-                        panic!("expected identifier `doc`")
+                        Err(syn::Error::new_spanned(
+                            attr.to_token_stream(),
+                            "expected `#[doc = \"docs...\"]`",
+                        ))?
                     }
                 }
-                _ => panic!("expected `doc = \"docs...\"`"),
+                _ => Err(syn::Error::new_spanned(
+                    attr.to_token_stream(),
+                    "expected `#[doc = \"docs...\"]`",
+                ))?,
             };
 
             match doc.len() {
@@ -305,7 +315,7 @@ impl ItemWithAttrs {
             }
         }
 
-        doc
+        Ok(doc)
     }
 }
 
@@ -531,13 +541,13 @@ impl JuliaModule {
         let init_fn = self.get_init_fn()?;
         let init_fn_ident = &init_fn.init_fn;
 
-        let fn_fragments = FunctionFragments::generate(&self, init_fn);
+        let fn_fragments = FunctionFragments::generate(&self, init_fn)?;
         let method_fragments = MethodFragments::generate(&self, init_fn);
-        let async_callback_fragments = AsyncCallbackFragments::generate(&self, init_fn);
+        let async_callback_fragments = AsyncCallbackFragments::generate(&self, init_fn)?;
         let type_fragments = TypeFragments::generate(&self, init_fn);
         let const_fragments = ConstFragments::generate(&self, init_fn);
         let global_fragments = GlobalFragments::generate(&self, init_fn);
-        let doc_fragments = DocFragments::generate(&self, init_fn);
+        let doc_fragments = DocFragments::generate(&self, init_fn)?;
 
         let type_init_fn = type_fragments.type_init_fn;
         let type_init_fn_ident = type_fragments.type_init_ident;
@@ -739,7 +749,7 @@ struct DocFragments {
 }
 
 impl DocFragments {
-    fn generate(module: &JuliaModule, init_fn: &InitFn) -> Self {
+    fn generate(module: &JuliaModule, init_fn: &InitFn) -> Result<Self> {
         let init_docs_fn_ident = format_ident!("{}_docs", init_fn.init_fn);
         let n_docs = module.get_items_with_attrs().count();
 
@@ -747,6 +757,11 @@ impl DocFragments {
             .get_items_with_attrs()
             .enumerate()
             .map(doc_info_fragment);
+
+        let mut fragments = Vec::with_capacity(n_docs);
+        for fragment in doc_init_fragments {
+            fragments.push(fragment?);
+        }
 
         let init_docs_fn = parse_quote! {
             unsafe fn #init_docs_fn_ident(
@@ -760,7 +775,7 @@ impl DocFragments {
                     let mut accessor = array.indeterminate_data_mut();
 
                     #(
-                        #doc_init_fragments
+                        #fragments
                     )*
 
                     Ok(())
@@ -768,10 +783,10 @@ impl DocFragments {
             }
         };
 
-        DocFragments {
+        Ok(DocFragments {
             init_docs_fn_ident,
             init_docs_fn,
-        }
+        })
     }
 }
 
@@ -781,7 +796,7 @@ struct FunctionFragments {
 }
 
 impl FunctionFragments {
-    fn generate(module: &JuliaModule, init_fn: &InitFn) -> Self {
+    fn generate(module: &JuliaModule, init_fn: &InitFn) -> Result<Self> {
         let init_functions_fn_ident = format_ident!("{}_functions", init_fn.init_fn);
         let n_functions = module.get_exported_functions().count();
 
@@ -789,6 +804,11 @@ impl FunctionFragments {
             .get_exported_functions()
             .enumerate()
             .map(function_info_fragment);
+
+        let mut fragments = Vec::with_capacity(n_functions);
+        for fragment in function_init_fragments {
+            fragments.push(fragment?);
+        }
 
         let init_functions_fn = parse_quote! {
             unsafe fn #init_functions_fn_ident(
@@ -802,7 +822,7 @@ impl FunctionFragments {
                     let mut accessor = array.value_data_mut().unwrap();
 
                     #(
-                        #function_init_fragments
+                        #fragments
                     )*
 
                     Ok(())
@@ -810,10 +830,10 @@ impl FunctionFragments {
             }
         };
 
-        FunctionFragments {
+        Ok(FunctionFragments {
             init_functions_fn_ident,
             init_functions_fn,
-        }
+        })
     }
 }
 
@@ -866,7 +886,7 @@ struct AsyncCallbackFragments {
 }
 
 impl AsyncCallbackFragments {
-    fn generate(module: &JuliaModule, init_fn: &InitFn) -> Self {
+    fn generate(module: &JuliaModule, init_fn: &InitFn) -> Result<Self> {
         let init_async_callbacks_fn_ident = format_ident!("{}_async_callbacks", init_fn.init_fn);
         let n_async_callbacks = module.get_exported_async_callbacks().count();
 
@@ -874,6 +894,11 @@ impl AsyncCallbackFragments {
             .get_exported_async_callbacks()
             .enumerate()
             .map(async_callback_info_fragment);
+
+        let mut fragments = Vec::with_capacity(n_async_callbacks);
+        for fragment in async_callback_init_fragments {
+            fragments.push(fragment?);
+        }
 
         let init_async_callbacks_fn = parse_quote! {
             unsafe fn #init_async_callbacks_fn_ident(
@@ -888,7 +913,7 @@ impl AsyncCallbackFragments {
                     let offset = ::jlrs::data::managed::array::dimensions::Dims::size(&accessor.dimensions()) - #n_async_callbacks;
 
                     #(
-                        #async_callback_init_fragments
+                        #fragments
                     )*
 
                     Ok(())
@@ -896,10 +921,10 @@ impl AsyncCallbackFragments {
             }
         };
 
-        AsyncCallbackFragments {
+        Ok(AsyncCallbackFragments {
             init_async_callbacks_fn_ident,
             init_async_callbacks_fn,
-        }
+        })
     }
 }
 
@@ -1019,9 +1044,12 @@ impl GlobalFragments {
     }
 }
 
-fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Expr {
+fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Result<Expr> {
     match info.item.as_ref() {
-        ModuleItem::InitFn(_) => panic!("Init function can't be documented"),
+        ModuleItem::InitFn(i) => Err(syn::Error::new_spanned(
+            i.init_fn.to_token_stream(),
+            "init function cannot be documented",
+        ))?,
         ModuleItem::ExportedType(ty) => {
             let override_module_fragment = override_module_fragment(&ty.name_override);
             let name_ident = &ty.name;
@@ -1034,9 +1062,9 @@ fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Expr {
                 .unwrap_or(name_ident)
                 .to_string();
 
-            let doc = info.get_docstr();
+            let doc = info.get_docstr()?;
 
-            parse_quote! {
+            let q = parse_quote! {
                 {
                     frame.scope(|mut frame| {
                         unsafe {
@@ -1052,8 +1080,9 @@ fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Expr {
                         Ok(())
                     }).unwrap();
                 }
+            };
 
-            }
+            Ok(q)
         }
         ModuleItem::ExportedFunction(func) => {
             let name_ident = &func.func.ident;
@@ -1071,9 +1100,9 @@ fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Expr {
                 rename.push('!')
             }
 
-            let doc = info.get_docstr();
+            let doc = info.get_docstr()?;
 
-            parse_quote! {
+            let q = parse_quote! {
                 {
                     frame.scope(|mut frame| {
                         unsafe {
@@ -1090,7 +1119,9 @@ fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Expr {
                     }).unwrap();
                 }
 
-            }
+            };
+
+            Ok(q)
         }
         ModuleItem::ExportedMethod(func) => {
             let name_ident = &func.func.ident;
@@ -1108,9 +1139,9 @@ fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Expr {
                 rename.push('!')
             }
 
-            let doc = info.get_docstr();
+            let doc = info.get_docstr()?;
 
-            parse_quote! {
+            let q = parse_quote! {
                 {
                     frame.scope(|mut frame| {
                         unsafe {
@@ -1127,7 +1158,9 @@ fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Expr {
                     }).unwrap();
                 }
 
-            }
+            };
+
+            Ok(q)
         }
         ModuleItem::ExportedAsyncCallback(func) => {
             let name_ident = &func.func.ident;
@@ -1145,9 +1178,9 @@ fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Expr {
                 rename.push('!')
             }
 
-            let doc = info.get_docstr();
+            let doc = info.get_docstr()?;
 
-            parse_quote! {
+            let q = parse_quote! {
                 {
                     frame.scope(|mut frame| {
                         unsafe {
@@ -1164,14 +1197,16 @@ fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Expr {
                     }).unwrap();
                 }
 
-            }
+            };
+
+            Ok(q)
         }
         ModuleItem::ExportedConst(val) => {
             let name_ident = &val.name;
             let rename = val.name_override.as_ref().unwrap_or(name_ident).to_string();
-            let doc = info.get_docstr();
+            let doc = info.get_docstr()?;
 
-            parse_quote! {
+            let q = parse_quote! {
                 {
                     frame.scope(|mut frame| {
                         unsafe {
@@ -1187,14 +1222,16 @@ fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Expr {
                     }).unwrap();
                 }
 
-            }
+            };
+
+            Ok(q)
         }
         ModuleItem::ExportedGlobal(val) => {
             let name_ident = &val.name;
             let rename = val.name_override.as_ref().unwrap_or(name_ident).to_string();
-            let doc = info.get_docstr();
+            let doc = info.get_docstr()?;
 
-            parse_quote! {
+            let q = parse_quote! {
                 {
                     frame.scope(|mut frame| {
                         unsafe {
@@ -1210,13 +1247,15 @@ fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Expr {
                     }).unwrap();
                 }
 
-            }
+            };
+
+            Ok(q)
         }
         ModuleItem::ItemWithAttrs(_) => unreachable!(),
     }
 }
 
-fn function_info_fragment((index, info): (usize, &ExportedFunction)) -> Expr {
+fn function_info_fragment((index, info): (usize, &ExportedFunction)) -> Result<Expr> {
     let n_args = info.func.inputs.len();
     let name_ident = &info.func.ident;
 
@@ -1246,9 +1285,9 @@ fn function_info_fragment((index, info): (usize, &ExportedFunction)) -> Expr {
     let ccall_arg_idx = 0..n_args;
     let julia_arg_idx = 0..n_args;
 
-    let (ccall_arg_types, julia_arg_types) = arg_type_fragments(info);
+    let (ccall_arg_types, julia_arg_types) = arg_type_fragments(info)?;
 
-    parse_quote! {
+    let expr = parse_quote! {
         {
             frame.scope(|mut frame| {
                 let name = Symbol::new(&frame, #rename);
@@ -1300,7 +1339,9 @@ fn function_info_fragment((index, info): (usize, &ExportedFunction)) -> Expr {
                 Ok(())
             }).unwrap();
         }
-    }
+    };
+
+    Ok(expr)
 }
 
 fn override_module_fragment(name_override: &Option<RenameFragments>) -> Expr {
@@ -1434,17 +1475,19 @@ fn async_callbackreturn_type_fragments(ret_ty: &ReturnType) -> Option<Type> {
 
 fn arg_type_fragments<'a>(
     info: &'a ExportedFunction,
-) -> (
+) -> Result<(
     impl 'a + Iterator<Item = Expr>,
     impl 'a + Iterator<Item = Expr>,
-) {
+)> {
     let inputs = &info.func.inputs;
     let n_args = inputs.len();
 
     if n_args > 0 {
-        match inputs.first().unwrap() {
-            FnArg::Receiver(_) => panic!(),
-            _ => (),
+        if let FnArg::Receiver(r) = inputs.first().unwrap() {
+            Err(syn::Error::new_spanned(
+                r.to_token_stream(),
+                "exported function must be a free-standing function, use `in <struct name> fn ...` to export methods",
+            ))?;
         }
     }
 
@@ -1472,7 +1515,7 @@ fn arg_type_fragments<'a>(
             }
         });
 
-    (ccall_arg_types, julia_arg_types)
+    Ok((ccall_arg_types, julia_arg_types))
 }
 
 fn init_type_fragment(info: &ExportedType) -> Expr {
@@ -1613,7 +1656,7 @@ fn method_info_fragment((index, info): (usize, &ExportedMethod)) -> Expr {
     }
 }
 
-fn async_callback_info_fragment((index, info): (usize, &ExportedAsyncCallback)) -> Expr {
+fn async_callback_info_fragment((index, info): (usize, &ExportedAsyncCallback)) -> Result<Expr> {
     let n_args = info.func.inputs.len();
     let name_ident = &info.func.ident;
 
@@ -1633,11 +1676,11 @@ fn async_callback_info_fragment((index, info): (usize, &ExportedAsyncCallback)) 
     let ret_ty = &info.func.output;
     let inner_ret_ty = async_callbackreturn_type_fragments(ret_ty);
     if inner_ret_ty.is_none() {
-        return parse_quote_spanned! {
+        return Ok(parse_quote_spanned! {
             name_ident.span() => {
                 compile_error!("Async callback must return JlrsResult<impl AsyncCallback<T>> where T is some type that implements IntoJulia");
             }
-        };
+        });
     }
 
     let inner_ret_ty = inner_ret_ty.unwrap();
@@ -1649,7 +1692,7 @@ fn async_callback_info_fragment((index, info): (usize, &ExportedAsyncCallback)) 
     };
 
     let (ccall_arg_types, julia_arg_types, invoke_fn) =
-        async_callback_arg_type_fragments(info, &inner_ret_ty);
+        async_callback_arg_type_fragments(info, &inner_ret_ty)?;
 
     let first_arg: Expr = syn::parse_quote! {
         <*mut ::std::ffi::c_void as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
@@ -1658,7 +1701,7 @@ fn async_callback_info_fragment((index, info): (usize, &ExportedAsyncCallback)) 
     let ccall_arg_idx = 0..n_args;
     let julia_arg_idx = 0..n_args;
 
-    parse_quote! {
+    let q = parse_quote! {
         {
             frame.scope(|mut frame| {
                 let unrooted = frame.unrooted();
@@ -1713,7 +1756,9 @@ fn async_callback_info_fragment((index, info): (usize, &ExportedAsyncCallback)) 
                 Ok(())
             }).unwrap();
         }
-    }
+    };
+
+    Ok(q)
 }
 
 fn const_info_fragment(info: &ExportedConst) -> Expr {
@@ -1799,7 +1844,6 @@ fn method_arg_type_fragments<'a>(
                     }
                 },
                 _ => {
-
                     let span = parent.span();
                     parse_quote_spanned! {
                         span=> <<TypedValue::<#parent> as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
@@ -1834,18 +1878,20 @@ fn method_arg_type_fragments<'a>(
 fn async_callback_arg_type_fragments<'a>(
     info: &'a ExportedAsyncCallback,
     inner_ret_ty: &Type,
-) -> (
+) -> Result<(
     impl 'a + Iterator<Item = Expr>,
     impl 'a + Iterator<Item = Expr>,
     Option<ItemFn>,
-) {
+)> {
     let inputs = &info.func.inputs;
     let n_args = inputs.len();
 
     if n_args > 0 {
-        match inputs.first().unwrap() {
-            FnArg::Receiver(_) => panic!(),
-            FnArg::Typed(_) => (),
+        if let FnArg::Receiver(r) = inputs.first().unwrap() {
+            Err(syn::Error::new_spanned(
+                r.to_token_stream(),
+                "async callback must be a free-standing function",
+            ))?;
         }
     }
 
@@ -1861,7 +1907,7 @@ fn async_callback_arg_type_fragments<'a>(
                         <<#ty as ::jlrs::convert::ccall_types::CCallArg>::CCallArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
                     }
                 },
-                _ => panic!()
+                _ => unreachable!()
             }
         });
 
@@ -1875,11 +1921,11 @@ fn async_callback_arg_type_fragments<'a>(
                         <<#ty as ::jlrs::convert::ccall_types::CCallArg>::FunctionArgType as ::jlrs::data::types::construct_type::ConstructType>::construct_type(frame.as_extended_target())
                     }
                 },
-                _ => panic!()
+                _ => unreachable!()
             }
         });
 
-    (ccall_arg_types, julia_arg_types, Some(invoke_fn))
+    Ok((ccall_arg_types, julia_arg_types, Some(invoke_fn)))
 }
 
 // FIXME: require impl AsyncCallback

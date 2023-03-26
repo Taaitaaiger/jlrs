@@ -22,7 +22,7 @@ pub fn emit_if_compatible(attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut since = None;
     let mut until = None;
     let mut except = None;
-    let mut windows_lts = true;
+    let mut windows_lts = None;
 
     loop {
         match tts.next() {
@@ -43,7 +43,7 @@ pub fn emit_if_compatible(attr: TokenStream, item: TokenStream) -> TokenStream {
                 }
                 "windows_lts" => {
                     expect_punt_eq(&mut tts);
-                    windows_lts = unwrap_bool(&mut tts);
+                    windows_lts = Some(unwrap_bool(&mut tts));
                     if !expect_comma_or_end(&mut tts) {
                         break;
                     }
@@ -197,7 +197,12 @@ fn selected_version() -> Version {
 }
 
 #[allow(unused_variables)]
-fn should_emit(since: Version, until: Version, windows_lts: bool, except: &[Version]) -> bool {
+fn should_emit(
+    since: Version,
+    until: Version,
+    windows_lts: Option<bool>,
+    except: &[Version],
+) -> bool {
     let selected = selected_version();
     if since > selected {
         return false;
@@ -211,9 +216,16 @@ fn should_emit(since: Version, until: Version, windows_lts: bool, except: &[Vers
         return false;
     }
 
-    #[cfg(any(feature = "windows", target_os = "windows"))]
-    if selected.minor == LTS_MINOR_VERSION && !windows_lts {
-        return false;
+    if let Some(windows_lts) = windows_lts {
+        #[cfg(any(feature = "windows", target_os = "windows"))]
+        if selected.minor == LTS_MINOR_VERSION && !windows_lts {
+            return false;
+        }
+
+        #[cfg(not(any(feature = "windows", target_os = "windows")))]
+        if windows_lts {
+            return false;
+        }
     }
 
     true

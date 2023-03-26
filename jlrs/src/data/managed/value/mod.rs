@@ -752,7 +752,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
 
     /// Returns the number of fields the underlying Julia value has.
     pub fn n_fields(self) -> usize {
-        self.datatype().n_fields() as _
+        self.datatype().n_fields().unwrap() as _
     }
 
     /// Returns an accessor to access the contents of this value without allocating temporary Julia data.
@@ -796,7 +796,7 @@ impl<'scope, 'data> Value<'scope, 'data> {
     /// inline, a `JlrsError::AccessError` is returned.
     pub fn get_nth_field_ref(self, idx: usize) -> JlrsResult<ValueRef<'scope, 'data>> {
         let ty = self.datatype();
-        if idx >= ty.n_fields() as _ {
+        if idx >= ty.n_fields().unwrap() as _ {
             Err(AccessError::OutOfBoundsField {
                 idx,
                 n_fields: self.n_fields(),

@@ -1,4 +1,4 @@
-/* generated from julia version 1.10.0-DEV (Commit: 0a9abc1919 2023-03-18 04:56 UTC) */
+/* generated from julia version 1.10.0-DEV (Commit: e90f6a3d9c 2023-03-24 19:40 UTC) */
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct __BindgenBitfieldUnit<Storage> {
@@ -618,7 +618,7 @@ pub struct _jl_method_t {
     pub primary_world: usize,
     pub deleted_world: usize,
     pub sig: *mut jl_value_t,
-    pub specializations: ::std::sync::atomic::AtomicPtr<jl_svec_t>,
+    pub specializations: ::std::sync::atomic::AtomicPtr<jl_value_t>,
     pub speckeyset: ::std::sync::atomic::AtomicPtr<jl_array_t>,
     pub slot_syms: *mut jl_value_t,
     pub external_mt: *mut jl_value_t,
@@ -1090,11 +1090,11 @@ impl _jl_datatype_t {
         }
     }
     #[inline]
-    pub fn cached_by_hash(&self) -> u16 {
+    pub fn maybe_subtype_of_cache(&self) -> u16 {
         unsafe { ::std::mem::transmute(self._bitfield_1.get(6usize, 1u8) as u16) }
     }
     #[inline]
-    pub fn set_cached_by_hash(&mut self, val: u16) {
+    pub fn set_maybe_subtype_of_cache(&mut self, val: u16) {
         unsafe {
             let val: u16 = ::std::mem::transmute(val);
             self._bitfield_1.set(6usize, 1u8, val as u64)
@@ -1141,7 +1141,7 @@ impl _jl_datatype_t {
         isbitstype: u16,
         zeroinit: u16,
         has_concrete_subtype: u16,
-        cached_by_hash: u16,
+        maybe_subtype_of_cache: u16,
         isprimitivetype: u16,
         ismutationfree: u16,
         isidentityfree: u16,
@@ -1172,8 +1172,9 @@ impl _jl_datatype_t {
             has_concrete_subtype as u64
         });
         __bindgen_bitfield_unit.set(6usize, 1u8, {
-            let cached_by_hash: u16 = unsafe { ::std::mem::transmute(cached_by_hash) };
-            cached_by_hash as u64
+            let maybe_subtype_of_cache: u16 =
+                unsafe { ::std::mem::transmute(maybe_subtype_of_cache) };
+            maybe_subtype_of_cache as u64
         });
         __bindgen_bitfield_unit.set(7usize, 1u8, {
             let isprimitivetype: u16 = unsafe { ::std::mem::transmute(isprimitivetype) };
@@ -2249,6 +2250,7 @@ pub struct _jl_task_t {
     pub priority: u16,
     pub tid: ::std::sync::atomic::AtomicI16,
     pub threadpoolid: i8,
+    pub reentrant_timing: u8,
     pub gcstack: *mut jl_gcframe_t,
     pub world_age: usize,
     pub ptls: jl_ptls_t,
@@ -2257,11 +2259,9 @@ pub struct _jl_task_t {
     pub ctx: jl_ucontext_t,
     pub stkbuf: *mut ::std::os::raw::c_void,
     pub bufsz: usize,
-    pub inference_start_time: u64,
-    pub reentrant_inference: u16,
-    pub reentrant_timing: u16,
     pub _bitfield_align_1: [u32; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 4usize]>,
+    pub __bindgen_padding_0: u32,
 }
 impl _jl_task_t {
     #[inline]

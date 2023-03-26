@@ -669,7 +669,7 @@ pub fn impl_valid_layout(ast: &syn::DeriveInput) -> TokenStream {
             fn valid_layout(v: ::jlrs::data::managed::value::Value) -> bool {
                 unsafe {
                     if let Ok(dt) = v.cast::<::jlrs::data::managed::datatype::DataType>() {
-                        if dt.n_fields() as usize != #n_fields {
+                        if dt.n_fields().unwrap() as usize != #n_fields {
                             return false;
                         }
 

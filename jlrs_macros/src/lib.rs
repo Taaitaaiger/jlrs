@@ -29,7 +29,7 @@ use self::version::emit_if_compatible;
 ///     // `foo_jl_init`.
 ///     become init_function_name;
 ///
-///     // Exports the function `foo` as `bar`.
+///     // Exports the function `foo` as `bar` with documentation.
 ///     //
 ///     // The `unsafe extern "C" part of the signature must be elided, the signature is verified
 ///     // in the generated code to ensure it's correct and that the function uses the C ABI.
@@ -38,8 +38,9 @@ use self::version::emit_if_compatible;
 ///     // name it has in Rust, the exposed name can end in an exclamation mark.
 ///     //
 ///     // A docstring can be provided with the doc attribute; if multiple functions are exported
-///     // with the same name it shoud only be documented once. A multi-line docstring can be
-///     // created by providing multiple doc attributes for the same item:
+///     // with the same name it shoud only be documented once. All exported items can be
+///     // documented, a multi-line docstring can be created by providing multiple doc attributes
+///     // for the same item.
 ///     #[doc = "    bar(arr::Array)"]
 ///     #[doc = ""]
 ///     #[doc = "Documentation for this function"]
@@ -67,22 +68,11 @@ use self::version::emit_if_compatible;
 ///     // `self` is taken by value, it's cloned after being tracked.
 ///     in MyType fn add(&mut self, incr: u32) -> RustResultRet<u32>  as increment!;
 ///
-///     // Exports the function `long_running_func`, the returned `AsyncCallback` is executed on
-///     // another thread.
+///     // Exports the function `long_running_func`, the returned closure is executed on another
+///     // thread.
 ///     //
-///     // `AsyncCallback` is essentially a trait alias for a closure with a specific signature:
-///     //
-///     // ```
-///     // impl<T, U> AsyncCallback<T> for U
-///     // where
-///     //     T: IntoJulia + Send + ConstructType,
-///     //     U: 'static + Send + FnOnce() -> JlrsResult<T>,
-///     // {
-///     // }
-///     // ```
-///     //
-///     // I.e., the exported function must return a closure. The generated Julia function waits
-///     // for the closure to finish using an `AsyncCondition`. Because the closure is executed on
+///     // After dispatching the closure to another thread, the generated Julia function waits for
+///     // the closure to return using an `AsyncCondition`. Because the closure is executed on
 ///     // another thread you can't call Julia functions or allocate Julia data from it, but it is
 ///     // possible to (mutably) access Julia data by tracking it.
 ///     //
@@ -130,6 +120,8 @@ use self::version::emit_if_compatible;
 /// ensures the data is boxed by using `Any` in the signature of the generated `ccall` invocation,
 /// but restricts the type of the data in the generated function to the type constructed from the
 /// `TypedValue`'s type parameter.
+///
+/// [`AsyncCondition`]: https://docs.julialang.org/en/v1/base/base/#Base.AsyncCondition
 #[proc_macro]
 #[cfg(feature = "ccall")]
 pub fn julia_module(item: TokenStream) -> TokenStream {
@@ -145,7 +137,7 @@ pub fn julia_module(item: TokenStream) -> TokenStream {
 ///
 /// `#[julia_version(since = "1.6", until = "1.10", except = ["1.8", "1.9"], windows_lts = false)]`
 ///
-/// By default, `since = "1.6"`, `until = "1.10"`, `except = []`, and `windows_lts = true`, so the
+/// By default, `since = "1.6"`, `until = "1.10"`, `except = []`, and `windows_lts = None`, so the
 /// above can be written more compactly as:
 ///
 /// `#[julia_version(except = ["1.8", "1.9"], windows_lts = false)]`.

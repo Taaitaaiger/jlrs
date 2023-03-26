@@ -372,6 +372,7 @@ fn generate_bindings(julia_dir: &str) {
         .allowlist_function("jl_ver_patch")
         .allowlist_function("jl_ver_string")
         .allowlist_function("jl_yield")
+        .allowlist_function("jlrs_catch_wrapper")
         .allowlist_function("jlrs_lock")
         .allowlist_function("jlrs_unlock")
         .allowlist_function("jlrs_array_data_owner_offset")
@@ -534,11 +535,6 @@ fn generate_bindings(julia_dir: &str) {
         .allowlist_var("jl_weakref_type")
         .opaque_type("uv_mutex_t")
         .opaque_type("uv_cond_t");
-
-    #[cfg(not(all(feature = "julia-1-6", any(windows, feature = "windows"))))]
-    {
-        builder = builder.allowlist_function("jlrs_catch_wrapper");
-    }
 
     #[cfg(feature = "julia-1-10")]
     {

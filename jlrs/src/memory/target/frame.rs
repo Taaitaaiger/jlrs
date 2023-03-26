@@ -230,7 +230,7 @@ cfg_if! {
         ///
         /// [`CallAsync`]: crate::call::CallAsync
         pub struct AsyncGcFrame<'scope> {
-            scope_context: GcFrame<'scope>,
+            frame: GcFrame<'scope>,
         }
 
         impl<'scope> AsyncGcFrame<'scope> {
@@ -286,7 +286,7 @@ cfg_if! {
                     _marker: PhantomData,
                 };
                 let frame = AsyncGcFrame {
-                    scope_context: GcFrame {
+                    frame: GcFrame {
                         stack,
                         offset: 0,
                         _marker: PhantomData,
@@ -302,7 +302,7 @@ cfg_if! {
                 (
                     owner,
                     AsyncGcFrame {
-                        scope_context: frame,
+                        frame: frame,
                     },
                 )
             }
@@ -312,13 +312,13 @@ cfg_if! {
             type Target = GcFrame<'scope>;
 
             fn deref(&self) -> &Self::Target {
-                &self.scope_context
+                &self.frame
             }
         }
 
         impl<'scope> DerefMut for AsyncGcFrame<'scope> {
             fn deref_mut(&mut self) -> &mut Self::Target {
-                &mut self.scope_context
+                &mut self.frame
             }
         }
     }
@@ -344,7 +344,7 @@ impl<'scope> GcFrameOwner<'scope> {
     pub(crate) unsafe fn reconstruct(&self, offset: usize) -> AsyncGcFrame<'scope> {
         self.stack.pop_roots(offset);
         AsyncGcFrame {
-            scope_context: GcFrame {
+            frame: GcFrame {
                 stack: self.stack,
                 offset,
                 _marker: PhantomData,
