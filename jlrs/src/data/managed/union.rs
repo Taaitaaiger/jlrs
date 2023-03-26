@@ -3,11 +3,11 @@
 use std::{marker::PhantomData, ptr::NonNull};
 
 use jl_sys::{jl_islayout_inline, jl_type_union, jl_uniontype_t, jl_uniontype_type};
-use jlrs_macros::julia_version;
 
-#[julia_version(windows_lts = false)]
-use super::value::ValueResult;
-use super::{value::ValueData, Ref};
+use super::{
+    value::{ValueData, ValueResult},
+    Ref,
+};
 use crate::{
     data::managed::{private::ManagedPriv, value::Value, Managed},
     impl_julia_typecheck,
@@ -22,7 +22,6 @@ use crate::{
 pub struct Union<'scope>(NonNull<jl_uniontype_t>, PhantomData<&'scope ()>);
 
 impl<'scope> Union<'scope> {
-    #[julia_version(windows_lts = false)]
     /// Returns the union of all types in `types`. For each of these types, [`Value::is_kind`]
     /// must return `true`. Note that the result is not necessarily a [`Union`], for example the
     /// union of a single [`DataType`] is that type, not a `Union` with a single variant.

@@ -6,8 +6,6 @@ use std::{
     ops::Deref,
 };
 
-use jlrs_macros::julia_version;
-
 use super::{
     data::{
         accessor::{
@@ -18,10 +16,8 @@ use super::{
         copied::CopiedArray,
     },
     dimensions::{ArrayDimensions, Dims},
-    Array, ArrayData, TypedArray, TypedArrayData,
+    Array, ArrayData, ArrayResult, TypedArray, TypedArrayData, TypedArrayResult,
 };
-#[julia_version(windows_lts = false)]
-use super::{ArrayResult, TypedArrayResult};
 use crate::{
     convert::unbox::Unbox,
     data::{
@@ -180,7 +176,6 @@ impl<'tracked, 'scope, 'data> TrackedArray<'tracked, 'scope, 'data, Array<'scope
         unsafe { self.data.indeterminate_data() }
     }
 
-    #[julia_version(windows_lts = false)]
     /// Reshape the array.
     ///
     /// Returns a new array with the provided dimensions, the content of the array is shared with
@@ -264,7 +259,6 @@ where
         unsafe { self.data.indeterminate_data() }
     }
 
-    #[julia_version(windows_lts = false)]
     /// Reshape the array.
     ///
     /// Returns a new array with the provided dimensions, the content of the array is shared with
@@ -433,7 +427,6 @@ impl<'tracked, 'scope, 'data> TrackedArrayMut<'tracked, 'scope, 'data, Array<'sc
 }
 
 impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 'static>> {
-    #[julia_version(windows_lts = false)]
     /// Create a mutable accessor for the content of the array if the element type is a managed
     /// type.
     ///
@@ -458,7 +451,6 @@ impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 
         self.tracked.data.grow_end_unchecked(inc);
     }
 
-    #[julia_version(windows_lts = false)]
     /// Remove `dec` elements from the end of the array.  The array must be one-dimensional. If
     /// the array isn't one-dimensional an exception is thrown.
     ///
@@ -479,7 +471,6 @@ impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 
         self.tracked.data.del_end_unchecked(dec);
     }
 
-    #[julia_version(windows_lts = false)]
     /// Add capacity for `inc` more elements at the start of the array. The array must be
     /// one-dimensional. If the array isn't one-dimensional an exception is thrown.
     ///
@@ -504,7 +495,6 @@ impl<'tracked, 'scope> TrackedArrayMut<'tracked, 'scope, 'static, Array<'scope, 
         self.tracked.data.grow_begin_unchecked(inc);
     }
 
-    #[julia_version(windows_lts = false)]
     /// Remove `dec` elements from the start of the array.  The array must be one-dimensional. If
     /// the array isn't one-dimensional an exception is thrown.
     ///
@@ -610,7 +600,6 @@ impl<'tracked, 'scope, T> TrackedArrayMut<'tracked, 'scope, 'static, TypedArray<
 where
     T: ValidField,
 {
-    #[julia_version(windows_lts = false)]
     /// Add capacity for `inc` more elements at the end of the array. The array must be
     /// one-dimensional. If the array isn't one-dimensional an exception is thrown.
     ///
@@ -635,7 +624,6 @@ where
         self.tracked.data.grow_end_unchecked(inc)
     }
 
-    #[julia_version(windows_lts = false)]
     /// Remove `dec` elements from the end of the array.  The array must be one-dimensional. If
     /// the array isn't one-dimensional an exception is thrown.
     ///
@@ -656,7 +644,6 @@ where
         self.tracked.data.del_end_unchecked(dec)
     }
 
-    #[julia_version(windows_lts = false)]
     /// Add capacity for `inc` more elements at the start of the array. The array must be
     /// one-dimensional. If the array isn't one-dimensional an exception is thrown.
     ///
@@ -681,7 +668,6 @@ where
         self.tracked.data.grow_begin_unchecked(inc)
     }
 
-    #[julia_version(windows_lts = false)]
     /// Remove `dec` elements from the start of the array.  The array must be one-dimensional. If
     /// the array isn't one-dimensional an exception is thrown.
     ///

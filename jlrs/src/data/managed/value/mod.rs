@@ -283,7 +283,6 @@ impl Value<'_, '_> {
         })
     }
 
-    #[julia_version(windows_lts = false)]
     /// Apply the given types to `self`.
     ///
     /// If `self` is the [`DataType`] `anytuple_type`, calling this method will return a new
@@ -911,7 +910,6 @@ impl<'scope, 'data> Value<'scope, 'data> {
         }
     }
 
-    #[julia_version(windows_lts = false)]
     /// Set the value of the field at `idx`. If Julia throws an exception it's caught, rooted in
     /// the frame, and returned. If the index is out of bounds or the value is not a subtype of
     /// the field an error is returned,
@@ -979,7 +977,6 @@ impl<'scope, 'data> Value<'scope, 'data> {
         jl_set_nth_field(self.unwrap(Private), idx, value.unwrap(Private))
     }
 
-    #[julia_version(windows_lts = false)]
     /// Set the value of the field with the name `field_name`. If Julia throws an exception it's
     /// caught, rooted in the frame, and returned. If there's no field with the given name or the
     /// value is not a subtype of the field an error is returned.

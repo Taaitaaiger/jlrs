@@ -13,9 +13,10 @@ use jl_sys::{
 };
 use jlrs_macros::julia_version;
 
-#[julia_version(windows_lts = false)]
-use super::value::ValueResult;
-use super::{value::ValueData, Managed, Ref};
+use super::{
+    value::{ValueData, ValueResult},
+    Managed, Ref,
+};
 use crate::{
     data::managed::{datatype::DataType, private::ManagedPriv, type_var::TypeVar, value::Value},
     impl_julia_typecheck,
@@ -30,7 +31,6 @@ use crate::{
 pub struct UnionAll<'scope>(NonNull<jl_unionall_t>, PhantomData<&'scope ()>);
 
 impl<'scope> UnionAll<'scope> {
-    #[julia_version(windows_lts = false)]
     /// Create a new `UnionAll`. If an exception is thrown, it's caught and returned.
     pub fn new<'target, T>(
         target: T,
@@ -41,8 +41,6 @@ impl<'scope> UnionAll<'scope> {
         T: Target<'target>,
     {
         use std::mem::MaybeUninit;
-
-        use jl_sys::jl_value_t;
 
         use crate::catch::catch_exceptions;
 
@@ -119,7 +117,6 @@ impl<'scope> UnionAll<'scope> {
         }
     }
 
-    #[julia_version(windows_lts = false)]
     pub unsafe fn apply_types<'target, 'params, V, T>(
         self,
         target: T,
