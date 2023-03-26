@@ -126,7 +126,10 @@ use self::version::emit_if_compatible;
 #[cfg(feature = "ccall")]
 pub fn julia_module(item: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(item as JuliaModule);
-    input.generate_init_code().unwrap()
+    match input.generate_init_code() {
+        Ok(a) => a,
+        Err(b) => b.to_compile_error().into()
+    }
 }
 
 /// Conditional compilation depending on the used version of Julia.

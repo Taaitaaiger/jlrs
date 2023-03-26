@@ -479,6 +479,42 @@ impl<'scope> DataType<'scope> {
                 != 0
         }
     }
+
+    #[julia_version(since = "1.9")]
+    /// Whether this is declared with 'primitive type' keyword (sized, no fields, and immutable)
+    pub fn is_primitive_type(self) -> bool {
+        // Safety: the pointer points to valid data
+        unsafe {
+            self.unwrap_non_null(Private)
+                .as_ref()
+                .isprimitivetype()
+                != 0
+        }
+    }
+
+    #[julia_version(since = "1.10")]
+    /// Whether any mutable memory is reachable through this type (in the type or via fields)
+    pub fn is_mutation_free(self) -> bool {
+        // Safety: the pointer points to valid data
+        unsafe {
+            self.unwrap_non_null(Private)
+                .as_ref()
+                .ismutationfree()
+                != 0
+        }
+    }
+
+    #[julia_version(since = "1.10")]
+    /// Whether this type or any object reachable through its fields has non-content-based identity
+    pub fn is_identity_free(self) -> bool {
+        // Safety: the pointer points to valid data
+        unsafe {
+            self.unwrap_non_null(Private)
+                .as_ref()
+                .isidentityfree()
+                != 0
+        }
+    }
 }
 
 impl<'scope> DataType<'scope> {
