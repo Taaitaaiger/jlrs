@@ -27,7 +27,6 @@ static inline T jl_atomic_load_relaxed(volatile T *obj)
 extern "C"
 {
 #endif
-#if !defined(JLRS_WINDOWS_LTS)
     typedef enum
     {
         JLRS_CATCH_OK = 0,
@@ -44,7 +43,6 @@ extern "C"
 
     typedef jlrs_catch_t (*jlrs_callback_caller_t)(void *, void *, void *);
     jlrs_catch_t jlrs_catch_wrapper(void *callback, jlrs_callback_caller_t caller, void *result, void *frame_slice);
-#endif
 
     uint_t jlrs_array_data_owner_offset(uint16_t n_dims);
     void jlrs_gc_queue_multiroot(jl_value_t *parent, jl_datatype_t *dt, const void *ptr) JL_NOTSAFEPOINT;

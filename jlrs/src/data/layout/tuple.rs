@@ -28,16 +28,13 @@
 //! Additionally, [`Tuple` ] can be used to create a tuple from an arbitrary number of `Value`s.
 
 use jl_sys::jl_tuple_typename;
-use jlrs_macros::julia_version;
 
-#[julia_version(windows_lts = false)]
-use crate::data::managed::value::ValueResult;
 use crate::{
     data::{
         managed::{
             datatype::DataType,
             private::ManagedPriv as _,
-            value::{Value, ValueData, MAX_SIZE},
+            value::{Value, ValueData, ValueResult, MAX_SIZE},
             Managed as _,
         },
         types::typecheck::Typecheck,
@@ -52,7 +49,6 @@ use crate::{
 pub struct Tuple;
 
 impl Tuple {
-    #[julia_version(windows_lts = false)]
     /// Create a new tuple from the contents of `values`.
     pub fn new<'target, 'current, 'borrow, 'value, 'data, V, T>(
         target: ExtendedTarget<'target, '_, '_, T>,

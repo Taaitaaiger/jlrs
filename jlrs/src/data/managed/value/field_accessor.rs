@@ -504,7 +504,13 @@ impl<'scope, 'data> FieldAccessor<'scope, 'data> {
             .as_ptr()
             .add(self.offset as usize);
 
-        match self.current_field_type.unwrap().as_managed().size() {
+        match self
+            .current_field_type
+            .unwrap()
+            .as_managed()
+            .size()
+            .unwrap_or(std::mem::size_of::<usize>() as _)
+        {
             0 => (),
             1 => {
                 let atomic = &*ptr.cast::<AtomicU8>();
@@ -816,10 +822,13 @@ mod private {
             }
 
             let n = self.size();
-            if ty.n_fields() as usize <= n {
+            let n_fields = ty.n_fields().ok_or_else(|| AccessError::NoFields {
+                value_type: ty.display_string_or(CANNOT_DISPLAY_TYPE),
+            })?;
+            if n_fields as usize <= n {
                 Err(AccessError::OutOfBoundsField {
                     idx: n,
-                    n_fields: ty.n_fields() as usize,
+                    n_fields: n_fields as usize,
                     value_type: ty.display_string_or(CANNOT_DISPLAY_TYPE),
                 })?;
             }

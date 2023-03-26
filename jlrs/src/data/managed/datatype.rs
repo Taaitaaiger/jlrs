@@ -34,18 +34,15 @@ use jl_sys::{
 use jlrs_macros::julia_version;
 
 use super::{simple_vector::SimpleVectorData, type_name::TypeName, value::ValueData, Ref};
-#[julia_version(windows_lts = false)]
-use crate::data::managed::array::Array;
-#[julia_version(windows_lts = false)]
-use crate::data::managed::value::ValueResult;
 use crate::{
     convert::to_symbol::ToSymbol,
     data::{
         managed::{
+            array::Array,
             private::ManagedPriv,
             simple_vector::{SimpleVector, SimpleVectorRef},
             symbol::{Symbol, SymbolRef},
-            value::Value,
+            value::{Value, ValueResult},
             Managed,
         },
         types::typecheck::Typecheck,
@@ -295,32 +292,28 @@ impl<'scope> DataType<'scope> {
     }
 
     /// Returns a pointer to the layout of this `DataType`.
-    pub fn layout(self) -> DatatypeLayout<'scope> {
+    pub fn layout(self) -> Option<DatatypeLayout<'scope>> {
         // Safety: the pointer points to valid data
         unsafe {
-            let layout = NonNull::new(self.unwrap_non_null(Private).as_ref().layout as *mut _)
-                .expect("Layout is null");
-            DatatypeLayout(layout, PhantomData)
+            let layout = NonNull::new(self.unwrap_non_null(Private).as_ref().layout as *mut _)?;
+            Some(DatatypeLayout(layout, PhantomData))
         }
-    }
-
-    #[julia_version(since = "1.9")]
-    /// Returns the size of a value of this type in bytes.
-    pub fn size(self) -> u32 {
-        if self.is_abstract() {
-            return std::mem::size_of::<usize>() as u32;
-        }
-        self.layout().size()
     }
 
     #[julia_version(until = "1.8")]
     /// Returns the size of a value of this type in bytes.
-    pub fn size(self) -> u32 {
+    pub fn size(self) -> Option<u32> {
         if self.is_abstract() {
-            return std::mem::size_of::<usize>() as u32;
+            return None;
         }
         // Safety: the pointer points to valid data
-        unsafe { self.unwrap_non_null(Private).as_ref().size as u32 }
+        unsafe { Some(self.unwrap_non_null(Private).as_ref().size as u32) }
+    }
+
+    #[julia_version(since = "1.9")]
+    /// Returns the size of a value of this type in bytes.
+    pub fn size(self) -> Option<u32> {
+        Some(self.layout()?.size())
     }
 
     /// Returns the hash of this type.
@@ -468,11 +461,23 @@ impl<'scope> DataType<'scope> {
         unsafe { self.unwrap_non_null(Private).as_ref().cached_by_hash != 0 }
     }
 
-    #[julia_version(since = "1.7")]
+    #[julia_version(since = "1.7", until = "1.9")]
     /// If true, the type is stored in hash-based set cache (instead of linear cache).
     pub fn cached_by_hash(self) -> bool {
         // Safety: the pointer points to valid data
         unsafe { self.unwrap_non_null(Private).as_ref().cached_by_hash() != 0 }
+    }
+
+    #[julia_version(since = "1.10")]
+    /// Computational bit for has_concrete_supertype. See description in jltypes.c.
+    pub fn maybe_subtype_of_cache(self) -> bool {
+        // Safety: the pointer points to valid data
+        unsafe {
+            self.unwrap_non_null(Private)
+                .as_ref()
+                .maybe_subtype_of_cache()
+                != 0
+        }
     }
 }
 
@@ -483,22 +488,20 @@ impl<'scope> DataType<'scope> {
     }
 
     /// Returns the alignment of a value of this type in bytes.
-    pub fn align(self) -> u16 {
+    pub fn align(self) -> Option<u16> {
         // Safety: the pointer points to valid data, if the layout is null the code
         // panics.
-        self.layout().alignment()
+        Some(self.layout()?.alignment())
     }
 
     /// Returns the size of a value of this type in bits.
-    pub fn n_bits(self) -> u32 {
-        self.size() * 8
+    pub fn n_bits(self) -> Option<u32> {
+        Some(self.size()? * 8)
     }
 
     /// Returns the number of fields of a value of this type.
-    pub fn n_fields(self) -> u32 {
-        // Safety: the pointer points to valid data, if the layout is null the code
-        // panics.
-        self.layout().n_fields()
+    pub fn n_fields(self) -> Option<u32> {
+        Some(self.layout()?.n_fields())
     }
 
     /// Returns the name of this type.
@@ -513,10 +516,14 @@ impl<'scope> DataType<'scope> {
 
     /// Returns the size of the field at position `idx` in this type.
     pub fn field_size(self, idx: usize) -> JlrsResult<u32> {
-        if idx >= self.n_fields() as usize {
+        let n_fields = self.n_fields().ok_or_else(|| AccessError::NoFields {
+            value_type: self.display_string_or(CANNOT_DISPLAY_TYPE),
+        })?;
+
+        if idx >= n_fields as usize {
             Err(AccessError::OutOfBoundsField {
                 idx,
-                n_fields: self.n_fields() as usize,
+                n_fields: n_fields as usize,
                 value_type: self.display_string_or(CANNOT_DISPLAY_TYPE),
             })?
         }
@@ -535,10 +542,14 @@ impl<'scope> DataType<'scope> {
 
     /// Returns the offset where the field at position `idx` is stored.
     pub fn field_offset(self, idx: usize) -> JlrsResult<u32> {
-        if idx >= self.n_fields() as usize {
+        let n_fields = self.n_fields().ok_or_else(|| AccessError::NoFields {
+            value_type: self.display_string_or(CANNOT_DISPLAY_TYPE),
+        })?;
+
+        if idx >= n_fields as usize {
             Err(AccessError::OutOfBoundsField {
                 idx,
-                n_fields: self.n_fields() as usize,
+                n_fields: n_fields as usize,
                 value_type: self.display_string_or(CANNOT_DISPLAY_TYPE),
             })?
         }
@@ -557,10 +568,14 @@ impl<'scope> DataType<'scope> {
 
     /// Returns true if the field at position `idx` is stored as a pointer.
     pub fn is_pointer_field(self, idx: usize) -> JlrsResult<bool> {
-        if idx >= self.n_fields() as usize {
+        let n_fields = self.n_fields().ok_or_else(|| AccessError::NoFields {
+            value_type: self.display_string_or(CANNOT_DISPLAY_TYPE),
+        })?;
+
+        if idx >= n_fields as usize {
             Err(AccessError::OutOfBoundsField {
                 idx,
-                n_fields: self.n_fields() as usize,
+                n_fields: n_fields as usize,
                 value_type: self.display_string_or(CANNOT_DISPLAY_TYPE),
             })?
         }
@@ -580,10 +595,14 @@ impl<'scope> DataType<'scope> {
     #[julia_version(since = "1.7")]
     /// Returns true if the field at position `idx` is an atomic field.
     pub fn is_atomic_field(self, idx: usize) -> JlrsResult<bool> {
-        if idx >= self.n_fields() as usize {
+        let n_fields = self.n_fields().ok_or_else(|| AccessError::NoFields {
+            value_type: self.display_string_or(CANNOT_DISPLAY_TYPE),
+        })?;
+
+        if idx >= n_fields as usize {
             Err(AccessError::OutOfBoundsField {
                 idx,
-                n_fields: self.n_fields() as usize,
+                n_fields: n_fields as usize,
                 value_type: self.display_string_or(CANNOT_DISPLAY_TYPE),
             })?
         }
@@ -618,10 +637,14 @@ impl<'scope> DataType<'scope> {
     #[julia_version(since = "1.8")]
     /// Returns true if the field at position `idx` is a constant field.
     pub fn is_const_field(self, idx: usize) -> JlrsResult<bool> {
-        if idx >= self.n_fields() as usize {
+        let n_fields = self.n_fields().ok_or_else(|| AccessError::NoFields {
+            value_type: self.display_string_or(CANNOT_DISPLAY_TYPE),
+        })?;
+
+        if idx >= n_fields as usize {
             Err(AccessError::OutOfBoundsField {
                 idx,
-                n_fields: self.n_fields() as usize,
+                n_fields: n_fields as usize,
                 value_type: self.display_string_or(CANNOT_DISPLAY_TYPE),
             })?
         }
@@ -661,7 +684,6 @@ impl<'scope> DataType<'scope> {
         isconst != 0
     }
 
-    #[julia_version(windows_lts = false)]
     /// Create a new instance of this `DataType`, using `values` to set the fields.
     /// This is essentially a more powerful version of [`Value::new`] that can instantiate
     /// arbitrary concrete `DataType`s, at the cost that each of its fields must have already been
@@ -741,7 +763,11 @@ impl<'scope> DataType<'scope> {
     pub fn has_pointer_fields(self) -> JlrsResult<bool> {
         // Safety: the pointer points to valid data, if the layout is null the code
         // panics.
-        Ok(self.layout().first_ptr() != -1)
+        let layout = self.layout().ok_or_else(|| AccessError::NoFields {
+            value_type: self.display_string_or(CANNOT_DISPLAY_TYPE),
+        })?;
+
+        Ok(layout.first_ptr() != -1)
     }
 }
 

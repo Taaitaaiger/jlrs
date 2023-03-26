@@ -135,7 +135,6 @@ impl<'data> Array<'_, 'data> {
     ///
     /// If the array size is too large, Julia will throw an error. This error is caught and
     /// returned.
-
     pub fn new<'target, 'current, 'borrow, T, D, S>(
         target: ExtendedTarget<'target, '_, '_, S>,
         dims: D,

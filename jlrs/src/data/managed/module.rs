@@ -202,7 +202,6 @@ impl<'scope> Module<'scope> {
         unsafe { Some(module.cast_unchecked()) }
     }
 
-    #[julia_version(windows_lts = false)]
     /// Set a global value in this module. Note that if this global already exists, this can
     /// make the old value unreachable. If an excection is thrown, it's caught, rooted and
     /// returned.
@@ -261,7 +260,6 @@ impl<'scope> Module<'scope> {
         );
     }
 
-    #[julia_version(windows_lts = false)]
     /// Set a constant in this module. If Julia throws an exception it's caught and rooted in the
     /// current frame, if the exception can't be rooted a `JlrsError::AllocError` is returned. If
     /// no exception is thrown an unrooted reference to the constant is returned.

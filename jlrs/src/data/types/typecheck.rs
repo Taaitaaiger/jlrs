@@ -237,9 +237,9 @@ unsafe impl Typecheck for PrimitiveType {
     fn typecheck(t: DataType) -> bool {
         unsafe {
             t.is::<Immutable>()
-                && !t.unwrap_non_null(Private).as_ref().layout.is_null()
-                && t.n_fields() == 0
-                && t.size() > 0
+                && !t.layout().is_none()
+                && t.n_fields().unwrap_unchecked() == 0
+                && t.size().unwrap_unchecked() > 0
         }
     }
 }

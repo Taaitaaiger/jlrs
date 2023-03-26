@@ -128,6 +128,8 @@ pub enum AccessError {
     FieldNeedsSimpleIndex,
     #[error("cannot access undefined reference")]
     UndefRef,
+    #[error("type {value_type} has no fields")]
+    NoFields { value_type: String },
 }
 
 /// Data instantiation errors.

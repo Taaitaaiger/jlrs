@@ -34,10 +34,10 @@ mod tests {
                     let val = Value::new(&mut frame, 3.0f32);
                     let dt = val.datatype();
 
-                    assert_eq!(dt.size(), 4);
-                    assert_eq!(dt.align(), 4);
-                    assert_eq!(dt.n_bits(), 32);
-                    assert_eq!(dt.n_fields(), 0);
+                    assert_eq!(dt.size().unwrap(), 4);
+                    assert_eq!(dt.align().unwrap(), 4);
+                    assert_eq!(dt.n_bits().unwrap(), 32);
+                    assert_eq!(dt.n_fields().unwrap(), 0);
                     assert!(dt.is_inline_alloc());
 
                     Ok(())
@@ -625,6 +625,7 @@ mod tests {
         })
     }
 
+    #[cfg(not(feature = "julia-1-10"))]
     fn datatype_cached_by_hash() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -753,6 +754,7 @@ mod tests {
         datatype_is_const_field();
         cannot_instantiate_with_incorrect_params();
         compare_with_value();
+        #[cfg(not(feature = "julia-1-10"))]
         datatype_cached_by_hash();
         extend_lifetime();
         check_names();

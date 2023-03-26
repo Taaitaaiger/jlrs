@@ -38,6 +38,8 @@
 
  - `TrackArray` has been removed, the trait methods are now implemented directly by `(Typed)Array`. The tracking methods have been renamed to `track_shared` and `track_exclusive`.
 
+ - `DataType` methods that depend on the type having a layout return `None` if the type has no layout.
+
 
 #### v0.17
 

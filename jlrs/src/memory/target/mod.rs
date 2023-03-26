@@ -3,10 +3,11 @@
 //! Many methods in jlrs return Julia data, these methods use targets to ensure the returned data
 //! has the correct type and appropriate lifetimes.
 //!
-//! Targets implement the [`Target`] trait. This trait is used in
-//! combination with methods that return `Data`, an `Exception` or a `Result`. `Data` is simply
-//! some Julia data, `Exception` is a result that can contain Julia data in its `Err` variant,
-//! and `Result` is a `Result` that contains Julia data in both its `Ok` and `Err` variants.
+//! Targets implement the [`Target`] trait. This trait is used in combination with methods that
+//! return `Data`, an `Exception` or a `Result`. `Data` is simply some Julia data, `Exception`
+//! is a result that can contain Julia data in its `Err` variant, and `Result` is a `Result` that
+//! contains Julia data in both its `Ok` and `Err` variants.
+//!
 //! If an `Err` is returned it contains a caught exception. An `Exception` is used in
 //! combination with methods that can throw an exception, but typically don't return Julia data
 //! on success. If an `Exception` does contain Julia data on success, the data is guaranteed to be
