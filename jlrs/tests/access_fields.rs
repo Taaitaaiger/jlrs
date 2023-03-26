@@ -4,13 +4,14 @@ mod tests {
     #[cfg(not(feature = "julia-1-6"))]
     use std::sync::atomic::Ordering;
 
-    use jlrs::{convert::to_symbol::ToSymbol, prelude::*};
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
-    use jlrs::{data::layout::union::EmptyUnion, data::types::typecheck::Mutable};
+    use jlrs::{
+        convert::to_symbol::ToSymbol,
+        data::{layout::union::EmptyUnion, types::typecheck::Mutable},
+        prelude::*,
+    };
 
     use super::util::{JULIA, MIXED_BAG_JL};
 
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     fn empty_union_field() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -113,7 +114,6 @@ mod tests {
         })
     }
 
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     fn access_mutable_struct_fields() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -155,7 +155,6 @@ mod tests {
         })
     }
 
-    #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
     fn cannot_access_unknown_mutable_struct_field() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -824,11 +823,8 @@ mod tests {
 
     #[test]
     fn access_field_tests() {
-        #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
         empty_union_field();
-        #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
         access_mutable_struct_fields();
-        #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
         cannot_access_unknown_mutable_struct_field();
         access_tuple_fields();
         cannot_access_oob_tuple_field();
