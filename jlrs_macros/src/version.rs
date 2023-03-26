@@ -222,6 +222,11 @@ fn should_emit(
             return false;
         }
 
+        #[cfg(any(feature = "windows", target_os = "windows"))]
+        if selected.minor != LTS_MINOR_VERSION && windows_lts {
+            return false;
+        }
+
         #[cfg(not(any(feature = "windows", target_os = "windows")))]
         if windows_lts {
             return false;

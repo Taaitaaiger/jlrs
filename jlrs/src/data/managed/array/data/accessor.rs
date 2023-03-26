@@ -8,10 +8,7 @@ use std::{
 };
 
 use jl_sys::{jl_array_ptr_set, jl_array_typetagdata, jl_arrayref, jl_arrayset};
-use jlrs_macros::julia_version;
 
-#[julia_version(windows_lts = false)]
-use crate::data::managed::value::ValueResult;
 use crate::{
     data::{
         layout::valid_layout::ValidField,
@@ -23,7 +20,7 @@ use crate::{
             datatype::DataType,
             private::ManagedPriv,
             union::{find_union_component, nth_union_component},
-            value::{Value, ValueData},
+            value::{Value, ValueData, ValueResult},
             Managed, ManagedRef, ManagedType,
         },
     },
@@ -201,7 +198,6 @@ impl<'borrow, 'array, 'data, U, L: ArrayLayout, M: Mutability>
         }
     }
 
-    #[julia_version(windows_lts = false)]
     /// Access the element at `index` and convert it to a `Value` rooted in `scope`.
     ///
     /// If an error is thrown by Julia it's caught and returned.
@@ -278,7 +274,6 @@ impl<'borrow, 'array, 'data, U, L: ArrayLayout, M: Mutability>
 impl<'borrow, 'array, 'data, U, L: ArrayLayout>
     ArrayAccessor<'borrow, 'array, 'data, U, L, Mutable<'borrow, U>>
 {
-    #[julia_version(windows_lts = false)]
     /// Set the element at `index` to `value`.
     ///
     /// If an error is thrown by Julia it's caught and returned.

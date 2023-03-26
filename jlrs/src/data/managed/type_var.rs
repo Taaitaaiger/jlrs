@@ -3,7 +3,6 @@
 use std::{marker::PhantomData, ptr::NonNull};
 
 use jl_sys::{jl_new_typevar, jl_tvar_t, jl_tvar_type};
-use jlrs_macros::julia_version;
 
 use super::{value::ValueData, Ref};
 use crate::{
@@ -27,7 +26,6 @@ use crate::{
 pub struct TypeVar<'scope>(NonNull<jl_tvar_t>, PhantomData<&'scope ()>);
 
 impl<'scope> TypeVar<'scope> {
-    #[julia_version(windows_lts = false)]
     /// Create a new `TypeVar`, the optional lower and upper bounds must be subtypes of `Type`,
     /// their default values are `Union{}` and `Any` respectively. The returned value can be
     /// cast to a [`TypeVar`]. If Julia throws an exception, it's caught, rooted and returned.

@@ -20,14 +20,13 @@
 //! `[usize; N]` and `&[usize; N]` implement it for all `N`, `&[usize]` can be used if `N` is not
 //! a constant at compile time.
 
-#[julia_version(windows_lts = false)]
-use std::mem::MaybeUninit;
 use std::{
     cell::UnsafeCell,
     ffi::c_void,
     fmt::{Debug, Formatter, Result as FmtResult},
     marker::PhantomData,
     mem,
+    mem::MaybeUninit,
     ptr::{null_mut, NonNull},
     slice,
 };
@@ -39,7 +38,6 @@ use jl_sys::{
     jl_datatype_t, jl_gc_add_ptr_finalizer, jl_new_array, jl_new_struct_uninit, jl_pchar_to_array,
     jl_ptr_to_array, jl_ptr_to_array_1d, jl_reshape_array,
 };
-use jlrs_macros::julia_version;
 
 use self::{
     data::accessor::{
@@ -55,9 +53,8 @@ use super::{
     value::{typed::TypedValue, ValueRef},
     Ref,
 };
-#[julia_version(windows_lts = false)]
-use crate::catch::{catch_exceptions, catch_exceptions_with_slots};
 use crate::{
+    catch::{catch_exceptions, catch_exceptions_with_slots},
     convert::{
         ccall_types::{CCallArg, CCallReturn},
         into_julia::IntoJulia,
@@ -126,7 +123,6 @@ pub struct Array<'scope, 'data>(
 );
 
 impl<'data> Array<'_, 'data> {
-    #[julia_version(windows_lts = false)]
     /// Allocate a new n-dimensional Julia array of dimensions `dims` for data of type `T`.
     ///
     /// This method can only be used in combination with types that implement `IntoJulia`. If you
@@ -247,7 +243,6 @@ impl<'data> Array<'_, 'data> {
             .unwrap()
     }
 
-    #[julia_version(windows_lts = false)]
     /// Allocate a new n-dimensional Julia array of dimensions `dims` for data of type `ty`.
     ///
     /// The elementy type, ty` must be a` Union`, `UnionAll` or `DataType`.
@@ -364,7 +359,6 @@ impl<'data> Array<'_, 'data> {
             .unwrap()
     }
 
-    #[julia_version(windows_lts = false)]
     /// Create a new n-dimensional Julia array of dimensions `dims` that borrows data from Rust.
     ///
     /// This method can only be used in combination with types that implement `IntoJulia`. Because
@@ -507,7 +501,6 @@ impl<'data> Array<'_, 'data> {
         })
     }
 
-    #[julia_version(windows_lts = false)]
     /// Create a new n-dimensional Julia array of dimensions `dims` that takes ownership of Rust
     /// data.
     ///
@@ -1136,7 +1129,6 @@ impl<'scope, 'data> Array<'scope, 'data> {
         std::slice::from_raw_parts_mut(data, len)
     }
 
-    #[julia_version(windows_lts = false)]
     /// Reshape the array, a new array is returned that has dimensions `dims`. The new array and
     /// `self` share their data.
     ///
@@ -1312,7 +1304,6 @@ impl<'scope> Array<'scope, 'static> {
         jl_array_ptr_1d_append
     */
 
-    #[julia_version(windows_lts = false)]
     /// Insert `inc` elements at the end of the array.
     ///
     /// The array must be 1D and not contain data borrowed or moved from Rust, otherwise an exception
@@ -1350,7 +1341,6 @@ impl<'scope> Array<'scope, 'static> {
         jl_array_grow_end(self.unwrap(Private), inc);
     }
 
-    #[julia_version(windows_lts = false)]
     /// Remove `dec` elements from the end of the array.
     ///
     /// The array must be 1D, not contain data borrowed or moved from Rust, otherwise an exception
@@ -1383,7 +1373,6 @@ impl<'scope> Array<'scope, 'static> {
         jl_array_del_end(self.unwrap(Private), dec);
     }
 
-    #[julia_version(windows_lts = false)]
     /// Insert `inc` elements at the beginning of the array.
     ///
     /// The array must be 1D, not contain data borrowed or moved from Rust, otherwise an exception
@@ -1420,7 +1409,6 @@ impl<'scope> Array<'scope, 'static> {
         jl_array_grow_beg(self.unwrap(Private), inc);
     }
 
-    #[julia_version(windows_lts = false)]
     /// Remove `dec` elements from the beginning of the array.
     ///
     /// The array must be 1D, not contain data borrowed or moved from Rust, otherwise an exception
@@ -1586,7 +1574,6 @@ impl<'data, T> TypedArray<'_, 'data, T>
 where
     T: ValidField + IntoJulia,
 {
-    #[julia_version(windows_lts = false)]
     /// Allocate a new n-dimensional Julia array of dimensions `dims` for data of type `T`.
     ///
     /// This method can only be used in combination with types that implement `IntoJulia`. If you
@@ -1654,7 +1641,6 @@ where
             .unwrap()
     }
 
-    #[julia_version(windows_lts = false)]
     /// Create a new n-dimensional Julia array of dimensions `dims` that borrows data from Rust.
     ///
     /// This method can only be used in combination with types that implement `IntoJulia`. Because
@@ -1723,7 +1709,6 @@ where
         })
     }
 
-    #[julia_version(windows_lts = false)]
     /// Create a new n-dimensional Julia array of dimensions `dims` that takes ownership of Rust
     /// data.
     ///
@@ -1799,7 +1784,6 @@ impl<'data, T> TypedArray<'_, 'data, T>
 where
     T: ValidField,
 {
-    #[julia_version(windows_lts = false)]
     /// Allocate a new n-dimensional Julia array of dimensions `dims` for data of type `ty`.
     ///
     /// The elementy type, ty` must be a `Union`, `UnionAll` or `DataType`.
@@ -2063,7 +2047,6 @@ where
         unsafe { std::mem::transmute(self) }
     }
 
-    #[julia_version(windows_lts = false)]
     /// Reshape the array, a new array is returned that has dimensions `dims`. The new array and
     /// `self` share their data.
     ///
@@ -2266,7 +2249,6 @@ impl<'scope, T> TypedArray<'scope, 'static, T>
 where
     T: ValidField,
 {
-    #[julia_version(windows_lts = false)]
     /// Insert `inc` elements at the end of the array.
     ///
     /// The array must be 1D and not contain data borrowed or moved from Rust, otherwise an exception
@@ -2291,7 +2273,6 @@ where
         self.as_array().grow_end_unchecked(inc)
     }
 
-    #[julia_version(windows_lts = false)]
     /// Remove `dec` elements from the end of the array.
     ///
     /// The array must be 1D, not contain data borrowed or moved from Rust, otherwise an exception
@@ -2311,7 +2292,6 @@ where
         self.as_array().del_end_unchecked(dec)
     }
 
-    #[julia_version(windows_lts = false)]
     /// Insert `inc` elements at the beginning of the array.
     ///
     /// The array must be 1D, not contain data borrowed or moved from Rust, otherwise an exception
@@ -2336,7 +2316,6 @@ where
         self.as_array().grow_begin_unchecked(inc)
     }
 
-    #[julia_version(windows_lts = false)]
     /// Remove `dec` elements from the beginning of the array.
     ///
     /// The array must be 1D, not contain data borrowed or moved from Rust, otherwise an exception
