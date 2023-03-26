@@ -1,7 +1,6 @@
 mod util;
 
 #[cfg(feature = "sync-rt")]
-#[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
 mod tests {
     #[cfg(feature = "internal-types")]
     use jlrs::data::managed::internal::code_instance::CodeInstance;

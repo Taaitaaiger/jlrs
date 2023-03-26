@@ -28,17 +28,11 @@ pub static MIXED_BAG_JL: &'static str = include_str!("MixedBagStable.jl");
 #[allow(dead_code)]
 pub static MIXED_BAG_JL: &'static str = include_str!("MixedBagLTS.jl");
 
-#[cfg(all(
-    feature = "async-rt",
-    not(all(target_os = "windows", feature = "julia-1-6"))
-))]
+#[cfg(all(feature = "async-rt",))]
 #[allow(dead_code)]
 pub static ASYNC_TESTS_JL: &'static str = include_str!("AsyncTests.jl");
 
-#[cfg(all(
-    feature = "async-rt",
-    not(all(target_os = "windows", feature = "julia-1-6"))
-))]
+#[cfg(all(feature = "async-rt",))]
 pub mod async_tasks;
 
 #[cfg(feature = "jlrs-derive")]

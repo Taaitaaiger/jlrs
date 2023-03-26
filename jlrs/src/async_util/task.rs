@@ -108,8 +108,6 @@ pub trait AsyncTask: 'static + Send {
 /// Example:
 ///
 /// ```
-/// # #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
-/// # {
 /// use jlrs::prelude::*;
 ///
 /// struct AccumulatorTask {
@@ -192,7 +190,6 @@ pub trait AsyncTask: 'static + Send {
 ///         }
 ///     }
 /// }
-/// # }
 /// ```
 ///
 /// [`AsyncJulia::persistent`]: crate::runtime::async_rt::AsyncJulia::persistent

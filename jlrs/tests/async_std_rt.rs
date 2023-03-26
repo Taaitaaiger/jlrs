@@ -1,14 +1,8 @@
-#[cfg(all(
-    feature = "async-std-rt",
-    not(all(target_os = "windows", feature = "julia-1-6")),
-))]
+#[cfg(all(feature = "async-std-rt",))]
 #[cfg(test)]
 mod util;
 
-#[cfg(all(
-    feature = "async-std-rt",
-    not(all(target_os = "windows", feature = "julia-1-6")),
-))]
+#[cfg(all(feature = "async-std-rt",))]
 #[cfg(test)]
 mod tests {
     use std::{num::NonZeroUsize, sync::Arc};

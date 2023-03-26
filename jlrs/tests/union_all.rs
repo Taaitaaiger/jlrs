@@ -1,6 +1,5 @@
 mod util;
 #[cfg(feature = "sync-rt")]
-#[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
 mod tests {
     use jlrs::{
         data::managed::{type_var::TypeVar, union_all::UnionAll},

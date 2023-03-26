@@ -1,7 +1,6 @@
 mod util;
 
 #[cfg(feature = "sync-rt")]
-#[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
 mod tests {
     use std::borrow::Cow;
 
@@ -434,7 +433,6 @@ mod tests {
         })
     }
 
-    #[cfg(not(all(feature = "julia-1-6", any(windows, feature = "windows"))))]
     fn cant_redefine_const() {
         JULIA.with(|j| {
             let mut frame = StackFrame::new();
@@ -538,7 +536,6 @@ mod tests {
         extend_lifetime_with_root();
         is_imported();
         submodule_must_be_module();
-        #[cfg(not(all(feature = "julia-1-6", any(windows, feature = "windows"))))]
         cant_redefine_const();
         set_global_unchecked();
         set_const_unchecked();

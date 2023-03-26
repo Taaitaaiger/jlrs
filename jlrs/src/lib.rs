@@ -437,8 +437,6 @@
 //! its contents:
 //!
 //! ```
-//! # #[cfg(not(all(target_os = "windows", feature = "julia-1-6")))]
-//! # {
 //! use jlrs::prelude::*;
 //!
 //! struct AccumulatorTask {
@@ -520,7 +518,6 @@
 //!         }
 //!     }
 //! }
-//! # }
 //! ```
 //!
 //! ## Calling Rust from Julia
