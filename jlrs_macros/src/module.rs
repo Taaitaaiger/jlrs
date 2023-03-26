@@ -1147,7 +1147,7 @@ fn doc_info_fragment((index, info): (usize, &ItemWithAttrs)) -> Result<Expr> {
                         unsafe {
                             let module = #override_module_fragment;
                             let item = ::jlrs::data::managed::symbol::Symbol::new(&frame, #rename);
-                            let signature ::jlrs::data::managed::value::Value::bottom_type(&frame);
+                            let signature = ::jlrs::data::managed::value::Value::bottom_type(&frame);
                             let doc = ::jlrs::data::managed::string::JuliaString::new(&mut frame, #doc);
 
                             let doc_it = doc_item_ty.instantiate_unchecked(&mut frame, [module.as_value(), item.as_value(), signature, doc.as_value()]);
