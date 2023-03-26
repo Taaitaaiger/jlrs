@@ -35,7 +35,7 @@ unsafe extern "C" fn freestanding_func_arrayarg(a: Array) -> usize {
     let elty = a.element_type();
 
     if let Ok(elty) = elty.cast::<DataType>() {
-        elty.size() as usize
+        elty.size().unwrap_or(std::mem::size_of::<usize>() as _) as _
     } else {
         std::mem::size_of::<usize>()
     }

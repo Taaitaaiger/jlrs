@@ -3,6 +3,9 @@ name = "julia_module_test"
 version = "0.1.0"
 edition = "2021"
 
+[profile.release]
+panic = "abort"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
 julia-1-6 = ["jlrs/julia-1-6"]

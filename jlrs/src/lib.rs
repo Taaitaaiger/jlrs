@@ -72,9 +72,6 @@
 //! `JULIA_DIR` environment variable. This doesn't work correctly with juliaup, in this case
 //! the environment variable must be set.
 //!
-//! Note that while Julia 1.6 is supported on Windows, several methods are currently unavailable
-//! when this version is used.
-//!
 //!
 //! # Features
 //!
@@ -576,7 +573,12 @@
 //! crate-type = ["cdylib"]
 //! ```
 //!
-//! to your crate's `Cargo.toml`.
+//! to your crate's `Cargo.toml`. It's also recommended to abort on panic:
+//! 
+//! ```toml
+//! [profile.releas
+//! panic = "abort"
+//! ```
 //!
 //! The easiest way to export Rust functions like `call_me` from the previous example is by
 //! using the [`julia_module`] macro. The content of the macro is converted to an initialization

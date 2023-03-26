@@ -40,6 +40,8 @@
 
  - `DataType` methods that depend on the type having a layout return `None` if the type has no layout.
 
+ - Methods that can catch a thrown exception are now available on Windows in combination with Julia 1.6.
+
 
 #### v0.17
 
