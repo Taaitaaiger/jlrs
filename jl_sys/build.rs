@@ -151,11 +151,8 @@ fn compile_jlrs_cc(julia_dir: &str) {
     let mut c = cc::Build::new();
     c.file("src/jlrs_cc.cc")
         .include(&include_dir)
-        .cpp(true)
+        .cpp(false)
         .flag_if_supported("-fPIC");
-
-    #[cfg(target_os = "macos")]
-    c.cpp(false);
 
     cfg_if! {
         if #[cfg(feature = "yggdrasil")] {
@@ -176,6 +173,7 @@ fn compile_jlrs_cc(julia_dir: &str) {
 
             #[cfg(target_env = "msvc")]
             {
+                c.cpp(true);
                 c.flag("/std:c++20");
 
                 let julia_dll_a = format!("{}/lib/libjulia.dll.a", julia_dir);

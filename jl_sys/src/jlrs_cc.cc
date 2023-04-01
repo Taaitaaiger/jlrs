@@ -6,7 +6,7 @@ extern "C"
 #endif
     jlrs_catch_t jlrs_catch_wrapper(void *callback, jlrs_callback_caller_t caller, void *result, void *frame_slice)
     {
-        jlrs_catch_t res;
+        jlrs_catch_t res = { .tag = JLRS_CATCH_OK, .error = NULL };
 
 #if !defined(JLRS_WINDOWS_LTS)
         JL_TRY
@@ -17,7 +17,8 @@ extern "C"
         }
         JL_CATCH
         {
-            res = {.tag = JLRS_CATCH_EXCEPTION, .error = jl_current_exception()};
+            res.tag = JLRS_CATCH_EXCEPTION;
+            res.error = jl_current_exception();
         }
 #endif
         return res;
