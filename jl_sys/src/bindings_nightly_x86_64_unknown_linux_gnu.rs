@@ -1,4 +1,4 @@
-/* generated from julia version 1.10.0-DEV (Commit: e90f6a3d9c 2023-03-24 19:40 UTC) */
+/* generated from julia version 1.10.0-DEV (Commit: 1eee6ef7c8 2023-04-01 03:25 UTC) */
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct __BindgenBitfieldUnit<Storage> {
@@ -266,11 +266,26 @@ impl _jl_taggedvalue_bits {
         }
     }
     #[inline]
-    pub fn new_bitfield_1(gc: usize) -> __BindgenBitfieldUnit<[u8; 1usize]> {
+    pub fn in_image(&self) -> usize {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(2usize, 1u8) as u64) }
+    }
+    #[inline]
+    pub fn set_in_image(&mut self, val: usize) {
+        unsafe {
+            let val: u64 = ::std::mem::transmute(val);
+            self._bitfield_1.set(2usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn new_bitfield_1(gc: usize, in_image: usize) -> __BindgenBitfieldUnit<[u8; 1usize]> {
         let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 1usize]> = Default::default();
         __bindgen_bitfield_unit.set(0usize, 2u8, {
             let gc: u64 = unsafe { ::std::mem::transmute(gc) };
             gc as u64
+        });
+        __bindgen_bitfield_unit.set(2usize, 1u8, {
+            let in_image: u64 = unsafe { ::std::mem::transmute(in_image) };
+            in_image as u64
         });
         __bindgen_bitfield_unit
     }
@@ -2243,7 +2258,7 @@ pub struct _jl_task_t {
     pub result: *mut jl_value_t,
     pub logstate: *mut jl_value_t,
     pub start: *mut jl_function_t,
-    pub rngState: [u64; 4usize],
+    pub rngState: [u64; 5usize],
     pub _state: ::std::sync::atomic::AtomicU8,
     pub sticky: u8,
     pub _isexception: ::std::sync::atomic::AtomicU8,

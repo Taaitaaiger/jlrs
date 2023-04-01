@@ -148,7 +148,7 @@ fn compile_jlrs_cc(julia_dir: &str) {
             c.flag("-mwindows");
 
             #[cfg(feature = "windows")]
-            c.flag("-mnop-fun-dllimport");
+            c.flag("-Wl,--no-undefined");
         } else {
             #[cfg(feature = "i686")]
             c.flag("-march=pentium4");
