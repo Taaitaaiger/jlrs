@@ -17,7 +17,7 @@ fn main() {
         return;
     }
 
-    println!("cargo:rerun-if-changed=src/jlrs_cc.cc");
+    println!("cargo:rerun-if-changed=src/jlrs_cc.c");
     println!("cargo:rerun-if-changed=src/jlrs_cc.h");
     println!("cargo:rerun-if-env-changed=JULIA_DIR");
 
@@ -149,7 +149,7 @@ fn compile_jlrs_cc(julia_dir: &str) {
     let include_dir = format!("{}/include/julia/", julia_dir);
 
     let mut c = cc::Build::new();
-    c.file("src/jlrs_cc.cc")
+    c.file("src/jlrs_cc.c")
         .include(&include_dir)
         .cpp(false)
         .flag_if_supported("-fPIC");
