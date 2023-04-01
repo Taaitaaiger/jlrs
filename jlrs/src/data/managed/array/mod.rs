@@ -2969,8 +2969,7 @@ pub type TypedRankedArrayRet<U, const N: isize> =
 /// This is a useful shorthand for signatures of `ccall`able functions that take a [`Array`].
 ///
 /// See [`TypedArrayUnbound`] for more information.
-pub type TypedRankedArrayUnbound<U, const N: isize> =
-    TypedRankedArray<'static, 'static, U, N>;
+pub type TypedRankedArrayUnbound<U, const N: isize> = TypedRankedArray<'static, 'static, U, N>;
 
 unsafe impl<U: ValidField, const N: isize> ValidLayout for TypedRankedArrayRef<'_, '_, U, N> {
     fn valid_layout(v: Value) -> bool {
