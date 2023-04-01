@@ -156,16 +156,17 @@ fn compile_jlrs_cc(julia_dir: &str) {
     cfg_if! {
         if #[cfg(feature = "yggdrasil")] {
             c.file("src/jlrs_cc.c");
+
             #[cfg(feature = "i686")]
             {
                 c.no_default_flags(true);
                 c.flag("-O3");
             }
 
-            #[cfg(feature = "windows")]
+            #[cfg(any(windows, target_os = "windows", feature = "windows"))]
             c.flag("-mwindows");
 
-            #[cfg(feature = "windows")]
+            #[cfg(any(windows, target_os = "windows", feature = "windows"))]
             c.flag("-Wl,--no-undefined");
         } else {
             #[cfg(feature = "i686")]
@@ -189,7 +190,7 @@ fn compile_jlrs_cc(julia_dir: &str) {
     #[cfg(feature = "julia-1-6")]
     c.define("JULIA_1_6", None);
 
-    #[cfg(all(any(windows, feature = "windows"), feature = "julia-1-6"))]
+    #[cfg(all(any(windows, target_os = "windows", feature = "windows"), feature = "julia-1-6"))]
     c.define("JLRS_WINDOWS_LTS", None);
 
     #[cfg(feature = "julia-1-7")]
