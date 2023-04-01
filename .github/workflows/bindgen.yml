@@ -81,7 +81,7 @@ jobs:
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v1
         with:
-          version: '1.9'
+          version: '1.9-nightly'
 
       - name: Setup Rust
         uses:  dtolnay/rust-toolchain@master
