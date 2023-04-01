@@ -1,0 +1,27 @@
+name: Bindgen
+
+on:
+  workflow_dispatch:
+
+jobs:
+  bindgen-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Julia environment
+        uses: julia-actions/setup-julia@v1
+        with:
+          version: '1.8'
+
+      - name: Setup Rust
+        uses:  dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+
+      - name: Run tests
+        run: |
+          export JULIA_DIR="$(dirname $(dirname $(which julia)))"
+          export LD_LIBRARY_PATH="${JULIA_DIR}/lib:${JULIA_DIR}/lib/julia:${LD_LIBRARY_PATH}"
+          cd jl_sys
+          cargo build --features use-bingen,julia-1-8
