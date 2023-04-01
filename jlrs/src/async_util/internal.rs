@@ -246,7 +246,7 @@ where
 
 #[async_trait(?Send)]
 pub(crate) trait PendingTaskEnvelope: Send + Sync {
-    async fn call(mut self: Box<Self>, mut stack: &'static Stack);
+    async fn call(mut self: Box<Self>, stack: &'static Stack);
 }
 
 #[async_trait(?Send)]
