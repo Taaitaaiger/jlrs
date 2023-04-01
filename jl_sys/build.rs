@@ -154,6 +154,9 @@ fn compile_jlrs_cc(julia_dir: &str) {
         .cpp(true)
         .flag_if_supported("-fPIC");
 
+    #[cfg(feature = "macos")]
+    c.cpp(false);
+
     cfg_if! {
         if #[cfg(feature = "yggdrasil")] {
             #[cfg(feature = "i686")]
