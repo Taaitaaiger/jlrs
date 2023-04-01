@@ -24,4 +24,4 @@ jobs:
           export JULIA_DIR="$(dirname $(dirname $(which julia)))"
           export LD_LIBRARY_PATH="${JULIA_DIR}/lib:${JULIA_DIR}/lib/julia:${LD_LIBRARY_PATH}"
           cd jl_sys
-          cargo build --features use-bingen,julia-1-8
+          cargo build --features use-bindgen,julia-1-8
