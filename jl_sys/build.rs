@@ -167,7 +167,7 @@ fn compile_jlrs_cc(julia_dir: &str) {
             c.flag("-mwindows");
 
             #[cfg(any(windows, target_os = "windows", feature = "windows"))]
-            println!("cargo:rustc-link-arg=-Wl,--no-undefined")
+            println!("cargo:rustc-link-arg=-Wl,--no-undefined");
 
             #[cfg(any(windows, target_os = "windows", feature = "windows"))]
             c.flag("-Wl,--no-undefined");
