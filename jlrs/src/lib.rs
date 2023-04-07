@@ -1,8 +1,7 @@
 //! jlrs is a crate that provides access to most of the Julia C API, it can be used to embed Julia
 //! in Rust applications and to use functionality from the Julia C API when writing `ccall`able
-//! functions in Rust. Currently this crate is only tested on Linux and Windows in combination
-//! with Julia 1.6 and 1.8. Using Julia 1.8 is highly recommended. The minimum supported Rust
-//! version is currently 1.65.
+//! functions in Rust. Currently this crate is only tested in combination with Julia 1.6 and 1.8.
+//! Using Julia 1.8 is highly recommended. The minimum supported Rust version is currently 1.65.
 //!
 //! The documentation assumes you're already familiar with the Julia and Rust programming
 //! languages.
@@ -72,6 +71,11 @@
 //! `JULIA_DIR` environment variable. This doesn't work correctly with juliaup, in this case
 //! the environment variable must be set.
 //!
+//! ## macOS
+//!
+//! Follow the instructions for Linux, but replace `LD_LIBARY_PATH` with `DYLD_LIBARY_PATH`.
+//! Support for macOS should be considered experimental, currently the only guarantee is that CI
+//! tests succeed.
 //!
 //! # Features
 //!
