@@ -10,6 +10,8 @@ mod tests {
             let image_path = format!("{}/lib/julia/sys.dll", julia_dir);
             #[cfg(target_os = "linux")]
             let image_path = format!("{}/lib/julia/sys.so", julia_dir);
+            #[cfg(target_os = "macos")]
+            let image_path = format!("{}/lib/julia/sys.dylib", julia_dir);
 
             unsafe {
                 assert!(RuntimeBuilder::new()
