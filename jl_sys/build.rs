@@ -32,6 +32,17 @@ fn main() {
     generate_bindings(&julia_dir);
 }
 
+#[cfg(feature = "yggdrasil")]
+fn find_julia() -> Option<String> {
+    if let Ok(mut path) = env::var("WORKSPACE") {
+        path.push_str("/destdir");
+        return Some(path);
+    }
+
+    None
+}
+
+#[cfg(not(feature = "yggdrasil"))]
 fn find_julia() -> Option<String> {
     if let Ok(path) = env::var("JULIA_DIR") {
         return Some(path);
