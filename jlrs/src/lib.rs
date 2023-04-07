@@ -823,7 +823,7 @@ pub mod safety;
 #[cfg(feature = "sync-rt")]
 pub mod util;
 
-pub(crate) unsafe fn init_jlrs<const N: usize>(frame: &mut PinnedFrame<N>) {
+pub(crate) unsafe fn init_jlrs<const N: usize>(frame: &mut PinnedFrame<N>, install_jlrs_jl: bool) {
     static IS_INIT: AtomicBool = AtomicBool::new(false);
 
     if IS_INIT.swap(true, Ordering::Relaxed) {
@@ -831,18 +831,28 @@ pub(crate) unsafe fn init_jlrs<const N: usize>(frame: &mut PinnedFrame<N>) {
     }
 
     let unrooted = Unrooted::new();
-    Value::eval_string(
-        unrooted,
-        "if !isdefined(Main, :Jlrs)
-            try
-                using Jlrs
-            catch e
-                import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/Jlrs.jl\")
-                using Jlrs
-            end
-        end",
-    )
-    .expect("Failed to load or install Jlrs package");
+    if install_jlrs_jl {
+        Value::eval_string(
+            unrooted,
+            "if !isdefined(Main, :Jlrs)
+                      try
+                          using Jlrs
+                      catch e
+                          import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/Jlrs.jl\")
+                          using Jlrs
+                      end
+                  end",
+        )
+        .expect("Failed to load or install Jlrs package");
+    } else {
+        Value::eval_string(
+            unrooted,
+            "if !isdefined(Main, :Jlrs)
+                      using Jlrs
+                  end",
+        )
+        .expect("Failed to load or install Jlrs package");
+    }
 
     let jlrs_module = Module::main(&unrooted)
         .submodule(unrooted, "Jlrs")

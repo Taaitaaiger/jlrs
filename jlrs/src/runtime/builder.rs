@@ -25,6 +25,7 @@ use crate::error::JlrsResult;
 /// must call [`RuntimeBuilder::start`].
 pub struct RuntimeBuilder {
     pub(crate) image: Option<(PathBuf, PathBuf)>,
+    pub(crate) install_jlrs_jl: bool,
 }
 
 cfg_if::cfg_if! {
@@ -129,6 +130,15 @@ cfg_if::cfg_if! {
                 self
             }
 
+            /// Enable or disable automatically installing Jlrs.jl.
+            ///
+            /// In order to function correctly, jlrs requires that the Jlrs.jl package is installed. By
+            /// default, this package is automatically installed if it hasn't been installed yet.
+            pub fn install_jlrs(mut self, install: bool) -> Self {
+                self.builder.install_jlrs_jl = install;
+                self
+            }
+
             /// Initialize Julia on another thread.
             ///
             /// You must set the maximum number of concurrent tasks with the `N` const generic.
@@ -161,7 +171,10 @@ cfg_if::cfg_if! {
 impl RuntimeBuilder {
     /// Create a new `RuntimeBuilder`.
     pub fn new() -> Self {
-        RuntimeBuilder { image: None }
+        RuntimeBuilder {
+            image: None,
+            install_jlrs_jl: true,
+        }
     }
 
     #[cfg(feature = "sync-rt")]
@@ -241,6 +254,15 @@ impl RuntimeBuilder {
             julia_bindir.as_ref().to_path_buf(),
             image_path.as_ref().to_path_buf(),
         ));
+        self
+    }
+
+    /// Enable or disable automatically installing Jlrs.jl.
+    ///
+    /// In order to function correctly, jlrs requires that the Jlrs.jl package is installed. By
+    /// default, this package is automatically installed if it hasn't been installed yet.
+    pub fn install_jlrs(mut self, install: bool) -> Self {
+        self.install_jlrs_jl = install;
         self
     }
 }

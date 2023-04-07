@@ -1,4 +1,4 @@
-/* generated from julia version 1.9.0-rc1 */
+/* generated from julia version 1.9.0-rc2 */
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct __BindgenBitfieldUnit<Storage> {
@@ -289,11 +289,26 @@ impl _jl_taggedvalue_bits {
         }
     }
     #[inline]
-    pub fn new_bitfield_1(gc: usize) -> __BindgenBitfieldUnit<[u8; 1usize]> {
+    pub fn in_image(&self) -> usize {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(2usize, 1u8) as u64) }
+    }
+    #[inline]
+    pub fn set_in_image(&mut self, val: usize) {
+        unsafe {
+            let val: u64 = ::std::mem::transmute(val);
+            self._bitfield_1.set(2usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn new_bitfield_1(gc: usize, in_image: usize) -> __BindgenBitfieldUnit<[u8; 1usize]> {
         let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 1usize]> = Default::default();
         __bindgen_bitfield_unit.set(0usize, 2u8, {
             let gc: u64 = unsafe { ::std::mem::transmute(gc) };
             gc as u64
+        });
+        __bindgen_bitfield_unit.set(2usize, 1u8, {
+            let in_image: u64 = unsafe { ::std::mem::transmute(in_image) };
+            in_image as u64
         });
         __bindgen_bitfield_unit
     }
