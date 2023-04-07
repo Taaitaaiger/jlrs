@@ -25,6 +25,7 @@ use crate::{
 ///
 /// This pending instance can be activated by calling [`PendingJulia::instance`].
 pub struct PendingJulia {
+    install_jlrs_jl: bool,
     _not_send_sync: PhantomData<*mut c_void>,
 }
 
@@ -61,6 +62,7 @@ impl PendingJulia {
         assert!(jl_is_initialized() != 0);
 
         Ok(PendingJulia {
+            install_jlrs_jl: builder.install_jlrs_jl,
             _not_send_sync: PhantomData,
         })
     }
@@ -73,7 +75,7 @@ impl PendingJulia {
             // Is popped when Julia is dropped.
             let mut pinned = frame.pin();
 
-            init_jlrs(&mut pinned);
+            init_jlrs(&mut pinned, self.install_jlrs_jl);
 
             let frame = pinned.stack_frame();
             let context = frame.sync_stack();

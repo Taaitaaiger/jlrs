@@ -193,7 +193,10 @@ fn compile_jlrs_cc(julia_dir: &str) {
     #[cfg(feature = "julia-1-6")]
     c.define("JULIA_1_6", None);
 
-    #[cfg(all(any(windows, target_os = "windows", feature = "windows"), feature = "julia-1-6"))]
+    #[cfg(all(
+        any(windows, target_os = "windows", feature = "windows"),
+        feature = "julia-1-6"
+    ))]
     c.define("JLRS_WINDOWS_LTS", None);
 
     #[cfg(feature = "julia-1-7")]

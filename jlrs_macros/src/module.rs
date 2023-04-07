@@ -626,7 +626,7 @@ impl JuliaModule {
                 let mut stack_frame = ::jlrs::memory::stack_frame::StackFrame::new();
                 let mut ccall = ::jlrs::ccall::CCall::new(&mut stack_frame);
 
-                ccall.init_jlrs(Some(module));
+                ccall.init_jlrs(false, Some(module));
 
                 ccall.scope(|mut frame| {
                     let wrap_mod = ::jlrs::data::managed::module::Module::main(&frame)

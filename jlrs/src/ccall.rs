@@ -258,9 +258,9 @@ impl<'context> CCall<'context> {
     /// A module can be provided to allow setting the size of the internal thread pool from Julia
     /// by calling `Jlrs.set_pool_size`.
     #[inline(never)]
-    pub fn init_jlrs(&mut self, module: Option<Module>) {
+    pub fn init_jlrs(&mut self, install_jlrs_jl: bool, module: Option<Module>) {
         unsafe {
-            init_jlrs(&mut self.frame);
+            init_jlrs(&mut self.frame, install_jlrs_jl);
 
             // Expose thread pool to Julia
             if let Some(module) = module {

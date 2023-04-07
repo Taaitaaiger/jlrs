@@ -501,7 +501,7 @@ where
         let base_frame: &'static mut StackFrame<N> = std::mem::transmute(base_frame);
         let mut pinned = base_frame.pin();
 
-        init_jlrs(&mut pinned);
+        init_jlrs(&mut pinned, builder.builder.install_jlrs_jl);
 
         let base_frame = pinned.stack_frame();
 

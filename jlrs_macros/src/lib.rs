@@ -128,7 +128,7 @@ pub fn julia_module(item: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(item as JuliaModule);
     match input.generate_init_code() {
         Ok(a) => a,
-        Err(b) => b.to_compile_error().into()
+        Err(b) => b.to_compile_error().into(),
     }
 }
 
