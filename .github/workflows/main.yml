@@ -38,6 +38,35 @@ jobs:
           export LD_LIBRARY_PATH="${JULIA_DIR}/lib:${JULIA_DIR}/lib/julia:${LD_LIBRARY_PATH}"
           cargo test --features full,julia-1-8 --verbose
 
+  test-macos:
+    runs-on: macos-latest
+    continue-on-error: ${{ matrix.allow-fail }}
+    strategy:
+      matrix:
+        rust: [stable, beta]
+        allow-fail: [false]
+        include:
+          - rust: nightly
+            allow-fail: true
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Julia environment
+        uses: julia-actions/setup-julia@v1
+        with:
+          version: '1.8'
+
+      - name: Setup Rust
+        uses:  dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
+
+      - name: Run tests
+        run: |
+          export JULIA_DIR="$(dirname $(dirname $(which julia)))"
+          export LD_LIBRARY_PATH="${JULIA_DIR}/lib:${JULIA_DIR}/lib/julia:${LD_LIBRARY_PATH}"
+          cargo test --features full,julia-1-8 --verbose
+
   test-windows-gnu:
     runs-on: windows-latest
     continue-on-error: ${{ matrix.allow-fail }}
