@@ -101,7 +101,6 @@ fn set_flags(julia_dir: &str) {
             }
         } else if #[cfg(target_os = "macos")] {
             println!("cargo:rustc-link-search={}/lib", &julia_dir);
-            println!("cargo:rustc-link-arg=-Wl,--export-dynamic");
 
             cfg_if! {
                 if #[cfg(feature = "debug")] {
