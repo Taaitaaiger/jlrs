@@ -23,6 +23,16 @@ static inline T jl_atomic_load_relaxed(volatile T *obj)
 #include <julia.h>
 #include <julia_gcext.h>
 
+/**
+ * <div rustbindgen replaces="_jl_tls_states_t"></div>
+ */
+struct jlrs_tls_states_t;
+
+/**
+ * <div rustbindgen replaces="_jl_handler_t"></div>
+ */
+struct jlrs_handler_t;
+
 #ifdef __cplusplus
 extern "C"
 {
