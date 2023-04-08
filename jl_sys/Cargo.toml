@@ -28,8 +28,9 @@ uv = []
 yggdrasil = ["no-link"]
 i686 = []
 debug = []
-
+macos = []
 windows = []
+
 use-bindgen = ["bindgen", "syn", "quote", "proc-macro2"]
 docs = []
 

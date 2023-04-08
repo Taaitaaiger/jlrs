@@ -173,7 +173,7 @@ fn compile_jlrs_cc(julia_dir: &str) {
                 c.flag("-O3");
             }
 
-            #[cfg(target_os = "macos")]
+            #[cfg(any(windows, target_os = "macos", feature = "macos"))]
             {
                 println!("cargo:rustc-link-lib=julia");
                 println!("cargo:rustc-link-lib=uv");
