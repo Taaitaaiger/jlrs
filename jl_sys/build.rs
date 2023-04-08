@@ -113,7 +113,7 @@ fn interpret_target() -> Option<Target> {
             return Some(Target::Windows);
         }
 
-        if target.contains("i686") {
+        if target.contains("i686") || target.contains("arm") {
             return Some(Target::I686);
         }
     }
