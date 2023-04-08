@@ -24,7 +24,6 @@ fn main() {
     let julia_dir =
         find_julia().expect("JULIA_DIR is not set and no installed version of Julia can be found");
 
-    #[cfg(not(feature = "no-link"))]
     set_flags(&julia_dir);
     compile_jlrs_cc(&julia_dir);
 
@@ -89,6 +88,24 @@ fn find_julia() -> Option<String> {
     }
 }
 
+#[cfg(feature = "no-link")]
+fn set_flags(julia_dir: &str) {
+    #[cfg(feature = "yggdrasil")]
+    {
+        #[cfg(any(macos, target_os = "macos", feature = "macos"))]
+        {
+            println!("cargo:rustc-link-lib=julia");
+            #[cfg(feature = "uv")]
+            println!("cargo:rustc-link-lib=uv");
+        }
+
+        #[cfg(any(windows, target_os = "windows", feature = "windows"))]
+        {
+            println!("cargo:rustc-link-arg=-Wl,--no-undefined");
+        }
+    }
+}
+
 #[cfg(not(feature = "no-link"))]
 fn set_flags(julia_dir: &str) {
     cfg_if! {
@@ -104,13 +121,12 @@ fn set_flags(julia_dir: &str) {
                 }
             }
 
-            cfg_if! {
-                if #[cfg(feature = "uv")] {
-                    println!("cargo:rustc-link-search={}/lib/julia", &julia_dir);
-                    println!("cargo:rustc-link-lib=uv");
-                }
+            #[cfg(feature = "uv")]
+            {
+                println!("cargo:rustc-link-search={}/lib/julia", &julia_dir);
+                println!("cargo:rustc-link-lib=uv");
             }
-        } else if #[cfg(target_os = "macos")] {
+        } else if #[cfg(any(target_os = "macos", target_os = "freebsd"))] {
             println!("cargo:rustc-link-search={}/lib", &julia_dir);
 
             cfg_if! {
@@ -150,7 +166,7 @@ fn set_flags(julia_dir: &str) {
                 }
             }
         } else {
-            unreachable!()
+            panic!("Unsupported platform")
         }
     }
 }
@@ -173,15 +189,8 @@ fn compile_jlrs_cc(julia_dir: &str) {
                 c.flag("-O3");
             }
 
-            #[cfg(any(windows, target_os = "macos", feature = "macos"))]
-            {
-                println!("cargo:rustc-link-lib=julia");
-                println!("cargo:rustc-link-lib=uv");
-            }
-
             #[cfg(any(windows, target_os = "windows", feature = "windows"))]
             {
-                println!("cargo:rustc-link-arg=-Wl,--no-undefined");
                 c.flag("-mwindows");
                 c.flag("-Wl,--no-undefined");
             }
