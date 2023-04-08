@@ -173,14 +173,18 @@ fn compile_jlrs_cc(julia_dir: &str) {
                 c.flag("-O3");
             }
 
-            #[cfg(any(windows, target_os = "windows", feature = "windows"))]
-            c.flag("-mwindows");
+            #[cfg(target_os = "macos")]
+            {
+                println!("cargo:rustc-link-lib=julia");
+                println!("cargo:rustc-link-lib=uv");
+            }
 
             #[cfg(any(windows, target_os = "windows", feature = "windows"))]
-            println!("cargo:rustc-link-arg=-Wl,--no-undefined");
-
-            #[cfg(any(windows, target_os = "windows", feature = "windows"))]
-            c.flag("-Wl,--no-undefined");
+            {
+                println!("cargo:rustc-link-arg=-Wl,--no-undefined");
+                c.flag("-mwindows");
+                c.flag("-Wl,--no-undefined");
+            }
         } else {
             #[cfg(feature = "i686")]
             c.flag("-march=pentium4");
