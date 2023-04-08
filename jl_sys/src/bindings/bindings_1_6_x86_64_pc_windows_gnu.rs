@@ -80,8 +80,6 @@ where
     }
 }
 pub type DWORD = ::std::os::raw::c_ulong;
-pub type uv_mutex_t = [u64; 5usize];
-pub type uv_cond_t = u64;
 pub type uint_t = u64;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -97,14 +95,6 @@ pub struct arraylist_t {
     pub max: usize,
     pub items: *mut *mut ::std::os::raw::c_void,
     pub _space: [*mut ::std::os::raw::c_void; 29usize],
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct small_arraylist_t {
-    pub len: u32,
-    pub max: u32,
-    pub items: *mut *mut ::std::os::raw::c_void,
-    pub _space: [*mut ::std::os::raw::c_void; 6usize],
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -128,7 +118,6 @@ pub struct win32_ucontext_t_stack_t {
     pub ss_size: usize,
 }
 pub type jl_taggedvalue_t = _jl_taggedvalue_t;
-pub type sig_atomic_t = ::std::os::raw::c_int;
 pub type jl_tls_states_t = _jl_tls_states_t;
 pub type jl_ptls_t = *mut jl_tls_states_t;
 #[link(name = "libjulia", kind = "raw-dylib")]
@@ -142,114 +131,6 @@ pub type jl_thread_t = DWORD;
 pub struct jl_mutex_t {
     pub owner: jl_thread_t,
     pub count: u32,
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct jl_gc_pool_t {
-    pub freelist: *mut jl_taggedvalue_t,
-    pub newpages: *mut jl_taggedvalue_t,
-    pub osize: u16,
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct jl_thread_gc_num_t {
-    pub allocd: i64,
-    pub freed: i64,
-    pub malloc: u64,
-    pub realloc: u64,
-    pub poolalloc: u64,
-    pub bigalloc: u64,
-    pub freecall: u64,
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct jl_thread_heap_t {
-    pub weak_refs: arraylist_t,
-    pub live_tasks: arraylist_t,
-    pub mallocarrays: *mut _mallocarray_t,
-    pub mafreelist: *mut _mallocarray_t,
-    pub big_objects: *mut _bigval_t,
-    pub rem_bindings: arraylist_t,
-    pub _remset: [arraylist_t; 2usize],
-    pub remset_nptr: ::std::os::raw::c_int,
-    pub remset: *mut arraylist_t,
-    pub last_remset: *mut arraylist_t,
-    pub norm_pools: [jl_gc_pool_t; 41usize],
-    pub free_stacks: [arraylist_t; 16usize],
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub struct _jl_gc_mark_data {
-    _unused: [u8; 0],
-}
-pub type jl_gc_mark_data_t = _jl_gc_mark_data;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct jl_gc_mark_sp_t {
-    pub pc: *mut *mut ::std::os::raw::c_void,
-    pub data: *mut jl_gc_mark_data_t,
-    pub pc_start: *mut *mut ::std::os::raw::c_void,
-    pub pc_end: *mut *mut ::std::os::raw::c_void,
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct jl_gc_mark_cache_t {
-    pub perm_scanned_bytes: usize,
-    pub scanned_bytes: usize,
-    pub nbig_obj: usize,
-    pub big_obj: [*mut ::std::os::raw::c_void; 1024usize],
-    pub stack_lock: jl_mutex_t,
-    pub pc_stack: *mut *mut ::std::os::raw::c_void,
-    pub pc_stack_end: *mut *mut ::std::os::raw::c_void,
-    pub data_stack: *mut jl_gc_mark_data_t,
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct _jl_bt_element_t {
-    _unused: [u8; 0],
-}
-#[repr(C)]
-#[repr(align(16))]
-#[derive(Debug, Copy, Clone)]
-pub struct _jl_tls_states_t {
-    pub pgcstack: *mut _jl_gcframe_t,
-    pub world_age: usize,
-    pub tid: i16,
-    pub rngseed: u64,
-    pub safepoint: *mut usize,
-    pub sleep_check_state: i8,
-    pub gc_state: i8,
-    pub in_finalizer: i8,
-    pub disable_gc: i8,
-    pub heap: jl_thread_heap_t,
-    pub gc_num: jl_thread_gc_num_t,
-    pub sleep_lock: uv_mutex_t,
-    pub wake_signal: uv_cond_t,
-    pub defer_signal: sig_atomic_t,
-    pub current_task: *mut _jl_task_t,
-    pub next_task: *mut _jl_task_t,
-    pub root_task: *mut _jl_task_t,
-    pub timing_stack: *mut _jl_timing_block_t,
-    pub stackbase: *mut ::std::os::raw::c_void,
-    pub stacksize: usize,
-    pub __bindgen_padding_0: u64,
-    pub base_ctx: jl_ucontext_t,
-    pub safe_restore: *mut jmp_buf,
-    pub sig_exception: *mut _jl_value_t,
-    pub bt_data: *mut _jl_bt_element_t,
-    pub bt_size: usize,
-    pub signal_request: sig_atomic_t,
-    pub io_wait: sig_atomic_t,
-    pub needs_resetstkoflw: ::std::os::raw::c_int,
-    pub system_id: jl_thread_t,
-    pub in_pure_callback: ::std::os::raw::c_int,
-    pub finalizers_inhibited: ::std::os::raw::c_int,
-    pub finalizers: arraylist_t,
-    pub gc_cache: jl_gc_mark_cache_t,
-    pub sweep_objs: arraylist_t,
-    pub gc_mark_sp: jl_gc_mark_sp_t,
-    pub previous_exception: *mut _jl_value_t,
-    pub locks: small_arraylist_t,
 }
 #[link(name = "libjulia", kind = "raw-dylib")]
 extern "C" {
@@ -1924,26 +1805,12 @@ extern "C" {
 extern "C" {
     pub fn jl_yield();
 }
-pub type jl_timing_block_t = _jl_timing_block_t;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct _jl_excstack_t {
     _unused: [u8; 0],
 }
 pub type jl_excstack_t = _jl_excstack_t;
-#[repr(C)]
-#[repr(align(16))]
-#[derive(Debug, Copy, Clone)]
-pub struct _jl_handler_t {
-    pub eh_ctx: jmp_buf,
-    pub gcstack: *mut jl_gcframe_t,
-    pub prev: *mut _jl_handler_t,
-    pub gc_state: i8,
-    pub locks_len: usize,
-    pub defer_signal: sig_atomic_t,
-    pub timing_stack: *mut jl_timing_block_t,
-    pub world_age: usize,
-}
 pub type jl_handler_t = _jl_handler_t;
 #[repr(C)]
 #[repr(align(16))]
@@ -2171,6 +2038,18 @@ extern "C" {
 extern "C" {
     pub fn jl_gc_schedule_foreign_sweepfunc(ptls: jl_ptls_t, bj: *mut jl_value_t);
 }
+#[doc = " <div rustbindgen replaces=\"_jl_tls_states_t\"></div>"]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct _jl_tls_states_t {
+    _unused: [u8; 0],
+}
+#[doc = " <div rustbindgen replaces=\"_jl_handler_t\"></div>"]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct _jl_handler_t {
+    _unused: [u8; 0],
+}
 pub const jlrs_catch_tag_t_JLRS_CATCH_OK: jlrs_catch_tag_t = 0;
 pub const jlrs_catch_tag_t_JLRS_CATCH_ERR: jlrs_catch_tag_t = 1;
 pub const jlrs_catch_tag_t_JLRS_CATCH_EXCEPTION: jlrs_catch_tag_t = 2;
@@ -2206,21 +2085,6 @@ extern "C" {
         dt: *mut jl_datatype_t,
         ptr: *const ::std::os::raw::c_void,
     );
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct _mallocarray_t {
-    pub _address: u8,
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct _bigval_t {
-    pub _address: u8,
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct _jl_timing_block_t {
-    pub _address: u8,
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
