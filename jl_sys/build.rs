@@ -24,8 +24,9 @@ fn main() {
     let julia_dir =
         find_julia().expect("JULIA_DIR is not set and no installed version of Julia can be found");
 
-    set_flags(&julia_dir);
-    compile_jlrs_cc(&julia_dir);
+    let target = interpret_target();
+    set_flags(&julia_dir, target);
+    compile_jlrs_cc(&julia_dir, target);
 
     #[cfg(feature = "use-bindgen")]
     generate_bindings(&julia_dir);
@@ -88,29 +89,55 @@ fn find_julia() -> Option<String> {
     }
 }
 
+#[allow(dead_code)]
+#[derive(Clone, Copy)]
+enum Target {
+    BSD,
+    Windows,
+    I686,
+}
+
+#[cfg(not(feature = "yggdrasil"))]
+fn interpret_target() -> Option<Target> {
+    return None;
+}
+
+#[cfg(feature = "yggdrasil")]
+fn interpret_target() -> Option<Target> {
+    if let Ok(target) = env::var("target") {
+        if target.contains("apple") || target.contains("freebsd") {
+            return Some(Target::BSD);
+        }
+
+        if target.contains("windows") {
+            return Some(Target::Windows);
+        }
+
+        if target.contains("i686") {
+            return Some(Target::I686);
+        }
+    }
+
+    None
+}
+
 #[cfg(feature = "no-link")]
-fn set_flags(julia_dir: &str) {
-    #[cfg(feature = "yggdrasil")]
-    {
-        #[cfg(any(macos, target_os = "macos", feature = "macos"))]
-        {
+fn set_flags(julia_dir: &str, target: Option<Target>) {
+    match target {
+        Some(Target::BSD) => {
             println!("cargo:rustc-link-lib=julia");
             #[cfg(feature = "uv")]
             println!("cargo:rustc-link-lib=uv");
         }
-
-        #[cfg(any(windows, target_os = "windows", feature = "windows"))]
-        {
+        Some(Target::Windows) => {
             println!("cargo:rustc-link-arg=-Wl,--no-undefined");
-            println!("cargo:rustc-link-lib=julia");
-            #[cfg(feature = "uv")]
-            println!("cargo:rustc-link-lib=uv-2");
         }
+        _ => (),
     }
 }
 
 #[cfg(not(feature = "no-link"))]
-fn set_flags(julia_dir: &str) {
+fn set_flags(julia_dir: &str, _tgt: Option<Target>) {
     cfg_if! {
         if #[cfg(target_os = "linux")] {
             println!("cargo:rustc-link-search={}/lib", &julia_dir);
@@ -174,7 +201,8 @@ fn set_flags(julia_dir: &str) {
     }
 }
 
-fn compile_jlrs_cc(julia_dir: &str) {
+#[allow(unused_variables)]
+fn compile_jlrs_cc(julia_dir: &str, target: Option<Target>) {
     let include_dir = format!("{}/include/julia/", julia_dir);
 
     let mut c = cc::Build::new();
@@ -186,16 +214,16 @@ fn compile_jlrs_cc(julia_dir: &str) {
         if #[cfg(feature = "yggdrasil")] {
             c.file("src/jlrs_cc.c");
 
-            #[cfg(feature = "i686")]
-            {
-                c.no_default_flags(true);
-                c.flag("-O3");
-            }
-
-            #[cfg(any(windows, target_os = "windows", feature = "windows"))]
-            {
-                c.flag("-mwindows");
-                c.flag("-Wl,--no-undefined");
+            match target {
+                Some(Target::I686) => {
+                    c.no_default_flags(true);
+                    c.flag("-O3");
+                }
+                Some(Target::Windows) => {
+                    c.flag("-mwindows");
+                    c.flag("-Wl,--no-undefined");
+                }
+                _ => ()
             }
         } else {
             #[cfg(feature = "i686")]
@@ -224,6 +252,11 @@ fn compile_jlrs_cc(julia_dir: &str) {
         feature = "julia-1-6"
     ))]
     c.define("JLRS_WINDOWS_LTS", None);
+
+    if let Some(Target::Windows) = target {
+        #[cfg(feature = "julia-1-6")]
+        c.define("JLRS_WINDOWS_LTS", None);
+    }
 
     #[cfg(feature = "julia-1-7")]
     c.define("JULIA_1_7", None);
