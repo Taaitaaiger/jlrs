@@ -36,10 +36,11 @@ bindings_for!(
     "windows",
     "64"
 );
+bindings_for!(bindings_1_6_x86_64_apple_darwin, "julia-1-6", "macos", "64");
 bindings_for!(
     bindings_1_6_x86_64_apple_darwin,
     "julia-1-6",
-    "macos",
+    "freebsd",
     "64"
 );
 
@@ -49,24 +50,23 @@ bindings_for!(
     "linux",
     "64"
 );
-
 bindings_for!(
     bindings_1_7_i686_unknown_linux_gnu,
     "julia-1-7",
     "linux",
     "32"
 );
-
 bindings_for!(
     bindings_1_7_x86_64_pc_windows_gnu,
     "julia-1-7",
     "windows",
     "64"
 );
+bindings_for!(bindings_1_7_x86_64_apple_darwin, "julia-1-7", "macos", "64");
 bindings_for!(
     bindings_1_7_x86_64_apple_darwin,
     "julia-1-7",
-    "macos",
+    "freebsd",
     "64"
 );
 
@@ -88,10 +88,11 @@ bindings_for!(
     "windows",
     "64"
 );
+bindings_for!(bindings_1_8_x86_64_apple_darwin, "julia-1-8", "macos", "64");
 bindings_for!(
     bindings_1_8_x86_64_apple_darwin,
     "julia-1-8",
-    "macos",
+    "freebsd",
     "64"
 );
 
@@ -113,10 +114,11 @@ bindings_for!(
     "windows",
     "64"
 );
+bindings_for!(bindings_1_9_x86_64_apple_darwin, "julia-1-9", "macos", "64");
 bindings_for!(
     bindings_1_9_x86_64_apple_darwin,
     "julia-1-9",
-    "macos",
+    "freebsd",
     "64"
 );
 
