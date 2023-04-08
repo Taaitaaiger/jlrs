@@ -86,6 +86,8 @@ no-link = ["jl-sys/no-link"]
 yggdrasil = ["jl-sys/yggdrasil"]
 # Cross-compile to Windows
 windows = ["jl-sys/windows", "jlrs-macros/windows"]
+# Cross-compile to macOS
+macos = ["jl-sys/macos"]
 
 # Internal
 
