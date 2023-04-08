@@ -57,6 +57,10 @@ extern "C"
     uint_t jlrs_array_data_owner_offset(uint16_t n_dims);
     void jlrs_gc_queue_multiroot(jl_value_t *parent, jl_datatype_t *dt, const void *ptr) JL_NOTSAFEPOINT;
 
+#if defined(JULIA_1_6)
+    void **jlrs_pgcstack(jl_tls_states_t *ptls);
+#endif
+
 #if !defined(JULIA_1_6)
     void jlrs_lock(jl_value_t *v);
     void jlrs_unlock(jl_value_t *v);

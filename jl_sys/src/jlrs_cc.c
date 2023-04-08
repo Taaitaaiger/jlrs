@@ -6,7 +6,7 @@ extern "C"
 #endif
     jlrs_catch_t jlrs_catch_wrapper(void *callback, jlrs_callback_caller_t caller, void *result, void *frame_slice)
     {
-        jlrs_catch_t res = { .tag = JLRS_CATCH_OK, .error = NULL };
+        jlrs_catch_t res = {.tag = JLRS_CATCH_OK, .error = NULL};
 
 #if !defined(JLRS_WINDOWS_LTS)
         JL_TRY
@@ -109,6 +109,14 @@ extern "C"
         }
     }
 #endif
+
+#if defined(JULIA_1_6)
+    void **jlrs_pgcstack(jl_tls_states_t *ptls)
+    {
+        return (void **)&(ptls->pgcstack);
+    }
+#endif
+
 #ifdef __cplusplus
 }
 #endif
