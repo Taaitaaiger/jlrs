@@ -65,9 +65,11 @@ pub(crate) struct PinnedFrame<'scope, const N: usize> {
 impl<'scope, const N: usize> PinnedFrame<'scope, N> {
     #[julia_version(until = "1.6")]
     unsafe fn new(raw: &'scope mut StackFrame<N>) -> Self {
-        let rtls = NonNull::new_unchecked(jl_sys::jl_get_ptls_states()).as_mut();
-        raw.prev = rtls.pgcstack.cast();
-        rtls.pgcstack = raw as *mut _ as *mut _;
+        let ptls = jl_sys::jl_get_ptls_states();
+        let mut pgcstack = NonNull::new_unchecked(jl_sys::jlrs_pgcstack(ptls));
+        let gcstack_ref: &mut *mut c_void = pgcstack.as_mut();
+        raw.prev = *gcstack_ref;
+        *gcstack_ref = raw as *mut _ as *mut _;
 
         PinnedFrame { raw: Pin::new(raw) }
     }
@@ -103,8 +105,10 @@ impl<'scope, const N: usize> Drop for PinnedFrame<'scope, N> {
     #[julia_version(until = "1.6")]
     fn drop(&mut self) {
         unsafe {
-            let rtls = NonNull::new_unchecked(jl_sys::jl_get_ptls_states()).as_mut();
-            rtls.pgcstack = self.raw.prev.cast();
+            let ptls = jl_sys::jl_get_ptls_states();
+            let mut pgcstack = NonNull::new_unchecked(jl_sys::jlrs_pgcstack(ptls));
+            let gcstack_ref: &mut *mut c_void = pgcstack.as_mut();
+            *gcstack_ref = self.raw.prev.cast();
             self.clear_roots();
         }
     }

@@ -1970,6 +1970,9 @@ pub struct _bigval_t {
 pub struct _jl_timing_block_t {
     pub _address: u8,
 }
+extern "C" {
+    pub fn jlrs_pgcstack(ptls: *mut jl_tls_states_t) -> *mut *mut ::std::os::raw::c_void;
+}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct _jl_value_t {

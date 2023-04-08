@@ -1835,6 +1835,9 @@ extern "C" {
         ptr: *const ::std::os::raw::c_void,
     );
 }
+extern "C" {
+    pub fn jlrs_pgcstack(ptls: *mut jl_tls_states_t) -> *mut *mut ::std::os::raw::c_void;
+}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct _jl_value_t {
