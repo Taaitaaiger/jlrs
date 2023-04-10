@@ -130,7 +130,7 @@ if [ "${NIGHTLY}" = "y" -o "${ALL}" = "y" ]; then
     cat ../target/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings/bindings_nightly_x86_64_unknown_linux_gnu.rs
 
     if [ "${BETA}" != "y" -a "${ALL}" != "y"  ]; then
-        rustfmt ./src/bindings/bindings_*
+        cargo +nightly fmt -- ./src/bindings/bindings_*
         exit
     fi
 fi
@@ -190,7 +190,7 @@ if [ "${BETA}" = "y" -o "${ALL}" = "y" ]; then
     cat ../target/i686-pc-windows-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings/bindings_1_9_i686_pc_windows_gnu.rs
 
     if [ "${ALL}" != "y"  ]; then
-        rustfmt ./src/bindings/bindings_*
+        cargo +nightly fmt -- ./src/bindings/bindings_*
         exit
     fi
 fi
@@ -352,6 +352,4 @@ JULIA_DIR=$JULIA_1_8_DIR_WIN32 cargo build --features use-bindgen,windows,julia-
 echo "/* generated from $JULIA_VERSION */" > ./src/bindings/bindings_1_8_i686_pc_windows_gnu.rs
 cat ../target/i686-pc-windows-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings/bindings_1_8_i686_pc_windows_gnu.rs
 
-rustup default nightly
-rustfmt ./src/bindings/bindings_*
-rustup default stable
+cargo +nightly fmt -- ./src/bindings/bindings_*
