@@ -74,6 +74,9 @@ function print_help() {
     echo "  Windows 64-bit 1.8       $HOME/julia-1.8.5-win           JULIA_1_8_DIR_WIN"
     echo "  Windows 64-bit 1.7       $HOME/julia-1.7.3-win           JULIA_1_7_DIR_WIN"
     echo "  Windows 64-bit 1.6       $HOME/julia-1.6.7-win           JULIA_1_6_DIR_WIN"
+    echo "  Windows 32-bit 1.8       $HOME/julia-1.8.5-win32         JULIA_1_8_DIR_WIN32"
+    echo "  Windows 32-bit 1.7       $HOME/julia-1.7.3-win32         JULIA_1_7_DIR_WIN32"
+    echo "  Windows 32-bit 1.6       $HOME/julia-1.6.7-win32         JULIA_1_6_DIR_WIN32"
     echo ""
     echo ""
     echo "When the nightly flag is set, the following is expected:"
@@ -88,6 +91,7 @@ function print_help() {
     echo "  Linux 64-bit 1.9         $HOME/julia-1.9.0-rc2          JULIA_1_9_DIR"
     echo "  Linux 32-bit 1.9         $HOME/julia-1.9.0-rc2-32       JULIA_1_9_DIR_32"
     echo "  Windows 64-bit 1.9       $HOME/julia-1.9.0-rc2-win      JULIA_1_9_DIR_WIN"
+    echo "  Windows 32-bit 1.9       $HOME/julia-1.9.0-rc2-win32    JULIA_1_9_DIR_WIN32"
     echo ""
     echo ""
     echo "All dependencies must have been installed before running this script. The"
@@ -95,11 +99,14 @@ function print_help() {
     echo ""
     echo "    apt install llvm-dev libclang-dev clang \\"
     echo "                g++-multilib-i686-linux-gnu \\"
-    echo "                g++-mingw-w64-x86-64"
+    echo "                g++-mingw-w64-x86-64 \\"
+    echo "                g++-mingw-w64-i686"
     echo "    rustup target add i686-unknown-linux-gnu"
     echo "    rustup toolchain install stable-i686-unknown-linux-gnu"
     echo "    rustup target add x86_64-pc-windows-gnu"
     echo "    rustup toolchain install stable-x86_64-pc-windows-gnu"
+    echo "    rustup target add i686-pc-windows-gnu"
+    echo "    rustup toolchain install stable-i686-pc-windows-gnu"
 }
 
 parse_args $@
@@ -153,6 +160,14 @@ if [ "${BETA}" = "y" -o "${ALL}" = "y" ]; then
         exit 1
     fi
 
+    if [ -z "$JULIA_1_9_DIR_WIN32" ]; then
+        JULIA_1_9_DIR_WIN32=${HOME}/julia-1.9.0-rc2-win32
+    fi
+    if [ ! -d "$JULIA_1_9_DIR_WIN32" ]; then
+        echo "Error: $JULIA_1_9_DIR_WIN32 does not exist" >&2
+        exit 1
+    fi
+
     cargo clean
     JULIA_VERSION=$($JULIA_1_9_DIR/bin/julia --version)
     JULIA_DIR=$JULIA_1_9_DIR cargo build --features use-bindgen,julia-1-9
@@ -168,6 +183,11 @@ if [ "${BETA}" = "y" -o "${ALL}" = "y" ]; then
     JULIA_DIR=$JULIA_1_9_DIR_WIN cargo build --features use-bindgen,windows,julia-1-9 --target x86_64-pc-windows-gnu
     echo "/* generated from $JULIA_VERSION */" > ./src/bindings/bindings_1_9_x86_64_pc_windows_gnu.rs
     cat ../target/x86_64-pc-windows-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings/bindings_1_9_x86_64_pc_windows_gnu.rs
+
+    cargo clean
+    JULIA_DIR=$JULIA_1_9_DIR_WIN32 cargo build --features use-bindgen,windows,julia-1-9,i686 --target i686-pc-windows-gnu
+    echo "/* generated from $JULIA_VERSION */" > ./src/bindings/bindings_1_9_i686_pc_windows_gnu.rs
+    cat ../target/i686-pc-windows-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings/bindings_1_9_i686_pc_windows_gnu.rs
 
     if [ "${ALL}" != "y"  ]; then
         rustfmt ./src/bindings/bindings_*
@@ -198,6 +218,13 @@ if [ ! -d "$JULIA_1_8_DIR_WIN" ]; then
     echo "Error: $JULIA_1_8_DIR_WIN does not exist" >&2
     exit 1
 fi
+if [ -z "$JULIA_1_8_DIR_WIN32" ]; then
+    JULIA_1_8_DIR_WIN32=$JULIA_1_8_DIR-win32
+fi
+if [ ! -d "$JULIA_1_8_DIR_WIN32" ]; then
+    echo "Error: $JULIA_1_8_DIR_WIN32 does not exist" >&2
+    exit 1
+fi
 
 if [ -z "$JULIA_1_7_DIR" ]; then
     JULIA_1_7_DIR=${HOME}/julia-1.7.3
@@ -220,6 +247,13 @@ if [ -z "$JULIA_1_7_DIR_WIN" ]; then
 fi
 if [ ! -d "$JULIA_1_7_DIR_WIN" ]; then
     echo "Error: $JULIA_1_7_DIR_WIN does not exist" >&2
+    exit 1
+fi
+if [ -z "$JULIA_1_7_DIR_WIN32" ]; then
+    JULIA_1_7_DIR_WIN32=$JULIA_1_7_DIR-win32
+fi
+if [ ! -d "$JULIA_1_7_DIR_WIN32" ]; then
+    echo "Error: $JULIA_1_7_DIR_WIN32 does not exist" >&2
     exit 1
 fi
 
@@ -247,6 +281,14 @@ if [ ! -d "$JULIA_1_6_DIR_WIN" ]; then
     exit 1
 fi
 
+if [ -z "$JULIA_1_6_DIR_WIN32" ]; then
+    JULIA_1_6_DIR_WIN32=$JULIA_1_6_DIR-win32
+fi
+if [ ! -d "$JULIA_1_6_DIR_WIN32" ]; then
+    echo "Error: $JULIA_1_6_DIR_WIN32 does not exist" >&2
+    exit 1
+fi
+
 cargo clean
 JULIA_VERSION=$($JULIA_1_6_DIR/bin/julia --version)
 JULIA_DIR=$JULIA_1_6_DIR cargo build --features use-bindgen,julia-1-6
@@ -262,6 +304,11 @@ cargo clean
 JULIA_DIR=$JULIA_1_6_DIR_WIN cargo build --features use-bindgen,windows,julia-1-6 --target x86_64-pc-windows-gnu
 echo "/* generated from $JULIA_VERSION */" > ./src/bindings/bindings_1_6_x86_64_pc_windows_gnu.rs
 cat ../target/x86_64-pc-windows-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings/bindings_1_6_x86_64_pc_windows_gnu.rs
+
+cargo clean
+JULIA_DIR=$JULIA_1_6_DIR_WIN32 cargo build --features use-bindgen,windows,julia-1-6,i686 --target i686-pc-windows-gnu
+echo "/* generated from $JULIA_VERSION */" > ./src/bindings/bindings_1_6_i686_pc_windows_gnu.rs
+cat ../target/i686-pc-windows-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings/bindings_1_6_i686_pc_windows_gnu.rs
 
 cargo clean
 JULIA_VERSION=$($JULIA_1_7_DIR/bin/julia --version)
@@ -280,6 +327,11 @@ echo "/* generated from $JULIA_VERSION */" > ./src/bindings/bindings_1_7_x86_64_
 cat ../target/x86_64-pc-windows-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings/bindings_1_7_x86_64_pc_windows_gnu.rs
 
 cargo clean
+JULIA_DIR=$JULIA_1_7_DIR_WIN32 cargo build --features use-bindgen,windows,julia-1-7,i686 --target i686-pc-windows-gnu
+echo "/* generated from $JULIA_VERSION */" > ./src/bindings/bindings_1_7_i686_pc_windows_gnu.rs
+cat ../target/i686-pc-windows-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings/bindings_1_7_i686_pc_windows_gnu.rs
+
+cargo clean
 JULIA_VERSION=$($JULIA_1_8_DIR/bin/julia --version)
 JULIA_DIR=$JULIA_1_8_DIR cargo build --features use-bindgen,julia-1-8
 echo "/* generated from $JULIA_VERSION */" > ./src/bindings/bindings_1_8_x86_64_unknown_linux_gnu.rs
@@ -294,6 +346,11 @@ cargo clean
 JULIA_DIR=$JULIA_1_8_DIR_WIN cargo build --features use-bindgen,windows,julia-1-8 --target x86_64-pc-windows-gnu
 echo "/* generated from $JULIA_VERSION */" > ./src/bindings/bindings_1_8_x86_64_pc_windows_gnu.rs
 cat ../target/x86_64-pc-windows-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings/bindings_1_8_x86_64_pc_windows_gnu.rs
+
+cargo clean
+JULIA_DIR=$JULIA_1_8_DIR_WIN32 cargo build --features use-bindgen,windows,julia-1-8,i686 --target i686-pc-windows-gnu
+echo "/* generated from $JULIA_VERSION */" > ./src/bindings/bindings_1_8_i686_pc_windows_gnu.rs
+cat ../target/i686-pc-windows-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings/bindings_1_8_i686_pc_windows_gnu.rs
 
 rustup default nightly
 rustfmt ./src/bindings/bindings_*
