@@ -20,7 +20,7 @@ use std::{
 };
 
 use quote::ToTokens;
-#[cfg(any(feature = "windows", windows))]
+#[cfg(all(any(feature = "windows", windows), not(feature = "i686")))]
 use syn::{parse::Parser, Attribute, ItemForeignMod};
 use syn::{
     punctuated::Punctuated, Field, ForeignItem, Ident, ItemStruct, ItemUnion, Meta, Token, Type,
@@ -377,7 +377,7 @@ fn convert_union_to_atomic(field_def: &mut Field, info: &AtomicField) {
     }
 }
 
-#[cfg(any(feature = "windows", windows))]
+#[cfg(all(any(feature = "windows", windows), not(feature = "i686")))]
 fn item_is_in_libjulia(fmod: &mut ItemForeignMod) {
     if let ForeignItem::Static(_) = &fmod.items[0] {
         let attr = Attribute::parse_outer
@@ -435,7 +435,7 @@ pub fn fix_bindings<P: AsRef<Path>, Q: AsRef<Path>>(header_path: P, bindings: &s
                 }
             }
             syn::Item::ForeignMod(fmod) => {
-                #[cfg(any(feature = "windows", windows))]
+                #[cfg(all(any(feature = "windows", windows), not(feature = "i686")))]
                 item_is_in_libjulia(fmod);
 
                 match &mut fmod.items[0] {
