@@ -218,6 +218,7 @@ fn compile_jlrs_cc(julia_dir: &str, target: Option<Target>) {
                 Some(Target::I686) => {
                     c.no_default_flags(true);
                     c.flag("-O3");
+                    c.flag("-fPIC");
                 }
                 Some(Target::Windows) => {
                     c.flag("-mwindows");
