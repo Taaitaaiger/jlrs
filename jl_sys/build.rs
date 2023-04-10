@@ -109,7 +109,7 @@ fn interpret_target() -> Option<Target> {
             return Some(Target::BSD);
         }
 
-        if target.contains("windows") {
+        if target.contains("w64") {
             return Some(Target::Windows);
         }
 
