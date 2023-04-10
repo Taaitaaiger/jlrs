@@ -177,7 +177,7 @@ macro_rules! impl_tuple {
 
                 unsafe {
                     target.data_from_ptr(
-                        ::std::ptr::NonNull::new_unchecked(::jl_sys::jl_apply_tuple_type_v(types.as_mut_ptr().cast(), types.len())),
+                        ::std::ptr::NonNull::new_unchecked(::jl_sys::jl_apply_tuple_type_v(types.as_mut_ptr().cast(), types.len()).cast()),
                         $crate::private::Private,
                     )
                 }

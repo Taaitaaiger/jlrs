@@ -1,4 +1,4 @@
-/* generated from julia version 1.10.0-DEV (Commit: 1eee6ef7c8 2023-04-01 03:25 UTC) */
+/* generated from julia version 1.10.0-DEV (Commit: 844c20dd63 2023-04-10 17:50 UTC) */
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct __BindgenBitfieldUnit<Storage> {
@@ -1734,7 +1734,7 @@ extern "C" {
     ) -> *mut jl_value_t;
 }
 extern "C" {
-    pub fn jl_apply_tuple_type_v(p: *mut *mut jl_value_t, np: usize) -> *mut jl_tupletype_t;
+    pub fn jl_apply_tuple_type_v(p: *mut *mut jl_value_t, np: usize) -> *mut jl_value_t;
 }
 extern "C" {
     pub fn jl_new_datatype(
