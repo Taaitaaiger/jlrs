@@ -2408,7 +2408,7 @@ where
     debug_assert!(n <= 8, "Too many dimensions for small_dim_tuple");
     let elem_types = JL_LONG_TYPE.with(|longs| longs.get());
     let tuple_type = jl_apply_tuple_type_v(elem_types.cast(), n);
-    let tuple = jl_new_struct_uninit(tuple_type);
+    let tuple = jl_new_struct_uninit(tuple_type.cast());
     let dims = dims.into_dimensions();
     let tup_nn = NonNull::new_unchecked(tuple);
     let _: Value = frame.data_from_ptr(tup_nn, Private);
@@ -2428,7 +2428,7 @@ where
         let n = dims.rank();
         let mut elem_types = vec![isize::julia_type(&frame); n];
         let tuple_type = jl_apply_tuple_type_v(elem_types.as_mut_ptr().cast(), n);
-        let tuple = jl_new_struct_uninit(tuple_type);
+        let tuple = jl_new_struct_uninit(tuple_type.cast());
         let tup_nn = NonNull::new_unchecked(tuple);
         let _: Value = frame.data_from_ptr(tup_nn, Private);
 
