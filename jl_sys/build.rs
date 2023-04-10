@@ -94,6 +94,7 @@ fn find_julia() -> Option<String> {
 enum Target {
     BSD,
     Windows,
+    WindowsI686,
     I686,
 }
 
@@ -110,6 +111,9 @@ fn interpret_target() -> Option<Target> {
         }
 
         if target.contains("w64") {
+            if target.contains("i686") {
+                return Some(Target::WindowsI686);
+            }
             return Some(Target::Windows);
         }
 
@@ -130,6 +134,9 @@ fn set_flags(julia_dir: &str, target: Option<Target>) {
             println!("cargo:rustc-link-lib=uv");
         }
         Some(Target::Windows) => {
+            println!("cargo:rustc-link-arg=-Wl,--no-undefined");
+        }
+        Some(Target::WindowsI686) => {
             println!("cargo:rustc-link-arg=-Wl,--no-undefined");
         }
         _ => (),
@@ -221,6 +228,12 @@ fn compile_jlrs_cc(julia_dir: &str, target: Option<Target>) {
                     c.flag("-fPIC");
                 }
                 Some(Target::Windows) => {
+                    c.flag("-mwindows");
+                    c.flag("-Wl,--no-undefined");
+                }
+                Some(Target::WindowsI686) => {
+                    c.no_default_flags(true);
+                    c.flag("-O3");
                     c.flag("-mwindows");
                     c.flag("-Wl,--no-undefined");
                 }
