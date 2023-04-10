@@ -138,6 +138,9 @@ fn set_flags(julia_dir: &str, target: Option<Target>) {
         }
         Some(Target::WindowsI686) => {
             println!("cargo:rustc-link-arg=-Wl,--no-undefined");
+            println!("cargo:rustc-link-lib=julia");
+            #[cfg(feature = "uv")]
+            println!("cargo:rustc-link-lib=uv-2");
         }
         _ => (),
     }
