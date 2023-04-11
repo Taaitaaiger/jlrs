@@ -79,19 +79,6 @@ where
         }
     }
 }
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct __sigset_t {
-    pub __val: [::std::os::raw::c_ulong; 32usize],
-}
-pub type __jmp_buf = [::std::os::raw::c_int; 6usize];
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct __jmp_buf_tag {
-    pub __jmpbuf: __jmp_buf,
-    pub __mask_was_saved: ::std::os::raw::c_int,
-    pub __saved_mask: __sigset_t,
-}
 pub type jl_gcframe_t = _jl_gcframe_t;
 pub type uint_t = u32;
 #[repr(C)]
@@ -109,32 +96,8 @@ pub struct arraylist_t {
     pub items: *mut *mut ::std::os::raw::c_void,
     pub _space: [*mut ::std::os::raw::c_void; 29usize],
 }
-pub type sigjmp_buf = [__jmp_buf_tag; 1usize];
 pub type jl_taggedvalue_t = _jl_taggedvalue_t;
 pub type jl_ptls_t = *mut _jl_tls_states_t;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct jl_stack_context_t {
-    pub uc_mcontext: sigjmp_buf,
-}
-pub type _jl_ucontext_t = jl_stack_context_t;
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub struct jl_ucontext_t {
-    pub __bindgen_anon_1: jl_ucontext_t__bindgen_ty_1,
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union jl_ucontext_t__bindgen_ty_1 {
-    pub ctx: _jl_ucontext_t,
-    pub copy_ctx: jl_stack_context_t,
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct jl_mutex_t {
-    pub owner: u32,
-    pub count: u32,
-}
 extern "C" {
     pub fn jl_get_ptls_states() -> *mut ::std::os::raw::c_void;
 }
@@ -2048,83 +2011,7 @@ extern "C" {
 extern "C" {
     pub fn jl_yield();
 }
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct _jl_excstack_t {
-    _unused: [u8; 0],
-}
-pub type jl_excstack_t = _jl_excstack_t;
 pub type jl_handler_t = _jl_handler_t;
-#[repr(C)]
-pub struct _jl_task_t {
-    pub next: *mut jl_value_t,
-    pub queue: *mut jl_value_t,
-    pub tls: *mut jl_value_t,
-    pub donenotify: *mut jl_value_t,
-    pub result: *mut jl_value_t,
-    pub logstate: *mut jl_value_t,
-    pub start: *mut jl_function_t,
-    pub rngState: [u64; 4usize],
-    pub _state: ::std::sync::atomic::AtomicU8,
-    pub sticky: u8,
-    pub _isexception: ::std::sync::atomic::AtomicU8,
-    pub priority: u16,
-    pub tid: ::std::sync::atomic::AtomicI16,
-    pub threadpoolid: i8,
-    pub gcstack: *mut jl_gcframe_t,
-    pub world_age: usize,
-    pub ptls: jl_ptls_t,
-    pub excstack: *mut jl_excstack_t,
-    pub eh: *mut jl_handler_t,
-    pub ctx: jl_ucontext_t,
-    pub stkbuf: *mut ::std::os::raw::c_void,
-    pub bufsz: usize,
-    pub inference_start_time: u64,
-    pub reentrant_inference: u16,
-    pub reentrant_timing: u16,
-    pub _bitfield_align_1: [u32; 0],
-    pub _bitfield_1: __BindgenBitfieldUnit<[u8; 4usize]>,
-}
-impl _jl_task_t {
-    #[inline]
-    pub fn copy_stack(&self) -> ::std::os::raw::c_uint {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(0usize, 31u8) as u32) }
-    }
-    #[inline]
-    pub fn set_copy_stack(&mut self, val: ::std::os::raw::c_uint) {
-        unsafe {
-            let val: u32 = ::std::mem::transmute(val);
-            self._bitfield_1.set(0usize, 31u8, val as u64)
-        }
-    }
-    #[inline]
-    pub fn started(&self) -> ::std::os::raw::c_uint {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(31usize, 1u8) as u32) }
-    }
-    #[inline]
-    pub fn set_started(&mut self, val: ::std::os::raw::c_uint) {
-        unsafe {
-            let val: u32 = ::std::mem::transmute(val);
-            self._bitfield_1.set(31usize, 1u8, val as u64)
-        }
-    }
-    #[inline]
-    pub fn new_bitfield_1(
-        copy_stack: ::std::os::raw::c_uint,
-        started: ::std::os::raw::c_uint,
-    ) -> __BindgenBitfieldUnit<[u8; 4usize]> {
-        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 4usize]> = Default::default();
-        __bindgen_bitfield_unit.set(0usize, 31u8, {
-            let copy_stack: u32 = unsafe { ::std::mem::transmute(copy_stack) };
-            copy_stack as u64
-        });
-        __bindgen_bitfield_unit.set(31usize, 1u8, {
-            let started: u32 = unsafe { ::std::mem::transmute(started) };
-            started as u64
-        });
-        __bindgen_bitfield_unit
-    }
-}
 pub type jl_task_t = _jl_task_t;
 extern "C" {
     pub fn jl_throw(e: *mut jl_value_t) -> !;
@@ -2289,6 +2176,35 @@ pub struct _jl_tls_states_t {
 #[derive(Debug, Copy, Clone)]
 pub struct _jl_handler_t {
     _unused: [u8; 0],
+}
+#[doc = " <div rustbindgen replaces=\"jl_mutex_t\"></div>"]
+#[repr(C)]
+#[derive(Debug)]
+pub struct jl_mutex_t {
+    pub owner: ::std::sync::atomic::AtomicPtr<jl_task_t>,
+    pub count: u32,
+}
+#[doc = " <div rustbindgen replaces=\"_jl_task_t\"></div>"]
+#[repr(C)]
+#[derive(Debug)]
+pub struct _jl_task_t {
+    pub next: *mut jl_value_t,
+    pub queue: *mut jl_value_t,
+    pub tls: *mut jl_value_t,
+    pub donenotify: *mut jl_value_t,
+    pub result: *mut jl_value_t,
+    pub logstate: *mut jl_value_t,
+    pub start: *mut jl_function_t,
+    pub rngState: [u64; 4usize],
+    pub _state: ::std::sync::atomic::AtomicU8,
+    pub sticky: u8,
+    pub _isexception: ::std::sync::atomic::AtomicU8,
+    pub priority: u16,
+    pub tid: ::std::sync::atomic::AtomicI16,
+    pub threadpoolid: i8,
+    pub gcstack: *mut jl_gcframe_t,
+    pub world_age: usize,
+    pub ptls: jl_ptls_t,
 }
 pub const jlrs_catch_tag_t_JLRS_CATCH_OK: jlrs_catch_tag_t = 0;
 pub const jlrs_catch_tag_t_JLRS_CATCH_ERR: jlrs_catch_tag_t = 1;

@@ -487,7 +487,6 @@ fn generate_bindings(julia_dir: &str) {
         .allowlist_function("jlrs_array_data_owner_offset")
         .allowlist_function("jlrs_gc_queue_multiroot")
         .allowlist_function("jlrs_pgcstack")
-        .allowlist_function("jl_setjmp")
         .allowlist_function("jl_excstack_state")
         .allowlist_function("jl_enter_handler")
         .allowlist_function("jl_eh_restore_state")
