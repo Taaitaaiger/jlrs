@@ -229,20 +229,16 @@ pub const jl_init: unsafe extern "C" fn() = jl_init__threading;
 pub const jl_init_with_image: unsafe extern "C" fn(*const c_char, *const c_char) =
     jl_init_with_image__threading;
 
-#[cfg(not(target_pointer_width = "32"))]
-#[cfg(all(feature = "uv", any(feature = "windows", target_os = "windows")))]
-#[link(name = "libuv-2", kind = "raw-dylib")]
-extern "C" {
-    pub fn uv_async_send(async_: *mut c_void) -> ::std::os::raw::c_int;
-}
-
-#[cfg(target_pointer_width = "32")]
-#[cfg(all(feature = "uv", any(feature = "windows", target_os = "windows")))]
-extern "C" {
-    pub fn uv_async_send(async_: *mut c_void) -> ::std::os::raw::c_int;
-}
-
-#[cfg(all(feature = "uv", not(any(feature = "windows", target_os = "windows"))))]
+#[cfg(feature = "uv")]
+#[cfg_attr(
+    all(
+        any(windows, target_os = "windows", feature = "windows"),
+        any(target_env = "msvc", feature = "yggdrasil")
+        target_pointer_width = "64"
+    ),
+    
+    link(name = "libuv-2", kind = "raw-dylib")
+)]
 extern "C" {
     pub fn uv_async_send(async_: *mut c_void) -> ::std::os::raw::c_int;
 }

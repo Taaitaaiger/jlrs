@@ -20,7 +20,7 @@ use std::{
 };
 
 use quote::ToTokens;
-#[cfg(all(any(feature = "windows", windows), not(feature = "i686")))]
+#[cfg(not(feature = "i686"))]
 use syn::{parse::Parser, Attribute, ItemForeignMod};
 use syn::{
     punctuated::Punctuated, Field, ForeignItem, Ident, ItemStruct, ItemUnion, Meta, Token, Type,
@@ -377,22 +377,19 @@ fn convert_union_to_atomic(field_def: &mut Field, info: &AtomicField) {
     }
 }
 
-#[cfg(all(any(feature = "windows", windows), not(feature = "i686")))]
+#[cfg(not(feature = "i686"))]
+static RDL: &str = "#[cfg_attr(all(any(windows, target_os = \"windows\", feature = \"windows\"), any(target_env = \"msvc\", feature = \"yggdrasil\")), link(name = \"libjulia\", kind = \"raw-dylib\"))]";
+
+#[cfg(not(feature = "i686"))]
 fn item_is_in_libjulia(fmod: &mut ItemForeignMod) {
     if let ForeignItem::Static(_) = &fmod.items[0] {
-        let attr = Attribute::parse_outer
-            .parse_str("#[link(name = \"libjulia\", kind = \"raw-dylib\")]")
-            .unwrap()[0]
-            .clone();
+        let attr = Attribute::parse_outer.parse_str(RDL).unwrap()[0].clone();
         fmod.attrs.push(attr);
     }
 
     if let ForeignItem::Fn(f) = &fmod.items[0] {
         if f.sig.ident.to_string().starts_with("jl_") {
-            let attr = Attribute::parse_outer
-                .parse_str("#[link(name = \"libjulia\", kind = \"raw-dylib\")]")
-                .unwrap()[0]
-                .clone();
+            let attr = Attribute::parse_outer.parse_str(RDL).unwrap()[0].clone();
             fmod.attrs.push(attr);
         }
     }
@@ -418,6 +415,17 @@ pub fn fix_bindings<P: AsRef<Path>, Q: AsRef<Path>>(header_path: P, bindings: &s
                             convert_to_atomic(field, info)
                         }
                     }
+                } else if struct_def.ident.to_string() == "jl_mutex_t" {
+                    #[cfg(not(feature = "julia-1-6"))]
+                    {
+                        clear_derives(struct_def);
+
+                        let field = struct_def.fields.iter_mut().next().unwrap();
+                        field.ty = Type::Path(
+                            syn::parse_str::<TypePath>("::std::sync::atomic::AtomicPtr<jl_task_t>")
+                                .unwrap(),
+                        );
+                    }
                 }
             }
             syn::Item::Union(struct_def) => {
@@ -435,7 +443,7 @@ pub fn fix_bindings<P: AsRef<Path>, Q: AsRef<Path>>(header_path: P, bindings: &s
                 }
             }
             syn::Item::ForeignMod(fmod) => {
-                #[cfg(all(any(feature = "windows", windows), not(feature = "i686")))]
+                #[cfg(not(feature = "i686"))]
                 item_is_in_libjulia(fmod);
 
                 match &mut fmod.items[0] {
