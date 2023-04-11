@@ -233,7 +233,7 @@ pub const jl_init_with_image: unsafe extern "C" fn(*const c_char, *const c_char)
 #[cfg_attr(
     all(
         any(windows, target_os = "windows", feature = "windows"),
-        any(target_env = "msvc", feature = "yggdrasil")
+        any(target_env = "msvc", feature = "yggdrasil"),
         target_pointer_width = "64"
     ),
     
