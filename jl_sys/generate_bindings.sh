@@ -52,7 +52,7 @@ function check_dir() {
 }
 
 function print_help() {
-    local spacing=$(printf %$((15 + ${#HOME}))s)
+    local spacing=$(printf %$((13 + ${#HOME}))s)
 
     echo "    generate_bindings.sh [--nightly] [--beta] [--all]"
     echo ""
@@ -64,33 +64,28 @@ function print_help() {
     echo "must be available. The following versions and default paths are expected, the"
     echo "default paths can be overridden with environment variables:"
     echo ""
-    echo -e "\033[1m      Version                  Default path${spacing}Override\033[0m"
-    echo "  Linux 64-bit 1.8         $HOME/julia-1.8.5               JULIA_1_8_DIR"
-    echo "  Linux 64-bit 1.7         $HOME/julia-1.7.3               JULIA_1_7_DIR"
-    echo "  Linux 64-bit 1.6         $HOME/julia-1.6.7               JULIA_1_6_DIR"
-    echo "  Linux 32-bit 1.8         $HOME/julia-1.8.5-32            JULIA_1_8_DIR_32"
-    echo "  Linux 32-bit 1.7         $HOME/julia-1.7.3-32            JULIA_1_7_DIR_32"
-    echo "  Linux 32-bit 1.8         $HOME/julia-1.6.7-32            JULIA_1_6_DIR_32"
+    echo -e "\033[1m       Version              Default path${spacing}Override\033[0m"
+    echo "    Linux 64-bit 1.8    $HOME/julia-1.8.5             JULIA_1_8_DIR"
+    echo "    Linux 64-bit 1.7    $HOME/julia-1.7.3             JULIA_1_7_DIR"
+    echo "    Linux 64-bit 1.6    $HOME/julia-1.6.7             JULIA_1_6_DIR"
     echo ""
     echo ""
     echo "When the nightly flag is set, the following is expected:"
     echo ""
-    echo -e "\033[1m      Version                  Default path${spacing}Override\033[0m"
-    echo "  Linux 64-bit dev         $HOME/Projects/C/julia/usr      JULIA_NIGHTLY_DIR"
+    echo -e "\033[1m        Version             Default path${spacing}Override\033[0m"
+    echo "    Linux 64-bit dev    $HOME/Projects/C/julia/usr    JULIA_NIGHTLY_DIR"
     echo ""
     echo ""
     echo "When the beta flag is set, the following is expected:"
     echo ""
-    echo -e "\033[1m      Version                  Default path${spacing}Override\033[0m"
-    echo "  Linux 64-bit 1.9         $HOME/julia-1.9.0-rc2          JULIA_1_9_DIR"
-    echo "  Linux 32-bit 1.9         $HOME/julia-1.9.0-rc2-32       JULIA_1_9_DIR_32"
+    echo -e "\033[1m        Version             Default path${spacing}Override\033[0m"
+    echo "    Linux 64-bit 1.9    $HOME/julia-1.9.0-rc2         JULIA_1_9_DIR"
     echo ""
     echo ""
     echo "All dependencies must have been installed before running this script. The"
     echo "following should be sufficient on Ubuntu:"
     echo ""
-    echo "    apt install llvm-dev libclang-dev clang \\"
-    echo "                g++-multilib-i686-linux-gnu"
+    echo "    apt install llvm-dev libclang-dev clang g++-multilib-i686-linux-gnu"
     echo "    rustup target add i686-unknown-linux-gnu"
     echo "    rustup toolchain install stable-i686-unknown-linux-gnu"
 }
@@ -112,8 +107,13 @@ if [ "${NIGHTLY}" = "y" -o "${ALL}" = "y" ]; then
     JULIA_COMMIT=$($JULIA_NIGHTLY_DIR/bin/julia -E "Base.GIT_VERSION_INFO.commit_short" | grep -oEe "[^\"]+")
     JULIA_COMMIT_DATE=$($JULIA_NIGHTLY_DIR/bin/julia -E "Base.GIT_VERSION_INFO.date_string" | grep -oEe "[^\"]+")
     JULIA_DIR=$JULIA_NIGHTLY_DIR cargo build --features use-bindgen,julia-1-10
-    echo "/* generated from $JULIA_VERSION (Commit: $JULIA_COMMIT $JULIA_COMMIT_DATE) */" > ./src/bindings/bindings_nightly_64.rs
-    cat ../target/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings/bindings_nightly_64.rs
+    echo "/* generated from $JULIA_VERSION (Commit: $JULIA_COMMIT $JULIA_COMMIT_DATE) */" > ./src/bindings/bindings_1_10_64.rs
+    cat ../target/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings/bindings_1_10_64.rs
+
+    cargo clean
+    JULIA_DIR=$JULIA_NIGHTLY_DIR cargo build --features use-bindgen,i686,julia-1-10 --target i686-unknown-linux-gnu
+    echo "/* generated from $JULIA_VERSION (Commit: $JULIA_COMMIT $JULIA_COMMIT_DATE) */" > ./src/bindings/bindings_1_10_32.rs
+    cat ../target/i686-unknown-linux-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings/bindings_1_10_32.rs
 
     if [ "${BETA}" != "y" -a "${ALL}" != "y"  ]; then
         cargo +nightly fmt -- ./src/bindings/bindings_*
@@ -130,14 +130,6 @@ if [ "${BETA}" = "y" -o "${ALL}" = "y" ]; then
         exit 1
     fi
 
-    if [ -z "$JULIA_1_9_DIR_32" ]; then
-        JULIA_1_9_DIR_32=${HOME}/julia-1.9.0-rc2-32
-    fi
-    if [ ! -d "$JULIA_1_9_DIR_32" ]; then
-        echo "Error: $JULIA_1_9_DIR_32 does not exist" >&2
-        exit 1
-    fi
-
     cargo clean
     JULIA_VERSION=$($JULIA_1_9_DIR/bin/julia --version)
     JULIA_DIR=$JULIA_1_9_DIR cargo build --features use-bindgen,julia-1-9
@@ -145,7 +137,7 @@ if [ "${BETA}" = "y" -o "${ALL}" = "y" ]; then
     cat ../target/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings/bindings_1_9_64.rs
 
     cargo clean
-    JULIA_DIR=$JULIA_1_9_DIR_32 cargo build --features use-bindgen,i686,julia-1-9 --target i686-unknown-linux-gnu
+    JULIA_DIR=$JULIA_1_9_DIR cargo build --features use-bindgen,i686,julia-1-9 --target i686-unknown-linux-gnu
     echo "/* generated from $JULIA_VERSION */" > ./src/bindings/bindings_1_9_32.rs
     cat ../target/i686-unknown-linux-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings/bindings_1_9_32.rs
 
@@ -163,27 +155,11 @@ if [ ! -d "$JULIA_1_8_DIR" ]; then
     exit 1
 fi
 
-if [ -z "$JULIA_1_8_DIR_32" ]; then
-    JULIA_1_8_DIR_32=$JULIA_1_8_DIR-32
-fi
-if [ ! -d "$JULIA_1_8_DIR_32" ]; then
-    echo "Error: $JULIA_1_8_DIR_32 does not exist" >&2
-    exit 1
-fi
-
 if [ -z "$JULIA_1_7_DIR" ]; then
     JULIA_1_7_DIR=${HOME}/julia-1.7.3
 fi
 if [ ! -d "$JULIA_1_7_DIR" ]; then
     echo "Error: $JULIA_1_7_DIR does not exist" >&2
-    exit 1
-fi
-
-if [ -z "$JULIA_1_7_DIR_32" ]; then
-    JULIA_1_7_DIR_32=$JULIA_1_7_DIR-32
-fi
-if [ ! -d "$JULIA_1_7_DIR_32" ]; then
-    echo "Error: $JULIA_1_7_DIR_32 does not exist" >&2
     exit 1
 fi
 
@@ -195,14 +171,6 @@ if [ ! -d "$JULIA_1_6_DIR" ]; then
     exit 1
 fi
 
-if [ -z "$JULIA_1_6_DIR_32" ]; then
-    JULIA_1_6_DIR_32=$JULIA_1_6_DIR-32
-fi
-if [ ! -d "$JULIA_1_6_DIR_32" ]; then
-    echo "Error: $JULIA_1_6_DIR_32 does not exist" >&2
-    exit 1
-fi
-
 cargo clean
 JULIA_VERSION=$($JULIA_1_6_DIR/bin/julia --version)
 JULIA_DIR=$JULIA_1_6_DIR cargo build --features use-bindgen,julia-1-6
@@ -210,7 +178,7 @@ echo "/* generated from $JULIA_VERSION */" > ./src/bindings/bindings_1_6_64.rs
 cat ../target/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings/bindings_1_6_64.rs
 
 cargo clean
-JULIA_DIR=$JULIA_1_6_DIR_32 cargo build --features use-bindgen,julia-1-6,i686 --target i686-unknown-linux-gnu
+JULIA_DIR=$JULIA_1_6_DIR cargo build --features use-bindgen,julia-1-6,i686 --target i686-unknown-linux-gnu
 echo "/* generated from $JULIA_VERSION */" > ./src/bindings/bindings_1_6_32.rs
 cat ../target/i686-unknown-linux-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings/bindings_1_6_32.rs
 
@@ -221,7 +189,7 @@ echo "/* generated from $JULIA_VERSION */" > ./src/bindings/bindings_1_7_64.rs
 cat ../target/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings/bindings_1_7_64.rs
 
 cargo clean
-JULIA_DIR=$JULIA_1_7_DIR_32 cargo build --features use-bindgen,i686,julia-1-7 --target i686-unknown-linux-gnu
+JULIA_DIR=$JULIA_1_7_DIR cargo build --features use-bindgen,i686,julia-1-7 --target i686-unknown-linux-gnu
 echo "/* generated from $JULIA_VERSION */" > ./src/bindings/bindings_1_7_32.rs
 cat ../target/i686-unknown-linux-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings/bindings_1_7_32.rs
 
@@ -232,7 +200,7 @@ echo "/* generated from $JULIA_VERSION */" > ./src/bindings/bindings_1_8_64.rs
 cat ../target/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings/bindings_1_8_64.rs
 
 cargo clean
-JULIA_DIR=$JULIA_1_8_DIR_32 cargo build --features use-bindgen,i686,julia-1-8 --target i686-unknown-linux-gnu
+JULIA_DIR=$JULIA_1_8_DIR cargo build --features use-bindgen,i686,julia-1-8 --target i686-unknown-linux-gnu
 echo "/* generated from $JULIA_VERSION */" > ./src/bindings/bindings_1_8_32.rs
 cat ../target/i686-unknown-linux-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings/bindings_1_8_32.rs
 
