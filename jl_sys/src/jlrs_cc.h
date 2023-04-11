@@ -62,6 +62,10 @@ struct jlrs_mutex_t {
 #endif
 
 #ifdef JULIA_1_10
+
+#ifndef JL_RNG_SIZE
+#define JL_RNG_SIZE 5
+#endif
 /**
  * <div rustbindgen replaces="_jl_task_t"></div>
  */
