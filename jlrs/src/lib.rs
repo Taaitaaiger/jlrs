@@ -761,22 +761,20 @@
 //! [`julia_module`]: jlrs_macros::julia_module
 //! [documentation]: jlrs_macros::julia_module
 //! [rustfft_jl]: https://github.com/Taaitaaiger/rustfft-jl
-//! [here]: https://github.com/JuliaPackaging/Yggdrasil/tree/master/R/rustfft-jl
+//! [here]: https://github.com/JuliaPackaging/Yggdrasil/tree/master/R/rustfft_jl
 
 #![forbid(rustdoc::broken_intra_doc_links)]
 
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, Ordering};
 
-use atomic::Ordering;
-use memory::stack_frame::PinnedFrame;
+#[cfg(feature = "sync-rt")]
+use once_cell::sync::OnceCell;
 
 use crate::{
-    data::{
-        managed::{module::Module, value::Value},
-        types::foreign_type::init_foreign_type_registry,
-    },
+    data::managed::{module::Module, value::Value},
     memory::{
         context::{ledger::init_ledger, stack::Stack},
+        stack_frame::PinnedFrame,
         target::unrooted::Unrooted,
     },
 };
@@ -827,7 +825,100 @@ pub mod safety;
 #[cfg(feature = "sync-rt")]
 pub mod util;
 
-pub(crate) unsafe fn init_jlrs<const N: usize>(frame: &mut PinnedFrame<N>, install_jlrs_jl: bool) {
+/// Installation method for the Jlrs package. If Jlrs is already installed the installed version
+/// is used.
+#[derive(Clone)]
+pub enum InstallJlrs {
+    /// Install the current default revision of Jlrs.jl
+    Default,
+    /// Don't install the Jlrs package
+    No,
+    /// Install the given version
+    Version {
+        /// Major version
+        major: usize,
+        /// Minor version
+        minor: usize,
+        /// Patch version
+        patch: usize,
+    },
+    /// Install a revision of some git repository
+    Git {
+        /// URL of the repository
+        repo: String,
+        /// Revision to be installed
+        revision: String,
+    },
+}
+
+impl InstallJlrs {
+    pub(crate) unsafe fn use_or_install(&self, unrooted: Unrooted) {
+        match self {
+            InstallJlrs::Default => {
+                Value::eval_string(
+                    unrooted,
+                    "if !isdefined(Main, :Jlrs)
+                         try
+                             using Jlrs
+                         catch e
+                             import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/Jlrs.jl#f88969f\")
+                             using Jlrs
+                         end
+                     end",
+                )
+            },
+            InstallJlrs::Git { repo, revision } => {
+                Value::eval_string(
+                    unrooted,
+                    format!(
+                        "if !isdefined(Main, :Jlrs)
+                             try
+                                 using Jlrs
+                             catch e
+                                 import Pkg; Pkg.add(url=\"{repo}#{revision}\")
+                                 using Jlrs
+                             end
+                         end"
+                    ),
+                )
+            },
+            InstallJlrs::Version { major, minor, patch } => {
+                Value::eval_string(
+                    unrooted,
+                    format!(
+                        "if !isdefined(Main, :Jlrs)
+                             try
+                                 using Jlrs
+                             catch e
+                                 import Pkg; Pkg.add(name=\"Jlrs\", version=\"{major}.{minor}.{patch}\")
+                                 using Jlrs
+                             end
+                         end"
+                    ),
+                )
+            },
+            InstallJlrs::No => {
+                Value::eval_string(
+                    unrooted,
+                    "if !isdefined(Main, :Jlrs)
+                         using Jlrs
+                     end",
+                )
+            },
+        }
+        .expect("Failed to load or install Jlrs package");
+    }
+}
+
+// The chosen install method is stored in a OnceCell when the sync runtime is used to
+// avoid having to store it in `PendingJulia`.
+#[cfg(feature = "sync-rt")]
+pub(crate) static INSTALL_METHOD: OnceCell<InstallJlrs> = OnceCell::new();
+
+pub(crate) unsafe fn init_jlrs<const N: usize>(
+    frame: &mut PinnedFrame<N>,
+    install_jlrs_jl: &InstallJlrs,
+) {
     static IS_INIT: AtomicBool = AtomicBool::new(false);
 
     if IS_INIT.swap(true, Ordering::Relaxed) {
@@ -835,28 +926,7 @@ pub(crate) unsafe fn init_jlrs<const N: usize>(frame: &mut PinnedFrame<N>, insta
     }
 
     let unrooted = Unrooted::new();
-    if install_jlrs_jl {
-        Value::eval_string(
-            unrooted,
-            "if !isdefined(Main, :Jlrs)
-                      try
-                          using Jlrs
-                      catch e
-                          import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/Jlrs.jl\")
-                          using Jlrs
-                      end
-                  end",
-        )
-        .expect("Failed to load or install Jlrs package");
-    } else {
-        Value::eval_string(
-            unrooted,
-            "if !isdefined(Main, :Jlrs)
-                      using Jlrs
-                  end",
-        )
-        .expect("Failed to load or install Jlrs package");
-    }
+    install_jlrs_jl.use_or_install(unrooted);
 
     let jlrs_module = Module::main(&unrooted)
         .submodule(unrooted, "Jlrs")
@@ -864,9 +934,6 @@ pub(crate) unsafe fn init_jlrs<const N: usize>(frame: &mut PinnedFrame<N>, insta
         .as_managed();
 
     init_ledger();
-
-    // Init foreign type registry
-    init_foreign_type_registry();
 
     // Init foreign Stack type
     Stack::init(frame, jlrs_module);

@@ -19,4 +19,4 @@ windows = ["jlrs/windows"]
 crate-type = ["cdylib"]
 
 [dependencies]
-jlrs = { path = "../jlrs", features = ["ccall", "uv", "no-link"] }
+jlrs = { path = "../jlrs", features = ["ccall", "uv"] }

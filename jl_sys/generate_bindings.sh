@@ -87,6 +87,7 @@ function print_help() {
     echo ""
     echo "    apt install llvm-dev libclang-dev clang g++-multilib-i686-linux-gnu"
     echo "    rustup target add i686-unknown-linux-gnu"
+    echo "    rustup toolchain install nightly"
     echo "    rustup toolchain install stable-i686-unknown-linux-gnu"
 }
 
