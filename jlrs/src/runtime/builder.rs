@@ -16,6 +16,7 @@ use jlrs_macros::julia_version;
 use super::sync_rt::PendingJulia;
 #[cfg(any(feature = "sync-rt", feature = "async-rt"))]
 use crate::error::JlrsResult;
+use crate::InstallJlrs;
 
 /// Build a sync runtime.
 ///
@@ -25,7 +26,7 @@ use crate::error::JlrsResult;
 /// must call [`RuntimeBuilder::start`].
 pub struct RuntimeBuilder {
     pub(crate) image: Option<(PathBuf, PathBuf)>,
-    pub(crate) install_jlrs_jl: bool,
+    pub(crate) install_jlrs_jl: InstallJlrs,
 }
 
 cfg_if::cfg_if! {
@@ -134,7 +135,7 @@ cfg_if::cfg_if! {
             ///
             /// In order to function correctly, jlrs requires that the Jlrs.jl package is installed. By
             /// default, this package is automatically installed if it hasn't been installed yet.
-            pub fn install_jlrs(mut self, install: bool) -> Self {
+            pub fn install_jlrs(mut self, install: InstallJlrs) -> Self {
                 self.builder.install_jlrs_jl = install;
                 self
             }
@@ -173,7 +174,7 @@ impl RuntimeBuilder {
     pub fn new() -> Self {
         RuntimeBuilder {
             image: None,
-            install_jlrs_jl: true,
+            install_jlrs_jl: InstallJlrs::Default,
         }
     }
 
@@ -261,7 +262,7 @@ impl RuntimeBuilder {
     ///
     /// In order to function correctly, jlrs requires that the Jlrs.jl package is installed. By
     /// default, this package is automatically installed if it hasn't been installed yet.
-    pub fn install_jlrs(mut self, install: bool) -> Self {
+    pub fn install_jlrs(mut self, install: InstallJlrs) -> Self {
         self.install_jlrs_jl = install;
         self
     }

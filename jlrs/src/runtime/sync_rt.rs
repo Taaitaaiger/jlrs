@@ -19,13 +19,13 @@ use crate::{
         target::frame::GcFrame,
     },
     runtime::{builder::RuntimeBuilder, INIT},
+    INSTALL_METHOD,
 };
 
 /// A pending Julia instance.
 ///
 /// This pending instance can be activated by calling [`PendingJulia::instance`].
 pub struct PendingJulia {
-    install_jlrs_jl: bool,
     _not_send_sync: PhantomData<*mut c_void>,
 }
 
@@ -61,8 +61,10 @@ impl PendingJulia {
 
         assert!(jl_is_initialized() != 0);
 
+        let install_method = builder.install_jlrs_jl.clone();
+        INSTALL_METHOD.get_or_init(|| install_method);
+
         Ok(PendingJulia {
-            install_jlrs_jl: builder.install_jlrs_jl,
             _not_send_sync: PhantomData,
         })
     }
@@ -75,7 +77,8 @@ impl PendingJulia {
             // Is popped when Julia is dropped.
             let mut pinned = frame.pin();
 
-            init_jlrs(&mut pinned, self.install_jlrs_jl);
+            let install_method = INSTALL_METHOD.get().unwrap();
+            init_jlrs(&mut pinned, install_method);
 
             let frame = pinned.stack_frame();
             let context = frame.sync_stack();

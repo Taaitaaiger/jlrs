@@ -40,6 +40,7 @@ use crate::{
         target::{frame::GcFrame, unrooted::Unrooted, Target},
     },
     private::Private,
+    InstallJlrs,
 };
 
 // The pool is lazily created either when it's first used, or when the number of threads is set.
@@ -258,7 +259,7 @@ impl<'context> CCall<'context> {
     /// A module can be provided to allow setting the size of the internal thread pool from Julia
     /// by calling `Jlrs.set_pool_size`.
     #[inline(never)]
-    pub fn init_jlrs(&mut self, install_jlrs_jl: bool, module: Option<Module>) {
+    pub fn init_jlrs(&mut self, install_jlrs_jl: &InstallJlrs, module: Option<Module>) {
         unsafe {
             init_jlrs(&mut self.frame, install_jlrs_jl);
 

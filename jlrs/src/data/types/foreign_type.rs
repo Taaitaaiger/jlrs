@@ -52,13 +52,7 @@
 //! `julia_module` automatically takes care of this, otherwise you must manually call
 //! `OpaqueType::create_type` or `OpaqueType::reinit_type`. The first must be called if the
 //! type doesn't exist yet, the second if the module that defines the type has been precompiled.
-use std::{
-    any::TypeId,
-    ffi::c_void,
-    mem::MaybeUninit,
-    ptr::NonNull,
-    sync::{Arc, RwLock},
-};
+use std::{any::TypeId, ffi::c_void, mem::MaybeUninit, ptr::NonNull, sync::RwLock};
 
 #[julia_version(except = ["1.7"])]
 use jl_sys::jl_gc_schedule_foreign_sweepfunc;
@@ -66,7 +60,6 @@ use jl_sys::jl_gc_schedule_foreign_sweepfunc;
 use jl_sys::jl_reinit_foreign_type;
 use jl_sys::{jl_emptysvec, jl_gc_alloc_typed, jl_new_datatype, jl_new_foreign_type, jl_value_t};
 use jlrs_macros::julia_version;
-use once_cell::sync::OnceCell;
 
 use super::typecheck::Typecheck;
 use crate::{
@@ -91,21 +84,19 @@ use crate::{
     private::Private,
 };
 
-static FOREIGN_TYPE_REGISTRY: OnceCell<Arc<ForeignTypes>> = OnceCell::new();
-
-pub(crate) unsafe extern "C" fn init_foreign_type_registry() {
-    FOREIGN_TYPE_REGISTRY.get_or_init(|| {
-        Arc::new(ForeignTypes {
-            data: RwLock::new(Vec::new()),
-        })
-    });
-}
+static FOREIGN_TYPE_REGISTRY: ForeignTypes = ForeignTypes::new();
 
 struct ForeignTypes {
     data: RwLock<Vec<(TypeId, DataType<'static>)>>,
 }
 
 impl ForeignTypes {
+    const fn new() -> Self {
+        ForeignTypes {
+            data: RwLock::new(Vec::new()),
+        }
+    }
+
     fn find<T: 'static>(&self) -> Option<DataType> {
         let tid = TypeId::of::<T>();
         self.data
@@ -286,7 +277,7 @@ where
     U: ForeignType,
     T: Target<'target>,
 {
-    if let Some(ty) = FOREIGN_TYPE_REGISTRY.get().unwrap().find::<U>() {
+    if let Some(ty) = FOREIGN_TYPE_REGISTRY.find::<U>() {
         return target.data_from_ptr(ty.unwrap_non_null(Private), Private);
     }
 
@@ -315,8 +306,6 @@ where
 
     debug_assert!(!ty.is_null());
     FOREIGN_TYPE_REGISTRY
-        .get()
-        .unwrap()
         .data
         .write()
         .expect("Foreign type lock was poisoned")
@@ -337,7 +326,7 @@ where
     U: OpaqueType,
     T: Target<'target>,
 {
-    if let Some(ty) = FOREIGN_TYPE_REGISTRY.get().unwrap().find::<U>() {
+    if let Some(ty) = FOREIGN_TYPE_REGISTRY.find::<U>() {
         return target.data_from_ptr(ty.unwrap_non_null(Private), Private);
     }
 
@@ -372,8 +361,6 @@ where
 
     debug_assert!(!ty.is_null());
     FOREIGN_TYPE_REGISTRY
-        .get()
-        .unwrap()
         .data
         .write()
         .expect("Foreign type lock was poisoned")
@@ -425,7 +412,7 @@ unsafe fn reinit_foreign_type<U>(datatype: DataType) -> bool
 where
     U: ForeignType,
 {
-    if let Some(_) = FOREIGN_TYPE_REGISTRY.get().unwrap().find::<U>() {
+    if let Some(_) = FOREIGN_TYPE_REGISTRY.find::<U>() {
         return true;
     }
 
@@ -441,8 +428,6 @@ where
     let ret = jl_reinit_foreign_type(ty, Some(mark::<U>), Some(sweep::<U>));
     if ret != 0 {
         FOREIGN_TYPE_REGISTRY
-            .get()
-            .unwrap()
             .data
             .write()
             .expect("Foreign type lock was poisoned")
@@ -468,13 +453,11 @@ unsafe fn reinit_opaque_type<U>(ty: DataType) -> bool
 where
     U: OpaqueType,
 {
-    if let Some(_) = FOREIGN_TYPE_REGISTRY.get().unwrap().find::<U>() {
+    if let Some(_) = FOREIGN_TYPE_REGISTRY.find::<U>() {
         return true;
     }
 
     FOREIGN_TYPE_REGISTRY
-        .get()
-        .unwrap()
         .data
         .write()
         .expect("Foreign type lock was poisoned")
@@ -508,11 +491,7 @@ unsafe impl<F: OpaqueType> IntoJulia for F {
     where
         T: Target<'scope>,
     {
-        let ty = FOREIGN_TYPE_REGISTRY
-            .get()
-            .unwrap()
-            .find::<F>()
-            .expect("Doesn't exist");
+        let ty = FOREIGN_TYPE_REGISTRY.find::<F>().expect("Doesn't exist");
         unsafe { target.data_from_ptr(ty.unwrap_non_null(Private), Private) }
     }
 
@@ -523,14 +502,12 @@ unsafe impl<F: OpaqueType> IntoJulia for F {
         unsafe {
             let ptls = get_tls();
             let sz = std::mem::size_of::<Self>();
-            let maybe_ty = FOREIGN_TYPE_REGISTRY.get().unwrap().find::<F>();
+            let maybe_ty = FOREIGN_TYPE_REGISTRY.find::<F>();
 
             let ty = match maybe_ty {
                 None => {
                     if let Some(func) = Self::TYPE_FN {
                         let mut guard = FOREIGN_TYPE_REGISTRY
-                            .get()
-                            .unwrap()
                             .data
                             .write()
                             .expect("Foreign type lock was poisoned");
@@ -584,7 +561,7 @@ unsafe impl<F: OpaqueType> IntoJulia for F {
 unsafe impl<T: OpaqueType> ValidLayout for T {
     fn valid_layout(ty: Value) -> bool {
         if let Ok(dt) = ty.cast::<DataType>() {
-            if let Some(ty) = FOREIGN_TYPE_REGISTRY.get().unwrap().find::<T>() {
+            if let Some(ty) = FOREIGN_TYPE_REGISTRY.find::<T>() {
                 dt.unwrap(Private) == ty.unwrap(Private)
             } else {
                 false
@@ -625,8 +602,6 @@ unsafe impl<T: OpaqueType> ConstructType for T {
     {
         let (target, _) = target.split();
         FOREIGN_TYPE_REGISTRY
-            .get()
-            .unwrap()
             .find::<T>()
             .unwrap()
             .as_value()
@@ -637,13 +612,6 @@ unsafe impl<T: OpaqueType> ConstructType for T {
     where
         Tgt: Target<'target>,
     {
-        Some(
-            FOREIGN_TYPE_REGISTRY
-                .get()
-                .unwrap()
-                .find::<T>()
-                .unwrap()
-                .as_value(),
-        )
+        Some(FOREIGN_TYPE_REGISTRY.find::<T>().unwrap().as_value())
     }
 }
