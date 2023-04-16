@@ -15,7 +15,7 @@ use self::version::emit_if_compatible;
 /// Export functions, types and constants defined in Rust as a Julia module.
 ///
 /// This macro generates an initialization function. This function is used in combination with the
-/// macros provided by the `Jlrs.Wrap` module to automatically generate the content of that
+/// macros provided by the `JlrsCore.Wrap` module to automatically generate the content of that
 /// module.
 ///
 /// The syntax is as follows:
@@ -101,7 +101,7 @@ use self::version::emit_if_compatible;
 ///
 /// ```julia
 /// module MyRustModule
-/// using Jlrs.Wrap
+/// using JlrsCore.Wrap
 ///
 /// @wrapmodule("path/to/lib", :init_function_name)
 ///

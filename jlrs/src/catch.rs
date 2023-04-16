@@ -123,7 +123,7 @@ where
     let enabled = unrooted.gc_is_enabled();
     unrooted.enable_gc(false);
 
-    let caller = Module::package_root_module(&unrooted, "Jlrs")
+    let caller = Module::package_root_module(&unrooted, "JlrsCore")
         .unwrap()
         .global(&unrooted, "call_catch_wrapper")
         .unwrap()
@@ -248,7 +248,7 @@ where
     let enabled = unrooted.gc_is_enabled();
     unrooted.enable_gc(false);
 
-    let caller = Module::package_root_module(&unrooted, "Jlrs")
+    let caller = Module::package_root_module(&unrooted, "JlrsCore")
         .unwrap()
         .global(&unrooted, "call_catch_wrapper")
         .unwrap()

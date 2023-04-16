@@ -270,13 +270,13 @@ pub trait Managed<'scope, 'data>: private::ManagedPriv<'scope, 'data> {
 
         let s = unsafe {
             Module::main(&global)
-                .submodule(&global, "Jlrs")?
+                .submodule(&global, "JlrsCore")?
                 .as_managed()
                 .function(&global, "valuestring")?
                 .as_managed()
                 .call1(&global, self.as_value())
                 .map_err(|e| e.as_value().error_string_or(CANNOT_DISPLAY_VALUE))
-                .map_err(|e| JlrsError::exception(format!("Jlrs.valuestring failed: {}", e)))?
+                .map_err(|e| JlrsError::exception(format!("JlrsCore.valuestring failed: {}", e)))?
                 .as_value()
                 .cast::<JuliaString>()?
                 .as_str()?
@@ -300,13 +300,13 @@ pub trait Managed<'scope, 'data>: private::ManagedPriv<'scope, 'data> {
         let s = unsafe {
             // TODO: caching?
             Module::main(&global)
-                .submodule(&global, "Jlrs")?
+                .submodule(&global, "JlrsCore")?
                 .as_managed()
                 .function(&global, "errorstring")?
                 .as_managed()
                 .call1(&global, self.as_value())
                 .map_err(|e| e.as_value().error_string_or(CANNOT_DISPLAY_VALUE))
-                .map_err(|e| JlrsError::exception(format!("Jlrs.errorstring failed: {}", e)))?
+                .map_err(|e| JlrsError::exception(format!("JlrsCore.errorstring failed: {}", e)))?
                 .as_value()
                 .cast::<JuliaString>()?
                 .as_str()?

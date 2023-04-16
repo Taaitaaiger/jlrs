@@ -101,7 +101,7 @@ pub(crate) static STACK_TYPE_NAME: Lazy<StaticSymbol> = Lazy::new(|| unsafe {
 });
 
 impl Stack {
-    // Create the foreign type Stack in the Jlrs module, or return immediately if it already
+    // Create the foreign type Stack in the JlrsCore module, or return immediately if it already
     // exists.
     pub(crate) fn init<const N: usize>(frame: &PinnedFrame<N>, module: Module) {
         let global = module.unrooted_target();
@@ -126,7 +126,7 @@ impl Stack {
             }
 
             // Safety: create_foreign_type is called with the correct arguments, the new type is
-            // rooted until the constant has been set, and we've just checked if Jlrs.Stack
+            // rooted until the constant has been set, and we've just checked if JlrsCore.Stack
             // already exists.
             let dt_ref = Self::create_type(global, sym, module);
             let ptr = dt_ref.ptr();

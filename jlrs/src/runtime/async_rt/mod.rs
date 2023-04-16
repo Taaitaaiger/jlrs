@@ -501,7 +501,7 @@ where
         let base_frame: &'static mut StackFrame<N> = std::mem::transmute(base_frame);
         let mut pinned = base_frame.pin();
 
-        init_jlrs(&mut pinned, &builder.builder.install_jlrs_jl);
+        init_jlrs(&mut pinned, &builder.builder.install_jlrs_core);
 
         let base_frame = pinned.stack_frame();
 
@@ -667,8 +667,8 @@ fn set_custom_fns(stack: &Stack) -> JlrsResult<()> {
     unsafe {
         let (owner, mut frame) = GcFrame::base(stack);
 
-        let cmd = CStr::from_bytes_with_nul_unchecked(b"const JlrsThreads = Jlrs.Threads\0");
-        Value::eval_cstring(&mut frame, cmd).expect("using Jlrs threw an exception");
+        let cmd = CStr::from_bytes_with_nul_unchecked(b"const JlrsThreads = JlrsCore.Threads\0");
+        Value::eval_cstring(&mut frame, cmd).expect("using JlrsCore threw an exception");
 
         let wake_rust = Value::new(&mut frame, wake_task as *mut c_void);
         Module::main(&frame)

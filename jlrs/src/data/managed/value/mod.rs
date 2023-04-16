@@ -472,7 +472,7 @@ impl Value<'_, '_> {
 /// contains a list of all active borrows, which lets it be used to prevent mutable aliasing.
 /// Unfortunately, this system isn't perfect, it's unaware of how this data is used in Julia. It's
 /// your responsibility that you only try to access data which isn't being used by some task
-/// running in the background. The raw ledger API is available in `Jlrs.Ledger`, you can prevent
+/// running in the background. The raw ledger API is available in `JlrsCore.Ledger`, you can prevent
 /// mutable access to data by tracking from Julia by calling these functions. If you do so, you
 /// should use a finalizer to ensure the borrow is removed from the ledger when the data is
 /// finalized.

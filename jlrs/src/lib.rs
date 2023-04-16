@@ -33,7 +33,7 @@
 //! # Prerequisites
 //!
 //! Julia must be installed before jlrs can be used, jlrs is compatible with Julia 1.6 up to and
-//! including Julia 1.9. The Jlrs package must also have been added, if this is not the case it
+//! including Julia 1.9. The JlrsCore package must also have been added, if this is not the case it
 //! will automatically be added when jlrs is initialized.
 //!
 //! ## Linux
@@ -166,7 +166,7 @@
 //!   feature is enabled the `CCall` struct is available which offers the same functionality as
 //!   the sync runtime without initializing Julia. The [`julia_module`] macro is provided to
 //!   easily export functions, foreign types, and data in combination with the macros from the
-//!   `Wrap` module in the Jlrs package.
+//!   `Wrap` module in the JlrsCore package.
 //!
 //! - `uv`
 //!
@@ -601,7 +601,7 @@
 //!
 //! ```julia
 //! module CallMe
-//! using Jlrs.Wrap
+//! using JlrsCore.Wrap
 //!
 //! @wrapmodule("./path/to/libcallme.so", :callme_init_fn)
 //!
@@ -703,7 +703,7 @@
 //!
 //! In order to map a struct in Rust to one in Julia you can derive several traits. You normally
 //! shouldn't need to implement these structs or traits manually. The `reflect` function defined
-//! in the `Jlrs.Reflect` module can generate Rust structs whose layouts match their counterparts
+//! in the `JlrsCore.Reflect` module can generate Rust structs whose layouts match their counterparts
 //! in Julia and automatically derive the supported traits.
 //!
 //! The main restriction is that structs with atomic fields, and tuple or union fields with type
@@ -825,13 +825,13 @@ pub mod safety;
 #[cfg(feature = "sync-rt")]
 pub mod util;
 
-/// Installation method for the Jlrs package. If Jlrs is already installed the installed version
+/// Installation method for the JlrsCore package. If JlrsCore is already installed the installed version
 /// is used.
 #[derive(Clone)]
-pub enum InstallJlrs {
-    /// Install the current default revision of Jlrs.jl
+pub enum InstallJlrsCore {
+    /// Install the current default revision of JlrsCore.jl
     Default,
-    /// Don't install the Jlrs package
+    /// Don't install the JlrsCore package
     No,
     /// Install the given version
     Version {
@@ -851,73 +851,73 @@ pub enum InstallJlrs {
     },
 }
 
-impl InstallJlrs {
+impl InstallJlrsCore {
     pub(crate) unsafe fn use_or_install(&self, unrooted: Unrooted) {
         match self {
-            InstallJlrs::Default => {
+            InstallJlrsCore::Default => {
                 Value::eval_string(
                     unrooted,
-                    "if !isdefined(Main, :Jlrs)
+                    "if !isdefined(Main, :JlrsCore)
                          try
-                             using Jlrs
+                             using JlrsCore
                          catch e
-                             import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/Jlrs.jl#f88969f\")
-                             using Jlrs
+                             import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl#c4710a4\")
+                             using JlrsCore
                          end
                      end",
                 )
             },
-            InstallJlrs::Git { repo, revision } => {
+            InstallJlrsCore::Git { repo, revision } => {
                 Value::eval_string(
                     unrooted,
                     format!(
-                        "if !isdefined(Main, :Jlrs)
+                        "if !isdefined(Main, :JlrsCore)
                              try
-                                 using Jlrs
+                                 using JlrsCore
                              catch e
                                  import Pkg; Pkg.add(url=\"{repo}#{revision}\")
-                                 using Jlrs
+                                 using JlrsCore
                              end
                          end"
                     ),
                 )
             },
-            InstallJlrs::Version { major, minor, patch } => {
+            InstallJlrsCore::Version { major, minor, patch } => {
                 Value::eval_string(
                     unrooted,
                     format!(
-                        "if !isdefined(Main, :Jlrs)
+                        "if !isdefined(Main, :JlrsCore)
                              try
-                                 using Jlrs
+                                 using JlrsCore
                              catch e
-                                 import Pkg; Pkg.add(name=\"Jlrs\", version=\"{major}.{minor}.{patch}\")
-                                 using Jlrs
+                                 import Pkg; Pkg.add(name=\"JlrsCore\", version=\"{major}.{minor}.{patch}\")
+                                 using JlrsCore
                              end
                          end"
                     ),
                 )
             },
-            InstallJlrs::No => {
+            InstallJlrsCore::No => {
                 Value::eval_string(
                     unrooted,
-                    "if !isdefined(Main, :Jlrs)
-                         using Jlrs
+                    "if !isdefined(Main, :JlrsCore)
+                         using JlrsCore
                      end",
                 )
             },
         }
-        .expect("Failed to load or install Jlrs package");
+        .expect("Failed to load or install JlrsCore package");
     }
 }
 
 // The chosen install method is stored in a OnceCell when the sync runtime is used to
 // avoid having to store it in `PendingJulia`.
 #[cfg(feature = "sync-rt")]
-pub(crate) static INSTALL_METHOD: OnceCell<InstallJlrs> = OnceCell::new();
+pub(crate) static INSTALL_METHOD: OnceCell<InstallJlrsCore> = OnceCell::new();
 
 pub(crate) unsafe fn init_jlrs<const N: usize>(
     frame: &mut PinnedFrame<N>,
-    install_jlrs_jl: &InstallJlrs,
+    install_jlrs_core: &InstallJlrsCore,
 ) {
     static IS_INIT: AtomicBool = AtomicBool::new(false);
 
@@ -926,10 +926,10 @@ pub(crate) unsafe fn init_jlrs<const N: usize>(
     }
 
     let unrooted = Unrooted::new();
-    install_jlrs_jl.use_or_install(unrooted);
+    install_jlrs_core.use_or_install(unrooted);
 
     let jlrs_module = Module::main(&unrooted)
-        .submodule(unrooted, "Jlrs")
+        .submodule(unrooted, "JlrsCore")
         .unwrap()
         .as_managed();
 

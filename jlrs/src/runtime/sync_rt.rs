@@ -61,7 +61,7 @@ impl PendingJulia {
 
         assert!(jl_is_initialized() != 0);
 
-        let install_method = builder.install_jlrs_jl.clone();
+        let install_method = builder.install_jlrs_core.clone();
         INSTALL_METHOD.get_or_init(|| install_method);
 
         Ok(PendingJulia {
@@ -121,7 +121,7 @@ impl Julia<'_> {
             };
 
             Module::main(&frame)
-                .submodule(&frame, "Jlrs")?
+                .submodule(&frame, "JlrsCore")?
                 .as_managed()
                 .global(&frame, "color")?
                 .as_value()

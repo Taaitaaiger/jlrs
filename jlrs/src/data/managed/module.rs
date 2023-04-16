@@ -180,7 +180,7 @@ impl<'scope> Module<'scope> {
 
         let func = FUNC.get_or_init(|| unsafe {
             let ptr = Module::main(&target)
-                .submodule(&target, "Jlrs")
+                .submodule(&target, "JlrsCore")
                 .unwrap()
                 .as_managed()
                 .global(&target, "root_module_c")

@@ -101,7 +101,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         let task = unsafe {
             Module::main(&frame)
                 .submodule(&frame, "JlrsThreads")
-                .expect("Jlrs.Threads not available")
+                .expect("JlrsCore.Threads not available")
                 .as_managed()
                 .function(&frame, "postblocking")
                 .expect("postblocking not available")
@@ -201,7 +201,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         let task = unsafe {
             Module::main(&frame)
                 .submodule(&frame, "JlrsThreads")
-                .expect("Jlrs.Threads not available")
+                .expect("JlrsCore.Threads not available")
                 .as_managed()
                 .function(&frame, method)
                 .expect(format!("{} not available", method).as_str())
@@ -255,7 +255,7 @@ impl<'frame, 'data> JuliaFuture<'frame, 'data> {
         let task = unsafe {
             Module::main(&frame)
                 .submodule(&frame, "JlrsThreads")
-                .expect("Jlrs.Threads not available")
+                .expect("JlrsCore.Threads not available")
                 .as_managed()
                 .function(&frame, method)
                 .expect(format!("{} not available", method).as_str())

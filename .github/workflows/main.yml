@@ -146,7 +146,6 @@ jobs:
 
       - name: Run tests
         run: |
-          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/Jlrs.jl\")"
           export JULIA_DIR="$(dirname $(dirname $(which julia)))"
           export LD_LIBRARY_PATH="${JULIA_DIR}/lib:${JULIA_DIR}/lib/julia:${LD_LIBRARY_PATH}"
           cargo test --features full,julia-1-6 --verbose
@@ -173,7 +172,6 @@ jobs:
 
       - name: Run tests
         run: |
-          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/Jlrs.jl\")"
           export JULIA_DIR="$(dirname $(dirname $(which julia)))"
           export DYLD_LIBRARY_PATH="${JULIA_DIR}/lib:${JULIA_DIR}/lib/julia:${DYLD_LIBRARY_PATH}"
           cargo test --features full,julia-1-6 --verbose
@@ -201,7 +199,6 @@ jobs:
 
       - name: Run tests
         run: |
-          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/Jlrs.jl\")"
           cargo test --features full,julia-1-6 --verbose
 
   test-windows-msvc-lts:
@@ -230,7 +227,6 @@ jobs:
 
       - name: Run tests
         run: |
-          julia -e "import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/Jlrs.jl\")"
           cargo test --features full,julia-1-6 --verbose
 
   docs:
