@@ -12,7 +12,14 @@ using Test
 module JuliaModuleTest
 using JlrsCore.Wrap
 
-@wrapmodule("./libjulia_module_test.so", :julia_module_tests_init_fn)
+path = if Sys.islinux()
+    "./libjulia_module_test.so"
+elseif Sys.iswindows()
+    "./libjulia_module_test.dll"
+else
+    "./libjulia_module_test.dylib"
+end
+@wrapmodule(path, :julia_module_tests_init_fn)
 
 function __init__()
     @initjlrs
