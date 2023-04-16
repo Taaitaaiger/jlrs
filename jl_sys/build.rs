@@ -149,7 +149,7 @@ fn set_flags(julia_dir: &str, target: Option<Target>) {
 #[cfg(not(feature = "no-link"))]
 fn set_flags(julia_dir: &str, _tgt: Option<Target>) {
     cfg_if! {
-        if #[cfg(target_os = "linux")] {
+        if #[cfg(all(target_os = "linux", not(any(feature = "windows", feature = "macos"))))] {
             println!("cargo:rustc-link-search={}/lib", &julia_dir);
             println!("cargo:rustc-link-arg=-Wl,--export-dynamic");
 
@@ -166,7 +166,7 @@ fn set_flags(julia_dir: &str, _tgt: Option<Target>) {
                 println!("cargo:rustc-link-search={}/lib/julia", &julia_dir);
                 println!("cargo:rustc-link-lib=uv");
             }
-        } else if #[cfg(any(target_os = "macos", target_os = "freebsd"))] {
+        } else if #[cfg(any(target_os = "macos", target_os = "freebsd", feature = "macos"))] {
             println!("cargo:rustc-link-search={}/lib", &julia_dir);
 
             cfg_if! {
@@ -186,7 +186,7 @@ fn set_flags(julia_dir: &str, _tgt: Option<Target>) {
         } else if #[cfg(all(target_os = "windows", target_env = "msvc"))] {
             println!("cargo:rustc-link-search={}/bin", &julia_dir);
             println!("cargo:rustc-link-search={}/lib", &julia_dir);
-        } else if #[cfg(all(target_os = "windows", target_env = "gnu"))] {
+        } else if #[cfg(any(all(target_os = "windows", target_env = "gnu"), feature = "windows"))] {
             println!("cargo:rustc-link-search={}/bin", &julia_dir);
 
             cfg_if! {
