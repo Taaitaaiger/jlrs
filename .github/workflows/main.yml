@@ -259,6 +259,31 @@ jobs:
           cp ./target/debug/libjulia_module_test.so .
           julia JuliaModuleTest.jl
 
+
+  julia-module-test-windows-gnu:
+    runs-on: windows-latest
+    needs: test-windows-gnu
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup Julia environment
+        uses: julia-actions/setup-julia@v1
+        with:
+          version: '1.8'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+
+      - name: Run module tests
+        run: |
+          cd julia_module_test
+          cargo build --features julia-1-8
+          cp ./target/debug/libjulia_module_test.dll libjulia_module_test.so
+          julia JuliaModuleTest.jl
+
+
   docs:
     runs-on: ubuntu-latest
     needs: test-linux
