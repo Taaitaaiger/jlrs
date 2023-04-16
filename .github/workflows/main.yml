@@ -262,7 +262,6 @@ jobs:
 
   julia-module-test-windows-gnu:
     runs-on: windows-latest
-    needs: test-windows-gnu
     steps:
       - uses: actions/checkout@v2
 
@@ -280,7 +279,7 @@ jobs:
         run: |
           cd julia_module_test
           cargo build --features julia-1-8
-          cp ./target/debug/libjulia_module_test.dll libjulia_module_test.so
+          cp ./target/debug/*julia_module_test.* libjulia_module_test.so
           julia JuliaModuleTest.jl
 
 
