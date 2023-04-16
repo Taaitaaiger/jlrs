@@ -922,7 +922,7 @@ cfg_if::cfg_if! {
 
                 let task = Module::main(&frame)
                     .submodule(&frame, "JlrsThreads")
-                    .expect("Jlrs.Threads not available")
+                    .expect("JlrsCore.Threads not available")
                     .as_managed()
                     .function(&frame, "interactivecall")
                     .expect("interactivecall not available")
@@ -951,7 +951,7 @@ cfg_if::cfg_if! {
 
                 let task = Module::main(&frame)
                     .submodule(&frame, "JlrsThreads")
-                    .expect("Jlrs.Threads not available")
+                    .expect("JlrsCore.Threads not available")
                     .as_managed()
                     .function(&frame, "asynccall")
                     .expect("asynccall not available")
@@ -991,7 +991,7 @@ cfg_if::cfg_if! {
 
                 let task = Module::main(&frame)
                     .submodule(&frame, "JlrsThreads")
-                    .expect("Jlrs.Threads not available")
+                    .expect("JlrsCore.Threads not available")
                     .as_managed()
                     .function(&frame, "scheduleasynclocal")
                     .expect("scheduleasynclocal not available")
@@ -1031,7 +1031,7 @@ cfg_if::cfg_if! {
 
                 let task = Module::main(&frame)
                     .submodule(&frame, "JlrsThreads")
-                    .expect("Jlrs.Threads not available")
+                    .expect("JlrsCore.Threads not available")
                     .as_managed()
                     .function(&frame, "scheduleasync")
                     .expect("scheduleasync not available")
@@ -1180,7 +1180,7 @@ cfg_if::cfg_if! {
 
                 let task = Module::main(&frame)
                     .submodule(&frame, "JlrsThreads")
-                    .expect("Jlrs.Threads not available")
+                    .expect("JlrsCore.Threads not available")
                     .as_managed()
                     .function(&frame, "interactivecall")
                     .expect("interactivecall not available")
@@ -1211,7 +1211,7 @@ cfg_if::cfg_if! {
 
                 let task = Module::main(&frame)
                     .submodule(&frame, "JlrsThreads")
-                    .expect("Jlrs.Threads not available")
+                    .expect("JlrsCore.Threads not available")
                     .as_managed()
                     .function(&frame, "asynccall")
                     .expect("asynccall not available")
@@ -1253,7 +1253,7 @@ cfg_if::cfg_if! {
 
                 let task = Module::main(&frame)
                     .submodule(&frame, "JlrsThreads")
-                    .expect("Jlrs.Threads not available")
+                    .expect("JlrsCore.Threads not available")
                     .as_managed()
                     .function(&frame, "scheduleasynclocal")
                     .expect("scheduleasynclocal not available")
@@ -1295,7 +1295,7 @@ cfg_if::cfg_if! {
 
                 let task = Module::main(&frame)
                     .submodule(&frame, "JlrsThreads")
-                    .expect("Jlrs.Threads not available")
+                    .expect("JlrsCore.Threads not available")
                     .as_managed()
                     .function(&frame, "scheduleasync")
                     .expect("scheduleasync not available")

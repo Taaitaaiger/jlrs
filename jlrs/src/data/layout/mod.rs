@@ -12,7 +12,7 @@
 //! are available to handle the distinction.
 //!
 //! You shouldn't implement layouts for Julia types manually, but rather use the functionality
-//! from the `Jlrs.Reflect` module to generate them and derive all applicable traits.
+//! from the `JlrsCore.Reflect` module to generate them and derive all applicable traits.
 //!
 //! [`ValidLayout`]: crate::data::layout::valid_layout::ValidLayout
 //! [`ValidField`]: crate::data::layout::valid_layout::ValidField

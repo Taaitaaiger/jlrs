@@ -16,7 +16,7 @@ use jlrs_macros::julia_version;
 use super::sync_rt::PendingJulia;
 #[cfg(any(feature = "sync-rt", feature = "async-rt"))]
 use crate::error::JlrsResult;
-use crate::InstallJlrs;
+use crate::InstallJlrsCore;
 
 /// Build a sync runtime.
 ///
@@ -26,7 +26,7 @@ use crate::InstallJlrs;
 /// must call [`RuntimeBuilder::start`].
 pub struct RuntimeBuilder {
     pub(crate) image: Option<(PathBuf, PathBuf)>,
-    pub(crate) install_jlrs_jl: InstallJlrs,
+    pub(crate) install_jlrs_core: InstallJlrsCore,
 }
 
 cfg_if::cfg_if! {
@@ -131,12 +131,12 @@ cfg_if::cfg_if! {
                 self
             }
 
-            /// Enable or disable automatically installing Jlrs.jl.
+            /// Enable or disable automatically installing JlrsCore.jl.
             ///
-            /// In order to function correctly, jlrs requires that the Jlrs.jl package is installed. By
+            /// In order to function correctly, jlrs requires that the JlrsCore.jl package is installed. By
             /// default, this package is automatically installed if it hasn't been installed yet.
-            pub fn install_jlrs(mut self, install: InstallJlrs) -> Self {
-                self.builder.install_jlrs_jl = install;
+            pub fn install_jlrs(mut self, install: InstallJlrsCore) -> Self {
+                self.builder.install_jlrs_core = install;
                 self
             }
 
@@ -174,7 +174,7 @@ impl RuntimeBuilder {
     pub fn new() -> Self {
         RuntimeBuilder {
             image: None,
-            install_jlrs_jl: InstallJlrs::Default,
+            install_jlrs_core: InstallJlrsCore::Default,
         }
     }
 
@@ -258,12 +258,12 @@ impl RuntimeBuilder {
         self
     }
 
-    /// Enable or disable automatically installing Jlrs.jl.
+    /// Enable or disable automatically installing JlrsCore.jl.
     ///
-    /// In order to function correctly, jlrs requires that the Jlrs.jl package is installed. By
+    /// In order to function correctly, jlrs requires that the JlrsCore.jl package is installed. By
     /// default, this package is automatically installed if it hasn't been installed yet.
-    pub fn install_jlrs(mut self, install: InstallJlrs) -> Self {
-        self.install_jlrs_jl = install;
+    pub fn install_jlrs(mut self, install: InstallJlrsCore) -> Self {
+        self.install_jlrs_core = install;
         self
     }
 }

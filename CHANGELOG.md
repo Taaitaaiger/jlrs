@@ -16,9 +16,9 @@
 
  - A managed type for `Binding` has been added, this is available since Julia 1.10.
 
- - The `Jlrs` Julia module is no longer included with jlrs, but published as a separate package.
+ - The `Jlrs` Julia module is no longer included with jlrs, but published as a separate package, `JlrsCore`.
 
- - The jlrs-derive crate is now part of jlrs-macros. Two additional macros are available: `julia_version` can be used as an alternative to writing big cfgs to handle differences between Julia versions, and `julia_module` to generate the data that `Jlrs.Wrap` uses to make the exported functions, methods, types, constant and globals available in a Julia module.
+ - The jlrs-derive crate is now part of jlrs-macros. Two additional macros are available: `julia_version` can be used as an alternative to writing big cfgs to handle differences between Julia versions, and `julia_module` to generate the data that `JlrsCore.Wrap` uses to make the exported functions, methods, types, constant and globals available in a Julia module.
 
  - Several traits have been added to implement the `julia_module` macro: `CCallArg`, `CCallReturn`, and `ConstructType`, the first two provide a mapping from a Rust type to the types Julia should use in generated Julia functions, the latter is used to construct the `DataType` at runtime. The managed type `TypedValue` has been added to make more types constructible, and `RustResult` to enable writing fallible `ccall`able functions. Similarly, `RankedArray` and `TypedRankedArray` have been added. A `CCallRef` type has been added to work with Julia `Ref`s that have been used as arguments of `ccall`ed functions.
 

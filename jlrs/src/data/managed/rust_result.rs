@@ -1,7 +1,7 @@
-//! Managed type for `Jlrs.RustResult`.
+//! Managed type for `JlrsCore.RustResult`.
 //!
 //! Functions written in Rust that are called from Julia can't arbitrarily throw an exception.
-//! `RustResult{T}` is a type provided by the Jlrs package that contains either data or an
+//! `RustResult{T}` is a type provided by the JlrsCore package that contains either data or an
 //! exception. It can be converted to `T`, if it contains an exception that exception is thrown.
 //!
 //! This is useful when writing functions that are exported to Julia with the [`julia_module`]
@@ -92,7 +92,7 @@ impl<'target, 'data, U: ConstructType> RustResult<'target, 'data, U> {
             .unwrap()
     }
 
-    /// Constructs a `RustResult` that contains a `Jlrs.BorrowException`.
+    /// Constructs a `RustResult` that contains a `JlrsCore.BorrowException`.
     pub fn borrow_error<T: Target<'target>>(
         target: ExtendedTarget<'target, '_, '_, T>,
     ) -> RustResultData<'target, 'data, U, T> {
@@ -103,7 +103,7 @@ impl<'target, 'data, U: ConstructType> RustResult<'target, 'data, U> {
                 let unrooted = frame.unrooted();
                 unsafe {
                     let error = Module::main(&unrooted)
-                        .submodule(unrooted, "Jlrs")
+                        .submodule(unrooted, "JlrsCore")
                         .unwrap()
                         .as_managed()
                         .global(unrooted, "BorrowError")
@@ -126,7 +126,7 @@ impl<'target, 'data, U: ConstructType> RustResult<'target, 'data, U> {
             .unwrap()
     }
 
-    /// Constructs a `RustResult` that contains `error`, which is converted to a `Jlrs.JlrsError`.
+    /// Constructs a `RustResult` that contains `error`, which is converted to a `JlrsCore.JlrsError`.
     pub fn jlrs_error<T: Target<'target>>(
         target: ExtendedTarget<'target, '_, '_, T>,
         error: JlrsError,
@@ -139,7 +139,7 @@ impl<'target, 'data, U: ConstructType> RustResult<'target, 'data, U> {
                 unsafe {
                     let msg = JuliaString::new(&mut frame, format!("{}", error));
                     let error = Module::main(&unrooted)
-                        .submodule(unrooted, "Jlrs")
+                        .submodule(unrooted, "JlrsCore")
                         .unwrap()
                         .as_managed()
                         .global(unrooted, "JlrsError")
@@ -171,7 +171,7 @@ impl<'target, 'data, U: ConstructType> RustResult<'target, 'data, U> {
                 let unrooted = frame.unrooted();
                 unsafe {
                     let error = Module::main(&unrooted)
-                        .submodule(unrooted, "Jlrs")
+                        .submodule(unrooted, "JlrsCore")
                         .unwrap()
                         .as_managed()
                         .global(unrooted, "BorrowError")
@@ -258,7 +258,7 @@ unsafe impl<'scope, 'data, U: ConstructType> ConstructType for RustResult<'scope
     where
         Tgt: Target<'target>,
     {
-        let base_type = inline_static_global!(BASE_TYPE, "Jlrs.RustResult", target);
+        let base_type = inline_static_global!(BASE_TYPE, "JlrsCore.RustResult", target);
         Some(base_type)
     }
 }

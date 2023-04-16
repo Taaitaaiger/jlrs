@@ -1,16 +1,16 @@
 module JuliaModuleTestTests
 try
-    using Jlrs
+    using JlrsCore
 catch e
-    import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/Jlrs.jl")
-    using Jlrs
+    import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl")
+    using JlrsCore
 end
 
-using Jlrs.Ledger
+using JlrsCore.Ledger
 using Test
 
 module JuliaModuleTest
-using Jlrs.Wrap
+using JlrsCore.Wrap
 
 @wrapmodule("./libjulia_module_test.so", :julia_module_tests_init_fn)
 
@@ -49,19 +49,19 @@ end
 
     @test JuliaModuleTest.freestanding_func_ret_rust_result(false) == 3
     @inferred JuliaModuleTest.freestanding_func_ret_rust_result(false)
-    @test_throws Jlrs.JlrsError JuliaModuleTest.freestanding_func_ret_rust_result(true)
+    @test_throws JlrsCore.JlrsError JuliaModuleTest.freestanding_func_ret_rust_result(true)
 end
 
 @testset "OpaqueInt" begin
     opaque_int = JuliaModuleTest.OpaqueInt(Int32(-1))
 
-    @test Jlrs.Ledger.try_borrow_shared(opaque_int)
-    @test_throws Jlrs.BorrowError isnothing(JuliaModuleTest.increment!(opaque_int))
-    @test Jlrs.Ledger.unborrow_shared(opaque_int)
+    @test JlrsCore.Ledger.try_borrow_shared(opaque_int)
+    @test_throws JlrsCore.BorrowError isnothing(JuliaModuleTest.increment!(opaque_int))
+    @test JlrsCore.Ledger.unborrow_shared(opaque_int)
 
-    @test Jlrs.Ledger.try_borrow_exclusive(opaque_int)
-    @test_throws Jlrs.BorrowError JuliaModuleTest.get_cloned(opaque_int)
-    @test Jlrs.Ledger.unborrow_exclusive(opaque_int)
+    @test JlrsCore.Ledger.try_borrow_exclusive(opaque_int)
+    @test_throws JlrsCore.BorrowError JuliaModuleTest.get_cloned(opaque_int)
+    @test JlrsCore.Ledger.unborrow_exclusive(opaque_int)
 
     @test JuliaModuleTest.get_cloned(opaque_int) == Int32(-1)
     @inferred JuliaModuleTest.get_cloned(opaque_int)
@@ -99,11 +99,11 @@ end
     @inferred JuliaModuleTest.async_callback(arr)
 
     @test Ledger.try_borrow_exclusive(arr)
-    @test_throws Jlrs.JlrsError JuliaModuleTest.async_callback(arr)
+    @test_throws JlrsCore.JlrsError JuliaModuleTest.async_callback(arr)
     @test Ledger.unborrow_exclusive(arr)
 
-    @test_throws Jlrs.JlrsError JuliaModuleTest.async_callback_init_err()
-    @test_throws Jlrs.JlrsError JuliaModuleTest.async_callback_callback_err()
+    @test_throws JlrsCore.JlrsError JuliaModuleTest.async_callback_init_err()
+    @test_throws JlrsCore.JlrsError JuliaModuleTest.async_callback_callback_err()
 end
 
 @testset "Constants and globals" begin

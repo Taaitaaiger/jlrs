@@ -30,7 +30,7 @@
 //!
 //! It's not possible to define custom managed types, but it is possible to implement layouts and
 //! type constructors. Rather than manually implementing such types and the relevant traits, you
-//! should use the `reflect` function from the `Jlrs.Reflect` module to do so automatically.
+//! should use the `reflect` function from the `JlrsCore.Reflect` module to do so automatically.
 //!
 //! [`memory`]: crate::memory
 //! [`Value`]: crate::data::managed::value::Value

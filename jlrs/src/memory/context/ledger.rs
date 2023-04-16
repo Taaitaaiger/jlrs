@@ -1,5 +1,5 @@
 // The ledger is used to track Julia data. It's implemented in a separate crate and distributed
-// as JlrsLedger_jll which is a dependency of Jlrs.jl. The reason it works this way is because
+// as JlrsLedger_jll which is a dependency of JlrsCore.jl. The reason it works this way is because
 // multiple packages could use different versions of jlrs and have been compiled with different
 // versions of Rust, all of these packages must use the same ledger.
 //
@@ -47,7 +47,7 @@ pub(crate) unsafe extern "C" fn init_ledger() {
     LEDGER.get_or_init(|| {
         let unrooted = Unrooted::new();
         let module = Module::main(&unrooted)
-            .submodule(unrooted, "Jlrs")
+            .submodule(unrooted, "JlrsCore")
             .unwrap()
             .as_managed();
 

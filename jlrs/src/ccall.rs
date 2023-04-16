@@ -40,7 +40,7 @@ use crate::{
         target::{frame::GcFrame, unrooted::Unrooted, Target},
     },
     private::Private,
-    InstallJlrs,
+    InstallJlrsCore,
 };
 
 // The pool is lazily created either when it's first used, or when the number of threads is set.
@@ -257,11 +257,11 @@ impl<'context> CCall<'context> {
     /// used this function is called automatically.
     ///
     /// A module can be provided to allow setting the size of the internal thread pool from Julia
-    /// by calling `Jlrs.set_pool_size`.
+    /// by calling `JlrsCore.set_pool_size`.
     #[inline(never)]
-    pub fn init_jlrs(&mut self, install_jlrs_jl: &InstallJlrs, module: Option<Module>) {
+    pub fn init_jlrs(&mut self, install_jlrs_core: &InstallJlrsCore, module: Option<Module>) {
         unsafe {
-            init_jlrs(&mut self.frame, install_jlrs_jl);
+            init_jlrs(&mut self.frame, install_jlrs_core);
 
             // Expose thread pool to Julia
             if let Some(module) = module {
@@ -269,7 +269,7 @@ impl<'context> CCall<'context> {
 
                 set_pool_name(module);
 
-                let add_pool = Module::package_root_module(&unrooted, "Jlrs")
+                let add_pool = Module::package_root_module(&unrooted, "JlrsCore")
                     .unwrap()
                     .global(unrooted, "add_pool")
                     .unwrap()
@@ -316,7 +316,7 @@ unsafe impl ConstructType for AsyncCCall {
     {
         let (target, _) = target.split();
         unsafe {
-            Module::package_root_module(&target, "Jlrs")
+            Module::package_root_module(&target, "JlrsCore")
                 .unwrap()
                 .submodule(&target, "Wrap")
                 .unwrap()
@@ -334,7 +334,7 @@ unsafe impl ConstructType for AsyncCCall {
     {
         unsafe {
             Some(
-                Module::package_root_module(target, "Jlrs")
+                Module::package_root_module(target, "JlrsCore")
                     .unwrap()
                     .submodule(target, "Wrap")
                     .unwrap()

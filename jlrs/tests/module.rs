@@ -84,7 +84,7 @@ mod tests {
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
                     let main_module = Module::main(&frame);
-                    let jlrs_module = main_module.submodule(&mut frame, "Jlrs");
+                    let jlrs_module = main_module.submodule(&mut frame, "JlrsCore");
                     assert!(jlrs_module.is_ok());
                     let func = jlrs_module.unwrap().function(&mut frame, "valuestring");
                     assert!(func.is_ok());
@@ -102,7 +102,7 @@ mod tests {
             jlrs.instance(&mut frame)
                 .scope(|mut frame| {
                     let main_module = Module::main(&frame);
-                    let jlrs_module = main_module.submodule(&mut frame, "Jlrs");
+                    let jlrs_module = main_module.submodule(&mut frame, "JlrsCore");
                     assert!(jlrs_module.is_ok());
                     let func = jlrs_module.unwrap().function(&mut frame, "valuestring");
                     assert!(func.is_ok());
@@ -119,7 +119,7 @@ mod tests {
 
             jlrs.instance(&mut frame)
                 .scope(|frame| {
-                    let jlrs_module = Module::package_root_module(&frame, "Jlrs");
+                    let jlrs_module = Module::package_root_module(&frame, "JlrsCore");
                     assert!(jlrs_module.is_some());
                     Ok(())
                 })

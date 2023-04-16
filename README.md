@@ -38,7 +38,7 @@ recently released version.
 ## Prerequisites
 
 Julia must be installed before jlrs can be used, jlrs is compatible with Julia 1.6 up to and
-including Julia 1.9. The Jlrs package must also have been added, if this is not the case it
+including Julia 1.9. The JlrsCore package must also have been added, if this is not the case it
 will automatically be added when jlrs is initialized.
 
 ### Linux
@@ -171,7 +171,7 @@ In addition to these runtimes, the following utility features are available:
   feature is enabled the `CCall` struct is available which offers the same functionality as
   the sync runtime without initializing Julia. The `julia_module` macro is provided to
   easily export functions, foreign types, and data in combination with the macros from the
-  `Wrap` module in the Jlrs package.
+  `Wrap` module in the JlrsCore package.
 
 - `uv`
 
@@ -598,7 +598,7 @@ while on the Julia side things look like this:
 
 ```julia
 module CallMe
-using Jlrs.Wrap
+using JlrsCore.Wrap
 
 @wrapmodule("./path/to/libcallme.so", :callme_init_fn)
 
@@ -700,7 +700,7 @@ fn test_2() {
 
 In order to map a struct in Rust to one in Julia you can derive several traits. You normally
 shouldn't need to implement these structs or traits manually. The `reflect` function defined
-in the `Jlrs.Reflect` module can generate Rust structs whose layouts match their counterparts
+in the `JlrsCore.Reflect` module can generate Rust structs whose layouts match their counterparts
 in Julia and automatically derive the supported traits.
 
 The main restriction is that structs with atomic fields, and tuple or union fields with type

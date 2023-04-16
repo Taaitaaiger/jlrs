@@ -535,7 +535,7 @@ where
         };
 
         Module::main(&unrooted)
-            .submodule(&unrooted, "Jlrs")?
+            .submodule(&unrooted, "JlrsCore")?
             .as_managed()
             .global(&unrooted, "color")?
             .as_value()
