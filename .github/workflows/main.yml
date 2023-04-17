@@ -273,7 +273,8 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: stable
+          toolchain: stable-x86_64-pc-windows-gnu
+          override: true
 
       - name: Run module tests
         run: |
@@ -296,8 +297,6 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: stable-x86_64-pc-windows-gnu
 
       - name: Set env
         run: |
