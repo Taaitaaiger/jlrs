@@ -306,7 +306,7 @@ jobs:
           export DYLD_LIBRARY_PATH="${JULIA_DIR}/lib:${JULIA_DIR}/lib/julia:${DYLD_LIBRARY_PATH}"
           cd julia_module_test
           cargo build --features julia-1-8
-          cp ./target/debug/libjulia_module_test.* libjulia_module_test.dylib
+          cp ./target/debug/libjulia_module_test.* .
           julia JuliaModuleTest.jl
 
   docs:
