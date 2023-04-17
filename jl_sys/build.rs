@@ -1,6 +1,10 @@
+use std::env;
+#[cfg(any(not(feature = "yggdrasil"), feature = "use-bindgen"))]
+use std::path::PathBuf;
+#[cfg(not(feature = "yggdrasil"))]
+use std::process::Command;
 #[cfg(target_os = "windows")]
 use std::str::FromStr;
-use std::{env, path::PathBuf, process::Command};
 #[cfg(target_os = "linux")]
 use std::{ffi::OsStr, os::unix::prelude::OsStrExt};
 
@@ -49,7 +53,7 @@ fn find_julia() -> Option<String> {
     }
 
     cfg_if! {
-        if #[cfg(target_os = "linux")] {
+        if #[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))] {
             let out = Command::new("which").arg("julia").output().ok()?.stdout;
             let mut julia_path = PathBuf::from(OsStr::from_bytes(out.as_ref()));
 
