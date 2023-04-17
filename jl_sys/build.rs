@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::process::Command;
 #[cfg(target_os = "windows")]
 use std::str::FromStr;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))]
 use std::{ffi::OsStr, os::unix::prelude::OsStrExt};
 
 use cfg_if::cfg_if;
