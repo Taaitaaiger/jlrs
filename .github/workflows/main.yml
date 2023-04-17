@@ -278,8 +278,8 @@ jobs:
       - name: Run module tests
         run: |
           cd julia_module_test
-          cargo build --features julia-1-8,windows
-          cp ./target/debug/*julia_module_test.* libjulia_module_test.dll
+          cargo build --features julia-1-8
+          cp ./target/debug/julia_module_test.* libjulia_module_test.dll
           julia JuliaModuleTest.jl
 
 
