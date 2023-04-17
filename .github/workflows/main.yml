@@ -262,6 +262,7 @@ jobs:
 
   julia-module-test-windows-gnu:
     runs-on: windows-latest
+    needs: test-windows-gnu
     steps:
       - uses: actions/checkout@v2
 
@@ -283,6 +284,30 @@ jobs:
           cp ./target/debug/julia_module_test.* libjulia_module_test.dll
           julia JuliaModuleTest.jl
 
+  julia-module-test-macos:
+    runs-on: macos-latest
+    needs: test-macos
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Julia environment
+        uses: julia-actions/setup-julia@v1
+        with:
+          version: '1.8'
+
+      - name: Setup Rust
+        uses:  dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+
+      - name: Run tests
+        run: |
+          export JULIA_DIR="$(dirname $(dirname $(which julia)))"
+          export DYLD_LIBRARY_PATH="${JULIA_DIR}/lib:${JULIA_DIR}/lib/julia:${DYLD_LIBRARY_PATH}"
+          cd julia_module_test
+          cargo build --features julia-1-8
+          cp ./target/debug/libjulia_module_test.* libjulia_module_test.dylib
+          julia JuliaModuleTest.jl
 
   docs:
     runs-on: ubuntu-latest
@@ -297,6 +322,8 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
 
       - name: Set env
         run: |
