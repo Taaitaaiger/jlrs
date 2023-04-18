@@ -131,17 +131,16 @@ fn interpret_target() -> Option<Target> {
 
 #[cfg(feature = "no-link")]
 fn set_flags(julia_dir: &str, target: Option<Target>) {
+    println!("cargo:rustc-link-arg=-Wl,--export-dynamic");
+
+    // TODO: is linking really necessary on these platforms?
     match target {
         Some(Target::BSD) => {
             println!("cargo:rustc-link-lib=julia");
             #[cfg(feature = "uv")]
             println!("cargo:rustc-link-lib=uv");
         }
-        Some(Target::Windows) => {
-            println!("cargo:rustc-link-arg=-Wl,--no-undefined");
-        }
         Some(Target::WindowsI686) => {
-            println!("cargo:rustc-link-arg=-Wl,--no-undefined");
             println!("cargo:rustc-link-lib=julia");
             #[cfg(feature = "uv")]
             println!("cargo:rustc-link-lib=uv");
@@ -152,10 +151,11 @@ fn set_flags(julia_dir: &str, target: Option<Target>) {
 
 #[cfg(not(feature = "no-link"))]
 fn set_flags(julia_dir: &str, _tgt: Option<Target>) {
+    println!("cargo:rustc-link-arg=-Wl,--export-dynamic");
+    
     cfg_if! {
         if #[cfg(all(target_os = "linux", not(any(feature = "windows", feature = "macos"))))] {
             println!("cargo:rustc-link-search={}/lib", &julia_dir);
-            println!("cargo:rustc-link-arg=-Wl,--export-dynamic");
 
             cfg_if! {
                 if #[cfg(feature = "debug")] {
@@ -236,13 +236,11 @@ fn compile_jlrs_cc(julia_dir: &str, target: Option<Target>) {
                 }
                 Some(Target::Windows) => {
                     c.flag("-mwindows");
-                    c.flag("-Wl,--no-undefined");
                 }
                 Some(Target::WindowsI686) => {
                     c.no_default_flags(true);
                     c.flag("-O3");
                     c.flag("-mwindows");
-                    c.flag("-Wl,--no-undefined");
                 }
                 _ => ()
             }
