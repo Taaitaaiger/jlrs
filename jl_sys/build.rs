@@ -131,8 +131,6 @@ fn interpret_target() -> Option<Target> {
 
 #[cfg(feature = "no-link")]
 fn set_flags(julia_dir: &str, target: Option<Target>) {
-    println!("cargo:rustc-link-arg=-Wl,--export-dynamic");
-
     // TODO: is linking really necessary on these platforms?
     match target {
         Some(Target::BSD) => {
@@ -141,18 +139,19 @@ fn set_flags(julia_dir: &str, target: Option<Target>) {
             println!("cargo:rustc-link-lib=uv");
         }
         Some(Target::WindowsI686) => {
+            println!("cargo:rustc-link-arg=-Wl,--export-dynamic");
             println!("cargo:rustc-link-lib=julia");
             #[cfg(feature = "uv")]
             println!("cargo:rustc-link-lib=uv");
         }
-        _ => (),
+        _ => println!("cargo:rustc-link-arg=-Wl,--export-dynamic"),
     }
 }
 
 #[cfg(not(feature = "no-link"))]
 fn set_flags(julia_dir: &str, _tgt: Option<Target>) {
     println!("cargo:rustc-link-arg=-Wl,--export-dynamic");
-    
+
     cfg_if! {
         if #[cfg(all(target_os = "linux", not(any(feature = "windows", feature = "macos"))))] {
             println!("cargo:rustc-link-search={}/lib", &julia_dir);
