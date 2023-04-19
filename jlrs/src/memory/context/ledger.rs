@@ -1,5 +1,5 @@
 // The ledger is used to track Julia data. It's implemented in a separate crate and distributed
-// as JlrsLedger_jll which is a dependency of JlrsCore.jl. The reason it works this way is because
+// as JlrsLedger_jll which is a dependency of JlrsCore. The reason it works this way is because
 // multiple packages could use different versions of jlrs and have been compiled with different
 // versions of Rust, all of these packages must use the same ledger.
 //
