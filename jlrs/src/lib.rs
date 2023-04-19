@@ -829,9 +829,9 @@ pub mod util;
 /// is used.
 #[derive(Clone)]
 pub enum InstallJlrsCore {
-    /// Install the current default revision of JlrsCore.jl
+    /// Install the most recent version of JlrsCore
     Default,
-    /// Don't install the JlrsCore package
+    /// Don't install the JlrsCore
     No,
     /// Install the given version
     Version {
@@ -861,7 +861,7 @@ impl InstallJlrsCore {
                          try
                              using JlrsCore
                          catch e
-                             import Pkg; Pkg.add(url=\"https://github.com/Taaitaaiger/JlrsCore.jl#c4710a4\")
+                             import Pkg; Pkg.add(\"JlrsCore\")
                              using JlrsCore
                          end
                      end",

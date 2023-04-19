@@ -131,9 +131,9 @@ cfg_if::cfg_if! {
                 self
             }
 
-            /// Enable or disable automatically installing JlrsCore.jl.
+            /// Enable or disable automatically installing JlrsCore.
             ///
-            /// In order to function correctly, jlrs requires that the JlrsCore.jl package is installed. By
+            /// In order to function correctly, jlrs requires that the JlrsCore package is installed. By
             /// default, this package is automatically installed if it hasn't been installed yet.
             pub fn install_jlrs(mut self, install: InstallJlrsCore) -> Self {
                 self.builder.install_jlrs_core = install;
@@ -258,9 +258,9 @@ impl RuntimeBuilder {
         self
     }
 
-    /// Enable or disable automatically installing JlrsCore.jl.
+    /// Enable or disable automatically installing JlrsCore.
     ///
-    /// In order to function correctly, jlrs requires that the JlrsCore.jl package is installed. By
+    /// In order to function correctly, jlrs requires that the JlrsCore package is installed. By
     /// default, this package is automatically installed if it hasn't been installed yet.
     pub fn install_jlrs(mut self, install: InstallJlrsCore) -> Self {
         self.install_jlrs_core = install;

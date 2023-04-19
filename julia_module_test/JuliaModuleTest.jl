@@ -2,7 +2,7 @@ module JuliaModuleTestTests
 try
     using JlrsCore
 catch e
-    import Pkg; Pkg.add(url="https://github.com/Taaitaaiger/JlrsCore.jl")
+    import Pkg; Pkg.add("JlrsCore")
     using JlrsCore
 end
 
