@@ -126,13 +126,11 @@ fn interpret_target() -> Option<Target> {
 
 #[cfg(feature = "no-link")]
 fn set_flags(julia_dir: &str, target: Option<Target>) {
-    match target {
-        Some(Target::WindowsI686) => {
-            // Linking is necessary until raw dylib linkage is supported for this target
-            println!("cargo:rustc-link-lib=julia");
-            #[cfg(feature = "uv")]
-            println!("cargo:rustc-link-lib=uv");
-        }
+    if let Some(Target::WindowsI686) = target {
+        // Linking is necessary until raw dylib linkage is supported for this target
+        println!("cargo:rustc-link-lib=julia");
+        #[cfg(feature = "uv")]
+        println!("cargo:rustc-link-lib=uv");
     }
 }
 
