@@ -45,7 +45,7 @@ struct jlrs_handler_t;
  * <div rustbindgen replaces="jl_mutex_t"></div>
  */
 struct jlrs_mutex_t {
-    // This field is atomic! Special handling in fix_bindings.rs is required because this struct 
+    // This field is atomic! Special handling in fix_bindings.rs is required because this struct
     // is not defined in julia.h
     jl_task_t *owner;
     uint32_t count;

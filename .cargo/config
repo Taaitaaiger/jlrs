@@ -1,0 +1,31 @@
+[registries.crates-io]
+protocol = "sparse"
+
+# musl targets require -crt-static, panic=abort must be set again because this overrides the 
+# rustflags set for the build key.
+[target.aarch64-unknown-linux-musl]
+rustflags = ["-C", "target-feature=-crt-static"]
+
+[target.arm-unknown-linux-musleabihf]
+rustflags = ["-C", "target-feature=-crt-static"]
+
+[target.armv7-unknown-linux-musleabihf]
+rustflags = ["-C", "target-feature=-crt-static"]
+
+[target.i686-unknown-linux-musl]
+rustflags = ["-C", "target-feature=-crt-static"]
+
+[target.x86_64-unknown-linux-musl]
+rustflags = ["-C", "target-feature=-crt-static"]
+
+# On BSD-like platforms, the link-args `-undefined` and `dynamic_lookup` must be set to allow
+# calling functions from libjulia without explicitly linking it. Like the musl targets above, 
+# panic=abort is set again.
+[target.aarch64-apple-darwin]
+rustflags = ["-C", "link-arg=-undefined", "-C", "link-arg=dynamic_lookup"]
+
+[target.x86_64-apple-darwin]
+rustflags = ["-C", "link-arg=-undefined", "-C", "link-arg=dynamic_lookup"]
+
+[target.x86_64-unknown-freebsd]
+rustflags = ["-C", "link-arg=-undefined", "-C", "link-arg=dynamic_lookup"]
