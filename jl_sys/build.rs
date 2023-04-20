@@ -96,8 +96,6 @@ fn find_julia() -> Option<String> {
 #[allow(dead_code)]
 #[derive(Clone, Copy)]
 enum Target {
-    BSD,
-    Windows,
     WindowsI686,
     I686,
 }
@@ -110,10 +108,6 @@ fn interpret_target() -> Option<Target> {
 #[cfg(feature = "yggdrasil")]
 fn interpret_target() -> Option<Target> {
     if let Ok(target) = env::var("target") {
-        if target.contains("apple") || target.contains("freebsd") {
-            return Some(Target::BSD);
-        }
-
         if target.contains("w64") {
             if target.contains("i686") {
                 return Some(Target::WindowsI686);
@@ -131,20 +125,13 @@ fn interpret_target() -> Option<Target> {
 
 #[cfg(feature = "no-link")]
 fn set_flags(julia_dir: &str, target: Option<Target>) {
-    // TODO: is linking really necessary on these platforms?
     match target {
-        Some(Target::BSD) => {
-            println!("cargo:rustc-link-lib=julia");
-            #[cfg(feature = "uv")]
-            println!("cargo:rustc-link-lib=uv");
-        }
         Some(Target::WindowsI686) => {
-            println!("cargo:rustc-link-arg=-Wl,--export-dynamic");
+            // Linking is necessary until raw dylib linkage is supported for this target
             println!("cargo:rustc-link-lib=julia");
             #[cfg(feature = "uv")]
             println!("cargo:rustc-link-lib=uv");
         }
-        _ => println!("cargo:rustc-link-arg=-Wl,--export-dynamic"),
     }
 }
 
@@ -272,9 +259,15 @@ fn compile_jlrs_cc(julia_dir: &str, target: Option<Target>) {
     ))]
     c.define("JLRS_WINDOWS_LTS", None);
 
-    if let Some(Target::Windows) = target {
-        #[cfg(feature = "julia-1-6")]
-        c.define("JLRS_WINDOWS_LTS", None);
+    #[cfg(feature = "julia-1-6")]
+    match target {
+        Some(Target::Windows) => {
+            c.define("JLRS_WINDOWS_LTS", None);
+        }
+        Some(Target::WindowsI686) => {
+            c.define("JLRS_WINDOWS_LTS", None);
+        }
+        _ => (),
     }
 
     #[cfg(feature = "julia-1-7")]

@@ -216,11 +216,11 @@
 //! If you want to embed Julia in a Rust application, you must enable a runtime and a version
 //! feature:
 //!
-//! `jlrs = {version = "0.18", features = ["sync-rt", "julia-1-8"]}`
+//! `jlrs = {version = "0.18.0-beta.0", features = ["sync-rt", "julia-1-8"]}`
 //!
-//! `jlrs = {version = "0.18", features = ["tokio-rt", "julia-1-8"]}`
+//! `jlrs = {version = "0.18.0-beta.0", features = ["tokio-rt", "julia-1-8"]}`
 //!
-//! `jlrs = {version = "0.18", features = ["async-std-rt", "julia-1-8"]}`
+//! `jlrs = {version = "0.18.0-beta.0", features = ["async-std-rt", "julia-1-8"]}`
 //!
 //! When Julia is embedded in an application, it must be initialized before it can be used. The
 //! following snippet initializes the sync runtime:
