@@ -89,7 +89,6 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
-          override: true
 
       - name: Run tests
         run: cargo test --features full,julia-1-8 --verbose
@@ -119,7 +118,6 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
-          override: true
 
       - name: Run tests
         run: cargo test --features full,julia-1-8 --verbose
@@ -196,7 +194,6 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
-          override: true
 
       - name: Run tests
         run: |
@@ -224,7 +221,6 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
-          override: true
 
       - name: Run tests
         run: |
@@ -275,7 +271,6 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable-x86_64-pc-windows-gnu
-          override: true
 
       - name: Run module tests
         run: |
