@@ -78,7 +78,7 @@ jobs:
           - rust: nightly-x86_64-pc-windows-gnu
             allow-fail: true
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v1
@@ -105,7 +105,7 @@ jobs:
           - rust: nightly-x86_64-pc-windows-msvc
             allow-fail: true
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Setup Julia environment
         id: setup-julia
@@ -132,7 +132,7 @@ jobs:
         rust: [stable]
         allow-fail: [false]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v1
@@ -159,7 +159,7 @@ jobs:
         rust: [stable]
         allow-fail: [false]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v1
@@ -185,7 +185,7 @@ jobs:
         rust: [stable-x86_64-pc-windows-gnu]
         allow-fail: [false]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v1
@@ -210,7 +210,7 @@ jobs:
         rust: [stable-x86_64-pc-windows-msvc]
         allow-fail: [false]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Setup Julia environment
         id: setup-julia
@@ -234,7 +234,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: test-linux
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v1
@@ -264,7 +264,7 @@ jobs:
     runs-on: windows-latest
     needs: test-windows-gnu
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v1
@@ -313,7 +313,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: test-linux
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Setup Julia environment
         uses: julia-actions/setup-julia@v1
