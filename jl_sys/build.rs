@@ -96,6 +96,7 @@ fn find_julia() -> Option<String> {
 #[allow(dead_code)]
 #[derive(Clone, Copy)]
 enum Target {
+    Windows,
     WindowsI686,
     I686,
 }
