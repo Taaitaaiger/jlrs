@@ -583,7 +583,7 @@ crate-type = ["cdylib"]
 to your crate's `Cargo.toml`. It's also recommended to abort on panic:
 
 ```toml
-[profile.releas
+[profile.release]
 panic = "abort"
 ```
 
