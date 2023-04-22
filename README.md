@@ -227,11 +227,11 @@ enabling the `full` feature.
 If you want to embed Julia in a Rust application, you must enable a runtime and a version
 feature:
 
-`jlrs = {version = "0.18.0-beta.1", features = ["sync-rt", "julia-1-8"]}`
+`jlrs = {version = "0.18.0-beta.2", features = ["sync-rt", "julia-1-8"]}`
 
-`jlrs = {version = "0.18.0-beta.1", features = ["tokio-rt", "julia-1-8"]}`
+`jlrs = {version = "0.18.0-beta.2", features = ["tokio-rt", "julia-1-8"]}`
 
-`jlrs = {version = "0.18.0-beta.1", features = ["async-std-rt", "julia-1-8"]}`
+`jlrs = {version = "0.18.0-beta.2", features = ["async-std-rt", "julia-1-8"]}`
 
 When Julia is embedded in an application, it must be initialized before it can be used. The
 following snippet initializes the sync runtime:
@@ -625,7 +625,7 @@ function:
 This macro has many more capabilities than just exporting extern "C" functions, for more
 information see the [documentation](https://docs.rs/jlrs-macros/latest/jlrs_macros/macro.julia_module.html). A practical example that uses this macro is the
 [rustfft-jl](https://github.com/Taaitaaiger/rustfft-jl) crate, which uses this macro to expose RustFFT to Julia. The recipe for
-BinaryBuilder can be found [here](https://github.com/JuliaPackaging/Yggdrasil/tree/master/R/rustfft_jl).
+BinaryBuilder can be found [here](https://github.com/JuliaPackaging/Yggdrasil/tree/master/R/rustfft).
 
 While `call_me` doesn't call back into Julia, it is possible to call arbitrary functions from
 jlrs from a `ccall`ed function. This will often require a `Target`, to create a target you
