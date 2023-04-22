@@ -17,6 +17,9 @@ use fix_bindings::fix_bindings;
 mod fix_bindings;
 
 fn main() {
+    #[cfg(feature = "docs")]
+    return;
+
     if env::var("DOCS_RS").is_ok() {
         return;
     }
