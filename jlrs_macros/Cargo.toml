@@ -1,11 +1,11 @@
 [package]
 name = "jlrs-macros"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Thomas van Doornmalen <thomas.vandoornmalen@gmail.com>"]
 description = """
 jlrs-macros contains the custom derives offered by jlrs.
 """
-documentation = "https://docs.rs/jlrs"
+documentation = "https://docs.rs/jlrs-macros"
 homepage = "https://github.com/Taaitaaiger/jlrs"
 repository = "https://github.com/Taaitaaiger/jlrs"
 readme = "../README.md"
@@ -31,3 +31,6 @@ proc-macro = true
 proc-macro2 = { version = "1", optional = true }
 syn = { version = "2", features = ["full"], optional = true }
 quote = { version = "1", optional = true }
+
+[package.metadata.docs.rs]
+features = ["ccall", "derive", "julia-1-10"]

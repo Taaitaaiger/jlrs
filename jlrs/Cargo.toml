@@ -1,6 +1,6 @@
 [package]
 name = "jlrs"
-version = "0.18.0-beta.0"
+version = "0.18.0-beta.1"
 authors = ["Thomas van Doornmalen <thomas.vandoornmalen@gmail.com>"]
 description = """
 jlrs provides bindings to the Julia C API that enables Julia code to be called from Rust and more.
@@ -92,7 +92,7 @@ macos = ["jl-sys/macos"]
 # Internal
 
 # Used to generate docs for docs.rs
-docs = ["jl-sys/docs", "full"]
+docs = ["jl-sys/docs", "full", "julia-1-10"]
 
 [dependencies]
 cfg-if = "1"
