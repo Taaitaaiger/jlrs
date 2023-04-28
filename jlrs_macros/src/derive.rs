@@ -155,7 +155,7 @@ pub fn impl_into_julia(ast: &syn::DeriveInput) -> TokenStream {
         },
         Some("Core") => syn::parse_quote! {
             {
-                ::jlrs::data::managed::module::Module::corr(&global)
+                ::jlrs::data::managed::module::Module::core(&global)
             }
         },
         Some(pkg) => syn::parse_quote! {
@@ -345,7 +345,7 @@ pub fn impl_construct_type(ast: &syn::DeriveInput) -> TokenStream {
         },
         Some("Core") => syn::parse_quote! {
             {
-                ::jlrs::data::managed::module::Module::corr(&frame)
+                ::jlrs::data::managed::module::Module::core(&frame)
             }
         },
         Some(pkg) => syn::parse_quote! {
