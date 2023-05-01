@@ -1,4 +1,4 @@
-/* generated from julia version 1.10.0-DEV (Commit: ff7b8eb00b 2023-04-14 16:29 UTC) */
+/* generated from julia version 1.10.0-DEV (Commit: d82ae9ee0f 2023-05-01 17:15 UTC) */
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct __BindgenBitfieldUnit<Storage> {
@@ -106,9 +106,8 @@ pub type jl_value_t = _jl_value_t;
 #[repr(align(8))]
 #[derive(Debug, Copy, Clone)]
 pub struct _jl_taggedvalue_bits {
-    pub _bitfield_align_1: [u8; 0],
-    pub _bitfield_1: __BindgenBitfieldUnit<[u8; 1usize]>,
-    pub __bindgen_padding_0: [u8; 7usize],
+    pub _bitfield_align_1: [u64; 0],
+    pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
 impl _jl_taggedvalue_bits {
     #[inline]
@@ -134,8 +133,23 @@ impl _jl_taggedvalue_bits {
         }
     }
     #[inline]
-    pub fn new_bitfield_1(gc: usize, in_image: usize) -> __BindgenBitfieldUnit<[u8; 1usize]> {
-        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 1usize]> = Default::default();
+    pub fn padding(&self) -> usize {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(3usize, 61u8) as u64) }
+    }
+    #[inline]
+    pub fn set_padding(&mut self, val: usize) {
+        unsafe {
+            let val: u64 = ::std::mem::transmute(val);
+            self._bitfield_1.set(3usize, 61u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn new_bitfield_1(
+        gc: usize,
+        in_image: usize,
+        padding: usize,
+    ) -> __BindgenBitfieldUnit<[u8; 8usize]> {
+        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 8usize]> = Default::default();
         __bindgen_bitfield_unit.set(0usize, 2u8, {
             let gc: u64 = unsafe { ::std::mem::transmute(gc) };
             gc as u64
@@ -143,6 +157,10 @@ impl _jl_taggedvalue_bits {
         __bindgen_bitfield_unit.set(2usize, 1u8, {
             let in_image: u64 = unsafe { ::std::mem::transmute(in_image) };
             in_image as u64
+        });
+        __bindgen_bitfield_unit.set(3usize, 61u8, {
+            let padding: u64 = unsafe { ::std::mem::transmute(padding) };
+            padding as u64
         });
         __bindgen_bitfield_unit
     }
@@ -510,6 +528,7 @@ pub struct _jl_method_t {
     pub isva: u8,
     pub is_for_opaque_closure: u8,
     pub constprop: u8,
+    pub max_varargs: u8,
     pub purity: _jl_purity_overrides_t,
     pub writelock: jl_mutex_t,
 }
@@ -1006,6 +1025,17 @@ impl _jl_datatype_t {
         }
     }
     #[inline]
+    pub fn padding(&self) -> u16 {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(10usize, 6u8) as u16) }
+    }
+    #[inline]
+    pub fn set_padding(&mut self, val: u16) {
+        unsafe {
+            let val: u16 = ::std::mem::transmute(val);
+            self._bitfield_1.set(10usize, 6u8, val as u64)
+        }
+    }
+    #[inline]
     pub fn new_bitfield_1(
         hasfreetypevars: u16,
         isconcretetype: u16,
@@ -1017,6 +1047,7 @@ impl _jl_datatype_t {
         isprimitivetype: u16,
         ismutationfree: u16,
         isidentityfree: u16,
+        padding: u16,
     ) -> __BindgenBitfieldUnit<[u8; 2usize]> {
         let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 2usize]> = Default::default();
         __bindgen_bitfield_unit.set(0usize, 1u8, {
@@ -1059,6 +1090,10 @@ impl _jl_datatype_t {
         __bindgen_bitfield_unit.set(9usize, 1u8, {
             let isidentityfree: u16 = unsafe { ::std::mem::transmute(isidentityfree) };
             isidentityfree as u64
+        });
+        __bindgen_bitfield_unit.set(10usize, 6u8, {
+            let padding: u16 = unsafe { ::std::mem::transmute(padding) };
+            padding as u64
         });
         __bindgen_bitfield_unit
     }
@@ -1145,12 +1180,24 @@ impl _jl_binding_t {
         }
     }
     #[inline]
+    pub fn padding(&self) -> u8 {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(6usize, 2u8) as u8) }
+    }
+    #[inline]
+    pub fn set_padding(&mut self, val: u8) {
+        unsafe {
+            let val: u8 = ::std::mem::transmute(val);
+            self._bitfield_1.set(6usize, 2u8, val as u64)
+        }
+    }
+    #[inline]
     pub fn new_bitfield_1(
         constp: u8,
         exportp: u8,
         imported: u8,
         usingfailed: u8,
         deprecated: u8,
+        padding: u8,
     ) -> __BindgenBitfieldUnit<[u8; 1usize]> {
         let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 1usize]> = Default::default();
         __bindgen_bitfield_unit.set(0usize, 1u8, {
@@ -1172,6 +1219,10 @@ impl _jl_binding_t {
         __bindgen_bitfield_unit.set(4usize, 2u8, {
             let deprecated: u8 = unsafe { ::std::mem::transmute(deprecated) };
             deprecated as u64
+        });
+        __bindgen_bitfield_unit.set(6usize, 2u8, {
+            let padding: u8 = unsafe { ::std::mem::transmute(padding) };
+            padding as u64
         });
         __bindgen_bitfield_unit
     }
@@ -3814,6 +3865,7 @@ pub struct jl_options_t {
     pub cpu_target: *const ::std::os::raw::c_char,
     pub nthreadpools: i8,
     pub nthreads: i16,
+    pub ngcthreads: i16,
     pub nthreads_per_pool: *const i16,
     pub nprocs: i32,
     pub machine_file: *const ::std::os::raw::c_char,

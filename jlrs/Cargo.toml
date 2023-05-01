@@ -88,6 +88,8 @@ yggdrasil = ["jl-sys/yggdrasil"]
 windows = ["jl-sys/windows", "jlrs-macros/windows"]
 # Cross-compile to macOS
 macos = ["jl-sys/macos"]
+# Print diagnostic information about memory management
+mem-debug = []
 
 # Internal
 

@@ -68,6 +68,9 @@ impl<'scope, const N: usize> PinnedFrame<'scope, N> {
         let ptls = jl_sys::jl_get_ptls_states();
         let mut pgcstack = NonNull::new_unchecked(jl_sys::jlrs_pgcstack(ptls));
         let gcstack_ref: &mut *mut c_void = pgcstack.as_mut();
+
+        #[cfg(feature = "mem-debug")]
+        eprintln!("Push raw frame: {:p} -> {:p}", gcstack_ref, raw);
         raw.prev = *gcstack_ref;
         *gcstack_ref = raw as *mut _ as *mut _;
 
@@ -78,6 +81,9 @@ impl<'scope, const N: usize> PinnedFrame<'scope, N> {
     unsafe fn new(raw: &'scope mut StackFrame<N>) -> Self {
         let task = NonNull::new_unchecked(jl_get_current_task().cast::<jl_task_t>()).as_mut();
         raw.prev = task.gcstack.cast();
+
+        #[cfg(feature = "mem-debug")]
+        eprintln!("Push raw frame: {:p} -> {:p}", task.gcstack, raw);
         task.gcstack = raw as *mut _ as *mut _;
 
         PinnedFrame { raw: Pin::new(raw) }
@@ -108,6 +114,9 @@ impl<'scope, const N: usize> Drop for PinnedFrame<'scope, N> {
             let ptls = jl_sys::jl_get_ptls_states();
             let mut pgcstack = NonNull::new_unchecked(jl_sys::jlrs_pgcstack(ptls));
             let gcstack_ref: &mut *mut c_void = pgcstack.as_mut();
+
+            #[cfg(feature = "mem-debug")]
+            eprintln!("Pop raw frame: {:p} -> {:p}", gcstack_ref, self.raw.prev);
             *gcstack_ref = self.raw.prev.cast();
             self.clear_roots();
         }
@@ -118,6 +127,9 @@ impl<'scope, const N: usize> Drop for PinnedFrame<'scope, N> {
         unsafe {
             use jl_sys::{jl_get_current_task, jl_task_t};
             let task = NonNull::new_unchecked(jl_get_current_task().cast::<jl_task_t>()).as_mut();
+
+            #[cfg(feature = "mem-debug")]
+            eprintln!("Pop raw frame: {:p} -> {:p}", task.gcstack, self.raw.prev);
             task.gcstack = self.raw.prev.cast();
             self.clear_roots();
         }
