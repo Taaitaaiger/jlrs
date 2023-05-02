@@ -146,11 +146,10 @@ impl<'context> CCall<'context> {
         for<'scope> F: FnOnce(GcFrame<'scope>) -> T,
     {
         let mut frame = StackFrame::new();
-        let mut ccall = std::mem::ManuallyDrop::new(CCall::new(&mut frame));
+        let mut ccall = CCall::new(&mut frame);
 
         let stack = ccall.frame.stack_frame().sync_stack();
         let (owner, frame) = GcFrame::base(stack);
-        let owner = std::mem::ManuallyDrop::new(owner);
         let ret = func(frame);
         std::mem::drop(owner);
         std::mem::drop(ccall);
@@ -167,11 +166,10 @@ impl<'context> CCall<'context> {
         for<'scope> F: FnOnce(GcFrame<'scope>) -> JlrsResult<RustResultRet<T>>,
     {
         let mut frame = StackFrame::new();
-        let mut ccall = std::mem::ManuallyDrop::new(CCall::new(&mut frame));
+        let mut ccall = CCall::new(&mut frame);
 
         let stack = ccall.frame.stack_frame().sync_stack();
         let (owner, frame) = GcFrame::base(stack);
-        let owner = std::mem::ManuallyDrop::new(owner);
 
         let ret = match func(frame) {
             Ok(res) => res,
@@ -279,6 +277,13 @@ impl<'context> CCall<'context> {
                 add_pool.call2(unrooted, module.as_value(), fn_ptr).unwrap();
             }
         }
+    }
+}
+
+impl Drop for CCall<'_> {
+    fn drop(&mut self) {
+        #[cfg(feature = "mem-debug")]
+        eprintln("Drop CCall");
     }
 }
 
