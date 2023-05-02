@@ -283,7 +283,7 @@ impl<'context> CCall<'context> {
 impl Drop for CCall<'_> {
     fn drop(&mut self) {
         #[cfg(feature = "mem-debug")]
-        eprintln("Drop CCall");
+        eprintln!("Drop CCall");
     }
 }
 
