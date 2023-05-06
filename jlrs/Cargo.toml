@@ -1,6 +1,6 @@
 [package]
 name = "jlrs"
-version = "0.18.0-beta.2"
+version = "0.18.0-beta.3"
 authors = ["Thomas van Doornmalen <thomas.vandoornmalen@gmail.com>"]
 description = """
 jlrs provides bindings to the Julia C API that enables Julia code to be called from Rust and more.
@@ -88,6 +88,8 @@ yggdrasil = ["jl-sys/yggdrasil"]
 windows = ["jl-sys/windows", "jlrs-macros/windows"]
 # Cross-compile to macOS
 macos = ["jl-sys/macos"]
+# Print diagnostic information about memory management
+mem-debug = []
 
 # Internal
 
