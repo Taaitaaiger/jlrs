@@ -582,7 +582,6 @@ mod tests {
     }
 
     #[test]
-
     fn function_tests() {
         return_nothing();
         throw_nothing();
