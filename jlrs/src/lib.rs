@@ -779,7 +779,6 @@ use prelude::Managed;
 
 use crate::{
     data::managed::{module::Module, value::Value},
-    error::CANNOT_DISPLAY_VALUE,
     memory::{
         context::{ledger::init_ledger, stack::Stack},
         stack_frame::PinnedFrame,
@@ -916,8 +915,11 @@ impl InstallJlrsCore {
         };
 
         if let Err(err) = res {
-            let err = err.as_value().error_string_or(CANNOT_DISPLAY_VALUE);
-            panic!("Failed to load or install JlrsCore package: {}", err);
+            eprintln!("Failed to load or install JlrsCore package");
+            // JlrsCore failed to load, print the error message to stderr without using
+            // `Managed::error_string_or`.
+            err.as_value().print_error();
+            panic!();
         }
     }
 }

@@ -63,11 +63,30 @@ mod tests {
         });
     }
 
+    fn print_error() {
+        JULIA.with(|j| {
+            let mut frame = StackFrame::new();
+            let mut jlrs = j.borrow_mut();
+            jlrs.instance(&mut frame)
+                .scope(|mut frame| unsafe {
+                    Value::eval_string(
+                        &mut frame,
+                        "ErrorException(\"This is an expected message\")",
+                    )
+                    .unwrap()
+                    .print_error();
+                    Ok(())
+                })
+                .unwrap();
+        });
+    }
+
     #[test]
     fn eval_string_tests() {
         basic_math();
         runtime_error();
         syntax_error();
         define_then_use();
+        print_error();
     }
 }
