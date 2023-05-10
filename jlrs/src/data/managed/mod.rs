@@ -316,6 +316,24 @@ pub trait Managed<'scope, 'data>: private::ManagedPriv<'scope, 'data> {
         Ok(s)
     }
 
+    #[doc(hidden)]
+    unsafe fn print_error(self) {
+        let unrooted = Unrooted::new();
+        Module::main(&unrooted)
+            .set_global(&unrooted, "__jlrs_global", self.as_value().assume_owned())
+            .unwrap();
+
+        Value::eval_string(
+            unrooted,
+            "println(stderr, sprint(showerror, __jlrs_global))",
+        )
+        .unwrap();
+
+        Module::main(&unrooted)
+            .set_global(&unrooted, "__jlrs_global", Value::nothing(&unrooted))
+            .unwrap();
+    }
+
     /// Convert the data to its display string, i.e. the string that is shown by calling
     /// `Base.display`, or some default value.
     fn display_string_or<S: Into<String>>(self, default: S) -> String {

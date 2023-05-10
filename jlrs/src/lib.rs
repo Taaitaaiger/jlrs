@@ -1,7 +1,7 @@
 //! jlrs is a crate that provides access to most of the Julia C API, it can be used to embed Julia
 //! in Rust applications and to use functionality it provides when writing `ccall`able
-//! functions in Rust. Currently this crate is only tested in combination with Julia 1.6 and 1.8,
-//! but also supports Julia 1.7 and 1.9. Using the current stable version is highly recommended.
+//! functions in Rust. Currently this crate is only tested in combination with Julia 1.6 and 1.9,
+//! but also supports Julia 1.7 and 1.8. Using the current stable version is highly recommended.
 //! The minimum supported Rust version is currently 1.65.
 //!
 //! The documentation assumes you're already familiar with the Julia and Rust programming
@@ -222,11 +222,11 @@
 //! If you want to embed Julia in a Rust application, you must enable a runtime and a version
 //! feature:
 //!
-//! `jlrs = {version = "0.18.0-beta.4", features = ["sync-rt", "julia-1-8"]}`
+//! `jlrs = {version = "0.18.0-beta.5", features = ["sync-rt", "julia-1-8"]}`
 //!
-//! `jlrs = {version = "0.18.0-beta.4", features = ["tokio-rt", "julia-1-8"]}`
+//! `jlrs = {version = "0.18.0-beta.5", features = ["tokio-rt", "julia-1-8"]}`
 //!
-//! `jlrs = {version = "0.18.0-beta.4", features = ["async-std-rt", "julia-1-8"]}`
+//! `jlrs = {version = "0.18.0-beta.5", features = ["async-std-rt", "julia-1-8"]}`
 //!
 //! When Julia is embedded in an application, it must be initialized before it can be used. The
 //! following snippet initializes the sync runtime:
@@ -783,7 +783,7 @@ use crate::{
         context::{ledger::init_ledger, stack::Stack},
         stack_frame::PinnedFrame,
         target::unrooted::Unrooted,
-    }, error::CANNOT_DISPLAY_VALUE,
+    },
 };
 
 #[cfg(feature = "pyplot")]
@@ -915,8 +915,11 @@ impl InstallJlrsCore {
         };
 
         if let Err(err) = res {
-            let err = err.as_value().error_string_or(CANNOT_DISPLAY_VALUE);
-            panic!("Failed to load or install JlrsCore package: {}", err);
+            eprintln!("Failed to load or install JlrsCore package");
+            // JlrsCore failed to load, print the error message to stderr without using
+            // `Managed::error_string_or`.
+            err.as_value().print_error();
+            panic!();
         }
     }
 }
