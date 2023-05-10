@@ -117,6 +117,12 @@ extern "C"
     }
 #endif
 
+#if !defined(JULIA_1_6) && !defined(JULIA_1_7) && !defined(JULIA_1_8) && !defined(JULIA_1_9)
+    jl_datatype_t *jlrs_typeof(jl_value_t *v) {
+        return (jl_datatype_t *)jl_typeof(v);
+    }
+#endif
+
 #ifdef __cplusplus
 }
 #endif

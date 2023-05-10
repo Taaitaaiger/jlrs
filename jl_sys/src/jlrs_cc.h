@@ -255,6 +255,10 @@ struct jlrs_task_t {
     void jl_enter_threaded_region(void);
     void jl_exit_threaded_region(void);
 #endif
+
+#if !defined(JULIA_1_6) && !defined(JULIA_1_7) && !defined(JULIA_1_8) && !defined(JULIA_1_9)
+    jl_datatype_t *jlrs_typeof(jl_value_t *v);
+#endif
 #ifdef __cplusplus
 }
 #endif

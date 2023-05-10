@@ -123,14 +123,13 @@ use std::{
 use jl_sys::jl_pair_type;
 use jl_sys::{
     jl_an_empty_string, jl_an_empty_vec_any, jl_any_type, jl_apply_type, jl_array_any_type,
-    jl_array_int32_type, jl_array_symbol_type, jl_array_uint8_type, jl_astaggedvalue,
-    jl_bottom_type, jl_call, jl_call0, jl_call1, jl_call2, jl_call3, jl_diverror_exception,
-    jl_egal, jl_emptytuple, jl_eval_string, jl_exception_occurred, jl_false, jl_field_index,
-    jl_field_isptr, jl_gc_add_finalizer, jl_gc_add_ptr_finalizer, jl_get_nth_field,
-    jl_get_nth_field_noalloc, jl_interrupt_exception, jl_isa, jl_memory_exception, jl_nothing,
-    jl_object_id, jl_readonlymemory_exception, jl_set_nth_field, jl_stackovf_exception,
-    jl_stderr_obj, jl_stdout_obj, jl_subtype, jl_true, jl_typeof_str, jl_undefref_exception,
-    jl_value_t,
+    jl_array_int32_type, jl_array_symbol_type, jl_array_uint8_type, jl_bottom_type, jl_call,
+    jl_call0, jl_call1, jl_call2, jl_call3, jl_diverror_exception, jl_egal, jl_emptytuple,
+    jl_eval_string, jl_exception_occurred, jl_false, jl_field_index, jl_field_isptr,
+    jl_gc_add_finalizer, jl_gc_add_ptr_finalizer, jl_get_nth_field, jl_get_nth_field_noalloc,
+    jl_interrupt_exception, jl_isa, jl_memory_exception, jl_nothing, jl_object_id,
+    jl_readonlymemory_exception, jl_set_nth_field, jl_stackovf_exception, jl_stderr_obj,
+    jl_stdout_obj, jl_subtype, jl_true, jl_typeof_str, jl_undefref_exception, jl_value_t,
 };
 use jlrs_macros::julia_version;
 
@@ -359,17 +358,29 @@ impl Value<'_, '_> {
 /// Every value is guaranteed to have a [`DataType`]. This contains all of the value's type
 /// information.
 impl<'scope, 'data> Value<'scope, 'data> {
+    #[julia_version(until = "1.9")]
     /// Returns the `DataType` of this value.
     pub fn datatype(self) -> DataType<'scope> {
         // Safety: the pointer points to valid data, every value can be converted to a tagged
         // value.
         unsafe {
-            let header = NonNull::new_unchecked(jl_astaggedvalue(self.unwrap(Private)))
+            let header = NonNull::new_unchecked(jl_sys::jl_astaggedvalue(self.unwrap(Private)))
                 .as_ref()
                 .__bindgen_anon_1
                 .header;
             let ptr = (header & !15usize) as *mut jl_value_t;
             DataType::wrap_non_null(NonNull::new_unchecked(ptr.cast()), Private)
+        }
+    }
+
+    #[julia_version(since = "1.10")]
+    /// Returns the `DataType` of this value.
+    pub fn datatype(self) -> DataType<'scope> {
+        // Safety: the pointer points to valid data, every value has a type.
+        unsafe {
+            let self_ptr = self.unwrap(Private);
+            let ty = jl_sys::jlrs_typeof(self_ptr);
+            DataType::wrap_non_null(NonNull::new_unchecked(ty), Private)
         }
     }
 

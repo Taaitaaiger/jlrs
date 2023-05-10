@@ -65,6 +65,7 @@ function print_help() {
     echo "default paths can be overridden with environment variables:"
     echo ""
     echo -e "\033[1m       Version              Default path${spacing}Override\033[0m"
+    echo "    Linux 64-bit 1.9    $HOME/julia-1.9.0             JULIA_1_9_DIR"
     echo "    Linux 64-bit 1.8    $HOME/julia-1.8.5             JULIA_1_8_DIR"
     echo "    Linux 64-bit 1.7    $HOME/julia-1.7.3             JULIA_1_7_DIR"
     echo "    Linux 64-bit 1.6    $HOME/julia-1.6.7             JULIA_1_6_DIR"
@@ -79,7 +80,7 @@ function print_help() {
     echo "When the beta flag is set, the following is expected:"
     echo ""
     echo -e "\033[1m        Version             Default path${spacing}Override\033[0m"
-    echo "    Linux 64-bit 1.9    $HOME/julia-1.9.0-rc3         JULIA_1_9_DIR"
+    echo "    -                   -                             -"
     echo ""
     echo ""
     echo "All dependencies must have been installed before running this script. The"
@@ -123,29 +124,38 @@ if [ "${NIGHTLY}" = "y" -o "${ALL}" = "y" ]; then
 fi
 
 if [ "${BETA}" = "y" -o "${ALL}" = "y" ]; then
-    if [ -z "$JULIA_1_9_DIR" ]; then
-        JULIA_1_9_DIR=${HOME}/julia-1.9.0-rc3
-    fi
-    if [ ! -d "$JULIA_1_9_DIR" ]; then
-        echo "Error: $JULIA_1_9_DIR does not exist" >&2
-        exit 1
-    fi
+    # if [ -z "$JULIA_BETA_DIR" ]; then
+    #     JULIA_BETA_DIR=${HOME}/julia-1.9.0-rc3
+    # fi
+    # if [ ! -d "$JULIA_BETA_DIR" ]; then
+    #     echo "Error: $JULIA_BETA_DIR does not exist" >&2
+    #     exit 1
+    # fi
 
-    cargo clean
-    JULIA_VERSION=$($JULIA_1_9_DIR/bin/julia --version)
-    JULIA_DIR=$JULIA_1_9_DIR cargo build --features use-bindgen,julia-1-9
-    echo "/* generated from $JULIA_VERSION */" > ./src/bindings/bindings_1_9_64.rs
-    cat ../target/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings/bindings_1_9_64.rs
+    # cargo clean
+    # JULIA_VERSION=$($JULIA_BETA_DIR/bin/julia --version)
+    # JULIA_DIR=$JULIA_BETA_DIR cargo build --features use-bindgen,julia-1-9
+    # echo "/* generated from $JULIA_VERSION */" > ./src/bindings/bindings_1_9_64.rs
+    # cat ../target/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings/bindings_1_9_64.rs
 
-    cargo clean
-    JULIA_DIR=$JULIA_1_9_DIR cargo build --features use-bindgen,i686,julia-1-9 --target i686-unknown-linux-gnu
-    echo "/* generated from $JULIA_VERSION */" > ./src/bindings/bindings_1_9_32.rs
-    cat ../target/i686-unknown-linux-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings/bindings_1_9_32.rs
+    # cargo clean
+    # JULIA_DIR=$JULIA_BETA_DIR cargo build --features use-bindgen,i686,julia-1-9 --target i686-unknown-linux-gnu
+    # echo "/* generated from $JULIA_VERSION */" > ./src/bindings/bindings_1_9_32.rs
+    # cat ../target/i686-unknown-linux-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings/bindings_1_9_32.rs
 
+    echo "Warning: there is no known beta version. Skipping beta bindings" >&2
     if [ "${ALL}" != "y"  ]; then
-        cargo +nightly fmt -- ./src/bindings/bindings_*
+        # cargo +nightly fmt -- ./src/bindings/bindings_*
         exit
     fi
+fi
+
+if [ -z "$JULIA_1_9_DIR" ]; then
+    JULIA_1_9_DIR=${HOME}/julia-1.9.0
+fi
+if [ ! -d "$JULIA_1_9_DIR" ]; then
+    echo "Error: $JULIA_1_9_DIR does not exist" >&2
+    exit 1
 fi
 
 if [ -z "$JULIA_1_8_DIR" ]; then
@@ -204,5 +214,16 @@ cargo clean
 JULIA_DIR=$JULIA_1_8_DIR cargo build --features use-bindgen,i686,julia-1-8 --target i686-unknown-linux-gnu
 echo "/* generated from $JULIA_VERSION */" > ./src/bindings/bindings_1_8_32.rs
 cat ../target/i686-unknown-linux-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings/bindings_1_8_32.rs
+
+cargo clean
+JULIA_VERSION=$($JULIA_1_9_DIR/bin/julia --version)
+JULIA_DIR=$JULIA_1_9_DIR cargo build --features use-bindgen,julia-1-9
+echo "/* generated from $JULIA_VERSION */" > ./src/bindings/bindings_1_9_64.rs
+cat ../target/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings/bindings_1_9_64.rs
+
+cargo clean
+JULIA_DIR=$JULIA_1_9_DIR cargo build --features use-bindgen,i686,julia-1-9 --target i686-unknown-linux-gnu
+echo "/* generated from $JULIA_VERSION */" > ./src/bindings/bindings_1_9_32.rs
+cat ../target/i686-unknown-linux-gnu/debug/build/jl-sys*/out/bindings.rs >> ./src/bindings/bindings_1_9_32.rs
 
 cargo +nightly fmt -- ./src/bindings/bindings_*
