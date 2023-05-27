@@ -468,7 +468,7 @@ impl<'scope> ManagedPriv<'scope, '_> for Method<'scope> {
     }
 }
 
-impl_construct_type_managed!(Method<'_>, jl_method_type);
+impl_construct_type_managed!(Method, 1, jl_method_type);
 
 /// A reference to a [`Method`] that has not been explicitly rooted.
 pub type MethodRef<'scope> = Ref<'scope, 'static, Method<'scope>>;

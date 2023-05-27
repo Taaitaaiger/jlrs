@@ -29,6 +29,8 @@ macro_rules! impl_ccall_arg {
 macro_rules! impl_construct_julia_type {
     ($ty:ty, $jl_ty:ident) => {
         unsafe impl $crate::data::types::construct_type::ConstructType for $ty {
+            type Static = $ty;
+
             fn construct_type<'target, T>(
                 target: $crate::memory::target::ExtendedTarget<'target, '_, '_, T>,
             ) -> $crate::data::managed::value::ValueData<'target, 'static, T>
@@ -65,5 +67,6 @@ pub mod nothing;
 #[cfg(feature = "internal-types")]
 pub mod ssa_value;
 pub mod tuple;
+pub mod typed_data;
 pub mod union;
 pub mod valid_layout;

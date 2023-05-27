@@ -9,7 +9,7 @@ use jl_sys::{jl_bool_type, jl_unbox_int8};
 
 use crate::{
     convert::unbox::Unbox,
-    data::managed::{private::ManagedPriv, value::Value},
+    data::{managed::{private::ManagedPriv, value::Value}},
     impl_julia_typecheck, impl_valid_layout,
     private::Private,
 };

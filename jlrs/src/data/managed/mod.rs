@@ -30,8 +30,43 @@ end
 */
 
 macro_rules! impl_construct_type_managed {
-    ($ty:ty, $jl_ty:expr) => {
-        unsafe impl crate::data::types::construct_type::ConstructType for $ty {
+    ($ty:ident, 1, $jl_ty:expr) => {
+        unsafe impl crate::data::types::construct_type::ConstructType for $ty<'_> {
+            type Static = $ty<'static>;
+
+            fn construct_type<'target, 'current, 'borrow, T>(
+                target: $crate::memory::target::ExtendedTarget<'target, '_, '_, T>,
+            ) -> $crate::data::managed::value::ValueData<'target, 'static, T>
+            where
+                T: $crate::memory::target::Target<'target>,
+            {
+                let (target, _) = target.split();
+                unsafe {
+                    target.data_from_ptr(
+                        NonNull::new_unchecked($jl_ty.cast::<::jl_sys::jl_value_t>()),
+                        $crate::private::Private,
+                    )
+                }
+            }
+
+            fn base_type<'target, Tgt>(_target: &Tgt) -> Option<$crate::data::managed::value::Value<'target, 'static>>
+            where
+                Tgt: crate::memory::target::Target<'target>,
+            {
+                unsafe {
+                    let ptr = NonNull::new_unchecked($jl_ty.cast::<::jl_sys::jl_value_t>());
+                    Some(<$crate::data::managed::value::Value as $crate::data::managed::private::ManagedPriv>::wrap_non_null(
+                        ptr,
+                        $crate::private::Private,
+                    ))
+                }
+            }
+        }
+    };
+    ($ty:ident, 2, $jl_ty:expr) => {
+        unsafe impl crate::data::types::construct_type::ConstructType for $ty<'_, '_> {
+            type Static = $ty<'static, 'static>;
+
             fn construct_type<'target, 'current, 'borrow, T>(
                 target: $crate::memory::target::ExtendedTarget<'target, '_, '_, T>,
             ) -> $crate::data::managed::value::ValueData<'target, 'static, T>

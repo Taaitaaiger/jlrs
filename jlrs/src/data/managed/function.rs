@@ -17,7 +17,7 @@ use crate::{
     data::{
         layout::valid_layout::{ValidField, ValidLayout},
         managed::{datatype::DataType, private::ManagedPriv, value::Value, Managed},
-        types::typecheck::Typecheck,
+        types::{construct_type::ConstructType, typecheck::Typecheck},
     },
     error::JlrsResult,
     memory::target::{unrooted::Unrooted, Target},
@@ -180,4 +180,24 @@ unsafe impl<'scope, 'data> CCallArg for Function<'scope, 'data> {
 unsafe impl CCallReturn for FunctionRet {
     type CCallReturnType = Value<'static, 'static>;
     type FunctionReturnType = Value<'static, 'static>;
+}
+
+unsafe impl ConstructType for Function<'_, '_> {
+    type Static = Function<'static, 'static>;
+    fn construct_type<'target, T>(
+        target: crate::memory::target::ExtendedTarget<'target, '_, '_, T>,
+    ) -> super::value::ValueData<'target, 'static, T>
+    where
+        T: Target<'target>,
+    {
+        let (target, _) = target.split();
+        DataType::function_type(&target).as_value().root(target)
+    }
+
+    fn base_type<'target, T>(target: &T) -> Option<Value<'target, 'static>>
+    where
+        T: Target<'target>,
+    {
+        Some(DataType::function_type(target).as_value())
+    }
 }

@@ -4,6 +4,7 @@ pub mod ccall_types;
 pub mod compatible;
 pub mod into_jlrs_result;
 pub mod into_julia;
+pub mod into_julia_p;
 #[cfg(feature = "async-rt")]
 pub mod into_result;
 #[cfg(feature = "jlrs-ndarray")]

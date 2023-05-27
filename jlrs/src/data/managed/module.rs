@@ -433,7 +433,7 @@ impl<'scope> ManagedPriv<'scope, '_> for Module<'scope> {
     }
 }
 
-impl_construct_type_managed!(Module<'_>, jl_module_type);
+impl_construct_type_managed!(Module, 1, jl_module_type);
 
 /// A reference to a [`Module`] that has not been explicitly rooted.
 pub type ModuleRef<'scope> = Ref<'scope, 'static, Module<'scope>>;

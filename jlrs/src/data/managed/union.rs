@@ -9,7 +9,7 @@ use super::{
     Ref,
 };
 use crate::{
-    data::managed::{private::ManagedPriv, value::Value, Managed},
+    data::{managed::{private::ManagedPriv, value::Value, Managed}},
     impl_julia_typecheck,
     memory::target::Target,
     private::Private,
@@ -227,7 +227,7 @@ pub(crate) fn find_union_component(haystack: Value, needle: Value, nth: &mut u32
     }
 }
 
-impl_construct_type_managed!(Union<'_>, jl_uniontype_type);
+impl_construct_type_managed!(Union, 1, jl_uniontype_type);
 
 /// A reference to a [`Union`] that has not been explicitly rooted.
 pub type UnionRef<'scope> = Ref<'scope, 'static, Union<'scope>>;

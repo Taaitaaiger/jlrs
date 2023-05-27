@@ -1,6 +1,8 @@
 //! Construct Julia type objects from Rust types.
 
-use std::{ffi::c_void, marker::PhantomData, ptr::NonNull};
+use std::{
+    any::TypeId, collections::HashMap, ffi::c_void, marker::PhantomData, ptr::NonNull, sync::RwLock,
+};
 
 use jl_sys::{
     jl_array_type, jl_bool_type, jl_bottom_type, jl_char_type, jl_float32_type, jl_float64_type,
@@ -8,6 +10,8 @@ use jl_sys::{
     jl_uint32_type, jl_uint64_type, jl_uint8_type, jl_uniontype_type, jl_value_t,
     jl_voidpointer_type,
 };
+
+use lazy_static::lazy_static;
 
 use super::abstract_types::AnyType;
 use crate::{
@@ -26,13 +30,61 @@ use crate::{
     private::Private,
 };
 
+lazy_static! {
+    static ref CONSTRUCTED_TYPE_REGISTRY: ConstructedTypes = ConstructedTypes::new();
+}
+
+struct ConstructedTypes {
+    data: RwLock<HashMap<TypeId, Value<'static, 'static>>>,
+}
+
+impl ConstructedTypes {
+    fn new() -> Self {
+        ConstructedTypes {
+            data: RwLock::new(HashMap::new()),
+        }
+    }
+
+    fn find_or_try_insert<'target, T: ConstructType, Tgt: Target<'target>>(
+        &self,
+        target: ExtendedTarget<'target, '_, '_, Tgt>,
+    ) -> Option<Value> {
+        let tid = T::type_id();
+        let res = self
+            .data
+            .read()
+            .expect("Lock poisoned")
+            .get(&tid)
+            .map(|dt| dt.clone());
+
+        if res.is_some() {
+            res
+        } else {
+            
+            // T::construct_type(target);
+            todo!()
+        }
+    }
+}
+
+unsafe impl Sync for ConstructedTypes {}
+unsafe impl Send for ConstructedTypes {}
+
 /// Associate a Julia type object with a Rust type.
 ///
 /// Safety:
 ///
 /// `ConstructType::construct_type` must either return a valid type object, or an instance of an
 /// isbits type which is immediately used as a type parameter of another constructed type.
-pub unsafe trait ConstructType {
+pub unsafe trait ConstructType: Sized {
+    /// `Self`, but with all lifetimes set to `'static`.
+    type Static: 'static + ConstructType;
+
+    /// Returns the `TypeId` of this type.
+    fn type_id() -> TypeId {
+        TypeId::of::<Self::Static>()
+    }
+
     /// Constructs the type object associated with this type.
     fn construct_type<'target, T>(
         target: ExtendedTarget<'target, '_, '_, T>,
@@ -62,6 +114,8 @@ pub unsafe trait ConstructType {
 macro_rules! impl_construct_julia_type_constant {
     ($ty:ty, $const_ty:ty) => {
         unsafe impl<const N: $const_ty> ConstructType for $ty {
+            type Static = $ty;
+
             fn construct_type<'target, T>(
                 target: ExtendedTarget<'target, '_, '_, T>,
             ) -> ValueData<'target, 'static, T>
@@ -85,6 +139,8 @@ macro_rules! impl_construct_julia_type_constant {
 macro_rules! impl_construct_julia_type_primitive {
     ($ty:ty, $jl_ty:ident) => {
         unsafe impl ConstructType for $ty {
+            type Static = $ty;
+
             fn construct_type<'target, T>(
                 target: ExtendedTarget<'target, '_, '_, T>,
             ) -> ValueData<'target, 'static, T>
@@ -168,7 +224,7 @@ impl_construct_julia_type_constant!(ConstantChar<N>, char);
 pub struct Name<const N: char>;
 
 /// Trait to set the name of`TypeVar`.
-pub trait TypeVarName {
+pub trait TypeVarName: 'static {
     const NAME: char;
 }
 
@@ -190,6 +246,8 @@ pub struct TypeVarConstructor<
 unsafe impl<N: TypeVarName, U: ConstructType, L: ConstructType> ConstructType
     for TypeVarConstructor<N, U, L>
 {
+    type Static = TypeVarConstructor<N, U::Static, L::Static>;
+
     fn construct_type<'target, T>(
         target: ExtendedTarget<'target, '_, '_, T>,
     ) -> ValueData<'target, 'static, T>
@@ -231,6 +289,8 @@ pub struct ArrayTypeConstructor<T: ConstructType, N: ConstructType> {
 }
 
 unsafe impl<T: ConstructType, N: ConstructType> ConstructType for ArrayTypeConstructor<T, N> {
+    type Static = ArrayTypeConstructor<T::Static, N::Static>;
+
     fn construct_type<'target, Tgt>(
         target: ExtendedTarget<'target, '_, '_, Tgt>,
     ) -> ValueData<'target, 'static, Tgt>
@@ -283,6 +343,8 @@ pub struct UnionTypeConstructor<L: ConstructType, R: ConstructType> {
 }
 
 unsafe impl<L: ConstructType, R: ConstructType> ConstructType for UnionTypeConstructor<L, R> {
+    type Static = UnionTypeConstructor<L::Static, R::Static>;
+
     fn construct_type<'target, T>(
         target: ExtendedTarget<'target, '_, '_, T>,
     ) -> ValueData<'target, 'static, T>
@@ -320,6 +382,8 @@ unsafe impl<L: ConstructType, R: ConstructType> ConstructType for UnionTypeConst
 pub struct BottomType;
 
 unsafe impl ConstructType for BottomType {
+    type Static = BottomType;
+
     fn construct_type<'target, T>(
         target: ExtendedTarget<'target, '_, '_, T>,
     ) -> ValueData<'target, 'static, T>
@@ -378,6 +442,8 @@ impl_construct_julia_type_primitive!(char, jl_char_type);
 impl_construct_julia_type_primitive!(*mut c_void, jl_voidpointer_type);
 
 unsafe impl<U: ConstructType> ConstructType for *mut U {
+    type Static = *mut U::Static;
+
     fn construct_type<'target, T>(
         target: ExtendedTarget<'target, '_, '_, T>,
     ) -> ValueData<'target, 'static, T>

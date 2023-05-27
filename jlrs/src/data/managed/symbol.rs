@@ -16,7 +16,7 @@ use jl_sys::{
 use super::Ref;
 use crate::{
     catch::catch_exceptions,
-    data::managed::private::ManagedPriv,
+    data::{managed::private::ManagedPriv},
     error::{JlrsError, JlrsResult},
     impl_julia_typecheck,
     memory::target::Target,
@@ -188,7 +188,7 @@ impl<'scope> ManagedPriv<'scope, '_> for Symbol<'scope> {
     }
 }
 
-impl_construct_type_managed!(Symbol<'_>, jl_symbol_type);
+impl_construct_type_managed!(Symbol, 1, jl_symbol_type);
 
 /// A reference to a [`Symbol`] that has not been explicitly rooted.
 pub type SymbolRef<'scope> = Ref<'scope, 'static, Symbol<'scope>>;

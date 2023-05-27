@@ -2520,6 +2520,8 @@ unsafe impl ConstructType for Array<'_, '_> {
     {
         Some(UnionAll::array_type(&target).as_value())
     }
+
+    type Static = Array<'static, 'static>;
 }
 
 unsafe impl ValidLayout for ArrayRef<'_, '_> {
@@ -2870,6 +2872,8 @@ impl<U, const N: isize> Copy for TypedRankedArray<'_, '_, U, N> {}
 unsafe impl<U: ConstructType + ValidField, const N: isize> ConstructType
     for TypedRankedArray<'_, '_, U, N>
 {
+    type Static = ArrayTypeConstructor<U::Static, ConstantIsize<N>>;
+
     fn construct_type<'target, T>(
         target: ExtendedTarget<'target, '_, '_, T>,
     ) -> super::value::ValueData<'target, 'static, T>

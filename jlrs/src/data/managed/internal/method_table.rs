@@ -13,14 +13,14 @@ use jl_sys::{jl_methtable_t, jl_methtable_type};
 use jlrs_macros::julia_version;
 
 use crate::{
-    data::managed::{
+    data::{managed::{
         array::{ArrayData, ArrayRef},
         module::Module,
         private::ManagedPriv,
         symbol::Symbol,
         value::{ValueData, ValueRef},
         Ref,
-    },
+    }},
     impl_julia_typecheck,
     memory::target::Target,
     private::Private,
@@ -242,7 +242,7 @@ impl<'scope> ManagedPriv<'scope, '_> for MethodTable<'scope> {
     }
 }
 
-impl_construct_type_managed!(MethodTable<'_>, jl_methtable_type);
+impl_construct_type_managed!(MethodTable, 1, jl_methtable_type);
 
 /// A reference to a [`MethodTable`] that has not been explicitly rooted.
 pub type MethodTableRef<'scope> = Ref<'scope, 'static, MethodTable<'scope>>;

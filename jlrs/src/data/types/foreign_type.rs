@@ -61,7 +61,7 @@ use jl_sys::jl_reinit_foreign_type;
 use jl_sys::{jl_emptysvec, jl_gc_alloc_typed, jl_new_datatype, jl_new_foreign_type, jl_value_t};
 use jlrs_macros::julia_version;
 
-use super::typecheck::Typecheck;
+use super::{construct_type::{TypeVarConstructor, TypeVarName}, typecheck::Typecheck};
 use crate::{
     convert::{into_julia::IntoJulia, unbox::Unbox},
     data::{
@@ -167,6 +167,99 @@ pub unsafe trait OpaqueType: Sized + Send + 'static {
     /// must not override the default implementation.
     unsafe fn reinit_type(datatype: DataType) -> bool {
         reinit_opaque_type::<Self>(datatype)
+    }
+}
+
+pub trait Bounds {}
+
+impl<N, U, L> Bounds for TypeVarConstructor<N, U, L>
+where
+    N: TypeVarName,
+    U: ConstructType,
+    L: ConstructType,
+{
+}
+impl<N0, U0, L0, N1, U1, L1> Bounds
+    for (
+        TypeVarConstructor<N0, U0, L0>,
+        TypeVarConstructor<N1, U1, L1>,
+    )
+where
+    N0: TypeVarName,
+    U0: ConstructType,
+    L0: ConstructType,
+    N1: TypeVarName,
+    U1: ConstructType,
+    L1: ConstructType,
+{
+}
+impl<N0, U0, L0, N1, U1, L1, N2, U2, L2> Bounds
+    for (
+        TypeVarConstructor<N0, U0, L0>,
+        TypeVarConstructor<N1, U1, L1>,
+        TypeVarConstructor<N2, U2, L2>,
+    )
+where
+    N0: TypeVarName,
+    U0: ConstructType,
+    L0: ConstructType,
+    N1: TypeVarName,
+    U1: ConstructType,
+    L1: ConstructType,
+    N2: TypeVarName,
+    U2: ConstructType,
+    L2: ConstructType,
+{
+}
+
+pub unsafe trait ParametricOpaqueType: Sized + Send + 'static {
+    #[doc(hidden)]
+    const IS_FOREIGN: bool = false;
+    #[doc(hidden)]
+    const TYPE_FN: Option<unsafe fn() -> DataType<'static>> = None;
+
+    type Bounds: Bounds;
+
+    /// The super-type of this type, `Core.Any` by default.
+    fn super_type<'target, Tgt>(target: Tgt) -> DataTypeData<'target, Tgt>
+    where
+        Tgt: Target<'target>,
+    {
+        DataType::any_type(&target).root(target)
+    }
+
+    /// Creates a new opaque type named `name` in `module`.
+    ///
+    /// An opaque type must be created if it doesn't exist yet in `module`. This method is called
+    /// automatically by init functions generated with the `julia_module` macro.
+    ///
+    /// Safety:
+    ///
+    /// The new type is not set as a constant in `module`, you must do this manually after calling
+    /// this function. You must not override the default implementation.
+    unsafe fn create_type<'target, Tgt>(
+        target: Tgt,
+        name: Symbol,
+        module: Module,
+    ) -> DataTypeData<'target, Tgt>
+    where
+        Tgt: Target<'target>,
+    {
+        create_parametric_opaque_type::<Self, Tgt>(target, name, module)
+    }
+
+    /// Reinitializes the previously created type `datatype`.
+    ///
+    /// An opaque type must be reinitialized if it has been created in a precompiled module and
+    /// this module is loaded. This method is called automatically by init functions generated
+    /// with the `julia_module` macro.
+    ///
+    /// Safety:
+    ///
+    /// The datatype must have been originally created by calling `OpaqueType::create_type`. You
+    /// must not override the default implementation.
+    unsafe fn reinit_type(datatype: DataType) -> bool {
+        reinit_parametric_opaque_type::<Self>(datatype)
     }
 }
 
@@ -372,6 +465,61 @@ where
     target.data_from_ptr(NonNull::new_unchecked(ty), Private)
 }
 
+unsafe fn create_parametric_opaque_type<'target, U, T>(
+    target: T,
+    name: Symbol,
+    module: Module,
+) -> DataTypeData<'target, T>
+where
+    U: ParametricOpaqueType,
+    T: Target<'target>,
+{
+    if let Some(ty) = FOREIGN_TYPE_REGISTRY.find::<U>() {
+        return target.data_from_ptr(ty.unwrap_non_null(Private), Private);
+    }
+
+    let super_type = U::super_type(&target).ptr().as_ptr();
+
+    #[cfg(feature = "julia-1-6")]
+    let ty = jl_new_datatype(
+        name.unwrap(Private),
+        module.unwrap(Private),
+        super_type,
+        jl_emptysvec,
+        jl_emptysvec,
+        jl_emptysvec,
+        0,
+        1,
+        0,
+    );
+
+    #[cfg(not(feature = "julia-1-6"))]
+    let ty = jl_new_datatype(
+        name.unwrap(Private),
+        module.unwrap(Private),
+        super_type,
+        jl_emptysvec,
+        jl_emptysvec,
+        jl_emptysvec,
+        jl_emptysvec,
+        0,
+        1,
+        0,
+    );
+
+    debug_assert!(!ty.is_null());
+    FOREIGN_TYPE_REGISTRY
+        .data
+        .write()
+        .expect("Foreign type lock was poisoned")
+        .push((
+            TypeId::of::<U>(),
+            DataType::wrap_non_null(NonNull::new_unchecked(ty), Private),
+        ));
+
+    target.data_from_ptr(NonNull::new_unchecked(ty), Private)
+}
+
 pub(crate) unsafe fn create_foreign_type_internal<'target, U, T>(
     target: T,
     name: Symbol,
@@ -452,6 +600,25 @@ where
 unsafe fn reinit_opaque_type<U>(ty: DataType) -> bool
 where
     U: OpaqueType,
+{
+    if let Some(_) = FOREIGN_TYPE_REGISTRY.find::<U>() {
+        return true;
+    }
+
+    FOREIGN_TYPE_REGISTRY
+        .data
+        .write()
+        .expect("Foreign type lock was poisoned")
+        .push((
+            TypeId::of::<U>(),
+            DataType::wrap_non_null(ty.unwrap_non_null(Private), Private),
+        ));
+    true
+}
+
+unsafe fn reinit_parametric_opaque_type<U>(ty: DataType) -> bool
+where
+    U: ParametricOpaqueType,
 {
     if let Some(_) = FOREIGN_TYPE_REGISTRY.find::<U>() {
         return true;
@@ -594,6 +761,8 @@ unsafe extern "C" fn drop_opaque<T: OpaqueType>(data: *mut c_void) {
 }
 
 unsafe impl<T: OpaqueType> ConstructType for T {
+    type Static = T;
+
     fn construct_type<'target, Tgt>(
         target: ExtendedTarget<'target, '_, '_, Tgt>,
     ) -> ValueData<'target, 'static, Tgt>

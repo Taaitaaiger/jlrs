@@ -252,6 +252,10 @@ struct Empty end
 
 struct TypedEmpty{T} end
 
+struct HasElidedParam{T, U}
+    a::T
+end
+
 #reflect([
 #    BitsCharBitsIntChar,
 #    BitsCharFloat32Float64,

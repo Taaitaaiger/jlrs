@@ -45,7 +45,7 @@ use crate::{
             value::{Value, ValueResult},
             Managed,
         },
-        types::typecheck::Typecheck,
+        types::{typecheck::Typecheck},
     },
     error::{AccessError, JlrsResult, CANNOT_DISPLAY_TYPE},
     impl_julia_typecheck,
@@ -1544,7 +1544,7 @@ impl<'scope> ManagedPriv<'scope, '_> for DataType<'scope> {
     }
 }
 
-impl_construct_type_managed!(DataType<'_>, jl_datatype_type);
+impl_construct_type_managed!(DataType, 1, jl_datatype_type);
 
 /// A reference to a [`DataType`] that has not been explicitly rooted.
 pub type DataTypeRef<'scope> = Ref<'scope, 'static, DataType<'scope>>;

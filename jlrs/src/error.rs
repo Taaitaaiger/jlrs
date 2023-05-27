@@ -70,6 +70,8 @@ pub enum TypeError {
     Immutable { value_type: String },
     #[error("No base type is available")]
     NoBaseType,
+    #[error("Layout of {ty} is None")]
+    LayoutNone { ty: String },
     #[error("The layout of this type is incompatible with {base_type}")]
     IncompatibleBaseType { base_type: String },
 }

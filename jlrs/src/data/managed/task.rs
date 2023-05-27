@@ -14,7 +14,7 @@ use jl_sys::{jl_task_t, jl_task_type};
 use jlrs_macros::julia_version;
 
 use super::Ref;
-use crate::{data::managed::private::ManagedPriv, impl_julia_typecheck, private::Private};
+use crate::{data::{managed::private::ManagedPriv}, impl_julia_typecheck, private::Private};
 #[cfg(feature = "extra-fields")]
 use crate::{
     data::managed::value::{ValueData, ValueRef},
@@ -215,7 +215,7 @@ impl<'scope> ManagedPriv<'scope, '_> for Task<'scope> {
     }
 }
 
-impl_construct_type_managed!(Task<'_>, jl_task_type);
+impl_construct_type_managed!(Task, 1, jl_task_type);
 
 /// A reference to a [`Task`] that has not been explicitly rooted.
 pub type TaskRef<'scope> = Ref<'scope, 'static, Task<'scope>>;

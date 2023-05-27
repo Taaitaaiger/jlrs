@@ -13,11 +13,11 @@ use jl_sys::{jl_code_instance_t, jl_code_instance_type};
 use jlrs_macros::julia_version;
 
 use crate::{
-    data::managed::{
+    data::{managed::{
         private::ManagedPriv,
         value::{Value, ValueData, ValueRef},
         Ref,
-    },
+    }},
     impl_julia_typecheck,
     memory::target::Target,
     private::Private,
@@ -301,7 +301,7 @@ impl<'scope> ManagedPriv<'scope, '_> for CodeInstance<'scope> {
     }
 }
 
-impl_construct_type_managed!(CodeInstance<'_>, jl_code_instance_type);
+impl_construct_type_managed!(CodeInstance, 1, jl_code_instance_type);
 
 /// A reference to a [`CodeInstance`] that has not been explicitly rooted.
 pub type CodeInstanceRef<'scope> = Ref<'scope, 'static, CodeInstance<'scope>>;

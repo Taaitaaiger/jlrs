@@ -5,12 +5,12 @@ use std::{marker::PhantomData, ptr::NonNull};
 use jl_sys::{jl_expr_t, jl_expr_type};
 
 use crate::{
-    data::managed::{
+    data::{managed::{
         array::{ArrayData, ArrayRef},
         private::ManagedPriv,
         symbol::Symbol,
         Ref,
-    },
+    }},
     impl_julia_typecheck,
     memory::target::Target,
     private::Private,
@@ -72,7 +72,7 @@ impl<'scope> ManagedPriv<'scope, '_> for Expr<'scope> {
     }
 }
 
-impl_construct_type_managed!(Expr<'_>, jl_expr_type);
+impl_construct_type_managed!(Expr, 1, jl_expr_type);
 
 /// A reference to an [`Expr`] that has not been explicitly rooted.
 pub type ExprRef<'scope> = Ref<'scope, 'static, Expr<'scope>>;

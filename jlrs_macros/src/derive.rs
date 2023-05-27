@@ -1,7 +1,7 @@
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TS2;
 use quote::quote;
-use syn::{self, punctuated::Punctuated, token::Comma, Expr, Lit, Meta, Token, WherePredicate};
+use syn::{self, punctuated::Punctuated, token::Comma, Token};
 
 #[derive(Default)]
 pub struct ClassifiedFields<'a> {
@@ -75,16 +75,16 @@ impl JlrsTypeAttrs {
         for attr in &ast.attrs {
             if attr.path().is_ident("jlrs") {
                 let nested = attr
-                    .parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)
+                    .parse_args_with(Punctuated::<syn::Meta, Token![,]>::parse_terminated)
                     .unwrap();
                 for meta in nested {
                     match meta {
-                        Meta::Path(path) if path.is_ident("zero_sized_type") => {
+                        syn::Meta::Path(path) if path.is_ident("zero_sized_type") => {
                             zst = true;
                         }
-                        Meta::NameValue(mnv) if mnv.path.is_ident("julia_type") => {
-                            if let Expr::Lit(lit) = mnv.value {
-                                if let Lit::Str(s) = lit.lit {
+                        syn::Meta::NameValue(mnv) if mnv.path.is_ident("julia_type") => {
+                            if let syn::Expr::Lit(lit) = mnv.value {
+                                if let syn::Lit::Str(s) = lit.lit {
                                     julia_type = Some(s.value());
                                 }
                             }
@@ -109,10 +109,10 @@ impl JlrsFieldAttr {
     pub fn parse(attr: &syn::Attribute) -> Option<Self> {
         if attr.path().is_ident("jlrs") {
             let nested = attr
-                .parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)
+                .parse_args_with(Punctuated::<syn::Meta, Token![,]>::parse_terminated)
                 .unwrap();
             for meta in nested {
-                let Meta::Path(path) = meta else {
+                let syn::Meta::Path(path) = meta else {
                     return None
                 };
 
@@ -240,7 +240,7 @@ pub fn impl_unbox(ast: &syn::DeriveInput) -> TokenStream {
         Some(wc) => {
             let mut wc = wc.clone();
             for generic in generics.type_params() {
-                let clause: WherePredicate = syn::parse_quote! {
+                let clause: syn::WherePredicate = syn::parse_quote! {
                     #generic: Clone
                 };
                 wc.predicates.push(clause)
@@ -250,7 +250,7 @@ pub fn impl_unbox(ast: &syn::DeriveInput) -> TokenStream {
         None => {
             let mut predicates = Punctuated::<_, Comma>::new();
             for generic in generics.type_params() {
-                let clause: WherePredicate = syn::parse_quote! {
+                let clause: syn::WherePredicate = syn::parse_quote! {
                     #generic: Clone
                 };
                 predicates.push(clause)
@@ -281,12 +281,12 @@ pub fn impl_typecheck(ast: &syn::DeriveInput) -> TokenStream {
     let where_clause = match ast.generics.where_clause.as_ref() {
         Some(wc) => {
             let mut wc = wc.clone();
-            let clause: WherePredicate = syn::parse_quote! {
+            let clause: syn::WherePredicate = syn::parse_quote! {
                 Self: ::jlrs::data::layout::valid_layout::ValidLayout
             };
             wc.predicates.push(clause);
             for generic in generics.type_params() {
-                let clause: WherePredicate = syn::parse_quote! {
+                let clause: syn::WherePredicate = syn::parse_quote! {
                     #generic: ::jlrs::data::layout::valid_layout::ValidLayout
                 };
                 wc.predicates.push(clause)
@@ -295,13 +295,13 @@ pub fn impl_typecheck(ast: &syn::DeriveInput) -> TokenStream {
         }
         None => {
             let mut predicates = Punctuated::<_, Comma>::new();
-            let clause: WherePredicate = syn::parse_quote! {
+            let clause: syn::WherePredicate = syn::parse_quote! {
                 Self: ::jlrs::data::layout::valid_layout::ValidLayout
             };
             predicates.push(clause);
 
             for generic in generics.type_params() {
-                let clause: WherePredicate = syn::parse_quote! {
+                let clause: syn::WherePredicate = syn::parse_quote! {
                     #generic: ::jlrs::data::layout::valid_layout::ValidLayout
                 };
                 predicates.push(clause)
@@ -330,6 +330,15 @@ pub fn impl_construct_type(ast: &syn::DeriveInput) -> TokenStream {
     let jl_type = attrs.julia_type
         .take()
         .expect("ConstructType can only be derived if the corresponding Julia type is set with #[julia_type = \"Main.MyModule.Submodule.StructType\"]");
+
+    let lifetimes = ast.generics.lifetimes().map(|_| -> syn::LifetimeParam {
+        syn::parse_quote! { 'static }
+    });
+
+    let static_types = ast.generics.type_params().map(|p| -> syn::Type {
+        let name = &p.ident;
+        syn::parse_quote! { #name::Static }
+    });
 
     let mut type_it = jl_type.split('.');
     let func: syn::Expr = match type_it.next() {
@@ -372,7 +381,7 @@ pub fn impl_construct_type(ast: &syn::DeriveInput) -> TokenStream {
         Some(wc) => {
             let mut wc = wc.clone();
             for generic in generics.type_params() {
-                let clause: WherePredicate = syn::parse_quote! {
+                let clause: syn::WherePredicate = syn::parse_quote! {
                     #generic: ::jlrs::data::types::construct_type::ConstructType
                 };
                 wc.predicates.push(clause)
@@ -382,7 +391,7 @@ pub fn impl_construct_type(ast: &syn::DeriveInput) -> TokenStream {
         None => {
             let mut predicates = Punctuated::<_, Comma>::new();
             for generic in generics.type_params() {
-                let clause: WherePredicate = syn::parse_quote! {
+                let clause: syn::WherePredicate = syn::parse_quote! {
                     #generic: ::jlrs::data::types::construct_type::ConstructType
                 };
                 predicates.push(clause)
@@ -405,6 +414,8 @@ pub fn impl_construct_type(ast: &syn::DeriveInput) -> TokenStream {
 
     let construct_type_impl = quote! {
         unsafe impl #generics ::jlrs::data::types::construct_type::ConstructType for #name #generics #wc {
+            type Static = #name <#(#lifetimes,)* #(#static_types,)*>;
+
             fn construct_type<'target, Tgt>(
                 target: ::jlrs::memory::target::ExtendedTarget<'target, '_, '_, Tgt>,
             ) -> ::jlrs::data::managed::value::ValueData<'target, 'static, Tgt>
@@ -473,143 +484,6 @@ pub fn impl_construct_type(ast: &syn::DeriveInput) -> TokenStream {
     construct_type_impl.into()
 }
 
-/*
-pub fn impl_construct_type(ast: &syn::DeriveInput) -> TokenStream {
-    let name = &ast.ident;
-    let mut attrs = JlrsTypeAttrs::parse(ast);
-    let jl_type = attrs.julia_type
-        .take()
-        .expect("ConstructType can only be derived if the corresponding Julia type is set with #[julia_type = \"Main.MyModule.Submodule.StructType\"]");
-
-    let mut type_it = jl_type.split('.');
-    let func: syn::Expr = match type_it.next() {
-        Some("Main") => syn::parse_quote! {
-            {
-                ::jlrs::data::managed::module::Module::main(target)
-            }
-        },
-        Some("Base") => syn::parse_quote! {
-            {
-                ::jlrs::data::managed::module::Module::base(target)
-            }
-        },
-        Some("Core") => syn::parse_quote! {
-            {
-                ::jlrs::data::managed::module::Module::corr(target)
-            }
-        },
-        Some(pkg) => syn::parse_quote! {
-            {
-                let module = ::jlrs::data::managed::module::Module::package_root_module(target, #pkg);
-                match module {
-                    Some(module) => module,
-                    _ => panic!("Package {} cannot be found", #pkg)
-                }
-            }
-        },
-        _ => panic!("ConstructType can only be derived if the first module of \"julia_type\" is either \"Main\", \"Base\" or \"Core\", or a package name."),
-    };
-
-    let mut modules = type_it.collect::<Vec<_>>();
-    let ty = modules.pop().expect("ConstructType can only be derived if the corresponding Julia type is set with #[jlrs(julia_type = \"Main.MyModule.Submodule.StructType\")]");
-    let modules_it = modules.iter();
-    let modules_it_b = modules_it.clone();
-
-    let generics = &ast.generics;
-    let wc = match ast.generics.where_clause.as_ref() {
-        Some(wc) => {
-            let mut wc = wc.clone();
-            for generic in generics.type_params() {
-                let clause: WherePredicate = syn::parse_quote! {
-                    #generic: ::jlrs::convert::construct_type::ConstructType
-                };
-                wc.predicates.push(clause)
-            }
-            wc
-        }
-        None => {
-            let mut predicates = Punctuated::<_, Comma>::new();
-            for generic in generics.type_params() {
-                let clause: WherePredicate = syn::parse_quote! {
-                    #generic: ::jlrs::convert::construct_type::ConstructType
-                };
-                predicates.push(clause)
-            }
-
-            syn::parse_quote! {
-                where #predicates
-            }
-        }
-    };
-
-    let param_names = ast
-        .generics
-        .type_params()
-        .map(|p| &p.ident)
-        .collect::<Vec<_>>();
-    let n_generics = param_names.len();
-    let param_names = param_names.iter();
-    let nth_generic = 0..n_generics;
-
-    let construct_type_impl = quote! {
-        unsafe impl #generics ::jlrs::convert::construct_type::ConstructType for #name #generics #wc {
-            fn base_type<'target, TARGET>(target: &TARGET) -> ::jlrs::data::managed::value::Value<'target, 'static>
-            where
-                TARGET: ::jlrs::memory::target::Target<'target>,
-            {
-                unsafe {
-                        #func
-                        #(
-                            .submodule(target, #modules_it)
-                            .expect(&format!("Submodule {} cannot be found", #modules_it_b))
-                            .as_managed()
-                        )*
-                        .global(target, #ty)
-                        .expect(&format!("Type {} cannot be found in module", #ty))
-                        .as_value()
-                }
-            }
-
-            fn construct_type<'target, 'current, 'borrow, TARGET>(
-                target: ::jlrs::memory::target::ExtendedTarget<'target, '_, '_, TARGET>,
-            ) -> ::jlrs::data::managed::datatype::DataTypeData<'target, TARGET>
-            where
-                TARGET: ::jlrs::memory::target::Target<'target>,
-            {
-                let (target, frame) = target.split();
-
-                frame.scope(|mut frame| {
-                    let base_type = Self::base_type(&frame);
-                    if let Ok(ty) = base_type.cast::<::jlrs::data::managed::datatype::DataType>() {
-                        Ok(ty.root(target))
-                    } else if let Ok(ua) = base_type.cast::<::jlrs::data::managed::union_all::UnionAll>() {
-                        let mut types: [Option<::jlrs::data::managed::value::Value>; #n_generics] = [None; #n_generics];
-                        #(
-                            types[#nth_generic] = Some(<#param_names as ::jlrs::convert::construct_type::ConstructType>::construct_type(frame.as_extended_target()).as_value());
-                        )*
-                        unsafe {
-                            let types = std::mem::transmute::<&[Option<::jlrs::data::managed::value::Value>; #n_generics], &[::jlrs::data::managed::value::Value; #n_generics]>(&types);
-                            let applied = ua
-                                .apply_types_unchecked(&target, types)
-                                .as_value()
-                                .cast::<::jlrs::data::managed::datatype::DataType>()
-                                .expect("UnionAll is not a DataType after applying generic types")
-                                .root(target);
-
-                            Ok(applied)
-                        }
-                    } else {
-                        panic!("Type is neither a DataType or UnionAll")
-                    }
-                }).unwrap()
-            }
-        }
-    };
-
-    construct_type_impl.into()
-}
-*/
-
 pub fn impl_valid_layout(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
     if !is_repr_c(ast) {
@@ -621,7 +495,7 @@ pub fn impl_valid_layout(ast: &syn::DeriveInput) -> TokenStream {
         Some(wc) => {
             let mut wc = wc.clone();
             for generic in generics.type_params() {
-                let clause: WherePredicate = syn::parse_quote! {
+                let clause: syn::WherePredicate = syn::parse_quote! {
                     #generic: ::jlrs::data::layout::valid_layout::ValidField
                 };
                 wc.predicates.push(clause)
@@ -631,7 +505,7 @@ pub fn impl_valid_layout(ast: &syn::DeriveInput) -> TokenStream {
         None => {
             let mut predicates = Punctuated::<_, Comma>::new();
             for generic in generics.type_params() {
-                let clause: WherePredicate = syn::parse_quote! {
+                let clause: syn::WherePredicate = syn::parse_quote! {
                     #generic: ::jlrs::data::layout::valid_layout::ValidField
                 };
                 predicates.push(clause)
@@ -721,7 +595,7 @@ pub fn impl_valid_field(ast: &syn::DeriveInput) -> TokenStream {
         Some(wc) => {
             let mut wc = wc.clone();
             for generic in generics.type_params() {
-                let clause: WherePredicate = syn::parse_quote! {
+                let clause: syn::WherePredicate = syn::parse_quote! {
                     #generic: ::jlrs::data::layout::valid_layout::ValidField
                 };
                 wc.predicates.push(clause)
@@ -731,7 +605,7 @@ pub fn impl_valid_field(ast: &syn::DeriveInput) -> TokenStream {
         None => {
             let mut predicates = Punctuated::<_, Comma>::new();
             for generic in generics.type_params() {
-                let clause: WherePredicate = syn::parse_quote! {
+                let clause: syn::WherePredicate = syn::parse_quote! {
                     #generic: ::jlrs::data::layout::valid_layout::ValidField
                 };
                 predicates.push(clause)
@@ -765,7 +639,7 @@ pub fn impl_ccall_arg(ast: &syn::DeriveInput) -> TokenStream {
         Some(wc) => {
             let mut wc = wc.clone();
             for generic in generics.type_params() {
-                let clause: WherePredicate = syn::parse_quote! {
+                let clause: syn::WherePredicate = syn::parse_quote! {
                     #generic: ::jlrs::data::types::construct_type::ConstructType
                 };
                 wc.predicates.push(clause)
@@ -775,7 +649,7 @@ pub fn impl_ccall_arg(ast: &syn::DeriveInput) -> TokenStream {
         None => {
             let mut predicates = Punctuated::<_, Comma>::new();
             for generic in generics.type_params() {
-                let clause: WherePredicate = syn::parse_quote! {
+                let clause: syn::WherePredicate = syn::parse_quote! {
                     #generic: ::jlrs::data::types::construct_type::ConstructType
                 };
                 predicates.push(clause)
@@ -808,7 +682,7 @@ pub fn impl_ccall_return(ast: &syn::DeriveInput) -> TokenStream {
         Some(wc) => {
             let mut wc = wc.clone();
             for generic in generics.type_params() {
-                let clause: WherePredicate = syn::parse_quote! {
+                let clause: syn::WherePredicate = syn::parse_quote! {
                     #generic: ::jlrs::data::types::construct_type::ConstructType
                 };
                 wc.predicates.push(clause)
@@ -818,7 +692,7 @@ pub fn impl_ccall_return(ast: &syn::DeriveInput) -> TokenStream {
         None => {
             let mut predicates = Punctuated::<_, Comma>::new();
             for generic in generics.type_params() {
-                let clause: WherePredicate = syn::parse_quote! {
+                let clause: syn::WherePredicate = syn::parse_quote! {
                     #generic: ::jlrs::data::types::construct_type::ConstructType
                 };
                 predicates.push(clause)

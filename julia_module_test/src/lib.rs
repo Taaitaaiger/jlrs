@@ -243,4 +243,35 @@ julia_module! {
     static CONST_U8: u8 as STATIC_CONST_U8;
     const STATIC_U8: u8 as CONST_STATIC_U8;
     static STATIC_U8: u8;
+
+    /*
+
+    struct Foo<T, U> {
+        a: T,
+        b: U
+    }
+
+    impl<T, U> Foo<T, U> {
+        
+    }
+
+    
+
+
+    unsafe impl<T, U> ParametricOpaqueType for Foo<T, U> 
+    where 
+        T: ConstructType, 
+        U: ConstructType,
+    {
+        type Bounds = (
+            TypeVarConstructor<Name<'T'>>,
+            TypeVarConstructor<Name<'U'>>,
+        )
+    }
+
+    for T in [f32, f64] {
+        struct FFTPlanner<T>;
+    }
+    
+     */
 }

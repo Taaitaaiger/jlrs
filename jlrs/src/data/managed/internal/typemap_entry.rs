@@ -13,10 +13,12 @@ use jl_sys::{jl_typemap_entry_t, jl_typemap_entry_type};
 use jlrs_macros::julia_version;
 
 use crate::{
-    data::managed::{
-        private::ManagedPriv,
-        value::{Value, ValueData, ValueRef},
-        Ref,
+    data::{
+        managed::{
+            private::ManagedPriv,
+            value::{Value, ValueData, ValueRef},
+            Ref,
+        },
     },
     impl_julia_typecheck,
     memory::target::Target,
@@ -167,7 +169,7 @@ impl<'scope> ManagedPriv<'scope, '_> for TypeMapEntry<'scope> {
     }
 }
 
-impl_construct_type_managed!(TypeMapEntry<'_>, jl_typemap_entry_type);
+impl_construct_type_managed!(TypeMapEntry, 1, jl_typemap_entry_type);
 
 /// A reference to a [`TypeMapEntry`] that has not been explicitly rooted.
 pub type TypeMapEntryRef<'scope> = Ref<'scope, 'static, TypeMapEntry<'scope>>;

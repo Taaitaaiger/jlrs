@@ -230,6 +230,8 @@ impl<'scope, 'data, U: ConstructType> ManagedPriv<'scope, 'data> for RustResult<
 }
 
 unsafe impl<'scope, 'data, U: ConstructType> ConstructType for RustResult<'scope, 'data, U> {
+    type Static = RustResult<'static, 'static, U::Static>;
+
     fn construct_type<'target, 'current, 'borrow, T>(
         target: ExtendedTarget<'target, '_, '_, T>,
     ) -> ValueData<'target, 'static, T>

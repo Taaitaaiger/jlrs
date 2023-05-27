@@ -10,7 +10,7 @@ use std::{marker::PhantomData, ptr::NonNull, sync::atomic::Ordering};
 use jl_sys::{jl_binding_t, jl_binding_type};
 
 use crate::{
-    data::managed::{private::ManagedPriv, value::ValueData, Ref},
+    data::{managed::{private::ManagedPriv, value::ValueData, Ref}},
     impl_julia_typecheck,
     memory::target::Target,
     private::Private,
@@ -119,7 +119,7 @@ impl<'scope> ManagedPriv<'scope, '_> for Binding<'scope> {
     }
 }
 
-impl_construct_type_managed!(Binding<'_>, jl_binding_type);
+impl_construct_type_managed!(Binding, 1, jl_binding_type);
 
 /// A reference to a [`Binding`] that has not been explicitly rooted.
 pub type BindingRef<'scope> = Ref<'scope, 'static, Binding<'scope>>;

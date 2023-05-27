@@ -4,10 +4,10 @@ use jl_sys::jl_nothing_type;
 
 use crate::{
     convert::{ccall_types::CCallReturn, into_julia::IntoJulia, unbox::Unbox},
-    data::managed::{
+    data::{managed::{
         datatype::{DataType, DataTypeData},
         Managed,
-    },
+    }},
     impl_julia_typecheck, impl_valid_layout,
     memory::target::Target,
 };

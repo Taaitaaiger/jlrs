@@ -13,11 +13,11 @@ use jl_sys::{jl_typemap_level_t, jl_typemap_level_type};
 use jlrs_macros::julia_version;
 
 use crate::{
-    data::managed::{
+    data::{managed::{
         private::ManagedPriv,
         value::{ValueData, ValueRef},
         Ref,
-    },
+    }},
     impl_julia_typecheck,
     memory::target::Target,
     private::Private,
@@ -253,7 +253,7 @@ impl<'scope> ManagedPriv<'scope, '_> for TypeMapLevel<'scope> {
     }
 }
 
-impl_construct_type_managed!(TypeMapLevel<'_>, jl_typemap_level_type);
+impl_construct_type_managed!(TypeMapLevel, 1, jl_typemap_level_type);
 
 /// A reference to a [`TypeMapLevel`] that has not been explicitly rooted.
 pub type TypeMapLevelRef<'scope> = Ref<'scope, 'static, TypeMapLevel<'scope>>;

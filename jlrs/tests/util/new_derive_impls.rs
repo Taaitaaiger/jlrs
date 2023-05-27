@@ -1,4 +1,13 @@
-use jlrs::prelude::*;
+use jlrs::{
+    data::{
+        layout::typed_data::{
+            AssociatedLayout, AssociatedTypeConstructor, AssociateType, TypedLayout, TypedLayoutFor,
+        },
+        managed::value::typed::TypedValue,
+        types::{construct_type::{ConstantBool, ConstructType}},
+    },
+    prelude::*,
+};
 
 #[derive(ConstructType)]
 #[jlrs(julia_type = "Main.AnAbstractType")]
@@ -857,4 +866,43 @@ pub struct WithValueType {
 #[jlrs(julia_type = "Main.WithValueType")]
 pub struct WithValueTypeTypeConstructor<N> {
     _n: ::std::marker::PhantomData<N>,
+}
+
+#[repr(C)]
+#[derive(Clone, Debug, Unbox, ValidLayout, Typecheck, ValidField)]
+#[jlrs(julia_type = "Main.HasElidedParam")]
+pub struct HasElidedParam<T> {
+    pub a: T,
+}
+
+#[derive(ConstructType)]
+#[jlrs(julia_type = "Main.HasElidedParam")]
+pub struct HasElidedParamTypeConstructor<T, U> {
+    _t: ::std::marker::PhantomData<T>,
+    _u: ::std::marker::PhantomData<U>,
+}
+
+unsafe impl<T, U> AssociatedLayout for HasElidedParamTypeConstructor<T, U>
+where
+    T: jlrs::data::layout::valid_layout::ValidField,
+    U: ConstructType, 
+{
+    type Layout = HasElidedParam<T>;
+}
+
+impl<T, U> AssociatedTypeConstructor<HasElidedParamTypeConstructor<T, U>> for HasElidedParam<T>
+where
+    T: jlrs::data::layout::valid_layout::ValidField,
+    U: ConstructType,
+    HasElidedParamTypeConstructor<T, U>: ConstructType
+{
+}
+
+fn foo() {
+    let a = HasElidedParam { a: 3.0 };
+    type ElidedParam<T, const U: bool> = HasElidedParamTypeConstructor<T, ConstantBool<U>>;
+    let tl = TypedLayoutFor::<ElidedParam<f64, true>>::from_layout(a);
+    let tid = std::any::TypeId::of::<<ElidedParam<f64, true> as ConstructType>::Static>();
+
+
 }

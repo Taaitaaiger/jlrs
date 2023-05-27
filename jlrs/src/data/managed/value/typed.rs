@@ -267,10 +267,12 @@ where
     }
 }
 
-unsafe impl<U> ConstructType for TypedValue<'_, 'static, U>
+unsafe impl<U> ConstructType for TypedValue<'_, '_, U>
 where
     U: ConstructType,
 {
+    type Static = U::Static;
+
     fn construct_type<'target, T>(
         target: ExtendedTarget<'target, '_, '_, T>,
     ) -> ValueData<'target, 'static, T>

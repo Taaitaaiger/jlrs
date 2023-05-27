@@ -14,7 +14,7 @@ use jl_sys::{jl_pchar_to_string, jl_string_type};
 use super::Ref;
 use crate::{
     convert::unbox::Unbox,
-    data::managed::{private::ManagedPriv, value::Value},
+    data::{managed::{private::ManagedPriv, value::Value}},
     error::{JlrsError, JlrsResult},
     impl_julia_typecheck,
     memory::target::Target,
@@ -96,7 +96,7 @@ impl<'scope> JuliaString<'scope> {
     }
 }
 
-impl_construct_type_managed!(JuliaString<'_>, jl_string_type);
+impl_construct_type_managed!(JuliaString, 1, jl_string_type);
 
 impl_julia_typecheck!(JuliaString<'scope>, jl_string_type, 'scope);
 

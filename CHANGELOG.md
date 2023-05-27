@@ -1,5 +1,9 @@
 #### v0.18
 
+- A `StaticType` trait has been added which is compatible with most types that implement `ConstructType`. It erases the lifetimes present in the constructible type and exposes this new type as the associated `Static` type. Because this type must be `'static` it has a type id.
+
+#### v0.18
+
  - jlrs is compatible with Julia 1.7 again, but this version isn't actively tested or supported. Version features have been added to select a particular version of Julia, picking a specific version is required.
 
  - The `wrappers` module has been renamed to `data`. Pointer wrappers are now called managed data, and inline wrappers are layouts. Traits and methods dealing with wrappers have been renamed accordingly.

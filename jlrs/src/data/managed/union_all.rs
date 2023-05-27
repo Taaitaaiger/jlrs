@@ -18,7 +18,7 @@ use super::{
     Managed, Ref,
 };
 use crate::{
-    data::managed::{datatype::DataType, private::ManagedPriv, type_var::TypeVar, value::Value},
+    data::{managed::{datatype::DataType, private::ManagedPriv, type_var::TypeVar, value::Value}},
     impl_julia_typecheck,
     memory::target::{ExtendedTarget, Target},
     private::Private,
@@ -317,7 +317,7 @@ impl<'scope> ManagedPriv<'scope, '_> for UnionAll<'scope> {
     }
 }
 
-impl_construct_type_managed!(UnionAll<'_>, jl_unionall_type);
+impl_construct_type_managed!(UnionAll, 1, jl_unionall_type);
 
 /// A reference to a [`UnionAll`] that has not been explicitly rooted.
 pub type UnionAllRef<'scope> = Ref<'scope, 'static, UnionAll<'scope>>;

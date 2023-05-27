@@ -5,11 +5,11 @@ use std::{marker::PhantomData, ptr::NonNull};
 use jl_sys::{jl_weakref_t, jl_weakref_type};
 
 use crate::{
-    data::managed::{
+    data::{managed::{
         private::ManagedPriv,
         value::{ValueData, ValueRef},
         Ref,
-    },
+    }},
     impl_julia_typecheck,
     memory::target::Target,
     private::Private,
@@ -60,7 +60,7 @@ impl<'scope> ManagedPriv<'scope, '_> for WeakRef<'scope> {
     }
 }
 
-impl_construct_type_managed!(WeakRef<'_>, jl_weakref_type);
+impl_construct_type_managed!(WeakRef, 1, jl_weakref_type);
 
 /// A reference to a [`WeakRef`] that has not been explicitly rooted.
 pub type WeakRefRef<'scope> = Ref<'scope, 'static, WeakRef<'scope>>;

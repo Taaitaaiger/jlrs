@@ -264,6 +264,8 @@ macro_rules! impl_tuple {
         where
             $($types: $crate::data::types::construct_type::ConstructType),+
         {
+            type Static = $name<$($types :: Static),*>;
+
             fn construct_type<'target, Tgt>(
                 target: $crate::memory::target::ExtendedTarget<'target, '_, '_, Tgt>,
             ) -> $crate::data::managed::value::ValueData<'target, 'static, Tgt>
@@ -363,6 +365,8 @@ macro_rules! impl_tuple {
         }
 
         unsafe impl $crate::data::types::construct_type::ConstructType for $name {
+            type Static = $name;
+
             fn construct_type<'target, Tgt>(
                 target: $crate::memory::target::ExtendedTarget<'target, '_, '_, Tgt>,
             ) -> $crate::data::managed::value::ValueData<'target, 'static, Tgt>

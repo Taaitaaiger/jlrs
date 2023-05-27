@@ -12,13 +12,13 @@ use jl_sys::{jl_method_instance_t, jl_method_instance_type};
 use jlrs_macros::julia_version;
 
 use crate::{
-    data::managed::{
+    data::{managed::{
         internal::code_instance::CodeInstanceRef,
         private::ManagedPriv,
         simple_vector::{SimpleVectorData, SimpleVectorRef},
         value::{ValueData, ValueRef},
         Ref,
-    },
+    }},
     impl_julia_typecheck,
     memory::target::Target,
     private::Private,
@@ -221,7 +221,7 @@ impl<'scope> ManagedPriv<'scope, '_> for MethodInstance<'scope> {
     }
 }
 
-impl_construct_type_managed!(MethodInstance<'_>, jl_method_instance_type);
+impl_construct_type_managed!(MethodInstance, 1, jl_method_instance_type);
 
 /// A reference to a [`MethodInstance`] that has not been explicitly rooted.
 pub type MethodInstanceRef<'scope> = Ref<'scope, 'static, MethodInstance<'scope>>;

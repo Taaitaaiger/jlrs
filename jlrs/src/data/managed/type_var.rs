@@ -7,13 +7,13 @@ use jl_sys::{jl_new_typevar, jl_tvar_t, jl_tvar_type};
 use super::{value::ValueData, Ref};
 use crate::{
     convert::to_symbol::ToSymbol,
-    data::managed::{
+    data::{managed::{
         datatype::DataType,
         private::ManagedPriv,
         symbol::Symbol,
         value::{Value, ValueRef},
         Managed,
-    },
+    }},
     impl_julia_typecheck,
     memory::target::Target,
     private::Private,
@@ -153,7 +153,7 @@ impl<'scope> ManagedPriv<'scope, '_> for TypeVar<'scope> {
     }
 }
 
-impl_construct_type_managed!(TypeVar<'_>, jl_tvar_type);
+impl_construct_type_managed!(TypeVar, 1, jl_tvar_type);
 
 /// A reference to a [`TypeVar`] that has not been explicitly rooted.
 pub type TypeVarRef<'scope> = Ref<'scope, 'static, TypeVar<'scope>>;

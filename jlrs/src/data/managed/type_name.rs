@@ -20,9 +20,9 @@ use jlrs_macros::julia_version;
 
 use super::Ref;
 use crate::{
-    data::managed::{
+    data::{managed::{
         module::Module, private::ManagedPriv, simple_vector::SimpleVector, symbol::Symbol,
-    },
+    }},
     impl_julia_typecheck,
     memory::target::Target,
     private::Private,
@@ -380,7 +380,7 @@ impl<'scope> ManagedPriv<'scope, '_> for TypeName<'scope> {
     }
 }
 
-impl_construct_type_managed!(TypeName<'_>, jl_typename_type);
+impl_construct_type_managed!(TypeName, 1, jl_typename_type);
 
 /// A reference to a [`TypeName`] that has not been explicitly rooted.
 pub type TypeNameRef<'scope> = Ref<'scope, 'static, TypeName<'scope>>;

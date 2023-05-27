@@ -1535,8 +1535,6 @@ impl<'scope, 'data> ManagedPriv<'scope, 'data> for Value<'scope, 'data> {
     }
 }
 
-impl_construct_type_managed!(Option<ValueRef<'_, '_>>, jl_any_type);
-
 /// A reference to a [`Value`] that has not been explicitly rooted.
 pub type ValueRef<'scope, 'data> = Ref<'scope, 'data, Value<'scope, 'data>>;
 
@@ -1591,4 +1589,4 @@ pub type ValueResult<'target, 'data, T> =
 
 impl_ccall_arg_managed!(Value, 2);
 
-impl_construct_type_managed!(Value<'_, '_>, jl_any_type);
+impl_construct_type_managed!(Value, 2, jl_any_type);

@@ -18,7 +18,7 @@ use crate::{
             value::{Value, ValueResult},
             Managed as _, Ref,
         },
-        types::typecheck::Typecheck,
+        types::{typecheck::Typecheck},
     },
     memory::target::{unrooted::Unrooted, Target},
     private::Private,
@@ -191,13 +191,13 @@ pub type OpaqueClosureResult<'target, T> =
     <T as TargetType<'target>>::Result<'static, OpaqueClosure<'target>>;
 
 unsafe impl<'scope> crate::convert::ccall_types::CCallArg for OpaqueClosure<'scope> {
-    type CCallArgType = Option<crate::data::managed::value::ValueRef<'scope, 'static>>;
-    type FunctionArgType = Option<crate::data::managed::value::ValueRef<'scope, 'static>>;
+    type CCallArgType = Value<'scope, 'static>;
+    type FunctionArgType = Value<'scope, 'static>;
 }
 
 unsafe impl crate::convert::ccall_types::CCallReturn
     for crate::data::managed::Ref<'static, 'static, OpaqueClosure<'static>>
 {
-    type CCallReturnType = Option<crate::data::managed::value::ValueRef<'static, 'static>>;
-    type FunctionReturnType = Option<crate::data::managed::value::ValueRef<'static, 'static>>;
+    type CCallReturnType = Value<'static, 'static>;
+    type FunctionReturnType = Value<'static, 'static>;
 }

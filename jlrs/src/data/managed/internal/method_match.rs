@@ -9,7 +9,7 @@ use std::{marker::PhantomData, ptr::NonNull};
 use jl_sys::{jl_method_match_t, jl_method_match_type};
 
 use crate::{
-    data::managed::{private::ManagedPriv, simple_vector::SimpleVector, value::Value, Ref},
+    data::{managed::{private::ManagedPriv, simple_vector::SimpleVector, value::Value, Ref}},
     impl_julia_typecheck,
     private::Private,
 };
@@ -86,7 +86,7 @@ impl<'scope> ManagedPriv<'scope, '_> for MethodMatch<'scope> {
     }
 }
 
-impl_construct_type_managed!(MethodMatch<'_>, jl_method_match_type);
+impl_construct_type_managed!(MethodMatch, 1, jl_method_match_type);
 
 /// A reference to a [`MethodMatch`] that has not been explicitly rooted.
 pub type MethodMatchRef<'scope> = Ref<'scope, 'static, MethodMatch<'scope>>;
