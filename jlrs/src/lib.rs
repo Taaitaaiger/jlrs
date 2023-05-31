@@ -864,13 +864,15 @@ impl InstallJlrsCore {
             InstallJlrsCore::Default => {
                 Value::eval_string(
                     unrooted,
-                    "if !isdefined(Main, :JlrsCore)
+                    "if !haskey(Base.loaded_modules, Base.PkgId(Base.UUID("29be08bc-e5fd-4da2-bbc1-72011c6ea2c9"), "JlrsCore"))
                          try
                              using JlrsCore
                          catch e
                              import Pkg; Pkg.add(\"JlrsCore\")
                              using JlrsCore
                          end
+                     else
+                         JlrsCore = Base.loaded_modules[Base.PkgId(Base.UUID("29be08bc-e5fd-4da2-bbc1-72011c6ea2c9"), "JlrsCore")]
                      end",
                 )
             },
@@ -878,13 +880,15 @@ impl InstallJlrsCore {
                 Value::eval_string(
                     unrooted,
                     format!(
-                        "if !isdefined(Main, :JlrsCore)
+                        "if !haskey(Base.loaded_modules, Base.PkgId(Base.UUID("29be08bc-e5fd-4da2-bbc1-72011c6ea2c9"), "JlrsCore"))
                              try
                                  using JlrsCore
                              catch e
                                  import Pkg; Pkg.add(url=\"{repo}#{revision}\")
                                  using JlrsCore
                              end
+                         else
+                             JlrsCore = Base.loaded_modules[Base.PkgId(Base.UUID("29be08bc-e5fd-4da2-bbc1-72011c6ea2c9"), "JlrsCore")]
                          end"
                     ),
                 )
@@ -893,13 +897,15 @@ impl InstallJlrsCore {
                 Value::eval_string(
                     unrooted,
                     format!(
-                        "if !isdefined(Main, :JlrsCore)
+                        "if !haskey(Base.loaded_modules, Base.PkgId(Base.UUID("29be08bc-e5fd-4da2-bbc1-72011c6ea2c9"), "JlrsCore"))
                              try
                                  using JlrsCore
                              catch e
                                  import Pkg; Pkg.add(name=\"JlrsCore\", version=\"{major}.{minor}.{patch}\")
                                  using JlrsCore
                              end
+                         else
+                             JlrsCore = Base.loaded_modules[Base.PkgId(Base.UUID("29be08bc-e5fd-4da2-bbc1-72011c6ea2c9"), "JlrsCore")]
                          end"
                     ),
                 )
@@ -907,8 +913,10 @@ impl InstallJlrsCore {
             InstallJlrsCore::No => {
                 Value::eval_string(
                     unrooted,
-                    "if !isdefined(Main, :JlrsCore)
+                    "if !haskey(Base.loaded_modules, Base.PkgId(Base.UUID("29be08bc-e5fd-4da2-bbc1-72011c6ea2c9"), "JlrsCore"))
                          using JlrsCore
+                     else
+                         JlrsCore = Base.loaded_modules[Base.PkgId(Base.UUID("29be08bc-e5fd-4da2-bbc1-72011c6ea2c9"), "JlrsCore")]
                      end",
                 )
             },
